@@ -14,7 +14,9 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/AI_DEBUG.C */
+
+void ai_debug_initialize_for_new_map(void);
 
 /* ---------- globals */
 

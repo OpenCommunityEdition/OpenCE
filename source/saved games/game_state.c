@@ -94,7 +94,34 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "cseries_windows.h"
+#include "real_math.h"
+#include "console.h"
+#include "game_state.h"
+#include "game.h"
+#include "tag_files.h"
+#include "cache_files.h"
+#include "scenario.h"
+#include "main.h"
+#include "game_sound.h"
+#include "sound_manager.h"
+#include "observer.h"
+#include "players.h"
+#include "rasterizer.h"
+#include "recorded_animations.h"
+#include "ai_debug.h"
+#include "structures.h"
+#include "director.h"
+#include "hud_messaging.h"
+#include "crc.h"
+
 /* ---------- constants */
+
+enum
+{
+	GAME_STATE_CPU_SIZE= 0x305000
+};
 
 /* ---------- macros */
 
@@ -102,8 +129,275 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void dummy(void);
+void code_001af6c0(void);
+
 /* ---------- globals */
 
+static FILE* bss_004d27b0;
+
+static struct
+{
+	void *base_address; // 0x0
+	long cpu_allocation_size; // 0x4
+	long gpu_allocation_size; // 0x8
+	long allocation_size_checksum; // 0xC
+	boolean locked; // 0x10
+	boolean saved_game_valid; // 0x11
+	long revert_time; // 0x14
+	struct game_state_header *header; // 0x18
+} game_state_globals;
+
+typedef void (*game_state_before_load_proc)();
+typedef void (*game_state_after_load_proc)();
+typedef void (*game_state_before_save_proc)();
+
+static game_state_before_save_proc before_save_procs[]=
+{
+	dummy,
+};
+
+static game_state_before_load_proc before_load_procs[]=
+{
+	game_sound_clear,
+};
+
+static game_state_after_load_proc after_load_procs[]=
+{
+	scenario_reload_structure_bsp_if_necessary,
+	sound_stop_all,
+	game_sound_restore,
+	observer_initialize_for_new_map,
+	update_queues_reset_and_fill_with_lies,
+	rasterizer_decals_update_function_pointers,
+	recorded_animations_clear_debug_storage,
+	ai_debug_initialize_for_new_map,
+	structure_detail_objects_flush,
+	code_001af6c0,
+	player_control_fix_for_loaded_game_state,
+	director_initialize_for_saved_game,
+	scripted_hud_messages_clear
+};
+
 /* ---------- public code */
+
+void dummy(
+	void)
+{
+	return;
+}
+
+void game_state_call_before_save_procs(
+	void)
+{
+	game_state_after_load_proc *proc= before_save_procs;
+	long i;
+
+	for (i=NUMBEROF(before_save_procs); i>0; i--, proc++)
+	{
+		(*proc)();
+	}
+
+	return;
+}
+
+void game_state_call_before_load_procs(
+	void)
+{
+	game_state_after_load_proc *proc= before_load_procs;
+	long i;
+
+	for (i=NUMBEROF(before_load_procs); i>0; i--, proc++)
+	{
+		(*proc)();
+	}
+
+	return;
+}
+
+void game_state_call_after_load_procs(
+	void)
+{
+	game_state_after_load_proc *proc= after_load_procs;
+	long i;
+
+	for (i=NUMBEROF(after_load_procs); i>0; i--, proc++)
+	{
+		(*proc)();
+	}
+
+	return;
+}
+
+void game_state_dispose(
+	void)
+{
+	game_state_free_buffer();
+	game_state_close_file();
+
+	return;
+}
+
+void game_state_initialize_for_new_map(
+	void)
+{
+	const char *name;
+
+	game_state_globals.locked= TRUE;
+	game_state_globals.saved_game_valid= FALSE;
+	game_state_globals.revert_time= NONE;
+
+	memset(game_state_globals.header, 0, sizeof(*game_state_globals.header));
+
+	name= tag_get_name(global_scenario_index);
+	strcpy(game_state_globals.header->map_name, name);
+	strcpy(game_state_globals.header->build_number, "01.01.14.2342");
+
+	game_state_globals.header->player_count= player_spawn_count;
+	game_state_globals.header->difficulty= game_difficulty_level_get();
+	game_state_globals.header->cache_file_checksum= cache_files_get_checksum();
+	game_state_globals.header->allocation_size_checksum= game_state_globals.allocation_size_checksum;
+
+	return;
+}
+
+void game_state_dispose_from_old_map(
+	void)
+{
+	return;
+}
+
+void game_state_save(
+	void)
+{
+	game_state_call_before_save_procs();
+
+	main_stop_time();
+	game_state_globals.saved_game_valid= (game_state_write_to_file()!=FALSE);
+	main_start_time();
+
+	return;
+}
+
+void game_state_revert(
+	void)
+{
+	if (!game_state_globals.saved_game_valid && !recover_saved_games_hack)
+	{
+		main_reset_map();
+
+		return;
+	}
+
+	game_state_call_before_load_procs();
+	game_state_read_from_file();
+	game_state_call_after_load_procs();
+
+	return;
+}
+
+void game_state_save_to_persistent_storage(
+	void)
+{
+	if (player_spawn_count==1)
+	{
+		game_state_revert();
+		game_state_write_to_persistent_storage(
+			game_state_globals.base_address,
+			&game_state_globals.header->checksum,
+			sizeof(*game_state_globals.header),
+			0x345000);
+	}
+
+	return;
+}
+
+boolean game_state_test_persistent_storage(
+	char *map_name,
+	short *difficulty,
+	boolean *corrupted)
+{
+	struct game_state_header header;
+	boolean success;
+
+	if (game_state_read_header_from_persistent_storage(
+		&header,
+		&header.checksum,
+		sizeof(*game_state_globals.header),
+		0x345000,
+		corrupted))
+	{
+		*difficulty= header.difficulty;
+		strcpy(map_name, header.map_name);
+
+		success= TRUE;
+	}
+	else
+	{
+		*difficulty= _game_difficulty_level_normal;
+		strcpy(map_name, "");
+
+		success= FALSE;
+	}
+
+	return success;
+}
+
+void game_state_save_core(
+	const char *name)
+{
+	if (game_state_write_core(name, game_state_globals.base_address, 0x345000))
+	{
+		console_printf(FALSE, "saved '%s'", name);
+	}
+	else
+	{
+		console_printf(FALSE, "error writing '%s'", name);
+	}
+}
+
+boolean game_state_reverted(
+	void)
+{
+	return (game_state_globals.revert_time==game_time_get());
+}
+
+// _code_001af4f0
+// _code_001af650
+// _code_001af6c0
+
+void *game_state_malloc(
+	const char *name,
+	const char *type,
+	long size)
+{
+	byte *pointer;
+	FILE *file;
+
+	match_assert("c:\\halo\\SOURCE\\saved games\\game_state.c", 153, !(size&3));
+	match_assert("c:\\halo\\SOURCE\\saved games\\game_state.c", 156, !game_state_globals.locked);
+	match_assert("c:\\halo\\SOURCE\\saved games\\game_state.c", 159, game_state_globals.cpu_allocation_size+size<=GAME_STATE_CPU_SIZE);
+
+	file= bss_004d27b0;
+
+	if (!file)
+	{
+		file= fopen("d:\\gamestate.txt", "w");
+		bss_004d27b0= file;
+	}
+
+	if (file)
+	{
+		fprintf(file, "% 40s% 20s% 10d%s\n", name, type, size, "");
+		fflush(bss_004d27b0);
+	}
+
+	pointer= (byte *)game_state_globals.base_address+game_state_globals.cpu_allocation_size;
+	game_state_globals.cpu_allocation_size+= size;
+
+	crc_checksum_buffer((unsigned long *)&game_state_globals.allocation_size_checksum, &size, sizeof(size));
+
+	return pointer;
+}
 
 /* ---------- private code */

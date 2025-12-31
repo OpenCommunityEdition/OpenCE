@@ -14,7 +14,9 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/RECORDED_ANIMATIONS.C */
+
+void recorded_animations_clear_debug_storage(void);
 
 /* ---------- globals */
 

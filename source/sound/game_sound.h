@@ -14,7 +14,10 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/GAME_SOUND.C */
+
+void game_sound_clear(void);
+void game_sound_restore(void);
 
 /* ---------- globals */
 

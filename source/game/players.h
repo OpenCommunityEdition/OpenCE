@@ -14,7 +14,13 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/PLAYERS.C */
+
+void player_control_fix_for_loaded_game_state(void);
+
+/* ---------- prototypes/PLAYER_QUEUES_NEW.C */
+
+void update_queues_reset_and_fill_with_lies(void);
 
 /* ---------- globals */
 

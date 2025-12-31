@@ -62,6 +62,9 @@ void scenario_get_atmospheric_fog(short local_player_index, short sky_index, rea
 
 /* ---------- globals */
 
+extern long global_scenario_index;
+extern short global_structure_bsp_index;
+
 /* ---------- public code */
 
 #endif // __SCENARIO_H

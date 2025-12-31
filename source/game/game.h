@@ -19,6 +19,15 @@ enum
 	NUMBER_OF_GAME_CONNECTIONS,
 };
 
+enum
+{
+	_game_difficulty_level_easy= 0,
+	_game_difficulty_level_normal,
+	_game_difficulty_level_hard,
+	_game_difficulty_level_impossible,
+	NUMBER_OF_GAME_DIFFICULTY_LEVELS
+};
+
 /* ---------- macros */
 
 /* ---------- structures */

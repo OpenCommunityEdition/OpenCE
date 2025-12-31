@@ -17,7 +17,10 @@ header included in hcex build.
 /* ---------- prototypes/SOUND_MANAGER.C */
 
 void sound_dispose(void);
+
 void sound_initialize(void);
+
+void sound_stop_all(void);
 
 /* ---------- globals */
 

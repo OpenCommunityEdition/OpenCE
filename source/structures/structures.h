@@ -14,7 +14,11 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/STRUCTURES.C */
+
+/* ---------- prototypes/STRUCTURE_DETAIL_OBJECTS.C */
+
+void structure_detail_objects_flush(void);
 
 /* ---------- globals */
 

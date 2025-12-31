@@ -14,7 +14,9 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/OBSERVER.C */
+
+void observer_initialize_for_new_map(void);
 
 /* ---------- globals */
 

@@ -14,7 +14,9 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/DIRECTOR.C */
+
+void director_initialize_for_saved_game(void);
 
 /* ---------- globals */
 

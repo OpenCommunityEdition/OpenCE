@@ -57,9 +57,9 @@ symbols in this file:
 #include "cseries.h"
 #include "object_lists.h"
 
-#include "cseries/errors.h"
-#include "memory/data.h"
-#include "objects/reference_lists.h"
+#include "errors.h"
+#include "data.h"
+#include "reference_lists.h"
 
 /* ---------- constants */
 

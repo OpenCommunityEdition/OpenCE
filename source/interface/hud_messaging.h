@@ -14,7 +14,9 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/HUD_MESSAGING.C */
+
+void scripted_hud_messages_clear(void);
 
 /* ---------- globals */
 

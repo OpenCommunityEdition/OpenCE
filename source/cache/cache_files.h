@@ -14,7 +14,9 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/CACHE_FILES.C */
+
+unsigned long cache_files_get_checksum();
 
 /* ---------- globals */
 

@@ -19,6 +19,8 @@ header included in hcex build.
 boolean rasterizer_initialize(void);
 void rasterizer_dispose(void);
 
+void rasterizer_decals_update_function_pointers(void);
+
 /* ---------- globals */
 
 /* ---------- public code */
