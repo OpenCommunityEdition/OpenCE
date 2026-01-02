@@ -14,7 +14,9 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/AI_SCRIPT.C */
+
+void ai_scripting_erase_all(void);
 
 /* ---------- globals */
 

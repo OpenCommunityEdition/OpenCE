@@ -14,7 +14,9 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/AI_PROFILE.C */
+
+void ai_profile_change_render_spray(void);
 
 /* ---------- globals */
 
