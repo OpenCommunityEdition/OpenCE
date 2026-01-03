@@ -136,7 +136,8 @@ void xbox_dashboard_launch(
 
 /* ---------- private code */
 
-static void clean_up_for_image_launch(void)
+static void clean_up_for_image_launch(
+	void)
 {
 	error(_error_silent, "preparing for XLaunchNewImage()...");
 	saved_game_files_take_mutex();
