@@ -16,7 +16,13 @@ header included in hcex build.
 
 /* ---------- prototypes/CACHE_FILES.C */
 
-unsigned long cache_files_get_checksum();
+unsigned long cache_files_get_checksum(void);
+
+/* ---------- prototypes/CACHE_FILES_WINDOWS.C */
+
+boolean cache_files_precache_in_progress(void);
+
+void cache_files_precache_map_end(void);
 
 /* ---------- globals */
 

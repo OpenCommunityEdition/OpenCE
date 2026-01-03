@@ -8,6 +8,11 @@ header included in hcex build.
 #define __UI_WIDGET_H
 #pragma once
 
+/* ---------- headers */
+
+#include "integer_math.h"
+#include "real_math.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -73,6 +78,8 @@ void display_scenario_help(short string_index);
 void process_ui_widgets(void);
 
 /* ---------- globals */
+
+extern short dashboard_abort_error;
 
 /* ---------- public code */
 

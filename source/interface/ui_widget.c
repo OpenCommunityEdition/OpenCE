@@ -625,6 +625,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "ui_widget.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -634,6 +637,8 @@ symbols in this file:
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+short dashboard_abort_error= NONE;
 
 /* ---------- public code */
 
