@@ -140,7 +140,7 @@ boolean game_time_initialized(
 void game_time_initialize(
 	void)
 {
-	game_time_globals= (game_time_globals_struct *)game_state_malloc("game time globals", NULL, sizeof(*game_time_globals));
+	game_time_globals= (struct game_time_globals_struct *)game_state_malloc("game time globals", NULL, sizeof(*game_time_globals));
 	memset(game_time_globals, 0, sizeof(*game_time_globals));
 
 	return;
