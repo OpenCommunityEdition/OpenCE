@@ -6,8 +6,6 @@ on:
 
 jobs:
   build:
-    # Just the dtk ci without versions (for now)
-
     # This is a *private* build container.
     # See docs/github_actions.md for more information.
     container: ghcr.io/punpckhdq/halo-build:main
@@ -15,6 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      matrix:
+        # Add game versions here
+        version: 2342
 
     steps:
     # Checkout the repository
@@ -46,8 +47,8 @@ jobs:
           build
           .ninja_deps
           .ninja_log
-        key: ${{ runner.os }}-${{ github.sha }}
-        restore-keys: ${{ runner.os }}-
+        key: ${{ runner.os }}-${{ matrix.version }}-${{ github.sha }}
+        restore-keys: ${{ runner.os }}-${{ matrix.version }}-
 
     # Build the project
     - name: Build
@@ -59,5 +60,5 @@ jobs:
     - name: Upload report
       uses: actions/upload-artifact@v4
       with:
-        name: report
+        name: ${{ matrix.version }}_report
         path: build/report.json
