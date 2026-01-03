@@ -146,7 +146,7 @@ void object_list_add(
 	long object_index)
 {
 	struct object_list_header_datum *list= object_list_header_get(object_list_index);
-	reference_list_add(object_list_header_data, &list->first_reference_index, object_index);
+	reference_list_add(object_list_data, &list->first_reference_index, object_index);
 	list->count++;
 
 	return;
