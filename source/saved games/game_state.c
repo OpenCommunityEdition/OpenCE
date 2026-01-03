@@ -130,7 +130,7 @@ enum
 /* ---------- prototypes */
 
 void dummy(void);
-void code_001af6c0(void);
+static void game_state_set_revert_time(void);
 
 /* ---------- globals */
 
@@ -173,7 +173,7 @@ static game_state_after_load_proc after_load_procs[]=
 	recorded_animations_clear_debug_storage,
 	ai_debug_initialize_for_new_map,
 	structure_detail_objects_flush,
-	code_001af6c0,
+	game_state_set_revert_time,
 	player_control_fix_for_loaded_game_state,
 	director_initialize_for_saved_game,
 	scripted_hud_messages_clear
@@ -364,7 +364,15 @@ boolean game_state_reverted(
 
 // _code_001af4f0
 // _code_001af650
-// _code_001af6c0
+
+static void game_state_set_revert_time(
+	void)
+{
+	game_state_globals.revert_time= game_time_get();
+	game_time_set_paused(FALSE);
+
+	return;
+}
 
 void *game_state_malloc(
 	const char *name,
