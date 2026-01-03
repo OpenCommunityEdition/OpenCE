@@ -113,6 +113,8 @@ class SolutionConfig:
         self.csplit_path: Optional[Path] = None  # If None, download
         self.objdiff_tag: Optional[str] = None  # Git tag
         self.objdiff_path: Optional[Path] = None  # If None, download
+        self.wibo_tag: Optional[str] = None # Git tag
+        self.wrapper: Optional[Path] = None  # If None, download wibo on Linux
         
         # Project config
         self.baserom: Optional[Path] = None
@@ -147,6 +149,26 @@ class SolutionConfig:
                 sys.exit(f"SolutionConfig.{attr} missing")
         for proj in self.projects:
             proj.validate()
+
+    # Gets the wrapper to use for compiler commands, if set.
+    def compiler_wrapper(self) -> Optional[Path]:
+        wrapper = self.wrapper
+
+        if self.use_wibo():
+            wrapper = self.build_dir / "tools" / "wibo"
+        if not is_windows() and wrapper is None:
+            wrapper = Path("wine")
+
+        return wrapper
+
+    # Determines whether or not to use wibo as the compiler wrapper.
+    def use_wibo(self) -> bool:
+        return (
+            self.wibo_tag is not None
+            and (sys.platform == "linux" or sys.platform == "darwin")
+            and platform.machine() in ("i386", "x86_64", "aarch64", "arm64")
+            and self.wrapper is None
+        )
 
 def is_windows() -> bool:
     return os.name == "nt"
@@ -226,6 +248,24 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
     else:
         sys.exit("SolutionConfig.csplit_tag missing")
 
+    wrapper = sln.compiler_wrapper()
+    if wrapper is not None and sln.use_wibo():
+        n.build(
+            outputs=wrapper,
+            rule="download_tool",
+            implicit=download_tool,
+            variables={
+                "tool": "wibo",
+                "tag": sln.wibo_tag,
+            },
+        )
+
+    wrapper_implicit: Optional[Path] = None
+    if wrapper is not None and (wrapper.exists() or sln.use_wibo()):
+        wrapper_implicit = wrapper
+
+    wrapper_cmd = f"{wrapper} " if wrapper else ""
+
     n.newline()
 
     ###
@@ -244,7 +284,7 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
     ###
     n.rule(
         name="cl",
-        command="xbox/bin/vc7/CL.Exe /nologo /c $cflags /Fo$out $in",
+        command=f"{wrapper_cmd}xbox/bin/vc7/CL.Exe /nologo /c $cflags /Fo$out $in",
         description="CL $out",
     )
     n.newline()
@@ -274,6 +314,7 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
                     rule="cl",
                     variables={"cflags": cflags},
                     inputs=obj.file_path,
+                    implicit=wrapper_implicit
                 )
         base_object_targets.extend(proj_base_object_targets)
         n.build(
