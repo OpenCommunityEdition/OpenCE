@@ -9,13 +9,6 @@ INTEGER_MATH.C
 
 /* ---------- constants */
 
-enum
-{
-	_adjust_rectangle_center = 0,
-	_adjust_rectangle_alert,
-	NUMBER_OF_ADJUST_RECTANGLE_MODES,
-};
-
 /* ---------- macros */
 
 /* ---------- structures */
@@ -34,7 +27,12 @@ point2d *global_integer_origin2d= &integer_origin2d;
 
 /* ---------- public code */
 
-rectangle2d *set_rectangle2d(rectangle2d *rectangle, short x0, short y0, short x1, short y1)
+rectangle2d *set_rectangle2d(
+	rectangle2d *rectangle,
+	short x0,
+	short y0,
+	short x1,
+	short y1)
 {
 	rectangle->x0= x0;
 	rectangle->y0= y0;
@@ -44,7 +42,10 @@ rectangle2d *set_rectangle2d(rectangle2d *rectangle, short x0, short y0, short x
 	return rectangle;
 }
 
-point2d *set_point2d(point2d *point, short x, short y)
+point2d *set_point2d(
+	point2d *point,
+	short x,
+	short y)
 {
 	point->n[0]= x;
 	point->n[1]= y;
@@ -52,7 +53,10 @@ point2d *set_point2d(point2d *point, short x, short y)
 	return point;
 }
 
-point2d *offset_point2d(point2d *point, short dx, short dy)
+point2d *offset_point2d(
+	point2d *point,
+	short dx,
+	short dy)
 {
 	point->n[0]+= dx;
 	point->n[1]+= dy;
@@ -60,17 +64,22 @@ point2d *offset_point2d(point2d *point, short dx, short dy)
 	return point;
 }
 
-short rectangle2d_width(rectangle2d const * rect)
+short rectangle2d_width(
+	const rectangle2d *rect)
 {
 	return rect->x1 - rect->x0;
 }
 
-short rectangle2d_height(rectangle2d const * rect)
+short rectangle2d_height(
+	const rectangle2d *rect)
 {
 	return rect->y1 - rect->y0;
 }
 
-rectangle2d *inset_rectangle2d(rectangle2d *rectangle, short dx, short dy)
+rectangle2d *inset_rectangle2d(
+	rectangle2d *rectangle,
+	short dx,
+	short dy)
 {
 	rectangle->x0+= dx;
 	rectangle->x1-= dx;
@@ -80,7 +89,10 @@ rectangle2d *inset_rectangle2d(rectangle2d *rectangle, short dx, short dy)
 	return rectangle;
 }
 
-rectangle2d *offset_rectangle2d(rectangle2d *rectangle, short dx, short dy)
+rectangle2d *offset_rectangle2d(
+	rectangle2d *rectangle,
+	short dx,
+	short dy)
 {
 	rectangle->x0+= dx;
 	rectangle->x1+= dx;
@@ -141,8 +153,10 @@ rectangle2d* adjust_rectangle2d(
 	return destination;
 }
 
-/* mismatch in instruction order to call csmemset */
-boolean intersect_rectangles2d(rectangle2d const *r1, rectangle2d const *r2, rectangle2d *intersection)
+boolean intersect_rectangles2d(
+	const rectangle2d *r1,
+	const rectangle2d *r2,
+	rectangle2d *intersection)
 {
 	boolean result= FALSE;
 
@@ -165,7 +179,6 @@ boolean intersect_rectangles2d(rectangle2d const *r1, rectangle2d const *r2, rec
 	return result;
 }
 
-//! Matches without /Ow
 rectangle2d *rectangle2d_hull_from_rectangles2d(
 	rectangle2d const *r1,
 	rectangle2d const *r2,
@@ -179,7 +192,9 @@ rectangle2d *rectangle2d_hull_from_rectangles2d(
 	return hull;
 }
 
-boolean point2d_in_rectangle2d(rectangle2d const *rectangle, const point2d *point)
+boolean point2d_in_rectangle2d(
+	const rectangle2d *rectangle,
+	const point2d *point)
 {
 	boolean result= FALSE;
 	if (point->x>=rectangle->x0 && point->x<rectangle->x1)
@@ -193,22 +208,29 @@ boolean point2d_in_rectangle2d(rectangle2d const *rectangle, const point2d *poin
 	return result;
 }
 
-boolean interior_rectangle2d(rectangle2d const *outer, const rectangle2d *inner)
+boolean interior_rectangle2d(
+	const rectangle2d *outer,
+	const rectangle2d *inner)
 {
 	return inner->x0>=outer->x0 && inner->x1<=outer->x1 && inner->y0>=outer->y0 && inner->y1<=outer->y1;
 }
 
-boolean equal_rectangle2d(rectangle2d const *r1, rectangle2d const *r2)
+boolean equal_rectangle2d(
+	const rectangle2d *r1,
+	const rectangle2d *r2)
 {
 	return r1->x0==r2->x0 && r1->x1==r2->x1 && r1->y0==r2->y0 && r1->y1==r2->y1;
 }
 
-boolean equal_point2d(point2d const *p1, point2d const *p2)
+boolean equal_point2d(
+	const point2d *p1,
+	const point2d *p2)
 {
 	return p1->x==p2->x && p1->y==p2->y;
 }
 
-short floor_log2(unsigned long k)
+short floor_log2(
+	unsigned long k)
 {
 	unsigned long counter= k;
 	long result= 0;
@@ -224,7 +246,8 @@ short floor_log2(unsigned long k)
 	return result;
 }
 
-short ceiling_log2(unsigned long k)
+short ceiling_log2(
+	unsigned long k)
 {
 	unsigned long counter;
 	long result= 0;
@@ -241,7 +264,8 @@ short ceiling_log2(unsigned long k)
 	return result + 1;
 }
 
-unsigned long floor_power2(unsigned short x)
+unsigned long floor_power2(
+	unsigned short x)
 {
 	long result= 1;
 	while (result*2<= x)
@@ -252,7 +276,8 @@ unsigned long floor_power2(unsigned short x)
 	return result;
 }
 
-unsigned long ceiling_power2(unsigned short x)
+unsigned long ceiling_power2(
+	unsigned short x)
 {
 	long result= 1;
 	while (result < x)
@@ -263,7 +288,8 @@ unsigned long ceiling_power2(unsigned short x)
 	return result;
 }
 
-unsigned long integer_square_root(unsigned long k)
+unsigned long integer_square_root(
+	unsigned long k)
 {
 	unsigned long sum;
 	unsigned long result= 0;
@@ -290,7 +316,11 @@ unsigned long integer_square_root(unsigned long k)
 	return result;
 }
 
-boolean bit_vector_and(short count, unsigned long const *v0, unsigned long const *v1, unsigned long *result)
+boolean bit_vector_and(
+	short count,
+	unsigned long const *v0,
+	unsigned long const *v1,
+	unsigned long *result)
 {
 	short i;
 	boolean res= FALSE;
@@ -313,7 +343,11 @@ boolean bit_vector_and(short count, unsigned long const *v0, unsigned long const
 	return res;
 }
 
-void bit_vector_or(short count, unsigned long const *v0, unsigned long const *v1, unsigned long *result)
+void bit_vector_or(
+	short count,
+	const unsigned long *v0,
+	const unsigned long *v1,
+	unsigned long *result)
 {
 	short i;
 
@@ -328,7 +362,10 @@ void bit_vector_or(short count, unsigned long const *v0, unsigned long const *v1
 	return;
 }
 
-void bit_vector_not(short count, unsigned long const *vector, unsigned long *result)
+void bit_vector_not(
+	short count,
+	const unsigned long *vector,
+	unsigned long *result)
 {
 	short i;
 
@@ -342,7 +379,11 @@ void bit_vector_not(short count, unsigned long const *vector, unsigned long *res
 	return;
 }
 
-rectangle2d *scale_rectangle2d(rectangle2d const *bounds, rectangle2d const *source, rectangle2d *destination, short scale)
+rectangle2d *scale_rectangle2d(
+	const rectangle2d *bounds,
+	const rectangle2d *source,
+	rectangle2d *destination,
+	short scale)
 {
 	rectangle2d new_rectangle;
 	short new_height;
