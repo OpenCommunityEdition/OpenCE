@@ -596,7 +596,7 @@
 				{ "name": "source/math/probability.c", "index": 224, "status": "NonMatching" },
 				{ "name": "source/math/periodic_functions.c", "index": 225, "status": "NonMatching" },
 				{ "name": "source/math/matrix_math.c", "index": 226, "status": "NonMatching" },
-				{ "name": "source/math/integer_math.c", "index": 227, "status": "NonMatching" },
+				{ "name": "source/math/integer_math.c", "index": 227, "status": "Matching" },
 				{ "name": "source/math/geometry.c", "index": 228, "status": "NonMatching" },
 				{ "name": "source/tool/error_geometry.c", "index": 229, "status": "NonMatching" },
 				{ "name": "source/tool/connected_geometry.c", "index": 230, "status": "NonMatching" },
