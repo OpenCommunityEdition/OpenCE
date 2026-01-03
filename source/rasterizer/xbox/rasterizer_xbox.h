@@ -18,6 +18,8 @@ void rasterizer_preinitialize__fill_you_up_with_the_devils_cock(void);
 
 /* ---------- globals */
 
+extern D3DDevice global_d3d_device;
+
 /* ---------- public code */
 
 #endif // __RASTERIZER_XBOX_H
