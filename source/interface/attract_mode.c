@@ -94,30 +94,31 @@ boolean attract_mode_should_start(
 		!network_game_is_active() &&
 		!bink_playback_active())
 	{
-		if (bss_00453ad8>event_manager_time_of_last_event())
-		{
-			unsigned long time_elapsed= bss_00453ad8-system_milliseconds();		
-			boolean ui_music_active= ui_main_menu_music_active();
+		unsigned long time_elapsed;
+		unsigned long current_time= system_milliseconds();
+		unsigned long time_since_last_event= event_manager_time_of_last_event();
+		
+		time_since_last_event= MAX(bss_00453ad8, time_since_last_event);
+		time_elapsed= current_time-time_since_last_event;
 	
-			if (time_elapsed>=73500)
+		if (time_elapsed>=73500)
+		{
+			if (ui_main_menu_music_active())
 			{
-				if (ui_music_active)
-				{
-					ui_stop_main_menu_music();
-				}
+				ui_stop_main_menu_music();
 			}
-			else
+		}
+		else
+		{
+			if (!ui_main_menu_music_active())
 			{
-				if (!ui_music_active)
-				{
-					ui_start_main_menu_music();
-				}
+				ui_start_main_menu_music();
 			}
+		}
 
-			if (time_elapsed>=75000)
-			{
-				should_start= TRUE;
-			}
+		if (time_elapsed>=75000)
+		{
+			should_start= TRUE;
 		}
 	}
 
