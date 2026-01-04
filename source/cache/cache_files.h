@@ -22,6 +22,8 @@ unsigned long cache_files_get_checksum(void);
 
 boolean cache_files_precache_in_progress(void);
 
+short cache_files_precache_map_status(real *progress);
+
 void cache_files_precache_map_end(void);
 
 /* ---------- globals */

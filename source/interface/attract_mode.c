@@ -44,6 +44,15 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "cseries_windows.h"
+#include "attract_mode.h"
+#include "real_math.h"
+#include "cache_files.h"
+#include "bink_playback.h"
+#include "ui_widget.h"
+#include "sound_manager.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -52,8 +61,115 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+/* random_math.c doesn't appear to have a header? */
+extern unsigned long *get_global_local_random_seed_address(void);
+extern short seed_random_range(unsigned long *seed, short lower_bound, short upper_bound);
+
+extern boolean network_game_is_active();
+
+extern unsigned long event_manager_time_of_last_event(void);
+
 /* ---------- globals */
 
+static unsigned long bss_00453ad8;
+
+short data_002e4c84= NONE;
+
 /* ---------- public code */
+
+boolean attract_mode_should_start(
+	void)
+{
+	boolean should_start= FALSE;
+	real progress;
+
+	if (cache_files_precache_in_progress() &&
+		cache_files_precache_map_status(&progress)==1)
+	{
+		cache_files_precache_map_end();
+	}
+
+	if (main_menu_screen_is_active() &&
+		!cache_files_precache_in_progress() &&
+		!network_game_is_active() &&
+		!bink_playback_active())
+	{
+		if (bss_00453ad8>event_manager_time_of_last_event())
+		{
+			unsigned long time_elapsed= bss_00453ad8-system_milliseconds();		
+			boolean ui_music_active= ui_main_menu_music_active();
+	
+			if (time_elapsed>=73500)
+			{
+				if (ui_music_active)
+				{
+					ui_stop_main_menu_music();
+				}
+			}
+			else
+			{
+				if (!ui_music_active)
+				{
+					ui_start_main_menu_music();
+				}
+			}
+
+			if (time_elapsed>=75000)
+			{
+				should_start= TRUE;
+			}
+		}
+	}
+
+	return should_start;
+}
+
+void attract_mode_reset_timer(
+	void)
+{
+	bss_00453ad8= system_milliseconds();
+
+	return;
+}
+
+void attract_mode_start(
+	void)
+{
+	short video_index;
+
+	while (TRUE)
+	{
+		video_index= seed_random_range(get_global_local_random_seed_address(), 0, NUMBER_OF_ATTRACT_MODE_MOVIES);
+		video_index= PIN(video_index, 0, _bink_attract3_movie);
+
+		if (video_index!=data_002e4c84)
+		{
+			data_002e4c84= video_index;
+			break;
+		}
+	}
+
+	ui_stop_main_menu_music();
+
+	bink_playback_start(attract_mode_get_localized_movie_path(video_index), 0x2e);
+
+	if (!bink_playback_active())
+	{
+		bss_00453ad8= system_milliseconds();
+	}
+
+	return;
+}
+
+void game_end_credits_start(
+	void)
+{
+	ui_stop_main_menu_music();
+	sound_stop_all();
+
+	bink_playback_start(attract_mode_get_localized_movie_path(_bink_outro_movie), 0x2e);
+
+	return;
+}
 
 /* ---------- private code */
