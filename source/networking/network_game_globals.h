@@ -14,7 +14,9 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/NETWORK_GAME_GLOBALS.C */
+
+boolean network_game_is_active(void);
 
 /* ---------- globals */
 

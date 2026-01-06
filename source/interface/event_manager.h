@@ -16,6 +16,8 @@ header included in hcex build.
 
 /* ---------- prototypes/EVENT_MANAGER.C */
 
+unsigned long event_manager_time_of_last_event(void);
+
 void event_manager_update(void);
 
 /* ---------- globals */
