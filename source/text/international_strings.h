@@ -23,11 +23,29 @@ enum
 	NUMBER_OF_SUPPORTED_LANGUAGES,
 };
 
+enum
+{
+	_language_roman= 0,
+	_language_japanese,
+	_language_simple_chinese,
+	_language_traditional_chinese,
+	_language_korean_wansung,
+	_language_korean_johab,
+	NUMBER_OF_LANGUAGE_CODES,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/INTERNATIONAL_STRINGS.C */
+
+void set_language_code(short language_code);
+unsigned short get_next_character(unsigned char *string, short *index);
+unsigned short get_previous_character(unsigned char *string, short *index);
+void align_to_character(unsigned char *string, short *index);
+boolean double_byte_character(unsigned char *string);
+boolean character_in_pattern(unsigned short character, char *pattern);
 
 /* ---------- globals */
 
