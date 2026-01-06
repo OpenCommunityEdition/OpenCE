@@ -22425,6 +22425,7 @@
 { "file_offset": 4537036, "flags": 0, "name": "_motion_sensor_globals" },
 { "file_offset": 4537044, "flags": 0, "name": "_debug_motion_sensor_draw_all_units" },
 { "file_offset": 4537048, "flags": 0, "name": "_bss_00453ad8" },
+{ "file_offset": 4537056, "flags": 0, "name": "_bss_00453ae8" },
 { "file_offset": 4537184, "flags": 0, "name": "_event_manager_globals" },
 { "file_offset": 4537544, "flags": 0, "name": "_bss_00453cc8" },
 { "file_offset": 4537548, "flags": 0, "name": "_bss_00453ccc" },

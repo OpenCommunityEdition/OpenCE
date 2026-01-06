@@ -54,6 +54,7 @@ symbols in this file:
 #include "sound_manager.h"
 #include "international_strings.h"
 #include "files.h"
+#include "errors.h"
 
 /* ---------- constants */
 
@@ -81,7 +82,7 @@ extern unsigned long event_manager_time_of_last_event(void);
 
 static unsigned long bss_00453ad8;
 
-static char bss_00453ad8_8[128];
+static char bss_00453ae8[128];
 
 short data_002e4c84= NONE;
 
@@ -146,8 +147,8 @@ void attract_mode_reset_timer(
 const char *attract_mode_get_localized_movie_path(
 	short movie)
 {
-	unsigned long language= 0;
-	const char *movie_format= "";
+	short attempted_languages= 0;
+	short language;
 	const char *language_suffixes[]=
 	{
 		"_de",
@@ -164,12 +165,6 @@ const char *attract_mode_get_localized_movie_path(
 
 	switch (XGetLanguage())
 	{
-	case XC_LANGUAGE_ENGLISH:
-		language= _english;
-		break;
-	case XC_LANGUAGE_JAPANESE:
-		language= _japanese;
-		break;
 	case XC_LANGUAGE_GERMAN:
 		language= _german;
 		break;
@@ -182,39 +177,66 @@ const char *attract_mode_get_localized_movie_path(
 	case XC_LANGUAGE_ITALIAN:
 		language= _italian;
 		break;
+	case XC_LANGUAGE_ENGLISH:
+		language= _english;
+		break;
+	case XC_LANGUAGE_JAPANESE:
+		language= _japanese;
+		break;
 	default:
 		language= _unknown;
 		break;
 	}
 
-	switch (movie)
+	while (TRUE)
 	{
-	case _bink_attract1_movie:
-		_snprintf(bss_00453ad8_8, NUMBEROF(bss_00453ad8_8), "d:\\bink\\attract1%s.bik", language_suffixes[language]);
-		break;
-	case _bink_attract2_movie:
-		_snprintf(bss_00453ad8_8, NUMBEROF(bss_00453ad8_8), "d:\\bink\\attract2%s.bik", language_suffixes[language]);
-		break;
-	case _bink_attract3_movie:
-		_snprintf(bss_00453ad8_8, NUMBEROF(bss_00453ad8_8), "d:\\bink\\attract3%s.bik", language_suffixes[language]);
-		break;
-	case _bink_intro_movie:
-		_snprintf(bss_00453ad8_8, NUMBEROF(bss_00453ad8_8), "d:\\bink\\intro%s.bik", language_suffixes[language]);
-		break;
-	case _bink_outro_movie:
-		_snprintf(bss_00453ad8_8, NUMBEROF(bss_00453ad8_8), "d:\\bink\\outro%s.bik", language_suffixes[language]);
-		break;
-	default:
-		match_vassert("c:\\halo\\SOURCE\\interface\\attract_mode.c", 198, FALSE, "unreachable");
-		break;
+		switch (movie)
+		{
+		case _bink_intro_movie:
+			_snprintf(bss_00453ae8, NUMBEROF(bss_00453ae8), "d:\\bink\\intro%s.bik", language_suffixes[language]);
+			break;
+		case _bink_outro_movie:
+			_snprintf(bss_00453ae8, NUMBEROF(bss_00453ae8), "d:\\bink\\credits%s.bik", language_suffixes[language]);
+			break;
+		case _bink_attract1_movie:
+			_snprintf(bss_00453ae8, NUMBEROF(bss_00453ae8), "d:\\bink\\attract1%s.bik", language_suffixes[language]);
+			break;
+		case _bink_attract2_movie:
+			_snprintf(bss_00453ae8, NUMBEROF(bss_00453ae8), "d:\\bink\\attract2%s.bik", language_suffixes[language]);
+			break;
+		case _bink_attract3_movie:
+			_snprintf(bss_00453ae8, NUMBEROF(bss_00453ae8), "d:\\bink\\attract3%s.bik", language_suffixes[language]);
+			break;
+		default:
+			match_assert("c:\\halo\\SOURCE\\interface\\attract_mode.c", 198, !"unreachable");
+			break;
+		}
+
+		if (file_exists(file_reference_create_from_path(&movie_file, bss_00453ae8, FALSE)))
+		{
+			break;
+		}
+
+		attempted_languages|= FLAG(language);
+
+		for (language= 0; language<NUMBER_OF_SUPPORTED_LANGUAGES; language++)
+		{
+			if (!TEST_FLAG(attempted_languages, language))
+			{
+				break;
+			}
+		}
+
+		if (language==NUMBER_OF_SUPPORTED_LANGUAGES)
+		{
+			error(_error_silent, "unable to locate any movie for movie #%d (checked for all possible language variations)", movie);
+			bss_00453ae8[0]= '\0';
+
+			break;
+		}
 	}
 
-	if (file_exists(file_reference_create_from_path(&movie_file, bss_00453ad8_8, FALSE)))
-	{
-
-	}
-
-	return bss_00453ad8_8;
+	return bss_00453ae8;
 }
 
 void attract_mode_start(

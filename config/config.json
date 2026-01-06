@@ -633,7 +633,7 @@
 				{ "name": "source/interface/interface.c", "index": 261, "status": "NonMatching" },
 				{ "name": "source/interface/first_person_weapons.c", "index": 262, "status": "NonMatching" },
 				{ "name": "source/interface/event_manager.c", "index": 263, "status": "NonMatching" },
-				{ "name": "source/interface/attract_mode.c", "index": 264, "status": "NonMatching" },
+				{ "name": "source/interface/attract_mode.c", "index": 264, "status": "Matching" },
 				{ "name": "source/interface/weapon_hud_interface_definition.c", "index": 265, "status": "Matching" },
 				{ "name": "source/interface/unit_hud_interface_definition.c", "index": 266, "status": "Matching" },
 				{ "name": "source/interface/motion_sensor.c", "index": 267, "status": "NonMatching" },
