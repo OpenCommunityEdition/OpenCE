@@ -111,6 +111,7 @@ void console_initialize(
 	console_globals.newest_previous_command_index= NONE;
 	console_globals.previous_command_count= 0;
 	console_globals.selected_previous_command_index= NONE;
+
 	return;
 }
 
@@ -129,6 +130,7 @@ void console_open(
 		console_globals.active= terminal_gets_begin(&console_globals.input_state);
 		profile_global_enable= FALSE;
 	}
+
 	return;
 }
 
@@ -140,6 +142,7 @@ void console_close(
 		terminal_gets_end(&console_globals.input_state);
 		console_globals.active= FALSE;
 	}
+
 	return;
 }
 
@@ -175,6 +178,7 @@ void console_printf(
 	}
 
 	va_end(arglist);
+
 	return;
 }
 
@@ -199,6 +203,7 @@ void console_warning(
 	}
 
 	va_end(arglist);
+
 	return;
 }
 
@@ -240,7 +245,6 @@ void console_startup(
 		fclose(file);
 	}
 
-
 	return;
 }
 
@@ -248,6 +252,7 @@ void console_dispose(
 	void)
 {
 	console_close();
+
 	return;
 }
 
@@ -320,8 +325,10 @@ boolean console_update(
 		console_globals.active= terminal_gets_begin(&console_globals.input_state);
 		profile_global_enable= FALSE;
 	}
+
 	return console_globals.active;
 }
+
 /* ---------- private code */
 
 static boolean console_process_command(
@@ -337,6 +344,7 @@ static boolean console_process_command(
 	
 	console_globals.previous_command_count= MIN(console_globals.previous_command_count + 1, MAXIMUM_NUMBER_OF_PREVIOUS_COMMANDS);
 	console_globals.selected_previous_command_index= NONE;
+
 	return hs_compile_and_evaluate(command);
 }
 
@@ -360,6 +368,7 @@ static char* console_get_text_to_autocomplete(
 	{
 		result= result_after_quote;
 	}
+
 	return result;
 }
 
@@ -371,6 +380,7 @@ static void console_complete(
 
 	char *token= console_get_text_to_autocomplete();
 	short count= hs_tokens_enumerate(token, NONE, matching_items, NUMBEROF(matching_items));
+
 	if (count)
 	{
 		short token_num;
@@ -420,5 +430,6 @@ static void console_complete(
 		token[last_similar_character_index + 1]= '\0';
 		console_globals.input_state.edit.insertion_point_index= &token[last_similar_character_index + 1] - console_globals.input_state.result;
 	}
+
 	return;
 }
