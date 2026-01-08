@@ -110,14 +110,14 @@ void write_to_error_file(
 				if (_time)
 				{
 					fprintf(
-					  handle,
-					  "%02d.%02d.%02d %02d:%02d:%02d  ",
-					  _time->tm_mon + 1,
-					  _time->tm_mday,
-					  _time->tm_year % 100,
-					  _time->tm_hour,
-					  _time->tm_min,
-					  _time->tm_sec);
+						handle,
+						"%02d.%02d.%02d %02d:%02d:%02d  ",
+						_time->tm_mon + 1,
+						_time->tm_mday,
+						_time->tm_year % 100,
+						_time->tm_hour,
+						_time->tm_min,
+						_time->tm_sec);
 				}
 				else
 				{
