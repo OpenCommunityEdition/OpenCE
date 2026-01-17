@@ -270,19 +270,21 @@ static void console_complete(
 		for (token_num= 0; token_num<count; token_num++)
 		{
 			short size= MIN(last_similar_character_index, strlen(matching_items[token_num]) - 1);
-
 			short index= 0;
+
+			/* likely fake match */
 			if (tolower(matching_items[token_num][0]) == tolower(matching_items[0][0]))
 			{
 				do
 				{
-					if(index > size)
+					if (index > size)
 					{
 						break;
 					}
-					++index;
+
+					index++;
 				}
-				while (tolower(matching_items[token_num][index]) == tolower(matching_items[0][index]) );
+				while (tolower(matching_items[token_num][index]) == tolower(matching_items[0][index]));
 			}
 			last_similar_character_index= index - 1;
 
