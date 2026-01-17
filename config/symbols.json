@@ -21969,7 +21969,7 @@
 { "file_offset": 3001644, "flags": 0, "name": "_data_002dcd2c" },
 { "file_offset": 3001648, "flags": 0, "name": "_header_strings" },
 { "file_offset": 3001656, "flags": 0, "name": "_format_strings" },
-{ "file_offset": 3001664, "flags": 0, "name": "_data_002dcd40" },
+{ "file_offset": 3001664, "flags": 0, "name": "_stack_walk_globals" },
 { "file_offset": 3001688, "flags": 0, "name": "_recorded_animation_event_stream_data" },
 { "file_offset": 3001824, "flags": 0, "name": "_recorded_animation_block" },
 { "file_offset": 3001872, "flags": 0, "name": "_data_002dce10" },

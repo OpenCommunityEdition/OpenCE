@@ -99,12 +99,14 @@ symbols in this file:
 002589E0 0019:
 	??_C@_0BJ@NNIPHMJN@Mon?5Dec?517?512?349?336?52001?$AA@ (0000)
 002DCD40 0014:
-	_data_002dcd40 (0000)
+	_stack_walk_globals (0000)
 00431C98 4008:
 	_bss_00431c98 (0000)
 */
 
 /* ---------- headers */
+
+#include "cseries.h"
 
 /* ---------- constants */
 
@@ -112,10 +114,72 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct debug_symbol_table
+{
+	long number_of_symbols;
+	char *string_storage;
+	struct debug_symbol *symbols;
+};
+
+struct debug_symbol
+{
+	unsigned long address;
+	unsigned long rva_base;
+	unsigned long name_string_offset;
+	unsigned long library_object_string_offset;
+};
+
+struct _stack_walk_globals
+{
+	long fixup;
+	boolean disregard_symbol_names;
+	struct debug_symbol_table symbol_table;
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+struct _stack_walk_globals stack_walk_globals=
+{
+	NONE,
+	FALSE
+};
+
 /* ---------- public code */
+
+void stack_walk_disregard_symbol_names(
+	boolean disregard)
+{
+	stack_walk_globals.disregard_symbol_names = disregard;
+}
+
+void free_symbol_table(
+	struct debug_symbol_table *symbol_table)
+{
+	match_assert("c:\\halo\\SOURCE\\cseries\\stack_walk_windows.c", 549, symbol_table);
+
+	if (symbol_table->string_storage)
+	{
+		debug_free(symbol_table->string_storage, "c:\\halo\\SOURCE\\cseries\\stack_walk_windows.c", 551);
+	}
+
+	if (symbol_table->symbols)
+	{
+		debug_free(symbol_table->symbols, "c:\\halo\\SOURCE\\cseries\\stack_walk_windows.c", 552);
+	}
+
+	symbol_table->number_of_symbols= 0;
+	symbol_table->string_storage= NULL;
+	symbol_table->symbols= NULL;
+}
+
+void stack_walk_dispose(
+	void)
+{
+	stack_walk_globals.fixup= NONE;
+	stack_walk_globals.disregard_symbol_names= FALSE;
+	free_symbol_table(&stack_walk_globals.symbol_table);
+}
 
 /* ---------- private code */
