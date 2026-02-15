@@ -10,7 +10,7 @@ INTEGER_MATH.H
 
 enum
 {
-	_adjust_rectangle_center = 0,
+	_adjust_rectangle_center= 0,
 	_adjust_rectangle_alert,
 	NUMBER_OF_ADJUST_RECTANGLE_MODES,
 };
@@ -33,6 +33,14 @@ union rectangle2d
 };
 typedef union rectangle2d rectangle2d;
 
+union byte_rectangle3d
+{
+	byte n[6];
+	struct { byte x0, x1, y0, y1, z0, z1; };
+};
+typedef union byte_rectangle3d byte_rectangle3d;
+
+
 typedef unsigned long pixel32;
 
 /* ---------- prototypes/INTEGER_MATH.C */
@@ -54,8 +62,8 @@ unsigned char equal_rectangle2d(const rectangle2d *r1, const rectangle2d *r2);
 unsigned char equal_point2d(const point2d *p1, const point2d *p2);
 short floor_log2(unsigned long k);
 short ceiling_log2(unsigned long k);
-unsigned long floor_power2(unsigned short x);
-unsigned long ceiling_power2(unsigned short x);
+unsigned long floor_power2(word x);
+unsigned long ceiling_power2(word x);
 unsigned long integer_square_root(unsigned long k);
 unsigned char bit_vector_and(short count, const unsigned long *v0, const unsigned long *v1, unsigned long *result);
 void bit_vector_or(short count, const unsigned long *v0, const unsigned long *v1, unsigned long *result);

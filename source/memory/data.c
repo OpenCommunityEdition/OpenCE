@@ -62,6 +62,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "data.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -75,5 +78,53 @@ static void datum_initialize(struct data_array *data, struct datum_header *heade
 /* ---------- globals */
 
 /* ---------- public code */
+
+void data_verify(
+	struct data_array *data)
+{
+	match_assert("c:\\halo\\SOURCE\\memory\\data.c", 457, data);
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\memory\\data.c",
+		470,
+		data->data &&
+		data->signature=='d@t@' &&
+		data->maximum_count>=0 &&
+		data->count>=0 &&
+		data->count<=data->maximum_count &&
+		data->first_free_absolute_index>=0 &&
+		data->first_free_absolute_index<=data->maximum_count &&
+		data->actual_count>=0 &&
+		data->actual_count<=data->count,
+		csprintf(temporary, "%s data array @%p is bad or not allocated", data->name, data));
+
+	return;
+}
+
+void datum_delete(
+	struct data_array *data,
+	long index)
+{
+	struct datum_header *header= (struct datum_header *)datum_get(data, index);
+	header->identifier= 0;
+
+	if (((short)index)<data->first_free_absolute_index)
+	{
+		data->first_free_absolute_index= index;
+	}
+
+	if (((short)index)+1==data->count)
+	{
+		do
+		{
+			header=(struct datum_header *)((byte *)header-data->size);
+			data->count--;
+		}
+		while (data->count > 0 && !header->identifier);
+	}
+	data->actual_count--;
+
+	return;
+}
 
 /* ---------- private code */

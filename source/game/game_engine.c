@@ -536,6 +536,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "game_engine.h"
+
+#include "objects.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -546,6 +551,38 @@ symbols in this file:
 
 /* ---------- globals */
 
+struct game_engine *game_engine;
+
 /* ---------- public code */
+
+boolean game_engine_running(
+	void)
+{
+	return game_engine!=NULL;
+}
+
+long game_engine_remap_object_definition(
+	long definition_index)
+{
+	if (game_engine_running() && definition_index!=NONE)
+	{
+		switch (object_definition_get(definition_index)->object.type)
+		{
+		case _object_type_vehicle:
+			definition_index= game_engine_remap_vehicle(definition_index);
+			break;
+		case _object_type_weapon:
+			definition_index= game_engine_remap_weapon(definition_index);
+			break;
+		case _object_type_equipment:
+			definition_index= game_engine_remap_equipment(definition_index);
+			break;
+		default:
+			break;
+		}
+	}
+
+	return definition_index;
+}
 
 /* ---------- private code */
