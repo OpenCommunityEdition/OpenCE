@@ -120,10 +120,10 @@ short numeric_countdown_timer_get(short digit_index)
 		digit= numeric_countdown_timer_milliseconds % 10;
 		break;
 	case 1:
-		digit= numeric_countdown_timer_milliseconds / 10 % 10;
+		digit= numeric_countdown_timer_milliseconds / (MILLISECONDS_PER_SECOND/100) % 10;
 		break;
 	case 2:
-		digit= numeric_countdown_timer_milliseconds / 100 % 10;
+		digit= numeric_countdown_timer_milliseconds / (MILLISECONDS_PER_SECOND/10) % 10;
 		break;
 	case 3:
 		digit= numeric_countdown_timer_milliseconds / MILLISECONDS_PER_SECOND % 10;
@@ -168,11 +168,11 @@ void numeric_countdown_timer_update(void)
 
 		if (game_time >= previous_game_time)
 		{
-			numeric_countdown_timer_milliseconds = numeric_countdown_timer_milliseconds - game_time + previous_game_time;
+			numeric_countdown_timer_milliseconds= numeric_countdown_timer_milliseconds - game_time + previous_game_time;
 
 			if (numeric_countdown_timer_milliseconds < 0)
 			{
-				numeric_countdown_timer_milliseconds = 0;
+				numeric_countdown_timer_milliseconds= 0;
 			}
 		}
 
