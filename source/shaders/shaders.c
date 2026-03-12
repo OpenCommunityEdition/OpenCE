@@ -71,6 +71,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "real_math.h"
+#include "game.h"
+#include "shaders.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -81,6 +86,98 @@ symbols in this file:
 
 /* ---------- globals */
 
+static long numeric_countdown_timer_milliseconds;
+static boolean numeric_countdown_timer_on;
+
 /* ---------- public code */
+
+boolean shader_is_destructable(struct shader *shader)
+{
+	return FALSE;
+}
+
+boolean shader_is_double_sided(struct shader *shader)
+{
+	return FALSE;
+}
+
+void numeric_countdown_timer_set(long milliseconds, boolean auto_start)
+{
+	numeric_countdown_timer_milliseconds= milliseconds;
+	numeric_countdown_timer_on= auto_start;
+}
+
+short numeric_countdown_timer_get(short digit_index)
+{
+	long digit = 0;
+
+	switch (digit_index)
+	{
+	case NONE:
+		digit= numeric_countdown_timer_milliseconds;
+		break;
+	case 0:
+		digit= numeric_countdown_timer_milliseconds % 10;
+		break;
+	case 1:
+		digit= numeric_countdown_timer_milliseconds / 10 % 10;
+		break;
+	case 2:
+		digit= numeric_countdown_timer_milliseconds / 100 % 10;
+		break;
+	case 3:
+		digit= numeric_countdown_timer_milliseconds / MILLISECONDS_PER_SECOND % 10;
+		break;
+	case 4:
+		digit= numeric_countdown_timer_milliseconds / (MILLISECONDS_PER_SECOND*10) % 6;
+		break;
+	case 5:
+		digit= numeric_countdown_timer_milliseconds / (MILLISECONDS_PER_SECOND*SECONDS_PER_MINUTE) % 10;
+		break;
+	case 6:
+		digit= numeric_countdown_timer_milliseconds / (MILLISECONDS_PER_SECOND*SECONDS_PER_MINUTE*10) % 6;
+		break;
+	case 7:
+		digit= numeric_countdown_timer_milliseconds / (MILLISECONDS_PER_SECOND*SECONDS_PER_MINUTE*MINUTES_PER_HOUR) % 10;
+		break;
+	case 8:
+		digit= numeric_countdown_timer_milliseconds / (MILLISECONDS_PER_SECOND*SECONDS_PER_MINUTE*MINUTES_PER_HOUR*10) % 10;
+		break;
+	}
+
+	return digit;
+}
+
+void numeric_countdown_timer_stop(void)
+{
+	numeric_countdown_timer_on= FALSE;
+}
+
+void numeric_countdown_timer_restart(void)
+{
+	numeric_countdown_timer_on= TRUE;
+}
+
+void numeric_countdown_timer_update(void)
+{
+	static long previous_game_time;
+
+	if (numeric_countdown_timer_on)
+	{
+		long game_time= MILLISECONDS_PER_SECOND * game_time_get() / TICKS_PER_SECOND;
+
+		if (game_time >= previous_game_time)
+		{
+			numeric_countdown_timer_milliseconds = numeric_countdown_timer_milliseconds - game_time + previous_game_time;
+
+			if (numeric_countdown_timer_milliseconds < 0)
+			{
+				numeric_countdown_timer_milliseconds = 0;
+			}
+		}
+
+		previous_game_time= game_time;
+	}
+}
 
 /* ---------- private code */
