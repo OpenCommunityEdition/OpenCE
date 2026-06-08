@@ -55,6 +55,7 @@ void render_debug_collision_bsp(struct collision_bsp *bsp, const real_matrix4x3 
 /* ---------- globals */
 
 /* ---------- public code */
+
 boolean collision_model_instance_new(
 	struct collision_model_instance *instance,
 	long object_index)
