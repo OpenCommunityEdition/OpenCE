@@ -189,8 +189,7 @@ void object_list_gc(
 {
 	long i;
 
-	for (
-		i = data_next_index(object_list_header_data, NONE);
+	for (i = data_next_index(object_list_header_data, NONE);
 		i!=NONE; 
 		i = data_next_index(object_list_header_data, i))
 	{
@@ -220,22 +219,26 @@ long object_list_get_first(
 	long object_list_index,
 	long *reference_index)
 {
-	long result = NONE;
-
-	if (object_list_index!=NONE)
+	long index = NONE;
+	
+	if (object_list_index != NONE)
 	{
-		struct object_list_header_datum *list = object_list_header_get(object_list_index);
+		index = object_list_header_get(object_list_index)->first_reference_index;
+		*reference_index = index;
 
-		*reference_index = list->first_reference_index;
-		if (list->first_reference_index!=NONE)
+		if (index != NONE)
 		{
-			struct data_reference *reference = object_list_get(list->first_reference_index);
+			struct data_reference *reference = object_list_get(index);
 			*reference_index = reference->next_reference_index;
-			result = reference->datum_index;
+			index = reference->datum_index;
+		}
+		else
+		{
+			index = NONE;
 		}
 	}
 
-	return result;
+	return index;
 }
 
 /* ---------- private code */
