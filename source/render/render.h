@@ -94,6 +94,9 @@ void render_initialize_for_new_map(void);
 void render_dispose_from_old_map(void);
 void render_dispose(void);
 
+void render_frame_pregame(const struct render_window *window);
+void render_frame_present(const point2d *screenshot_index, struct bitmap_data *bitmap);
+boolean render_location_visible(struct location *location);
 struct rendered_cluster *rendered_cluster_get(short rendered_cluster_index);
 
 /* ---------- prototypes/RENDER_OBJECTS.C */

@@ -11,6 +11,7 @@ header included in hcex build.
 /* ---------- headers */
 
 #include "real_math.h"
+#include "render_cameras.h"
 
 /* ---------- constants */
 
@@ -88,9 +89,32 @@ struct rasterizer_frame_begin_parameters
 	real dt;
 };
 
+struct rasterizer_window_begin_parameters
+{
+	short rasterizer_target;
+	short window_index;
+	boolean has_mirror;
+	boolean suppress_clear;
+	struct render_camera camera;
+	struct render_frustum frustum;
+	struct render_fog fog;
+	struct render_screen_flash screen_flash;
+	struct render_screen_effect screen_effect;
+};
+
 /* ---------- prototypes/RASTERIZER.C */
 
 boolean rasterizer_initialize(void);
+
+void rasterizer_frame_begin(const struct rasterizer_frame_begin_parameters *parameters);
+boolean rasterizer_windows_begin(void);
+void rasterizer_window_begin(const struct rasterizer_window_begin_parameters *parameters);
+
+void rasterizer_window_end(void);
+void rasterizer_windows_end(void);
+void rasterizer_frame_end(void);
+
+void rasterizer_present(struct bitmap_data *screenshot_bitmap, const point2d *screenshot_index);
 void rasterizer_dispose(void);
 
 void rasterizer_decals_update_function_pointers(void);

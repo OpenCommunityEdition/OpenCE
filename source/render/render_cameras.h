@@ -19,6 +19,19 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct render_screen_flash
+{
+	short type;
+	real intensity;
+	real_argb_color color;
+};
+
+struct render_screen_effect
+{
+	short type;
+	real intensity;
+};
+
 struct render_camera
 {
 	real_point3d position;
@@ -31,6 +44,14 @@ struct render_camera
 	real z_near;
 	real z_far;
 	real_plane3d mirror_plane;
+};
+
+struct render_window
+{
+	short local_player_index;
+	boolean console_window;
+	struct render_camera render_camera;
+	struct render_camera rasterizer_camera;
 };
 
 struct render_frustum
@@ -50,6 +71,8 @@ struct render_frustum
 };
 
 /* ---------- prototypes/RENDER_CAMERAS.C */
+
+void render_camera_build_frustum(const struct render_camera *camera, const real_rectangle2d *frustum_bounds, struct render_frustum *frustum, boolean build_projection);
 
 /* ---------- globals */
 

@@ -42,8 +42,10 @@ struct profile_section
 void profile_initialize(void);
 
 void profile_enter_private(struct profile_section *objects_update_section);
-
 void profile_exit_private(struct profile_section *objects_update_section);
+
+void profile_render_window_start(void *arg0);
+void profile_render_window_end(void);
 
 /* ---------- globals */
 

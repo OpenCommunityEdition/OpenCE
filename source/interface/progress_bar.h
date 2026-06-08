@@ -8,13 +8,19 @@ header included in hcex build.
 #define __PROGRESS_BAR_H
 #pragma once
 
+/* ---------- headers */
+
+#include "real_math.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/PROGRESS_BAR.C */
+
+void progress_bar_display(real progress);
 
 /* ---------- globals */
 
