@@ -83,7 +83,7 @@ void object_lists_initialize(
 	void)
 {
 	object_list_header_data = game_state_data_new("object list header", MAXIMUM_OBJECT_LISTS_PER_MAP, sizeof(struct object_list_header_datum));
-	object_list_data = reference_list_new("list object", sizeof(struct data_reference));
+	object_list_data = reference_list_new("list object", MAXIMUM_LISTED_OBJECTS_PER_MAP);
 
 	return;
 }
