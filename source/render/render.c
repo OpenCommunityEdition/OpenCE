@@ -61,6 +61,9 @@ symbols in this file:
 
 #include "cseries.h"
 #include "render.h"
+#include "objects.h"
+#include "scenario.h"
+#include "structure_bsp_definitions.h"
 
 /* ---------- constants */
 
@@ -110,6 +113,13 @@ void render_dispose(
 	void)
 {
 	render_objects_dispose();
+}
+
+boolean render_location_visible(
+	struct location *location)
+{
+	match_assert("c:\\halo\\SOURCE\\render\\render.c", 584, location->cluster_index>=0 && location->cluster_index<global_structure_bsp_get()->clusters.count);
+	return TEST_FLAG(render.visible_cluster_flags[location->cluster_index>>5], location->cluster_index&31);
 }
 
 struct rendered_cluster *rendered_cluster_get(
