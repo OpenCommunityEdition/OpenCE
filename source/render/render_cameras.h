@@ -70,6 +70,24 @@ struct render_frustum
 	real_vector2d projection_world_to_screen;
 };
 
+struct render_fog
+{
+	word fog_definition_flags;
+	word runtime_flags;
+	real_rgb_color atmospheric_color;
+	real atmospheric_maximum_density;
+	real atmospheric_minimum_distance;
+	real atmospheric_maximum_distance;
+	short planar_mode;
+	real_plane3d plane;
+	real_rgb_color planar_color;
+	real planar_maximum_density;
+	real planar_maximum_distance;
+	real planar_maximum_depth;
+	const struct fog_screen *screen;
+	real screen_external_intensity;
+};
+
 /* ---------- prototypes/RENDER_CAMERAS.C */
 
 void render_camera_build_frustum(const struct render_camera *camera, const real_rectangle2d *frustum_bounds, struct render_frustum *frustum, boolean build_projection);
