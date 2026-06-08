@@ -72,6 +72,51 @@ symbols in this file:
 
 /* ---------- globals */
 
+boolean render_contrails_enabled = TRUE;
+boolean render_particles_enabled = TRUE;
+boolean render_particle_systems_enabled = TRUE;
+boolean render_weather_particle_systems_enabled = TRUE;
+
 /* ---------- public code */
+
+void render_effects(
+	boolean enable)
+{
+	render_weather_particle_systems_enabled = enable;
+	render_particle_systems_enabled = enable;
+	render_particles_enabled = enable;
+	render_contrails_enabled = enable;
+}
+
+void render_initialize(
+	void)
+{
+	render_objects_initialize();
+}
+
+void render_initialize_for_new_map(
+	void)
+{
+	render_objects_initialize_for_new_map();
+}
+
+void render_dispose_from_old_map(
+	void)
+{
+	render_objects_dispose_from_old_map();
+}
+
+void render_dispose(
+	void)
+{
+	render_objects_dispose();
+}
+
+struct rendered_cluster *rendered_cluster_get(
+	short rendered_cluster_index)
+{
+	match_assert("c:\\halo\\SOURCE\\render\\render.c", 592, rendered_cluster_index>=0 && rendered_cluster_index<render.rendered_cluster_count);
+	return &render.rendered_clusters[rendered_cluster_index];
+}
 
 /* ---------- private code */

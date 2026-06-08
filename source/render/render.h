@@ -86,8 +86,22 @@ struct render_globals
 	long environment_surface_indices[MAXIMUM_RENDERED_ENVIRONMENT_SURFACES];
 };
 
+/* ---------- prototypes/RENDER.C */
 
-/* ---------- prototypes/EXAMPLE.C */
+void render_effects(boolean enable);
+void render_initialize(void);
+void render_initialize_for_new_map(void);
+void render_dispose_from_old_map(void);
+void render_dispose(void);
+
+struct rendered_cluster *rendered_cluster_get(short rendered_cluster_index);
+
+/* ---------- prototypes/RENDER_OBJECTS.C */
+
+void render_objects_initialize(void);
+void render_objects_initialize_for_new_map(void);
+void render_objects_dispose_from_old_map(void);
+void render_objects_dispose(void);
 
 /* ---------- globals */
 
