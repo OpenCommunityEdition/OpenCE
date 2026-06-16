@@ -227,6 +227,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "real_math.h"
+#include "players.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -236,6 +240,8 @@ symbols in this file:
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+struct data_array *player_data;
 
 /* ---------- public code */
 
