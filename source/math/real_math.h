@@ -748,4 +748,66 @@ __inline real real_random_range(
 	return real_seed_random_range(get_global_random_seed_address(), lower_bound, upper_bound);
 }
 
+__inline real_plane3d *plane3d_from_point_and_normal(
+	real_plane3d *plane,
+	real_point3d const *point,
+	real_vector3d const *normal
+)
+{
+	plane->n = *normal;
+	plane->d = dot_product3d((real_vector3d *)point, &plane->n);
+
+	return plane;
+}
+
+__inline real_plane3d *plane3d_negate(
+	const real_plane3d *p1,
+	real_plane3d *plane
+)
+{
+	plane->n.i = -p1->n.i;
+	plane->n.j = -p1->n.j;
+	plane->n.k = -p1->n.k;
+	plane->d = -p1->d;
+
+	return plane;
+}
+
+__inline real plane3d_distance_to_point(
+	real_plane3d const *plane,
+	real_point3d const *point
+)
+{
+	return plane->n.i*point->x +
+		   plane->n.j*point->y +
+		   plane->n.k*point->z -
+		   plane->d;
+}
+
+__inline real_plane3d *plane3d_from_points(
+	real_plane3d *plane,
+	real_point3d const *p0,
+	real_point3d const *p1,
+	real_point3d const *p2)
+{
+	real_vector3d v0;
+	real_vector3d v1;
+
+	vector_from_points3d(p0, p1, &v0);
+	vector_from_points3d(p0, p2, &v1);
+
+	cross_product3d(&v0, &v1, &plane->n);
+
+	if (normalize3d(&plane->n) == 0.0f)
+	{
+		plane->d = 0.0f;
+	}
+	else
+	{
+		plane->d = dot_product3d((real_vector3d *)p0, &plane->n);
+	}
+
+	return plane;
+}
+
 #endif // __REAL_MATH_H

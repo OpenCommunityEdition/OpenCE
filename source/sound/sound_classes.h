@@ -8,6 +8,9 @@ file has inline function assertions.
 #define __SOUND_CLASSES_H
 #pragma once
 
+#include "real_math.h"
+#include "objects.h"
+
 /* ---------- constants */
 
 /* ---------- macros */

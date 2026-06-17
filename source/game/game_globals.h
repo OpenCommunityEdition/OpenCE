@@ -10,6 +10,46 @@ header included in hcex build.
 
 /* ---------- constants */
 
+/* referenced in game_globals.c? */
+enum
+{
+	_material_dirt = 0,
+	_material_sand,
+	_material_stone,
+	_material_snow,
+	_material_wood,
+	_material_hollow_metal,
+	_material_thin_metal,
+	_material_thick_metal,
+	_material_rubber,
+	_material_glass,
+	_material_force_field,
+	_material_grunt,
+	_material_hunter_armor,
+	_material_hunter_skin,
+	_material_elite,
+	_material_jackal,
+	_material_jackal_energy_shield,
+	_material_engineer,
+	_material_engineer_force_field,
+	_material_flood_combat_form,
+	_material_flood_carrier_form,
+	_material_cyborg,
+	_material_cyborg_energy_shield,
+	_material_armored_human,
+	_material_human,
+	_material_sentinel,
+	_material_monitor,
+	_material_plastic,
+	_material_water,
+	_material_leaves,
+	_material_elite_energy_shield,
+	_material_ice,
+	_material_hunter_shield,
+	NUMBER_OF_MATERIAL_TYPES,
+	MAXIMUM_NUMBER_OF_MATERIAL_TYPES = 40,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
