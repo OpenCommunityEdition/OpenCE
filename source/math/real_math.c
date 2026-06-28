@@ -311,8 +311,6 @@ void real_math_initialize(
 	periodic_functions_initialize();
 }
 
-/* ---------- private code */
-
 void real_math_dispose(
 	void)
 {
@@ -384,8 +382,7 @@ real_vector3d *rotate_vector_about_axis(
 	real_vector3d *v,
 	const real_vector3d *n,
 	real sine,
-	real cosine
-)
+	real cosine)
 {
 	real dot;
 	real i, j, k;
@@ -407,8 +404,7 @@ void vectors_interpolate(
 	const real_vector3d *a,
 	const real_vector3d *b,
 	real t,
-	real_vector3d *result
-)
+	real_vector3d *result)
 {
 	real f = 1-t;
 	result->i = f*a->i + t*b->i;
@@ -451,14 +447,15 @@ void component_vectors_from_normal3d(
 	const real_vector3d *vector,
 	const real_vector3d *normal,
 	real_vector3d *parallel,
-	real_vector3d *perpendicular
-)
+	real_vector3d *perpendicular)
 {
 	real_vector3d back_chain;
 	real dot = dot_product3d(vector, normal);
 
 	if (parallel== NULL)
+	{
 		parallel = &back_chain;
+	}
 
 	scale_vector3d(normal, dot, parallel);
 
@@ -493,8 +490,7 @@ void component_vectors_from_direction3d(
 void quaternions_multiply(
     const real_quaternion *q0, 
     const real_quaternion *q1, 
-    real_quaternion *result
-)
+    real_quaternion *result)
 {
     real_quaternion back_chain;
     if (q0== result)
@@ -621,20 +617,28 @@ boolean fast_vector_intersects_sphere(
 
 	c = (d.i * d.i) + (d.j * d.j) + (d.k * d.k) - (radius * radius);
 	if (c < 0)
+	{
 		return TRUE;
+	}
 
 	dot = (vector->i * d.i) + (vector->j * d.j) + (vector->k * d.k);
 	if (dot >= 0)
+	{
 		return FALSE;
+	}
 
 	a = (vector->i * vector->i) + (vector->j * vector->j) + (vector->k * vector->k);
 	discrim = dot * dot - a * c;
 	if (discrim <= 0)
+	{
 		return FALSE;
+	}
 
 	tcheck = -a - dot;
 	if (tcheck < 0)
+	{
 		return TRUE;
+	}
 
 	return tcheck * tcheck < discrim;
 }
@@ -691,12 +695,16 @@ boolean vector_intersects_rectangle2d(
 		}
 
 		if (min > max)
+		{
 			return FALSE;
+		}
 	}
 	else
 	{
 		if (point->x < bounds->x0 || point->x > bounds->x1)
+		{
 			return FALSE;
+		}
 	}
 
 	if (!(fabs(vector->j) < _real_epsilon))
@@ -717,12 +725,16 @@ boolean vector_intersects_rectangle2d(
 		}
 
 		if (min > max)
+		{
 			return FALSE;
+		}
 	}
 	else
 	{
 		if (point->y < bounds->y0 || point->y > bounds->y1)
+		{
 			return FALSE;
+		}
 	}
 
 	return max >= 0 && min <= 1;
@@ -759,7 +771,9 @@ boolean vector_intersects_rectangle3d(
 		}
 
 		if (min > max)
+		{
 			return FALSE;
+		}
 	}
 	else
 	{
@@ -785,12 +799,16 @@ boolean vector_intersects_rectangle3d(
 		}
 
 		if (min > max)
+		{
 			return FALSE;
+		}
 	}
 	else
 	{
 		if (point->y < bounds->y0 || point->y > bounds->y1)
+		{
 			return FALSE;
+		}
 	}
 
 	if (!(fabs(vector->k) < _real_epsilon))
@@ -811,12 +829,16 @@ boolean vector_intersects_rectangle3d(
 		}
 
 		if (min > max)
+		{
 			return FALSE;
+		}
 	}
 	else
 	{
 		if (point->z < bounds->z0 || point->z > bounds->z1)
+		{
 			return FALSE;
+		}
 	}
 
 	return max >= 0 && min <= 1;
@@ -891,7 +913,9 @@ real signed_angle_between_vectors2d(
 	angle = arccosine(cosine);
 
 	if ((a->i*b->j) - (a->j*b->i) < 0)
+	{
 		return -angle;
+	}
 
 	return angle;
 }
@@ -914,7 +938,9 @@ real angle_between_vectors2d(
 
 		angle = arccosine(cosine) * 0.5f;
 		if (dot< 0)
+		{
 			return _pi - angle;
+		}
 	}
 
 	return angle;
@@ -939,7 +965,9 @@ real angle_between_vectors3d(
 
 		angle = arccosine(cosine) * 0.5f;
 		if (dot< 0)
+		{
 			return _pi - angle;
+		}
 	}
 
 	return angle;
@@ -1313,3 +1341,5 @@ boolean valid_real_sine_cosine(
 {
 	return valid_realcmp(sine * sine + cosine * cosine, 1.0f);
 }
+
+/* ---------- private code */

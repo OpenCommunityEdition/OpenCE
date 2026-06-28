@@ -383,18 +383,74 @@ typedef union real_argb_color real_argb_color;
 
 void real_math_initialize(void);
 void real_math_dispose(void);
+void real_math_reset_precision(void);
 
-real angle_between_vectors3d(real_vector3d const *a, real_vector3d const *b);
-
+real_vector2d *perpendicular2d(real_vector2d const *a, real_vector2d *result);
 real_vector3d *perpendicular3d(real_vector3d const *a, real_vector3d *result);
+real_vector4d *perpendicular4d(real_vector4d const *a, real_vector4d *result);
 
 real_vector3d *rotate_vector_about_axis(real_vector3d *v, real_vector3d const *n, real sine, real cosine);
 
-real_euler_angles2d *euler_angles2d_from_vector3d(real_euler_angles2d *angles, real_vector3d const *vector);
+void vectors_interpolate(real_vector3d const *a, real_vector3d const *b, real t, real_vector3d *result);
+void points_interpolate(real_point3d const *a, real_point3d const *b, real t, real_point3d *result);
+void scalars_interpolate(real a, real b, real t, real *result);
+void scalars_interpolate_and_clamp_0_to_1(real a, real b, real t, real *result);
+
+void component_vectors_from_normal3d(real_vector3d const *vector, real_vector3d const *normal, real_vector3d *parallel, real_vector3d *perpendicular);
+void component_vectors_from_direction3d(real_vector3d const *vector, real_vector3d const *direction, real_vector3d *parallel, real_vector3d *perpendicular);
+
+void quaternions_multiply(real_quaternion const *q0, real_quaternion const *q1, real_quaternion *result);
+void quaternions_interpolate(real_quaternion const *q0, real_quaternion const *q1, real t, real_quaternion *result);
+void quaternion_transform_point(real_quaternion const *q, real_point3d const *p, real_point3d *result);
+
 void vectors3d_from_euler_angles3d(real_vector3d *forward, real_vector3d *up, real_euler_angles3d const *angles);
+boolean fast_vector_intersects_sphere(real_point3d const *point, real_vector3d const *vector, real_point3d const *center, real radius);
+
+boolean point_in_rectangle2d(real_point2d const *point, real_rectangle2d const *bounds);
+boolean point_in_rectangle3d(real_point3d const *point, real_rectangle3d const *bounds);
+
+boolean vector_intersects_rectangle2d(real_point2d const *point, real_vector2d const *vector, real_rectangle2d const *bounds);
+boolean vector_intersects_rectangle3d(real_point3d const *point, real_vector3d const *vector, real_rectangle3d const *bounds);
+boolean pill_intersects_rectangle3d(real_point3d const *base, real_vector3d const *height, real width, real_rectangle3d const *bounds);
+
+real_vector2d *fast_normalize2d(real_vector2d *v);
+real_vector3d *fast_normalize3d(real_vector3d *v);
+
+real cross_product_magnitude3d(real_vector3d const *a, real_vector3d const *b);
+
+real dequantize_byte_to_real(real min, real max, unsigned char value);
+
+real signed_angle_between_vectors2d(real_vector2d const *a, real_vector2d const *b);
+real angle_between_vectors2d(real_vector2d const *a, real_vector2d const *b);
+real angle_between_vectors3d(real_vector3d const *a, real_vector3d const *b);
+real angle_between_normals3d(real_vector3d const *a, real_vector3d const *b);
+
+void yaw_vectors(real_vector3d *forward, real_vector3d const *up, real sine, real cosine);
+void pitch_vectors(real_vector3d *forward, real_vector3d *up, real sine, real cosine);
+
+void fast_normals_interpolate(real_vector3d const *a, real_vector3d const *b, real t, real_vector3d *result);
+void normals_interpolate(real_vector3d const *a, real_vector3d const *b, real t, real_vector3d *result);
+
+real_vector3d *reflect_vector3d(real_vector3d const *incident, real_vector3d const *normal, real_vector3d *reflection);
+real_vector3d *refract_vector3d(real_vector3d const *incident, real_vector3d const *normal, real coefficient_of_refraction, real_vector3d *refraction);
+
+void quaternion_normalize(real_quaternion *q);
+void quaternion_from_angle_and_vector(real_quaternion *q, real a, real_vector3d const *v);
+void quaternion_to_angle_and_vector(real_quaternion const *q, real *a, real_vector3d *v);
+void quaternions_interpolate_and_normalize(real_quaternion const *q0, real_quaternion const *q1, real t, real_quaternion *result);
+
+void orientations_interpolate(real_orientation const *a, real_orientation const *b, real t, real_orientation *result);
+
+real_euler_angles2d *euler_angles2d_from_vector3d(real_euler_angles2d *angles, real_vector3d const *vector);
+real_vector3d *vector3d_from_angle(real_vector3d *vector, real angle);
 real_vector3d *vector3d_from_euler_angles2d(real_vector3d *vector, real_euler_angles2d const *angles);
 
-real point_to_line_distance_squared3d(const real_point3d *point, const real_point3d *base, const real_vector3d *height);
+boolean point_in_pill2d(real_point2d const *point, real_point2d const *base, real_vector2d const *height, real width);
+real point_to_line_distance_squared3d(real_point3d const *point, real_point3d const *base, real_vector3d const *height);
+
+boolean sphere_test_vector3d(real_point3d const *center, real radius, real_point3d const *point, real_vector3d const *vector, real *t, real_vector3d *normal);
+
+boolean valid_real_sine_cosine(real sine, real cosine);
 
 void angular_accelerate_to_position(
 	real_vector3d *position,
