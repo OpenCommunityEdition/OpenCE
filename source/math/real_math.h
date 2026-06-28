@@ -388,12 +388,13 @@ real angle_between_vectors3d(real_vector3d const *a, real_vector3d const *b);
 
 real_vector3d *perpendicular3d(real_vector3d const *a, real_vector3d *result);
 
-real_vector3d *rotate_vector_about_axis(real_vector3d *v, real_vector3d const *n, float sine, float cosine);
+real_vector3d *rotate_vector_about_axis(real_vector3d *v, real_vector3d const *n, real sine, real cosine);
 
 real_euler_angles2d *euler_angles2d_from_vector3d(real_euler_angles2d *angles, real_vector3d const *vector);
 void vectors3d_from_euler_angles3d(real_vector3d *forward, real_vector3d *up, real_euler_angles3d const *angles);
 real_vector3d *vector3d_from_euler_angles2d(real_vector3d *vector, real_euler_angles2d const *angles);
 
+real point_to_line_distance_squared3d(const real_point3d *point, const real_point3d *base, const real_vector3d *height);
 
 void angular_accelerate_to_position(
 	real_vector3d *position,
@@ -435,12 +436,18 @@ void matrix4x3_multiply(real_matrix4x3 const *a, real_matrix4x3 const *b, real_m
 
 unsigned long *get_global_random_seed_address(void);
 
+unsigned short seed_random(unsigned long *seed);
 short seed_random_range(unsigned long *seed, short lower_bound, short upper_bound);
 
 real real_seed_random(unsigned long *seed);
 real real_seed_random_range(unsigned long *seed, real lower_bound, real upper_bound);
 
+real_vector3d *seed_random_direction3d(unsigned long *seed, real_vector3d *direction);
+real_vector3d *seed_random_vector_in_cone3d(unsigned long *seed, real_vector3d const *axis, real inner_cone_angle, real outer_cone_angle, real_vector3d *result);
+
 /* ---------- globals */
+
+extern short const global_projection3d_mappings[3][2][2];
 
 extern const real_point3d *const global_origin3d;
 
@@ -488,12 +495,14 @@ __inline real arctangent(
 	return atan2(y, x);
 }
 
-__inline real arccosine(real x)
+__inline real arccosine(
+	real x)
 {
 	return acos(x);
 }
 
-__inline real arcsine(real x)
+__inline real arcsine(
+	real x)
 {
 	return asin(x);
 }
@@ -523,19 +532,260 @@ __inline real square_root(
 	return sqrt(x);
 }
 
-__inline real_point3d *point_from_line3d(real_point3d const *p, real_vector3d const *v, real t, real_point3d *result)
+__inline real reciprocal_square_root(
+	real x)
+{
+	return 1.0 / square_root(x);
+}
+
+__inline real power(
+	real a, 
+	real b)
+{
+	return pow(a, b);
+}
+
+__inline real_point2d *set_real_point2d(
+	real_point2d *p, 
+	real x,
+	real y)
+{
+	p->x = x;
+	p->y = y;
+}
+
+__inline real_vector2d *set_real_vector2d(
+	real_vector2d *v,
+	real i,
+	real j)
+{
+	v->i = i;
+	v->j = j;
+}
+
+__inline real_point2d *point_from_line2d(
+	real_point2d const *p, 
+	real_vector2d const *v,
+	real t, 
+	real_point2d *result)
+{
+	result->x = (v->i*t) + p->x;
+	result->y = (v->j*t) + p->y;
+	return result;
+}
+
+__inline real_vector2d *vector_from_points2d(
+	real_point2d const *a,
+	real_point2d const *b, 
+	real_vector2d *result)
+{
+	result->i = b->x-a->x;
+	result->j = b->y-a->y;
+	return result;
+}
+
+__inline real_vector2d *scale_vector2d(
+	real_vector2d const *a,
+	real c,
+	real_vector2d *result)
+{
+	result->i = c*a->i;
+	result->j = c*a->j;
+	return result;
+}
+
+__inline real_vector2d *rotate_vector2d(
+	real_vector2d const *v,
+	real sine, 
+	real cosine,
+	real_vector2d *result)
+{
+	result->i = cosine*v->i - sine*v->j;
+	result->j = sine*v->i + cosine*v->j;
+	return result;
+}
+
+__inline real magnitude_squared2d(
+	real_vector2d const *v)
+{
+	return v->i*v->i + v->j*v->j;
+}
+
+__inline real magnitude2d(
+	real_vector2d const *v)
+{
+	return square_root(magnitude_squared2d(v));
+}
+
+__inline real normalize2d(
+	real_vector2d *v)
+{
+	real result = magnitude2d(v);
+	if (fabs(result-0.f)>=_real_epsilon)
+	{
+		scale_vector2d(v, 1.f / result, v);
+	}
+	else
+	{
+		result = 0.f;
+	}
+
+	return result;
+}
+
+__inline boolean limit2d(
+	real_vector2d *vector, 
+	real length)
+{
+	real dot = vector->i*vector->i + vector->j*vector->j;
+	if (dot <= length*length)
+		return FALSE;
+
+	scale_vector2d(vector, length / square_root(dot), vector);
+	return TRUE;
+}
+
+__inline real distance_squared2d(
+	real_point2d const *a,
+	real_point2d const *b)
+{
+	real_vector2d v;
+	return magnitude_squared2d(vector_from_points2d(a, b, &v));
+}
+
+__inline real distance2d(
+	real_point2d const *a,
+	real_point2d const *b)
+{
+	real_vector2d v;
+	return magnitude2d(vector_from_points2d(a, b, &v));
+}
+
+__inline real dot_product2d(
+	real_vector2d const *a,
+	real_vector2d const *b)
+{
+	return a->i*b->i + a->j*b->j;
+}
+
+__inline real cross_product2d(
+	real_vector2d const *a,
+	real_vector2d const *b)
+{
+	return a->i*b->j - a->j*b->i;
+}
+
+__inline real_vector2d *negate_vector2d(
+	real_vector2d const *a, 
+	real_vector2d *result)
+{
+	result->i = -a->i;
+	result->j = -a->j;
+	return result;
+}
+
+__inline short projection_from_vector3d(
+	real_vector3d const *n)
+{
+	real i, j, k;
+	i = fabs(n->i);
+	j = fabs(n->j);
+	k = fabs(n->k);
+
+	// TODO: these comparisons likely don't match
+	if (k < j || k < i)
+		return j >= i;
+	else
+		return 2;
+}
+
+__inline boolean projection_sign_from_vector3d(
+	real_vector3d const *n, 
+	short projection)
+{
+	return n->n[projection] > 0.f;
+}
+
+__inline real_point2d *project_point3d(
+	real_point3d const *p3d, 
+	short projection, 
+	boolean sign,
+	real_point2d *p2d)
+{
+	int mapping = 2 * projection + sign;
+	p2d->x = p3d->n[global_projection3d_mappings[0][mapping][0]];
+	p2d->y = p3d->n[global_projection3d_mappings[0][mapping][1]];
+	return p2d;
+}
+
+__inline real_point3d *project_point2d(
+	real_point2d const *p2d,
+	real_plane3d const *plane,
+	short projection, 
+	boolean sign,
+	real_point3d *p3d)
+{
+	int mapping;
+	int x;
+	int y;
+
+	mapping = 2 * projection + sign;
+	x = global_projection3d_mappings[0][mapping][0];
+	y = global_projection3d_mappings[0][mapping][1];
+
+	p3d->n[x] = p2d->x;
+	p3d->n[y] = p2d->y;
+
+	if (fabs(plane->n.n[projection]) >= _real_epsilon)
+	{
+		// TODO: definitely doesn't match
+		p3d->n[projection] = -((p2d->y * plane->n.n[y]) + (p2d->x * plane->n.n[x] - plane->d))
+			/ plane->n.n[projection];
+	}
+	else
+	{
+		p3d->n[projection] = 0.f;
+	}
+
+	return p3d;
+}
+
+__inline real_point3d *set_real_point3d(
+	real_point3d *p,
+	real x,
+	real y,
+	real z)
+{
+	p->x = x;
+	p->y = y;
+	p->z = z;
+
+	return p;
+}
+
+__inline real_vector3d *set_real_vector3d(
+	real_vector3d *v,
+	real i,
+	real j,
+	real k)
+{
+	v->i = i;
+	v->j = j;
+	v->k = k;
+
+	return v;
+}
+
+__inline real_point3d *point_from_line3d(
+	real_point3d const *p, 
+	real_vector3d const *v, 
+	real t,
+	real_point3d *result)
 {
 	result->x = (v->i*t) + p->x;
 	result->y = (v->j*t) + p->y;
 	result->z = (v->k*t) + p->z;
 	return result;
-}
-
-__inline real dot_product3d(
-	real_vector3d const *a,
-	real_vector3d const *b)
-{
-	return (a->i*b->i) + (a->j*b->j) + (a->k*b->k);
 }
 
 __inline real_vector3d *vector_from_points3d(
@@ -546,7 +796,6 @@ __inline real_vector3d *vector_from_points3d(
 	result->i = b->x-a->x;
 	result->j = b->y-a->y;
 	result->k = b->z-a->z;
-
 	return result;
 }
 
@@ -558,14 +807,13 @@ __inline real_vector3d *scale_vector3d(
 	result->i = c*a->i;
 	result->j = c*a->j;
 	result->k = c*a->k;
-
 	return result;
 }
 
 __inline real magnitude_squared3d(
-	real_vector3d const *vector)
+	real_vector3d const *v)
 {
-	return vector->i*vector->i + vector->j*vector->j + vector->k*vector->k;
+	return v->i*v->i + v->j*v->j + v->k*v->k;
 }
 
 __inline real magnitude3d(
@@ -590,13 +838,99 @@ __inline real normalize3d(
 	return result;
 }
 
+__inline boolean limit3d(
+	real_vector3d *vector,
+	real length)
+{
+	real dot = vector->i*vector->i + vector->j*vector->j + vector->k*vector->k;
+	if (dot <= length*length)
+		return FALSE;
+
+	scale_vector3d(vector, length / square_root(dot), vector);
+	return TRUE;
+}
+
 __inline real distance_squared3d(
 	real_point3d const *a,
 	real_point3d const *b)
 {
 	real_vector3d v;
-
 	return magnitude_squared3d(vector_from_points3d(a, b, &v));
+}
+
+__inline real distance3d(
+	real_point3d const *a,
+	real_point3d const *b)
+{
+	real_vector3d v;
+	return magnitude3d(vector_from_points3d(a, b, &v));
+}
+
+__inline real_point3d *midpoint3d(
+	real_point3d const *p0,
+	real_point3d const *p1,
+	real_point3d *result)
+{
+	result->x = (p0->x + p1->x) * 0.5f;
+	result->y = (p0->y + p1->y) * 0.5f;
+	result->z = (p0->z + p1->z) * 0.5f;
+}
+
+__inline real dot_product3d(
+	real_vector3d const *a,
+	real_vector3d const *b)
+{
+	return a->i*b->i + a->j*b->j + a->k*b->k;
+}
+
+__inline real_vector3d *cross_product3d(
+	real_vector3d const *a,
+	real_vector3d const *b,
+	real_vector3d *result)
+{
+	real k = a->i*b->j - a->j*b->i;
+	real j = a->k*b->i - a->i*b->k;
+	real i = a->j*b->k - a->k*b->j;
+	result->i = i;
+	result->j = j;
+	result->k = k;
+
+	return result;
+}
+
+__inline real triple_product3d(
+	real_vector3d const *a,
+	real_vector3d const *b,
+	real_vector3d const *n)
+{
+	// TODO: doesn't match
+	return (n->i * ((b->k * a->j) - (b->j * a->k)))
+		 + (n->k * ((a->i * b->j) - (b->i * a->j)))
+		 + (n->j * ((b->i * a->k) - (a->i * b->k)));
+}
+
+__inline real_vector3d *add_vectors3d(
+	real_vector3d const *a,
+	real_vector3d const *b,
+	real_vector3d *result)
+{
+	result->i = a->i+b->i;
+	result->j = a->j+b->j;
+	result->k = a->k+b->k;
+
+	return result;
+}
+
+__inline real_vector3d *subtract_vectors3d(
+	real_vector3d const *a,
+	real_vector3d const *b,
+	real_vector3d *result)
+{
+	result->i = a->i-b->i;
+	result->j = a->j-b->j;
+	result->k = a->k-b->k;
+
+	return result;
 }
 
 __inline real_vector3d *negate_vector3d(
@@ -609,17 +943,359 @@ __inline real_vector3d *negate_vector3d(
 	return result;
 }
 
-__inline real_point3d *set_real_point3d(
-	real_point3d *p,
-	real x,
-	real y,
-	real z)
+__inline real dot_product4d(
+	real_vector4d const *a, 
+	real_vector4d const *b)
 {
-	p->x = x;
-	p->y = y;
-	p->z = z;
+	return a->i*b->i + a->j*b->j + a->k*b->k + a->l*b->l;
+}
 
-	return p;
+__inline real_plane2d *plane2d_from_points(
+	real_plane2d *plane,
+	real_point2d const *point0,
+	real_point2d const *point1)
+{
+	vector_from_points2d(point0, point1, &plane->n);
+
+	if (normalize2d(&plane->n) == 0.0f)
+	{
+		plane->d = 0.0f;
+	}
+	else
+	{
+		plane->d = dot_product2d((real_vector2d *)point0, &plane->n);
+	}
+
+	return plane;
+}
+
+__inline real plane2d_distance_to_point(
+	real_plane2d const *plane,
+	real_point2d const *point)
+{
+	return (plane->n.i*point->x + plane->n.j*point->y) - plane->d;
+}
+	
+__inline real point_to_line_distance3d(
+	real_point3d const *point,
+	real_point3d const *base, 
+	real_vector3d const *height)
+{
+	return square_root(point_to_line_distance_squared3d(point, base, height));
+}
+
+__inline real_plane3d *plane3d_from_point_and_normal(
+	real_plane3d *plane,
+	real_point3d const *point,
+	real_vector3d const *normal
+)
+{
+	plane->n = *normal;
+	plane->d = dot_product3d((real_vector3d *)point, &plane->n);
+	return plane;
+}
+
+__inline real_plane3d *plane3d_from_points(
+	real_plane3d *plane,
+	real_point3d const *point0,
+	real_point3d const *point1,
+	real_point3d const *point2)
+{
+	real_vector3d v0;
+	real_vector3d v1;
+
+	vector_from_points3d(point0, point1, &v0);
+	vector_from_points3d(point0, point2, &v1);
+
+	cross_product3d(&v0, &v1, &plane->n);
+
+	if (normalize3d(&plane->n) == 0.0f)
+	{
+		plane->d = 0.0f;
+	}
+	else
+	{
+		plane->d = dot_product3d((real_vector3d *)point0, &plane->n);
+	}
+
+	return plane;
+}
+
+__inline real_plane3d *plane3d_negate(
+	const real_plane3d *p1,
+	real_plane3d *plane
+)
+{
+	plane->n.i = -p1->n.i;
+	plane->n.j = -p1->n.j;
+	plane->n.k = -p1->n.k;
+	plane->d = -p1->d;
+
+	return plane;
+}
+
+__inline real plane3d_distance_to_point(
+	real_plane3d const *plane,
+	real_point3d const *point
+)
+{
+	return plane->n.i*point->x +
+		   plane->n.j*point->y +
+		   plane->n.k*point->z -
+		   plane->d;
+}
+
+__inline real vector_intersect_plane3d(
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real_plane3d const *plane)
+{
+	// TODO: might not be correct
+	return (dot_product3d((real_vector3d *)point, &plane->n) - plane->d) 
+	     / -dot_product3d(vector, &plane->n);
+}
+
+__inline boolean point_in_circle(
+	real_point2d const *point,
+	real_point2d const *center, 
+	real radius)
+{
+	return distance_squared2d(point, center) <= (radius*radius);
+}
+
+__inline boolean point_in_sphere(
+	real_point3d const *point,
+	real_point3d const *center,
+	real radius)
+{
+	return distance_squared3d(point, center) <= (radius*radius);
+}
+
+__inline real_quaternion *set_real_quaternion(
+	real_quaternion *q,
+	real i,
+	real j,
+	real k,
+	real w)
+{
+	q->v.i = i;
+	q->v.j = j;
+	q->v.k = k;
+	q->w = w;
+	return q;
+}
+
+__inline real_euler_angles2d *set_real_euler_angles2d(
+	real_euler_angles2d *angles,
+	real pitch, real yaw)
+{
+	angles->pitch = pitch;
+	angles->yaw = yaw;
+	return angles;
+}
+
+__inline void set_random_seed(
+	unsigned long seed)
+{
+	*get_global_random_seed_address() = seed;
+}
+
+__inline unsigned short random()
+{
+	return seed_random(get_global_random_seed_address());
+}
+
+__inline short random_range(
+	short lower_bound,
+	short upper_bound)
+{
+	return seed_random_range(get_global_random_seed_address(), lower_bound, upper_bound);
+}
+
+__inline boolean random_boolean(
+	void)
+{
+	return random() > 0x8000;
+}
+
+__inline real real_random(
+	void)
+{
+	return real_seed_random(get_global_random_seed_address());
+}
+
+__inline real real_random_range(
+	real lower_bound,
+	real upper_bound)
+{
+	return real_seed_random_range(get_global_random_seed_address(), lower_bound, upper_bound);
+}
+
+__inline real_vector3d *random_direction3d(
+	real_vector3d *direction)
+{
+	return seed_random_direction3d(get_global_random_seed_address(), direction);
+}
+
+__inline real_vector3d *random_vector_in_cone3d(
+	real_vector3d const *axis,
+	real inner_cone_angle,
+	real outer_cone_angle,
+	real_vector3d *result)
+{
+	return seed_random_vector_in_cone3d(get_global_random_seed_address(), axis, inner_cone_angle, outer_cone_angle, result);
+}
+
+// TODO: doesn't match, needs cleanup
+__inline real uniform_cubic_spline(
+	real f0, 
+	real f1, 
+	real f2, 
+	real f3, 
+	real t0, 
+	real h, 
+	real t)
+{
+	real v7, v8, v9, v10, v11;
+	v7 = f2 - f1;
+	v8 = f1 - f0;
+	v9 = (f3 - f2) - (f2 - f1);
+	v10 = v7 - (f1 - f0);
+	v11 = ((((((((t - ((h * 2.f) + t0)) * (v9 - v10)) 
+		/ (h * 3.f)) + v10) * (t - (t0 + h))) 
+		/ (h * 2.f)) + v8)
+		* ((t - t0) / h))
+		 + f0;
+	return v11;
+}
+
+// TODO: doesn't match, needs cleanup
+__inline real nonuniform_cubic_spline(
+	real f0,
+	real f1,
+	real f2, 
+	real f3,
+	real t0, 
+	real t1, 
+	real t2, 
+	real t3, 
+	real t)
+{
+	real v9, v10, v11;
+	v10 = ((f2 - f1) / (t2 - t1)) - ((f1 - f0) / (t1 - t0));
+	v11 = (((((((((((f3 - f2) / (t3 - t2)) - ((f2 - f1) 
+		/ (t2 - t1))) / (t3 - t1)) - (v10 / (t2 - t0))) 
+		/ (t3 - t0))
+		* (v9 - t2))
+		+ (v10 / (t2 - t0)))
+		* (v9 - t1))
+		+ ((f1 - f0) / (t1 - t0)))
+		* (v9 - t0))
+		 + f0;
+	return v11;
+}
+
+// TODO: doesn't match, needs cleanup. uses above inlines
+__inline void uniform_cubic_spline_vector3d(
+	real_vector3d *result, 
+	real_vector3d const *f0,
+	real_vector3d const *f1, 
+	real_vector3d const *f2, 
+	real_vector3d const *f3,
+	real t0,
+	real h,
+	real t)
+{
+	real v8, v9, v10, v11, v12, v13;
+	v8 = h * 2.f;
+	v9 = h * 3.f;
+	v11 = (h * 2.f) + t0;
+	v12 = t - (t0 + h);
+	v13 = ((((((t - ((h * 2.f) + t0))
+		* (((f3->i - f2->i) - (f2->i - f1->i)) - ((f2->i - f1->i) - (f1->i - f0->i))))
+		/ (h * 3.f))
+		+ ((f2->i - f1->i) - (f1->i - f0->i)))
+		* (t - (t0 + h)))
+		 / (h * 2.f));
+	v10 = 1.0 / h;
+
+	result->i = (((v13 + (f1->i - f0->i)) * v10) * (t - t0)) + f0->i;
+
+	result->j = (((((((((t - v11)
+		* (((f3->j - f2->j) - (f2->j - f1->j))
+		- ((f2->j - f1->j) - (f1->j - f0->j))))
+		/ v9)
+		+ ((f2->j - f1->j) - (f1->j - f0->j)))
+		* v12)
+		/ v8)
+		+ (f1->j - f0->j))
+		* v10)
+		* (t - t0))
+		+ f0->j;
+
+	result->k = (((((((((t - v11)
+		* (((f3->k - f2->k) - (f2->k - f1->k))
+		- ((f2->k - f1->k) - (f1->k - f0->k))))
+		/ v9)
+		+ ((f2->k - f1->k) - (f1->k - f0->k)))
+		* v12)
+		/ v8)
+		+ (f1->k - f0->k))
+		* v10)
+		* (t - t0))
+		+ f0->k;
+}
+
+// TODO: doesn't match, needs cleanup. uses above inlines
+__inline void nonuniform_cubic_spline_vector3d(
+	real_vector3d *result,
+	real_vector3d const *f0, 
+	real_vector3d const *f1,
+	real_vector3d const *f2,
+	real_vector3d const *f3, 
+	real t0, 
+	real t1, 
+	real t2,
+	real t3,
+	real t)
+{
+	real v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20;
+	v10 = t3 - t2;
+	v11 = t2 - t1;
+	v12 = t1 - t0;
+	v13 = t3 - t1;
+	v14 = t2 - t0;
+	v15 = t3 - t0;
+	v16 = t - t2;
+	v17 = t - t1;
+	v18 = t - t0;
+
+	result->i = (((((((((((f3->i - f2->i) / v10) - ((f2->i - f1->i) / v11)) / v13)
+		- ((((f2->i - f1->i) / v11) - ((f1->i - f0->i) / v12)) / v14))
+		/ v15)
+		* v16)
+		+ ((((f2->i - f1->i) / v11) - ((f1->i - f0->i) / v12)) / v14))
+		* v17)
+		+ ((f1->i - f0->i) / v12))
+		* v18)
+		+ f0->i;
+
+	result->j = (((((((((((f3->j - f2->j) / v10) - ((f2->j - f1->j) / v11)) / v13)
+		- ((((f2->j - f1->j) / v11) - ((f1->j - f0->j) / v12)) / v14))
+		/ v15)
+		* v16)
+		+ ((((f2->j - f1->j) / v11) - ((f1->j - f0->j) / v12)) / v14))
+		* v17)
+		+ ((f1->j - f0->j) / v12))
+		* v18)
+		+ f0->j;
+
+	v19 = (((f3->k - f2->k) / v10) - ((f2->k - f1->k) / v11));
+	v20 = (((f2->k - f1->k) / v11) - ((f1->k - f0->k) / v12));
+
+	result->k = ((((((((v19 / v13) - (v20 / v14)) / v15) * v16) + (v20 / v14)) * v17) + ((f1->k - f0->k) / v12))
+				* v18)
+				+ f0->k;
 }
 
 __inline boolean valid_real(
@@ -636,17 +1312,23 @@ __inline boolean valid_realcmp(
 	return valid_real(result) && fabs(result) < 0.001f;
 }
 
+__inline boolean valid_real_point2d(
+	real_point2d const *p)
+{
+	return valid_real(p->x) && valid_real(p->y);
+}
+
 __inline boolean valid_real_point3d(
 	real_point3d const *p)
 {
 	return valid_real(p->x) && valid_real(p->y) && valid_real(p->z);
 }
 
-__inline boolean valid_real_vector3d(real_vector3d const *v)
+__inline boolean valid_real_vector3d(
+	real_vector3d const *v)
 {
 	return valid_real(v->i) && valid_real(v->j) && valid_real(v->k);
 }
-
 
 __inline boolean valid_real_normal3d(
 	real_vector3d const *n)
@@ -693,121 +1375,40 @@ __inline boolean valid_real_matrix4x3(
 		valid_real_point3d(&matrix->position);
 }
 
-__inline real_vector3d *cross_product3d(
-	real_vector3d const *a,
-	real_vector3d const *b,
-	real_vector3d *result)
+// TODO: depends on byte_rectangle3d, need to include integer_math?
+/*
+__inline real_rectangle3d *dequantize_byte_to_real_rectangle3d(
+	real_rectangle3d const *parent,
+	byte_rectangle3d const *compressed_rectangle,
+	real_rectangle3d *result)
 {
-	real k = (a->i*b->j) - (a->j*b->i);
-	real j = (a->k*b->i) - (a->i*b->k);
-	real i = (a->j*b->k) - (a->k*b->j);
-	result->i = i;
-	result->j = j;
-	result->k = k;
-
-	return result;
+	result->x0 = dequantize_byte_to_real(parent->x0, parent->x1, compressed_rectangle->x0);
+	result->x1 = dequantize_byte_to_real(parent->x0, parent->x1, compressed_rectangle->x1);
+	result->y0 = dequantize_byte_to_real(parent->y0, parent->y1, compressed_rectangle->y0);
+	result->y1 = dequantize_byte_to_real(parent->y0, parent->y1, compressed_rectangle->y1);
+	result->z0 = dequantize_byte_to_real(parent->z0, parent->z1, compressed_rectangle->z0);
+	result->z1 = dequantize_byte_to_real(parent->z0, parent->z1, compressed_rectangle->z1);
 }
+*/
 
-__inline real_vector3d *subtract_vectors3d(
-	real_vector3d const *a,
-	real_vector3d const *b,
-	real_vector3d *result)
+// TODO: this is wrong, maybe uses PIN macro?
+__inline void interpolate_scalar(
+	real *current, 
+	real desired,
+	real maximum_speed)
 {
-	result->i= a->i-b->i;
-	result->j= a->j-b->j;
-	result->k= a->k-b->k;
-
-	return result;
-}
-
-__inline boolean point_in_sphere(
-	real_point3d const *point,
-	real_point3d const *center,
-	real radius)
-{
-	return distance_squared3d(point, center)<=(radius*radius);
-}
-
-__inline short random_range(
-	short lower_bound,
-	short upper_bound)
-{
-	return seed_random_range(get_global_random_seed_address(), lower_bound, upper_bound);
-}
-
-__inline real real_random(
-	void)
-{
-	return real_seed_random(get_global_random_seed_address());
-}
-
-__inline real real_random_range(
-	real lower_bound,
-	real upper_bound)
-{
-	return real_seed_random_range(get_global_random_seed_address(), lower_bound, upper_bound);
-}
-
-__inline real_plane3d *plane3d_from_point_and_normal(
-	real_plane3d *plane,
-	real_point3d const *point,
-	real_vector3d const *normal
-)
-{
-	plane->n = *normal;
-	plane->d = dot_product3d((real_vector3d *)point, &plane->n);
-
-	return plane;
-}
-
-__inline real_plane3d *plane3d_negate(
-	const real_plane3d *p1,
-	real_plane3d *plane
-)
-{
-	plane->n.i = -p1->n.i;
-	plane->n.j = -p1->n.j;
-	plane->n.k = -p1->n.k;
-	plane->d = -p1->d;
-
-	return plane;
-}
-
-__inline real plane3d_distance_to_point(
-	real_plane3d const *plane,
-	real_point3d const *point
-)
-{
-	return plane->n.i*point->x +
-		   plane->n.j*point->y +
-		   plane->n.k*point->z -
-		   plane->d;
-}
-
-__inline real_plane3d *plane3d_from_points(
-	real_plane3d *plane,
-	real_point3d const *p0,
-	real_point3d const *p1,
-	real_point3d const *p2)
-{
-	real_vector3d v0;
-	real_vector3d v1;
-
-	vector_from_points3d(p0, p1, &v0);
-	vector_from_points3d(p0, p2, &v1);
-
-	cross_product3d(&v0, &v1, &plane->n);
-
-	if (normalize3d(&plane->n) == 0.0f)
+	real v3 = desired - *current;
+	if (v3 >= -maximum_speed)
 	{
-		plane->d = 0.0f;
+		if (v3 <= maximum_speed)
+			*current = *current + (desired - *current);
+		else
+			*current = *current + maximum_speed;
 	}
 	else
 	{
-		plane->d = dot_product3d((real_vector3d *)p0, &plane->n);
+		*current = *current + -maximum_speed;
 	}
-
-	return plane;
 }
 
 #endif // __REAL_MATH_H
