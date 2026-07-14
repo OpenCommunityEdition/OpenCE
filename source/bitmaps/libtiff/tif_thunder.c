@@ -53,8 +53,8 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_thunder.c,v
 #define	    DELTA3_SKIP		4	/* skip code for 3-bit deltas */
 #define	THUNDER_RAW		0xc0	/* raw data encoded */
 
-static const int twobitdeltas[4] = { 0, 1, 0, -1 };
-static const int threebitdeltas[8] = { 0, 1, 2, 3, 0, -3, -2, -1 };
+static int twobitdeltas[4] = { 0, 1, 0, -1 };
+static int threebitdeltas[8] = { 0, 1, 2, 3, 0, -3, -2, -1 };
 
 #define	SETPIXEL(op, v) { \
 	lastpixel = (v) & 0xf; \
