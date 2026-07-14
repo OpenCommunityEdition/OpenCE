@@ -34,7 +34,7 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_warning.c,v
 #include "prototypes.h"
 
 static void
-DECLARE3(defaultHandler, char*, module, char*, fmt, va_list, ap)
+DECLARE3(code_0005dfc0, char*, module, char*, fmt, va_list, ap)
 {
 	if (module != NULL)
 		fprintf(stderr, "%s: ", module);
@@ -43,7 +43,7 @@ DECLARE3(defaultHandler, char*, module, char*, fmt, va_list, ap)
 	fprintf(stderr, ".\n");
 }
 
-static TIFFErrorHandler _warningHandler = defaultHandler;
+static TIFFErrorHandler _warningHandler = code_0005dfc0;
 
 TIFFErrorHandler
 DECLARE1(TIFFSetWarningHandler, TIFFErrorHandler, handler)
