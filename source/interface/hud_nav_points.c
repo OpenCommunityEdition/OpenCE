@@ -98,6 +98,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -109,5 +111,9 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void hud_dispose_nav_points_from_old_map(void)
+{
+}
 
 /* ---------- private code */
