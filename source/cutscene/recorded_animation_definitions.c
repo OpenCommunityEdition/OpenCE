@@ -27,6 +27,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "cutscene/recorded_animation_definitions.h"
+#include "math/real_math.h"
+#include "scenario/scenario_definitions.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -38,5 +43,27 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+short scenario_get_animation_by_name(struct scenario const *scenario, char const *name)
+{
+	short animation_index;
+	short result = NONE;
+
+	for (animation_index = 0; animation_index < scenario->recorded_animations.count; animation_index++)
+	{
+		struct recorded_animation_definition const *animation = TAG_BLOCK_GET_ELEMENT(
+			&scenario->recorded_animations,
+			animation_index,
+			struct recorded_animation_definition);
+
+		if (!_stricmp(animation->name, name))
+		{
+			result = animation_index;
+			break;
+		}
+	}
+
+	return result;
+}
 
 /* ---------- private code */
