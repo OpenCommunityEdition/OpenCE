@@ -191,3 +191,9 @@ static real code_000a4850(
 
 	return result;
 }
+
+real game_difficulty_get_value(
+	short value_type)
+{
+	return code_000a4850(value_type, game_difficulty_level_get());
+}
