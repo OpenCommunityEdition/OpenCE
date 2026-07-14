@@ -80,6 +80,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "game/game_globals.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -89,6 +92,55 @@ symbols in this file:
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+char const *global_material_type_strings[NUMBER_OF_MATERIAL_TYPES] =
+{
+	"dirt",
+	"sand",
+	"stone",
+	"snow",
+	"wood",
+	"metal (hollow)",
+	"metal (thin)",
+	"metal (thick)",
+	"rubber",
+	"glass",
+	"force field",
+	"grunt",
+	"hunter armor",
+	"hunter skin",
+	"elite",
+	"jackal",
+	"jackal energy shield",
+	"engineer skin",
+	"engineer force field",
+	"flood combat form",
+	"flood carrier form",
+	"cyborg armor",
+	"cyborg energy shield",
+	"human armor",
+	"human skin",
+	"sentinel",
+	"monitor",
+	"plastic",
+	"water",
+	"leaves",
+	"elite energy shield",
+	"ice",
+	"hunter shield",
+};
+
+short const global_difficulty_friend_settings[NUMBER_OF_GAME_DIFFICULTY_VALUES] =
+{
+	_game_difficulty_value_friend_damage,
+	_game_difficulty_value_friend_vitality,
+	_game_difficulty_value_friend_shield,
+	_game_difficulty_value_friend_recharge,
+	NONE, NONE, NONE, NONE, NONE, NONE,
+	NONE, NONE, NONE, NONE, NONE, NONE, NONE, NONE, NONE, NONE,
+	NONE, NONE, NONE, NONE, NONE, NONE, NONE, NONE, NONE, NONE,
+	NONE, NONE, NONE, NONE, NONE,
+};
 
 /* ---------- public code */
 

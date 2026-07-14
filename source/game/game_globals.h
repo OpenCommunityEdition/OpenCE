@@ -11,6 +11,8 @@ header included in hcex build.
 /* ---------- headers */
 
 #include "math/integer_math.h"
+#include "math/real_math.h"
+#include "tag_files/tag_groups.h"
 
 /* ---------- constants */
 
@@ -52,6 +54,46 @@ enum
 	_material_hunter_shield,
 	NUMBER_OF_MATERIAL_TYPES,
 	MAXIMUM_NUMBER_OF_MATERIAL_TYPES = 40,
+};
+
+enum
+{
+	_game_difficulty_value_enemy_damage = 0,
+	_game_difficulty_value_enemy_vitality,
+	_game_difficulty_value_enemy_shield,
+	_game_difficulty_value_enemy_recharge,
+	_game_difficulty_value_friend_damage,
+	_game_difficulty_value_friend_vitality,
+	_game_difficulty_value_friend_shield,
+	_game_difficulty_value_friend_recharge,
+	_game_difficulty_value_infection_forms,
+	_game_difficulty_value_unused9,
+	_game_difficulty_value_rate_of_fire,
+	_game_difficulty_value_projectile_error,
+	_game_difficulty_value_burst_error,
+	_game_difficulty_value_new_target_delay,
+	_game_difficulty_value_burst_separation,
+	_game_difficulty_value_target_tracking,
+	_game_difficulty_value_target_leading,
+	_game_difficulty_value_overcharge_chance,
+	_game_difficulty_value_special_fire_delay,
+	_game_difficulty_value_guidance_vs_player,
+	_game_difficulty_value_melee_delay_base,
+	_game_difficulty_value_melee_delay_scale,
+	_game_difficulty_value_unused22,
+	_game_difficulty_value_grenade_chance_scale,
+	_game_difficulty_value_grenade_timer_scale,
+	_game_difficulty_value_unused25,
+	_game_difficulty_value_unused26,
+	_game_difficulty_value_unused27,
+	_game_difficulty_value_major_upgrade,
+	_game_difficulty_value_major_upgrade_1,
+	_game_difficulty_value_major_upgrade_2,
+	_game_difficulty_value_unused31,
+	_game_difficulty_value_unused32,
+	_game_difficulty_value_unused33,
+	_game_difficulty_value_unused34,
+	NUMBER_OF_GAME_DIFFICULTY_VALUES,
 };
 
 /* ---------- macros */
@@ -140,6 +182,12 @@ struct game_globals_first_person_interface
 	unsigned long unused[22];
 };
 
+struct game_globals_difficulty_information
+{
+	real values[NUMBER_OF_GAME_DIFFICULTY_VALUES][4];
+	real pad[21];
+};
+
 struct game_globals
 {
 	unsigned long flags;
@@ -161,7 +209,11 @@ struct game_globals
 	struct tag_block playlist;
 };
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/GAME_GLOBALS.C */
+
+char const *material_get_name(short material_type);
+real game_difficulty_get_value(short value_type);
+real game_difficulty_get_team_value(short value_type, short team_index);
 
 /* ---------- globals */
 
