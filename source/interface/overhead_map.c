@@ -44,4 +44,8 @@ void overhead_map_initialize(void)
 {
 }
 
+void overhead_map_initialize_for_new_map(void)
+{
+}
+
 /* ---------- private code */
