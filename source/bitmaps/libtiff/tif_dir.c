@@ -158,7 +158,7 @@ DECLARE3(setJPEGCTable, u_char***, cpp, u_char**, cp, int, nc)
 #endif
 
 static
-TIFFSetField1(tif, tag, ap)
+code_00053960(tif, tag, ap)
 	TIFF *tif;
 	int tag;
 	va_list ap;
@@ -508,7 +508,7 @@ DECLARE2V(TIFFSetField, TIFF*, tif, int, tag)
 		va_list ap;
 
 		VA_START(ap, tag);
-		status = TIFFSetField1(tif, tag, ap);
+		status = code_00053960(tif, tag, ap);
 		va_end(ap);
 	} else {
 		TIFFFieldInfo const *fip = TIFFFindFieldInfo(tag, TIFF_ANY);
@@ -540,7 +540,7 @@ TIFFVSetField(tif, tag, ap)
 			    "%s: Cannot modify tag \"%s\" while writing",
 			    tif->tif_name, fip->field_name);
 	} else
-		status = TIFFSetField1(tif, tag, ap);
+		status = code_00053960(tif, tag, ap);
 	return (status);
 }
 
