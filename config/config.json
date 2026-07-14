@@ -449,7 +449,7 @@
 				{ "name": "source/scenario/scenario.c", "index": 77, "status": "NonMatching" },
 				{ "name": "source/scenario/multiplayer_scenario_description.c", "index": 78, "status": "NonMatching" },
 				{ "name": "source/scenario/fog_definitions.c", "index": 79, "status": "Matching" },
-				{ "name": "source/render/triangle_strips.c", "index": 80, "status": "NonMatching" },
+				{ "name": "source/render/triangle_strips.c", "index": 80, "status": "Matching" },
 				{ "name": "source/render/render_sprite.c", "index": 81, "status": "NonMatching" },
 				{ "name": "source/render/render_sky.c", "index": 82, "status": "NonMatching" },
 				{ "name": "source/render/render_particles.c", "index": 83, "status": "NonMatching" },
