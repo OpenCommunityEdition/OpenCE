@@ -33,18 +33,20 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_next.c,v 1.
  */
 #include "tiffioP.h"
 
+extern void *csmemcpy(void *destination, const void *source, unsigned long size);
+
 #if USE_PROTOTYPES
-static	int NeXTDecode(TIFF *, u_char *, int, u_int);
+static	int code_0005b9b0(TIFF *, u_char *, int, u_int);
 #else
-static	int NeXTDecode();
+static	int code_0005b9b0();
 #endif
 
 TIFFInitNeXT(tif)
 	TIFF *tif;
 {
-	tif->tif_decoderow = NeXTDecode;
-	tif->tif_decodestrip = NeXTDecode;
-	tif->tif_decodetile = NeXTDecode;
+	tif->tif_decoderow = code_0005b9b0;
+	tif->tif_decodestrip = code_0005b9b0;
+	tif->tif_decodetile = code_0005b9b0;
 	return (1);
 }
 
@@ -62,7 +64,7 @@ TIFFInitNeXT(tif)
 #define WHITE   	((1<<2)-1)
 
 static int
-NeXTDecode(tif, buf, occ, s)
+code_0005b9b0(tif, buf, occ, s)
 	TIFF *tif;
 	u_char *buf;
 	int occ;
@@ -93,7 +95,7 @@ NeXTDecode(tif, buf, occ, s)
 			 */
 			if (cc < scanline)
 				goto bad;
-			bcopy(bp, row, scanline);
+			csmemcpy(row, bp, scanline);
 			bp += scanline;
 			cc -= scanline;
 			break;
@@ -107,7 +109,7 @@ NeXTDecode(tif, buf, occ, s)
 			n = (bp[2] * 256) + bp[3];
 			if (cc < 4+n)
 				goto bad;
-			bcopy(bp+4, row+off, n);
+			csmemcpy(row+off, bp+4, n);
 			bp += 4+n;
 			cc -= 4+n;
 			break;
