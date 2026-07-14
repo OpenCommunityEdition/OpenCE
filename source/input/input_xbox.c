@@ -119,4 +119,8 @@ void input_activate(void)
 {
 }
 
+void input_deactivate(void)
+{
+}
+
 /* ---------- private code */
