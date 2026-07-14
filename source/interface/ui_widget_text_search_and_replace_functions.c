@@ -44,10 +44,18 @@ typedef char widget_instance_local_player_index_offset[
 
 typedef wchar_t *(*ui_widget_text_replacement_function)(void *widget);
 
+wchar_t *code_000e4a90(void *widget);
+wchar_t *code_000e4aa0(void *widget);
+
 /* ---------- globals */
 
-extern ui_widget_text_replacement_function data_0030632c[2];
-extern wchar_t bss_00454d08[2];
+ui_widget_text_replacement_function data_0030632c[2] =
+{
+	code_000e4a90,
+	code_000e4aa0
+};
+
+wchar_t bss_00454d08[2] = { 0 };
 
 /* ---------- public code */
 
