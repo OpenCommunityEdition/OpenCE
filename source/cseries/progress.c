@@ -14,6 +14,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "cseries_windows.h"
+#include "progress.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -25,5 +29,25 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void progress_new(
+	struct progress_data *data,
+	const struct progress_callback *callback,
+	const char *description,
+	long total)
+{
+	csmemset(data, 0, sizeof(*data));
+
+	if (callback && callback->update)
+	{
+		data->update = callback->update;
+		data->context = callback->context;
+
+		if (description)
+			csstrncpy(data->description, description, sizeof(data->description) - 1);
+
+		data->total = total;
+	}
+}
 
 /* ---------- private code */
