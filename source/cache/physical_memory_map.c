@@ -34,10 +34,18 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
 #include "cseries_windows.h"
 #include "cache/physical_memory_map.h"
 
 /* ---------- constants */
+
+#define GAME_STATE_BASE_ADDRESS 0x80061000
+#define GAME_STATE_SIZE 0x345000
+#define TAG_CACHE_BASE_ADDRESS 0x803A6000
+#define TAG_CACHE_SIZE 0x1600000
+#define TEXTURE_CACHE_SIZE 0x1600000
+#define SOUND_CACHE_SIZE 0x400000
 
 /* ---------- macros */
 
@@ -58,6 +66,25 @@ struct physical_memory_map_globals
 static struct physical_memory_map_globals physical_memory_map_globals;
 
 /* ---------- public code */
+
+void physical_memory_allocate(void)
+{
+	physical_memory_map_globals.game_state_base_address = XPhysicalAlloc(GAME_STATE_SIZE, GAME_STATE_BASE_ADDRESS & 0x7FFFFFFF, 0, PAGE_READWRITE);
+#line 46 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"
+	match_assert(__FILE__, __LINE__, (unsigned long)physical_memory_map_globals.game_state_base_address==GAME_STATE_BASE_ADDRESS);
+
+	physical_memory_map_globals.tag_cache_base_address = XPhysicalAlloc(TAG_CACHE_SIZE, TAG_CACHE_BASE_ADDRESS & 0x7FFFFFFF, 0, PAGE_READWRITE);
+#line 50 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"
+	match_assert(__FILE__, __LINE__, (unsigned long)physical_memory_map_globals.tag_cache_base_address==TAG_CACHE_BASE_ADDRESS);
+
+	physical_memory_map_globals.texture_cache_base_address = XPhysicalAlloc(TEXTURE_CACHE_SIZE, -1, 0, PAGE_READWRITE | PAGE_WRITECOMBINE);
+#line 55 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"
+	match_assert(__FILE__, __LINE__, physical_memory_map_globals.texture_cache_base_address);
+
+	physical_memory_map_globals.sound_cache_base_address = XPhysicalAlloc(SOUND_CACHE_SIZE, -1, 0, PAGE_READWRITE);
+#line 58 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"
+	match_assert(__FILE__, __LINE__, physical_memory_map_globals.sound_cache_base_address);
+}
 
 void physical_memory_free(void)
 {
