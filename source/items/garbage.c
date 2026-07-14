@@ -45,4 +45,16 @@ boolean garbage_update(
 	return active;
 }
 
+boolean garbage_new(
+	long garbage_index)
+{
+	struct garbage_datum *garbage = (struct garbage_datum *)object_get_and_verify_type(garbage_index, _object_mask_garbage);
+
+	object_set_garbage(garbage_index, TRUE);
+	garbage->object.flags |= FLAG(_object_shadowless_bit) | FLAG(_object_deleted_when_deactivated_bit);
+	garbage->lifetime_ticks = random_range(10 * TICKS_PER_SECOND, 20 * TICKS_PER_SECOND);
+
+	return TRUE;
+}
+
 /* ---------- private code */

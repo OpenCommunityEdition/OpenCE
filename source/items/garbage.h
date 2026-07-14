@@ -27,6 +27,7 @@ struct garbage_datum
 /* ---------- prototypes/GARBAGE.C */
 
 boolean garbage_update(long garbage_index);
+boolean garbage_new(long garbage_index);
 
 /* ---------- globals */
 
