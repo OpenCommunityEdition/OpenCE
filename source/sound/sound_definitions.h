@@ -107,7 +107,11 @@ struct sound_definition
 	struct tag_reference promotion_sound;
 	short promotion_count;
 	short unknown0;
-	struct tag_data unknown1;
+	unsigned long longest_permutation_length;
+	unsigned long promotion_counter;
+	unsigned long promotion_time;
+	unsigned long scripting_time;
+	long scripting_sound_index;
 	struct tag_block pitch_ranges;
 };
 

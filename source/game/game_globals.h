@@ -188,6 +188,26 @@ struct game_globals_difficulty_information
 	real pad[21];
 };
 
+struct game_globals_vehicle
+{
+	struct tag_reference vehicle;
+};
+
+struct game_globals_multiplayer_information
+{
+	struct tag_reference flag;
+	struct tag_reference unit;
+	struct tag_block vehicles;			// game_globals_vehicle
+	struct tag_reference hill_shader;
+	struct tag_reference flag_shader;
+	struct tag_reference ball;
+	struct tag_block sounds;				// tag_reference
+	byte tag_padding[56];
+};
+
+typedef char verify_game_globals_multiplayer_information_size[sizeof(struct game_globals_multiplayer_information) == 0xA0 ? 1 : -1];
+typedef char verify_game_globals_multiplayer_sounds_offset[offsetof(struct game_globals_multiplayer_information, sounds) == 0x5C ? 1 : -1];
+
 struct game_globals
 {
 	unsigned long flags;
