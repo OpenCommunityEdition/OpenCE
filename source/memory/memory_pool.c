@@ -85,6 +85,12 @@ symbols in this file:
 
 /* ---------- public code */
 
+long memory_pool_allocation_size(
+	long size)
+{
+	return size+sizeof(struct memory_pool);
+}
+
 long memory_pool_get_free_size(
 	struct memory_pool *pool)
 {
