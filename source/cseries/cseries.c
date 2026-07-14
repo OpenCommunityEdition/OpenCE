@@ -260,6 +260,28 @@ char *tag_to_string(
 	return s;
 }
 
+long strnlen(
+	const char *string,
+	long n)
+{
+	long length;
+	const char *p;
+
+	length = 0;
+	if (n > 0)
+	{
+		p = string;
+		do
+		{
+			if (!*p++)
+				break;
+			length++;
+		} while (length < n);
+	}
+
+	return length;
+}
+
 
 char *strnupr(
 	char *string,
