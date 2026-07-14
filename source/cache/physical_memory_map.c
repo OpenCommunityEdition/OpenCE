@@ -68,4 +68,9 @@ void *physical_memory_get_tag_cache_base_address(void)
 	return physical_memory_map_globals.tag_cache_base_address;
 }
 
+void *physical_memory_get_texture_cache_base_address(void)
+{
+	return physical_memory_map_globals.texture_cache_base_address;
+}
+
 /* ---------- private code */
