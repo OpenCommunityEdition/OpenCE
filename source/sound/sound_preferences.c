@@ -42,4 +42,8 @@ void read_sound_preferences(struct sound_preferences **preferences)
 	*preferences = &data_00317a84;
 }
 
+void write_sound_preferences(void)
+{
+}
+
 /* ---------- private code */

@@ -25,6 +25,7 @@ struct sound_preferences
 /* ---------- prototypes/SOUND_PREFERENCES.C */
 
 void read_sound_preferences(struct sound_preferences **preferences);
+void write_sound_preferences(void);
 
 /* ---------- globals */
 
