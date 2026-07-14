@@ -387,17 +387,17 @@ TIFFSetupStrips(tif)
 	if (td->td_planarconfig == PLANARCONFIG_SEPARATE)
 		td->td_nstrips *= td->td_samplesperpixel;
 	td->td_stripoffset = (u_long *)
-	    malloc(td->td_nstrips * sizeof (u_long));
+	    debug_malloc(td->td_nstrips * sizeof (u_long), 0, "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_write.c", 390);
 	td->td_stripbytecount = (u_long *)
-	    malloc(td->td_nstrips * sizeof (u_long));
+	    debug_malloc(td->td_nstrips * sizeof (u_long), 0, "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_write.c", 392);
 	if (td->td_stripoffset == NULL || td->td_stripbytecount == NULL)
 		return (0);
 	/*
 	 * Place data at the end-of-file
 	 * (by setting offsets to zero).
 	 */
-	bzero((char *)td->td_stripoffset, td->td_nstrips * sizeof (u_long));
-	bzero((char *)td->td_stripbytecount, td->td_nstrips * sizeof (u_long));
+	csmemset((char *)td->td_stripoffset, 0, td->td_nstrips * sizeof (u_long));
+	csmemset((char *)td->td_stripbytecount, 0, td->td_nstrips * sizeof (u_long));
 	TIFFSetFieldBit(tif, FIELD_STRIPOFFSETS);
 	TIFFSetFieldBit(tif, FIELD_STRIPBYTECOUNTS);
 	return (1);

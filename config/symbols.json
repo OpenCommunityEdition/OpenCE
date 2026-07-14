@@ -1161,7 +1161,7 @@
 { "file_offset": 384960, "flags": 32, "name": "_code_0005dfc0" },
 { "file_offset": 385056, "flags": 32, "name": "_TIFFSetWarningHandler" },
 { "file_offset": 385088, "flags": 32, "name": "_TIFFWarning" },
-{ "file_offset": 385120, "flags": 32, "name": "_code_0005e060" },
+{ "file_offset": 385120, "flags": 32, "name": "_TIFFSetupStrips", "static": true },
 { "file_offset": 385376, "flags": 32, "name": "_code_0005e160" },
 { "file_offset": 385600, "flags": 32, "name": "_code_0005e240" },
 { "file_offset": 385744, "flags": 32, "name": "_code_0005e2d0" },
