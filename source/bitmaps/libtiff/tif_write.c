@@ -481,7 +481,7 @@ TIFFBufferSetup(tif, module)
 	 */
 	if (size < 8*1024)
 		size = 8*1024;
-	tif->tif_rawdata = malloc(size);
+	tif->tif_rawdata = (char *)debug_malloc(size, 0, "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_write.c", 484);
 	if (tif->tif_rawdata == NULL) {
 		TIFFError(module, "%s: No space for output buffer",
 		    tif->tif_name);
