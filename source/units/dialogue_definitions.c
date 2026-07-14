@@ -863,4 +863,22 @@ char const *dialogue_get_vocalization_name(
 	return name;
 }
 
+short dialogue_get_vocalization_type_by_name(
+	char const *name)
+{
+	short vocalization_type = NONE;
+	short index;
+
+	for (index = 0; index < NUMBER_OF_DIALOGUE_VOCALIZATION_TYPES; index++)
+	{
+		if (csstrcmp(dialogue_vocalization_type_name[index][0], name) == 0)
+		{
+			vocalization_type = index;
+			break;
+		}
+	}
+
+	return vocalization_type;
+}
+
 /* ---------- private code */
