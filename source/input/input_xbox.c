@@ -123,4 +123,9 @@ void input_deactivate(void)
 {
 }
 
+const struct mouse_state *input_get_mouse_state(void)
+{
+	return NULL;
+}
+
 /* ---------- private code */
