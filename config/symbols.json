@@ -21914,6 +21914,8 @@
 { "file_offset": 2993760, "flags": 0, "name": "_data_002dae60" },
 { "file_offset": 2993976, "flags": 0, "name": "_data_002daf38" },
 { "file_offset": 2994072, "flags": 0, "name": "_data_002daf98" },
+{ "file_offset": 2994164, "flags": 0, "name": "_photoNames" },
+{ "file_offset": 2994200, "flags": 0, "name": "_orientNames" },
 { "file_offset": 2994240, "flags": 0, "name": "_data_002db040" },
 { "file_offset": 2994416, "flags": 0, "name": "_data_002db0f0" },
 { "file_offset": 2994504, "flags": 0, "name": "_data_002db148" },
