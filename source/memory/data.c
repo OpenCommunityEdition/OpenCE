@@ -108,6 +108,24 @@ void data_verify(
 	return;
 }
 
+struct data_array *data_new(
+	const char *name,
+	short maximum_count,
+	short size)
+{
+	struct data_array *data = (struct data_array *)match_malloc(
+		"c:\\halo\\SOURCE\\memory\\data.c",
+		41,
+		data_allocation_size(maximum_count, size));
+
+	if (data)
+	{
+		data_initialize(data, name, maximum_count, size);
+	}
+
+	return data;
+}
+
 void data_dispose(
 	struct data_array *data)
 {
