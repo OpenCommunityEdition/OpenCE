@@ -132,4 +132,34 @@ void recorded_animation_byteswap_unit_control(byte **stream, byte unit_control_d
 	}
 }
 
+void recorded_animation_initialize_unit_control(
+	struct recorded_unit_control *unit_control,
+	byte **stream,
+	byte unit_control_data_version)
+{
+	short version_index;
+
+	csmemset(unit_control, 0, sizeof(*unit_control));
+	unit_control->version3_field = NONE;
+
+	for (version_index = 0; version_index < MAX(unit_control_data_version, 1); version_index++)
+	{
+		struct recorded_animation_control_field *field = data_002dce10.fields_by_version[version_index];
+
+		while (field->size != NONE)
+		{
+			if (field->unit_control_offset != NONE)
+			{
+				csmemcpy(
+					(byte *)unit_control + field->unit_control_offset,
+					*stream,
+					field->size);
+			}
+
+			*stream += field->size;
+			field++;
+		}
+	}
+}
+
 /* ---------- private code */
