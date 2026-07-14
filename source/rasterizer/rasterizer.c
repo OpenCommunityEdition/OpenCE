@@ -314,6 +314,7 @@ void _rasterizer_decals_update_function_pointers(void);
 void _rasterizer_dispose(void);
 void _rasterizer_frame_end(void);
 void _rasterizer_window_end(void);
+boolean _rasterizer_windows_begin(void);
 
 /* ---------- globals */
 
@@ -337,6 +338,11 @@ void rasterizer_frame_end(void)
 void rasterizer_window_end(void)
 {
 	_rasterizer_window_end();
+}
+
+boolean rasterizer_windows_begin(void)
+{
+	return _rasterizer_windows_begin();
 }
 
 /* ---------- private code */
