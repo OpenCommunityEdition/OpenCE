@@ -127,4 +127,9 @@ void damage_dispose_from_old_map(void)
 	return;
 }
 
+void damage_render_debug(void)
+{
+	return;
+}
+
 /* ---------- private code */
