@@ -75,10 +75,21 @@ struct random_math_globals
 	unsigned long global_local_random_seed;
 };
 
+struct geosphere
+{
+	long pad0;
+	real_vector3d *vertices;
+	long pad8;
+	short vertex_count;
+	short pad14;
+};
+
 /* ---------- prototypes */
 
 unsigned long system_seconds(void);
 void code_000fab20(void);
+struct geosphere *geosphere_new(short subdivision_count);
+void geosphere_dispose(struct geosphere *sphere);
 
 /* ---------- globals */
 
@@ -129,6 +140,24 @@ void random_seed_debug_log(
 unsigned long get_number_suitable_for_initializing_random_seed(void)
 {
 	return system_seconds()^system_milliseconds()^rand();
+}
+
+void random_math_initialize(void)
+{
+	struct geosphere *random_direction_geosphere;
+	short index;
+
+	bss_00456208.global_local_random_seed= get_number_suitable_for_initializing_random_seed();
+	random_direction_geosphere= geosphere_new(16);
+	match_assert("c:\\halo\\SOURCE\\math\\random_math.c", 174, random_direction_geosphere);
+	bss_00456208.random_direction_table= match_malloc(
+		"c:\\halo\\SOURCE\\math\\random_math.c",
+		176,
+		random_direction_geosphere->vertex_count*sizeof(real_vector3d));
+	bss_00456208.random_direction_table_size= random_direction_geosphere->vertex_count;
+	for (index= 0; index<random_direction_geosphere->vertex_count; index++)
+		((real_vector3d *)bss_00456208.random_direction_table)[index]= random_direction_geosphere->vertices[index];
+	geosphere_dispose(random_direction_geosphere);
 }
 
 void random_math_dispose(void)
