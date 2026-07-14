@@ -78,16 +78,17 @@ struct random_math_globals
 /* ---------- prototypes */
 
 unsigned long system_seconds(void);
+void code_000fab20(void);
 
 /* ---------- globals */
 
-static struct random_math_globals random_math_globals;
+static struct random_math_globals bss_00456208;
 
 /* ---------- public code */
 
 void lock_global_random_seed(void)
 {
-	random_math_globals.global_random_seed_lock++;
+	bss_00456208.global_random_seed_lock++;
 }
 
 void unlock_global_random_seed(void)
@@ -95,14 +96,14 @@ void unlock_global_random_seed(void)
 	match_vassert(
 		"c:\\halo\\SOURCE\\math\\random_math.c",
 		41,
-		random_math_globals.global_random_seed_lock>0,
+		bss_00456208.global_random_seed_lock>0,
 		"unmatched call to unlock_random_seed()");
-	random_math_globals.global_random_seed_lock--;
+	bss_00456208.global_random_seed_lock--;
 }
 
 unsigned long get_random_seed(void)
 {
-	return random_math_globals.global_random_seed;
+	return bss_00456208.global_random_seed;
 }
 
 unsigned long *get_global_random_seed_address(void)
@@ -110,14 +111,14 @@ unsigned long *get_global_random_seed_address(void)
 	match_vassert(
 		"c:\\halo\\SOURCE\\math\\random_math.c",
 		56,
-		!game_engine_running() || !random_math_globals.global_random_seed_lock,
+		!game_engine_running() || !bss_00456208.global_random_seed_lock,
 		"you should not be using global random(); use local random() instead");
-	return &random_math_globals.global_random_seed;
+	return &bss_00456208.global_random_seed;
 }
 
 unsigned long *get_global_local_random_seed_address(void)
 {
-	return &random_math_globals.global_local_random_seed;
+	return &bss_00456208.global_local_random_seed;
 }
 
 void random_seed_debug_log(
@@ -133,7 +134,7 @@ unsigned long get_number_suitable_for_initializing_random_seed(void)
 void random_math_dispose(void)
 {
 	debug_free(
-		random_math_globals.random_direction_table,
+		bss_00456208.random_direction_table,
 		"c:\\halo\\SOURCE\\math\\random_math.c",
 		200);
 }
@@ -167,6 +168,35 @@ real real_seed_random_range(
 {
 	real random= real_seed_random(seed);
 	return lower_bound+(upper_bound-lower_bound)*random;
+}
+
+__declspec(naked) real_vector3d *seed_random_direction3d(
+	unsigned long *seed,
+	real_vector3d *direction)
+{
+	__asm
+	{
+		push ebp
+		mov ebp, esp
+		mov ecx, seed
+		mov eax, dword ptr [bss_00456208+4]
+		push ebx
+		push esi
+		mov esi, dword ptr [ecx]
+		mov ebx, direction
+		imul esi, esi, 019660Dh
+		add esi, 03C6EF35Fh
+		mov dword ptr [ecx], esi
+		movsx eax, ax
+		shr esi, 16
+		imul esi, eax
+		shr esi, 16
+		call code_000fab20
+		pop esi
+		pop ebx
+		pop ebp
+		ret
+	}
 }
 
 /* ---------- private code */
