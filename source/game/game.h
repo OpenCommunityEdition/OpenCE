@@ -127,7 +127,7 @@ void game_unload(void);
 void game_dispose_from_old_map(void);
 void game_frame(real dt);
 void remove_quitting_players_from_game(void);
-void game_tick(long ticks_remaining_this_frame);
+void game_tick(void);
 void game_options_new(struct game_options *options);
 boolean game_options_verify(struct game_options *options);
 void game_initial_pulse(void);

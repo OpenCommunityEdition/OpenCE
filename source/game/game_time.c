@@ -123,6 +123,14 @@ struct game_time_globals_struct
 extern void update_client_start(void);
 extern void update_server_start(void);
 extern void *game_state_malloc(char const *, char const *, long);
+struct network_game_server;
+extern struct network_game_server *global_network_game_server_get(void);
+extern long network_game_server_get_oldest_client_update_received(struct network_game_server *server);
+extern void network_game_server_stalled_on_client(struct network_game_server *server, boolean stalled);
+extern void network_game_server_update_ticks(struct network_game_server *server, long ticks);
+extern long update_client_get_maximum_actions(void);
+extern long update_client_get_maximum_possible_server_time(void);
+extern void update_client_local_ticks(long ticks);
 
 /* ---------- globals */
 
@@ -299,7 +307,106 @@ void code_000a50c0(
 	return;
 }
 
-//code_000a50d0
+static void code_000a50d0(
+	short latency,
+	short server_updates,
+	short predicted_updates,
+	boolean first_line)
+{
+	short milliseconds_elapsed;
+	unsigned long milliseconds;
+
+	if (!game_time_statistics.active)
+	{
+		game_time_statistics.frame_count = 0;
+		game_time_statistics.total_milliseconds_elapsed = 0;
+		game_time_statistics.minimum_milliseconds_per_frame = SHORT_MAX;
+		game_time_statistics.maximum_milliseconds_per_frame = SHORT_MIN;
+		game_time_statistics.total_latency = 0;
+		game_time_statistics.minimum_latency = SHORT_MAX;
+		game_time_statistics.maximum_latency = SHORT_MIN;
+		game_time_statistics.server_updates = 0;
+		game_time_statistics.minimum_server_updates = SHORT_MAX;
+		game_time_statistics.maximum_server_updates = SHORT_MIN;
+		game_time_statistics.predicted_updates = 0;
+		game_time_statistics.minimum_predicted_updates = SHORT_MAX;
+		game_time_statistics.maximum_predicted_updates = SHORT_MIN;
+		game_time_statistics.last_milliseconds = system_milliseconds();
+		game_time_statistics.active = TRUE;
+		return;
+	}
+
+	milliseconds = system_milliseconds();
+	milliseconds_elapsed = (short)(milliseconds - game_time_statistics.last_milliseconds);
+	game_time_statistics.frame_count++;
+	game_time_statistics.total_milliseconds_elapsed += milliseconds_elapsed;
+	game_time_statistics.last_milliseconds = milliseconds;
+	if (milliseconds_elapsed > game_time_statistics.maximum_milliseconds_per_frame)
+		game_time_statistics.maximum_milliseconds_per_frame = milliseconds_elapsed;
+	if (milliseconds_elapsed < game_time_statistics.minimum_milliseconds_per_frame)
+		game_time_statistics.minimum_milliseconds_per_frame = milliseconds_elapsed;
+
+	game_time_statistics.total_latency += latency;
+	if (latency > game_time_statistics.maximum_latency)
+		game_time_statistics.maximum_latency = latency;
+	if (latency < game_time_statistics.minimum_latency)
+		game_time_statistics.minimum_latency = latency;
+
+	game_time_statistics.server_updates += server_updates;
+	if (server_updates > game_time_statistics.maximum_server_updates)
+		game_time_statistics.maximum_server_updates = server_updates;
+	if (server_updates < game_time_statistics.minimum_server_updates)
+		game_time_statistics.minimum_server_updates = server_updates;
+
+	game_time_statistics.predicted_updates += predicted_updates;
+	if (predicted_updates > game_time_statistics.maximum_predicted_updates)
+		game_time_statistics.maximum_predicted_updates = predicted_updates;
+	if (predicted_updates < game_time_statistics.minimum_predicted_updates)
+		game_time_statistics.minimum_predicted_updates = predicted_updates;
+
+	if (game_time_statistics.total_milliseconds_elapsed >= SOME_LARGE_NUMBER_OF_TICKS &&
+		game_time_statistics.frame_count > 0)
+	{
+		if (game_time_statistics.minimum_latency)
+		{
+			short monitor_state = game_time_statistics.minimum_latency >= 0;
+			if (monitor_state != game_time_globals->monitor_state)
+			{
+				game_time_globals->monitor_state = monitor_state;
+				game_time_globals->monitor_counter = 0;
+				game_time_globals->monitor_latency = monitor_state ? SHORT_MAX : SHORT_MIN;
+			}
+
+			switch (game_time_globals->monitor_state)
+			{
+			case 0:
+				if (game_time_statistics.minimum_latency > game_time_globals->monitor_latency)
+					game_time_globals->monitor_latency = game_time_statistics.minimum_latency;
+				break;
+			case 1:
+				if (game_time_statistics.minimum_latency < game_time_globals->monitor_latency)
+					game_time_globals->monitor_latency = game_time_statistics.minimum_latency;
+				break;
+			}
+
+			game_time_globals->monitor_counter++;
+			if (game_time_globals->monitor_counter == 5)
+			{
+				game_time_globals->monitor_state = NONE;
+				game_time_statistics.active = FALSE;
+				return;
+			}
+		}
+		else
+		{
+			game_time_globals->monitor_state = NONE;
+		}
+
+		game_time_statistics.active = FALSE;
+	}
+
+	return;
+}
 
 void game_time_start(
 	void)
@@ -345,30 +452,139 @@ void game_time_update(
 
 	if (game_time_globals->active)
 	{
-		real v31 = game_time_globals->speed*30.;
+		long maximum_ticks_elapsed;
+		long ticks_elapsed;
+		real ticks_per_second = game_time_globals->speed*TICKS_PER_SECOND;
 
-		if (v31>.0f)
+		if (ticks_per_second > 0.f)
 		{
+			boolean discard_leftover_time = TRUE;
+			real game_time;
+
 			switch (game_connection())
 			{
+			case _game_connection_local:
+				maximum_ticks_elapsed = 7;
+				break;
 			case _game_connection_network_client:
-			{
+				maximum_ticks_elapsed = TICKS_PER_SECOND;
 				break;
-			}
 			case _game_connection_network_server:
-			{
+				{
+					struct network_game_server *server = global_network_game_server_get();
+					long oldest_client_update = network_game_server_get_oldest_client_update_received(server);
+					long game_time = game_time_get();
+
+					match_assert("c:\\halo\\SOURCE\\game\\game_time.c", 243,
+						(unsigned long)(game_time - oldest_client_update) <= 128);
+					if (game_time > 0)
+					{
+						maximum_ticks_elapsed = oldest_client_update - game_time + 128;
+						if (maximum_ticks_elapsed < TICKS_PER_SECOND)
+						{
+							if (maximum_ticks_elapsed <= 0)
+							{
+								network_game_server_stalled_on_client(server, TRUE);
+								break;
+							}
+						}
+						else
+						{
+							maximum_ticks_elapsed = TICKS_PER_SECOND;
+						}
+
+						network_game_server_stalled_on_client(server, FALSE);
+					}
+					else
+					{
+						maximum_ticks_elapsed = 1;
+					}
+				}
 				break;
-			}
 			case _game_connection_film_playback:
-			{
+				maximum_ticks_elapsed = TICKS_PER_SECOND;
+				discard_leftover_time = FALSE;
 				break;
 			}
-			default:
+
+			game_time = time_delta_sec + game_time_globals->leftover_dt;
+			ticks_elapsed = (long)MIN(floor(game_time*ticks_per_second), (real)SOME_LARGE_NUMBER_OF_TICKS);
+			if (ticks_elapsed > maximum_ticks_elapsed)
 			{
-				break;
+				ticks_elapsed = maximum_ticks_elapsed;
+				if (discard_leftover_time)
+					game_time = ticks_elapsed/ticks_per_second;
 			}
+
+			game_time_globals->leftover_dt = game_time - ticks_elapsed/ticks_per_second;
+			if (game_time_globals->leftover_dt <= 0.f)
+				game_time_globals->leftover_dt = 0.f;
+			match_assert("c:\\halo\\SOURCE\\game\\game_time.c", 306,
+				game_time_globals->leftover_dt >= 0.f && game_time_globals->leftover_dt <= 100.f);
+
+			if (game_connection() == _game_connection_network_client)
+			{
+				long maximum_actions = update_client_get_maximum_actions();
+				if (ticks_elapsed > maximum_actions)
+					ticks_elapsed = FLOOR(maximum_actions - 1, 0);
+				else if (ticks_elapsed + 7 < maximum_actions)
+					ticks_elapsed = FLOOR(maximum_actions - 1, 0);
+				else if (ticks_elapsed + 1 < maximum_actions)
+					ticks_elapsed++;
+
+				match_assert("c:\\halo\\SOURCE\\game\\game_time.c", 339, ticks_elapsed <= maximum_actions);
+				if (ticks_elapsed > maximum_actions)
+					ticks_elapsed = maximum_actions;
+			}
+
+			if (ticks_elapsed > 0)
+			{
+				long ticks_remaining = ticks_elapsed;
+				long final_local_time;
+				long maximum_possible_server_time;
+
+				while (game_time_globals->local_time < game_time_globals->server_time && ticks_remaining > 0)
+				{
+					game_time_globals->local_time++;
+					ticks_remaining--;
+				}
+
+				final_local_time = game_time_globals->local_time + ticks_remaining;
+				switch (game_connection())
+				{
+				case _game_connection_local:
+					update_client_local_ticks(ticks_remaining);
+					break;
+				case _game_connection_network_server:
+					network_game_server_update_ticks(global_network_game_server_get(), ticks_remaining);
+					break;
+				}
+
+				maximum_possible_server_time = update_client_get_maximum_possible_server_time();
+				if (maximum_possible_server_time > game_time_globals->server_time)
+				{
+					long final_server_time = MIN(maximum_possible_server_time, final_local_time);
+					long server_updates = final_server_time - game_time_globals->server_time;
+					long update_index;
+					for (update_index = 0; update_index < server_updates; update_index++)
+					{
+						game_tick();
+						game_time_globals->server_time++;
+						game_time_globals->local_time++;
+					}
+					code_000a50d0((short)(maximum_possible_server_time - game_time_globals->local_time),
+						(short)server_updates, 0, FALSE);
+				}
+				else
+				{
+					code_000a50d0((short)(maximum_possible_server_time - game_time_globals->local_time), 0, 0, FALSE);
+				}
+
+				game_time_globals->last_local_time_elapsed = (short)ticks_elapsed;
 			}
 		}
+
+		game_frame(game_time_globals->speed*time_delta_sec);
 	}
 	else
 	{
