@@ -1,5 +1,5 @@
 #ifndef lint
-static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_dir.c,v 1.110 92/03/06 11:59:49 sam Exp $";
+static char data_002b7f88[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_dir.c,v 1.110 92/03/06 11:59:49 sam Exp $\0TIFFSetDirectory";
 #endif
 
 /*
@@ -41,6 +41,9 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_dir.c,v 1.1
 #include "prototypes.h"
 
 void debug_free(void *pointer, const char *file, long line);
+
+#undef SeekOK
+#define SeekOK(fd, off) (_lseek(fd, (long)off, L_SET) == (long)off)
 
 static
 DECLARE2(code_000538c0, char**, cpp, char*, cp)
@@ -937,7 +940,6 @@ TIFFSetDirectory(tif, dirn)
 	register TIFF *tif;
 	int dirn;
 {
-	static char module[] = "TIFFSetDirectory";
 	u_short dircount;
 	long nextdir;
 	int n;
@@ -946,15 +948,15 @@ TIFFSetDirectory(tif, dirn)
 	for (n = dirn; n > 0 && nextdir != 0; n--) {
 		if (!SeekOK(tif->tif_fd, nextdir) ||
 		    !ReadOK(tif->tif_fd, &dircount, sizeof (dircount))) {
-			TIFFError(module, "%s: Error fetching directory count",
+			TIFFError(data_002b7f88+88, "%s: Error fetching directory count",
 			    tif->tif_name);
 			return (0);
 		}
 		if (tif->tif_flags & TIFF_SWAB)
 			TIFFSwabShort(&dircount);
-		lseek(tif->tif_fd, dircount*sizeof (TIFFDirEntry), L_INCR);
+		_lseek(tif->tif_fd, dircount*sizeof (TIFFDirEntry), L_INCR);
 		if (!ReadOK(tif->tif_fd, &nextdir, sizeof (nextdir))) {
-			TIFFError(module, "%s: Error fetching directory link",
+			TIFFError(data_002b7f88+88, "%s: Error fetching directory link",
 			    tif->tif_name);
 			return (0);
 		}
