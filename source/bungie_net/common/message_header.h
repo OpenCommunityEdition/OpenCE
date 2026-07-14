@@ -17,6 +17,12 @@ enum
 	MESSAGE_FLAG_BITS_MASK = 3,
 };
 
+enum message_header_byte_order
+{
+	_message_header_byte_order_network = 0,
+	_message_header_byte_order_host,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -24,6 +30,7 @@ enum
 /* ---------- prototypes/MESSAGE_HEADER.C */
 
 void build_message_header(word *msg, word length, byte type, byte flags);
+void byte_swap_message_header(word *header, enum message_header_byte_order byte_order);
 
 /* ---------- globals */
 

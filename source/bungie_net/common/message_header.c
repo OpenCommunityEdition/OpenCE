@@ -59,4 +59,29 @@ void build_message_header(
 	*msg = (*msg & 0xFFFC) | flags;
 }
 
+void byte_swap_message_header(
+	word *header,
+	enum message_header_byte_order byte_order)
+{
+	word value;
+
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\message_header.c", 80, header);
+
+	if (byte_order == _message_header_byte_order_host)
+	{
+		value = *header;
+		*header = (value << 8) | (value >> 8);
+		return;
+	}
+
+	if (byte_order == _message_header_byte_order_network)
+	{
+		value = *header;
+		*header = (value << 8) | (value >> 8);
+		return;
+	}
+
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\message_header.c", 94, !"bad value for byte order");
+}
+
 /* ---------- private code */
