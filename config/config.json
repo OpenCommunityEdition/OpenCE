@@ -423,7 +423,7 @@
 				{ "name": "source/tag_files/tag_files_xbox.c", "index": 51, "status": "Matching" },
 				{ "name": "source/tag_files/tag_files.c", "index": 52, "status": "Matching" },
 				{ "name": "source/tag_files/files_windows.c", "index": 53, "status": "NonMatching" },
-				{ "name": "source/tag_files/files.c", "index": 54, "status": "NonMatching" },
+				{ "name": "source/tag_files/files.c", "index": 54, "status": "Matching" },
 				{ "name": "source/structures/structures.c", "index": 55, "status": "NonMatching" },
 				{ "name": "source/structures/structure_visibility.c", "index": 56, "status": "NonMatching" },
 				{ "name": "source/structures/structure_runtime_decals.c", "index": 57, "status": "NonMatching" },
