@@ -218,8 +218,7 @@ void  zcfree (opaque, ptr)
     voidpf opaque;
     voidpf ptr;
 {
-    free(ptr);
-    if (opaque) return; /* make compiler happy */
+    debug_free(ptr, "c:\\halo\\SOURCE\\memory\\zlib\\zutil.c", 228);
 }
 
 #endif /* MY_ZCALLOC */
