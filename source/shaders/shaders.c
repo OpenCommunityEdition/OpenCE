@@ -101,6 +101,19 @@ boolean shader_is_double_sided(struct shader *shader)
 	return FALSE;
 }
 
+boolean shader_type_is_transparent(short shader_type)
+{
+	long type = shader_type;
+	boolean result = FALSE;
+
+	if (type==1 || (type>4 && type<=10))
+	{
+		result = TRUE;
+	}
+
+	return result;
+}
+
 void numeric_countdown_timer_set(long milliseconds, boolean auto_start)
 {
 	numeric_countdown_timer_milliseconds = milliseconds;
