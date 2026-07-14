@@ -108,6 +108,16 @@ void data_verify(
 	return;
 }
 
+void data_dispose(
+	struct data_array *data)
+{
+	data_verify(data);
+	csmemset(data, 0, sizeof(*data));
+	match_free("c:\\halo\\SOURCE\\memory\\data.c", 89, data);
+
+	return;
+}
+
 void data_make_invalid(
 	struct data_array *data)
 {
