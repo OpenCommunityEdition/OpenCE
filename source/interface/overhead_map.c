@@ -48,4 +48,9 @@ void overhead_map_initialize_for_new_map(void)
 {
 }
 
+void overhead_map_dispose_from_old_map(void)
+{
+	overhead_map_globals.enabled = FALSE;
+}
+
 /* ---------- private code */
