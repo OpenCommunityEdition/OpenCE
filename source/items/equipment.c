@@ -53,6 +53,16 @@ void equipment_place(
 		equipment->object.position.z += 0.05f;
 }
 
+void equipment_handle_pickup(
+	long equipment_index)
+{
+	struct item_datum *equipment = (struct item_datum *)object_get_and_verify_type(equipment_index, _object_mask_equipment);
+	struct equipment_definition *equipment_definition = equipment_definition_get(equipment->definition_index);
+
+	if (equipment_definition->equipment.pickup_sound.index != NONE)
+		unspatialized_impulse_sound_new(equipment_definition->equipment.pickup_sound.index, 1.f);
+}
+
 void equipment_definition_handle_pickup(
 	long equipment_definition_index)
 {
