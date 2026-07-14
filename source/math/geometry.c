@@ -210,4 +210,13 @@ real plane2d_distance_to_point(
 	return (plane->n.i*point->x + plane->n.j*point->y) - plane->d;
 }
 
+real vector_intersect_plane2d(
+	real_point2d const *point,
+	real_vector2d const *vector,
+	real_plane2d const *plane)
+{
+	return ((plane->n.i*point->x + plane->n.j*point->y) - plane->d) /
+		-(plane->n.i*vector->i + plane->n.j*vector->j);
+}
+
 /* ---------- private code */
