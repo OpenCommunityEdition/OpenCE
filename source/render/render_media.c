@@ -61,4 +61,8 @@ boolean render_media_build_render_target(void)
 	return FALSE;
 }
 
+void render_media(void)
+{
+}
+
 /* ---------- private code */
