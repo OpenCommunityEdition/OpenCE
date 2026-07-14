@@ -47,4 +47,16 @@ __declspec(naked) void *code_0012b870(void)
 	}
 }
 
+void code_0012b880(long object_index, void const *context, struct object_shadow *shadow)
+{
+	while (object_index != NONE)
+	{
+		struct object_datum *object = object_get(object_index);
+
+		object_get(object_index);
+		code_0012b880(object->object.first_child_object_index, context, shadow);
+		object_index = object->object.next_object_index;
+	}
+}
+
 /* ---------- private code */
