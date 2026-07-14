@@ -1129,7 +1129,7 @@
 { "file_offset": 380480, "flags": 32, "name": "_TIFFReadRawTile1", "static": true },
 { "file_offset": 380640, "flags": 32, "name": "_TIFFReadBufferSetup" },
 { "file_offset": 380832, "flags": 32, "name": "_TIFFStartStrip", "static": true },
-{ "file_offset": 380912, "flags": 32, "name": "_code_0005cff0" },
+{ "file_offset": 380912, "flags": 32, "name": "_TIFFStartTile", "static": true },
 { "file_offset": 381040, "flags": 32, "name": "_code_0005d070" },
 { "file_offset": 381120, "flags": 32, "name": "_TIFFReadRawStrip" },
 { "file_offset": 381280, "flags": 32, "name": "_code_0005d160" },
