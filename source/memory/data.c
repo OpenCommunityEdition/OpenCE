@@ -79,6 +79,13 @@ static void datum_initialize(struct data_array *data, struct datum_header *heade
 
 /* ---------- public code */
 
+long data_allocation_size(
+	short maximum_count,
+	short size)
+{
+	return maximum_count*size+sizeof(struct data_array);
+}
+
 void data_verify(
 	struct data_array *data)
 {
