@@ -116,4 +116,8 @@ void hud_dispose_nav_points_from_old_map(void)
 {
 }
 
+void hud_dispose_nav_points(void)
+{
+}
+
 /* ---------- private code */
