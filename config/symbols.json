@@ -1134,7 +1134,7 @@
 { "file_offset": 381120, "flags": 32, "name": "_TIFFReadRawStrip" },
 { "file_offset": 381280, "flags": 32, "name": "_TIFFFillStrip", "static": true },
 { "file_offset": 381472, "flags": 32, "name": "_TIFFReadRawTile" },
-{ "file_offset": 381632, "flags": 32, "name": "_code_0005d2c0" },
+{ "file_offset": 381632, "flags": 32, "name": "_TIFFFillTile", "static": true },
 { "file_offset": 381824, "flags": 32, "name": "_TIFFSeek", "static": true },
 { "file_offset": 382032, "flags": 32, "name": "_TIFFReadEncodedStrip" },
 { "file_offset": 382224, "flags": 32, "name": "_TIFFReadTile" },
