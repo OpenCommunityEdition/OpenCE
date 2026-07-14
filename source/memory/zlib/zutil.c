@@ -211,7 +211,7 @@ voidpf zcalloc (opaque, items, size)
     unsigned size;
 {
     if (opaque) items += size - size; /* make compiler happy */
-    return (voidpf)calloc(items, size);
+    return (voidpf)debug_malloc(items * size, TRUE, "c:\\halo\\SOURCE\\memory\\zlib\\zutil.c", 221);
 }
 
 void  zcfree (opaque, ptr)
