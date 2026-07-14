@@ -512,7 +512,8 @@ TIFFReadBufferSetup(tif, bp, size)
 
 	if (tif->tif_rawdata) {
 		if (tif->tif_flags & TIFF_MYBUFFER)
-			free(tif->tif_rawdata);
+			debug_free(tif->tif_rawdata,
+			    "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_read.c", 515);
 		tif->tif_rawdata = NULL;
 	}
 	if (bp) {
@@ -521,7 +522,8 @@ TIFFReadBufferSetup(tif, bp, size)
 		tif->tif_flags &= ~TIFF_MYBUFFER;
 	} else {
 		tif->tif_rawdatasize = roundup(size, 1024);
-		tif->tif_rawdata = malloc(tif->tif_rawdatasize);
+		tif->tif_rawdata = debug_malloc(tif->tif_rawdatasize, 0,
+		    "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_read.c", 524);
 		tif->tif_flags |= TIFF_MYBUFFER;
 	}
 	if (tif->tif_rawdata == NULL) {
