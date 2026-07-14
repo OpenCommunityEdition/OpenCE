@@ -51,4 +51,9 @@ void render_media_initialize_for_new_map(void)
 	render_media_globals.render_target_index = 0;
 }
 
+void render_media_dispose_from_old_map(void)
+{
+	render_media_globals.initialized = FALSE;
+}
+
 /* ---------- private code */
