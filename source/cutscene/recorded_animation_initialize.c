@@ -115,4 +115,21 @@ struct recorded_animation_layout_data data_002dce10 =
 
 /* ---------- public code */
 
+void recorded_animation_byteswap_unit_control(byte **stream, byte unit_control_data_version)
+{
+	short version_index;
+
+	for (version_index = 0; version_index < MAX(unit_control_data_version, 1); version_index++)
+	{
+		struct recorded_animation_control_field *field = data_002dce10.fields_by_version[version_index];
+
+		while (field->size != NONE)
+		{
+			byte_swap_data(field->definition, *stream, 1);
+			*stream += field->size;
+			field++;
+		}
+	}
+}
+
 /* ---------- private code */
