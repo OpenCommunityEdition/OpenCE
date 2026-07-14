@@ -315,6 +315,7 @@ void _rasterizer_dispose(void);
 void _rasterizer_frame_end(void);
 void _rasterizer_window_end(void);
 boolean _rasterizer_windows_begin(void);
+void _rasterizer_windows_end(void);
 
 /* ---------- globals */
 
@@ -343,6 +344,11 @@ void rasterizer_window_end(void)
 boolean rasterizer_windows_begin(void)
 {
 	return _rasterizer_windows_begin();
+}
+
+void rasterizer_windows_end(void)
+{
+	_rasterizer_windows_end();
 }
 
 /* ---------- private code */
