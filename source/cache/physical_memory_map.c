@@ -42,6 +42,7 @@ symbols in this file:
 
 #define GAME_STATE_BASE_ADDRESS 0x80061000
 #define GAME_STATE_SIZE 0x345000
+#define GAME_STATE_VERIFY_SIZE 0x305000
 #define TAG_CACHE_BASE_ADDRESS 0x803A6000
 #define TAG_CACHE_SIZE 0x1600000
 #define TEXTURE_CACHE_SIZE 0x1600000
@@ -84,6 +85,30 @@ void physical_memory_allocate(void)
 	physical_memory_map_globals.sound_cache_base_address = XPhysicalAlloc(SOUND_CACHE_SIZE, -1, 0, PAGE_READWRITE);
 #line 58 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"
 	match_assert(__FILE__, __LINE__, physical_memory_map_globals.sound_cache_base_address);
+}
+
+void physical_memory_verify(void)
+{
+	byte *address;
+	unsigned long page_status;
+
+	for (address = physical_memory_map_globals.tag_cache_base_address;
+		address < (byte *)physical_memory_map_globals.tag_cache_base_address + TAG_CACHE_SIZE;
+		address += 0x1000)
+	{
+		page_status = XQueryMemoryProtect(address);
+#line 77 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"
+		match_assert(__FILE__, __LINE__, page_status == PAGE_READWRITE);
+	}
+
+	for (address = physical_memory_map_globals.game_state_base_address;
+		address < (byte *)physical_memory_map_globals.game_state_base_address + GAME_STATE_VERIFY_SIZE;
+		address += 0x1000)
+	{
+		page_status = XQueryMemoryProtect(address);
+#line 86 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"
+		match_assert(__FILE__, __LINE__, page_status == PAGE_READWRITE);
+	}
 }
 
 void physical_memory_free(void)
