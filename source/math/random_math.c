@@ -56,6 +56,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "real_math.h"
+#include "game_engine.h"
 
 /* ---------- constants */
 
@@ -99,6 +100,16 @@ void unlock_global_random_seed(void)
 unsigned long get_random_seed(void)
 {
 	return random_math_globals.global_random_seed;
+}
+
+unsigned long *get_global_random_seed_address(void)
+{
+	match_vassert(
+		"c:\\halo\\SOURCE\\math\\random_math.c",
+		56,
+		!game_engine_running() || !random_math_globals.global_random_seed_lock,
+		"you should not be using global random(); use local random() instead");
+	return &random_math_globals.global_random_seed;
 }
 
 unsigned long *get_global_local_random_seed_address(void)
