@@ -110,7 +110,14 @@ symbols in this file:
 
 /* ---------- globals */
 
+static void *nav_point_data;
+
 /* ---------- public code */
+
+void hud_initialize_nav_points_for_new_map(void)
+{
+	csmemset(nav_point_data, NONE, 0xC0);
+}
 
 void hud_dispose_nav_points_from_old_map(void)
 {
