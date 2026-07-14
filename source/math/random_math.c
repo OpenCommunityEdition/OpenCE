@@ -145,4 +145,12 @@ unsigned short seed_random(
 	return *seed>>16;
 }
 
+short seed_random_range(
+	unsigned long *seed,
+	short lower_bound,
+	short upper_bound)
+{
+	return lower_bound+((unsigned long)(upper_bound-lower_bound)*seed_random(seed)>>16);
+}
+
 /* ---------- private code */
