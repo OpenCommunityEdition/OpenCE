@@ -10,11 +10,20 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum
+{
+	MAXIMUM_MESSAGE_SIZE = 0xFFF,
+	NUMBER_OF_MESSAGE_TYPES = 4,
+	MESSAGE_FLAG_BITS_MASK = 3,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/MESSAGE_HEADER.C */
+
+void build_message_header(word *msg, word length, byte type, byte flags);
 
 /* ---------- globals */
 

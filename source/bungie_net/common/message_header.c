@@ -26,6 +26,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "message_header.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -37,5 +40,23 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void build_message_header(
+	word *msg,
+	word length,
+	byte type,
+	byte flags)
+{
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\message_header.c", 67, msg);
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\message_header.c", 69, (0<=(length)) && ((length)<=MAXIMUM_MESSAGE_SIZE));
+
+	*msg = (*msg & 0xF) | (length << 4);
+
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\message_header.c", 70, (0<(type)) && ((type)<NUMBER_OF_MESSAGE_TYPES));
+	*msg = (*msg & 0xFFF3) | ((type & 3) << 2);
+
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\message_header.c", 71, (0<=flags) && ((flags)<=MESSAGE_FLAG_BITS_MASK));
+	*msg = (*msg & 0xFFFC) | flags;
+}
 
 /* ---------- private code */
