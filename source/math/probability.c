@@ -36,4 +36,21 @@ symbols in this file:
 
 /* ---------- public code */
 
+long factorial(short value)
+{
+	long result = 0;
+	short factor;
+
+	if (value >= 0)
+	{
+		result = 1;
+		for (factor = value; factor > 1; factor--)
+		{
+			result *= factor;
+		}
+	}
+
+	return result;
+}
+
 /* ---------- private code */
