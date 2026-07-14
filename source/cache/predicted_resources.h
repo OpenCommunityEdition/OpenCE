@@ -10,14 +10,26 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum
+{
+	_predicted_resource_bitmap,
+	_predicted_resource_sound
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct predicted_resource
+{
+	short type;
+	short resource_index;
+	long tag_index;
+};
+
 /* ---------- prototypes/PREDICTED_RESOURCES.C */
 
 void predicted_resources_precache(struct tag_block *predicted_resources);
-void predicted_resources_sound_precache(long sound_definition_index);
 
 /* ---------- globals */
 
