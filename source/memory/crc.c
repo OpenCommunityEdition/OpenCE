@@ -50,7 +50,8 @@ void crc_new(unsigned long *crc_reference)
 	*crc_reference = 0xFFFFFFFF;
 }
 
-__declspec(noinline) static void crc_table_initialize(unsigned long *crc_table)
+/* Initializes the CRC-32 lookup table; the private function has no surviving PDB name. */
+__declspec(noinline) static void code_001088e0(unsigned long *crc_table)
 {
 	unsigned long byte_index;
 	long byte_count;
@@ -86,7 +87,7 @@ void crc_checksum_buffer(unsigned long *crc_reference, void const *buffer, long 
 
 	if (!bss_00456220.initialized)
 	{
-		crc_table_initialize(bss_00456220.table);
+		code_001088e0(bss_00456220.table);
 		bss_00456220.initialized = TRUE;
 	}
 
