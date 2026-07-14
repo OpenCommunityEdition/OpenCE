@@ -784,7 +784,7 @@
 				{ "name": "source/bitmaps/libtiff/tif_fax4.c", "index": 412, "status": "NonMatching" },
 				{ "name": "source/bitmaps/libtiff/tif_fax3.c", "index": 413, "status": "MISSING" },
 				{ "name": "source/bitmaps/libtiff/tif_error.c", "index": 414, "status": "Matching" },
-				{ "name": "source/bitmaps/libtiff/tif_dumpmode.c", "index": 415, "status": "NonMatching" },
+				{ "name": "source/bitmaps/libtiff/tif_dumpmode.c", "index": 415, "status": "Matching" },
 				{ "name": "source/bitmaps/libtiff/tif_dirwrite.c", "index": 416, "status": "NonMatching" },
 				{ "name": "source/bitmaps/libtiff/tif_dirread.c", "index": 417, "status": "NonMatching" },
 				{ "name": "source/bitmaps/libtiff/tif_dirinfo.c", "index": 418, "status": "NonMatching" },

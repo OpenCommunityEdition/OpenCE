@@ -126,15 +126,13 @@ DumpModeDecode(tif, buf, cc, s)
 	 * data buffer to avoid extra copy.
 	 */
 	if (tif->tif_rawcp != (char*) buf)
-		bcopy(tif->tif_rawcp, buf, cc);
+		csmemcpy(buf, tif->tif_rawcp, cc);
 	if (tif->tif_flags & TIFF_SWAB) {
 		switch (tif->tif_dir.td_bitspersample) {
 		case 16:
-			assert((cc & 3) == 0);
 			TIFFSwabArrayOfShort((u_short *)buf, cc/2);
 			break;
 		case 32:
-			assert((cc & 15) == 0);
 			TIFFSwabArrayOfLong((u_long *)buf, cc/4);
 			break;
 		}
