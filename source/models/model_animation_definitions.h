@@ -186,6 +186,10 @@ struct animation_list
 
 /* ---------- prototypes/MODEL_ANIMATION_DEFINITIONS.C */
 
+byte *animation_get_frame_data(struct animation const *animation, short frame_index);
+byte *animation_get_frame_info(struct animation const *animation, short frame_index, short frame_info_size);
+char const *animation_list_get_string(struct animation_list const *animation_list, short animation_index);
+
 /* ---------- prototypes/MODEL_ANIMATIONS.C */
 
 void animation_get_node_orientations(
