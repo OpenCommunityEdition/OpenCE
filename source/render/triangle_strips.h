@@ -39,6 +39,9 @@ void triangle_strip_iterator_new(
 	struct triangle_strip_iterator *iterator,
 	word const *triangle_strip_vertex_indices,
 	short strip_count);
+boolean triangle_strip_iterator_get_triangle(
+	struct triangle_strip_iterator *iterator,
+	word *vertices);
 
 /* ---------- globals */
 

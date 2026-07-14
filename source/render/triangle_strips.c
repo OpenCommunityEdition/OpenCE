@@ -47,4 +47,52 @@ void triangle_strip_iterator_new(
 	iterator->signature = _valid_strip_iterator_signature;
 }
 
+boolean triangle_strip_iterator_get_triangle(
+	struct triangle_strip_iterator *iterator,
+	word *vertices)
+{
+	boolean result = TRUE;
+
+	match_assert("c:\\halo\\SOURCE\\render\\triangle_strips.c", 39, iterator);
+	match_assert("c:\\halo\\SOURCE\\render\\triangle_strips.c", 40, vertices);
+	match_assert("c:\\halo\\SOURCE\\render\\triangle_strips.c", 41, iterator->signature==_valid_strip_iterator_signature);
+
+	if (iterator->vertex_count)
+	{
+		if (iterator->reverse_winding)
+		{
+			vertices[0] = iterator->triangle_strip_vertex_indices[-1];
+			vertices[1] = iterator->triangle_strip_vertex_indices[-2];
+		}
+		else
+		{
+			vertices[0] = iterator->triangle_strip_vertex_indices[-2];
+			vertices[1] = iterator->triangle_strip_vertex_indices[-1];
+		}
+
+		vertices[2] = iterator->triangle_strip_vertex_indices[0];
+		iterator->triangle_strip_vertex_indices++;
+		iterator->reverse_winding = !iterator->reverse_winding;
+		iterator->vertex_count--;
+	}
+	else if (iterator->strip_count)
+	{
+		iterator->vertex_count = *iterator->triangle_strip_vertex_indices - 3;
+		iterator->triangle_strip_vertex_indices++;
+		match_assert("c:\\halo\\SOURCE\\render\\triangle_strips.c", 65, iterator->vertex_count>=0);
+
+		iterator->reverse_winding = TRUE;
+		vertices[0] = *iterator->triangle_strip_vertex_indices++;
+		vertices[1] = *iterator->triangle_strip_vertex_indices++;
+		vertices[2] = *iterator->triangle_strip_vertex_indices++;
+		iterator->strip_count--;
+	}
+	else
+	{
+		result = FALSE;
+	}
+
+	return result;
+}
+
 /* ---------- private code */
