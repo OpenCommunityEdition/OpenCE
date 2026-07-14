@@ -29,6 +29,17 @@ symbols in this file:
 
 /* ---------- structures */
 
+/* Fields shared by every widget instance and evidenced by ui_widget.c. */
+struct widget_instance_prefix
+{
+	long definition_tag_index;
+	char const *name;
+	short local_player_index;
+};
+
+typedef char widget_instance_local_player_index_offset[
+	offsetof(struct widget_instance_prefix, local_player_index) == 8 ? 1 : -1];
+
 /* ---------- prototypes */
 
 typedef wchar_t *(*ui_widget_text_replacement_function)(void *widget);
@@ -36,6 +47,7 @@ typedef wchar_t *(*ui_widget_text_replacement_function)(void *widget);
 /* ---------- globals */
 
 extern ui_widget_text_replacement_function data_0030632c[2];
+extern wchar_t bss_00454d08[2];
 
 /* ---------- public code */
 
@@ -55,4 +67,38 @@ wchar_t *code_000e4a90(void *widget)
 {
 	(void)widget;
 	return L"";
+}
+
+wchar_t *code_000e4aa0(void *widget)
+{
+	struct widget_instance_prefix *instance = widget;
+
+	switch (instance->local_player_index)
+	{
+	case NONE:
+	case 0:
+		bss_00454d08[0] = L'1';
+		bss_00454d08[1] = L'\0';
+		return bss_00454d08;
+
+	case 1:
+		bss_00454d08[0] = L'2';
+		bss_00454d08[1] = L'\0';
+		return bss_00454d08;
+
+	case 2:
+		bss_00454d08[0] = L'3';
+		bss_00454d08[1] = L'\0';
+		return bss_00454d08;
+
+	case 3:
+		bss_00454d08[0] = L'4';
+		bss_00454d08[1] = L'\0';
+		return bss_00454d08;
+
+	default:
+		bss_00454d08[0] = L'?';
+		bss_00454d08[1] = L'\0';
+		return bss_00454d08;
+	}
 }
