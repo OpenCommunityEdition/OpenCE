@@ -18,6 +18,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "triangle_strips.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -29,5 +32,19 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void triangle_strip_iterator_new(
+	struct triangle_strip_iterator *iterator,
+	word const *triangle_strip_vertex_indices,
+	short strip_count)
+{
+	match_assert("c:\\halo\\SOURCE\\render\\triangle_strips.c", 22, iterator);
+	match_assert("c:\\halo\\SOURCE\\render\\triangle_strips.c", 23, triangle_strip_vertex_indices);
+
+	iterator->triangle_strip_vertex_indices = triangle_strip_vertex_indices;
+	iterator->strip_count = strip_count;
+	iterator->vertex_count = 0;
+	iterator->signature = _valid_strip_iterator_signature;
+}
 
 /* ---------- private code */
