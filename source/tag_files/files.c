@@ -131,8 +131,8 @@ struct file_reference *file_reference_copy(
 	struct file_reference *destination,
 	const struct file_reference *source)
 {
-	struct file_reference_info *info = file_reference_get_info((struct file_reference *)source);
-	memcpy(destination, info, sizeof(*info));
+	file_reference_get_info((struct file_reference *)source);
+	memcpy(destination, source, sizeof(struct file_reference_info));
 
 	return destination;
 }
