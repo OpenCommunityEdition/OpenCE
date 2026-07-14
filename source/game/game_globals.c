@@ -144,4 +144,17 @@ short const global_difficulty_friend_settings[NUMBER_OF_GAME_DIFFICULTY_VALUES] 
 
 /* ---------- public code */
 
+char const *material_get_name(
+	short material_type)
+{
+	if (material_type != NONE)
+	{
+		match_assert("c:\\halo\\SOURCE\\game\\game_globals.c", 0x389,
+			material_type>=0 && material_type<NUMBER_OF_MATERIAL_TYPES);
+		return global_material_type_strings[material_type];
+	}
+
+	return "NONE";
+}
+
 /* ---------- private code */
