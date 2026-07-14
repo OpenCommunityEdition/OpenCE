@@ -76,4 +76,25 @@ unsigned long data_decompressed_size(
 	return result;
 }
 
+boolean data_decompress(
+	void const *compressed_data,
+	unsigned long compressed_size,
+	void *destination,
+	unsigned long *destination_size)
+{
+	boolean result = FALSE;
+
+	*destination_size = data_decompressed_size(compressed_data, compressed_size);
+	if (uncompress(
+		(Bytef *)destination,
+		destination_size,
+		(Bytef const *)compressed_data + sizeof(struct compressed_data_header),
+		compressed_size) == Z_OK)
+	{
+		result = TRUE;
+	}
+
+	return result;
+}
+
 /* ---------- private code */
