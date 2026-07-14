@@ -160,4 +160,13 @@ real real_seed_random(
 	return (real)(*seed>>16)/65535.0f;
 }
 
+real real_seed_random_range(
+	unsigned long *seed,
+	real lower_bound,
+	real upper_bound)
+{
+	real random= real_seed_random(seed);
+	return lower_bound+(upper_bound-lower_bound)*random;
+}
+
 /* ---------- private code */
