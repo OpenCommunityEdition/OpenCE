@@ -838,7 +838,7 @@ DECLARE2V(_TIFFgetfield, TIFFDirectory*, td, int, tag)
 
 #define	CleanupField(member) {		\
     if (td->member) {			\
-	debug_free((char *)td->member, "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_dir.c", __LINE__+20); \
+	debug_free((char *)td->member, "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_dir.c", __LINE__+17); \
 	td->member = 0;			\
     }					\
 }
