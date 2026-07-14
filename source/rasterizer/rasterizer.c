@@ -311,6 +311,7 @@ symbols in this file:
 /* ---------- prototypes */
 
 void _rasterizer_decals_update_function_pointers(void);
+void _rasterizer_dispose(void);
 
 /* ---------- globals */
 
@@ -319,6 +320,11 @@ void _rasterizer_decals_update_function_pointers(void);
 void rasterizer_decals_update_function_pointers(void)
 {
 	_rasterizer_decals_update_function_pointers();
+}
+
+void rasterizer_dispose(void)
+{
+	_rasterizer_dispose();
 }
 
 /* ---------- private code */
