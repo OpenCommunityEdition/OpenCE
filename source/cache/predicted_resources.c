@@ -12,6 +12,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cache/predicted_resources.h"
+#include "bitmaps/bitmap_group.h"
 #include "sound/sound_definitions.h"
 #include "tag_files/tag_groups.h"
 
@@ -28,6 +29,11 @@ void _sound_cache_sound_request(
 	boolean load,
 	boolean reference,
 	boolean block);
+
+void *_texture_cache_bitmap_get_hardware_format(
+	struct bitmap_data *bitmap,
+	boolean block,
+	boolean load);
 
 static void code_001ad870(long sound_definition_index);
 
@@ -50,8 +56,22 @@ void predicted_resources_precache(
 			predicted_resources,
 			predicted_resource_index,
 			struct predicted_resource);
-		if (predicted_resource->type == _predicted_resource_sound)
+		switch (predicted_resource->type)
+		{
+		case _predicted_resource_bitmap:
+			_texture_cache_bitmap_get_hardware_format(
+				TAG_BLOCK_GET_ELEMENT(
+					&((struct bitmap_group *)tag_get('bitm', predicted_resource->tag_index))->bitmap_data,
+					predicted_resource->resource_index,
+					struct bitmap_data),
+				FALSE,
+				TRUE);
+			break;
+
+		case _predicted_resource_sound:
 			code_001ad870(predicted_resource->tag_index);
+			break;
+		}
 	}
 }
 
