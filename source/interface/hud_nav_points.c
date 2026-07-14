@@ -99,6 +99,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "game_state.h"
 
 /* ---------- constants */
 
@@ -113,6 +114,12 @@ symbols in this file:
 static void *nav_point_data;
 
 /* ---------- public code */
+
+void hud_initialize_nav_points(void)
+{
+	nav_point_data = game_state_malloc("hud nav points", NULL, 0xC0);
+	match_assert("c:\\halo\\SOURCE\\interface\\hud_nav_points.c", 106, nav_point_data);
+}
 
 void hud_initialize_nav_points_for_new_map(void)
 {
