@@ -275,6 +275,8 @@ symbols in this file:
 
 /* ---------- globals */
 
+extern boolean hs_model_animation_compression_enabled;
+
 static struct animation_list_entry unit_seat_animation_list_entries[] =
 {
 	{ "airborne-dead", _animation_base },
@@ -312,5 +314,23 @@ static struct animation_list_entry unit_seat_animation_list_entries[] =
 struct animation_list unit_seat_animation_list = {NUMBEROF(unit_seat_animation_list_entries), unit_seat_animation_list_entries };
 
 /* ---------- public code */
+
+byte *animation_get_frame_data(struct animation const *animation, short frame_index)
+{
+	byte *frame_data;
+	boolean compressed;
+
+	compressed = TEST_FLAG(animation->flags, _animation_compressed_bit) && hs_model_animation_compression_enabled;
+	frame_data = tag_data_get_pointer(&animation->data, 0, 0);
+
+	match_assert("c:\\halo\\SOURCE\\models\\model_animation_definitions.c", 1147, frame_index>=0 && frame_index<animation->frame_count);
+
+	if (compressed)
+		frame_data += animation->compressed_data_offset;
+	else
+		frame_data += frame_index * animation->frame_size;
+
+	return frame_data;
+}
 
 /* ---------- private code */
