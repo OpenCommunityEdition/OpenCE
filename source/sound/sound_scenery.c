@@ -10,6 +10,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "object_types.h"
+#include "objects.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -21,5 +25,16 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+boolean sound_scenery_new(
+	long object_index)
+{
+	struct object_datum *object;
+
+	object = (struct object_datum *)object_get_and_verify_type(object_index, FLAG(_object_type_sound_scenery));
+	object->object.flags |= FLAG(_object_shadowless_bit);
+
+	return TRUE;
+}
 
 /* ---------- private code */
