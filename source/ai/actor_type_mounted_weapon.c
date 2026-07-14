@@ -12,6 +12,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "actors.h"
+#include "actor_types.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -20,8 +24,53 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void mounted_weapon_decide_action(long actor_index);
+
 /* ---------- globals */
 
 /* ---------- public code */
 
 /* ---------- private code */
+
+void mounted_weapon_decide_action(long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	actor_action_handle_initial_action(actor_index);
+	actor_action_handle_pending_command_list(actor_index);
+	if (!actor_action_deny_transition(actor_index))
+	{
+		actor_action_handle_combat_transition(actor_index);
+	}
+
+	switch (actor->state.action)
+	{
+	case _actor_action_fight:
+	case _actor_action_flee:
+	case _actor_action_guard:
+	case _actor_action_charge:
+		if (!actor_action_handle_combat_status(actor_index, TRUE, FALSE))
+		{
+			actor_action_handle_combat_failure(actor_index);
+			return;
+		}
+		break;
+
+	case _actor_action_uncover:
+	case _actor_action_search:
+	case _actor_action_wait:
+		if (!actor_action_handle_combat_status(actor_index, TRUE, FALSE))
+		{
+			actor_action_handle_exit_pursuit(actor_index);
+			return;
+		}
+		break;
+
+	case _actor_action_obey:
+		actor_action_handle_combat_status(
+			actor_index,
+			actor->state.action_data.obey.initiative,
+			actor->state.action_data.obey.finished);
+		break;
+	}
+}

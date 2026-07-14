@@ -35,6 +35,25 @@ enum
 
 /* ---------- structures */
 
+typedef void (*actor_decide_action_proc)(long actor_index);
+typedef void (*actor_swarm_control_proc)(long actor_index);
+typedef void (*actor_swarm_aim_jump_proc)(long actor_index);
+
+struct actor_type_definition
+{
+	const char *name;
+	short race;
+	short when_to_search_at_target;
+	short when_to_pursue;
+	short when_to_search_pursuit;
+	long pursuit_controller;
+	boolean swarm;
+	byte pad[3];
+	actor_decide_action_proc decide_action;
+	actor_swarm_control_proc swarm_control;
+	actor_swarm_aim_jump_proc swarm_aim_jump;
+};
+
 /* ---------- prototypes/EXAMPLE.C */
 
 /* ---------- globals */

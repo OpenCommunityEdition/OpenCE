@@ -366,6 +366,14 @@ struct action_state_data
 
 /* ---------- prototypes/ACTIONS.C */
 
+void actor_action_handle_initial_action(long actor_index);
+void actor_action_handle_pending_command_list(long actor_index);
+boolean actor_action_deny_transition(long actor_index);
+void actor_action_handle_combat_transition(long actor_index);
+boolean actor_action_handle_combat_status(long actor_index, boolean initiative, boolean finished);
+void actor_action_handle_combat_failure(long actor_index);
+void actor_action_handle_exit_pursuit(long actor_index);
+
 struct pursuit_location *actor_get_pursuit_location(long actor_index);
 
 real_argb_color *actor_action_debug_color(long actor_index);
