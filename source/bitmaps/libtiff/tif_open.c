@@ -168,14 +168,15 @@ TIFFFdOpen(fd, name, mode)
 	m = getMode(mode, module);
 	if (m == -1)
 		goto bad2;
-	tif = (TIFF *)malloc(sizeof (TIFF) + strlen(name) + 1);
+	tif = (TIFF *)debug_malloc(sizeof (TIFF) + csstrlen(name) + 1, 0,
+	    "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_open.c", 171);
 	if (tif == NULL) {
 		TIFFError(module, "%s: Out of memory (TIFF structure)", name);
 		goto bad2;
 	}
-	bzero((char *)tif, sizeof (*tif));
+	csmemset((char *)tif, 0, sizeof (*tif));
 	tif->tif_name = (char *)tif + sizeof (TIFF);
-	strcpy(tif->tif_name, name);
+	csstrcpy(tif->tif_name, name);
 	tif->tif_fd = fd;
 	tif->tif_mode = m &~ (O_CREAT|O_TRUNC);
 	tif->tif_curdir = -1;		/* non-existent directory */
