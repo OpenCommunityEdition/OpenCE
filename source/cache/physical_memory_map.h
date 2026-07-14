@@ -19,6 +19,8 @@ header included in hcex build.
 void physical_memory_allocate(void);
 void physical_memory_verify(void);
 
+void *physical_memory_get_game_state_base_address(void);
+
 /* ---------- globals */
 
 /* ---------- public code */

@@ -34,16 +34,33 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cache/physical_memory_map.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct physical_memory_map_globals
+{
+	void *game_state_base_address;
+	void *tag_cache_base_address;
+	void *texture_cache_base_address;
+	void *sound_cache_base_address;
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+static struct physical_memory_map_globals physical_memory_map_globals;
+
 /* ---------- public code */
+
+void *physical_memory_get_game_state_base_address(void)
+{
+	return physical_memory_map_globals.game_state_base_address;
+}
 
 /* ---------- private code */
