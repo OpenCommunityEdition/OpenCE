@@ -203,6 +203,11 @@ symbols in this file:
 
 /* ---------- public code */
 
+boolean convex_hull3d_verify(void)
+{
+	return TRUE;
+}
+
 real plane2d_distance_to_point(
 	real_plane2d const *plane,
 	real_point2d const *point)
