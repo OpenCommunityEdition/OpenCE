@@ -778,7 +778,7 @@
 				{ "name": "source/bitmaps/libtiff/tif_next.c", "index": 406, "status": "Matching" },
 				{ "name": "source/bitmaps/libtiff/tif_machdep.c", "index": 407, "status": "NonMatching" },
 				{ "name": "source/bitmaps/libtiff/tif_lzw.c", "index": 408, "status": "NonMatching" },
-				{ "name": "source/bitmaps/libtiff/tif_jpeg.c", "index": 409, "status": "NonMatching" },
+				{ "name": "source/bitmaps/libtiff/tif_jpeg.c", "index": 409, "status": "Matching" },
 				{ "name": "source/bitmaps/libtiff/tif_getimage.c", "index": 410, "status": "NonMatching" },
 				{ "name": "source/bitmaps/libtiff/tif_flush.c", "index": 411, "status": "Matching" },
 				{ "name": "source/bitmaps/libtiff/tif_fax4.c", "index": 412, "status": "NonMatching" },
