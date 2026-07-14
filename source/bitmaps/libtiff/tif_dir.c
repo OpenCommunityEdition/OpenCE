@@ -543,7 +543,7 @@ TIFFVSetField(tif, tag, ap)
 }
 
 static
-TIFFGetField1(td, tag, ap)
+code_00054160(td, tag, ap)
 	TIFFDirectory *td;
 	int tag;
 	va_list ap;
@@ -784,7 +784,7 @@ DECLARE2V(TIFFGetField, TIFF*, tif, int, tag)
 		if (bit != FIELD_IGNORE && TIFFFieldSet(tif, bit)) {
 			va_list ap;
 			VA_START(ap, tag);
-			(void) TIFFGetField1(&tif->tif_dir, tag, ap);
+			(void) code_00054160(&tif->tif_dir, tag, ap);
 			va_end(ap);
 			return (1);
 		}
@@ -809,7 +809,7 @@ TIFFVGetField(tif, tag, ap)
 	if (fip) {
 		u_short bit = fip->field_bit;
 		if (bit != FIELD_IGNORE && TIFFFieldSet(tif, bit)) {
-			(void) TIFFGetField1(&tif->tif_dir, tag, ap);
+			(void) code_00054160(&tif->tif_dir, tag, ap);
 			return (1);
 		}
 	} else
@@ -827,7 +827,7 @@ DECLARE2V(_TIFFgetfield, TIFFDirectory*, td, int, tag)
 	va_list ap;
 
 	VA_START(ap, tag);
-	(void) TIFFGetField1(td, tag, ap);
+	(void) code_00054160(td, tag, ap);
 	va_end(ap);
 }
 
