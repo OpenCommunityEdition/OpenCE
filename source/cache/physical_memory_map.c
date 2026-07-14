@@ -34,6 +34,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries_windows.h"
 #include "cache/physical_memory_map.h"
 
 /* ---------- constants */
@@ -57,6 +58,18 @@ struct physical_memory_map_globals
 static struct physical_memory_map_globals physical_memory_map_globals;
 
 /* ---------- public code */
+
+void physical_memory_free(void)
+{
+	if (physical_memory_map_globals.game_state_base_address)
+		XPhysicalFree(physical_memory_map_globals.game_state_base_address);
+	if (physical_memory_map_globals.tag_cache_base_address)
+		XPhysicalFree(physical_memory_map_globals.tag_cache_base_address);
+	if (physical_memory_map_globals.texture_cache_base_address)
+		XPhysicalFree(physical_memory_map_globals.texture_cache_base_address);
+	if (physical_memory_map_globals.sound_cache_base_address)
+		XPhysicalFree(physical_memory_map_globals.sound_cache_base_address);
+}
 
 void *physical_memory_get_game_state_base_address(void)
 {
