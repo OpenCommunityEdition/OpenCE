@@ -639,7 +639,7 @@
 				{ "name": "source/interface/motion_sensor.c", "index": 267, "status": "NonMatching" },
 				{ "name": "source/interface/hud_weapon.c", "index": 268, "status": "NonMatching" },
 				{ "name": "source/interface/hud_unit.c", "index": 269, "status": "NonMatching" },
-				{ "name": "source/interface/hud_sounds.c", "index": 270, "status": "NonMatching" },
+				{ "name": "source/interface/hud_sounds.c", "index": 270, "status": "Matching" },
 				{ "name": "source/interface/hud_nav_points.c", "index": 271, "status": "NonMatching" },
 				{ "name": "source/interface/hud_messaging_definitions.c", "index": 272, "status": "Matching" },
 				{ "name": "source/interface/hud_messaging.c", "index": 273, "status": "NonMatching" },
