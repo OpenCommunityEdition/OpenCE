@@ -18,6 +18,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "memory/crc.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -29,5 +32,10 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void crc_new(unsigned long *crc_reference)
+{
+	*crc_reference = 0xFFFFFFFF;
+}
 
 /* ---------- private code */
