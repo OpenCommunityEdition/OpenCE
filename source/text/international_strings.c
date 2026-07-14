@@ -93,17 +93,19 @@ word get_previous_character(
 	short *index)
 {
 	short i;
+	short previous_index;
 	word result;
 
 	match_vassert(
 		"c:\\halo\\SOURCE\\text\\international_strings.c",
 		55,
-		VALID_INDEX(*index, (short)strlen((char *)string)),
+		*index>0 && *index<=strlen((char *)string),
 		csprintf(temporary, "#%d is out of range in string @%p", *index, string));
 
 	i = 0;
 	do
 	{
+		previous_index = i;
 		result = get_next_character(string, &i);
 	}
 	while (i<*index);
@@ -115,7 +117,7 @@ word get_previous_character(
 		i==*index,
 		csprintf(temporary, "index #%d is inbetween characters in string %p", *index, string));
 
-	*index = i;
+	*index = previous_index;
 
 	return result;
 }
