@@ -33,6 +33,10 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_compress.c,
  */
 #include "tiffioP.h"
 
+#define LZW_SUPPORT
+#define PACKBITS_SUPPORT
+#define JPEG_SUPPORT
+
 #if USE_PROTOTYPES
 extern	int TIFFInitDumpMode(TIFF*);
 #ifdef PACKBITS_SUPPORT
