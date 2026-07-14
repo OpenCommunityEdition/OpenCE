@@ -43,25 +43,25 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_dir.c,v 1.1
 void debug_free(void *pointer, const char *file, long line);
 
 static
-DECLARE2(setString, char**, cpp, char*, cp)
+DECLARE2(code_000538c0, char**, cpp, char*, cp)
 {
 	if (*cpp)
-		free(*cpp), *cpp = 0;
+		debug_free(*cpp, "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_dir.c", 69), *cpp = 0;
 	if (cp) {
-		int len = strlen(cp)+1;
-		if (*cpp = malloc(len))
-			bcopy(cp, *cpp, len);
+		int len = csstrlen(cp)+1;
+		if (*cpp = debug_malloc(len, 0, "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_dir.c", 72))
+			csmemcpy(*cpp, cp, len);
 	}
 }
 
 static
-DECLARE3(setShortArray, u_short**, wpp, u_short*, wp, long, n)
+DECLARE3(code_00053910, u_short**, wpp, u_short*, wp, long, n)
 {
 	if (*wpp)
-		free((char *)*wpp), *wpp = 0;
+		debug_free((char *)*wpp, "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_dir.c", 81), *wpp = 0;
 	n *= sizeof (u_short);
-	if (wp && (*wpp = (u_short *)malloc(n)))
-		bcopy(wp, *wpp, n);
+	if (wp && (*wpp = (u_short *)debug_malloc(n, 0, "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_dir.c", 83)))
+		csmemcpy(*wpp, wp, n);
 }
 
 static
@@ -212,28 +212,28 @@ TIFFSetField1(tif, tag, ap)
 		td->td_fillorder = v;
 		break;
 	case TIFFTAG_DOCUMENTNAME:
-		setString(&td->td_documentname, va_arg(ap, char *));
+		code_000538c0(&td->td_documentname, va_arg(ap, char *));
 		break;
 	case TIFFTAG_ARTIST:
-		setString(&td->td_artist, va_arg(ap, char *));
+		code_000538c0(&td->td_artist, va_arg(ap, char *));
 		break;
 	case TIFFTAG_DATETIME:
-		setString(&td->td_datetime, va_arg(ap, char *));
+		code_000538c0(&td->td_datetime, va_arg(ap, char *));
 		break;
 	case TIFFTAG_HOSTCOMPUTER:
-		setString(&td->td_hostcomputer, va_arg(ap, char *));
+		code_000538c0(&td->td_hostcomputer, va_arg(ap, char *));
 		break;
 	case TIFFTAG_IMAGEDESCRIPTION:
-		setString(&td->td_imagedescription, va_arg(ap, char *));
+		code_000538c0(&td->td_imagedescription, va_arg(ap, char *));
 		break;
 	case TIFFTAG_MAKE:
-		setString(&td->td_make, va_arg(ap, char *));
+		code_000538c0(&td->td_make, va_arg(ap, char *));
 		break;
 	case TIFFTAG_MODEL:
-		setString(&td->td_model, va_arg(ap, char *));
+		code_000538c0(&td->td_model, va_arg(ap, char *));
 		break;
 	case TIFFTAG_SOFTWARE:
-		setString(&td->td_software, va_arg(ap, char *));
+		code_000538c0(&td->td_software, va_arg(ap, char *));
 		break;
 	case TIFFTAG_ORIENTATION:
 		v = va_arg(ap, int);
@@ -285,7 +285,7 @@ TIFFSetField1(tif, tag, ap)
 		td->td_planarconfig = v;
 		break;
 	case TIFFTAG_PAGENAME:
-		setString(&td->td_pagename, va_arg(ap, char *));
+		code_000538c0(&td->td_pagename, va_arg(ap, char *));
 		break;
 	case TIFFTAG_XPOSITION:
 		td->td_xposition = va_arg(ap, dblparam_t);
@@ -315,9 +315,9 @@ TIFFSetField1(tif, tag, ap)
 		break;
 	case TIFFTAG_COLORMAP:
 		v = 1L<<td->td_bitspersample;
-		setShortArray(&td->td_colormap[0], va_arg(ap, u_short *), v);
-		setShortArray(&td->td_colormap[1], va_arg(ap, u_short *), v);
-		setShortArray(&td->td_colormap[2], va_arg(ap, u_short *), v);
+		code_00053910(&td->td_colormap[0], va_arg(ap, u_short *), v);
+		code_00053910(&td->td_colormap[1], va_arg(ap, u_short *), v);
+		code_00053910(&td->td_colormap[2], va_arg(ap, u_short *), v);
 		break;
 	case TIFFTAG_PREDICTOR:
 		td->td_predictor = va_arg(ap, int);
@@ -418,7 +418,7 @@ TIFFSetField1(tif, tag, ap)
 		break;
 	case TIFFTAG_TRANSFERFUNCTION:
 		for (i = 0; i < td->td_samplesperpixel; i++)
-		    setShortArray(&td->td_transferfunction[i],
+		    code_00053910(&td->td_transferfunction[i],
 			va_arg(ap, u_short *), 1L<<td->td_bitspersample);
 		break;
 	case TIFFTAG_REFERENCEBLACKWHITE:
@@ -437,10 +437,10 @@ TIFFSetField1(tif, tag, ap)
 		td->td_dotrange[1] = va_arg(ap, int);
 		break;
 	case TIFFTAG_INKNAMES:
-		setString(&td->td_inknames, va_arg(ap, char *));
+		code_000538c0(&td->td_inknames, va_arg(ap, char *));
 		break;
 	case TIFFTAG_TARGETPRINTER:
-		setString(&td->td_targetprinter, va_arg(ap, char *));
+		code_000538c0(&td->td_targetprinter, va_arg(ap, char *));
 		break;
 #endif
 	default:
