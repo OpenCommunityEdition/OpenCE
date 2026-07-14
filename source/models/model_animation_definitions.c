@@ -339,4 +339,12 @@ byte *animation_get_frame_info(struct animation const *animation, short frame_in
 	return tag_data_get_pointer(&animation->frame_info, frame_index * frame_info_size, frame_info_size);
 }
 
+char const *animation_list_get_string(struct animation_list const *animation_list, short animation_index)
+{
+	if (animation_index < animation_list->count && animation_list->animations[animation_index].name)
+		return animation_list->animations[animation_index].name;
+
+	return "#<invalid>";
+}
+
 /* ---------- private code */
