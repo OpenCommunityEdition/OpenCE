@@ -298,7 +298,9 @@ boolean datastore_read(
 	void *data)
 {
 	struct file_reference file_ref;
-	boolean success = FALSE;
+	boolean success;
+	unsigned long datastore_size = 0;
+	struct datastore *datastore;
 
 	struct file_reference_info *info = (struct file_reference_info *)&file_ref;
 
@@ -317,24 +319,40 @@ boolean datastore_read(
 
 	if (file_exists(&file_ref))
 	{
-		long datastore_size;
-		void *buffer = file_read_into_memory(&file_ref, (unsigned long *)&datastore_size);
+		long entry_index;
 
-		if (!buffer)
+		datastore = file_read_into_memory(&file_ref, &datastore_size);
+
+		if (!datastore)
 		{
 			file_delete(&file_ref);
 		}
 
 		if (datastore_size!=sizeof(struct datastore))
 		{
-			match_free("c:\\halo\\SOURCE\\tag_files\\files.c", 133, buffer);
+			match_free("c:\\halo\\SOURCE\\tag_files\\files.c", 389, datastore);
 			file_delete(&file_ref);
+			datastore = NULL;
 		}
 
-		if (buffer)
+		if (datastore)
 		{
-			long v10 = 0;
+			for (entry_index = 0; entry_index < NUMBER_OF_DATASTORE_ENTRIES; entry_index++)
+			{
+				if (!strcmp(datastore->entry[entry_index].name, field_name))
+				{
+					memcpy(data, datastore->entry[entry_index].data, length);
+					success = TRUE;
+					break;
+				}
 
+				if (datastore->entry[entry_index].name[0] == '\0')
+				{
+					break;
+				}
+			}
+
+			match_free("c:\\halo\\SOURCE\\tag_files\\files.c", 416, datastore);
 		}
 	}
 

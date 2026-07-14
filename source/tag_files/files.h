@@ -49,7 +49,7 @@ enum
 
 enum
 {
-	//NUMBER_OF_DATASTORE_ENTRIES
+	NUMBER_OF_DATASTORE_ENTRIES = 200,
 	DATASTORE_MAX_DATA_SIZE = 255,
 	DATASTORE_MAX_FIELD_NAME_SIZE = 255
 };
@@ -62,7 +62,7 @@ struct datastore_entry
 
 struct datastore
 {
-	struct datastore_entry entry[200];
+	struct datastore_entry entry[NUMBER_OF_DATASTORE_ENTRIES];
 };
 
 //enum
