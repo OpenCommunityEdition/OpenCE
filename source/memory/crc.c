@@ -27,9 +27,21 @@ symbols in this file:
 
 /* ---------- structures */
 
+#pragma pack(push, 1)
+struct crc_globals
+{
+	unsigned long table[256];
+	boolean initialized;
+};
+#pragma pack(pop)
+
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+#pragma bss_seg(".bss")
+struct crc_globals bss_00456220;
+#pragma bss_seg()
 
 /* ---------- public code */
 
