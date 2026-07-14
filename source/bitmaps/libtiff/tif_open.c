@@ -145,7 +145,7 @@ TIFFOpen(name, mode)
 	m = getMode(mode, module);
 	if (m == -1)
 		return ((TIFF *)0);
-	fd = TIFFOpenFile(name, m, 0666);
+	fd = TIFFOpenFile(name, m|O_BINARY, 0666);
 	if (fd < 0) {
 		TIFFError(module, "%s: Cannot open", name);
 		return ((TIFF *)0);
