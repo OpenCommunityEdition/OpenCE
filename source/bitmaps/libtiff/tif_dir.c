@@ -473,7 +473,7 @@ badvalue:
  * on the format of the data that is written.
  */
 static
-OkToChangeTag(tif, tag)
+code_00054030(tif, tag)
 	TIFF *tif;
 	int tag;
 {
@@ -504,7 +504,7 @@ DECLARE2V(TIFFSetField, TIFF*, tif, int, tag)
 {
 	int status = 0;
 
-	if (OkToChangeTag(tif, tag)) {
+	if (code_00054030(tif, tag)) {
 		va_list ap;
 
 		VA_START(ap, tag);
@@ -533,7 +533,7 @@ TIFFVSetField(tif, tag, ap)
 {
 	int status = 0;
 
-	if (!OkToChangeTag(tif, tag)) {
+	if (!code_00054030(tif, tag)) {
 		TIFFFieldInfo const *fip = TIFFFindFieldInfo(tag, TIFF_ANY);
 		if (fip)
 			TIFFError("TIFFVSetField",
