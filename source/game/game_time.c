@@ -290,7 +290,7 @@ void game_time_set_speed(
 	return;
 }
 
-static void code_000a50c0(
+void code_000a50c0(
 	void)
 {
 	game_time_statistics.first_line = TRUE;
@@ -315,8 +315,7 @@ void game_time_start(
 	game_time_globals->leftover_dt = 0;
 	game_time_globals->active = TRUE;
 	
-	game_time_statistics.first_line = TRUE;
-	game_time_statistics.active = FALSE;
+	code_000a50c0();
 
 	connection = game_connection();
 
