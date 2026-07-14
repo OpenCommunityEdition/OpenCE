@@ -892,7 +892,7 @@ TIFFDefaultDirectory(tif)
 {
 	register TIFFDirectory *td = &tif->tif_dir;
 
-	bzero((char *)td, sizeof (*td));
+	csmemset((char *)td, 0, sizeof (*td));
 	td->td_fillorder = FILLORDER_MSB2LSB;
 	td->td_bitspersample = 1;
 	td->td_threshholding = THRESHHOLD_BILEVEL;
