@@ -91,6 +91,21 @@ long memory_pool_allocation_size(
 	return size+sizeof(struct memory_pool);
 }
 
+void memory_pool_initialize(
+	struct memory_pool *pool,
+	char const *name,
+	long size)
+{
+	csmemset(pool, 0, sizeof(struct memory_pool));
+	pool->signature = 'pool';
+	csstrncpy(pool->name, name, sizeof(pool->name)-1);
+	pool->base_address = pool+1;
+	pool->size = size;
+	pool->free_size = size;
+	pool->first_block = NULL;
+	pool->last_block = NULL;
+}
+
 long memory_pool_get_free_size(
 	struct memory_pool *pool)
 {
