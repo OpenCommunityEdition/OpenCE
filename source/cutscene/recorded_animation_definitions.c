@@ -29,6 +29,8 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cutscene/recorded_animation_definitions.h"
+#include "cutscene/recorded_animation_playback.h"
+#include "cutscene/recorded_animation_playback_v1.h"
 #include "math/real_math.h"
 #include "scenario/scenario_definitions.h"
 
@@ -67,3 +69,22 @@ short scenario_get_animation_by_name(struct scenario const *scenario, char const
 }
 
 /* ---------- private code */
+
+void code_00081cd0(
+	struct recorded_animation_definition const *animation,
+	void *stream,
+	long stream_size)
+{
+	if (animation->version > 0)
+	{
+		if (animation->version > 3)
+		{
+			if (animation->version == 4)
+				byte_swap_recording_stream(stream, stream_size, animation->unit_control_data_version);
+		}
+		else
+		{
+			byte_swap_recording_stream_v1(stream, stream_size, animation->unit_control_data_version);
+		}
+	}
+}

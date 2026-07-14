@@ -14,7 +14,9 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/RECORDED_ANIMATION_PLAYBACK.C */
+
+void byte_swap_recording_stream(void *stream, long stream_size, byte unit_control_data_version);
 
 /* ---------- globals */
 
