@@ -26,4 +26,6 @@ boolean data_compress(
 	unsigned long *compressed_size,
 	unsigned long compressed_capacity);
 
+unsigned long data_decompressed_size(void const *compressed_data, unsigned long compressed_size);
+
 #endif // __DATA_COMPRESS_H

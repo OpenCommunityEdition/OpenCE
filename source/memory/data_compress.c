@@ -61,4 +61,19 @@ boolean data_compress(
 	return result;
 }
 
+unsigned long data_decompressed_size(
+	void const *compressed_data,
+	unsigned long compressed_size)
+{
+	unsigned long result = 0;
+
+	if (compressed_size >= sizeof(struct compressed_data_header))
+	{
+		struct compressed_data_header const *header = compressed_data;
+		result = SWAP4(header->decompressed_size);
+	}
+
+	return result;
+}
+
 /* ---------- private code */
