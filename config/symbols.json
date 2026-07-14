@@ -1126,7 +1126,7 @@
 { "file_offset": 377792, "flags": 32, "name": "_TIFFInitPackBits" },
 { "file_offset": 377872, "flags": 32, "name": "_TIFFPrintDirectory" },
 { "file_offset": 380336, "flags": 32, "name": "_code_0005cdb0" },
-{ "file_offset": 380480, "flags": 32, "name": "_code_0005ce40" },
+{ "file_offset": 380480, "flags": 32, "name": "_TIFFReadRawTile1", "static": true },
 { "file_offset": 380640, "flags": 32, "name": "_TIFFReadBufferSetup" },
 { "file_offset": 380832, "flags": 32, "name": "_TIFFStartStrip", "static": true },
 { "file_offset": 380912, "flags": 32, "name": "_code_0005cff0" },
