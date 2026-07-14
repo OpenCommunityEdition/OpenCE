@@ -183,6 +183,14 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
+#define plane2d_distance_to_point plane2d_distance_to_point_inline
+#include "real_math.h"
+#undef plane2d_distance_to_point
+
+#include "geometry.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -194,5 +202,12 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+real plane2d_distance_to_point(
+	real_plane2d const *plane,
+	real_point2d const *point)
+{
+	return (plane->n.i*point->x + plane->n.j*point->y) - plane->d;
+}
 
 /* ---------- private code */
