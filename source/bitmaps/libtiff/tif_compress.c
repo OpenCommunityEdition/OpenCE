@@ -86,7 +86,7 @@ struct cscheme {
 	int	scheme;
 	int	(*init)();
 };
-static const struct cscheme CompressionSchemes[] = {
+static struct cscheme CompressionSchemes[] = {
     { "Null",		COMPRESSION_NONE,	TIFFInitDumpMode },
 #ifdef LZW_SUPPORT
     { "LZW",		COMPRESSION_LZW,	TIFFInitLZW },
