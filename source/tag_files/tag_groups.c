@@ -54,7 +54,7 @@ void *tag_block_get_element_with_size(
 		csprintf(temporary,
 			"#%d is not a valid %s index in [#0,#%d)",
 			index,
-			block->definition->name ? block->definition->name : "unknown", block->count));
+			block->definition ? block->definition->name : "<unknown>", block->count));
 	match_assert("c:\\halo\\SOURCE\\tag_files\\tag_groups.c", 3090, block->address);
 
 	return (void *)((byte *)block->address + (index * element_size));
