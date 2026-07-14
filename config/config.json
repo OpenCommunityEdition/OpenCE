@@ -769,7 +769,7 @@
 				{ "name": "source/bitmaps/libtiff/tif_version.c", "index": 397, "status": "Matching" },
 				{ "name": "source/bitmaps/libtiff/tif_tile.c", "index": 398, "status": "NonMatching" },
 				{ "name": "source/bitmaps/libtiff/tif_thunder.c", "index": 399, "status": "Matching" },
-				{ "name": "source/bitmaps/libtiff/tif_swab.c", "index": 400, "status": "NonMatching" },
+				{ "name": "source/bitmaps/libtiff/tif_swab.c", "index": 400, "status": "Matching" },
 				{ "name": "source/bitmaps/libtiff/tif_strip.c", "index": 401, "status": "Matching" },
 				{ "name": "source/bitmaps/libtiff/tif_read.c", "index": 402, "status": "Matching" },
 				{ "name": "source/bitmaps/libtiff/tif_print.c", "index": 403, "status": "Matching" },
