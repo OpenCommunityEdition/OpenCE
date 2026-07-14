@@ -106,6 +106,23 @@ void memory_pool_initialize(
 	pool->last_block = NULL;
 }
 
+struct memory_pool *memory_pool_new(
+	char const *name,
+	long size)
+{
+	struct memory_pool *pool = match_malloc(
+		"c:\\halo\\SOURCE\\memory\\memory_pool.c",
+		70,
+		memory_pool_allocation_size(size));
+
+	if (pool)
+	{
+		memory_pool_initialize(pool, name, size);
+	}
+
+	return pool;
+}
+
 long memory_pool_get_free_size(
 	struct memory_pool *pool)
 {
