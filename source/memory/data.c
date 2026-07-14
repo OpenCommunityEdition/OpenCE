@@ -117,6 +117,16 @@ void data_make_invalid(
 	return;
 }
 
+void data_make_valid(
+	struct data_array *data)
+{
+	data_verify(data);
+	data->valid = TRUE;
+	data_delete_all(data);
+
+	return;
+}
+
 void datum_delete(
 	struct data_array *data,
 	long index)
