@@ -56,4 +56,9 @@ void render_media_dispose_from_old_map(void)
 	render_media_globals.initialized = FALSE;
 }
 
+boolean render_media_build_render_target(void)
+{
+	return FALSE;
+}
+
 /* ---------- private code */
