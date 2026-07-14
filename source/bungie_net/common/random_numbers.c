@@ -22,6 +22,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "bungie_net/common/random_numbers.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -32,6 +35,18 @@ symbols in this file:
 
 /* ---------- globals */
 
+static boolean random_numbers_initialized;
+
 /* ---------- public code */
+
+long randomrange(long min, long max)
+{
+	if (!random_numbers_initialized)
+	{
+		srand(time(NULL));
+		random_numbers_initialized= TRUE;
+	}
+	return (long)((double)rand()*(unsigned long)max/((unsigned long)min+32767.0))+min;
+}
 
 /* ---------- private code */
