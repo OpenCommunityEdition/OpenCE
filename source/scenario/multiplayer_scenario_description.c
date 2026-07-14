@@ -16,16 +16,105 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include <stdio.h>
+
+#include "cseries.h"
+
+#include "tag_files/tag_groups.h"
+
 /* ---------- constants */
+
+enum
+{
+	MULTIPLAYER_SCENARIO_DESCRIPTION_TAG = 'mply'
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct multiplayer_scenario_description_item
+{
+	struct tag_reference descriptive_bitmap;
+	struct tag_reference displayed_map_name;
+	char scenario_tag_path[1];
+};
+
+struct multiplayer_scenario_description
+{
+	struct tag_block scenarios;
+};
+
+typedef char multiplayer_scenario_description_item_path_offset_assert[
+	offsetof(struct multiplayer_scenario_description_item, scenario_tag_path) == 0x20 ? 1 : -1];
+
 /* ---------- prototypes */
+
+struct multiplayer_scenario_description_item *multiplayer_scenario_description_get_list(short *count);
+boolean map_name_from_multiplayer_scenario_description_item(
+	struct multiplayer_scenario_description_item const *item,
+	char *map_name,
+	unsigned long map_name_size);
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+struct multiplayer_scenario_description_item *multiplayer_scenario_description_get_list(
+	short *count)
+{
+	long scenario_list_index;
+
+	match_assert("c:\\halo\\SOURCE\\scenario\\multiplayer_scenario_description.c", 60, count);
+	scenario_list_index = tag_loaded(MULTIPLAYER_SCENARIO_DESCRIPTION_TAG, "ui\\multiplayer_scenarios");
+	if (scenario_list_index != NONE)
+	{
+		struct multiplayer_scenario_description *scenario_list =
+			tag_get(MULTIPLAYER_SCENARIO_DESCRIPTION_TAG, scenario_list_index);
+		struct multiplayer_scenario_description_item *result;
+
+		match_assert("c:\\halo\\SOURCE\\scenario\\multiplayer_scenario_description.c", 66, scenario_list);
+		result = scenario_list->scenarios.address;
+		*count = (short)scenario_list->scenarios.count;
+		return result;
+	}
+
+	*count = 0;
+	return NULL;
+}
+
+boolean map_name_from_multiplayer_scenario_description_item(
+	struct multiplayer_scenario_description_item const *item,
+	char *map_name,
+	unsigned long map_name_size)
+{
+	char const *scenario_tag_path;
+	long character_index;
+
+	match_assert("c:\\halo\\SOURCE\\scenario\\multiplayer_scenario_description.c", 88, item);
+	scenario_tag_path = item->scenario_tag_path;
+	*map_name = 0;
+	character_index = csstrlen(scenario_tag_path);
+	if (character_index >= 0)
+	{
+		do
+		{
+			if (*(scenario_tag_path + character_index) == '\\')
+			{
+				_snprintf(
+					map_name,
+					map_name_size,
+					"%s\\%s",
+					scenario_tag_path,
+					&item->scenario_tag_path[character_index + 1]);
+				break;
+			}
+			character_index--;
+		}
+		while (character_index >= 0);
+	}
+
+	return TRUE;
+}
 
 /* ---------- private code */
