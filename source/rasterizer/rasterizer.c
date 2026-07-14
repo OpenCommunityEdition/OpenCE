@@ -310,8 +310,15 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void _rasterizer_decals_update_function_pointers(void);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+void rasterizer_decals_update_function_pointers(void)
+{
+	_rasterizer_decals_update_function_pointers();
+}
 
 /* ---------- private code */
