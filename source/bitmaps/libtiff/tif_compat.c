@@ -31,8 +31,12 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_compat.c,v 
  */
 #include "tiffioP.h"
 
-#if defined(unix) || defined(__unix) || defined(MSDOS) || defined(VMS)
+#if defined(unix) || defined(__unix) || defined(MSDOS) || defined(VMS) || defined(xbox)
 #include <sys/stat.h>
+#ifdef xbox
+#define	stat	_stat
+#define	fstat	_fstat
+#endif
 
 long
 TIFFGetFileSize(fd)

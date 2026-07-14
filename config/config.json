@@ -790,7 +790,7 @@
 				{ "name": "source/bitmaps/libtiff/tif_dirinfo.c", "index": 418, "status": "NonMatching" },
 				{ "name": "source/bitmaps/libtiff/tif_dir.c", "index": 419, "status": "NonMatching" },
 				{ "name": "source/bitmaps/libtiff/tif_compress.c", "index": 420, "status": "NonMatching" },
-				{ "name": "source/bitmaps/libtiff/tif_compat.c", "index": 421, "status": "NonMatching" },
+				{ "name": "source/bitmaps/libtiff/tif_compat.c", "index": 421, "status": "Matching" },
 				{ "name": "source/bitmaps/libtiff/tif_close.c", "index": 422, "status": "Matching" },
 				{ "name": "source/bitmaps/libtiff/tif_ccittrle.c", "index": 423, "status": "NonMatching" },
 				{ "name": "source/bitmaps/libtiff/tif_aux.c", "index": 424, "status": "NonMatching" },
