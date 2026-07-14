@@ -20,6 +20,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "ui_widget_text_search_and_replace_functions.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -28,8 +31,22 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+typedef wchar_t *(*ui_widget_text_replacement_function)(void *widget);
+
 /* ---------- globals */
 
+extern ui_widget_text_replacement_function data_0030632c[2];
+
 /* ---------- public code */
+
+wchar_t *ui_widget_search_and_replace_invoke(void *widget, unsigned short function_index)
+{
+	match_assert("c:\\halo\\SOURCE\\interface\\ui_widget_text_search_and_replace_functions.c", 45, widget);
+
+	if ((short)function_index >= 0 && function_index < 2)
+		return data_0030632c[(short)function_index](widget);
+
+	return L"<invalid>";
+}
 
 /* ---------- private code */
