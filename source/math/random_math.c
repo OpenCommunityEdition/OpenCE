@@ -86,6 +86,11 @@ void lock_global_random_seed(void)
 	random_math_globals.global_random_seed_lock++;
 }
 
+unsigned long get_random_seed(void)
+{
+	return random_math_globals.global_random_seed;
+}
+
 unsigned long *get_global_local_random_seed_address(void)
 {
 	return &random_math_globals.global_local_random_seed;
