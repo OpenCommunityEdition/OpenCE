@@ -84,4 +84,39 @@ void byte_swap_message_header(
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\message_header.c", 94, !"bad value for byte order");
 }
 
+void *create_message(
+	long type,
+	void const *data,
+	unsigned long data_size,
+	void *buffer,
+	word buffer_size)
+{
+	short message_size = data_size + sizeof(word);
+
+	if (buffer)
+	{
+		match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\message_header.c", 41, buffer_size >= message_size);
+	}
+	else
+	{
+		buffer = debug_malloc(
+			message_size,
+			FALSE,
+			"c:\\halo\\SOURCE\\bungie_net\\common\\message_header.c",
+			46);
+	}
+
+	if (buffer)
+	{
+		build_message_header((word *)buffer, message_size, type, 0);
+
+		if (data)
+		{
+			csmemcpy((byte *)buffer + sizeof(word), data, (word)data_size);
+		}
+	}
+
+	return buffer;
+}
+
 /* ---------- private code */

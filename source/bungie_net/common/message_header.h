@@ -31,6 +31,7 @@ enum message_header_byte_order
 
 void build_message_header(word *msg, word length, byte type, byte flags);
 void byte_swap_message_header(word *header, enum message_header_byte_order byte_order);
+void *create_message(long type, void const *data, unsigned long data_size, void *buffer, word buffer_size);
 
 /* ---------- globals */
 
