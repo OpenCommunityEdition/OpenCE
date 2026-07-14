@@ -14,6 +14,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "text/text_group.h"
+#include "tag_files/tag_groups.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -25,5 +29,31 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+char *string_list_get_string(long tag_index, short string_index)
+{
+	char *result = "<missing string>";
+
+	if (tag_index != NONE)
+	{
+		struct string_list *list = tag_get('str#', tag_index);
+
+		if (string_index >= 0 && string_index < list->strings.count)
+		{
+			struct string_list_entry *entry = TAG_BLOCK_GET_ELEMENT(
+				&list->strings,
+				string_index,
+				struct string_list_entry);
+
+			if (entry->string.size > 0)
+			{
+				result = entry->string.address;
+				result[entry->string.size - 1] = '\0';
+			}
+		}
+	}
+
+	return result;
+}
 
 /* ---------- private code */

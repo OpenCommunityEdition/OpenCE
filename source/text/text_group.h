@@ -8,6 +8,10 @@ header included in hcex build.
 #define __TEXT_GROUP_H
 #pragma once
 
+/* ---------- headers */
+
+#include "tag_files/tag_groups.h"
+
 /* ---------- constants */
 
 enum
@@ -24,7 +28,20 @@ enum
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+struct string_list
+{
+	struct tag_block strings;
+};
+
+struct string_list_entry
+{
+	struct tag_data string;
+};
+
+/* ---------- prototypes/TEXT_GROUP.C */
+
+char *string_list_get_string(long tag_index, short string_index);
+wchar_t *unicode_string_list_get_string(long tag_index, short string_index);
 
 /* ---------- globals */
 
