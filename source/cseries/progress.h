@@ -34,6 +34,7 @@ struct progress_data
 /* ---------- prototypes/PROGRESS.C */
 
 void progress_new(struct progress_data *data, const struct progress_callback *callback, const char *description, long total);
+void progress_update(struct progress_data *data, long status, long completed, boolean force_update);
 
 /* ---------- globals */
 

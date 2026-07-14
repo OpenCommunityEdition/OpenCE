@@ -723,7 +723,7 @@
 				{ "name": "source/cutscene/cinematics.c", "index": 351, "status": "NonMatching" },
 				{ "name": "source/cseries/stack_walk_windows.c", "index": 352, "status": "NonMatching" },
 				{ "name": "source/cseries/sort.c", "index": 353, "status": "NonMatching" },
-				{ "name": "source/cseries/progress.c", "index": 354, "status": "NonMatching" },
+				{ "name": "source/cseries/progress.c", "index": 354, "status": "Matching" },
 				{ "name": "source/cseries/profile.c", "index": 355, "status": "NonMatching" },
 				{ "name": "source/cseries/errors.c", "index": 356, "status": "NonMatching" },
 				{ "name": "source/cseries/debug_memory.c", "index": 357, "status": "NonMatching" },

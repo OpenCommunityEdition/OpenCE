@@ -50,4 +50,25 @@ void progress_new(
 	}
 }
 
+void progress_update(
+	struct progress_data *data,
+	long status,
+	long completed,
+	boolean force_update)
+{
+	unsigned long milliseconds;
+
+	match_assert("c:\\halo\\SOURCE\\cseries\\progress.c", 35, data);
+
+	if (data->update && data->total)
+	{
+		milliseconds = system_milliseconds();
+		if (milliseconds - data->last_update_milliseconds > 125 || force_update)
+		{
+			data->update(data->context, data->description, status, completed * 100 / data->total);
+			data->last_update_milliseconds = milliseconds;
+		}
+	}
+}
+
 /* ---------- private code */
