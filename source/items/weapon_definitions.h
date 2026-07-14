@@ -207,7 +207,9 @@ struct weapon_definition
 	struct _weapon_definition weapon;
 };
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/WEAPON_DEFINITIONS.C */
+
+real weapon_definition_get_damage_potential(long weapon_definition_index, real *rate_of_fire);
 
 /* ---------- globals */
 
