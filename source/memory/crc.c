@@ -40,7 +40,7 @@ struct crc_globals
 /* ---------- globals */
 
 #pragma bss_seg(".bss")
-struct crc_globals bss_00456220;
+struct crc_globals crc_state;
 #pragma bss_seg()
 
 /* ---------- public code */
@@ -85,10 +85,10 @@ void crc_checksum_buffer(unsigned long *crc_reference, void const *buffer, long 
 
 	match_assert("c:\\halo\\SOURCE\\memory\\crc.c", 42, buffer_size>=0);
 
-	if (!bss_00456220.initialized)
+	if (!crc_state.initialized)
 	{
-		code_001088e0(bss_00456220.table);
-		bss_00456220.initialized = TRUE;
+		code_001088e0(crc_state.table);
+		crc_state.initialized = TRUE;
 	}
 
 	crc = *crc_reference;
@@ -97,7 +97,7 @@ void crc_checksum_buffer(unsigned long *crc_reference, void const *buffer, long 
 		do
 		{
 			table_index = (*(byte const *)buffer ^ crc) & 0xFF;
-			table_index = bss_00456220.table[table_index];
+			table_index = crc_state.table[table_index];
 			crc >>= 8;
 			buffer = (byte const *)buffer + 1;
 			crc ^= table_index;
