@@ -14,6 +14,16 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum tag_field_type
+{
+	_tag_field_string = 0,
+	_tag_field_char_integer = 1,
+	_tag_field_short_integer = 2,
+	_tag_field_data = 37,
+	_tag_field_pad = 40,
+	_tag_field_terminator = 44,
+};
+
 /* ---------- macros */
 
 #define TAG_BLOCK_GET_ELEMENT(block_address, index, type) ((type *)tag_block_get_element_with_size((block_address), (index), sizeof(type)))
@@ -24,6 +34,23 @@ typedef void (*byte_swap_block_proc)(void *);
 typedef boolean (*postprocess_block_proc)(void *, boolean);
 typedef byte *(*format_block_proc)(long, struct tag_block *, long, byte *);
 typedef void (*delete_block_proc)(struct tag_block *, long);
+typedef void (*byte_swap_data_proc)(void *, void *, long);
+
+struct tag_field
+{
+	short type;
+	word pad;
+	char *name;
+	void *definition;
+};
+
+struct tag_data_definition
+{
+	char *name;
+	unsigned long flags;
+	long maximum_size;
+	byte_swap_data_proc byte_swap_data;
+};
 
 struct tag_block_definition
 {

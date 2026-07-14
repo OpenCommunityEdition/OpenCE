@@ -42,7 +42,55 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void code_00081cd0(
+	struct recorded_animation_definition const *animation,
+	void *stream,
+	long stream_size);
+
 /* ---------- globals */
+
+struct recorded_animation_event_stream_definition
+{
+	struct tag_data_definition data;
+	struct tag_field fields[10];
+};
+
+struct recorded_animation_event_stream_definition recorded_animation_event_stream_data =
+{
+	{
+		"recorded_animation_event_stream_data",
+		0,
+		0x200000,
+		code_00081cd0,
+	},
+	{
+		{ _tag_field_string, 0, "name^", NULL },
+		{ _tag_field_char_integer, 0, "version*", NULL },
+		{ _tag_field_char_integer, 0, "raw animation data*", NULL },
+		{ _tag_field_char_integer, 0, "unit control data version*", NULL },
+		{ _tag_field_pad, 0, NULL, (void *)1 },
+		{ _tag_field_short_integer, 0, "length of animation*:ticks", NULL },
+		{ _tag_field_pad, 0, NULL, (void *)2 },
+		{ _tag_field_pad, 0, NULL, (void *)4 },
+		{ _tag_field_data, 0, "recorded animation event stream*", &recorded_animation_event_stream_data.data },
+		{ _tag_field_terminator, 0, NULL, NULL },
+	},
+};
+
+struct tag_block_definition recorded_animation_block =
+{
+	"recorded_animation_block",
+	0,
+	1024,
+	sizeof(struct recorded_animation_definition),
+	NULL,
+	recorded_animation_event_stream_data.fields,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+};
 
 /* ---------- public code */
 

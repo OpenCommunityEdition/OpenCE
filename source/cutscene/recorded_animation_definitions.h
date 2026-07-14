@@ -25,12 +25,13 @@ struct recorded_animation_definition
 {
 	char name[TAG_STRING_LENGTH+1];
 	byte version;
-	byte pad;
+	char raw_animation_data;
 	byte unit_control_data_version;
-	byte pad2;
-	long length_in_ticks;
+	byte pad;
+	short length_in_ticks;
+	word pad2;
+	unsigned long pad3;
 	struct tag_data event_stream;
-	long unused;
 };
 
 /* ---------- prototypes/RECORDED_ANIMATION_DEFINITIONS.C */
