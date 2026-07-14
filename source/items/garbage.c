@@ -10,6 +10,14 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "garbage.h"
+
+#include "items/items.h"
+#include "math/real_math.h"
+#include "objects/object_types.h"
+#include "objects/objects.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -21,5 +29,20 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+boolean garbage_update(
+	long garbage_index)
+{
+	struct garbage_datum *garbage = (struct garbage_datum *)object_get_and_verify_type(garbage_index, _object_mask_garbage);
+	boolean active;
+
+	--garbage->lifetime_ticks;
+	active = garbage->lifetime_ticks > 0;
+
+	if (!active)
+		object_delete(garbage_index);
+
+	return active;
+}
 
 /* ---------- private code */

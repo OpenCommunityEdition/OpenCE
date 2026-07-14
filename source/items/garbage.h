@@ -8,13 +8,25 @@ header included in hcex build.
 #define __GARBAGE_H
 #pragma once
 
+#include "items/items.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+struct garbage_datum
+{
+	long definition_index;
+	struct _object_datum object;
+	struct _item_datum item;
+	short lifetime_ticks;
+};
+
+/* ---------- prototypes/GARBAGE.C */
+
+boolean garbage_update(long garbage_index);
 
 /* ---------- globals */
 
