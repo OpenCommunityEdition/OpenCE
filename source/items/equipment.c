@@ -12,6 +12,13 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "equipment.h"
+
+#include "items/items.h"
+#include "objects/object_types.h"
+#include "objects/objects.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -23,5 +30,25 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void equipment_place(
+	long equipment_index,
+	struct scenario_equipment_datum *scenario_equipment)
+{
+	struct item_datum *equipment = (struct item_datum *)object_get_and_verify_type(equipment_index, _object_mask_equipment);
+
+	SET_FLAG(
+		equipment->object.flags,
+		_object_at_rest_bit,
+		TEST_FLAG(scenario_equipment->object.misc_flags, _scenario_equipment_levitate_bit));
+	equipment->object.flags |= FLAG(_object_cannot_be_garbage_bit) | FLAG(_object_shadowless_bit);
+	SET_FLAG(
+		equipment->item.flags,
+		_equipment_orient_to_ground_bit,
+		!TEST_FLAG(scenario_equipment->object.misc_flags, _scenario_equipment_does_not_orient_to_ground_bit));
+
+	if (!TEST_FLAG(scenario_equipment->object.misc_flags, _scenario_equipment_levitate_bit))
+		equipment->object.position.z += 0.05f;
+}
 
 /* ---------- private code */

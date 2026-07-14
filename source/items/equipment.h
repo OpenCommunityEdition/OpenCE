@@ -8,13 +8,34 @@ header included in hcex build.
 #define __EQUIPMENT_H
 #pragma once
 
+#include "math/real_math.h"
+#include "scenario/scenario_definitions.h"
+
 /* ---------- constants */
+
+enum
+{
+	_scenario_equipment_levitate_bit = 0,
+	_scenario_equipment_does_not_orient_to_ground_bit = 2,
+};
+
+enum
+{
+	_equipment_orient_to_ground_bit = 5,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+struct scenario_equipment_datum
+{
+	struct scenario_object_datum object;
+};
+
+/* ---------- prototypes/EQUIPMENT.C */
+
+void equipment_place(long equipment_index, struct scenario_equipment_datum *scenario_equipment);
 
 /* ---------- globals */
 
