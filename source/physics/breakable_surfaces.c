@@ -213,9 +213,13 @@ void breakable_surface_damage_area_of_effect(
 		{
 			if (breakable_surface_extant(breakable_surface_index))
 			{
-				struct structure_breakable_surface *breakable_surface = TAG_BLOCK_GET_ELEMENT(&structure_bsp->breakable_surfaces, breakable_surface_index, struct structure_breakable_surface);
+				struct structure_breakable_surface const *breakable_surface = TAG_BLOCK_GET_ELEMENT(&structure_bsp->breakable_surfaces, breakable_surface_index, struct structure_breakable_surface);
+				real radius;
 
-				if (point_in_sphere(&breakable_surface->centroid, &damage_data->epicenter, breakable_surface->bounding_radius + cutoff_radius))
+				radius = breakable_surface->bounding_radius;
+				radius += cutoff_radius;
+
+				if (point_in_sphere(&breakable_surface->centroid, &damage_data->epicenter, radius))
 				{
 					breakable_surface_get(breakable_surface_index)->vitality = 0.f;
 					BIT_VECTOR_SET_FLAG((long *)breakable_surface_flags_get(), breakable_surface_index, FALSE);
