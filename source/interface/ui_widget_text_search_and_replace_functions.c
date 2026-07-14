@@ -50,3 +50,9 @@ wchar_t *ui_widget_search_and_replace_invoke(void *widget, unsigned short functi
 }
 
 /* ---------- private code */
+
+wchar_t *code_000e4a90(void *widget)
+{
+	(void)widget;
+	return L"";
+}
