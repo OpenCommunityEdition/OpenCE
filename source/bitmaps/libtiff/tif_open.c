@@ -38,7 +38,7 @@ extern	int TIFFDefaultDirectory(TIFF*);
 extern	int TIFFDefaultDirectory();
 #endif
 
-static const long typemask[13] = {
+static long typemask[13] = {
 	0,		/* TIFF_NOTYPE */
 	0x000000ff,	/* TIFF_BYTE */
 	0xffffffff,	/* TIFF_ASCII */
@@ -53,7 +53,7 @@ static const long typemask[13] = {
 	0xffffffff,	/* TIFF_FLOAT */
 	0xffffffff,	/* TIFF_DOUBLE */
 };
-static const int bigTypeshift[13] = {
+static int bigTypeshift[13] = {
 	0,		/* TIFF_NOTYPE */
 	24,		/* TIFF_BYTE */
 	0,		/* TIFF_ASCII */
@@ -68,7 +68,7 @@ static const int bigTypeshift[13] = {
 	0,		/* TIFF_FLOAT */
 	0,		/* TIFF_DOUBLE */
 };
-static const int litTypeshift[13] = {
+static int litTypeshift[13] = {
 	0,		/* TIFF_NOTYPE */
 	0,		/* TIFF_BYTE */
 	0,		/* TIFF_ASCII */
