@@ -15,9 +15,11 @@ symbols in this file:
 #include "cseries.h"
 #include "equipment.h"
 
+#include "equipment_definitions.h"
 #include "items/items.h"
 #include "objects/object_types.h"
 #include "objects/objects.h"
+#include "sound/game_sound.h"
 
 /* ---------- constants */
 
@@ -49,6 +51,15 @@ void equipment_place(
 
 	if (!TEST_FLAG(scenario_equipment->object.misc_flags, _scenario_equipment_levitate_bit))
 		equipment->object.position.z += 0.05f;
+}
+
+void equipment_definition_handle_pickup(
+	long equipment_definition_index)
+{
+	struct equipment_definition *equipment_definition = equipment_definition_get(equipment_definition_index);
+
+	if (equipment_definition->equipment.pickup_sound.index != NONE)
+		unspatialized_impulse_sound_new(equipment_definition->equipment.pickup_sound.index, 1.f);
 }
 
 /* ---------- private code */

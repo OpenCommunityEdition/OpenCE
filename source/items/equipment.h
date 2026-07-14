@@ -36,6 +36,7 @@ struct scenario_equipment_datum
 /* ---------- prototypes/EQUIPMENT.C */
 
 void equipment_place(long equipment_index, struct scenario_equipment_datum *scenario_equipment);
+void equipment_definition_handle_pickup(long equipment_definition_index);
 
 /* ---------- globals */
 
