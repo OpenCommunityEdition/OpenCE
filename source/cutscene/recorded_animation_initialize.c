@@ -30,19 +30,19 @@ symbols in this file:
 
 struct recorded_unit_control
 {
-	byte control_flags;
-	byte control_mode;
-	short animation_state;
-	short weapon_index;
+	byte byte_field0;
+	byte byte_field1;
+	short word_field2;
+	short word_field4;
 	short version2_field;
 	short version3_field;
-	short pad;
-	real_vector2d throttle;
-	long reserved;
+	short unused_field10;
+	real_vector2d vector2d_field12;
+	long long_field20;
 	long version1_field;
-	real_vector3d facing;
-	real_vector3d aiming;
-	real_vector3d looking;
+	real_vector3d vector3d_field28;
+	real_vector3d vector3d_field40;
+	real_vector3d vector3d_field52;
 };
 
 struct recorded_animation_control_field
@@ -82,15 +82,15 @@ struct recorded_animation_layout_data data_002dce10 =
 	{ "real_vector3d", sizeof(real_vector3d), data_002dce10.real_vector3d_codes, BYTE_SWAP_DEFINITION_SIGNATURE, FALSE },
 	0, /* the original independently declared version table begins on an 8-byte data boundary */
 	{
-		{ &byte_bs_definition, sizeof(byte), offsetof(struct recorded_unit_control, control_flags) },
-		{ &byte_bs_definition, sizeof(byte), offsetof(struct recorded_unit_control, control_mode) },
-		{ &word_bs_definition, sizeof(short), offsetof(struct recorded_unit_control, animation_state) },
-		{ &word_bs_definition, sizeof(short), offsetof(struct recorded_unit_control, weapon_index) },
+		{ &byte_bs_definition, sizeof(byte), offsetof(struct recorded_unit_control, byte_field0) },
+		{ &byte_bs_definition, sizeof(byte), offsetof(struct recorded_unit_control, byte_field1) },
+		{ &word_bs_definition, sizeof(short), offsetof(struct recorded_unit_control, word_field2) },
+		{ &word_bs_definition, sizeof(short), offsetof(struct recorded_unit_control, word_field4) },
 		{ &word_bs_definition, sizeof(short), NONE },
-		{ &data_002dce10.real_vector2d_definition, sizeof(real_vector2d), offsetof(struct recorded_unit_control, throttle) },
-		{ &data_002dce10.real_vector3d_definition, sizeof(real_vector3d), offsetof(struct recorded_unit_control, facing) },
-		{ &data_002dce10.real_vector3d_definition, sizeof(real_vector3d), offsetof(struct recorded_unit_control, aiming) },
-		{ &data_002dce10.real_vector3d_definition, sizeof(real_vector3d), offsetof(struct recorded_unit_control, looking) },
+		{ &data_002dce10.real_vector2d_definition, sizeof(real_vector2d), offsetof(struct recorded_unit_control, vector2d_field12) },
+		{ &data_002dce10.real_vector3d_definition, sizeof(real_vector3d), offsetof(struct recorded_unit_control, vector3d_field28) },
+		{ &data_002dce10.real_vector3d_definition, sizeof(real_vector3d), offsetof(struct recorded_unit_control, vector3d_field40) },
+		{ &data_002dce10.real_vector3d_definition, sizeof(real_vector3d), offsetof(struct recorded_unit_control, vector3d_field52) },
 		{ NULL, NONE, NONE },
 	},
 	{
