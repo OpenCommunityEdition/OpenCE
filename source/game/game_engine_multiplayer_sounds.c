@@ -101,6 +101,8 @@ typedef char verify_multiplayer_sound_queue_size[sizeof(struct multiplayer_sound
 
 /* ---------- prototypes */
 
+void game_engine_intialize_queued_sounds(void);
+
 /* ---------- globals */
 
 boolean data_002de530[_multiplayer_sound_ting] =
@@ -118,5 +120,13 @@ static struct multiplayer_sound_queue bss_0043eb78;
 #define multiplayer_sound_queue bss_0043eb78
 
 /* ---------- public code */
+
+void game_engine_intialize_queued_sounds(void)
+{
+	csmemset(multiplayer_sound_queue.sounds, 0, sizeof(multiplayer_sound_queue.sounds));
+	multiplayer_sound_queue.count = 1;
+	multiplayer_sound_queue.sounds[0].sound_index = NONE;
+	multiplayer_sound_queue.sounds[0].delay_ticks = MULTIPLAYER_SOUND_QUEUE_INITIAL_DELAY_TICKS;
+}
 
 /* ---------- private code */
