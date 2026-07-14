@@ -36,7 +36,7 @@ const char * ZEXPORT zlibVersion()
 #  ifndef verbose
 #    define verbose 0
 #  endif
-int z_verbose = verbose;
+int z_verbose = -1;
 
 void z_error (m)
     char *m;
