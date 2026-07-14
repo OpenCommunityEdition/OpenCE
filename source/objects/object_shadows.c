@@ -12,11 +12,22 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "objects/objects.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct object_shadow
+{
+	real object_bounding_radius;
+	real_rectangle3d bounds;
+	short count;
+	short pad;
+};
 
 /* ---------- prototypes */
 
