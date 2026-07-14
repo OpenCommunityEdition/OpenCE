@@ -851,4 +851,16 @@ short const dialogue_vocalization_lookup[NUMBER_OF_DIALOGUE_VOCALIZATION_TYPES] 
 
 /* ---------- public code */
 
+char const *dialogue_get_vocalization_name(
+	short vocalization_type,
+	boolean abbreviated)
+{
+	char const *name = "<error>";
+
+	if (vocalization_type >= 0 && vocalization_type < NUMBER_OF_DIALOGUE_VOCALIZATION_TYPES)
+		name = dialogue_vocalization_type_name[vocalization_type][abbreviated];
+
+	return name;
+}
+
 /* ---------- private code */
