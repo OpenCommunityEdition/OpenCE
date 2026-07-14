@@ -138,4 +138,11 @@ void random_math_dispose(void)
 		200);
 }
 
+unsigned short seed_random(
+	unsigned long *seed)
+{
+	*seed = *seed*0x19660D+0x3C6EF35F;
+	return *seed>>16;
+}
+
 /* ---------- private code */
