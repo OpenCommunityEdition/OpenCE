@@ -64,6 +64,12 @@ struct unit_camera
 	struct tag_block unit_camera_tracks;
 };
 
+struct unit_hud_reference
+{
+	struct tag_reference hud;
+	long unused[8];
+};
+
 struct unit_seat
 {
 	unsigned long flags;
@@ -156,6 +162,8 @@ struct unit_definition
 };
 
 /* ---------- prototypes/EXAMPLE.C */
+
+long unit_definition_get_active_hud_index(struct unit_definition const *definition, boolean multiplayer);
 
 /* ---------- globals */
 
