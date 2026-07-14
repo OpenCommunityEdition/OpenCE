@@ -81,16 +81,14 @@ DumpModeEncode(tif, pp, cc, s)
 		int n;
 		if ((n = cc) > tif->tif_rawdatasize)
 			n = tif->tif_rawdatasize;
-		bcopy(pp, tif->tif_rawcp, n);
+		csmemcpy(tif->tif_rawcp, pp, n);
 		if (tif->tif_flags & TIFF_SWAB) {
 			switch (tif->tif_dir.td_bitspersample) {
 			case 16:
-				assert((n & 3) == 0);
 				TIFFSwabArrayOfShort((u_short *)tif->tif_rawcp,
 				    n/2);
 				break;
 			case 32:
-				assert((n & 15) == 0);
 				TIFFSwabArrayOfLong((u_long *)tif->tif_rawcp,
 				    n/4);
 				break;

@@ -1020,7 +1020,7 @@
 { "file_offset": 353760, "flags": 32, "name": "_code_000565e0" },
 { "file_offset": 353952, "flags": 32, "name": "_code_000566a0" },
 { "file_offset": 354064, "flags": 32, "name": "_TIFFWriteDirectory" },
-{ "file_offset": 355824, "flags": 32, "name": "_code_00056df0" },
+{ "file_offset": 355824, "flags": 32, "name": "_DumpModeEncode", "static": true },
 { "file_offset": 356096, "flags": 32, "name": "_code_00056f00" },
 { "file_offset": 356272, "flags": 32, "name": "_DumpModeSeek", "static": true },
 { "file_offset": 356320, "flags": 32, "name": "_TIFFInitDumpMode" },
