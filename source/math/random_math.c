@@ -54,16 +54,36 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "real_math.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct random_math_globals
+{
+	void *random_direction_table;
+	short random_direction_table_size;
+	short pad;
+	long global_random_seed_lock;
+	unsigned long global_random_seed;
+	unsigned long global_local_random_seed;
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+static struct random_math_globals random_math_globals;
+
 /* ---------- public code */
+
+unsigned long *get_global_local_random_seed_address(void)
+{
+	return &random_math_globals.global_local_random_seed;
+}
 
 /* ---------- private code */
