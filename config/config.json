@@ -719,7 +719,7 @@
 				{ "name": "source/cutscene/recorded_animation_playback_v1.c", "index": 347, "status": "NonMatching" },
 				{ "name": "source/cutscene/recorded_animation_playback.c", "index": 348, "status": "NonMatching" },
 				{ "name": "source/cutscene/recorded_animation_initialize.c", "index": 349, "status": "NonMatching" },
-				{ "name": "source/cutscene/recorded_animation_definitions.c", "index": 350, "status": "NonMatching" },
+				{ "name": "source/cutscene/recorded_animation_definitions.c", "index": 350, "status": "Matching" },
 				{ "name": "source/cutscene/cinematics.c", "index": 351, "status": "NonMatching" },
 				{ "name": "source/cseries/stack_walk_windows.c", "index": 352, "status": "NonMatching" },
 				{ "name": "source/cseries/sort.c", "index": 353, "status": "NonMatching" },
