@@ -37,6 +37,8 @@ long object_impulse_sound_new(
 	real scale);
 long unattached_impulse_sound_new(long definition_index, struct sound_location const *location, real scale);
 long unspatialized_impulse_sound_new(long definition_index, real scale);
+long unattached_looping_sound_start(long definition_index, long period, real scale);
+void unattached_looping_sound_stop(long looping_sound_index);
 
 /* ---------- globals */
 
