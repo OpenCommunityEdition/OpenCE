@@ -145,12 +145,13 @@ void align_to_character(
 boolean double_byte_character(
 	byte *string)
 {
-	boolean result = FALSE;
 	byte character = string[0];
+	byte next_character;
+	boolean result = FALSE;
 
 	if (character!='\0')
 	{
-		byte next_character = string[1];
+		next_character = string[1];
 		if (character==(byte)('|') &&
 			next_character &&
 			strchr("ibukprlctn", next_character)
@@ -164,7 +165,7 @@ boolean double_byte_character(
 			{
 			case _language_japanese:
 				if ((character>=(byte)('\x81') && character<=(byte)('\x9F') ||
-					character>=(byte)('\xE0') && character!=(byte)('\xFE')) &&
+					character>=(byte)('\xE0') && character<=(byte)('\xFE')) &&
 					next_character>=(byte)('@') &&
 					next_character<=(byte)('\xFC') &&
 					next_character!=(byte)('\x7F')
@@ -175,9 +176,9 @@ boolean double_byte_character(
 				break;
 			case _language_simple_chinese:
 				if (character>=(byte)('\xA1') &&
-					character!=(byte)('\xFE') &&
+					character<=(byte)('\xFE') &&
 					next_character>=(byte)('\xA1') &&
-					next_character!=(byte)('\xFE')
+					next_character<=(byte)('\xFE')
 				)
 				{
 					result = TRUE;
@@ -185,9 +186,9 @@ boolean double_byte_character(
 				break;
 			case _language_traditional_chinese:
 				if (character>=(byte)('\x81') &&
-					character!=(byte)('\xFE') &&
+					character<=(byte)('\xFE') &&
 					(next_character>=(byte)('@') && next_character<=(byte)('~') ||
-					next_character>=(byte)('\xA1') && next_character!=(byte)('\xFE'))
+					next_character>=(byte)('\xA1') && next_character<=(byte)('\xFE'))
 				)
 				{
 					result = TRUE;
@@ -195,11 +196,11 @@ boolean double_byte_character(
 				break;
 			case _language_korean_wansung:
 				if (character>=(byte)('\x81') &&
-					character!=(byte)('\xFE') &&
+					character<=(byte)('\xFE') &&
 					(
 					next_character>=(byte)('A') && next_character<=(byte)('Z') ||
 					next_character>=(byte)('a') && next_character<=(byte)('z') ||
-					next_character>=(byte)('\x81') && next_character!=(byte)('\xFE')
+					next_character>=(byte)('\x81') && next_character<=(byte)('\xFE')
 					)
 				)
 				{
@@ -213,7 +214,7 @@ boolean double_byte_character(
 					) &&
 					(
 					next_character>=(byte)('A') && next_character<=(byte)('~') ||
-					next_character>=(byte)('\x81') && next_character!=(byte)('\xFE')
+					next_character>=(byte)('\x81') && next_character<=(byte)('\xFE')
 					)
 				)
 				{
