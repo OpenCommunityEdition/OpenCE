@@ -117,4 +117,9 @@ void damage_initialize(void)
 	return;
 }
 
+void damage_dispose(void)
+{
+	return;
+}
+
 /* ---------- private code */
