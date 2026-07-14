@@ -100,6 +100,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "input.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -111,5 +114,9 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void input_activate(void)
+{
+}
 
 /* ---------- private code */
