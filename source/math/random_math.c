@@ -153,4 +153,11 @@ short seed_random_range(
 	return lower_bound+((unsigned long)(upper_bound-lower_bound)*seed_random(seed)>>16);
 }
 
+real real_seed_random(
+	unsigned long *seed)
+{
+	*seed = *seed*0x19660D+0x3C6EF35F;
+	return (real)(*seed>>16)/65535.0f;
+}
+
 /* ---------- private code */
