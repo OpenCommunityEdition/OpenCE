@@ -128,4 +128,9 @@ const struct mouse_state *input_get_mouse_state(void)
 	return NULL;
 }
 
+boolean input_mouse_button_is_down(short button_index)
+{
+	return FALSE;
+}
+
 /* ---------- private code */
