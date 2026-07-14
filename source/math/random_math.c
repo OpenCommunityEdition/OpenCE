@@ -81,6 +81,11 @@ static struct random_math_globals random_math_globals;
 
 /* ---------- public code */
 
+void lock_global_random_seed(void)
+{
+	random_math_globals.global_random_seed_lock++;
+}
+
 unsigned long *get_global_local_random_seed_address(void)
 {
 	return &random_math_globals.global_local_random_seed;
