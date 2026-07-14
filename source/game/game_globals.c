@@ -81,7 +81,9 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "game/game.h"
 #include "game/game_globals.h"
+#include "scenario/scenario.h"
 
 /* ---------- constants */
 
@@ -158,3 +160,34 @@ char const *material_get_name(
 }
 
 /* ---------- private code */
+
+static real code_000a4850(
+	short value_type,
+	short difficulty)
+{
+	real result = 1.0f;
+	struct game_globals *game_globals = scenario_get_game_globals();
+	struct game_globals_difficulty_information *difficulty_information;
+	short difficulty_level;
+
+	match_assert("c:\\halo\\SOURCE\\game\\game_globals.c", 0x39a,
+		(value_type >= 0) && (value_type < NUMBER_OF_GAME_DIFFICULTY_VALUES));
+	if (game_globals && game_globals->difficulty_information.count)
+	{
+		difficulty_information = TAG_BLOCK_GET_ELEMENT(
+			&game_globals->difficulty_information,
+			0,
+			struct game_globals_difficulty_information);
+		if (difficulty_information)
+		{
+			if (difficulty < 0)
+				difficulty_level = 0;
+			else
+				difficulty_level = MIN(difficulty, NUMBER_OF_GAME_DIFFICULTY_LEVELS - 1);
+
+			result = difficulty_information->values[value_type][difficulty_level];
+		}
+	}
+
+	return result;
+}
