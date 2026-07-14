@@ -91,4 +91,9 @@ unsigned long *get_global_local_random_seed_address(void)
 	return &random_math_globals.global_local_random_seed;
 }
 
+void random_seed_debug_log(
+	boolean log)
+{
+}
+
 /* ---------- private code */
