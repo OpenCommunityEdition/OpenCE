@@ -606,7 +606,7 @@
 				{ "name": "source/main/console.c", "index": 234, "status": "Matching" },
 				{ "name": "source/items/weapons.c", "index": 235, "status": "NonMatching" },
 				{ "name": "source/items/weapon_interfaces.c", "index": 236, "status": "Matching" },
-				{ "name": "source/items/weapon_definitions.c", "index": 237, "status": "NonMatching" },
+				{ "name": "source/items/weapon_definitions.c", "index": 237, "status": "Matching" },
 				{ "name": "source/items/projectiles.c", "index": 238, "status": "NonMatching" },
 				{ "name": "source/items/projectile_definitions.c", "index": 239, "status": "NonMatching" },
 				{ "name": "source/items/items.c", "index": 240, "status": "NonMatching" },
