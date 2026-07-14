@@ -186,7 +186,9 @@ symbols in this file:
 #include "cseries.h"
 
 #define plane2d_distance_to_point plane2d_distance_to_point_inline
+#define vector_intersect_plane3d vector_intersect_plane3d_inline
 #include "real_math.h"
+#undef vector_intersect_plane3d
 #undef plane2d_distance_to_point
 
 #include "geometry.h"
@@ -222,6 +224,15 @@ real vector_intersect_plane2d(
 {
 	return ((plane->n.i*point->x + plane->n.j*point->y) - plane->d) /
 		-(plane->n.i*vector->i + plane->n.j*vector->j);
+}
+
+real vector_intersect_plane3d(
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real_plane3d const *plane)
+{
+	return (point->x*plane->n.i + point->y*plane->n.j + point->z*plane->n.k - plane->d) /
+		-(vector->i*plane->n.i + vector->j*plane->n.j + vector->k*plane->n.k);
 }
 
 /* ---------- private code */
