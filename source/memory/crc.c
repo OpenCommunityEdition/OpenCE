@@ -50,7 +50,7 @@ void crc_new(unsigned long *crc_reference)
 	*crc_reference = 0xFFFFFFFF;
 }
 
-__declspec(noinline) void crc_table_initialize(unsigned long *crc_table)
+__declspec(noinline) static void crc_table_initialize(unsigned long *crc_table)
 {
 	unsigned long byte_index;
 	long byte_count;
@@ -75,6 +75,35 @@ __declspec(noinline) void crc_table_initialize(unsigned long *crc_table)
 		byte_index++;
 		crc_table++;
 	} while (--byte_count);
+}
+
+void crc_checksum_buffer(unsigned long *crc_reference, void const *buffer, long buffer_size)
+{
+	unsigned long crc;
+	unsigned long table_index;
+
+	match_assert("c:\\halo\\SOURCE\\memory\\crc.c", 42, buffer_size>=0);
+
+	if (!bss_00456220.initialized)
+	{
+		crc_table_initialize(bss_00456220.table);
+		bss_00456220.initialized = TRUE;
+	}
+
+	crc = *crc_reference;
+	if (buffer_size > 0)
+	{
+		do
+		{
+			table_index = (*(byte const *)buffer ^ crc) & 0xFF;
+			table_index = bss_00456220.table[table_index];
+			crc >>= 8;
+			buffer = (byte const *)buffer + 1;
+			crc ^= table_index;
+		} while (--buffer_size);
+	}
+
+	*crc_reference = crc;
 }
 
 /* ---------- private code */
