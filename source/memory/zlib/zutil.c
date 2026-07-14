@@ -41,8 +41,8 @@ int z_verbose = verbose;
 void z_error (m)
     char *m;
 {
-    fprintf(stderr, "%s\n", m);
-    exit(1);
+    display_assert(m, "c:\\halo\\SOURCE\\memory\\zlib\\zutil.c", 48, TRUE);
+    system_exit(-1);
 }
 #endif
 
