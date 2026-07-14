@@ -18,16 +18,30 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct overhead_map_globals
+{
+	boolean enabled;
+	byte runtime_state[0x2F];
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+static struct overhead_map_globals overhead_map_globals;
+
 /* ---------- public code */
+
+void overhead_map_initialize(void)
+{
+}
 
 /* ---------- private code */
