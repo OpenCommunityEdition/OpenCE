@@ -162,4 +162,27 @@ void recorded_animation_initialize_unit_control(
 	}
 }
 
+void recorded_animation_write_unit_control(
+	struct recorded_unit_control const *unit_control,
+	byte **stream,
+	byte unit_control_data_version)
+{
+	short version_index;
+
+	for (version_index = 0; version_index < MAX(unit_control_data_version, 1); version_index++)
+	{
+		struct recorded_animation_control_field *field = data_002dce10.fields_by_version[version_index];
+
+		while (field->size != NONE)
+		{
+			csmemcpy(
+				*stream,
+				(byte const *)unit_control + field->unit_control_offset,
+				field->size);
+			*stream += field->size;
+			field++;
+		}
+	}
+}
+
 /* ---------- private code */
