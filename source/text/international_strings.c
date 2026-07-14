@@ -129,7 +129,7 @@ void align_to_character(
 	match_vassert(
 		"c:\\halo\\SOURCE\\text\\international_strings.c",
 		85,
-		*index>0 || *index <=(short)strlen((char *)string),
+		*index>=0 && *index<=strlen((char *)string),
 		csprintf(temporary, "#%d is out of range in string @%p", *index, string));
 
 	i = 0;
