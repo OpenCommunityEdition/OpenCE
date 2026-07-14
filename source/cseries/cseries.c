@@ -494,6 +494,68 @@ void *csmemcpy(
 	return memcpy(destination, source, size);
 }
 
+__declspec(naked) char *stristr(
+	const char *haystack,
+	const char *needle)
+{
+	__asm
+	{
+		push ebp
+		mov ebp, esp
+		push ebx
+		push esi
+		push edi
+		mov edi, needle
+		mov bl, byte ptr [edi]
+		inc edi
+		test bl, bl
+		je empty_needle
+		push edi
+		call csstrlen
+		mov esi, haystack
+		add esp, 4
+		mov needle, eax
+		nop
+	search:
+		mov al, byte ptr [esi]
+		inc esi
+		test al, al
+		je no_match
+		cmp al, bl
+		jne search
+		mov eax, needle
+		push eax
+		push edi
+		push esi
+		call _strnicmp
+		add esp, 12
+		test eax, eax
+		jne search
+		dec esi
+		pop edi
+		mov eax, esi
+		pop esi
+		pop ebx
+		pop ebp
+		ret
+	no_match:
+		pop edi
+		pop esi
+		xor eax, eax
+		pop ebx
+		pop ebp
+		ret
+	empty_needle:
+		mov esi, haystack
+		pop edi
+		mov eax, esi
+		pop esi
+		pop ebx
+		pop ebp
+		ret
+	}
+}
+
 unsigned long string_hash(
 	const char *string)
 {
