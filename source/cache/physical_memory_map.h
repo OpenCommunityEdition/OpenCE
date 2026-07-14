@@ -22,6 +22,7 @@ void physical_memory_verify(void);
 void *physical_memory_get_game_state_base_address(void);
 void *physical_memory_get_tag_cache_base_address(void);
 void *physical_memory_get_texture_cache_base_address(void);
+void *physical_memory_get_sound_cache_base_address(void);
 
 /* ---------- globals */
 
