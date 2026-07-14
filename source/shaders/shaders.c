@@ -127,6 +127,19 @@ boolean shader_type_is_lightmapped(short shader_type)
 	return result;
 }
 
+boolean shader_type_is_vertex_lit(short shader_type)
+{
+	long type = shader_type;
+	boolean result = FALSE;
+
+	if (type==4 || type==8)
+	{
+		result = TRUE;
+	}
+
+	return result;
+}
+
 void numeric_countdown_timer_set(long milliseconds, boolean auto_start)
 {
 	numeric_countdown_timer_milliseconds = milliseconds;
