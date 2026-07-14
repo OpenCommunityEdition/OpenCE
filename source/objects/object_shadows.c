@@ -31,6 +31,9 @@ struct object_shadow
 
 /* ---------- prototypes */
 
+void _ReadWriteBarrier(void);
+#pragma intrinsic(_ReadWriteBarrier)
+
 /* ---------- globals */
 
 /* ---------- public code */
@@ -57,6 +60,33 @@ void code_0012b880(long object_index, void const *context, struct object_shadow 
 		code_0012b880(object->object.first_child_object_index, context, shadow);
 		object_index = object->object.next_object_index;
 	}
+}
+
+boolean object_build_shadow(long object_index, void const *context, struct object_shadow *shadow)
+{
+	struct object_datum *object = object_get(object_index);
+	struct object_definition *definition = object_definition_get(object->definition_index);
+
+	shadow->object_bounding_radius = definition->object.bounding_radius;
+	shadow->bounds.x0 = REAL_MAX;
+	shadow->bounds.x1 = -REAL_MAX;
+	shadow->bounds.y0 = REAL_MAX;
+	shadow->bounds.y1 = -REAL_MAX;
+	shadow->bounds.z0 = REAL_MAX;
+	shadow->bounds.z1 = -REAL_MAX;
+	shadow->count = 0;
+	shadow->pad = 0;
+
+	object_get(object_index);
+	code_0012b880(object->object.first_child_object_index, context, shadow);
+	if (shadow->count > 0)
+	{
+		_ReadWriteBarrier();
+		return TRUE;
+	}
+
+	_ReadWriteBarrier();
+	return FALSE;
 }
 
 /* ---------- private code */
