@@ -1107,7 +1107,7 @@
 { "file_offset": 375216, "flags": 32, "name": "_code_0005b9b0" },
 { "file_offset": 375616, "flags": 32, "name": "_TIFFInitNeXT" },
 { "file_offset": 375664, "flags": 32, "name": "_TIFFInitOrder", "static": true },
-{ "file_offset": 375728, "flags": 32, "name": "_code_0005bbb0" },
+{ "file_offset": 375728, "flags": 32, "name": "_getMode", "static": true },
 { "file_offset": 375808, "flags": 32, "name": "_TIFFFdOpen" },
 { "file_offset": 376464, "flags": 32, "name": "_TIFFScanlineSize" },
 { "file_offset": 376512, "flags": 32, "name": "_TIFFFileName" },
