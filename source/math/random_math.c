@@ -130,4 +130,12 @@ unsigned long get_number_suitable_for_initializing_random_seed(void)
 	return system_seconds()^system_milliseconds()^rand();
 }
 
+void random_math_dispose(void)
+{
+	debug_free(
+		random_math_globals.random_direction_table,
+		"c:\\halo\\SOURCE\\math\\random_math.c",
+		200);
+}
+
 /* ---------- private code */
