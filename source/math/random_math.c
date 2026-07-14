@@ -55,6 +55,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries_windows.h"
 #include "real_math.h"
 #include "game_engine.h"
 
@@ -75,6 +76,8 @@ struct random_math_globals
 };
 
 /* ---------- prototypes */
+
+unsigned long system_seconds(void);
 
 /* ---------- globals */
 
@@ -120,6 +123,11 @@ unsigned long *get_global_local_random_seed_address(void)
 void random_seed_debug_log(
 	boolean log)
 {
+}
+
+unsigned long get_number_suitable_for_initializing_random_seed(void)
+{
+	return system_seconds()^system_milliseconds()^rand();
 }
 
 /* ---------- private code */
