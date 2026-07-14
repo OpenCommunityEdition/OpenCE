@@ -82,6 +82,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "game/game.h"
+#include "game/game_engine.h"
 #include "game/game_globals.h"
 #include "scenario/scenario.h"
 
@@ -92,6 +93,8 @@ symbols in this file:
 /* ---------- structures */
 
 /* ---------- prototypes */
+
+boolean game_team_is_enemy(short team_index0, short team_index1);
 
 /* ---------- globals */
 
@@ -196,4 +199,27 @@ real game_difficulty_get_value(
 	short value_type)
 {
 	return code_000a4850(value_type, game_difficulty_level_get());
+}
+
+real game_difficulty_get_team_value(
+	short value_type,
+	short team_index)
+{
+	short difficulty = game_difficulty_level_get();
+	short friend_value_type;
+
+	if (game_engine_running())
+		difficulty = _game_difficulty_level_normal;
+	else if (!game_team_is_enemy(_game_team_player, team_index))
+	{
+		match_assert("c:\\halo\\SOURCE\\game\\game_globals.c", 0x3bd,
+			(value_type >= 0) && (value_type < NUMBER_OF_GAME_DIFFICULTY_VALUES));
+		friend_value_type = global_difficulty_friend_settings[value_type];
+		if (friend_value_type == NONE)
+			return code_000a4850(value_type, _game_difficulty_level_normal);
+
+		return code_000a4850(friend_value_type, difficulty);
+	}
+
+	return code_000a4850(value_type, difficulty);
 }
