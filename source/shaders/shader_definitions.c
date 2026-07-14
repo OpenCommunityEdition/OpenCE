@@ -29,6 +29,52 @@ symbols in this file:
 
 /* ---------- globals */
 
+struct shader_effect_definition global_shader_effect_additive =
+{
+	{
+		{
+			0,
+			0,
+			0.0f,
+			{ 0.0f, 0.0f, 0.0f },
+			{ 0.0f, 0.0f, 0.0f },
+			0,
+			0,
+			1,
+			0
+		}
+	},
+	0,
+	0,
+	3,
+	{ 0 },
+	{ 'bitm', "", 0, NONE },
+	{ 0 }
+};
+
+struct shader_effect_definition global_shader_effect_alpha_blended =
+{
+	{
+		{
+			0,
+			0,
+			0.0f,
+			{ 0.0f, 0.0f, 0.0f },
+			{ 0.0f, 0.0f, 0.0f },
+			0,
+			0,
+			1,
+			0
+		}
+	},
+	0,
+	0,
+	0,
+	{ 0 },
+	{ 'bitm', "", 0, NONE },
+	{ 0 }
+};
+
 /* ---------- public code */
 
 struct shader *shader_get_and_verify_type(struct shader *shader, short shader_type)
