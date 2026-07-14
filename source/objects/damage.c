@@ -112,4 +112,9 @@ symbols in this file:
 
 /* ---------- public code */
 
+void damage_initialize(void)
+{
+	return;
+}
+
 /* ---------- private code */
