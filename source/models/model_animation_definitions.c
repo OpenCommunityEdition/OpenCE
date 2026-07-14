@@ -333,4 +333,10 @@ byte *animation_get_frame_data(struct animation const *animation, short frame_in
 	return frame_data;
 }
 
+byte *animation_get_frame_info(struct animation const *animation, short frame_index, short frame_info_size)
+{
+	match_assert("c:\\halo\\SOURCE\\models\\model_animation_definitions.c", 1167, frame_index>=0 && frame_index<animation->frame_count);
+	return tag_data_get_pointer(&animation->frame_info, frame_index * frame_info_size, frame_info_size);
+}
+
 /* ---------- private code */
