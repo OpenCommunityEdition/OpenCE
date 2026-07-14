@@ -504,19 +504,18 @@ TIFFGrowStrips(tif, delta, module)
 {
 	TIFFDirectory *td = &tif->tif_dir;
 
-	assert(td->td_planarconfig == PLANARCONFIG_CONTIG);
-	td->td_stripoffset = (u_long *)realloc(td->td_stripoffset,
-	    (td->td_nstrips + delta) * sizeof (u_long));
-	td->td_stripbytecount = (u_long *)realloc(td->td_stripbytecount,
-	    (td->td_nstrips + delta) * sizeof (u_long));
+	td->td_stripoffset = (u_long *)debug_realloc(td->td_stripoffset,
+	    (td->td_nstrips + delta) * sizeof (u_long), "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_write.c", 509);
+	td->td_stripbytecount = (u_long *)debug_realloc(td->td_stripbytecount,
+	    (td->td_nstrips + delta) * sizeof (u_long), "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_write.c", 511);
 	if (td->td_stripoffset == NULL || td->td_stripbytecount == NULL) {
 		td->td_nstrips = 0;
 		TIFFError(module, "%s: No space to expand strip arrays",
 		    tif->tif_name);
 		return (0);
 	}
-	bzero(td->td_stripoffset+td->td_nstrips, delta*sizeof (u_long));
-	bzero(td->td_stripbytecount+td->td_nstrips, delta*sizeof (u_long));
+	csmemset((char *)td->td_stripoffset + td->td_nstrips, 0, delta*sizeof (u_long));
+	csmemset((char *)td->td_stripbytecount + td->td_nstrips, 0, delta*sizeof (u_long));
 	td->td_nstrips += delta;
 	return (1);
 }

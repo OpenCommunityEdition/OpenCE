@@ -1164,7 +1164,7 @@
 { "file_offset": 385120, "flags": 32, "name": "_TIFFSetupStrips", "static": true },
 { "file_offset": 385376, "flags": 32, "name": "_TIFFWriteCheck", "static": true },
 { "file_offset": 385600, "flags": 32, "name": "_TIFFBufferSetup", "static": true },
-{ "file_offset": 385744, "flags": 32, "name": "_code_0005e2d0" },
+{ "file_offset": 385744, "flags": 32, "name": "_TIFFGrowStrips", "static": true },
 { "file_offset": 385952, "flags": 32, "name": "_code_0005e3a0" },
 { "file_offset": 386176, "flags": 32, "name": "_TIFFFlushData1" },
 { "file_offset": 386320, "flags": 32, "name": "_TIFFWriteScanline" },
