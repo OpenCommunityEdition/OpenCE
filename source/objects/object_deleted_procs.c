@@ -21,25 +21,32 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void ai_handle_deleted_object(long deleted_object_index);
+void players_handle_deleted_object(long deleted_object_index);
+
 /* ---------- globals */
 
-object_deleted_proc object_deleted_procs[3];
+object_deleted_proc object_deleted_procs[3] =
+{
+	objects_fix_for_deleted_object,
+	ai_handle_deleted_object,
+	players_handle_deleted_object
+};
 
 /* ---------- public code */
 
 void object_deleted_procs_call(
 	long deleted_object_index)
 {
-	long i =0;
+	object_deleted_proc *deleted_proc = object_deleted_procs;
+	long deleted_proc_count = NUMBEROF(object_deleted_procs);
 
 	do
 	{
-		(object_deleted_procs[i])(deleted_object_index);
-		i++;
+		(*deleted_proc)(deleted_object_index);
+		deleted_proc++;
 	}
-	while (i<NUMBEROF(object_deleted_procs));
-
-	return;
+	while (--deleted_proc_count);
 }
 
 /* ---------- private code */
