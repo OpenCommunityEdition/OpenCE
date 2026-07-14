@@ -21,16 +21,34 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct render_media_globals
+{
+	boolean initialized;
+	byte pad[3];
+	long render_target_index;
+	byte runtime_state[0x24];
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+static struct render_media_globals render_media_globals;
+
 /* ---------- public code */
+
+void render_media_initialize_for_new_map(void)
+{
+	render_media_globals.initialized = TRUE;
+	render_media_globals.render_target_index = 0;
+}
 
 /* ---------- private code */
