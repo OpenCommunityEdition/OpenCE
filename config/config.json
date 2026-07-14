@@ -417,7 +417,7 @@
 				{ "name": "source/text/unicode.c", "index": 45, "status": "NonMatching" },
 				{ "name": "source/text/text_group.c", "index": 46, "status": "NonMatching" },
 				{ "name": "source/text/international_strings.c", "index": 47, "status": "NonMatching" },
-				{ "name": "source/text/font_group.c", "index": 48, "status": "NonMatching" },
+				{ "name": "source/text/font_group.c", "index": 48, "status": "Matching" },
 				{ "name": "source/text/draw_string.c", "index": 49, "status": "NonMatching" },
 				{ "name": "source/tag_files/tag_groups.c", "index": 50, "status": "Matching" },
 				{ "name": "source/tag_files/tag_files_xbox.c", "index": 51, "status": "Matching" },

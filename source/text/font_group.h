@@ -8,11 +8,17 @@ header included in hcex build.
 #define __FONT_GROUP_H
 #pragma once
 
+/* ---------- headers */
+
+#include "tag_files/tag_groups.h"
+#include "text/text_group.h"
+
 /* ---------- constants */
 
 enum
 {
 	FONT_GROUP_TAG = 'font',
+	FONT_CHARACTER_SIZE = 0x14,
 };
 
 /* ---------- macros */
@@ -20,6 +26,13 @@ enum
 #define font_definition_get(index) ((struct font_header *)tag_get(FONT_GROUP_TAG, index))
 
 /* ---------- structures */
+
+struct font_character;
+
+struct font_character_table
+{
+	struct tag_block character_indices;
+};
 
 struct font_header
 {
@@ -40,5 +53,7 @@ struct font_header
 /* ---------- globals */
 
 /* ---------- public code */
+
+struct font_character *font_get_character_by_ascii_code(struct font_header *font, word character_code);
 
 #endif // __FONT_GROUP_H
