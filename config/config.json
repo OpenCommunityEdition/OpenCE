@@ -400,7 +400,7 @@
 				{ "name": "source/cache/xbox_texture_cache.c", "index": 28, "status": "NonMatching" },
 				{ "name": "source/cache/xbox_sound_cache.c", "index": 29, "status": "NonMatching" },
 				{ "name": "source/cache/predicted_resources.c", "index": 30, "status": "Matching" },
-				{ "name": "source/cache/physical_memory_map.c", "index": 31, "status": "NonMatching" },
+				{ "name": "source/cache/physical_memory_map.c", "index": 31, "status": "Matching" },
 				{ "name": "source/cache/cache_files_windows.c", "index": 32, "status": "NonMatching" },
 				{ "name": "source/cache/cache_files_decompress_windows.c", "index": 33, "status": "NonMatching" },
 				{ "name": "source/cache/cache_files.c", "index": 34, "status": "NonMatching" },
