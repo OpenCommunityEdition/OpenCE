@@ -53,4 +53,24 @@ long factorial(short value)
 	return result;
 }
 
+long permutations(
+	short count,
+	short selection_count)
+{
+	long result = 0;
+
+	if (count >= selection_count && selection_count >= 0)
+	{
+		result = 1;
+		while (selection_count != 0)
+		{
+			result *= count;
+			count--;
+			selection_count--;
+		}
+	}
+
+	return result;
+}
+
 /* ---------- private code */
