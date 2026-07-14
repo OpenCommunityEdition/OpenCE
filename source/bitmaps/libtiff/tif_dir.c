@@ -40,6 +40,8 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_dir.c,v 1.1
 #include "tiffioP.h"
 #include "prototypes.h"
 
+void debug_free(void *pointer, const char *file, long line);
+
 static
 DECLARE2(setString, char**, cpp, char*, cp)
 {
@@ -833,7 +835,7 @@ DECLARE2V(_TIFFgetfield, TIFFDirectory*, td, int, tag)
 
 #define	CleanupField(member) {		\
     if (td->member) {			\
-	free((char *)td->member);	\
+	debug_free((char *)td->member, "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_dir.c", __LINE__+20); \
 	td->member = 0;			\
     }					\
 }
