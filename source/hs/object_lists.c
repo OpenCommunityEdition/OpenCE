@@ -215,27 +215,32 @@ short object_list_count(
 	return result;
 }
 
+#define object_list_get_first_internal(object_list_index, reference_index, index) \
+	do \
+	{ \
+		(index) = object_list_header_get(object_list_index)->first_reference_index; \
+		*(reference_index) = (index); \
+		if ((index) != NONE) \
+		{ \
+			struct data_reference *reference = object_list_get(index); \
+			*(reference_index) = reference->next_reference_index; \
+			(index) = reference->datum_index; \
+		} \
+		else \
+		{ \
+			(index) = NONE; \
+		} \
+	} while (0)
+
 long object_list_get_first(
 	long object_list_index,
 	long *reference_index)
 {
 	long index = NONE;
-	
+
 	if (object_list_index != NONE)
 	{
-		index = object_list_header_get(object_list_index)->first_reference_index;
-		*reference_index = index;
-
-		if (index != NONE)
-		{
-			struct data_reference *reference = object_list_get(index);
-			*reference_index = reference->next_reference_index;
-			index = reference->datum_index;
-		}
-		else
-		{
-			index = NONE;
-		}
+		object_list_get_first_internal(object_list_index, reference_index, index);
 	}
 
 	return index;
