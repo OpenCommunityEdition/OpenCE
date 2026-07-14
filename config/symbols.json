@@ -4475,6 +4475,7 @@
 { "file_offset": 1064672, "flags": 32, "name": "_inflate_blocks_sync_point" },
 { "file_offset": 1064704, "flags": 32, "name": "_inflate_codes_new" },
 { "file_offset": 1064800, "flags": 32, "name": "_inflate_codes" },
+{ "file_offset": 1066832, "flags": 32, "name": "$L2499" },
 { "file_offset": 1066880, "flags": 32, "name": "_inflate_codes_free" },
 { "file_offset": 1066944, "flags": 32, "name": "_inflate_fast" },
 { "file_offset": 1068000, "flags": 32, "name": "_inflateReset" },
