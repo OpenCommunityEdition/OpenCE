@@ -35,4 +35,16 @@ struct object_shadow
 
 /* ---------- public code */
 
+__declspec(naked) void *code_0012b870(void)
+{
+	__asm
+	{
+		push NONE
+		push eax
+		call object_get_and_verify_type
+		add esp, 8
+		ret
+	}
+}
+
 /* ---------- private code */
