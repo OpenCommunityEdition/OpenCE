@@ -86,6 +86,16 @@ void lock_global_random_seed(void)
 	random_math_globals.global_random_seed_lock++;
 }
 
+void unlock_global_random_seed(void)
+{
+	match_vassert(
+		"c:\\halo\\SOURCE\\math\\random_math.c",
+		41,
+		random_math_globals.global_random_seed_lock>0,
+		"unmatched call to unlock_random_seed()");
+	random_math_globals.global_random_seed_lock--;
+}
+
 unsigned long get_random_seed(void)
 {
 	return random_math_globals.global_random_seed;
