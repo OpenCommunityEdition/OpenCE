@@ -365,5 +365,88 @@ boolean datastore_write(
 	long length,
 	const void *data)
 {
+	struct file_reference file_ref;
+	boolean success = FALSE;
+	unsigned long datastore_size = 0;
+	struct datastore *datastore;
+	struct file_reference_info *info = (struct file_reference_info *)&file_ref;
+
+	match_assert("c:\\halo\\SOURCE\\tag_files\\files.c", 430, NULL != file_name);
+	match_assert("c:\\halo\\SOURCE\\tag_files\\files.c", 431, NULL != field_name);
+	match_assert("c:\\halo\\SOURCE\\tag_files\\files.c", 432, '\0' != file_name[0]);
+	match_assert("c:\\halo\\SOURCE\\tag_files\\files.c", 433, '\0' != field_name[0]);
+	match_assert("c:\\halo\\SOURCE\\tag_files\\files.c", 434, length < DATASTORE_MAX_DATA_SIZE);
+	match_assert("c:\\halo\\SOURCE\\tag_files\\files.c", 435, strlen(field_name) < DATASTORE_MAX_FIELD_NAME_SIZE);
+
+	memset(info, 0, FILE_REFERENCE_SIZE);
+	info->signature = FILE_REFERENCE_SIGNATURE;
+	info->location = NONE;
+
+	file_reference_set_name(&file_ref, file_name);
+
+	if (file_exists(&file_ref))
+	{
+		datastore = file_read_into_memory(&file_ref, &datastore_size);
+
+		if (!datastore)
+		{
+			file_delete(&file_ref);
+		}
+
+		if (datastore_size != sizeof(struct datastore))
+		{
+			match_free("c:\\halo\\SOURCE\\tag_files\\files.c", 450, datastore);
+			file_delete(&file_ref);
+			datastore = NULL;
+		}
+	}
+	else
+	{
+		datastore = NULL;
+	}
+
+	if (!datastore)
+	{
+		datastore = match_malloc("c:\\halo\\SOURCE\\tag_files\\files.c", 461, sizeof(struct datastore));
+
+		if (datastore)
+		{
+			memset(datastore, 0, sizeof(struct datastore));
+		}
+	}
+
+	if (datastore)
+	{
+		long entry_index;
+
+		for (entry_index = 0; entry_index < NUMBER_OF_DATASTORE_ENTRIES; entry_index++)
+		{
+			if (datastore->entry[entry_index].name[0] == '\0' ||
+				!strcmp(datastore->entry[entry_index].name, field_name))
+			{
+				strcpy(datastore->entry[entry_index].name, field_name);
+				memcpy(datastore->entry[entry_index].data, data, length);
+				success = TRUE;
+				break;
+			}
+		}
+
+		if (!file_exists(&file_ref))
+		{
+			file_create(&file_ref);
+		}
+
+		if (file_open(&file_ref, FLAG(_permission_write_bit)))
+		{
+			file_write(&file_ref, sizeof(struct datastore), datastore);
+			file_close(&file_ref);
+		}
+
+		match_free("c:\\halo\\SOURCE\\tag_files\\files.c", 492, datastore);
+	}
+
+	match_assert("c:\\halo\\SOURCE\\tag_files\\files.c", 495, success);
+
+	return success;
 
 }
