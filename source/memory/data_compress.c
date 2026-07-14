@@ -12,6 +12,12 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "data_compress.h"
+
+#include "memory/byte_swapping.h"
+#include "memory/zlib/zlib.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -23,5 +29,36 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+boolean data_compress(
+	void const *source,
+	unsigned long source_size,
+	void *compressed_data,
+	unsigned long *compressed_size,
+	unsigned long compressed_capacity)
+{
+	boolean result = FALSE;
+
+	if (compressed_capacity >= sizeof(struct compressed_data_header))
+	{
+		struct compressed_data_header *header = compressed_data;
+
+		header->decompressed_size = SWAP4(source_size);
+		*compressed_size = compressed_capacity - sizeof(struct compressed_data_header);
+
+		if (compress2(
+			(Bytef *)(header + 1),
+			compressed_size,
+			(Bytef const *)source,
+			source_size,
+			Z_BEST_COMPRESSION) == Z_OK)
+		{
+			*compressed_size += sizeof(struct compressed_data_header);
+			result = TRUE;
+		}
+	}
+
+	return result;
+}
 
 /* ---------- private code */

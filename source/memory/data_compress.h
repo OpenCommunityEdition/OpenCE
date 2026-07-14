@@ -1,0 +1,29 @@
+/*
+DATA_COMPRESS.H
+*/
+
+#ifndef __DATA_COMPRESS_H
+#define __DATA_COMPRESS_H
+#pragma once
+
+/* ---------- headers */
+
+#include "cseries.h"
+
+/* ---------- structures */
+
+struct compressed_data_header
+{
+	unsigned long decompressed_size;
+};
+
+/* ---------- prototypes/DATA_COMPRESS.C */
+
+boolean data_compress(
+	void const *source,
+	unsigned long source_size,
+	void *compressed_data,
+	unsigned long *compressed_size,
+	unsigned long compressed_capacity);
+
+#endif // __DATA_COMPRESS_H
