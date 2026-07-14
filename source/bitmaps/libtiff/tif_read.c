@@ -522,7 +522,7 @@ TIFFReadBufferSetup(tif, bp, size)
 		tif->tif_flags &= ~TIFF_MYBUFFER;
 	} else {
 		tif->tif_rawdatasize = roundup(size, 1024);
-		tif->tif_rawdata = debug_malloc(tif->tif_rawdatasize, 0,
+		tif->tif_rawdata = (char *)debug_malloc(tif->tif_rawdatasize, 0,
 		    "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_read.c", 524);
 		tif->tif_flags |= TIFF_MYBUFFER;
 	}
