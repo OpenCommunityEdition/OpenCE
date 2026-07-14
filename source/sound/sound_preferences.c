@@ -13,6 +13,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "sound_preferences.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -23,6 +25,21 @@ symbols in this file:
 
 /* ---------- globals */
 
+struct sound_preferences data_00317a84 =
+{
+	0,
+	{ 10, 51, 10, 10 },
+	{ 9, 46, 9, 9 },
+	0,
+};
+
+short sound_channel_type_flags[4] = { 8, 9, 10, 14 };
+
 /* ---------- public code */
+
+void read_sound_preferences(struct sound_preferences **preferences)
+{
+	*preferences = &data_00317a84;
+}
 
 /* ---------- private code */
