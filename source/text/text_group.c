@@ -56,4 +56,30 @@ char *string_list_get_string(long tag_index, short string_index)
 	return result;
 }
 
+wchar_t *unicode_string_list_get_string(long tag_index, short string_index)
+{
+	wchar_t *result = L"<missing string>";
+
+	if (tag_index != NONE)
+	{
+		struct string_list *list = tag_get('ustr', tag_index);
+
+		if (string_index >= 0 && string_index < list->strings.count)
+		{
+			struct string_list_entry *entry = TAG_BLOCK_GET_ELEMENT(
+				&list->strings,
+				string_index,
+				struct string_list_entry);
+
+			if (entry->string.size > 0)
+			{
+				result = entry->string.address;
+				result[entry->string.size / sizeof(wchar_t) - 1] = L'\0';
+			}
+		}
+	}
+
+	return result;
+}
+
 /* ---------- private code */
