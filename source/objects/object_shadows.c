@@ -26,7 +26,7 @@ struct object_shadow
 	real object_bounding_radius;
 	real_rectangle3d bounds;
 	short count;
-	short pad;
+	short unknown1;
 };
 
 /* ---------- prototypes */
@@ -75,7 +75,7 @@ boolean object_build_shadow(long object_index, void const *context, struct objec
 	shadow->bounds.z0 = REAL_MAX;
 	shadow->bounds.z1 = -REAL_MAX;
 	shadow->count = 0;
-	shadow->pad = 0;
+	shadow->unknown1 = 0;
 
 	object_get(object_index);
 	code_0012b880(object->object.first_child_object_index, context, shadow);
