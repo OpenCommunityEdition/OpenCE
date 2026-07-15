@@ -90,4 +90,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+void glow_dispose(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
