@@ -64,7 +64,8 @@ boolean shell_platform_initialize(
 	return TRUE;
 }
 
-void shell_platform_verify(
+void
+shell_platform_verify(
 	void)
 {
 	physical_memory_verify();
@@ -72,13 +73,15 @@ void shell_platform_verify(
 	return;
 }
 
-void shell_platform_dispose(
+void
+shell_platform_dispose(
 	void)
 {
 	return;
 }
 
-void shell_screen_pause(
+void
+shell_screen_pause(
 	boolean paused)
 {
 	return;
@@ -90,7 +93,8 @@ const char *shell_get_command_line(
 	return shell_command_line;
 }
 
-void shell_idle(
+void
+shell_idle(
 	void)
 {
 	return;
@@ -121,7 +125,8 @@ int main(
 
 /* ---------- private code */
 
-static void fuck_code_in_the_eye(
+static void
+fuck_code_in_the_eye(
 	void)
 {
 	DWORD flOldProtect;
