@@ -816,7 +816,7 @@
 				{ "name": "source/ai/actor_type_marine.c", "index": 442, "status": "NonMatching" },
 				{ "name": "source/ai/actor_type_jackal.c", "index": 443, "status": "NonMatching" },
 				{ "name": "source/ai/actor_type_infection.c", "index": 444, "status": "NonMatching" },
-				{ "name": "source/ai/actor_type_hunter.c", "index": 445, "status": "NonMatching" },
+				{ "name": "source/ai/actor_type_hunter.c", "index": 445, "status": "Matching" },
 				{ "name": "source/ai/actor_type_grunt.c", "index": 446, "status": "NonMatching" },
 				{ "name": "source/ai/actor_type_flood.c", "index": 447, "status": "NonMatching" },
 				{ "name": "source/ai/actor_type_engineer.c", "index": 448, "status": "NonMatching" },
