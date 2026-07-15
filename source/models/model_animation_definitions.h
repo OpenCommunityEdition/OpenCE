@@ -231,7 +231,17 @@ void interpolate_node_orientations(
 
 /* ---------- globals */
 
+extern struct animation_list weapon_type_animation_list;
+extern struct animation_list weapon_class_animation_list;
 extern struct animation_list unit_seat_animation_list;
+extern struct animation_list first_person_weapon_animation_list;
+extern struct animation_list weapon_animation_list;
+extern struct animation_list vehicle_animation_list;
+extern struct animation_list device_animation_list;
+
+extern char *damage_type_strings[4];
+extern char *damage_direction_strings[4];
+extern char *damage_part_strings[11];
 
 /* ---------- public code */
 
