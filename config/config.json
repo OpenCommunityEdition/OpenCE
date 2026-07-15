@@ -437,7 +437,7 @@
 				{ "name": "source/structures/radiosity/radiosity_io.c", "index": 65, "status": "Matching" },
 				{ "name": "source/structures/radiosity/radiosity.c", "index": 66, "status": "Matching" },
 				{ "name": "source/structures/radiosity/intermediate_radiosity.c", "index": 67, "status": "Matching" },
-				{ "name": "source/shell/shell_xbox.c", "index": 68, "status": "NonMatching" },
+				{ "name": "source/shell/shell_xbox.c", "index": 68, "status": "Matching" },
 				{ "name": "source/shell/shell_windows.c", "index": 69, "status": "Matching" },
 				{ "name": "source/shell/shell.c", "index": 70, "status": "Matching" },
 				{ "name": "source/shaders/shaders.c", "index": 71, "status": "NonMatching" },
