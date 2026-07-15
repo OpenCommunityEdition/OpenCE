@@ -40,6 +40,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "following_camera.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -51,5 +53,22 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void following_camera_new(
+	struct following_camera *camera)
+{
+	match_assert("c:\\halo\\SOURCE\\camera\\following_camera.c", 19, camera);
+	camera->initialized = FALSE;
+	camera->field_1 = FALSE;
+	camera->unit_is_biped = FALSE;
+	camera->field_3 = FALSE;
+	camera->zoom_level = 0;
+	camera->facing_angles.pitch = 0.f;
+	camera->facing_angles.yaw = 0.f;
+	camera->unit_index = NONE;
+	camera->seat_index = NONE;
+	camera->position_scale = 1.f;
+	return;
+}
 
 /* ---------- private code */
