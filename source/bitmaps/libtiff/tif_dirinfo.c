@@ -272,17 +272,16 @@ TIFFFieldInfo const *bss_0031be4c = NULL;
 TIFFFieldInfo const *
 DECLARE2(TIFFFindFieldInfo, u_short, tag, TIFFDataType, dt)
 {
-	static TIFFFieldInfo const *last = NULL;
 	register TIFFFieldInfo const *fip;
 
-	if (last && last->field_tag == tag &&
-	    (dt == TIFF_ANY || dt == last->field_type))
-		return (last);
+	if (bss_0031be4c && bss_0031be4c->field_tag == tag &&
+	    (dt == TIFF_ANY || dt == bss_0031be4c->field_type))
+		return (bss_0031be4c);
 	/* NB: if table gets big, use sorted search (e.g. binary search) */
 	for (fip = tiffFieldInfo; fip->field_tag; fip++)
 		if (fip->field_tag == tag &&
 		    (dt == TIFF_ANY || fip->field_type == dt))
-			return (last = fip);
+			return (bss_0031be4c = fip);
 	return ((TIFFFieldInfo *)0);
 }
 
