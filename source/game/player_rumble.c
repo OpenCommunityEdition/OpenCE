@@ -52,4 +52,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+void rumble_dispose(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */

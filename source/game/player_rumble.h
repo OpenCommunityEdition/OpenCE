@@ -13,6 +13,8 @@ PLAYER_RUMBLE.H
 
 /* ---------- prototypes/PLAYER_RUMBLE.C */
 
+void rumble_dispose(
+	void);
 void rumble_player_set_scripted_values(
 	real left_motor,
 	real right_motor);
