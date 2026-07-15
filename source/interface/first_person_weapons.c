@@ -96,6 +96,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "interface/first_person_weapons.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -107,5 +109,17 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void first_person_weapons_dispose(
+	void)
+{
+	return;
+}
+
+void first_person_weapons_dispose_from_old_map(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */

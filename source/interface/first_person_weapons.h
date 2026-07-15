@@ -16,6 +16,10 @@ header included in hcex build.
 
 /* ---------- prototypes/FIRST_PERSON_WEAPONS.C */
 
+void first_person_weapons_dispose(
+	void);
+void first_person_weapons_dispose_from_old_map(
+	void);
 void first_person_weapon_message_from_weapon(long weapon_index, short message_type);
 
 /* ---------- globals */
