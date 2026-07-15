@@ -176,16 +176,92 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "cseries/errors.h"
+#include "memory/data_packet_groups.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct network_game_message_packet_definitions
+{
+	unsigned char packet_definitions[0x830];
+	struct data_packet_group_definition group;
+};
+
 /* ---------- prototypes */
+
+void initialize_network_game_packets(
+	void);
+
+void network_event(
+	char *format,
+	...);
+
+boolean decode_network_game_message(
+	void *message_struct,
+	const void *encoded_message,
+	short *encoded_message_size,
+	short *packet_type,
+	short *packet_version,
+	long message_struct_size);
 
 /* ---------- globals */
 
+extern struct network_game_message_packet_definitions data_0030aa68;
+
 /* ---------- public code */
+
+void initialize_network_game_packets(
+	void)
+{
+	data_packet_group_initialize(&data_0030aa68.group);
+
+	return;
+}
+
+void network_event(
+	char *format,
+	...)
+{
+	va_list arguments;
+
+#line 331 "c:\\halo\\SOURCE\\networking\\network_messages.c"
+	match_assert(__FILE__, __LINE__, format);
+
+	va_start(arguments, format);
+	_vsnprintf(temporary, NUMBEROF(temporary) - 1, format, arguments);
+	va_end(arguments);
+
+	error(3, temporary);
+
+	return;
+}
+
+boolean decode_network_game_message(
+	void *message_struct,
+	const void *encoded_message,
+	short *encoded_message_size,
+	short *packet_type,
+	short *packet_version,
+	long message_struct_size)
+{
+	boolean result;
+
+#line 313 "c:\\halo\\SOURCE\\networking\\network_messages.c"
+	match_assert(__FILE__, __LINE__, message_struct && encoded_message && encoded_message_size && (*encoded_message_size>0) && packet_type && (*packet_type>=0) && packet_version && (*packet_version>0));
+
+	result = data_packet_group_decode_packet(&data_0030aa68.group, message_struct, encoded_message, encoded_message_size, packet_type, packet_version, message_struct_size);
+
+	if (!result)
+	{
+		network_event("decode_network_game_message() failed");
+	}
+
+	return result;
+}
 
 /* ---------- private code */

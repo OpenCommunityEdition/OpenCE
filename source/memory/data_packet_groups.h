@@ -6,6 +6,10 @@ DATA_PACKET_GROUPS.H
 #define __DATA_PACKET_GROUPS_H
 #pragma once
 
+/* ---------- headers */
+
+#include "cseries.h"
+
 /* ---------- structures */
 
 struct data_packet_group_definition
@@ -17,5 +21,14 @@ struct data_packet_group_definition
 
 void data_packet_group_initialize(
 	struct data_packet_group_definition *group_definition);
+
+boolean data_packet_group_decode_packet(
+	struct data_packet_group_definition *group_definition,
+	void *decoded_packet,
+	const void *encoded_packet,
+	short *encoded_packet_size,
+	short *packet_type,
+	short *packet_version,
+	long decoded_packet_size);
 
 #endif // __DATA_PACKET_GROUPS_H
