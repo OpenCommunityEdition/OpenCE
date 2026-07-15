@@ -233,6 +233,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "models/model_animation_definitions.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -244,5 +247,47 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+char animation_left_foot_frame_index(
+	struct animation const *animation)
+{
+	return animation->private_left_foot_frame_index;
+}
+
+char animation_right_foot_frame_index(
+	struct animation const *animation)
+{
+	return animation->private_right_foot_frame_index;
+}
+
+void bipeds_initialize(
+	void)
+{
+	return;
+}
+
+void bipeds_initialize_for_new_map(
+	void)
+{
+	return;
+}
+
+void bipeds_dispose_from_old_map(
+	void)
+{
+	return;
+}
+
+void bipeds_dispose(
+	void)
+{
+	return;
+}
+
+void biped_delete(
+	long biped_index)
+{
+	return;
+}
 
 /* ---------- private code */

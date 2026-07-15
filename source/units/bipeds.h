@@ -21,6 +21,8 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct animation;
+
 struct _biped_datum
 {
 	unsigned long flags;
@@ -61,6 +63,22 @@ struct biped_datum
 };
 
 /* ---------- prototypes/BIPEDS.C */
+
+char animation_left_foot_frame_index(
+	struct animation const *animation);
+char animation_right_foot_frame_index(
+	struct animation const *animation);
+
+void bipeds_initialize(
+	void);
+void bipeds_initialize_for_new_map(
+	void);
+void bipeds_dispose_from_old_map(
+	void);
+void bipeds_dispose(
+	void);
+void biped_delete(
+	long biped_index);
 
 void biped_get_sight_position(
 	long biped_index,
