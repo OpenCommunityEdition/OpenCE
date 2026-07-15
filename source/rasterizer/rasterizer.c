@@ -311,6 +311,18 @@ symbols in this file:
 /* ---------- prototypes */
 
 void _rasterizer_decals_update_function_pointers(void);
+void _rasterizer_decals_initialize(
+	void);
+void _rasterizer_decals_initialize_for_new_map(
+	void);
+void _rasterizer_decals_dispose_from_old_map(
+	void);
+void _rasterizer_decals_dispose(
+	void);
+void _rasterizer_decals_begin(
+	short type);
+void _rasterizer_decals_end(
+	void);
 void _rasterizer_dispose(void);
 void _rasterizer_frame_end(void);
 void _rasterizer_window_end(void);
@@ -321,9 +333,51 @@ void _rasterizer_windows_end(void);
 
 /* ---------- public code */
 
+void rasterizer_decals_initialize(
+	void)
+{
+	_rasterizer_decals_initialize();
+	return;
+}
+
 void rasterizer_decals_update_function_pointers(void)
 {
 	_rasterizer_decals_update_function_pointers();
+}
+
+void rasterizer_decals_initialize_for_new_map(
+	void)
+{
+	_rasterizer_decals_initialize_for_new_map();
+	return;
+}
+
+void rasterizer_decals_dispose_from_old_map(
+	void)
+{
+	_rasterizer_decals_dispose_from_old_map();
+	return;
+}
+
+void rasterizer_decals_dispose(
+	void)
+{
+	_rasterizer_decals_dispose();
+	return;
+}
+
+void rasterizer_decals_begin(
+	short type)
+{
+	_rasterizer_decals_begin(type);
+	return;
+}
+
+void rasterizer_decals_end(
+	void)
+{
+	_rasterizer_decals_end();
+	return;
 }
 
 void rasterizer_dispose(void)

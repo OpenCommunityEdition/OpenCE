@@ -117,6 +117,18 @@ void rasterizer_frame_end(void);
 void rasterizer_present(struct bitmap_data *screenshot_bitmap, const point2d *screenshot_index);
 void rasterizer_dispose(void);
 
+void rasterizer_decals_initialize(
+	void);
+void rasterizer_decals_initialize_for_new_map(
+	void);
+void rasterizer_decals_dispose_from_old_map(
+	void);
+void rasterizer_decals_dispose(
+	void);
+void rasterizer_decals_begin(
+	short type);
+void rasterizer_decals_end(
+	void);
 void rasterizer_decals_update_function_pointers(void);
 
 /* ---------- prototypes/RASTERIZER_TEXT.C */
