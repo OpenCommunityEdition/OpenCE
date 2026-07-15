@@ -4747,7 +4747,6 @@ static void object_compute_function_values(
 	return;
 }
 
-// TODO: match
 static void object_compute_change_colors(
 	long object_index)
 {
@@ -4756,7 +4755,7 @@ static void object_compute_change_colors(
 
 	if (TEST_FLAG(object_definition->object.runtime_flags, _object_runtime_scaled_change_colors_bit))
 	{
-		long cc_index;
+		short cc_index;
 		for (cc_index = 0; cc_index<object_definition->object.change_colors.count; cc_index++)
 		{
 			struct object_change_color_definition *change_color = TAG_BLOCK_GET_ELEMENT(
@@ -4771,12 +4770,12 @@ static void object_compute_change_colors(
 					change_color->scale_flags,
 					&change_color->color_lower_bound,
 					&change_color->color_upper_bound,
-					object->object.incoming_function_values[change_color->scaled_by]);
+					OBJECT_INCOMING_FUNCTION_GET_VALUE(object, change_color->scaled_by));
 			}
 
 			if (change_color->darken_by)
 			{
-				const real scale = object->object.incoming_function_values[change_color->scaled_by];
+				const real scale = OBJECT_INCOMING_FUNCTION_GET_VALUE(object, change_color->darken_by);
 				object->object.outgoing_change_colors[cc_index].red*= scale;
 				object->object.outgoing_change_colors[cc_index].green*= scale;
 				object->object.outgoing_change_colors[cc_index].blue*= scale;
