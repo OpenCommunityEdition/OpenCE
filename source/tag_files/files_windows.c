@@ -114,6 +114,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
+#include "files.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -125,5 +129,18 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+boolean file_location_is_valid(
+	short location)
+{
+	return TRUE;
+}
+
+long file_compare_last_modification_dates(
+	struct file_last_modification_date const *date0,
+	struct file_last_modification_date const *date1)
+{
+	return csmemcmp(date0, date1, sizeof(*date0));
+}
 
 /* ---------- private code */

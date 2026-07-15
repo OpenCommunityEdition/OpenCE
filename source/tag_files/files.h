@@ -155,8 +155,11 @@ boolean datastore_write(const char *file_name, const char *field_name, long leng
 
 /* ---------- prototypes/FILES_WINDOWS.C */
 
-// file_location_is_valid
-// file_compare_last_modification_dates
+boolean file_location_is_valid(
+	short location);
+long file_compare_last_modification_dates(
+	struct file_last_modification_date const *date0,
+	struct file_last_modification_date const *date1);
 void find_files_start(unsigned long flags, const struct file_reference *directory);
 void file_path_add_name(char *path, const char *name);
 void file_path_add_extension(char *path, const char *extension);
