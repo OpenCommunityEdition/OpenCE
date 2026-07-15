@@ -111,6 +111,8 @@ void particles_stop_on_first_person_weapon(
 	short local_player_index);
 real particle_get_radius(
 	long particle_index);
+boolean valid_real_argb_color(
+	real_argb_color const *color);
 void particles_disconnect_from_structure_bsp(
 	void);
 void particle_new(struct new_particle_data const *data);
