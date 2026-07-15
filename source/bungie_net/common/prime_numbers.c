@@ -3,7 +3,7 @@ PRIME_NUMBERS.C
 
 symbols in this file:
 0006F3A0 0020:
-	_code_0006f3a0 (0000)
+	_compare_prime_numbers_descending (0000)
 0006F3C0 0160:
 	_code_0006f3c0 (0000)
 0006F520 0050:
@@ -20,6 +20,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -33,3 +35,16 @@ symbols in this file:
 /* ---------- public code */
 
 /* ---------- private code */
+
+int compare_prime_numbers_descending(
+	void const *left,
+	void const *right)
+{
+	unsigned long left_value = *(unsigned long const *)left;
+	unsigned long right_value = *(unsigned long const *)right;
+
+	if (left_value < right_value)
+		return 1;
+
+	return left_value > right_value ? -1 : 0;
+}

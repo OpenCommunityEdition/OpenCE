@@ -1339,7 +1339,7 @@
 { "file_offset": 455088, "flags": 32, "name": "_build_message_header" },
 { "file_offset": 455312, "flags": 32, "name": "_byte_swap_message_header" },
 { "file_offset": 455440, "flags": 32, "name": "_create_message" },
-{ "file_offset": 455584, "flags": 32, "name": "_code_0006f3a0" },
+{ "file_offset": 455584, "flags": 32, "name": "_compare_prime_numbers_descending" },
 { "file_offset": 455616, "flags": 32, "name": "_code_0006f3c0" },
 { "file_offset": 455968, "flags": 32, "name": "_randomprime" },
 { "file_offset": 456048, "flags": 32, "name": "_probable_prime64" },
