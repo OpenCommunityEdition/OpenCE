@@ -26,8 +26,35 @@ enum
 
 /* ---------- structures */
 
-struct control_definition;
 struct scenario_control_datum;
+
+struct _control_definition
+{
+	short type;
+	short triggers_when;
+	real call_value;
+	byte reserved8[0x50];
+	struct tag_reference on_effect;
+	struct tag_reference off_effect;
+	struct tag_reference denied_effect;
+	byte reserved88[0xC];
+};
+
+struct control_definition
+{
+	struct _object_definition object;
+	struct _device_definition device;
+	struct _control_definition control;
+};
+
+typedef char verify_control_definition_control_offset[
+	offsetof(struct control_definition, control) == 0x290 ? 1 : -1];
+typedef char verify_control_definition_on_effect_index_offset[
+	offsetof(struct control_definition, control.on_effect.index) == 0x2F4 ? 1 : -1];
+typedef char verify_control_definition_off_effect_index_offset[
+	offsetof(struct control_definition, control.off_effect.index) == 0x304 ? 1 : -1];
+typedef char verify_control_definition_denied_effect_index_offset[
+	offsetof(struct control_definition, control.denied_effect.index) == 0x314 ? 1 : -1];
 
 struct _control_datum
 {
@@ -62,5 +89,9 @@ boolean control_update(
 void control_place(
 	long control_index,
 	struct scenario_control_datum *scenario_control);
+void control_touched(
+	long control_index);
+void control_destroyed(
+	long control_index);
 
 #endif // __DEVICE_CONTROLS_H

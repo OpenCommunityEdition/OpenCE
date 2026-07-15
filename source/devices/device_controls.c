@@ -33,6 +33,7 @@ symbols in this file:
 #include "cseries.h"
 
 #include "device_controls.h"
+#include "memory/data.h"
 #include "scenario/scenario_definitions.h"
 
 /* ---------- constants */
@@ -50,7 +51,17 @@ struct scenario_control_datum
 	short custom_name_index;
 };
 
+struct device_group_datum
+{
+	short identifier;
+	word pad;
+	real actual_value;
+};
+
 /* ---------- prototypes */
+
+static void code_00083e30(
+	long control_index);
 
 /* ---------- globals */
 
@@ -123,4 +134,87 @@ void control_place(
 	return;
 }
 
+void control_touched(
+	long control_index)
+{
+	struct control_datum *control= control_get(control_index);
+	struct control_definition *definition= control_definition_get(control->definition_index);
+
+	if (definition->control.triggers_when == 0)
+		code_00083e30(control_index);
+
+	return;
+}
+
+void control_destroyed(
+	long control_index)
+{
+	struct control_datum *control= control_get(control_index);
+	struct control_definition *definition= control_definition_get(control->definition_index);
+
+	if (definition->control.triggers_when == 1)
+		code_00083e30(control_index);
+
+	return;
+}
+
 /* ---------- private code */
+
+static void code_00083e30(
+	long control_index)
+{
+	struct control_datum *control= control_get(control_index);
+	struct control_definition *definition= control_definition_get(control->definition_index);
+
+	if (control->device.position_group_index != NONE)
+	{
+		struct device_group_datum *group= datum_get(
+			device_groups_data,
+			control->device.position_group_index);
+		real desired_value;
+
+		switch (definition->control.type)
+		{
+		case 0:
+			desired_value= group->actual_value > 0.5f ? 0.0f : 1.0f;
+			break;
+		case 1:
+			desired_value= 1.0f;
+			break;
+		case 2:
+			desired_value= 0.0f;
+			break;
+		case 3:
+			desired_value= definition->control.call_value;
+			break;
+		default:
+			display_assert(
+				NULL,
+				"c:\\halo\\SOURCE\\devices\\device_controls.c",
+				138,
+				TRUE);
+			system_exit(NONE);
+			break;
+		}
+
+		if (device_group_set_desired_value(
+			control->device.position_group_index,
+			desired_value))
+		{
+			long effect_index;
+
+			if (desired_value > 0.5f)
+				effect_index= definition->control.on_effect.index;
+			else
+				effect_index= definition->control.off_effect.index;
+
+			device_effect_new(control_index, effect_index);
+		}
+		else
+		{
+			device_effect_new(control_index, definition->control.denied_effect.index);
+		}
+	}
+
+	return;
+}

@@ -69,13 +69,7 @@ struct device_group_datum
 boolean game_team_is_enemy(
 	short team_index0,
 	short team_index1);
-void device_group_set_desired_value(
-	short group_index,
-	real desired_value);
-
 /* ---------- globals */
-
-extern struct data_array *device_groups_data;
 
 /* ---------- public code */
 

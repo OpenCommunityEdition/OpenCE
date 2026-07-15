@@ -88,6 +88,14 @@ void device_add_scenario_information(
 void device_set_actual_position(
 	long device_index,
 	real position);
+boolean device_group_set_desired_value(
+	short group_index,
+	real desired_value);
+void device_effect_new(
+	long device_index,
+	long effect_index);
+
+extern struct data_array *device_groups_data;
 
 /* ---------- globals */
 
