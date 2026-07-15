@@ -17,7 +17,10 @@ header included in hcex build.
 /* ---------- prototypes/RASTERIZER_CINEMATICS.C */
 
 void rasterizer_screen_effects_initialize_for_new_map(void);
-void rasterizer_screen_effects_dispose_from_old_map(void);
+void rasterizer_screen_effects_dispose_from_old_map(
+	void);
+void rasterizer_screen_effects_dispose(
+	void);
 
 void rasterizer_set_near_clip_distance(real near_clip_distance);
 

@@ -62,4 +62,16 @@ symbols in this file:
 
 /* ---------- public code */
 
+void rasterizer_screen_effects_dispose_from_old_map(
+	void)
+{
+	return;
+}
+
+void rasterizer_screen_effects_dispose(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
