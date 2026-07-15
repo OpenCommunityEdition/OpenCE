@@ -22,17 +22,26 @@ enum
 
 /* ---------- macros */
 
-#define point_physics_definition_get(index) ((struct physics_definition *)tag_get(POINT_PHYSICS_TAG, (index)))
+#define point_physics_definition_get(index) ((struct point_physics_definition *)tag_get(POINT_PHYSICS_TAG, (index)))
 
 /* ---------- structures */
+
+struct point_physics_definition
+{
+	unsigned long flags;
+	real density;
+};
 
 /* ---------- prototypes/POINT_PHYSICS.C */
 
 void point_physics_dispose_from_old_map(
 	void);
+real point_physics_definition_get_mass(
+	struct point_physics_definition const *definition,
+	real scale);
 void point_physics_update(
 	unsigned long flags,
-	struct physics_definition const *definition,
+	struct point_physics_definition const *definition,
 	struct location *location,
 	long collision_flags,
 	real_point3d *position,

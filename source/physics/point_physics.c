@@ -40,6 +40,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "physics/point_physics.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -56,6 +59,13 @@ void point_physics_dispose_from_old_map(
 	void)
 {
 	return;
+}
+
+real point_physics_definition_get_mass(
+	struct point_physics_definition const *definition,
+	real scale)
+{
+	return scale * definition->density * scale * scale;
 }
 
 /* ---------- private code */
