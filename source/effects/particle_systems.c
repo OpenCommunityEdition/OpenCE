@@ -76,7 +76,9 @@ symbols in this file:
 /* ---------- headers */
 
 #include "effects/particle_systems.h"
+#include "effects/particle_system_definitions.h"
 
+#include "math/real_math.h"
 #include "memory/data.h"
 #include "saved games/game_state.h"
 
@@ -98,6 +100,9 @@ enum
 
 void code_0008dd80(
 	long system_index);
+void code_0008e0d0(
+	struct particle_system_datum *system,
+	real delta_time);
 
 /* ---------- globals */
 
@@ -166,3 +171,13 @@ void particle_systems_disconnect_from_structure_bsp(
 }
 
 /* ---------- private code */
+
+void code_0008e310(
+	struct particle_system_datum *system,
+	real delta_time)
+{
+	particle_system_definition_get(system->definition_index);
+	code_0008e0d0(system, delta_time);
+
+	return;
+}
