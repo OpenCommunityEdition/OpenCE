@@ -10,6 +10,7 @@ header included in hcex build.
 
 #include "objects/object_types.h"
 #include "objects/objects.h"
+#include "scenario/scenario_definitions.h"
 
 /* ---------- constants */
 
@@ -26,18 +27,41 @@ struct scenery_datum
 	unsigned long flags;
 };
 
+struct scenario_scenery_datum;
+
 typedef char verify_scenery_extension_offset[
 	sizeof(struct object_datum) == 0x1A4 ? 1 : -1];
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/SCENERY.C */
 
-void scenery_initialize(void);
-void scenery_initialize_for_new_map(void);
-void scenery_dispose_from_old_map(void);
-void scenery_dispose(void);
-void scenery_delete(long object_index);
-boolean scenery_update(long object_index);
-short scenery_get_animation_time(long object_index);
+void scenery_initialize(
+	void);
+void scenery_initialize_for_new_map(
+	void);
+void scenery_dispose_from_old_map(
+	void);
+void scenery_dispose(
+	void);
+void scenery_place(
+	long object_index,
+	struct scenario_scenery_datum *scenario_scenery);
+boolean scenery_new(
+	long object_index);
+void scenery_delete(
+	long object_index);
+boolean scenery_update(
+	long object_index);
+short scenery_get_animation_time(
+	long object_index);
+void scenery_animation_start(
+	long object_index,
+	long animation_graph_index,
+	char const *animation_name);
+void scenery_animation_start_at_frame(
+	long object_index,
+	long animation_graph_index,
+	char const *animation_name,
+	short frame_index);
 
 /* ---------- globals */
 
