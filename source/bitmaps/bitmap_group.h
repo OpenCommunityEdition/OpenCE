@@ -22,8 +22,8 @@ header included in hcex build.
 struct bitmap_data
 {
 	unsigned long bitmap_class;
-	unsigned short width;
-	unsigned short height;
+	short width;
+	short height;
 	unsigned short depth;
 	short type;
 	short format;
