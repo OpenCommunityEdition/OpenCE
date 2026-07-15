@@ -60,7 +60,10 @@ void infection_decide_action(
 void code_00027470(
 	long actor_index);
 void infection_swarm_aim_jump(
-	long actor_index);
+	long actor_index,
+	void *arg1,
+	void *arg2,
+	void *arg3);
 
 /* ---------- globals */
 
@@ -71,9 +74,10 @@ struct actor_type_definition actor_type_infection =
 	2,
 	2,
 	2,
-	256,
-	FALSE,
-	{ 0, 0, 0 },
+	0,
+	TRUE,
+	{ 0, 0 },
+	NULL,
 	infection_decide_action,
 	code_00027470,
 	infection_swarm_aim_jump

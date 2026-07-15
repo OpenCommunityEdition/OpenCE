@@ -40,7 +40,8 @@ struct actor_type_definition actor_type_engineer =
 	0,
 	0,
 	FALSE,
-	{ 0, 0, 0 },
+	{ 0, 0 },
+	NULL,
 	engineer_decide_action,
 	NULL,
 	NULL

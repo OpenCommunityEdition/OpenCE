@@ -41,7 +41,8 @@ struct actor_type_definition actor_type_jackal =
 	2,
 	0,
 	FALSE,
-	{ 0, 0, 0 },
+	{ 0, 0 },
+	NULL,
 	jackal_decide_action,
 	NULL,
 	NULL

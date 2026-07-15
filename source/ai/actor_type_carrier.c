@@ -41,7 +41,8 @@ struct actor_type_definition actor_type_carrier =
 	2,
 	1,
 	FALSE,
-	{ 0, 0, 0 },
+	{ 0, 0 },
+	NULL,
 	carrier_decide_action,
 	NULL,
 	NULL

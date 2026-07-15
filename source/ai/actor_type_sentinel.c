@@ -40,7 +40,8 @@ struct actor_type_definition actor_type_sentinel =
 	0,
 	0,
 	FALSE,
-	{ 0, 0, 0 },
+	{ 0, 0 },
+	NULL,
 	sentinel_decide_action,
 	NULL,
 	NULL

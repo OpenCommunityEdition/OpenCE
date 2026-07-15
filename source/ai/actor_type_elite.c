@@ -41,7 +41,8 @@ struct actor_type_definition actor_type_elite =
 	1,
 	1,
 	FALSE,
-	{ 0, 0, 0 },
+	{ 0, 0 },
+	NULL,
 	elite_decide_action,
 	NULL,
 	NULL

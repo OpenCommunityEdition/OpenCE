@@ -39,7 +39,8 @@ struct actor_type_definition actor_type_hunter =
 	1,
 	1,
 	FALSE,
-	{ 0, 0, 0 },
+	{ 0, 0 },
+	NULL,
 	hunter_decide_action,
 	NULL,
 	NULL

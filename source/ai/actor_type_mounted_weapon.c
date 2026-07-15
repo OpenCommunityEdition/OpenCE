@@ -37,7 +37,8 @@ struct actor_type_definition actor_type_mounted_weapon =
 	2,
 	0,
 	FALSE,
-	{ 0, 0, 0 },
+	{ 0, 0 },
+	NULL,
 	mounted_weapon_decide_action,
 	NULL,
 	NULL
