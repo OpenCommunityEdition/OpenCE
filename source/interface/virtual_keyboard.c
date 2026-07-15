@@ -79,6 +79,9 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/cseries_windows.h"
+#include "cseries/errors.h"
+#include "interface/event_manager.h"
 #include "interface/virtual_keyboard.h"
 #include "tag_files/tag_groups.h"
 
@@ -89,6 +92,10 @@ enum
 	VIRTUAL_KEYBOARD_ROW_COUNT = 5,
 	VIRTUAL_KEYBOARD_COLUMN_COUNT = 11,
 	NUMBER_OF_CONFIGURABLE_VIRTUAL_KEYS = 0x24,
+	FIRST_VIRTUAL_KEYBOARD_CAPTION_STRING_INDEX = 8,
+	NUMBER_OF_VIRTUAL_KEYBOARD_STRINGS = 11,
+	MAXIMUM_VIRTUAL_KEYBOARD_BUFFER_SIZE = 0x40,
+	MAXIMUM_VIRTUAL_KEYBOARD_SAVED_TEXT_LENGTH = 0x20,
 };
 
 /* ---------- macros */
@@ -124,12 +131,16 @@ struct virtual_keyboard_globals
 	short row;
 	short column;
 	unsigned short buffer_size;
-	byte reservedE[0x8];
+	short keycode;
+	short previous_keycode;
+	short key_repeat_count;
+	short caption_index;
 	boolean last_exit_saved_text;
-	byte reserved17;
+	boolean needs_redraw;
 	wchar_t *text_buffer;
 	wchar_t *cursor;
-	byte reserved20[8];
+	unsigned long last_cursor_flash_time;
+	long caret_bitmap_index;
 	wchar_t saved_text[34];
 };
 
@@ -173,6 +184,123 @@ byte const virtual_keyboard_key_layout[VIRTUAL_KEYBOARD_ROW_COUNT][VIRTUAL_KEYBO
 struct virtual_keyboard_globals virtual_keyboard_globals;
 
 /* ---------- public code */
+
+boolean virtual_keyboard_initialize(
+	void)
+{
+	long keyboard_index;
+
+	virtual_keyboard_globals.active= FALSE;
+	virtual_keyboard_globals.modifier_a= FALSE;
+	virtual_keyboard_globals.modifier_b= FALSE;
+	virtual_keyboard_globals.modifier_c= FALSE;
+
+	keyboard_index= tag_loaded('vcky', "ui\\english");
+	if (keyboard_index != NONE)
+	{
+		virtual_keyboard_globals.keyboard= tag_get('vcky', keyboard_index);
+		match_assert(
+			"c:\\halo\\SOURCE\\interface\\virtual_keyboard.c",
+			364,
+			virtual_keyboard_globals.keyboard);
+
+		virtual_keyboard_globals.row= 0;
+		virtual_keyboard_globals.column= 0;
+		virtual_keyboard_globals.buffer_size= 0;
+		virtual_keyboard_globals.keycode= NONE;
+		virtual_keyboard_globals.previous_keycode= NONE;
+		virtual_keyboard_globals.key_repeat_count= 0;
+		virtual_keyboard_globals.text_buffer= NULL;
+		virtual_keyboard_globals.cursor= NULL;
+		virtual_keyboard_globals.last_cursor_flash_time= 0;
+	}
+	else
+	{
+		error(2, "failed to load virtual keyboard for '%s' language", "<unknown>");
+	}
+
+	virtual_keyboard_globals.caret_bitmap_index=
+		tag_loaded('bitm', "ui\\shell\\bitmaps\\white");
+	if (virtual_keyboard_globals.caret_bitmap_index == NONE)
+	{
+		error(
+			2,
+			"failed to load virtual keyboard caret bitmap '%s'",
+			"ui\\shell\\bitmaps\\white");
+	}
+
+	return virtual_keyboard_globals.keyboard != NULL;
+}
+
+void virtual_keyboard_dispose(
+	void)
+{
+	virtual_keyboard_globals.active= FALSE;
+	virtual_keyboard_globals.modifier_a= FALSE;
+	virtual_keyboard_globals.modifier_b= FALSE;
+	virtual_keyboard_globals.modifier_c= FALSE;
+	virtual_keyboard_globals.keyboard= NULL;
+	virtual_keyboard_globals.row= 0;
+	virtual_keyboard_globals.column= 0;
+	virtual_keyboard_globals.buffer_size= 0;
+	virtual_keyboard_globals.keycode= NONE;
+	virtual_keyboard_globals.previous_keycode= NONE;
+	virtual_keyboard_globals.key_repeat_count= 0;
+	virtual_keyboard_globals.text_buffer= NULL;
+	virtual_keyboard_globals.cursor= NULL;
+	virtual_keyboard_globals.last_cursor_flash_time= 0;
+
+	event_manager_flush();
+
+	return;
+}
+
+boolean virtual_keyboard_launch(
+	wchar_t *text_buffer,
+	unsigned short buffer_size,
+	short caption_index)
+{
+	boolean result= FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\virtual_keyboard.c",
+		418,
+		text_buffer && buffer_size && !(buffer_size&1) && !virtual_keyboard_globals.active);
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\virtual_keyboard.c",
+		419,
+		(caption_index>=FIRST_VIRTUAL_KEYBOARD_CAPTION_STRING_INDEX) && (caption_index<NUMBER_OF_VIRTUAL_KEYBOARD_STRINGS));
+
+	if (!virtual_keyboard_globals.active && virtual_keyboard_globals.keyboard)
+	{
+		event_manager_flush();
+		virtual_keyboard_globals.row= 0;
+		virtual_keyboard_globals.column= 0;
+		virtual_keyboard_globals.active= TRUE;
+		virtual_keyboard_globals.text_buffer= text_buffer;
+		virtual_keyboard_globals.cursor= text_buffer + ustrlen(text_buffer);
+		virtual_keyboard_globals.buffer_size= buffer_size;
+		if (virtual_keyboard_globals.buffer_size >= MAXIMUM_VIRTUAL_KEYBOARD_BUFFER_SIZE)
+			virtual_keyboard_globals.buffer_size= MAXIMUM_VIRTUAL_KEYBOARD_BUFFER_SIZE;
+		virtual_keyboard_globals.keycode= NONE;
+		virtual_keyboard_globals.last_cursor_flash_time= system_milliseconds();
+		virtual_keyboard_globals.caption_index= caption_index;
+		virtual_keyboard_globals.modifier_a= FALSE;
+		virtual_keyboard_globals.modifier_b= FALSE;
+		virtual_keyboard_globals.modifier_c= FALSE;
+		virtual_keyboard_globals.needs_redraw= TRUE;
+		ustrncpy(
+			virtual_keyboard_globals.saved_text,
+			text_buffer,
+			MAXIMUM_VIRTUAL_KEYBOARD_SAVED_TEXT_LENGTH);
+		virtual_keyboard_globals.saved_text[MAXIMUM_VIRTUAL_KEYBOARD_SAVED_TEXT_LENGTH - 1]= L'\0';
+		virtual_keyboard_globals.last_exit_saved_text= FALSE;
+		ui_play_audio_feedback_sound(2);
+		result= TRUE;
+	}
+
+	return result;
+}
 
 boolean virtual_keyboard_active(
 	void)
