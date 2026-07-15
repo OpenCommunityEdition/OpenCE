@@ -38,10 +38,16 @@ struct director_player_globals
 	byte pad0[4];
 	short mode;
 	boolean mode_changed;
-	byte pad7[0x52];
+	byte pad7[9];
+	void (*camera_update)(void);
+	byte pad14[0x45];
 	boolean inhibit_facing;
 	boolean inhibit_input;
-	byte pad5B[0x9D];
+	byte pad5B[0x6D];
+	boolean unknown_c8;
+	byte padC9[3];
+	real unknown_cc;
+	byte padD0[0x28];
 };
 
 /* ---------- prototypes/DIRECTOR.C */
@@ -49,6 +55,8 @@ struct director_player_globals
 void director_initialize(
 	void);
 void director_dispose(
+	void);
+void director_dispose_from_old_map(
 	void);
 void director_inhibit_facing(
 	short local_player_index);

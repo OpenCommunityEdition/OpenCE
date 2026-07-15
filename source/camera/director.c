@@ -140,6 +140,23 @@ void director_dispose(
 	return;
 }
 
+void director_dispose_from_old_map(
+	void)
+{
+	short local_player_index;
+
+	for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
+	{
+		match_assert("c:\\halo\\SOURCE\\camera\\director.c", 179, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+		director_globals[local_player_index].camera_update = NULL;
+		director_globals[local_player_index].unknown_cc = 1.f;
+		director_globals[local_player_index].unknown_c8 = FALSE;
+	}
+
+	director_camera_scripted->camera_scripted = FALSE;
+	return;
+}
+
 void director_inhibit_facing(
 	short local_player_index)
 {
