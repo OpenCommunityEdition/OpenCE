@@ -96,7 +96,8 @@ struct virtual_keyboard_globals
 	boolean last_exit_saved_text;
 	byte reserved17;
 	wchar_t *text_buffer;
-	byte reserved1C[0x50];
+	wchar_t *cursor;
+	byte reserved20[0x4C];
 };
 
 typedef char verify_virtual_keyboard_globals_size[
@@ -112,6 +113,8 @@ void code_000e5be0(
 	void);
 unsigned long ustrlen(
 	wchar_t const *string);
+void ui_play_audio_feedback_sound(
+	short audio_feedback);
 
 /* ---------- globals */
 
@@ -136,6 +139,30 @@ long code_000e5700(
 {
 	return virtual_keyboard_globals.buffer_size -
 		2 * (ustrlen(virtual_keyboard_globals.text_buffer) + 1);
+}
+
+void code_000e5720(
+	void)
+{
+	if (virtual_keyboard_globals.cursor > virtual_keyboard_globals.text_buffer)
+	{
+		long remaining_size= virtual_keyboard_globals.buffer_size -
+			((byte *)virtual_keyboard_globals.cursor - (byte *)virtual_keyboard_globals.text_buffer);
+
+		if (remaining_size>=0)
+		{
+			csmemmove(
+				virtual_keyboard_globals.cursor - 1,
+				virtual_keyboard_globals.cursor,
+				remaining_size);
+			virtual_keyboard_globals.text_buffer[virtual_keyboard_globals.buffer_size / 2 - 1]= L'\0';
+			virtual_keyboard_globals.cursor--;
+		}
+	}
+
+	ui_play_audio_feedback_sound(1);
+
+	return;
 }
 
 void virtual_keyboard_close(
