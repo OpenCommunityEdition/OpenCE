@@ -80,6 +80,8 @@ struct machine_datum
 
 /* ---------- prototypes/DEVICES.C */
 
+void devices_dispose(
+	void);
 void device_add_scenario_information(
 	long object_index,
 	struct scenario_device_datum *scenario_device);

@@ -82,6 +82,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "devices.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -93,5 +96,11 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void devices_dispose(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */
