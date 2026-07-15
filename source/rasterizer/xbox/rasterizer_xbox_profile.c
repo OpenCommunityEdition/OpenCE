@@ -136,4 +136,16 @@ symbols in this file:
 
 /* ---------- public code */
 
+void rasterizer_profile_window_end(
+	void)
+{
+	return;
+}
+
+void rasterizer_profile_dispose(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
