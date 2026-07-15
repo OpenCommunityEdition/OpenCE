@@ -42,4 +42,8 @@ void light_fixtures_dispose(void)
 {
 }
 
+void light_fixtures_initialize_for_new_map(void)
+{
+}
+
 /* ---------- private code */
