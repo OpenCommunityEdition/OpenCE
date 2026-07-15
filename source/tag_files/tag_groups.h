@@ -19,6 +19,9 @@ enum tag_field_type
 	_tag_field_string = 0,
 	_tag_field_char_integer = 1,
 	_tag_field_short_integer = 2,
+	_tag_field_long_integer = 3,
+	_tag_field_enum = 6,
+	_tag_field_tag_reference = 33,
 	_tag_field_data = 37,
 	_tag_field_pad = 40,
 	_tag_field_terminator = 44,
@@ -35,6 +38,13 @@ typedef boolean (*postprocess_block_proc)(void *, boolean);
 typedef byte *(*format_block_proc)(long, struct tag_block *, long, byte *);
 typedef void (*delete_block_proc)(struct tag_block *, long);
 typedef void (*byte_swap_data_proc)(void *, void *, long);
+
+struct tag_enum_definition
+{
+	long count;
+	char **names;
+	void *unused;
+};
 
 struct tag_field
 {
