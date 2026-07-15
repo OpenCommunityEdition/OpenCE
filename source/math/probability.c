@@ -73,4 +73,28 @@ long permutations(
 	return result;
 }
 
+long combinations(
+	short count,
+	short selection_count)
+{
+	long result = 0;
+	short divisor;
+
+	if (count >= selection_count && selection_count >= 0)
+	{
+		if (selection_count > count - selection_count)
+		{
+			selection_count = count - selection_count;
+		}
+
+		result = permutations(count, selection_count);
+		for (divisor = selection_count; divisor > 1; divisor--)
+		{
+			result /= divisor;
+		}
+	}
+
+	return result;
+}
+
 /* ---------- private code */
