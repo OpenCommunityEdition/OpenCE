@@ -96,6 +96,9 @@ enum
 
 /* ---------- prototypes */
 
+void code_0008dd80(
+	long system_index);
+
 /* ---------- globals */
 
 /* ---------- public code */
@@ -114,6 +117,27 @@ void particle_systems_initialize_for_new_map(
 {
 	data_make_valid(particle_systems);
 	data_make_valid(system_particles);
+
+	return;
+}
+
+void particle_systems_dispose_from_old_map(
+	void)
+{
+	if (particle_systems && particle_systems->valid)
+	{
+		long system_index;
+
+		for (system_index = data_next_index(particle_systems, NONE);
+			system_index != NONE;
+			system_index = data_next_index(particle_systems, system_index))
+		{
+			code_0008dd80(system_index);
+		}
+
+		data_make_invalid(particle_systems);
+		data_make_invalid(system_particles);
+	}
 
 	return;
 }

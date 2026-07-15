@@ -23,6 +23,8 @@ void particle_systems_initialize(
 	void);
 void particle_systems_initialize_for_new_map(
 	void);
+void particle_systems_dispose_from_old_map(
+	void);
 void particle_systems_dispose(
 	void);
 void particle_systems_disconnect_from_structure_bsp(
