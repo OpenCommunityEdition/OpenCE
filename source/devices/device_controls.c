@@ -33,6 +33,7 @@ symbols in this file:
 #include "cseries.h"
 
 #include "device_controls.h"
+#include "scenario/scenario_definitions.h"
 
 /* ---------- constants */
 
@@ -40,7 +41,27 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct scenario_device_datum
+{
+	short power_group_index;
+	short position_group_index;
+	unsigned long flags;
+};
+
+struct scenario_control_datum
+{
+	struct scenario_object_datum object;
+	struct scenario_device_datum device;
+	word flags;
+	short unused;
+	short custom_name_index;
+};
+
 /* ---------- prototypes */
+
+void device_add_scenario_information(
+	long object_index,
+	struct scenario_device_datum *scenario_device);
 
 /* ---------- globals */
 
@@ -94,6 +115,23 @@ boolean control_update(
 	control_definition_get(control->definition_index);
 
 	return TRUE;
+}
+
+void control_place(
+	long control_index,
+	struct scenario_control_datum *scenario_control)
+{
+	struct control_datum *control = control_get(control_index);
+
+	control_definition_get(control->definition_index);
+	device_add_scenario_information(control_index, &scenario_control->device);
+	if (TEST_FLAG(scenario_control->flags, 0))
+		control->control.flags |= FLAG(0);
+	if (TEST_FLAG(scenario_control->flags, 4))
+		control->control.flags |= FLAG(1);
+	control->control.custom_name_index = scenario_control->custom_name_index - 1;
+
+	return;
 }
 
 /* ---------- private code */

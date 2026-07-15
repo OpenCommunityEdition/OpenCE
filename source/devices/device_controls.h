@@ -27,12 +27,20 @@ enum
 /* ---------- structures */
 
 struct control_definition;
+struct scenario_control_datum;
+
+struct _control_datum
+{
+	unsigned long flags;
+	short custom_name_index;
+};
 
 struct control_datum
 {
 	long definition_index;
 	struct _object_datum object;
 	struct _device_datum device;
+	struct _control_datum control;
 };
 
 /* ---------- prototypes/DEVICE_CONTROLS.C */
@@ -51,5 +59,8 @@ void control_delete(
 	long control_index);
 boolean control_update(
 	long control_index);
+void control_place(
+	long control_index,
+	struct scenario_control_datum *scenario_control);
 
 #endif // __DEVICE_CONTROLS_H
