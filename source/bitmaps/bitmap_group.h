@@ -15,7 +15,14 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum
+{
+	BITMAP_GROUP_TAG = 'bitm',
+};
+
 /* ---------- macros */
+
+#define bitmap_group_get(index) ((struct bitmap_group *)tag_get(BITMAP_GROUP_TAG, (index)))
 
 /* ---------- structures */
 

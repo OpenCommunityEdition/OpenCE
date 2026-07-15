@@ -9,6 +9,8 @@ header included in hcex build.
 #pragma once
 
 #include "math/real_math.h"
+#include "items/items.h"
+#include "objects/object_types.h"
 #include "scenario/scenario_definitions.h"
 
 /* ---------- constants */
@@ -25,6 +27,9 @@ enum
 };
 
 /* ---------- macros */
+
+#define equipment_get(index) ((struct item_datum *)object_get_and_verify_type((index), _object_mask_equipment))
+#define equipment_try_and_get(index) ((struct item_datum *)object_try_and_get_and_verify_type((index), _object_mask_equipment))
 
 /* ---------- structures */
 

@@ -45,15 +45,6 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct scenery_datum
-{
-	struct object_datum object;
-	unsigned long flags;
-};
-
-typedef char verify_scenery_extension_offset[
-	sizeof(struct object_datum) == 0x1A4 ? 1 : -1];
-
 /* ---------- prototypes */
 
 short animation_update_internal(
@@ -66,43 +57,41 @@ short animation_update_internal(
 
 /* ---------- public code */
 
-void
-scenery_initialize(
+void scenery_initialize(
 	void)
 {
+	return;
 }
 
-void
-scenery_initialize_for_new_map(
+void scenery_initialize_for_new_map(
 	void)
 {
+	return;
 }
 
-void
-scenery_dispose_from_old_map(
+void scenery_dispose_from_old_map(
 	void)
 {
+	return;
 }
 
-void
-scenery_dispose(
+void scenery_dispose(
 	void)
 {
+	return;
 }
 
-void
-scenery_delete(
+void scenery_delete(
 	long object_index)
 {
+	return;
 }
 
 boolean scenery_update(
 	long object_index)
 {
 	long animation_graph_index;
-	struct scenery_datum *scenery = (struct scenery_datum *)object_get_and_verify_type(
-		object_index,
-		FLAG(_object_type_scenery));
+	struct scenery_datum *scenery = scenery_get(object_index);
 
 	if (TEST_FLAG(scenery->flags, 0))
 	{
@@ -127,9 +116,7 @@ short scenery_get_animation_time(
 {
 	struct animation *animation;
 	struct animation_graph *animation_graph;
-	struct scenery_datum *scenery = (struct scenery_datum *)object_get_and_verify_type(
-		object_index,
-		FLAG(_object_type_scenery));
+	struct scenery_datum *scenery = scenery_get(object_index);
 
 	if (TEST_FLAG(scenery->flags, 0))
 	{

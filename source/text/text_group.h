@@ -16,6 +16,12 @@ header included in hcex build.
 
 enum
 {
+	STRING_LIST_TAG = 'str#',
+	UNICODE_STRING_LIST_TAG = 'ustr',
+};
+
+enum
+{
 	_text_style_plain = NONE,
 	_text_style_bold = 0,
 	_text_style_italic,
@@ -25,6 +31,9 @@ enum
 };
 
 /* ---------- macros */
+
+#define string_list_definition_get(index) ((struct string_list *)tag_get(STRING_LIST_TAG, (index)))
+#define unicode_string_list_definition_get(index) ((struct string_list *)tag_get(UNICODE_STRING_LIST_TAG, (index)))
 
 /* ---------- structures */
 

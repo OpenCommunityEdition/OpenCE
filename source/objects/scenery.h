@@ -8,11 +8,26 @@ header included in hcex build.
 #define __SCENERY_H
 #pragma once
 
+#include "objects/object_types.h"
+#include "objects/objects.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
+#define scenery_get(index) ((struct scenery_datum *)object_get_and_verify_type((index), _object_mask_scenery))
+#define scenery_try_and_get(index) ((struct scenery_datum *)object_try_and_get_and_verify_type((index), _object_mask_scenery))
+
 /* ---------- structures */
+
+struct scenery_datum
+{
+	struct object_datum object;
+	unsigned long flags;
+};
+
+typedef char verify_scenery_extension_offset[
+	sizeof(struct object_datum) == 0x1A4 ? 1 : -1];
 
 /* ---------- prototypes/EXAMPLE.C */
 

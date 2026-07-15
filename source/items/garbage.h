@@ -9,10 +9,14 @@ header included in hcex build.
 #pragma once
 
 #include "items/items.h"
+#include "objects/object_types.h"
 
 /* ---------- constants */
 
 /* ---------- macros */
+
+#define garbage_get(index) ((struct garbage_datum *)object_get_and_verify_type((index), _object_mask_garbage))
+#define garbage_try_and_get(index) ((struct garbage_datum *)object_try_and_get_and_verify_type((index), _object_mask_garbage))
 
 /* ---------- structures */
 

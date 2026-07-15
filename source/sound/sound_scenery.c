@@ -13,6 +13,7 @@ symbols in this file:
 #include "cseries.h"
 #include "object_types.h"
 #include "objects.h"
+#include "sound/sound_scenery.h"
 
 /* ---------- constants */
 
@@ -31,16 +32,16 @@ boolean sound_scenery_new(
 {
 	struct object_datum *object;
 
-	object = (struct object_datum *)object_get_and_verify_type(object_index, FLAG(_object_type_sound_scenery));
+	object = sound_scenery_get(object_index);
 	object->object.flags |= FLAG(_object_shadowless_bit);
 
 	return TRUE;
 }
 
-void
-sound_scenery_delete(
+void sound_scenery_delete(
 	long object_index)
 {
+	return;
 }
 
 /* ---------- private code */

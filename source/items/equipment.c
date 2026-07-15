@@ -37,7 +37,7 @@ void equipment_place(
 	long equipment_index,
 	struct scenario_equipment_datum *scenario_equipment)
 {
-	struct item_datum *equipment = (struct item_datum *)object_get_and_verify_type(equipment_index, _object_mask_equipment);
+	struct item_datum *equipment = equipment_get(equipment_index);
 
 	SET_FLAG(
 		equipment->object.flags,
@@ -51,16 +51,20 @@ void equipment_place(
 
 	if (!TEST_FLAG(scenario_equipment->object.misc_flags, _scenario_equipment_levitate_bit))
 		equipment->object.position.z += 0.05f;
+
+	return;
 }
 
 void equipment_handle_pickup(
 	long equipment_index)
 {
-	struct item_datum *equipment = (struct item_datum *)object_get_and_verify_type(equipment_index, _object_mask_equipment);
+	struct item_datum *equipment = equipment_get(equipment_index);
 	struct equipment_definition *equipment_definition = equipment_definition_get(equipment->definition_index);
 
 	if (equipment_definition->equipment.pickup_sound.index != NONE)
 		unspatialized_impulse_sound_new(equipment_definition->equipment.pickup_sound.index, 1.f);
+
+	return;
 }
 
 void equipment_definition_handle_pickup(
@@ -70,6 +74,8 @@ void equipment_definition_handle_pickup(
 
 	if (equipment_definition->equipment.pickup_sound.index != NONE)
 		unspatialized_impulse_sound_new(equipment_definition->equipment.pickup_sound.index, 1.f);
+
+	return;
 }
 
 /* ---------- private code */

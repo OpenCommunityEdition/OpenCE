@@ -36,7 +36,7 @@ char *string_list_get_string(long tag_index, short string_index)
 
 	if (tag_index != NONE)
 	{
-		struct string_list *list = tag_get('str#', tag_index);
+		struct string_list *list = string_list_definition_get(tag_index);
 
 		if (string_index >= 0 && string_index < list->strings.count)
 		{
@@ -62,7 +62,7 @@ wchar_t *unicode_string_list_get_string(long tag_index, short string_index)
 
 	if (tag_index != NONE)
 	{
-		struct string_list *list = tag_get('ustr', tag_index);
+		struct string_list *list = unicode_string_list_definition_get(tag_index);
 
 		if (string_index >= 0 && string_index < list->strings.count)
 		{

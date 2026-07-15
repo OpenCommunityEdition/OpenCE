@@ -11,6 +11,7 @@ symbols in this file:
 #include "cseries.h"
 #include "math/real_math.h"
 #include "tag_files/tag_groups.h"
+#include "text/text_group.h"
 
 /* ---------- constants */
 
@@ -19,8 +20,6 @@ symbols in this file:
 /* ---------- structures */
 
 /* ---------- prototypes */
-
-wchar_t const *unicode_string_list_get_string(long tag_index, short string_index);
 
 /* ---------- globals */
 
@@ -34,14 +33,14 @@ wchar_t const *network_game_get_random_player_name(
 
 	if (string_list_index != NONE)
 	{
-		struct tag_block *string_list = tag_get('ustr', string_list_index);
+		struct string_list *string_list = unicode_string_list_definition_get(string_list_index);
 
 		if (string_list)
 		{
 			short string_index = seed_random_range(
 				get_global_local_random_seed_address(),
 				0,
-				string_list->count - 1);
+				string_list->strings.count - 1);
 			player_name = unicode_string_list_get_string(string_list_index, string_index);
 		}
 	}

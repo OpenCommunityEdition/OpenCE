@@ -61,7 +61,7 @@ void predicted_resources_precache(
 		case _predicted_resource_bitmap:
 			_texture_cache_bitmap_get_hardware_format(
 				TAG_BLOCK_GET_ELEMENT(
-					&((struct bitmap_group *)tag_get('bitm', predicted_resource->tag_index))->bitmap_data,
+					&bitmap_group_get(predicted_resource->tag_index)->bitmap_data,
 					predicted_resource->resource_index,
 					struct bitmap_data),
 				FALSE,
@@ -73,6 +73,8 @@ void predicted_resources_precache(
 			break;
 		}
 	}
+
+	return;
 }
 
 /* ---------- private code */
@@ -84,7 +86,7 @@ static void code_001ad870(
 	struct tag_block *pitch_ranges;
 	short pitch_range_index;
 
-	sound_definition = (struct sound_definition *)tag_get(SOUND_DEFINITION_TAG, sound_definition_index);
+	sound_definition = sound_definition_get(sound_definition_index);
 	pitch_range_index = 0;
 	if (sound_definition->pitch_ranges.count <= 0)
 		return;
@@ -110,4 +112,6 @@ pitch_range_loop:
 	}
 	if (pitch_range_index < pitch_ranges->count)
 		goto pitch_range_loop;
+
+	return;
 }

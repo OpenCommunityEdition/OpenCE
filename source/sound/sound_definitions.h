@@ -41,6 +41,8 @@ enum
 
 /* ---------- macros */
 
+#define sound_definition_get(index) ((struct sound_definition *)tag_get(SOUND_DEFINITION_TAG, (index)))
+
 /* ---------- structures */
 
 struct real_bounds
