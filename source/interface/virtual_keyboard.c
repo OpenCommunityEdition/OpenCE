@@ -105,7 +105,8 @@ struct virtual_keyboard_globals
 	byte reserved17;
 	wchar_t *text_buffer;
 	wchar_t *cursor;
-	byte reserved20[0x4C];
+	byte reserved20[8];
+	wchar_t saved_text[34];
 };
 
 typedef char verify_virtual_keyboard_globals_size[
@@ -121,6 +122,10 @@ void code_000e5be0(
 	void);
 unsigned long ustrlen(
 	wchar_t const *string);
+wchar_t *ustrncpy(
+	wchar_t *destination,
+	wchar_t const *source,
+	unsigned long count);
 void ui_play_audio_feedback_sound(
 	short audio_feedback);
 
@@ -219,6 +224,28 @@ boolean code_000e4f00(
 	while (virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column] == keycode);
 
 	ui_play_audio_feedback_sound(1);
+
+	return TRUE;
+}
+
+boolean code_000e4f50(
+	void)
+{
+	virtual_keyboard_globals.active= FALSE;
+	if (virtual_keyboard_globals.text_buffer)
+	{
+		ustrncpy(
+			virtual_keyboard_globals.text_buffer,
+			virtual_keyboard_globals.saved_text,
+			virtual_keyboard_globals.buffer_size / sizeof(wchar_t));
+		virtual_keyboard_globals.text_buffer[
+			virtual_keyboard_globals.buffer_size / sizeof(wchar_t) - 1]= L'\0';
+	}
+
+	virtual_keyboard_globals.text_buffer= NULL;
+	virtual_keyboard_globals.saved_text[0]= L'\0';
+	virtual_keyboard_globals.last_exit_saved_text= FALSE;
+	ui_play_audio_feedback_sound(3);
 
 	return TRUE;
 }
