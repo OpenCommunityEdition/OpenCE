@@ -138,6 +138,15 @@ void rasterizer_detail_objects_begin(
 void rasterizer_detail_objects_end(
 	void);
 
+void rasterizer_debug_immediate_begin(
+	void);
+void rasterizer_debug_immediate_end(
+	void);
+void rasterizer_debug_immediate_begin_screenspace(
+	void);
+void rasterizer_debug_immediate_end_screenspace(
+	void);
+
 void rasterizer_hud_begin(
 	void);
 void rasterizer_hud_end(

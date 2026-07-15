@@ -327,6 +327,14 @@ void _rasterizer_detail_objects_begin(
 	void);
 void _rasterizer_detail_objects_end(
 	void);
+void _rasterizer_debug_immediate_begin(
+	void);
+void _rasterizer_debug_immediate_end(
+	void);
+void _rasterizer_debug_immediate_begin_screenspace(
+	void);
+void _rasterizer_debug_immediate_end_screenspace(
+	void);
 void _rasterizer_hud_begin(
 	void);
 void _rasterizer_hud_end(
@@ -412,6 +420,34 @@ void rasterizer_detail_objects_end(
 	void)
 {
 	_rasterizer_detail_objects_end();
+	return;
+}
+
+void rasterizer_debug_immediate_begin(
+	void)
+{
+	_rasterizer_debug_immediate_begin();
+	return;
+}
+
+void rasterizer_debug_immediate_end(
+	void)
+{
+	_rasterizer_debug_immediate_end();
+	return;
+}
+
+void rasterizer_debug_immediate_begin_screenspace(
+	void)
+{
+	_rasterizer_debug_immediate_begin_screenspace();
+	return;
+}
+
+void rasterizer_debug_immediate_end_screenspace(
+	void)
+{
+	_rasterizer_debug_immediate_end_screenspace();
 	return;
 }
 
