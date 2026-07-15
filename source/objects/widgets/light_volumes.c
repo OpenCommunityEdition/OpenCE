@@ -46,4 +46,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+void light_volumes_dispose(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
