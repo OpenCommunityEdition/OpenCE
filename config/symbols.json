@@ -22579,7 +22579,7 @@
 { "file_offset": 4982960, "flags": 0, "name": "_bss_004c08b0" },
 { "file_offset": 4983996, "flags": 0, "name": "_debug_detail_objects" },
 { "file_offset": 4984016, "flags": 0, "name": "_bss_004c0cd0" },
-{ "file_offset": 4984040, "flags": 0, "name": "_bss_004c0ce8" },
+{ "file_offset": 4984040, "flags": 0, "name": "_structure_decals_globals" },
 { "file_offset": 4984048, "flags": 0, "name": "_bss_004c0cf0" },
 { "file_offset": 4985088, "flags": 0, "name": "_bss_004c1100" },
 { "file_offset": 4987144, "flags": 0, "name": "_bss_004c1908" },

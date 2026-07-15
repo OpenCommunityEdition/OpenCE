@@ -23,7 +23,7 @@ symbols in this file:
 002A1AE0 0011:
 	??_C@_0BB@PDFGKABJ@structure?5decals?$AA@ (0000)
 004C0CE8 0004:
-	_bss_004c0ce8 (0000)
+	_structure_decals_globals (0000)
 */
 
 /* ---------- headers */
@@ -49,8 +49,7 @@ struct structure_decals_globals
 
 /* ---------- globals */
 
-struct structure_decals_globals *bss_004c0ce8 = NULL;
-#define structure_decals_globals bss_004c0ce8
+struct structure_decals_globals *structure_decals_globals = NULL;
 
 /* ---------- public code */
 
