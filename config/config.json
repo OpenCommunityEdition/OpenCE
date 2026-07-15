@@ -814,7 +814,7 @@
 				{ "name": "source/ai/actor_type_sentinel.c", "index": 440, "status": "NonMatching" },
 				{ "name": "source/ai/actor_type_mounted_weapon.c", "index": 441, "status": "Matching" },
 				{ "name": "source/ai/actor_type_marine.c", "index": 442, "status": "NonMatching" },
-				{ "name": "source/ai/actor_type_jackal.c", "index": 443, "status": "NonMatching" },
+				{ "name": "source/ai/actor_type_jackal.c", "index": 443, "status": "Matching" },
 				{ "name": "source/ai/actor_type_infection.c", "index": 444, "status": "NonMatching" },
 				{ "name": "source/ai/actor_type_hunter.c", "index": 445, "status": "Matching" },
 				{ "name": "source/ai/actor_type_grunt.c", "index": 446, "status": "Matching" },
