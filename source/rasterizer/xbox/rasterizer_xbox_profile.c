@@ -144,6 +144,8 @@ struct rasterizer_profile_globals
 	short active_profile_index;
 	short pad_a;
 	short window_index;
+	short pad_e;
+	const char *profile_names[NUMBER_OF_RASTERIZER_PROFILES];
 };
 
 struct rasterizer_window_parameters
@@ -207,6 +209,17 @@ void rasterizer_profile_window_begin(
 	data_0030cf00.active_profile_index = NONE;
 
 	return;
+}
+
+const char *rasterizer_profile_get_string(
+	short profile)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_profile.c",
+		363,
+		profile>=0 && profile<NUMBER_OF_RASTERIZER_PROFILES);
+
+	return data_0030cf00.profile_names[profile];
 }
 
 void rasterizer_profile_window_end(
