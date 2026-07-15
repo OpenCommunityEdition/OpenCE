@@ -66,16 +66,89 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "effects/weather_particle_systems.h"
+
+#include "cseries/errors.h"
+#include "networking/network_connection.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct local_weather_particle_system_globals
+{
+	long particle_system_index;
+	byte pad4[0x98];
+};
+
+struct weather_particle_system_globals
+{
+	short active_system_count;
+	short pad2;
+	struct local_weather_particle_system_globals local_players[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+};
+
+typedef char local_weather_particle_system_globals_size_assert[
+	sizeof(struct local_weather_particle_system_globals) == 0x9C ? 1 : -1];
+typedef char weather_particle_system_globals_size_assert[
+	sizeof(struct weather_particle_system_globals) == 0x274 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+static struct weather_particle_system_globals weather_globals;
+
 /* ---------- public code */
+
+void weather_particle_systems_initialize(
+	void)
+{
+	weather_particle_data = data_new("weather particles", 512, 0x54);
+	if (!weather_particle_data)
+		error(_error_immediate, "couldn't allocate weather particle system globals.");
+
+	return;
+}
+
+void weather_particle_systems_initialize_for_new_map(
+	void)
+{
+	short local_player_index;
+
+	for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
+	{
+		match_assert("c:\\halo\\SOURCE\\effects\\weather_particle_systems.c", 91, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+		weather_globals.local_players[local_player_index].particle_system_index = NONE;
+	}
+
+	weather_globals.active_system_count = 0;
+	data_make_valid(weather_particle_data);
+
+	return;
+}
+
+void weather_particle_systems_dispose_from_old_map(
+	void)
+{
+	if (weather_particle_data->valid)
+		data_make_invalid(weather_particle_data);
+
+	return;
+}
+
+void weather_particle_systems_dispose(
+	void)
+{
+	if (weather_particle_data)
+	{
+		data_dispose(weather_particle_data);
+		weather_particle_data = NULL;
+	}
+
+	return;
+}
 
 /* ---------- private code */
