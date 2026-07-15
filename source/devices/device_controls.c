@@ -30,6 +30,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
+#include "device_controls.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -66,10 +70,30 @@ void controls_dispose_from_old_map(
 	return;
 }
 
+boolean control_new(
+	long control_index)
+{
+	struct control_datum *control = control_get(control_index);
+
+	control_definition_get(control->definition_index);
+
+	return TRUE;
+}
+
 void control_delete(
 	long control_index)
 {
 	return;
+}
+
+boolean control_update(
+	long control_index)
+{
+	struct control_datum *control = control_get(control_index);
+
+	control_definition_get(control->definition_index);
+
+	return TRUE;
 }
 
 /* ---------- private code */
