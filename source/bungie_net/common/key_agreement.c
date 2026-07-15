@@ -48,16 +48,36 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "bungie_net/common/key_agreement.h"
+
+#include "memory/data_packet_groups.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct key_agreement_packet_definitions
+{
+	unsigned char packet_definitions[0x74];
+	struct data_packet_group_definition group;
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+extern struct key_agreement_packet_definitions data_002dcad4;
+
 /* ---------- public code */
+
+void initialize_key_agreement_packets(
+	void)
+{
+	data_packet_group_initialize(&data_002dcad4.group);
+
+	return;
+}
 
 /* ---------- private code */
