@@ -134,16 +134,40 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "rasterizer.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct rasterizer_frame_statistics_globals
+{
+	byte data[0x170];
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+extern struct rasterizer_frame_statistics_globals rasterizer_frame_statistics;
+
 /* ---------- public code */
+
+void rasterizer_frame_statistics_begin(
+	void)
+{
+	memset(&rasterizer_frame_statistics, 0, sizeof(rasterizer_frame_statistics));
+
+	return;
+}
+
+void rasterizer_frame_statistics_end(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */

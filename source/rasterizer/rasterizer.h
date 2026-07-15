@@ -168,6 +168,13 @@ void rasterizer_lights_begin(
 void rasterizer_lights_end(
 	void);
 
+/* ---------- prototypes/RASTERIZER_FRAME_STATISTICS.C */
+
+void rasterizer_frame_statistics_begin(
+	void);
+void rasterizer_frame_statistics_end(
+	void);
+
 /* ---------- prototypes/RASTERIZER_TEXT.C */
 
 void rasterizer_text_cache_flush(void);
