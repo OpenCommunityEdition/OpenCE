@@ -171,6 +171,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "interface/progress_bar.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -182,5 +184,11 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void progress_bar_dispose(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */

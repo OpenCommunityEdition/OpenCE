@@ -10,6 +10,7 @@ header included in hcex build.
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
 #include "real_math.h"
 
 /* ---------- constants */
@@ -20,6 +21,8 @@ header included in hcex build.
 
 /* ---------- prototypes/PROGRESS_BAR.C */
 
+void progress_bar_dispose(
+	void);
 void progress_bar_display(real progress);
 
 /* ---------- globals */
