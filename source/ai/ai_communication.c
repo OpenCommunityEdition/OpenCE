@@ -553,4 +553,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+void ai_communication_dispose(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
