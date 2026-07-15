@@ -24,6 +24,10 @@ const char *cache_files_map_directory(
 	void);
 
 unsigned long cache_files_get_checksum(void);
+void tag_files_close(
+	void);
+void tag_files_open(
+	void);
 
 /* ---------- prototypes/CACHE_FILES_WINDOWS.C */
 

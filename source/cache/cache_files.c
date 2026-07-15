@@ -141,14 +141,53 @@ struct cache_file_tag_instance
 	unsigned long unused[2];
 };
 
+struct cache_file_globals
+{
+	boolean tags_loaded;
+	byte reserved1[0x67];
+	unsigned long checksum;
+	byte reserved6C[0x7A0];
+};
+
+typedef char verify_cache_file_globals_size[
+	sizeof(struct cache_file_globals) == 0x80C ? 1 : -1];
+
 /* ---------- prototypes */
 
 // TODO: 
 /*static*/ struct cache_file_tag_instance *cache_get_tag_instance(long tag_index);
+void cache_files_dispose(
+	void);
+void cache_files_initialize(
+	void);
 
 /* ---------- globals */
 
+struct cache_file_globals cache_file_globals;
+
 /* ---------- public code */
+
+void tag_files_open(
+	void)
+{
+	cache_files_initialize();
+
+	return;
+}
+
+void tag_files_close(
+	void)
+{
+	cache_files_dispose();
+
+	return;
+}
+
+unsigned long cache_files_get_checksum(
+	void)
+{
+	return cache_file_globals.checksum;
+}
 
 void *tag_get(
 	long group_tag,
