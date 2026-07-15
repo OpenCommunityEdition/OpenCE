@@ -124,17 +124,45 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct rasterizer_profile_globals
+{
+	__int64 performance_counter_frequency;
+	short active_profile_index;
+	short pad_a;
+	short window_index;
+};
+
+struct rasterizer_window_parameters
+{
+	short rasterizer_target;
+	short window_index;
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+extern struct rasterizer_profile_globals data_0030cf00;
+extern struct rasterizer_window_parameters global_window_parameters;
+
 /* ---------- public code */
+
+void rasterizer_profile_window_begin(
+	void)
+{
+	data_0030cf00.window_index = global_window_parameters.window_index;
+	data_0030cf00.active_profile_index = NONE;
+
+	return;
+}
 
 void rasterizer_profile_window_end(
 	void)
