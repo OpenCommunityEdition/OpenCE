@@ -52,6 +52,7 @@ symbols in this file:
 
 #include "structure_bsp_definitions.h"
 #include "physics/collision_bsp_definitions.h"
+#include "scenario/scenario.h"
 
 /* ---------- constants */
 
@@ -59,11 +60,33 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct temporary_lens_flare_marker
+{
+	byte unknown[0x10];
+	short cluster_index;
+};
+
 /* ---------- prototypes */
+
+long code_00183bb0(
+	struct temporary_lens_flare_marker const *a,
+	struct temporary_lens_flare_marker const *b);
+boolean build_structure_lens_flares(
+	struct structure_bsp *structure_bsp);
+void structure_lens_flares_place(
+	void);
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+void structure_lens_flares_place(
+	void)
+{
+	build_structure_lens_flares(global_structure_bsp_get());
+
+	return;
+}
 
 long cluster_index_from_point(
 	struct structure_bsp const *structure_bsp,
@@ -72,12 +95,19 @@ long cluster_index_from_point(
 	long test_result = bsp3d_test_point(&TAG_BLOCK_GET_ELEMENT(&structure_bsp->collision_bsp, 0, struct collision_bsp)->bsp3d, 0, point);
 	long result = NONE;
 	
-	if (test_result!=NONE)
+	if (test_result != NONE)
 	{
-		result = TAG_BLOCK_GET_ELEMENT(&structure_bsp->leaves, test_result&LONG_MAX, struct structure_leaf)->cluster_index;
+		result = TAG_BLOCK_GET_ELEMENT(&structure_bsp->leaves, test_result & LONG_MAX, struct structure_leaf)->cluster_index;
 	}
 
 	return result;
 }
 
 /* ---------- private code */
+
+long code_00183bb0(
+	struct temporary_lens_flare_marker const *a,
+	struct temporary_lens_flare_marker const *b)
+{
+	return a->cluster_index > b->cluster_index ? 1 : -1;
+}
