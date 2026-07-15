@@ -52,6 +52,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cinematics.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -63,5 +65,11 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void cinematic_dispose(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */

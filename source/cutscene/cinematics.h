@@ -14,7 +14,10 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/CINEMATICS.C */
+
+void cinematic_dispose(
+	void);
 
 /* ---------- globals */
 
