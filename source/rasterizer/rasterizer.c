@@ -338,7 +338,10 @@ void _rasterizer_model_end(
 	void);
 void _rasterizer_dispose(void);
 void _rasterizer_frame_end(void);
-void _rasterizer_window_end(void);
+void _rasterizer_window_begin(
+	struct rasterizer_window_begin_parameters const *parameters);
+void _rasterizer_window_end(
+	void);
 boolean _rasterizer_windows_begin(void);
 void _rasterizer_windows_end(void);
 
@@ -446,9 +449,18 @@ void rasterizer_frame_end(void)
 	_rasterizer_frame_end();
 }
 
-void rasterizer_window_end(void)
+void rasterizer_window_begin(
+	struct rasterizer_window_begin_parameters const *parameters)
+{
+	_rasterizer_window_begin(parameters);
+	return;
+}
+
+void rasterizer_window_end(
+	void)
 {
 	_rasterizer_window_end();
+	return;
 }
 
 boolean rasterizer_windows_begin(void)
