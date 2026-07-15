@@ -225,6 +225,11 @@ void code_000d1f00(
 void code_000d25f0(
 	void);
 
+void __stdcall D3DDevice_SetVertexData2f(
+	unsigned long register_index,
+	real x,
+	real y);
+
 /* ---------- globals */
 
 extern struct progress_bar_data data_002fd5a8;
@@ -324,6 +329,26 @@ boolean code_000d1150(
 	result= progress_bar_mode.texture0 != NULL;
 
 	return result;
+}
+
+void gen_cloud_coord(
+	real x,
+	real y,
+	real offset)
+{
+	D3DDevice_SetVertexData2f(10, x*32.f + offset, y*20.f);
+
+	return;
+}
+
+void gen_mask_coord(
+	real x,
+	real y,
+	real mask_position)
+{
+	D3DDevice_SetVertexData2f(10, x - (mask_position*768.f - 64.f - 64.f), y*0.033333335f);
+
+	return;
 }
 
 void code_000d16d0(
