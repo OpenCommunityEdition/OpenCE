@@ -120,4 +120,12 @@ void light_fixture_delete(long object_index)
 {
 }
 
+boolean light_fixture_update(long object_index)
+{
+	struct light_fixture_datum *light_fixture = object_get_and_verify_type(object_index, _object_mask_light_fixture);
+
+	tag_get(LIGHT_FIXTURE_DEFINITION_TAG, light_fixture->definition_index);
+	return TRUE;
+}
+
 /* ---------- private code */
