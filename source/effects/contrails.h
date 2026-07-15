@@ -22,6 +22,11 @@ header included in hcex build.
 
 /* ---------- prototypes/CONTRAILS.C */
 
+real contrail_scale_value(
+	real value,
+	real scale,
+	unsigned long flags,
+	char flag_bit);
 void contrails_initialize(
 	void);
 void contrails_initialize_for_new_map(

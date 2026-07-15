@@ -83,6 +83,20 @@ symbols in this file:
 
 /* ---------- public code */
 
+real contrail_scale_value(
+	real value,
+	real scale,
+	unsigned long flags,
+	char flag_bit)
+{
+	real result= scale;
+
+	if (flags & (1 << flag_bit))
+		result= value * scale;
+
+	return result;
+}
+
 void contrails_initialize(
 	void)
 {
