@@ -80,23 +80,28 @@ void device_add_scenario_information(long object_index, struct scenario_device_d
 
 /* ---------- public code */
 
-void light_fixtures_initialize(void)
+void
+light_fixtures_initialize(void)
 {
 }
 
-void light_fixtures_dispose(void)
+void
+light_fixtures_dispose(void)
 {
 }
 
-void light_fixtures_initialize_for_new_map(void)
+void
+light_fixtures_initialize_for_new_map(void)
 {
 }
 
-void light_fixtures_dispose_from_old_map(void)
+void
+light_fixtures_dispose_from_old_map(void)
 {
 }
 
-void light_fixture_place(long object_index, struct scenario_light_fixture_datum *scenario_light_fixture)
+void
+light_fixture_place(long object_index, struct scenario_light_fixture_datum *scenario_light_fixture)
 {
 	struct light_fixture_datum *light_fixture = object_get_and_verify_type(object_index, _object_mask_light_fixture);
 
@@ -116,7 +121,8 @@ boolean light_fixture_new(long object_index)
 	return TRUE;
 }
 
-void light_fixture_delete(long object_index)
+void
+light_fixture_delete(long object_index)
 {
 }
 

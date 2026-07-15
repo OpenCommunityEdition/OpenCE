@@ -299,7 +299,8 @@ __declspec(align(4)) struct tag_data_definition hs_string_data_definition =
 
 /* ---------- public code */
 
-void code_000bd310(void *owner, void *data, long size)
+void
+code_000bd310(void *owner, void *data, long size)
 {
 	long data_size;
 
