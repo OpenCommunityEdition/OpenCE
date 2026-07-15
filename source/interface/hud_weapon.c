@@ -52,6 +52,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "interface/hud_weapon.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -63,5 +65,17 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void hud_dispose_weapon_interface_from_old_map(
+	void)
+{
+	return;
+}
+
+void hud_dispose_weapon_interface(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */
