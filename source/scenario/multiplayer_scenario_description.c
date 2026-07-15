@@ -64,6 +64,7 @@ struct multiplayer_scenario_description_item *multiplayer_scenario_description_g
 	short *count)
 {
 	long scenario_list_index;
+	struct multiplayer_scenario_description_item *result;
 
 	match_assert("c:\\halo\\SOURCE\\scenario\\multiplayer_scenario_description.c", 60, count);
 	scenario_list_index = tag_loaded(MULTIPLAYER_SCENARIO_DESCRIPTION_TAG, "ui\\multiplayer_scenarios");
@@ -71,16 +72,18 @@ struct multiplayer_scenario_description_item *multiplayer_scenario_description_g
 	{
 		struct multiplayer_scenario_description *scenario_list =
 			tag_get(MULTIPLAYER_SCENARIO_DESCRIPTION_TAG, scenario_list_index);
-		struct multiplayer_scenario_description_item *result;
 
 		match_assert("c:\\halo\\SOURCE\\scenario\\multiplayer_scenario_description.c", 66, scenario_list);
 		result = scenario_list->scenarios.address;
 		*count = (short)scenario_list->scenarios.count;
-		return result;
+	}
+	else
+	{
+		result = NULL;
+		*count = 0;
 	}
 
-	*count = 0;
-	return NULL;
+	return result;
 }
 
 boolean map_name_from_multiplayer_scenario_description_item(
