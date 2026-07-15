@@ -403,6 +403,12 @@ boolean actor_action_handle_combat_transition(
 	long actor_index);
 boolean actor_action_handle_danger_avoidance(
 	long actor_index);
+void actor_action_handle_vehicle_entry(
+	long actor_index);
+boolean actor_action_handle_vehicle_exit(
+	long actor_index);
+boolean actor_action_handle_grenade_throwing(
+	long actor_index);
 boolean actor_action_handle_combat_status(
 	long actor_index,
 	boolean initiative,
@@ -416,6 +422,8 @@ boolean actor_action_can_stop_guarding(
 	short combat_action,
 	short guard_action);
 boolean actor_action_handle_done_fleeing(
+	long actor_index);
+boolean actor_action_consider_grenade(
 	long actor_index);
 void actor_action_handle_exit_pursuit(
 	long actor_index);
