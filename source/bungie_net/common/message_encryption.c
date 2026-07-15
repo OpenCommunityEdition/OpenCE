@@ -94,16 +94,24 @@ void tea_encipher(
 	unsigned long value1;
 	long sum;
 	unsigned long rounds;
+	long key0;
+	long key1;
+	long key2;
+	long key3;
 
 	value0 = input[0];
 	value1 = input[1];
 	sum = 0;
 	rounds = TEA_ROUND_COUNT;
+	key0 = key[0];
+	key1 = key[1];
+	key2 = key[2];
+	key3 = key[3];
 	do
 	{
 		sum += 0x9E3779B9;
-		value0 += ((value1 >> 5) + key[1]) ^ (value1 * 0x10 + key[0]) ^ (value1 + sum);
-		value1 += ((value0 >> 5) + key[3]) ^ (value0 * 0x10 + key[2]) ^ (value0 + sum);
+		value0 += ((value1 >> 5) + key1) ^ (value1 * 0x10 + key0) ^ (value1 + sum);
+		value1 += ((value0 >> 5) + key3) ^ (value0 * 0x10 + key2) ^ (value0 + sum);
 	}
 	while (--rounds);
 	output[0] = value0;
@@ -121,15 +129,23 @@ void tea_decipher(
 	unsigned long value1;
 	long sum;
 	unsigned long rounds;
+	long key0;
+	long key1;
+	long key2;
+	long key3;
 
 	value0 = input[0];
 	value1 = input[1];
 	sum = 0xC6EF3720;
 	rounds = TEA_ROUND_COUNT;
+	key0 = key[0];
+	key1 = key[1];
+	key2 = key[2];
+	key3 = key[3];
 	do
 	{
-		value1 -= ((value0 >> 5) + key[3]) ^ (value0 * 0x10 + key[2]) ^ (value0 + sum);
-		value0 -= ((value1 >> 5) + key[1]) ^ (value1 * 0x10 + key[0]) ^ (value1 + sum);
+		value1 -= ((value0 >> 5) + key3) ^ (value0 * 0x10 + key2) ^ (value0 + sum);
+		value0 -= ((value1 >> 5) + key1) ^ (value1 * 0x10 + key0) ^ (value1 + sum);
 		sum -= 0x9E3779B9;
 	}
 	while (--rounds);
