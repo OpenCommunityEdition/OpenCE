@@ -366,22 +366,42 @@ struct action_state_data
 
 /* ---------- prototypes/ACTIONS.C */
 
-void actor_action_handle_initial_action(long actor_index);
-void actor_action_handle_pending_command_list(long actor_index);
-boolean actor_action_deny_transition(long actor_index);
-void actor_action_handle_berserking_from_damage(
+boolean actor_action_handle_initial_action(
 	long actor_index);
-void actor_action_handle_berserking_from_attached_projectiles(
+boolean actor_action_handle_pending_command_list(
 	long actor_index);
-void actor_action_handle_berserk_transition(
+boolean actor_action_handle_surprise(
 	long actor_index,
-	short transition_type);
-void actor_action_handle_combat_transition(long actor_index);
-void actor_action_handle_danger_avoidance(
+	short surprise_level);
+boolean actor_action_deny_transition(
 	long actor_index);
-boolean actor_action_handle_combat_status(long actor_index, boolean initiative, boolean finished);
-void actor_action_handle_combat_failure(long actor_index);
-void actor_action_handle_exit_pursuit(long actor_index);
+boolean actor_action_handle_berserking_from_attacking_mode(
+	long actor_index);
+boolean actor_action_handle_berserking_from_damage(
+	long actor_index);
+boolean actor_action_handle_berserking_from_proximity(
+	long actor_index);
+boolean actor_action_handle_berserk_transition(
+	long actor_index,
+	short berserk_count);
+boolean actor_action_handle_combat_transition(
+	long actor_index);
+boolean actor_action_handle_combat_status(
+	long actor_index,
+	boolean initiative,
+	boolean finished);
+boolean actor_action_handle_combat_failure(
+	long actor_index);
+boolean actor_action_handle_evasion(
+	long actor_index);
+boolean actor_action_can_stop_guarding(
+	long actor_index,
+	short combat_action,
+	short guard_action);
+boolean actor_action_handle_done_fleeing(
+	long actor_index);
+void actor_action_handle_exit_pursuit(
+	long actor_index);
 boolean actor_action_can_stop_conversing(
 	long actor_index);
 

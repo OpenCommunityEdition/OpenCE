@@ -822,7 +822,7 @@
 				{ "name": "source/ai/actor_type_engineer.c", "index": 448, "status": "NonMatching" },
 				{ "name": "source/ai/actor_type_elite.c", "index": 449, "status": "NonMatching" },
 				{ "name": "source/ai/actor_type_crew.c", "index": 450, "status": "NonMatching" },
-				{ "name": "source/ai/actor_type_carrier.c", "index": 451, "status": "NonMatching" },
+				{ "name": "source/ai/actor_type_carrier.c", "index": 451, "status": "Matching" },
 				{ "name": "source/ai/actor_stimulus.c", "index": 452, "status": "NonMatching" },
 				{ "name": "source/ai/actor_perception.c", "index": 453, "status": "NonMatching" },
 				{ "name": "source/ai/actor_moving.c", "index": 454, "status": "NonMatching" },
