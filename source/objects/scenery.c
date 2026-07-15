@@ -32,6 +32,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "scenery.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -43,5 +45,35 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void
+scenery_initialize(
+	void)
+{
+}
+
+void
+scenery_initialize_for_new_map(
+	void)
+{
+}
+
+void
+scenery_dispose_from_old_map(
+	void)
+{
+}
+
+void
+scenery_dispose(
+	void)
+{
+}
+
+void
+scenery_delete(
+	long object_index)
+{
+}
 
 /* ---------- private code */
