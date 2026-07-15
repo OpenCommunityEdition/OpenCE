@@ -60,6 +60,12 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "objects/widgets/flags.h"
+
+#include "cseries/cseries.h"
+#include "cseries/errors.h"
+#include "saved games/game_state.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -70,6 +76,43 @@ symbols in this file:
 
 /* ---------- globals */
 
+struct data_array *flag_data;
+
 /* ---------- public code */
+
+void flags_initialize(
+	void)
+{
+	flag_data = game_state_data_new("flag", 2, 0x16BC);
+	if (!flag_data)
+		error(_error_immediate, "couldn't allocate flag globals");
+
+	return;
+}
+
+void flags_initialize_for_new_map(
+	void)
+{
+	data_make_valid(flag_data);
+
+	return;
+}
+
+void flags_dispose_from_old_map(
+	void)
+{
+	data_make_invalid(flag_data);
+
+	return;
+}
+
+void flags_dispose(
+	void)
+{
+	if (flag_data)
+		flag_data = NULL;
+
+	return;
+}
 
 /* ---------- private code */
