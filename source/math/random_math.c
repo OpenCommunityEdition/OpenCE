@@ -235,4 +235,29 @@ __declspec(naked) real_vector3d *seed_random_direction3d(
 	}
 }
 
+void
+seed_random_orientation(
+	unsigned long *seed,
+	real_vector3d *facing,
+	real_vector3d *up)
+{
+	real azimuth= real_seed_random_range(seed, 0.f, 2.f*_pi);
+	real elevation= real_seed_random_range(seed, -_pi/2.f, _pi/2.f);
+	real roll= real_seed_random_range(seed, 0.f, 2.f*_pi);
+	real azimuth_cosine= cosine(azimuth);
+	real azimuth_sine= sine(azimuth);
+	real elevation_cosine= cosine(elevation);
+	real elevation_sine= sine(elevation);
+
+	facing->i= elevation_cosine*azimuth_cosine;
+	facing->j= elevation_cosine*azimuth_sine;
+	facing->k= elevation_sine;
+
+	up->i= -azimuth_cosine*elevation_sine;
+	up->j= -azimuth_sine*elevation_sine;
+	up->k= elevation_cosine;
+
+	yaw_vectors(up, facing, sine(roll), cosine(roll));
+}
+
 /* ---------- private code */
