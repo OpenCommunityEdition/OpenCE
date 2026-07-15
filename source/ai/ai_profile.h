@@ -16,6 +16,11 @@ header included in hcex build.
 
 /* ---------- prototypes/AI_PROFILE.C */
 
+void ai_profile_initialize(
+	void);
+void ai_profile_initialize_for_new_map(
+	void);
+
 void ai_profile_dispose(
 	void);
 void ai_profile_dispose_from_old_map(

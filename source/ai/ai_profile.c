@@ -80,17 +80,44 @@ symbols in this file:
 
 #include "ai/ai_profile.h"
 
+#include "cseries/cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct ai_profile_globals
+{
+	long __unknown0;
+	boolean enabled;
+	byte __unknown5[7];
+	byte map_data[0xEE0];
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+struct ai_profile_globals ai_profile;
+
 /* ---------- public code */
+
+void ai_profile_initialize(
+	void)
+{
+	csmemset(&ai_profile, 0, sizeof(ai_profile));
+	ai_profile.enabled = TRUE;
+	return;
+}
+
+void ai_profile_initialize_for_new_map(
+	void)
+{
+	csmemset(ai_profile.map_data, 0, sizeof(ai_profile.map_data));
+	return;
+}
 
 void ai_profile_dispose(
 	void)
