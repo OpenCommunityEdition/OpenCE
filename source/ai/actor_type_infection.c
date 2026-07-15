@@ -40,6 +40,13 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
+#include "actions.h"
+#include "actor_definitions.h"
+#include "actors.h"
+#include "actor_types.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -48,8 +55,84 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void infection_decide_action(
+	long actor_index);
+void code_00027470(
+	long actor_index);
+void infection_swarm_aim_jump(
+	long actor_index);
+
 /* ---------- globals */
+
+struct actor_type_definition actor_type_infection =
+{
+	"infection",
+	32,
+	2,
+	2,
+	2,
+	256,
+	FALSE,
+	{ 0, 0, 0 },
+	infection_decide_action,
+	code_00027470,
+	infection_swarm_aim_jump
+};
 
 /* ---------- public code */
 
 /* ---------- private code */
+
+void infection_decide_action(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	actor_definition_get(actor->meta.definition_index);
+	actor_action_handle_initial_action(actor_index);
+	actor_action_handle_pending_command_list(actor_index);
+	if (!actor_action_deny_transition(actor_index))
+		actor_action_handle_combat_transition(actor_index);
+
+	switch (actor->state.action)
+	{
+	case _actor_action_fight:
+	case _actor_action_charge:
+		if (!actor_action_handle_combat_status(actor_index, TRUE, FALSE))
+		{
+			actor_action_handle_combat_failure(actor_index);
+			return;
+		}
+		break;
+
+	case _actor_action_flee:
+		if (actor->state.action_data.flee.unable_to_flee)
+			actor_action_handle_combat_status(actor_index, TRUE, TRUE);
+		else
+			actor_action_handle_done_fleeing(actor_index);
+		return;
+
+	case _actor_action_guard:
+		actor_action_handle_combat_status(
+			actor_index,
+			actor_action_can_stop_guarding(actor_index, _actor_action_fight, _actor_action_guard),
+			FALSE);
+		return;
+
+	case _actor_action_uncover:
+	case _actor_action_search:
+	case _actor_action_wait:
+		if (!actor_action_handle_combat_status(actor_index, TRUE, FALSE))
+			actor_action_handle_exit_pursuit(actor_index);
+		return;
+
+	case _actor_action_obey:
+		actor_action_handle_combat_status(
+			actor_index,
+			actor->state.action_data.obey.initiative,
+			actor->state.action_data.obey.finished);
+		break;
+	}
+
+	return;
+}
