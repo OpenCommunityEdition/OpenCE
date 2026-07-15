@@ -22,6 +22,14 @@ struct data_packet_group_definition
 void data_packet_group_initialize(
 	struct data_packet_group_definition *group_definition);
 
+boolean data_packet_group_encode_packet(
+	struct data_packet_group_definition *group_definition,
+	const void *decoded_packet,
+	void *encoded_packet,
+	short *encoded_packet_size,
+	long packet_type,
+	long packet_version);
+
 boolean data_packet_group_decode_packet(
 	struct data_packet_group_definition *group_definition,
 	void *decoded_packet,
