@@ -42,6 +42,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "objects/widgets/lightning.h"
+
+#include "cseries/cseries.h"
+#include "saved games/game_state.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -52,11 +57,40 @@ symbols in this file:
 
 /* ---------- globals */
 
+struct lightning_globals lightning_globals;
+
 /* ---------- public code */
+
+void lightnings_initialize(
+	void)
+{
+	lightning_globals.lightning_data = game_state_data_new("lightnings", 256, 8);
+	match_assert("c:\\halo\\SOURCE\\objects\\widgets\\lightning.c", 50, lightning_globals.lightning_data);
+
+	return;
+}
 
 void lightnings_dispose(
 	void)
 {
+	return;
+}
+
+void lightnings_initialize_for_new_map(
+	void)
+{
+	if (lightning_globals.lightning_data)
+		data_make_valid(lightning_globals.lightning_data);
+
+	return;
+}
+
+void lightnings_dispose_from_old_map(
+	void)
+{
+	if (lightning_globals.lightning_data)
+		data_make_invalid(lightning_globals.lightning_data);
+
 	return;
 }
 
