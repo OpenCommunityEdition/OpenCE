@@ -56,6 +56,10 @@ void items_dispose(
 	void);
 void item_delete(
 	long item_index);
+boolean item_new(
+	long item_index);
+boolean dangerous_items_near_player(
+	void);
 void item_in_unit_inventory(long item_index, long owner_unit_index);
 void item_accelerate(long item_index, real_vector3d const *acceleration, boolean detonates_explosives);
 

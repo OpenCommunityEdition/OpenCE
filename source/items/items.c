@@ -58,6 +58,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
+#include "game/game.h"
+#include "items.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -98,6 +103,35 @@ void item_delete(
 	long item_index)
 {
 	return;
+}
+
+boolean item_new(
+	long item_index)
+{
+	struct item_datum *item = item_get(item_index);
+
+	item->object.flags |= FLAG(_object_dynamic_lighting_recompute_bit) |
+		FLAG(_object_static_lighting_recompute_bit);
+	item->item.last_owned_time = game_time_get();
+	item->item.ignore_object_index = NONE;
+
+	return TRUE;
+}
+
+boolean dangerous_items_near_player(
+	void)
+{
+	struct object_iterator iterator;
+	struct item_datum *item;
+
+	object_iterator_new(&iterator, _object_mask_item, 1);
+	while (item = (struct item_datum *)object_iterator_next(&iterator))
+	{
+		if (item->item.detonation_ticks > 0)
+			return TRUE;
+	}
+
+	return FALSE;
 }
 
 /* ---------- private code */
