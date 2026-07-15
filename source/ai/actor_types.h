@@ -54,7 +54,10 @@ struct actor_type_definition
 	actor_swarm_aim_jump_proc swarm_aim_jump;
 };
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/ACTOR_TYPES.C */
+
+void actor_types_initialize(
+	void);
 
 /* ---------- globals */
 

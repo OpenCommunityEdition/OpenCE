@@ -25,6 +25,14 @@ enum
 
 enum
 {
+	MAXIMUM_ACTORS = 256,
+	MAXIMUM_SWARMS = 32,
+	MAXIMUM_SWARM_COMPONENTS = 256,
+	SWARM_COMPONENT_DATUM_SIZE = 0x40,
+};
+
+enum
+{
 	_actor_target_none = 0,
 	_actor_target_partial_enemy,
 	_actor_target_dead_enemy,
@@ -775,7 +783,13 @@ struct vector_avoidance_data
 
 /* ---------- prototypes/ACTORS.C */
 
+void actors_initialize(
+	void);
 void actors_dispose(
+	void);
+void actors_initialize_for_new_map(
+	void);
+void actors_dispose_from_old_map(
 	void);
 real_argb_color const *actor_activation_debug_color(long actor_index);
 
@@ -814,6 +828,7 @@ short actor_perception_aiming_vector_test_blockage(real_point3d const *source_po
 /* ---------- globals */
 
 extern struct data_array *swarm_data;
+extern struct data_array *swarm_component_data;
 extern struct data_array *actor_data;
 
 /* ---------- public code */

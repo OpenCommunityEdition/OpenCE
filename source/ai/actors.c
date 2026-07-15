@@ -282,7 +282,10 @@ symbols in this file:
 
 #include "cseries.h"
 #include "actors.h"
+#include "actor_types.h"
 #include "props.h"
+
+#include "saved games/game_state.h"
 
 /* ---------- constants */
 
@@ -295,13 +298,51 @@ symbols in this file:
 /* ---------- globals */
 
 struct data_array *swarm_data = NULL;
+struct data_array *swarm_component_data = NULL;
 struct data_array *actor_data = NULL;
 
 /* ---------- public code */
 
+void actors_initialize(
+	void)
+{
+	actor_types_initialize();
+	actor_data = game_state_data_new("actor", MAXIMUM_ACTORS, sizeof(struct actor_datum));
+	match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 121, actor_data);
+	swarm_data = game_state_data_new("swarm", MAXIMUM_SWARMS, sizeof(struct swarm_datum));
+	match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 124, swarm_data);
+	swarm_component_data = game_state_data_new(
+		"swarm component",
+		MAXIMUM_SWARM_COMPONENTS,
+		SWARM_COMPONENT_DATUM_SIZE);
+	match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 127, swarm_component_data);
+
+	return;
+}
+
 void actors_dispose(
 	void)
 {
+	return;
+}
+
+void actors_initialize_for_new_map(
+	void)
+{
+	data_make_valid(actor_data);
+	data_make_valid(swarm_data);
+	data_make_valid(swarm_component_data);
+
+	return;
+}
+
+void actors_dispose_from_old_map(
+	void)
+{
+	data_make_invalid(actor_data);
+	data_make_invalid(swarm_data);
+	data_make_invalid(swarm_component_data);
+
 	return;
 }
 
