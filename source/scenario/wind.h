@@ -21,6 +21,8 @@ struct wind_globals
 
 void wind_dispose_from_old_map(
 	void);
+void wind_update(
+	void);
 
 /* ---------- globals */
 

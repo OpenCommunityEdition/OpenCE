@@ -165,6 +165,7 @@ symbols in this file:
 #include "scenario.h"
 
 #include "physics/bsp3d.h"
+#include "scenario/wind.h"
 
 /* ---------- constants */
 
@@ -181,6 +182,28 @@ struct scenario *global_scenario;
 struct bsp3d *global_bsp3d;
 
 /* ---------- public code */
+
+void scenario_dispose_from_old_map(
+	void)
+{
+	wind_dispose_from_old_map();
+
+	return;
+}
+
+void scenario_frame_update(
+	real delta_time)
+{
+	wind_update();
+
+	return;
+}
+
+struct scenario *global_scenario_try_and_get(
+	void)
+{
+	return global_scenario;
+}
 
 struct structure_bsp *global_structure_bsp_get(
 	void)
