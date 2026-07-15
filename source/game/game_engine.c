@@ -549,11 +549,24 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void game_engine_playlist_next(
+	long parameter0,
+	long parameter1,
+	long playlist_type);
+
 /* ---------- globals */
 
 struct game_engine *game_engine;
 
 /* ---------- public code */
+
+void game_engine_playlist_initialize(
+	void)
+{
+	game_engine_playlist_next(0, 0, 2);
+
+	return;
+}
 
 boolean game_engine_running(
 	void)

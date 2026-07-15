@@ -16,6 +16,9 @@ header included in hcex build.
 
 /* ---------- prototypes/GAME_ENGINE.C */
 
+void game_engine_playlist_initialize(
+	void);
+
 boolean game_engine_running(void);
 
 boolean game_engine_infinite_grenades(long player_index);
