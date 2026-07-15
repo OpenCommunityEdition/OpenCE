@@ -50,10 +50,22 @@ enum
 
 /* ---------- prototypes/STRUCTURES.C */
 
+void structures_initialize(
+	void);
+void structures_initialize_for_new_map(
+	void);
+void structures_dispose_from_old_map(
+	void);
+void structures_dispose(
+	void);
 short structure_clusters_in_sphere(short cluster_index, real_point3d const *position, real radius, short maximum_count, short *intersected_indices);
 
 /* ---------- prototypes/STRUCTURE_DETAIL_OBJECTS.C */
 
+void structure_detail_objects_initialize(
+	void);
+void structure_detail_objects_initialize_for_new_map(
+	void);
 void structure_detail_objects_dispose_from_old_map(
 	void);
 void structure_detail_objects_dispose(
@@ -67,6 +79,10 @@ long cluster_index_from_point(struct structure_bsp const *structure_bsp, union r
 
 /* ---------- prototypes/STRUCTURE_RUNTIME_DECALS.C */
 
+void structure_decals_initialize(
+	void);
+void structure_decals_initialize_for_new_map(
+	void);
 void structure_decals_dispose_from_old_map(
 	void);
 void structure_decals_dispose(
