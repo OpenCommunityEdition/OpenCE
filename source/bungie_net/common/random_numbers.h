@@ -8,16 +8,13 @@ header included in hcex build.
 #define __RANDOM_NUMBERS_H
 #pragma once
 
+#include "bungie_net/common/64bit_math.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
-
-struct qword_value
-{
-	unsigned __int64 qword;
-};
 
 /* ---------- prototypes/EXAMPLE.C */
 

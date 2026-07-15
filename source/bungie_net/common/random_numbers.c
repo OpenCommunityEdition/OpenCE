@@ -31,13 +31,6 @@ symbols in this file:
 
 /* ---------- structures */
 
-/* ---------- prototypes */
-
-void add64(
-	struct qword_value const *a,
-	struct qword_value const *b,
-	struct qword_value *result);
-
 /* ---------- globals */
 
 boolean random_numbers_initialized = FALSE;
