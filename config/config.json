@@ -820,7 +820,7 @@
 				{ "name": "source/ai/actor_type_grunt.c", "index": 446, "status": "Matching" },
 				{ "name": "source/ai/actor_type_flood.c", "index": 447, "status": "NonMatching" },
 				{ "name": "source/ai/actor_type_engineer.c", "index": 448, "status": "NonMatching" },
-				{ "name": "source/ai/actor_type_elite.c", "index": 449, "status": "NonMatching" },
+				{ "name": "source/ai/actor_type_elite.c", "index": 449, "status": "Matching" },
 				{ "name": "source/ai/actor_type_crew.c", "index": 450, "status": "Matching" },
 				{ "name": "source/ai/actor_type_carrier.c", "index": 451, "status": "Matching" },
 				{ "name": "source/ai/actor_stimulus.c", "index": 452, "status": "NonMatching" },

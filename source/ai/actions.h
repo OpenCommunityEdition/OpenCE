@@ -396,6 +396,8 @@ boolean actor_action_handle_berserking_from_damage(
 	long actor_index);
 boolean actor_action_handle_berserking_from_proximity(
 	long actor_index);
+boolean actor_action_handle_berserking_from_attached_projectiles(
+	long actor_index);
 boolean actor_action_handle_berserk_transition(
 	long actor_index,
 	short berserk_count);
