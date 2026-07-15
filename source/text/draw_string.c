@@ -110,4 +110,16 @@ symbols in this file:
 
 /* ---------- public code */
 
+void draw_string_initialize(
+	void)
+{
+	return;
+}
+
+void draw_string_dispose(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
