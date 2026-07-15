@@ -81,6 +81,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "memory/data.h"
 #include "saved games/game_state.h"
+#include "scenario/scenario.h"
 
 /* ---------- constants */
 
@@ -166,6 +167,21 @@ void particles_disconnect_from_structure_bsp(
 	void)
 {
 	return;
+}
+
+// struct location const *location is passed in eax
+__declspec(naked) boolean code_0008fcd0(
+	void)
+{
+	__asm
+	{
+		push eax
+		call scenario_location_potentially_visible_local
+		add esp, 4
+		test al, al
+		setne al
+		ret
+	}
 }
 
 real particle_get_radius(
