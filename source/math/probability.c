@@ -142,4 +142,49 @@ boolean permute(
 	return FALSE;
 }
 
+boolean combine(
+	short base,
+	short count,
+	short *indices)
+{
+	short index;
+
+	match_assert("c:\\halo\\SOURCE\\math\\probability.c", 119, base>=count);
+	match_assert("c:\\halo\\SOURCE\\math\\probability.c", 120, count>0);
+	match_assert("c:\\halo\\SOURCE\\math\\probability.c", 121, indices);
+
+	for (index = 0; index < count; index++)
+	{
+		if (indices[index] < 0 ||
+			indices[index] >= base ||
+			(index > 0 && indices[index] <= indices[index - 1]))
+		{
+			for (index = 0; index < count; index++)
+			{
+				indices[index] = index;
+			}
+
+			return TRUE;
+		}
+	}
+
+	for (index = count - 1; index >= 0; index--)
+	{
+		if (indices[index] < base - count + index)
+		{
+			indices[index]++;
+			index++;
+
+			for (; index < count; index++)
+			{
+				indices[index] = indices[index - 1] + 1;
+			}
+
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
 /* ---------- private code */
