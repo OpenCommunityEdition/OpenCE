@@ -80,6 +80,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "interface/virtual_keyboard.h"
+#include "tag_files/tag_groups.h"
 
 /* ---------- constants */
 
@@ -87,16 +88,39 @@ enum
 {
 	VIRTUAL_KEYBOARD_ROW_COUNT = 5,
 	VIRTUAL_KEYBOARD_COLUMN_COUNT = 11,
+	NUMBER_OF_CONFIGURABLE_VIRTUAL_KEYS = 0x24,
 };
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct virtual_keyboard_key
+{
+	short keycode;
+	wchar_t character;
+	wchar_t modifier_a_character;
+	wchar_t modifier_b_character;
+	wchar_t modifier_c_character;
+	wchar_t modifier_a_b_character;
+	wchar_t modifier_a_c_character;
+	wchar_t modifier_b_c_character;
+	byte reserved10[0x40];
+};
+
+struct virtual_keyboard_definition
+{
+	byte reserved0[0x30];
+	struct tag_block keys;
+};
+
 struct virtual_keyboard_globals
 {
 	boolean active;
-	byte reserved1[7];
+	boolean modifier_a;
+	boolean modifier_b;
+	boolean modifier_c;
+	struct virtual_keyboard_definition *keyboard;
 	short row;
 	short column;
 	unsigned short buffer_size;
@@ -111,10 +135,16 @@ struct virtual_keyboard_globals
 
 typedef char verify_virtual_keyboard_globals_size[
 	sizeof(struct virtual_keyboard_globals) == 0x6C ? 1 : -1];
+typedef char verify_virtual_keyboard_key_size[
+	sizeof(struct virtual_keyboard_key) == 0x50 ? 1 : -1];
 
 /* ---------- prototypes */
 
 boolean code_000e4f50(
+	void);
+static wchar_t code_000e4fb0(
+	unsigned short keycode);
+wchar_t code_000e5080(
 	void);
 void code_000e50b0(
 	void);
@@ -248,6 +278,59 @@ boolean code_000e4f50(
 	ui_play_audio_feedback_sound(3);
 
 	return TRUE;
+}
+
+static wchar_t code_000e4fb0(
+	unsigned short keycode)
+{
+	struct virtual_keyboard_key *key;
+	wchar_t character;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\virtual_keyboard.c",
+		987,
+		virtual_keyboard_globals.keyboard != NULL);
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\virtual_keyboard.c",
+		988,
+		keycode < NUMBER_OF_CONFIGURABLE_VIRTUAL_KEYS);
+
+	key= (struct virtual_keyboard_key *)virtual_keyboard_globals.keyboard->keys.address + keycode;
+	if (virtual_keyboard_globals.modifier_a)
+	{
+		if (virtual_keyboard_globals.modifier_b)
+			character= key->modifier_a_b_character;
+		else if (virtual_keyboard_globals.modifier_c)
+			character= key->modifier_a_c_character;
+		else
+			character= key->modifier_a_character;
+	}
+	else
+	{
+		if (virtual_keyboard_globals.modifier_b)
+		{
+			if (virtual_keyboard_globals.modifier_c)
+				character= key->modifier_b_c_character;
+			else
+				character= key->modifier_b_character;
+		}
+		else if (virtual_keyboard_globals.modifier_c)
+			character= key->modifier_c_character;
+		else
+			character= key->character;
+	}
+
+	if (!character)
+		character= 0x7F;
+
+	return character;
+}
+
+wchar_t code_000e5080(
+	void)
+{
+	return code_000e4fb0((signed char)virtual_keyboard_key_layout[
+		virtual_keyboard_globals.row][virtual_keyboard_globals.column]);
 }
 
 long code_000e5700(
