@@ -43,8 +43,7 @@ static void negate64(
 
 /* ---------- public code */
 
-void
-add64(
+void add64(
 	struct qword_value const *a,
 	struct qword_value const *b,
 	struct qword_value *result)
@@ -65,10 +64,11 @@ add64(
 			carry = 0;
 		result->words[i] = (word)value;
 	}
+
+	return;
 }
 
-void
-subtract64(
+void subtract64(
 	struct qword_value const *a,
 	struct qword_value const *b,
 	struct qword_value *result)
@@ -79,10 +79,11 @@ subtract64(
 
 	negate64(b, &negative_b);
 	add64(a, &negative_b, result);
+
+	return;
 }
 
-void
-multiply64(
+void multiply64(
 	struct qword_value const *a,
 	struct qword_value const *b,
 	struct qword_value *result)
@@ -108,10 +109,11 @@ multiply64(
 	result->words[1] = (word)accumulator[1];
 	result->words[2] = (word)accumulator[2];
 	result->words[3] = (word)accumulator[3];
+
+	return;
 }
 
-void
-divide64(
+void divide64(
 	struct qword_value const *numerator,
 	struct qword_value const *denominator,
 	struct qword_value *quotient,
@@ -155,12 +157,13 @@ divide64(
 		*quotient = *(struct qword_value *)&work[0];
 	if (remainder)
 		*remainder = *(struct qword_value *)&work[4];
+
+	return;
 }
 
 /* ---------- private code */
 
-static void
-negate64(
+static void negate64(
 	struct qword_value const *a,
 	struct qword_value *result)
 {
@@ -178,4 +181,6 @@ negate64(
 	if (a->words[2])
 		carry = 1;
 	result->words[3] = (word)-(a->words[3] + carry);
+
+	return;
 }

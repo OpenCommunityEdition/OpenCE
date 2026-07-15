@@ -299,8 +299,10 @@ __declspec(align(4)) struct tag_data_definition hs_string_data_definition =
 
 /* ---------- public code */
 
-void
-code_000bd310(void *owner, void *data, long size)
+void code_000bd310(
+	void *owner,
+	void *data,
+	long size)
 {
 	long data_size;
 
@@ -329,6 +331,8 @@ code_000bd310(void *owner, void *data, long size)
 			byte_swap_data(&hs_source_files_block.syntax_node_definition, data, syntax_node_count);
 		}
 	}
+
+	return;
 }
 
 /* ---------- private code */

@@ -119,8 +119,7 @@ static struct byte_swap_definition aiff_common_chunk_byte_swap_definition=
 
 /* ---------- public code */
 
-boolean
-sound_file_is_aiff(
+boolean sound_file_is_aiff(
 	struct file_reference const *file)
 {
 	struct aiff_container_chunk container;
@@ -143,8 +142,7 @@ sound_file_is_aiff(
 	return result;
 }
 
-boolean
-sound_file_aiff_info_get(
+boolean sound_file_aiff_info_get(
 	struct file_reference const *file,
 	struct sound_file_info *info)
 {
@@ -198,8 +196,7 @@ sound_file_aiff_info_get(
 	return result;
 }
 
-boolean
-sound_file_aiff_raw_data_get(
+boolean sound_file_aiff_raw_data_get(
 	struct file_reference const *file,
 	long *size,
 	void *data)
@@ -233,12 +230,12 @@ sound_file_aiff_raw_data_get(
 	return result;
 }
 
-void
-sound_file_aiff_format(
+void sound_file_aiff_format(
 	struct sound_file_info const *info,
 	long *size,
 	void *data)
 {
+	return;
 }
 
 /* ---------- private code */
