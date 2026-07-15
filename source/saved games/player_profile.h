@@ -24,6 +24,9 @@ long player_profile_get_random_color(
 	void);
 long player_profile_get_random_good_color(
 	void);
+boolean player_profile_get_enclosing_directory_path(
+	long profile,
+	char *full_path);
 short player_profile_number_of_available_primary_colors(
 	void);
 

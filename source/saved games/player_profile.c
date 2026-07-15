@@ -127,6 +127,10 @@ enum
 
 /* ---------- prototypes */
 
+boolean saved_game_file_get_path_to_enclosing_directory(
+	long saved_game_file,
+	char *full_path);
+
 /* ---------- globals */
 
 /* ---------- public code */
@@ -135,6 +139,13 @@ short player_profile_number_of_available_primary_colors(
 	void)
 {
 	return NUMBER_OF_AVAILABLE_PRIMARY_COLORS;
+}
+
+boolean player_profile_get_enclosing_directory_path(
+	long profile,
+	char *full_path)
+{
+	return saved_game_file_get_path_to_enclosing_directory(profile, full_path);
 }
 
 long player_profile_get_random_good_color(
