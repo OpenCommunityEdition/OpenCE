@@ -138,4 +138,18 @@ void machine_bumped(
 	return;
 }
 
+void machine_try_to_open_with_damage(
+	long machine_index)
+{
+	struct machine_datum *machine = machine_get(machine_index);
+
+	machine_definition_get(machine->definition_index);
+	if (TEST_FLAG(machine->machine.flags, _machine_opened_by_melee_attack_bit))
+	{
+		device_set_actual_position(machine_index, 1.0f);
+	}
+
+	return;
+}
+
 /* ---------- private code */

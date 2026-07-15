@@ -83,6 +83,9 @@ struct machine_datum
 void device_add_scenario_information(
 	long object_index,
 	struct scenario_device_datum *scenario_device);
+void device_set_actual_position(
+	long device_index,
+	real position);
 
 /* ---------- globals */
 
