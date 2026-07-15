@@ -114,7 +114,10 @@ struct hs_source_files_definition
 
 extern char *hs_script_type_names[];
 extern char *hs_type_names[];
-void code_000bd310(void *owner, void *data, long data_size);
+void code_000bd310(
+	void *owner,
+	void *data,
+	long data_size);
 
 /* ---------- globals */
 
