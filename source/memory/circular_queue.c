@@ -49,19 +49,24 @@ enum
 
 /* ---------- prototypes */
 
-static void circular_queue_validate(struct circular_queue *queue);
+static void circular_queue_validate(
+	struct circular_queue *queue);
 
 /* ---------- globals */
 
 /* ---------- public code */
 
-void circular_queue_reset(struct circular_queue *queue)
+void circular_queue_reset(
+	struct circular_queue *queue)
 {
 	queue->write_offset = 0;
 	queue->read_offset = 0;
+	return;
 }
 
-struct circular_queue *circular_queue_new(char const *name, long buffer_size)
+struct circular_queue *circular_queue_new(
+	char const *name,
+	long buffer_size)
 {
 	struct circular_queue *queue = match_malloc("c:\\halo\\SOURCE\\memory\\circular_queue.c", 52, sizeof(*queue) + buffer_size + 1);
 
@@ -78,13 +83,16 @@ struct circular_queue *circular_queue_new(char const *name, long buffer_size)
 	return queue;
 }
 
-void circular_queue_delete(struct circular_queue *queue)
+void circular_queue_delete(
+	struct circular_queue *queue)
 {
 	circular_queue_validate(queue);
 	match_free("c:\\halo\\SOURCE\\memory\\circular_queue.c", 72, queue);
+	return;
 }
 
-long circular_queue_size(struct circular_queue *queue)
+long circular_queue_size(
+	struct circular_queue *queue)
 {
 	long size;
 
@@ -96,7 +104,8 @@ long circular_queue_size(struct circular_queue *queue)
 	return size;
 }
 
-long circular_queue_free_space(struct circular_queue *queue)
+long circular_queue_free_space(
+	struct circular_queue *queue)
 {
 	long size;
 
@@ -108,7 +117,10 @@ long circular_queue_free_space(struct circular_queue *queue)
 	return queue->buffer_size - size - 1;
 }
 
-boolean circular_queue_queue_data(struct circular_queue *queue, void const *data, long data_size)
+boolean circular_queue_queue_data(
+	struct circular_queue *queue,
+	void const *data,
+	long data_size)
 {
 	long write_offset;
 	long size;
@@ -149,7 +161,8 @@ boolean circular_queue_queue_data(struct circular_queue *queue, void const *data
 
 /* ---------- private code */
 
-static void circular_queue_validate(struct circular_queue *queue)
+static void circular_queue_validate(
+	struct circular_queue *queue)
 {
 	if (!queue ||
 		queue->signature != CIRCULAR_QUEUE_SIGNATURE ||
@@ -167,4 +180,6 @@ static void circular_queue_validate(struct circular_queue *queue)
 			TRUE);
 		system_exit(-1);
 	}
+
+	return;
 }
