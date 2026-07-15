@@ -85,6 +85,46 @@ void code_000a47f0(void);
 
 /* ---------- globals */
 
+struct stub_game_engine stub_engine =
+{
+	"stub",
+	_game_engine_type_stub,
+	{
+		code_000a4710,
+		(stub_game_engine_callback) code_000a4720,
+		code_000a4730,
+		code_000a4740,
+		code_000a4750,
+		code_000a4760,
+		code_000a4770,
+		code_000a4780,
+		code_000a4790,
+		code_000a47a0,
+		code_000a47b0,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		code_000a47c0,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		(stub_game_engine_callback) code_000a47d0,
+		code_000a47e0,
+		code_000a47f0,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+	},
+};
+
 /* ---------- public code */
 
 void code_000a4710(void)
