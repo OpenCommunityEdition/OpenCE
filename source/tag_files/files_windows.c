@@ -115,8 +115,10 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries_windows.h"
 
 #include "files.h"
+#include "text/international_strings.h"
 
 /* ---------- constants */
 
@@ -141,6 +143,92 @@ long file_compare_last_modification_dates(
 	struct file_last_modification_date const *date1)
 {
 	return csmemcmp(date0, date1, sizeof(*date0));
+}
+
+void file_path_add_name(
+	char *path,
+	char const *name)
+{
+	if (*name)
+	{
+		char *end;
+
+		match_assert(
+			"c:\\halo\\SOURCE\\tag_files\\files_windows.c",
+			672,
+			strlen(path)+1+strlen(name)<=MAXIMUM_FILENAME_LENGTH);
+		end = path + strlen(path);
+		if (end != path)
+		{
+			*end++ = '\\';
+			*end = 0;
+		}
+		strncpy(end, name, MAXIMUM_FILENAME_LENGTH-strlen(path));
+		path[MAXIMUM_FILENAME_LENGTH] = 0;
+	}
+
+	return;
+}
+
+void file_path_add_extension(
+	char *path,
+	char const *extension)
+{
+	if (*extension)
+	{
+		char *end;
+
+		match_assert(
+			"c:\\halo\\SOURCE\\tag_files\\files_windows.c",
+			696,
+			strlen(path)+1+strlen(extension)<=MAXIMUM_FILENAME_LENGTH);
+		end = path + strlen(path);
+		if (end != path)
+		{
+			*end++ = '.';
+			*end = 0;
+		}
+		strncpy(end, extension, MAXIMUM_FILENAME_LENGTH-strlen(path));
+		path[MAXIMUM_FILENAME_LENGTH] = 0;
+	}
+
+	return;
+}
+
+void file_path_remove_name(
+	char *path)
+{
+	char *original_path = path;
+	short index = (short)strlen(original_path);
+
+	while (index && get_previous_character((byte *)original_path, &index) != '\\')
+		;
+
+	if (get_next_character((byte *)original_path, &index) == '\\')
+	{
+		index--;
+		original_path[index] = 0;
+	}
+	else
+		original_path[index] = 0;
+
+	return;
+}
+
+boolean file_read_only(
+	struct file_reference *file)
+{
+	char full_path[MAXIMUM_FILENAME_LENGTH+1];
+	struct file_reference_info *info = file_reference_get_info(file);
+	unsigned long attributes;
+	boolean read_only = FALSE;
+
+	file_location_get_full_path(info->location, info->path, full_path);
+	attributes = GetFileAttributesA(full_path);
+	if (attributes != (unsigned long)-1 && (attributes & FILE_ATTRIBUTE_READONLY) != 0)
+		read_only = TRUE;
+
+	return read_only;
 }
 
 /* ---------- private code */
