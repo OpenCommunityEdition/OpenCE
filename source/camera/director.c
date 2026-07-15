@@ -105,6 +105,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "director.h"
+
+#include "saved games/game_state.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -116,5 +120,19 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void director_initialize(
+	void)
+{
+	director_camera_scripted = game_state_malloc("director scripting", NULL, sizeof(*director_camera_scripted));
+	director_camera_scripted->camera_scripted = FALSE;
+	return;
+}
+
+void director_dispose(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */
