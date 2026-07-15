@@ -34,21 +34,69 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "objects/widgets/light_volumes.h"
+
+#include "cseries/cseries.h"
+#include "saved games/game_state.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct light_volume_globals
+{
+	unsigned char reserved[0xB0];
+	struct data_array *light_volumes;
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+struct light_volume_globals bss_00456d90;
+
 /* ---------- public code */
+
+void light_volumes_initialize(
+	void)
+{
+	bss_00456d90.light_volumes = game_state_data_new("light volumes", 256, 8);
+	if (!bss_00456d90.light_volumes)
+	{
+		display_assert(
+			"light_volume_globals.light_volume_data",
+			"c:\\halo\\SOURCE\\objects\\widgets\\light_volumes.c",
+			44,
+			TRUE);
+		system_exit(-1);
+	}
+
+	return;
+}
 
 void light_volumes_dispose(
 	void)
 {
+	return;
+}
+
+void light_volumes_initialize_for_new_map(
+	void)
+{
+	if (bss_00456d90.light_volumes)
+		data_make_valid(bss_00456d90.light_volumes);
+
+	return;
+}
+
+void light_volumes_dispose_from_old_map(
+	void)
+{
+	if (bss_00456d90.light_volumes)
+		data_make_invalid(bss_00456d90.light_volumes);
+
 	return;
 }
 

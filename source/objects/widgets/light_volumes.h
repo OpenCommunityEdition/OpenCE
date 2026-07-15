@@ -16,7 +16,13 @@ header included in hcex build.
 
 /* ---------- prototypes/EXAMPLE.C */
 
+void light_volumes_initialize(
+	void);
 void light_volumes_dispose(
+	void);
+void light_volumes_initialize_for_new_map(
+	void);
+void light_volumes_dispose_from_old_map(
 	void);
 
 /* ---------- globals */
