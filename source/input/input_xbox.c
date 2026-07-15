@@ -109,9 +109,18 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct input_globals
+{
+	unsigned char reserved0[0x22D];
+	boolean frame_active;
+	unsigned char reserved1[0x1DE];
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+struct input_globals bss_004536a0;
 
 /* ---------- public code */
 
@@ -131,6 +140,14 @@ const struct mouse_state *input_get_mouse_state(void)
 boolean input_mouse_button_is_down(short button_index)
 {
 	return FALSE;
+}
+
+void input_frame_end(
+	void)
+{
+	bss_004536a0.frame_active = FALSE;
+
+	return;
 }
 
 /* ---------- private code */
