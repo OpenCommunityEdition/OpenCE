@@ -110,6 +110,7 @@ symbols in this file:
 #include "first_person_camera.h"
 #include "following_camera.h"
 
+#include "editor/editor_stubs.h"
 #include "saved games/game_state.h"
 
 #include "units/unit_definitions.h"
@@ -135,6 +136,14 @@ void scripted_camera_update(
 	void *camera,
 	void *command,
 	void *result);
+void code_00074c70(
+	void);
+void code_00075450(
+	void);
+void code_00075610(
+	void);
+void code_000756c0(
+	void);
 
 /* ---------- globals */
 
@@ -292,6 +301,95 @@ void director_set_mode(
 		director_globals[0].mode = mode;
 		director_globals[0].mode_changed = TRUE;
 	}
+
+	return;
+}
+
+void director_initialize_for_new_map(
+	void)
+{
+	short local_player_index;
+
+	/* These private helpers use translation-unit register conventions. */
+	__asm
+	{
+		call game_in_editor
+		neg al
+		mov edi, offset director_globals+54h
+		sbb eax, eax
+		and eax, 2
+		xor ebx, ebx
+		mov word ptr [director_globals+4], ax
+		mov byte ptr [director_globals+6], bl
+	}
+
+	local_player_index = 0;
+	do
+	{
+		/* The original TU keeps the zero constant in bx for this assertion. */
+		__asm
+		{
+			cmp si, bx
+			_emit 07ch
+			_emit 006h
+		}
+		if (local_player_index >= MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+		{
+			display_assert("local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS", "c:\\halo\\SOURCE\\camera\\director.c", 179, TRUE);
+			system_exit(NONE);
+		}
+		__asm
+		{
+			mov byte ptr [edi+4], bl
+			mov dword ptr [edi], ebx
+			mov dword ptr [edi-48h], ebx
+		}
+
+		switch (director_globals[0].mode)
+		{
+		case 0:
+		case 1:
+			__asm
+			{
+				push ebx
+				push 1
+				mov eax, esi
+				call code_00075450
+				add esp, 8
+			}
+			break;
+
+		case 2:
+			__asm
+			{
+				push ebx
+				push 1
+				call code_00075610
+				add esp, 8
+			}
+			break;
+
+		case 4:
+			__asm
+			{
+				push ebx
+				mov al, 1
+				call code_000756c0
+				add esp, 4
+			}
+			break;
+		}
+
+		__asm
+		{
+			mov eax, esi
+			call code_00074c70
+		}
+
+		local_player_index++;
+		__asm add edi, 0f8h
+	}
+	while (local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
 
 	return;
 }

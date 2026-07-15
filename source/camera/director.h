@@ -43,7 +43,9 @@ struct director_camera_state
 	byte pad0[4];
 	real transition;
 	director_camera_update_proc update;
-	byte padC[0x45];
+	byte padC[0x40];
+	long unknown_4c;
+	boolean unknown_50;
 	boolean inhibit_facing;
 	boolean inhibit_input;
 	byte pad53[3];
