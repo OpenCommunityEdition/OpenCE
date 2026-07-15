@@ -108,4 +108,12 @@ void light_fixture_place(long object_index, struct scenario_light_fixture_datum 
 	light_fixture->light_fixture.cutoff_angle = scenario_light_fixture->cutoff_angle;
 }
 
+boolean light_fixture_new(long object_index)
+{
+	struct light_fixture_datum *light_fixture = object_get_and_verify_type(object_index, _object_mask_light_fixture);
+
+	tag_get(LIGHT_FIXTURE_DEFINITION_TAG, light_fixture->definition_index);
+	return TRUE;
+}
+
 /* ---------- private code */
