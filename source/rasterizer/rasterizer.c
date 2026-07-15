@@ -331,6 +331,11 @@ void _rasterizer_hud_begin(
 	void);
 void _rasterizer_hud_end(
 	void);
+void _rasterizer_hud_motion_sensor_blip_begin(
+	void);
+void _rasterizer_hud_motion_sensor_blip_end(
+	real_point2d const *center,
+	real scale);
 void _rasterizer_model_begin(
 	struct rasterizer_model_begin_parameters const *parameters,
 	boolean is_dynamic);
@@ -421,6 +426,21 @@ void rasterizer_hud_end(
 	void)
 {
 	_rasterizer_hud_end();
+	return;
+}
+
+void rasterizer_hud_motion_sensor_blip_begin(
+	void)
+{
+	_rasterizer_hud_motion_sensor_blip_begin();
+	return;
+}
+
+void rasterizer_hud_motion_sensor_blip_end(
+	real_point2d const *center,
+	real scale)
+{
+	_rasterizer_hud_motion_sensor_blip_end(center, scale);
 	return;
 }
 

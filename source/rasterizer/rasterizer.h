@@ -142,6 +142,11 @@ void rasterizer_hud_begin(
 	void);
 void rasterizer_hud_end(
 	void);
+void rasterizer_hud_motion_sensor_blip_begin(
+	void);
+void rasterizer_hud_motion_sensor_blip_end(
+	real_point2d const *center,
+	real scale);
 void rasterizer_model_begin(
 	struct rasterizer_model_begin_parameters const *parameters,
 	boolean is_dynamic);
