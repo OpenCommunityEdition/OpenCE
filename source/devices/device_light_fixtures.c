@@ -38,4 +38,8 @@ void light_fixtures_initialize(void)
 {
 }
 
+void light_fixtures_dispose(void)
+{
+}
+
 /* ---------- private code */
