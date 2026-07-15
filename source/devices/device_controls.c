@@ -42,4 +42,34 @@ symbols in this file:
 
 /* ---------- public code */
 
+void controls_initialize(
+	void)
+{
+	return;
+}
+
+void controls_dispose(
+	void)
+{
+	return;
+}
+
+void controls_initialize_for_new_map(
+	void)
+{
+	return;
+}
+
+void controls_dispose_from_old_map(
+	void)
+{
+	return;
+}
+
+void control_delete(
+	long control_index)
+{
+	return;
+}
+
 /* ---------- private code */
