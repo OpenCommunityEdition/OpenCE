@@ -179,9 +179,24 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct progress_bar_globals
+{
+	unsigned char reserved[0x1D8];
+};
+
+struct progress_bar_mode
+{
+	unsigned char reserved[0x10];
+	boolean active;
+	unsigned char padding[3];
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+struct progress_bar_globals bss_00454030;
+struct progress_bar_mode progress_bar_mode;
 
 /* ---------- public code */
 
@@ -189,6 +204,12 @@ void progress_bar_dispose(
 	void)
 {
 	return;
+}
+
+boolean progress_bar_is_active(
+	void)
+{
+	return progress_bar_mode.active;
 }
 
 /* ---------- private code */

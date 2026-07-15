@@ -23,6 +23,8 @@ header included in hcex build.
 
 void progress_bar_dispose(
 	void);
+boolean progress_bar_is_active(
+	void);
 void progress_bar_display(real progress);
 
 /* ---------- globals */
