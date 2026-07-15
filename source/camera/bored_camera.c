@@ -47,6 +47,13 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+unsigned long *get_global_local_random_seed_address(
+	void);
+float real_seed_random_range(
+	unsigned long *seed,
+	float lower_bound,
+	float upper_bound);
+
 /* ---------- globals */
 
 /* ---------- public code */
@@ -72,4 +79,14 @@ boolean is_still_bored(
 	void)
 {
 	return FALSE;
+}
+
+float real_local_random_range(
+	float lower_bound,
+	float upper_bound)
+{
+	return real_seed_random_range(
+		get_global_local_random_seed_address(),
+		lower_bound,
+		upper_bound);
 }
