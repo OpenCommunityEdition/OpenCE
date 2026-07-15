@@ -181,6 +181,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "game/player_control.h"
 #include "players.h"
 
 #include "real_math.h"
@@ -196,5 +197,17 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void player_control_dispose(
+	void)
+{
+	return;
+}
+
+void player_control_dispose_from_old_map(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */
