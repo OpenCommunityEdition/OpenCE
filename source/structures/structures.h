@@ -54,7 +54,12 @@ short structure_clusters_in_sphere(short cluster_index, real_point3d const *posi
 
 /* ---------- prototypes/STRUCTURE_DETAIL_OBJECTS.C */
 
-void structure_detail_objects_flush(void);
+void structure_detail_objects_dispose_from_old_map(
+	void);
+void structure_detail_objects_dispose(
+	void);
+void structure_detail_objects_flush(
+	void);
 
 /* ---------- prototypes/STRUCTURE_LENS_FLARES.C */
 

@@ -48,6 +48,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "math/real_math.h"
+#include "structures.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -59,5 +63,17 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void structure_detail_objects_dispose_from_old_map(
+	void)
+{
+	return;
+}
+
+void structure_detail_objects_dispose(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */
