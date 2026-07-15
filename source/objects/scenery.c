@@ -32,6 +32,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "object_types.h"
+#include "objects.h"
 #include "scenery.h"
 
 /* ---------- constants */
@@ -40,7 +43,22 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct scenery_datum
+{
+	struct object_datum object;
+	unsigned long flags;
+};
+
+typedef char verify_scenery_extension_offset[
+	sizeof(struct object_datum) == 0x1A4 ? 1 : -1];
+
 /* ---------- prototypes */
+
+short animation_update_internal(
+	short animation_type,
+	long animation_graph_index,
+	struct animation_state *state,
+	boolean unknown);
 
 /* ---------- globals */
 
@@ -74,6 +92,32 @@ void
 scenery_delete(
 	long object_index)
 {
+}
+
+boolean scenery_update(
+	long object_index)
+{
+	long animation_graph_index;
+	struct scenery_datum *scenery = (struct scenery_datum *)object_get_and_verify_type(
+		object_index,
+		FLAG(_object_type_scenery));
+
+	if (TEST_FLAG(scenery->flags, 0))
+	{
+		animation_graph_index = scenery->object.object.animation.animation_graph_index;
+		switch (animation_update_internal(
+			1,
+			animation_graph_index,
+			&scenery->object.object.animation.state,
+			FALSE))
+		{
+		case 2:
+			scenery->object.object.animation.state.frame_index--;
+			break;
+		}
+	}
+
+	return TRUE;
 }
 
 /* ---------- private code */
