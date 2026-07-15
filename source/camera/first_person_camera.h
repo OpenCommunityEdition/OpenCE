@@ -8,13 +8,26 @@ header included in hcex build.
 #define __FIRST_PERSON_CAMERA_H
 #pragma once
 
+/* ---------- headers */
+
+#include "cseries/cseries.h"
+#include "math/real_math.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+struct first_person_camera
+{
+	real field_of_view;
+};
+
+/* ---------- prototypes/FIRST_PERSON_CAMERA.C */
+
+void first_person_camera_new(
+	struct first_person_camera *camera);
 
 /* ---------- globals */
 

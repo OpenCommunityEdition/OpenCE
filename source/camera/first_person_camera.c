@@ -22,6 +22,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "first_person_camera.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -33,5 +35,13 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void first_person_camera_new(
+	struct first_person_camera *camera)
+{
+	match_assert("c:\\halo\\SOURCE\\camera\\first_person_camera.c", 24, camera);
+	camera->field_of_view = 0.f;
+	return;
+}
 
 /* ---------- private code */
