@@ -122,4 +122,57 @@ long encounter_definition_get_platoon_by_name(
 	return result;
 }
 
+short choose_random_array_element(
+	void const *array,
+	short element_size,
+	short element_count,
+	short weight_offset,
+	unsigned long const *excluded_elements)
+{
+	byte const *weight;
+	short element_index;
+	short result;
+	real total_weight;
+
+	result = NONE;
+	total_weight = 0.f;
+	weight = (byte const *)array + weight_offset;
+	for (element_index = 0; element_index < element_count;)
+	{
+		if (!BIT_VECTOR_TEST_FLAG(excluded_elements, element_index))
+			total_weight += *(real const *)weight;
+		element_index++;
+		weight += element_size;
+	}
+
+	if (total_weight > 0.f)
+	{
+		real accumulated_weight;
+		real selected_weight;
+
+		selected_weight = real_seed_random_range(
+			get_global_random_seed_address(),
+			0.f,
+			total_weight);
+		accumulated_weight = 0.f;
+		weight = (byte const *)array + weight_offset;
+		for (element_index = 0; element_index < element_count;)
+		{
+			if (!BIT_VECTOR_TEST_FLAG(excluded_elements, element_index))
+			{
+				accumulated_weight += *(real const *)weight;
+				if (selected_weight <= accumulated_weight)
+				{
+					result = element_index;
+					break;
+				}
+			}
+			element_index++;
+			weight += element_size;
+		}
+	}
+
+	return result;
+}
+
 /* ---------- private code */

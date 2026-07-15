@@ -189,5 +189,11 @@ long encounter_definition_get_squad_by_name(
 long encounter_definition_get_platoon_by_name(
 	struct encounter_definition *encounter,
 	char const *name);
+short choose_random_array_element(
+	void const *array,
+	short element_size,
+	short element_count,
+	short weight_offset,
+	unsigned long const *excluded_elements);
 
 #endif // __AI_SCENARIO_DEFINITIONS_H
