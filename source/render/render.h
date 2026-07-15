@@ -101,10 +101,14 @@ struct rendered_cluster *rendered_cluster_get(short rendered_cluster_index);
 
 /* ---------- prototypes/RENDER_OBJECTS.C */
 
-void render_objects_initialize(void);
-void render_objects_initialize_for_new_map(void);
-void render_objects_dispose_from_old_map(void);
-void render_objects_dispose(void);
+void render_objects_initialize(
+	void);
+void render_objects_initialize_for_new_map(
+	void);
+void render_objects_dispose_from_old_map(
+	void);
+void render_objects_dispose(
+	void);
 
 /* ---------- globals */
 

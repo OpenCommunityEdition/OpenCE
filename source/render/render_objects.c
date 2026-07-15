@@ -83,16 +83,76 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "memory/data.h"
+#include "render/render.h"
+#include "saved games/game_state.h"
+
 /* ---------- constants */
+
+enum
+{
+	MAXIMUM_CACHED_OBJECT_RENDER_STATES = 256,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct cached_object_render_state
+{
+	struct datum_header header;
+	byte opaque[0xFE];
+};
+
+typedef char cached_object_render_state_size_assert[
+	sizeof(struct cached_object_render_state) == 0x100 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+struct data_array *cached_object_render_states;
+
 /* ---------- public code */
+
+void render_objects_initialize(
+	void)
+{
+	cached_object_render_states = game_state_data_new(
+		"cached object render states",
+		MAXIMUM_CACHED_OBJECT_RENDER_STATES,
+		sizeof(struct cached_object_render_state));
+	match_assert("c:\\halo\\SOURCE\\render\\render_objects.c", 125, cached_object_render_states);
+
+	return;
+}
+
+void render_objects_initialize_for_new_map(
+	void)
+{
+	data_make_valid(cached_object_render_states);
+
+	return;
+}
+
+void render_objects_dispose_from_old_map(
+	void)
+{
+	if (cached_object_render_states && cached_object_render_states->valid)
+	{
+		data_make_invalid(cached_object_render_states);
+	}
+
+	return;
+}
+
+void render_objects_dispose(
+	void)
+{
+	cached_object_render_states = NULL;
+
+	return;
+}
 
 /* ---------- private code */
