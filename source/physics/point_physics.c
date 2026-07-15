@@ -52,4 +52,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+void point_physics_dispose_from_old_map(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */

@@ -28,6 +28,8 @@ enum
 
 /* ---------- prototypes/POINT_PHYSICS.C */
 
+void point_physics_dispose_from_old_map(
+	void);
 void point_physics_update(
 	unsigned long flags,
 	struct physics_definition const *definition,
