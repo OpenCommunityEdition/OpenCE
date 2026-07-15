@@ -34,4 +34,8 @@ symbols in this file:
 
 /* ---------- public code */
 
+void light_fixtures_initialize(void)
+{
+}
+
 /* ---------- private code */
