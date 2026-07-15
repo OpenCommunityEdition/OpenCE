@@ -20,6 +20,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "math/real_math.h"
+#include "physics/physics_variables.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -31,5 +35,49 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void
+physics_variable_position_update(
+	real *position,
+	real *limits,
+	boolean wrap,
+	real delta)
+{
+	*position += delta;
+
+	if (*position < limits[1])
+	{
+		if (wrap)
+			*position += limits[0] - limits[1];
+		else
+			*position = limits[1];
+
+		return;
+	}
+
+	if (*position > limits[0])
+	{
+		if (wrap)
+			*position -= limits[0] - limits[1];
+		else
+			*position = limits[0];
+	}
+
+	return;
+}
+
+void
+physics_variable_update(
+	real *position,
+	real *range,
+	real *velocity,
+	boolean update_velocity,
+	real delta)
+{
+	physics_variable_speed_update(range, velocity + 2, delta);
+	physics_variable_position_update(position, velocity, update_velocity, *range);
+
+	return;
+}
 
 /* ---------- private code */
