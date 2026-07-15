@@ -114,6 +114,8 @@ boolean scenery_new(
 	long object_index)
 {
 	short animation_index;
+	long animation_graph_index;
+	unsigned long object_flags;
 	struct animation_graph *animation_graph;
 	struct object_definition *definition;
 	struct scenery_datum *scenery = scenery_get(object_index);
@@ -124,15 +126,19 @@ boolean scenery_new(
 		animation_graph = animation_graph_definition_get(definition->object.animation_graph.index);
 		if (animation_graph->animations.count > 0)
 		{
+			animation_graph_index = definition->object.animation_graph.index;
 			animation_index = animation_choose_random_permutation_internal(
 				_animation_overlay,
-				definition->object.animation_graph.index,
+				animation_graph_index,
 				0);
 			if (animation_index != NONE)
 			{
 				scenery->object.object.animation.state.index = animation_index;
-				scenery->object.object.flags |= FLAG(7);
-				scenery->object.object.animation.animation_graph_index = definition->object.animation_graph.index;
+				object_flags = scenery->object.object.flags;
+				animation_graph_index = definition->object.animation_graph.index;
+				object_flags |= FLAG(7);
+				scenery->object.object.animation.animation_graph_index = animation_graph_index;
+				scenery->object.object.flags = object_flags;
 			}
 		}
 	}
