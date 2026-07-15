@@ -57,6 +57,10 @@ boolean director_inhibited_input(
 	short local_player_index);
 void director_set_mode(
 	short mode);
+void director_initialize_for_new_map(
+	void);
+void director_script_camera(
+	boolean scripted);
 void director_initialize_for_saved_game(
 	void);
 

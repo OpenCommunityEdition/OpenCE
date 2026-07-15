@@ -180,4 +180,13 @@ void director_set_mode(
 	return;
 }
 
+void director_initialize_for_saved_game(
+	void)
+{
+	director_initialize_for_new_map();
+	director_script_camera(director_camera_scripted->camera_scripted);
+
+	return;
+}
+
 /* ---------- private code */
