@@ -36,6 +36,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "scenario/wind.h"
+
+#include "cseries/cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -46,6 +50,16 @@ symbols in this file:
 
 /* ---------- globals */
 
+extern struct wind_globals wind_globals;
+
 /* ---------- public code */
+
+void wind_dispose_from_old_map(
+	void)
+{
+	wind_globals.initialized = FALSE;
+
+	return;
+}
 
 /* ---------- private code */
