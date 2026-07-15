@@ -114,6 +114,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "interface/hud_messaging.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -125,5 +127,17 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void hud_messaging_dispose_from_old_map(
+	void)
+{
+	return;
+}
+
+void hud_messaging_dispose(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */

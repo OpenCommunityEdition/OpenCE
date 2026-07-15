@@ -16,6 +16,10 @@ header included in hcex build.
 
 /* ---------- prototypes/HUD_MESSAGING.C */
 
+void hud_messaging_dispose_from_old_map(
+	void);
+void hud_messaging_dispose(
+	void);
 void scripted_hud_messages_clear(void);
 
 /* ---------- globals */
