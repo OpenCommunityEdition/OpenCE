@@ -644,7 +644,7 @@
 				{ "name": "source/interface/hud_messaging_definitions.c", "index": 272, "status": "Matching" },
 				{ "name": "source/interface/hud_messaging.c", "index": 273, "status": "NonMatching" },
 				{ "name": "source/interface/hud_draw.c", "index": 274, "status": "NonMatching" },
-				{ "name": "source/interface/hud_definitions.c", "index": 275, "status": "NonMatching" },
+				{ "name": "source/interface/hud_definitions.c", "index": 275, "status": "Matching" },
 				{ "name": "source/interface/hud.c", "index": 276, "status": "NonMatching" },
 				{ "name": "source/input/input_xbox.c", "index": 277, "status": "NonMatching" },
 				{ "name": "source/input/input_windows.c", "index": 278, "status": "Matching" },
