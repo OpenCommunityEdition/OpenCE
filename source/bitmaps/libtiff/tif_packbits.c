@@ -1,5 +1,5 @@
 #ifndef lint
-static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_packbits.c,v 1.23 92/03/30 18:29:40 sam Exp $";
+char data_002daf38[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_packbits.c,v 1.23 92/03/30 18:29:40 sam Exp $";
 #endif
 
 /*
@@ -33,39 +33,22 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_packbits.c,
  */
 #include "tiffioP.h"
 #include <stdio.h>
-#include <assert.h>
 
 #if USE_PROTOTYPES
-static	int PackBitsPreEncode(TIFF *);
-static	int PackBitsEncode(TIFF *, u_char *, int, u_int);
-static	int PackBitsEncodeChunk(TIFF *, u_char *, int, u_int);
-static	int PackBitsDecode(TIFF *, u_char *, int, u_int);
+int	code_0005bff0(TIFF *);
+int	code_0005c030(TIFF *, u_char *, int, u_int);
+int	code_0005c260(TIFF *, u_char *, int, u_int);
+int	code_0005c370(TIFF *, u_char *, int, u_int);
 #else
-static	int PackBitsPreEncode();
-static	int PackBitsEncode(), PackBitsEncodeChunk();
-static	int PackBitsDecode();
+int	code_0005bff0();
+int	code_0005c030(), code_0005c260();
+int	code_0005c370();
 #endif
 
-TIFFInitPackBits(tif)
+int
+code_0005bff0(tif)
 	TIFF *tif;
 {
-	tif->tif_decoderow = PackBitsDecode;
-	tif->tif_decodestrip = PackBitsDecode;
-	tif->tif_decodetile = PackBitsDecode;
-	tif->tif_preencode = PackBitsPreEncode;
-	tif->tif_encoderow = PackBitsEncode;
-	tif->tif_encodestrip = PackBitsEncodeChunk;
-	tif->tif_encodetile = PackBitsEncodeChunk;
-	return (1);
-}
-
-static int
-PackBitsPreEncode(tif)
-	TIFF *tif;
-{
-	/*
-	 * Calculate the scanline/tile-width size in bytes.
-	 */
 	if (isTiled(tif))
 		tif->tif_data = (char *) TIFFTileRowSize(tif);
 	else
@@ -74,36 +57,10 @@ PackBitsPreEncode(tif)
 }
 
 /*
- * Encode a rectangular chunk of pixels.  We break it up
- * into row-sized pieces to insure that encoded runs do
- * not span rows.  Otherwise, there can be problems with
- * the decoder if data is read, for example, by scanlines
- * when it was encoded by strips.
- */
-static int
-PackBitsEncodeChunk(tif, bp, cc, s)
-	TIFF *tif;
-	u_char *bp;
-	int cc;
-	u_int s;
-{
-	int rowsize = (int) tif->tif_data;
-
-	assert(rowsize > 0);
-	while (cc > 0) {
-		if (PackBitsEncode(tif, bp, rowsize, s) < 0)
-			return (-1);
-		bp += rowsize;
-		cc -= rowsize;
-	}
-	return (1);
-}
-
-/*
  * Encode a run of pixels.
  */
-static int
-PackBitsEncode(tif, bp, cc, s)
+int
+code_0005c030(tif, bp, cc, s)
 	TIFF *tif;
 	u_char *bp;
 	register int cc;
@@ -120,20 +77,11 @@ PackBitsEncode(tif, bp, cc, s)
 	state = BASE;
 	lastliteral = 0;
 	while (cc > 0) {
-		/*
-		 * Find the longest string of identical bytes.
-		 */
 		b = *bp++, cc--, n = 1;
 		for (; cc > 0 && b == *bp; cc--, bp++)
 			n++;
 	again:
-		if (op + 2 >= ep) {		/* insure space for new data */
-			/*
-			 * Be careful about writing the last
-			 * literal.  Must write up to that point
-			 * and then copy the remainder to the
-			 * front of the buffer.
-			 */
+		if (op + 2 >= ep) {
 			if (state == LITERAL || state == LITERAL_RUN) {
 				slop = op - lastliteral;
 				tif->tif_rawcc += lastliteral - tif->tif_rawcp;
@@ -151,7 +99,7 @@ PackBitsEncode(tif, bp, cc, s)
 			}
 		}
 		switch (state) {
-		case BASE:		/* initial state, set run/literal */
+		case BASE:
 			if (n > 1) {
 				state = RUN;
 				if (n > 128) {
@@ -169,7 +117,7 @@ PackBitsEncode(tif, bp, cc, s)
 				state = LITERAL;
 			}
 			break;
-		case LITERAL:		/* last object was literal string */
+		case LITERAL:
 			if (n > 1) {
 				state = LITERAL_RUN;
 				if (n > 128) {
@@ -178,15 +126,15 @@ PackBitsEncode(tif, bp, cc, s)
 					n -= 128;
 					goto again;
 				}
-				*op++ = -(n-1);		/* encode run */
+				*op++ = -(n-1);
 				*op++ = b;
-			} else {			/* extend literal */
+			} else {
 				if (++(*lastliteral) == 127)
 					state = BASE;
 				*op++ = b;
 			}
 			break;
-		case RUN:		/* last object was run */
+		case RUN:
 			if (n > 1) {
 				if (n > 128) {
 					*op++ = -127;
@@ -203,18 +151,12 @@ PackBitsEncode(tif, bp, cc, s)
 				state = LITERAL;
 			}
 			break;
-		case LITERAL_RUN:	/* literal followed by a run */
-			/*
-			 * Check to see if previous run should
-			 * be converted to a literal, in which
-			 * case we convert literal-run-literal
-			 * to a single literal.
-			 */
+		case LITERAL_RUN:
 			if (n == 1 && op[-2] == (char)-1 &&
 			    *lastliteral < 126) {
 				state = (((*lastliteral) += 2) == 127 ?
 				    BASE : LITERAL);
-				op[-2] = op[-1];	/* replicate */
+				op[-2] = op[-1];
 			} else
 				state = RUN;
 			goto again;
@@ -225,8 +167,8 @@ PackBitsEncode(tif, bp, cc, s)
 	return (1);
 }
 
-static int
-PackBitsDecode(tif, op, occ, s)
+int
+code_0005c260(tif, op, occ, s)
 	TIFF *tif;
 	register u_char *op;
 	register int occ;
@@ -239,22 +181,18 @@ PackBitsDecode(tif, op, occ, s)
 	bp = tif->tif_rawcp; cc = tif->tif_rawcc;
 	while (cc > 0 && occ > 0) {
 		n = (int) *bp++;
-		/*
-		 * Watch out for compilers that
-		 * don't sign extend chars...
-		 */
 		if (n >= 128)
 			n -= 256;
-		if (n < 0) {		/* replicate next byte -n+1 times */
+		if (n < 0) {
 			cc--;
-			if (n == -128)	/* nop */
+			if (n == -128)
 				continue;
 			n = -n + 1;
 			occ -= n;
 			for (b = *bp++; n-- > 0;)
 				*op++ = b;
-		} else {		/* copy next n+1 bytes literally */
-			bcopy(bp, op, ++n);
+		} else {
+			csmemcpy(op, bp, ++n);
 			op += n; occ -= n;
 			bp += n; cc -= n;
 		}
@@ -267,6 +205,46 @@ PackBitsDecode(tif, op, occ, s)
 		    tif->tif_row);
 		return (0);
 	}
-	/* check for buffer overruns? */
+	return (1);
+}
+
+/*
+ * Encode a rectangular chunk of pixels.  We break it up
+ * into row-sized pieces to insure that encoded runs do
+ * not span rows.  Otherwise, there can be problems with
+ * the decoder if data is read, for example, by scanlines
+ * when it was encoded by strips.
+ */
+int
+code_0005c370(tif, bp, cc, s)
+	TIFF *tif;
+	u_char *bp;
+	int cc;
+	u_int s;
+{
+	int rowsize = (int) tif->tif_data;
+
+	while (cc > 0) {
+		if (code_0005c030(tif, bp, rowsize, s) < 0)
+			return (-1);
+		bp += rowsize;
+		cc -= rowsize;
+	}
+	return (1);
+}
+
+TIFFInitPackBits(tif)
+	TIFF *tif;
+{
+	int (*fp)();
+	fp = code_0005c260;
+	tif->tif_decoderow = fp;
+	tif->tif_decodestrip = fp;
+	tif->tif_decodetile = fp;
+	*(int (**)())((char *)tif + 0xf4) = code_0005bff0;
+	*(int (**)())((char *)tif + 0x100) = code_0005c030;
+	fp = code_0005c370;
+	*(int (**)())((char *)tif + 0x108) = fp;
+	*(int (**)())((char *)tif + 0x110) = fp;
 	return (1);
 }
