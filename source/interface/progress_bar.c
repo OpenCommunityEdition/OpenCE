@@ -204,6 +204,17 @@ struct progress_bar_mode
 	unsigned char padding1[3];
 };
 
+struct tga_image
+{
+	unsigned char reserved[4];
+	unsigned char image_type;
+	unsigned char pixel_depth;
+	short width;
+	short height;
+	unsigned char padding[2];
+	unsigned long *pixels;
+};
+
 /* ---------- prototypes */
 
 int __stdcall SetThreadPriority(
@@ -225,6 +236,14 @@ void code_000d1f00(
 void code_000d25f0(
 	void);
 
+void tgaLoadHeader(
+	FILE *file,
+	struct tga_image *image);
+
+void tgaLoadImageData(
+	FILE *file,
+	struct tga_image *image);
+
 void __stdcall D3DDevice_SetVertexData2f(
 	unsigned long register_index,
 	real x,
@@ -237,6 +256,75 @@ struct progress_bar_globals bss_00454030;
 struct progress_bar_mode progress_bar_mode;
 
 /* ---------- public code */
+
+void tgaLoadHeader(
+	FILE *file,
+	struct tga_image *image)
+{
+	unsigned char ignored_byte;
+	short ignored_short;
+
+	fread(&ignored_byte, 1, 1, file);
+	fread(&ignored_byte, 1, 1, file);
+	fread(&image->image_type, 1, 1, file);
+	fread(&ignored_short, 2, 1, file);
+	fread(&ignored_short, 2, 1, file);
+	fread(&ignored_byte, 1, 1, file);
+	fread(&ignored_short, 2, 1, file);
+	fread(&ignored_short, 2, 1, file);
+	fread(&image->width, 2, 1, file);
+	fread(&image->height, 2, 1, file);
+	fread(&image->pixel_depth, 1, 1, file);
+	fread(&ignored_byte, 1, 1, file);
+
+	return;
+}
+
+void tgaLoadImageData(
+	FILE *file,
+	struct tga_image *image)
+{
+	long y;
+
+	for (y= 0; y<image->height; y++)
+	{
+		long x;
+		unsigned long *pixel;
+
+		pixel= image->pixels + (image->height - y - 1)*image->width;
+		for (x= 0; x<image->width; x++)
+		{
+			unsigned char color[3];
+			unsigned long intensity;
+
+			fread(color, 1, 3, file);
+			intensity= color[0];
+			*pixel= ((intensity<<9) | (intensity & ~1))<<7 | intensity>>2;
+			pixel++;
+		}
+	}
+
+	return;
+}
+
+void tgaLoad(
+	const char *path,
+	unsigned long *pixels)
+{
+	struct tga_image image;
+	FILE *file;
+
+	file= fopen(path, "rb");
+	if (file)
+	{
+		tgaLoadHeader(file, &image);
+		image.pixels= pixels;
+		tgaLoadImageData(file, &image);
+		fclose(file);
+	}
+
+	return;
+}
 
 void progress_bar_initialize(
 	void)
