@@ -73,6 +73,14 @@ struct player_datum
 	long aim_assist_timestamp;
 	struct network_player network_player_data;
 	short powerup_durations[NUMBER_OF_PLAYER_POWERUPS];
+	real speed_multiplier;
+	long unknown70;
+	long unknown74;
+	long unknown78;
+	long unknown7c;
+	byte unknown80[4];
+	long death_time;
+	long unknown88;
 	struct game_statistics statistics;
 	long telefrag_timeout;
 	long quit_out_of_game_time;
@@ -80,6 +88,11 @@ struct player_datum
 	boolean quit_out_of_game;
 	struct player_action action_input;
 };
+
+typedef char player_datum_team_index_offset_assert[
+	offsetof(struct player_datum, team_index) == 0x20 ? 1 : -1];
+typedef char player_datum_statistics_offset_assert[
+	offsetof(struct player_datum, statistics) == 0x8C ? 1 : -1];
 
 /* ---------- prototypes/PLAYER_CONTROL.C */
 

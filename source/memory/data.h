@@ -38,6 +38,18 @@ struct datum_header
 	short identifier;
 };
 
+struct data_iterator
+{
+	struct data_array *data;
+	short absolute_index;
+	short pad;
+	long datum_index;
+	unsigned long signature;
+};
+
+typedef char data_iterator_size_assert[
+	sizeof(struct data_iterator) == 0x10 ? 1 : -1];
+
 /* ---------- prototypes/DATA.C */
 
 long data_allocation_size(short maximum_count, short size);

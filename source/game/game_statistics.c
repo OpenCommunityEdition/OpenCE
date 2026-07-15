@@ -18,6 +18,8 @@ symbols in this file:
 
 #include "cseries.h"
 #include "real_math.h"
+#include "game/players.h"
+#include "memory/data.h"
 
 /* ---------- constants */
 
@@ -37,6 +39,32 @@ void game_statistics_start(
 	void)
 {
 	game_statistics_active = 1;
+
+	return;
+}
+
+void
+game_statistics_stop(
+	short winning_team_index)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	data_iterator_new(&iterator, player_data);
+	player = (struct player_datum *)data_iterator_next(&iterator);
+
+	while (player)
+	{
+		player->statistics.seconds_online = game_time_get() / 30;
+		player->statistics.games_played = 1;
+
+		if (player->team_index == winning_team_index)
+			player->statistics.games_won++;
+
+		player = (struct player_datum *)data_iterator_next(&iterator);
+	}
+
+	game_statistics_active = FALSE;
 
 	return;
 }
