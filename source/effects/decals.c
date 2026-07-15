@@ -215,6 +215,7 @@ symbols in this file:
 #include "effects/decals.h"
 
 #include "cseries/cseries.h"
+#include "memory/data.h"
 
 /* ---------- constants */
 
@@ -226,12 +227,26 @@ symbols in this file:
 
 void rasterizer_decals_dispose(
 	void);
+void rasterizer_decals_dispose_from_old_map(
+	void);
 
 /* ---------- globals */
 
-extern void *global_decal_data;
+extern struct data_array *global_decal_data;
+static void *decal_globals;
 
 /* ---------- public code */
+
+void decals_dispose_from_old_map(
+	void)
+{
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 777, global_decal_data);
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 778, decal_globals);
+	rasterizer_decals_dispose_from_old_map();
+	data_make_invalid(global_decal_data);
+
+	return;
+}
 
 void decals_dispose(
 	void)

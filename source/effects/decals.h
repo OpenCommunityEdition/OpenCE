@@ -22,5 +22,7 @@ header included in hcex build.
 
 void decals_dispose(
 	void);
+void decals_dispose_from_old_map(
+	void);
 
 #endif // __DECALS_H
