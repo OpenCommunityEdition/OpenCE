@@ -37,6 +37,8 @@ symbols in this file:
 #include "objects.h"
 #include "scenery.h"
 
+#include "models/model_animation_definitions.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -118,6 +120,32 @@ boolean scenery_update(
 	}
 
 	return TRUE;
+}
+
+short scenery_get_animation_time(
+	long object_index)
+{
+	struct animation *animation;
+	struct animation_graph *animation_graph;
+	struct scenery_datum *scenery = (struct scenery_datum *)object_get_and_verify_type(
+		object_index,
+		FLAG(_object_type_scenery));
+
+	if (TEST_FLAG(scenery->flags, 0))
+	{
+		animation_graph = animation_graph_definition_get(
+			scenery->object.object.animation.animation_graph_index);
+		animation = TAG_BLOCK_GET_ELEMENT(
+			&animation_graph->animations,
+			scenery->object.object.animation.state.index,
+			struct animation);
+
+		return MAX(
+			animation->frame_count - scenery->object.object.animation.state.frame_index - 2,
+			0);
+	}
+
+	return 0;
 }
 
 /* ---------- private code */

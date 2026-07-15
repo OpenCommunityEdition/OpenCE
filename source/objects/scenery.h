@@ -22,6 +22,7 @@ void scenery_dispose_from_old_map(void);
 void scenery_dispose(void);
 void scenery_delete(long object_index);
 boolean scenery_update(long object_index);
+short scenery_get_animation_time(long object_index);
 
 /* ---------- globals */
 
