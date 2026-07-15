@@ -154,6 +154,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "ai/path.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -165,5 +167,29 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void paths_initialize(
+	void)
+{
+	return;
+}
+
+void paths_dispose(
+	void)
+{
+	return;
+}
+
+void paths_initialize_for_new_map(
+	void)
+{
+	return;
+}
+
+void paths_dispose_from_old_map(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */

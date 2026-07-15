@@ -10,6 +10,7 @@ file has inline function assertions.
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
 #include "math/real_math.h"
 
 /* ---------- constants */
@@ -151,7 +152,16 @@ struct path_debug_storage
 	char __unknown[51676];
 };
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/PATH.C */
+
+void paths_initialize(
+	void);
+void paths_dispose(
+	void);
+void paths_initialize_for_new_map(
+	void);
+void paths_dispose_from_old_map(
+	void);
 
 /* ---------- globals */
 
