@@ -444,6 +444,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "ai/ai_script.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -455,5 +457,35 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void ai_script_initialize(
+	void)
+{
+	return;
+}
+
+void ai_script_dispose(
+	void)
+{
+	return;
+}
+
+void ai_script_initialize_for_new_map(
+	void)
+{
+	return;
+}
+
+void ai_script_dispose_from_old_map(
+	void)
+{
+	return;
+}
+
+void ai_scripting_reconnect(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */
