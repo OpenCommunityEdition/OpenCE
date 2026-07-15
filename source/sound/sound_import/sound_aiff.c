@@ -17,7 +17,7 @@ symbols in this file:
 002AA8C8 0015:
 	??_C@_0BF@EADPPKIJ@aiff?5container?5chunk?$AA@ (0000)
 00316944 0088:
-	_data_00316944 (0000)
+	_aiff_byte_swap_globals (0000)
 */
 
 /* ---------- headers */
@@ -65,57 +65,66 @@ struct aiff_common_chunk
 	byte compression_type[4];
 };
 
+struct aiff_byte_swap_globals
+{
+	byte_swap_code container_chunk_codes[6];
+	struct byte_swap_definition container_chunk_definition;
+	byte_swap_code chunk_codes[5];
+	struct byte_swap_definition chunk_definition;
+	byte_swap_code common_chunk_codes[8];
+	struct byte_swap_definition common_chunk_definition;
+};
+
+typedef char verify_aiff_byte_swap_globals_size[
+	sizeof(struct aiff_byte_swap_globals) == 0x88 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
-static byte_swap_code aiff_container_chunk_byte_swap_codes[]=
+struct aiff_byte_swap_globals aiff_byte_swap_globals =
 {
-	_begin_bs_array, 1,
-	_4byte, _4byte, _4byte,
-	_end_bs_array
+	{
+		_begin_bs_array, 1,
+		_4byte, _4byte, _4byte,
+		_end_bs_array,
+	},
+	{
+		"aiff container chunk",
+		sizeof(struct aiff_container_chunk),
+		aiff_byte_swap_globals.container_chunk_codes,
+		BYTE_SWAP_DEFINITION_SIGNATURE,
+		FALSE,
+	},
+	{
+		_begin_bs_array, 1,
+		_4byte, _4byte,
+		_end_bs_array,
+	},
+	{
+		"aiff chunk",
+		sizeof(struct aiff_chunk),
+		aiff_byte_swap_globals.chunk_codes,
+		BYTE_SWAP_DEFINITION_SIGNATURE,
+		FALSE,
+	},
+	{
+		_begin_bs_array, 1,
+		_2byte, _4byte, _2byte, 10, _4byte,
+		_end_bs_array,
+	},
+	{
+		"aiff format info p1",
+		AIFC_COMMON_CHUNK_SIZE,
+		aiff_byte_swap_globals.common_chunk_codes,
+		BYTE_SWAP_DEFINITION_SIGNATURE,
+		FALSE,
+	},
 };
 
-static struct byte_swap_definition aiff_container_chunk_byte_swap_definition=
-{
-	"aiff container chunk",
-	sizeof(struct aiff_container_chunk),
-	aiff_container_chunk_byte_swap_codes,
-	BYTE_SWAP_DEFINITION_SIGNATURE,
-	FALSE
-};
-
-static byte_swap_code aiff_chunk_byte_swap_codes[]=
-{
-	_begin_bs_array, 1,
-	_4byte, _4byte,
-	_end_bs_array
-};
-
-static struct byte_swap_definition aiff_chunk_byte_swap_definition=
-{
-	"aiff chunk",
-	sizeof(struct aiff_chunk),
-	aiff_chunk_byte_swap_codes,
-	BYTE_SWAP_DEFINITION_SIGNATURE,
-	FALSE
-};
-
-static byte_swap_code aiff_common_chunk_byte_swap_codes[]=
-{
-	_begin_bs_array, 1,
-	_2byte, _4byte, _2byte, 10, _4byte,
-	_end_bs_array
-};
-
-static struct byte_swap_definition aiff_common_chunk_byte_swap_definition=
-{
-	"aiff format info p1",
-	AIFC_COMMON_CHUNK_SIZE,
-	aiff_common_chunk_byte_swap_codes,
-	BYTE_SWAP_DEFINITION_SIGNATURE,
-	FALSE
-};
+#define aiff_container_chunk_byte_swap_definition aiff_byte_swap_globals.container_chunk_definition
+#define aiff_chunk_byte_swap_definition aiff_byte_swap_globals.chunk_definition
+#define aiff_common_chunk_byte_swap_definition aiff_byte_swap_globals.common_chunk_definition
 
 /* ---------- public code */
 
@@ -169,21 +178,31 @@ boolean sound_file_aiff_info_get(
 
 				byte_swap_data(&aiff_common_chunk_byte_swap_definition, &common, 1);
 				if (csmemcmp(sample_rate_11025, common.sample_rate, sizeof(common.sample_rate))==0)
-					info->samples_per_second= 11025;
-				else if (csmemcmp(sample_rate_22050, common.sample_rate, sizeof(common.sample_rate))==0)
-					info->samples_per_second= 22050;
-				else if (csmemcmp(sample_rate_44100, common.sample_rate, sizeof(common.sample_rate))==0)
-					info->samples_per_second= 44100;
-				else
-					info->samples_per_second= NONE;
-
-				if (info->samples_per_second!=NONE)
 				{
-					info->channel_count= common.channel_count;
+					info->samples_per_second= 11025;
 					info->significant_bits_per_sample= common.significant_bits_per_sample;
+					info->channel_count= common.channel_count;
 					if (chunk.data_size==AIFF_COMMON_CHUNK_SIZE || *(tag *)common.compression_type=='NONE')
 						result= TRUE;
 				}
+				else if (csmemcmp(sample_rate_22050, common.sample_rate, sizeof(common.sample_rate))==0)
+				{
+					info->samples_per_second= 22050;
+					info->significant_bits_per_sample= common.significant_bits_per_sample;
+					info->channel_count= common.channel_count;
+					if (chunk.data_size==AIFF_COMMON_CHUNK_SIZE || *(tag *)common.compression_type=='NONE')
+						result= TRUE;
+				}
+				else if (csmemcmp(sample_rate_44100, common.sample_rate, sizeof(common.sample_rate))==0)
+				{
+					info->samples_per_second= 44100;
+					info->significant_bits_per_sample= common.significant_bits_per_sample;
+					info->channel_count= common.channel_count;
+					if (chunk.data_size==AIFF_COMMON_CHUNK_SIZE || *(tag *)common.compression_type=='NONE')
+						result= TRUE;
+				}
+				else
+					info->samples_per_second= NONE;
 				}
 				break;
 			}

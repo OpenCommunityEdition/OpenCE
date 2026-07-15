@@ -22255,7 +22255,7 @@
 { "file_offset": 3238088, "flags": 0, "name": "_data_003168c8" },
 { "file_offset": 3238196, "flags": 0, "name": "_data_00316934" },
 { "file_offset": 3238204, "flags": 0, "name": "_data_0031693c" },
-{ "file_offset": 3238212, "flags": 0, "name": "_data_00316944" },
+{ "file_offset": 3238212, "flags": 0, "name": "_aiff_byte_swap_globals" },
 { "file_offset": 3238348, "flags": 0, "name": "_data_003169cc" },
 { "file_offset": 3238524, "flags": 0, "name": "_data_00316a7c" },
 { "file_offset": 3238568, "flags": 0, "name": "_sound_classes" },
