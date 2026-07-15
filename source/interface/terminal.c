@@ -29,7 +29,7 @@ symbols in this file:
 000D3190 0130:
 	_terminal_printf (0000)
 002712D0 0006:
-	_rdata_002712d0 (0000)
+	rdata_002712d0 (0000)
 002712D8 0010:
 	??_C@_0BA@LJDMLJDP@terminal?5output?$AA@ (0000)
 002712E8 0006:
@@ -115,7 +115,7 @@ static long terminal_new_line(void);
 
 boolean terminal_render_enable = TRUE;
 
-static const short terminal_tab_stops[] = {160, 320, 470};
+const short rdata_002712d0[] = {160, 320, 470};
 
 static struct terminal_globals terminal_globals;
 
@@ -280,14 +280,14 @@ void terminal_draw(
 				if (line->tabstop)
 				{
 					draw_string_set_tab_stops(
-						terminal_tab_stops,
-						NUMBEROF(terminal_tab_stops)
+						rdata_002712d0,
+						NUMBEROF(rdata_002712d0)
 					);
 				}
 
 				draw_string_set_draw_mode(font_tag_index, NONE, 0, 0, &color);
 				rasterizer_draw_string(&terminal_gets_bounds, NULL, NULL, 0, line->buffer);
-				draw_string_set_tab_stops(terminal_tab_stops, 0);
+				draw_string_set_tab_stops(rdata_002712d0, 0);
 			}
 		}
 	}
