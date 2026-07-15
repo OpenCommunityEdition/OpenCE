@@ -17,7 +17,12 @@ file has inline function assertions.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/SOUND_CLASSES.C */
+
+void sound_classes_dispose_from_old_map(
+	void);
+void sound_classes_dispose(
+	void);
 
 /* ---------- globals */
 

@@ -107,16 +107,43 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "sound_classes.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct sound_class_runtime
+{
+	real target_gain;
+	real current_gain;
+	short interpolation_ticks;
+	short pad;
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+struct sound_class_runtime *sound_class_data;
+
 /* ---------- public code */
+
+void sound_classes_dispose_from_old_map(
+	void)
+{
+	return;
+}
+
+void sound_classes_dispose(
+	void)
+{
+	sound_class_data = NULL;
+
+	return;
+}
 
 /* ---------- private code */
