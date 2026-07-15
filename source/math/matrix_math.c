@@ -246,6 +246,20 @@ void matrix4x3_from_point_and_vectors(
 	return;
 }
 
+void
+matrix4x3_to_point_and_vectors(
+	real_matrix4x3 const *matrix,
+	real_point3d *point,
+	real_vector3d *forward,
+	real_vector3d *up)
+{
+	*forward = matrix->forward;
+	*up = matrix->up;
+	*point = matrix->position;
+
+	return;
+}
+
 real_point3d *matrix4x3_transform_point(
 	real_matrix4x3 const *matrix,
 	real_point3d const *point,
@@ -281,6 +295,35 @@ real_vector3d *matrix4x3_transform_normal(
 	result->j = i*matrix->forward.j + j*matrix->left.j + k*matrix->up.j;
 	result->k = i*matrix->forward.k + j*matrix->left.k + k*matrix->up.k;
 	return result;
+}
+
+real_vector3d *
+matrix4x3_inverse_transform_normal(
+	real_matrix4x3 const *matrix,
+	real_vector3d const *normal,
+	real_vector3d *result)
+{
+	real i = normal->i;
+	real j = normal->j;
+	real k = normal->k;
+
+	result->i = i * matrix->forward.i + j * matrix->forward.j + k * matrix->forward.k;
+	result->j = i * matrix->left.i + j * matrix->left.j + k * matrix->left.k;
+	result->k = i * matrix->up.i + j * matrix->up.j + k * matrix->up.k;
+
+	return result;
+}
+
+real
+matrix3x3_determinant(
+	real_matrix3x3 const *matrix)
+{
+	return matrix->up.i * matrix->forward.j * matrix->left.k
+		+ matrix->forward.k * matrix->left.i * matrix->up.j
+		+ matrix->up.k * matrix->forward.i * matrix->left.j
+		- matrix->forward.i * matrix->up.j * matrix->left.k
+		- matrix->up.k * matrix->forward.j * matrix->left.i
+		- matrix->up.i * matrix->forward.k * matrix->left.j;
 }
 
 /* ---------- private code */
