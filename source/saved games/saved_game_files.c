@@ -307,6 +307,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "saved games/saved_game_files.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -315,8 +318,19 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void code_001b4b00(
+	void);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+void enumerate_memory_units_test(
+	void)
+{
+	code_001b4b00();
+
+	return;
+}
 
 /* ---------- private code */

@@ -18,6 +18,8 @@ header included in hcex build.
 
 void saved_game_files_take_mutex(void);
 void saved_game_files_release_mutex(void);
+void enumerate_memory_units_test(
+	void);
 
 /* ---------- globals */
 
