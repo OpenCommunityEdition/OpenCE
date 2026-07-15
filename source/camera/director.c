@@ -112,6 +112,9 @@ symbols in this file:
 
 #include "saved games/game_state.h"
 
+#include "units/unit_definitions.h"
+#include "units/units.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -227,6 +230,57 @@ director_perspective director_get_perspective(
 	}
 
 	return camera->perspective;
+}
+
+short director_desired_perspective(
+	long unit_index,
+	director_perspective *perspective)
+{
+	short following = FALSE;
+
+	*perspective = 0;
+	if (unit_index != NONE)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+		if (unit->object.parent_object_index != NONE)
+		{
+			struct object_datum *parent_object = object_get(unit->object.parent_object_index);
+			if (TEST_FLAG(_object_mask_unit, parent_object->object.type))
+			{
+				boolean third_person_on_enter;
+				struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+					&unit_definition_get(parent_object->definition_index)->unit.seats,
+					unit->unit.parent_seat_index,
+					struct unit_seat);
+
+				third_person_on_enter = TEST_FLAG(seat->flags, _unit_seat_third_person_on_enter_bit);
+				if (TEST_FLAG(seat->flags, _unit_seat_third_person_camera_bit))
+					following = TRUE;
+				if (third_person_on_enter)
+				{
+					if (unit->unit.animation.state == _unit_state_entering_seat)
+						*perspective = 1;
+					else if (unit->unit.animation.state == _unit_state_exiting_seat)
+						*perspective = 3;
+					else
+						*perspective = 2;
+				}
+				else
+				{
+					*perspective = 2;
+				}
+			}
+			else
+			{
+				*perspective = 2;
+			}
+		}
+
+		if (*perspective == 1 || *perspective == 3)
+			following = TRUE;
+	}
+
+	return following;
 }
 
 void director_set_mode(

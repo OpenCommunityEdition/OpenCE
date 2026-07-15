@@ -48,6 +48,12 @@ enum
 	NUMBER_OF_UNIT_DEFINITION_FLAGS,
 };
 
+enum
+{
+	_unit_seat_third_person_camera_bit = 4,
+	_unit_seat_third_person_on_enter_bit = 6,
+};
+
 /* ---------- macros */
 
 #define unit_definition_get(index) ((struct unit_definition *)tag_get(UNIT_DEFINITION_TAG, index))
