@@ -59,6 +59,14 @@ void physics_variable_update(
 	boolean update_velocity,
 	real delta);
 
+boolean physics_variable_update_seek(
+	real *position,
+	real *range,
+	real *velocity,
+	boolean update_velocity,
+	real target,
+	real delta);
+
 /* ---------- globals */
 
 /* ---------- public code */

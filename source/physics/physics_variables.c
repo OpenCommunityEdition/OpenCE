@@ -185,6 +185,35 @@ physics_variable_update(
 	return;
 }
 
+boolean
+physics_variable_update_seek(
+	real *position,
+	real *range,
+	real *velocity,
+	boolean update_velocity,
+	real target,
+	real delta)
+{
+	real *parameters = velocity;
+	real direction = code_00143f40(parameters, *position, update_velocity, target);
+
+	if (direction != 0.f)
+	{
+		physics_variable_speed_update(
+			range,
+			(struct physics_variable_speed_parameters *)(parameters + 2),
+			direction * delta);
+		physics_variable_position_update(position, parameters, update_velocity, *range);
+		if (code_00143f40(parameters, *position, update_velocity, target) == direction)
+			return FALSE;
+	}
+
+	*position = target;
+	*range = 0.f;
+
+	return TRUE;
+}
+
 /* ---------- private code */
 
 static real
