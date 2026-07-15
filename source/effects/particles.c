@@ -74,6 +74,12 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "effects/particles.h"
+
+#include "cseries/errors.h"
+#include "memory/data.h"
+#include "saved games/game_state.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -85,6 +91,49 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void particles_initialize(
+	void)
+{
+	particle_data = game_state_data_new("particle", 1024, 0x70);
+	if (!particle_data)
+		error(_error_immediate, "couldn't allocate particle globals");
+
+	return;
+}
+
+void particles_initialize_for_new_map(
+	void)
+{
+	data_make_valid(particle_data);
+
+	return;
+}
+
+void particles_dispose_from_old_map(
+	void)
+{
+	data_make_invalid(particle_data);
+
+	return;
+}
+
+void particles_dispose(
+	void)
+{
+	if (particle_data)
+		particle_data = NULL;
+
+	return;
+}
+
+void particle_delete(
+	long particle_index)
+{
+	datum_delete(particle_data, particle_index);
+
+	return;
+}
 
 void particles_disconnect_from_structure_bsp(
 	void)
