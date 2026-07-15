@@ -50,6 +50,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "game/game_allegiance.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -61,5 +63,17 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void game_allegiance_dispose(
+	void)
+{
+	return;
+}
+
+void game_allegiance_dispose_from_old_map(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */
