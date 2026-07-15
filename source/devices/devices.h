@@ -35,6 +35,9 @@ enum
 
 /* ---------- macros */
 
+#define machine_get(index) ((struct machine_datum *)object_get_and_verify_type((index), _object_mask_machine))
+#define machine_try_and_get(index) ((struct machine_datum *)object_try_and_get_and_verify_type((index), _object_mask_machine))
+
 /* ---------- structures */
 
 struct _device_datum
@@ -72,6 +75,10 @@ struct machine_datum
 };
 
 /* ---------- prototypes/DEVICES.C */
+
+void machine_bumped(
+	long machine_index,
+	long biped_index);
 
 /* ---------- globals */
 

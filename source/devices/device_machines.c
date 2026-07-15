@@ -26,6 +26,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
+#include "device_definitions.h"
+#include "devices.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -65,6 +70,17 @@ void machines_dispose_from_old_map(
 void machine_delete(
 	long machine_index)
 {
+	return;
+}
+
+void machine_bumped(
+	long machine_index,
+	long biped_index)
+{
+	struct machine_datum *machine = machine_get(machine_index);
+
+	machine_definition_get(machine->definition_index);
+
 	return;
 }
 
