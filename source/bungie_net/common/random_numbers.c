@@ -40,7 +40,7 @@ void add64(
 
 /* ---------- globals */
 
-boolean random_numbers_initialized;
+boolean random_numbers_initialized = FALSE;
 
 /* ---------- public code */
 
