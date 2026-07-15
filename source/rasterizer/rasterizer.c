@@ -323,6 +323,10 @@ void _rasterizer_decals_begin(
 	short type);
 void _rasterizer_decals_end(
 	void);
+void _rasterizer_detail_objects_begin(
+	void);
+void _rasterizer_detail_objects_end(
+	void);
 void _rasterizer_dispose(void);
 void _rasterizer_frame_end(void);
 void _rasterizer_window_end(void);
@@ -377,6 +381,20 @@ void rasterizer_decals_end(
 	void)
 {
 	_rasterizer_decals_end();
+	return;
+}
+
+void rasterizer_detail_objects_begin(
+	void)
+{
+	_rasterizer_detail_objects_begin();
+	return;
+}
+
+void rasterizer_detail_objects_end(
+	void)
+{
+	_rasterizer_detail_objects_end();
 	return;
 }
 

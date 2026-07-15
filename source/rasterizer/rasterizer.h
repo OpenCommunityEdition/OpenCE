@@ -130,6 +130,10 @@ void rasterizer_decals_begin(
 void rasterizer_decals_end(
 	void);
 void rasterizer_decals_update_function_pointers(void);
+void rasterizer_detail_objects_begin(
+	void);
+void rasterizer_detail_objects_end(
+	void);
 
 /* ---------- prototypes/RASTERIZER_TEXT.C */
 
