@@ -9,6 +9,7 @@ header included in hcex build.
 #pragma once
 
 #include "cseries/cseries.h"
+#include "math/real_math.h"
 #include "memory/data.h"
 
 /* ---------- constants */
@@ -21,6 +22,7 @@ enum
 /* ---------- macros */
 
 #define particle_system_get(system_index) ((struct particle_system_datum *)datum_get(particle_systems, (system_index)))
+#define system_particle_get(particle_index) ((struct system_particle_datum *)datum_get(system_particles, (particle_index)))
 
 /* ---------- structures */
 
@@ -33,11 +35,33 @@ struct particle_system_datum
 	long object_index;
 	short attachment_index;
 	short type_state_index;
-	byte opaque[0x144];
+	byte opaque14[0xC];
+	real_point3d position;
+	real_vector3d velocity;
+	byte opaque38[0x120];
+};
+
+struct system_particle_datum
+{
+	struct datum_header header;
+	byte opaque02[0x1A];
+	real_point3d position;
+	real_vector3d velocity;
+	byte opaque34[0x4C];
 };
 
 typedef char particle_system_datum_size_assert[
 	sizeof(struct particle_system_datum) == 0x158 ? 1 : -1];
+typedef char particle_system_datum_position_offset_assert[
+	offsetof(struct particle_system_datum, position) == 0x20 ? 1 : -1];
+typedef char particle_system_datum_velocity_offset_assert[
+	offsetof(struct particle_system_datum, velocity) == 0x2C ? 1 : -1];
+typedef char system_particle_datum_size_assert[
+	sizeof(struct system_particle_datum) == 0x80 ? 1 : -1];
+typedef char system_particle_datum_position_offset_assert[
+	offsetof(struct system_particle_datum, position) == 0x1C ? 1 : -1];
+typedef char system_particle_datum_velocity_offset_assert[
+	offsetof(struct system_particle_datum, velocity) == 0x28 ? 1 : -1];
 
 /* ---------- prototypes/PARTICLE_SYSTEMS.C */
 

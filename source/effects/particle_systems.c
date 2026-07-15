@@ -80,6 +80,7 @@ symbols in this file:
 
 #include "math/real_math.h"
 #include "memory/data.h"
+#include "objects/objects.h"
 #include "saved games/game_state.h"
 
 /* ---------- constants */
@@ -171,6 +172,18 @@ void particle_systems_disconnect_from_structure_bsp(
 }
 
 /* ---------- private code */
+
+void code_0008e140(
+	struct particle_system_datum const *system,
+	short type_index,
+	struct system_particle_datum *particle,
+	struct object_marker const *marker)
+{
+	particle->position = marker->matrix.position;
+	particle->velocity = system->velocity;
+
+	return;
+}
 
 void code_0008e310(
 	struct particle_system_datum *system,
