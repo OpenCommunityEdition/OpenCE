@@ -78,6 +78,12 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "objects/widgets/glow.h"
+
+#include "cseries/cseries.h"
+#include "cseries/errors.h"
+#include "saved games/game_state.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -89,6 +95,55 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void glow_initialize(
+	void)
+{
+	if (!glow_globals.glow_data)
+	{
+		glow_globals.glow_data = game_state_data_new("glow", 8, 0x25C);
+		if (glow_globals.glow_data)
+		{
+			if (!glow_globals.glow_particle_data)
+			{
+				glow_globals.glow_particle_data = game_state_data_new("glow particles", 512, 100);
+				if (!glow_globals.glow_particle_data)
+				{
+					error(_error_silent, "could not allocate glow particle data array");
+					return;
+				}
+			}
+		}
+		else
+		{
+			error(_error_silent, "could not allocate glow data array");
+		}
+	}
+
+	return;
+}
+
+void glow_initialize_for_new_map(
+	void)
+{
+	if (glow_globals.glow_data)
+		data_make_valid(glow_globals.glow_data);
+	if (glow_globals.glow_particle_data)
+		data_make_valid(glow_globals.glow_particle_data);
+
+	return;
+}
+
+void glow_dispose_from_old_map(
+	void)
+{
+	if (glow_globals.glow_data)
+		data_make_invalid(glow_globals.glow_data);
+	if (glow_globals.glow_particle_data)
+		data_make_invalid(glow_globals.glow_particle_data);
+
+	return;
+}
 
 void glow_dispose(
 	void)
