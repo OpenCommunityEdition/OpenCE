@@ -387,8 +387,8 @@ boolean actor_action_handle_panic_from_burning_to_death(
 	long actor_index);
 boolean actor_action_handle_panic_transition(
 	long actor_index,
-	boolean panic,
-	boolean surprise,
+	boolean panic_from_unopposable,
+	boolean panic_from_damage,
 	short panic_type);
 boolean actor_action_handle_berserking_from_attacking_mode(
 	long actor_index);
@@ -401,6 +401,10 @@ boolean actor_action_handle_berserk_transition(
 	short berserk_count);
 boolean actor_action_handle_combat_transition(
 	long actor_index);
+boolean actor_action_handle_active_cover_seeking(
+	long actor_index,
+	boolean allow_defensive_cover,
+	boolean allow_active_cover);
 boolean actor_action_handle_danger_avoidance(
 	long actor_index);
 void actor_action_handle_vehicle_entry(
