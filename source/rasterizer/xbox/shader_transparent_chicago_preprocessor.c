@@ -16,6 +16,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -24,8 +26,17 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+boolean code_0016b4e0(
+	void);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+boolean code_0016b4e0(
+	void)
+{
+	return TRUE;
+}
 
 /* ---------- private code */
