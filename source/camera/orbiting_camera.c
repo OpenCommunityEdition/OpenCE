@@ -14,6 +14,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "orbiting_camera.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -25,5 +27,15 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void orbiting_camera_new(
+	struct orbiting_camera *camera,
+	real distance,
+	real_vector3d const *forward)
+{
+	camera->distance = distance;
+	euler_angles2d_from_vector3d(&camera->facing, forward);
+	return;
+}
 
 /* ---------- private code */
