@@ -22376,7 +22376,7 @@
 { "file_offset": 3261204, "flags": 0, "name": "_bss_0031c314" },
 { "file_offset": 3261216, "flags": 0, "name": "_bss_0031c320" },
 { "file_offset": 3261728, "flags": 0, "name": "_bss_0031c520" },
-{ "file_offset": 3262240, "flags": 0, "name": "_bss_0031c720" },
+{ "file_offset": 3262240, "flags": 0, "name": "_random_numbers_initialized" },
 { "file_offset": 3262248, "flags": 0, "name": "_bss_0031c728" },
 { "file_offset": 3263792, "flags": 0, "name": "_bss_0031cd30" },
 { "file_offset": 3264048, "flags": 0, "name": "_transport_initialized" },

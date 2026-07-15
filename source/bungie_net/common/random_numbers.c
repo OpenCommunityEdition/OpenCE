@@ -35,7 +35,7 @@ symbols in this file:
 
 /* ---------- globals */
 
-static boolean random_numbers_initialized;
+boolean random_numbers_initialized;
 
 /* ---------- public code */
 
