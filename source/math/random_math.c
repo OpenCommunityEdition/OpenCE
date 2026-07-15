@@ -87,7 +87,10 @@ struct geosphere
 /* ---------- prototypes */
 
 unsigned long system_seconds(void);
-void code_000fab20(void);
+static real_vector3d *
+code_000fab20(
+	short index,
+	real_vector3d *result);
 struct geosphere *geosphere_new(short subdivision_count);
 void geosphere_dispose(struct geosphere *sphere);
 
@@ -206,33 +209,13 @@ real real_seed_random_range(
 	return lower_bound+(upper_bound-lower_bound)*random;
 }
 
-__declspec(naked) real_vector3d *seed_random_direction3d(
+real_vector3d *seed_random_direction3d(
 	unsigned long *seed,
 	real_vector3d *direction)
 {
-	__asm
-	{
-		push ebp
-		mov ebp, esp
-		mov ecx, seed
-		mov eax, dword ptr [random_math_globals+4]
-		push ebx
-		push esi
-		mov esi, dword ptr [ecx]
-		mov ebx, direction
-		imul esi, esi, 019660Dh
-		add esi, 03C6EF35Fh
-		mov dword ptr [ecx], esi
-		movsx eax, ax
-		shr esi, 16
-		imul esi, eax
-		shr esi, 16
-		call code_000fab20
-		pop esi
-		pop ebx
-		pop ebp
-		ret
-	}
+	return code_000fab20(
+		seed_random_range(seed, 0, random_math_globals.random_direction_table_size),
+		direction);
 }
 
 void
@@ -260,4 +243,49 @@ seed_random_orientation(
 	yaw_vectors(up, facing, sine(roll), cosine(roll));
 }
 
+real_vector3d *
+seed_random_vector_in_cone3d(
+	unsigned long *seed,
+	real_vector3d const *axis,
+	real inner_cone_angle,
+	real outer_cone_angle,
+	real_vector3d *result)
+{
+	real_vector3d random_direction;
+	real_vector3d rotation_axis;
+	real angle;
+
+	*result= *axis;
+	code_000fab20(
+		seed_random_range(seed, 0, random_math_globals.random_direction_table_size),
+		&random_direction);
+	cross_product3d(axis, &random_direction, &rotation_axis);
+	if (normalize3d(&rotation_axis)>0.f)
+	{
+		angle= real_seed_random_range(seed, inner_cone_angle, outer_cone_angle);
+		rotate_vector_about_axis(result, &rotation_axis, sine(angle), cosine(angle));
+	}
+
+	return result;
+}
+
 /* ---------- private code */
+
+static real_vector3d *
+code_000fab20(
+	short index,
+	real_vector3d *result)
+{
+	real_vector3d *random_direction=
+		&((real_vector3d *)random_math_globals.random_direction_table)[index];
+	match_assert(
+		"c:\\halo\\SOURCE\\math\\random_math.c",
+		250,
+		random_math_globals.random_direction_table);
+	match_assert(
+		"c:\\halo\\SOURCE\\math\\random_math.c",
+		251,
+		index>=0 && index<random_math_globals.random_direction_table_size);
+	*result= *random_direction;
+	return result;
+}
