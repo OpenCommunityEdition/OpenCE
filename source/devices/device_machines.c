@@ -38,4 +38,34 @@ symbols in this file:
 
 /* ---------- public code */
 
+void machines_initialize(
+	void)
+{
+	return;
+}
+
+void machines_dispose(
+	void)
+{
+	return;
+}
+
+void machines_initialize_for_new_map(
+	void)
+{
+	return;
+}
+
+void machines_dispose_from_old_map(
+	void)
+{
+	return;
+}
+
+void machine_delete(
+	long machine_index)
+{
+	return;
+}
+
 /* ---------- private code */
