@@ -32,6 +32,12 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+static real code_00143f40(
+	real *limits,
+	real position,
+	boolean wrap,
+	real target);
+
 /* ---------- globals */
 
 /* ---------- public code */
@@ -140,6 +146,28 @@ physics_variable_position_update(
 	return;
 }
 
+boolean
+physics_variable_position_update_seek(
+	real *position,
+	real *limits,
+	boolean wrap,
+	real target,
+	real delta)
+{
+	real direction = code_00143f40(limits, *position, wrap, target);
+
+	if (direction != 0.f)
+	{
+		physics_variable_position_update(position, limits, wrap, direction * delta);
+		if (code_00143f40(limits, *position, wrap, target) == direction)
+			return FALSE;
+	}
+
+	*position = target;
+
+	return TRUE;
+}
+
 void
 physics_variable_update(
 	real *position,
@@ -158,3 +186,23 @@ physics_variable_update(
 }
 
 /* ---------- private code */
+
+static real
+code_00143f40(
+	real *limits,
+	real position,
+	boolean wrap,
+	real target)
+{
+	real direction = target - position;
+
+	if (direction != 0.f)
+	{
+		if (wrap && fabs(direction) > (limits[0] - limits[1]) * 0.5f)
+			direction = -direction;
+
+		direction = direction > 0.f ? 1.f : -1.f;
+	}
+
+	return direction;
+}

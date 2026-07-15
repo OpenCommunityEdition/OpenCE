@@ -39,6 +39,13 @@ boolean physics_variable_speed_update_seek(
 	real target,
 	real delta);
 
+boolean physics_variable_position_update_seek(
+	real *position,
+	real *limits,
+	boolean wrap,
+	real target,
+	real delta);
+
 void physics_variable_position_update(
 	real *position,
 	real *limits,
