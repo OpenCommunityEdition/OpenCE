@@ -29,9 +29,13 @@ struct sound_file_info;
 
 boolean sound_file_is_aiff(struct file_reference const *file);
 boolean sound_file_aiff_info_get(struct file_reference const *file, struct sound_file_info *info);
+boolean sound_file_aiff_raw_data_get(struct file_reference const *file, long *size, void *data);
+void sound_file_aiff_format(struct sound_file_info const *info, long *size, void *data);
 
 boolean sound_file_is_wave(struct file_reference const *file);
 boolean sound_file_wave_info_get(struct file_reference const *file, struct sound_file_info *info);
+boolean sound_file_wave_raw_data_get(struct file_reference const *file, long *size, void *data);
+void sound_file_wave_format(struct sound_file_info const *info, long *size, void *data);
 
 /* ---------- globals */
 
@@ -48,6 +52,30 @@ boolean sound_file_info_get(
 
 	if (!(sound_file_is_aiff(file) && sound_file_aiff_info_get(file, info)) &&
 		!(sound_file_is_wave(file) && sound_file_wave_info_get(file, info)))
+	{
+		result = FALSE;
+	}
+
+	return result;
+}
+
+boolean sound_raw_sample_data_get(
+	struct file_reference const *file,
+	struct sound_file_info const *info,
+	long *size,
+	void *data)
+{
+	boolean result = TRUE;
+
+	if (sound_file_is_aiff(file) && sound_file_aiff_raw_data_get(file, size, data))
+	{
+		sound_file_aiff_format(info, size, data);
+	}
+	else if (sound_file_is_wave(file) && sound_file_wave_raw_data_get(file, size, data))
+	{
+		sound_file_wave_format(info, size, data);
+	}
+	else
 	{
 		result = FALSE;
 	}

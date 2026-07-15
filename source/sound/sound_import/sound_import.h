@@ -24,5 +24,10 @@ struct sound_file_info;
 /* ---------- public code */
 
 boolean sound_file_info_get(struct sound_file_info *info, struct file_reference const *file);
+boolean sound_raw_sample_data_get(
+	struct file_reference const *file,
+	struct sound_file_info const *info,
+	long *size,
+	void *data);
 
 #endif // __SOUND_IMPORT_H
