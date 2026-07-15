@@ -16,6 +16,8 @@ header included in hcex build.
 
 /* ---------- prototypes/EFFECTS.C */
 
+void effects_disconnect_from_structure_bsp(
+	void);
 long effect_new_looping(
 	long definition_index,
 	long object_index,

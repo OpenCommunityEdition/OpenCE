@@ -87,4 +87,16 @@ symbols in this file:
 
 /* ---------- public code */
 
+void particle_systems_dispose(
+	void)
+{
+	return;
+}
+
+void particle_systems_disconnect_from_structure_bsp(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */

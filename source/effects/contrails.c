@@ -78,4 +78,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+void contrails_disconnect_from_structure_bsp(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */

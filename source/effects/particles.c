@@ -86,4 +86,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+void particles_disconnect_from_structure_bsp(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
