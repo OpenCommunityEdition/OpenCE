@@ -36,6 +36,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "bored_camera.h"
+#include "cseries/cseries_windows.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -47,5 +50,14 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void bored_camera_new(
+	struct bored_camera *camera)
+{
+	camera->boredom_count = 0;
+	camera->last_update_milliseconds = system_milliseconds();
+	camera->timer_milliseconds = 0;
+	return;
+}
 
 /* ---------- private code */
