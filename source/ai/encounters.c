@@ -282,7 +282,17 @@ symbols in this file:
 #include "cseries.h"
 #include "encounters.h"
 
+#include "memory/data.h"
+#include "saved games/game_state.h"
+
 /* ---------- constants */
+
+enum
+{
+	MAXIMUM_ENCOUNTERS = 128,
+	MAXIMUM_PURSUITS = 256,
+	PURSUIT_DATUM_SIZE = 0x28,
+};
 
 /* ---------- macros */
 
@@ -299,9 +309,35 @@ struct data_array *pursuit_data;
 
 /* ---------- public code */
 
+void encounters_initialize(
+	void)
+{
+	encounter_data = game_state_data_new("encounter", MAXIMUM_ENCOUNTERS, sizeof(struct encounter_datum));
+	match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 110, encounter_data);
+
+	squad_array = (struct squad_datum *)game_state_malloc("squad", "squad", MAXIMUM_SQUADS_PER_MAP * sizeof(struct squad_datum));
+	match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 113, squad_array);
+
+	platoon_array = (struct platoon_datum *)game_state_malloc("platoon", "platoon", MAXIMUM_PLATOONS_PER_MAP * sizeof(struct platoon_datum));
+	match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 116, platoon_array);
+
+	pursuit_data = game_state_data_new("ai pursuit", MAXIMUM_PURSUITS, PURSUIT_DATUM_SIZE);
+	match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 119, pursuit_data);
+
+	return;
+}
+
 void encounters_dispose(
 	void)
 {
+	return;
+}
+
+void encounters_dispose_from_old_map(
+	void)
+{
+	data_make_invalid(encounter_data);
+	data_make_invalid(pursuit_data);
 	return;
 }
 
