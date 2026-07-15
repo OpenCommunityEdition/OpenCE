@@ -375,6 +375,21 @@ boolean actor_action_handle_surprise(
 	short surprise_level);
 boolean actor_action_deny_transition(
 	long actor_index);
+boolean actor_action_handle_panic_from_surprise(
+	long actor_index);
+boolean actor_action_handle_panic_from_damage(
+	long actor_index);
+boolean actor_action_handle_panic_from_attached_projectiles(
+	long actor_index);
+boolean actor_action_handle_panic_from_attached_melee_attackers(
+	long actor_index);
+boolean actor_action_handle_panic_from_burning_to_death(
+	long actor_index);
+boolean actor_action_handle_panic_transition(
+	long actor_index,
+	boolean panic,
+	boolean surprise,
+	short panic_type);
 boolean actor_action_handle_berserking_from_attacking_mode(
 	long actor_index);
 boolean actor_action_handle_berserking_from_damage(
@@ -385,6 +400,8 @@ boolean actor_action_handle_berserk_transition(
 	long actor_index,
 	short berserk_count);
 boolean actor_action_handle_combat_transition(
+	long actor_index);
+boolean actor_action_handle_danger_avoidance(
 	long actor_index);
 boolean actor_action_handle_combat_status(
 	long actor_index,
