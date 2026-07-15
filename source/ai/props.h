@@ -154,6 +154,8 @@ struct prop_iterator
 
 /* ---------- prototypes/PROPS.C */
 
+void props_dispose(
+	void);
 void prop_iterator_new(struct prop_iterator *iterator, long actor_index);
 struct prop_datum *prop_iterator_next(struct prop_iterator *iterator);
 

@@ -83,4 +83,10 @@ struct data_array *prop_data = NULL;
 
 /* ---------- public code */
 
+void props_dispose(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
