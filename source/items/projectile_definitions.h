@@ -19,11 +19,55 @@ enum
 	PROJECTILE_DEFINITION_TAG = 'proj',
 };
 
+enum
+{
+	_projectile_material_response_disappear = 0,
+	_projectile_material_response_detonate,
+	_projectile_material_response_reflect,
+	_projectile_material_response_overpenetrate,
+	_projectile_material_response_attach,
+	NUMBER_OF_PROJECTILE_MATERIAL_RESPONSES,
+};
+
+enum
+{
+	_projectile_material_effect_scale_damage = 0,
+	_projectile_material_effect_scale_angle,
+	NUMBER_OF_PROJECTILE_MATERIAL_EFFECT_SCALES,
+};
+
 /* ---------- macros */
 
 #define projectile_definition_get(index) ((struct projectile_definition *)tag_get(PROJECTILE_DEFINITION_TAG, index))
 
 /* ---------- structures */
+
+struct projectile_material_response_definition
+{
+	word flags;
+	short default_response;
+	struct tag_reference default_effect;
+	byte pad0[16];
+	short potential_response;
+	word potential_flags;
+	real potential_skip_fraction;
+	real potential_angle_lower_bound;
+	real potential_angle_upper_bound;
+	real potential_velocity_lower_bound;
+	real potential_velocity_upper_bound;
+	struct tag_reference potential_effect;
+	byte pad1[16];
+	short scale_effects_by;
+	word pad2;
+	real angular_noise;
+	real velocity_noise;
+	struct tag_reference detonation_effect;
+	byte pad3[24];
+	real initial_friction;
+	real maximum_distance;
+	real parallel_friction;
+	real perpendicular_friction;
+};
 
 struct _projectile_definition
 {
@@ -69,6 +113,8 @@ struct projectile_definition
 /* ---------- prototypes/EXAMPLE.C */
 
 /* ---------- globals */
+
+extern struct projectile_material_response_definition default_projectile_material_response;
 
 /* ---------- public code */
 
