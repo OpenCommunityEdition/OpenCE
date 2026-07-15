@@ -34,6 +34,8 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_dirinfo.c,v
 #include "tiffioP.h"
 #include "prototypes.h"
 
+__declspec(noreturn) void __cdecl exit(int status);
+
 #ifndef TRUE
 #define	TRUE	1
 #define	FALSE	0
