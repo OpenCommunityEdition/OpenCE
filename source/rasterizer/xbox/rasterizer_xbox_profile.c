@@ -128,6 +128,12 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	NUMBER_OF_RASTERIZER_PROFILES = 29,
+	MAXIMUM_RASTERIZER_PROFILE_CALLBACKS = 16
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -146,14 +152,53 @@ struct rasterizer_window_parameters
 	short window_index;
 };
 
+struct rasterizer_profile_elapsed_state
+{
+	__int64 callback_start_times[MAXIMUM_RASTERIZER_PROFILE_CALLBACKS];
+	__int64 active_window_masks[NUMBER_OF_RASTERIZER_PROFILES];
+	volatile __int64 elapsed_times[NUMBER_OF_RASTERIZER_PROFILES];
+};
+
 /* ---------- prototypes */
 
+long __stdcall QueryPerformanceFrequency(
+	__int64 *frequency);
+
 /* ---------- globals */
+
+static volatile __int64 rasterizer_profile_start_times[NUMBER_OF_RASTERIZER_PROFILES];
+static struct rasterizer_profile_elapsed_state rasterizer_profile_elapsed_state;
+static volatile __int64 rasterizer_profile_callback_end_times[MAXIMUM_RASTERIZER_PROFILE_CALLBACKS];
+static volatile __int64 rasterizer_profile_callback_elapsed_times[MAXIMUM_RASTERIZER_PROFILE_CALLBACKS];
 
 extern struct rasterizer_profile_globals data_0030cf00;
 extern struct rasterizer_window_parameters global_window_parameters;
 
 /* ---------- public code */
+
+boolean rasterizer_profile_initialize(
+	void)
+{
+	long profile_count;
+	long profile_index;
+
+	profile_count = NUMBER_OF_RASTERIZER_PROFILES;
+	profile_index = 0;
+	do
+	{
+		rasterizer_profile_start_times[profile_index] = 0;
+		rasterizer_profile_elapsed_state.elapsed_times[profile_index] = 0;
+		profile_index++;
+	}
+	while (--profile_count);
+
+	csmemset(rasterizer_profile_elapsed_state.callback_start_times, 0, sizeof(rasterizer_profile_elapsed_state.callback_start_times));
+	csmemset((void *)rasterizer_profile_callback_end_times, 0, sizeof(rasterizer_profile_callback_end_times));
+	csmemset((void *)rasterizer_profile_callback_elapsed_times, 0, sizeof(rasterizer_profile_callback_elapsed_times));
+	QueryPerformanceFrequency(&data_0030cf00.performance_counter_frequency);
+
+	return TRUE;
+}
 
 void rasterizer_profile_window_begin(
 	void)
