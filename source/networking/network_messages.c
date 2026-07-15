@@ -179,6 +179,7 @@ symbols in this file:
 #include "cseries.h"
 #include "cseries/errors.h"
 #include "memory/data_packet_groups.h"
+#include "networking/network_messages.h"
 
 /* ---------- constants */
 
@@ -193,21 +194,6 @@ struct network_game_message_packet_definitions
 };
 
 /* ---------- prototypes */
-
-void initialize_network_game_packets(
-	void);
-
-void network_event(
-	char *format,
-	...);
-
-boolean decode_network_game_message(
-	void *message_struct,
-	const void *encoded_message,
-	short *encoded_message_size,
-	short *packet_type,
-	short *packet_version,
-	long message_struct_size);
 
 /* ---------- globals */
 
@@ -247,14 +233,14 @@ boolean decode_network_game_message(
 	short *encoded_message_size,
 	short *packet_type,
 	short *packet_version,
-	long message_struct_size)
+	long expected_packet_class)
 {
 	boolean result;
 
 #line 313 "c:\\halo\\SOURCE\\networking\\network_messages.c"
 	match_assert(__FILE__, __LINE__, message_struct && encoded_message && encoded_message_size && (*encoded_message_size>0) && packet_type && (*packet_type>=0) && packet_version && (*packet_version>0));
 
-	result = data_packet_group_decode_packet(&data_0030aa68.group, message_struct, encoded_message, encoded_message_size, packet_type, packet_version, message_struct_size);
+	result = data_packet_group_decode_packet(&data_0030aa68.group, message_struct, encoded_message, encoded_message_size, packet_type, packet_version, expected_packet_class);
 
 	if (!result)
 	{
