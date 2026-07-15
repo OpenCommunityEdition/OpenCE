@@ -126,4 +126,34 @@ symbols in this file:
 
 /* ---------- public code */
 
+void projectiles_initialize(
+	void)
+{
+	return;
+}
+
+void projectiles_initialize_for_new_map(
+	void)
+{
+	return;
+}
+
+void projectiles_dispose_from_old_map(
+	void)
+{
+	return;
+}
+
+void projectiles_dispose(
+	void)
+{
+	return;
+}
+
+void projectile_delete(
+	long projectile_index)
+{
+	return;
+}
+
 /* ---------- private code */
