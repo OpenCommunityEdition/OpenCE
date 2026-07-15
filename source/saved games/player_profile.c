@@ -133,12 +133,54 @@ boolean saved_game_file_get_path_to_enclosing_directory(
 
 /* ---------- globals */
 
+long player_profile_primary_colors[NUMBER_OF_AVAILABLE_PRIMARY_COLORS] =
+{
+	0x00FFFFFF,
+	0x00000000,
+	0x00FE0000,
+	0x000201E3,
+	0x00707E71,
+	0x00FFFF01,
+	0x0000FF01,
+	0x00FF56B9,
+	0x00AB10F4,
+	0x0001FFFF,
+	0x006493ED,
+	0x00FF7F00,
+	0x001ECC91,
+	0x00006401,
+	0x00603814,
+	0x00C69C6C,
+	0x009D0B0E,
+	0x00F5999E,
+};
+
 /* ---------- public code */
 
 short player_profile_number_of_available_primary_colors(
 	void)
 {
 	return NUMBER_OF_AVAILABLE_PRIMARY_COLORS;
+}
+
+real_rgb_color *player_profile_get_rgb_color(
+	real_rgb_color *result,
+	long color_index)
+{
+	long color;
+	real_rgb_color rgb_color;
+
+	color_index = color_index < NUMBER_OF_AVAILABLE_PRIMARY_COLORS - 1 ?
+		color_index : NUMBER_OF_AVAILABLE_PRIMARY_COLORS - 1;
+	color_index = color_index < 0 ? 0 : color_index;
+	color = player_profile_primary_colors[color_index];
+
+	rgb_color.red = ((color >> 16) & 0xFF) / 255.f;
+	rgb_color.green = ((color >> 8) & 0xFF) / 255.f;
+	rgb_color.blue = (color & 0xFF) / 255.f;
+	*result = rgb_color;
+
+	return result;
 }
 
 boolean player_profile_get_enclosing_directory_path(

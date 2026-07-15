@@ -11,6 +11,7 @@ header included in hcex build.
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "math/real_math.h"
 
 /* ---------- constants */
 
@@ -29,6 +30,9 @@ boolean player_profile_get_enclosing_directory_path(
 	char *full_path);
 short player_profile_number_of_available_primary_colors(
 	void);
+real_rgb_color *player_profile_get_rgb_color(
+	real_rgb_color *result,
+	long color_index);
 
 /* ---------- globals */
 

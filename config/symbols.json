@@ -22251,7 +22251,7 @@
 { "file_offset": 3237952, "flags": 0, "name": "_before_save_procs" },
 { "file_offset": 3237956, "flags": 0, "name": "_before_load_procs" },
 { "file_offset": 3237960, "flags": 0, "name": "_after_load_procs" },
-{ "file_offset": 3238016, "flags": 0, "name": "_data_00316880" },
+{ "file_offset": 3238016, "flags": 0, "name": "_player_profile_primary_colors" },
 { "file_offset": 3238088, "flags": 0, "name": "_data_003168c8" },
 { "file_offset": 3238196, "flags": 0, "name": "_data_00316934" },
 { "file_offset": 3238204, "flags": 0, "name": "_data_0031693c" },
