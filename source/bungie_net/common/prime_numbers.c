@@ -5,7 +5,7 @@ symbols in this file:
 0006F3A0 0020:
 	_compare_prime_numbers_descending (0000)
 0006F3C0 0160:
-	_code_0006f3c0 (0000)
+	_generate_prime_numbers (0000)
 0006F520 0050:
 	_randomprime (0000)
 0006F570 00c0:
@@ -30,9 +30,28 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+unsigned long *generate_prime_numbers(unsigned long maximum, unsigned long *prime_count);
+long randomrange(long minimum, long maximum);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+unsigned long randomprime(
+	unsigned long maximum)
+{
+	unsigned long result = 0;
+	unsigned long prime_count;
+	unsigned long *primes = generate_prime_numbers(maximum, &prime_count);
+
+	if (primes)
+	{
+		result = primes[randomrange(0, prime_count - 1)];
+		match_free("c:\\halo\\SOURCE\\bungie_net\\common\\prime_numbers.c", 137, primes);
+	}
+
+	return result;
+}
 
 /* ---------- private code */
 
