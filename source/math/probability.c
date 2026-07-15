@@ -24,6 +24,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -95,6 +97,49 @@ long combinations(
 	}
 
 	return result;
+}
+
+boolean permute(
+	short base,
+	short count,
+	short *indices)
+{
+	short index;
+
+	match_assert("c:\\halo\\SOURCE\\math\\probability.c", 77, base>0);
+	match_assert("c:\\halo\\SOURCE\\math\\probability.c", 78, count>0);
+	match_assert("c:\\halo\\SOURCE\\math\\probability.c", 79, indices);
+
+	for (index = 0; index < count; index++)
+	{
+		if (indices[index] < 0 || indices[index] >= base)
+		{
+			for (index = 0; index < count; index++)
+			{
+				indices[index] = 0;
+			}
+
+			return TRUE;
+		}
+	}
+
+	for (index = count - 1; index >= 0; index--)
+	{
+		if (indices[index] < base - 1)
+		{
+			indices[index]++;
+			index++;
+
+			for (; index < count; index++)
+			{
+				indices[index] = 0;
+			}
+
+			return TRUE;
+		}
+	}
+
+	return FALSE;
 }
 
 /* ---------- private code */
