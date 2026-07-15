@@ -37,7 +37,8 @@ boolean sound_scenery_new(
 	return TRUE;
 }
 
-void sound_scenery_delete(
+void
+sound_scenery_delete(
 	long object_index)
 {
 }
