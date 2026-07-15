@@ -19,6 +19,8 @@ header included in hcex build.
 void sound_dispose(void);
 
 void sound_initialize(void);
+void sound_initialize_for_new_map(
+	void);
 
 void sound_stop_all(void);
 void sound_stop_impulse(long sound_index);

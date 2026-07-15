@@ -230,4 +230,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+void sound_initialize_for_new_map(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
