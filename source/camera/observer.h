@@ -32,6 +32,8 @@ struct observer_result
 
 void observer_initialize(
 	void);
+void observer_dispose_from_old_map(
+	void);
 void observer_initialize_for_new_map(
 	void);
 

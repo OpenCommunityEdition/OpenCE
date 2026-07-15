@@ -121,4 +121,10 @@ void observer_initialize(
 	return;
 }
 
+void observer_dispose_from_old_map(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
