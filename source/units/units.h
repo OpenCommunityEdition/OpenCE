@@ -498,6 +498,14 @@ struct unit_datum
 
 /* ---------- prototypes/UNITS.C */
 
+void units_initialize(
+	void);
+void units_initialize_for_new_map(
+	void);
+void units_dispose_from_old_map(
+	void);
+void units_dispose(
+	void);
 void units_update(void);
 
 boolean unit_update(long unit_index);

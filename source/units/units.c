@@ -671,6 +671,7 @@ symbols in this file:
 #include "physics/collision_usage.h"
 #include "physics/collisions.h"
 #include "scenario/scenario.h"
+#include "saved games/game_state.h"
 #include "sound/game_sound.h"
 
 /* ---------- constants */
@@ -751,6 +752,35 @@ boolean debug_unit_animations;
 boolean debug_unit_all_animations;
 
 /* ---------- public code */
+
+void units_initialize(
+	void)
+{
+	unit_globals = (struct unit_globals *)game_state_malloc("unit globals", NULL, sizeof(*unit_globals));
+	match_assert("c:\\halo\\SOURCE\\units\\units.c", 264, unit_globals);
+
+	return;
+}
+
+void units_initialize_for_new_map(
+	void)
+{
+	memset(unit_globals, 0, offsetof(struct unit_globals, used_time));
+
+	return;
+}
+
+void units_dispose_from_old_map(
+	void)
+{
+	return;
+}
+
+void units_dispose(
+	void)
+{
+	return;
+}
 
 void units_update(
 	void)
