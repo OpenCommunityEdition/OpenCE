@@ -30,6 +30,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "ai_scenario_definitions.h"
+#include "scenario/scenario_definitions.h"
 
 /* ---------- constants */
 
@@ -42,5 +43,83 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+long scenario_get_encounter_by_name(
+	struct scenario *scenario,
+	char const *name)
+{
+	long encounter_index;
+	long result;
+
+	result = NONE;
+	for (encounter_index = 0; encounter_index < scenario->ai_encounters.count; encounter_index++)
+	{
+		struct encounter_definition *encounter;
+
+		encounter = TAG_BLOCK_GET_ELEMENT(
+			&scenario->ai_encounters,
+			encounter_index,
+			struct encounter_definition);
+		if (_strnicmp(encounter->name, name, TAG_STRING_LENGTH+1) == 0)
+		{
+			result = encounter_index;
+			break;
+		}
+	}
+
+	return result;
+}
+
+long encounter_definition_get_squad_by_name(
+	struct encounter_definition *encounter,
+	char const *name)
+{
+	long result;
+	long squad_index;
+
+	result = NONE;
+	for (squad_index = 0; squad_index < encounter->squads.count; squad_index++)
+	{
+		struct squad_definition *squad;
+
+		squad = TAG_BLOCK_GET_ELEMENT(
+			&encounter->squads,
+			squad_index,
+			struct squad_definition);
+		if (_strnicmp(squad->name, name, TAG_STRING_LENGTH+1) == 0)
+		{
+			result = squad_index;
+			break;
+		}
+	}
+
+	return result;
+}
+
+long encounter_definition_get_platoon_by_name(
+	struct encounter_definition *encounter,
+	char const *name)
+{
+	long platoon_index;
+	long result;
+
+	result = NONE;
+	for (platoon_index = 0; platoon_index < encounter->platoons.count; platoon_index++)
+	{
+		struct platoon_definition *platoon;
+
+		platoon = TAG_BLOCK_GET_ELEMENT(
+			&encounter->platoons,
+			platoon_index,
+			struct platoon_definition);
+		if (_strnicmp(platoon->name, name, TAG_STRING_LENGTH+1) == 0)
+		{
+			result = platoon_index;
+			break;
+		}
+	}
+
+	return result;
+}
 
 /* ---------- private code */

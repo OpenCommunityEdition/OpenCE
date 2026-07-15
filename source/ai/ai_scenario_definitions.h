@@ -79,6 +79,8 @@ enum
 
 /* ---------- structures */
 
+struct scenario;
+
 struct squad_definition
 {
 	char name[TAG_STRING_LENGTH+1];
@@ -130,6 +132,12 @@ struct encounter_definition
 	struct tag_block player_starting_locations;
 };
 
+struct platoon_definition
+{
+	char name[TAG_STRING_LENGTH+1];
+	unsigned char reserved[0x8C];
+};
+
 struct ai_command_definition
 {
 	short atom_type;
@@ -171,5 +179,15 @@ struct ai_command_list_definition
 /* ---------- globals */
 
 /* ---------- public code */
+
+long scenario_get_encounter_by_name(
+	struct scenario *scenario,
+	char const *name);
+long encounter_definition_get_squad_by_name(
+	struct encounter_definition *encounter,
+	char const *name);
+long encounter_definition_get_platoon_by_name(
+	struct encounter_definition *encounter,
+	char const *name);
 
 #endif // __AI_SCENARIO_DEFINITIONS_H
