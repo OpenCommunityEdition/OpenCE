@@ -135,6 +135,28 @@ void particle_delete(
 	return;
 }
 
+void particles_stop_on_first_person_weapon(
+	short local_player_index)
+{
+	long particle_index;
+
+	for (particle_index = data_next_index(particle_data, NONE);
+		particle_index != NONE;
+		particle_index = data_next_index(particle_data, particle_index))
+	{
+		struct particle_datum *particle = particle_get(particle_index);
+
+		if (particle->local_player_index == local_player_index &&
+			TEST_FLAG(particle->flags, _particle_datum_attached_to_local_player_bit) &&
+			particle->object_index != NONE)
+		{
+			datum_delete(particle_data, particle_index);
+		}
+	}
+
+	return;
+}
+
 void particles_disconnect_from_structure_bsp(
 	void)
 {
