@@ -121,6 +121,17 @@ void particle_systems_initialize_for_new_map(
 	return;
 }
 
+void particle_system_orphan(
+	long system_index)
+{
+	struct particle_system_datum *system = particle_system_get(system_index);
+
+	SET_FLAG(system->flags, _particle_system_attached_bit, FALSE);
+	system->object_index = NONE;
+
+	return;
+}
+
 void particle_systems_dispose_from_old_map(
 	void)
 {
