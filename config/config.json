@@ -840,7 +840,7 @@
 				{ "name": "source/ai/action_fight.c", "index": 468, "status": "NonMatching" },
 				{ "name": "source/ai/action_converse.c", "index": 469, "status": "NonMatching" },
 				{ "name": "source/ai/action_charge.c", "index": 470, "status": "NonMatching" },
-				{ "name": "source/ai/action_avoid.c", "index": 471, "status": "NonMatching" },
+				{ "name": "source/ai/action_avoid.c", "index": 471, "status": "Matching" },
 				{ "name": "source/ai/action_alert.c", "index": 472, "status": "NonMatching" },
 				{ "name": "source/linker_common.c", "index": 847, "status": "MISSING" }
 			]
