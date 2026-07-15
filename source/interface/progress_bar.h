@@ -23,8 +23,14 @@ header included in hcex build.
 
 void progress_bar_dispose(
 	void);
+void progress_bar_begin(
+	boolean skip_frame_capture);
+void progress_bar_end(
+	void);
 boolean progress_bar_is_active(
 	void);
+void progress_bar_enable(
+	boolean enabled);
 void progress_bar_display(real progress);
 
 /* ---------- globals */

@@ -184,17 +184,32 @@ struct progress_bar_globals
 	unsigned char reserved[0x1D8];
 };
 
+struct progress_bar_data
+{
+	boolean enabled;
+	unsigned char reserved[0x47F0];
+};
+
 struct progress_bar_mode
 {
-	unsigned char reserved[0x10];
+	long state;
+	boolean capture_frame;
+	unsigned char padding0[3];
+	void *texture0;
+	void *texture1;
 	boolean active;
-	unsigned char padding[3];
+	unsigned char padding1[3];
 };
 
 /* ---------- prototypes */
 
+int __stdcall SetThreadPriority(
+	void *thread,
+	int priority);
+
 /* ---------- globals */
 
+extern struct progress_bar_data data_002fd5a8;
 struct progress_bar_globals bss_00454030;
 struct progress_bar_mode progress_bar_mode;
 
@@ -206,10 +221,37 @@ void progress_bar_dispose(
 	return;
 }
 
+void progress_bar_begin(
+	boolean skip_frame_capture)
+{
+	progress_bar_mode.capture_frame= !skip_frame_capture;
+	progress_bar_mode.active= TRUE;
+	SetThreadPriority((void *)-2, 2);
+
+	return;
+}
+
+void progress_bar_end(
+	void)
+{
+	progress_bar_mode.active= FALSE;
+	SetThreadPriority((void *)-2, 0);
+
+	return;
+}
+
 boolean progress_bar_is_active(
 	void)
 {
 	return progress_bar_mode.active;
+}
+
+void progress_bar_enable(
+	boolean enabled)
+{
+	data_002fd5a8.enabled= enabled;
+
+	return;
 }
 
 /* ---------- private code */
