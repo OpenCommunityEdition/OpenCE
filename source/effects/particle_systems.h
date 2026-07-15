@@ -8,6 +8,9 @@ header included in hcex build.
 #define __PARTICLE_SYSTEMS_H
 #pragma once
 
+#include "cseries/cseries.h"
+#include "memory/data.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -16,6 +19,10 @@ header included in hcex build.
 
 /* ---------- prototypes/PARTICLE_SYSTEMS.C */
 
+void particle_systems_initialize(
+	void);
+void particle_systems_initialize_for_new_map(
+	void);
 void particle_systems_dispose(
 	void);
 void particle_systems_disconnect_from_structure_bsp(
@@ -25,6 +32,9 @@ long particle_system_new_attached(long definition_index, long object_index, shor
 void particle_system_orphan(long system_index);
 
 /* ---------- globals */
+
+extern struct data_array *particle_systems;
+extern struct data_array *system_particles;
 
 /* ---------- public code */
 

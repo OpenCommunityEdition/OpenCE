@@ -75,7 +75,20 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "effects/particle_systems.h"
+
+#include "memory/data.h"
+#include "saved games/game_state.h"
+
 /* ---------- constants */
+
+enum
+{
+	MAXIMUM_PARTICLE_SYSTEMS = 64,
+	PARTICLE_SYSTEM_DATUM_SIZE = 0x158,
+	MAXIMUM_SYSTEM_PARTICLES = 512,
+	SYSTEM_PARTICLE_DATUM_SIZE = 0x80,
+};
 
 /* ---------- macros */
 
@@ -86,6 +99,24 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void particle_systems_initialize(
+	void)
+{
+	particle_systems = game_state_data_new("particle systems", MAXIMUM_PARTICLE_SYSTEMS, PARTICLE_SYSTEM_DATUM_SIZE);
+	system_particles = game_state_data_new("particle system particles", MAXIMUM_SYSTEM_PARTICLES, SYSTEM_PARTICLE_DATUM_SIZE);
+
+	return;
+}
+
+void particle_systems_initialize_for_new_map(
+	void)
+{
+	data_make_valid(particle_systems);
+	data_make_valid(system_particles);
+
+	return;
+}
 
 void particle_systems_dispose(
 	void)
