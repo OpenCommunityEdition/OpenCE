@@ -87,4 +87,8 @@ void code_000a47f0(void);
 
 /* ---------- public code */
 
+void code_000a4710(void)
+{
+}
+
 /* ---------- private code */
