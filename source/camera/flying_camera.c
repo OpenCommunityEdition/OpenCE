@@ -14,6 +14,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "flying_camera.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -25,5 +27,17 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void flying_camera_new(
+	struct flying_camera *camera)
+{
+	camera->position.y = 0.f;
+	camera->position.x = 0.f;
+	camera->facing.yaw = 0.f;
+	camera->facing.pitch = 0.f;
+	camera->facing.roll = 0.f;
+	camera->field_of_view = DEGREES_TO_RADIANS(70);
+	return;
+}
 
 /* ---------- private code */
