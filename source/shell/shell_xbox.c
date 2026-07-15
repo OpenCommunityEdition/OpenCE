@@ -43,7 +43,7 @@ static void fuck_code_in_the_eye(void);
 
 /* ---------- globals */
 
-static char bss_004c08a8[8];
+static char shell_command_line[8];
 
 /* ---------- public code */
 
@@ -57,8 +57,8 @@ boolean shell_platform_initialize(
 		launch_data_type==LDT_TITLE &&
 		!strcmp((const char *)launch_data.Data, "XDEMOS"))
 	{
-		strncat(bss_004c08a8, "xdemo ", NUMBEROF(bss_004c08a8)-1);
-		bss_004c08a8[NUMBEROF(bss_004c08a8)-1] = '\0';
+		strncat(shell_command_line, "xdemo ", NUMBEROF(shell_command_line)-1);
+		shell_command_line[NUMBEROF(shell_command_line)-1] = '\0';
 	}
 
 	return TRUE;
@@ -87,7 +87,7 @@ void shell_screen_pause(
 const char *shell_get_command_line(
 	void)
 {
-	return bss_004c08a8;
+	return shell_command_line;
 }
 
 void shell_idle(
