@@ -700,7 +700,7 @@
 				{ "name": "source/effects/decals.c", "index": 326, "status": "NonMatching" },
 				{ "name": "source/effects/decal_definitions.c", "index": 327, "status": "NonMatching" },
 				{ "name": "source/effects/contrails.c", "index": 328, "status": "NonMatching" },
-				{ "name": "source/effects/contrail_definitions.c", "index": 329, "status": "NonMatching" },
+				{ "name": "source/effects/contrail_definitions.c", "index": 329, "status": "Matching" },
 				{ "name": "source/editor/editor_stubs.c", "index": 330, "status": "Matching" },
 				{ "name": "source/dialogs/value_control.c", "index": 331, "status": "Matching" },
 				{ "name": "source/dialogs/static_text_control.c", "index": 332, "status": "Matching" },

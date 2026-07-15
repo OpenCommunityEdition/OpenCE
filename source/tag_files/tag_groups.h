@@ -92,6 +92,16 @@ struct tag_reference
 	long index;
 };
 
+struct tag_reference_definition
+{
+	unsigned long flags;
+	unsigned long group_tag;
+	unsigned long *group_tags;
+};
+
+typedef char tag_reference_definition_size_assert[
+	sizeof(struct tag_reference_definition) == 0xC ? 1 : -1];
+
 struct tag_data
 {
 	long size;
