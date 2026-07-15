@@ -299,4 +299,35 @@ __declspec(align(4)) struct tag_data_definition hs_string_data_definition =
 
 /* ---------- public code */
 
+void code_000bd310(void *owner, void *data, long size)
+{
+	long data_size;
+
+	if (size)
+	{
+		match_assert("c:\\halo\\SOURCE\\hs\\hs_scenario_definitions.c", 109,
+			size>=sizeof(struct data_array));
+
+		if (!memcmp(data, "csirtpn \0edo", 12))
+		{
+			byte_swap_data(&hs_source_files_block.data_array_definition, data, 1);
+			byte_swap_data(&hs_source_files_block.syntax_node_definition, data, 0x4000);
+			return;
+		}
+
+		data_size= size-sizeof(struct data_array);
+		match_assert("c:\\halo\\SOURCE\\hs\\hs_scenario_definitions.c", 121,
+			data_size>=0 && (data_size%sizeof(struct hs_syntax_node))==0);
+
+		if (data_size>=0 && (data_size%sizeof(struct hs_syntax_node))==0)
+		{
+			long syntax_node_count= data_size/sizeof(struct hs_syntax_node);
+
+			byte_swap_data(&hs_source_files_block.data_array_definition, data, 1);
+			data= (byte *)data+sizeof(struct data_array);
+			byte_swap_data(&hs_source_files_block.syntax_node_definition, data, syntax_node_count);
+		}
+	}
+}
+
 /* ---------- private code */
