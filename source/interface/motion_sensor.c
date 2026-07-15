@@ -100,6 +100,40 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct motion_sensor_blip
+{
+	byte type;
+	byte pad[3];
+};
+
+struct motion_sensor_blip_row
+{
+	struct motion_sensor_blip blips[16];
+	byte pad[0x44];
+};
+
+struct motion_sensor_player
+{
+	short unknown;
+	struct motion_sensor_blip_row rows[10];
+	byte pad[0x3E];
+};
+
+struct motion_sensor_globals_definition
+{
+	struct motion_sensor_player players[4];
+	byte pad[8];
+};
+
+typedef char motion_sensor_blip_size_assert[
+	sizeof(struct motion_sensor_blip) == 4 ? 1 : -1];
+typedef char motion_sensor_blip_row_size_assert[
+	sizeof(struct motion_sensor_blip_row) == 0x84 ? 1 : -1];
+typedef char motion_sensor_player_size_assert[
+	sizeof(struct motion_sensor_player) == 0x568 ? 1 : -1];
+typedef char motion_sensor_globals_size_assert[
+	sizeof(struct motion_sensor_globals_definition) == 0x15A8 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
@@ -139,5 +173,44 @@ void motion_sensor_dispose(
 void motion_sensor_dispose_from_old_map(
 	void)
 {
+	return;
+}
+
+void
+motion_sensor_initialize_for_new_map(
+	void)
+{
+	struct motion_sensor_player *player;
+	long player_count;
+
+	csmemset(motion_sensor_globals, 0, sizeof(*motion_sensor_globals));
+	player = motion_sensor_globals->players;
+	player_count = NUMBEROF(motion_sensor_globals->players);
+
+	do
+	{
+		struct motion_sensor_blip_row *row = player->rows;
+		long row_count = NUMBEROF(player->rows);
+
+		do
+		{
+			struct motion_sensor_blip *blip = row->blips;
+			long blip_count = NUMBEROF(row->blips);
+
+			do
+			{
+				blip->type = 6;
+				blip++;
+			}
+			while (--blip_count);
+
+			row++;
+		}
+		while (--row_count);
+
+		player++;
+	}
+	while (--player_count);
+
 	return;
 }
