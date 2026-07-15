@@ -175,6 +175,13 @@ void rasterizer_frame_statistics_begin(
 void rasterizer_frame_statistics_end(
 	void);
 
+/* ---------- prototypes/RASTERIZER_TRANSPARENT_GEOMETRY.C */
+
+void rasterizer_transparent_geometry_begin(
+	void);
+void rasterizer_transparent_geometry_end(
+	void);
+
 /* ---------- prototypes/RASTERIZER_TEXT.C */
 
 void rasterizer_text_cache_flush(void);

@@ -68,16 +68,55 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "rasterizer.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+#pragma pack(push, 1)
+struct rasterizer_transparent_geometry_globals
+{
+	byte opaque00[0x4];
+	unsigned long group_pending_flags[12];
+	void *groups;
+	void *groups2;
+	long group_count;
+	long group_count2;
+	short *group_sorted_indices;
+	short next_group_sorted_index;
+};
+#pragma pack(pop)
+
+typedef char rasterizer_transparent_geometry_globals_size_assert[
+	sizeof(struct rasterizer_transparent_geometry_globals) == 0x4A ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+struct rasterizer_transparent_geometry_globals bss_004b8ad8;
+
 /* ---------- public code */
+
+void rasterizer_transparent_geometry_begin(
+	void)
+{
+	bss_004b8ad8.group_count = 0;
+	bss_004b8ad8.next_group_sorted_index = 0;
+	memset(bss_004b8ad8.group_pending_flags, 0, sizeof(bss_004b8ad8.group_pending_flags));
+	bss_004b8ad8.group_count2 = 0;
+
+	return;
+}
+
+void rasterizer_transparent_geometry_end(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */
