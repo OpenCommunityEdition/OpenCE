@@ -88,6 +88,8 @@ symbols in this file:
 
 #include "effects/player_effects.h"
 
+#include "game/player_rumble.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -109,6 +111,14 @@ void player_effect_dispose(
 void player_effect_dispose_from_old_map(
 	void)
 {
+	return;
+}
+
+void scripted_player_effect_set_rumble(
+	real left_motor,
+	real right_motor)
+{
+	rumble_player_set_scripted_values(left_motor, right_motor);
 	return;
 }
 

@@ -38,6 +38,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "game/player_rumble.h"
+
 /* ---------- constants */
 
 /* ---------- macros */

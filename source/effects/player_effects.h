@@ -8,6 +8,11 @@ header included in hcex build.
 #define __PLAYER_EFFECTS_H
 #pragma once
 
+/* ---------- headers */
+
+#include "cseries/cseries.h"
+#include "math/real_math.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -24,5 +29,8 @@ void player_effect_dispose(
 	void);
 void player_effect_dispose_from_old_map(
 	void);
+void scripted_player_effect_set_rumble(
+	real left_motor,
+	real right_motor);
 
 #endif // __PLAYER_EFFECTS_H
