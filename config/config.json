@@ -752,7 +752,7 @@
 				{ "name": "source/bungie_net/common/message_header.c", "index": 380, "status": "Matching" },
 				{ "name": "source/bungie_net/common/message_encryption.c", "index": 381, "status": "NonMatching" },
 				{ "name": "source/bungie_net/common/key_agreement.c", "index": 382, "status": "NonMatching" },
-				{ "name": "source/bungie_net/common/64bit_math.c", "index": 383, "status": "NonMatching" },
+				{ "name": "source/bungie_net/common/64bit_math.c", "index": 383, "status": "Matching" },
 				{ "name": "source/bitmaps/tiff_file.c", "index": 384, "status": "NonMatching" },
 				{ "name": "source/bitmaps/targa_file.c", "index": 385, "status": "Matching" },
 				{ "name": "source/bitmaps/color_table_group.c", "index": 386, "status": "Matching" },
