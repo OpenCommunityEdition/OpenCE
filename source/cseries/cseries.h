@@ -205,7 +205,7 @@ void debug_dump_memory_for_file(const char *);
 void debug_dump_memory_by_file(void);
 void *debug_malloc(unsigned int, boolean, const char *, long);
 void debug_free(void *, const char *, long);
-void *debug_realloc(void *, unsigned int, boolean, const char *, long);
+void *debug_realloc(void *, unsigned int, const char *, long);
 void debug_dump_memory(void);
 
 /* ---------- prototypes/STACK_WALK_WINDOWS.C */
@@ -230,7 +230,7 @@ void stack_walk_disregard_symbol_names(boolean disregard);
 
 #define match_malloc(file, line, size) debug_malloc(size, FALSE, MATCH_FILE(file), MATCH_LINE(line))
 #define match_free(file, line, ptr) debug_free(ptr, MATCH_FILE(file), MATCH_LINE(line))
-#define match_realloc(file, line, ptr, size) debug_realloc(ptr, size, FALSE, MATCH_FILE(file), MATCH_LINE(line))
+#define match_realloc(file, line, ptr, size) debug_realloc(ptr, size, MATCH_FILE(file), MATCH_LINE(line))
 
 #define malloc(size) match_malloc(__FILE__, __LINE__, size)
 #define free(ptr) match_free(__FILE__, __LINE__, ptr)
