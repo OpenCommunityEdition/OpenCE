@@ -1,5 +1,5 @@
 #ifndef lint
-char data_002daf38[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_packbits.c,v 1.23 92/03/30 18:29:40 sam Exp $";
+static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_packbits.c,v 1.23 92/03/30 18:29:40 sam Exp $";
 #endif
 
 /*
@@ -35,18 +35,18 @@ char data_002daf38[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_packbits.c
 #include <stdio.h>
 
 #if USE_PROTOTYPES
-int	code_0005bff0(TIFF *);
-int	code_0005c030(TIFF *, u_char *, int, u_int);
-int	code_0005c260(TIFF *, u_char *, int, u_int);
-int	code_0005c370(TIFF *, u_char *, int, u_int);
+int	PackBitsPreEncode(TIFF *);
+int	PackBitsEncode(TIFF *, u_char *, int, u_int);
+int	PackBitsDecode(TIFF *, u_char *, int, u_int);
+int	PackBitsEncodeChunk(TIFF *, u_char *, int, u_int);
 #else
-int	code_0005bff0();
-int	code_0005c030(), code_0005c260();
-int	code_0005c370();
+int	PackBitsPreEncode();
+int	PackBitsEncode(), PackBitsDecode();
+int	PackBitsEncodeChunk();
 #endif
 
 int
-code_0005bff0(tif)
+PackBitsPreEncode(tif)
 	TIFF *tif;
 {
 	if (isTiled(tif))
@@ -60,7 +60,7 @@ code_0005bff0(tif)
  * Encode a run of pixels.
  */
 int
-code_0005c030(tif, bp, cc, s)
+PackBitsEncode(tif, bp, cc, s)
 	TIFF *tif;
 	u_char *bp;
 	register int cc;
@@ -168,7 +168,7 @@ code_0005c030(tif, bp, cc, s)
 }
 
 int
-code_0005c260(tif, op, occ, s)
+PackBitsDecode(tif, op, occ, s)
 	TIFF *tif;
 	register u_char *op;
 	register int occ;
@@ -216,7 +216,7 @@ code_0005c260(tif, op, occ, s)
  * when it was encoded by strips.
  */
 int
-code_0005c370(tif, bp, cc, s)
+PackBitsEncodeChunk(tif, bp, cc, s)
 	TIFF *tif;
 	u_char *bp;
 	int cc;
@@ -225,7 +225,7 @@ code_0005c370(tif, bp, cc, s)
 	int rowsize = (int) tif->tif_data;
 
 	while (cc > 0) {
-		if (code_0005c030(tif, bp, rowsize, s) < 0)
+		if (PackBitsEncode(tif, bp, rowsize, s) < 0)
 			return (-1);
 		bp += rowsize;
 		cc -= rowsize;
@@ -236,15 +236,12 @@ code_0005c370(tif, bp, cc, s)
 TIFFInitPackBits(tif)
 	TIFF *tif;
 {
-	int (*fp)();
-	fp = code_0005c260;
-	tif->tif_decoderow = fp;
-	tif->tif_decodestrip = fp;
-	tif->tif_decodetile = fp;
-	*(int (**)())((char *)tif + 0xf4) = code_0005bff0;
-	*(int (**)())((char *)tif + 0x100) = code_0005c030;
-	fp = code_0005c370;
-	*(int (**)())((char *)tif + 0x108) = fp;
-	*(int (**)())((char *)tif + 0x110) = fp;
+	tif->tif_decoderow = PackBitsDecode;
+	tif->tif_decodestrip = PackBitsDecode;
+	tif->tif_decodetile = PackBitsDecode;
+	tif->tif_preencode = PackBitsPreEncode;
+	tif->tif_encoderow = PackBitsEncode;
+	tif->tif_encodestrip = PackBitsEncodeChunk;
+	tif->tif_encodetile = PackBitsEncodeChunk;
 	return (1);
 }
