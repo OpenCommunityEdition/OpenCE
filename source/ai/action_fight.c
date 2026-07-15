@@ -20,6 +20,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "actions.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -31,5 +34,17 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void action_fight_begin(
+	long actor_index)
+{
+	return;
+}
+
+void action_fight_end(
+	long actor_index)
+{
+	return;
+}
 
 /* ---------- private code */

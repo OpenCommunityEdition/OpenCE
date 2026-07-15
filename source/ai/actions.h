@@ -444,6 +444,13 @@ real_argb_color *actor_action_debug_color(long actor_index);
 
 void action_obey_describe_command(struct scenario *scenario, struct ai_command_definition *command, char *string, long string_size);
 
+/* ---------- prototypes/ACTION_FIGHT.C */
+
+void action_fight_begin(
+	long actor_index);
+void action_fight_end(
+	long actor_index);
+
 /* ---------- globals */
 
 /* ---------- public code */
