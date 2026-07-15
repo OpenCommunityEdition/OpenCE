@@ -832,7 +832,7 @@
 				{ "name": "source/ai/action_wait.c", "index": 460, "status": "NonMatching" },
 				{ "name": "source/ai/action_vehicle.c", "index": 461, "status": "NonMatching" },
 				{ "name": "source/ai/action_uncover.c", "index": 462, "status": "NonMatching" },
-				{ "name": "source/ai/action_sleep.c", "index": 463, "status": "NonMatching" },
+				{ "name": "source/ai/action_sleep.c", "index": 463, "status": "Matching" },
 				{ "name": "source/ai/action_search.c", "index": 464, "status": "NonMatching" },
 				{ "name": "source/ai/action_obey.c", "index": 465, "status": "NonMatching" },
 				{ "name": "source/ai/action_guard.c", "index": 466, "status": "NonMatching" },
