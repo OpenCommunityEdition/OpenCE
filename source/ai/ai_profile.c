@@ -78,6 +78,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "ai/ai_profile.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -89,5 +91,17 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void ai_profile_dispose(
+	void)
+{
+	return;
+}
+
+void ai_profile_dispose_from_old_map(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */
