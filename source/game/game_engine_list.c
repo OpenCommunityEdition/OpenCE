@@ -8,6 +8,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+
+#include "game/game_engine.h"
+#include "game/game_engine_list.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -17,6 +22,25 @@ symbols in this file:
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+extern struct game_engine stub_engine;
+extern struct game_engine race_engine;
+extern struct game_engine king_engine;
+extern struct game_engine oddball_engine;
+extern struct game_engine slayer_engine;
+extern struct game_engine ctf_engine;
+
+struct game_engine *game_engines[] =
+{
+	NULL,
+	&ctf_engine,
+	&slayer_engine,
+	&oddball_engine,
+	&king_engine,
+	&race_engine,
+	&stub_engine,
+	NULL,
+};
 
 /* ---------- public code */
 

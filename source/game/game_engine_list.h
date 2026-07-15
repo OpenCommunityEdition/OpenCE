@@ -14,9 +14,13 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct game_engine;
+
 /* ---------- prototypes/EXAMPLE.C */
 
 /* ---------- globals */
+
+extern struct game_engine *game_engines[];
 
 /* ---------- public code */
 
