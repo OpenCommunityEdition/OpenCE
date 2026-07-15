@@ -101,6 +101,70 @@ symbols in this file:
 
 /* ---------- public code */
 
+void
+matrix4x3_identity(
+	real_matrix4x3 *matrix)
+{
+	matrix->scale = 1.f;
+	matrix->forward.i = 1.f;
+	matrix->forward.j = 0.f;
+	matrix->forward.k = 0.f;
+	matrix->left.i = 0.f;
+	matrix->left.j = 1.f;
+	matrix->left.k = 0.f;
+	matrix->up.i = 0.f;
+	matrix->up.j = 0.f;
+	matrix->up.k = 1.f;
+	matrix->position.x = 0.f;
+	matrix->position.y = 0.f;
+	matrix->position.z = 0.f;
+
+	return;
+}
+
+void
+matrix4x3_transpose(
+	real_matrix4x3 *matrix)
+{
+	real temporary;
+
+	temporary = matrix->left.i;
+	matrix->left.i = matrix->forward.j;
+	matrix->forward.j = temporary;
+
+	temporary = matrix->up.i;
+	matrix->up.i = matrix->forward.k;
+	matrix->forward.k = temporary;
+
+	temporary = matrix->up.j;
+	matrix->up.j = matrix->left.k;
+	matrix->left.k = temporary;
+
+	return;
+}
+
+void
+matrix4x3_scale(
+	real_matrix4x3 *matrix,
+	real scale)
+{
+	matrix->scale = scale;
+	matrix->forward.i = 1.f;
+	matrix->forward.j = 0.f;
+	matrix->forward.k = 0.f;
+	matrix->left.i = 0.f;
+	matrix->left.j = 1.f;
+	matrix->left.k = 0.f;
+	matrix->up.i = 0.f;
+	matrix->up.j = 0.f;
+	matrix->up.k = 1.f;
+	matrix->position.x = 0.f;
+	matrix->position.y = 0.f;
+	matrix->position.z = 0.f;
+
+	return;
+}
+
 void matrix4x3_inverse(
 	real_matrix4x3 const *matrix,
 	real_matrix4x3 *result)
