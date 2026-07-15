@@ -10,6 +10,17 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum hud_anchor
+{
+	_hud_anchor_top_left,
+	_hud_anchor_top_right,
+	_hud_anchor_bottom_left,
+	_hud_anchor_bottom_right,
+	_hud_anchor_center,
+
+	NUMBER_OF_HUD_ANCHORS
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -17,6 +28,8 @@ header included in hcex build.
 /* ---------- prototypes/EXAMPLE.C */
 
 /* ---------- globals */
+
+extern char const *global_hud_anchor_names[NUMBER_OF_HUD_ANCHORS];
 
 /* ---------- public code */
 
