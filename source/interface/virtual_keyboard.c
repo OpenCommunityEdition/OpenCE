@@ -83,6 +83,12 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	VIRTUAL_KEYBOARD_ROW_COUNT = 5,
+	VIRTUAL_KEYBOARD_COLUMN_COUNT = 11,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -90,7 +96,9 @@ symbols in this file:
 struct virtual_keyboard_globals
 {
 	boolean active;
-	byte reserved1[0xB];
+	byte reserved1[7];
+	short row;
+	short column;
 	unsigned short buffer_size;
 	byte reservedE[0x8];
 	boolean last_exit_saved_text;
@@ -118,6 +126,15 @@ void ui_play_audio_feedback_sound(
 
 /* ---------- globals */
 
+byte const virtual_keyboard_key_layout[VIRTUAL_KEYBOARD_ROW_COUNT][VIRTUAL_KEYBOARD_COLUMN_COUNT] =
+{
+	{ 0x24, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09 },
+	{ 0x25, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13 },
+	{ 0x26, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D },
+	{ 0x27, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x28, 0x28, 0x28, 0x28 },
+	{ 0x2B, 0x2B, 0x2B, 0x2B, 0x2B, 0x2B, 0x2B, 0x29, 0x29, 0x2A, 0x2A },
+};
+
 struct virtual_keyboard_globals virtual_keyboard_globals;
 
 /* ---------- public code */
@@ -132,6 +149,78 @@ boolean virtual_keyboard_last_exit_saved_text(
 	void)
 {
 	return virtual_keyboard_globals.last_exit_saved_text;
+}
+
+boolean code_000e4e10(
+	void)
+{
+	byte keycode = virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column];
+
+	do
+	{
+		virtual_keyboard_globals.column--;
+		if (virtual_keyboard_globals.column < 0)
+			virtual_keyboard_globals.column = VIRTUAL_KEYBOARD_COLUMN_COUNT - 1;
+	}
+	while (virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column] == keycode);
+
+	ui_play_audio_feedback_sound(1);
+
+	return TRUE;
+}
+
+boolean code_000e4e60(
+	void)
+{
+	byte keycode = virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column];
+
+	do
+	{
+		virtual_keyboard_globals.column++;
+		if (virtual_keyboard_globals.column == VIRTUAL_KEYBOARD_COLUMN_COUNT)
+			virtual_keyboard_globals.column = 0;
+	}
+	while (virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column] == keycode);
+
+	ui_play_audio_feedback_sound(1);
+
+	return TRUE;
+}
+
+boolean code_000e4eb0(
+	void)
+{
+	byte keycode = virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column];
+
+	do
+	{
+		virtual_keyboard_globals.row--;
+		if (virtual_keyboard_globals.row < 0)
+			virtual_keyboard_globals.row = VIRTUAL_KEYBOARD_ROW_COUNT - 1;
+	}
+	while (virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column] == keycode);
+
+	ui_play_audio_feedback_sound(1);
+
+	return TRUE;
+}
+
+boolean code_000e4f00(
+	void)
+{
+	byte keycode = virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column];
+
+	do
+	{
+		virtual_keyboard_globals.row++;
+		if (virtual_keyboard_globals.row == VIRTUAL_KEYBOARD_ROW_COUNT)
+			virtual_keyboard_globals.row = 0;
+	}
+	while (virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column] == keycode);
+
+	ui_play_audio_feedback_sound(1);
+
+	return TRUE;
 }
 
 long code_000e5700(

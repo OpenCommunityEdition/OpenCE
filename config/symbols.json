@@ -17409,7 +17409,7 @@
 { "file_offset": 2591780, "flags": 0, "name": "??_C@_0DJ@FKCKCMDM@failed?5to?5load?5the?5multiplayer?5g@" },
 { "file_offset": 2591840, "flags": 0, "name": "??_C@_1BE@PJJJEMAC@?$AA?$DM?$AAi?$AAn?$AAv?$AAa?$AAl?$AAi?$AAd?$AA?$DO?$AA?$AA@" },
 { "file_offset": 2591864, "flags": 0, "name": "??_C@_0EH@LDHNIENI@c?3?2halo?2SOURCE?2interface?2ui_widg@" },
-{ "file_offset": 2591936, "flags": 0, "name": "_rdata_00278cc0" },
+{ "file_offset": 2591936, "flags": 0, "name": "_virtual_keyboard_key_layout" },
 { "file_offset": 2591992, "flags": 0, "name": "??_C@_0DC@DOACNNNI@failed?5to?5load?5virtual?5keyboard?5@" },
 { "file_offset": 2592044, "flags": 0, "name": "??_C@_0DC@DKJLNFKM@failed?5to?5load?5virtual?5keyboard?5@" },
 { "file_offset": 2592096, "flags": 0, "name": "??_C@_0CC@BINJJDCB@virtual_keyboard_globals?4keyboar@" },
