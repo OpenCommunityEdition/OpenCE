@@ -28,7 +28,12 @@ struct cheat_globals
 	boolean bottomless_clip;
 };
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/CHEATS.C */
+
+void cheats_dispose(
+	void);
+void cheats_dispose_from_old_map(
+	void);
 
 /* ---------- globals */
 

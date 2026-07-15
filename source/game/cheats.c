@@ -65,4 +65,16 @@ struct cheat_globals cheat;
 
 /* ---------- public code */
 
+void cheats_dispose(
+	void)
+{
+	return;
+}
+
+void cheats_dispose_from_old_map(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
