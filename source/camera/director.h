@@ -11,6 +11,7 @@ header included in hcex build.
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "math/real_math.h"
 #include "networking/network_connection.h"
 
 /* ---------- constants */
@@ -23,6 +24,8 @@ enum
 /* ---------- macros */
 
 /* ---------- structures */
+
+typedef short director_perspective;
 
 struct director_scripting_globals
 {
@@ -55,6 +58,13 @@ boolean director_inhibited_facing(
 	short local_player_index);
 boolean director_inhibited_input(
 	short local_player_index);
+short director_desired_perspective(
+	long unit_index,
+	director_perspective *perspective);
+short director_camera_deterministic(
+	long unit_index,
+	real_point3d *position,
+	real_vector3d *forward);
 void director_set_mode(
 	short mode);
 void director_initialize_for_new_map(

@@ -28,6 +28,10 @@ struct first_person_camera
 
 void first_person_camera_new(
 	struct first_person_camera *camera);
+void first_person_camera_deterministic(
+	long unit_index,
+	real_point3d *position,
+	real_vector3d *forward);
 
 /* ---------- globals */
 

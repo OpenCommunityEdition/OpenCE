@@ -38,6 +38,10 @@ struct following_camera
 
 void following_camera_new(
 	struct following_camera *camera);
+void following_camera_deterministic(
+	long unit_index,
+	real_point3d *position,
+	real_vector3d *forward);
 
 /* ---------- globals */
 

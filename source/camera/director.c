@@ -107,6 +107,9 @@ symbols in this file:
 
 #include "director.h"
 
+#include "first_person_camera.h"
+#include "following_camera.h"
+
 #include "saved games/game_state.h"
 
 /* ---------- constants */
@@ -187,6 +190,23 @@ void director_initialize_for_saved_game(
 	director_script_camera(director_camera_scripted->camera_scripted);
 
 	return;
+}
+
+short director_camera_deterministic(
+	long unit_index,
+	real_point3d *position,
+	real_vector3d *forward)
+{
+	director_perspective perspective;
+	short following;
+
+	following = director_desired_perspective(unit_index, &perspective);
+	if (!following)
+		first_person_camera_deterministic(unit_index, position, forward);
+	else
+		following_camera_deterministic(unit_index, position, forward);
+
+	return following;
 }
 
 /* ---------- private code */
