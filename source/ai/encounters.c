@@ -299,4 +299,10 @@ struct data_array *pursuit_data;
 
 /* ---------- public code */
 
+void encounters_dispose(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */

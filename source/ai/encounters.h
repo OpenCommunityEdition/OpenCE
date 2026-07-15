@@ -112,6 +112,8 @@ struct platoon_datum
 
 /* ---------- prototypes/ENCOUNTERS.C */
 
+void encounters_dispose(
+	void);
 void encounter_compute_activation_cluster_bit_vector(long encounter_index, boolean update_actor_dormancy, long bit_vector_size, unsigned long const *active_area, unsigned long *bit_vector);
 
 /* ---------- globals */
