@@ -99,7 +99,7 @@ symbols in this file:
 002DCBA0 0088:
 	_data_002dcba0 (0000)
 0031D048 03ea:
-	_bss_0031d048 (0000)
+	_director_globals (0000)
 	_director_camera_switch_fast (03e8)
 */
 
@@ -119,6 +119,8 @@ symbols in this file:
 
 /* ---------- globals */
 
+struct director_player_globals director_globals[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+
 /* ---------- public code */
 
 void director_initialize(
@@ -133,6 +135,36 @@ void director_dispose(
 	void)
 {
 	return;
+}
+
+void director_inhibit_facing(
+	short local_player_index)
+{
+	match_assert("c:\\halo\\SOURCE\\camera\\director.c", 179, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+	director_globals[local_player_index].inhibit_facing = TRUE;
+	return;
+}
+
+void director_inhibit_input(
+	short local_player_index)
+{
+	match_assert("c:\\halo\\SOURCE\\camera\\director.c", 179, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+	director_globals[local_player_index].inhibit_input = TRUE;
+	return;
+}
+
+boolean director_inhibited_facing(
+	short local_player_index)
+{
+	match_assert("c:\\halo\\SOURCE\\camera\\director.c", 179, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+	return director_globals[local_player_index].inhibit_facing;
+}
+
+boolean director_inhibited_input(
+	short local_player_index)
+{
+	match_assert("c:\\halo\\SOURCE\\camera\\director.c", 179, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+	return director_globals[local_player_index].inhibit_input;
 }
 
 /* ---------- private code */

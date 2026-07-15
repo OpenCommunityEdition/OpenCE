@@ -11,6 +11,7 @@ header included in hcex build.
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "networking/network_connection.h"
 
 /* ---------- constants */
 
@@ -24,18 +25,35 @@ struct director_scripting_globals
 	byte pad[3];
 };
 
+struct director_player_globals
+{
+	byte pad0[0x59];
+	boolean inhibit_facing;
+	boolean inhibit_input;
+	byte pad5B[0x9D];
+};
+
 /* ---------- prototypes/DIRECTOR.C */
 
 void director_initialize(
 	void);
 void director_dispose(
 	void);
+void director_inhibit_facing(
+	short local_player_index);
+void director_inhibit_input(
+	short local_player_index);
+boolean director_inhibited_facing(
+	short local_player_index);
+boolean director_inhibited_input(
+	short local_player_index);
 void director_initialize_for_saved_game(
 	void);
 
 /* ---------- globals */
 
 extern struct director_scripting_globals *director_camera_scripted;
+extern struct director_player_globals director_globals[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
 
 /* ---------- public code */
 

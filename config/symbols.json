@@ -22383,7 +22383,7 @@
 { "file_offset": 3264049, "flags": 0, "name": "_global_client_active" },
 { "file_offset": 3264052, "flags": 0, "name": "_global_key_depth" },
 { "file_offset": 3264056, "flags": 0, "name": "_bss_0031ce38" },
-{ "file_offset": 3264584, "flags": 0, "name": "_bss_0031d048" },
+{ "file_offset": 3264584, "flags": 0, "name": "_director_globals" },
 { "file_offset": 3265584, "flags": 0, "name": "_director_camera_switch_fast" },
 { "file_offset": 3265592, "flags": 0, "name": "_bss_0031d438" },
 { "file_offset": 3265720, "flags": 0, "name": "_bss_0031d4b8" },
