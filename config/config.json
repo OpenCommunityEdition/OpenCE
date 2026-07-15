@@ -381,7 +381,7 @@
 				{ "name": "source/sound/sound_scenery.c", "index": 9, "status": "Matching" },
 				{ "name": "source/sound/sound_preferences.c", "index": 10, "status": "Matching" },
 				{ "name": "source/sound/sound_manager.c", "index": 11, "status": "NonMatching" },
-				{ "name": "source/sound/sound_environment_definitions.c", "index": 12, "status": "NonMatching" },
+				{ "name": "source/sound/sound_environment_definitions.c", "index": 12, "status": "Matching" },
 				{ "name": "source/sound/sound_dsound_xbox.c", "index": 13, "status": "NonMatching" },
 				{ "name": "source/sound/sound_definitions.c", "index": 14, "status": "NonMatching" },
 				{ "name": "source/sound/sound_classes.c", "index": 15, "status": "NonMatching" },
