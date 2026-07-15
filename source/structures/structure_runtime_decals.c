@@ -30,6 +30,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "math/real_math.h"
+#include "saved games/game_state.h"
 #include "structures.h"
 
 /* ---------- constants */
@@ -38,11 +39,47 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct structure_decals_globals
+{
+	boolean reconnect_to_structure_bsp;
+	byte pad[3];
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+struct structure_decals_globals *bss_004c0ce8 = NULL;
+#define structure_decals_globals bss_004c0ce8
+
 /* ---------- public code */
+
+void structure_decals_initialize(
+	void)
+{
+	structure_decals_globals = game_state_malloc("structure decals", NULL, sizeof(*structure_decals_globals));
+	match_assert("c:\\halo\\SOURCE\\structures\\structure_runtime_decals.c", 0x1c, structure_decals_globals);
+
+	return;
+}
+
+void structure_decals_initialize_for_new_map(
+	void)
+{
+	match_assert("c:\\halo\\SOURCE\\structures\\structure_runtime_decals.c", 0x24, structure_decals_globals);
+	structure_decals_globals->reconnect_to_structure_bsp = FALSE;
+
+	return;
+}
+
+void structure_decals_reconnect_to_structure_bsp(
+	void)
+{
+	match_assert("c:\\halo\\SOURCE\\structures\\structure_runtime_decals.c", 0x2d, structure_decals_globals);
+	structure_decals_globals->reconnect_to_structure_bsp = TRUE;
+
+	return;
+}
 
 void structure_decals_dispose_from_old_map(
 	void)
