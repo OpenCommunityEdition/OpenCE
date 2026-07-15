@@ -172,6 +172,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "interface/progress_bar.h"
+#include "cache/cache_files.h"
 
 /* ---------- constants */
 
@@ -207,6 +208,15 @@ int __stdcall SetThreadPriority(
 	void *thread,
 	int priority);
 
+int __stdcall CreateDirectoryA(
+	const char *path,
+	void *security_attributes);
+
+int __stdcall CopyFileA(
+	const char *existing_path,
+	const char *new_path,
+	int fail_if_exists);
+
 /* ---------- globals */
 
 extern struct progress_bar_data data_002fd5a8;
@@ -214,6 +224,25 @@ struct progress_bar_globals bss_00454030;
 struct progress_bar_mode progress_bar_mode;
 
 /* ---------- public code */
+
+void progress_bar_initialize(
+	void)
+{
+	char destination_directory[40];
+	char map_directory[40];
+	char destination_path[40];
+	char source_path[40];
+
+	csstrcpy(map_directory, cache_files_map_directory());
+	sprintf(source_path, "d%sloading.tga", map_directory + 1);
+	sprintf(destination_path, "z%sloading.tga", map_directory + 1);
+	sprintf(destination_directory, "z%s", map_directory + 1);
+	destination_directory[csstrlen(destination_directory) - 1]= 0;
+	CreateDirectoryA(destination_directory, NULL);
+	CopyFileA(source_path, destination_path, TRUE);
+
+	return;
+}
 
 void progress_bar_dispose(
 	void)

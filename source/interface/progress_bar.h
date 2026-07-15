@@ -21,6 +21,8 @@ header included in hcex build.
 
 /* ---------- prototypes/PROGRESS_BAR.C */
 
+void progress_bar_initialize(
+	void);
 void progress_bar_dispose(
 	void);
 void progress_bar_begin(

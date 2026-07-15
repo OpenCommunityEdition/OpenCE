@@ -20,6 +20,9 @@ header included in hcex build.
 
 /* ---------- prototypes/CACHE_FILES.C */
 
+const char *cache_files_map_directory(
+	void);
+
 unsigned long cache_files_get_checksum(void);
 
 /* ---------- prototypes/CACHE_FILES_WINDOWS.C */
