@@ -93,6 +93,34 @@ void machine_place(
 	return;
 }
 
+boolean machine_new(
+	long machine_index)
+{
+	struct machine_datum *machine = machine_get(machine_index);
+	struct machine_definition *definition = machine_definition_get(machine->definition_index);
+
+	machine->object.flags |= FLAG(13);
+	if (TEST_FLAG(definition->machine.flags, _machine_is_elevator_bit))
+	{
+		machine->object.flags |= FLAG(14);
+	}
+	else
+	{
+		machine->object.flags &= ~FLAG(14);
+	}
+
+	if (TEST_FLAG(definition->machine.flags, _machine_is_elevator_bit))
+	{
+		machine->object.flags |= FLAG(15);
+	}
+	else
+	{
+		machine->object.flags &= ~FLAG(15);
+	}
+
+	return TRUE;
+}
+
 void machine_delete(
 	long machine_index)
 {

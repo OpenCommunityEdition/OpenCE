@@ -40,6 +40,8 @@ void machines_dispose_from_old_map(
 void machine_place(
 	long machine_index,
 	struct scenario_machine_datum *scenario_machine);
+boolean machine_new(
+	long machine_index);
 void machine_delete(
 	long machine_index);
 void machine_bumped(
