@@ -30,6 +30,12 @@ struct bored_camera
 void bored_camera_new(
 	struct bored_camera *camera);
 
+boolean is_bored(
+	void);
+
+boolean is_still_bored(
+	void);
+
 /* ---------- globals */
 
 /* ---------- public code */

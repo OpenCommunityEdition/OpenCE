@@ -61,3 +61,15 @@ void bored_camera_new(
 }
 
 /* ---------- private code */
+
+boolean is_bored(
+	void)
+{
+	return FALSE;
+}
+
+boolean is_still_bored(
+	void)
+{
+	return FALSE;
+}
