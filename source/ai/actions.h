@@ -366,6 +366,9 @@ struct action_state_data
 
 /* ---------- prototypes/ACTIONS.C */
 
+void actor_action_flush_position_indices(
+	long actor_index);
+
 boolean actor_action_handle_initial_action(
 	long actor_index);
 boolean action_charge_is_leaping(

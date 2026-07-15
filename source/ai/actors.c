@@ -473,4 +473,44 @@ long actor_target_unit_index(
 	return result;
 }
 
+void actor_derive_target_information(
+	long actor_index,
+	long target_actor_index)
+{
+	struct actor_datum *target_actor = actor_get(target_actor_index);
+	long target_prop_index = target_actor->target.target_prop_index;
+
+	if (target_prop_index != NONE)
+	{
+		struct prop_datum *target_prop = prop_get(target_prop_index);
+
+		actor_perception_create_orphan_from_friend(
+			actor_index,
+			target_prop->unit_index,
+			target_actor_index,
+			target_prop_index);
+	}
+
+	return;
+}
+
+void actor_flush_position_indices(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	actor->firing_positions.current_position_index = NONE;
+
+	if (actor->control.path.destination_orders.destination_type == _actor_destination_firing_position ||
+		actor->control.path.destination_orders.destination_type == _actor_destination_move_position)
+	{
+		actor->control.path.destination_orders.destination_type = _actor_destination_none;
+		actor->control.path.destination_orders.ignore_target_object_index = NONE;
+	}
+
+	actor_action_flush_position_indices(actor_index);
+
+	return;
+}
+
 /* ---------- private code */

@@ -142,6 +142,13 @@ enum
 
 enum
 {
+	_actor_destination_none = 0,
+	_actor_destination_firing_position = 3,
+	_actor_destination_move_position = 4,
+};
+
+enum
+{
 	_actor_fire_state_none = 0,
 	_actor_fire_state_holding,
 	_actor_fire_state_bursting,
@@ -810,6 +817,11 @@ boolean actor_has_ranged_weapon(
 	long actor_index);
 long actor_target_unit_index(
 	long actor_index);
+void actor_derive_target_information(
+	long actor_index,
+	long target_actor_index);
+void actor_flush_position_indices(
+	long actor_index);
 
 /* ---------- prototypes/ACTOR_COMBAT.C */
 
@@ -826,6 +838,12 @@ boolean actor_path_has_path(long actor_index);
 boolean actor_path_at_destination(long actor_index);
 
 /* ---------- prototypes/ACTOR_PERCEPTION.C */
+
+void actor_perception_create_orphan_from_friend(
+	long actor_index,
+	long unit_index,
+	long friend_actor_index,
+	long friend_prop_index);
 
 void actor_get_vision_distances(long actor_index, real maximum_vision_distance, real perception_factor, real horizontal_angle, real *full_distance_reference, real *partial_distance_reference);
 
