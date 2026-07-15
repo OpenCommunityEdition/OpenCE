@@ -74,6 +74,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -85,5 +87,43 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void code_000a3d40(
+	void)
+{
+	return;
+}
+
+void code_000a3d80(
+	void)
+{
+	return;
+}
+
+void code_000a3dc0(
+	void)
+{
+	return;
+}
+
+void code_000a3e30(
+	void)
+{
+	return;
+}
+
+void code_000a3e60(
+	long player_index,
+	long damage_owner_player_index,
+	boolean damage_was_melee)
+{
+	return;
+}
+
+void code_000a3fc0(
+	long player_index)
+{
+	return;
+}
 
 /* ---------- private code */
