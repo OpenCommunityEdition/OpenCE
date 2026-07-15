@@ -27,10 +27,32 @@ enum
 
 typedef short director_perspective;
 
+typedef void (*director_camera_update_proc)(
+	void *camera,
+	void *command,
+	void *result);
+
 struct director_scripting_globals
 {
 	boolean camera_scripted;
 	byte pad[3];
+};
+
+struct director_camera_state
+{
+	byte pad0[4];
+	real transition;
+	director_camera_update_proc update;
+	byte padC[0x45];
+	boolean inhibit_facing;
+	boolean inhibit_input;
+	byte pad53[3];
+	director_perspective perspective;
+	byte pad58[0x68];
+	boolean unknown_c0;
+	byte padC1[3];
+	real unknown_c4;
+	byte padC8[0x28];
 };
 
 struct director_player_globals
@@ -38,16 +60,8 @@ struct director_player_globals
 	byte pad0[4];
 	short mode;
 	boolean mode_changed;
-	byte pad7[9];
-	void (*camera_update)(void);
-	byte pad14[0x45];
-	boolean inhibit_facing;
-	boolean inhibit_input;
-	byte pad5B[0x6D];
-	boolean unknown_c8;
-	byte padC9[3];
-	real unknown_cc;
-	byte padD0[0x28];
+	byte pad7;
+	struct director_camera_state camera;
 };
 
 /* ---------- prototypes/DIRECTOR.C */
@@ -65,6 +79,8 @@ void director_inhibit_input(
 boolean director_inhibited_facing(
 	short local_player_index);
 boolean director_inhibited_input(
+	short local_player_index);
+director_perspective director_get_perspective(
 	short local_player_index);
 short director_desired_perspective(
 	long unit_index,

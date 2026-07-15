@@ -120,6 +120,19 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void first_person_camera_update(
+	void *camera,
+	void *command,
+	void *result);
+void following_camera_update(
+	void *camera,
+	void *command,
+	void *result);
+void scripted_camera_update(
+	void *camera,
+	void *command,
+	void *result);
+
 /* ---------- globals */
 
 struct director_player_globals director_globals[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
@@ -148,9 +161,9 @@ void director_dispose_from_old_map(
 	for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
 	{
 		match_assert("c:\\halo\\SOURCE\\camera\\director.c", 179, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
-		director_globals[local_player_index].camera_update = NULL;
-		director_globals[local_player_index].unknown_cc = 1.f;
-		director_globals[local_player_index].unknown_c8 = FALSE;
+		director_globals[local_player_index].camera.update = NULL;
+		director_globals[local_player_index].camera.unknown_c4 = 1.f;
+		director_globals[local_player_index].camera.unknown_c0 = FALSE;
 	}
 
 	director_camera_scripted->camera_scripted = FALSE;
@@ -161,7 +174,7 @@ void director_inhibit_facing(
 	short local_player_index)
 {
 	match_assert("c:\\halo\\SOURCE\\camera\\director.c", 179, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
-	director_globals[local_player_index].inhibit_facing = TRUE;
+	director_globals[local_player_index].camera.inhibit_facing = TRUE;
 	return;
 }
 
@@ -169,7 +182,7 @@ void director_inhibit_input(
 	short local_player_index)
 {
 	match_assert("c:\\halo\\SOURCE\\camera\\director.c", 179, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
-	director_globals[local_player_index].inhibit_input = TRUE;
+	director_globals[local_player_index].camera.inhibit_input = TRUE;
 	return;
 }
 
@@ -177,14 +190,43 @@ boolean director_inhibited_facing(
 	short local_player_index)
 {
 	match_assert("c:\\halo\\SOURCE\\camera\\director.c", 179, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
-	return director_globals[local_player_index].inhibit_facing;
+	return director_globals[local_player_index].camera.inhibit_facing;
 }
 
 boolean director_inhibited_input(
 	short local_player_index)
 {
 	match_assert("c:\\halo\\SOURCE\\camera\\director.c", 179, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
-	return director_globals[local_player_index].inhibit_input;
+	return director_globals[local_player_index].camera.inhibit_input;
+}
+
+director_perspective director_get_perspective(
+	short local_player_index)
+{
+	struct director_camera_state *camera;
+
+	match_assert("c:\\halo\\SOURCE\\camera\\director.c", 179, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+	camera = &director_globals[local_player_index].camera;
+
+	if (camera->update == first_person_camera_update)
+	{
+		if (camera->transition == 0.f)
+			camera->perspective = 0;
+	}
+	else if (camera->update == following_camera_update)
+	{
+		camera->perspective = 1;
+	}
+	else if (camera->update == scripted_camera_update)
+	{
+		camera->perspective = 2;
+	}
+	else
+	{
+		camera->perspective = 3;
+	}
+
+	return camera->perspective;
 }
 
 void director_set_mode(
