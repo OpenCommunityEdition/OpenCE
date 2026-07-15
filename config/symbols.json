@@ -22483,7 +22483,7 @@
 { "file_offset": 4546996, "flags": 0, "name": "_bss_004561b4" },
 { "file_offset": 4547000, "flags": 0, "name": "_integer_origin2d" },
 { "file_offset": 4547004, "flags": 0, "name": "_bss_004561bc" },
-{ "file_offset": 4547080, "flags": 0, "name": "_bss_00456208" },
+{ "file_offset": 4547080, "flags": 0, "name": "_random_math_globals" },
 { "file_offset": 4547104, "flags": 0, "name": "_bss_00456220" },
 { "file_offset": 4548132, "flags": 0, "name": "_bss_00456624" },
 { "file_offset": 4548136, "flags": 0, "name": "_bss_00456628" },

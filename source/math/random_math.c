@@ -49,7 +49,7 @@ symbols in this file:
 0027AF84 002b:
 	??_C@_0CL@KJMLMACI@random_math_globals?4random_direc@ (0000)
 00456208 0014:
-	_bss_00456208 (0000)
+	_random_math_globals (0000)
 */
 
 /* ---------- headers */
@@ -93,28 +93,32 @@ void geosphere_dispose(struct geosphere *sphere);
 
 /* ---------- globals */
 
-static struct random_math_globals bss_00456208;
+#pragma bss_seg(".bss")
+struct random_math_globals random_math_globals;
+#pragma bss_seg()
 
 /* ---------- public code */
 
-void lock_global_random_seed(void)
+void
+lock_global_random_seed(void)
 {
-	bss_00456208.global_random_seed_lock++;
+	random_math_globals.global_random_seed_lock++;
 }
 
-void unlock_global_random_seed(void)
+void
+unlock_global_random_seed(void)
 {
 	match_vassert(
 		"c:\\halo\\SOURCE\\math\\random_math.c",
 		41,
-		bss_00456208.global_random_seed_lock>0,
-		"unmatched call to unlock_random_seed()");
-	bss_00456208.global_random_seed_lock--;
+		random_math_globals.global_random_seed_lock>0,
+		"unmatched call to unlock_random_seed() somewhere");
+	random_math_globals.global_random_seed_lock--;
 }
 
 unsigned long get_random_seed(void)
 {
-	return bss_00456208.global_random_seed;
+	return random_math_globals.global_random_seed;
 }
 
 unsigned long *get_global_random_seed_address(void)
@@ -122,17 +126,18 @@ unsigned long *get_global_random_seed_address(void)
 	match_vassert(
 		"c:\\halo\\SOURCE\\math\\random_math.c",
 		56,
-		!game_engine_running() || !bss_00456208.global_random_seed_lock,
+		!game_engine_running() || !random_math_globals.global_random_seed_lock,
 		"you should not be using global random(); use local random() instead");
-	return &bss_00456208.global_random_seed;
+	return &random_math_globals.global_random_seed;
 }
 
 unsigned long *get_global_local_random_seed_address(void)
 {
-	return &bss_00456208.global_local_random_seed;
+	return &random_math_globals.global_local_random_seed;
 }
 
-void random_seed_debug_log(
+void
+random_seed_debug_log(
 	boolean log)
 {
 }
@@ -142,28 +147,30 @@ unsigned long get_number_suitable_for_initializing_random_seed(void)
 	return system_seconds()^system_milliseconds()^rand();
 }
 
-void random_math_initialize(void)
+void
+random_math_initialize(void)
 {
 	struct geosphere *random_direction_geosphere;
 	short index;
 
-	bss_00456208.global_local_random_seed= get_number_suitable_for_initializing_random_seed();
+	random_math_globals.global_local_random_seed= get_number_suitable_for_initializing_random_seed();
 	random_direction_geosphere= geosphere_new(16);
 	match_assert("c:\\halo\\SOURCE\\math\\random_math.c", 174, random_direction_geosphere);
-	bss_00456208.random_direction_table= match_malloc(
+	random_math_globals.random_direction_table= match_malloc(
 		"c:\\halo\\SOURCE\\math\\random_math.c",
 		176,
 		random_direction_geosphere->vertex_count*sizeof(real_vector3d));
-	bss_00456208.random_direction_table_size= random_direction_geosphere->vertex_count;
+	random_math_globals.random_direction_table_size= random_direction_geosphere->vertex_count;
 	for (index= 0; index<random_direction_geosphere->vertex_count; index++)
-		((real_vector3d *)bss_00456208.random_direction_table)[index]= random_direction_geosphere->vertices[index];
+		((real_vector3d *)random_math_globals.random_direction_table)[index]= random_direction_geosphere->vertices[index];
 	geosphere_dispose(random_direction_geosphere);
 }
 
-void random_math_dispose(void)
+void
+random_math_dispose(void)
 {
 	debug_free(
-		bss_00456208.random_direction_table,
+		random_math_globals.random_direction_table,
 		"c:\\halo\\SOURCE\\math\\random_math.c",
 		200);
 }
@@ -208,7 +215,7 @@ __declspec(naked) real_vector3d *seed_random_direction3d(
 		push ebp
 		mov ebp, esp
 		mov ecx, seed
-		mov eax, dword ptr [bss_00456208+4]
+		mov eax, dword ptr [random_math_globals+4]
 		push ebx
 		push esi
 		mov esi, dword ptr [ecx]
