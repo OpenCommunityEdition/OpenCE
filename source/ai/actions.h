@@ -368,6 +368,8 @@ struct action_state_data
 
 boolean actor_action_handle_initial_action(
 	long actor_index);
+boolean action_charge_is_leaping(
+	long actor_index);
 boolean actor_action_handle_pending_command_list(
 	long actor_index);
 boolean actor_action_handle_surprise(

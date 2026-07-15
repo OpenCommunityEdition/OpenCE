@@ -282,6 +282,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "actors.h"
+#include "props.h"
 
 /* ---------- constants */
 
@@ -302,6 +303,61 @@ void actors_dispose(
 	void)
 {
 	return;
+}
+
+boolean actor_has_unlimited_grenades(
+	long actor_index)
+{
+	return TRUE;
+}
+
+boolean actor_is_noncombat(
+	long actor_index)
+{
+	boolean result = actor_get(actor_index)->state.mode < 3;
+
+	return result;
+}
+
+boolean actor_in_combat(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->state.mode == 3 && actor->state.combat_status > actor->state.artificial_combat_status)
+	{
+		return TRUE;
+	}
+
+	return FALSE;
+}
+
+boolean actor_is_leaping(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean result = FALSE;
+
+	if (actor->state.action == 10)
+	{
+		result = action_charge_is_leaping(actor_index);
+	}
+
+	return result;
+}
+
+long actor_target_unit_index(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	long result = NONE;
+
+	if (actor->target.target_prop_index != NONE)
+	{
+		result = prop_get(actor->target.target_prop_index)->unit_index;
+	}
+
+	return result;
 }
 
 /* ---------- private code */

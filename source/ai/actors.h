@@ -780,7 +780,16 @@ void actors_dispose(
 real_argb_color const *actor_activation_debug_color(long actor_index);
 
 boolean actor_get_running_blind_vector(long actor_index, real_vector3d *run_vector);
-boolean actor_has_unlimited_grenades(long actor_index);
+boolean actor_has_unlimited_grenades(
+	long actor_index);
+boolean actor_is_noncombat(
+	long actor_index);
+boolean actor_in_combat(
+	long actor_index);
+boolean actor_is_leaping(
+	long actor_index);
+long actor_target_unit_index(
+	long actor_index);
 
 /* ---------- prototypes/ACTOR_COMBAT.C */
 
