@@ -49,5 +49,7 @@ void machine_bumped(
 	long biped_index);
 void machine_try_to_open_with_damage(
 	long machine_index);
+boolean machine_update(
+	long machine_index);
 
 #endif // __DEVICE_MACHINES_H

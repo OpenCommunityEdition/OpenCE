@@ -713,7 +713,7 @@
 				{ "name": "source/dialogs/dialog_controls.c", "index": 339, "status": "Matching" },
 				{ "name": "source/dialogs/button_control.c", "index": 340, "status": "Matching" },
 				{ "name": "source/devices/devices.c", "index": 341, "status": "NonMatching" },
-				{ "name": "source/devices/device_machines.c", "index": 342, "status": "NonMatching" },
+				{ "name": "source/devices/device_machines.c", "index": 342, "status": "Matching" },
 				{ "name": "source/devices/device_light_fixtures.c", "index": 343, "status": "Matching" },
 				{ "name": "source/devices/device_definitions.c", "index": 344, "status": "Matching" },
 				{ "name": "source/devices/device_controls.c", "index": 345, "status": "NonMatching" },
