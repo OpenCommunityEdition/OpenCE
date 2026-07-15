@@ -692,7 +692,7 @@
 				{ "name": "source/effects/particle_systems.c", "index": 318, "status": "NonMatching" },
 				{ "name": "source/effects/particle_system_definitions.c", "index": 319, "status": "Matching" },
 				{ "name": "source/effects/particle_definitions.c", "index": 320, "status": "Matching" },
-				{ "name": "source/effects/material_effects.c", "index": 321, "status": "NonMatching" },
+				{ "name": "source/effects/material_effects.c", "index": 321, "status": "Matching" },
 				{ "name": "source/effects/material_effect_definitions.c", "index": 322, "status": "Matching" },
 				{ "name": "source/effects/glass_definitions.c", "index": 323, "status": "Matching" },
 				{ "name": "source/effects/effects.c", "index": 324, "status": "NonMatching" },

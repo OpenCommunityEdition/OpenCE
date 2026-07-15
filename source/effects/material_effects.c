@@ -21,10 +21,21 @@ symbols in this file:
 #include "effects/material_effect_definitions.h"
 #include "game/players.h"
 #include "networking/network_connection.h"
+#include "physics/collisions.h"
 #include "render/render_debug.h"
+#include "scenario/scenario.h"
 #include "sound/game_sound.h"
 
 /* ---------- constants */
+
+enum
+{
+	_material_effect_collision_flags =
+		_collision_test_objects_sight_blocking_flags |
+		FLAG(_collision_test_structure_bit) |
+		FLAG(_collision_test_objects_bit),
+	_material_effect_underwater_material_type = 0x1C,
+};
 
 /* ---------- macros */
 
@@ -33,6 +44,10 @@ symbols in this file:
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+#pragma bss_seg(".bss")
+boolean debug_material_effects;
+#pragma bss_seg()
 
 /* ---------- public code */
 
@@ -122,6 +137,58 @@ void material_effect_new(
 
 			if (debug_material_effects)
 				render_debug_sphere(FALSE, position, 0.05f, global_real_argb_cyan);
+		}
+	}
+
+	return;
+}
+
+void material_effect_new_from_point(
+	long definition_index,
+	short effect_index,
+	real_point3d const *position,
+	real scale)
+{
+	struct material_effects_definition *definition;
+
+	definition = material_effects_definition_get(definition_index);
+	if (effect_index < definition->effects.count)
+	{
+		real_point3d test_point;
+		real_vector3d test_vector;
+		struct collision_result collision;
+
+		TAG_BLOCK_GET_ELEMENT(&definition->effects, effect_index, struct material_effect);
+		test_point = *position;
+		test_point.z += 0.15f;
+		test_vector.i = global_down3d->i * 0.3f;
+		test_vector.j = global_down3d->j * 0.3f;
+		test_vector.k = global_down3d->k * 0.3f;
+
+		if (collision_test_vector(
+			_material_effect_collision_flags,
+			&test_point,
+			&test_vector,
+			NONE,
+			&collision))
+		{
+			long material_type;
+
+			material_type = scenario_location_underwater(&collision.location, &collision.point, NULL)
+				? _material_effect_underwater_material_type
+				: collision.material_type;
+			material_effect_new(
+				definition_index,
+				effect_index,
+				(short)material_type,
+				&collision.point,
+				&collision.plane.n,
+				&collision.location,
+				scale);
+		}
+		else if (debug_material_effects)
+		{
+			render_debug_sphere(FALSE, position, 0.05f, global_real_argb_red);
 		}
 	}
 

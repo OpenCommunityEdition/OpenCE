@@ -79,7 +79,7 @@ struct collision_result
 	real t;
 	real_point3d point;
 	real_plane3d plane;
-	short material_type;
+	long material_type;
 	long object_index;
 	short region_index;
 	short node_index;
@@ -90,6 +90,17 @@ struct collision_result
 	byte breakable_surface_index;
 	short material_index;
 };
+
+typedef char collision_result_size_assert[
+	sizeof(struct collision_result) == 0x50 ? 1 : -1];
+typedef char collision_result_location_offset_assert[
+	offsetof(struct collision_result, location) == 0x0C ? 1 : -1];
+typedef char collision_result_point_offset_assert[
+	offsetof(struct collision_result, point) == 0x18 ? 1 : -1];
+typedef char collision_result_plane_offset_assert[
+	offsetof(struct collision_result, plane) == 0x24 ? 1 : -1];
+typedef char collision_result_material_type_offset_assert[
+	offsetof(struct collision_result, material_type) == 0x34 ? 1 : -1];
 
 /* ---------- prototypes/COLLISIONS.C */
 

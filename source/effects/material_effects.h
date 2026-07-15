@@ -39,5 +39,10 @@ void material_effect_new(
 	real_vector3d const *normal,
 	struct location const *location,
 	real scale);
+void material_effect_new_from_point(
+	long definition_index,
+	short effect_index,
+	real_point3d const *position,
+	real scale);
 
 #endif // __MATERIAL_EFFECTS_H
