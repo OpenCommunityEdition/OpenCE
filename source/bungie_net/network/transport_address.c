@@ -90,6 +90,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+
+#include "bungie_net/network/transport.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -101,5 +105,59 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+struct transport_address *create_transport_address(
+	struct transport_address_data const *address,
+	word address_length,
+	word port)
+{
+	struct transport_address *result;
+
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c", 30, transport_initialized);
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c", 31, address);
+
+	result = match_malloc(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c",
+		33,
+		sizeof(*result));
+	if (result)
+	{
+		result->address = *address;
+		result->address_length = address_length;
+		result->port = port;
+		result->address_type = 0;
+	}
+
+	return result;
+}
+
+void delete_transport_address(
+	struct transport_address *address)
+{
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c", 47, transport_initialized);
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c", 48, address);
+	match_free("c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c", 50, address);
+	return;
+}
+
+long transport_address_equivalent(
+	struct transport_address const *a,
+	struct transport_address const *b)
+{
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c", 59, a);
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c", 60, b);
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c", 61, transport_initialized);
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c", 63, IPV4_ADDRESS_LENGTH == a->address_length);
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c", 64, IPV4_ADDRESS_LENGTH == b->address_length);
+
+	if (csmemcmp(
+			&a->address,
+			&b->address,
+			a->address_length > b->address_length ? a->address_length : b->address_length) == 0 &&
+		a->port == b->port)
+		return TRUE;
+
+	return FALSE;
+}
 
 /* ---------- private code */
