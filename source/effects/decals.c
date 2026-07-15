@@ -212,6 +212,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "effects/decals.h"
+
+#include "cseries/cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -220,8 +224,22 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void rasterizer_decals_dispose(
+	void);
+
 /* ---------- globals */
 
+extern void *global_decal_data;
+
 /* ---------- public code */
+
+void decals_dispose(
+	void)
+{
+	global_decal_data = NULL;
+	rasterizer_decals_dispose();
+
+	return;
+}
 
 /* ---------- private code */

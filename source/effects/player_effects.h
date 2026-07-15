@@ -20,4 +20,9 @@ header included in hcex build.
 
 /* ---------- public code */
 
+void player_effect_dispose(
+	void);
+void player_effect_dispose_from_old_map(
+	void);
+
 #endif // __PLAYER_EFFECTS_H

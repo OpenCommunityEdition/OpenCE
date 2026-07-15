@@ -20,4 +20,7 @@ header included in hcex build.
 
 /* ---------- public code */
 
+void decals_dispose(
+	void);
+
 #endif // __DECALS_H

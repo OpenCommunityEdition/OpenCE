@@ -86,6 +86,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "effects/player_effects.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -97,5 +99,17 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void player_effect_dispose(
+	void)
+{
+	return;
+}
+
+void player_effect_dispose_from_old_map(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */
