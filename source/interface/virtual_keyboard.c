@@ -90,9 +90,13 @@ symbols in this file:
 struct virtual_keyboard_globals
 {
 	boolean active;
-	byte reserved1[0x15];
+	byte reserved1[0xB];
+	unsigned short buffer_size;
+	byte reservedE[0x8];
 	boolean last_exit_saved_text;
-	byte reserved17[0x55];
+	byte reserved17;
+	wchar_t *text_buffer;
+	byte reserved1C[0x50];
 };
 
 typedef char verify_virtual_keyboard_globals_size[
@@ -106,6 +110,8 @@ void code_000e50b0(
 	void);
 void code_000e5be0(
 	void);
+unsigned long ustrlen(
+	wchar_t const *string);
 
 /* ---------- globals */
 
@@ -123,6 +129,13 @@ boolean virtual_keyboard_last_exit_saved_text(
 	void)
 {
 	return virtual_keyboard_globals.last_exit_saved_text;
+}
+
+long code_000e5700(
+	void)
+{
+	return virtual_keyboard_globals.buffer_size -
+		2 * (ustrlen(virtual_keyboard_globals.text_buffer) + 1);
 }
 
 void virtual_keyboard_close(
