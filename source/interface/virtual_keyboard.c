@@ -78,16 +78,55 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "interface/virtual_keyboard.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct virtual_keyboard_globals
+{
+	boolean active;
+	byte reserved1[0x15];
+	boolean last_exit_saved_text;
+	byte reserved17[0x55];
+};
+
+typedef char verify_virtual_keyboard_globals_size[
+	sizeof(struct virtual_keyboard_globals) == 0x6C ? 1 : -1];
+
 /* ---------- prototypes */
+
+boolean code_000e4f50(
+	void);
 
 /* ---------- globals */
 
+struct virtual_keyboard_globals virtual_keyboard_globals;
+
 /* ---------- public code */
+
+boolean virtual_keyboard_active(
+	void)
+{
+	return virtual_keyboard_globals.active;
+}
+
+boolean virtual_keyboard_last_exit_saved_text(
+	void)
+{
+	return virtual_keyboard_globals.last_exit_saved_text;
+}
+
+void virtual_keyboard_close(
+	void)
+{
+	code_000e4f50();
+
+	return;
+}
 
 /* ---------- private code */

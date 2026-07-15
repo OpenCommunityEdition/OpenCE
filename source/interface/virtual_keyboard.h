@@ -8,6 +8,10 @@ header included in hcex build.
 #define __VIRTUAL_KEYBOARD_H
 #pragma once
 
+/* ---------- headers */
+
+#include "cseries/cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -15,6 +19,13 @@ header included in hcex build.
 /* ---------- structures */
 
 /* ---------- prototypes/EXAMPLE.C */
+
+boolean virtual_keyboard_active(
+	void);
+void virtual_keyboard_close(
+	void);
+boolean virtual_keyboard_last_exit_saved_text(
+	void);
 
 /* ---------- globals */
 
