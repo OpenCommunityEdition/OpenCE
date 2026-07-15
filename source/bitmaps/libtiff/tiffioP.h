@@ -205,8 +205,8 @@ typedef	struct {
 #define	TIFF_VARIABLE	-1		/* marker for variable length tags */
 #define	TIFF_SPP	-2		/* marker for SamplesPerPixel tags */
 
-extern	const TIFFFieldInfo tiffFieldInfo[];/* table of field descriptors */
-extern	const int tiffDataWidth[];	/* table of tag datatype widths */
+extern	TIFFFieldInfo tiffFieldInfo[];	/* table of field descriptors */
+extern	int tiffDataWidth[];		/* table of tag datatype widths */
 
 #define BITn(n)				(((unsigned)1L)<<((n)&0x1f)) 
 #define BITFIELDn(tif, n)		((tif)->tif_dir.td_fieldsset[(n)/32]) 

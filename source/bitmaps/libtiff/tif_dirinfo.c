@@ -45,7 +45,7 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_dirinfo.c,v
  *     then the LONG must be placed before the SHORT for
  *     writing to work properly.
  */
-const TIFFFieldInfo tiffFieldInfo[] = {
+TIFFFieldInfo tiffFieldInfo[] = {
     { TIFFTAG_SUBFILETYPE,	 1, 1, TIFF_LONG,	FIELD_SUBFILETYPE,
       TRUE,	"SubfileType" },
 /* XXX SHORT for compatibility w/ old versions of the library */
@@ -251,7 +251,7 @@ const TIFFFieldInfo tiffFieldInfo[] = {
     { 0 }
 };
 
-const int tiffDataWidth[] = {
+int tiffDataWidth[] = {
     1,	/* nothing */
     1,	/* TIFF_BYTE */
     1,	/* TIFF_ASCII */
@@ -266,6 +266,8 @@ const int tiffDataWidth[] = {
     4,	/* TIFF_FLOAT */
     8,	/* TIFF_DOUBLE */
 };
+
+TIFFFieldInfo const *bss_0031be4c = NULL;
 
 TIFFFieldInfo const *
 DECLARE2(TIFFFindFieldInfo, u_short, tag, TIFFDataType, dt)
