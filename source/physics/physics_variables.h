@@ -33,6 +33,12 @@ void physics_variable_speed_update(
 	struct physics_variable_speed_parameters *parameters,
 	real delta);
 
+boolean physics_variable_speed_update_seek(
+	real *speed,
+	struct physics_variable_speed_parameters *parameters,
+	real target,
+	real delta);
+
 void physics_variable_position_update(
 	real *position,
 	real *limits,

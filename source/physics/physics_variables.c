@@ -75,6 +75,41 @@ physics_variable_speed_update(
 	return;
 }
 
+boolean
+physics_variable_speed_update_seek(
+	real *speed,
+	struct physics_variable_speed_parameters *parameters,
+	real target,
+	real delta)
+{
+	boolean result = FALSE;
+
+	if (*speed > target)
+	{
+		physics_variable_speed_update(speed, parameters, -delta);
+		if (*speed <= target)
+		{
+			*speed = target;
+			result = TRUE;
+		}
+	}
+	else if (*speed < target)
+	{
+		physics_variable_speed_update(speed, parameters, delta);
+		if (*speed >= target)
+		{
+			*speed = target;
+			result = TRUE;
+		}
+	}
+	else
+	{
+		result = TRUE;
+	}
+
+	return result;
+}
+
 void
 physics_variable_position_update(
 	real *position,
