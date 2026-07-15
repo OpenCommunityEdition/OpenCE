@@ -87,16 +87,71 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "editor_flying_camera.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct editor_camera_data
+{
+	real speed;
+	long unit_focus;
+};
+
+struct editor_camera_globals
+{
+	boolean scripted;
+	byte _unknown01[0x2b];
+	short mode;
+};
+
+struct editor_camera_constants
+{
+	long speed_steps[5];
+	real field_of_view_by_mode[7];
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+extern struct editor_camera_data data_002dcc28;
+extern struct editor_camera_globals bss_0031d438;
+extern struct editor_camera_constants const rdata_00256c64;
+
 /* ---------- public code */
+
+long editor_camera_get_speed(
+	void)
+{
+	return (long)data_002dcc28.speed;
+}
+
+long editor_camera_get_unit_focus(
+	void)
+{
+	return data_002dcc28.unit_focus;
+}
+
+short editor_camera_get_mode(
+	void)
+{
+	return bss_0031d438.mode;
+}
+
+boolean editor_camera_get_scripted(
+	void)
+{
+	return bss_0031d438.scripted;
+}
+
+real editor_camera_get_field_of_view(
+	void)
+{
+	return rdata_00256c64.field_of_view_by_mode[5 + bss_0031d438.mode];
+}
 
 /* ---------- private code */
