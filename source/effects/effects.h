@@ -35,6 +35,20 @@ long effect_new_from_object(
 	real_rgb_color const *color,
 	struct effect_vector_field const *impulse_field);
 
+long effect_new_unattached_from_markers(
+	long definition_index,
+	long argument_1,
+	real_vector3d const *translational_velocity,
+	short marker_count,
+	long argument_4,
+	real_point3d const *marker_points,
+	real_vector3d const *marker_forwards,
+	real scale_a,
+	real scale_b,
+	real_rgb_color const *color,
+	struct effect_vector_field const *impulse_field,
+	long argument_11);
+
 void effect_delete(long effect_index);
 
 /* ---------- globals */

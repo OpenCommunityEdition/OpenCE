@@ -17,8 +17,12 @@ symbols in this file:
 #include "effects/material_effects.h"
 
 #include "camera/observer.h"
+#include "effects/effects.h"
+#include "effects/material_effect_definitions.h"
 #include "game/players.h"
 #include "networking/network_connection.h"
+#include "render/render_debug.h"
+#include "sound/game_sound.h"
 
 /* ---------- constants */
 
@@ -59,6 +63,69 @@ boolean material_effect_visible(
 	}
 
 	return visible;
+}
+
+void material_effect_new(
+	long definition_index,
+	short effect_index,
+	short material_index,
+	real_point3d const *position,
+	real_vector3d const *normal,
+	struct location const *location,
+	real scale)
+{
+	struct material_effects_definition *definition;
+
+	definition = material_effects_definition_get(definition_index);
+	if (effect_index < definition->effects.count)
+	{
+		struct material_effect *effect;
+
+		effect = TAG_BLOCK_GET_ELEMENT(&definition->effects, effect_index, struct material_effect);
+		if (material_index != NONE && material_index < effect->materials.count)
+		{
+			struct material_effect_material *material;
+			real_point3d effect_position;
+
+			material = TAG_BLOCK_GET_ELEMENT(&effect->materials, material_index, struct material_effect_material);
+			effect_position.x = position->x + normal->i * 0.01f;
+			effect_position.y = position->y + normal->j * 0.01f;
+			effect_position.z = position->z + normal->k * 0.01f;
+
+			if (material->effect.index != NONE)
+			{
+				effect_new_unattached_from_markers(
+					material->effect.index,
+					NONE,
+					NULL,
+					1,
+					0,
+					&effect_position,
+					normal,
+					scale,
+					0.f,
+					NULL,
+					NULL,
+					0);
+			}
+
+			if (material->sound.index != NONE)
+			{
+				struct sound_location sound_location;
+
+				sound_location.position = effect_position;
+				sound_location.forward = *normal;
+				sound_location.translational_velocity = *global_zero_vector3d;
+				sound_location.game_location = *location;
+				unattached_impulse_sound_new(material->sound.index, &sound_location, scale);
+			}
+
+			if (debug_material_effects)
+				render_debug_sphere(FALSE, position, 0.05f, global_real_argb_cyan);
+		}
+	}
+
+	return;
 }
 
 /* ---------- private code */
