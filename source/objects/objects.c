@@ -858,7 +858,6 @@ long find_objects_from_point_vector(
 void objects_dump_memory(
 	void)
 {
-	struct objects_information information;
 	struct dump_datum dumps[MAXIMUM_DUMPS];
 	struct dump_datum dumps_by_type[NUMBER_OF_OBJECT_TYPES];
 	struct object_iterator iterator;
@@ -936,6 +935,8 @@ void objects_dump_memory(
 	if (file)
 	{
 		{
+			struct objects_information information;
+
 			objects_information_get(&information);
 
 			fprintf(
