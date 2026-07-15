@@ -83,6 +83,8 @@ enum
 
 /* ---------- structures */
 
+struct rasterizer_model_begin_parameters;
+
 struct rasterizer_frame_begin_parameters
 {
 	real game_time_sec;
@@ -133,6 +135,16 @@ void rasterizer_decals_update_function_pointers(void);
 void rasterizer_detail_objects_begin(
 	void);
 void rasterizer_detail_objects_end(
+	void);
+
+void rasterizer_hud_begin(
+	void);
+void rasterizer_hud_end(
+	void);
+void rasterizer_model_begin(
+	struct rasterizer_model_begin_parameters const *parameters,
+	boolean is_dynamic);
+void rasterizer_model_end(
 	void);
 
 /* ---------- prototypes/RASTERIZER_TEXT.C */

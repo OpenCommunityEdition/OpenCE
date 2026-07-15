@@ -327,6 +327,15 @@ void _rasterizer_detail_objects_begin(
 	void);
 void _rasterizer_detail_objects_end(
 	void);
+void _rasterizer_hud_begin(
+	void);
+void _rasterizer_hud_end(
+	void);
+void _rasterizer_model_begin(
+	struct rasterizer_model_begin_parameters const *parameters,
+	boolean is_dynamic);
+void _rasterizer_model_end(
+	void);
 void _rasterizer_dispose(void);
 void _rasterizer_frame_end(void);
 void _rasterizer_window_end(void);
@@ -395,6 +404,35 @@ void rasterizer_detail_objects_end(
 	void)
 {
 	_rasterizer_detail_objects_end();
+	return;
+}
+
+void rasterizer_hud_begin(
+	void)
+{
+	_rasterizer_hud_begin();
+	return;
+}
+
+void rasterizer_hud_end(
+	void)
+{
+	_rasterizer_hud_end();
+	return;
+}
+
+void rasterizer_model_begin(
+	struct rasterizer_model_begin_parameters const *parameters,
+	boolean is_dynamic)
+{
+	_rasterizer_model_begin(parameters, is_dynamic);
+	return;
+}
+
+void rasterizer_model_end(
+	void)
+{
+	_rasterizer_model_end();
 	return;
 }
 
