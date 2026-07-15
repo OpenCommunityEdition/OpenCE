@@ -490,7 +490,7 @@
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_lights.c", "index": 116, "status": "NonMatching" },
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_hardware_geometry.c", "index": 117, "status": "NonMatching" },
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.c", "index": 118, "status": "NonMatching" },
-				{ "name": "source/rasterizer/xbox/rasterizer_xbox_errors.c", "index": 119, "status": "NonMatching" },
+				{ "name": "source/rasterizer/xbox/rasterizer_xbox_errors.c", "index": 119, "status": "Matching" },
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_environment_fog.c", "index": 120, "status": "NonMatching" },
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_environment.c", "index": 121, "status": "NonMatching" },
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_dynavobgeom.c", "index": 122, "status": "NonMatching" },
