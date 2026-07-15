@@ -180,11 +180,26 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct d3dx_vector4
+{
+	real x;
+	real y;
+	real z;
+	real w;
+};
+
+struct d3dx_matrix
+{
+	real elements[4][4];
+};
+
 struct progress_bar_globals
 {
 	long field0;
 	real initial_progress;
-	unsigned char reserved[0x1D0];
+	unsigned char reserved0[0xC0];
+	struct d3dx_matrix screen_transform;
+	unsigned char reserved1[0xD0];
 };
 
 struct progress_bar_data
@@ -216,6 +231,11 @@ struct tga_image
 };
 
 /* ---------- prototypes */
+
+struct d3dx_vector4 *__stdcall D3DXVec4Transform(
+	struct d3dx_vector4 *output,
+	struct d3dx_vector4 const *input,
+	struct d3dx_matrix const *matrix);
 
 int __stdcall SetThreadPriority(
 	void *thread,
@@ -408,6 +428,26 @@ void progress_bar_display(
 }
 
 /* ---------- private code */
+
+void to_screen(
+	real x,
+	real y,
+	real z,
+	real *screen_x,
+	real *screen_y)
+{
+	struct d3dx_vector4 input;
+	struct d3dx_vector4 output;
+
+	input.x = x;
+	input.y = y;
+	input.z = z;
+	input.w = 1.0f;
+	D3DXVec4Transform(&output, &input, &bss_00454030.screen_transform);
+	*screen_x = output.x / output.w;
+	*screen_y = output.y / output.w;
+	return;
+}
 
 boolean code_000d1150(
 	void)
