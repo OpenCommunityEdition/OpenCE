@@ -188,6 +188,13 @@ void rasterizer_transparent_geometry_begin(
 void rasterizer_transparent_geometry_end(
 	void);
 
+/* ---------- prototypes/RASTERIZER_DEBUG.C */
+
+void rasterizer_debug_begin(
+	void);
+void rasterizer_debug_end(
+	void);
+
 /* ---------- prototypes/RASTERIZER_TEXT.C */
 
 void rasterizer_text_cache_flush(void);

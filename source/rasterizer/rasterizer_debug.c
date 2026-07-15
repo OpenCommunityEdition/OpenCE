@@ -58,16 +58,57 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "rasterizer.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+#pragma pack(push, 1)
+struct rasterizer_debug_data
+{
+	boolean initialized;
+	byte pad1[3];
+	void *opaque_triangles;
+	long opaque_triangle_count;
+	void *opaque_lines;
+	long opaque_line_count;
+	void *non_opaque_primitives;
+	long non_opaque_primitive_count;
+	long primitive_count;
+	boolean geometry_buffer_full_warning;
+};
+#pragma pack(pop)
+
+typedef char rasterizer_debug_data_size_assert[
+	sizeof(struct rasterizer_debug_data) == 0x21 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+struct rasterizer_debug_data bss_004662f8;
+
 /* ---------- public code */
+
+void rasterizer_debug_begin(
+	void)
+{
+	bss_004662f8.opaque_triangle_count = 0;
+	bss_004662f8.opaque_line_count = 0;
+	bss_004662f8.non_opaque_primitive_count = 0;
+	bss_004662f8.primitive_count = 0;
+
+	return;
+}
+
+void rasterizer_debug_end(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */
