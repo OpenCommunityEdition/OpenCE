@@ -255,3 +255,19 @@ void progress_bar_enable(
 }
 
 /* ---------- private code */
+
+boolean code_000d1150(
+	void)
+{
+	boolean result;
+
+	result= progress_bar_mode.texture0 != NULL;
+
+	return result;
+}
+
+void code_000d16d0(
+	void)
+{
+	return;
+}
