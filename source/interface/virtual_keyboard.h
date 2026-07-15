@@ -26,6 +26,10 @@ void virtual_keyboard_close(
 	void);
 boolean virtual_keyboard_last_exit_saved_text(
 	void);
+void virtual_keyboard_process(
+	void);
+void virtual_keyboard_render(
+	void);
 
 /* ---------- globals */
 

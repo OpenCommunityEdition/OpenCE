@@ -102,6 +102,10 @@ typedef char verify_virtual_keyboard_globals_size[
 
 boolean code_000e4f50(
 	void);
+void code_000e50b0(
+	void);
+void code_000e5be0(
+	void);
 
 /* ---------- globals */
 
@@ -125,6 +129,24 @@ void virtual_keyboard_close(
 	void)
 {
 	code_000e4f50();
+
+	return;
+}
+
+void virtual_keyboard_render(
+	void)
+{
+	if (virtual_keyboard_globals.active)
+		code_000e50b0();
+
+	return;
+}
+
+void virtual_keyboard_process(
+	void)
+{
+	if (virtual_keyboard_globals.active)
+		code_000e5be0();
 
 	return;
 }
