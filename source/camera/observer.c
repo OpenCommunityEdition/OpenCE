@@ -100,6 +100,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "observer.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -111,5 +114,11 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void observer_initialize(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */
