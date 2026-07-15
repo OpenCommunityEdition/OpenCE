@@ -116,4 +116,8 @@ boolean light_fixture_new(long object_index)
 	return TRUE;
 }
 
+void light_fixture_delete(long object_index)
+{
+}
+
 /* ---------- private code */
