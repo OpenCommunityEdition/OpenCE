@@ -800,7 +800,13 @@ boolean actor_is_noncombat(
 	long actor_index);
 boolean actor_in_combat(
 	long actor_index);
+boolean actor_is_fighting(
+	long actor_index);
 boolean actor_is_leaping(
+	long actor_index);
+long actor_get_weapon(
+	long actor_index);
+boolean actor_has_ranged_weapon(
 	long actor_index);
 long actor_target_unit_index(
 	long actor_index);

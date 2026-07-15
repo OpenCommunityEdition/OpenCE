@@ -60,6 +60,11 @@ enum
 	NUMBER_OF_ACTOR_DEFINITION_FLAGS,
 };
 
+enum
+{
+	_actor_variant_definition_cannot_use_ranged_weapons_bit = 6,
+};
+
 
 /* ---------- macros */
 

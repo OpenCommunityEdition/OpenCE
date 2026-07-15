@@ -282,10 +282,12 @@ symbols in this file:
 
 #include "cseries.h"
 #include "actors.h"
+#include "actor_definitions.h"
 #include "actor_types.h"
 #include "props.h"
 
 #include "saved games/game_state.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
@@ -373,6 +375,22 @@ boolean actor_in_combat(
 	return FALSE;
 }
 
+boolean actor_is_fighting(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean result = actor->state.combat_status >= 7;
+
+	if (result &&
+		actor->state.action == _actor_action_flee &&
+		actor->state.action_data.flee.panic_type > 0)
+	{
+		result = FALSE;
+	}
+
+	return result;
+}
+
 boolean actor_is_leaping(
 	long actor_index)
 {
@@ -382,6 +400,60 @@ boolean actor_is_leaping(
 	if (actor->state.action == 10)
 	{
 		result = action_charge_is_leaping(actor_index);
+	}
+
+	return result;
+}
+
+long actor_get_weapon(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	long result = NONE;
+
+	if (actor->input.vehicle_gunner && actor->input.vehicle_index != NONE)
+	{
+		struct unit_datum *unit = unit_get(actor->input.vehicle_index);
+
+		result = unit_inventory_get_weapon(
+			actor->input.vehicle_index,
+			(word)unit->unit.current_weapon_index);
+	}
+
+	if (result == NONE && actor->meta.unit_index != NONE)
+	{
+		struct actor_variant_definition *actor_variant_definition =
+			actor_variant_definition_get(actor->meta.variant_definition_index);
+
+		if (!TEST_FLAG(
+			actor_variant_definition->flags,
+			_actor_variant_definition_cannot_use_ranged_weapons_bit))
+		{
+			struct unit_datum *unit = unit_get(actor->meta.unit_index);
+
+			result = unit_inventory_get_weapon(
+				actor->meta.unit_index,
+				unit->unit.current_weapon_index);
+		}
+	}
+
+	return result;
+}
+
+boolean actor_has_ranged_weapon(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean result = actor_get_weapon(actor_index) != NONE;
+
+	if (result && actor->meta.unit_index != NONE)
+	{
+		struct unit_datum *unit = unit_get(actor->meta.unit_index);
+
+		if (TEST_FLAG(unit->object.damage_flags, _object_ranged_attack_inhibited_bit))
+		{
+			result = FALSE;
+		}
 	}
 
 	return result;
