@@ -28,8 +28,7 @@ symbols in this file:
 
 #include "cseries.h"
 
-#include "device_definitions.h"
-#include "devices.h"
+#include "device_machines.h"
 
 /* ---------- constants */
 
@@ -64,6 +63,33 @@ void machines_initialize_for_new_map(
 void machines_dispose_from_old_map(
 	void)
 {
+	return;
+}
+
+void machine_place(
+	long machine_index,
+	struct scenario_machine_datum *scenario_machine)
+{
+	struct machine_datum *machine = machine_get(machine_index);
+
+	device_add_scenario_information(machine_index, &scenario_machine->device);
+	if (TEST_FLAG(scenario_machine->flags, _machine_does_not_operate_automatically_bit))
+	{
+		machine->machine.flags |= FLAG(_machine_does_not_operate_automatically_bit);
+	}
+	if (TEST_FLAG(scenario_machine->flags, _machine_one_sided_bit))
+	{
+		machine->machine.flags |= FLAG(_machine_one_sided_bit);
+	}
+	if (TEST_FLAG(scenario_machine->flags, _machine_never_appears_locked_bit))
+	{
+		machine->machine.flags |= FLAG(_machine_never_appears_locked_bit);
+	}
+	if (TEST_FLAG(scenario_machine->flags, _machine_opened_by_melee_attack_bit))
+	{
+		machine->machine.flags |= FLAG(_machine_opened_by_melee_attack_bit);
+	}
+
 	return;
 }
 

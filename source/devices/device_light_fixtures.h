@@ -32,13 +32,6 @@ enum
 
 struct light_fixture_definition;
 
-struct scenario_device_datum
-{
-	short power_group_index;
-	short position_group_index;
-	unsigned long flags;
-};
-
 struct scenario_light_fixture_datum
 {
 	struct scenario_object_datum object;

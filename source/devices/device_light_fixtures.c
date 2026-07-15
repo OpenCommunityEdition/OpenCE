@@ -37,10 +37,6 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-void device_add_scenario_information(
-	long object_index,
-	struct scenario_device_datum *scenario_device);
-
 /* ---------- globals */
 
 /* ---------- public code */
