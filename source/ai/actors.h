@@ -775,6 +775,8 @@ struct vector_avoidance_data
 
 /* ---------- prototypes/ACTORS.C */
 
+void actors_dispose(
+	void);
 real_argb_color const *actor_activation_debug_color(long actor_index);
 
 boolean actor_get_running_blind_vector(long actor_index, real_vector3d *run_vector);

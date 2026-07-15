@@ -298,4 +298,10 @@ struct data_array *actor_data = NULL;
 
 /* ---------- public code */
 
+void actors_dispose(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
