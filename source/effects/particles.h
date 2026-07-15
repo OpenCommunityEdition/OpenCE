@@ -11,6 +11,7 @@ header included in hcex build.
 #include "cseries/cseries.h"
 #include "math/real_math.h"
 #include "memory/data.h"
+#include "objects/objects.h"
 #include "tag_files/tag_groups.h"
 
 /* ---------- constants */
@@ -54,12 +55,16 @@ struct particle_datum
 	word flags;
 	long definition_index;
 	long object_index;
-	byte unknownC[3];
+	short node_index;
+	byte unknownE;
 	byte local_player_index;
 	byte unknown10[4];
 	real age;
 	real lifespan;
-	byte unknown1C[0x40];
+	byte unknown1C[0x0C];
+	struct location location;
+	real_point3d position;
+	byte unknown3C[0x20];
 	real radius;
 	byte unknown60[0x10];
 };
@@ -81,12 +86,18 @@ typedef char particle_datum_definition_index_offset_assert[
 	offsetof(struct particle_datum, definition_index) == 0x04 ? 1 : -1];
 typedef char particle_datum_object_index_offset_assert[
 	offsetof(struct particle_datum, object_index) == 0x08 ? 1 : -1];
+typedef char particle_datum_node_index_offset_assert[
+	offsetof(struct particle_datum, node_index) == 0x0C ? 1 : -1];
 typedef char particle_datum_local_player_index_offset_assert[
 	offsetof(struct particle_datum, local_player_index) == 0x0F ? 1 : -1];
 typedef char particle_datum_age_offset_assert[
 	offsetof(struct particle_datum, age) == 0x14 ? 1 : -1];
 typedef char particle_datum_lifespan_offset_assert[
 	offsetof(struct particle_datum, lifespan) == 0x18 ? 1 : -1];
+typedef char particle_datum_location_offset_assert[
+	offsetof(struct particle_datum, location) == 0x28 ? 1 : -1];
+typedef char particle_datum_position_offset_assert[
+	offsetof(struct particle_datum, position) == 0x30 ? 1 : -1];
 typedef char particle_datum_radius_offset_assert[
 	offsetof(struct particle_datum, radius) == 0x5C ? 1 : -1];
 typedef char particle_definition_radius_lower_bound_offset_assert[
@@ -118,6 +129,8 @@ real particle_get_radius(
 boolean valid_real_argb_color(
 	real_argb_color const *color);
 void particles_disconnect_from_structure_bsp(
+	void);
+void particles_reconnect_to_structure_bsp(
 	void);
 void particle_new(struct new_particle_data const *data);
 

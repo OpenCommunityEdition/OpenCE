@@ -79,7 +79,9 @@ symbols in this file:
 #undef valid_real_point3d
 
 #include "cseries/errors.h"
+#include "interface/first_person_weapons.h"
 #include "memory/data.h"
+#include "objects/objects.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 
@@ -176,6 +178,56 @@ void particles_stop_on_first_person_weapon(
 void particles_disconnect_from_structure_bsp(
 	void)
 {
+	return;
+}
+
+void particles_reconnect_to_structure_bsp(
+	void)
+{
+	long particle_index;
+
+	for (particle_index = data_next_index(particle_data, NONE);
+		particle_index != NONE;
+		particle_index = data_next_index(particle_data, particle_index))
+	{
+		struct particle_datum *particle = particle_get(particle_index);
+		real_point3d const *position;
+
+		if (particle->object_index == NONE)
+		{
+			position = &particle->position;
+		}
+		else if (TEST_FLAG(particle->flags, _particle_datum_attached_to_local_player_bit))
+		{
+			position = &first_person_weapon_get_node_matrix(
+				particle->local_player_index,
+				particle->node_index)->position;
+		}
+		else if (object_try_and_get(particle->object_index))
+		{
+			position = &object_get_node_matrix(
+				particle->object_index,
+				particle->node_index)->position;
+		}
+		else
+		{
+			position = NULL;
+		}
+
+		if (!position)
+		{
+			particle_delete(particle_index);
+		}
+		else
+		{
+			scenario_location_from_point(&particle->location, position);
+			if (particle->location.cluster_index == NONE)
+			{
+				particle_delete(particle_index);
+			}
+		}
+	}
+
 	return;
 }
 
