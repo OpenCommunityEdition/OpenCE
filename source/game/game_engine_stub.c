@@ -40,13 +40,48 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+
 /* ---------- constants */
+
+enum
+{
+	_game_engine_type_stub = 7,
+	NUMBER_OF_STUB_GAME_ENGINE_CALLBACKS = 32,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+typedef void (*stub_game_engine_callback)(void);
+
+struct stub_game_engine
+{
+	char const *name;
+	long type;
+	stub_game_engine_callback callbacks[NUMBER_OF_STUB_GAME_ENGINE_CALLBACKS];
+};
+
+typedef char verify_stub_game_engine_size[sizeof(struct stub_game_engine) == 0x88 ? 1 : -1];
+
 /* ---------- prototypes */
+
+void code_000a4710(void);
+boolean code_000a4720(void);
+void code_000a4730(void);
+void code_000a4740(void);
+void code_000a4750(void);
+void code_000a4760(void);
+void code_000a4770(void);
+void code_000a4780(void);
+void code_000a4790(void);
+void code_000a47a0(void);
+void code_000a47b0(void);
+void code_000a47c0(void);
+boolean code_000a47d0(void);
+void code_000a47e0(void);
+void code_000a47f0(void);
 
 /* ---------- globals */
 
