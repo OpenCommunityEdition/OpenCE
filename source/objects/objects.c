@@ -153,8 +153,6 @@ static struct object_globals *object_globals;
 static struct memory_pool *object_memory_pool;
 static long *object_name_list;
 
-static struct profile_section objects_update_section = {"objects_update", NONE, TRUE};
-
 boolean debug_objects_names;
 boolean debug_objects_pathfinding_spheres;
 boolean debug_objects_physics;
@@ -3991,6 +3989,8 @@ void objects_garbage_collection(
 void objects_update(
 	void)
 {
+	static struct profile_section section = {"objects_update", NONE, TRUE};
+
 	unsigned long *last_active_cluster_bits;
 	unsigned long *active_cluster_bits;
 	short cluster_count;
@@ -3999,7 +3999,7 @@ void objects_update(
 
 	boolean dont_update_object = ((game_time_get()&1)!=0) && game_players_are_double_speed();
 
-	profile_enter(objects_update_section);
+	profile_enter(section);
 
 	object_globals->active_garbage_object_count = 0;
 	
@@ -4102,7 +4102,7 @@ void objects_update(
 
 	objects_garbage_collection();
 
-	profile_exit(objects_update_section);
+	profile_exit(section);
 
 	return;
 }
