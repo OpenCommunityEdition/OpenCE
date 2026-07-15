@@ -24,8 +24,18 @@ struct sound_location
 
 /* ---------- prototypes/GAME_SOUND.C */
 
-void game_sound_clear(void);
-void game_sound_restore(void);
+void game_sound_initialize(
+	void);
+void game_sound_dispose(
+	void);
+void game_sound_initialize_for_new_map(
+	void);
+void game_sound_dispose_from_old_map(
+	void);
+void game_sound_clear(
+	void);
+void game_sound_restore(
+	void);
 long game_looping_sound_new(long object_index, long definition_index, char const *marker_name, short function_index);
 void game_looping_sound_delete(long looping_sound_index);
 long object_impulse_sound_new(

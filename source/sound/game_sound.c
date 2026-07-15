@@ -96,16 +96,107 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "memory/data.h"
+#include "objects/objects.h"
+#include "saved games/game_state.h"
+#include "sound/game_sound.h"
+
 /* ---------- constants */
+
+enum
+{
+	MAXIMUM_GAME_LOOPING_SOUNDS = 1024,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct game_looping_sound_datum
+{
+	struct datum_header header;
+	short unknown2;
+	unsigned long flags;
+	long unknown8;
+	long definition_index;
+	long object_index;
+	long sound_index;
+	short function_index;
+	short node_index;
+	real_point3d position;
+	real_vector3d forward;
+};
+
+struct game_sound_globals
+{
+	long update_index;
+	long music_looping_sound_index;
+};
+
+typedef char game_looping_sound_datum_size_assert[
+	sizeof(struct game_looping_sound_datum) == 0x34 ? 1 : -1];
+typedef char game_sound_globals_size_assert[
+	sizeof(struct game_sound_globals) == 0x8 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+struct game_sound_globals *game_sound_globals;
+struct data_array *game_looping_sound_data;
+
 /* ---------- public code */
+
+void game_sound_initialize(
+	void)
+{
+	game_looping_sound_data = game_state_data_new(
+		"object looping sounds",
+		MAXIMUM_GAME_LOOPING_SOUNDS,
+		sizeof(struct game_looping_sound_datum));
+	game_sound_globals = (struct game_sound_globals *)game_state_malloc(
+		"game sound globals",
+		NULL,
+		sizeof(*game_sound_globals));
+
+	return;
+}
+
+void game_sound_dispose(
+	void)
+{
+	if (game_looping_sound_data)
+	{
+		game_looping_sound_data = NULL;
+	}
+
+	return;
+}
+
+void game_sound_initialize_for_new_map(
+	void)
+{
+	if (game_looping_sound_data)
+	{
+		data_make_valid(game_looping_sound_data);
+		game_sound_globals->music_looping_sound_index = NONE;
+		game_sound_globals->update_index = 0;
+	}
+
+	return;
+}
+
+void game_sound_dispose_from_old_map(
+	void)
+{
+	if (game_looping_sound_data && game_looping_sound_data->valid)
+	{
+		game_sound_clear();
+		data_make_invalid(game_looping_sound_data);
+	}
+
+	return;
+}
 
 /* ---------- private code */
