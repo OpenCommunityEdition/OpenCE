@@ -41,13 +41,6 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct scenario_device_datum
-{
-	short power_group_index;
-	short position_group_index;
-	unsigned long flags;
-};
-
 struct scenario_control_datum
 {
 	struct scenario_object_datum object;
@@ -58,10 +51,6 @@ struct scenario_control_datum
 };
 
 /* ---------- prototypes */
-
-void device_add_scenario_information(
-	long object_index,
-	struct scenario_device_datum *scenario_device);
 
 /* ---------- globals */
 
