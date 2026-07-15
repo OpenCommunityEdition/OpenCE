@@ -623,7 +623,7 @@
 				{ "name": "source/interface/ui_widget_game_data_input_functions.c", "index": 249, "status": "NonMatching" },
 				{ "name": "source/interface/ui_widget_event_handler_functions.c", "index": 250, "status": "NonMatching" },
 				{ "name": "source/interface/ui_widget.c", "index": 251, "status": "NonMatching" },
-				{ "name": "source/interface/terminal.c", "index": 252, "status": "NonMatching" },
+				{ "name": "source/interface/terminal.c", "index": 252, "status": "Matching" },
 				{ "name": "source/interface/progress_bar.c", "index": 253, "status": "NonMatching" },
 				{ "name": "source/interface/player_ui.c", "index": 254, "status": "NonMatching" },
 				{ "name": "source/interface/overhead_map.c", "index": 255, "status": "Matching" },
