@@ -167,4 +167,17 @@ boolean director_inhibited_input(
 	return director_globals[local_player_index].inhibit_input;
 }
 
+void director_set_mode(
+	short mode)
+{
+	match_assert("c:\\halo\\SOURCE\\camera\\director.c", 384, mode>=0 && mode<NUMBER_OF_DIRECTOR_GAME_MODES);
+	if (director_globals[0].mode != mode)
+	{
+		director_globals[0].mode = mode;
+		director_globals[0].mode_changed = TRUE;
+	}
+
+	return;
+}
+
 /* ---------- private code */

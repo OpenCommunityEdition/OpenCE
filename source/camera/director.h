@@ -15,6 +15,11 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum
+{
+	NUMBER_OF_DIRECTOR_GAME_MODES = 5
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -27,7 +32,10 @@ struct director_scripting_globals
 
 struct director_player_globals
 {
-	byte pad0[0x59];
+	byte pad0[4];
+	short mode;
+	boolean mode_changed;
+	byte pad7[0x52];
 	boolean inhibit_facing;
 	boolean inhibit_input;
 	byte pad5B[0x9D];
@@ -47,6 +55,8 @@ boolean director_inhibited_facing(
 	short local_player_index);
 boolean director_inhibited_input(
 	short local_player_index);
+void director_set_mode(
+	short mode);
 void director_initialize_for_saved_game(
 	void);
 
