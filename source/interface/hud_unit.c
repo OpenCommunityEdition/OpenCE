@@ -66,6 +66,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "interface/hud_unit.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -77,5 +79,17 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void hud_dispose_unit_interface_from_old_map(
+	void)
+{
+	return;
+}
+
+void hud_dispose_unit_interface(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */
