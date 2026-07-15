@@ -18,6 +18,10 @@ header included in hcex build.
 
 void draw_string_initialize(
 	void);
+void draw_string_initialize_for_new_map(
+	void);
+void draw_string_dispose_from_old_map(
+	void);
 void draw_string_dispose(
 	void);
 

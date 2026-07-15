@@ -98,21 +98,82 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "cseries/errors.h"
+#include "interface/interface.h"
+#include "math/real_math.h"
+#include "text/draw_string.h"
+#include "text/international_strings.h"
+#include "text/text_group.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct draw_string_globals
+{
+	byte __unknown0[0x20];
+	long localization_string_list_index;
+	long font_index;
+	unsigned long flags;
+	short style;
+	short justification;
+	real_argb_color color;
+	short tab_stop_count;
+	short tab_stops[16];
+	short highlight_start;
+	short highlight_end;
+	short initial_indent;
+	short paragraph_indent;
+	byte __unknown6A[0x8E];
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+struct draw_string_globals bss_004c1908;
+
+#define draw_string_globals bss_004c1908
 
 /* ---------- public code */
 
 void draw_string_initialize(
 	void)
 {
+	return;
+}
+
+void draw_string_initialize_for_new_map(
+	void)
+{
+	long localization_string_list_index = interface_get_tag_index(_interface_string_list_localization);
+	draw_string_globals.localization_string_list_index = localization_string_list_index;
+
+	if (localization_string_list_index != NONE)
+	{
+		set_language_code((short)atoi(string_list_get_string(localization_string_list_index, 0)));
+		draw_string_globals.tab_stop_count = 0;
+		draw_string_globals.flags = 0;
+		draw_string_globals.justification = 0;
+		draw_string_globals.initial_indent = 0;
+		draw_string_globals.paragraph_indent = 0;
+		draw_string_globals.font_index = NONE;
+	}
+	else
+	{
+		error(_error_immediate, "internal string localization tag is missing.");
+	}
+
+	return;
+}
+
+void draw_string_dispose_from_old_map(
+	void)
+{
+	draw_string_globals.localization_string_list_index = NONE;
 	return;
 }
 
