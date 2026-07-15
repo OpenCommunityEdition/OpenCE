@@ -15,7 +15,13 @@ header included in hcex build.
 /* ---------- structures */
 
 struct file_reference;
-struct sound_file_info;
+struct sound_file_info
+{
+	long samples_per_second;
+	short channel_count;
+	short block_alignment;
+	short significant_bits_per_sample;
+};
 
 /* ---------- prototypes/EXAMPLE.C */
 
