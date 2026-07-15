@@ -182,7 +182,9 @@ symbols in this file:
 
 struct progress_bar_globals
 {
-	unsigned char reserved[0x1D8];
+	long field0;
+	real initial_progress;
+	unsigned char reserved[0x1D0];
 };
 
 struct progress_bar_data
@@ -216,6 +218,12 @@ int __stdcall CopyFileA(
 	const char *existing_path,
 	const char *new_path,
 	int fail_if_exists);
+
+void code_000d1f00(
+	real progress);
+
+void code_000d25f0(
+	void);
 
 /* ---------- globals */
 
@@ -279,6 +287,29 @@ void progress_bar_enable(
 	boolean enabled)
 {
 	data_002fd5a8.enabled= enabled;
+
+	return;
+}
+
+void progress_bar_display(
+	real progress)
+{
+#line 827 "c:\\halo\\SOURCE\\interface\\progress_bar.c"
+	match_assert(__FILE__, __LINE__, (progress>=0.f) && (progress<=1.f));
+
+	if (progress_bar_mode.active && progress>0.f)
+	{
+		if (!progress_bar_mode.texture0)
+		{
+			code_000d25f0();
+			bss_00454030.initial_progress= progress;
+		}
+
+		if (data_002fd5a8.enabled)
+		{
+			code_000d1f00((progress - bss_00454030.initial_progress) / (1.f - bss_00454030.initial_progress));
+		}
+	}
 
 	return;
 }
