@@ -154,4 +154,34 @@ symbols in this file:
 
 /* ---------- public code */
 
+void vehicles_initialize(
+	void)
+{
+	return;
+}
+
+void vehicles_initialize_for_new_map(
+	void)
+{
+	return;
+}
+
+void vehicles_dispose_from_old_map(
+	void)
+{
+	return;
+}
+
+void vehicles_dispose(
+	void)
+{
+	return;
+}
+
+void vehicle_delete(
+	long vehicle_index)
+{
+	return;
+}
+
 /* ---------- private code */

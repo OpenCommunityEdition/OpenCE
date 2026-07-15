@@ -14,7 +14,18 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/VEHICLES.C */
+
+void vehicles_initialize(
+	void);
+void vehicles_initialize_for_new_map(
+	void);
+void vehicles_dispose_from_old_map(
+	void);
+void vehicles_dispose(
+	void);
+void vehicle_delete(
+	long vehicle_index);
 
 /* ---------- globals */
 
