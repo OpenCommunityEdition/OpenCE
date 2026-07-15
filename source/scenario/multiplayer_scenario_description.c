@@ -102,7 +102,7 @@ boolean map_name_from_multiplayer_scenario_description_item(
 	{
 		do
 		{
-			if (*(scenario_tag_path + character_index) == '\\')
+			if (item->scenario_tag_path[character_index] == '\\')
 			{
 				_snprintf(
 					map_name,
