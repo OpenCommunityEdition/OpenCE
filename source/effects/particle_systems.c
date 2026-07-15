@@ -81,6 +81,7 @@ symbols in this file:
 #include "math/real_math.h"
 #include "memory/data.h"
 #include "objects/objects.h"
+#include "physics/point_physics.h"
 #include "saved games/game_state.h"
 
 /* ---------- constants */
@@ -172,6 +173,31 @@ void particle_systems_disconnect_from_structure_bsp(
 }
 
 /* ---------- private code */
+
+void code_0008e0d0(
+	struct particle_system_datum *system,
+	real delta_time)
+{
+	struct particle_system_definition *definition = particle_system_definition_get(system->definition_index);
+
+	if (system->object_index == NONE && definition->point_physics_index != NONE)
+	{
+		point_physics_update(
+			0,
+			point_physics_definition_get(definition->point_physics_index),
+			&system->location,
+			NONE,
+			&system->position,
+			&system->velocity,
+			NULL,
+			NULL,
+			NULL,
+			1.0f,
+			delta_time);
+	}
+
+	return;
+}
 
 void code_0008e140(
 	struct particle_system_datum const *system,

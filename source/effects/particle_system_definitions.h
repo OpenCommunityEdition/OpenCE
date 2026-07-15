@@ -27,7 +27,14 @@ enum
 
 /* ---------- structures */
 
-struct particle_system_definition;
+struct particle_system_definition
+{
+	byte opaque00[0x44];
+	long point_physics_index;
+};
+
+typedef char particle_system_definition_point_physics_index_offset_assert[
+	offsetof(struct particle_system_definition, point_physics_index) == 0x44 ? 1 : -1];
 
 /* ---------- prototypes/EXAMPLE.C */
 

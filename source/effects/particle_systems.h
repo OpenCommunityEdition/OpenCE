@@ -11,6 +11,7 @@ header included in hcex build.
 #include "cseries/cseries.h"
 #include "math/real_math.h"
 #include "memory/data.h"
+#include "objects/objects.h"
 
 /* ---------- constants */
 
@@ -35,7 +36,8 @@ struct particle_system_datum
 	long object_index;
 	short attachment_index;
 	short type_state_index;
-	byte opaque14[0xC];
+	real function_value;
+	struct location location;
 	real_point3d position;
 	real_vector3d velocity;
 	byte opaque38[0x120];
@@ -54,6 +56,8 @@ typedef char particle_system_datum_size_assert[
 	sizeof(struct particle_system_datum) == 0x158 ? 1 : -1];
 typedef char particle_system_datum_position_offset_assert[
 	offsetof(struct particle_system_datum, position) == 0x20 ? 1 : -1];
+typedef char particle_system_datum_location_offset_assert[
+	offsetof(struct particle_system_datum, location) == 0x18 ? 1 : -1];
 typedef char particle_system_datum_velocity_offset_assert[
 	offsetof(struct particle_system_datum, velocity) == 0x2C ? 1 : -1];
 typedef char system_particle_datum_size_assert[
