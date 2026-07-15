@@ -91,61 +91,61 @@ void code_000a4710(void)
 {
 }
 
-+boolean code_000a4720(void)
+boolean code_000a4720(void)
 {
 	return TRUE;
 }
 
-+void code_000a4730(void)
+void code_000a4730(void)
 {
 }
 
-+void code_000a4740(void)
+void code_000a4740(void)
 {
 }
 
-+void code_000a4750(void)
+void code_000a4750(void)
 {
 }
 
-+void code_000a4760(void)
+void code_000a4760(void)
 {
 }
 
-+void code_000a4770(void)
+void code_000a4770(void)
 {
 }
 
-+void code_000a4780(void)
+void code_000a4780(void)
 {
 }
 
-+void code_000a4790(void)
+void code_000a4790(void)
 {
 }
 
-+void code_000a47a0(void)
+void code_000a47a0(void)
 {
 }
 
-+void code_000a47b0(void)
+void code_000a47b0(void)
 {
 }
 
-+void code_000a47c0(void)
+void code_000a47c0(void)
 {
 }
 
-+boolean code_000a47d0(void)
+boolean code_000a47d0(void)
 {
 	return TRUE;
 }
 
-+void code_000a47e0(void)
+void code_000a47e0(void)
 {
 }
 
-+void code_000a47f0(void)
+void code_000a47f0(void)
 {
 }
 
