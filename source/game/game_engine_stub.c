@@ -100,4 +100,8 @@ void code_000a4710(void)
 {
 }
 
++void code_000a4740(void)
+{
+}
+
 /* ---------- private code */
