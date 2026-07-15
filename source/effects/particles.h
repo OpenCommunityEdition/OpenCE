@@ -66,7 +66,9 @@ struct particle_datum
 
 struct particle_definition
 {
-	byte unknown0[0x74];
+	byte unknown0[0x58];
+	struct tag_reference effect;
+	byte unknown68[0x0C];
 	real radius_lower_bound;
 	real radius_upper_bound;
 };
@@ -91,6 +93,8 @@ typedef char particle_definition_radius_lower_bound_offset_assert[
 	offsetof(struct particle_definition, radius_lower_bound) == 0x74 ? 1 : -1];
 typedef char particle_definition_radius_upper_bound_offset_assert[
 	offsetof(struct particle_definition, radius_upper_bound) == 0x78 ? 1 : -1];
+typedef char particle_definition_effect_offset_assert[
+	offsetof(struct particle_definition, effect) == 0x58 ? 1 : -1];
 
 #define particle_get(index) ((struct particle_datum *)datum_get(particle_data, (index)))
 #define particle_definition_get(index) ((struct particle_definition *)tag_get(PARTICLE_TAG, (index)))

@@ -85,6 +85,13 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum particle_private_abi_offsets
+{
+	_particle_datum_definition_index_offset = offsetof(struct particle_datum, definition_index),
+	_particle_definition_effect_group_tag_offset = offsetof(struct particle_definition, effect) + offsetof(struct tag_reference, group_tag),
+	_particle_definition_effect_index_offset = offsetof(struct particle_definition, effect) + offsetof(struct tag_reference, index)
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -93,6 +100,9 @@ symbols in this file:
 
 boolean valid_real_rgb_color(
 	real_rgb_color const *color);
+// particle is passed in eax, group tag in ecx, and effect index in esi
+void code_0008fde0(
+	long parameter);
 
 /* ---------- globals */
 
@@ -208,6 +218,44 @@ boolean valid_real_argb_color(
 		color->alpha >= 0.0f &&
 		color->alpha <= 1.0f &&
 		valid_real_rgb_color(&color->rgb);
+}
+
+// long particle_index is passed in ebx
+__declspec(naked) void code_0008ff30(
+	void)
+{
+	__asm
+	{
+		mov eax, particle_data
+		push esi
+		push edi
+		push ebx
+		push eax
+		call datum_get
+		mov edi, eax
+		mov ecx, [edi + _particle_datum_definition_index_offset]
+		push ecx
+		push PARTICLE_TAG
+		call tag_get
+		mov esi, [eax + _particle_definition_effect_index_offset]
+		add esp, 16
+		cmp esi, NONE
+		je delete_particle
+		mov ecx, [eax + _particle_definition_effect_group_tag_offset]
+		push FALSE
+		mov eax, edi
+		call code_0008fde0
+		add esp, 4
+	delete_particle:
+		mov edx, particle_data
+		push ebx
+		push edx
+		call datum_delete
+		add esp, 8
+		pop edi
+		pop esi
+		ret
+	}
 }
 
 /* ---------- private code */
