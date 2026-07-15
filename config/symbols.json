@@ -22419,7 +22419,7 @@
 { "file_offset": 4451240, "flags": 0, "name": "_bss_0043eba8" },
 { "file_offset": 4451504, "flags": 0, "name": "_bss_0043ecb0" },
 { "file_offset": 4451712, "flags": 0, "name": "_bss_0043ed80" },
-{ "file_offset": 4451840, "flags": 0, "name": "_bss_0043ee00" },
+{ "file_offset": 4451840, "flags": 0, "name": "_game_statistics_active" },
 { "file_offset": 4451844, "flags": 0, "name": "_game_time_statistics" },
 { "file_offset": 4451884, "flags": 0, "name": "_game_time_globals" },
 { "file_offset": 4451888, "flags": 0, "name": "_bss_0043ee30" },

@@ -11,10 +11,13 @@ symbols in this file:
 000A4A60 02a0:
 	_game_statistics_record_kill (0000)
 0043EE00 0001:
-	_bss_0043ee00 (0000)
+	_game_statistics_active (0000)
 */
 
 /* ---------- headers */
+
+#include "cseries.h"
+#include "real_math.h"
 
 /* ---------- constants */
 
@@ -26,6 +29,26 @@ symbols in this file:
 
 /* ---------- globals */
 
+boolean game_statistics_active = FALSE;
+
 /* ---------- public code */
+
+void game_statistics_start(
+	void)
+{
+	game_statistics_active = 1;
+
+	return;
+}
+
+void game_statistics_record_damage(
+	long object_index,
+	real damage,
+	long owner_player_index,
+	long owner_object_index,
+	short owner_team_index)
+{
+	return;
+}
 
 /* ---------- private code */
