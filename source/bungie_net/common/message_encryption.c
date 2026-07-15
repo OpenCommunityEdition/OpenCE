@@ -40,6 +40,17 @@ enum
 
 /* ---------- structures */
 
+union message_header_value
+{
+	word value;
+	struct
+	{
+		word flags : 2;
+		word type : 2;
+		word message_size : 12;
+	} fields;
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
@@ -132,8 +143,9 @@ void message_encrypt(
 	word *msgptr,
 	unsigned long const key[2])
 {
-	word flags;
+	union message_header_value header;
 	word message_size;
+	word flags;
 	word block_count;
 	short remainder_size;
 	word *cursor;
@@ -141,18 +153,16 @@ void message_encrypt(
 	unsigned long block_index;
 
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\message_encryption.c", 31, msgptr && key);
-	flags = *msgptr;
-	message_size = flags >> 4;
-	flags &= MESSAGE_FLAG_BITS_MASK;
+	header.value = *msgptr;
+	flags = header.fields.flags;
+	message_size = header.fields.message_size;
 	if (!TEST_FLAG(flags, 0))
 	{
 		block_count = (message_size - sizeof(word)) >> 3;
 		remainder_size = (message_size - sizeof(word)) & 7;
 		cursor = msgptr + 1;
-		key_copy[0] = key[0];
-		key_copy[1] = key[1];
-		key_copy[2] = key_copy[0];
-		key_copy[3] = key_copy[1];
+		key_copy[0] = key_copy[2] = key[0];
+		key_copy[1] = key_copy[3] = key[1];
 		if (block_count)
 		{
 			block_index = block_count;
@@ -179,8 +189,9 @@ void message_decrypt(
 	word *msgptr,
 	unsigned long const key[2])
 {
-	word flags;
+	union message_header_value header;
 	word message_size;
+	word flags;
 	word block_count;
 	short remainder_size;
 	word *cursor;
@@ -188,18 +199,16 @@ void message_decrypt(
 	unsigned long block_index;
 
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\message_encryption.c", 88, msgptr && key);
-	flags = *msgptr;
-	message_size = flags >> 4;
-	flags &= MESSAGE_FLAG_BITS_MASK;
+	header.value = *msgptr;
+	flags = header.fields.flags;
+	message_size = header.fields.message_size;
 	if (TEST_FLAG(flags, 0))
 	{
 		block_count = (message_size - sizeof(word)) >> 3;
 		remainder_size = (message_size - sizeof(word)) & 7;
 		cursor = msgptr + 1;
-		key_copy[0] = key[0];
-		key_copy[1] = key[1];
-		key_copy[2] = key_copy[0];
-		key_copy[3] = key_copy[1];
+		key_copy[0] = key_copy[2] = key[0];
+		key_copy[1] = key_copy[3] = key[1];
 		if (block_count)
 		{
 			block_index = block_count;
