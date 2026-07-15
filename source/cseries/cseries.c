@@ -133,6 +133,8 @@ symbols in this file:
 
 #define BUILDING_CSERIES
 
+#include <wchar.h>
+
 #include "cseries.h"
 #include "profile.h"
 #include "errors.h"
@@ -492,6 +494,45 @@ void *csmemcpy(
 	cseries_match_assert("c:\\halo\\SOURCE\\cseries\\cseries.c", 385, (byte *)source+size<=(byte *)destination || (byte *)destination+size<=(byte *)source);
 	
 	return memcpy(destination, source, size);
+}
+
+long csstrcasecmp(
+	const char *s1,
+	const char *s2)
+{
+	register int c1;
+	int c2;
+	int offset;
+
+	cseries_match_assert("c:\\halo\\SOURCE\\cseries\\cseries.c", 397, s1 && s2);
+
+	c1 = towlower(*s1);
+	c2 = towlower(*s2);
+	if (c1 == 0)
+		goto c1_zero;
+
+	offset = s1 - s2;
+loop:
+	if (c2 == 0)
+		goto c2_zero;
+	if (c2 != c1)
+		goto not_equal;
+	s2++;
+	c1 = towlower(s2[offset]);
+	c2 = towlower(*s2);
+	if (c1 != 0)
+		goto loop;
+
+c1_zero:
+	if (c2 != 0)
+		return -1;
+	return 0;
+
+c2_zero:
+	return c1 != 0;
+
+not_equal:
+	return c1 > c2 ? 1 : -1;
 }
 
 __declspec(naked) char *stristr(
