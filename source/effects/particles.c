@@ -163,4 +163,15 @@ void particles_disconnect_from_structure_bsp(
 	return;
 }
 
+real particle_get_radius(
+	long particle_index)
+{
+	struct particle_datum *particle = particle_get(particle_index);
+	struct particle_definition *definition = particle_definition_get(particle->definition_index);
+
+	return ((definition->radius_upper_bound - definition->radius_lower_bound) *
+			(particle->age / particle->lifespan) + definition->radius_lower_bound) *
+		particle->radius;
+}
+
 /* ---------- private code */
