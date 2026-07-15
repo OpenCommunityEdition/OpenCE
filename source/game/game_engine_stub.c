@@ -96,4 +96,8 @@ void code_000a4710(void)
 	return TRUE;
 }
 
++void code_000a4730(void)
+{
+}
+
 /* ---------- private code */
