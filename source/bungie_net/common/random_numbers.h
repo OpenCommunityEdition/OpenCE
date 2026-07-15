@@ -14,10 +14,21 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct qword_value
+{
+	unsigned __int64 qword;
+};
+
 /* ---------- prototypes/EXAMPLE.C */
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+long randomrange(long min, long max);
+void randomrange64(
+	struct qword_value const *min,
+	struct qword_value const *max,
+	struct qword_value *result);
 
 #endif // __RANDOM_NUMBERS_H
