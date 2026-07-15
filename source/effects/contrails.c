@@ -66,6 +66,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "effects/contrails.h"
+
+#include "cseries/errors.h"
+#include "saved games/game_state.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -77,6 +82,57 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void contrails_initialize(
+	void)
+{
+	contrail_data = game_state_data_new("contrail", 256, 0x44);
+	contrail_point_data = game_state_data_new("contrail point", 1024, 0x38);
+	if (contrail_data)
+	{
+		if (contrail_point_data)
+			return;
+		contrail_data = NULL;
+	}
+	else if (contrail_point_data)
+	{
+		contrail_point_data = NULL;
+		error(_error_immediate, "couldn't allocate contrail globals");
+		return;
+	}
+	error(_error_immediate, "couldn't allocate contrail globals");
+
+	return;
+}
+
+void contrails_initialize_for_new_map(
+	void)
+{
+	data_make_valid(contrail_data);
+	data_make_valid(contrail_point_data);
+
+	return;
+}
+
+void contrails_dispose_from_old_map(
+	void)
+{
+	data_make_invalid(contrail_point_data);
+	data_make_invalid(contrail_data);
+
+	return;
+}
+
+void contrails_dispose(
+	void)
+{
+	if (contrail_point_data)
+		contrail_point_data = NULL;
+	if (contrail_data)
+		contrail_data = NULL;
+
+	return;
+}
 
 void contrails_disconnect_from_structure_bsp(
 	void)
