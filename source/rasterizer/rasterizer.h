@@ -147,6 +147,10 @@ void rasterizer_memory_pool_dispose(void);
 /* ---------- prototypes/RASTERIZER_LIGHTS.C */
 
 void rasterizer_lights_reset_for_new_map(void);
+void rasterizer_lights_begin(
+	void);
+void rasterizer_lights_end(
+	void);
 
 /* ---------- prototypes/RASTERIZER_TEXT.C */
 

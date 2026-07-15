@@ -110,6 +110,11 @@ struct rasterizer_lens_flare_submit_parameters
 	long internal__occlusion_pixels;
 };
 
+struct rasterizer_lights_globals
+{
+	long light_count;
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
@@ -119,6 +124,7 @@ static byte local_lens_flare_occlusion_test_results2[65544][MAXIMUM_WINDOWS];
 static struct rasterizer_lens_flare_submit_parameters local_lens_flare_parameters[MAXIMUM_LENS_FLARES_PER_FRAME] = {0};
 static long local_lens_flare_count = 0;
 static boolean local_lens_flare_error_printed = FALSE;
+extern struct rasterizer_lights_globals rasterizer_lights;
 
 /* ---------- public code */
 
@@ -128,6 +134,20 @@ void rasterizer_lights_reset_for_new_map(void)
 	memset(local_lens_flare_occlusion_test_results2, 0, sizeof(local_lens_flare_occlusion_test_results2));
 	local_lens_flare_count = 0;
 
+	return;
+}
+
+void rasterizer_lights_begin(
+	void)
+{
+	rasterizer_lights.light_count = 0;
+
+	return;
+}
+
+void rasterizer_lights_end(
+	void)
+{
 	return;
 }
 
