@@ -48,6 +48,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include <xtl.h>
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -59,5 +61,61 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+/*
+These are custom-ABI callback thunks. D3D arguments arrive in registers and a
+dispatcher-owned stack word is consumed by the return instruction.
+*/
+
+__declspec(naked) long code_00148dd0(
+	void)
+{
+	__asm
+	{
+		push eax
+		push ecx
+		push edx
+		call D3DDevice_SetVertexShaderConstant
+		xor eax, eax
+		ret 4
+	}
+}
+
+__declspec(naked) long code_00148de0(
+	void)
+{
+	__asm
+	{
+		push eax
+		push ecx
+		push edx
+		call D3DDevice_SetVertexData2s
+		xor eax, eax
+		ret 4
+	}
+}
+
+__declspec(naked) long code_00148df0(
+	void)
+{
+	__asm
+	{
+		push eax
+		call D3DDevice_Begin
+		xor eax, eax
+		ret 4
+	}
+}
+
+__declspec(naked) long code_00148e00(
+	void)
+{
+	__asm
+	{
+		call D3DDevice_End
+		xor eax, eax
+		ret 4
+	}
+}
 
 /* ---------- private code */
