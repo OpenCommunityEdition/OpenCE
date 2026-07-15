@@ -93,6 +93,8 @@ short director_camera_deterministic(
 	real_vector3d *forward);
 void director_set_mode(
 	short mode);
+void director_save_camera(
+	void);
 void director_initialize_for_new_map(
 	void);
 void director_script_camera(

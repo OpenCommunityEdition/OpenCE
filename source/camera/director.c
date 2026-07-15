@@ -109,6 +109,7 @@ symbols in this file:
 
 #include "first_person_camera.h"
 #include "following_camera.h"
+#include "observer.h"
 
 #include "editor/editor_stubs.h"
 #include "saved games/game_state.h"
@@ -300,6 +301,27 @@ void director_set_mode(
 	{
 		director_globals[0].mode = mode;
 		director_globals[0].mode_changed = TRUE;
+	}
+
+	return;
+}
+
+void director_save_camera(
+	void)
+{
+	FILE *file;
+
+	file = fopen("d:\\camera.txt", "w");
+	if (file)
+	{
+		struct observer_result const *camera;
+
+		camera = observer_get_camera(0);
+		fprintf(file, "%f %f %f\n", camera->position.x, camera->position.y, camera->position.z);
+		fprintf(file, "%f %f %f\n", camera->forward.i, camera->forward.j, camera->forward.k);
+		fprintf(file, "%f %f %f\n", camera->up.i, camera->up.j, camera->up.k);
+		fprintf(file, "%f\n", camera->field_of_view);
+		fclose(file);
 	}
 
 	return;
