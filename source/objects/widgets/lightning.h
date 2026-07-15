@@ -16,6 +16,9 @@ header included in hcex build.
 
 /* ---------- prototypes/EXAMPLE.C */
 
+void lightnings_dispose(
+	void);
+
 /* ---------- globals */
 
 /* ---------- public code */

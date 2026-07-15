@@ -54,4 +54,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+void lightnings_dispose(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
