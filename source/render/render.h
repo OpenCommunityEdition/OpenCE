@@ -99,6 +99,15 @@ void render_frame_present(const point2d *screenshot_index, struct bitmap_data *b
 boolean render_location_visible(struct location *location);
 struct rendered_cluster *rendered_cluster_get(short rendered_cluster_index);
 
+/* ---------- prototypes/RENDER_CONTRAILS.C */
+
+void render_contrails_ground_mapped(
+	void);
+void render_contrails_media_mapped(
+	void);
+void render_contrails_normal(
+	void);
+
 /* ---------- prototypes/RENDER_OBJECTS.C */
 
 void render_objects_initialize(

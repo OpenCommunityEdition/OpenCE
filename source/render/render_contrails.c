@@ -24,7 +24,17 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "render.h"
+
 /* ---------- constants */
+
+enum
+{
+	_contrail_render_mode_media_mapped = 1 << 2,
+	_contrail_render_mode_ground_mapped = 1 << 3,
+	_contrail_render_mode_normal = ~(_contrail_render_mode_media_mapped | _contrail_render_mode_ground_mapped),
+};
 
 /* ---------- macros */
 
@@ -32,8 +42,32 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void code_00178000(
+	unsigned long render_mode_flags);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+void render_contrails_ground_mapped(
+	void)
+{
+	code_00178000(_contrail_render_mode_ground_mapped);
+	return;
+}
+
+void render_contrails_media_mapped(
+	void)
+{
+	code_00178000(_contrail_render_mode_media_mapped);
+	return;
+}
+
+void render_contrails_normal(
+	void)
+{
+	code_00178000(_contrail_render_mode_normal);
+	return;
+}
 
 /* ---------- private code */
