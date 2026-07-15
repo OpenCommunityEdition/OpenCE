@@ -34,16 +34,19 @@ symbols in this file:
 #include "cseries_windows.h"
 #include "shell.h"
 #include "physical_memory_map.h"
-#include "xbox/rasterizer_xbox.h"
 #include "main.h"
 
 /* ---------- prototypes */
 
-static void fuck_code_in_the_eye(void);
+void fuck_code_in_the_eye(
+	void);
+
+void rasterizer_preinitialize__fill_you_up_with_the_devils_cock(
+	void);
 
 /* ---------- globals */
 
-static char shell_command_line[8];
+char bss_004c08a8[8] = { 0 };
 
 /* ---------- public code */
 
@@ -54,11 +57,11 @@ boolean shell_platform_initialize(
 	DWORD launch_data_type;
 
 	if (!XGetLaunchInfo(&launch_data_type, &launch_data) &&
-		launch_data_type==LDT_TITLE &&
-		!strcmp((const char *)launch_data.Data, "XDEMOS"))
+		launch_data_type == LDT_TITLE &&
+		!csstrcmp((const char *)launch_data.Data, "XDEMOS"))
 	{
-		strncat(shell_command_line, "xdemo ", NUMBEROF(shell_command_line)-1);
-		shell_command_line[NUMBEROF(shell_command_line)-1] = '\0';
+		csstrncat(bss_004c08a8, "xdemo ", NUMBEROF(bss_004c08a8) - 1);
+		bss_004c08a8[NUMBEROF(bss_004c08a8) - 1] = '\0';
 	}
 
 	return TRUE;
@@ -90,7 +93,7 @@ shell_screen_pause(
 const char *shell_get_command_line(
 	void)
 {
-	return shell_command_line;
+	return bss_004c08a8;
 }
 
 void
@@ -125,30 +128,35 @@ int main(
 
 /* ---------- private code */
 
-static void
+void
 fuck_code_in_the_eye(
 	void)
 {
 	DWORD flOldProtect;
-
-	PDM_WALK_MODSECT walk_modsect = NULL;
+	PDM_WALK_MODSECT walk_modsect;
 	DMN_SECTIONLOAD section_load;
-
-	PDM_WALK_MODULES walk_modules = NULL;
+	PDM_WALK_MODULES walk_modules;
 	DMN_MODLOAD module_load;
 
-	while (DmWalkLoadedModules(&walk_modules, &module_load)!=XBDM_ENDOFLIST)
+	walk_modsect = NULL;
+	walk_modules = NULL;
+
+	while (DmWalkLoadedModules(&walk_modules, &module_load) != XBDM_ENDOFLIST)
 	{
 		walk_modsect = NULL;
-		while (DmWalkModuleSections(&walk_modsect, module_load.Name, &section_load)!=XBDM_ENDOFLIST)
+
+		while (DmWalkModuleSections(&walk_modsect, module_load.Name, &section_load) != XBDM_ENDOFLIST)
 		{
-			if (fuck_code_in_the_eye>section_load.BaseAddress && fuck_code_in_the_eye<(void *)((byte *)section_load.BaseAddress + section_load.Size))
+			if (fuck_code_in_the_eye > section_load.BaseAddress &&
+				fuck_code_in_the_eye < (void *)((char *)section_load.BaseAddress + section_load.Size))
 			{
 				VirtualProtect(section_load.BaseAddress, section_load.Size, PAGE_READONLY, &flOldProtect);
-				
 				DmCloseModuleSections(walk_modsect);
+
 				break;
 			}
 		}
 	}
+
+	return;
 }
