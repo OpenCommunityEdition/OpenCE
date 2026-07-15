@@ -37,6 +37,45 @@ symbols in this file:
 /* ---------- public code */
 
 void
+physics_variable_speed_update(
+	real *speed,
+	struct physics_variable_speed_parameters *parameters,
+	real delta)
+{
+	real magnitude = (real)fabs(delta);
+	real acceleration = magnitude * parameters->acceleration;
+	real deceleration = magnitude * parameters->deceleration;
+
+	if (delta > 0.f)
+	{
+		if (*speed <= -deceleration)
+			*speed += deceleration;
+		else if (*speed >= 0.f)
+			*speed += acceleration;
+		else
+			*speed = (*speed / deceleration + 1.f) * acceleration;
+
+		*speed = MIN(*speed, magnitude * parameters->positive_scale);
+
+		return;
+	}
+
+	if (delta < 0.f)
+	{
+		if (*speed >= deceleration)
+			*speed -= deceleration;
+		else if (*speed <= 0.f)
+			*speed -= acceleration;
+		else
+			*speed = (*speed / deceleration - 1.f) * acceleration;
+
+		*speed = MAX(-magnitude * parameters->negative_scale, *speed);
+	}
+
+	return;
+}
+
+void
 physics_variable_position_update(
 	real *position,
 	real *limits,
@@ -74,7 +113,10 @@ physics_variable_update(
 	boolean update_velocity,
 	real delta)
 {
-	physics_variable_speed_update(range, velocity + 2, delta);
+	physics_variable_speed_update(
+		range,
+		(struct physics_variable_speed_parameters *)(velocity + 2),
+		delta);
 	physics_variable_position_update(position, velocity, update_velocity, *range);
 
 	return;

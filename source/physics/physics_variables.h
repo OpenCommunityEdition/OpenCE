@@ -18,11 +18,19 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct physics_variable_speed_parameters
+{
+	real positive_scale;
+	real negative_scale;
+	real acceleration;
+	real deceleration;
+};
+
 /* ---------- prototypes/PHYSICS_VARIABLES.C */
 
 void physics_variable_speed_update(
-	real *range,
-	real *velocity,
+	real *speed,
+	struct physics_variable_speed_parameters *parameters,
 	real delta);
 
 void physics_variable_position_update(
