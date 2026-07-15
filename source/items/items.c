@@ -70,4 +70,34 @@ symbols in this file:
 
 /* ---------- public code */
 
+void items_initialize(
+	void)
+{
+	return;
+}
+
+void items_initialize_for_new_map(
+	void)
+{
+	return;
+}
+
+void items_dispose_from_old_map(
+	void)
+{
+	return;
+}
+
+void items_dispose(
+	void)
+{
+	return;
+}
+
+void item_delete(
+	long item_index)
+{
+	return;
+}
+
 /* ---------- private code */
