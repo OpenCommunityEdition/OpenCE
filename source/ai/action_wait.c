@@ -41,6 +41,15 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void ai_communication_event(
+	short type,
+	long unit_index,
+	long prop_index,
+	long object_index,
+	long position_index,
+	long structure_index,
+	boolean allow_reply);
+
 /* ---------- globals */
 
 /* ---------- public code */
@@ -109,6 +118,45 @@ boolean action_wait_setup(
 	}
 
 	return result;
+}
+
+void
+action_wait_update(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->state.action_data.wait.query_timer > 0)
+	{
+		actor->state.action_data.wait.query_timer--;
+		if (actor->state.action_data.wait.query_timer == 0)
+		{
+			if (actor->meta.unit_index != NONE)
+			{
+				ai_communication_event(17, actor->meta.unit_index, NONE, NONE, NONE, NONE, FALSE);
+			}
+			actor->state.action_data.wait.query_timer = seed_random_range(get_global_random_seed_address(), 300, 600);
+		}
+	}
+
+	if (actor->state.action_data.wait.exit_timer > 0)
+	{
+		actor->state.action_data.wait.exit_timer--;
+		if (actor->state.action_data.wait.exit_timer == 0)
+		{
+			if (actor->state.action_data.wait.waiting_as_coordinator && actor->meta.unit_index != NONE)
+			{
+				ai_communication_event(20, actor->meta.unit_index, NONE, NONE, NONE, NONE, FALSE);
+			}
+			actor->state.action_data.wait.wait_done = TRUE;
+		}
+	}
+
+	if (!actor->state.action_data.wait.desire_move && actor->state.action_data.wait.look_timer > 0)
+	{
+		actor->state.action_data.wait.look_timer--;
+	}
+	return;
 }
 
 /* ---------- private code */
