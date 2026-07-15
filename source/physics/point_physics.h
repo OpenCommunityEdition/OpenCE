@@ -32,9 +32,17 @@ struct point_physics_definition
 	real density;
 };
 
+struct point_physics_globals
+{
+	real water_density;
+	real air_density;
+};
+
 /* ---------- prototypes/POINT_PHYSICS.C */
 
 void point_physics_dispose_from_old_map(
+	void);
+void point_physics_initialize_for_new_map(
 	void);
 real point_physics_definition_get_mass(
 	struct point_physics_definition const *definition,

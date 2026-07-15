@@ -22528,7 +22528,7 @@
 { "file_offset": 4579352, "flags": 0, "name": "_debug_collision_skip_objects" },
 { "file_offset": 4579353, "flags": 0, "name": "_debug_collision_skip_vectors" },
 { "file_offset": 4579354, "flags": 0, "name": "_debug_physics_disable_penetration_freeze" },
-{ "file_offset": 4579356, "flags": 0, "name": "_bss_0045e01c" },
+{ "file_offset": 4579356, "flags": 0, "name": "_point_physics_globals" },
 { "file_offset": 4579364, "flags": 0, "name": "_global_rasterizer_data" },
 { "file_offset": 4579368, "flags": 0, "name": "_bss_0045e028" },
 { "file_offset": 4581584, "flags": 0, "name": "_global_d3d_device" },

@@ -45,6 +45,8 @@ symbols in this file:
 
 /* ---------- constants */
 
+#define POINT_PHYSICS_DENSITY_SCALE 118613.344f
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -53,7 +55,21 @@ symbols in this file:
 
 /* ---------- globals */
 
+extern real global_air_density;
+extern real global_water_density;
+
+struct point_physics_globals point_physics_globals;
+
 /* ---------- public code */
+
+void point_physics_initialize_for_new_map(
+	void)
+{
+	point_physics_globals.air_density= global_air_density * POINT_PHYSICS_DENSITY_SCALE;
+	point_physics_globals.water_density= global_water_density * POINT_PHYSICS_DENSITY_SCALE;
+
+	return;
+}
 
 void point_physics_dispose_from_old_map(
 	void)
