@@ -22,6 +22,9 @@ void sound_initialize(void);
 void sound_initialize_for_new_map(
 	void);
 
+long sound_render_time(
+	void);
+
 void sound_stop_all(void);
 void sound_stop_impulse(long sound_index);
 

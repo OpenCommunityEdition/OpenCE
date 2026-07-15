@@ -224,11 +224,26 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct sound_manager_globals
+{
+	unsigned char reserved0[0xC];
+	long render_time;
+	unsigned char reserved1[0x168];
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+struct sound_manager_globals bss_004d2d60;
+
 /* ---------- public code */
+
+long sound_render_time(
+	void)
+{
+	return bss_004d2d60.render_time;
+}
 
 void sound_initialize_for_new_map(
 	void)
