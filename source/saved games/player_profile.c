@@ -108,7 +108,18 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "math/real_math.h"
+#include "saved games/player_profile.h"
+
 /* ---------- constants */
+
+enum
+{
+	NUMBER_OF_AVAILABLE_PRIMARY_COLORS = 18,
+	NUMBER_OF_GOOD_RANDOM_COLORS = 3,
+	NUMBER_OF_RANDOM_COLORS = 17,
+};
 
 /* ---------- macros */
 
@@ -119,5 +130,29 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+short player_profile_number_of_available_primary_colors(
+	void)
+{
+	return NUMBER_OF_AVAILABLE_PRIMARY_COLORS;
+}
+
+long player_profile_get_random_good_color(
+	void)
+{
+	return seed_random_range(
+		get_global_local_random_seed_address(),
+		0,
+		NUMBER_OF_GOOD_RANDOM_COLORS);
+}
+
+long player_profile_get_random_color(
+	void)
+{
+	return seed_random_range(
+		get_global_local_random_seed_address(),
+		0,
+		NUMBER_OF_RANDOM_COLORS);
+}
 
 /* ---------- private code */
