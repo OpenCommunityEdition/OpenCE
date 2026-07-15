@@ -104,6 +104,8 @@ symbols in this file:
 
 /* ---------- globals */
 
+char transport_address_string[256];
+
 /* ---------- public code */
 
 struct transport_address *create_transport_address(
@@ -158,6 +160,103 @@ long transport_address_equivalent(
 		return TRUE;
 
 	return FALSE;
+}
+
+char const *transport_address_to_string(
+	struct transport_address const *addr)
+{
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c", 74, addr);
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c", 75, IPV4_ADDRESS_LENGTH == addr->address_length);
+
+	transport_address_string[0] = 0;
+	if (addr->address_length == IPV4_ADDRESS_LENGTH)
+	{
+		_snprintf(
+			transport_address_string,
+			NUMBEROF(transport_address_string),
+			"%hd.%hd.%hd.%hd:%hd",
+			addr->address.bytes[3],
+			addr->address.bytes[2],
+			addr->address.bytes[1],
+			addr->address.bytes[0],
+			addr->port);
+	}
+	else if (addr->address_length == IPV6_ADDRESS_LENGTH)
+	{
+		_snprintf(
+			transport_address_string,
+			NUMBEROF(transport_address_string),
+			"%4X.%4X.%4X.%4X.%4X.%4X.%4X.%4X:%hd",
+			addr->address.words[0],
+			addr->address.words[1],
+			addr->address.words[2],
+			addr->address.words[3],
+			addr->address.words[4],
+			addr->address.words[5],
+			addr->address.words[6],
+			addr->address.words[7],
+			addr->port);
+	}
+
+	return transport_address_string;
+}
+
+char const *transport_error_to_string(
+	short error)
+{
+	switch (error)
+	{
+	case _transport_error_none:
+		return "_transport_error_none";
+	case _transport_error_unknown:
+		return "_transport_error_unknown";
+	case _transport_error_endpoint_io:
+		return "_transport_error_endpoint_io";
+	case _transport_error_connection_lost:
+		return "_transport_error_connection_lost";
+	case _transport_result_operation_would_block:
+		return "_transport_result_operation_would_block";
+	case _transport_error_not_initialized:
+		return "_transport_error_not_initialized";
+	case _transport_result_already_initialized:
+		return "_transport_result_already_initialized";
+	case _transport_error_bad_input_parameters:
+		return "_transport_error_bad_input_parameters";
+	case _transport_error_dns_lookup_failure:
+		return "_transport_error_dns_lookup_failure";
+	case _transport_error_out_of_memory:
+		return "_transport_error_out_of_memory";
+	case _transport_error_seg_fault:
+		return "_transport_error_seg_fault";
+	case _transport_error_buffers_full:
+		return "_transport_error_buffers_full";
+	case _transport_error_bad_endpoint:
+		return "_transport_error_bad_endpoint";
+	case _transport_result_poll_timeout:
+		return "_transport_result_poll_timeout";
+	case _transport_error_bind_endpoint:
+		return "_transport_error_bind_endpoint";
+	case _transport_error_address_unknown:
+		return "_transport_error_address_unknown";
+	case _transport_error_connect_failed:
+		return "_transport_error_connect_failed";
+	case _transport_error_listen_failed:
+		return "_transport_error_listen_failed";
+	case _transport_error_options_failed:
+		return "_transport_error_options_failed";
+	case _transport_error_endpoint_not_in_set:
+		return "_transport_error_endpoint_not_in_set";
+	case _transport_error_endpoint_set_full:
+		return "_transport_error_endpoint_set_full";
+	case _transport_error_poll_error:
+		return "_transport_error_poll_error";
+	case _transport_result_dns_lookup_in_progress:
+		return "_transport_result_dns_lookup_in_progress";
+	case _transport_result_connect_in_progress:
+		return "_transport_result_connect_in_progress";
+	default:
+		return "<unknown transport error>";
+	}
 }
 
 /* ---------- private code */
