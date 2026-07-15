@@ -15,6 +15,10 @@ RASTERIZER_XBOX.H
 /* ---------- prototypes/RASTERIZER_XBOX.C */
 
 void rasterizer_preinitialize__fill_you_up_with_the_devils_cock(void);
+void rasterizer_spin_begin(
+	void);
+void rasterizer_spin_end(
+	void);
 
 
 /* ---------- prototypes/RASTERIZER_XBOX_PROFILE.C */

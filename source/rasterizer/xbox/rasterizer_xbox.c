@@ -383,6 +383,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include <xtl.h>
+
+#include "rasterizer_xbox.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -394,5 +398,17 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void rasterizer_spin_begin(
+	void)
+{
+	return;
+}
+
+void rasterizer_spin_end(
+	void)
+{
+	return;
+}
 
 /* ---------- private code */
