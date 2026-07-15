@@ -178,6 +178,8 @@ struct ai_command_list_definition
 
 /* ---------- globals */
 
+extern char const *global_ai_default_state_names[12];
+
 /* ---------- public code */
 
 long scenario_get_encounter_by_name(

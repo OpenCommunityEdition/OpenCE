@@ -42,6 +42,22 @@ symbols in this file:
 
 /* ---------- globals */
 
+char const *global_ai_default_state_names[12] =
+{
+	"none",
+	"sleep",
+	"alert",
+	"move_repeat",
+	"move_loop",
+	"move_loop_back_and_forth",
+	"move_loop_random",
+	"move_random",
+	"guard",
+	"guard_at_position",
+	"search",
+	"flee",
+};
+
 /* ---------- public code */
 
 long scenario_get_encounter_by_name(
