@@ -216,4 +216,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+void network_connection_initialize(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */

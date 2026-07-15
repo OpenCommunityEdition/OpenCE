@@ -21,6 +21,9 @@ enum
 
 /* ---------- prototypes/EXAMPLE.C */
 
+void network_connection_initialize(
+	void);
+
 /* ---------- globals */
 
 /* ---------- public code */
