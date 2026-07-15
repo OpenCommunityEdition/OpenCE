@@ -24,6 +24,7 @@ symbols in this file:
 #include "actions.h"
 
 #include "actors.h"
+#include "props.h"
 #include "game/game.h"
 
 /* ---------- constants */
@@ -49,6 +50,15 @@ void ai_communication_event(
 	long position_index,
 	long structure_index,
 	boolean allow_reply);
+void actor_pursuit_find_nearby_actors(
+	long actor_index,
+	boolean pursuit_is_coordinator);
+boolean actor_move_to_prop(
+	long actor_index,
+	long prop_index,
+	real distance);
+void actor_move_halt(
+	long actor_index);
 
 /* ---------- globals */
 
@@ -59,6 +69,66 @@ action_wait_begin(
 	long actor_index)
 {
 	return;
+}
+
+boolean
+action_wait_perform(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct wait_state_data *state_data = &actor->state.action_data.wait;
+
+	if (actor->meta.timeslice)
+	{
+		state_data->desire_move = FALSE;
+		actor_pursuit_find_nearby_actors(actor_index, actor->external_orders.pursuit_is_coordinator);
+		if (state_data->waiting_as_coordinator)
+		{
+			if (actor->external_orders.pursuit_group_prop_index == NONE)
+			{
+				if (state_data->exit_timer == 0)
+					state_data->exit_timer = 150;
+			}
+			else if (game_time_get() >= state_data->entry_time + 2700)
+			{
+				state_data->wait_done = TRUE;
+			}
+		}
+		else
+		{
+			state_data->wait_done = TRUE;
+			if (actor->external_orders.pursuit_group_prop_index != NONE)
+			{
+				struct prop_datum *prop = prop_get(actor->external_orders.pursuit_group_prop_index);
+
+				if ((!state_data->was_actively_searching || state_data->move_failed) &&
+					(prop->visibility < 2 || !(prop->distance < 8.0f)))
+				{
+					state_data->wait_done = TRUE;
+				}
+				else
+				{
+					state_data->desire_move = !state_data->move_failed && prop->distance > 3.5f;
+					state_data->wait_done = FALSE;
+				}
+			}
+		}
+
+		if (!actor->meta.swarm)
+		{
+			if (state_data->desire_move)
+			{
+				if (!actor_move_to_prop(actor_index, actor->external_orders.pursuit_group_prop_index, 8.0f))
+					state_data->move_failed = TRUE;
+			}
+			else
+			{
+				actor_move_halt(actor_index);
+			}
+		}
+	}
+
+	return state_data->wait_done;
 }
 
 void

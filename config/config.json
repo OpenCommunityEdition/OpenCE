@@ -831,7 +831,7 @@
 				{ "name": "source/ai/actor_definitions.c", "index": 457, "status": "Matching" },
 				{ "name": "source/ai/actor_combat.c", "index": 458, "status": "NonMatching" },
 				{ "name": "source/ai/actions.c", "index": 459, "status": "NonMatching" },
-				{ "name": "source/ai/action_wait.c", "index": 460, "status": "NonMatching" },
+				{ "name": "source/ai/action_wait.c", "index": 460, "status": "Matching" },
 				{ "name": "source/ai/action_vehicle.c", "index": 461, "status": "NonMatching" },
 				{ "name": "source/ai/action_uncover.c", "index": 462, "status": "NonMatching" },
 				{ "name": "source/ai/action_sleep.c", "index": 463, "status": "Matching" },
