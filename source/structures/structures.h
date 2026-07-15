@@ -67,7 +67,14 @@ long cluster_index_from_point(struct structure_bsp const *structure_bsp, union r
 
 /* ---------- prototypes/STRUCTURE_RUNTIME_DECALS.C */
 
-void structure_decals_update(unsigned long *old_combined_pvs, unsigned long *new_combined_pvs, short cluster_count);
+void structure_decals_dispose_from_old_map(
+	void);
+void structure_decals_dispose(
+	void);
+void structure_decals_update(
+	unsigned long *old_combined_pvs,
+	unsigned long *new_combined_pvs,
+	short cluster_count);
 
 /* ---------- globals */
 
