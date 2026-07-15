@@ -91,4 +91,9 @@ void code_000a4710(void)
 {
 }
 
++boolean code_000a4720(void)
+{
+	return TRUE;
+}
+
 /* ---------- private code */
