@@ -117,7 +117,7 @@ boolean terminal_render_enable = TRUE;
 
 const short rdata_002712d0[] = {160, 320, 470};
 
-static struct terminal_globals terminal_globals;
+struct terminal_globals terminal_globals = {0};
 
 /* ---------- public code */
 
