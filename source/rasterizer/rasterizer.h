@@ -84,6 +84,9 @@ enum
 /* ---------- structures */
 
 struct rasterizer_model_begin_parameters;
+struct bitmap_data;
+struct shader;
+struct vertex_buffer;
 
 struct rasterizer_frame_begin_parameters
 {
@@ -223,6 +226,15 @@ void rasterizer_model_end(
 	void);
 void rasterizer_models_end(
 	void);
+void rasterizer_environment_lightmap_begin(
+	struct bitmap_data const *lightmap_bitmap);
+void rasterizer_environment_lightmap_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
 void rasterizer_environment_lightmap_end(
 	void);
 void rasterizer_environment_lightmaps_end(
@@ -231,8 +243,19 @@ void rasterizer_environment_diffuse_light_end(
 	void);
 void rasterizer_environment_diffuse_lights_end(
 	void);
+void rasterizer_environment_diffuse_light_begin(
+	long light_index);
+void rasterizer_environment_diffuse_light_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
 void rasterizer_environment_shadows_begin(
 	void);
+void rasterizer_environment_shadow_model_begin(
+	struct rasterizer_model_begin_parameters const *parameters);
 void rasterizer_environment_shadow_model_end(
 	void);
 void rasterizer_environment_shadow_end(
@@ -241,6 +264,22 @@ void rasterizer_environment_shadows_end(
 	void);
 void rasterizer_environment_diffuse_textures_end(
 	void);
+void rasterizer_environment_diffuse_texture_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
+void rasterizer_environment_specular_light_begin(
+	long light_index);
+void rasterizer_environment_specular_light_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
 void rasterizer_environment_specular_light_end(
 	void);
 void rasterizer_environment_specular_lights_end(
@@ -249,6 +288,15 @@ void rasterizer_environment_specular_lightmap_end(
 	void);
 void rasterizer_environment_specular_lightmaps_end(
 	void);
+void rasterizer_environment_specular_lightmap_begin(
+	struct bitmap_data const *lightmap_bitmap);
+void rasterizer_environment_specular_lightmap_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
 void rasterizer_environment_reflection_lightmap_mask_end(
 	void);
 void rasterizer_environment_reflection_lightmap_masks_end(
