@@ -52,4 +52,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+void rasterizer_text_end(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
