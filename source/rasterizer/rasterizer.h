@@ -394,6 +394,10 @@ void rasterizer_screen_flash(
 	void);
 void rasterizer_environment_fog_screen_begin(
 	boolean render_fog);
+void rasterizer_environment_fog_screen_wind_get_vector(
+	short wind_index,
+	real animation_time,
+	real_vector3d *wind_vector);
 void rasterizer_environment_fog_draw(
 	struct shader const *shader,
 	short bitmap_index,

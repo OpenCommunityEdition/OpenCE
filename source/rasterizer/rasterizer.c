@@ -604,6 +604,10 @@ void _rasterizer_environment_fog_draw(
 	struct vertex_buffer const *vertex_buffer);
 void _rasterizer_environment_fog_screen_end(
 	void);
+void _rasterizer_environment_fog_screen_wind_get_vector(
+	short wind_index,
+	real animation_time,
+	real_vector3d *wind_vector);
 void _rasterizer_environment_fog_screen_begin(
 	boolean render_fog);
 void _rasterizer_environment_fog_screen_draw(
@@ -1439,6 +1443,15 @@ void rasterizer_environment_fog_screen_begin(
 	boolean render_fog)
 {
 	_rasterizer_environment_fog_screen_begin(render_fog);
+	return;
+}
+
+void rasterizer_environment_fog_screen_wind_get_vector(
+	short wind_index,
+	real animation_time,
+	real_vector3d *wind_vector)
+{
+	_rasterizer_environment_fog_screen_wind_get_vector(wind_index, animation_time, wind_vector);
 	return;
 }
 
