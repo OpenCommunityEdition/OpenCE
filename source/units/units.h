@@ -550,14 +550,24 @@ void unit_get_center_of_mass(long unit_index, real_point3d *center_of_mass);
 boolean unit_test_animation_impulse(long unit_index, short animation_impulse);
 boolean unit_start_animation_impulse(long unit_index, short animation_impulse, real_vector2d *alignment_vector);
 long unit_get_aiming_unit_index(long unit_index);
-void unit_get_aiming_vector(long unit_index, real_vector3d *aiming_vector);
-void unit_get_looking_vector(long unit_index, real_vector3d *looking_vector);
+void unit_get_aiming_vector(
+	long unit_index,
+	real_vector3d *aiming_vector);
+void unit_get_looking_vector(
+	long unit_index,
+	real_vector3d *looking_vector);
 void unit_get_facing_vector(
 	long unit_index,
 	real_vector3d *facing_vector);
 boolean unit_controllable(
 	long unit_index);
+long unit_scripting_unit_driver(
+	long unit_index);
+long unit_scripting_unit_gunner(
+	long unit_index);
 long unit_get_current_equipment(
+	long unit_index);
+boolean unit_get_current_flashlight_state(
 	long unit_index);
 void unit_abort_animation(
 	long unit_index);
@@ -567,6 +577,8 @@ void unit_close(
 	long unit_index);
 void scripting_set_magic_base_seat(
 	char const *seat_name);
+void unit_stop_running_blindly(
+	long unit_index);
 boolean unit_clip_to_aiming_bounds(long unit_index, real_vector3d *vector, boolean use_aiming_screen);
 long unit_inventory_get_weapon(long unit_index, short index);
 short unit_inventory_next_grenade(long unit_index, short current_index, short delta);

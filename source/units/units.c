@@ -864,6 +864,75 @@ void unit_get_facing_vector(
 	return;
 }
 
+void unit_get_aiming_vector(
+	long unit_index,
+	real_vector3d *aiming_vector)
+{
+	*aiming_vector = unit_get(unit_index)->unit.aiming_vector;
+
+	return;
+}
+
+void unit_get_looking_vector(
+	long unit_index,
+	real_vector3d *looking_vector)
+{
+	*looking_vector = unit_get(unit_index)->unit.looking_vector;
+
+	return;
+}
+
+long unit_scripting_unit_driver(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_try_and_get(unit_index);
+	long driver_object_index = NONE;
+
+	if (unit)
+	{
+		driver_object_index = unit->unit.driver_object_index;
+	}
+
+	return driver_object_index;
+}
+
+long unit_scripting_unit_gunner(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_try_and_get(unit_index);
+	long gunner_object_index = NONE;
+
+	if (unit)
+	{
+		gunner_object_index = unit->unit.gunner_object_index;
+	}
+
+	return gunner_object_index;
+}
+
+boolean unit_get_current_flashlight_state(
+	long unit_index)
+{
+	boolean flashlight_on = FALSE;
+
+	if (unit_index!=NONE)
+	{
+		flashlight_on = TEST_FLAG(unit_get(unit_index)->unit.flags, _unit_integrated_light_on_bit);
+	}
+
+	return flashlight_on;
+}
+
+void unit_stop_running_blindly(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	SET_FLAG(unit->unit.flags, _unit_running_blindly_bit, FALSE);
+
+	return;
+}
+
 void unit_abort_animation(
 	long unit_index)
 {
