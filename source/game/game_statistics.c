@@ -18,8 +18,11 @@ symbols in this file:
 
 #include "cseries.h"
 #include "real_math.h"
+#include "game/game_allegiance.h"
+#include "game/game_engine.h"
 #include "game/players.h"
 #include "memory/data.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
@@ -28,6 +31,10 @@ symbols in this file:
 /* ---------- structures */
 
 /* ---------- prototypes */
+
+boolean game_team_is_enemy(
+	short team_index0,
+	short team_index1);
 
 /* ---------- globals */
 
@@ -76,6 +83,138 @@ void game_statistics_record_damage(
 	long owner_object_index,
 	short owner_team_index)
 {
+	return;
+}
+
+void game_statistics_record_kill(
+	long dead_unit_index,
+	long killing_player_index,
+	long damage_type,
+	short killing_team_index)
+{
+	if (game_statistics_active)
+	{
+		long dead_player_index = player_index_from_unit_index(dead_unit_index);
+
+		if (dead_player_index != NONE)
+		{
+			struct player_datum *dead_player = player_get(dead_player_index);
+			long dead_team_index = dead_player->team_index;
+			boolean friendly_fire;
+			long assist_time;
+			long recent_kill_time;
+			struct unit_datum *dead_unit;
+			struct unit_attacker *attackers;
+			struct unit_attacker *attacker;
+			short killer_attacker_index;
+			long best_attacker_index;
+			real best_damage;
+			short attacker_index;
+			long credited_player_index;
+			real assist_damage;
+			boolean credited_friendly_fire;
+
+			dead_player = player_get(dead_player_index);
+			if (killing_player_index == dead_player_index)
+				dead_player->statistics.suicides++;
+
+			dead_player->statistics.deaths++;
+			dead_player->statistics.kills_in_a_row = 0;
+			dead_player->statistics.last_kill_time = NONE;
+			dead_player->statistics.multiple_kills = 0;
+
+			friendly_fire = killing_player_index == NONE ||
+				!game_team_is_enemy(dead_team_index, killing_team_index);
+			assist_time = game_time_get() - 120;
+			recent_kill_time = game_time_get() - 180;
+			dead_unit = unit_get(dead_unit_index);
+			attackers = dead_unit->unit.attackers;
+			best_attacker_index = NONE;
+			best_damage = REAL_MIN;
+			killer_attacker_index = NONE;
+			attacker = attackers;
+
+			for (attacker_index = 0;
+				attacker_index < MAXIMUM_ATTACKERS_PER_UNIT;
+				attacker_index++, attacker++)
+			{
+				if (attacker->player_index == killing_player_index)
+					killer_attacker_index = (short)attacker_index;
+
+				if ((attacker_index == killer_attacker_index ||
+					(friendly_fire && game_team_is_enemy(dead_team_index, (short)attacker->player_index))) &&
+					attacker->game_time_stamp > (unsigned long)recent_kill_time &&
+					attacker->damage_inflicted > best_damage)
+				{
+					best_attacker_index = attacker_index;
+					best_damage = attacker->damage_inflicted;
+				}
+			}
+
+			if (best_attacker_index == NONE)
+				best_attacker_index = killer_attacker_index;
+			credited_friendly_fire = FALSE;
+
+			if ((short)best_attacker_index != NONE)
+			{
+				struct unit_attacker *attacker = &dead_unit->unit.attackers[best_attacker_index];
+				credited_player_index = attacker->player_index;
+				assist_damage = attacker->damage_inflicted * 0.4f;
+			}
+			else
+			{
+				credited_player_index = killing_player_index;
+				assist_damage = 0.f;
+			}
+
+			if (credited_player_index != NONE)
+			{
+				struct player_datum *credited_player = player_get(credited_player_index);
+
+				if (game_team_is_enemy(dead_team_index, (short)credited_player->team_index))
+				{
+					credited_player->statistics.kills[0]++;
+					credited_player->statistics.kills_in_a_row++;
+					if (credited_player->statistics.last_kill_time >= assist_time)
+						credited_player->statistics.multiple_kills++;
+					else
+						credited_player->statistics.multiple_kills = 1;
+					credited_player->statistics.last_kill_time = (short)game_time_get();
+				}
+				else
+				{
+					credited_player->statistics.friendly_fire_kills++;
+					credited_friendly_fire = TRUE;
+				}
+			}
+
+			if (assist_damage > 0.f)
+			{
+				attacker = attackers;
+				for (attacker_index = 0;
+					attacker_index < MAXIMUM_ATTACKERS_PER_UNIT;
+					attacker_index++, attacker++)
+				{
+					if ((attacker_index == killer_attacker_index || attacker->damage_inflicted > assist_damage) &&
+						attacker->player_index != NONE &&
+						attacker->player_index != credited_player_index)
+					{
+						struct player_datum *assisting_player = player_get(attacker->player_index);
+
+						if (game_team_is_enemy(dead_team_index, (short)assisting_player->team_index))
+							assisting_player->statistics.assists[0]++;
+					}
+				}
+			}
+
+			game_engine_player_killed(
+				credited_player_index,
+				damage_type,
+				dead_player_index,
+				credited_friendly_fire);
+		}
+	}
+
 	return;
 }
 

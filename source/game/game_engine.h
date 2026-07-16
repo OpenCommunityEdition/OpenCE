@@ -32,6 +32,12 @@ long game_engine_remap_weapon(long weapon_definition_index);
 
 boolean game_engine_allow_integrated_lights(long object_index);
 
+void game_engine_player_killed(
+	long killing_player_index,
+	long damage_type,
+	long dead_player_index,
+	boolean friendly_fire);
+
 /* ---------- globals */
 
 extern struct game_engine *game_engine;
