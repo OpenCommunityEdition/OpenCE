@@ -109,8 +109,14 @@ symbols in this file:
 
 #include "cseries.h"
 #include "sound_classes.h"
+#include "game_state.h"
 
 /* ---------- constants */
+
+enum
+{
+	NUMBER_OF_SOUND_CLASSES = 51
+};
 
 /* ---------- macros */
 
@@ -132,6 +138,17 @@ struct sound_class_runtime *sound_class_data;
 
 /* ---------- public code */
 
+void sound_classes_initialize(
+	void)
+{
+	sound_class_data = game_state_malloc(
+		"sound classes",
+		NULL,
+		0x264);
+
+	return;
+}
+
 void sound_classes_dispose_from_old_map(
 	void)
 {
@@ -144,6 +161,27 @@ void sound_classes_dispose(
 	sound_class_data = NULL;
 
 	return;
+}
+
+static struct sound_class_runtime *code_001b84c0(
+	short index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\sound_classes.c",
+		288,
+		index>=0 && index<NUMBER_OF_SOUND_CLASSES);
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\sound_classes.c",
+		289,
+		sound_class_data);
+
+	return &sound_class_data[index];
+}
+
+real sound_class_get_gain(
+	short index)
+{
+	return code_001b84c0(index)->current_gain;
 }
 
 /* ---------- private code */
