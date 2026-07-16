@@ -58,6 +58,23 @@ struct structure_lightmap
 	struct tag_block materials;	// structure_material
 };
 
+struct structure_cluster_runtime_decals
+{
+	byte unused[0xC];
+	short first_decal_index;
+	word decal_count;
+	byte unused2[0x58];
+};
+
+struct structure_runtime_decal
+{
+	real_point3d position;
+	byte palette_index;
+	byte unused;
+	char yaw;
+	char pitch;
+};
+
 struct structure_bsp
 {
 	struct tag_reference lightmap_group;

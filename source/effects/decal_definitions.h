@@ -8,11 +8,24 @@ header included in hcex build.
 #define __DECAL_DEFINITIONS_H
 #pragma once
 
+/* ---------- headers */
+
+#include "tag_files/tag_groups.h"
+
 /* ---------- constants */
+
+enum
+{
+	DECAL_GROUP_TAG = 'deca',
+};
 
 /* ---------- macros */
 
+#define decal_definition_get(index) ((struct decal_definition *)tag_get(DECAL_GROUP_TAG, (index)))
+
 /* ---------- structures */
+
+struct decal_definition;
 
 /* ---------- prototypes/EXAMPLE.C */
 

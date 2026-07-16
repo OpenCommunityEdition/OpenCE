@@ -29,10 +29,12 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "effects/decal_definitions.h"
 #include "effects/decals.h"
 #include "math/real_math.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
 #include "structures.h"
 #include "structure_bsp_definitions.h"
 
@@ -48,15 +50,16 @@ struct structure_decals_globals
 	byte pad[3];
 };
 
-struct structure_cluster_runtime_decals
-{
-	byte unused[0xC];
-	short first_decal_index;
-	word decal_count;
-	byte unused2[0x58];
-};
-
 /* ---------- prototypes */
+
+long decal_new(
+	long definition_index,
+	real_point3d const *position,
+	real_vector3d const *normal,
+	real scale,
+	short layer,
+	short cluster_index,
+	boolean permanent);
 
 /* ---------- globals */
 
@@ -135,6 +138,80 @@ void structure_decals_dispose_from_old_map(
 void structure_decals_dispose(
 	void)
 {
+	return;
+}
+
+void structure_decals_update(
+	unsigned long *old_combined_pvs,
+	unsigned long *new_combined_pvs,
+	short cluster_count)
+{
+	struct structure_bsp *structure_bsp = global_structure_bsp_get();
+	struct tag_block *runtime_decals;
+
+	match_assert("c:\\halo\\SOURCE\\structures\\structure_runtime_decals.c", 0x62, structure_decals_globals);
+	runtime_decals = &structure_bsp->runtime_decals;
+
+	if (runtime_decals->count && cluster_count > 0)
+	{
+		struct tag_block *clusters = &structure_bsp->clusters;
+		short cluster_index = 0;
+
+		do
+		{
+			struct structure_cluster_runtime_decals *cluster = TAG_BLOCK_GET_ELEMENT(
+				clusters,
+				cluster_index,
+				struct structure_cluster_runtime_decals);
+			boolean cluster_has_decals = cluster->first_decal_index != NONE && cluster->decal_count;
+			boolean delete_decals = cluster_has_decals &&
+				!structure_decals_globals->reconnect_to_structure_bsp &&
+				BIT_VECTOR_TEST_FLAG(old_combined_pvs, cluster_index) &&
+				!BIT_VECTOR_TEST_FLAG(new_combined_pvs, cluster_index);
+			boolean create_decals = cluster_has_decals &&
+				(!BIT_VECTOR_TEST_FLAG(old_combined_pvs, cluster_index) ||
+					structure_decals_globals->reconnect_to_structure_bsp) &&
+				BIT_VECTOR_TEST_FLAG(new_combined_pvs, cluster_index);
+
+			if (delete_decals)
+			{
+				decals_delete_permanent_from_cluster(cluster_index);
+			}
+			else if (create_decals)
+			{
+				long decal_index = 0;
+				if (decal_index < cluster->decal_count)
+				{
+					do
+					{
+						struct structure_runtime_decal *runtime_decal = TAG_BLOCK_GET_ELEMENT(
+							runtime_decals,
+							cluster->first_decal_index + decal_index,
+							struct structure_runtime_decal);
+						struct scenario_decal_palette_entry *palette_entry = TAG_BLOCK_GET_ELEMENT(
+							&global_scenario_get()->decal_palette,
+							runtime_decal->palette_index,
+							struct scenario_decal_palette_entry);
+						long definition_index = palette_entry->reference.index;
+						real_euler_angles2d angles;
+						real_vector3d normal;
+
+						decal_definition_get(definition_index);
+						angles.yaw = runtime_decal->yaw * (_pi / 127.f);
+						angles.pitch = runtime_decal->pitch * (_pi / 254.f);
+						vector3d_from_euler_angles2d(&normal, &angles);
+						decal_new(definition_index, &runtime_decal->position, &normal, 1.0f, 1, NONE, FALSE);
+						decal_index++;
+					} while (decal_index < cluster->decal_count);
+				}
+			}
+
+			cluster_index++;
+		} while (cluster_index < cluster_count);
+	}
+
+	structure_decals_globals->reconnect_to_structure_bsp = FALSE;
+
 	return;
 }
 
