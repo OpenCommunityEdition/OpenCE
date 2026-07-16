@@ -94,4 +94,30 @@ void lightnings_dispose_from_old_map(
 	return;
 }
 
+long lightning_new(
+	long definition_index)
+{
+	long lightning_index = datum_new(lightning_globals.lightning_data);
+
+	if (lightning_index != NONE)
+		lightning_get(lightning_index)->definition_index = definition_index;
+
+	return lightning_index;
+}
+
+void lightning_delete(
+	long lightning_index)
+{
+	if (lightning_index != NONE)
+		datum_delete(lightning_globals.lightning_data, lightning_index);
+
+	return;
+}
+
+void lightning_render(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
