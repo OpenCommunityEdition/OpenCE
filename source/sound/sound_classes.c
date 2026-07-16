@@ -134,7 +134,9 @@ struct sound_class_definition
 {
 	short maximum_number_per_datum;
 	short maximum_number_per_object;
-	byte unused[0x14];
+	byte unused_4[0xC];
+	real wet_gain;
+	byte unused_14[4];
 	real minimum_distance;
 	real maximum_distance;
 	byte unused_20[8];
@@ -261,6 +263,59 @@ void sound_classes_initialize_for_new_map(
 		sound_class->target_gain = 1.f;
 		sound_class->interpolation_ticks = 0;
 	}
+
+	return;
+}
+
+void debug_sound_classes_set_wet(
+	char const *name,
+	real wet)
+{
+	short class_index;
+	char const **sound_class_name;
+
+	class_index = 0;
+	sound_class_name = sound_class_names;
+	do
+	{
+		if ((*sound_class_name)[0] && strstr(*sound_class_name, name))
+		{
+			real wet_gain = PIN(1.f - wet, 0.f, 1.f);
+
+			sound_class_get(class_index)->wet_gain = wet_gain;
+		}
+		class_index++;
+		sound_class_name++;
+	}
+	while (class_index < NUMBER_OF_SOUND_CLASSES);
+
+	return;
+}
+
+void sound_class_set_gain(
+	char const *name,
+	real gain,
+	short interpolation_ticks)
+{
+	short class_index;
+	char const **sound_class_name;
+
+	class_index = 0;
+	sound_class_name = sound_class_names;
+	do
+	{
+		if ((*sound_class_name)[0] && strstr(*sound_class_name, name))
+		{
+			struct sound_class_runtime *sound_class = code_001b84c0(class_index);
+
+			sound_class->target_gain = PIN(gain, 0.f, 1.f);
+			sound_class->interpolation_ticks =
+				interpolation_ticks < 0 ? 0 : interpolation_ticks;
+		}
+		class_index++;
+		sound_class_name++;
+	}
+	while (class_index < NUMBER_OF_SOUND_CLASSES);
 
 	return;
 }
