@@ -314,13 +314,6 @@ struct rasterizer_global_defaults
 	real model_ambient_reflection_tint[4];
 };
 
-struct rasterizer_globals_definition
-{
-	byte reserved0[0x44];
-	real model_ambient_reflection_tint[4];
-	byte reserved54[0xA0];
-};
-
 struct rasterizer_debug_options_definition
 {
 	byte reserved0[0x10];

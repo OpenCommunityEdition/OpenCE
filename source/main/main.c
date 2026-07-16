@@ -351,6 +351,8 @@ symbols in this file:
 #include "cache/predicted_resources.h"
 #include "interface/hud.h"
 #include "saved games/player_profile.h"
+#include "rasterizer/rasterizer.h"
+#include "main/d3d_intimacy.h"
 
 /* ---------- constants */
 
@@ -435,7 +437,12 @@ struct _main_globals
 
 struct _main_globals
 {
-	byte __unknown00[216];
+	byte reserved00[0xB0];
+	unsigned long frame_start_milliseconds;
+	byte reservedB4[4];
+	unsigned long rasterizer_frame_index;
+	unsigned long rasterizer_vertical_blank_index;
+	byte reservedC0[0x18];
 	real seconds_elapsed;
 	short connection;
 	byte __unknownDE[2];
@@ -480,9 +487,22 @@ struct _main_globals
 	char soloplayer_map_name[256];
 	char multiplayer_map_name[256];
 	char queued_map_name[256];
-	char core_name[682];
+	char core_name[64];
+	byte reserved465[0x43];
+	volatile unsigned int *d3d_flip_count;
+	short vblank_flip_delta_index;
+	short vblank_flip_deltas[15];
+	byte reserved4CC[0x204];
 };
 
+typedef char main_globals_size_assert[
+	sizeof(struct _main_globals) == 0x6D0 ? 1 : -1];
+typedef char main_globals_frame_start_milliseconds_offset_assert[
+	offsetof(struct _main_globals, frame_start_milliseconds) == 0xB0 ? 1 : -1];
+typedef char main_globals_rasterizer_frame_index_offset_assert[
+	offsetof(struct _main_globals, rasterizer_frame_index) == 0xB8 ? 1 : -1];
+typedef char main_globals_rasterizer_vertical_blank_index_offset_assert[
+	offsetof(struct _main_globals, rasterizer_vertical_blank_index) == 0xBC ? 1 : -1];
 typedef char main_globals_seconds_elapsed_offset_assert[
 	offsetof(struct _main_globals, seconds_elapsed) == 0xD8 ? 1 : -1];
 typedef char main_globals_connection_offset_assert[
@@ -517,6 +537,12 @@ typedef char main_globals_multiplayer_map_name_offset_assert[
 	offsetof(struct _main_globals, multiplayer_map_name) == 0x225 ? 1 : -1];
 typedef char main_globals_core_name_offset_assert[
 	offsetof(struct _main_globals, core_name) == 0x425 ? 1 : -1];
+typedef char main_globals_d3d_flip_count_offset_assert[
+	offsetof(struct _main_globals, d3d_flip_count) == 0x4A8 ? 1 : -1];
+typedef char main_globals_vblank_flip_delta_index_offset_assert[
+	offsetof(struct _main_globals, vblank_flip_delta_index) == 0x4AC ? 1 : -1];
+typedef char main_globals_vblank_flip_deltas_offset_assert[
+	offsetof(struct _main_globals, vblank_flip_deltas) == 0x4AE ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -1140,6 +1166,38 @@ void code_000f0b60(
 		console_dispose();
 		break;
 	}
+	return;
+}
+
+void code_000f0bb0(
+	void)
+{
+	unsigned long frame_index;
+	unsigned long vertical_blank_index;
+	main_globals.frame_start_milliseconds = system_milliseconds();
+	frame_index = rasterizer_globals.frame_index;
+	vertical_blank_index = rasterizer_globals.vertical_blank_index;
+	main_globals.rasterizer_frame_index = frame_index;
+	main_globals.rasterizer_vertical_blank_index = vertical_blank_index;
+	return;
+}
+
+boolean code_000f0be0(
+	void)
+{
+	return rasterizer_globals.initialized;
+}
+
+void code_000f1ce0(
+	void)
+{
+	main_globals.frame_start_milliseconds = system_milliseconds();
+	main_globals.rasterizer_frame_index = 0;
+	main_globals.rasterizer_vertical_blank_index = 0;
+	rasterizer_set_vblank_callback(main_vertical_blank_interrupt_handler);
+	main_globals.vblank_flip_delta_index = 0;
+	csmemset(main_globals.vblank_flip_deltas, 0, sizeof(main_globals.vblank_flip_deltas));
+	main_globals.d3d_flip_count = d3d_find_flipcount();
 	return;
 }
 

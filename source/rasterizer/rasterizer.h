@@ -94,6 +94,19 @@ struct rasterizer_frame_begin_parameters
 	real dt;
 };
 
+struct rasterizer_globals_definition
+{
+	byte reserved00[0x28];
+	/* updated asynchronously by the rasterizer and vertical-blank callback */
+	volatile unsigned long frame_index;
+	volatile unsigned long vertical_blank_index;
+	byte reserved30[0xD];
+	boolean initialized;
+	byte reserved3E[6];
+	real model_ambient_reflection_tint[4];
+	byte reserved54[0xA0];
+};
+
 struct rasterizer_window_begin_parameters
 {
 	short rasterizer_target;
@@ -368,6 +381,7 @@ void rasterizer_text_cache_dispose(
 /* ---------- globals */
 
 extern real_argb_color *global_rasterizer_model_ambient_reflection_tint;
+extern struct rasterizer_globals_definition rasterizer_globals;
 
 /* comm. not sure where this should be */
 struct rasterizer_frame_begin_parameters global_frame_parameters;
