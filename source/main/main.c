@@ -446,7 +446,7 @@ struct _main_globals
 	boolean saving_map;
 	boolean save_map_safely;
 	boolean save_map_timeout;
-	byte __unknownFB;
+	boolean save_map_completed;
 	long ticks_until_next_save_check;
 	long ticks_unable_to_save;
 	unsigned long map_change_load_timer;
@@ -467,7 +467,7 @@ struct _main_globals
 	byte __unknown118;
 	boolean skip;
 	short skip_ticks;
-	byte __unknown11C[2];
+	short loss_timer;
 	short respawn_timer;
 	boolean queue_map;
 	byte __unknown121[0x3];
@@ -502,6 +502,8 @@ typedef char main_globals_halt_time_scale_offset_assert[
 	offsetof(struct _main_globals, halt_time_scale) == 0x116 ? 1 : -1];
 typedef char main_globals_respawn_timer_offset_assert[
 	offsetof(struct _main_globals, respawn_timer) == 0x11E ? 1 : -1];
+typedef char main_globals_loss_timer_offset_assert[
+	offsetof(struct _main_globals, loss_timer) == 0x11C ? 1 : -1];
 typedef char main_globals_allow_persistent_storage_offset_assert[
 	offsetof(struct _main_globals, allow_persistent_storage) == 0x124 ? 1 : -1];
 typedef char main_globals_soloplayer_map_name_offset_assert[
@@ -882,6 +884,112 @@ void main_roll_credits(
 	error(_error_silent, "congratulations, you won the game!");
 	main_menu_load();
 	game_end_credits_start();
+	return;
+}
+
+extern void hud_autosave(
+	boolean end);
+extern boolean cinematic_can_be_skipped(
+	void);
+extern boolean cinematic_in_progress(
+	void);
+extern boolean players_respawn_coop(
+	void);
+extern void game_state_load_core(
+	char const *name);
+extern void game_state_save_core(
+	char const *name);
+
+void code_000f05a0(
+	void)
+{
+	game_state_revert();
+	ui_widgets_disable_pause_game(30);
+	main_globals.revert_map = FALSE;
+	return;
+}
+
+void code_000f05c0(
+	void)
+{
+	if (cinematic_can_be_skipped())
+	{
+		game_state_revert();
+		ui_widgets_disable_pause_game(30);
+		main_globals.revert_map = FALSE;
+	}
+	main_globals.skip_cinematic = FALSE;
+	return;
+}
+
+void code_000f06a0(
+	void)
+{
+	game_state_save();
+	hud_autosave(FALSE);
+	main_globals.save_map_completed = FALSE;
+	return;
+}
+
+void code_000f07a0(
+	void)
+{
+	scenario_switch_structure_bsp(main_globals.switch_to_structure_bsp_index);
+	main_globals.switch_to_structure_bsp_index = NONE;
+	hud_load(0);
+	return;
+}
+
+void code_000f07d0(
+	void)
+{
+	if (!game_time_get_paused())
+	{
+		if (main_globals.loss_timer++ > 90)
+		{
+			main_globals.lost_map = FALSE;
+			main_globals.loss_timer = 0;
+			game_state_revert();
+		}
+	}
+	return;
+}
+
+void code_000f0810(
+	void)
+{
+	if (!game_time_get_paused() && !cinematic_in_progress())
+	{
+		if (main_globals.respawn_timer++ > 90 && players_respawn_coop())
+		{
+			main_globals.respawn = FALSE;
+			main_globals.respawn_timer = 0;
+		}
+	}
+	return;
+}
+
+void code_000f08b0(
+	void)
+{
+	game_state_load_core(main_globals.core_name);
+	main_globals.load_core = FALSE;
+	return;
+}
+
+void code_000f08d0(
+	void)
+{
+	game_state_save_core(main_globals.core_name);
+	main_globals.save_core = FALSE;
+	return;
+}
+
+void code_000f0930(
+	void)
+{
+	main_globals.run_xdemos = FALSE;
+	xbox_demos_launch();
 	return;
 }
 
