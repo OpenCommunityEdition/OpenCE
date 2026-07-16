@@ -314,4 +314,70 @@ long scenario_leaf_index_from_point(
 	return bsp3d_test_point(global_bsp3d_get(), 0, point);
 }
 
+real scenario_fog_at_point(
+	const struct location *viewer_location,
+	const real_point3d *viewer_point,
+	const real_point3d *point)
+{
+	return 0.0f;
+}
+
+short scenario_object_name_index_from_string(
+	struct scenario *scenario,
+	const char *name)
+{
+	short object_name_index;
+
+	for (object_name_index = 0; object_name_index < scenario->object_names.count; object_name_index++)
+	{
+		struct scenario_object_name *object_name = TAG_BLOCK_GET_ELEMENT(
+			&scenario->object_names,
+			object_name_index,
+			struct scenario_object_name);
+
+		if (!csstrcmp(object_name->name, name))
+			return object_name_index;
+	}
+
+	return NONE;
+}
+
+short scenario_get_structure_reference_index_from_tag_index(
+	struct scenario *scenario,
+	long structure_bsp_index)
+{
+	const char *structure_bsp_name = tag_get_name(structure_bsp_index);
+	short structure_bsp_reference_index;
+	short result = NONE;
+
+	for (structure_bsp_reference_index = 0;
+		structure_bsp_reference_index < scenario->structure_bsp_references.count;
+		structure_bsp_reference_index++)
+	{
+		struct scenario_structure_bsp_reference *reference = TAG_BLOCK_GET_ELEMENT(
+			&scenario->structure_bsp_references,
+			structure_bsp_reference_index,
+			struct scenario_structure_bsp_reference);
+
+		if (!csstrcmp(structure_bsp_name, reference->structure_bsp.name))
+		{
+			result = structure_bsp_reference_index;
+			break;
+		}
+	}
+
+	return result;
+}
+
+void scenario_location_from_line(
+	struct location *location,
+	const struct location *start_location,
+	const real_point3d *start_point,
+	const real_point3d *end_point)
+{
+	scenario_location_from_point(location, end_point);
+
+	return;
+}
+
 /* ---------- private code */
