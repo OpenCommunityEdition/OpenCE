@@ -640,6 +640,38 @@ long game_globals_get_weapon(
 	return weapon->index;
 }
 
+long game_engine_get_team_score(
+	long team_index)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	data_iterator_new(&iterator, player_data);
+	player = (struct player_datum *)data_iterator_next(&iterator);
+	while (player)
+	{
+		if (player->team_index == team_index)
+			return game_engine->get_player_score(iterator.datum_index, TRUE);
+
+		player = (struct player_datum *)data_iterator_next(&iterator);
+	}
+
+	return 0;
+}
+
+long players_in_game(
+	void)
+{
+	struct data_iterator iterator;
+	long player_count = 0;
+
+	data_iterator_new(&iterator, player_data);
+	while (data_iterator_next(&iterator))
+		player_count++;
+
+	return player_count;
+}
+
 void game_engine_playlist_initialize(
 	void)
 {

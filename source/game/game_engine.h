@@ -62,7 +62,11 @@ struct game_engine
 	void (*handle_server_message)(void);
 	void (*unknown2C)(void);
 	void (*post_rasterize_objects)(void);
-	void (*unknown34[9])(void);
+	void (*unknown34[5])(void);
+	long (*get_player_score)(
+		long player_index,
+		boolean team_score);
+	void (*unknown4C[3])(void);
 	boolean (*allow_pick_up)(
 		long unit_index,
 		long weapon_index);
@@ -113,6 +117,12 @@ void game_engine_state_message(
 
 void game_engine_player_depower_active_camo(
 	long player_index);
+
+long game_engine_get_team_score(
+	long team_index);
+
+long players_in_game(
+	void);
 
 float get_blink_alpha(
 	void);
