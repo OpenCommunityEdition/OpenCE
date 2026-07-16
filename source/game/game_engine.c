@@ -547,6 +547,22 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct game_engine_goal
+{
+	real_point3d position;
+	boolean in_use;
+	byte unused[0x13];
+};
+
+struct game_engine_globals
+{
+	unsigned long flags;
+	byte unused[0xC];
+	long postgame_state;
+};
+
+typedef char verify_game_engine_goal_size[sizeof(struct game_engine_goal) == 0x20 ? 1 : -1];
+
 /* ---------- prototypes */
 
 void game_engine_playlist_next(
@@ -557,6 +573,10 @@ void game_engine_playlist_next(
 /* ---------- globals */
 
 struct game_engine *game_engine;
+
+extern struct game_engine_goal global_goal[32];
+extern struct game_variant global_variant;
+extern struct game_engine_globals game_engine_globals;
 
 /* ---------- public code */
 
@@ -572,6 +592,57 @@ boolean game_engine_running(
 	void)
 {
 	return game_engine!=NULL;
+}
+
+struct game_variant *game_engine_get_variant(
+	void)
+{
+	return &global_variant;
+}
+
+boolean game_engine_get_goal_in_use(
+	short goal_index)
+{
+	return global_goal[goal_index].in_use;
+}
+
+boolean game_engine_has_teams(
+	void)
+{
+	boolean has_teams = FALSE;
+
+	if (game_engine)
+		has_teams = global_variant.has_teams;
+
+	return has_teams;
+}
+
+boolean game_engine_allow_pause(
+	void)
+{
+	return game_engine_globals.postgame_state==0;
+}
+
+boolean game_engine_allow_dynamic_lighting(
+	long object_index)
+{
+	boolean allow_dynamic_lighting = TRUE;
+
+	if (game_engine)
+		allow_dynamic_lighting = !TEST_FLAG(game_engine_globals.flags, _game_engine_allow_dynamic_lighting_bit);
+
+	return allow_dynamic_lighting;
+}
+
+boolean game_engine_allow_integrated_lights(
+	long object_index)
+{
+	boolean allow_integrated_lights = TRUE;
+
+	if (game_engine)
+		allow_integrated_lights = !TEST_FLAG(game_engine_globals.flags, _game_engine_allow_integrated_lights_bit);
+
+	return allow_integrated_lights;
 }
 
 long game_engine_remap_object_definition(
