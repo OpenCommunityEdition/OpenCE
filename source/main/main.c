@@ -679,6 +679,15 @@ void main_save_core(
 	return;
 }
 
+void main_save_core_name(
+	char const *core_name)
+{
+	match_vwarn("c:\\halo\\SOURCE\\main\\main.c", 0x3a5, csstrlen(core_name) < 64, "warning, core file name will be truncated to 63 characters");
+	csstrncpy(main_globals.core_name, core_name, 63);
+	main_globals.save_core = TRUE;
+	return;
+}
+
 void main_load_core(
 	void)
 {
@@ -692,6 +701,24 @@ void main_load_core_at_startup(
 {
 	main_globals.load_core_at_startup = TRUE;
 	csstrcpy(main_globals.core_name, "core.bin");
+	return;
+}
+
+void main_load_core_name(
+	char const *core_name)
+{
+	match_vwarn("c:\\halo\\SOURCE\\main\\main.c", 0x3c9, csstrlen(core_name) < 64, "warning, core file name will be truncated to 63 characters");
+	csstrncpy(main_globals.core_name, core_name, 63);
+	main_globals.load_core = TRUE;
+	return;
+}
+
+void main_load_core_name_at_startup(
+	char const *core_name)
+{
+	match_vwarn("c:\\halo\\SOURCE\\main\\main.c", 0x3d7, csstrlen(core_name) < 64, "warning, core file name will be truncated to 63 characters");
+	csstrncpy(main_globals.core_name, core_name, 63);
+	main_globals.load_core_at_startup = TRUE;
 	return;
 }
 
