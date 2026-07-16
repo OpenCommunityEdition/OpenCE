@@ -3980,17 +3980,21 @@ void objects_garbage_collection(
 					
 					if (!result)
 					{
-						if (update_time)
-						{
-							object_globals->last_garbage_warn_time = game_time_get();
-						}
-
 						break;
 					}
 
 					garbage_collection_after_first_attempt = TRUE;
 					memory_pool_compact(object_memory_pool);
 				}
+				else
+				{
+					break;
+				}
+			}
+
+			if (update_time)
+			{
+				object_globals->last_garbage_warn_time = game_time_get();
 			}
 		}
 	}
