@@ -125,10 +125,6 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-void first_person_camera_update(
-	void *camera,
-	void *command,
-	void *result);
 void following_camera_update(
 	void *camera,
 	void *command,
