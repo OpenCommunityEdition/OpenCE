@@ -80,4 +80,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+void action_vehicle_update(
+	long actor_index)
+{
+	return;
+}
+
 /* ---------- private code */

@@ -38,4 +38,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+void action_converse_begin(
+	long actor_index)
+{
+	return;
+}
+
 /* ---------- private code */

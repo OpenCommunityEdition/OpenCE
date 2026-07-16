@@ -57,4 +57,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+void action_alert_begin(
+	long actor_index)
+{
+	return;
+}
+
 /* ---------- private code */
