@@ -181,6 +181,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "game/game.h"
 #include "game/player_control.h"
 #include "players.h"
 
@@ -210,6 +211,25 @@ void player_control_dispose_from_old_map(
 	void)
 {
 	return;
+}
+
+boolean code_000a5780(
+	void)
+{
+	return (boolean)(!TEST_FLAG(
+		player_control_globals->flags,
+		_player_control_camera_control_disabled_bit) &&
+		!game_time_get_paused());
+}
+
+boolean scripted_player_control_set_camera_control(
+	boolean camera_control)
+{
+	SET_FLAG(
+		player_control_globals->flags,
+		_player_control_camera_control_disabled_bit,
+		!camera_control);
+	return camera_control;
 }
 
 void player_control_action_test_reset(
@@ -320,6 +340,20 @@ boolean player_control_action_test_look_relative_down(
 	return TEST_FLAG(
 		player_control_globals->action_flags,
 		_player_control_look_relative_down_bit);
+}
+
+boolean player_control_action_test_move_relative_all_directions(
+	void)
+{
+	return !(~player_control_globals->action_flags &
+		_player_control_move_relative_all_directions_flags);
+}
+
+boolean player_control_action_test_look_relative_all_directions(
+	void)
+{
+	return !(~player_control_globals->action_flags &
+		_player_control_look_relative_all_directions_flags);
 }
 
 /* ---------- private code */
