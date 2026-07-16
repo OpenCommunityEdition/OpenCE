@@ -2308,31 +2308,38 @@ void object_compute_node_matrices(
 
 		world_relative = FALSE;
 
-		if (object->object.animation.animation_graph_index!=NONE && object->object.animation.state.index!=NONE)
+		if (object->object.animation.animation_graph_index!=NONE)
 		{
-			short frame_index;
-
-			struct animation_graph *animation_graph = animation_graph_definition_get(
-				object->object.animation.animation_graph_index);
-			struct animation *animation = TAG_BLOCK_GET_ELEMENT(
-				&animation_graph->animations,
-				object->object.animation.state.index,
-				struct animation);
-
-			if (TEST_FLAG(object->object.flags, _object_animates_automatically_bit) && animation->frame_count>0)
+			if (object->object.animation.state.index!=NONE)
 			{
+				short frame_index;
 
-				frame_index = OBJECT_FRAME_INDEX_GET(object_index) % (unsigned long)animation->frame_count;
+				struct animation_graph *animation_graph = animation_graph_definition_get(
+					object->object.animation.animation_graph_index);
+				struct animation *animation = TAG_BLOCK_GET_ELEMENT(
+					&animation_graph->animations,
+					object->object.animation.state.index,
+					struct animation);
 
-				match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 2704, frame_index>=0)
+				if (TEST_FLAG(object->object.flags, _object_animates_automatically_bit) && animation->frame_count>0)
+				{
+
+					frame_index = OBJECT_FRAME_INDEX_GET(object_index) % (unsigned long)animation->frame_count;
+
+					match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 2704, frame_index>=0)
+				}
+				else
+				{
+					frame_index = object->object.animation.state.frame_index;
+				}
+
+				animation_get_node_orientations(model, animation, frame_index, node_orientations);
+				world_relative = TEST_FLAG(animation->flags, _animation_world_relative_bit);
 			}
 			else
 			{
-				frame_index = object->object.animation.state.frame_index;
+				model_get_node_orientations(model, node_orientations);
 			}
-
-			animation_get_node_orientations(model, animation, frame_index, node_orientations);
-			world_relative = TEST_FLAG(animation->flags, _animation_world_relative_bit);
 		}
 		else
 		{
