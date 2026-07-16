@@ -41,7 +41,7 @@ struct data_packet_entry
 struct data_packet_group_definition
 {
 	char const *name;
-	short packet_count;
+	short packet_type_count;
 	short packet_class_count;
 	long maximum_decoded_packet_size;
 	long maximum_encoded_packet_size;

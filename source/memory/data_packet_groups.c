@@ -59,6 +59,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "memory/data_packet_groups.h"
+#include "memory/data_packets.h"
 
 #include "cseries/cseries.h"
 
@@ -68,6 +69,11 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct packet_header
+{
+	byte value;
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
@@ -75,6 +81,37 @@ symbols in this file:
 char const *bss_00456624;
 
 /* ---------- public code */
+
+void data_packet_group_initialize(
+	struct data_packet_group_definition *group_definition)
+{
+	short packet_index;
+
+	for (packet_index = 0; packet_index < group_definition->packet_type_count; packet_index++)
+	{
+		struct data_packet_entry *packet = &group_definition->packets[packet_index];
+
+		if (packet->definition)
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\memory\\data_packet_groups.c",
+				40,
+				packet->packet_class>=0 && packet->packet_class<group_definition->packet_class_count);
+			match_assert(
+				"c:\\halo\\SOURCE\\memory\\data_packet_groups.c",
+				41,
+				packet->definition->size<=group_definition->maximum_decoded_packet_size);
+			match_assert(
+				"c:\\halo\\SOURCE\\memory\\data_packet_groups.c",
+				42,
+				packet->definition->size + sizeof(struct packet_header)<=group_definition->maximum_encoded_packet_size);
+
+			data_packet_verify(packet->definition);
+		}
+	}
+
+	return;
+}
 
 char const *data_packet_groups_get_error(
 	void)

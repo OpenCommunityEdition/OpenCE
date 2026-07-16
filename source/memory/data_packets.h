@@ -14,7 +14,12 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+struct data_packet_definition;
+
+/* ---------- prototypes/DATA_PACKETS.C */
+
+void data_packet_verify(
+	struct data_packet_definition *packet_definition);
 
 /* ---------- globals */
 
