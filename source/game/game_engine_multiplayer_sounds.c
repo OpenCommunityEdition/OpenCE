@@ -115,12 +115,15 @@ typedef char verify_game_globals_multiplayer_information_offset[
 
 /* ---------- prototypes */
 
-static void game_engine_play_multiplayer_sound_immediate(
+/* game_engine_play_multiplayer_sound_immediate */
+static void code_000a1460(
 	long sound_index);
-static void game_engine_queue_multiplayer_sound(
+/* game_engine_queue_multiplayer_sound */
+static void code_000a14c0(
 	long sound_index,
 	long delay_ticks);
-static long game_engine_get_multiplayer_sound_duration(
+/* game_engine_get_multiplayer_sound_duration */
+static long code_000a1530(
 	long sound_index);
 
 /* ---------- globals */
@@ -141,7 +144,7 @@ static struct multiplayer_sound_queue bss_0043eb78;
 
 /* ---------- public code */
 
-static void game_engine_play_multiplayer_sound_immediate(
+static void code_000a1460(
 	long sound_index)
 {
 	struct game_globals_multiplayer_sound_view *game_globals;
@@ -167,7 +170,7 @@ static void game_engine_play_multiplayer_sound_immediate(
 	return;
 }
 
-static void game_engine_queue_multiplayer_sound(
+static void code_000a14c0(
 	long sound_index,
 	long delay_ticks)
 {
@@ -197,13 +200,13 @@ void game_engine_update_multiplayer_sound(
 		queue_count--;
 		multiplayer_sound_queue.count = queue_count;
 		if (queue_count)
-			game_engine_play_multiplayer_sound_immediate(multiplayer_sound_queue.sounds[0].sound_index);
+			code_000a1460(multiplayer_sound_queue.sounds[0].sound_index);
 	}
 
 	return;
 }
 
-static long game_engine_get_multiplayer_sound_duration(
+static long code_000a1530(
 	long sound_index)
 {
 	struct game_globals_multiplayer_sound_view *game_globals;
@@ -235,15 +238,15 @@ void game_engine_play_multiplayer_sound(
 {
 	if (data_002de530[sound_index])
 	{
-		game_engine_queue_multiplayer_sound(
+		code_000a14c0(
 			sound_index,
-			game_engine_get_multiplayer_sound_duration(sound_index) + 5);
+			code_000a1530(sound_index) + 5);
 		if (multiplayer_sound_queue.count == 1)
-			game_engine_play_multiplayer_sound_immediate(sound_index);
+			code_000a1460(sound_index);
 	}
 	else
 	{
-		game_engine_play_multiplayer_sound_immediate(sound_index);
+		code_000a1460(sound_index);
 	}
 
 	return;
