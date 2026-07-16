@@ -246,7 +246,7 @@ DEFINE_NETWORK_GAME_MESSAGE(message_client_graceful_game_exit_postgame, 0x04);
 
 extern struct network_game_message_packet_definitions data_0030aa68;
 
-static byte network_game_message_buffer[0x604];
+static byte bss_004566f0[0x604];
 
 /* ---------- public code */
 
@@ -276,7 +276,7 @@ void network_event(
 	return;
 }
 
-static boolean encode_network_game_message(
+static boolean code_0011af00(
 	const void *message_struct,
 	void *encoded_message,
 	short *encoded_message_size,
@@ -448,9 +448,9 @@ void *create_network_game_message(
 		break;
 	}
 
-	if (encode_network_game_message(message_struct, encoded_message, &encoded_message_size.encoded, message_type, 1))
+	if (code_0011af00(message_struct, encoded_message, &encoded_message_size.encoded, message_type, 1))
 	{
-		message = create_message(3, encoded_message, encoded_message_size.value, network_game_message_buffer, sizeof(network_game_message_buffer));
+		message = create_message(3, encoded_message, encoded_message_size.value, bss_004566f0, sizeof(bss_004566f0));
 		if (!message)
 		{
 			network_event("create_message() failed");
