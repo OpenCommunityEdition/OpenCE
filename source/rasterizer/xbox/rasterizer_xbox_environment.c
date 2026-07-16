@@ -138,11 +138,51 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 /* ---------- constants */
+
+enum
+{
+	_d3d_texture_address_clamp = 3,
+	_d3d_texture_state_address_u = 10,
+	_d3d_texture_state_address_v = 11,
+	_d3d_texture_state_mag_filter = 13,
+	_d3d_texture_state_min_filter = 14,
+	_d3d_texture_state_mip_filter = 15,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct bitmap_data;
+
+struct rasterizer_environment_debug_options
+{
+	byte reserved0[0x4];
+	short disable_environment;
+	byte reserved6[0x11];
+	boolean specular_lightmaps;
+	boolean reflection_mirrors;
+	boolean reflections;
+	boolean reflection_lightmaps;
+	byte reserved1B[0x1A];
+	boolean point_filtering;
+};
+
+struct rasterizer_environment_rasterizer_globals
+{
+	byte reserved0[0x60];
+	short environment_mode;
+};
+
+struct rasterizer_environment_globals
+{
+	byte reserved0[0xAC];
+	boolean lightmap_missing;
+	byte reservedAD[0x8];
+};
 
 /* ---------- prototypes */
 
@@ -155,6 +195,15 @@ void rasterizer_profile_end(
 void rasterizer_set_stencil_mode(
 	short mode);
 
+void rasterizer_set_texture_bitmap_data(
+	short stage,
+	struct bitmap_data const *bitmap);
+
+void __fastcall D3DDevice_SetTextureState_Deferred(
+	unsigned long stage,
+	unsigned long type,
+	unsigned long value);
+
 void rasterizer_transparent_geometry_groups_begin(
 	void);
 
@@ -162,6 +211,11 @@ void rasterizer_transparent_geometry_groups_end(
 	void);
 
 /* ---------- globals */
+
+extern void *global_d3d_device;
+extern struct rasterizer_environment_debug_options rasterizer_debug_options;
+extern struct rasterizer_environment_rasterizer_globals rasterizer_globals;
+extern struct rasterizer_environment_globals bss_00465a18;
 
 /* ---------- public code */
 
@@ -225,6 +279,34 @@ void _rasterizer_environment_specular_lightmaps_end(
 	return;
 }
 
+void _rasterizer_environment_specular_lightmap_begin(
+	struct bitmap_data const *lightmap_bitmap)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+		1874,
+		global_d3d_device);
+
+	if (!rasterizer_debug_options.disable_environment && rasterizer_debug_options.specular_lightmaps)
+	{
+		if (lightmap_bitmap)
+		{
+			rasterizer_set_texture_bitmap_data(1, lightmap_bitmap);
+			D3DDevice_SetTextureState_Deferred(1, _d3d_texture_state_address_u, _d3d_texture_address_clamp);
+			D3DDevice_SetTextureState_Deferred(1, _d3d_texture_state_address_v, _d3d_texture_address_clamp);
+			D3DDevice_SetTextureState_Deferred(1, _d3d_texture_state_mag_filter, (rasterizer_debug_options.point_filtering != FALSE) + 1);
+			D3DDevice_SetTextureState_Deferred(1, _d3d_texture_state_min_filter, (rasterizer_debug_options.point_filtering != FALSE) + 1);
+			D3DDevice_SetTextureState_Deferred(1, _d3d_texture_state_mip_filter, (rasterizer_debug_options.point_filtering != FALSE) + 1);
+			bss_00465a18.lightmap_missing = FALSE;
+		}
+		else
+		{
+			bss_00465a18.lightmap_missing = TRUE;
+		}
+	}
+	return;
+}
+
 void _rasterizer_environment_reflection_lightmap_mask_end(
 	void)
 {
@@ -235,6 +317,37 @@ void _rasterizer_environment_reflection_lightmap_masks_end(
 	void)
 {
 	rasterizer_profile_end(13);
+	return;
+}
+
+void _rasterizer_environment_reflection_lightmap_mask_begin(
+	struct bitmap_data const *lightmap_bitmap)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+		2120,
+		global_d3d_device);
+
+	if (!rasterizer_debug_options.disable_environment &&
+		rasterizer_debug_options.reflection_mirrors &&
+		rasterizer_debug_options.reflection_lightmaps &&
+		!rasterizer_globals.environment_mode)
+	{
+		if (lightmap_bitmap)
+		{
+			rasterizer_set_texture_bitmap_data(0, lightmap_bitmap);
+			D3DDevice_SetTextureState_Deferred(0, _d3d_texture_state_address_u, _d3d_texture_address_clamp);
+			D3DDevice_SetTextureState_Deferred(0, _d3d_texture_state_address_v, _d3d_texture_address_clamp);
+			D3DDevice_SetTextureState_Deferred(0, _d3d_texture_state_mag_filter, (rasterizer_debug_options.point_filtering != FALSE) + 1);
+			D3DDevice_SetTextureState_Deferred(0, _d3d_texture_state_min_filter, (rasterizer_debug_options.point_filtering != FALSE) + 1);
+			D3DDevice_SetTextureState_Deferred(0, _d3d_texture_state_mip_filter, (rasterizer_debug_options.point_filtering != FALSE) + 1);
+			bss_00465a18.lightmap_missing = FALSE;
+		}
+		else
+		{
+			bss_00465a18.lightmap_missing = TRUE;
+		}
+	}
 	return;
 }
 
