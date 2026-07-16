@@ -312,6 +312,9 @@ symbols in this file:
 
 void _rasterizer_reset_state(
 	void);
+void _rasterizer_present(
+	struct bitmap_data *screenshot_bitmap,
+	point2d const *screenshot_index);
 void _rasterizer_widget_end(
 	void);
 
@@ -415,6 +418,14 @@ void rasterizer_reset_state(
 	void)
 {
 	_rasterizer_reset_state();
+	return;
+}
+
+void rasterizer_present(
+	struct bitmap_data *screenshot_bitmap,
+	point2d const *screenshot_index)
+{
+	_rasterizer_present(screenshot_bitmap, screenshot_index);
 	return;
 }
 
