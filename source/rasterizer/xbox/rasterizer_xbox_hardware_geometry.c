@@ -62,7 +62,29 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct rasterizer_vertex_buffer
+{
+	short vertex_type;
+	short pad2;
+	long vertex_count;
+	long buffer_size;
+	void *vertices;
+	void *hardware_buffer;
+};
+
+struct rasterizer_triangle_buffer
+{
+	short triangle_type;
+	short pad2;
+	long triangle_count;
+	void *triangles;
+	void *hardware_buffer;
+};
+
 /* ---------- prototypes */
+
+unsigned long __stdcall D3DResource_Release(
+	void *resource);
 
 /* ---------- globals */
 
@@ -104,6 +126,30 @@ long __stdcall code_00158510(
 	void *resource)
 {
 	return 0;
+}
+
+void rasterizer_vertex_buffer_delete(
+	struct rasterizer_vertex_buffer *vertex_buffer)
+{
+	if (vertex_buffer && vertex_buffer->hardware_buffer)
+	{
+		D3DResource_Release(vertex_buffer->hardware_buffer);
+		vertex_buffer->hardware_buffer = 0;
+	}
+
+	return;
+}
+
+void rasterizer_triangle_buffer_delete(
+	struct rasterizer_triangle_buffer *triangle_buffer)
+{
+	if (triangle_buffer && triangle_buffer->hardware_buffer)
+	{
+		D3DResource_Release(triangle_buffer->hardware_buffer);
+		triangle_buffer->hardware_buffer = 0;
+	}
+
+	return;
 }
 
 /* ---------- private code */
