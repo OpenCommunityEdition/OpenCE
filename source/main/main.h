@@ -92,6 +92,36 @@ short main_get_current_solo_level(
 void main_run_demos(
 	void);
 
+void main_set_multiplayer_map_name(
+	char const *map_name);
+
+void main_set_difficulty(
+	short difficulty);
+
+void main_save_map_safe(
+	void);
+
+void main_save_map_no_timeout(
+	void);
+
+void main_skip(
+	short ticks);
+
+void main_queue_map_name(
+	char const *map_name);
+
+boolean main_taking_screenshot(
+	void);
+
+void main_movie_stop(
+	void);
+
+void main_print_version(
+	void);
+
+void main_roll_credits(
+	void);
+
 void main_reset_map(void);
 
 void main_stop_time(void);

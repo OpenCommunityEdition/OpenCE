@@ -332,6 +332,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "errors.h"
 #include "main.h"
 #include "real_math.h"
 #include "game.h"
@@ -432,7 +433,9 @@ struct _main_globals
 	byte __unknown00[216];
 	real seconds_elapsed;
 	short connection;
-	byte __unknownDE[18];
+	byte __unknownDE[2];
+	struct bitmap_data *movie;
+	byte __unknownE4[12];
 	boolean save_map;
 	boolean rename_map;
 	byte __unknownF2[2];
@@ -460,7 +463,11 @@ struct _main_globals
 	boolean run_xdemos;
 	byte __unknown115;
 	boolean halt_time_scale;
-	byte __unknown117[0x7];
+	boolean restart_time;
+	byte __unknown118;
+	boolean skip;
+	short skip_ticks;
+	byte __unknown11C[2];
 	short respawn_timer;
 	boolean queue_map;
 	byte __unknown121[0x3];
@@ -475,6 +482,8 @@ typedef char main_globals_seconds_elapsed_offset_assert[
 	offsetof(struct _main_globals, seconds_elapsed) == 0xD8 ? 1 : -1];
 typedef char main_globals_connection_offset_assert[
 	offsetof(struct _main_globals, connection) == 0xDC ? 1 : -1];
+typedef char main_globals_movie_offset_assert[
+	offsetof(struct _main_globals, movie) == 0xE0 ? 1 : -1];
 typedef char main_globals_defer_map_change_offset_assert[
 	offsetof(struct _main_globals, defer_map_change) == 0xF5 ? 1 : -1];
 typedef char main_globals_reset_map_offset_assert[
@@ -603,14 +612,14 @@ void main_stop_time(
 	void)
 {
 	main_globals.halt_time_scale = FALSE;
-	main_globals.__unknown117[0] = FALSE;
+	main_globals.restart_time = FALSE;
 	return;
 }
 
 void main_start_time(
 	void)
 {
-	main_globals.__unknown117[0] = TRUE;
+	main_globals.restart_time = TRUE;
 	return;
 }
 
@@ -754,6 +763,128 @@ void main_run_demos(
 	return;
 }
 
+extern void cache_files_give_time_to_precache(
+	char const *map_name);
+
+void main_set_multiplayer_map_name(
+	char const *map_name)
+{
+	csstrncpy(main_globals.multiplayer_map_name, map_name, NUMBEROF(main_globals.multiplayer_map_name) - 1);
+	main_globals.multiplayer_map_name[NUMBEROF(main_globals.multiplayer_map_name) - 1] = 0;
+	cache_files_give_time_to_precache(main_globals.multiplayer_map_name);
+	return;
+}
+
+void main_set_difficulty(
+	short difficulty)
+{
+	if (difficulty >= _game_difficulty_level_easy && difficulty < NUMBER_OF_GAME_DIFFICULTY_LEVELS)
+		global_difficulty_level = difficulty;
+	return;
+}
+
+void main_save_map_safe(
+	void)
+{
+	if (!main_globals.saving_map || main_globals.save_map_timeout)
+	{
+		main_globals.saving_map = TRUE;
+		main_globals.save_map_safely = TRUE;
+		main_globals.save_map_timeout = TRUE;
+		main_globals.ticks_until_next_save_check = 0;
+		main_globals.ticks_unable_to_save = 0;
+		main_globals.safe_intervals = 0;
+	}
+	return;
+}
+
+void main_save_map_no_timeout(
+	void)
+{
+	if (!main_globals.saving_map || main_globals.save_map_timeout)
+	{
+		main_globals.saving_map = TRUE;
+		main_globals.save_map_safely = TRUE;
+		main_globals.ticks_until_next_save_check = 0;
+		main_globals.ticks_unable_to_save = 0;
+		main_globals.safe_intervals = 0;
+	}
+	main_globals.save_map_timeout = FALSE;
+	return;
+}
+
+void main_skip(
+	short ticks)
+{
+	if (ticks <= 15)
+	{
+		main_globals.skip_ticks = ticks;
+		main_globals.skip = TRUE;
+	}
+	else
+	{
+		error(_error_silent, "cannot skip more than 15 frames (half a second)");
+	}
+	return;
+}
+
+void main_queue_map_name(
+	char const *map_name)
+{
+	if (map_name)
+	{
+		csstrncpy(main_globals.queued_map_name, map_name, NUMBEROF(main_globals.queued_map_name) - 1);
+		main_globals.queue_map = TRUE;
+	}
+	else
+	{
+		main_globals.queued_map_name[0] = 0;
+		main_globals.queue_map = FALSE;
+	}
+	return;
+}
+
+extern short global_screenshot_count;
+
+boolean main_taking_screenshot(
+	void)
+{
+	return global_screenshot_count > 0 || main_globals.movie != NULL;
+}
+
+extern void bitmap_delete(
+	struct bitmap_data *bitmap);
+
+void main_movie_stop(
+	void)
+{
+	if (main_globals.movie)
+	{
+		bitmap_delete(main_globals.movie);
+		main_globals.movie = NULL;
+	}
+	return;
+}
+
+void main_print_version(
+	void)
+{
+	console_printf(FALSE, "halobeta xbox 01.01.14.2342 Jan 14 2002 12:49:20");
+	return;
+}
+
+extern void game_end_credits_start(
+	void);
+
+void main_roll_credits(
+	void)
+{
+	error(_error_silent, "congratulations, you won the game!");
+	main_menu_load();
+	game_end_credits_start();
+	return;
+}
+
 static void main_reset_map_private(
 	void)
 {
@@ -889,7 +1020,7 @@ void main_loop(
 				main_menu_load();
 			}
 
-			if (main_globals.__unknown117[1])
+			if (main_globals.__unknown118)
 			{
 				main_load_last_solo_map();
 			}
@@ -900,7 +1031,7 @@ void main_loop(
 				xbox_demos_launch();
 			}
 
-			if (main_globals.__unknown117[2])
+			if (main_globals.skip)
 			{
 				code_000f05f0();
 			}
@@ -1164,7 +1295,7 @@ void main_loop(
 		profile_frame_end();
 		code_000f0940();
 		
-		if (main_globals.__unknown117[0])
+		if (main_globals.restart_time)
 		{
 			//main_globals.__unknown117[0] = 0;
 			//*(_DWORD *)&main_globals.__unknown00[176] = system_milliseconds();
