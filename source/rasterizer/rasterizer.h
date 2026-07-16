@@ -340,6 +340,10 @@ long rasterizer_widget_submit(
 	long mode);
 void *rasterizer_widget_begin(
 	long handle);
+void rasterizer_profile_enable(
+	boolean enable);
+void rasterizer_screen_flash(
+	void);
 void rasterizer_widget_set_texture(
 	long handle);
 void rasterizer_widget_set_tint_factor(

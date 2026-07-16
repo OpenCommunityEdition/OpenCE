@@ -565,6 +565,10 @@ long _rasterizer_widget_submit(
 	long mode);
 void *_rasterizer_widget_begin(
 	long handle);
+void _rasterizer_profile_enable(
+	boolean enable);
+void _rasterizer_screen_flash(
+	void);
 void _rasterizer_widget_set_texture(
 	long handle);
 void _rasterizer_widget_set_tint_factor(
@@ -1254,6 +1258,20 @@ void rasterizer_dynamic_screen_geometry_draw(
 	long vertex_count)
 {
 	_rasterizer_dynamic_screen_geometry_draw(primitive_type, vertex_type, dynamic_vertex_buffer_index, vertex_count);
+	return;
+}
+
+void rasterizer_profile_enable(
+	boolean enable)
+{
+	_rasterizer_profile_enable(enable);
+	return;
+}
+
+void rasterizer_screen_flash(
+	void)
+{
+	_rasterizer_screen_flash();
 	return;
 }
 
