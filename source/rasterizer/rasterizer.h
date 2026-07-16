@@ -106,6 +106,9 @@ struct rasterizer_window_begin_parameters
 
 /* ---------- prototypes/RASTERIZER.C */
 
+void rasterizer_reset_state(
+	void);
+
 boolean rasterizer_initialize(void);
 
 void rasterizer_frame_begin(const struct rasterizer_frame_begin_parameters *parameters);

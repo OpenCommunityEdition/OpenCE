@@ -399,6 +399,12 @@ symbols in this file:
 
 /* ---------- public code */
 
+void _rasterizer_reset_state(
+	void)
+{
+	return;
+}
+
 void rasterizer_spin_begin(
 	void)
 {

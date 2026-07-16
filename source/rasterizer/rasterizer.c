@@ -310,6 +310,9 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void _rasterizer_reset_state(
+	void);
+
 void _rasterizer_decals_update_function_pointers(void);
 void _rasterizer_decals_initialize(
 	void);
@@ -361,6 +364,13 @@ void _rasterizer_windows_end(void);
 /* ---------- globals */
 
 /* ---------- public code */
+
+void rasterizer_reset_state(
+	void)
+{
+	_rasterizer_reset_state();
+	return;
+}
 
 void rasterizer_decals_initialize(
 	void)
