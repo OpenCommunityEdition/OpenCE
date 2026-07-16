@@ -54,6 +54,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cinematics.h"
+#include "game/game.h"
 
 /* ---------- constants */
 
@@ -61,18 +62,33 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct cinematic_title
+{
+	short title_index;
+	short time;
+};
+
 struct cinematic_global_data
 {
 	long title_index;
 	long start_tick;
-	boolean active;
+	boolean show_letterbox;
 	boolean in_progress;
 	boolean can_be_skipped;
-	boolean show_letterbox;
-	long queued_title_indices[4];
+	boolean suppress_bsp_object_creation;
+	struct cinematic_title queued_titles[4];
 };
 
+typedef char verify_cinematic_title_size[
+	sizeof(struct cinematic_title) == 0x4 ? 1 : -1];
+typedef char verify_cinematic_global_data_size[
+	sizeof(struct cinematic_global_data) == 0x1C ? 1 : -1];
+
 /* ---------- prototypes */
+
+void cinematic_set_title_delayed(
+	short title_index,
+	real delay);
 
 /* ---------- globals */
 
@@ -98,6 +114,64 @@ void cinematic_skip_stop(
 	void)
 {
 	cinematic_globals->can_be_skipped = FALSE;
+
+	return;
+}
+
+void cinematic_dispose_from_old_map(
+	void)
+{
+	cinematic_globals->show_letterbox = FALSE;
+	cinematic_globals->in_progress = FALSE;
+
+	return;
+}
+
+boolean cinematic_can_be_skipped(
+	void)
+{
+	return cinematic_globals->can_be_skipped;
+}
+
+void cinematic_show_letterbox(
+	boolean show)
+{
+	cinematic_globals->show_letterbox = show;
+	if (show)
+	{
+		cinematic_globals->start_tick = game_time_get();
+	}
+
+	return;
+}
+
+void cinematic_force_title(
+	unsigned short title_index)
+{
+	cinematic_globals->queued_titles[0].title_index = title_index;
+	cinematic_globals->queued_titles[0].time = 0;
+
+	return;
+}
+
+void cinematic_suppress_bsp_object_creation(
+	boolean suppress)
+{
+	cinematic_globals->suppress_bsp_object_creation = suppress;
+
+	return;
+}
+
+boolean cinematic_in_progress(
+	void)
+{
+	return cinematic_globals->in_progress;
+}
+
+void cinematic_set_title(
+	unsigned short title_index)
+{
+	cinematic_set_title_delayed(title_index, 0.0f);
 
 	return;
 }

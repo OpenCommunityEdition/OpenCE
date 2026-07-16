@@ -22,6 +22,20 @@ void cinematic_skip_start(
 	void);
 void cinematic_skip_stop(
 	void);
+void cinematic_dispose_from_old_map(
+	void);
+boolean cinematic_can_be_skipped(
+	void);
+void cinematic_show_letterbox(
+	boolean show);
+void cinematic_force_title(
+	unsigned short title_index);
+void cinematic_suppress_bsp_object_creation(
+	boolean suppress);
+boolean cinematic_in_progress(
+	void);
+void cinematic_set_title(
+	unsigned short title_index);
 
 /* ---------- globals */
 
