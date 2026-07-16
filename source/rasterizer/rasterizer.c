@@ -308,10 +308,44 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct rasterizer_global_defaults
+{
+	real model_ambient_reflection_tint[4];
+};
+
+struct rasterizer_globals_definition
+{
+	byte reserved0[0x44];
+	real model_ambient_reflection_tint[4];
+	byte reserved54[0xA0];
+};
+
+struct rasterizer_debug_options_definition
+{
+	byte reserved0[0x10];
+	byte all;
+	byte field_11;
+	byte field_12;
+	byte field_13;
+	byte field_14;
+	byte field_15;
+	byte field_16;
+	byte field_17;
+	byte field_18;
+	byte field_19;
+	byte field_1A;
+	byte field_1B;
+	byte field_1C;
+	byte field_1D;
+	byte reserved1E[0x4A];
+};
+
 /* ---------- prototypes */
 
 void _rasterizer_reset_state(
 	void);
+void _rasterizer_frame_begin(
+	struct rasterizer_frame_begin_parameters const *parameters);
 void _rasterizer_present(
 	struct bitmap_data *screenshot_bitmap,
 	point2d const *screenshot_index);
@@ -412,12 +446,50 @@ void _rasterizer_windows_end(void);
 
 /* ---------- globals */
 
+extern struct rasterizer_global_defaults rasterizer_global_defaults;
+extern struct rasterizer_globals_definition rasterizer_globals;
+extern struct rasterizer_debug_options_definition rasterizer_debug_options;
+
 /* ---------- public code */
 
 void rasterizer_reset_state(
 	void)
 {
 	_rasterizer_reset_state();
+	return;
+}
+
+void rasterizer_frame_begin(
+	struct rasterizer_frame_begin_parameters const *parameters)
+{
+	if (rasterizer_debug_options.all <= 1)
+	{
+		rasterizer_debug_options.field_1C = rasterizer_debug_options.all;
+		rasterizer_debug_options.field_1B = rasterizer_debug_options.all;
+		rasterizer_debug_options.field_1A = rasterizer_debug_options.all;
+		rasterizer_debug_options.field_19 = rasterizer_debug_options.all;
+		rasterizer_debug_options.field_18 = rasterizer_debug_options.all;
+		rasterizer_debug_options.field_17 = rasterizer_debug_options.all;
+		rasterizer_debug_options.field_16 = rasterizer_debug_options.all;
+		rasterizer_debug_options.field_15 = rasterizer_debug_options.all;
+		rasterizer_debug_options.field_14 = rasterizer_debug_options.all;
+		rasterizer_debug_options.field_12 = rasterizer_debug_options.all;
+		rasterizer_debug_options.field_13 = rasterizer_debug_options.all;
+		rasterizer_debug_options.field_11 = rasterizer_debug_options.all;
+		rasterizer_debug_options.field_1D = rasterizer_debug_options.all;
+		rasterizer_debug_options.all = 2;
+	}
+
+	if (rasterizer_globals.model_ambient_reflection_tint[0] == 0.f)
+		rasterizer_globals.model_ambient_reflection_tint[0] = rasterizer_global_defaults.model_ambient_reflection_tint[0];
+	if (rasterizer_globals.model_ambient_reflection_tint[1] == 0.f)
+		rasterizer_globals.model_ambient_reflection_tint[1] = rasterizer_global_defaults.model_ambient_reflection_tint[1];
+	if (rasterizer_globals.model_ambient_reflection_tint[2] == 0.f)
+		rasterizer_globals.model_ambient_reflection_tint[2] = rasterizer_global_defaults.model_ambient_reflection_tint[2];
+	if (rasterizer_globals.model_ambient_reflection_tint[3] == 0.f)
+		rasterizer_globals.model_ambient_reflection_tint[3] = rasterizer_global_defaults.model_ambient_reflection_tint[3];
+
+	_rasterizer_frame_begin(parameters);
 	return;
 }
 
