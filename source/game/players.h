@@ -121,6 +121,9 @@ typedef char player_datum_statistics_offset_assert[
 
 /* ---------- prototypes/PLAYER_CONTROL.C */
 
+void player_input_enable(
+	boolean enable);
+
 void player_control_unzoom(long unit_index);
 
 /* ---------- prototypes/PLAYERS.C */

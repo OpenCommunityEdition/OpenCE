@@ -54,7 +54,14 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cinematics.h"
+#include "ai/ai.h"
 #include "game/game.h"
+#include "game/players.h"
+#include "interface/ui_widget.h"
+#include "items/projectiles.h"
+#include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_cinematics.h"
+#include "saved games/game_state.h"
 
 /* ---------- constants */
 
@@ -96,9 +103,36 @@ struct cinematic_global_data *cinematic_globals;
 
 /* ---------- public code */
 
+void cinematic_initialize(
+	void)
+{
+	cinematic_globals = game_state_malloc(
+		"cinematic globals",
+		NULL,
+		sizeof(*cinematic_globals));
+	match_assert(
+		"c:\\halo\\SOURCE\\cutscene\\cinematics.c",
+		24,
+		cinematic_globals);
+
+	return;
+}
+
 void cinematic_dispose(
 	void)
 {
+	return;
+}
+
+void cinematic_initialize_for_new_map(
+	void)
+{
+	csmemset(cinematic_globals, 0, sizeof(*cinematic_globals));
+	csmemset(
+		cinematic_globals->queued_titles,
+		NONE,
+		sizeof(cinematic_globals->queued_titles));
+
 	return;
 }
 
@@ -123,6 +157,19 @@ void cinematic_dispose_from_old_map(
 {
 	cinematic_globals->show_letterbox = FALSE;
 	cinematic_globals->in_progress = FALSE;
+
+	return;
+}
+
+void cinematic_start(
+	void)
+{
+	player_input_enable(FALSE);
+	ai_globals_dialogue_triggers_enabled(FALSE);
+	cinematic_globals->show_letterbox = TRUE;
+	cinematic_globals->start_tick = game_time_get();
+	cinematic_globals->in_progress = TRUE;
+	projectiles_delete_all();
 
 	return;
 }
@@ -166,6 +213,27 @@ boolean cinematic_in_progress(
 	void)
 {
 	return cinematic_globals->in_progress;
+}
+
+void cinematic_stop(
+	void)
+{
+	cinematic_globals->show_letterbox = FALSE;
+	player_input_enable(TRUE);
+	ai_globals_dialogue_triggers_enabled(TRUE);
+	cinematic_globals->in_progress = FALSE;
+	rasterizer_screen_effects_initialize_for_new_map();
+	if (global_rasterizer_model_ambient_reflection_tint)
+	{
+		csmemset(
+			global_rasterizer_model_ambient_reflection_tint,
+			0,
+			sizeof(*global_rasterizer_model_ambient_reflection_tint));
+	}
+	rasterizer_set_near_clip_distance(0.0f);
+	display_errors_deferred_until_cinematic_stop();
+
+	return;
 }
 
 void cinematic_set_title(
