@@ -78,8 +78,73 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void __stdcall code_00157c90(
+	void *resource,
+	void *locked_region);
+long __stdcall code_00157cc0(
+	void *resource,
+	void *locked_region);
+void __stdcall code_00157cd0(
+	void *resource,
+	void *locked_region);
+long __stdcall code_00157d00(
+	void *resource,
+	void *locked_region);
+void __stdcall code_00157d10(
+	void *resource,
+	void *locked_region,
+	long face_index);
+long __stdcall code_00157d40(
+	void *resource,
+	void *locked_region,
+	long face_index);
+
 /* ---------- globals */
 
 /* ---------- public code */
 
 /* ---------- private code */
+
+void __stdcall code_00157c90(
+	void *resource,
+	void *locked_region)
+{
+	return;
+}
+
+long __stdcall code_00157cc0(
+	void *resource,
+	void *locked_region)
+{
+	return 0;
+}
+
+void __stdcall code_00157cd0(
+	void *resource,
+	void *locked_region)
+{
+	return;
+}
+
+long __stdcall code_00157d00(
+	void *resource,
+	void *locked_region)
+{
+	return 0;
+}
+
+void __stdcall code_00157d10(
+	void *resource,
+	void *locked_region,
+	long face_index)
+{
+	return;
+}
+
+long __stdcall code_00157d40(
+	void *resource,
+	void *locked_region,
+	long face_index)
+{
+	return 0;
+}
