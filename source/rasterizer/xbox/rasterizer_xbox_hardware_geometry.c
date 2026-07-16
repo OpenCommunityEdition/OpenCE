@@ -7,27 +7,27 @@ symbols in this file:
 00158430 0020:
 	_code_00158430 (0000)
 00158450 0010:
-	_code_00158450 (0000)
+	_code_00158450@8 (0000)
 00158460 0010:
-	_code_00158460 (0000)
+	_code_00158460@8 (0000)
 00158470 0010:
-	_code_00158470 (0000)
+	_code_00158470@4 (0000)
 00158480 0010:
 	_code_00158480 (0000)
 00158490 0020:
 	_code_00158490 (0000)
 001584B0 0010:
-	_code_001584b0 (0000)
+	_code_001584b0@4 (0000)
 001584C0 0010:
 	_code_001584c0 (0000)
 001584D0 0010:
-	_code_001584d0 (0000)
+	_code_001584d0@4 (0000)
 001584E0 0010:
 	_code_001584e0 (0000)
 001584F0 0020:
 	_code_001584f0 (0000)
 00158510 0010:
-	_code_00158510 (0000)
+	_code_00158510@4 (0000)
 00158520 0170:
 	_rasterizer_vertex_buffer_new (0000)
 00158690 0030:
@@ -67,5 +67,43 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void __stdcall code_00158450(
+	void *resource,
+	void *data)
+{
+	return;
+}
+
+void __stdcall code_00158460(
+	void *resource,
+	void *data)
+{
+	return;
+}
+
+void __stdcall code_00158470(
+	void *resource)
+{
+	return;
+}
+
+long __stdcall code_001584b0(
+	void *resource)
+{
+	return 0;
+}
+
+void __stdcall code_001584d0(
+	void *resource)
+{
+	return;
+}
+
+long __stdcall code_00158510(
+	void *resource)
+{
+	return 0;
+}
 
 /* ---------- private code */
