@@ -71,6 +71,6 @@ boolean data_packet_group_decode_packet(
 	short *encoded_packet_size,
 	short *packet_type,
 	short *packet_version,
-	long expected_packet_class);
+	short expected_packet_class);
 
 #endif // __DATA_PACKET_GROUPS_H

@@ -29,6 +29,14 @@ boolean data_packet_encode(
 	short *encoded_packet_size,
 	short maximum_buffer_size);
 
+boolean data_packet_decode(
+	struct data_packet_definition *packet_definition,
+	void const *encoded_packet,
+	short encoded_packet_size,
+	void *decoded_packet,
+	short *packet_version,
+	boolean flag);
+
 /* ---------- globals */
 
 /* ---------- public code */

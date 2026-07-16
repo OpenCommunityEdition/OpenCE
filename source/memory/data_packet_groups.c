@@ -72,7 +72,7 @@ symbols in this file:
 
 struct packet_header
 {
-	byte value;
+	char packet_type;
 };
 
 struct packet_header_byte_swap_data
@@ -161,7 +161,7 @@ boolean data_packet_group_append_packet_header(
 
 	if (*encoded_packet_size + sizeof(struct packet_header) < group_definition->maximum_encoded_packet_size)
 	{
-		packet_header->value = (byte)packet_type;
+		packet_header->packet_type = (char)packet_type;
 		byte_swap_data(&data_00309e38.definition, packet_header, 1);
 		++*encoded_packet_size;
 	}
@@ -219,6 +219,81 @@ boolean data_packet_group_encode_packet(
 	else
 	{
 		error = "couldn't encode packet";
+	}
+
+	bss_00456624 = error;
+
+	return error==NULL;
+}
+
+boolean data_packet_group_decode_packet(
+	struct data_packet_group_definition *group_definition,
+	void *decoded_packet,
+	void const *encoded_packet,
+	short *encoded_packet_size,
+	short *packet_type,
+	short *packet_version,
+	short expected_packet_class)
+{
+	char const *error = NULL;
+
+	match_assert("c:\\halo\\SOURCE\\memory\\data_packet_groups.c", 73, decoded_packet);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\data_packet_groups.c",
+		74,
+		encoded_packet && encoded_packet_size);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\data_packet_groups.c",
+		75,
+		packet_type && packet_version);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\data_packet_groups.c",
+		77,
+		expected_packet_class>=0 && expected_packet_class<group_definition->packet_class_count);
+
+	if (*encoded_packet_size >= sizeof(struct packet_header))
+	{
+		struct packet_header *packet_header = (struct packet_header *)((byte const *)encoded_packet + *encoded_packet_size - sizeof(struct packet_header));
+
+		byte_swap_data(&data_00309e38.definition, packet_header, 1);
+
+		if (packet_header->packet_type>=0 && packet_header->packet_type<group_definition->packet_type_count)
+		{
+			struct data_packet_entry *packet = &group_definition->packets[packet_header->packet_type];
+
+			if (packet->packet_class == expected_packet_class)
+			{
+				--*encoded_packet_size;
+
+				if (!packet->definition ||
+					data_packet_decode(
+						packet->definition,
+						encoded_packet,
+						*encoded_packet_size,
+						decoded_packet,
+						packet_version,
+						FALSE))
+				{
+					*packet_type = packet_header->packet_type;
+				}
+				else
+				{
+					error = "got packet which wouldn't decode";
+				}
+			}
+			else
+			{
+				error = "got packet with mismatched class";
+			}
+		}
+		else
+		{
+			error = "got packet with bad type";
+		}
+	}
+	else
+	{
+		error = "got packet with no header";
 	}
 
 	bss_00456624 = error;
