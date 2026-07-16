@@ -845,6 +845,21 @@ void unit_persistent_control(
 	return;
 }
 
+boolean unit_set_user_animation(
+	long unit_index,
+	long animation_index,
+	short index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
+
+	animation_graph_definition_get(unit_definition->object.animation_graph.index);
+
+	match_assert("c:\\halo\\SOURCE\\units\\units.c", 6689, index>=0 && index<NUMBER_OF_UNIT_USER_ANIMATIONS);
+
+	return FALSE;
+}
+
 short unit_get_zoom_level(
 	long unit_index)
 {
@@ -988,6 +1003,43 @@ boolean unit_gunned_by_ai(
 	}
 
 	return unit->unit.actor_index!=NONE;
+}
+
+long unit_scripting_unit_riders(
+	long unit_index)
+{
+	long object_list_index = NONE;
+
+	if (unit_index!=NONE)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+
+		object_list_index = object_list_new();
+
+		if (object_list_index!=NONE)
+		{
+			long child_object_index = unit->object.first_child_object_index;
+
+			while (child_object_index!=NONE)
+			{
+				struct object_datum *child_object = object_get(child_object_index);
+
+				if (TEST_FLAG(_object_mask_unit, child_object->object.type))
+				{
+					struct unit_datum *rider = (struct unit_datum *)child_object;
+
+					if (rider->unit.parent_seat_index!=NONE)
+					{
+						object_list_add(object_list_index, child_object_index);
+					}
+				}
+
+				child_object_index = child_object->object.next_object_index;
+			}
+		}
+	}
+
+	return object_list_index;
 }
 
 boolean unit_seat_filled(
@@ -1175,6 +1227,28 @@ boolean unit_has_weapon_definition_index(
 	}
 
 	return FALSE;
+}
+
+boolean unit_has_weapon_with_flag(
+	long unit_index,
+	long flag_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	boolean has_weapon = FALSE;
+	long weapon_index;
+
+	for (weapon_index = 0; weapon_index<MAXIMUM_WEAPONS_PER_UNIT; ++weapon_index)
+	{
+		long weapon_object_index = unit->unit.weapon_object_indices[weapon_index];
+
+		if (weapon_object_index!=NONE && TEST_FLAG(weapon_get(weapon_object_index)->weapon.flags, flag_index))
+		{
+			has_weapon = TRUE;
+			break;
+		}
+	}
+
+	return has_weapon;
 }
 
 short unit_get_grenade_count(
@@ -1481,6 +1555,18 @@ void unit_get_facing_vector(
 	return;
 }
 
+void unit_get_center_of_mass(
+	long unit_index,
+	real_point3d *center_of_mass)
+{
+	struct object_marker body_marker;
+
+	object_get_marker_by_name(unit_index, "body", &body_marker, 1);
+	*center_of_mass = body_marker.matrix.position;
+
+	return;
+}
+
 void unit_get_aiming_vector(
 	long unit_index,
 	real_vector3d *aiming_vector)
@@ -1564,6 +1650,19 @@ void unit_impulse(
 		unit->object.translational_velocity.i += scale*impulse->i;
 		unit->object.translational_velocity.j += scale*impulse->j;
 		unit->object.translational_velocity.k += scale*impulse->k;
+	}
+
+	return;
+}
+
+void unit_scripting_set_seat(
+	long unit_index,
+	char const *seat_label)
+{
+	if (unit_index!=NONE)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+		unit->unit.magic_seat_index = seat_label_to_base_seat_index(seat_label);
 	}
 
 	return;

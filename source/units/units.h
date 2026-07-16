@@ -540,6 +540,18 @@ void unit_impulse(
 	long impulse_index,
 	real_vector3d const *impulse,
 	real magnitude);
+boolean unit_set_user_animation(
+	long unit_index,
+	long animation_index,
+	short index);
+boolean unit_has_weapon_with_flag(
+	long unit_index,
+	long flag_index);
+long unit_scripting_unit_riders(
+	long unit_index);
+void unit_scripting_set_seat(
+	long unit_index,
+	char const *seat_label);
 
 boolean unit_update(long unit_index);
 
@@ -566,7 +578,9 @@ void unit_estimate_position(
 	real_vector3d *desired_facing,
 	real_vector3d *desired_gun_offset,
 	real_point3d *estimated_position);
-void unit_get_center_of_mass(long unit_index, real_point3d *center_of_mass);
+void unit_get_center_of_mass(
+	long unit_index,
+	real_point3d *center_of_mass);
 boolean unit_test_animation_impulse(long unit_index, short animation_impulse);
 boolean unit_start_animation_impulse(long unit_index, short animation_impulse, real_vector2d *alignment_vector);
 long unit_get_aiming_unit_index(long unit_index);
