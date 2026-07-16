@@ -433,15 +433,17 @@ struct _main_globals
 	real seconds_elapsed;
 	short connection;
 	byte __unknownDE[18];
-	boolean reset_map;
+	boolean save_map;
 	boolean rename_map;
+	byte __unknownF2[2];
+	boolean reset_map;
+	boolean defer_map_change;
 	boolean revert_map;
 	boolean skip_cinematic;
-	boolean save_map;
-	boolean defer_map_change;
+	boolean saving_map;
 	boolean save_map_safely;
 	boolean save_map_timeout;
-	boolean saving_map;
+	byte __unknownFB;
 	long ticks_until_next_save_check;
 	long ticks_unable_to_save;
 	unsigned long map_change_load_timer;
@@ -458,14 +460,15 @@ struct _main_globals
 	boolean run_xdemos;
 	byte __unknown115;
 	boolean halt_time_scale;
-	byte __unknown117[0x9];
+	byte __unknown117[0x7];
+	short respawn_timer;
 	boolean queue_map;
 	byte __unknown121[0x3];
 	boolean allow_persistent_storage;
 	char soloplayer_map_name[256];
 	char multiplayer_map_name[256];
 	char queued_map_name[256];
-	byte __unknown125[682];
+	char core_name[682];
 };
 
 typedef char main_globals_seconds_elapsed_offset_assert[
@@ -474,18 +477,30 @@ typedef char main_globals_connection_offset_assert[
 	offsetof(struct _main_globals, connection) == 0xDC ? 1 : -1];
 typedef char main_globals_defer_map_change_offset_assert[
 	offsetof(struct _main_globals, defer_map_change) == 0xF5 ? 1 : -1];
+typedef char main_globals_reset_map_offset_assert[
+	offsetof(struct _main_globals, reset_map) == 0xF4 ? 1 : -1];
+typedef char main_globals_revert_map_offset_assert[
+	offsetof(struct _main_globals, revert_map) == 0xF6 ? 1 : -1];
+typedef char main_globals_skip_cinematic_offset_assert[
+	offsetof(struct _main_globals, skip_cinematic) == 0xF7 ? 1 : -1];
 typedef char main_globals_saving_map_offset_assert[
 	offsetof(struct _main_globals, saving_map) == 0xF8 ? 1 : -1];
+typedef char main_globals_save_map_safely_offset_assert[
+	offsetof(struct _main_globals, save_map_safely) == 0xF9 ? 1 : -1];
 typedef char main_globals_won_map_offset_assert[
 	offsetof(struct _main_globals, won_map) == 0x10A ? 1 : -1];
 typedef char main_globals_halt_time_scale_offset_assert[
 	offsetof(struct _main_globals, halt_time_scale) == 0x116 ? 1 : -1];
+typedef char main_globals_respawn_timer_offset_assert[
+	offsetof(struct _main_globals, respawn_timer) == 0x11E ? 1 : -1];
 typedef char main_globals_allow_persistent_storage_offset_assert[
 	offsetof(struct _main_globals, allow_persistent_storage) == 0x124 ? 1 : -1];
 typedef char main_globals_soloplayer_map_name_offset_assert[
 	offsetof(struct _main_globals, soloplayer_map_name) == 0x125 ? 1 : -1];
 typedef char main_globals_multiplayer_map_name_offset_assert[
 	offsetof(struct _main_globals, multiplayer_map_name) == 0x225 ? 1 : -1];
+typedef char main_globals_core_name_offset_assert[
+	offsetof(struct _main_globals, core_name) == 0x425 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -596,6 +611,146 @@ void main_start_time(
 	void)
 {
 	main_globals.__unknown117[0] = TRUE;
+	return;
+}
+
+void main_reset_map(
+	void)
+{
+	main_globals.switch_to_structure_bsp_index = NONE;
+	main_globals.saving_map = FALSE;
+	main_globals.reset_map = TRUE;
+	main_globals.lost_map = FALSE;
+	return;
+}
+
+void main_revert_map(
+	void)
+{
+	main_globals.switch_to_structure_bsp_index = NONE;
+	main_globals.saving_map = FALSE;
+	main_globals.revert_map = TRUE;
+	main_globals.lost_map = FALSE;
+	return;
+}
+
+void main_skip_cinematic(
+	void)
+{
+	main_globals.switch_to_structure_bsp_index = NONE;
+	main_globals.saving_map = FALSE;
+	main_globals.skip_cinematic = TRUE;
+	return;
+}
+
+void main_save_map_nonsafe(
+	void)
+{
+	main_globals.saving_map = TRUE;
+	main_globals.save_map_safely = FALSE;
+	return;
+}
+
+void main_respawn(
+	boolean in_multiplayer)
+{
+	main_globals.respawn = TRUE;
+	if (in_multiplayer)
+		main_globals.respawn_timer = 91;
+	return;
+}
+
+void main_save_core(
+	void)
+{
+	main_globals.save_core = TRUE;
+	csstrcpy(main_globals.core_name, "core.bin");
+	return;
+}
+
+void main_load_core(
+	void)
+{
+	main_globals.load_core = TRUE;
+	csstrcpy(main_globals.core_name, "core.bin");
+	return;
+}
+
+void main_load_core_at_startup(
+	void)
+{
+	main_globals.load_core_at_startup = TRUE;
+	csstrcpy(main_globals.core_name, "core.bin");
+	return;
+}
+
+void main_goto_main_menu(
+	void)
+{
+	main_globals.switch_to_structure_bsp_index = NONE;
+	main_globals.saving_map = FALSE;
+	main_globals.want_to_be_at_main_menu = TRUE;
+	return;
+}
+
+void main_menu_unload(
+	void)
+{
+	ui_stop_main_menu_music();
+	main_menu_active(FALSE);
+	main_globals.__unknown112 = FALSE;
+	return;
+}
+
+extern void update_server_delete(
+	void);
+extern void update_server_new(
+	void);
+extern void update_server_start(
+	void);
+
+void main_menu_ensure_player_queues_exist(
+	void)
+{
+	update_server_delete();
+	update_server_new();
+	update_server_start();
+	return;
+}
+
+boolean main_menu_fade_active(
+	void)
+{
+	return main_globals.map_change_load_timer != 0;
+}
+
+void main_menu_switch_to_single_player(
+	void)
+{
+	main_globals.defer_map_change = TRUE;
+	return;
+}
+
+void main_set_game_connection_to_film_playback(
+	void)
+{
+	main_globals.__unknown115 = TRUE;
+	return;
+}
+
+extern short main_get_solo_level_from_name(
+	char const *name);
+
+short main_get_current_solo_level(
+	void)
+{
+	return main_get_solo_level_from_name(main_globals.soloplayer_map_name);
+}
+
+void main_run_demos(
+	void)
+{
+	main_globals.run_xdemos = TRUE;
 	return;
 }
 
