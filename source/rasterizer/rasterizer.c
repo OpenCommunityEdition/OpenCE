@@ -368,6 +368,8 @@ void _rasterizer_decals_begin(
 	short type);
 void _rasterizer_decals_end(
 	void);
+void _rasterizer_decals_flush(
+	void);
 void _rasterizer_detail_objects_begin(
 	void);
 void _rasterizer_detail_objects_end(
@@ -396,6 +398,8 @@ void _rasterizer_model_end(
 	void);
 void _rasterizer_models_end(
 	void);
+void _rasterizer_environment_lightmaps_begin(
+	void);
 void _rasterizer_environment_lightmap_end(
 	void);
 void _rasterizer_environment_lightmaps_end(
@@ -403,6 +407,8 @@ void _rasterizer_environment_lightmaps_end(
 void _rasterizer_environment_diffuse_light_end(
 	void);
 void _rasterizer_environment_diffuse_lights_end(
+	void);
+void _rasterizer_environment_diffuse_lights_begin(
 	void);
 void _rasterizer_environment_shadows_begin(
 	void);
@@ -414,17 +420,25 @@ void _rasterizer_environment_shadows_end(
 	void);
 void _rasterizer_environment_diffuse_textures_end(
 	void);
+void _rasterizer_environment_diffuse_textures_begin(
+	void);
 void _rasterizer_environment_specular_light_end(
 	void);
 void _rasterizer_environment_specular_lights_end(
+	void);
+void _rasterizer_environment_specular_lights_begin(
 	void);
 void _rasterizer_environment_specular_lightmap_end(
 	void);
 void _rasterizer_environment_specular_lightmaps_end(
 	void);
+void _rasterizer_environment_specular_lightmaps_begin(
+	void);
 void _rasterizer_environment_reflection_lightmap_mask_end(
 	void);
 void _rasterizer_environment_reflection_lightmap_masks_end(
+	void);
+void _rasterizer_environment_reflection_lightmap_masks_begin(
 	void);
 void _rasterizer_environment_reflection_mirrors_begin(
 	void);
@@ -437,6 +451,12 @@ void _rasterizer_environment_reflections_end(
 void _rasterizer_environment_transparent_geometry_begin(
 	void);
 void _rasterizer_environment_transparent_geometry_end(
+	void);
+void _rasterizer_environment_fog_begin(
+	void);
+void _rasterizer_environment_fog_end(
+	void);
+void _rasterizer_environment_fog_screen_end(
 	void);
 void _rasterizer_dispose(void);
 void _rasterizer_frame_end(void);
@@ -575,6 +595,13 @@ void rasterizer_decals_end(
 	return;
 }
 
+void rasterizer_decals_flush(
+	void)
+{
+	_rasterizer_decals_flush();
+	return;
+}
+
 void rasterizer_detail_objects_begin(
 	void)
 {
@@ -668,6 +695,13 @@ void rasterizer_models_end(
 	return;
 }
 
+void rasterizer_environment_lightmaps_begin(
+	void)
+{
+	_rasterizer_environment_lightmaps_begin();
+	return;
+}
+
 void rasterizer_environment_lightmap_end(
 	void)
 {
@@ -693,6 +727,13 @@ void rasterizer_environment_diffuse_lights_end(
 	void)
 {
 	_rasterizer_environment_diffuse_lights_end();
+	return;
+}
+
+void rasterizer_environment_diffuse_lights_begin(
+	void)
+{
+	_rasterizer_environment_diffuse_lights_begin();
 	return;
 }
 
@@ -731,6 +772,13 @@ void rasterizer_environment_diffuse_textures_end(
 	return;
 }
 
+void rasterizer_environment_diffuse_textures_begin(
+	void)
+{
+	_rasterizer_environment_diffuse_textures_begin();
+	return;
+}
+
 void rasterizer_environment_specular_light_end(
 	void)
 {
@@ -742,6 +790,13 @@ void rasterizer_environment_specular_lights_end(
 	void)
 {
 	_rasterizer_environment_specular_lights_end();
+	return;
+}
+
+void rasterizer_environment_specular_lights_begin(
+	void)
+{
+	_rasterizer_environment_specular_lights_begin();
 	return;
 }
 
@@ -759,6 +814,13 @@ void rasterizer_environment_specular_lightmaps_end(
 	return;
 }
 
+void rasterizer_environment_specular_lightmaps_begin(
+	void)
+{
+	_rasterizer_environment_specular_lightmaps_begin();
+	return;
+}
+
 void rasterizer_environment_reflection_lightmap_mask_end(
 	void)
 {
@@ -770,6 +832,13 @@ void rasterizer_environment_reflection_lightmap_masks_end(
 	void)
 {
 	_rasterizer_environment_reflection_lightmap_masks_end();
+	return;
+}
+
+void rasterizer_environment_reflection_lightmap_masks_begin(
+	void)
+{
+	_rasterizer_environment_reflection_lightmap_masks_begin();
 	return;
 }
 
@@ -812,6 +881,27 @@ void rasterizer_environment_transparent_geometry_end(
 	void)
 {
 	_rasterizer_environment_transparent_geometry_end();
+	return;
+}
+
+void rasterizer_environment_fog_begin(
+	void)
+{
+	_rasterizer_environment_fog_begin();
+	return;
+}
+
+void rasterizer_environment_fog_end(
+	void)
+{
+	_rasterizer_environment_fog_end();
+	return;
+}
+
+void rasterizer_environment_fog_screen_end(
+	void)
+{
+	_rasterizer_environment_fog_screen_end();
 	return;
 }
 
