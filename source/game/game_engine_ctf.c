@@ -130,4 +130,76 @@ symbols in this file:
 
 /* ---------- public code */
 
+void code_0009ebc0(
+	void)
+{
+	return;
+}
+
+void code_0009ec70(
+	void)
+{
+	return;
+}
+
+void code_0009eca0(
+	void)
+{
+	return;
+}
+
+void code_0009ecc0(
+	void)
+{
+	return;
+}
+
+void code_0009ecd0(
+	void)
+{
+	return;
+}
+
+void code_0009ece0(
+	void)
+{
+	return;
+}
+
+void code_0009ecf0(
+	void)
+{
+	return;
+}
+
+void code_0009ed00(
+	void)
+{
+	return;
+}
+
+void code_0009ef00(
+	void)
+{
+	return;
+}
+
+void code_0009ef10(
+	void)
+{
+	return;
+}
+
+void code_0009f2c0(
+	void)
+{
+	return;
+}
+
+void code_0009f2d0(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
