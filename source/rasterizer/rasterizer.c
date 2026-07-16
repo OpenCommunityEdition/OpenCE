@@ -1607,4 +1607,40 @@ void rasterizer_windows_end(void)
 	_rasterizer_windows_end();
 }
 
+void rasterizer_debug_immediate_point(
+	real_point3d const *point,
+	real radius,
+	real_rgb_color const *color)
+{
+	real_point3d p0;
+	real_point3d p1;
+
+	radius *= 0.5f;
+	set_real_point3d(&p0, point->x - radius, point->y, point->z);
+	set_real_point3d(&p1, point->x + radius, point->y, point->z);
+	_rasterizer_debug_immediate_line(&p0, &p1, color, color);
+	set_real_point3d(&p0, point->x, point->y - radius, point->z);
+	set_real_point3d(&p1, point->x, point->y + radius, point->z);
+	_rasterizer_debug_immediate_line(&p0, &p1, color, color);
+	set_real_point3d(&p0, point->x, point->y, point->z - radius);
+	set_real_point3d(&p1, point->x, point->y, point->z + radius);
+	_rasterizer_debug_immediate_line(&p0, &p1, color, color);
+	return;
+}
+
+void rasterizer_debug_immediate_vector(
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real scale,
+	real_rgb_color const *color)
+{
+	real_point3d endpoint;
+
+	endpoint.x = point->x + scale * vector->i;
+	endpoint.y = point->y + scale * vector->j;
+	endpoint.z = point->z + scale * vector->k;
+	_rasterizer_debug_immediate_line(point, &endpoint, color, color);
+	return;
+}
+
 /* ---------- private code */

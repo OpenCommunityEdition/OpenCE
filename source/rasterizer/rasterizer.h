@@ -172,6 +172,15 @@ void rasterizer_debug_immediate_line(
 	real_point3d const *p1,
 	real_rgb_color const *color0,
 	real_rgb_color const *color1);
+void rasterizer_debug_immediate_point(
+	real_point3d const *point,
+	real radius,
+	real_rgb_color const *color);
+void rasterizer_debug_immediate_vector(
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real scale,
+	real_rgb_color const *color);
 void rasterizer_debug_immediate_triangle(
 	real_point3d const *p0,
 	real_point3d const *p1,
