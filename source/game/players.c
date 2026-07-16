@@ -257,4 +257,36 @@ short local_player_count(
 	return players_globals->local_player_count;
 }
 
+boolean players_are_all_dead(
+	void)
+{
+	return players_globals->all_dead;
+}
+
+unsigned long const *players_get_combined_pvs_local(
+	void)
+{
+	return players_globals->combined_pvs_local;
+}
+
+unsigned long const *players_get_combined_pvs(
+	void)
+{
+	return players_globals->combined_pvs;
+}
+
+void player_input_enable(
+	boolean enable)
+{
+	players_globals->input_disabled = !enable;
+
+	return;
+}
+
+boolean player_input_enabled(
+	void)
+{
+	return !players_globals->input_disabled;
+}
+
 /* ---------- private code */

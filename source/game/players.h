@@ -111,6 +111,14 @@ typedef char players_globals_local_player_count_offset_assert[
 	offsetof(struct players_globals, local_player_count) == 0x24 ? 1 : -1];
 typedef char players_globals_respawn_failure_offset_assert[
 	offsetof(struct players_globals, respawn_failure) == 0x2C ? 1 : -1];
+typedef char players_globals_all_dead_offset_assert[
+	offsetof(struct players_globals, all_dead) == 0x28 ? 1 : -1];
+typedef char players_globals_input_disabled_offset_assert[
+	offsetof(struct players_globals, input_disabled) == 0x29 ? 1 : -1];
+typedef char players_globals_combined_pvs_offset_assert[
+	offsetof(struct players_globals, combined_pvs) == 0x30 ? 1 : -1];
+typedef char players_globals_combined_pvs_local_offset_assert[
+	offsetof(struct players_globals, combined_pvs_local) == 0x70 ? 1 : -1];
 typedef char players_globals_size_assert[
 	sizeof(struct players_globals) == 0xB0 ? 1 : -1];
 
@@ -123,6 +131,9 @@ typedef char player_datum_statistics_offset_assert[
 
 void player_input_enable(
 	boolean enable);
+
+boolean player_input_enabled(
+	void);
 
 void player_control_unzoom(long unit_index);
 
@@ -137,10 +148,16 @@ short local_player_count(
 short players_get_respawn_failure(
 	void);
 
+boolean players_are_all_dead(
+	void);
+
 long player_index_from_unit_index(long unit_index);
 
-unsigned long const *players_get_combined_pvs_local(void);
-unsigned long const *players_get_combined_pvs(void);
+unsigned long const *players_get_combined_pvs_local(
+	void);
+
+unsigned long const *players_get_combined_pvs(
+	void);
 
 void player_control_fix_for_loaded_game_state(void);
 
