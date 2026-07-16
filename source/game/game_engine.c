@@ -539,8 +539,10 @@ symbols in this file:
 #include "cseries.h"
 #include "game_engine.h"
 
+#include "game_globals.h"
 #include "objects.h"
 #include "players.h"
+#include "scenario/scenario.h"
 
 /* ---------- constants */
 
@@ -558,11 +560,29 @@ struct game_engine_goal
 struct game_engine_globals
 {
 	unsigned long flags;
-	byte unused[0xC];
+	byte unused4[4];
+	real postgame_timer;
+	byte unusedC[4];
 	long postgame_state;
 };
 
+struct game_engine_stage
+{
+	char map_name[64];
+	struct game_variant variant;
+};
+
 typedef char verify_game_engine_goal_size[sizeof(struct game_engine_goal) == 0x20 ? 1 : -1];
+typedef char verify_game_engine_globals_postgame_timer_offset[
+	offsetof(struct game_engine_globals, postgame_timer) == 0x8 ? 1 : -1];
+typedef char verify_game_engine_globals_postgame_state_offset[
+	offsetof(struct game_engine_globals, postgame_state) == 0x10 ? 1 : -1];
+typedef char verify_game_engine_globals_size[
+	sizeof(struct game_engine_globals) == 0x14 ? 1 : -1];
+typedef char verify_game_engine_stage_variant_offset[
+	offsetof(struct game_engine_stage, variant) == 0x40 ? 1 : -1];
+typedef char verify_game_engine_stage_size[
+	sizeof(struct game_engine_stage) == 0xA8 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -580,6 +600,9 @@ long game_engine_did_player_win_default(
 boolean multiple_teams_alive(
 	void);
 
+struct network_game_server *global_network_game_server_get(
+	void);
+
 /* ---------- globals */
 
 struct game_engine *game_engine;
@@ -587,6 +610,7 @@ struct game_engine *game_engine;
 extern struct game_engine_goal global_goal[32];
 extern struct game_variant global_variant;
 extern struct game_engine_globals game_engine_globals;
+extern struct game_engine_stage global_stage;
 
 /* ---------- public code */
 
@@ -733,6 +757,83 @@ boolean game_engine_should_end_game(
 		should_end_game = TRUE;
 
 	return should_end_game;
+}
+
+void game_engine_clear_goal_position(
+	short goal_index)
+{
+	csmemset(&global_goal[goal_index], 0, sizeof(struct game_engine_goal));
+
+	return;
+}
+
+long get_flag_definition_index(
+	void)
+{
+	struct game_globals *game_globals;
+	struct game_globals_multiplayer_information *multiplayer_information;
+
+	global_scenario_get();
+	game_globals = scenario_get_game_globals();
+	multiplayer_information = TAG_BLOCK_GET_ELEMENT(
+		&game_globals->multiplayer_information,
+		0,
+		struct game_globals_multiplayer_information);
+
+	return multiplayer_information->flag.index;
+}
+
+long get_ball_definition_index(
+	void)
+{
+	struct game_globals *game_globals;
+	struct game_globals_multiplayer_information *multiplayer_information;
+
+	global_scenario_get();
+	game_globals = scenario_get_game_globals();
+	multiplayer_information = TAG_BLOCK_GET_ELEMENT(
+		&game_globals->multiplayer_information,
+		0,
+		struct game_globals_multiplayer_information);
+
+	return multiplayer_information->ball.index;
+}
+
+void game_engine_override_map_name(
+	char const *map_name)
+{
+	if (map_name && map_name[0])
+		csstrncpy(global_stage.map_name, map_name, sizeof(global_stage.map_name)-1);
+
+	return;
+}
+
+void game_engine_override_game_variant(
+	struct game_variant const *variant)
+{
+	if (variant)
+		csmemcpy(&global_stage.variant, variant, sizeof(global_stage.variant));
+
+	return;
+}
+
+void game_engine_switch_to_postgame(
+	void)
+{
+	if (game_engine_globals.postgame_state==0)
+	{
+		if (global_network_game_server_get())
+		{
+			game_engine_globals.postgame_state = 1;
+			game_engine_globals.postgame_timer = 7.0f;
+		}
+		else
+		{
+			game_engine_globals.postgame_state = 3;
+		}
+	}
+
+	return;
 }
 
 boolean game_engine_allow_pick_up(

@@ -147,6 +147,24 @@ boolean game_engine_draw_object_in_motion_sensor(
 boolean game_engine_should_end_game(
 	void);
 
+void game_engine_clear_goal_position(
+	short goal_index);
+
+long get_flag_definition_index(
+	void);
+
+long get_ball_definition_index(
+	void);
+
+void game_engine_override_map_name(
+	char const *map_name);
+
+void game_engine_override_game_variant(
+	struct game_variant const *variant);
+
+void game_engine_switch_to_postgame(
+	void);
+
 long game_engine_remap_object_definition(long definition_index);
 
 long game_engine_remap_vehicle(long vehicle_definition_index);
