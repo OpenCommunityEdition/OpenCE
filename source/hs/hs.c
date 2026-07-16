@@ -3857,6 +3857,33 @@ void cinematic_show_letterbox(
 	boolean show);
 void cinematic_set_title(
 	unsigned short title_index);
+void cinematic_suppress_bsp_object_creation(
+	boolean suppress);
+void main_load_core_name(
+	char const *core_name);
+void main_load_core_name_at_startup(
+	char const *core_name);
+void main_save_core_name(
+	char const *core_name);
+void main_skip(
+	unsigned short skip_type);
+void scripted_sound_stop(
+	long sound_index);
+void scripted_foley_predict(
+	long object_index);
+void scripted_looping_sound_stop(
+	long sound_index);
+void scripted_looping_sound_set_alternate(
+	long sound_index,
+	boolean alternate);
+void debug_sound_classes_enable(
+	long sound_class,
+	boolean enable);
+void sound_enable(
+	boolean enable);
+void vehicle_hover(
+	long vehicle_index,
+	boolean hover);
 
 /* ---------- globals */
 
@@ -4090,6 +4117,18 @@ HS_EVALUATE_VOID_STRING(code_000b15c0, ai_debug_speak)
 HS_EVALUATE_VOID_STRING(code_000b1600, ai_debug_speak_list)
 HS_EVALUATE_VOID_BOOLEAN(code_000b1760, cinematic_show_letterbox)
 HS_EVALUATE_VOID_UNSIGNED_SHORT(code_000b17a0, cinematic_set_title)
+HS_EVALUATE_VOID_BOOLEAN(code_000b1820, cinematic_suppress_bsp_object_creation)
+HS_EVALUATE_VOID_STRING(code_000b1a90, main_load_core_name)
+HS_EVALUATE_VOID_STRING(code_000b1ad0, main_load_core_name_at_startup)
+HS_EVALUATE_VOID_STRING(code_000b1b30, main_save_core_name)
+HS_EVALUATE_VOID_UNSIGNED_SHORT(code_000b1b70, main_skip)
+HS_EVALUATE_VOID_LONG(code_000b1c60, scripted_sound_stop)
+HS_EVALUATE_VOID_LONG(code_000b1ca0, scripted_foley_predict)
+HS_EVALUATE_VOID_LONG(code_000b1d20, scripted_looping_sound_stop)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000b1da0, scripted_looping_sound_set_alternate)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000b1de0, debug_sound_classes_enable)
+HS_EVALUATE_VOID_BOOLEAN(code_000b1ef0, sound_enable)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000b1f30, vehicle_hover)
 HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2010, struct hs_arguments_boolean, (scripted_hud_set_flashing_state(arguments->value)))
 HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b21b0, struct hs_arguments_long_word, (hud_unit_deactivate_nav_point_with_flag(arguments->value0, arguments->value1)))
 HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b21f0, struct hs_arguments_long_long, (hud_unit_deactivate_nav_point_with_object(arguments->value0, arguments->value1)))
