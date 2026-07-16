@@ -93,15 +93,17 @@ symbols in this file:
 
 /* ---------- structures */
 
+typedef long hresult;
+
 /* ---------- prototypes */
 
 void rasterizer_error(
-	long error_result,
-	const char *format,
+	hresult error_result,
+	char const *format,
 	...);
 
-long __stdcall D3DXGetErrorStringA(
-	long error_result,
+hresult __stdcall D3DXGetErrorStringA(
+	hresult error_result,
 	char *buffer,
 	unsigned long buffer_length);
 
@@ -110,13 +112,13 @@ long __stdcall D3DXGetErrorStringA(
 /* ---------- public code */
 
 void rasterizer_error(
-	long error_result,
-	const char *format,
+	hresult error_result,
+	char const *format,
 	...)
 {
 	char formatted_message[1024];
 	char error_description[1024];
-	const char *error_name;
+	char const *error_name;
 	va_list arguments;
 
 	error_name = "<unknown error>";
