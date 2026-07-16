@@ -26,6 +26,12 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "actions.h"
+
+#include "actors.h"
+#include "ai_communication.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -41,6 +47,60 @@ symbols in this file:
 void action_converse_begin(
 	long actor_index)
 {
+	return;
+}
+
+void action_converse_update(
+	long actor_index)
+{
+	actor_get(actor_index);
+
+	return;
+}
+
+void action_converse_replace_prop(
+	long actor_index,
+	long old_prop_index,
+	long new_prop_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct converse_state_data *state_data = &actor->state.action_data.converse;
+
+	if (state_data->run_to_prop_index == old_prop_index)
+		state_data->run_to_prop_index = new_prop_index;
+
+	return;
+}
+
+void actor_conversation_end(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->external_orders.conversation_index != NONE)
+	{
+		ai_conversation_finish(
+			actor->external_orders.conversation_index,
+			FALSE,
+			FALSE);
+	}
+
+	return;
+}
+
+void action_converse_end(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->external_orders.conversation_index != NONE)
+	{
+		ai_conversation_finish(
+			actor->external_orders.conversation_index,
+			FALSE,
+			FALSE);
+	}
+
 	return;
 }
 
