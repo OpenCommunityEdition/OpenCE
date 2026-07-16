@@ -104,33 +104,31 @@ long compress_ima_adpcm_audio_data(
 	byte *output_data,
 	long output_data_size)
 {
-	long remaining_sample_count = input_sample_count;
+	long result = (input_sample_count>>1) + (input_sample_count&1) + sizeof(struct bungie_ima_adpcm_header);
 
-	if (!output_data)
+	if (output_data)
 	{
-		return (remaining_sample_count>>1) + (remaining_sample_count&1) + sizeof(struct bungie_ima_adpcm_header);
-	}
-	else
-	{
-		long original_sample_count = remaining_sample_count;
+		boolean write_high_nibble = TRUE;
+		long original_sample_count = input_sample_count;
 		struct bungie_ima_adpcm_header *header = (struct bungie_ima_adpcm_header *)output_data;
 		long sample = input_samples[0];
 		short step_size_index = 0;
-		boolean write_high_nibble = TRUE;
 
 		output_data += sizeof(struct bungie_ima_adpcm_header);
 		output_data_size -= sizeof(struct bungie_ima_adpcm_header);
 
 		header->initial_sample = (short)sample;
 
-		while (remaining_sample_count>0 && output_data_size)
+		while (input_sample_count>0 && output_data_size)
 		{
 			long difference = *input_samples - sample;
 			long step_size = step_size_table[step_size_index];
 			long temporary_step_size;
 			long sample_difference;
-			byte mask;
+			char mask;
 			char code;
+
+			temporary_step_size = step_size;
 
 			if (difference<0)
 			{
@@ -143,7 +141,6 @@ long compress_ima_adpcm_audio_data(
 			}
 
 			mask = 4;
-			temporary_step_size = step_size;
 			do
 			{
 				if (difference>=temporary_step_size)
@@ -156,9 +153,9 @@ long compress_ima_adpcm_audio_data(
 			}
 			while (mask);
 
+			temporary_step_size = step_size;
 			sample_difference = step_size>>3;
 			mask = 4;
-			temporary_step_size = step_size;
 			do
 			{
 				if (code&mask)
@@ -175,25 +172,12 @@ long compress_ima_adpcm_audio_data(
 				sample_difference = -sample_difference;
 			}
 
-			sample += sample_difference;
-			if (sample<-32768)
-			{
-				sample = -32768;
-			}
-			else if (sample>32767)
-			{
-				sample = 32767;
-			}
+			sample = PIN(sample + sample_difference, -32768, 32767);
 
-			step_size_index += (short)step_size_adjustment_table[code];
-			if (step_size_index<0)
-			{
-				step_size_index = 0;
-			}
-			else if (step_size_index>88)
-			{
-				step_size_index = 88;
-			}
+			step_size_index = (short)PIN(
+				step_size_index + step_size_adjustment_table[code],
+				0,
+				88);
 
 			if (write_high_nibble)
 			{
@@ -212,42 +196,40 @@ long compress_ima_adpcm_audio_data(
 			}
 
 			input_samples++;
-			remaining_sample_count--;
+			input_sample_count--;
 		}
 
-		header->sample_count = original_sample_count - remaining_sample_count;
+		header->sample_count = original_sample_count - input_sample_count;
+		result = input_sample_count;
 	}
 
-	return remaining_sample_count;
+	return result;
 }
 
 long decompress_ima_adpcm_audio_data(
-	byte *input_data,
+	struct bungie_ima_adpcm_header const *input_header,
 	long input_data_size,
 	short *output_samples,
 	long output_sample_count,
 	struct bungie_ima_adpcm_state *state)
 {
-	byte const *input = (byte const *)input_data + sizeof(struct bungie_ima_adpcm_header);
-	long remaining_sample_count = ((struct bungie_ima_adpcm_header const *)input_data)->sample_count;
+	long sample_count = input_header->sample_count;
+	char const *input = (char const *)(input_header + 1);
+	long result = sample_count * sizeof(short);
 	long sample;
 	short step_size_index;
 	boolean read_high_nibble;
 
 	input_data_size -= sizeof(struct bungie_ima_adpcm_header);
 
-	if (!output_samples)
-	{
-		remaining_sample_count *= sizeof(short);
-	}
-	else
+	if (output_samples)
 	{
 		if (state)
 		{
 			if (state->sample_count==0)
 			{
-				state->sample_count = ((struct bungie_ima_adpcm_header const *)input_data)->sample_count;
-				state->sample = ((struct bungie_ima_adpcm_header const *)input_data)->initial_sample;
+				state->sample_count = sample_count;
+				state->sample = input_header->initial_sample;
 				state->step_size_index = 0;
 			}
 
@@ -255,23 +237,24 @@ long decompress_ima_adpcm_audio_data(
 			step_size_index = state->step_size_index;
 			input += state->sample_index/2;
 			input_data_size -= state->sample_index/2;
-			remaining_sample_count = state->sample_count - state->sample_index;
+			result = state->sample_count - state->sample_index;
 			read_high_nibble = !(state->sample_index&1);
 		}
 		else
 		{
-			sample = ((struct bungie_ima_adpcm_header const *)input_data)->initial_sample;
+			sample = input_header->initial_sample;
 			step_size_index = 0;
 			read_high_nibble = TRUE;
+			result = sample_count;
 		}
 
-		while (remaining_sample_count && output_sample_count && input_data_size)
+		while (result && output_sample_count && input_data_size)
 		{
-			byte code = *input;
+			char code = *input;
 			long step_size = step_size_table[step_size_index];
 			long temporary_step_size;
 			long sample_difference = step_size>>3;
-			byte mask = 4;
+			char mask = 4;
 
 			if (read_high_nibble)
 			{
@@ -296,25 +279,12 @@ long decompress_ima_adpcm_audio_data(
 				sample_difference = -sample_difference;
 			}
 
-			sample += sample_difference;
-			if (sample<-32768)
-			{
-				sample = -32768;
-			}
-			else if (sample>32767)
-			{
-				sample = 32767;
-			}
+			sample = PIN(sample + sample_difference, -32768, 32767);
 
-			step_size_index += (short)step_size_adjustment_table[code];
-			if (step_size_index<0)
-			{
-				step_size_index = 0;
-			}
-			else if (step_size_index>88)
-			{
-				step_size_index = 88;
-			}
+			step_size_index = (short)PIN(
+				step_size_index + step_size_adjustment_table[code],
+				0,
+				88);
 
 			*output_samples = (short)sample;
 			read_high_nibble = !read_high_nibble;
@@ -325,7 +295,7 @@ long decompress_ima_adpcm_audio_data(
 			}
 
 			output_samples++;
-			remaining_sample_count--;
+			result--;
 			output_sample_count--;
 			if (state)
 			{
@@ -340,7 +310,7 @@ long decompress_ima_adpcm_audio_data(
 		}
 	}
 
-	return remaining_sample_count;
+	return result;
 }
 
 void byte_swap_bungie_ima_adpcm_header(
