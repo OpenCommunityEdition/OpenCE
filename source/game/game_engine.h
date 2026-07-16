@@ -28,6 +28,8 @@ enum
 
 /* ---------- structures */
 
+struct game_globals;
+
 struct game_variant
 {
 	short variant_index;
@@ -85,6 +87,28 @@ typedef char verify_game_engine_size[sizeof(struct game_engine) == 0x88 ? 1 : -1
 
 void game_engine_playlist_initialize(
 	void);
+
+long game_globals_get_weapon(
+	struct game_globals *game_globals,
+	long weapon_list_index);
+
+void game_engine_playlist_begin(
+	void);
+
+boolean game_engine_get_current_stage(
+	struct game_variant *variant,
+	char *map_name);
+
+long list_index_to_weapon_definition_index(
+	long weapon_list_index);
+
+void game_engine_state_message(
+	long player_index,
+	long state_message,
+	long state_message_player_index);
+
+void game_engine_player_depower_active_camo(
+	long player_index);
 
 boolean game_engine_running(
 	void);

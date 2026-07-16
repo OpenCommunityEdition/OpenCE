@@ -76,8 +76,8 @@ struct player_datum
 	short powerup_durations[NUMBER_OF_PLAYER_POWERUPS];
 	real speed_multiplier;
 	long unknown70;
-	long unknown74;
-	long unknown78;
+	long state_message;
+	long state_message_player_index;
 	long unknown7c;
 	byte unknown80[4];
 	long death_time;

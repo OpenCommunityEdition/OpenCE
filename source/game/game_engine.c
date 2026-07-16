@@ -547,6 +547,7 @@ symbols in this file:
 #include "objects.h"
 #include "players.h"
 #include "scenario/scenario.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
@@ -621,10 +622,98 @@ extern struct game_engine_stage global_stage;
 
 /* ---------- public code */
 
+long game_globals_get_weapon(
+	struct game_globals *game_globals,
+	long weapon_list_index)
+{
+	struct tag_reference *weapon = TAG_BLOCK_GET_ELEMENT(
+		&game_globals->weapon_list,
+		weapon_list_index,
+		struct tag_reference);
+
+	return weapon->index;
+}
+
 void game_engine_playlist_initialize(
 	void)
 {
 	game_engine_playlist_next(0, 0, 2);
+
+	return;
+}
+
+void game_engine_playlist_begin(
+	void)
+{
+	main_set_multiplayer_map_name(global_stage.map_name);
+	game_set_game_variant(&global_stage.variant);
+
+	if (!network_game_is_active())
+		main_reset_map();
+
+	return;
+}
+
+boolean game_engine_get_current_stage(
+	struct game_variant *variant,
+	char *map_name)
+{
+	match_assert("c:\\halo\\SOURCE\\game\\game_engine.c", 0x918, variant && map_name);
+
+	csmemcpy(variant, &global_stage.variant, sizeof(*variant));
+	csstrncpy(map_name, global_stage.map_name, sizeof(global_stage.map_name)-1);
+	map_name[sizeof(global_stage.map_name)-1] = 0;
+
+	return TRUE;
+}
+
+long list_index_to_weapon_definition_index(
+	long weapon_list_index)
+{
+	long weapon_definition_index = NONE;
+
+	if (weapon_list_index!=NONE)
+	{
+		struct game_globals *game_globals = scenario_get_game_globals();
+		struct tag_reference *weapon = TAG_BLOCK_GET_ELEMENT(
+			&game_globals->weapon_list,
+			weapon_list_index,
+			struct tag_reference);
+
+		weapon_definition_index = weapon->index;
+	}
+
+	return weapon_definition_index;
+}
+
+void game_engine_state_message(
+	long player_index,
+	long state_message,
+	long state_message_player_index)
+{
+	struct player_datum *player = player_get(player_index);
+
+	player->state_message = state_message;
+	player->state_message_player_index = state_message_player_index;
+
+	return;
+}
+
+void game_engine_player_depower_active_camo(
+	long player_index)
+{
+	if (player_index!=NONE)
+	{
+		struct player_datum *player = player_get(player_index);
+
+		if (player->unit_index!=NONE)
+		{
+			struct unit_datum *unit = unit_get(player->unit_index);
+
+			if (TEST_FLAG(unit->unit.flags, _unit_active_camouflaged_bit))
+				unit->unit.active_camouflage = 0.5f;
+		}
+	}
 
 	return;
 }
