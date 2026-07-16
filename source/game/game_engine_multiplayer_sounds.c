@@ -24,6 +24,12 @@ symbols in this file:
 
 #include "cseries.h"
 
+#include "game/game_globals.h"
+#include "objects/objects.h"
+#include "scenario/scenario.h"
+#include "sound/game_sound.h"
+#include "sound/sound_definitions.h"
+
 /* ---------- constants */
 
 enum multiplayer_information_sound
@@ -97,11 +103,25 @@ struct multiplayer_sound_queue
 	struct queued_multiplayer_sound sounds[MAXIMUM_QUEUED_MULTIPLAYER_SOUNDS];
 };
 
+struct game_globals_multiplayer_sound_view
+{
+	byte unused[0x164];
+	struct tag_block multiplayer_information;
+};
+
 typedef char verify_multiplayer_sound_queue_size[sizeof(struct multiplayer_sound_queue) == 0x2C ? 1 : -1];
+typedef char verify_game_globals_multiplayer_information_offset[
+	offsetof(struct game_globals_multiplayer_sound_view, multiplayer_information) == 0x164 ? 1 : -1];
 
 /* ---------- prototypes */
 
-void game_engine_intialize_queued_sounds(void);
+static void game_engine_play_multiplayer_sound_immediate(
+	long sound_index);
+static void game_engine_queue_multiplayer_sound(
+	long sound_index,
+	long delay_ticks);
+static long game_engine_get_multiplayer_sound_duration(
+	long sound_index);
 
 /* ---------- globals */
 
@@ -121,12 +141,123 @@ static struct multiplayer_sound_queue bss_0043eb78;
 
 /* ---------- public code */
 
-void game_engine_intialize_queued_sounds(void)
+static void game_engine_play_multiplayer_sound_immediate(
+	long sound_index)
+{
+	struct game_globals_multiplayer_sound_view *game_globals;
+	struct game_globals_multiplayer_information *multiplayer_information;
+	struct tag_reference *sound;
+
+	global_scenario_get();
+	game_globals = (struct game_globals_multiplayer_sound_view *)scenario_get_game_globals();
+	multiplayer_information = TAG_BLOCK_GET_ELEMENT(
+		&game_globals->multiplayer_information,
+		0,
+		struct game_globals_multiplayer_information);
+	if (multiplayer_information && sound_index < multiplayer_information->sounds.count)
+	{
+		sound = TAG_BLOCK_GET_ELEMENT(
+			&multiplayer_information->sounds,
+			sound_index,
+			struct tag_reference);
+		if (sound && sound->index != NONE)
+			unspatialized_impulse_sound_new(sound->index, 1.0f);
+	}
+
+	return;
+}
+
+static void game_engine_queue_multiplayer_sound(
+	long sound_index,
+	long delay_ticks)
+{
+	long queue_index = multiplayer_sound_queue.count;
+
+	if (queue_index < MAXIMUM_QUEUED_MULTIPLAYER_SOUNDS)
+	{
+		multiplayer_sound_queue.sounds[queue_index].sound_index = sound_index;
+		multiplayer_sound_queue.sounds[queue_index].delay_ticks = delay_ticks;
+		multiplayer_sound_queue.count++;
+	}
+
+	return;
+}
+
+void game_engine_update_multiplayer_sound(
+	void)
+{
+	long i;
+	long queue_count = multiplayer_sound_queue.count;
+
+	if (queue_count && --multiplayer_sound_queue.sounds[0].delay_ticks == 0)
+	{
+		for (i = 1; i < queue_count; i++)
+			multiplayer_sound_queue.sounds[i - 1] = multiplayer_sound_queue.sounds[i];
+
+		queue_count--;
+		multiplayer_sound_queue.count = queue_count;
+		if (queue_count)
+			game_engine_play_multiplayer_sound_immediate(multiplayer_sound_queue.sounds[0].sound_index);
+	}
+
+	return;
+}
+
+static long game_engine_get_multiplayer_sound_duration(
+	long sound_index)
+{
+	struct game_globals_multiplayer_sound_view *game_globals;
+	struct game_globals_multiplayer_information *multiplayer_information;
+	struct tag_reference *sound;
+	long duration = 0;
+
+	global_scenario_get();
+	game_globals = (struct game_globals_multiplayer_sound_view *)scenario_get_game_globals();
+	multiplayer_information = TAG_BLOCK_GET_ELEMENT(
+		&game_globals->multiplayer_information,
+		0,
+		struct game_globals_multiplayer_information);
+	if (multiplayer_information && sound_index < multiplayer_information->sounds.count)
+	{
+		sound = TAG_BLOCK_GET_ELEMENT(
+			&multiplayer_information->sounds,
+			sound_index,
+			struct tag_reference);
+		if (sound && sound->index != NONE)
+			duration = (long)(sound_definition_get(sound->index)->longest_permutation_length * TICKS_PER_SECOND) / 1000;
+	}
+
+	return duration;
+}
+
+void game_engine_play_multiplayer_sound(
+	long sound_index)
+{
+	if (data_002de530[sound_index])
+	{
+		game_engine_queue_multiplayer_sound(
+			sound_index,
+			game_engine_get_multiplayer_sound_duration(sound_index) + 5);
+		if (multiplayer_sound_queue.count == 1)
+			game_engine_play_multiplayer_sound_immediate(sound_index);
+	}
+	else
+	{
+		game_engine_play_multiplayer_sound_immediate(sound_index);
+	}
+
+	return;
+}
+
+void game_engine_intialize_queued_sounds(
+	void)
 {
 	csmemset(multiplayer_sound_queue.sounds, 0, sizeof(multiplayer_sound_queue.sounds));
 	multiplayer_sound_queue.count = 1;
 	multiplayer_sound_queue.sounds[0].sound_index = NONE;
 	multiplayer_sound_queue.sounds[0].delay_ticks = MULTIPLAYER_SOUND_QUEUE_INITIAL_DELAY_TICKS;
+
+	return;
 }
 
 /* ---------- private code */
