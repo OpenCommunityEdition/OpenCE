@@ -551,6 +551,33 @@ void _rasterizer_environment_fog_end(
 	void);
 void _rasterizer_environment_fog_screen_end(
 	void);
+void _rasterizer_dynamic_screen_geometry_draw(
+	long primitive_type,
+	long vertex_type,
+	long dynamic_vertex_buffer_index,
+	long vertex_count);
+void _rasterizer_dynamic_lit_geometry_draw(
+	void const *vertices,
+	void const *parameters);
+void _rasterizer_psuedo_dynamic_screen_quad_draw(
+	long dynamic_vertex_buffer_index);
+long _rasterizer_widget_submit(
+	long mode);
+void *_rasterizer_widget_begin(
+	long handle);
+void _rasterizer_widget_set_texture(
+	long handle);
+void _rasterizer_widget_set_tint_factor(
+	long handle);
+long _rasterizer_widget_set_zbuffer_enable(
+	long handle,
+	long enable);
+short _rasterizer_widget_draw_sprite2d(
+	long dynamic_vertex_buffer_index);
+long _rasterizer_widget_draw_sprite3d(
+	long zbuffer_result);
+void _rasterizer_widget_submit_occlusion_test(
+	long handle);
 void _rasterizer_dispose(void);
 void _rasterizer_frame_end(void);
 void _rasterizer_window_begin(
@@ -1217,6 +1244,83 @@ void rasterizer_environment_transparent_geometry_end(
 	void)
 {
 	_rasterizer_environment_transparent_geometry_end();
+	return;
+}
+
+void rasterizer_dynamic_screen_geometry_draw(
+	long primitive_type,
+	long vertex_type,
+	long dynamic_vertex_buffer_index,
+	long vertex_count)
+{
+	_rasterizer_dynamic_screen_geometry_draw(primitive_type, vertex_type, dynamic_vertex_buffer_index, vertex_count);
+	return;
+}
+
+void rasterizer_dynamic_lit_geometry_draw(
+	void const *vertices,
+	void const *parameters)
+{
+	_rasterizer_dynamic_lit_geometry_draw(vertices, parameters);
+	return;
+}
+
+void rasterizer_psuedo_dynamic_screen_quad_draw(
+	long dynamic_vertex_buffer_index)
+{
+	_rasterizer_psuedo_dynamic_screen_quad_draw(dynamic_vertex_buffer_index);
+	return;
+}
+
+long rasterizer_widget_submit(
+	long mode)
+{
+	return _rasterizer_widget_submit(mode);
+}
+
+void *rasterizer_widget_begin(
+	long handle)
+{
+	return _rasterizer_widget_begin(handle);
+}
+
+void rasterizer_widget_set_texture(
+	long handle)
+{
+	_rasterizer_widget_set_texture(handle);
+	return;
+}
+
+void rasterizer_widget_set_tint_factor(
+	long handle)
+{
+	_rasterizer_widget_set_tint_factor(handle);
+	return;
+}
+
+long rasterizer_widget_set_zbuffer_enable(
+	long handle,
+	long enable)
+{
+	return _rasterizer_widget_set_zbuffer_enable(handle, enable);
+}
+
+short rasterizer_widget_draw_sprite2d(
+	long dynamic_vertex_buffer_index)
+{
+	return _rasterizer_widget_draw_sprite2d(dynamic_vertex_buffer_index);
+}
+
+long rasterizer_widget_draw_sprite3d(
+	long zbuffer_result)
+{
+	return _rasterizer_widget_draw_sprite3d(zbuffer_result);
+}
+
+void rasterizer_widget_submit_occlusion_test(
+	long handle)
+{
+	_rasterizer_widget_submit_occlusion_test(handle);
 	return;
 }
 

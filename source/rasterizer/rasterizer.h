@@ -326,6 +326,33 @@ void rasterizer_environment_transparent_geometry_begin(
 	void);
 void rasterizer_environment_transparent_geometry_end(
 	void);
+void rasterizer_dynamic_screen_geometry_draw(
+	long primitive_type,
+	long vertex_type,
+	long dynamic_vertex_buffer_index,
+	long vertex_count);
+void rasterizer_dynamic_lit_geometry_draw(
+	void const *vertices,
+	void const *parameters);
+void rasterizer_psuedo_dynamic_screen_quad_draw(
+	long dynamic_vertex_buffer_index);
+long rasterizer_widget_submit(
+	long mode);
+void *rasterizer_widget_begin(
+	long handle);
+void rasterizer_widget_set_texture(
+	long handle);
+void rasterizer_widget_set_tint_factor(
+	long handle);
+long rasterizer_widget_set_zbuffer_enable(
+	long handle,
+	long enable);
+short rasterizer_widget_draw_sprite2d(
+	long dynamic_vertex_buffer_index);
+long rasterizer_widget_draw_sprite3d(
+	long zbuffer_result);
+void rasterizer_widget_submit_occlusion_test(
+	long handle);
 
 /* ---------- prototypes/RASTERIZER_TEXT.C */
 
