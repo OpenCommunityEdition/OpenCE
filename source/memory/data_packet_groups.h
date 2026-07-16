@@ -53,6 +53,9 @@ struct data_packet_group_definition
 void data_packet_group_initialize(
 	struct data_packet_group_definition *group_definition);
 
+char const *data_packet_groups_get_error(
+	void);
+
 boolean data_packet_group_encode_packet(
 	struct data_packet_group_definition *group_definition,
 	const void *decoded_packet,

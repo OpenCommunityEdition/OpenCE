@@ -58,6 +58,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "memory/data_packet_groups.h"
+
+#include "cseries/cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -68,6 +72,19 @@ symbols in this file:
 
 /* ---------- globals */
 
+char const *bss_00456624;
+
 /* ---------- public code */
+
+char const *data_packet_groups_get_error(
+	void)
+{
+	char const *result = bss_00456624;
+	bss_00456624 = NULL;
+
+	match_assert("c:\\halo\\SOURCE\\memory\\data_packet_groups.c", 57, result);
+
+	return result;
+}
 
 /* ---------- private code */
