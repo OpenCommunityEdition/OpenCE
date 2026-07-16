@@ -25,12 +25,19 @@ struct orbiting_camera
 	real distance;
 };
 
+struct camera_action;
+struct camera_command;
+
 /* ---------- prototypes/ORBITING_CAMERA.C */
 
 void orbiting_camera_new(
 	struct orbiting_camera *camera,
 	real distance,
 	real_vector3d const *forward);
+void orbiting_camera_update(
+	struct orbiting_camera *camera,
+	struct camera_action const *action,
+	struct camera_command *result);
 
 /* ---------- globals */
 
