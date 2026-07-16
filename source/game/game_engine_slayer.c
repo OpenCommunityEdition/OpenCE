@@ -126,4 +126,34 @@ void code_000a3fc0(
 	return;
 }
 
+void code_000a3df0(
+	void)
+{
+	return;
+}
+
+void code_000a3e00(
+	void)
+{
+	return;
+}
+
+void code_000a3e10(
+	void)
+{
+	return;
+}
+
+void code_000a3e20(
+	void)
+{
+	return;
+}
+
+void code_000a3e40(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
