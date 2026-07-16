@@ -82,6 +82,11 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 
+#include "ai/actors.h"
+#include "ai/encounters.h"
+
+#include "memory/data.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -129,6 +134,30 @@ void ai_profile_dispose_from_old_map(
 	void)
 {
 	return;
+}
+
+short code_00041f40(
+	void)
+{
+	return encounter_data->actual_count;
+}
+
+short code_00041f50(
+	void)
+{
+	return actor_data->actual_count;
+}
+
+short code_00041fc0(
+	void)
+{
+	return swarm_data->actual_count;
+}
+
+short code_00042020(
+	void)
+{
+	return swarm_component_data->actual_count;
 }
 
 /* ---------- private code */
