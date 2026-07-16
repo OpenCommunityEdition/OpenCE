@@ -782,6 +782,36 @@ void units_dispose(
 	return;
 }
 
+void unit_kill(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	SET_FLAG(unit->object.damage_flags, _object_die_act_of_god_bit, TRUE);
+
+	return;
+}
+
+void unit_kill_silent(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	SET_FLAG(unit->object.damage_flags, _object_die_act_of_god_silent_bit, TRUE);
+
+	return;
+}
+
+void unit_kill_no_statistics(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	SET_FLAG(unit->object.damage_flags, _object_die_act_of_god_no_statistics_bit, TRUE);
+
+	return;
+}
+
 void unit_delete(
 	long unit_index)
 {
@@ -796,6 +826,24 @@ void units_update(
 	unit_globals->used_time = 0;
 
 	return;
+}
+
+short unit_get_zoom_level(
+	long unit_index)
+{
+	return unit_get(unit_index)->unit.current_zoom_level;
+}
+
+boolean unit_controllable(
+	long unit_index)
+{
+	return TEST_FLAG(unit_get(unit_index)->unit.flags, _unit_controllable_bit);
+}
+
+long unit_get_current_equipment(
+	long unit_index)
+{
+	return unit_get(unit_index)->unit.equipment_object_index;
 }
 
 boolean unit_update(

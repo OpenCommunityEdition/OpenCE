@@ -506,9 +506,18 @@ void units_dispose_from_old_map(
 	void);
 void units_dispose(
 	void);
+void unit_kill(
+	long unit_index);
+void unit_kill_silent(
+	long unit_index);
+void unit_kill_no_statistics(
+	long unit_index);
 void unit_delete(
 	long unit_index);
 void units_update(void);
+
+short unit_get_zoom_level(
+	long unit_index);
 
 boolean unit_update(long unit_index);
 
@@ -541,6 +550,10 @@ long unit_get_aiming_unit_index(long unit_index);
 void unit_get_aiming_vector(long unit_index, real_vector3d *aiming_vector);
 void unit_get_looking_vector(long unit_index, real_vector3d *looking_vector);
 void unit_get_facing_vector(long unit_index, real_vector3d *facing_vector);
+boolean unit_controllable(
+	long unit_index);
+long unit_get_current_equipment(
+	long unit_index);
 boolean unit_clip_to_aiming_bounds(long unit_index, real_vector3d *vector, boolean use_aiming_screen);
 long unit_inventory_get_weapon(long unit_index, short index);
 short unit_inventory_next_grenade(long unit_index, short current_index, short delta);
