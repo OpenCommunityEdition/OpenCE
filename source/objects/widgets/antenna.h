@@ -25,6 +25,9 @@ void antennas_dispose_from_old_map(
 void antennas_dispose(
 	void);
 
+void antenna_delete(
+	long antenna_index);
+
 /* ---------- globals */
 
 extern struct data_array *antenna_data;

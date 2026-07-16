@@ -85,4 +85,11 @@ void antennas_dispose(
 	return;
 }
 
+void antenna_delete(
+	long antenna_index)
+{
+	datum_delete(antenna_data, antenna_index);
+	return;
+}
+
 /* ---------- private code */
