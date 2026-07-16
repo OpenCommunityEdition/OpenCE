@@ -101,17 +101,73 @@ byte *sound_permutation_get_mouth_aperture(
 	return (byte *)permutation->mouth_data.address + tick_index;
 }
 
+short sound_definition_find_pitch_range_by_pitch(
+	struct sound_definition *definition,
+	real pitch,
+	long pitch_range_index)
+{
+	short result = NONE;
+
+	if ((short)pitch_range_index != NONE && (short)pitch_range_index < definition->pitch_ranges.count)
+	{
+		struct sound_pitch_range *range = TAG_BLOCK_GET_ELEMENT(
+			&definition->pitch_ranges,
+			(short)pitch_range_index,
+			struct sound_pitch_range);
+
+		if (range->bend_bounds.lower <= pitch &&
+			pitch <= range->bend_bounds.upper &&
+			range->permutations.count)
+		{
+			return (short)pitch_range_index;
+		}
+	}
+
+	{
+		real closest_pitch_ratio = FLT_MAX;
+		short range_index;
+
+		for (range_index = 0; range_index < definition->pitch_ranges.count; range_index++)
+		{
+			struct sound_pitch_range *range = TAG_BLOCK_GET_ELEMENT(
+				&definition->pitch_ranges,
+				range_index,
+				struct sound_pitch_range);
+
+			if (range->permutations.count)
+			{
+				if (range->bend_bounds.lower <= pitch && pitch <= range->bend_bounds.upper)
+					return range_index;
+
+				{
+					real pitch_ratio = range->bend_bounds.upper < pitch ?
+						pitch / range->bend_bounds.upper :
+						range->bend_bounds.lower / pitch;
+
+					if (pitch_ratio < closest_pitch_ratio)
+					{
+						closest_pitch_ratio = pitch_ratio;
+						result = range_index;
+					}
+				}
+			}
+		}
+	}
+
+	return result;
+}
+
 void try_to_reset_permutations(
 	struct sound_pitch_range *range)
 {
 	short permutation_count = range->actual_permutation_count;
 	unsigned long all_permutations_mask = (FLAG(permutation_count) - 1);
 
-	if ((~range->unknown0 & all_permutations_mask) == 0)
+	if ((~range->played_permutation_mask & all_permutations_mask) == 0)
 	{
-		range->unknown0 = 0;
+		range->played_permutation_mask = 0;
 		if (permutation_count > 1)
-			range->unknown0 = FLAG((byte)range->unknown1);
+			range->played_permutation_mask = FLAG((byte)range->previous_permutation_index);
 	}
 
 	return;
@@ -136,6 +192,79 @@ real sound_permutation_get_real_mouth_aperture(
 		permutation->name);
 
 	return 0.f;
+}
+
+short sound_definition_next_permutation(
+	struct sound_definition *definition,
+	short pitch_range_index,
+	short permutation_index)
+{
+	struct sound_pitch_range *range = TAG_BLOCK_GET_ELEMENT(
+		&definition->pitch_ranges,
+		pitch_range_index,
+		struct sound_pitch_range);
+	short selected_permutation_index;
+	short attempt_count = 0;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\sound_definitions.c",
+		892,
+		range->permutations.count);
+
+	if (range->forced_permutation_index != NONE)
+	{
+		selected_permutation_index = range->forced_permutation_index;
+		range->forced_permutation_index = NONE;
+		range->previous_permutation_index = selected_permutation_index;
+		return selected_permutation_index;
+	}
+
+	if (TEST_FLAG(definition->flags, 1) && permutation_index != NONE)
+	{
+		struct sound_permutation *permutation = TAG_BLOCK_GET_ELEMENT(
+			&range->permutations,
+			permutation_index,
+			struct sound_permutation);
+
+		return permutation->next_permutation_index;
+	}
+
+	selected_permutation_index = seed_random_range(
+		get_global_local_random_seed_address(),
+		0,
+		range->actual_permutation_count);
+
+	for (;;)
+	{
+		try_to_reset_permutations(range);
+
+		if (!TEST_FLAG(range->played_permutation_mask, selected_permutation_index))
+		{
+			struct sound_permutation *permutation;
+
+			SET_FLAG(range->played_permutation_mask, selected_permutation_index, TRUE);
+			if (attempt_count++ == 16)
+				break;
+
+			{
+				real random = real_seed_random(get_global_local_random_seed_address());
+
+				permutation = TAG_BLOCK_GET_ELEMENT(
+				&range->permutations,
+				selected_permutation_index,
+				struct sound_permutation);
+				if (random >= permutation->skip_fraction)
+					break;
+			}
+		}
+
+		selected_permutation_index++;
+		if (selected_permutation_index == range->actual_permutation_count)
+			selected_permutation_index = 0;
+	}
+
+	range->previous_permutation_index = selected_permutation_index;
+	return selected_permutation_index;
 }
 
 /* ---------- private code */

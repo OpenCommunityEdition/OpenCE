@@ -76,8 +76,9 @@ struct sound_pitch_range
 	short actual_permutation_count;
 	short unused;
 	real playback_rate;
-	long unknown0;
-	long unknown1;
+	unsigned long played_permutation_mask;
+	short previous_permutation_index;
+	short forced_permutation_index;
 	struct tag_block permutations;
 };
 
@@ -122,5 +123,15 @@ struct sound_definition
 /* ---------- globals */
 
 /* ---------- public code */
+
+short sound_definition_find_pitch_range_by_pitch(
+	struct sound_definition *definition,
+	real pitch,
+	long pitch_range_index);
+
+short sound_definition_next_permutation(
+	struct sound_definition *definition,
+	short pitch_range_index,
+	short permutation_index);
 
 #endif // __SOUND_DEFINITIONS_H
