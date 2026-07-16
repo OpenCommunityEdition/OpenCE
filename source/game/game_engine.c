@@ -537,6 +537,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries_windows.h"
 #include "game_engine.h"
 
 #include "game_globals.h"
@@ -604,6 +605,11 @@ void code_00096890(
 
 long game_engine_did_player_win_default(
 	long player_index);
+
+void game_show_score_extended(
+	long player_index,
+	long score,
+	long team_index);
 
 boolean multiple_teams_alive(
 	void);
@@ -714,6 +720,105 @@ void game_engine_player_depower_active_camo(
 				unit->unit.active_camouflage = 0.5f;
 		}
 	}
+
+	return;
+}
+
+float get_blink_alpha(
+	void)
+{
+	long phase = system_milliseconds()%2700;
+
+	return sin(phase * (3.14159265358979/2700.0));
+}
+
+long game_engine_player_get_team_index(
+	long player_index)
+{
+	long team_index = 1;
+
+	match_assert("c:\\halo\\SOURCE\\game\\game_engine.c", 0xC11, game_engine);
+
+	if (!game_engine->team_index_override)
+		team_index = player_get(player_index)->local_player_index%2;
+
+	return team_index;
+}
+
+void game_engine_update_player_always_invis(
+	long player_index)
+{
+	if (game_engine)
+	{
+		if ((TEST_FLAG(global_variant.flags, _game_variant_always_invisible_bit) ||
+			game_engine->test_trait && game_engine->test_trait(player_index, 1)) &&
+			player_get(player_index)->unit_index!=NONE)
+		{
+			player_handle_powerup_minor(player_index, 0, 15);
+		}
+	}
+
+	return;
+}
+
+boolean game_engine_player_has_flag(
+	long player_index)
+{
+	boolean has_flag = FALSE;
+
+	if (player_index!=NONE)
+	{
+		struct player_datum *player = player_get(player_index);
+
+		if (player->unit_index!=NONE)
+		{
+			struct unit_datum *unit = unit_get(player->unit_index);
+			long weapon_index;
+
+			for (weapon_index = 0; weapon_index<MAXIMUM_WEAPONS_PER_UNIT; weapon_index++)
+			{
+				long weapon_object_index = unit->unit.weapon_object_indices[weapon_index];
+
+				if (weapon_object_index!=NONE && weapon_is_flag(weapon_object_index))
+				{
+					has_flag = TRUE;
+					break;
+				}
+			}
+		}
+	}
+
+	return has_flag;
+}
+
+void game_show_score(
+	long player_index,
+	long score)
+{
+	game_show_score_extended(player_index, score, NONE);
+
+	return;
+}
+
+void get_postgame_hilite_colors(
+	real_argb_color *winner_color,
+	real_argb_color *normal_color,
+	real_argb_color *hilite_color)
+{
+	winner_color->red = 0.45882353f;
+	winner_color->green = 0.7294118f;
+	winner_color->blue = 1.0f;
+	winner_color->alpha = 1.0f;
+
+	normal_color->red = 1.0f;
+	normal_color->green = 1.0f;
+	normal_color->blue = 0.0f;
+	normal_color->alpha = 1.0f;
+
+	hilite_color->red = 0.98f;
+	hilite_color->green = 0.96f;
+	hilite_color->blue = 0.96f;
+	hilite_color->alpha = 1.0f;
 
 	return;
 }

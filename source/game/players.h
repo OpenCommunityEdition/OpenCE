@@ -161,6 +161,11 @@ unsigned long const *players_get_combined_pvs(
 
 void player_control_fix_for_loaded_game_state(void);
 
+void player_handle_powerup_minor(
+	long player_index,
+	long powerup_index,
+	long duration);
+
 /* ---------- prototypes/PLAYER_QUEUES_NEW.C */
 
 void update_queues_reset_and_fill_with_lies(void);

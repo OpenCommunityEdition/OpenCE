@@ -22,6 +22,7 @@ enum
 	_game_variant_draw_object_in_motion_sensor_bit = 0,
 	_game_variant_infinite_grenades_bit = 2,
 	_game_variant_no_shields_bit,
+	_game_variant_always_invisible_bit,
 };
 
 /* ---------- macros */
@@ -29,6 +30,7 @@ enum
 /* ---------- structures */
 
 struct game_globals;
+union real_argb_color;
 
 struct game_variant
 {
@@ -71,7 +73,9 @@ struct game_engine
 	void (*unknown60[3])(void);
 	void (*prespawn_player_update)(
 		long player_index);
-	void (*unknown70[3])(void);
+	void (*unknown70)(void);
+	void (*team_index_override)(void);
+	void (*unknown78)(void);
 	boolean (*test_flag)(
 		long flag);
 	boolean (*test_trait)(
@@ -109,6 +113,27 @@ void game_engine_state_message(
 
 void game_engine_player_depower_active_camo(
 	long player_index);
+
+float get_blink_alpha(
+	void);
+
+long game_engine_player_get_team_index(
+	long player_index);
+
+void game_engine_update_player_always_invis(
+	long player_index);
+
+boolean game_engine_player_has_flag(
+	long player_index);
+
+void game_show_score(
+	long player_index,
+	long score);
+
+void get_postgame_hilite_colors(
+	union real_argb_color *winner_color,
+	union real_argb_color *normal_color,
+	union real_argb_color *hilite_color);
 
 boolean game_engine_running(
 	void);
