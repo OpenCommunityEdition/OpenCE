@@ -551,6 +551,8 @@ void _rasterizer_environment_fog_end(
 	void);
 void _rasterizer_environment_fog_screen_end(
 	void);
+void _rasterizer_environment_fog_screen_begin(
+	boolean render_fog);
 void _rasterizer_dynamic_screen_geometry_draw(
 	long primitive_type,
 	long vertex_type,
@@ -581,6 +583,8 @@ short _rasterizer_widget_draw_sprite2d(
 long _rasterizer_widget_draw_sprite3d(
 	long zbuffer_result);
 void _rasterizer_widget_submit_occlusion_test(
+	long handle);
+long _rasterizer_widget_get_occlusion_test_result(
 	long handle);
 void _rasterizer_dispose(void);
 void _rasterizer_frame_end(void);
@@ -1275,6 +1279,13 @@ void rasterizer_screen_flash(
 	return;
 }
 
+void rasterizer_environment_fog_screen_begin(
+	boolean render_fog)
+{
+	_rasterizer_environment_fog_screen_begin(render_fog);
+	return;
+}
+
 void rasterizer_dynamic_lit_geometry_draw(
 	void const *vertices,
 	void const *parameters)
@@ -1340,6 +1351,12 @@ void rasterizer_widget_submit_occlusion_test(
 {
 	_rasterizer_widget_submit_occlusion_test(handle);
 	return;
+}
+
+long rasterizer_widget_get_occlusion_test_result(
+	long handle)
+{
+	return _rasterizer_widget_get_occlusion_test_result(handle);
 }
 
 void rasterizer_environment_fog_begin(

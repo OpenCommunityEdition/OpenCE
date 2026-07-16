@@ -344,6 +344,8 @@ void rasterizer_profile_enable(
 	boolean enable);
 void rasterizer_screen_flash(
 	void);
+void rasterizer_environment_fog_screen_begin(
+	boolean render_fog);
 void rasterizer_widget_set_texture(
 	long handle);
 void rasterizer_widget_set_tint_factor(
@@ -356,6 +358,8 @@ short rasterizer_widget_draw_sprite2d(
 long rasterizer_widget_draw_sprite3d(
 	long zbuffer_result);
 void rasterizer_widget_submit_occlusion_test(
+	long handle);
+long rasterizer_widget_get_occlusion_test_result(
 	long handle);
 
 /* ---------- prototypes/RASTERIZER_TEXT.C */
