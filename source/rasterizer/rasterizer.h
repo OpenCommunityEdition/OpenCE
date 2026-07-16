@@ -347,6 +347,14 @@ void rasterizer_environment_reflections_end(
 	void);
 void rasterizer_environment_transparent_geometry_begin(
 	void);
+void rasterizer_environment_transparent_geometry_submit(
+	struct shader const *shader,
+	short bitmap_index,
+	struct bitmap_data const *bitmap,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
 void rasterizer_environment_transparent_geometry_end(
 	void);
 void rasterizer_dynamic_screen_geometry_draw(

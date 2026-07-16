@@ -566,6 +566,14 @@ void _rasterizer_environment_reflections_end(
 	void);
 void _rasterizer_environment_transparent_geometry_begin(
 	void);
+void _rasterizer_environment_transparent_geometry_submit(
+	struct shader const *shader,
+	short bitmap_index,
+	struct bitmap_data const *bitmap,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
 void _rasterizer_environment_transparent_geometry_end(
 	void);
 void _rasterizer_environment_fog_begin(
@@ -1306,6 +1314,19 @@ void rasterizer_environment_transparent_geometry_begin(
 	void)
 {
 	_rasterizer_environment_transparent_geometry_begin();
+	return;
+}
+
+void rasterizer_environment_transparent_geometry_submit(
+	struct shader const *shader,
+	short bitmap_index,
+	struct bitmap_data const *bitmap,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer)
+{
+	_rasterizer_environment_transparent_geometry_submit(shader, bitmap_index, bitmap, dynamic_triangle_buffer_index, first_triangle_index, triangle_count, vertex_buffer);
 	return;
 }
 
