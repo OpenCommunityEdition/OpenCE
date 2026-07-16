@@ -782,6 +782,12 @@ void units_dispose(
 	return;
 }
 
+void unit_delete(
+	long unit_index)
+{
+	return;
+}
+
 void units_update(
 	void)
 {

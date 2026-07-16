@@ -506,6 +506,8 @@ void units_dispose_from_old_map(
 	void);
 void units_dispose(
 	void);
+void unit_delete(
+	long unit_index);
 void units_update(void);
 
 boolean unit_update(long unit_index);
