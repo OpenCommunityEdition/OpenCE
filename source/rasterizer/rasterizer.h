@@ -325,10 +325,24 @@ void rasterizer_environment_reflection_lightmap_masks_end(
 	void);
 void rasterizer_environment_reflection_mirrors_begin(
 	void);
+void rasterizer_environment_reflection_mirror_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
 void rasterizer_environment_reflection_mirrors_end(
 	void);
 void rasterizer_environment_reflections_begin(
 	void);
+void rasterizer_environment_reflection_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
 void rasterizer_environment_reflections_end(
 	void);
 void rasterizer_environment_transparent_geometry_begin(
