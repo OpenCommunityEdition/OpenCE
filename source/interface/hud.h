@@ -14,7 +14,10 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/HUD.C */
+
+void hud_load(
+	boolean load);
 
 /* ---------- globals */
 

@@ -37,6 +37,10 @@ short cache_files_precache_map_status(real *progress);
 
 void cache_files_precache_map_end(void);
 
+void cache_files_precache_map_begin(
+	char const *map_name,
+	boolean copy_map);
+
 unsigned long tag_get_group_tag(long tag_index);
 
 /* ---------- globals */

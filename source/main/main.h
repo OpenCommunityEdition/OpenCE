@@ -77,7 +77,13 @@ void main_load_core_name(
 void main_load_core_name_at_startup(
 	char const *core_name);
 
+void main_switch_structure_bsp(
+	short structure_bsp_index);
+
 void main_goto_main_menu(
+	void);
+
+void main_menu_precache_resources(
 	void);
 
 void main_menu_unload(

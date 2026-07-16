@@ -346,6 +346,10 @@ symbols in this file:
 #include "console.h"
 #include "debug_keys.h"
 #include "scenario.h"
+#include "scenario/scenario_definitions.h"
+#include "cache/cache_files.h"
+#include "cache/predicted_resources.h"
+#include "interface/hud.h"
 
 /* ---------- constants */
 
@@ -722,12 +726,57 @@ void main_load_core_name_at_startup(
 	return;
 }
 
+void main_switch_structure_bsp(
+	short structure_bsp_index)
+{
+	struct scenario *scenario = global_scenario_get();
+	if (structure_bsp_index < 0 || structure_bsp_index >= scenario->structure_bsp_references.count)
+	{
+		console_warning("tried to switch to invalid structure-bsp %d", structure_bsp_index);
+		return;
+	}
+	if (structure_bsp_index == global_structure_bsp_index)
+	{
+		console_warning("tried to switch to current structure-bsp %d", structure_bsp_index);
+		return;
+	}
+	main_globals.switch_to_structure_bsp_index = structure_bsp_index;
+	hud_load(TRUE);
+	return;
+}
+
 void main_goto_main_menu(
 	void)
 {
 	main_globals.switch_to_structure_bsp_index = NONE;
 	main_globals.saving_map = FALSE;
 	main_globals.want_to_be_at_main_menu = TRUE;
+	return;
+}
+
+void code_000efde0(
+	void)
+{
+	real progress;
+	if (cache_files_precache_in_progress() && cache_files_precache_map_status(&progress) == 1)
+		cache_files_precache_map_end();
+	if (!cache_files_precache_in_progress())
+	{
+		cache_files_precache_map_begin(main_globals.queued_map_name, FALSE);
+		main_globals.queue_map = FALSE;
+	}
+	return;
+}
+
+void main_menu_precache_resources(
+	void)
+{
+	struct scenario *scenario = global_scenario_get();
+	if (scenario)
+	{
+		match_assert("c:\\halo\\SOURCE\\main\\main.c", 0x46d, scenario->type==_scenario_type_main_menu);
+		predicted_resources_precache(&scenario->predicted_ui_resources);
+	}
 	return;
 }
 
