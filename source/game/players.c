@@ -245,4 +245,16 @@ struct data_array *player_data;
 
 /* ---------- public code */
 
+short players_get_respawn_failure(
+	void)
+{
+	return players_globals->respawn_failure;
+}
+
+short local_player_count(
+	void)
+{
+	return players_globals->local_player_count;
+}
+
 /* ---------- private code */

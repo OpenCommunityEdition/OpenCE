@@ -19,6 +19,7 @@ enum
 	_player_powerup_active_camouflage = 0,
 	_player_powerup_full_spectrum_vision,
 	NUMBER_OF_PLAYER_POWERUPS,
+	MAXIMUM_LOCAL_PLAYERS = 4,
 };
 
 
@@ -89,6 +90,30 @@ struct player_datum
 	struct player_action action_input;
 };
 
+struct players_globals
+{
+	long unknown0;
+	long local_players[MAXIMUM_LOCAL_PLAYERS];
+	long dead_units[MAXIMUM_LOCAL_PLAYERS];
+	short local_player_count;
+	short double_speed_ticks;
+	boolean all_dead;
+	boolean input_disabled;
+	short pending_teleport_starting_location_index;
+	short respawn_failure;
+	boolean respawn_failed;
+	byte pad2F;
+	unsigned long combined_pvs[16];
+	unsigned long combined_pvs_local[16];
+};
+
+typedef char players_globals_local_player_count_offset_assert[
+	offsetof(struct players_globals, local_player_count) == 0x24 ? 1 : -1];
+typedef char players_globals_respawn_failure_offset_assert[
+	offsetof(struct players_globals, respawn_failure) == 0x2C ? 1 : -1];
+typedef char players_globals_size_assert[
+	sizeof(struct players_globals) == 0xB0 ? 1 : -1];
+
 typedef char player_datum_team_index_offset_assert[
 	offsetof(struct player_datum, team_index) == 0x20 ? 1 : -1];
 typedef char player_datum_statistics_offset_assert[
@@ -106,6 +131,9 @@ long local_player_get_player_index(
 short local_player_count(
 	void);
 
+short players_get_respawn_failure(
+	void);
+
 long player_index_from_unit_index(long unit_index);
 
 unsigned long const *players_get_combined_pvs_local(void);
@@ -120,6 +148,7 @@ void update_queues_reset_and_fill_with_lies(void);
 /* ---------- globals */
 
 extern struct data_array *player_data;
+extern struct players_globals *players_globals;
 
 /* ---------- public code */
 
