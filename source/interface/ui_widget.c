@@ -642,4 +642,10 @@ short dashboard_abort_error = NONE;
 
 /* ---------- public code */
 
+void ui_widgets_safe_to_load(
+	boolean safe)
+{
+	return;
+}
+
 /* ---------- private code */
