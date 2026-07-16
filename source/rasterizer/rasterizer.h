@@ -132,8 +132,21 @@ void rasterizer_set_vblank_callback(
 	void (*callback)(unsigned long));
 long rasterizer_dynamic_triangles_new(
 	long triangle_count);
+short *rasterizer_dynamic_triangles_lock(
+	long triangle_buffer_index);
+void rasterizer_dynamic_triangles_unlock(
+	long triangle_buffer_index);
 void rasterizer_dynamic_triangles_delete(
 	long triangle_buffer_index);
+long rasterizer_dynamic_vertices_new(
+	short type,
+	long vertex_count);
+short rasterizer_dynamic_vertices_get_type(
+	long dynamic_vertex_buffer_index);
+void *rasterizer_dynamic_vertices_lock(
+	long dynamic_vertex_buffer_index);
+void rasterizer_dynamic_vertices_unlock(
+	long dynamic_vertex_buffer_index);
 void rasterizer_dynamic_vertices_delete(
 	long dynamic_vertex_buffer_index);
 void rasterizer_debug_immediate_line(
@@ -162,6 +175,10 @@ void *rasterizer_decal_vertices_lock(
 	unsigned long cache_size);
 void rasterizer_decal_vertices_unlock(
 	void);
+long rasterizer_decal_vertices_new(
+	long size);
+void rasterizer_decal_vertices_delete(
+	long decal_vertex_buffer_index);
 
 void rasterizer_decals_initialize(
 	void);

@@ -360,8 +360,21 @@ void _rasterizer_set_vblank_callback(
 	void (*callback)(unsigned long));
 long _rasterizer_dynamic_triangles_new(
 	long triangle_count);
+short *_rasterizer_dynamic_triangles_lock(
+	long triangle_buffer_index);
+void _rasterizer_dynamic_triangles_unlock(
+	long triangle_buffer_index);
 void _rasterizer_dynamic_triangles_delete(
 	long triangle_buffer_index);
+long _rasterizer_dynamic_vertices_new(
+	short type,
+	long vertex_count);
+short _rasterizer_dynamic_vertices_get_type(
+	long dynamic_vertex_buffer_index);
+void *_rasterizer_dynamic_vertices_lock(
+	long dynamic_vertex_buffer_index);
+void _rasterizer_dynamic_vertices_unlock(
+	long dynamic_vertex_buffer_index);
 void _rasterizer_dynamic_vertices_delete(
 	long dynamic_vertex_buffer_index);
 void _rasterizer_debug_immediate_line(
@@ -388,6 +401,10 @@ void _rasterizer_debug_immediate_linestrip_screenspace(
 void *_rasterizer_decal_vertices_lock(
 	short cache_index,
 	unsigned long cache_size);
+long _rasterizer_decal_vertices_new(
+	long size);
+void _rasterizer_decal_vertices_delete(
+	long decal_vertex_buffer_index);
 void _rasterizer_decal_vertices_unlock(
 	void);
 void _rasterizer_widget_end(
@@ -606,6 +623,19 @@ long rasterizer_dynamic_triangles_new(
 	return _rasterizer_dynamic_triangles_new(triangle_count);
 }
 
+short *rasterizer_dynamic_triangles_lock(
+	long triangle_buffer_index)
+{
+	return _rasterizer_dynamic_triangles_lock(triangle_buffer_index);
+}
+
+void rasterizer_dynamic_triangles_unlock(
+	long triangle_buffer_index)
+{
+	_rasterizer_dynamic_triangles_unlock(triangle_buffer_index);
+	return;
+}
+
 void rasterizer_dynamic_triangles_delete(
 	long triangle_buffer_index)
 {
@@ -613,10 +643,49 @@ void rasterizer_dynamic_triangles_delete(
 	return;
 }
 
+long rasterizer_dynamic_vertices_new(
+	short type,
+	long vertex_count)
+{
+	return _rasterizer_dynamic_vertices_new(type, vertex_count);
+}
+
+short rasterizer_dynamic_vertices_get_type(
+	long dynamic_vertex_buffer_index)
+{
+	return _rasterizer_dynamic_vertices_get_type(dynamic_vertex_buffer_index);
+}
+
+void *rasterizer_dynamic_vertices_lock(
+	long dynamic_vertex_buffer_index)
+{
+	return _rasterizer_dynamic_vertices_lock(dynamic_vertex_buffer_index);
+}
+
+void rasterizer_dynamic_vertices_unlock(
+	long dynamic_vertex_buffer_index)
+{
+	_rasterizer_dynamic_vertices_unlock(dynamic_vertex_buffer_index);
+	return;
+}
+
 void rasterizer_dynamic_vertices_delete(
 	long dynamic_vertex_buffer_index)
 {
 	_rasterizer_dynamic_vertices_delete(dynamic_vertex_buffer_index);
+	return;
+}
+
+long rasterizer_decal_vertices_new(
+	long size)
+{
+	return _rasterizer_decal_vertices_new(size);
+}
+
+void rasterizer_decal_vertices_delete(
+	long decal_vertex_buffer_index)
+{
+	_rasterizer_decal_vertices_delete(decal_vertex_buffer_index);
 	return;
 }
 
