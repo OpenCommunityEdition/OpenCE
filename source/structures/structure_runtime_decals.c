@@ -148,30 +148,31 @@ void structure_decals_update(
 {
 	struct structure_bsp *structure_bsp = global_structure_bsp_get();
 	struct tag_block *runtime_decals;
+	short cluster_index;
 
 	match_assert("c:\\halo\\SOURCE\\structures\\structure_runtime_decals.c", 0x62, structure_decals_globals);
 	runtime_decals = &structure_bsp->runtime_decals;
 
-	if (runtime_decals->count && cluster_count > 0)
+	if (runtime_decals->count && cluster_count > (cluster_index = 0))
 	{
 		struct tag_block *clusters = &structure_bsp->clusters;
-		short cluster_index = 0;
+		long element_index = 0;
 
 		do
 		{
 			struct structure_cluster_runtime_decals *cluster = TAG_BLOCK_GET_ELEMENT(
 				clusters,
-				cluster_index,
+				element_index,
 				struct structure_cluster_runtime_decals);
 			boolean cluster_has_decals = cluster->first_decal_index != NONE && cluster->decal_count;
 			boolean delete_decals = cluster_has_decals &&
 				!structure_decals_globals->reconnect_to_structure_bsp &&
-				BIT_VECTOR_TEST_FLAG(old_combined_pvs, cluster_index) &&
-				!BIT_VECTOR_TEST_FLAG(new_combined_pvs, cluster_index);
+				BIT_VECTOR_TEST_FLAG(old_combined_pvs, element_index) &&
+				!BIT_VECTOR_TEST_FLAG(new_combined_pvs, element_index);
 			boolean create_decals = cluster_has_decals &&
-				(!BIT_VECTOR_TEST_FLAG(old_combined_pvs, cluster_index) ||
+				(!BIT_VECTOR_TEST_FLAG(old_combined_pvs, element_index) ||
 					structure_decals_globals->reconnect_to_structure_bsp) &&
-				BIT_VECTOR_TEST_FLAG(new_combined_pvs, cluster_index);
+				BIT_VECTOR_TEST_FLAG(new_combined_pvs, element_index);
 
 			if (delete_decals)
 			{
@@ -193,20 +194,26 @@ void structure_decals_update(
 							runtime_decal->palette_index,
 							struct scenario_decal_palette_entry);
 						long definition_index = palette_entry->reference.index;
-						real_euler_angles2d angles;
-						real_vector3d normal;
 
 						decal_definition_get(definition_index);
-						angles.yaw = runtime_decal->yaw * (_pi / 127.f);
-						angles.pitch = runtime_decal->pitch * (_pi / 254.f);
-						vector3d_from_euler_angles2d(&normal, &angles);
-						decal_new(definition_index, &runtime_decal->position, &normal, 1.0f, 1, NONE, FALSE);
+						{
+							real_euler_angles2d angles =
+							{
+								runtime_decal->yaw * (_pi / 127.f),
+								runtime_decal->pitch * (_pi / 254.f),
+							};
+							real_vector3d normal;
+
+							vector3d_from_euler_angles2d(&normal, &angles);
+							decal_new(definition_index, &runtime_decal->position, &normal, 1.0f, 1, NONE, FALSE);
+						}
 						decal_index++;
 					} while (decal_index < cluster->decal_count);
 				}
 			}
 
 			cluster_index++;
+			element_index++;
 		} while (cluster_index < cluster_count);
 	}
 

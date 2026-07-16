@@ -428,7 +428,7 @@
 				{ "name": "source/tag_files/files.c", "index": 54, "status": "Matching" },
 				{ "name": "source/structures/structures.c", "index": 55, "status": "NonMatching" },
 				{ "name": "source/structures/structure_visibility.c", "index": 56, "status": "NonMatching" },
-				{ "name": "source/structures/structure_runtime_decals.c", "index": 57, "status": "NonMatching" },
+				{ "name": "source/structures/structure_runtime_decals.c", "index": 57, "status": "Matching" },
 				{ "name": "source/structures/structure_render.c", "index": 58, "status": "NonMatching" },
 				{ "name": "source/structures/structure_lens_flares.c", "index": 59, "status": "NonMatching" },
 				{ "name": "source/structures/structure_detail_objects.c", "index": 60, "status": "NonMatching" },
