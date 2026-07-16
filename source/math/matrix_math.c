@@ -184,6 +184,85 @@ void matrix4x3_translation(
 	return;
 }
 
+void matrix4x3_rotation_from_quaternion(
+	real_matrix4x3 *matrix,
+	real_quaternion const *quaternion)
+{
+	real scale =
+		quaternion->v.i * quaternion->v.i +
+		quaternion->v.j * quaternion->v.j +
+		quaternion->v.k * quaternion->v.k +
+		quaternion->w * quaternion->w;
+	real x;
+	real y;
+	real z;
+	real wx;
+	real wy;
+	real wz;
+	real xx;
+	real xy;
+	real xz;
+	real yy;
+	real yz;
+	real zz;
+
+	if (scale != 0.f)
+		scale = 2.f / scale;
+	else
+		scale = 0.f;
+
+	x = scale * quaternion->v.i;
+	y = scale * quaternion->v.j;
+	z = scale * quaternion->v.k;
+	wx = quaternion->w * x;
+	wy = quaternion->w * y;
+	wz = quaternion->w * z;
+	xx = quaternion->v.i * x;
+	xy = quaternion->v.i * y;
+	xz = quaternion->v.i * z;
+	yy = quaternion->v.j * y;
+	yz = quaternion->v.j * z;
+	zz = quaternion->v.k * z;
+
+	matrix->scale = 1.f;
+	matrix->forward.i = 1.f - (yy + zz);
+	matrix->forward.j = xy - wz;
+	matrix->forward.k = xz + wy;
+	matrix->left.i = xy + wz;
+	matrix->left.j = 1.f - (xx + zz);
+	matrix->left.k = yz - wx;
+	matrix->up.i = xz - wy;
+	matrix->up.j = yz + wx;
+	matrix->up.k = 1.f - (xx + yy);
+	matrix->position.x = 0.f;
+	matrix->position.y = 0.f;
+	matrix->position.z = 0.f;
+
+	return;
+}
+
+void matrix4x3_from_point_and_quaternion(
+	real_matrix4x3 *matrix,
+	real_point3d const *point,
+	real_quaternion const *quaternion)
+{
+	matrix4x3_rotation_from_quaternion(matrix, quaternion);
+	matrix->position = *point;
+
+	return;
+}
+
+void matrix4x3_from_orientation(
+	real_matrix4x3 *matrix,
+	real_orientation const *orientation)
+{
+	matrix4x3_rotation_from_quaternion(matrix, &orientation->rotation);
+	matrix->scale = orientation->scale;
+	matrix->position = orientation->translation;
+
+	return;
+}
+
 void matrix4x3_inverse(
 	real_matrix4x3 const *matrix,
 	real_matrix4x3 *result)
