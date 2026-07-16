@@ -489,6 +489,7 @@ real_vector3d *matrix4x3_inverse_transform_vector(real_matrix4x3 const *matrix, 
 real_vector3d *matrix4x3_inverse_transform_normal(real_matrix4x3 const *matrix, real_vector3d const *normal, real_vector3d *result);
 real_plane3d *matrix4x3_inverse_transform_plane(real_matrix4x3 const *matrix, real_plane3d const *plane, real_plane3d *result);
 void matrix4x3_multiply(real_matrix4x3 const *a, real_matrix4x3 const *b, real_matrix4x3 *result);
+boolean valid_real_plane3d(real_plane3d const *plane);
 
 /* ---------- prototypes/RANDOM_MATH.C */
 

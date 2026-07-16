@@ -165,6 +165,25 @@ matrix4x3_scale(
 	return;
 }
 
+void matrix4x3_translation(
+	real_matrix4x3 *matrix,
+	real_point3d const *point)
+{
+	matrix->scale = 1.f;
+	matrix->forward.i = 1.f;
+	matrix->forward.j = 0.f;
+	matrix->forward.k = 0.f;
+	matrix->left.i = 0.f;
+	matrix->left.j = 1.f;
+	matrix->left.k = 0.f;
+	matrix->up.i = 0.f;
+	matrix->up.j = 0.f;
+	matrix->up.k = 1.f;
+	matrix->position = *point;
+
+	return;
+}
+
 void matrix4x3_inverse(
 	real_matrix4x3 const *matrix,
 	real_matrix4x3 *result)
@@ -324,6 +343,14 @@ matrix3x3_determinant(
 		- matrix->forward.i * matrix->up.j * matrix->left.k
 		- matrix->up.k * matrix->forward.j * matrix->left.i
 		- matrix->up.i * matrix->forward.k * matrix->left.j;
+}
+
+boolean valid_real_plane3d(
+	real_plane3d const *plane)
+{
+	return
+		valid_real_normal3d(&plane->n) &&
+		valid_real(plane->d);
 }
 
 /* ---------- private code */
