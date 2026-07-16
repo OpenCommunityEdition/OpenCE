@@ -30,16 +30,75 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "cseries/errors.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct vertex_shader_entry
+{
+	void const *declaration;
+	void const *function;
+	unsigned long handle;
+	long instruction_count;
+};
+
 /* ---------- prototypes */
+
+void __stdcall D3DDevice_DeleteVertexShader(
+	unsigned long handle);
+
+void rasterizer_error(
+	long error_result,
+	char const *format,
+	...);
+
+static __inline long delete_vertex_shader(
+	void *device,
+	unsigned long handle)
+{
+	D3DDevice_DeleteVertexShader(handle);
+	return 0;
+}
 
 /* ---------- globals */
 
+extern void *global_d3d_device;
+extern struct vertex_shader_entry vertex_shader_table[67];
+
 /* ---------- public code */
+
+void rasterizer_vertex_shaders_dispose(
+	void)
+{
+	boolean success;
+	short vertex_shader_index;
+
+	success = TRUE;
+	for (vertex_shader_index = 0; vertex_shader_index < 67; vertex_shader_index++)
+	{
+		if (delete_vertex_shader(global_d3d_device, vertex_shader_table[vertex_shader_index].handle) >= 0 && success)
+		{
+			success = TRUE;
+		}
+		else
+		{
+			success = FALSE;
+			rasterizer_error(
+				0,
+				"IDirect3DDevice8_DeleteVertexShader(global_d3d_device, (DWORD)vertex_shader_table[vertex_shader_index].handle)");
+		}
+	}
+
+	if (!success)
+	{
+		error(2, "### ERROR rasterizer_vertex_shaders_dispose failed");
+	}
+	return;
+}
 
 /* ---------- private code */
