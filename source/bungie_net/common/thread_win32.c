@@ -89,6 +89,8 @@ struct thread_globals
 
 struct thread_reference *code_0006fc30(
 	void);
+struct mutex_reference *code_0006fc60(
+	void);
 boolean thread_has_exited(
 	struct thread_reference *thread_reference);
 void dispose_thread(
@@ -104,6 +106,7 @@ void dispose_mutex(
 /* ---------- globals */
 
 struct thread_globals bss_0031c728;
+extern struct mutex_reference bss_0031cd30;
 
 /* ---------- public code */
 
@@ -198,4 +201,32 @@ struct thread_reference *code_0006fc30(
 	}
 
 	return thread_reference;
+}
+
+struct mutex_reference *code_0006fc60(
+	void)
+{
+	struct mutex_reference *mutex_reference = NULL;
+	boolean *in_use;
+	long mutex_index;
+
+	mutex_index = 0;
+	in_use = &bss_0031c728.mutex_references[0].in_use;
+	do
+	{
+		if (!*in_use)
+		{
+			mutex_reference = &bss_0031c728.mutex_references[mutex_index];
+			mutex_reference->name[0] = 0;
+			mutex_reference->handle = NULL;
+			mutex_reference->in_use = TRUE;
+			break;
+		}
+
+		in_use += sizeof(struct mutex_reference);
+		mutex_index++;
+	}
+	while ((long)in_use<(long)&bss_0031cd30.in_use);
+
+	return mutex_reference;
 }
