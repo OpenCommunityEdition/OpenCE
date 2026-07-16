@@ -2808,6 +2808,55 @@ void evaluator( \
 	return; \
 }
 
+#define HS_EVALUATE_RETURN_SHORT(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	union hs_short_result result; \
+	result.value = 0; \
+	result.short_value = function(); \
+	hs_return(thread_index, result.value); \
+	return; \
+}
+
+#define HS_EVALUATE_SHORT_FROM_LONG(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	long *arguments; \
+	union hs_short_result result; \
+	result.value = 0; \
+	arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		result.short_value = function(arguments[0]); \
+		hs_return(thread_index, result.value); \
+	} \
+	return; \
+}
+
+#define HS_EVALUATE_SHORT_FROM_UNSIGNED_SHORT(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	union hs_evaluation_argument *arguments; \
+	union hs_short_result result; \
+	result.value = 0; \
+	arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		result.short_value = function(arguments[0].unsigned_short_value); \
+		hs_return(thread_index, result.value); \
+	} \
+	return; \
+}
+
 #define HS_EVALUATE_LONG_FROM_LONG(evaluator, function) \
 void evaluator( \
 	short function_index, \
@@ -2974,6 +3023,12 @@ union hs_real_value
 	long long_value;
 };
 
+union hs_short_result
+{
+	short short_value;
+	long value;
+};
+
 union hs_evaluation_argument
 {
 	long long_value;
@@ -3063,6 +3118,44 @@ void *hs_macro_function_evaluate(
 	short function_index,
 	long thread_index,
 	boolean initialize);
+short object_list_count(
+	long object_list_index);
+short numeric_countdown_timer_get(
+	short digit_index);
+short recorded_animation_get_time_left(
+	long unit_index);
+short scenery_get_animation_time(
+	long scenery_index);
+short unit_get_custom_animation_time(
+	long unit_index);
+short unit_scripting_get_grenade_count(
+	long unit_index);
+short ai_scripting_command_list_status(
+	long ai_reference);
+short ai_scripting_going_to_vehicle(
+	long ai_reference);
+short ai_scripting_living_count(
+	long ai_reference);
+short ai_scripting_swarm_count(
+	long ai_reference);
+short ai_scripting_nonswarm_count(
+	long ai_reference);
+short ai_scripting_status(
+	long ai_reference);
+short ai_scripting_conversation_line(
+	word conversation_index);
+short ai_scripting_conversation_status(
+	word conversation_index);
+short scripted_camera_time(
+	void);
+short game_difficulty_level_get_ignore_easy(
+	void);
+short game_difficulty_level_get(
+	void);
+short global_structure_bsp_index_get(
+	void);
+short scripted_hud_get_timer_ticks(
+	void);
 boolean hs_not(
 	boolean value);
 boolean scenario_trigger_volume_test_object(
@@ -3443,6 +3536,25 @@ HS_EVALUATE_NO_OP(code_000b14c0)
 HS_EVALUATE_NO_OP(code_000b14e0)
 HS_EVALUATE_RETURN_LONG(code_000ad320, hs_players)
 HS_EVALUATE_RETURN_LONG(code_000b0c50, game_time_get)
+HS_EVALUATE_RETURN_SHORT(code_000b0b60, scripted_camera_time)
+HS_EVALUATE_RETURN_SHORT(code_000b0c70, game_difficulty_level_get_ignore_easy)
+HS_EVALUATE_RETURN_SHORT(code_000b0ca0, game_difficulty_level_get)
+HS_EVALUATE_RETURN_SHORT(code_000b11f0, global_structure_bsp_index_get)
+HS_EVALUATE_RETURN_SHORT(code_000b2840, scripted_hud_get_timer_ticks)
+HS_EVALUATE_SHORT_FROM_LONG(code_000ad750, object_list_count)
+HS_EVALUATE_SHORT_FROM_UNSIGNED_SHORT(code_000ada40, numeric_countdown_timer_get)
+HS_EVALUATE_SHORT_FROM_LONG(code_000adc40, recorded_animation_get_time_left)
+HS_EVALUATE_SHORT_FROM_LONG(code_000ae0c0, scenery_get_animation_time)
+HS_EVALUATE_SHORT_FROM_LONG(code_000ae320, unit_get_custom_animation_time)
+HS_EVALUATE_SHORT_FROM_LONG(code_000aeae0, unit_scripting_get_grenade_count)
+HS_EVALUATE_SHORT_FROM_LONG(code_000b0600, ai_scripting_command_list_status)
+HS_EVALUATE_SHORT_FROM_LONG(code_000b0650, ai_scripting_going_to_vehicle)
+HS_EVALUATE_SHORT_FROM_LONG(code_000b06a0, ai_scripting_living_count)
+HS_EVALUATE_SHORT_FROM_LONG(code_000b0770, ai_scripting_swarm_count)
+HS_EVALUATE_SHORT_FROM_LONG(code_000b07c0, ai_scripting_nonswarm_count)
+HS_EVALUATE_SHORT_FROM_LONG(code_000b0850, ai_scripting_status)
+HS_EVALUATE_SHORT_FROM_UNSIGNED_SHORT(code_000b08f0, ai_scripting_conversation_line)
+HS_EVALUATE_SHORT_FROM_UNSIGNED_SHORT(code_000b0940, ai_scripting_conversation_status)
 HS_EVALUATE_LONG_FROM_LONG(code_000ae9a0, unit_scripting_unit_riders)
 HS_EVALUATE_LONG_FROM_LONG(code_000ae9e0, unit_scripting_unit_driver)
 HS_EVALUATE_LONG_FROM_LONG(code_000aea20, unit_scripting_unit_gunner)
