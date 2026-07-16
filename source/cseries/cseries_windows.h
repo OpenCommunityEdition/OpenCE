@@ -14,7 +14,42 @@ CSERIES_WINDOWS.H
 
 /* ---------- prototypes/CSERIES_WINDOWS.C */
 
-unsigned long system_milliseconds(void);
+void display_debug_string(
+	const char *string);
+void system_unique_identifier_get(
+	void *identifier);
+long system_unique_identifiers_equal(
+	const void *identifier1,
+	const void *identifier2);
+unsigned long system_milliseconds(
+	void);
+unsigned long system_seconds(
+	void);
+void system_get_user_name(
+	char *user_name,
+	short maximum_length);
+void *system_calloc(
+	long count,
+	long size);
+void *system_malloc(
+	long size);
+void system_free(
+	void *pointer);
+void *system_realloc(
+	void *pointer,
+	long size);
+unsigned long system_get_used_memory_size(
+	void *pointer);
+struct system_memory_information;
+void system_memory_information_get(
+	struct system_memory_information *information);
+void system_show_wait_cursor(
+	const char *file,
+	long line);
+void system_alert(
+	void);
+void system_kill_screen_saver(
+	void);
 
 long generic_exception_filter(unsigned long exception_code, PEXCEPTION_POINTERS exception_information);
 
