@@ -33,6 +33,8 @@ short player_profile_number_of_available_primary_colors(
 real_rgb_color *player_profile_get_rgb_color(
 	real_rgb_color *result,
 	long color_index);
+void player_profile_save_level_completed(
+	short local_player_index);
 
 /* ---------- globals */
 

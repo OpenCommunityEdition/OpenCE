@@ -350,6 +350,7 @@ symbols in this file:
 #include "cache/cache_files.h"
 #include "cache/predicted_resources.h"
 #include "interface/hud.h"
+#include "saved games/player_profile.h"
 
 /* ---------- constants */
 
@@ -861,6 +862,21 @@ void main_set_difficulty(
 	return;
 }
 
+long code_000ef8a0(
+	short const *a,
+	short const *b)
+{
+	short value_a = *a;
+	short value_b = *b;
+	if (value_a == NONE && value_b != value_a)
+		return 1;
+	if (value_a != NONE && value_b == NONE)
+		return -1;
+	if (value_a > value_b)
+		return 1;
+	return (value_a >= value_b) - 1;
+}
+
 void main_save_map_safe(
 	void)
 {
@@ -1066,6 +1082,22 @@ void code_000f0930(
 {
 	main_globals.run_xdemos = FALSE;
 	xbox_demos_launch();
+	return;
+}
+
+void code_000f0850(
+	void)
+{
+	short level;
+	short local_player_index;
+	main_globals.want_to_be_at_main_menu = TRUE;
+	main_globals.won_map = FALSE;
+	level = main_get_solo_level_from_name(main_globals.soloplayer_map_name) + 1;
+	if (level >= 10)
+		level = NONE;
+	for (local_player_index = 0; local_player_index < player_spawn_count; local_player_index++)
+		player_profile_save_level_completed(local_player_index);
+	ui_set_next_level(level);
 	return;
 }
 
