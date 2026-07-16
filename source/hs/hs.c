@@ -3099,6 +3099,22 @@ void evaluator( \
 	return; \
 }
 
+#define HS_EVALUATE_VOID_FROM_ARGUMENTS(evaluator, arguments_type, expression) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	arguments_type const *arguments; \
+	arguments = (arguments_type const *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		expression; \
+		hs_return(thread_index, 0); \
+	} \
+	return; \
+}
+
 #define HS_EVALUATE_RETURN_BOOLEAN(evaluator, arguments_type, expression) \
 void evaluator( \
 	short function_index, \
@@ -3222,6 +3238,20 @@ struct hs_arguments_long_long_long_boolean_word
 	word value4;
 };
 
+struct hs_arguments_real
+{
+	real value;
+};
+
+struct hs_arguments_word_word_word
+{
+	word value0;
+	word pad0;
+	word value1;
+	word pad1;
+	word value2;
+};
+
 union hs_boolean_result
 {
 	boolean boolean;
@@ -3282,6 +3312,66 @@ short vehicle_scripting_load_magic(
 short vehicle_scripting_unload(
 	long vehicle_index,
 	char const *seat_name);
+void scripted_hud_set_flashing_state(
+	boolean enabled);
+void hud_unit_deactivate_nav_point_with_flag(
+	long unit_index,
+	word flag_index);
+void hud_unit_deactivate_nav_point_with_object(
+	long unit_index,
+	long object_index);
+void hud_deactivate_team_nav_point_with_flag(
+	short team,
+	word flag_index);
+void hud_deactivate_team_nav_point_with_object(
+	short team,
+	long object_index);
+void errors_overflow_suppression_enable(
+	boolean enabled);
+void scripted_player_effect_stop(
+	real decay_time);
+void scripted_hud_show_health(
+	boolean show);
+void scripted_hud_blink_health(
+	boolean blink);
+void scripted_hud_show_shield(
+	boolean show);
+void scripted_hud_blink_shield(
+	boolean blink);
+void scripted_hud_show_motion_sensor(
+	boolean show);
+void scripted_hud_blink_motion_sensor(
+	boolean blink);
+void scripted_hud_show_crosshair(
+	boolean show);
+void scripted_hud_set_state_message(
+	word message_index);
+void scripted_hud_set_objective(
+	word message_index);
+void scripted_hud_set_timer_time(
+	short minutes,
+	word seconds);
+void scripted_hud_set_timer_warning_cutoff(
+	short minutes,
+	word seconds);
+void scripted_hud_set_timer_position(
+	word x,
+	word y,
+	word corner);
+void scripted_hud_show_timer(
+	boolean show);
+void scripted_hud_pause_timer(
+	boolean pause);
+void scripted_hud_time_code_show(
+	boolean show);
+void scripted_hud_time_code_start(
+	boolean start);
+void rasterizer_screen_effect_start(
+	boolean clear);
+void rasterizer_set_near_clip_distance(
+	real distance);
+void player0_look_invert_pitch(
+	boolean invert);
 boolean hs_not(
 	boolean value);
 boolean scenario_trigger_volume_test_object(
@@ -3992,6 +4082,32 @@ HS_EVALUATE_VOID_STRING(code_000b15c0, ai_debug_speak)
 HS_EVALUATE_VOID_STRING(code_000b1600, ai_debug_speak_list)
 HS_EVALUATE_VOID_BOOLEAN(code_000b1760, cinematic_show_letterbox)
 HS_EVALUATE_VOID_UNSIGNED_SHORT(code_000b17a0, cinematic_set_title)
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2010, struct hs_arguments_boolean, (scripted_hud_set_flashing_state(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b21b0, struct hs_arguments_long_word, (hud_unit_deactivate_nav_point_with_flag(arguments->value0, arguments->value1)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b21f0, struct hs_arguments_long_long, (hud_unit_deactivate_nav_point_with_object(arguments->value0, arguments->value1)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2230, struct hs_arguments_short_word, (hud_deactivate_team_nav_point_with_flag(arguments->value0, arguments->value1)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2270, struct hs_arguments_short_long, (hud_deactivate_team_nav_point_with_object(arguments->value0, arguments->value1)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b22d0, struct hs_arguments_boolean, (errors_overflow_suppression_enable(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2450, struct hs_arguments_real, (scripted_player_effect_stop(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2490, struct hs_arguments_boolean, (scripted_hud_show_health(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b24d0, struct hs_arguments_boolean, (scripted_hud_blink_health(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2510, struct hs_arguments_boolean, (scripted_hud_show_shield(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2550, struct hs_arguments_boolean, (scripted_hud_blink_shield(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2590, struct hs_arguments_boolean, (scripted_hud_show_motion_sensor(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b25d0, struct hs_arguments_boolean, (scripted_hud_blink_motion_sensor(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2610, struct hs_arguments_boolean, (scripted_hud_show_crosshair(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2670, struct hs_arguments_word, (scripted_hud_set_state_message(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b26b0, struct hs_arguments_word, (scripted_hud_set_objective(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b26f0, struct hs_arguments_short_word, (scripted_hud_set_timer_time(arguments->value0, arguments->value1)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2730, struct hs_arguments_short_word, (scripted_hud_set_timer_warning_cutoff(arguments->value0, arguments->value1)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2770, struct hs_arguments_word_word_word, (scripted_hud_set_timer_position(arguments->value0, arguments->value1, arguments->value2)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b27c0, struct hs_arguments_boolean, (scripted_hud_show_timer(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2800, struct hs_arguments_boolean, (scripted_hud_pause_timer(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2870, struct hs_arguments_boolean, (scripted_hud_time_code_show(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b28b0, struct hs_arguments_boolean, (scripted_hud_time_code_start(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2a00, struct hs_arguments_boolean, (rasterizer_screen_effect_start(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2bb0, struct hs_arguments_real, (rasterizer_set_near_clip_distance(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2c70, struct hs_arguments_boolean, (player0_look_invert_pitch(arguments->value)))
 HS_EVALUATE_RETURN_BOOLEAN(code_000ad290, struct hs_arguments_boolean, (hs_not(arguments->value)))
 HS_EVALUATE_RETURN_BOOLEAN(code_000ad380, struct hs_arguments_short_long, (scenario_trigger_volume_test_object(arguments->value0, arguments->value1)))
 HS_EVALUATE_RETURN_BOOLEAN(code_000ad3d0, struct hs_arguments_short_long, (hs_trigger_volume_test_objects_any(arguments->value0, arguments->value1)))
