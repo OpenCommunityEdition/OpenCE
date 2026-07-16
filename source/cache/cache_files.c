@@ -141,21 +141,35 @@ struct cache_file_tag_instance
 	unsigned long unused[2];
 };
 
+struct cache_file_tag_header
+{
+	byte reserved0[0xC];
+	long tag_count;
+};
+
 struct cache_file_globals
 {
 	boolean tags_loaded;
 	byte reserved1[0x67];
 	unsigned long checksum;
-	byte reserved6C[0x7A0];
+	byte reserved6C[0x798];
+	struct cache_file_tag_header *tag_header;
+	void *structure_bsp_header;
 };
+
+typedef char verify_cache_file_tag_instance_size[
+	sizeof(struct cache_file_tag_instance) == 0x20 ? 1 : -1];
+
+typedef char verify_cache_file_tag_header_count_offset[
+	offsetof(struct cache_file_tag_header, tag_count) == 0xC ? 1 : -1];
 
 typedef char verify_cache_file_globals_size[
 	sizeof(struct cache_file_globals) == 0x80C ? 1 : -1];
 
 /* ---------- prototypes */
 
-// TODO: 
-/*static*/ struct cache_file_tag_instance *cache_get_tag_instance(long tag_index);
+static struct cache_file_tag_instance *code_001a95d0(
+	long tag_index);
 void cache_files_dispose(
 	void);
 void cache_files_initialize(
@@ -164,6 +178,41 @@ void cache_files_initialize(
 /* ---------- globals */
 
 struct cache_file_globals cache_file_globals;
+extern struct cache_file_tag_instance *global_tag_instances;
+
+/* ---------- private code */
+
+static struct cache_file_tag_instance *code_001a95d0(
+	long tag_index)
+{
+	short absolute_index;
+	struct cache_file_tag_instance *tag_instance;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\cache_files.c",
+		518,
+		cache_file_globals.tags_loaded);
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\cache_files.c",
+		519,
+		global_tag_instances);
+
+	absolute_index = (short)tag_index;
+	match_vassert(
+		"c:\\halo\\SOURCE\\cache\\cache_files.c",
+		522,
+		absolute_index >= 0 && absolute_index < cache_file_globals.tag_header->tag_count,
+		csprintf(temporary, "i don't think %08x is a tag index", tag_index));
+
+	tag_instance = &global_tag_instances[absolute_index];
+	match_vassert(
+		"c:\\halo\\SOURCE\\cache\\cache_files.c",
+		526,
+		!(tag_index & 0xFFFF0000) || tag_instance->tag_index == tag_index,
+		csprintf(temporary, "i don't think %08x is a tag index", tag_index));
+
+	return tag_instance;
+}
 
 /* ---------- public code */
 
@@ -196,7 +245,7 @@ void *tag_get(
 	char expected_group[16];
 	char returned_group[16];
 
-	struct cache_file_tag_instance *tag_instance = cache_get_tag_instance(tag_index);
+	struct cache_file_tag_instance *tag_instance = code_001a95d0(tag_index);
 	match_vassert(
 		"c:\\halo\\SOURCE\\cache\\cache_files.c",
 		298,
@@ -220,4 +269,14 @@ void *tag_get(
 	return tag_instance->base_address;
 }
 
-/* ---------- private code */
+char *tag_get_name(
+	long tag_index)
+{
+	return code_001a95d0(tag_index)->name;
+}
+
+unsigned long tag_get_group_tag(
+	long tag_index)
+{
+	return code_001a95d0(tag_index)->group_tag;
+}
