@@ -82,6 +82,57 @@ void units_scripting_set_maximum_vitality(
 	return;
 }
 
+void unit_scripting_set_current_vitality(
+	long unit_index,
+	real body_vitality,
+	real shield_vitality)
+{
+	if (unit_index != NONE)
+	{
+		struct object_datum *object = object_get(unit_index);
+
+		if (!TEST_FLAG(object->object.damage_flags, _object_dead_bit))
+		{
+			real new_shield_vitality;
+			real new_body_vitality;
+
+			if (object->object.maximum_shield_vitality <= 0.f)
+			{
+				new_shield_vitality = 0.f;
+			}
+			else
+			{
+				if (shield_vitality >= object->object.maximum_shield_vitality)
+					new_shield_vitality = 1.f;
+				else
+					new_shield_vitality = shield_vitality / object->object.maximum_shield_vitality;
+			}
+
+			if (object->object.maximum_body_vitality <= 0.f)
+			{
+				new_body_vitality = 0.f;
+			}
+			else
+			{
+				if (body_vitality >= object->object.maximum_body_vitality)
+					new_body_vitality = 1.f;
+				else
+					new_body_vitality = body_vitality / object->object.maximum_body_vitality;
+			}
+
+			if (object->object.shield_vitality > 0.f && new_shield_vitality <= 0.f)
+				object_deplete_shield(unit_index);
+			object->object.shield_vitality = new_shield_vitality;
+
+			if (object->object.body_vitality > 0.f && new_body_vitality <= 0.f)
+				object_deplete_body(unit_index);
+			object->object.body_vitality = new_body_vitality;
+		}
+	}
+
+	return;
+}
+
 void units_scripting_set_current_vitality(
 	long object_list_index,
 	real body_vitality,
@@ -96,6 +147,44 @@ void units_scripting_set_current_vitality(
 		unit_index = object_list_get_next(object_list_index, &reference_index);
 	}
 	return;
+}
+
+real unit_scripting_get_health(
+	long unit_index)
+{
+	struct object_datum const *object;
+	real result;
+
+	object = object_try_and_get(unit_index);
+	result = -1.f;
+	if (object)
+	{
+		if (TEST_FLAG(object->object.damage_flags, _object_dead_bit))
+			result = 0.f;
+		else
+			result = object->object.body_vitality;
+	}
+
+	return result;
+}
+
+real unit_scripting_get_shield(
+	long unit_index)
+{
+	struct object_datum const *object;
+	real result;
+
+	object = object_try_and_get(unit_index);
+	result = -1.f;
+	if (object)
+	{
+		if (TEST_FLAG(object->object.damage_flags, _object_dead_bit))
+			result = 0.f;
+		else
+			result = object->object.shield_vitality;
+	}
+
+	return result;
 }
 
 short unit_scripting_get_grenade_count(
