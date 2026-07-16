@@ -116,4 +116,70 @@ symbols in this file:
 
 /* ---------- public code */
 
+void code_000a1630(
+	void)
+{
+	return;
+}
+
+void code_000a1640(
+	void)
+{
+	return;
+}
+
+void code_000a1670(
+	void)
+{
+	return;
+}
+
+void code_000a1680(
+	void)
+{
+	return;
+}
+
+void code_000a1690(
+	void)
+{
+	return;
+}
+
+void code_000a16a0(
+	void)
+{
+	return;
+}
+
+void code_000a16b0(
+	void)
+{
+	return;
+}
+
+void code_000a16c0(
+	void)
+{
+	return;
+}
+
+void code_000a16d0(
+	void)
+{
+	return;
+}
+
+void code_000a1820(
+	void)
+{
+	return;
+}
+
+void code_000a1b80(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
