@@ -73,7 +73,7 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-static void datum_initialize(struct data_array *data, struct datum_header *header);
+static void code_00108cc0(struct data_array *data, struct datum_header *header);
 
 /* ---------- globals */
 
@@ -238,6 +238,75 @@ void data_make_invalid(
 	return;
 }
 
+long datum_new_at_index(
+	struct data_array *data,
+	long index)
+{
+	struct datum_header *header;
+	short absolute_index = index;
+	short identifier = index>>16;
+	long result = NONE;
+
+	data_verify(data);
+	match_assert("c:\\halo\\SOURCE\\memory\\data.c", 123, data->valid);
+
+	if (absolute_index>=0 && absolute_index<data->maximum_count && identifier)
+	{
+		header = (struct datum_header *)((byte *)data->data+data->size*absolute_index);
+		if (!header->identifier)
+		{
+			data->actual_count++;
+			if (absolute_index>=data->count)
+			{
+				data->count = absolute_index+1;
+			}
+
+			code_00108cc0(data, header);
+			header->identifier = identifier;
+			result = identifier<<16 | absolute_index;
+		}
+	}
+
+	return result;
+}
+
+long datum_new(
+	struct data_array *data)
+{
+	struct datum_header *header;
+	short absolute_index;
+	long size;
+	long result = NONE;
+
+	data_verify(data);
+	match_assert("c:\\halo\\SOURCE\\memory\\data.c", 163, data->valid);
+
+	absolute_index = data->first_free_absolute_index;
+	size = data->size;
+	header = (struct datum_header *)((byte *)data->data+size*absolute_index);
+	while (absolute_index<data->maximum_count)
+	{
+		if (!header->identifier)
+		{
+			code_00108cc0(data, header);
+			data->actual_count++;
+			data->first_free_absolute_index = absolute_index+1;
+			if (data->count<=absolute_index)
+			{
+				data->count = absolute_index+1;
+			}
+
+			result = header->identifier<<16 | absolute_index;
+			break;
+		}
+
+		absolute_index++;
+		header = (struct datum_header *)((byte *)header+size);
+	}
+
+	return result;
+}
+
 void data_make_valid(
 	struct data_array *data)
 {
@@ -341,4 +410,50 @@ long data_next_index(
 	return result;
 }
 
+long data_prev_index(
+	struct data_array *data,
+	long index)
+{
+	struct datum_header *header;
+	long result = NONE;
+	short absolute_index;
+
+	data_verify(data);
+	match_assert("c:\\halo\\SOURCE\\memory\\data.c", 335, data->valid);
+
+	absolute_index = index==NONE ? data->count-1 : index-1;
+	if (absolute_index>=0 && absolute_index<data->count)
+	{
+		header = (struct datum_header *)((byte *)data->data+data->size*absolute_index);
+		do
+		{
+			if (header->identifier)
+			{
+				result = header->identifier<<16 | absolute_index;
+				break;
+			}
+
+			header = (struct datum_header *)((byte *)header-data->size);
+		}
+		while (absolute_index-->=0);
+	}
+
+	return result;
+}
+
 /* ---------- private code */
+
+static void code_00108cc0(
+	struct data_array *data,
+	struct datum_header *header)
+{
+	csmemset(header, 0, data->size);
+	header->identifier = data->next_identifier;
+	data->next_identifier++;
+	if (!data->next_identifier)
+	{
+		data->next_identifier = 0x8000;
+	}
+
+	return;
+}
