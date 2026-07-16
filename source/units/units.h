@@ -523,6 +523,23 @@ real unit_get_zoom_magnification(
 	short zoom_level);
 short unit_test_spawning(
 	long unit_index);
+void unit_persistent_control(
+	long unit_index,
+	long control_ticks,
+	unsigned long persistent_control_flags);
+boolean unit_can_see_point(
+	long unit_index,
+	real_point3d const *point,
+	real field_of_view);
+boolean unit_has_animation_to_enter_seat(
+	long unit_index,
+	long target_unit_index,
+	short seat_index);
+void unit_impulse(
+	long unit_index,
+	long impulse_index,
+	real_vector3d const *impulse,
+	real magnitude);
 
 boolean unit_update(long unit_index);
 

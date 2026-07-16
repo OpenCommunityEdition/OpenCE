@@ -671,6 +671,7 @@ symbols in this file:
 #include "physics/collision_models.h"
 #include "physics/collision_usage.h"
 #include "physics/collisions.h"
+#include "physics/physics_definitions.h"
 #include "scenario/scenario.h"
 #include "saved games/game_state.h"
 #include "sound/game_sound.h"
@@ -825,6 +826,21 @@ void units_update(
 	unit_globals->next_timer = unit_globals->highest_timer;
 	unit_globals->highest_timer = 0;
 	unit_globals->used_time = 0;
+
+	return;
+}
+
+void unit_persistent_control(
+	long unit_index,
+	long control_ticks,
+	unsigned long persistent_control_flags)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	match_assert("c:\\halo\\SOURCE\\units\\units.c", 1541, VALID_FLAGS(persistent_control_flags, NUMBER_OF_UNIT_CONTROL_FLAGS));
+
+	unit->unit.persistent_control_flags = persistent_control_flags;
+	unit->unit.persistent_control_timer = control_ticks;
 
 	return;
 }
@@ -1470,6 +1486,85 @@ void unit_get_aiming_vector(
 	real_vector3d *aiming_vector)
 {
 	*aiming_vector = unit_get(unit_index)->unit.aiming_vector;
+
+	return;
+}
+
+boolean unit_can_see_point(
+	long unit_index,
+	real_point3d const *point,
+	real field_of_view)
+{
+	boolean can_see_point = FALSE;
+
+	if (unit_index!=NONE)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+		struct object_marker head_marker;
+		real_vector3d direction;
+
+		object_get_marker_by_name(unit_index, "head", &head_marker, 1);
+		vector_from_points3d(&head_marker.matrix.position, point, &direction);
+		normalize3d(&direction);
+
+		if (dot_product3d(&direction, &unit->unit.looking_vector)>cosine(field_of_view))
+		{
+			can_see_point = TRUE;
+		}
+	}
+
+	return can_see_point;
+}
+
+boolean unit_has_animation_to_enter_seat(
+	long unit_index,
+	long target_unit_index,
+	short seat_index)
+{
+	struct unit_datum *target_unit = unit_get(target_unit_index);
+	struct unit_definition *target_unit_definition = unit_definition_get(target_unit->definition_index);
+	boolean has_animation = FALSE;
+
+	if (seat_index>=0 && seat_index<target_unit_definition->unit.seats.count)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+
+		if (unit->object.type==_object_type_vehicle)
+		{
+			has_animation = TRUE;
+		}
+		else
+		{
+			struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(&target_unit_definition->unit.seats, seat_index, struct unit_seat);
+
+			if (unit_set_or_test_seat_and_weapon_label(unit_index, seat->label, NULL, FALSE))
+			{
+				has_animation = TRUE;
+			}
+		}
+	}
+
+	return has_animation;
+}
+
+void unit_impulse(
+	long unit_index,
+	long impulse_index,
+	real_vector3d const *impulse,
+	real magnitude)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
+
+	if (unit_definition->object.physics.index!=NONE)
+	{
+		struct physics_definition *physics_definition = physics_definition_get(unit_definition->object.physics.index);
+		real scale = magnitude/physics_definition->mass;
+
+		unit->object.translational_velocity.i += scale*impulse->i;
+		unit->object.translational_velocity.j += scale*impulse->j;
+		unit->object.translational_velocity.k += scale*impulse->k;
+	}
 
 	return;
 }
