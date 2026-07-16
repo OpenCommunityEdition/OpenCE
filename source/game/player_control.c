@@ -187,14 +187,25 @@ symbols in this file:
 
 #include "items/weapons.h"
 #include "objects/objects.h"
+#include "saved games/game_state.h"
 #include "units/unit_definitions.h"
 #include "units/units.h"
+#include "units/vehicle_definitions.h"
+#include "units/vehicles.h"
 
 #include "real_math.h"
 
 /* ---------- constants */
 
 /* ---------- macros */
+
+#define valid_euler_angles2d(angles) ( \
+	valid_real((angles)->pitch) && \
+	(angles)->pitch <= DEGREES_TO_RADIANS(85.5f) && \
+	(angles)->pitch >= -DEGREES_TO_RADIANS(85.5f) && \
+	valid_real((angles)->yaw) && \
+	(angles)->yaw <= _pi * 2.f && \
+	(angles)->yaw >= 0.f)
 
 /* ---------- structures */
 
@@ -214,6 +225,16 @@ real weapon_get_field_of_view(
 struct player_control_globals_data *bss_0043ee30;
 
 /* ---------- public code */
+
+void player_control_initialize(
+	void)
+{
+	player_control_globals = game_state_malloc(
+		"player control globals",
+		NULL,
+		sizeof(*player_control_globals));
+	return;
+}
 
 struct player_control *player_control_get(
 	short local_player_index)
@@ -310,6 +331,53 @@ real player_control_get_field_of_view(
 	return field_of_view;
 }
 
+void player_control_get_unit_camera_info(
+	short local_player_index,
+	struct player_control_unit_camera_info *camera_info)
+{
+	struct player_control *control;
+	struct unit_datum *unit;
+
+	match_assert("c:\\halo\\SOURCE\\game\\player_control.c", 0x402, camera_info);
+	camera_info->camera = NULL;
+	control = player_control_get(local_player_index);
+	camera_info->unit_index = control->unit_index;
+	camera_info->seat_index = NONE;
+
+	if (camera_info->unit_index != NONE)
+	{
+		unit = unit_get(camera_info->unit_index);
+		unit_get_camera_position(camera_info->unit_index, &camera_info->position);
+
+		if (unit->object.parent_object_index != NONE)
+		{
+			struct unit_datum *vehicle = vehicle_try_and_get(
+				unit->object.parent_object_index);
+
+			if (vehicle)
+			{
+				struct unit_definition *definition = vehicle_definition_get(
+					vehicle->definition_index);
+				struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+					&definition->unit.seats,
+					unit->unit.parent_seat_index,
+					struct unit_seat);
+
+				camera_info->unit_index = unit->object.parent_object_index;
+				camera_info->camera = &seat->camera;
+				camera_info->seat_index = unit->unit.parent_seat_index;
+				unit = unit_get(camera_info->unit_index);
+			}
+		}
+
+		if (camera_info->seat_index == NONE)
+		{
+			camera_info->camera = &unit_definition_get(unit->definition_index)->unit.camera;
+		}
+	}
+	return;
+}
+
 long player_control_get_unit_index(
 	short local_player_index)
 {
@@ -389,6 +457,18 @@ void player_control_unzoom(
 	return;
 }
 
+real_euler_angles2d const *player_control_get_facing_angles(
+	short local_player_index)
+{
+	struct player_control *player = player_control_get(local_player_index);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\player_control.c",
+		0x3C0,
+		valid_euler_angles2d(&player->desired_angles));
+	return &player->desired_angles;
+}
+
 real_vector3d *player_control_get_facing_direction(
 	short local_player_index,
 	real_vector3d *facing_direction)
@@ -415,6 +495,66 @@ void player_control_set_desired_weapon(
 			player_control_get(player->local_player_index)->desired_weapon_index =
 				desired_weapon_index;
 		}
+	}
+	return;
+}
+
+void player_control_set_facing(
+	short local_player_index,
+	real_vector3d const *facing_direction)
+{
+	struct player_control *player_control = player_control_get(local_player_index);
+
+	euler_angles2d_from_vector3d(
+		&player_control->desired_angles,
+		facing_direction);
+	match_assert_valid_real(
+		"c:\\halo\\SOURCE\\game\\player_control.c",
+		0xBB,
+		player_control->desired_angles.pitch);
+	match_assert_valid_real(
+		"c:\\halo\\SOURCE\\game\\player_control.c",
+		0xBC,
+		player_control->desired_angles.yaw);
+	if (player_control->desired_angles.yaw < 0.f)
+	{
+		player_control->desired_angles.yaw += _pi * 2.f;
+	}
+	return;
+}
+
+void player_control_new_unit(
+	short local_player_index,
+	long unit_index)
+{
+	struct player_control *control = player_control_get(local_player_index);
+
+	csmemset(control, 0, sizeof(*control));
+	control->unit_index = unit_index;
+	control->desired_weapon_index = NONE;
+	control->desired_grenade_index = NONE;
+	control->zoom_level = NONE;
+	control->unknown26 = FALSE;
+	control->target_object_index = NONE;
+	control->pitch_maximum = DEGREES_TO_RADIANS(85.5f);
+	control->pitch_minimum = -DEGREES_TO_RADIANS(85.5f);
+	control->inhibited_action_flags = 0;
+	control->persistent_inhibited_action_flags = 0;
+
+	if (unit_index != NONE)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+
+		euler_angles2d_from_vector3d(
+			&control->desired_angles,
+			&unit->unit.desired_facing_vector);
+		if (control->desired_angles.yaw < 0.f)
+		{
+			control->desired_angles.yaw += _pi * 2.f;
+		}
+		control->desired_weapon_index = unit->unit.desired_weapon_index;
+		control->desired_grenade_index = unit->unit.desired_grenade_index;
+		control->zoom_level = unit->unit.desired_zoom_level;
 	}
 	return;
 }

@@ -30,14 +30,24 @@ enum
 
 /* ---------- structures */
 
+struct unit_camera;
+
+struct player_control_unit_camera_info
+{
+	long unit_index;
+	short seat_index;
+	short pad6;
+	struct unit_camera const *camera;
+	real_point3d position;
+};
+
 struct player_control
 {
 	long unit_index;
 	long unknown04;
 	short inhibited_action_flags;
 	short persistent_inhibited_action_flags;
-	float desired_yaw;
-	float desired_pitch;
+	real_euler_angles2d desired_angles;
 	byte unknown14[0xC];
 	short desired_weapon_index;
 	short desired_grenade_index;
@@ -46,7 +56,9 @@ struct player_control
 	byte unknown27;
 	long target_object_index;
 	float autoaim_level;
-	byte unknown30[0x10];
+	byte unknown30[8];
+	real pitch_minimum;
+	real pitch_maximum;
 };
 
 struct player_control_globals_data
@@ -65,9 +77,9 @@ typedef char player_control_unit_index_offset_assert[
 typedef char player_control_inhibited_action_flags_offset_assert[
 	offsetof(struct player_control, inhibited_action_flags) == 0x8 ? 1 : -1];
 typedef char player_control_desired_yaw_offset_assert[
-	offsetof(struct player_control, desired_yaw) == 0xC ? 1 : -1];
+	offsetof(struct player_control, desired_angles.yaw) == 0xC ? 1 : -1];
 typedef char player_control_desired_pitch_offset_assert[
-	offsetof(struct player_control, desired_pitch) == 0x10 ? 1 : -1];
+	offsetof(struct player_control, desired_angles.pitch) == 0x10 ? 1 : -1];
 typedef char player_control_desired_weapon_index_offset_assert[
 	offsetof(struct player_control, desired_weapon_index) == 0x20 ? 1 : -1];
 typedef char player_control_desired_grenade_index_offset_assert[
@@ -78,6 +90,12 @@ typedef char player_control_target_object_index_offset_assert[
 	offsetof(struct player_control, target_object_index) == 0x28 ? 1 : -1];
 typedef char player_control_autoaim_level_offset_assert[
 	offsetof(struct player_control, autoaim_level) == 0x2C ? 1 : -1];
+typedef char player_control_pitch_minimum_offset_assert[
+	offsetof(struct player_control, pitch_minimum) == 0x38 ? 1 : -1];
+typedef char player_control_pitch_maximum_offset_assert[
+	offsetof(struct player_control, pitch_maximum) == 0x3C ? 1 : -1];
+typedef char player_control_unit_camera_info_size_assert[
+	sizeof(struct player_control_unit_camera_info) == 0x18 ? 1 : -1];
 typedef char player_control_globals_size_assert[
 	sizeof(struct player_control_globals_data) == 0x110 ? 1 : -1];
 typedef char player_control_globals_players_offset_assert[
@@ -91,6 +109,8 @@ typedef char player_control_globals_flags_offset_assert[
 
 /* ---------- prototypes */
 
+void player_control_initialize(
+	void);
 void player_control_dispose(
 	void);
 void player_control_dispose_from_old_map(
@@ -105,6 +125,9 @@ long player_control_get_target_object_index(
 	short local_player_index);
 real player_control_get_field_of_view(
 	short local_player_index);
+void player_control_get_unit_camera_info(
+	short local_player_index,
+	struct player_control_unit_camera_info *camera_info);
 long player_control_get_unit_index(
 	short local_player_index);
 long player_control_get_desired_weapon(
@@ -126,6 +149,12 @@ real_vector3d *player_control_get_facing_direction(
 void player_control_set_desired_weapon(
 	long unit_index,
 	short desired_weapon_index);
+void player_control_set_facing(
+	short local_player_index,
+	real_vector3d const *facing_direction);
+void player_control_new_unit(
+	short local_player_index,
+	long unit_index);
 boolean scripted_player_control_set_camera_control(
 	boolean camera_control);
 void player_control_action_test_reset(
