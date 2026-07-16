@@ -432,12 +432,13 @@ struct _main_globals
 	byte __unknown00[216];
 	real seconds_elapsed;
 	short connection;
-	byte __unknownDE[22];
+	byte __unknownDE[18];
 	boolean reset_map;
 	boolean rename_map;
 	boolean revert_map;
 	boolean skip_cinematic;
 	boolean save_map;
+	boolean defer_map_change;
 	boolean save_map_safely;
 	boolean save_map_timeout;
 	boolean saving_map;
@@ -459,13 +460,32 @@ struct _main_globals
 	boolean halt_time_scale;
 	byte __unknown117[0x9];
 	boolean queue_map;
-	byte __unknown121[0x4];
-	boolean solo_try_and_load_from_persistent_storage;
+	byte __unknown121[0x3];
+	boolean allow_persistent_storage;
 	char soloplayer_map_name[256];
 	char multiplayer_map_name[256];
 	char queued_map_name[256];
 	byte __unknown125[682];
 };
+
+typedef char main_globals_seconds_elapsed_offset_assert[
+	offsetof(struct _main_globals, seconds_elapsed) == 0xD8 ? 1 : -1];
+typedef char main_globals_connection_offset_assert[
+	offsetof(struct _main_globals, connection) == 0xDC ? 1 : -1];
+typedef char main_globals_defer_map_change_offset_assert[
+	offsetof(struct _main_globals, defer_map_change) == 0xF5 ? 1 : -1];
+typedef char main_globals_saving_map_offset_assert[
+	offsetof(struct _main_globals, saving_map) == 0xF8 ? 1 : -1];
+typedef char main_globals_won_map_offset_assert[
+	offsetof(struct _main_globals, won_map) == 0x10A ? 1 : -1];
+typedef char main_globals_halt_time_scale_offset_assert[
+	offsetof(struct _main_globals, halt_time_scale) == 0x116 ? 1 : -1];
+typedef char main_globals_allow_persistent_storage_offset_assert[
+	offsetof(struct _main_globals, allow_persistent_storage) == 0x124 ? 1 : -1];
+typedef char main_globals_soloplayer_map_name_offset_assert[
+	offsetof(struct _main_globals, soloplayer_map_name) == 0x125 ? 1 : -1];
+typedef char main_globals_multiplayer_map_name_offset_assert[
+	offsetof(struct _main_globals, multiplayer_map_name) == 0x225 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -480,8 +500,104 @@ extern void main_present_frame(void);
 /* ---------- globals */
 
 static struct _main_globals main_globals;
+extern short global_difficulty_level;
 
 /* ---------- public code */
+
+real main_get_seconds_elapsed(
+	void)
+{
+	return main_globals.seconds_elapsed;
+}
+
+void game_connection_set(
+	short connection)
+{
+	main_globals.connection = connection;
+	return;
+}
+
+short game_connection(
+	void)
+{
+	return main_globals.connection;
+}
+
+void main_disallow_persistent_storage(
+	void)
+{
+	main_globals.allow_persistent_storage = FALSE;
+	return;
+}
+
+void main_defer_map_map_change(
+	void)
+{
+	main_globals.defer_map_change = FALSE;
+	return;
+}
+
+char *main_get_map_name(
+	void)
+{
+	return main_globals.soloplayer_map_name;
+}
+
+char *main_get_multiplayer_map_name(
+	void)
+{
+	return main_globals.multiplayer_map_name;
+}
+
+short main_get_difficulty(
+	void)
+{
+	return global_difficulty_level;
+}
+
+boolean main_saving_map(
+	void)
+{
+	return main_globals.saving_map;
+}
+
+void main_save_cancel(
+	void)
+{
+	main_globals.saving_map = FALSE;
+	return;
+}
+
+void main_won_map(
+	void)
+{
+	main_globals.saving_map = FALSE;
+	main_globals.won_map = TRUE;
+	return;
+}
+
+void main_lost_map(
+	void)
+{
+	main_globals.saving_map = FALSE;
+	main_globals.lost_map = TRUE;
+	return;
+}
+
+void main_stop_time(
+	void)
+{
+	main_globals.halt_time_scale = FALSE;
+	main_globals.__unknown117[0] = FALSE;
+	return;
+}
+
+void main_start_time(
+	void)
+{
+	main_globals.__unknown117[0] = TRUE;
+	return;
+}
 
 static void main_reset_map_private(
 	void)
