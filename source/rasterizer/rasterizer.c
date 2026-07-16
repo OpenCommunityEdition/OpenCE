@@ -352,6 +352,25 @@ void _rasterizer_frame_begin(
 void _rasterizer_present(
 	struct bitmap_data *screenshot_bitmap,
 	point2d const *screenshot_index);
+long _rasterizer_dynamic_triangles_new(
+	long triangle_count);
+short *_rasterizer_dynamic_triangles_lock(
+	long dynamic_triangle_buffer_index);
+void _rasterizer_dynamic_triangles_unlock(
+	long dynamic_triangle_buffer_index);
+long _rasterizer_dynamic_vertices_new(
+	short type,
+	long vertex_count);
+short _rasterizer_dynamic_vertices_get_type(
+	long dynamic_vertex_buffer_index);
+void *_rasterizer_dynamic_vertices_lock(
+	long dynamic_vertex_buffer_index);
+void _rasterizer_dynamic_vertices_unlock(
+	long dynamic_vertex_buffer_index);
+long _rasterizer_decal_vertices_new(
+	long size);
+void _rasterizer_decal_vertices_delete(
+	long decal_vertex_buffer_index);
 void _rasterizer_widget_end(
 	void);
 
@@ -519,6 +538,178 @@ void rasterizer_present(
 {
 	_rasterizer_present(screenshot_bitmap, screenshot_index);
 	return;
+}
+
+__declspec(naked) long rasterizer_dynamic_triangles_new(
+	long triangle_count)
+{
+	__asm
+	{
+		push ebp
+		mov ebp, esp
+		pop ebp
+		jmp _rasterizer_dynamic_triangles_new
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+	}
+}
+
+__declspec(naked) short *rasterizer_dynamic_triangles_lock(
+	long dynamic_triangle_buffer_index)
+{
+	__asm
+	{
+		push ebp
+		mov ebp, esp
+		pop ebp
+		jmp _rasterizer_dynamic_triangles_lock
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+	}
+}
+
+__declspec(naked) void rasterizer_dynamic_triangles_unlock(
+	long dynamic_triangle_buffer_index)
+{
+	__asm
+	{
+		push ebp
+		mov ebp, esp
+		pop ebp
+		jmp _rasterizer_dynamic_triangles_unlock
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+	}
+}
+
+__declspec(naked) long rasterizer_dynamic_vertices_new(
+	short type,
+	long vertex_count)
+{
+	__asm
+	{
+		push ebp
+		mov ebp, esp
+		pop ebp
+		jmp _rasterizer_dynamic_vertices_new
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+	}
+}
+
+__declspec(naked) short rasterizer_dynamic_vertices_get_type(
+	long dynamic_vertex_buffer_index)
+{
+	__asm
+	{
+		push ebp
+		mov ebp, esp
+		pop ebp
+		jmp _rasterizer_dynamic_vertices_get_type
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+	}
+}
+
+__declspec(naked) void *rasterizer_dynamic_vertices_lock(
+	long dynamic_vertex_buffer_index)
+{
+	__asm
+	{
+		push ebp
+		mov ebp, esp
+		pop ebp
+		jmp _rasterizer_dynamic_vertices_lock
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+	}
+}
+
+__declspec(naked) void rasterizer_dynamic_vertices_unlock(
+	long dynamic_vertex_buffer_index)
+{
+	__asm
+	{
+		push ebp
+		mov ebp, esp
+		pop ebp
+		jmp _rasterizer_dynamic_vertices_unlock
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+	}
+}
+
+__declspec(naked) long rasterizer_decal_vertices_new(
+	long size)
+{
+	__asm
+	{
+		push ebp
+		mov ebp, esp
+		pop ebp
+		jmp _rasterizer_decal_vertices_new
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+	}
+}
+
+__declspec(naked) void rasterizer_decal_vertices_delete(
+	long decal_vertex_buffer_index)
+{
+	__asm
+	{
+		push ebp
+		mov ebp, esp
+		pop ebp
+		jmp _rasterizer_decal_vertices_delete
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+	}
 }
 
 void rasterizer_widget_end(
