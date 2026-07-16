@@ -130,11 +130,27 @@ struct sound_class_runtime
 	short pad;
 };
 
+struct sound_class_definition
+{
+	short maximum_number_per_datum;
+	short maximum_number_per_object;
+	byte unused[0x14];
+	real minimum_distance;
+	real maximum_distance;
+	byte unused_20[8];
+	boolean disabled;
+	byte unused_29[3];
+};
+
 /* ---------- prototypes */
+
+struct sound_class_definition *sound_class_get(
+	short sound_class);
 
 /* ---------- globals */
 
 struct sound_class_runtime *sound_class_data;
+extern char const *sound_class_names[NUMBER_OF_SOUND_CLASSES];
 
 /* ---------- public code */
 
@@ -182,6 +198,54 @@ real sound_class_get_gain(
 	short index)
 {
 	return code_001b84c0(index)->current_gain;
+}
+
+void debug_sound_classes_enable(
+	char const *name,
+	boolean enable)
+{
+	short class_index;
+	char const **sound_class_name;
+
+	class_index = 0;
+	sound_class_name = sound_class_names;
+	do
+	{
+		if ((*sound_class_name)[0] && strstr(*sound_class_name, name))
+		{
+			sound_class_get(class_index)->disabled = !enable;
+		}
+		class_index++;
+		sound_class_name++;
+	}
+	while (class_index < NUMBER_OF_SOUND_CLASSES);
+
+	return;
+}
+
+void debug_sound_classes_set_distances(
+	char const *name,
+	real minimum_distance,
+	real maximum_distance)
+{
+	short class_index;
+	char const **sound_class_name;
+
+	class_index = 0;
+	sound_class_name = sound_class_names;
+	do
+	{
+		if ((*sound_class_name)[0] && strstr(*sound_class_name, name))
+		{
+			sound_class_get(class_index)->minimum_distance = minimum_distance;
+			sound_class_get(class_index)->maximum_distance = maximum_distance;
+		}
+		class_index++;
+		sound_class_name++;
+	}
+	while (class_index < NUMBER_OF_SOUND_CLASSES);
+
+	return;
 }
 
 /* ---------- private code */
