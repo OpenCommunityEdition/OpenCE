@@ -378,6 +378,34 @@ void player_control_get_unit_camera_info(
 	return;
 }
 
+real evaluate_piecewise_linear_function(
+	short count,
+	real const *function,
+	real input)
+{
+	boolean negate = TRUE;
+	short low_index;
+	short high_index;
+	real result;
+
+	if (!(input < 0.f))
+	{
+		negate = FALSE;
+	}
+	input = PIN(fabs(input) * (count - 1), 0.0, (real)count - 1.f);
+	low_index = PIN((short)input, 0, count - 1);
+	high_index = MIN(low_index + 1, count - 1);
+	match_assert("c:\\halo\\SOURCE\\game\\player_control.c", 0x14B,
+		function && low_index>=0 && low_index<=high_index && high_index<count);
+	result = (function[high_index] - function[low_index]) *
+		(input - low_index) + function[low_index];
+	if (negate)
+	{
+		result = -result;
+	}
+	return result;
+}
+
 long player_control_get_unit_index(
 	short local_player_index)
 {
