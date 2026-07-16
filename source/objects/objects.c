@@ -3688,12 +3688,7 @@ void object_delete_immediately(
 void objects_garbage_collection(
 	void)
 {
-	long garbage_object_indices[MAXIMUM_OBJECTS_PER_MAP];
-	char warningbuf[512];
-	unsigned char release_proc_working_memory[4096];
-	char released_resultbuf[512];
-
-	long garbage_collect_mode = NONE;
+	short garbage_collect_mode = NONE;
 
 	if (object_globals->force_garbage_collection)
 	{
@@ -3706,10 +3701,6 @@ void objects_garbage_collection(
 		if (memory_pool_get_contiguous_free_size(object_memory_pool)<=GARBAGE_LIMIT_FREE_MEMORY_TRIGGER)
 		{
 			garbage_collect_mode = _garbage_collect_for_space;
-		}
-		else
-		{
-			object_globals->force_garbage_collection = FALSE;
 		}
 	}
 	else
@@ -3729,103 +3720,108 @@ void objects_garbage_collection(
 	
 	if (garbage_collect_mode!=NONE)
 	{
-		short garbage_object_count = 0;
 		boolean should_collect = FALSE;
 
-		if (debug_object_garbage_collection)
 		{
-			console_printf(
-				FALSE,
-				"#%d objects using 0x%x bytes (0x%x contiguous free)",
-				object_header_data->actual_count,
-				OBJECT_MEMORY_POOL_SIZE - memory_pool_get_free_size(object_memory_pool),
-				memory_pool_get_contiguous_free_size(object_memory_pool));
-		}
+			short garbage_object_count = 0;
+			long garbage_object_indices[MAXIMUM_OBJECTS_PER_MAP];
 
-		{
-			long garbage_object_index;
-			struct object_datum *object;
-
-			for (
-				garbage_object_index = object_globals->first_garbage_object_index;
-				garbage_object_index!=NONE;
-				garbage_object_index = object->object.next_garbage_object_index)
+			if (debug_object_garbage_collection)
 			{
-				object = object_get(garbage_object_index);
-
-				match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 4289, garbage_object_count<MAXIMUM_OBJECTS_PER_MAP);
-
-				garbage_object_indices[garbage_object_count++] = garbage_object_index;
-			}
-		}
-
-		while (TRUE)
-		{
-			long object_index;
-			struct object_header_datum *header;
-			boolean garbage_collect;
-
-			switch (garbage_collect_mode)
-			{
-			case _garbage_collect_everything:
-				should_collect = FALSE;
-				break;
-			case _garbage_collect_active_objects:
-				should_collect = object_globals->active_garbage_object_count<=GARBAGE_LIMIT_ACTIVE_GARBAGE_TARGET;
-				break;
-			case _garbage_collect_for_space:
-				should_collect =
-					memory_pool_get_free_size(object_memory_pool)>=GARBAGE_LIMIT_FREE_MEMORY_TRIGGER &&
-					MAXIMUM_OBJECTS_PER_MAP-object_header_data->count>=GARBAGE_LIMIT_FREE_OBJECTS_TARGET;
-				break;
-			default:
-				match_vassert("c:\\halo\\SOURCE\\objects\\objects.c", 4314, FALSE, NULL);
-				break;
+				console_printf(
+					FALSE,
+					"#%d objects using 0x%x bytes (0x%x contiguous free)",
+					object_header_data->actual_count,
+					OBJECT_MEMORY_POOL_SIZE - memory_pool_get_free_size(object_memory_pool),
+					memory_pool_get_contiguous_free_size(object_memory_pool));
 			}
 
-			if (should_collect || garbage_object_count==0)
 			{
-				break;
-			}
-			
+				long garbage_object_index;
+				struct object_datum *object;
 
-			object_index = garbage_object_indices[--garbage_object_count];
-			header = object_header_get(object_index);
-			garbage_collect = TRUE;
-
-			if (garbage_collect_mode==_garbage_collect_active_objects)
-			{
-				garbage_collect = TEST_FLAG(header->flags, _object_header_active_bit);
-			}
-
-			if (garbage_collect && object_visible_to_any_player(object_index))
-			{
-				garbage_collect = FALSE;
-			}
-
-			if (garbage_collect)
-			{
-				struct object_datum *garbage_object = object_get(object_index);
-
-				if (TEST_FLAG(_object_mask_unit, garbage_object->object.type) &&
-					!TEST_FLAG(garbage_object->object.damage_flags, _object_dead_bit))
+				for (
+					garbage_object_index = object_globals->first_garbage_object_index;
+					garbage_object_index!=NONE;
+					garbage_object_index = object->object.next_garbage_object_index)
 				{
-					error(
-						_error_silent,
-						"WARNING: garbage collecting a living unit (%s)",
-						ai_debug_describe_actor(NONE, object_index, TRUE, temporary, NUMBEROF(temporary)));
+					object = object_get(garbage_object_index);
+
+					match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 4289, garbage_object_count<MAXIMUM_OBJECTS_PER_MAP);
+
+					garbage_object_indices[garbage_object_count++] = garbage_object_index;
+				}
+			}
+
+			while (TRUE)
+			{
+				long object_index;
+				struct object_header_datum *header;
+				boolean garbage_collect;
+
+				switch (garbage_collect_mode)
+				{
+				case _garbage_collect_everything:
+					should_collect = FALSE;
+					break;
+				case _garbage_collect_active_objects:
+					should_collect = object_globals->active_garbage_object_count<=GARBAGE_LIMIT_ACTIVE_GARBAGE_TARGET;
+					break;
+				case _garbage_collect_for_space:
+					should_collect =
+						memory_pool_get_free_size(object_memory_pool)>=GARBAGE_LIMIT_FREE_MEMORY_TRIGGER &&
+						MAXIMUM_OBJECTS_PER_MAP-object_header_data->count>=GARBAGE_LIMIT_FREE_OBJECTS_TARGET;
+					break;
+				default:
+					match_vassert("c:\\halo\\SOURCE\\objects\\objects.c", 4314, FALSE, NULL);
+					break;
+				}
+
+				if (should_collect || garbage_object_count==0)
+				{
+					break;
 				}
 
 
-				if (TEST_FLAG(header->flags, _object_header_active_bit))
+				object_index = garbage_object_indices[--garbage_object_count];
+				header = object_header_get(object_index);
+				garbage_collect = TRUE;
+
+				if (garbage_collect_mode==_garbage_collect_active_objects)
 				{
-					--object_globals->active_garbage_object_count;
+					garbage_collect = TEST_FLAG(header->flags, _object_header_active_bit);
 				}
 
-				object_set_garbage(object_index, FALSE);
-				object_delete_immediately(object_index);
+				if (object_visible_to_any_player(object_index))
+				{
+					garbage_collect = FALSE;
+				}
+
+				if (garbage_collect)
+				{
+					struct object_datum *garbage_object = object_get(object_index);
+
+					if (TEST_FLAG(_object_mask_unit, garbage_object->object.type) &&
+						!TEST_FLAG(garbage_object->object.damage_flags, _object_dead_bit))
+					{
+						error(
+							_error_silent,
+							"WARNING: garbage collecting a living unit (%s)",
+							ai_debug_describe_actor(NONE, object_index, TRUE, temporary, NUMBEROF(temporary)));
+					}
+
+
+					if (TEST_FLAG(header->flags, _object_header_active_bit))
+					{
+						--object_globals->active_garbage_object_count;
+					}
+
+					object_set_garbage(object_index, FALSE);
+					object_delete_immediately(object_index);
+				}
 			}
-		}
+
+			}
 
 		memory_pool_compact(object_memory_pool);
 		
@@ -3840,6 +3836,9 @@ void objects_garbage_collection(
 
 		if (!should_collect)
 		{
+			char warningbuf[512];
+			unsigned char release_proc_working_memory[4096];
+			char released_resultbuf[512];
 			const struct object_memory_release_function *current_release_procs = object_memory_release_procs;
 			boolean v0 = FALSE;
 			boolean garbage_collection_after_first_attempt = FALSE;
@@ -3857,7 +3856,7 @@ void objects_garbage_collection(
 					long free_objects = MAXIMUM_OBJECTS_PER_MAP-object_header_data->count;
 					boolean debug_slots_free = FALSE;
 
-					if (free_size<=GARBAGE_LIMIT_FREE_MEMORY_CRITICAL)
+					if (free_size<=GARBAGE_LIMIT_FREE_MEMORY_CRITICAL/2)
 					{
 						status_still_critical = TRUE;
 						debug_garbage_collection = TRUE;
