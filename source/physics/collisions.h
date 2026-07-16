@@ -54,9 +54,9 @@ enum
 		FLAG(_collision_test_objects_last_type_bit+1)-FLAG(_collision_test_objects_first_type_bit),
 	
 	_collision_test_environment_flags = 
-		FLAG(_collision_test_front_facing_surfaces_bit) |
 		FLAG(_collision_test_structure_bit) |
-		FLAG(_collision_test_media_bit),
+		FLAG(_collision_test_media_bit) |
+		FLAG(_collision_test_objects_bit),
 	
 	_collision_test_for_projectiles_flags = 0x1000E9,
 	_collision_test_for_projectiles_fat_flags = 0x89,
@@ -79,7 +79,8 @@ struct collision_result
 	real t;
 	real_point3d point;
 	real_plane3d plane;
-	long material_type;
+	short material_type;
+	word material_type_pad;
 	long object_index;
 	short region_index;
 	short node_index;
@@ -104,7 +105,46 @@ typedef char collision_result_material_type_offset_assert[
 
 /* ---------- prototypes/COLLISIONS.C */
 
-boolean collision_test_vector(unsigned long flags, real_point3d const *point, real_vector3d const *vector, long ignore_object_index, struct collision_result *collision);
+long collision_model_get_material_type(
+	struct collision_model const *model,
+	short material_index);
+boolean collision_test_sphere(
+	real_point3d const *center,
+	real radius);
+boolean collision_test_pill_new(
+	unsigned long flags,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real radius,
+	long ignore_object_index,
+	struct collision_result *collision);
+boolean collision_test_vector(
+	unsigned long flags,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	long ignore_object_index,
+	struct collision_result *collision);
+boolean collision_move_pill(
+	unsigned long flags,
+	real_point3d const *position,
+	real_vector3d const *velocity,
+	real height,
+	real radius,
+	long ignore_object_index,
+	real_point3d *clipped_position,
+	real_vector3d *clipped_velocity,
+	struct collision_result *collisions,
+	short *collision_count);
+boolean collision_move_sphere(
+	unsigned long flags,
+	real_point3d const *position,
+	real_vector3d const *velocity,
+	real radius,
+	long ignore_object_index,
+	real_point3d *clipped_position,
+	real_vector3d *clipped_velocity,
+	struct collision_result *collisions,
+	short *collision_count);
 
 /* ---------- globals */
 

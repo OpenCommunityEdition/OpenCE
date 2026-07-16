@@ -18,6 +18,20 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct damage_resistance_material
+{
+	char name[TAG_STRING_LENGTH+1];
+	unsigned long flags;
+	short material_type;
+	word pad;
+	long unused[8];
+};
+
+typedef char damage_resistance_material_size_assert[
+	sizeof(struct damage_resistance_material) == 0x48 ? 1 : -1];
+typedef char damage_resistance_material_type_offset_assert[
+	offsetof(struct damage_resistance_material, material_type) == 0x24 ? 1 : -1];
+
 struct damage_resistance
 {
 	unsigned long flags;
@@ -59,7 +73,7 @@ struct damage_resistance
 	unsigned long unused2[2];
 	real runtime_shield_recharge_velocity;
 	unsigned long unused[28];
-	struct tag_block materials;
+	struct tag_block materials;	// damage_resistance_material
 	struct tag_block regions;
 	struct tag_block modifiers;
 };
