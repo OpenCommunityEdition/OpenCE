@@ -160,4 +160,40 @@ void code_000a3330(
 	return;
 }
 
+void code_000a2a10(
+	void)
+{
+	return;
+}
+
+void code_000a2a20(
+	void)
+{
+	return;
+}
+
+void code_000a2a30(
+	void)
+{
+	return;
+}
+
+void code_000a2a40(
+	void)
+{
+	return;
+}
+
+void code_000a2d10(
+	void)
+{
+	return;
+}
+
+void code_000a2ea0(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
