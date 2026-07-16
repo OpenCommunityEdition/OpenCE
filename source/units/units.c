@@ -860,6 +860,21 @@ boolean unit_set_user_animation(
 	return FALSE;
 }
 
+short unit_get_animation_frames_remaining(
+	long unit_index,
+	short *animation_state)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct animation_graph *animation_graph = animation_graph_definition_get(unit->object.animation.animation_graph_index);
+	struct animation *animation = TAG_BLOCK_GET_ELEMENT(&animation_graph->animations, unit->object.animation.state.index, struct animation);
+
+	match_assert("c:\\halo\\SOURCE\\units\\units.c", 1848, animation_state);
+
+	*animation_state = unit->unit.animation.state;
+
+	return animation->frame_count - unit->object.animation.state.frame_index;
+}
+
 short unit_get_zoom_level(
 	long unit_index)
 {
@@ -979,6 +994,35 @@ void unit_set_desired_flashlight_state(
 	return;
 }
 
+void units_set_desired_flashlight_state(
+	long object_list_index,
+	boolean desired_state)
+{
+	long reference_index;
+	long unit_index = object_list_get_first(object_list_index, &reference_index);
+
+	while (unit_index!=NONE)
+	{
+		if (unit_try_and_get(unit_index)!=NULL && unit_index!=NONE)
+		{
+			struct unit_datum *unit = unit_get(unit_index);
+
+			if (desired_state)
+			{
+				SET_FLAG(unit->unit.flags, _unit_desired_integrated_light_on_bit, TRUE);
+			}
+			else
+			{
+				SET_FLAG(unit->unit.flags, _unit_desired_integrated_light_off_bit, TRUE);
+			}
+		}
+
+		unit_index = object_list_get_next(object_list_index, &reference_index);
+	}
+
+	return;
+}
+
 boolean unit_driven_by_ai(
 	long unit_index)
 {
@@ -1040,6 +1084,39 @@ long unit_scripting_unit_riders(
 	}
 
 	return object_list_index;
+}
+
+boolean unit_scripting_vehicle_test_seat(
+	long vehicle_index,
+	char const *seat_name,
+	long unit_index)
+{
+	boolean result = FALSE;
+
+	if (vehicle_index!=NONE && unit_index!=NONE)
+	{
+		short seat_index;
+		struct unit_datum *vehicle = unit_get(vehicle_index);
+		struct unit_definition *vehicle_definition = unit_definition_get(vehicle->definition_index);
+
+		for (seat_index = 0; seat_index<vehicle_definition->unit.seats.count; ++seat_index)
+		{
+			struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(&vehicle_definition->unit.seats, seat_index, struct unit_seat);
+
+			if (!_stricmp(seat_name, seat->label))
+			{
+				struct unit_datum *unit = unit_get(unit_index);
+
+				if (unit->object.parent_object_index==vehicle_index && unit->unit.parent_seat_index==seat_index)
+				{
+					result = TRUE;
+					break;
+				}
+			}
+		}
+	}
+
+	return result;
 }
 
 boolean unit_seat_filled(
@@ -1491,6 +1568,34 @@ void unit_drop_current_equipment(
 	return;
 }
 
+boolean unit_can_use_weapon(
+	long unit_index,
+	long weapon_index)
+{
+	boolean can_use_weapon;
+	char const *seat_label;
+	char const *weapon_label;
+
+	unit_get(unit_index);
+	weapon_get(weapon_index);
+
+	seat_label = unit_get_seat_label(unit_index);
+	weapon_label = weapon_get_label(weapon_index);
+
+	can_use_weapon = unit_set_or_test_seat_and_weapon_label(
+		unit_index,
+		seat_label,
+		weapon_label,
+		FALSE);
+
+	if (can_use_weapon)
+	{
+		can_use_weapon = game_engine_allow_pick_up(unit_index, weapon_index);
+	}
+
+	return can_use_weapon;
+}
+
 boolean unit_overcharged(
 	long unit_index)
 {
@@ -1503,6 +1608,29 @@ boolean unit_overcharged(
 	}
 
 	return FALSE;
+}
+
+boolean unit_solo_player_integrated_night_vision_is_active(
+	void)
+{
+	boolean active = FALSE;
+
+	if (local_player_count()==1)
+	{
+		long player_index = local_player_get_player_index(local_player_get_next(NONE));
+
+		if (player_index!=NONE)
+		{
+			long unit_index = player_get(player_index)->unit_index;
+
+			if (unit_index!=NONE)
+			{
+				active = unit_integrated_night_vision_is_active(unit_index);
+			}
+		}
+	}
+
+	return active;
 }
 
 boolean unit_has_weapon(

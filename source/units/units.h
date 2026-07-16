@@ -602,6 +602,10 @@ long unit_scripting_unit_driver(
 	long unit_index);
 long unit_scripting_unit_gunner(
 	long unit_index);
+boolean unit_scripting_vehicle_test_seat(
+	long vehicle_index,
+	char const *seat_name,
+	long unit_index);
 long unit_get_current_equipment(
 	long unit_index);
 void unit_delete_current_equipment(
@@ -674,7 +678,14 @@ boolean unit_set_seat(
 
 void unit_ready_desired_weapon(long unit_index, boolean immediate);
 
-boolean unit_can_use_weapon(long unit_index, long weapon_index);
+boolean unit_can_use_weapon(
+	long unit_index,
+	long weapon_index);
+boolean unit_solo_player_integrated_night_vision_is_active(
+	void);
+short unit_get_animation_frames_remaining(
+	long unit_index,
+	short *animation_state);
 boolean unit_overcharged(
 	long unit_index);
 boolean unit_has_weapon(
@@ -703,6 +714,9 @@ void unit_scripting_doesnt_drop_items(
 	long object_list_index);
 void unit_set_desired_flashlight_state(
 	long unit_index,
+	boolean desired_state);
+void units_set_desired_flashlight_state(
+	long object_list_index,
 	boolean desired_state);
 boolean unit_driven_by_ai(
 	long unit_index);
