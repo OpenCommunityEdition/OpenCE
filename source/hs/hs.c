@@ -2771,6 +2771,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "hs.h"
+#include "math/real_math.h"
 
 /* ---------- constants */
 
@@ -2819,12 +2820,50 @@ void evaluator( \
 	return; \
 }
 
+#define HS_EVALUATE_REAL_FROM_LONG(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	long *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		union hs_real_value result; \
+		result.real_value = function(arguments[0]); \
+		hs_return(thread_index, result.long_value); \
+	} \
+	return; \
+}
+
+#define HS_EVALUATE_REAL_FROM_UNSIGNED_SHORT(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	unsigned short *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		union hs_real_value result; \
+		result.real_value = function(arguments[0]); \
+		hs_return(thread_index, result.long_value); \
+	} \
+	return; \
+}
+
 /* ---------- structures */
 
 struct hs_object_list_get_element_arguments
 {
 	long object_list_index;
 	unsigned short element_index;
+};
+
+union hs_real_value
+{
+	real real_value;
+	long long_value;
 };
 
 /* ---------- prototypes */
@@ -2853,6 +2892,22 @@ long scripted_sound_time(
 long hs_object_list_get_element(
 	long object_list_index,
 	unsigned short element_index);
+real hs_sound_get_gain(
+	long sound_index);
+real unit_scripting_get_health(
+	long unit_index);
+real unit_scripting_get_shield(
+	long unit_index);
+real device_get_power(
+	long device_index);
+real device_get_position(
+	long device_index);
+real device_group_get_value(
+	unsigned short device_group_index);
+real ai_scripting_living_fraction(
+	long ai_reference);
+real ai_scripting_strength(
+	long ai_reference);
 void hs_object_destroy_all(
 	void);
 void numeric_countdown_timer_stop(
@@ -3070,5 +3125,14 @@ void code_000ad710(
 
 	return;
 }
+
+HS_EVALUATE_REAL_FROM_LONG(code_000ad9c0, hs_sound_get_gain)
+HS_EVALUATE_REAL_FROM_LONG(code_000aea60, unit_scripting_get_health)
+HS_EVALUATE_REAL_FROM_LONG(code_000aeaa0, unit_scripting_get_shield)
+HS_EVALUATE_REAL_FROM_LONG(code_000aee10, device_get_power)
+HS_EVALUATE_REAL_FROM_LONG(code_000aeea0, device_get_position)
+HS_EVALUATE_REAL_FROM_UNSIGNED_SHORT(code_000aef20, device_group_get_value)
+HS_EVALUATE_REAL_FROM_LONG(code_000b06f0, ai_scripting_living_fraction)
+HS_EVALUATE_REAL_FROM_LONG(code_000b0730, ai_scripting_strength)
 
 /* ---------- private code */
