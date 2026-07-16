@@ -537,6 +537,26 @@ matrix3x3_determinant(
 		- matrix->up.i * matrix->forward.k * matrix->left.j;
 }
 
+real_vector3d *matrix3x3_transform_vector(
+	real_matrix3x3 const *matrix,
+	real_vector3d const *vector,
+	real_vector3d *result)
+{
+	real_vector3d temporary;
+
+	if (vector == result)
+	{
+		temporary = *vector;
+		vector = &temporary;
+	}
+
+	result->i = matrix->up.i * vector->k + matrix->left.i * vector->j + matrix->forward.i * vector->i;
+	result->j = matrix->up.j * vector->k + matrix->forward.j * vector->i + matrix->left.j * vector->j;
+	result->k = matrix->up.k * vector->k + matrix->forward.k * vector->i + matrix->left.k * vector->j;
+
+	return result;
+}
+
 boolean valid_real_plane3d(
 	real_plane3d const *plane)
 {
