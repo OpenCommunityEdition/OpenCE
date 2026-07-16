@@ -258,6 +258,8 @@ void rasterizer_model_end(
 	void);
 void rasterizer_models_end(
 	void);
+void rasterizer_models_begin(
+	boolean skip_obscurer_test);
 void rasterizer_environment_lightmap_begin(
 	struct bitmap_data const *lightmap_bitmap);
 void rasterizer_environment_lightmap_draw(

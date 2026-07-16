@@ -299,13 +299,18 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "physics/collisions.h"
+#include "physics/collision_usage.h"
 #include "real_math.h"
 #include "rasterizer.h"
+#include "render/render.h"
 #include "saved games/game_state.h"
 
 /* ---------- constants */
 
 /* ---------- macros */
+
+#define rasterizer_model_obscurer_object_index bss_004662ec
 
 /* ---------- structures */
 
@@ -332,6 +337,15 @@ struct rasterizer_debug_options_definition
 	byte field_1C;
 	byte field_1D;
 	byte reserved1E[0x4A];
+};
+
+struct rasterizer_window_parameters
+{
+	short rasterizer_target;
+	short window_index;
+	byte reserved04[4];
+	real_point3d camera_position;
+	real_vector3d camera_forward;
 };
 
 /* ---------- prototypes */
@@ -658,6 +672,8 @@ void _rasterizer_window_end(
 	void);
 boolean _rasterizer_windows_begin(void);
 void _rasterizer_windows_end(void);
+void _rasterizer_models_begin(
+	boolean skip_obscurer_test);
 
 /* ---------- globals */
 
@@ -667,6 +683,10 @@ const struct rasterizer_global_defaults rasterizer_global_defaults =
 };
 extern struct rasterizer_globals_definition rasterizer_globals;
 extern struct rasterizer_debug_options_definition rasterizer_debug_options;
+extern struct rasterizer_window_parameters global_window_parameters;
+/* No PDB name survives for this target-owned BSS symbol. */
+long bss_004662ec;
+real_argb_color *global_rasterizer_model_ambient_reflection_tint;
 
 /* ---------- public code */
 
@@ -1605,6 +1625,45 @@ boolean rasterizer_windows_begin(void)
 void rasterizer_windows_end(void)
 {
 	_rasterizer_windows_end();
+}
+
+void rasterizer_models_begin(
+	boolean skip_obscurer_test)
+{
+	struct collision_result collision;
+	real_vector3d vector;
+
+	if (!skip_obscurer_test)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\rasterizer.c",
+			740,
+			global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
+		global_current_collision_users[global_current_collision_user_depth++] = 21;
+		vector.i = global_window_parameters.camera_forward.i * 10000.f;
+		vector.j = global_window_parameters.camera_forward.j * 10000.f;
+		vector.k = global_window_parameters.camera_forward.k * 10000.f;
+		if (collision_test_vector(
+			0xFFF80,
+			&global_window_parameters.camera_position,
+			&vector,
+			render.local_player_index,
+			&collision))
+		{
+			rasterizer_model_obscurer_object_index = collision.object_index;
+		}
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\rasterizer.c",
+			756,
+			global_current_collision_user_depth > 1);
+		--global_current_collision_user_depth;
+	}
+	else
+	{
+		rasterizer_model_obscurer_object_index = NONE;
+	}
+	_rasterizer_models_begin(skip_obscurer_test);
+	return;
 }
 
 void rasterizer_debug_immediate_point(
