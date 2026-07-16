@@ -45,12 +45,6 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct light_volume_globals
-{
-	unsigned char reserved[0xB0];
-	struct data_array *light_volumes;
-};
-
 /* ---------- prototypes */
 
 /* ---------- globals */
@@ -96,6 +90,26 @@ void light_volumes_dispose_from_old_map(
 {
 	if (bss_00456d90.light_volumes)
 		data_make_invalid(bss_00456d90.light_volumes);
+
+	return;
+}
+
+long light_volume_new(
+	long definition_index)
+{
+	long light_volume_index = datum_new(bss_00456d90.light_volumes);
+
+	if (light_volume_index != NONE)
+		light_volume_get(light_volume_index)->definition_index = definition_index;
+
+	return light_volume_index;
+}
+
+void light_volume_delete(
+	long light_volume_index)
+{
+	if (light_volume_index != NONE)
+		datum_delete(bss_00456d90.light_volumes, light_volume_index);
 
 	return;
 }
