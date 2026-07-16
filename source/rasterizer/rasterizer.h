@@ -166,6 +166,50 @@ void rasterizer_model_begin(
 	boolean is_dynamic);
 void rasterizer_model_end(
 	void);
+void rasterizer_models_end(
+	void);
+void rasterizer_environment_lightmap_end(
+	void);
+void rasterizer_environment_lightmaps_end(
+	void);
+void rasterizer_environment_diffuse_light_end(
+	void);
+void rasterizer_environment_diffuse_lights_end(
+	void);
+void rasterizer_environment_shadows_begin(
+	void);
+void rasterizer_environment_shadow_model_end(
+	void);
+void rasterizer_environment_shadow_end(
+	void);
+void rasterizer_environment_shadows_end(
+	void);
+void rasterizer_environment_diffuse_textures_end(
+	void);
+void rasterizer_environment_specular_light_end(
+	void);
+void rasterizer_environment_specular_lights_end(
+	void);
+void rasterizer_environment_specular_lightmap_end(
+	void);
+void rasterizer_environment_specular_lightmaps_end(
+	void);
+void rasterizer_environment_reflection_lightmap_mask_end(
+	void);
+void rasterizer_environment_reflection_lightmap_masks_end(
+	void);
+void rasterizer_environment_reflection_mirrors_begin(
+	void);
+void rasterizer_environment_reflection_mirrors_end(
+	void);
+void rasterizer_environment_reflections_begin(
+	void);
+void rasterizer_environment_reflections_end(
+	void);
+void rasterizer_environment_transparent_geometry_begin(
+	void);
+void rasterizer_environment_transparent_geometry_end(
+	void);
 
 /* ---------- prototypes/RASTERIZER_TEXT.C */
 
