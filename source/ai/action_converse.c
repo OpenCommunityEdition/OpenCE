@@ -31,6 +31,8 @@ symbols in this file:
 
 #include "actors.h"
 #include "ai_communication.h"
+#include "props.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
@@ -68,6 +70,42 @@ void action_converse_replace_prop(
 
 	if (state_data->run_to_prop_index == old_prop_index)
 		state_data->run_to_prop_index = new_prop_index;
+
+	return;
+}
+
+void actor_conversation_control(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->external_orders.conversation_index != NONE &&
+		actor->external_orders.conversation_attention_unit_index != NONE)
+	{
+		struct direction_specification direction;
+		long prop_index = prop_get_active_by_unit_index(
+			actor_index,
+			actor->external_orders.conversation_attention_unit_index);
+
+		if (prop_index != NONE)
+		{
+			direction.type = _direction_specification_prop;
+			direction.prop_index = prop_index;
+		}
+		else
+		{
+			direction.type = _direction_specification_point;
+			unit_get_head_position(
+				actor->external_orders.conversation_attention_unit_index,
+				&direction.point);
+		}
+
+		actor_look_secondary(
+			actor_index,
+			_secondary_look_communicating_prop,
+			_secondary_look_priority_turn_and_aim,
+			&direction);
+	}
 
 	return;
 }

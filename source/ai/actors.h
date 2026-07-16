@@ -831,6 +831,12 @@ long actor_aim_grenade(long actor_index, real_point3d const *origin, real_vector
 
 boolean actor_move_animation_busy(long actor_index);
 
+void actor_look_secondary(
+	long actor_index,
+	short type,
+	short priority,
+	struct direction_specification const *direction);
+
 void actor_move_transform_avoidance_vector(struct vector_avoidance_data *avoidance_data, real_vector3d const *avoidance_vector, real_vector3d *direction_vector);
 void actor_move_get_avoidance_direction(struct vector_avoidance_data *avoidance_data, real direction, real_vector3d *direction_vector);
 
