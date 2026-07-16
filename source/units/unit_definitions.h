@@ -52,6 +52,7 @@ enum
 {
 	_unit_seat_third_person_camera_bit = 4,
 	_unit_seat_third_person_on_enter_bit = 6,
+	_unit_seat_first_person_camera_bit = 7,
 };
 
 /* ---------- macros */

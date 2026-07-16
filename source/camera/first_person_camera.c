@@ -24,6 +24,12 @@ symbols in this file:
 
 #include "first_person_camera.h"
 
+#include "objects/objects.h"
+#include "units/unit_definitions.h"
+#include "units/units.h"
+#include "units/vehicle_definitions.h"
+#include "units/vehicles.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -41,6 +47,53 @@ void first_person_camera_new(
 {
 	match_assert("c:\\halo\\SOURCE\\camera\\first_person_camera.c", 24, camera);
 	camera->field_of_view = 0.f;
+	return;
+}
+
+void first_person_camera_deterministic(
+	long unit_index,
+	real_point3d *position,
+	real_vector3d *forward)
+{
+	struct unit_datum *unit;
+
+	unit = unit_get(unit_index);
+	unit_get_camera_position(unit_index, position);
+	*forward = unit->unit.aiming_vector;
+
+	if (unit->object.parent_object_index != NONE)
+	{
+		struct unit_datum *vehicle;
+
+		vehicle = vehicle_try_and_get(unit->object.parent_object_index);
+		if (vehicle)
+		{
+			struct unit_definition *definition;
+			struct unit_seat *seat;
+
+			definition = vehicle_definition_get(vehicle->definition_index);
+			seat = TAG_BLOCK_GET_ELEMENT(
+				&definition->unit.seats,
+				unit->unit.parent_seat_index,
+				struct unit_seat);
+
+			if (TEST_FLAG(seat->flags, _unit_seat_first_person_camera_bit))
+			{
+				struct object_marker marker;
+
+				if (object_get_marker_by_name(
+					unit->object.parent_object_index,
+					"primary trigger",
+					&marker,
+					1))
+				{
+					*position = marker.matrix.position;
+					*forward = marker.matrix.forward;
+				}
+			}
+		}
+	}
+
 	return;
 }
 

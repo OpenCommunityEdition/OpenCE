@@ -8,9 +8,15 @@ header included in hcex build.
 #define __VEHICLES_H
 #pragma once
 
+/* ---------- headers */
+
+#include "units.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
+
+#define vehicle_try_and_get(index) ((struct unit_datum *)object_try_and_get_and_verify_type(index, _object_mask_vehicle))
 
 /* ---------- structures */
 
