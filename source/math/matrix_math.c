@@ -492,6 +492,39 @@ real_vector3d *matrix4x3_inverse_transform_vector(
 	return result;
 }
 
+real_plane3d *matrix4x3_transform_plane(
+	real_matrix4x3 const *matrix,
+	real_plane3d const *plane,
+	real_plane3d *result)
+{
+	matrix4x3_transform_normal(matrix, &plane->n, &result->n);
+	result->d = plane->d * matrix->scale + dot_product3d((real_vector3d const *)&matrix->position, &result->n);
+
+	return result;
+}
+
+real_plane3d *matrix4x3_inverse_transform_plane(
+	real_matrix4x3 const *matrix,
+	real_plane3d const *plane,
+	real_plane3d *result)
+{
+	if (matrix->scale != 0.f)
+	{
+		result->d = plane->d - dot_product3d((real_vector3d const *)&matrix->position, &plane->n);
+
+		if (matrix->scale != 1.f)
+			result->d /= matrix->scale;
+	}
+	else
+	{
+		result->d = 0.f;
+	}
+
+	matrix4x3_inverse_transform_vector(matrix, &plane->n, &result->n);
+
+	return result;
+}
+
 real
 matrix3x3_determinant(
 	real_matrix3x3 const *matrix)
