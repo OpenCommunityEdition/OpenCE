@@ -273,6 +273,13 @@ void rasterizer_environment_shadow_model_end(
 	void);
 void rasterizer_environment_shadow_end(
 	void);
+void rasterizer_environment_shadow_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
 void rasterizer_environment_shadows_end(
 	void);
 void rasterizer_environment_diffuse_textures_end(
