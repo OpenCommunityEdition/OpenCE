@@ -3039,6 +3039,66 @@ void evaluator( \
 	return; \
 }
 
+#define HS_EVALUATE_VOID_UNSIGNED_SHORT(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	union hs_evaluation_argument *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		function(arguments[0].unsigned_short_value); \
+		hs_return(thread_index, 0); \
+	} \
+	return; \
+}
+
+#define HS_EVALUATE_VOID_BOOLEAN(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	union hs_evaluation_argument *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		function(arguments[0].boolean_value); \
+		hs_return(thread_index, 0); \
+	} \
+	return; \
+}
+
+#define HS_EVALUATE_VOID_STRING(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	struct hs_arguments_string *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		function(arguments->value); \
+		hs_return(thread_index, 0); \
+	} \
+	return; \
+}
+
+#define HS_EVALUATE_VOID_LONG_STRING(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	struct hs_arguments_long_string *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		function(arguments->value0, arguments->value1); \
+		hs_return(thread_index, 0); \
+	} \
+	return; \
+}
+
 #define HS_EVALUATE_RETURN_BOOLEAN(evaluator, arguments_type, expression) \
 void evaluator( \
 	short function_index, \
@@ -3111,6 +3171,17 @@ struct hs_arguments_long_word
 {
 	long value0;
 	word value1;
+};
+
+struct hs_arguments_string
+{
+	char const *value;
+};
+
+struct hs_arguments_long_string
+{
+	long value0;
+	char const *value1;
 };
 
 struct hs_arguments_long_long
@@ -3599,6 +3670,95 @@ void ai_scripting_playfight(
 void ai_scripting_vehicle_encounter(
 	long vehicle_index,
 	long encounter_index);
+void ai_scripting_vehicle_enterable_team(
+	long object_list_index,
+	unsigned short team);
+void ai_scripting_vehicle_enterable_actor_type(
+	long object_list_index,
+	unsigned short actor_type);
+void ai_scripting_vehicle_enterable_actors(
+	long vehicle_index,
+	long actor_list_index);
+void ai_scripting_vehicle_enterable_disable(
+	long vehicle_index);
+void ai_scripting_look_at_object(
+	long ai_index,
+	long object_index);
+void ai_scripting_stop_looking(
+	long ai_index);
+void ai_scripting_automatic_migration_target(
+	long ai_index,
+	boolean enable);
+void ai_scripting_follow_target_disable(
+	long ai_index);
+void ai_scripting_follow_target_players(
+	long ai_index);
+void ai_scripting_follow_target_unit(
+	long ai_index,
+	long unit_index);
+void ai_scripting_follow_target_ai(
+	long ai_index,
+	long target_ai_index);
+void ai_scripting_conversation_stop(
+	unsigned short conversation_index);
+void ai_scripting_conversation_advance(
+	unsigned short conversation_index);
+void ai_scripting_link_activation(
+	long source_ai_index,
+	long target_ai_index);
+void ai_scripting_berserk(
+	long ai_index,
+	boolean enable);
+void ai_scripting_set_team(
+	long ai_index,
+	unsigned short team);
+void ai_scripting_allow_charge(
+	long ai_index,
+	boolean allow_charge);
+void ai_scripting_allow_dormant(
+	long ai_index,
+	boolean allow_dormant);
+void scripted_camera_set_first_person(
+	long object_index);
+void scripted_camera_set_dead(
+	long object_index);
+void game_set_game_variant_from_name(
+	char const *name);
+void player_input_enable(
+	boolean enable);
+void main_set_map_name(
+	char const *map_name);
+void main_set_multiplayer_map_name(
+	char const *map_name);
+void main_set_difficulty(
+	unsigned short difficulty);
+void main_crash(
+	char const *reason);
+void debug_dump_memory_for_file(
+	char const *file_name);
+void profile_dump_to_file(
+	char const *file_name);
+void profile_sections_activate(
+	char const *section_name);
+void profile_sections_deactivate(
+	char const *section_name);
+void profile_graph_toggle(
+	char const *graph_name);
+void debug_pvs(
+	boolean enable);
+void ai_debug_vocalize(
+	long ai_index,
+	char const *vocalization);
+void ai_debug_teleport_to(
+	long ai_index);
+void ai_debug_speak(
+	char const *vocalization);
+void ai_debug_speak_list(
+	char const *list_name);
+void cinematic_show_letterbox(
+	boolean show);
+void cinematic_set_title(
+	unsigned short title_index);
 
 /* ---------- globals */
 
@@ -3794,6 +3954,44 @@ HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(code_000aff90, ai_scripting_set_return_stat
 HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(code_000affd0, ai_scripting_set_current_state)
 HS_EVALUATE_VOID_LONG_BOOLEAN(code_000b0010, ai_scripting_playfight)
 HS_EVALUATE_VOID_LONG_LONG(code_000b0070, ai_scripting_vehicle_encounter)
+HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(code_000b00f0, ai_scripting_vehicle_enterable_team)
+HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(code_000b0130, ai_scripting_vehicle_enterable_actor_type)
+HS_EVALUATE_VOID_LONG_LONG(code_000b0170, ai_scripting_vehicle_enterable_actors)
+HS_EVALUATE_VOID_LONG(code_000b01b0, ai_scripting_vehicle_enterable_disable)
+HS_EVALUATE_VOID_LONG_LONG(code_000b01f0, ai_scripting_look_at_object)
+HS_EVALUATE_VOID_LONG(code_000b0230, ai_scripting_stop_looking)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000b0270, ai_scripting_automatic_migration_target)
+HS_EVALUATE_VOID_LONG(code_000b02b0, ai_scripting_follow_target_disable)
+HS_EVALUATE_VOID_LONG(code_000b02f0, ai_scripting_follow_target_players)
+HS_EVALUATE_VOID_LONG_LONG(code_000b0330, ai_scripting_follow_target_unit)
+HS_EVALUATE_VOID_LONG_LONG(code_000b0370, ai_scripting_follow_target_ai)
+HS_EVALUATE_VOID_UNSIGNED_SHORT(code_000b03f0, ai_scripting_conversation_stop)
+HS_EVALUATE_VOID_UNSIGNED_SHORT(code_000b0430, ai_scripting_conversation_advance)
+HS_EVALUATE_VOID_LONG_LONG(code_000b0470, ai_scripting_link_activation)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000b04b0, ai_scripting_berserk)
+HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(code_000b04f0, ai_scripting_set_team)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000b0530, ai_scripting_allow_charge)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000b0570, ai_scripting_allow_dormant)
+HS_EVALUATE_VOID_LONG(code_000b0ae0, scripted_camera_set_first_person)
+HS_EVALUATE_VOID_LONG(code_000b0b20, scripted_camera_set_dead)
+HS_EVALUATE_VOID_STRING(code_000b0c10, game_set_game_variant_from_name)
+HS_EVALUATE_VOID_BOOLEAN(code_000b0cf0, player_input_enable)
+HS_EVALUATE_VOID_STRING(code_000b10b0, main_set_map_name)
+HS_EVALUATE_VOID_STRING(code_000b10f0, main_set_multiplayer_map_name)
+HS_EVALUATE_VOID_UNSIGNED_SHORT(code_000b1130, main_set_difficulty)
+HS_EVALUATE_VOID_STRING(code_000b1170, main_crash)
+HS_EVALUATE_VOID_STRING(code_000b12e0, debug_dump_memory_for_file)
+HS_EVALUATE_VOID_STRING(code_000b1360, profile_dump_to_file)
+HS_EVALUATE_VOID_STRING(code_000b13a0, profile_sections_activate)
+HS_EVALUATE_VOID_STRING(code_000b13e0, profile_sections_deactivate)
+HS_EVALUATE_VOID_STRING(code_000b1420, profile_graph_toggle)
+HS_EVALUATE_VOID_BOOLEAN(code_000b1460, debug_pvs)
+HS_EVALUATE_VOID_LONG_STRING(code_000b1540, ai_debug_vocalize)
+HS_EVALUATE_VOID_LONG(code_000b1580, ai_debug_teleport_to)
+HS_EVALUATE_VOID_STRING(code_000b15c0, ai_debug_speak)
+HS_EVALUATE_VOID_STRING(code_000b1600, ai_debug_speak_list)
+HS_EVALUATE_VOID_BOOLEAN(code_000b1760, cinematic_show_letterbox)
+HS_EVALUATE_VOID_UNSIGNED_SHORT(code_000b17a0, cinematic_set_title)
 HS_EVALUATE_RETURN_BOOLEAN(code_000ad290, struct hs_arguments_boolean, (hs_not(arguments->value)))
 HS_EVALUATE_RETURN_BOOLEAN(code_000ad380, struct hs_arguments_short_long, (scenario_trigger_volume_test_object(arguments->value0, arguments->value1)))
 HS_EVALUATE_RETURN_BOOLEAN(code_000ad3d0, struct hs_arguments_short_long, (hs_trigger_volume_test_objects_any(arguments->value0, arguments->value1)))
