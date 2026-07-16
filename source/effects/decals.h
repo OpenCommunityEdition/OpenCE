@@ -24,5 +24,7 @@ void decals_dispose(
 	void);
 void decals_dispose_from_old_map(
 	void);
+void decals_delete_permanent_from_cluster(
+	short cluster_index);
 
 #endif // __DECALS_H

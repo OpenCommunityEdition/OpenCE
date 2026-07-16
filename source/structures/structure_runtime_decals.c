@@ -29,9 +29,12 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "effects/decals.h"
 #include "math/real_math.h"
 #include "saved games/game_state.h"
+#include "scenario/scenario.h"
 #include "structures.h"
+#include "structure_bsp_definitions.h"
 
 /* ---------- constants */
 
@@ -43,6 +46,14 @@ struct structure_decals_globals
 {
 	boolean reconnect_to_structure_bsp;
 	byte pad[3];
+};
+
+struct structure_cluster_runtime_decals
+{
+	byte unused[0xC];
+	short first_decal_index;
+	word decal_count;
+	byte unused2[0x58];
 };
 
 /* ---------- prototypes */
@@ -76,6 +87,41 @@ void structure_decals_reconnect_to_structure_bsp(
 {
 	match_assert("c:\\halo\\SOURCE\\structures\\structure_runtime_decals.c", 0x2d, structure_decals_globals);
 	structure_decals_globals->reconnect_to_structure_bsp = TRUE;
+
+	return;
+}
+
+void structure_decals_disconnect_from_structure_bsp(
+	void)
+{
+	struct structure_bsp *structure_bsp = global_structure_bsp_get();
+
+	if (structure_bsp->runtime_decals.count)
+	{
+		struct tag_block *clusters = &structure_bsp->clusters;
+		short cluster_index = 0;
+		short const cluster_count = (short)structure_bsp->clusters.count;
+
+		if (cluster_index < cluster_count)
+		{
+			long element_index = 0;
+			do
+			{
+				struct structure_cluster_runtime_decals *cluster = TAG_BLOCK_GET_ELEMENT(
+					clusters,
+					element_index,
+					struct structure_cluster_runtime_decals);
+
+				if (cluster->first_decal_index != NONE && cluster->decal_count)
+				{
+					decals_delete_permanent_from_cluster(cluster_index);
+				}
+
+				cluster_index++;
+				element_index++;
+			} while (cluster_index < cluster_count);
+		}
+	}
 
 	return;
 }
