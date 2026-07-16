@@ -802,7 +802,8 @@ long find_objects_from_point_vector(
 
 		if (cluster_index!=NONE)
 		{
-			unsigned long* cluster_pvs;
+			unsigned long *cluster_pvs;
+			unsigned long *cluster_pvs_word;
 			short i;
 			short bit_vector_size;
 
@@ -810,40 +811,48 @@ long find_objects_from_point_vector(
 
 			cluster_pvs = structure_bsp_get_cluster_pvs(global_structure_bsp_get(), cluster_index);
 			bit_vector_size = BIT_VECTOR_SIZE_IN_LONGS(global_structure_bsp_get()->clusters.count);
+			cluster_pvs_word = cluster_pvs;
 
-			for (i =0; i<bit_vector_size; ++i)
+			i = 0;
+			if (i<bit_vector_size)
 			{
-				if (cluster_pvs[i])
+				do
 				{
-					short j;
-
-					short offset = (LONG_BITS * i);
-					short size = MIN(offset + LONG_BITS, global_structure_bsp_get()->clusters.count);
-
-					for (j = offset; j<size; ++j)
+					if (*cluster_pvs_word)
 					{
-						if (BIT_VECTOR_TEST_FLAG(cluster_pvs, j))
+						short offset = (LONG_BITS * i);
+						short size = MIN(offset + LONG_BITS, global_structure_bsp_get()->clusters.count);
+						short j;
+
+						for (j = offset; j<size; ++j, ++offset)
 						{
-							long reference;
-							long k;
-							for (k = cluster_get_first_collideable_object(&reference, j);
-								k!=NONE;
-								k = cluster_get_next_collideable_object(&reference))
+							if (BIT_VECTOR_TEST_FLAG(cluster_pvs, offset))
 							{
-								if (object_mark_function(k))
+								long reference;
+								long k;
+								for (k = cluster_get_first_collideable_object(&reference, j);
+									k!=NONE;
+									k = cluster_get_next_collideable_object(&reference))
 								{
-									state = recursive_object_adder(
-										k,
-										add_object_function,
-										custom_data,
-										state,
-										maximum_object_count,
-										object_indices);
+									if (object_mark_function(k))
+									{
+										state = recursive_object_adder(
+											k,
+											add_object_function,
+											custom_data,
+											state,
+											maximum_object_count,
+											object_indices);
+									}
 								}
 							}
 						}
 					}
+
+					i++;
+					cluster_pvs_word++;
 				}
+				while (i<bit_vector_size);
 			}
 
 			object_marker_end();
