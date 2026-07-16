@@ -449,7 +449,10 @@ void _rasterizer_windows_end(void);
 
 /* ---------- globals */
 
-extern struct rasterizer_global_defaults rasterizer_global_defaults;
+const struct rasterizer_global_defaults rasterizer_global_defaults =
+{
+	{ 0.0625f, 1024.f, 0.01171875f, 1024.f }
+};
 extern struct rasterizer_globals_definition rasterizer_globals;
 extern struct rasterizer_debug_options_definition rasterizer_debug_options;
 
