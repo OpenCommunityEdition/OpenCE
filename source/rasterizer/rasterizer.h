@@ -310,7 +310,12 @@ void rasterizer_debug_end(
 
 /* ---------- prototypes/RASTERIZER_TEXT.C */
 
-void rasterizer_text_cache_flush(void);
+void rasterizer_text_set_shadow_color(
+	pixel32 shadow_color);
+void rasterizer_text_cache_flush(
+	void);
+void rasterizer_text_cache_dispose(
+	void);
 
 /* ---------- globals */
 

@@ -62,16 +62,113 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "bitmaps/bitmap_group.h"
+#include "math/integer_math.h"
+
 /* ---------- constants */
+
+enum
+{
+	HARDWARE_CHARACTER_CACHE_BITMAP_WIDTH = 128,
+	HARDWARE_CHARACTER_CACHE_BITMAP_HEIGHT = 128,
+	MAXIMUM_HARDWARE_CHARACTERS = 256,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct font_character
+{
+	byte unused[0xC];
+	short hardware_character_index;
+};
+
+struct hardware_character
+{
+	struct font_character *character;
+	short x;
+	short y;
+};
+
+struct hardware_character_cache
+{
+	boolean initialized;
+	byte unused1;
+	unsigned short read_index;
+	unsigned short write_index;
+	short x;
+	short y;
+	short maximum_character_height;
+	struct bitmap_data *bitmap;
+	struct hardware_character characters[MAXIMUM_HARDWARE_CHARACTERS];
+	pixel32 shadow_color;
+	short unused814;
+};
+
 /* ---------- prototypes */
+
+void bitmap_delete(
+	struct bitmap_data *bitmap);
 
 /* ---------- globals */
 
+extern struct hardware_character_cache bss_004b82c0;
+
 /* ---------- public code */
 
+void
+rasterizer_text_set_shadow_color(
+	pixel32 shadow_color)
+{
+	bss_004b82c0.shadow_color = shadow_color;
+
+	return;
+}
+
+void
+rasterizer_text_cache_flush(
+	void)
+{
+	struct hardware_character *hardware_character;
+	long hardware_character_count;
+
+	if (bss_004b82c0.initialized)
+	{
+		hardware_character = bss_004b82c0.characters;
+		hardware_character_count = MAXIMUM_HARDWARE_CHARACTERS;
+		do
+		{
+			if (hardware_character->character)
+				hardware_character->character->hardware_character_index = NONE;
+			hardware_character->character = NULL;
+			hardware_character++;
+		} while (--hardware_character_count);
+	}
+
+	return;
+}
+
+void
+rasterizer_text_cache_dispose(
+	void)
+{
+	if (bss_004b82c0.initialized)
+	{
+		rasterizer_text_cache_flush();
+		bitmap_delete(bss_004b82c0.bitmap);
+		bss_004b82c0.initialized = FALSE;
+	}
+
+	return;
+}
+
 /* ---------- private code */
+
+struct bitmap_data *
+code_00172fa0(
+	void)
+{
+	return bss_004b82c0.initialized ? bss_004b82c0.bitmap : NULL;
+}
