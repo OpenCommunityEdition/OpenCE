@@ -380,6 +380,62 @@ real_point3d *matrix4x3_transform_point(
 	return result;
 }
 
+real_vector3d *matrix4x3_transform_vector(
+	real_matrix4x3 const *matrix,
+	real_vector3d const *vector,
+	real_vector3d *result)
+{
+	real i = vector->i;
+	real j = vector->j;
+	real k = vector->k;
+
+	if (matrix->scale != 1.f)
+	{
+		i *= matrix->scale;
+		j *= matrix->scale;
+		k *= matrix->scale;
+	}
+
+	result->i = i*matrix->forward.i + j*matrix->left.i + k*matrix->up.i;
+	result->j = i*matrix->forward.j + j*matrix->left.j + k*matrix->up.j;
+	result->k = i*matrix->forward.k + j*matrix->left.k + k*matrix->up.k;
+
+	return result;
+}
+
+real_point3d *matrix4x3_inverse_transform_point(
+	real_matrix4x3 const *matrix,
+	real_point3d const *point,
+	real_point3d *result)
+{
+	if (matrix->scale != 0.f)
+	{
+		real x = point->x - matrix->position.x;
+		real y = point->y - matrix->position.y;
+		real z = point->z - matrix->position.z;
+
+		if (matrix->scale != 1.f)
+		{
+			real scale = 1.f / matrix->scale;
+			x *= scale;
+			y *= scale;
+			z *= scale;
+		}
+
+		result->x = x * matrix->forward.i + y * matrix->forward.j + z * matrix->forward.k;
+		result->y = x * matrix->left.i + y * matrix->left.j + z * matrix->left.k;
+		result->z = x * matrix->up.i + y * matrix->up.j + z * matrix->up.k;
+	}
+	else
+	{
+		result->x = 0.f;
+		result->y = 0.f;
+		result->z = 0.f;
+	}
+
+	return result;
+}
+
 real_vector3d *matrix4x3_transform_normal(
 	real_matrix4x3 const *matrix,
 	real_vector3d const *normal,
@@ -404,6 +460,30 @@ matrix4x3_inverse_transform_normal(
 	real i = normal->i;
 	real j = normal->j;
 	real k = normal->k;
+
+	result->i = i * matrix->forward.i + j * matrix->forward.j + k * matrix->forward.k;
+	result->j = i * matrix->left.i + j * matrix->left.j + k * matrix->left.k;
+	result->k = i * matrix->up.i + j * matrix->up.j + k * matrix->up.k;
+
+	return result;
+}
+
+real_vector3d *matrix4x3_inverse_transform_vector(
+	real_matrix4x3 const *matrix,
+	real_vector3d const *vector,
+	real_vector3d *result)
+{
+	real i = vector->i;
+	real j = vector->j;
+	real k = vector->k;
+
+	if (matrix->scale != 1.f)
+	{
+		real scale = 1.f / matrix->scale;
+		i *= scale;
+		j *= scale;
+		k *= scale;
+	}
 
 	result->i = i * matrix->forward.i + j * matrix->forward.j + k * matrix->forward.k;
 	result->j = i * matrix->left.i + j * matrix->left.j + k * matrix->left.k;
