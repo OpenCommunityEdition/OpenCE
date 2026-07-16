@@ -579,6 +579,25 @@ void scripting_set_magic_base_seat(
 	char const *seat_name);
 void unit_stop_running_blindly(
 	long unit_index);
+void unit_set_emotion(
+	long unit_index,
+	word emotion_index);
+boolean unit_is_playing_custom_animation(
+	long unit_index);
+boolean unit_flying_through_air(
+	long unit_index);
+void unit_stop_custom_animation(
+	long unit_index);
+boolean unit_melee_attack_begin(
+	long unit_index,
+	boolean continuous,
+	real_vector2d const *alignment_vector);
+void scripting_magic_melee_attack(
+	void);
+boolean unit_try_and_exit_seat(
+	long unit_index);
+void unit_scripting_exit_vehicle(
+	long unit_index);
 boolean unit_clip_to_aiming_bounds(long unit_index, real_vector3d *vector, boolean use_aiming_screen);
 long unit_inventory_get_weapon(long unit_index, short index);
 short unit_inventory_next_grenade(long unit_index, short current_index, short delta);

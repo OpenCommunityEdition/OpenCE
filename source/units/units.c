@@ -933,6 +933,79 @@ void unit_stop_running_blindly(
 	return;
 }
 
+void unit_set_emotion(
+	long unit_index,
+	word emotion_index)
+{
+	if (unit_index!=NONE)
+	{
+		unit_get(unit_index)->unit.animation.emotion_index = emotion_index;
+		object_start_interpolation(unit_index, 6);
+	}
+
+	return;
+}
+
+boolean unit_is_playing_custom_animation(
+	long unit_index)
+{
+	if (unit_index!=NONE)
+	{
+		return unit_get(unit_index)->unit.animation.state==_unit_state_user_animation;
+	}
+
+	return FALSE;
+}
+
+boolean unit_flying_through_air(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	boolean flying_through_air = FALSE;
+
+	if (unit->object.type==_object_type_biped)
+	{
+		flying_through_air = biped_flying_through_air(unit_index);
+	}
+
+	return flying_through_air;
+}
+
+void unit_stop_custom_animation(
+	long unit_index)
+{
+	if (unit_index!=NONE && unit_get(unit_index)->unit.animation.state==_unit_state_user_animation)
+	{
+		unit_animation_set_state(unit_index, _unit_state_idle);
+	}
+
+	return;
+}
+
+void scripting_magic_melee_attack(
+	void)
+{
+	unit_melee_attack_begin(player_get(0)->unit_index, FALSE, 0);
+
+	return;
+}
+
+void unit_scripting_exit_vehicle(
+	long unit_index)
+{
+	if (unit_index!=NONE)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+
+		if (unit->object.parent_object_index!=NONE && unit->unit.parent_seat_index!=NONE)
+		{
+			unit_try_and_exit_seat(unit_index);
+		}
+	}
+
+	return;
+}
+
 void unit_abort_animation(
 	long unit_index)
 {
