@@ -2807,17 +2807,52 @@ void evaluator( \
 	return; \
 }
 
+#define HS_EVALUATE_LONG_FROM_LONG(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	long *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+		hs_return(thread_index, function(arguments[0])); \
+	return; \
+}
+
 /* ---------- structures */
+
+struct hs_object_list_get_element_arguments
+{
+	long object_list_index;
+	unsigned short element_index;
+};
 
 /* ---------- prototypes */
 
 void hs_return(
 	long thread_index,
 	long value);
+void *hs_macro_function_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
 long hs_players(
 	void);
 long game_time_get(
 	void);
+long unit_scripting_unit_riders(
+	long unit_index);
+long unit_scripting_unit_driver(
+	long unit_index);
+long unit_scripting_unit_gunner(
+	long unit_index);
+long object_list_from_ai_reference(
+	long ai_reference);
+long scripted_sound_time(
+	long sound_index);
+long hs_object_list_get_element(
+	long object_list_index,
+	unsigned short element_index);
 void hs_object_destroy_all(
 	void);
 void numeric_countdown_timer_stop(
@@ -3012,5 +3047,28 @@ HS_EVALUATE_NO_OP(code_000b14c0)
 HS_EVALUATE_NO_OP(code_000b14e0)
 HS_EVALUATE_RETURN_LONG(code_000ad320, hs_players)
 HS_EVALUATE_RETURN_LONG(code_000b0c50, game_time_get)
+HS_EVALUATE_LONG_FROM_LONG(code_000ae9a0, unit_scripting_unit_riders)
+HS_EVALUATE_LONG_FROM_LONG(code_000ae9e0, unit_scripting_unit_driver)
+HS_EVALUATE_LONG_FROM_LONG(code_000aea20, unit_scripting_unit_gunner)
+HS_EVALUATE_LONG_FROM_LONG(code_000b0810, object_list_from_ai_reference)
+HS_EVALUATE_LONG_FROM_LONG(code_000b1c20, scripted_sound_time)
+
+void code_000ad710(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_object_list_get_element_arguments *arguments;
+
+	arguments = hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		hs_return(
+			thread_index,
+			hs_object_list_get_element(arguments->object_list_index, arguments->element_index));
+	}
+
+	return;
+}
 
 /* ---------- private code */
