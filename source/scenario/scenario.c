@@ -165,9 +165,11 @@ symbols in this file:
 #include "scenario.h"
 
 #include "game/game_globals.h"
+#include "objects/objects.h"
 #include "physics/bsp3d.h"
 #include "physics/collision_bsp_definitions.h"
 #include "scenario_definitions.h"
+#include "sky_definitions.h"
 #include "scenario/wind.h"
 
 /* ---------- constants */
@@ -259,6 +261,51 @@ long global_structure_bsp_tag_index_get(
 		struct scenario_structure_bsp_reference);
 
 	return reference->structure_bsp.index;
+}
+
+void scenario_location_award_bonus(
+	struct location *location)
+{
+	location->bonus = NONE;
+
+	return;
+}
+
+long scenario_get_sky_definition_index(
+	short sky_index)
+{
+	struct scenario *scenario = global_scenario_get();
+	long definition_index = NONE;
+
+	if (sky_index >= 0 && sky_index < scenario->sky_references.count)
+	{
+		struct tag_reference *sky_reference = TAG_BLOCK_GET_ELEMENT(
+			&scenario->sky_references,
+			sky_index,
+			struct tag_reference);
+
+		definition_index = sky_reference->index;
+	}
+
+	return definition_index;
+}
+
+struct sky *scenario_get_sky(
+	short sky_index)
+{
+	long definition_index = scenario_get_sky_definition_index(sky_index);
+	struct sky *sky = NULL;
+
+	if (definition_index != NONE)
+		sky = sky_definition_get(definition_index);
+
+	return sky;
+}
+
+short global_structure_bsp_index_get(
+	void)
+{
+	return global_structure_bsp_index;
 }
 
 long scenario_leaf_index_from_point(

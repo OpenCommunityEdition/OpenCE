@@ -91,7 +91,7 @@ struct scenario
 	struct tag_reference ugly_structure_bsp;
 	struct tag_reference unloved_globals;
 	struct tag_reference bad_sky;
-	struct tag_block sky_references;
+	struct tag_block sky_references; // tag_reference
 	short type;
 	word flags;
 	struct tag_block scenario_references;
