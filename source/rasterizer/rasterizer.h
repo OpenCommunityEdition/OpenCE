@@ -108,6 +108,8 @@ struct rasterizer_window_begin_parameters
 
 void rasterizer_reset_state(
 	void);
+void rasterizer_widget_end(
+	void);
 
 boolean rasterizer_initialize(void);
 

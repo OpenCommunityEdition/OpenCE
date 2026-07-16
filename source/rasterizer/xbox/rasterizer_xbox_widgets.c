@@ -84,4 +84,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+void _rasterizer_widget_end(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */

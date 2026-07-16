@@ -312,6 +312,8 @@ symbols in this file:
 
 void _rasterizer_reset_state(
 	void);
+void _rasterizer_widget_end(
+	void);
 
 void _rasterizer_decals_update_function_pointers(void);
 void _rasterizer_decals_initialize(
@@ -369,6 +371,13 @@ void rasterizer_reset_state(
 	void)
 {
 	_rasterizer_reset_state();
+	return;
+}
+
+void rasterizer_widget_end(
+	void)
+{
+	_rasterizer_widget_end();
 	return;
 }
 
