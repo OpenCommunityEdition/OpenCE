@@ -60,6 +60,40 @@ void action_converse_update(
 	return;
 }
 
+void action_converse_control(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct converse_state_data *state_data = &actor->state.action_data.converse;
+	struct ai_conversation_datum_header *conversation = NULL;
+	long prop_index = NONE;
+
+	if (state_data->conversation_index != NONE)
+		conversation = ai_conversation_header_get(state_data->conversation_index);
+
+	if (state_data->run_to_prop_index != NONE)
+	{
+		prop_index = state_data->run_to_prop_index;
+	}
+	else if (conversation && conversation->unit_index != NONE)
+	{
+		prop_index = prop_get_active_by_unit_index(
+			actor_index,
+			conversation->unit_index);
+	}
+
+	actor->orders.look.idle_look_type = 1;
+
+	if (prop_index != NONE)
+	{
+		actor->orders.look.primary_priority = _primary_priority_aiming;
+		actor->orders.look.primary_direction.type = _direction_specification_prop;
+		actor->orders.look.primary_direction.prop_index = prop_index;
+	}
+
+	return;
+}
+
 void action_converse_replace_prop(
 	long actor_index,
 	long old_prop_index,
