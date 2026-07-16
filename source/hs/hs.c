@@ -2787,6 +2787,26 @@ void evaluator( \
 	return; \
 }
 
+#define HS_EVALUATE_NO_OP(evaluator) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	hs_return(thread_index, 0); \
+	return; \
+}
+
+#define HS_EVALUATE_RETURN_LONG(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	hs_return(thread_index, function()); \
+	return; \
+}
+
 /* ---------- structures */
 
 /* ---------- prototypes */
@@ -2794,6 +2814,10 @@ void evaluator( \
 void hs_return(
 	long thread_index,
 	long value);
+long hs_players(
+	void);
+long game_time_get(
+	void);
 void hs_object_destroy_all(
 	void);
 void numeric_countdown_timer_stop(
@@ -2982,5 +3006,11 @@ HS_EVALUATE_NO_ARGUMENTS(code_000b2c30, player_ui_fast_setup_network_server)
 HS_EVALUATE_NO_ARGUMENTS(code_000b2c50, player_ui_activate_all_solo_levels)
 HS_EVALUATE_NO_ARGUMENTS(code_000b2d90, network_game_client_request_immediate_start)
 HS_EVALUATE_NO_ARGUMENTS(code_000b4390, hs_doc)
+HS_EVALUATE_NO_OP(code_000b1320)
+HS_EVALUATE_NO_OP(code_000b14a0)
+HS_EVALUATE_NO_OP(code_000b14c0)
+HS_EVALUATE_NO_OP(code_000b14e0)
+HS_EVALUATE_RETURN_LONG(code_000ad320, hs_players)
+HS_EVALUATE_RETURN_LONG(code_000b0c50, game_time_get)
 
 /* ---------- private code */
