@@ -544,6 +544,14 @@ void unit_get_facing_vector(long unit_index, real_vector3d *facing_vector);
 boolean unit_clip_to_aiming_bounds(long unit_index, real_vector3d *vector, boolean use_aiming_screen);
 long unit_inventory_get_weapon(long unit_index, short index);
 short unit_inventory_next_grenade(long unit_index, short current_index, short delta);
+boolean unit_has_weapon_definition_index(
+	long unit_index,
+	long weapon_definition_index);
+boolean unit_start_user_animation(
+	long unit_index,
+	long animation_graph_index,
+	char const *animation_name,
+	boolean interpolate);
 
 void unit_ready_desired_weapon(long unit_index, boolean immediate);
 
