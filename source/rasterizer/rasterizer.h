@@ -124,6 +124,44 @@ void rasterizer_frame_end(void);
 
 void rasterizer_present(struct bitmap_data *screenshot_bitmap, const point2d *screenshot_index);
 void rasterizer_dispose(void);
+void rasterizer_window_get_fog(
+	struct render_fog *fog);
+void rasterizer_window_set_fog(
+	struct render_fog const *fog);
+void rasterizer_set_vblank_callback(
+	void (*callback)(unsigned long));
+long rasterizer_dynamic_triangles_new(
+	long triangle_count);
+void rasterizer_dynamic_triangles_delete(
+	long triangle_buffer_index);
+void rasterizer_dynamic_vertices_delete(
+	long dynamic_vertex_buffer_index);
+void rasterizer_debug_immediate_line(
+	real_point3d const *p0,
+	real_point3d const *p1,
+	real_rgb_color const *color0,
+	real_rgb_color const *color1);
+void rasterizer_debug_immediate_triangle(
+	real_point3d const *p0,
+	real_point3d const *p1,
+	real_point3d const *p2,
+	real_rgb_color const *color0,
+	real_rgb_color const *color1,
+	real_rgb_color const *color2);
+void rasterizer_debug_immediate_line_screenspace(
+	point2d const *p0,
+	point2d const *p1,
+	real_rgb_color const *color0,
+	real_rgb_color const *color1);
+void rasterizer_debug_immediate_linestrip_screenspace(
+	point2d const *points,
+	short point_count,
+	real_rgb_color const *color);
+void *rasterizer_decal_vertices_lock(
+	short cache_index,
+	unsigned long cache_size);
+void rasterizer_decal_vertices_unlock(
+	void);
 
 void rasterizer_decals_initialize(
 	void);
