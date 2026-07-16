@@ -32,12 +32,50 @@ struct game_variant
 
 typedef char verify_game_variant_size[sizeof(struct game_variant) == 0x68 ? 1 : -1];
 
+struct game_engine
+{
+	char const *name;
+	long type;
+	void (*dispose)(void);
+	boolean (*initialize_for_new_map)(void);
+	void (*dispose_from_old_map)(void);
+	void (*player_added)(long player_index);
+	void (*game_ending)(void);
+	void (*game_starting)(void);
+	void (*statistics_append)(void);
+	void (*handle_client_message)(void);
+	void (*handle_server_message)(void);
+	void (*unknown2C)(void);
+	void (*post_rasterize_objects)(void);
+	void (*unknown34[21])(void);
+};
+
+typedef char verify_game_engine_size[sizeof(struct game_engine) == 0x88 ? 1 : -1];
+
 /* ---------- prototypes/GAME_ENGINE.C */
 
 void game_engine_playlist_initialize(
 	void);
 
 boolean game_engine_running(void);
+
+void game_engine_dispose(
+	void);
+
+void game_engine_dispose_from_old_map(
+	void);
+
+void game_engine_game_ending(
+	void);
+
+void game_engine_game_starting(
+	void);
+
+void game_engine_post_rasterize_objects(
+	void);
+
+boolean game_engine_can_score(
+	void);
 
 struct game_variant *game_engine_get_variant(
 	void);

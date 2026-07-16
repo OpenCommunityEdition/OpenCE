@@ -570,6 +570,9 @@ void game_engine_playlist_next(
 	long parameter1,
 	long playlist_type);
 
+void code_00096890(
+	void);
+
 /* ---------- globals */
 
 struct game_engine *game_engine;
@@ -592,6 +595,72 @@ boolean game_engine_running(
 	void)
 {
 	return game_engine!=NULL;
+}
+
+void game_engine_dispose(
+	void)
+{
+	if (game_engine)
+	{
+		if (game_engine->dispose)
+			game_engine->dispose();
+
+		game_engine = NULL;
+	}
+
+	return;
+}
+
+void game_engine_dispose_from_old_map(
+	void)
+{
+	if (game_engine && game_engine->dispose_from_old_map)
+		game_engine->dispose_from_old_map();
+
+	return;
+}
+
+void game_engine_game_ending(
+	void)
+{
+	if (game_engine && game_engine->game_ending)
+		game_engine->game_ending();
+
+	return;
+}
+
+void game_engine_game_starting(
+	void)
+{
+	if (game_engine)
+	{
+		if (game_engine->game_starting)
+			game_engine->game_starting();
+
+		code_00096890();
+	}
+
+	return;
+}
+
+void game_engine_post_rasterize_objects(
+	void)
+{
+	if (game_engine && game_engine->post_rasterize_objects)
+		game_engine->post_rasterize_objects();
+
+	return;
+}
+
+boolean game_engine_can_score(
+	void)
+{
+	boolean can_score = TRUE;
+
+	if (game_engine)
+		can_score = game_engine_globals.postgame_state==0;
+
+	return can_score;
 }
 
 struct game_variant *game_engine_get_variant(
