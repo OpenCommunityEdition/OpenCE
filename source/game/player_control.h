@@ -44,6 +44,14 @@ void player_control_dispose(
 	void);
 void player_control_dispose_from_old_map(
 	void);
+void player_control_action_test_reset(
+	void);
+boolean player_control_action_test_accept(
+	void);
+boolean player_control_action_test_back(
+	void);
+boolean player_control_action_test_action(
+	void);
 boolean player_control_action_test_jump(
 	void);
 boolean player_control_action_test_primary_trigger(
@@ -55,6 +63,10 @@ boolean player_control_action_test_zoom(
 boolean player_control_action_test_look_relative_left(
 	void);
 boolean player_control_action_test_look_relative_right(
+	void);
+boolean player_control_action_test_look_relative_up(
+	void);
+boolean player_control_action_test_look_relative_down(
 	void);
 
 /* ---------- globals */

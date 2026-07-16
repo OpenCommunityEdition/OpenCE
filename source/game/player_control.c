@@ -212,6 +212,52 @@ void player_control_dispose_from_old_map(
 	return;
 }
 
+void player_control_action_test_reset(
+	void)
+{
+	struct player_control_globals_header *globals = player_control_globals;
+
+	globals->action_flags = 0;
+	globals->action_test_flags = 0;
+	return;
+}
+
+boolean player_control_action_test_accept(
+	void)
+{
+	struct player_control_globals_header *globals = player_control_globals;
+
+	globals->action_test_flags |= FLAG(_player_control_accept_bit);
+	globals->suppressed_action_flags |= FLAG(_player_control_accept_bit);
+	return TEST_FLAG(
+		globals->action_flags,
+		_player_control_accept_bit);
+}
+
+boolean player_control_action_test_back(
+	void)
+{
+	struct player_control_globals_header *globals = player_control_globals;
+
+	globals->action_test_flags |= FLAG(_player_control_back_bit);
+	globals->suppressed_action_flags |= FLAG(_player_control_back_bit);
+	return TEST_FLAG(
+		globals->action_flags,
+		_player_control_back_bit);
+}
+
+boolean player_control_action_test_action(
+	void)
+{
+	struct player_control_globals_header *globals = player_control_globals;
+
+	globals->action_test_flags |= FLAG(_player_control_action_bit);
+	globals->suppressed_action_flags |= FLAG(_player_control_action_bit);
+	return TEST_FLAG(
+		globals->action_flags,
+		_player_control_action_bit);
+}
+
 boolean player_control_action_test_jump(
 	void)
 {
@@ -258,6 +304,22 @@ boolean player_control_action_test_look_relative_right(
 	return TEST_FLAG(
 		player_control_globals->action_flags,
 		_player_control_look_relative_right_bit);
+}
+
+boolean player_control_action_test_look_relative_up(
+	void)
+{
+	return TEST_FLAG(
+		player_control_globals->action_flags,
+		_player_control_look_relative_up_bit);
+}
+
+boolean player_control_action_test_look_relative_down(
+	void)
+{
+	return TEST_FLAG(
+		player_control_globals->action_flags,
+		_player_control_look_relative_down_bit);
 }
 
 /* ---------- private code */
