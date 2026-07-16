@@ -140,6 +140,45 @@ void *datum_try_and_get(
 	return header;
 }
 
+void *datum_get(
+	struct data_array *data,
+	long index)
+{
+	struct datum_header *header;
+	short identifier;
+	short absolute_index;
+
+	identifier = index>>16;
+	absolute_index = index;
+	match_assert("c:\\halo\\SOURCE\\memory\\data.c", 396, data->valid);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\data.c",
+		397,
+		identifier || !data->identifier_zero_invalid);
+
+	if (absolute_index>=0 && absolute_index<data->count)
+	{
+		header = (struct datum_header *)((byte *)data->data+data->size*absolute_index);
+		if (header->identifier && (!identifier || identifier==header->identifier))
+		{
+			return header;
+		}
+	}
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\memory\\data.c",
+		412,
+		FALSE,
+		csprintf(
+			temporary,
+			"%s index #%d (0x%x) is unused or changed",
+			data->name,
+			index&0xFFFF,
+			index));
+
+	return NULL;
+}
+
 void data_verify(
 	struct data_array *data)
 {
@@ -270,6 +309,36 @@ void data_iterator_new(
 	iterator->datum_index = NONE;
 
 	return;
+}
+
+long data_next_index(
+	struct data_array *data,
+	long index)
+{
+	struct datum_header *header;
+	long result = NONE;
+	short absolute_index = index+1;
+
+	data_verify(data);
+	match_assert("c:\\halo\\SOURCE\\memory\\data.c", 303, data->valid);
+
+	if (absolute_index>=0 && absolute_index<data->count)
+	{
+		header = (struct datum_header *)((byte *)data->data+data->size*absolute_index);
+		while (absolute_index<data->count)
+		{
+			if (header->identifier)
+			{
+				result = header->identifier<<16 | absolute_index;
+				break;
+			}
+
+			absolute_index++;
+			header = (struct datum_header *)((byte *)header+data->size);
+		}
+	}
+
+	return result;
 }
 
 /* ---------- private code */
