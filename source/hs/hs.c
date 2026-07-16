@@ -2852,6 +2852,96 @@ void evaluator( \
 	return; \
 }
 
+#define HS_EVALUATE_VOID_LONG(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	long *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		function(arguments[0]); \
+		hs_return(thread_index, 0); \
+	} \
+	return; \
+}
+
+#define HS_EVALUATE_VOID_LONG_BOOLEAN(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	union hs_evaluation_argument *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		function(arguments[0].long_value, arguments[1].boolean_value); \
+		hs_return(thread_index, 0); \
+	} \
+	return; \
+}
+
+#define HS_EVALUATE_VOID_LONG_LONG(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	long *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		function(arguments[0], arguments[1]); \
+		hs_return(thread_index, 0); \
+	} \
+	return; \
+}
+
+#define HS_EVALUATE_VOID_LONG_LONG_LONG(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	long *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		function(arguments[0], arguments[1], arguments[2]); \
+		hs_return(thread_index, 0); \
+	} \
+	return; \
+}
+
+#define HS_EVALUATE_VOID_SHORT_SHORT(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	union hs_evaluation_argument *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		function(arguments[0].short_value, arguments[1].unsigned_short_value); \
+		hs_return(thread_index, 0); \
+	} \
+	return; \
+}
+
+#define HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	union hs_evaluation_argument *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		function(arguments[0].long_value, arguments[1].unsigned_short_value); \
+		hs_return(thread_index, 0); \
+	} \
+	return; \
+}
+
 /* ---------- structures */
 
 struct hs_object_list_get_element_arguments
@@ -2864,6 +2954,14 @@ union hs_real_value
 {
 	real real_value;
 	long long_value;
+};
+
+union hs_evaluation_argument
+{
+	long long_value;
+	short short_value;
+	unsigned short unsigned_short_value;
+	boolean boolean_value;
 };
 
 /* ---------- prototypes */
@@ -3030,6 +3128,90 @@ void network_game_client_request_immediate_start(
 	void);
 void hs_doc(
 	void);
+void ai_scripting_maneuver(
+	long ai_index);
+void ai_scripting_maneuver_enable(
+	long ai_index,
+	boolean enable);
+void ai_scripting_migrate(
+	long source_ai_index,
+	long destination_ai_index);
+void ai_scripting_migrate_and_speak(
+	long source_ai_index,
+	long destination_ai_index,
+	long dialogue_index);
+void ai_scripting_migrate_by_unit(
+	long unit_index,
+	long destination_ai_index);
+void ai_scripting_allegiance(
+	short team_a,
+	unsigned short team_b);
+void ai_scripting_allegiance_remove(
+	short team_a,
+	unsigned short team_b);
+void ai_scripting_go_to_vehicle(
+	long ai_index,
+	long unit_index,
+	long vehicle_index);
+void ai_scripting_go_to_vehicle_override(
+	long ai_index,
+	long unit_index,
+	long vehicle_index);
+void ai_scripting_exit_vehicle(
+	long ai_index);
+void ai_scripting_braindead(
+	long ai_index,
+	boolean braindead);
+void ai_scripting_braindead_by_unit(
+	long unit_index,
+	boolean braindead);
+void ai_scripting_ignore(
+	long ai_index,
+	boolean ignore);
+void ai_scripting_prefer_target(
+	long ai_index,
+	boolean prefer);
+void ai_scripting_teleport_starting_location(
+	long ai_index);
+void ai_scripting_teleport_starting_location_if_unsupported(
+	long ai_index);
+void ai_scripting_renew(
+	long ai_index);
+void ai_scripting_try_to_fight_nothing(
+	long ai_index);
+void ai_scripting_try_to_fight(
+	long source_ai_index,
+	long target_ai_index);
+void ai_scripting_try_to_fight_player(
+	long ai_index);
+void ai_scripting_command_list(
+	long ai_index,
+	unsigned short command_list_index);
+void ai_scripting_command_list_by_unit(
+	long unit_index,
+	unsigned short command_list_index);
+void ai_scripting_command_list_advance(
+	long ai_index);
+void ai_scripting_command_list_advance_by_unit(
+	long unit_index);
+void ai_scripting_force_active(
+	long ai_index,
+	boolean force_active);
+void ai_scripting_force_active_by_unit(
+	long unit_index,
+	boolean force_active);
+void ai_scripting_set_return_state(
+	long ai_index,
+	unsigned short state);
+void ai_scripting_set_current_state(
+	long ai_index,
+	unsigned short state);
+void ai_scripting_playfight(
+	long ai_index,
+	boolean playfight);
+void ai_scripting_vehicle_encounter(
+	long vehicle_index,
+	long encounter_index);
 
 /* ---------- globals */
 
@@ -3134,5 +3316,35 @@ HS_EVALUATE_REAL_FROM_LONG(code_000aeea0, device_get_position)
 HS_EVALUATE_REAL_FROM_UNSIGNED_SHORT(code_000aef20, device_group_get_value)
 HS_EVALUATE_REAL_FROM_LONG(code_000b06f0, ai_scripting_living_fraction)
 HS_EVALUATE_REAL_FROM_LONG(code_000b0730, ai_scripting_strength)
+HS_EVALUATE_VOID_LONG(code_000af910, ai_scripting_maneuver)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000af950, ai_scripting_maneuver_enable)
+HS_EVALUATE_VOID_LONG_LONG(code_000af990, ai_scripting_migrate)
+HS_EVALUATE_VOID_LONG_LONG_LONG(code_000af9d0, ai_scripting_migrate_and_speak)
+HS_EVALUATE_VOID_LONG_LONG(code_000afa10, ai_scripting_migrate_by_unit)
+HS_EVALUATE_VOID_SHORT_SHORT(code_000afa50, ai_scripting_allegiance)
+HS_EVALUATE_VOID_SHORT_SHORT(code_000afa90, ai_scripting_allegiance_remove)
+HS_EVALUATE_VOID_LONG_LONG_LONG(code_000afad0, ai_scripting_go_to_vehicle)
+HS_EVALUATE_VOID_LONG_LONG_LONG(code_000afb10, ai_scripting_go_to_vehicle_override)
+HS_EVALUATE_VOID_LONG(code_000afb50, ai_scripting_exit_vehicle)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000afb90, ai_scripting_braindead)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000afbd0, ai_scripting_braindead_by_unit)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000afc10, ai_scripting_ignore)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000afc50, ai_scripting_prefer_target)
+HS_EVALUATE_VOID_LONG(code_000afc90, ai_scripting_teleport_starting_location)
+HS_EVALUATE_VOID_LONG(code_000afcd0, ai_scripting_teleport_starting_location_if_unsupported)
+HS_EVALUATE_VOID_LONG(code_000afd10, ai_scripting_renew)
+HS_EVALUATE_VOID_LONG(code_000afd50, ai_scripting_try_to_fight_nothing)
+HS_EVALUATE_VOID_LONG_LONG(code_000afd90, ai_scripting_try_to_fight)
+HS_EVALUATE_VOID_LONG(code_000afdd0, ai_scripting_try_to_fight_player)
+HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(code_000afe10, ai_scripting_command_list)
+HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(code_000afe50, ai_scripting_command_list_by_unit)
+HS_EVALUATE_VOID_LONG(code_000afe90, ai_scripting_command_list_advance)
+HS_EVALUATE_VOID_LONG(code_000afed0, ai_scripting_command_list_advance_by_unit)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000aff10, ai_scripting_force_active)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000aff50, ai_scripting_force_active_by_unit)
+HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(code_000aff90, ai_scripting_set_return_state)
+HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(code_000affd0, ai_scripting_set_current_state)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000b0010, ai_scripting_playfight)
+HS_EVALUATE_VOID_LONG_LONG(code_000b0070, ai_scripting_vehicle_encounter)
 
 /* ---------- private code */
