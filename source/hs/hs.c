@@ -3372,6 +3372,14 @@ void rasterizer_set_near_clip_distance(
 	real distance);
 void player0_look_invert_pitch(
 	boolean invert);
+void ui_widget_debug_show_path(
+	boolean show);
+void display_scenario_help(
+	word string_index);
+void xbox_set_machine_name(
+	char const *machine_name);
+void hs_help(
+	char const *function_name);
 boolean hs_not(
 	boolean value);
 boolean scenario_trigger_volume_test_object(
@@ -4108,6 +4116,10 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b28b0, struct hs_arguments_boolean, (scr
 HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2a00, struct hs_arguments_boolean, (rasterizer_screen_effect_start(arguments->value)))
 HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2bb0, struct hs_arguments_real, (rasterizer_set_near_clip_distance(arguments->value)))
 HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2c70, struct hs_arguments_boolean, (player0_look_invert_pitch(arguments->value)))
+HS_EVALUATE_VOID_BOOLEAN(code_000b2d10, ui_widget_debug_show_path)
+HS_EVALUATE_VOID_UNSIGNED_SHORT(code_000b2d50, display_scenario_help)
+HS_EVALUATE_VOID_STRING(code_000b2db0, xbox_set_machine_name)
+HS_EVALUATE_VOID_STRING(code_000b43b0, hs_help)
 HS_EVALUATE_RETURN_BOOLEAN(code_000ad290, struct hs_arguments_boolean, (hs_not(arguments->value)))
 HS_EVALUATE_RETURN_BOOLEAN(code_000ad380, struct hs_arguments_short_long, (scenario_trigger_volume_test_object(arguments->value0, arguments->value1)))
 HS_EVALUATE_RETURN_BOOLEAN(code_000ad3d0, struct hs_arguments_short_long, (hs_trigger_volume_test_objects_any(arguments->value0, arguments->value1)))
