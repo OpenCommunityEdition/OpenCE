@@ -312,6 +312,15 @@ void rasterizer_environment_specular_lightmap_draw(
 	struct vertex_buffer const *vertex_buffer);
 void rasterizer_environment_reflection_lightmap_mask_end(
 	void);
+void rasterizer_environment_reflection_lightmap_mask_begin(
+	struct bitmap_data const *lightmap_bitmap);
+void rasterizer_environment_reflection_lightmap_mask_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
 void rasterizer_environment_reflection_lightmap_masks_end(
 	void);
 void rasterizer_environment_reflection_mirrors_begin(
@@ -346,6 +355,13 @@ void rasterizer_screen_flash(
 	void);
 void rasterizer_environment_fog_screen_begin(
 	boolean render_fog);
+void rasterizer_environment_fog_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
 void rasterizer_environment_fog_screen_draw(
 	struct shader const *shader,
 	short bitmap_index,

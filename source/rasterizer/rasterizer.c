@@ -529,6 +529,15 @@ void _rasterizer_environment_specular_lightmap_draw(
 	struct vertex_buffer const *vertex_buffer);
 void _rasterizer_environment_reflection_lightmap_mask_end(
 	void);
+void _rasterizer_environment_reflection_lightmap_mask_begin(
+	struct bitmap_data const *lightmap_bitmap);
+void _rasterizer_environment_reflection_lightmap_mask_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
 void _rasterizer_environment_reflection_lightmap_masks_end(
 	void);
 void _rasterizer_environment_reflection_lightmap_masks_begin(
@@ -549,6 +558,13 @@ void _rasterizer_environment_fog_begin(
 	void);
 void _rasterizer_environment_fog_end(
 	void);
+void _rasterizer_environment_fog_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
 void _rasterizer_environment_fog_screen_end(
 	void);
 void _rasterizer_environment_fog_screen_begin(
@@ -1262,6 +1278,25 @@ void rasterizer_environment_transparent_geometry_end(
 	return;
 }
 
+void rasterizer_environment_reflection_lightmap_mask_begin(
+	struct bitmap_data const *lightmap_bitmap)
+{
+	_rasterizer_environment_reflection_lightmap_mask_begin(lightmap_bitmap);
+	return;
+}
+
+void rasterizer_environment_reflection_lightmap_mask_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer)
+{
+	_rasterizer_environment_reflection_lightmap_mask_draw(shader, bitmap_index, dynamic_triangle_buffer_index, first_triangle_index, triangle_count, vertex_buffer);
+	return;
+}
+
 void rasterizer_dynamic_screen_geometry_draw(
 	long primitive_type,
 	long vertex_type,
@@ -1389,6 +1424,18 @@ void rasterizer_environment_fog_end(
 	void)
 {
 	_rasterizer_environment_fog_end();
+	return;
+}
+
+void rasterizer_environment_fog_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer)
+{
+	_rasterizer_environment_fog_draw(shader, bitmap_index, dynamic_triangle_buffer_index, first_triangle_index, triangle_count, vertex_buffer);
 	return;
 }
 
