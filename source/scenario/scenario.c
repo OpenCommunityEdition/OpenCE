@@ -165,12 +165,14 @@ symbols in this file:
 #include "scenario.h"
 
 #include "game/game_globals.h"
+#include "game/players.h"
 #include "objects/objects.h"
 #include "physics/bsp3d.h"
 #include "physics/collision_bsp_definitions.h"
 #include "scenario_definitions.h"
 #include "sky_definitions.h"
 #include "scenario/wind.h"
+#include "structures/structure_bsp_definitions.h"
 
 /* ---------- constants */
 
@@ -378,6 +380,49 @@ void scenario_location_from_line(
 	scenario_location_from_point(location, end_point);
 
 	return;
+}
+
+boolean scenario_test_pvs(
+	short cluster_index0,
+	short cluster_index1)
+{
+	struct structure_bsp *structure_bsp = global_structure_bsp_get();
+	unsigned long *pvs = structure_bsp_get_cluster_pvs(structure_bsp, cluster_index0);
+
+	match_assert("c:\\halo\\SOURCE\\scenario\\scenario.c", 468,
+		cluster_index1>=0 && cluster_index1<structure_bsp->clusters.count);
+
+	return BIT_VECTOR_TEST_FLAG(pvs, cluster_index1);
+}
+
+boolean scenario_location_potentially_visible_local(
+	const struct location *location)
+{
+	match_assert("c:\\halo\\SOURCE\\scenario\\scenario.c", 487,
+		location->cluster_index>=0 && location->cluster_index<global_structure_bsp_get()->clusters.count);
+
+	return BIT_VECTOR_TEST_FLAG(players_get_combined_pvs_local(), location->cluster_index);
+}
+
+boolean scenario_location_potentially_visible(
+	const struct location *location)
+{
+	match_assert("c:\\halo\\SOURCE\\scenario\\scenario.c", 495,
+		location->cluster_index>=0 && location->cluster_index<global_structure_bsp_get()->clusters.count);
+
+	return BIT_VECTOR_TEST_FLAG(players_get_combined_pvs(), location->cluster_index);
+}
+
+boolean scenario_trigger_volume_test_object(
+	short trigger_volume_index,
+	long object_index)
+{
+	boolean result = FALSE;
+
+	if (object_index != NONE)
+		result = scenario_trigger_volume_test_point(trigger_volume_index, &object_get(object_index)->object.bounding_sphere_center);
+
+	return result;
 }
 
 /* ---------- private code */
