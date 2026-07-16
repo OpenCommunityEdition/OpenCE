@@ -86,6 +86,60 @@ long data_allocation_size(
 	return maximum_count*size+sizeof(struct data_array);
 }
 
+void data_initialize(
+	struct data_array *data,
+	const char *name,
+	short maximum_count,
+	short size)
+{
+	match_assert("c:\\halo\\SOURCE\\memory\\data.c", 64, maximum_count>0);
+	match_assert("c:\\halo\\SOURCE\\memory\\data.c", 65, size>0);
+	match_assert("c:\\halo\\SOURCE\\memory\\data.c", 66, name);
+	match_assert("c:\\halo\\SOURCE\\memory\\data.c", 67, data);
+
+	csmemset(data, 0, sizeof(*data));
+	csstrncpy(data->name, name, sizeof(data->name)-1);
+	data->maximum_count = maximum_count;
+	data->size = size;
+	data->signature = 'd@t@';
+	data->data = data+1;
+	data->valid = FALSE;
+
+	return;
+}
+
+void *datum_try_and_get(
+	struct data_array *data,
+	long index)
+{
+	struct datum_header *header = NULL;
+	short identifier;
+	short absolute_index;
+
+	if (index!=NONE)
+	{
+		identifier = index>>16;
+		absolute_index = index;
+
+		match_assert("c:\\halo\\SOURCE\\memory\\data.c", 371, data->valid);
+		match_assert(
+			"c:\\halo\\SOURCE\\memory\\data.c",
+			372,
+			identifier || !data->identifier_zero_invalid);
+
+		if (absolute_index>=0 && absolute_index<data->maximum_count)
+		{
+			header = (struct datum_header *)((byte *)data->data+data->size*absolute_index);
+			if (!header->identifier || (identifier && header->identifier!=identifier))
+			{
+				header = NULL;
+			}
+		}
+	}
+
+	return header;
+}
+
 void data_verify(
 	struct data_array *data)
 {
@@ -177,6 +231,43 @@ void datum_delete(
 		while (data->count > 0 && !header->identifier);
 	}
 	data->actual_count--;
+
+	return;
+}
+
+void data_delete_all(
+	struct data_array *data)
+{
+	short absolute_index;
+
+	data_verify(data);
+	match_assert("c:\\halo\\SOURCE\\memory\\data.c", 226, data->valid);
+
+	data->count = 0;
+	data->actual_count = 0;
+	data->first_free_absolute_index = 0;
+	csstrncpy((char *)&data->next_identifier, data->name, sizeof(data->next_identifier));
+	data->next_identifier |= 0x8000;
+
+	for (absolute_index = 0; absolute_index<data->maximum_count; absolute_index++)
+	{
+		((struct datum_header *)((byte *)data->data+data->size*absolute_index))->identifier = 0;
+	}
+
+	return;
+}
+
+void data_iterator_new(
+	struct data_iterator *iterator,
+	struct data_array *data)
+{
+	data_verify(data);
+	match_assert("c:\\halo\\SOURCE\\memory\\data.c", 249, data->valid);
+
+	iterator->data = data;
+	iterator->signature = (unsigned long)data^'iter';
+	iterator->absolute_index = 0;
+	iterator->datum_index = NONE;
 
 	return;
 }
