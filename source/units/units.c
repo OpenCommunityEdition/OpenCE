@@ -840,6 +840,89 @@ boolean unit_controllable(
 	return TEST_FLAG(unit_get(unit_index)->unit.flags, _unit_controllable_bit);
 }
 
+void unit_set_controllable(
+	long unit_index,
+	boolean controllable)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	SET_FLAG(unit->unit.flags, _unit_controllable_bit, controllable);
+
+	return;
+}
+
+void unit_set_possessed(
+	long unit_index,
+	boolean possessed)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	SET_FLAG(unit->unit.flags, _unit_possessed_by_recording_bit, possessed);
+
+	return;
+}
+
+void unit_scripting_can_blink(
+	long unit_index,
+	boolean can_blink)
+{
+	if (unit_index!=NONE)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+
+		SET_FLAG(unit->unit.flags, _unit_cannot_blink_bit, !can_blink);
+	}
+
+	return;
+}
+
+void unit_set_desired_flashlight_state(
+	long unit_index,
+	boolean desired_state)
+{
+	if (unit_index!=NONE)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+
+		if (desired_state)
+		{
+			SET_FLAG(unit->unit.flags, _unit_desired_integrated_light_on_bit, TRUE);
+		}
+		else
+		{
+			SET_FLAG(unit->unit.flags, _unit_desired_integrated_light_off_bit, TRUE);
+		}
+	}
+
+	return;
+}
+
+boolean unit_driven_by_ai(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	if (unit->unit.driver_object_index!=NONE)
+	{
+		unit = unit_get(unit->unit.driver_object_index);
+	}
+
+	return unit->unit.actor_index!=NONE;
+}
+
+boolean unit_gunned_by_ai(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	if (unit->unit.gunner_object_index!=NONE)
+	{
+		unit = unit_get(unit->unit.gunner_object_index);
+	}
+
+	return unit->unit.actor_index!=NONE;
+}
+
 long unit_get_current_equipment(
 	long unit_index)
 {

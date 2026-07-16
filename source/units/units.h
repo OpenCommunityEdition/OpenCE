@@ -561,6 +561,9 @@ void unit_get_facing_vector(
 	real_vector3d *facing_vector);
 boolean unit_controllable(
 	long unit_index);
+void unit_set_controllable(
+	long unit_index,
+	boolean controllable);
 long unit_scripting_unit_driver(
 	long unit_index);
 long unit_scripting_unit_gunner(
@@ -614,8 +617,20 @@ void unit_ready_desired_weapon(long unit_index, boolean immediate);
 
 boolean unit_can_use_weapon(long unit_index, long weapon_index);
 
-void unit_set_possessed(long unit_index, boolean possessed);
+void unit_set_possessed(
+	long unit_index,
+	boolean possessed);
 void unit_set_actively_controlled(long unit_index, boolean actively_controlled);
+void unit_scripting_can_blink(
+	long unit_index,
+	boolean can_blink);
+void unit_set_desired_flashlight_state(
+	long unit_index,
+	boolean desired_state);
+boolean unit_driven_by_ai(
+	long unit_index);
+boolean unit_gunned_by_ai(
+	long unit_index);
 boolean unit_is_busy(long object_index);
 void unit_scripting_set_emotion_animation(long unit_index, char const *animation_name);
 
