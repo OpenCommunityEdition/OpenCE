@@ -50,9 +50,12 @@ enum
 
 enum
 {
+	_unit_seat_driver_bit = 2,
+	_unit_seat_gunner_bit,
 	_unit_seat_third_person_camera_bit = 4,
 	_unit_seat_third_person_on_enter_bit = 6,
 	_unit_seat_first_person_camera_bit = 7,
+	_unit_seat_allows_noncombatants_bit = 10,
 };
 
 /* ---------- macros */

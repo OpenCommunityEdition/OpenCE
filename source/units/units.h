@@ -572,6 +572,10 @@ long unit_get_current_equipment(
 	long unit_index);
 void unit_delete_current_equipment(
 	long unit_index);
+void unit_delete_all_weapons(
+	long unit_index);
+short unit_get_weapon_count(
+	long unit_index);
 boolean unit_get_current_flashlight_state(
 	long unit_index);
 void unit_abort_animation(
@@ -640,6 +644,18 @@ boolean unit_driven_by_ai(
 	long unit_index);
 boolean unit_gunned_by_ai(
 	long unit_index);
+boolean unit_seat_filled(
+	long unit_index,
+	short seat_index);
+boolean unit_seat_is_driver(
+	long unit_index,
+	short seat_index);
+boolean unit_seat_is_gunner(
+	long unit_index,
+	short seat_index);
+boolean unit_seat_allow_noncombatants(
+	long unit_index,
+	short seat_index);
 boolean unit_is_busy(long object_index);
 void unit_scripting_set_emotion_animation(long unit_index, char const *animation_name);
 

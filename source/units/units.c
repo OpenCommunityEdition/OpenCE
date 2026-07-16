@@ -924,6 +924,76 @@ boolean unit_gunned_by_ai(
 	return unit->unit.actor_index!=NONE;
 }
 
+boolean unit_seat_filled(
+	long unit_index,
+	short seat_index)
+{
+	struct object_iterator iterator;
+	struct unit_datum *unit;
+	boolean filled = FALSE;
+
+	object_iterator_new(&iterator, _object_mask_unit, 0);
+
+	while ((unit = object_iterator_next(&iterator))!=NULL)
+	{
+		if (unit->object.parent_object_index==unit_index && unit->unit.parent_seat_index==seat_index)
+		{
+			filled = TRUE;
+			break;
+		}
+	}
+
+	return filled;
+}
+
+boolean unit_seat_is_driver(
+	long unit_index,
+	short seat_index)
+{
+	struct unit_definition *unit_definition = unit_definition_get(unit_get(unit_index)->definition_index);
+	boolean is_driver = FALSE;
+
+	if (seat_index>=0 && seat_index<unit_definition->unit.seats.count)
+	{
+		struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(&unit_definition->unit.seats, seat_index, struct unit_seat);
+		is_driver = TEST_FLAG(seat->flags, _unit_seat_driver_bit);
+	}
+
+	return is_driver;
+}
+
+boolean unit_seat_is_gunner(
+	long unit_index,
+	short seat_index)
+{
+	struct unit_definition *unit_definition = unit_definition_get(unit_get(unit_index)->definition_index);
+	boolean is_gunner = FALSE;
+
+	if (seat_index>=0 && seat_index<unit_definition->unit.seats.count)
+	{
+		struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(&unit_definition->unit.seats, seat_index, struct unit_seat);
+		is_gunner = TEST_FLAG(seat->flags, _unit_seat_gunner_bit);
+	}
+
+	return is_gunner;
+}
+
+boolean unit_seat_allow_noncombatants(
+	long unit_index,
+	short seat_index)
+{
+	struct unit_definition *unit_definition = unit_definition_get(unit_get(unit_index)->definition_index);
+	boolean allow_noncombatants = FALSE;
+
+	if (seat_index>=0 && seat_index<unit_definition->unit.seats.count)
+	{
+		struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(&unit_definition->unit.seats, seat_index, struct unit_seat);
+		allow_noncombatants = TEST_FLAG(seat->flags, _unit_seat_allows_noncombatants_bit);
+	}
+
+	return allow_noncombatants;
+}
+
 void unit_delete_current_equipment(
 	long unit_index)
 {
@@ -936,6 +1006,60 @@ void unit_delete_current_equipment(
 	}
 
 	return;
+}
+
+void unit_delete_all_weapons(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	short weapon_index;
+
+	for (weapon_index = 0; weapon_index<MAXIMUM_WEAPONS_PER_UNIT; ++weapon_index)
+	{
+		if (unit->unit.weapon_object_indices[weapon_index]!=NONE && weapon_index!=unit->unit.current_weapon_index)
+		{
+			object_delete(unit->unit.weapon_object_indices[weapon_index]);
+			unit->unit.weapon_object_indices[weapon_index] = NONE;
+
+			if (weapon_index==unit->unit.desired_weapon_index)
+			{
+				unit->unit.desired_weapon_index = NONE;
+			}
+
+			if (weapon_index==unit->unit.current_weapon_index)
+			{
+				unit->unit.current_weapon_index = NONE;
+			}
+		}
+	}
+
+	return;
+}
+
+short unit_get_weapon_count(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	long weapon_count = 0;
+	short weapon_index;
+
+	for (weapon_index = 0; weapon_index<MAXIMUM_WEAPONS_PER_UNIT; ++weapon_index)
+	{
+		long weapon_object_index = unit->unit.weapon_object_indices[weapon_index];
+
+		if (weapon_object_index!=NONE)
+		{
+			struct weapon_datum *weapon = weapon_get(weapon_object_index);
+			struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
+
+			if (!TEST_FLAG(weapon_definition->weapon.flags, _weapon_doesnt_count_toward_maximum_bit))
+			{
+				++weapon_count;
+			}
+		}
+	}
+
+	return weapon_count;
 }
 
 boolean unit_has_weapon_definition_index(
