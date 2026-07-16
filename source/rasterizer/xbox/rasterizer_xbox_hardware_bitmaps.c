@@ -70,6 +70,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "bitmaps/bitmap_group.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -77,6 +80,11 @@ symbols in this file:
 /* ---------- structures */
 
 /* ---------- prototypes */
+
+void texture_cache_bitmap_delete(
+	struct bitmap_data *bitmap);
+unsigned long __stdcall D3DResource_Release(
+	void *resource);
 
 void __stdcall code_00157c90(
 	void *resource,
@@ -102,6 +110,19 @@ long __stdcall code_00157d40(
 /* ---------- globals */
 
 /* ---------- public code */
+
+void rasterizer_bitmap_delete(
+	struct bitmap_data *bitmap)
+{
+	texture_cache_bitmap_delete(bitmap);
+	if (bitmap && bitmap->hardware_format)
+	{
+		D3DResource_Release(bitmap->hardware_format);
+		bitmap->hardware_format = NULL;
+	}
+
+	return;
+}
 
 /* ---------- private code */
 
