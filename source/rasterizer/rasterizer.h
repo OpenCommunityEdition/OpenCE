@@ -125,26 +125,6 @@ void rasterizer_frame_end(void);
 void rasterizer_present(struct bitmap_data *screenshot_bitmap, const point2d *screenshot_index);
 void rasterizer_dispose(void);
 
-long rasterizer_dynamic_triangles_new(
-	long triangle_count);
-short *rasterizer_dynamic_triangles_lock(
-	long dynamic_triangle_buffer_index);
-void rasterizer_dynamic_triangles_unlock(
-	long dynamic_triangle_buffer_index);
-long rasterizer_dynamic_vertices_new(
-	short type,
-	long vertex_count);
-short rasterizer_dynamic_vertices_get_type(
-	long dynamic_vertex_buffer_index);
-void *rasterizer_dynamic_vertices_lock(
-	long dynamic_vertex_buffer_index);
-void rasterizer_dynamic_vertices_unlock(
-	long dynamic_vertex_buffer_index);
-long rasterizer_decal_vertices_new(
-	long size);
-void rasterizer_decal_vertices_delete(
-	long decal_vertex_buffer_index);
-
 void rasterizer_decals_initialize(
 	void);
 void rasterizer_decals_initialize_for_new_map(
