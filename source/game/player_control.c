@@ -185,7 +185,9 @@ symbols in this file:
 #include "game/player_control.h"
 #include "players.h"
 
+#include "items/weapons.h"
 #include "objects/objects.h"
+#include "units/unit_definitions.h"
 #include "units/units.h"
 
 #include "real_math.h"
@@ -197,6 +199,15 @@ symbols in this file:
 /* ---------- structures */
 
 /* ---------- prototypes */
+
+void player_aiming_vector_from_facing(
+	long player_index,
+	real_vector3d *facing_direction,
+	real_euler_angles2d const *facing_angles);
+real weapon_get_field_of_view(
+	long weapon_index,
+	real field_of_view,
+	short zoom_level);
 
 /* ---------- globals */
 
@@ -270,6 +281,35 @@ long player_control_get_target_object_index(
 	return NONE;
 }
 
+real player_control_get_field_of_view(
+	short local_player_index)
+{
+	struct player_control *control = player_control_get(local_player_index);
+	real field_of_view = DEGREES_TO_RADIANS(70.f);
+
+	if (control->unit_index != NONE)
+	{
+		struct unit_datum *unit = unit_get(control->unit_index);
+		struct unit_definition *definition = unit_definition_get(unit->definition_index);
+		long weapon_index = unit_inventory_get_weapon(
+			control->unit_index,
+			unit->unit.current_weapon_index);
+
+		if (weapon_index != NONE)
+		{
+			field_of_view = weapon_get_field_of_view(
+				weapon_index,
+				definition->unit.camera_field_of_view,
+				control->zoom_level);
+		}
+		else
+		{
+			field_of_view = definition->unit.camera_field_of_view;
+		}
+	}
+	return field_of_view;
+}
+
 long player_control_get_unit_index(
 	short local_player_index)
 {
@@ -296,6 +336,25 @@ float player_control_get_autoaim_level(
 	match_assert("c:\\halo\\SOURCE\\game\\player_control.c", 0xB1,
 		local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
 	return player_control_globals->players[local_player_index].autoaim_level;
+}
+
+long player_control_get_desired_weapon(
+	short local_player_index,
+	long unit_index)
+{
+	struct player_control *control = player_control_get(local_player_index);
+	long weapon_index = NONE;
+
+	if (control->unit_index != unit_index ||
+		(weapon_index = unit_inventory_get_weapon(
+			unit_index,
+			control->desired_weapon_index)) == NONE)
+	{
+		weapon_index = unit_inventory_get_weapon(
+			unit_index,
+			unit_get(unit_index)->unit.current_weapon_index);
+	}
+	return weapon_index;
 }
 
 void players_unzoom_all(
@@ -325,6 +384,36 @@ void player_control_unzoom(
 		if (player->local_player_index != NONE)
 		{
 			player_control_get(player->local_player_index)->zoom_level = NONE;
+		}
+	}
+	return;
+}
+
+real_vector3d *player_control_get_facing_direction(
+	short local_player_index,
+	real_vector3d *facing_direction)
+{
+	player_aiming_vector_from_facing(
+		local_player_get_player_index(local_player_index),
+		facing_direction,
+		player_control_get_facing_angles(local_player_index));
+	return facing_direction;
+}
+
+void player_control_set_desired_weapon(
+	long unit_index,
+	short desired_weapon_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	if (unit->unit.player_index != NONE)
+	{
+		struct player_datum *player = player_get(unit->unit.player_index);
+
+		if (player->local_player_index != NONE)
+		{
+			player_control_get(player->local_player_index)->desired_weapon_index =
+				desired_weapon_index;
 		}
 	}
 	return;

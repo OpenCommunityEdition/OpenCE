@@ -103,8 +103,13 @@ void player_control_inhibit_buttons(
 	boolean persistent);
 long player_control_get_target_object_index(
 	short local_player_index);
+real player_control_get_field_of_view(
+	short local_player_index);
 long player_control_get_unit_index(
 	short local_player_index);
+long player_control_get_desired_weapon(
+	short local_player_index,
+	long unit_index);
 short player_control_get_zoom_level(
 	short local_player_index);
 float player_control_get_autoaim_level(
@@ -113,6 +118,14 @@ void players_unzoom_all(
 	void);
 void player_control_unzoom(
 	long unit_index);
+real_euler_angles2d const *player_control_get_facing_angles(
+	short local_player_index);
+real_vector3d *player_control_get_facing_direction(
+	short local_player_index,
+	real_vector3d *facing_direction);
+void player_control_set_desired_weapon(
+	long unit_index,
+	short desired_weapon_index);
 boolean scripted_player_control_set_camera_control(
 	boolean camera_control);
 void player_control_action_test_reset(
