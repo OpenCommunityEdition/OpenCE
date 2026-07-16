@@ -634,10 +634,26 @@ boolean unit_start_user_animation(
 void unit_ready_desired_weapon(long unit_index, boolean immediate);
 
 boolean unit_can_use_weapon(long unit_index, long weapon_index);
+boolean unit_overcharged(
+	long unit_index);
+boolean unit_has_weapon(
+	long unit_index,
+	long weapon_index);
+void unit_drop_current_equipment(
+	long unit_index);
+void unit_set_mouth_aperture(
+	long unit_index,
+	real mouth_aperture);
 
 void unit_set_possessed(
 	long unit_index,
 	boolean possessed);
+void unit_set_enterable_by_player(
+	long unit_index,
+	boolean enterable_by_player);
+void unit_aim_without_turning(
+	long unit_index,
+	boolean aim_without_turning);
 void unit_set_actively_controlled(long unit_index, boolean actively_controlled);
 void unit_scripting_can_blink(
 	long unit_index,

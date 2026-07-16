@@ -857,6 +857,32 @@ boolean unit_controllable(
 	return TEST_FLAG(unit_get(unit_index)->unit.flags, _unit_controllable_bit);
 }
 
+void unit_set_enterable_by_player(
+	long unit_index,
+	boolean enterable_by_player)
+{
+	if (unit_index!=NONE)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+		SET_FLAG(unit->unit.flags, _unit_not_enterable_by_player_bit, !enterable_by_player);
+	}
+
+	return;
+}
+
+void unit_aim_without_turning(
+	long unit_index,
+	boolean aim_without_turning)
+{
+	if (unit_index!=NONE)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+		SET_FLAG(unit->unit.flags, _unit_aim_without_turning_bit, aim_without_turning);
+	}
+
+	return;
+}
+
 void unit_set_controllable(
 	long unit_index,
 	boolean controllable)
@@ -1255,6 +1281,67 @@ long unit_get_current_equipment(
 	long unit_index)
 {
 	return unit_get(unit_index)->unit.equipment_object_index;
+}
+
+void unit_drop_current_equipment(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	long equipment_index = unit->unit.equipment_object_index;
+
+	if (equipment_index!=NONE)
+	{
+		unit_drop_item(unit_index, equipment_index);
+		unit->unit.equipment_object_index = NONE;
+	}
+
+	return;
+}
+
+boolean unit_overcharged(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	long weapon_index = unit_inventory_get_weapon(unit_index, unit->unit.current_weapon_index);
+
+	if (weapon_index!=NONE)
+	{
+		return weapon_overcharged(weapon_index);
+	}
+
+	return FALSE;
+}
+
+boolean unit_has_weapon(
+	long unit_index,
+	long weapon_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	long index;
+	boolean has_weapon = FALSE;
+
+	for (index = 0; index<MAXIMUM_WEAPONS_PER_UNIT; ++index)
+	{
+		if (unit->unit.weapon_object_indices[index]==weapon_index)
+		{
+			has_weapon = TRUE;
+			break;
+		}
+	}
+
+	return has_weapon;
+}
+
+void unit_set_mouth_aperture(
+	long unit_index,
+	real mouth_aperture)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	real *current_mouth_aperture = &unit->unit.mouth_aperture;
+
+	*current_mouth_aperture += PIN(mouth_aperture - *current_mouth_aperture, -0.3f, 0.3f);
+
+	return;
 }
 
 void unit_destroy(

@@ -188,6 +188,8 @@ void weapons_dispose(
 	void);
 
 boolean weapon_must_be_readied(long weapon_index);
+boolean weapon_overcharged(
+	long weapon_index);
 real weapon_get_zoom_magnification(
 	long weapon_index,
 	short zoom_level);
