@@ -2857,6 +2857,24 @@ void evaluator( \
 	return; \
 }
 
+#define HS_EVALUATE_RETURN_SHORT_FROM_ARGUMENTS(evaluator, arguments_type, expression) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	arguments_type const *arguments; \
+	union hs_short_result result; \
+	result.value = 0; \
+	arguments = (arguments_type const *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		result.short_value = expression; \
+		hs_return(thread_index, result.value); \
+	} \
+	return; \
+}
+
 #define HS_EVALUATE_LONG_FROM_LONG(evaluator, function) \
 void evaluator( \
 	short function_index, \
@@ -3156,6 +3174,13 @@ short global_structure_bsp_index_get(
 	void);
 short scripted_hud_get_timer_ticks(
 	void);
+short vehicle_scripting_load_magic(
+	long vehicle_index,
+	char const *seat_name,
+	long object_list_index);
+short vehicle_scripting_unload(
+	long vehicle_index,
+	char const *seat_name);
 boolean hs_not(
 	boolean value);
 boolean scenario_trigger_volume_test_object(
@@ -3555,6 +3580,8 @@ HS_EVALUATE_SHORT_FROM_LONG(code_000b07c0, ai_scripting_nonswarm_count)
 HS_EVALUATE_SHORT_FROM_LONG(code_000b0850, ai_scripting_status)
 HS_EVALUATE_SHORT_FROM_UNSIGNED_SHORT(code_000b08f0, ai_scripting_conversation_line)
 HS_EVALUATE_SHORT_FROM_UNSIGNED_SHORT(code_000b0940, ai_scripting_conversation_status)
+HS_EVALUATE_RETURN_SHORT_FROM_ARGUMENTS(code_000ae860, struct hs_arguments_long_long_long, (vehicle_scripting_load_magic(arguments->value0, arguments->value1, arguments->value2)))
+HS_EVALUATE_RETURN_SHORT_FROM_ARGUMENTS(code_000ae8b0, struct hs_arguments_long_long, (vehicle_scripting_unload(arguments->value0, (char const *)arguments->value1)))
 HS_EVALUATE_LONG_FROM_LONG(code_000ae9a0, unit_scripting_unit_riders)
 HS_EVALUATE_LONG_FROM_LONG(code_000ae9e0, unit_scripting_unit_driver)
 HS_EVALUATE_LONG_FROM_LONG(code_000aea20, unit_scripting_unit_gunner)
