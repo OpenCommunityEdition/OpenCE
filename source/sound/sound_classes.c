@@ -248,4 +248,21 @@ void debug_sound_classes_set_distances(
 	return;
 }
 
+void sound_classes_initialize_for_new_map(
+	void)
+{
+	short class_index;
+
+	for (class_index = 0; class_index < NUMBER_OF_SOUND_CLASSES; class_index++)
+	{
+		struct sound_class_runtime *sound_class = code_001b84c0(class_index);
+
+		sound_class->current_gain = 1.f;
+		sound_class->target_gain = 1.f;
+		sound_class->interpolation_ticks = 0;
+	}
+
+	return;
+}
+
 /* ---------- private code */
