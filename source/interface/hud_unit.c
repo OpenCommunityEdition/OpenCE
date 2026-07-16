@@ -80,6 +80,24 @@ symbols in this file:
 
 /* ---------- public code */
 
+void code_000c6590(
+	void)
+{
+	return;
+}
+
+void code_000c65a0(
+	void)
+{
+	return;
+}
+
+void unit_hud_shield_meter_mapper_init(
+	void)
+{
+	return;
+}
+
 void hud_dispose_unit_interface_from_old_map(
 	void)
 {
