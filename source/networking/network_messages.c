@@ -184,13 +184,99 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	_data_packet_field_pad = 0,
+	_data_packet_field_bytes = 1,
+	_data_packet_field_shorts = 2,
+	_data_packet_field_longs = 3,
+	_data_packet_field_array = 7,
+	_data_packet_field_raw = 8,
+	_data_packet_field_end = 9,
+};
+
 /* ---------- macros */
+
+#define DATA_PACKET_FIELD(type, count) { type, count, 0, 0, 0 }
+#define DATA_PACKET_FIELD_END DATA_PACKET_FIELD(_data_packet_field_end, 0)
+#define NETWORK_GAME_MESSAGE_DEFINITION(member, name, structure) \
+	{ name, 0, sizeof(structure), 1, data_0030aa68.member##_fields, FALSE }
 
 /* ---------- structures */
 
 struct network_game_message_packet_definitions
 {
-	unsigned char packet_definitions[0x830];
+	struct data_packet_field client_broadcast_game_search_fields[3];
+	struct data_packet_definition client_broadcast_game_search;
+	struct data_packet_field client_ping_fields[4];
+	struct data_packet_definition client_ping;
+	struct data_packet_field server_game_advertise_fields[2];
+	struct data_packet_definition server_game_advertise;
+	struct data_packet_field server_pong_fields[2];
+	struct data_packet_definition server_pong;
+	struct data_packet_field server_machine_accepted_fields[4];
+	struct data_packet_definition server_machine_accepted;
+	struct data_packet_field server_machine_rejected_fields[2];
+	struct data_packet_definition server_machine_rejected;
+	struct data_packet_field server_game_settings_update_fields[2];
+	struct data_packet_definition server_game_settings_update;
+	struct data_packet_field server_pregame_countdown_fields[2];
+	struct data_packet_definition server_pregame_countdown;
+	struct data_packet_field server_pregame_keep_alive_fields[2];
+	struct data_packet_definition server_pregame_keep_alive;
+	struct data_packet_field server_postgame_keep_alive_fields[2];
+	struct data_packet_definition server_postgame_keep_alive;
+	struct data_packet_field server_begin_game_fields[2];
+	struct data_packet_definition server_begin_game;
+	struct data_packet_field server_graceful_game_exit_pregame_fields[2];
+	struct data_packet_definition server_graceful_game_exit_pregame;
+	struct data_packet_field client_join_game_request_fields[3];
+	struct data_packet_definition client_join_game_request;
+	struct data_packet_field client_add_player_request_pregame_fields[4];
+	struct data_packet_definition client_add_player_request_pregame;
+	struct data_packet_field client_remove_player_request_pregame_fields[4];
+	struct data_packet_definition client_remove_player_request_pregame;
+	struct data_packet_field client_settings_request_fields[4];
+	struct data_packet_definition client_settings_request;
+	struct data_packet_field client_player_settings_request_fields[4];
+	struct data_packet_definition client_player_settings_request;
+	struct data_packet_field client_game_start_request_fields[2];
+	struct data_packet_definition client_game_start_request;
+	struct data_packet_field client_graceful_game_exit_pregame_fields[2];
+	struct data_packet_definition client_graceful_game_exit_pregame;
+	struct data_packet_field client_map_is_precached_pregame_fields[2];
+	struct data_packet_definition client_map_is_precached_pregame;
+	struct data_packet_field server_game_update_fields[8];
+	struct data_packet_definition server_game_update;
+	struct data_packet_field server_add_player_ingame_fields[4];
+	struct data_packet_definition server_add_player_ingame;
+	struct data_packet_field server_remove_player_ingame_fields[5];
+	struct data_packet_definition server_remove_player_ingame;
+	struct data_packet_field server_game_over_fields[2];
+	struct data_packet_definition server_game_over;
+	struct data_packet_field client_loaded_fields[2];
+	struct data_packet_definition client_loaded;
+	struct data_packet_field client_game_update_fields[8];
+	struct data_packet_definition client_game_update;
+	struct data_packet_field client_add_player_request_ingame_fields[4];
+	struct data_packet_definition client_add_player_request_ingame;
+	struct data_packet_field client_remove_player_request_ingame_fields[4];
+	struct data_packet_definition client_remove_player_request_ingame;
+	struct data_packet_field client_host_crashed_cry_for_help_fields[4];
+	struct data_packet_definition client_host_crashed_cry_for_help;
+	struct data_packet_field client_join_new_host_fields[4];
+	struct data_packet_definition client_join_new_host;
+	struct data_packet_field server_switch_to_pregame_fields[2];
+	struct data_packet_definition server_switch_to_pregame;
+	struct data_packet_field server_graceful_game_exit_postgame_fields[2];
+	struct data_packet_definition server_graceful_game_exit_postgame;
+	struct data_packet_field client_remove_player_request_postgame_fields[4];
+	struct data_packet_definition client_remove_player_request_postgame;
+	struct data_packet_field client_switch_to_pregame_fields[2];
+	struct data_packet_definition client_switch_to_pregame;
+	struct data_packet_field client_graceful_game_exit_postgame_fields[2];
+	struct data_packet_definition client_graceful_game_exit_postgame;
+	struct data_packet_entry packets[35];
 	struct data_packet_group_definition group;
 };
 
@@ -244,7 +330,270 @@ DEFINE_NETWORK_GAME_MESSAGE(message_client_graceful_game_exit_postgame, 0x04);
 
 /* ---------- globals */
 
-extern struct network_game_message_packet_definitions data_0030aa68;
+struct network_game_message_packet_definitions data_0030aa68 =
+{
+	{
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 2),
+		DATA_PACKET_FIELD(_data_packet_field_bytes, 8),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_broadcast_game_search, "message_client_broadcast_game_search_packet", message_client_broadcast_game_search),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_longs, 1),
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 1),
+		DATA_PACKET_FIELD(_data_packet_field_pad, 2),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_ping, "message_client_ping_packet", message_client_ping),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_raw, 276),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(server_game_advertise, "message_server_game_advertise_packet", message_server_game_advertise),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_longs, 1),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(server_pong, "message_server_pong_packet", message_server_pong),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_longs, 1),
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 1),
+		DATA_PACKET_FIELD(_data_packet_field_pad, 2),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(server_machine_accepted, "message_server_machine_accepted_packet", message_server_machine_accepted),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 1),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(server_machine_rejected, "message_server_machine_rejected_packet", message_server_machine_rejected),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_raw, 1076),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(server_game_settings_update, "message_server_game_settings_update_packet", message_server_game_settings_update),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 1),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(server_pregame_countdown, "message_server_pregame_countdown_packet", message_server_pregame_countdown),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 1),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(server_pregame_keep_alive, "message_server_pregame_keep_alive_packet", message_server_pregame_keep_alive),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 1),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(server_postgame_keep_alive, "message_server_postgame_keep_alive_packet", message_server_postgame_keep_alive),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_longs, 1),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(server_begin_game, "message_server_begin_game_packet", message_server_begin_game),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_longs, 1),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(server_graceful_game_exit_pregame, "message_server_graceful_game_exit_pregame_packet", message_server_graceful_game_exit_pregame),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 32),
+		DATA_PACKET_FIELD(_data_packet_field_bytes, 16),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_join_game_request, "message_client_join_game_request_packet", message_client_join_game_request),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 12),
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 2),
+		DATA_PACKET_FIELD(_data_packet_field_bytes, 4),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_add_player_request_pregame, "message_client_add_player_request_pregame_packet", message_client_add_player_request_pregame),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 12),
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 2),
+		DATA_PACKET_FIELD(_data_packet_field_bytes, 4),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_remove_player_request_pregame, "message_client_remove_player_request_pregame_packet", message_client_remove_player_request_pregame),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 32),
+		DATA_PACKET_FIELD(_data_packet_field_bytes, 1),
+		DATA_PACKET_FIELD(_data_packet_field_pad, 3),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_settings_request, "message_client_settings_request_packet", message_client_settings_request),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 12),
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 2),
+		DATA_PACKET_FIELD(_data_packet_field_bytes, 4),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_player_settings_request, "message_client_player_settings_request_packet", message_client_player_settings_request),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 1),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_game_start_request, "message_client_game_start_request_packet", message_client_game_start_request),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_longs, 1),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_graceful_game_exit_pregame, "message_client_graceful_game_exit_pregame_packet", message_client_graceful_game_exit_pregame),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_bytes, 256),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_map_is_precached_pregame, "message_client_map_is_precached_pregame_packet", message_client_map_is_precached_pregame),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_longs, 3),
+		DATA_PACKET_FIELD(_data_packet_field_pad, 2),
+		DATA_PACKET_FIELD(_data_packet_field_array, 16),
+		DATA_PACKET_FIELD(_data_packet_field_longs, 6),
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 3),
+		DATA_PACKET_FIELD(_data_packet_field_pad, 2),
+		DATA_PACKET_FIELD_END,
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(server_game_update, "message_server_game_update_packet", message_server_game_update),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 12),
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 2),
+		DATA_PACKET_FIELD(_data_packet_field_bytes, 4),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(server_add_player_ingame, "message_server_add_player_ingame_packet", message_server_add_player_ingame),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 12),
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 2),
+		DATA_PACKET_FIELD(_data_packet_field_bytes, 4),
+		DATA_PACKET_FIELD(_data_packet_field_longs, 1),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(server_remove_player_ingame, "message_server_remove_player_ingame_packet", message_server_remove_player_ingame),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_longs, 1),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(server_game_over, "message_server_game_over_packet", message_server_game_over),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_longs, 1),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_loaded, "message_client_loaded_packet", message_client_loaded),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_longs, 1),
+		DATA_PACKET_FIELD(_data_packet_field_pad, 2),
+		DATA_PACKET_FIELD(_data_packet_field_array, 4),
+		DATA_PACKET_FIELD(_data_packet_field_longs, 6),
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 3),
+		DATA_PACKET_FIELD(_data_packet_field_pad, 2),
+		DATA_PACKET_FIELD_END,
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_game_update, "message_client_game_update_packet", message_client_game_update),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 12),
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 2),
+		DATA_PACKET_FIELD(_data_packet_field_bytes, 4),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_add_player_request_ingame, "message_client_add_player_request_ingame_packet", message_client_add_player_request_ingame),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 12),
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 2),
+		DATA_PACKET_FIELD(_data_packet_field_bytes, 4),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_remove_player_request_ingame, "message_client_remove_player_request_ingame_packet", message_client_remove_player_request_ingame),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_longs, 3),
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 1),
+		DATA_PACKET_FIELD(_data_packet_field_pad, 2),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_host_crashed_cry_for_help, "message_client_host_crashed_cry_for_help_packet", message_client_host_crashed_cry_for_help),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_longs, 3),
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 1),
+		DATA_PACKET_FIELD(_data_packet_field_pad, 2),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_join_new_host, "message_client_join_new_host_packet", message_client_join_new_host),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_longs, 1),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(server_switch_to_pregame, "message_server_switch_to_pregame_packet", message_server_switch_to_pregame),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_longs, 1),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(server_graceful_game_exit_postgame, "message_server_graceful_game_exit_postgame_packet", message_server_graceful_game_exit_postgame),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 12),
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 2),
+		DATA_PACKET_FIELD(_data_packet_field_bytes, 4),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_remove_player_request_postgame, "message_client_remove_player_request_postgame_packet", message_client_remove_player_request_postgame),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_longs, 1),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_switch_to_pregame, "message_client_switch_to_pregame_packet", message_client_switch_to_pregame),
+	{
+		DATA_PACKET_FIELD(_data_packet_field_longs, 1),
+		DATA_PACKET_FIELD_END,
+	},
+	NETWORK_GAME_MESSAGE_DEFINITION(client_graceful_game_exit_postgame, "message_client_graceful_game_exit_postgame_packet", message_client_graceful_game_exit_postgame),
+	{
+		{ 0, 0, &data_0030aa68.client_broadcast_game_search },
+		{ 0, 0, &data_0030aa68.client_ping },
+		{ 1, 0, &data_0030aa68.server_game_advertise },
+		{ 1, 0, &data_0030aa68.server_pong },
+		{ 2, 0, &data_0030aa68.server_machine_accepted },
+		{ 2, 0, &data_0030aa68.server_machine_rejected },
+		{ 2, 0, &data_0030aa68.server_game_settings_update },
+		{ 2, 0, &data_0030aa68.server_pregame_countdown },
+		{ 2, 0, &data_0030aa68.server_pregame_keep_alive },
+		{ 2, 0, &data_0030aa68.server_begin_game },
+		{ 2, 0, &data_0030aa68.server_graceful_game_exit_pregame },
+		{ 6, 0, &data_0030aa68.server_postgame_keep_alive },
+		{ 3, 0, &data_0030aa68.client_join_game_request },
+		{ 3, 0, &data_0030aa68.client_add_player_request_pregame },
+		{ 3, 0, &data_0030aa68.client_remove_player_request_pregame },
+		{ 3, 0, &data_0030aa68.client_settings_request },
+		{ 3, 0, &data_0030aa68.client_player_settings_request },
+		{ 3, 0, &data_0030aa68.client_game_start_request },
+		{ 3, 0, &data_0030aa68.client_graceful_game_exit_pregame },
+		{ 3, 0, &data_0030aa68.client_map_is_precached_pregame },
+		{ 4, 0, &data_0030aa68.server_game_update },
+		{ 4, 0, &data_0030aa68.server_add_player_ingame },
+		{ 4, 0, &data_0030aa68.server_remove_player_ingame },
+		{ 4, 0, &data_0030aa68.server_game_over },
+		{ 5, 0, &data_0030aa68.client_loaded },
+		{ 5, 0, &data_0030aa68.client_game_update },
+		{ 5, 0, &data_0030aa68.client_add_player_request_ingame },
+		{ 5, 0, &data_0030aa68.client_remove_player_request_ingame },
+		{ 5, 0, &data_0030aa68.client_host_crashed_cry_for_help },
+		{ 5, 0, &data_0030aa68.client_join_new_host },
+		{ 6, 0, &data_0030aa68.server_switch_to_pregame },
+		{ 6, 0, &data_0030aa68.server_graceful_game_exit_postgame },
+		{ 7, 0, &data_0030aa68.client_remove_player_request_postgame },
+		{ 7, 0, &data_0030aa68.client_switch_to_pregame },
+		{ 7, 0, &data_0030aa68.client_graceful_game_exit_postgame },
+	},
+	{
+		"network_game_messages_group",
+		35,
+		8,
+		0x600,
+		0x800,
+		data_0030aa68.packets,
+	},
+};
 
 static byte bss_004566f0[0x604];
 

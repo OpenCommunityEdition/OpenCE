@@ -12,9 +12,40 @@ DATA_PACKET_GROUPS.H
 
 /* ---------- structures */
 
+struct data_packet_field
+{
+	short type;
+	short count;
+	short minimum_version;
+	short maximum_version;
+	short size;
+};
+
+struct data_packet_definition
+{
+	char const *name;
+	long flags;
+	short size;
+	short version;
+	struct data_packet_field *fields;
+	boolean initialized;
+};
+
+struct data_packet_entry
+{
+	short packet_class;
+	short flags;
+	struct data_packet_definition *definition;
+};
+
 struct data_packet_group_definition
 {
-	unsigned char opaque[0x14];
+	char const *name;
+	short packet_count;
+	short packet_class_count;
+	long maximum_decoded_packet_size;
+	long maximum_encoded_packet_size;
+	struct data_packet_entry *packets;
 };
 
 /* ---------- prototypes/DATA_PACKET_GROUPS.C */
