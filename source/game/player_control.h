@@ -97,12 +97,22 @@ void player_control_dispose_from_old_map(
 	void);
 struct player_control *player_control_get(
 	short local_player_index);
+void player_control_inhibit_buttons(
+	short local_player_index,
+	word action_flags,
+	boolean persistent);
+long player_control_get_target_object_index(
+	short local_player_index);
 long player_control_get_unit_index(
 	short local_player_index);
 short player_control_get_zoom_level(
 	short local_player_index);
 float player_control_get_autoaim_level(
 	short local_player_index);
+void players_unzoom_all(
+	void);
+void player_control_unzoom(
+	long unit_index);
 boolean scripted_player_control_set_camera_control(
 	boolean camera_control);
 void player_control_action_test_reset(

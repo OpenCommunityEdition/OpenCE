@@ -185,6 +185,9 @@ symbols in this file:
 #include "game/player_control.h"
 #include "players.h"
 
+#include "objects/objects.h"
+#include "units/units.h"
+
 #include "real_math.h"
 
 /* ---------- constants */
@@ -240,6 +243,33 @@ boolean scripted_player_control_set_camera_control(
 	return camera_control;
 }
 
+void player_control_inhibit_buttons(
+	short local_player_index,
+	word action_flags,
+	boolean persistent)
+{
+	struct player_control *control = player_control_get(local_player_index);
+
+	control->inhibited_action_flags |= action_flags;
+	if (persistent)
+	{
+		control->persistent_inhibited_action_flags |= action_flags;
+	}
+	return;
+}
+
+long player_control_get_target_object_index(
+	short local_player_index)
+{
+	struct player_control *control = player_control_get(local_player_index);
+
+	if (object_try_and_get(control->target_object_index))
+	{
+		return control->target_object_index;
+	}
+	return NONE;
+}
+
 long player_control_get_unit_index(
 	short local_player_index)
 {
@@ -266,6 +296,38 @@ float player_control_get_autoaim_level(
 	match_assert("c:\\halo\\SOURCE\\game\\player_control.c", 0xB1,
 		local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
 	return player_control_globals->players[local_player_index].autoaim_level;
+}
+
+void players_unzoom_all(
+	void)
+{
+	short local_player_index;
+
+	for (local_player_index = 0;
+		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
+		local_player_index++)
+	{
+		player_control_get(local_player_index)->zoom_level = NONE;
+	}
+	return;
+}
+
+void player_control_unzoom(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	long player_index = unit->unit.player_index;
+
+	if (player_index != NONE)
+	{
+		struct player_datum *player = player_get(player_index);
+
+		if (player->local_player_index != NONE)
+		{
+			player_control_get(player->local_player_index)->zoom_level = NONE;
+		}
+	}
+	return;
 }
 
 void player_control_action_test_reset(
