@@ -86,6 +86,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cseries_windows.h"
+#include "errors.h"
 
 #include <time.h>
 
@@ -102,6 +103,11 @@ struct system_memory_information
 };
 
 /* ---------- prototypes */
+
+void stack_walk_with_context(
+	boolean disregard_symbol_names,
+	const char *name,
+	CONTEXT *context);
 
 /* ---------- globals */
 
@@ -253,6 +259,85 @@ void system_kill_screen_saver(
 	void)
 {
 	return;
+}
+
+static const char *code_0007cb70(
+	unsigned long exception_code)
+{
+	const char *exception_name = NULL;
+
+	switch (exception_code)
+	{
+	case EXCEPTION_FLT_INVALID_OPERATION:
+		exception_name = "EXCEPTION_FLT_INVALID_OPERATION";
+		break;
+	case EXCEPTION_FLT_OVERFLOW:
+		exception_name = "EXCEPTION_FLT_OVERFLOW";
+		break;
+	case EXCEPTION_FLT_STACK_CHECK:
+		exception_name = "EXCEPTION_FLT_STACK_CHECK";
+		break;
+	case EXCEPTION_FLT_UNDERFLOW:
+		exception_name = "EXCEPTION_FLT_UNDERFLOW";
+		break;
+	case EXCEPTION_INT_DIVIDE_BY_ZERO:
+		exception_name = "EXCEPTION_INT_DIVIDE_BY_ZERO";
+		break;
+	case EXCEPTION_INT_OVERFLOW:
+		exception_name = "EXCEPTION_INT_OVERFLOW";
+		break;
+	case EXCEPTION_PRIV_INSTRUCTION:
+		exception_name = "EXCEPTION_PRIV_INSTRUCTION";
+		break;
+	case EXCEPTION_FLT_INEXACT_RESULT:
+		exception_name = "EXCEPTION_FLT_INEXACT_RESULT";
+		break;
+	case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+		exception_name = "EXCEPTION_ARRAY_BOUNDS_EXCEEDED";
+		break;
+	case EXCEPTION_FLT_DENORMAL_OPERAND:
+		exception_name = "EXCEPTION_FLT_DENORMAL_OPERAND";
+		break;
+	case EXCEPTION_FLT_DIVIDE_BY_ZERO:
+		exception_name = "EXCEPTION_FLT_DIVIDE_BY_ZERO";
+		break;
+	case EXCEPTION_NONCONTINUABLE_EXCEPTION:
+		exception_name = "EXCEPTION_NONCONTINUABLE_EXCEPTION";
+		break;
+	case EXCEPTION_ACCESS_VIOLATION:
+		exception_name = "EXCEPTION_ACCESS_VIOLATION";
+		break;
+	case EXCEPTION_SINGLE_STEP:
+		exception_name = "EXCEPTION_SINGLE_STEP";
+		break;
+	case EXCEPTION_DATATYPE_MISALIGNMENT:
+		exception_name = "EXCEPTION_DATATYPE_MISALIGNMENT";
+		break;
+	case EXCEPTION_BREAKPOINT:
+		exception_name = "EXCEPTION_BREAKPOINT";
+		break;
+	}
+
+	return exception_name;
+}
+
+long generic_exception_filter(
+	unsigned long exception_code,
+	PEXCEPTION_POINTERS exception_information)
+{
+	const char *exception_name = code_0007cb70(exception_code);
+
+	stack_walk_with_context(FALSE, NULL, exception_information->ContextRecord);
+	if (exception_name)
+	{
+		error(_error_silent, "%s", exception_name);
+	}
+	else
+	{
+		error(_error_silent, "unknown exception %08lX", exception_code);
+	}
+
+	return EXCEPTION_EXECUTE_HANDLER;
 }
 
 /* ---------- private code */

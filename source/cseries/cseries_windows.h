@@ -51,6 +51,8 @@ void system_alert(
 void system_kill_screen_saver(
 	void);
 
-long generic_exception_filter(unsigned long exception_code, PEXCEPTION_POINTERS exception_information);
+long generic_exception_filter(
+	unsigned long exception_code,
+	PEXCEPTION_POINTERS exception_information);
 
 #endif // __CSERIES_WINDOWS_H
