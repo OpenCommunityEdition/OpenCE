@@ -3289,6 +3289,23 @@ struct hs_arguments_word_word_word
 	word value2;
 };
 
+struct hs_arguments_word_word_long
+{
+	word value0;
+	word pad0;
+	word value1;
+	word pad1;
+	long value2;
+};
+
+struct hs_arguments_long_word_boolean
+{
+	long value0;
+	word value1;
+	word pad1;
+	boolean value2;
+};
+
 union hs_boolean_result
 {
 	boolean boolean;
@@ -4005,6 +4022,29 @@ void ai_debug_speak(
 	char const *vocalization);
 void ai_debug_speak_list(
 	char const *list_name);
+void director_script_camera(
+	boolean scripted);
+void scripted_camera_set_absolute(
+	short camera_point_index,
+	word transition_time);
+void scripted_camera_set(
+	word camera_point_index0,
+	word camera_point_index1,
+	long transition_time);
+void scripted_camera_set_animation(
+	long animation_index,
+	long object_index);
+void game_time_set_speed(
+	real speed);
+void player_add_equipment(
+	long player_index,
+	word equipment_definition_index,
+	boolean force);
+void debug_player_teleport(
+	short player_index,
+	word location_index);
+boolean scenario_switch_structure_bsp(
+	word structure_bsp_index);
 void cinematic_show_letterbox(
 	boolean show);
 void cinematic_set_title(
@@ -4289,13 +4329,21 @@ HS_EVALUATE_VOID_LONG_BOOLEAN(code_000b04b0, ai_scripting_berserk)
 HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(code_000b04f0, ai_scripting_set_team)
 HS_EVALUATE_VOID_LONG_BOOLEAN(code_000b0530, ai_scripting_allow_charge)
 HS_EVALUATE_VOID_LONG_BOOLEAN(code_000b0570, ai_scripting_allow_dormant)
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b09e0, struct hs_arguments_boolean, (director_script_camera(arguments->value)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b0a20, struct hs_arguments_short_word, (scripted_camera_set_absolute(arguments->value0, arguments->value1)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b0a60, struct hs_arguments_word_word_long, (scripted_camera_set(arguments->value0, arguments->value1, arguments->value2)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b0aa0, struct hs_arguments_long_long, (scripted_camera_set_animation(arguments->value0, arguments->value1)))
 HS_EVALUATE_VOID_LONG(code_000b0ae0, scripted_camera_set_first_person)
 HS_EVALUATE_VOID_LONG(code_000b0b20, scripted_camera_set_dead)
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b0bd0, struct hs_arguments_real, (game_time_set_speed(arguments->value)))
 HS_EVALUATE_VOID_STRING(code_000b0c10, game_set_game_variant_from_name)
 HS_EVALUATE_VOID_BOOLEAN(code_000b0cf0, player_input_enable)
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b1010, struct hs_arguments_long_word_boolean, (player_add_equipment(arguments->value0, arguments->value1, arguments->value2)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b1050, struct hs_arguments_short_word, (debug_player_teleport(arguments->value0, arguments->value1)))
 HS_EVALUATE_VOID_STRING(code_000b10b0, main_set_map_name)
 HS_EVALUATE_VOID_STRING(code_000b10f0, main_set_multiplayer_map_name)
 HS_EVALUATE_VOID_UNSIGNED_SHORT(code_000b1130, main_set_difficulty)
+HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b11b0, struct hs_arguments_word, (scenario_switch_structure_bsp(arguments->value)))
 HS_EVALUATE_VOID_STRING(code_000b1170, main_crash)
 HS_EVALUATE_VOID_STRING(code_000b12e0, debug_dump_memory_for_file)
 HS_EVALUATE_VOID_STRING(code_000b1360, profile_dump_to_file)
