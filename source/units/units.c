@@ -857,6 +857,14 @@ boolean unit_controllable(
 	return TEST_FLAG(unit_get(unit_index)->unit.flags, _unit_controllable_bit);
 }
 
+boolean unit_is_busy(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	return unit_animation_busy(&unit->unit.animation);
+}
+
 void unit_set_enterable_by_player(
 	long unit_index,
 	boolean enterable_by_player)
@@ -1104,6 +1112,35 @@ short unit_get_weapon_count(
 	return weapon_count;
 }
 
+boolean unit_approve_weapon_pickup(
+	long unit_index,
+	long weapon_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct weapon_datum *weapon = weapon_get(weapon_index);
+	long *inventory_weapon_index;
+	long remaining_weapon_count;
+	boolean approved;
+
+	weapon_definition_get(weapon->definition_index);
+	approved = TRUE;
+	inventory_weapon_index = unit->unit.weapon_object_indices;
+	remaining_weapon_count = MAXIMUM_WEAPONS_PER_UNIT;
+
+	while (remaining_weapon_count--)
+	{
+		if (*inventory_weapon_index!=NONE &&
+			weapon->definition_index==weapon_get(*inventory_weapon_index)->definition_index)
+		{
+			approved = FALSE;
+		}
+
+		++inventory_weapon_index;
+	}
+
+	return approved;
+}
+
 boolean unit_has_weapon_definition_index(
 	long unit_index,
 	long weapon_definition_index)
@@ -1148,6 +1185,72 @@ short unit_get_current_grenade_type(
 	match_assert("c:\\halo\\SOURCE\\units\\units.c", 7864, unit->unit.current_grenade_index==NONE || (unit->unit.current_grenade_index>=0 && unit->unit.current_grenade_index<NUMBER_OF_UNIT_GRENADE_TYPES));
 
 	return unit->unit.current_grenade_index;
+}
+
+short unit_inventory_next_grenade(
+	long unit_index,
+	short current_index,
+	short delta)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	short next_index = NONE;
+	short index;
+
+	if (current_index==NONE)
+	{
+		current_index = 0;
+	}
+	else
+	{
+		match_assert("c:\\halo\\SOURCE\\units\\units.c", 5694, current_index>=0 && current_index<NUMBER_OF_UNIT_GRENADE_TYPES);
+	}
+
+	index = current_index;
+
+	do
+	{
+		if (unit->unit.grenade_counts[index]>0)
+		{
+			next_index = index;
+
+			if (index!=current_index || delta==0)
+			{
+				break;
+			}
+		}
+
+		if (delta<0)
+		{
+			index = index==0 ? NUMBER_OF_UNIT_GRENADE_TYPES-1 : index-1;
+		}
+		else
+		{
+			index = index==NUMBER_OF_UNIT_GRENADE_TYPES-1 ? 0 : index+1;
+		}
+	} while (index!=current_index);
+
+	return next_index;
+}
+
+short unit_inventory_get_must_be_readied_weapon(
+	long unit_index)
+{
+	short must_be_readied_weapon_index = NONE;
+	struct unit_datum *unit = unit_get(unit_index);
+	short index;
+
+	for (index = 0; index<MAXIMUM_WEAPONS_PER_UNIT; ++index)
+	{
+		long weapon_index = unit->unit.weapon_object_indices[index];
+
+		if (weapon_index!=NONE && weapon_must_be_readied(weapon_index))
+		{
+			must_be_readied_weapon_index = index;
+			break;
+		}
+	}
+
+	return must_be_readied_weapon_index;
 }
 
 short unit_add_grenade_type_to_inventory(
@@ -1478,6 +1581,38 @@ boolean unit_is_playing_custom_animation(
 	}
 
 	return FALSE;
+}
+
+short unit_get_custom_animation_time(
+	long unit_index)
+{
+	if (unit_index!=NONE)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+
+		if (unit->unit.animation.state==_unit_state_user_animation)
+		{
+			struct animation_graph *animation_graph = animation_graph_definition_get(unit->object.animation.animation_graph_index);
+			struct animation *animation = TAG_BLOCK_GET_ELEMENT(&animation_graph->animations, unit->object.animation.state.index, struct animation);
+			return MAX(animation->frame_count - unit->object.animation.state.frame_index - 2, 0);
+		}
+	}
+
+	return 0;
+}
+
+boolean unit_set_seat(
+	long unit_index,
+	char const *seat_label)
+{
+	boolean seat_set = FALSE;
+
+	if (unit_set_or_test_seat_and_weapon_label(unit_index, seat_label, NULL, TRUE))
+	{
+		seat_set = TRUE;
+	}
+
+	return seat_set;
 }
 
 boolean unit_flying_through_air(

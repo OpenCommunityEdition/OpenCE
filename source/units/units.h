@@ -613,6 +613,8 @@ void unit_scripting_exit_vehicle(
 boolean unit_clip_to_aiming_bounds(long unit_index, real_vector3d *vector, boolean use_aiming_screen);
 long unit_inventory_get_weapon(long unit_index, short index);
 short unit_inventory_next_grenade(long unit_index, short current_index, short delta);
+short unit_inventory_get_must_be_readied_weapon(
+	long unit_index);
 boolean unit_has_weapon_definition_index(
 	long unit_index,
 	long weapon_definition_index);
@@ -630,6 +632,14 @@ boolean unit_start_user_animation(
 	long animation_graph_index,
 	char const *animation_name,
 	boolean interpolate);
+short unit_get_custom_animation_time(
+	long unit_index);
+boolean unit_approve_weapon_pickup(
+	long unit_index,
+	long weapon_index);
+boolean unit_set_seat(
+	long unit_index,
+	char const *seat_label);
 
 void unit_ready_desired_weapon(long unit_index, boolean immediate);
 
