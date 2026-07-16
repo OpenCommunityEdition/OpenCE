@@ -212,7 +212,6 @@ static long code_000a1530(
 	struct game_globals_multiplayer_sound_view *game_globals;
 	struct game_globals_multiplayer_information *multiplayer_information;
 	struct tag_reference *sound;
-	long duration = 0;
 
 	global_scenario_get();
 	game_globals = (struct game_globals_multiplayer_sound_view *)scenario_get_game_globals();
@@ -220,17 +219,21 @@ static long code_000a1530(
 		&game_globals->multiplayer_information,
 		0,
 		struct game_globals_multiplayer_information);
-	if (multiplayer_information && sound_index < multiplayer_information->sounds.count)
-	{
-		sound = TAG_BLOCK_GET_ELEMENT(
-			&multiplayer_information->sounds,
-			sound_index,
-			struct tag_reference);
-		if (sound && sound->index != NONE)
-			duration = (long)(sound_definition_get(sound->index)->longest_permutation_length * TICKS_PER_SECOND) / 1000;
-	}
+	if (!multiplayer_information)
+		return 0;
+	if (sound_index >= multiplayer_information->sounds.count)
+		return 0;
 
-	return duration;
+	sound = TAG_BLOCK_GET_ELEMENT(
+		&multiplayer_information->sounds,
+		sound_index,
+		struct tag_reference);
+	if (!sound)
+		return 0;
+	if (sound->index == NONE)
+		return 0;
+
+	return (long)(sound_definition_get(sound->index)->longest_permutation_length * TICKS_PER_SECOND) / 1000;
 }
 
 void game_engine_play_multiplayer_sound(
