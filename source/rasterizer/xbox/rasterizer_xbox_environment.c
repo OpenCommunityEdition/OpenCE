@@ -146,8 +146,140 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void rasterizer_profile_begin(
+	short profile);
+
+void rasterizer_profile_end(
+	short profile);
+
+void rasterizer_set_stencil_mode(
+	short mode);
+
+void rasterizer_transparent_geometry_groups_begin(
+	void);
+
+void rasterizer_transparent_geometry_groups_end(
+	void);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+void _rasterizer_environment_lightmap_end(
+	void)
+{
+	return;
+}
+
+void _rasterizer_environment_lightmaps_end(
+	void)
+{
+	rasterizer_profile_end(3);
+	return;
+}
+
+void _rasterizer_environment_diffuse_light_end(
+	void)
+{
+	return;
+}
+
+void _rasterizer_environment_diffuse_lights_end(
+	void)
+{
+	rasterizer_profile_end(5);
+	return;
+}
+
+void _rasterizer_environment_diffuse_textures_end(
+	void)
+{
+	rasterizer_set_stencil_mode(2);
+	rasterizer_profile_end(8);
+	return;
+}
+
+void _rasterizer_environment_specular_light_end(
+	void)
+{
+	return;
+}
+
+void _rasterizer_environment_specular_lights_end(
+	void)
+{
+	rasterizer_profile_end(11);
+	return;
+}
+
+void _rasterizer_environment_specular_lightmap_end(
+	void)
+{
+	return;
+}
+
+void _rasterizer_environment_specular_lightmaps_end(
+	void)
+{
+	rasterizer_profile_end(12);
+	return;
+}
+
+void _rasterizer_environment_reflection_lightmap_mask_end(
+	void)
+{
+	return;
+}
+
+void _rasterizer_environment_reflection_lightmap_masks_end(
+	void)
+{
+	rasterizer_profile_end(13);
+	return;
+}
+
+void _rasterizer_environment_reflection_mirrors_begin(
+	void)
+{
+	rasterizer_profile_begin(14);
+	return;
+}
+
+void _rasterizer_environment_reflection_mirrors_end(
+	void)
+{
+	rasterizer_profile_end(14);
+	return;
+}
+
+void _rasterizer_environment_reflections_begin(
+	void)
+{
+	rasterizer_profile_begin(15);
+	return;
+}
+
+void _rasterizer_environment_reflections_end(
+	void)
+{
+	rasterizer_profile_end(15);
+	return;
+}
+
+void _rasterizer_environment_transparent_geometry_begin(
+	void)
+{
+	rasterizer_profile_begin(16);
+	rasterizer_transparent_geometry_groups_begin();
+	return;
+}
+
+void _rasterizer_environment_transparent_geometry_end(
+	void)
+{
+	rasterizer_transparent_geometry_groups_end();
+	rasterizer_profile_end(16);
+	return;
+}
 
 /* ---------- private code */
