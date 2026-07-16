@@ -3379,6 +3379,8 @@ short vehicle_scripting_load_magic(
 short vehicle_scripting_unload(
 	long vehicle_index,
 	char const *seat_name);
+boolean unit_solo_player_integrated_night_vision_is_active(
+	void);
 void scripted_hud_set_flashing_state(
 	boolean enabled);
 void hud_unit_deactivate_nav_point_with_flag(
@@ -4032,6 +4034,10 @@ boolean player_control_action_test_look_relative_all_directions(
 	void);
 boolean player_control_action_test_move_relative_all_directions(
 	void);
+boolean player0_look_pitch_is_inverted(
+	void);
+boolean player0_joystick_set_is_normal(
+	void);
 void main_set_map_name(
 	char const *map_name);
 void main_set_multiplayer_map_name(
@@ -4447,6 +4453,8 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b28b0, struct hs_arguments_boolean, (scr
 HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2a00, struct hs_arguments_boolean, (rasterizer_screen_effect_start(arguments->value)))
 HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2bb0, struct hs_arguments_real, (rasterizer_set_near_clip_distance(arguments->value)))
 HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b2c70, struct hs_arguments_boolean, (player0_look_invert_pitch(arguments->value)))
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b2cb0, player0_look_pitch_is_inverted)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b2ce0, player0_joystick_set_is_normal)
 HS_EVALUATE_VOID_BOOLEAN(code_000b2d10, ui_widget_debug_show_path)
 HS_EVALUATE_VOID_UNSIGNED_SHORT(code_000b2d50, display_scenario_help)
 HS_EVALUATE_VOID_STRING(code_000b2db0, xbox_set_machine_name)
@@ -4467,6 +4475,7 @@ HS_EVALUATE_RETURN_BOOLEAN(code_000ae600, struct hs_arguments_long_long_long, (u
 HS_EVALUATE_RETURN_BOOLEAN(code_000ae650, struct hs_arguments_long_long_long, (unit_scripting_vehicle_test_seat(arguments->value0, arguments->value1, arguments->value2)))
 HS_EVALUATE_RETURN_BOOLEAN(code_000aeb30, struct hs_arguments_long_long, (unit_scripting_has_weapon(arguments->value0, arguments->value1)))
 HS_EVALUATE_RETURN_BOOLEAN(code_000aeb80, struct hs_arguments_long_long, (unit_scripting_has_weapon_readied(arguments->value0, arguments->value1)))
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000aec90, unit_solo_player_integrated_night_vision_is_active)
 HS_EVALUATE_RETURN_BOOLEAN(code_000aed40, struct hs_arguments_long, (unit_get_current_flashlight_state(arguments->value)))
 HS_EVALUATE_RETURN_BOOLEAN(code_000b05b0, struct hs_arguments_long, (ai_scripting_is_attacking(arguments->value)))
 HS_EVALUATE_RETURN_BOOLEAN(code_000b08a0, struct hs_arguments_word, (ai_scripting_conversation(arguments->value)))
