@@ -301,6 +301,7 @@ symbols in this file:
 #include "cseries.h"
 #include "real_math.h"
 #include "rasterizer.h"
+#include "saved games/game_state.h"
 
 /* ---------- constants */
 
@@ -343,6 +344,8 @@ struct rasterizer_debug_options_definition
 /* ---------- prototypes */
 
 void _rasterizer_reset_state(
+	void);
+boolean _rasterizer_initialize(
 	void);
 void _rasterizer_frame_begin(
 	struct rasterizer_frame_begin_parameters const *parameters);
@@ -451,6 +454,20 @@ extern struct rasterizer_globals_definition rasterizer_globals;
 extern struct rasterizer_debug_options_definition rasterizer_debug_options;
 
 /* ---------- public code */
+
+boolean rasterizer_initialize(
+	void)
+{
+	global_rasterizer_model_ambient_reflection_tint = game_state_malloc(
+		"rasterizer model ambient reflection tint",
+		NULL,
+		sizeof(*global_rasterizer_model_ambient_reflection_tint));
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\rasterizer.c",
+		289,
+		global_rasterizer_model_ambient_reflection_tint);
+	return _rasterizer_initialize();
+}
 
 void rasterizer_reset_state(
 	void)
