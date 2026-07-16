@@ -50,6 +50,8 @@ real object_get_maximum_body_vitality(long object_index, boolean ignore_difficul
 real object_get_maximum_shield_vitality(long object_index, boolean ignore_difficulty);
 
 void object_damage_update(long object_index);
+void object_destroy(
+	long object_index);
 void damage_data_new(struct damage_data *damage_data, long definition_index);
 
 void object_cause_damage(struct damage_data *damage_data, long object_index, short node_index, short region_index, short material_index, real_vector3d const *object_normal);

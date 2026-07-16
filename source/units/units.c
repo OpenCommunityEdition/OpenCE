@@ -713,7 +713,7 @@ static boolean unit_set_or_test_seat_and_weapon_label(
 	char const *weapon_label,
 	boolean change_flag);
 
-static boolean unit_animation_set_state(
+boolean unit_animation_set_state(
 	long unit_index,
 	short new_state);
 
@@ -844,6 +844,62 @@ long unit_get_current_equipment(
 	long unit_index)
 {
 	return unit_get(unit_index)->unit.equipment_object_index;
+}
+
+void unit_destroy(
+	long unit_index)
+{
+	object_destroy(unit_index);
+	unit_test_spawning(unit_index);
+
+	return;
+}
+
+void unit_get_facing_vector(
+	long unit_index,
+	real_vector3d *facing_vector)
+{
+	object_get_orientation(unit_index, facing_vector, NULL);
+
+	return;
+}
+
+void unit_abort_animation(
+	long unit_index)
+{
+	unit_animation_set_state(unit_index, _unit_state_idle);
+
+	return;
+}
+
+void unit_open(
+	long unit_index)
+{
+	if (unit_index!=NONE)
+	{
+		unit_animation_set_state(unit_index, _unit_state_opening);
+	}
+
+	return;
+}
+
+void unit_close(
+	long unit_index)
+{
+	if (unit_index!=NONE)
+	{
+		unit_animation_set_state(unit_index, _unit_state_closing);
+	}
+
+	return;
+}
+
+void scripting_set_magic_base_seat(
+	char const *seat_name)
+{
+	magic_base_animation_seat_index = seat_label_to_base_seat_index(seat_name);
+
+	return;
 }
 
 boolean unit_update(
@@ -2276,7 +2332,7 @@ static boolean unit_set_or_test_seat_and_weapon_label(
 	return result;
 }
 
-static boolean unit_animation_set_state(
+boolean unit_animation_set_state(
 	long unit_index,
 	short new_state)
 {

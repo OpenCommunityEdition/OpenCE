@@ -518,6 +518,8 @@ void units_update(void);
 
 short unit_get_zoom_level(
 	long unit_index);
+short unit_test_spawning(
+	long unit_index);
 
 boolean unit_update(long unit_index);
 
@@ -532,7 +534,8 @@ void unit_euler_aiming_update(
 
 void unit_unzoom(long unit_index);
 
-void unit_destroy(long unit_index);
+void unit_destroy(
+	long unit_index);
 void unit_died(long unit_index, boolean feigned);
 void unit_get_head_position(long unit_index, union real_point3d *head_position);
 void unit_get_camera_position(long unit_index, real_point3d *camera_position);
@@ -549,11 +552,21 @@ boolean unit_start_animation_impulse(long unit_index, short animation_impulse, r
 long unit_get_aiming_unit_index(long unit_index);
 void unit_get_aiming_vector(long unit_index, real_vector3d *aiming_vector);
 void unit_get_looking_vector(long unit_index, real_vector3d *looking_vector);
-void unit_get_facing_vector(long unit_index, real_vector3d *facing_vector);
+void unit_get_facing_vector(
+	long unit_index,
+	real_vector3d *facing_vector);
 boolean unit_controllable(
 	long unit_index);
 long unit_get_current_equipment(
 	long unit_index);
+void unit_abort_animation(
+	long unit_index);
+void unit_open(
+	long unit_index);
+void unit_close(
+	long unit_index);
+void scripting_set_magic_base_seat(
+	char const *seat_name);
 boolean unit_clip_to_aiming_bounds(long unit_index, real_vector3d *vector, boolean use_aiming_screen);
 long unit_inventory_get_weapon(long unit_index, short index);
 short unit_inventory_next_grenade(long unit_index, short current_index, short delta);
