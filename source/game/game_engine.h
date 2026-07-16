@@ -14,6 +14,14 @@ enum
 {
 	_game_engine_allow_dynamic_lighting_bit = 0,
 	_game_engine_allow_integrated_lights_bit,
+	_game_engine_disable_infinite_grenades_bit,
+};
+
+enum
+{
+	_game_variant_draw_object_in_motion_sensor_bit = 0,
+	_game_variant_infinite_grenades_bit = 2,
+	_game_variant_no_shields_bit,
 };
 
 /* ---------- macros */
@@ -71,7 +79,11 @@ typedef char verify_game_engine_size[sizeof(struct game_engine) == 0x88 ? 1 : -1
 void game_engine_playlist_initialize(
 	void);
 
-boolean game_engine_running(void);
+boolean game_engine_running(
+	void);
+
+boolean game_engine_force_single_screen(
+	void);
 
 void game_engine_dispose(
 	void);
@@ -123,7 +135,17 @@ boolean game_engine_allow_pause(
 boolean game_engine_allow_dynamic_lighting(
 	long object_index);
 
-boolean game_engine_infinite_grenades(long player_index);
+boolean game_engine_infinite_grenades(
+	long player_index);
+
+boolean game_engine_has_shield(
+	long player_index);
+
+boolean game_engine_draw_object_in_motion_sensor(
+	void);
+
+boolean game_engine_should_end_game(
+	void);
 
 long game_engine_remap_object_definition(long definition_index);
 

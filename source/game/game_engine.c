@@ -577,6 +577,9 @@ void code_00096890(
 long game_engine_did_player_win_default(
 	long player_index);
 
+boolean multiple_teams_alive(
+	void);
+
 /* ---------- globals */
 
 struct game_engine *game_engine;
@@ -598,7 +601,24 @@ void game_engine_playlist_initialize(
 boolean game_engine_running(
 	void)
 {
-	return game_engine!=NULL;
+	boolean running = game_engine!=NULL;
+
+	return running;
+}
+
+boolean game_engine_force_single_screen(
+	void)
+{
+	boolean force_single_screen = FALSE;
+
+	if (game_engine &&
+		game_engine_globals.postgame_state>=2 &&
+		game_engine_globals.postgame_state<=3)
+	{
+		force_single_screen = TRUE;
+	}
+
+	return force_single_screen;
 }
 
 void game_engine_dispose(
@@ -665,6 +685,54 @@ boolean game_engine_can_score(
 		can_score = game_engine_globals.postgame_state==0;
 
 	return can_score;
+}
+
+boolean game_engine_infinite_grenades(
+	long player_index)
+{
+	boolean infinite_grenades = FALSE;
+
+	if (game_engine &&
+		player_index!=NONE &&
+		!TEST_FLAG(game_engine_globals.flags, _game_engine_disable_infinite_grenades_bit))
+	{
+		infinite_grenades = TEST_FLAG(global_variant.flags, _game_variant_infinite_grenades_bit);
+	}
+
+	return infinite_grenades;
+}
+
+boolean game_engine_has_shield(
+	long player_index)
+{
+	boolean has_shield = TRUE;
+
+	if (game_engine && player_index!=NONE)
+		has_shield = !TEST_FLAG(global_variant.flags, _game_variant_no_shields_bit);
+
+	return has_shield;
+}
+
+boolean game_engine_draw_object_in_motion_sensor(
+	void)
+{
+	boolean draw_object = TRUE;
+
+	if (game_engine)
+		draw_object = TEST_FLAG(global_variant.flags, _game_variant_draw_object_in_motion_sensor_bit);
+
+	return draw_object;
+}
+
+boolean game_engine_should_end_game(
+	void)
+{
+	boolean should_end_game = FALSE;
+
+	if (game_engine && !multiple_teams_alive())
+		should_end_game = TRUE;
+
+	return should_end_game;
 }
 
 boolean game_engine_allow_pick_up(
