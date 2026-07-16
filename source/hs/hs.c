@@ -2769,16 +2769,218 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "hs.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
+
+#define HS_EVALUATE_NO_ARGUMENTS(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	function(); \
+	hs_return(thread_index, 0); \
+	return; \
+}
 
 /* ---------- structures */
 
 /* ---------- prototypes */
 
+void hs_return(
+	long thread_index,
+	long value);
+void hs_object_destroy_all(
+	void);
+void numeric_countdown_timer_stop(
+	void);
+void numeric_countdown_timer_restart(
+	void);
+void objects_dump_memory(
+	void);
+void garbage_collect_now(
+	void);
+void object_pvs_clear(
+	void);
+void breakable_surfaces_reset(
+	void);
+void cheat_all_powerups(
+	void);
+void cheat_all_weapons(
+	void);
+void cheat_all_vehicles(
+	void);
+void cheat_teleport_to_camera(
+	void);
+void cheat_active_camouflage(
+	void);
+void scripting_magic_melee_attack(
+	void);
+void cheats_load(
+	void);
+void ai_scripting_erase_all(
+	void);
+void ai_scripting_deselect(
+	void);
+void ai_scripting_reconnect(
+	void);
+void director_save_camera(
+	void);
+void director_load_camera(
+	void);
+void players_unzoom_all(
+	void);
+void player_control_action_test_reset(
+	void);
+void main_reset_map(
+	void);
+void main_print_version(
+	void);
+void main_set_game_connection_to_film_playback(
+	void);
+void texture_cache_flush(
+	void);
+void sound_cache_flush(
+	void);
+void debug_dump_memory(
+	void);
+void debug_dump_memory_by_file(
+	void);
+void profile_initialize(
+	void);
+void ai_profile_change_render_spray(
+	void);
+void ai_debug_sound_point_set(
+	void);
+void cinematic_start(
+	void);
+void cinematic_stop(
+	void);
+void cinematic_skip_start(
+	void);
+void cinematic_skip_stop(
+	void);
+void attract_mode_start(
+	void);
+void main_won_map(
+	void);
+void main_lost_map(
+	void);
+void main_save_map_safe(
+	void);
+void main_save_cancel(
+	void);
+void main_save_map_no_timeout(
+	void);
+void main_save_map_nonsafe(
+	void);
+void main_revert_map(
+	void);
+void main_load_core(
+	void);
+void main_load_core_at_startup(
+	void);
+void main_save_core(
+	void);
+void scripted_hud_restart_flashing(
+	void);
+void terminal_clear(
+	void);
+void structure_lens_flares_place(
+	void);
+void scripted_hud_messages_clear(
+	void);
+void scripted_hud_time_code_reset(
+	void);
+void rasterizer_decals_flush(
+	void);
+void rasterizer_fps_accumulate(
+	void);
+void rasterizer_lights_reset_for_new_map(
+	void);
+void rasterizer_screen_effect_stop(
+	void);
+void enumerate_memory_units_test(
+	void);
+void saved_game_files_delete_all_custom_profiles(
+	void);
+void player_ui_fast_setup_network_server(
+	void);
+void player_ui_activate_all_solo_levels(
+	void);
+void network_game_client_request_immediate_start(
+	void);
+void hs_doc(
+	void);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+HS_EVALUATE_NO_ARGUMENTS(code_000ad5f0, hs_object_destroy_all)
+HS_EVALUATE_NO_ARGUMENTS(code_000ada90, numeric_countdown_timer_stop)
+HS_EVALUATE_NO_ARGUMENTS(code_000adab0, numeric_countdown_timer_restart)
+HS_EVALUATE_NO_ARGUMENTS(code_000add10, objects_dump_memory)
+HS_EVALUATE_NO_ARGUMENTS(code_000ade30, garbage_collect_now)
+HS_EVALUATE_NO_ARGUMENTS(code_000ae010, object_pvs_clear)
+HS_EVALUATE_NO_ARGUMENTS(code_000af0b0, breakable_surfaces_reset)
+HS_EVALUATE_NO_ARGUMENTS(code_000af0d0, cheat_all_powerups)
+HS_EVALUATE_NO_ARGUMENTS(code_000af0f0, cheat_all_weapons)
+HS_EVALUATE_NO_ARGUMENTS(code_000af110, cheat_all_vehicles)
+HS_EVALUATE_NO_ARGUMENTS(code_000af130, cheat_teleport_to_camera)
+HS_EVALUATE_NO_ARGUMENTS(code_000af150, cheat_active_camouflage)
+HS_EVALUATE_NO_ARGUMENTS(code_000ae980, scripting_magic_melee_attack)
+HS_EVALUATE_NO_ARGUMENTS(code_000af1b0, cheats_load)
+HS_EVALUATE_NO_ARGUMENTS(code_000af550, ai_scripting_erase_all)
+HS_EVALUATE_NO_ARGUMENTS(code_000af5b0, ai_scripting_deselect)
+HS_EVALUATE_NO_ARGUMENTS(code_000b0050, ai_scripting_reconnect)
+HS_EVALUATE_NO_ARGUMENTS(code_000b0b90, director_save_camera)
+HS_EVALUATE_NO_ARGUMENTS(code_000b0bb0, director_load_camera)
+HS_EVALUATE_NO_ARGUMENTS(code_000b0cd0, players_unzoom_all)
+HS_EVALUATE_NO_ARGUMENTS(code_000b0d80, player_control_action_test_reset)
+HS_EVALUATE_NO_ARGUMENTS(code_000b1090, main_reset_map)
+HS_EVALUATE_NO_ARGUMENTS(code_000b1220, main_print_version)
+HS_EVALUATE_NO_ARGUMENTS(code_000b1240, main_set_game_connection_to_film_playback)
+HS_EVALUATE_NO_ARGUMENTS(code_000b1260, texture_cache_flush)
+HS_EVALUATE_NO_ARGUMENTS(code_000b1280, sound_cache_flush)
+HS_EVALUATE_NO_ARGUMENTS(code_000b12a0, debug_dump_memory)
+HS_EVALUATE_NO_ARGUMENTS(code_000b12c0, debug_dump_memory_by_file)
+HS_EVALUATE_NO_ARGUMENTS(code_000b1340, profile_initialize)
+HS_EVALUATE_NO_ARGUMENTS(code_000b1500, ai_profile_change_render_spray)
+HS_EVALUATE_NO_ARGUMENTS(code_000b1520, ai_debug_sound_point_set)
+HS_EVALUATE_NO_ARGUMENTS(code_000b16e0, cinematic_start)
+HS_EVALUATE_NO_ARGUMENTS(code_000b1700, cinematic_stop)
+HS_EVALUATE_NO_ARGUMENTS(code_000b1720, cinematic_skip_start)
+HS_EVALUATE_NO_ARGUMENTS(code_000b1740, cinematic_skip_stop)
+HS_EVALUATE_NO_ARGUMENTS(code_000b1860, attract_mode_start)
+HS_EVALUATE_NO_ARGUMENTS(code_000b1880, main_won_map)
+HS_EVALUATE_NO_ARGUMENTS(code_000b18a0, main_lost_map)
+HS_EVALUATE_NO_ARGUMENTS(code_000b1980, main_save_map_safe)
+HS_EVALUATE_NO_ARGUMENTS(code_000b19a0, main_save_cancel)
+HS_EVALUATE_NO_ARGUMENTS(code_000b19c0, main_save_map_no_timeout)
+HS_EVALUATE_NO_ARGUMENTS(code_000b19e0, main_save_map_nonsafe)
+HS_EVALUATE_NO_ARGUMENTS(code_000b1a30, main_revert_map)
+HS_EVALUATE_NO_ARGUMENTS(code_000b1a50, main_load_core)
+HS_EVALUATE_NO_ARGUMENTS(code_000b1a70, main_load_core_at_startup)
+HS_EVALUATE_NO_ARGUMENTS(code_000b1b10, main_save_core)
+HS_EVALUATE_NO_ARGUMENTS(code_000b2050, scripted_hud_restart_flashing)
+HS_EVALUATE_NO_ARGUMENTS(code_000b22b0, terminal_clear)
+HS_EVALUATE_NO_ARGUMENTS(code_000b2310, structure_lens_flares_place)
+HS_EVALUATE_NO_ARGUMENTS(code_000b2650, scripted_hud_messages_clear)
+HS_EVALUATE_NO_ARGUMENTS(code_000b28f0, scripted_hud_time_code_reset)
+HS_EVALUATE_NO_ARGUMENTS(code_000b2910, rasterizer_decals_flush)
+HS_EVALUATE_NO_ARGUMENTS(code_000b2930, rasterizer_fps_accumulate)
+HS_EVALUATE_NO_ARGUMENTS(code_000b29a0, rasterizer_lights_reset_for_new_map)
+HS_EVALUATE_NO_ARGUMENTS(code_000b2b90, rasterizer_screen_effect_stop)
+HS_EVALUATE_NO_ARGUMENTS(code_000b2bf0, enumerate_memory_units_test)
+HS_EVALUATE_NO_ARGUMENTS(code_000b2c10, saved_game_files_delete_all_custom_profiles)
+HS_EVALUATE_NO_ARGUMENTS(code_000b2c30, player_ui_fast_setup_network_server)
+HS_EVALUATE_NO_ARGUMENTS(code_000b2c50, player_ui_activate_all_solo_levels)
+HS_EVALUATE_NO_ARGUMENTS(code_000b2d90, network_game_client_request_immediate_start)
+HS_EVALUATE_NO_ARGUMENTS(code_000b4390, hs_doc)
 
 /* ---------- private code */
