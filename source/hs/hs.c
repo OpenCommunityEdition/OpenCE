@@ -2821,6 +2821,19 @@ void evaluator( \
 	return; \
 }
 
+#define HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	union hs_boolean_result result; \
+	result.value = 0; \
+	result.boolean = function(); \
+	hs_return(thread_index, result.value); \
+	return; \
+}
+
 #define HS_EVALUATE_SHORT_FROM_LONG(evaluator, function) \
 void evaluator( \
 	short function_index, \
@@ -3993,6 +4006,32 @@ void game_set_game_variant_from_name(
 	char const *name);
 void player_input_enable(
 	boolean enable);
+boolean player_control_action_test_jump(
+	void);
+boolean player_control_action_test_primary_trigger(
+	void);
+boolean player_control_action_test_grenade_trigger(
+	void);
+boolean player_control_action_test_zoom(
+	void);
+boolean player_control_action_test_action(
+	void);
+boolean player_control_action_test_accept(
+	void);
+boolean player_control_action_test_back(
+	void);
+boolean player_control_action_test_look_relative_up(
+	void);
+boolean player_control_action_test_look_relative_down(
+	void);
+boolean player_control_action_test_look_relative_left(
+	void);
+boolean player_control_action_test_look_relative_right(
+	void);
+boolean player_control_action_test_look_relative_all_directions(
+	void);
+boolean player_control_action_test_move_relative_all_directions(
+	void);
 void main_set_map_name(
 	char const *map_name);
 void main_set_multiplayer_map_name(
@@ -4338,6 +4377,19 @@ HS_EVALUATE_VOID_LONG(code_000b0b20, scripted_camera_set_dead)
 HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b0bd0, struct hs_arguments_real, (game_time_set_speed(arguments->value)))
 HS_EVALUATE_VOID_STRING(code_000b0c10, game_set_game_variant_from_name)
 HS_EVALUATE_VOID_BOOLEAN(code_000b0cf0, player_input_enable)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b0da0, player_control_action_test_jump)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b0dd0, player_control_action_test_primary_trigger)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b0e00, player_control_action_test_grenade_trigger)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b0e30, player_control_action_test_zoom)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b0e60, player_control_action_test_action)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b0e90, player_control_action_test_accept)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b0ec0, player_control_action_test_back)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b0ef0, player_control_action_test_look_relative_up)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b0f20, player_control_action_test_look_relative_down)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b0f50, player_control_action_test_look_relative_left)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b0f80, player_control_action_test_look_relative_right)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b0fb0, player_control_action_test_look_relative_all_directions)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b0fe0, player_control_action_test_move_relative_all_directions)
 HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b1010, struct hs_arguments_long_word_boolean, (player_add_equipment(arguments->value0, arguments->value1, arguments->value2)))
 HS_EVALUATE_VOID_FROM_ARGUMENTS(code_000b1050, struct hs_arguments_short_word, (debug_player_teleport(arguments->value0, arguments->value1)))
 HS_EVALUATE_VOID_STRING(code_000b10b0, main_set_map_name)
