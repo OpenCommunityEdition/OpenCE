@@ -3372,6 +3372,15 @@ void object_attach_to_node(
 {
 	long object_index;
 	struct object_datum *object;
+	void *(*get_object)(
+		long,
+		unsigned long) = object_get_and_verify_type;
+	boolean (*has_node)(
+		long,
+		short) = object_has_node;
+	real_matrix4x3 *(*get_node_matrix)(
+		long,
+		short) = object_get_node_matrix;
 
 	boolean valid = TRUE;
 
@@ -3399,21 +3408,22 @@ void object_attach_to_node(
 	{
 		real_matrix4x3 inverse_node_matrix;
 
-		struct object_datum *child_object = object_get(child_object_index);
-		struct object_datum *parent_object = object_get(parent_object_index);
+		struct object_datum *child_object = (struct object_datum *)get_object(child_object_index, _object_mask_all);
+		struct object_datum *parent_object = (struct object_datum *)get_object(parent_object_index, _object_mask_all);
 		boolean connected_to_map = TEST_FLAG(child_object->object.flags, _object_connected_to_map_bit);
 
-		match_assert(
+		match_vassert(
 			"c:\\halo\\SOURCE\\objects\\objects.c",
 			1235,
-			object_has_node(parent_object_index, parent_node_index));
+			has_node(parent_object_index, parent_node_index),
+			"object_has_node(parent_object_index, parent_node_index)");
 
 		if (connected_to_map)
 		{
 			object_disconnect_from_map(child_object_index);
 		}
 		
-		matrix4x3_inverse(object_get_node_matrix(parent_object_index, parent_node_index), &inverse_node_matrix);
+		matrix4x3_inverse(get_node_matrix(parent_object_index, parent_node_index), &inverse_node_matrix);
 		matrix4x3_transform_point(&inverse_node_matrix, &child_object->object.position, &child_object->object.position);
 		matrix4x3_transform_normal(&inverse_node_matrix, &child_object->object.forward, &child_object->object.forward);
 		matrix4x3_transform_normal(&inverse_node_matrix, &child_object->object.up, &child_object->object.up);
@@ -3426,9 +3436,20 @@ void object_attach_to_node(
 			object_reconnect_to_map(child_object_index, NULL);
 		}
 
-		object_deactivate(child_object_index);
+		{
+			struct object_header_datum *header = object_header_get(child_object_index);
+			struct object_datum *deactivated_object = (struct object_datum *)get_object(child_object_index, _object_mask_all);
 
-		SET_FLAG(object_header_get(child_object_index)->flags, _object_header_do_not_update_bit, TRUE);
+			if (TEST_FLAG(header->flags, _object_header_active_bit))
+			{
+				SET_FLAG(header->flags, _object_header_active_bit, FALSE);
+			}
+		}
+
+		{
+			struct object_header_datum *header = object_header_get(child_object_index);
+			SET_FLAG(header->flags, _object_header_do_not_update_bit, TRUE);
+		}
 
 		object_compute_node_matrices(child_object_index);
 	}
