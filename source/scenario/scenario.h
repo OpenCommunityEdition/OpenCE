@@ -104,7 +104,9 @@ extern long global_scenario_index;
 extern short global_structure_bsp_index;
 
 extern struct scenario *global_scenario;
+extern struct collision_bsp *global_collision_bsp;
 extern struct bsp3d *global_bsp3d;
+extern struct game_globals *global_game_globals;
 
 /* ---------- public code */
 

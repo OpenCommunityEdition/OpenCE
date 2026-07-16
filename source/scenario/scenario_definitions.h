@@ -77,6 +77,15 @@ struct scenario_decal_palette_entry
 	struct tag_reference reference;
 };
 
+struct scenario_structure_bsp_reference
+{
+	byte unused0[0x10];
+	struct tag_reference structure_bsp;
+};
+
+typedef char scenario_structure_bsp_reference_size_assert[
+	sizeof(struct scenario_structure_bsp_reference) == 0x20 ? 1 : -1];
+
 struct scenario
 {
 	struct tag_reference ugly_structure_bsp;
@@ -148,7 +157,7 @@ struct scenario
 	struct tag_reference custom_object_names;
 	struct tag_reference ingame_help_text;
 	struct tag_reference hud_messages;
-	struct tag_block structure_bsp_references;
+	struct tag_block structure_bsp_references; // scenario_structure_bsp_reference
 };
 
 /* ---------- prototypes/EXAMPLE.C */

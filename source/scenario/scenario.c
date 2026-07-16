@@ -164,7 +164,10 @@ symbols in this file:
 #include "cseries.h"
 #include "scenario.h"
 
+#include "game/game_globals.h"
 #include "physics/bsp3d.h"
+#include "physics/collision_bsp_definitions.h"
+#include "scenario_definitions.h"
 #include "scenario/wind.h"
 
 /* ---------- constants */
@@ -179,7 +182,9 @@ symbols in this file:
 
 struct structure_bsp *global_structure_bsp;
 struct scenario *global_scenario;
+struct collision_bsp *global_collision_bsp;
 struct bsp3d *global_bsp3d;
+struct game_globals *global_game_globals;
 
 /* ---------- public code */
 
@@ -205,6 +210,14 @@ struct scenario *global_scenario_try_and_get(
 	return global_scenario;
 }
 
+struct scenario *global_scenario_get(
+	void)
+{
+	match_assert("c:\\halo\\SOURCE\\scenario\\scenario.c", 183, global_scenario);
+
+	return global_scenario;
+}
+
 struct structure_bsp *global_structure_bsp_get(
 	void)
 {
@@ -213,11 +226,39 @@ struct structure_bsp *global_structure_bsp_get(
 	return global_structure_bsp;
 }
 
-struct bsp3d *global_bsp3d_get(void)
+struct collision_bsp *global_collision_bsp_get(
+	void)
+{
+	match_assert("c:\\halo\\SOURCE\\scenario\\scenario.c", 205, global_collision_bsp);
+
+	return global_collision_bsp;
+}
+
+struct bsp3d *global_bsp3d_get(
+	void)
 {
 	match_assert("c:\\halo\\SOURCE\\scenario\\scenario.c", 213, global_bsp3d);
 
 	return global_bsp3d;
+}
+
+struct game_globals *scenario_get_game_globals(
+	void)
+{
+	match_assert("c:\\halo\\SOURCE\\scenario\\scenario.c", 221, global_game_globals);
+
+	return global_game_globals;
+}
+
+long global_structure_bsp_tag_index_get(
+	void)
+{
+	struct scenario_structure_bsp_reference *reference = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->structure_bsp_references,
+		global_structure_bsp_index,
+		struct scenario_structure_bsp_reference);
+
+	return reference->structure_bsp.index;
 }
 
 long scenario_leaf_index_from_point(
