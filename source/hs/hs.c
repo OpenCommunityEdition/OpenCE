@@ -3099,6 +3099,36 @@ void evaluator( \
 	return; \
 }
 
+#define HS_EVALUATE_VOID_LONG_LONG_STRING(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	struct hs_arguments_long_long_string *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		function(arguments->value0, arguments->value1, arguments->value2); \
+		hs_return(thread_index, 0); \
+	} \
+	return; \
+}
+
+#define HS_EVALUATE_VOID_SHORT_BOOLEAN(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	union hs_evaluation_argument *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		function(arguments[0].short_value, arguments[1].boolean_value); \
+		hs_return(thread_index, 0); \
+	} \
+	return; \
+}
+
 #define HS_EVALUATE_VOID_FROM_ARGUMENTS(evaluator, arguments_type, expression) \
 void evaluator( \
 	short function_index, \
@@ -3204,6 +3234,13 @@ struct hs_arguments_long_long
 {
 	long value0;
 	long value1;
+};
+
+struct hs_arguments_long_long_string
+{
+	long value0;
+	long value1;
+	char const *value2;
 };
 
 struct hs_arguments_short_word
@@ -3546,6 +3583,121 @@ void ai_scripting_defend(
 	long ai_reference);
 void ai_scripting_retreat(
 	long ai_reference);
+void hs_print(
+	char const *message);
+void hs_object_create_containing(
+	char const *object_name);
+void hs_object_create_anew_containing(
+	char const *object_name);
+void hs_object_destroy_containing(
+	char const *object_name);
+void hs_objects_delete_by_definition(
+	long definition_index);
+void scripting_set_magic_base_seat(
+	char const *seat_name);
+void object_set_ranged_attack_inhibited(
+	long object_index,
+	boolean inhibited);
+void object_set_melee_attack_inhibited(
+	long object_index,
+	boolean inhibited);
+void object_scripting_set_collideable(
+	long object_index,
+	boolean collideable);
+void unit_scripting_can_blink(
+	long unit_index,
+	boolean can_blink);
+void unit_aim_without_turning(
+	long unit_index,
+	boolean enabled);
+void unit_set_enterable_by_player(
+	long unit_index,
+	boolean enterable);
+void unit_scripting_impervious(
+	long object_list_index,
+	boolean impervious);
+void unit_scripting_suspended(
+	long unit_index,
+	boolean suspended);
+void units_set_desired_flashlight_state(
+	long object_list_index,
+	boolean desired_state);
+void unit_set_desired_flashlight_state(
+	long unit_index,
+	boolean desired_state);
+void device_set_never_appears_locked(
+	long device_index,
+	boolean never_locked);
+void device_one_sided_set(
+	long device_index,
+	boolean one_sided);
+void device_operates_automatically_set(
+	long device_index,
+	boolean automatic);
+void ai_scripting_set_respawn(
+	long ai_reference,
+	boolean respawn);
+void ai_scripting_set_deaf(
+	long ai_reference,
+	boolean deaf);
+void ai_scripting_set_blind(
+	long ai_reference,
+	boolean blind);
+void hs_damage_object(
+	long damage_definition_index,
+	long object_index);
+void objects_scripting_detach(
+	long parent_object_index,
+	long child_object_index);
+void ai_scripting_attach_unit(
+	long ai_reference,
+	long unit_index);
+void ai_scripting_attach_units(
+	long ai_reference,
+	long object_list_index);
+void ai_scripting_attach_free(
+	long ai_reference,
+	long unit_index);
+void ai_scripting_magically_see_encounter(
+	long ai_reference,
+	long encounter_index);
+void ai_scripting_magically_see_unit(
+	long ai_reference,
+	long unit_index);
+void ai_scripting_magically_see_units(
+	long ai_reference,
+	long object_list_index);
+void hs_object_teleport(
+	long object_index,
+	word cutscene_flag_index);
+void hs_object_set_facing(
+	long object_index,
+	word cutscene_flag_index);
+void hs_effect_new(
+	long effect_definition_index,
+	word cutscene_flag_index);
+void hs_damage_new(
+	long damage_definition_index,
+	word cutscene_flag_index);
+void numeric_countdown_timer_set(
+	long milliseconds,
+	boolean auto_start);
+void unit_scripting_set_emotion_animation(
+	long unit_index,
+	char const *animation_name);
+void unit_scripting_set_seat(
+	long unit_index,
+	char const *seat_name);
+void device_group_change_only_once_more_set(
+	short device_group_index,
+	boolean change_only_once_more);
+void unit_set_emotion(
+	long unit_index,
+	word emotion_index);
+void unit_scripting_enter_vehicle(
+	long unit_index,
+	long vehicle_index,
+	char const *seat_name);
 real hs_sound_get_gain(
 	long sound_index);
 real unit_scripting_get_health(
@@ -4022,6 +4174,46 @@ HS_EVALUATE_VOID_BOOLEAN(code_000ae1a0, render_effects)
 HS_EVALUATE_VOID_BOOLEAN(code_000af1d0, ai_globals_ai_active)
 HS_EVALUATE_VOID_BOOLEAN(code_000af210, ai_globals_dialogue_triggers_enabled)
 HS_EVALUATE_VOID_BOOLEAN(code_000af250, ai_globals_grenades_enabled)
+HS_EVALUATE_VOID_STRING(code_000ad2e0, hs_print)
+HS_EVALUATE_VOID_STRING(code_000ad530, hs_object_create_containing)
+HS_EVALUATE_VOID_STRING(code_000ad570, hs_object_create_anew_containing)
+HS_EVALUATE_VOID_STRING(code_000ad5b0, hs_object_destroy_containing)
+HS_EVALUATE_VOID_LONG(code_000ad940, hs_objects_delete_by_definition)
+HS_EVALUATE_VOID_STRING(code_000ae900, scripting_set_magic_base_seat)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000adc90, object_set_ranged_attack_inhibited)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000adcd0, object_set_melee_attack_inhibited)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000add30, object_scripting_set_collideable)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000ae1e0, unit_scripting_can_blink)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000ae500, unit_aim_without_turning)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000ae580, unit_set_enterable_by_player)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000aec10, unit_scripting_impervious)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000aec50, unit_scripting_suspended)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000aecc0, units_set_desired_flashlight_state)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000aed00, unit_set_desired_flashlight_state)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000aed90, device_set_never_appears_locked)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000aeff0, device_one_sided_set)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000af030, device_operates_automatically_set)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000af610, ai_scripting_set_respawn)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000af650, ai_scripting_set_deaf)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000af690, ai_scripting_set_blind)
+HS_EVALUATE_VOID_LONG_LONG(code_000ad860, hs_damage_object)
+HS_EVALUATE_VOID_LONG_LONG(code_000addf0, objects_scripting_detach)
+HS_EVALUATE_VOID_LONG_LONG(code_000af310, ai_scripting_attach_unit)
+HS_EVALUATE_VOID_LONG_LONG(code_000af350, ai_scripting_attach_units)
+HS_EVALUATE_VOID_LONG_LONG(code_000af390, ai_scripting_attach_free)
+HS_EVALUATE_VOID_LONG_LONG(code_000af6d0, ai_scripting_magically_see_encounter)
+HS_EVALUATE_VOID_LONG_LONG(code_000af750, ai_scripting_magically_see_unit)
+HS_EVALUATE_VOID_LONG_LONG(code_000af790, ai_scripting_magically_see_units)
+HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(code_000ad610, hs_object_teleport)
+HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(code_000ad650, hs_object_set_facing)
+HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(code_000ad7a0, hs_effect_new)
+HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(code_000ad820, hs_damage_new)
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000ada00, numeric_countdown_timer_set)
+HS_EVALUATE_VOID_LONG_STRING(code_000ae6a0, unit_scripting_set_emotion_animation)
+HS_EVALUATE_VOID_LONG_STRING(code_000ae940, unit_scripting_set_seat)
+HS_EVALUATE_VOID_SHORT_BOOLEAN(code_000af070, device_group_change_only_once_more_set)
+HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(code_000ae540, unit_set_emotion)
+HS_EVALUATE_VOID_LONG_LONG_STRING(code_000ae5c0, unit_scripting_enter_vehicle)
 
 void code_000ad710(
 	short function_index,
