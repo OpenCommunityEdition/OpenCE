@@ -346,6 +346,13 @@ void rasterizer_screen_flash(
 	void);
 void rasterizer_environment_fog_screen_begin(
 	boolean render_fog);
+void rasterizer_environment_fog_screen_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
 void rasterizer_widget_set_texture(
 	long handle);
 void rasterizer_widget_set_tint_factor(
