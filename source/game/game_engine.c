@@ -540,6 +540,7 @@ symbols in this file:
 #include "game_engine.h"
 
 #include "objects.h"
+#include "players.h"
 
 /* ---------- constants */
 
@@ -572,6 +573,9 @@ void game_engine_playlist_next(
 
 void code_00096890(
 	void);
+
+long game_engine_did_player_win_default(
+	long player_index);
 
 /* ---------- globals */
 
@@ -661,6 +665,85 @@ boolean game_engine_can_score(
 		can_score = game_engine_globals.postgame_state==0;
 
 	return can_score;
+}
+
+boolean game_engine_allow_pick_up(
+	long unit_index,
+	long weapon_index)
+{
+	boolean allow_pick_up = TRUE;
+
+	if (game_engine && game_engine->allow_pick_up)
+		allow_pick_up = game_engine->allow_pick_up(unit_index, weapon_index);
+
+	return allow_pick_up;
+}
+
+boolean game_engine_test_flag(
+	long flag)
+{
+	boolean result = FALSE;
+
+	if (game_engine && game_engine->test_flag)
+		result = game_engine->test_flag(flag);
+
+	return result;
+}
+
+boolean game_engine_test_trait(
+	long trait,
+	long value)
+{
+	boolean result = FALSE;
+
+	if (game_engine && game_engine->test_trait)
+		result = game_engine->test_trait(trait, value);
+
+	return result;
+}
+
+void game_engine_prespawn_player_update(
+	long player_index)
+{
+	if (game_engine)
+	{
+		if (game_engine->prespawn_player_update)
+			game_engine->prespawn_player_update(player_index);
+		else
+		{
+			struct player_datum *player = player_get(player_index);
+			player->team_index = player->local_player_index % 2;
+		}
+	}
+
+	return;
+}
+
+long game_engine_did_player_win(
+	long player_index)
+{
+	long result = 0;
+
+	if (game_engine)
+	{
+		if (game_engine->did_player_win)
+			result = game_engine->did_player_win(player_index);
+		else
+			result = game_engine_did_player_win_default(player_index);
+	}
+
+	return result;
+}
+
+long code_0009b2e0(
+	void)
+{
+	long game_engine_type = NONE;
+
+	if (game_engine)
+		game_engine_type = game_engine->type;
+
+	return game_engine_type;
 }
 
 struct game_variant *game_engine_get_variant(

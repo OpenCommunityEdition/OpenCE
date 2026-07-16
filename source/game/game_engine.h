@@ -47,7 +47,21 @@ struct game_engine
 	void (*handle_server_message)(void);
 	void (*unknown2C)(void);
 	void (*post_rasterize_objects)(void);
-	void (*unknown34[21])(void);
+	void (*unknown34[9])(void);
+	boolean (*allow_pick_up)(
+		long unit_index,
+		long weapon_index);
+	void (*unknown5C[4])(void);
+	void (*prespawn_player_update)(
+		long player_index);
+	void (*unknown70[3])(void);
+	boolean (*test_flag)(
+		long flag);
+	boolean (*test_trait)(
+		long trait,
+		long value);
+	long (*did_player_win)(
+		long player_index);
 };
 
 typedef char verify_game_engine_size[sizeof(struct game_engine) == 0x88 ? 1 : -1];
@@ -76,6 +90,23 @@ void game_engine_post_rasterize_objects(
 
 boolean game_engine_can_score(
 	void);
+
+boolean game_engine_allow_pick_up(
+	long unit_index,
+	long weapon_index);
+
+boolean game_engine_test_flag(
+	long flag);
+
+boolean game_engine_test_trait(
+	long trait,
+	long value);
+
+void game_engine_prespawn_player_update(
+	long player_index);
+
+long game_engine_did_player_win(
+	long player_index);
 
 struct game_variant *game_engine_get_variant(
 	void);
