@@ -196,6 +196,8 @@ symbols in this file:
 
 /* ---------- globals */
 
+struct player_control_globals_header *bss_0043ee30;
+
 /* ---------- public code */
 
 void player_control_dispose(
@@ -208,6 +210,54 @@ void player_control_dispose_from_old_map(
 	void)
 {
 	return;
+}
+
+boolean player_control_action_test_jump(
+	void)
+{
+	return TEST_FLAG(
+		player_control_globals->action_flags,
+		_player_control_jump_bit);
+}
+
+boolean player_control_action_test_primary_trigger(
+	void)
+{
+	return TEST_FLAG(
+		player_control_globals->action_flags,
+		_player_control_primary_trigger_bit);
+}
+
+boolean player_control_action_test_grenade_trigger(
+	void)
+{
+	return TEST_FLAG(
+		player_control_globals->action_flags,
+		_player_control_grenade_trigger_bit);
+}
+
+boolean player_control_action_test_zoom(
+	void)
+{
+	return TEST_FLAG(
+		player_control_globals->action_flags,
+		_player_control_zoom_bit);
+}
+
+boolean player_control_action_test_look_relative_left(
+	void)
+{
+	return TEST_FLAG(
+		player_control_globals->action_flags,
+		_player_control_look_relative_left_bit);
+}
+
+boolean player_control_action_test_look_relative_right(
+	void)
+{
+	return TEST_FLAG(
+		player_control_globals->action_flags,
+		_player_control_look_relative_right_bit);
 }
 
 /* ---------- private code */

@@ -2,9 +2,65 @@
 #define __PLAYER_CONTROL_H
 #pragma once
 
+/* ---------- constants */
+
+enum
+{
+	_player_control_action_bit,
+	_player_control_jump_bit,
+	_player_control_accept_bit,
+	_player_control_back_bit,
+	_player_control_primary_trigger_bit,
+	_player_control_grenade_trigger_bit,
+	_player_control_zoom_bit,
+	_player_control_look_relative_up_bit,
+	_player_control_look_relative_down_bit,
+	_player_control_look_relative_left_bit,
+	_player_control_look_relative_right_bit,
+};
+
+/* ---------- structures */
+
+struct player_control_globals_header
+{
+	unsigned long action_flags;
+	unsigned long action_test_flags;
+	unsigned long suppressed_action_flags;
+	unsigned long flags;
+};
+
+typedef char player_control_globals_header_size_assert[
+	sizeof(struct player_control_globals_header) == 0x10 ? 1 : -1];
+typedef char player_control_globals_action_test_flags_offset_assert[
+	offsetof(struct player_control_globals_header, action_test_flags) == 0x4 ? 1 : -1];
+typedef char player_control_globals_suppressed_action_flags_offset_assert[
+	offsetof(struct player_control_globals_header, suppressed_action_flags) == 0x8 ? 1 : -1];
+typedef char player_control_globals_flags_offset_assert[
+	offsetof(struct player_control_globals_header, flags) == 0xC ? 1 : -1];
+
+/* ---------- prototypes */
+
 void player_control_dispose(
 	void);
 void player_control_dispose_from_old_map(
 	void);
+boolean player_control_action_test_jump(
+	void);
+boolean player_control_action_test_primary_trigger(
+	void);
+boolean player_control_action_test_grenade_trigger(
+	void);
+boolean player_control_action_test_zoom(
+	void);
+boolean player_control_action_test_look_relative_left(
+	void);
+boolean player_control_action_test_look_relative_right(
+	void);
+
+/* ---------- globals */
+
+extern struct player_control_globals_header *bss_0043ee30;
+
+#define player_control_globals bss_0043ee30
 
 #endif // __PLAYER_CONTROL_H
