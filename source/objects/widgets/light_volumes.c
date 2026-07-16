@@ -37,6 +37,7 @@ symbols in this file:
 #include "objects/widgets/light_volumes.h"
 
 #include "cseries/cseries.h"
+#include "math/real_math.h"
 #include "saved games/game_state.h"
 
 /* ---------- constants */
@@ -46,6 +47,10 @@ symbols in this file:
 /* ---------- structures */
 
 /* ---------- prototypes */
+
+real code_001246a0(
+	real value,
+	real exponent);
 
 /* ---------- globals */
 
@@ -115,3 +120,13 @@ void light_volume_delete(
 }
 
 /* ---------- private code */
+
+real code_001246a0(
+	real value,
+	real exponent)
+{
+	if (exponent != 1.f)
+		value = power(value, exponent);
+
+	return value;
+}
