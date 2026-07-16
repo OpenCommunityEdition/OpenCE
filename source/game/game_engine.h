@@ -31,11 +31,14 @@ enum
 struct game_variant
 {
 	short variant_index;
-	byte unused0[0x1A];
+	byte unused0[0x16];
+	long engine_type;
 	boolean has_teams;
 	byte unused1[3];
 	unsigned long flags;
-	byte unused2[0x44];
+	byte unused24[0x14];
+	long maximum_lives;
+	byte unused3C[0x2C];
 };
 
 typedef char verify_game_variant_size[sizeof(struct game_variant) == 0x68 ? 1 : -1];
@@ -59,7 +62,11 @@ struct game_engine
 	boolean (*allow_pick_up)(
 		long unit_index,
 		long weapon_index);
-	void (*unknown5C[4])(void);
+	void (*player_damaged_player)(
+		long damaging_player_index,
+		long dead_player_index,
+		long damage_type);
+	void (*unknown60[3])(void);
 	void (*prespawn_player_update)(
 		long player_index);
 	void (*unknown70[3])(void);
@@ -164,6 +171,30 @@ void game_engine_override_game_variant(
 
 void game_engine_switch_to_postgame(
 	void);
+
+void game_engine_load_stage(
+	char const *map_name);
+
+void game_engine_end_game(
+	void);
+
+void game_engine_player_damaged_player(
+	long damaging_player_index,
+	long dead_player_index,
+	long damage_type);
+
+boolean game_engine_player_is_out_of_lives(
+	long player_index);
+
+boolean game_engine_hud_draw_messages(
+	long player_index);
+
+boolean game_engine_force_autopickup(
+	long unit_index,
+	long weapon_index);
+
+void game_engine_play_multiplayer_sound(
+	long sound_index);
 
 long game_engine_remap_object_definition(long definition_index);
 

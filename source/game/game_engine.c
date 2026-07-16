@@ -540,6 +540,10 @@ symbols in this file:
 #include "game_engine.h"
 
 #include "game_globals.h"
+#include "interface/ui_widget.h"
+#include "items/weapons.h"
+#include "main/main.h"
+#include "networking/network_game_globals.h"
 #include "objects.h"
 #include "players.h"
 #include "scenario/scenario.h"
@@ -564,6 +568,7 @@ struct game_engine_globals
 	real postgame_timer;
 	byte unusedC[4];
 	long postgame_state;
+	real hud_message_timers[MAXIMUM_LOCAL_PLAYERS];
 };
 
 struct game_engine_stage
@@ -577,8 +582,10 @@ typedef char verify_game_engine_globals_postgame_timer_offset[
 	offsetof(struct game_engine_globals, postgame_timer) == 0x8 ? 1 : -1];
 typedef char verify_game_engine_globals_postgame_state_offset[
 	offsetof(struct game_engine_globals, postgame_state) == 0x10 ? 1 : -1];
+typedef char verify_game_engine_globals_hud_message_timers_offset[
+	offsetof(struct game_engine_globals, hud_message_timers) == 0x14 ? 1 : -1];
 typedef char verify_game_engine_globals_size[
-	sizeof(struct game_engine_globals) == 0x14 ? 1 : -1];
+	sizeof(struct game_engine_globals) == 0x24 ? 1 : -1];
 typedef char verify_game_engine_stage_variant_offset[
 	offsetof(struct game_engine_stage, variant) == 0x40 ? 1 : -1];
 typedef char verify_game_engine_stage_size[
@@ -834,6 +841,93 @@ void game_engine_switch_to_postgame(
 	}
 
 	return;
+}
+
+void game_engine_load_stage(
+	char const *map_name)
+{
+	if (!map_name || csstrcmp(global_stage.map_name, map_name))
+		main_set_multiplayer_map_name(global_stage.map_name);
+
+	game_set_game_variant(&global_stage.variant);
+	if (!network_game_is_active())
+		main_reset_map();
+
+	return;
+}
+
+void game_engine_end_game(
+	void)
+{
+	if (game_engine_globals.postgame_state==0)
+	{
+		game_engine_globals.postgame_state = 1;
+		game_engine_globals.postgame_timer = 7.0f;
+		game_engine_play_multiplayer_sound(1);
+		ui_widgets_close_all();
+	}
+
+	return;
+}
+
+void game_engine_player_damaged_player(
+	long damaging_player_index,
+	long dead_player_index,
+	long damage_type)
+{
+	match_assert("c:\\halo\\SOURCE\\game\\game_engine.c", 0xA20, dead_player_index != NONE);
+
+	if (game_engine && game_engine->player_damaged_player)
+		game_engine->player_damaged_player(damaging_player_index, dead_player_index, damage_type);
+
+	return;
+}
+
+boolean game_engine_player_is_out_of_lives(
+	long player_index)
+{
+	boolean out_of_lives = FALSE;
+
+	if (global_variant.maximum_lives>0)
+	{
+		struct player_datum *player = player_get(player_index);
+
+		if (player->unit_index==NONE && player->statistics.deaths>=global_variant.maximum_lives)
+			out_of_lives = TRUE;
+	}
+
+	return out_of_lives;
+}
+
+boolean game_engine_hud_draw_messages(
+	long player_index)
+{
+	boolean draw_messages = TRUE;
+
+	if (game_engine && player_index!=NONE)
+	{
+		struct player_datum *player = player_get(player_index);
+
+		if (player->local_player_index!=NONE &&
+			game_engine_globals.hud_message_timers[player->local_player_index]>0.0f)
+		{
+			draw_messages = FALSE;
+		}
+	}
+
+	return draw_messages;
+}
+
+boolean game_engine_force_autopickup(
+	long unit_index,
+	long weapon_index)
+{
+	boolean force_autopickup = FALSE;
+
+	if (game_engine && global_variant.engine_type==1 && weapon_is_flag(weapon_index))
+		force_autopickup = TRUE;
+
+	return force_autopickup;
 }
 
 boolean game_engine_allow_pick_up(
