@@ -60,6 +60,7 @@ symbols in this file:
 
 #include "memory/data_packet_groups.h"
 #include "memory/data_packets.h"
+#include "memory/byte_swapping.h"
 
 #include "cseries/cseries.h"
 
@@ -74,11 +75,23 @@ struct packet_header
 	byte value;
 };
 
+struct packet_header_byte_swap_data
+{
+	byte_swap_code codes[4];
+	struct byte_swap_definition definition;
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
 char const *bss_00456624;
+
+struct packet_header_byte_swap_data data_00309e38 =
+{
+	{ _begin_bs_array, 1, _1byte, _end_bs_array },
+	{ "packet_header", sizeof(struct packet_header), data_00309e38.codes, BYTE_SWAP_DEFINITION_SIGNATURE, FALSE }
+};
 
 /* ---------- public code */
 
@@ -122,6 +135,44 @@ char const *data_packet_groups_get_error(
 	match_assert("c:\\halo\\SOURCE\\memory\\data_packet_groups.c", 57, result);
 
 	return result;
+}
+
+boolean data_packet_group_append_packet_header(
+	struct data_packet_group_definition *group_definition,
+	void *encoded_packet,
+	short *encoded_packet_size,
+	short packet_type)
+{
+	struct packet_header *packet_header = (struct packet_header *)((byte *)encoded_packet + *encoded_packet_size);
+	char const *error = NULL;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\data_packet_groups.c",
+		172,
+		encoded_packet && encoded_packet_size);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\data_packet_groups.c",
+		173,
+		*encoded_packet_size>=0);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\data_packet_groups.c",
+		174,
+		packet_type>=0 && packet_type<group_definition->packet_type_count);
+
+	if (*encoded_packet_size + sizeof(struct packet_header) < group_definition->maximum_encoded_packet_size)
+	{
+		packet_header->value = (byte)packet_type;
+		byte_swap_data(&data_00309e38.definition, packet_header, 1);
+		++*encoded_packet_size;
+	}
+	else
+	{
+		error = "couldn't append header to encoded packet";
+	}
+
+	bss_00456624 = error;
+
+	return error==NULL;
 }
 
 /* ---------- private code */
