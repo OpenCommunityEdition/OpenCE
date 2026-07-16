@@ -40,6 +40,11 @@ struct error_global_data
 
 void errors_initialize(void);
 void errors_dispose(void);
+void errors_output_to_debug_file(boolean output_to_debug_file);
+void errors_overflow_suppression_enable(boolean overflow_suppression);
+char *error_get(void);
+boolean errors_handle(void);
+void errors_clear(void);
 void error(long priority, const char *format, ...);
 
 void write_to_error_file(char *string, boolean date);

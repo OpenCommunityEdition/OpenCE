@@ -71,24 +71,57 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void stack_walk_initialize(
+	void);
+void stack_walk_dispose(
+	void);
+
 /* ---------- globals */
 
-struct error_global_data error_globals;
+boolean data_002dcd2c = TRUE;
 
 /* ---------- public code */
+
+void errors_dispose(
+	void)
+{
+	stack_walk_dispose();
+
+	return;
+}
+
+void errors_output_to_debug_file(
+	boolean output_to_debug_file)
+{
+	error_globals.output_to_debug_file = output_to_debug_file;
+
+	return;
+}
+
+void errors_overflow_suppression_enable(
+	boolean overflow_suppression)
+{
+	error_globals.overflow_suppression = overflow_suppression;
+
+	return;
+}
+
+char *error_get(
+	void)
+{
+	return error_globals.message_buffer;
+}
 
 void write_to_error_file(
 	char *string,
 	boolean date)
 {
-	static unsigned char first_line = TRUE;
-
 	char line[1024];
 	long time_value;
 
-	if (first_line)
+	if (data_002dcd2c)
 	{
-		first_line = FALSE;
+		data_002dcd2c = FALSE;
 		write_to_error_file("\r\n\r\n", FALSE);
 		write_to_error_file("halobeta xbox 01.01.14.2342(CACHE) ----------------------------------------------\r\n", TRUE);
 		sprintf(line, "reference function: %s\r\n", "_write_to_error_file");
@@ -130,6 +163,47 @@ void write_to_error_file(
 			fclose(handle);
 		}
 	}
+
+	return;
+}
+
+void code_0007d9d0(
+	void)
+{
+	error_globals.delayed = FALSE;
+	error_globals.message_buffer_size = 0;
+
+	return;
+}
+
+void errors_initialize(
+	void)
+{
+	error_globals.output_to_debug_file = TRUE;
+	error_globals.overflow_suppression = TRUE;
+	error_globals.delayed = FALSE;
+	error_globals.message_buffer_size = 0;
+	stack_walk_initialize();
+
+	return;
+}
+
+boolean errors_handle(
+	void)
+{
+	boolean delayed = error_globals.delayed;
+
+	error_globals.delayed = FALSE;
+	error_globals.message_buffer_size = 0;
+
+	return delayed;
+}
+
+void errors_clear(
+	void)
+{
+	error_globals.delayed = FALSE;
+	error_globals.message_buffer_size = 0;
 
 	return;
 }
