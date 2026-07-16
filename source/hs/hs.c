@@ -2934,6 +2934,36 @@ void evaluator( \
 	return; \
 }
 
+#define HS_EVALUATE_VOID_BOOLEAN(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	union hs_evaluation_argument *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		function(arguments[0].boolean_value); \
+		hs_return(thread_index, 0); \
+	} \
+	return; \
+}
+
+#define HS_EVALUATE_VOID_UNSIGNED_SHORT(evaluator, function) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	union hs_evaluation_argument *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		function(arguments[0].unsigned_short_value); \
+		hs_return(thread_index, 0); \
+	} \
+	return; \
+}
+
 #define HS_EVALUATE_VOID_LONG_BOOLEAN(evaluator, function) \
 void evaluator( \
 	short function_index, \
@@ -3267,6 +3297,86 @@ long scripted_sound_time(
 long hs_object_list_get_element(
 	long object_list_index,
 	unsigned short element_index);
+void hs_object_destroy(
+	long object_index);
+void hs_object_create(
+	word object_name_index);
+void hs_object_create_anew(
+	word object_name_index);
+void object_pvs_set_camera_point(
+	word camera_point_index);
+void cheat_active_camouflage_local_player(
+	word player_index);
+void breakable_surfaces_enable(
+	boolean enabled);
+void render_effects(
+	boolean enabled);
+void ai_globals_ai_active(
+	boolean enabled);
+void ai_globals_dialogue_triggers_enabled(
+	boolean enabled);
+void ai_globals_grenades_enabled(
+	boolean enabled);
+void recorded_animation_kill(
+	long unit_index);
+void object_cannot_take_damage(
+	long object_list_index);
+void object_can_take_damage(
+	long object_list_index);
+void hs_objects_predict(
+	long object_list_index);
+void object_definition_predict(
+	long definition_index);
+void object_pvs_set_object(
+	long object_index);
+void object_pvs_activate(
+	long object_index);
+void unit_open(
+	long unit_index);
+void unit_close(
+	long unit_index);
+void unit_kill(
+	long unit_index);
+void unit_kill_silent(
+	long unit_index);
+void unit_stop_custom_animation(
+	long unit_index);
+void unit_scripting_exit_vehicle(
+	long unit_index);
+void unit_scripting_doesnt_drop_items(
+	long unit_index);
+void ai_scripting_free(
+	long ai_reference);
+void ai_scripting_free_units(
+	long ai_reference);
+void ai_scripting_detach_unit(
+	long unit_index);
+void ai_scripting_detach_units(
+	long object_list_index);
+void ai_scripting_place(
+	long ai_reference);
+void ai_scripting_kill(
+	long ai_reference);
+void ai_scripting_kill_silent(
+	long ai_reference);
+void ai_scripting_erase(
+	long ai_reference);
+void ai_scripting_select(
+	long ai_reference);
+void ai_scripting_spawn_actor(
+	long ai_reference);
+void ai_scripting_magically_see_players(
+	long ai_reference);
+void ai_scripting_timer_start(
+	long ai_reference);
+void ai_scripting_timer_expire(
+	long ai_reference);
+void ai_scripting_attack(
+	long ai_reference);
+void ai_scripting_defend(
+	long ai_reference);
+void ai_scripting_retreat(
+	long ai_reference);
 real hs_sound_get_gain(
 	long sound_index);
 real unit_scripting_get_health(
@@ -3587,6 +3697,46 @@ HS_EVALUATE_LONG_FROM_LONG(code_000ae9e0, unit_scripting_unit_driver)
 HS_EVALUATE_LONG_FROM_LONG(code_000aea20, unit_scripting_unit_gunner)
 HS_EVALUATE_LONG_FROM_LONG(code_000b0810, object_list_from_ai_reference)
 HS_EVALUATE_LONG_FROM_LONG(code_000b1c20, scripted_sound_time)
+HS_EVALUATE_VOID_LONG(code_000ad4b0, hs_object_destroy)
+HS_EVALUATE_VOID_LONG(code_000adc00, recorded_animation_kill)
+HS_EVALUATE_VOID_LONG(code_000ade50, object_cannot_take_damage)
+HS_EVALUATE_VOID_LONG(code_000ade90, object_can_take_damage)
+HS_EVALUATE_VOID_LONG(code_000adf10, hs_objects_predict)
+HS_EVALUATE_VOID_LONG(code_000adf50, object_definition_predict)
+HS_EVALUATE_VOID_LONG(code_000adf90, object_pvs_set_object)
+HS_EVALUATE_VOID_LONG(code_000ae030, object_pvs_activate)
+HS_EVALUATE_VOID_LONG(code_000ae220, unit_open)
+HS_EVALUATE_VOID_LONG(code_000ae260, unit_close)
+HS_EVALUATE_VOID_LONG(code_000ae2a0, unit_kill)
+HS_EVALUATE_VOID_LONG(code_000ae2e0, unit_kill_silent)
+HS_EVALUATE_VOID_LONG(code_000ae370, unit_stop_custom_animation)
+HS_EVALUATE_VOID_LONG(code_000ae6e0, unit_scripting_exit_vehicle)
+HS_EVALUATE_VOID_LONG(code_000aebd0, unit_scripting_doesnt_drop_items)
+HS_EVALUATE_VOID_LONG(code_000af290, ai_scripting_free)
+HS_EVALUATE_VOID_LONG(code_000af2d0, ai_scripting_free_units)
+HS_EVALUATE_VOID_LONG(code_000af3d0, ai_scripting_detach_unit)
+HS_EVALUATE_VOID_LONG(code_000af410, ai_scripting_detach_units)
+HS_EVALUATE_VOID_LONG(code_000af450, ai_scripting_place)
+HS_EVALUATE_VOID_LONG(code_000af490, ai_scripting_kill)
+HS_EVALUATE_VOID_LONG(code_000af4d0, ai_scripting_kill_silent)
+HS_EVALUATE_VOID_LONG(code_000af510, ai_scripting_erase)
+HS_EVALUATE_VOID_LONG(code_000af570, ai_scripting_select)
+HS_EVALUATE_VOID_LONG(code_000af5d0, ai_scripting_spawn_actor)
+HS_EVALUATE_VOID_LONG(code_000af710, ai_scripting_magically_see_players)
+HS_EVALUATE_VOID_LONG(code_000af7d0, ai_scripting_timer_start)
+HS_EVALUATE_VOID_LONG(code_000af810, ai_scripting_timer_expire)
+HS_EVALUATE_VOID_LONG(code_000af850, ai_scripting_attack)
+HS_EVALUATE_VOID_LONG(code_000af890, ai_scripting_defend)
+HS_EVALUATE_VOID_LONG(code_000af8d0, ai_scripting_retreat)
+HS_EVALUATE_VOID_UNSIGNED_SHORT(code_000ad470, hs_object_create)
+HS_EVALUATE_VOID_UNSIGNED_SHORT(code_000ad4f0, hs_object_create_anew)
+HS_EVALUATE_VOID_UNSIGNED_SHORT(code_000adfd0, object_pvs_set_camera_point)
+HS_EVALUATE_VOID_UNSIGNED_SHORT(code_000af170, cheat_active_camouflage_local_player)
+HS_EVALUATE_VOID_BOOLEAN(code_000adad0, breakable_surfaces_enable)
+HS_EVALUATE_VOID_BOOLEAN(code_000ae1a0, render_effects)
+HS_EVALUATE_VOID_BOOLEAN(code_000af1d0, ai_globals_ai_active)
+HS_EVALUATE_VOID_BOOLEAN(code_000af210, ai_globals_dialogue_triggers_enabled)
+HS_EVALUATE_VOID_BOOLEAN(code_000af250, ai_globals_grenades_enabled)
 
 void code_000ad710(
 	short function_index,
