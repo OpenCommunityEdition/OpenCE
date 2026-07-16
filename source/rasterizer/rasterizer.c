@@ -416,12 +416,16 @@ void _rasterizer_decals_begin(
 	short type);
 void _rasterizer_decals_end(
 	void);
+void _rasterizer_decals_draw(
+	short cluster_index);
 void _rasterizer_decals_flush(
 	void);
 void _rasterizer_detail_objects_begin(
 	void);
 void _rasterizer_detail_objects_end(
 	void);
+void _rasterizer_screen_effect(
+	struct render_screen_effect const *effect);
 void _rasterizer_debug_immediate_begin(
 	void);
 void _rasterizer_debug_immediate_end(
@@ -923,6 +927,13 @@ void rasterizer_decals_end(
 	return;
 }
 
+void rasterizer_decals_draw(
+	short cluster_index)
+{
+	_rasterizer_decals_draw(cluster_index);
+	return;
+}
+
 void rasterizer_decals_flush(
 	void)
 {
@@ -941,6 +952,13 @@ void rasterizer_detail_objects_end(
 	void)
 {
 	_rasterizer_detail_objects_end();
+	return;
+}
+
+void rasterizer_screen_effect(
+	struct render_screen_effect const *effect)
+{
+	_rasterizer_screen_effect(effect);
 	return;
 }
 

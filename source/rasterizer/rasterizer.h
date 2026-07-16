@@ -208,11 +208,15 @@ void rasterizer_decals_begin(
 	short type);
 void rasterizer_decals_end(
 	void);
+void rasterizer_decals_draw(
+	short cluster_index);
 void rasterizer_decals_update_function_pointers(void);
 void rasterizer_detail_objects_begin(
 	void);
 void rasterizer_detail_objects_end(
 	void);
+void rasterizer_screen_effect(
+	struct render_screen_effect const *effect);
 
 void rasterizer_debug_immediate_begin(
 	void);
