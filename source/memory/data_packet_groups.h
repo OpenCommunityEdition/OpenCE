@@ -12,6 +12,21 @@ DATA_PACKET_GROUPS.H
 
 /* ---------- structures */
 
+enum data_packet_field_type
+{
+	_data_packet_field_pad = 0,
+	_data_packet_field_bytes,
+	_data_packet_field_shorts,
+	_data_packet_field_longs,
+	_data_packet_field_int64s,
+	_data_packet_field_string,
+	_data_packet_field_data,
+	_data_packet_field_array,
+	_data_packet_field_raw,
+	_data_packet_field_end,
+	_data_packet_field_type_count
+};
+
 struct data_packet_field
 {
 	short type;

@@ -184,17 +184,6 @@ symbols in this file:
 
 /* ---------- constants */
 
-enum
-{
-	_data_packet_field_pad = 0,
-	_data_packet_field_bytes = 1,
-	_data_packet_field_shorts = 2,
-	_data_packet_field_longs = 3,
-	_data_packet_field_array = 7,
-	_data_packet_field_raw = 8,
-	_data_packet_field_end = 9,
-};
-
 /* ---------- macros */
 
 #define DATA_PACKET_FIELD(type, count) { type, count, 0, 0, 0 }

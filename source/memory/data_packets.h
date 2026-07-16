@@ -35,7 +35,7 @@ boolean data_packet_decode(
 	short encoded_packet_size,
 	void *decoded_packet,
 	short *packet_version,
-	boolean flag);
+	short *decoded_packet_size);
 
 /* ---------- globals */
 
