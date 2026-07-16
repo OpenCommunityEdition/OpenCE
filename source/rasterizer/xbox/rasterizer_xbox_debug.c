@@ -66,4 +66,16 @@ symbols in this file:
 
 /* ---------- public code */
 
+void _rasterizer_debug_immediate_end(
+	void)
+{
+	return;
+}
+
+void _rasterizer_debug_immediate_end_screenspace(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */

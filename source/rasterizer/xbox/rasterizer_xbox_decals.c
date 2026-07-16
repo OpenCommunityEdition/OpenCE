@@ -118,4 +118,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+void _rasterizer_decals_initialize_for_new_map(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
