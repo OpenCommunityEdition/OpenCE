@@ -159,6 +159,47 @@ boolean circular_queue_queue_data(
 	return FALSE;
 }
 
+boolean circular_queue_dequeue_data(
+	struct circular_queue *queue,
+	void *data,
+	long data_size,
+	boolean advance)
+{
+	boolean result = FALSE;
+	long read_offset;
+	long contiguous_size;
+
+	circular_queue_validate(queue);
+	match_assert("c:\\halo\\SOURCE\\memory\\circular_queue.c", 153, data && data_size>0 && data_size<queue->buffer_size);
+
+	if (data_size <= circular_queue_size(queue))
+	{
+		read_offset = queue->read_offset;
+		contiguous_size = queue->buffer_size - read_offset;
+		if (data_size >= contiguous_size)
+		{
+			csmemcpy(data, queue->buffer + read_offset, contiguous_size);
+			read_offset = 0;
+			data = (byte *)data + contiguous_size;
+			data_size -= contiguous_size;
+		}
+
+		if (data_size > 0)
+		{
+			csmemcpy(data, queue->buffer + read_offset, data_size);
+			read_offset += data_size;
+		}
+
+		match_assert("c:\\halo\\SOURCE\\memory\\circular_queue.c", 174, read_offset>=0 && read_offset<queue->buffer_size);
+		result = TRUE;
+	}
+
+	if (result && advance)
+		queue->read_offset = read_offset;
+
+	return result;
+}
+
 /* ---------- private code */
 
 static void circular_queue_validate(
