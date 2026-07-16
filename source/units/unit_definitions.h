@@ -50,6 +50,7 @@ enum
 
 enum
 {
+	_unit_seat_invisible_bit = 0,
 	_unit_seat_driver_bit = 2,
 	_unit_seat_gunner_bit,
 	_unit_seat_third_person_camera_bit = 4,

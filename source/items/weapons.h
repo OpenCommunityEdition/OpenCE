@@ -188,6 +188,9 @@ void weapons_dispose(
 	void);
 
 boolean weapon_must_be_readied(long weapon_index);
+real weapon_get_zoom_magnification(
+	long weapon_index,
+	short zoom_level);
 boolean weapon_is_flag(long weapon_index);
 
 char const *weapon_get_label(long weapon_index);

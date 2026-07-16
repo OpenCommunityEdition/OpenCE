@@ -835,6 +835,22 @@ short unit_get_zoom_level(
 	return unit_get(unit_index)->unit.current_zoom_level;
 }
 
+real unit_get_zoom_magnification(
+	long unit_index,
+	short zoom_level)
+{
+	real magnification = 1.f;
+	struct unit_datum *unit = unit_get(unit_index);
+	long weapon_index = unit_inventory_get_weapon(unit_index, unit->unit.current_weapon_index);
+
+	if (weapon_index!=NONE)
+	{
+		magnification = weapon_get_zoom_magnification(weapon_index, zoom_level);
+	}
+
+	return magnification;
+}
+
 boolean unit_controllable(
 	long unit_index)
 {
@@ -1108,6 +1124,23 @@ short unit_get_current_grenade_type(
 	return unit->unit.current_grenade_index;
 }
 
+short unit_add_grenade_type_to_inventory(
+	long unit_index,
+	short grenade_type,
+	short grenade_count)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	match_assert("c:\\halo\\SOURCE\\units\\units.c", 7309, grenade_count>=0);
+	match_assert("c:\\halo\\SOURCE\\units\\units.c", 7310, (grenade_type >= 0) && (grenade_type < NUMBER_OF_UNIT_GRENADE_TYPES));
+
+	unit->unit.grenade_counts[grenade_type] += grenade_count;
+	unit->unit.desired_grenade_index = grenade_type;
+	unit->unit.current_grenade_index = grenade_type;
+
+	return unit->unit.grenade_counts[grenade_type];
+}
+
 void unit_scripting_doesnt_drop_items(
 	long object_list_index)
 {
@@ -1149,6 +1182,73 @@ void unit_scripting_set_emotion_animation(
 	}
 
 	return;
+}
+
+void unit_scripting_suspended(
+	long unit_index,
+	boolean suspended)
+{
+	if (unit_index!=NONE)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+
+		SET_FLAG(unit->unit.flags, _unit_suspended_bit, suspended);
+		unit->object.translational_velocity = *global_zero_vector3d;
+
+		if (unit->object.type==_object_type_biped)
+		{
+			struct biped_datum *biped = biped_get(unit_index);
+			SET_FLAG(biped->biped.flags, _biped_limping_bit, FALSE);
+		}
+	}
+
+	return;
+}
+
+boolean any_unit_is_dangerous(
+	void)
+{
+	struct object_iterator iterator;
+	struct unit_datum *unit;
+
+	object_iterator_new(&iterator, _object_mask_unit, 1);
+
+	while ((unit = object_iterator_next(&iterator))!=NULL)
+	{
+		if ((unit->unit.animation.state==_unit_state_throw_grenade && unit->unit.grenade_throw_state!=_unit_grenade_throw_ending) ||
+			((unit->unit.animation.state==_unit_state_dying || unit->unit.animation.state==_unit_state_dying_airborne) &&
+			!TEST_FLAG(unit->unit.animation.flags, _unit_animation_ignore_translation_bit)))
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+boolean unit_custom_animation_at_frame(
+	long unit_index,
+	long animation_graph_index,
+	char const *animation_name,
+	boolean interpolate,
+	short frame_index)
+{
+	boolean success = FALSE;
+
+	if (unit_start_user_animation(unit_index, animation_graph_index, animation_name, interpolate))
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+		struct animation_graph *animation_graph = animation_graph_definition_get(unit->object.animation.animation_graph_index);
+		struct animation *animation = TAG_BLOCK_GET_ELEMENT(&animation_graph->animations, unit->object.animation.state.index, struct animation);
+
+		if (frame_index>=0 && frame_index<animation->frame_count)
+		{
+			unit->object.animation.state.frame_index = frame_index;
+			success = TRUE;
+		}
+	}
+
+	return success;
 }
 
 long unit_get_current_equipment(
@@ -1242,6 +1342,31 @@ void unit_stop_running_blindly(
 	SET_FLAG(unit->unit.flags, _unit_running_blindly_bit, FALSE);
 
 	return;
+}
+
+long unit_get_aiming_unit_index(
+	long unit_index)
+{
+	long aiming_unit_index = unit_index;
+
+	if (unit_index!=NONE)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+
+		if (unit->object.parent_object_index!=NONE && unit->unit.parent_seat_index!=NONE)
+		{
+			struct unit_datum *parent_unit = unit_get(unit->object.parent_object_index);
+			struct unit_definition *parent_unit_definition = unit_definition_get(parent_unit->definition_index);
+			struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(&parent_unit_definition->unit.seats, unit->unit.parent_seat_index, struct unit_seat);
+
+			if (TEST_FLAG(seat->flags, _unit_seat_invisible_bit) || TEST_FLAG(seat->flags, _unit_seat_gunner_bit))
+			{
+				aiming_unit_index = unit->object.parent_object_index;
+			}
+		}
+	}
+
+	return aiming_unit_index;
 }
 
 void unit_set_emotion(

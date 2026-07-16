@@ -518,6 +518,9 @@ void units_update(void);
 
 short unit_get_zoom_level(
 	long unit_index);
+real unit_get_zoom_magnification(
+	long unit_index,
+	short zoom_level);
 short unit_test_spawning(
 	long unit_index);
 
@@ -618,6 +621,10 @@ short unit_get_grenade_count(
 	short grenade_type);
 short unit_get_current_grenade_type(
 	long unit_index);
+short unit_add_grenade_type_to_inventory(
+	long unit_index,
+	short grenade_type,
+	short grenade_count);
 boolean unit_start_user_animation(
 	long unit_index,
 	long animation_graph_index,
@@ -658,6 +665,17 @@ boolean unit_seat_allow_noncombatants(
 	short seat_index);
 boolean unit_is_busy(long object_index);
 void unit_scripting_set_emotion_animation(long unit_index, char const *animation_name);
+void unit_scripting_suspended(
+	long unit_index,
+	boolean suspended);
+boolean any_unit_is_dangerous(
+	void);
+boolean unit_custom_animation_at_frame(
+	long unit_index,
+	long animation_graph_index,
+	char const *animation_name,
+	boolean interpolate,
+	short frame_index);
 
 boolean unit_drop_current_weapon(long unit_index, boolean immediate);
 
