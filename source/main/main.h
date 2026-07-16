@@ -95,6 +95,9 @@ void main_run_demos(
 void main_set_multiplayer_map_name(
 	char const *map_name);
 
+void main_set_map_name(
+	char const *map_name);
+
 void main_set_difficulty(
 	short difficulty);
 

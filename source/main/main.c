@@ -993,6 +993,48 @@ void code_000f0930(
 	return;
 }
 
+void main_set_map_name(
+	char const *map_name)
+{
+	main_globals.want_to_be_at_main_menu = FALSE;
+	csstrncpy(main_globals.soloplayer_map_name, map_name, NUMBEROF(main_globals.soloplayer_map_name) - 1);
+	main_globals.soloplayer_map_name[NUMBEROF(main_globals.soloplayer_map_name) - 1] = 0;
+	main_globals.allow_persistent_storage = TRUE;
+	if ((game_in_editor() || game_in_progress()) && main_globals.connection == _game_connection_local)
+		main_globals.defer_map_change = TRUE;
+	return;
+}
+
+extern void dispose_global_network_game_client(
+	void);
+extern void dispose_global_network_game_server(
+	void);
+
+void code_000f0b60(
+	void)
+{
+	switch (main_globals.connection)
+	{
+	case _game_connection_network_server:
+		dispose_global_network_game_client();
+		dispose_global_network_game_server();
+		game_dispose_from_old_map();
+		game_dispose();
+		debug_keys_dispose();
+		console_dispose();
+		break;
+	case _game_connection_network_client:
+		dispose_global_network_game_client();
+	default:
+		game_dispose_from_old_map();
+		game_dispose();
+		debug_keys_dispose();
+		console_dispose();
+		break;
+	}
+	return;
+}
+
 static void main_reset_map_private(
 	void)
 {
