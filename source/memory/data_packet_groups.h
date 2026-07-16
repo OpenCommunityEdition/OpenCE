@@ -61,7 +61,7 @@ boolean data_packet_group_encode_packet(
 	const void *decoded_packet,
 	void *encoded_packet,
 	short *encoded_packet_size,
-	long packet_type,
+	short packet_type,
 	long packet_version);
 
 boolean data_packet_group_decode_packet(

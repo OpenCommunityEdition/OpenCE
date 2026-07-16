@@ -175,4 +175,55 @@ boolean data_packet_group_append_packet_header(
 	return error==NULL;
 }
 
+boolean data_packet_group_encode_packet(
+	struct data_packet_group_definition *group_definition,
+	void const *decoded_packet,
+	void *encoded_packet,
+	short *encoded_packet_size,
+	short packet_type,
+	long packet_version)
+{
+	char const *error = NULL;
+	struct data_packet_entry *packet;
+
+	match_assert("c:\\halo\\SOURCE\\memory\\data_packet_groups.c", 132, group_definition);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\data_packet_groups.c",
+		133,
+		packet_type>=0 && packet_type<group_definition->packet_type_count);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\data_packet_groups.c",
+		134,
+		encoded_packet && encoded_packet_size);
+
+	packet = &group_definition->packets[packet_type];
+	match_assert("c:\\halo\\SOURCE\\memory\\data_packet_groups.c", 139, packet->definition);
+
+	if (data_packet_encode(
+		packet->definition,
+		packet_version,
+		decoded_packet,
+		encoded_packet,
+		encoded_packet_size,
+		(short)group_definition->maximum_encoded_packet_size))
+	{
+		if (!data_packet_group_append_packet_header(
+			group_definition,
+			encoded_packet,
+			encoded_packet_size,
+			(short)packet_type))
+		{
+			error = bss_00456624;
+		}
+	}
+	else
+	{
+		error = "couldn't encode packet";
+	}
+
+	bss_00456624 = error;
+
+	return error==NULL;
+}
+
 /* ---------- private code */

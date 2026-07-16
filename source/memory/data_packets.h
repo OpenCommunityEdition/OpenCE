@@ -21,6 +21,14 @@ struct data_packet_definition;
 void data_packet_verify(
 	struct data_packet_definition *packet_definition);
 
+boolean data_packet_encode(
+	struct data_packet_definition *packet_definition,
+	long packet_version,
+	void const *decoded_packet,
+	void *encoded_packet,
+	short *encoded_packet_size,
+	short maximum_buffer_size);
+
 /* ---------- globals */
 
 /* ---------- public code */
