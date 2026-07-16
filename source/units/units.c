@@ -659,6 +659,7 @@ symbols in this file:
 #include "game/game_globals.h"
 #include "game/game_engine.h"
 #include "game/players.h"
+#include "hs/object_lists.h"
 #include "items/projectiles.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
@@ -921,6 +922,109 @@ boolean unit_gunned_by_ai(
 	}
 
 	return unit->unit.actor_index!=NONE;
+}
+
+void unit_delete_current_equipment(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	if (unit->unit.equipment_object_index!=NONE)
+	{
+		object_delete(unit->unit.equipment_object_index);
+		unit->unit.equipment_object_index = NONE;
+	}
+
+	return;
+}
+
+boolean unit_has_weapon_definition_index(
+	long unit_index,
+	long weapon_definition_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	short weapon_index;
+
+	for (weapon_index = 0; weapon_index<MAXIMUM_WEAPONS_PER_UNIT; ++weapon_index)
+	{
+		long weapon_object_index = unit->unit.weapon_object_indices[weapon_index];
+
+		if (weapon_object_index!=NONE && weapon_get(weapon_object_index)->definition_index==weapon_definition_index)
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+short unit_get_grenade_count(
+	long unit_index,
+	short grenade_type)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	if (grenade_type!=NONE)
+	{
+		match_assert("c:\\halo\\SOURCE\\units\\units.c", 7847, grenade_type==NONE || (grenade_type>=0 && grenade_type<NUMBER_OF_UNIT_GRENADE_TYPES));
+
+		return unit->unit.grenade_counts[grenade_type];
+	}
+
+	return 0;
+}
+
+short unit_get_current_grenade_type(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	match_assert("c:\\halo\\SOURCE\\units\\units.c", 7864, unit->unit.current_grenade_index==NONE || (unit->unit.current_grenade_index>=0 && unit->unit.current_grenade_index<NUMBER_OF_UNIT_GRENADE_TYPES));
+
+	return unit->unit.current_grenade_index;
+}
+
+void unit_scripting_doesnt_drop_items(
+	long object_list_index)
+{
+	long reference_index;
+	long object_index = object_list_get_first(object_list_index, &reference_index);
+
+	while (object_index!=NONE)
+	{
+		struct unit_datum *unit = unit_try_and_get(object_index);
+
+		if (unit)
+		{
+			SET_FLAG(unit->unit.flags, _unit_doesnt_drop_items_bit, TRUE);
+		}
+
+		object_index = object_list_get_next(object_list_index, &reference_index);
+	}
+
+	return;
+}
+
+void unit_scripting_set_emotion_animation(
+	long unit_index,
+	char const *animation_name)
+{
+	if (unit_index!=NONE)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+		short animation_index = animation_graph_get_animation_by_name(unit->object.animation.animation_graph_index, animation_name);
+
+		if (animation_index!=NONE)
+		{
+			unit->unit.override_emotion_animation_index = animation_index;
+		}
+		else
+		{
+			console_warning("couldn't find the emotion animation '%s'", animation_name);
+		}
+	}
+
+	return;
 }
 
 long unit_get_current_equipment(

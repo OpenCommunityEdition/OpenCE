@@ -192,6 +192,10 @@ char const *animation_list_get_string(struct animation_list const *animation_lis
 
 /* ---------- prototypes/MODEL_ANIMATIONS.C */
 
+short animation_graph_get_animation_by_name(
+	long animation_graph_index,
+	char const *animation_name);
+
 void animation_get_node_orientations(
 	struct model const *model,
 	struct animation const *animation,

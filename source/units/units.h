@@ -570,6 +570,8 @@ long unit_scripting_unit_gunner(
 	long unit_index);
 long unit_get_current_equipment(
 	long unit_index);
+void unit_delete_current_equipment(
+	long unit_index);
 boolean unit_get_current_flashlight_state(
 	long unit_index);
 void unit_abort_animation(
@@ -607,6 +609,11 @@ short unit_inventory_next_grenade(long unit_index, short current_index, short de
 boolean unit_has_weapon_definition_index(
 	long unit_index,
 	long weapon_definition_index);
+short unit_get_grenade_count(
+	long unit_index,
+	short grenade_type);
+short unit_get_current_grenade_type(
+	long unit_index);
 boolean unit_start_user_animation(
 	long unit_index,
 	long animation_graph_index,
@@ -624,6 +631,8 @@ void unit_set_actively_controlled(long unit_index, boolean actively_controlled);
 void unit_scripting_can_blink(
 	long unit_index,
 	boolean can_blink);
+void unit_scripting_doesnt_drop_items(
+	long object_list_index);
 void unit_set_desired_flashlight_state(
 	long unit_index,
 	boolean desired_state);
