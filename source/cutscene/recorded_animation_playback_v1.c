@@ -74,6 +74,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -85,5 +87,13 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void byte_swap_recording_stream_v1(
+	void *stream,
+	long stream_size,
+	byte unit_control_data_version)
+{
+	return;
+}
 
 /* ---------- private code */
