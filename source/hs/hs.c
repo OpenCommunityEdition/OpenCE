@@ -4124,6 +4124,8 @@ void vehicle_hover(
 
 /* ---------- globals */
 
+byte bss_00453468[0x12] = { 0 };
+
 /* ---------- public code */
 
 HS_EVALUATE_NO_ARGUMENTS(code_000ad5f0, hs_object_destroy_all)
@@ -4483,5 +4485,36 @@ HS_EVALUATE_RETURN_BOOLEAN(code_000b0990, struct hs_arguments_short_word, (ai_sc
 HS_EVALUATE_RETURN_BOOLEAN(code_000b0d30, struct hs_arguments_boolean, (scripted_player_control_set_camera_control(arguments->value)))
 HS_EVALUATE_RETURN_BOOLEAN(code_000b1f70, struct hs_arguments_boolean, (scripted_show_hud(arguments->value)))
 HS_EVALUATE_RETURN_BOOLEAN(code_000b1fc0, struct hs_arguments_boolean, (scripted_show_hud_help_text(arguments->value)))
+
+void code_000b3ee0(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	bss_00453468[0x10] = TRUE;
+	hs_return(thread_index, 0);
+	return;
+}
+
+void code_000b3f00(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	union hs_short_result result;
+	union hs_evaluation_argument const *arguments;
+	word upper_bound;
+	short lower_bound;
+	result.value = 0;
+	arguments = (union hs_evaluation_argument const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		upper_bound = arguments[1].unsigned_short_value;
+		lower_bound = arguments[0].short_value;
+		result.short_value = seed_random_range(get_global_random_seed_address(), lower_bound, upper_bound);
+		hs_return(thread_index, result.value);
+	}
+	return;
+}
 
 /* ---------- private code */
