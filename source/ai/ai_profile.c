@@ -84,6 +84,7 @@ symbols in this file:
 
 #include "ai/actors.h"
 #include "ai/encounters.h"
+#include "ai/props.h"
 
 #include "memory/data.h"
 
@@ -152,6 +153,12 @@ short code_00041fc0(
 	void)
 {
 	return swarm_data->actual_count;
+}
+
+short code_00041fb0(
+	void)
+{
+	return prop_data->actual_count;
 }
 
 short code_00042020(
