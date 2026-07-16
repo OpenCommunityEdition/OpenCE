@@ -52,6 +52,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
 #include "cinematics.h"
 
 /* ---------- constants */
@@ -60,15 +61,44 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct cinematic_global_data
+{
+	long title_index;
+	long start_tick;
+	boolean active;
+	boolean in_progress;
+	boolean can_be_skipped;
+	boolean show_letterbox;
+	long queued_title_indices[4];
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+struct cinematic_global_data *cinematic_globals;
 
 /* ---------- public code */
 
 void cinematic_dispose(
 	void)
 {
+	return;
+}
+
+void cinematic_skip_start(
+	void)
+{
+	cinematic_globals->can_be_skipped = TRUE;
+
+	return;
+}
+
+void cinematic_skip_stop(
+	void)
+{
+	cinematic_globals->can_be_skipped = FALSE;
+
 	return;
 }
 

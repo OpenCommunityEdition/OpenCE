@@ -18,6 +18,10 @@ header included in hcex build.
 
 void cinematic_dispose(
 	void);
+void cinematic_skip_start(
+	void);
+void cinematic_skip_stop(
+	void);
 
 /* ---------- globals */
 
