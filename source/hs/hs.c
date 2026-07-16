@@ -2942,6 +2942,24 @@ void evaluator( \
 	return; \
 }
 
+#define HS_EVALUATE_RETURN_BOOLEAN(evaluator, arguments_type, expression) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	arguments_type const *arguments; \
+	union hs_boolean_result result; \
+	result.value = 0; \
+	arguments = (arguments_type const *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		result.boolean = expression; \
+		hs_return(thread_index, result.value); \
+	} \
+	return; \
+}
+
 /* ---------- structures */
 
 struct hs_object_list_get_element_arguments
@@ -2964,6 +2982,78 @@ union hs_evaluation_argument
 	boolean boolean_value;
 };
 
+struct hs_arguments_boolean
+{
+	boolean value;
+};
+
+struct hs_arguments_long
+{
+	long value;
+};
+
+struct hs_arguments_word
+{
+	word value;
+};
+
+struct hs_arguments_short_long
+{
+	short value0;
+	word pad0;
+	long value1;
+};
+
+struct hs_arguments_long_word
+{
+	long value0;
+	word value1;
+};
+
+struct hs_arguments_long_long
+{
+	long value0;
+	long value1;
+};
+
+struct hs_arguments_short_word
+{
+	short value0;
+	word pad0;
+	word value1;
+};
+
+struct hs_arguments_long_long_long
+{
+	long value0;
+	char const *value1;
+	long value2;
+};
+
+struct hs_arguments_long_long_long_boolean
+{
+	long value0;
+	long value1;
+	char const *value2;
+	boolean value3;
+};
+
+struct hs_arguments_long_long_long_boolean_word
+{
+	long value0;
+	long value1;
+	char const *value2;
+	boolean value3;
+	byte pad3[3];
+	word value4;
+};
+
+union hs_boolean_result
+{
+	boolean boolean;
+	long value;
+};
+
 /* ---------- prototypes */
 
 void hs_return(
@@ -2973,6 +3063,75 @@ void *hs_macro_function_evaluate(
 	short function_index,
 	long thread_index,
 	boolean initialize);
+boolean hs_not(
+	boolean value);
+boolean scenario_trigger_volume_test_object(
+	short trigger_volume_index,
+	long object_index);
+boolean hs_trigger_volume_test_objects_any(
+	short trigger_volume_index,
+	long object_list_index);
+boolean hs_trigger_volume_test_objects_all(
+	short trigger_volume_index,
+	long object_list_index);
+boolean recorded_animation_play(
+	long unit_index,
+	word recording_index);
+boolean recorded_animation_play_and_delete(
+	long unit_index,
+	word recording_index);
+boolean recorded_animation_play_and_hover(
+	long unit_index,
+	word recording_index);
+boolean lights_enable(
+	boolean enable);
+boolean unit_start_user_animation(
+	long unit_index,
+	long animation_graph_index,
+	char const *animation_name,
+	boolean interpolate);
+boolean unit_scripting_start_user_animation_list(
+	long object_list_index,
+	long animation_graph_index,
+	char const *animation_name,
+	boolean interpolate);
+boolean unit_custom_animation_at_frame(
+	long unit_index,
+	long animation_graph_index,
+	char const *animation_name,
+	boolean interpolate,
+	word frame_index);
+boolean unit_is_playing_custom_animation(
+	long unit_index);
+boolean unit_scripting_vehicle_test_seat_list(
+	long vehicle_index,
+	char const *seat_name,
+	long object_list_index);
+boolean unit_scripting_vehicle_test_seat(
+	long vehicle_index,
+	char const *seat_name,
+	long unit_index);
+boolean unit_scripting_has_weapon(
+	long unit_index,
+	long weapon_definition_index);
+boolean unit_scripting_has_weapon_readied(
+	long unit_index,
+	long weapon_definition_index);
+boolean unit_get_current_flashlight_state(
+	long unit_index);
+boolean ai_scripting_is_attacking(
+	long encounter_index);
+boolean ai_scripting_conversation(
+	word conversation_index);
+boolean ai_scripting_allegiance_broken(
+	short team0,
+	word team1);
+boolean scripted_player_control_set_camera_control(
+	boolean enabled);
+boolean scripted_show_hud(
+	boolean show);
+boolean scripted_show_hud_help_text(
+	boolean show);
 long hs_players(
 	void);
 long game_time_get(
@@ -3346,5 +3505,28 @@ HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(code_000aff90, ai_scripting_set_return_stat
 HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(code_000affd0, ai_scripting_set_current_state)
 HS_EVALUATE_VOID_LONG_BOOLEAN(code_000b0010, ai_scripting_playfight)
 HS_EVALUATE_VOID_LONG_LONG(code_000b0070, ai_scripting_vehicle_encounter)
+HS_EVALUATE_RETURN_BOOLEAN(code_000ad290, struct hs_arguments_boolean, (hs_not(arguments->value)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000ad380, struct hs_arguments_short_long, (scenario_trigger_volume_test_object(arguments->value0, arguments->value1)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000ad3d0, struct hs_arguments_short_long, (hs_trigger_volume_test_objects_any(arguments->value0, arguments->value1)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000ad420, struct hs_arguments_short_long, (hs_trigger_volume_test_objects_all(arguments->value0, arguments->value1)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000adb10, struct hs_arguments_long_word, (recorded_animation_play(arguments->value0, arguments->value1)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000adb60, struct hs_arguments_long_word, (recorded_animation_play_and_delete(arguments->value0, arguments->value1)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000adbb0, struct hs_arguments_long_word, (recorded_animation_play_and_hover(arguments->value0, arguments->value1)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000ae070, struct hs_arguments_boolean, (lights_enable(arguments->value)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000ae3b0, struct hs_arguments_long_long_long_boolean, (unit_start_user_animation(arguments->value0, arguments->value1, arguments->value2, arguments->value3)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000ae400, struct hs_arguments_long_long_long_boolean, (unit_scripting_start_user_animation_list(arguments->value0, arguments->value1, arguments->value2, arguments->value3)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000ae450, struct hs_arguments_long_long_long_boolean_word, (unit_custom_animation_at_frame(arguments->value0, arguments->value1, arguments->value2, arguments->value3, arguments->value4)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000ae4b0, struct hs_arguments_long, (unit_is_playing_custom_animation(arguments->value)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000ae600, struct hs_arguments_long_long_long, (unit_scripting_vehicle_test_seat_list(arguments->value0, arguments->value1, arguments->value2)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000ae650, struct hs_arguments_long_long_long, (unit_scripting_vehicle_test_seat(arguments->value0, arguments->value1, arguments->value2)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000aeb30, struct hs_arguments_long_long, (unit_scripting_has_weapon(arguments->value0, arguments->value1)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000aeb80, struct hs_arguments_long_long, (unit_scripting_has_weapon_readied(arguments->value0, arguments->value1)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000aed40, struct hs_arguments_long, (unit_get_current_flashlight_state(arguments->value)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000b05b0, struct hs_arguments_long, (ai_scripting_is_attacking(arguments->value)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000b08a0, struct hs_arguments_word, (ai_scripting_conversation(arguments->value)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000b0990, struct hs_arguments_short_word, (ai_scripting_allegiance_broken(arguments->value0, arguments->value1)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000b0d30, struct hs_arguments_boolean, (scripted_player_control_set_camera_control(arguments->value)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000b1f70, struct hs_arguments_boolean, (scripted_show_hud(arguments->value)))
+HS_EVALUATE_RETURN_BOOLEAN(code_000b1fc0, struct hs_arguments_boolean, (scripted_show_hud_help_text(arguments->value)))
 
 /* ---------- private code */
