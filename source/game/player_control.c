@@ -197,9 +197,17 @@ symbols in this file:
 
 /* ---------- globals */
 
-struct player_control_globals_header *bss_0043ee30;
+struct player_control_globals_data *bss_0043ee30;
 
 /* ---------- public code */
+
+struct player_control *player_control_get(
+	short local_player_index)
+{
+	match_assert("c:\\halo\\SOURCE\\game\\player_control.c", 0xB1,
+		local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+	return &player_control_globals->players[local_player_index];
+}
 
 void player_control_dispose(
 	void)
@@ -232,10 +240,38 @@ boolean scripted_player_control_set_camera_control(
 	return camera_control;
 }
 
+long player_control_get_unit_index(
+	short local_player_index)
+{
+	match_assert("c:\\halo\\SOURCE\\game\\player_control.c", 0xB1,
+		local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+	return player_control_globals->players[local_player_index].unit_index;
+}
+
+short player_control_get_zoom_level(
+	short local_player_index)
+{
+	short zoom_level = NONE;
+
+	if (local_player_index != NONE)
+	{
+		zoom_level = player_control_get(local_player_index)->zoom_level;
+	}
+	return zoom_level;
+}
+
+float player_control_get_autoaim_level(
+	short local_player_index)
+{
+	match_assert("c:\\halo\\SOURCE\\game\\player_control.c", 0xB1,
+		local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+	return player_control_globals->players[local_player_index].autoaim_level;
+}
+
 void player_control_action_test_reset(
 	void)
 {
-	struct player_control_globals_header *globals = player_control_globals;
+	struct player_control_globals_data *globals = player_control_globals;
 
 	globals->action_flags = 0;
 	globals->action_test_flags = 0;
@@ -245,7 +281,7 @@ void player_control_action_test_reset(
 boolean player_control_action_test_accept(
 	void)
 {
-	struct player_control_globals_header *globals = player_control_globals;
+	struct player_control_globals_data *globals = player_control_globals;
 
 	globals->action_test_flags |= FLAG(_player_control_accept_bit);
 	globals->suppressed_action_flags |= FLAG(_player_control_accept_bit);
@@ -257,7 +293,7 @@ boolean player_control_action_test_accept(
 boolean player_control_action_test_back(
 	void)
 {
-	struct player_control_globals_header *globals = player_control_globals;
+	struct player_control_globals_data *globals = player_control_globals;
 
 	globals->action_test_flags |= FLAG(_player_control_back_bit);
 	globals->suppressed_action_flags |= FLAG(_player_control_back_bit);
@@ -269,7 +305,7 @@ boolean player_control_action_test_back(
 boolean player_control_action_test_action(
 	void)
 {
-	struct player_control_globals_header *globals = player_control_globals;
+	struct player_control_globals_data *globals = player_control_globals;
 
 	globals->action_test_flags |= FLAG(_player_control_action_bit);
 	globals->suppressed_action_flags |= FLAG(_player_control_action_bit);
