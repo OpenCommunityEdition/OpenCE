@@ -92,4 +92,64 @@ symbols in this file:
 
 /* ---------- public code */
 
+void code_000a0030(
+	void)
+{
+	return;
+}
+
+void code_000a03b0(
+	void)
+{
+	return;
+}
+
+void code_000a03e0(
+	void)
+{
+	return;
+}
+
+void code_000a0410(
+	void)
+{
+	return;
+}
+
+void code_000a0420(
+	void)
+{
+	return;
+}
+
+void code_000a0430(
+	void)
+{
+	return;
+}
+
+void code_000a0440(
+	void)
+{
+	return;
+}
+
+void code_000a0800(
+	void)
+{
+	return;
+}
+
+void code_000a0810(
+	void)
+{
+	return;
+}
+
+void code_000a09b0(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
