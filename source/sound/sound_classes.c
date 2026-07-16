@@ -267,6 +267,35 @@ void sound_classes_initialize_for_new_map(
 	return;
 }
 
+void sound_classes_update(
+	long ticks)
+{
+	if (ticks > 0)
+	{
+		short class_index;
+
+		for (class_index = 0; class_index < NUMBER_OF_SOUND_CLASSES; class_index++)
+		{
+			struct sound_class_runtime *sound_class = code_001b84c0(class_index);
+			if (sound_class->interpolation_ticks > ticks)
+			{
+				sound_class->current_gain =
+					(real)ticks / sound_class->interpolation_ticks *
+					(sound_class->target_gain - sound_class->current_gain) +
+					sound_class->current_gain;
+				sound_class->interpolation_ticks -= ticks;
+			}
+			else
+			{
+				sound_class->current_gain = sound_class->target_gain;
+				sound_class->interpolation_ticks = 0;
+			}
+		}
+	}
+
+	return;
+}
+
 void debug_sound_classes_set_wet(
 	char const *name,
 	real wet)

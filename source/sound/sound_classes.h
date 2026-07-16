@@ -23,6 +23,8 @@ void sound_classes_dispose_from_old_map(
 	void);
 void sound_classes_dispose(
 	void);
+void sound_classes_update(
+	long ticks);
 
 /* ---------- globals */
 
