@@ -167,6 +167,9 @@ struct object_type_definition *object_type_definitions[NUMBER_OF_OBJECT_TYPES] =
 	&sound_scenery_data_definition
 };
 
+extern struct object_type_definition *first_object_type_definition;
+short bss_00456e98;
+
 typedef char verify_object_type_definition_size[
 	sizeof(struct object_type_definition) == 0xA0 ? 1 : -1];
 
@@ -246,6 +249,52 @@ char const *object_type_get_name(
 		object_type_definitions[object_type]);
 
 	return object_type_definitions[object_type]->name;
+}
+
+void object_types_dispose(
+	void)
+{
+	struct object_type_definition *definition = first_object_type_definition;
+
+	while (definition)
+	{
+		if (definition->dispose)
+			definition->dispose();
+		definition = definition->next;
+	}
+
+	return;
+}
+
+void object_types_initialize_for_new_map(
+	void)
+{
+	struct object_type_definition *definition = first_object_type_definition;
+	bss_00456e98 = 0;
+
+	while (definition)
+	{
+		if (definition->initialize_for_new_map)
+			definition->initialize_for_new_map();
+		definition = definition->next;
+	}
+
+	return;
+}
+
+void object_types_dispose_from_old_map(
+	void)
+{
+	struct object_type_definition *definition = first_object_type_definition;
+
+	while (definition)
+	{
+		if (definition->dispose_from_old_map)
+			definition->dispose_from_old_map();
+		definition = definition->next;
+	}
+
+	return;
 }
 
 short object_definition_index_to_object_type(
