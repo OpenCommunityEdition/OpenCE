@@ -14,6 +14,8 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct byte_swap_definition;
+
 struct data_encoding_state
 {
 	byte *buffer;
@@ -30,16 +32,22 @@ void data_encode_new(
 	void *buffer,
 	long buffer_size);
 
-void data_encode_memory(
+boolean data_encode_memory(
 	struct data_encoding_state *state,
 	void const *source,
-	long element_count,
+	short element_count,
 	long element_size);
 
-void data_encode_integer(
+boolean data_encode_integer(
 	struct data_encoding_state *state,
 	long value,
 	long maximum_value);
+
+boolean data_encode_structures(
+	struct data_encoding_state *state,
+	void const *source_structures,
+	short structure_count,
+	struct byte_swap_definition *bs_definition);
 
 boolean data_encode_string(
 	struct data_encoding_state *state,
@@ -53,8 +61,13 @@ void data_decode_new(
 
 void *data_decode_memory(
 	struct data_encoding_state *state,
-	long element_count,
+	short count,
 	long element_size);
+
+void *data_decode_structures(
+	struct data_encoding_state *state,
+	short structure_count,
+	struct byte_swap_definition *bs_definition);
 
 byte data_decode_byte(
 	struct data_encoding_state *state);

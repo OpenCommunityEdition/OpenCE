@@ -67,6 +67,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "memory/byte_swapping.h"
 #include "memory/data_encoding.h"
 
 /* ---------- constants */
@@ -94,6 +95,38 @@ void data_encode_new(
 	state->buffer_size = buffer_size;
 
 	return;
+}
+
+boolean data_encode_structures(
+	struct data_encoding_state *state,
+	void const *source_structures,
+	short structure_count,
+	struct byte_swap_definition *bs_definition)
+{
+	short memory_size;
+	void *destination;
+
+	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 110, state && state->buffer && state->offset>=0 && state->offset<state->buffer_size);
+	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 111, source_structures);
+	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 112, bs_definition);
+
+	memory_size = (short)(bs_definition->size * structure_count);
+	if (memory_size > 0)
+	{
+		if (state->offset + memory_size <= state->buffer_size && !state->overflow)
+		{
+			destination = state->buffer + state->offset;
+			csmemcpy(destination, source_structures, memory_size);
+			byte_swap_data(bs_definition, destination, structure_count);
+			state->offset += memory_size;
+		}
+		else
+		{
+			state->overflow = TRUE;
+		}
+	}
+
+	return !state->overflow;
 }
 
 boolean data_encode_string(
@@ -133,6 +166,36 @@ void data_decode_new(
 	state->buffer_size = buffer_size;
 
 	return;
+}
+
+void *data_decode_structures(
+	struct data_encoding_state *state,
+	short structure_count,
+	struct byte_swap_definition *bs_definition)
+{
+	short memory_size;
+	void *structures = NULL;
+
+	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 222, state && state->buffer && state->offset>=0 && state->offset<=state->buffer_size);
+	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 223, structure_count>=0);
+	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 224, bs_definition);
+
+	memory_size = (short)(bs_definition->size * structure_count);
+	if (state->offset + memory_size <= state->buffer_size && !state->overflow)
+	{
+		structures = state->buffer + state->offset;
+		if (memory_size)
+		{
+			byte_swap_data(bs_definition, structures, structure_count);
+			state->offset += memory_size;
+		}
+	}
+	else
+	{
+		state->overflow = TRUE;
+	}
+
+	return structures;
 }
 
 __int64 data_decode_int64(
