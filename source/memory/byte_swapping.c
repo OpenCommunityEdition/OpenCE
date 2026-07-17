@@ -52,6 +52,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "byte_swapping.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -60,8 +63,103 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void code_00108010(
+	struct byte_swap_definition *definition,
+	void *data,
+	byte_swap_code *codes,
+	long *size,
+	byte_swap_code **next_code);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+long byte_swap_codes_size(
+	char *name,
+	byte_swap_code *codes)
+{
+	struct byte_swap_definition definition;
+
+	definition.name = name;
+	definition.size = 0;
+	definition.codes = codes;
+	definition.signature = BYTE_SWAP_DEFINITION_SIGNATURE;
+	code_00108010(&definition, NULL, codes, (long *)&name, &codes);
+
+	return (long)name;
+}
+
+void byte_swap_data(
+	struct byte_swap_definition *definition,
+	void *data,
+	long data_count)
+{
+	byte_swap_code *next_code;
+	long calculated_size;
+	long index;
+
+	match_assert("c:\\halo\\SOURCE\\memory\\byte_swapping.c", 77, definition);
+
+	if (!definition->verified && definition->size>=0)
+	{
+		code_00108010(
+			definition,
+			NULL,
+			definition->codes,
+			&calculated_size,
+			&next_code);
+
+		match_vassert(
+			"c:\\halo\\SOURCE\\memory\\byte_swapping.c",
+			88,
+			calculated_size==definition->size,
+			csprintf(
+				temporary,
+				"%s bs data @%p is #%d but should be #%d bytes",
+				definition->name,
+				definition,
+				calculated_size,
+				definition->size));
+		definition->verified = TRUE;
+	}
+
+	if (data)
+	{
+		for (index = 0; index<data_count; index++)
+		{
+			code_00108010(
+				definition,
+				(byte *)data+definition->size*index,
+				definition->codes,
+				NULL,
+				NULL);
+		}
+	}
+
+	return;
+}
+
+void byte_swap_data_explicit(
+	char *name,
+	long size,
+	byte_swap_code *codes,
+	long data_count,
+	void *data)
+{
+	struct byte_swap_definition definition;
+
+	match_assert("c:\\halo\\SOURCE\\memory\\byte_swapping.c", 40, codes);
+	match_assert("c:\\halo\\SOURCE\\memory\\byte_swapping.c", 41, data_count>=0);
+	match_assert("c:\\halo\\SOURCE\\memory\\byte_swapping.c", 42, size>=0);
+
+	definition.name = name;
+	definition.size = size;
+	definition.codes = codes;
+	definition.signature = BYTE_SWAP_DEFINITION_SIGNATURE;
+	definition.verified = data!=NULL;
+	byte_swap_data(&definition, data, data_count);
+
+	return;
+}
 
 /* ---------- private code */
