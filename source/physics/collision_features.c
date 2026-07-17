@@ -66,6 +66,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "collision_features.h"
+
+#include "math/real_math.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -77,5 +82,13 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void collision_features_new(
+	struct collision_feature_list *features)
+{
+	csmemset(features->count, 0, sizeof(features->count));
+
+	return;
+}
 
 /* ---------- private code */

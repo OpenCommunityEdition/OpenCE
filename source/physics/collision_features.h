@@ -8,80 +8,89 @@ header included in hcex build.
 #define __COLLISION_FEATURES_H
 #pragma once
 
+/* ---------- headers */
+
+#include "math/real_math.h"
+
 /* ---------- constants */
 
 enum
 {
-	MAXIMUM_COLLISION_FEATURES_PER_TYPE = 256,
+	MAXIMUM_COLLISION_FEATURES_PER_TEST = 256,
+};
+
+enum collision_feature_type
+{
+	_collision_feature_sphere,
+	_collision_feature_cylinder,
+	_collision_feature_prism,
+	NUMBER_OF_COLLISION_FEATURE_TYPES,
 };
 
 /* ---------- macros */
 
 /* ---------- structures */
 
-struct collision_feature_reference
+struct collision_feature_common
 {
+	long source_index;
 	long object_index;
-	long feature_index;
-	byte type;
 	byte flags;
+	byte breakable_surface_index;
 	short material_index;
 };
 
-struct collision_point_feature
+struct collision_feature_sphere
 {
-	struct collision_feature_reference reference;
-	real_point3d point;
-	long plane_designator;
+	struct collision_feature_common common;
+	union real_point3d center;
+	long user_data;
 };
 
-struct collision_line_feature
+struct collision_feature_cylinder
 {
-	struct collision_feature_reference reference;
-	real_point3d point0;
-	real_point3d point1;
-	long plane_designator;
+	struct collision_feature_common common;
+	union real_point3d point;
+	long user_data;
+	real height;
+	real radius;
+	long user_data2;
 };
 
-struct collision_polygon_feature
+struct collision_feature_prism
 {
-	struct collision_feature_reference reference;
-	real_plane3d plane;
-	long plane_designator;
-	short projection;
-	byte projection_sign;
-	byte pad;
-	long point_count;
-	real_point2d points[8];
+	struct collision_feature_common common;
+	byte data[0x5C];
 };
 
 struct collision_feature_list
 {
-	short point_count;
-	short line_count;
-	short polygon_count;
-	short pad;
-	struct collision_point_feature points[MAXIMUM_COLLISION_FEATURES_PER_TYPE];
-	struct collision_line_feature lines[MAXIMUM_COLLISION_FEATURES_PER_TYPE];
-	struct collision_polygon_feature polygons[MAXIMUM_COLLISION_FEATURES_PER_TYPE];
+	short count[NUMBER_OF_COLLISION_FEATURE_TYPES];
+	word pad;
+	struct collision_feature_sphere spheres[MAXIMUM_COLLISION_FEATURES_PER_TEST];
+	struct collision_feature_cylinder cylinders[MAXIMUM_COLLISION_FEATURES_PER_TEST];
+	struct collision_feature_prism prisms[MAXIMUM_COLLISION_FEATURES_PER_TEST];
 };
 
-typedef char collision_feature_reference_size_assert[
-	sizeof(struct collision_feature_reference) == 0x0C ? 1 : -1];
-typedef char collision_point_feature_size_assert[
-	sizeof(struct collision_point_feature) == 0x1C ? 1 : -1];
-typedef char collision_line_feature_size_assert[
-	sizeof(struct collision_line_feature) == 0x28 ? 1 : -1];
-typedef char collision_polygon_feature_size_assert[
-	sizeof(struct collision_polygon_feature) == 0x68 ? 1 : -1];
-typedef char collision_feature_list_lines_offset_assert[
-	offsetof(struct collision_feature_list, lines) == 0x1C08 ? 1 : -1];
-typedef char collision_feature_list_polygons_offset_assert[
-	offsetof(struct collision_feature_list, polygons) == 0x4408 ? 1 : -1];
-typedef char collision_feature_list_size_assert[
-	sizeof(struct collision_feature_list) == 0xAC08 ? 1 : -1];
+typedef char collision_feature_common_size_assert[
+	sizeof(struct collision_feature_common) == 0x0C ? 1 : -1];
+typedef char collision_feature_sphere_size_assert[
+	sizeof(struct collision_feature_sphere) == 0x1C ? 1 : -1];
+typedef char collision_feature_cylinder_size_assert[
+	sizeof(struct collision_feature_cylinder) == 0x28 ? 1 : -1];
+typedef char collision_feature_prism_size_assert[
+	sizeof(struct collision_feature_prism) == 0x68 ? 1 : -1];
+typedef char collision_feature_list_spheres_offset_assert[
+	offsetof(struct collision_feature_list, spheres) == 0x08 ? 1 : -1];
+typedef char collision_feature_list_cylinders_offset_assert[
+	offsetof(struct collision_feature_list, cylinders) == 0x1C08 ? 1 : -1];
+typedef char collision_feature_list_prisms_offset_assert[
+	offsetof(struct collision_feature_list, prisms) == 0x4408 ? 1 : -1];
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/COLLISION_FEATURES.C */
+
+void collision_features_new(
+	struct collision_feature_list *features);
 
 /* ---------- globals */
 
