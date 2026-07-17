@@ -249,6 +249,81 @@ void hashtable_remove(
 	return;
 }
 
+boolean hashtable_grow(
+	struct hashtable *table,
+	short growth_bits)
+{
+	short old_count = table->count;
+	unsigned long *old_used_slots = table->used_slots;
+	struct dynamic_array old_elements = table->elements;
+	short old_capacity_bits = table->capacity_bits;
+	short old_element_index;
+	short new_count;
+	void *old_element;
+
+	match_assert("c:\\halo\\SOURCE\\memory\\hashtable.c", 134, hashtable_valid(table));
+	match_assert("c:\\halo\\SOURCE\\memory\\hashtable.c", 135, growth_bits>0);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\hashtable.c",
+		136,
+		table->capacity_bits+growth_bits<SHORT_BITS);
+
+	table->capacity_bits += growth_bits;
+	new_count = 1<<table->capacity_bits;
+	table->count = 0;
+	table->used_slots = match_malloc(
+		"c:\\halo\\SOURCE\\memory\\hashtable.c",
+		143,
+		BIT_VECTOR_SIZE_IN_BYTES(new_count));
+	if (table->used_slots)
+	{
+		dynamic_array_new(&table->elements, table->elements.element_size);
+		if (dynamic_array_resize(&table->elements, new_count))
+		{
+			csmemset(table->used_slots, 0, BIT_VECTOR_SIZE_IN_BYTES(new_count));
+			for (old_element_index = 0;
+				old_element_index<old_elements.count;
+				old_element_index++)
+			{
+				if (BIT_VECTOR_TEST_FLAG(old_used_slots, old_element_index))
+				{
+					old_element = dynamic_array_get_element(
+						&old_elements,
+						old_element_index,
+						old_elements.element_size);
+					csmemcpy(
+						code_0010b630(table, old_element),
+						(byte *)old_element+table->key_size,
+						table->element_size);
+				}
+			}
+
+			if (old_used_slots)
+			{
+				match_free(
+					"c:\\halo\\SOURCE\\memory\\hashtable.c",
+					168,
+					old_used_slots);
+			}
+			dynamic_array_delete(&old_elements);
+
+			return TRUE;
+		}
+
+		match_free(
+			"c:\\halo\\SOURCE\\memory\\hashtable.c",
+			176,
+			table->used_slots);
+	}
+
+	table->capacity_bits = old_capacity_bits;
+	table->count = old_count;
+	table->used_slots = old_used_slots;
+	table->elements = old_elements;
+
+	return FALSE;
+}
+
 void *hashtable_put(
 	struct hashtable *table,
 	const void *key)
