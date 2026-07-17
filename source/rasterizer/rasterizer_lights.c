@@ -85,6 +85,11 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	MAXIMUM_LENS_FLARE_OCCLUSION_TESTS = 897
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -119,7 +124,7 @@ struct rasterizer_lights_globals
 
 /* ---------- globals */
 
-static struct lens_flare_occlusion_test_results local_lens_flare_occlusion_test_results[896];
+static struct lens_flare_occlusion_test_results local_lens_flare_occlusion_test_results[MAXIMUM_LENS_FLARE_OCCLUSION_TESTS];
 static byte local_lens_flare_occlusion_test_results2[65544][MAXIMUM_WINDOWS];
 static struct rasterizer_lens_flare_submit_parameters local_lens_flare_parameters[MAXIMUM_LENS_FLARES_PER_FRAME] = {0};
 static long local_lens_flare_count = 0;
