@@ -85,6 +85,9 @@ void hs_dispose(
 void hs_runtime_dispose(
 	void);
 
+void hs_runtime_dispose_from_old_map(
+	void);
+
 void hs_recompile(
 	void);
 

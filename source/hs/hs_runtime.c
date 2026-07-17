@@ -267,6 +267,8 @@ symbols in this file:
 #include "math/real_math.h"
 #include "memory/data.h"
 #include "objects/objects.h"
+#include "saved games/game_state.h"
+#include "cseries/errors.h"
 
 /* ---------- constants */
 
@@ -283,6 +285,14 @@ union hs_conversion_result
 	long long_integer;
 	real real;
 	char const *string;
+};
+
+struct hs_runtime_globals
+{
+	byte reserved[4];
+	boolean initialized;
+	byte pad;
+	short executing_thread_index;
 };
 
 /* ---------- prototypes */
@@ -339,13 +349,64 @@ static boolean code_000ba390(
 
 extern hs_typecasting_procedure typecasting_procedures[NUMBER_OF_HS_TYPES][NUMBER_OF_HS_TYPES];
 extern struct data_array *hs_global_data;
+extern struct data_array *hs_thread_data;
+extern short hs_external_global_count;
+extern struct hs_runtime_globals bss_004535ac;
 
 /* ---------- public code */
+
+void hs_runtime_initialize(
+	void)
+{
+	short global_index;
+	long index;
+
+	hs_thread_data = game_state_data_new("hs thread", 0x100, 0x218);
+	hs_global_data = game_state_data_new("hs globals", 0x400, 8);
+	if (hs_thread_data && hs_global_data)
+	{
+		match_vassert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0xa9,
+			hs_external_global_count*2<0x400,
+			"raise MAXIMUM_NUMBER_OF_HS_GLOBALS.");
+		data_make_valid(hs_global_data);
+		for (global_index = 0;
+			global_index<hs_external_global_count;
+			global_index++)
+		{
+			index = datum_new_at_index(hs_global_data, global_index|0xaced0000);
+			match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0xb1, index!=NONE);
+		}
+	}
+	else
+	{
+		error(_error_immediate, "couldn't allocate scripting globals.");
+	}
+
+	return;
+}
 
 void hs_runtime_dispose(
 	void)
 {
 	data_make_invalid(hs_global_data);
+
+	return;
+}
+
+void hs_runtime_dispose_from_old_map(
+	void)
+{
+	short global_index;
+
+	data_make_invalid(hs_thread_data);
+	for (global_index = hs_external_global_count;
+		global_index<hs_global_data->count;
+		global_index++)
+	{
+		if (datum_try_and_get(hs_global_data, global_index))
+			datum_delete(hs_global_data, global_index);
+	}
+	bss_004535ac.initialized = FALSE;
 
 	return;
 }
