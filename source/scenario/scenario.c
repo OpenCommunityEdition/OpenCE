@@ -165,6 +165,7 @@ symbols in this file:
 #include "scenario.h"
 
 #include "cache/cache_files.h"
+#include "effects/material_effect_definitions.h"
 #include "game/game_globals.h"
 #include "game/players.h"
 #include "objects/objects.h"
@@ -181,6 +182,12 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct scenario_material_globals
+{
+	struct material_definition default_material;
+	boolean default_material_initialized;
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
@@ -188,6 +195,7 @@ symbols in this file:
 struct structure_bsp *global_structure_bsp;
 struct scenario *global_scenario;
 struct collision_bsp *global_collision_bsp;
+struct scenario_material_globals bss_004c0520;
 struct bsp3d *global_bsp3d;
 struct game_globals *global_game_globals;
 
@@ -274,6 +282,18 @@ void scenario_location_award_bonus(
 	return;
 }
 
+struct material_definition *default_material_definition_get(
+	void)
+{
+	if (!bss_004c0520.default_material_initialized)
+	{
+		bss_004c0520.default_material.melee_hit_sound.index = NONE;
+		bss_004c0520.default_material_initialized = TRUE;
+	}
+
+	return &bss_004c0520.default_material;
+}
+
 long scenario_get_sky_definition_index(
 	short sky_index)
 {
@@ -305,6 +325,25 @@ struct sky *scenario_get_sky(
 	return sky;
 }
 
+boolean scenario_illumination_at_point(
+	const real_point3d *point,
+	real_vector3d *surface_normal,
+	real_vector3d *radiosity_vector,
+	real_rgb_color *radiosity_color,
+	real_rgb_color *diffuse_color)
+{
+	if (surface_normal)
+		*surface_normal = *global_up3d;
+	if (radiosity_vector)
+		*radiosity_vector = *global_left3d;
+	if (radiosity_color)
+		*radiosity_color = *global_real_rgb_white;
+	if (diffuse_color)
+		*diffuse_color = *global_real_rgb_white;
+
+	return TRUE;
+}
+
 short global_structure_bsp_index_get(
 	void)
 {
@@ -315,6 +354,21 @@ long scenario_leaf_index_from_point(
 	const union real_point3d *point)
 {
 	return bsp3d_test_point(global_bsp3d_get(), 0, point);
+}
+
+boolean scenario_ensure_point_within_world(
+	real_point3d *point)
+{
+	short iteration_count = 0;
+
+	while (bsp3d_test_point(global_bsp3d_get(), 0, point) == NONE)
+	{
+		if (iteration_count++ >= 150)
+			break;
+		point->z += 0.05f;
+	}
+
+	return iteration_count == 0;
 }
 
 real scenario_fog_at_point(
