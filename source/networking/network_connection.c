@@ -210,6 +210,11 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	_connection_create_server_bit = 0,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -221,6 +226,8 @@ struct network_connection
 	void *connection_rejection_procedure;
 	byte __unknown10[0x20];
 	unsigned long flags;
+	byte __unknown34[0x18];
+	boolean allow_client_connections;
 };
 
 /* ---------- prototypes */
@@ -275,6 +282,24 @@ void network_connection_keep_alive(
 	struct network_connection *connection)
 {
 	connection->keep_alive_time = system_milliseconds();
+
+	return;
+}
+
+void network_server_allow_client_connections(
+	struct network_connection *server_connection,
+	boolean allow_client_connections)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_connection.c",
+		0x151,
+		server_connection);
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_connection.c",
+		0x152,
+		server_connection->flags&FLAG(_connection_create_server_bit));
+
+	server_connection->allow_client_connections = allow_client_connections;
 
 	return;
 }

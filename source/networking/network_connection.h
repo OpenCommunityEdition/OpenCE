@@ -34,6 +34,9 @@ boolean network_connection_going_stale(
 	struct network_connection *connection);
 void network_connection_keep_alive(
 	struct network_connection *connection);
+void network_server_allow_client_connections(
+	struct network_connection *server_connection,
+	boolean allow_client_connections);
 
 /* ---------- globals */
 
