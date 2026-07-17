@@ -18,12 +18,26 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct tag_block;
+struct tag_data;
+struct tag_reference;
+
+struct tag_iterator
+{
+	byte reserved0[4];
+	short absolute_index;
+	byte reserved6[10];
+	long group_tag;
+};
+
 /* ---------- prototypes/CACHE_FILES.C */
 
 const char *cache_files_map_directory(
 	void);
 
 unsigned long cache_files_get_checksum(void);
+void cache_files_enable_writes(
+	void);
 void scenario_structure_bsp_unload(
 	struct scenario_structure_bsp_reference *reference);
 void scenario_tags_unload(
@@ -32,6 +46,34 @@ void tag_files_close(
 	void);
 void tag_files_open(
 	void);
+boolean tag_block_resize(
+	struct tag_block *block,
+	long count);
+boolean tag_data_resize(
+	struct tag_data *data,
+	long size);
+long tag_block_add_element(
+	struct tag_block *block);
+void tag_block_delete_element(
+	struct tag_block *block,
+	long element_index);
+long tag_load(
+	long group_tag,
+	char const *name,
+	unsigned long flags);
+void tag_unload(
+	long tag_index);
+void tag_file_get_path(
+	long group_tag,
+	char const *name,
+	char *path);
+void tag_reference_set(
+	struct tag_reference *reference,
+	unsigned long group_tag,
+	char const *name);
+void tag_iterator_new(
+	struct tag_iterator *iterator,
+	long group_tag);
 
 /* ---------- prototypes/CACHE_FILES_WINDOWS.C */
 

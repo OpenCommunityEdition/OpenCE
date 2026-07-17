@@ -123,6 +123,9 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries_windows.h"
+#include "errors.h"
+#include "tag_files/tag_groups.h"
 #include "cache_files.h"
 
 /* ---------- constants */
@@ -236,6 +239,98 @@ unsigned long cache_files_get_checksum(
 	void)
 {
 	return cache_file_globals.checksum;
+}
+
+void cache_files_enable_writes(
+	void)
+{
+	XPhysicalProtect((void *)0x803A6000, 0x01600000, PAGE_READWRITE);
+
+	return;
+}
+
+boolean tag_block_resize(
+	struct tag_block *block,
+	long count)
+{
+	error(_error_silent, "tag_block_resize() is not supported with a cache file active");
+
+	return FALSE;
+}
+
+boolean tag_data_resize(
+	struct tag_data *data,
+	long size)
+{
+	error(_error_silent, "tag_data_resize() is not supported with a cache file active");
+
+	return FALSE;
+}
+
+long tag_block_add_element(
+	struct tag_block *block)
+{
+	error(_error_silent, "tag_block_add_element() is not supported with a cache file active");
+
+	return NONE;
+}
+
+void tag_block_delete_element(
+	struct tag_block *block,
+	long element_index)
+{
+	error(_error_silent, "tag_block_delete_element() is not supported with a cache file active");
+
+	return;
+}
+
+long tag_load(
+	long group_tag,
+	char const *name,
+	unsigned long flags)
+{
+	error(_error_silent, "tag_load() is not supported with a cache file active");
+
+	return NONE;
+}
+
+void tag_unload(
+	long tag_index)
+{
+	error(_error_silent, "tag_unload() is not supported with a cache file active");
+
+	return;
+}
+
+void tag_file_get_path(
+	long group_tag,
+	char const *name,
+	char *path)
+{
+	error(_error_silent, "tag_file_get_path() is not supported with a cache file active");
+	path[0] = 0;
+
+	return;
+}
+
+void tag_reference_set(
+	struct tag_reference *reference,
+	unsigned long group_tag,
+	char const *name)
+{
+	error(_error_silent, "tag_reference_set() is not supported with a cache file active");
+
+	return;
+}
+
+void tag_iterator_new(
+	struct tag_iterator *iterator,
+	long group_tag)
+{
+	iterator->absolute_index = 0;
+	iterator->group_tag = group_tag;
+
+	return;
 }
 
 void *tag_get(
