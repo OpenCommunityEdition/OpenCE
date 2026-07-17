@@ -126,6 +126,7 @@ symbols in this file:
 #include "object_types.h"
 
 #include "cache/cache_files.h"
+#include "cutscene/cinematics.h"
 #include "objects.h"
 #include "scenario/scenario_definitions.h"
 
@@ -136,6 +137,9 @@ symbols in this file:
 /* ---------- structures */
 
 /* ---------- prototypes */
+
+void object_types_place_objects(
+	boolean reconnecting);
 
 /* ---------- globals */
 
@@ -698,6 +702,35 @@ struct tag_block *scenario_get_object_type_scenario_palette(
 		definition->palette_tag_block_offset>=0 && definition->palette_tag_block_offset<=sizeof(struct scenario)+sizeof(struct tag_block));
 
 	return (struct tag_block *)((byte *)scenario + definition->palette_tag_block_offset);
+}
+
+void object_types_disconnect_from_structure_bsp(
+	void)
+{
+	struct object_iterator iterator;
+	struct object_datum *object;
+
+	object_iterator_new(&iterator, _object_mask_remove_on_bsp_switch, 0);
+	while ((object = (struct object_datum *)object_iterator_next(&iterator))!=NULL)
+	{
+		if (object->object.name_index==NONE)
+		{
+			object_delete(iterator.index);
+		}
+	}
+
+	return;
+}
+
+void object_types_reconnect_to_structure_bsp(
+	void)
+{
+	if (!cinematic_in_progress() || !cinematic_globals->suppress_bsp_object_creation)
+	{
+		object_types_place_objects(TRUE);
+	}
+
+	return;
 }
 
 

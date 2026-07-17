@@ -99,6 +99,10 @@ void object_types_initialize(void);
 void object_types_dispose(void);
 void object_types_initialize_for_new_map(void);
 void object_types_dispose_from_old_map(void);
+void object_types_disconnect_from_structure_bsp(
+	void);
+void object_types_reconnect_to_structure_bsp(
+	void);
 void object_type_adjust_placement(long object_index, struct object_placement_data *data);
 boolean object_type_new(long object_index);
 void object_type_place(long object_index, struct scenario_object_datum *scenario_object);

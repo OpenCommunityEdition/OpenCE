@@ -69,28 +69,6 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct cinematic_title
-{
-	short title_index;
-	short time;
-};
-
-struct cinematic_global_data
-{
-	long title_index;
-	long start_tick;
-	boolean show_letterbox;
-	boolean in_progress;
-	boolean can_be_skipped;
-	boolean suppress_bsp_object_creation;
-	struct cinematic_title queued_titles[4];
-};
-
-typedef char verify_cinematic_title_size[
-	sizeof(struct cinematic_title) == 0x4 ? 1 : -1];
-typedef char verify_cinematic_global_data_size[
-	sizeof(struct cinematic_global_data) == 0x1C ? 1 : -1];
-
 /* ---------- prototypes */
 
 void cinematic_set_title_delayed(
