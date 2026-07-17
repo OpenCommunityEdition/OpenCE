@@ -119,4 +119,25 @@ __int64 data_decode_int64(
 	return (value = data_decode_memory(state, 1, -sizeof(*value))) ? *value : 0;
 }
 
+char *data_decode_string(
+	struct data_encoding_state *state,
+	long maximum_length)
+{
+	char *string = state->buffer + state->offset;
+	short string_length = 0;
+
+	while (state->offset + string_length < state->buffer_size)
+	{
+		if (!string[string_length])
+		{
+			state->offset += string_length + 1;
+			return string;
+		}
+		string_length++;
+	}
+
+	state->overflow = TRUE;
+	return NULL;
+}
+
 /* ---------- private code */
