@@ -87,7 +87,7 @@ symbols in this file:
 
 enum
 {
-	MAXIMUM_LENS_FLARE_OCCLUSION_TESTS = 897
+	MAXIMUM_LENS_FLARE_OCCLUSION_TESTS = 896
 };
 
 /* ---------- macros */
@@ -135,7 +135,11 @@ extern struct rasterizer_lights_globals rasterizer_lights;
 
 void rasterizer_lights_reset_for_new_map(void)
 {
-	memset(local_lens_flare_occlusion_test_results, 0, sizeof(local_lens_flare_occlusion_test_results));
+	/* The original clears one record beyond this array into the following BSS allocation. */
+	memset(
+		local_lens_flare_occlusion_test_results,
+		0,
+		sizeof(local_lens_flare_occlusion_test_results)+sizeof(local_lens_flare_occlusion_test_results[0]));
 	memset(local_lens_flare_occlusion_test_results2, 0, sizeof(local_lens_flare_occlusion_test_results2));
 	local_lens_flare_count = 0;
 
