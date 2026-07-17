@@ -16,7 +16,9 @@ header included in hcex build.
 
 /* ---------- prototypes/MODELS.C */
 
-void model_get_node_orientations(struct model const *model, struct real_orientation *node_orientations);
+void model_get_node_orientations(
+	struct model const *model,
+	struct real_orientation *node_orientations);
 
 short model_find_marker(long model_index, char const *name);
 struct real_matrix4x3 *model_get_default_inverse_matrix(
