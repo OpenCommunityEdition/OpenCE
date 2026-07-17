@@ -66,6 +66,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "memory/data_encoding.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -77,5 +80,43 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void data_encode_new(
+	struct data_encoding_state *state,
+	void *buffer,
+	long buffer_size)
+{
+	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 25, buffer);
+	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 26, buffer_size>=0);
+
+	csmemset(state, 0, sizeof(*state));
+	state->buffer = buffer;
+	state->buffer_size = buffer_size;
+
+	return;
+}
+
+void data_decode_new(
+	struct data_encoding_state *state,
+	void const *buffer,
+	long buffer_size)
+{
+	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 204, buffer);
+	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 205, buffer_size>=0);
+
+	csmemset(state, 0, sizeof(*state));
+	state->buffer = (byte *)buffer;
+	state->buffer_size = buffer_size;
+
+	return;
+}
+
+__int64 data_decode_int64(
+	struct data_encoding_state *state)
+{
+	__int64 *value;
+
+	return (value = data_decode_memory(state, 1, -sizeof(*value))) ? *value : 0;
+}
 
 /* ---------- private code */

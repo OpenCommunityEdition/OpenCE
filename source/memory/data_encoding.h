@@ -59,6 +59,9 @@ void *data_decode_memory(
 byte data_decode_byte(
 	struct data_encoding_state *state);
 
+__int64 data_decode_int64(
+	struct data_encoding_state *state);
+
 long data_decode_integer(
 	struct data_encoding_state *state,
 	long maximum_value);
