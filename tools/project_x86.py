@@ -25,6 +25,7 @@ from typing import (
 
 from . import ninja_syntax
 from .ninja_syntax import serialize_path
+from .semantic_progress import SemanticProgressError, apply_semantic_matches
 
 from .vsgen.configuration import BuildParams
 from .vsgen.configuration import Configuration
@@ -208,6 +209,7 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
     n.comment("Tooling")
     
     report_path = sln.build_dir / "report.json"
+    semantic_report_path = sln.build_dir / "semantic_report.json"
     build_tools_path = sln.build_dir / "tools"
     download_tool = sln.tools_dir / "download_tool.py"
     n.rule(
@@ -388,6 +390,10 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
             configure_script,
             python_lib,
             report_path,
+            semantic_report_path,
+            sln.config_dir / "semantic_matches.json",
+            sln.tools_dir / "coff_compare.py",
+            sln.tools_dir / "semantic_progress.py",
         ],
     )
     n.newline()
@@ -406,6 +412,25 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
         rule="report",
         implicit=[objdiff, "objdiff.json", "all_source", "all_split"],
     )
+    n.newline()
+
+    n.comment("Generate strict semantic exact-match ledger")
+    n.rule(
+        name="semantic_report",
+        command="$python -m tools.audit_semantic_matches",
+        description="SEMANTIC REPORT",
+    )
+    n.build(
+        outputs=semantic_report_path,
+        rule="semantic_report",
+        implicit=[
+            report_path,
+            "objdiff.json",
+            sln.tools_dir / "audit_semantic_matches.py",
+            sln.tools_dir / "coff_compare.py",
+        ],
+    )
+    n.build(outputs="semantic_progress", rule="phony", inputs=semantic_report_path)
     n.newline()
 
     ###
@@ -579,6 +604,16 @@ def calculate_progress(sln: SolutionConfig) -> None:
     for category in report_data.get("categories", []):
         convert_numbers(category["measures"])
 
+    try:
+        semantic_matches = apply_semantic_matches(
+            report_data,
+            Path.cwd(),
+            sln.config_dir / "semantic_matches.json",
+            Path("objdiff.json"),
+        )
+    except SemanticProgressError as error:
+        sys.exit(f"Semantic progress verification failed: {error}")
+
     # Output to GitHub Actions job summary, if available
     summary_path = os.getenv("GITHUB_STEP_SUMMARY")
     summary_file: Optional[IO[str]] = None
@@ -593,6 +628,8 @@ def calculate_progress(sln: SolutionConfig) -> None:
 
     # Print human-readable progress
     progress_print("Progress:")
+    for semantic_match in semantic_matches:
+        progress_print(f"  Verified objdiff exception: {semantic_match}")
 
     def print_category(name: str, measures: Dict[str, Any]) -> None:
         total_code = measures.get("total_code", 0)

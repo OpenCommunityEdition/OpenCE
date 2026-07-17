@@ -1,0 +1,187 @@
+[
+  {
+    "unit": "source/cache/cache_files",
+    "function": "_cache_files_map_directory",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/units/units",
+    "function": "_unit_is_busy",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/text/international_strings",
+    "function": "_double_byte_character",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/shaders/shaders",
+    "function": "_numeric_countdown_timer_get",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/rasterizer/xbox/rasterizer_xbox_errors",
+    "function": "_rasterizer_error",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/networking/network_messages",
+    "function": "_create_network_game_message",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/memory/data_encoding",
+    "function": "_data_decode_array",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/memory/byte_swapping",
+    "function": "_code_00108010",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/memory/zlib/inflate",
+    "function": "_inflate",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/main/console",
+    "function": "_console_update",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_text_search_and_replace_functions",
+    "function": "_code_000e4aa0",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/interface/attract_mode",
+    "function": "_attract_mode_get_localized_movie_path",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/game/game_time",
+    "function": "_game_time_start",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/game/game_time",
+    "function": "_game_time_update",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/devices/device_controls",
+    "function": "_code_00083e30",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/cseries/cseries_windows",
+    "function": "_code_0007cb70",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/camera/director",
+    "function": "_director_initialize_for_new_map",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bungie_net/network/transport_address",
+    "function": "_transport_error_to_string",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_print",
+    "function": "_TIFFPrintDirectory",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_packbits",
+    "function": "_PackBitsEncode",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_next",
+    "function": "_code_0005b9b0",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_dir",
+    "function": "_code_00053960",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_dir",
+    "function": "_code_00054160",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_aux",
+    "function": "_TIFFVGetFieldDefaulted",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/ai/actor_type_sentinel",
+    "function": "_sentinel_decide_action",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/ai/actor_type_mounted_weapon",
+    "function": "_mounted_weapon_decide_action",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/ai/actor_type_marine",
+    "function": "_marine_decide_action",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/ai/actor_type_jackal",
+    "function": "_jackal_decide_action",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/ai/actor_type_infection",
+    "function": "_infection_decide_action",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/ai/actor_type_hunter",
+    "function": "_hunter_decide_action",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/ai/actor_type_grunt",
+    "function": "_grunt_decide_action",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/ai/actor_type_flood",
+    "function": "_flood_decide_action",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/ai/actor_type_engineer",
+    "function": "_engineer_decide_action",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/ai/actor_type_elite",
+    "function": "_elite_decide_action",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/ai/actor_type_crew",
+    "function": "_crew_decide_action",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/ai/actor_type_carrier",
+    "function": "_carrier_decide_action",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/ai/action_guard",
+    "function": "_code_000041b0",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  }
+]
