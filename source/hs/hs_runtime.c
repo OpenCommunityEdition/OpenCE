@@ -287,6 +287,26 @@ union hs_conversion_result
 
 /* ---------- prototypes */
 
+void code_000b9880(
+	short type,
+	union hs_conversion_result value,
+	char *result);
+void code_000b98d0(
+	short type,
+	union hs_conversion_result value,
+	char *result);
+void code_000b9920(
+	short type,
+	union hs_conversion_result value,
+	char *result);
+void code_000b9970(
+	short type,
+	union hs_conversion_result value,
+	char *result);
+void code_000b99c0(
+	short type,
+	union hs_conversion_result value,
+	char *result);
 union hs_conversion_result code_000ba220(
 	union hs_conversion_result value);
 union hs_conversion_result code_000ba240(
@@ -331,6 +351,71 @@ void hs_runtime_dispose(
 }
 
 /* ---------- private code */
+
+void code_000b9880(
+	short type,
+	union hs_conversion_result value,
+	char *result)
+{
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x241,
+		type==_hs_type_boolean);
+
+	sprintf(result, "%s", value.boolean ? "true" : "false");
+
+	return;
+}
+
+void code_000b98d0(
+	short type,
+	union hs_conversion_result value,
+	char *result)
+{
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x24c,
+		type==_hs_type_real);
+
+	sprintf(result, "%f", value.real);
+
+	return;
+}
+
+void code_000b9920(
+	short type,
+	union hs_conversion_result value,
+	char *result)
+{
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x257,
+		type==_hs_type_short_integer);
+
+	sprintf(result, "%d", value.short_integer);
+
+	return;
+}
+
+void code_000b9970(
+	short type,
+	union hs_conversion_result value,
+	char *result)
+{
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x262,
+		type==_hs_type_long_integer);
+
+	sprintf(result, "%ld", value.long_integer);
+
+	return;
+}
+
+void code_000b99c0(
+	short type,
+	union hs_conversion_result value,
+	char *result)
+{
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x26d,
+		type==_hs_type_string);
+
+	sprintf(result, "%s", value.string);
+
+	return;
+}
 
 union hs_conversion_result code_000ba220(
 	union hs_conversion_result value)
