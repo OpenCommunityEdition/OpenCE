@@ -103,10 +103,18 @@ symbols in this file:
 #include "interface/interface.h"
 #include "math/real_math.h"
 #include "text/draw_string.h"
+#include "text/font_group.h"
 #include "text/international_strings.h"
 #include "text/text_group.h"
 
 /* ---------- constants */
+
+enum
+{
+	NUMBER_OF_TEXT_STRINGS = 1,
+	NUMBER_OF_TEXT_JUSTIFICATIONS = 3,
+	NUMBER_OF_TEXT_FLAGS = 4
+};
 
 /* ---------- macros */
 
@@ -134,7 +142,7 @@ struct draw_string_globals
 
 /* ---------- globals */
 
-struct draw_string_globals bss_004c1908;
+struct draw_string_globals bss_004c1908 = { 0 };
 
 #define draw_string_globals bss_004c1908
 
@@ -180,6 +188,100 @@ void draw_string_dispose_from_old_map(
 void draw_string_dispose(
 	void)
 {
+	return;
+}
+
+char *draw_string_get_string(
+	short index)
+{
+	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 341, index>=0 && index<NUMBER_OF_TEXT_STRINGS);
+
+	return string_list_get_string(draw_string_globals.localization_string_list_index, index + 7);
+}
+
+void draw_string_set_indents(
+	short initial_indent,
+	short paragraph_indent)
+{
+	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 366, initial_indent>=0);
+	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 367, paragraph_indent>=0);
+
+	draw_string_globals.paragraph_indent = paragraph_indent;
+	draw_string_globals.initial_indent = initial_indent;
+
+	return;
+}
+
+void draw_string_set_color(
+	real_argb_color const *color)
+{
+	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 378, color);
+	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 379, (color->alpha >= 0.f) && (color->alpha <= 1.f));
+	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 380, (color->red >= 0.f) && (color->red <= 1.f));
+	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 381, (color->green >= 0.f) && (color->green <= 1.f));
+	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 382, (color->blue >= 0.f) && (color->blue <= 1.f));
+
+	draw_string_globals.color = *color;
+
+	return;
+}
+
+void draw_string_get_color(
+	real_argb_color *color)
+{
+	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 392, color);
+
+	*color = draw_string_globals.color;
+
+	return;
+}
+
+void draw_string_set_font(
+	long font_index)
+{
+	font_definition_get(font_index);
+	draw_string_globals.font_index = font_index;
+
+	return;
+}
+
+void draw_string_set_format(
+	short style,
+	short justification,
+	unsigned long flags)
+{
+	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 410, VALID_FLAGS(flags, NUMBER_OF_TEXT_FLAGS));
+	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 411, style==_text_style_plain || (style>=0 && style<NUMBER_OF_TEXT_STYLES));
+	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 412, justification>=0 && justification<NUMBER_OF_TEXT_JUSTIFICATIONS);
+
+	draw_string_globals.style = style;
+	draw_string_globals.justification = justification;
+	draw_string_globals.flags = flags;
+
+	return;
+}
+
+void draw_string_set_draw_mode(
+	long font_index,
+	short style,
+	short justification,
+	unsigned long flags,
+	real_argb_color const *color)
+{
+	draw_string_set_font(font_index);
+	draw_string_set_color(color);
+	draw_string_set_format(style, justification, flags);
+
+	return;
+}
+
+void draw_string_set_highlight(
+	short start,
+	short end)
+{
+	draw_string_globals.highlight_start = start;
+	draw_string_globals.highlight_end = end;
+
 	return;
 }
 

@@ -25,12 +25,33 @@ void draw_string_dispose_from_old_map(
 void draw_string_dispose(
 	void);
 
-void draw_string_set_tab_stops(short const *tab_stops, short count);
-void draw_string_set_indents(short initial_indent, short paragraph_indent);
-void draw_string_set_color(real_argb_color const *color);
-void draw_string_get_color(real_argb_color *color);
-
-void draw_string_set_draw_mode(long font_index, short style, short justification, unsigned long flags, union real_argb_color const *color);
+char *draw_string_get_string(
+	short index);
+void draw_string_set_tab_stops(
+	short const *tab_stops,
+	short count);
+void draw_string_set_indents(
+	short initial_indent,
+	short paragraph_indent);
+void draw_string_set_color(
+	real_argb_color const *color);
+void draw_string_get_color(
+	real_argb_color *color);
+void draw_string_set_font(
+	long font_index);
+void draw_string_set_format(
+	short style,
+	short justification,
+	unsigned long flags);
+void draw_string_set_draw_mode(
+	long font_index,
+	short style,
+	short justification,
+	unsigned long flags,
+	real_argb_color const *color);
+void draw_string_set_highlight(
+	short start,
+	short end);
 
 /* ---------- globals */
 
