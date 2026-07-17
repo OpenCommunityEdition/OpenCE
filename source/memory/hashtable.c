@@ -137,7 +137,7 @@ short default_hash_function(
 	const void *key,
 	unsigned long key_size)
 {
-	long hash = 0;
+	short hash = 0;
 	short polynomial_index = 0;
 	const byte *key_byte;
 
