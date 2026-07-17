@@ -72,6 +72,46 @@ void code_00108010(
 
 /* ---------- globals */
 
+byte_swap_code data_00309da8[] = { _begin_bs_array, 1, 1, _end_bs_array };
+struct byte_swap_definition byte_bs_definition =
+{
+	"byte",
+	1,
+	data_00309da8,
+	BYTE_SWAP_DEFINITION_SIGNATURE,
+	FALSE
+};
+
+static byte_swap_code word_bs_codes[] = { _begin_bs_array, 1, 2, _end_bs_array };
+struct byte_swap_definition word_bs_definition =
+{
+	"word",
+	2,
+	word_bs_codes,
+	BYTE_SWAP_DEFINITION_SIGNATURE,
+	FALSE
+};
+
+static byte_swap_code long_bs_codes[] = { _begin_bs_array, 1, 4, _end_bs_array };
+struct byte_swap_definition long_bs_definition =
+{
+	"long",
+	4,
+	long_bs_codes,
+	BYTE_SWAP_DEFINITION_SIGNATURE,
+	FALSE
+};
+
+static byte_swap_code int64_bs_codes[] = { _begin_bs_array, 1, 8, _end_bs_array };
+struct byte_swap_definition int64_bs_definition =
+{
+	"int64",
+	8,
+	int64_bs_codes,
+	BYTE_SWAP_DEFINITION_SIGNATURE,
+	FALSE
+};
+
 /* ---------- public code */
 
 long byte_swap_codes_size(
