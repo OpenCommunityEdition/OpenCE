@@ -44,6 +44,10 @@ void damage_initialize_for_new_map(void);
 void damage_dispose_from_old_map(void);
 void damage_render_debug(void);
 void object_initialize_vitality(long object_index, real *custom_body_vitality, real *custom_shield_vitality);
+void object_can_take_damage(long object_list_index);
+void object_cannot_take_damage(long object_list_index);
+void object_set_ranged_attack_inhibited(long object_index, boolean inhibited);
+void object_set_melee_attack_inhibited(long object_index, boolean inhibited);
 real object_get_actual_body_vitality(long object_index, boolean ignore_difficulty);
 real object_get_actual_shield_vitality(long object_index, boolean ignore_difficulty);
 real object_get_maximum_body_vitality(long object_index, boolean ignore_difficulty);
@@ -53,6 +57,7 @@ void object_damage_update(long object_index);
 void object_destroy(
 	long object_index);
 void damage_data_new(struct damage_data *damage_data, long definition_index);
+boolean object_restore_body(long object_index);
 
 void object_cause_damage(struct damage_data *damage_data, long object_index, short node_index, short region_index, short material_index, real_vector3d const *object_normal);
 

@@ -100,15 +100,28 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "damage.h"
+#include "game/game_globals.h"
+#include "hs/object_lists.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct damage_globals
+{
+	byte unknown[0x48];
+	long debug_object_index;
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+struct damage_globals bss_00456e48;
 
 /* ---------- public code */
 
@@ -122,6 +135,12 @@ void damage_dispose(void)
 	return;
 }
 
+void damage_initialize_for_new_map(void)
+{
+	bss_00456e48.debug_object_index = NONE;
+	return;
+}
+
 void damage_dispose_from_old_map(void)
 {
 	return;
@@ -129,6 +148,122 @@ void damage_dispose_from_old_map(void)
 
 void damage_render_debug(void)
 {
+	return;
+}
+
+real object_get_maximum_body_vitality(
+	long object_index,
+	boolean ignore_difficulty)
+{
+	struct object_datum *object = object_get(object_index);
+	real result = object->object.maximum_body_vitality;
+
+	if (!ignore_difficulty)
+		result *= game_difficulty_get_team_value(1, object->object.owner_team_index);
+
+	return result;
+}
+
+real object_get_maximum_shield_vitality(
+	long object_index,
+	boolean ignore_difficulty)
+{
+	struct object_datum *object = object_get(object_index);
+	real result = object->object.maximum_shield_vitality;
+
+	if (!ignore_difficulty)
+		result *= game_difficulty_get_team_value(2, object->object.owner_team_index);
+
+	return result;
+}
+
+void damage_data_new(
+	struct damage_data *damage_data,
+	long definition_index)
+{
+	csmemset(damage_data, 0, sizeof(*damage_data));
+	damage_data->definition_index = definition_index;
+	damage_data->material_type = NONE;
+	damage_data->owner_player_index = NONE;
+	damage_data->owner_object_index = NONE;
+	damage_data->owner_team_index = NONE;
+	damage_data->location.cluster_index = NONE;
+	damage_data->scale = 1.f;
+	damage_data->multiplier = 1.f;
+	return;
+}
+
+boolean object_restore_body(
+	long object_index)
+{
+	struct object_datum *object = object_get(object_index);
+	boolean restored = FALSE;
+
+	if (!TEST_FLAG(object->object.damage_flags, _object_dead_bit) &&
+		object->object.body_vitality < 1.f)
+	{
+		object->object.body_vitality = 1.f;
+		restored = TRUE;
+	}
+
+	return restored;
+}
+
+void object_can_take_damage(
+	long object_list_index)
+{
+	long reference_index;
+	long object_index = object_list_get_first(object_list_index, &reference_index);
+
+	while (object_index != NONE)
+	{
+		struct object_datum *object = object_get(object_index);
+		SET_FLAG(object->object.damage_flags, _object_cannot_take_damage_bit, FALSE);
+		object_index = object_list_get_next(object_list_index, &reference_index);
+	}
+
+	return;
+}
+
+void object_cannot_take_damage(
+	long object_list_index)
+{
+	long reference_index;
+	long object_index = object_list_get_first(object_list_index, &reference_index);
+
+	while (object_index != NONE)
+	{
+		struct object_datum *object = object_get(object_index);
+		SET_FLAG(object->object.damage_flags, _object_cannot_take_damage_bit, TRUE);
+		object_index = object_list_get_next(object_list_index, &reference_index);
+	}
+
+	return;
+}
+
+void object_set_ranged_attack_inhibited(
+	long object_index,
+	boolean inhibited)
+{
+	if (object_index != NONE)
+	{
+		struct object_datum *object = object_get(object_index);
+		SET_FLAG(object->object.damage_flags, _object_ranged_attack_inhibited_bit, inhibited);
+	}
+
+	return;
+}
+
+void object_set_melee_attack_inhibited(
+	long object_index,
+	boolean inhibited)
+{
+	if (object_index != NONE)
+	{
+		struct object_datum *object = object_get(object_index);
+		SET_FLAG(object->object.damage_flags, _object_melee_attack_inhibited_bit, inhibited);
+	}
+
 	return;
 }
 
