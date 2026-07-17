@@ -19,6 +19,12 @@ header included in hcex build.
 void model_get_node_orientations(struct model const *model, struct real_orientation *node_orientations);
 
 short model_find_marker(long model_index, char const *name);
+struct real_matrix4x3 *model_get_default_inverse_matrix(
+	struct model *model,
+	short node_index);
+short model_find_node(
+	long model_index,
+	char const *name);
 short model_get_marker_by_name(
 	long model_index,
 	char const *name,

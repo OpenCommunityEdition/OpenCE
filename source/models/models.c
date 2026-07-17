@@ -80,6 +80,38 @@ symbols in this file:
 
 /* ---------- public code */
 
+real_matrix4x3 *model_get_default_inverse_matrix(
+	struct model *model,
+	short node_index)
+{
+	struct model_node *node = TAG_BLOCK_GET_ELEMENT(&model->nodes, node_index, struct model_node);
+
+	return &node->runtime_default_inverse_matrix;
+}
+
+short model_find_node(
+	long model_index,
+	char const *name)
+{
+	if (model_index!=NONE)
+	{
+		short node_index;
+		struct model *model = model_definition_get(model_index);
+
+		for (node_index = 0; node_index<model->nodes.count; node_index++)
+		{
+			struct model_node *node = TAG_BLOCK_GET_ELEMENT(&model->nodes, node_index, struct model_node);
+
+			if (!csstrcmp(node->name, name))
+			{
+				return node_index;
+			}
+		}
+	}
+
+	return NONE;
+}
+
 short model_get_marker_by_name(
 	long model_index,
 	char const *name,
