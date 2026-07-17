@@ -65,9 +65,12 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "memory/data.h"
+#include "objects/objects.h"
 #include "objects/reference_lists.h"
 #include "saved games/game_state.h"
+#include "scenario/scenario.h"
 #include "cluster_partitions.h"
+#include "structure_bsp_definitions.h"
 #include "structures/structures.h"
 
 /* ---------- constants */
@@ -78,9 +81,45 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void reference_list_remove(
+	struct data_array *array,
+	long *first_reference_index,
+	long datum_index);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+void reference_list_remove(
+	struct data_array *array,
+	long *first_reference_index,
+	long datum_index)
+{
+	long *reference_index = first_reference_index;
+	struct data_reference *reference;
+
+	while (*reference_index != NONE)
+	{
+		reference = (struct data_reference *)datum_get(array, *reference_index);
+		if (reference->datum_index == datum_index)
+		{
+			datum_delete(array, *reference_index);
+			*reference_index = reference->next_reference_index;
+
+			return;
+		}
+
+		reference_index = &reference->next_reference_index;
+	}
+
+	match_vassert(
+		"..\\objects\\reference_lists.h",
+		0x6d,
+		FALSE,
+		csprintf(temporary, "attempt to remove invalid element %ld from reference list", datum_index));
+
+	return;
+}
 
 void cluster_partition_new(
 	struct cluster_partition *partition,
@@ -131,6 +170,109 @@ long cluster_partition_get_next_cluster(
 	long *reference_index)
 {
 	return reference_list_get_next_datum_index(partition->cluster_reference_data, reference_index);
+}
+
+void cluster_partition_reconnect(
+	struct cluster_partition *partition,
+	long datum_index,
+	long *first_cluster_reference,
+	real_point3d const *position,
+	float radius,
+	struct location const *location)
+{
+	short cluster_indices[64];
+	short cluster_count;
+	short cluster_index_index;
+
+	match_assert("c:\\halo\\SOURCE\\structures\\cluster_partitions.c", 0x6f, partition);
+	match_assert("c:\\halo\\SOURCE\\structures\\cluster_partitions.c", 0x70, first_cluster_reference);
+	match_assert("c:\\halo\\SOURCE\\structures\\cluster_partitions.c", 0x71, *first_cluster_reference==NONE);
+	match_assert("c:\\halo\\SOURCE\\structures\\cluster_partitions.c", 0x72, position);
+	match_assert("c:\\halo\\SOURCE\\structures\\cluster_partitions.c", 0x73, location);
+
+	cluster_count = structure_clusters_in_sphere(
+		location->cluster_index,
+		position,
+		radius,
+		NUMBEROF(cluster_indices),
+		cluster_indices);
+
+	if (cluster_count > 64)
+	{
+		error(_error_silent, "an object or light spanned %d clusters.", cluster_count);
+		cluster_count = NUMBEROF(cluster_indices);
+	}
+
+	for (cluster_index_index = 0; cluster_index_index < cluster_count; cluster_index_index++)
+	{
+		short const cluster_index = cluster_indices[cluster_index_index];
+
+		reference_list_add(
+			partition->cluster_reference_data,
+			first_cluster_reference,
+			cluster_index);
+
+		match_assert(
+			"c:\\halo\\SOURCE\\structures\\cluster_partitions.c",
+			0xd5,
+			cluster_index>=0 && cluster_index<global_structure_bsp_get()->clusters.count);
+
+		reference_list_add(
+			partition->data_reference_data,
+			&partition->cluster_first_data_references[cluster_index],
+			datum_index);
+	}
+
+	return;
+}
+
+void cluster_partition_disconnect(
+	struct cluster_partition *partition,
+	long datum_index,
+	long *first_cluster_reference)
+{
+	long cluster_reference_index = *first_cluster_reference;
+
+	while (cluster_reference_index != NONE)
+	{
+		struct data_reference *cluster_reference = (struct data_reference *)datum_get(
+			partition->cluster_reference_data,
+			cluster_reference_index);
+		short const cluster_index = (short)cluster_reference->datum_index;
+
+		datum_delete(partition->cluster_reference_data, cluster_reference_index);
+
+		match_assert(
+			"c:\\halo\\SOURCE\\structures\\cluster_partitions.c",
+			0xd5,
+			cluster_index>=0 && cluster_index<global_structure_bsp_get()->clusters.count);
+
+		reference_list_remove(
+			partition->data_reference_data,
+			&partition->cluster_first_data_references[cluster_index],
+			datum_index);
+
+		cluster_reference_index = cluster_reference->next_reference_index;
+	}
+
+	*first_cluster_reference = NONE;
+
+	return;
+}
+
+long cluster_partition_get_first_datum(
+	struct cluster_partition const *partition,
+	long *reference_index,
+	short cluster_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\structures\\cluster_partitions.c",
+		0xd5,
+		cluster_index>=0 && cluster_index<global_structure_bsp_get()->clusters.count);
+
+	*reference_index = partition->cluster_first_data_references[cluster_index];
+
+	return reference_list_get_next_datum_index(partition->data_reference_data, reference_index);
 }
 
 /* ---------- private code */
