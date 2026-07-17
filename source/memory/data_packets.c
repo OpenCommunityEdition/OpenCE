@@ -131,7 +131,6 @@ boolean data_packet_encode(
 {
 	struct data_encoding_state state;
 	short version;
-	byte version_byte;
 
 	match_assert("c:\\halo\\SOURCE\\memory\\data_packets.c", 61, packet_definition);
 	match_assert("c:\\halo\\SOURCE\\memory\\data_packets.c", 62, buffer && buffer_size);
@@ -144,7 +143,7 @@ boolean data_packet_encode(
 		version = packet_definition->version;
 	if (packet_definition->version > 0)
 	{
-		version_byte = (byte)version;
+		byte version_byte = (byte)version;
 		data_encode_memory(&state, &version_byte, 1, 1);
 	}
 	code_0010a7c0(
