@@ -160,6 +160,12 @@ enum
 	NUMBER_OF_DAMAGE_PARTS = 11,
 };
 
+enum
+{
+	animation_update_kind_render_only = 0,
+	animation_update_kind_affects_game_state,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -343,6 +349,85 @@ void animation_frame_get_xy_translation(
 	{
 		translation->i = 0.f;
 		translation->j = 0.f;
+	}
+
+	return;
+}
+
+short animation_choose_random_permutation_internal(
+	long render_or_affects_game_state,
+	long animation_graph_index,
+	short animation_index)
+{
+	struct animation_graph const *animation_graph = animation_graph_definition_get(animation_graph_index);
+	real random;
+
+	if (render_or_affects_game_state == animation_update_kind_affects_game_state)
+	{
+		random = real_seed_random(get_global_random_seed_address());
+	}
+	else
+	{
+		random = real_seed_random(get_global_local_random_seed_address());
+		match_assert(
+			"c:\\halo\\SOURCE\\models\\model_animations.c",
+			1008,
+			(animation_update_kind_affects_game_state==render_or_affects_game_state) ||
+			(animation_update_kind_render_only==render_or_affects_game_state));
+	}
+
+	while (animation_index != NONE)
+	{
+		struct animation const *animation = TAG_BLOCK_GET_ELEMENT(
+			&animation_graph->animations,
+			animation_index,
+			struct animation);
+
+		if (random <= animation->runtime_normalized_weight)
+		{
+			break;
+		}
+
+		animation_index = animation->next_animation_index;
+	}
+
+	return animation_index;
+}
+
+void interpolate_node_orientations(
+	short node_count,
+	struct real_orientation *original_node_orientations,
+	struct real_orientation *target_node_orientations,
+	short frame_index,
+	short frame_count)
+{
+	real fraction = (real)(frame_index + 1) / (real)frame_count;
+	real inverse_fraction = 1.f - fraction;
+	short node_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\models\\model_animations.c",
+		1277,
+		frame_count>0);
+	match_assert(
+		"c:\\halo\\SOURCE\\models\\model_animations.c",
+		1278,
+		frame_index<frame_count);
+
+	for (node_index = 0; node_index < node_count; node_index++)
+	{
+		struct real_orientation *target = &target_node_orientations[node_index];
+		struct real_orientation const *original = &original_node_orientations[node_index];
+
+		target->scale = original->scale * inverse_fraction + target->scale * fraction;
+		quaternions_interpolate_and_normalize(
+			&original->rotation,
+			&target->rotation,
+			fraction,
+			&target->rotation);
+		target->translation.x = original->translation.x * inverse_fraction + target->translation.x * fraction;
+		target->translation.y = original->translation.y * inverse_fraction + target->translation.y * fraction;
+		target->translation.z = original->translation.z * inverse_fraction + target->translation.z * fraction;
 	}
 
 	return;

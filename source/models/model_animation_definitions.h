@@ -245,6 +245,10 @@ void animation_frame_get_xy_translation(
 	struct animation const *animation,
 	short frame_index,
 	real_vector2d *translation);
+short animation_choose_random_permutation_internal(
+	long render_or_affects_game_state,
+	long animation_graph_index,
+	short animation_index);
 
 void animation_get_node_orientations(
 	struct model const *model,
