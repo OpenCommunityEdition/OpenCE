@@ -59,6 +59,11 @@ symbols in this file:
 
 /* ---------- macros */
 
+#define SWAP8(q) \
+	(((q)>>56) | (((q)>>40)&0xff00) | (((q)>>24)&0xff0000) | (((q)>>8)&0xff000000) | \
+	 (((q)<<8)&0xff00000000ui64) | (((q)<<24)&0xff0000000000ui64) | \
+	 (((q)<<40)&0xff000000000000ui64) | ((q)<<56))
+
 /* ---------- structures */
 
 /* ---------- prototypes */
@@ -68,7 +73,7 @@ void code_00108010(
 	void *data,
 	byte_swap_code *codes,
 	long *size,
-	byte_swap_code **next_code);
+	long *next_code);
 
 /* ---------- globals */
 
@@ -114,6 +119,170 @@ struct byte_swap_definition int64_bs_definition =
 
 /* ---------- public code */
 
+void code_00108010(
+	struct byte_swap_definition *definition,
+	void *data,
+	byte_swap_code *codes,
+	long *size,
+	long *next_code)
+{
+	long code;
+	long offset;
+	long code_index;
+	register long array_count;
+	long repeat_count;
+	long local_size;
+	long local_code_count;
+	long external_size;
+
+	if (definition->signature!=BYTE_SWAP_DEFINITION_SIGNATURE)
+	{
+		display_assert(
+			csprintf(temporary, "got bs data with bad signature (assuming name is wrong)"),
+			"c:\\halo\\SOURCE\\memory\\byte_swapping.c",
+			0xb0,
+			FALSE);
+
+		match_vassert(
+			"c:\\halo\\SOURCE\\memory\\byte_swapping.c",
+			0xb2,
+			definition->signature==BYTE_SWAP_DEFINITION_SIGNATURE,
+			csprintf(temporary, "%s bs data has bad signature", definition->name));
+	}
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\memory\\byte_swapping.c",
+		0xb7,
+		codes[0]==_begin_bs_array,
+		csprintf(
+			temporary,
+			"%s bs data @%p.#0 has bad start #%d",
+			definition->name,
+			codes,
+			definition->codes[0]));
+
+	array_count = codes[1];
+	match_vassert(
+		"c:\\halo\\SOURCE\\memory\\byte_swapping.c",
+		0xbd,
+		array_count>=0,
+		csprintf(
+			temporary,
+			"%s bs data @%p.#1 has invalid array size #%d",
+			definition->name,
+			codes,
+			array_count));
+
+	offset = 0;
+	if (array_count<=0)
+		goto done;
+	repeat_count = array_count;
+
+	do
+	{
+		code_index = 2;
+		for (;;)
+		{
+			code = codes[code_index];
+			switch (code)
+			{
+			case _2byte:
+				if (data)
+				{
+					unsigned short value = *(unsigned short *)((byte *)data+offset);
+					*(unsigned short *)((byte *)data+offset) = (unsigned short)((value>>8) | (value<<8));
+				}
+				code_index++;
+				offset += 2;
+				break;
+
+			case _4byte:
+				if (data)
+				{
+					*(unsigned long *)((byte *)data+offset) =
+						SWAP4(*(unsigned long *)((byte *)data+offset));
+				}
+				code_index++;
+				offset += 4;
+				break;
+
+			case _8byte:
+				if (data)
+				{
+					*(unsigned __int64 *)((byte *)data+offset) =
+						SWAP8(*(unsigned __int64 *)((byte *)data+offset));
+				}
+				code_index++;
+				offset += 8;
+				break;
+
+			case _begin_bs_array:
+				code_00108010(
+					definition,
+					data ? (byte *)data+offset : NULL,
+					codes+code_index,
+					&local_size,
+					&local_code_count);
+				code_index += local_code_count;
+				offset += local_size;
+				break;
+
+			case _extern_bs_definition:
+			{
+				struct byte_swap_definition *external_definition = (struct byte_swap_definition *)codes[code_index+1];
+				code_00108010(
+					external_definition,
+					data ? (byte *)data+offset : NULL,
+					external_definition->codes,
+					&external_size,
+					NULL);
+				code_index += 2;
+				offset += external_size;
+				break;
+			}
+
+			case _end_bs_array:
+				goto next_iteration;
+
+			default:
+				if (code>0)
+				{
+					code_index++;
+					offset += code;
+				}
+				else
+				{
+					match_vassert(
+						"c:\\halo\\SOURCE\\memory\\byte_swapping.c",
+						0x129,
+						FALSE,
+						csprintf(
+							temporary,
+							"%s bs @%p.#%d has invalid code #%d",
+							definition->name,
+							codes,
+							code_index,
+							code));
+				}
+				break;
+			}
+		}
+
+next_iteration:
+		code_index++;
+		repeat_count--;
+	}
+	while (repeat_count!=0);
+
+done:
+	if (size)
+		*size = offset;
+	if (next_code)
+		*next_code = code_index;
+
+	return;
+}
+
 long byte_swap_codes_size(
 	char *name,
 	byte_swap_code *codes)
@@ -124,7 +293,7 @@ long byte_swap_codes_size(
 	definition.size = 0;
 	definition.codes = codes;
 	definition.signature = BYTE_SWAP_DEFINITION_SIGNATURE;
-	code_00108010(&definition, NULL, codes, (long *)&name, &codes);
+	code_00108010(&definition, NULL, codes, (long *)&name, (long *)&codes);
 
 	return (long)name;
 }
@@ -147,7 +316,7 @@ void byte_swap_data(
 			NULL,
 			definition->codes,
 			&calculated_size,
-			&next_code);
+			(long *)&next_code);
 
 		match_vassert(
 			"c:\\halo\\SOURCE\\memory\\byte_swapping.c",
