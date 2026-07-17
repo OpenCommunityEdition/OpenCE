@@ -209,6 +209,16 @@ void animation_get_x_offsets(
 	struct animation const *animation,
 	real *key_frame_x_offset,
 	real *total_x_offset);
+void animation_get_root_matrix(
+	struct model const *model,
+	struct animation const *animation,
+	short frame_index,
+	real_matrix4x3 *root_matrix);
+void animation_get_root_velocity(
+	struct model const *model,
+	struct animation const *animation,
+	short frame_index,
+	real_vector3d *root_velocity);
 struct compressed_quaternion_8byte;
 struct compressed_quaternion_6byte;
 void quaternion_decompress_8byte(

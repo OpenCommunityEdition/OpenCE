@@ -279,6 +279,52 @@ void animation_get_x_offsets(
 	return;
 }
 
+void animation_get_root_matrix(
+	struct model const *model,
+	struct animation const *animation,
+	short frame_index,
+	real_matrix4x3 *root_matrix)
+{
+	struct real_orientation node_orientations[MAXIMUM_NODES_PER_ANIMATION];
+
+	animation_get_node_orientations(model, animation, frame_index, node_orientations);
+	matrix4x3_from_point_and_quaternion(
+		root_matrix,
+		&node_orientations[0].translation,
+		&node_orientations[0].rotation);
+
+	return;
+}
+
+void animation_get_root_velocity(
+	struct model const *model,
+	struct animation const *animation,
+	short frame_index,
+	real_vector3d *root_velocity)
+{
+	struct real_orientation node_orientations[MAXIMUM_NODES_PER_ANIMATION];
+	struct real_orientation previous_node_orientations[MAXIMUM_NODES_PER_ANIMATION];
+
+	match_assert(
+		"c:\\halo\\SOURCE\\models\\model_animations.c",
+		221,
+		animation->frame_count>1);
+
+	if (frame_index == 0)
+	{
+		frame_index = 1;
+	}
+
+	animation_get_node_orientations(model, animation, frame_index, node_orientations);
+	animation_get_node_orientations(model, animation, frame_index - 1, previous_node_orientations);
+
+	root_velocity->i = node_orientations[0].translation.x - previous_node_orientations[0].translation.x;
+	root_velocity->j = node_orientations[0].translation.y - previous_node_orientations[0].translation.y;
+	root_velocity->k = node_orientations[0].translation.z - previous_node_orientations[0].translation.z;
+
+	return;
+}
+
 void quaternion_decompress_8byte(
 	struct compressed_quaternion_8byte const *compressed,
 	real_quaternion *quaternion)
