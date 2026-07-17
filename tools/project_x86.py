@@ -25,7 +25,11 @@ from typing import (
 
 from . import ninja_syntax
 from .ninja_syntax import serialize_path
-from .semantic_progress import SemanticProgressError, apply_semantic_matches
+from .semantic_progress import (
+    SemanticProgressError,
+    apply_semantic_matches,
+    apply_semantic_rejections,
+)
 
 from .vsgen.configuration import BuildParams
 from .vsgen.configuration import Configuration
@@ -605,6 +609,10 @@ def calculate_progress(sln: SolutionConfig) -> None:
         convert_numbers(category["measures"])
 
     try:
+        semantic_rejections = apply_semantic_rejections(
+            report_data,
+            sln.build_dir / "semantic_report.json",
+        )
         semantic_matches = apply_semantic_matches(
             report_data,
             Path.cwd(),
@@ -628,6 +636,8 @@ def calculate_progress(sln: SolutionConfig) -> None:
 
     # Print human-readable progress
     progress_print("Progress:")
+    for semantic_rejection in semantic_rejections:
+        progress_print(f"  Rejected objdiff false positive: {semantic_rejection}")
     for semantic_match in semantic_matches:
         progress_print(f"  Verified objdiff exception: {semantic_match}")
 

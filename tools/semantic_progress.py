@@ -32,6 +32,69 @@ def _credit(measures: Dict[str, Any], code_bytes: int) -> None:
     )
 
 
+def _debit(measures: Dict[str, Any], code_bytes: int) -> None:
+    measures["matched_code"] = int(measures.get("matched_code", 0)) - code_bytes
+    measures["matched_functions"] = int(measures.get("matched_functions", 0)) - 1
+    if measures["matched_code"] < 0 or measures["matched_functions"] < 0:
+        raise SemanticProgressError("semantic rejection would make progress negative")
+    measures["matched_code_percent"] = _percent(
+        measures["matched_code"], int(measures.get("total_code", 0))
+    )
+    measures["matched_functions_percent"] = _percent(
+        measures["matched_functions"], int(measures.get("total_functions", 0))
+    )
+
+
+def apply_semantic_rejections(
+    report: Dict[str, Any],
+    semantic_report_path: Path,
+) -> List[str]:
+    """Remove objdiff credits rejected by the stricter COFF-shape audit."""
+    if not semantic_report_path.is_file():
+        return []
+
+    semantic_report = json.loads(semantic_report_path.read_text(encoding="utf-8"))
+    report_units = {unit["name"]: unit for unit in report.get("units", [])}
+    categories = {item["id"]: item for item in report.get("categories", [])}
+    rejected = []
+
+    for entry in semantic_report.get("ordinary_rejected", []):
+        unit_name = entry["unit"]
+        function_name = entry["function"]
+        report_unit = report_units.get(unit_name)
+        if report_unit is None:
+            raise SemanticProgressError(f"semantic rejection unit not found: {unit_name}")
+        functions = [
+            function for function in report_unit.get("functions", [])
+            if function.get("name") == function_name
+        ]
+        if len(functions) != 1 or functions[0].get("fuzzy_match_percent") != 100.0:
+            raise SemanticProgressError(
+                f"semantic rejection is not an objdiff exact function: "
+                f"{unit_name}:{function_name}"
+            )
+
+        code_bytes = int(functions[0]["size"])
+        _debit(report["measures"], code_bytes)
+        _debit(report_unit["measures"], code_bytes)
+
+        progress_categories = report_unit.get("metadata", {}).get(
+            "progress_categories", []
+        )
+        if isinstance(progress_categories, str):
+            progress_categories = [progress_categories]
+        for category_id in progress_categories:
+            if category_id not in categories:
+                raise SemanticProgressError(f"progress category not found: {category_id}")
+            _debit(categories[category_id]["measures"], code_bytes)
+
+        rejected.append(
+            f"{unit_name}:{function_name} (-{code_bytes} code bytes, -1 function)"
+        )
+
+    return rejected
+
+
 def apply_semantic_matches(
     report: Dict[str, Any],
     project_root: Path,

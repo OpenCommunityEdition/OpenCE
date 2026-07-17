@@ -5,7 +5,11 @@ import unittest
 from pathlib import Path
 
 from tools.coff_compare import build_coff
-from tools.semantic_progress import SemanticProgressError, apply_semantic_matches
+from tools.semantic_progress import (
+    SemanticProgressError,
+    apply_semantic_matches,
+    apply_semantic_rejections,
+)
 
 
 class SemanticProgressTests(unittest.TestCase):
@@ -117,6 +121,30 @@ class SemanticProgressTests(unittest.TestCase):
 
         with self.assertRaisesRegex(SemanticProgressError, "expected one"):
             self._apply()
+
+    def test_structurally_rejected_objdiff_match_is_debited_everywhere(self):
+        report = copy.deepcopy(self.report)
+        report["units"][0]["functions"][0]["fuzzy_match_percent"] = 100.0
+        report["units"][0]["measures"] = self._measures(16, 16, 1, 1)
+        report["categories"][0]["measures"] = self._measures(80, 24, 8, 2)
+        semantic_report_path = self.root / "semantic_report.json"
+        semantic_report_path.write_text(
+            json.dumps({
+                "ordinary_rejected": [{
+                    "unit": "unit",
+                    "function": "_fn",
+                }]
+            }),
+            encoding="utf-8",
+        )
+
+        notes = apply_semantic_rejections(report, semantic_report_path)
+
+        self.assertEqual(len(notes), 1)
+        self.assertEqual(report["measures"]["matched_code"], 4)
+        self.assertEqual(report["measures"]["matched_functions"], 1)
+        self.assertEqual(report["units"][0]["measures"]["matched_code"], 0)
+        self.assertEqual(report["categories"][0]["measures"]["matched_code"], 8)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,28 @@ from pathlib import Path
 from tools.coff_compare import CoffError, load, section_info
 
 
+def relocation_shape_matches(target_info, base_info):
+    """Return whether objdiff's exact result has an identical COFF shape.
+
+    Symbol ownership can legitimately differ between csplit output and the
+    rebuilt object, but section size, normalized bytes, relocation count,
+    relocation addresses, and relocation types must still agree.  This keeps
+    objdiff from admitting code whose special relocations it did not model.
+    """
+    if target_info["size"] != base_info["size"]:
+        return False
+    if target_info["normalized_sha256"] != base_info["normalized_sha256"]:
+        return False
+    target_relocations = target_info["relocations"]
+    base_relocations = base_info["relocations"]
+    if len(target_relocations) != len(base_relocations):
+        return False
+    return all(
+        target["address"] == base["address"] and target["type"] == base["type"]
+        for target, base in zip(target_relocations, base_relocations)
+    )
+
+
 def audit(project_root, report_path, config_path):
     report = json.loads(report_path.read_text(encoding="utf-8"))
     config = json.loads(config_path.read_text(encoding="utf-8"))
@@ -15,6 +37,7 @@ def audit(project_root, report_path, config_path):
     exact = []
     hidden = []
     ordinary_only = []
+    ordinary_rejected = []
     missing_base_symbol = 0
     unit_errors = []
     functions_evaluated = 0
@@ -72,9 +95,9 @@ def audit(project_root, report_path, config_path):
                 "normalized_sha256": target_info["normalized_sha256"],
                 "objdiff_percent": function.get("fuzzy_match_percent", 0.0),
             }
+            key = f"{unit_name}:{function_name}"
             if semantic_exact:
                 exact.append(item)
-                key = f"{unit_name}:{function_name}"
                 if key in accepted_ledger:
                     accepted_ledger[key]["proof_sources"].append("semantic-coff")
                     accepted_ledger[key].update({
@@ -90,6 +113,13 @@ def audit(project_root, report_path, config_path):
                 item["target"] = target_info
                 item["base"] = base_info
                 ordinary_only.append(item)
+                if relocation_shape_matches(target_info, base_info):
+                    accepted_ledger[key]["proof_sources"].append(
+                        "objdiff-coff-shape"
+                    )
+                else:
+                    ordinary_rejected.append(item)
+                    accepted_ledger.pop(key, None)
 
     return {
         "summary": {
@@ -100,12 +130,15 @@ def audit(project_root, report_path, config_path):
             "hidden_exact": len(hidden),
             "hidden_code_bytes": sum(item["code_bytes"] for item in hidden),
             "ordinary_only": len(ordinary_only),
+            "ordinary_structural": len(ordinary_only) - len(ordinary_rejected),
+            "ordinary_rejected": len(ordinary_rejected),
             "unit_errors": len(unit_errors),
             "local_symbols_skipped": local_symbols_skipped,
             "accepted_exact": len(accepted_ledger),
         },
         "hidden_exact": hidden,
         "ordinary_only": ordinary_only,
+        "ordinary_rejected": ordinary_rejected,
         "unit_errors": unit_errors,
         "semantic_exact": exact,
         "accepted_ledger": sorted(
