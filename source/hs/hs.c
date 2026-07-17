@@ -2771,9 +2771,18 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "hs.h"
+#include "object_lists.h"
+#include "hs_scenario_definitions.h"
 #include "math/real_math.h"
+#include "memory/data.h"
+#include "scenario/scenario_definitions.h"
 
 /* ---------- constants */
+
+enum
+{
+	hs_function_table_count = 418,
+};
 
 /* ---------- macros */
 
@@ -3305,6 +3314,29 @@ struct hs_arguments_long_long_long
 	long value2;
 };
 
+struct hs_function_definition
+{
+	short return_type;
+	short flags;
+	char const *name;
+};
+
+struct hs_external_global_definition
+{
+	char const *name;
+	short type;
+};
+
+struct hs_profile_section;
+
+struct hs_function_table_storage
+{
+	struct hs_function_definition *functions[418];
+	char const *profile_name;
+	long profile_index;
+	boolean profile_active;
+};
+
 struct hs_arguments_long_string_string
 {
 	long value0;
@@ -3478,6 +3510,16 @@ void *hs_macro_function_evaluate(
 	short function_index,
 	long thread_index,
 	boolean initialize);
+void hs_runtime_evaluate(
+	long expression_index);
+void hs_runtime_update(
+	void);
+void profile_enter_private(
+	struct hs_profile_section *section);
+void profile_exit_private(
+	struct hs_profile_section *section);
+struct scenario *global_scenario_get(
+	void);
 void hs_teleport_players_not_in_trigger_volume(
 	short trigger_volume_index,
 	word cutscene_flag_index);
@@ -4447,6 +4489,12 @@ void vehicle_hover(
 	boolean hover);
 void hs_runtime_dispose_from_old_map(
 	void);
+void hs_runtime_initialize_for_new_map(
+	void);
+void code_000b2f00(
+	void);
+void hs_scenario_postprocess(
+	boolean force);
 void object_lists_dispose(
 	void);
 boolean game_safe_to_save(
@@ -4465,6 +4513,12 @@ boolean game_state_reverted(
 /* ---------- globals */
 
 byte bss_00453468[0x12] = { 0 };
+struct data_array *hs_syntax_data;
+extern long global_scenario_index;
+extern boolean profile_global_enable;
+extern struct hs_function_table_storage hs_function_table;
+extern short hs_external_global_count;
+extern struct hs_external_global_definition *hs_external_globals[];
 
 /* ---------- public code */
 
@@ -4476,11 +4530,200 @@ void hs_dispose(
 	return;
 }
 
+void hs_update(
+	void)
+{
+	if (profile_global_enable && hs_function_table.profile_active)
+		profile_enter_private((struct hs_profile_section *)&hs_function_table.profile_name);
+	hs_runtime_update();
+	if (profile_global_enable && hs_function_table.profile_active)
+		profile_exit_private((struct hs_profile_section *)&hs_function_table.profile_name);
+	return;
+}
+
+void hs_node_gc(
+	void)
+{
+	long syntax_node_index;
+
+	for (syntax_node_index = data_next_index(hs_syntax_data, NONE);
+		syntax_node_index != NONE;
+		syntax_node_index = data_next_index(hs_syntax_data, syntax_node_index))
+	{
+		struct hs_syntax_node *syntax_node;
+
+		syntax_node = (struct hs_syntax_node *)datum_get(hs_syntax_data, syntax_node_index);
+		if (!(((byte)syntax_node->flags) & 8))
+			datum_delete(hs_syntax_data, syntax_node_index);
+	}
+	return;
+}
+
+void hs_initialize_for_new_map(
+	void)
+{
+	struct scenario *scenario;
+
+	scenario = global_scenario_index != NONE ? global_scenario_get() : NULL;
+	code_000b2f00();
+	if (scenario && scenario->hs_syntax_data.size)
+		hs_scenario_postprocess(FALSE);
+	object_lists_initialize_for_new_map();
+	hs_runtime_initialize_for_new_map();
+	return;
+}
+
+void hs_dispose_from_old_map(
+	void)
+{
+	if (hs_syntax_data)
+	{
+		hs_node_gc();
+		if (bss_00453468[0x11])
+		{
+			data_make_invalid(hs_syntax_data);
+			data_dispose(hs_syntax_data);
+			bss_00453468[0x11] = FALSE;
+		}
+		hs_syntax_data = NULL;
+	}
+	hs_runtime_dispose_from_old_map();
+	object_lists_dispose_from_old_map();
+	return;
+}
+
 void hs_recompile(
 	void)
 {
 	bss_00453468[0x10] = TRUE;
 	return;
+}
+
+struct hs_function_definition *hs_function_get(
+	short function_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs.c",
+		522,
+		function_index>=0 && function_index<hs_function_table_count);
+
+	return hs_function_table.functions[function_index];
+}
+
+short hs_find_script_by_name(
+	char const *name)
+{
+	short script_index;
+
+	if (global_scenario_index != NONE)
+	{
+		struct tag_block const *scripts;
+
+		scripts = &global_scenario_get()->hs_scripts;
+		for (script_index = 0; script_index<scripts->count; script_index++)
+		{
+			struct hs_script const *script;
+
+			script = TAG_BLOCK_GET_ELEMENT(scripts, script_index, struct hs_script);
+			if (csstrcmp(name, script->name) == 0)
+				return script_index;
+		}
+	}
+
+	return NONE;
+}
+
+short hs_find_tag_reference_by_index(
+	long tag_index)
+{
+	short reference_index;
+
+	if (global_scenario_index != NONE)
+	{
+		struct tag_block const *references;
+
+		references = &global_scenario_get()->hs_references;
+		for (reference_index = 0; reference_index<references->count; reference_index++)
+		{
+			struct hs_reference const *reference;
+
+			reference = TAG_BLOCK_GET_ELEMENT(references, reference_index, struct hs_reference);
+			if (reference->reference.index == tag_index)
+				return reference_index;
+		}
+	}
+
+	return NONE;
+}
+
+struct hs_external_global_definition *hs_global_external_get(
+	short global_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs.c",
+		576,
+		global_index>=0 && global_index<hs_external_global_count);
+
+	return hs_external_globals[global_index];
+}
+
+short hs_global_get_type(
+	short global_index)
+{
+	if (global_index & 0x8000)
+		return hs_global_external_get(global_index & 0x7FFF)->type;
+
+	return TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->hs_globals,
+		global_index & 0x7FFF,
+		struct hs_global)->type;
+}
+
+char const *hs_global_get_name(
+	short global_index)
+{
+	if (global_index & 0x8000)
+		return hs_global_external_get(global_index & 0x7FFF)->name;
+
+	return TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->hs_globals,
+		global_index & 0x7FFF,
+		struct hs_global)->name;
+}
+
+short hs_find_function_by_name(
+	char const *name)
+{
+	short function_index;
+
+	for (function_index = 0; function_index<hs_function_table_count; function_index++)
+	{
+		if (_stricmp(hs_function_table.functions[function_index]->name, name) == 0)
+			return function_index;
+	}
+
+	return NONE;
+}
+
+boolean hs_evaluate_by_name(
+	char const *name)
+{
+	short script_index;
+
+	script_index = hs_find_script_by_name(name);
+	if (script_index != NONE)
+	{
+		struct hs_script const *script;
+
+		script = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->hs_scripts,
+			script_index,
+			struct hs_script);
+		hs_runtime_evaluate(script->root_expression_index);
+		return TRUE;
+	}
+
+	return FALSE;
 }
 
 long code_000b33b0(
