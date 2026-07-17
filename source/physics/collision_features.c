@@ -70,6 +70,7 @@ symbols in this file:
 #include "collision_features.h"
 
 #include "math/real_math.h"
+#include "physics/collision_bsp.h"
 #include "physics/collision_bsp_definitions.h"
 #include "render/render_debug.h"
 #include "tag_files/tag_groups.h"
@@ -84,6 +85,18 @@ symbols in this file:
 
 void collision_features_from_point(
 	const real_point3d *point,
+	real radius,
+	long source_index,
+	long object_index,
+	long surface_index,
+	byte flags,
+	byte breakable_surface_index,
+	short material_index,
+	struct collision_feature_list *features);
+void collision_features_from_polygon(
+	short point_count,
+	const real_point3d *points,
+	const real_plane3d *plane,
 	real radius,
 	long source_index,
 	long object_index,
@@ -168,6 +181,69 @@ void collision_features_from_vertex(
 		source_index,
 		object_index,
 		surface_index,
+		surface->flags,
+		surface->breakable_surface_index,
+		surface->material_index,
+		features);
+
+	return;
+}
+
+void collision_features_from_surface(
+	const struct collision_bsp *collision_bsp,
+	long surface_index,
+	const real_matrix4x3 *transform,
+	real radius,
+	long source_index,
+	long object_index,
+	struct collision_feature_list *features)
+{
+	const struct collision_surface *surface = TAG_BLOCK_GET_ELEMENT(
+		&collision_bsp->surfaces,
+		surface_index,
+		struct collision_surface);
+	real_point3d points[MAXIMUM_VERTICES_PER_COLLISION_SURFACE];
+	real_plane3d plane;
+	short point_count = collision_surface_polygon(
+		collision_bsp,
+		surface_index,
+		points);
+	long feature_surface_index;
+
+	bsp3d_get_plane_from_designator(
+		(const struct bsp3d *)collision_bsp,
+		surface->plane_designator,
+		&plane);
+
+	if (transform)
+	{
+		short remaining_point_count = point_count;
+		if (remaining_point_count > 0)
+		{
+			real_point3d *point = points;
+
+			while (remaining_point_count-- > 0)
+			{
+				matrix4x3_transform_point(transform, point, point);
+				point++;
+			}
+		}
+		matrix4x3_transform_plane(transform, &plane, &plane);
+	}
+
+	if (object_index != NONE)
+		feature_surface_index = NONE;
+	else
+		feature_surface_index = surface_index;
+
+	collision_features_from_polygon(
+		point_count,
+		points,
+		&plane,
+		radius,
+		source_index,
+		object_index,
+		feature_surface_index,
 		surface->flags,
 		surface->breakable_surface_index,
 		surface->material_index,
