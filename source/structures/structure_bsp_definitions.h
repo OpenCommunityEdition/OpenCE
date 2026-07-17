@@ -75,6 +75,26 @@ struct structure_runtime_decal
 	char pitch;
 };
 
+struct structure_fog_region
+{
+	byte unused[0x24];
+	short fog_palette_index;
+	word pad;
+};
+
+typedef char structure_fog_region_size_assert[
+	sizeof(struct structure_fog_region) == 0x28 ? 1 : -1];
+
+struct structure_fog_palette_entry
+{
+	byte unused[0x20];
+	struct tag_reference fog;
+	byte unused2[0x58];
+};
+
+typedef char structure_fog_palette_entry_size_assert[
+	sizeof(struct structure_fog_palette_entry) == 0x88 ? 1 : -1];
+
 struct structure_bsp
 {
 	struct tag_reference lightmap_group;
@@ -100,8 +120,8 @@ struct structure_bsp
 	long cluster_unused[3];
 	struct tag_block breakable_surfaces;
 	struct tag_block fog_planes;
-	struct tag_block fog_regions;
-	struct tag_block fog_palette;
+	struct tag_block fog_regions; // structure_fog_region
+	struct tag_block fog_palette; // structure_fog_palette_entry
 	long fog_unused[6];
 	struct tag_block weather_palette;
 	struct tag_block weather_polyhedra;

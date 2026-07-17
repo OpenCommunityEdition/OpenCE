@@ -164,6 +164,7 @@ symbols in this file:
 #include "cseries.h"
 #include "scenario.h"
 
+#include "cache/cache_files.h"
 #include "game/game_globals.h"
 #include "game/players.h"
 #include "objects/objects.h"
@@ -423,6 +424,107 @@ boolean scenario_trigger_volume_test_object(
 		result = scenario_trigger_volume_test_point(trigger_volume_index, &object_get(object_index)->object.bounding_sphere_center);
 
 	return result;
+}
+
+boolean scenario_trigger_volume_test_point(
+	short trigger_volume_index,
+	const real_point3d *position)
+{
+	struct scenario_trigger_volume *trigger_volume = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->trigger_volumes,
+		trigger_volume_index,
+		struct scenario_trigger_volume);
+
+	switch (trigger_volume->type)
+	{
+	case _scenario_trigger_volume_type_axis_aligned:
+		return position->x > trigger_volume->bounds.x0 &&
+			position->y > trigger_volume->bounds.y0 &&
+			position->z > trigger_volume->bounds.z0 &&
+			position->x < trigger_volume->bounds.x1 &&
+			position->y < trigger_volume->bounds.y1 &&
+			position->z < trigger_volume->bounds.z1;
+
+	case _scenario_trigger_volume_type_oriented:
+	{
+		real_matrix4x3 matrix;
+		real_point3d transformed_position;
+
+		matrix4x3_from_point_and_vectors(
+			&matrix,
+			&trigger_volume->position,
+			&trigger_volume->forward,
+			&trigger_volume->up);
+		matrix4x3_inverse_transform_point(&matrix, position, &transformed_position);
+
+		return transformed_position.x > 0.0f &&
+			transformed_position.y > 0.0f &&
+			transformed_position.z > 0.0f &&
+			transformed_position.x < trigger_volume->extents.i &&
+			transformed_position.y < trigger_volume->extents.j &&
+			transformed_position.z < trigger_volume->extents.k;
+	}
+
+	default:
+		match_vassert("c:\\halo\\SOURCE\\scenario\\scenario.c", 817, FALSE, NULL);
+		return FALSE;
+	}
+}
+
+long scenario_fog_region_get_fog_index(
+	short fog_region_index)
+{
+	struct structure_bsp *structure_bsp = global_structure_bsp_get();
+
+	if (fog_region_index != NONE)
+	{
+		struct structure_fog_region *fog_region = TAG_BLOCK_GET_ELEMENT(
+			&structure_bsp->fog_regions,
+			fog_region_index,
+			struct structure_fog_region);
+
+		if (fog_region->fog_palette_index != NONE)
+		{
+			struct structure_fog_palette_entry *fog_palette_entry = TAG_BLOCK_GET_ELEMENT(
+				&structure_bsp->fog_palette,
+				fog_region->fog_palette_index,
+				struct structure_fog_palette_entry);
+
+			if (fog_palette_entry->fog.index != NONE)
+				return fog_palette_entry->fog.index;
+		}
+	}
+
+	return NONE;
+}
+
+boolean scenario_test_pas(
+	short cluster_index0,
+	short cluster_index1)
+{
+	struct structure_bsp *structure_bsp = global_structure_bsp_get();
+	unsigned long *pvs0 = structure_bsp_get_cluster_pvs(structure_bsp, cluster_index0);
+	unsigned long *pvs1 = structure_bsp_get_cluster_pvs(structure_bsp, cluster_index1);
+
+	return bit_vector_and((short)structure_bsp->clusters.count, pvs0, pvs1, NULL);
+}
+
+void scenario_reload_structure_bsp_if_necessary(
+	void)
+{
+	if (scenario_globals->structure_bsp_index != global_structure_bsp_index)
+	{
+		struct scenario_structure_bsp_reference *reference = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario->structure_bsp_references,
+			global_structure_bsp_index,
+			struct scenario_structure_bsp_reference);
+
+		scenario_structure_bsp_unload(reference);
+		global_structure_bsp_index = NONE;
+		scenario_switch_structure_bsp(scenario_globals->structure_bsp_index);
+	}
+
+	return;
 }
 
 /* ---------- private code */

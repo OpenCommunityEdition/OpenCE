@@ -52,6 +52,11 @@ enum
 
 /* ---------- structures */
 
+struct scenario_globals
+{
+	short structure_bsp_index;
+};
+
 /* ---------- prototypes/SCENARIO.C */
 
 void scenario_initialize(void);
@@ -102,6 +107,7 @@ void scenario_get_atmospheric_fog(short local_player_index, short sky_index, rea
 
 extern long global_scenario_index;
 extern short global_structure_bsp_index;
+extern struct scenario_globals *scenario_globals;
 
 extern struct scenario *global_scenario;
 extern struct collision_bsp *global_collision_bsp;

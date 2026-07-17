@@ -26,6 +26,12 @@ enum
 	NUMBER_OF_SCENARIO_OBJECT_LOCATION_PLACEMENT_FLAGS,
 };
 
+enum
+{
+	_scenario_trigger_volume_type_axis_aligned = 0,
+	_scenario_trigger_volume_type_oriented,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -86,6 +92,28 @@ struct scenario_structure_bsp_reference
 typedef char scenario_structure_bsp_reference_size_assert[
 	sizeof(struct scenario_structure_bsp_reference) == 0x20 ? 1 : -1];
 
+struct scenario_trigger_volume
+{
+	short type;
+	word pad;
+	char name[TAG_STRING_LENGTH+1];
+	byte unused[0xC];
+	real_vector3d forward;
+	real_vector3d up;
+	union
+	{
+		struct
+		{
+			real_point3d position;
+			real_vector3d extents;
+		};
+		real_rectangle3d bounds;
+	};
+};
+
+typedef char scenario_trigger_volume_size_assert[
+	sizeof(struct scenario_trigger_volume) == 0x60 ? 1 : -1];
+
 struct scenario
 {
 	struct tag_reference ugly_structure_bsp;
@@ -126,7 +154,7 @@ struct scenario
 	struct tag_block unused_blocks[7];
 	struct tag_block starting_profiles;
 	struct tag_block players;
-	struct tag_block trigger_volumes;
+	struct tag_block trigger_volumes; // scenario_trigger_volume
 	struct tag_block recorded_animations;
 	struct tag_block netgame_flags;
 	struct tag_block netgame_equipment;
