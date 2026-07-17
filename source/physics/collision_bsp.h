@@ -68,6 +68,11 @@ struct collision_surface_test_line2d_result
 	long exit_surface_index;
 };
 
+typedef char collision_surface_test_line2d_result_size_assert[
+	sizeof(struct collision_surface_test_line2d_result) == 0x18 ? 1 : -1];
+typedef char collision_surface_test_line2d_result_exit_t_offset_assert[
+	offsetof(struct collision_surface_test_line2d_result, exit_t) == 0x0C ? 1 : -1];
+
 struct collision_bsp_test_sphere_result
 {
 	long surface_count;
@@ -111,6 +116,14 @@ boolean collision_surface_test_point2d(
 	short projection,
 	boolean sign,
 	real_point2d const *point);
+boolean collision_surface_test_line2d(
+	struct collision_bsp const *bsp,
+	long surface_index,
+	short projection,
+	boolean sign,
+	real_point2d const *point,
+	real_vector2d const *direction,
+	struct collision_surface_test_line2d_result *result);
 boolean collision_bsp_test_sphere(
 	struct collision_bsp const *bsp,
 	short breakable_surface_count,

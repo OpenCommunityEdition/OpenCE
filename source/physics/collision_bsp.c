@@ -371,4 +371,90 @@ boolean collision_surface_test_point2d(
 	return TRUE;
 }
 
+boolean collision_surface_test_line2d(
+	struct collision_bsp const *bsp,
+	long surface_index,
+	short projection,
+	boolean sign,
+	real_point2d const *point,
+	real_vector2d const *direction,
+	struct collision_surface_test_line2d_result *result)
+{
+	struct collision_surface const *surface = TAG_BLOCK_GET_ELEMENT(
+		&bsp->surfaces,
+		surface_index,
+		struct collision_surface);
+	long const first_edge_index = surface->first_edge_index;
+	long edge_index = first_edge_index;
+
+	result->enter_t = REAL_MIN;
+	result->enter_edge_index = NONE;
+	result->enter_surface_index = NONE;
+	result->exit_t = REAL_MAX;
+	result->exit_edge_index = NONE;
+	result->exit_surface_index = NONE;
+
+	do
+	{
+		struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(
+			&bsp->edges,
+			edge_index,
+			struct collision_edge);
+		boolean const reverse = edge->surface_indices[1] == surface_index;
+		struct collision_vertex const *vertex0 = TAG_BLOCK_GET_ELEMENT(
+			&bsp->vertices,
+			edge->vertex_indices[0],
+			struct collision_vertex);
+		struct collision_vertex const *vertex1 = TAG_BLOCK_GET_ELEMENT(
+			&bsp->vertices,
+			edge->vertex_indices[1],
+			struct collision_vertex);
+		real_vector2d edge_vector;
+		real_vector2d point_vector;
+		volatile real edge_cross;
+		real point_cross;
+
+		edge_vector.i = vertex1->point.x-vertex0->point.x;
+		edge_vector.j = vertex1->point.y-vertex0->point.y;
+		point_vector.i = point->x-vertex0->point.x;
+		point_vector.j = point->y-vertex0->point.y;
+		edge_cross = cross_product2d(direction, &edge_vector);
+		point_cross = cross_product2d(&edge_vector, &point_vector);
+
+		if (edge_cross != 0.f)
+		{
+			point_cross /= edge_cross;
+			if ((edge_cross < 0.f) != reverse)
+			{
+				if (point_cross > result->enter_t)
+				{
+					result->enter_t = point_cross;
+					result->enter_edge_index = edge_index;
+					result->enter_surface_index = edge->surface_indices[!reverse];
+				}
+			}
+			else if (point_cross < result->exit_t)
+			{
+				result->exit_t = point_cross;
+				result->exit_edge_index = edge_index;
+				result->exit_surface_index = edge->surface_indices[!reverse];
+			}
+		}
+		else if ((point_cross < 0.f) != reverse)
+		{
+			result->enter_t = REAL_MAX;
+			result->enter_edge_index = edge_index;
+			result->enter_surface_index = edge->surface_indices[!reverse];
+			result->exit_t = REAL_MIN;
+			result->exit_edge_index = edge_index;
+			result->exit_surface_index = edge->surface_indices[!reverse];
+		}
+
+		edge_index = edge->edge_indices[reverse];
+	}
+	while (edge_index != first_edge_index);
+
+	return result->enter_t > result->exit_t;
+}
+
 /* ---------- private code */
