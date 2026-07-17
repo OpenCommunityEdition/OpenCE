@@ -340,6 +340,62 @@ long data_decode_integer(
 	return data_decode_long(state);
 }
 
+void *data_decode_array(
+	struct data_encoding_state *state,
+	long element_size,
+	long *element_count_reference,
+	long maximum_element_count,
+	struct byte_swap_definition *bs_definition)
+{
+	long element_count;
+	void *array = NULL;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\data_encoding.c",
+		348,
+		state && state->buffer && state->offset>=0 && state->offset<state->buffer_size);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\data_encoding.c",
+		349,
+		element_count_reference);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\data_encoding.c",
+		350,
+		maximum_element_count>0);
+	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 351, bs_definition);
+
+	switch (element_size)
+	{
+	case 1:
+		element_count = data_decode_byte(state);
+		break;
+	case -2:
+		element_count = data_decode_short(state);
+		break;
+	case -4:
+		element_count = data_decode_long(state);
+		break;
+	case -8:
+		element_count = (long)data_decode_int64(state);
+		break;
+	default:
+		display_assert(NULL, "c:\\halo\\SOURCE\\memory\\data_encoding.c", 370, TRUE);
+		system_exit(-1);
+		break;
+	}
+
+	if (!state->overflow && element_count >= 0 && element_count <= maximum_element_count)
+	{
+		*element_count_reference = element_count;
+		array = data_decode_structures(
+			state,
+			(short)element_count,
+			bs_definition);
+	}
+
+	return array;
+}
+
 char *data_decode_string(
 	struct data_encoding_state *state,
 	long maximum_length)

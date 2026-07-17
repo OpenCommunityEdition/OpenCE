@@ -85,6 +85,13 @@ long data_decode_integer(
 	struct data_encoding_state *state,
 	long maximum_value);
 
+void *data_decode_array(
+	struct data_encoding_state *state,
+	long element_size,
+	long *element_count_reference,
+	long maximum_element_count,
+	struct byte_swap_definition *bs_definition);
+
 char *data_decode_string(
 	struct data_encoding_state *state,
 	long maximum_length);
