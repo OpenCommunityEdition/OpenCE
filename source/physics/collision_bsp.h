@@ -82,6 +82,14 @@ struct collision_bsp_test_sphere_result
 
 /* ---------- prototypes/COLLISION_BSP.C */
 
+short collision_surface_edge_count(
+	struct collision_bsp const *bsp,
+	long surface_index);
+short collision_surface_polygon(
+	struct collision_bsp const *bsp,
+	long surface_index,
+	real_point3d *points);
+
 boolean collision_bsp_test_sphere(
 	struct collision_bsp const *bsp,
 	short breakable_surface_count,

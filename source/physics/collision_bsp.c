@@ -76,6 +76,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "collision_bsp.h"
+#include "collision_bsp_definitions.h"
+#include "tag_files/tag_groups.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -87,5 +92,79 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+short collision_surface_edge_count(
+	struct collision_bsp const *bsp,
+	long surface_index)
+{
+	short edge_count = 0;
+	struct collision_surface const *surface;
+	long first_edge_index;
+	long edge_index;
+
+	surface = TAG_BLOCK_GET_ELEMENT(
+		&bsp->surfaces,
+		surface_index,
+		struct collision_surface);
+	first_edge_index = surface->first_edge_index;
+	edge_index = first_edge_index;
+
+	do
+	{
+		struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(
+			&bsp->edges,
+			edge_index,
+			struct collision_edge);
+		boolean const reverse = edge->surface_indices[1] == surface_index;
+
+		edge_count++;
+		edge_index = edge->edge_indices[reverse];
+	}
+	while (edge_index != first_edge_index);
+
+	return edge_count;
+}
+
+short collision_surface_polygon(
+	struct collision_bsp const *bsp,
+	long surface_index,
+	real_point3d *points)
+{
+	short point_count = 0;
+	struct collision_surface const *surface;
+	long first_edge_index;
+	long edge_index;
+
+	surface = TAG_BLOCK_GET_ELEMENT(
+		&bsp->surfaces,
+		surface_index,
+		struct collision_surface);
+	first_edge_index = surface->first_edge_index;
+	edge_index = first_edge_index;
+
+	do
+	{
+		struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(
+			&bsp->edges,
+			edge_index,
+			struct collision_edge);
+		boolean const reverse = edge->surface_indices[1] == surface_index;
+		struct collision_vertex const *vertex = TAG_BLOCK_GET_ELEMENT(
+			&bsp->vertices,
+			edge->vertex_indices[reverse],
+			struct collision_vertex);
+
+		match_assert(
+			"c:\\halo\\SOURCE\\physics\\collision_bsp.c",
+			0xe1,
+			point_count<MAXIMUM_VERTICES_PER_COLLISION_SURFACE);
+
+		points[point_count++] = vertex->point;
+		edge_index = edge->edge_indices[reverse];
+	}
+	while (edge_index != first_edge_index);
+
+	return point_count;
+}
 
 /* ---------- private code */
