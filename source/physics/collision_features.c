@@ -70,7 +70,9 @@ symbols in this file:
 #include "collision_features.h"
 
 #include "math/real_math.h"
+#include "physics/collision_bsp_definitions.h"
 #include "render/render_debug.h"
+#include "tag_files/tag_groups.h"
 
 /* ---------- constants */
 
@@ -79,6 +81,17 @@ symbols in this file:
 /* ---------- structures */
 
 /* ---------- prototypes */
+
+void collision_features_from_point(
+	const real_point3d *point,
+	real radius,
+	long source_index,
+	long object_index,
+	long surface_index,
+	byte flags,
+	byte breakable_surface_index,
+	short material_index,
+	struct collision_feature_list *features);
 
 /* ---------- globals */
 
@@ -111,6 +124,54 @@ void render_debug_collision_cylinder(
 		&cylinder->height,
 		cylinder->radius,
 		color);
+
+	return;
+}
+
+void collision_features_from_vertex(
+	const struct collision_bsp *collision_bsp,
+	long vertex_index,
+	const real_matrix4x3 *transform,
+	real radius,
+	long source_index,
+	long object_index,
+	struct collision_feature_list *features)
+{
+	const struct collision_vertex *vertex = TAG_BLOCK_GET_ELEMENT(
+		&collision_bsp->vertices,
+		vertex_index,
+		struct collision_vertex);
+	const struct collision_edge *edge = TAG_BLOCK_GET_ELEMENT(
+		&collision_bsp->edges,
+		vertex->first_edge_index,
+		struct collision_edge);
+	const struct collision_surface *surface = TAG_BLOCK_GET_ELEMENT(
+		&collision_bsp->surfaces,
+		edge->surface_indices[0],
+		struct collision_surface);
+	long surface_index;
+	const real_point3d *point;
+	real_point3d transformed_point;
+	if (object_index != NONE)
+		surface_index = NONE;
+	else
+		surface_index = edge->surface_indices[0];
+
+	if (transform)
+		point = matrix4x3_transform_point(transform, &vertex->point, &transformed_point);
+	else
+		point = &vertex->point;
+
+	collision_features_from_point(
+		point,
+		radius,
+		source_index,
+		object_index,
+		surface_index,
+		surface->flags,
+		surface->breakable_surface_index,
+		surface->material_index,
+		features);
 
 	return;
 }

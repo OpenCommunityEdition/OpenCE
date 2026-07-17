@@ -95,6 +95,14 @@ void render_debug_collision_sphere(
 void render_debug_collision_cylinder(
 	const struct collision_feature_cylinder *cylinder,
 	const real_argb_color *color);
+void collision_features_from_vertex(
+	const struct collision_bsp *collision_bsp,
+	long vertex_index,
+	const real_matrix4x3 *transform,
+	real radius,
+	long source_index,
+	long object_index,
+	struct collision_feature_list *features);
 
 /* ---------- globals */
 
