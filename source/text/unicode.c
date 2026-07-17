@@ -268,6 +268,10 @@ enum
 
 /* ---------- globals */
 
+#pragma bss_seg(".bss")
+wchar_t bss_004c1a08[0x100];
+#pragma bss_seg()
+
 /* ---------- public code */
 
 int uisalpha(
@@ -1236,6 +1240,238 @@ wchar_t *ustrnupr(
 		*position = towlower(*position);
 
 	return string;
+}
+
+unsigned long ustrxfrm(
+	wchar_t *dest,
+	wchar_t const *src,
+	unsigned long count)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		380,
+		dest && src);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		381,
+		wcslen(dest) < MAXIMUM_STRING_SIZE);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		382,
+		wcslen(src) < MAXIMUM_STRING_SIZE);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		383,
+		count < MAXIMUM_STRING_SIZE);
+
+	return wcsxfrm(dest, src, count);
+}
+
+long ustrcasecmp(
+	wchar_t const *string1,
+	wchar_t const *string2)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		455,
+		string1 && string2);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		456,
+		wcslen(string1) < MAXIMUM_STRING_SIZE);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		457,
+		wcslen(string2) < MAXIMUM_STRING_SIZE);
+
+	return _wcsicmp(string1, string2);
+}
+
+long ustrncasecmp(
+	wchar_t const *string1,
+	wchar_t const *string2,
+	unsigned long count)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		472,
+		string1 && string2);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		473,
+		wcslen(string1) < MAXIMUM_STRING_SIZE);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		474,
+		wcslen(string2) < MAXIMUM_STRING_SIZE);
+
+	return _wcsnicmp(string1, string2, count);
+}
+
+int usnprintf(
+	wchar_t *string,
+	unsigned long size,
+	wchar_t const *format,
+	...)
+{
+	int result;
+	va_list arglist;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		719,
+		string);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		720,
+		(size > 0) && (size <= MAXIMUM_STRING_SIZE));
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		721,
+		wcslen(format) < MAXIMUM_STRING_SIZE);
+
+	va_start(arglist, format);
+	result = _vsnwprintf(string, size, format, arglist);
+	va_end(arglist);
+
+	return result;
+}
+
+int usprintf(
+	wchar_t *string,
+	wchar_t const *format,
+	...)
+{
+	int result;
+	va_list arglist;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		751,
+		string && format);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		752,
+		wcslen(string) < MAXIMUM_STRING_SIZE);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		753,
+		wcslen(format) < MAXIMUM_STRING_SIZE);
+
+	va_start(arglist, format);
+	result = vswprintf(string, format, arglist);
+	va_end(arglist);
+
+	return result;
+}
+
+int uvsnprintf(
+	wchar_t *string,
+	unsigned long size,
+	wchar_t const *format,
+	va_list arglist)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		816,
+		string && format);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		817,
+		wcslen(string) < MAXIMUM_STRING_SIZE);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		818,
+		wcslen(format) < MAXIMUM_STRING_SIZE);
+
+	return _vsnwprintf(string, size, format, arglist);
+}
+
+int uvsprintf(
+	wchar_t *string,
+	wchar_t const *format,
+	va_list arglist)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		841,
+		string && format);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		842,
+		wcslen(string) < MAXIMUM_STRING_SIZE);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		843,
+		wcslen(format) < MAXIMUM_STRING_SIZE);
+
+	return vswprintf(string, format, arglist);
+}
+
+FILE *ufreopen(
+	wchar_t const *path,
+	wchar_t const *mode,
+	FILE *stream)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		911,
+		path && mode);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		912,
+		wcslen(path) < MAXIMUM_STRING_SIZE);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		913,
+		wcslen(mode) < MAXIMUM_MODE_STRING_SIZE);
+
+	return _wfreopen(path, mode, stream);
+}
+
+char *wide_to_ascii(
+	wchar_t const *unicode,
+	char *ascii,
+	unsigned long size)
+{
+	unsigned long length;
+	unsigned long i;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		1040,
+		unicode && ascii);
+
+	length = wcslen(unicode);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		1042,
+		length < MAXIMUM_STRING_SIZE);
+
+	if (length > size - 1)
+		return NULL;
+
+	for (i = 0; i < length; i++)
+	{
+		if (unicode[i] & 0xFF80)
+			return NULL;
+	}
+
+	for (i = 0; i < length; i++)
+		ascii[i] = (char)unicode[i];
+
+	ascii[i] = 0;
+
+	return ascii;
+}
+
+wchar_t *ustrerror(
+	int error_number)
+{
+	bss_004c1a08[0] = 0;
+	usnprintf(bss_004c1a08, 0x100, L"%hs", strerror(error_number));
+
+	return bss_004c1a08;
 }
 
 /* ---------- private code */

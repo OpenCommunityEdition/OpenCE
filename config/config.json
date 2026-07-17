@@ -416,7 +416,7 @@
 				{ "name": "source/units/bipeds.c", "index": 42, "status": "NonMatching" },
 				{ "name": "source/units/biped_limp_noodle.c", "index": 43, "status": "NonMatching" },
 				{ "name": "source/units/biped_definitions.c", "index": 44, "status": "Matching" },
-				{ "name": "source/text/unicode.c", "index": 45, "status": "NonMatching" },
+				{ "name": "source/text/unicode.c", "index": 45, "status": "Matching" },
 				{ "name": "source/text/text_group.c", "index": 46, "status": "Matching" },
 				{ "name": "source/text/international_strings.c", "index": 47, "status": "Matching" },
 				{ "name": "source/text/font_group.c", "index": 48, "status": "Matching" },

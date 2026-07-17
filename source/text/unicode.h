@@ -203,5 +203,44 @@ wchar_t *ustrnlwr(
 wchar_t *ustrnupr(
 	wchar_t *string,
 	unsigned long count);
+unsigned long ustrxfrm(
+	wchar_t *dest,
+	wchar_t const *src,
+	unsigned long count);
+long ustrcasecmp(
+	wchar_t const *string1,
+	wchar_t const *string2);
+long ustrncasecmp(
+	wchar_t const *string1,
+	wchar_t const *string2,
+	unsigned long count);
+int usnprintf(
+	wchar_t *string,
+	unsigned long size,
+	wchar_t const *format,
+	...);
+int usprintf(
+	wchar_t *string,
+	wchar_t const *format,
+	...);
+int uvsnprintf(
+	wchar_t *string,
+	unsigned long size,
+	wchar_t const *format,
+	va_list arglist);
+int uvsprintf(
+	wchar_t *string,
+	wchar_t const *format,
+	va_list arglist);
+FILE *ufreopen(
+	wchar_t const *path,
+	wchar_t const *mode,
+	FILE *stream);
+char *wide_to_ascii(
+	wchar_t const *unicode,
+	char *ascii,
+	unsigned long size);
+wchar_t *ustrerror(
+	int error_number);
 
 #endif // __UNICODE_H
