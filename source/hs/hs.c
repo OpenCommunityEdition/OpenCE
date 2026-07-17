@@ -3158,6 +3158,22 @@ void evaluator( \
 	return; \
 }
 
+#define HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(evaluator, arguments_type, expression) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	arguments_type volatile const *arguments; \
+	arguments = (arguments_type volatile const *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		expression; \
+		hs_return(thread_index, 0); \
+	} \
+	return; \
+}
+
 #define HS_EVALUATE_RETURN_BOOLEAN(evaluator, arguments_type, expression) \
 void evaluator( \
 	short function_index, \
@@ -3168,6 +3184,24 @@ void evaluator( \
 	union hs_boolean_result result; \
 	result.value = 0; \
 	arguments = (arguments_type const *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	if (arguments) \
+	{ \
+		result.boolean = expression; \
+		hs_return(thread_index, result.value); \
+	} \
+	return; \
+}
+
+#define HS_EVALUATE_RETURN_BOOLEAN_VOLATILE(evaluator, arguments_type, expression) \
+void evaluator( \
+	short function_index, \
+	long thread_index, \
+	boolean initialize) \
+{ \
+	arguments_type volatile const *arguments; \
+	union hs_boolean_result result; \
+	result.value = 0; \
+	arguments = (arguments_type volatile const *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
 		result.boolean = expression; \
@@ -3199,6 +3233,7 @@ union hs_short_result
 union hs_evaluation_argument
 {
 	long long_value;
+	real real_value;
 	short short_value;
 	unsigned short unsigned_short_value;
 	boolean boolean_value;
@@ -3270,6 +3305,29 @@ struct hs_arguments_long_long_long
 	long value2;
 };
 
+struct hs_arguments_long_string_string
+{
+	long value0;
+	char const *value1;
+	char const *value2;
+};
+
+struct hs_arguments_long_string_long_string
+{
+	long value0;
+	char const *value1;
+	long value2;
+	char const *value3;
+};
+
+struct hs_arguments_long_long_string_word
+{
+	long value0;
+	long value1;
+	char const *value2;
+	word value3;
+};
+
 struct hs_arguments_long_long_long_boolean
 {
 	long value0;
@@ -3291,6 +3349,92 @@ struct hs_arguments_long_long_long_boolean_word
 struct hs_arguments_real
 {
 	real value;
+};
+
+struct hs_arguments_real_volatile_real
+{
+	real value0;
+	volatile real value1;
+};
+
+struct hs_arguments_real_volatile_real_real
+{
+	real value0;
+	volatile real value1;
+	volatile real value2;
+};
+
+struct hs_arguments_real_volatile_real_real_real
+{
+	real value0;
+	volatile real value1;
+	volatile real value2;
+	volatile real value3;
+};
+
+struct hs_arguments_word_word_word_volatile_real
+{
+	word value0;
+	word pad0;
+	word value1;
+	word pad1;
+	word value2;
+	word pad2;
+	volatile real value3;
+};
+
+struct hs_arguments_word_word_long_volatile_real
+{
+	word value0;
+	word pad0;
+	word value1;
+	word pad1;
+	long value2;
+	volatile real value3;
+};
+
+struct hs_arguments_real_volatile_real_real_real_boolean_real
+{
+	real value0;
+	volatile real value1;
+	volatile real value2;
+	volatile real value3;
+	boolean value4;
+	byte pad4[3];
+	volatile real value5;
+};
+
+struct hs_arguments_long_volatile_real_word
+{
+	long value0;
+	volatile real value1;
+	word value2;
+};
+
+struct hs_arguments_long_volatile_real_real
+{
+	long value0;
+	volatile real value1;
+	volatile real value2;
+};
+
+struct hs_arguments_long_volatile_real_real_word
+{
+	long value0;
+	volatile real value1;
+	volatile real value2;
+	word value3;
+};
+
+struct hs_arguments_short_word_volatile_real_real_real
+{
+	short value0;
+	word pad0;
+	word value1;
+	word pad1;
+	volatile real value2;
+	volatile real value3;
+	volatile real value4;
 };
 
 struct hs_arguments_word_word_word
@@ -3334,6 +3478,186 @@ void *hs_macro_function_evaluate(
 	short function_index,
 	long thread_index,
 	boolean initialize);
+void hs_teleport_players_not_in_trigger_volume(
+	short trigger_volume_index,
+	word cutscene_flag_index);
+void hs_object_set_shield(
+	long object_index,
+	real shield_vitality);
+void hs_object_set_permutation(
+	long object_index,
+	char const *region_name,
+	char const *permutation_name);
+void hs_effect_new_from_object_marker(
+	long effect_definition_index,
+	long object_index,
+	char const *marker_name);
+boolean hs_objects_can_see_object(
+	long object_list_index,
+	long object_index,
+	real degrees);
+boolean hs_objects_can_see_flag(
+	long object_list_index,
+	word cutscene_flag_index,
+	real degrees);
+void hs_sound_set_gain(
+	long sound_index,
+	real gain);
+void objects_scripting_set_scale(
+	long object_index,
+	real scale,
+	short interpolation_frame_count);
+void objects_scripting_attach(
+	long parent_object_index,
+	char const *parent_marker_name,
+	long child_object_index,
+	char const *child_marker_name);
+void object_beautify(
+	long object_index,
+	boolean beautiful);
+void scenery_animation_start(
+	long object_index,
+	long animation_graph_index,
+	char const *animation_name);
+void scenery_animation_start_at_frame(
+	long object_index,
+	long animation_graph_index,
+	char const *animation_name,
+	short frame_index);
+void unit_scripting_set_maximum_vitality(
+	long unit_index,
+	real body_vitality,
+	real shield_vitality);
+void units_scripting_set_maximum_vitality(
+	long object_list_index,
+	real body_vitality,
+	real shield_vitality);
+void unit_scripting_set_current_vitality(
+	long unit_index,
+	real body_vitality,
+	real shield_vitality);
+void units_scripting_set_current_vitality(
+	long object_list_index,
+	real body_vitality,
+	real shield_vitality);
+void device_set_power(
+	long device_index,
+	real power);
+boolean device_set_desired_position(
+	long device_index,
+	real position);
+void device_set_actual_position(
+	long device_index,
+	real position);
+boolean device_group_set_desired_value(
+	short group_index,
+	real desired_value);
+void device_group_set_actual_value(
+	short group_index,
+	real actual_value);
+void ai_scripting_vehicle_enterable_distance(
+	long ai_reference,
+	real distance);
+void ai_scripting_follow_distance(
+	long ai_reference,
+	real distance);
+void player_effect_screen_fade_in(
+	long color,
+	real initial_opacity,
+	real final_opacity,
+	short duration_ticks);
+void player_effect_screen_fade_out(
+	long color,
+	real initial_opacity,
+	real final_opacity,
+	short duration_ticks);
+void cinematic_set_title_delayed(
+	short title_index,
+	real delay);
+void scripted_sound_new(
+	long sound_index,
+	long source_object_index,
+	real gain);
+void scripted_looping_sound_start(
+	long sound_index,
+	long source_object_index,
+	real gain);
+void scripted_looping_sound_set_scale(
+	long sound_index,
+	real scale);
+void debug_sound_classes_set_distances(
+	char const *name,
+	real minimum_distance,
+	real maximum_distance);
+void debug_sound_classes_set_wet(
+	char const *name,
+	real wet);
+void sound_class_set_gain(
+	char const *name,
+	real gain,
+	short interpolation_ticks);
+void hud_unit_activate_nav_point_with_flag(
+	word player_index,
+	long unit_index,
+	word flag_index,
+	real vertical_offset);
+void hud_unit_activate_nav_point_with_object(
+	word player_index,
+	long unit_index,
+	long object_index,
+	real vertical_offset);
+void hud_activate_team_nav_point_with_flag(
+	word player_index,
+	word team,
+	word flag_index,
+	real vertical_offset);
+void hud_activate_team_nav_point_with_object(
+	word player_index,
+	word team,
+	long object_index,
+	real vertical_offset);
+void scripted_player_effect_set_translation(
+	real horizontal,
+	real vertical,
+	real depth);
+void scripted_player_effect_set_rotation(
+	real yaw,
+	real pitch,
+	real roll);
+void scripted_player_effect_set_rumble(
+	real left_motor,
+	real right_motor);
+void scripted_player_effect_start(
+	real maximum_intensity,
+	real attack_time);
+void rasterizer_model_ambient_reflection_tint(
+	real alpha,
+	real red,
+	real green,
+	real blue);
+void rasterizer_script_screen_effect_set_value(
+	word effect_index,
+	real value);
+void rasterizer_screen_effect_set_convolution(
+	short convolution_type,
+	word source,
+	real value0,
+	real value1,
+	real value2);
+void rasterizer_screen_effect_set_filter(
+	real value0,
+	real value1,
+	real value2,
+	real value3,
+	boolean enabled,
+	real value4);
+void rasterizer_screen_effect_set_filter_desaturation_tint(
+	real red,
+	real green,
+	real blue);
+void rasterizer_screen_effect_set_video(
+	word video_index,
+	real value);
 short object_list_count(
 	long object_list_index);
 short numeric_countdown_timer_get(
@@ -4346,6 +4670,188 @@ HS_EVALUATE_VOID_LONG_STRING(code_000ae940, unit_scripting_set_seat)
 HS_EVALUATE_VOID_SHORT_BOOLEAN(code_000af070, device_group_change_only_once_more_set)
 HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(code_000ae540, unit_set_emotion)
 HS_EVALUATE_VOID_LONG_LONG_STRING(code_000ae5c0, unit_scripting_enter_vehicle)
+
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000ad340,
+	struct hs_arguments_short_word,
+	hs_teleport_players_not_in_trigger_volume(arguments->value0, arguments->value1))
+HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	code_000ad690,
+	union hs_evaluation_argument,
+	hs_object_set_shield(arguments[0].long_value, arguments[1].real_value))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000ad6d0,
+	struct hs_arguments_long_string_string,
+	hs_object_set_permutation(arguments->value0, arguments->value1, arguments->value2))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000ad7e0,
+	struct hs_arguments_long_long_string,
+	hs_effect_new_from_object_marker(arguments->value0, arguments->value1, arguments->value2))
+HS_EVALUATE_RETURN_BOOLEAN_VOLATILE(
+	code_000ad8a0,
+	union hs_evaluation_argument,
+	hs_objects_can_see_object(arguments[0].long_value, arguments[1].long_value, arguments[2].real_value))
+HS_EVALUATE_RETURN_BOOLEAN_VOLATILE(
+	code_000ad8f0,
+	union hs_evaluation_argument,
+	hs_objects_can_see_flag(arguments[0].long_value, arguments[1].unsigned_short_value, arguments[2].real_value))
+HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	code_000ad980,
+	union hs_evaluation_argument,
+	hs_sound_set_gain(arguments[0].long_value, arguments[1].real_value))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000add70,
+	struct hs_arguments_long_volatile_real_word,
+	objects_scripting_set_scale(arguments->value0, arguments->value1, arguments->value2))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000addb0,
+	struct hs_arguments_long_string_long_string,
+	objects_scripting_attach(arguments->value0, arguments->value1, arguments->value2, arguments->value3))
+HS_EVALUATE_VOID_LONG_BOOLEAN(code_000aded0, object_beautify)
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000ae110,
+	struct hs_arguments_long_long_string,
+	scenery_animation_start(arguments->value0, arguments->value1, arguments->value2))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000ae150,
+	struct hs_arguments_long_long_string_word,
+	scenery_animation_start_at_frame(arguments->value0, arguments->value1, arguments->value2, arguments->value3))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000ae720,
+	struct hs_arguments_long_volatile_real_real,
+	unit_scripting_set_maximum_vitality(arguments->value0, arguments->value1, arguments->value2))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000ae770,
+	struct hs_arguments_long_volatile_real_real,
+	units_scripting_set_maximum_vitality(arguments->value0, arguments->value1, arguments->value2))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000ae7c0,
+	struct hs_arguments_long_volatile_real_real,
+	unit_scripting_set_current_vitality(arguments->value0, arguments->value1, arguments->value2))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000ae810,
+	struct hs_arguments_long_volatile_real_real,
+	units_scripting_set_current_vitality(arguments->value0, arguments->value1, arguments->value2))
+HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	code_000aedd0,
+	union hs_evaluation_argument,
+	device_set_power(arguments[0].long_value, arguments[1].real_value))
+HS_EVALUATE_RETURN_BOOLEAN_VOLATILE(
+	code_000aee50,
+	union hs_evaluation_argument,
+	device_set_desired_position(arguments[0].long_value, arguments[1].real_value))
+HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	code_000aeee0,
+	union hs_evaluation_argument,
+	device_set_actual_position(arguments[0].long_value, arguments[1].real_value))
+HS_EVALUATE_RETURN_BOOLEAN_VOLATILE(
+	code_000aef60,
+	union hs_evaluation_argument,
+	device_group_set_desired_value(arguments[0].short_value, arguments[1].real_value))
+HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	code_000aefb0,
+	union hs_evaluation_argument,
+	device_group_set_actual_value(arguments[0].short_value, arguments[1].real_value))
+HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	code_000b00b0,
+	union hs_evaluation_argument,
+	ai_scripting_vehicle_enterable_distance(arguments[0].long_value, arguments[1].real_value))
+HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	code_000b03b0,
+	union hs_evaluation_argument,
+	ai_scripting_follow_distance(arguments[0].long_value, arguments[1].real_value))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000b1640,
+	struct hs_arguments_long_volatile_real_real_word,
+	player_effect_screen_fade_in(arguments->value0, arguments->value1, arguments->value2, arguments->value3))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000b1690,
+	struct hs_arguments_long_volatile_real_real_word,
+	player_effect_screen_fade_out(arguments->value0, arguments->value1, arguments->value2, arguments->value3))
+HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	code_000b17e0,
+	union hs_evaluation_argument,
+	cinematic_set_title_delayed(arguments[0].short_value, arguments[1].real_value))
+HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	code_000b1be0,
+	union hs_evaluation_argument,
+	scripted_sound_new(arguments[0].long_value, arguments[1].long_value, arguments[2].real_value))
+HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	code_000b1ce0,
+	union hs_evaluation_argument,
+	scripted_looping_sound_start(arguments[0].long_value, arguments[1].long_value, arguments[2].real_value))
+HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	code_000b1d60,
+	union hs_evaluation_argument,
+	scripted_looping_sound_set_scale(arguments[0].long_value, arguments[1].real_value))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000b1e20,
+	struct hs_arguments_long_volatile_real_real,
+	debug_sound_classes_set_distances((char const *)arguments->value0, arguments->value1, arguments->value2))
+HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	code_000b1e70,
+	union hs_evaluation_argument,
+	debug_sound_classes_set_wet((char const *)arguments[0].long_value, arguments[1].real_value))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000b1eb0,
+	struct hs_arguments_long_volatile_real_word,
+	sound_class_set_gain((char const *)arguments->value0, arguments->value1, arguments->value2))
+HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	code_000b2070,
+	union hs_evaluation_argument,
+	hud_unit_activate_nav_point_with_flag(arguments[0].unsigned_short_value, arguments[1].long_value, arguments[2].unsigned_short_value, arguments[3].real_value))
+HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	code_000b20c0,
+	union hs_evaluation_argument,
+	hud_unit_activate_nav_point_with_object(arguments[0].unsigned_short_value, arguments[1].long_value, arguments[2].long_value, arguments[3].real_value))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000b2110,
+	struct hs_arguments_word_word_word_volatile_real,
+	hud_activate_team_nav_point_with_flag(arguments->value0, arguments->value1, arguments->value2, arguments->value3))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000b2160,
+	struct hs_arguments_word_word_long_volatile_real,
+	hud_activate_team_nav_point_with_object(arguments->value0, arguments->value1, arguments->value2, arguments->value3))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000b2330,
+	struct hs_arguments_real_volatile_real_real,
+	scripted_player_effect_set_translation(arguments->value0, arguments->value1, arguments->value2))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000b2380,
+	struct hs_arguments_real_volatile_real_real,
+	scripted_player_effect_set_rotation(arguments->value0, arguments->value1, arguments->value2))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000b23d0,
+	struct hs_arguments_real_volatile_real,
+	scripted_player_effect_set_rumble(arguments->value0, arguments->value1))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000b2410,
+	struct hs_arguments_real_volatile_real,
+	scripted_player_effect_start(arguments->value0, arguments->value1))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000b2950,
+	struct hs_arguments_real_volatile_real_real_real,
+	rasterizer_model_ambient_reflection_tint(arguments->value0, arguments->value1, arguments->value2, arguments->value3))
+HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	code_000b29c0,
+	union hs_evaluation_argument,
+	rasterizer_script_screen_effect_set_value(arguments[0].unsigned_short_value, arguments[1].real_value))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000b2a40,
+	struct hs_arguments_short_word_volatile_real_real_real,
+	rasterizer_screen_effect_set_convolution(arguments->value0, arguments->value1, arguments->value2, arguments->value3, arguments->value4))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000b2aa0,
+	struct hs_arguments_real_volatile_real_real_real_boolean_real,
+	rasterizer_screen_effect_set_filter(arguments->value0, arguments->value1, arguments->value2, arguments->value3, arguments->value4, arguments->value5))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(
+	code_000b2b00,
+	struct hs_arguments_real_volatile_real_real,
+	rasterizer_screen_effect_set_filter_desaturation_tint(arguments->value0, arguments->value1, arguments->value2))
+HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	code_000b2b50,
+	union hs_evaluation_argument,
+	rasterizer_screen_effect_set_video(arguments[0].unsigned_short_value, arguments[1].real_value))
 
 void code_000ad710(
 	short function_index,
