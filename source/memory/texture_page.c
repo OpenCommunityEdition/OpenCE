@@ -56,6 +56,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "data.h"
+#include "texture_page.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -64,8 +68,134 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+static void code_0010f570(
+	struct texture_page *texture_page);
+boolean code_0010f790(
+	struct texture_page *texture_page);
+
 /* ---------- globals */
+
+struct texture_page *bss_00456628 = NULL;
 
 /* ---------- public code */
 
+float texture_page_fraction_used(
+	struct texture_page *texture_page,
+	boolean use_sorted_pixel_count)
+{
+	long pixel_count = use_sorted_pixel_count ? texture_page->used_pixel_count : texture_page->texture_pixel_count;
+
+	return (float)pixel_count/(texture_page->width*texture_page->height);
+}
+
+struct texture_page *texture_page_new(
+	void *user_data,
+	short page_width,
+	short page_height,
+	short spacing)
+{
+	struct texture_page *texture_page = match_malloc(
+		"c:\\halo\\SOURCE\\memory\\texture_page.c",
+		29,
+		sizeof(*texture_page));
+
+	match_assert("c:\\halo\\SOURCE\\memory\\texture_page.c", 31, page_width>0 && page_height>0);
+	if (texture_page)
+	{
+		csmemset(texture_page, 0, sizeof(*texture_page));
+		texture_page->width = page_width;
+		texture_page->height = page_height;
+		texture_page->spacing = spacing;
+		texture_page->user_data = user_data;
+		texture_page->texture_pixel_count = 0;
+		texture_page->used_pixel_count = 0;
+		texture_page->contains_unsorted_textures = FALSE;
+		texture_page->textures = data_new(
+			"texture page textures",
+			MAXIMUM_TEXTURES_PER_PAGE,
+			sizeof(struct texture_page_texture));
+		if (texture_page->textures)
+		{
+			data_make_valid(texture_page->textures);
+			code_0010f570(texture_page);
+			return texture_page;
+		}
+
+		{
+			struct data_array *textures = texture_page->textures;
+			texture_page = NULL;
+			match_free("c:\\halo\\SOURCE\\memory\\texture_page.c", 56, textures);
+		}
+	}
+
+	return texture_page;
+}
+
+void texture_page_delete(
+	struct texture_page *texture_page)
+{
+	code_0010f570(texture_page);
+	data_dispose(texture_page->textures);
+	match_free("c:\\halo\\SOURCE\\memory\\texture_page.c", 69, texture_page);
+	return;
+}
+
+void texture_page_textures_begin(
+	struct texture_page *texture_page)
+{
+	code_0010f570(texture_page);
+	match_assert("c:\\halo\\SOURCE\\memory\\texture_page.c", 78, !texture_page->contains_unsorted_textures);
+	texture_page->contains_unsorted_textures = TRUE;
+	return;
+}
+
+struct texture_page_texture *texture_page_texture_get(
+	struct texture_page *texture_page,
+	long texture_index)
+{
+	code_0010f570(texture_page);
+	return datum_get(texture_page->textures, texture_index);
+}
+
+void texture_page_texture_delete(
+	struct texture_page *texture_page,
+	long texture_index)
+{
+	code_0010f570(texture_page);
+	datum_delete(texture_page->textures, texture_index);
+	code_0010f790(texture_page);
+	return;
+}
+
+boolean texture_page_resize(
+	struct texture_page *texture_page,
+	short width,
+	short height)
+{
+	short old_width;
+	short old_height;
+
+	code_0010f570(texture_page);
+	old_width = texture_page->width;
+	old_height = texture_page->height;
+	texture_page->width = width;
+	texture_page->height = height;
+	if (code_0010f790(texture_page))
+		return TRUE;
+
+	texture_page->width = old_width;
+	texture_page->height = old_height;
+	code_0010f790(texture_page);
+	return FALSE;
+}
+
 /* ---------- private code */
+
+static void code_0010f570(
+	struct texture_page *texture_page)
+{
+	match_assert("c:\\halo\\SOURCE\\memory\\texture_page.c", 260, texture_page);
+	match_assert("c:\\halo\\SOURCE\\memory\\texture_page.c", 261, texture_page->width>0 && texture_page->height>0);
+	data_verify(texture_page->textures);
+	return;
+}
