@@ -100,6 +100,9 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
+#include "game/players.h"
+#include "main/main.h"
+#include "network_game_manager.h"
 #include "network_game_globals.h"
 
 /* ---------- constants */
@@ -114,12 +117,33 @@ symbols in this file:
 struct network_game_server;
 struct network_game_client;
 
+struct network_machine
+{
+	byte __unknown0[0x40];
+	char machine_index;
+};
+
+struct local_network_player
+{
+	byte __unknown0[0x1C];
+	boolean machine_index;
+};
+
 struct network_game
 {
-	byte __unknown0[0x428];
+	byte __unknown0[0x226];
+	struct network_player players[16];
+	byte __unknown426[2];
 	long random_seed;
 	long number_of_games_played;
 };
+
+typedef char network_machine_index_offset_assert[
+	offsetof(struct network_machine, machine_index) == 0x40 ? 1 : -1];
+typedef char network_game_players_offset_assert[
+	offsetof(struct network_game, players) == 0x226 ? 1 : -1];
+typedef char network_game_random_seed_offset_assert[
+	offsetof(struct network_game, random_seed) == 0x428 ? 1 : -1];
 
 struct network_game_globals
 {
@@ -128,7 +152,8 @@ struct network_game_globals
 	boolean accept_remote_connections;
 	boolean quickstart_local;
 	boolean client_started;
-	byte __padding0b[5];
+	byte __padding0b;
+	unsigned long last_client_update_time;
 };
 
 typedef char network_game_globals_size_assert[
@@ -147,10 +172,15 @@ struct network_game_server *network_game_server_create(
 
 struct network_game *network_game_client_get_game(
 	struct network_game_client *client);
+struct network_machine *network_game_client_get_machine(
+	struct network_game_client *client);
 struct network_game_client *network_game_client_create(
 	void);
 void network_game_client_dispose(
 	struct network_game_client *client);
+boolean network_game_client_request_remove_player(
+	struct network_game_client *client,
+	struct network_player *player);
 boolean network_game_client_request_start_time_change(
 	struct network_game_client *client,
 	long start_time);
@@ -212,6 +242,34 @@ struct network_game *network_game_get_game(
 		return network_game_client_get_game(global_network_game_client);
 
 	return NULL;
+}
+
+boolean network_game_player_is_local(
+	struct network_player *player)
+{
+	boolean machine_index;
+	struct network_machine *machine;
+
+	if (player && network_player_is_valid(player) && global_network_game_client)
+	{
+		machine = network_game_client_get_machine(global_network_game_client);
+		if (!machine || machine->machine_index != player->machine_index)
+			return FALSE;
+	}
+	else if (game_connection() == _game_connection_film_playback)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\networking\\network_game_globals.c",
+			0x9B,
+			player);
+
+		machine_index = ((struct local_network_player *)player)->machine_index;
+		machine_index = !machine_index;
+
+		return machine_index;
+	}
+
+	return TRUE;
 }
 
 void network_game_accept_remote_connections(
@@ -316,6 +374,73 @@ void dispose_global_network_game_client(
 	}
 
 	bss_004566dc.client_started = FALSE;
+
+	return;
+}
+
+short network_game_client_get_local_machine_index(
+	void)
+{
+	short machine_index = NONE;
+	struct network_machine *machine;
+
+	if (global_network_game_client)
+	{
+		machine = network_game_client_get_machine(global_network_game_client);
+		if (machine)
+			machine_index = machine->machine_index;
+	}
+
+	return machine_index;
+}
+
+void network_game_client_local_player_quit(
+	short controller_index)
+{
+	long player_index;
+	char *player_machine_index;
+	struct network_game *game;
+	struct network_machine *machine;
+	struct network_player *player;
+	struct network_player *test_player;
+
+	if (global_network_game_client)
+	{
+		machine = network_game_client_get_machine(global_network_game_client);
+		game = network_game_client_get_game(global_network_game_client);
+		player = NULL;
+		if (machine)
+		{
+			player_index = 0;
+			player_machine_index = &game->players[0].machine_index;
+			while (player_index < 16)
+			{
+				test_player = (struct network_player *)(
+					player_machine_index - offsetof(struct network_player, machine_index));
+				if (network_player_is_valid(test_player) &&
+					player_machine_index[0] == machine->machine_index &&
+					player_machine_index[1] == controller_index)
+				{
+					player = &game->players[player_index];
+					break;
+				}
+
+				player_index++;
+				player_machine_index += sizeof(struct network_player);
+			}
+		}
+
+		if (player &&
+			!network_game_client_request_remove_player(
+				global_network_game_client,
+				player))
+		{
+			error(
+				_error_silent,
+				"failed to request player removal in-game for player #%d",
+				player->controller_index);
+		}
+	}
 
 	return;
 }
