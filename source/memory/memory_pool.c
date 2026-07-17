@@ -87,6 +87,9 @@ symbols in this file:
 
 static long code_0010dc10(
 	long size);
+static void *code_0010dc20(
+	struct memory_pool *pool,
+	long size);
 static void code_0010dc50(
 	struct memory_pool *pool);
 static struct memory_pool_block *code_0010ddc0(
@@ -158,8 +161,8 @@ boolean memory_pool_block_allocate(
 	code_0010dc50(pool);
 	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 124, size>=0);
 
-	block = pool->last_block ? (struct memory_pool_block *)((byte *)pool->last_block+pool->last_block->size) : pool->base_address;
-	if ((byte *)block+actual_size <= (byte *)pool->base_address+pool->size && block)
+	block = code_0010dc20(pool, actual_size);
+	if (block)
 	{
 		block->size = actual_size;
 		block->header_signature = BLOCK_HEADER_SIGNATURE;
@@ -310,6 +313,24 @@ static long code_0010dc10(
 	}
 
 	return size;
+}
+
+static void *code_0010dc20(
+	struct memory_pool *pool,
+	long size)
+{
+	byte *address;
+
+	address = pool->last_block
+		? (byte *)pool->last_block+pool->last_block->size
+		: pool->base_address;
+
+	if (address+size > (byte *)pool->base_address+pool->size)
+	{
+		address = NULL;
+	}
+
+	return address;
 }
 
 static void code_0010dc50(

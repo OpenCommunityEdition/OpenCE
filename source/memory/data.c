@@ -479,6 +479,52 @@ long data_prev_index(
 	return result;
 }
 
+void data_compact(
+	struct data_array *data)
+{
+	void *compacted_data;
+	struct datum_header *datum;
+	short compacted_count = 0;
+	short absolute_index;
+
+	compacted_data = match_malloc(
+		"c:\\halo\\SOURCE\\memory\\data.c",
+		421,
+		data->maximum_count*data->size);
+	data_verify(data);
+	match_assert("c:\\halo\\SOURCE\\memory\\data.c", 424, data->valid);
+
+	if (compacted_data)
+	{
+		datum = data->data;
+		for (absolute_index = compacted_count; absolute_index<data->count; absolute_index++)
+		{
+			if (datum->identifier)
+			{
+				csmemcpy(
+					(byte *)compacted_data+compacted_count*data->size,
+					datum,
+					data->size);
+				compacted_count++;
+			}
+
+			datum = (struct datum_header *)((byte *)datum+data->size);
+		}
+
+		csmemcpy(data->data, compacted_data, compacted_count*data->size);
+		csmemset(
+			(byte *)data->data+compacted_count*data->size,
+			0,
+			(data->maximum_count-compacted_count)*data->size);
+		data->actual_count = compacted_count;
+		data->count = compacted_count;
+		data->first_free_absolute_index = compacted_count;
+		match_free("c:\\halo\\SOURCE\\memory\\data.c", 447, compacted_data);
+	}
+
+	return;
+}
+
 /* ---------- private code */
 
 static void code_00108cc0(
