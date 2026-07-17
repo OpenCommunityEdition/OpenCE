@@ -14,9 +14,46 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct network_game;
+struct network_game_server;
+struct network_game_client;
+
 /* ---------- prototypes/NETWORK_GAME_GLOBALS.C */
 
-boolean network_game_is_active(void);
+boolean network_game_is_active(
+	void);
+void network_game_set_number_of_games_played(
+	long number_of_games_played);
+void network_game_set_random_seed(
+	long random_seed);
+struct network_game *network_game_get_game(
+	void);
+void network_game_accept_remote_connections(
+	boolean accept_remote_connections);
+boolean network_game_should_accept_remote_connections(
+	void);
+boolean network_game_is_splitscreen_local(
+	void);
+void network_game_set_quickstart_local(
+	void);
+boolean network_game_is_quickstart_local(
+	void);
+struct network_game_server *global_network_game_server_get(
+	void);
+void dispose_global_network_game_server(
+	void);
+boolean network_game_server_start_frame(
+	void);
+struct network_game_client *global_network_game_client_get(
+	void);
+boolean create_global_network_game_client(
+	void);
+void dispose_global_network_game_client(
+	void);
+long network_game_get_number_of_games_played(
+	void);
+long network_game_get_random_seed(
+	void);
 
 /* ---------- globals */
 

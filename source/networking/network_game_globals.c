@@ -98,16 +98,242 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "cseries/errors.h"
+#include "network_game_globals.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
+#define global_network_game_client bss_004566dc.client
+#define global_network_game_server bss_004566dc.server
+
 /* ---------- structures */
+
+struct network_game_server;
+struct network_game_client;
+
+struct network_game
+{
+	byte __unknown0[0x428];
+	long random_seed;
+	long number_of_games_played;
+};
+
+struct network_game_globals
+{
+	struct network_game_server *server;
+	struct network_game_client *client;
+	boolean accept_remote_connections;
+	boolean quickstart_local;
+	boolean client_started;
+	byte __padding0b[5];
+};
+
+typedef char network_game_globals_size_assert[
+	sizeof(struct network_game_globals) == 0x10 ? 1 : -1];
 
 /* ---------- prototypes */
 
+struct network_game *network_game_server_get_game(
+	struct network_game_server *server);
+void network_game_server_dispose(
+	struct network_game_server *server);
+boolean network_game_server_idle(
+	struct network_game_server *server);
+
+struct network_game *network_game_client_get_game(
+	struct network_game_client *client);
+struct network_game_client *network_game_client_create(
+	void);
+void network_game_client_dispose(
+	struct network_game_client *client);
+
 /* ---------- globals */
 
+struct network_game_globals bss_004566dc = { 0 };
+
 /* ---------- public code */
+
+boolean network_game_is_active(
+	void)
+{
+	return bss_004566dc.client != NULL || bss_004566dc.server != NULL;
+}
+
+void network_game_set_number_of_games_played(
+	long number_of_games_played)
+{
+	if (bss_004566dc.server)
+	{
+		network_game_server_get_game(bss_004566dc.server)->number_of_games_played =
+			number_of_games_played;
+	}
+
+	if (bss_004566dc.client)
+	{
+		network_game_client_get_game(bss_004566dc.client)->number_of_games_played =
+			number_of_games_played;
+	}
+
+	return;
+}
+
+void network_game_set_random_seed(
+	long random_seed)
+{
+	if (bss_004566dc.server)
+		network_game_server_get_game(bss_004566dc.server)->random_seed = random_seed;
+
+	if (bss_004566dc.client)
+		network_game_client_get_game(bss_004566dc.client)->random_seed = random_seed;
+
+	return;
+}
+
+struct network_game *network_game_get_game(
+	void)
+{
+	if (global_network_game_server)
+		return network_game_server_get_game(global_network_game_server);
+
+	if (global_network_game_client)
+		return network_game_client_get_game(global_network_game_client);
+
+	return NULL;
+}
+
+void network_game_accept_remote_connections(
+	boolean accept_remote_connections)
+{
+	bss_004566dc.accept_remote_connections = accept_remote_connections;
+
+	return;
+}
+
+boolean network_game_should_accept_remote_connections(
+	void)
+{
+	return bss_004566dc.accept_remote_connections;
+}
+
+boolean network_game_is_splitscreen_local(
+	void)
+{
+	return bss_004566dc.server != NULL && !bss_004566dc.accept_remote_connections;
+}
+
+void network_game_set_quickstart_local(
+	void)
+{
+	bss_004566dc.quickstart_local = TRUE;
+
+	return;
+}
+
+boolean network_game_is_quickstart_local(
+	void)
+{
+	return bss_004566dc.server != NULL &&
+		!bss_004566dc.accept_remote_connections &&
+		bss_004566dc.quickstart_local == TRUE;
+}
+
+struct network_game_server *global_network_game_server_get(
+	void)
+{
+	return bss_004566dc.server;
+}
+
+void dispose_global_network_game_server(
+	void)
+{
+	if (bss_004566dc.server)
+	{
+		network_game_server_dispose(bss_004566dc.server);
+		bss_004566dc.server = NULL;
+		bss_004566dc.quickstart_local = FALSE;
+	}
+
+	return;
+}
+
+boolean network_game_server_start_frame(
+	void)
+{
+	boolean result;
+
+	if (bss_004566dc.server)
+		result = network_game_server_idle(bss_004566dc.server);
+	else
+	{
+		error(_error_silent, "no network game server");
+		result = TRUE;
+	}
+
+	return result;
+}
+
+struct network_game_client *global_network_game_client_get(
+	void)
+{
+	return bss_004566dc.client;
+}
+
+boolean create_global_network_game_client(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_game_globals.c",
+		0x10F,
+		global_network_game_client==NULL);
+
+	bss_004566dc.client = network_game_client_create();
+	if (bss_004566dc.client)
+		bss_004566dc.client_started = FALSE;
+
+	return bss_004566dc.client != NULL;
+}
+
+void dispose_global_network_game_client(
+	void)
+{
+	if (bss_004566dc.client)
+	{
+		network_game_client_dispose(bss_004566dc.client);
+		bss_004566dc.client = NULL;
+	}
+
+	bss_004566dc.client_started = FALSE;
+
+	return;
+}
+
+long network_game_get_number_of_games_played(
+	void)
+{
+	struct network_game *game = network_game_get_game();
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_game_globals.c",
+		0x55,
+		game);
+
+	return game->number_of_games_played;
+}
+
+long network_game_get_random_seed(
+	void)
+{
+	struct network_game *game = network_game_get_game();
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_game_globals.c",
+		0x73,
+		game);
+
+	return game->random_seed;
+}
 
 /* ---------- private code */
