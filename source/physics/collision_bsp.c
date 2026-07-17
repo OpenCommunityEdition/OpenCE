@@ -87,7 +87,50 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct collision_bsp_test_pill_new_context
+{
+	struct collision_bsp const *bsp;
+	short breakable_surface_count;
+	short pad;
+	byte const *breakable_surface_flags;
+	real_point3d const *point;
+	real_vector3d const *vector;
+	real radius;
+	real *t;
+	real_vector3d *normal;
+	long surface_index;
+	byte flags;
+	byte pad2[3];
+	long leaf_index;
+};
+
+typedef char collision_bsp_test_pill_new_context_size_assert[
+	sizeof(struct collision_bsp_test_pill_new_context) == 0x2C ? 1 : -1];
+
+struct collision_bsp_test_pill_context
+{
+	struct collision_bsp const *bsp;
+	real_point3d const *point;
+	real_vector3d const *vector;
+	real radius;
+	struct collision_bsp_test_pill_result *result;
+	long stack_depth;
+	long traversal_stack[133];
+};
+
+typedef char collision_bsp_test_pill_context_size_assert[
+	sizeof(struct collision_bsp_test_pill_context) == 0x22C ? 1 : -1];
+
 /* ---------- prototypes */
+
+boolean code_00137c90(
+	struct collision_bsp_test_pill_new_context *context,
+	long node_index,
+	long stack_depth,
+	real maximum_t);
+boolean code_00138ed0(
+	struct collision_bsp_test_pill_context *context,
+	long node_index);
 
 /* ---------- globals */
 
@@ -455,6 +498,56 @@ boolean collision_surface_test_line2d(
 	while (edge_index != first_edge_index);
 
 	return result->enter_t > result->exit_t;
+}
+
+boolean collision_bsp_test_pill_new(
+	struct collision_bsp const *bsp,
+	short breakable_surface_count,
+	byte const *breakable_surface_flags,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real radius,
+	real *t,
+	real_vector3d *normal)
+{
+	struct collision_bsp_test_pill_new_context context;
+
+	context.bsp = bsp;
+	context.breakable_surface_count = breakable_surface_count;
+	context.breakable_surface_flags = breakable_surface_flags;
+	context.point = point;
+	context.vector = vector;
+	context.radius = radius;
+	context.t = t;
+	context.normal = normal;
+	context.surface_index = NONE;
+	context.flags = 0;
+	context.leaf_index = NONE;
+	*t = REAL_MAX;
+
+	return code_00137c90(&context, 0, 0, 1.f);
+}
+
+boolean collision_bsp_test_pill(
+	struct collision_bsp const *bsp,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real radius,
+	real maximum_t,
+	struct collision_bsp_test_pill_result *result)
+{
+	struct collision_bsp_test_pill_context context;
+
+	context.bsp = bsp;
+	context.point = point;
+	context.vector = vector;
+	context.radius = radius;
+	context.result = result;
+	context.stack_depth = 0;
+	result->t = maximum_t < 0.f ? 0.f : maximum_t;
+	result->leaf_count = 0;
+
+	return code_00138ed0(&context, 0);
 }
 
 /* ---------- private code */

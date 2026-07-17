@@ -124,6 +124,22 @@ boolean collision_surface_test_line2d(
 	real_point2d const *point,
 	real_vector2d const *direction,
 	struct collision_surface_test_line2d_result *result);
+boolean collision_bsp_test_pill_new(
+	struct collision_bsp const *bsp,
+	short breakable_surface_count,
+	byte const *breakable_surface_flags,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real radius,
+	real *t,
+	real_vector3d *normal);
+boolean collision_bsp_test_pill(
+	struct collision_bsp const *bsp,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real radius,
+	real maximum_t,
+	struct collision_bsp_test_pill_result *result);
 boolean collision_bsp_test_sphere(
 	struct collision_bsp const *bsp,
 	short breakable_surface_count,
