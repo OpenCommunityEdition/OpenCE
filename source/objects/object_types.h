@@ -68,7 +68,7 @@ struct object_type_definition
 	void (*dispose_from_old_map)();
 	void (*datum_adjust_placement)(long, struct object_placement_data *);
 	boolean (*datum_new)(long);
-	void (*datum_place)(long, void *);
+	void (*datum_place)(long, struct scenario_object_datum *);
 	void (*datum_delete)(long);
 	boolean(*datum_update)(long);
 	void (*datum_export_function_values)(long);

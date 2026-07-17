@@ -268,6 +268,25 @@ short object_definition_index_to_object_type(
 	return result;
 }
 
+void object_type_adjust_placement(
+	long object_index,
+	struct object_placement_data *data)
+{
+	short i;
+	struct object_type_definition *definition = object_type_definition_get(object_get(object_index)->object.type);
+
+	for (i = 0; definition->part_definitions[i]; i++)
+	{
+		struct object_type_definition *current_definition = definition->part_definitions[i];
+		if (current_definition->datum_adjust_placement)
+		{
+			current_definition->datum_adjust_placement(object_index, data);
+		}
+	}
+
+	return;
+}
+
 boolean object_type_new(
 	long object_index)
 {
@@ -290,6 +309,25 @@ boolean object_type_new(
 	return result;
 }
 
+void object_type_place(
+	long object_index,
+	struct scenario_object_datum *scenario_object)
+{
+	short i;
+	struct object_type_definition *definition = object_type_definition_get(object_get(object_index)->object.type);
+
+	for (i = 0; definition->part_definitions[i]; i++)
+	{
+		struct object_type_definition *current_definition = definition->part_definitions[i];
+		if (current_definition->datum_place)
+		{
+			current_definition->datum_place(object_index, scenario_object);
+		}
+	}
+
+	return;
+}
+
 void object_type_delete(
 	long object_index)
 {
@@ -304,6 +342,44 @@ void object_type_delete(
 		if (current_definition->datum_delete)
 		{
 			current_definition->datum_delete(object_index);
+		}
+	}
+
+	return;
+}
+
+boolean object_type_update(
+	long object_index)
+{
+	short i;
+	boolean result;
+	struct object_type_definition *definition = object_type_definition_get(object_get(object_index)->object.type);
+	result = FALSE;
+
+	for (i = 0; definition->part_definitions[i]; i++)
+	{
+		struct object_type_definition *current_definition = definition->part_definitions[i];
+		if (current_definition->datum_update && current_definition->datum_update(object_index))
+		{
+			result = TRUE;
+		}
+	}
+
+	return result;
+}
+
+void object_type_export_function_values(
+	long object_index)
+{
+	short i;
+	struct object_type_definition *definition = object_type_definition_get(object_get(object_index)->object.type);
+
+	for (i = 0; definition->part_definitions[i]; i++)
+	{
+		struct object_type_definition *current_definition = definition->part_definitions[i];
+		if (current_definition->datum_export_function_values)
+		{
+			current_definition->datum_export_function_values(object_index);
 		}
 	}
 
