@@ -380,6 +380,44 @@ void data_iterator_new(
 	return;
 }
 
+void *data_iterator_next(
+	struct data_iterator *iterator)
+{
+	struct datum_header *header;
+	short absolute_index;
+	long datum_index;
+	long size;
+	void *result = NULL;
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\memory\\data.c",
+		268,
+		iterator->signature==((unsigned long)iterator->data^'iter'),
+		"uninitialized iterator passed to iterator_next()");
+	data_verify(iterator->data);
+	match_assert("c:\\halo\\SOURCE\\memory\\data.c", 271, iterator->data->valid);
+
+	absolute_index = iterator->absolute_index;
+	size = iterator->data->size;
+	header = (struct datum_header *)((byte *)iterator->data->data+size*absolute_index);
+	while (absolute_index<iterator->data->count)
+	{
+		datum_index = header->identifier<<16 | absolute_index;
+		absolute_index++;
+		if (header->identifier)
+		{
+			iterator->datum_index = datum_index;
+			result = header;
+			break;
+		}
+
+		header = (struct datum_header *)((byte *)header+size);
+	}
+	iterator->absolute_index = absolute_index;
+
+	return result;
+}
+
 long data_next_index(
 	struct data_array *data,
 	long index)
