@@ -111,6 +111,13 @@ long collision_model_get_material_type(
 boolean collision_test_sphere(
 	real_point3d const *center,
 	real radius);
+boolean collision_test_pill(
+	unsigned long flags,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real radius,
+	long ignore_object_index,
+	struct collision_result *collision);
 boolean collision_test_pill_new(
 	unsigned long flags,
 	real_point3d const *point,

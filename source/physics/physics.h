@@ -28,6 +28,9 @@ struct physics_instance
 /* ---------- prototypes/PHYSICS.C */
 
 boolean physics_instance_new(struct physics_instance *instance, long object_index);
+boolean physics_test_point(
+	struct physics_instance const *instance,
+	real_point3d const *point);
 
 void render_debug_physics(struct physics_instance *instance);
 

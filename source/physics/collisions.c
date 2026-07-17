@@ -98,7 +98,12 @@ symbols in this file:
 #include "breakable_surfaces.h"
 #include "collision_bsp.h"
 #include "collision_model_definitions.h"
+#include "collision_models.h"
+#include "physics.h"
+#include "objects/object_types.h"
+#include "objects/objects.h"
 #include "scenario/scenario.h"
+#include "structures/structure_bsp_definitions.h"
 
 /* ---------- constants */
 
@@ -117,6 +122,18 @@ boolean collision_bsp_test_pill_new(
 	real radius,
 	real *t,
 	real_vector3d *normal);
+boolean collision_bsp_test_pill(
+	struct collision_bsp const *bsp,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real radius,
+	real maximum_t,
+	struct collision_bsp_test_pill_result *result);
+boolean code_0013d360(
+	long object_index,
+	unsigned long flags,
+	real_point3d const *point,
+	long ignore_object_index);
 
 /* ---------- globals */
 
@@ -166,6 +183,89 @@ boolean collision_test_sphere(
 	}
 
 	return TRUE;
+}
+
+boolean collision_test_pill(
+	unsigned long flags,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real radius,
+	long ignore_object_index,
+	struct collision_result *collision)
+{
+	boolean hit = FALSE;
+	struct collision_bsp_test_pill_result bsp_result;
+
+	collision->type = NONE;
+	collision->t = REAL_MAX;
+
+	if (collision_bsp_test_pill(
+		global_collision_bsp_get(),
+		point,
+		vector,
+		radius,
+		REAL_MAX,
+		&bsp_result))
+	{
+		collision->t = bsp_result.t;
+		if (flags & FLAG(_collision_test_structure_bit))
+		{
+			collision->plane = bsp_result.plane;
+			collision->flags = 0;
+			collision->breakable_surface_index = 0;
+			collision->type = 2;
+			collision->material_type = bsp_result.material_index;
+			collision->surface_index = bsp_result.surface_index;
+			collision->plane_designator = NONE;
+			collision->material_index = bsp_result.material_index;
+			hit = TRUE;
+		}
+	}
+
+	if (bsp_result.leaf_count > 0)
+	{
+		long leaf_index = bsp_result.leaf_indices[0];
+		long cluster_index;
+
+		collision->start_location.leaf_index = leaf_index;
+		if (leaf_index == NONE)
+		{
+			cluster_index = NONE;
+		}
+		else
+		{
+			cluster_index = TAG_BLOCK_GET_ELEMENT(
+				&global_structure_bsp_get()->leaves,
+				leaf_index & LONG_MAX,
+				struct structure_leaf)->cluster_index;
+		}
+		collision->start_location.cluster_index = cluster_index;
+
+		leaf_index = bsp_result.leaf_indices[bsp_result.leaf_count - 1];
+		collision->location.leaf_index = leaf_index;
+		if (leaf_index == NONE)
+		{
+			cluster_index = NONE;
+		}
+		else
+		{
+			cluster_index = TAG_BLOCK_GET_ELEMENT(
+				&global_structure_bsp_get()->leaves,
+				leaf_index & LONG_MAX,
+				struct structure_leaf)->cluster_index;
+		}
+		collision->location.cluster_index = cluster_index;
+	}
+
+	if (!hit)
+	{
+		collision->t = 1.0f;
+	}
+
+	point_from_line3d(point, vector, collision->t, &collision->point);
+	scenario_location_from_point(&collision->location, &collision->point);
+
+	return hit;
 }
 
 boolean collision_test_pill_new(
@@ -243,3 +343,63 @@ boolean collision_move_sphere(
 }
 
 /* ---------- private code */
+
+boolean code_0013d360(
+	long object_index,
+	unsigned long flags,
+	real_point3d const *point,
+	long ignore_object_index)
+{
+	do
+	{
+		struct object_datum const *object = object_get(object_index);
+
+		if (object_index != ignore_object_index &&
+			!(object->object.flags & FLAG(_object_invisible_bit)))
+		{
+			long object_type = object->object.type;
+
+			if ((flags & FLAG(object_type + _collision_test_objects_first_type_bit)) &&
+				point_in_sphere(point, &object->object.bounding_sphere_center, object->object.bounding_sphere_radius))
+			{
+				boolean hit;
+
+				if ((FLAG(object_type) & _object_mask_vehicle) &&
+					(flags & FLAG(_collision_test_use_vehicle_physics_bit)))
+				{
+					struct physics_instance instance;
+
+					hit = physics_instance_new(&instance, object_index) &&
+						physics_test_point(&instance, point);
+				}
+				else
+				{
+					struct collision_model_instance instance;
+
+					hit = collision_model_instance_new(&instance, object_index) &&
+						collision_model_test_point(&instance, point);
+				}
+
+				if (hit)
+				{
+					return TRUE;
+				}
+
+				if (object->object.first_child_object_index != NONE &&
+					code_0013d360(
+						object->object.first_child_object_index,
+						flags,
+						point,
+						ignore_object_index))
+				{
+					return TRUE;
+				}
+			}
+		}
+
+		object_index = object->object.next_object_index;
+	}
+	while (object_index != NONE);
+
+	return FALSE;
+}
