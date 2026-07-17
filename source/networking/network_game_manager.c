@@ -76,16 +76,79 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "game/players.h"
+#include "network_game_manager.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct network_game
+{
+	byte __unknown0[0x430];
+	boolean load_ui;
+	byte __padding431[3];
+};
+
 /* ---------- prototypes */
+
+void main_load_ui_scenario(
+	boolean load_ui);
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+void network_game_invalidate_player(
+	struct network_player *player)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_game_manager.c",
+		0x58,
+		player);
+
+	player->machine_index = NONE;
+	player->controller_index = NONE;
+	player->team_index = NONE;
+	player->player_list_index = NONE;
+	player->name[0] = 0;
+
+	return;
+}
+
+void network_game_end_and_load_ui(
+	struct network_game *game)
+{
+	if (game->load_ui)
+		main_load_ui_scenario(TRUE);
+
+	csmemset(&game->load_ui, 0, sizeof(long));
+
+	return;
+}
+
+void code_0011a4c0(
+	void)
+{
+	return;
+}
+
+boolean network_player_is_valid(
+	struct network_player *player)
+{
+	if (player &&
+		player->controller_index >= 0 &&
+		player->controller_index < MAXIMUM_LOCAL_PLAYERS &&
+		player->machine_index >= 0 &&
+		player->machine_index < MAXIMUM_LOCAL_PLAYERS)
+	{
+		return TRUE;
+	}
+
+	return FALSE;
+}
 
 /* ---------- private code */
