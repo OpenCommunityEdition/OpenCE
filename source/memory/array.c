@@ -80,7 +80,12 @@ symbols in this file:
 
 /* ---------- globals */
 
-extern struct profile_section data_00308bc0[3];
+struct profile_section data_00308bc0[3] =
+{
+	{ "memory_dynamic_array_resize", NONE, TRUE },
+	{ "memory_dynamic_array_add_element", NONE, TRUE },
+	{ "memory_dynamic_array_delete_element", NONE, TRUE },
+};
 
 /* ---------- public code */
 
@@ -271,6 +276,47 @@ void *dynamic_array_get_element(
 	return (char *)array->elements + index * array->element_size;
 }
 
+void dynamic_array_delete_element(
+	struct dynamic_array *array,
+	long index)
+{
+	char *element;
+	void *elements;
+
+	match_assert("c:\\halo\\SOURCE\\memory\\array.c", 139, array);
+	match_assert("c:\\halo\\SOURCE\\memory\\array.c", 140, array->element_size>0);
+	match_assert("c:\\halo\\SOURCE\\memory\\array.c", 141, array->count>=0);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\array.c",
+		142,
+		(array->count!=0)==(array->elements!=NULL));
+	match_assert("c:\\halo\\SOURCE\\memory\\array.c", 143, index>=0 && index<array->count);
+
+	profile_enter(data_00308bc0[2]);
+	array->count--;
+	if (index<array->count)
+	{
+		element = (char *)array->elements+index*array->element_size;
+		csmemmove(
+			element,
+			element+array->element_size,
+			(array->count-index)*array->element_size);
+	}
+	elements = debug_realloc(
+		array->elements,
+		array->count*array->element_size,
+		"c:\\halo\\SOURCE\\memory\\array.c",
+		156);
+	array->elements = elements;
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\array.c",
+		158,
+		(array->count!=0)==(array->elements!=NULL));
+	profile_exit(data_00308bc0[2]);
+
+	return;
+}
+
 void static_array_new(
 	unsigned char *count,
 	void *elements,
@@ -404,6 +450,33 @@ void *static_array_get_element(
 		index>=0 && index<count);
 
 	return (char *)elements + index * element_size;
+}
+
+void static_array_delete_element(
+	unsigned char *count,
+	void *elements,
+	short element_size,
+	short index)
+{
+	char *element;
+
+	match_assert("c:\\halo\\SOURCE\\memory\\array.c", 265, count && *count>0);
+	match_assert("c:\\halo\\SOURCE\\memory\\array.c", 266, elements);
+	match_assert("c:\\halo\\SOURCE\\memory\\array.c", 267, element_size>0);
+	match_assert("c:\\halo\\SOURCE\\memory\\array.c", 268, index>=0 && index<*count);
+
+	(*count)--;
+	if (index<*count)
+	{
+		element = (char *)elements+index*element_size;
+		csmemmove(
+			element,
+			element+element_size,
+			(*count-index)*element_size);
+	}
+	csmemset((char *)elements+*count*element_size, NONE, element_size);
+
+	return;
 }
 
 

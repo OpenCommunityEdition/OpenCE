@@ -39,6 +39,9 @@ void *dynamic_array_get_element(
 	struct dynamic_array *array,
 	long index,
 	long element_size);
+void dynamic_array_delete_element(
+	struct dynamic_array *array,
+	long index);
 void static_array_new(
 	unsigned char *count,
 	void *elements,
@@ -57,6 +60,11 @@ short static_array_add_element(
 	short maximum_count);
 void *static_array_get_element(
 	unsigned char count,
+	void *elements,
+	short element_size,
+	short index);
+void static_array_delete_element(
+	unsigned char *count,
 	void *elements,
 	short element_size,
 	short index);
