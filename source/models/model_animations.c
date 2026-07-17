@@ -155,6 +155,9 @@ symbols in this file:
 enum
 {
 	COMPRESSED_QUATERNION_COMPONENT_MAXIMUM = 32767,
+	NUMBER_OF_ANIMATION_DAMAGE_TYPES = 4,
+	NUMBER_OF_ANIMATION_DAMAGE_DIRECTIONS = 4,
+	NUMBER_OF_DAMAGE_PARTS = 11,
 };
 
 /* ---------- macros */
@@ -229,6 +232,28 @@ short animation_sound_frame_index(
 	struct animation const *animation)
 {
 	return animation->private_sound_frame_index;
+}
+
+short build_damage_animation_index(
+	short damage_type,
+	short damage_direction,
+	short damage_part)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\models\\model_animations.c",
+		55,
+		damage_type>=0 && damage_type<NUMBER_OF_ANIMATION_DAMAGE_TYPES);
+	match_assert(
+		"c:\\halo\\SOURCE\\models\\model_animations.c",
+		56,
+		damage_direction>=0 && damage_direction<NUMBER_OF_ANIMATION_DAMAGE_DIRECTIONS);
+	match_assert(
+		"c:\\halo\\SOURCE\\models\\model_animations.c",
+		57,
+		damage_part>=0 && damage_part<NUMBER_OF_DAMAGE_PARTS);
+
+	return (damage_type * NUMBER_OF_ANIMATION_DAMAGE_DIRECTIONS + damage_direction) *
+		NUMBER_OF_DAMAGE_PARTS + damage_part;
 }
 
 void animation_get_x_offsets(
@@ -422,6 +447,22 @@ void quaternion_compress_8byte(
 	compressed->j = (short)(quaternion->v.j * COMPRESSED_QUATERNION_COMPONENT_MAXIMUM);
 	compressed->k = (short)(quaternion->v.k * COMPRESSED_QUATERNION_COMPONENT_MAXIMUM);
 	compressed->w = (short)(quaternion->w * COMPRESSED_QUATERNION_COMPONENT_MAXIMUM);
+
+	return;
+}
+
+void quaternion_compress_6byte(
+	real_quaternion const *quaternion,
+	struct compressed_quaternion_6byte *compressed)
+{
+	long j = (long)(quaternion->v.j * COMPRESSED_QUATERNION_COMPONENT_MAXIMUM);
+	long k = (long)(quaternion->v.k * COMPRESSED_QUATERNION_COMPONENT_MAXIMUM);
+	long w = (long)(quaternion->w * COMPRESSED_QUATERNION_COMPONENT_MAXIMUM);
+	long i = (long)(quaternion->v.i * COMPRESSED_QUATERNION_COMPONENT_MAXIMUM);
+
+	compressed->words[0] = (word)((i & 0xFFF0) | ((word)j >> 12));
+	compressed->words[1] = (word)(((j & 0xFFF0) << 4) | (((word)k >> 8) & 0x00FF));
+	compressed->words[2] = (word)(((k & 0x00F0) << 8) | ((word)w >> 4));
 
 	return;
 }

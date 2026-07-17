@@ -205,6 +205,10 @@ short animation_second_key_frame_index(
 	struct animation const *animation);
 short animation_sound_frame_index(
 	struct animation const *animation);
+short build_damage_animation_index(
+	short damage_type,
+	short damage_direction,
+	short damage_part);
 void animation_get_x_offsets(
 	struct animation const *animation,
 	real *key_frame_x_offset,
@@ -230,6 +234,9 @@ void quaternion_decompress_6byte(
 void quaternion_compress_8byte(
 	real_quaternion const *quaternion,
 	struct compressed_quaternion_8byte *compressed);
+void quaternion_compress_6byte(
+	real_quaternion const *quaternion,
+	struct compressed_quaternion_6byte *compressed);
 
 short animation_graph_get_animation_by_name(
 	long animation_graph_index,
