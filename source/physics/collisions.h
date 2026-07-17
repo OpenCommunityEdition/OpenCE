@@ -111,6 +111,10 @@ long collision_model_get_material_type(
 boolean collision_test_sphere(
 	real_point3d const *center,
 	real radius);
+boolean collision_test_point(
+	unsigned long flags,
+	real_point3d const *point,
+	long ignore_object_index);
 boolean collision_test_pill(
 	unsigned long flags,
 	real_point3d const *point,
@@ -131,7 +135,7 @@ boolean collision_test_vector(
 	real_vector3d const *vector,
 	long ignore_object_index,
 	struct collision_result *collision);
-boolean collision_move_pill(
+short collision_move_pill(
 	unsigned long flags,
 	real_point3d const *position,
 	real_vector3d const *velocity,
@@ -142,7 +146,7 @@ boolean collision_move_pill(
 	real_vector3d *clipped_velocity,
 	struct collision_result *collisions,
 	short *collision_count);
-boolean collision_move_sphere(
+short collision_move_sphere(
 	unsigned long flags,
 	real_point3d const *position,
 	real_vector3d const *velocity,

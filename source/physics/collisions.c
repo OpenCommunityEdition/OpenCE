@@ -96,9 +96,12 @@ symbols in this file:
 #include "collisions.h"
 
 #include "breakable_surfaces.h"
+#include "bsp3d.h"
 #include "collision_bsp.h"
+#include "collision_features.h"
 #include "collision_model_definitions.h"
 #include "collision_models.h"
+#include "collision_usage.h"
 #include "physics.h"
 #include "objects/object_types.h"
 #include "objects/objects.h"
@@ -134,8 +137,26 @@ boolean code_0013d360(
 	unsigned long flags,
 	real_point3d const *point,
 	long ignore_object_index);
+boolean collision_get_features_in_sphere(
+	unsigned long flags,
+	real_point3d const *center,
+	real enclosing_radius,
+	real height,
+	real radius,
+	long ignore_object_index,
+	struct collision_feature_list *features);
+short collision_move_point(
+	real_point3d const *position,
+	real_vector3d const *velocity,
+	struct collision_feature_list const *features,
+	real_point3d *clipped_position,
+	real_vector3d *clipped_velocity,
+	struct collision_result *collisions,
+	short *collision_count);
 
 /* ---------- globals */
+
+extern boolean debug_collision_skip_objects;
 
 /* ---------- public code */
 
@@ -182,6 +203,63 @@ boolean collision_test_sphere(
 		}
 	}
 
+	return TRUE;
+}
+
+boolean collision_test_point(
+	unsigned long flags,
+	real_point3d const *point,
+	long ignore_object_index)
+{
+	unsigned long collision_flags = flags;
+	long leaf_index;
+	long reference_index;
+	boolean test_objects;
+
+	if (!(collision_flags & _collision_test_environment_flags))
+	{
+		goto no_collision;
+	}
+
+	leaf_index = bsp3d_test_point(global_bsp3d_get(), 0, point);
+	test_objects = TEST_FLAG(collision_flags, _collision_test_objects_bit);
+	if (debug_collision_skip_objects)
+	{
+		test_objects = FALSE;
+	}
+
+	if (leaf_index == NONE)
+	{
+		goto collision;
+	}
+
+	if (!test_objects)
+	{
+		goto no_collision;
+	}
+
+	{
+		short cluster_index = TAG_BLOCK_GET_ELEMENT(
+			&global_structure_bsp_get()->leaves,
+			leaf_index & LONG_MAX,
+			struct structure_leaf)->cluster_index;
+		long object_index;
+
+		for (object_index = cluster_get_first_collideable_object(&reference_index, cluster_index);
+			object_index != NONE;
+			object_index = cluster_get_next_collideable_object(&reference_index))
+		{
+			if (code_0013d360(object_index, collision_flags, point, ignore_object_index))
+			{
+				goto collision;
+			}
+		}
+	}
+
+no_collision:
+	return FALSE;
+
+collision:
 	return TRUE;
 }
 
@@ -318,7 +396,7 @@ boolean collision_test_pill_new(
 	return result;
 }
 
-boolean collision_move_sphere(
+short collision_move_sphere(
 	unsigned long flags,
 	real_point3d const *position,
 	real_vector3d const *velocity,
@@ -340,6 +418,62 @@ boolean collision_move_sphere(
 		clipped_velocity,
 		collisions,
 		collision_count);
+}
+
+short collision_move_pill(
+	unsigned long flags,
+	real_point3d const *position,
+	real_vector3d const *velocity,
+	real height,
+	real radius,
+	long ignore_object_index,
+	real_point3d *clipped_position,
+	real_vector3d *clipped_velocity,
+	struct collision_result *collisions,
+	short *collision_count)
+{
+	short result = FALSE;
+	struct collision_feature_list features;
+	real_point3d center;
+
+	match_assert("c:\\halo\\SOURCE\\physics\\collisions.c", 1214, global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
+	global_current_collision_users[global_current_collision_user_depth++] = 7;
+
+	center.x = position->x + velocity->i * 0.5f;
+	center.y = position->y + velocity->j * 0.5f;
+	center.z = height * 0.5f + (position->z + velocity->k * 0.5f);
+
+	if (collision_get_features_in_sphere(
+		flags,
+		&center,
+		magnitude3d(velocity) * 0.5f + height * 0.5f + radius,
+		height,
+		radius,
+		ignore_object_index,
+		&features))
+	{
+		result = collision_move_point(
+			position,
+			velocity,
+			&features,
+			clipped_position,
+			clipped_velocity,
+			collisions,
+			collision_count);
+	}
+	else
+	{
+		add_vectors3d(
+			(real_vector3d const *)position,
+			velocity,
+			(real_vector3d *)clipped_position);
+		*clipped_velocity = *velocity;
+	}
+
+	match_assert("c:\\halo\\SOURCE\\physics\\collisions.c", 1230, global_current_collision_user_depth > 1);
+	--global_current_collision_user_depth;
+
+	return result;
 }
 
 /* ---------- private code */
