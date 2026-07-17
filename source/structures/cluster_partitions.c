@@ -89,6 +89,10 @@ void reference_list_copy(
 	struct data_array *result,
 	struct data_array *source);
 
+static long *code_00180fa0(
+	struct cluster_partition *partition,
+	short cluster_index);
+
 /* ---------- globals */
 
 /* ---------- public code */
@@ -273,14 +277,9 @@ void cluster_partition_reconnect(
 			first_cluster_reference,
 			cluster_index);
 
-		match_assert(
-			"c:\\halo\\SOURCE\\structures\\cluster_partitions.c",
-			0xd5,
-			cluster_index>=0 && cluster_index<global_structure_bsp_get()->clusters.count);
-
 		reference_list_add(
 			partition->data_reference_data,
-			&partition->cluster_first_data_references[cluster_index],
+			code_00180fa0(partition, cluster_index),
 			datum_index);
 	}
 
@@ -303,14 +302,9 @@ void cluster_partition_disconnect(
 
 		datum_delete(partition->cluster_reference_data, cluster_reference_index);
 
-		match_assert(
-			"c:\\halo\\SOURCE\\structures\\cluster_partitions.c",
-			0xd5,
-			cluster_index>=0 && cluster_index<global_structure_bsp_get()->clusters.count);
-
 		reference_list_remove(
 			partition->data_reference_data,
-			&partition->cluster_first_data_references[cluster_index],
+			code_00180fa0(partition, cluster_index),
 			datum_index);
 
 		cluster_reference_index = cluster_reference->next_reference_index;
@@ -326,14 +320,21 @@ long cluster_partition_get_first_datum(
 	long *reference_index,
 	short cluster_index)
 {
-	match_assert(
-		"c:\\halo\\SOURCE\\structures\\cluster_partitions.c",
-		0xd5,
-		cluster_index>=0 && cluster_index<global_structure_bsp_get()->clusters.count);
-
-	*reference_index = partition->cluster_first_data_references[cluster_index];
+	*reference_index = *code_00180fa0((struct cluster_partition *)partition, cluster_index);
 
 	return reference_list_get_next_datum_index(partition->data_reference_data, reference_index);
 }
 
 /* ---------- private code */
+
+static long *code_00180fa0(
+	struct cluster_partition *partition,
+	short cluster_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\structures\\cluster_partitions.c",
+		0xd5,
+		cluster_index>=0 && cluster_index<global_structure_bsp_get()->clusters.count);
+
+	return &partition->cluster_first_data_references[cluster_index];
+}
