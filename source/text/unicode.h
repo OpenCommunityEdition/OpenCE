@@ -12,6 +12,7 @@ header included in hcex build.
 
 #include <wchar.h>
 #include <time.h>
+#include <stdarg.h>
 
 /* ---------- constants */
 
@@ -103,5 +104,38 @@ long ustrtol(
 	int base);
 int uatoi(
 	wchar_t const *string);
+void *umemset(
+	void *buffer,
+	int value,
+	unsigned long count);
+long ustrncmp(
+	wchar_t const *string1,
+	wchar_t const *string2,
+	unsigned long count);
+wchar_t *ustrncpy(
+	wchar_t *dest,
+	wchar_t const *src,
+	unsigned long count);
+wchar_t *ustrtok(
+	wchar_t *string,
+	wchar_t const *delimiters);
+int uprintf(
+	wchar_t const *format,
+	...);
+int uvprintf(
+	wchar_t const *format,
+	va_list arglist);
+void uperror(
+	wchar_t const *string);
+unsigned long ustrtoul(
+	wchar_t const *nptr,
+	wchar_t **endptr,
+	int base);
+double ustrtod(
+	wchar_t const *nptr,
+	wchar_t **endptr);
+unsigned long ustrnlen(
+	wchar_t const *string,
+	unsigned long maximum_length);
 
 #endif // __UNICODE_H

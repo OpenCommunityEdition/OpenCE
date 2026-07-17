@@ -244,6 +244,7 @@ symbols in this file:
 
 #include <wchar.h>
 #include <wctype.h>
+#include <stdarg.h>
 
 #include "cseries/cseries.h"
 #include "unicode.h"
@@ -254,6 +255,7 @@ enum
 {
 	MAXIMUM_MEMCMP_SIZE = 0x10000000,
 	MAXIMUM_MEMCPY_MEMMOVE_SIZE = 0x10000000,
+	MAXIMUM_MEMSET_SIZE = 0x10000000,
 	MAXIMUM_STRING_SIZE = 0x8000,
 };
 
@@ -626,6 +628,185 @@ int uatoi(
 		wcslen(string) < MAXIMUM_STRING_SIZE);
 
 	return _wtoi(string);
+}
+
+void *umemset(
+	void *buffer,
+	int value,
+	unsigned long count)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		133,
+		buffer);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		134,
+		(count >= 0) && (count <= MAXIMUM_MEMSET_SIZE));
+
+	return csmemset(buffer, value, count);
+}
+
+long ustrncmp(
+	wchar_t const *string1,
+	wchar_t const *string2,
+	unsigned long count)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		298,
+		string1 && string2);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		299,
+		(count >= 0) && (count < MAXIMUM_STRING_SIZE));
+
+	return wcsncmp(string1, string2, count);
+}
+
+wchar_t *ustrncpy(
+	wchar_t *dest,
+	wchar_t const *src,
+	unsigned long count)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		310,
+		dest && src);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		311,
+		(count >= 0) && (count < MAXIMUM_STRING_SIZE));
+
+	return wcsncpy(dest, src, count);
+}
+
+wchar_t *ustrtok(
+	wchar_t *string,
+	wchar_t const *delimiters)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		368,
+		delimiters);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		369,
+		wcslen(delimiters) < MAXIMUM_STRING_SIZE);
+
+	return wcstok(string, delimiters);
+}
+
+int uprintf(
+	wchar_t const *format,
+	...)
+{
+	int result;
+	va_list arglist;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		699,
+		format);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		700,
+		wcslen(format) < MAXIMUM_STRING_SIZE);
+
+	va_start(arglist, format);
+	result = vwprintf(format, arglist);
+	va_end(arglist);
+
+	return result;
+}
+
+int uvprintf(
+	wchar_t const *format,
+	va_list arglist)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		803,
+		format);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		804,
+		wcslen(format) < MAXIMUM_STRING_SIZE);
+
+	return vwprintf(format, arglist);
+}
+
+void uperror(
+	wchar_t const *string)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		922,
+		string);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		923,
+		wcslen(string) < MAXIMUM_STRING_SIZE);
+
+	_wperror(string);
+
+	return;
+}
+
+unsigned long ustrtoul(
+	wchar_t const *nptr,
+	wchar_t **endptr,
+	int base)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		979,
+		nptr);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		980,
+		wcslen(nptr) < MAXIMUM_STRING_SIZE);
+
+	return wcstoul(nptr, endptr, base);
+}
+
+double ustrtod(
+	wchar_t const *nptr,
+	wchar_t **endptr)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		990,
+		nptr);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		991,
+		wcslen(nptr) < MAXIMUM_STRING_SIZE);
+
+	return wcstod(nptr, endptr);
+}
+
+unsigned long ustrnlen(
+	wchar_t const *string,
+	unsigned long maximum_length)
+{
+	unsigned long size;
+
+	size = 0;
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		208,
+		string);
+
+	while ((size < maximum_length) && *string++)
+		size++;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		214,
+		size < MAXIMUM_STRING_SIZE);
+
+	return size;
 }
 
 /* ---------- private code */
