@@ -93,7 +93,11 @@ char const *object_type_get_name(short object_type);
 short object_definition_index_to_object_type(
 	long definition_index);
 
-void object_types_place_all(struct scenario *scenario);
+void object_types_place_all(
+	struct scenario *scenario);
+void object_names_postprocess(
+	struct scenario *scenario,
+	boolean postprocess);
 
 void object_types_initialize(void);
 void object_types_dispose(void);

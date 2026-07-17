@@ -127,6 +127,7 @@ symbols in this file:
 
 #include "cache/cache_files.h"
 #include "cutscene/cinematics.h"
+#include "editor/editor_stubs.h"
 #include "objects.h"
 #include "scenario/scenario_definitions.h"
 
@@ -728,6 +729,108 @@ void object_types_reconnect_to_structure_bsp(
 	if (!cinematic_in_progress() || !cinematic_globals->suppress_bsp_object_creation)
 	{
 		object_types_place_objects(TRUE);
+	}
+
+	return;
+}
+
+void object_types_place_all(
+	struct scenario *scenario)
+{
+	if (!game_in_editor())
+	{
+		short object_type;
+
+		for (object_type = 0; object_type < NUMBER_OF_OBJECT_TYPES; object_type++)
+		{
+			struct object_type_definition *definition;
+
+			if (TEST_FLAG(_object_mask_remove_on_bsp_switch, object_type))
+			{
+				continue;
+			}
+
+			definition = object_type_definition_get(object_type);
+			if (definition->placement_tag_block_offset!=NONE &&
+				definition->palette_tag_block_offset!=NONE)
+			{
+				long element_size;
+				short scenario_datum_index;
+				struct tag_block *scenario_datums = scenario_get_object_type_scenario_datums(
+					scenario,
+					object_type,
+					&element_size);
+				struct tag_block *scenario_palette = scenario_get_object_type_scenario_palette(
+					scenario,
+					object_type);
+
+				for (scenario_datum_index = 0;
+					scenario_datum_index < scenario_datums->count;
+					scenario_datum_index++)
+				{
+					struct scenario_object_datum *scenario_object =
+						(struct scenario_object_datum *)tag_block_get_element_with_size(
+							scenario_datums,
+							scenario_datum_index,
+							element_size);
+
+					object_new_from_scenario(scenario_object, scenario_palette);
+					objects_garbage_collection();
+				}
+			}
+		}
+
+		object_types_place_objects(TRUE);
+	}
+
+	return;
+}
+
+void object_names_postprocess(
+	struct scenario *scenario,
+	boolean postprocess)
+{
+	if (!postprocess)
+	{
+		short object_type;
+
+		for (object_type = 0; object_type < NUMBER_OF_OBJECT_TYPES; object_type++)
+		{
+			struct object_type_definition *definition = object_type_definition_get(object_type);
+
+			if (definition->placement_tag_block_offset!=NONE &&
+				definition->palette_tag_block_offset!=NONE)
+			{
+				long element_size;
+				short scenario_datum_index;
+				struct tag_block *scenario_datums = scenario_get_object_type_scenario_datums(
+					scenario,
+					object_type,
+					&element_size);
+
+				for (scenario_datum_index = 0;
+					scenario_datum_index < scenario_datums->count;
+					scenario_datum_index++)
+				{
+					struct scenario_object_datum *scenario_object =
+						(struct scenario_object_datum *)tag_block_get_element_with_size(
+							scenario_datums,
+							scenario_datum_index,
+							element_size);
+
+					if (scenario_object->name_index!=NONE)
+					{
+						struct scenario_object_name *object_name = TAG_BLOCK_GET_ELEMENT(
+							&scenario->object_names,
+							scenario_object->name_index,
+							struct scenario_object_name);
+
+						object_name->runtime_object_type = object_type;
+						object_name->runtime_scenario_datum_index = scenario_datum_index;
+					}
+				}
+			}
+		}
 	}
 
 	return;
