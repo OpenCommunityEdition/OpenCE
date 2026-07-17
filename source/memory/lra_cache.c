@@ -44,6 +44,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
+#include "memory/lra_cache.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -52,8 +56,356 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+static void code_0010b9f0(
+	long *address,
+	long new_address);
+static void code_0010ba00(
+	long *address);
+static void code_0010ba10(
+	struct lra_block *block,
+	struct lra_cache *cache);
+static void code_0010ba30(
+	struct lra_block *block,
+	struct lra_cache *cache);
+static void code_0010bab0(
+	struct lra_cache *cache);
+static long code_0010bdf0(
+	struct lra_block *block,
+	struct lra_cache *cache);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+long lra_full(
+	struct lra_cache *cache)
+{
+	if (cache->last_block && cache->last_block->next)
+	{
+		return TRUE;
+	}
+
+	return FALSE;
+}
+
+static void code_0010b9f0(
+	long *address,
+	long new_address)
+{
+	*address = new_address;
+
+	return;
+}
+
+static void code_0010ba00(
+	long *address)
+{
+	*address = 0;
+
+	return;
+}
+
+static void code_0010ba10(
+	struct lra_block *block,
+	struct lra_cache *cache)
+{
+	if (!TEST_FLAG(block->signature, _lra_block_deleted_bit))
+	{
+		cache->delete_proc(block->address);
+		block->signature = (block->signature&~FLAG(_lra_block_locked_bit))|FLAG(_lra_block_deleted_bit);
+	}
+
+	return;
+}
+
+static void code_0010ba30(
+	struct lra_block *block,
+	struct lra_cache *cache)
+{
+	match_vassert(
+		"c:\\halo\\SOURCE\\memory\\lra_cache.c",
+		398,
+		(block->signature&~(FLAG(_lra_block_locked_bit)|FLAG(_lra_block_deleted_bit)))==LRA_BLOCK_SIGNATURE &&
+			block->size>=0 && block->size<cache->size &&
+			(char *)block-(char *)cache->base_address>=0 &&
+			block->size+((char *)block-(char *)cache->base_address)<=cache->size &&
+			(!block->next || (char *)block->next-(char *)cache->base_address>=0) &&
+			(unsigned long)((block->next ? (char *)block->next-(char *)cache->base_address : 0)+sizeof(struct lra_block))<=(unsigned long)cache->size,
+		csprintf(temporary, "lra cache %s @%p block @%p appears to be corrupt", cache->name, cache, block));
+
+	return;
+}
+
+static void code_0010bab0(
+	struct lra_cache *cache)
+{
+	match_assert("c:\\halo\\SOURCE\\memory\\lra_cache.c", 408, cache);
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\memory\\lra_cache.c",
+		418,
+		cache->signature==LRA_CACHE_SIGNATURE && cache->base_address && cache->size>=0,
+		csprintf(temporary, "lra cache %s @%p appears to be corrupt", cache->name, cache));
+
+	if (cache->last_block)
+	{
+		code_0010ba30(cache->last_block, cache);
+	}
+
+	return;
+}
+
+static long code_0010bdf0(
+	struct lra_block *block,
+	struct lra_cache *cache)
+{
+	code_0010ba30(block, cache);
+
+	return (long)((char *)block - (char *)cache->base_address);
+}
+
+struct lra_cache *lra_new(
+	char const *name,
+	long size,
+	lra_update_proc update_proc,
+	lra_delete_proc delete_proc,
+	void *base_address)
+{
+	struct lra_cache *cache = match_malloc("c:\\halo\\SOURCE\\memory\\lra_cache.c", 86, sizeof(struct lra_cache));
+
+	match_assert("c:\\halo\\SOURCE\\memory\\lra_cache.c", 88, size>=0);
+
+	if (!update_proc || !delete_proc)
+	{
+		update_proc = code_0010b9f0;
+		delete_proc = code_0010ba00;
+	}
+
+	if (cache)
+	{
+		boolean malloced = FALSE;
+
+		if (!base_address)
+		{
+			base_address = match_malloc("c:\\halo\\SOURCE\\memory\\lra_cache.c", 102, size);
+			malloced = TRUE;
+		}
+
+		if (base_address)
+		{
+			match_assert("c:\\halo\\SOURCE\\memory\\lra_cache.c", 107, !((long)base_address&3));
+
+			csmemset(cache, 0, sizeof(struct lra_cache));
+			csstrncpy(cache->name, name, MAXIMUM_LRA_CACHE_NAME_LENGTH);
+			cache->name[MAXIMUM_LRA_CACHE_NAME_LENGTH] = 0;
+			cache->size = size;
+			cache->base_address = base_address;
+			cache->last_block = NULL;
+			cache->signature = LRA_CACHE_SIGNATURE;
+			cache->malloced = malloced;
+			cache->delete_proc = delete_proc;
+			cache->update_proc = update_proc;
+
+			code_0010bab0(cache);
+		}
+		else
+		{
+			match_free("c:\\halo\\SOURCE\\memory\\lra_cache.c", 126, cache);
+
+			return NULL;
+		}
+	}
+
+	return cache;
+}
+
+void lra_dispose(
+	struct lra_cache *cache)
+{
+	code_0010bab0(cache);
+
+	if (cache->malloced)
+	{
+		match_free("c:\\halo\\SOURCE\\memory\\lra_cache.c", 140, cache->base_address);
+	}
+
+	match_free("c:\\halo\\SOURCE\\memory\\lra_cache.c", 141, cache);
+
+	return;
+}
+
+void lra_flush(
+	struct lra_cache *cache)
+{
+	code_0010bab0(cache);
+
+	if (cache->last_block && cache->base_address)
+	{
+		struct lra_block *block;
+
+		for (block = (struct lra_block *)cache->base_address; block; block = block->next)
+		{
+			code_0010ba10(block, cache);
+		}
+	}
+
+	cache->last_block = NULL;
+
+	return;
+}
+
+void lra_free(
+	struct lra_cache *cache,
+	void *pointer)
+{
+	struct lra_block *block = (struct lra_block *)((char *)pointer - sizeof(struct lra_block));
+
+	match_assert("c:\\halo\\SOURCE\\memory\\lra_cache.c", 282, pointer);
+
+	code_0010bab0(cache);
+	code_0010ba30(block, cache);
+	code_0010ba10(block, cache);
+
+	return;
+}
+
+void lra_lock(
+	struct lra_cache *cache,
+	void *pointer)
+{
+	struct lra_block *block = (struct lra_block *)((char *)pointer - sizeof(struct lra_block));
+
+	match_assert("c:\\halo\\SOURCE\\memory\\lra_cache.c", 298, pointer);
+
+	code_0010bab0(cache);
+	code_0010ba30(block, cache);
+
+	block->signature |= FLAG(_lra_block_locked_bit);
+
+	return;
+}
+
+void lra_unlock(
+	struct lra_cache *cache,
+	void *pointer)
+{
+	struct lra_block *block = (struct lra_block *)((char *)pointer - sizeof(struct lra_block));
+
+	match_assert("c:\\halo\\SOURCE\\memory\\lra_cache.c", 314, pointer);
+
+	code_0010bab0(cache);
+	code_0010ba30(block, cache);
+
+	block->signature &= ~FLAG(_lra_block_locked_bit);
+
+	return;
+}
+
+void *lra_allocate(
+	struct lra_cache *cache,
+	long size,
+	long *address)
+{
+	void *result = NULL;
+	struct lra_block *last_block;
+	struct lra_block *next_block;
+	struct lra_block *first_deleted_block;
+	long number_of_passes;
+	long write_offset;
+
+	code_0010bab0(cache);
+
+	size += sizeof(struct lra_block);
+	if (size&3)
+	{
+		size = (size|3)+1;
+	}
+
+	if (size<0 || size>cache->size)
+	{
+		return NULL;
+	}
+
+	last_block = cache->last_block;
+	next_block = last_block ? last_block->next : NULL;
+	first_deleted_block = NULL;
+	number_of_passes = 0;
+
+	do
+	{
+		if (last_block)
+		{
+			write_offset = code_0010bdf0(last_block, cache) + last_block->size;
+		}
+		else
+		{
+			write_offset = 0;
+		}
+
+		if (next_block)
+		{
+			code_0010ba30(next_block, cache);
+
+			if (write_offset+size>code_0010bdf0(next_block, cache))
+			{
+				if (TEST_FLAG(next_block->signature, _lra_block_locked_bit))
+				{
+					last_block = next_block;
+					next_block = next_block->next;
+					first_deleted_block = NULL;
+				}
+				else
+				{
+					if (!first_deleted_block)
+					{
+						first_deleted_block = next_block;
+					}
+					next_block = next_block->next;
+				}
+
+				continue;
+			}
+		}
+
+		if (write_offset+size<=cache->size)
+		{
+			struct lra_block *block;
+
+			for (block = first_deleted_block; block && block!=next_block; block = block->next)
+			{
+				code_0010ba10(block, cache);
+			}
+
+			block = (struct lra_block *)((char *)cache->base_address + write_offset);
+			block->size = size;
+			block->signature = LRA_BLOCK_SIGNATURE;
+			block->address = address;
+			block->next = next_block;
+
+			result = (char *)block + sizeof(struct lra_block);
+			cache->update_proc(address, (long)result);
+
+			if (last_block)
+			{
+				last_block->next = block;
+			}
+			cache->last_block = block;
+		}
+		else
+		{
+			next_block = (struct lra_block *)cache->base_address;
+			last_block = NULL;
+			first_deleted_block = NULL;
+
+			if ((short)(number_of_passes++))
+			{
+				break;
+			}
+		}
+	}
+	while (!result);
+
+	return result;
+}
 
 /* ---------- private code */
