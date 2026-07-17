@@ -557,6 +557,28 @@ real_vector3d *matrix3x3_transform_vector(
 	return result;
 }
 
+void matrix4x3_from_plane(
+	real_matrix4x3 *matrix,
+	real_plane3d const *plane)
+{
+	real_vector3d forward;
+	real_point3d point;
+
+	match_assert("c:\\halo\\SOURCE\\math\\matrix_math.c", 370, valid_real_plane3d(plane));
+
+	perpendicular3d(&plane->n, &forward);
+	normalize3d(&forward);
+
+	point.x = plane->n.i * plane->d;
+	point.y = plane->n.j * plane->d;
+	point.z = plane->n.k * plane->d;
+
+	matrix4x3_rotation_from_vectors(matrix, &forward, &plane->n);
+	matrix->position = point;
+
+	return;
+}
+
 boolean valid_real_plane3d(
 	real_plane3d const *plane)
 {
