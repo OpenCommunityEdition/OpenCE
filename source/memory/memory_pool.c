@@ -85,6 +85,8 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+static long code_0010dc10(
+	long size);
 static void code_0010dc50(
 	struct memory_pool *pool);
 static struct memory_pool_block *code_0010ddc0(
@@ -245,9 +247,7 @@ boolean memory_pool_block_reallocate(
 	byte *next_block_address;
 
 	block = code_0010ddc0(pool, reference);
-	actual_new_size = new_size+sizeof(*block);
-	if (actual_new_size&3)
-		actual_new_size = (actual_new_size|3)+1;
+	actual_new_size = code_0010dc10(new_size);
 	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 174, new_size>=0);
 
 	next_block_address = block->next_block ? (byte *)block->next_block : (byte *)pool->base_address+pool->size;
@@ -299,6 +299,18 @@ long memory_pool_get_contiguous_free_size(
 }
 
 /* ---------- private code */
+
+static long code_0010dc10(
+	long size)
+{
+	size += sizeof(struct memory_pool_block);
+	if (size&3)
+	{
+		size = (size|3)+1;
+	}
+
+	return size;
+}
 
 static void code_0010dc50(
 	struct memory_pool *pool)
