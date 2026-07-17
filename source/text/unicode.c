@@ -242,6 +242,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include <wchar.h>
+#include <wctype.h>
+
+#include "unicode.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -253,5 +258,83 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+int uisalpha(
+	wchar_t character)
+{
+	return iswalpha(character);
+}
+
+int uisupper(
+	wchar_t character)
+{
+	return iswupper(character);
+}
+
+int uislower(
+	wchar_t character)
+{
+	return iswlower(character);
+}
+
+int uisdigit(
+	wchar_t character)
+{
+	return iswdigit(character);
+}
+
+int uisxdigit(
+	wchar_t character)
+{
+	return iswxdigit(character);
+}
+
+int uisspace(
+	wchar_t character)
+{
+	return iswspace(character);
+}
+
+int uispunct(
+	wchar_t character)
+{
+	return iswpunct(character);
+}
+
+int uisalnum(
+	wchar_t character)
+{
+	return iswalnum(character);
+}
+
+int uisprint(
+	wchar_t character)
+{
+	return iswprint(character);
+}
+
+int uisgraph(
+	wchar_t character)
+{
+	return iswgraph(character);
+}
+
+int uiscntrl(
+	wchar_t character)
+{
+	return iswcntrl(character);
+}
+
+int utoupper(
+	wchar_t character)
+{
+	return towupper(character);
+}
+
+int utolower(
+	wchar_t character)
+{
+	return towlower(character);
+}
 
 /* ---------- private code */
