@@ -179,10 +179,10 @@ typedef char verify_compressed_quaternion_8byte_size[
 typedef char verify_compressed_quaternion_6byte_size[
 	sizeof(struct compressed_quaternion_6byte) == 0x06 ? 1 : -1];
 
-struct animation_frame_info_dx_dyaw
+struct animation_frame_info_dx_dy
 {
 	real dx;
-	real dyaw;
+	real dy;
 };
 
 struct animation_frame_info_dx_dy_dyaw
@@ -200,8 +200,8 @@ struct animation_frame_info_dx_dy_dz_dyaw
 	real dyaw;
 };
 
-typedef char verify_animation_frame_info_dx_dyaw_size[
-	sizeof(struct animation_frame_info_dx_dyaw) == 0x08 ? 1 : -1];
+typedef char verify_animation_frame_info_dx_dy_size[
+	sizeof(struct animation_frame_info_dx_dy) == 0x08 ? 1 : -1];
 typedef char verify_animation_frame_info_dx_dy_dyaw_size[
 	sizeof(struct animation_frame_info_dx_dy_dyaw) == 0x0C ? 1 : -1];
 typedef char verify_animation_frame_info_dx_dy_dz_dyaw_size[
@@ -246,8 +246,8 @@ void animation_get_x_offsets(
 		switch (animation->frame_info_type)
 		{
 		case 1:
-			x_offset += ((struct animation_frame_info_dx_dyaw const *)frame_info)->dx;
-			frame_info += sizeof(struct animation_frame_info_dx_dyaw);
+			x_offset += ((struct animation_frame_info_dx_dy const *)frame_info)->dx;
+			frame_info += sizeof(struct animation_frame_info_dx_dy);
 			break;
 
 		case 2:
@@ -274,6 +274,50 @@ void animation_get_x_offsets(
 	if (key_frame_x_offset)
 	{
 		*key_frame_x_offset = key_x_offset;
+	}
+
+	return;
+}
+
+short animation_graph_get_animation_by_name(
+	long animation_graph_index,
+	char const *animation_name)
+{
+	struct animation_graph const *animation_graph = animation_graph_definition_get(animation_graph_index);
+	short animation_index;
+
+	for (animation_index = 0; animation_index < animation_graph->animations.count; animation_index++)
+	{
+		struct animation const *animation = TAG_BLOCK_GET_ELEMENT(
+			&animation_graph->animations,
+			animation_index,
+			struct animation);
+
+		if (!_stricmp(animation_name, animation->name))
+		{
+			return animation_index;
+		}
+	}
+
+	return NONE;
+}
+
+void animation_frame_get_xy_translation(
+	struct animation const *animation,
+	short frame_index,
+	real_vector2d *translation)
+{
+	if (animation->frame_info_type == 1)
+	{
+		*translation = *(real_vector2d const *)animation_get_frame_info(
+			animation,
+			frame_index,
+			sizeof(struct animation_frame_info_dx_dy));
+	}
+	else
+	{
+		translation->i = 0.f;
+		translation->j = 0.f;
 	}
 
 	return;

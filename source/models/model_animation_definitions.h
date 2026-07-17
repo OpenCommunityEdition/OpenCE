@@ -231,6 +231,10 @@ void quaternion_decompress_6byte(
 short animation_graph_get_animation_by_name(
 	long animation_graph_index,
 	char const *animation_name);
+void animation_frame_get_xy_translation(
+	struct animation const *animation,
+	short frame_index,
+	real_vector2d *translation);
 
 void animation_get_node_orientations(
 	struct model const *model,
