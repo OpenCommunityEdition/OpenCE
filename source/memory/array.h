@@ -8,6 +8,8 @@ header included in hcex build.
 #define __ARRAY_H
 #pragma once
 
+#include "cseries/cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */

@@ -46,9 +46,21 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "memory/hashtable.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
+
+#define hashtable_valid(table) \
+	((table) && \
+	(table)->key_size>0 && \
+	(table)->element_size>0 && \
+	(table)->load_factor>0 && \
+	(table)->load_factor<=1 && \
+	((table)->capacity_bits==NONE || \
+	(1<<(table)->capacity_bits)==(table)->elements.count))
 
 /* ---------- structures */
 
@@ -56,6 +68,58 @@ symbols in this file:
 
 /* ---------- globals */
 
+short default_hash_polynomial[] =
+{
+	3, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59
+};
+
 /* ---------- public code */
+
+void hashtable_new(
+	struct hashtable *table,
+	short key_size,
+	short element_size,
+	real load_factor,
+	hashtable_hash_function hash_function,
+	hashtable_compare_function compare_function)
+{
+	match_assert("c:\\halo\\SOURCE\\memory\\hashtable.c", 41, table);
+	match_assert("c:\\halo\\SOURCE\\memory\\hashtable.c", 42, key_size>0);
+	match_assert("c:\\halo\\SOURCE\\memory\\hashtable.c", 43, element_size>0);
+	match_assert("c:\\halo\\SOURCE\\memory\\hashtable.c", 44, load_factor>0 && load_factor<=1);
+
+	table->key_size = key_size;
+	table->element_size = element_size;
+	table->count = 0;
+	table->capacity_bits = NONE;
+	table->load_factor = load_factor;
+	table->hash_function = hash_function;
+	table->compare_function = compare_function;
+	dynamic_array_new(&table->elements, key_size + element_size);
+	table->used_slots = NULL;
+
+	return;
+}
+
+void hashtable_set_user_data(
+	struct hashtable *table,
+	void *user_data)
+{
+	table->user_data = user_data;
+
+	return;
+}
+
+void hashtable_delete(
+	struct hashtable *table)
+{
+	match_assert("c:\\halo\\SOURCE\\memory\\hashtable.c", 110, hashtable_valid(table));
+
+	dynamic_array_delete(&table->elements);
+	if (table->used_slots)
+		match_free("c:\\halo\\SOURCE\\memory\\hashtable.c", 116, table->used_slots);
+
+	return;
+}
 
 /* ---------- private code */
