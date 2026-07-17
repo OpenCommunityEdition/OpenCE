@@ -28,6 +28,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "bsp3d.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -39,5 +42,31 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+long bsp3d_test_point(
+	struct bsp3d const *bsp,
+	long node_index,
+	union real_point3d const *point)
+{
+	do
+	{
+		struct bsp3d_node const *node = TAG_BLOCK_GET_ELEMENT(
+			&bsp->nodes,
+			node_index,
+			struct bsp3d_node);
+		real_plane3d const *plane = TAG_BLOCK_GET_ELEMENT(
+			&bsp->planes,
+			node->plane_designator,
+			real_plane3d);
+
+		node_index = node->children[plane3d_distance_to_point(plane, point) >= 0.f];
+	}
+	while (!(node_index & LONG_MIN));
+
+	if (node_index != NONE)
+		return node_index & LONG_MAX;
+
+	return NONE;
+}
 
 /* ---------- private code */

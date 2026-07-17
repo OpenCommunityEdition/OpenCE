@@ -12,6 +12,7 @@ header included in hcex build.
 /* ---------- headers */
 
 #include "tag_files/tag_groups.h"
+#include "math/real_math.h"
 
 /* ---------- constants */
 
@@ -24,6 +25,15 @@ struct bsp3d
 	struct tag_block nodes;
 	struct tag_block planes;
 };
+
+struct bsp3d_node
+{
+	long plane_designator;
+	long children[2];
+};
+
+typedef char bsp3d_node_size_check[
+	sizeof(struct bsp3d_node) == 0xC ? 1 : -1];
 
 /* ---------- prototypes/BSP3D.C */
 
