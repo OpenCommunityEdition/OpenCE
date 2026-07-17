@@ -227,6 +227,9 @@ void quaternion_decompress_8byte(
 void quaternion_decompress_6byte(
 	struct compressed_quaternion_6byte const *compressed,
 	real_quaternion *quaternion);
+void quaternion_compress_8byte(
+	real_quaternion const *quaternion,
+	struct compressed_quaternion_8byte *compressed);
 
 short animation_graph_get_animation_by_name(
 	long animation_graph_index,

@@ -414,4 +414,16 @@ void quaternion_decompress_6byte_renormalized(
 	return;
 }
 
+void quaternion_compress_8byte(
+	real_quaternion const *quaternion,
+	struct compressed_quaternion_8byte *compressed)
+{
+	compressed->i = (short)(quaternion->v.i * COMPRESSED_QUATERNION_COMPONENT_MAXIMUM);
+	compressed->j = (short)(quaternion->v.j * COMPRESSED_QUATERNION_COMPONENT_MAXIMUM);
+	compressed->k = (short)(quaternion->v.k * COMPRESSED_QUATERNION_COMPONENT_MAXIMUM);
+	compressed->w = (short)(quaternion->w * COMPRESSED_QUATERNION_COMPONENT_MAXIMUM);
+
+	return;
+}
+
 /* ---------- private code */
