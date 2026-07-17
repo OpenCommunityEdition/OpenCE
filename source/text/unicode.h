@@ -79,5 +79,29 @@ wchar_t *uasctime(
 	struct tm const *timeptr);
 wchar_t *utmpnam(
 	wchar_t *string);
+unsigned long ustrlen(
+	wchar_t const *string);
+wchar_t *ustrchr(
+	wchar_t const *string,
+	wchar_t character);
+wchar_t *ustrrchr(
+	wchar_t const *string,
+	wchar_t character);
+wchar_t *ustrlwr(
+	wchar_t *string);
+wchar_t *ustrupr(
+	wchar_t *string);
+wchar_t *ugets(
+	wchar_t *string);
+int uputs(
+	wchar_t const *string);
+int uremove(
+	wchar_t const *path);
+long ustrtol(
+	wchar_t const *nptr,
+	wchar_t **endptr,
+	int base);
+int uatoi(
+	wchar_t const *string);
 
 #endif // __UNICODE_H

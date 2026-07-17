@@ -254,6 +254,7 @@ enum
 {
 	MAXIMUM_MEMCMP_SIZE = 0x10000000,
 	MAXIMUM_MEMCPY_MEMMOVE_SIZE = 0x10000000,
+	MAXIMUM_STRING_SIZE = 0x8000,
 };
 
 /* ---------- macros */
@@ -467,6 +468,164 @@ wchar_t *utmpnam(
 	wchar_t *string)
 {
 	return _wtmpnam(string);
+}
+
+unsigned long ustrlen(
+	wchar_t const *string)
+{
+	unsigned long size;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		194,
+		string);
+
+	size = wcslen(string);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		196,
+		size < MAXIMUM_STRING_SIZE);
+
+	return size;
+}
+
+wchar_t *ustrchr(
+	wchar_t const *string,
+	wchar_t character)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		224,
+		string);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		225,
+		wcslen(string) < MAXIMUM_STRING_SIZE);
+
+	return wcschr(string, character);
+}
+
+wchar_t *ustrrchr(
+	wchar_t const *string,
+	wchar_t character)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		333,
+		string);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		334,
+		wcslen(string) < MAXIMUM_STRING_SIZE);
+
+	return wcsrchr(string, character);
+}
+
+wchar_t *ustrlwr(
+	wchar_t *string)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		392,
+		string);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		393,
+		wcslen(string) < MAXIMUM_STRING_SIZE);
+
+	return _wcslwr(string);
+}
+
+wchar_t *ustrupr(
+	wchar_t *string)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		402,
+		string);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		403,
+		wcslen(string) < MAXIMUM_STRING_SIZE);
+
+	return _wcsupr(string);
+}
+
+wchar_t *ugets(
+	wchar_t *string)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		643,
+		string);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		644,
+		wcslen(string) < MAXIMUM_STRING_SIZE);
+
+	return _getws(string);
+}
+
+int uputs(
+	wchar_t const *string)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		665,
+		string);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		666,
+		wcslen(string) < MAXIMUM_STRING_SIZE);
+
+	return _putws(string);
+}
+
+int uremove(
+	wchar_t const *path)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		946,
+		path);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		947,
+		wcslen(path) < MAXIMUM_STRING_SIZE);
+
+	return _wremove(path);
+}
+
+long ustrtol(
+	wchar_t const *nptr,
+	wchar_t **endptr,
+	int base)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		967,
+		nptr);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		968,
+		wcslen(nptr) < MAXIMUM_STRING_SIZE);
+
+	return wcstol(nptr, endptr, base);
+}
+
+int uatoi(
+	wchar_t const *string)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		1002,
+		string);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		1003,
+		wcslen(string) < MAXIMUM_STRING_SIZE);
+
+	return _wtoi(string);
 }
 
 /* ---------- private code */
