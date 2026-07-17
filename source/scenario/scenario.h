@@ -74,7 +74,8 @@ void scenario_initialize_for_new_map(
 	void);
 void scenario_dispose_from_old_map(void);
 void scenario_frame_update(real dt);
-void scenario_unload(void);
+void scenario_unload(
+	void);
 struct scenario *global_scenario_get(void);
 struct scenario *global_scenario_try_and_get(void);
 struct structure_bsp *global_structure_bsp_get(void);

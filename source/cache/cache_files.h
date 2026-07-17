@@ -26,6 +26,8 @@ const char *cache_files_map_directory(
 unsigned long cache_files_get_checksum(void);
 void scenario_structure_bsp_unload(
 	struct scenario_structure_bsp_reference *reference);
+void scenario_tags_unload(
+	void);
 void tag_files_close(
 	void);
 void tag_files_open(

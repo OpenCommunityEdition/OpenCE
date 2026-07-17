@@ -164,6 +164,7 @@ symbols in this file:
 #include "cseries.h"
 #include "scenario.h"
 
+#include "bink/bink_playback.h"
 #include "cache/cache_files.h"
 #include "effects/material_effect_definitions.h"
 #include "game/game_globals.h"
@@ -239,6 +240,27 @@ void scenario_frame_update(
 	real delta_time)
 {
 	wind_update();
+
+	return;
+}
+
+void scenario_unload(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\scenario\\scenario.c",
+		0xA4,
+		!bink_playback_active());
+
+	scenario_tags_unload();
+	global_scenario_index = NONE;
+	global_structure_bsp_index = NONE;
+	scenario_globals->structure_bsp_index = NONE;
+	global_scenario = NULL;
+	global_structure_bsp = NULL;
+	global_collision_bsp = NULL;
+	global_bsp3d = NULL;
+	global_game_globals = NULL;
 
 	return;
 }
