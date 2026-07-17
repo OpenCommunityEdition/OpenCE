@@ -8,6 +8,11 @@ header included in hcex build.
 #define __CLUSTER_PARTITIONS_H
 #pragma once
 
+/* ---------- headers */
+
+#include "math/real_math.h"
+#include "memory/data.h"
+
 /* ---------- constants */
 
 /* ---------- macros */

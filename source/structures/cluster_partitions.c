@@ -62,6 +62,14 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "cseries/errors.h"
+#include "memory/data.h"
+#include "objects/reference_lists.h"
+#include "saved games/game_state.h"
+#include "cluster_partitions.h"
+#include "structures/structures.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -73,5 +81,56 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void cluster_partition_new(
+	struct cluster_partition *partition,
+	char const *name)
+{
+	char cluster_name[256];
+
+	partition->cluster_first_data_references = game_state_malloc(
+		name,
+		"cluster references",
+		MAXIMUM_CLUSTERS_PER_STRUCTURE * sizeof(*partition->cluster_first_data_references));
+
+	sprintf(cluster_name, "cluster %s", name);
+	partition->data_reference_data = reference_list_new(cluster_name, 2048);
+
+	sprintf(cluster_name, "%s cluster", name);
+	partition->cluster_reference_data = reference_list_new(cluster_name, 2048);
+
+	if (!partition->cluster_first_data_references ||
+		!partition->cluster_reference_data ||
+		!partition->data_reference_data)
+	{
+		error(_error_immediate, "couldn't allocate %s cluster partition globals", name);
+	}
+
+	return;
+}
+
+long cluster_partition_get_next_datum(
+	struct cluster_partition const *partition,
+	long *reference_index)
+{
+	return reference_list_get_next_datum_index(partition->data_reference_data, reference_index);
+}
+
+long cluster_partition_get_first_cluster(
+	struct cluster_partition const *partition,
+	long *reference_index,
+	long first_cluster_reference)
+{
+	*reference_index = first_cluster_reference;
+
+	return reference_list_get_next_datum_index(partition->cluster_reference_data, reference_index);
+}
+
+long cluster_partition_get_next_cluster(
+	struct cluster_partition const *partition,
+	long *reference_index)
+{
+	return reference_list_get_next_datum_index(partition->cluster_reference_data, reference_index);
+}
 
 /* ---------- private code */
