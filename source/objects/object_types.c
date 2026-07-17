@@ -952,3 +952,152 @@ void object_names_postprocess(
 
 
 /* ---------- private code */
+
+/* Preserve the original inline expansion used by the matrix validation below. */
+#define valid_realcmp(a, b) \
+	(valid_real((a) - (b)) && fabs((a) - (b)) < 0.001f)
+
+long object_type_synchronize(
+	long object_index,
+	struct scenario_object_datum *scenario_object,
+	struct tag_block *palette,
+	short object_type,
+	short scenario_datum_index)
+{
+	struct object_placement_data placement_data;
+	real_matrix4x3 matrix;
+	struct object_datum *object;
+
+	if (scenario_object->palette_entry_index==NONE)
+	{
+		if (object_index!=NONE)
+		{
+			object_delete(object_index);
+			object_index = NONE;
+		}
+	}
+	else
+	{
+		if (object_index==NONE)
+		{
+			long definition_index = TAG_BLOCK_GET_ELEMENT(
+				palette,
+				scenario_object->palette_entry_index,
+				struct scenario_object_palette_entry)->reference.index;
+
+			if (definition_index!=NONE)
+			{
+				object_placement_data_new(
+					&placement_data,
+					definition_index,
+					NONE);
+				placement_data.position = scenario_object->position;
+				vectors3d_from_euler_angles3d(
+					&placement_data.forward,
+					&placement_data.up,
+					&scenario_object->rotation);
+				placement_data.variant_number = scenario_object->variant_number;
+
+				object_index = object_new(&placement_data);
+				if (object_index!=NONE)
+				{
+					object_type_place(object_index, scenario_object);
+				}
+			}
+		}
+		else
+		{
+			struct scenario_object_palette_entry *palette_entry;
+
+			object = object_try_and_get(object_index);
+			palette_entry = TAG_BLOCK_GET_ELEMENT(
+				palette,
+				scenario_object->palette_entry_index,
+				struct scenario_object_palette_entry);
+			if (!object || object->definition_index!=palette_entry->reference.index)
+			{
+				if (object)
+				{
+					object_delete(object_index);
+				}
+				object_index = NONE;
+
+				if (palette_entry->reference.index!=NONE)
+				{
+					object_placement_data_new(
+						&placement_data,
+						palette_entry->reference.index,
+						NONE);
+					placement_data.position = scenario_object->position;
+					vectors3d_from_euler_angles3d(
+						&placement_data.forward,
+						&placement_data.up,
+						&scenario_object->rotation);
+					placement_data.variant_number = scenario_object->variant_number;
+
+					object_index = object_new(&placement_data);
+					if (object_index!=NONE)
+					{
+						object_type_place(object_index, scenario_object);
+					}
+				}
+			}
+		}
+
+		if (object_index!=NONE)
+		{
+			struct object_definition *definition;
+
+			object = object_get(object_index);
+			object_activate(object_index);
+			matrix4x3_rotation_from_angles(
+				&matrix,
+				scenario_object->rotation.yaw,
+				scenario_object->rotation.pitch,
+				scenario_object->rotation.roll);
+			match_assert_valid_real_matrix4x3(
+				"c:\\halo\\SOURCE\\objects\\object_types.c",
+				975,
+				&matrix);
+
+			definition = object_definition_get(object->definition_index);
+			if (definition->object.physics.index!=NONE)
+			{
+				real_point3d position = scenario_object->position;
+				position.z += object->object.bounding_sphere_radius * 0.5f;
+				object_set_position(
+					object_index,
+					&position,
+					&matrix.forward,
+					&matrix.up);
+			}
+			else
+			{
+				object_set_position(
+					object_index,
+					&scenario_object->position,
+					&matrix.forward,
+					&matrix.up);
+			}
+			object->object.name_index = scenario_object->name_index;
+		}
+	}
+
+	if (scenario_object->name_index!=NONE)
+	{
+		struct scenario_object_name *object_name = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->object_names,
+			scenario_object->name_index,
+			struct scenario_object_name);
+
+		object_name->runtime_object_type = object_type;
+		object_name->runtime_scenario_datum_index = scenario_datum_index;
+		object_set_object_index_for_name_index(
+			scenario_object->name_index,
+			object_index);
+	}
+
+	return object_index;
+}
+
+#undef valid_realcmp
