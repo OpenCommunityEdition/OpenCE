@@ -119,6 +119,66 @@ struct byte_swap_definition int64_bs_definition =
 
 /* ---------- public code */
 
+void byte_swap_memory(
+	void *memory,
+	long count,
+	byte_swap_code code)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\byte_swapping.c",
+		0x71,
+		memory);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\byte_swapping.c",
+		0x72,
+		count>=0);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\byte_swapping.c",
+		0x73,
+		code==_2byte || code==_4byte || code==_8byte);
+
+	switch (code)
+	{
+	case _2byte:
+	{
+		unsigned short *values = memory;
+		while (count>0)
+		{
+			*values = SWAP2(*values);
+			values++;
+			count--;
+		}
+		break;
+	}
+
+	case _4byte:
+	{
+		unsigned long *values = memory;
+		while (count>0)
+		{
+			*values = SWAP4(*values);
+			values++;
+			count--;
+		}
+		break;
+	}
+
+	case _8byte:
+	{
+		unsigned __int64 *values = memory;
+		while (count>0)
+		{
+			*values = SWAP8(*values);
+			values++;
+			count--;
+		}
+		break;
+	}
+	}
+
+	return;
+}
+
 void code_00108010(
 	struct byte_swap_definition *definition,
 	void *data,
