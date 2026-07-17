@@ -152,9 +152,32 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	COMPRESSED_QUATERNION_COMPONENT_MAXIMUM = 32767,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct compressed_quaternion_8byte
+{
+	short i;
+	short j;
+	short k;
+	short w;
+};
+
+struct compressed_quaternion_6byte
+{
+	word words[3];
+};
+
+typedef char verify_compressed_quaternion_8byte_size[
+	sizeof(struct compressed_quaternion_8byte) == 0x08 ? 1 : -1];
+typedef char verify_compressed_quaternion_6byte_size[
+	sizeof(struct compressed_quaternion_6byte) == 0x06 ? 1 : -1];
 
 struct animation_frame_info_dx_dyaw
 {
@@ -185,10 +208,6 @@ typedef char verify_animation_frame_info_dx_dy_dz_dyaw_size[
 	sizeof(struct animation_frame_info_dx_dy_dz_dyaw) == 0x10 ? 1 : -1];
 
 /* ---------- prototypes */
-
-void quaternion_decompress_6byte(
-	void const *compressed,
-	real_quaternion *quaternion);
 
 /* ---------- globals */
 
@@ -256,6 +275,41 @@ void animation_get_x_offsets(
 	{
 		*key_frame_x_offset = key_x_offset;
 	}
+
+	return;
+}
+
+void quaternion_decompress_8byte(
+	struct compressed_quaternion_8byte const *compressed,
+	real_quaternion *quaternion)
+{
+	real const scale = 1.f / COMPRESSED_QUATERNION_COMPONENT_MAXIMUM;
+
+	quaternion->v.i = compressed->i * scale;
+	quaternion->v.j = compressed->j * scale;
+	quaternion->v.k = compressed->k * scale;
+	quaternion->w = compressed->w * scale;
+
+	return;
+}
+
+void quaternion_decompress_6byte(
+	struct compressed_quaternion_6byte const *compressed,
+	real_quaternion *quaternion)
+{
+	word word0 = compressed->words[0];
+	word word1 = compressed->words[1];
+	word word2 = compressed->words[2];
+	short i = (short)((word0 >> 12) | (word0 & 0xFFF0));
+	short j = (short)(((word1 >> 4) & 0x0FF0) | (word0 & 0x000F) | (word0 << 12));
+	short k = (short)(((((word2 >> 4) & 0x0F00) | (word1 & 0x00F0)) >> 4) | (word1 << 8));
+	short w = (short)(((word2 >> 8) & 0x000F) | (word2 << 4));
+	real const scale = 1.f / COMPRESSED_QUATERNION_COMPONENT_MAXIMUM;
+
+	quaternion->v.i = i * scale;
+	quaternion->v.j = j * scale;
+	quaternion->v.k = k * scale;
+	quaternion->w = w * scale;
 
 	return;
 }

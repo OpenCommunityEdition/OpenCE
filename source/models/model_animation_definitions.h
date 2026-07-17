@@ -209,6 +209,14 @@ void animation_get_x_offsets(
 	struct animation const *animation,
 	real *key_frame_x_offset,
 	real *total_x_offset);
+struct compressed_quaternion_8byte;
+struct compressed_quaternion_6byte;
+void quaternion_decompress_8byte(
+	struct compressed_quaternion_8byte const *compressed,
+	real_quaternion *quaternion);
+void quaternion_decompress_6byte(
+	struct compressed_quaternion_6byte const *compressed,
+	real_quaternion *quaternion);
 
 short animation_graph_get_animation_by_name(
 	long animation_graph_index,
