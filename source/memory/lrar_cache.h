@@ -24,6 +24,15 @@ typedef void (*lrar_unlock_proc)(
 
 /* ---------- prototypes/EXAMPLE.C */
 
+struct lrar_cache *lrar_new(
+	char const *name,
+	unsigned long minimum_address,
+	unsigned long maximum_address,
+	short block_count,
+	short alignment_bit,
+	short boundary_bit,
+	lrar_lock_proc lock_proc,
+	lrar_unlock_proc unlock_proc);
 void lrar_dispose(
 	struct lrar_cache *cache);
 unsigned long lrar_block_address(

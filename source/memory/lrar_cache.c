@@ -129,6 +129,98 @@ void code_0010bfb0(
 	return;
 }
 
+struct lrar_cache *lrar_new(
+	char const *name,
+	unsigned long minimum_address,
+	unsigned long maximum_address,
+	short block_count,
+	short alignment_bit,
+	short boundary_bit,
+	lrar_lock_proc lock_proc,
+	lrar_unlock_proc unlock_proc)
+{
+	struct lrar_cache *cache;
+	struct lrar_cache_block *blocks;
+	long blocks_size;
+	unsigned long alignment_mask;
+
+	cache = debug_malloc(
+		sizeof(*cache),
+		FALSE,
+		"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+		0x56);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+		0x58,
+		minimum_address<maximum_address);
+
+	alignment_mask = FLAG(alignment_bit)-1;
+	if (minimum_address&alignment_mask)
+	{
+		minimum_address = (minimum_address|alignment_mask)+1;
+	}
+
+	if (!lock_proc || !unlock_proc)
+	{
+		lock_proc = code_0010bfa0;
+		unlock_proc = code_0010bfb0;
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+		0x66,
+		alignment_bit>=0);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+		0x67,
+		boundary_bit==NONE || boundary_bit>=0);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+		0x68,
+		block_count>0);
+
+	if (cache)
+	{
+		blocks_size = block_count*sizeof(*blocks);
+		blocks = debug_malloc(
+			blocks_size,
+			FALSE,
+			"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+			0x6C);
+		if (blocks)
+		{
+			csmemset(cache, 0, sizeof(*cache));
+			csmemset(blocks, 0, blocks_size);
+			csstrncpy(cache->name, name, 31);
+			cache->name[31] = 0;
+			cache->minimum_address = minimum_address;
+			cache->maximum_address = maximum_address;
+			cache->total_size = maximum_address-minimum_address;
+			cache->alignment_bit = alignment_bit;
+			cache->boundary_bit = boundary_bit;
+			cache->first_block_index = NONE;
+			cache->last_block_index = NONE;
+			cache->blocks = blocks;
+			cache->block_count = block_count;
+			cache->unlock_proc = unlock_proc;
+			cache->lock_proc = lock_proc;
+			cache->signature = _lrar_cache_signature;
+			code_0010c040(cache);
+		}
+		else
+		{
+			debug_free(
+				cache,
+				"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+				0x8A);
+			cache = NULL;
+		}
+	}
+
+	return cache;
+}
+
 void lrar_dispose(
 	struct lrar_cache *cache)
 {
