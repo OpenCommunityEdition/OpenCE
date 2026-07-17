@@ -125,6 +125,7 @@ symbols in this file:
 #include "cseries.h"
 #include "object_types.h"
 
+#include "cache/cache_files.h"
 #include "objects.h"
 
 /* ---------- constants */
@@ -137,7 +138,135 @@ symbols in this file:
 
 /* ---------- globals */
 
+extern struct object_type_definition biped_data_definition;
+extern struct object_type_definition vehicle_data_definition;
+extern struct object_type_definition weapon_data_definition;
+extern struct object_type_definition equipment_data_definition;
+extern struct object_type_definition garbage_data_definition;
+extern struct object_type_definition projectile_data_definition;
+extern struct object_type_definition scenery_data_definition;
+extern struct object_type_definition machine_data_definition;
+extern struct object_type_definition control_data_definition;
+extern struct object_type_definition light_fixture_data_definition;
+extern struct object_type_definition placeholder_data_definition;
+extern struct object_type_definition sound_scenery_data_definition;
+
+struct object_type_definition *object_type_definitions[NUMBER_OF_OBJECT_TYPES] =
+{
+	&biped_data_definition,
+	&vehicle_data_definition,
+	&weapon_data_definition,
+	&equipment_data_definition,
+	&garbage_data_definition,
+	&projectile_data_definition,
+	&scenery_data_definition,
+	&machine_data_definition,
+	&control_data_definition,
+	&light_fixture_data_definition,
+	&placeholder_data_definition,
+	&sound_scenery_data_definition
+};
+
+typedef char verify_object_type_definition_size[
+	sizeof(struct object_type_definition) == 0xA0 ? 1 : -1];
+
+typedef char verify_object_type_definition_group_tag_offset[
+	offsetof(struct object_type_definition, group_tag) == 0x4 ? 1 : -1];
+
+typedef char verify_object_type_definition_game_datum_size_offset[
+	offsetof(struct object_type_definition, game_datum_size) == 0x8 ? 1 : -1];
+
+typedef char verify_object_type_definition_part_definitions_offset[
+	offsetof(struct object_type_definition, part_definitions) == 0x5C ? 1 : -1];
+
+typedef char verify_object_type_definition_next_offset[
+	offsetof(struct object_type_definition, next) == 0x9C ? 1 : -1];
+
 /* ---------- public code */
+
+struct object_type_definition *object_type_definition_get(
+	short object_type)
+{
+	match_vassert(
+		"c:\\halo\\SOURCE\\objects\\object_types.c",
+		631,
+		VALID_INDEX(object_type, NUMBER_OF_OBJECT_TYPES),
+		csprintf(
+			temporary,
+			"#%d isn't a valid object type in [#0,#%d)",
+			object_type,
+			NUMBER_OF_OBJECT_TYPES));
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\object_types.c",
+		632,
+		object_type_definitions[object_type]);
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\object_types.c",
+		633,
+		object_type_definitions[object_type]->group_tag);
+
+	return object_type_definitions[object_type];
+}
+
+short object_type_get_datum_size(
+	short object_type)
+{
+	match_vassert(
+		"c:\\halo\\SOURCE\\objects\\object_types.c",
+		642,
+		VALID_INDEX(object_type, NUMBER_OF_OBJECT_TYPES),
+		csprintf(
+			temporary,
+			"#%d isn't a valid object type in [#0,#%d)",
+			object_type,
+			NUMBER_OF_OBJECT_TYPES));
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\object_types.c",
+		643,
+		object_type_definitions[object_type]);
+
+	return object_type_definitions[object_type]->game_datum_size;
+}
+
+char const *object_type_get_name(
+	short object_type)
+{
+	match_vassert(
+		"c:\\halo\\SOURCE\\objects\\object_types.c",
+		652,
+		VALID_INDEX(object_type, NUMBER_OF_OBJECT_TYPES),
+		csprintf(
+			temporary,
+			"#%d isn't a valid object type in [#0,#%d)",
+			object_type,
+			NUMBER_OF_OBJECT_TYPES));
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\object_types.c",
+		653,
+		object_type_definitions[object_type]);
+
+	return object_type_definitions[object_type]->name;
+}
+
+short object_definition_index_to_object_type(
+	long definition_index)
+{
+	short object_type;
+	short result;
+	long group_tag = tag_get_group_tag(definition_index);
+	result = NONE;
+
+	for (object_type = 0; object_type < NUMBER_OF_OBJECT_TYPES; object_type++)
+	{
+		if (object_type_definition_get(object_type)->group_tag == group_tag)
+		{
+			result = object_type;
+			break;
+		}
+	}
+
+	return result;
+}
 
 boolean object_type_new(
 	long object_index)

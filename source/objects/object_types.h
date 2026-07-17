@@ -90,6 +90,8 @@ struct object_type_definition
 struct object_type_definition *object_type_definition_get(short object_type);
 short object_type_get_datum_size(short object_type);
 char const *object_type_get_name(short object_type);
+short object_definition_index_to_object_type(
+	long definition_index);
 
 void object_types_place_all(struct scenario *scenario);
 
