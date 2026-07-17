@@ -2778,6 +2778,8 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "ai/ai_scenario_definitions.h"
 #include "cutscene/recorded_animation_definitions.h"
+#include "interface/interface.h"
+#include "tag_files/files.h"
 
 /* ---------- constants */
 
@@ -2788,6 +2790,8 @@ enum
 	scenario_conversation_definition_size = 0x74,
 	scenario_cutscene_flag_size = 0x5C,
 	scenario_cutscene_chapter_title_size = 0x60,
+	hud_globals_group_tag = 'hudg',
+	hud_message_text_group_tag = 'hmt ',
 };
 
 /* ---------- macros */
@@ -3173,6 +3177,11 @@ void evaluator( \
 	return; \
 }
 
+#define hud_globals_definition_get(index) \
+	((struct hud_globals_definition *)tag_get(hud_globals_group_tag, (index)))
+#define hud_message_text_definition_get(index) \
+	((struct hud_message_text_definition *)tag_get(hud_message_text_group_tag, (index)))
+
 #define HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(evaluator, arguments_type, expression) \
 void evaluator( \
 	short function_index, \
@@ -3350,6 +3359,28 @@ struct hs_profile_section
 	byte unknown18[1460];
 	long field_5CC;
 	byte unknown5D0[40];
+};
+
+struct hud_globals_definition
+{
+	byte reserved_000[0x160];
+	struct tag_block waypoint_arrows;
+};
+
+struct hud_message_text_definition
+{
+	byte reserved_000[0x20];
+	struct tag_block messages;
+};
+
+struct hud_message_definition
+{
+	byte reserved[0x40];
+};
+
+struct hud_waypoint_arrow_definition
+{
+	byte reserved[0x68];
 };
 
 typedef void (*hs_token_enumerator)(
@@ -4964,6 +4995,21 @@ static void code_000b3490(
 	return;
 }
 
+void code_000b34d0(
+	short block_offset,
+	short name_offset,
+	long element_size)
+{
+	if (global_scenario_index != NONE)
+	{
+		struct tag_block const *block;
+
+		block = (struct tag_block const *)((byte const *)global_scenario_get() + block_offset);
+		code_000b3490(block, name_offset, element_size);
+	}
+	return;
+}
+
 void code_000b3500(
 	void)
 {
@@ -5014,6 +5060,32 @@ void code_000b35e0(
 		scripts = (struct tag_block const *)scenario;
 		scripts = (struct tag_block const *)((byte const *)scripts + offsetof(struct scenario, hs_scripts));
 		code_000b3490(scripts, 0, sizeof(struct hs_script));
+	}
+	return;
+}
+
+void code_000b3610(
+	void)
+{
+	short global_index;
+
+	for (global_index = 0; global_index<hs_external_global_count; global_index++)
+		code_000b33d0(hs_global_external_get(global_index)->name);
+
+	if (global_scenario_index != NONE)
+	{
+		struct scenario *scenario;
+		struct tag_block const *globals;
+
+		scenario = global_scenario_get();
+		globals = &scenario->hs_globals;
+		for (global_index = 0; global_index<globals->count; global_index++)
+		{
+			struct hs_global const *global;
+
+			global = TAG_BLOCK_GET_ELEMENT(globals, global_index, struct hs_global);
+			code_000b33d0(global->name);
+		}
 	}
 	return;
 }
@@ -5176,6 +5248,52 @@ void code_000b3870(
 		code_000b3490(recorded_animations, 0, sizeof(struct recorded_animation_definition));
 	}
 	return;
+}
+
+void code_000b38a0(
+	void)
+{
+	long hud_globals_index;
+
+	hud_globals_index = interface_get_tag_index(_interface_hud_globals);
+	if (hud_globals_index != NONE)
+	{
+		struct hud_globals_definition const *hud_globals;
+
+		hud_globals = hud_globals_definition_get(
+			interface_get_tag_index(_interface_hud_globals));
+		code_000b3490(
+			&hud_globals->waypoint_arrows,
+			0,
+			sizeof(struct hud_waypoint_arrow_definition));
+	}
+	return;
+}
+
+void code_000b38e0(
+	void)
+{
+	if (global_scenario_get()->hud_messages.index != NONE)
+	{
+		struct hud_message_text_definition const *hud_messages;
+
+		hud_messages = hud_message_text_definition_get(
+			global_scenario_get()->hud_messages.index);
+		code_000b3490(&hud_messages->messages, 0, sizeof(struct hud_message_definition));
+	}
+	return;
+}
+
+long code_000b3b10(
+	struct file_reference const *left,
+	struct file_reference const *right)
+{
+	char left_name[MAXIMUM_FILENAME_LENGTH+1];
+	char right_name[MAXIMUM_FILENAME_LENGTH+1];
+
+	file_reference_get_name(left, FLAG(_name_filename_bit), left_name);
+	file_reference_get_name(right, FLAG(_name_filename_bit), right_name);
+	return _stricmp(left_name, right_name);
 }
 
 long code_000b33b0(
