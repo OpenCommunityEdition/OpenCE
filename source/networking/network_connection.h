@@ -19,10 +19,21 @@ enum
 
 /* ---------- structures */
 
+struct network_connection;
+
 /* ---------- prototypes/EXAMPLE.C */
 
 void network_connection_initialize(
 	void);
+void network_connection_set_connection_rejection_procedure(
+	struct network_connection *connection,
+	void *connection_rejection_procedure);
+boolean network_connection_active(
+	struct network_connection *connection);
+boolean network_connection_going_stale(
+	struct network_connection *connection);
+void network_connection_keep_alive(
+	struct network_connection *connection);
 
 /* ---------- globals */
 
