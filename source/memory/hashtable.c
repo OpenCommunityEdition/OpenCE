@@ -66,6 +66,17 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+short default_hash_function(
+	const void *key,
+	unsigned long key_size);
+static boolean code_0010b270(
+	struct hashtable *table,
+	const void *key,
+	short *element_index);
+static void *code_0010b630(
+	struct hashtable *table,
+	const void *key);
+
 /* ---------- globals */
 
 short default_hash_polynomial[] =
@@ -122,4 +133,123 @@ void hashtable_delete(
 	return;
 }
 
+void *hashtable_get(
+	struct hashtable *table,
+	const void *key)
+{
+	void *result = NULL;
+	short element_index;
+
+	match_assert("c:\\halo\\SOURCE\\memory\\hashtable.c", 77, hashtable_valid(table));
+	if (table->count && code_0010b270(table, key, &element_index))
+	{
+		result = (byte *)dynamic_array_get_element(
+			&table->elements,
+			element_index,
+			table->element_size) + table->key_size;
+	}
+
+	return result;
+}
+
+void *hashtable_put(
+	struct hashtable *table,
+	const void *key)
+{
+	match_assert("c:\\halo\\SOURCE\\memory\\hashtable.c", 93, hashtable_valid(table));
+	if ((table->capacity_bits == NONE ||
+		table->count >= table->elements.count * table->load_factor) &&
+		!hashtable_grow(table, 1 + (table->capacity_bits == NONE)))
+	{
+		return NULL;
+	}
+
+	return code_0010b630(table, key);
+}
+
 /* ---------- private code */
+
+static boolean code_0010b270(
+	struct hashtable *table,
+	const void *key,
+	short *element_index_reference)
+{
+	short element_index;
+	short probe_count = 0;
+	long hash;
+	boolean equal;
+	void *element;
+
+	if (table->hash_function)
+	{
+		hash = table->hash_function(table->user_data, key);
+	}
+	else
+	{
+		hash = default_hash_function(key, table->key_size);
+	}
+
+	element_index = hash & (table->elements.count - 1);
+	while (BIT_VECTOR_TEST_FLAG(table->used_slots, element_index))
+	{
+		if (probe_count >= table->count)
+		{
+			break;
+		}
+
+		element = dynamic_array_get_element(
+			&table->elements,
+			element_index,
+			table->element_size);
+		if (table->compare_function)
+		{
+			equal = table->compare_function(table->user_data, element, key);
+		}
+		else
+		{
+			equal = !csmemcmp(element, key, table->key_size);
+		}
+
+		if (equal)
+		{
+			*element_index_reference = element_index;
+			return TRUE;
+		}
+
+		element_index = (element_index + 1) & (table->elements.count - 1);
+		probe_count++;
+	}
+
+	*element_index_reference = element_index;
+	return FALSE;
+}
+
+static void *code_0010b630(
+	struct hashtable *table,
+	const void *key)
+{
+	short element_index;
+	void *element = NULL;
+
+	if (code_0010b270(table, key, &element_index))
+	{
+		match_vassert(
+			"c:\\halo\\SOURCE\\memory\\hashtable.c",
+			241,
+			FALSE,
+			"putting key already in hashtable");
+	}
+	else
+	{
+		element = dynamic_array_get_element(
+			&table->elements,
+			element_index,
+			table->element_size);
+		csmemcpy(element, key, table->key_size);
+		BIT_VECTOR_SET_FLAG(table->used_slots, element_index, TRUE);
+		table->count++;
+		element = (byte *)element + table->key_size;
+	}
+
+	return element;
+}
