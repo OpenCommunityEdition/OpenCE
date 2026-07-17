@@ -28,10 +28,18 @@ struct cluster_partition
 
 /* ---------- prototypes/CLUSTER_PARTITIONS.C */
 
-void cluster_partition_new(struct cluster_partition *partition, char const *name);
-void cluster_partition_make_valid(struct cluster_partition *partition);
-void cluster_partition_make_invalid(struct cluster_partition *partition);
-void cluster_partition_delete(struct cluster_partition *partition);
+void cluster_partition_new(
+	struct cluster_partition *partition,
+	char const *name);
+void cluster_partition_make_valid(
+	struct cluster_partition *partition);
+void cluster_partition_make_invalid(
+	struct cluster_partition *partition);
+void cluster_partition_delete(
+	struct cluster_partition *partition);
+void cluster_partition_copy(
+	struct cluster_partition *result,
+	struct cluster_partition const *source);
 void cluster_partition_reconnect(
 	struct cluster_partition *partition,
 	long datum_index,

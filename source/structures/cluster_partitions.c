@@ -85,6 +85,9 @@ void reference_list_remove(
 	struct data_array *array,
 	long *first_reference_index,
 	long datum_index);
+void reference_list_copy(
+	struct data_array *result,
+	struct data_array *source);
 
 /* ---------- globals */
 
@@ -144,6 +147,64 @@ void cluster_partition_new(
 	{
 		error(_error_immediate, "couldn't allocate %s cluster partition globals", name);
 	}
+
+	return;
+}
+
+void cluster_partition_make_valid(
+	struct cluster_partition *partition)
+{
+	csmemset(
+		partition->cluster_first_data_references,
+		NONE,
+		MAXIMUM_CLUSTERS_PER_STRUCTURE * sizeof(*partition->cluster_first_data_references));
+	data_make_valid(partition->cluster_reference_data);
+	data_make_valid(partition->data_reference_data);
+
+	return;
+}
+
+void cluster_partition_make_invalid(
+	struct cluster_partition *partition)
+{
+	if (partition->cluster_reference_data->valid)
+		data_make_invalid(partition->cluster_reference_data);
+
+	if (partition->data_reference_data->valid)
+		data_make_invalid(partition->data_reference_data);
+
+	return;
+}
+
+void cluster_partition_delete(
+	struct cluster_partition *partition)
+{
+	if (partition->cluster_first_data_references)
+		partition->cluster_first_data_references = NULL;
+
+	if (partition->cluster_reference_data)
+		partition->cluster_reference_data = NULL;
+
+	if (partition->data_reference_data)
+		partition->data_reference_data = NULL;
+
+	return;
+}
+
+void cluster_partition_copy(
+	struct cluster_partition *result,
+	struct cluster_partition const *source)
+{
+	csmemcpy(
+		result->cluster_first_data_references,
+		source->cluster_first_data_references,
+		global_structure_bsp_get()->clusters.count * sizeof(*result->cluster_first_data_references));
+	reference_list_copy(
+		result->cluster_reference_data,
+		source->cluster_reference_data);
+	reference_list_copy(
+		result->data_reference_data,
+		source->data_reference_data);
 
 	return;
 }
