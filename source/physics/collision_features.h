@@ -99,9 +99,9 @@ void collision_features_from_vertex(
 	const struct collision_bsp *collision_bsp,
 	long vertex_index,
 	const real_matrix4x3 *transform,
+	real depth,
 	real radius,
 	long source_index,
-	long object_index,
 	struct collision_feature_list *features);
 void collision_features_from_surface(
 	const struct collision_bsp *collision_bsp,

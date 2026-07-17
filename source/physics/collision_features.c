@@ -85,10 +85,10 @@ symbols in this file:
 
 void collision_features_from_point(
 	const real_point3d *point,
+	real depth,
 	real radius,
 	long source_index,
 	long object_index,
-	long surface_index,
 	byte flags,
 	byte breakable_surface_index,
 	short material_index,
@@ -141,13 +141,77 @@ void render_debug_collision_cylinder(
 	return;
 }
 
+void collision_features_from_point(
+	const real_point3d *point,
+	real depth,
+	real radius,
+	long source_index,
+	long object_index,
+	byte flags,
+	byte breakable_surface_index,
+	short material_index,
+	struct collision_feature_list *features)
+{
+	short sphere_index = features->count[_collision_feature_sphere];
+
+	if (sphere_index < MAXIMUM_COLLISION_FEATURES_PER_TEST)
+	{
+		struct collision_feature_sphere *sphere = &features->spheres[sphere_index];
+		features->count[_collision_feature_sphere]++;
+		sphere->common.source_index = source_index;
+		sphere->common.object_index = object_index;
+		sphere->common.flags = flags;
+		sphere->common.material_index = material_index;
+		sphere->common.breakable_surface_index = breakable_surface_index;
+		sphere->center = *point;
+		sphere->radius = radius;
+	}
+
+	if (depth > 0.0f)
+	{
+		real lower_z = point->z - depth;
+		sphere_index = features->count[_collision_feature_sphere];
+		if (sphere_index < MAXIMUM_COLLISION_FEATURES_PER_TEST)
+		{
+			struct collision_feature_sphere *sphere = &features->spheres[sphere_index];
+			features->count[_collision_feature_sphere]++;
+			sphere->common.source_index = source_index;
+			sphere->common.object_index = object_index;
+			sphere->common.flags = flags;
+			sphere->common.breakable_surface_index = breakable_surface_index;
+			sphere->common.material_index = material_index;
+			set_real_point3d(&sphere->center, point->x, point->y, lower_z);
+			sphere->radius = radius;
+		}
+
+		{
+			short cylinder_index = features->count[_collision_feature_cylinder];
+			if (cylinder_index < MAXIMUM_COLLISION_FEATURES_PER_TEST)
+			{
+				struct collision_feature_cylinder *cylinder = &features->cylinders[cylinder_index];
+				features->count[_collision_feature_cylinder]++;
+				cylinder->common.source_index = source_index;
+				cylinder->common.object_index = object_index;
+				cylinder->common.flags = flags;
+				cylinder->common.breakable_surface_index = breakable_surface_index;
+				cylinder->common.material_index = material_index;
+				set_real_point3d(&cylinder->point, point->x, point->y, lower_z);
+				set_real_vector3d(&cylinder->height, 0.0f, 0.0f, depth);
+				cylinder->radius = radius;
+			}
+		}
+	}
+
+	return;
+}
+
 void collision_features_from_vertex(
 	const struct collision_bsp *collision_bsp,
 	long vertex_index,
 	const real_matrix4x3 *transform,
+	real depth,
 	real radius,
 	long source_index,
-	long object_index,
 	struct collision_feature_list *features)
 {
 	const struct collision_vertex *vertex = TAG_BLOCK_GET_ELEMENT(
@@ -162,13 +226,13 @@ void collision_features_from_vertex(
 		&collision_bsp->surfaces,
 		edge->surface_indices[0],
 		struct collision_surface);
-	long surface_index;
+	long object_index;
 	const real_point3d *point;
 	real_point3d transformed_point;
-	if (object_index != NONE)
-		surface_index = NONE;
+	if (source_index != NONE)
+		object_index = NONE;
 	else
-		surface_index = edge->surface_indices[0];
+		object_index = edge->surface_indices[0];
 
 	if (transform)
 		point = matrix4x3_transform_point(transform, &vertex->point, &transformed_point);
@@ -177,10 +241,10 @@ void collision_features_from_vertex(
 
 	collision_features_from_point(
 		point,
+		depth,
 		radius,
 		source_index,
 		object_index,
-		surface_index,
 		surface->flags,
 		surface->breakable_surface_index,
 		surface->material_index,
