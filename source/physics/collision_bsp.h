@@ -144,9 +144,18 @@ boolean collision_bsp_test_sphere(
 	struct collision_bsp const *bsp,
 	short breakable_surface_count,
 	byte const *breakable_surface_flags,
-	union real_point3d const *center,
+	real_point3d const *center,
 	real radius,
 	struct collision_bsp_test_sphere_result *result);
+boolean collision_bsp_test_vector(
+	unsigned long flags,
+	struct collision_bsp const *bsp,
+	short breakable_surface_count,
+	byte const *breakable_surface_flags,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real maximum_t,
+	struct collision_bsp_test_vector_result *result);
 
 /* ---------- globals */
 

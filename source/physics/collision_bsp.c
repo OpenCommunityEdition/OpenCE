@@ -79,6 +79,8 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "collision_bsp.h"
 #include "collision_bsp_definitions.h"
+#include "collision_usage.h"
+#include "scenario/scenario.h"
 #include "tag_files/tag_groups.h"
 
 /* ---------- constants */
@@ -121,6 +123,47 @@ struct collision_bsp_test_pill_context
 typedef char collision_bsp_test_pill_context_size_assert[
 	sizeof(struct collision_bsp_test_pill_context) == 0x22C ? 1 : -1];
 
+struct collision_bsp_test_sphere_context
+{
+	struct collision_bsp const *bsp;
+	short breakable_surface_count;
+	short pad;
+	byte const *breakable_surface_flags;
+	real_point3d const *center;
+	real radius;
+	struct collision_bsp_test_sphere_result *result;
+	long stack_depth;
+	long traversal_stack[131];
+};
+
+typedef char collision_bsp_test_sphere_context_size_assert[
+	sizeof(struct collision_bsp_test_sphere_context) == 0x228 ? 1 : -1];
+
+struct collision_bsp_test_vector_context
+{
+	unsigned long flags;
+	struct collision_bsp const *bsp;
+	short breakable_surface_count;
+	short pad;
+	byte const *breakable_surface_flags;
+	real_point3d const *point;
+	real_vector3d const *vector;
+	struct collision_bsp_test_vector_result *result;
+	long surface_index;
+	byte result_flags;
+	byte pad2[3];
+	long leaf_index;
+};
+
+typedef char collision_bsp_test_vector_context_size_assert[
+	sizeof(struct collision_bsp_test_vector_context) == 0x28 ? 1 : -1];
+
+struct collision_bsp_usage_times
+{
+	__int64 vector;
+	__int64 sphere;
+};
+
 /* ---------- prototypes */
 
 boolean code_00137c90(
@@ -131,8 +174,18 @@ boolean code_00137c90(
 boolean code_00138ed0(
 	struct collision_bsp_test_pill_context *context,
 	long node_index);
+void code_001383e0(
+	struct collision_bsp_test_sphere_context *context,
+	long node_index);
+boolean code_00138700(
+	struct collision_bsp_test_vector_context *context,
+	long node_index,
+	long stack_depth,
+	real maximum_t);
 
 /* ---------- globals */
+
+struct collision_bsp_usage_times bss_00456eb0 = { 0 };
 
 /* ---------- public code */
 
@@ -548,6 +601,76 @@ boolean collision_bsp_test_pill(
 	result->leaf_count = 0;
 
 	return code_00138ed0(&context, 0);
+}
+
+boolean collision_bsp_test_sphere(
+	struct collision_bsp const *bsp,
+	short breakable_surface_count,
+	byte const *breakable_surface_flags,
+	real_point3d const *center,
+	real radius,
+	struct collision_bsp_test_sphere_result *result)
+{
+	struct collision_bsp_test_sphere_context context;
+	short collision_function = 6 + (bsp == global_collision_bsp);
+
+	collision_log_usage(collision_function);
+	collision_log_start_time(&bss_00456eb0.sphere);
+
+	context.bsp = bsp;
+	context.breakable_surface_count = breakable_surface_count;
+	context.breakable_surface_flags = breakable_surface_flags;
+	context.center = center;
+	context.radius = radius;
+	context.result = result;
+	context.stack_depth = 0;
+	result->leaf_count = 0;
+	result->surface_count = 0;
+	result->edge_count = 0;
+	result->vertex_count = 0;
+
+	code_001383e0(&context, 0);
+	collision_log_end_time(collision_function, bss_00456eb0.sphere);
+
+	return result->surface_count > 0 || result->edge_count > 0;
+}
+
+boolean collision_bsp_test_vector(
+	unsigned long flags,
+	struct collision_bsp const *bsp,
+	short breakable_surface_count,
+	byte const *breakable_surface_flags,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real maximum_t,
+	struct collision_bsp_test_vector_result *result)
+{
+	struct collision_bsp_test_vector_context context;
+	short collision_function = 4 + (bsp == global_collision_bsp);
+	boolean return_value;
+	real t;
+
+	collision_log_usage(collision_function);
+	collision_log_start_time(&bss_00456eb0.vector);
+
+	context.flags = flags;
+	context.bsp = bsp;
+	context.breakable_surface_count = breakable_surface_count;
+	context.breakable_surface_flags = breakable_surface_flags;
+	context.point = point;
+	context.vector = vector;
+	context.result = result;
+	result->t = maximum_t < 0.f ? 0.f : maximum_t;
+	context.surface_index = NONE;
+	context.leaf_index = NONE;
+	result->leaf_count = 0;
+	context.result_flags = 0;
+
+	t = PIN(maximum_t, 0.f, 1.f);
+	return_value = code_00138700(&context, 0, 0, t);
+	collision_log_end_time(collision_function, bss_00456eb0.vector);
+
+	return return_value;
 }
 
 /* ---------- private code */
