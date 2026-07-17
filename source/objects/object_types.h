@@ -104,6 +104,8 @@ boolean object_type_new(long object_index);
 void object_type_place(long object_index, struct scenario_object_datum *scenario_object);
 
 void object_type_handle_deleted_object(long object_index, long deleted_object_index);
+void object_type_handle_region_destroyed(long object_index, short region_index, unsigned long damage_flags);
+boolean object_type_handle_parent_destroyed(long object_index);
 
 void object_type_delete(long object_index);
 boolean object_type_update(long object_index);
@@ -113,6 +115,8 @@ void object_type_preprocess_node_orientations(long object_index, struct real_ori
 void object_type_postprocess_node_matrices(long object_index, struct real_matrix4x3 *node_matrices);
 void object_type_reset(long object_index);
 void object_type_disconnect_from_structure_bsp(long object_index);
+void object_type_render_debug(long object_index);
+void object_type_notify_impulse_sound(long object_index, long sound_index, long source_object_index);
 
 struct tag_block *scenario_get_object_type_scenario_datums(struct scenario *scenario, short object_type, long *size);
 struct tag_block *scenario_get_object_type_scenario_palette(struct scenario *scenario, short object_type);

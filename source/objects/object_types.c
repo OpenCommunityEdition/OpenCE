@@ -405,6 +405,47 @@ void object_type_handle_deleted_object(
 	return;
 }
 
+void object_type_handle_region_destroyed(
+	long object_index,
+	short region_index,
+	unsigned long damage_flags)
+{
+	short i;
+	struct object_type_definition *definition = object_type_definition_get(object_get(object_index)->object.type);
+
+	for (i = 0; definition->part_definitions[i]; i++)
+	{
+		struct object_type_definition *current_definition = definition->part_definitions[i];
+		if (current_definition->handle_region_destroyed)
+		{
+			current_definition->handle_region_destroyed(object_index, region_index, damage_flags);
+		}
+	}
+
+	return;
+}
+
+boolean object_type_handle_parent_destroyed(
+	long object_index)
+{
+	short i;
+	boolean result;
+	struct object_type_definition *definition = object_type_definition_get(object_get(object_index)->object.type);
+	result = FALSE;
+
+	for (i = 0; definition->part_definitions[i]; i++)
+	{
+		struct object_type_definition *current_definition = definition->part_definitions[i];
+		if (current_definition->handle_parent_destroyed &&
+			current_definition->handle_parent_destroyed(object_index))
+		{
+			result = TRUE;
+		}
+	}
+
+	return result;
+}
+
 void object_type_preprocess_node_orientations(
 	long object_index,
 	struct real_orientation *node_orientations)
@@ -455,6 +496,62 @@ void object_type_disconnect_from_structure_bsp(
 		if (current_definition->disconnect_from_structure_bsp)
 		{
 			current_definition->disconnect_from_structure_bsp(object_index);
+		}
+	}
+
+	return;
+}
+
+void object_type_reset(
+	long object_index)
+{
+	short i;
+	struct object_type_definition *definition = object_type_definition_get(object_get(object_index)->object.type);
+
+	for (i = 0; definition->part_definitions[i]; i++)
+	{
+		struct object_type_definition *current_definition = definition->part_definitions[i];
+		if (current_definition->reset)
+		{
+			current_definition->reset(object_index);
+		}
+	}
+
+	return;
+}
+
+void object_type_render_debug(
+	long object_index)
+{
+	short i;
+	struct object_type_definition *definition = object_type_definition_get(object_get(object_index)->object.type);
+
+	for (i = 0; definition->part_definitions[i]; i++)
+	{
+		struct object_type_definition *current_definition = definition->part_definitions[i];
+		if (current_definition->render_debug)
+		{
+			current_definition->render_debug(object_index);
+		}
+	}
+
+	return;
+}
+
+void object_type_notify_impulse_sound(
+	long object_index,
+	long sound_index,
+	long source_object_index)
+{
+	short i;
+	struct object_type_definition *definition = object_type_definition_get(object_get(object_index)->object.type);
+
+	for (i = 0; definition->part_definitions[i]; i++)
+	{
+		struct object_type_definition *current_definition = definition->part_definitions[i];
+		if (current_definition->notify_impulse_sound)
+		{
+			current_definition->notify_impulse_sound(object_index, sound_index, source_object_index);
 		}
 	}
 
