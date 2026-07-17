@@ -96,6 +96,30 @@ void data_encode_new(
 	return;
 }
 
+boolean data_encode_string(
+	struct data_encoding_state *state,
+	char const *string,
+	short maximum_length)
+{
+	short string_length = (short)strnlen(string, maximum_length);
+	char *destination = state->buffer + state->offset;
+
+	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 182, state->offset+string_length+1<=state->buffer_size);
+
+	if (state->offset + string_length + 1 <= state->buffer_size && !state->overflow)
+	{
+		csstrncpy(destination, string, string_length);
+		destination[string_length] = 0;
+		state->offset += string_length + 1;
+	}
+	else
+	{
+		state->overflow = TRUE;
+	}
+
+	return !state->overflow;
+}
+
 void data_decode_new(
 	struct data_encoding_state *state,
 	void const *buffer,

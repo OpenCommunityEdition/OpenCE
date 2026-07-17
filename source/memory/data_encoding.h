@@ -41,10 +41,10 @@ void data_encode_integer(
 	long value,
 	long maximum_value);
 
-void data_encode_string(
+boolean data_encode_string(
 	struct data_encoding_state *state,
 	char const *string,
-	long maximum_length);
+	short maximum_length);
 
 void data_decode_new(
 	struct data_encoding_state *state,
