@@ -102,6 +102,9 @@ void code_0010bfa0(
 	short value);
 void code_0010bfb0(
 	short *reference);
+static void code_0010bfc0(
+	struct lrar_cache *cache,
+	struct lrar_cache_block *block);
 static void code_0010bfe0(
 	struct lrar_cache *cache,
 	struct lrar_cache_block *block);
@@ -128,6 +131,19 @@ void code_0010bfb0(
 	short *reference)
 {
 	*reference = NONE;
+
+	return;
+}
+
+static void code_0010bfc0(
+	struct lrar_cache *cache,
+	struct lrar_cache_block *block)
+{
+	if (block->user_data)
+	{
+		cache->unlock_proc(block->user_data);
+		block->user_data = NULL;
+	}
 
 	return;
 }
@@ -251,11 +267,7 @@ void lrar_flush(
 	while (block_index != NONE)
 	{
 		block = code_0010c280(cache, block_index);
-		if (block->user_data)
-		{
-			cache->unlock_proc(block->user_data);
-			block->user_data = NULL;
-		}
+		code_0010bfc0(cache, block);
 
 		if (block_index == cache->last_block_index)
 		{
@@ -273,6 +285,126 @@ void lrar_flush(
 	cache->last_block_index = NONE;
 
 	return;
+}
+
+short lrar_allocate(
+	struct lrar_cache *cache,
+	long size,
+	void *user_data)
+{
+	short new_block_index = NONE;
+	short block_index;
+	short next_block_index;
+	unsigned long search_address;
+	unsigned long adjusted_new_block_address;
+	unsigned long alignment_mask;
+	struct lrar_cache_block *block;
+	struct lrar_cache_block *new_block;
+	struct lrar_cache_block *test_block;
+
+	code_0010c040(cache);
+	alignment_mask = FLAG(cache->alignment_bit)-1;
+	if (size&alignment_mask)
+	{
+		size = (size|alignment_mask)+1;
+	}
+
+	if (size >= 0 && size <= cache->total_size)
+	{
+		block_index = cache->first_block_index;
+		new_block_index = cache->last_block_index == NONE ? 0 : cache->last_block_index+1;
+		next_block_index = block_index;
+		if (new_block_index >= cache->block_count)
+		{
+			new_block_index = 0;
+		}
+
+		for (;;)
+		{
+			if (cache->last_block_index == NONE)
+			{
+				search_address = cache->minimum_address;
+			}
+			else
+			{
+				block = code_0010c280(cache, cache->last_block_index);
+				search_address = block->address+block->size;
+			}
+
+			adjusted_new_block_address = search_address;
+			if (cache->boundary_bit != NONE)
+			{
+				unsigned long boundary = FLAG(cache->boundary_bit);
+				unsigned long boundary_mask = ~(boundary-1);
+				unsigned long aligned_base = search_address&boundary_mask;
+
+				block_index = next_block_index;
+				if (aligned_base != ((search_address+size)&boundary_mask))
+				{
+					adjusted_new_block_address = aligned_base+boundary;
+				}
+			}
+
+			if (block_index != NONE)
+			{
+				block = code_0010c280(cache, block_index);
+				while (block_index == new_block_index ||
+					(search_address <= block->address &&
+					block->address < adjusted_new_block_address+size))
+				{
+					code_0010bfc0(cache, block);
+					block->signature = NONE;
+					next_block_index = block_index+1;
+					if (next_block_index >= cache->block_count)
+					{
+						next_block_index = 0;
+					}
+
+					block = code_0010c280(cache, next_block_index);
+					block_index = next_block_index;
+				}
+			}
+
+			if (adjusted_new_block_address+size <= cache->maximum_address)
+			{
+				break;
+			}
+
+			cache->last_block_index = NONE;
+		}
+
+		new_block = &cache->blocks[new_block_index];
+		match_assert(
+			"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+			0x111,
+			adjusted_new_block_address>=cache->minimum_address &&
+			adjusted_new_block_address+size<=cache->maximum_address);
+
+		for (block_index = 0; block_index < cache->block_count; block_index++)
+		{
+			test_block = &cache->blocks[block_index];
+			if (test_block->signature == _lrar_block_signature &&
+				adjusted_new_block_address < test_block->address+test_block->size &&
+				test_block->address < adjusted_new_block_address+size)
+			{
+				match_assert(
+					"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+					0x11C,
+					adjusted_new_block_address>=test_block->address+test_block->size ||
+					adjusted_new_block_address+size<=test_block->address);
+			}
+		}
+
+		new_block->size = size;
+		new_block->signature = _lrar_block_signature;
+		new_block->address = adjusted_new_block_address;
+		new_block->user_data = user_data;
+		cache->lock_proc(user_data, new_block_index);
+		cache->last_block_index = new_block_index;
+		cache->first_block_index = next_block_index == NONE ? new_block_index : next_block_index;
+	}
+
+	return new_block_index;
 }
 
 unsigned long lrar_block_address(
@@ -306,11 +438,7 @@ void lrar_deallocate(
 		block_index>=0 && block_index<cache->block_count);
 	block = &cache->blocks[block_index];
 	code_0010bfe0(cache, block);
-	if (block->user_data)
-	{
-		cache->unlock_proc(block->user_data);
-		block->user_data = NULL;
-	}
+	code_0010bfc0(cache, block);
 
 	return;
 }

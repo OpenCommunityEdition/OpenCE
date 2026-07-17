@@ -37,6 +37,10 @@ void lrar_dispose(
 	struct lrar_cache *cache);
 void lrar_flush(
 	struct lrar_cache *cache);
+short lrar_allocate(
+	struct lrar_cache *cache,
+	long size,
+	void *user_data);
 unsigned long lrar_block_address(
 	struct lrar_cache *cache,
 	short block_index);
