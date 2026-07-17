@@ -277,6 +277,27 @@ symbols in this file:
 
 extern boolean hs_model_animation_compression_enabled;
 
+typedef char verify_animation_size[
+	sizeof(struct animation) == 0xB4 ? 1 : -1];
+typedef char verify_animation_frame_count_offset[
+	offsetof(struct animation, frame_count) == 0x22 ? 1 : -1];
+typedef char verify_animation_frame_size_offset[
+	offsetof(struct animation, frame_size) == 0x24 ? 1 : -1];
+typedef char verify_animation_flags_offset[
+	offsetof(struct animation, flags) == 0x3A ? 1 : -1];
+typedef char verify_animation_frame_info_offset[
+	offsetof(struct animation, frame_info) == 0x48 ? 1 : -1];
+typedef char verify_animation_compressed_data_offset_offset[
+	offsetof(struct animation, compressed_data_offset) == 0x88 ? 1 : -1];
+typedef char verify_animation_data_offset[
+	offsetof(struct animation, data) == 0xA0 ? 1 : -1];
+typedef char verify_animation_list_entry_size[
+	sizeof(struct animation_list_entry) == 0x08 ? 1 : -1];
+typedef char verify_animation_list_size[
+	sizeof(struct animation_list) == 0x08 ? 1 : -1];
+typedef char verify_animation_list_animations_offset[
+	offsetof(struct animation_list, animations) == 0x04 ? 1 : -1];
+
 struct animation_list_entry data_00309e80[] =
 {
 	{ "reload-1", _animation_replacement },
