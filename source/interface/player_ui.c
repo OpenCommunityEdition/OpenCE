@@ -140,16 +140,181 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "player_ui.h"
+
 /* ---------- constants */
+
+enum
+{
+	NUMBER_OF_LOCAL_PLAYERS = 4,
+	PLAYER_UI_DISPOSE_SIZE = 0x230,
+	SAVED_GAME_FILE_TYPE_PLAYER_PROFILE = 0,
+	SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE = 1
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct player_ui_local_player
+{
+	byte unknown0[0x29];
+	byte joystick_set;
+	byte unknown2A;
+	boolean look_pitch_inverted;
+	byte unknown2C[4];
+	long active_profile_index;
+	boolean autojoin_next_multiplayer_game;
+	byte unknown35[3];
+};
+
+struct player_ui_globals
+{
+	struct player_ui_local_player local_players[NUMBER_OF_LOCAL_PLAYERS];
+	boolean multiplayer_autojoin[NUMBER_OF_LOCAL_PLAYERS];
+	short single_player_controller[NUMBER_OF_LOCAL_PLAYERS];
+	byte unknownEC[0x68];
+	boolean multiplayer_variant_specified;
+	byte unknown155[3];
+	long edit_profile_index;
+	byte edit_profile[0xD4];
+	byte unknown230[0x100];
+};
+
 /* ---------- prototypes */
+
+void game_connection_set(
+	short connection);
+void game_engine_dispose(
+	void);
+void game_set_game_variant(
+	struct game_variant *variant);
+short saved_game_file_get_type(
+	long profile_index);
 
 /* ---------- globals */
 
+struct player_ui_globals player_ui_globals = { 0 };
+
 /* ---------- public code */
 
+void player_ui_dispose(
+	void)
+{
+	csmemset(&player_ui_globals, 0, PLAYER_UI_DISPOSE_SIZE);
+	return;
+}
+
+void player_ui_reset_single_player_local_player_controllers(
+	void)
+{
+	csmemset(
+		player_ui_globals.single_player_controller,
+		NONE,
+		sizeof(player_ui_globals.single_player_controller));
+	return;
+}
+
+short player_ui_get_single_player_local_player_from_controller(
+	short controller_index)
+{
+	short local_player_index;
+	short result;
+
+	result = NONE;
+	for (local_player_index = 0; local_player_index < NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
+	{
+		if (player_ui_globals.single_player_controller[local_player_index] == controller_index)
+		{
+			result = local_player_index;
+			break;
+		}
+	}
+	return result;
+}
+
+void player_ui_autojoin_players_to_next_multiplayer_game(
+	void)
+{
+	player_ui_globals.local_players[0].autojoin_next_multiplayer_game = player_ui_globals.multiplayer_autojoin[0];
+	player_ui_globals.local_players[1].autojoin_next_multiplayer_game = player_ui_globals.multiplayer_autojoin[1];
+	player_ui_globals.local_players[2].autojoin_next_multiplayer_game = player_ui_globals.multiplayer_autojoin[2];
+	player_ui_globals.local_players[3].autojoin_next_multiplayer_game = player_ui_globals.multiplayer_autojoin[3];
+	return;
+}
+
+void player_ui_clear_multiplayer_variant(
+	void)
+{
+	player_ui_globals.multiplayer_variant_specified = FALSE;
+	game_connection_set(0);
+	game_engine_dispose();
+	game_set_game_variant(NULL);
+	return;
+}
+
+long player_ui_get_active_player_profile_index(
+	short local_player_index)
+{
+	long result;
+
+	if (local_player_index >= 0 && local_player_index < NUMBER_OF_LOCAL_PLAYERS)
+		result = player_ui_globals.local_players[local_player_index].active_profile_index;
+	else
+		result = NONE;
+	return result;
+}
+
+struct player_profile *player_ui_get_edit_player_profile(
+	void)
+{
+	struct player_profile *result;
+
+	if (saved_game_file_get_type(player_ui_globals.edit_profile_index) == SAVED_GAME_FILE_TYPE_PLAYER_PROFILE)
+		result = (struct player_profile *)player_ui_globals.edit_profile;
+	else
+		result = NULL;
+	return result;
+}
+
+struct playlist_profile *player_ui_get_edit_playlist_profile(
+	void)
+{
+	struct playlist_profile *result;
+
+	if (saved_game_file_get_type(player_ui_globals.edit_profile_index) == SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE)
+		result = (struct playlist_profile *)player_ui_globals.edit_profile;
+	else
+		result = NULL;
+	return result;
+}
+
+boolean player0_look_pitch_is_inverted(
+	void)
+{
+	return player_ui_globals.local_players[0].look_pitch_inverted;
+}
+
+boolean player0_joystick_set_is_normal(
+	void)
+{
+	return player_ui_globals.local_players[0].joystick_set == 0 ||
+		player_ui_globals.local_players[0].joystick_set == 1;
+}
+
+void player_ui_end_editing_profile(
+	void)
+{
+	player_ui_globals.edit_profile_index = NONE;
+	return;
+}
+
 /* ---------- private code */
+
+void code_000d0800(
+	void)
+{
+	player_ui_globals.edit_profile_index = NONE;
+	return;
+}
