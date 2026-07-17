@@ -4121,12 +4121,57 @@ void sound_enable(
 void vehicle_hover(
 	long vehicle_index,
 	boolean hover);
+void hs_runtime_dispose_from_old_map(
+	void);
+void object_lists_dispose(
+	void);
+boolean game_safe_to_save(
+	void);
+boolean game_all_quiet(
+	void);
+boolean game_safe_to_speak(
+	void);
+boolean game_is_cooperative(
+	void);
+boolean main_saving_map(
+	void);
+boolean game_state_reverted(
+	void);
 
 /* ---------- globals */
 
 byte bss_00453468[0x12] = { 0 };
 
 /* ---------- public code */
+
+void hs_dispose(
+	void)
+{
+	hs_runtime_dispose_from_old_map();
+	object_lists_dispose();
+	return;
+}
+
+void hs_recompile(
+	void)
+{
+	bss_00453468[0x10] = TRUE;
+	return;
+}
+
+long code_000b33b0(
+	char const **left,
+	char const **right)
+{
+	return _stricmp(*left, *right);
+}
+
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b18c0, game_safe_to_save)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b18f0, game_all_quiet)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b1920, game_safe_to_speak)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b1950, game_is_cooperative)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b1a00, main_saving_map)
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(code_000b1bb0, game_state_reverted)
 
 HS_EVALUATE_NO_ARGUMENTS(code_000ad5f0, hs_object_destroy_all)
 HS_EVALUATE_NO_ARGUMENTS(code_000ada90, numeric_countdown_timer_stop)

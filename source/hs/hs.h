@@ -16,6 +16,12 @@ header included in hcex build.
 
 /* ---------- prototypes/HS.C */
 
+void hs_dispose(
+	void);
+
+void hs_recompile(
+	void);
+
 boolean hs_compile_and_evaluate(const char *expression);
 
 short hs_tokens_enumerate(char const *substring, long type_flags, char const **results, short maximum_count);
