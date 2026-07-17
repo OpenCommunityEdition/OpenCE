@@ -179,8 +179,16 @@ unsigned long file_get_eof(const struct file_reference *file);
 boolean file_set_eof(const struct file_reference *file, unsigned long position);
 boolean file_read(const struct file_reference *file, unsigned long count, void *buffer);
 boolean file_write(const struct file_reference *file, unsigned long count, const void *buffer);
-boolean file_read_from_position(const struct file_reference *file, unsigned long position, unsigned long count, void *buffer);
-// file_write_to_position
+boolean file_read_from_position(
+	struct file_reference const *file,
+	unsigned long position,
+	unsigned long count,
+	void *buffer);
+boolean file_write_to_position(
+	struct file_reference const *file,
+	unsigned long position,
+	unsigned long count,
+	void const *buffer);
 // file_get_last_modification_date
 // file_get_size
 boolean find_files_next(struct file_reference *file, struct file_last_modification_date *date);

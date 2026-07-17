@@ -231,4 +231,22 @@ boolean file_read_only(
 	return read_only;
 }
 
+boolean file_read_from_position(
+	struct file_reference const *file,
+	unsigned long position,
+	unsigned long count,
+	void *buffer)
+{
+	return file_set_position(file, position) && file_read(file, count, buffer);
+}
+
+boolean file_write_to_position(
+	struct file_reference const *file,
+	unsigned long position,
+	unsigned long count,
+	void const *buffer)
+{
+	return file_set_position(file, position) && file_write(file, count, buffer);
+}
+
 /* ---------- private code */
