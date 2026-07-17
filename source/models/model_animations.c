@@ -158,8 +158,22 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void quaternion_decompress_6byte(
+	void const *compressed,
+	real_quaternion *quaternion);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+void quaternion_decompress_6byte_renormalized(
+	void const *compressed,
+	real_quaternion *quaternion)
+{
+	quaternion_decompress_6byte(compressed, quaternion);
+	quaternion_normalize(quaternion);
+
+	return;
+}
 
 /* ---------- private code */

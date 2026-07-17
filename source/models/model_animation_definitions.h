@@ -231,6 +231,9 @@ void interpolate_node_orientations(
 	struct real_orientation *target_node_orientations,
 	short frame_index,
 	short frame_count);
+void quaternion_decompress_6byte_renormalized(
+	void const *compressed,
+	real_quaternion *quaternion);
 
 
 /* ---------- globals */
