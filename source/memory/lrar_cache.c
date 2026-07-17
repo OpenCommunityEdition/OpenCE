@@ -50,16 +50,186 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "cseries/errors.h"
+#include "lrar_cache.h"
+
 /* ---------- constants */
+
+enum
+{
+	_lrar_cache_signature = 0x6C726172,
+	_lrar_block_signature = 0x52626C6B,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct lrar_cache_block
+{
+	void *user_data;
+	unsigned long signature;
+	unsigned long address;
+	long size;
+};
+
+struct lrar_cache
+{
+	char name[32];
+	short alignment_bit;
+	short boundary_bit;
+	unsigned long minimum_address;
+	unsigned long maximum_address;
+	long total_size;
+	struct lrar_cache_block *blocks;
+	short first_block_index;
+	short last_block_index;
+	short block_count;
+	short __pad3A;
+	lrar_lock_proc lock_proc;
+	lrar_unlock_proc unlock_proc;
+	unsigned long signature;
+};
+
+typedef char lrar_cache_size_assert[sizeof(struct lrar_cache) == 0x48 ? 1 : -1];
+typedef char lrar_cache_block_size_assert[sizeof(struct lrar_cache_block) == 0x10 ? 1 : -1];
+
 /* ---------- prototypes */
+
+void code_0010bfa0(
+	short *reference,
+	short value);
+void code_0010bfb0(
+	short *reference);
+static void code_0010bfe0(
+	struct lrar_cache *cache,
+	struct lrar_cache_block *block);
+static void code_0010c040(
+	struct lrar_cache *cache);
 
 /* ---------- globals */
 
 /* ---------- public code */
 
+void code_0010bfa0(
+	short *reference,
+	short value)
+{
+	*reference = value;
+
+	return;
+}
+
+void code_0010bfb0(
+	short *reference)
+{
+	*reference = NONE;
+
+	return;
+}
+
+void lrar_dispose(
+	struct lrar_cache *cache)
+{
+	code_0010c040(cache);
+	debug_free(
+		cache->blocks,
+		"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+		0x98);
+	debug_free(
+		cache,
+		"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+		0x99);
+
+	return;
+}
+
+unsigned long lrar_block_address(
+	struct lrar_cache *cache,
+	short block_index)
+{
+	struct lrar_cache_block *block;
+
+	code_0010c040(cache);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+		0x16E,
+		block_index>=0 && block_index<cache->block_count);
+	block = &cache->blocks[block_index];
+	code_0010bfe0(cache, block);
+
+	return block->address;
+}
+
+void lrar_deallocate(
+	struct lrar_cache *cache,
+	short block_index)
+{
+	struct lrar_cache_block *block;
+
+	code_0010c040(cache);
+	code_0010c040(cache);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+		0x16E,
+		block_index>=0 && block_index<cache->block_count);
+	block = &cache->blocks[block_index];
+	code_0010bfe0(cache, block);
+	if (block->user_data)
+	{
+		cache->unlock_proc(block->user_data);
+		block->user_data = NULL;
+	}
+
+	return;
+}
+
 /* ---------- private code */
+
+static void code_0010bfe0(
+	struct lrar_cache *cache,
+	struct lrar_cache_block *block)
+{
+	boolean valid =
+		block->signature == _lrar_block_signature &&
+		block->size >= 0 &&
+		block->size < cache->total_size &&
+		block->address >= cache->minimum_address &&
+		block->address + block->size <= cache->maximum_address;
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+		0x186,
+		valid,
+		csprintf(
+			temporary,
+			"lrar cache %s @%p block @%p appears to be corrupt",
+			cache,
+			cache,
+			block));
+
+	return;
+}
+
+static void code_0010c040(
+	struct lrar_cache *cache)
+{
+	boolean valid =
+		cache->signature == _lrar_cache_signature &&
+		cache->minimum_address < cache->maximum_address &&
+		cache->total_size > 0 &&
+		cache->block_count > 0;
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+		0x199,
+		valid,
+		csprintf(
+			temporary,
+			"lrar cache %s @%p appears to be corrupt",
+			cache,
+			cache));
+
+	return;
+}
