@@ -126,11 +126,17 @@ symbols in this file:
 #include "cseries_windows.h"
 #include "errors.h"
 #include "tag_files/tag_groups.h"
+#include "tag_files/files.h"
 #include "cache_files.h"
+#include "scenario/scenario_definitions.h"
 
 /* ---------- constants */
 
 /* ---------- macros */
+
+#define STRUCTURE_BSP_TAG 'sbsp'
+#define CACHE_FILE_HEADER_SIGNATURE 'head'
+#define CACHE_FILE_FOOTER_SIGNATURE 'foot'
 
 /* ---------- structures */
 
@@ -146,8 +152,35 @@ struct cache_file_tag_instance
 
 struct cache_file_tag_header
 {
-	byte reserved0[0xC];
+	struct cache_file_tag_instance *tag_instances;
+	long scenario_tag_index;
+	unsigned long checksum;
 	long tag_count;
+	long vertex_buffer_count;
+	void *vertex_buffers;
+	long index_buffer_count;
+	void *index_buffers;
+};
+
+struct cache_file_structure_bsp_header
+{
+	void *base_address;
+	long vertex_buffer_count;
+	void *vertex_buffers;
+	long index_buffer_count;
+	void *index_buffers;
+};
+
+struct cache_file_header
+{
+	unsigned long header_signature;
+	long version;
+	long file_length;
+	byte reservedC[0x14];
+	char name[0x20];
+	char build[0x20];
+	byte reserved60[0x79C];
+	unsigned long footer_signature;
 };
 
 struct cache_file_globals
@@ -157,7 +190,7 @@ struct cache_file_globals
 	unsigned long checksum;
 	byte reserved6C[0x798];
 	struct cache_file_tag_header *tag_header;
-	void *structure_bsp_header;
+	struct cache_file_structure_bsp_header *structure_bsp_header;
 };
 
 typedef char verify_cache_file_tag_instance_size[
@@ -168,6 +201,8 @@ typedef char verify_cache_file_tag_header_count_offset[
 
 typedef char verify_cache_file_globals_size[
 	sizeof(struct cache_file_globals) == 0x80C ? 1 : -1];
+typedef char verify_cache_file_header_size[
+	sizeof(struct cache_file_header) == 0x800 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -177,11 +212,38 @@ void cache_files_dispose(
 	void);
 void cache_files_initialize(
 	void);
+void sound_cache_close(
+	void);
+void texture_cache_close(
+	void);
+void cache_file_close(
+	void);
+void tags_header_deregister_vertex_and_index_buffers(
+	struct cache_file_tag_header *header);
+void structure_bsp_header_deregister_vertex_buffers(
+	struct cache_file_structure_bsp_header *header);
+boolean cache_files_precache_map_loaded(
+	char const *map_name);
+boolean cache_files_precache_is_copying_map(
+	char const *map_name);
+void cache_files_precache_set_priority(
+	long priority);
+void display_error_damaged_media(
+	void);
 
 /* ---------- globals */
 
 struct cache_file_globals cache_file_globals;
 extern struct cache_file_tag_instance *global_tag_instances;
+char const *data_00316820[] =
+{
+	"d:\\maps_de\\",
+	"d:\\maps_fr\\",
+	"d:\\maps_es\\",
+	"d:\\maps_it\\",
+	"d:\\maps\\",
+	NULL
+};
 
 /* ---------- private code */
 
@@ -219,6 +281,69 @@ static struct cache_file_tag_instance *code_001a95d0(
 
 /* ---------- public code */
 
+char const *cache_files_map_directory(
+	void)
+{
+	char const *map_directory;
+	struct file_reference reference;
+	long directory_index;
+
+	switch (XGetLanguage())
+	{
+	case XC_LANGUAGE_GERMAN:
+		map_directory = "d:\\maps_de\\";
+		break;
+	case XC_LANGUAGE_FRENCH:
+		map_directory = "d:\\maps_fr\\";
+		break;
+	case XC_LANGUAGE_SPANISH:
+		map_directory = "d:\\maps_es\\";
+		break;
+	case XC_LANGUAGE_ITALIAN:
+		map_directory = "d:\\maps_it\\";
+		break;
+	default:
+		map_directory = "d:\\maps\\";
+		break;
+	}
+
+	if (!file_exists(file_reference_create_from_path(&reference, map_directory, TRUE)))
+	{
+		for (directory_index = 0; data_00316820[directory_index]; directory_index++)
+		{
+			if (file_exists(file_reference_create_from_path(
+				&reference,
+				data_00316820[directory_index],
+				TRUE)))
+			{
+				map_directory = data_00316820[directory_index];
+				break;
+			}
+		}
+
+		match_vassert(
+			"c:\\halo\\SOURCE\\cache\\cache_files.c",
+			60,
+			data_00316820[directory_index],
+			"no valid map directory exists");
+	}
+
+	return map_directory;
+}
+
+void scenario_tags_unload(
+	void)
+{
+	sound_cache_close();
+	texture_cache_close();
+	cache_file_close();
+	tags_header_deregister_vertex_and_index_buffers(cache_file_globals.tag_header);
+	cache_file_globals.tags_loaded = FALSE;
+	global_tag_instances = NULL;
+
+	return;
+}
+
 void tag_files_open(
 	void)
 {
@@ -241,10 +366,79 @@ unsigned long cache_files_get_checksum(
 	return cache_file_globals.checksum;
 }
 
+unsigned long tag_groups_checksum(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\cache_files.c",
+		327,
+		cache_file_globals.tags_loaded);
+
+	return cache_file_globals.tag_header->checksum;
+}
+
+long tag_loaded(
+	long group_tag,
+	char const *name)
+{
+	short absolute_index;
+	long result = NONE;
+
+	if (cache_file_globals.tags_loaded)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\cache\\cache_files.c",
+			346,
+			global_tag_instances);
+
+		for (absolute_index = 0;
+			absolute_index < cache_file_globals.tag_header->tag_count;
+			absolute_index++)
+		{
+			if (group_tag == global_tag_instances[absolute_index].group_tag &&
+				!_stricmp(name, global_tag_instances[absolute_index].name))
+			{
+				result = global_tag_instances[absolute_index].tag_index;
+				break;
+			}
+		}
+	}
+
+	return result;
+}
+
 void cache_files_enable_writes(
 	void)
 {
 	XPhysicalProtect((void *)0x803A6000, 0x01600000, PAGE_READWRITE);
+
+	return;
+}
+
+void cache_files_disable_writes(
+	void)
+{
+	XPhysicalProtect((void *)0x803A6000, 0x01600000, PAGE_READONLY);
+	XPhysicalProtect(
+		cache_file_globals.tag_header->vertex_buffers,
+		cache_file_globals.tag_header->vertex_buffer_count * 12,
+		PAGE_READWRITE);
+	XPhysicalProtect(
+		cache_file_globals.tag_header->index_buffers,
+		cache_file_globals.tag_header->index_buffer_count * 12,
+		PAGE_READWRITE);
+
+	if (cache_file_globals.structure_bsp_header)
+	{
+		XPhysicalProtect(
+			cache_file_globals.structure_bsp_header->vertex_buffers,
+			cache_file_globals.structure_bsp_header->vertex_buffer_count * 12,
+			PAGE_READWRITE);
+		XPhysicalProtect(
+			cache_file_globals.structure_bsp_header->index_buffers,
+			cache_file_globals.structure_bsp_header->index_buffer_count * 12,
+			PAGE_READWRITE);
+	}
 
 	return;
 }
@@ -329,6 +523,147 @@ void tag_iterator_new(
 {
 	iterator->absolute_index = 0;
 	iterator->group_tag = group_tag;
+
+	return;
+}
+
+long tag_iterator_next(
+	struct tag_iterator *iterator)
+{
+	long result = NONE;
+
+	while (iterator->absolute_index < cache_file_globals.tag_header->tag_count)
+	{
+		struct cache_file_tag_instance *tag_instance =
+			&global_tag_instances[iterator->absolute_index++];
+
+		if (tag_instance &&
+			(iterator->group_tag == NONE ||
+			iterator->group_tag == tag_instance->group_tag ||
+			iterator->group_tag == tag_instance->parent_group_tags[0] ||
+			iterator->group_tag == tag_instance->parent_group_tags[1]))
+		{
+			result = tag_instance->tag_index;
+			break;
+		}
+	}
+
+	return result;
+}
+
+boolean cache_file_header_verify(
+	struct cache_file_header *header,
+	char const *scenario_name,
+	boolean fatal)
+{
+	if (header->header_signature != CACHE_FILE_HEADER_SIGNATURE ||
+		header->footer_signature != CACHE_FILE_FOOTER_SIGNATURE ||
+		header->file_length < 0 ||
+		header->file_length > 0x11600000 ||
+		csstrlen(header->name) > 31)
+	{
+		if (fatal)
+		{
+			match_vassert(
+				"c:\\halo\\SOURCE\\cache\\cache_files.c",
+				544,
+				FALSE,
+				csprintf(temporary, "'%s' does not appear to be a cache file", scenario_name));
+		}
+
+		return FALSE;
+	}
+
+	if (header->version != 5)
+	{
+		if (fatal)
+		{
+			match_vassert(
+				"c:\\halo\\SOURCE\\cache\\cache_files.c",
+				548,
+				FALSE,
+				csprintf(temporary, "the cache file '%s' is an old version", scenario_name));
+		}
+
+		return FALSE;
+	}
+
+	if (csstrcmp(header->build, "01.01.14.2342"))
+	{
+		if (fatal)
+		{
+			match_vassert(
+				"c:\\halo\\SOURCE\\cache\\cache_files.c",
+				553,
+				FALSE,
+				csprintf(
+					temporary,
+					"the cache file '%s' belongs to a different build (%s)",
+					header->name,
+					header->build));
+		}
+
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+boolean cache_files_give_time_to_precache(
+	char const *map_name)
+{
+	boolean result = FALSE;
+
+	if (cache_files_precache_map_loaded(map_name))
+	{
+		result = TRUE;
+	}
+	else
+	{
+		if (cache_files_precache_in_progress() &&
+			!cache_files_precache_is_copying_map(map_name))
+		{
+			cache_files_precache_map_end();
+		}
+
+		if (cache_files_precache_in_progress())
+		{
+			real progress;
+			short status = cache_files_precache_map_status(&progress);
+
+			if (status == 2)
+				display_error_damaged_media();
+			else if (status == 1)
+				cache_files_precache_map_end();
+		}
+		else
+		{
+			cache_files_precache_set_priority(0);
+			if (!cache_files_precache_map_begin(map_name, FALSE))
+				display_error_damaged_media();
+		}
+	}
+
+	return result;
+}
+
+void scenario_structure_bsp_unload(
+	struct scenario_structure_bsp_reference *reference)
+{
+	struct cache_file_tag_instance *tag_instance;
+
+	structure_bsp_header_deregister_vertex_buffers(cache_file_globals.structure_bsp_header);
+	tag_instance = code_001a95d0(reference->structure_bsp.index);
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\cache_files.c",
+		256,
+		tag_instance->base_address);
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\cache_files.c",
+		257,
+		tag_instance->group_tag==STRUCTURE_BSP_TAG);
+	tag_instance->base_address = NULL;
+	cache_file_globals.structure_bsp_header = NULL;
 
 	return;
 }

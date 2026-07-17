@@ -38,6 +38,8 @@ const char *cache_files_map_directory(
 unsigned long cache_files_get_checksum(void);
 void cache_files_enable_writes(
 	void);
+void cache_files_disable_writes(
+	void);
 void scenario_structure_bsp_unload(
 	struct scenario_structure_bsp_reference *reference);
 void scenario_tags_unload(
@@ -74,6 +76,8 @@ void tag_reference_set(
 void tag_iterator_new(
 	struct tag_iterator *iterator,
 	long group_tag);
+long tag_iterator_next(
+	struct tag_iterator *iterator);
 
 /* ---------- prototypes/CACHE_FILES_WINDOWS.C */
 
@@ -83,7 +87,7 @@ short cache_files_precache_map_status(real *progress);
 
 void cache_files_precache_map_end(void);
 
-void cache_files_precache_map_begin(
+boolean cache_files_precache_map_begin(
 	char const *map_name,
 	boolean copy_map);
 
