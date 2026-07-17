@@ -119,6 +119,20 @@ __int64 data_decode_int64(
 	return (value = data_decode_memory(state, 1, -sizeof(*value))) ? *value : 0;
 }
 
+long data_decode_integer(
+	struct data_encoding_state *state,
+	long maximum_value)
+{
+	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 321, maximum_value>0);
+
+	if (maximum_value <= UNSIGNED_CHAR_MAX)
+		return data_decode_byte(state);
+	if (maximum_value <= UNSIGNED_SHORT_MAX)
+		return data_decode_short(state);
+
+	return data_decode_long(state);
+}
+
 char *data_decode_string(
 	struct data_encoding_state *state,
 	long maximum_length)
