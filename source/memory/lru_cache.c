@@ -96,6 +96,9 @@ void code_0010c800(
 static void code_0010c830(
 	struct lru_cache *cache,
 	struct lru_cache_block *block);
+static long code_0010c810(
+	struct lru_cache *cache,
+	struct lru_cache_block *block);
 static void code_0010c8b0(
 	struct lru_cache *cache);
 
@@ -348,6 +351,15 @@ void lru_touch(
 
 /* ---------- private code */
 
+static long code_0010c810(
+	struct lru_cache *cache,
+	struct lru_cache_block *block)
+{
+	code_0010c830(cache, block);
+
+	return (byte *)block-(byte *)cache->blocks;
+}
+
 static void code_0010c830(
 	struct lru_cache *cache,
 	struct lru_cache_block *block)
@@ -357,7 +369,7 @@ static void code_0010c830(
 
 	if ((block->flags & ~FLAG(0)) == _lru_block_signature && !block->unused)
 	{
-		code_0010c830(cache, block);
+		code_0010c810(cache, block);
 		offset = (byte *)block - (byte *)cache->blocks;
 		if (offset >= 0 &&
 			cache->block_size + offset <= cache->total_size &&
