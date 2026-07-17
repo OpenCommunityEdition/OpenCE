@@ -89,6 +89,15 @@ short collision_surface_polygon(
 	struct collision_bsp const *bsp,
 	long surface_index,
 	real_point3d *points);
+real collision_edge_length(
+	struct collision_bsp const *bsp,
+	long edge_index);
+real collision_surface_perimeter(
+	struct collision_bsp const *bsp,
+	long surface_index);
+real collision_surface_area(
+	struct collision_bsp const *bsp,
+	long surface_index);
 
 boolean collision_bsp_test_sphere(
 	struct collision_bsp const *bsp,

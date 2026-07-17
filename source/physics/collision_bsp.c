@@ -167,4 +167,136 @@ short collision_surface_polygon(
 	return point_count;
 }
 
+real collision_edge_length(
+	struct collision_bsp const *bsp,
+	long edge_index)
+{
+	struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(
+		&bsp->edges,
+		edge_index,
+		struct collision_edge);
+	struct collision_vertex const *vertex0 = TAG_BLOCK_GET_ELEMENT(
+		&bsp->vertices,
+		edge->vertex_indices[0],
+		struct collision_vertex);
+	struct collision_vertex const *vertex1 = TAG_BLOCK_GET_ELEMENT(
+		&bsp->vertices,
+		edge->vertex_indices[1],
+		struct collision_vertex);
+
+	return distance3d(&vertex0->point, &vertex1->point);
+}
+
+real collision_surface_perimeter(
+	struct collision_bsp const *bsp,
+	long surface_index)
+{
+	real perimeter = 0.f;
+	struct collision_surface const *surface = TAG_BLOCK_GET_ELEMENT(
+		&bsp->surfaces,
+		surface_index,
+		struct collision_surface);
+	long const first_edge_index = surface->first_edge_index;
+	long edge_index = first_edge_index;
+
+	do
+	{
+		struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(
+			&bsp->edges,
+			edge_index,
+			struct collision_edge);
+		boolean const reverse = edge->surface_indices[1] == surface_index;
+		struct collision_vertex const *vertex0 = TAG_BLOCK_GET_ELEMENT(
+			&bsp->vertices,
+			edge->vertex_indices[reverse],
+			struct collision_vertex);
+		struct collision_vertex const *vertex1 = TAG_BLOCK_GET_ELEMENT(
+			&bsp->vertices,
+			edge->vertex_indices[!reverse],
+			struct collision_vertex);
+
+		perimeter += distance3d(&vertex0->point, &vertex1->point);
+		edge_index = edge->edge_indices[reverse];
+	}
+	while (edge_index != first_edge_index);
+
+	return perimeter;
+}
+
+real collision_surface_area(
+	struct collision_bsp const *bsp,
+	long surface_index)
+{
+	real_plane3d plane;
+	real_vector3d p_vector;
+	real_vector3d q_vector;
+	real_vector3d cross;
+	struct collision_vertex const *anchor;
+	struct collision_vertex const *p;
+	struct collision_vertex const *q;
+	struct collision_surface const *surface;
+	struct collision_edge const *edge;
+	boolean reverse;
+	boolean owner;
+	real area = 0.f;
+
+	surface = TAG_BLOCK_GET_ELEMENT(
+		&bsp->surfaces,
+		surface_index,
+		struct collision_surface);
+	edge = TAG_BLOCK_GET_ELEMENT(
+		&bsp->edges,
+		surface->first_edge_index,
+		struct collision_edge);
+	reverse = edge->surface_indices[1] == surface_index;
+	anchor = TAG_BLOCK_GET_ELEMENT(
+		&bsp->vertices,
+		edge->vertex_indices[reverse],
+		struct collision_vertex);
+	bsp3d_get_plane_from_designator(
+		&bsp->bsp3d,
+		surface->plane_designator,
+		&plane);
+	edge = TAG_BLOCK_GET_ELEMENT(
+		&bsp->edges,
+		edge->edge_indices[reverse],
+		struct collision_edge);
+	owner = edge->surface_indices[1] == surface_index;
+	reverse = owner;
+
+	if (edge->edge_indices[reverse] != surface->first_edge_index)
+	{
+		do
+		{
+			p = TAG_BLOCK_GET_ELEMENT(
+				&bsp->vertices,
+				edge->vertex_indices[reverse],
+				struct collision_vertex);
+			q = TAG_BLOCK_GET_ELEMENT(
+				&bsp->vertices,
+				edge->vertex_indices[!owner],
+				struct collision_vertex);
+			vector_from_points3d(&anchor->point, &p->point, &p_vector);
+			vector_from_points3d(&anchor->point, &q->point, &q_vector);
+			cross_product3d(&p_vector, &q_vector, &cross);
+			area += dot_product3d(&cross, &plane.n);
+
+			edge = TAG_BLOCK_GET_ELEMENT(
+				&bsp->edges,
+				edge->edge_indices[reverse],
+				struct collision_edge);
+			owner = edge->surface_indices[1] == surface_index;
+			reverse = owner;
+		}
+		while (edge->edge_indices[reverse] != surface->first_edge_index);
+
+		if (area > 0.f)
+		{
+			return area;
+		}
+	}
+
+	return 0.f;
+}
+
 /* ---------- private code */
