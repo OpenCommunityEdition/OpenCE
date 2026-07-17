@@ -411,6 +411,23 @@ boolean fast_vector_intersects_sphere(real_point3d const *point, real_vector3d c
 boolean point_in_rectangle2d(real_point2d const *point, real_rectangle2d const *bounds);
 boolean point_in_rectangle3d(real_point3d const *point, real_rectangle3d const *bounds);
 
+boolean circle_intersects_rectangle2d(
+	real_point2d const *center,
+	real radius,
+	real_rectangle2d const *bounds);
+boolean point_in_cone2d(
+	real_point2d const *point,
+	real_point2d const *center,
+	real_vector2d const *direction,
+	real length,
+	real cosine);
+boolean point_in_sector2d(
+	real_point2d const *point,
+	real_point2d const *center,
+	real_vector2d const *direction,
+	real radius,
+	real cosine);
+
 boolean vector_intersects_rectangle2d(real_point2d const *point, real_vector2d const *vector, real_rectangle2d const *bounds);
 boolean vector_intersects_rectangle3d(real_point3d const *point, real_vector3d const *vector, real_rectangle3d const *bounds);
 boolean pill_intersects_rectangle3d(real_point3d const *base, real_vector3d const *height, real width, real_rectangle3d const *bounds);

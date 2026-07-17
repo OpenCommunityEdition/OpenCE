@@ -436,6 +436,112 @@ boolean point_in_rectangle3d(
 		&& point->z <= bounds->z1;
 }
 
+boolean circle_intersects_rectangle2d(
+	real_point2d const *center,
+	real radius,
+	real_rectangle2d const *bounds)
+{
+	real dx;
+	real dy;
+
+	if (center->x <= bounds->x1)
+	{
+		if (center->x < bounds->x0)
+		{
+			dx = bounds->x0 - center->x;
+		}
+		else
+		{
+			dx = 0.f;
+		}
+	}
+	else
+	{
+		dx = center->x - bounds->x1;
+	}
+
+	if (center->y <= bounds->y1)
+	{
+		if (center->y < bounds->y0)
+		{
+			dy = bounds->y0 - center->y;
+		}
+		else
+		{
+			dy = 0.f;
+		}
+	}
+	else
+	{
+		dy = center->y - bounds->y1;
+	}
+
+	return dx * dx + dy * dy <= radius * radius;
+}
+
+boolean point_in_cone2d(
+	real_point2d const *point,
+	real_point2d const *center,
+	real_vector2d const *direction,
+	real length,
+	real cosine)
+{
+	real_vector2d offset;
+	real projection;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\math\\real_math.c",
+		1375,
+		cosine>=0.0f);
+
+	vector_from_points2d(center, point, &offset);
+	projection = dot_product2d(&offset, direction);
+
+	return (boolean)(projection >= 0.f &&
+		projection <= length &&
+		projection * projection >= magnitude_squared2d(&offset) * cosine * cosine);
+}
+
+boolean point_in_sector2d(
+	real_point2d const *point,
+	real_point2d const *center,
+	real_vector2d const *direction,
+	real radius,
+	real cosine)
+{
+	real_vector2d offset;
+	real distance_squared;
+	real projection;
+	boolean result;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\math\\real_math.c",
+		1433,
+		cosine>=0.0f);
+
+	vector_from_points2d(center, point, &offset);
+	distance_squared = magnitude_squared2d(&offset);
+	if (distance_squared <= radius * radius)
+	{
+		projection = dot_product2d(&offset, direction);
+		if (projection >= 0.f &&
+			projection * projection >= distance_squared * cosine * cosine)
+		{
+			result = TRUE;
+		}
+		else
+		{
+			result = FALSE;
+		}
+	}
+	else
+	{
+		result = FALSE;
+	}
+
+	return result;
+}
+
 boolean vector_intersects_rectangle2d(
 	real_point2d const *point,
 	real_vector2d const *vector,
