@@ -172,5 +172,36 @@ FILE *ufopen(
 FILE *upopen(
 	wchar_t const *command,
 	wchar_t const *mode);
+wchar_t *ascii_to_wide(
+	char const *ascii,
+	wchar_t *unicode,
+	unsigned long size);
+wchar_t *ustrcat(
+	wchar_t *dest,
+	wchar_t const *src);
+long ustrcmp(
+	wchar_t const *string1,
+	wchar_t const *string2);
+long ustrcoll(
+	wchar_t const *string1,
+	wchar_t const *string2);
+unsigned long ustrcspn(
+	wchar_t const *string,
+	wchar_t const *character_set);
+wchar_t *ustrpbrk(
+	wchar_t const *string,
+	wchar_t const *character_set);
+unsigned long ustrspn(
+	wchar_t const *string,
+	wchar_t const *character_set);
+wchar_t *ustrstr(
+	wchar_t const *string,
+	wchar_t const *character_set);
+wchar_t *ustrnlwr(
+	wchar_t *string,
+	unsigned long count);
+wchar_t *ustrnupr(
+	wchar_t *string,
+	unsigned long count);
 
 #endif // __UNICODE_H
