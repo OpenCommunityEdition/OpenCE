@@ -91,6 +91,10 @@ void lruv_delete(
 void lruv_idle(
 	struct lruv_cache *cache);
 
+void lruv_block_delete(
+	struct lruv_cache *cache,
+	long block_index);
+
 void lruv_block_touch(
 	struct lruv_cache *cache,
 	long block_index);
@@ -102,6 +106,17 @@ void *lruv_block_get_address(
 boolean lruv_block_touched(
 	struct lruv_cache *cache,
 	long block_index);
+
+void lruv_cache_get_page_usage(
+	struct lruv_cache *cache,
+	byte *page_usage);
+
+void lruv_resize(
+	struct lruv_cache *cache,
+	long new_page_count);
+
+void lruv_flush(
+	struct lruv_cache *cache);
 
 /* ---------- globals */
 

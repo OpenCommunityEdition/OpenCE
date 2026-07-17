@@ -208,6 +208,54 @@ void lruv_idle(
 	return;
 }
 
+void lruv_block_delete(
+	struct lruv_cache *cache,
+	long block_index)
+{
+	struct lruv_cache_block *block;
+	struct lruv_cache_block *next_block;
+	struct lruv_cache_block *previous_block;
+
+	block = datum_get(cache->blocks, block_index);
+	code_0010cd70(cache, TRUE);
+
+	if (cache->delete_block_proc)
+		cache->delete_block_proc(block_index);
+
+	if (block->previous_block_index != NONE)
+	{
+		previous_block = datum_get(cache->blocks, block->previous_block_index);
+		previous_block->next_block_index = block->next_block_index;
+	}
+	else
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+			488,
+			cache->first_block_index==block_index);
+		cache->first_block_index = block->next_block_index;
+	}
+
+	if (block->next_block_index != NONE)
+	{
+		next_block = datum_get(cache->blocks, block->next_block_index);
+		next_block->previous_block_index = block->previous_block_index;
+	}
+	else
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+			501,
+			cache->last_block_index==block_index);
+		cache->last_block_index = block->previous_block_index;
+	}
+
+	datum_delete(cache->blocks, block_index);
+	code_0010cd70(cache, TRUE);
+
+	return;
+}
+
 void lruv_block_touch(
 	struct lruv_cache *cache,
 	long block_index)
@@ -245,6 +293,62 @@ boolean lruv_block_touched(
 	return block->last_used_tick == cache->tick;
 }
 
+void lruv_cache_get_page_usage(
+	struct lruv_cache *cache,
+	byte *page_usage)
+{
+	struct data_iterator iterator;
+	struct lruv_cache_block *block;
+	byte usage;
+
+	code_0010cd70(cache, TRUE);
+	csmemset(page_usage, 0, cache->page_count);
+
+	data_iterator_new(&iterator, cache->blocks);
+	while ((block = data_iterator_next(&iterator)) != NULL)
+	{
+		usage = 1;
+		if (cache->locked_block_proc && cache->locked_block_proc(iterator.datum_index))
+			usage |= 8;
+		if (block->last_used_tick == cache->tick)
+			usage |= 2;
+		if ((unsigned long)(block->last_used_tick + 30) < (unsigned long)cache->tick)
+			usage |= 4;
+
+		csmemset(
+			page_usage + block->first_page_index,
+			usage,
+			block->page_count);
+	}
+
+	return;
+}
+
+void lruv_resize(
+	struct lruv_cache *cache,
+	long new_page_count)
+{
+	struct data_iterator iterator;
+	struct lruv_cache_block *block;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+		603,
+		new_page_count>0);
+	code_0010cd70(cache, TRUE);
+
+	data_iterator_new(&iterator, cache->blocks);
+	while ((block = data_iterator_next(&iterator)) != NULL)
+	{
+		if (block->first_page_index + block->page_count > new_page_count)
+			lruv_block_delete(cache, iterator.datum_index);
+	}
+
+	cache->page_count = new_page_count;
+
+	return;
+}
+
 struct lruv_cache *lruv_new(
 	const char *name,
 	long page_count,
@@ -271,6 +375,19 @@ struct lruv_cache *lruv_new(
 	}
 
 	return cache;
+}
+
+void lruv_flush(
+	struct lruv_cache *cache)
+{
+	struct data_iterator iterator;
+
+	code_0010cd70(cache, TRUE);
+	data_iterator_new(&iterator, cache->blocks);
+	while (data_iterator_next(&iterator))
+		lruv_block_delete(cache, iterator.datum_index);
+
+	return;
 }
 
 /* ---------- private code */
