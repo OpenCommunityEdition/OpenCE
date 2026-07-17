@@ -283,6 +283,12 @@ enum
 	NUMBER_OF_HS_THREAD_TYPES,
 };
 
+enum
+{
+	_hs_syntax_node_primitive_bit = 0,
+	_hs_function_wake = 0x15,
+};
+
 /* ---------- macros */
 
 typedef long (*hs_typecasting_procedure)(long value);
@@ -390,6 +396,8 @@ static void code_000b9f20(
 	long thread_index);
 static void code_000ba090(
 	long thread_index);
+static long code_000ba140(
+	short script_index);
 static long code_000ba1a0(
 	char const *name);
 
@@ -489,6 +497,39 @@ boolean hs_wake_by_name(
 	}
 
 	return result;
+}
+
+void hs_evaluate_wake(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	long wake_thread_index;
+	struct hs_thread_datum *thread;
+	struct hs_syntax_node *script_name_node;
+
+	thread = datum_get(hs_thread_data, thread_index);
+	script_name_node = datum_get(
+		hs_syntax_data,
+		((struct hs_syntax_node *)datum_get(
+			hs_syntax_data,
+			((struct hs_syntax_node *)datum_get(
+				hs_syntax_data,
+				thread->stack->expression_index))->data))->next_node_index);
+
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x22c,
+		function_index==_hs_function_wake);
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x22d,
+		TEST_FLAG(script_name_node->flags, _hs_syntax_node_primitive_bit));
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x22e,
+		script_name_node->type==_hs_type_script);
+
+	wake_thread_index = code_000ba140((short)script_name_node->data);
+	if (wake_thread_index != NONE)
+		code_000ba090(wake_thread_index);
+	hs_return(thread_index, 0);
+
+	return;
 }
 
 /* ---------- private code */
@@ -605,6 +646,25 @@ static long code_000ba1a0(
 			if (_stricmp(script->name, name) == 0)
 				return thread_index;
 		}
+		thread_index = data_next_index(hs_thread_data, thread_index);
+	}
+
+	return NONE;
+}
+
+static long code_000ba140(
+	short script_index)
+{
+	long thread_index;
+
+	thread_index = data_next_index(hs_thread_data, NONE);
+	while (thread_index != NONE)
+	{
+		struct hs_thread_datum *thread;
+
+		thread = datum_get(hs_thread_data, thread_index);
+		if (thread->script_index == script_index)
+			return thread_index;
 		thread_index = data_next_index(hs_thread_data, thread_index);
 	}
 

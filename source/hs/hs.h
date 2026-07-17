@@ -99,6 +99,13 @@ char const *hs_runtime_get_executing_thread_name(
 	void);
 boolean hs_wake_by_name(
 	char const *name);
+void hs_evaluate_wake(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_return(
+	long thread_index,
+	long value);
 
 void hs_recompile(
 	void);
