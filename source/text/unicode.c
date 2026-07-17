@@ -256,6 +256,7 @@ enum
 	MAXIMUM_MEMCMP_SIZE = 0x10000000,
 	MAXIMUM_MEMCPY_MEMMOVE_SIZE = 0x10000000,
 	MAXIMUM_MEMSET_SIZE = 0x10000000,
+	MAXIMUM_MODE_STRING_SIZE = 4,
 	MAXIMUM_STRING_SIZE = 0x8000,
 };
 
@@ -807,6 +808,213 @@ unsigned long ustrnlen(
 		size < MAXIMUM_STRING_SIZE);
 
 	return size;
+}
+
+wchar_t *ustrcpy(
+	wchar_t *dest,
+	wchar_t const *src)
+{
+	unsigned long source_size;
+
+	source_size = wcslen(src);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		146,
+		(source_size >= 0) && (source_size < MAXIMUM_STRING_SIZE));
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		147,
+		((src+source_size) < dest) || ((dest + source_size) < src));
+
+	return wcscpy(dest, src);
+}
+
+int uvfprintf(
+	FILE *stream,
+	wchar_t const *format,
+	va_list arglist)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		792,
+		stream && format);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		793,
+		wcslen(format) < MAXIMUM_STRING_SIZE);
+
+	return vfwprintf(stream, format, arglist);
+}
+
+void *umemcpy(
+	void *dest,
+	void const *src,
+	unsigned long count)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		96,
+		dest && src);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		97,
+		(count >= 0) && (count < MAXIMUM_MEMCPY_MEMMOVE_SIZE));
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		98,
+		(((char *)src+count) <= (char *)dest) || (((char *)dest+count) <= (char *)src));
+
+	return csmemcpy(dest, src, count);
+}
+
+wchar_t *ustrncat(
+	wchar_t *dest,
+	wchar_t const *src,
+	unsigned long count)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		273,
+		dest && src);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		274,
+		wcslen(dest) < MAXIMUM_STRING_SIZE);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		275,
+		(count >= 0) && (count < MAXIMUM_STRING_SIZE));
+
+	return wcsncat(dest, src, count);
+}
+
+wchar_t *ufgets(
+	wchar_t *string,
+	int size,
+	FILE *stream)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		620,
+		string);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		621,
+		wcslen(string) < MAXIMUM_STRING_SIZE);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		622,
+		size < MAXIMUM_STRING_SIZE);
+
+	return fgetws(string, size, stream);
+}
+
+int ufputs(
+	wchar_t const *string,
+	FILE *stream)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		632,
+		string);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		633,
+		wcslen(string) < MAXIMUM_STRING_SIZE);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		634,
+		stream);
+
+	return fputws(string, stream);
+}
+
+int ufprintf(
+	FILE *stream,
+	wchar_t const *format,
+	...)
+{
+	int result;
+	va_list arglist;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		680,
+		stream);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		681,
+		format);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		682,
+		wcslen(format) < MAXIMUM_STRING_SIZE);
+
+	va_start(arglist, format);
+	result = vfwprintf(stream, format, arglist);
+	va_end(arglist);
+
+	return result;
+}
+
+FILE *ufdopen(
+	int fd,
+	wchar_t const *path)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		877,
+		path);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		878,
+		wcslen(path) < MAXIMUM_STRING_SIZE);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		879,
+		fd > 0);
+
+	return _wfdopen(fd, path);
+}
+
+FILE *ufopen(
+	wchar_t const *path,
+	wchar_t const *mode)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		889,
+		path && mode);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		890,
+		wcslen(path) < MAXIMUM_STRING_SIZE);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		891,
+		wcslen(mode) < MAXIMUM_MODE_STRING_SIZE);
+
+	return _wfopen(path, mode);
+}
+
+FILE *upopen(
+	wchar_t const *command,
+	wchar_t const *mode)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		935,
+		command && mode);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		936,
+		wcslen(command) < MAXIMUM_STRING_SIZE);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		937,
+		wcslen(mode) < MAXIMUM_MODE_STRING_SIZE);
+
+	return NULL;
 }
 
 /* ---------- private code */

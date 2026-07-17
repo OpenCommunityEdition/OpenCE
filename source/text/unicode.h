@@ -137,5 +137,40 @@ double ustrtod(
 unsigned long ustrnlen(
 	wchar_t const *string,
 	unsigned long maximum_length);
+wchar_t *ustrcpy(
+	wchar_t *dest,
+	wchar_t const *src);
+int uvfprintf(
+	FILE *stream,
+	wchar_t const *format,
+	va_list arglist);
+void *umemcpy(
+	void *dest,
+	void const *src,
+	unsigned long count);
+wchar_t *ustrncat(
+	wchar_t *dest,
+	wchar_t const *src,
+	unsigned long count);
+wchar_t *ufgets(
+	wchar_t *string,
+	int size,
+	FILE *stream);
+int ufputs(
+	wchar_t const *string,
+	FILE *stream);
+int ufprintf(
+	FILE *stream,
+	wchar_t const *format,
+	...);
+FILE *ufdopen(
+	int fd,
+	wchar_t const *path);
+FILE *ufopen(
+	wchar_t const *path,
+	wchar_t const *mode);
+FILE *upopen(
+	wchar_t const *command,
+	wchar_t const *mode);
 
 #endif // __UNICODE_H
