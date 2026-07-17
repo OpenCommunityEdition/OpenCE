@@ -120,16 +120,85 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct stack_memory_pool_block
+{
+	unsigned long size_and_flags;
+	long slot_index;
+	struct stack_memory_pool_block *previous;
+	struct stack_memory_pool_block *next;
+	void **handle;
+	long lock_count;
+	unsigned long header_signature;
+	byte data[1];
+};
+
+struct stack_memory_pool
+{
+	char const *name;
+	byte *base_address;
+	long size;
+	long maximum_block_count;
+	long next_block_index;
+	long bytes_used;
+	long maximum_bytes_used;
+	long block_count;
+	long maximum_block_count_used;
+	long largest_block_size;
+	boolean disable_compaction;
+	byte unused29[3];
+	struct stack_memory_pool_block *first_block;
+	struct stack_memory_pool_block *last_block;
+	struct stack_memory_pool_block *blocks[1];
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+void stack_memory_pool_reset(
+	struct stack_memory_pool *pool)
+{
+	unsigned long *pool_data = (unsigned long *)pool;
+	unsigned long saved_name;
+	unsigned long saved_base_address;
+	unsigned long saved_size;
+	unsigned long saved_maximum_block_count;
+	unsigned long *blocks;
+	unsigned long blocks_address;
+
+	if (!pool)
+	{
+		display_assert("pool", "c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x1B0, TRUE);
+		system_exit(-1);
+	}
+
+	saved_name = pool_data[0];
+	saved_base_address = pool_data[1];
+	saved_maximum_block_count = pool_data[3];
+	blocks = pool_data + 13;
+	blocks_address = (unsigned long)blocks;
+	saved_size = pool_data[2];
+
+	csmemset(blocks, 0, saved_maximum_block_count * sizeof(*blocks));
+	csmemset(pool, 0, 0x34);
+
+	pool_data[0] = saved_name;
+	pool_data[1] = saved_base_address;
+	pool_data[3] = saved_maximum_block_count;
+	pool_data[2] = saved_size;
+	csmemcpy(blocks, &blocks_address, sizeof(blocks_address));
+
+	return;
+}
 
 /* ---------- private code */
