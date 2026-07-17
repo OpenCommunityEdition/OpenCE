@@ -115,7 +115,9 @@ symbols in this file:
 
 enum
 {
-	NUMBER_OF_SOUND_CLASSES = 51
+	NUMBER_OF_SOUND_CLASSES = 51,
+	MAXIMUM_SOUND_INSTANCES_PER_DEFINITION = 16,
+	MAXIMUM_SOUND_INSTANCES_PER_OBJECT_PER_DEFINITION = 16
 };
 
 /* ---------- macros */
@@ -132,7 +134,7 @@ struct sound_class_runtime
 
 struct sound_class_definition
 {
-	short maximum_number_per_datum;
+	short maximum_number_per_definition;
 	short maximum_number_per_object;
 	byte unused_4[0xC];
 	real wet_gain;
@@ -153,8 +155,37 @@ struct sound_class_definition *sound_class_get(
 
 struct sound_class_runtime *sound_class_data;
 extern char const *sound_class_names[NUMBER_OF_SOUND_CLASSES];
+extern struct sound_class_definition sound_classes[NUMBER_OF_SOUND_CLASSES];
 
 /* ---------- public code */
+
+struct sound_class_definition *sound_class_get(
+	short class_index)
+{
+	long definition_offset;
+	struct sound_class_definition *definition;
+
+	definition_offset = sizeof(*definition)*class_index;
+	definition = (struct sound_class_definition *)((byte *)sound_classes+definition_offset);
+	match_assert(
+		"c:\\halo\\source\\sound\\sound_classes.h",
+		131,
+		class_index>=0 && class_index<NUMBER_OF_SOUND_CLASSES);
+	match_assert(
+		"c:\\halo\\source\\sound\\sound_classes.h",
+		132,
+		sound_class_names[class_index][0]);
+	match_assert(
+		"c:\\halo\\source\\sound\\sound_classes.h",
+		133,
+		definition->maximum_number_per_definition<=MAXIMUM_SOUND_INSTANCES_PER_DEFINITION);
+	match_assert(
+		"c:\\halo\\source\\sound\\sound_classes.h",
+		134,
+		definition->maximum_number_per_object<=MAXIMUM_SOUND_INSTANCES_PER_OBJECT_PER_DEFINITION);
+
+	return definition;
+}
 
 void sound_classes_initialize(
 	void)
