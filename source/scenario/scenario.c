@@ -171,6 +171,7 @@ symbols in this file:
 #include "objects/objects.h"
 #include "physics/bsp3d.h"
 #include "physics/collision_bsp_definitions.h"
+#include "saved games/game_state.h"
 #include "scenario_definitions.h"
 #include "sky_definitions.h"
 #include "scenario/wind.h"
@@ -200,6 +201,17 @@ struct bsp3d *global_bsp3d;
 struct game_globals *global_game_globals;
 
 /* ---------- public code */
+
+void scenario_initialize(
+	void)
+{
+	scenario_globals = game_state_malloc(
+		"scenario globals",
+		NULL,
+		sizeof(*scenario_globals));
+
+	return;
+}
 
 void scenario_dispose_from_old_map(
 	void)

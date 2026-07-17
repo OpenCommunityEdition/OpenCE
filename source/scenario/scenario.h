@@ -55,11 +55,16 @@ enum
 struct scenario_globals
 {
 	short structure_bsp_index;
+	byte unknown[0xFE];
 };
+
+typedef char scenario_globals_size_assert[
+	sizeof(struct scenario_globals) == 0x100 ? 1 : -1];
 
 /* ---------- prototypes/SCENARIO.C */
 
-void scenario_initialize(void);
+void scenario_initialize(
+	void);
 void scenario_initialize_for_new_map(void);
 void scenario_dispose_from_old_map(void);
 void scenario_frame_update(real dt);
