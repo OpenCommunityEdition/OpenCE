@@ -129,6 +129,7 @@ symbols in this file:
 #include "cutscene/cinematics.h"
 #include "editor/editor_stubs.h"
 #include "objects.h"
+#include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 
 /* ---------- constants */
@@ -174,7 +175,7 @@ struct object_type_definition *object_type_definitions[NUMBER_OF_OBJECT_TYPES] =
 };
 
 extern struct object_type_definition *first_object_type_definition;
-short bss_00456e98;
+word bss_00456e98;
 
 typedef char verify_object_type_definition_size[
 	sizeof(struct object_type_definition) == 0xA0 ? 1 : -1];
@@ -718,6 +719,119 @@ void object_types_disconnect_from_structure_bsp(
 		{
 			object_delete(iterator.index);
 		}
+	}
+
+	return;
+}
+
+void object_types_place_objects(
+	boolean reconnecting)
+{
+	if (!game_in_editor() && global_structure_bsp_index!=NONE)
+	{
+		short object_type;
+		struct scenario *scenario = global_scenario_get();
+
+		for (object_type = 0; object_type < NUMBER_OF_OBJECT_TYPES; object_type++)
+		{
+			struct object_type_definition *definition;
+
+			if (!TEST_FLAG(_object_mask_remove_on_bsp_switch, object_type))
+			{
+				continue;
+			}
+
+			definition = object_type_definition_get(object_type);
+			if (definition->placement_tag_block_offset!=NONE &&
+				definition->palette_tag_block_offset!=NONE)
+			{
+				long element_size;
+				struct tag_block *scenario_datums = scenario_get_object_type_scenario_datums(
+					scenario,
+					object_type,
+					&element_size);
+				struct tag_block *scenario_palette = scenario_get_object_type_scenario_palette(
+					scenario,
+					object_type);
+
+				if (!TEST_FLAG(bss_00456e98, global_structure_bsp_index))
+				{
+					short scenario_datum_index;
+
+					for (scenario_datum_index = 0;
+						scenario_datum_index < scenario_datums->count;
+						scenario_datum_index++)
+					{
+						struct scenario_object_datum *scenario_object =
+							(struct scenario_object_datum *)tag_block_get_element_with_size(
+								scenario_datums,
+								scenario_datum_index,
+								element_size);
+
+						if (scenario_object->palette_entry_index!=NONE)
+						{
+							struct scenario_object_palette_entry *palette_entry = TAG_BLOCK_GET_ELEMENT(
+								scenario_palette,
+								scenario_object->palette_entry_index,
+								struct scenario_object_palette_entry);
+							struct object_definition *object_definition = object_definition_get(
+								palette_entry->reference.index);
+							real_matrix4x3 matrix;
+							real_point3d transformed_bounding_offset;
+
+							matrix4x3_rotation_from_angles(
+								&matrix,
+								scenario_object->rotation.yaw,
+								scenario_object->rotation.pitch,
+								scenario_object->rotation.roll);
+							matrix.position = scenario_object->position;
+							matrix4x3_transform_point(
+								&matrix,
+								&object_definition->object.bounding_offset,
+								&transformed_bounding_offset);
+
+							if (scenario_leaf_index_from_point(&scenario_object->position)==NONE &&
+								scenario_leaf_index_from_point(&transformed_bounding_offset)==NONE)
+							{
+								scenario_object->on_bsp_flags &= ~FLAG(global_structure_bsp_index);
+							}
+							else
+							{
+								scenario_object->on_bsp_flags |= FLAG(global_structure_bsp_index);
+							}
+						}
+					}
+				}
+
+				if (reconnecting)
+				{
+					short scenario_datum_index;
+
+					objects_memory_compact();
+					for (scenario_datum_index = 0;
+						scenario_datum_index < scenario_datums->count;
+						scenario_datum_index++)
+					{
+						struct scenario_object_datum *scenario_object =
+							(struct scenario_object_datum *)tag_block_get_element_with_size(
+								scenario_datums,
+								scenario_datum_index,
+								element_size);
+
+						if ((scenario_object->name_index==NONE ||
+							object_index_from_name_index(scenario_object->name_index)==NONE) &&
+							!TEST_FLAG(scenario_object->placement_flags, _scenario_object_placement_not_automatic_bit) &&
+							TEST_FLAG(scenario_object->on_bsp_flags, global_structure_bsp_index))
+						{
+							object_new_from_scenario(scenario_object, scenario_palette);
+							objects_garbage_collection();
+						}
+					}
+				}
+			}
+		}
+
+		bss_00456e98 |= FLAG(global_structure_bsp_index);
 	}
 
 	return;
