@@ -107,6 +107,9 @@ static void code_0010bfe0(
 	struct lrar_cache_block *block);
 static void code_0010c040(
 	struct lrar_cache *cache);
+static struct lrar_cache_block *code_0010c280(
+	struct lrar_cache *cache,
+	short block_index);
 
 /* ---------- globals */
 
@@ -237,6 +240,41 @@ void lrar_dispose(
 	return;
 }
 
+void lrar_flush(
+	struct lrar_cache *cache)
+{
+	short block_index;
+	struct lrar_cache_block *block;
+
+	code_0010c040(cache);
+	block_index = cache->first_block_index;
+	while (block_index != NONE)
+	{
+		block = code_0010c280(cache, block_index);
+		if (block->user_data)
+		{
+			cache->unlock_proc(block->user_data);
+			block->user_data = NULL;
+		}
+
+		if (block_index == cache->last_block_index)
+		{
+			break;
+		}
+
+		block_index++;
+		if (block_index == cache->block_count)
+		{
+			block_index = 0;
+		}
+	}
+
+	cache->first_block_index = NONE;
+	cache->last_block_index = NONE;
+
+	return;
+}
+
 unsigned long lrar_block_address(
 	struct lrar_cache *cache,
 	short block_index)
@@ -324,4 +362,21 @@ static void code_0010c040(
 			cache));
 
 	return;
+}
+
+static struct lrar_cache_block *code_0010c280(
+	struct lrar_cache *cache,
+	short block_index)
+{
+	struct lrar_cache_block *block;
+
+	code_0010c040(cache);
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+		0x16E,
+		block_index>=0 && block_index<cache->block_count);
+	block = &cache->blocks[block_index];
+	code_0010bfe0(cache, block);
+
+	return block;
 }

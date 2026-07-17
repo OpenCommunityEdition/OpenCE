@@ -35,6 +35,8 @@ struct lrar_cache *lrar_new(
 	lrar_unlock_proc unlock_proc);
 void lrar_dispose(
 	struct lrar_cache *cache);
+void lrar_flush(
+	struct lrar_cache *cache);
 unsigned long lrar_block_address(
 	struct lrar_cache *cache,
 	short block_index);
