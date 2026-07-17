@@ -8,13 +8,29 @@ header included in hcex build.
 #define __LRUV_CACHE_H
 #pragma once
 
+/* ---------- headers */
+
+#include "cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+struct lruv_cache;
+
+/* ---------- prototypes/LRUV_CACHE.C */
+
+long lruv_allocation_size(long maximum_block_count);
+void lruv_initialize(
+	struct lruv_cache *cache,
+	const char *name,
+	long page_count,
+	long page_size_bits,
+	long maximum_block_count,
+	void (*delete_block_proc)(long),
+	boolean (*locked_block_proc)(long));
 
 /* ---------- globals */
 

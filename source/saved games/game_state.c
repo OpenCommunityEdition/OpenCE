@@ -116,6 +116,9 @@ symbols in this file:
 #include "director.h"
 #include "hud_messaging.h"
 #include "crc.h"
+#include "data.h"
+#include "lruv_cache.h"
+#include "memory_pool.h"
 
 /* ---------- constants */
 
@@ -139,7 +142,7 @@ boolean recover_saved_games_hack;
 
 static FILE* bss_004d27b0;
 
-static struct
+struct
 {
 	void *base_address; // 0x0
 	long cpu_allocation_size; // 0x4
@@ -149,7 +152,7 @@ static struct
 	boolean saved_game_valid; // 0x11
 	long revert_time; // 0x14
 	struct game_state_header *header; // 0x18
-} game_state_globals;
+} game_state_globals = { 0 };
 
 typedef void (*game_state_before_load_proc)();
 typedef void (*game_state_after_load_proc)();
@@ -409,6 +412,58 @@ void *game_state_malloc(
 	crc_checksum_buffer((unsigned long *)&game_state_globals.allocation_size_checksum, &size, sizeof(size));
 
 	return pointer;
+}
+
+struct data_array *game_state_data_new(
+	const char *name,
+	short maximum_count,
+	short size)
+{
+	struct data_array *data;
+
+	data = game_state_malloc(name, "data array", data_allocation_size(maximum_count, size));
+	data_initialize(data, name, maximum_count, size);
+
+	return data;
+}
+
+struct memory_pool *game_state_memory_pool_new(
+	const char *name,
+	long size)
+{
+	struct memory_pool *pool;
+
+	pool = game_state_malloc(name, "memory pool", memory_pool_allocation_size(size));
+	memory_pool_initialize(pool, name, size);
+
+	return pool;
+}
+
+struct lruv_cache *game_state_lruv_cache_new(
+	const char *name,
+	long page_count,
+	long page_size_bits,
+	long maximum_block_count,
+	void (*delete_block_proc)(long),
+	boolean (*locked_block_proc)(long))
+{
+	struct lruv_cache *cache;
+
+	cache = game_state_malloc(name, "lruv cache", lruv_allocation_size(maximum_block_count));
+	lruv_initialize(cache, name, page_count, page_size_bits, maximum_block_count, delete_block_proc, locked_block_proc);
+
+	return cache;
+}
+
+void game_state_initialize(
+	void)
+{
+	crc_new(&game_state_globals.allocation_size_checksum);
+	game_state_globals.base_address = game_state_allocate_buffer(0x80061000, GAME_STATE_CPU_SIZE, 0x40000);
+	game_state_create_or_open_file();
+	game_state_globals.header = game_state_malloc("header", NULL, sizeof(*game_state_globals.header));
+
+	return;
 }
 
 /* ---------- private code */
