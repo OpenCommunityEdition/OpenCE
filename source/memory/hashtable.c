@@ -229,7 +229,8 @@ static void *code_0010b630(
 	const void *key)
 {
 	short element_index;
-	void *element = NULL;
+	void *element;
+	void *result = NULL;
 
 	if (code_0010b270(table, key, &element_index))
 	{
@@ -247,9 +248,9 @@ static void *code_0010b630(
 			table->element_size);
 		csmemcpy(element, key, table->key_size);
 		BIT_VECTOR_SET_FLAG(table->used_slots, element_index, TRUE);
+		result = (byte *)element + table->key_size;
 		table->count++;
-		element = (byte *)element + table->key_size;
 	}
 
-	return element;
+	return result;
 }
