@@ -54,6 +54,14 @@ long network_game_get_number_of_games_played(
 	void);
 long network_game_get_random_seed(
 	void);
+void network_game_abort(
+	void);
+void network_game_client_all_local_players_have_quit(
+	void);
+void network_game_client_request_immediate_start(
+	void);
+boolean create_global_network_game_server(
+	void);
 
 /* ---------- globals */
 

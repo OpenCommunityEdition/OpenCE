@@ -142,6 +142,8 @@ void network_game_server_dispose(
 	struct network_game_server *server);
 boolean network_game_server_idle(
 	struct network_game_server *server);
+struct network_game_server *network_game_server_create(
+	void);
 
 struct network_game *network_game_client_get_game(
 	struct network_game_client *client);
@@ -149,6 +151,14 @@ struct network_game_client *network_game_client_create(
 	void);
 void network_game_client_dispose(
 	struct network_game_client *client);
+boolean network_game_client_request_start_time_change(
+	struct network_game_client *client,
+	long start_time);
+
+unsigned long *get_global_local_random_seed_address(
+	void);
+unsigned short seed_random(
+	unsigned long *seed);
 
 /* ---------- globals */
 
@@ -334,6 +344,52 @@ long network_game_get_random_seed(
 		game);
 
 	return game->random_seed;
+}
+
+void network_game_abort(
+	void)
+{
+	bss_004566dc.client_started = TRUE;
+
+	return;
+}
+
+void network_game_client_all_local_players_have_quit(
+	void)
+{
+	bss_004566dc.client_started = TRUE;
+
+	return;
+}
+
+void network_game_client_request_immediate_start(
+	void)
+{
+	if (global_network_game_client &&
+		!network_game_client_request_start_time_change(global_network_game_client, 3))
+	{
+		error(_error_silent, "network_game_client_request_start() failed");
+	}
+
+	return;
+}
+
+boolean create_global_network_game_server(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_game_globals.c",
+		0xD6,
+		global_network_game_server==NULL);
+
+	global_network_game_server = network_game_server_create();
+	if (global_network_game_server)
+	{
+		network_game_set_random_seed(
+			seed_random(get_global_local_random_seed_address()));
+	}
+
+	return global_network_game_server != NULL;
 }
 
 /* ---------- private code */
