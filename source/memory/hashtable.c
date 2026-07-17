@@ -133,6 +133,35 @@ void hashtable_delete(
 	return;
 }
 
+short default_hash_function(
+	const void *key,
+	unsigned long key_size)
+{
+	long hash = 0;
+	short polynomial_index = 0;
+	const byte *key_byte;
+
+	if (polynomial_index < key_size)
+	{
+		key_byte = key;
+		do
+		{
+			if (polynomial_index == NUMBEROF(default_hash_polynomial))
+			{
+				polynomial_index = 0;
+				key_size -= NUMBEROF(default_hash_polynomial);
+			}
+
+			hash += default_hash_polynomial[polynomial_index] * (short)*key_byte;
+			polynomial_index++;
+			key_byte++;
+		}
+		while (polynomial_index < key_size);
+	}
+
+	return hash;
+}
+
 void *hashtable_get(
 	struct hashtable *table,
 	const void *key)
@@ -150,6 +179,74 @@ void *hashtable_get(
 	}
 
 	return result;
+}
+
+void hashtable_remove(
+	struct hashtable *table,
+	const void *key)
+{
+	short empty_index;
+	short element_index;
+	short home_index;
+	long hash;
+	void *element;
+
+	match_assert("c:\\halo\\SOURCE\\memory\\hashtable.c", 195, hashtable_valid(table));
+	match_assert("c:\\halo\\SOURCE\\memory\\hashtable.c", 196, key);
+
+	if (code_0010b270(table, key, &empty_index))
+	{
+		element_index = (empty_index + 1) & (table->elements.count - 1);
+		while (BIT_VECTOR_TEST_FLAG(table->used_slots, element_index))
+		{
+			element = dynamic_array_get_element(
+				&table->elements,
+				element_index,
+				table->element_size);
+			if (table->hash_function)
+			{
+				hash = table->hash_function(table->user_data, element);
+			}
+			else
+			{
+				hash = default_hash_function(element, table->key_size);
+			}
+
+			home_index = hash & (table->elements.count - 1);
+			if ((home_index < element_index &&
+				empty_index >= home_index &&
+				empty_index < element_index) ||
+				(home_index > element_index &&
+				(empty_index >= home_index || empty_index < element_index)))
+			{
+				csmemcpy(
+					dynamic_array_get_element(
+						&table->elements,
+						empty_index,
+						table->element_size),
+					dynamic_array_get_element(
+						&table->elements,
+						element_index,
+						table->element_size),
+					table->elements.element_size);
+				empty_index = element_index;
+			}
+
+			element_index = (element_index + 1) & (table->elements.count - 1);
+		}
+
+		BIT_VECTOR_SET_FLAG(table->used_slots, empty_index, FALSE);
+	}
+	else
+	{
+		match_vassert(
+			"c:\\halo\\SOURCE\\memory\\hashtable.c",
+			225,
+			FALSE,
+			"removing key not in hashtable");
+	}
+
+	return;
 }
 
 void *hashtable_put(
