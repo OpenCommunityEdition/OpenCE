@@ -294,6 +294,27 @@ struct material_definition *default_material_definition_get(
 	return &bss_004c0520.default_material;
 }
 
+struct material_definition *scenario_material_definition_get(
+	short material_type)
+{
+	struct game_globals *game_globals = scenario_get_game_globals();
+
+	match_assert(
+		"c:\\halo\\SOURCE\\scenario\\scenario.c",
+		286,
+		material_type==NONE || (material_type>=0 && material_type<NUMBER_OF_MATERIAL_TYPES));
+
+	if (material_type >= 0 && material_type < game_globals->materials.count)
+	{
+		return TAG_BLOCK_GET_ELEMENT(
+			&game_globals->materials,
+			material_type,
+			struct material_definition);
+	}
+
+	return default_material_definition_get();
+}
+
 long scenario_get_sky_definition_index(
 	short sky_index)
 {
