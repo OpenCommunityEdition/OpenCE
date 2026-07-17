@@ -251,6 +251,56 @@ char const *object_type_get_name(
 	return object_type_definitions[object_type]->name;
 }
 
+void object_types_initialize(
+	void)
+{
+	short object_type;
+	struct object_type_definition *definition;
+	struct object_type_definition **next_definition = &first_object_type_definition;
+
+	for (object_type = 0; object_type < NUMBER_OF_OBJECT_TYPES; object_type++)
+	{
+		short part_index;
+
+		definition = object_type_definition_get(object_type);
+		match_assert(
+			"c:\\halo\\SOURCE\\objects\\object_types.c",
+			746,
+			!definition->next);
+		*next_definition = definition;
+		next_definition = &definition->next;
+
+		for (part_index = 0; part_index < MAXIMUM_CHILDREN_PER_OBJECT_TYPE_DEFINITION; part_index++)
+		{
+			struct object_type_definition *part_definition = definition->part_definitions[part_index];
+
+			if (!part_definition)
+			{
+				break;
+			}
+
+			if (!part_definition->next)
+			{
+				*next_definition = part_definition;
+				next_definition = &part_definition->next;
+			}
+		}
+	}
+
+	*next_definition = NULL;
+	definition = first_object_type_definition;
+	while (definition)
+	{
+		if (definition->initialize)
+		{
+			definition->initialize();
+		}
+		definition = definition->next;
+	}
+
+	return;
+}
+
 void object_types_dispose(
 	void)
 {
