@@ -44,17 +44,15 @@ struct collision_feature_sphere
 {
 	struct collision_feature_common common;
 	union real_point3d center;
-	long user_data;
+	real radius;
 };
 
 struct collision_feature_cylinder
 {
 	struct collision_feature_common common;
 	union real_point3d point;
-	long user_data;
-	real height;
+	union real_vector3d height;
 	real radius;
-	long user_data2;
 };
 
 struct collision_feature_prism
@@ -91,6 +89,12 @@ typedef char collision_feature_list_prisms_offset_assert[
 
 void collision_features_new(
 	struct collision_feature_list *features);
+void render_debug_collision_sphere(
+	const struct collision_feature_sphere *sphere,
+	const real_argb_color *color);
+void render_debug_collision_cylinder(
+	const struct collision_feature_cylinder *cylinder,
+	const real_argb_color *color);
 
 /* ---------- globals */
 

@@ -70,6 +70,7 @@ symbols in this file:
 #include "collision_features.h"
 
 #include "math/real_math.h"
+#include "render/render_debug.h"
 
 /* ---------- constants */
 
@@ -87,6 +88,29 @@ void collision_features_new(
 	struct collision_feature_list *features)
 {
 	csmemset(features->count, 0, sizeof(features->count));
+
+	return;
+}
+
+void render_debug_collision_sphere(
+	const struct collision_feature_sphere *sphere,
+	const real_argb_color *color)
+{
+	render_debug_sphere(TRUE, &sphere->center, sphere->radius, color);
+
+	return;
+}
+
+void render_debug_collision_cylinder(
+	const struct collision_feature_cylinder *cylinder,
+	const real_argb_color *color)
+{
+	render_debug_cylinder(
+		TRUE,
+		&cylinder->point,
+		&cylinder->height,
+		cylinder->radius,
+		color);
 
 	return;
 }
