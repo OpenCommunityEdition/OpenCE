@@ -198,6 +198,82 @@ void *data_decode_structures(
 	return structures;
 }
 
+void *data_decode_memory(
+	struct data_encoding_state *state,
+	short count,
+	long element_size)
+{
+	void *memory = NULL;
+	long memory_size;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\data_encoding.c",
+		256,
+		state && state->buffer && state->offset>=0 && state->offset<=state->buffer_size);
+	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 257, count>=0);
+
+	switch (element_size)
+	{
+	case 1:
+		memory_size = count;
+		break;
+	case -2:
+		memory_size = count<<1;
+		break;
+	case -4:
+		memory_size = count<<2;
+		break;
+	case -8:
+		memory_size = count<<3;
+		break;
+	default:
+		display_assert(NULL, "c:\\halo\\SOURCE\\memory\\data_encoding.c", 265, TRUE);
+		system_exit(-1);
+		memory_size = count;
+		break;
+	}
+
+	if (state->offset+memory_size<=state->buffer_size && !state->overflow)
+	{
+		memory = state->buffer+state->offset;
+		if (element_size!=1)
+		{
+			byte_swap_memory(memory, count, element_size);
+		}
+		state->offset += memory_size;
+	}
+	else
+	{
+		state->overflow = TRUE;
+	}
+
+	return memory;
+}
+
+byte data_decode_byte(
+	struct data_encoding_state *state)
+{
+	byte *value;
+
+	return (value = data_decode_memory(state, 1, sizeof(*value))) ? *value : 0;
+}
+
+short data_decode_short(
+	struct data_encoding_state *state)
+{
+	short *value;
+
+	return (value = data_decode_memory(state, 1, -sizeof(*value))) ? *value : 0;
+}
+
+long data_decode_long(
+	struct data_encoding_state *state)
+{
+	long *value;
+
+	return (value = data_decode_memory(state, 1, -sizeof(*value))) ? *value : 0;
+}
+
 __int64 data_decode_int64(
 	struct data_encoding_state *state)
 {
