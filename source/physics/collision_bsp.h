@@ -98,7 +98,19 @@ real collision_surface_perimeter(
 real collision_surface_area(
 	struct collision_bsp const *bsp,
 	long surface_index);
-
+real_point3d *collision_surface_project_point2d(
+	struct collision_bsp const *bsp,
+	long surface_index,
+	short projection,
+	boolean sign,
+	real_point2d const *point,
+	real_point3d *result);
+boolean collision_surface_test_point2d(
+	struct collision_bsp const *bsp,
+	long surface_index,
+	short projection,
+	boolean sign,
+	real_point2d const *point);
 boolean collision_bsp_test_sphere(
 	struct collision_bsp const *bsp,
 	short breakable_surface_count,

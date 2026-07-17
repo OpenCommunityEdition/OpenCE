@@ -299,4 +299,76 @@ real collision_surface_area(
 	return 0.f;
 }
 
+real_point3d *collision_surface_project_point2d(
+	struct collision_bsp const *bsp,
+	long surface_index,
+	short projection,
+	boolean sign,
+	real_point2d const *point,
+	real_point3d *result)
+{
+	struct collision_surface const *surface = TAG_BLOCK_GET_ELEMENT(
+		&bsp->surfaces,
+		surface_index,
+		struct collision_surface);
+	real_plane3d const *plane = TAG_BLOCK_GET_ELEMENT(
+		&bsp->bsp3d.planes,
+		surface->plane_designator & LONG_MAX,
+		real_plane3d);
+
+	project_point2d(point, plane, projection, sign, result);
+	return result;
+}
+
+boolean collision_surface_test_point2d(
+	struct collision_bsp const *bsp,
+	long surface_index,
+	short projection,
+	boolean sign,
+	real_point2d const *point)
+{
+	struct collision_surface const *surface = TAG_BLOCK_GET_ELEMENT(
+		&bsp->surfaces,
+		surface_index,
+		struct collision_surface);
+	long const first_edge_index = surface->first_edge_index;
+	long edge_index = first_edge_index;
+
+	do
+	{
+		struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(
+			&bsp->edges,
+			edge_index,
+			struct collision_edge);
+		boolean const reverse = edge->surface_indices[1] == surface_index;
+		struct collision_vertex const *vertex0 = TAG_BLOCK_GET_ELEMENT(
+			&bsp->vertices,
+			edge->vertex_indices[reverse],
+			struct collision_vertex);
+		struct collision_vertex const *vertex1 = TAG_BLOCK_GET_ELEMENT(
+			&bsp->vertices,
+			edge->vertex_indices[!reverse],
+			struct collision_vertex);
+		real_point2d point0;
+		real_point2d point1;
+		real_vector2d vector0;
+		real_vector2d vector1;
+
+		project_point3d(&vertex0->point, projection, sign, &point0);
+		project_point3d(&vertex1->point, projection, sign, &point1);
+		vector_from_points2d(&point0, point, &vector0);
+		vector_from_points2d(&point1, point, &vector1);
+
+		if (cross_product2d(&vector0, &vector1) > 0.f)
+		{
+			return FALSE;
+		}
+
+		edge_index = edge->edge_indices[reverse];
+	}
+	while (edge_index != first_edge_index);
+
+	return TRUE;
+}
+
 /* ---------- private code */
