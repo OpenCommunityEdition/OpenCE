@@ -10,6 +10,8 @@ file has inline function assertions.
 
 #include <float.h>
 
+#include "integer_math.h"
+
 /* ---------- constants */
 
 #define _real_epsilon 0.0001f
@@ -427,6 +429,17 @@ boolean point_in_sector2d(
 	real_vector2d const *direction,
 	real radius,
 	real cosine);
+boolean point_in_triangle2d(
+	real_point2d const *point,
+	real_point2d const *triangle0,
+	real_point2d const *triangle1,
+	real_point2d const *triangle2,
+	real *t0,
+	real *t1);
+boolean sphere_intersects_rectangle3d(
+	real_point3d const *center,
+	real radius,
+	real_rectangle3d const *bounds);
 
 boolean vector_intersects_rectangle2d(real_point2d const *point, real_vector2d const *vector, real_rectangle2d const *bounds);
 boolean vector_intersects_rectangle3d(real_point3d const *point, real_vector3d const *vector, real_rectangle3d const *bounds);
@@ -438,6 +451,12 @@ real_vector3d *fast_normalize3d(real_vector3d *v);
 real cross_product_magnitude3d(real_vector3d const *a, real_vector3d const *b);
 
 real dequantize_byte_to_real(real min, real max, unsigned char value);
+byte quantize_real_to_byte_lower_bound(real min, real max, real value);
+byte quantize_real_to_byte_upper_bound(real min, real max, real value);
+byte_rectangle3d *quantize_real_to_byte_rectangle3d(
+	real_rectangle3d const *parent,
+	real_rectangle3d const *rectangle,
+	byte_rectangle3d *result);
 
 real signed_angle_between_vectors2d(real_vector2d const *a, real_vector2d const *b);
 real angle_between_vectors2d(real_vector2d const *a, real_vector2d const *b);

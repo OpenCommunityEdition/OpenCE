@@ -542,6 +542,117 @@ boolean point_in_sector2d(
 	return result;
 }
 
+boolean point_in_triangle2d(
+	real_point2d const *point,
+	real_point2d const *triangle0,
+	real_point2d const *triangle1,
+	real_point2d const *triangle2,
+	real *t0,
+	real *t1)
+{
+	real_vector2d edge0;
+	real_vector2d edge1;
+	real_vector2d offset;
+	real cross0;
+	real cross1;
+	real determinant;
+	boolean result;
+
+	vector_from_points2d(triangle0, triangle1, &edge0);
+	vector_from_points2d(triangle0, point, &offset);
+	cross0 = cross_product2d(&edge0, &offset);
+	if (cross0 >= 0.f)
+	{
+		vector_from_points2d(triangle0, triangle2, &edge1);
+		cross1 = cross_product2d(&offset, &edge1);
+		if (cross1 >= 0.f)
+		{
+			determinant = cross_product2d(&edge0, &edge1);
+			if (cross0 + cross1 <= determinant)
+			{
+				real inverse_determinant = 1.f / determinant;
+				*t0 = cross1 * inverse_determinant;
+				*t1 = cross0 * inverse_determinant;
+				result = TRUE;
+			}
+			else
+			{
+				result = FALSE;
+			}
+		}
+		else
+		{
+			result = FALSE;
+		}
+	}
+	else
+	{
+		result = FALSE;
+	}
+
+	return result;
+}
+
+boolean sphere_intersects_rectangle3d(
+	real_point3d const *center,
+	real radius,
+	real_rectangle3d const *bounds)
+{
+	real dx;
+	real dy;
+	real dz;
+
+	if (center->x <= bounds->x1)
+	{
+		if (center->x < bounds->x0)
+		{
+			dx = bounds->x0 - center->x;
+		}
+		else
+		{
+			dx = 0.f;
+		}
+	}
+	else
+	{
+		dx = center->x - bounds->x1;
+	}
+
+	if (center->y <= bounds->y1)
+	{
+		if (center->y < bounds->y0)
+		{
+			dy = bounds->y0 - center->y;
+		}
+		else
+		{
+			dy = 0.f;
+		}
+	}
+	else
+	{
+		dy = center->y - bounds->y1;
+	}
+
+	if (center->z <= bounds->z1)
+	{
+		if (center->z < bounds->z0)
+		{
+			dz = bounds->z0 - center->z;
+		}
+		else
+		{
+			dz = 0.f;
+		}
+	}
+	else
+	{
+		dz = center->z - bounds->z1;
+	}
+
+	return dx * dx + dy * dy + dz * dz < radius * radius;
+}
+
 boolean vector_intersects_rectangle2d(
 	real_point2d const *point,
 	real_vector2d const *vector,
@@ -768,6 +879,33 @@ real dequantize_byte_to_real(
 	}
 	
 	return (max-min) * ((real)value / 255.f) + min;
+}
+
+byte_rectangle3d *quantize_real_to_byte_rectangle3d(
+	real_rectangle3d const *parent,
+	real_rectangle3d const *rectangle,
+	byte_rectangle3d *result)
+{
+	if (rectangle->x0 == REAL_MAX)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\math\\real_math.c",
+			2843,
+			rectangle->x1==REAL_MIN && rectangle->y0==REAL_MAX && rectangle->y1==REAL_MIN && rectangle->z0==REAL_MAX && rectangle->z1==REAL_MIN);
+
+		csmemset(result, 0, sizeof(*result));
+	}
+	else
+	{
+		result->x0 = quantize_real_to_byte_lower_bound(parent->x0, parent->x1, rectangle->x0);
+		result->x1 = quantize_real_to_byte_upper_bound(parent->x0, parent->x1, rectangle->x1);
+		result->y0 = quantize_real_to_byte_lower_bound(parent->y0, parent->y1, rectangle->y0);
+		result->y1 = quantize_real_to_byte_upper_bound(parent->y0, parent->y1, rectangle->y1);
+		result->z0 = quantize_real_to_byte_lower_bound(parent->z0, parent->z1, rectangle->z0);
+		result->z1 = quantize_real_to_byte_upper_bound(parent->z0, parent->z1, rectangle->z1);
+	}
+
+	return result;
 }
 
 real signed_angle_between_vectors2d(
