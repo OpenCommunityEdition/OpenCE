@@ -89,6 +89,7 @@ struct detail_object_render_data;
 struct bitmap_data;
 struct shader;
 struct vertex_buffer;
+struct rasterizer_dynamic_screen_geometry_parameters;
 
 struct rasterizer_frame_begin_parameters
 {
@@ -248,12 +249,36 @@ void rasterizer_hud_end(
 	void);
 void rasterizer_hud_motion_sensor_blip_begin(
 	void);
+void rasterizer_hud_motion_sensor_blip_draw(
+	real_point2d const *position,
+	real intensity,
+	real size,
+	real_rgb_color const *color,
+	boolean large_blip);
 void rasterizer_hud_motion_sensor_blip_end(
 	real_point2d const *center,
 	real scale);
 void rasterizer_model_begin(
 	struct rasterizer_model_begin_parameters const *parameters,
 	boolean is_dynamic);
+void rasterizer_model_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	void const *geometry,
+	long geometry_index,
+	long model_data,
+	real_rgb_color const *change_colors,
+	long model_effect);
+void rasterizer_model_transparent_geometry_submit(
+	struct shader const *shader,
+	short bitmap_index,
+	void const *geometry,
+	long geometry_index,
+	long model_data,
+	real_rgb_color const *change_colors,
+	long model_effect,
+	void const *lighting,
+	void const *effect);
 void rasterizer_model_end(
 	void);
 void rasterizer_models_end(
@@ -288,8 +313,19 @@ void rasterizer_environment_diffuse_light_draw(
 	struct vertex_buffer const *vertex_buffer);
 void rasterizer_environment_shadows_begin(
 	void);
+void rasterizer_environment_shadow_begin(
+	long object_index,
+	real_matrix4x3 const *shadow_matrix,
+	real_point3d const *object_position,
+	real object_bounding_radius,
+	real_rgb_color const *shadow_color);
 void rasterizer_environment_shadow_model_begin(
 	struct rasterizer_model_begin_parameters const *parameters);
+void rasterizer_environment_shadow_model_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	void const *geometry,
+	real_rgb_color const *change_colors);
 void rasterizer_environment_shadow_model_end(
 	void);
 void rasterizer_environment_shadow_end(
@@ -390,6 +426,18 @@ void rasterizer_dynamic_screen_geometry_draw(
 	long vertex_type,
 	long dynamic_vertex_buffer_index,
 	long vertex_count);
+void rasterizer_dynamic_screen_geometry_add_multitexture_params_to_base(
+	struct rasterizer_dynamic_screen_geometry_parameters *base,
+	struct rasterizer_dynamic_screen_geometry_parameters const *multitex_params);
+void rasterizer_dynamic_unlit_geometry_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	struct bitmap_data const *bitmap,
+	long dynamic_triangle_buffer_index,
+	long dynamic_vertex_buffer_index,
+	long vertex_count,
+	real_point3d const *centroid,
+	unsigned long geometry_flags);
 void rasterizer_dynamic_lit_geometry_draw(
 	void const *vertices,
 	void const *parameters);
