@@ -245,9 +245,16 @@ symbols in this file:
 #include <wchar.h>
 #include <wctype.h>
 
+#include "cseries/cseries.h"
 #include "unicode.h"
 
 /* ---------- constants */
+
+enum
+{
+	MAXIMUM_MEMCMP_SIZE = 0x10000000,
+	MAXIMUM_MEMCPY_MEMMOVE_SIZE = 0x10000000,
+};
 
 /* ---------- macros */
 
@@ -335,6 +342,131 @@ int utolower(
 	wchar_t character)
 {
 	return towlower(character);
+}
+
+void *umemchr(
+	void const *buffer,
+	int value,
+	unsigned long count)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		84,
+		buffer);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		85,
+		count < MAXIMUM_MEMCMP_SIZE);
+
+	return memchr(buffer, value, count);
+}
+
+long umemcmp(
+	void const *buffer1,
+	void const *buffer2,
+	unsigned long count)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		109,
+		buffer1 && buffer2);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		110,
+		(count >= 0) && (count <= MAXIMUM_MEMCMP_SIZE));
+
+	return csmemcmp(buffer1, buffer2, count);
+}
+
+void *umemmove(
+	void *dest,
+	void const *src,
+	unsigned long count)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		121,
+		dest && src);
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		122,
+		(count >= 0) && (count <= MAXIMUM_MEMCPY_MEMMOVE_SIZE));
+
+	return csmemmove(dest, src, count);
+}
+
+wint_t ufgetc(
+	FILE *stream)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		589,
+		stream);
+
+	return fgetwc(stream);
+}
+
+wint_t ufputc(
+	wchar_t character,
+	FILE *stream)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		599,
+		stream);
+
+	return fputwc(character, stream);
+}
+
+wint_t uungetc(
+	wchar_t character,
+	FILE *stream)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		609,
+		stream);
+
+	return ungetwc(character, stream);
+}
+
+int ufclose(
+	FILE *stream)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		900,
+		stream);
+
+	return fclose(stream);
+}
+
+wchar_t *uctime(
+	time_t const *timer)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		1014,
+		timer);
+
+	return _wctime(timer);
+}
+
+wchar_t *uasctime(
+	struct tm const *timeptr)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\text\\unicode.c",
+		1023,
+		timeptr);
+
+	return _wasctime(timeptr);
+}
+
+wchar_t *utmpnam(
+	wchar_t *string)
+{
+	return _wtmpnam(string);
 }
 
 /* ---------- private code */

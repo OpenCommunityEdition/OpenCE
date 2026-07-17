@@ -11,6 +11,7 @@ header included in hcex build.
 /* ---------- headers */
 
 #include <wchar.h>
+#include <time.h>
 
 /* ---------- constants */
 
@@ -50,5 +51,33 @@ int utoupper(
 	wchar_t character);
 int utolower(
 	wchar_t character);
+void *umemchr(
+	void const *buffer,
+	int value,
+	unsigned long count);
+long umemcmp(
+	void const *buffer1,
+	void const *buffer2,
+	unsigned long count);
+void *umemmove(
+	void *dest,
+	void const *src,
+	unsigned long count);
+wint_t ufgetc(
+	FILE *stream);
+wint_t ufputc(
+	wchar_t character,
+	FILE *stream);
+wint_t uungetc(
+	wchar_t character,
+	FILE *stream);
+int ufclose(
+	FILE *stream);
+wchar_t *uctime(
+	time_t const *timer);
+wchar_t *uasctime(
+	struct tm const *timeptr);
+wchar_t *utmpnam(
+	wchar_t *string);
 
 #endif // __UNICODE_H
