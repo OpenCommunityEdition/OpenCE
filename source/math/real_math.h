@@ -613,6 +613,7 @@ __inline real_point2d *set_real_point2d(
 {
 	p->x = x;
 	p->y = y;
+	return p;
 }
 
 __inline real_vector2d *set_real_vector2d(
@@ -622,6 +623,7 @@ __inline real_vector2d *set_real_vector2d(
 {
 	v->i = i;
 	v->j = j;
+	return v;
 }
 
 __inline real_point2d *point_from_line2d(
