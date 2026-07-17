@@ -94,7 +94,16 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "memory/data.h"
+#include "memory/lruv_cache.h"
+
 /* ---------- constants */
+
+enum
+{
+	LRUV_CACHE_SIGNATURE = 'weee'
+};
 
 /* ---------- macros */
 
@@ -102,8 +111,166 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void code_0010cd70(
+	struct lruv_cache *cache,
+	boolean verify_blocks);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+long lruv_allocation_size(
+	long maximum_block_count)
+{
+	return sizeof(struct lruv_cache) + data_allocation_size(
+		(short)maximum_block_count,
+		sizeof(struct lruv_cache_block));
+}
+
+void lruv_update_function_pointers(
+	struct lruv_cache *cache,
+	lruv_delete_block_proc delete_block_proc,
+	lruv_locked_block_proc locked_block_proc)
+{
+	match_assert("c:\\halo\\SOURCE\\memory\\lruv_cache.c", 148, cache);
+
+	cache->delete_block_proc = delete_block_proc;
+	cache->locked_block_proc = locked_block_proc;
+
+	return;
+}
+
+boolean lruv_has_locked_proc(
+	struct lruv_cache *cache)
+{
+	match_assert("c:\\halo\\SOURCE\\memory\\lruv_cache.c", 631, cache);
+
+	return cache->locked_block_proc != NULL;
+}
+
+void lruv_initialize(
+	struct lruv_cache *cache,
+	const char *name,
+	long page_count,
+	long page_size_bits,
+	long maximum_block_count,
+	lruv_delete_block_proc delete_block_proc,
+	lruv_locked_block_proc locked_block_proc)
+{
+	struct data_array *blocks = (struct data_array *)(cache + 1);
+
+	match_assert("c:\\halo\\SOURCE\\memory\\lruv_cache.c", 109, name);
+	match_assert("c:\\halo\\SOURCE\\memory\\lruv_cache.c", 110, page_count>0);
+	match_assert("c:\\halo\\SOURCE\\memory\\lruv_cache.c", 111, page_size_bits>0 && page_size_bits<SHORT_BITS);
+	match_assert("c:\\halo\\SOURCE\\memory\\lruv_cache.c", 112, maximum_block_count>0);
+
+	data_initialize(
+		blocks,
+		name,
+		(short)maximum_block_count,
+		sizeof(struct lruv_cache_block));
+	data_make_valid(blocks);
+	csmemset(cache, 0, sizeof(*cache));
+	csstrncpy(cache->name, name, NUMBEROF(cache->name) - 1);
+
+	cache->delete_block_proc = delete_block_proc;
+	cache->locked_block_proc = locked_block_proc;
+	cache->page_count = page_count;
+	cache->page_size_bits = page_size_bits;
+	cache->blocks = blocks;
+	cache->signature = LRUV_CACHE_SIGNATURE;
+	cache->first_block_index = NONE;
+	cache->last_block_index = NONE;
+	cache->tick = 1;
+
+	code_0010cd70(cache, TRUE);
+
+	return;
+}
+
+void lruv_delete(
+	struct lruv_cache *cache)
+{
+	code_0010cd70(cache, TRUE);
+	data_dispose(cache->blocks);
+	csmemset(cache, 0, sizeof(*cache));
+	match_free("c:\\halo\\SOURCE\\memory\\lruv_cache.c", 163, cache);
+
+	return;
+}
+
+void lruv_idle(
+	struct lruv_cache *cache)
+{
+	code_0010cd70(cache, FALSE);
+	cache->tick++;
+
+	return;
+}
+
+void lruv_block_touch(
+	struct lruv_cache *cache,
+	long block_index)
+{
+	struct lruv_cache_block *block;
+
+	code_0010cd70(cache, FALSE);
+	block = datum_get(cache->blocks, block_index);
+	block->last_used_tick = cache->tick;
+
+	return;
+}
+
+void *lruv_block_get_address(
+	struct lruv_cache *cache,
+	long block_index)
+{
+	struct lruv_cache_block *block;
+
+	code_0010cd70(cache, FALSE);
+	block = datum_get(cache->blocks, block_index);
+
+	return (void *)(block->first_page_index << cache->page_size_bits);
+}
+
+boolean lruv_block_touched(
+	struct lruv_cache *cache,
+	long block_index)
+{
+	struct lruv_cache_block *block;
+
+	code_0010cd70(cache, FALSE);
+	block = datum_get(cache->blocks, block_index);
+
+	return block->last_used_tick == cache->tick;
+}
+
+struct lruv_cache *lruv_new(
+	const char *name,
+	long page_count,
+	long page_size_bits,
+	long maximum_block_count,
+	lruv_delete_block_proc delete_block_proc,
+	lruv_locked_block_proc locked_block_proc)
+{
+	struct lruv_cache *cache = match_malloc(
+		"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+		82,
+		lruv_allocation_size(maximum_block_count));
+
+	if (cache)
+	{
+		lruv_initialize(
+			cache,
+			name,
+			page_count,
+			page_size_bits,
+			maximum_block_count,
+			delete_block_proc,
+			locked_block_proc);
+	}
+
+	return cache;
+}
 
 /* ---------- private code */

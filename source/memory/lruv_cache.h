@@ -10,7 +10,7 @@ header included in hcex build.
 
 /* ---------- headers */
 
-#include "cseries.h"
+#include "cseries/cseries.h"
 
 /* ---------- constants */
 
@@ -18,7 +18,44 @@ header included in hcex build.
 
 /* ---------- structures */
 
-struct lruv_cache;
+struct data_array;
+
+typedef void (*lruv_delete_block_proc)(
+	long block_index);
+
+typedef boolean (*lruv_locked_block_proc)(
+	long block_index);
+
+struct lruv_cache
+{
+	char name[32];
+	lruv_delete_block_proc delete_block_proc;
+	lruv_locked_block_proc locked_block_proc;
+	long page_count;
+	long page_size_bits;
+	long tick;
+	long first_block_index;
+	long last_block_index;
+	struct data_array *blocks;
+	unsigned long signature;
+};
+
+struct lruv_cache_block
+{
+	short identifier;
+	short flags;
+	long page_count;
+	long first_page_index;
+	long next_block_index;
+	long previous_block_index;
+	long last_used_tick;
+	long user_data;
+};
+
+typedef char lruv_cache_size_assert[
+	sizeof(struct lruv_cache) == 0x44 ? 1 : -1];
+typedef char lruv_cache_block_size_assert[
+	sizeof(struct lruv_cache_block) == 0x1C ? 1 : -1];
 
 /* ---------- prototypes/LRUV_CACHE.C */
 
@@ -29,8 +66,42 @@ void lruv_initialize(
 	long page_count,
 	long page_size_bits,
 	long maximum_block_count,
-	void (*delete_block_proc)(long),
-	boolean (*locked_block_proc)(long));
+	lruv_delete_block_proc delete_block_proc,
+	lruv_locked_block_proc locked_block_proc);
+
+void lruv_update_function_pointers(
+	struct lruv_cache *cache,
+	lruv_delete_block_proc delete_block_proc,
+	lruv_locked_block_proc locked_block_proc);
+
+boolean lruv_has_locked_proc(
+	struct lruv_cache *cache);
+
+struct lruv_cache *lruv_new(
+	const char *name,
+	long page_count,
+	long page_size_bits,
+	long maximum_block_count,
+	lruv_delete_block_proc delete_block_proc,
+	lruv_locked_block_proc locked_block_proc);
+
+void lruv_delete(
+	struct lruv_cache *cache);
+
+void lruv_idle(
+	struct lruv_cache *cache);
+
+void lruv_block_touch(
+	struct lruv_cache *cache,
+	long block_index);
+
+void *lruv_block_get_address(
+	struct lruv_cache *cache,
+	long block_index);
+
+boolean lruv_block_touched(
+	struct lruv_cache *cache,
+	long block_index);
 
 /* ---------- globals */
 
