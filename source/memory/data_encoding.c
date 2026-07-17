@@ -97,6 +97,50 @@ void data_encode_new(
 	return;
 }
 
+boolean data_encode_integer(
+	struct data_encoding_state *state,
+	long value,
+	long maximum_value)
+{
+	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 84, maximum_value>0);
+
+	if (maximum_value <= UNSIGNED_CHAR_MAX)
+	{
+		byte byte_value;
+
+		byte_value = (byte)value;
+		match_assert(
+			"c:\\halo\\SOURCE\\memory\\data_encoding.c",
+			43,
+			state && state->buffer && state->offset>=0 && state->offset<state->buffer_size);
+		if (state->offset + 1 <= state->buffer_size && !state->overflow)
+		{
+			csmemcpy(state->buffer + state->offset, &byte_value, 1);
+			state->offset++;
+		}
+		else
+		{
+			state->overflow = TRUE;
+		}
+	}
+	else if (maximum_value <= UNSIGNED_SHORT_MAX)
+	{
+		short short_value;
+
+		short_value = (short)value;
+		data_encode_memory(state, &short_value, 1, -sizeof(short_value));
+	}
+	else
+	{
+		long long_value;
+
+		long_value = value;
+		data_encode_memory(state, &long_value, 1, -sizeof(long_value));
+	}
+
+	return !state->overflow;
+}
+
 boolean data_encode_structures(
 	struct data_encoding_state *state,
 	void const *source_structures,
