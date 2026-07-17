@@ -177,8 +177,7 @@ static boolean code_0010b270(
 	short element_index;
 	short probe_count = 0;
 	long hash;
-	boolean equal;
-	void *element;
+	long equal;
 
 	if (table->hash_function)
 	{
@@ -192,32 +191,43 @@ static boolean code_0010b270(
 	element_index = hash & (table->elements.count - 1);
 	while (BIT_VECTOR_TEST_FLAG(table->used_slots, element_index))
 	{
-		if (probe_count >= table->count)
+		if (probe_count < table->count)
 		{
-			break;
-		}
+			if (table->compare_function)
+			{
+				equal = table->compare_function(
+					table->user_data,
+					dynamic_array_get_element(
+						&table->elements,
+						element_index,
+						table->element_size),
+					key);
+			}
+			else
+			{
+				equal = !csmemcmp(
+					dynamic_array_get_element(
+						&table->elements,
+						element_index,
+						table->element_size),
+					key,
+					table->key_size);
+			}
 
-		element = dynamic_array_get_element(
-			&table->elements,
-			element_index,
-			table->element_size);
-		if (table->compare_function)
-		{
-			equal = table->compare_function(table->user_data, element, key);
+			if (equal)
+			{
+				*element_index_reference = element_index;
+				return TRUE;
+			}
+
+			element_index = (element_index + 1) & (table->elements.count - 1);
+			probe_count++;
 		}
 		else
 		{
-			equal = !csmemcmp(element, key, table->key_size);
-		}
-
-		if (equal)
-		{
 			*element_index_reference = element_index;
-			return TRUE;
+			return FALSE;
 		}
-
-		element_index = (element_index + 1) & (table->elements.count - 1);
-		probe_count++;
 	}
 
 	*element_index_reference = element_index;
