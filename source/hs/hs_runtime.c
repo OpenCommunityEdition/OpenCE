@@ -261,16 +261,133 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "math/real_math.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+union hs_conversion_result
+{
+	boolean boolean;
+	short short_integer;
+	long long_integer;
+	real real;
+	char const *string;
+};
+
 /* ---------- prototypes */
+
+union hs_conversion_result code_000ba220(
+	union hs_conversion_result value);
+union hs_conversion_result code_000ba240(
+	union hs_conversion_result value);
+union hs_conversion_result code_000ba260(
+	union hs_conversion_result value);
+union hs_conversion_result code_000ba280(
+	union hs_conversion_result value);
+long code_000ba290(
+	long value);
+union hs_conversion_result code_000ba2b0(
+	union hs_conversion_result value);
+long code_000ba2c0(
+	long value);
+union hs_conversion_result code_000ba2e0(
+	union hs_conversion_result value);
+long code_000ba300(
+	union hs_conversion_result value);
+long code_000ba310(
+	long value);
 
 /* ---------- globals */
 
 /* ---------- public code */
 
 /* ---------- private code */
+
+union hs_conversion_result code_000ba220(
+	union hs_conversion_result value)
+{
+	value.boolean = value.long_integer==0;
+
+	return value;
+}
+
+union hs_conversion_result code_000ba240(
+	union hs_conversion_result value)
+{
+	value.boolean = value.short_integer==0;
+
+	return value;
+}
+
+union hs_conversion_result code_000ba260(
+	union hs_conversion_result value)
+{
+	union hs_conversion_result result;
+
+	result.boolean = csstrlen(value.string)==0;
+
+	return result;
+}
+
+union hs_conversion_result code_000ba280(
+	union hs_conversion_result value)
+{
+	union hs_conversion_result result;
+
+	result.long_integer = 0;
+
+	return result;
+}
+
+long code_000ba290(
+	long value)
+{
+	value = *(short *)&value;
+	*(real *)&value = (real)*(long *)&value;
+
+	return value;
+}
+
+union hs_conversion_result code_000ba2b0(
+	union hs_conversion_result value)
+{
+	value.real = value.long_integer;
+
+	return value;
+}
+
+long code_000ba2c0(
+	long value)
+{
+	value = *(short *)&value+1;
+	*(real *)&value = (real)*(long *)&value;
+
+	return value;
+}
+
+union hs_conversion_result code_000ba2e0(
+	union hs_conversion_result value)
+{
+	value.short_integer = (short)value.real;
+
+	return value;
+}
+
+long code_000ba300(
+	union hs_conversion_result value)
+{
+	return (long)value.real;
+}
+
+long code_000ba310(
+	long value)
+{
+	*(short *)&value = *(short *)&value;
+
+	return value;
+}
