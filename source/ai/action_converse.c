@@ -32,6 +32,8 @@ symbols in this file:
 #include "actors.h"
 #include "ai_communication.h"
 #include "props.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
 #include "units/units.h"
 
 /* ---------- constants */
@@ -40,11 +42,49 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct scenario_conversation_definition
+{
+	byte __unknown0[0x28];
+	real run_to_distance;
+	byte __unknown2c[0x48];
+};
+
+typedef char scenario_conversation_definition_size_assert[
+	sizeof(struct scenario_conversation_definition) == 0x74 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+boolean action_converse_setup(
+	long actor_index,
+	long conversation_index,
+	struct converse_state_data *state_data)
+{
+	struct ai_conversation_datum_header *conversation;
+	struct scenario_conversation_definition *definition;
+
+	actor_get(actor_index);
+	conversation = ai_conversation_header_get(conversation_index);
+	definition = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_conversations,
+		conversation->scenario_conversation_index,
+		struct scenario_conversation_definition);
+
+	match_assert("c:\\halo\\SOURCE\\ai\\action_converse.c", 33, state_data);
+	csmemset(state_data, 0, sizeof(*state_data));
+	state_data->conversation_index = conversation_index;
+	state_data->run_to_distance = definition->run_to_distance;
+	state_data->run_to_unit_index = state_data->run_to_distance == 0.0f
+		? NONE
+		: conversation->unit_index;
+	state_data->run_to_prop_index = NONE;
+	state_data->in_range = FALSE;
+
+	return TRUE;
+}
 
 void action_converse_begin(
 	long actor_index)
