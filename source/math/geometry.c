@@ -235,4 +235,26 @@ real vector_intersect_plane3d(
 		-(vector->i*plane->n.i + vector->j*plane->n.j + vector->k*plane->n.k);
 }
 
+boolean convex_polygon2d_verify(
+	short count,
+	real *vertices)
+{
+	short index = 0;
+
+	if (count > 0)
+	{
+		do
+		{
+			if (!valid_real(vertices[index*2]) || !valid_real(vertices[index*2 + 1]))
+			{
+				return FALSE;
+			}
+			index++;
+		}
+		while (index < count);
+	}
+
+	return TRUE;
+}
+
 /* ---------- private code */
