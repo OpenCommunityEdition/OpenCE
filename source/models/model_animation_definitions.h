@@ -94,6 +94,13 @@ struct animation
 	struct tag_data data;
 };
 
+typedef char verify_animation_loop_frame_index_offset[
+	offsetof(struct animation, private_loop_frame_index) == 0x2E ? 1 : -1];
+typedef char verify_animation_second_key_frame_index_offset[
+	offsetof(struct animation, private_second_key_frame_index) == 0x36 ? 1 : -1];
+typedef char verify_animation_sound_frame_index_offset[
+	offsetof(struct animation, private_sound_frame_index) == 0x3E ? 1 : -1];
+
 struct animation_graph_object_overlay
 {
 	short animation_index;
@@ -191,6 +198,17 @@ byte *animation_get_frame_info(struct animation const *animation, short frame_in
 char const *animation_list_get_string(struct animation_list const *animation_list, short animation_index);
 
 /* ---------- prototypes/MODEL_ANIMATIONS.C */
+
+short animation_loop_frame_index(
+	struct animation const *animation);
+short animation_second_key_frame_index(
+	struct animation const *animation);
+short animation_sound_frame_index(
+	struct animation const *animation);
+void animation_get_x_offsets(
+	struct animation const *animation,
+	real *key_frame_x_offset,
+	real *total_x_offset);
 
 short animation_graph_get_animation_by_name(
 	long animation_graph_index,

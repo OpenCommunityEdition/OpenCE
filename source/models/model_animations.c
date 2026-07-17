@@ -156,6 +156,34 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct animation_frame_info_dx_dyaw
+{
+	real dx;
+	real dyaw;
+};
+
+struct animation_frame_info_dx_dy_dyaw
+{
+	real dx;
+	real dy;
+	real dyaw;
+};
+
+struct animation_frame_info_dx_dy_dz_dyaw
+{
+	real dx;
+	real dy;
+	real dz;
+	real dyaw;
+};
+
+typedef char verify_animation_frame_info_dx_dyaw_size[
+	sizeof(struct animation_frame_info_dx_dyaw) == 0x08 ? 1 : -1];
+typedef char verify_animation_frame_info_dx_dy_dyaw_size[
+	sizeof(struct animation_frame_info_dx_dy_dyaw) == 0x0C ? 1 : -1];
+typedef char verify_animation_frame_info_dx_dy_dz_dyaw_size[
+	sizeof(struct animation_frame_info_dx_dy_dz_dyaw) == 0x10 ? 1 : -1];
+
 /* ---------- prototypes */
 
 void quaternion_decompress_6byte(
@@ -165,6 +193,72 @@ void quaternion_decompress_6byte(
 /* ---------- globals */
 
 /* ---------- public code */
+
+short animation_loop_frame_index(
+	struct animation const *animation)
+{
+	return animation->private_loop_frame_index;
+}
+
+short animation_second_key_frame_index(
+	struct animation const *animation)
+{
+	return animation->private_second_key_frame_index;
+}
+
+short animation_sound_frame_index(
+	struct animation const *animation)
+{
+	return animation->private_sound_frame_index;
+}
+
+void animation_get_x_offsets(
+	struct animation const *animation,
+	real *key_frame_x_offset,
+	real *total_x_offset)
+{
+	short frame_index;
+	real x_offset = 0.f;
+	real key_x_offset = 0.f;
+	byte const *frame_info = animation->frame_info.address;
+
+	for (frame_index = 0; frame_index < animation->frame_count; frame_index++)
+	{
+		switch (animation->frame_info_type)
+		{
+		case 1:
+			x_offset += ((struct animation_frame_info_dx_dyaw const *)frame_info)->dx;
+			frame_info += sizeof(struct animation_frame_info_dx_dyaw);
+			break;
+
+		case 2:
+			x_offset += ((struct animation_frame_info_dx_dy_dyaw const *)frame_info)->dx;
+			frame_info += sizeof(struct animation_frame_info_dx_dy_dyaw);
+			break;
+
+		case 3:
+			x_offset += ((struct animation_frame_info_dx_dy_dz_dyaw const *)frame_info)->dx;
+			frame_info += sizeof(struct animation_frame_info_dx_dy_dz_dyaw);
+			break;
+		}
+
+		if (frame_index == animation->private_key_frame_index)
+		{
+			key_x_offset = x_offset;
+		}
+	}
+
+	if (total_x_offset)
+	{
+		*total_x_offset = x_offset;
+	}
+	if (key_frame_x_offset)
+	{
+		*key_frame_x_offset = key_x_offset;
+	}
+
+	return;
+}
 
 void quaternion_decompress_6byte_renormalized(
 	void const *compressed,
