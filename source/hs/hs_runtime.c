@@ -264,13 +264,24 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "hs/hs.h"
 #include "hs/object_lists.h"
+#include "hs/hs_scenario_definitions.h"
 #include "math/real_math.h"
 #include "memory/data.h"
 #include "objects/objects.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
 #include "saved games/game_state.h"
 #include "cseries/errors.h"
 
 /* ---------- constants */
+
+enum
+{
+	_hs_thread_type_script = 0,
+	_hs_thread_type_global_initialize,
+	_hs_thread_type_console_command,
+	NUMBER_OF_HS_THREAD_TYPES,
+};
 
 /* ---------- macros */
 
@@ -295,6 +306,31 @@ struct hs_runtime_globals
 	short executing_thread_index;
 };
 
+struct hs_stack_frame
+{
+	struct hs_stack_frame *previous;
+	long expression_index;
+	void *result;
+	short size;
+	byte data[2];
+};
+
+struct hs_thread_datum
+{
+	short identifier;
+	byte type;
+	byte flags;
+	long script_index;
+	long sleep_until;
+	long unknown0c;
+	struct hs_stack_frame *stack;
+	long unknown14;
+	byte stack_data[0x200];
+};
+
+typedef char hs_thread_datum_size_assert[
+	sizeof(struct hs_thread_datum) == 0x218 ? 1 : -1];
+
 /* ---------- prototypes */
 
 void code_000b9880(
@@ -316,6 +352,10 @@ void code_000b9970(
 void code_000b99c0(
 	short type,
 	union hs_conversion_result value,
+	char *result);
+void code_000b9a10(
+	short type,
+	long enum_value,
 	char *result);
 union hs_conversion_result code_000ba220(
 	union hs_conversion_result value);
@@ -344,12 +384,21 @@ long code_000ba360(
 static boolean code_000ba390(
 	short actual_type,
 	short desired_type);
+static char const *code_000b9e20(
+	long thread_index);
+static void code_000b9f20(
+	long thread_index);
+static void code_000ba090(
+	long thread_index);
+static long code_000ba1a0(
+	char const *name);
 
 /* ---------- globals */
 
 extern hs_typecasting_procedure typecasting_procedures[NUMBER_OF_HS_TYPES][NUMBER_OF_HS_TYPES];
 extern struct data_array *hs_global_data;
 extern struct data_array *hs_thread_data;
+extern struct data_array *hs_syntax_data;
 extern short hs_external_global_count;
 extern struct hs_runtime_globals bss_004535ac;
 
@@ -411,7 +460,156 @@ void hs_runtime_dispose_from_old_map(
 	return;
 }
 
+char const *hs_runtime_get_executing_thread_name(
+	void)
+{
+	char const *name;
+
+	name = NULL;
+	if (bss_004535ac.executing_thread_index != NONE)
+		name = code_000b9e20(bss_004535ac.executing_thread_index);
+	if (!name)
+		name = "[unknown]";
+
+	return name;
+}
+
+boolean hs_wake_by_name(
+	char const *name)
+{
+	long thread_index;
+	boolean result;
+
+	thread_index = code_000ba1a0(name);
+	result = FALSE;
+	if (thread_index != NONE)
+	{
+		code_000ba090(thread_index);
+		result = TRUE;
+	}
+
+	return result;
+}
+
 /* ---------- private code */
+
+static char const *code_000b9e20(
+	long thread_index)
+{
+	struct hs_thread_datum *thread;
+	char const *name;
+
+	name = NULL;
+	thread = datum_get(hs_thread_data, thread_index);
+	switch (thread->type)
+	{
+	case _hs_thread_type_script:
+		name = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->hs_scripts,
+			((struct hs_thread_datum *)datum_get(
+				hs_thread_data,
+				thread_index))->script_index,
+			struct hs_script)->name;
+		break;
+	case _hs_thread_type_global_initialize:
+		name = "[global initialize]";
+		break;
+	case _hs_thread_type_console_command:
+		name = "[console command]";
+		break;
+	default:
+		display_assert(NULL, "c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x2a9, TRUE);
+		system_exit(-1);
+		break;
+	}
+
+	return name;
+}
+
+static void code_000b9f20(
+	long thread_index)
+{
+	struct hs_thread_datum *thread;
+
+	thread = datum_get(hs_thread_data, thread_index);
+	thread->stack = thread->stack->previous;
+
+	return;
+}
+
+static void code_000ba090(
+	long thread_index)
+{
+	struct hs_thread_datum *thread;
+	struct hs_syntax_node *syntax;
+
+	thread = datum_get(hs_thread_data, thread_index);
+	if (thread->sleep_until != NONE)
+	{
+		thread->sleep_until = 0;
+		if (TEST_FLAG(thread->flags, 1))
+		{
+			thread->sleep_until = thread->unknown0c;
+			SET_FLAG(thread->flags, 1, FALSE);
+		}
+		else
+		{
+			if (thread->stack->expression_index != NONE)
+			{
+				syntax = datum_get(hs_syntax_data, thread->stack->expression_index);
+				if (syntax->index == 0x14)
+				{
+					code_000b9f20(thread_index);
+					return;
+				}
+			}
+
+			if (thread->stack->previous &&
+				thread->stack->previous->expression_index != NONE)
+			{
+				syntax = datum_get(
+					hs_syntax_data,
+					thread->stack->previous->expression_index);
+				if (syntax->index == 0x14)
+				{
+					code_000b9f20(thread_index);
+					code_000b9f20(thread_index);
+					SET_FLAG(thread->flags, 0, FALSE);
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+static long code_000ba1a0(
+	char const *name)
+{
+	long thread_index;
+
+	thread_index = data_next_index(hs_thread_data, NONE);
+	while (thread_index != NONE)
+	{
+		struct hs_thread_datum *thread;
+
+		thread = datum_get(hs_thread_data, thread_index);
+		if (thread->script_index != NONE)
+		{
+			struct hs_script const *script;
+
+			script = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->hs_scripts,
+				thread->script_index,
+				struct hs_script);
+			if (_stricmp(script->name, name) == 0)
+				return thread_index;
+		}
+		thread_index = data_next_index(hs_thread_data, thread_index);
+	}
+
+	return NONE;
+}
 
 void code_000b9880(
 	short type,
@@ -474,6 +672,25 @@ void code_000b99c0(
 		type==_hs_type_string);
 
 	sprintf(result, "%s", value.string);
+
+	return;
+}
+
+void code_000b9a10(
+	short type,
+	long enum_value,
+	char *result)
+{
+	struct hs_enum_definition *enum_definition;
+
+	enum_definition = &hs_enum_table[type];
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x27b,
+		HS_TYPE_IS_ENUM(type));
+	match_vassert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x27c,
+		(short)enum_value>=0 && (short)enum_value<enum_definition->count,
+		"enum_value>=0 && enum_value<enum_definition->count");
+
+	sprintf(result, "%s", enum_definition->values[(short)enum_value]);
 
 	return;
 }

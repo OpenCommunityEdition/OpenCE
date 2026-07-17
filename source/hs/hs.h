@@ -72,10 +72,18 @@ enum
 /* ---------- macros */
 
 #define hs_type_valid(type) ((type)>=_hs_type_void && (type)<NUMBER_OF_HS_TYPES)
+#define HS_TYPE_IS_ENUM(type) ((type)>=_hs_type_enum_game_difficulty && (type)<=_hs_type_enum_hud_corner)
 #define HS_TYPE_IS_OBJECT_NAME(type) ((type)>=_hs_type_object_name && (type)<=_hs_type_scenery_name)
 #define HS_TYPE_IS_OBJECT(type) ((type)>=_hs_type_object && (type)<=_hs_type_scenery)
 
 /* ---------- structures */
+
+struct hs_enum_definition
+{
+	short count;
+	short pad;
+	char const **values;
+};
 
 /* ---------- prototypes/HS.C */
 
@@ -87,6 +95,10 @@ void hs_runtime_dispose(
 
 void hs_runtime_dispose_from_old_map(
 	void);
+char const *hs_runtime_get_executing_thread_name(
+	void);
+boolean hs_wake_by_name(
+	char const *name);
 
 void hs_recompile(
 	void);
@@ -102,6 +114,7 @@ boolean hs_can_cast(
 /* ---------- globals */
 
 extern word hs_object_type_masks[NUMBER_OF_HS_OBJECT_TYPES];
+extern struct hs_enum_definition hs_enum_table[NUMBER_OF_HS_TYPES];
 
 /* ---------- public code */
 
