@@ -386,5 +386,80 @@ void object_type_export_function_values(
 	return;
 }
 
+void object_type_handle_deleted_object(
+	long object_index,
+	long deleted_object_index)
+{
+	short i;
+	struct object_type_definition *definition = object_type_definition_get(object_get(object_index)->object.type);
+
+	for (i = 0; definition->part_definitions[i]; i++)
+	{
+		struct object_type_definition *current_definition = definition->part_definitions[i];
+		if (current_definition->handle_deleted_object)
+		{
+			current_definition->handle_deleted_object(object_index, deleted_object_index);
+		}
+	}
+
+	return;
+}
+
+void object_type_preprocess_node_orientations(
+	long object_index,
+	struct real_orientation *node_orientations)
+{
+	short i;
+	struct object_type_definition *definition = object_type_definition_get(object_get(object_index)->object.type);
+
+	for (i = 0; definition->part_definitions[i]; i++)
+	{
+		struct object_type_definition *current_definition = definition->part_definitions[i];
+		if (current_definition->datum_preprocess_node_orientations)
+		{
+			current_definition->datum_preprocess_node_orientations(object_index, node_orientations);
+		}
+	}
+
+	return;
+}
+
+void object_type_postprocess_node_matrices(
+	long object_index,
+	struct real_matrix4x3 *node_matrices)
+{
+	short i;
+	struct object_type_definition *definition = object_type_definition_get(object_get(object_index)->object.type);
+
+	for (i = 0; definition->part_definitions[i]; i++)
+	{
+		struct object_type_definition *current_definition = definition->part_definitions[i];
+		if (current_definition->datum_postprocess_node_matrices)
+		{
+			current_definition->datum_postprocess_node_matrices(object_index, node_matrices);
+		}
+	}
+
+	return;
+}
+
+void object_type_disconnect_from_structure_bsp(
+	long object_index)
+{
+	short i;
+	struct object_type_definition *definition = object_type_definition_get(object_get(object_index)->object.type);
+
+	for (i = 0; definition->part_definitions[i]; i++)
+	{
+		struct object_type_definition *current_definition = definition->part_definitions[i];
+		if (current_definition->disconnect_from_structure_bsp)
+		{
+			current_definition->disconnect_from_structure_bsp(object_index);
+		}
+	}
+
+	return;
+}
+
 
 /* ---------- private code */
