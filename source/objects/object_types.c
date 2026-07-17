@@ -127,6 +127,7 @@ symbols in this file:
 
 #include "cache/cache_files.h"
 #include "objects.h"
+#include "scenario/scenario_definitions.h"
 
 /* ---------- constants */
 
@@ -655,6 +656,48 @@ void object_type_notify_impulse_sound(
 	}
 
 	return;
+}
+
+struct tag_block *scenario_get_object_type_scenario_datums(
+	struct scenario *scenario,
+	short object_type,
+	long *size)
+{
+	struct object_type_definition *definition = object_type_definition_get(object_type);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\object_types.c",
+		1279,
+		definition->placement_tag_block_offset!=NONE);
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\object_types.c",
+		1280,
+		definition->placement_tag_block_offset>=0 && definition->placement_tag_block_offset<=sizeof(struct scenario)+sizeof(struct tag_block));
+
+	if (size)
+	{
+		*size = definition->placement_tag_block_element_size;
+	}
+
+	return (struct tag_block *)((byte *)scenario + definition->placement_tag_block_offset);
+}
+
+struct tag_block *scenario_get_object_type_scenario_palette(
+	struct scenario *scenario,
+	short object_type)
+{
+	struct object_type_definition *definition = object_type_definition_get(object_type);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\object_types.c",
+		1293,
+		definition->palette_tag_block_offset!=NONE);
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\object_types.c",
+		1294,
+		definition->palette_tag_block_offset>=0 && definition->palette_tag_block_offset<=sizeof(struct scenario)+sizeof(struct tag_block));
+
+	return (struct tag_block *)((byte *)scenario + definition->palette_tag_block_offset);
 }
 
 

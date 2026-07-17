@@ -118,7 +118,12 @@ void object_type_disconnect_from_structure_bsp(long object_index);
 void object_type_render_debug(long object_index);
 void object_type_notify_impulse_sound(long object_index, long sound_index, long source_object_index);
 
-struct tag_block *scenario_get_object_type_scenario_datums(struct scenario *scenario, short object_type, long *size);
-struct tag_block *scenario_get_object_type_scenario_palette(struct scenario *scenario, short object_type);
+struct tag_block *scenario_get_object_type_scenario_datums(
+	struct scenario *scenario,
+	short object_type,
+	long *size);
+struct tag_block *scenario_get_object_type_scenario_palette(
+	struct scenario *scenario,
+	short object_type);
 
 #endif // __OBJECT_TYPES_H
