@@ -262,11 +262,17 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "hs/hs.h"
+#include "hs/object_lists.h"
 #include "math/real_math.h"
+#include "memory/data.h"
+#include "objects/objects.h"
 
 /* ---------- constants */
 
 /* ---------- macros */
+
+typedef long (*hs_typecasting_procedure)(long value);
 
 /* ---------- structures */
 
@@ -301,10 +307,28 @@ long code_000ba300(
 	union hs_conversion_result value);
 long code_000ba310(
 	long value);
+long code_000ba320(
+	short object_name_index);
+long code_000ba360(
+	long object_index);
+static boolean code_000ba390(
+	short actual_type,
+	short desired_type);
 
 /* ---------- globals */
 
+extern hs_typecasting_procedure typecasting_procedures[NUMBER_OF_HS_TYPES][NUMBER_OF_HS_TYPES];
+extern struct data_array *hs_global_data;
+
 /* ---------- public code */
+
+void hs_runtime_dispose(
+	void)
+{
+	data_make_invalid(hs_global_data);
+
+	return;
+}
 
 /* ---------- private code */
 
@@ -390,4 +414,102 @@ long code_000ba310(
 	*(short *)&value = *(short *)&value;
 
 	return value;
+}
+
+long code_000ba320(
+	short object_name_index)
+{
+	long object_index;
+	long object_list_index = NONE;
+
+	object_index = object_index_from_name_index(object_name_index);
+	if (object_index != NONE)
+	{
+		object_list_index = object_list_new();
+		object_list_add(object_list_index, object_index);
+	}
+
+	return object_list_index;
+}
+
+long code_000ba360(
+	long object_index)
+{
+	long object_list_index = NONE;
+
+	if (object_index != NONE)
+	{
+		object_list_index = object_list_new();
+		object_list_add(object_list_index, object_index);
+	}
+
+	return object_list_index;
+}
+
+static boolean code_000ba390(
+	short actual_type,
+	short desired_type)
+{
+	word actual_type_mask;
+	word desired_type_mask;
+
+	desired_type_mask = hs_object_type_masks[desired_type];
+	actual_type_mask = hs_object_type_masks[actual_type];
+
+	match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x599,
+		actual_type>=0 && actual_type<NUMBER_OF_HS_OBJECT_TYPES);
+	match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x59a,
+		desired_type>=0 && desired_type<NUMBER_OF_HS_OBJECT_TYPES);
+
+	return (actual_type_mask & desired_type_mask)==actual_type_mask;
+}
+
+boolean hs_can_cast(
+	short actual_type,
+	short desired_type)
+{
+	match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x5a4,
+		actual_type==_hs_passthrough || hs_type_valid(actual_type));
+	match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x5a5,
+		hs_type_valid(desired_type));
+
+	if (actual_type==_hs_passthrough || actual_type==desired_type)
+	{
+		return TRUE;
+	}
+
+	if (HS_TYPE_IS_OBJECT_NAME(desired_type))
+	{
+		desired_type -= _hs_type_object_name;
+		if (HS_TYPE_IS_OBJECT_NAME(actual_type))
+		{
+			return code_000ba390(
+				actual_type-_hs_type_object_name,
+				desired_type);
+		}
+		else if (!HS_TYPE_IS_OBJECT(actual_type))
+		{
+			return FALSE;
+		}
+
+		goto cast_object_type;
+	}
+	else if (HS_TYPE_IS_OBJECT(desired_type))
+	{
+		if (!HS_TYPE_IS_OBJECT(actual_type))
+		{
+			return FALSE;
+		}
+
+		desired_type -= _hs_type_object;
+
+cast_object_type:
+		return code_000ba390(
+			actual_type-_hs_type_object,
+			desired_type);
+	}
+	else
+	{
+		return typecasting_procedures[desired_type][actual_type] != NULL;
+	}
 }
