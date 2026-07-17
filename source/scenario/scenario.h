@@ -12,6 +12,7 @@ header included in hcex build.
 /* ---------- headers */
 
 #include "real_math.h"
+#include "sound/sound_environment_definitions.h"
 
 /* ---------- constants */
 
@@ -55,7 +56,11 @@ enum
 struct scenario_globals
 {
 	short structure_bsp_index;
-	byte unknown[0xFE];
+	word pad;
+	byte unknown04[0xB0];
+	boolean sound_environment_initialized;
+	byte pad2[3];
+	struct sound_environment_definition sound_environment;
 };
 
 typedef char scenario_globals_size_assert[
@@ -65,7 +70,8 @@ typedef char scenario_globals_size_assert[
 
 void scenario_initialize(
 	void);
-void scenario_initialize_for_new_map(void);
+void scenario_initialize_for_new_map(
+	void);
 void scenario_dispose_from_old_map(void);
 void scenario_frame_update(real dt);
 void scenario_unload(void);

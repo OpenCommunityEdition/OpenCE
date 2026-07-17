@@ -213,6 +213,20 @@ void scenario_initialize(
 	return;
 }
 
+void scenario_initialize_for_new_map(
+	void)
+{
+	wind_initialize_for_new_map();
+	csmemset(
+		scenario_globals->unknown04,
+		0,
+		sizeof(scenario_globals->unknown04));
+	scenario_globals->sound_environment = default_sound_environment;
+	scenario_globals->sound_environment_initialized = FALSE;
+
+	return;
+}
+
 void scenario_dispose_from_old_map(
 	void)
 {
