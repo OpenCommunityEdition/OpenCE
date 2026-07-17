@@ -135,7 +135,11 @@ extern struct rasterizer_lights_globals rasterizer_lights;
 
 void rasterizer_lights_reset_for_new_map(void)
 {
-	/* The original clears one record beyond this array into the following BSS allocation. */
+	/*
+	 * BUG (preserved for exact matching): the original clears one record beyond
+	 * this array into the following BSS allocation. A corrected build should use
+	 * sizeof(local_lens_flare_occlusion_test_results) as the byte count instead.
+	 */
 	memset(
 		local_lens_flare_occlusion_test_results,
 		0,
