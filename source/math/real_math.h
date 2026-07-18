@@ -423,10 +423,22 @@ boolean point_in_cone2d(
 	real_vector2d const *direction,
 	real length,
 	real cosine);
+boolean point_in_cone3d(
+	real_point3d const *point,
+	real_point3d const *center,
+	real_vector3d const *direction,
+	real length,
+	real cosine);
 boolean point_in_sector2d(
 	real_point2d const *point,
 	real_point2d const *center,
 	real_vector2d const *direction,
+	real radius,
+	real cosine);
+boolean point_in_sector3d(
+	real_point3d const *point,
+	real_point3d const *center,
+	real_vector3d const *direction,
 	real radius,
 	real cosine);
 boolean point_in_triangle2d(
@@ -487,6 +499,11 @@ boolean point_in_pill2d(real_point2d const *point, real_point2d const *base, rea
 real point_to_line_distance_squared3d(real_point3d const *point, real_point3d const *base, real_vector3d const *height);
 
 boolean sphere_test_vector3d(real_point3d const *center, real radius, real_point3d const *point, real_vector3d const *vector, real *t, real_vector3d *normal);
+
+boolean accelerate_to_velocity3d(
+	real_vector3d *velocity,
+	real_vector3d const *target_velocity,
+	real acceleration);
 
 boolean valid_real_sine_cosine(real sine, real cosine);
 

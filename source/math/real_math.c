@@ -502,6 +502,29 @@ boolean point_in_cone2d(
 		projection * projection >= magnitude_squared2d(&offset) * cosine * cosine);
 }
 
+boolean point_in_cone3d(
+	real_point3d const *point,
+	real_point3d const *center,
+	real_vector3d const *direction,
+	real length,
+	real cosine)
+{
+	real_vector3d offset;
+	real projection;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\math\\real_math.c",
+		1404,
+		cosine>=0.0f);
+
+	vector_from_points3d(center, point, &offset);
+	projection = dot_product3d(&offset, direction);
+
+	return (boolean)(projection >= 0.f &&
+		projection <= length &&
+		projection * projection >= magnitude_squared3d(&offset) * cosine * cosine);
+}
+
 boolean point_in_sector2d(
 	real_point2d const *point,
 	real_point2d const *center,
@@ -524,6 +547,46 @@ boolean point_in_sector2d(
 	if (distance_squared <= radius * radius)
 	{
 		projection = dot_product2d(&offset, direction);
+		if (projection >= 0.f &&
+			projection * projection >= distance_squared * cosine * cosine)
+		{
+			result = TRUE;
+		}
+		else
+		{
+			result = FALSE;
+		}
+	}
+	else
+	{
+		result = FALSE;
+	}
+
+	return result;
+}
+
+boolean point_in_sector3d(
+	real_point3d const *point,
+	real_point3d const *center,
+	real_vector3d const *direction,
+	real radius,
+	real cosine)
+{
+	real_vector3d offset;
+	real distance_squared;
+	real projection;
+	boolean result;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\math\\real_math.c",
+		1462,
+		cosine>=0.0f);
+
+	vector_from_points3d(center, point, &offset);
+	distance_squared = magnitude_squared3d(&offset);
+	if (distance_squared <= radius * radius)
+	{
+		projection = dot_product3d(&offset, direction);
 		if (projection >= 0.f &&
 			projection * projection >= distance_squared * cosine * cosine)
 		{
@@ -1298,6 +1361,29 @@ boolean sphere_test_vector3d(
 	}
 
 	return FALSE;
+}
+
+boolean accelerate_to_velocity3d(
+	real_vector3d *velocity,
+	real_vector3d const *target_velocity,
+	real acceleration)
+{
+	real_vector3d delta;
+	boolean result;
+
+	subtract_vectors3d(target_velocity, velocity, &delta);
+	if (limit3d(&delta, acceleration))
+	{
+		add_vectors3d(velocity, &delta, velocity);
+		result = FALSE;
+	}
+	else
+	{
+		*velocity = *target_velocity;
+		result = TRUE;
+	}
+
+	return result;
 }
 
 boolean valid_real_sine_cosine(
