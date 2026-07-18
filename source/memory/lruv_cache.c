@@ -391,3 +391,77 @@ void lruv_flush(
 }
 
 /* ---------- private code */
+
+void code_0010cd70(
+	struct lruv_cache *cache,
+	boolean verify_blocks)
+{
+	long block_index;
+	struct lruv_cache_block *block;
+	struct lruv_cache_block *next_block;
+	struct lruv_cache_block *previous_block;
+
+	match_assert("c:\\halo\\SOURCE\\memory\\lruv_cache.c", 754, cache);
+	match_assert("c:\\halo\\SOURCE\\memory\\lruv_cache.c", 755, cache->signature==LRUV_CACHE_SIGNATURE);
+	data_verify(cache->blocks);
+
+	if (verify_blocks)
+	{
+		block_index = cache->first_block_index;
+		while (block_index != NONE)
+		{
+			block = datum_get(cache->blocks, block_index);
+			if (block->previous_block_index == NONE)
+			{
+				match_assert(
+					"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+					770,
+					cache->first_block_index==block_index);
+			}
+			else
+			{
+				previous_block = datum_get(cache->blocks, block->previous_block_index);
+				match_assert(
+					"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+					776,
+					previous_block->next_block_index==block_index);
+				match_assert(
+					"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+					777,
+					previous_block->first_page_index<block->first_page_index);
+				match_assert(
+					"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+					778,
+					previous_block->first_page_index+previous_block->page_count<=block->first_page_index);
+			}
+
+			if (block->next_block_index == NONE)
+			{
+				match_assert(
+					"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+					784,
+					cache->last_block_index==block_index);
+			}
+			else
+			{
+				next_block = datum_get(cache->blocks, block->next_block_index);
+				match_assert(
+					"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+					790,
+					next_block->previous_block_index==block_index);
+				match_assert(
+					"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+					791,
+					next_block->first_page_index>block->first_page_index);
+				match_assert(
+					"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+					792,
+					block->first_page_index+block->page_count<=next_block->first_page_index);
+			}
+
+			block_index = block->next_block_index;
+		}
+	}
+
+	return;
+}
