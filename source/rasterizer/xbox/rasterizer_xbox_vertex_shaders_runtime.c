@@ -44,6 +44,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+extern void __stdcall D3DDevice_SetVertexShader(unsigned long handle);
+extern void __stdcall D3DDevice_LoadVertexShader(unsigned long handle, unsigned long address);
+extern void __stdcall D3DDevice_SelectVertexShader(unsigned long handle, unsigned long address);
+extern void __stdcall D3DDevice_GetVertexShaderSize(unsigned long handle, unsigned long *size);
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -55,5 +60,56 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+__declspec(naked) long code_00168350(
+	void)
+{
+	__asm
+	{
+		push eax
+		call D3DDevice_SetVertexShader
+		xor eax, eax
+		ret 4
+	}
+}
+
+__declspec(naked) long code_00168360(
+	void)
+{
+	__asm
+	{
+		push eax
+		push ecx
+		call D3DDevice_LoadVertexShader
+		xor eax, eax
+		ret 4
+	}
+}
+
+__declspec(naked) long code_00168370(
+	void)
+{
+	__asm
+	{
+		push eax
+		push ecx
+		call D3DDevice_SelectVertexShader
+		xor eax, eax
+		ret 4
+	}
+}
+
+__declspec(naked) long code_00168380(
+	void)
+{
+	__asm
+	{
+		push eax
+		push ecx
+		call D3DDevice_GetVertexShaderSize
+		xor eax, eax
+		ret 4
+	}
+}
 
 /* ---------- private code */
