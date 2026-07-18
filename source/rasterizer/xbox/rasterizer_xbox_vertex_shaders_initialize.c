@@ -32,6 +32,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cseries/errors.h"
+#include "rasterizer_xbox_vertex_shaders.h"
 #include <xtl.h>
 
 /* ---------- constants */
@@ -39,14 +40,6 @@ symbols in this file:
 /* ---------- macros */
 
 /* ---------- structures */
-
-struct vertex_shader_entry
-{
-	void const *declaration;
-	void const *code;
-	unsigned long handle;
-	long instruction_count;
-};
 
 /* ---------- prototypes */
 
@@ -58,7 +51,6 @@ void rasterizer_error(
 /* ---------- globals */
 
 extern void *global_d3d_device;
-extern struct vertex_shader_entry vertex_shader_table[67];
 
 unsigned long const rdata_0029bf94[] =
 {
