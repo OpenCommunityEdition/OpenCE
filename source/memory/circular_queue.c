@@ -165,11 +165,12 @@ boolean circular_queue_dequeue_data(
 	long data_size,
 	boolean advance)
 {
-	/* NonMatching: target/candidate are 0x100/0xF0 padded bytes with all 12
-	   relocation identities preserved. The target keeps FALSE in BL across
-	   the failure path and later coalesces that register with read_offset;
-	   this compiler instead constant-folds the failure return and rotates
-	   queue/read_offset through EBX/EDI. */
+	/* NonMatching and not parked: target/candidate are 0x100/0xF0 padded
+	   bytes with all 12 relocation identities preserved. The meaningful-code
+	   delta is four bytes: January keeps FALSE in BL, later coalesces EBX with
+	   read_offset, and returns BL on failure; this TU folds FALSE into AL and
+	   rotates queue/read_offset through EBX/EDI. Five legal-C lifetime and
+	   control-flow shapes did not remove the padded-size mismatch. */
 	long read_offset;
 	long contiguous_size;
 	boolean result;
