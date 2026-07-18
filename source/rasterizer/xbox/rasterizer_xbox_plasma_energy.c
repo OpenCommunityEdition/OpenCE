@@ -26,6 +26,14 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
+/* The January translation unit retains the XDK's out-of-line D3D wrappers.
+ * This is the same source shape verified in rasterizer_xbox_text.c and
+ * rasterizer_xbox_active_camouflage.c. */
+#define D3DINLINE static
+#include <xtl.h>
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -36,6 +44,31 @@ symbols in this file:
 
 /* ---------- globals */
 
+extern void *global_d3d_device;
+
 /* ---------- public code */
+
+/* NonMatching foundation: the calls below preserve the translation unit's
+ * proven XDK wrapper set while the January plasma draw body is reconstructed.
+ */
+void rasterizer_plasma_energy_draw(
+	long group_index)
+{
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_CULLMODE,
+		D3DCULL_NONE);
+	IDirect3DDevice8_SetTextureStageState(
+		global_d3d_device,
+		0,
+		D3DTSS_ADDRESSU,
+		D3DTADDRESS_WRAP);
+	IDirect3DDevice8_SetVertexShaderConstant(
+		global_d3d_device,
+		-81,
+		&group_index,
+		1);
+	return;
+}
 
 /* ---------- private code */
