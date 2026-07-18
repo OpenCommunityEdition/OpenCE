@@ -579,7 +579,7 @@
 				{ "name": "source/memory/array.c", "index": 205, "status": "Matching" },
 				{ "name": "source/memory/zlib/zutil.c", "index": 206, "status": "Matching" },
 				{ "name": "source/memory/zlib/uncompr.c", "index": 207, "status": "Matching" },
-				{ "name": "source/memory/zlib/trees.c", "index": 208, "status": "NonMatching" },
+				{ "name": "source/memory/zlib/trees.c", "index": 208, "status": "Matching" },
 				{ "name": "source/memory/zlib/infutil.c", "index": 209, "status": "Matching" },
 				{ "name": "source/memory/zlib/inftrees.c", "index": 210, "status": "Matching" },
 				{ "name": "source/memory/zlib/inflate.c", "index": 211, "status": "Matching" },
