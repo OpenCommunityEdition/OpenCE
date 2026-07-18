@@ -33,6 +33,8 @@ symbols in this file:
 #include "cseries.h"
 #include "cseries/errors.h"
 #include "rasterizer_xbox_vertex_shaders.h"
+/* The January object retains exact out-of-line copies of the two D3D wrappers. */
+#define D3DINLINE static
 #include <xtl.h>
 
 /* ---------- constants */
