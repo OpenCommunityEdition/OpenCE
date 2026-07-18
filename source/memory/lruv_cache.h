@@ -26,6 +26,12 @@ typedef void (*lruv_delete_block_proc)(
 typedef boolean (*lruv_locked_block_proc)(
 	long block_index);
 
+typedef void (*lruv_debug_header_proc)(
+	FILE *stream);
+
+typedef const char *(*lruv_debug_block_name_proc)(
+	long block_index);
+
 struct lruv_cache
 {
 	char name[32];
@@ -118,6 +124,14 @@ void lruv_cache_get_page_usage(
 void lruv_resize(
 	struct lruv_cache *cache,
 	long new_page_count);
+
+void lruv_debug_to_file(
+	const char *path,
+	const char *allocation_name,
+	long allocation_size,
+	struct lruv_cache *cache,
+	lruv_debug_header_proc header_proc,
+	lruv_debug_block_name_proc block_name_proc);
 
 void lruv_flush(
 	struct lruv_cache *cache);

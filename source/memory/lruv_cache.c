@@ -364,6 +364,130 @@ void lruv_resize(
 	return;
 }
 
+/* NonMatching: target and candidate are both 0x1D0 padded bytes with all 20
+ * semantic relocations present. The remaining difference is VC7 control-flow
+ * scheduling and callee-saved register allocation in the block-report loop. */
+void lruv_debug_to_file(
+	const char *path,
+	const char *allocation_name,
+	long allocation_size,
+	struct lruv_cache *cache,
+	lruv_debug_header_proc header_proc,
+	lruv_debug_block_name_proc block_name_proc)
+{
+	FILE *stream;
+	struct lruv_cache_block *block;
+	long page_size;
+	long allocation_page_count;
+	long page_index;
+	long block_index;
+	long page_count;
+	long age;
+	boolean locked;
+	const char *block_name;
+
+	code_0010cd70(cache, TRUE);
+	stream = fopen(path, "w+");
+	if (stream)
+	{
+		fprintf(
+			stream,
+			"%s (v1: only blocks used this frame are locked)\n",
+			cache);
+		header_proc(stream);
+
+		page_size = 1 << cache->page_size_bits;
+		allocation_page_count = allocation_size >> cache->page_size_bits;
+		if (allocation_size & (page_size - 1))
+			allocation_page_count++;
+
+		fprintf(
+			stream,
+			"\n#%d pages, each #%d bytes\n"
+			"#%d blocks at frame index #%d\n"
+			"failed allocation of \"%s\" was #%d bytes (#%d pages)\n\n",
+			cache->page_count,
+			page_size,
+			cache->blocks->actual_count,
+			cache->tick,
+			allocation_name,
+			allocation_size,
+			allocation_page_count);
+
+		block_index = cache->first_block_index;
+		page_index = 0;
+		while (page_index < cache->page_count)
+		{
+			age = 0;
+			locked = FALSE;
+			if (block_index == NONE)
+			{
+				page_count = cache->page_count - page_index;
+				page_index = cache->page_count;
+				goto output_hole;
+			}
+			else
+			{
+				block = datum_get(cache->blocks, block_index);
+				if (page_index == block->first_page_index)
+				{
+					age = cache->tick - block->last_used_tick;
+					page_count = block->page_count;
+					if (cache->locked_block_proc &&
+						cache->locked_block_proc(block_index))
+					{
+						locked = TRUE;
+					}
+					else if (cache->locked_block_proc)
+					{
+						locked = FALSE;
+					}
+					if ((unsigned long)(block->last_used_tick + 1) >=
+						(unsigned long)cache->tick)
+					{
+						locked = TRUE;
+					}
+
+					page_index = block->first_page_index + block->page_count;
+					block_name = block_name_proc(block_index);
+					block_index = block->next_block_index;
+					if (block_name)
+						goto output_block;
+				}
+				else
+				{
+					page_count = block->first_page_index - page_index;
+					match_assert(
+						"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+						716,
+						page_count>0);
+					page_index = block->first_page_index;
+				}
+			}
+
+		output_hole:
+			block_name = "";
+
+		output_block:
+
+			age = MIN((unsigned long)age, 9999);
+
+			fprintf(
+				stream,
+				"%s % 5d% 5d %s\n",
+				locked ? "L" : " ",
+				page_count,
+				age,
+				block_name);
+		}
+
+		fprintf(stream, "\n");
+		fclose(stream);
+	}
+
+	return;
+}
+
 struct lruv_cache *lruv_new(
 	const char *name,
 	long page_count,
