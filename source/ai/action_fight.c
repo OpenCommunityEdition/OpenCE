@@ -23,6 +23,8 @@ symbols in this file:
 #include "cseries.h"
 #include "actions.h"
 
+#include "actors.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -30,6 +32,11 @@ symbols in this file:
 /* ---------- structures */
 
 /* ---------- prototypes */
+
+void actor_discard_firing_position(
+	long actor_index,
+	short firing_position_index,
+	boolean temporary);
 
 /* ---------- globals */
 
@@ -57,3 +64,55 @@ void action_fight_end(
 }
 
 /* ---------- private code */
+
+void
+action_fight_update(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct fight_state_data *state_data = &actor->state.action_data.fight;
+
+	if (state_data->firing_position_timer > 0 && actor->control.path.at_destination)
+	{
+		state_data->firing_position_timer--;
+		if (state_data->firing_position_timer == 0 &&
+			actor->firing_positions.current_position_index != NONE &&
+			!actor->firing_positions.current_position_found_outside_range)
+		{
+			actor_discard_firing_position(
+				actor_index,
+				actor->firing_positions.current_position_index,
+				FALSE);
+		}
+	}
+
+	return;
+}
+
+void
+action_fight_control(
+	long actor_index)
+{
+	/* NonMatching: target and candidate are both 0x80 bytes with both
+	   relocations exact. January reuses CL for defensive_crouch and then
+	   FALSE, while this TU selects DL for the first value. Five legal-C
+	   lifetime and statement-order shapes did not remove the register tie. */
+	struct actor_datum *actor = actor_get(actor_index);
+
+	actor->orders.move.stationary_crouch = actor->emotions.defensive_crouch;
+	actor->orders.look.primary_priority = 5;
+	actor->orders.look.primary_direction.type = 2;
+	actor->orders.look.idle_look_type = 4;
+	actor->orders.move.moving_crouch = FALSE;
+	actor->orders.move.panicked = FALSE;
+	actor->orders.move.dive_into_cover = FALSE;
+	actor->orders.move.emerge_from_cover = FALSE;
+
+	if (actor->input.vehicle_driver_type != 4 && actor->state.combat_status >= 5)
+	{
+		actor->orders.combat.shoot_at_target = TRUE;
+		actor->orders.look.primary_priority = 7;
+	}
+
+	return;
+}
