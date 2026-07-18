@@ -561,7 +561,7 @@
 				{ "name": "source/memory/texture_page.c", "index": 187, "status": "NonMatching" },
 				{ "name": "source/memory/stack_memory_pool.c", "index": 188, "status": "NonMatching" },
 				{ "name": "source/memory/sl_list.c", "index": 189, "status": "Matching" },
-				{ "name": "source/memory/memory_pool.c", "index": 190, "status": "NonMatching" },
+				{ "name": "source/memory/memory_pool.c", "index": 190, "status": "Matching" },
 				{ "name": "source/memory/lruv_cache.c", "index": 191, "status": "NonMatching" },
 				{ "name": "source/memory/lru_cache.c", "index": 192, "status": "Matching" },
 				{ "name": "source/memory/lrar_cache.c", "index": 193, "status": "NonMatching" },

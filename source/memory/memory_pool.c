@@ -325,12 +325,9 @@ static void *code_0010dc20(
 		? (byte *)pool->last_block+pool->last_block->size
 		: pool->base_address;
 
-	if (address+size > (byte *)pool->base_address+pool->size)
-	{
-		address = NULL;
-	}
-
-	return address;
+	return address+size <= (byte *)pool->base_address+pool->size
+		? address
+		: NULL;
 }
 
 static void code_0010dc50(
