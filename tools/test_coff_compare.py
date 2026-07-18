@@ -73,9 +73,9 @@ class TestCoffCompare(unittest.TestCase):
         ]
         anchor = _build_code_data(anchor_symbols, [(0x10, 1, 6, 8)])
         local = _build_code_data(local_symbols, [(0x10, 2, 6, 0)])
-        self.assertEqual(
+        self.assertTrue(coff_compare.section_infos_equal(
             coff_compare.section_info(anchor, "func"),
-            coff_compare.section_info(local, "func"))
+            coff_compare.section_info(local, "func")))
 
     def test_defined_noncode_different_offset_refuses(self):
         """Different resolved offsets in the same section remain unequal."""
@@ -91,9 +91,9 @@ class TestCoffCompare(unittest.TestCase):
         ]
         anchor = _build_code_data(anchor_symbols, [(0x10, 1, 6, 8)])
         local = _build_code_data(local_symbols, [(0x10, 2, 6, 0)])
-        self.assertNotEqual(
+        self.assertFalse(coff_compare.section_infos_equal(
             coff_compare.section_info(anchor, "func"),
-            coff_compare.section_info(local, "func"))
+            coff_compare.section_info(local, "func")))
 
     def test_defined_noncode_different_section_refuses(self):
         """A destination in a differently identified section is unequal."""
@@ -115,9 +115,9 @@ class TestCoffCompare(unittest.TestCase):
         right = _build_code_data(
             right_symbols, [(0x10, 2, 6, 0)],
             [(".rdata", 0x20), (".data", 0x20)])
-        self.assertNotEqual(
+        self.assertFalse(coff_compare.section_infos_equal(
             coff_compare.section_info(left, "func"),
-            coff_compare.section_info(right, "func"))
+            coff_compare.section_info(right, "func")))
 
     def test_defined_noncode_undefined_remains_symbolic(self):
         """An undefined anchor is not inferred to be a defined section."""
@@ -137,9 +137,9 @@ class TestCoffCompare(unittest.TestCase):
         ]
         undefined = _build_code_data(undefined_symbols, [(0x10, 1, 6, 8)])
         defined = _build_code_data(defined_symbols, [(0x10, 2, 6, 0)])
-        self.assertNotEqual(
+        self.assertFalse(coff_compare.section_infos_equal(
             coff_compare.section_info(undefined, "func"),
-            coff_compare.section_info(defined, "func"))
+            coff_compare.section_info(defined, "func")))
 
     def test_defined_noncode_absolute_remains_conservative(self):
         """An absolute target is not inferred to be a defined section."""
@@ -159,9 +159,9 @@ class TestCoffCompare(unittest.TestCase):
         ]
         absolute = _build_code_data(absolute_symbols, [(0x10, 1, 6, 0)])
         defined = _build_code_data(defined_symbols, [(0x10, 2, 6, 0)])
-        self.assertNotEqual(
+        self.assertFalse(coff_compare.section_infos_equal(
             coff_compare.section_info(absolute, "func"),
-            coff_compare.section_info(defined, "func"))
+            coff_compare.section_info(defined, "func")))
 
     def test_defined_noncode_ambiguous_owner_refuses(self):
         """Multiple external offset-zero owners prevent normalization."""
@@ -184,9 +184,9 @@ class TestCoffCompare(unittest.TestCase):
         ambiguous = _build_code_data(
             ambiguous_symbols, [(0x10, 1, 6, 8)])
         defined = _build_code_data(defined_symbols, [(0x10, 2, 6, 0)])
-        self.assertNotEqual(
+        self.assertFalse(coff_compare.section_infos_equal(
             coff_compare.section_info(ambiguous, "func"),
-            coff_compare.section_info(defined, "func"))
+            coff_compare.section_info(defined, "func")))
 
     def test_defined_noncode_duplicate_owner_name_refuses(self):
         """A defined owner name reused by another section is ambiguous."""
@@ -210,9 +210,29 @@ class TestCoffCompare(unittest.TestCase):
             duplicate_symbols, [(0x10, 1, 6, 8)],
             [(".rdata", 0x20), (".data", 0x20)])
         defined = _build_code_data(defined_symbols, [(0x10, 2, 6, 0)])
-        self.assertNotEqual(
+        self.assertFalse(coff_compare.section_infos_equal(
             coff_compare.section_info(duplicate, "func"),
-            coff_compare.section_info(defined, "func"))
+            coff_compare.section_info(defined, "func")))
+
+    def test_defined_and_undefined_same_symbol_spelling_matches(self):
+        """Definition ownership does not change a same-name relocation."""
+        defined_symbols = [
+            {"name": "func", "value": 0, "section": 1,
+             "type": 0x20, "storage": 2, "aux_count": 0},
+            {"name": "_table", "value": 0, "section": 2,
+             "type": 0, "storage": 2, "aux_count": 0},
+        ]
+        undefined_symbols = [
+            {"name": "func", "value": 0, "section": 1,
+             "type": 0x20, "storage": 2, "aux_count": 0},
+            {"name": "_table", "value": 0, "section": 0,
+             "type": 0, "storage": 2, "aux_count": 0},
+        ]
+        defined = _build_code_data(defined_symbols, [(0x10, 1, 6, 8)])
+        undefined = _build_code_data(undefined_symbols, [(0x10, 1, 6, 8)])
+        self.assertTrue(coff_compare.section_infos_equal(
+            coff_compare.section_info(defined, "func"),
+            coff_compare.section_info(undefined, "func")))
 
     # â”€â”€ 1. zero vs absolute-image placeholder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 

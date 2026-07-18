@@ -10,7 +10,13 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
-from .coff_compare import CoffError, load, section_info, section_info_resolved
+from .coff_compare import (
+    CoffError,
+    load,
+    section_info,
+    section_info_resolved,
+    section_infos_equal,
+)
 
 
 class SemanticProgressError(RuntimeError):
@@ -154,7 +160,7 @@ def apply_semantic_matches(
             raise SemanticProgressError(
                 f"cannot verify semantic match {unit_name}:{function_name}: {error}"
             ) from error
-        if target_info != base_info:
+        if not section_infos_equal(target_info, base_info):
             raise SemanticProgressError(
                 f"semantic match is no longer exact: {unit_name}:{function_name}"
             )

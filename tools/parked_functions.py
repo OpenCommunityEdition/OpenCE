@@ -10,7 +10,7 @@ import argparse
 import json
 from pathlib import Path
 
-from .coff_compare import CoffError, load, section_info
+from .coff_compare import CoffError, load, section_info, section_infos_equal
 
 
 ALLOWED_CLASSES = {
@@ -106,7 +106,7 @@ def validate_parked_functions(project_root, report_path, config_path, manifest_p
             invalid.append({"key": key, "reason": f"cannot measure function: {error}"})
             continue
 
-        if target_info == base_info:
+        if section_infos_equal(target_info, base_info):
             invalid.append({"key": key, "reason": "function is now semantically exact"})
             continue
 

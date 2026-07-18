@@ -11,7 +11,14 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
-from .coff_compare import CoffError, IMAGE_REL_I386_DIR32, IMAGE_REL_I386_REL32, load, section_info
+from .coff_compare import (
+	CoffError,
+	IMAGE_REL_I386_DIR32,
+	IMAGE_REL_I386_REL32,
+	load,
+	relocation_infos_equal,
+	section_info,
+)
 
 
 VERDICTS = {
@@ -43,7 +50,8 @@ def classify_candidate(
 
 
 def _relocation_identities_equal(target_info, base_info):
-	return target_info["relocations"] == base_info["relocations"]
+	return relocation_infos_equal(
+		target_info["relocations"], base_info["relocations"])
 
 
 def analyze(project_root, report_path, config_path):

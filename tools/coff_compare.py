@@ -279,6 +279,7 @@ def section_info(obj, function_name):
 
         sec_no = target["section"]
         raw_target = target["value"] + addend
+        defined_destination = None
 
         def _within_section(val):
             return 0 <= val <= section["size"]
@@ -315,11 +316,15 @@ def section_info(obj, function_name):
             else:
                 semantic_target = ["symbol", target["name"], addend]
 
-        relocs.append({
+        relocation = {
             "address": address,
             "type": reloc_type,
             "target": semantic_target,
-        })
+        }
+        if defined_destination is not None:
+            relocation["symbolic_target"] = [
+                "symbol", target["name"], addend]
+        relocs.append(relocation)
 
     return {
         "size": section["size"],
@@ -327,6 +332,46 @@ def section_info(obj, function_name):
         "normalized_sha256": hashlib.sha256(raw).hexdigest(),
         "relocations": relocs,
     }
+
+
+def relocation_infos_equal(left, right):
+    """Compare relocation lists with pairwise, fail-closed alias handling.
+
+    A defined non-code relocation carries both its proven section-relative
+    destination and its original symbol spelling.  Two relocations match when
+    their proven destinations match, or when both producers used exactly the
+    same symbol name and addend.  The latter preserves ordinary external-symbol
+    equality when one producer happens to define that symbol locally.
+    """
+    if len(left) != len(right):
+        return False
+    for left_item, right_item in zip(left, right):
+        if left_item["address"] != right_item["address"] \
+                or left_item["type"] != right_item["type"]:
+            return False
+        if left_item["target"] == right_item["target"]:
+            continue
+
+        left_symbolic = left_item.get("symbolic_target")
+        if left_symbolic is None and left_item["target"][0] == "symbol":
+            left_symbolic = left_item["target"]
+        right_symbolic = right_item.get("symbolic_target")
+        if right_symbolic is None and right_item["target"][0] == "symbol":
+            right_symbolic = right_item["target"]
+        if left_symbolic is not None and left_symbolic == right_symbolic:
+            continue
+        return False
+    return True
+
+
+def section_infos_equal(left, right):
+    """Return strict pairwise equality for two section measurements."""
+    return (
+        left["size"] == right["size"]
+        and left["relocation_count"] == right["relocation_count"]
+        and left["normalized_sha256"] == right["normalized_sha256"]
+        and relocation_infos_equal(left["relocations"], right["relocations"])
+    )
 
 
 def section_info_resolved(obj, section_symbol_name, symbol_addresses):
@@ -528,7 +573,7 @@ def main(argv=None):
     for name in args.functions:
         target_info = section_info(target_obj, name)
         base_info = section_info(base_obj, name)
-        equal = target_info == base_info
+        equal = section_infos_equal(target_info, base_info)
         all_equal &= equal
         result["functions"][name] = {"equal": equal, "target": target_info, "base": base_info}
 

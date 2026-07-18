@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from tools.coff_compare import CoffError, load, section_info
+from tools.coff_compare import CoffError, load, section_info, section_infos_equal
 
 
 def relocation_shape_matches(target_info, base_info):
@@ -85,7 +85,7 @@ def audit(project_root, report_path, config_path):
                 missing_base_symbol += 1
                 continue
             functions_evaluated += 1
-            semantic_exact = target_info == base_info
+            semantic_exact = section_infos_equal(target_info, base_info)
             item = {
                 "unit": unit_name,
                 "function": function_name,
