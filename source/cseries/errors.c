@@ -298,8 +298,8 @@ void error(
 				}
 
 				message_buffer_size = (short)(prefix_size+copy_size);
-				error_globals.message_buffer_size = message_buffer_size;
 				error_globals.message_buffer[message_buffer_size] = 0;
+				error_globals.message_buffer_size = message_buffer_size;
 			}
 
 			if (message_buffer_size+new_size < ERROR_MESSAGE_BUFFER_MAXIMUM_SIZE)
