@@ -107,13 +107,28 @@ enum
 
 /* ---------- macros */
 
+#define lruv_cache_block_get(cache, block_index) \
+	((struct lruv_cache_block *)datum_get((cache)->blocks, (block_index)))
+
 /* ---------- structures */
+
+struct lruv_cache_hole
+{
+	long block_index;
+	unsigned long last_used_tick;
+	long first_page_index;
+	long page_count;
+};
 
 /* ---------- prototypes */
 
 void code_0010cd70(
 	struct lruv_cache *cache,
 	boolean verify_blocks);
+
+static long code_0010cd50(
+	struct lruv_cache *cache,
+	long size);
 
 /* ---------- globals */
 
@@ -390,7 +405,257 @@ void lruv_flush(
 	return;
 }
 
+long lruv_block_new(
+	struct lruv_cache *cache,
+	long size)
+{
+#define index datum_index
+	struct lruv_cache_hole holes[256];
+	struct data_iterator iterator;
+	struct lruv_cache_block *block;
+	struct lruv_cache_block *next_block;
+	struct lruv_cache_block *new_block;
+	short hole_index;
+	short hole_read_index;
+	short hole_write_index;
+	short saved_hole_index;
+	long desired_page_count;
+	long page_index;
+	long block_index;
+	long pending_block_index;
+	long page_count;
+	unsigned long last_used_tick;
+	boolean locked;
+	long oldest_unlocked_block_index;
+	unsigned long oldest_unlocked_tick;
+	boolean found_hole;
+	long found_block_index;
+	unsigned long found_last_used_tick;
+	long found_first_page_index;
+	long found_page_count;
+	long new_block_index;
+
+	desired_page_count = code_0010cd50(cache, size);
+	found_hole = FALSE;
+	oldest_unlocked_block_index = NONE;
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+		225,
+		desired_page_count>0);
+
+	page_index = 0;
+	hole_write_index = 0;
+	hole_read_index = 0;
+	pending_block_index = NONE;
+	block_index = cache->first_block_index;
+
+	while (page_index < cache->page_count)
+	{
+		locked = FALSE;
+		hole_index = hole_write_index == 255 ? 0 : hole_write_index + 1;
+		if (hole_index != hole_read_index)
+		{
+			holes[hole_write_index].block_index = pending_block_index;
+			holes[hole_write_index].last_used_tick = 0;
+			holes[hole_write_index].first_page_index = page_index;
+			holes[hole_write_index].page_count = 0;
+			hole_write_index = hole_write_index == 255 ? 0 : hole_write_index + 1;
+		}
+
+		if (block_index == NONE)
+		{
+			page_count = cache->page_count - page_index;
+			last_used_tick = 0;
+			page_index = cache->page_count;
+		}
+		else
+			goto process_block;
+
+	accumulate_holes:
+		hole_index = hole_read_index;
+		while (hole_index != hole_write_index)
+		{
+			saved_hole_index = hole_index;
+			if (last_used_tick > holes[hole_index].last_used_tick)
+				holes[hole_index].last_used_tick = last_used_tick;
+			holes[hole_index].page_count += page_count;
+			if (holes[hole_index].page_count >= desired_page_count)
+			{
+				if (!found_hole ||
+					holes[hole_index].last_used_tick < found_last_used_tick ||
+					(holes[hole_index].last_used_tick == found_last_used_tick &&
+					 holes[hole_index].page_count < found_page_count))
+				{
+					found_block_index = holes[hole_index].block_index;
+					found_last_used_tick = holes[hole_index].last_used_tick;
+					found_first_page_index = holes[hole_index].first_page_index;
+					found_page_count = holes[hole_index].page_count;
+					found_hole = TRUE;
+				}
+
+				match_assert(
+					"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+					351,
+					hole_read_index==hole_index);
+				hole_read_index = hole_read_index == 255 ? 0 : hole_read_index + 1;
+			}
+
+			hole_index = saved_hole_index == 255 ? 0 : saved_hole_index + 1;
+		}
+		goto loop_complete;
+
+	process_block:
+		block = datum_get(cache->blocks, block_index);
+		if (page_index == block->first_page_index)
+		{
+			last_used_tick = block->last_used_tick;
+			page_count = block->page_count;
+			if (cache->locked_block_proc && cache->locked_block_proc(block_index))
+				locked = TRUE;
+			if ((unsigned long)block->last_used_tick == (unsigned long)cache->tick)
+				locked = TRUE;
+			else if (!locked &&
+				(oldest_unlocked_block_index == NONE ||
+				(unsigned long)block->last_used_tick < oldest_unlocked_tick))
+			{
+				oldest_unlocked_block_index = block_index;
+				oldest_unlocked_tick = block->last_used_tick;
+			}
+
+			pending_block_index = block_index;
+			block_index = block->next_block_index;
+			page_index = block->first_page_index + block->page_count;
+			if (!locked)
+				goto accumulate_holes;
+			hole_read_index = hole_write_index;
+		}
+		else
+		{
+			page_count = block->first_page_index - page_index;
+			last_used_tick = 0;
+			match_assert(
+				"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+				311,
+				page_count>0);
+			page_index = block->first_page_index;
+			goto accumulate_holes;
+		}
+
+	loop_complete:
+		;
+	}
+
+	if (!found_hole)
+		return NONE;
+
+	data_iterator_new(&iterator, cache->blocks);
+	while ((block = data_iterator_next(&iterator)) != NULL)
+	{
+		if (block->first_page_index < found_first_page_index + desired_page_count &&
+			block->first_page_index + block->page_count > found_first_page_index)
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+				375,
+				!cache->locked_block_proc || !cache->locked_block_proc(iterator.index));
+			lruv_block_delete(cache, iterator.datum_index);
+		}
+	}
+
+	if (cache->blocks->actual_count == cache->blocks->maximum_count &&
+		oldest_unlocked_block_index != NONE)
+	{
+		if (found_block_index == oldest_unlocked_block_index)
+		{
+			block = datum_get(cache->blocks, oldest_unlocked_block_index);
+			found_block_index = block->previous_block_index;
+		}
+		match_assert(
+			"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+			392,
+			lruv_cache_block_get(cache, oldest_unlocked_block_index));
+		match_assert(
+			"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+			393,
+			!cache->locked_block_proc || !cache->locked_block_proc(oldest_unlocked_block_index));
+		lruv_block_delete(cache, oldest_unlocked_block_index);
+	}
+
+	new_block_index = datum_new(cache->blocks);
+	if (new_block_index != NONE)
+	{
+		new_block = datum_get(cache->blocks, new_block_index);
+		if (found_block_index == NONE)
+		{
+			if (cache->first_block_index == NONE)
+			{
+				match_assert(
+					"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+					408,
+					cache->last_block_index==NONE);
+				new_block->previous_block_index = NONE;
+				cache->last_block_index = new_block_index;
+				new_block->next_block_index = cache->first_block_index;
+				cache->first_block_index = new_block_index;
+			}
+			else
+			{
+				next_block = datum_get(cache->blocks, cache->first_block_index);
+				match_assert(
+					"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+					416,
+					next_block->previous_block_index==NONE);
+				new_block->previous_block_index = NONE;
+				next_block->previous_block_index = new_block_index;
+				new_block->next_block_index = cache->first_block_index;
+				cache->first_block_index = new_block_index;
+			}
+		}
+		else
+		{
+			block = datum_get(cache->blocks, found_block_index);
+			if (block->next_block_index != NONE)
+			{
+				next_block = datum_get(cache->blocks, block->next_block_index);
+				new_block->previous_block_index = next_block->previous_block_index;
+				next_block->previous_block_index = new_block_index;
+			}
+			else
+			{
+				new_block->previous_block_index = cache->last_block_index;
+				cache->last_block_index = new_block_index;
+			}
+			block = datum_get(cache->blocks, found_block_index);
+			new_block->next_block_index = block->next_block_index;
+			block->next_block_index = new_block_index;
+		}
+
+		new_block->first_page_index = found_first_page_index;
+		new_block->page_count = desired_page_count;
+		new_block->last_used_tick = cache->tick;
+		code_0010cd70(cache, TRUE);
+	}
+
+	return new_block_index;
+#undef index
+}
+
 /* ---------- private code */
+
+static long code_0010cd50(
+	struct lruv_cache *cache,
+	long size)
+{
+	long page_count;
+	long page_size;
+
+	page_size = 1 << cache->page_size_bits;
+	page_count = size >> cache->page_size_bits;
+	if (size & (page_size - 1))
+		page_count++;
+
+	return page_count;
+}
 
 void code_0010cd70(
 	struct lruv_cache *cache,

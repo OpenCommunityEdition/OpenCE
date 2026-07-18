@@ -107,6 +107,10 @@ boolean lruv_block_touched(
 	struct lruv_cache *cache,
 	long block_index);
 
+long lruv_block_new(
+	struct lruv_cache *cache,
+	long size);
+
 void lruv_cache_get_page_usage(
 	struct lruv_cache *cache,
 	byte *page_usage);
