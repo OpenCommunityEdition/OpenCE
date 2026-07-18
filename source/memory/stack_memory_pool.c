@@ -183,6 +183,15 @@ static void *code_0010e490(
 	struct stack_memory_pool_block **previous_block);
 static boolean code_0010e510(
 	struct stack_memory_pool_block *block);
+static boolean code_0010e770(
+	struct stack_memory_pool_block *block,
+	struct stack_memory_pool *pool);
+static void code_0010e7f0(
+	struct stack_memory_pool_block *block,
+	struct stack_memory_pool *pool);
+static void *code_0010e890(
+	struct stack_memory_pool_block *block,
+	struct stack_memory_pool *pool);
 
 /* ---------- globals */
 
@@ -234,6 +243,9 @@ void stack_memory_pool_reset(
 		code_0010e430(pool);
 		code_0010e490(pool, sizeof(*block), &block);
 		code_0010e510(block);
+		code_0010e770(block, pool);
+		code_0010e7f0(block, pool);
+		code_0010e890(block, pool);
 	}
 
 	return;
@@ -396,4 +408,94 @@ static boolean code_0010e510(
 		return FALSE;
 	}
 	return TRUE;
+}
+
+static boolean code_0010e770(
+	struct stack_memory_pool_block *block,
+	struct stack_memory_pool *pool)
+{
+	struct stack_memory_pool_block *pool_block;
+	long block_index;
+	boolean valid = FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
+		0x3D7,
+		pool && pool->base_address);
+	if (
+		(byte *)block >= pool->base_address &&
+		(byte *)block < pool->base_address+pool->size &&
+		code_0010e510(block))
+	{
+		block_index = code_0010e330(block);
+		if (block_index < pool->maximum_block_count)
+		{
+			pool_block = pool->blocks[block_index];
+			if (
+				pool_block &&
+				pool_block->size_and_flags == block->size_and_flags &&
+				pool_block->previous == block->previous &&
+				pool_block->next == block->next)
+			{
+				valid = TRUE;
+			}
+		}
+	}
+	return valid;
+}
+
+static void code_0010e7f0(
+	struct stack_memory_pool_block *block,
+	struct stack_memory_pool *pool)
+{
+	long block_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
+		0x2D3,
+		code_0010e770(block, pool));
+	match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x24A, block);
+	block_index = block->slot_index;
+	if (block->previous)
+		block->previous->next = block->next;
+	if (block->next)
+		block->next->previous = block->previous;
+	if (pool->first_block == block)
+		pool->first_block = block->next;
+	if (pool->last_block == block)
+		pool->last_block = block->previous;
+	pool->blocks[block_index] = NULL;
+	pool->next_block_index = pool->first_block ? block_index : 0;
+	return;
+}
+
+static void *code_0010e890(
+	struct stack_memory_pool_block *block,
+	struct stack_memory_pool *pool)
+{
+	if (code_0010e770(block, pool))
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
+			0x215,
+			code_0010e510(block));
+		if (!(block->size_and_flags&0x80000000))
+			goto mark_block;
+	}
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
+		0x2E5,
+		code_0010e770(block, pool) && !(block->size_and_flags&0x80000000));
+
+mark_block:
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
+		0x203,
+		code_0010e510(block));
+	block->size_and_flags |= 0x80000000;
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
+		0x23F,
+		code_0010e510(block));
+	return block->data;
 }
