@@ -59,8 +59,11 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries_windows.h"
 #include "errors.h"
+#include "interface/terminal.h"
 
+#include <stdarg.h>
 #include <time.h>
 
 /* ---------- constants */
@@ -68,6 +71,12 @@ symbols in this file:
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct error_suppression_globals
+{
+	long last_error_time;
+	long error_count;
+};
 
 /* ---------- prototypes */
 
@@ -79,6 +88,9 @@ void stack_walk_dispose(
 /* ---------- globals */
 
 boolean data_002dcd2c = TRUE;
+struct error_suppression_globals bss_0031df2c = { 0, 0 };
+boolean find_all_fucked_up_shit = FALSE;
+long fucked_up_shit_count = 0;
 
 /* ---------- public code */
 
@@ -184,6 +196,127 @@ void errors_initialize(
 	error_globals.delayed = FALSE;
 	error_globals.message_buffer_size = 0;
 	stack_walk_initialize();
+
+	return;
+}
+
+void error(
+	short priority,
+	const char *format,
+	...)
+{
+	char string[1024];
+	char *newline;
+	short message_buffer_size;
+	long new_size;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\cseries\\errors.c",
+		0x61,
+		priority>=0 && priority<NUMBER_OF_ERROR_MESSAGE_PRIORITIES);
+
+	if (error_globals.overflow_suppression && priority == _error_silent)
+	{
+		long time = system_milliseconds();
+
+		if (time > bss_0031df2c.last_error_time+900)
+		{
+			bss_0031df2c.error_count = 0;
+		}
+		bss_0031df2c.last_error_time = time;
+		if (bss_0031df2c.error_count == 10)
+		{
+			terminal_printf(
+				global_real_argb_white,
+				"too many errors, only printing to debug.txt");
+		}
+		bss_0031df2c.error_count++;
+		if (bss_0031df2c.error_count >= 10)
+		{
+			priority = _error_log;
+		}
+	}
+
+	if (!error_globals.recursion_lock)
+	{
+		error_globals.recursion_lock = TRUE;
+		if (priority == _error_delayed)
+		{
+			error_globals.delayed = TRUE;
+		}
+
+		if (format)
+		{
+			va_list argument_list;
+
+			va_start(argument_list, format);
+			vsprintf(string, format, argument_list);
+			va_end(argument_list);
+			csstrcat(string, "\r\n");
+
+			if (priority != _error_log)
+			{
+				terminal_printf(global_real_argb_white, "%s", string);
+			}
+			write_to_error_file(string, TRUE);
+
+			new_size = csstrlen(string);
+			message_buffer_size = error_globals.message_buffer_size;
+			if (message_buffer_size+new_size >= ERROR_MESSAGE_BUFFER_MAXIMUM_SIZE)
+			{
+				long old_size;
+				long copy_size;
+				long prefix_size = csstrlen("[...too many errors to print...]\r\n");
+				long offset = prefix_size+1024+new_size;
+
+				if (offset < 0)
+				{
+					offset = 0;
+				}
+				else if (offset > error_globals.message_buffer_size-1)
+				{
+					offset = error_globals.message_buffer_size-1;
+				}
+
+				newline = strchr(error_globals.message_buffer+offset, '\n');
+				old_size = newline ? newline-error_globals.message_buffer+1 : error_globals.message_buffer_size;
+				copy_size = error_globals.message_buffer_size-old_size;
+				match_assert(
+					"c:\\halo\\SOURCE\\cseries\\errors.c",
+					0xBF,
+					prefix_size + copy_size + new_size < ERROR_MESSAGE_BUFFER_MAXIMUM_SIZE);
+				csstrncpy(
+					error_globals.message_buffer,
+					"[...too many errors to print...]\r\n",
+					prefix_size);
+				if (copy_size > 0)
+				{
+					csmemmove(
+						error_globals.message_buffer+prefix_size,
+						newline,
+						copy_size);
+				}
+
+				message_buffer_size = (short)(prefix_size+copy_size);
+				error_globals.message_buffer_size = message_buffer_size;
+				error_globals.message_buffer[message_buffer_size] = 0;
+			}
+
+			if (message_buffer_size+new_size < ERROR_MESSAGE_BUFFER_MAXIMUM_SIZE)
+			{
+				csstrcpy(
+					error_globals.message_buffer+message_buffer_size,
+					string);
+				error_globals.message_buffer_size += (short)new_size;
+			}
+		}
+
+		if (priority == _error_immediate)
+		{
+			system_exit(-4998);
+		}
+		error_globals.recursion_lock = FALSE;
+	}
 
 	return;
 }

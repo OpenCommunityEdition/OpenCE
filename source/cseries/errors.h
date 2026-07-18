@@ -45,7 +45,10 @@ void errors_overflow_suppression_enable(boolean overflow_suppression);
 char *error_get(void);
 boolean errors_handle(void);
 void errors_clear(void);
-void error(long priority, const char *format, ...);
+void error(
+	short priority,
+	const char *format,
+	...);
 
 void write_to_error_file(char *string, boolean date);
 
