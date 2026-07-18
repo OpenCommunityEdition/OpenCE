@@ -8,5 +8,15 @@
       "relocation_count": 68,
       "normalized_sha256": "3ed97b7cf09b09837ca36461d74c21909d34106d563a7b914aaffd7c51cf3e56"
     }
+  },
+  {
+    "unit": "source/hs/hs_globals_external",
+    "symbol": "_data_002e07c8",
+    "reason": "csplit and the rebuilt object express internal table pointers through different symbols; resolved image destinations, normalized bytes, relocation addresses, and relocation types are exact",
+    "measurements": {
+      "size": 7076,
+      "relocation_count": 1322,
+      "normalized_sha256": "1e4346aef4491a55772f4f51a6989e06074dc5245a2c01aa1be97fb2e221ae8c"
+    }
   }
 ]
