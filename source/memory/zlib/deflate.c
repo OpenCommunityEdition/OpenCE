@@ -51,8 +51,6 @@
 
 #include "deflate.h"
 
-const char deflate_copyright[] =
-   " deflate 1.1.3 Copyright 1995-1998 Jean-loup Gailly ";
 /*
   If you use the zlib library in a product, an acknowledgment is welcome
   in the documentation of your product. If for some reason you cannot
@@ -76,13 +74,14 @@ typedef block_state (*compress_func) OF((deflate_state *s, int flush));
 /* January-build private symbols, with their upstream zlib 1.1.3 identities:
  * 00100660 putShortMSB, 00100690 flush_pending, 00100be0 read_buf,
  * 00100c40 lm_init, 00100cc0 longest_match, 00100ed0 check_match,
- * 00100f90 fill_window, and 00101130 deflate_stored.
+ * 00100f90 fill_window, 00101130 deflate_stored, 001013c0 deflate_fast,
+ * and 001016c0 deflate_slow.
  */
 
 local void code_00100f90    OF((deflate_state *s));
 local block_state code_00101130 OF((deflate_state *s, int flush));
-local block_state deflate_fast   OF((deflate_state *s, int flush));
-local block_state deflate_slow   OF((deflate_state *s, int flush));
+local block_state code_001013c0   OF((deflate_state *s, int flush));
+local block_state code_001016c0   OF((deflate_state *s, int flush));
 local void code_00100c40        OF((deflate_state *s));
 local void code_00100660    OF((deflate_state *s, uInt b));
 local void code_00100690  OF((z_streamp strm));
@@ -129,22 +128,32 @@ typedef struct config_s {
    compress_func func;
 } config;
 
-local const config configuration_table[10] = {
+typedef struct deflate_static_data_s {
+   char copyright[56];
+   config configuration_table[10];
+} deflate_static_data;
+
+const deflate_static_data deflate_copyright = {
+" deflate 1.1.3 Copyright 1995-1998 Jean-loup Gailly ", {
 /*      good lazy nice chain */
 /* 0 */ {0,    0,  0,    0, code_00101130},  /* store only */
-/* 1 */ {4,    4,  8,    4, deflate_fast}, /* maximum speed, no lazy matches */
-/* 2 */ {4,    5, 16,    8, deflate_fast},
-/* 3 */ {4,    6, 32,   32, deflate_fast},
+/* 1 */ {4,    4,  8,    4, code_001013c0}, /* maximum speed, no lazy matches */
+/* 2 */ {4,    5, 16,    8, code_001013c0},
+/* 3 */ {4,    6, 32,   32, code_001013c0},
 
-/* 4 */ {4,    4, 16,   16, deflate_slow},  /* lazy matches */
-/* 5 */ {8,   16, 32,   32, deflate_slow},
-/* 6 */ {8,   16, 128, 128, deflate_slow},
-/* 7 */ {8,   32, 128, 256, deflate_slow},
-/* 8 */ {32, 128, 258, 1024, deflate_slow},
-/* 9 */ {32, 258, 258, 4096, deflate_slow}}; /* maximum compression */
+/* 4 */ {4,    4, 16,   16, code_001016c0},  /* lazy matches */
+/* 5 */ {8,   16, 32,   32, code_001016c0},
+/* 6 */ {8,   16, 128, 128, code_001016c0},
+/* 7 */ {8,   32, 128, 256, code_001016c0},
+/* 8 */ {32, 128, 258, 1024, code_001016c0},
+/* 9 */ {32, 258, 258, 4096, code_001016c0}}}; /* maximum compression */
+
+#define configuration_table deflate_copyright.configuration_table
+
+const char *data_003079f8 = ZLIB_VERSION;
 
 /* Note: the deflate() code requires max_lazy >= MIN_MATCH and max_chain >= 4
- * For deflate_fast() (levels <= 3) good is ignored and lazy has a different
+ * For code_001013c0() (levels <= 3) good is ignored and lazy has a different
  * meaning.
  */
 
@@ -218,14 +227,12 @@ int ZEXPORT deflateInit2_(strm, level, method, windowBits, memLevel, strategy,
 {
     deflate_state *s;
     int noheader = 0;
-    static const char* my_version = ZLIB_VERSION;
-
     ushf *overlay;
     /* We overlay pending_buf and d_buf+l_buf. This works since the average
      * output size for (length,distance) codes is <= 24 bits.
      */
 
-    if (version == Z_NULL || version[0] != my_version[0] ||
+    if (version == Z_NULL || version[0] != data_003079f8[0] ||
         stream_size != sizeof(z_stream)) {
 	return Z_VERSION_ERROR;
     }
@@ -1142,7 +1149,7 @@ local block_state code_00101130(s, flush)
  * new strings in the dictionary only for unmatched strings or for short
  * matches. It is used only for the fast compression options.
  */
-local block_state deflate_fast(s, flush)
+local block_state code_001013c0(s, flush)
     deflate_state *s;
     int flush;
 {
@@ -1238,7 +1245,7 @@ local block_state deflate_fast(s, flush)
  * evaluation for matches: a match is finally adopted only if there is
  * no better match at the next window position.
  */
-local block_state deflate_slow(s, flush)
+local block_state code_001016c0(s, flush)
     deflate_state *s;
     int flush;
 {
