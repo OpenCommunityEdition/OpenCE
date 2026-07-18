@@ -97,6 +97,63 @@ void data_encode_new(
 	return;
 }
 
+boolean data_encode_memory(
+	struct data_encoding_state *state,
+	void const *source,
+	short element_count,
+	long element_size)
+{
+	long memory_size;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\data_encoding.c",
+		43,
+		state && state->buffer && state->offset>=0 && state->offset<state->buffer_size);
+
+	/* Preserve the January VC7 stack reload at switch dispatch. */
+	switch (*(long volatile *)&element_size)
+	{
+	case 1:
+		memory_size = element_count;
+		break;
+	case -2:
+		memory_size = element_count<<1;
+		break;
+	case -4:
+		memory_size = element_count<<2;
+		break;
+	case -8:
+		memory_size = element_count<<3;
+		break;
+	default:
+		display_assert(NULL, "c:\\halo\\SOURCE\\memory\\data_encoding.c", 51, TRUE);
+		system_exit(-1);
+		memory_size = element_size;
+		break;
+	}
+
+	if (state->offset+memory_size<=state->buffer_size && !state->overflow)
+	{
+		void *destination;
+
+		destination = state->buffer+state->offset;
+		if (source)
+			csmemcpy(destination, source, memory_size);
+		else
+			csmemset(destination, 0, memory_size);
+
+		if (element_size != 1)
+			byte_swap_memory(destination, element_count, element_size);
+		state->offset += memory_size;
+	}
+	else
+	{
+		state->overflow = TRUE;
+	}
+
+	return !state->overflow;
+}
+
 boolean data_encode_integer(
 	struct data_encoding_state *state,
 	long value,
@@ -169,6 +226,99 @@ boolean data_encode_structures(
 			state->overflow = TRUE;
 		}
 	}
+
+	return !state->overflow;
+}
+
+/* volatile preserves the target's stack-backed source_array lifetime. */
+boolean data_encode_array(
+	struct data_encoding_state *state,
+	long element_size,
+	void const *volatile source_array,
+	long element_count,
+	struct byte_swap_definition *bs_definition)
+{
+	register long count;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\memory\\data_encoding.c",
+		141,
+		state && state->buffer && state->offset>=0 && state->offset<state->buffer_size);
+	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 142, source_array);
+	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 143, bs_definition);
+	count = element_count;
+	match_vassert(
+		"c:\\halo\\SOURCE\\memory\\data_encoding.c",
+		144,
+		count>=0,
+		"element_count>=0");
+
+	switch (element_size)
+	{
+	case 1:
+	{
+		byte byte_count;
+
+		match_vassert(
+			"c:\\halo\\SOURCE\\memory\\data_encoding.c",
+			150,
+			count<=UNSIGNED_CHAR_MAX,
+			"element_count<=UNSIGNED_CHAR_MAX");
+		byte_count = (byte)count;
+		match_assert(
+			"c:\\halo\\SOURCE\\memory\\data_encoding.c",
+			43,
+			state && state->buffer && state->offset>=0 && state->offset<state->buffer_size);
+		if (state->offset+1<=state->buffer_size && !state->overflow)
+		{
+			csmemcpy(state->buffer+state->offset, &byte_count, 1);
+			state->offset++;
+		}
+		else
+		{
+			state->overflow = TRUE;
+		}
+		break;
+	}
+	case -2:
+	{
+		short short_count;
+
+		match_vassert(
+			"c:\\halo\\SOURCE\\memory\\data_encoding.c",
+			154,
+			count<=UNSIGNED_SHORT_MAX,
+			"element_count<=UNSIGNED_SHORT_MAX");
+		short_count = (short)count;
+		data_encode_memory(state, &short_count, 1, -sizeof(short_count));
+		break;
+	}
+	case -4:
+	{
+		long long_count;
+
+		long_count = count;
+		data_encode_memory(state, &long_count, 1, -sizeof(long_count));
+		break;
+	}
+	case -8:
+	{
+		__int64 int64_count = count;
+
+		data_encode_memory(state, &int64_count, 1, -sizeof(int64_count));
+		break;
+	}
+	default:
+		display_assert(NULL, "c:\\halo\\SOURCE\\memory\\data_encoding.c", 165, TRUE);
+		system_exit(-1);
+		break;
+	}
+
+	data_encode_structures(
+		state,
+		source_array,
+		(short)count,
+		bs_definition);
 
 	return !state->overflow;
 }

@@ -49,6 +49,13 @@ boolean data_encode_structures(
 	short structure_count,
 	struct byte_swap_definition *bs_definition);
 
+boolean data_encode_array(
+	struct data_encoding_state *state,
+	long element_size,
+	void const *volatile source_array,
+	long element_count,
+	struct byte_swap_definition *bs_definition);
+
 boolean data_encode_string(
 	struct data_encoding_state *state,
 	char const *string,
