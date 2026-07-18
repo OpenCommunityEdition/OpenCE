@@ -316,7 +316,10 @@ symbols in this file:
 
 struct rasterizer_global_defaults
 {
-	real model_ambient_reflection_tint[4];
+	real near_clip_distance;
+	real far_clip_distance;
+	real first_person_weapon_near_clip_distance;
+	real first_person_weapon_far_clip_distance;
 };
 
 struct rasterizer_debug_options_definition
@@ -726,17 +729,24 @@ void _rasterizer_models_begin(
 
 const struct rasterizer_global_defaults rasterizer_global_defaults =
 {
-	{ 0.0625f, 1024.f, 0.01171875f, 1024.f }
+	0.0625f,
+	1024.f,
+	0.01171875f,
+	1024.f
 };
 struct rasterizer_globals_definition rasterizer_globals =
 {
+	FALSE,
 	{ 0 },
 	0,
 	0,
 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0 },
 	TRUE,
 	{ 0 },
-	{ 0.0625f, 1024.f, 0.01171875f, 1024.f },
+	0.0625f,
+	1024.f,
+	0.01171875f,
+	1024.f,
 	{ 0 }
 };
 struct rasterizer_debug_options_definition rasterizer_debug_options =
@@ -815,14 +825,14 @@ void rasterizer_frame_begin(
 		rasterizer_debug_options.all = 2;
 	}
 
-	if (rasterizer_globals.model_ambient_reflection_tint[0] == 0.f)
-		rasterizer_globals.model_ambient_reflection_tint[0] = rasterizer_global_defaults.model_ambient_reflection_tint[0];
-	if (rasterizer_globals.model_ambient_reflection_tint[1] == 0.f)
-		rasterizer_globals.model_ambient_reflection_tint[1] = rasterizer_global_defaults.model_ambient_reflection_tint[1];
-	if (rasterizer_globals.model_ambient_reflection_tint[2] == 0.f)
-		rasterizer_globals.model_ambient_reflection_tint[2] = rasterizer_global_defaults.model_ambient_reflection_tint[2];
-	if (rasterizer_globals.model_ambient_reflection_tint[3] == 0.f)
-		rasterizer_globals.model_ambient_reflection_tint[3] = rasterizer_global_defaults.model_ambient_reflection_tint[3];
+	if (rasterizer_globals.near_clip_distance == 0.f)
+		rasterizer_globals.near_clip_distance = rasterizer_global_defaults.near_clip_distance;
+	if (rasterizer_globals.far_clip_distance == 0.f)
+		rasterizer_globals.far_clip_distance = rasterizer_global_defaults.far_clip_distance;
+	if (rasterizer_globals.first_person_weapon_near_clip_distance == 0.f)
+		rasterizer_globals.first_person_weapon_near_clip_distance = rasterizer_global_defaults.first_person_weapon_near_clip_distance;
+	if (rasterizer_globals.first_person_weapon_far_clip_distance == 0.f)
+		rasterizer_globals.first_person_weapon_far_clip_distance = rasterizer_global_defaults.first_person_weapon_far_clip_distance;
 
 	_rasterizer_frame_begin(parameters);
 	return;

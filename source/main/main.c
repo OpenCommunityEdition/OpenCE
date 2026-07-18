@@ -1185,7 +1185,7 @@ void code_000f0bb0(
 boolean code_000f0be0(
 	void)
 {
-	return rasterizer_globals.initialized;
+	return rasterizer_globals.framerate_throttle;
 }
 
 void code_000f1ce0(

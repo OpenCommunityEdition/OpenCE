@@ -99,16 +99,29 @@ struct rasterizer_frame_begin_parameters
 
 struct rasterizer_globals_definition
 {
-	byte reserved00[0x28];
+	boolean initialized;
+	byte reserved01[0x27];
 	/* updated asynchronously by the rasterizer and vertical-blank callback */
 	volatile unsigned long frame_index;
 	volatile unsigned long vertical_blank_index;
 	byte reserved30[0xD];
-	boolean initialized;
+	boolean framerate_throttle;
 	byte reserved3E[6];
-	real model_ambient_reflection_tint[4];
+	real near_clip_distance;
+	real far_clip_distance;
+	real first_person_weapon_near_clip_distance;
+	real first_person_weapon_far_clip_distance;
 	byte reserved54[0x14];
 };
+
+typedef char verify_rasterizer_globals_size[
+	sizeof(struct rasterizer_globals_definition) == 0x68 ? 1 : -1];
+typedef char verify_rasterizer_globals_initialized_offset[
+	offsetof(struct rasterizer_globals_definition, initialized) == 0x00 ? 1 : -1];
+typedef char verify_rasterizer_globals_framerate_throttle_offset[
+	offsetof(struct rasterizer_globals_definition, framerate_throttle) == 0x3D ? 1 : -1];
+typedef char verify_rasterizer_globals_near_clip_distance_offset[
+	offsetof(struct rasterizer_globals_definition, near_clip_distance) == 0x44 ? 1 : -1];
 
 struct rasterizer_window_begin_parameters
 {
