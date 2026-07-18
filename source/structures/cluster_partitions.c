@@ -128,6 +128,42 @@ void reference_list_remove(
 	return;
 }
 
+/* NonMatching: size and all nine relocations (including addresses) match the
+ * January object. VC7 assigns the source and destination pointer live ranges
+ * to opposite registers; eight legal-C source shapes did not break the tie. */
+void reference_list_copy(
+	struct data_array *result,
+	struct data_array *source)
+{
+	short absolute_index;
+	struct data_reference *source_reference;
+	struct data_reference *result_reference;
+
+	match_assert("..\\objects\\reference_lists.h", 0x88, result->size==source->size);
+	match_assert("..\\objects\\reference_lists.h", 0x89, result->maximum_count==source->maximum_count);
+	result_reference = result->data;
+	source_reference = source->data;
+
+	absolute_index = 0;
+	while (absolute_index < result->maximum_count)
+	{
+		if (source_reference->identifier)
+		{
+			*result_reference = *source_reference;
+		}
+		else if (result_reference->identifier)
+		{
+			datum_delete(result, absolute_index);
+		}
+
+		absolute_index++;
+		result_reference++;
+		source_reference++;
+	}
+
+	return;
+}
+
 void cluster_partition_new(
 	struct cluster_partition *partition,
 	char const *name)
