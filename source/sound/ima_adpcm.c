@@ -98,9 +98,9 @@ struct bungie_ima_adpcm_byte_swap_globals data_00316a7c =
 
 /* ---------- public code */
 
-/* NonMatching: target and candidate are both 0x160 bytes with two relocations
-   at the exact offsets. The remaining 20 normalized-byte differences are a
-   three-instruction reconstruction-loop schedule and two register choices. */
+/* NonMatching: target and candidate are both 0x160 bytes with both relocations
+   exact. The sole remaining divergence is a three-instruction independent-
+   assignment schedule when the second reconstruction pass is initialized. */
 long compress_ima_adpcm_audio_data(
 	short *input_samples,
 	long input_sample_count,
@@ -114,8 +114,10 @@ long compress_ima_adpcm_audio_data(
 		boolean write_high_nibble = TRUE;
 		long original_sample_count = input_sample_count;
 		struct bungie_ima_adpcm_header *header = (struct bungie_ima_adpcm_header *)output_data;
-		long sample = input_samples[0];
+		long sample;
 		short step_size_index = 0;
+
+		sample = input_samples[0];
 
 		output_data += sizeof(struct bungie_ima_adpcm_header);
 		output_data_size -= sizeof(struct bungie_ima_adpcm_header);
@@ -199,8 +201,8 @@ long compress_ima_adpcm_audio_data(
 				output_data_size--;
 			}
 
-			input_samples++;
 			input_sample_count--;
+			input_samples++;
 		}
 
 		header->sample_count = original_sample_count - input_sample_count;
@@ -210,8 +212,10 @@ long compress_ima_adpcm_audio_data(
 	return result;
 }
 
-/* NonMatching: target is 0x1A0 bytes and candidate is 0x1B0; both have two
-   relocations, but their offsets differ by 15 and 16 bytes respectively. */
+/* NonMatching: target and candidate are both 0x1A0 bytes with two semantic
+   relocations; candidate offsets are +3 and +2. Recovering the original
+   sample-index shift removed the prior 0x10-byte structural excess. The
+   remainder is local-slot/register allocation around the persistent state. */
 long decompress_ima_adpcm_audio_data(
 	struct bungie_ima_adpcm_header const *input_header,
 	long input_data_size,
@@ -241,8 +245,8 @@ long decompress_ima_adpcm_audio_data(
 
 			sample = state->sample;
 			step_size_index = state->step_size_index;
-			input += state->sample_index/2;
-			input_data_size -= state->sample_index/2;
+			input += state->sample_index>>1;
+			input_data_size -= state->sample_index>>1;
 			result = state->sample_count - state->sample_index;
 			read_high_nibble = !(state->sample_index&1);
 		}
