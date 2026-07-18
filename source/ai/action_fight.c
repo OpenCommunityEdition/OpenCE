@@ -35,6 +35,15 @@ symbols in this file:
 
 /* ---------- public code */
 
+boolean action_fight_setup(
+	long actor_index,
+	struct fight_state_data *state_data)
+{
+	match_assert("c:\\halo\\SOURCE\\ai\\action_fight.c", 30, state_data);
+	memset(state_data, 0, sizeof(*state_data));
+	return TRUE;
+}
+
 void action_fight_begin(
 	long actor_index)
 {

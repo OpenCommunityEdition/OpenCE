@@ -36,8 +36,13 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define valid_real_vector3d valid_real_vector3d_inline
+#define real_local_random_range real_local_random_range_inline
 #include "bored_camera.h"
 #include "cseries/cseries_windows.h"
+#include "math/real_math.h"
+#undef real_local_random_range
+#undef valid_real_vector3d
 
 /* ---------- constants */
 
@@ -53,6 +58,9 @@ float real_seed_random_range(
 	unsigned long *seed,
 	float lower_bound,
 	float upper_bound);
+
+boolean valid_real_vector3d(
+	real_vector3d const *v);
 
 /* ---------- globals */
 
@@ -89,4 +97,10 @@ float real_local_random_range(
 		get_global_local_random_seed_address(),
 		lower_bound,
 		upper_bound);
+}
+
+boolean valid_real_vector3d(
+	real_vector3d const *v)
+{
+	return valid_real(v->i) && valid_real(v->j) && valid_real(v->k);
 }
