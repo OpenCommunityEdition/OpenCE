@@ -541,11 +541,26 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "ai_communication.h"
+
+#include "memory/data.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct ai_conversation_line_view
+{
+	struct ai_conversation_datum_header header;
+	byte __unknown14[0x34];
+	short current_line;
+};
+
+typedef char ai_conversation_line_view_current_line_offset_assert[
+	offsetof(struct ai_conversation_line_view, current_line) == 0x48 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -557,6 +572,26 @@ void ai_communication_dispose(
 	void)
 {
 	return;
+}
+
+short ai_conversation_line(
+	short scenario_conversation_index)
+{
+	struct data_iterator iterator;
+	struct ai_conversation_line_view *conversation;
+	short line = 999;
+
+	data_iterator_new(&iterator, conversation_data);
+	while ((conversation = (struct ai_conversation_line_view *)data_iterator_next(&iterator)) != NULL)
+	{
+		if (conversation->header.scenario_conversation_index == scenario_conversation_index)
+		{
+			line = conversation->current_line;
+			break;
+		}
+	}
+
+	return line;
 }
 
 /* ---------- private code */

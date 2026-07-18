@@ -36,6 +36,8 @@ struct ai_conversation_datum_header
 
 void ai_communication_dispose(
 	void);
+short ai_conversation_line(
+	short scenario_conversation_index);
 void ai_conversation_finish(
 	long conversation_index,
 	boolean abort,
