@@ -107,7 +107,7 @@ struct rasterizer_globals_definition
 	boolean initialized;
 	byte reserved3E[6];
 	real model_ambient_reflection_tint[4];
-	byte reserved54[0xA0];
+	byte reserved54[0x14];
 };
 
 struct rasterizer_window_begin_parameters

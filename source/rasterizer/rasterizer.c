@@ -336,7 +336,7 @@ struct rasterizer_debug_options_definition
 	byte field_1B;
 	byte field_1C;
 	byte field_1D;
-	byte reserved1E[0x4A];
+	byte reserved1E[0x6E];
 };
 
 struct rasterizer_window_parameters
@@ -728,8 +728,44 @@ const struct rasterizer_global_defaults rasterizer_global_defaults =
 {
 	{ 0.0625f, 1024.f, 0.01171875f, 1024.f }
 };
-extern struct rasterizer_globals_definition rasterizer_globals;
-extern struct rasterizer_debug_options_definition rasterizer_debug_options;
+struct rasterizer_globals_definition rasterizer_globals =
+{
+	{ 0 },
+	0,
+	0,
+	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0 },
+	TRUE,
+	{ 0 },
+	{ 0.0625f, 1024.f, 0.01171875f, 1024.f },
+	{ 0 }
+};
+struct rasterizer_debug_options_definition rasterizer_debug_options =
+{
+	{ 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF, 0, 0, 1, 1, 1, 1 },
+	2,
+	1,
+	1,
+	1,
+	1,
+	1,
+	1,
+	1,
+	1,
+	1,
+	1,
+	1,
+	1,
+	1,
+	{
+		1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0,
+		0x80, 0x3F, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1,
+		1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0,
+		0, 0, 0xCD, 0xCC, 0xCC, 0x3E, 8, 0, 0, 0, 0, 0, 0x80, 0x3B,
+		0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0x80, 0x3F, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	}
+};
 extern struct rasterizer_window_parameters global_window_parameters;
 /* No PDB name survives for this target-owned BSS symbol. */
 long bss_004662ec;
