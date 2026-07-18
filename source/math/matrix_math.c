@@ -263,6 +263,45 @@ void matrix4x3_from_orientation(
 	return;
 }
 
+/* NonMatching: target and candidate are both 0x70 bytes with no relocations.
+   Every instruction after the opening argument loads is exact; VC7 reverses
+   only the load/compare order of matrix and result in this reconstruction. */
+void matrix3x3_transpose(
+	real_matrix3x3 const *matrix,
+	real_matrix3x3 *result)
+{
+	if (result == matrix)
+	{
+		real temporary;
+
+		temporary = matrix->forward.j;
+		result->forward.j = matrix->left.i;
+		result->left.i = temporary;
+
+		temporary = matrix->forward.k;
+		result->forward.k = matrix->up.i;
+		result->up.i = temporary;
+
+		temporary = matrix->left.k;
+		result->left.k = matrix->up.j;
+		result->up.j = temporary;
+	}
+	else
+	{
+		result->forward.i = matrix->forward.i;
+		result->forward.j = matrix->left.i;
+		result->forward.k = matrix->up.i;
+		result->left.i = matrix->forward.j;
+		result->left.j = matrix->left.j;
+		result->left.k = matrix->up.j;
+		result->up.i = matrix->forward.k;
+		result->up.j = matrix->left.k;
+		result->up.k = matrix->up.k;
+	}
+
+	return;
+}
+
 void matrix4x3_inverse(
 	real_matrix4x3 const *matrix,
 	real_matrix4x3 *result)
@@ -356,6 +395,28 @@ matrix4x3_to_point_and_vectors(
 	*point = matrix->position;
 
 	return;
+}
+
+real_vector3d *vector_from_matrices4x3(
+	real_matrix4x3 const *a,
+	real_matrix4x3 const *b,
+	real_vector3d *rotation)
+{
+	real_matrix4x3 inverse_b;
+	real_matrix4x3 relative;
+	real_quaternion quaternion;
+	real angle;
+
+	matrix4x3_inverse(b, &inverse_b);
+	matrix4x3_multiply(a, &inverse_b, &relative);
+	matrix4x3_rotation_to_quaternion(&relative, &quaternion);
+	quaternion_to_angle_and_vector(&quaternion, &angle, rotation);
+
+	rotation->i *= angle;
+	rotation->j *= angle;
+	rotation->k *= angle;
+
+	return rotation;
 }
 
 real_point3d *matrix4x3_transform_point(
