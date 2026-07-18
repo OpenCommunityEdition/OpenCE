@@ -1,5 +1,15 @@
 #ifndef lint
-static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_dirwrite.c,v 1.16 92/03/18 09:36:15 sam Exp $";
+struct tif_dirwrite_data
+{
+	char rcsid[92];
+	char module[18];
+};
+
+struct tif_dirwrite_data data_002b8688 =
+{
+	"$Header: /usr/people/sam/tiff/libtiff/RCS/tif_dirwrite.c,v 1.16 92/03/18 09:36:15 sam Exp $",
+	"TIFFLinkDirectory"
+};
 #endif
 
 /*
@@ -38,6 +48,22 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_dirwrite.c,
  */
 #include "tiffioP.h"
 #include "prototypes.h"
+
+/* Preserve the symbols owned by the January 2002 csplit object. */
+#define TIFFWriteData code_00055dd0
+#define TIFFLinkDirectory code_00055e60
+#define TIFFWriteRational code_00055fd0
+#define TIFFWriteShortTable code_00056060
+#define TIFFWriteString code_000560e0
+#define TIFFWriteShortArray code_00056130
+#define TIFFWriteLongArray code_000561b0
+#define TIFFWriteRationalArray code_000561f0
+#define TIFFWriteFloatArray code_00056280
+#define TIFFWriteNormalTag code_000562c0
+#define TIFFWritePerSampleShorts code_000565e0
+#define lseek _lseek
+#define write _write
+#define module (data_002b8688.module)
 
 #if HAVE_IEEEFP
 #define	TIFFCvtNativeToIEEEFloat(tif, n, fp)
@@ -97,7 +123,8 @@ static	TIFFLinkDirectory();
 	dir++;							\
 }
 
-static	long dataoff;
+long bss_0031be50 = 0;
+#define dataoff bss_0031be50
 /*
  * Write the contents of the current directory
  * to the specified file.  This routine doesn't
@@ -758,7 +785,6 @@ static
 TIFFLinkDirectory(tif)
 	register TIFF *tif;
 {
-	static char module[] = "TIFFLinkDirectory";
 	u_short dircount;
 	long nextdir;
 
