@@ -91,10 +91,17 @@ struct thread_reference *code_0006fc30(
 	void);
 struct mutex_reference *code_0006fc60(
 	void);
+boolean create_thread(
+	long priority_flags,
+	LPTHREAD_START_ROUTINE function,
+	void *parameter,
+	struct thread_reference **thread_reference);
 boolean thread_has_exited(
 	struct thread_reference *thread_reference);
 void dispose_thread(
 	struct thread_reference *thread_reference);
+boolean create_mutex(
+	struct mutex_reference **mutex_reference);
 boolean take_mutex(
 	struct mutex_reference *mutex_reference,
 	unsigned long timeout_ms);
@@ -109,6 +116,56 @@ struct thread_globals bss_0031c728;
 extern struct mutex_reference bss_0031cd30;
 
 /* ---------- public code */
+
+boolean create_thread(
+	long priority_flags,
+	LPTHREAD_START_ROUTINE function,
+	void *parameter,
+	struct thread_reference **thread_reference)
+{
+	struct thread_reference *reference;
+	long priority;
+
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\thread_win32.c", 0x6B, function);
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\thread_win32.c", 0x6C, thread_reference);
+
+	reference = code_0006fc30();
+
+	if (reference)
+	{
+		reference->handle = CreateThread(
+			NULL,
+			0x4000,
+			function,
+			parameter,
+			CREATE_SUSPENDED,
+			(unsigned long *)&function);
+		if (reference->handle)
+		{
+			priority = 0;
+			if (TEST_FLAG(priority_flags, 1))
+				priority = THREAD_PRIORITY_BELOW_NORMAL;
+			else if (TEST_FLAG(priority_flags, 2))
+				priority = THREAD_PRIORITY_ABOVE_NORMAL;
+
+			if (SetThreadPriority(reference->handle, priority) &&
+				ResumeThread(reference->handle) != (unsigned long)-1)
+			{
+				*thread_reference = reference;
+				return TRUE;
+			}
+
+			CloseHandle(reference->handle);
+			/* Original bug: the reserved slot remains marked in use here. A
+			   nonmatching robustness fix would also clear reference->in_use. */
+			*thread_reference = NULL;
+			return FALSE;
+		}
+	}
+
+	*thread_reference = reference;
+	return FALSE;
+}
 
 boolean thread_has_exited(
 	struct thread_reference *thread_reference)
@@ -137,6 +194,38 @@ void dispose_thread(
 	thread_reference->in_use = FALSE;
 
 	return;
+}
+
+boolean create_mutex(
+	struct mutex_reference **mutex_reference)
+{
+	struct mutex_reference *reference;
+
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\thread_win32.c", 0xB8, mutex_reference);
+
+	reference = code_0006fc60();
+	if (!reference)
+	{
+		*mutex_reference = reference;
+		return FALSE;
+	}
+
+	_snprintf(
+		reference->name,
+		NUMBEROF(reference->name),
+		"mutex_%ld",
+		bss_0031c728.mutex_index++);
+	reference->handle = CreateMutexA(NULL, FALSE, reference->name);
+	if (reference->handle)
+	{
+		*mutex_reference = reference;
+		return TRUE;
+	}
+
+	/* Original bug: the reserved slot remains marked in use when mutex
+	   creation fails. A nonmatching fix would release the slot here. */
+	*mutex_reference = NULL;
+	return FALSE;
 }
 
 boolean take_mutex(
