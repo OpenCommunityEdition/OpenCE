@@ -128,13 +128,17 @@ symbols in this file:
 #include "tag_files/tag_groups.h"
 #include "tag_files/files.h"
 #include "cache_files.h"
+#include "physical_memory_map.h"
 #include "scenario/scenario_definitions.h"
+#include "sound/sound_manager.h"
 
 /* ---------- constants */
 
 /* ---------- macros */
 
 #define STRUCTURE_BSP_TAG 'sbsp'
+#define CACHE_FILE_TAG_HEADER_SIGNATURE 'tags'
+#define CACHE_FILE_STRUCTURE_BSP_HEADER_SIGNATURE 'sbsp'
 #define CACHE_FILE_HEADER_SIGNATURE 'head'
 #define CACHE_FILE_FOOTER_SIGNATURE 'foot'
 
@@ -160,6 +164,7 @@ struct cache_file_tag_header
 	void *vertex_buffers;
 	long index_buffer_count;
 	void *index_buffers;
+	unsigned long signature;
 };
 
 struct cache_file_structure_bsp_header
@@ -169,6 +174,7 @@ struct cache_file_structure_bsp_header
 	void *vertex_buffers;
 	long index_buffer_count;
 	void *index_buffers;
+	unsigned long signature;
 };
 
 struct cache_file_header
@@ -176,19 +182,23 @@ struct cache_file_header
 	unsigned long header_signature;
 	long version;
 	long file_length;
-	byte reservedC[0x14];
+	byte reservedC[4];
+	long tag_data_offset;
+	long tag_data_size;
+	byte reserved18[8];
 	char name[0x20];
 	char build[0x20];
-	byte reserved60[0x79C];
+	byte reserved60[4];
+	unsigned long checksum;
+	byte reserved68[0x794];
 	unsigned long footer_signature;
 };
 
 struct cache_file_globals
 {
 	boolean tags_loaded;
-	byte reserved1[0x67];
-	unsigned long checksum;
-	byte reserved6C[0x798];
+	byte pad1[3];
+	struct cache_file_header header;
 	struct cache_file_tag_header *tag_header;
 	struct cache_file_structure_bsp_header *structure_bsp_header;
 };
@@ -230,10 +240,30 @@ void cache_files_precache_set_priority(
 	long priority);
 void display_error_damaged_media(
 	void);
+void texture_cache_open(
+	void);
+void sound_cache_open(
+	void);
+void sound_idle(
+	void);
+boolean cache_file_open(
+	char const *scenario_name,
+	struct cache_file_header *header);
+void cache_file_read(
+	long request_index,
+	long offset,
+	long size,
+	void *buffer,
+	boolean *completion_flag,
+	boolean block);
+void tags_header_register_vertex_and_index_buffers(
+	struct cache_file_tag_header *header);
+void structure_bsp_header_register_vertex_buffers(
+	struct cache_file_structure_bsp_header *header);
 
 /* ---------- globals */
 
-struct cache_file_globals cache_file_globals;
+struct cache_file_globals cache_file_globals = { 0 };
 extern struct cache_file_tag_instance *global_tag_instances;
 char const *data_00316820[] =
 {
@@ -363,7 +393,7 @@ void tag_files_close(
 unsigned long cache_files_get_checksum(
 	void)
 {
-	return cache_file_globals.checksum;
+	return cache_file_globals.header.checksum;
 }
 
 unsigned long tag_groups_checksum(
@@ -645,6 +675,112 @@ boolean cache_files_give_time_to_precache(
 	}
 
 	return result;
+}
+
+long scenario_tags_load(
+	char const *scenario_name)
+{
+	long result;
+	char const *stripped_scenario_name;
+	void *tag_cache_base_address;
+	boolean read_complete;
+
+	stripped_scenario_name = tag_name_strip_path(scenario_name);
+	result = NONE;
+	texture_cache_open();
+	sound_cache_open();
+	if (cache_file_open(stripped_scenario_name, &cache_file_globals.header))
+	{
+		tag_cache_base_address = physical_memory_get_tag_cache_base_address();
+		if (cache_file_header_verify(&cache_file_globals.header, scenario_name, TRUE))
+		{
+			csmemset(tag_cache_base_address, 0xCD, 0x01600000);
+			cache_file_read(
+				NONE,
+				cache_file_globals.header.tag_data_offset,
+				cache_file_globals.header.tag_data_size,
+				tag_cache_base_address,
+				&read_complete,
+				TRUE);
+			while (!read_complete)
+			{
+				SwitchToThread();
+			}
+
+			cache_file_globals.tag_header = tag_cache_base_address;
+			match_vassert(
+				"c:\\halo\\SOURCE\\cache\\cache_files.c",
+				0x94,
+				cache_file_globals.tag_header->signature == CACHE_FILE_TAG_HEADER_SIGNATURE,
+				csprintf(
+					temporary,
+					"signature is '%c%c%c%c', should be '%c%c%c%c'",
+					((char *)&cache_file_globals.tag_header->signature)[3],
+					((char *)&cache_file_globals.tag_header->signature)[2],
+					((char *)&cache_file_globals.tag_header->signature)[1],
+					((char *)&cache_file_globals.tag_header->signature)[0],
+					't',
+					'a',
+					'g',
+					's'));
+			global_tag_instances = cache_file_globals.tag_header->tag_instances;
+			tags_header_register_vertex_and_index_buffers(cache_file_globals.tag_header);
+			cache_file_globals.tags_loaded = TRUE;
+			result = cache_file_globals.tag_header->scenario_tag_index;
+		}
+	}
+
+	return result;
+}
+
+boolean scenario_structure_bsp_load(
+	struct scenario_structure_bsp_reference *reference)
+{
+	struct cache_file_tag_instance *tag_instance;
+	struct scenario_structure_bsp_reference *bsp_reference;
+	byte *tag_cache_base_address;
+
+	tag_cache_base_address = physical_memory_get_tag_cache_base_address();
+	csmemset(
+		tag_cache_base_address + cache_file_globals.header.tag_data_size,
+		0xCD,
+		0x01600000 - cache_file_globals.header.tag_data_size);
+	/* Preserve the target's parameter-home reload before cache_file_read. */
+	bsp_reference = *(struct scenario_structure_bsp_reference * volatile *)&reference;
+	cache_file_read(
+		NONE,
+		bsp_reference->file_offset,
+		bsp_reference->file_size,
+		bsp_reference->base_address,
+		(boolean *)((byte *)&reference + 3),
+		TRUE);
+	while (!*((boolean *)((byte *)&reference + 3)))
+	{
+		SwitchToThread();
+		if (system_milliseconds() - sound_render_time() > 33)
+		{
+			sound_idle();
+		}
+	}
+
+	cache_file_globals.structure_bsp_header = bsp_reference->base_address;
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\cache_files.c",
+		0xE0,
+		cache_file_globals.structure_bsp_header->signature==CACHE_FILE_STRUCTURE_BSP_HEADER_SIGNATURE);
+	structure_bsp_header_register_vertex_buffers(cache_file_globals.structure_bsp_header);
+	tag_instance = code_001a95d0(bsp_reference->structure_bsp.index);
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\cache_files.c",
+		0xEA,
+		!tag_instance->base_address);
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\cache_files.c",
+		0xEB,
+		tag_instance->group_tag==STRUCTURE_BSP_TAG);
+	tag_instance->base_address = cache_file_globals.structure_bsp_header->base_address;
+
+	return TRUE;
 }
 
 void scenario_structure_bsp_unload(

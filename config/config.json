@@ -405,7 +405,7 @@
 				{ "name": "source/cache/physical_memory_map.c", "index": 31, "status": "Matching" },
 				{ "name": "source/cache/cache_files_windows.c", "index": 32, "status": "NonMatching" },
 				{ "name": "source/cache/cache_files_decompress_windows.c", "index": 33, "status": "NonMatching" },
-				{ "name": "source/cache/cache_files.c", "index": 34, "status": "NonMatching" },
+				{ "name": "source/cache/cache_files.c", "index": 34, "status": "Matching" },
 				{ "name": "source/units/vehicles.c", "index": 35, "status": "NonMatching" },
 				{ "name": "source/units/vehicle_definitions.c", "index": 36, "status": "Matching" },
 				{ "name": "source/units/units.c", "index": 37, "status": "NonMatching" },

@@ -85,7 +85,10 @@ struct scenario_decal_palette_entry
 
 struct scenario_structure_bsp_reference
 {
-	byte unused0[0x10];
+	long file_offset;
+	long file_size;
+	void *base_address;
+	byte unusedC[4];
 	struct tag_reference structure_bsp;
 };
 
