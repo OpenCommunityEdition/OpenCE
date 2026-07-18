@@ -167,9 +167,9 @@
         "base": {
           "size": 624,
           "relocation_count": 50,
-          "normalized_sha256": "217dead5d1cb5487be0faac4002a8d8baaa851162106fa4da28b1f43a18c999a"
+          "normalized_sha256": "09377b04504056b8f2278b92bf682d5bd8be32a924e9e87c53cddd954f11ce53"
         },
-        "objdiff_percent": 87.235634
+        "objdiff_percent": 87.55173
       }
     },
     {
