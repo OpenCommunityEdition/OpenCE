@@ -22,7 +22,18 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
+#include "bitmaps/bitmap_group.h"
+
 /* ---------- constants */
+
+enum
+{
+	CHANNEL_COUNT = 4,
+	CHANNEL_BITS = 8,
+	_bitmap_type_2d = 0,
+};
 
 /* ---------- macros */
 
@@ -30,8 +41,204 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+boolean bitmap_verify(
+	struct bitmap_data *bitmap,
+	boolean repair);
+void *bitmap_2d_address(
+	struct bitmap_data *bitmap,
+	short x,
+	short y,
+	short mipmap_index);
+
+static void code_0006d5d0(
+	short *destination,
+	byte const *source,
+	short pixel_count);
+void code_0006d5f0(
+	short const *bits_per_channel,
+	short const *minimum_error,
+	short pixel_count,
+	short *source,
+	short *next_source,
+	byte *destination);
+
 /* ---------- globals */
+
+short bits_per_channel_r5g6b5[CHANNEL_COUNT] = { 0, 5, 6, 5 };
+short bits_per_channel_a1r5g5b5[CHANNEL_COUNT] = { 8, 5, 5, 5 };
+short bits_per_channel_a4r4g4b4[CHANNEL_COUNT] = { 4, 4, 4, 4 };
+short bss_0031c314[CHANNEL_COUNT] = { 0 };
 
 /* ---------- public code */
 
+void bitmap_quantitize(
+	struct bitmap_data *bitmap,
+	short const *bits_per_channel)
+{
+	short minimum_error[CHANNEL_COUNT];
+	short *source;
+	short *next_source;
+	short channel_index;
+	short y;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps_quantitize.c", 48, bitmap_verify(bitmap, TRUE));
+
+	if (bits_per_channel && bitmap->type == _bitmap_type_2d)
+	{
+		source = match_malloc("c:\\halo\\SOURCE\\bitmaps\\bitmaps_quantitize.c", 52, bitmap->width * CHANNEL_COUNT * sizeof(short));
+		next_source = match_malloc("c:\\halo\\SOURCE\\bitmaps\\bitmaps_quantitize.c", 53, bitmap->width * CHANNEL_COUNT * sizeof(short));
+
+		for (channel_index = 0; channel_index < CHANNEL_COUNT; channel_index++)
+		{
+			match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps_quantitize.c", 63, bits_per_channel[channel_index]>=0 && bits_per_channel[channel_index]<=CHANNEL_BITS);
+		}
+		for (channel_index = 0; channel_index < CHANNEL_COUNT; channel_index++)
+			bss_0031c314[CHANNEL_COUNT - 1 - channel_index] = bits_per_channel[channel_index];
+
+		for (channel_index = 0; channel_index < CHANNEL_COUNT; channel_index++)
+			minimum_error[channel_index] = (short)((1 << (CHANNEL_BITS - bss_0031c314[channel_index])) * 0.25f);
+
+		/* Original behavior: if exactly one allocation fails, the successful
+		 * allocation is leaked. A corrected implementation would free either
+		 * non-NULL buffer before leaving this block. */
+		if (source && next_source)
+		{
+			code_0006d5d0(source, bitmap->base_address, bitmap->width);
+
+			for (y = 0; y < bitmap->height - 1; y++)
+			{
+				code_0006d5d0(
+					next_source,
+					bitmap_2d_address(bitmap, 0, (short)(y + 1), 0),
+					bitmap->width);
+				code_0006d5f0(
+					bss_0031c314,
+					minimum_error,
+					bitmap->width,
+					source,
+					next_source,
+					bitmap_2d_address(bitmap, 0, y, 0));
+				{
+					short *swap = source;
+					source = next_source;
+					next_source = swap;
+				}
+			}
+
+			code_0006d5f0(
+				bss_0031c314,
+				minimum_error,
+				bitmap->width,
+				source,
+				NULL,
+				bitmap_2d_address(bitmap, 0, (short)(bitmap->height - 1), 0));
+			match_free("c:\\halo\\SOURCE\\bitmaps\\bitmaps_quantitize.c", 115, source);
+			match_free("c:\\halo\\SOURCE\\bitmaps\\bitmaps_quantitize.c", 116, next_source);
+		}
+	}
+	return;
+}
+
 /* ---------- private code */
+
+static void code_0006d5d0(
+	short *destination,
+	byte const *source,
+	short pixel_count)
+{
+	long channel_count = pixel_count * CHANNEL_COUNT;
+
+	while (channel_count-- > 0)
+		*destination++ = *source++;
+	return;
+}
+
+void code_0006d5f0(
+	short const *bits_per_channel,
+	short const *minimum_error,
+	short pixel_count,
+	short *source,
+	short *next_source,
+	byte *destination)
+{
+	short pixel_index;
+	long channel_index;
+
+	for (pixel_index = 0; pixel_index < pixel_count; pixel_index++)
+	{
+		byte original[CHANNEL_COUNT];
+		byte quantized[CHANNEL_COUNT];
+		short *source_channel;
+		short *source_after_pixel;
+		byte *original_channel;
+		short const *bits_channel;
+		short const *minimum_channel;
+		long channels_remaining;
+		long quantized_value;
+
+		source_channel = source;
+		original_channel = original;
+		channels_remaining = CHANNEL_COUNT;
+		do
+		{
+			short value = *source_channel;
+			*original_channel = value < 0 ? 0 : value > 255 ? 255 : value;
+			source_channel++;
+			original_channel++;
+		}
+		while (--channels_remaining);
+		source_after_pixel = source_channel;
+
+		bits_channel = bits_per_channel;
+		channel_index = 0;
+		channels_remaining = CHANNEL_COUNT;
+		do
+		{
+			if (*bits_channel)
+			{
+				quantized_value =
+					((original[channel_index] >> (CHANNEL_BITS - *bits_channel)) * 255) /
+					((1 << *bits_channel) - 1);
+			}
+			else
+			{
+				quantized_value = 0;
+			}
+			quantized[channel_index] = quantized_value;
+			destination[channel_index] = quantized_value;
+			bits_channel++;
+			channel_index++;
+		}
+		while (--channels_remaining);
+
+		minimum_channel = minimum_error;
+		channel_index = 0;
+		channels_remaining = CHANNEL_COUNT;
+		do
+		{
+			short error = original[channel_index] - quantized[channel_index];
+
+			if (pixel_index < pixel_count - 1 && source[CHANNEL_COUNT + channel_index] > *minimum_channel)
+				source[CHANNEL_COUNT + channel_index] += (error * 7) / 16;
+
+			if (next_source)
+			{
+				if (pixel_index && next_source[-CHANNEL_COUNT + channel_index] > *minimum_channel)
+					next_source[-CHANNEL_COUNT + channel_index] += (error * 3) / 16;
+				if (next_source[channel_index] > *minimum_channel)
+					next_source[channel_index] += (error * 5) / 16;
+				if (pixel_index < pixel_count - 1 && next_source[CHANNEL_COUNT + channel_index] > *minimum_channel)
+					next_source[CHANNEL_COUNT + channel_index] += error / 16;
+			}
+			channel_index++;
+			minimum_channel++;
+		}
+		while (--channels_remaining);
+
+		source = source_after_pixel;
+		destination += CHANNEL_COUNT;
+		if (next_source)
+			next_source += CHANNEL_COUNT;
+	}
+	return;
+}

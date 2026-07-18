@@ -14,9 +14,15 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct bitmap_data;
+
 /* ---------- prototypes/BITMAPS.C */
 
 /* ---------- prototypes/BITMAP_UTILITIES.C */
+
+void bitmap_quantitize(
+	struct bitmap_data *bitmap,
+	short const *bits_per_channel);
 
 real real_rgb_color_brightness(union real_rgb_color const *color);
 
