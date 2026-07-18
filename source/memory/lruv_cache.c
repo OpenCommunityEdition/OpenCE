@@ -433,15 +433,8 @@ void lruv_debug_to_file(
 				{
 					age = cache->tick - block->last_used_tick;
 					page_count = block->page_count;
-					if (cache->locked_block_proc &&
-						cache->locked_block_proc(block_index))
-					{
-						locked = TRUE;
-					}
-					else if (cache->locked_block_proc)
-					{
-						locked = FALSE;
-					}
+					locked = cache->locked_block_proc &&
+						cache->locked_block_proc(block_index);
 					if ((unsigned long)(block->last_used_tick + 1) >=
 						(unsigned long)cache->tick)
 					{
