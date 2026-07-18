@@ -115,7 +115,6 @@ void render_model(
 /* ---------- globals */
 
 real bss_004c04f8[MAXIMUM_SKIES_PER_SCENARIO] = {0.f};
-extern real_matrix4x3 const *const global_identity4x3;
 
 /* ---------- public code */
 
