@@ -94,9 +94,334 @@ void actor_discard_firing_position(
 	short firing_position_index,
 	boolean temporary);
 
+void actor_perception_forget_recent_damage(
+	long actor_index);
+
+void actor_perception_retreat_successful(
+	long actor_index);
+
+void actor_perception_find_prop_pathfinding_location(
+	long actor_index,
+	long prop_index);
+
+boolean actor_nearby_firing_positions(
+	long actor_index,
+	real_point3d const *point,
+	long surface_index,
+	boolean allow_outside_range);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+boolean
+action_guard_setup_current_position(
+	long actor_index,
+	struct guard_state_data *state_data)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	match_assert("c:\\halo\\SOURCE\\ai\\action_guard.c", 114, state_data);
+	csmemset(state_data, 0, sizeof(*state_data));
+	state_data->guard_location_type = 1;
+	state_data->has_guard_direction = TRUE;
+	state_data->guard_direction = actor->input.facing_vector;
+	state_data->guard_look_prop_index = NONE;
+
+	return TRUE;
+}
+
+boolean
+action_guard_setup_find_position(
+	long actor_index,
+	long wait_ticks,
+	struct guard_state_data *state_data)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	match_assert("c:\\halo\\SOURCE\\ai\\action_guard.c", 134, state_data);
+	csmemset(state_data, 0, sizeof(*state_data));
+
+	if (!actor->input.vehicle_passenger && !actor->meta.swarm)
+	{
+		state_data->wait_ticks = wait_ticks;
+		if ((short)wait_ticks == 0)
+		{
+			state_data->find_new_guard_position = TRUE;
+			state_data->guard_location_type = 0;
+		}
+		else
+		{
+			state_data->guard_location_type = 1;
+			state_data->has_guard_direction = TRUE;
+			state_data->guard_direction = actor->input.facing_vector;
+		}
+	}
+	else
+	{
+		state_data->guard_location_type = 1;
+	}
+
+	state_data->guard_look_prop_index = NONE;
+
+	return TRUE;
+}
+
+boolean
+action_guard_setup_postcombat(
+	long actor_index,
+	struct guard_state_data *state_data)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean result = TRUE;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\action_guard.c", 172, state_data);
+	csmemset(state_data, 0, sizeof(*state_data));
+	state_data->wait_ticks = 120;
+	state_data->guard_location_type = 1;
+	state_data->post_combat = TRUE;
+	state_data->guard_look_prop_index = NONE;
+
+	if (actor->input.vehicle_driver_type == 4)
+	{
+		result = FALSE;
+	}
+	else if (!actor->input.vehicle_passenger &&
+		!actor->meta.swarm &&
+		actor->external_orders.postcombat_prop_index != NONE)
+	{
+		struct prop_datum *prop = prop_get(actor->external_orders.postcombat_prop_index);
+
+		state_data->guard_look_prop_index = actor->external_orders.postcombat_prop_index;
+		state_data->look_ticks = 120;
+		state_data->guard_look_until_reached_point = TRUE;
+
+		switch (actor->external_orders.postcombat_type)
+		{
+		case _actor_postcombat_run_to:
+			state_data->guard_point.radius = 2.f;
+			break;
+		case _actor_postcombat_check_enemy:
+		case _actor_postcombat_check_friend:
+			state_data->guard_point.radius = 1.f;
+			break;
+		case _actor_postcombat_shoot_corpse:
+			state_data->guard_point.radius = 1.5f;
+			break;
+		default:
+			goto done;
+		}
+
+		actor_perception_find_prop_pathfinding_location(
+			actor_index,
+			actor->external_orders.postcombat_prop_index);
+		state_data->guard_location_type = 2;
+		state_data->guard_point.position = prop->pathfinding_point;
+		state_data->guard_point.surface_index = prop->pathfinding_surface_index;
+	}
+
+done:
+	return result;
+}
+
+boolean
+action_guard_setup_from_combat_transition(
+	long actor_index,
+	struct guard_state_data *state_data)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	match_assert("c:\\halo\\SOURCE\\ai\\action_guard.c", 32, state_data);
+	csmemset(state_data, 0, sizeof(*state_data));
+	state_data->wait_ticks = (short)actor->stimuli.combat_transition_guard_timer;
+
+	if (!actor->input.vehicle_passenger && !actor->meta.swarm)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\action_guard.c",
+			45,
+			actor->stimuli.combat_transition);
+
+		if (actor->stimuli.combat_transition_guard_at_point &&
+			actor_nearby_firing_positions(
+				actor_index,
+				&actor->stimuli.combat_transition_guard_point,
+				actor->stimuli.combat_transition_guard_point_surface_index,
+				TRUE))
+		{
+			state_data->guard_location_type = 2;
+			state_data->guard_point.position = actor->stimuli.combat_transition_guard_point;
+			state_data->guard_point.surface_index = actor->stimuli.combat_transition_guard_point_surface_index;
+			state_data->guard_point.radius = actor->stimuli.combat_transition_guard_point_distance;
+		}
+		else if (state_data->wait_ticks > 0)
+		{
+			state_data->guard_location_type = 1;
+			state_data->has_guard_direction = actor->stimuli.combat_transition_has_vector;
+			state_data->aim_in_guard_direction = FALSE;
+			if (state_data->has_guard_direction)
+			{
+				state_data->guard_direction = actor->stimuli.combat_transition_vector;
+				if (normalize3d(&state_data->guard_direction) == 0.f)
+				{
+					state_data->has_guard_direction = FALSE;
+				}
+			}
+		}
+		else
+		{
+			state_data->guard_location_type = 0;
+			state_data->find_new_guard_position = TRUE;
+		}
+	}
+	else
+	{
+		state_data->guard_location_type = 1;
+	}
+
+	if (actor->stimuli.combat_transition == 2)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\action_guard.c",
+			90,
+			actor->stimuli.combat_transition_prop_index != NONE);
+		state_data->shout_about_dead_friend = TRUE;
+		state_data->shout_dead_friend_prop_index = actor->stimuli.combat_transition_prop_index;
+	}
+
+	state_data->guard_look_prop_index = actor->stimuli.combat_transition_prop_index;
+	if (state_data->guard_look_prop_index != NONE)
+	{
+		state_data->look_ticks = (short)actor->stimuli.combat_transition_prop_look_timer;
+		state_data->guard_look_until_reached_point = actor->stimuli.combat_transition_prop_look_while_moving;
+	}
+
+	return TRUE;
+}
+
+void
+action_guard_begin(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct guard_state_data *state_data = &actor->state.action_data.guard;
+
+	actor_perception_forget_recent_damage(actor_index);
+	actor->state.searching = FALSE;
+	if (state_data->cower_from_retreat)
+	{
+		actor_perception_retreat_successful(actor_index);
+	}
+
+	return;
+}
+
+void
+action_guard_end(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->state.action_data.guard.post_combat)
+	{
+		actor->external_orders.postcombat_type = _actor_postcombat_none;
+		actor->external_orders.postcombat_prop_index = NONE;
+	}
+
+	return;
+}
+
+void
+action_guard_flush_position_indices(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct guard_state_data *state_data = &actor->state.action_data.guard;
+
+	if (state_data->cower && state_data->guard_location_type == 3)
+	{
+		state_data->cower = FALSE;
+		state_data->cower_ticks = 0;
+		state_data->cower_from_retreat = FALSE;
+	}
+
+	if (state_data->guard_location_type == 3 ||
+		(state_data->guard_location_type == 1 && !actor->input.vehicle_passenger))
+	{
+		state_data->guard_location_type = 0;
+		state_data->guard_firing_position_index = NONE;
+		state_data->find_new_guard_position = TRUE;
+	}
+
+	return;
+}
+
+void
+action_guard_flush_structure_indices(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct guard_state_data *state_data = &actor->state.action_data.guard;
+
+	if (state_data->guard_location_type == 2)
+	{
+		state_data->guard_point.surface_index = NONE;
+	}
+
+	return;
+}
+
+void
+action_guard_modify_color(
+	long actor_index,
+	real_argb_color *color)
+{
+	struct guard_state_data *state_data = &actor_get(actor_index)->state.action_data.guard;
+
+	if (!state_data->cower)
+	{
+		*color = *global_real_argb_salmon;
+	}
+	else if (state_data->cower_from_retreat)
+	{
+		*color = *global_real_argb_violet;
+	}
+	else if (state_data->cower_panicked)
+	{
+		*color = *global_real_argb_pink;
+	}
+	else
+	{
+		*color = *global_real_argb_purple;
+	}
+
+	return;
+}
+
+void
+action_guard_replace_prop(
+	long actor_index,
+	long old_prop_index,
+	long new_prop_index)
+{
+	struct guard_state_data *state_data = &actor_get(actor_index)->state.action_data.guard;
+
+	if (state_data->guard_look_prop_index == old_prop_index)
+	{
+		state_data->guard_look_prop_index = new_prop_index;
+	}
+
+	if (state_data->shout_dead_friend_prop_index == old_prop_index)
+	{
+		state_data->shout_dead_friend_prop_index = new_prop_index;
+		if (new_prop_index == NONE)
+		{
+			state_data->shout_about_dead_friend = FALSE;
+		}
+	}
+
+	return;
+}
 
 /* ---------- private code */
 
