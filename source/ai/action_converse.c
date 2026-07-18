@@ -54,6 +54,18 @@ typedef char scenario_conversation_definition_size_assert[
 
 /* ---------- prototypes */
 
+long prop_get_base_by_unit_index(
+	long actor_index,
+	long unit_index,
+	boolean include_orphans,
+	boolean create_if_missing);
+boolean actor_move_to_prop(
+	long actor_index,
+	long prop_index,
+	real distance);
+void actor_move_halt(
+	long actor_index);
+
 /* ---------- globals */
 
 /* ---------- public code */
@@ -90,6 +102,67 @@ void action_converse_begin(
 	long actor_index)
 {
 	return;
+}
+
+/* NonMatching: VC7 folds TRUE into immediates instead of retaining it in EBX. */
+boolean action_converse_perform(
+	long actor_index)
+{
+	struct actor_datum *actor;
+	struct converse_state_data *state_data;
+	boolean true_value;
+
+	actor = actor_get(actor_index);
+	state_data = &actor->state.action_data.converse;
+	true_value = TRUE;
+	if (actor->meta.timeslice)
+	{
+		if (state_data->run_to_prop_index == NONE &&
+			state_data->run_to_unit_index != NONE)
+		{
+			state_data->run_to_prop_index = prop_get_base_by_unit_index(
+				actor_index,
+				state_data->run_to_unit_index,
+				true_value,
+				true_value);
+		}
+
+		if (state_data->run_to_prop_index != NONE)
+		{
+			if (!state_data->in_range)
+			{
+				struct prop_datum *prop;
+
+				prop = prop_get(state_data->run_to_prop_index);
+				if ((prop->visibility >= 2 &&
+					prop->distance < state_data->run_to_distance) ||
+					prop->distance < 0.7f)
+				{
+					state_data->in_range = true_value;
+				}
+			}
+
+			if (state_data->in_range)
+			{
+				actor_move_halt(actor_index);
+				return state_data->failed;
+			}
+
+			if (!actor_move_to_prop(
+				actor_index,
+				state_data->run_to_prop_index,
+				state_data->run_to_distance))
+			{
+				state_data->failed = true_value;
+			}
+		}
+		else
+		{
+			state_data->failed = true_value;
+		}
+	}
+
+	return state_data->failed;
 }
 
 void action_converse_update(

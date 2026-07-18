@@ -162,11 +162,9 @@ extern struct sound_class_definition sound_classes[NUMBER_OF_SOUND_CLASSES];
 struct sound_class_definition *sound_class_get(
 	short class_index)
 {
-	long definition_offset;
 	struct sound_class_definition *definition;
 
-	definition_offset = sizeof(*definition)*class_index;
-	definition = (struct sound_class_definition *)((byte *)sound_classes+definition_offset);
+	definition = &sound_classes[class_index];
 	match_assert(
 		"c:\\halo\\source\\sound\\sound_classes.h",
 		131,

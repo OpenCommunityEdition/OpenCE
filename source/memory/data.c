@@ -479,6 +479,8 @@ long data_prev_index(
 	return result;
 }
 
+/* NonMatching: the remaining January codegen difference is the zero-count
+predicate and compacted_count initialization form; size and relocations match. */
 void data_compact(
 	struct data_array *data)
 {
@@ -497,7 +499,8 @@ void data_compact(
 	if (compacted_data)
 	{
 		datum = data->data;
-		for (absolute_index = compacted_count; absolute_index<data->count; absolute_index++)
+		absolute_index = compacted_count;
+		while (absolute_index<data->count)
 		{
 			if (datum->identifier)
 			{
@@ -508,6 +511,7 @@ void data_compact(
 				compacted_count++;
 			}
 
+			absolute_index++;
 			datum = (struct datum_header *)((byte *)datum+data->size);
 		}
 
