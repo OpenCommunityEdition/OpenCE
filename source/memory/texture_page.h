@@ -68,6 +68,15 @@ void texture_page_textures_begin(
 struct texture_page_texture *texture_page_texture_get(
 	struct texture_page *texture_page,
 	long texture_index);
+long texture_page_texture_new(
+	struct texture_page *texture_page,
+	short width,
+	short height,
+	boolean immediate);
+void texture_page_textures_cancel(
+	struct texture_page *texture_page);
+void texture_page_textures_end(
+	struct texture_page *texture_page);
 void texture_page_texture_delete(
 	struct texture_page *texture_page,
 	long texture_index);
