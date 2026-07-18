@@ -481,6 +481,14 @@ long data_prev_index(
 
 /* NonMatching: the remaining January codegen difference is the zero-count
 predicate and compacted_count initialization form; size and relocations match. */
+/* NonMatching: target and candidate are both 0x110 padded bytes with the
+   same 12 relocation identities.  Eighteen sibling functions in data.obj
+   are exact.  The remaining difference is local to zero initialization:
+   the target reuses zero already held in EBX for the compacted-data null
+   comparison and absolute_index store, while this compiler emits TEST plus
+   a seven-byte immediate-zero store.  Delayed initialization reproduces
+   the EBX store but perturbs the allocator call and preceding branch, so the
+   exact target shape is parked as a compiler register-reuse tie. */
 void data_compact(
 	struct data_array *data)
 {
