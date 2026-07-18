@@ -4560,11 +4560,20 @@ void hs_runtime_initialize_for_new_map(
 	void);
 void hs_dispose_from_old_map(
 	void);
+void hs_compile_initialize(
+	boolean compiling_scenario);
+void hs_compile_dispose(
+	void);
+long hs_compile(
+	long source_size,
+	char const *source,
+	char const **error_source,
+	char const **error_message);
 void code_000b2f00(
 	void);
 boolean code_000b3b60(
 	void);
-void code_000b3d10(
+boolean code_000b3d10(
 	void);
 void hs_scenario_postprocess(
 	boolean force);
@@ -4648,6 +4657,94 @@ void hs_hack(
 		hs_runtime_initialize_for_new_map();
 	}
 	return;
+}
+
+static void code_000b3ca0(
+	struct hs_source_file const *source_file,
+	char *error_message,
+	char const *source,
+	char const *error_source)
+{
+	char *newline = NULL;
+
+	if (error_message)
+	{
+		newline = strchr(error_message, '\n');
+		if (newline)
+			*newline = 0;
+	}
+
+	if (source_file && newline)
+	{
+		short line = 1;
+
+		while (newline > source)
+		{
+			if (*newline == '\n')
+				line++;
+			newline--;
+		}
+		error(2, "[%s line %d] %s: %s", source_file->name, line, error_source, error_message);
+	}
+	else
+	{
+		error(2, "%s: %s", error_source, error_message);
+	}
+	return;
+}
+
+boolean code_000b3d10(
+	void)
+{
+	struct scenario *scenario;
+	struct tag_block const *source_files;
+	boolean success;
+	char const *error_source;
+	char const *error_message;
+	short source_file_index;
+
+	scenario = global_scenario_get();
+	success = TRUE;
+	hs_compile_initialize(TRUE);
+	source_file_index = 0;
+	source_files = &scenario->hs_source_files;
+	while (source_file_index<source_files->count)
+	{
+		struct hs_source_file const *source_file;
+		char const *source;
+
+		source_file = TAG_BLOCK_GET_ELEMENT(
+			source_files,
+			source_file_index,
+			struct hs_source_file);
+		hs_compile(
+			source_file->source.size,
+			tag_data_get_pointer(
+				&source_file->source,
+				0,
+				source_file->source.size),
+			&error_source,
+			&error_message);
+		if (error_source)
+		{
+			source = tag_data_get_pointer(
+				&source_file->source,
+				0,
+				source_file->source.size);
+			code_000b3ca0(
+				source_file,
+				(char *)error_message,
+				source,
+				error_source);
+			success = FALSE;
+		}
+		source_file_index++;
+	}
+
+	if (success)
+		console_printf(FALSE, "scripts successfully compiled.");
+	hs_compile_dispose();
+	return success;
 }
 
 void hs_update(
