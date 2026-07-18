@@ -59,6 +59,25 @@
       }
     },
     {
+      "unit": "source/ai/action_converse",
+      "function": "_action_converse_perform",
+      "class": "register-allocation",
+      "evidence": "Target and candidate have equal 0x100 padded size and eight matching relocation identities; after five grounded shapes the remaining difference is VC7 retaining constant TRUE in EBX versus folding it into immediate operands.",
+      "measurements": {
+        "target": {
+          "size": 256,
+          "relocation_count": 8,
+          "normalized_sha256": "7a3fad8fb69307c132558b906832d4d31f0334734fc76d18fe773189b5a38d5d"
+        },
+        "base": {
+          "size": 256,
+          "relocation_count": 8,
+          "normalized_sha256": "288862a662942eb5b03ee84809dbd6b6aea1c023d52915f2bc373192e7c212cb"
+        },
+        "objdiff_percent": 93.14815
+      }
+    },
+    {
       "unit": "source/structures/cluster_partitions",
       "function": "_reference_list_copy",
       "class": "register-allocation",
