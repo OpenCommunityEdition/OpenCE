@@ -102,6 +102,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "game/players.h"
 #include "main/main.h"
+#include "network_messages.h"
 #include "network_game_manager.h"
 #include "network_game_globals.h"
 
@@ -116,6 +117,20 @@ symbols in this file:
 
 struct network_game_server;
 struct network_game_client;
+
+struct player_action_collection_definition
+{
+	byte __unknown0[0x14];
+	short previous_client_state;
+};
+
+struct client_game_update_message
+{
+	long update_number;
+	short __unknown4;
+	short local_player_count;
+	byte update[0x80];
+};
 
 struct network_machine
 {
@@ -184,6 +199,32 @@ boolean network_game_client_request_remove_player(
 boolean network_game_client_request_start_time_change(
 	struct network_game_client *client,
 	long start_time);
+boolean network_game_client_idle(
+	struct network_game_client *client);
+short network_game_client_get_error(
+	struct network_game_client *client);
+short network_game_client_get_state(
+	struct network_game_client *client,
+	long *state_data);
+boolean network_game_client_server_has_started_game(
+	struct network_game_client *client);
+long network_game_client_get_next_update_number(
+	struct network_game_client *client);
+boolean network_client_get_oos(
+	struct network_game_client *client);
+void network_game_client_get_remote_server_address(
+	struct network_game_client *client,
+	void *address);
+void *network_game_client_get_connection(
+	struct network_game_client *client);
+boolean network_game_client_write(
+	void *connection,
+	void *message,
+	long message_size,
+	void *address,
+	long flags);
+void update_client_build_client_update(
+	void *update);
 
 unsigned long *get_global_local_random_seed_address(
 	void);
@@ -193,6 +234,7 @@ unsigned short seed_random(
 /* ---------- globals */
 
 struct network_game_globals bss_004566dc = { 0 };
+extern struct player_action_collection_definition player_action_collection_definition;
 
 /* ---------- public code */
 
@@ -376,6 +418,167 @@ void dispose_global_network_game_client(
 	bss_004566dc.client_started = FALSE;
 
 	return;
+}
+
+boolean network_game_client_start_frame(
+	void)
+{
+	short state;
+	long state_data;
+	boolean result;
+	struct network_game *game;
+
+	if (bss_004566dc.client_started == TRUE)
+	{
+		game_connection_set(0);
+		if (global_network_game_server)
+			game = network_game_server_get_game(global_network_game_server);
+		else if (global_network_game_client)
+			game = network_game_client_get_game(global_network_game_client);
+		else
+			game = NULL;
+		network_game_end_and_load_ui(game);
+
+		if (global_network_game_client)
+		{
+			network_game_client_dispose(global_network_game_client);
+			global_network_game_client = NULL;
+		}
+
+		bss_004566dc.client_started = FALSE;
+		if (global_network_game_server)
+		{
+			network_game_server_dispose(global_network_game_server);
+			global_network_game_server = NULL;
+			bss_004566dc.quickstart_local = FALSE;
+		}
+
+		main_goto_main_menu();
+		return TRUE;
+	}
+
+	result = network_game_client_idle(global_network_game_client);
+	if (result)
+	{
+		if (!network_game_client_get_error(global_network_game_client))
+		{
+			state = network_game_client_get_state(global_network_game_client, &state_data);
+			switch (state)
+			{
+			case 0:
+				if (player_action_collection_definition.previous_client_state != state)
+					network_event("searching for a network game ...");
+				break;
+			case 1:
+				if (player_action_collection_definition.previous_client_state != state)
+					network_event("joining a network game ...");
+				break;
+			case 2:
+				if (player_action_collection_definition.previous_client_state != state)
+					network_event("waiting for game to start ...");
+				break;
+			case 3:
+				if (player_action_collection_definition.previous_client_state != state)
+					network_event("client signalled to begin loading for network game");
+				break;
+			case 4:
+				if (player_action_collection_definition.previous_client_state != state)
+					network_event("waiting for game to restart ...");
+				break;
+			default:
+				display_assert(
+					"client is in an unknown state",
+					"c:\\halo\\SOURCE\\networking\\network_game_globals.c",
+					0x160,
+					TRUE);
+				system_exit(-1);
+				break;
+			}
+
+			player_action_collection_definition.previous_client_state = state;
+		}
+		else
+		{
+			network_event("internal networking error [network_game_client_get_error()!=0]");
+			result = FALSE;
+		}
+	}
+	else
+	{
+		network_event("internal networking error [network_game_client_idle() failed]");
+	}
+
+	return result;
+}
+
+boolean network_game_client_end_frame(
+	void)
+{
+	byte update[0x80];
+	struct client_game_update_message message;
+	byte remote_server_address[0x18];
+	unsigned long now;
+	void *encoded_message;
+	boolean result;
+
+	result = TRUE;
+	if (!global_network_game_client)
+	{
+		game_connection_set(0);
+		main_menu_ensure_player_queues_exist();
+	}
+	else if (network_game_client_get_state(global_network_game_client, NULL) == 3)
+	{
+		now = system_milliseconds();
+		if (now-bss_004566dc.last_client_update_time >= 0x10 &&
+			network_game_client_server_has_started_game(global_network_game_client))
+		{
+			network_game_client_get_next_update_number(global_network_game_client);
+			network_game_client_get_game(global_network_game_client);
+			update_client_build_client_update(update);
+
+			if (network_client_get_oos(global_network_game_client))
+			{
+				message.update_number = network_game_client_get_next_update_number(
+					global_network_game_client) | 0x80000000;
+			}
+			else
+			{
+				message.update_number = network_game_client_get_next_update_number(
+					global_network_game_client) & 0x7FFFFFFF;
+			}
+
+			csmemcpy(message.update, update, sizeof(update));
+			message.local_player_count = local_player_count();
+			encoded_message = create_network_game_message(
+				_message_client_game_update,
+				&message,
+				sizeof(message));
+			if (encoded_message)
+			{
+				network_game_client_get_remote_server_address(
+					global_network_game_client,
+					remote_server_address);
+				result = network_game_client_write(
+					network_game_client_get_connection(global_network_game_client),
+					encoded_message,
+					*(unsigned short *)encoded_message>>4,
+					remote_server_address,
+					0);
+				if (!result)
+					network_event("failed to send a game update to the server");
+			}
+			else
+			{
+				network_event("failed to create a _message_type_client_game_update message");
+				result = FALSE;
+			}
+
+			bss_004566dc.last_client_update_time = now;
+		}
+	}
+
+	return result;
 }
 
 short network_game_client_get_local_machine_index(
