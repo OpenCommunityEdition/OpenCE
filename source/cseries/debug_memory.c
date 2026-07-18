@@ -108,7 +108,8 @@ enum
 	debug_memory_signature = 0x53414654,
 	debug_memory_allocated_signature = 0x2D2D2D3E,
 	debug_memory_disposed_signature = 0x3C424144,
-	debug_memory_trailing_signature = 0x3C2D2D2D
+	debug_memory_trailing_signature = 0x3C2D2D2D,
+	MAXIMUM_POINTER_SIZE = 0x10000000
 };
 
 /* ---------- macros */
@@ -160,6 +161,19 @@ unsigned long *get_global_local_random_seed_address(
 unsigned short seed_random(
 	unsigned long *seed);
 static void code_0007ce40(
+	struct debug_memory_header *header,
+	const char *file,
+	long line);
+static void code_0007cd40(
+	void *pointer,
+	const char *file,
+	long line);
+static void code_0007cf50(
+	void *pointer,
+	unsigned long size);
+static void code_0007cfc0(
+	struct debug_memory_header *header);
+static void code_0007d060(
 	struct debug_memory_header *header,
 	const char *file,
 	long line);
@@ -279,6 +293,143 @@ void debug_check_memory(
 	return;
 }
 
+void *debug_malloc(
+	unsigned int size,
+	boolean clear,
+	const char *file,
+	long line)
+{
+	unsigned long allocation_size =
+		size + sizeof(struct debug_memory_header) + sizeof(unsigned long);
+	struct debug_memory_header *header;
+	void *pointer = NULL;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\cseries\\debug_memory.c",
+		214,
+		size>=0 && size<MAXIMUM_POINTER_SIZE);
+	code_0007ccf0(file, line);
+
+	header = system_malloc(allocation_size);
+	if (header != NULL)
+	{
+		header->file = file;
+		header->signature = debug_memory_allocated_signature;
+		header->line = line;
+		header->allocation_id = data_002dcd0c.next_allocation_id++;
+		header->size = size;
+		*(unsigned long *)((byte *)(header + 1) + size) =
+			debug_memory_trailing_signature;
+		code_0007cfc0(header);
+
+		pointer = header + 1;
+		csmemset(pointer, clear ? 0 : 0xCA, size);
+	}
+
+	if (pointer != NULL)
+	{
+		data_002dcd0c.total_pointer_size += size;
+		if (data_002dcd0c.total_pointer_size > data_002dcd0c.maximum_pointer_size)
+		{
+			data_002dcd0c.maximum_pointer_size = data_002dcd0c.total_pointer_size;
+		}
+	}
+
+	return pointer;
+}
+
+void debug_free(
+	void *pointer,
+	const char *file,
+	long line)
+{
+	struct debug_memory_header *header =
+		(struct debug_memory_header *)pointer - 1;
+
+	code_0007ccf0(file, line);
+	code_0007ce40(header, file, line);
+	code_0007cd40(pointer, file, line);
+
+	data_002dcd0c.total_pointer_size -= header->size;
+	code_0007d060(header, file, line);
+	header->signature = debug_memory_disposed_signature;
+	system_free(header);
+
+	return;
+}
+
+void *debug_realloc(
+	void *pointer,
+	unsigned int size,
+	const char *file,
+	long line)
+{
+	void *result = NULL;
+	unsigned long old_size = 0;
+	unsigned long allocation_size =
+		size + sizeof(struct debug_memory_header) + sizeof(unsigned long);
+	struct debug_memory_header *header = NULL;
+	const char *allocation_file = file;
+	long allocation_line = line;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\cseries\\debug_memory.c",
+		337,
+		pointer || size);
+	match_assert(
+		"c:\\halo\\SOURCE\\cseries\\debug_memory.c",
+		338,
+		size>=0 && size<MAXIMUM_POINTER_SIZE);
+	code_0007ccf0(file, line);
+
+	if (pointer != NULL)
+	{
+		header = (struct debug_memory_header *)pointer - 1;
+		code_0007ce40(header, file, line);
+		code_0007cd40(pointer, file, line);
+		code_0007d060(header, file, line);
+
+		allocation_line = header->line;
+		old_size = header->size;
+		allocation_file = header->file;
+		header->signature = debug_memory_disposed_signature;
+	}
+
+	header = system_realloc(
+		header,
+		pointer != NULL && size == 0 ? 0 : allocation_size);
+	if (header != NULL)
+	{
+		header->signature = debug_memory_allocated_signature;
+		header->line = allocation_line;
+		header->file = allocation_file;
+		header->allocation_id = data_002dcd0c.next_allocation_id++;
+		header->size = size;
+		*(unsigned long *)((byte *)(header + 1) + size) =
+			debug_memory_trailing_signature;
+		code_0007cfc0(header);
+
+		result = header + 1;
+		if (size > old_size)
+		{
+			code_0007cf50(
+				(byte *)result + old_size,
+				size - old_size);
+		}
+	}
+
+	if (size != 0)
+	{
+		data_002dcd0c.total_pointer_size += size - old_size;
+		if (data_002dcd0c.total_pointer_size > data_002dcd0c.maximum_pointer_size)
+		{
+			data_002dcd0c.maximum_pointer_size = data_002dcd0c.total_pointer_size;
+		}
+	}
+
+	return result;
+}
+
 /* ---------- private code */
 
 unsigned short local_random(
@@ -371,6 +522,121 @@ static void code_0007ce40(
 			reason,
 			file,
 			line));
+
+	return;
+}
+
+static void code_0007cd40(
+	void *pointer,
+	const char *file,
+	long line)
+{
+	struct debug_memory_header *header = (struct debug_memory_header *)pointer - 1;
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\cseries\\debug_memory.c",
+		199,
+		*(unsigned long *)((byte *)pointer + header->size) ==
+			debug_memory_trailing_signature,
+		csprintf(
+			temporary,
+			"Pointer allocated at %s, %d has overrun the end of its buffer. (Size: %d) (%s:%d)",
+			header->file,
+			header->line,
+			header->size,
+			file,
+			line));
+
+	return;
+}
+
+static void code_0007cf50(
+	void *pointer,
+	unsigned long size)
+{
+	byte *current = pointer;
+	byte *end;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\cseries\\debug_memory.c",
+		269,
+		pointer);
+
+	end = current + size - 1;
+	while (current < end)
+	{
+		*(unsigned short *)current = local_random();
+		current += sizeof(unsigned short);
+	}
+	if (size & 1)
+	{
+		*end = (byte)local_random();
+	}
+
+	return;
+}
+
+static void code_0007cfc0(
+	struct debug_memory_header *header)
+{
+	struct debug_memory_header *first = data_002dcd0c.first_pointer;
+
+	if (first == NULL || header < data_002dcd0c.minimum_pointer)
+	{
+		data_002dcd0c.minimum_pointer = header;
+	}
+	if (first == NULL || header > data_002dcd0c.maximum_pointer)
+	{
+		data_002dcd0c.maximum_pointer = header;
+	}
+
+	header->next = first;
+	if (first != NULL)
+	{
+		first->previous = header;
+		first->checksum = code_0007cd90(first);
+	}
+	header->previous = NULL;
+	data_002dcd0c.first_pointer = header;
+	header->checksum = code_0007cd90(header);
+
+	return;
+}
+
+static void code_0007d060(
+	struct debug_memory_header *header,
+	const char *file,
+	long line)
+{
+	struct debug_memory_header *previous;
+	struct debug_memory_header *next;
+
+	if (header == data_002dcd0c.first_pointer)
+	{
+		data_002dcd0c.first_pointer = header->next;
+		if (data_002dcd0c.first_pointer != NULL)
+		{
+			data_002dcd0c.first_pointer->previous = NULL;
+			data_002dcd0c.first_pointer->checksum =
+				code_0007cd90(data_002dcd0c.first_pointer);
+		}
+	}
+	else
+	{
+		previous = header->previous;
+		match_assert(
+			"c:\\halo\\SOURCE\\cseries\\debug_memory.c",
+			446,
+			previous);
+		next = header->next;
+		previous->next = next;
+		previous->checksum = code_0007cd90(previous);
+		if (next != NULL)
+		{
+			next->previous = previous;
+			next->checksum = code_0007cd90(next);
+		}
+	}
 
 	return;
 }
