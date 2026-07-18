@@ -149,8 +149,8 @@ struct stack_memory_pool
 	long next_block_index;
 	long bytes_used;
 	long maximum_bytes_used;
-	long block_count;
-	long maximum_block_count_used;
+	unsigned long block_count;
+	unsigned long maximum_block_count_used;
 	long largest_block_size;
 	boolean disable_compaction;
 	byte unused29[3];
@@ -221,8 +221,8 @@ static struct stack_memory_pool_block *code_0010ef10(
 	char const *file,
 	unsigned long line);
 static struct stack_memory_pool_block *code_0010ef70(
-	long allocation_size,
 	struct stack_memory_pool *pool,
+	long allocation_size,
 	struct stack_memory_pool_block *block,
 	char const *file,
 	unsigned long line);
@@ -289,7 +289,7 @@ void stack_memory_pool_reset(
 		code_0010ea00(sizeof(*block), pool, __FILE__, __LINE__);
 		code_0010eef0(sizeof(*block), pool, __FILE__, __LINE__);
 		code_0010ef10(sizeof(*block), pool, __FILE__, __LINE__);
-		code_0010ef70(sizeof(*block), pool, block, __FILE__, __LINE__);
+		code_0010ef70(pool, sizeof(*block), block, __FILE__, __LINE__);
 	}
 
 	return;
@@ -407,8 +407,7 @@ void dispose_pointer(
 	return;
 }
 
-/* NonMatching foundation: semantics and sole allocator relocation recovered;
-target/candidate padded sizes are 0x70/0x60 pending TU register scheduling. */
+/* Exact January reconstruction: 0x70 padded bytes and one relocation. */
 struct stack_memory_pool_block *pool_new_handle(
 	struct stack_memory_pool *pool,
 	long allocation_size,
@@ -416,27 +415,25 @@ struct stack_memory_pool_block *pool_new_handle(
 	unsigned long line)
 {
 	struct stack_memory_pool_block *block;
-	unsigned long block_size;
 
 	block = code_0010ea00(allocation_size, pool, file, line);
 	if (block)
 	{
-		block_size = block->size_and_flags&0x7FFFFFFF;
-		pool->bytes_used += block_size;
+		pool->bytes_used += block->size_and_flags&0x7FFFFFFF;
 		pool->block_count++;
 		if (pool->bytes_used > pool->maximum_bytes_used)
 			pool->maximum_bytes_used = pool->bytes_used;
 		if (pool->block_count > pool->maximum_block_count_used)
 			pool->maximum_block_count_used = pool->block_count;
-		if (block_size > (unsigned long)pool->largest_block_size)
-			pool->largest_block_size = block_size;
+		if ((block->size_and_flags&0x7FFFFFFF) > (unsigned long)pool->largest_block_size)
+			pool->largest_block_size = block->size_and_flags&0x7FFFFFFF;
+		return block;
 	}
 
-	return block;
+	return NULL;
 }
 
-/* NonMatching foundation: all seven relocation identities recovered;
-target/candidate padded sizes are 0xB0/0xA0. */
+/* Exact January reconstruction: 0xB0 padded bytes and seven relocations. */
 struct stack_memory_pool_block *pool_new_handle_clear(
 	struct stack_memory_pool *pool,
 	long allocation_size,
@@ -444,7 +441,6 @@ struct stack_memory_pool_block *pool_new_handle_clear(
 	unsigned long line)
 {
 	struct stack_memory_pool_block *block;
-	unsigned long block_size;
 
 	block = code_0010ea00(allocation_size, pool, file, line);
 	if (block)
@@ -455,18 +451,18 @@ struct stack_memory_pool_block *pool_new_handle_clear(
 			code_0010e510(block),
 			"memory_block_valid(block)");
 		csmemset(block->data, 0, allocation_size);
-		block_size = block->size_and_flags&0x7FFFFFFF;
-		pool->bytes_used += block_size;
+		pool->bytes_used += block->size_and_flags&0x7FFFFFFF;
 		pool->block_count++;
 		if (pool->bytes_used > pool->maximum_bytes_used)
 			pool->maximum_bytes_used = pool->bytes_used;
 		if (pool->block_count > pool->maximum_block_count_used)
 			pool->maximum_block_count_used = pool->block_count;
-		if (block_size > (unsigned long)pool->largest_block_size)
-			pool->largest_block_size = block_size;
+		if ((block->size_and_flags&0x7FFFFFFF) > (unsigned long)pool->largest_block_size)
+			pool->largest_block_size = block->size_and_flags&0x7FFFFFFF;
+		return block;
 	}
 
-	return block;
+	return NULL;
 }
 
 /* NonMatching foundation: all fifteen relocation identities recovered;
@@ -500,7 +496,7 @@ boolean pool_resize_handle(
 	{
 		match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x22F, block);
 		old_block_size = block->size_and_flags&0x7FFFFFFF;
-		new_block = code_0010ef70(allocation_size, pool, block, file, line);
+		new_block = code_0010ef70(pool, allocation_size, block, file, line);
 		if (!new_block)
 		{
 			result = FALSE;
@@ -529,7 +525,6 @@ void *pool_new_pointer(
 	unsigned long line)
 {
 	struct stack_memory_pool_block *block;
-	unsigned long block_size;
 	void *pointer = NULL;
 
 	block = code_0010ea00(allocation_size, pool, file, line);
@@ -541,15 +536,14 @@ void *pool_new_pointer(
 			0x23F,
 			code_0010e510(block),
 			"memory_block_valid(block)");
-		block_size = block->size_and_flags&0x7FFFFFFF;
-		pool->bytes_used += block_size;
+		pool->bytes_used += block->size_and_flags&0x7FFFFFFF;
 		pool->block_count++;
 		if (pool->bytes_used > pool->maximum_bytes_used)
 			pool->maximum_bytes_used = pool->bytes_used;
 		if (pool->block_count > pool->maximum_block_count_used)
 			pool->maximum_block_count_used = pool->block_count;
-		if (block_size > (unsigned long)pool->largest_block_size)
-			pool->largest_block_size = block_size;
+		if ((block->size_and_flags&0x7FFFFFFF) > (unsigned long)pool->largest_block_size)
+			pool->largest_block_size = block->size_and_flags&0x7FFFFFFF;
 	}
 
 	return pointer;
@@ -564,7 +558,6 @@ void *pool_new_pointer_clear(
 	unsigned long line)
 {
 	struct stack_memory_pool_block *block;
-	unsigned long block_size;
 	void *pointer = NULL;
 
 	block = code_0010ea00(allocation_size, pool, file, line);
@@ -583,15 +576,14 @@ void *pool_new_pointer_clear(
 			0x23F,
 			code_0010e510(block),
 			"memory_block_valid(block)");
-		block_size = block->size_and_flags&0x7FFFFFFF;
-		pool->bytes_used += block_size;
+		pool->bytes_used += block->size_and_flags&0x7FFFFFFF;
 		pool->block_count++;
 		if (pool->bytes_used > pool->maximum_bytes_used)
 			pool->maximum_bytes_used = pool->bytes_used;
 		if (pool->block_count > pool->maximum_block_count_used)
 			pool->maximum_block_count_used = pool->block_count;
-		if (block_size > (unsigned long)pool->largest_block_size)
-			pool->largest_block_size = block_size;
+		if ((block->size_and_flags&0x7FFFFFFF) > (unsigned long)pool->largest_block_size)
+			pool->largest_block_size = block->size_and_flags&0x7FFFFFFF;
 	}
 
 	return pointer;
@@ -619,7 +611,7 @@ void *pool_resize_pointer(
 		old_block_size = block->size_and_flags&0x7FFFFFFF;
 	}
 
-	new_block = code_0010ef70(allocation_size, pool, block, file, line);
+	new_block = code_0010ef70(pool, allocation_size, block, file, line);
 	if (!new_block)
 		return NULL;
 
@@ -1198,37 +1190,44 @@ static struct stack_memory_pool_block *code_0010ef10(
 /* NonMatching foundation: target/candidate padded sizes are both 0xC0;
 one assertion relocation is absent from the first grounded shape. */
 static struct stack_memory_pool_block *code_0010ef70(
-	long allocation_size,
 	struct stack_memory_pool *pool,
+	long allocation_size,
 	struct stack_memory_pool_block *block,
 	char const *file,
 	unsigned long line)
 {
-	struct stack_memory_pool_block *new_block;
-	unsigned long old_user_size;
+	struct stack_memory_pool_block *new_block = NULL;
 
-	if (allocation_size <= 0)
-		return NULL;
-	if (!block)
-		return code_0010ea00(allocation_size, pool, file, line);
-
-	match_vassert(
-		"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
-		0x2B4,
-		code_0010e770(block, pool),
-		"stack_memory_pool_valid_block(pool, reference)");
-	old_user_size = code_0010e2e0(block);
-	if ((unsigned long)allocation_size <= old_user_size)
-		return block;
-
-	new_block = code_0010ea00(allocation_size, pool, file, line);
-	if (new_block)
+	if (allocation_size > 0)
 	{
-		csmemcpy(
-			code_0010e670(new_block),
-			code_0010e670(block),
-			old_user_size);
-		code_0010e7f0(block, pool);
+		if (!block)
+		{
+			new_block = code_0010ea00(allocation_size, pool, file, line);
+		}
+		else
+		{
+			match_vassert(
+				"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
+				0x2B4,
+				code_0010e770(block, pool),
+				"stack_memory_pool_valid_block(pool, reference)");
+			if ((unsigned long)allocation_size <= code_0010e2e0(block))
+			{
+				new_block = block;
+			}
+			else
+			{
+				new_block = code_0010ea00(allocation_size, pool, file, line);
+				if (new_block)
+				{
+					csmemcpy(
+						code_0010e670(new_block),
+						code_0010e670(block),
+						code_0010e2e0(block));
+					code_0010e7f0(block, pool);
+				}
+			}
+		}
 	}
 	return new_block;
 }
