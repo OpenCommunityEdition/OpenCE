@@ -81,6 +81,57 @@ struct rasterizer_text_debug_options
 struct rasterizer_text_window_parameters
 {
 	short rasterizer_target;
+	byte reserved02[0x32];
+	short left;
+	short top;
+	short right;
+	short bottom;
+};
+
+struct bitmap_data;
+
+struct rasterizer_text_begin_parameters
+{
+	void *meter_parameters;
+	real_vector2d const *scale;
+	boolean map_enabled[3];
+	byte pad0B;
+	struct bitmap_data const *map[3];
+	boolean clamp[3];
+	byte pad1B;
+	real_vector2d const *texture_offset[3];
+	real first_constants[6];
+	real second_constants[6];
+	real_rgb_color const *constant_color[3];
+	real_argb_color color;
+	unsigned long reserved74;
+	real const *constant_alpha[3];
+	unsigned long reserved84;
+	short framebuffer_blend_function;
+	boolean point_filtering;
+	byte pad8B;
+};
+
+struct pixel_shader_definition
+{
+	unsigned long alpha_inputs[8];
+	unsigned long final_combiner_inputs_abcd;
+	unsigned long final_combiner_inputs_efg;
+	unsigned long constant_0[8];
+	unsigned long constant_1[8];
+	unsigned long alpha_outputs[8];
+	unsigned long rgb_inputs[8];
+	unsigned long compare_mode;
+	unsigned long final_combiner_constant_0;
+	unsigned long final_combiner_constant_1;
+	unsigned long rgb_outputs[8];
+	unsigned long combiner_count;
+	unsigned long texture_modes;
+	unsigned long dot_mapping;
+	unsigned long input_texture;
+	unsigned long c0_mapping;
+	unsigned long c1_mapping;
+	unsigned long final_combiner_constants;
 };
 
 /* ---------- prototypes */
@@ -90,17 +141,275 @@ void rasterizer_error(
 	char const *format,
 	...);
 
+void rasterizer_set_framebuffer_blend_function(
+	short function);
+
+void rasterizer_set_texture_bitmap_data(
+	short stage,
+	struct bitmap_data const *bitmap);
+
+void rasterizer_set_vertex_shader_permutation(
+	short vertex_type,
+	short permutation,
+	boolean one_node);
+
+void rasterizer_set_pixel_shader(
+	struct pixel_shader_definition const *pixel_shader_definition);
+
+unsigned long real_argb_color_to_pixel32(
+	real_argb_color const *color);
+
 /* ---------- globals */
 
 extern void *global_d3d_device;
 extern struct rasterizer_text_debug_options rasterizer_debug_options;
 extern struct rasterizer_text_window_parameters global_window_parameters;
+extern struct pixel_shader_definition pixel_shader;
 
 /* ---------- public code */
 
 void rasterizer_text_end(
 	void)
 {
+	return;
+}
+
+/* NonMatching: the reconstructed body has the January call/data-relocation
+ * sequence (85/85, including addends) but remains 16 padded bytes larger due
+ * to local scheduling and register-allocation differences. */
+void rasterizer_text_begin(
+	struct rasterizer_text_begin_parameters const *parameters)
+{
+	real vertex_constants[5][4];
+	real texture_constants[6][4];
+	short window_width;
+	short window_height;
+	volatile real x_scale;
+	real y_scale;
+	short map_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_text.c",
+		13,
+		global_d3d_device);
+	if (rasterizer_debug_options.render_text &&
+		global_window_parameters.rasterizer_target == 0)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_text.c",
+			18,
+			parameters);
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_text.c",
+			20,
+			parameters->map[0]);
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_text.c",
+			22,
+			!parameters->map[2] || parameters->map[1]);
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_text.c",
+			24,
+			!parameters->map[1] || !parameters->meter_parameters);
+
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_CULLMODE,
+			D3DCULL_NONE);
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_COLORWRITEENABLE,
+			D3DCOLORWRITEENABLE_RED |
+			D3DCOLORWRITEENABLE_GREEN |
+			D3DCOLORWRITEENABLE_BLUE);
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_ALPHABLENDENABLE,
+			TRUE);
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_ZENABLE,
+			FALSE);
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_ZBIAS,
+			0);
+		rasterizer_set_framebuffer_blend_function(
+			parameters->framebuffer_blend_function);
+
+		window_height = global_window_parameters.bottom -
+			global_window_parameters.top;
+		window_width = global_window_parameters.right -
+			global_window_parameters.left;
+		if (parameters->scale)
+		{
+			x_scale = 2.0f * parameters->scale->i / window_height;
+			y_scale = -2.0f * parameters->scale->j / window_width;
+		}
+		else
+		{
+			x_scale = 0.0f;
+			y_scale = 0.0f;
+		}
+
+		vertex_constants[0][0] = 2.0f / window_height;
+		vertex_constants[0][1] = 0.0f;
+		vertex_constants[0][2] = 0.0f;
+		vertex_constants[0][3] = x_scale - (1.0f + 1.0f / window_height);
+		vertex_constants[1][0] = 0.0f;
+		vertex_constants[1][1] = -2.0f / window_width;
+		vertex_constants[1][2] = 0.0f;
+		vertex_constants[1][3] = y_scale + 1.0f / window_width + 1.0f;
+		vertex_constants[2][0] = 0.0f;
+		vertex_constants[2][1] = 0.0f;
+		vertex_constants[2][2] = 0.0f;
+		vertex_constants[2][3] = 0.5f;
+		vertex_constants[3][0] = 0.0f;
+		vertex_constants[3][1] = 0.0f;
+		vertex_constants[3][2] = 0.0f;
+		vertex_constants[3][3] = 1.0f;
+		vertex_constants[4][0] = parameters->second_constants[0];
+		vertex_constants[4][1] = parameters->second_constants[1];
+		vertex_constants[4][2] = 0.0f;
+		vertex_constants[4][3] = 1.0f;
+
+		texture_constants[0][0] = parameters->second_constants[2];
+		texture_constants[0][1] = parameters->second_constants[3];
+		texture_constants[0][2] = parameters->second_constants[4];
+		texture_constants[0][3] = parameters->second_constants[5];
+		texture_constants[1][0] = parameters->map_enabled[0] ? 1.0f : 0.0f;
+		texture_constants[1][1] = parameters->map_enabled[0] ? 0.0f : 1.0f;
+		texture_constants[1][2] = parameters->map_enabled[1] ? 1.0f : 0.0f;
+		texture_constants[1][3] = parameters->map_enabled[1] ? 0.0f : 1.0f;
+		texture_constants[2][0] = parameters->map_enabled[2] ? 1.0f : 0.0f;
+		texture_constants[2][1] = parameters->map_enabled[2] ? 0.0f : 1.0f;
+		texture_constants[2][2] = parameters->texture_offset[0] ? parameters->texture_offset[0]->i : 0.0f;
+		texture_constants[2][3] = parameters->texture_offset[0] ? parameters->texture_offset[0]->j : 0.0f;
+		texture_constants[3][0] = parameters->texture_offset[1] ? parameters->texture_offset[1]->i : 0.0f;
+		texture_constants[3][1] = parameters->texture_offset[1] ? parameters->texture_offset[1]->j : 0.0f;
+		texture_constants[3][2] = parameters->texture_offset[2] ? parameters->texture_offset[2]->i : 0.0f;
+		texture_constants[3][3] = parameters->texture_offset[2] ? parameters->texture_offset[2]->j : 0.0f;
+		texture_constants[4][0] = parameters->first_constants[0];
+		texture_constants[4][1] = parameters->first_constants[1];
+		texture_constants[4][2] = parameters->first_constants[2];
+		texture_constants[4][3] = parameters->first_constants[3];
+		texture_constants[5][0] = parameters->first_constants[4];
+		texture_constants[5][1] = parameters->first_constants[5];
+		texture_constants[5][2] = 0.0f;
+		texture_constants[5][3] = 0.0f;
+
+		IDirect3DDevice8_SetVertexShaderConstant(
+			global_d3d_device,
+			-68,
+			vertex_constants,
+			5);
+		IDirect3DDevice8_SetVertexShaderConstant(
+			global_d3d_device,
+			-63,
+			texture_constants,
+			6);
+
+		for (map_index = 0; map_index < 3; map_index++)
+		{
+			if (parameters->map[map_index])
+			{
+				rasterizer_set_texture_bitmap_data(
+					map_index,
+					parameters->map[map_index]);
+				IDirect3DDevice8_SetTextureStageState(
+					global_d3d_device,
+					map_index,
+					D3DTSS_ADDRESSU,
+					parameters->clamp[map_index] ? D3DTADDRESS_WRAP : D3DTADDRESS_CLAMP);
+				IDirect3DDevice8_SetTextureStageState(
+					global_d3d_device,
+					map_index,
+					D3DTSS_ADDRESSV,
+					parameters->clamp[map_index] ? D3DTADDRESS_WRAP : D3DTADDRESS_CLAMP);
+				IDirect3DDevice8_SetTextureStageState(
+					global_d3d_device,
+					map_index,
+					D3DTSS_MAGFILTER,
+					parameters->point_filtering ? D3DTEXF_POINT : D3DTEXF_LINEAR);
+				IDirect3DDevice8_SetTextureStageState(
+					global_d3d_device,
+					map_index,
+					D3DTSS_MINFILTER,
+					parameters->point_filtering ? D3DTEXF_POINT : D3DTEXF_LINEAR);
+				IDirect3DDevice8_SetTextureStageState(
+					global_d3d_device,
+					map_index,
+					D3DTSS_MIPFILTER,
+					parameters->point_filtering ? D3DTEXF_POINT : D3DTEXF_LINEAR);
+			}
+		}
+
+		rasterizer_set_vertex_shader_permutation(4, 8, TRUE);
+		if (parameters->map[0])
+		{
+			real_argb_color *constant_colors;
+			real_rgb_color const *constant_color;
+
+			constant_colors = (real_argb_color *)&vertex_constants[2];
+			csmemset(&pixel_shader, 0, sizeof(pixel_shader));
+			pixel_shader.texture_modes =
+				((((parameters->map[2] != NULL) << 5) |
+				(parameters->map[1] != NULL)) << 5) |
+				(parameters->map[0] != NULL);
+			constant_color = parameters->constant_color[0] ?
+				parameters->constant_color[0] : global_real_rgb_white;
+			constant_colors[0].rgb = *constant_color;
+			constant_color = parameters->constant_color[1] ?
+				parameters->constant_color[1] : global_real_rgb_white;
+			constant_colors[1].rgb = *constant_color;
+			constant_color = parameters->constant_color[2] ?
+				parameters->constant_color[2] : global_real_rgb_white;
+			constant_colors[2].rgb = *constant_color;
+			if (parameters->constant_alpha[0])
+				constant_colors[0].alpha = *parameters->constant_alpha[0];
+			else
+				constant_colors[0].alpha = 1.0f;
+			if (parameters->constant_alpha[1])
+				constant_colors[1].alpha = *parameters->constant_alpha[1];
+			else
+				constant_colors[1].alpha = 1.0f;
+			if (parameters->constant_alpha[2])
+				constant_colors[2].alpha = *parameters->constant_alpha[2];
+			else
+				constant_colors[2].alpha = 1.0f;
+			pixel_shader.constant_0[0] = real_argb_color_to_pixel32(&constant_colors[0]);
+			pixel_shader.constant_1[0] = real_argb_color_to_pixel32(&constant_colors[1]);
+			pixel_shader.constant_0[1] = real_argb_color_to_pixel32(&constant_colors[2]);
+			pixel_shader.constant_0[4] = real_argb_color_to_pixel32(&parameters->color);
+			pixel_shader.constant_0[5] = real_argb_color_to_pixel32(&parameters->color);
+			pixel_shader.constant_0[6] = real_argb_color_to_pixel32(&parameters->color);
+			pixel_shader.constant_0[7] = real_argb_color_to_pixel32(&parameters->color);
+			pixel_shader.rgb_outputs[0] = 0x89;
+			pixel_shader.alpha_outputs[0] = 0x89;
+			pixel_shader.rgb_inputs[0] = 0x08010902;
+			pixel_shader.alpha_inputs[0] = 0x18111912;
+			pixel_shader.rgb_inputs[1] = 0x0A010804;
+			pixel_shader.rgb_outputs[1] = 0xAC;
+			pixel_shader.alpha_inputs[1] = 0x1A111814;
+			pixel_shader.alpha_outputs[1] = 0xAC;
+			pixel_shader.combiner_count = 0x11102;
+			pixel_shader.final_combiner_inputs_abcd = 12;
+			pixel_shader.final_combiner_inputs_efg = 0x1C00;
+		}
+
+		rasterizer_set_pixel_shader(&pixel_shader);
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_CULLMODE,
+			0x901);
+		rasterizer_set_vertex_shader_permutation(4, 8, FALSE);
+		IDirect3DDevice8_SetTextureStageState(
+			global_d3d_device,
+			0,
+			D3DTSS_ALPHAKILL,
+			0);
+	}
+
 	return;
 }
 
