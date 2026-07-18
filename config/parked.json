@@ -40,25 +40,6 @@
       }
     },
     {
-      "unit": "source/sound/ima_adpcm",
-      "function": "_compress_ima_adpcm_audio_data",
-      "class": "instruction-scheduling",
-      "evidence": "Target and candidate have equal 0x160 padded size and two relocations at identical offsets; only a three-instruction reconstruction-loop schedule and two register choices remain.",
-      "measurements": {
-        "target": {
-          "size": 352,
-          "relocation_count": 2,
-          "normalized_sha256": "97e166836a7a6f05810477e6d722d209a4c07f5fb2e604756915f8b3de58fff3"
-        },
-        "base": {
-          "size": 352,
-          "relocation_count": 2,
-          "normalized_sha256": "9ef202fbd4db1aced4543636bb9f85efdcaca79b0edbb7b8d912535d3fc6eaf6"
-        },
-        "objdiff_percent": 98.40741
-      }
-    },
-    {
       "unit": "source/ai/action_converse",
       "function": "_action_converse_perform",
       "class": "register-allocation",
