@@ -49,6 +49,13 @@ struct tif_dirwrite_data data_002b8688 =
 #include "tiffioP.h"
 #include "prototypes.h"
 
+extern unsigned long csstrlen(const char *string);
+extern void *csmemcpy(void *destination, const void *source, unsigned long size);
+extern void *debug_malloc(unsigned int size, int clear, const char *file, long line);
+extern void debug_free(void *pointer, const char *file, long line);
+
+#define TIFF_DIRWRITE_FILE "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_dirwrite.c"
+
 /* Preserve the symbols owned by the January 2002 csplit object. */
 #define TIFFWriteData code_00055dd0
 #define TIFFLinkDirectory code_00055e60
@@ -171,7 +178,7 @@ TIFFWriteDirectory(tif)
 		return (0);
 	}
 	if ((tif->tif_flags & TIFF_MYBUFFER) && tif->tif_rawdata) {
-		free(tif->tif_rawdata);
+		debug_free(tif->tif_rawdata, TIFF_DIRWRITE_FILE, 154);
 		tif->tif_rawdata = NULL;
 		tif->tif_rawcc = 0;
 	}
@@ -188,7 +195,7 @@ TIFFWriteDirectory(tif)
 		if (TIFFFieldSet(tif, b))
 			nfields += (b < FIELD_SUBFILETYPE ? 2 : 1);
 	dirsize = nfields * sizeof (TIFFDirEntry);
-	data = malloc(dirsize);
+	data = debug_malloc(dirsize, 0, TIFF_DIRWRITE_FILE, 171);
 	if (data == NULL) {
 		TIFFError(tif->tif_name,
 		    "Cannot write directory, out of space");
@@ -211,7 +218,7 @@ TIFFWriteDirectory(tif)
 	 * Setup external form of directory
 	 * entries and write data items.
 	 */
-	bcopy(td->td_fieldsset, fields, sizeof (fields));
+	csmemcpy(fields, td->td_fieldsset, sizeof (fields));
 /*BEGIN XXX*/
 	/*
 	 * Write out ExtraSamples tag only if Matteing would
@@ -356,7 +363,7 @@ TIFFWriteDirectory(tif)
 		goto bad;
 	}
 	TIFFFreeDirectory(tif);
-	free(data);
+	debug_free(data, TIFF_DIRWRITE_FILE, 339);
 	tif->tif_flags &= ~TIFF_DIRTYDIRECT;
 
 	/*
@@ -370,7 +377,7 @@ TIFFWriteDirectory(tif)
 	tif->tif_curstrip = -1;
 	return (1);
 bad:
-	free(data);
+	debug_free(data, TIFF_DIRWRITE_FILE, 353);
 	return (0);
 }
 #undef WriteRationalPair
@@ -584,12 +591,12 @@ DECLARE4(TIFFWriteString,
 {
 	dir->tdir_tag = tag;
 	dir->tdir_type = (short)TIFF_ASCII;
-	dir->tdir_count = strlen(cp) + 1;	/* includes \0 byte */
+	dir->tdir_count = csstrlen(cp) + 1;	/* includes \0 byte */
 	if (dir->tdir_count > 4) {
 		if (!TIFFWriteData(tif, dir, cp))
 			return (0);
 	} else
-		bcopy(cp, &dir->tdir_offset, dir->tdir_count);
+		csmemcpy(&dir->tdir_offset, cp, dir->tdir_count);
 	return (1);
 }
 
@@ -651,14 +658,15 @@ DECLARE6(TIFFWriteRationalArray, TIFF*, tif,
 	dir->tdir_tag = tag;
 	dir->tdir_type = (short)type;
 	dir->tdir_count = n;
-	t = (u_long *)malloc(2*n * sizeof (long));
+	t = (u_long *)debug_malloc(2*n * sizeof (long), 0,
+	    TIFF_DIRWRITE_FILE, 634);
 	for (i = 0; i < n; i++) {
 		/* need algorithm to convert ... XXX */
 		t[2*i+0] = v[i]*10000.0 + 0.5;
 		t[2*i+1] = 10000;
 	}
 	status = TIFFWriteData(tif, dir, (char *)t);
-	free((char *)t);
+	debug_free((char *)t, TIFF_DIRWRITE_FILE, 641);
 	return (status);
 }
 
