@@ -35,6 +35,8 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_fax3.c,v 1.
 #include <stdio.h>
 #include <assert.h>
 #include "tif_fax3.h"
+/* The January object owns every fax lookup table in writable .data. */
+#define const
 #define	G3CODES
 #include "t4.h"
 #define	G3STATES
