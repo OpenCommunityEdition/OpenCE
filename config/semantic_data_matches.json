@@ -18,5 +18,145 @@
       "relocation_count": 1322,
       "normalized_sha256": "1e4346aef4491a55772f4f51a6989e06074dc5245a2c01aa1be97fb2e221ae8c"
     }
+  },
+  {
+    "unit": "source/units/dialogue_definitions",
+    "symbol": "_dialogue_vocalization_type_name",
+    "reason": "the complete rebuilt object owns an exact pointer table, but objdiff attributes its internal string targets differently",
+    "measurements": {
+      "size": 1672,
+      "relocation_count": 418,
+      "normalized_sha256": "256984cb62bc879971463ff0ff7567042dc95d8b0fb2bc676f246c2293c77ae8"
+    }
+  },
+  {
+    "unit": "source/shaders/shader_definitions",
+    "symbol": "_global_shader_effect_additive",
+    "reason": "the complete rebuilt object has exact normalized data and resolved relocations despite symbol-ownership attribution differences",
+    "measurements": {
+      "size": 364,
+      "relocation_count": 2,
+      "normalized_sha256": "8bbb21a994d2ec5051de3ea76497f648469fe42d5f6aa7da85f3b598bf16bcd0"
+    }
+  },
+  {
+    "unit": "source/models/model_animation_definitions",
+    "symbol": "_data_00309e80",
+    "reason": "the complete rebuilt object has exact normalized data and resolved relocations despite internal-symbol expression differences",
+    "measurements": {
+      "size": 1288,
+      "relocation_count": 170,
+      "normalized_sha256": "76f074030d3cb6940a74673504f664555bd5d02087282c01338c8b83fe3d1654"
+    }
+  },
+  {
+    "unit": "source/memory/byte_swapping",
+    "symbol": "_data_00309da8",
+    "reason": "the complete rebuilt object has exact normalized data and resolved relocations despite internal-symbol expression differences",
+    "measurements": {
+      "size": 144,
+      "relocation_count": 8,
+      "normalized_sha256": "fc892f5c359e0165aa8cdbd745b191928baac3213935c79d8699cdcba32468d0"
+    }
+  },
+  {
+    "unit": "source/memory/zlib/zutil",
+    "symbol": "_z_errmsg",
+    "reason": "the complete zlib 1.1.3 object owns an exact error-message pointer table that objdiff does not fully credit",
+    "measurements": {
+      "size": 44,
+      "relocation_count": 10,
+      "normalized_sha256": "966ef500de11387122d16ed112b63eb8562f81fc0e67d6f8f4d190766cf1e6ae"
+    }
+  },
+  {
+    "unit": "source/memory/zlib/deflate",
+    "symbol": "_data_003079f8",
+    "reason": "the complete zlib 1.1.3 object owns an exact relocated data word that objdiff does not fully credit",
+    "measurements": {
+      "size": 4,
+      "relocation_count": 1,
+      "normalized_sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+    }
+  },
+  {
+    "unit": "source/items/projectile_definitions",
+    "symbol": "_default_projectile_material_response",
+    "reason": "the complete rebuilt object has exact normalized data and resolved relocations despite internal-symbol expression differences",
+    "measurements": {
+      "size": 160,
+      "relocation_count": 3,
+      "normalized_sha256": "b71e2246c2d39831ad65f2b9570fecb59a1a0d743278b63cc125b118c148f6b9"
+    }
+  },
+  {
+    "unit": "source/interface/hud_definitions",
+    "symbol": "_global_hud_anchor_names",
+    "reason": "the complete rebuilt object owns an exact pointer table whose string ownership is attributed differently by csplit",
+    "measurements": {
+      "size": 20,
+      "relocation_count": 5,
+      "normalized_sha256": "de47c9b27eb8d300dbb5f2c353e632c393262cf06340c4fa7f1b40c4cbd36f90"
+    }
+  },
+  {
+    "unit": "source/hs/hs_scenario_definitions",
+    "symbol": "_hs_script_types_enum",
+    "reason": "the complete rebuilt object owns an exact script-type definition table whose internal targets are expressed differently",
+    "measurements": {
+      "size": 628,
+      "relocation_count": 33,
+      "normalized_sha256": "a1add12fc2ddd7afb3935997f9e1532b27a3887f8e85e914db954d1665547c09"
+    }
+  },
+  {
+    "unit": "source/game/game_globals",
+    "symbol": "_global_material_type_strings",
+    "reason": "the complete rebuilt object owns an exact material-name pointer table whose string ownership is attributed differently by csplit",
+    "measurements": {
+      "size": 132,
+      "relocation_count": 33,
+      "normalized_sha256": "115bad14f1c9f2c027a84de21b107015722cb76be8d0abf3760ad8e00d6c24a5"
+    }
+  },
+  {
+    "unit": "source/cutscene/recorded_animation_definitions",
+    "symbol": "_recorded_animation_event_stream_data",
+    "reason": "the complete rebuilt object has exact normalized data and resolved relocations despite internal-symbol expression differences",
+    "measurements": {
+      "size": 180,
+      "relocation_count": 11,
+      "normalized_sha256": "c83e71991a0ac6309173102325bf6a194d27d5d80cdc9a395ed954c80bae3d5d"
+    }
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_version",
+    "symbol": "_TIFFVersion",
+    "reason": "the complete RCS-pinned libtiff object owns an exact version payload that objdiff does not credit",
+    "measurements": {
+      "size": 129,
+      "relocation_count": 0,
+      "normalized_sha256": "785b9b7f7b7f20a532ad6e388e8dd29336d580d9721b046118cb426c5f2273f8"
+    }
+  },
+  {
+    "unit": "source/ai/ai_scenario_definitions",
+    "symbol": "_global_ai_default_state_names",
+    "reason": "the complete rebuilt object owns an exact AI-state pointer table whose string ownership is attributed differently by csplit",
+    "measurements": {
+      "size": 48,
+      "relocation_count": 12,
+      "normalized_sha256": "17b0761f87b081d5cf10757ccc89f12be355c70e2e29df288b65b30710dcbcd1"
+    }
+  },
+  {
+    "unit": "source/ai/actor_types",
+    "symbol": "_data_002b6c68",
+    "reason": "the complete rebuilt object owns an exact actor-type pointer table whose targets are expressed differently by csplit",
+    "measurements": {
+      "size": 128,
+      "relocation_count": 32,
+      "normalized_sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+    }
   }
 ]
