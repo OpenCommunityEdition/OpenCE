@@ -1,5 +1,5 @@
 #ifndef lint
-static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_getimage.c,v 1.8 92/03/11 09:19:10 sam Exp $";
+char data_002dac80[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_getimage.c,v 1.8 92/03/11 09:19:10 sam Exp $";
 #endif
 
 /*
@@ -34,6 +34,11 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_getimage.c,
 #include "tiffio.h"
 #include "tiffcompat.h"
 #include "prototypes.h"
+
+extern void *debug_malloc(unsigned int, int, const char *, long);
+extern void debug_free(void *, const char *, long);
+
+#define TIF_GETIMAGE_FILE "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_getimage.c"
 
 typedef	u_char RGBvalue;
 
@@ -87,6 +92,21 @@ __declspec(align(4)) struct tif_getimage_globals bss_0031be54 = { 0 };
 #define photometric bss_0031be54.photometric
 #define samplesperpixel bss_0031be54.samplesperpixel
 #define bitspersample bss_0031be54.bitspersample
+
+/* January anonymous-symbol map, recovered from exact bodies and relocation
+ * call graphs against the authentic libtiff 1.8 source above:
+ * 00058910 checkcmap                 00059df0 pickTileContigCase
+ * 00058a20 makebwmap                 00059f10 pickTileSeparateCase
+ * 00058c40 makecmap                  00059f50 gtTileContig
+ * 00058f80 put8bitcmaptile           0005a0e0 gtTileSeparate
+ * 00059010 put4bitcmaptile           0005a320 gtStripContig
+ * 000590b0 put2bitcmaptile           0005a4b0 gtStripSeparate
+ * 00059180 put1bitcmaptile           0005a6f0 gt
+ * 000592d0 putgreytile
+ * 00059a60 initYCbCrConversion
+ * 00059ab0 putRGBContigYCbCrClump
+ * 00059c80 putcontig8bitYCbCrtile
+ */
 
 static	int gt();
 
@@ -144,9 +164,9 @@ TIFFReadRGBAImage(tif, rwidth, rheight, raster, stop)
 	PALmap = NULL;
 	ok = gt(tif, rwidth, height, raster + (rheight-height)*rwidth);
 	if (BWmap)
-		free((char *)BWmap);
+		debug_free((char *)BWmap, TIF_GETIMAGE_FILE, 125);
 	if (PALmap)
-		free((char *)PALmap);
+		debug_free((char *)PALmap, TIF_GETIMAGE_FILE, 127);
 	return (ok);
 }
 
@@ -200,7 +220,8 @@ gt(tif, w, h, raster)
 		register int x, range;
 
 		range = maxsamplevalue - minsamplevalue;
-		Map = (RGBvalue *)malloc((range + 1) * sizeof (RGBvalue));
+		Map = (RGBvalue *)debug_malloc((range + 1) * sizeof (RGBvalue), 0,
+		    TIF_GETIMAGE_FILE, 181);
 		if (Map == NULL) {
 			TIFFError(filename,
 			    "No space for photometric conversion table");
@@ -221,7 +242,7 @@ gt(tif, w, h, raster)
 			if (!makebwmap(Map))
 				return (0);
 			/* no longer need Map, free it */
-			free((char *)Map);
+			debug_free((char *)Map, TIF_GETIMAGE_FILE, 202);
 			Map = NULL;
 		}
 		break;
@@ -267,7 +288,7 @@ gt(tif, w, h, raster)
 		    gtStripContig(tif, raster, Map, h, w);
 	}
 	if (Map)
-		free((char *)Map);
+		debug_free((char *)Map, TIF_GETIMAGE_FILE, 248);
 	return (e);
 }
 
@@ -335,7 +356,8 @@ gtTileContig(tif, raster, Map, h, w)
 	put = pickTileContigCase(Map);
 	if (put == 0)
 		return (0);
-	buf = (u_char *)malloc(TIFFTileSize(tif));
+	buf = (u_char *)debug_malloc(TIFFTileSize(tif), 0,
+	    TIF_GETIMAGE_FILE, 316);
 	if (buf == 0) {
 		TIFFError(filename, "No space for tile buffer");
 		return (0);
@@ -365,7 +387,7 @@ gtTileContig(tif, raster, Map, h, w)
 		}
 		y += (orientation == ORIENTATION_TOPLEFT ? -nrow : nrow);
 	}
-	free(buf);
+	debug_free(buf, TIF_GETIMAGE_FILE, 346);
 	return (1);
 }
 
@@ -404,7 +426,8 @@ gtTileSeparate(tif, raster, Map, h, w)
 	if (put == 0)
 		return (0);
 	tilesize = TIFFTileSize(tif);
-	buf = (u_char *)malloc(3*tilesize);
+	buf = (u_char *)debug_malloc(3*tilesize, 0,
+	    TIF_GETIMAGE_FILE, 376);
 	if (buf == 0) {
 		TIFFError(filename, "No space for tile buffer");
 		return (0);
@@ -440,7 +463,7 @@ gtTileSeparate(tif, raster, Map, h, w)
 		}
 		y += (orientation == ORIENTATION_TOPLEFT ? -nrow : nrow);
 	}
-	free(buf);
+	debug_free(buf, TIF_GETIMAGE_FILE, 412);
 	return (1);
 }
 
@@ -468,7 +491,8 @@ gtStripContig(tif, raster, Map, h, w)
 	put = pickTileContigCase(Map);
 	if (put == 0)
 		return (0);
-	buf = (u_char *)malloc(TIFFStripSize(tif));
+	buf = (u_char *)debug_malloc(TIFFStripSize(tif), 0,
+	    TIF_GETIMAGE_FILE, 440);
 	if (buf == 0) {
 		TIFFError(filename, "No space for strip buffer");
 		return (0);
@@ -487,7 +511,7 @@ gtStripContig(tif, raster, Map, h, w)
 		(*put)(raster + y*w, buf, Map, w, nrow, fromskew, toskew);
 		y += (orientation == ORIENTATION_TOPLEFT ? -nrow : nrow);
 	}
-	free(buf);
+	debug_free(buf, TIF_GETIMAGE_FILE, 459);
 	return (1);
 }
 
@@ -515,13 +539,16 @@ gtStripSeparate(tif, raster, Map, h, w)
 	int fromskew, toskew;
 
 	stripsize = TIFFStripSize(tif);
-	r = buf = (u_char *)malloc(3*stripsize);
+	r = buf = (u_char *)debug_malloc(3*stripsize, 0,
+	    TIF_GETIMAGE_FILE, 487);
 	if (buf == 0)
 		return (0);
 	g = r + stripsize;
 	b = g + stripsize;
 	put = pickTileSeparateCase(Map);
 	if (put == 0) {
+		/* BUG (original): buf is leaked on this error path. A corrected build
+		 * should debug_free(buf, TIF_GETIMAGE_FILE, 517) before returning. */
 		TIFFError(filename, "Can not handle format");
 		return (0);
 	}
@@ -545,7 +572,7 @@ gtStripSeparate(tif, raster, Map, h, w)
 		(*put)(raster + y*w, r, g, b, Map, w, nrow, fromskew, toskew);
 		y += (orientation == ORIENTATION_TOPLEFT ? -nrow : nrow);
 	}
-	free(buf);
+	debug_free(buf, TIF_GETIMAGE_FILE, 517);
 	return (1);
 }
 
@@ -565,8 +592,9 @@ makebwmap(Map)
 	int nsamples = 8 / bitspersample;
 	register u_long *p;
 
-	BWmap = (u_long **)malloc(
-	    256*sizeof (u_long *)+(256*nsamples*sizeof(u_long)));
+	BWmap = (u_long **)debug_malloc(
+	    256*sizeof (u_long *)+(256*nsamples*sizeof(u_long)), 0,
+	    TIF_GETIMAGE_FILE, 538);
 	if (BWmap == NULL) {
 		TIFFError(filename, "No space for B&W mapping table");
 		return (0);
@@ -620,8 +648,9 @@ makecmap(rmap, gmap, bmap)
 	int nsamples = 8 / bitspersample;
 	register u_long *p;
 
-	PALmap = (u_long **)malloc(
-	    256*sizeof (u_long *)+(256*nsamples*sizeof(u_long)));
+	PALmap = (u_long **)debug_malloc(
+	    256*sizeof (u_long *)+(256*nsamples*sizeof(u_long)), 0,
+	    TIF_GETIMAGE_FILE, 593);
 	if (PALmap == NULL) {
 		TIFFError(filename, "No space for Palette mapping table");
 		return (0);
