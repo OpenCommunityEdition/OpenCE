@@ -42,6 +42,13 @@ struct player_action
 	short pad;
 };
 
+typedef char player_action_size_assert[
+	sizeof(struct player_action) == 0x20 ? 1 : -1];
+typedef char player_action_desired_facing_yaw_offset_assert[
+	offsetof(struct player_action, desired_facing.yaw) == 0x4 ? 1 : -1];
+typedef char player_action_desired_facing_pitch_offset_assert[
+	offsetof(struct player_action, desired_facing.pitch) == 0x8 ? 1 : -1];
+
 struct network_player
 {
 	wchar_t name[12];
@@ -83,11 +90,11 @@ struct player_datum
 	long death_time;
 	long unknown88;
 	struct game_statistics statistics;
-	long telefrag_timeout;
-	long quit_out_of_game_time;
-	boolean is_blocking_teleporter;
-	boolean quit_out_of_game;
-	struct player_action action_input;
+	long unknown_c8;
+	long unknown_cc;
+	boolean unknown_d0;
+	boolean unknown_d1;
+	byte pad_d2[2];
 };
 
 struct players_globals
@@ -126,6 +133,16 @@ typedef char player_datum_team_index_offset_assert[
 	offsetof(struct player_datum, team_index) == 0x20 ? 1 : -1];
 typedef char player_datum_statistics_offset_assert[
 	offsetof(struct player_datum, statistics) == 0x8C ? 1 : -1];
+typedef char player_datum_unknown_c8_offset_assert[
+	offsetof(struct player_datum, unknown_c8) == 0xC8 ? 1 : -1];
+typedef char player_datum_unknown_cc_offset_assert[
+	offsetof(struct player_datum, unknown_cc) == 0xCC ? 1 : -1];
+typedef char player_datum_unknown_d0_offset_assert[
+	offsetof(struct player_datum, unknown_d0) == 0xD0 ? 1 : -1];
+typedef char player_datum_unknown_d1_offset_assert[
+	offsetof(struct player_datum, unknown_d1) == 0xD1 ? 1 : -1];
+typedef char player_datum_size_assert[
+	sizeof(struct player_datum) == 0xD4 ? 1 : -1];
 
 /* ---------- prototypes/PLAYER_CONTROL.C */
 
@@ -138,6 +155,9 @@ boolean player_input_enabled(
 void player_control_unzoom(long unit_index);
 
 /* ---------- prototypes/PLAYERS.C */
+
+void players_initialize(
+	void);
 
 long local_player_get_player_index(
 	short local_player_index);

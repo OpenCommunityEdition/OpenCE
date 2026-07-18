@@ -230,6 +230,7 @@ symbols in this file:
 #include "cseries.h"
 #include "real_math.h"
 #include "players.h"
+#include "saved games/game_state.h"
 
 /* ---------- constants */
 
@@ -242,8 +243,37 @@ symbols in this file:
 /* ---------- globals */
 
 struct data_array *player_data;
+extern struct data_array *team_data;
 
 /* ---------- public code */
+
+void players_initialize(
+	void)
+{
+	player_data = game_state_data_new(
+		"players",
+		16,
+		sizeof(struct player_datum));
+	team_data = game_state_data_new(
+		"teams",
+		16,
+		0x40);
+	players_globals = (struct players_globals *)game_state_malloc(
+		"players globals",
+		NULL,
+		sizeof(struct players_globals));
+
+	csmemset(
+		players_globals->local_players,
+		NONE,
+		sizeof(players_globals->local_players));
+	players_globals->unknown0 = NONE;
+	players_globals->local_player_count = 0;
+
+	player_control_initialize();
+
+	return;
+}
 
 short players_get_respawn_failure(
 	void)
