@@ -105,7 +105,10 @@ symbols in this file:
 
 enum
 {
-	debug_memory_signature = 0x53414654
+	debug_memory_signature = 0x53414654,
+	debug_memory_allocated_signature = 0x2D2D2D3E,
+	debug_memory_disposed_signature = 0x3C424144,
+	debug_memory_trailing_signature = 0x3C2D2D2D
 };
 
 /* ---------- macros */
@@ -115,12 +118,12 @@ enum
 struct debug_memory_globals
 {
 	unsigned long signature;
-	void *first_pointer;
 	long total_pointer_size;
-	long pointer_count;
 	long maximum_pointer_size;
-	long maximum_pointer_count;
-	unsigned long random_seed;
+	struct debug_memory_header *first_pointer;
+	struct debug_memory_header *minimum_pointer;
+	struct debug_memory_header *maximum_pointer;
+	long next_allocation_id;
 	unsigned long trailing_signature;
 };
 
@@ -130,16 +133,19 @@ typedef char debug_memory_globals_size_must_be_0x20[
 struct debug_memory_header
 {
 	unsigned long signature;
-	unsigned long checksum;
+	struct debug_memory_header *next;
+	struct debug_memory_header *previous;
 	unsigned long size;
 	const char *file;
 	long line;
 	long allocation_id;
-	struct debug_memory_header *next;
+	unsigned long checksum;
 };
 
-typedef char debug_memory_header_size_must_be_0x1c[
-	sizeof(struct debug_memory_header) == 0x1c ? 1 : -1];
+typedef char debug_memory_header_size_must_be_0x20[
+	sizeof(struct debug_memory_header) == 0x20 ? 1 : -1];
+typedef char debug_memory_header_checksum_offset_must_be_0x1c[
+	offsetof(struct debug_memory_header, checksum) == 0x1C ? 1 : -1];
 
 struct memory_status
 {
@@ -153,17 +159,21 @@ unsigned long *get_global_local_random_seed_address(
 	void);
 unsigned short seed_random(
 	unsigned long *seed);
+static void code_0007ce40(
+	struct debug_memory_header *header,
+	const char *file,
+	long line);
 
 /* ---------- globals */
 
 struct debug_memory_globals data_002dcd0c =
 {
 	debug_memory_signature,
+	0,
+	0,
 	NULL,
-	0,
-	0,
-	0,
-	0,
+	NULL,
+	NULL,
 	0,
 	debug_memory_signature
 };
@@ -174,12 +184,29 @@ void debug_memory_manager_initialize(
 	void)
 {
 	data_002dcd0c.signature = debug_memory_signature;
-	data_002dcd0c.first_pointer = NULL;
 	data_002dcd0c.total_pointer_size = 0;
-	data_002dcd0c.pointer_count = 0;
 	data_002dcd0c.maximum_pointer_size = 0;
-	data_002dcd0c.maximum_pointer_count = 0;
+	data_002dcd0c.first_pointer = NULL;
+	data_002dcd0c.minimum_pointer = NULL;
+	data_002dcd0c.maximum_pointer = NULL;
 	data_002dcd0c.trailing_signature = debug_memory_signature;
+
+	return;
+}
+
+void code_0007ccf0(
+	const char *file,
+	long line)
+{
+	match_vassert(
+		"c:\\halo\\SOURCE\\cseries\\debug_memory.c",
+		145,
+		data_002dcd0c.signature == debug_memory_signature &&
+			data_002dcd0c.trailing_signature == debug_memory_signature,
+		((char *(__cdecl *)(char *, ...))csprintf)(
+			"Debug memory manager is uninitialized or corrupted. (%s:%d)",
+			file,
+			line));
 
 	return;
 }
@@ -222,6 +249,36 @@ void check_memory_status(
 	return;
 }
 
+void debug_check_memory(
+	const char *file,
+	long line)
+{
+	struct debug_memory_header *header;
+
+	code_0007ccf0(file, line);
+	header = data_002dcd0c.first_pointer;
+	while (header != NULL)
+	{
+		code_0007ce40(header, file, line);
+		match_vassert(
+			"c:\\halo\\SOURCE\\cseries\\debug_memory.c",
+			199,
+			*(unsigned long *)((byte *)(header + 1) + header->size) ==
+				debug_memory_trailing_signature,
+			csprintf(
+				temporary,
+				"Pointer allocated at %s, %d has overrun the end of its buffer. (Size: %d) (%s:%d)",
+				header->file,
+				header->line,
+				header->size,
+				file,
+				line));
+		header = header->next;
+	}
+
+	return;
+}
+
 /* ---------- private code */
 
 unsigned short local_random(
@@ -236,7 +293,7 @@ unsigned long code_0007cd90(
 	unsigned long checksum;
 
 	crc_new(&checksum);
-	crc_checksum_buffer(&checksum, header, sizeof(*header));
+	crc_checksum_buffer(&checksum, header, offsetof(struct debug_memory_header, checksum));
 
 	return checksum;
 }
@@ -245,5 +302,75 @@ long code_0007cdc0(
 	struct debug_memory_header const *a,
 	struct debug_memory_header const *b)
 {
-	return b->line - a->line;
+	return (long)b->file - (long)a->file;
+}
+
+static void code_0007ce40(
+	struct debug_memory_header *header,
+	const char *file,
+	long line)
+{
+	const char *reason = NULL;
+	unsigned long checksum;
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\cseries\\debug_memory.c",
+		160,
+		data_002dcd0c.first_pointer != NULL,
+		csprintf(
+			temporary,
+			"Attempted an operation with pointer at 0x%x when no pointers have been allocated. (%s:%d)",
+			header + 1,
+			file,
+			line));
+	match_vassert(
+		"c:\\halo\\SOURCE\\cseries\\debug_memory.c",
+		165,
+		header >= data_002dcd0c.minimum_pointer &&
+			header <= data_002dcd0c.maximum_pointer,
+		csprintf(
+			temporary,
+			"Attempted an operation with pointer at 0x%x, outside of the valid pointer range. (%s:%d)",
+			header + 1,
+			file,
+			line));
+
+	if (header->signature == debug_memory_disposed_signature)
+	{
+		reason = "Pointer has been disposed.";
+	}
+	else if (header->signature != debug_memory_allocated_signature)
+	{
+		reason = "Signature is incorrect.";
+	}
+	else
+	{
+		crc_new(&checksum);
+		crc_checksum_buffer(
+			&checksum,
+			header,
+			offsetof(struct debug_memory_header, checksum));
+		if (checksum != header->checksum)
+		{
+			reason = "Checksum is incorrect.";
+		}
+	}
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\cseries\\debug_memory.c",
+		183,
+		reason == NULL,
+		csprintf(
+			temporary,
+			"Invalid pointer: header: 0x%x signature: 0x%x line: %d file: 0x%x size: 0x%x reason: %s (%s:%d)",
+			header,
+			header->signature,
+			header->line,
+			header->file,
+			header->size,
+			reason,
+			file,
+			line));
+
+	return;
 }
