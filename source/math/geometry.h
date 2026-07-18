@@ -17,6 +17,9 @@ header included in hcex build.
 /* ---------- prototypes/GEOMETRY.C */
 
 boolean convex_hull2d_test_point(short count, union real_point2d const *points, union real_point2d const *point, real epsilon);
+real convex_hull2d_area(
+	short count,
+	real_point2d const *vertices);
 boolean convex_polygon2d_verify(
 	short count,
 	real *vertices);

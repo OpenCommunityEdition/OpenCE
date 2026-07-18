@@ -235,6 +235,37 @@ real vector_intersect_plane3d(
 		-(vector->i*plane->n.i + vector->j*plane->n.j + vector->k*plane->n.k);
 }
 
+real convex_hull2d_area(
+	short count,
+	real_point2d const *vertices)
+{
+	real area;
+
+	area = 0.f;
+	if (count > 2)
+	{
+		long remaining;
+		real_point2d const *vertex = vertices + 1;
+		remaining = (unsigned short)(count - 2);
+		do
+		{
+			real_vector2d first;
+			real_vector2d second;
+
+			first.i = vertex->x - vertices[0].x;
+			first.j = vertex->y - vertices[0].y;
+			second.i = (vertex + 1)->x - vertices[0].x;
+			second.j = (vertex + 1)->y - vertices[0].y;
+			area += (first.i*second.j - first.j*second.i)*0.5f;
+			vertex++;
+			remaining--;
+		}
+		while (remaining != 0);
+	}
+
+	return (real)fabs(area);
+}
+
 boolean convex_polygon2d_verify(
 	short count,
 	real *vertices)
