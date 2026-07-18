@@ -98,6 +98,9 @@ struct bungie_ima_adpcm_byte_swap_globals data_00316a7c =
 
 /* ---------- public code */
 
+/* NonMatching: target and candidate are both 0x160 bytes with two relocations
+   at the exact offsets. The remaining 20 normalized-byte differences are a
+   three-instruction reconstruction-loop schedule and two register choices. */
 long compress_ima_adpcm_audio_data(
 	short *input_samples,
 	long input_sample_count,
@@ -123,8 +126,8 @@ long compress_ima_adpcm_audio_data(
 		{
 			long difference = *input_samples - sample;
 			long step_size = step_size_table[step_size_index];
-			long temporary_step_size;
 			long sample_difference;
+			long temporary_step_size;
 			char mask;
 			char code;
 
@@ -153,8 +156,9 @@ long compress_ima_adpcm_audio_data(
 			}
 			while (mask);
 
+			sample_difference = step_size;
+			sample_difference >>= 3;
 			temporary_step_size = step_size;
-			sample_difference = step_size>>3;
 			mask = 4;
 			do
 			{
@@ -206,6 +210,8 @@ long compress_ima_adpcm_audio_data(
 	return result;
 }
 
+/* NonMatching: target is 0x1A0 bytes and candidate is 0x1B0; both have two
+   relocations, but their offsets differ by 15 and 16 bytes respectively. */
 long decompress_ima_adpcm_audio_data(
 	struct bungie_ima_adpcm_header const *input_header,
 	long input_data_size,
