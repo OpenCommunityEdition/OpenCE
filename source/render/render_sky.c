@@ -114,7 +114,7 @@ void render_model(
 
 /* ---------- globals */
 
-real bss_004c04f8[MAXIMUM_SKIES_PER_SCENARIO];
+real bss_004c04f8[MAXIMUM_SKIES_PER_SCENARIO] = {0.f};
 extern real_matrix4x3 const *const global_identity4x3;
 
 /* ---------- public code */
@@ -127,6 +127,7 @@ void render_sky(
 	struct sky_render_model_record render_model_record;
 	real region_scales[MAXIMUM_SKIES_PER_SCENARIO];
 	real_matrix4x3 view_matrix;
+	struct object_marker light_marker;
 	struct sky *sky;
 	struct model *model;
 	struct animation_graph *animation_graph;
@@ -209,8 +210,6 @@ void render_sky(
 
 					if (csstrlen(light->marker_name) != 0)
 					{
-						struct object_marker marker;
-
 						if (model_get_marker_by_name(
 							sky->model.index,
 							light->marker_name,
@@ -219,13 +218,16 @@ void render_sky(
 							NONE,
 							node_matrices,
 							FALSE,
-							&marker,
+							&light_marker,
 							1) == 0)
 						{
 							goto next_light;
 						}
 
-						vector_from_points3d(&render.camera.position, &marker.matrix.position, &direction);
+						vector_from_points3d(
+							&render.camera.position,
+							&light_marker.matrix.position,
+							&direction);
 						normalize3d(&direction);
 					}
 					else
@@ -234,19 +236,19 @@ void render_sky(
 					}
 
 					{
-						real_point3d position;
-						real_vector3d forward;
-						real_vector3d up;
-
-						point_from_line3d(&render.camera.position, &direction, 1023.875f, &position);
-						negate_vector3d(&direction, &forward);
-						perpendicular3d(&forward, &up);
-						normalize3d(&up);
+						point_from_line3d(
+							&render.camera.position,
+							&direction,
+							1023.875f,
+							&light_marker.matrix.position);
+						negate_vector3d(&direction, &light_marker.matrix.forward);
+						perpendicular3d(&light_marker.matrix.forward, &light_marker.matrix.up);
+						normalize3d(&light_marker.matrix.up);
 						lights_queue_lens_flare(
 							light->lens_flare.index,
-							&position,
-							&forward,
-							&up,
+							&light_marker.matrix.position,
+							&light_marker.matrix.forward,
+							&light_marker.matrix.up,
 							global_real_rgb_white,
 							1.f);
 					}
