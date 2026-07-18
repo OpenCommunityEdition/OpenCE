@@ -90,6 +90,8 @@ struct bitmap_data;
 struct shader;
 struct vertex_buffer;
 struct rasterizer_dynamic_screen_geometry_parameters;
+struct rasterizer_model_geometry_part;
+struct rasterizer_model_skinning;
 
 struct rasterizer_frame_begin_parameters
 {
@@ -195,6 +197,10 @@ void rasterizer_debug_immediate_vector(
 	real_vector3d const *vector,
 	real scale,
 	real_rgb_color const *color);
+void rasterizer_debug_model_vertices(
+	long object_index,
+	struct rasterizer_model_skinning const *skinning,
+	struct rasterizer_model_geometry_part const *part);
 void rasterizer_debug_immediate_triangle(
 	real_point3d const *p0,
 	real_point3d const *p1,

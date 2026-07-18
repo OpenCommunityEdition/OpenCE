@@ -303,14 +303,25 @@ symbols in this file:
 #include "physics/collision_usage.h"
 #include "real_math.h"
 #include "rasterizer.h"
+#include "rasterizer_geometry.h"
 #include "render/render.h"
+#include "render/render_debug.h"
 #include "saved games/game_state.h"
+#include "tag_files/tag_groups.h"
 
 /* ---------- constants */
+
+enum
+{
+	_triangle_buffer_type_precompiled_strip = 1,
+	MAXIMUM_RASTERIZER_DEBUG_MODEL_VERTICES = 2048,
+	MAXIMUM_RASTERIZER_DEBUG_MODEL_VERTEX_REFERENCES = 12,
+};
 
 /* ---------- macros */
 
 #define rasterizer_model_obscurer_object_index bss_004662ec
+#define rasterizer_debug_model_vertices_enabled rasterizer_debug_options.reserved0[7]
 
 /* ---------- structures */
 
@@ -349,6 +360,60 @@ struct rasterizer_window_parameters
 	byte reserved04[4];
 	real_point3d camera_position;
 	real_vector3d camera_forward;
+};
+
+struct rasterizer_triangle_buffer
+{
+	short type;
+	word pad;
+	long count;
+	void *data;
+	void *hardware_format;
+};
+
+struct rasterizer_model_vertex_compressed
+{
+	real_point3d position;
+	unsigned long normal;
+	unsigned long binormal;
+	unsigned long tangent;
+	point2d texture_coordinates;
+	char node_indices[2];
+	short node_weight;
+};
+
+struct rasterizer_model_geometry_part
+{
+	unsigned long flags;
+	short shader_index;
+	char previous_part_index;
+	char next_part_index;
+	short centroid_primary_node_index;
+	short centroid_secondary_node_index;
+	real centroid_primary_node_weight;
+	real centroid_secondary_node_weight;
+	real_point3d centroid;
+	struct tag_block uncompressed_vertices;
+	struct tag_block compressed_vertices;
+	struct tag_block triangles;
+	struct rasterizer_triangle_buffer triangle_buffer;
+};
+
+struct rasterizer_model_skinning
+{
+	real_matrix4x3 const *node_matrices;
+	short node_matrix_count;
+	word pad;
+};
+
+struct rasterizer_debug_model_vertex
+{
+	real_point3d position;
+	short triangle_vertex_indices[MAXIMUM_RASTERIZER_DEBUG_MODEL_VERTEX_REFERENCES];
+	short model_vertex_indices[MAXIMUM_RASTERIZER_DEBUG_MODEL_VERTEX_REFERENCES];
+	byte triangle_vertex_index_count;
+	byte model_vertex_index_count;
+	word pad;
 };
 
 /* ---------- prototypes */
@@ -419,6 +484,9 @@ void _rasterizer_decal_vertices_unlock(
 	void);
 void _rasterizer_widget_end(
 	void);
+real_vector3d *uncompress_int32_to_real_vector3d(
+	real_vector3d *result,
+	unsigned long compressed);
 
 void _rasterizer_decals_update_function_pointers(void);
 void _rasterizer_decals_initialize(
@@ -1874,6 +1942,222 @@ void rasterizer_debug_immediate_vector(
 	endpoint.y = point->y + scale * vector->j;
 	endpoint.z = point->z + scale * vector->k;
 	_rasterizer_debug_immediate_line(point, &endpoint, color, color);
+	return;
+}
+
+void rasterizer_debug_model_vertices(
+	long object_index,
+	struct rasterizer_model_skinning const *skinning,
+	struct rasterizer_model_geometry_part const *part)
+{
+	long debug_vertex_count;
+	long closest_debug_vertex_index;
+	real closest_debug_vertex_dot;
+	short triangle_vertex_index;
+	char model_vertex_string[256];
+	char triangle_vertex_string[256];
+	struct rasterizer_debug_model_vertex debug_vertices[MAXIMUM_RASTERIZER_DEBUG_MODEL_VERTICES];
+
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\rasterizer.c",
+		830,
+		part);
+
+	if (rasterizer_debug_model_vertices_enabled &&
+		object_index == rasterizer_model_obscurer_object_index)
+	{
+		debug_vertex_count = 0;
+		closest_debug_vertex_index = NONE;
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\rasterizer.c",
+			857,
+			part->triangle_buffer.type==_triangle_buffer_type_precompiled_strip);
+
+		for (triangle_vertex_index = 0;
+			triangle_vertex_index < part->triangle_buffer.count + 2;
+			triangle_vertex_index++)
+		{
+			word model_vertex_index = ((word const *)part->triangles.address)[triangle_vertex_index];
+			struct rasterizer_model_vertex_compressed const *vertex =
+				&((struct rasterizer_model_vertex_compressed const *)part->compressed_vertices.address)[model_vertex_index];
+			short node_index0;
+			short node_index1;
+			real node_weight0;
+			real node_weight1;
+			real_point3d node_point0;
+			real_vector3d node_normal0;
+			real_point3d node_point1;
+			real_vector3d node_normal1;
+			real_vector3d decompressed_normal;
+			real_vector3d *decompressed_normal_result;
+			real_vector3d vertex_normal;
+			real_point3d point;
+			real_vector3d normal;
+			long debug_vertex_index;
+
+			node_index0 = vertex->node_indices[0] / 3;
+			node_weight0 = (real)vertex->node_weight * (1.f / 32767.f);
+			node_weight1 = 1.f - node_weight0;
+			node_index1 = vertex->node_indices[1] / 3;
+			decompressed_normal_result = uncompress_int32_to_real_vector3d(&decompressed_normal, vertex->normal);
+			node_point0.x = 0.f;
+			node_point0.y = 0.f;
+			node_point0.z = 0.f;
+			node_normal0.i = 0.f;
+			node_normal0.j = 0.f;
+			node_normal0.k = 0.f;
+			node_point1.x = 0.f;
+			node_point1.y = 0.f;
+			node_point1.z = 0.f;
+			node_normal1.i = 0.f;
+			node_normal1.j = 0.f;
+			node_normal1.k = 0.f;
+			vertex_normal = *decompressed_normal_result;
+			match_assert(
+				"c:\\halo\\SOURCE\\rasterizer\\rasterizer.c",
+				878,
+				node_index0<skinning->node_matrix_count);
+			match_assert(
+				"c:\\halo\\SOURCE\\rasterizer\\rasterizer.c",
+				879,
+				node_index1<skinning->node_matrix_count);
+			match_assert(
+				"c:\\halo\\SOURCE\\rasterizer\\rasterizer.c",
+				880,
+				node_weight0>=0.0f && node_weight0<=1.0f);
+
+			if (node_index0 >= 0)
+			{
+				matrix4x3_transform_point(&skinning->node_matrices[node_index0], &vertex->position, &node_point0);
+				matrix4x3_transform_vector(&skinning->node_matrices[node_index0], &vertex_normal, &node_normal0);
+			}
+			if (node_index1 >= 0)
+			{
+				matrix4x3_transform_point(&skinning->node_matrices[node_index1], &vertex->position, &node_point1);
+				matrix4x3_transform_vector(&skinning->node_matrices[node_index1], &vertex_normal, &node_normal1);
+			}
+
+			point.x = node_point0.x * node_weight0 + node_point1.x * node_weight1;
+			point.y = node_point0.y * node_weight0 + node_point1.y * node_weight1;
+			point.z = node_point0.z * node_weight0 + node_point1.z * node_weight1;
+			normal.i = node_normal0.i * node_weight0 + node_normal1.i * node_weight1;
+			normal.j = node_normal0.j * node_weight0 + node_normal1.j * node_weight1;
+			normal.k = node_normal0.k * node_weight0 + node_normal1.k * node_weight1;
+			normalize3d(&normal);
+
+			for (debug_vertex_index = 0; debug_vertex_index < debug_vertex_count; debug_vertex_index++)
+			{
+				struct rasterizer_debug_model_vertex *debug_vertex = &debug_vertices[debug_vertex_index];
+				if (point.x == debug_vertex->position.x &&
+					point.y == debug_vertex->position.y &&
+					point.z == debug_vertex->position.z)
+				{
+					short reference_index;
+
+					if (debug_vertex->triangle_vertex_index_count < MAXIMUM_RASTERIZER_DEBUG_MODEL_VERTEX_REFERENCES)
+					{
+						for (reference_index = 0;
+							reference_index < debug_vertex->triangle_vertex_index_count &&
+							debug_vertex->triangle_vertex_indices[reference_index] != triangle_vertex_index;
+							reference_index++)
+						{
+						}
+						if (reference_index == debug_vertex->triangle_vertex_index_count)
+						{
+							debug_vertex->triangle_vertex_indices[debug_vertex->triangle_vertex_index_count++] = triangle_vertex_index;
+						}
+					}
+
+					if (debug_vertex->model_vertex_index_count < MAXIMUM_RASTERIZER_DEBUG_MODEL_VERTEX_REFERENCES)
+					{
+						for (reference_index = 0;
+							reference_index < debug_vertex->model_vertex_index_count &&
+							debug_vertex->model_vertex_indices[reference_index] != model_vertex_index;
+							reference_index++)
+						{
+						}
+						if (reference_index == debug_vertex->model_vertex_index_count)
+						{
+							debug_vertex->model_vertex_indices[debug_vertex->model_vertex_index_count++] = model_vertex_index;
+						}
+					}
+					break;
+				}
+			}
+
+			if (debug_vertex_index == debug_vertex_count &&
+				debug_vertex_count < MAXIMUM_RASTERIZER_DEBUG_MODEL_VERTICES)
+			{
+				struct rasterizer_debug_model_vertex *debug_vertex = &debug_vertices[debug_vertex_count];
+				real_vector3d camera_to_vertex;
+				real camera_dot;
+
+				debug_vertex->position = point;
+				debug_vertex->triangle_vertex_indices[0] = triangle_vertex_index;
+				debug_vertex->model_vertex_indices[0] = model_vertex_index;
+				debug_vertex->triangle_vertex_index_count = 1;
+				debug_vertex->model_vertex_index_count = 1;
+
+				camera_to_vertex.i = point.x - global_window_parameters.camera_position.x;
+				camera_to_vertex.j = point.y - global_window_parameters.camera_position.y;
+				camera_to_vertex.k = point.z - global_window_parameters.camera_position.z;
+				normalize3d(&camera_to_vertex);
+				camera_dot =
+					camera_to_vertex.i * global_window_parameters.camera_forward.i +
+					camera_to_vertex.j * global_window_parameters.camera_forward.j +
+					camera_to_vertex.k * global_window_parameters.camera_forward.k;
+				if ((camera_to_vertex.i * normal.i +
+					camera_to_vertex.j * normal.j +
+					camera_to_vertex.k * normal.k < 0.f &&
+					closest_debug_vertex_dot < camera_dot) ||
+					closest_debug_vertex_dot == -1.f)
+				{
+					closest_debug_vertex_dot = camera_dot;
+					closest_debug_vertex_index = debug_vertex_index;
+				}
+				debug_vertex_count++;
+			}
+		}
+
+		{
+			long debug_vertex_index;
+			for (debug_vertex_index = 0; debug_vertex_index < debug_vertex_count; debug_vertex_index++)
+			{
+				struct rasterizer_debug_model_vertex *debug_vertex = &debug_vertices[debug_vertex_index];
+				if (debug_vertex_index == closest_debug_vertex_index)
+				{
+					short reference_index;
+
+					csstrcpy(temporary, "I=");
+					for (reference_index = 0; reference_index < debug_vertex->triangle_vertex_index_count; reference_index++)
+					{
+						sprintf(
+							triangle_vertex_string,
+							"%d%c",
+							debug_vertex->triangle_vertex_indices[reference_index],
+							reference_index != debug_vertex->triangle_vertex_index_count - 1 ? ',' : ' ');
+						csstrcat(temporary, triangle_vertex_string);
+					}
+					csstrcat(temporary, "\nV=");
+					for (reference_index = 0; reference_index < debug_vertex->model_vertex_index_count; reference_index++)
+					{
+						sprintf(
+							model_vertex_string,
+							"%d%c",
+							debug_vertex->model_vertex_indices[reference_index],
+							reference_index != debug_vertex->model_vertex_index_count - 1 ? ',' : ' ');
+						csstrcat(temporary, model_vertex_string);
+					}
+					render_debug_point(FALSE, &debug_vertex->position, 0.03125f, global_real_argb_red);
+					render_debug_string_at_point(FALSE, &debug_vertex->position, temporary, global_real_argb_yellow);
+				}
+				else
+				{
+					render_debug_point(FALSE, &debug_vertex->position, 0.03125f, global_real_argb_white);
+				}
+			}
+		}
+	}
 	return;
 }
 
