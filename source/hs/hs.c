@@ -4569,6 +4569,12 @@ long hs_compile(
 	char const *source,
 	char const **error_source,
 	char const **error_message);
+long code_000b3b10(
+	struct file_reference const *left,
+	struct file_reference const *right);
+boolean tag_data_resize(
+	struct tag_data *data,
+	long size);
 void code_000b2f00(
 	void);
 boolean code_000b3b60(
@@ -4744,6 +4750,101 @@ boolean code_000b3d10(
 	if (success)
 		console_printf(FALSE, "scripts successfully compiled.");
 	hs_compile_dispose();
+	return success;
+}
+
+static boolean code_000b3a00(
+	struct file_reference *file)
+{
+	struct scenario *scenario;
+	struct tag_block *source_files;
+	struct hs_source_file *source_file;
+	void *source;
+	unsigned long source_size;
+	short source_file_index;
+	char name[MAXIMUM_FILENAME_LENGTH+1];
+
+	scenario = global_scenario_get();
+	if (file_exists(file))
+	{
+		source_files = &scenario->hs_source_files;
+		source_file_index = tag_block_add_element(source_files);
+		if (source_file_index != NONE)
+		{
+			source_file = TAG_BLOCK_GET_ELEMENT(
+				source_files,
+				source_file_index,
+				struct hs_source_file);
+			source = file_read_into_memory(file, &source_size);
+			if (source)
+			{
+				if (tag_data_resize(&source_file->source, source_size))
+				{
+					file_reference_get_name(file, FLAG(_name_filename_bit), name);
+					csstrncpy(source_file->name, name, NUMBEROF(source_file->name)-1);
+					source_file->name[NUMBEROF(source_file->name)-1] = 0;
+					csmemcpy(
+						tag_data_get_pointer(&source_file->source, 0, source_size),
+						source,
+						source_size);
+					return TRUE;
+				}
+				error(2, "maximum source file size exceeded.");
+				return FALSE;
+			}
+			error(2, "couldn't read source file into memory.");
+			return FALSE;
+		}
+		error(2, "maximum source files per scenario exceeded.");
+	}
+	return FALSE;
+}
+
+boolean code_000b3b60(
+	void)
+{
+	boolean success = TRUE;
+	char scenario_path[MAXIMUM_FILENAME_LENGTH+1];
+	struct file_reference global_scripts;
+	char extension[MAXIMUM_FILENAME_LENGTH+1];
+	struct file_reference scripts_directory;
+	struct file_reference source_files[8];
+	short source_file_count;
+	short source_file_index;
+
+	tag_block_resize(&global_scenario_get()->hs_source_files, 0);
+	sprintf(scenario_path, "data\\%s", tag_get_name(global_scenario_index));
+	sprintf(strrchr(scenario_path, '\\') + 1, "scripts");
+	file_reference_create_from_path(
+		&global_scripts,
+		"data\\global_scripts.hsc",
+		FALSE);
+	if (file_exists(&global_scripts))
+		success = code_000b3a00(&global_scripts);
+
+	file_reference_create_from_path(&scripts_directory, scenario_path, TRUE);
+	source_file_count = (short)find_files(
+		0,
+		&scripts_directory,
+		NUMBEROF(source_files),
+		source_files);
+	qsort(
+		source_files,
+		source_file_count,
+		sizeof(struct file_reference),
+		(int (__cdecl *)(void const *, void const *))code_000b3b10);
+	for (source_file_index = 0; source_file_index<source_file_count; source_file_index++)
+	{
+		file_reference_get_name(
+			&source_files[source_file_index],
+			FLAG(_name_extension_bit),
+			extension);
+		if (csstrcmp(extension, "hsc") == 0 &&
+			!code_000b3a00(&source_files[source_file_index]))
+		{
+			success = FALSE;
+		}
+	}
 	return success;
 }
 
