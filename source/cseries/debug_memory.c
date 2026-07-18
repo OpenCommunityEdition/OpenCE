@@ -96,16 +96,154 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "cseries_windows.h"
+#include "errors.h"
+#include "memory/crc.h"
+
 /* ---------- constants */
+
+enum
+{
+	debug_memory_signature = 0x53414654
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct debug_memory_globals
+{
+	unsigned long signature;
+	void *first_pointer;
+	long total_pointer_size;
+	long pointer_count;
+	long maximum_pointer_size;
+	long maximum_pointer_count;
+	unsigned long random_seed;
+	unsigned long trailing_signature;
+};
+
+typedef char debug_memory_globals_size_must_be_0x20[
+	sizeof(struct debug_memory_globals) == 0x20 ? 1 : -1];
+
+struct debug_memory_header
+{
+	unsigned long signature;
+	unsigned long checksum;
+	unsigned long size;
+	const char *file;
+	long line;
+	long allocation_id;
+	struct debug_memory_header *next;
+};
+
+typedef char debug_memory_header_size_must_be_0x1c[
+	sizeof(struct debug_memory_header) == 0x1c ? 1 : -1];
+
+struct memory_status
+{
+	unsigned long minimum_available_memory;
+	unsigned long maximum_available_memory;
+};
+
 /* ---------- prototypes */
+
+unsigned long *get_global_local_random_seed_address(
+	void);
+unsigned short seed_random(
+	unsigned long *seed);
 
 /* ---------- globals */
 
+struct debug_memory_globals data_002dcd0c =
+{
+	debug_memory_signature,
+	NULL,
+	0,
+	0,
+	0,
+	0,
+	0,
+	debug_memory_signature
+};
+
 /* ---------- public code */
 
+void debug_memory_manager_initialize(
+	void)
+{
+	data_002dcd0c.signature = debug_memory_signature;
+	data_002dcd0c.first_pointer = NULL;
+	data_002dcd0c.total_pointer_size = 0;
+	data_002dcd0c.pointer_count = 0;
+	data_002dcd0c.maximum_pointer_size = 0;
+	data_002dcd0c.maximum_pointer_count = 0;
+	data_002dcd0c.trailing_signature = debug_memory_signature;
+
+	return;
+}
+
+void debug_dump_memory(
+	void)
+{
+	debug_dump_memory_for_file(NULL);
+
+	return;
+}
+
+void check_memory_status(
+	struct memory_status *memory_status,
+	const char *location)
+{
+	MEMORYSTATUS status;
+	unsigned long difference;
+
+	GlobalMemoryStatus(&status);
+	memory_status->minimum_available_memory =
+		status.dwAvailPhys > memory_status->minimum_available_memory
+			? memory_status->minimum_available_memory
+			: status.dwAvailPhys;
+	memory_status->maximum_available_memory =
+		status.dwAvailPhys <= memory_status->maximum_available_memory
+			? memory_status->maximum_available_memory
+			: status.dwAvailPhys;
+
+	difference = memory_status->maximum_available_memory - memory_status->minimum_available_memory;
+	if (difference > 16 * 1024)
+	{
+		error(
+			_error_silent,
+			"memory check failed at %s, difference between min and max memory free is %d",
+			location,
+			difference);
+	}
+
+	return;
+}
+
 /* ---------- private code */
+
+unsigned short local_random(
+	void)
+{
+	return seed_random(get_global_local_random_seed_address());
+}
+
+unsigned long code_0007cd90(
+	struct debug_memory_header const *header)
+{
+	unsigned long checksum;
+
+	crc_new(&checksum);
+	crc_checksum_buffer(&checksum, header, sizeof(*header));
+
+	return checksum;
+}
+
+long code_0007cdc0(
+	struct debug_memory_header const *a,
+	struct debug_memory_header const *b)
+{
+	return b->line - a->line;
+}
