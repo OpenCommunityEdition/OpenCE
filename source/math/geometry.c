@@ -235,6 +235,85 @@ real vector_intersect_plane3d(
 		-(vector->i*plane->n.i + vector->j*plane->n.j + vector->k*plane->n.k);
 }
 
+boolean convex_hull2d_test_circle(
+	short count,
+	real_point2d const *points,
+	real_point2d const *center,
+	real radius)
+{
+	short index = 0;
+	boolean result = TRUE;
+	register real_point2d const *point_base = points;
+	register real_point2d const *circle_center = center;
+	real radius_squared = radius*radius;
+
+	if (count > 0)
+	{
+		do
+		{
+			long next_index = index + 1 < count ? index + 1 : 0;
+			real_vector2d edge;
+			real_vector2d offset;
+			real edge_length_squared;
+			real cross;
+
+			edge.i = point_base[next_index].x - point_base[index].x;
+			edge.j = point_base[next_index].y - point_base[index].y;
+			offset.i = circle_center->x - point_base[index].x;
+			offset.j = circle_center->y - point_base[index].y;
+			edge_length_squared = magnitude_squared2d(&edge);
+			if (edge_length_squared > 0.f)
+			{
+				cross = cross_product2d(&edge, &offset);
+				if (cross > 0.f && cross*cross > edge_length_squared*radius_squared)
+				{
+					result = FALSE;
+					break;
+				}
+			}
+			index++;
+		}
+		while (index < count);
+	}
+
+	return result;
+}
+
+boolean convex_hull2d_test_point_indexed(
+	short count,
+	short const *indices,
+	real_point2d const *points,
+	real_point2d const *point,
+	real epsilon)
+{
+	short index = 0;
+	boolean result = TRUE;
+	register short const *index_base = indices;
+	register real_point2d const *point_base = points;
+
+	if (count > 0)
+	{
+			do
+		{
+			real_point2d const *current = point_base + index_base[index];
+			long next_index = index + 1 < count ? index + 1 : 0;
+			real_point2d const *next = point_base + index_base[next_index];
+
+			if (
+				(next->x - current->x)*(point->y - current->y) -
+				(next->y - current->y)*(point->x - current->x) < -epsilon)
+			{
+				result = FALSE;
+				break;
+			}
+			index++;
+		}
+		while (index < count);
+	}
+
+	return result;
+}
+
 real convex_hull2d_area(
 	short count,
 	real_point2d const *vertices)
@@ -264,6 +343,71 @@ real convex_hull2d_area(
 	}
 
 	return (real)fabs(area);
+}
+
+boolean convex_hull2d_test_vector(
+	short count,
+	real_point2d const *points,
+	real_point2d const *origin,
+	real_vector2d const *vector,
+	real *minimum_distance,
+	real *maximum_distance)
+{
+	real minimum = REAL_MIN;
+	real maximum = REAL_MAX;
+	short index = 0;
+
+	if (count > 0)
+	{
+		do
+		{
+			short next_index = index + 1 < count ? index + 1 : 0;
+			real edge_i = points[next_index].x - points[index].x;
+			real edge_j = points[next_index].y - points[index].y;
+			real offset_i = origin->x - points[index].x;
+			real offset_j = origin->y - points[index].y;
+			real denominator = edge_j*vector->i - edge_i*vector->j;
+			real numerator = offset_j*edge_i - offset_i*edge_j;
+
+			if (!(fabs(denominator) < _real_epsilon))
+			{
+				real distance = numerator / denominator;
+				if (denominator <= 0.f)
+				{
+					if (distance < maximum)
+					{
+						maximum = distance;
+					}
+				}
+				else if (distance > minimum)
+				{
+					minimum = distance;
+				}
+
+				if (maximum < minimum)
+				{
+					return FALSE;
+				}
+			}
+			else if (numerator < _real_epsilon)
+			{
+				return FALSE;
+			}
+			index++;
+		}
+		while (index < count);
+	}
+
+	if (minimum_distance)
+	{
+		*minimum_distance = minimum;
+	}
+	if (maximum_distance)
+	{
+		*maximum_distance = maximum;
+	}
+
+	return TRUE;
 }
 
 boolean convex_polygon2d_verify(
