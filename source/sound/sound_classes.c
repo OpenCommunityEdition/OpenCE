@@ -122,6 +122,9 @@ enum
 
 /* ---------- macros */
 
+#define SOUND_CLASS_DEFINITION(maximum_per_definition, maximum_per_object, preemption_time, flags, priority, cache_miss_mode, wet_gain, minimum_distance, maximum_distance, unknown_gain, unknown_scale, disabled) \
+	{ maximum_per_definition, maximum_per_object, preemption_time, flags, priority, cache_miss_mode, 0, wet_gain, 0.f, minimum_distance, maximum_distance, unknown_gain, unknown_scale, disabled, { 0, 0, 0 } }
+
 /* ---------- structures */
 
 struct sound_class_runtime
@@ -136,15 +139,23 @@ struct sound_class_definition
 {
 	short maximum_number_per_definition;
 	short maximum_number_per_object;
-	byte unused_4[0xC];
+	long preemption_time;
+	short flags;
+	short priority;
+	short cache_miss_mode;
+	short pad_E;
 	real wet_gain;
-	byte unused_14[4];
+	real pad_14;
 	real minimum_distance;
 	real maximum_distance;
-	byte unused_20[8];
+	real unknown_gain;
+	real unknown_scale;
 	boolean disabled;
-	byte unused_29[3];
+	byte pad_29[3];
 };
+
+typedef char verify_sound_class_definition_size[
+	sizeof(struct sound_class_definition) == 0x2C ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -154,11 +165,81 @@ struct sound_class_definition *sound_class_get(
 /* ---------- globals */
 
 struct sound_class_runtime *sound_class_data;
-extern char const *sound_class_names[NUMBER_OF_SOUND_CLASSES];
-extern struct sound_class_definition sound_classes[NUMBER_OF_SOUND_CLASSES];
+struct sound_class_definition sound_classes[NUMBER_OF_SOUND_CLASSES] =
+{
+	SOUND_CLASS_DEFINITION(6, 4, 100, 0, 4, 0, 0.5f, 1.4f, 8.f, 1.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 200, 0, 5, 1, 0.5f, 8.f, 120.f, 1.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 0, 0, 4, 1, 0.5f, 4.f, 70.f, 1.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 500, 0, 4, 1, 0.5f, 1.f, 9.f, 1.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 500, 0, 4, 1, 0.5f, 1.f, 9.f, 1.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 60, 0, 4, 1, 0.5f, 1.f, 9.f, 1.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 500, 0, 4, 1, 0.5f, 1.f, 9.f, 1.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 500, 0, 4, 1, 0.5f, 1.f, 9.f, 1.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 500, 0, 4, 1, 0.5f, 1.f, 9.f, 1.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 100, 0, 3, 1, 0.5f, 0.5f, 3.f, 0.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 100, 0, 3, 0, 0.5f, 0.5f, 3.f, 0.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 1000, 0, 3, 0, 0.5f, 0.5f, 3.f, 0.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 200, 0, 3, 0, 0.5f, 0.9f, 10.f, 1.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 100, 1, 3, 1, 0.8f, 3.f, 20.f, 0.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(4, 2, 400, 0, 3, 0, 0.5f, 1.4f, 8.f, 1.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 2, 100, 0, 3, 1, 0.9f, 1.4f, 8.f, 1.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 100, 0, 2, 1, 0.5f, 0.9f, 5.f, 1.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 100, 0, 2, 1, 0.5f, 0.9f, 5.f, 1.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 100, 0, 1, 1, 0.5f, 0.9f, 5.f, 1.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 100, 0, 1, 1, 0.5f, 0.9f, 5.f, 1.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 100, 0, 1, 1, 0.5f, 0.5f, 3.f, 1.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(4, 4, 100, 0, 2, 1, 1.f, 0.9f, 5.f, 0.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 100, 0, 1, 1, 1.f, 0.9f, 5.f, 0.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 100, 0, 1, 1, 1.f, 0.9f, 5.f, 0.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 100, 0, 1, 1, 1.f, 0.5f, 3.f, 0.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 100, 0, 4, 1, 1.f, 0.5f, 3.f, 1.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(4, 4, 100, 1, 6, 1, 0.8f, 3.f, 20.f, 0.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 4, 100, 0, 3, 1, 0.8f, 2.f, 5.f, 0.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 4, 100, 1, 5, 1, 0.8f, 3.f, 20.f, 0.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(4, 4, 100, 1, 6, 1, 0.8f, 3.f, 20.f, 0.f, 1.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(0, 0, 0, 0, 0, 0, 0.f, 0.f, 0.f, 0.f, 0.f, 0),
+	SOUND_CLASS_DEFINITION(4, 1, 100, 0, 5, 1, 1.f, 3.f, 20.f, 1.f, 1.f, 0),
+};
+
+char const *sound_class_names[NUMBER_OF_SOUND_CLASSES] =
+{
+	"projectile_impact", "projectile_detonation", "", "",
+	"weapon_fire", "weapon_ready", "weapon_reload", "weapon_empty",
+	"weapon_charge", "weapon_overheat", "weapon_idle", "", "",
+	"object_impacts", "particle_impacts", "slow_particle_impacts", "", "",
+	"unit_footsteps", "unit_dialog", "", "", "vehicle_collision",
+	"vehicle_engine", "", "", "device_door", "device_force_field",
+	"device_machinery", "device_nature", "device_computers", "", "music",
+	"ambient_nature", "ambient_machinery", "ambient_computers", "", "", "",
+	"first_person_damage", "", "", "", "", "scripted_dialog_player",
+	"scripted_effect", "scripted_dialog_other",
+	"scripted_dialog_force_unspatialized", "", "", "game_event",
+};
 
 /* ---------- public code */
 
+/* NonMatching: target and candidate are both 0xD0 bytes with 18 relocations.
+   The first relocation is at +0x16 in the target and +0x13 in the candidate;
+   the remaining difference is an ESI/EDI index-pointer register mirror. */
 struct sound_class_definition *sound_class_get(
 	short class_index)
 {
