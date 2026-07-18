@@ -249,14 +249,17 @@ void hashtable_remove(
 	return;
 }
 
+/* NonMatching: declaration order reproduces the target's complete prologue,
+body, 0x240-byte size, and all 27 relocations.  The residual is a two-byte
+EAX/ECX permutation in the capacity_bits+growth_bits assertion. */
 boolean hashtable_grow(
 	struct hashtable *table,
 	short growth_bits)
 {
 	short old_count = table->count;
+	short old_capacity_bits = table->capacity_bits;
 	unsigned long *old_used_slots = table->used_slots;
 	struct dynamic_array old_elements = table->elements;
-	short old_capacity_bits = table->capacity_bits;
 	short old_element_index;
 	short new_count;
 	void *old_element;
@@ -341,6 +344,9 @@ void *hashtable_put(
 
 /* ---------- private code */
 
+/* NonMatching: target and candidate are both 0x120 bytes with four exact
+relocations; the only remaining differences are four register-selection
+bytes in the duplicate success/not-found output epilogues. */
 static boolean code_0010b270(
 	struct hashtable *table,
 	const void *key,
