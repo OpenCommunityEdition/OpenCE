@@ -1,5 +1,13 @@
 #ifndef lint
-static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_dirread.c,v 1.20 92/03/25 09:58:09 sam Exp $";
+struct tif_dirread_data {
+	char rcsid[92];
+	char fetch_tag_message[19];
+};
+
+struct tif_dirread_data data_002b8618 = {
+	"$Header: /usr/people/sam/tiff/libtiff/RCS/tif_dirread.c,v 1.20 92/03/25 09:58:09 sam Exp $",
+	"to fetch tag value"
+};
 #endif
 
 /*
@@ -37,6 +45,10 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_dirread.c,v
  *     are busted in one way or another (e.g. SGI/MIPS).
  */
 #include "tiffioP.h"
+
+extern void *debug_malloc(unsigned int, int, const char *, long);
+extern void debug_free(void *, const char *, long);
+extern void *csmemcpy(void *, const void *, unsigned long);
 
 #define	IGNORE	0		/* tag placeholder used below */
 
@@ -93,7 +105,8 @@ CheckMalloc(tif, n, what)
 	int n;
 	char *what;
 {
-	char *cp = malloc(n);
+	char *cp = debug_malloc(n, 0,
+	    "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_dirread.c", 96);
 	if (cp == NULL)
 		TIFFError(tif->tif_name, "No space %s", what);
 	return (cp);
@@ -156,7 +169,7 @@ TIFFReadDirectory(tif)
 			    "Can not read TIFF directory count");
 			return (0);
 		} else
-			bcopy(tif->tif_base + off, &dircount, sizeof (short));
+			csmemcpy(&dircount, tif->tif_base + off, sizeof (short));
 		off += sizeof (short);
 		if (tif->tif_flags & TIFF_SWAB)
 			TIFFSwabShort(&dircount);
@@ -168,11 +181,11 @@ TIFFReadDirectory(tif)
 			TIFFError(tif->tif_name, "Can not read TIFF directory");
 			goto bad;
 		} else
-			bcopy(tif->tif_base + off, dir,
+			csmemcpy(dir, tif->tif_base + off,
 			    dircount*sizeof (TIFFDirEntry));
 		off += dircount* sizeof (TIFFDirEntry);
 		if (off + sizeof (long) < tif->tif_size)
-			bcopy(tif->tif_base + off, &tif->tif_nextdiroff,
+			csmemcpy(&tif->tif_nextdiroff, tif->tif_base + off,
 			    sizeof (long));
 		else
 			tif->tif_nextdiroff = 0;
@@ -224,9 +237,6 @@ TIFFReadDirectory(tif)
 		while (fip->field_tag && fip->field_tag < dp->tdir_tag)
 			fip++;
 		if (!fip->field_tag || fip->field_tag != dp->tdir_tag) {
-			TIFFWarning(tif->tif_name,
-			    "unknown field with tag %d (0x%x) ignored",
-			    dp->tdir_tag,  dp->tdir_tag);
 			dp->tdir_tag = IGNORE;
 			fip = tiffFieldInfo;	/* restart search */
 			continue;
@@ -400,7 +410,8 @@ TIFFReadDirectory(tif)
 					TIFFSetField(tif, dp->tdir_tag,
 					    cp, cp+v, cp+2*v, cp+3*v);
 				}
-				free(cp);
+				debug_free(cp,
+				    "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_dirread.c", 404);
 			}
 			break;
 		case TIFFTAG_PAGENUMBER:
@@ -506,7 +517,8 @@ TIFFReadDirectory(tif)
 		EstimateStripByteCounts(tif, dir, dircount);
 	}
 	if (dir)
-		free((char *)dir);
+		debug_free((char *)dir,
+		    "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_dirread.c", 510);
 	if (!TIFFFieldSet(tif, FIELD_MAXSAMPLEVALUE))
 		td->td_maxsamplevalue = (1L<<td->td_bitspersample)-1;
 	/*
@@ -526,7 +538,8 @@ TIFFReadDirectory(tif)
 	return (1);
 bad:
 	if (dir)
-		free((char *)dir);
+		debug_free((char *)dir,
+		    "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_dirread.c", 530);
 	return (0);
 }
 
@@ -596,14 +609,7 @@ CheckDirCount(tif, dir, count)
 	TIFFDirEntry *dir;
 	u_long count;
 {
-	if (count != dir->tdir_count) {
-		TIFFWarning(tif->tif_name,
-	"incorrect count for field \"%s\" (%lu, expecting %lu); tag ignored",
-		    TIFFFieldWithTag(dir->tdir_tag)->field_name,
-		    dir->tdir_count, count);
-		return (0);
-	}
-	return (1);
+	return (count == dir->tdir_count);
 }
 
 /*
@@ -628,7 +634,7 @@ TIFFFetchData(tif, dir, cp)
 	} else {
 		if (dir->tdir_offset + cc > tif->tif_size)
 			goto bad;
-		bcopy(tif->tif_base + dir->tdir_offset, cp, cc);
+		csmemcpy(cp, tif->tif_base + dir->tdir_offset, cc);
 #endif
 	}
 	if (tif->tif_flags & TIFF_SWAB) {
@@ -668,7 +674,7 @@ TIFFFetchString(tif, dir, cp)
 		u_long l = dir->tdir_offset;
 		if (tif->tif_flags & TIFF_SWAB)
 			TIFFSwabLong(&l);
-		bcopy(&l, cp, dir->tdir_count);
+		csmemcpy(cp, &l, dir->tdir_count);
 		return (1);
 	}
 	return (TIFFFetchData(tif, dir, cp));
@@ -832,7 +838,8 @@ TIFFFetchRationalArray(tif, dir, v)
 					break;
 			}
 		}
-		free((char *)l);
+		debug_free((char *)l,
+		    "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_dirread.c", 837);
 	}
 	return (ok);
 }
@@ -863,7 +870,6 @@ TIFFFetchNormalTag(tif, dp)
 	TIFF *tif;
 	TIFFDirEntry *dp;
 {
-	static char mesg[] = "to fetch tag value";
 	int ok = 0;
 
 	if (dp->tdir_count > 1) {		/* array of values */
@@ -874,30 +880,30 @@ TIFFFetchNormalTag(tif, dp)
 		case TIFF_SBYTE:
 			/* NB: always expand BYTE values to shorts */
 			cp = CheckMalloc(tif,
-			    dp->tdir_count * sizeof (u_short), mesg);
+			    dp->tdir_count * sizeof (u_short), data_002b8618.fetch_tag_message);
 			ok = cp && TIFFFetchByteArray(tif, dp, (u_short *)cp);
 			break;
 		case TIFF_SHORT:
 		case TIFF_SSHORT:
 			cp = CheckMalloc(tif,
-			    dp->tdir_count * sizeof (u_short), mesg);
+			    dp->tdir_count * sizeof (u_short), data_002b8618.fetch_tag_message);
 			ok = cp && TIFFFetchShortArray(tif, dp, (u_short *)cp);
 			break;
 		case TIFF_LONG:
 		case TIFF_SLONG:
 			cp = CheckMalloc(tif,
-			    dp->tdir_count * sizeof (u_long), mesg);
+			    dp->tdir_count * sizeof (u_long), data_002b8618.fetch_tag_message);
 			ok = cp && TIFFFetchLongArray(tif, dp, (u_long *)cp);
 			break;
 		case TIFF_RATIONAL:
 		case TIFF_SRATIONAL:
 			cp = CheckMalloc(tif,
-			    dp->tdir_count * sizeof (float), mesg);
+			    dp->tdir_count * sizeof (float), data_002b8618.fetch_tag_message);
 			ok = cp && TIFFFetchRationalArray(tif, dp, (float *)cp);
 			break;
 		case TIFF_FLOAT:
 			cp = CheckMalloc(tif,
-			    dp->tdir_count * sizeof (float), mesg);
+			    dp->tdir_count * sizeof (float), data_002b8618.fetch_tag_message);
 			ok = cp && TIFFFetchFloatArray(tif, dp, (float *)cp);
 			break;
 		case TIFF_ASCII:
@@ -905,7 +911,8 @@ TIFFFetchNormalTag(tif, dp)
 			 * Some vendors write strings w/o the trailing
 			 * NULL byte, so always append one just in case.
 			 */
-			cp = CheckMalloc(tif, dp->tdir_count+1, mesg);
+			cp = CheckMalloc(tif, dp->tdir_count+1,
+			    data_002b8618.fetch_tag_message);
 			if (ok = (cp && TIFFFetchString(tif, dp, cp)))
 				cp[dp->tdir_count] = '\0';	/* XXX */
 			break;
@@ -913,7 +920,8 @@ TIFFFetchNormalTag(tif, dp)
 		if (ok)
 			ok = TIFFSetField(tif, dp->tdir_tag, cp);
 		if (cp != NULL)
-			free(cp);
+			debug_free(cp,
+			    "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_dirread.c", 918);
 	} else if (CheckDirCount(tif, dp, 1)) {	/* singleton value */
 		char c[2];
 		switch (dp->tdir_type) {
@@ -1017,7 +1025,8 @@ TIFFFetchStripThing(tif, dir, nstrips, lpp)
 			while (nstrips-- > 0)
 				*lp++ = *wp++;
 		}
-		free((char *)dp);
+		debug_free((char *)dp,
+		    "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_dirread.c", 1022);
 	} else
 		status = TIFFFetchLongArray(tif, dir, lp);
 	return (status);
@@ -1184,17 +1193,9 @@ TIFFFetchExtraSamples(tif, dp)
 	TIFF *tif;
 	TIFFDirEntry *dp;
 {
-	int type;
-	
 	if (dp->tdir_count != 1) {
 		TIFFError(tif->tif_name,
 		    "Can not handle more than 1 extra sample/pixel");
-		return (0);
-	}
-	type = TIFFExtractData(tif, dp->tdir_type, dp->tdir_offset);
-	if (type != EXTRASAMPLE_ASSOCALPHA) {
-		TIFFError(tif->tif_name,
-		    "Can only handle associated-alpha extra samples");
 		return (0);
 	}
 	return (TIFFSetField(tif, TIFFTAG_MATTEING, 1));
