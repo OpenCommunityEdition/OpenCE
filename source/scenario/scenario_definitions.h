@@ -17,7 +17,9 @@ header included in hcex build.
 
 enum
 {
-	_scenario_type_main_menu = 2,
+	_scenario_type_solo = 0,
+	_scenario_type_multiplayer,
+	_scenario_type_main_menu,
 
 	_scenario_object_placement_not_automatic_bit = 0,
 	_scenario_object_placement_not_on_easy_bit,
