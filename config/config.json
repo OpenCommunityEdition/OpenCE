@@ -596,7 +596,7 @@
 				{ "name": "source/math/real_math.c", "index": 222, "status": "NonMatching" },
 				{ "name": "source/math/random_math.c", "index": 223, "status": "Matching" },
 				{ "name": "source/math/probability.c", "index": 224, "status": "Matching" },
-				{ "name": "source/math/periodic_functions.c", "index": 225, "status": "NonMatching" },
+				{ "name": "source/math/periodic_functions.c", "index": 225, "status": "NonMatching", "options": { "cflags": [ "/nologo", "/c", "/O2", "/Oy-", "/Op", "/QIfist" ] } },
 				{ "name": "source/math/matrix_math.c", "index": 226, "status": "NonMatching" },
 				{ "name": "source/math/integer_math.c", "index": 227, "status": "Matching" },
 				{ "name": "source/math/geometry.c", "index": 228, "status": "NonMatching" },
