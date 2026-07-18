@@ -3,25 +3,25 @@ RASTERIZER_XBOX_MOTION_SENSOR.C
 
 symbols in this file:
 0015D220 01b0:
-	_code_0015d220 (0000)
+	_code_0015d220 (D3DDevice_SetRenderState)
 0015D3D0 0050:
-	_code_0015d3d0 (0000)
+	_code_0015d3d0 (D3DDevice_SetTextureStageState)
 0015D420 0220:
-	_code_0015d420 (0000)
+	_code_0015d420 (IDirect3DDevice8_SetRenderState)
 0015D640 0060:
-	_code_0015d640 (0000)
+	_code_0015d640 (IDirect3DDevice8_SetTextureStageState)
 0015D6A0 0010:
-	_code_0015d6a0 (0000)
+	_code_0015d6a0 (IDirect3DDevice8_SetVertexShaderConstant)
 0015D6B0 0020:
-	_code_0015d6b0 (0000)
+	_code_0015d6b0 (IDirect3DDevice8_SetVertexData2f)
 0015D6D0 0030:
-	_code_0015d6d0 (0000)
+	_code_0015d6d0 (IDirect3DDevice8_SetVertexData4f)
 0015D700 0010:
-	_code_0015d700 (0000)
+	_code_0015d700 (IDirect3DDevice8_SetVertexData2s)
 0015D710 0010:
-	_code_0015d710 (0000)
+	_code_0015d710 (IDirect3DDevice8_Begin)
 0015D720 0010:
-	_code_0015d720 (0000)
+	_code_0015d720 (IDirect3DDevice8_End)
 0015D730 0280:
 	__rasterizer_hud_motion_sensor_blip_begin (0000)
 0015D9B0 0180:
