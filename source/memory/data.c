@@ -479,16 +479,15 @@ long data_prev_index(
 	return result;
 }
 
-/* NonMatching: the remaining January codegen difference is the zero-count
-predicate and compacted_count initialization form; size and relocations match. */
 /* NonMatching: target and candidate are both 0x110 padded bytes with the
-   same 12 relocation identities.  Eighteen sibling functions in data.obj
-   are exact.  The remaining difference is local to zero initialization:
-   the target reuses zero already held in EBX for the compacted-data null
-   comparison and absolute_index store, while this compiler emits TEST plus
-   a seven-byte immediate-zero store.  Delayed initialization reproduces
-   the EBX store but perturbs the allocator call and preceding branch, so the
-   exact target shape is parked as a compiler register-reuse tie. */
+   same 12 relocation identities; all 18 sibling functions are exact.  The
+   target reuses zero in EBX for CMP EDI,EBX and MOV [EBP-4],EBX, while this
+   compiler emits TEST EDI,EDI and a seven-byte immediate-zero store.  Five
+   bounded shapes were measured: explicit !=NULL, register compacted_count,
+   comparison with compacted_count, declaration-time absolute_index setup,
+   and block-scoped setup.  The first three and fifth normalize to baseline;
+   declaration-time setup shifts the first seven relocations by three bytes.
+   This is parked as an XDK 3911 register-reuse/code-scheduling tie. */
 void data_compact(
 	struct data_array *data)
 {
