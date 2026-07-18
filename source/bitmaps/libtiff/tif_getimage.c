@@ -108,7 +108,30 @@ __declspec(align(4)) struct tif_getimage_globals bss_0031be54 = { 0 };
  * 00059c80 putcontig8bitYCbCrtile
  */
 
+/* Preserve the recovered libtiff names in source while emitting the anonymous
+ * symbols owned by the January object. */
+#define checkcmap code_00058910
+#define makebwmap code_00058a20
+#define makecmap code_00058c40
+#define put8bitcmaptile code_00058f80
+#define put4bitcmaptile code_00059010
+#define put2bitcmaptile code_000590b0
+#define put1bitcmaptile code_00059180
+#define putgreytile code_000592d0
+#define initYCbCrConversion code_00059a60
+#define putRGBContigYCbCrClump code_00059ab0
+#define putcontig8bitYCbCrtile code_00059c80
+#define pickTileContigCase code_00059df0
+#define pickTileSeparateCase code_00059f10
+#define gtTileContig code_00059f50
+#define gtTileSeparate code_0005a0e0
+#define gtStripContig code_0005a320
+#define gtStripSeparate code_0005a4b0
+#define gt code_0005a6f0
+
 static	int gt();
+static	int makebwmap();
+static	int makecmap();
 
 TIFFReadRGBAImage(tif, rwidth, rheight, raster, stop)
 	TIFF *tif;
@@ -585,23 +608,26 @@ gtStripSeparate(tif, raster, Map, h, w)
  * pixel values simply by indexing into the table with one
  * number.
  */
+static
 makebwmap(Map)
 	RGBvalue *Map;
 {
 	register int i;
 	int nsamples = 8 / bitspersample;
 	register u_long *p;
+	register u_long **bwmap;
 
-	BWmap = (u_long **)debug_malloc(
+	bwmap = (u_long **)debug_malloc(
 	    256*sizeof (u_long *)+(256*nsamples*sizeof(u_long)), 0,
 	    TIF_GETIMAGE_FILE, 538);
-	if (BWmap == NULL) {
+	BWmap = bwmap;
+	if (bwmap == NULL) {
 		TIFFError(filename, "No space for B&W mapping table");
 		return (0);
 	}
-	p = (u_long *)(BWmap + 256);
+	p = (u_long *)(bwmap + 256);
 	for (i = 0; i < 256; i++) {
-		BWmap[i] = p;
+		bwmap[i] = p;
 		switch (bitspersample) {
 			register RGBvalue c;
 #define	GREY(x)	c = Map[x]; *p++ = PACK(c,c,c);
@@ -641,21 +667,24 @@ makebwmap(Map)
  * pixel values simply by indexing into the table with one
  * number.
  */
+static
 makecmap(rmap, gmap, bmap)
 	u_short *rmap, *gmap, *bmap;
 {
+	register u_long **palmap;
 	register int i;
 	int nsamples = 8 / bitspersample;
 	register u_long *p;
 
-	PALmap = (u_long **)debug_malloc(
+	palmap = (u_long **)debug_malloc(
 	    256*sizeof (u_long *)+(256*nsamples*sizeof(u_long)), 0,
 	    TIF_GETIMAGE_FILE, 593);
-	if (PALmap == NULL) {
+	PALmap = palmap;
+	if (palmap == NULL) {
 		TIFFError(filename, "No space for Palette mapping table");
 		return (0);
 	}
-	p = (u_long *)(PALmap + 256);
+	p = (u_long *)(palmap + 256);
 	for (i = 0; i < 256; i++) {
 		PALmap[i] = p;
 #define	CMAP(x)	\
@@ -760,10 +789,15 @@ put8bitcmaptile(cp, pp, Map, w, h, fromskew, toskew)
 	u_long w, h;
 	int fromskew, toskew;
 {
-	while (h-- > 0) {
-		UNROLL8(w,, *cp++ = PALmap[*pp++][0]);
-		cp += toskew;
-		pp += fromskew;
+	register u_long **palmap;
+
+	if (h > 0) {
+		palmap = PALmap;
+		while (h-- > 0) {
+			UNROLL8(w,, *cp++ = palmap[*pp++][0]);
+			cp += toskew;
+			pp += fromskew;
+		}
 	}
 }
 
@@ -841,12 +875,17 @@ putgreytile(cp, pp, Map, w, h, fromskew, toskew)
 	u_long w, h;
 	int fromskew, toskew;
 {
-	while (h-- > 0) {
-		register u_long x;
-		for (x = w; x-- > 0;)
-			*cp++ = BWmap[*pp++][0];
-		cp += toskew;
-		pp += fromskew;
+	register u_long **bwmap;
+
+	if (h > 0) {
+		bwmap = BWmap;
+		while (h-- > 0) {
+			register u_long x;
+			for (x = w; x-- > 0;)
+				*cp++ = bwmap[*pp++][0];
+			cp += toskew;
+			pp += fromskew;
+		}
 	}
 }
 
@@ -1075,13 +1114,18 @@ putRGBContigYCbCrClump(cp, pp, cw, ch, w, n, fromskew, toskew)
 	Cb = Code2V(pp[n],   refBlackWhite[2], refBlackWhite[3], 127);
 	Cr = Code2V(pp[n+1], refBlackWhite[4], refBlackWhite[5], 127);
 	for (j = 0; j < ch; j++) {
+		register double D1Cr = Cr*D1;
+		register double D3Cb = Cb*D3;
+		register double D4Cb = Cb*D4;
+		register float D2Cr = Cr*D2;
+
 		for (k = 0; k < cw; k++) {
 			float Y, R, G, B;
 			Y = Code2V(*pp++,
 			    refBlackWhite[0], refBlackWhite[1], 255);
-			R = Y + Cr*D1;
-			B = Y + Cb*D3;
-			G = Y - Cb*D4 - Cr*D2;
+			R = D1Cr + Y;
+			B = D3Cb + Y;
+			G = Y - D4Cb - D2Cr;
 			cp[k] = PACK(CLAMP(R,0,255),
 				     CLAMP(G,0,255),
 				     CLAMP(B,0,255));
