@@ -19,6 +19,23 @@ def _build(symbols, relocs, sec_size=0x200, sec_name=".text"):
     return coff_compare.load(data)
 
 
+def _build_code_data(symbols, relocs, data_sections=None):
+    """Build a code section followed by one or more non-code sections."""
+    raw_bytes, reloc_bytes = coff_compare.make_section_raw(0x40, relocs)
+    sections = [{
+        "name": ".text", "size": 0x40, "raw_data": raw_bytes,
+        "reloc_data": reloc_bytes, "flags": 0xE0000060,
+    }]
+    for item in data_sections or [(".rdata", 0x20)]:
+        name, size = item
+        sections.append({
+            "name": name, "size": size, "raw_data": b"\0" * size,
+            "flags": 0x40000040,
+        })
+    return coff_compare.load(
+        coff_compare.build_coff(sections=sections, symbols=symbols))
+
+
 def _idx(symbols, name):
     """Return index of first symbol matching *name*."""
     for i, s in enumerate(symbols):
@@ -41,6 +58,161 @@ ANCHOR_SYMS = [
 # ====================================================================
 
 class TestCoffCompare(unittest.TestCase):
+
+    def test_defined_noncode_same_destination_normalizes(self):
+        """Owner+addend and a local symbol at the same offset are equal."""
+        anchor_symbols = [
+            {"name": "func", "value": 0, "section": 1,
+             "type": 0x20, "storage": 2, "aux_count": 0},
+            {"name": "_table", "value": 0, "section": 2,
+             "type": 0, "storage": 2, "aux_count": 0},
+        ]
+        local_symbols = anchor_symbols + [
+            {"name": "$entry", "value": 8, "section": 2,
+             "type": 0, "storage": 3, "aux_count": 0},
+        ]
+        anchor = _build_code_data(anchor_symbols, [(0x10, 1, 6, 8)])
+        local = _build_code_data(local_symbols, [(0x10, 2, 6, 0)])
+        self.assertEqual(
+            coff_compare.section_info(anchor, "func"),
+            coff_compare.section_info(local, "func"))
+
+    def test_defined_noncode_different_offset_refuses(self):
+        """Different resolved offsets in the same section remain unequal."""
+        anchor_symbols = [
+            {"name": "func", "value": 0, "section": 1,
+             "type": 0x20, "storage": 2, "aux_count": 0},
+            {"name": "_table", "value": 0, "section": 2,
+             "type": 0, "storage": 2, "aux_count": 0},
+        ]
+        local_symbols = anchor_symbols + [
+            {"name": "$entry", "value": 12, "section": 2,
+             "type": 0, "storage": 3, "aux_count": 0},
+        ]
+        anchor = _build_code_data(anchor_symbols, [(0x10, 1, 6, 8)])
+        local = _build_code_data(local_symbols, [(0x10, 2, 6, 0)])
+        self.assertNotEqual(
+            coff_compare.section_info(anchor, "func"),
+            coff_compare.section_info(local, "func"))
+
+    def test_defined_noncode_different_section_refuses(self):
+        """A destination in a differently identified section is unequal."""
+        left_symbols = [
+            {"name": "func", "value": 0, "section": 1,
+             "type": 0x20, "storage": 2, "aux_count": 0},
+            {"name": "_table", "value": 0, "section": 2,
+             "type": 0, "storage": 2, "aux_count": 0},
+        ]
+        right_symbols = [
+            {"name": "func", "value": 0, "section": 1,
+             "type": 0x20, "storage": 2, "aux_count": 0},
+            {"name": "_table", "value": 0, "section": 3,
+             "type": 0, "storage": 2, "aux_count": 0},
+            {"name": "$entry", "value": 8, "section": 3,
+             "type": 0, "storage": 3, "aux_count": 0},
+        ]
+        left = _build_code_data(left_symbols, [(0x10, 1, 6, 8)])
+        right = _build_code_data(
+            right_symbols, [(0x10, 2, 6, 0)],
+            [(".rdata", 0x20), (".data", 0x20)])
+        self.assertNotEqual(
+            coff_compare.section_info(left, "func"),
+            coff_compare.section_info(right, "func"))
+
+    def test_defined_noncode_undefined_remains_symbolic(self):
+        """An undefined anchor is not inferred to be a defined section."""
+        undefined_symbols = [
+            {"name": "func", "value": 0, "section": 1,
+             "type": 0x20, "storage": 2, "aux_count": 0},
+            {"name": "_table", "value": 0, "section": 0,
+             "type": 0, "storage": 2, "aux_count": 0},
+        ]
+        defined_symbols = [
+            {"name": "func", "value": 0, "section": 1,
+             "type": 0x20, "storage": 2, "aux_count": 0},
+            {"name": "_table", "value": 0, "section": 2,
+             "type": 0, "storage": 2, "aux_count": 0},
+            {"name": "$entry", "value": 8, "section": 2,
+             "type": 0, "storage": 3, "aux_count": 0},
+        ]
+        undefined = _build_code_data(undefined_symbols, [(0x10, 1, 6, 8)])
+        defined = _build_code_data(defined_symbols, [(0x10, 2, 6, 0)])
+        self.assertNotEqual(
+            coff_compare.section_info(undefined, "func"),
+            coff_compare.section_info(defined, "func"))
+
+    def test_defined_noncode_absolute_remains_conservative(self):
+        """An absolute target is not inferred to be a defined section."""
+        absolute_symbols = [
+            {"name": "func", "value": 0, "section": 1,
+             "type": 0x20, "storage": 2, "aux_count": 0},
+            {"name": "_table", "value": 8, "section": -1,
+             "type": 0, "storage": 2, "aux_count": 0},
+        ]
+        defined_symbols = [
+            {"name": "func", "value": 0, "section": 1,
+             "type": 0x20, "storage": 2, "aux_count": 0},
+            {"name": "_table", "value": 0, "section": 2,
+             "type": 0, "storage": 2, "aux_count": 0},
+            {"name": "$entry", "value": 8, "section": 2,
+             "type": 0, "storage": 3, "aux_count": 0},
+        ]
+        absolute = _build_code_data(absolute_symbols, [(0x10, 1, 6, 0)])
+        defined = _build_code_data(defined_symbols, [(0x10, 2, 6, 0)])
+        self.assertNotEqual(
+            coff_compare.section_info(absolute, "func"),
+            coff_compare.section_info(defined, "func"))
+
+    def test_defined_noncode_ambiguous_owner_refuses(self):
+        """Multiple external offset-zero owners prevent normalization."""
+        ambiguous_symbols = [
+            {"name": "func", "value": 0, "section": 1,
+             "type": 0x20, "storage": 2, "aux_count": 0},
+            {"name": "_table", "value": 0, "section": 2,
+             "type": 0, "storage": 2, "aux_count": 0},
+            {"name": "_alias", "value": 0, "section": 2,
+             "type": 0, "storage": 2, "aux_count": 0},
+        ]
+        defined_symbols = [
+            {"name": "func", "value": 0, "section": 1,
+             "type": 0x20, "storage": 2, "aux_count": 0},
+            {"name": "_table", "value": 0, "section": 2,
+             "type": 0, "storage": 2, "aux_count": 0},
+            {"name": "$entry", "value": 8, "section": 2,
+             "type": 0, "storage": 3, "aux_count": 0},
+        ]
+        ambiguous = _build_code_data(
+            ambiguous_symbols, [(0x10, 1, 6, 8)])
+        defined = _build_code_data(defined_symbols, [(0x10, 2, 6, 0)])
+        self.assertNotEqual(
+            coff_compare.section_info(ambiguous, "func"),
+            coff_compare.section_info(defined, "func"))
+
+    def test_defined_noncode_duplicate_owner_name_refuses(self):
+        """A defined owner name reused by another section is ambiguous."""
+        duplicate_symbols = [
+            {"name": "func", "value": 0, "section": 1,
+             "type": 0x20, "storage": 2, "aux_count": 0},
+            {"name": "_table", "value": 0, "section": 2,
+             "type": 0, "storage": 2, "aux_count": 0},
+            {"name": "_table", "value": 0, "section": 3,
+             "type": 0, "storage": 2, "aux_count": 0},
+        ]
+        defined_symbols = [
+            {"name": "func", "value": 0, "section": 1,
+             "type": 0x20, "storage": 2, "aux_count": 0},
+            {"name": "_table", "value": 0, "section": 2,
+             "type": 0, "storage": 2, "aux_count": 0},
+            {"name": "$entry", "value": 8, "section": 2,
+             "type": 0, "storage": 3, "aux_count": 0},
+        ]
+        duplicate = _build_code_data(
+            duplicate_symbols, [(0x10, 1, 6, 8)],
+            [(".rdata", 0x20), (".data", 0x20)])
+        defined = _build_code_data(defined_symbols, [(0x10, 2, 6, 0)])
+        self.assertNotEqual(
+            coff_compare.section_info(duplicate, "func"),
+            coff_compare.section_info(defined, "func"))
 
     # â”€â”€ 1. zero vs absolute-image placeholder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 

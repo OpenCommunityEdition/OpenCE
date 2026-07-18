@@ -13,7 +13,9 @@ from pathlib import Path
 # â”€â”€ COFF constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 IMAGE_REL_I386_DIR32 = 0x0006
 IMAGE_REL_I386_REL32 = 0x0014
+IMAGE_SCN_CNT_CODE = 0x00000020
 IMAGE_SCN_CNT_UNINITIALIZED_DATA = 0x00000080
+IMAGE_SYM_CLASS_EXTERNAL = 0x02
 IMAGE_SYM_ABSOLUTE   = -1
 IMAGE_SYM_UNDEFINED  = 0
 COFF_HEADER_SIZE     = 20
@@ -196,6 +198,63 @@ def _section_bytes(obj, section):
     return bytearray(obj["data"][section["raw"]:sec_end])
 
 
+def _defined_noncode_destination(obj, source_section_number, target, addend):
+    """Return a proven destination in another defined non-code section.
+
+    csplit can encode a reference as an externally visible section anchor plus
+    an addend while MSVC uses a local symbol at the destination.  Those forms
+    are equivalent only when the nearest externally visible anchor at or below
+    the destination is unique.  Section numbers alone are object-local and
+    therefore are never used as cross-object identity.
+
+    Ambiguous ownership, duplicate owner names, code sections, and destinations
+    outside the target section deliberately remain symbolic.
+    """
+    target_section_number = target["section"]
+    if target_section_number <= 0 \
+            or target_section_number == source_section_number \
+            or target_section_number > len(obj["sections"]):
+        return None
+
+    section = obj["sections"][target_section_number - 1]
+    if section["flags"] & IMAGE_SCN_CNT_CODE:
+        return None
+
+    destination_offset = target["value"] + addend
+    if not 0 <= destination_offset <= section["size"]:
+        return None
+
+    anchors = [
+        item for item in obj["symbols"]
+        if item["section"] == target_section_number
+        and item["value"] <= destination_offset
+        and item["storage"] == IMAGE_SYM_CLASS_EXTERNAL
+        and item["type"] != 0x20
+    ]
+    if not anchors:
+        return None
+
+    nearest_value = max(item["value"] for item in anchors)
+    nearest = [item for item in anchors if item["value"] == nearest_value]
+    if len(nearest) != 1:
+        return None
+
+    anchor = nearest[0]
+    defined_with_anchor_name = [
+        item for item in obj["symbols"]
+        if item["section"] > 0 and item["name"] == anchor["name"]
+    ]
+    if len(defined_with_anchor_name) != 1:
+        return None
+
+    return [
+        "defined-noncode",
+        section["name"],
+        anchor["name"],
+        destination_offset - anchor["value"],
+    ]
+
+
 def section_info(obj, function_name):
     fn = symbol(obj, function_name)
     fn_sec_num = fn["section"]
@@ -249,7 +308,12 @@ def section_info(obj, function_name):
             else:
                 semantic_target = ["absolute", target["value"], addend]
         else:
-            semantic_target = ["symbol", target["name"], addend]
+            defined_destination = _defined_noncode_destination(
+                obj, fn_sec_num, target, addend)
+            if defined_destination is not None:
+                semantic_target = defined_destination
+            else:
+                semantic_target = ["symbol", target["name"], addend]
 
         relocs.append({
             "address": address,
@@ -412,7 +476,7 @@ def build_coff(machine=0x14C, sections=None, symbols=None, strtab=None):
             0,
             reloc_count,
             0,
-            0xE0000060,
+            sec.get("flags", 0xE0000060),
         ))
         cum_data += sec["size"]
         cum_reloc += reloc_count * RELOC_ENTRY_SIZE
