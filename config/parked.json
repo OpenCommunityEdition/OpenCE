@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "unit": "source/memory/data",
+      "function": "_data_compact",
+      "class": "register-allocation",
+      "evidence": "Target and candidate have equal 0x110 padded size and 12 relocation identities; the residual is EBX zero reuse versus TEST plus an immediate-zero store after exhausted legal-C shapes.",
+      "measurements": {
+        "target": {
+          "size": 272,
+          "relocation_count": 12,
+          "normalized_sha256": "7c65e62ccaa0fc779d8d48b2de10abcc73331854a642f2fc1c638742829fcb07"
+        },
+        "base": {
+          "size": 272,
+          "relocation_count": 12,
+          "normalized_sha256": "61bd697208495c5d0b43c25535148cdfbd7a8aa7f983f2bef046b9edf5755088"
+        },
+        "objdiff_percent": 98.70968
+      }
+    },
+    {
+      "unit": "source/sound/sound_classes",
+      "function": "_sound_class_get",
+      "class": "register-allocation",
+      "evidence": "Target and candidate have equal 0xD0 padded size and 18 relocations; the remaining codegen is an ESI/EDI index-pointer mirror documented beside the function.",
+      "measurements": {
+        "target": {
+          "size": 208,
+          "relocation_count": 18,
+          "normalized_sha256": "94cb85335dd2d7a8df3858d5f19def3472fc2fe6869825370127078f852d65a0"
+        },
+        "base": {
+          "size": 208,
+          "relocation_count": 18,
+          "normalized_sha256": "6b1d112cd08fd123c3ce0cdc72232802444600c5e669463144181f64f4572c00"
+        },
+        "objdiff_percent": 88.59649
+      }
+    },
+    {
+      "unit": "source/sound/ima_adpcm",
+      "function": "_compress_ima_adpcm_audio_data",
+      "class": "instruction-scheduling",
+      "evidence": "Target and candidate have equal 0x160 padded size and two relocations at identical offsets; only a three-instruction reconstruction-loop schedule and two register choices remain.",
+      "measurements": {
+        "target": {
+          "size": 352,
+          "relocation_count": 2,
+          "normalized_sha256": "97e166836a7a6f05810477e6d722d209a4c07f5fb2e604756915f8b3de58fff3"
+        },
+        "base": {
+          "size": 352,
+          "relocation_count": 2,
+          "normalized_sha256": "1e89ae2012b9e008ad898d7b5bade514fed5409ebab38e2c10471c79ebf7c592"
+        },
+        "objdiff_percent": 96.67407
+      }
+    },
+    {
+      "unit": "source/structures/cluster_partitions",
+      "function": "_reference_list_copy",
+      "class": "register-allocation",
+      "evidence": "Target and candidate have equal 0xC0 padded size and all nine relocation addresses; VC7 assigns source and destination pointer live ranges to opposite registers after eight legal-C shapes.",
+      "measurements": {
+        "target": {
+          "size": 192,
+          "relocation_count": 9,
+          "normalized_sha256": "28ab903006bf625bb291ffe9b82a710eabf80400b9d1f2403b78b04429904c8b"
+        },
+        "base": {
+          "size": 192,
+          "relocation_count": 9,
+          "normalized_sha256": "dcebabeded0e38211be7325fc38d98591a621f800556829f6184e38dbacf7c03"
+        },
+        "objdiff_percent": 95.3125
+      }
+    }
+  ]
+}

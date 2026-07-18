@@ -30,6 +30,10 @@ from .semantic_progress import (
     apply_semantic_matches,
     apply_semantic_rejections,
 )
+from .parked_functions import (
+    ParkedFunctionsError,
+    require_valid_parked_functions,
+)
 
 from .vsgen.configuration import BuildParams
 from .vsgen.configuration import Configuration
@@ -396,7 +400,9 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
             report_path,
             semantic_report_path,
             sln.config_dir / "semantic_matches.json",
+            sln.config_dir / "parked.json",
             sln.tools_dir / "coff_compare.py",
+            sln.tools_dir / "parked_functions.py",
             sln.tools_dir / "semantic_progress.py",
         ],
     )
@@ -619,8 +625,16 @@ def calculate_progress(sln: SolutionConfig) -> None:
             sln.config_dir / "semantic_matches.json",
             Path("objdiff.json"),
         )
+        parked = require_valid_parked_functions(
+            Path.cwd(),
+            report_path,
+            Path("objdiff.json"),
+            sln.config_dir / "parked.json",
+        )
     except SemanticProgressError as error:
         sys.exit(f"Semantic progress verification failed: {error}")
+    except ParkedFunctionsError as error:
+        sys.exit(f"Parked-function verification failed: {error}")
 
     # Output to GitHub Actions job summary, if available
     summary_path = os.getenv("GITHUB_STEP_SUMMARY")
@@ -640,6 +654,9 @@ def calculate_progress(sln: SolutionConfig) -> None:
         progress_print(f"  Rejected objdiff false positive: {semantic_rejection}")
     for semantic_match in semantic_matches:
         progress_print(f"  Verified objdiff exception: {semantic_match}")
+    progress_print(
+        f"  Validated parked compiler ties: {parked['summary']['active']}"
+    )
 
     def print_category(name: str, measures: Dict[str, Any]) -> None:
         total_code = measures.get("total_code", 0)
