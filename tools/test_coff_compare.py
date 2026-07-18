@@ -230,6 +230,42 @@ class TestCoffCompare(unittest.TestCase):
         self.assertEqual(obj["sections"][0]["size"], 0x100000)
         self.assertEqual(obj["sections"][0]["raw"], 0)
 
+    def test_uninitialized_section_info_hashes_logical_zero_bytes(self):
+        """A payload-less BSS must not hash bytes from the COFF header."""
+        import struct as _struct
+
+        data = bytearray(coff_compare.build_coff(
+            sections=[{
+                "name": ".bss",
+                "size": 4,
+                "raw_data": b"\0" * 4,
+                "reloc_count": 0,
+                "flags": coff_compare.IMAGE_SCN_CNT_UNINITIALIZED_DATA,
+            }],
+            symbols=[{
+                "name": "_bss_owner",
+                "value": 0,
+                "section": 1,
+                "type": 0,
+                "storage": 2,
+                "aux_count": 0,
+            }],
+        ))
+        # Section characteristics are the final dword in the 40-byte header.
+        _struct.pack_into(
+            "<L", data, 56,
+            coff_compare.IMAGE_SCN_CNT_UNINITIALIZED_DATA)
+        with_payload = coff_compare.section_info(
+            coff_compare.load(data), "_bss_owner")
+
+        # PointerToRawData is the fifth dword-like field in the section
+        # header: COFF header (20) + name/virtual fields/size (20).
+        _struct.pack_into("<L", data, 40, 0)
+        without_payload = coff_compare.section_info(
+            coff_compare.load(data), "_bss_owner")
+
+        self.assertEqual(with_payload, without_payload)
+
     def test_initialized_section_without_raw_payload_is_rejected(self):
         """Only an explicitly uninitialized section may omit its payload."""
         import struct as _struct

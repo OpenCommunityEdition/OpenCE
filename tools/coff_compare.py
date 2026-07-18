@@ -178,14 +178,29 @@ def _find_matching_rel_sym(obj, target, fn_sec_num, base_va):
     return rel_all[0]
 
 
+def _section_bytes(obj, section):
+    """Return the logical bytes of a COFF section.
+
+    IMAGE_SCN_CNT_UNINITIALIZED_DATA sections may have a nonzero logical size
+    with PointerToRawData == 0.  In that encoding the bytes are zero-filled by
+    the loader; offset zero is the COFF header, not section data.
+    """
+    if (section["flags"] & IMAGE_SCN_CNT_UNINITIALIZED_DATA) \
+            and section["raw"] == 0:
+        return bytearray(section["size"])
+
+    sec_end = section["raw"] + section["size"]
+    if sec_end > len(obj["data"]):
+        raise CoffError(
+            f"section {section['index']} raw data extends past file end")
+    return bytearray(obj["data"][section["raw"]:sec_end])
+
+
 def section_info(obj, function_name):
     fn = symbol(obj, function_name)
     fn_sec_num = fn["section"]
     section = obj["sections"][fn_sec_num - 1]
-    sec_end = section["raw"] + section["size"]
-    if sec_end > len(obj["data"]):
-        raise CoffError(f"section {fn_sec_num} raw data extends past file end")
-    raw = bytearray(obj["data"][section["raw"]:sec_end])
+    raw = _section_bytes(obj, section)
     relocs = []
     base_va = _infer_section_base(obj, fn_sec_num)
 
@@ -264,16 +279,12 @@ def section_info_resolved(obj, section_symbol_name, symbol_addresses):
     owner = symbol(obj, section_symbol_name)
     section_number = owner["section"]
     section = obj["sections"][section_number - 1]
-    section_end = section["raw"] + section["size"]
-    if section_end > len(obj["data"]):
-        raise CoffError(
-            f"section {section_number} raw data extends past file end")
     if section_symbol_name not in symbol_addresses:
         raise CoffError(
             f"image address unavailable for section owner {section_symbol_name!r}")
 
     section_base = symbol_addresses[section_symbol_name] - owner["value"]
-    raw = bytearray(obj["data"][section["raw"]:section_end])
+    raw = _section_bytes(obj, section)
     relocs = []
     for ri in range(section["reloc_count"]):
         relocation_offset = section["reloc"] + ri * RELOC_ENTRY_SIZE
