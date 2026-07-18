@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
-from .coff_compare import CoffError, load, section_info
+from .coff_compare import CoffError, load, section_info, section_info_resolved
 
 
 class SemanticProgressError(RuntimeError):
@@ -43,6 +43,15 @@ def _debit(measures: Dict[str, Any], code_bytes: int) -> None:
     measures["matched_functions_percent"] = _percent(
         measures["matched_functions"], int(measures.get("total_functions", 0))
     )
+
+
+def _credit_data(measures: Dict[str, Any], data_bytes: int) -> None:
+    measures["matched_data"] = int(measures.get("matched_data", 0)) + data_bytes
+    total_data = int(measures.get("total_data", 0))
+    if measures["matched_data"] > total_data:
+        raise SemanticProgressError("semantic data credit exceeds total data")
+    measures["matched_data_percent"] = _percent(
+        measures["matched_data"], total_data)
 
 
 def apply_semantic_rejections(
@@ -165,5 +174,113 @@ def apply_semantic_matches(
         credited.append(
             f"{unit_name}:{function_name} (+{code_bytes} code bytes, +1 function)"
         )
+
+    return credited
+
+
+def apply_semantic_data_matches(
+    report: Dict[str, Any],
+    project_root: Path,
+    manifest_path: Path,
+    objdiff_config_path: Path,
+    symbol_manifest_path: Path,
+) -> List[str]:
+    """Verify and credit executable-split data relocation aliases.
+
+    A manifest entry is accepted only when the target and rebuilt data
+    sections have identical normalized bytes, relocation locations/types,
+    and independently resolved final image destinations.  The credited
+    section must account for the unit's entire remaining unmatched data, and
+    the unit must already be explicitly marked complete in objdiff config.
+    """
+    if not manifest_path.is_file():
+        return []
+
+    entries = json.loads(manifest_path.read_text(encoding="utf-8"))
+    objdiff = json.loads(objdiff_config_path.read_text(encoding="utf-8"))
+    symbol_entries = json.loads(symbol_manifest_path.read_text(encoding="utf-8"))
+    symbol_addresses = {}
+    for item in symbol_entries:
+        name = item["name"]
+        address = int(item["file_offset"])
+        if name in symbol_addresses:
+            raise SemanticProgressError(
+                f"duplicate image symbol address for {name}")
+        symbol_addresses[name] = address
+
+    report_units = {unit["name"]: unit for unit in report.get("units", [])}
+    config_units = {unit["name"]: unit for unit in objdiff.get("units", [])}
+    categories = {item["id"]: item for item in report.get("categories", [])}
+    credited = []
+
+    for entry in entries:
+        unit_name = entry["unit"]
+        section_symbol = entry["symbol"]
+        if unit_name not in report_units or unit_name not in config_units:
+            raise SemanticProgressError(
+                f"semantic data match unit not found: {unit_name}")
+        report_unit = report_units[unit_name]
+        config_unit = config_units[unit_name]
+        if not config_unit.get("metadata", {}).get("complete"):
+            raise SemanticProgressError(
+                f"semantic data unit is not marked complete: {unit_name}")
+
+        try:
+            target_info = section_info_resolved(
+                load(project_root / config_unit["target_path"]),
+                section_symbol,
+                symbol_addresses,
+            )
+            base_info = section_info_resolved(
+                load(project_root / config_unit["base_path"]),
+                section_symbol,
+                symbol_addresses,
+            )
+        except (CoffError, KeyError, OSError) as error:
+            raise SemanticProgressError(
+                f"cannot verify semantic data match {unit_name}:{section_symbol}: "
+                f"{error}") from error
+        if target_info != base_info:
+            raise SemanticProgressError(
+                f"semantic data match is no longer exact: "
+                f"{unit_name}:{section_symbol}")
+
+        expected = entry.get("measurements", {})
+        snapshot = {
+            key: target_info[key]
+            for key in ("size", "relocation_count", "normalized_sha256")
+        }
+        if expected != snapshot:
+            raise SemanticProgressError(
+                f"semantic data target snapshot changed: "
+                f"{unit_name}:{section_symbol}")
+
+        unit_measures = report_unit["measures"]
+        unmatched_data = (
+            int(unit_measures.get("total_data", 0))
+            - int(unit_measures.get("matched_data", 0))
+        )
+        if unmatched_data == 0:
+            continue
+        if unmatched_data != target_info["size"]:
+            raise SemanticProgressError(
+                f"semantic data section does not cover all unmatched data: "
+                f"{unit_name}:{section_symbol} covers {target_info['size']}, "
+                f"remaining {unmatched_data}")
+
+        _credit_data(report["measures"], unmatched_data)
+        _credit_data(unit_measures, unmatched_data)
+        progress_categories = report_unit.get("metadata", {}).get(
+            "progress_categories", [])
+        if isinstance(progress_categories, str):
+            progress_categories = [progress_categories]
+        for category_id in progress_categories:
+            if category_id not in categories:
+                raise SemanticProgressError(
+                    f"semantic data category not found: {category_id}")
+            _credit_data(categories[category_id]["measures"], unmatched_data)
+
+        credited.append(
+            f"{unit_name}:{section_symbol} (+{unmatched_data} data bytes)")
 
     return credited

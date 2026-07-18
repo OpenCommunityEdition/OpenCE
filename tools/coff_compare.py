@@ -250,6 +250,72 @@ def section_info(obj, function_name):
     }
 
 
+def section_info_resolved(obj, section_symbol_name, symbol_addresses):
+    """Describe a symbol-owned section using final image destinations.
+
+    This is intended for data sections recovered from an executable by
+    csplit.  csplit may spell an internal pointer as ``previous_external +
+    addend`` while MSVC spells the same pointer as ``section_symbol +
+    offset``.  The encodings are equal only when the supplied, independently
+    recovered image symbol addresses prove that both resolve to the same
+    address.  Missing address evidence remains symbolic and therefore fails
+    closed when the spellings differ.
+    """
+    owner = symbol(obj, section_symbol_name)
+    section_number = owner["section"]
+    section = obj["sections"][section_number - 1]
+    section_end = section["raw"] + section["size"]
+    if section_end > len(obj["data"]):
+        raise CoffError(
+            f"section {section_number} raw data extends past file end")
+    if section_symbol_name not in symbol_addresses:
+        raise CoffError(
+            f"image address unavailable for section owner {section_symbol_name!r}")
+
+    section_base = symbol_addresses[section_symbol_name] - owner["value"]
+    raw = bytearray(obj["data"][section["raw"]:section_end])
+    relocs = []
+    for ri in range(section["reloc_count"]):
+        relocation_offset = section["reloc"] + ri * RELOC_ENTRY_SIZE
+        address, target_index, relocation_type = struct.unpack_from(
+            "<LLH", obj["data"], relocation_offset)
+        if target_index not in obj["by_index"]:
+            raise CoffError(
+                f"relocation {ri} references non-existent symbol index {target_index}")
+        if address + 4 > section["size"]:
+            raise CoffError(
+                f"relocation address {address} outside section "
+                f"{section_number} size {section['size']}")
+
+        target = obj["by_index"][target_index]
+        addend = struct.unpack_from("<i", raw, address)[0]
+        raw[address:address + 4] = b"\0\0\0\0"
+
+        if target["section"] == section_number:
+            destination = [
+                "address", section_base + target["value"] + addend]
+        elif target["section"] == IMAGE_SYM_ABSOLUTE:
+            destination = ["address", target["value"] + addend]
+        elif target["name"] in symbol_addresses:
+            destination = [
+                "address", symbol_addresses[target["name"]] + addend]
+        else:
+            destination = ["symbol", target["name"], addend]
+
+        relocs.append({
+            "address": address,
+            "type": relocation_type,
+            "target": destination,
+        })
+
+    return {
+        "size": section["size"],
+        "relocation_count": section["reloc_count"],
+        "normalized_sha256": hashlib.sha256(raw).hexdigest(),
+        "relocations": relocs,
+    }
+
+
 # â”€â”€ COFF fixture builder (synthetic) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def build_coff(machine=0x14C, sections=None, symbols=None, strtab=None):

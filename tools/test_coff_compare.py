@@ -560,6 +560,72 @@ class TestCoffCompare(unittest.TestCase):
         with self.assertRaises(coff_compare.CoffError):
             coff_compare.load(bytes(mangled))
 
+    def test_resolved_data_pointer_aliases_compare_equal(self):
+        target_symbols = [
+            {"name": "_data", "value": 0, "section": 1,
+             "type": 0, "storage": 2, "aux_count": 0},
+            {"name": "_previous", "value": 0, "section": 0,
+             "type": 0, "storage": 2, "aux_count": 0},
+        ]
+        base_symbols = [
+            {"name": "_data", "value": 0, "section": 1,
+             "type": 0, "storage": 2, "aux_count": 0},
+        ]
+        target = _build(
+            target_symbols, [(0x20, 1, 6, 6)], sec_name=".data")
+        base = _build(
+            base_symbols, [(0x20, 0, 6, 0)], sec_name=".data")
+        addresses = {"_previous": 0x1000, "_data": 0x1006}
+        self.assertEqual(
+            coff_compare.section_info_resolved(target, "_data", addresses),
+            coff_compare.section_info_resolved(base, "_data", addresses),
+        )
+
+    def test_resolved_data_pointer_missing_evidence_refuses_alias(self):
+        target_symbols = [
+            {"name": "_data", "value": 0, "section": 1,
+             "type": 0, "storage": 2, "aux_count": 0},
+            {"name": "_previous", "value": 0, "section": 0,
+             "type": 0, "storage": 2, "aux_count": 0},
+        ]
+        base_symbols = [
+            {"name": "_data", "value": 0, "section": 1,
+             "type": 0, "storage": 2, "aux_count": 0},
+        ]
+        target = _build(
+            target_symbols, [(0x20, 1, 6, 6)], sec_name=".data")
+        base = _build(
+            base_symbols, [(0x20, 0, 6, 0)], sec_name=".data")
+        addresses = {"_data": 0x1006}
+        self.assertNotEqual(
+            coff_compare.section_info_resolved(target, "_data", addresses),
+            coff_compare.section_info_resolved(base, "_data", addresses),
+        )
+
+    def test_resolved_data_pointer_different_destination_fails(self):
+        target_symbols = [
+            {"name": "_data", "value": 0, "section": 1,
+             "type": 0, "storage": 2, "aux_count": 0},
+            {"name": "_previous", "value": 0, "section": 0,
+             "type": 0, "storage": 2, "aux_count": 0},
+        ]
+        base_symbols = [
+            {"name": "_data", "value": 0, "section": 1,
+             "type": 0, "storage": 2, "aux_count": 0},
+        ]
+        target = _build(
+            target_symbols, [(0x20, 1, 6, 6)], sec_name=".data")
+        base = _build(
+            base_symbols, [(0x20, 0, 6, 0)], sec_name=".data")
+        target_addresses = {"_previous": 0x2000, "_data": 0x1006}
+        base_addresses = {"_previous": 0x1000, "_data": 0x1006}
+        self.assertNotEqual(
+            coff_compare.section_info_resolved(
+                target, "_data", target_addresses),
+            coff_compare.section_info_resolved(
+                base, "_data", base_addresses),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
