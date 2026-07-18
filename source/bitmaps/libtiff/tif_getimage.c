@@ -37,23 +37,56 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_getimage.c,
 
 typedef	u_char RGBvalue;
 
-static	u_long width, height;		/* image width & height */
-static	u_short bitspersample;
-static	u_short samplesperpixel;
-static	u_short photometric;
-static	u_short orientation;
-/* colormap for pallete images */
-static	u_short *redcmap, *greencmap, *bluecmap;
-static	int stoponerr;			/* stop on read error */
-static	char *filename;
-/* YCbCr support */
-static	u_short YCbCrHorizSampling;
-static	u_short YCbCrVertSampling;
-static	float *YCbCrCoeffs;
-static	float *refBlackWhite;
+#pragma pack(push, 2)
+struct tif_getimage_globals {
+	float D4;
+	float D3;
+	float D2;
+	float D1;
+	u_long **PALmap;
+	u_long **BWmap;
+	float *refBlackWhite;
+	float *YCbCrCoeffs;
+	u_short YCbCrVertSampling;
+	u_short pad34;
+	u_short YCbCrHorizSampling;
+	u_short pad38;
+	char *filename;
+	int stoponerr;
+	u_short *bluecmap;
+	u_short *greencmap;
+	u_short *redcmap;
+	u_short orientation;
+	u_short pad62;
+	u_short photometric;
+	u_short pad66;
+	u_short samplesperpixel;
+	u_short pad70;
+	u_short bitspersample;
+};
+#pragma pack(pop)
 
-static	u_long **BWmap;
-static	u_long **PALmap;
+__declspec(align(4)) struct tif_getimage_globals bss_0031be54 = { 0 };
+
+#define D4 bss_0031be54.D4
+#define D3 bss_0031be54.D3
+#define D2 bss_0031be54.D2
+#define D1 bss_0031be54.D1
+#define PALmap bss_0031be54.PALmap
+#define BWmap bss_0031be54.BWmap
+#define refBlackWhite bss_0031be54.refBlackWhite
+#define YCbCrCoeffs bss_0031be54.YCbCrCoeffs
+#define YCbCrVertSampling bss_0031be54.YCbCrVertSampling
+#define YCbCrHorizSampling bss_0031be54.YCbCrHorizSampling
+#define filename bss_0031be54.filename
+#define stoponerr bss_0031be54.stoponerr
+#define bluecmap bss_0031be54.bluecmap
+#define greencmap bss_0031be54.greencmap
+#define redcmap bss_0031be54.redcmap
+#define orientation bss_0031be54.orientation
+#define photometric bss_0031be54.photometric
+#define samplesperpixel bss_0031be54.samplesperpixel
+#define bitspersample bss_0031be54.bitspersample
 
 static	int gt();
 
@@ -989,9 +1022,6 @@ putRGBseparate16bittile(cp, br, bg, bb, Map, w, h, fromskew, toskew)
 #define	LumaRed		YCbCrCoeffs[0]
 #define	LumaGreen	YCbCrCoeffs[1]
 #define	LumaBlue	YCbCrCoeffs[2]
-
-static	float D1, D2;
-static	float D3, D4;
 
 static void
 initYCbCrConversion()
