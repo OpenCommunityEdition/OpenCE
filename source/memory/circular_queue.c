@@ -165,10 +165,16 @@ boolean circular_queue_dequeue_data(
 	long data_size,
 	boolean advance)
 {
-	boolean result = FALSE;
+	/* NonMatching: target/candidate are 0x100/0xF0 padded bytes with all 12
+	   relocation identities preserved. The target keeps FALSE in BL across
+	   the failure path and later coalesces that register with read_offset;
+	   this compiler instead constant-folds the failure return and rotates
+	   queue/read_offset through EBX/EDI. */
 	long read_offset;
 	long contiguous_size;
+	boolean result;
 
+	result = FALSE;
 	circular_queue_validate(queue);
 	match_assert("c:\\halo\\SOURCE\\memory\\circular_queue.c", 153, data && data_size>0 && data_size<queue->buffer_size);
 
@@ -191,11 +197,10 @@ boolean circular_queue_dequeue_data(
 		}
 
 		match_assert("c:\\halo\\SOURCE\\memory\\circular_queue.c", 174, read_offset>=0 && read_offset<queue->buffer_size);
+		if (advance)
+			queue->read_offset = read_offset;
 		result = TRUE;
 	}
-
-	if (result && advance)
-		queue->read_offset = read_offset;
 
 	return result;
 }
