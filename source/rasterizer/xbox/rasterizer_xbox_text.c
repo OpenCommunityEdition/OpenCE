@@ -43,7 +43,14 @@ symbols in this file:
 #include "cseries.h"
 #include "cseries/errors.h"
 #include "real_math.h"
-/* The January object retains out-of-line copies of the D3D inline wrappers:
+/* The January object retains out-of-line copies of the D3D inline wrappers.
+ * Defining D3DINLINE as static before the normal XDK headers reproduces eight
+ * of the nine wrappers exactly.  IDirect3DDevice8_SetRenderState is the lone
+ * translation-unit-context exception: January retained its 0x220-byte body,
+ * while this partial translation unit emits a 0x10-byte call to the exact
+ * D3DDevice_SetRenderState helper.  Do not replace either with a handwritten
+ * Microsoft dispatcher.
+ *
  * code_00162ea0 = D3DDevice_SetRenderState
  * code_00163050 = D3DDevice_SetTextureStageState
  * code_001630a0 = IDirect3DDevice8_SetRenderState
