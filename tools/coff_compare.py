@@ -13,6 +13,7 @@ from pathlib import Path
 # â”€â”€ COFF constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 IMAGE_REL_I386_DIR32 = 0x0006
 IMAGE_REL_I386_REL32 = 0x0014
+IMAGE_SCN_CNT_UNINITIALIZED_DATA = 0x00000080
 IMAGE_SYM_ABSOLUTE   = -1
 IMAGE_SYM_UNDEFINED  = 0
 COFF_HEADER_SIZE     = 20
@@ -78,7 +79,12 @@ def load(data):
             "flags": flags,
         })
         offset += SECTION_HEADER_SIZE
-        if raw_offset + size > len(data):
+        # COFF represents uninitialized sections (normally .bss) with a
+        # logical size but no file-backed payload.  MSVC emits
+        # PointerToRawData == 0 for these sections, so their logical size can
+        # legitimately exceed the object-file length.
+        uninitialized = bool(flags & IMAGE_SCN_CNT_UNINITIALIZED_DATA)
+        if not (uninitialized and raw_offset == 0) and raw_offset + size > len(data):
             raise CoffError(f"section {index + 1} raw data extends past file end")
         if reloc_count and reloc_offset + reloc_count * RELOC_ENTRY_SIZE > len(data):
             raise CoffError(f"section {index + 1} relocation table truncated")

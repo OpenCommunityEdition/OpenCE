@@ -208,6 +208,49 @@ class TestCoffCompare(unittest.TestCase):
         with self.assertRaises(coff_compare.CoffError):
             coff_compare.load(data[:30])  # cut after header
 
+    def test_uninitialized_section_without_raw_payload(self):
+        """A .bss section has a logical size but no file-backed bytes."""
+        import struct as _struct
+
+        header = _struct.pack("<HHLLLHH", 0x14C, 1, 0, 60, 0, 0, 0)
+        section = _struct.pack(
+            "<8sLLLLLLHHL",
+            b".bss\0\0\0\0",
+            0,
+            0,
+            0x100000,
+            0,
+            0,
+            0,
+            0,
+            0,
+            coff_compare.IMAGE_SCN_CNT_UNINITIALIZED_DATA,
+        )
+        obj = coff_compare.load(header + section + _struct.pack("<L", 4))
+        self.assertEqual(obj["sections"][0]["size"], 0x100000)
+        self.assertEqual(obj["sections"][0]["raw"], 0)
+
+    def test_initialized_section_without_raw_payload_is_rejected(self):
+        """Only an explicitly uninitialized section may omit its payload."""
+        import struct as _struct
+
+        header = _struct.pack("<HHLLLHH", 0x14C, 1, 0, 60, 0, 0, 0)
+        section = _struct.pack(
+            "<8sLLLLLLHHL",
+            b".data\0\0\0",
+            0,
+            0,
+            0x100000,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0x40,
+        )
+        with self.assertRaises(coff_compare.CoffError):
+            coff_compare.load(header + section + _struct.pack("<L", 4))
+
     def test_truncated_symbol_table(self):
         """Symbol table entry truncated."""
         syms = ANCHOR_SYMS + [
