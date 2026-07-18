@@ -302,6 +302,21 @@ void matrix3x3_transpose(
 	return;
 }
 
+/* NonMatching: target and candidate are both 0x70 bytes with no relocations.
+   The matrix values and cross-product order agree; the remaining difference
+   is VC7 register allocation and scheduling around the inlined cross product. */
+void matrix3x3_from_forward_and_up(
+	real_matrix3x3 *matrix,
+	real_vector3d const *forward,
+	real_vector3d const *up)
+{
+	matrix->forward = *forward;
+	cross_product3d(up, forward, &matrix->left);
+	matrix->up = *up;
+
+	return;
+}
+
 void matrix4x3_inverse(
 	real_matrix4x3 const *matrix,
 	real_matrix4x3 *result)

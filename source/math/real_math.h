@@ -528,6 +528,10 @@ void matrix4x3_multiply(real_matrix4x3 const *a, real_matrix4x3 const *b, real_m
 void matrix3x3_transpose(
 	real_matrix3x3 const *matrix,
 	real_matrix3x3 *result);
+void matrix3x3_from_forward_and_up(
+	real_matrix3x3 *matrix,
+	real_vector3d const *forward,
+	real_vector3d const *up);
 real_vector3d *matrix3x3_transform_vector(real_matrix3x3 const *matrix, real_vector3d const *vector, real_vector3d *result);
 boolean valid_real_plane3d(real_plane3d const *plane);
 
