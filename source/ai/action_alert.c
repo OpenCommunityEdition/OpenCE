@@ -42,8 +42,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define real_random_range real_random_range_inline
 #include "cseries.h"
 #include "actions.h"
+#include "math/real_math.h"
+#undef real_random_range
 
 /* ---------- constants */
 
@@ -61,6 +64,16 @@ void action_alert_begin(
 	long actor_index)
 {
 	return;
+}
+
+real real_random_range(
+	real lower_bound,
+	real upper_bound)
+{
+	return real_seed_random_range(
+		get_global_random_seed_address(),
+		lower_bound,
+		upper_bound);
 }
 
 /* ---------- private code */
