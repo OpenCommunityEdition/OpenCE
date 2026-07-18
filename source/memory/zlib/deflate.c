@@ -73,23 +73,29 @@ typedef enum {
 typedef block_state (*compress_func) OF((deflate_state *s, int flush));
 /* Compression function. Returns the block state after the call. */
 
-local void fill_window    OF((deflate_state *s));
-local block_state deflate_stored OF((deflate_state *s, int flush));
+/* January-build private symbols, with their upstream zlib 1.1.3 identities:
+ * 00100660 putShortMSB, 00100690 flush_pending, 00100be0 read_buf,
+ * 00100c40 lm_init, 00100cc0 longest_match, 00100ed0 check_match,
+ * 00100f90 fill_window, and 00101130 deflate_stored.
+ */
+
+local void code_00100f90    OF((deflate_state *s));
+local block_state code_00101130 OF((deflate_state *s, int flush));
 local block_state deflate_fast   OF((deflate_state *s, int flush));
 local block_state deflate_slow   OF((deflate_state *s, int flush));
-local void lm_init        OF((deflate_state *s));
-local void putShortMSB    OF((deflate_state *s, uInt b));
-local void flush_pending  OF((z_streamp strm));
-local int read_buf        OF((z_streamp strm, Bytef *buf, unsigned size));
+local void code_00100c40        OF((deflate_state *s));
+local void code_00100660    OF((deflate_state *s, uInt b));
+local void code_00100690  OF((z_streamp strm));
+local int code_00100be0        OF((z_streamp strm, Bytef *buf, unsigned size));
 #ifdef ASMV
       void match_init OF((void)); /* asm code initialization */
-      uInt longest_match  OF((deflate_state *s, IPos cur_match));
+      uInt code_00100cc0  OF((deflate_state *s, IPos cur_match));
 #else
-local uInt longest_match  OF((deflate_state *s, IPos cur_match));
+local uInt code_00100cc0  OF((deflate_state *s, IPos cur_match));
 #endif
 
 #ifdef DEBUG
-local  void check_match OF((deflate_state *s, IPos start, IPos match,
+local  void code_00100ed0 OF((deflate_state *s, IPos start, IPos match,
                             int length));
 #endif
 
@@ -125,7 +131,7 @@ typedef struct config_s {
 
 local const config configuration_table[10] = {
 /*      good lazy nice chain */
-/* 0 */ {0,    0,  0,    0, deflate_stored},  /* store only */
+/* 0 */ {0,    0,  0,    0, code_00101130},  /* store only */
 /* 1 */ {4,    4,  8,    4, deflate_fast}, /* maximum speed, no lazy matches */
 /* 2 */ {4,    5, 16,    8, deflate_fast},
 /* 3 */ {4,    6, 32,   32, deflate_fast},
@@ -317,7 +323,7 @@ int ZEXPORT deflateSetDictionary (strm, dictionary, dictLength)
 
     /* Insert all strings in the hash table (except for the last two bytes).
      * s->lookahead stays null, so s->ins_h will be recomputed at the next
-     * call of fill_window.
+     * call of code_00100f90.
      */
     s->ins_h = s->window[0];
     UPDATE_HASH(s, s->ins_h, s->window[1]);
@@ -353,7 +359,7 @@ int ZEXPORT deflateReset (strm)
     s->last_flush = Z_NO_FLUSH;
 
     _tr_init(s);
-    lm_init(s);
+    code_00100c40(s);
 
     return Z_OK;
 }
@@ -399,7 +405,7 @@ int ZEXPORT deflateParams(strm, level, strategy)
  * IN assertion: the stream state is correct and there is enough room in
  * pending_buf.
  */
-local void putShortMSB (s, b)
+local void code_00100660 (s, b)
     deflate_state *s;
     uInt b;
 {
@@ -411,9 +417,9 @@ local void putShortMSB (s, b)
  * Flush as much pending output as possible. All deflate() output goes
  * through this function so some applications may wish to modify it
  * to avoid allocating a large strm->next_out buffer and copying into it.
- * (See also read_buf()).
+ * (See also code_00100be0()).
  */
-local void flush_pending(strm)
+local void code_00100690(strm)
     z_streamp strm;
 {
     unsigned len = strm->state->pending;
@@ -469,19 +475,19 @@ int ZEXPORT deflate (strm, flush)
         header += 31 - (header % 31);
 
         s->status = BUSY_STATE;
-        putShortMSB(s, header);
+        code_00100660(s, header);
 
 	/* Save the adler32 of the preset dictionary: */
 	if (s->strstart != 0) {
-	    putShortMSB(s, (uInt)(strm->adler >> 16));
-	    putShortMSB(s, (uInt)(strm->adler & 0xffff));
+	    code_00100660(s, (uInt)(strm->adler >> 16));
+	    code_00100660(s, (uInt)(strm->adler & 0xffff));
 	}
 	strm->adler = 1L;
     }
 
     /* Flush as much pending output as possible */
     if (s->pending != 0) {
-        flush_pending(strm);
+        code_00100690(strm);
         if (strm->avail_out == 0) {
 	    /* Since avail_out is 0, deflate will be called again with
 	     * more output space, but possibly with both pending and
@@ -543,7 +549,7 @@ int ZEXPORT deflate (strm, flush)
                     CLEAR_HASH(s);             /* forget history */
                 }
             }
-            flush_pending(strm);
+            code_00100690(strm);
 	    if (strm->avail_out == 0) {
 	      s->last_flush = -1; /* avoid BUF_ERROR at next call, see above */
 	      return Z_OK;
@@ -556,9 +562,9 @@ int ZEXPORT deflate (strm, flush)
     if (s->noheader) return Z_STREAM_END;
 
     /* Write the zlib trailer (adler32) */
-    putShortMSB(s, (uInt)(strm->adler >> 16));
-    putShortMSB(s, (uInt)(strm->adler & 0xffff));
-    flush_pending(strm);
+    code_00100660(s, (uInt)(strm->adler >> 16));
+    code_00100660(s, (uInt)(strm->adler & 0xffff));
+    code_00100690(strm);
     /* If avail_out is zero, the application will call deflate again
      * to flush the rest.
      */
@@ -657,9 +663,9 @@ int ZEXPORT deflateCopy (dest, source)
  * and total number of bytes read.  All deflate() input goes through
  * this function so some applications may wish to modify it to avoid
  * allocating a large strm->next_in buffer and copying from it.
- * (See also flush_pending()).
+ * (See also code_00100690()).
  */
-local int read_buf(strm, buf, size)
+local int code_00100be0(strm, buf, size)
     z_streamp strm;
     Bytef *buf;
     unsigned size;
@@ -684,7 +690,7 @@ local int read_buf(strm, buf, size)
 /* ===========================================================================
  * Initialize the "longest match" routines for a new zlib stream
  */
-local void lm_init (s)
+local void code_00100c40 (s)
     deflate_state *s;
 {
     s->window_size = (ulg)2L*s->w_size;
@@ -723,7 +729,7 @@ local void lm_init (s)
  * match.S. The code will be functionally equivalent.
  */
 #ifndef FASTEST
-local uInt longest_match(s, cur_match)
+local uInt code_00100cc0(s, cur_match)
     deflate_state *s;
     IPos cur_match;                             /* current match */
 {
@@ -865,7 +871,7 @@ local uInt longest_match(s, cur_match)
 /* ---------------------------------------------------------------------------
  * Optimized version for level == 1 only
  */
-local uInt longest_match(s, cur_match)
+local uInt code_00100cc0(s, cur_match)
     deflate_state *s;
     IPos cur_match;                             /* current match */
 {
@@ -924,7 +930,7 @@ local uInt longest_match(s, cur_match)
 /* ===========================================================================
  * Check that the match at match_start is indeed a match.
  */
-local void check_match(s, start, match, length)
+local void code_00100ed0(s, start, match, length)
     deflate_state *s;
     IPos start, match;
     int length;
@@ -941,11 +947,11 @@ local void check_match(s, start, match, length)
     }
     if (z_verbose > 1) {
         fprintf(stderr,"\\[%d,%d]", start-match, length);
-        do { putc(s->window[start++], stderr); } while (--length != 0);
+        do { (putc)(s->window[start++], stderr); } while (--length != 0);
     }
 }
 #else
-#  define check_match(s, start, match, length)
+#  define code_00100ed0(s, start, match, length)
 #endif
 
 /* ===========================================================================
@@ -958,7 +964,7 @@ local void check_match(s, start, match, length)
  *    performed for at least two bytes (required for the zip translate_eol
  *    option -- not supported here).
  */
-local void fill_window(s)
+local void code_00100f90(s)
     deflate_state *s;
 {
     register unsigned n, m;
@@ -1030,7 +1036,7 @@ local void fill_window(s)
          */
         Assert(more >= 2, "more < 2");
 
-        n = read_buf(s->strm, s->window + s->strstart + s->lookahead, more);
+        n = code_00100be0(s->strm, s->window + s->strstart + s->lookahead, more);
         s->lookahead += n;
 
         /* Initialize the hash value now that we have some input: */
@@ -1059,7 +1065,7 @@ local void fill_window(s)
 		(ulg)((long)s->strstart - s->block_start), \
 		(eof)); \
    s->block_start = s->strstart; \
-   flush_pending(s->strm); \
+   code_00100690(s->strm); \
    Tracev((stderr,"[FLUSH]")); \
 }
 
@@ -1078,7 +1084,7 @@ local void fill_window(s)
  * NOTE: this function should be optimized to avoid extra copying from
  * window to pending_buf.
  */
-local block_state deflate_stored(s, flush)
+local block_state code_00101130(s, flush)
     deflate_state *s;
     int flush;
 {
@@ -1100,7 +1106,7 @@ local block_state deflate_stored(s, flush)
             Assert(s->strstart < s->w_size+MAX_DIST(s) ||
 		   s->block_start >= (long)s->w_size, "slide too late");
 
-            fill_window(s);
+            code_00100f90(s);
             if (s->lookahead == 0 && flush == Z_NO_FLUSH) return need_more;
 
             if (s->lookahead == 0) break; /* flush the current block */
@@ -1150,7 +1156,7 @@ local block_state deflate_fast(s, flush)
          * string following the next match.
          */
         if (s->lookahead < MIN_LOOKAHEAD) {
-            fill_window(s);
+            code_00100f90(s);
             if (s->lookahead < MIN_LOOKAHEAD && flush == Z_NO_FLUSH) {
 	        return need_more;
 	    }
@@ -1173,12 +1179,12 @@ local block_state deflate_fast(s, flush)
              * of the string with itself at the start of the input file).
              */
             if (s->strategy != Z_HUFFMAN_ONLY) {
-                s->match_length = longest_match (s, hash_head);
+                s->match_length = code_00100cc0 (s, hash_head);
             }
-            /* longest_match() sets match_start */
+            /* code_00100cc0() sets match_start */
         }
         if (s->match_length >= MIN_MATCH) {
-            check_match(s, s->strstart, s->match_start, s->match_length);
+            code_00100ed0(s, s->strstart, s->match_start, s->match_length);
 
             _tr_tally_dist(s, s->strstart - s->match_start,
                            s->match_length - MIN_MATCH, bflush);
@@ -1247,7 +1253,7 @@ local block_state deflate_slow(s, flush)
          * string following the next match.
          */
         if (s->lookahead < MIN_LOOKAHEAD) {
-            fill_window(s);
+            code_00100f90(s);
             if (s->lookahead < MIN_LOOKAHEAD && flush == Z_NO_FLUSH) {
 	        return need_more;
 	    }
@@ -1273,9 +1279,9 @@ local block_state deflate_slow(s, flush)
              * of the string with itself at the start of the input file).
              */
             if (s->strategy != Z_HUFFMAN_ONLY) {
-                s->match_length = longest_match (s, hash_head);
+                s->match_length = code_00100cc0 (s, hash_head);
             }
-            /* longest_match() sets match_start */
+            /* code_00100cc0() sets match_start */
 
             if (s->match_length <= 5 && (s->strategy == Z_FILTERED ||
                  (s->match_length == MIN_MATCH &&
@@ -1294,7 +1300,7 @@ local block_state deflate_slow(s, flush)
             uInt max_insert = s->strstart + s->lookahead - MIN_MATCH;
             /* Do not insert strings in hash table beyond this. */
 
-            check_match(s, s->strstart-1, s->prev_match, s->prev_length);
+            code_00100ed0(s, s->strstart-1, s->prev_match, s->prev_length);
 
             _tr_tally_dist(s, s->strstart -1 - s->prev_match,
 			   s->prev_length - MIN_MATCH, bflush);
