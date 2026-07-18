@@ -1,6 +1,20 @@
-#ifndef lint
-static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_lzw.c,v 1.37 92/02/12 11:27:28 sam Exp $";
-#endif
+struct tif_lzw_data {
+	char rcsid[88];
+	unsigned char rmask[9];
+	unsigned char padding[3];
+	unsigned char lmask[9];
+};
+
+struct tif_lzw_data data_002dad38 = {
+	"$Header: /usr/people/sam/tiff/libtiff/RCS/tif_lzw.c,v 1.37 92/02/12 11:27:28 sam Exp $",
+	{ 0x00, 0x01, 0x03, 0x07, 0x0f, 0x1f, 0x3f, 0x7f, 0xff },
+	{ 0x00, 0x00, 0x00 },
+	{ 0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe, 0xff }
+};
+
+#define rcsid data_002dad38.rcsid
+#define rmask data_002dad38.rmask
+#define lmask data_002dad38.lmask
 
 /*
  * Copyright (c) 1988, 1989, 1990, 1991, 1992 Sam Leffler
@@ -40,6 +54,10 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_lzw.c,v 1.3
 #include <stdio.h>
 #include <assert.h>
 #include "prototypes.h"
+
+extern void *debug_malloc(unsigned int, int, const char *, long);
+extern void debug_free(void *, const char *, long);
+extern void *csmemset(void *, long, unsigned long);
 
 #define MAXCODE(n)	((1 << (n)) - 1)
 /*
@@ -146,12 +164,6 @@ typedef	struct {
 #define	enc_outcount	u.enc.outcount
 #define	enc_htab	u.enc.htab
 #define	enc_codetab	u.enc.codetab
-
-/* masks for extracting/inserting variable length bit codes */
-static const u_char rmask[9] =
-    { 0x00, 0x01, 0x03, 0x07, 0x0f, 0x1f, 0x3f, 0x7f, 0xff };
-static const u_char lmask[9] =
-    { 0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe, 0xff };
 
 #if USE_PROTOTYPES
 static	int LZWPreEncode(TIFF*);
@@ -305,7 +317,8 @@ LZWPreDecode(tif)
 	register int code;
 
 	if (sp == NULL) {
-		tif->tif_data = malloc(sizeof (LZWState));
+		tif->tif_data = debug_malloc(sizeof (LZWState), 0,
+		    "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_lzw.c", 308);
 		if (tif->tif_data == NULL) {
 			TIFFError("LZWPreDecode",
 			    "No space for LZW state block");
@@ -393,7 +406,7 @@ LZWDecode(tif, op0, occ0, s)
 	firstchar = sp->dec_firstchar;
 	while (occ > 0 && (code = GetNextCode(tif)) != CODE_EOI) {
 		if (code == CODE_CLEAR) {
-			bzero(sp->dec_prefix, sizeof (sp->dec_prefix));
+			csmemset(sp->dec_prefix, 0, sizeof (sp->dec_prefix));
 			sp->lzw_free_ent = CODE_FIRST;
 			sp->lzw_nbits = BITS_MIN;
 			SetMaxCode(sp, MAXCODE(BITS_MIN));
@@ -616,7 +629,8 @@ LZWPreEncode(tif)
 	register LZWState *sp = (LZWState *)tif->tif_data;
 
 	if (sp == NULL) {
-		tif->tif_data = malloc(sizeof (LZWState));
+		tif->tif_data = debug_malloc(sizeof (LZWState), 0,
+		    "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_lzw.c", 619);
 		if (tif->tif_data == NULL) {
 			TIFFError("LZWPreEncode",
 			    "No space for LZW state block");
@@ -664,7 +678,6 @@ LZWEncode(tif, bp, cc, s)
 	int cc;
 	u_int s;
 {
-	static char module[] = "LZWEncode";
 	register LZWState *sp;
 	register long fcode;
 	register int h, c, ent, disp;
@@ -719,7 +732,6 @@ LZWEncode(tif, bp, cc, s)
 			 */
 			if (sp->lzw_free_ent > sp->lzw_maxcode) {
 				sp->lzw_nbits++;
-				assert(sp->lzw_nbits <= BITS_MAX);
 				SetMaxCode(sp, MAXCODE(sp->lzw_nbits)+1);
 			} else if (sp->enc_incount >= sp->enc_checkpoint)
 				cl_block(tif);
@@ -922,7 +934,8 @@ LZWCleanup(tif)
 	TIFF *tif;
 {
 	if (tif->tif_data) {
-		free(tif->tif_data);
+		debug_free(tif->tif_data,
+		    "c:\\halo\\SOURCE\\bitmaps\\libtiff\\tif_lzw.c", 925);
 		tif->tif_data = NULL;
 	}
 }
