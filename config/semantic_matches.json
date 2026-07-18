@@ -183,5 +183,15 @@
     "unit": "source/ai/action_guard",
     "function": "_code_000041b0",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_fax3",
+    "function": "_skiptoeol",
+    "reason": "hardened COFF comparison proves exact bytes and internal jump-table relocations; objdiff reports a local-label ownership false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_fax3",
+    "function": "_Fax3Decode2DRow",
+    "reason": "hardened COFF comparison proves exact bytes and uniquely anchored non-code relocation destinations; objdiff reports csplit data-anchor naming false negatives"
   }
 ]
