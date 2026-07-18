@@ -4558,7 +4558,13 @@ void hs_runtime_dispose_from_old_map(
 	void);
 void hs_runtime_initialize_for_new_map(
 	void);
+void hs_dispose_from_old_map(
+	void);
 void code_000b2f00(
+	void);
+boolean code_000b3b60(
+	void);
+void code_000b3d10(
 	void);
 void hs_scenario_postprocess(
 	boolean force);
@@ -4622,6 +4628,25 @@ void hs_initialize(
 		hs_scenario_postprocess(FALSE);
 	object_lists_initialize_for_new_map();
 	hs_runtime_initialize_for_new_map();
+	return;
+}
+
+void hs_hack(
+	void)
+{
+	struct scenario *scenario;
+
+	if (code_000b3b60())
+	{
+		code_000b3d10();
+		hs_dispose_from_old_map();
+		scenario = global_scenario_index != NONE ? global_scenario_get() : NULL;
+		code_000b2f00();
+		if (scenario && scenario->hs_syntax_data.size)
+			hs_scenario_postprocess(FALSE);
+		object_lists_initialize_for_new_map();
+		hs_runtime_initialize_for_new_map();
+	}
 	return;
 }
 
