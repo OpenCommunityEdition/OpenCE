@@ -295,6 +295,11 @@ symbols in this file:
 
 /* ---------- structures */
 
+typedef char actor_datum_output_control_flags_offset_assert[
+	offsetof(struct actor_datum, output.control_flags) == 0x6D0 ? 1 : -1];
+typedef char actor_datum_output_animation_impulse_offset_assert[
+	offsetof(struct actor_datum, output.animation.impulse) == 0x6EC ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
@@ -509,6 +514,36 @@ void actor_flush_position_indices(
 	}
 
 	actor_action_flush_position_indices(actor_index);
+
+	return;
+}
+
+void actor_unit_control_jump(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	actor->output.control_flags |= FLAG(_unit_control_jump_bit);
+
+	return;
+}
+
+void actor_unit_control_throw_grenade(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	actor->output.control_flags |= FLAG(_unit_control_throw_grenade_bit);
+
+	return;
+}
+
+void actor_unit_control_stop_animation_impulse(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	actor->output.animation.impulse = NONE;
 
 	return;
 }

@@ -822,6 +822,12 @@ void actor_derive_target_information(
 	long target_actor_index);
 void actor_flush_position_indices(
 	long actor_index);
+void actor_unit_control_jump(
+	long actor_index);
+void actor_unit_control_throw_grenade(
+	long actor_index);
+void actor_unit_control_stop_animation_impulse(
+	long actor_index);
 
 /* ---------- prototypes/ACTOR_COMBAT.C */
 
