@@ -220,7 +220,7 @@ void *network_game_client_get_connection(
 boolean network_game_client_write(
 	void *connection,
 	void *message,
-	long message_size,
+	unsigned short message_size,
 	void *address,
 	long flags);
 void update_client_build_client_update(
@@ -463,7 +463,7 @@ boolean network_game_client_start_frame(
 		if (!network_game_client_get_error(global_network_game_client))
 		{
 			state = network_game_client_get_state(global_network_game_client, &state_data);
-			switch (state)
+			switch ((unsigned short)state)
 			{
 			case 0:
 				if (player_action_collection_definition.previous_client_state != state)
