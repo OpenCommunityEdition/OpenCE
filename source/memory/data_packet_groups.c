@@ -85,7 +85,7 @@ struct packet_header_byte_swap_data
 
 /* ---------- globals */
 
-char const *bss_00456624;
+char const *bss_00456624 = NULL;
 
 struct packet_header_byte_swap_data data_00309e38 =
 {
