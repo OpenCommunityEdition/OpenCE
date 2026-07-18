@@ -95,14 +95,427 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	_periodic_function_one = 0,
+	_periodic_function_zero,
+	_periodic_function_cosine,
+	_periodic_function_cosine_variable_period,
+	_periodic_function_diagonal_wave,
+	_periodic_function_diagonal_wave_variable_period,
+	_periodic_function_slide,
+	_periodic_function_slide_variable_period,
+	_periodic_function_noise,
+	_periodic_function_jitter,
+	_periodic_function_wander,
+	_periodic_function_spark,
+	NUMBER_OF_PERIODIC_FUNCTIONS,
+};
+
+enum
+{
+	PERIODIC_FUNCTION_TABLE_SIZE = 1024,
+	PERIODIC_FUNCTION_TABLE_MASK = PERIODIC_FUNCTION_TABLE_SIZE-1,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct tag_enum_definition
+{
+	long count;
+	char **names;
+	void *unused;
+};
+
+struct periodic_functions_globals
+{
+	boolean function_tables_initialized;
+	byte pad[3];
+	byte *transition_function_tables[NUMBER_OF_TRANSITION_FUNCTIONS];
+	byte *periodic_function_tables[NUMBER_OF_PERIODIC_FUNCTIONS];
+};
+
 /* ---------- prototypes */
+
+static void code_000fa050(real *values);
+static void code_000fa150(byte *table, short function_type);
+void code_000fa280(short function_type, byte *table);
 
 /* ---------- globals */
 
+char *data_0030791c[NUMBER_OF_PERIODIC_FUNCTIONS] =
+{
+	"one",
+	"zero",
+	"cosine",
+	"cosine (variable period)",
+	"diagonal wave",
+	"diagonal wave (variable period)",
+	"slide",
+	"slide (variable period)",
+	"noise",
+	"jitter",
+	"wander",
+	"spark",
+};
+
+struct tag_enum_definition global_periodic_functions_enum =
+{
+	NUMBER_OF_PERIODIC_FUNCTIONS,
+	data_0030791c,
+	NULL,
+};
+
+static char *transition_function_names[NUMBER_OF_TRANSITION_FUNCTIONS] =
+{
+	"linear",
+	"early",
+	"very early",
+	"late",
+	"very late",
+	"cosine",
+};
+
+struct tag_enum_definition global_transition_functions_enum =
+{
+	NUMBER_OF_TRANSITION_FUNCTIONS,
+	transition_function_names,
+	NULL,
+};
+
+struct periodic_functions_globals bss_004561bc = { 0 };
+
 /* ---------- public code */
 
+void periodic_functions_dispose(
+	void)
+{
+	short function_index;
+
+	if (bss_004561bc.function_tables_initialized)
+	{
+		for (function_index = 0; function_index < NUMBER_OF_PERIODIC_FUNCTIONS; function_index++)
+		{
+			match_free(
+				"c:\\halo\\SOURCE\\math\\periodic_functions.c",
+				122,
+				bss_004561bc.periodic_function_tables[function_index]);
+		}
+
+		for (function_index = 0; function_index < NUMBER_OF_TRANSITION_FUNCTIONS; function_index++)
+		{
+			match_free(
+				"c:\\halo\\SOURCE\\math\\periodic_functions.c",
+				132,
+				bss_004561bc.transition_function_tables[function_index]);
+		}
+
+		bss_004561bc.function_tables_initialized = FALSE;
+	}
+
+	return;
+}
+
+real periodic_function_evaluate(
+	short function_type,
+	real time)
+{
+	long index;
+	real fraction;
+	real first_value;
+	real second_value;
+	real result;
+
+	if (function_type == _periodic_function_one)
+		return 1.0f;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\math\\periodic_functions.c",
+		157,
+		function_type>=0 && function_type<NUMBER_OF_PERIODIC_FUNCTIONS);
+
+	if (!bss_004561bc.function_tables_initialized)
+		return 0.0f;
+
+	time *= 25.6f;
+	fraction = (real)fmod((double)time, 1.0);
+	index = (long)(time-fraction);
+	first_value = bss_004561bc.periodic_function_tables[function_type][index&PERIODIC_FUNCTION_TABLE_MASK] * (1.0f/255.0f);
+	second_value = bss_004561bc.periodic_function_tables[function_type][(index+1)&PERIODIC_FUNCTION_TABLE_MASK] * (1.0f/255.0f);
+
+	if ((function_type == _periodic_function_slide ||
+		function_type == _periodic_function_slide_variable_period) &&
+		first_value > 0.75f && second_value < 0.25f)
+	{
+		second_value += 1.0f;
+	}
+
+	result = first_value*(1.0f-fraction) + second_value*fraction;
+	if (result > 1.0f)
+		result -= 1.0f;
+
+	return result;
+}
+
+real transition_function_evaluate(
+	short function_type,
+	real value)
+{
+	short index;
+	real fraction;
+	real first_value;
+	real second_value;
+
+	if (value < 0.0f)
+		value = 0.0f;
+	else if (value > 1.0f)
+		value = 1.0f;
+
+	if (function_type == _transition_function_linear)
+		return value;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\math\\periodic_functions.c",
+		216,
+		function_type>=0 && function_type<NUMBER_OF_TRANSITION_FUNCTIONS);
+
+	if (!bss_004561bc.function_tables_initialized)
+		return 0.0f;
+
+	value *= (real)(PERIODIC_FUNCTION_TABLE_SIZE-1);
+	fraction = (real)fmod((double)value, 1.0);
+	index = (short)(value-0.5f);
+	if (index == PERIODIC_FUNCTION_TABLE_SIZE-1)
+	{
+		return bss_004561bc.transition_function_tables[function_type][index] * (1.0f/255.0f);
+	}
+
+	first_value = bss_004561bc.transition_function_tables[function_type][index] * (1.0f/255.0f);
+	second_value = bss_004561bc.transition_function_tables[function_type][index+1] * (1.0f/255.0f);
+
+	return first_value*(1.0f-fraction) + second_value*fraction;
+}
+
 /* ---------- private code */
+
+static void code_000fa050(
+	real *values)
+{
+	long index;
+	real sum = 0.0f;
+	real frequencies[3];
+	real amplitudes[3];
+
+	for (index = 0; index < PERIODIC_FUNCTION_TABLE_SIZE; index++)
+	{
+		values[index] = sum;
+		amplitudes[0] = real_seed_random(get_global_random_seed_address());
+		amplitudes[1] = real_seed_random(get_global_random_seed_address());
+		amplitudes[2] = real_seed_random(get_global_random_seed_address());
+		frequencies[0] = (real)index;
+		frequencies[1] = real_seed_random(get_global_random_seed_address());
+		frequencies[1] = (frequencies[1]+1.0f)*0.25f;
+		frequencies[0] = (real)cos(frequencies[0]*0.044791f);
+		frequencies[0] = (frequencies[0]+1.0f)*amplitudes[2] + frequencies[1];
+		frequencies[1] = (real)cos((real)index*0.03129321f);
+		frequencies[1] = (frequencies[1]+1.0f)*amplitudes[1] + frequencies[0];
+		frequencies[2] = (real)cos((real)index*0.025157287f);
+		frequencies[2] = (frequencies[2]+1.0f)*amplitudes[0] + frequencies[1];
+		sum += frequencies[2];
+	}
+
+	for (index = 0; index < PERIODIC_FUNCTION_TABLE_SIZE; index++)
+		values[index] *= 1.0f/sum;
+
+	return;
+}
+
+static void code_000fa150(
+	byte *table,
+	short function_type)
+{
+	long index;
+	real value;
+	real result;
+
+	for (index = 0; index < PERIODIC_FUNCTION_TABLE_SIZE; index++)
+	{
+		value = index * (1.0f/(PERIODIC_FUNCTION_TABLE_SIZE-1));
+		switch (function_type)
+		{
+		case _transition_function_linear:
+			result = value;
+			break;
+		case _transition_function_early:
+			result = (real)pow((double)value, 0.5);
+			break;
+		case _transition_function_very_early:
+			result = (real)pow((double)value, 0.25);
+			break;
+		case _transition_function_late:
+			result = (real)pow((double)value, 2.0);
+			break;
+		case _transition_function_very_late:
+			result = (real)pow((double)value, 4.0);
+			break;
+		case _transition_function_cosine:
+			result = ((real)sin(value*3.1415927f-1.5707964f)+1.0f)*0.5f;
+			break;
+		default:
+			display_assert(NULL, "c:\\halo\\SOURCE\\math\\periodic_functions.c", 411, TRUE);
+			system_exit(-1);
+			result = 0.0f;
+			break;
+		}
+
+		table[index] = (byte)PIN((long)(result*255.0f), 0, 255);
+	}
+
+	return;
+}
+
+void code_000fa280(
+	short function_type,
+	byte *table)
+{
+	long index;
+	real random_values[PERIODIC_FUNCTION_TABLE_SIZE];
+	real values[PERIODIC_FUNCTION_TABLE_SIZE];
+	real minimum = 3.402823466e+38f;
+	real maximum = -3.402823466e+38f;
+	real x;
+	real random_x;
+	real result;
+	real range;
+
+	code_000fa050(random_values);
+	for (index = 0; index < PERIODIC_FUNCTION_TABLE_SIZE; index++)
+	{
+		x = index*(28.0f/PERIODIC_FUNCTION_TABLE_SIZE);
+		random_x = random_values[index]*28.0f;
+		switch (function_type)
+		{
+		case _periodic_function_one:
+			result = 1.0f;
+			break;
+		case _periodic_function_zero:
+			result = 0.0f;
+			break;
+		case _periodic_function_cosine:
+			result = (real)cos(x*6.2831855f);
+			break;
+		case _periodic_function_cosine_variable_period:
+			result = (real)cos(random_x*6.2831855f);
+			break;
+		case _periodic_function_diagonal_wave:
+			result = (real)fmod((double)x, 1.0);
+			break;
+		case _periodic_function_diagonal_wave_variable_period:
+			result = (real)fmod((double)random_x, 1.0);
+			break;
+		case _periodic_function_slide:
+		case _periodic_function_slide_variable_period:
+			result = (real)fmod(
+				(double)(function_type == _periodic_function_slide ? x : random_x),
+				1.0);
+			if (result <= 0.5f)
+				result *= 2.0f;
+			else
+				result = 1.0f-(result-0.5f)*2.0f;
+			break;
+		case _periodic_function_noise:
+			result = real_seed_random(get_global_random_seed_address());
+			break;
+		case _periodic_function_jitter:
+		case _periodic_function_wander:
+			result = ((real)cos(x*0.897598f)*(real)cos(x*25.132742f) +
+				(real)cos(x*43.9823f)*(real)sin(x*1.5707964f))*0.5f +
+				(real)sin(x*3.1415927f)*(real)cos(x*6.2831855f);
+			break;
+		case _periodic_function_spark:
+			result = (real)fmod((double)random_x, 1.0);
+			result *= result;
+			break;
+		default:
+			display_assert(NULL, "c:\\halo\\SOURCE\\math\\periodic_functions.c", 499, TRUE);
+			system_exit(-1);
+			result = 0.0f;
+			break;
+		}
+
+		minimum = MIN(minimum, result);
+		maximum = MAX(maximum, result);
+		values[index] = result;
+	}
+
+	range = function_type == _periodic_function_slide ||
+		function_type == _periodic_function_slide_variable_period
+		? 0.0f
+		: maximum-minimum;
+	for (index = 0; index < PERIODIC_FUNCTION_TABLE_SIZE; index++)
+	{
+		result = values[index];
+		if (range != 0.0f)
+			result = (result-minimum)/range;
+		table[index] = (byte)PIN((long)(result*255.0f), 0, 255);
+	}
+
+	return;
+}
+
+#define function_tables_initialized bss_004561bc.function_tables_initialized
+
+void periodic_functions_initialize(
+	void)
+{
+	short function_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\math\\periodic_functions.c",
+		67,
+		!function_tables_initialized);
+	function_tables_initialized = TRUE;
+	*get_global_random_seed_address() = 0x20F3F660;
+
+	for (function_index = 0; function_index < NUMBER_OF_PERIODIC_FUNCTIONS; function_index++)
+	{
+		bss_004561bc.periodic_function_tables[function_index] = match_malloc(
+			"c:\\halo\\SOURCE\\math\\periodic_functions.c",
+			78,
+			PERIODIC_FUNCTION_TABLE_SIZE);
+		if (bss_004561bc.periodic_function_tables[function_index])
+		{
+			code_000fa280(
+				function_index,
+				bss_004561bc.periodic_function_tables[function_index]);
+		}
+		else
+		{
+			function_tables_initialized = FALSE;
+		}
+	}
+
+	for (function_index = 0; function_index < NUMBER_OF_TRANSITION_FUNCTIONS; function_index++)
+	{
+		bss_004561bc.transition_function_tables[function_index] = match_malloc(
+			"c:\\halo\\SOURCE\\math\\periodic_functions.c",
+			96,
+			PERIODIC_FUNCTION_TABLE_SIZE);
+		if (bss_004561bc.transition_function_tables[function_index])
+		{
+			code_000fa150(
+				bss_004561bc.transition_function_tables[function_index],
+				function_index);
+		}
+		else
+		{
+			function_tables_initialized = FALSE;
+		}
+	}
+
+	return;
+}
+
+#undef function_tables_initialized
