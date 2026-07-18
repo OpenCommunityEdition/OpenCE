@@ -86,6 +86,10 @@ void game_statistics_record_damage(
 	return;
 }
 
+/* NonMatching: target and candidate are both 0x2a0 padded bytes with all 22
+   relocation identities preserved. The remaining January codegen differences
+   are an ESI/EDX zero-register permutation for the three death-statistic
+   stores and one independent last-kill-time load scheduled seven bytes apart. */
 void game_statistics_record_kill(
 	long dead_unit_index,
 	long killing_player_index,
@@ -107,7 +111,7 @@ void game_statistics_record_kill(
 			struct unit_attacker *attackers;
 			struct unit_attacker *attacker;
 			short killer_attacker_index;
-			long best_attacker_index;
+			short best_attacker_index;
 			real best_damage;
 			short attacker_index;
 			long credited_player_index;
@@ -128,20 +132,20 @@ void game_statistics_record_kill(
 			assist_time = game_time_get() - 120;
 			recent_kill_time = game_time_get() - 180;
 			dead_unit = unit_get(dead_unit_index);
-			attackers = dead_unit->unit.attackers;
 			best_attacker_index = NONE;
 			best_damage = REAL_MIN;
 			killer_attacker_index = NONE;
-			attacker = attackers;
-
-			for (attacker_index = 0;
+			attacker = dead_unit->unit.attackers;
+			attacker_index = 0;
+			attackers = attacker;
+			for (;
 				attacker_index < MAXIMUM_ATTACKERS_PER_UNIT;
 				attacker_index++, attacker++)
 			{
 				if (attacker->player_index == killing_player_index)
 					killer_attacker_index = (short)attacker_index;
 
-				if ((attacker_index == killer_attacker_index ||
+				if ((killer_attacker_index == attacker_index ||
 					(friendly_fire && game_team_is_enemy(dead_team_index, (short)attacker->player_index))) &&
 					attacker->game_time_stamp > (unsigned long)recent_kill_time &&
 					attacker->damage_inflicted > best_damage)
@@ -151,15 +155,17 @@ void game_statistics_record_kill(
 				}
 			}
 
-			if (best_attacker_index == NONE)
-				best_attacker_index = killer_attacker_index;
 			credited_friendly_fire = FALSE;
 
-			if ((short)best_attacker_index != NONE)
+			if (best_attacker_index == NONE)
+				best_attacker_index = killer_attacker_index;
+
+			if (best_attacker_index != NONE)
 			{
-				struct unit_attacker *attacker = &dead_unit->unit.attackers[best_attacker_index];
-				credited_player_index = attacker->player_index;
-				assist_damage = attacker->damage_inflicted * 0.4f;
+				credited_player_index =
+					dead_unit->unit.attackers[best_attacker_index].player_index;
+				assist_damage =
+					dead_unit->unit.attackers[best_attacker_index].damage_inflicted * 0.4f;
 			}
 			else
 			{
