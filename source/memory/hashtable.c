@@ -249,9 +249,9 @@ void hashtable_remove(
 	return;
 }
 
-/* NonMatching: declaration order reproduces the target's complete prologue,
-body, 0x240-byte size, and all 27 relocations.  The residual is a two-byte
-EAX/ECX permutation in the capacity_bits+growth_bits assertion. */
+/* NonMatching: target and candidate are both 0x240 bytes with 27 exact
+relocations.  The only residual is an EAX/ECX permutation while evaluating
+the commutative capacity_bits+growth_bits assertion expression. */
 boolean hashtable_grow(
 	struct hashtable *table,
 	short growth_bits)
@@ -344,9 +344,6 @@ void *hashtable_put(
 
 /* ---------- private code */
 
-/* NonMatching: target and candidate are both 0x120 bytes with four exact
-relocations; the only remaining differences are four register-selection
-bytes in the duplicate success/not-found output epilogues. */
 static boolean code_0010b270(
 	struct hashtable *table,
 	const void *key,
@@ -356,6 +353,7 @@ static boolean code_0010b270(
 	short probe_count = 0;
 	long hash;
 	long equal;
+	boolean result = FALSE;
 
 	if (table->hash_function)
 	{
@@ -394,8 +392,8 @@ static boolean code_0010b270(
 
 			if (equal)
 			{
-				*element_index_reference = element_index;
-				return TRUE;
+				result = TRUE;
+				goto done;
 			}
 
 			element_index = (element_index + 1) & (table->elements.count - 1);
@@ -403,13 +401,13 @@ static boolean code_0010b270(
 		}
 		else
 		{
-			*element_index_reference = element_index;
-			return FALSE;
+			goto done;
 		}
 	}
 
+done:
 	*element_index_reference = element_index;
-	return FALSE;
+	return result;
 }
 
 static void *code_0010b630(
