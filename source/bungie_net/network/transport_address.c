@@ -104,7 +104,9 @@ symbols in this file:
 
 /* ---------- globals */
 
-char transport_address_string[256];
+#pragma bss_seg(".bss")
+char bss_0031cd30[256];
+#pragma bss_seg()
 
 /* ---------- public code */
 
@@ -168,12 +170,12 @@ char const *transport_address_to_string(
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c", 74, addr);
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c", 75, IPV4_ADDRESS_LENGTH == addr->address_length);
 
-	transport_address_string[0] = 0;
+	bss_0031cd30[0] = 0;
 	if (addr->address_length == IPV4_ADDRESS_LENGTH)
 	{
 		_snprintf(
-			transport_address_string,
-			NUMBEROF(transport_address_string),
+			bss_0031cd30,
+			NUMBEROF(bss_0031cd30),
 			"%hd.%hd.%hd.%hd:%hd",
 			addr->address.bytes[3],
 			addr->address.bytes[2],
@@ -184,8 +186,8 @@ char const *transport_address_to_string(
 	else if (addr->address_length == IPV6_ADDRESS_LENGTH)
 	{
 		_snprintf(
-			transport_address_string,
-			NUMBEROF(transport_address_string),
+			bss_0031cd30,
+			NUMBEROF(bss_0031cd30),
 			"%4X.%4X.%4X.%4X.%4X.%4X.%4X.%4X:%hd",
 			addr->address.words[0],
 			addr->address.words[1],
@@ -198,7 +200,7 @@ char const *transport_address_to_string(
 			addr->port);
 	}
 
-	return transport_address_string;
+	return bss_0031cd30;
 }
 
 char const *transport_error_to_string(

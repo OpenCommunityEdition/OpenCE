@@ -140,6 +140,16 @@
     }
   },
   {
+    "unit": "source/bitmaps/libtiff/tif_print",
+    "symbol": "_data_002daf98",
+    "reason": "the complete RCS-pinned libtiff object owns an exact data section, including both pointer tables; objdiff leaves one word uncredited despite identical normalized bytes, relocation addresses and types, and independently resolved image destinations",
+    "measurements": {
+      "size": 164,
+      "relocation_count": 18,
+      "normalized_sha256": "a81bb4fa00f599a245c1e6b636a2a630629557f2c86f92e2960cf3e16ed94e23"
+    }
+  },
+  {
     "unit": "source/ai/ai_scenario_definitions",
     "symbol": "_global_ai_default_state_names",
     "reason": "the complete rebuilt object owns an exact AI-state pointer table whose string ownership is attributed differently by csplit",
