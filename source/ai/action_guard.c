@@ -50,9 +50,17 @@ symbols in this file:
 #include "actions.h"
 
 #include "actors.h"
+#include "actor_definitions.h"
 #include "props.h"
 
 /* ---------- constants */
+
+enum
+{
+	_actor_guard_crouch_when_inactive_bit = 6,
+	_actor_guard_crouch_when_uncovered_bit = 7,
+	_actor_guard_crouch_when_cowering_bit = 23,
+};
 
 /* ---------- macros */
 
@@ -66,6 +74,23 @@ symbols in this file:
 #define action_guard_cower_retreat_timer(actor) (*(short *)((byte *)(actor) + 0x3A8))
 
 /* ---------- structures */
+
+struct firing_position_search_definition
+{
+	long allowed_groups;
+	short firing_position_group;
+	byte unresolved[0x66A];
+};
+
+struct firing_position_search_workspace
+{
+	byte unresolved[0x1408C];
+};
+
+struct firing_position_candidate
+{
+	byte unresolved[0x3C];
+};
 
 /* ---------- prototypes */
 
@@ -109,6 +134,46 @@ boolean actor_nearby_firing_positions(
 	real_point3d const *point,
 	long surface_index,
 	boolean allow_outside_range);
+
+void actor_move_halt(
+	long actor_index);
+
+void actor_move_to_point(
+	long actor_index,
+	real_point3d const *point,
+	long surface_index,
+	long ignore_object_index);
+
+boolean actor_move_to_firing_position(
+	long actor_index,
+	short firing_position_index,
+	boolean allow_pathfinding_failure);
+
+void actor_stimulus_suspicion(
+	long actor_index,
+	short suspicion_level,
+	long ticks);
+
+long actor_get_firing_position_group(
+	long actor_index,
+	short group,
+	boolean include_discarded);
+
+long actor_select_firing_position(
+	long actor_index,
+	struct firing_position_search_definition *search,
+	struct firing_position_candidate *candidate,
+	long *previous_owner_actor_index,
+	struct firing_position_search_workspace *workspace,
+	long *position_flags);
+
+short actor_change_firing_position(
+	long actor_index,
+	long firing_position_index,
+	struct firing_position_candidate *candidate,
+	long previous_owner_actor_index,
+	struct firing_position_search_workspace *workspace,
+	long position_flags);
 
 /* ---------- globals */
 
@@ -604,6 +669,280 @@ action_guard_update(
 			state_data->find_new_guard_position = TRUE;
 		}
 	}
+
+	return;
+}
+
+boolean
+action_guard_perform(
+	long actor_index)
+{
+	long position_flags;
+	long previous_owner_actor_index;
+	long selected_firing_position_index;
+	real guard_position_time_lower_bound;
+	real guard_position_time_upper_bound;
+	short firing_position_index;
+	struct firing_position_candidate candidate;
+	struct firing_position_search_definition search;
+	struct firing_position_search_workspace workspace;
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition = actor_definition_get(actor->meta.definition_index);
+	struct guard_state_data *state_data = &actor->state.action_data.guard;
+
+	if (actor->meta.swarm)
+	{
+		state_data->guard_location_type = 1;
+		return FALSE;
+	}
+
+	if (actor->input.vehicle_passenger)
+	{
+		state_data->guard_location_type = 1;
+		state_data->find_new_guard_position = TRUE;
+		return FALSE;
+	}
+
+	if (state_data->guard_location_type == 3 &&
+		actor->firing_positions.current_position_index == NONE)
+	{
+		state_data->guard_location_type = 0;
+		state_data->find_new_guard_position = TRUE;
+	}
+
+	if (actor->meta.timeslice && state_data->find_new_guard_position)
+	{
+		if (state_data->guard_location_type == 3 &&
+			actor->firing_positions.current_position_index != NONE)
+		{
+			actor_discard_firing_position(
+				actor_index,
+				actor->firing_positions.current_position_index,
+				FALSE);
+		}
+
+		csmemset(&search, 0, sizeof(search));
+		search.firing_position_group = 4;
+		search.allowed_groups = actor_get_firing_position_group(actor_index, 4, FALSE);
+		search.unresolved[0xF] = TRUE;
+		selected_firing_position_index = actor_select_firing_position(
+			actor_index,
+			&search,
+			&candidate,
+			&previous_owner_actor_index,
+			&workspace,
+			&position_flags);
+		firing_position_index = actor_change_firing_position(
+			actor_index,
+			selected_firing_position_index,
+			&candidate,
+			previous_owner_actor_index,
+			&workspace,
+			position_flags);
+		state_data->find_new_guard_position = FALSE;
+		state_data->has_guard_direction = FALSE;
+		if (firing_position_index == NONE)
+		{
+			state_data->guard_location_type = 1;
+		}
+		else
+		{
+			state_data->guard_location_type = 3;
+			state_data->guard_firing_position_index = firing_position_index;
+		}
+
+		guard_position_time_upper_bound = definition->firing_position.guard_position_time_upper_bound;
+		guard_position_time_lower_bound = definition->firing_position.guard_position_time_lower_bound;
+		state_data->wait_ticks = (short)(real_seed_random_range(
+			get_global_random_seed_address(),
+			guard_position_time_lower_bound,
+			guard_position_time_upper_bound) * 30.f);
+	}
+
+	return FALSE;
+}
+
+void
+action_guard_control(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition = actor_definition_get(actor->meta.definition_index);
+	struct guard_state_data *state_data = &actor->state.action_data.guard;
+
+	if (TEST_FLAG(definition->flags, _actor_guard_crouch_when_inactive_bit) &&
+		actor->state.combat_status == 0)
+	{
+		actor->orders.move.stationary_crouch = TRUE;
+		actor->orders.move.moving_crouch = TRUE;
+	}
+	else
+	{
+		actor->orders.move.moving_crouch = FALSE;
+		if (state_data->cower)
+		{
+			if (state_data->cower_from_retreat)
+			{
+				actor->orders.move.stationary_crouch =
+					TEST_FLAG(definition->flags, _actor_guard_crouch_when_cowering_bit);
+			}
+			else
+			{
+				actor->orders.move.stationary_crouch = TRUE;
+			}
+		}
+		else
+		{
+			actor->orders.move.stationary_crouch =
+				TEST_FLAG(definition->flags, _actor_guard_crouch_when_uncovered_bit) &&
+				actor->state.combat_status > 0;
+		}
+	}
+
+	actor->orders.move.panicked = FALSE;
+	actor->orders.move.dive_into_cover = FALSE;
+	actor->orders.move.emerge_from_cover = FALSE;
+
+	if (actor->meta.timeslice && !actor->meta.swarm)
+	{
+		boolean path_succeeded = FALSE;
+
+		switch (state_data->guard_location_type)
+		{
+		case 0:
+		case 1:
+			actor_move_halt(actor_index);
+			path_succeeded = TRUE;
+			break;
+
+		case 2:
+		{
+			real distance_squared = distance_squared3d(
+				&actor->input.position.body_position,
+				&state_data->guard_point.position);
+
+			if (distance_squared < state_data->guard_point.radius * state_data->guard_point.radius)
+			{
+				actor_move_halt(actor_index);
+			}
+			else
+			{
+				actor_move_to_point(
+					actor_index,
+					&state_data->guard_point.position,
+					state_data->guard_point.surface_index,
+					NONE);
+			}
+
+			path_succeeded = distance_squared < 9.f;
+			break;
+		}
+
+		case 3:
+		{
+			if (state_data->guard_firing_position_index != NONE)
+			{
+				actor->firing_positions.current_position_index = state_data->guard_firing_position_index;
+				actor->firing_positions.current_position_found_outside_range = FALSE;
+				if (!actor_move_to_firing_position(
+					actor_index,
+					actor->firing_positions.current_position_index,
+					FALSE))
+				{
+					actor_discard_firing_position(
+						actor_index,
+						state_data->guard_firing_position_index,
+						FALSE);
+					actor->firing_positions.current_position_index = NONE;
+				}
+			}
+
+			path_succeeded = !actor->control.path.path.valid ||
+				distance_squared3d(
+					&actor->control.path.path.endpoint.point,
+					&actor->input.position.body_position) < 9.f;
+			break;
+		}
+
+		default:
+			display_assert(NULL, "c:\\halo\\SOURCE\\ai\\action_guard.c", 685, TRUE);
+			system_exit(-1);
+			break;
+		}
+
+		state_data->path_begun = TRUE;
+		if (path_succeeded)
+		{
+			if (state_data->shout_about_dead_friend)
+			{
+				struct prop_datum *prop = prop_get(state_data->shout_dead_friend_prop_index);
+
+				state_data->shout_about_dead_friend = FALSE;
+				state_data->shout_dead_friend_prop_index = NONE;
+				actor_stimulus_suspicion(actor_index, 2, 600);
+				ai_communication_event(
+					7,
+					actor->meta.unit_index,
+					prop->unit_index,
+					NONE,
+					NONE,
+					2,
+					FALSE);
+			}
+
+			if (state_data->post_combat)
+			{
+				code_000041b0(actor_index);
+				if (actor->external_orders.postcombat_type == _actor_postcombat_shoot_corpse &&
+					state_data->guard_location_type == 2)
+				{
+					state_data->post_combat_shooting = TRUE;
+				}
+			}
+		}
+	}
+
+	if (state_data->post_combat_shooting)
+	{
+		real_vector3d const *up;
+
+		actor->orders.look.primary_priority = 7;
+		actor->orders.look.primary_direction.type = _direction_specification_target;
+		actor->orders.combat.shoot_at_target = TRUE;
+		actor->orders.combat.use_manual_target_point = TRUE;
+		up = global_up3d;
+		actor->orders.combat.target_point.x =
+			state_data->guard_point.position.x + up->i * 0.05f;
+		actor->orders.combat.target_point.y =
+			state_data->guard_point.position.y + up->j * 0.05f;
+		actor->orders.combat.target_point.z =
+			state_data->guard_point.position.z + up->k * 0.05f;
+	}
+	else if (state_data->guard_look_prop_index != NONE)
+	{
+		actor->orders.look.primary_priority = 5;
+		actor->orders.look.primary_direction.type = _direction_specification_prop;
+		actor->orders.look.primary_direction.prop_index = state_data->guard_look_prop_index;
+	}
+	else if (state_data->has_guard_direction)
+	{
+		actor->orders.look.primary_priority = state_data->aim_in_guard_direction ? 5 : 3;
+		actor->orders.look.primary_direction.type = _direction_specification_vector;
+		actor->orders.look.primary_direction.vector = state_data->guard_direction;
+	}
+	else if (actor->state.combat_status > 0 &&
+		actor->target.target_prop_index != NONE)
+	{
+		actor->orders.look.primary_priority = 3;
+		actor->orders.look.primary_direction.type = _direction_specification_prop;
+		actor->orders.look.primary_direction.prop_index = actor->target.target_prop_index;
+	}
+	else
+	{
+		actor->orders.look.primary_priority = _primary_priority_none;
+	}
+
+	actor->orders.look.idle_look_type = actor->state.combat_status >= 4 ? 4 : 2;
 
 	return;
 }
