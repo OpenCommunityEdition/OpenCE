@@ -3755,6 +3755,7 @@ void objects_garbage_collection(
 	
 	if (garbage_collect_mode!=NONE)
 	{
+		long garbage_collect_mode_wide;
 		short garbage_object_count = 0;
 		boolean should_collect = FALSE;
 
@@ -3788,13 +3789,15 @@ void objects_garbage_collection(
 				}
 			}
 
+			garbage_collect_mode_wide = garbage_collect_mode;
+
 			while (TRUE)
 			{
 				long object_index;
 				struct object_header_datum *header;
 				boolean garbage_collect;
 
-				switch (garbage_collect_mode)
+				switch (garbage_collect_mode_wide)
 				{
 				case _garbage_collect_everything:
 					should_collect = FALSE;
@@ -3885,7 +3888,9 @@ void objects_garbage_collection(
 				boolean debug_garbage_collection = FALSE;
 				boolean status_still_critical = FALSE;
 
-				if (garbage_collect_mode==_garbage_collect_for_space)
+				switch (garbage_collect_mode_wide)
+				{
+				case _garbage_collect_for_space:
 				{
 					long free_size = memory_pool_get_contiguous_free_size(object_memory_pool);
 					long free_objects = MAXIMUM_OBJECTS_PER_MAP-object_header_data->count;
@@ -3930,6 +3935,8 @@ void objects_garbage_collection(
 						sprintf(warningbuf, "%4.2f%% memory free", ((free_size * 100.f) / (real)OBJECT_MEMORY_POOL_SIZE));
 					}
 				}
+					break;
+				}
 
 				if (status_still_critical || garbage_collection_after_first_attempt)
 				{
@@ -3958,10 +3965,10 @@ void objects_garbage_collection(
 
 				if (status_still_critical)
 				{
-					boolean result = FALSE;
-
 					if (current_release_procs->function)
 					{
+						boolean result = FALSE;
+
 						while (current_release_procs->function && !result)
 						{
 							boolean more_to_release = FALSE;
@@ -3995,15 +4002,19 @@ void objects_garbage_collection(
 								v0 = FALSE;
 							}
 						}
+
+						if (!result)
+						{
+							break;
+						}
+
+						garbage_collection_after_first_attempt = TRUE;
+						memory_pool_compact(object_memory_pool);
 					}
-					
-					if (!result)
+					else
 					{
 						break;
 					}
-
-					garbage_collection_after_first_attempt = TRUE;
-					memory_pool_compact(object_memory_pool);
 				}
 				else
 				{
