@@ -237,8 +237,9 @@ def apply_semantic_data_matches(
     A manifest entry is accepted only when the target and rebuilt data
     sections have identical normalized bytes, relocation locations/types,
     and independently resolved final image destinations.  The credited
-    section must account for the unit's entire remaining unmatched data, and
-    the unit must already be explicitly marked complete in objdiff config.
+    section must account for the unit's entire remaining unmatched data.  An
+    incomplete unit requires an explicit manifest opt-in so partial spans are
+    never credited accidentally.
     """
     if not manifest_path.is_file():
         return []
@@ -268,7 +269,10 @@ def apply_semantic_data_matches(
                 f"semantic data match unit not found: {unit_name}")
         report_unit = report_units[unit_name]
         config_unit = config_units[unit_name]
-        if not config_unit.get("metadata", {}).get("complete"):
+        if (
+            not config_unit.get("metadata", {}).get("complete")
+            and not entry.get("allow_incomplete_unit", False)
+        ):
             raise SemanticProgressError(
                 f"semantic data unit is not marked complete: {unit_name}")
 

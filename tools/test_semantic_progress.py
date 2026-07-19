@@ -285,6 +285,19 @@ class SemanticDataProgressTests(unittest.TestCase):
         with self.assertRaisesRegex(SemanticProgressError, "not marked complete"):
             self._apply()
 
+    def test_explicit_full_span_allows_incomplete_unit(self):
+        config = json.loads(self.config_path.read_text(encoding="utf-8"))
+        config["units"][0]["metadata"]["complete"] = False
+        self.config_path.write_text(json.dumps(config), encoding="utf-8")
+        entries = json.loads(self.manifest_path.read_text(encoding="utf-8"))
+        entries[0]["allow_incomplete_unit"] = True
+        self.manifest_path.write_text(json.dumps(entries), encoding="utf-8")
+
+        notes = self._apply()
+
+        self.assertEqual(len(notes), 1)
+        self.assertEqual(self.report["units"][0]["measures"]["matched_data"], 16)
+
 
 if __name__ == "__main__":
     unittest.main()

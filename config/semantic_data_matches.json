@@ -158,5 +158,16 @@
       "relocation_count": 32,
       "normalized_sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
     }
+  },
+  {
+    "unit": "source/objects/objects",
+    "symbol": "?section@?1??objects_update@@9@9",
+    "allow_incomplete_unit": true,
+    "reason": "the compiler-generated objects_update profile static spans the entire remaining .data section; normalized bytes, relocation address/type, and the independently resolved image destination are exact, while csplit alone changes its storage class from static to external",
+    "measurements": {
+      "size": 1530,
+      "relocation_count": 1,
+      "normalized_sha256": "e94bb79478c95dce11c4a1f720a07ccbaa3a8d18b84acbe5605472d6f8635b74"
+    }
   }
 ]
