@@ -51,6 +51,27 @@ def _debit(measures: Dict[str, Any], code_bytes: int) -> None:
     )
 
 
+def _revoke_completion(
+    measures: Dict[str, Any], code_bytes: int, data_bytes: int
+) -> None:
+    """Remove one previously complete unit from aggregate progress measures."""
+    measures["complete_code"] = int(measures.get("complete_code", 0)) - code_bytes
+    measures["complete_data"] = int(measures.get("complete_data", 0)) - data_bytes
+    measures["complete_units"] = int(measures.get("complete_units", 0)) - 1
+    if (
+        measures["complete_code"] < 0
+        or measures["complete_data"] < 0
+        or measures["complete_units"] < 0
+    ):
+        raise SemanticProgressError("semantic rejection would make completion negative")
+    measures["complete_code_percent"] = _percent(
+        measures["complete_code"], int(measures.get("total_code", 0))
+    )
+    measures["complete_data_percent"] = _percent(
+        measures["complete_data"], int(measures.get("total_data", 0))
+    )
+
+
 def _credit_data(measures: Dict[str, Any], data_bytes: int) -> None:
     measures["matched_data"] = int(measures.get("matched_data", 0)) + data_bytes
     total_data = int(measures.get("total_data", 0))
@@ -72,6 +93,7 @@ def apply_semantic_rejections(
     report_units = {unit["name"]: unit for unit in report.get("units", [])}
     categories = {item["id"]: item for item in report.get("categories", [])}
     rejected = []
+    revoked_units = set()
 
     for entry in semantic_report.get("ordinary_rejected", []):
         unit_name = entry["unit"]
@@ -102,6 +124,25 @@ def apply_semantic_rejections(
             if category_id not in categories:
                 raise SemanticProgressError(f"progress category not found: {category_id}")
             _debit(categories[category_id]["measures"], code_bytes)
+
+        if unit_name not in revoked_units and report_unit.get("metadata", {}).get(
+            "complete", False
+        ):
+            unit_measures = report_unit["measures"]
+            complete_code = int(unit_measures.get("complete_code", 0))
+            complete_data = int(unit_measures.get("complete_data", 0))
+            _revoke_completion(report["measures"], complete_code, complete_data)
+            for category_id in progress_categories:
+                _revoke_completion(
+                    categories[category_id]["measures"], complete_code, complete_data
+                )
+            unit_measures["complete_code"] = 0
+            unit_measures["complete_data"] = 0
+            unit_measures["complete_units"] = 0
+            unit_measures["complete_code_percent"] = 0.0
+            unit_measures["complete_data_percent"] = 0.0
+            report_unit["metadata"]["complete"] = False
+            revoked_units.add(unit_name)
 
         rejected.append(
             f"{unit_name}:{function_name} (-{code_bytes} code bytes, -1 function)"

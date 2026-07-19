@@ -147,6 +147,45 @@ class SemanticProgressTests(unittest.TestCase):
         self.assertEqual(report["units"][0]["measures"]["matched_code"], 0)
         self.assertEqual(report["categories"][0]["measures"]["matched_code"], 8)
 
+    def test_rejection_revokes_completed_object_everywhere(self):
+        report = copy.deepcopy(self.report)
+        report["units"][0]["functions"][0]["fuzzy_match_percent"] = 100.0
+        report["units"][0]["metadata"]["complete"] = True
+        report["units"][0]["measures"].update({
+            "matched_code": 16,
+            "matched_functions": 1,
+            "complete_code": 16,
+            "complete_data": 4,
+            "complete_units": 1,
+        })
+        report["measures"].update({
+            "total_data": 40,
+            "complete_code": 36,
+            "complete_data": 12,
+            "complete_units": 2,
+        })
+        report["categories"][0]["measures"].update({
+            "matched_code": 24,
+            "matched_functions": 2,
+            "total_data": 20,
+            "complete_code": 24,
+            "complete_data": 8,
+            "complete_units": 2,
+        })
+        semantic_report_path = self.root / "semantic_report.json"
+        semantic_report_path.write_text(json.dumps({
+            "ordinary_rejected": [{"unit": "unit", "function": "_fn"}]
+        }), encoding="utf-8")
+
+        apply_semantic_rejections(report, semantic_report_path)
+
+        self.assertFalse(report["units"][0]["metadata"]["complete"])
+        self.assertEqual(report["units"][0]["measures"]["complete_units"], 0)
+        self.assertEqual(report["measures"]["complete_units"], 1)
+        self.assertEqual(report["measures"]["complete_code"], 20)
+        self.assertEqual(report["measures"]["complete_data"], 8)
+        self.assertEqual(report["categories"][0]["measures"]["complete_units"], 1)
+
 
 class SemanticDataProgressTests(unittest.TestCase):
     def setUp(self):
