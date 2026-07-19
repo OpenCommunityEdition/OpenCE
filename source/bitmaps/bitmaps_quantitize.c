@@ -206,8 +206,8 @@ void code_0006d5f0(
 			}
 			quantized[channel_index] = quantized_value;
 			destination[channel_index] = quantized_value;
-			bits_channel++;
 			channel_index++;
+			bits_channel++;
 		}
 		while (--channels_remaining);
 
@@ -230,8 +230,8 @@ void code_0006d5f0(
 				if (pixel_index < pixel_count - 1 && next_source[CHANNEL_COUNT + channel_index] > *minimum_channel)
 					next_source[CHANNEL_COUNT + channel_index] += error / 16;
 			}
-			channel_index++;
 			minimum_channel++;
+			channel_index++;
 		}
 		while (--channels_remaining);
 
