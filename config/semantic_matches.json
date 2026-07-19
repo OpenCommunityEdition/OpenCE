@@ -35,6 +35,16 @@
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
+    "unit": "source/memory/data_encoding",
+    "function": "_data_encode_memory",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/memory/data_encoding",
+    "function": "_data_encode_array",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
     "unit": "source/memory/byte_swapping",
     "function": "_code_00108010",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
@@ -117,6 +127,81 @@
   {
     "unit": "source/bitmaps/libtiff/tif_aux",
     "function": "_TIFFVGetFieldDefaulted",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_lzw",
+    "function": "_horizontalAccumulate8",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_lzw",
+    "function": "_horizontalAccumulate16",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_lzw",
+    "function": "_horizontalDifference8",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_lzw",
+    "function": "_horizontalDifference16",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_getimage",
+    "function": "_setorientation",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_getimage",
+    "function": "_code_00058a20",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_getimage",
+    "function": "_code_00059180",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_getimage",
+    "function": "_put1bitbwtile",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_getimage",
+    "function": "_code_00059df0",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_getimage",
+    "function": "_code_0005a6f0",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_getimage",
+    "function": "_TIFFReadRGBAImage",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_dirread",
+    "function": "_TIFFFetchData",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_dirread",
+    "function": "_TIFFFetchByteArray",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_dirread",
+    "function": "_TIFFFetchNormalTag",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_dirread",
+    "function": "_TIFFReadDirectory",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
