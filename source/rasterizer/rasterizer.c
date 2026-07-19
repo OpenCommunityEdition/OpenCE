@@ -1999,7 +1999,6 @@ void rasterizer_debug_model_vertices(
 			node_weight0 = (real)vertex->node_weight * (1.f / 32767.f);
 			node_weight1 = 1.f - node_weight0;
 			node_index1 = vertex->node_indices[1] / 3;
-			decompressed_normal_result = uncompress_int32_to_real_vector3d(&decompressed_normal, vertex->normal);
 			node_point0.x = 0.f;
 			node_point0.y = 0.f;
 			node_point0.z = 0.f;
@@ -2012,6 +2011,7 @@ void rasterizer_debug_model_vertices(
 			node_normal1.i = 0.f;
 			node_normal1.j = 0.f;
 			node_normal1.k = 0.f;
+			decompressed_normal_result = uncompress_int32_to_real_vector3d(&decompressed_normal, vertex->normal);
 			vertex_normal = *decompressed_normal_result;
 			match_assert(
 				"c:\\halo\\SOURCE\\rasterizer\\rasterizer.c",
