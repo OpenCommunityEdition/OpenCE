@@ -31,6 +31,7 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "objects/objects.h"
 #include "units/vehicle_definitions.h"
+#include "units/vehicles.h"
 
 /* ---------- constants */
 
@@ -309,9 +310,7 @@ action_fight_perform(
 					combat_position_time_upper_bound);
 				if (actor->input.vehicle_driver_type > 0)
 				{
-					struct object_datum *vehicle = object_get_and_verify_type(
-						actor->input.vehicle_index,
-						_object_mask_vehicle);
+					struct unit_datum *vehicle = vehicle_get(actor->input.vehicle_index);
 					struct fight_vehicle_definition *vehicle_definition =
 						(struct fight_vehicle_definition *)vehicle_definition_get(
 							vehicle->definition_index);
