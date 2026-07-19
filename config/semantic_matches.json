@@ -312,5 +312,11 @@
     "function": "$L10620",
     "owner_function": "_attachments_delete",
     "reason": "the exact owning COMDAT and an internal relocation prove this differently named jump-table label is the same destination"
+  },
+  {
+    "unit": "source/memory/zlib/infblock",
+    "function": "$L2587",
+    "owner_function": "_inflate_blocks",
+    "reason": "the exact owning COMDAT and an internal relocation prove this differently numbered jump-table label is the same destination"
   }
 ]
