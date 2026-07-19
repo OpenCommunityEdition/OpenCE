@@ -257,7 +257,20 @@ def _defined_noncode_destination(obj, source_section_number, target, addend):
 
 def section_info(obj, function_name):
     fn = symbol(obj, function_name)
-    fn_sec_num = fn["section"]
+    return section_info_by_number(obj, fn["section"])
+
+
+def section_info_by_number(obj, fn_sec_num):
+    """Describe one COFF section using the hardened relocation resolver.
+
+    ``section_info`` remains the function-name convenience API.  Regression
+    manifests also need identical, non-divergent semantics for data, BSS,
+    directive, and debug sections, which may not have a unique public owner
+    symbol.  This section-number entry point deliberately shares every proof
+    rule with the function comparator.
+    """
+    if fn_sec_num <= 0 or fn_sec_num > len(obj["sections"]):
+        raise CoffError(f"invalid section number {fn_sec_num}")
     section = obj["sections"][fn_sec_num - 1]
     raw = _section_bytes(obj, section)
     relocs = []
