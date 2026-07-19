@@ -190,6 +190,82 @@
         },
         "objdiff_percent": 85.0
       }
+    },
+    {
+      "unit": "source/objects/objects",
+      "function": "_object_new",
+      "class": "instruction-scheduling",
+      "evidence": "Target and candidate have equal 0x5C0 padded size and all 77 relocation identities. Failure-first cleanup fixes two structural regions and every relocation address; the sole residual is an independent FMULS versus deferred ADD ESP instruction-pair schedule after five additional legal-C shapes.",
+      "measurements": {
+        "target": {
+          "size": 1472,
+          "relocation_count": 77,
+          "normalized_sha256": "9330b5a3d54aa9d6aa56663ca760683643fb4a18a69fead290fa75e9eb6f3590"
+        },
+        "base": {
+          "size": 1472,
+          "relocation_count": 77,
+          "normalized_sha256": "c71ae18ca9e2d3938e9d4024885f267bb6d6e0625b4c9e508a73a6a0022c9edd"
+        },
+        "objdiff_percent": 99.57173
+      }
+    },
+    {
+      "unit": "source/objects/objects",
+      "function": "_find_objects_from_point_vector",
+      "class": "register-allocation",
+      "evidence": "Target and candidate have equal 0x260 padded size and all 35 relocation identities. January spills state and reserves EBX for the inner bit offset; VC7 retains state in EBX. Five new lifetime/type shapes and prior traversal corrections exhausted legal-C controls.",
+      "measurements": {
+        "target": {
+          "size": 608,
+          "relocation_count": 35,
+          "normalized_sha256": "42dd4f516ea97589f6235e012e6c5b850bc85f91bcc35b01f4e6b3ff15fb6664"
+        },
+        "base": {
+          "size": 608,
+          "relocation_count": 35,
+          "normalized_sha256": "54b3481edd9e8b35302a77b7799cd692c7aad51403daaada8cdb00ddcca38b06"
+        },
+        "objdiff_percent": 84.67027
+      }
+    },
+    {
+      "unit": "source/objects/objects",
+      "function": "_object_get_marker_by_name",
+      "class": "register-allocation",
+      "evidence": "Target and candidate have equal 0x110 padded size and all 11 relocation identities. Seventeen measured source shapes leave only two VC7 allocator regions: deferred model-index load into ECX versus EDI hoisting, and EDX versus ECX scratch selection.",
+      "measurements": {
+        "target": {
+          "size": 272,
+          "relocation_count": 11,
+          "normalized_sha256": "302db0f36677f304c6d076e0f16f3bb4e9603519b34d650a4311c296bd21c8cf"
+        },
+        "base": {
+          "size": 272,
+          "relocation_count": 11,
+          "normalized_sha256": "50ed7fd21af289949423752968be8f3c631d44faea42a98e502c66f3b9e57323"
+        },
+        "objdiff_percent": 97.85
+      }
+    },
+    {
+      "unit": "source/objects/objects",
+      "function": "_objects_garbage_collection",
+      "class": "register-allocation",
+      "evidence": "Target and candidate have equal 0x620 padded size and all 102 relocation identities. A promoted 32-bit mode probe recovers January's exact frame and stack-slot reuse, but VC7 selects EAX instead of the target's long-lived EDI; five legal-C shapes either fold away or regress size/relocations.",
+      "measurements": {
+        "target": {
+          "size": 1568,
+          "relocation_count": 102,
+          "normalized_sha256": "39ff915966e4062a23f3bd1d17bee7b000736d6b83d46486d243afe0ec9161d4"
+        },
+        "base": {
+          "size": 1568,
+          "relocation_count": 102,
+          "normalized_sha256": "6005a64dd694065fa5d09e1a3aa954f8604aac4b088ddd111a50213080bbecdc"
+        },
+        "objdiff_percent": 97.15565
+      }
     }
   ]
 }
