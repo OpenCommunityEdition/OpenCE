@@ -364,6 +364,88 @@ action_guard_setup_from_combat_transition(
 	return TRUE;
 }
 
+boolean
+action_guard_setup_from_fleeing(
+	long actor_index,
+	struct flee_state_data *flee_state,
+	struct guard_state_data *state_data)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition = actor_definition_get(actor->meta.definition_index);
+
+	match_assert("c:\\halo\\SOURCE\\ai\\action_guard.c", 237, state_data);
+	csmemset(state_data, 0, sizeof(*state_data));
+
+	if (!actor->input.vehicle_passenger && !actor->meta.swarm)
+	{
+		state_data->wait_ticks = 0;
+		state_data->cower = TRUE;
+		state_data->cower_ticks = 0;
+		state_data->cower_panicked = flee_state->panic_type > 0;
+		state_data->cower_from_retreat =
+			action_guard_cower_retreat_timer(actor) > 0 &&
+			!state_data->cower_panicked;
+
+		if (!state_data->cower_from_retreat)
+		{
+			if (state_data->cower_panicked)
+			{
+				real upper_bound = definition->panic.cower_time_upper_bound;
+				real lower_bound = definition->panic.cower_time_lower_bound;
+
+				state_data->cower_ticks = (short)(real_seed_random_range(
+					get_global_random_seed_address(),
+					lower_bound,
+					upper_bound) * 30.f);
+			}
+			else
+			{
+				real upper_bound = definition->defensive.hide_time_upper_bound;
+				real lower_bound = definition->defensive.hide_time_lower_bound;
+
+				state_data->cower_ticks = (short)(real_seed_random_range(
+					get_global_random_seed_address(),
+					lower_bound,
+					upper_bound) * 30.f);
+			}
+		}
+
+		if (flee_state->flee_firing_position_index == NONE)
+		{
+			state_data->find_new_guard_position = TRUE;
+			state_data->guard_location_type = 0;
+			state_data->guard_look_prop_index = NONE;
+
+			return TRUE;
+		}
+
+		state_data->find_new_guard_position = FALSE;
+		state_data->guard_location_type = 3;
+		state_data->guard_firing_position_index = flee_state->flee_firing_position_index;
+		if (flee_state->has_approach_point)
+		{
+			state_data->has_guard_direction = TRUE;
+			state_data->aim_in_guard_direction = TRUE;
+			vector_from_points3d(
+				&actor->input.position.body_position,
+				&flee_state->approach_point,
+				&state_data->guard_direction);
+			if (normalize3d(&state_data->guard_direction) == 0.f)
+			{
+				state_data->has_guard_direction = FALSE;
+			}
+		}
+	}
+	else
+	{
+		state_data->guard_location_type = 1;
+	}
+
+	state_data->guard_look_prop_index = NONE;
+
+	return TRUE;
+}
+
 void
 action_guard_begin(
 	long actor_index)
