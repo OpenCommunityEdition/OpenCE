@@ -143,7 +143,7 @@ static void object_compute_change_colors(long object_index);
 
 /* ---------- globals */
 
-static const struct object_memory_release_function object_memory_release_procs[3] =
+const struct object_memory_release_function object_memory_release_procs[3] =
 {
 	{ NULL, ai_release_inactive_swarms },
 	{ ai_find_inactive_encounters, ai_release_inactive_encounters },
@@ -168,8 +168,6 @@ boolean debug_object_garbage_collection;
 struct data_array *object_header_data;
 
 boolean debug_objects_position_velocity = FALSE;
-boolean debug_objects_bounding_spheres = TRUE;
-boolean debug_objects_collision_models = TRUE;
 
 /* ---------- public code */
 
@@ -3757,10 +3755,10 @@ void objects_garbage_collection(
 	
 	if (garbage_collect_mode!=NONE)
 	{
+		short garbage_object_count = 0;
 		boolean should_collect = FALSE;
 
 		{
-			short garbage_object_count = 0;
 			long garbage_object_indices[MAXIMUM_OBJECTS_PER_MAP];
 
 			if (debug_object_garbage_collection)
@@ -4146,6 +4144,9 @@ void objects_update(
 
 	return;
 }
+
+boolean debug_objects_bounding_spheres = TRUE;
+boolean debug_objects_collision_models = TRUE;
 
 void objects_memory_compact(
 	void)
