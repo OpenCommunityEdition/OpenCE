@@ -74,9 +74,10 @@ void generate_key_parameters(
 	struct public_key *x,
 	struct public_key *g)
 {
+	long count = 2;
 	long i;
 
-	for (i = 0; i < 2; i++)
+	for (i = 0; count; i++, count--)
 	{
 		unsigned long prime0;
 		unsigned long prime1;
