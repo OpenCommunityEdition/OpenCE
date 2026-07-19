@@ -30,6 +30,8 @@ from .semantic_progress import (
     apply_semantic_data_matches,
     apply_semantic_matches,
     apply_semantic_rejections,
+    require_symbol_ownership_snapshots,
+    revoke_incomplete_units,
 )
 from .parked_functions import (
     ParkedFunctionsError,
@@ -389,7 +391,7 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
     n.comment("Calculate progress")
     n.rule(
         name="progress",
-        command=f"$python {configure_script} $configure_args progress",
+        command=f"$python {configure_script} progress",
         description="PROGRESS",
     )
     n.build(
@@ -403,6 +405,7 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
             sln.config_dir / "semantic_matches.json",
             sln.config_dir / "semantic_data_matches.json",
             sln.config_dir / "symbols.json",
+            sln.config_dir / "symbol_ownership.json",
             sln.config_dir / "parked.json",
             sln.tools_dir / "coff_compare.py",
             sln.tools_dir / "parked_functions.py",
@@ -635,6 +638,12 @@ def calculate_progress(sln: SolutionConfig) -> None:
             Path("objdiff.json"),
             sln.config_dir / "symbols.json",
         )
+        ownership_snapshots = require_symbol_ownership_snapshots(
+            Path.cwd(),
+            sln.config_dir / "symbol_ownership.json",
+            Path("objdiff.json"),
+        )
+        incomplete_units = revoke_incomplete_units(report_data)
         parked = require_valid_parked_functions(
             Path.cwd(),
             report_path,
@@ -667,6 +676,12 @@ def calculate_progress(sln: SolutionConfig) -> None:
     for semantic_data_match in semantic_data_matches:
         progress_print(
             f"  Verified objdiff data exception: {semantic_data_match}")
+    for ownership_snapshot in ownership_snapshots:
+        progress_print(
+            f"  Validated COFF ownership: {ownership_snapshot}")
+    for incomplete_unit in incomplete_units:
+        progress_print(
+            f"  Revoked premature complete unit: {incomplete_unit}")
     progress_print(
         f"  Validated parked compiler ties: {parked['summary']['active']}"
     )

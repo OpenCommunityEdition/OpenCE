@@ -10,6 +10,8 @@ from tools.semantic_progress import (
     apply_semantic_data_matches,
     apply_semantic_matches,
     apply_semantic_rejections,
+    require_symbol_ownership_snapshots,
+    revoke_incomplete_units,
 )
 
 
@@ -280,6 +282,57 @@ class SemanticProgressTests(unittest.TestCase):
         self.assertEqual(report["measures"]["complete_data"], 8)
         self.assertEqual(report["categories"][0]["measures"]["complete_units"], 1)
 
+    def test_visible_mismatch_revokes_premature_complete_label(self):
+        report = copy.deepcopy(self.report)
+        report["units"][0]["metadata"]["complete"] = True
+        report["units"][0]["measures"].update({
+            "total_data": 4,
+            "matched_data": 4,
+            "complete_code": 16,
+            "complete_data": 4,
+            "complete_units": 1,
+        })
+        report["measures"].update({
+            "total_data": 40,
+            "complete_code": 36,
+            "complete_data": 12,
+            "complete_units": 2,
+        })
+        report["categories"][0]["measures"].update({
+            "total_data": 20,
+            "complete_code": 24,
+            "complete_data": 8,
+            "complete_units": 2,
+        })
+
+        notes = revoke_incomplete_units(report)
+
+        self.assertEqual(notes, ["unit (1 unmatched functions, 0 unmatched data bytes)"])
+        self.assertFalse(report["units"][0]["metadata"]["complete"])
+        self.assertEqual(report["units"][0]["measures"]["complete_units"], 0)
+        self.assertEqual(report["measures"]["complete_units"], 1)
+        self.assertEqual(report["measures"]["complete_code"], 20)
+        self.assertEqual(report["measures"]["complete_data"], 8)
+        self.assertEqual(report["categories"][0]["measures"]["complete_units"], 1)
+
+    def test_fully_matched_complete_unit_remains_complete(self):
+        report = copy.deepcopy(self.report)
+        report["units"][0]["metadata"]["complete"] = True
+        report["units"][0]["measures"] = {
+            "total_code": 16,
+            "matched_code": 16,
+            "total_functions": 1,
+            "matched_functions": 1,
+            "total_data": 4,
+            "matched_data": 4,
+            "complete_code": 16,
+            "complete_data": 4,
+            "complete_units": 1,
+        }
+
+        self.assertEqual(revoke_incomplete_units(report), [])
+        self.assertTrue(report["units"][0]["metadata"]["complete"])
+
 
 class SemanticDataProgressTests(unittest.TestCase):
     def setUp(self):
@@ -391,6 +444,89 @@ class SemanticDataProgressTests(unittest.TestCase):
 
         self.assertEqual(len(notes), 1)
         self.assertEqual(self.report["units"][0]["measures"]["matched_data"], 16)
+
+
+class SymbolOwnershipSnapshotTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary_directory.name)
+        self.target_path = self.root / "target.obj"
+        self.base_path = self.root / "base.obj"
+        self.manifest_path = self.root / "symbol_ownership.json"
+        self.config_path = self.root / "objdiff.json"
+
+        self.target_path.write_bytes(self._object())
+        self.base_path.write_bytes(self._object())
+        self.config_path.write_text(json.dumps({
+            "units": [{
+                "name": "unit",
+                "target_path": "target.obj",
+                "base_path": "base.obj",
+            }],
+        }), encoding="utf-8")
+        self.manifest_path.write_text(json.dumps([{
+            "unit": "unit",
+            "section": ".bss",
+            "snapshot": self._snapshot(),
+        }]), encoding="utf-8")
+
+    def tearDown(self):
+        self.temporary_directory.cleanup()
+
+    @staticmethod
+    def _symbols(globals_storage=3):
+        return [
+            {"name": "_name", "value": 0, "section": 1,
+             "type": 0, "storage": 3},
+            {"name": "_pool", "value": 4, "section": 1,
+             "type": 0, "storage": 3},
+            {"name": "_globals", "value": 8, "section": 1,
+             "type": 0, "storage": globals_storage},
+            {"name": "_debug", "value": 12, "section": 1,
+             "type": 0, "storage": 2},
+        ]
+
+    @classmethod
+    def _object(cls, globals_storage=3):
+        return build_coff(
+            sections=[{
+                "name": ".bss",
+                "size": 13,
+                "raw_data": b"\0" * 13,
+                "flags": 0xC0300080,
+            }],
+            symbols=cls._symbols(globals_storage),
+        )
+
+    @staticmethod
+    def _snapshot():
+        return {
+            "size": 13,
+            "flags": 0xC0300080,
+            "relocation_count": 0,
+            "normalized_sha256":
+                "dd46c3eebb1884ff3b5258c0a2fc9398e560a29e0780d4b53869b6254aa46a96",
+            "symbols": [
+                {"name": "_name", "value": 0, "type": 0, "storage": 3},
+                {"name": "_pool", "value": 4, "type": 0, "storage": 3},
+                {"name": "_globals", "value": 8, "type": 0, "storage": 3},
+                {"name": "_debug", "value": 12, "type": 0, "storage": 2},
+            ],
+        }
+
+    def _validate(self):
+        return require_symbol_ownership_snapshots(
+            self.root, self.manifest_path, self.config_path)
+
+    def test_exact_symbol_ownership_snapshot_passes(self):
+        self.assertEqual(self._validate(), ["unit:.bss (4 symbols)"])
+
+    def test_storage_class_drift_fails_closed(self):
+        self.base_path.write_bytes(self._object(globals_storage=2))
+        with self.assertRaisesRegex(
+            SemanticProgressError, "rebuilt ownership snapshot changed"
+        ):
+            self._validate()
 
 
 if __name__ == "__main__":

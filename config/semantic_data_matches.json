@@ -163,7 +163,7 @@
     "unit": "source/objects/objects",
     "symbol": "?section@?1??objects_update@@9@9",
     "allow_incomplete_unit": true,
-    "reason": "the compiler-generated objects_update profile static spans the entire remaining .data section; normalized bytes, relocation address/type, and the independently resolved image destination are exact, while csplit alone changes its storage class from static to external",
+    "reason": "the compiler-generated objects_update profile static spans the entire remaining .data section; its static ownership is now explicit on both sides, while csplit and MSVC encode the relocation placeholder differently; normalized bytes, relocation address/type, and the independently resolved image destination are exact",
     "measurements": {
       "size": 1530,
       "relocation_count": 1,

@@ -291,6 +291,11 @@
   },
   {
     "unit": "source/objects/objects",
+    "function": "_object_compute_node_matrices",
+    "reason": "hardened COFF comparison proves all 6560 padded bytes and all 318 semantic relocations exact; objdiff reports a local-label encoding false negative"
+  },
+  {
+    "unit": "source/objects/objects",
     "function": "$L11841",
     "owner_function": "_attachments_new",
     "reason": "the exact owning COMDAT and an internal relocation prove this differently named jump-table label is the same destination"

@@ -1,0 +1,39 @@
+[
+  {
+    "unit": "source/objects/objects",
+    "section": ".bss",
+    "reason": "January layout, PDB-public evidence, and module-local references prove three source-private object globals followed by the externally visible debug byte",
+    "snapshot": {
+      "size": 13,
+      "flags": 3224371328,
+      "relocation_count": 0,
+      "normalized_sha256": "dd46c3eebb1884ff3b5258c0a2fc9398e560a29e0780d4b53869b6254aa46a96",
+      "symbols": [
+        {
+          "name": "_object_name_list",
+          "value": 0,
+          "type": 0,
+          "storage": 3
+        },
+        {
+          "name": "_object_memory_pool",
+          "value": 4,
+          "type": 0,
+          "storage": 3
+        },
+        {
+          "name": "_object_globals",
+          "value": 8,
+          "type": 0,
+          "storage": 3
+        },
+        {
+          "name": "_debug_objects_position_velocity",
+          "value": 12,
+          "type": 0,
+          "storage": 2
+        }
+      ]
+    }
+  }
+]

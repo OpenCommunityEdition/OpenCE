@@ -14,6 +14,7 @@ from .coff_compare import (
     CoffError,
     load,
     section_info,
+    section_info_by_number,
     section_info_resolved,
     section_infos_equal,
 )
@@ -152,6 +153,161 @@ def _credit_data(measures: Dict[str, Any], data_bytes: int) -> None:
         raise SemanticProgressError("semantic data credit exceeds total data")
     measures["matched_data_percent"] = _percent(
         measures["matched_data"], total_data)
+
+
+def revoke_incomplete_units(report: Dict[str, Any]) -> List[str]:
+    """Revoke config-level completion when measured content is incomplete.
+
+    ``metadata.complete`` originates from the manually maintained Matching
+    label.  It must not grant linked-object credit when the current report,
+    after strict semantic corrections, still contains unmatched functions or
+    data.  This is deliberately a one-way safety gate: it can revoke a stale
+    label, but it never promotes an object to complete.
+    """
+    categories = {item["id"]: item for item in report.get("categories", [])}
+    revoked = []
+
+    for report_unit in report.get("units", []):
+        if not report_unit.get("metadata", {}).get("complete", False):
+            continue
+
+        unit_measures = report_unit.get("measures", {})
+        matched_functions = int(unit_measures.get("matched_functions", 0))
+        total_functions = int(unit_measures.get("total_functions", 0))
+        matched_data = int(unit_measures.get("matched_data", 0))
+        total_data = int(unit_measures.get("total_data", 0))
+        missing_functions = total_functions - matched_functions
+        missing_data = total_data - matched_data
+        if missing_functions < 0 or missing_data < 0:
+            raise SemanticProgressError(
+                f"unit progress exceeds totals: {report_unit.get('name', '<unknown>')}"
+            )
+        if missing_functions == 0 and missing_data == 0:
+            continue
+
+        if int(unit_measures.get("complete_units", 0)) != 1:
+            raise SemanticProgressError(
+                f"complete unit has inconsistent completion measures: "
+                f"{report_unit.get('name', '<unknown>')}"
+            )
+
+        complete_code = int(unit_measures.get("complete_code", 0))
+        complete_data = int(unit_measures.get("complete_data", 0))
+        _revoke_completion(report["measures"], complete_code, complete_data)
+
+        progress_categories = report_unit.get("metadata", {}).get(
+            "progress_categories", []
+        )
+        if isinstance(progress_categories, str):
+            progress_categories = [progress_categories]
+        for category_id in progress_categories:
+            if category_id not in categories:
+                raise SemanticProgressError(
+                    f"progress category not found: {category_id}"
+                )
+            _revoke_completion(
+                categories[category_id]["measures"], complete_code, complete_data
+            )
+
+        unit_measures["complete_code"] = 0
+        unit_measures["complete_data"] = 0
+        unit_measures["complete_units"] = 0
+        unit_measures["complete_code_percent"] = 0.0
+        unit_measures["complete_data_percent"] = 0.0
+        report_unit["metadata"]["complete"] = False
+        revoked.append(
+            f"{report_unit['name']} ({missing_functions} unmatched functions, "
+            f"{missing_data} unmatched data bytes)"
+        )
+
+    return revoked
+
+
+def _section_ownership_snapshot(obj: Dict[str, Any], section_name: str) -> Dict[str, Any]:
+    sections = [section for section in obj["sections"] if section["name"] == section_name]
+    if len(sections) != 1:
+        raise SemanticProgressError(
+            f"expected one {section_name} section, found {len(sections)}"
+        )
+
+    section = sections[0]
+    info = section_info_by_number(obj, int(section["index"]))
+    symbols = sorted(
+        (
+            {
+                "name": symbol["name"],
+                "value": int(symbol["value"]),
+                "type": int(symbol["type"]),
+                "storage": int(symbol["storage"]),
+            }
+            for symbol in obj["symbols"]
+            if int(symbol["section"]) == int(section["index"])
+            and symbol["name"] != section_name
+        ),
+        key=lambda symbol: (symbol["value"], symbol["name"]),
+    )
+    return {
+        "size": int(section["size"]),
+        "flags": int(section["flags"]),
+        "relocation_count": int(info["relocation_count"]),
+        "normalized_sha256": info["normalized_sha256"],
+        "symbols": symbols,
+    }
+
+
+def require_symbol_ownership_snapshots(
+    project_root: Path,
+    manifest_path: Path,
+    objdiff_config_path: Path,
+) -> List[str]:
+    """Require exact COFF section ownership for admission-sensitive data.
+
+    Zero-filled BSS can compare byte-exact even when symbols move or change
+    linkage.  This manifest records the complete named-symbol set for a
+    section and validates both the csplit target and rebuilt object.  It is a
+    pure safety gate: it grants no progress credit and any drift fails closed.
+    """
+    if not manifest_path.is_file():
+        return []
+
+    entries = json.loads(manifest_path.read_text(encoding="utf-8"))
+    objdiff = json.loads(objdiff_config_path.read_text(encoding="utf-8"))
+    config_units = {unit["name"]: unit for unit in objdiff.get("units", [])}
+    validated = []
+
+    for entry in entries:
+        unit_name = entry["unit"]
+        section_name = entry["section"]
+        if unit_name not in config_units:
+            raise SemanticProgressError(
+                f"ownership snapshot unit not found: {unit_name}"
+            )
+        config_unit = config_units[unit_name]
+        try:
+            target = load(project_root / config_unit["target_path"])
+            base = load(project_root / config_unit["base_path"])
+            target_snapshot = _section_ownership_snapshot(target, section_name)
+            base_snapshot = _section_ownership_snapshot(base, section_name)
+        except (CoffError, KeyError, OSError) as error:
+            raise SemanticProgressError(
+                f"cannot verify ownership snapshot {unit_name}:{section_name}: {error}"
+            ) from error
+
+        expected = entry.get("snapshot", {})
+        if target_snapshot != expected:
+            raise SemanticProgressError(
+                f"target ownership snapshot changed: {unit_name}:{section_name}"
+            )
+        if base_snapshot != expected:
+            raise SemanticProgressError(
+                f"rebuilt ownership snapshot changed: {unit_name}:{section_name}"
+            )
+
+        validated.append(
+            f"{unit_name}:{section_name} ({len(expected.get('symbols', []))} symbols)"
+        )
+
+    return validated
 
 
 def apply_semantic_rejections(

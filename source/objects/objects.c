@@ -149,9 +149,9 @@ const struct object_memory_release_function object_memory_release_procs[3] =
 	{ ai_find_inactive_encounters, ai_release_inactive_encounters },
 	{ NULL, NULL }
 };
-static struct object_globals *object_globals;
-static struct memory_pool *object_memory_pool;
-static long *object_name_list;
+static long *object_name_list = NULL;
+static struct memory_pool *object_memory_pool = NULL;
+static struct object_globals *object_globals = NULL;
 
 boolean debug_objects_names;
 boolean debug_objects_pathfinding_spheres;
@@ -780,7 +780,6 @@ void objects_place(
 	return;
 }
 
-// TODO: match
 long find_objects_from_point_vector(
 	real_point3d const *position,
 	real_vector3d const *direction, 
@@ -801,7 +800,6 @@ long find_objects_from_point_vector(
 		if (cluster_index!=NONE)
 		{
 			unsigned long *cluster_pvs;
-			unsigned long *cluster_pvs_word;
 			short i;
 			short bit_vector_size;
 
@@ -809,48 +807,39 @@ long find_objects_from_point_vector(
 
 			cluster_pvs = structure_bsp_get_cluster_pvs(global_structure_bsp_get(), cluster_index);
 			bit_vector_size = BIT_VECTOR_SIZE_IN_LONGS(global_structure_bsp_get()->clusters.count);
-			cluster_pvs_word = cluster_pvs;
 
-			i = 0;
-			if (i<bit_vector_size)
+			for (i = 0; i<bit_vector_size; ++i)
 			{
-				do
+				if (cluster_pvs[i])
 				{
-					if (*cluster_pvs_word)
-					{
-						short offset = (LONG_BITS * i);
-						short size = MIN(offset + LONG_BITS, global_structure_bsp_get()->clusters.count);
-						short j;
+					short offset = (short)(i << 5);
+					short size = MIN(offset + LONG_BITS, global_structure_bsp_get()->clusters.count);
+					short j;
 
-						for (j = offset; j<size; ++j, ++offset)
+					for (j = offset; j<size; ++j)
+					{
+						if (BIT_VECTOR_TEST_FLAG(cluster_pvs, j))
 						{
-							if (BIT_VECTOR_TEST_FLAG(cluster_pvs, offset))
+							long reference;
+							long k;
+							for (k = cluster_get_first_collideable_object(&reference, j);
+								k!=NONE;
+								k = cluster_get_next_collideable_object(&reference))
 							{
-								long reference;
-								long k;
-								for (k = cluster_get_first_collideable_object(&reference, j);
-									k!=NONE;
-									k = cluster_get_next_collideable_object(&reference))
+								if (object_mark_function(k))
 								{
-									if (object_mark_function(k))
-									{
-										state = recursive_object_adder(
-											k,
-											add_object_function,
-											custom_data,
-											state,
-											maximum_object_count,
-											object_indices);
-									}
+									state = recursive_object_adder(
+										k,
+										add_object_function,
+										custom_data,
+										state,
+										maximum_object_count,
+										object_indices);
 								}
 							}
 						}
 					}
-
-					i++;
-					cluster_pvs_word++;
 				}
-				while (i<bit_vector_size);
 			}
 
 			object_marker_end();
@@ -1841,12 +1830,12 @@ short object_get_marker_by_name(
 
 	struct object_datum const *object = object_get(object_index);
 	struct object_definition const *object_definition = object_definition_get(object->definition_index);
-	
-	real_matrix4x3 const *matrices = object_get_node_matrices(object_index);
-	long const model_index = object_definition->object.model.index;
+	struct object_datum *matrix_object = object_get(object_index);
+	real_matrix4x3 const *matrices = (real_matrix4x3 *)object_header_block_get(object_index,
+		&matrix_object->object.node_matrices);
 
 	marker = model_get_marker_by_name(
-		model_index,
+		object_definition->object.model.index,
 		name,
 		object->object.region_permutations,
 		FALSE,
@@ -2269,6 +2258,62 @@ void object_export_function_values(
 	return;
 }
 
+// These local variants preserve the original XDK 3911 operand provenance for
+// this large function.  They are semantically identical to the shared matrix
+// validation macros, but the typed aliases reproduce the January codegen.
+#define ocnm_root_matrix_internal(file, line, matrix, string) \
+match_vassert(file, line, valid_real((*matrix).scale), csprintf(temporary, "%s had a bad scale %f", string, (*matrix).scale)); \
+match_vassert(file, line, valid_real_normal3d(&(*matrix).forward), csprintf(temporary, "%s had a bad forward (%f,%f,%f)", string, (*matrix).forward.i, (*matrix).forward.j, (*matrix).forward.k)); \
+match_vassert(file, line, valid_real_normal3d(&(*matrix).left), csprintf(temporary, "%s had a bad left (%f,%f,%f)", string, (*matrix).left.i, (*matrix).left.j, (*matrix).left.k)); \
+match_vassert(file, line, valid_real_normal3d(&(*matrix).up), csprintf(temporary, "%s had a bad up (%f,%f,%f)", string, (*matrix).up.i, (*matrix).up.j, (*matrix).up.k)); \
+match_vassert(file, line, valid_real_point3d(&(*matrix).position), csprintf(temporary, "%s had a bad position (%f,%f,%f)", string, (*matrix).position.x, (*matrix).position.y, (*matrix).position.z)); \
+match_vassert(file, line, \
+	valid_realcmp(dot_product3d(&(*matrix).forward, &(*matrix).left), 0.f), \
+	csprintf(temporary, "%s had a forward (%f,%f,%f) not perpendicular to left (%f,%f,%f)", string, (*matrix).forward.i, (*matrix).forward.j, (*matrix).forward.k, (*matrix).left.i, (*matrix).left.j, (*matrix).left.k)); \
+match_vassert(file, line, \
+	valid_realcmp(dot_product3d(ocnm_left, &(*matrix).up), 0.f), \
+	csprintf(temporary, "%s had a up (%f,%f,%f) not perpendicular to left (%f,%f,%f)", string, (*matrix).up.i, (*matrix).up.j, (*matrix).up.k, (*matrix).left.i, (*matrix).left.j, (*matrix).left.k)); \
+match_vassert(file, line, \
+	valid_realcmp(dot_product3d(ocnm_forward, ocnm_up), 0.f), \
+	csprintf(temporary, "%s had a forward (%f,%f,%f) not perpendicular to up (%f,%f,%f)", string, (*matrix).forward.i, (*matrix).forward.j, (*matrix).forward.k, (*matrix).up.i, (*matrix).up.j, (*matrix).up.k)); \
+match_vassert(file, line, valid_real_matrix4x3(matrix), csprintf(temporary, "%s: assert_valid_real_matrix4x3", string));
+
+#define ocnm_root_matrix_custom(file, line, matrix, custom_string) \
+if (!valid_real_matrix4x3(matrix)) \
+{ \
+	char const *string = (custom_string); \
+	real_vector3d const *ocnm_forward = &(*matrix).forward; \
+	real_vector3d const *ocnm_left = &(*matrix).left; \
+	real_vector3d const *ocnm_up = &(*matrix).up; \
+	ocnm_root_matrix_internal(file, line, matrix, string); \
+}
+
+#define ocnm_parent_matrix_internal(file, line, matrix, string) \
+match_vassert(file, line, valid_real((*matrix).scale), csprintf(temporary, "%s had a bad scale %f", string, (*matrix).scale)); \
+match_vassert(file, line, valid_real_normal3d(&(*matrix).forward), csprintf(temporary, "%s had a bad forward (%f,%f,%f)", string, (*matrix).forward.i, (*matrix).forward.j, (*matrix).forward.k)); \
+match_vassert(file, line, valid_real_normal3d(&(*matrix).left), csprintf(temporary, "%s had a bad left (%f,%f,%f)", string, (*matrix).left.i, (*matrix).left.j, (*matrix).left.k)); \
+match_vassert(file, line, valid_real_normal3d(&(*matrix).up), csprintf(temporary, "%s had a bad up (%f,%f,%f)", string, (*matrix).up.i, (*matrix).up.j, (*matrix).up.k)); \
+match_vassert(file, line, valid_real_point3d(&(*matrix).position), csprintf(temporary, "%s had a bad position (%f,%f,%f)", string, (*matrix).position.x, (*matrix).position.y, (*matrix).position.z)); \
+match_vassert(file, line, \
+	valid_realcmp(dot_product3d(&(*matrix).forward, &(*matrix).left), 0.f), \
+	csprintf(temporary, "%s had a forward (%f,%f,%f) not perpendicular to left (%f,%f,%f)", string, (*matrix).forward.i, (*matrix).forward.j, (*matrix).forward.k, (*matrix).left.i, (*matrix).left.j, (*matrix).left.k)); \
+match_vassert(file, line, \
+	valid_realcmp(dot_product3d(ocnm_up, ocnm_left), 0.f), \
+	csprintf(temporary, "%s had a up (%f,%f,%f) not perpendicular to left (%f,%f,%f)", string, (*matrix).up.i, (*matrix).up.j, (*matrix).up.k, (*matrix).left.i, (*matrix).left.j, (*matrix).left.k)); \
+match_vassert(file, line, \
+	valid_realcmp(dot_product3d(&(*matrix).forward, &(*matrix).up), 0.f), \
+	csprintf(temporary, "%s had a forward (%f,%f,%f) not perpendicular to up (%f,%f,%f)", string, (*matrix).forward.i, (*matrix).forward.j, (*matrix).forward.k, (*matrix).up.i, (*matrix).up.j, (*matrix).up.k)); \
+match_vassert(file, line, valid_real_matrix4x3(matrix), csprintf(temporary, "%s: assert_valid_real_matrix4x3", string));
+
+#define ocnm_parent_matrix_custom(file, line, matrix, custom_string) \
+if (!valid_real_matrix4x3(matrix)) \
+{ \
+	char const *string = (custom_string); \
+	real_vector3d const *ocnm_left = &(*matrix).left; \
+	real_vector3d const *ocnm_up = &(*matrix).up; \
+	ocnm_parent_matrix_internal(file, line, matrix, string); \
+}
+
 void object_compute_node_matrices(
 	long object_index)
 {
@@ -2450,20 +2495,24 @@ void object_compute_node_matrices(
 					object->object.position.x,
 					object->object.position.y,
 					object->object.position.z));
-			match_vassert(
-				"c:\\halo\\SOURCE\\objects\\objects.c",
-				2787,
-				valid_real_vector3d_axes2(&object->object.forward, &object->object.up),
-				csprintf(
-					temporary,
-					"%s had a bad forward and up before compute_node_matrices (%f,%f,%f)x(%f,%f,%f)",
-					tag_get_name(object->definition_index),
-					object->object.forward.i,
-					object->object.forward.j,
-					object->object.forward.k,
-					object->object.up.i,
-					object->object.up.j,
-					object->object.up.k));
+			{
+				real_vector3d const *validated_forward = &object->object.forward;
+
+				match_vassert(
+					"c:\\halo\\SOURCE\\objects\\objects.c",
+					2787,
+					valid_real_vector3d_axes2(validated_forward, &object->object.up),
+					csprintf(
+						temporary,
+						"%s had a bad forward and up before compute_node_matrices (%f,%f,%f)x(%f,%f,%f)",
+						tag_get_name(object->definition_index),
+						object->object.forward.i,
+						object->object.forward.j,
+						object->object.forward.k,
+						object->object.up.i,
+						object->object.up.j,
+						object->object.up.k));
+			}
 		}
 
 		node_index = 0;
@@ -2471,9 +2520,10 @@ void object_compute_node_matrices(
 		unknown_var = 0;
 		node_stack[0] = 0;
 
-		while (node_index!=node_count)
+		while (TRUE)
 		{
 			short node_stack_index = node_stack[node_index++];
+			short next_sibling_node_index;
 			struct model_node *node = TAG_BLOCK_GET_ELEMENT(&model->nodes, node_stack_index, struct model_node);
 			
 			if (node_stack_index==0)
@@ -2505,13 +2555,18 @@ void object_compute_node_matrices(
 
 					if (object_node_matrix)
 					{
+						real_matrix4x3 const *validated_parent_node_matrix;
+
 						if (object_node_matrix->scale!=1.f)
 						{
+							real scaled_z;
+
 							object_translation_matrix.position.x *= object_node_matrix->scale;
 							object_translation_matrix.position.y *= object_node_matrix->scale;
-							object_translation_matrix.position.z *= object_node_matrix->scale;
+							scaled_z = object_translation_matrix.position.z * object_node_matrix->scale;
 
 							parent_node_matrix_no_scale_no_mirror= *object_node_matrix;
+							object_translation_matrix.position.z = scaled_z;
 							object_node_matrix= &parent_node_matrix_no_scale_no_mirror;
 							parent_node_matrix_no_scale_no_mirror.scale= 1.f;
 						}
@@ -2527,10 +2582,11 @@ void object_compute_node_matrices(
 							negate_vector3d(&object_node_matrix->left, &object_node_matrix->left);
 						}
 
-						match_assert_valid_real_matrix4x3_custom_string(
+						validated_parent_node_matrix = object_node_matrix;
+						ocnm_parent_matrix_custom(
 							"c:\\halo\\SOURCE\\objects\\objects.c",
 							2871,
-							object_node_matrix,
+							validated_parent_node_matrix,
 							csprintf(
 								temporary,
 								"%s as parent node of %s",
@@ -2555,6 +2611,8 @@ void object_compute_node_matrices(
 
 				if (!valid_real_matrix4x3(&object_nodes[node_stack_index]))
 				{
+					real_matrix4x3 const *validated_root_node_matrix;
+
 					error(_error_silent, "object_compute_node_matrices FAILURE on root node of %s", tag_get_name(object->definition_index));
 					error(
 						_error_silent,
@@ -2643,38 +2701,52 @@ void object_compute_node_matrices(
 						object_nodes[node_stack_index].position.y,
 						object_nodes[node_stack_index].position.z);
 					error(_error_silent, "                scale %f", object_nodes[node_stack_index].scale);
-				}
-				
 
-				match_assert_valid_real_matrix4x3_custom_string(
-					"c:\\halo\\SOURCE\\objects\\objects.c",
-					2921,
-					&object_nodes[node_stack_index],
-					"object_compute_node_matrices root node matrix");
+					validated_root_node_matrix = &object_nodes[node_stack_index];
+					ocnm_root_matrix_custom(
+						"c:\\halo\\SOURCE\\objects\\objects.c",
+						2921,
+						validated_root_node_matrix,
+						"object_compute_node_matrices root node matrix");
+				}
 			}
 			else
 			{
-				real_matrix4x3 *matrix = &object_nodes[node_stack_index];
 				real_orientation *orientation = &node_orientations[node_stack_index];
 
-				matrix4x3_from_orientation(matrix, orientation);
+				matrix4x3_from_orientation(&object_nodes[node_stack_index], orientation);
 				match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 2929, node->parent_node_index!=NONE);
-				matrix4x3_multiply(&object_nodes[node->parent_node_index], matrix, matrix);
+				matrix4x3_multiply(
+					&object_nodes[node->parent_node_index],
+					&object_nodes[node_stack_index],
+					&object_nodes[node_stack_index]);
 			}
 
-			match_assert_valid_real_matrix4x3_custom_string(
-				"c:\\halo\\SOURCE\\objects\\objects.c",
-				2935,
-				&object_nodes[node_stack_index],
-				tag_get_name(object->definition_index));
-
-			if (node->next_sibling_node_index!=NONE)
+			if (node_stack_index==0)
 			{
-				node_stack[node_count++] = node->next_sibling_node_index;
+				real_matrix4x3 *final_matrix = &object_nodes[node_stack_index];
+				if (!valid_real_matrix4x3(final_matrix))
+				{
+					char *name2 = tag_get_name(object->definition_index);
+					char *string = name2;
+					match_assert_valid_real_matrix4x3_internal("c:\\halo\\SOURCE\\objects\\objects.c", 2935, final_matrix, string);
+				}
+			}
+
+			next_sibling_node_index = node->next_sibling_node_index;
+
+			if (next_sibling_node_index!=NONE)
+			{
+				node_stack[node_count++] = next_sibling_node_index;
 			}
 			if (node->first_child_node_index!=NONE)
 			{
 				node_stack[node_count++] = node->first_child_node_index;
+			}
+
+			if (node_index==node_count)
+			{
+				break;
 			}
 		}
 	}
@@ -2697,6 +2769,11 @@ void object_compute_node_matrices(
 
 	return;
 }
+
+#undef ocnm_root_matrix_custom
+#undef ocnm_root_matrix_internal
+#undef ocnm_parent_matrix_custom
+#undef ocnm_parent_matrix_internal
 
 static void object_postprocess_node_matrices(
 	long object_index)
@@ -3203,11 +3280,18 @@ long object_new(
 			object->object.translational_velocity = data->translational_velocity;
 			object->object.angular_velocity = data->angular_velocity;
 			
-			point_from_line3d(
-				&object->object.position,
-				&object->object.up,
-				data->height,
-				&object->object.position);
+			// Preserve the January inline schedule without emitting a point_from_line3d COMDAT.
+			{
+				real_point3d const *p = &object->object.position;
+				real_vector3d const *v = &object->object.up;
+				real t = data->height;
+				real_point3d *result = &object->object.position;
+				real height = t;
+
+				result->x = (v->i*height) + p->x;
+				result->y = (v->j*height) + p->y;
+				result->z = (v->k*height) + p->z;
+			}
 
 			SET_FLAG(object->object.flags, _object_mirrored_bit, TEST_FLAG(data->flags, _new_object_mirrored_bit));
 
