@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.coff_compare import build_coff
+from tools.coff_compare import build_coff, make_section_raw
 from tools.semantic_progress import (
     SemanticProgressError,
     apply_semantic_data_matches,
@@ -73,6 +73,45 @@ class SemanticProgressTests(unittest.TestCase):
         )
 
     @staticmethod
+    def _local_label_object(raw, label_name, label_value=8,
+                            duplicate_label=False, with_relocation=True):
+        symbols = [{
+            "name": "_fn",
+            "value": 0,
+            "section": 1,
+            "type": 0x20,
+            "storage": 2,
+        }, {
+            "name": label_name,
+            "value": label_value,
+            "section": 1,
+            "type": 0,
+            "storage": 3,
+        }]
+        if duplicate_label:
+            symbols.append({
+                "name": "$duplicate",
+                "value": label_value,
+                "section": 1,
+                "type": 0,
+                "storage": 3,
+            })
+        relocations = [(0, 1, 6, 0)] if with_relocation else []
+        relocated_raw, relocation_data = make_section_raw(len(raw), relocations)
+        relocated_raw = bytes(
+            original if index >= 4 else generated
+            for index, (original, generated) in enumerate(zip(raw, relocated_raw)))
+        return build_coff(
+            sections=[{
+                "name": ".text",
+                "size": len(raw),
+                "raw_data": relocated_raw,
+                "reloc_data": relocation_data,
+            }],
+            symbols=symbols,
+        )
+
+    @staticmethod
     def _measures(total_code, matched_code, total_functions, matched_functions):
         return {
             "total_code": total_code,
@@ -121,6 +160,61 @@ class SemanticProgressTests(unittest.TestCase):
         self.report["units"][0]["functions"] = []
 
         with self.assertRaisesRegex(SemanticProgressError, "expected one"):
+            self._apply()
+
+    def test_local_label_continuation_is_credited_by_exact_owner(self):
+        raw = b"\0\0\0\0" + b"\x90" * 12
+        self.target_path.write_bytes(
+            self._local_label_object(raw, "$Ltarget"))
+        self.base_path.write_bytes(
+            self._local_label_object(raw, "$Lbase"))
+        self.manifest_path.write_text(json.dumps([{
+            "unit": "unit",
+            "function": "$Ltarget",
+            "owner_function": "_fn",
+        }]), encoding="utf-8")
+        self.report["units"][0]["functions"][0].update({
+            "name": "$Ltarget",
+            "size": 8,
+        })
+
+        notes = self._apply()
+
+        self.assertEqual(len(notes), 1)
+        self.assertEqual(self.report["units"][0]["measures"]["matched_code"], 8)
+
+    def test_local_label_continuation_refuses_ambiguous_base_offset(self):
+        raw = b"\0\0\0\0" + b"\x90" * 12
+        self.target_path.write_bytes(
+            self._local_label_object(raw, "$Ltarget"))
+        self.base_path.write_bytes(
+            self._local_label_object(raw, "$Lbase", duplicate_label=True))
+        self.manifest_path.write_text(json.dumps([{
+            "unit": "unit",
+            "function": "$Ltarget",
+            "owner_function": "_fn",
+        }]), encoding="utf-8")
+        self.report["units"][0]["functions"][0]["name"] = "$Ltarget"
+
+        with self.assertRaisesRegex(
+                SemanticProgressError, "expected one base local destination"):
+            self._apply()
+
+    def test_local_label_continuation_requires_internal_relocation(self):
+        raw = b"\x90" * 16
+        self.target_path.write_bytes(
+            self._local_label_object(raw, "$Ltarget", with_relocation=False))
+        self.base_path.write_bytes(
+            self._local_label_object(raw, "$Lbase", with_relocation=False))
+        self.manifest_path.write_text(json.dumps([{
+            "unit": "unit",
+            "function": "$Ltarget",
+            "owner_function": "_fn",
+        }]), encoding="utf-8")
+        self.report["units"][0]["functions"][0]["name"] = "$Ltarget"
+
+        with self.assertRaisesRegex(
+                SemanticProgressError, "no proven internal relocation"):
             self._apply()
 
     def test_structurally_rejected_objdiff_match_is_debited_everywhere(self):

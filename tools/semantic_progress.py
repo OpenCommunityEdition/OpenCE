@@ -23,6 +23,79 @@ class SemanticProgressError(RuntimeError):
     pass
 
 
+def _verify_local_label_continuation(target, base, label_name, owner_name):
+    """Prove that an objdiff ``$L`` pseudo-function is an exact continuation.
+
+    csplit can expose a compiler-local jump-table label as an external,
+    function-typed symbol while the rebuilt COFF emits a differently named
+    static label at the same offset.  The label is creditable only when the
+    complete owning COMDAT is semantically exact, both labels are unique at
+    that offset, and an internal relocation in the owner proves the offset is
+    an actual encoded destination.  Any ambiguity fails closed.
+    """
+    if not label_name.startswith("$"):
+        raise SemanticProgressError(
+            f"local-label match does not name a local label: {label_name}")
+
+    target_labels = [
+        item for item in target["symbols"]
+        if item["name"] == label_name and item["section"] > 0
+    ]
+    if len(target_labels) != 1:
+        raise SemanticProgressError(
+            f"expected one target local label {label_name}, found {len(target_labels)}")
+    target_label = target_labels[0]
+    if target_label["value"] <= 0:
+        raise SemanticProgressError(
+            f"target local label is not a continuation: {label_name}")
+
+    target_owners = [
+        item for item in target["symbols"]
+        if item["name"] == owner_name and item["section"] > 0
+    ]
+    base_owners = [
+        item for item in base["symbols"]
+        if item["name"] == owner_name and item["section"] > 0
+    ]
+    if len(target_owners) != 1 or len(base_owners) != 1:
+        raise SemanticProgressError(
+            f"expected unique local-label owner {owner_name}, found "
+            f"{len(target_owners)}/{len(base_owners)}")
+    target_owner = target_owners[0]
+    base_owner = base_owners[0]
+    if target_owner["value"] != 0 or base_owner["value"] != 0:
+        raise SemanticProgressError(
+            f"local-label owner is not a COMDAT entry: {owner_name}")
+    if target_label["section"] != target_owner["section"]:
+        raise SemanticProgressError(
+            f"target local label is outside owner {owner_name}: {label_name}")
+
+    target_info = section_info(target, owner_name)
+    base_info = section_info(base, owner_name)
+    if not section_infos_equal(target_info, base_info):
+        raise SemanticProgressError(
+            f"local-label owner is no longer exact: {owner_name}")
+
+    offset = target_label["value"]
+    base_labels = [
+        item for item in base["symbols"]
+        if item["section"] == base_owner["section"]
+        and item["value"] == offset
+        and item["name"].startswith("$")
+    ]
+    if len(base_labels) != 1:
+        raise SemanticProgressError(
+            f"expected one base local destination at {offset:#x}, found {len(base_labels)}")
+    if not any(
+        relocation["target"] == ["internal", offset]
+        for relocation in target_info["relocations"]
+    ):
+        raise SemanticProgressError(
+            f"target local label has no proven internal relocation: {label_name}")
+
+    return target_info
+
+
 def _percent(numerator: int, denominator: int) -> float:
     return 100.0 * numerator / denominator if denominator else 0.0
 
@@ -195,8 +268,14 @@ def apply_semantic_matches(
         try:
             target = load(project_root / config_unit["target_path"])
             base = load(project_root / config_unit["base_path"])
-            target_info = section_info(target, function_name)
-            base_info = section_info(base, function_name)
+            owner_function = entry.get("owner_function")
+            if owner_function:
+                target_info = _verify_local_label_continuation(
+                    target, base, function_name, owner_function)
+                base_info = target_info
+            else:
+                target_info = section_info(target, function_name)
+                base_info = section_info(base, function_name)
         except (CoffError, KeyError, OSError) as error:
             raise SemanticProgressError(
                 f"cannot verify semantic match {unit_name}:{function_name}: {error}"
