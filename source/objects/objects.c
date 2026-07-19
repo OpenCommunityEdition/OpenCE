@@ -3327,7 +3327,13 @@ long object_new(
 				success = FALSE;
 			}
 
-			if (success)
+			if (!success)
+			{
+				object_type_delete(object_index);
+				object_header_delete(object_header_data, object_index);
+				object_index = NONE;
+			}
+			else
 			{
 				if (object_definition->object.creation_effect.index!=NONE)
 				{
@@ -3341,12 +3347,6 @@ long object_new(
 						NULL,
 						NULL);
 				}
-			}
-			else
-			{
-				object_type_delete(object_index);
-				object_header_delete(object_header_data, object_index);
-				object_index = NONE;
 			}
 		}
 	}
