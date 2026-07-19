@@ -185,6 +185,16 @@
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
+    "unit": "source/ai/action_guard",
+    "function": "_action_guard_setup_postcombat",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
+    "unit": "source/ai/action_guard",
+    "function": "_action_guard_control",
+    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
+  },
+  {
     "unit": "source/bitmaps/libtiff/tif_fax3",
     "function": "_skiptoeol",
     "reason": "hardened COFF comparison proves exact bytes and internal jump-table relocations; objdiff reports a local-label ownership false negative"
