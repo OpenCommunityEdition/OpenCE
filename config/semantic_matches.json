@@ -1,9 +1,21 @@
 [
   {
     "unit": "source/rasterizer/xbox/rasterizer_xbox_plasma_energy",
+    "function": "_code_0015e2b0",
+    "base_function": "_D3DDevice_SetRenderState",
+    "reason": "stock XDK D3DINLINE emits the source-authentic wrapper under its SDK name; hardened COFF comparison proves exact bytes and resolved relocation destinations despite csplit relocation spelling"
+  },
+  {
+    "unit": "source/rasterizer/xbox/rasterizer_xbox_plasma_energy",
     "function": "_code_0015e460",
     "base_function": "_D3DDevice_SetTextureStageState",
     "reason": "stock XDK D3DINLINE emits the source-authentic wrapper under its SDK name; strict COFF comparison proves exact bytes and semantic relocations"
+  },
+  {
+    "unit": "source/rasterizer/xbox/rasterizer_xbox_plasma_energy",
+    "function": "_code_0015e4b0",
+    "base_function": "_IDirect3DDevice8_SetRenderState@12",
+    "reason": "stock XDK D3DINLINE emits the source-authentic wrapper under its SDK name; hardened COFF comparison proves exact bytes and resolved relocation destinations despite csplit relocation spelling"
   },
   {
     "unit": "source/rasterizer/xbox/rasterizer_xbox_plasma_energy",
