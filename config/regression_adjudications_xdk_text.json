@@ -1,0 +1,102 @@
+{
+  "debug_sections": [
+    {
+      "after_fingerprint_sha256": "8e07b48ebedfa52de730be35f0b56d2fadb9b72e51a1edd029e20b5bb5cddc23",
+      "before_fingerprint_sha256": "92288b56cfbca8760857b38d5fb34cdfe3b56c092891ebfa6c00dc9cfc68b395",
+      "recipe": "xdk-stock-d3dinline",
+      "section": ".debug$F|anonymous=2",
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_text"
+    }
+  ],
+  "functions": [
+    {
+      "after_comdat_selection": 2,
+      "after_fingerprint_sha256": "458fb5bd5e078ea76d95e47dd9632bb3bb0b3a25c8aa64efba41fd359a99b2cf",
+      "before_comdat_selection": 1,
+      "before_fingerprint_sha256": "9ff19872aa908361445bece0a21cab0ca4c93f68cb7bad1bcc70e77f0de6c6c8",
+      "function": "_D3DDevice_SetRenderState",
+      "recipe": "xdk-stock-d3dinline",
+      "source_recipe": "stock XDK D3DINLINE (static __forceinline)",
+      "target_evidence_sha256": "ef767bb47681ea399daf6f8720f056e523790d105bcea1f634d71c3e3611d192",
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_text"
+    },
+    {
+      "after_comdat_selection": 2,
+      "after_fingerprint_sha256": "459f5d33ded34255e79f255c42a193c74066bdad08fc9116b2dd82eaf16ee094",
+      "before_comdat_selection": 1,
+      "before_fingerprint_sha256": "142d63782a1e9e3a41a5f722084b8681b1bf765912c4dd91784299a280112204",
+      "function": "_D3DDevice_SetTextureStageState",
+      "recipe": "xdk-stock-d3dinline",
+      "source_recipe": "stock XDK D3DINLINE (static __forceinline)",
+      "target_evidence_sha256": "ef19cb2f99aa7c1ad0f06f57c44a2dbace4b75ba6c779e68a1885e832d50d6c4",
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_text"
+    },
+    {
+      "after_comdat_selection": 2,
+      "after_fingerprint_sha256": "5382805b884f0d40e945936f88f42d2b3c9f0c5ca0f83098312bc5a8444c3d66",
+      "before_comdat_selection": 1,
+      "before_fingerprint_sha256": "8f5385e5727b96b51ea06b98ff74fc9ba2f57802f0118f6f759e32ed3bb60797",
+      "function": "_IDirect3DDevice8_Begin@8",
+      "recipe": "xdk-stock-d3dinline",
+      "source_recipe": "stock XDK D3DINLINE (static __forceinline)",
+      "target_evidence_sha256": "f9f8776473104153fbb44b071659641050b0ef17ffde33740e053f1d31598d86",
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_text"
+    },
+    {
+      "after_comdat_selection": 2,
+      "after_fingerprint_sha256": "a6c5208bf1949404ef5f4340bb14eff5ffab46a37c3aa041c2d5e4523b1dd8c2",
+      "before_comdat_selection": 1,
+      "before_fingerprint_sha256": "7916c2492802dcf917429ec316aefe67fbd8c96ef60bad99e12e26c38271342a",
+      "function": "_IDirect3DDevice8_End@4",
+      "recipe": "xdk-stock-d3dinline",
+      "source_recipe": "stock XDK D3DINLINE (static __forceinline)",
+      "target_evidence_sha256": "2acf41df227cc5ab56a634bc22b9a1af2f3594aa640b8a26e2126783c6802ed2",
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_text"
+    },
+    {
+      "after_comdat_selection": 2,
+      "after_fingerprint_sha256": "09a181160ca4a0cec88563ed68f170bb7562d98e07cae82eb6ede383067e867c",
+      "before_comdat_selection": 1,
+      "before_fingerprint_sha256": "41c0a05e408be665a1bb43ea64bc56c1dbca0c5ef460f81b4248f6d02a2999d3",
+      "function": "_IDirect3DDevice8_SetTextureStageState@16",
+      "recipe": "xdk-stock-d3dinline",
+      "source_recipe": "stock XDK D3DINLINE (static __forceinline)",
+      "target_evidence_sha256": "b53ab8eb325c14f08df0e98df7b272a3dceb09921ed0d1dbeea49b69e07557f2",
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_text"
+    },
+    {
+      "after_comdat_selection": 2,
+      "after_fingerprint_sha256": "13ff5c4aa2773bc0df32f62fce0afe58261ebabf2b2ca76426ef01a613fa7bf0",
+      "before_comdat_selection": 1,
+      "before_fingerprint_sha256": "7bb9a9967e3ddbbadfd0667b85c8f52ee06137a1f0b0cd4a0e45a4e1247d1815",
+      "function": "_IDirect3DDevice8_SetVertexData2f@16",
+      "recipe": "xdk-stock-d3dinline",
+      "source_recipe": "stock XDK D3DINLINE (static __forceinline)",
+      "target_evidence_sha256": "1303752bb188cf6b5a00adb8c2c49092f22408c2c38203e8daddf5b61aa61153",
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_text"
+    },
+    {
+      "after_comdat_selection": 2,
+      "after_fingerprint_sha256": "78b5829871e22251b4e266bd81caa2eda338a6e93f43c2a592c93eaad8808e6b",
+      "before_comdat_selection": 1,
+      "before_fingerprint_sha256": "464ecff7dc1e2d1a1c18d02c467dcbe893baedfebfa42920922583cde75b9331",
+      "function": "_IDirect3DDevice8_SetVertexDataColor@12",
+      "recipe": "xdk-stock-d3dinline",
+      "source_recipe": "stock XDK D3DINLINE (static __forceinline)",
+      "target_evidence_sha256": "e4a0591ba36b4fdad4a24f1009fed7b141c8acf919c8a4bca421435760c2e38a",
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_text"
+    },
+    {
+      "after_comdat_selection": 2,
+      "after_fingerprint_sha256": "c936826f1cdc47b8e52662c867164d8fa9063b86bd7050db06a3992a0414dba7",
+      "before_comdat_selection": 1,
+      "before_fingerprint_sha256": "db0e0cd1dc136a05abf97c28072edfda4b9cd8de3a0bf1e45fd45747655dcef5",
+      "function": "_IDirect3DDevice8_SetVertexShaderConstant@16",
+      "recipe": "xdk-stock-d3dinline",
+      "source_recipe": "stock XDK D3DINLINE (static __forceinline)",
+      "target_evidence_sha256": "cc42796796437d1eaee75aa6b6a300dc712d6d48cb2571820adf13f5eea7a3bd",
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_text"
+    }
+  ],
+  "schema_version": 1
+}
