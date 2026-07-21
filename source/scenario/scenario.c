@@ -182,6 +182,13 @@ symbols in this file:
 
 /* ---------- macros */
 
+#define scenario_structure_bsp_reconnect_procs \
+	((scenario_structure_bsp_connection_proc *)((byte *)&global_structure_bsp_index + \
+		2 * sizeof(global_structure_bsp_index)))
+#define scenario_structure_bsp_disconnect_procs \
+	((scenario_structure_bsp_connection_proc *)((byte *)&global_structure_bsp_index + \
+		2 * sizeof(global_structure_bsp_index) + sizeof(scenario_structure_bsp_reconnect_proc_table)))
+
 /* ---------- structures */
 
 struct scenario_material_globals
@@ -192,7 +199,98 @@ struct scenario_material_globals
 
 /* ---------- prototypes */
 
+void objects_reconnect_to_structure_bsp(
+	void);
+void lights_reconnect_to_structure_bsp(
+	void);
+void ai_reconnect_to_structure_bsp(
+	void);
+void effects_reconnect_to_structure_bsp(
+	void);
+void particles_reconnect_to_structure_bsp(
+	void);
+void particle_systems_reconnect_to_structure_bsp(
+	void);
+void contrails_reconnect_to_structure_bsp(
+	void);
+void decals_reconnect_to_structure_bsp(
+	void);
+void structure_decals_reconnect_to_structure_bsp(
+	void);
+void observer_reconnect_to_structure_bsp(
+	void);
+void players_reconnect_to_structure_bsp(
+	void);
+void sound_reconnect_to_structure_bsp(
+	void);
+void object_types_reconnect_to_structure_bsp(
+	void);
+
+void object_types_disconnect_from_structure_bsp(
+	void);
+void objects_disconnect_from_structure_bsp(
+	void);
+void lights_disconnect_from_structure_bsp(
+	void);
+void ai_disconnect_from_structure_bsp(
+	void);
+void effects_disconnect_from_structure_bsp(
+	void);
+void particles_disconnect_from_structure_bsp(
+	void);
+void particle_systems_disconnect_from_structure_bsp(
+	void);
+void contrails_disconnect_from_structure_bsp(
+	void);
+void structure_decals_disconnect_from_structure_bsp(
+	void);
+void decals_disconnect_from_structure_bsp(
+	void);
+
+typedef void (*scenario_structure_bsp_connection_proc)(
+	void);
+
 /* ---------- globals */
+
+long global_scenario_index = NONE;
+short global_structure_bsp_index = NONE;
+
+static scenario_structure_bsp_connection_proc scenario_structure_bsp_reconnect_proc_table[] =
+{
+	objects_reconnect_to_structure_bsp,
+	lights_reconnect_to_structure_bsp,
+	ai_reconnect_to_structure_bsp,
+	effects_reconnect_to_structure_bsp,
+	particles_reconnect_to_structure_bsp,
+	particle_systems_reconnect_to_structure_bsp,
+	contrails_reconnect_to_structure_bsp,
+	decals_reconnect_to_structure_bsp,
+	structure_decals_reconnect_to_structure_bsp,
+	observer_reconnect_to_structure_bsp,
+	players_reconnect_to_structure_bsp,
+	sound_reconnect_to_structure_bsp,
+	object_types_reconnect_to_structure_bsp,
+};
+
+static scenario_structure_bsp_connection_proc scenario_structure_bsp_disconnect_proc_table[] =
+{
+	object_types_disconnect_from_structure_bsp,
+	objects_disconnect_from_structure_bsp,
+	lights_disconnect_from_structure_bsp,
+	ai_disconnect_from_structure_bsp,
+	effects_disconnect_from_structure_bsp,
+	particles_disconnect_from_structure_bsp,
+	particle_systems_disconnect_from_structure_bsp,
+	contrails_disconnect_from_structure_bsp,
+	structure_decals_disconnect_from_structure_bsp,
+	decals_disconnect_from_structure_bsp,
+};
+
+/*
+ * csplit attributes both tables to global_structure_bsp_index in the January
+ * object.  Use that owner when reading the tables so the relocation destination
+ * remains the same as the original object.
+ */
 
 struct structure_bsp *global_structure_bsp;
 struct scenario *global_scenario;
@@ -202,6 +300,28 @@ struct bsp3d *global_bsp3d;
 struct game_globals *global_game_globals;
 
 /* ---------- public code */
+
+void code_0017da90(
+	void)
+{
+	short proc_index;
+
+	for (proc_index = 0; proc_index < NUMBEROF(scenario_structure_bsp_disconnect_proc_table); proc_index++)
+		scenario_structure_bsp_disconnect_procs[proc_index]();
+
+	return;
+}
+
+void code_0017dab0(
+	void)
+{
+	short proc_index;
+
+	for (proc_index = 0; proc_index < NUMBEROF(scenario_structure_bsp_reconnect_proc_table); proc_index++)
+		scenario_structure_bsp_reconnect_procs[proc_index]();
+
+	return;
+}
 
 void scenario_initialize(
 	void)
@@ -493,6 +613,34 @@ short scenario_get_structure_reference_index_from_tag_index(
 	}
 
 	return result;
+}
+
+void scenario_location_from_point(
+	struct location *location,
+	const real_point3d *point)
+{
+	long cluster_index;
+
+	location->leaf_index = bsp3d_test_point(
+		global_bsp3d_get(),
+		0,
+		point);
+
+	if (location->leaf_index == NONE)
+	{
+		cluster_index = location->leaf_index;
+	}
+	else
+	{
+		cluster_index = TAG_BLOCK_GET_ELEMENT(
+			&global_structure_bsp_get()->leaves,
+			location->leaf_index & LONG_MAX,
+			struct structure_leaf)->cluster_index;
+	}
+
+	location->cluster_index = (short)cluster_index;
+
+	return;
 }
 
 void scenario_location_from_line(
