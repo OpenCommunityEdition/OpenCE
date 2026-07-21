@@ -21,6 +21,8 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "bungie_net/common/64bit_math.h"
+#include "bungie_net/common/random_numbers.h"
 
 /* ---------- constants */
 
@@ -30,8 +32,12 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-unsigned long *generate_prime_numbers(unsigned long maximum, unsigned long *prime_count);
-long randomrange(long minimum, long maximum);
+unsigned long *generate_prime_numbers(
+	unsigned long maximum,
+	unsigned long *num_primes);
+
+void probable_prime64(
+	struct qword_value *result);
 
 /* ---------- globals */
 
@@ -66,4 +72,137 @@ int compare_prime_numbers_descending(
 		return 1;
 
 	return left_value > right_value ? -1 : 0;
+}
+/* NonMatching foundation: this source preserves the January count model,
+ * including an in-bounds trailing slot for prime 2. The target/candidate are
+ * 0x160/0x150 padded bytes with the same twelve relocation destinations in
+ * the same order; the remaining delta starts with a 0xC/0x8 frame-layout
+ * difference and propagates through local allocation and scheduling. */
+unsigned long *generate_prime_numbers(
+	unsigned long maximum,
+	unsigned long *num_primes)
+{
+	unsigned long *primes;
+	unsigned long odd_count;
+	unsigned long total_count;
+	unsigned long sqrt_max;
+	unsigned long i;
+	unsigned long scan_count;
+	unsigned long j;
+	unsigned long k;
+	unsigned long m;
+
+	odd_count = maximum >> 1;
+	if (!(maximum & 1))
+		odd_count--;
+	i = 0;
+	scan_count = 0;
+
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\prime_numbers.c", 61, num_primes);
+
+	if (maximum < 2)
+	{
+		*num_primes = 0;
+
+		return NULL;
+	}
+
+	total_count = odd_count + 1;
+	*num_primes = total_count;
+	primes = match_malloc(
+		"c:\\halo\\SOURCE\\bungie_net\\common\\prime_numbers.c",
+		71,
+		total_count * sizeof(*primes));
+
+	if (!primes)
+		return NULL;
+
+	sqrt_max = (unsigned long)sqrt((double)maximum);
+	k = 3;
+
+	while (i < odd_count)
+	{
+		primes[i] = k;
+		k += 2;
+		i++;
+	}
+
+	while (scan_count < odd_count && primes[scan_count] <= sqrt_max)
+		scan_count++;
+
+	if (scan_count)
+	{
+		m = 1;
+		j = 0;
+
+		while (scan_count)
+		{
+			if (primes[j])
+			{
+				for (k = m; k < odd_count; k++)
+				{
+					if (primes[k] && !(primes[k] % primes[j]))
+					{
+						primes[k] = 0;
+						(*num_primes)--;
+					}
+				}
+			}
+
+			m++;
+			j++;
+			scan_count--;
+		}
+	}
+
+	primes[odd_count] = 2;
+	qsort(primes, total_count, sizeof(*primes), compare_prime_numbers_descending);
+
+	if (*num_primes < total_count)
+	{
+		primes = match_realloc(
+			"c:\\halo\\SOURCE\\bungie_net\\common\\prime_numbers.c",
+			117,
+			primes,
+			*num_primes * sizeof(*primes));
+	}
+
+	return primes;
+}
+
+void probable_prime64(
+	struct qword_value *result)
+{
+	unsigned long prime_count;
+	unsigned long *primes;
+	unsigned long prime;
+	unsigned long iteration_count;
+	struct qword_value two;
+	struct qword_value prime_qword;
+
+	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\prime_numbers.c", 150, result);
+
+	result->qword = 1;
+	two.qword = 2;
+	iteration_count = 4;
+
+	do
+	{
+		prime = 0;
+		primes = generate_prime_numbers(0xFFFF, &prime_count);
+
+		if (primes)
+		{
+			prime = primes[randomrange(0, prime_count - 1)];
+			match_free("c:\\halo\\SOURCE\\bungie_net\\common\\prime_numbers.c", 137, primes);
+		}
+
+		prime_qword.qword = prime;
+		multiply64(result, &prime_qword, result);
+	}
+	while (--iteration_count);
+
+	add64(result, &two, result);
+
+	return;
 }
