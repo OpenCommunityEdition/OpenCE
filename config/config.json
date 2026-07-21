@@ -484,7 +484,7 @@
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_shadows.c", "index": 110, "status": "NonMatching" },
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_screen_effect.c", "index": 111, "status": "NonMatching" },
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_profile.c", "index": 112, "status": "NonMatching" },
-				{ "name": "source/rasterizer/xbox/rasterizer_xbox_plasma_energy.c", "index": 113, "status": "NonMatching" },
+				{ "name": "source/rasterizer/xbox/rasterizer_xbox_plasma_energy.c", "index": 113, "status": "Matching" },
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_motion_sensor.c", "index": 114, "status": "NonMatching" },
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_models.c", "index": 115, "status": "NonMatching" },
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_lights.c", "index": 116, "status": "NonMatching" },
