@@ -62,11 +62,11 @@ class SemanticProgressTests(unittest.TestCase):
         self.temporary_directory.cleanup()
 
     @staticmethod
-    def _object(raw):
+    def _object(raw, function_name="_fn"):
         return build_coff(
             sections=[{"name": ".text", "size": 16, "raw_data": raw}],
             symbols=[{
-                "name": "_fn",
+                "name": function_name,
                 "value": 0,
                 "section": 1,
                 "type": 0x20,
@@ -154,6 +154,30 @@ class SemanticProgressTests(unittest.TestCase):
 
     def test_changed_object_refuses_credit(self):
         self.base_path.write_bytes(self._object(b"\xcc" * 16))
+
+        with self.assertRaisesRegex(SemanticProgressError, "no longer exact"):
+            self._apply()
+
+    def test_unique_cross_name_exact_function_is_credited(self):
+        self.base_path.write_bytes(self._object(b"\x90" * 16, "_sdk_fn"))
+        self.manifest_path.write_text(json.dumps([{
+            "unit": "unit",
+            "function": "_fn",
+            "base_function": "_sdk_fn",
+        }]), encoding="utf-8")
+
+        notes = self._apply()
+
+        self.assertEqual(len(notes), 1)
+        self.assertEqual(self.report["units"][0]["measures"]["matched_code"], 16)
+
+    def test_cross_name_alias_still_requires_exact_evidence(self):
+        self.base_path.write_bytes(self._object(b"\xcc" * 16, "_sdk_fn"))
+        self.manifest_path.write_text(json.dumps([{
+            "unit": "unit",
+            "function": "_fn",
+            "base_function": "_sdk_fn",
+        }]), encoding="utf-8")
 
         with self.assertRaisesRegex(SemanticProgressError, "no longer exact"):
             self._apply()
