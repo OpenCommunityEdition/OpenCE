@@ -143,20 +143,446 @@ symbols in this file:
 void object_types_place_objects(
 	boolean reconnecting);
 
+#define DECLARE_OBJECT_TYPE_LIFECYCLE(prefix) \
+	void prefix##_initialize( \
+		void); \
+	void prefix##_dispose( \
+		void); \
+	void prefix##_initialize_for_new_map( \
+		void); \
+	void prefix##_dispose_from_old_map( \
+		void)
+
+DECLARE_OBJECT_TYPE_LIFECYCLE(units);
+DECLARE_OBJECT_TYPE_LIFECYCLE(bipeds);
+DECLARE_OBJECT_TYPE_LIFECYCLE(vehicles);
+DECLARE_OBJECT_TYPE_LIFECYCLE(items);
+DECLARE_OBJECT_TYPE_LIFECYCLE(weapons);
+DECLARE_OBJECT_TYPE_LIFECYCLE(projectiles);
+DECLARE_OBJECT_TYPE_LIFECYCLE(scenery);
+DECLARE_OBJECT_TYPE_LIFECYCLE(devices);
+DECLARE_OBJECT_TYPE_LIFECYCLE(machines);
+DECLARE_OBJECT_TYPE_LIFECYCLE(controls);
+DECLARE_OBJECT_TYPE_LIFECYCLE(light_fixtures);
+DECLARE_OBJECT_TYPE_LIFECYCLE(placeholder);
+
+#undef DECLARE_OBJECT_TYPE_LIFECYCLE
+
+void object_export_function_values(
+	long object_index);
+void object_render_debug(
+	long object_index);
+
+boolean unit_new(
+	long object_index);
+void unit_delete(
+	long object_index);
+boolean unit_update(
+	long object_index);
+void unit_export_function_values(
+	long object_index);
+void unit_handle_deleted_object(
+	long object_index,
+	long deleted_object_index);
+void unit_handle_region_destroyed(
+	long object_index,
+	short region_index,
+	unsigned long damage_flags);
+void unit_preprocess_node_orientations(
+	long object_index,
+	struct real_orientation *node_orientations);
+void unit_postprocess_node_matrices(
+	long object_index,
+	struct real_matrix4x3 *node_matrices);
+void unit_notify_impulse_sound(
+	long object_index,
+	long sound_index,
+	long source_object_index);
+void unit_render_debug(
+	long object_index);
+
+void biped_adjust_placement(
+	long object_index,
+	struct object_placement_data *data);
+boolean biped_new(
+	long object_index);
+void biped_place(
+	long object_index,
+	struct scenario_object_datum *scenario_object);
+void biped_delete(
+	long object_index);
+boolean biped_update(
+	long object_index);
+void biped_export_function_values(
+	long object_index);
+void biped_preprocess_node_orientations(
+	long object_index,
+	struct real_orientation *node_orientations);
+void biped_reset(
+	long object_index);
+void biped_disconnect_from_structure_bsp(
+	long object_index);
+void biped_render_debug(
+	long object_index);
+
+boolean vehicle_new(
+	long object_index);
+void vehicle_place(
+	long object_index,
+	struct scenario_object_datum *scenario_object);
+void vehicle_delete(
+	long object_index);
+boolean vehicle_update(
+	long object_index);
+void vehicle_export_function_values(
+	long object_index);
+void vehicle_preprocess_node_orientations(
+	long object_index,
+	struct real_orientation *node_orientations);
+void vehicle_reset(
+	long object_index);
+void vehicle_render_debug(
+	long object_index);
+
+boolean item_new(
+	long object_index);
+void item_delete(
+	long object_index);
+boolean item_update(
+	long object_index);
+
+boolean weapon_new(
+	long object_index);
+void weapon_place(
+	long object_index,
+	struct scenario_object_datum *scenario_object);
+void weapon_delete(
+	long object_index);
+boolean weapon_update(
+	long object_index);
+void weapon_export_function_values(
+	long object_index);
+void weapon_preprocess_node_orientations(
+	long object_index,
+	struct real_orientation *node_orientations);
+
+void equipment_place(
+	long object_index,
+	struct scenario_object_datum *scenario_object);
+boolean garbage_new(
+	long object_index);
+boolean garbage_update(
+	long object_index);
+
+boolean projectile_new(
+	long object_index);
+void projectile_delete(
+	long object_index);
+boolean projectile_update(
+	long object_index);
+void projectile_export_function_values(
+	long object_index);
+void projectile_handle_deleted_object(
+	long object_index,
+	long deleted_object_index);
+boolean projectile_handle_parent_destroyed(
+	long object_index);
+
+boolean scenery_new(
+	long object_index);
+void scenery_place(
+	long object_index,
+	struct scenario_object_datum *scenario_object);
+void scenery_delete(
+	long object_index);
+boolean scenery_update(
+	long object_index);
+
+boolean sound_scenery_new(
+	long object_index);
+void sound_scenery_delete(
+	long object_index);
+
+boolean device_new(
+	long object_index);
+void device_delete(
+	long object_index);
+boolean device_update(
+	long object_index);
+void device_export_function_values(
+	long object_index);
+void device_preprocess_node_orientations(
+	long object_index,
+	struct real_orientation *node_orientations);
+void device_render_debug(
+	long object_index);
+
+boolean machine_new(
+	long object_index);
+void machine_place(
+	long object_index,
+	struct scenario_object_datum *scenario_object);
+void machine_delete(
+	long object_index);
+boolean machine_update(
+	long object_index);
+
+boolean control_new(
+	long object_index);
+void control_place(
+	long object_index,
+	struct scenario_object_datum *scenario_object);
+void control_delete(
+	long object_index);
+boolean control_update(
+	long object_index);
+
+boolean light_fixture_new(
+	long object_index);
+void light_fixture_place(
+	long object_index,
+	struct scenario_object_datum *scenario_object);
+void light_fixture_delete(
+	long object_index);
+boolean light_fixture_update(
+	long object_index);
+
+boolean placeholder_new(
+	long object_index);
+void placeholder_place(
+	long object_index,
+	struct scenario_object_datum *scenario_object);
+void placeholder_delete(
+	long object_index);
+
 /* ---------- globals */
 
-extern struct object_type_definition biped_data_definition;
-extern struct object_type_definition vehicle_data_definition;
-extern struct object_type_definition weapon_data_definition;
-extern struct object_type_definition equipment_data_definition;
-extern struct object_type_definition garbage_data_definition;
-extern struct object_type_definition projectile_data_definition;
-extern struct object_type_definition scenery_data_definition;
-extern struct object_type_definition machine_data_definition;
-extern struct object_type_definition control_data_definition;
-extern struct object_type_definition light_fixture_data_definition;
-extern struct object_type_definition placeholder_data_definition;
-extern struct object_type_definition sound_scenery_data_definition;
+/*
+The initializer rows follow object_type_definition's field order: identity and
+scenario layout, lifecycle callbacks, datum callbacks, hierarchy, then next.
+*/
+struct object_type_definition object_data_definition =
+{
+	"object", 'obje', 0x1A4, NONE, NONE, NONE,
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL,
+	object_export_function_values,
+	NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL,
+	object_render_debug,
+	{ &object_data_definition },
+	NULL
+};
+
+struct object_type_definition unit_data_definition =
+{
+	"unit", 'unit', 0x424, NONE, NONE, NONE,
+	units_initialize, units_dispose, units_initialize_for_new_map, units_dispose_from_old_map,
+	NULL, unit_new, NULL, unit_delete, unit_update,
+	unit_export_function_values,
+	unit_handle_deleted_object, unit_handle_region_destroyed, NULL,
+	unit_preprocess_node_orientations, unit_postprocess_node_matrices,
+	NULL, NULL, unit_notify_impulse_sound,
+	unit_render_debug,
+	{ &object_data_definition, &unit_data_definition },
+	NULL
+};
+
+struct object_type_definition biped_data_definition =
+{
+	"biped", 'bipd', 0x480, 0x228, 0x234, 0x78,
+	bipeds_initialize, bipeds_dispose, bipeds_initialize_for_new_map, bipeds_dispose_from_old_map,
+	biped_adjust_placement, biped_new, biped_place, biped_delete, biped_update,
+	biped_export_function_values,
+	NULL, NULL, NULL,
+	biped_preprocess_node_orientations, NULL,
+	biped_reset, biped_disconnect_from_structure_bsp, NULL,
+	biped_render_debug,
+	{ &object_data_definition, &unit_data_definition, &biped_data_definition },
+	NULL
+};
+
+struct object_type_definition vehicle_data_definition =
+{
+	"vehicle", 'vehi', 0x47C, 0x240, 0x24C, 0x78,
+	vehicles_initialize, vehicles_dispose, vehicles_initialize_for_new_map, vehicles_dispose_from_old_map,
+	NULL, vehicle_new, vehicle_place, vehicle_delete, vehicle_update,
+	vehicle_export_function_values,
+	NULL, NULL, NULL,
+	vehicle_preprocess_node_orientations, NULL,
+	vehicle_reset, NULL, NULL,
+	vehicle_render_debug,
+	{ &object_data_definition, &unit_data_definition, &vehicle_data_definition },
+	NULL
+};
+
+struct object_type_definition item_data_definition =
+{
+	"item", 'item', 0x1DC, NONE, NONE, NONE,
+	items_initialize, items_dispose, items_initialize_for_new_map, items_dispose_from_old_map,
+	NULL, item_new, NULL, item_delete, item_update,
+	NULL,
+	NULL, NULL, NULL,
+	NULL, NULL,
+	NULL, NULL, NULL,
+	NULL,
+	{ &object_data_definition, &item_data_definition },
+	NULL
+};
+
+struct object_type_definition weapon_data_definition =
+{
+	"weapon", 'weap', 0x27C, 0x270, 0x27C, 0x5C,
+	weapons_initialize, weapons_dispose, weapons_initialize_for_new_map, weapons_dispose_from_old_map,
+	NULL, weapon_new, weapon_place, weapon_delete, weapon_update,
+	weapon_export_function_values,
+	NULL, NULL, NULL,
+	weapon_preprocess_node_orientations, NULL,
+	NULL, NULL, NULL,
+	NULL,
+	{ &object_data_definition, &item_data_definition, &weapon_data_definition },
+	NULL
+};
+
+struct object_type_definition equipment_data_definition =
+{
+	"equipment", 'eqip', 0x1F4, 0x258, 0x264, 0x28,
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, equipment_place, NULL, NULL,
+	NULL,
+	NULL, NULL, NULL,
+	NULL, NULL,
+	NULL, NULL, NULL,
+	NULL,
+	{ &object_data_definition, &item_data_definition, &equipment_data_definition },
+	NULL
+};
+
+struct object_type_definition garbage_data_definition =
+{
+	"garbage", 'garb', 0x1F4, NONE, NONE, NONE,
+	NULL, NULL, NULL, NULL,
+	NULL, garbage_new, NULL, NULL, garbage_update,
+	NULL,
+	NULL, NULL, NULL,
+	NULL, NULL,
+	NULL, NULL, NULL,
+	NULL,
+	{ &object_data_definition, &item_data_definition, &garbage_data_definition },
+	NULL
+};
+
+struct object_type_definition projectile_data_definition =
+{
+	"projectile", 'proj', 0x228, NONE, NONE, NONE,
+	projectiles_initialize, projectiles_dispose, projectiles_initialize_for_new_map, projectiles_dispose_from_old_map,
+	NULL, projectile_new, NULL, projectile_delete, projectile_update,
+	projectile_export_function_values,
+	projectile_handle_deleted_object, NULL, projectile_handle_parent_destroyed,
+	NULL, NULL,
+	NULL, NULL, NULL,
+	NULL,
+	{ &object_data_definition, &projectile_data_definition },
+	NULL
+};
+
+struct object_type_definition scenery_data_definition =
+{
+	"scenery", 'scen', 0x1A8, 0x210, 0x21C, 0x48,
+	scenery_initialize, scenery_dispose, scenery_initialize_for_new_map, scenery_dispose_from_old_map,
+	NULL, scenery_new, scenery_place, scenery_delete, scenery_update,
+	NULL,
+	NULL, NULL, NULL,
+	NULL, NULL,
+	NULL, NULL, NULL,
+	NULL,
+	{ &object_data_definition, &scenery_data_definition },
+	NULL
+};
+
+struct object_type_definition sound_scenery_data_definition =
+{
+	"sound_scenery", 'ssce', 0x1A8, 0x2DC, 0x2E8, 0x28,
+	NULL, NULL, NULL, NULL,
+	NULL, sound_scenery_new, NULL, sound_scenery_delete, NULL,
+	NULL,
+	NULL, NULL, NULL,
+	NULL, NULL,
+	NULL, NULL, NULL,
+	NULL,
+	{ &object_data_definition, &sound_scenery_data_definition },
+	NULL
+};
+
+struct object_type_definition device_data_definition =
+{
+	"device", 'devi', 0x1C4, NONE, NONE, NONE,
+	devices_initialize, devices_dispose, devices_initialize_for_new_map, devices_dispose_from_old_map,
+	NULL, device_new, NULL, device_delete, device_update,
+	device_export_function_values,
+	NULL, NULL, NULL,
+	device_preprocess_node_orientations, NULL,
+	NULL, NULL, NULL,
+	device_render_debug,
+	{ &object_data_definition, &device_data_definition },
+	NULL
+};
+
+struct object_type_definition machine_data_definition =
+{
+	"machine", 'mach', 0x1D8, 0x294, 0x2A0, 0x40,
+	machines_initialize, machines_dispose, machines_initialize_for_new_map, machines_dispose_from_old_map,
+	NULL, machine_new, machine_place, machine_delete, machine_update,
+	NULL,
+	NULL, NULL, NULL,
+	NULL, NULL,
+	NULL, NULL, NULL,
+	NULL,
+	{ &object_data_definition, &device_data_definition, &machine_data_definition },
+	NULL
+};
+
+struct object_type_definition control_data_definition =
+{
+	"control", 'ctrl', 0x1CC, 0x2AC, 0x2B8, 0x40,
+	controls_initialize, controls_dispose, controls_initialize_for_new_map, controls_dispose_from_old_map,
+	NULL, control_new, control_place, control_delete, control_update,
+	NULL,
+	NULL, NULL, NULL,
+	NULL, NULL,
+	NULL, NULL, NULL,
+	NULL,
+	{ &object_data_definition, &device_data_definition, &control_data_definition },
+	NULL
+};
+
+struct object_type_definition light_fixture_data_definition =
+{
+	"light_fixture", 'lifi', 0x1DC, 0x2C4, 0x2D0, 0x58,
+	light_fixtures_initialize, light_fixtures_dispose, light_fixtures_initialize_for_new_map, light_fixtures_dispose_from_old_map,
+	NULL, light_fixture_new, light_fixture_place, light_fixture_delete, light_fixture_update,
+	NULL,
+	NULL, NULL, NULL,
+	NULL, NULL,
+	NULL, NULL, NULL,
+	NULL,
+	{ &object_data_definition, &device_data_definition, &light_fixture_data_definition },
+	NULL
+};
+
+struct object_type_definition placeholder_data_definition =
+{
+	"placeholder", 'plac', 0x1FC, NONE, NONE, NONE,
+	placeholder_initialize, placeholder_dispose, placeholder_initialize_for_new_map, placeholder_dispose_from_old_map,
+	NULL, placeholder_new, placeholder_place, placeholder_delete, NULL,
+	NULL,
+	NULL, NULL, NULL,
+	NULL, NULL,
+	NULL, NULL, NULL,
+	NULL,
+	{ &object_data_definition, &placeholder_data_definition },
+	NULL
+};
 
 struct object_type_definition *object_type_definitions[NUMBER_OF_OBJECT_TYPES] =
 {
@@ -175,7 +601,10 @@ struct object_type_definition *object_type_definitions[NUMBER_OF_OBJECT_TYPES] =
 };
 
 extern struct object_type_definition *first_object_type_definition;
+/* VC7 otherwise emits this tentative definition as a common symbol. */
+#pragma bss_seg(".bss")
 word bss_00456e98;
+#pragma bss_seg()
 
 typedef char verify_object_type_definition_size[
 	sizeof(struct object_type_definition) == 0xA0 ? 1 : -1];
