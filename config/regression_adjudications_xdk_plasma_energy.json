@@ -1,0 +1,20 @@
+{
+  "debug_sections": [
+    {
+      "after_fingerprint_sha256": "8e07b48ebedfa52de730be35f0b56d2fadb9b72e51a1edd029e20b5bb5cddc23",
+      "before_fingerprint_sha256": "92288b56cfbca8760857b38d5fb34cdfe3b56c092891ebfa6c00dc9cfc68b395",
+      "recipe": "xdk-stock-d3dinline",
+      "section": ".debug$F|anonymous=2",
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_plasma_energy"
+    },
+    {
+      "after_fingerprint_sha256": "5b79f3d7f6d7cd9eca0a4324f66baf87dff523b69e917689707607178a0b48ab",
+      "before_fingerprint_sha256": "fd054221f7d9970be62ba370272c65e7c78a8a116110be3a5796fb06a8127ece",
+      "recipe": "xdk-stock-d3dinline",
+      "section": ".debug$S|anonymous=0",
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_plasma_energy"
+    }
+  ],
+  "functions": [],
+  "schema_version": 1
+}
