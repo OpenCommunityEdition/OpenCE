@@ -1999,18 +1999,10 @@ void rasterizer_debug_model_vertices(
 			node_weight0 = (real)vertex->node_weight * (1.f / 32767.f);
 			node_weight1 = 1.f - node_weight0;
 			node_index1 = vertex->node_indices[1] / 3;
-			node_point0.x = 0.f;
-			node_point0.y = 0.f;
-			node_point0.z = 0.f;
-			node_normal0.i = 0.f;
-			node_normal0.j = 0.f;
-			node_normal0.k = 0.f;
-			node_point1.x = 0.f;
-			node_point1.y = 0.f;
-			node_point1.z = 0.f;
-			node_normal1.i = 0.f;
-			node_normal1.j = 0.f;
-			node_normal1.k = 0.f;
+			set_real_point3d(&node_point0, 0.f, 0.f, 0.f);
+			set_real_vector3d(&node_normal0, 0.f, 0.f, 0.f);
+			set_real_point3d(&node_point1, 0.f, 0.f, 0.f);
+			set_real_vector3d(&node_normal1, 0.f, 0.f, 0.f);
 			decompressed_normal_result = uncompress_int32_to_real_vector3d(&decompressed_normal, vertex->normal);
 			vertex_normal = *decompressed_normal_result;
 			match_assert(
@@ -2098,22 +2090,20 @@ void rasterizer_debug_model_vertices(
 				debug_vertex->triangle_vertex_index_count = 1;
 				debug_vertex->model_vertex_index_count = 1;
 
-				camera_to_vertex.i = point.x - global_window_parameters.camera_position.x;
-				camera_to_vertex.j = point.y - global_window_parameters.camera_position.y;
-				camera_to_vertex.k = point.z - global_window_parameters.camera_position.z;
+				vector_from_points3d(
+					&global_window_parameters.camera_position,
+					&point,
+					&camera_to_vertex);
 				normalize3d(&camera_to_vertex);
-				camera_dot =
-					camera_to_vertex.i * global_window_parameters.camera_forward.i +
-					camera_to_vertex.j * global_window_parameters.camera_forward.j +
-					camera_to_vertex.k * global_window_parameters.camera_forward.k;
-				if ((camera_to_vertex.i * normal.i +
-					camera_to_vertex.j * normal.j +
-					camera_to_vertex.k * normal.k < 0.f &&
+				camera_dot = dot_product3d(
+					&camera_to_vertex,
+					&global_window_parameters.camera_forward);
+				if ((dot_product3d(&camera_to_vertex, &normal) < 0.f &&
 					closest_debug_vertex_dot < camera_dot) ||
 					closest_debug_vertex_dot == -1.f)
 				{
-					closest_debug_vertex_dot = camera_dot;
 					closest_debug_vertex_index = debug_vertex_index;
+					closest_debug_vertex_dot = camera_dot;
 				}
 				debug_vertex_count++;
 			}
@@ -2135,7 +2125,7 @@ void rasterizer_debug_model_vertices(
 							triangle_vertex_string,
 							"%d%c",
 							debug_vertex->triangle_vertex_indices[reference_index],
-							reference_index != debug_vertex->triangle_vertex_index_count - 1 ? ',' : ' ');
+							reference_index == debug_vertex->triangle_vertex_index_count - 1 ? ' ' : ',');
 						csstrcat(temporary, triangle_vertex_string);
 					}
 					csstrcat(temporary, "\nV=");
@@ -2145,7 +2135,7 @@ void rasterizer_debug_model_vertices(
 							model_vertex_string,
 							"%d%c",
 							debug_vertex->model_vertex_indices[reference_index],
-							reference_index != debug_vertex->model_vertex_index_count - 1 ? ',' : ' ');
+							reference_index == debug_vertex->model_vertex_index_count - 1 ? ' ' : ',');
 						csstrcat(temporary, model_vertex_string);
 					}
 					render_debug_point(FALSE, &debug_vertex->position, 0.03125f, global_real_argb_red);
