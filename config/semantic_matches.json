@@ -1,5 +1,23 @@
 [
   {
+    "unit": "source/rasterizer/xbox/rasterizer_xbox_plasma_energy",
+    "function": "_code_0015e460",
+    "base_function": "_D3DDevice_SetTextureStageState",
+    "reason": "stock XDK D3DINLINE emits the source-authentic wrapper under its SDK name; strict COFF comparison proves exact bytes and semantic relocations"
+  },
+  {
+    "unit": "source/rasterizer/xbox/rasterizer_xbox_plasma_energy",
+    "function": "_code_0015e6d0",
+    "base_function": "_IDirect3DDevice8_SetTextureStageState@16",
+    "reason": "stock XDK D3DINLINE emits the source-authentic wrapper under its SDK name; strict COFF comparison proves exact bytes and semantic relocations"
+  },
+  {
+    "unit": "source/rasterizer/xbox/rasterizer_xbox_plasma_energy",
+    "function": "_code_0015e730",
+    "base_function": "_IDirect3DDevice8_SetVertexShaderConstant@16",
+    "reason": "stock XDK D3DINLINE emits the source-authentic wrapper under its SDK name; strict COFF comparison proves exact bytes and semantic relocations"
+  },
+  {
     "unit": "source/cache/cache_files",
     "function": "_cache_files_map_directory",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"

@@ -431,7 +431,13 @@ def apply_semantic_matches(
                 base_info = target_info
             else:
                 target_info = section_info(target, function_name)
-                base_info = section_info(base, function_name)
+                # csplit may expose a source/SDK function under an anonymous
+                # image name while VC7 emits its authentic public name.  An
+                # explicit per-unit alias is safe only because the unchanged
+                # strict comparator below still proves the complete function
+                # shape, including relocation destinations and addends.
+                base_info = section_info(
+                    base, entry.get("base_function", function_name))
         except (CoffError, KeyError, OSError) as error:
             raise SemanticProgressError(
                 f"cannot verify semantic match {unit_name}:{function_name}: {error}"

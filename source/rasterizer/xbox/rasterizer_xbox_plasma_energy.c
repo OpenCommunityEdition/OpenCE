@@ -32,9 +32,8 @@ symbols in this file:
 #include <stddef.h>
 
 /* The January translation unit retains the XDK's out-of-line D3D wrappers.
- * This is the same source shape verified in rasterizer_xbox_text.c and
- * rasterizer_xbox_active_camouflage.c. */
-#define D3DINLINE static
+ * Keep the stock D3DINLINE definition: the real calls below make VC7 emit
+ * the target's complete wrapper bodies. */
 #include <xtl.h>
 
 /* ---------- constants */
@@ -182,10 +181,8 @@ extern struct pixel_shader_definition pixel_shader;
  * matrix stores in this partial TU; January schedules that independent read
  * 120 bytes later and rejoins before both shader-constant uploads.
  *
- * The XDK also emits IDirect3DDevice8_SetRenderState as a 0x10-byte call to
- * the exact D3DDevice_SetRenderState helper here, while January retained its
- * 0x220-byte expanded body.  Both are TU-context optimizer differences, so
- * this object must remain NonMatching. */
+ * The stock XDK wrapper bodies are exact; the remaining difference is in
+ * this Halo function, so this object must remain NonMatching. */
 void rasterizer_plasma_energy_draw(
 	struct rasterizer_transparent_geometry_group_plasma const *group)
 {
