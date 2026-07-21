@@ -170,6 +170,16 @@
     }
   },
   {
+    "unit": "source/objects/object_types",
+    "symbol": "_object_data_definition",
+    "reason": "the complete rebuilt object owns the exact 16-record object-type hierarchy and registry; csplit expresses its 190 internal and external data relocations through different section-symbol ownership, while normalized bytes, relocation locations and types, and independently resolved destinations are exact",
+    "measurements": {
+      "size": 2608,
+      "relocation_count": 190,
+      "normalized_sha256": "205043014fcdf8e45147d168ae70e43cda7814dfc63f1c1dade93f2c0f9f4341"
+    }
+  },
+  {
     "unit": "source/objects/objects",
     "symbol": "?section@?1??objects_update@@9@9",
     "allow_incomplete_unit": true,
