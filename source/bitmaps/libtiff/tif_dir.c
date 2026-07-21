@@ -1,5 +1,5 @@
 #ifndef lint
-static char data_002b7f88[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_dir.c,v 1.110 92/03/06 11:59:49 sam Exp $\0TIFFSetDirectory";
+char data_002b7f88[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_dir.c,v 1.110 92/03/06 11:59:49 sam Exp $\0TIFFSetDirectory";
 #endif
 
 /*
@@ -46,7 +46,7 @@ static char data_002b7f88[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_dir
 void debug_free(void *pointer, const char *file, long line);
 
 #undef SeekOK
-#define SeekOK(fd, off) (_lseek(fd, (long)off, L_SET) == (long)off)
+#define SeekOK(fd, off) (lseek(fd, (long)off, L_SET) == (long)off)
 
 static
 DECLARE2(code_000538c0, char**, cpp, char*, cp)
@@ -957,7 +957,7 @@ TIFFSetDirectory(tif, dirn)
 		}
 		if (tif->tif_flags & TIFF_SWAB)
 			TIFFSwabShort(&dircount);
-		_lseek(tif->tif_fd, dircount*sizeof (TIFFDirEntry), L_INCR);
+		lseek(tif->tif_fd, dircount*sizeof (TIFFDirEntry), L_INCR);
 		if (!ReadOK(tif->tif_fd, &nextdir, sizeof (nextdir))) {
 			TIFFError(data_002b7f88+88, "%s: Error fetching directory link",
 			    tif->tif_name);
