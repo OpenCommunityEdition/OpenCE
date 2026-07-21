@@ -19,7 +19,14 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum
+{
+	STRUCTURE_BSP_TAG = 'sbsp',
+};
+
 /* ---------- macros */
+
+#define structure_bsp_definition_get(index) ((struct structure_bsp *)tag_get(STRUCTURE_BSP_TAG, (index)))
 
 /* ---------- structures */
 
@@ -66,6 +73,44 @@ struct structure_cluster_runtime_decals
 	byte unused2[0x58];
 };
 
+/*
+ * The January scenario code indexes this block with a 0x68-byte stride and
+ * reads the background-sound palette index at +0x4.  The surrounding fields
+ * remain unnamed until independently evidenced.
+ */
+struct structure_cluster
+{
+	short sky_index;
+	short fog_reference;
+	short background_sound_palette_index;
+	short sound_environment_palette_index;
+	short weather_palette_index;
+	byte unusedA[0x5E];
+};
+
+typedef char structure_cluster_size_assert[
+	sizeof(struct structure_cluster) == 0x68 ? 1 : -1];
+typedef char structure_cluster_fog_reference_offset_assert[
+	offsetof(struct structure_cluster, fog_reference) == 0x02 ? 1 : -1];
+typedef char structure_cluster_background_sound_offset_assert[
+	offsetof(struct structure_cluster, background_sound_palette_index) == 0x04 ? 1 : -1];
+typedef char structure_cluster_weather_offset_assert[
+	offsetof(struct structure_cluster, weather_palette_index) == 0x08 ? 1 : -1];
+
+/*
+ * The January scenario code indexes this palette with a 0x74-byte stride and
+ * resolves the looping-sound reference at +0x20.
+ */
+struct structure_background_sound_palette_entry
+{
+	byte unused0[0x20];
+	struct tag_reference background_sound;
+	byte unused30[0x44];
+};
+
+typedef char structure_background_sound_palette_entry_size_assert[
+	sizeof(struct structure_background_sound_palette_entry) == 0x74 ? 1 : -1];
+
 struct structure_runtime_decal
 {
 	real_point3d position;
@@ -79,11 +124,24 @@ struct structure_fog_region
 {
 	byte unused[0x24];
 	short fog_palette_index;
-	word pad;
+	short weather_palette_index;
 };
+
+struct structure_fog_plane
+{
+	short fog_palette_index;
+	word pad;
+	real_plane3d plane;
+	byte unused14[0xC];
+};
+
+typedef char structure_fog_plane_size_assert[
+	sizeof(struct structure_fog_plane) == 0x20 ? 1 : -1];
 
 typedef char structure_fog_region_size_assert[
 	sizeof(struct structure_fog_region) == 0x28 ? 1 : -1];
+typedef char structure_fog_region_weather_offset_assert[
+	offsetof(struct structure_fog_region, weather_palette_index) == 0x26 ? 1 : -1];
 
 struct structure_fog_palette_entry
 {

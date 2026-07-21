@@ -17,6 +17,8 @@ header included in hcex build.
 
 enum
 {
+	SCENARIO_TAG = 'scnr',
+
 	_scenario_type_solo = 0,
 	_scenario_type_multiplayer,
 	_scenario_type_main_menu,
@@ -35,6 +37,8 @@ enum
 };
 
 /* ---------- macros */
+
+#define scenario_definition_get(index) ((struct scenario *)tag_get(SCENARIO_TAG, (index)))
 
 /* ---------- structures */
 

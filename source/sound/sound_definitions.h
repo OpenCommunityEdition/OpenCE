@@ -42,6 +42,7 @@ enum
 /* ---------- macros */
 
 #define sound_definition_get(index) ((struct sound_definition *)tag_get(SOUND_DEFINITION_TAG, (index)))
+#define looping_sound_definition_get(index) ((struct looping_sound_definition *)tag_get(LOOPING_SOUND_DEFINITION_TAG, (index)))
 
 /* ---------- structures */
 
@@ -116,6 +117,11 @@ struct sound_definition
 	unsigned long scripting_time;
 	long scripting_sound_index;
 	struct tag_block pitch_ranges;
+};
+
+struct looping_sound_definition
+{
+	byte flags;
 };
 
 /* ---------- prototypes/EXAMPLE.C */

@@ -166,17 +166,23 @@ symbols in this file:
 
 #include "bink/bink_playback.h"
 #include "cache/cache_files.h"
+#include "cseries/errors.h"
 #include "effects/material_effect_definitions.h"
 #include "game/game_globals.h"
 #include "game/players.h"
+#include "main/main.h"
 #include "objects/objects.h"
 #include "physics/bsp3d.h"
+#include "physics/collision_usage.h"
 #include "physics/collision_bsp_definitions.h"
 #include "saved games/game_state.h"
 #include "scenario_definitions.h"
+#include "fog_definitions.h"
 #include "sky_definitions.h"
 #include "scenario/wind.h"
+#include "sound/sound_definitions.h"
 #include "structures/structure_bsp_definitions.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
@@ -195,6 +201,12 @@ struct scenario_material_globals
 {
 	struct material_definition default_material;
 	boolean default_material_initialized;
+};
+
+struct memory_status
+{
+	unsigned long minimum_available_memory;
+	unsigned long maximum_available_memory;
 };
 
 /* ---------- prototypes */
@@ -284,6 +296,12 @@ static scenario_structure_bsp_connection_proc scenario_structure_bsp_disconnect_
 	contrails_disconnect_from_structure_bsp,
 	structure_decals_disconnect_from_structure_bsp,
 	decals_disconnect_from_structure_bsp,
+};
+
+static struct memory_status scenario_memory_status =
+{
+	(unsigned long)-1,
+	0,
 };
 
 /*
@@ -483,6 +501,32 @@ struct material_definition *scenario_material_definition_get(
 	return default_material_definition_get();
 }
 
+boolean scenario_location_deafening(
+	const struct location *location)
+{
+	struct structure_cluster *cluster = TAG_BLOCK_GET_ELEMENT(
+		&global_structure_bsp_get()->clusters,
+		location->cluster_index,
+		struct structure_cluster);
+	boolean deafening = FALSE;
+
+	if (cluster->background_sound_palette_index != NONE &&
+		cluster->background_sound_palette_index < global_structure_bsp_get()->background_sound_palette.count)
+	{
+		struct structure_background_sound_palette_entry *background_sound = TAG_BLOCK_GET_ELEMENT(
+			&global_structure_bsp_get()->background_sound_palette,
+			cluster->background_sound_palette_index,
+			struct structure_background_sound_palette_entry);
+
+		if (background_sound->background_sound.index != NONE)
+			deafening = TEST_FLAG(
+				looping_sound_definition_get(background_sound->background_sound.index)->flags,
+				0);
+	}
+
+	return deafening;
+}
+
 long scenario_get_sky_definition_index(
 	short sky_index)
 {
@@ -558,6 +602,159 @@ boolean scenario_ensure_point_within_world(
 	}
 
 	return iteration_count == 0;
+}
+
+short scenario_get_fog_region_index(
+	const struct location *location,
+	const real_point3d *position)
+{
+	short result = NONE;
+	short fog_reference;
+	real plane_distance;
+	struct structure_bsp *structure_bsp;
+	struct structure_cluster *cluster;
+	struct structure_fog_plane *fog_plane;
+	struct fog_definition *fog;
+	long fog_index;
+
+	if (location->cluster_index != NONE)
+	{
+		structure_bsp = global_structure_bsp_get();
+		cluster = TAG_BLOCK_GET_ELEMENT(
+			&structure_bsp->clusters,
+			location->cluster_index,
+			struct structure_cluster);
+		fog_reference = cluster->fog_reference;
+		if (fog_reference != NONE)
+		{
+			if (TEST_FLAG((word)fog_reference, 15))
+			{
+				fog_plane = TAG_BLOCK_GET_ELEMENT(
+					&structure_bsp->fog_planes,
+					fog_reference & SHORT_MAX,
+					struct structure_fog_plane);
+				fog_index = scenario_fog_region_get_fog_index(fog_plane->fog_palette_index);
+				plane_distance = 0.0f;
+				if (fog_index != NONE)
+				{
+					fog = fog_definition_get(fog_index);
+					if (TEST_FLAG(fog->flags, 0))
+						plane_distance = fog->plane_distance;
+				}
+
+				if (!position || plane3d_distance_to_point(&fog_plane->plane, position) + plane_distance < 0.0f)
+					result = fog_plane->fog_palette_index;
+			}
+			else
+			{
+				result = fog_reference & SHORT_MAX;
+			}
+		}
+	}
+
+	return result;
+}
+
+boolean scenario_location_underwater(
+	const struct location *location,
+	const real_point3d *position,
+	short *optional_weather_palette_index)
+{
+	boolean result = FALSE;
+	short fog_region_index;
+	short weather_palette_index;
+	long fog_index;
+	struct structure_bsp *structure_bsp = global_structure_bsp_get();
+	struct structure_fog_region *fog_region;
+	struct structure_cluster *cluster;
+
+	fog_region_index = scenario_get_fog_region_index(location, position);
+	weather_palette_index = NONE;
+	match_assert("c:\\halo\\SOURCE\\scenario\\scenario.c", 0x258, location);
+	match_assert("c:\\halo\\SOURCE\\scenario\\scenario.c", 0x259, position);
+
+	if (fog_region_index != NONE)
+	{
+		fog_region = TAG_BLOCK_GET_ELEMENT(
+			&structure_bsp->fog_regions,
+			fog_region_index,
+			struct structure_fog_region);
+		fog_index = scenario_fog_region_get_fog_index(fog_region_index);
+		if (fog_index != NONE)
+			result = TEST_FLAG(fog_definition_get(fog_index)->flags, 0);
+		weather_palette_index = fog_region->weather_palette_index;
+	}
+
+	if (weather_palette_index == NONE && location->cluster_index != NONE)
+	{
+		cluster = TAG_BLOCK_GET_ELEMENT(
+			&structure_bsp->clusters,
+			location->cluster_index,
+			struct structure_cluster);
+		weather_palette_index = cluster->weather_palette_index;
+	}
+
+	if (optional_weather_palette_index)
+		*optional_weather_palette_index = weather_palette_index;
+
+	return result;
+}
+
+real scenario_location_water_depth(
+	const struct location *location,
+	const real_point3d *position)
+{
+	real result = REAL_MIN;
+	short fog_reference;
+	short fog_palette_index;
+	long fog_index;
+	struct structure_bsp *structure_bsp;
+	struct structure_cluster *cluster;
+	struct structure_fog_plane *fog_plane;
+	struct fog_definition *fog;
+	real_plane3d *plane;
+
+	if (location->cluster_index != NONE)
+	{
+		structure_bsp = global_structure_bsp_get();
+		cluster = TAG_BLOCK_GET_ELEMENT(
+			&structure_bsp->clusters,
+			location->cluster_index,
+			struct structure_cluster);
+		fog_reference = cluster->fog_reference;
+		if (fog_reference != NONE)
+		{
+			if (TEST_FLAG((word)fog_reference, 15))
+			{
+				fog_plane = TAG_BLOCK_GET_ELEMENT(
+					&structure_bsp->fog_planes,
+					fog_reference & SHORT_MAX,
+					struct structure_fog_plane);
+				fog_palette_index = fog_plane->fog_palette_index;
+				plane = &fog_plane->plane;
+			}
+			else
+			{
+				fog_palette_index = fog_reference & SHORT_MAX;
+				plane = NULL;
+			}
+
+			fog_index = scenario_fog_region_get_fog_index(fog_palette_index);
+			if (fog_index != NONE)
+			{
+				fog = fog_definition_get(fog_index);
+				if (TEST_FLAG(fog->flags, 0))
+				{
+					if (plane)
+						result = -(plane3d_distance_to_point(plane, position) + fog->plane_distance);
+					else
+						result = REAL_MAX;
+				}
+			}
+		}
+	}
+
+	return result;
 }
 
 real scenario_fog_at_point(
@@ -697,6 +894,56 @@ boolean scenario_trigger_volume_test_object(
 	return result;
 }
 
+void scenario_debug_to_file(
+	FILE *stream)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	struct object_datum *unit;
+
+	if (global_scenario_index != NONE)
+	{
+		match_assert("c:\\halo\\SOURCE\\scenario\\scenario.c", 0xB7, global_scenario);
+		fprintf(
+			stream,
+			"\"%s\" bsp \"%s\" (#%d)\n",
+			tag_get_name(global_scenario_index),
+			tag_get_name(TAG_BLOCK_GET_ELEMENT(
+				&global_scenario->structure_bsp_references,
+				global_structure_bsp_index,
+				struct scenario_structure_bsp_reference)->structure_bsp.index),
+			global_structure_bsp_index);
+
+		data_iterator_new(&iterator, player_data);
+		while ((player = data_iterator_next(&iterator)) != NULL)
+		{
+			fprintf(stream, "player 0x%08x", iterator.datum_index);
+			if (player->unit_index != NONE)
+			{
+				unit = (struct object_datum *)unit_get(player->unit_index);
+				fprintf(
+					stream,
+					" at (%.2f,%.2f,%.2f) (leaf#%d,cluster#%d)\n",
+					unit->object.bounding_sphere_center.x,
+					unit->object.bounding_sphere_center.y,
+					unit->object.bounding_sphere_center.z,
+					unit->object.location.leaf_index,
+					unit->object.location.cluster_index);
+			}
+			else
+			{
+				fprintf(stream, " dead\n");
+			}
+		}
+	}
+	else
+	{
+		fprintf(stream, "<no scenario loaded>\n");
+	}
+
+	return;
+}
+
 boolean scenario_trigger_volume_test_point(
 	short trigger_volume_index,
 	const real_point3d *position)
@@ -769,6 +1016,75 @@ long scenario_fog_region_get_fog_index(
 	return NONE;
 }
 
+boolean scenario_switch_structure_bsp(
+	short structure_bsp_index)
+{
+	boolean result = FALSE;
+	boolean had_old_structure_bsp;
+	short proc_index;
+	struct scenario_structure_bsp_reference *reference;
+
+	if (structure_bsp_index != global_structure_bsp_index &&
+		structure_bsp_index >= 0 &&
+		structure_bsp_index < global_scenario->structure_bsp_references.count)
+	{
+		reference = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario->structure_bsp_references,
+			structure_bsp_index,
+			struct scenario_structure_bsp_reference);
+		had_old_structure_bsp = FALSE;
+
+		match_assert("c:\\halo\\SOURCE\\scenario\\scenario.c", 0x2B7, global_scenario);
+		main_stop_time();
+		collision_log_enable(FALSE);
+
+		if (global_structure_bsp_index != NONE)
+		{
+			for (proc_index = 0; proc_index < NUMBEROF(scenario_structure_bsp_disconnect_proc_table); proc_index++)
+				scenario_structure_bsp_disconnect_procs[proc_index]();
+
+			had_old_structure_bsp = TRUE;
+			scenario_structure_bsp_unload(TAG_BLOCK_GET_ELEMENT(
+				&global_scenario->structure_bsp_references,
+				global_structure_bsp_index,
+				struct scenario_structure_bsp_reference));
+			scenario_globals->structure_bsp_index = NONE;
+			global_structure_bsp_index = NONE;
+		}
+
+		if (scenario_structure_bsp_load(reference))
+		{
+			global_structure_bsp = structure_bsp_definition_get(reference->structure_bsp.index);
+			global_collision_bsp = TAG_BLOCK_GET_ELEMENT(
+				&global_structure_bsp->collision_bsp,
+				0,
+				struct collision_bsp);
+			global_bsp3d = (struct bsp3d *)TAG_BLOCK_GET_ELEMENT(
+				&global_structure_bsp->collision_bsp,
+				0,
+				struct collision_bsp);
+			scenario_globals->structure_bsp_index = structure_bsp_index;
+			global_structure_bsp_index = structure_bsp_index;
+
+			if (had_old_structure_bsp)
+			{
+				for (proc_index = 0; proc_index < NUMBEROF(scenario_structure_bsp_reconnect_proc_table); proc_index++)
+					scenario_structure_bsp_reconnect_procs[proc_index]();
+			}
+			result = TRUE;
+		}
+		else
+		{
+			error(_error_immediate, "failed to load structure bsp '%s'", reference->structure_bsp.name);
+		}
+
+		collision_log_enable(TRUE);
+		main_start_time();
+	}
+
+	return result;
+}
+
 boolean scenario_test_pas(
 	short cluster_index0,
 	short cluster_index1)
@@ -796,6 +1112,55 @@ void scenario_reload_structure_bsp_if_necessary(
 	}
 
 	return;
+}
+
+boolean scenario_load(
+	const char *name)
+{
+	char *missing_tag = "";
+	char *newline;
+	boolean result = FALSE;
+
+	check_memory_status(&scenario_memory_status, "scenario_load");
+	global_scenario_index = scenario_tags_load(name);
+	if (global_scenario_index != NONE)
+	{
+		global_scenario = scenario_definition_get(global_scenario_index);
+		if (global_scenario->structure_bsp_references.count > 0)
+		{
+			global_game_globals = game_globals_definition_get(
+				tag_loaded(GAME_GLOBALS_TAG, "globals\\globals"));
+			if (scenario_switch_structure_bsp(0))
+				result = TRUE;
+		}
+		else
+		{
+			error(_error_delayed, "scenario doesn't have a structure bsp");
+		}
+	}
+	else
+	{
+		error(_error_delayed, "need to get the following tags:");
+		do
+		{
+			newline = strchr(missing_tag, '\n');
+			if (newline)
+				*newline = 0;
+			error(_error_delayed, "%s", missing_tag);
+			if (newline)
+			{
+				missing_tag = newline + 1;
+				*newline = '\n';
+			}
+			else
+			{
+				missing_tag = NULL;
+			}
+		}
+		while (missing_tag);
+	}
+
+	return result;
 }
 
 /* ---------- private code */
