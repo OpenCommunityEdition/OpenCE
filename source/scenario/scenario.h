@@ -57,7 +57,17 @@ struct scenario_globals
 {
 	short structure_bsp_index;
 	word pad;
-	byte unknown04[0xB0];
+	struct atmospheric_fog_state
+	{
+		boolean valid;
+		byte pad[3];
+		real_point3d camera_point;
+		real atmospheric_start_distance;
+		real atmospheric_opaque_distance;
+		real atmospheric_maximum_density;
+		real_rgb_color atmospheric_color;
+		real indoor_fog_scale;
+	} atmospheric_fog[4];
 	boolean sound_environment_initialized;
 	byte pad2[3];
 	struct sound_environment_definition sound_environment;

@@ -31,12 +31,19 @@ struct fog_definition
 	byte flags;
 	byte unused1[0x73];
 	real plane_distance;
+	byte unused78[0x88];
+	long background_sound_index;
+	struct tag_reference sound_environment;
 };
 
 typedef char fog_definition_size_assert[
-	sizeof(struct fog_definition) == 0x78 ? 1 : -1];
+	sizeof(struct fog_definition) == 0x114 ? 1 : -1];
 typedef char fog_definition_plane_distance_offset_assert[
 	offsetof(struct fog_definition, plane_distance) == 0x74 ? 1 : -1];
+typedef char fog_definition_background_sound_offset_assert[
+	offsetof(struct fog_definition, background_sound_index) == 0x100 ? 1 : -1];
+typedef char fog_definition_sound_environment_offset_assert[
+	offsetof(struct fog_definition, sound_environment) == 0x104 ? 1 : -1];
 
 /* ---------- prototypes/EXAMPLE.C */
 

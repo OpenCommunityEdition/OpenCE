@@ -111,6 +111,16 @@ struct structure_background_sound_palette_entry
 typedef char structure_background_sound_palette_entry_size_assert[
 	sizeof(struct structure_background_sound_palette_entry) == 0x74 ? 1 : -1];
 
+struct structure_sound_environment_palette_entry
+{
+	byte unused0[0x20];
+	struct tag_reference sound_environment;
+	byte unused30[0x20];
+};
+
+typedef char structure_sound_environment_palette_entry_size_assert[
+	sizeof(struct structure_sound_environment_palette_entry) == 0x50 ? 1 : -1];
+
 struct structure_runtime_decal
 {
 	real_point3d position;

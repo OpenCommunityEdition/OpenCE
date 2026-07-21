@@ -170,6 +170,7 @@ symbols in this file:
 #include "effects/material_effect_definitions.h"
 #include "game/game_globals.h"
 #include "game/players.h"
+#include "camera/observer.h"
 #include "main/main.h"
 #include "objects/objects.h"
 #include "physics/bsp3d.h"
@@ -179,6 +180,8 @@ symbols in this file:
 #include "scenario_definitions.h"
 #include "fog_definitions.h"
 #include "sky_definitions.h"
+#include "render/render_cameras.h"
+#include "render/render_debug.h"
 #include "scenario/wind.h"
 #include "sound/sound_definitions.h"
 #include "structures/structure_bsp_definitions.h"
@@ -194,6 +197,8 @@ symbols in this file:
 #define scenario_structure_bsp_disconnect_procs \
 	((scenario_structure_bsp_connection_proc *)((byte *)&global_structure_bsp_index + \
 		2 * sizeof(global_structure_bsp_index) + sizeof(scenario_structure_bsp_reconnect_proc_table)))
+#define scenario_memory_status_attributed \
+	((struct memory_status *)((byte *)&global_structure_bsp_index + 0x60))
 
 /* ---------- structures */
 
@@ -261,6 +266,8 @@ void decals_disconnect_from_structure_bsp(
 
 typedef void (*scenario_structure_bsp_connection_proc)(
 	void);
+
+extern boolean debug_sound_environment;
 
 /* ---------- globals */
 
@@ -357,9 +364,9 @@ void scenario_initialize_for_new_map(
 {
 	wind_initialize_for_new_map();
 	csmemset(
-		scenario_globals->unknown04,
+		scenario_globals->atmospheric_fog,
 		0,
-		sizeof(scenario_globals->unknown04));
+		sizeof(scenario_globals->atmospheric_fog));
 	scenario_globals->sound_environment = default_sound_environment;
 	scenario_globals->sound_environment_initialized = FALSE;
 
@@ -1117,11 +1124,11 @@ void scenario_reload_structure_bsp_if_necessary(
 boolean scenario_load(
 	const char *name)
 {
-	char *missing_tag = "";
+	char *missing_tag;
 	char *newline;
 	boolean result = FALSE;
 
-	check_memory_status(&scenario_memory_status, "scenario_load");
+	check_memory_status(scenario_memory_status_attributed, "scenario_load");
 	global_scenario_index = scenario_tags_load(name);
 	if (global_scenario_index != NONE)
 	{
@@ -1140,6 +1147,7 @@ boolean scenario_load(
 	}
 	else
 	{
+		missing_tag = "";
 		error(_error_delayed, "need to get the following tags:");
 		do
 		{
@@ -1161,6 +1169,297 @@ boolean scenario_load(
 	}
 
 	return result;
+}
+
+void scenario_get_sound_environment(
+	long *background_sound_index,
+	long *sound_environment_tag,
+	boolean *crossed_water_boundary)
+{
+	struct structure_bsp *structure_bsp;
+	long local_player_index;
+	long player_index;
+	long fog_index;
+	long sound_environment_index;
+	long selected_sound_environment_index;
+	long selected_background_sound_index;
+	short best_priority;
+	boolean water_boundary;
+	struct observer_result const *camera;
+	struct structure_cluster *cluster;
+	struct fog_definition *volatile fog;
+	struct fog_definition *fog_result;
+	struct structure_sound_environment_palette_entry *sound_environment;
+	struct structure_background_sound_palette_entry *background_sound;
+	struct sound_environment_definition *definition;
+	struct sound_environment_definition *current;
+	const char *name;
+	real *current_values;
+	real const *definition_values;
+
+	water_boundary = FALSE;
+	selected_sound_environment_index = NONE;
+	selected_background_sound_index = NONE;
+	best_priority = -32768;
+
+	for (local_player_index = 0; (short)local_player_index < 4; local_player_index++)
+	{
+		fog_index = NONE;
+		player_index = local_player_get_player_index((short)local_player_index);
+		if (player_index != NONE)
+		{
+			camera = observer_get_camera((short)local_player_index);
+			if (camera->location.cluster_index != NONE)
+			{
+				match_assert(
+					"c:\\halo\\SOURCE\\scenario\\scenario.c",
+					0xC5,
+					global_structure_bsp);
+				structure_bsp = global_structure_bsp;
+				cluster = TAG_BLOCK_GET_ELEMENT(
+					&structure_bsp->clusters,
+					camera->location.cluster_index,
+					struct structure_cluster);
+				fog_index = scenario_fog_region_get_fog_index(
+					scenario_get_fog_region_index(&camera->location, &camera->position));
+
+				if (fog_index != NONE)
+				{
+					fog_result = fog_definition_get(fog_index);
+					sound_environment_index = fog_result->sound_environment.index;
+					fog = fog_result;
+					if (sound_environment_index != NONE &&
+						sound_environment_definition_get(sound_environment_index)->priority > best_priority)
+					{
+						best_priority = sound_environment_definition_get(sound_environment_index)->priority;
+						selected_sound_environment_index = sound_environment_index;
+						selected_background_sound_index = fog->background_sound_index;
+						water_boundary = TEST_FLAG(fog_definition_get(fog_index)->flags, 0);
+					}
+				}
+
+				if (cluster->sound_environment_palette_index != NONE)
+				{
+					sound_environment = TAG_BLOCK_GET_ELEMENT(
+						&structure_bsp->sound_environment_palette,
+						cluster->sound_environment_palette_index,
+						struct structure_sound_environment_palette_entry);
+					sound_environment_index = sound_environment->sound_environment.index;
+					if (sound_environment_index != NONE &&
+						sound_environment_definition_get(sound_environment_index)->priority > best_priority)
+					{
+						selected_sound_environment_index = sound_environment_index;
+						best_priority = sound_environment_definition_get(sound_environment_index)->priority;
+						water_boundary = FALSE;
+						if (cluster->background_sound_palette_index != NONE &&
+							cluster->background_sound_palette_index < structure_bsp->background_sound_palette.count)
+						{
+							background_sound = TAG_BLOCK_GET_ELEMENT(
+								&structure_bsp->background_sound_palette,
+								cluster->background_sound_palette_index,
+								struct structure_background_sound_palette_entry);
+							selected_background_sound_index = background_sound->background_sound.index;
+						}
+						else
+						{
+							selected_background_sound_index = NONE;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if (debug_sound_environment)
+	{
+		if (selected_sound_environment_index == NONE)
+			name = "no sound environment";
+		else
+			name = tag_get_name(selected_sound_environment_index);
+		sprintf(temporary, "|n|n|n|n%s", name);
+		render_debug_string(FALSE, temporary);
+	}
+
+	if (selected_sound_environment_index == NONE)
+		definition = (struct sound_environment_definition *)&default_sound_environment;
+	else
+		definition = sound_environment_definition_get(selected_sound_environment_index);
+
+	current = &scenario_globals->sound_environment;
+	if (water_boundary != scenario_globals->sound_environment_initialized)
+	{
+		*current = *definition;
+		scenario_globals->sound_environment_initialized = water_boundary;
+		*crossed_water_boundary = TRUE;
+		*background_sound_index = selected_background_sound_index;
+		*sound_environment_tag = (long)current;
+		return;
+	}
+
+	current_values = (real *)current;
+	definition_values = (real const *)definition;
+	current_values[2] += PIN(definition_values[2] - current_values[2], -0.03f, 0.03f);
+	current_values[3] += PIN(definition_values[3] - current_values[3], -0.03f, 0.03f);
+	current_values[4] += PIN(definition_values[4] - current_values[4], -0.3f, 0.3f);
+	current_values[5] += PIN(definition_values[5] - current_values[5], -0.1f, 0.1f);
+	current_values[6] += PIN(definition_values[6] - current_values[6], -0.03f, 0.03f);
+	current_values[7] += PIN(definition_values[7] - current_values[7], -0.03f, 0.03f);
+	current_values[8] += PIN(definition_values[8] - current_values[8], -0.09f, 0.09f);
+	current_values[9] += PIN(definition_values[9] - current_values[9], -0.03f, 0.03f);
+	current_values[10] += PIN(definition_values[10] - current_values[10], -0.003f, 0.003f);
+	current_values[11] += PIN(definition_values[11] - current_values[11], -0.03f, 0.03f);
+	current_values[12] += PIN(definition_values[12] - current_values[12], -0.03f, 0.03f);
+	current_values[13] += PIN(definition_values[13] - current_values[13], -600.0f, 600.0f);
+	*crossed_water_boundary = FALSE;
+	*background_sound_index = selected_background_sound_index;
+	*sound_environment_tag = (long)current;
+
+	return;
+}
+
+static void code_0017f370(
+	real_rgb_color *current,
+	real_rgb_color const *desired,
+	real maximum_step)
+{
+	current->red += PIN(desired->red - current->red, -maximum_step, maximum_step);
+	current->green += PIN(desired->green - current->green, -maximum_step, maximum_step);
+	current->blue += PIN(desired->blue - current->blue, -maximum_step, maximum_step);
+
+	return;
+}
+
+void scenario_get_atmospheric_fog(
+	short local_player_index,
+	short sky_index,
+	real_point3d *camera_point,
+	struct render_fog *render_fog)
+{
+	long sky_definition_index;
+	long tag_reference_index;
+	struct sky *sky;
+	struct atmospheric_fog_state *fog_state;
+	struct tag_reference *reference;
+	struct atmospheric_fog_state local_fog_state;
+	struct sky_atmospheric_fog *fog;
+	real_vector3d camera_delta;
+	real indoor_fog_scale;
+	real distance;
+	real blended_distance;
+
+	match_assert("c:\\halo\\SOURCE\\scenario\\scenario.c", 0xB7, global_scenario);
+	if (sky_index == NONE)
+	{
+		match_assert("c:\\halo\\SOURCE\\scenario\\scenario.c", 0xB7, global_scenario);
+		tag_reference_index = NONE;
+		if (global_scenario->sky_references.count > 0)
+		{
+			reference = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario->sky_references,
+				0,
+				struct tag_reference);
+			tag_reference_index = reference->index;
+		}
+		sky = NULL;
+		if (tag_reference_index != NONE)
+			sky = sky_definition_get(tag_reference_index);
+	}
+	else
+	{
+		struct sky *resolved_sky = NULL;
+
+		sky_definition_index = scenario_get_sky_definition_index(sky_index);
+		if (sky_definition_index != NONE)
+			resolved_sky = sky_definition_get(sky_definition_index);
+		sky = resolved_sky;
+	}
+
+	if (local_player_index != NONE)
+		fog_state = &scenario_globals->atmospheric_fog[local_player_index];
+	else
+		fog_state = &local_fog_state;
+
+	if (sky)
+	{
+		if (sky_index == NONE)
+		{
+			fog = &sky->indoor_fog;
+			match_assert("c:\\halo\\SOURCE\\scenario\\scenario.c", 0xB7, global_scenario);
+			tag_reference_index = NONE;
+			if (global_scenario->sky_references.count > 0)
+			{
+				reference = TAG_BLOCK_GET_ELEMENT(
+					&global_scenario->sky_references,
+					0,
+					struct tag_reference);
+				tag_reference_index = reference->index;
+			}
+			sky = NULL;
+			if (tag_reference_index != NONE)
+				sky = sky_definition_get(tag_reference_index);
+			indoor_fog_scale = sky->indoor_fog_screen.index == NONE ? 0.0f : 1.0f;
+		}
+		else
+		{
+			fog = &sky->outdoor_fog;
+			indoor_fog_scale = 0.0f;
+		}
+
+		vector_from_points3d(&fog_state->camera_point, camera_point, &camera_delta);
+		distance = square_root(
+			camera_delta.j * camera_delta.j +
+			camera_delta.k * camera_delta.k +
+			camera_delta.i * camera_delta.i);
+		if (local_player_index != NONE &&
+			distance < 15.0f &&
+			fog_state->valid &&
+			fog->opaque_distance != 0.0f &&
+			fog_state->atmospheric_opaque_distance != 0.0f)
+		{
+			interpolate_scalar(&fog_state->atmospheric_start_distance, fog->start_distance, distance);
+			interpolate_scalar(&fog_state->atmospheric_opaque_distance, fog->opaque_distance, distance);
+			distance *= 0.05f;
+			interpolate_scalar(&fog_state->atmospheric_maximum_density, fog->maximum_density, distance);
+			code_0017f370(&fog_state->atmospheric_color, &fog->color, distance);
+			interpolate_scalar(&fog_state->indoor_fog_scale, indoor_fog_scale, distance);
+		}
+		else
+		{
+			fog_state->atmospheric_start_distance = fog->start_distance;
+			fog_state->atmospheric_opaque_distance = fog->opaque_distance;
+			fog_state->atmospheric_maximum_density = fog->maximum_density;
+			fog_state->atmospheric_color = fog->color;
+			fog_state->indoor_fog_scale = indoor_fog_scale;
+			fog_state->valid = TRUE;
+		}
+		fog_state->camera_point = *camera_point;
+	}
+
+	render_fog->atmospheric_color = fog_state->atmospheric_color;
+	render_fog->atmospheric_maximum_density = fog_state->atmospheric_maximum_density;
+	render_fog->atmospheric_minimum_distance = fog_state->atmospheric_start_distance;
+	if (fog_state->atmospheric_opaque_distance != 0.0f)
+	{
+		blended_distance = fog_state->atmospheric_start_distance + 0.0001f;
+		if (blended_distance < fog_state->atmospheric_opaque_distance)
+			blended_distance = fog_state->atmospheric_opaque_distance;
+	}
+	else
+		blended_distance = 0.0f;
+	render_fog->atmospheric_maximum_distance = blended_distance;
+	if (fog_state->indoor_fog_scale < 0.0f)
+	{
+		render_fog->screen_external_intensity = 0.0f;
+		return;
+	}
+	if (fog_state->indoor_fog_scale > 1.0f)
+	{
+		render_fog->screen_external_intensity = 1.0f;
+		return;
+	}
+	render_fog->screen_external_intensity = fog_state->indoor_fog_scale;
+
+	return;
 }
 
 /* ---------- private code */
