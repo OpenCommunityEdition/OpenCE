@@ -44,12 +44,13 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "real_math.h"
 /* The January object retains out-of-line copies of the D3D inline wrappers.
- * Defining D3DINLINE as static before the normal XDK headers reproduces eight
- * of the nine wrappers exactly.  IDirect3DDevice8_SetRenderState is the lone
- * translation-unit-context exception: January retained its 0x220-byte body,
- * while this partial translation unit emits a 0x10-byte call to the exact
- * D3DDevice_SetRenderState helper.  Do not replace either with a handwritten
- * Microsoft dispatcher.
+ * The stock XDK definition of D3DINLINE (static __forceinline) reproduces all
+ * nine wrappers, including IDirect3DDevice8_SetRenderState's 0x220-byte body.
+ * Do not replace them with handwritten Microsoft dispatchers or override the
+ * XDK's inline policy: taking an address or weakening __forceinline changes
+ * their emitted ABI and code shape.
+ * Keep this note's line count stable: debug records encode the source lines
+ * of these functions and are part of the whole-object regression evidence.
  *
  * code_00162ea0 = D3DDevice_SetRenderState
  * code_00163050 = D3DDevice_SetTextureStageState
@@ -61,7 +62,6 @@ symbols in this file:
  * code_00163370 = IDirect3DDevice8_Begin
  * code_00163380 = IDirect3DDevice8_End
  */
-#define D3DINLINE static
 #include <xtl.h>
 
 /* ---------- constants */
