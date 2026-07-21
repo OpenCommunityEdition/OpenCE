@@ -1149,23 +1149,23 @@ boolean scenario_load(
 	{
 		missing_tag = "";
 		error(_error_delayed, "need to get the following tags:");
-		do
+
+missing_tag_loop:
+		newline = strchr(missing_tag, '\n');
+		if (newline)
+			*newline = 0;
+		error(_error_delayed, "%s", missing_tag);
+		if (newline)
 		{
-			newline = strchr(missing_tag, '\n');
-			if (newline)
-				*newline = 0;
-			error(_error_delayed, "%s", missing_tag);
-			if (newline)
-			{
-				missing_tag = newline + 1;
-				*newline = '\n';
-			}
-			else
-			{
-				missing_tag = NULL;
-			}
+			missing_tag = newline + 1;
+			*newline = '\n';
 		}
-		while (missing_tag);
+		else
+		{
+			missing_tag = NULL;
+		}
+		if (missing_tag)
+			goto missing_tag_loop;
 	}
 
 	return result;
