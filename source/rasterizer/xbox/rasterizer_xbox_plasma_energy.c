@@ -175,14 +175,8 @@ extern struct pixel_shader_definition pixel_shader;
 
 /* ---------- public code */
 
-/* NonMatching: the reconstructed body has the target's exact 0x590 padded
- * size and all 85 relocations (targets, addends, and all but one address).
- * VC7 schedules the second global_frame_parameters read before the primary
- * matrix stores in this partial TU; January schedules that independent read
- * 120 bytes later and rejoins before both shader-constant uploads.
- *
- * The stock XDK wrapper bodies are exact; the remaining difference is in
- * this Halo function, so this object must remain NonMatching. */
+/* January uses three-axis texture wrapping and additive plasma blending.
+ * The initialization order below also preserves VC7's original x87 schedule. */
 void rasterizer_plasma_energy_draw(
 	struct rasterizer_transparent_geometry_group_plasma const *group)
 {
@@ -237,24 +231,24 @@ void rasterizer_plasma_energy_draw(
 		rasterizer_set_texture(0, 1, 0, plasma->primary_noise_map, group->bitmap_sequence_index);
 		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
 		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_ADDRESSW, D3DTADDRESS_WRAP);
 		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
 		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
 		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
-		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MIPMAPLODBIAS, D3DTEXF_LINEAR);
 		rasterizer_set_texture(1, 1, 0, plasma->secondary_noise_map, group->bitmap_sequence_index);
 		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
 		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_ADDRESSW, D3DTADDRESS_WRAP);
 		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
 		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
 		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
-		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MIPMAPLODBIAS, D3DTEXF_LINEAR);
 
 		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_CULLMODE, D3DCULL_NONE);
 		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_COLORWRITEENABLE,
 			D3DCOLORWRITEENABLE_RED | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_BLUE);
 		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ALPHABLENDENABLE, TRUE);
 		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
-		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_DESTBLEND, D3DBLEND_ONE);
 		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_BLENDOP, D3DBLENDOP_ADD);
 		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ALPHATESTENABLE, FALSE);
 		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZENABLE, TRUE);
@@ -281,39 +275,38 @@ void rasterizer_plasma_energy_draw(
 			 * third __real@00000000 relocation. */
 			*(long *)&offset = 0;
 		primary_time = global_frame_parameters.game_time_sec / plasma->primary_noise_map_animation_period;
-		secondary_time = global_frame_parameters.game_time_sec / plasma->secondary_noise_map_animation_period;
-		primary_scale = plasma->primary_noise_map_scale;
-		secondary_scale = plasma->secondary_noise_map_scale;
-
-		vertex_constants[0][0] = primary_scale;
 		vertex_constants[0][1] = 0.0f;
 		vertex_constants[0][2] = offset;
-		vertex_constants[0][3] = primary_time * plasma->primary_noise_map_animation_direction.i;
 		vertex_constants[1][0] = 0.0f;
-		vertex_constants[1][1] = primary_scale;
 		vertex_constants[1][2] = 0.0f;
-		vertex_constants[1][3] = primary_time * plasma->primary_noise_map_animation_direction.j;
 		vertex_constants[2][0] = 0.0f;
 		vertex_constants[2][1] = 0.0f;
-		vertex_constants[2][2] = primary_scale;
-		vertex_constants[2][3] = primary_time * plasma->primary_noise_map_animation_direction.k;
-		vertex_constants[3][0] = secondary_scale;
 		vertex_constants[3][1] = 0.0f;
 		vertex_constants[3][2] = 0.0f;
-		vertex_constants[3][3] = secondary_time * plasma->secondary_noise_map_animation_direction.i;
 		vertex_constants[4][0] = 0.0f;
-		vertex_constants[4][1] = secondary_scale;
 		vertex_constants[4][2] = 0.0f;
-		vertex_constants[4][3] = secondary_time * plasma->secondary_noise_map_animation_direction.j;
 		vertex_constants[5][0] = 0.0f;
 		vertex_constants[5][1] = 0.0f;
-		vertex_constants[5][2] = secondary_scale;
-		vertex_constants[5][3] = secondary_time * plasma->secondary_noise_map_animation_direction.k;
-
 		color_constants[0][0] = 1.0f;
 		color_constants[0][1] = 1.0f;
 		color_constants[0][2] = 1.0f;
 		color_constants[0][3] = 1.0f;
+
+		secondary_time = global_frame_parameters.game_time_sec / plasma->secondary_noise_map_animation_period;
+		primary_scale = plasma->primary_noise_map_scale;
+		secondary_scale = plasma->secondary_noise_map_scale;
+		vertex_constants[0][0] = primary_scale;
+		vertex_constants[0][3] = primary_time * plasma->primary_noise_map_animation_direction.i;
+		vertex_constants[1][1] = primary_scale;
+		vertex_constants[1][3] = primary_time * plasma->primary_noise_map_animation_direction.j;
+		vertex_constants[2][2] = primary_scale;
+		vertex_constants[2][3] = primary_time * plasma->primary_noise_map_animation_direction.k;
+		vertex_constants[3][0] = secondary_scale;
+		vertex_constants[3][3] = secondary_time * plasma->secondary_noise_map_animation_direction.i;
+		vertex_constants[4][1] = secondary_scale;
+		vertex_constants[4][3] = secondary_time * plasma->secondary_noise_map_animation_direction.j;
+		vertex_constants[5][2] = secondary_scale;
+		vertex_constants[5][3] = secondary_time * plasma->secondary_noise_map_animation_direction.k;
 		color_constants[1][0] = (plasma->perpendicular_color.red - plasma->parallel_color.red) * tint->red;
 		color_constants[1][1] = (plasma->perpendicular_color.green - plasma->parallel_color.green) * tint->green;
 		color_constants[1][2] = (plasma->perpendicular_color.blue - plasma->parallel_color.blue) * tint->blue;
