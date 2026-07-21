@@ -42,6 +42,8 @@ from .audit_semantic_matches import relocation_shape_matches
 
 
 SCHEMA_VERSION = 1
+ADJUDICATION_SCHEMA_VERSION = 1
+XDK_D3DINLINE_RECIPE = "xdk-stock-d3dinline"
 IMAGE_SCN_CNT_INITIALIZED_DATA = 0x00000040
 IMAGE_SCN_LNK_COMDAT = 0x00001000
 IMAGE_SYM_CLASS_STATIC = 0x03
@@ -895,8 +897,140 @@ def _diff_maps(
     return vanished, appeared, changed
 
 
+def _function_code_evidence(fingerprint: Mapping[str, Any]) -> Dict[str, Any]:
+    """Return the runtime-relevant evidence an adjudication may never waive."""
+    return {
+        "padded_size": fingerprint.get("padded_size"),
+        "normalized_sha256": fingerprint.get("normalized_sha256"),
+        "relocation_count": fingerprint.get("relocation_count"),
+        "relocations": [
+            {
+                "address": item.get("address"),
+                "type": item.get("type"),
+                "addend": item.get("addend"),
+                "resolved_destination": copy.deepcopy(
+                    item.get("resolved_destination")
+                ),
+                "symbolic_destination": copy.deepcopy(
+                    item.get("symbolic_destination")
+                ),
+            }
+            for item in fingerprint.get("relocations", [])
+        ],
+    }
+
+
+def _comdat_delta_only(
+    before: Mapping[str, Any],
+    after: Mapping[str, Any],
+    entry: Mapping[str, Any],
+) -> bool:
+    """Prove that a wrapper changed only its recorded COMDAT selection.
+
+    The linked XBE cannot retain source-object COMDAT selection.  This helper
+    is intentionally recipe-specific and does not create a general metadata
+    ignore rule.
+    """
+    if entry.get("recipe") != XDK_D3DINLINE_RECIPE:
+        return False
+    if before.get("kind") != "CODE" or after.get("kind") != "CODE":
+        return False
+    if not before.get("comdat") or not after.get("comdat"):
+        return False
+    if before.get("comdat_selection") != entry.get("before_comdat_selection"):
+        return False
+    if after.get("comdat_selection") != entry.get("after_comdat_selection"):
+        return False
+    if entry.get("before_comdat_selection") != 1:
+        return False
+    if entry.get("after_comdat_selection") != 2:
+        return False
+
+    normalized_before = copy.deepcopy(before)
+    normalized_after = copy.deepcopy(after)
+    normalized_before["comdat_selection"] = "ADJUDICATED"
+    normalized_after["comdat_selection"] = "ADJUDICATED"
+    return normalized_before == normalized_after
+
+
+def _index_adjudications(
+    value: Optional[Mapping[str, Any]],
+) -> Tuple[Dict[Tuple[str, str], Mapping[str, Any]], Dict[Tuple[str, str], Mapping[str, Any]]]:
+    if value is None:
+        return {}, {}
+    if value.get("schema_version") != ADJUDICATION_SCHEMA_VERSION:
+        raise GateError("unsupported or missing adjudication schema version")
+    function_entries: Dict[Tuple[str, str], Mapping[str, Any]] = {}
+    debug_entries: Dict[Tuple[str, str], Mapping[str, Any]] = {}
+    for entry in value.get("functions", []):
+        key = (entry.get("unit"), entry.get("function"))
+        if not all(isinstance(item, str) and item for item in key):
+            raise GateError("function adjudication requires unit and function")
+        if key in function_entries:
+            raise GateError(f"duplicate function adjudication: {key[0]}:{key[1]}")
+        function_entries[key] = entry
+    for entry in value.get("debug_sections", []):
+        key = (entry.get("unit"), entry.get("section"))
+        if not all(isinstance(item, str) and item for item in key):
+            raise GateError("debug adjudication requires unit and section")
+        if key in debug_entries:
+            raise GateError(f"duplicate debug adjudication: {key[0]}:{key[1]}")
+        debug_entries[key] = entry
+    return function_entries, debug_entries
+
+
+def _adjudicate_function_change(
+    unit_name: str,
+    function_name: str,
+    before_target: Mapping[str, Any],
+    after_target: Mapping[str, Any],
+    before_base: Mapping[str, Any],
+    after_base: Mapping[str, Any],
+    entry: Optional[Mapping[str, Any]],
+) -> bool:
+    if entry is None:
+        return False
+    if entry.get("source_recipe") != "stock XDK D3DINLINE (static __forceinline)":
+        return False
+    if entry.get("before_fingerprint_sha256") != _json_hash(before_base):
+        return False
+    if entry.get("after_fingerprint_sha256") != _json_hash(after_base):
+        return False
+    if entry.get("target_evidence_sha256") != _json_hash(
+        _function_code_evidence(after_target)
+    ):
+        return False
+    if before_target != after_target:
+        return False
+    if _function_code_evidence(before_base) != _function_code_evidence(after_base):
+        return False
+    if not _comdat_delta_only(before_base, after_base, entry):
+        return False
+    return True
+
+
+def _adjudicate_debug_change(
+    before: Mapping[str, Any],
+    after: Mapping[str, Any],
+    entry: Optional[Mapping[str, Any]],
+) -> bool:
+    """Permit one exact, pre-recorded compiler-debug transition only."""
+    if entry is None or entry.get("recipe") != XDK_D3DINLINE_RECIPE:
+        return False
+    if not str(before.get("name", "")).startswith(".debug"):
+        return False
+    if not str(after.get("name", "")).startswith(".debug"):
+        return False
+    return (
+        entry.get("before_fingerprint_sha256") == _json_hash(before)
+        and entry.get("after_fingerprint_sha256") == _json_hash(after)
+    )
+
+
 def compare_manifests(
-    baseline: Mapping[str, Any], current: Mapping[str, Any]
+    baseline: Mapping[str, Any],
+    current: Mapping[str, Any],
+    adjudications: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     result: Dict[str, Any] = {
         "ok": True,
@@ -910,6 +1044,16 @@ def compare_manifests(
         record = {"kind": kind, "message": message}
         record.update(detail)
         result["failures"].append(record)
+
+    try:
+        function_adjudications, debug_adjudications = _index_adjudications(
+            adjudications
+        )
+    except GateError as error:
+        fail("UNKNOWN", str(error))
+        return result
+    consumed_functions = set()
+    consumed_debug_sections = set()
 
     if baseline.get("schema_version") != SCHEMA_VERSION:
         fail("UNKNOWN", "unsupported or missing baseline schema version")
@@ -983,12 +1127,37 @@ def compare_manifests(
                     previous != now
                     or previous_base_fingerprint != current_base_fingerprint
                 ):
-                    fail(
-                        "UNKNOWN",
-                        f"accepted function evidence changed: {unit_name}:{name}",
-                        unit=unit_name,
-                        item=name,
-                    )
+                    key = (unit_name, name)
+                    entry = function_adjudications.get(key)
+                    if _adjudicate_function_change(
+                        unit_name,
+                        name,
+                        before["target"]["functions"].get(name, {}),
+                        after["target"]["functions"].get(name, {}),
+                        previous_base_fingerprint or {},
+                        current_base_fingerprint or {},
+                        entry,
+                    ):
+                        consumed_functions.add(key)
+                        unit_result.setdefault("adjudicated_exact", []).append(name)
+                        result["warnings"].append(
+                            {
+                                "kind": "ADJUDICATED_COMDAT_CHANGE",
+                                "unit": unit_name,
+                                "item": name,
+                                "message": (
+                                    "exact code and relocation evidence preserved; "
+                                    "reviewed stock-XDK COMDAT transition accepted"
+                                ),
+                            }
+                        )
+                    else:
+                        fail(
+                            "UNKNOWN",
+                            f"accepted function evidence changed: {unit_name}:{name}",
+                            unit=unit_name,
+                            item=name,
+                        )
                 else:
                     unit_result["still_exact"].append(name)
             elif now["accepted"]:
@@ -1013,13 +1182,39 @@ def compare_manifests(
         before_sections = before["base"]["non_code_sections"]
         after_sections = after["base"]["non_code_sections"]
         vanished, appeared, changed = _diff_maps(before_sections, after_sections)
-        for identity in vanished + appeared + changed:
+        for identity in vanished + appeared:
             fail(
                 "DATA_CHANGED",
                 f"rebuilt non-code section changed: {unit_name}:{identity}",
                 unit=unit_name,
                 item=identity,
             )
+        for identity in changed:
+            key = (unit_name, identity)
+            if _adjudicate_debug_change(
+                before_sections[identity],
+                after_sections[identity],
+                debug_adjudications.get(key),
+            ):
+                consumed_debug_sections.add(key)
+                result["warnings"].append(
+                    {
+                        "kind": "ADJUDICATED_DEBUG_CHANGE",
+                        "unit": unit_name,
+                        "item": identity,
+                        "message": (
+                            "exact pre-recorded stock-XDK compiler-debug "
+                            "transition accepted"
+                        ),
+                    }
+                )
+            else:
+                fail(
+                    "DATA_CHANGED",
+                    f"rebuilt non-code section changed: {unit_name}:{identity}",
+                    unit=unit_name,
+                    item=identity,
+                )
 
         before_symbols = before["base"]["symbols"]
         after_symbols = after["base"]["symbols"]
@@ -1029,6 +1224,25 @@ def compare_manifests(
                 f"rebuilt symbol ownership changed for {unit_name}",
                 unit=unit_name,
             )
+
+    unused_functions = sorted(set(function_adjudications) - consumed_functions)
+    unused_debug_sections = sorted(
+        set(debug_adjudications) - consumed_debug_sections
+    )
+    for unit_name, name in unused_functions:
+        fail(
+            "UNKNOWN",
+            f"function adjudication was not consumed: {unit_name}:{name}",
+            unit=unit_name,
+            item=name,
+        )
+    for unit_name, identity in unused_debug_sections:
+        fail(
+            "UNKNOWN",
+            f"debug adjudication was not consumed: {unit_name}:{identity}",
+            unit=unit_name,
+            item=identity,
+        )
 
     return result
 
@@ -1108,6 +1322,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
     snapshot_parser = subparsers.add_parser("snapshot", parents=[_common_parser()])
     check_parser = subparsers.add_parser("check", parents=[_common_parser()])
+    check_parser.add_argument(
+        "--adjudications",
+        type=Path,
+        help=(
+            "explicit one-shot reviewed evidence changes; omitted by default "
+            "so ordinary checks remain fully strict"
+        ),
+    )
     explain_parser = subparsers.add_parser("explain")
     explain_parser.add_argument("unit")
     explain_parser.add_argument("item")
@@ -1177,7 +1399,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         else:
             selected = baseline_names
         current = _capture_from_cli(args, selected, config, baseline)
-        comparison = compare_manifests(baseline, current)
+        adjudications = None
+        if args.adjudications is not None:
+            adjudications = _read_json(
+                _resolve_path(root, args.adjudications)
+            )
+        comparison = compare_manifests(
+            baseline, current, adjudications=adjudications
+        )
         print(json.dumps(comparison, indent=2, sort_keys=True))
         return 0 if comparison["ok"] else 1
     except GateError as error:
