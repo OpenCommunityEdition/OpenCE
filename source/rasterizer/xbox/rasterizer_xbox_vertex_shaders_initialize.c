@@ -75,6 +75,7 @@ boolean rasterizer_vertex_shaders_initialize(
 	void)
 {
 	boolean success;
+	long result;
 	short vertex_shader_index;
 
 	success = TRUE;
@@ -89,7 +90,6 @@ boolean rasterizer_vertex_shaders_initialize(
 	vertex_shader_table[2].declaration = &rdata_0029bf94[0x34 / sizeof(unsigned long)];
 	vertex_shader_table[12].declaration = &rdata_0029bf94[0x34 / sizeof(unsigned long)];
 	vertex_shader_table[56].declaration = &rdata_0029bf94[0x34 / sizeof(unsigned long)];
-	vertex_shader_table[11].declaration = &rdata_0029bf94[0x20 / sizeof(unsigned long)];
 	vertex_shader_table[0].declaration = &rdata_0029bf94[0x00 / sizeof(unsigned long)];
 	vertex_shader_table[1].declaration = &rdata_0029bf94[0x10 / sizeof(unsigned long)];
 	vertex_shader_table[66].declaration = &rdata_0029bf94[0x48 / sizeof(unsigned long)];
@@ -108,6 +108,7 @@ boolean rasterizer_vertex_shaders_initialize(
 	vertex_shader_table[6].declaration = &rdata_0029bf94[0xC4 / sizeof(unsigned long)];
 	vertex_shader_table[8].declaration = &rdata_0029bf94[0xC4 / sizeof(unsigned long)];
 	vertex_shader_table[10].declaration = &rdata_0029bf94[0x78 / sizeof(unsigned long)];
+	vertex_shader_table[11].declaration = &rdata_0029bf94[0x20 / sizeof(unsigned long)];
 	vertex_shader_table[9].declaration = &rdata_0029bf94[0x78 / sizeof(unsigned long)];
 	vertex_shader_table[27].declaration = &rdata_0029bf94[0x78 / sizeof(unsigned long)];
 	vertex_shader_table[17].declaration = &rdata_0029bf94[0x78 / sizeof(unsigned long)];
@@ -159,12 +160,13 @@ boolean rasterizer_vertex_shaders_initialize(
 			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_vertex_shaders_initialize.c",
 			243,
 			vertex_shader_table[vertex_shader_index].code);
-		if (IDirect3DDevice8_CreateVertexShader(
+		result = IDirect3DDevice8_CreateVertexShader(
 			global_d3d_device,
 			vertex_shader_table[vertex_shader_index].declaration,
 			vertex_shader_table[vertex_shader_index].code,
 			&vertex_shader_table[vertex_shader_index].handle,
-			0) >= 0 && success)
+			0);
+		if (success && result >= 0)
 		{
 			success = TRUE;
 		}
@@ -172,7 +174,7 @@ boolean rasterizer_vertex_shaders_initialize(
 		{
 			success = FALSE;
 			rasterizer_error(
-				0,
+				result,
 				"IDirect3DDevice8_CreateVertexShader(global_d3d_device, (DWORD*)vertex_shader_table[vertex_shader_index].declaration, (DWORD*)vertex_shader_table[vertex_shader_index].code, (DWORD*)&vertex_shader_table[vertex_shader_index].handle, 0)");
 		}
 	}
