@@ -202,12 +202,6 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct scenario_material_globals
-{
-	struct material_definition default_material;
-	boolean default_material_initialized;
-};
-
 struct memory_status
 {
 	unsigned long minimum_available_memory;
@@ -323,7 +317,8 @@ static struct memory_status scenario_memory_status =
 struct structure_bsp *global_structure_bsp;
 struct scenario *global_scenario;
 struct collision_bsp *global_collision_bsp;
-struct scenario_material_globals bss_004c0520;
+struct material_definition bss_004c0520 = { 0 };
+static boolean default_material_initialized = FALSE;
 struct bsp3d *global_bsp3d;
 struct game_globals *global_game_globals;
 
@@ -481,13 +476,13 @@ void scenario_location_award_bonus(
 struct material_definition *default_material_definition_get(
 	void)
 {
-	if (!bss_004c0520.default_material_initialized)
+	if (!default_material_initialized)
 	{
-		bss_004c0520.default_material.melee_hit_sound.index = NONE;
-		bss_004c0520.default_material_initialized = TRUE;
+		bss_004c0520.melee_hit_sound.index = NONE;
+		default_material_initialized = TRUE;
 	}
 
-	return &bss_004c0520.default_material;
+	return &bss_004c0520;
 }
 
 struct material_definition *scenario_material_definition_get(
