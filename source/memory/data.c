@@ -479,21 +479,14 @@ long data_prev_index(
 	return result;
 }
 
-/* NonMatching: target and candidate are both 0x110 padded bytes with the
-   same 12 relocation identities; all 18 sibling functions are exact.  The
-   target reuses zero in EBX for CMP EDI,EBX and MOV [EBP-4],EBX, while this
-   compiler emits TEST EDI,EDI and a seven-byte immediate-zero store.  Five
-   bounded shapes were measured: explicit !=NULL, register compacted_count,
-   comparison with compacted_count, declaration-time absolute_index setup,
-   and block-scoped setup.  The first three and fifth normalize to baseline;
-   declaration-time setup shifts the first seven relocations by three bytes.
-   This is parked as an XDK 3911 register-reuse/code-scheduling tie. */
 void data_compact(
 	struct data_array *data)
 {
 	void *compacted_data;
+	/* Keep the null sentinel distinct; VC7 coalesces it with compacted_count. */
+	void *empty = NULL;
 	struct datum_header *datum;
-	short compacted_count = 0;
+	short compacted_count;
 	short absolute_index;
 
 	compacted_data = match_malloc(
@@ -503,10 +496,11 @@ void data_compact(
 	data_verify(data);
 	match_assert("c:\\halo\\SOURCE\\memory\\data.c", 424, data->valid);
 
-	if (compacted_data)
+	if (compacted_data!=empty)
 	{
 		datum = data->data;
-		absolute_index = compacted_count;
+		absolute_index = (long)empty;
+		compacted_count = (short)(long)empty;
 		while (absolute_index<data->count)
 		{
 			if (datum->identifier)

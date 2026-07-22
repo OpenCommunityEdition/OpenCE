@@ -2,25 +2,6 @@
   "version": 1,
   "entries": [
     {
-      "unit": "source/memory/data",
-      "function": "_data_compact",
-      "class": "register-allocation",
-      "evidence": "Target and candidate have equal 0x110 padded size and 12 relocation identities; the residual is EBX zero reuse versus TEST plus an immediate-zero store after exhausted legal-C shapes.",
-      "measurements": {
-        "target": {
-          "size": 272,
-          "relocation_count": 12,
-          "normalized_sha256": "7c65e62ccaa0fc779d8d48b2de10abcc73331854a642f2fc1c638742829fcb07"
-        },
-        "base": {
-          "size": 272,
-          "relocation_count": 12,
-          "normalized_sha256": "61bd697208495c5d0b43c25535148cdfbd7a8aa7f983f2bef046b9edf5755088"
-        },
-        "objdiff_percent": 98.70968
-      }
-    },
-    {
       "unit": "source/sound/sound_classes",
       "function": "_sound_class_get",
       "class": "register-allocation",
