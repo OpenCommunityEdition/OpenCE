@@ -480,7 +480,7 @@
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_vertex_shaders_initialize.c", "index": 106, "status": "NonMatching" },
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_vertex_shaders.c", "index": 107, "status": "NonMatching" },
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_transparent_geometry.c", "index": 108, "status": "NonMatching" },
-				{ "name": "source/rasterizer/xbox/rasterizer_xbox_text.c", "index": 109, "status": "NonMatching" },
+				{ "name": "source/rasterizer/xbox/rasterizer_xbox_text.c", "index": 109, "status": "Matching" },
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_shadows.c", "index": 110, "status": "NonMatching" },
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_screen_effect.c", "index": 111, "status": "NonMatching" },
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_profile.c", "index": 112, "status": "NonMatching" },
