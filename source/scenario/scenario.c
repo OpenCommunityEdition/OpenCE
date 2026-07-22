@@ -216,6 +216,9 @@ struct memory_status
 
 /* ---------- prototypes */
 
+void _ReadWriteBarrier(void);
+#pragma intrinsic(_ReadWriteBarrier)
+
 void objects_reconnect_to_structure_bsp(
 	void);
 void lights_reconnect_to_structure_bsp(
@@ -1331,11 +1334,10 @@ static void code_0017f370(
 
 void scenario_get_atmospheric_fog(
 	short local_player_index,
-	short sky_index,
+	long sky_index,
 	real_point3d *camera_point,
 	struct render_fog *render_fog)
 {
-	long sky_definition_index;
 	long tag_reference_index;
 	struct sky *sky;
 	struct atmospheric_fog_state *fog_state;
@@ -1348,7 +1350,7 @@ void scenario_get_atmospheric_fog(
 	real blended_distance;
 
 	match_assert("c:\\halo\\SOURCE\\scenario\\scenario.c", 0xB7, global_scenario);
-	if (sky_index == NONE)
+	if ((short)sky_index == NONE)
 	{
 		match_assert("c:\\halo\\SOURCE\\scenario\\scenario.c", 0xB7, global_scenario);
 		tag_reference_index = NONE;
@@ -1363,15 +1365,11 @@ void scenario_get_atmospheric_fog(
 		sky = NULL;
 		if (tag_reference_index != NONE)
 			sky = sky_definition_get(tag_reference_index);
+		_ReadWriteBarrier();
 	}
 	else
 	{
-		struct sky *resolved_sky = NULL;
-
-		sky_definition_index = scenario_get_sky_definition_index(sky_index);
-		if (sky_definition_index != NONE)
-			resolved_sky = sky_definition_get(sky_definition_index);
-		sky = resolved_sky;
+		sky = scenario_get_sky(sky_index);
 	}
 
 	if (local_player_index != NONE)
@@ -1381,7 +1379,7 @@ void scenario_get_atmospheric_fog(
 
 	if (sky)
 	{
-		if (sky_index == NONE)
+		if ((short)sky_index == NONE)
 		{
 			fog = &sky->indoor_fog;
 			match_assert("c:\\halo\\SOURCE\\scenario\\scenario.c", 0xB7, global_scenario);
@@ -1397,13 +1395,15 @@ void scenario_get_atmospheric_fog(
 			sky = NULL;
 			if (tag_reference_index != NONE)
 				sky = sky_definition_get(tag_reference_index);
-			indoor_fog_scale = sky->indoor_fog_screen.index == NONE ? 0.0f : 1.0f;
 		}
 		else
 		{
 			fog = &sky->outdoor_fog;
-			indoor_fog_scale = 0.0f;
 		}
+		indoor_fog_scale =
+			(short)sky_index == NONE && sky->indoor_fog_screen.index != NONE
+				? 1.0f
+				: 0.0f;
 
 		vector_from_points3d(&fog_state->camera_point, camera_point, &camera_delta);
 		distance = square_root(
