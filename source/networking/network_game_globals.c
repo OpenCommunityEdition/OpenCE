@@ -102,6 +102,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "game/players.h"
 #include "main/main.h"
+#include "memory/data_packet_groups.h"
 #include "network_messages.h"
 #include "network_game_manager.h"
 #include "network_game_globals.h"
@@ -118,11 +119,32 @@ symbols in this file:
 struct network_game_server;
 struct network_game_client;
 
+#pragma pack(push, 2)
 struct player_action_collection_definition
 {
-	byte __unknown0[0x14];
+	char const *name;
+	long flags;
+	short size;
+	short version;
+	struct data_packet_field *packet_fields;
+	boolean initialized;
+	byte __padding11[3];
 	short previous_client_state;
 };
+#pragma pack(pop)
+
+struct player_action_packet_definition_storage
+{
+	struct data_packet_definition definition;
+	long __padding14;
+	struct data_packet_field collection_fields[13];
+	short __padding9a;
+};
+
+typedef char player_action_collection_definition_size_assert[
+	sizeof(struct player_action_collection_definition) == 0x16 ? 1 : -1];
+typedef char player_action_packet_definition_storage_size_assert[
+	sizeof(struct player_action_packet_definition_storage) == 0x9C ? 1 : -1];
 
 struct client_game_update_message
 {
@@ -234,7 +256,52 @@ unsigned short seed_random(
 /* ---------- globals */
 
 struct network_game_globals bss_004566dc = { 0 };
-extern struct player_action_collection_definition player_action_collection_definition;
+struct data_packet_field data_0030a988[4] =
+{
+	{ _data_packet_field_longs, 6, 0, 0, 0 },
+	{ _data_packet_field_shorts, 3, 0, 0, 0 },
+	{ _data_packet_field_pad, 2, 0, 0, 0 },
+	{ _data_packet_field_end, 0, 0, 0, 0 },
+};
+struct player_action_packet_definition_storage player_action_packet_definition =
+{
+	{
+		"player_action_packet_definition",
+		0,
+		0x20,
+		1,
+		data_0030a988,
+		FALSE,
+	},
+	0,
+	{
+		{ _data_packet_field_longs, 6, 0, 0, 0 },
+		{ _data_packet_field_shorts, 3, 0, 0, 0 },
+		{ _data_packet_field_pad, 2, 0, 0, 0 },
+		{ _data_packet_field_longs, 6, 0, 0, 0 },
+		{ _data_packet_field_shorts, 3, 0, 0, 0 },
+		{ _data_packet_field_pad, 2, 0, 0, 0 },
+		{ _data_packet_field_longs, 6, 0, 0, 0 },
+		{ _data_packet_field_shorts, 3, 0, 0, 0 },
+		{ _data_packet_field_pad, 2, 0, 0, 0 },
+		{ _data_packet_field_longs, 6, 0, 0, 0 },
+		{ _data_packet_field_shorts, 3, 0, 0, 0 },
+		{ _data_packet_field_pad, 2, 0, 0, 0 },
+		{ _data_packet_field_end, 0, 0, 0, 0 },
+	},
+	0,
+};
+struct player_action_collection_definition player_action_collection_definition =
+{
+	"player_action_collection_definition",
+	0,
+	0x80,
+	1,
+	player_action_packet_definition.collection_fields,
+	FALSE,
+	{ 0, 0, 0 },
+	-1,
+};
 
 /* ---------- public code */
 
@@ -454,58 +521,60 @@ boolean network_game_client_start_frame(
 		}
 
 		main_goto_main_menu();
-		return TRUE;
-	}
-
-	result = network_game_client_idle(global_network_game_client);
-	if (result)
-	{
-		if (!network_game_client_get_error(global_network_game_client))
-		{
-			state = network_game_client_get_state(global_network_game_client, &state_data);
-			switch ((unsigned short)state)
-			{
-			case 0:
-				if (player_action_collection_definition.previous_client_state != state)
-					network_event("searching for a network game ...");
-				break;
-			case 1:
-				if (player_action_collection_definition.previous_client_state != state)
-					network_event("joining a network game ...");
-				break;
-			case 2:
-				if (player_action_collection_definition.previous_client_state != state)
-					network_event("waiting for game to start ...");
-				break;
-			case 3:
-				if (player_action_collection_definition.previous_client_state != state)
-					network_event("client signalled to begin loading for network game");
-				break;
-			case 4:
-				if (player_action_collection_definition.previous_client_state != state)
-					network_event("waiting for game to restart ...");
-				break;
-			default:
-				display_assert(
-					"client is in an unknown state",
-					"c:\\halo\\SOURCE\\networking\\network_game_globals.c",
-					0x160,
-					TRUE);
-				system_exit(-1);
-				break;
-			}
-
-			player_action_collection_definition.previous_client_state = state;
-		}
-		else
-		{
-			network_event("internal networking error [network_game_client_get_error()!=0]");
-			result = FALSE;
-		}
+		result = TRUE;
 	}
 	else
 	{
-		network_event("internal networking error [network_game_client_idle() failed]");
+		result = network_game_client_idle(global_network_game_client);
+		if (result)
+		{
+			if (!network_game_client_get_error(global_network_game_client))
+			{
+				state = network_game_client_get_state(global_network_game_client, &state_data);
+				switch ((unsigned short)state)
+				{
+				case 0:
+					if (player_action_collection_definition.previous_client_state != state)
+						network_event("searching for a network game ...");
+					break;
+				case 1:
+					if (player_action_collection_definition.previous_client_state != state)
+						network_event("joining a network game ...");
+					break;
+				case 2:
+					if (player_action_collection_definition.previous_client_state != state)
+						network_event("waiting for game to start ...");
+					break;
+				case 3:
+					if (player_action_collection_definition.previous_client_state != state)
+						network_event("client signalled to begin loading for network game");
+					break;
+				case 4:
+					if (player_action_collection_definition.previous_client_state != state)
+						network_event("waiting for game to restart ...");
+					break;
+				default:
+					display_assert(
+						"client is in an unknown state",
+						"c:\\halo\\SOURCE\\networking\\network_game_globals.c",
+						0x160,
+						TRUE);
+					system_exit(-1);
+					break;
+				}
+
+				player_action_collection_definition.previous_client_state = state;
+			}
+			else
+			{
+				network_event("internal networking error [network_game_client_get_error()!=0]");
+				result = FALSE;
+			}
+		}
+		else
+		{
+			network_event("internal networking error [network_game_client_idle() failed]");
+		}
 	}
 
 	return result;
