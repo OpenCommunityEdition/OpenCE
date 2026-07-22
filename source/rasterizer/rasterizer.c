@@ -1984,25 +1984,23 @@ void rasterizer_debug_model_vertices(
 			short node_index1;
 			real node_weight0;
 			real node_weight1;
-			real_point3d node_point0;
-			real_vector3d node_normal0;
-			real_point3d node_point1;
-			real_vector3d node_normal1;
 			real_vector3d decompressed_normal;
 			real_vector3d *decompressed_normal_result;
 			real_vector3d vertex_normal;
 			real_point3d point;
 			real_vector3d normal;
-			long debug_vertex_index;
 
 			node_index0 = vertex->node_indices[0] / 3;
 			node_weight0 = (real)vertex->node_weight * (1.f / 32767.f);
 			node_weight1 = 1.f - node_weight0;
 			node_index1 = vertex->node_indices[1] / 3;
-			set_real_point3d(&node_point0, 0.f, 0.f, 0.f);
-			set_real_vector3d(&node_normal0, 0.f, 0.f, 0.f);
-			set_real_point3d(&node_point1, 0.f, 0.f, 0.f);
-			set_real_vector3d(&node_normal1, 0.f, 0.f, 0.f);
+			{
+				real_point3d node_point0 = { 0.f, 0.f, 0.f };
+				real_vector3d node_normal0 = { 0.f, 0.f, 0.f };
+				real_point3d node_point1 = { 0.f, 0.f, 0.f };
+				real_vector3d node_normal1 = { 0.f, 0.f, 0.f };
+				long debug_vertex_index;
+
 			decompressed_normal_result = uncompress_int32_to_real_vector3d(&decompressed_normal, vertex->normal);
 			vertex_normal = *decompressed_normal_result;
 			match_assert(
@@ -2106,6 +2104,7 @@ void rasterizer_debug_model_vertices(
 					closest_debug_vertex_dot = camera_dot;
 				}
 				debug_vertex_count++;
+			}
 			}
 		}
 
