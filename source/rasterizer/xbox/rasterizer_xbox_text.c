@@ -181,9 +181,6 @@ void rasterizer_text_end(
 	return;
 }
 
-/* NonMatching: the reconstructed body has the January call/data-relocation
- * sequence (85/85, including addends) but remains 16 padded bytes larger due
- * to local scheduling and register-allocation differences. */
 void rasterizer_text_begin(
 	struct rasterizer_text_begin_parameters const *parameters)
 {
@@ -191,8 +188,7 @@ void rasterizer_text_begin(
 	real texture_constants[6][4];
 	short window_width;
 	short window_height;
-	volatile real x_scale;
-	real y_scale;
+	real_vector2d scale;
 	short map_index;
 
 	match_assert(
@@ -249,24 +245,22 @@ void rasterizer_text_begin(
 		window_width = global_window_parameters.right -
 			global_window_parameters.left;
 		if (parameters->scale)
-		{
-			x_scale = 2.0f * parameters->scale->i / window_height;
-			y_scale = -2.0f * parameters->scale->j / window_width;
-		}
+			scale.i = 2.0f * parameters->scale->i / window_height;
 		else
-		{
-			x_scale = 0.0f;
-			y_scale = 0.0f;
-		}
+			scale.i = 0.0f;
+		if (parameters->scale)
+			scale.j = -2.0f * parameters->scale->j / window_width;
+		else
+			scale.j = 0.0f;
 
 		vertex_constants[0][0] = 2.0f / window_height;
 		vertex_constants[0][1] = 0.0f;
 		vertex_constants[0][2] = 0.0f;
-		vertex_constants[0][3] = x_scale - (1.0f + 1.0f / window_height);
+		vertex_constants[0][3] = scale.i - (1.0f + 1.0f / window_height);
 		vertex_constants[1][0] = 0.0f;
 		vertex_constants[1][1] = -2.0f / window_width;
 		vertex_constants[1][2] = 0.0f;
-		vertex_constants[1][3] = y_scale + 1.0f / window_width + 1.0f;
+		vertex_constants[1][3] = scale.j + 1.0f / window_width + 1.0f;
 		vertex_constants[2][0] = 0.0f;
 		vertex_constants[2][1] = 0.0f;
 		vertex_constants[2][2] = 0.0f;
@@ -316,41 +310,58 @@ void rasterizer_text_begin(
 			texture_constants,
 			6);
 
-		for (map_index = 0; map_index < 3; map_index++)
+		map_index = 0;
+map_loop:
 		{
-			if (parameters->map[map_index])
+			long map_array_index;
+			short map_stage;
+			struct bitmap_data const *bitmap;
+
+			map_stage = map_index;
+			map_array_index = map_stage;
+			bitmap = parameters->map[map_array_index];
+			/* Texture maps are contiguous; the original exits at the first gap.
+			 * Keep the increment on the populated path to preserve that control
+			 * flow and VC7's direct signed-index loop shape. */
+			if (bitmap)
 			{
-				rasterizer_set_texture_bitmap_data(
-					map_index,
-					parameters->map[map_index]);
+				rasterizer_set_texture_bitmap_data(map_index, bitmap);
 				IDirect3DDevice8_SetTextureStageState(
 					global_d3d_device,
-					map_index,
+					map_array_index,
 					D3DTSS_ADDRESSU,
-					parameters->clamp[map_index] ? D3DTADDRESS_WRAP : D3DTADDRESS_CLAMP);
+					parameters->clamp[map_array_index] ? D3DTADDRESS_WRAP : D3DTADDRESS_CLAMP);
 				IDirect3DDevice8_SetTextureStageState(
 					global_d3d_device,
-					map_index,
+					map_array_index,
 					D3DTSS_ADDRESSV,
-					parameters->clamp[map_index] ? D3DTADDRESS_WRAP : D3DTADDRESS_CLAMP);
+					parameters->clamp[map_array_index] ? D3DTADDRESS_WRAP : D3DTADDRESS_CLAMP);
 				IDirect3DDevice8_SetTextureStageState(
 					global_d3d_device,
-					map_index,
+					map_array_index,
 					D3DTSS_MAGFILTER,
 					parameters->point_filtering ? D3DTEXF_POINT : D3DTEXF_LINEAR);
 				IDirect3DDevice8_SetTextureStageState(
 					global_d3d_device,
-					map_index,
+					map_array_index,
 					D3DTSS_MINFILTER,
 					parameters->point_filtering ? D3DTEXF_POINT : D3DTEXF_LINEAR);
 				IDirect3DDevice8_SetTextureStageState(
 					global_d3d_device,
-					map_index,
+					map_array_index,
 					D3DTSS_MIPFILTER,
 					parameters->point_filtering ? D3DTEXF_POINT : D3DTEXF_LINEAR);
+				map_index++;
 			}
+			else
+			{
+				goto maps_done;
+			}
+			if (map_index < 3)
+				goto map_loop;
 		}
 
+maps_done:
 		rasterizer_set_vertex_shader_permutation(4, 8, TRUE);
 		if (parameters->map[0])
 		{
