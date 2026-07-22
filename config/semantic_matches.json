@@ -60,6 +60,11 @@
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
+    "unit": "source/networking/network_game_globals",
+    "function": "_network_game_client_start_frame",
+    "reason": "hardened COFF comparison proves all 560 padded bytes and all 57 semantic relocations exact; objdiff reports a local jump-table label encoding false negative"
+  },
+  {
     "unit": "source/memory/data_encoding",
     "function": "_data_decode_array",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
