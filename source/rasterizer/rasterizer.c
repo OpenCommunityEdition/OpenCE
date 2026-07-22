@@ -846,8 +846,10 @@ struct rasterizer_debug_options_definition rasterizer_debug_options =
 };
 extern struct rasterizer_window_parameters global_window_parameters;
 /* No PDB name survives for this target-owned BSS symbol. */
+#pragma bss_seg(".bss")
 long bss_004662ec;
 real_argb_color *global_rasterizer_model_ambient_reflection_tint;
+#pragma bss_seg()
 
 /* ---------- public code */
 
