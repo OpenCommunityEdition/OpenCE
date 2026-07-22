@@ -2033,7 +2033,13 @@ void rasterizer_debug_model_vertices(
 			normal.i = node_normal0.i * node_weight0 + node_normal1.i * node_weight1;
 			normal.j = node_normal0.j * node_weight0 + node_normal1.j * node_weight1;
 			normal.k = node_normal0.k * node_weight0 + node_normal1.k * node_weight1;
-			normalize3d(&normal);
+			/* Preserve January VC7 scheduling: this inline self-copy is eliminated,
+			 * but keeps the x87 result pop ahead of the loop-bound reload. */
+			normalize3d(set_real_vector3d(
+				&normal,
+				normal.i,
+				normal.j,
+				normal.k));
 
 			for (debug_vertex_index = 0; debug_vertex_index < debug_vertex_count; debug_vertex_index++)
 			{
