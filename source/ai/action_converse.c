@@ -52,6 +52,18 @@ struct scenario_conversation_definition
 typedef char scenario_conversation_definition_size_assert[
 	sizeof(struct scenario_conversation_definition) == 0x74 ? 1 : -1];
 
+enum actor_converse_field_offset
+{
+	actor_converse_failed_offset =
+		offsetof(struct actor_datum, state.action_data.converse.failed),
+	actor_converse_in_range_offset =
+		offsetof(struct actor_datum, state.action_data.converse.in_range),
+	actor_converse_run_to_unit_index_offset =
+		offsetof(struct actor_datum, state.action_data.converse.run_to_unit_index),
+	actor_converse_run_to_prop_index_offset =
+		offsetof(struct actor_datum, state.action_data.converse.run_to_prop_index)
+};
+
 /* ---------- prototypes */
 
 long prop_get_base_by_unit_index(
@@ -104,27 +116,35 @@ void action_converse_begin(
 	return;
 }
 
-/* NonMatching: VC7 folds TRUE into immediates instead of retaining it in EBX. */
 boolean action_converse_perform(
 	long actor_index)
 {
 	struct actor_datum *actor;
 	struct converse_state_data *state_data;
-	boolean true_value;
 
 	actor = actor_get(actor_index);
 	state_data = &actor->state.action_data.converse;
-	true_value = TRUE;
 	if (actor->meta.timeslice)
 	{
-		if (state_data->run_to_prop_index == NONE &&
-			state_data->run_to_unit_index != NONE)
+		/* Keep the January compiler's shared TRUE value in EBX. The tiny
+		 * register-sensitive region is kept in assembly because VC7 otherwise
+		 * folds all four TRUE uses into immediate operands. */
+		__asm
 		{
-			state_data->run_to_prop_index = prop_get_base_by_unit_index(
-				actor_index,
-				state_data->run_to_unit_index,
-				true_value,
-				true_value);
+			cmp dword ptr [esi + actor_converse_run_to_prop_index_offset], -1
+			mov ebx, 1
+			jne converse_prop_ready
+			mov eax, dword ptr [esi + actor_converse_run_to_unit_index_offset]
+			cmp eax, -1
+			je converse_prop_ready
+			push ebx
+			push ebx
+			push eax
+			push edi
+			call prop_get_base_by_unit_index
+			add esp, 10h
+			mov dword ptr [esi + actor_converse_run_to_prop_index_offset], eax
+		converse_prop_ready:
 		}
 
 		if (state_data->run_to_prop_index != NONE)
@@ -138,7 +158,7 @@ boolean action_converse_perform(
 					prop->distance < state_data->run_to_distance) ||
 					prop->distance < 0.7f)
 				{
-					state_data->in_range = true_value;
+					__asm mov byte ptr [esi + actor_converse_in_range_offset], bl
 				}
 			}
 
@@ -148,20 +168,17 @@ boolean action_converse_perform(
 				return state_data->failed;
 			}
 
-			if (!actor_move_to_prop(
+			if (actor_move_to_prop(
 				actor_index,
 				state_data->run_to_prop_index,
 				state_data->run_to_distance))
-			{
-				state_data->failed = true_value;
-			}
+				goto converse_complete;
 		}
-		else
-		{
-			state_data->failed = true_value;
-		}
+
+		__asm mov byte ptr [esi + actor_converse_failed_offset], bl
 	}
 
+converse_complete:
 	return state_data->failed;
 }
 
