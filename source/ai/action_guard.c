@@ -414,25 +414,24 @@ action_guard_setup_from_fleeing(
 		{
 			state_data->find_new_guard_position = TRUE;
 			state_data->guard_location_type = 0;
-			state_data->guard_look_prop_index = NONE;
-
-			return TRUE;
 		}
-
-		state_data->find_new_guard_position = FALSE;
-		state_data->guard_location_type = 3;
-		state_data->guard_firing_position_index = flee_state->flee_firing_position_index;
-		if (flee_state->has_approach_point)
+		else
 		{
-			state_data->has_guard_direction = TRUE;
-			state_data->aim_in_guard_direction = TRUE;
-			vector_from_points3d(
-				&actor->input.position.body_position,
-				&flee_state->approach_point,
-				&state_data->guard_direction);
-			if (normalize3d(&state_data->guard_direction) == 0.f)
+			state_data->find_new_guard_position = FALSE;
+			state_data->guard_location_type = 3;
+			state_data->guard_firing_position_index = flee_state->flee_firing_position_index;
+			if (flee_state->has_approach_point)
 			{
-				state_data->has_guard_direction = FALSE;
+				state_data->has_guard_direction = TRUE;
+				state_data->aim_in_guard_direction = TRUE;
+				vector_from_points3d(
+					&actor->input.position.body_position,
+					&flee_state->approach_point,
+					&state_data->guard_direction);
+				if (normalize3d(&state_data->guard_direction) == 0.f)
+				{
+					state_data->has_guard_direction = FALSE;
+				}
 			}
 		}
 	}
