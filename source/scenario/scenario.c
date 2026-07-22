@@ -1360,6 +1360,9 @@ void scenario_get_atmospheric_fog(
 		sky = NULL;
 		if (tag_reference_index != NONE)
 			sky = sky_definition_get(tag_reference_index);
+		/* Prevent VC7 from tail-merging this default-sky expansion with the
+		 * second expansion below. The remaining direct-edge versus branch-hop
+		 * difference is documented in config/parked.json. */
 		_ReadWriteBarrier();
 	}
 	else
