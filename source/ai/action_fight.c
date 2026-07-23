@@ -193,10 +193,6 @@ boolean
 action_fight_perform(
 	long actor_index)
 {
-	/* NonMatching: target and candidate are both 0x3D0 bytes with all 39
-	   relocation addresses and targets exact. The control flow and nearby-
-	   position spill now match; only four compiler stack-slot assignments
-	   for the selection outputs and range bounds remain permuted. */
 	struct actor_datum *actor = actor_get(actor_index);
 	struct actor_definition *definition;
 
@@ -210,16 +206,6 @@ action_fight_perform(
 
 		if (!actor->input.vehicle_passenger)
 		{
-			long firing_position_index;
-			long position_flags;
-			real combat_position_time_lower_bound;
-			long previous_owner_actor_index;
-			short old_firing_position_index;
-			short new_firing_position_index;
-			struct firing_position_candidate candidate;
-			struct firing_position_search_definition search;
-			struct firing_position_search_workspace workspace;
-
 			if (actor->emotions.defensive_crouch &&
 				TEST_FLAG(definition->flags, 5))
 			{
@@ -275,56 +261,68 @@ action_fight_perform(
 				}
 			}
 
-			old_firing_position_index = actor->firing_positions.current_position_index;
-			csmemset(&search, 0, sizeof(search));
-			search.firing_position_group = _firing_position_group_attacking;
-			firing_position_index = actor_active_select_firing_position(
-				actor_index,
-				&search,
-				&candidate,
-				&previous_owner_actor_index,
-				&workspace,
-				&position_flags);
-			new_firing_position_index = actor_change_firing_position(
-				actor_index,
-				firing_position_index,
-				&candidate,
-				previous_owner_actor_index,
-				&workspace,
-				position_flags);
-			if (new_firing_position_index == NONE)
 			{
-				actor->state.action_data.fight.firing_position_timer = 0;
-			}
-			else if (new_firing_position_index != old_firing_position_index)
-			{
-				real combat_position_time;
-				real combat_position_time_upper_bound;
+				long firing_position_index;
+				long position_flags;
+				real combat_position_time_lower_bound;
+				long previous_owner_actor_index;
+				short old_firing_position_index;
+				short new_firing_position_index;
+				struct firing_position_candidate candidate;
+				struct firing_position_search_definition search;
+				struct firing_position_search_workspace workspace;
 
-				combat_position_time_upper_bound =
-					definition->firing_position.combat_position_time_upper_bound;
-				combat_position_time_lower_bound =
-					definition->firing_position.combat_position_time_lower_bound;
-				combat_position_time = real_seed_random_range(
-					get_global_random_seed_address(),
-					combat_position_time_lower_bound,
-					combat_position_time_upper_bound);
-				if (actor->input.vehicle_driver_type > 0)
+				old_firing_position_index = actor->firing_positions.current_position_index;
+				csmemset(&search, 0, sizeof(search));
+				search.firing_position_group = _firing_position_group_attacking;
+				firing_position_index = actor_active_select_firing_position(
+					actor_index,
+					&search,
+					&candidate,
+					&previous_owner_actor_index,
+					&workspace,
+					&position_flags);
+				new_firing_position_index = actor_change_firing_position(
+					actor_index,
+					firing_position_index,
+					&candidate,
+					previous_owner_actor_index,
+					&workspace,
+					position_flags);
+				if (new_firing_position_index == NONE)
 				{
-					struct unit_datum *vehicle = vehicle_get(actor->input.vehicle_index);
-					struct fight_vehicle_definition *vehicle_definition =
-						(struct fight_vehicle_definition *)vehicle_definition_get(
-							vehicle->definition_index);
-
-					if (vehicle_definition->minimum_firing_position_time > 0.f &&
-						combat_position_time > vehicle_definition->minimum_firing_position_time)
-					{
-						combat_position_time = vehicle_definition->minimum_firing_position_time;
-					}
+					actor->state.action_data.fight.firing_position_timer = 0;
 				}
+				else if (new_firing_position_index != old_firing_position_index)
+				{
+					real combat_position_time;
+					real combat_position_time_upper_bound;
 
-				actor->state.action_data.fight.firing_position_timer =
-					(short)(combat_position_time * 30.f);
+					combat_position_time_upper_bound =
+						definition->firing_position.combat_position_time_upper_bound;
+					combat_position_time_lower_bound =
+						definition->firing_position.combat_position_time_lower_bound;
+					combat_position_time = real_seed_random_range(
+						get_global_random_seed_address(),
+						combat_position_time_lower_bound,
+						combat_position_time_upper_bound);
+					if (actor->input.vehicle_driver_type > 0)
+					{
+						struct unit_datum *vehicle = vehicle_get(actor->input.vehicle_index);
+						struct fight_vehicle_definition *vehicle_definition =
+							(struct fight_vehicle_definition *)vehicle_definition_get(
+								vehicle->definition_index);
+
+						if (vehicle_definition->minimum_firing_position_time > 0.f &&
+							combat_position_time > vehicle_definition->minimum_firing_position_time)
+						{
+							combat_position_time = vehicle_definition->minimum_firing_position_time;
+						}
+					}
+
+					actor->state.action_data.fight.firing_position_timer =
+						(short)(combat_position_time * 30.f);
+				}
 			}
 		}
 
