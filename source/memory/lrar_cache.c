@@ -110,7 +110,7 @@ static void code_0010bfe0(
 	struct lrar_cache_block *block);
 static void code_0010c040(
 	struct lrar_cache *cache);
-static struct lrar_cache_block *code_0010c280(
+static __declspec(noinline) struct lrar_cache_block *code_0010c280(
 	struct lrar_cache *cache,
 	short block_index);
 
@@ -266,7 +266,13 @@ void lrar_flush(
 	block_index = cache->first_block_index;
 	while (block_index != NONE)
 	{
-		block = code_0010c280(cache, block_index);
+		code_0010c040(cache);
+		match_assert(
+			"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+			0x16E,
+			block_index>=0 && block_index<cache->block_count);
+		block = &cache->blocks[block_index];
+		code_0010bfe0(cache, block);
 		code_0010bfc0(cache, block);
 
 		if (block_index == cache->last_block_index)
@@ -292,11 +298,11 @@ short lrar_allocate(
 	long size,
 	void *user_data)
 {
+	unsigned long adjusted_new_block_address;
 	short new_block_index = NONE;
 	short block_index;
-	short next_block_index;
+	short test_block_index;
 	unsigned long search_address;
-	unsigned long adjusted_new_block_address;
 	unsigned long alignment_mask;
 	struct lrar_cache_block *block;
 	struct lrar_cache_block *new_block;
@@ -313,7 +319,6 @@ short lrar_allocate(
 	{
 		block_index = cache->first_block_index;
 		new_block_index = cache->last_block_index == NONE ? 0 : cache->last_block_index+1;
-		next_block_index = block_index;
 		if (new_block_index >= cache->block_count)
 		{
 			new_block_index = 0;
@@ -338,7 +343,6 @@ short lrar_allocate(
 				unsigned long boundary_mask = ~(boundary-1);
 				unsigned long aligned_base = search_address&boundary_mask;
 
-				block_index = next_block_index;
 				if (aligned_base != ((search_address+size)&boundary_mask))
 				{
 					adjusted_new_block_address = aligned_base+boundary;
@@ -350,18 +354,23 @@ short lrar_allocate(
 				block = code_0010c280(cache, block_index);
 				while (block_index == new_block_index ||
 					(search_address <= block->address &&
-					block->address < adjusted_new_block_address+size))
+					adjusted_new_block_address+size > block->address))
 				{
 					code_0010bfc0(cache, block);
 					block->signature = NONE;
-					next_block_index = block_index+1;
-					if (next_block_index >= cache->block_count)
+					block_index++;
+					if (block_index >= cache->block_count)
 					{
-						next_block_index = 0;
+						block_index = 0;
 					}
 
-					block = code_0010c280(cache, next_block_index);
-					block_index = next_block_index;
+					code_0010c040(cache);
+					match_assert(
+						"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+						0x16E,
+						block_index>=0 && block_index<cache->block_count);
+					block = &cache->blocks[block_index];
+					code_0010bfe0(cache, block);
 				}
 			}
 
@@ -380,12 +389,12 @@ short lrar_allocate(
 			adjusted_new_block_address>=cache->minimum_address &&
 			adjusted_new_block_address+size<=cache->maximum_address);
 
-		for (block_index = 0; block_index < cache->block_count; block_index++)
+		for (test_block_index = 0; test_block_index < cache->block_count; test_block_index++)
 		{
-			test_block = &cache->blocks[block_index];
+			test_block = &cache->blocks[test_block_index];
 			if (test_block->signature == _lrar_block_signature &&
 				adjusted_new_block_address < test_block->address+test_block->size &&
-				test_block->address < adjusted_new_block_address+size)
+				adjusted_new_block_address+size > test_block->address)
 			{
 				match_assert(
 					"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
@@ -401,7 +410,12 @@ short lrar_allocate(
 		new_block->user_data = user_data;
 		cache->lock_proc(user_data, new_block_index);
 		cache->last_block_index = new_block_index;
-		cache->first_block_index = next_block_index == NONE ? new_block_index : next_block_index;
+		if (block_index == NONE)
+		{
+			block_index = new_block_index;
+		}
+
+		cache->first_block_index = block_index;
 	}
 
 	return new_block_index;
@@ -492,7 +506,7 @@ static void code_0010c040(
 	return;
 }
 
-static struct lrar_cache_block *code_0010c280(
+static __declspec(noinline) struct lrar_cache_block *code_0010c280(
 	struct lrar_cache *cache,
 	short block_index)
 {
