@@ -839,7 +839,7 @@
 				{ "name": "source/ai/action_obey.c", "index": 465, "status": "NonMatching" },
 				{ "name": "source/ai/action_guard.c", "index": 466, "status": "Matching" },
 				{ "name": "source/ai/action_flee.c", "index": 467, "status": "NonMatching" },
-				{ "name": "source/ai/action_fight.c", "index": 468, "status": "NonMatching" },
+				{ "name": "source/ai/action_fight.c", "index": 468, "status": "Matching" },
 				{ "name": "source/ai/action_converse.c", "index": 469, "status": "Matching" },
 				{ "name": "source/ai/action_charge.c", "index": 470, "status": "NonMatching" },
 				{ "name": "source/ai/action_avoid.c", "index": 471, "status": "Matching" },
