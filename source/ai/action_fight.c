@@ -169,16 +169,12 @@ void
 action_fight_control(
 	long actor_index)
 {
-	/* NonMatching: target and candidate are both 0x80 bytes with both
-	   relocations exact. January reuses CL for defensive_crouch and then
-	   FALSE, while this TU selects DL for the first value. Five legal-C
-	   lifetime and statement-order shapes did not remove the register tie. */
 	struct actor_datum *actor = actor_get(actor_index);
 
-	actor->orders.move.stationary_crouch = actor->emotions.defensive_crouch;
 	actor->orders.look.primary_priority = 5;
 	actor->orders.look.primary_direction.type = 2;
 	actor->orders.look.idle_look_type = 4;
+	actor->orders.move.stationary_crouch = actor->emotions.defensive_crouch;
 	actor->orders.move.moving_crouch = FALSE;
 	actor->orders.move.panicked = FALSE;
 	actor->orders.move.dive_into_cover = FALSE;
@@ -198,33 +194,32 @@ action_fight_perform(
 	long actor_index)
 {
 	/* NonMatching: target and candidate are both 0x3D0 bytes with all 39
-	   relocation targets exact. January spills the nearby-position boolean;
-	   this TU keeps it in CL. Forcing the spill aligns that block but adds
-	   eight bytes downstream, so the evidence-backed reconstruction remains. */
-	boolean near_current_firing_position;
-	long firing_position_index;
-	long position_flags;
-	long previous_owner_actor_index;
-	real combat_position_time;
-	real combat_position_time_lower_bound;
-	real combat_position_time_upper_bound;
-	short old_firing_position_index;
-	short new_firing_position_index;
-	struct firing_position_candidate candidate;
-	struct firing_position_search_definition search;
-	struct firing_position_search_workspace workspace;
+	   relocation addresses and targets exact. The control flow and nearby-
+	   position spill now match; only four compiler stack-slot assignments
+	   for the selection outputs and range bounds remain permuted. */
 	struct actor_datum *actor = actor_get(actor_index);
 	struct actor_definition *definition;
-	struct actor_variant_definition *firing_variant;
 
 	match_assert("c:\\halo\\SOURCE\\ai\\action_fight.c", 55, !actor->meta.swarm);
 	if (actor->meta.timeslice)
 	{
+		struct actor_variant_definition *firing_variant;
+
 		definition = actor_definition_get(actor->meta.definition_index);
 		firing_variant = actor_combat_get_firing_variant_definition(actor_index);
 
 		if (!actor->input.vehicle_passenger)
 		{
+			long firing_position_index;
+			long position_flags;
+			real combat_position_time_lower_bound;
+			long previous_owner_actor_index;
+			short old_firing_position_index;
+			short new_firing_position_index;
+			struct firing_position_candidate candidate;
+			struct firing_position_search_definition search;
+			struct firing_position_search_workspace workspace;
+
 			if (actor->emotions.defensive_crouch &&
 				TEST_FLAG(definition->flags, 5))
 			{
@@ -235,6 +230,8 @@ action_fight_perform(
 					actor->input.pathfinding_surface_index,
 					FALSE))
 				{
+					boolean near_current_firing_position;
+
 					near_current_firing_position = FALSE;
 					if (actor->meta.encounter_index != NONE &&
 						actor->firing_positions.current_position_index != NONE)
@@ -249,22 +246,23 @@ action_fight_perform(
 							struct firing_position_definition);
 						real tolerance = actor_destination_tolerance(actor_index);
 
-						near_current_firing_position = distance_squared3d(
+						if (distance_squared3d(
 							&actor->input.position.body_position,
-							&firing_position->position) < tolerance * tolerance;
+							&firing_position->position) < tolerance * tolerance)
+						{
+							near_current_firing_position = TRUE;
+						}
 					}
 
-					if (actor->control.moving)
+					if (actor->control.moving &&
+						actor->situation.cumulative_threats[5] == 0)
 					{
-						if (actor->situation.cumulative_threats[5] == 0)
-						{
-							if (actor->target.target_prop_index == NONE)
-								goto update_unreachable;
+						if (actor->target.target_prop_index == NONE)
+							goto update_unreachable;
 
-							if (prop_get(actor->target.target_prop_index)->distance >=
-								firing_variant->ranged_combat.combat_range_upper_bound)
-								goto update_unreachable;
-						}
+						if (!(prop_get(actor->target.target_prop_index)->distance <
+							firing_variant->ranged_combat.combat_range_upper_bound))
+							goto update_unreachable;
 					}
 					else if (near_current_firing_position)
 					{
@@ -300,6 +298,9 @@ action_fight_perform(
 			}
 			else if (new_firing_position_index != old_firing_position_index)
 			{
+				real combat_position_time;
+				real combat_position_time_upper_bound;
+
 				combat_position_time_upper_bound =
 					definition->firing_position.combat_position_time_upper_bound;
 				combat_position_time_lower_bound =

@@ -133,25 +133,6 @@
         },
         "objdiff_percent": 87.55173
       }
-    },
-    {
-      "unit": "source/ai/action_fight",
-      "function": "_action_fight_control",
-      "class": "register-allocation",
-      "evidence": "Target and candidate have equal 0x80 padded size and both relocation identities/addresses. Five grounded lifetime and statement-order shapes leave January reusing CL for defensive_crouch and FALSE while VC7 selects DL for the first value; all following instructions realign.",
-      "measurements": {
-        "target": {
-          "size": 128,
-          "relocation_count": 2,
-          "normalized_sha256": "23bad43bd8205d7ca0227442ee479bcaa323b9cabf0055c8d4bfb8dee525a54d"
-        },
-        "base": {
-          "size": 128,
-          "relocation_count": 2,
-          "normalized_sha256": "ec4d45ae910359cfad47895b158416a7634e0fbad7691d4903d98f345b1e2c45"
-        },
-        "objdiff_percent": 85.0
-      }
     }
   ]
 }
