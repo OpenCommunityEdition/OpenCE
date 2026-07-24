@@ -20,6 +20,7 @@ enum
 enum
 {
 	_game_variant_draw_object_in_motion_sensor_bit = 0,
+	_game_variant_unknown1_bit = 1,
 	_game_variant_infinite_grenades_bit = 2,
 	_game_variant_no_shields_bit,
 	_game_variant_always_invisible_bit,
@@ -173,6 +174,9 @@ void game_engine_handle_server_message(
 	void *message);
 
 void game_engine_post_rasterize_objects(
+	void);
+
+boolean game_engine_display_team_indicators(
 	void);
 
 boolean game_engine_can_score(

@@ -960,6 +960,17 @@ void game_engine_post_rasterize_objects(
 	return;
 }
 
+boolean game_engine_display_team_indicators(
+	void)
+{
+	boolean display = FALSE;
+
+	if (game_engine)
+		display = TEST_FLAG(global_variant.flags, _game_variant_unknown1_bit) && global_variant.has_teams;
+
+	return display;
+}
+
 boolean game_engine_can_score(
 	void)
 {
