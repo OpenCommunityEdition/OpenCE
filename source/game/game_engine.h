@@ -57,9 +57,9 @@ struct game_engine
 	void (*player_added)(long player_index);
 	void (*game_ending)(void);
 	void (*game_starting)(void);
-	void (*statistics_append)(void);
-	void (*handle_client_message)(void);
-	void (*handle_server_message)(void);
+	void (*statistics_append)(long statistic);
+	void (*handle_client_message)(void *message);
+	void (*handle_server_message)(void *message);
 	void (*unknown2C)(void);
 	void (*post_rasterize_objects)(void);
 	void (*unknown34[5])(void);
@@ -162,6 +162,15 @@ void game_engine_game_ending(
 
 void game_engine_game_starting(
 	void);
+
+void game_engine_statistics_append(
+	long statistic);
+
+void game_engine_handle_client_message(
+	void *message);
+
+void game_engine_handle_server_message(
+	void *message);
 
 void game_engine_post_rasterize_objects(
 	void);

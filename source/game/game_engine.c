@@ -924,6 +924,33 @@ void game_engine_game_starting(
 	return;
 }
 
+void game_engine_statistics_append(
+	long statistic)
+{
+	if (game_engine && game_engine->statistics_append)
+		game_engine->statistics_append(statistic);
+
+	return;
+}
+
+void game_engine_handle_client_message(
+	void *message)
+{
+	if (game_engine && game_engine->handle_client_message)
+		game_engine->handle_client_message(message);
+
+	return;
+}
+
+void game_engine_handle_server_message(
+	void *message)
+{
+	if (game_engine && game_engine->handle_server_message)
+		game_engine->handle_server_message(message);
+
+	return;
+}
+
 void game_engine_post_rasterize_objects(
 	void)
 {
