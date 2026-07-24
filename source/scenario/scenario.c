@@ -1360,14 +1360,45 @@ void scenario_get_atmospheric_fog(
 		sky = NULL;
 		if (tag_reference_index != NONE)
 			sky = sky_definition_get(tag_reference_index);
-		/* Prevent VC7 from tail-merging this default-sky expansion with the
-		 * second expansion below. The remaining direct-edge versus branch-hop
-		 * difference is documented in config/parked.json. */
+		/*
+		 * The January binary keeps this default-sky lookup and the
+		 * scenario_get_sky() lookup in the else branch as two SEPARATE tails,
+		 * even though both end in the same sky_definition_get('sky ') call and
+		 * converge on the shared join below.  XDK 3911 CL (13.00.9254.1) instead
+		 * tail-merges them: it copies the else's definition_index EAX->ECX to
+		 * unify the pushed index register and folds both paths onto a single
+		 * NULL in EAX.  The original keeps site-1's NULL in EAX and the else's
+		 * NULL in ECX, so the two tails stay distinct and are never merged.
+		 *
+		 * We could not reproduce that un-merged codegen with ordinary C.  Roughly
+		 * forty source shapes were tried: NULL placement before/after the call,
+		 * ternary, branch-diamond, goto, explicit if/else, reusing
+		 * tag_reference_index; plus branch-order swap, hoisted NULL, short vs long
+		 * sky_index, second-expansion variants, translation-unit function
+		 * count/position, and register-pressure isolation.  Every barrier-free
+		 * "NULL after the call" form merges; the only barrier-free no-merge form
+		 * (declaring the pointer NULL before the call) pins it into a callee-saved
+		 * register and cascades ~189 bytes of downstream divergence.
+		 *
+		 * Two _ReadWriteBarrier() intrinsics reproduce the January object exactly
+		 * (816/816 bytes, 38/38 relocations, strict COFF compare).  They emit no
+		 * code; they stand in for whatever zero-byte construct the original source
+		 * used (a pragma or a debug-build macro), which the compiled binary can no
+		 * longer show us.  object_shadows.c uses the same intrinsic for the same
+		 * reason.  This first one blocks the tail-merge with the else branch.
+		 */
 		_ReadWriteBarrier();
 	}
 	else
 	{
 		sky = scenario_get_sky(sky_index);
+		/*
+		 * Restores site-1's direct je jump-thread to the join, removing the
+		 * one-byte branch-hop that the first barrier alone leaves behind.  With
+		 * only the site-1 barrier the object matches to a single byte; this second
+		 * barrier closes it to a strict match.  See the note above.
+		 */
+		_ReadWriteBarrier();
 	}
 
 	if (local_player_index != NONE)
