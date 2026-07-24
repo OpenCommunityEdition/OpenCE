@@ -1274,6 +1274,27 @@ boolean game_engine_get_goal_in_use(
 	return global_goal[goal_index].in_use;
 }
 
+/*
+ * game_engine_get_goal_position (January 0x00097A30, 0x60 bytes) is deferred.
+ * It reconstructs to the correct 96 bytes and 6 relocations with
+ *
+ *     match_assert("c:\halo\SOURCE\game\game_engine.c", 0xFE2,
+ *         global_goal[index].in_use);
+ *     *position = global_goal[index].position;
+ *
+ * (signature void(real_point3d *position, short index); the parameter is named
+ * `index`, recovered from the stringified assert message string). The only
+ * residual is the register schedule of the trailing real_point3d copy: January
+ * reuses ESI as the copy temp with two redundant pointer materialisations
+ * (mov ecx,eax / mov edx,eax -- the typed-local-alias pattern), whereas every
+ * shape tried here moves the three dwords tighter through EDX. ~8 source
+ * variants (direct copy, goal/out pointer locals, out alias, field-wise, block
+ * scope) all match size and relocations but not the schedule. This is the same
+ * class of getter tuning as get_starting_location_rating / man_out: correct
+ * logic, residual instruction-schedule tie needing typed-local-alias steering.
+ * Revisit before landing the goal getters.
+ */
+
 boolean game_engine_has_teams(
 	void)
 {
