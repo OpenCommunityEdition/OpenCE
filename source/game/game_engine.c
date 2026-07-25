@@ -1307,6 +1307,29 @@ boolean game_engine_get_goal_in_use(
  * Revisit before landing the goal getters.
  */
 
+/*
+ * game_engine_man_out(long player_index) is deferred: logic fully recovered,
+ * residual schedule tie. It is (boolean result):
+ *
+ *     if (player_get(player_index)->unknown_d1)
+ *         man_out = TRUE;
+ *     else if (global_variant.maximum_lives > 0) {
+ *         struct player_datum *player = player_get(player_index);
+ *         if (player->unit_index == NONE &&
+ *             player->statistics.deaths >= global_variant.maximum_lives)
+ *             man_out = TRUE;
+ *     }
+ *     if (!man_out) man_out = code_00097250();   // fallback, private helper
+ *
+ * Fields: player_datum.unknown_d1 @0xd1, .unit_index @0x34, .statistics.deaths
+ * (game_statistics.deaths @0x1e, i.e. player+0xaa); global_variant.maximum_lives
+ * @0x38. Size, relocations (7) and the two datum_get calls all match. Residual:
+ * January keeps the conditional fallback code_00097250() call expanded and
+ * normalised (112 bytes) and uses EDI for player_index, whereas our CL
+ * tail-merges/compacts it to 96 bytes with ESI -- the same "our compiler
+ * optimises more" tie as atmospheric_fog. Needs schedule steering; revisit.
+ */
+
 boolean game_engine_has_teams(
 	void)
 {
