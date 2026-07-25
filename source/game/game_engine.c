@@ -625,6 +625,7 @@ extern struct game_engine_goal global_goal[32];
 extern struct game_variant global_variant;
 extern struct game_engine_globals game_engine_globals;
 extern struct game_engine_stage global_stage;
+extern struct game_engine *game_engines[];
 
 /* ---------- public code */
 
@@ -1343,6 +1344,22 @@ boolean game_engine_allow_integrated_lights(
 		allow_integrated_lights = !TEST_FLAG(game_engine_globals.flags, _game_engine_allow_integrated_lights_bit);
 
 	return allow_integrated_lights;
+}
+
+void game_engine_initialize(
+	struct game_variant *variant)
+{
+	csmemset(&game_engine_globals, 0, sizeof(game_engine_globals));
+	game_engine_globals.postgame_state = 0;
+
+	if (variant && variant->engine_type)
+	{
+		global_variant = *variant;
+		game_engine_variant_cleanup(&global_variant);
+		game_engine = game_engines[variant->engine_type];
+	}
+
+	return;
 }
 
 long game_engine_remap_object_definition(

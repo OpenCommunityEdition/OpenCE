@@ -176,6 +176,12 @@ void game_engine_handle_server_message(
 void game_engine_post_rasterize_objects(
 	void);
 
+void game_engine_initialize(
+	struct game_variant *variant);
+
+void game_engine_variant_cleanup(
+	struct game_variant *variant);
+
 boolean game_engine_display_team_indicators(
 	void);
 
