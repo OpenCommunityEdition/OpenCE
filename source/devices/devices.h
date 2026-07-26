@@ -35,6 +35,8 @@ enum
 
 /* ---------- macros */
 
+#define device_get(index) ((struct device_datum *)object_get_and_verify_type((index), _object_mask_device))
+
 /* ---------- structures */
 
 struct _device_datum
@@ -91,6 +93,12 @@ void device_set_actual_position(
 boolean device_group_set_desired_value(
 	short group_index,
 	real desired_value);
+boolean device_can_change_position(
+	long device_index);
+boolean device_frontfacing(
+	long device_index,
+	real_point3d const *position,
+	real_vector3d const *facing);
 void device_effect_new(
 	long device_index,
 	long effect_index);

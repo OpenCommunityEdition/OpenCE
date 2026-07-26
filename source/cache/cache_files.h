@@ -44,6 +44,10 @@ void scenario_structure_bsp_unload(
 	struct scenario_structure_bsp_reference *reference);
 void scenario_tags_unload(
 	void);
+long scenario_tags_load(
+	char const *scenario_name);
+boolean scenario_structure_bsp_load(
+	struct scenario_structure_bsp_reference *reference);
 void tag_files_close(
 	void);
 void tag_files_open(

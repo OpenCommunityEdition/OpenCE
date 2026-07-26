@@ -409,6 +409,11 @@ void quaternion_transform_point(real_quaternion const *q, real_point3d const *p,
 
 void vectors3d_from_euler_angles3d(real_vector3d *forward, real_vector3d *up, real_euler_angles3d const *angles);
 boolean fast_vector_intersects_sphere(real_point3d const *point, real_vector3d const *vector, real_point3d const *center, real radius);
+real fast_vector_intersection_with_sphere(
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real_point3d const *center,
+	real radius);
 
 boolean point_in_rectangle2d(real_point2d const *point, real_rectangle2d const *bounds);
 boolean point_in_rectangle3d(real_point3d const *point, real_rectangle3d const *bounds);
@@ -448,6 +453,25 @@ boolean point_in_triangle2d(
 	real_point2d const *triangle2,
 	real *t0,
 	real *t1);
+boolean circle_intersects_triangle2d(
+	real_point2d const *center,
+	real radius,
+	real_point2d const *triangle0,
+	real_point2d const *triangle1,
+	real_point2d const *triangle2);
+boolean vector_intersects_pill2d(
+	real_point2d const *point,
+	real_vector2d const *vector,
+	real_point2d const *pill_base,
+	real_vector2d const *pill_height,
+	real pill_width);
+boolean pill_intersects_triangle2d(
+	real_point2d const *pill_base,
+	real_vector2d const *pill_height,
+	real pill_width,
+	real_point2d const *triangle0,
+	real_point2d const *triangle1,
+	real_point2d const *triangle2);
 boolean sphere_intersects_rectangle3d(
 	real_point3d const *center,
 	real radius,
@@ -500,10 +524,33 @@ real point_to_line_distance_squared3d(real_point3d const *point, real_point3d co
 
 boolean sphere_test_vector3d(real_point3d const *center, real radius, real_point3d const *point, real_vector3d const *vector, real *t, real_vector3d *normal);
 
+boolean accelerate_to_position(
+	real *position,
+	real *velocity,
+	real target_position,
+	real maximum_velocity,
+	real acceleration,
+	real minimum_position,
+	real maximum_position,
+	boolean periodic);
+void accelerate_to_velocity(
+	real *position,
+	real *velocity,
+	real acceleration,
+	real target_velocity,
+	real minimum_position,
+	real maximum_position,
+	boolean periodic);
 boolean accelerate_to_velocity3d(
 	real_vector3d *velocity,
 	real_vector3d const *target_velocity,
 	real acceleration);
+boolean accerate_to_position3d(
+	real_point3d *position,
+	real_vector3d *velocity,
+	real_point3d const *target_position,
+	long unused,
+	real maximum_length);
 
 boolean valid_real_sine_cosine(real sine, real cosine);
 

@@ -15,7 +15,16 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum
+{
+	SOUND_ENVIRONMENT_TAG = 'snde',
+};
+
 /* ---------- macros */
+
+#define sound_environment_definition_get(index) \
+	((struct sound_environment_definition *)tag_get(SOUND_ENVIRONMENT_TAG, (index)))
+
 
 /* ---------- structures */
 

@@ -159,16 +159,19 @@ void player_control_unzoom(long unit_index);
 void players_initialize(
 	void);
 
-long local_player_get_player_index(
+__declspec(noinline) long local_player_get_player_index(
 	short local_player_index);
 
-short local_player_get_next(
+__declspec(noinline) short local_player_get_next(
 	short local_player_index);
 
 short local_player_count(
 	void);
 
 short players_get_respawn_failure(
+	void);
+
+boolean players_respawn_coop(
 	void);
 
 boolean players_are_all_dead(
@@ -186,8 +189,13 @@ void player_control_fix_for_loaded_game_state(void);
 
 void player_handle_powerup_minor(
 	long player_index,
-	long powerup_index,
-	long duration);
+	short powerup_index,
+	short duration);
+
+void player_add_equipment(
+	long unit_index,
+	short starting_profile_index,
+	boolean reset_equipment);
 
 /* ---------- prototypes/PLAYER_QUEUES_NEW.C */
 

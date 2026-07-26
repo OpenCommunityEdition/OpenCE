@@ -57,7 +57,17 @@ struct scenario_globals
 {
 	short structure_bsp_index;
 	word pad;
-	byte unknown04[0xB0];
+	struct atmospheric_fog_state
+	{
+		boolean valid;
+		byte pad[3];
+		real_point3d camera_point;
+		real atmospheric_start_distance;
+		real atmospheric_opaque_distance;
+		real atmospheric_maximum_density;
+		real_rgb_color atmospheric_color;
+		real indoor_fog_scale;
+	} atmospheric_fog[4];
 	boolean sound_environment_initialized;
 	byte pad2[3];
 	struct sound_environment_definition sound_environment;
@@ -113,7 +123,7 @@ short scenario_get_fog_region_index(const struct location *location, const real_
 boolean scenario_location_underwater(const struct location *location, const real_point3d *position, short *optional_weather_palette_index);
 real scenario_location_water_depth(const struct location *location, const real_point3d *position);
 void scenario_get_sound_environment(long *background_sound_index, long *sound_environment_tag, boolean *crossed_water_boundary);
-void scenario_get_atmospheric_fog(short local_player_index, short sky_index, real_point3d *camera_point, struct render_fog *render_fog);
+void scenario_get_atmospheric_fog(short local_player_index, long sky_index, real_point3d *camera_point, struct render_fog *render_fog);
 
 /* ---------- globals */
 

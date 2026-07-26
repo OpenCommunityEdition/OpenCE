@@ -19,6 +19,8 @@ header included in hcex build.
 /* referenced in game_globals.c? */
 enum
 {
+	GAME_GLOBALS_TAG = 'matg',
+
 	_material_dirt = 0,
 	_material_sand,
 	_material_stone,
@@ -55,6 +57,8 @@ enum
 	NUMBER_OF_MATERIAL_TYPES,
 	MAXIMUM_NUMBER_OF_MATERIAL_TYPES = 40,
 };
+
+#define game_globals_definition_get(index) ((struct game_globals *)tag_get(GAME_GLOBALS_TAG, (index)))
 
 enum
 {

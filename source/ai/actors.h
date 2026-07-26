@@ -859,6 +859,10 @@ void actor_perception_create_orphan_from_friend(
 
 void actor_get_vision_distances(long actor_index, real maximum_vision_distance, real perception_factor, real horizontal_angle, real *full_distance_reference, real *partial_distance_reference);
 
+void actor_berserk(
+	long actor_index,
+	boolean berserk);
+
 short actor_perception_aiming_vector_test_blockage(real_point3d const *source_position, real_vector3d const *source_vector, real_point3d const *friend_position, real_vector3d *friend_direction_to_aiming_vector);
 
 /* ---------- globals */
