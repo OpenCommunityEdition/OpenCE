@@ -660,6 +660,14 @@ long game_engine_get_team_score(
 	return 0;
 }
 
+real linear_to_non_linear_alpha(
+	real linear_alpha)
+{
+	real non_linear_alpha = (real)pow((double)linear_alpha, 1.9f);
+
+	return non_linear_alpha;
+}
+
 long players_in_game(
 	void)
 {
@@ -1018,6 +1026,42 @@ boolean game_engine_draw_object_in_motion_sensor(
 		draw_object = TEST_FLAG(global_variant.flags, _game_variant_draw_object_in_motion_sensor_bit);
 
 	return draw_object;
+}
+
+boolean game_engine_hud_draw_motion_sensor(
+	void)
+{
+	boolean draw_motion_sensor = TRUE;
+
+	if (game_engine)
+	{
+		boolean default_draw_motion_sensor;
+
+		draw_motion_sensor =
+			TEST_FLAG(global_variant.flags, _game_variant_draw_object_in_motion_sensor_bit);
+		default_draw_motion_sensor = global_variant.unknown24 == 0;
+
+		if (global_variant.engine_type == 2 && !global_variant.unknown4E)
+			default_draw_motion_sensor = FALSE;
+
+		draw_motion_sensor |= default_draw_motion_sensor;
+	}
+
+	return draw_motion_sensor;
+}
+
+long find_netgame_flag(
+	float const *position,
+	float radius,
+	float height,
+	short type,
+	short index)
+{
+	long flag_index = NONE;
+
+	find_netgame_flags(position, radius, height, type, index, 1, &flag_index);
+
+	return flag_index;
 }
 
 boolean game_engine_should_end_game(

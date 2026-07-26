@@ -41,9 +41,12 @@ struct game_variant
 	boolean has_teams;
 	byte unused1[3];
 	unsigned long flags;
-	byte unused24[0x14];
+	long unknown24;
+	byte unused28[0x10];
 	long maximum_lives;
-	byte unused3C[0x2C];
+	byte unused3C[0x12];
+	boolean unknown4E;
+	byte unused4F[0x19];
 };
 
 typedef char verify_game_variant_size[sizeof(struct game_variant) == 0x68 ? 1 : -1];
@@ -228,6 +231,25 @@ boolean game_engine_has_shield(
 
 boolean game_engine_draw_object_in_motion_sensor(
 	void);
+
+boolean game_engine_hud_draw_motion_sensor(
+	void);
+
+long find_netgame_flags(
+	float const *position,
+	float radius,
+	float height,
+	short type,
+	short index,
+	long maximum_count,
+	long *flag_indices);
+
+long find_netgame_flag(
+	float const *position,
+	float radius,
+	float height,
+	short type,
+	short index);
 
 boolean game_engine_should_end_game(
 	void);
