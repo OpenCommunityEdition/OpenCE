@@ -247,6 +247,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
+#include "actors.h"
+#include "props.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -255,8 +260,188 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void actor_situation_update_target_status(
+	long actor_index);
+
+void actor_situation_combat_status_update(
+	long actor_index);
+
+real actor_compute_prop_target_weight(
+	long actor_index,
+	long prop_index);
+
+boolean actor_compute_prop_unopposable(
+	long actor_index,
+	long prop_index);
+
 /* ---------- globals */
 
 /* ---------- public code */
 
+void actor_perception_forget_recent_damage(
+	long actor_index)
+{
+	struct prop_iterator iterator;
+	struct prop_datum *prop;
+
+	prop_iterator_new(&iterator, actor_index);
+	prop = prop_iterator_next(&iterator);
+	while (prop != NULL)
+	{
+		prop->currently_damaging_me = FALSE;
+		prop->ticks_since_damage = NONE;
+		prop = prop_iterator_next(&iterator);
+	}
+
+	return;
+}
+
+void actor_perception_retreat_successful(
+	long actor_index)
+{
+	struct prop_iterator iterator;
+	struct prop_datum *prop;
+
+	actor_get(actor_index);
+	prop_iterator_new(&iterator, actor_index);
+	prop = prop_iterator_next(&iterator);
+	while (prop != NULL)
+	{
+		prop->unopposable_trigger_hysteresis = 0;
+		prop->unopposable_trigger_threshold = 0;
+		prop->unopposable_trigger_timer = 0;
+		prop = prop_iterator_next(&iterator);
+	}
+
+	return;
+}
+
+void actor_perception_tried_to_uncover(
+	long actor_index,
+	long prop_index)
+{
+	if (prop_index != NONE)
+	{
+		struct actor_datum *actor = actor_get(actor_index);
+		struct prop_datum *prop = prop_get(prop_index);
+
+		prop->tried_to_uncover = TRUE;
+		if (prop_index != actor->target.target_prop_index)
+		{
+		}
+		else
+		{
+			actor_situation_update_target_status(actor_index);
+			actor_situation_combat_status_update(actor_index);
+		}
+	}
+
+	return;
+}
+
+void actor_perception_tried_to_search(
+	long actor_index,
+	long prop_index)
+{
+	if (prop_index != NONE)
+	{
+		struct actor_datum *actor = actor_get(actor_index);
+		struct prop_datum *prop = prop_get(prop_index);
+
+		prop->tried_to_search = TRUE;
+		if (prop_index != actor->target.target_prop_index)
+		{
+		}
+		else
+		{
+			actor_situation_update_target_status(actor_index);
+			actor_situation_combat_status_update(actor_index);
+		}
+	}
+
+	return;
+}
+
+void actor_perception_abandoned_search(
+	long actor_index,
+	long prop_index)
+{
+	if (prop_index == NONE)
+	{
+		struct actor_datum *actor = actor_get(actor_index);
+
+		actor->firing_positions.pursuit_positions_count = 0;
+		actor->firing_positions.pursuit_fired_at_orphan = FALSE;
+		actor->firing_positions.pursuit_communicated_lost_contact = FALSE;
+		actor->state.artificial_combat_status = 0;
+		actor->state.suspicion_combat_status = 0;
+		actor_situation_combat_status_update(actor_index);
+	}
+	else
+	{
+		struct actor_datum *actor = actor_get(actor_index);
+		struct prop_datum *prop = prop_get(prop_index);
+
+		if (prop->state == _prop_state_uninspected_orphan)
+			prop->state = _prop_state_inspected_orphan;
+
+		prop->abandoned_search = TRUE;
+		if (prop_index != actor->target.target_prop_index)
+		{
+		}
+		else
+		{
+			actor_situation_update_target_status(actor_index);
+			actor_situation_combat_status_update(actor_index);
+		}
+	}
+
+	return;
+}
+
+void actor_perception_unreachable(
+	long actor_index,
+	long prop_index,
+	boolean unreachable)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct prop_datum *prop = prop_get(prop_index);
+
+	if (unreachable)
+	{
+		if (prop->unreachable_ticks == 0)
+			prop->unreachable_ticks = 1;
+
+		prop->last_unreachable_time = game_time_get();
+	}
+	else
+	{
+		prop->unreachable_ticks = 0;
+		prop->last_unreachable_time = NONE;
+	}
+
+	prop->unopposable_enemy =
+		actor_compute_prop_unopposable(actor_index, prop_index);
+	prop->target_weight =
+		actor_compute_prop_target_weight(actor_index, prop_index);
+
+	return;
+}
+
 /* ---------- private code */
+
+long code_0001dbc0(
+	void const *a,
+	void const *b)
+{
+	real a_value = ((real const *)a)[2];
+	real b_value = ((real const *)b)[2];
+
+	if (a_value < b_value)
+		return -1;
+
+	if (a_value > b_value)
+		return 1;
+
+	return 0;
+}
