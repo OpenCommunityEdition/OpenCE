@@ -298,7 +298,8 @@ struct actor_perception_prop_view
 	short type;
 	byte __unknown012[6];
 	long unit_index;
-	byte __unknown01C[8];
+	long actor_index;
+	byte __unknown020[4];
 	short state;
 	byte __unknown026[0x2A];
 	long copied_position_data[4];
@@ -318,7 +319,11 @@ struct actor_perception_prop_view
 	short unopposable_trigger_threshold;
 	byte __unknown0B0[8];
 	boolean orphan_corpse_cheated;
-	byte __unknown0B9[0x33];
+	byte __unknown0B9[3];
+	real_point3d body_position;
+	real_point3d center_of_mass;
+	real_vector3d velocity;
+	real_vector3d actor_to_prop;
 	long pathfinding_surface_index;
 	real_point3d pathfinding_point;
 	byte __unknown0FC[0x14];
@@ -772,6 +777,65 @@ boolean actor_perception_become_acknowledged(
 
 	if (expected_acknowledgement_out)
 		*expected_acknowledgement_out = expected_acknowledgement;
+
+	return result;
+}
+
+boolean actor_expected_acknowledgement(
+	long actor_index,
+	long prop_index)
+{
+	struct actor_perception_actor_view *actor =
+		(struct actor_perception_actor_view *)actor_get(actor_index);
+	struct actor_perception_prop_view *prop =
+		(struct actor_perception_prop_view *)prop_get(prop_index);
+	struct prop_iterator iterator;
+	struct actor_perception_prop_view *current_prop;
+	boolean result = FALSE;
+
+#line 3613 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+	match_vassert(
+		__FILE__,
+		__LINE__,
+		!(prop->state >= _prop_state_uninspected_orphan &&
+			prop->state <= _prop_state_inspected_orphan),
+		"!prop_orphaned(prop)");
+#line 790 "source\\ai\\actor_perception.c"
+
+	prop_iterator_new(&iterator, actor_index);
+	current_prop =
+		(struct actor_perception_prop_view *)prop_iterator_next(&iterator);
+	while (current_prop != NULL)
+	{
+		if (iterator.index != prop_index &&
+			(current_prop->unit_index == prop->unit_index ||
+				current_prop->actor_index == prop->actor_index ||
+				(prop->enemy &&
+					current_prop->enemy &&
+					((current_prop->state >=
+							_prop_state_uninspected_orphan &&
+							current_prop->state <=
+							_prop_state_inspected_orphan) ||
+						(current_prop->state >=
+							_prop_state_becoming_unacknowledged &&
+							current_prop->state <=
+							_prop_state_acknowledged)))) &&
+			distance_squared2d(
+				(real_point2d *)&current_prop->body_position,
+				(real_point2d *)&prop->body_position) < 6.25f &&
+			fabs(current_prop->body_position.z - prop->body_position.z) <
+				1.5f &&
+			dot_product3d(
+				&prop->actor_to_prop,
+				&current_prop->actor_to_prop) > 0.5f)
+		{
+			result = TRUE;
+		}
+
+		current_prop =
+			(struct actor_perception_prop_view *)prop_iterator_next(
+				&iterator);
+	}
 
 	return result;
 }
