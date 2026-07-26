@@ -2338,6 +2338,34 @@ struct game_variant *build_game_variant_elimination(
 	return variant;
 }
 
+struct game_variant *build_game_variant_phantoms(
+	struct game_variant *variant)
+{
+	struct game_variant result = { 0 };
+
+	result.flags = (result.flags & ~0x2D) | 0x12;
+	result.engine_type = 2;
+	result.unknown30 = 150;
+	result.unknown24 = 1;
+	result.unknown48 = 2;
+	result.unknown34 = 150;
+	result.unknown4C.byte0 = 1;
+	result.unknown4C.byte1 = 1;
+	result.unknown4C.byte2 = 1;
+	result.unknown64 = 1;
+	result.unknown3C = 1.0f;
+	result.maximum_lives = 0;
+	result.unknown28 = FALSE;
+	result.unknown2C = 0;
+	result.unknown40 = 10;
+	result.has_teams = FALSE;
+	result.unknown44 = 0;
+
+	*variant = result;
+
+	return variant;
+}
+
 long postgame_statistic_get_rating(
 	long player_index,
 	long parameter1,
