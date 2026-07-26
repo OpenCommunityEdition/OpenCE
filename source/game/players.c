@@ -231,6 +231,7 @@ symbols in this file:
 #include "ai/ai_debug.h"
 #include "ai/ai_scenario_definitions.h"
 #include "data.h"
+#include "devices/devices.h"
 #include "effects/player_effects.h"
 #include "game.h"
 #include "game/game_globals.h"
@@ -400,6 +401,11 @@ static void code_000aa3b0(
 	long player_index);
 static void code_000aa460(
 	long player_index);
+static __declspec(noinline) void code_000ab350(
+	long player_index,
+	short action_result,
+	long object_index,
+	short seat_index);
 static void code_000abc90(
 	long player_index,
 	long source_unit_index,
@@ -1916,6 +1922,104 @@ static void code_000aa460(
 			screen_flash.screen_flash_color.blue = 0.917647f;
 			player_effect_screen_flash(player_index, &screen_flash, 1.f);
 		}
+	}
+
+	return;
+}
+
+static __inline real player_action_distance3d(
+	real_point3d const *a,
+	real_point3d const *b)
+{
+	real_vector3d v;
+
+	vector_from_points3d(a, b, &v);
+	return square_root(v.j*v.j + v.i*v.i + v.k*v.k);
+}
+
+static __inline real player_action_new_distance3d(
+	real_point3d const *a,
+	real_point3d const *b)
+{
+	real_vector3d v;
+	real magnitude_squared;
+
+	vector_from_points3d(a, b, &v);
+	magnitude_squared = v.k*v.k;
+	magnitude_squared += v.j*v.j;
+	magnitude_squared += v.i*v.i;
+	return square_root(magnitude_squared);
+}
+
+static __declspec(noinline) void code_000ab350(
+	long player_index,
+	short action_result,
+	long object_index,
+	short seat_index)
+{
+	struct player_datum *player;
+	real_point3d const *unit_position;
+	real_point3d const *current_position;
+	real_point3d const *new_position;
+	real current_distance;
+	real new_distance;
+	boolean set_action;
+
+	player = player_get(player_index);
+	set_action = TRUE;
+	if (action_result != 11)
+	{
+		if (action_result == player->action_result)
+		{
+			unit_position = &object_get(player->unit_index)->object.position;
+			current_position =
+				&object_get(player->action_object_index)->object.position;
+			new_position = &object_get(object_index)->object.position;
+			current_distance = player_action_distance3d(
+				unit_position,
+				current_position);
+			new_distance = player_action_new_distance3d(
+				unit_position,
+				new_position);
+			if (!(current_distance > new_distance))
+				set_action = FALSE;
+		}
+		else if (action_result <= player->action_result)
+			set_action = FALSE;
+	}
+
+	if (set_action)
+	{
+		player->action_result = action_result;
+		player->action_object_index = object_index;
+		player->action_seat_index = seat_index;
+	}
+
+	return;
+}
+
+void code_000ac270(
+	long player_index,
+	long device_index)
+{
+	struct player_datum *player;
+	struct unit_datum *unit;
+	struct device_datum *device;
+	real_point3d camera_position;
+
+	player = player_get(player_index);
+	unit = unit_get(player->unit_index);
+	device = device_get(device_index);
+	unit_get_camera_position(player->unit_index, &camera_position);
+	if (fast_vector_intersects_sphere(
+		&camera_position,
+		&unit->unit.aiming_vector,
+		&device->object.bounding_sphere_center,
+		*(volatile real *)&device->object.bounding_sphere_radius) &&
+		device_frontfacing(device_index, &camera_position, &unit->unit.aiming_vector) &&
+		device_can_change_position(device_index))
+	{
+		code_000ab350(player_index, 10, device_index, NONE);
 	}
 
 	return;
