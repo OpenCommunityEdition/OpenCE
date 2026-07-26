@@ -258,6 +258,66 @@ symbols in this file:
 
 /* ---------- structures */
 
+/*
+ * January actor/prop fields whose HCEX-derived shared structure positions do
+ * not agree with this executable. Keep the executable-specific view local
+ * until the complete January layouts are recovered.
+ */
+struct actor_perception_actor_view
+{
+	byte __unknown000[0x6A];
+	short combat_status;
+	byte __unknown06C[2];
+	short artificial_combat_status;
+	byte __unknown070[0xF1];
+	boolean flying;
+	byte __unknown162[0x8B];
+	boolean searching;
+	byte __unknown1EE[0x14];
+	boolean vehicle_passenger;
+	byte __unknown203[0x6D];
+	long target_prop_index;
+	byte __unknown274[0x134];
+	short unopposable_retreat_timer;
+	byte __unknown3AA[2];
+	long unopposable_retreat_prop_index;
+};
+
+struct actor_perception_prop_view
+{
+	byte __unknown000[4];
+	long owner_actor_index;
+	byte __unknown008[4];
+	long orphan_prop_index;
+	short type;
+	byte __unknown012[0x12];
+	short state;
+	byte __unknown026[0x3A];
+	boolean enemy;
+	byte __unknown061[5];
+	short perception;
+	byte __unknown068[0x34];
+	short unreachable_ticks;
+	byte __unknown09E[6];
+	boolean unopposable_enemy;
+	byte __unknown0A5[5];
+	short unopposable_trigger_hysteresis;
+	short unopposable_trigger_timer;
+	short unopposable_trigger_threshold;
+	byte __unknown0B0[8];
+	boolean orphan_corpse_cheated;
+	byte __unknown0B9[0x6E];
+	boolean dead;
+	byte __unknown128[0x0D];
+	boolean dangerous_vehicle_driver;
+	boolean preferred_target;
+};
+
+typedef char actor_perception_actor_view_target_prop_index_offset_assert[
+	offsetof(struct actor_perception_actor_view, target_prop_index) == 0x270 ? 1 : -1];
+typedef char actor_perception_prop_view_unopposable_enemy_offset_assert[
+	offsetof(struct actor_perception_prop_view, unopposable_enemy) == 0xA4 ? 1 : -1];
+
 /* ---------- prototypes */
 
 void actor_situation_update_target_status(
@@ -274,9 +334,51 @@ boolean actor_compute_prop_unopposable(
 	long actor_index,
 	long prop_index);
 
+void actor_stimulus_prop_acknowledged(
+	long actor_index,
+	long prop_index,
+	long stimulus,
+	boolean initial_acknowledgement);
+
+static __inline boolean prop_acknowledged(
+	struct prop_datum const *prop)
+{
+	return prop->state >= _prop_state_becoming_unacknowledged &&
+		prop->state <= _prop_state_acknowledged;
+}
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+void actor_perception_acknowledge(
+	long actor_index,
+	long prop_index,
+	long stimulus,
+	boolean initial_acknowledgement)
+{
+	struct prop_datum *prop = prop_get(prop_index);
+
+#line 1037 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+	assert(prop->owner_actor_index == actor_index);
+	assert(prop_acknowledged(prop));
+#line 1039 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+	vassert(prop->orphan_prop_index == NONE, "prop->orphan_prop_index == NONE");
+#line 300 "source\\ai\\actor_perception.c"
+
+	prop->tried_to_search = FALSE;
+	prop->tried_to_uncover = FALSE;
+	prop->abandoned_search = FALSE;
+	prop->refresh_stimuli = TRUE;
+
+	actor_stimulus_prop_acknowledged(
+		actor_index,
+		prop_index,
+		stimulus,
+		initial_acknowledgement);
+
+	return;
+}
 
 void actor_perception_forget_recent_damage(
 	long actor_index)
@@ -314,6 +416,61 @@ void actor_perception_retreat_successful(
 	}
 
 	return;
+}
+
+boolean actor_compute_prop_unopposable(
+	long actor_index,
+	long prop_index)
+{
+	struct actor_perception_actor_view *actor =
+		(struct actor_perception_actor_view *)actor_get(actor_index);
+	struct actor_perception_prop_view *prop =
+		(struct actor_perception_prop_view *)prop_get(prop_index);
+	short type = prop->state;
+	boolean result = FALSE;
+
+	if (type >= 2 && type <= 3 &&
+		prop->enemy &&
+		!prop->dead)
+	{
+		if (prop->unreachable_ticks != 0 &&
+			(actor->target_prop_index == prop_index ||
+				!actor->searching))
+		{
+			result = TRUE;
+		}
+		else if ((prop->dangerous_vehicle_driver ||
+			prop->preferred_target) &&
+			!actor->flying &&
+			!actor->vehicle_passenger)
+		{
+			result = TRUE;
+		}
+		else if (prop->type == 15)
+		{
+			result = TRUE;
+		}
+	}
+
+	if (prop->unopposable_enemy && !result)
+	{
+		prop->unopposable_trigger_hysteresis = 0;
+		prop->unopposable_trigger_threshold = 0;
+		prop->unopposable_trigger_timer = 0;
+	}
+
+	if (type >= 2 && type <= 3 &&
+		!result &&
+		actor->unopposable_retreat_timer > 0 &&
+		actor->unopposable_retreat_prop_index == prop_index)
+	{
+		actor->unopposable_retreat_timer = 0;
+		actor->unopposable_retreat_prop_index = NONE;
+	}
+
+	prop->unopposable_enemy = result;
+
+	return result;
 }
 
 void actor_perception_tried_to_uncover(
