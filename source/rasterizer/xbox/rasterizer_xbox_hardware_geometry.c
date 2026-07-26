@@ -56,21 +56,16 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "cseries/errors.h"
+#include "rasterizer/rasterizer_geometry.h"
+#include <xtl.h>
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
-
-struct rasterizer_vertex_buffer
-{
-	short vertex_type;
-	short pad2;
-	long vertex_count;
-	long buffer_size;
-	void *vertices;
-	void *hardware_buffer;
-};
 
 struct rasterizer_triangle_buffer
 {
@@ -83,8 +78,24 @@ struct rasterizer_triangle_buffer
 
 /* ---------- prototypes */
 
-unsigned long __stdcall D3DResource_Release(
-	void *resource);
+void rasterizer_error(
+	long error_result,
+	char const *format,
+	...);
+
+void _ReadWriteBarrier(
+	void);
+#pragma intrinsic(_ReadWriteBarrier)
+
+extern D3DDevice *global_d3d_device;
+
+struct rasterizer_hardware_geometry_globals
+{
+	byte pad00[2];
+	short locked_vertex_buffer_count;
+};
+
+extern struct rasterizer_hardware_geometry_globals rasterizer_globals;
 
 /* ---------- globals */
 
@@ -128,16 +139,207 @@ long __stdcall code_00158510(
 	return 0;
 }
 
-void rasterizer_vertex_buffer_delete(
-	struct rasterizer_vertex_buffer *vertex_buffer)
+boolean rasterizer_vertex_buffer_new(
+	struct vertex_buffer *vertex_buffer,
+	long vertex_type,
+	long count,
+	void const *vertices,
+	long buffer_size)
 {
-	if (vertex_buffer && vertex_buffer->hardware_buffer)
+	D3DVertexBuffer *d3d_vertex_buffer;
+	byte *locked_vertices;
+	boolean success;
+	short vertex_size;
+	long result;
+
+	success = TRUE;
+	vertex_size = rasterizer_geometry_get_vertex_size(vertex_type);
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_geometry.c", 24, vertex_buffer);
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_geometry.c", 25, vertex_size*count==buffer_size || !vertices);
+
+	if (!count)
+		success = FALSE;
+	if (!global_d3d_device)
+		success = FALSE;
+	else if (success)
 	{
-		D3DResource_Release(vertex_buffer->hardware_buffer);
-		vertex_buffer->hardware_buffer = 0;
+		result = IDirect3DDevice8_CreateVertexBuffer(
+			global_d3d_device,
+			buffer_size,
+			D3DUSAGE_WRITEONLY,
+			0,
+			D3DPOOL_MANAGED,
+			&d3d_vertex_buffer);
+		if (result >= 0)
+		{
+			success = TRUE;
+		}
+		else
+		{
+			success = FALSE;
+			rasterizer_error(
+				result,
+				"IDirect3DDevice8_CreateVertexBuffer(global_d3d_device, buffer_size, RASTERIZER_STATIC_BUFFER_USAGE, 0, RASTERIZER_STATIC_BUFFER_POOL, &d3d_vertex_buffer)");
+		}
+		if (!d3d_vertex_buffer)
+			success = FALSE;
+		if (!d3d_vertex_buffer || !success)
+			d3d_vertex_buffer = NULL;
+	}
+
+	if (vertices && success)
+	{
+		rasterizer_globals.locked_vertex_buffer_count = 2;
+		IDirect3DVertexBuffer8_Lock(
+			d3d_vertex_buffer,
+			0,
+			buffer_size,
+			&locked_vertices,
+			0);
+		rasterizer_globals.locked_vertex_buffer_count = 0;
+		if (!locked_vertices)
+		{
+			success = FALSE;
+			locked_vertices = NULL;
+		}
+		else
+		{
+			csmemcpy(locked_vertices, vertices, buffer_size);
+			vertex_buffer->count = count;
+			vertex_buffer->base_address = (void *)vertices;
+			vertex_buffer->offset = 0;
+			vertex_buffer->type = vertex_type;
+			_ReadWriteBarrier();
+			vertex_buffer->hardware_format = d3d_vertex_buffer;
+			return TRUE;
+		}
+	}
+
+	if (!success)
+	{
+		csmemset(vertex_buffer, 0, sizeof(*vertex_buffer));
+		error(2, "### ERROR failed to create vertex buffer hardware format");
+	}
+
+	return success;
+}
+
+void rasterizer_vertex_buffer_delete(
+	struct vertex_buffer *vertex_buffer)
+{
+	if (vertex_buffer && vertex_buffer->hardware_format)
+	{
+		IDirect3DVertexBuffer8_Release(
+			(D3DVertexBuffer *)vertex_buffer->hardware_format);
+		vertex_buffer->hardware_format = 0;
 	}
 
 	return;
+}
+
+boolean rasterizer_triangle_buffer_new(
+	struct rasterizer_triangle_buffer *triangle_buffer,
+	short triangle_type,
+	long count,
+	void const *triangles)
+{
+	D3DIndexBuffer *d3d_index_buffer;
+	byte *locked_triangles;
+	boolean success;
+	long buffer_size;
+	long result;
+
+	buffer_size = 0;
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_geometry.c", 115, triangle_buffer);
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_geometry.c", 116, triangles);
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_geometry.c", 117, count>0);
+
+	switch (triangle_type)
+	{
+	case 0:
+		buffer_size = 6 * count;
+		break;
+	case 1:
+		buffer_size = 2 * count + 4;
+		break;
+	default:
+		display_assert(
+			"### ERROR unsupported triangle buffer type",
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_geometry.c",
+			128,
+			TRUE);
+		system_exit(-1);
+		break;
+	}
+
+	success = TRUE;
+	if (!global_d3d_device)
+	{
+		success = FALSE;
+		_ReadWriteBarrier();
+failure:
+		csmemset(triangle_buffer, 0, sizeof(*triangle_buffer));
+		error(2, "### ERROR failed to create triangle buffer hardware format");
+		return success;
+	}
+
+	result = IDirect3DDevice8_CreateIndexBuffer(
+		global_d3d_device,
+		buffer_size,
+		D3DUSAGE_WRITEONLY,
+		D3DFMT_INDEX16,
+		D3DPOOL_MANAGED,
+		&d3d_index_buffer);
+	if (result >= 0)
+	{
+		success = TRUE;
+	}
+	else
+	{
+		success = FALSE;
+		rasterizer_error(
+			result,
+			"IDirect3DDevice8_CreateIndexBuffer(global_d3d_device, buffer_size, RASTERIZER_STATIC_BUFFER_USAGE, D3DFMT_INDEX16, RASTERIZER_STATIC_BUFFER_POOL, &d3d_index_buffer)");
+	}
+	if (!d3d_index_buffer)
+	{
+		success = FALSE;
+		d3d_index_buffer = NULL;
+	}
+	if (!success)
+	{
+		d3d_index_buffer = NULL;
+	}
+	if (!success)
+		goto failure;
+
+	IDirect3DIndexBuffer8_Lock(
+		d3d_index_buffer,
+		0,
+		buffer_size,
+		&locked_triangles,
+		0);
+	if (!locked_triangles)
+	{
+		success = FALSE;
+	}
+	else
+	{
+		csmemcpy(
+			locked_triangles,
+			triangles,
+			buffer_size);
+		triangle_buffer->triangle_count = count;
+		_ReadWriteBarrier();
+		triangle_buffer->triangles = (void *)triangles;
+		triangle_buffer->hardware_buffer = d3d_index_buffer;
+		_ReadWriteBarrier();
+		triangle_buffer->triangle_type = triangle_type;
+	}
+	if (!success)
+		goto failure;
+
+	return TRUE;
 }
 
 void rasterizer_triangle_buffer_delete(
@@ -145,7 +347,8 @@ void rasterizer_triangle_buffer_delete(
 {
 	if (triangle_buffer && triangle_buffer->hardware_buffer)
 	{
-		D3DResource_Release(triangle_buffer->hardware_buffer);
+		IDirect3DIndexBuffer8_Release(
+			(D3DIndexBuffer *)triangle_buffer->hardware_buffer);
 		triangle_buffer->hardware_buffer = 0;
 	}
 
