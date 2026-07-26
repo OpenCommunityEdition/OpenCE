@@ -189,6 +189,11 @@ void player_handle_powerup_minor(
 	short powerup_index,
 	short duration);
 
+void player_add_equipment(
+	long unit_index,
+	short starting_profile_index,
+	boolean reset_equipment);
+
 /* ---------- prototypes/PLAYER_QUEUES_NEW.C */
 
 void update_queues_reset_and_fill_with_lies(void);

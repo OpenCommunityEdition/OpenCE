@@ -378,10 +378,6 @@ boolean object_double_charge_shield(
 	long object_index);
 void observer_obsolete_position(
 	short local_player_index);
-void player_add_equipment(
-	long unit_index,
-	short starting_profile_index,
-	boolean reset_equipment);
 boolean biped_fix_position(
 	long unit_index,
 	long seat_index,
@@ -2114,6 +2110,119 @@ void players_handle_deleted_object(
 		{
 			if (player->unit_index == deleted_object_index)
 				player_died(iterator.datum_index);
+		}
+	}
+
+	return;
+}
+
+static long code_000a9f80(
+	struct scenario_starting_profile_weapon const *starting_weapon,
+	long unit_index)
+{
+	struct object_placement_data placement_data;
+	struct weapon_datum *weapon;
+	long weapon_index;
+
+	weapon_index = NONE;
+	if (starting_weapon->weapon.index != NONE)
+	{
+		object_placement_data_new(
+			&placement_data,
+			starting_weapon->weapon.index,
+			unit_index);
+		weapon_index = object_new(&placement_data);
+		if (weapon_index != NONE)
+		{
+			weapon = weapon_get(weapon_index);
+			weapon->weapon.magazines[0].rounds_total =
+				starting_weapon->rounds_total;
+			weapon->weapon.magazines[0].rounds_loaded =
+				starting_weapon->rounds_loaded;
+		}
+	}
+
+	return weapon_index;
+}
+
+void player_add_equipment(
+	long unit_index,
+	short starting_profile_index,
+	boolean reset_equipment)
+{
+	struct unit_datum *unit;
+	struct scenario_starting_profile *starting_profile;
+	struct scenario *scenario;
+	long weapon_index;
+	short grenade_index;
+
+	if (unit_index != NONE && starting_profile_index != NONE)
+	{
+		unit = unit_try_and_get(unit_index);
+		if (unit->unit.player_index != NONE)
+		{
+			scenario = global_scenario_get();
+			starting_profile = TAG_BLOCK_GET_ELEMENT(
+				&scenario->starting_profiles,
+				starting_profile_index,
+				struct scenario_starting_profile);
+
+			if (reset_equipment)
+			{
+				unit_delete_all_weapons(unit_index);
+				unit->object.shield_vitality = 0.f;
+				unit->object.body_vitality = 0.f;
+				*(short *)unit->unit.grenade_counts = 0;
+			}
+
+			if (starting_profile->primary_weapon.weapon.index != NONE)
+			{
+				weapon_index = code_000a9f80(
+					&starting_profile->primary_weapon,
+					unit_index);
+				if (weapon_index != NONE &&
+					!unit_add_weapon_to_inventory(
+						unit_index,
+						weapon_index,
+						reset_equipment != FALSE))
+				{
+					error(2, "Could not attach starting weapon to player");
+					object_delete(weapon_index);
+				}
+			}
+
+			if (starting_profile->secondary_weapon.weapon.index != NONE)
+			{
+				weapon_index = code_000a9f80(
+					&starting_profile->secondary_weapon,
+					unit_index);
+				if (weapon_index != NONE &&
+					!unit_add_weapon_to_inventory(
+						unit_index,
+						weapon_index,
+						FALSE))
+				{
+					error(2, "Could not attach starting weapon to player");
+					object_delete(weapon_index);
+				}
+			}
+
+			unit->object.shield_vitality +=
+				starting_profile->starting_shield_modifier;
+			unit->object.body_vitality +=
+				starting_profile->starting_health_modifier;
+			unit = (struct unit_datum *)unit->unit.grenade_counts;
+			starting_profile =
+				(struct scenario_starting_profile *)starting_profile->grenade_counts;
+			grenade_index = NUMBER_OF_UNIT_GRENADE_TYPES;
+			do
+			{
+				*(byte *)unit += *(byte *)starting_profile;
+				starting_profile = (struct scenario_starting_profile *)(
+					(byte *)starting_profile + 1);
+				unit = (struct unit_datum *)((byte *)unit + 1);
+			}
+			while (--grenade_index);
 		}
 	}
 

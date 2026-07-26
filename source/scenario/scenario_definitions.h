@@ -123,6 +123,27 @@ struct scenario_trigger_volume
 typedef char scenario_trigger_volume_size_assert[
 	sizeof(struct scenario_trigger_volume) == 0x60 ? 1 : -1];
 
+struct scenario_starting_profile_weapon
+{
+	struct tag_reference weapon;
+	short rounds_loaded;
+	short rounds_total;
+};
+
+struct scenario_starting_profile
+{
+	char name[32];
+	real starting_health_modifier;
+	real starting_shield_modifier;
+	struct scenario_starting_profile_weapon primary_weapon;
+	struct scenario_starting_profile_weapon secondary_weapon;
+	char grenade_counts[2];
+	byte pad[22];
+};
+
+typedef char scenario_starting_profile_size_assert[
+	sizeof(struct scenario_starting_profile) == 0x68 ? 1 : -1];
+
 struct scenario
 {
 	struct tag_reference ugly_structure_bsp;

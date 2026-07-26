@@ -612,6 +612,10 @@ void unit_delete_current_equipment(
 	long unit_index);
 void unit_delete_all_weapons(
 	long unit_index);
+boolean unit_add_weapon_to_inventory(
+	long unit_index,
+	long weapon_index,
+	long is_starting_weapon);
 short unit_get_weapon_count(
 	long unit_index);
 boolean unit_get_current_flashlight_state(
