@@ -233,7 +233,11 @@ symbols in this file:
 #include "real_math.h"
 #include "players.h"
 #include "player_control.h"
+#include "objects/objects.h"
 #include "saved games/game_state.h"
+#include "units/bipeds.h"
+#include "units/units.h"
+#include "units/vehicle_definitions.h"
 
 /* ---------- constants */
 
@@ -241,13 +245,38 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct _players_vehicle_datum
+{
+	byte unknown_state;
+	byte pad[3];
+};
+
+struct players_vehicle_datum
+{
+	long definition_index;
+	struct _object_datum object;
+	struct _unit_datum unit;
+	long unknown424;
+	struct _players_vehicle_datum vehicle;
+};
+
 /* ---------- prototypes */
+
+void hud_fix_unit_data(
+	short old_local_player_index,
+	short new_local_player_index);
+void hud_fix_weapon_data(
+	short old_local_player_index,
+	short new_local_player_index);
+short player_ui_get_single_player_local_player_controller(
+	short local_player_index);
 
 /* ---------- globals */
 
 struct data_array *player_data;
 extern struct data_array *team_data;
 extern long bss_00453408[][MAXIMUM_LOCAL_PLAYERS];
+extern short player_spawn_count;
 
 /* ---------- public code */
 
@@ -559,6 +588,64 @@ boolean player_input_enabled(
 	return !players_globals->input_disabled;
 }
 
+boolean any_player_is_in_the_air(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	struct unit_datum *unit;
+	struct object_datum *root_object;
+	struct players_vehicle_datum *vehicle;
+	struct unit_definition *vehicle_definition;
+	long root_object_index;
+
+	data_iterator_new(&iterator, player_data);
+	while (player = data_iterator_next(&iterator))
+	{
+		if (player->unit_index == NONE)
+			continue;
+
+		unit = unit_get(player->unit_index);
+		root_object_index = object_get_ultimate_parent(player->unit_index);
+		root_object = object_get(root_object_index);
+		if (TEST_FLAG(root_object->object.flags, _object_outside_of_map_bit))
+			return TRUE;
+
+		if (unit->object.parent_object_index == NONE)
+		{
+			if (unit->object.type == _object_type_biped)
+			{
+				if (biped_flying_through_air(player->unit_index))
+					return TRUE;
+				continue;
+			}
+			if (unit->object.type != _object_type_vehicle)
+				continue;
+			vehicle = (struct players_vehicle_datum *)unit;
+		}
+		else
+		{
+			vehicle = (struct players_vehicle_datum *)object_try_and_get_and_verify_type(
+				unit->object.parent_object_index,
+				_object_mask_vehicle);
+			if (!vehicle)
+				continue;
+			vehicle_definition = vehicle_definition_get(vehicle->definition_index);
+			if (!TEST_FLAG(
+					vehicle_definition->unit.flags,
+					_unit_causes_passenger_dialogue_bit))
+			{
+				continue;
+			}
+		}
+
+		if (vehicle->vehicle.unknown_state > 2)
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
 boolean any_player_is_dead(
 	void)
 {
@@ -575,6 +662,74 @@ boolean any_player_is_dead(
 	}
 
 	return FALSE;
+}
+
+void player_control_fix_for_loaded_game_state(
+	void)
+{
+	struct player_datum *player;
+	long player_index;
+	short controller_local_player_index;
+	short local_player_index;
+
+	local_player_index = 0;
+	controller_local_player_index =
+		player_ui_get_single_player_local_player_controller(0);
+	if (controller_local_player_index == NONE)
+		controller_local_player_index = 0;
+
+	if (local_player_get_player_index(controller_local_player_index) == NONE)
+	{
+		if (player_spawn_count == 1)
+		{
+			for (local_player_index = 0;
+				local_player_index < MAXIMUM_LOCAL_PLAYERS;
+				local_player_index++)
+			{
+				player_index = local_player_get_player_index(local_player_index);
+				if (player_index != NONE)
+				{
+					player = player_get(player_index);
+					local_player_set_player_index(local_player_index, NONE);
+					player_control_new_unit(local_player_index, NONE);
+					local_player_set_player_index(
+						controller_local_player_index,
+						player_index);
+					player_control_new_unit(
+						controller_local_player_index,
+						player->unit_index);
+					hud_fix_weapon_data(
+						local_player_index,
+						controller_local_player_index);
+					hud_fix_unit_data(
+						local_player_index,
+						controller_local_player_index);
+					error(2, "corrected player control for restored saved game");
+					break;
+				}
+			}
+
+			if (local_player_index == MAXIMUM_LOCAL_PLAYERS)
+			{
+				error(2,
+					"failed to correct player control for restored saved game... probably won't be able to control the player");
+			}
+		}
+		else
+		{
+			error(2,
+				"tried to fix broken player control for a game w/ player_spawn_count= %d... but we don't allow restored games for anything other than player_spawn_count= 1",
+				player_spawn_count);
+		}
+	}
+
+	return;
+}
+
+boolean valid_real_vector2d(
+	real_vector2d const *vector)
+{
+	return valid_real(vector->i) && valid_real(vector->j);
 }
 
 /* ---------- private code */
