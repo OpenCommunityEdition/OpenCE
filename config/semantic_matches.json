@@ -358,5 +358,10 @@
     "function": "$L2587",
     "owner_function": "_inflate_blocks",
     "reason": "the exact owning COMDAT and an internal relocation prove this differently numbered jump-table label is the same destination"
+  },
+  {
+    "unit": "source/rasterizer/xbox/rasterizer_xbox_vertex_shaders_runtime",
+    "function": "_rasterizer_set_vertex_shader_permutation",
+    "reason": "hardened COFF comparison proves all 1376 padded bytes and all 133 semantic relocations exact; objdiff reports a switch-table/local-label encoding false negative"
   }
 ]
