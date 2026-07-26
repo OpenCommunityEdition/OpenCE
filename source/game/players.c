@@ -261,6 +261,7 @@ symbols in this file:
 #include "units/bipeds.h"
 #include "units/units.h"
 #include "units/vehicle_definitions.h"
+#include "units/vehicles.h"
 
 /* ---------- constants */
 
@@ -299,6 +300,31 @@ struct players_vehicle_datum
 	struct _unit_datum unit;
 	long unknown424;
 	struct _players_vehicle_datum vehicle;
+};
+
+struct _vehicle_datum
+{
+	byte flags;
+	byte unused425[3];
+	byte unknown_state;
+	char approach_type;
+	byte unknown42A;
+	byte unused42B;
+};
+
+struct vehicle_datum
+{
+	long definition_index;
+	struct _object_datum object;
+	struct _unit_datum unit;
+	struct _vehicle_datum vehicle;
+};
+
+struct player_vehicle_difficulty_information
+{
+	byte unused[0x70];
+	real vehicle_ram_angle;
+	byte unused74[0xC];
 };
 
 struct scenario_player_starting_location
@@ -398,6 +424,10 @@ boolean biped_fix_position(
 	boolean keep_basis,
 	boolean dont_teleport,
 	boolean scale_by_height);
+short unit_find_nearby_seat(
+	long unit_index,
+	long target_unit_index,
+	short *seat_index);
 
 static long code_000a9bc0(
 	short bsp_switch_trigger_volume_index,
@@ -426,6 +456,9 @@ static __declspec(noinline) void code_000ab350(
 	short action_result,
 	long object_index,
 	short seat_index);
+static void code_000ac0b0(
+	long player_index,
+	long vehicle_index);
 static void code_000abc90(
 	long player_index,
 	long source_unit_index,
@@ -1927,6 +1960,7 @@ void debug_player_teleport(
 		code_000aa4f0(0, 0);
 		code_000aa530(0, 0);
 		code_000aa560(0, 0);
+		code_000ac0b0(0, 0);
 	}
 
 	return;
@@ -2560,6 +2594,99 @@ static __declspec(noinline) void code_000ab350(
 		player->action_result = action_result;
 		player->action_object_index = object_index;
 		player->action_seat_index = seat_index;
+	}
+
+	return;
+}
+
+static void code_000ac0b0(
+	long player_index,
+	long vehicle_index)
+{
+	struct player_datum *player;
+	struct vehicle_datum *vehicle;
+	struct vehicle_datum *test_vehicle;
+	struct unit_datum *unit;
+	struct player_vehicle_difficulty_information *difficulty_information;
+	real vehicle_ram_angle;
+	short seat_state;
+
+	player = player_get(player_index);
+	vehicle = (struct vehicle_datum *)vehicle_get(vehicle_index);
+	if (!TEST_FLAG(vehicle->object.damage_flags, _object_dead_bit))
+	{
+		difficulty_information = TAG_BLOCK_GET_ELEMENT(
+			(struct tag_block *)((byte *)scenario_get_game_globals() + 0x110),
+			0,
+			struct player_vehicle_difficulty_information);
+		vehicle_ram_angle =
+			(_pi * 0.5f) - difficulty_information->vehicle_ram_angle;
+		test_vehicle = (struct vehicle_datum *)vehicle_get(vehicle_index);
+		if (*(real *)((byte *)test_vehicle + 0x38) >
+			cosine(vehicle_ram_angle))
+		{
+			if (!unit_overcharged(player->unit_index))
+			{
+				unit = unit_get(player->unit_index);
+				if (magnitude_squared3d(&unit->object.translational_velocity) < 0.01f)
+				{
+					if (magnitude_squared3d(
+						&((struct vehicle_datum *)vehicle_get(
+							vehicle_index))->object.angular_velocity) <
+						0.01f)
+					{
+						short seat_index;
+
+						seat_index = NONE;
+						seat_state = unit_find_nearby_seat(
+							player->unit_index,
+							vehicle_index,
+							&seat_index);
+						switch (seat_state)
+						{
+						case 2:
+							if (seat_index == NONE)
+							{
+								display_assert(
+									"seat_index != NONE",
+									"c:\\halo\\SOURCE\\game\\players.c",
+									0x83C,
+									TRUE);
+								system_exit(-1);
+							}
+							code_000ab350(
+								player_index,
+								8,
+								vehicle_index,
+								seat_index);
+							break;
+
+						case 1:
+							if (seat_index == NONE)
+							{
+								display_assert(
+									"seat_index != NONE",
+									"c:\\halo\\SOURCE\\game\\players.c",
+									0x841,
+									TRUE);
+								system_exit(-1);
+							}
+							code_000ab350(
+								player_index,
+								9,
+								vehicle_index,
+								seat_index);
+							break;
+						}
+					}
+				}
+			}
+		}
+		else if (!TEST_FLAG(vehicle->vehicle.flags, 4) &&
+			vehicle->unit.driver_object_index == NONE)
+		{
+			code_000ab350(player_index, 11, vehicle_index, NONE);
+		}
 	}
 
 	return;
