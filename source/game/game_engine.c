@@ -695,6 +695,11 @@ static struct postgame_statistic_entry *code_0009a3b0(
 	struct postgame_statistic_entry *entry,
 	long player_index);
 
+long postgame_statistic_get_rating(
+	long player_index,
+	long parameter1,
+	long parameter2);
+
 long populate_statistic_buffer(
 	struct postgame_statistic_entry *entries,
 	long parameter1,
@@ -2195,6 +2200,33 @@ static struct postgame_statistic_entry *code_0009a3b0(
 	*entry = entries[place];
 
 	return entry;
+}
+
+long postgame_statistic_get_rating(
+	long player_index,
+	long parameter1,
+	long parameter2)
+{
+	struct postgame_statistic_entry entries[16];
+	long rating;
+	long entry_count;
+	long entry_index;
+
+	entry_count = populate_statistic_buffer(entries, parameter1, parameter2);
+	rating = 0;
+	if (entries[0].values[0] != player_index)
+	{
+		for (entry_index = 1; entry_index < entry_count; entry_index++)
+		{
+			if (entries[entry_index - 1].values[1] != entries[entry_index].values[1])
+				rating++;
+
+			if (entries[entry_index].values[0] == player_index)
+				break;
+		}
+	}
+
+	return rating;
 }
 
 long game_engine_did_player_win(
