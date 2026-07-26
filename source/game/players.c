@@ -241,6 +241,7 @@ symbols in this file:
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
 #include "objects/damage.h"
+#include "physics/collisions.h"
 #include "real_math.h"
 #include "players.h"
 #include "player_control.h"
@@ -248,6 +249,7 @@ symbols in this file:
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#include "structures/structure_bsp_definitions.h"
 #include "text/unicode.h"
 #include "units/bipeds.h"
 #include "units/units.h"
@@ -290,6 +292,23 @@ struct scenario_player_starting_location
 	short team_index;
 	short structure_bsp_reference_index;
 	byte unused[0x20];
+};
+
+struct scenario_bsp_switch_trigger_volume
+{
+	short trigger_volume_index;
+	short source_structure_bsp_index;
+	short destination_structure_bsp_index;
+	short cutscene_flag_index;
+};
+
+struct scenario_cutscene_flag
+{
+	long runtime_unused;
+	char name[TAG_STRING_LENGTH];
+	real_point3d position;
+	real_euler_angles2d facing;
+	byte unused[0x24];
 };
 
 struct player_screen_flash_parameters
@@ -345,12 +364,19 @@ void player_effect_screen_flash(
 boolean object_double_charge_shield(
 	long object_index);
 
+static long code_000a9bc0(
+	short bsp_switch_trigger_volume_index,
+	long object_index);
 static void code_000aa300(
 	long player_index);
 static void code_000aa3b0(
 	long player_index);
 static void code_000aa460(
 	long player_index);
+static void code_000abc90(
+	long player_index,
+	long source_unit_index,
+	real_point3d const *position);
 
 /* ---------- globals */
 
@@ -919,6 +945,29 @@ struct scenario_player_starting_location *player_get_starting_location(
 	return starting_location;
 }
 
+static long code_000a9bc0(
+	short bsp_switch_trigger_volume_index,
+	long object_index)
+{
+	struct scenario_bsp_switch_trigger_volume *bsp_switch_trigger_volume;
+
+	if (bsp_switch_trigger_volume_index != NONE)
+	{
+		bsp_switch_trigger_volume = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->bsp_switch_trigger_volumes,
+			bsp_switch_trigger_volume_index,
+			struct scenario_bsp_switch_trigger_volume);
+		if (scenario_trigger_volume_test_object(
+			bsp_switch_trigger_volume->trigger_volume_index,
+			object_index))
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
 void placement_data_set_change_color(
 	struct object_placement_data *placement_data,
 	real_rgb_color const *change_color)
@@ -1133,6 +1182,220 @@ void debug_player_teleport(
 			target_unit_index,
 			&target_unit->object.bounding_sphere_center);
 	}
+
+	return;
+}
+
+static void code_000abc90(
+	long player_index,
+	long source_unit_index,
+	real_point3d const *position)
+{
+	struct player_datum *player;
+	struct biped_datum *biped;
+	struct biped_datum *source_biped;
+	struct scenario_bsp_switch_trigger_volume *bsp_switch;
+	long unit_index;
+	volatile boolean outside_switch_trigger;
+	boolean inside_switch_trigger;
+	boolean teleport_succeeded;
+
+	player = player_get(player_index);
+	unit_index = player->unit_index;
+	biped = biped_try_and_get(unit_index);
+	match_assert("c:\\halo\\SOURCE\\game\\players.c", 0x4CB,
+		player_index!=NONE);
+	match_assert("c:\\halo\\SOURCE\\game\\players.c", 0x4CC,
+		position);
+	if (biped)
+	{
+		if (players_globals->pending_teleport_starting_location_index != NONE)
+		{
+			bsp_switch = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->bsp_switch_trigger_volumes,
+				players_globals->pending_teleport_starting_location_index,
+				struct scenario_bsp_switch_trigger_volume);
+			inside_switch_trigger = scenario_trigger_volume_test_object(
+				bsp_switch->trigger_volume_index,
+				unit_index);
+			if (inside_switch_trigger)
+			{
+				outside_switch_trigger = TRUE;
+				outside_switch_trigger = FALSE;
+			}
+			else
+			{
+				outside_switch_trigger = TRUE;
+			}
+		}
+		else
+		{
+			outside_switch_trigger = FALSE;
+		}
+
+		if (scenario_leaf_index_from_point(
+			&biped->object.bounding_sphere_center) == NONE ||
+			outside_switch_trigger)
+		{
+			if (biped->object.parent_object_index != NONE)
+			{
+				source_biped = biped_get(source_unit_index);
+				if (biped->object.parent_object_index !=
+					source_biped->object.parent_object_index)
+				{
+					unit_exit_seat_end(unit_index);
+				}
+			}
+
+			if (biped->object.parent_object_index == NONE)
+			{
+				teleport_succeeded = code_000aa9e0(
+					player_index,
+					source_unit_index,
+					position);
+			}
+			else
+			{
+				teleport_succeeded = TRUE;
+			}
+			players_globals->respawn_failed = !teleport_succeeded;
+		}
+	}
+
+	return;
+}
+
+void players_reconnect_to_structure_bsp(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	struct scenario *scenario;
+	struct scenario_bsp_switch_trigger_volume *bsp_switch;
+	struct scenario_cutscene_flag *cutscene_flag;
+	struct structure_leaf *leaf;
+	real_point3d biped_base;
+	real_point3d teleport_position;
+	real biped_height;
+	long source_unit_index;
+	real adjustment_or_width;
+	boolean teleport_position_valid;
+	boolean found_player;
+	short local_player_index;
+	short cutscene_flag_index;
+	long player_index;
+	long player_unit_index;
+	long cluster_index;
+	long (*local_player_index_getter)(short local_player_index);
+
+	if (players_globals->pending_teleport_starting_location_index != NONE &&
+		players_globals->local_player_count > 1)
+	{
+		scenario = global_scenario_get();
+		bsp_switch = TAG_BLOCK_GET_ELEMENT(
+			&scenario->bsp_switch_trigger_volumes,
+			players_globals->pending_teleport_starting_location_index,
+			struct scenario_bsp_switch_trigger_volume);
+		source_unit_index = NONE;
+		found_player = FALSE;
+		teleport_position_valid = FALSE;
+		cutscene_flag_index = bsp_switch->cutscene_flag_index;
+		if (cutscene_flag_index != NONE)
+		{
+			adjustment_or_width = 0.f;
+			cutscene_flag = TAG_BLOCK_GET_ELEMENT(
+				&scenario->cutscene_flags,
+				cutscene_flag_index,
+				struct scenario_cutscene_flag);
+			teleport_position = cutscene_flag->position;
+		collision_test:
+			if (collision_test_point(
+				FLAG(_collision_test_front_facing_surfaces_bit) |
+					FLAG(_collision_test_ignore_invisible_surfaces_bit) |
+					FLAG(_collision_test_structure_bit) |
+					FLAG(_collision_test_objects_scenery_bit),
+				&teleport_position,
+				NONE))
+			{
+				teleport_position.z += 0.05f;
+				adjustment_or_width += 0.05f;
+				if (adjustment_or_width < 0.3f)
+					goto collision_test;
+			}
+			teleport_position_valid = adjustment_or_width < 0.3f;
+		}
+
+		data_iterator_new(&iterator, player_data);
+		while ((player = data_iterator_next(&iterator)) && !found_player)
+		{
+			player_unit_index = player->unit_index;
+			if (player_unit_index != NONE &&
+				players_globals->pending_teleport_starting_location_index != NONE)
+			{
+				if (code_000a9bc0(
+					players_globals->pending_teleport_starting_location_index,
+					player_unit_index))
+				{
+					biped_get_physics_pill(
+						player->unit_index,
+						&biped_base,
+						&biped_height,
+						&adjustment_or_width);
+					if (scenario_leaf_index_from_point(&biped_base) != NONE)
+					{
+						leaf = TAG_BLOCK_GET_ELEMENT(
+							&global_structure_bsp_get()->leaves,
+							scenario_leaf_index_from_point(&biped_base) & LONG_MAX,
+							struct structure_leaf);
+						cluster_index =
+							*(volatile short *)&leaf->cluster_index;
+						if (cluster_index != NONE)
+						{
+							if (!teleport_position_valid)
+								teleport_position = biped_base;
+							else
+								teleport_position.z =
+									*(volatile real *)&adjustment_or_width +
+									teleport_position.z;
+							source_unit_index = player->unit_index;
+							found_player = TRUE;
+						}
+					}
+				}
+			}
+		}
+
+		match_vassert(
+			"c:\\halo\\SOURCE\\game\\players.c",
+			0x63E,
+			found_player,
+			"no players in the bsp");
+		if (found_player)
+		{
+			local_player_index_getter = local_player_get_player_index;
+			local_player_index = local_player_get_next(NONE);
+			while (local_player_index != NONE)
+			{
+				player_index = local_player_index_getter(local_player_index);
+				player = player_get(player_index);
+				if (player->unit_index != NONE &&
+					player->unit_index != source_unit_index)
+				{
+					code_000abc90(
+						player_index,
+						source_unit_index,
+						&teleport_position);
+					player_get(player_index)->cluster_index = NONE;
+				}
+				local_player_index = local_player_get_next(local_player_index);
+			}
+		}
+		players_globals->pending_teleport_starting_location_index = NONE;
+	}
+
+	data_iterator_new(&iterator, player_data);
+	while (player = data_iterator_next(&iterator))
+		player->cluster_index = NONE;
 
 	return;
 }
