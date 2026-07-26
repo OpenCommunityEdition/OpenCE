@@ -2202,6 +2202,32 @@ static struct postgame_statistic_entry *code_0009a3b0(
 	return entry;
 }
 
+struct game_variant *build_game_variant_king(
+	struct game_variant *variant)
+{
+	struct game_variant result = { 0 };
+
+	result.flags = (result.flags & ~0x3C) | 3;
+	result.unknown24 = 1;
+	result.unknown30 = 150;
+	result.unknown40 = 2;
+	result.unknown64 = 1;
+	result.unknown34 = 150;
+	result.unknown48 = 2;
+	result.engine_type = 4;
+	result.unknown3C = 1.0f;
+	result.maximum_lives = 0;
+	result.unknown28 = FALSE;
+	result.unknown2C = 0;
+	result.has_teams = FALSE;
+	result.unknown44 = 0;
+	result.unknown4C.byte0 = 0;
+
+	*variant = result;
+
+	return variant;
+}
+
 long postgame_statistic_get_rating(
 	long player_index,
 	long parameter1,
