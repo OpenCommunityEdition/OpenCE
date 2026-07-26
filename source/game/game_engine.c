@@ -858,6 +858,46 @@ static boolean code_00099880(
 	return result;
 }
 
+boolean match_game_type(
+	long game_type,
+	long count,
+	short const *game_types)
+{
+	boolean result;
+	long index;
+
+	if (game_engine)
+	{
+		result = FALSE;
+		for (index = 0; index < count; index++)
+		{
+			short entry = game_types[index];
+
+			result = result | (entry == game_type);
+			if (entry == 12)
+			{
+				result = result | TRUE;
+			}
+			else if (entry == 13)
+			{
+				result = result | (game_type != 1);
+			}
+			else if (entry == 14)
+			{
+				result = result | (game_type != 1 && game_type != 5);
+			}
+		}
+	}
+	else
+	{
+		result = TRUE;
+		for (index = 0; index < count; index++)
+			result = result & (game_types[index] == 0);
+	}
+
+	return result;
+}
+
 boolean code_00097c00(
 	void)
 {

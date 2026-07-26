@@ -222,6 +222,11 @@ void game_engine_nonplayer_post_rasterize(
 void game_engine_update_non_deterministic(
 	float delta_seconds);
 
+boolean match_game_type(
+	long game_type,
+	long count,
+	short const *game_types);
+
 void game_engine_initialize(
 	struct game_variant *variant);
 
