@@ -251,6 +251,7 @@ symbols in this file:
 
 #include "actors.h"
 #include "props.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
@@ -265,7 +266,9 @@ symbols in this file:
  */
 struct actor_perception_actor_view
 {
-	byte __unknown000[0x6A];
+	byte __unknown000[0x18];
+	long unit_index;
+	byte __unknown01C[0x4E];
 	short combat_status;
 	byte __unknown06C[2];
 	short artificial_combat_status;
@@ -275,7 +278,10 @@ struct actor_perception_actor_view
 	boolean searching;
 	byte __unknown1EE[0x14];
 	boolean vehicle_passenger;
-	byte __unknown203[0x6D];
+	byte __unknown203[0x65];
+	short target_type;
+	byte __unknown26A[2];
+	long target_last_visible_time;
 	long target_prop_index;
 	byte __unknown274[0x134];
 	short unopposable_retreat_timer;
@@ -290,23 +296,34 @@ struct actor_perception_prop_view
 	byte __unknown008[4];
 	long orphan_prop_index;
 	short type;
-	byte __unknown012[0x12];
+	byte __unknown012[6];
+	long unit_index;
+	byte __unknown01C[8];
 	short state;
-	byte __unknown026[0x3A];
+	byte __unknown026[0x2A];
+	long copied_position_data[4];
 	boolean enemy;
 	byte __unknown061[5];
 	short perception;
 	byte __unknown068[0x34];
 	short unreachable_ticks;
-	byte __unknown09E[6];
+	byte __unknown09E[2];
+	long last_unreachable_time;
 	boolean unopposable_enemy;
-	byte __unknown0A5[5];
+	byte __unknown0A5[1];
+	short unopposable_casualties_inflicted;
+	short unopposable_casualty_decay_timer;
 	short unopposable_trigger_hysteresis;
 	short unopposable_trigger_timer;
 	short unopposable_trigger_threshold;
 	byte __unknown0B0[8];
 	boolean orphan_corpse_cheated;
-	byte __unknown0B9[0x6E];
+	byte __unknown0B9[0x33];
+	long pathfinding_surface_index;
+	real_point3d pathfinding_point;
+	byte __unknown0FC[0x14];
+	long vehicle_index;
+	byte __unknown114[0x13];
 	boolean dead;
 	byte __unknown128[0x0D];
 	boolean dangerous_vehicle_driver;
@@ -317,6 +334,12 @@ typedef char actor_perception_actor_view_target_prop_index_offset_assert[
 	offsetof(struct actor_perception_actor_view, target_prop_index) == 0x270 ? 1 : -1];
 typedef char actor_perception_prop_view_unopposable_enemy_offset_assert[
 	offsetof(struct actor_perception_prop_view, unopposable_enemy) == 0xA4 ? 1 : -1];
+
+union actor_perception_boolean_slot
+{
+	boolean value;
+	long storage;
+};
 
 /* ---------- prototypes */
 
@@ -339,6 +362,31 @@ void actor_stimulus_prop_acknowledged(
 	long prop_index,
 	long stimulus,
 	boolean initial_acknowledgement);
+
+long ai_get_responsible_unit(
+	long object_index,
+	boolean include_self);
+
+long vehicle_find_pathfinding_surface_index(
+	long vehicle_index,
+	real_point3d *position);
+
+long biped_find_pathfinding_surface_index(
+	long biped_index,
+	real_point3d *position);
+
+boolean actor_expected_acknowledgement(
+	long actor_index,
+	long prop_index);
+
+void actor_switch_props(
+	long actor_index,
+	long old_prop_index,
+	long new_prop_index);
+
+void prop_delete(
+	long actor_index,
+	long prop_index);
 
 static __inline boolean prop_acknowledged(
 	struct prop_datum const *prop)
@@ -473,6 +521,42 @@ boolean actor_compute_prop_unopposable(
 	return result;
 }
 
+void actor_perception_find_prop_pathfinding_location(
+	long actor_index,
+	long prop_index)
+{
+	struct actor_perception_prop_view *prop =
+		(struct actor_perception_prop_view *)prop_get(prop_index);
+
+#line 3585 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+	assert(prop->owner_actor_index == actor_index);
+#line 510 "source\\ai\\actor_perception.c"
+
+	if (prop->pathfinding_surface_index == NONE)
+	{
+		if (prop->vehicle_index != NONE)
+		{
+			prop->pathfinding_surface_index =
+				vehicle_find_pathfinding_surface_index(
+					prop->vehicle_index,
+					&prop->pathfinding_point);
+			return;
+		}
+
+		if (object_try_and_get_and_verify_type(
+			prop->unit_index,
+			_object_mask_biped))
+		{
+			prop->pathfinding_surface_index =
+				biped_find_pathfinding_surface_index(
+					prop->unit_index,
+					&prop->pathfinding_point);
+		}
+	}
+
+	return;
+}
+
 void actor_perception_tried_to_uncover(
 	long actor_index,
 	long prop_index)
@@ -583,6 +667,110 @@ void actor_perception_unreachable(
 		actor_compute_prop_target_weight(actor_index, prop_index);
 
 	return;
+}
+
+boolean actor_perception_become_acknowledged(
+	long actor_index,
+	long prop_index,
+	boolean *expected_acknowledgement_out)
+{
+	struct actor_perception_prop_view *prop =
+		(struct actor_perception_prop_view *)prop_get(prop_index);
+	boolean result = FALSE;
+	boolean expected_acknowledgement = FALSE;
+
+	if (prop->state < 2 || prop->state > 3)
+	{
+		union actor_perception_boolean_slot orphaned;
+		union actor_perception_boolean_slot expected;
+
+		orphaned.value = prop->orphan_prop_index != NONE;
+		expected.value =
+			actor_expected_acknowledgement(actor_index, prop_index);
+
+		if (orphaned.value)
+		{
+			struct actor_perception_prop_view *orphan =
+				(struct actor_perception_prop_view *)prop_get(
+					prop->orphan_prop_index);
+
+			prop->copied_position_data[0] = orphan->copied_position_data[0];
+			prop->copied_position_data[1] = orphan->copied_position_data[1];
+			prop->copied_position_data[2] = orphan->copied_position_data[2];
+			prop->copied_position_data[3] = orphan->copied_position_data[3];
+			prop->unreachable_ticks = orphan->unreachable_ticks;
+			prop->last_unreachable_time = orphan->last_unreachable_time;
+			prop->unopposable_enemy = orphan->unopposable_enemy;
+			prop->unopposable_casualties_inflicted =
+				orphan->unopposable_casualties_inflicted;
+			prop->unopposable_casualty_decay_timer =
+				orphan->unopposable_casualty_decay_timer;
+
+			actor_switch_props(
+				actor_index,
+				prop->orphan_prop_index,
+				prop_index);
+			prop_delete(actor_index, prop->orphan_prop_index);
+			prop->orphan_prop_index = NONE;
+		}
+
+		prop->state = 3;
+			actor_perception_acknowledge(
+			actor_index,
+			prop_index,
+			orphaned.storage,
+			expected.storage);
+		expected_acknowledgement = expected.value;
+		result = TRUE;
+	}
+
+	if (expected_acknowledgement_out)
+		*expected_acknowledgement_out = expected_acknowledgement;
+
+	return result;
+}
+
+boolean actor_situation_try_new_target(
+	long actor_index,
+	long new_prop_index)
+{
+	struct actor_perception_actor_view *actor =
+		(struct actor_perception_actor_view *)actor_get(actor_index);
+	struct actor_perception_prop_view *new_prop =
+		(struct actor_perception_prop_view *)prop_get(new_prop_index);
+	struct actor_perception_prop_view *target_prop;
+	boolean result = FALSE;
+
+	if (actor->target_prop_index == NONE)
+		target_prop = NULL;
+	else
+		target_prop =
+			(struct actor_perception_prop_view *)prop_get(
+				actor->target_prop_index);
+
+	*(real *)&new_prop->copied_position_data[0] =
+		actor_compute_prop_target_weight(actor_index, new_prop_index);
+
+	if (*(real *)&new_prop->copied_position_data[0] > 0.0f)
+	{
+#line 4685 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+		assert(new_prop->enemy);
+#line 700 "source\\ai\\actor_perception.c"
+
+		if (!target_prop ||
+			*(real *)&new_prop->copied_position_data[0] >=
+				*(real *)&target_prop->copied_position_data[0])
+		{
+			actor->target_type = 0;
+			actor->target_prop_index = new_prop_index;
+			actor->target_last_visible_time = NONE;
+			actor_situation_update_target_status(actor_index);
+			actor_situation_combat_status_update(actor_index);
+			result = TRUE;
+		}
+	}
+
+	return result;
 }
 
 /* ---------- private code */
