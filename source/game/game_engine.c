@@ -548,6 +548,7 @@ symbols in this file:
 #include "main/main.h"
 #include "networking/network_game_globals.h"
 #include "objects.h"
+#include "player_rumble.h"
 #include "players.h"
 #include "saved games/player_profile.h"
 #include "scenario/scenario.h"
@@ -1244,6 +1245,53 @@ void game_engine_post_rasterize(
 			match_assert(
 				"c:\\halo\\SOURCE\\game\\game_engine.c",
 				0x7B7,
+				!"unreachable");
+			break;
+		}
+	}
+
+	return;
+}
+
+void game_engine_nonplayer_post_rasterize(
+	void)
+{
+	if (game_engine)
+	{
+		switch (game_engine_globals.postgame_state)
+		{
+		case 0:
+		case 1:
+			break;
+
+		case 2:
+		case 3:
+			{
+				rectangle2d window_bounds;
+				long local_player_index;
+
+				game_engine_post_rasterize_post_game();
+				window_bounds.x0 = 0;
+				window_bounds.x1 = 640;
+				window_bounds.y0 = 0;
+				window_bounds.y1 = 480;
+
+				for (local_player_index = 0;
+					local_player_index < MAXIMUM_LOCAL_PLAYERS;
+					local_player_index++)
+				{
+					render_ui_widgets_postgame(
+						(short)local_player_index,
+						&window_bounds);
+					rumble_player_clear((short)local_player_index);
+				}
+			}
+			break;
+
+		default:
+			match_assert(
+				"c:\\halo\\SOURCE\\game\\game_engine.c",
+				0xE3B,
 				!"unreachable");
 			break;
 		}

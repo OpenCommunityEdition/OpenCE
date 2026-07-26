@@ -18,5 +18,7 @@ void rumble_dispose(
 void rumble_player_set_scripted_values(
 	real left_motor,
 	real right_motor);
+void rumble_player_clear(
+	short local_player_index);
 
 #endif // __PLAYER_RUMBLE_H
