@@ -228,8 +228,11 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "data.h"
+#include "input.h"
 #include "real_math.h"
 #include "players.h"
+#include "player_control.h"
 #include "saved games/game_state.h"
 
 /* ---------- constants */
@@ -244,6 +247,7 @@ symbols in this file:
 
 struct data_array *player_data;
 extern struct data_array *team_data;
+extern long bss_00453408[][MAXIMUM_LOCAL_PLAYERS];
 
 /* ---------- public code */
 
@@ -275,16 +279,252 @@ void players_initialize(
 	return;
 }
 
+void players_initialize_for_new_map(
+	void)
+{
+	player_control_dispose();
+	csmemset(
+		players_globals,
+		0,
+		sizeof(struct players_globals));
+	csmemset(
+		players_globals->local_players,
+		NONE,
+		sizeof(players_globals->local_players));
+	csmemset(
+		players_globals->dead_units,
+		NONE,
+		sizeof(players_globals->dead_units));
+	players_globals->unknown0 = NONE;
+	players_globals->input_disabled = FALSE;
+	players_globals->double_speed_ticks = 0;
+	players_globals->all_dead = FALSE;
+	players_globals->pending_teleport_starting_location_index = NONE;
+	players_globals->respawn_failure = 0;
+	data_make_valid(player_data);
+	data_make_valid(team_data);
+	csmemset(
+		bss_00453408,
+		NONE,
+		0x40);
+
+	return;
+}
+
+void players_dispose_from_old_map(
+	void)
+{
+	data_make_invalid(player_data);
+	data_make_invalid(team_data);
+
+	return;
+}
+
+void players_dispose(
+	void)
+{
+	if (player_data)
+		player_data = NULL;
+	if (team_data)
+		team_data = NULL;
+	if (players_globals)
+		players_globals = NULL;
+
+	return;
+}
+
+long *machine_get_player_list(
+	long machine_index)
+{
+	machine_index &= 0xFFFF;
+
+	return bss_00453408[machine_index];
+}
+
+boolean local_player_exists(
+	long local_player_index)
+{
+	boolean result;
+	struct player_datum *player;
+	struct data_iterator iterator;
+
+	result = FALSE;
+	data_iterator_new(
+		&iterator,
+		player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+	{
+		if (player->local_player_index == local_player_index)
+		{
+			result = TRUE;
+			break;
+		}
+	}
+
+	return result;
+}
+
+long find_unused_local_player_index(
+	void)
+{
+	long index;
+	long result;
+
+	result = NONE;
+	for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
+	{
+		if (input_has_gamepad((short)index) && !local_player_exists(index))
+		{
+			result = index;
+			break;
+		}
+	}
+
+	if (result == NONE)
+	{
+		for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
+		{
+			if (!local_player_exists(index))
+			{
+				result = index;
+				break;
+			}
+		}
+	}
+
+	return result;
+}
+
+void player_delete(
+	long player_index)
+{
+	datum_delete(
+		player_data,
+		player_index);
+
+	return;
+}
+
 short players_get_respawn_failure(
 	void)
 {
 	return players_globals->respawn_failure;
 }
 
+long local_player_get_player_index(
+	short local_player_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\players.c",
+		943,
+		local_player_index>=NONE && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+
+	if (local_player_index == NONE)
+		return NONE;
+
+	return players_globals->local_players[local_player_index];
+}
+
+void local_player_set_player_index(
+	short local_player_index,
+	long player_index)
+{
+	long previous_player_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\players.c",
+		952,
+		local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+
+	previous_player_index = players_globals->local_players[local_player_index];
+	if (previous_player_index != NONE)
+		player_get(previous_player_index)->local_player_index = NONE;
+
+	players_globals->local_players[local_player_index] = player_index;
+
+	if (player_index != NONE)
+	{
+		player_get(players_globals->local_players[local_player_index])->local_player_index =
+			local_player_index;
+	}
+
+	return;
+}
+
 short local_player_count(
 	void)
 {
 	return players_globals->local_player_count;
+}
+
+short local_player_get_next(
+	short local_player_index)
+{
+	short result;
+	short index;
+
+	result = NONE;
+	for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
+	{
+		if (players_globals->local_players[index] != NONE &&
+			index > local_player_index &&
+			(index < result || result == NONE))
+		{
+			result = index;
+		}
+	}
+
+	return result;
+}
+
+long player_index_from_unit_index(
+	long unit_index)
+{
+	long player_index;
+	struct player_datum *player;
+	struct data_iterator iterator;
+
+	player_index = NONE;
+	data_iterator_new(
+		&iterator,
+		player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+	{
+		if (player->unit_index == unit_index)
+			player_index = iterator.datum_index;
+	}
+
+	return player_index;
+}
+
+void player_died(
+	long player_index)
+{
+	struct player_datum *player;
+	struct player_datum *other_player;
+	struct data_iterator iterator;
+
+	player = player_get(player_index);
+	player->dead_unit_index = player->unit_index;
+	player->unit_index = NONE;
+	if (player->local_player_index != NONE)
+	{
+		player_control_new_unit(
+			player->local_player_index,
+			NONE);
+	}
+
+	players_globals->all_dead = TRUE;
+	data_iterator_new(
+		&iterator,
+		player_data);
+	while ((other_player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+	{
+		if (other_player->unit_index != NONE)
+			players_globals->all_dead = FALSE;
+	}
+
+	return;
 }
 
 boolean players_are_all_dead(
@@ -317,6 +557,24 @@ boolean player_input_enabled(
 	void)
 {
 	return !players_globals->input_disabled;
+}
+
+boolean any_player_is_dead(
+	void)
+{
+	struct player_datum *player;
+	struct data_iterator iterator;
+
+	data_iterator_new(
+		&iterator,
+		player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+	{
+		if (player->unit_index == NONE)
+			return TRUE;
+	}
+
+	return FALSE;
 }
 
 /* ---------- private code */
