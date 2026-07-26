@@ -739,6 +739,45 @@ boolean code_00096c80(
 	return result;
 }
 
+void code_00096d30(
+	void)
+{
+	struct object_iterator iterator;
+	long cutoff_time = game_time_get() - 900;
+
+	object_iterator_new(&iterator, _object_mask_item, 0);
+	while (object_iterator_next(&iterator))
+	{
+		struct item_datum *item = item_get(iterator.index);
+
+		if (item->item.last_owned_time < cutoff_time &&
+			!TEST_FLAG(item->item.flags, _item_attached_to_unit_bit))
+		{
+			long item_index = iterator.index;
+			struct weapon_datum *weapon = weapon_try_and_get(item_index);
+			if (!weapon || !weapon_is_flag(item_index))
+				object_delete(iterator.index);
+		}
+	}
+
+	object_iterator_new(&iterator, _object_mask_biped, 0);
+	while (object_iterator_next(&iterator))
+	{
+		struct object_datum *object;
+
+		cutoff_time = 900;
+		object = object_get(iterator.index);
+
+		if (object->object.idle_ticks > (short)cutoff_time &&
+			TEST_FLAG(object->object.damage_flags, _object_dead_bit))
+		{
+			object_delete(iterator.index);
+		}
+	}
+
+	return;
+}
+
 void game_engine_flag_reset(
 	long weapon_index,
 	real_point3d const *position)

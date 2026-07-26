@@ -14,6 +14,11 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum
+{
+	_item_attached_to_unit_bit = 0,
+};
+
 /* ---------- macros */
 
 #define item_get(index)			((struct item_datum*)object_get_and_verify_type(index, _object_mask_item))
