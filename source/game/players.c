@@ -228,13 +228,22 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "ai/ai_debug.h"
+#include "ai/ai_scenario_definitions.h"
 #include "data.h"
+#include "game.h"
+#include "game_engine.h"
 #include "input.h"
+#include "items/weapon_definitions.h"
+#include "items/weapons.h"
 #include "real_math.h"
 #include "players.h"
 #include "player_control.h"
 #include "objects/objects.h"
 #include "saved games/game_state.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
+#include "text/unicode.h"
 #include "units/bipeds.h"
 #include "units/units.h"
 #include "units/vehicle_definitions.h"
@@ -260,6 +269,15 @@ struct players_vehicle_datum
 	struct _players_vehicle_datum vehicle;
 };
 
+struct scenario_player_starting_location
+{
+	real_point3d position;
+	real facing;
+	short team_index;
+	short structure_bsp_reference_index;
+	byte unused[0x20];
+};
+
 /* ---------- prototypes */
 
 void hud_fix_unit_data(
@@ -270,6 +288,15 @@ void hud_fix_weapon_data(
 	short new_local_player_index);
 short player_ui_get_single_player_local_player_controller(
 	short local_player_index);
+real game_engine_get_starting_location_rating(
+	long player_index,
+	struct scenario_player_starting_location *starting_location);
+boolean code_000aa9e0(
+	long player_index,
+	long source_unit_index,
+	real_point3d const *position);
+void unit_exit_seat_end(
+	long unit_index);
 
 /* ---------- globals */
 
@@ -556,6 +583,44 @@ void player_died(
 	return;
 }
 
+void players_set_local_player_unit(
+	short local_player_index,
+	long unit_index)
+{
+	long old_unit_index;
+	long player_index;
+	struct player_datum *player;
+	struct unit_datum *unit;
+
+	old_unit_index = player_control_get_unit_index(local_player_index);
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\players.c",
+		1060,
+		game_connection()==_game_connection_local);
+
+	if (old_unit_index != NONE)
+	{
+		unit = unit_get(old_unit_index);
+		unit->unit.player_index = NONE;
+		unit_set_actively_controlled(old_unit_index, FALSE);
+	}
+
+	if (unit_index != NONE)
+	{
+		unit = unit_get(unit_index);
+		unit_set_actively_controlled(unit_index, TRUE);
+		unit->unit.player_index = local_player_get_player_index(local_player_index);
+	}
+
+	player_index = local_player_get_player_index(local_player_index);
+	player = player_get(player_index);
+	player->unit_index = unit_index;
+	player->dead_unit_index = NONE;
+	player_control_new_unit(local_player_index, unit_index);
+
+	return;
+}
+
 boolean players_are_all_dead(
 	void)
 {
@@ -726,10 +791,418 @@ void player_control_fix_for_loaded_game_state(
 	return;
 }
 
+short player_get_starting_location_count(
+	void)
+{
+	struct scenario *scenario;
+	struct encounter_definition *encounter;
+	short starting_location_count;
+
+	scenario = global_scenario_get();
+	starting_location_count = scenario->players.count;
+	if (ai_debug.selected_squad_index != NONE)
+	{
+		encounter = TAG_BLOCK_GET_ELEMENT(
+			&scenario->ai_encounters,
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(ai_debug.selected_squad_index),
+			struct encounter_definition);
+		if (encounter->player_starting_locations.count > 0)
+			starting_location_count = encounter->player_starting_locations.count;
+	}
+
+	return starting_location_count;
+}
+
+struct scenario_player_starting_location *player_get_starting_location(
+	short starting_location_index)
+{
+	struct scenario *scenario;
+	struct encounter_definition *encounter;
+	struct scenario_player_starting_location *starting_location;
+	short structure_bsp_reference_index;
+
+	scenario = global_scenario_get();
+	starting_location = NULL;
+	if (starting_location_index >= 0 && starting_location_index < scenario->players.count)
+	{
+		starting_location = TAG_BLOCK_GET_ELEMENT(
+			&scenario->players,
+			starting_location_index,
+			struct scenario_player_starting_location);
+	}
+
+	if (ai_debug.selected_squad_index != NONE)
+	{
+		encounter = TAG_BLOCK_GET_ELEMENT(
+			&scenario->ai_encounters,
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(ai_debug.selected_squad_index),
+			struct encounter_definition);
+
+		if (starting_location_index >= 0 &&
+			starting_location_index < encounter->player_starting_locations.count)
+		{
+			starting_location = TAG_BLOCK_GET_ELEMENT(
+				&encounter->player_starting_locations,
+				starting_location_index,
+				struct scenario_player_starting_location);
+			structure_bsp_reference_index = encounter->runtime_structure_bsp_reference_index;
+			if (structure_bsp_reference_index >= 0 &&
+				structure_bsp_reference_index < scenario->structure_bsp_references.count)
+			{
+				starting_location->structure_bsp_reference_index = structure_bsp_reference_index;
+			}
+		}
+	}
+
+	return starting_location;
+}
+
+void placement_data_set_change_color(
+	struct object_placement_data *placement_data,
+	real_rgb_color const *change_color)
+{
+	placement_data->change_colors[_object_change_color_a] = *change_color;
+	placement_data->change_colors[_object_change_color_b] = *change_color;
+	placement_data->change_colors[_object_change_color_c] = *change_color;
+	placement_data->change_colors[_object_change_color_d] = *change_color;
+
+	return;
+}
+
 boolean valid_real_vector2d(
 	real_vector2d const *vector)
 {
 	return valid_real(vector->i) && valid_real(vector->j);
+}
+
+static void code_000a9600(
+	long machine_index,
+	long player_index)
+{
+	long *machine_player_list;
+	long machine_player_index;
+
+	machine_index &= 0xFFFF;
+	machine_index <<= 4;
+	machine_player_list = (long *)((byte *)bss_00453408 + machine_index);
+	for (machine_player_index = 0;
+		machine_player_index < MAXIMUM_LOCAL_PLAYERS;
+		machine_player_index++)
+	{
+		if (machine_player_list[machine_player_index] == NONE)
+		{
+			machine_player_list[machine_player_index] = player_index;
+			break;
+		}
+	}
+
+	if (machine_player_index == MAXIMUM_LOCAL_PLAYERS)
+	{
+		display_assert(
+			"failed to create a player",
+			"c:\\halo\\SOURCE\\game\\players.c",
+			240,
+			TRUE);
+		system_exit(-1);
+	}
+
+	return;
+}
+
+long player_new(
+	long machine_index,
+	long player_index,
+	short local_player_index,
+	struct network_player const *network_player)
+{
+	struct player_datum *player;
+	struct player_datum *player2;
+	wchar_t const *player_name;
+
+	if (player_index == NONE)
+		player_index = datum_new(player_data);
+	else
+		player_index = datum_new_at_index(player_data, player_index);
+
+	match_assert("c:\\halo\\SOURCE\\game\\players.c", 309,
+		((local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)) || (local_player_index==NONE));
+
+	if (player_index != NONE)
+	{
+		player = player_get(player_index);
+		player_name = L"";
+		if (network_player)
+			player_name = network_player->name;
+		ustrncpy(player->name, player_name, 11);
+		player->name[11] = 0;
+		player->local_player_index = local_player_index;
+		player->unit_index = NONE;
+		player->dead_unit_index = NONE;
+		player->squad_index = NONE;
+		player->cluster_index = NONE;
+		player->aim_assist_unit_index = NONE;
+		player->speed_multiplier = 1.0f;
+		player->team_index = 1;
+
+		player2 = player_get(player_index);
+		player2->action_result = 0;
+		player2->action_object_index = NONE;
+		player->unknown_cc = NONE;
+		player->unknown_d1 = FALSE;
+
+		if (network_player)
+			csmemcpy(&player->network_player_data, network_player, sizeof(struct network_player));
+	}
+
+	code_000a9600(machine_index, player_index);
+
+	return player_index;
+}
+
+long find_best_starting_location_index(
+	long player_index)
+{
+	struct scenario *scenario;
+	struct encounter_definition *encounter;
+	struct scenario_player_starting_location *starting_location;
+	short starting_location_count;
+	short starting_location_index;
+	short best_starting_location_index;
+	real starting_location_rating;
+	real best_starting_location_rating;
+
+	scenario = global_scenario_get();
+	starting_location_count = scenario->players.count;
+	if (ai_debug.selected_squad_index != NONE)
+	{
+		encounter = TAG_BLOCK_GET_ELEMENT(
+			&scenario->ai_encounters,
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(ai_debug.selected_squad_index),
+			struct encounter_definition);
+		if (encounter->player_starting_locations.count > 0)
+			starting_location_count = encounter->player_starting_locations.count;
+	}
+
+	best_starting_location_index = NONE;
+	best_starting_location_rating = 0.0f;
+	for (starting_location_index = 0;
+		starting_location_index < starting_location_count;
+		starting_location_index++)
+	{
+		starting_location = player_get_starting_location(starting_location_index);
+		starting_location_rating = game_engine_get_starting_location_rating(
+			player_index,
+			starting_location);
+		starting_location_rating *= (real)pow(
+			(double)real_random_range(0.0f, 1.0f),
+			0.5);
+		if (starting_location_rating > best_starting_location_rating)
+		{
+			best_starting_location_rating = starting_location_rating;
+			best_starting_location_index = starting_location_index;
+		}
+	}
+
+	return best_starting_location_index;
+}
+
+boolean player_teleport(
+	long player_index,
+	long source_unit_index,
+	real_point3d const *position)
+{
+	struct player_datum *player;
+	struct biped_datum *biped;
+	long unit_index;
+	boolean result;
+
+	player = player_get(player_index);
+	unit_index = player->unit_index;
+	biped = biped_try_and_get(unit_index);
+	result = FALSE;
+	if (biped)
+	{
+		if (biped->object.parent_object_index != NONE)
+			unit_exit_seat_end(unit_index);
+		result = code_000aa9e0(player_index, source_unit_index, position);
+	}
+
+	return result;
+}
+
+void debug_player_teleport(
+	short local_player_index,
+	short target_local_player_index)
+{
+	long player_index;
+	long unit_index;
+	long target_player_index;
+	long target_unit_index;
+	struct player_datum *player;
+	struct unit_datum *target_unit;
+
+	player_index = local_player_get_player_index(local_player_index);
+	if (player_index == NONE)
+	{
+		unit_index = NONE;
+	}
+	else
+	{
+		player = player_get(local_player_get_player_index(local_player_index));
+		unit_index = player->unit_index;
+	}
+
+	target_player_index = local_player_get_player_index(target_local_player_index);
+	if (target_player_index == NONE)
+	{
+		target_unit_index = NONE;
+	}
+	else
+	{
+		player = player_get(local_player_get_player_index(target_local_player_index));
+		target_unit_index = player->unit_index;
+	}
+
+	if (unit_index != NONE && target_unit_index != NONE)
+	{
+		target_unit = unit_get(target_unit_index);
+		code_000aa9e0(
+			player_index_from_unit_index(unit_index),
+			target_unit_index,
+			&target_unit->object.bounding_sphere_center);
+	}
+
+	return;
+}
+
+boolean unit_should_autopick_weapon(
+	long unit_index,
+	long weapon_index)
+{
+	struct weapon_datum *weapon;
+	struct weapon_definition *volatile weapon_definition;
+	long weapon_count;
+
+	weapon = weapon_try_and_get(weapon_index);
+	weapon_definition = weapon_definition_get(weapon->definition_index);
+	weapon_count = unit_get_weapon_count(unit_index);
+
+	if (!(unit_approve_weapon_pickup(unit_index, weapon_index) &&
+		TEST_FLAG(weapon_definition->weapon.flags, _weapon_doesnt_count_toward_maximum_bit)) &&
+		weapon_count != 0 &&
+		(game_engine_running() ||
+			!unit_approve_weapon_pickup(unit_index, weapon_index) ||
+			weapon_count >= 2) &&
+		!game_engine_force_autopickup(unit_index, weapon_index))
+	{
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+long code_000aa160(
+	void)
+{
+	long local_player_count = 0;
+	short local_player_index;
+
+	for (local_player_index = 0;
+		local_player_index < MAXIMUM_LOCAL_PLAYERS;
+		local_player_index++)
+	{
+		if (players_globals->local_players[local_player_index] != NONE)
+			local_player_count++;
+	}
+
+	return local_player_count;
+}
+
+void code_000aa180(
+	void)
+{
+	return;
+}
+
+void players_handle_deleted_object(
+	long deleted_object_index)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	struct object_datum *object;
+
+	object = object_get(deleted_object_index);
+	if (TEST_FLAG(_object_mask_unit, object->object.type))
+	{
+		data_iterator_new(&iterator, player_data);
+		while (player = data_iterator_next(&iterator))
+		{
+			if (player->unit_index == deleted_object_index)
+				player_died(iterator.datum_index);
+		}
+	}
+
+	return;
+}
+
+void player_aiming_vector_from_facing(
+	long player_index,
+	real_vector3d *aiming_vector,
+	real_euler_angles2d const *facing)
+{
+	struct player_datum *player;
+	struct unit_datum *unit;
+	struct players_vehicle_datum *vehicle;
+	struct unit_definition *vehicle_definition;
+	struct unit_seat *seat;
+	real_matrix4x3 rotation;
+
+	player = player_get(player_index);
+	vector3d_from_euler_angles2d(aiming_vector, facing);
+	if (player->unit_index != NONE)
+	{
+		unit = unit_get(player->unit_index);
+		if (unit->object.parent_object_index != NONE)
+		{
+			vehicle = (struct players_vehicle_datum *)object_try_and_get_and_verify_type(
+				unit->object.parent_object_index,
+				_object_mask_vehicle);
+			if (vehicle)
+			{
+				vehicle_definition = vehicle_definition_get(
+					vehicle->definition_index);
+				seat = TAG_BLOCK_GET_ELEMENT(
+					&vehicle_definition->unit.seats,
+					unit->unit.parent_seat_index,
+					struct unit_seat);
+				if (!TEST_FLAG(seat->flags, _unit_seat_third_person_camera_bit))
+				{
+					cross_product3d(
+						&vehicle->object.up,
+						global_right3d,
+						&rotation.forward);
+					if (normalize3d(&rotation.forward) == 0.f)
+					{
+						cross_product3d(
+							&vehicle->object.up,
+							global_down3d,
+							&rotation.forward);
+						normalize3d(&rotation.forward);
+					}
+					matrix4x3_rotation_from_vectors(
+						&rotation,
+						&rotation.forward,
+						&vehicle->object.up);
+					matrix4x3_transform_normal(
+						&rotation,
+						aiming_vector,
+						aiming_vector);
+				}
+			}
+		}
+	}
+
+	return;
 }
 
 /* ---------- private code */
