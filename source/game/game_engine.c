@@ -554,6 +554,11 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	MULTIPLAYER_MAXIMUM_PLAYERS = 16,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -581,6 +586,13 @@ struct game_engine_stage
 	struct game_variant variant;
 };
 
+struct postgame_statistic_entry
+{
+	long values[7];
+};
+
+typedef char verify_postgame_statistic_entry_size[
+	sizeof(struct postgame_statistic_entry) == 0x1C ? 1 : -1];
 typedef char verify_game_engine_goal_size[sizeof(struct game_engine_goal) == 0x20 ? 1 : -1];
 typedef char verify_game_engine_globals_postgame_timer_offset[
 	offsetof(struct game_engine_globals, postgame_timer) == 0x8 ? 1 : -1];
@@ -627,6 +639,18 @@ void code_0009e9c0(
 
 void game_engine_post_rasterize_post_game(
 	void);
+
+boolean team_has_players(
+	long team_index);
+
+static struct postgame_statistic_entry *code_0009a3b0(
+	struct postgame_statistic_entry *entry,
+	long player_index);
+
+long populate_statistic_buffer(
+	struct postgame_statistic_entry *entries,
+	long parameter1,
+	long parameter2);
 
 /* ---------- globals */
 
@@ -1528,6 +1552,32 @@ void game_engine_prespawn_player_update(
 	return;
 }
 
+static struct postgame_statistic_entry *code_0009a3b0(
+	struct postgame_statistic_entry *entry,
+	long player_index)
+{
+	struct postgame_statistic_entry entries[16];
+	long place = 0;
+
+	populate_statistic_buffer(entries, 0, 0);
+	if (entries[place].values[0] != player_index)
+	{
+		do
+		{
+			place++;
+			match_assert(
+				"c:\\halo\\SOURCE\\game\\game_engine.c",
+				0x362,
+				place<MULTIPLAYER_MAXIMUM_PLAYERS);
+		}
+		while (entries[place].values[0] != player_index);
+	}
+
+	*entry = entries[place];
+
+	return entry;
+}
+
 long game_engine_did_player_win(
 	long player_index)
 {
@@ -1542,6 +1592,53 @@ long game_engine_did_player_win(
 	}
 
 	return result;
+}
+
+long game_engine_did_player_win_default(
+	long player_index)
+{
+	long result;
+
+	if (global_variant.has_teams)
+	{
+		long team0_score = game_engine_get_team_score(0);
+		long team1_score = game_engine_get_team_score(1);
+		struct player_datum *player = player_get(player_index);
+
+		if (multiple_teams_alive())
+		{
+			if (team0_score == team1_score)
+				goto tied;
+
+			result = team0_score <= team1_score;
+		}
+		else
+		{
+			result = !team_has_players(0);
+		}
+
+		if (result != NONE)
+			result = player->team_index == result;
+		else
+			goto tied;
+	}
+	else
+	{
+		struct postgame_statistic_entry entry;
+
+		entry = *code_0009a3b0(&entry, player_index);
+		if (
+			(entry.values[6] & (unsigned long)0x80000000) > 0 &&
+			!(entry.values[6] & 0x7FFFFFFF))
+			goto tied;
+		else
+			result = (entry.values[6] & 0x7FFFFFFF) == 0;
+	}
+
+	return result;
+
+tied:
+	return NONE;
 }
 
 long code_0009b2e0(
