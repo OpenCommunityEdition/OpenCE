@@ -622,6 +622,12 @@ struct network_game_server *global_network_game_server_get(
 boolean player_ui_game_variant_specified(
 	struct game_variant *variant);
 
+void code_0009e9c0(
+	void);
+
+void game_engine_post_rasterize_post_game(
+	void);
+
 /* ---------- globals */
 
 struct game_engine *game_engine;
@@ -1111,6 +1117,33 @@ void game_engine_post_rasterize_objects(
 {
 	if (game_engine && game_engine->post_rasterize_objects)
 		game_engine->post_rasterize_objects();
+
+	return;
+}
+
+void game_engine_post_rasterize(
+	void)
+{
+	if (game_engine)
+	{
+		switch (game_engine_globals.postgame_state)
+		{
+		case 0:
+		case 1:
+			code_0009e9c0();
+			break;
+		case 2:
+		case 3:
+			game_engine_post_rasterize_post_game();
+			break;
+		default:
+			match_assert(
+				"c:\\halo\\SOURCE\\game\\game_engine.c",
+				0x7B7,
+				!"unreachable");
+			break;
+		}
+	}
 
 	return;
 }

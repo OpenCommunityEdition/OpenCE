@@ -202,6 +202,9 @@ void game_engine_handle_server_message(
 void game_engine_post_rasterize_objects(
 	void);
 
+void game_engine_post_rasterize(
+	void);
+
 void game_engine_initialize(
 	struct game_variant *variant);
 
