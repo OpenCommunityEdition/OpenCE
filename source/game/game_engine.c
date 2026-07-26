@@ -2773,6 +2773,33 @@ struct game_variant *build_game_variant_race(
 	return variant;
 }
 
+struct game_variant *build_game_variant_rally(
+	struct game_variant *variant)
+{
+	struct game_variant result = { 0 };
+
+	result.flags = (result.flags & ~0x3C) | 3;
+	result.unknown24 = 1;
+	result.unknown48 = 2;
+	result.unknown4C.value = 2;
+	result.unknown64 = 1;
+	result.engine_type = 5;
+	result.unknown3C = 1.0f;
+	result.maximum_lives = 0;
+	result.unknown28 = FALSE;
+	result.unknown30 = 0;
+	result.unknown2C = 0;
+	result.unknown40 = 15;
+	result.unknown34 = 300;
+	result.has_teams = FALSE;
+	result.unknown44 = 0;
+	result.unknown50 = 0;
+
+	*variant = result;
+
+	return variant;
+}
+
 long postgame_statistic_get_rating(
 	long player_index,
 	long parameter1,
