@@ -343,6 +343,13 @@ struct actor_perception_prop_view
 	boolean preferred_target;
 };
 
+struct actor_perception_swarm_component_view
+{
+	short identifier;
+	word flags;
+	real_point3d position;
+};
+
 typedef char actor_perception_actor_view_target_prop_index_offset_assert[
 	offsetof(struct actor_perception_actor_view, target_prop_index) == 0x270 ? 1 : -1];
 typedef char actor_perception_prop_view_unopposable_enemy_offset_assert[
@@ -351,6 +358,8 @@ typedef char actor_perception_actor_view_active_threat_count_offset_assert[
 	offsetof(struct actor_perception_actor_view, active_threat_count) == 0x308 ? 1 : -1];
 typedef char actor_perception_prop_view_fleeing_offset_assert[
 	offsetof(struct actor_perception_prop_view, fleeing) == 0x12C ? 1 : -1];
+typedef char actor_perception_swarm_component_position_offset_assert[
+	offsetof(struct actor_perception_swarm_component_view, position) == 4 ? 1 : -1];
 
 union actor_perception_boolean_slot
 {
@@ -400,6 +409,11 @@ void actor_switch_props(
 	long actor_index,
 	long old_prop_index,
 	long new_prop_index);
+
+void actor_input_sample_position(
+	long actor_index,
+	long unit_index,
+	struct actor_position_data *position);
 
 void prop_delete(
 	long actor_index,
@@ -965,6 +979,69 @@ boolean actor_expected_acknowledgement(
 	}
 
 	return result;
+}
+
+void actor_perception_find_sense_position(
+	long actor_index,
+	real_point3d const *position,
+	long unused,
+	struct actor_position_data *sense_position)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->meta.swarm)
+	{
+		struct swarm_datum *swarm =
+			swarm_get(actor->meta.swarm_cache_index);
+		real best_distance_squared = FLT_MAX;
+		long best_unit_index = NONE;
+		short unit_index;
+
+#line 1637 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+		assert(actor->meta.swarm_unit_count > 0);
+#line 1634 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+		match_vassert(
+			__FILE__,
+			__LINE__,
+			actor->meta.swarm_unit_index != NONE,
+			"actor->meta.swarm_unit_index != NONE");
+#line 970 "source\\ai\\actor_perception.c"
+
+		for (unit_index = 0; unit_index < swarm->unit_count; unit_index++)
+		{
+			struct actor_perception_swarm_component_view *component =
+				(struct actor_perception_swarm_component_view *)datum_get(
+					swarm_component_data,
+					swarm->component_indices[unit_index]);
+			real distance_squared =
+				distance_squared3d(&component->position, position);
+
+			if (distance_squared < best_distance_squared)
+			{
+				best_distance_squared = distance_squared;
+				best_unit_index = swarm->unit_indices[unit_index];
+			}
+		}
+
+#line 1651 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+		match_vassert(
+			__FILE__,
+			__LINE__,
+			best_unit_index != NONE,
+			"best_unit_index != NONE");
+#line 990 "source\\ai\\actor_perception.c"
+
+		actor_input_sample_position(
+			actor_index,
+			best_unit_index,
+			sense_position);
+	}
+	else
+	{
+		*sense_position = actor->input.position;
+	}
+
+	return;
 }
 
 boolean actor_emotion_flee_with_friends(
