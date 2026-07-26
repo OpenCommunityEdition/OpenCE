@@ -405,6 +405,15 @@ static void code_000aa3b0(
 	long player_index);
 static void code_000aa460(
 	long player_index);
+static void code_000aa4f0(
+	long player_index,
+	short powerup_type);
+static void code_000aa530(
+	long player_index,
+	short powerup_type);
+static void code_000aa560(
+	long player_index,
+	long powerup_type);
 static __declspec(noinline) void code_000ab350(
 	long player_index,
 	short action_result,
@@ -1902,6 +1911,15 @@ void debug_player_teleport(
 			&target_unit->object.bounding_sphere_center);
 	}
 
+	/* These dead calls intentionally keep VC7's private-ABI helper bodies
+	   emitted; their real call sites are manually inlined for exact codegen. */
+	if (0)
+	{
+		code_000aa4f0(0, 0);
+		code_000aa530(0, 0);
+		code_000aa560(0, 0);
+	}
+
 	return;
 }
 
@@ -2350,6 +2368,59 @@ static void code_000aa460(
 			player_effect_screen_flash(player_index, &screen_flash, 1.f);
 		}
 	}
+
+	return;
+}
+
+/* VC7 inlines this helper into player_handle_powerup_minor while retaining
+   the January-exact private body and register ABI. */
+static void code_000aa4f0(
+	long player_index,
+	short powerup_type)
+{
+	struct player_datum *player;
+	struct unit_datum *unit;
+
+	player = player_get(player_index);
+	unit = unit_get(player->unit_index);
+	if (powerup_type == 0)
+	{
+		SET_FLAG(unit->unit.flags, _unit_active_camouflaged_bit, TRUE);
+		unit->unit.cause_for_camo_regrowth = powerup_type;
+	}
+
+	return;
+}
+
+/* Exact-emission foundations: these private helpers match January when their
+   powerup-update callers are present. Unreferenced helpers are currently
+   elided by VC7. */
+static void code_000aa530(
+	long player_index,
+	short powerup_type)
+{
+	struct player_datum *player;
+	struct unit_datum *unit;
+
+	player = player_get(player_index);
+	unit = unit_get(player->unit_index);
+	if (powerup_type == 0)
+		SET_FLAG(unit->unit.flags, _unit_super_camouflaged_bit, TRUE);
+
+	return;
+}
+
+static void code_000aa560(
+	long player_index,
+	long powerup_type)
+{
+	struct player_datum *player;
+	struct unit_datum *unit;
+
+	player = player_get(player_index);
+	unit = unit_get(player->unit_index);
+	if ((short)powerup_type == 0)
+		SET_FLAG(unit->unit.flags, _unit_active_camouflaged_bit, FALSE);
 
 	return;
 }
