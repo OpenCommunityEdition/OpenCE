@@ -407,6 +407,13 @@ void hud_picked_up_powerup(
 void hud_picked_up_weapon(
 	short local_player_index,
 	long weapon_definition_index);
+void hud_picked_up_grenade(
+	short local_player_index,
+	long grenade_definition_index);
+void hud_picked_up_ammunition(
+	short local_player_index,
+	long weapon_definition_index,
+	short ammunition_count);
 void player_effect_screen_flash(
 	long player_index,
 	struct screen_flash_definition const *screen_flash,
@@ -420,6 +427,12 @@ boolean unit_add_equipment_to_inventory(
 	long unit_index,
 	long equipment_index,
 	boolean replace);
+boolean unit_add_grenade_to_inventory(
+	long unit_index,
+	long equipment_index);
+boolean unit_approve_weapon_swap(
+	long unit_index,
+	long weapon_index);
 boolean unit_can_enter_seat(
 	long unit_index,
 	long target_unit_index,
@@ -433,6 +446,11 @@ void ai_try_vehicle_eviction(
 	long actor_index,
 	long entering_unit_index,
 	boolean immediate);
+boolean weapon_handle_potential_inventory_item(
+	long inventory_item_index,
+	long weapon_index,
+	short local_player_index,
+	short *ammunition_count);
 void observer_obsolete_position(
 	short local_player_index);
 boolean biped_fix_position(
@@ -481,6 +499,12 @@ static boolean code_000ab440(
 static void code_000ac0b0(
 	long player_index,
 	long vehicle_index);
+static void code_000acb50(
+	long player_index,
+	long item_index);
+void code_000ac320(
+	long player_index,
+	long equipment_index);
 static void code_000abc90(
 	long player_index,
 	long source_unit_index,
@@ -2093,6 +2117,7 @@ void debug_player_teleport(
 		code_000aa560(0, 0);
 		code_000ab440(0);
 		code_000ac0b0(0, 0);
+		code_000acb50(0, 0);
 	}
 
 	return;
@@ -2818,6 +2843,179 @@ static void code_000ac0b0(
 			vehicle->unit.driver_object_index == NONE)
 		{
 			code_000ab350(player_index, 11, vehicle_index, NONE);
+		}
+	}
+
+	return;
+}
+
+static void code_000acb50(
+	long player_index,
+	long item_index)
+{
+	struct player_datum *player;
+	struct unit_datum *unit;
+	struct item_datum *item;
+	struct item_datum *equipment;
+	struct equipment_definition *equipment_definition;
+	struct equipment_definition *current_equipment_definition;
+	long current_equipment_index;
+
+	player = player_get(player_index);
+	unit = unit_get(player->unit_index);
+	item = item_get(item_index);
+	if (item->object.parent_object_index != NONE ||
+		item->item.ignore_object_index == player->unit_index)
+	{
+		return;
+	}
+
+	{
+		short inventory_index;
+		short ammunition_count;
+		long inventory_item_index;
+
+		for (inventory_index = 0;
+			inventory_index < MAXIMUM_WEAPONS_PER_UNIT;
+			inventory_index++)
+		{
+			inventory_item_index =
+				unit->unit.weapon_object_indices[inventory_index];
+			if (inventory_item_index != NONE &&
+				weapon_handle_potential_inventory_item(
+					inventory_item_index,
+					item_index,
+					player->local_player_index,
+					&ammunition_count))
+			{
+				if (ammunition_count > 0)
+				{
+					hud_picked_up_ammunition(
+						player->local_player_index,
+						weapon_get(inventory_item_index)->definition_index,
+						ammunition_count);
+				}
+				break;
+			}
+		}
+	}
+
+	equipment = equipment_try_and_get(item_index);
+	if (equipment)
+	{
+		equipment_definition = equipment_definition_get(equipment->definition_index);
+		if (equipment_definition->equipment.powerup_type == 6)
+		{
+			if (unit_add_grenade_to_inventory(player->unit_index, item_index))
+			{
+				hud_picked_up_grenade(
+					player->local_player_index,
+					equipment->definition_index);
+			}
+		}
+		else if (equipment_definition->equipment.powerup_type != 0)
+		{
+			current_equipment_index = unit_get_current_equipment(player->unit_index);
+			if (current_equipment_index == NONE)
+			{
+				code_000ac320(player_index, item_index);
+			}
+			else
+			{
+				/* Original bug: the current equipment is verified, but its
+				 * definition is not used. To fix this, pass
+				 * equipment_get(current_equipment_index)->definition_index to
+				 * equipment_definition_get below. */
+				equipment_get(current_equipment_index);
+				current_equipment_definition =
+					equipment_definition_get(equipment->definition_index);
+				if (equipment_definition->equipment.powerup_type !=
+					current_equipment_definition->equipment.powerup_type)
+				{
+					code_000ab350(player_index, 5, item_index, NONE);
+				}
+			}
+		}
+	}
+
+	{
+		struct weapon_datum *weapon;
+		struct weapon_datum *current_weapon;
+		struct weapon_definition *weapon_definition;
+		struct weapon_definition *current_weapon_definition;
+		long current_weapon_index;
+		long weapon_count;
+		long weapon_item_index;
+		boolean weapon_trigger_active;
+		boolean current_weapon_does_not_count;
+
+		weapon_item_index = item_index;
+		weapon = weapon_try_and_get(weapon_item_index);
+		if (!weapon || !unit_can_use_weapon(player->unit_index, weapon_item_index))
+		{
+			return;
+		}
+
+		weapon_definition = weapon_definition_get(weapon->definition_index);
+		weapon_trigger_active =
+			TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit) ||
+			TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_secondary_trigger_bit);
+		unit = unit_get(player->unit_index);
+		current_weapon_index = unit_inventory_get_weapon(
+			player->unit_index,
+			unit->unit.current_weapon_index);
+		weapon_count = unit_get_weapon_count(player->unit_index);
+		current_weapon_does_not_count = FALSE;
+		if (weapon_count >= 2 &&
+			current_weapon_index != NONE &&
+			!TEST_FLAG(
+				weapon_definition->weapon.flags,
+				_weapon_doesnt_count_toward_maximum_bit))
+		{
+			current_weapon = weapon_get(current_weapon_index);
+			current_weapon_definition =
+				weapon_definition_get(current_weapon->definition_index);
+			if (TEST_FLAG(
+				current_weapon_definition->weapon.flags,
+				_weapon_doesnt_count_toward_maximum_bit))
+			{
+				current_weapon_does_not_count = TRUE;
+			}
+		}
+
+		if (weapon_trigger_active &&
+			TEST_FLAG(weapon_definition->weapon.flags, _weapon_must_be_readied_bit))
+		{
+			return;
+		}
+
+		if (unit_should_autopick_weapon(player->unit_index, weapon_item_index))
+		{
+			if (unit_add_weapon_to_inventory(
+				player->unit_index,
+				weapon_item_index,
+				TRUE))
+			{
+				hud_picked_up_weapon(
+					player->local_player_index,
+					weapon_get(weapon_item_index)->definition_index);
+				player_control_unzoom(player->unit_index);
+			}
+		}
+		else if (!current_weapon_does_not_count &&
+			unit_approve_weapon_swap(player->unit_index, weapon_item_index))
+		{
+			current_weapon = weapon_try_and_get(current_weapon_index);
+			if (*(volatile long *)&weapon_count == 1 &&
+				current_weapon &&
+				current_weapon->definition_index != weapon->definition_index)
+			{
+				code_000ab350(player_index, 7, weapon_item_index, NONE);
+			}
+			else
+			{
+				code_000ab350(player_index, 6, weapon_item_index, NONE);
+			}
 		}
 	}
 
