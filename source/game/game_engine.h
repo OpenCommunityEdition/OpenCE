@@ -31,6 +31,7 @@ enum
 /* ---------- structures */
 
 struct game_globals;
+struct player_starting_location;
 union real_argb_color;
 union real_point2d;
 union real_point3d;
@@ -110,7 +111,10 @@ struct game_engine
 		long damaging_player_index,
 		long dead_player_index,
 		long damage_type);
-	void (*unknown60[3])(void);
+	void (*unknown60[2])(void);
+	float (*starting_location_rating)(
+		long player_index,
+		struct player_starting_location const *starting_location);
 	void (*prespawn_player_update)(
 		long player_index);
 	void (*unknown70)(void);

@@ -597,6 +597,15 @@ struct game_engine_stage
 	struct game_variant variant;
 };
 
+struct player_starting_location
+{
+	real_point3d position;
+	real facing;
+	short team_index;
+	word pad12;
+	short game_types[4];
+};
+
 struct postgame_statistic_entry
 {
 	long values[7];
@@ -619,6 +628,8 @@ typedef char verify_game_engine_stage_variant_offset[
 	offsetof(struct game_engine_stage, variant) == 0x40 ? 1 : -1];
 typedef char verify_game_engine_stage_size[
 	sizeof(struct game_engine_stage) == 0xA8 ? 1 : -1];
+typedef char verify_player_starting_location_game_types_offset[
+	offsetof(struct player_starting_location, game_types) == 0x14 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -835,6 +846,138 @@ static boolean code_00097840(
 	}
 
 	return result;
+}
+
+static boolean code_00097570(
+	long player_index,
+	struct player_starting_location const *starting_location)
+{
+	struct location location;
+	long object_indices[16];
+	short object_count;
+	short object_index;
+
+	player_get(player_index);
+	scenario_location_from_point(&location, &starting_location->position);
+	object_count = objects_in_sphere(
+		0,
+		0x11F,
+		&location,
+		&starting_location->position,
+		0.1f,
+		object_indices,
+		NUMBEROF(object_indices));
+
+	for (object_index = 0; object_index < object_count; object_index++)
+	{
+		struct object_datum *object = object_get(object_indices[object_index]);
+
+		match_assert(
+			"c:\\halo\\SOURCE\\game\\game_engine.c",
+			0xEE9,
+			object);
+
+		if (object->object.type == _object_type_vehicle)
+		{
+			struct vehicle_datum *vehicle =
+				(struct vehicle_datum *)object_get_and_verify_type(
+					object_indices[object_index],
+					_object_mask_vehicle);
+
+			match_assert(
+				"c:\\halo\\SOURCE\\game\\game_engine.c",
+				0xEEE,
+				vehicle);
+
+			if (vehicle)
+				return TRUE;
+
+			return FALSE;
+		}
+	}
+
+	return FALSE;
+}
+
+static real code_0009c340(
+	long player_index,
+	real_point3d const *position)
+{
+	struct player_datum *player = player_get(player_index);
+	struct data_iterator iterator;
+	struct player_datum *other_player;
+	real rating = 0.0f;
+
+	data_iterator_new(&iterator, player_data);
+	other_player = (struct player_datum *)data_iterator_next(&iterator);
+	while (other_player)
+	{
+		if (player->team_index == other_player->team_index &&
+			other_player->unit_index != NONE)
+		{
+			real_point3d origin;
+			real distance;
+
+			object_get_origin(other_player->unit_index, &origin);
+			distance = distance3d(&origin, position);
+			if (distance >= 1.0f && distance <= 6.0f)
+			{
+				rating += (real)pow(
+					(double)(1.0f - (distance - 1.0f) * 0.2f),
+					(double)0.6f);
+			}
+		}
+
+		other_player = (struct player_datum *)data_iterator_next(&iterator);
+	}
+
+	if (rating > 3.0f)
+		rating = 3.0f;
+
+	return rating * 3.0f + 1.0f;
+}
+
+/*
+ * NonMatching: this source is retained with its caller because VC7 otherwise
+ * removes the two exact private helpers above.  The remaining binary delta is
+ * an EBX/EDI allocation mirror; relocation count, order, and destinations
+ * already agree with the January object.
+ */
+static real code_0009c460(
+	struct player_starting_location const *starting_location,
+	long player_index)
+{
+	struct player_datum *player = player_get(player_index);
+	real rating;
+
+	if (game_engine &&
+		game_engine->test_flag &&
+		game_engine->test_flag(0) &&
+		player->team_index != starting_location->team_index)
+	{
+		rating = 0.0f;
+	}
+	else
+	{
+		rating = game_engine_get_distance_rating_for_spawn(
+			player_index,
+			&starting_location->position);
+	}
+
+	if (game_engine)
+	{
+		if (rating > 0.0f && global_variant.has_teams)
+			rating *= code_0009c340(player_index, &starting_location->position);
+
+		if (game_engine && game_engine->starting_location_rating)
+		{
+			rating *= game_engine->starting_location_rating(
+				player_index,
+				starting_location);
+		}
+	}
+
+	return rating;
 }
 
 static boolean code_00099880(
@@ -2383,6 +2526,25 @@ real game_engine_get_distance_rating_for_spawn(
 	}
 
 	return rating;
+}
+
+real game_engine_get_starting_location_rating(
+	long player_index,
+	struct player_starting_location const *starting_location)
+{
+	/* NonMatching with the same EBX/EDI mirror as code_0009c460. */
+	long game_type = NONE;
+
+	if (game_engine)
+		game_type = game_engine->type;
+
+	if (!match_game_type(game_type, 4, starting_location->game_types))
+		return 0.0f;
+
+	if (code_00097570(player_index, starting_location))
+		return 0.0f;
+
+	return code_0009c460(starting_location, player_index);
 }
 
 long game_engine_remap_vehicle(
