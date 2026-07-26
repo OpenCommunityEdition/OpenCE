@@ -32,6 +32,8 @@ enum
 
 struct game_globals;
 union real_argb_color;
+union real_point3d;
+union real_rgb_color;
 
 struct game_variant
 {
@@ -244,6 +246,15 @@ struct game_variant *game_engine_get_variant_by_name(
 boolean game_engine_get_goal_in_use(
 	short goal_index);
 
+void game_engine_set_goal_position(
+	short goal_index,
+	union real_point3d const *position,
+	float height,
+	char const *name,
+	long target_object_index,
+	short team_index,
+	long player_index);
+
 boolean game_engine_has_teams(
 	void);
 
@@ -266,6 +277,10 @@ boolean game_engine_hud_draw_motion_sensor(
 	void);
 
 boolean game_engine_player_has_stealth_weapon(
+	long player_index);
+
+union real_rgb_color *game_engine_player_get_change_color(
+	union real_rgb_color *change_color,
 	long player_index);
 
 long find_netgame_flags(

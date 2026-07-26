@@ -548,6 +548,7 @@ symbols in this file:
 #include "networking/network_game_globals.h"
 #include "objects.h"
 #include "players.h"
+#include "saved games/player_profile.h"
 #include "scenario/scenario.h"
 #include "text/unicode.h"
 #include "units/units.h"
@@ -567,7 +568,13 @@ struct game_engine_goal
 {
 	real_point3d position;
 	boolean in_use;
-	byte unused[0x13];
+	byte padD[3];
+	long target_object_index;
+	short team_index;
+	short pad16;
+	long player_index;
+	short nav_point_index;
+	byte pad1E[2];
 };
 
 struct game_engine_globals
@@ -643,6 +650,9 @@ void game_engine_post_rasterize_post_game(
 boolean team_has_players(
 	long team_index);
 
+short find_nav_point(
+	char const *name);
+
 static struct postgame_statistic_entry *code_0009a3b0(
 	struct postgame_statistic_entry *entry,
 	long player_index);
@@ -684,6 +694,7 @@ struct game_variant *build_game_variant_team_king(
 /* ---------- globals */
 
 struct game_engine *game_engine;
+short debug_player_color = NONE;
 
 extern struct game_engine_goal global_goal[32];
 extern struct game_variant global_variant;
@@ -1736,6 +1747,26 @@ boolean game_engine_get_goal_in_use(
 	return global_goal[goal_index].in_use;
 }
 
+void game_engine_set_goal_position(
+	short goal_index,
+	real_point3d const *position,
+	real height,
+	char const *name,
+	long target_object_index,
+	short team_index,
+	long player_index)
+{
+	global_goal[goal_index].player_index = player_index;
+	global_goal[goal_index].nav_point_index = find_nav_point(name);
+	global_goal[goal_index].in_use = TRUE;
+	global_goal[goal_index].position = *position;
+	global_goal[goal_index].team_index = team_index;
+	global_goal[goal_index].position.z += height + 0.63f;
+	global_goal[goal_index].target_object_index = target_object_index;
+
+	return;
+}
+
 /*
  * game_engine_get_goal_position (January 0x00097A30, 0x60 bytes) is deferred.
  * It reconstructs to the correct 96 bytes and 6 relocations with
@@ -1779,6 +1810,36 @@ boolean game_engine_get_goal_in_use(
  * tail-merges/compacts it to 96 bytes with ESI -- the same "our compiler
  * optimises more" tie as atmospheric_fog. Needs schedule steering; revisit.
  */
+
+real_rgb_color *game_engine_player_get_change_color(
+	real_rgb_color *change_color,
+	long player_index)
+{
+	struct player_datum *player = player_get(player_index);
+	real_rgb_color result;
+	real_rgb_color profile_color;
+
+	if (global_variant.has_teams)
+	{
+		if (player->team_index == 0)
+			result = *global_real_rgb_red;
+		else
+			result = *global_real_rgb_blue;
+	}
+	else
+	{
+		long color_index = player->network_player_data.primary_color_index;
+
+		if (debug_player_color != NONE)
+			color_index = debug_player_color;
+
+		result = *player_profile_get_rgb_color(&profile_color, color_index);
+	}
+
+	*change_color = result;
+
+	return change_color;
+}
 
 boolean game_engine_has_teams(
 	void)
