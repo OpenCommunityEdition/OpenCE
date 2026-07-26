@@ -152,6 +152,9 @@ boolean game_engine_get_current_stage(
 long list_index_to_weapon_definition_index(
 	long weapon_list_index);
 
+long weapon_definition_index_to_list_index(
+	long weapon_definition_index);
+
 void game_engine_state_message(
 	long player_index,
 	long state_message,

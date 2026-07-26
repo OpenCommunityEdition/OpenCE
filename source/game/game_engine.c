@@ -1210,6 +1210,37 @@ long list_index_to_weapon_definition_index(
 	return weapon_definition_index;
 }
 
+long weapon_definition_index_to_list_index(
+	long weapon_definition_index)
+{
+	struct game_globals *game_globals = scenario_get_game_globals();
+	struct tag_reference *weapon;
+	long result;
+	long weapon_list_index;
+
+	if (game_globals->weapon_list.count)
+		weapon = TAG_BLOCK_GET_ELEMENT(
+			&game_globals->weapon_list,
+			0,
+			struct tag_reference);
+	else
+		weapon = NULL;
+
+	result = NONE;
+	for (weapon_list_index = 0;
+		weapon_list_index < game_globals->weapon_list.count;
+		weapon_list_index++, weapon++)
+	{
+		if (weapon_definition_index == weapon->index)
+		{
+			result = weapon_list_index;
+			break;
+		}
+	}
+
+	return result;
+}
+
 void game_engine_state_message(
 	long player_index,
 	long state_message,
