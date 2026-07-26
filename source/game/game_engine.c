@@ -2172,6 +2172,79 @@ real game_engine_get_distance_rating_for_spawn(
 	return rating;
 }
 
+long game_engine_remap_vehicle(
+	long vehicle_definition_index)
+{
+	long result = vehicle_definition_index;
+
+	if (game_engine)
+	{
+		struct game_globals *game_globals;
+		struct game_globals_multiplayer_information *multiplayer_information;
+		struct tag_block *vehicles;
+		struct game_globals_vehicle *vehicle0;
+		struct game_globals_vehicle *vehicle1;
+		struct game_globals_vehicle *vehicle2;
+		struct game_globals_vehicle *vehicle;
+
+		game_globals = scenario_get_game_globals();
+		multiplayer_information = TAG_BLOCK_GET_ELEMENT(
+			&game_globals->multiplayer_information,
+			0,
+			struct game_globals_multiplayer_information);
+		vehicle0 = TAG_BLOCK_GET_ELEMENT(
+			&multiplayer_information->vehicles,
+			0,
+			struct game_globals_vehicle);
+		vehicles = &multiplayer_information->vehicles;
+		vehicle1 = TAG_BLOCK_GET_ELEMENT(vehicles, 1, struct game_globals_vehicle);
+		vehicle2 = TAG_BLOCK_GET_ELEMENT(vehicles, 2, struct game_globals_vehicle);
+
+		if (result != vehicle0->vehicle.index &&
+			result != vehicle1->vehicle.index &&
+			result != vehicle2->vehicle.index)
+		{
+			result = NONE;
+		}
+
+		switch (global_variant.unknown48)
+		{
+		case 1:
+			result = NONE;
+			break;
+
+		case 2:
+			vehicle = TAG_BLOCK_GET_ELEMENT(
+				vehicles,
+				0,
+				struct game_globals_vehicle);
+			if (vehicle->vehicle.index != result)
+				result = NONE;
+			break;
+
+		case 3:
+			vehicle = TAG_BLOCK_GET_ELEMENT(
+				vehicles,
+				1,
+				struct game_globals_vehicle);
+			if (vehicle->vehicle.index != result)
+				result = NONE;
+			break;
+
+		case 4:
+			vehicle = TAG_BLOCK_GET_ELEMENT(
+				vehicles,
+				2,
+				struct game_globals_vehicle);
+			if (vehicle->vehicle.index != result)
+				result = NONE;
+			break;
+		}
+	}
+
+	return result;
+}
+
 long game_engine_remap_object_definition(
 	long definition_index)
 {
