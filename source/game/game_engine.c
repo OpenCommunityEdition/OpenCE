@@ -542,19 +542,23 @@ symbols in this file:
 #include "game_engine.h"
 
 #include "game_globals.h"
+#include "interface/interface.h"
 #include "interface/ui_widget.h"
 #include "input/input.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
 #include "main/main.h"
+#include "math/integer_math.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_server_manager.h"
 #include "objects.h"
 #include "player_rumble.h"
 #include "players.h"
+#include "render/render.h"
 #include "saved games/player_profile.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#include "text/draw_string.h"
 #include "text/text_group.h"
 #include "text/unicode.h"
 #include "units/units.h"
@@ -699,6 +703,13 @@ void game_engine_intialize_queued_sounds(
 void game_engine_post_rasterize_post_game(
 	void);
 
+void rasterizer_draw_unicode_string(
+	rectangle2d const *bounds,
+	short parameter1,
+	short parameter2,
+	short parameter3,
+	wchar_t const *string);
+
 boolean team_has_players(
 	long team_index);
 
@@ -759,6 +770,7 @@ extern struct game_engine_globals game_engine_globals;
 extern struct game_engine_stage global_stage;
 extern struct game_engine *game_engines[];
 extern long timeout_for_endgame_sound;
+extern byte *hud_globals;
 
 /* ---------- public code */
 
@@ -1298,6 +1310,50 @@ float get_blink_alpha(
 	long phase = system_milliseconds()%2700;
 
 	return sin(phase * (3.14159265358979/2700.0));
+}
+
+void game_engine_rasterize_message(
+	wchar_t const *message,
+	real alpha)
+{
+	rectangle2d bounds;
+	real_argb_color color;
+	long font_index;
+	long terminal_font_index;
+
+	if (local_player_count())
+		font_index = *(long *)(hud_globals + 0x64);
+	else
+		font_index = *(long *)(hud_globals + 0x54);
+
+	bounds = render.camera.window_bounds;
+
+	terminal_font_index = interface_get_tag_index(_interface_font_terminal);
+	draw_string_set_draw_mode(
+		terminal_font_index,
+		NONE,
+		0,
+		0,
+		global_real_argb_white);
+
+	color.alpha = alpha;
+	color.red = 0.45882353f;
+	color.green = 0.7294118f;
+	color.blue = 1.0f;
+
+	offset_rectangle2d(
+		&bounds,
+		-render.camera.viewport_bounds.x0,
+		-render.camera.viewport_bounds.y0);
+
+	bounds.y1 = (short)((5 * bounds.y0 + bounds.y1) / 6 + 9);
+	bounds.y0 = bounds.y1 - 15;
+
+	draw_string_set_draw_mode(font_index, NONE, 2, 8, &color);
+	draw_string_set_color(&color);
+	rasterizer_draw_unicode_string(&bounds, 0, 0, 0, message);
+	draw_string_set_format(NONE, 0, 0);
+	draw_string_set_tab_stops(NULL, 0);
 }
 
 long game_engine_player_get_team_index(
