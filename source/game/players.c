@@ -231,11 +231,16 @@ symbols in this file:
 #include "ai/ai_debug.h"
 #include "ai/ai_scenario_definitions.h"
 #include "data.h"
+#include "effects/player_effects.h"
 #include "game.h"
 #include "game_engine.h"
 #include "input.h"
+#include "interface/hud.h"
+#include "items/equipment.h"
+#include "items/equipment_definitions.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
+#include "objects/damage.h"
 #include "real_math.h"
 #include "players.h"
 #include "player_control.h"
@@ -249,6 +254,15 @@ symbols in this file:
 #include "units/vehicle_definitions.h"
 
 /* ---------- constants */
+
+enum equipment_powerup_type
+{
+	_equipment_powerup_double_speed = 1,
+	_equipment_powerup_overshield,
+	_equipment_powerup_active_camouflage,
+	_equipment_powerup_full_spectrum_vision,
+	_equipment_powerup_health
+};
 
 /* ---------- macros */
 
@@ -278,6 +292,30 @@ struct scenario_player_starting_location
 	byte unused[0x20];
 };
 
+struct player_screen_flash_parameters
+{
+	short type;
+	word pad;
+	real maximum_intensity;
+	real red;
+	real green;
+	real duration;
+};
+
+struct screen_flash_definition
+{
+	short type;
+	short priority;
+	unsigned long unused1[3];
+	real duration;
+	short fade_function;
+	word pad;
+	unsigned long unused2[2];
+	real max_intensity;
+	real zero_scale_factor;
+	real_argb_color screen_flash_color;
+};
+
 /* ---------- prototypes */
 
 void hud_fix_unit_data(
@@ -297,6 +335,22 @@ boolean code_000aa9e0(
 	real_point3d const *position);
 void unit_exit_seat_end(
 	long unit_index);
+void hud_picked_up_powerup(
+	short local_player_index,
+	long powerup_definition_index);
+void player_effect_screen_flash(
+	long player_index,
+	struct screen_flash_definition const *screen_flash,
+	real scale);
+boolean object_double_charge_shield(
+	long object_index);
+
+static void code_000aa300(
+	long player_index);
+static void code_000aa3b0(
+	long player_index);
+static void code_000aa460(
+	long player_index);
 
 /* ---------- globals */
 
@@ -304,6 +358,14 @@ struct data_array *player_data;
 extern struct data_array *team_data;
 extern long bss_00453408[][MAXIMUM_LOCAL_PLAYERS];
 extern short player_spawn_count;
+extern byte data_002dee08[];
+
+#define PLAYER_SCREEN_FLASH_PARAMETERS(offset) \
+	((struct player_screen_flash_parameters *)(data_002dee08 + (offset)))
+#define PLAYER_SCREEN_FLASH_FADE_FUNCTION(offset) \
+	(*(short *)((byte *)bss_00453408 + (offset)))
+#define PLAYER_SCREEN_FLASH_COLOR(offset) \
+	(*(real *)((byte *)bss_00453408 + (offset)))
 
 /* ---------- public code */
 
@@ -1121,6 +1183,233 @@ long code_000aa160(
 void code_000aa180(
 	void)
 {
+	return;
+}
+
+boolean player_handle_powerup(
+	long player_index,
+	short powerup_type,
+	short duration)
+{
+	struct player_datum *player;
+	long powerup_index;
+	struct unit_datum *unit;
+
+	player = player_get(player_index);
+	match_assert("c:\\halo\\SOURCE\\game\\players.c", 0xAEE,
+		powerup_type>=0 && powerup_type<NUMBER_OF_PLAYER_POWERUPS);
+
+	if (powerup_type == 0)
+	{
+		long unit_index = player->unit_index;
+
+		unit = unit_get(unit_index);
+		if (TEST_FLAG(unit->unit.flags, _unit_active_camouflaged_bit))
+			return FALSE;
+	}
+
+	powerup_index = powerup_type;
+	if (player->powerup_durations[powerup_index] == 0)
+	{
+		struct player_datum *powerup_player;
+
+		powerup_player = player_get(player_index);
+		unit = unit_get(powerup_player->unit_index);
+		if (powerup_index == 0)
+		{
+			SET_FLAG(unit->unit.flags, _unit_active_camouflaged_bit, TRUE);
+			unit->unit.cause_for_camo_regrowth = (short)powerup_index;
+		}
+	}
+	else if (!game_engine_running())
+	{
+		struct player_datum *powerup_player;
+
+		powerup_player = player_get(player_index);
+		unit = unit_get(powerup_player->unit_index);
+		if (powerup_index == 0)
+			SET_FLAG(unit->unit.flags, _unit_super_camouflaged_bit, TRUE);
+	}
+
+	player->powerup_durations[powerup_index] += duration;
+
+	return TRUE;
+}
+
+static void code_000aa300(
+	long player_index)
+{
+	struct player_datum *player;
+
+	if (player_index != NONE)
+	{
+		player = player_get(player_index);
+		if (player->local_player_index != NONE)
+		{
+			struct screen_flash_definition screen_flash = { 0 };
+
+			screen_flash.fade_function =
+				PLAYER_SCREEN_FLASH_FADE_FUNCTION(0x44);
+			screen_flash.type =
+				PLAYER_SCREEN_FLASH_PARAMETERS(0xBF0)->type;
+			screen_flash.priority = 2;
+			screen_flash.duration =
+				PLAYER_SCREEN_FLASH_PARAMETERS(0xBF0)->duration;
+			screen_flash.max_intensity =
+				PLAYER_SCREEN_FLASH_PARAMETERS(0xBF0)->maximum_intensity;
+			screen_flash.zero_scale_factor = 0.f;
+			screen_flash.screen_flash_color.alpha =
+				PLAYER_SCREEN_FLASH_COLOR(0x48);
+			screen_flash.screen_flash_color.red =
+				PLAYER_SCREEN_FLASH_PARAMETERS(0xBF0)->red;
+			screen_flash.screen_flash_color.green =
+				PLAYER_SCREEN_FLASH_COLOR(0x4C);
+			screen_flash.screen_flash_color.blue =
+				PLAYER_SCREEN_FLASH_PARAMETERS(0xBF0)->green;
+			player_effect_screen_flash(player_index, &screen_flash, 1.f);
+		}
+	}
+
+	return;
+}
+
+static void code_000aa3b0(
+	long player_index)
+{
+	struct player_datum *player;
+
+	if (player_index != NONE)
+	{
+		player = player_get(player_index);
+		if (player->local_player_index != NONE)
+		{
+			struct screen_flash_definition screen_flash = { 0 };
+
+			screen_flash.fade_function =
+				PLAYER_SCREEN_FLASH_FADE_FUNCTION(0x50);
+			screen_flash.type =
+				PLAYER_SCREEN_FLASH_PARAMETERS(0xC04)->type;
+			screen_flash.priority = 2;
+			screen_flash.duration =
+				PLAYER_SCREEN_FLASH_PARAMETERS(0xC04)->duration;
+			screen_flash.max_intensity =
+				PLAYER_SCREEN_FLASH_PARAMETERS(0xC04)->maximum_intensity;
+			screen_flash.zero_scale_factor = 0.f;
+			screen_flash.screen_flash_color.alpha =
+				PLAYER_SCREEN_FLASH_COLOR(0x54);
+			screen_flash.screen_flash_color.red =
+				PLAYER_SCREEN_FLASH_PARAMETERS(0xC04)->red;
+			screen_flash.screen_flash_color.green =
+				PLAYER_SCREEN_FLASH_PARAMETERS(0xC04)->green;
+			screen_flash.screen_flash_color.blue =
+				PLAYER_SCREEN_FLASH_COLOR(0x58);
+			player_effect_screen_flash(player_index, &screen_flash, 1.f);
+		}
+	}
+
+	return;
+}
+
+static void code_000aa460(
+	long player_index)
+{
+	struct player_datum *player;
+
+	if (player_index != NONE)
+	{
+		player = player_get(player_index);
+		if (player->local_player_index != NONE)
+		{
+			struct screen_flash_definition screen_flash = { 0 };
+
+			screen_flash.fade_function = 1;
+			screen_flash.type = 6;
+			screen_flash.priority = 2;
+			screen_flash.duration = 2.f;
+			screen_flash.max_intensity = 0.5f;
+			screen_flash.zero_scale_factor = 0.f;
+			screen_flash.screen_flash_color.alpha = 1.f;
+			screen_flash.screen_flash_color.red = 0.917647f;
+			screen_flash.screen_flash_color.green = 0.917647f;
+			screen_flash.screen_flash_color.blue = 0.917647f;
+			player_effect_screen_flash(player_index, &screen_flash, 1.f);
+		}
+	}
+
+	return;
+}
+
+void code_000ac320(
+	long player_index,
+	long equipment_index)
+{
+	struct player_datum *player;
+	struct item_datum *equipment;
+	struct equipment_definition *equipment_definition;
+	short powerup_type;
+	short duration;
+	long powerup_index;
+
+	player = player_get(player_index);
+	equipment = equipment_get(equipment_index);
+	equipment_definition = equipment_definition_get(equipment->definition_index);
+	duration = (short)(equipment_definition->equipment.powerup_time * 30.f);
+	if (duration <= 0)
+		return;
+
+	powerup_type = equipment_definition->equipment.powerup_type;
+	if (powerup_type == _equipment_powerup_double_speed)
+	{
+		players_globals->double_speed_ticks += duration;
+		game_set_players_are_double_speed(TRUE);
+	}
+	else if (powerup_type == _equipment_powerup_overshield)
+	{
+		if (!object_double_charge_shield(player->unit_index))
+			return;
+		code_000aa300(player_index);
+	}
+	else if (powerup_type == _equipment_powerup_health)
+	{
+		if (!object_restore_body(player->unit_index))
+			return;
+		code_000aa460(player_index);
+	}
+	else
+	{
+		switch (powerup_type)
+		{
+		case _equipment_powerup_active_camouflage:
+			powerup_index = 0;
+			break;
+
+		case _equipment_powerup_full_spectrum_vision:
+			powerup_index = 1;
+			break;
+
+		default:
+			display_assert(
+				NULL,
+				"c:\\halo\\SOURCE\\game\\players.c",
+				0xACB,
+				TRUE);
+			system_exit(-1);
+		}
+
+		if (!player_handle_powerup(player_index, (short)powerup_index, duration))
+			return;
+		if ((short)powerup_index == 0)
+			code_000aa3b0(player_index);
+	}
+
+	equipment = equipment_get(equipment_index);
+	hud_picked_up_powerup(
+		(unsigned short)player->local_player_index,
+		equipment->definition_index);
+	if (player->local_player_index != NONE)
+		equipment_handle_pickup(equipment_index);
+	object_delete(equipment_index);
+
 	return;
 }
 
