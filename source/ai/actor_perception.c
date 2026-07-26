@@ -251,6 +251,7 @@ symbols in this file:
 
 #include "actor_definitions.h"
 #include "actors.h"
+#include "encounters.h"
 #include "props.h"
 #include "units/units.h"
 
@@ -269,9 +270,15 @@ struct actor_perception_actor_view
 {
 	byte __unknown000[4];
 	short team_index;
-	byte __unknown006[0x12];
+	byte __unknown006[2];
+	boolean active;
+	byte __unknown009[0xA];
+	boolean dormant;
+	byte __unknown014[4];
 	long unit_index;
-	byte __unknown01C[0x4E];
+	byte __unknown01C[0x18];
+	long encounter_index;
+	byte __unknown038[0x32];
 	short combat_status;
 	short friend_state;
 	short artificial_combat_status;
@@ -279,7 +286,9 @@ struct actor_perception_actor_view
 	short friend_fighting_count;
 	byte __unknown0AA[0xB7];
 	boolean flying;
-	byte __unknown162[0x8B];
+	byte __unknown162[0x6A];
+	boolean corpse_interest_inhibited;
+	byte __unknown1CD[0x20];
 	boolean searching;
 	byte __unknown1EE[0x14];
 	boolean vehicle_passenger;
@@ -292,7 +301,9 @@ struct actor_perception_actor_view
 	boolean target_outside_active_area;
 	byte __unknown27D[0x8B];
 	short active_threat_count;
-	byte __unknown30A[0x9E];
+	byte __unknown30A[0x96];
+	long corpse_ignore_time;
+	byte __unknown3A4[4];
 	short unopposable_retreat_timer;
 	byte __unknown3AA[2];
 	long unopposable_retreat_prop_index;
@@ -346,6 +357,17 @@ struct actor_perception_prop_view
 	boolean preferred_target;
 };
 
+struct actor_perception_encounter_view
+{
+	byte __unknown000[0x42];
+	boolean blind;
+	byte __unknown043[1];
+	boolean stand_down;
+	boolean enemy_target;
+	byte __unknown046[0x12];
+	long corpse_ignore_time;
+};
+
 struct actor_perception_swarm_component_view
 {
 	short identifier;
@@ -355,6 +377,16 @@ struct actor_perception_swarm_component_view
 
 typedef char actor_perception_actor_view_target_prop_index_offset_assert[
 	offsetof(struct actor_perception_actor_view, target_prop_index) == 0x270 ? 1 : -1];
+typedef char actor_perception_actor_view_active_offset_assert[
+	offsetof(struct actor_perception_actor_view, active) == 0x8 ? 1 : -1];
+typedef char actor_perception_actor_view_dormant_offset_assert[
+	offsetof(struct actor_perception_actor_view, dormant) == 0x13 ? 1 : -1];
+typedef char actor_perception_actor_view_encounter_index_offset_assert[
+	offsetof(struct actor_perception_actor_view, encounter_index) == 0x34 ? 1 : -1];
+typedef char actor_perception_actor_view_corpse_interest_inhibited_offset_assert[
+	offsetof(struct actor_perception_actor_view, corpse_interest_inhibited) == 0x1CC ? 1 : -1];
+typedef char actor_perception_actor_view_corpse_ignore_time_offset_assert[
+	offsetof(struct actor_perception_actor_view, corpse_ignore_time) == 0x3A0 ? 1 : -1];
 typedef char actor_perception_prop_view_unopposable_enemy_offset_assert[
 	offsetof(struct actor_perception_prop_view, unopposable_enemy) == 0xA4 ? 1 : -1];
 typedef char actor_perception_actor_view_active_threat_count_offset_assert[
@@ -363,11 +395,30 @@ typedef char actor_perception_prop_view_fleeing_offset_assert[
 	offsetof(struct actor_perception_prop_view, fleeing) == 0x12C ? 1 : -1];
 typedef char actor_perception_swarm_component_position_offset_assert[
 	offsetof(struct actor_perception_swarm_component_view, position) == 4 ? 1 : -1];
+typedef char actor_perception_encounter_view_blind_offset_assert[
+	offsetof(struct actor_perception_encounter_view, blind) == 0x42 ? 1 : -1];
+typedef char actor_perception_encounter_view_stand_down_offset_assert[
+	offsetof(struct actor_perception_encounter_view, stand_down) == 0x44 ? 1 : -1];
+typedef char actor_perception_encounter_view_enemy_target_offset_assert[
+	offsetof(struct actor_perception_encounter_view, enemy_target) == 0x45 ? 1 : -1];
+typedef char actor_perception_encounter_view_corpse_ignore_time_offset_assert[
+	offsetof(struct actor_perception_encounter_view, corpse_ignore_time) == 0x58 ? 1 : -1];
 
 union actor_perception_boolean_slot
 {
 	boolean value;
 	long storage;
+};
+
+union actor_perception_prop_actor_slot
+{
+	long actor_index;
+
+	struct
+	{
+		byte padding[3];
+		boolean too_far;
+	};
 };
 
 /*
@@ -390,6 +441,9 @@ void actor_situation_update_target_status(
 	long actor_index);
 
 void actor_situation_combat_status_update(
+	long actor_index);
+
+short actor_action_class(
 	long actor_index);
 
 real actor_compute_prop_target_weight(
@@ -446,6 +500,149 @@ static __inline boolean prop_acknowledged(
 /* ---------- globals */
 
 /* ---------- public code */
+
+boolean actor_perception_desire_prop(
+	long actor_index,
+	short prop_type,
+	long unit_index,
+	union actor_perception_prop_actor_slot prop_actor,
+	boolean in_use,
+	boolean player,
+	boolean enemy,
+	boolean dead,
+	short dead_ticks,
+	real suicide_radius,
+	real distance_squared,
+	short required_ticks,
+	boolean *too_far_reference)
+{
+	struct actor_perception_actor_view *actor =
+		(struct actor_perception_actor_view *)actor_get(actor_index);
+	struct actor_perception_actor_view *related_actor;
+	boolean desire = dead;
+
+	if (prop_actor.actor_index == NONE)
+		related_actor = NULL;
+	else
+		related_actor =
+			(struct actor_perception_actor_view *)actor_get(
+				prop_actor.actor_index);
+
+	prop_actor.too_far = FALSE;
+
+	if ((!enemy || dead) && prop_type >= 4 && prop_type <= 5)
+	{
+		desire = FALSE;
+	}
+	else if (player)
+	{
+		desire = TRUE;
+	}
+	else if (related_actor &&
+		(!related_actor->active || related_actor->dormant))
+	{
+		desire = FALSE;
+	}
+	else if (prop_type == NONE && (in_use || required_ticks > 0))
+	{
+		desire = TRUE;
+	}
+	else if (distance_squared > 1600.0f)
+	{
+		desire = FALSE;
+	}
+	else if (dead)
+	{
+		desire = TRUE;
+
+		if (actor->encounter_index != NONE)
+		{
+			struct actor_perception_encounter_view *encounter =
+				(struct actor_perception_encounter_view *)
+					encounter_get(actor->encounter_index);
+			struct unit_datum *unit = unit_get(unit_index);
+			long ignore_time = encounter->corpse_ignore_time;
+			boolean inactive_encounter;
+
+			if (ignore_time <= actor->corpse_ignore_time)
+				ignore_time = actor->corpse_ignore_time;
+
+			if (ignore_time != NONE &&
+				(unit->unit.time_of_death == NONE ||
+					unit->unit.time_of_death < ignore_time))
+			{
+				desire = FALSE;
+			}
+
+			inactive_encounter =
+				!encounter->enemy_target &&
+				!encounter->stand_down &&
+				!encounter->blind;
+
+			if (!desire)
+				goto done;
+
+			if (inactive_encounter)
+			{
+				if (distance_squared < 225.0f)
+				{
+					desire = TRUE;
+					goto done;
+				}
+
+				desire = FALSE;
+				goto done;
+			}
+		}
+
+		if (suicide_radius > 0.0f)
+		{
+			desire = TRUE;
+		}
+		else if (enemy && dead_ticks > 150)
+		{
+			desire = FALSE;
+		}
+		else if (actor_action_class(actor_index) > 1)
+		{
+			desire = FALSE;
+		}
+		else
+		{
+			real maximum_distance_squared = 16.0f;
+
+			if (!enemy && actor->combat_status < 3)
+				maximum_distance_squared = 64.0f;
+
+			desire = distance_squared < maximum_distance_squared;
+		}
+	}
+	else
+	{
+		if (enemy)
+		{
+			desire = TRUE;
+			prop_actor.too_far = distance_squared > 36.0f;
+		}
+		else
+		{
+			desire = distance_squared < 225.0f;
+
+			if (actor->artificial_combat_status >= 4)
+				prop_actor.too_far = TRUE;
+			else if (actor->corpse_interest_inhibited)
+				prop_actor.too_far = FALSE;
+			else
+				prop_actor.too_far = distance_squared > 16.0f;
+		}
+	}
+
+done:
+	if (too_far_reference)
+		*too_far_reference = prop_actor.too_far;
+
+	return desire;
+}
 
 void actor_perception_acknowledge(
 	long actor_index,
