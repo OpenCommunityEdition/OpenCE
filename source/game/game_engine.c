@@ -3107,6 +3107,53 @@ long game_engine_did_player_win(
 	return result;
 }
 
+boolean multiple_teams_alive(
+	void)
+{
+	boolean result = FALSE;
+
+	if (players_in_game() <= 1)
+		return TRUE;
+	else
+	{
+		struct data_iterator iterator;
+		struct player_datum *player;
+		long team_index = NONE;
+
+		data_iterator_new(&iterator, player_data);
+		player = (struct player_datum *)data_iterator_next(&iterator);
+		while (player)
+		{
+			if (!player->unknown_d1 &&
+				(player->unit_index != NONE ||
+					(!code_00097250(iterator.datum_index) &&
+						!game_engine_player_is_out_of_lives(
+							iterator.datum_index))))
+			{
+				match_assert(
+					"c:\\halo\\SOURCE\\game\\game_engine.c",
+					0x1BE,
+					player->team_index != NONE);
+
+				if (player->team_index != team_index)
+				{
+					if (team_index != NONE)
+					{
+						result = TRUE;
+						break;
+					}
+
+					team_index = player->team_index;
+				}
+			}
+
+			player = (struct player_datum *)data_iterator_next(&iterator);
+		}
+	}
+
+	return result;
+}
+
 long game_engine_did_player_win_default(
 	long player_index)
 {
