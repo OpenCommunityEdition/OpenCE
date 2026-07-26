@@ -219,6 +219,9 @@ void game_engine_post_rasterize(
 void game_engine_nonplayer_post_rasterize(
 	void);
 
+void game_engine_update_non_deterministic(
+	float delta_seconds);
+
 void game_engine_initialize(
 	struct game_variant *variant);
 

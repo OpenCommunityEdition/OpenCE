@@ -543,10 +543,12 @@ symbols in this file:
 
 #include "game_globals.h"
 #include "interface/ui_widget.h"
+#include "input/input.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
 #include "main/main.h"
 #include "networking/network_game_globals.h"
+#include "networking/network_server_manager.h"
 #include "objects.h"
 #include "player_rumble.h"
 #include "players.h"
@@ -584,7 +586,7 @@ struct game_engine_globals
 	unsigned long flags;
 	byte unused4[4];
 	real postgame_timer;
-	byte unusedC[4];
+	real postgame_progress;
 	long postgame_state;
 	real hud_message_timers[MAXIMUM_LOCAL_PLAYERS];
 };
@@ -605,6 +607,8 @@ typedef char verify_postgame_statistic_entry_size[
 typedef char verify_game_engine_goal_size[sizeof(struct game_engine_goal) == 0x20 ? 1 : -1];
 typedef char verify_game_engine_globals_postgame_timer_offset[
 	offsetof(struct game_engine_globals, postgame_timer) == 0x8 ? 1 : -1];
+typedef char verify_game_engine_globals_postgame_progress_offset[
+	offsetof(struct game_engine_globals, postgame_progress) == 0xC ? 1 : -1];
 typedef char verify_game_engine_globals_postgame_state_offset[
 	offsetof(struct game_engine_globals, postgame_state) == 0x10 ? 1 : -1];
 typedef char verify_game_engine_globals_hud_message_timers_offset[
@@ -827,6 +831,27 @@ static boolean code_00097840(
 			(goal->player_index == NONE || player_index != goal->player_index))
 		{
 			result = TRUE;
+		}
+	}
+
+	return result;
+}
+
+static boolean code_00099880(
+	long button_index)
+{
+	boolean result = FALSE;
+	long gamepad_index;
+
+	for (gamepad_index = 0; gamepad_index < 4; gamepad_index++)
+	{
+		struct gamepad_state const *gamepad_state =
+			input_get_gamepad_state((short)gamepad_index);
+
+		if (gamepad_state && gamepad_state->buttons[button_index])
+		{
+			result = TRUE;
+			break;
 		}
 	}
 
@@ -1305,6 +1330,43 @@ void game_engine_nonplayer_post_rasterize(
 				"c:\\halo\\SOURCE\\game\\game_engine.c",
 				0xE3B,
 				!"unreachable");
+			break;
+		}
+	}
+
+	return;
+}
+
+void game_engine_update_non_deterministic(
+	real delta_seconds)
+{
+	if (game_engine)
+	{
+		switch (game_engine_globals.postgame_state)
+		{
+		case 2:
+			rumble_clear_all_now();
+			game_engine_globals.postgame_timer -= delta_seconds;
+			if (game_engine_globals.postgame_timer <= 0.0f)
+				game_engine_globals.postgame_state = 3;
+			break;
+
+		case 3:
+			rumble_clear_all_now();
+			game_engine_globals.postgame_progress += delta_seconds;
+			if (game_engine_globals.postgame_progress > 1.0f)
+				game_engine_globals.postgame_progress = 1.0f;
+
+			if (code_00099880(0) || code_00099880(12))
+			{
+				if (global_network_game_server_get())
+				network_game_server_reset_to_pregame(
+					global_network_game_server_get());
+			}
+			else if (code_00099880(1) || code_00099880(13))
+			{
+				network_game_abort();
+			}
 			break;
 		}
 	}
