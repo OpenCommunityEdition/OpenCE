@@ -652,6 +652,35 @@ long populate_statistic_buffer(
 	long parameter1,
 	long parameter2);
 
+struct game_variant *build_game_variant_race(
+	struct game_variant *variant);
+struct game_variant *build_game_variant_team_race(
+	struct game_variant *variant);
+struct game_variant *build_game_variant_rally(
+	struct game_variant *variant);
+struct game_variant *build_game_variant_slayer(
+	struct game_variant *variant);
+struct game_variant *build_game_variant_team_slayer(
+	struct game_variant *variant);
+struct game_variant *build_game_variant_elimination(
+	struct game_variant *variant);
+struct game_variant *build_game_variant_stalker(
+	struct game_variant *variant);
+struct game_variant *build_game_variant_team_oddball(
+	struct game_variant *variant);
+struct game_variant *build_game_variant_accumulation(
+	struct game_variant *variant);
+struct game_variant *build_game_variant_oddball(
+	struct game_variant *variant);
+struct game_variant *build_game_variant_ctf(
+	struct game_variant *variant);
+struct game_variant *build_game_variant_iron_ctf(
+	struct game_variant *variant);
+struct game_variant *build_game_variant_king(
+	struct game_variant *variant);
+struct game_variant *build_game_variant_team_king(
+	struct game_variant *variant);
+
 /* ---------- globals */
 
 struct game_engine *game_engine;
@@ -1656,6 +1685,49 @@ struct game_variant *game_engine_get_variant(
 	void)
 {
 	return &global_variant;
+}
+
+struct game_variant *game_engine_get_variant_by_name(
+	struct game_variant *variant,
+	char const *name)
+{
+	struct game_variant temporary;
+	struct game_variant result;
+
+	csmemset(&result, 0, sizeof(result));
+
+	if (csstrcmp(name, "race") == 0)
+		result = *build_game_variant_race(&temporary);
+	else if (csstrcmp(name, "team_race") == 0)
+		result = *build_game_variant_team_race(&temporary);
+	else if (csstrcmp(name, "rally") == 0)
+		result = *build_game_variant_rally(&temporary);
+	else if (csstrcmp(name, "slayer") == 0)
+		result = *build_game_variant_slayer(&temporary);
+	else if (csstrcmp(name, "team_slayer") == 0)
+		result = *build_game_variant_team_slayer(&temporary);
+	else if (csstrcmp(name, "elimination") == 0)
+		result = *build_game_variant_elimination(&temporary);
+	else if (csstrcmp(name, "stalker") == 0)
+		result = *build_game_variant_stalker(&temporary);
+	else if (csstrcmp(name, "team_oddball") == 0)
+		result = *build_game_variant_team_oddball(&temporary);
+	else if (csstrcmp(name, "accumulation") == 0)
+		result = *build_game_variant_accumulation(&temporary);
+	else if (csstrcmp(name, "oddball") == 0)
+		result = *build_game_variant_oddball(&temporary);
+	else if (csstrcmp(name, "ctf") == 0)
+		result = *build_game_variant_ctf(&temporary);
+	else if (csstrcmp(name, "ironctf") == 0)
+		result = *build_game_variant_iron_ctf(&temporary);
+	else if (csstrcmp(name, "king") == 0)
+		result = *build_game_variant_king(&temporary);
+	else if (csstrcmp(name, "team_king") == 0)
+		result = *build_game_variant_team_king(&temporary);
+
+	*variant = result;
+
+	return variant;
 }
 
 boolean game_engine_get_goal_in_use(

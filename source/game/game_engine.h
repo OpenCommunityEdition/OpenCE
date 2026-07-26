@@ -237,6 +237,10 @@ long game_engine_did_player_win(
 struct game_variant *game_engine_get_variant(
 	void);
 
+struct game_variant *game_engine_get_variant_by_name(
+	struct game_variant *variant,
+	char const *name);
+
 boolean game_engine_get_goal_in_use(
 	short goal_index);
 
