@@ -378,6 +378,9 @@ void unit_exit_seat_end(
 void hud_picked_up_powerup(
 	short local_player_index,
 	long powerup_definition_index);
+void hud_picked_up_weapon(
+	short local_player_index,
+	long weapon_definition_index);
 void player_effect_screen_flash(
 	long player_index,
 	struct screen_flash_definition const *screen_flash,
@@ -400,6 +403,8 @@ static long code_000a9bc0(
 	short bsp_switch_trigger_volume_index,
 	long object_index);
 static void code_000aa220(
+	long player_index);
+static boolean code_000aa240(
 	long player_index);
 static void code_000aa300(
 	long player_index);
@@ -1918,6 +1923,7 @@ void debug_player_teleport(
 	if (0)
 	{
 		code_000aa220(0);
+		code_000aa240(0);
 		code_000aa4f0(0, 0);
 		code_000aa530(0, 0);
 		code_000aa560(0, 0);
@@ -2201,6 +2207,52 @@ static void code_000aa220(
 	player->action_object_index = NONE;
 
 	return;
+}
+
+static boolean code_000aa240(
+	long player_index)
+{
+	struct player_datum *player;
+	struct unit_datum *unit;
+	struct weapon_datum *weapon;
+	boolean result;
+
+	player = player_get(player_index);
+	unit = unit_get(player->unit_index);
+	result = FALSE;
+	switch (player->action_result)
+	{
+	case 6:
+		if (unit_drop_current_weapon(player->unit_index, TRUE) &&
+			unit_add_weapon_to_inventory(
+				player->unit_index,
+				player->action_object_index,
+				TRUE))
+		{
+			weapon = weapon_get(player->action_object_index);
+			hud_picked_up_weapon(
+				player->local_player_index,
+				weapon->definition_index);
+			player_control_unzoom(player->unit_index);
+		}
+		result = TRUE;
+		break;
+
+	case 7:
+		if (unit_add_weapon_to_inventory(
+			player->unit_index,
+			player->action_object_index,
+			TRUE))
+		{
+			weapon = weapon_get(player->action_object_index);
+			hud_picked_up_weapon(
+				player->local_player_index,
+				weapon->definition_index);
+		}
+		break;
+	}
+
+	return result;
 }
 
 boolean player_handle_powerup(
