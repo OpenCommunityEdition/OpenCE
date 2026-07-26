@@ -280,7 +280,11 @@ enum
 		FLAG(_collision_test_front_facing_surfaces_bit) |
 		FLAG(_collision_test_ignore_invisible_surfaces_bit) |
 		FLAG(_collision_test_structure_bit) |
-		FLAG(_collision_test_objects_scenery_bit)
+		FLAG(_collision_test_objects_scenery_bit),
+	_object_mask_player_interaction =
+		_object_mask_unit |
+		_object_mask_item |
+		_object_mask_control
 };
 
 /* ---------- macros */
@@ -502,6 +506,8 @@ static void code_000ac0b0(
 static void code_000acb50(
 	long player_index,
 	long item_index);
+static void code_000ace70(
+	long player_index);
 void code_000ac320(
 	long player_index,
 	long equipment_index);
@@ -2118,6 +2124,7 @@ void debug_player_teleport(
 		code_000ab440(0);
 		code_000ac0b0(0, 0);
 		code_000acb50(0, 0);
+		code_000ace70(0);
 	}
 
 	return;
@@ -3138,6 +3145,58 @@ void players_handle_deleted_object(
 		{
 			if (player->unit_index == deleted_object_index)
 				player_died(iterator.datum_index);
+		}
+	}
+
+	return;
+}
+
+static void code_000ace70(
+	long player_index)
+{
+	struct player_datum *player;
+	struct unit_datum *unit;
+	struct object_datum *object;
+	long object_indices[16];
+	short object_count;
+	short object_number;
+
+	player = player_get(player_index);
+	if (player->unit_index != NONE)
+	{
+		unit = unit_get(player->unit_index);
+		if (unit->object.parent_object_index == NONE)
+		{
+			object_count = objects_in_sphere(
+				0,
+				_object_mask_player_interaction,
+				&unit->object.location,
+				&unit->object.bounding_sphere_center,
+				unit->object.bounding_sphere_radius,
+				object_indices,
+				NUMBEROF(object_indices));
+			for (object_number = 0; object_number < object_count; object_number++)
+			{
+				object = object_get(object_indices[object_number]);
+				switch (object->object.type)
+				{
+				case _object_type_biped:
+					continue;
+
+				case _object_type_vehicle:
+					code_000ac0b0(player_index, object_indices[object_number]);
+					break;
+
+				case _object_type_weapon:
+				case _object_type_equipment:
+					code_000acb50(player_index, object_indices[object_number]);
+					break;
+
+				case _object_type_control:
+					code_000ac270(player_index, object_indices[object_number]);
+					break;
+				}
+			}
 		}
 	}
 
