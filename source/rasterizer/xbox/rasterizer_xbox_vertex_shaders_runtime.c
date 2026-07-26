@@ -172,57 +172,6 @@ extern void *global_d3d_device;
 
 /* ---------- public code */
 
-__declspec(naked) long code_00168350(
-	void)
-{
-	__asm
-	{
-		push eax
-		call D3DDevice_SetVertexShader
-		xor eax, eax
-		ret 4
-	}
-}
-
-__declspec(naked) long code_00168360(
-	void)
-{
-	__asm
-	{
-		push eax
-		push ecx
-		call D3DDevice_LoadVertexShader
-		xor eax, eax
-		ret 4
-	}
-}
-
-__declspec(naked) long code_00168370(
-	void)
-{
-	__asm
-	{
-		push eax
-		push ecx
-		call D3DDevice_SelectVertexShader
-		xor eax, eax
-		ret 4
-	}
-}
-
-__declspec(naked) long code_00168380(
-	void)
-{
-	__asm
-	{
-		push eax
-		push ecx
-		call D3DDevice_GetVertexShaderSize
-		xor eax, eax
-		ret 4
-	}
-}
-
 void rasterizer_set_vertex_shader_permutation(
 	short vertex_shader_index,
 	short vertex_type,
