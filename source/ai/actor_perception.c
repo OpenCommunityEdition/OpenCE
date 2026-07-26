@@ -249,6 +249,7 @@ symbols in this file:
 
 #include "cseries.h"
 
+#include "actor_definitions.h"
 #include "actors.h"
 #include "props.h"
 #include "units/units.h"
@@ -367,6 +368,20 @@ union actor_perception_boolean_slot
 {
 	boolean value;
 	long storage;
+};
+
+/*
+ * Runtime perception values in the January actor definition. The shared
+ * HCEX-derived definition still labels two of these slots as unused.
+ */
+struct actor_perception_definition_view
+{
+	byte __unknown000[0x1C];
+	real maximum_vision_angle;
+	real central_vision_angle;
+	byte __unknown024[4];
+	real peripheral_distance;
+	real maximum_peripheral_distance;
 };
 
 /* ---------- prototypes */
@@ -505,6 +520,90 @@ long actor_get_perception_knowledge(
 		return 2;
 
 	return actor->combat_status >= 3;
+}
+
+void actor_get_vision_distances(
+	long actor_index,
+	real maximum_vision_distance,
+	real perception_factor,
+	real horizontal_angle,
+	real *full_distance_reference,
+	real *partial_distance_reference)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_perception_definition_view const *definition =
+		(struct actor_perception_definition_view const *)
+			actor_definition_get(actor->meta.definition_index);
+	real full_distance;
+	real partial_distance;
+
+	if (horizontal_angle > definition->peripheral_distance)
+	{
+		partial_distance = 0.0f;
+		full_distance = 0.0f;
+	}
+	else
+	{
+		real maximum_distance =
+			maximum_vision_distance * perception_factor;
+		real peripheral_distance =
+			perception_factor * definition->maximum_peripheral_distance;
+		real minimum_full_distance = 0.7f * maximum_distance;
+		real minimum_partial_distance = 0.7f * peripheral_distance;
+
+		if (minimum_partial_distance > 3.5f)
+			minimum_partial_distance = 3.5f;
+
+		if (horizontal_angle > definition->central_vision_angle)
+		{
+			partial_distance = peripheral_distance;
+			full_distance = minimum_partial_distance;
+		}
+		else
+		{
+			real maximum_vision_angle =
+				definition->maximum_vision_angle;
+			real full_vision_angle = 0.8f * maximum_vision_angle;
+
+			if (horizontal_angle < maximum_vision_angle)
+			{
+				partial_distance = maximum_distance;
+			}
+			else
+			{
+				real interpolation =
+					(horizontal_angle - maximum_vision_angle) /
+					(definition->central_vision_angle -
+						maximum_vision_angle);
+
+				partial_distance =
+					(1.0f - interpolation) * maximum_distance +
+					peripheral_distance * interpolation;
+			}
+
+			if (horizontal_angle < full_vision_angle)
+			{
+				full_distance = minimum_full_distance;
+			}
+			else
+			{
+				real interpolation =
+					(horizontal_angle - full_vision_angle) /
+					(definition->central_vision_angle -
+						full_vision_angle);
+
+				full_distance =
+					(1.0f - interpolation) *
+						minimum_full_distance +
+					minimum_partial_distance * interpolation;
+			}
+		}
+	}
+
+	*partial_distance_reference = partial_distance;
+	*full_distance_reference = full_distance;
+
+	return;
 }
 
 void actor_situation_update_target_status(
