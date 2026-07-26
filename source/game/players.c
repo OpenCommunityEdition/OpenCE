@@ -1785,6 +1785,39 @@ boolean player_handle_powerup(
 	return TRUE;
 }
 
+void player_handle_powerup_minor(
+	long player_index,
+	short powerup_type,
+	short duration)
+{
+	struct player_datum *player;
+	struct unit_datum *unit;
+	long powerup_index;
+
+	player = player_get(player_index);
+	match_assert("c:\\halo\\SOURCE\\game\\players.c", 0xB19,
+		powerup_type>=0 && powerup_type<NUMBER_OF_PLAYER_POWERUPS);
+
+	powerup_index = powerup_type;
+	if (player->powerup_durations[powerup_index] == 0)
+	{
+		struct player_datum *powerup_player;
+
+		powerup_player = player_get(player_index);
+		unit = unit_get(powerup_player->unit_index);
+		if (powerup_index == 0)
+		{
+			SET_FLAG(unit->unit.flags, _unit_active_camouflaged_bit, TRUE);
+			unit->unit.cause_for_camo_regrowth = (short)powerup_index;
+		}
+	}
+
+	player->powerup_durations[powerup_index] =
+		MAX(player->powerup_durations[powerup_index], duration);
+
+	return;
+}
+
 static void code_000aa300(
 	long player_index)
 {

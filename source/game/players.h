@@ -186,8 +186,8 @@ void player_control_fix_for_loaded_game_state(void);
 
 void player_handle_powerup_minor(
 	long player_index,
-	long powerup_index,
-	long duration);
+	short powerup_index,
+	short duration);
 
 /* ---------- prototypes/PLAYER_QUEUES_NEW.C */
 
