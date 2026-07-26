@@ -2482,6 +2482,38 @@ struct game_variant *build_game_variant_oddball(
 	return variant;
 }
 
+struct game_variant *build_game_variant_team_oddball(
+	struct game_variant *variant)
+{
+	struct game_variant result;
+
+	result.flags = (result.flags & ~0x1C) | 0x23;
+	result.unknown24 = 1;
+	result.maximum_lives = 0;
+	result.has_teams = TRUE;
+	result.unknown28 = FALSE;
+	result.unknown48 = 1;
+	result.unknown2C = 0;
+	result.unknown60 = 1;
+	result.unknown44 = 0;
+	result.unknown64 = 1;
+	result.unknown4C.byte1 = 0;
+	result.unknown4C.byte0 = 0;
+	result.unknown5C = 0;
+	result.unknown54 = 0;
+	result.unknown58 = 0;
+	result.unknown50 = 0;
+	result.engine_type = 3;
+	result.unknown3C = 1.0f;
+	result.unknown30 = 300;
+	result.unknown40 = 2;
+	result.unknown34 = 150;
+
+	*variant = result;
+
+	return variant;
+}
+
 long postgame_statistic_get_rating(
 	long player_index,
 	long parameter1,
