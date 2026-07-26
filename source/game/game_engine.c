@@ -672,6 +672,24 @@ real linear_to_non_linear_alpha(
 	return non_linear_alpha;
 }
 
+long sort_statistic_buffer(
+	long entry0,
+	long entry1)
+{
+	long result = 0;
+	long entry0_value;
+	long entry1_value;
+
+	entry0_value = *(long *)(entry0 + sizeof(long));
+	entry1_value = *(long *)(entry1 + sizeof(long));
+	if (entry1_value < entry0_value)
+		return -1;
+	if (entry1_value > entry0_value)
+		result = 1;
+
+	return result;
+}
+
 long players_in_game(
 	void)
 {
