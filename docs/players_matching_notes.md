@@ -53,3 +53,48 @@ divergence occurs when forming the scenario BSP-switch block pointer:
   identically to the named-field expression and did not improve the residual.
 
 The semantic lift remains uncredited and is not retained in `players.c`.
+
+## `code_000a9ff0`
+
+The semantic PVS reconstruction has January's exact `0x170` padded size and
+all 22 relocation identities. Only one instruction-scheduling window differs:
+
+- January emits `lea ecx, [ebp-0x14]`, stores the activation-call result at
+  `[ebp-4]`, then loads `player_data`.
+- VC7 stores the result, loads and pushes `player_data`, and only then forms
+  `&iterator`; the `player_data` relocation is therefore at `+0x32` instead of
+  January's `+0x35`.
+- The normalized residual is 11 bytes at offsets `0x2E` through `0x39`; every
+  instruction after that window matches.
+- An explicit iterator pointer, a result temporary plus compiler barrier, and
+  an aggregate exposing the iterator/result stack adjacency all compiled to
+  the same baseline schedule. Argument-expression and premature-pointer
+  variants either retained that schedule or worsened it.
+
+The function remains dormant and uncredited as a scheduler/lifetime tie.
+
+## `code_000aa9e0`
+
+The independent-pointer reconstruction retains January's exact `0x510`
+padded size and all 61 relocation identities. Its residual begins with a
+stack-home and register-allocation difference and expands into a block-layout
+tie:
+
+- January homes `player`, `player_unit_index`, `biped`, and
+  `source_root_object` at `[ebp-8]`, `[ebp-0x14]`, `[ebp-0x10]`, and
+  `[ebp-0xC]`; VC7 uses a `0x78` frame, omits the source-root home, and maps the
+  other three to `[ebp-4]`, `[ebp-0xC]`, and `[ebp-0x14]`.
+- January keeps the initial `biped_get` result in `ESI` before homing it and
+  later uses a stack-homed source-root pointer. VC7 instead homes the biped
+  immediately and keeps the source-root pointer in `ESI`.
+- Splitting the two-pointer aggregate into independent locals restored the
+  exact `0x510` size after a failed CFG experiment, but did not resolve the
+  opening register allocation and is not retained in production source.
+- Whole-variable and targeted volatile access produced the `0x7C` frame but
+  inflated the body to `0x520` and mapped the homes incorrectly.
+- Hoisting/reordering scalar declarations was byte-identical to the best form.
+- Late-label and single-fallback CFG rewrites shortened the body to `0x500`;
+  VC7 either placed the fallback block early or over-merged the source paths.
+
+The aggregate baseline remains dormant and uncredited pending a compiler
+register-allocation/block-layout solution.

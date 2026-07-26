@@ -994,7 +994,14 @@ void player_control_fix_for_loaded_game_state(
 				local_player_index < MAXIMUM_LOCAL_PLAYERS;
 				local_player_index++)
 			{
-				player_index = local_player_get_player_index(local_player_index);
+				match_assert(
+					"c:\\halo\\SOURCE\\game\\players.c",
+					943,
+					local_player_index>=NONE &&
+						local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+				player_index = local_player_index == NONE
+					? NONE
+					: players_globals->local_players[local_player_index];
 				if (player_index != NONE)
 				{
 					player = player_get(player_index);
