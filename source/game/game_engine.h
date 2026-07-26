@@ -304,6 +304,11 @@ void game_engine_load_stage(
 void game_engine_end_game(
 	void);
 
+void ticks_to_unicode_time_string(
+	long ticks,
+	unsigned long character_count,
+	wchar_t *string);
+
 void game_engine_player_damaged_player(
 	long damaging_player_index,
 	long dead_player_index,

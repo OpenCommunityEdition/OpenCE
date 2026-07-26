@@ -549,6 +549,7 @@ symbols in this file:
 #include "objects.h"
 #include "players.h"
 #include "scenario/scenario.h"
+#include "text/unicode.h"
 #include "units/units.h"
 
 /* ---------- constants */
@@ -792,6 +793,36 @@ void game_engine_flag_reset(
 		weapon->item.last_owned_time = game_time_get();
 		weapon->item.ignore_object_index = NONE;
 	}
+
+	return;
+}
+
+void ticks_to_unicode_time_string(
+	long ticks,
+	unsigned long character_count,
+	wchar_t *string)
+{
+	long total_seconds;
+	long minutes;
+	long seconds;
+	wchar_t minute_string[64];
+	wchar_t second_string[64];
+
+	total_seconds = ticks / 30;
+	minutes = total_seconds / 60;
+	seconds = total_seconds - minutes * 60;
+
+	if (minutes == 0)
+		usnprintf(minute_string, NUMBEROF(minute_string), L" ");
+	else
+		usnprintf(minute_string, NUMBEROF(minute_string), L"%d", minutes);
+
+	if (seconds <= 9)
+		usnprintf(second_string, NUMBEROF(second_string), L"0%d", seconds);
+	else
+		usnprintf(second_string, NUMBEROF(second_string), L"%d", seconds);
+
+	usnprintf(string, character_count, L"%s:%s", minute_string, second_string);
 
 	return;
 }
