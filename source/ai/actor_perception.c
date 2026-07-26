@@ -285,9 +285,11 @@ struct actor_perception_actor_view
 	byte __unknown203[0x65];
 	short target_type;
 	byte __unknown26A[2];
-	long target_last_visible_time;
+	long target_unit_index;
 	long target_prop_index;
-	byte __unknown274[0x94];
+	byte __unknown274[8];
+	boolean target_outside_active_area;
+	byte __unknown27D[0x8B];
 	short active_threat_count;
 	byte __unknown30A[0x9E];
 	short unopposable_retreat_timer;
@@ -503,6 +505,115 @@ long actor_get_perception_knowledge(
 		return 2;
 
 	return actor->combat_status >= 3;
+}
+
+void actor_situation_update_target_status(
+	long actor_index)
+{
+	struct actor_perception_actor_view *actor =
+		(struct actor_perception_actor_view *)actor_get(actor_index);
+
+	if (actor->target_prop_index == NONE)
+	{
+		actor->target_type = 0;
+		actor->target_unit_index = NONE;
+		actor->target_outside_active_area = FALSE;
+	}
+	else
+	{
+		struct actor_perception_prop_view *target_prop =
+			(struct actor_perception_prop_view *)prop_get(
+				actor->target_prop_index);
+		struct unit_datum *target_unit =
+			unit_get(target_prop->unit_index);
+		short target_type;
+
+#line 4291 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+		assert(target_prop->enemy);
+#line 510 "source\\ai\\actor_perception.c"
+
+		switch (target_prop->state)
+		{
+		case _prop_state_unacknowledged:
+			target_type = 0;
+			actor->target_prop_index = NONE;
+			actor->target_unit_index = NONE;
+			break;
+
+		case _prop_state_becoming_acknowledged:
+			target_type = 1;
+			break;
+
+		case _prop_state_becoming_unacknowledged:
+		case _prop_state_acknowledged:
+			if (*((boolean *)target_prop + 0x127))
+				target_type = 2;
+			else if (*((boolean *)target_prop + 0x74))
+				target_type = 11;
+			else if (*(short *)((byte *)target_prop + 0x32) >= 2)
+				target_type = 10;
+			else if (*(short *)((byte *)target_prop + 0x38) != 0 &&
+				*(short *)((byte *)target_prop + 0x38) != 1)
+			{
+				target_type = 7;
+			}
+			else if (*((char *)target_prop + 0x122) <= 2 &&
+				*(real *)((byte *)target_prop + 0x11C) < 6.f)
+			{
+				target_type = 9;
+			}
+			else
+			{
+				target_type = 8;
+			}
+			break;
+
+		case _prop_state_inspected_orphan:
+			if (*((boolean *)target_prop + 0x127))
+				target_type = 2;
+			else
+				target_type =
+					*((boolean *)target_prop + 0xBB) ? 3 : 4;
+			break;
+
+		case _prop_state_uninspected_orphan:
+			target_type =
+				(*((boolean *)target_prop + 0xB8) != FALSE) + 5;
+			break;
+
+		default:
+			display_assert(
+				NULL,
+				"c:\\halo\\SOURCE\\ai\\actor_perception.c",
+				4362,
+				TRUE);
+			system_exit(-1);
+			break;
+		}
+
+		actor->target_type = target_type;
+
+		if (target_prop->state >=
+				_prop_state_becoming_unacknowledged &&
+			target_prop->state <= _prop_state_acknowledged)
+		{
+			actor->target_outside_active_area =
+				!*((boolean *)target_prop + 0x127);
+
+			if (*(short *)((byte *)target_prop + 0x32) > 0)
+				actor->target_unit_index =
+					*(long *)((byte *)target_prop + 0x8C);
+		}
+		else
+		{
+			actor->target_outside_active_area =
+				!TEST_FLAG(
+					*((byte *)target_unit + 0xB6),
+					2);
+		}
+	}
+
+	return;
 }
 
 void actor_berserk(
@@ -1178,7 +1289,7 @@ boolean actor_situation_try_new_target(
 		{
 			actor->target_type = 0;
 			actor->target_prop_index = new_prop_index;
-			actor->target_last_visible_time = NONE;
+			actor->target_unit_index = NONE;
 			actor_situation_update_target_status(actor_index);
 			actor_situation_combat_status_update(actor_index);
 			result = TRUE;
