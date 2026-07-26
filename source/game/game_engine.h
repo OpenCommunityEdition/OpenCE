@@ -216,6 +216,10 @@ void game_engine_initialize(
 void game_engine_initialize_for_new_map(
 	void);
 
+float game_engine_get_distance_rating_for_spawn(
+	long player_index,
+	union real_point3d const *position);
+
 void game_engine_variant_cleanup(
 	struct game_variant *variant);
 

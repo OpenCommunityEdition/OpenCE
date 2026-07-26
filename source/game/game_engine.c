@@ -2038,6 +2038,55 @@ void game_engine_initialize_for_new_map(
 	return;
 }
 
+real game_engine_get_distance_rating_for_spawn(
+	long player_index,
+	real_point3d const *position)
+{
+	boolean has_teams = game_engine ? global_variant.has_teams : FALSE;
+	struct player_datum *player;
+	struct data_iterator iterator;
+	struct player_datum *other_player;
+	real rating;
+
+	player = player_get(player_index);
+	rating = 1.0f;
+	data_iterator_new(&iterator, player_data);
+	other_player = (struct player_datum *)data_iterator_next(&iterator);
+	while (other_player)
+	{
+		if (other_player->unit_index!=NONE)
+		{
+			real_point3d origin;
+			real distance;
+
+			object_get_origin(other_player->unit_index, &origin);
+			distance = distance3d(&origin, position);
+
+			if (!has_teams ||
+				other_player->team_index!=player->team_index ||
+				!(distance>0.25f))
+			{
+				if (distance<0.25f)
+					rating = 0.0f;
+				else if (distance<1.0f)
+					rating *= 0.1f;
+
+				if (other_player->team_index!=player->team_index)
+				{
+					if (distance<2.0f)
+						rating = 0.0f;
+					else if (!(distance>5.0f))
+						rating = (distance-2.0f)*rating*0.33333334f;
+				}
+			}
+		}
+
+		other_player = (struct player_datum *)data_iterator_next(&iterator);
+	}
+
+	return rating;
+}
+
 long game_engine_remap_object_definition(
 	long definition_index)
 {
