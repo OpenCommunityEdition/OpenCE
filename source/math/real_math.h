@@ -453,6 +453,12 @@ boolean point_in_triangle2d(
 	real_point2d const *triangle2,
 	real *t0,
 	real *t1);
+boolean circle_intersects_triangle2d(
+	real_point2d const *center,
+	real radius,
+	real_point2d const *triangle0,
+	real_point2d const *triangle1,
+	real_point2d const *triangle2);
 boolean sphere_intersects_rectangle3d(
 	real_point3d const *center,
 	real radius,

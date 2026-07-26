@@ -726,6 +726,47 @@ boolean point_in_triangle2d(
 	return result;
 }
 
+boolean circle_intersects_triangle2d(
+	real_point2d const *center,
+	real radius,
+	real_point2d const *triangle0,
+	real_point2d const *triangle1,
+	real_point2d const *triangle2)
+{
+	real_vector2d edge;
+	real_vector2d offset;
+	boolean result = TRUE;
+
+	vector_from_points2d(triangle0, center, &offset);
+	vector_from_points2d(triangle0, triangle1, &edge);
+	if (cross_product2d(&offset, &edge) > 0.0f)
+	{
+		if (point_in_pill2d(center, triangle0, &edge, radius))
+			return TRUE;
+		result = FALSE;
+	}
+
+	vector_from_points2d(triangle1, center, &offset);
+	vector_from_points2d(triangle1, triangle2, &edge);
+	if (cross_product2d(&offset, &edge) < 0.0f)
+	{
+		if (point_in_pill2d(center, triangle1, &edge, radius))
+			return TRUE;
+		result = FALSE;
+	}
+
+	vector_from_points2d(triangle2, center, &offset);
+	vector_from_points2d(triangle2, triangle0, &edge);
+	if (cross_product2d(&offset, &edge) > 0.0f)
+	{
+		if (point_in_pill2d(center, triangle2, &edge, radius))
+			return TRUE;
+		result = FALSE;
+	}
+
+	return result;
+}
+
 boolean sphere_intersects_rectangle3d(
 	real_point3d const *center,
 	real radius,
