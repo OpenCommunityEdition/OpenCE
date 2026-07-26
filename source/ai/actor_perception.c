@@ -479,6 +479,69 @@ long actor_get_perception_knowledge(
 	return actor->combat_status >= 3;
 }
 
+long actor_perception_find_recent_damaging_prop_index(
+	long actor_index,
+	boolean enemies_only)
+{
+	struct actor_perception_actor_view *actor =
+		(struct actor_perception_actor_view *)actor_get(actor_index);
+	long damaging_prop_index = NONE;
+
+	if (actor->unit_index != NONE)
+	{
+		struct unit_datum *unit = unit_get(actor->unit_index);
+		unsigned long most_recent_damage_time = 0;
+		short attacker_index;
+
+		for (attacker_index = 0;
+			attacker_index < MAXIMUM_ATTACKERS_PER_UNIT;
+			attacker_index++)
+		{
+			struct unit_attacker *attacker =
+				&unit->unit.attackers[attacker_index];
+			long unit_index =
+				ai_get_responsible_unit(
+					attacker->object_index,
+					TRUE);
+
+			if (unit_index != NONE)
+			{
+				long current_prop_index =
+					prop_get_active_by_unit_index(
+						actor_index,
+						unit_index);
+
+				if (current_prop_index != NONE)
+				{
+					struct prop_datum *current_prop =
+						prop_get(current_prop_index);
+
+					if (current_prop->state >=
+							_prop_state_becoming_unacknowledged &&
+						current_prop->state <=
+							_prop_state_acknowledged &&
+						(current_prop->enemy || !enemies_only) &&
+						attacker->game_time_stamp >
+							most_recent_damage_time)
+					{
+						damaging_prop_index =
+							current_prop_index;
+						most_recent_damage_time =
+							attacker->game_time_stamp;
+					}
+				}
+			}
+
+		}
+
+#line 3726 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+		assert(damaging_prop_index != 0x00000000);
+#line 500 "source\\ai\\actor_perception.c"
+	}
+
+	return damaging_prop_index;
+}
+
 void actor_perception_forget_recent_damage(
 	long actor_index)
 {
