@@ -55,6 +55,11 @@ enum
 
 enum
 {
+	_weapon_runtime_game_engine_active_bit = 5,
+};
+
+enum
+{
 	_first_person_weapon_message_primary_fire = 0,
 	_first_person_weapon_message_secondary_fire,
 	_first_person_weapon_message_primary_misfire,

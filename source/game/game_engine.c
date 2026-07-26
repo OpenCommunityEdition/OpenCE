@@ -709,6 +709,35 @@ void code_00097560(
 	return;
 }
 
+boolean code_00097c00(
+	void)
+{
+	boolean infinite_grenades = FALSE;
+
+	if (!TEST_FLAG(game_engine_globals.flags, _game_engine_disable_infinite_grenades_bit))
+		infinite_grenades = TEST_FLAG(global_variant.flags, _game_variant_infinite_grenades_bit);
+
+	return infinite_grenades;
+}
+
+void game_engine_flag_reset(
+	long weapon_index,
+	real_point3d const *position)
+{
+	if (weapon_index != NONE)
+	{
+		struct weapon_datum *weapon = weapon_get(weapon_index);
+
+		object_set_position(weapon_index, position, global_forward3d, global_up3d);
+		object_reset(weapon_index);
+		SET_FLAG(weapon->weapon.flags, _weapon_runtime_game_engine_active_bit, FALSE);
+		weapon->item.last_owned_time = game_time_get();
+		weapon->item.ignore_object_index = NONE;
+	}
+
+	return;
+}
+
 void game_engine_playlist_initialize(
 	void)
 {
