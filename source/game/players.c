@@ -455,6 +455,8 @@ boolean weapon_handle_potential_inventory_item(
 	long weapon_index,
 	short local_player_index,
 	short *ammunition_count);
+void _ReadWriteBarrier(void);
+#pragma intrinsic(_ReadWriteBarrier)
 void observer_obsolete_position(
 	short local_player_index);
 boolean biped_fix_position(
@@ -499,6 +501,8 @@ static __declspec(noinline) void code_000ab350(
 	long object_index,
 	short seat_index);
 static boolean code_000ab440(
+	long player_index);
+static void code_000ab820(
 	long player_index);
 static void code_000ac0b0(
 	long player_index,
@@ -2070,6 +2074,47 @@ void players_debug_render(
 	return;
 }
 
+static void code_000ab820(
+	long player_index)
+{
+	struct player_datum *player;
+	struct unit_datum *unit;
+	short *powerup_duration;
+	long powerup_index;
+	long remaining_powerups;
+
+	player = player_get(player_index);
+	_ReadWriteBarrier();
+	powerup_index = 0;
+	powerup_duration = player->powerup_durations;
+	remaining_powerups = NUMBER_OF_PLAYER_POWERUPS;
+	do
+	{
+		if (*powerup_duration > 0)
+		{
+			(*powerup_duration)--;
+			if (*powerup_duration == 0)
+			{
+				player = player_get(player_index);
+				unit = unit_get(player->unit_index);
+				if (powerup_index == _player_powerup_active_camouflage)
+				{
+					SET_FLAG(
+						unit->unit.flags,
+						_unit_active_camouflaged_bit,
+						FALSE);
+				}
+			}
+		}
+
+		powerup_index++;
+		powerup_duration++;
+	}
+	while (--remaining_powerups);
+
+	return;
+}
+
 void debug_player_teleport(
 	short local_player_index,
 	short target_local_player_index)
@@ -2122,6 +2167,7 @@ void debug_player_teleport(
 		code_000aa530(0, 0);
 		code_000aa560(0, 0);
 		code_000ab440(0);
+		code_000ab820(0);
 		code_000ac0b0(0, 0);
 		code_000acb50(0, 0);
 		code_000ace70(0);
