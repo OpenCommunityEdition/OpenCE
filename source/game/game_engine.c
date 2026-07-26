@@ -720,6 +720,25 @@ boolean code_00097c00(
 	return infinite_grenades;
 }
 
+boolean code_00096c80(
+	long object_index,
+	long const *excluded_player_index)
+{
+	long excluded_player = *excluded_player_index;
+	boolean result = FALSE;
+	struct object_datum *object = object_get(object_index);
+
+	if (!TEST_FLAG(object->object.flags, _object_invisible_bit) &&
+		TEST_FLAG(_object_mask_biped, object->object.type) &&
+		!TEST_FLAG(object->object.damage_flags, _object_dead_bit) &&
+		player_index_from_unit_index(object_index) != excluded_player)
+	{
+		result = TRUE;
+	}
+
+	return result;
+}
+
 void game_engine_flag_reset(
 	long weapon_index,
 	real_point3d const *position)
