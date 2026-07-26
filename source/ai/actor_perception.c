@@ -428,6 +428,52 @@ void actor_perception_acknowledge(
 	return;
 }
 
+long actor_get_perception_knowledge(
+	long actor_index,
+	long prop_index)
+{
+	struct actor_perception_actor_view *actor =
+		(struct actor_perception_actor_view *)actor_get(actor_index);
+
+	if (prop_index != NONE)
+	{
+		struct actor_perception_prop_view *prop =
+			(struct actor_perception_prop_view *)prop_get(prop_index);
+
+#line 1394 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+		assert(prop->owner_actor_index == actor_index);
+#line 390 "source\\ai\\actor_perception.c"
+
+		if (prop->state >= 2 && prop->state <= 3)
+			return 3;
+
+		if (prop->perception == 1 || prop->perception == 2)
+			return 3;
+
+		if (!prop->enemy &&
+			(!prop->dead || actor->combat_status >= 3))
+		{
+			return 3;
+		}
+
+		if (prop->orphan_prop_index != NONE)
+		{
+			struct actor_perception_prop_view *orphan =
+				(struct actor_perception_prop_view *)prop_get(
+					prop->orphan_prop_index);
+			long result = (orphan->orphan_corpse_cheated != FALSE) + 2;
+
+			if ((short)result != NONE)
+				return result;
+		}
+	}
+
+	if (actor->artificial_combat_status >= 2)
+		return 2;
+
+	return actor->combat_status >= 3;
+}
+
 void actor_perception_forget_recent_damage(
 	long actor_index)
 {
