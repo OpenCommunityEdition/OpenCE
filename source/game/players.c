@@ -472,6 +472,10 @@ short unit_find_nearby_seat(
 	long unit_index,
 	long target_unit_index,
 	short *seat_index);
+boolean dangerous_projectiles_near_player(
+	void);
+boolean ai_enemies_attacking_player(
+	void);
 
 static long code_000a9bc0(
 	short bsp_switch_trigger_volume_index,
@@ -2181,6 +2185,113 @@ void debug_player_teleport(
 	}
 
 	return;
+}
+
+boolean players_respawn_coop(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	struct biped_datum *biped;
+	struct players_vehicle_datum *vehicle;
+	long respawn_unit_index;
+	long root_object_index;
+	boolean result;
+	boolean dangerous;
+
+	players_globals->respawn_failure = 0;
+	result = FALSE;
+	if (!players_globals->respawn_failed)
+	{
+		if (dangerous_projectiles_near_player() ||
+			any_unit_is_dangerous())
+		{
+			players_globals->respawn_failure = 1;
+			goto result_complete;
+		}
+	}
+
+	if (!players_globals->respawn_failed &&
+		ai_enemies_attacking_player())
+	{
+		players_globals->respawn_failure = 2;
+		goto result_complete;
+	}
+
+	respawn_unit_index = NONE;
+	data_iterator_new(&iterator, player_data);
+	while (player = data_iterator_next(&iterator))
+	{
+		if (player->unit_index != NONE)
+		{
+			root_object_index =
+				object_get_ultimate_parent(player->unit_index);
+			if (root_object_index == player->unit_index)
+			{
+				biped = biped_try_and_get(player->unit_index);
+				if (biped)
+				{
+					dangerous = TEST_FLAG(
+						biped->biped.flags,
+						_biped_limping_bit);
+				}
+				else
+				{
+					dangerous = FALSE;
+				}
+			}
+			else
+			{
+				vehicle =
+					(struct players_vehicle_datum *)
+						object_try_and_get_and_verify_type(
+							root_object_index,
+							_object_mask_vehicle);
+				if (vehicle)
+					dangerous = vehicle->vehicle.unknown_state > 0;
+				else
+					dangerous = FALSE;
+			}
+
+			if (!dangerous)
+				respawn_unit_index = player->unit_index;
+			else
+				players_globals->respawn_failure = 3;
+		}
+	}
+
+	if (respawn_unit_index != NONE)
+	{
+		result = TRUE;
+		data_iterator_new(&iterator, player_data);
+		while (player = data_iterator_next(&iterator))
+		{
+			if (player->unit_index == NONE)
+			{
+				code_000ab020(iterator.datum_index);
+				if (player->unit_index != NONE)
+				{
+					result = player_teleport(
+						iterator.datum_index,
+						respawn_unit_index,
+						&object_get(respawn_unit_index)->
+							object.bounding_sphere_center);
+				}
+				else
+				{
+					result = FALSE;
+				}
+			}
+		}
+	}
+
+	players_globals->respawn_failed =
+		players_globals->respawn_failed && !result;
+	if (result)
+		players_globals->respawn_failure = 0;
+
+result_complete:
+	return result;
 }
 
 static void code_000abc90(

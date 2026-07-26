@@ -171,6 +171,9 @@ short local_player_count(
 short players_get_respawn_failure(
 	void);
 
+boolean players_respawn_coop(
+	void);
+
 boolean players_are_all_dead(
 	void);
 
