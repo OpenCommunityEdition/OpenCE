@@ -444,6 +444,46 @@ boolean fast_vector_intersects_sphere(
 	}
 }
 
+real fast_vector_intersection_with_sphere(
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real_point3d const *center,
+	real radius)
+{
+	real_point3d p =
+	{
+		point->x - center->x,
+		point->y - center->y,
+		point->z - center->z
+	};
+	real c = p.x * p.x + p.y * p.y + p.z * p.z - radius * radius;
+	real_vector3d direction;
+	real b;
+	real a;
+	real discriminant;
+
+	if (c < 0.0f)
+		return 0.0f;
+
+	direction = *vector;
+	b =
+		direction.i * p.x +
+		direction.j * p.y +
+		direction.k * p.z;
+	if (b >= 0.0f)
+		return REAL_MAX;
+
+	a =
+		direction.i * direction.i +
+		direction.j * direction.j +
+		direction.k * direction.k;
+	discriminant = b * b - a * c;
+	if (discriminant <= 0.0f)
+		return REAL_MAX;
+
+	return (-b - square_root(discriminant)) / a;
+}
+
 boolean point_in_rectangle2d(
 	real_point2d const *point,
 	real_rectangle2d const *bounds)
