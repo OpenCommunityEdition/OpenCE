@@ -538,6 +538,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cseries_windows.h"
+#include "errors.h"
 #include "game_engine.h"
 
 #include "game_globals.h"
@@ -644,6 +645,15 @@ boolean player_ui_game_variant_specified(
 void code_0009e9c0(
 	void);
 
+void code_00099b90(
+	void);
+
+void code_0009ccf0(
+	void);
+
+void game_engine_intialize_queued_sounds(
+	void);
+
 void game_engine_post_rasterize_post_game(
 	void);
 
@@ -701,6 +711,7 @@ extern struct game_variant global_variant;
 extern struct game_engine_globals game_engine_globals;
 extern struct game_engine_stage global_stage;
 extern struct game_engine *game_engines[];
+extern long timeout_for_endgame_sound;
 
 /* ---------- public code */
 
@@ -1989,6 +2000,39 @@ void game_engine_initialize(
 		global_variant = *variant;
 		game_engine_variant_cleanup(&global_variant);
 		game_engine = game_engines[variant->engine_type];
+	}
+
+	return;
+}
+
+void game_engine_initialize_for_new_map(
+	void)
+{
+	if (game_engine)
+	{
+		code_0009ccf0();
+		game_engine_intialize_queued_sounds();
+		csmemset(global_goal, 0, sizeof(global_goal));
+		*(long *)game_engine_globals.unused4 = 0;
+		timeout_for_endgame_sound = 0;
+
+		if (game_engine->initialize_for_new_map &&
+			!game_engine->initialize_for_new_map())
+		{
+			error(
+				_error_silent,
+				"failed to initialize custome game engine for new map, reverting to default game engine");
+
+			if (game_engine)
+			{
+				if (game_engine->dispose)
+					game_engine->dispose();
+
+				game_engine = NULL;
+			}
+		}
+
+		code_00099b90();
 	}
 
 	return;

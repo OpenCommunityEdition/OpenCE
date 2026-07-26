@@ -213,6 +213,9 @@ void game_engine_post_rasterize(
 void game_engine_initialize(
 	struct game_variant *variant);
 
+void game_engine_initialize_for_new_map(
+	void);
+
 void game_engine_variant_cleanup(
 	struct game_variant *variant);
 
