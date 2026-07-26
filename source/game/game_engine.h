@@ -36,17 +36,40 @@ union real_argb_color;
 struct game_variant
 {
 	short variant_index;
-	byte unused0[0x16];
+	byte unused2[0x16];
 	long engine_type;
 	boolean has_teams;
-	byte unused1[3];
+	byte unused1D[3];
 	unsigned long flags;
 	long unknown24;
-	byte unused28[0x10];
+	boolean unknown28;
+	byte unused29[3];
+	long unknown2C;
+	long unknown30;
+	long unknown34;
 	long maximum_lives;
-	byte unused3C[0x12];
-	boolean unknown4E;
-	byte unused4F[0x19];
+	float unknown3C;
+	long unknown40;
+	long unknown44;
+	long unknown48;
+	union
+	{
+		long value;
+		struct
+		{
+			boolean byte0;
+			boolean byte1;
+			boolean byte2;
+			boolean byte3;
+		};
+	} unknown4C;
+	long unknown50;
+	long unknown54;
+	long unknown58;
+	long unknown5C;
+	long unknown60;
+	short unknown64;
+	byte unused66[2];
 };
 
 typedef char verify_game_variant_size[sizeof(struct game_variant) == 0x68 ? 1 : -1];

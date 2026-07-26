@@ -617,6 +617,9 @@ boolean multiple_teams_alive(
 struct network_game_server *global_network_game_server_get(
 	void);
 
+boolean player_ui_game_variant_specified(
+	struct game_variant *variant);
+
 /* ---------- globals */
 
 struct game_engine *game_engine;
@@ -1041,7 +1044,7 @@ boolean game_engine_hud_draw_motion_sensor(
 			TEST_FLAG(global_variant.flags, _game_variant_draw_object_in_motion_sensor_bit);
 		default_draw_motion_sensor = global_variant.unknown24 == 0;
 
-		if (global_variant.engine_type == 2 && !global_variant.unknown4E)
+		if (global_variant.engine_type == 2 && !global_variant.unknown4C.byte2)
 			default_draw_motion_sensor = FALSE;
 
 		draw_motion_sensor |= default_draw_motion_sensor;
@@ -1062,6 +1065,28 @@ long find_netgame_flag(
 	find_netgame_flags(position, radius, height, type, index, 1, &flag_index);
 
 	return flag_index;
+}
+
+void game_engine_playlist_next(
+	long parameter0,
+	long parameter1,
+	long playlist_type)
+{
+	char *map_name;
+	struct game_variant variant;
+
+	csstrcpy(global_stage.map_name, "levels\\test\\carousel\\carousel");
+	map_name = main_get_multiplayer_map_name();
+	if (map_name && map_name[0])
+	{
+		csstrncpy(global_stage.map_name, map_name, sizeof(global_stage.map_name) - 1);
+		global_stage.map_name[sizeof(global_stage.map_name) - 1] = 0;
+	}
+
+	if (player_ui_game_variant_specified(&variant))
+		csmemcpy(&global_stage.variant, &variant, sizeof(global_stage.variant));
+
+	return;
 }
 
 boolean game_engine_should_end_game(
