@@ -703,6 +703,12 @@ long players_in_game(
 	return player_count;
 }
 
+void code_00097560(
+	void)
+{
+	return;
+}
+
 void game_engine_playlist_initialize(
 	void)
 {
