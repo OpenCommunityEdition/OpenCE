@@ -1416,6 +1416,57 @@ boolean accelerate_to_velocity3d(
 	return result;
 }
 
+void accelerate_to_velocity(
+	real *position,
+	real *velocity,
+	real acceleration,
+	real target_velocity,
+	real minimum_position,
+	real maximum_position,
+	boolean periodic)
+{
+	if (periodic)
+	{
+		real new_position = *position;
+		real new_velocity = *velocity;
+		real delta = target_velocity - new_velocity;
+
+		if (fabs(delta) > acceleration)
+		{
+			if (delta < 0.0f)
+				delta = -acceleration;
+			else
+				delta = acceleration;
+		}
+
+		new_velocity += delta;
+		new_position += new_velocity + delta * 0.5f;
+		if (new_position < minimum_position || new_position > maximum_position)
+		{
+			new_position = fmod(
+				new_position - minimum_position,
+				maximum_position - minimum_position) - minimum_position;
+		}
+
+		*position = new_position;
+		*velocity = new_velocity;
+	}
+	else
+	{
+		accelerate_to_position(
+			position,
+			velocity,
+			target_velocity < 0.0f ? minimum_position : maximum_position,
+			acceleration,
+			fabs(target_velocity),
+			minimum_position,
+			maximum_position,
+			FALSE);
+	}
+
+	return;
+}
+
 boolean valid_real_sine_cosine(
 	real sine, 
 	real cosine)

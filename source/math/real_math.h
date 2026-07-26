@@ -500,6 +500,23 @@ real point_to_line_distance_squared3d(real_point3d const *point, real_point3d co
 
 boolean sphere_test_vector3d(real_point3d const *center, real radius, real_point3d const *point, real_vector3d const *vector, real *t, real_vector3d *normal);
 
+boolean accelerate_to_position(
+	real *position,
+	real *velocity,
+	real target_position,
+	real maximum_velocity,
+	real acceleration,
+	real minimum_position,
+	real maximum_position,
+	boolean periodic);
+void accelerate_to_velocity(
+	real *position,
+	real *velocity,
+	real acceleration,
+	real target_velocity,
+	real minimum_position,
+	real maximum_position,
+	boolean periodic);
 boolean accelerate_to_velocity3d(
 	real_vector3d *velocity,
 	real_vector3d const *target_velocity,
