@@ -1369,6 +1369,48 @@ boolean game_engine_player_has_stealth_weapon(
 	return has_stealth_weapon;
 }
 
+void game_engine_weapon_fired(
+	long player_index)
+{
+	if (game_engine && player_index != NONE)
+	{
+		struct player_datum *player = player_get(player_index);
+		long unit_index = player->unit_index;
+
+		if (unit_index != NONE)
+		{
+			struct unit_datum *unit = unit_get(unit_index);
+			long weapon_index = unit_inventory_get_weapon(
+				unit_index,
+				unit_get(unit_index)->unit.current_weapon_index);
+			real active_camouflage_decrease = 0.1f;
+
+			if (game_engine_player_has_stealth_weapon(player_index))
+			{
+				active_camouflage_decrease = 0.0f;
+			}
+			else if (weapon_index != NONE)
+			{
+				struct weapon_datum *weapon = weapon_get(weapon_index);
+				struct weapon_definition *weapon_definition =
+					weapon_definition_get(weapon->definition_index);
+
+				if (0.0f != weapon_definition->weapon.active_camo_ding)
+					active_camouflage_decrease =
+						weapon_definition->weapon.active_camo_ding;
+			}
+
+			if (unit->unit.active_camouflage >= 0.05f)
+			{
+				unit->unit.active_camouflage -= active_camouflage_decrease;
+				unit->unit.cause_for_camo_regrowth = 1;
+				unit->unit.active_camouflage =
+					MAX(0.05f, unit->unit.active_camouflage);
+			}
+		}
+	}
+}
+
 long find_netgame_flag(
 	float const *position,
 	float radius,

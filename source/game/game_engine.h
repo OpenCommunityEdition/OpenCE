@@ -289,6 +289,9 @@ boolean game_engine_hud_draw_motion_sensor(
 boolean game_engine_player_has_stealth_weapon(
 	long player_index);
 
+void game_engine_weapon_fired(
+	long player_index);
+
 short game_engine_player_get_custom_motion_sensor_positions(
 	long player_index,
 	union real_point2d *positions,
