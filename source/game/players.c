@@ -399,6 +399,8 @@ boolean biped_fix_position(
 static long code_000a9bc0(
 	short bsp_switch_trigger_volume_index,
 	long object_index);
+static void code_000aa220(
+	long player_index);
 static void code_000aa300(
 	long player_index);
 static void code_000aa3b0(
@@ -1915,6 +1917,7 @@ void debug_player_teleport(
 	   emitted; their real call sites are manually inlined for exact codegen. */
 	if (0)
 	{
+		code_000aa220(0);
 		code_000aa4f0(0, 0);
 		code_000aa530(0, 0);
 		code_000aa560(0, 0);
@@ -2183,6 +2186,20 @@ long code_000aa160(
 void code_000aa180(
 	void)
 {
+	return;
+}
+
+/* Exact-emission foundation: the players_update_after_game call is inlined,
+   while VC7 also emits this private helper with January's register ABI. */
+static void code_000aa220(
+	long player_index)
+{
+	struct player_datum *player;
+
+	player = player_get(player_index);
+	player->action_result = 0;
+	player->action_object_index = NONE;
+
 	return;
 }
 
