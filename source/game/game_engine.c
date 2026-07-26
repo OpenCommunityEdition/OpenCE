@@ -3239,6 +3239,55 @@ boolean game_engine_allow_integrated_lights(
 	return allow_integrated_lights;
 }
 
+void game_engine_variant_cleanup(
+	struct game_variant *variant)
+{
+	struct game_variant original = *variant;
+
+	*(short *)&variant->unused2[20] = 0;
+	variant->engine_type = PIN(variant->engine_type, 1, 5);
+	variant->has_teams = !!variant->has_teams;
+	variant->unknown28 = !!variant->unknown28;
+	variant->unknown2C = MAX(variant->unknown2C, 0);
+	variant->unknown30 = MAX(variant->unknown30, 0);
+	variant->unknown34 = MAX(variant->unknown34, 0);
+	variant->maximum_lives = MAX(variant->maximum_lives, 0);
+	variant->unknown3C = PIN(variant->unknown3C, 0.25f, 4.0f);
+	variant->unknown44 = PIN(variant->unknown44, 0, 10);
+	variant->unknown48 = PIN(variant->unknown48, 0, 4);
+
+	switch (variant->engine_type)
+	{
+	case 1:
+		variant->unknown4C.byte0 = !!variant->unknown4C.byte0;
+		variant->unknown4C.byte1 = !!variant->unknown4C.byte1;
+		variant->unknown4C.byte2 = !!variant->unknown4C.byte2;
+		variant->has_teams = TRUE;
+		variant->unknown4C.byte3 = !!variant->unknown4C.byte3;
+		variant->unknown50 = FLOOR(variant->unknown50, 0);
+		break;
+
+	case 2:
+		variant->unknown4C.byte0 = !!variant->unknown4C.byte0;
+		variant->unknown4C.byte1 = !!variant->unknown4C.byte1;
+		variant->unknown4C.byte2 = !!variant->unknown4C.byte2;
+		break;
+	}
+
+	if (csmemcmp(&original, variant, sizeof(original)) != 0)
+	{
+		struct game_variant cleaned;
+
+		csmemcpy(&cleaned, &original, sizeof(cleaned));
+		csmemcpy(&cleaned, variant, sizeof(cleaned));
+		error(
+			_error_silent,
+			"NETGAME CODE FAILURE: game_engine_variant_cleanup changed the variant");
+	}
+
+	return;
+}
+
 void game_engine_initialize(
 	struct game_variant *variant)
 {
