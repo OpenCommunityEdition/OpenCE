@@ -780,6 +780,35 @@ void code_00097560(
 	return;
 }
 
+static boolean code_00097840(
+	long goal_index,
+	struct player_datum *player,
+	long player_index)
+{
+	boolean result = FALSE;
+
+	if (game_engine)
+	{
+		struct game_engine_goal *goal = &global_goal[goal_index];
+
+		if (game_engine->player_can_see_goal)
+		{
+			if (goal->in_use)
+				result = game_engine->player_can_see_goal(player_index, goal_index);
+		}
+		else if (
+			goal->in_use &&
+			(goal->target_object_index == NONE || player_index == goal->target_object_index) &&
+			(goal->team_index == NONE || player->team_index == goal->team_index) &&
+			(goal->player_index == NONE || player_index != goal->player_index))
+		{
+			result = TRUE;
+		}
+	}
+
+	return result;
+}
+
 boolean code_00097c00(
 	void)
 {
@@ -1507,6 +1536,40 @@ boolean game_engine_player_is_out_of_lives(
 	}
 
 	return out_of_lives;
+}
+
+short game_engine_player_get_custom_motion_sensor_positions(
+	long player_index,
+	real_point2d *positions,
+	byte *goal_indices,
+	short maximum_count)
+{
+	short count = 0;
+
+	if (game_engine && global_variant.unknown24 == 0 && player_index != NONE)
+	{
+		struct player_datum *player = player_get(player_index);
+		long goal_index = 0;
+		struct game_engine_goal *goal = global_goal;
+
+		do
+		{
+			if (code_00097840(goal_index, player, player_index) && count < maximum_count)
+			{
+				goal_indices[count] = goal_index;
+				positions[count].x = goal->position.x;
+				positions[count].y = goal->position.y;
+				count++;
+			}
+
+			goal++;
+			goal_index++;
+		}
+		/* January uses the adjacent global_variant address as the signed loop bound. */
+		while ((long)goal < (long)&global_variant);
+	}
+
+	return count;
 }
 
 boolean game_engine_hud_draw_messages(

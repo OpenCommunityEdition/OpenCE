@@ -32,6 +32,7 @@ enum
 
 struct game_globals;
 union real_argb_color;
+union real_point2d;
 union real_point3d;
 union real_rgb_color;
 
@@ -108,7 +109,9 @@ struct game_engine
 		long player_index);
 	void (*unknown70)(void);
 	void (*team_index_override)(void);
-	void (*unknown78)(void);
+	boolean (*player_can_see_goal)(
+		long player_index,
+		long goal_index);
 	boolean (*test_flag)(
 		long flag);
 	boolean (*test_trait)(
@@ -278,6 +281,12 @@ boolean game_engine_hud_draw_motion_sensor(
 
 boolean game_engine_player_has_stealth_weapon(
 	long player_index);
+
+short game_engine_player_get_custom_motion_sensor_positions(
+	long player_index,
+	union real_point2d *positions,
+	byte *goal_indices,
+	short maximum_count);
 
 union real_rgb_color *game_engine_player_get_change_color(
 	union real_rgb_color *change_color,
