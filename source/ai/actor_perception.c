@@ -266,13 +266,17 @@ symbols in this file:
  */
 struct actor_perception_actor_view
 {
-	byte __unknown000[0x18];
+	byte __unknown000[4];
+	short team_index;
+	byte __unknown006[0x12];
 	long unit_index;
 	byte __unknown01C[0x4E];
 	short combat_status;
-	byte __unknown06C[2];
+	short friend_state;
 	short artificial_combat_status;
-	byte __unknown070[0xF1];
+	byte __unknown070[0x38];
+	short friend_fighting_count;
+	byte __unknown0AA[0xB7];
 	boolean flying;
 	byte __unknown162[0x8B];
 	boolean searching;
@@ -283,7 +287,9 @@ struct actor_perception_actor_view
 	byte __unknown26A[2];
 	long target_last_visible_time;
 	long target_prop_index;
-	byte __unknown274[0x134];
+	byte __unknown274[0x94];
+	short active_threat_count;
+	byte __unknown30A[0x9E];
 	short unopposable_retreat_timer;
 	byte __unknown3AA[2];
 	long unopposable_retreat_prop_index;
@@ -330,7 +336,9 @@ struct actor_perception_prop_view
 	long vehicle_index;
 	byte __unknown114[0x13];
 	boolean dead;
-	byte __unknown128[0x0D];
+	byte __unknown128[4];
+	boolean fleeing;
+	byte __unknown12D[8];
 	boolean dangerous_vehicle_driver;
 	boolean preferred_target;
 };
@@ -339,6 +347,10 @@ typedef char actor_perception_actor_view_target_prop_index_offset_assert[
 	offsetof(struct actor_perception_actor_view, target_prop_index) == 0x270 ? 1 : -1];
 typedef char actor_perception_prop_view_unopposable_enemy_offset_assert[
 	offsetof(struct actor_perception_prop_view, unopposable_enemy) == 0xA4 ? 1 : -1];
+typedef char actor_perception_actor_view_active_threat_count_offset_assert[
+	offsetof(struct actor_perception_actor_view, active_threat_count) == 0x308 ? 1 : -1];
+typedef char actor_perception_prop_view_fleeing_offset_assert[
+	offsetof(struct actor_perception_prop_view, fleeing) == 0x12C ? 1 : -1];
 
 union actor_perception_boolean_slot
 {
@@ -953,6 +965,63 @@ boolean actor_expected_acknowledgement(
 	}
 
 	return result;
+}
+
+boolean actor_emotion_flee_with_friends(
+	long actor_index,
+	real *desire_to_flee)
+{
+	struct actor_perception_actor_view *actor =
+		(struct actor_perception_actor_view *)actor_get(actor_index);
+	struct prop_iterator iterator;
+	struct actor_perception_prop_view *prop;
+	short fighting_friend_count = 0;
+	short fleeing_friend_count = 0;
+	real modifier;
+
+	prop_iterator_new(&iterator, actor_index);
+	prop =
+		(struct actor_perception_prop_view *)prop_iterator_next(&iterator);
+	while (prop != NULL)
+	{
+		if (prop->state >= _prop_state_becoming_unacknowledged &&
+			prop->state <= _prop_state_acknowledged &&
+			!prop->enemy &&
+			prop->type == actor->team_index &&
+			prop->actor_index != NONE)
+		{
+			struct actor_perception_actor_view *friend_actor =
+				(struct actor_perception_actor_view *)actor_get(
+					prop->actor_index);
+
+			if (friend_actor->active_threat_count > 0 ||
+				(friend_actor->friend_state == 4 &&
+					friend_actor->friend_fighting_count > 0))
+			{
+				fighting_friend_count++;
+			}
+			else if (prop->fleeing)
+			{
+				fleeing_friend_count++;
+			}
+		}
+
+		prop =
+			(struct actor_perception_prop_view *)prop_iterator_next(
+				&iterator);
+	}
+
+	if (fighting_friend_count > 1)
+		return TRUE;
+
+	if (fleeing_friend_count > 1)
+		modifier = 1.0f - (fleeing_friend_count - 1) * 0.25f;
+	else
+		modifier = 1.0f + (1 - fleeing_friend_count) * 0.5f;
+
+	*desire_to_flee *= PIN(modifier, 0.0f, 2.0f);
+
+	return FALSE;
 }
 
 boolean actor_situation_try_new_target(
