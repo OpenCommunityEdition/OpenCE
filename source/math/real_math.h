@@ -521,6 +521,12 @@ boolean accelerate_to_velocity3d(
 	real_vector3d *velocity,
 	real_vector3d const *target_velocity,
 	real acceleration);
+boolean accerate_to_position3d(
+	real_point3d *position,
+	real_vector3d *velocity,
+	real_point3d const *target_position,
+	long unused,
+	real maximum_length);
 
 boolean valid_real_sine_cosine(real sine, real cosine);
 

@@ -1416,6 +1416,53 @@ boolean accelerate_to_velocity3d(
 	return result;
 }
 
+boolean accerate_to_position3d(
+	real_point3d *position,
+	real_vector3d *velocity,
+	real_point3d const *target_position,
+	long unused,
+	real maximum_length)
+{
+	volatile real delta[3];
+	real magnitude;
+	real scale;
+
+	delta[0] = target_position->x - position->x;
+	delta[1] = target_position->y - position->y;
+	delta[2] = target_position->z - position->z;
+	magnitude = normalize3d((real_vector3d *)(real *)delta);
+	if (magnitude == 0.0f)
+	{
+		delta[0] = 0.0f;
+		delta[1] = 0.0f;
+		delta[2] = 0.0f;
+	}
+	else
+	{
+		scale = square_root(
+			magnitude * maximum_length +
+			magnitude * maximum_length);
+		delta[0] = delta[0] * scale;
+		delta[1] = delta[1] * scale;
+		delta[2] = delta[2] * scale;
+	}
+
+	if (accelerate_to_velocity3d(
+			velocity,
+			(real_vector3d *)(real *)delta,
+			maximum_length) &&
+		magnitude == 0.0f)
+	{
+		*position = *target_position;
+		return TRUE;
+	}
+
+	position->x = position->x + velocity->i;
+	position->y = velocity->j + position->y;
+	position->z = velocity->k + position->z;
+	return FALSE;
+}
+
 void accelerate_to_velocity(
 	real *position,
 	real *velocity,
