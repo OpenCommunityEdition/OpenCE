@@ -70,8 +70,8 @@ static void code_0010ba30(
 static void code_0010bab0(
 	struct lra_cache *cache);
 static long code_0010bdf0(
-	struct lra_block *block,
-	struct lra_cache *cache);
+	struct lra_cache *cache,
+	struct lra_block *block);
 
 /* ---------- globals */
 
@@ -122,15 +122,17 @@ static void code_0010ba30(
 	struct lra_block *block,
 	struct lra_cache *cache)
 {
+	long block_offset;
+
 	match_vassert(
 		"c:\\halo\\SOURCE\\memory\\lra_cache.c",
 		398,
 		(block->signature&~(FLAG(_lra_block_locked_bit)|FLAG(_lra_block_deleted_bit)))==LRA_BLOCK_SIGNATURE &&
 			block->size>=0 && block->size<cache->size &&
-			(char *)block-(char *)cache->base_address>=0 &&
-			block->size+((char *)block-(char *)cache->base_address)<=cache->size &&
-			(!block->next || (char *)block->next-(char *)cache->base_address>=0) &&
-			(unsigned long)((block->next ? (char *)block->next-(char *)cache->base_address : 0)+sizeof(struct lra_block))<=(unsigned long)cache->size,
+			(block_offset=(char *)block-(char *)cache->base_address)>=0 &&
+			block->size+block_offset<=cache->size &&
+			(block_offset=(block->next ? (char *)block->next-(char *)cache->base_address : 0))>=0 &&
+			(unsigned long)(block_offset+sizeof(struct lra_block))<=(unsigned long)cache->size,
 		csprintf(temporary, "lra cache %s @%p block @%p appears to be corrupt", cache->name, cache, block));
 
 	return;
@@ -139,6 +141,8 @@ static void code_0010ba30(
 static void code_0010bab0(
 	struct lra_cache *cache)
 {
+	struct lra_block *last_block;
+
 	match_assert("c:\\halo\\SOURCE\\memory\\lra_cache.c", 408, cache);
 
 	match_vassert(
@@ -147,17 +151,18 @@ static void code_0010bab0(
 		cache->signature==LRA_CACHE_SIGNATURE && cache->base_address && cache->size>=0,
 		csprintf(temporary, "lra cache %s @%p appears to be corrupt", cache->name, cache));
 
-	if (cache->last_block)
+	last_block = cache->last_block;
+	if (last_block)
 	{
-		code_0010ba30(cache->last_block, cache);
+		code_0010ba30(last_block, cache);
 	}
 
 	return;
 }
 
 static long code_0010bdf0(
-	struct lra_block *block,
-	struct lra_cache *cache)
+	struct lra_cache *cache,
+	struct lra_block *block)
 {
 	code_0010ba30(block, cache);
 
@@ -335,7 +340,7 @@ void *lra_allocate(
 	{
 		if (last_block)
 		{
-			write_offset = code_0010bdf0(last_block, cache) + last_block->size;
+			write_offset = code_0010bdf0(cache, last_block) + last_block->size;
 		}
 		else
 		{
@@ -346,7 +351,7 @@ void *lra_allocate(
 		{
 			code_0010ba30(next_block, cache);
 
-			if (write_offset+size>code_0010bdf0(next_block, cache))
+			if (write_offset+size>code_0010bdf0(cache, next_block))
 			{
 				if (TEST_FLAG(next_block->signature, _lra_block_locked_bit))
 				{
