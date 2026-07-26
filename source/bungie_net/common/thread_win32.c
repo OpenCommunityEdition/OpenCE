@@ -200,32 +200,29 @@ boolean create_mutex(
 	struct mutex_reference **mutex_reference)
 {
 	struct mutex_reference *reference;
+	boolean success;
 
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\thread_win32.c", 0xB8, mutex_reference);
 
+	success = FALSE;
 	reference = code_0006fc60();
-	if (!reference)
+	if (reference)
 	{
-		*mutex_reference = reference;
-		return FALSE;
+		_snprintf(
+			reference->name,
+			NUMBEROF(reference->name),
+			"mutex_%ld",
+			bss_0031c728.mutex_index++);
+		reference->handle = CreateMutexA(NULL, FALSE, reference->name);
+		if (reference->handle)
+			success = TRUE;
+		else
+			reference = NULL;
 	}
 
-	_snprintf(
-		reference->name,
-		NUMBEROF(reference->name),
-		"mutex_%ld",
-		bss_0031c728.mutex_index++);
-	reference->handle = CreateMutexA(NULL, FALSE, reference->name);
-	if (reference->handle)
-	{
-		*mutex_reference = reference;
-		return TRUE;
-	}
+	*mutex_reference = reference;
 
-	/* Original bug: the reserved slot remains marked in use when mutex
-	   creation fails. A nonmatching fix would release the slot here. */
-	*mutex_reference = NULL;
-	return FALSE;
+	return success;
 }
 
 boolean take_mutex(
