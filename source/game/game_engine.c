@@ -2254,6 +2254,34 @@ struct game_variant *build_game_variant_crazy_king(
 	return variant;
 }
 
+struct game_variant *build_game_variant_slayer(
+	struct game_variant *variant)
+{
+	struct game_variant result = { 0 };
+
+	result.engine_type = 2;
+	result.flags = (result.flags & ~0x3C) | 3;
+	result.unknown48 = 2;
+	result.unknown24 = 0;
+	result.unknown3C = 1.0f;
+	result.maximum_lives = 0;
+	result.unknown28 = FALSE;
+	result.unknown30 = 0;
+	result.unknown2C = 0;
+	result.unknown40 = 15;
+	result.unknown34 = 300;
+	result.has_teams = FALSE;
+	result.unknown44 = 0;
+	result.unknown4C.byte0 = 0;
+	result.unknown4C.byte1 = 0;
+	result.unknown4C.byte2 = 0;
+	result.unknown64 = 1;
+
+	*variant = result;
+
+	return variant;
+}
+
 long postgame_statistic_get_rating(
 	long player_index,
 	long parameter1,
