@@ -555,6 +555,7 @@ symbols in this file:
 #include "saved games/player_profile.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#include "text/text_group.h"
 #include "text/unicode.h"
 #include "units/units.h"
 
@@ -1763,6 +1764,54 @@ void game_engine_weapon_fired(
 			}
 		}
 	}
+}
+
+struct game_engine_place
+{
+	short flags;
+	short place;
+};
+
+wchar_t *get_place_name(
+	struct game_engine_place place)
+{
+	long lookup_index;
+	long string_list_index;
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\game\\game_engine.c",
+		0x1316,
+		place.place < 16,
+		"place.place < maximum_places");
+
+	if ((place.flags & FLAG(2)) && TEST_FLAG(place.flags, 0))
+		lookup_index = 35;
+	else if ((place.flags & FLAG(2)) && place.place == 0)
+		lookup_index = 33;
+	else if ((place.flags & FLAG(2)) && place.place == 1)
+		lookup_index = 34;
+	else if (TEST_FLAG(place.flags, 1))
+		lookup_index = 32;
+	else
+	{
+		lookup_index = place.place;
+		if (TEST_FLAG(place.flags, 0))
+			lookup_index += 16;
+	}
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\game\\game_engine.c",
+		0x1331,
+		lookup_index != NONE,
+		"NONE != lookup_index");
+
+	string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+	if (string_list_index != NONE)
+		return unicode_string_list_get_string(
+			string_list_index,
+			lookup_index + 0x66);
+
+	return L"";
 }
 
 long find_netgame_flags(
