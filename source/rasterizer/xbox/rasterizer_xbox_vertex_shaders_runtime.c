@@ -365,12 +365,12 @@ void rasterizer_set_vertex_shader_permutation(
 				data_0030d3b8.packed_shaders[packed_shader_index].loaded = FALSE;
 		}
 
-			if (rasterizer_debug_options.vertex_shader_statistics)
-				rasterizer_frame_statistics.vertex_shader_instruction_count +=
-					vertex_shader_table[vertex_shader_index].instruction_count;
+		if (rasterizer_debug_options.vertex_shader_statistics)
+			rasterizer_frame_statistics.vertex_shader_instruction_count +=
+				vertex_shader_table[vertex_shader_index].instruction_count;
 
-		set_current_vertex_shader:
-			data_0030d3b8.current_vertex_shader_index = vertex_shader_index;
+	set_current_vertex_shader:
+		data_0030d3b8.current_vertex_shader_index = vertex_shader_index;
 		if (!success)
 			error(2, "### ERROR rasterizer_set_vertex_shader failed");
 	}

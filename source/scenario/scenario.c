@@ -210,7 +210,8 @@ struct memory_status
 
 /* ---------- prototypes */
 
-void _ReadWriteBarrier(void);
+void _ReadWriteBarrier(
+	void);
 #pragma intrinsic(_ReadWriteBarrier)
 
 void objects_reconnect_to_structure_bsp(
@@ -1477,6 +1478,10 @@ void scenario_get_atmospheric_fog(
 	else
 		blended_distance = 0.0f;
 	render_fog->atmospheric_maximum_distance = blended_distance;
+	/*
+	 * Exactness exception to the preferred single-return house style: the two
+	 * saturated endpoints below reproduce the January control-flow exits.
+	 */
 	if (fog_state->indoor_fog_scale < 0.0f)
 	{
 		render_fog->screen_external_intensity = 0.0f;
