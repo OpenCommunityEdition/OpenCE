@@ -413,6 +413,26 @@ void player_effect_screen_flash(
 	real scale);
 boolean object_double_charge_shield(
 	long object_index);
+void device_touched(
+	long device_index,
+	long unit_index);
+boolean unit_add_equipment_to_inventory(
+	long unit_index,
+	long equipment_index,
+	boolean replace);
+boolean unit_can_enter_seat(
+	long unit_index,
+	long target_unit_index,
+	short seat_index,
+	long *occupant_unit_index);
+void unit_enter_seat(
+	long unit_index,
+	long target_unit_index,
+	short seat_index);
+void ai_try_vehicle_eviction(
+	long actor_index,
+	long entering_unit_index,
+	boolean immediate);
 void observer_obsolete_position(
 	short local_player_index);
 boolean biped_fix_position(
@@ -456,6 +476,8 @@ static __declspec(noinline) void code_000ab350(
 	short action_result,
 	long object_index,
 	short seat_index);
+static boolean code_000ab440(
+	long player_index);
 static void code_000ac0b0(
 	long player_index,
 	long vehicle_index);
@@ -1526,6 +1548,115 @@ static void code_000a9ff0(
 	return;
 }
 
+static boolean code_000ab440(
+	long player_index)
+{
+	struct player_datum *player;
+	struct unit_datum *unit;
+	struct unit_datum *nearby_unit;
+	struct item_datum *equipment;
+	struct vehicle_datum *target_vehicle;
+	real_matrix4x3 player_matrix;
+	real_matrix4x3 target_matrix;
+	real_point3d *player_position;
+	real_point3d *target_position;
+	real_vector3d delta;
+	real dot;
+	char approach_type;
+	boolean result;
+
+	player = player_get(player_index);
+	unit_get(player->unit_index);
+	result = FALSE;
+	switch (player->action_result)
+	{
+	case 10:
+		device_touched(player->action_object_index, player->unit_index);
+		result = TRUE;
+		break;
+
+	case 5:
+		unit_drop_current_equipment(player->unit_index);
+		if (unit_add_equipment_to_inventory(
+			player->unit_index,
+			player->action_object_index,
+			FALSE))
+		{
+			equipment = equipment_get(player->action_object_index);
+			hud_picked_up_powerup(
+				player->local_player_index,
+				equipment->definition_index);
+		}
+		result = TRUE;
+		break;
+
+	case 8:
+	case 9:
+	{
+		long nearby_unit_index;
+
+		if (unit_can_enter_seat(
+			player->unit_index,
+			player->action_object_index,
+			player->action_seat_index,
+			(nearby_unit_index = NONE, &nearby_unit_index)))
+		{
+			unit_enter_seat(
+				player->unit_index,
+				player->action_object_index,
+				player->action_seat_index);
+		}
+		else if (nearby_unit_index != NONE)
+		{
+			nearby_unit = unit_get(nearby_unit_index);
+			if (nearby_unit->unit.actor_index != NONE)
+			{
+				ai_try_vehicle_eviction(
+					nearby_unit->unit.actor_index,
+					player->unit_index,
+					TRUE);
+			}
+		}
+		break;
+	}
+
+	case 11:
+		unit = unit_get(player->unit_index);
+		target_vehicle = (struct vehicle_datum *)vehicle_get(
+			player->action_object_index);
+		unit->unit.last_vehicle_index = player->action_object_index;
+		unit->unit.game_time_at_last_vehicle_exit = game_time_get();
+
+		if (fabs(target_vehicle->object.forward.k) > 0.70710677f)
+		{
+			approach_type = (target_vehicle->object.forward.k < 0.f) + 3;
+		}
+		else
+		{
+			target_position = &object_get_world_matrix(
+				player->action_object_index,
+				&target_matrix)->position;
+			player_position = &object_get_world_matrix(
+				player->unit_index,
+				&player_matrix)->position;
+			delta.i = target_position->x - player_position->x;
+			delta.j = target_position->y - player_position->y;
+			delta.k = target_position->z - player_position->z;
+			cross_product3d(global_up3d, &delta, &delta);
+			dot = dot_product3d(&delta, &target_vehicle->object.forward);
+			approach_type = (dot > 0.f) + 1;
+		}
+
+		SET_FLAG(target_vehicle->vehicle.flags, 4, TRUE);
+		target_vehicle->vehicle.approach_type = approach_type;
+		target_vehicle->vehicle.unknown42A = 0;
+		result = TRUE;
+		break;
+	}
+
+	return result;
+}
+
 /* NonMatching foundation: exact 0x510 padded size and all 61 relocation
    identities, with residual register allocation and block-layout differences.
    This semantic caller is retained because it authentically emits the exact
@@ -1960,6 +2091,7 @@ void debug_player_teleport(
 		code_000aa4f0(0, 0);
 		code_000aa530(0, 0);
 		code_000aa560(0, 0);
+		code_000ab440(0);
 		code_000ac0b0(0, 0);
 	}
 
