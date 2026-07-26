@@ -233,6 +233,7 @@ symbols in this file:
 #include "data.h"
 #include "effects/player_effects.h"
 #include "game.h"
+#include "game/game_globals.h"
 #include "game_engine.h"
 #include "input.h"
 #include "interface/hud.h"
@@ -363,6 +364,12 @@ void player_effect_screen_flash(
 	real scale);
 boolean object_double_charge_shield(
 	long object_index);
+void observer_obsolete_position(
+	short local_player_index);
+void player_add_equipment(
+	long unit_index,
+	short starting_profile_index,
+	boolean reset_equipment);
 
 static long code_000a9bc0(
 	short bsp_switch_trigger_volume_index,
@@ -1115,6 +1122,174 @@ long find_best_starting_location_index(
 	}
 
 	return best_starting_location_index;
+}
+
+void code_000ab020(
+	long player_index)
+{
+	struct player_datum *player;
+	struct game_globals *volatile game_globals;
+	struct player_datum *player2;
+	struct unit_datum *unit;
+	struct scenario *scenario;
+	struct game_globals_player_information *player_information;
+	struct game_globals_multiplayer_information *multiplayer_information;
+	struct scenario_player_starting_location *starting_location;
+	struct object_placement_data placement_data;
+	real_rgb_color change_color;
+	real_rgb_color change_color_storage;
+	long saved_unit_index;
+	long weapon_index;
+	long unit_definition_index;
+	long unit_index;
+	long starting_equipment_count;
+	short starting_location_index;
+
+	player = player_get(player_index);
+	saved_unit_index = NONE;
+	if (!game_engine_running() && player->local_player_index != NONE)
+	{
+		saved_unit_index =
+			players_globals->dead_units[player->local_player_index];
+		players_globals->dead_units[player->local_player_index] = NONE;
+		if (saved_unit_index != NONE)
+		{
+			unit = unit_get(saved_unit_index);
+			if (TEST_FLAG(unit->object.damage_flags, _object_dead_bit))
+			{
+				object_delete(saved_unit_index);
+				saved_unit_index = NONE;
+			}
+		}
+	}
+
+	if (!game_engine_running() && saved_unit_index != NONE)
+	{
+		unit = unit_get(saved_unit_index);
+		weapon_index = unit_inventory_get_weapon(
+			saved_unit_index,
+			unit->unit.current_weapon_index);
+		match_assert(
+			"c:\\halo\\SOURCE\\game\\players.c",
+			0x73A,
+			player->local_player_index!=NONE);
+		object_activate(saved_unit_index);
+		object_set_visibility(saved_unit_index, TRUE);
+		players_set_local_player_unit(
+			player->local_player_index,
+			saved_unit_index);
+		if (weapon_index != NONE)
+			object_set_visibility(weapon_index, TRUE);
+	}
+	else
+	{
+		scenario = global_scenario_get();
+		if (ai_debug.selected_squad_index != NONE)
+		{
+			TAG_BLOCK_GET_ELEMENT(
+				&scenario->ai_encounters,
+				DATUM_INDEX_TO_ABSOLUTE_INDEX(ai_debug.selected_squad_index),
+				struct encounter_definition);
+		}
+
+		starting_location_index =
+			(short)find_best_starting_location_index(player_index);
+		if (starting_location_index != NONE)
+		{
+			game_globals = scenario_get_game_globals();
+			player_information = TAG_BLOCK_GET_ELEMENT(
+				&scenario_get_game_globals()->player_information,
+				0,
+				struct game_globals_player_information);
+			if (player_information->player_unit.index != NONE)
+			{
+				starting_location =
+					player_get_starting_location(starting_location_index);
+				if (game_engine_running())
+				{
+					multiplayer_information = TAG_BLOCK_GET_ELEMENT(
+						&game_globals->multiplayer_information,
+						0,
+						struct game_globals_multiplayer_information);
+					unit_definition_index = multiplayer_information->unit.index;
+				}
+				else
+				{
+					unit_definition_index = player_information->player_unit.index;
+				}
+
+				object_placement_data_new(
+					&placement_data,
+					unit_definition_index,
+					NONE);
+				placement_data.position = starting_location->position;
+				vector3d_from_angle(
+					&placement_data.forward,
+					starting_location->facing);
+				placement_data.up = *global_up3d;
+				change_color = *game_engine_player_get_change_color(
+					&change_color_storage,
+					player_index);
+				placement_data_set_change_color(
+					&placement_data,
+					&change_color);
+				unit_index = object_new(&placement_data);
+				if (unit_index != NONE)
+				{
+					unit = unit_try_and_get(unit_index);
+					if (unit != NULL)
+					{
+						player2 = player_get(player_index);
+						unit->object.owner_player_index = player_index;
+						unit->object.owner_team_index = (short)player2->team_index;
+						unit->unit.player_index = player_index;
+						player2->unit_index = unit_index;
+						unit_set_actively_controlled(unit_index, TRUE);
+						if (player2->local_player_index != NONE)
+						{
+							player_control_new_unit(
+								player2->local_player_index,
+								unit_index);
+						}
+
+						if (!game_engine_running())
+						{
+							scenario = global_scenario_get();
+							starting_equipment_count =
+								*(long *)((byte *)scenario + 0x348);
+							if (starting_equipment_count > 1 &&
+								*(short *)((byte *)player2 + 0xAA) > 0)
+							{
+								player_add_equipment(
+									player2->unit_index,
+									1,
+									TRUE);
+							}
+							else if (starting_equipment_count != 0)
+							{
+								player_add_equipment(
+									player2->unit_index,
+									0,
+									TRUE);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	csmemset(
+		player->powerup_durations,
+		0,
+		sizeof(player->powerup_durations));
+	player2 = player_get(player_index);
+	player2->action_result = 0;
+	player2->action_object_index = NONE;
+	if (player->local_player_index != NONE)
+		observer_obsolete_position(player->local_player_index);
+
+	return;
 }
 
 boolean player_teleport(
