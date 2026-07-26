@@ -258,6 +258,9 @@ boolean game_engine_draw_object_in_motion_sensor(
 boolean game_engine_hud_draw_motion_sensor(
 	void);
 
+boolean game_engine_player_has_stealth_weapon(
+	long player_index);
+
 long find_netgame_flags(
 	float const *position,
 	float radius,

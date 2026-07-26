@@ -542,6 +542,7 @@ symbols in this file:
 
 #include "game_globals.h"
 #include "interface/ui_widget.h"
+#include "items/weapon_definitions.h"
 #include "items/weapons.h"
 #include "main/main.h"
 #include "networking/network_game_globals.h"
@@ -1051,6 +1052,42 @@ boolean game_engine_hud_draw_motion_sensor(
 	}
 
 	return draw_motion_sensor;
+}
+
+boolean game_engine_player_has_stealth_weapon(
+	long player_index)
+{
+	boolean has_stealth_weapon = FALSE;
+
+	if (player_index != NONE)
+	{
+		struct player_datum *player = player_get(player_index);
+		if (player->unit_index != NONE)
+		{
+			struct unit_datum *unit = unit_get(player->unit_index);
+			long current_weapon_index = unit->unit.current_weapon_index;
+
+			if (current_weapon_index != NONE)
+			{
+				long weapon_index =
+					unit->unit.weapon_object_indices[current_weapon_index];
+				if (weapon_index != NONE)
+				{
+					struct weapon_datum *weapon = weapon_get(weapon_index);
+					if (weapon->definition_index != NONE)
+					{
+						struct weapon_definition *weapon_definition =
+							weapon_definition_get(weapon->definition_index);
+						has_stealth_weapon = TEST_FLAG(
+							weapon_definition->weapon.flags,
+							_weapon_does_not_depower_active_camo_bit);
+					}
+				}
+			}
+		}
+	}
+
+	return has_stealth_weapon;
 }
 
 long find_netgame_flag(
