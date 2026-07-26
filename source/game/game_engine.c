@@ -618,6 +618,18 @@ typedef char verify_game_engine_stage_size[
 
 /* ---------- prototypes */
 
+long hud_get_nav_point_render_type(
+	long local_player_index,
+	real_point3d const *position,
+	struct game_engine_goal const *goal,
+	long object_index);
+
+void custom_render_nav_point(
+	long local_player_index,
+	struct game_engine_goal const *goal,
+	word nav_point_index,
+	long render_type);
+
 void game_engine_playlist_next(
 	long parameter0,
 	long parameter1,
@@ -1704,6 +1716,57 @@ short game_engine_player_get_custom_motion_sensor_positions(
 	}
 
 	return count;
+}
+
+void game_engine_render_nav_points(
+	long local_player_index)
+{
+	if (game_engine &&
+		global_variant.unknown24 == 1 &&
+		(short)local_player_index != NONE)
+	{
+		long player_index = local_player_get_player_index((short)local_player_index);
+
+		if (player_index != NONE)
+		{
+			struct player_datum *player = player_get(player_index);
+
+			if (player->unit_index != NONE)
+			{
+				real_point3d head_position;
+
+				unit_get_head_position(player->unit_index, &head_position);
+				{
+					long goal_index = 0;
+					struct game_engine_goal *goal = global_goal;
+
+					do
+					{
+						if (code_00097840(goal_index, player, player_index))
+						{
+							long render_type = hud_get_nav_point_render_type(
+								local_player_index,
+								&head_position,
+								goal,
+								NONE);
+
+							custom_render_nav_point(
+								local_player_index,
+								goal,
+								(word)goal->nav_point_index,
+								render_type);
+						}
+
+						goal++;
+						goal_index++;
+					}
+					while ((long)goal < (long)&global_variant);
+				}
+			}
+		}
+	}
+
+	return;
 }
 
 boolean game_engine_hud_draw_messages(

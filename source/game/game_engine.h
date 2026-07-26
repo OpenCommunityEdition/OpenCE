@@ -311,6 +311,9 @@ short game_engine_player_get_custom_motion_sensor_positions(
 	byte *goal_indices,
 	short maximum_count);
 
+void game_engine_render_nav_points(
+	long local_player_index);
+
 union real_rgb_color *game_engine_player_get_change_color(
 	union real_rgb_color *change_color,
 	long player_index);
