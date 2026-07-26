@@ -348,6 +348,9 @@ void game_engine_player_damaged_player(
 boolean game_engine_player_is_out_of_lives(
 	long player_index);
 
+boolean game_engine_man_out(
+	long player_index);
+
 boolean game_engine_hud_draw_messages(
 	long player_index);
 

@@ -1522,6 +1522,39 @@ void game_engine_player_damaged_player(
 	return;
 }
 
+static boolean code_00097250(
+	long player_index)
+{
+	struct player_datum *player = player_get(player_index);
+	boolean result = FALSE;
+
+	if (global_variant.unknown28 && player->unit_index==NONE)
+	{
+		struct data_iterator iterator;
+		struct player_datum *other_player;
+
+		result = TRUE;
+		data_iterator_new(&iterator, player_data);
+		other_player = (struct player_datum *)data_iterator_next(&iterator);
+		while (other_player)
+		{
+			if (other_player->unit_index==NONE &&
+				other_player!=player &&
+				(other_player->death_time>player->death_time ||
+					(other_player->death_time==player->death_time &&
+						DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index)<
+							DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index))))
+			{
+				result = FALSE;
+			}
+
+			other_player = (struct player_datum *)data_iterator_next(&iterator);
+		}
+	}
+
+	return result;
+}
+
 boolean game_engine_player_is_out_of_lives(
 	long player_index)
 {
@@ -1851,28 +1884,30 @@ void game_engine_set_goal_position(
  * Revisit before landing the goal getters.
  */
 
-/*
- * game_engine_man_out(long player_index) is deferred: logic fully recovered,
- * residual schedule tie. It is (boolean result):
- *
- *     if (player_get(player_index)->unknown_d1)
- *         man_out = TRUE;
- *     else if (global_variant.maximum_lives > 0) {
- *         struct player_datum *player = player_get(player_index);
- *         if (player->unit_index == NONE &&
- *             player->statistics.deaths >= global_variant.maximum_lives)
- *             man_out = TRUE;
- *     }
- *     if (!man_out) man_out = code_00097250();   // fallback, private helper
- *
- * Fields: player_datum.unknown_d1 @0xd1, .unit_index @0x34, .statistics.deaths
- * (game_statistics.deaths @0x1e, i.e. player+0xaa); global_variant.maximum_lives
- * @0x38. Size, relocations (7) and the two datum_get calls all match. Residual:
- * January keeps the conditional fallback code_00097250() call expanded and
- * normalised (112 bytes) and uses EDI for player_index, whereas our CL
- * tail-merges/compacts it to 96 bytes with ESI -- the same "our compiler
- * optimises more" tie as atmospheric_fog. Needs schedule steering; revisit.
- */
+boolean game_engine_man_out(
+	long player_index)
+{
+	struct player_datum *player = player_get(player_index);
+
+	if (player->unknown_d1)
+		goto man_out;
+
+	if (global_variant.maximum_lives>0)
+	{
+		player = player_get(player_index);
+		if (player->unit_index==NONE &&
+			player->statistics.deaths>=global_variant.maximum_lives)
+		{
+			goto man_out;
+		}
+	}
+
+	if (!code_00097250(player_index))
+		return FALSE;
+
+man_out:
+	return TRUE;
+}
 
 real_rgb_color *game_engine_player_get_change_color(
 	real_rgb_color *change_color,
