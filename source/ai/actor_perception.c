@@ -479,6 +479,58 @@ long actor_get_perception_knowledge(
 	return actor->combat_status >= 3;
 }
 
+long actor_perception_find_killer_prop_index(
+	long actor_index,
+	long prop_index,
+	boolean enemies_only)
+{
+	struct prop_datum *prop = prop_get(prop_index);
+	struct unit_datum *unit = unit_get(prop->unit_index);
+	long killer_prop_index = NONE;
+	long most_recent_damage_time = 0;
+	short attacker_index;
+
+	for (attacker_index = 0;
+		attacker_index < MAXIMUM_ATTACKERS_PER_UNIT;
+		attacker_index++)
+	{
+		long *attacker_object_index =
+			&unit->unit.attackers[attacker_index].object_index;
+		long damage_time = attacker_object_index[-2];
+		long unit_index =
+			ai_get_responsible_unit(
+				*attacker_object_index,
+				TRUE);
+
+		if (unit_index != NONE)
+		{
+			long current_prop_index =
+				prop_get_active_by_unit_index(
+					actor_index,
+					unit_index);
+
+			if (current_prop_index != NONE)
+			{
+				struct prop_datum *current_prop =
+					prop_get(current_prop_index);
+
+				if (current_prop->state >=
+						_prop_state_becoming_unacknowledged &&
+					current_prop->state <=
+						_prop_state_acknowledged &&
+					(current_prop->enemy || !enemies_only) &&
+					damage_time > most_recent_damage_time)
+				{
+					killer_prop_index = current_prop_index;
+					most_recent_damage_time = damage_time;
+				}
+			}
+		}
+	}
+
+	return killer_prop_index;
+}
+
 long actor_perception_find_recent_damaging_prop_index(
 	long actor_index,
 	boolean enemies_only)
