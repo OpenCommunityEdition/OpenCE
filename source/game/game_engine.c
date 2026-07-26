@@ -554,6 +554,7 @@ symbols in this file:
 #include "players.h"
 #include "saved games/player_profile.h"
 #include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
 #include "text/unicode.h"
 #include "units/units.h"
 
@@ -630,6 +631,18 @@ typedef char verify_game_engine_stage_size[
 	sizeof(struct game_engine_stage) == 0xA8 ? 1 : -1];
 typedef char verify_player_starting_location_game_types_offset[
 	offsetof(struct player_starting_location, game_types) == 0x14 ? 1 : -1];
+
+struct scenario_netgame_flag
+{
+	real_point3d position;
+	real facing;
+	short type;
+	short index;
+	byte unused[0x80];
+};
+
+typedef char verify_scenario_netgame_flag_size[
+	sizeof(struct scenario_netgame_flag) == 0x94 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -1750,6 +1763,60 @@ void game_engine_weapon_fired(
 			}
 		}
 	}
+}
+
+long find_netgame_flags(
+	float const *position,
+	float radius,
+	float height,
+	short type,
+	short index,
+	long maximum_count,
+	long *flag_indices)
+{
+	real radius_squared = radius * radius;
+	long found_count = 0;
+	short flag_index;
+	struct scenario *scenario;
+
+	scenario = global_scenario_get();
+	flag_index = 0;
+
+	for (; flag_index < scenario->netgame_flags.count; flag_index++)
+	{
+		struct scenario_netgame_flag *flag = TAG_BLOCK_GET_ELEMENT(
+			&scenario->netgame_flags,
+			flag_index,
+			struct scenario_netgame_flag);
+
+		if (type != NONE && type != flag->type)
+			continue;
+
+		if (index != NONE && index != flag->index)
+			continue;
+
+		if (position)
+		{
+			real_point3d const *point = (real_point3d const *)position;
+
+			if (radius >= 0.0f &&
+				distance_squared3d(&flag->position, point) > radius_squared)
+			{
+				continue;
+			}
+
+			if (height > 0.0f &&
+				fabs(flag->position.z - point->z) > height)
+			{
+				continue;
+			}
+		}
+
+		if (found_count < maximum_count)
+			flag_indices[found_count++] = flag_index;
+	}
+
+	return found_count;
 }
 
 long find_netgame_flag(
