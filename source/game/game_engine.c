@@ -2716,6 +2716,36 @@ struct game_variant *build_game_variant_invasion(
 	return variant;
 }
 
+struct game_variant *build_game_variant_iron_ctf(
+	struct game_variant *variant)
+{
+	struct game_variant result = { 0 };
+
+	result.engine_type = 1;
+	result.flags = (result.flags & ~0x3C) | 3;
+	result.unknown24 = 1;
+	result.has_teams = TRUE;
+	result.unknown4C.byte2 = 1;
+	result.unknown64 = 1;
+	result.unknown3C = 2.0f;
+	result.maximum_lives = 0;
+	result.unknown28 = FALSE;
+	result.unknown30 = 450;
+	result.unknown2C = 0;
+	result.unknown40 = 3;
+	result.unknown34 = 150;
+	result.unknown44 = 0;
+	result.unknown48 = 4;
+	result.unknown4C.byte0 = 0;
+	result.unknown4C.byte3 = 0;
+	result.unknown4C.byte1 = 0;
+	result.unknown50 = 0;
+
+	*variant = result;
+
+	return variant;
+}
+
 long postgame_statistic_get_rating(
 	long player_index,
 	long parameter1,
