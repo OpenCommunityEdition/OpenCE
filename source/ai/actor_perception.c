@@ -505,6 +505,50 @@ long actor_get_perception_knowledge(
 	return actor->combat_status >= 3;
 }
 
+void actor_berserk(
+	long actor_index,
+	boolean berserk)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (berserk != actor->emotions.berserk)
+	{
+		actor->emotions.berserk = berserk;
+		actor->emotions.played_berserk_sound = FALSE;
+
+		if (actor->meta.swarm)
+		{
+			long object_index;
+
+			for (object_index = actor->meta.swarm_unit_index;
+				object_index != NONE;)
+			{
+				struct unit_datum *unit = unit_get(object_index);
+
+				SET_FLAG(
+					unit->object.damage_flags,
+					_object_melee_attack_inhibited_bit,
+					TRUE);
+				object_index = unit->unit.swarm_next_unit_index;
+			}
+		}
+		else
+		{
+			struct unit_datum *unit = unit_get(actor->meta.unit_index);
+
+			SET_FLAG(
+				unit->unit.flags,
+				7,
+				berserk);
+		}
+
+		if (berserk)
+			actor->emotions.forced_to_charge = TRUE;
+	}
+
+	return;
+}
+
 long actor_perception_find_killer_prop_index(
 	long actor_index,
 	long prop_index,
