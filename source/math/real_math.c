@@ -767,6 +767,69 @@ boolean circle_intersects_triangle2d(
 	return result;
 }
 
+boolean pill_intersects_triangle2d(
+	real_point2d const *pill_base,
+	real_vector2d const *pill_height,
+	real pill_width,
+	real_point2d const *triangle0,
+	real_point2d const *triangle1,
+	real_point2d const *triangle2)
+{
+	real_vector2d edge;
+	real_vector2d offset;
+	boolean result = TRUE;
+
+	vector_from_points2d(triangle0, pill_base, &offset);
+	vector_from_points2d(triangle0, triangle1, &edge);
+	if (cross_product2d(&offset, &edge) > 0.0f)
+	{
+		if (vector_intersects_pill2d(
+			triangle0,
+			&edge,
+			pill_base,
+			pill_height,
+			pill_width))
+		{
+			return TRUE;
+		}
+		result = FALSE;
+	}
+
+	vector_from_points2d(triangle1, pill_base, &offset);
+	vector_from_points2d(triangle1, triangle2, &edge);
+	if (cross_product2d(&offset, &edge) > 0.0f)
+	{
+		if (vector_intersects_pill2d(
+			triangle1,
+			&edge,
+			pill_base,
+			pill_height,
+			pill_width))
+		{
+			return TRUE;
+		}
+		result = FALSE;
+	}
+
+	vector_from_points2d(triangle2, pill_base, &offset);
+	vector_from_points2d(triangle2, triangle0, &edge);
+	if (cross_product2d(&offset, &edge) > 0.0f)
+	{
+		if (vector_intersects_pill2d(
+			triangle2,
+			&edge,
+			pill_base,
+			pill_height,
+			pill_width))
+		{
+			return TRUE;
+		}
+		result = FALSE;
+	}
+
+	return result;
+}
+
 boolean sphere_intersects_rectangle3d(
 	real_point3d const *center,
 	real radius,
