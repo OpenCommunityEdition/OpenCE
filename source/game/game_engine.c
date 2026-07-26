@@ -3356,6 +3356,32 @@ real game_engine_get_starting_location_rating(
 	return code_0009c460(starting_location, player_index);
 }
 
+real game_engine_get_damage_multiplier(
+	long damaging_player_index,
+	long damaged_player_index)
+{
+	real result = 1.0f;
+
+	if (game_engine)
+		result /= PIN(global_variant.unknown3C, 0.25f, 4.0f);
+
+	if (damaging_player_index != NONE &&
+		damaged_player_index != NONE)
+	{
+		if (game_engine_test_trait(damaging_player_index, 2))
+		{
+			result *= 1.5f;
+		}
+
+		if (game_engine_test_trait(damaged_player_index, 3))
+		{
+			result *= 0.5f;
+		}
+	}
+
+	return result;
+}
+
 long game_engine_remap_vehicle(
 	long vehicle_definition_index)
 {
