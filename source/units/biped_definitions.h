@@ -87,6 +87,7 @@ struct _biped_definition
 	real crouching_camera_height;
 	real crouch_transition_time;
 	real camera_unused[6];
+	real collision_unused0[2];
 	real collision_height_standing;
 	real collision_height_crouching;
 	real collision_radius;

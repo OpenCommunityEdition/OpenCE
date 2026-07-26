@@ -244,6 +244,7 @@ symbols in this file:
 #include "objects/damage.h"
 #include "physics/collisions.h"
 #include "real_math.h"
+#include "render/render_debug.h"
 #include "players.h"
 #include "player_control.h"
 #include "objects/objects.h"
@@ -252,6 +253,7 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "structures/structure_bsp_definitions.h"
 #include "text/unicode.h"
+#include "units/biped_definitions.h"
 #include "units/bipeds.h"
 #include "units/units.h"
 #include "units/vehicle_definitions.h"
@@ -265,6 +267,15 @@ enum equipment_powerup_type
 	_equipment_powerup_active_camouflage,
 	_equipment_powerup_full_spectrum_vision,
 	_equipment_powerup_health
+};
+
+enum
+{
+	_collision_test_for_player_teleport_flags =
+		FLAG(_collision_test_front_facing_surfaces_bit) |
+		FLAG(_collision_test_ignore_invisible_surfaces_bit) |
+		FLAG(_collision_test_structure_bit) |
+		FLAG(_collision_test_objects_scenery_bit)
 };
 
 /* ---------- macros */
@@ -370,6 +381,15 @@ void player_add_equipment(
 	long unit_index,
 	short starting_profile_index,
 	boolean reset_equipment);
+boolean biped_fix_position(
+	long unit_index,
+	long seat_index,
+	real_point3d *initial_position,
+	real_point3d *final_position,
+	real scale,
+	boolean keep_basis,
+	boolean dont_teleport,
+	boolean scale_by_height);
 
 static long code_000a9bc0(
 	short bsp_switch_trigger_volume_index,
@@ -389,9 +409,10 @@ static void code_000abc90(
 
 struct data_array *player_data;
 extern struct data_array *team_data;
-extern long bss_00453408[][MAXIMUM_LOCAL_PLAYERS];
+byte bss_00453408[0x5C] = { 0 };
 extern short player_spawn_count;
 extern byte data_002dee08[];
+boolean debug_render_player_teleport = FALSE;
 
 #define PLAYER_SCREEN_FLASH_PARAMETERS(offset) \
 	((struct player_screen_flash_parameters *)(data_002dee08 + (offset)))
@@ -487,9 +508,7 @@ void players_dispose(
 long *machine_get_player_list(
 	long machine_index)
 {
-	machine_index &= 0xFFFF;
-
-	return bss_00453408[machine_index];
+	return (long *)(bss_00453408 + ((machine_index & 0xFFFF) << 4));
 }
 
 boolean local_player_exists(
@@ -562,7 +581,7 @@ short players_get_respawn_failure(
 	return players_globals->respawn_failure;
 }
 
-long local_player_get_player_index(
+__declspec(noinline) long local_player_get_player_index(
 	short local_player_index)
 {
 	match_assert(
@@ -608,7 +627,7 @@ short local_player_count(
 	return players_globals->local_player_count;
 }
 
-short local_player_get_next(
+__declspec(noinline) short local_player_get_next(
 	short local_player_index)
 {
 	short result;
@@ -1314,6 +1333,98 @@ boolean player_teleport(
 	}
 
 	return result;
+}
+
+void players_debug_render(
+	void)
+{
+	struct collision_result collision;
+	real_point3d pill_position;
+	real_vector3d pill_vector;
+	real initial_radius;
+	real_point3d fixed_position;
+	short local_player_count;
+	real pill_height;
+	real pill_width;
+	short local_player_index;
+	long player_index;
+	long biped_index;
+	struct player_datum *player;
+	struct unit_datum *unit;
+	struct biped_definition *biped_definition;
+
+	if (debug_render_player_teleport)
+	{
+		for (local_player_count = 0, local_player_index = local_player_get_next(NONE);
+			local_player_count < 2 && local_player_index != NONE;
+			local_player_count++, local_player_index = local_player_get_next(local_player_index))
+		{
+			match_assert("c:\\halo\\SOURCE\\game\\players.c", 0x3AF,
+				local_player_index>=NONE && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+
+			if (players_globals->local_players[local_player_index] != NONE)
+			{
+				player_index = local_player_get_player_index(local_player_index);
+				player = player_get(player_index);
+				biped_index = player->unit_index;
+				if (biped_index != NONE)
+				{
+					unit = unit_get(biped_index);
+					biped_get_physics_pill(
+						biped_index,
+						&fixed_position,
+						&initial_radius,
+						&initial_radius);
+					if (biped_fix_position(
+						NONE,
+						biped_index,
+						&fixed_position,
+						&fixed_position,
+						2.0f,
+						FALSE,
+						TRUE,
+						TRUE))
+					{
+						biped_definition = biped_definition_get(unit->definition_index);
+						biped_get_physics_pill(
+							biped_index,
+							&pill_position,
+							&pill_height,
+							&pill_width);
+						fixed_position.z +=
+							biped_definition->biped.collision_height_standing;
+						scale_vector3d(global_up3d, pill_height, &pill_vector);
+						if (collision_test_pill(
+							_collision_test_for_player_teleport_flags,
+							&fixed_position,
+							&pill_vector,
+							pill_width,
+							biped_index,
+							&collision))
+						{
+							render_debug_pill(
+								FALSE,
+								&fixed_position,
+								&pill_vector,
+								pill_width,
+								global_real_argb_red);
+						}
+						else
+						{
+							render_debug_pill(
+								FALSE,
+								&fixed_position,
+								&pill_vector,
+								pill_width,
+								global_real_argb_green);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return;
 }
 
 void debug_player_teleport(
