@@ -317,8 +317,9 @@ static struct memory_status scenario_memory_status =
 struct structure_bsp *global_structure_bsp;
 struct scenario *global_scenario;
 struct collision_bsp *global_collision_bsp;
-struct material_definition bss_004c0520 = { 0 };
-static boolean default_material_initialized = FALSE;
+byte bss_004c0520[0x375] = { 0 };
+#define default_material_definition (*(struct material_definition *)&bss_004c0520[0])
+#define default_material_initialized (*(boolean *)&bss_004c0520[0x374])
 struct bsp3d *global_bsp3d;
 struct game_globals *global_game_globals;
 
@@ -478,11 +479,11 @@ struct material_definition *default_material_definition_get(
 {
 	if (!default_material_initialized)
 	{
-		bss_004c0520.melee_hit_sound.index = NONE;
+		default_material_definition.melee_hit_sound.index = NONE;
 		default_material_initialized = TRUE;
 	}
 
-	return &bss_004c0520;
+	return &default_material_definition;
 }
 
 struct material_definition *scenario_material_definition_get(
