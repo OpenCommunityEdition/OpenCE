@@ -92,7 +92,13 @@ struct game_engine
 	void (*handle_server_message)(void *message);
 	void (*unknown2C)(void);
 	void (*post_rasterize_objects)(void);
-	void (*unknown34[5])(void);
+	void (*unknown34[2])(void);
+	boolean (*picking_up)(
+		long weapon_index,
+		long player_index);
+	void (*weapon_dropped)(
+		long weapon_index);
+	void (*unknown44)(void);
 	long (*get_player_score)(
 		long player_index,
 		boolean team_score);
@@ -230,6 +236,10 @@ boolean game_engine_can_score(
 	void);
 
 boolean game_engine_allow_pick_up(
+	long unit_index,
+	long weapon_index);
+
+boolean game_engine_picking_up(
 	long unit_index,
 	long weapon_index);
 

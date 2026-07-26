@@ -1701,6 +1701,49 @@ boolean game_engine_allow_pick_up(
 	return allow_pick_up;
 }
 
+boolean game_engine_picking_up(
+	long unit_index,
+	long weapon_index)
+{
+	boolean allow_pick_up = TRUE;
+
+	if (game_engine)
+	{
+		struct weapon_datum *weapon = weapon_try_and_get(weapon_index);
+
+		if (weapon && weapon_is_flag(weapon_index))
+		{
+			if (TEST_FLAG(weapon->weapon.flags, _weapon_runtime_game_engine_active_bit))
+			{
+				SET_FLAG(weapon->weapon.flags, _weapon_runtime_game_engine_active_bit, FALSE);
+
+				if (game_engine->weapon_dropped)
+					game_engine->weapon_dropped(weapon_index);
+			}
+
+			SET_FLAG(weapon->weapon.flags, _weapon_runtime_game_engine_active_bit, TRUE);
+
+			if (game_engine->picking_up)
+			{
+				long player_index = player_index_from_unit_index(unit_index);
+
+				allow_pick_up = game_engine->picking_up(
+					weapon_index,
+					player_index);
+			}
+
+			match_assert(
+				"c:\\halo\\SOURCE\\game\\game_engine.c",
+				0xF58,
+				!allow_pick_up ||
+					!TEST_FLAG(weapon->weapon.flags, _weapon_must_be_readied_bit) ||
+					!unit_has_weapon_with_flag(unit_index, _weapon_must_be_readied_bit));
+		}
+	}
+
+	return allow_pick_up;
+}
+
 boolean game_engine_test_flag(
 	long flag)
 {
