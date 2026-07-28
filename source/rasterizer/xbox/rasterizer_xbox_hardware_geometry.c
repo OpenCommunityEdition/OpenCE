@@ -275,8 +275,8 @@ boolean rasterizer_triangle_buffer_new(
 	success = TRUE;
 	if (!global_d3d_device)
 	{
-		success = FALSE;
 		_ReadWriteBarrier();
+		success = FALSE;
 failure:
 		csmemset(triangle_buffer, 0, sizeof(*triangle_buffer));
 		error(2, "### ERROR failed to create triangle buffer hardware format");
@@ -329,12 +329,11 @@ failure:
 			locked_triangles,
 			triangles,
 			buffer_size);
-		triangle_buffer->triangle_count = count;
-		_ReadWriteBarrier();
-		triangle_buffer->triangles = (void *)triangles;
-		triangle_buffer->hardware_buffer = d3d_index_buffer;
-		_ReadWriteBarrier();
 		triangle_buffer->triangle_type = triangle_type;
+		triangle_buffer->triangle_count = count;
+		triangle_buffer->triangles = (void *)triangles;
+		_ReadWriteBarrier();
+		triangle_buffer->hardware_buffer = d3d_index_buffer;
 	}
 	if (!success)
 		goto failure;
