@@ -69,6 +69,14 @@ symbols in this file:
 #include "cseries.h"
 #include "props.h"
 
+#include "actors.h"
+#include "cseries/errors.h"
+#include "game/game.h"
+#include "memory/data.h"
+#include "saved games/game_state.h"
+#include "units/unit_definitions.h"
+#include "units/units.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -77,11 +85,62 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+boolean game_team_is_enemy(short team_index0, short team_index1);
+boolean game_team_is_ally(short team_index0, short team_index1);
+boolean game_team_ally_status_changed(short team_index0, short team_index1);
+boolean actor_perception_desire_prop(
+	long actor_index,
+	long ignored_prop_index,
+	long unit_index,
+	long prop_actor_index,
+	boolean in_use,
+	boolean player,
+	boolean enemy,
+	boolean dead,
+	short dead_ticks,
+	real suicide_radius,
+	real distance_squared,
+	short required_ticks,
+	boolean *replace);
+void actor_switch_props(
+	long actor_index,
+	long old_prop_index,
+	long new_prop_index);
+void prop_position_refresh(
+	long actor_index,
+	long prop_index,
+	struct actor_position_data *position,
+	boolean force,
+	boolean update_status);
+void prop_status_refresh(
+	long actor_index,
+	long prop_index,
+	struct actor_position_data *position);
+boolean actor_expected_acknowledgement(
+	long actor_index,
+	long prop_index);
+void actor_perception_acknowledge(
+	long actor_index,
+	long prop_index,
+	boolean force,
+	boolean expected);
+
 /* ---------- globals */
 
 struct data_array *prop_data = NULL;
+long data_002b7d78 = NONE;
 
 /* ---------- public code */
+
+void props_initialize(
+	void)
+{
+	prop_data = game_state_data_new("prop", 768, sizeof(struct prop_datum));
+
+	match_assert("c:\\halo\\SOURCE\\ai\\props.c", 0x24, prop_data);
+
+	return;
+}
 
 void props_dispose(
 	void)
@@ -89,4 +148,598 @@ void props_dispose(
 	return;
 }
 
+void props_initialize_for_new_map(
+	void)
+{
+	data_make_valid(prop_data);
+
+	return;
+}
+
+void props_dispose_from_old_map(
+	void)
+{
+	data_make_invalid(prop_data);
+
+	return;
+}
+
 /* ---------- private code */
+
+static void code_000527e0(
+	long actor_index,
+	long prop_index,
+	long unit_index)
+{
+	if (prop_index == NONE)
+	{
+		long game_time = game_time_get();
+
+		if (data_002b7d78 == NONE || game_time >= data_002b7d78 + TICKS_PER_SECOND * 30)
+		{
+			error(
+				_error_silent,
+				"AI knowledge database (%d entries) is full (warns once every 30 sec)",
+				768);
+			data_002b7d78 = game_time;
+		}
+	}
+	else
+	{
+		struct actor_datum *actor = actor_get(actor_index);
+		struct prop_datum *prop = prop_get(prop_index);
+
+		prop->owner_actor_index = actor_index;
+		prop->unit_effect = NONE;
+		prop->ticks_since_damage = NONE;
+		prop->unit_index = unit_index;
+		prop->currently_damaging_me = FALSE;
+		prop->damage_inflicted_on_me = 0.0f;
+		prop->ticks_since_definitely_located = NONE;
+		prop->definitely_located = FALSE;
+		prop->definite_knowledge_source_actor = NONE;
+		prop->last_perceived_time = NONE;
+		prop->last_visible_time = NONE;
+		prop->orphan_corpse_cheated = FALSE;
+		prop->actor_index = NONE;
+		prop->orphan_prop_index = NONE;
+		prop->required_ticks = 0;
+		prop->last_unreachable_time = NONE;
+
+		if (unit_index != NONE)
+		{
+			struct unit_datum *prop_unit = unit_get(unit_index);
+			struct unit_definition *unit_definition =
+				unit_definition_get(prop_unit->definition_index);
+
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\props.c",
+				0xe8,
+				unit_index != actor->meta.unit_index);
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\props.c",
+				0xe9,
+				prop_unit->object.type == _object_type_biped);
+
+			prop->team_index = prop_unit->object.owner_team_index;
+			prop->enemy = game_team_is_enemy(actor->meta.team_index, prop->team_index);
+			prop->ally = game_team_is_ally(actor->meta.team_index, prop->team_index);
+			prop->ally_status_changed =
+				game_team_ally_status_changed(actor->meta.team_index, prop->team_index);
+			prop->dead = TEST_FLAG(prop_unit->object.damage_flags, _object_dead_bit);
+			prop->suicide_radius = unit_definition->unit.ai_danger_radius;
+			prop->really_dead =
+				prop->dead && prop_unit->unit.feign_death_timer == 0;
+			prop->dead_ticks = prop->dead ? 1000 : 0;
+			prop->player = prop_unit->object.owner_player_index != NONE;
+
+			if (prop_unit->unit.swarm_actor_index != NONE)
+			{
+				prop->swarm = TRUE;
+				prop->actor_index = prop_unit->unit.swarm_actor_index;
+				prop->swarm_unit_selected_time = game_time_get();
+			}
+			else
+			{
+				prop->actor_index = prop_unit->unit.actor_index;
+			}
+
+			if (!prop->player)
+			{
+				if (prop->actor_index == NONE)
+				{
+					prop->type = NONE;
+				}
+				else
+				{
+					prop->type = actor_get(prop->actor_index)->meta.type;
+				}
+			}
+			else
+			{
+				prop->type = 6;
+			}
+		}
+
+		prop->next_prop_index = actor->meta.first_prop_index;
+		actor->meta.first_prop_index = prop_index;
+	}
+
+	return;
+}
+
+long code_00052a40(
+	long actor_index)
+{
+	long prop_index = datum_new(prop_data);
+
+	code_000527e0(actor_index, prop_index, NONE);
+
+	return prop_index;
+}
+
+static void code_00052a70(
+	long actor_index,
+	long prop_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct prop_datum *prop;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\props.c",
+		0x19b,
+		actor->target.target_prop_index != prop_index);
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\props.c",
+		0x19e,
+		!((actor->control.secondary_look_type != _secondary_look_none) &&
+		  (actor->control.secondary_look_direction.type == _direction_specification_prop) &&
+		  (actor->control.secondary_look_direction.prop_index == prop_index)));
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\props.c",
+		0x1a1,
+		!((actor->control.idle_major_active) &&
+		  (actor->control.idle_major_direction.type == _direction_specification_prop) &&
+		  (actor->control.idle_major_direction.prop_index == prop_index)));
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\props.c",
+		0x1a4,
+		!((actor->control.idle_minor_active) &&
+		  (actor->control.idle_minor_direction.type == _direction_specification_prop) &&
+		  (actor->control.idle_minor_direction.prop_index == prop_index)));
+
+	prop = prop_get(actor->meta.first_prop_index);
+	if (actor->meta.first_prop_index == prop_index)
+	{
+		actor->meta.first_prop_index = prop->next_prop_index;
+	}
+	else
+	{
+		long *previous_next_prop_index;
+
+		do
+		{
+			previous_next_prop_index = &prop->next_prop_index;
+			prop = prop_get(prop->next_prop_index);
+		}
+		while (*previous_next_prop_index != prop_index);
+
+		*previous_next_prop_index = prop->next_prop_index;
+	}
+
+	return;
+}
+
+void prop_iterator_new(
+	struct prop_iterator *iterator,
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	iterator->next_index = actor->meta.first_prop_index;
+
+	return;
+}
+
+struct prop_datum *prop_iterator_next(
+	struct prop_iterator *iterator)
+{
+	struct prop_datum *prop = NULL;
+
+	iterator->index = iterator->next_index;
+	if (iterator->index != NONE)
+	{
+		prop = prop_get(iterator->index);
+		iterator->next_index = prop->next_prop_index;
+	}
+
+	return prop;
+}
+
+long prop_new_unacknowledged(
+	long actor_index,
+	long unit_index,
+	boolean enemy)
+{
+	long next_prop_index;
+	long prop_index;
+	long worst_prop_index = NONE;
+	long worst_required_prop_index = NONE;
+	real worst_distance = REAL_MAX;
+	real worst_required_distance = REAL_MAX;
+	short required_prop_count = 0;
+	struct actor_datum *actor = actor_get(actor_index);
+
+	next_prop_index = actor->meta.first_prop_index;
+
+scan_next_prop:
+	{
+		struct prop_datum *prop;
+
+		prop_index = next_prop_index;
+		if (next_prop_index == NONE)
+		{
+			goto scan_complete;
+		}
+
+		prop = prop_get(prop_index);
+		next_prop_index = prop->next_prop_index;
+		if ((prop->state < _prop_state_uninspected_orphan ||
+			 prop->state > _prop_state_inspected_orphan) &&
+			prop->orphan_prop_index == NONE)
+		{
+			boolean replace = FALSE;
+			boolean desire_prop = actor_perception_desire_prop(
+				actor_index,
+				NONE,
+				prop->unit_index,
+				prop->actor_index,
+				prop->in_use,
+				prop->player,
+				prop->enemy,
+				prop->dead,
+				prop->dead_ticks,
+				prop->suicide_radius,
+				prop->distance * prop->distance,
+				prop->required_ticks,
+				&replace);
+
+			if (!desire_prop)
+			{
+				if (prop->distance < worst_distance)
+				{
+					worst_prop_index = prop_index;
+					worst_distance = prop->distance;
+				}
+			}
+			else if (prop->enemy == enemy)
+			{
+				required_prop_count++;
+
+				if (replace && prop->distance < worst_required_distance)
+				{
+					worst_required_prop_index = prop_index;
+					worst_required_distance = prop->distance;
+				}
+			}
+		}
+
+		goto scan_next_prop;
+	}
+
+scan_complete:
+	prop_index = worst_prop_index;
+	if (prop_index == NONE)
+	{
+		prop_index = worst_required_prop_index;
+		if (prop_index == NONE ||
+			required_prop_count < (enemy ? 6 : 4))
+		{
+			prop_index = datum_new(prop_data);
+			goto initialize_prop;
+		}
+	}
+
+	{
+		struct prop_datum *prop = prop_get(prop_index);
+		short identifier;
+
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\props.c",
+			0x9e,
+			prop->orphan_prop_index == NONE);
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\props.c",
+			0x9f,
+			prop->parent_prop_index == NONE);
+
+		actor_switch_props(actor_index, prop_index, NONE);
+		code_00052a70(actor_index, prop_index);
+		identifier = prop->identifier;
+		memset(prop, 0, sizeof(*prop));
+		prop->identifier = identifier;
+	}
+
+initialize_prop:
+	code_000527e0(actor_index, prop_index, unit_index);
+
+	return prop_index;
+}
+
+static void code_00052e30(
+	long actor_index,
+	long prop_index,
+	long parent_prop_index)
+{
+	struct prop_datum *parent_prop = prop_get(parent_prop_index);
+	struct prop_datum *prop = prop_get(prop_index);
+	short identifier;
+	long owner_actor_index;
+	long next_prop_index;
+	long preserved_parent_prop_index;
+
+	identifier = prop->identifier;
+	owner_actor_index = prop->owner_actor_index;
+	next_prop_index = prop->next_prop_index;
+	preserved_parent_prop_index = prop->parent_prop_index;
+
+	memcpy(prop, parent_prop, sizeof(*prop));
+	prop->owner_actor_index = owner_actor_index;
+	prop->next_prop_index = next_prop_index;
+	prop->identifier = identifier;
+	prop->parent_prop_index = preserved_parent_prop_index;
+	prop->state = _prop_state_uninspected_orphan;
+	prop->orphan_lifespan_ticks = TICKS_PER_SECOND * 30;
+	prop->orphan_inspection_ticks = 0;
+	prop->tried_to_uncover = FALSE;
+	prop->tried_to_search = FALSE;
+	prop->abandoned_search = FALSE;
+	vector_from_points3d(
+		&prop->last_perceived_body_position,
+		&prop->body_position,
+		&prop->orphan_hint_vector);
+	prop->velocity = *global_zero_vector3d;
+	prop->quantized_speed = 0;
+
+	return;
+}
+
+long prop_orphan_transition(
+	long actor_index,
+	long parent_prop_index)
+{
+	long prop_index = datum_new(prop_data);
+
+	code_000527e0(actor_index, prop_index, NONE);
+	if (prop_index != NONE)
+	{
+		struct prop_datum *parent_prop = prop_get(parent_prop_index);
+		struct prop_datum *prop = prop_get(prop_index);
+
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\props.c",
+			0x155,
+			parent_prop->owner_actor_index == actor_index);
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\props.c",
+			0x156,
+			parent_prop->orphan_prop_index == NONE);
+
+		code_00052e30(actor_index, prop_index, parent_prop_index);
+		parent_prop->orphan_prop_index = prop_index;
+		prop->parent_prop_index = parent_prop_index;
+	}
+
+	return prop_index;
+}
+
+long prop_orphan_from_friend(
+	long actor_index,
+	long parent_prop_index,
+	long friend_prop_index)
+{
+	long prop_index = datum_new(prop_data);
+
+	code_000527e0(actor_index, prop_index, NONE);
+	if (prop_index != NONE)
+	{
+		struct prop_datum *parent_prop = prop_get(parent_prop_index);
+		struct prop_datum *prop = prop_get(prop_index);
+		struct prop_datum *friend_prop = prop_get(friend_prop_index);
+
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\props.c",
+			0x16d,
+			parent_prop->owner_actor_index == actor_index);
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\props.c",
+			0x16e,
+			parent_prop->orphan_prop_index == NONE);
+
+		code_00052e30(actor_index, prop_index, friend_prop_index);
+		parent_prop->orphan_prop_index = prop_index;
+		prop->parent_prop_index = parent_prop_index;
+
+		if (friend_prop->state >= _prop_state_uninspected_orphan &&
+			friend_prop->state <= _prop_state_inspected_orphan)
+		{
+			prop->state = friend_prop->state;
+		}
+	}
+
+	return prop_index;
+}
+
+void prop_orphan_update_information(
+	long actor_index,
+	long prop_index,
+	long parent_prop_index)
+{
+	code_00052e30(actor_index, prop_index, parent_prop_index);
+
+	return;
+}
+
+void prop_delete(
+	long actor_index,
+	long prop_index)
+{
+	code_00052a70(actor_index, prop_index);
+	datum_delete(prop_data, prop_index);
+
+	return;
+}
+
+long prop_get_active_by_unit_index(
+	long actor_index,
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	long swarm_actor_index = unit->unit.swarm_actor_index;
+	long target_actor_index;
+	long next_prop_index;
+	long prop_index;
+	struct actor_datum *actor;
+
+	if (swarm_actor_index != NONE)
+	{
+		target_actor_index = swarm_actor_index;
+	}
+	else
+	{
+		target_actor_index = unit->unit.actor_index;
+	}
+
+	actor = actor_get(actor_index);
+	next_prop_index = actor->meta.first_prop_index;
+	while (TRUE)
+	{
+		struct prop_datum *prop;
+
+		prop_index = next_prop_index;
+		if (next_prop_index == NONE)
+		{
+			return NONE;
+		}
+
+		prop = prop_get(next_prop_index);
+		next_prop_index = prop->next_prop_index;
+		if (prop->state >= _prop_state_unacknowledged &&
+			prop->state <= _prop_state_becoming_acknowledged)
+		{
+			continue;
+		}
+		if (prop->unit_index == unit_index)
+		{
+			return prop_index;
+		}
+		if (!prop->swarm)
+		{
+			continue;
+		}
+		if (prop->actor_index == NONE)
+		{
+			continue;
+		}
+		if (prop->actor_index != target_actor_index)
+		{
+			continue;
+		}
+
+		return prop_index;
+	}
+}
+
+long prop_get_base_by_unit_index(
+	long actor_index,
+	long unit_index,
+	boolean create_if_missing,
+	boolean update_status)
+{
+	long result = NONE;
+
+	if (unit_index != NONE)
+	{
+		struct actor_datum *actor = actor_get(actor_index);
+		struct unit_datum *unit = unit_get(unit_index);
+		long target_actor_index = unit->unit.swarm_actor_index;
+
+		if (target_actor_index == NONE)
+		{
+			target_actor_index = unit->unit.actor_index;
+		}
+
+		if (unit->object.type == _object_type_biped &&
+			target_actor_index != actor_index)
+		{
+			long next_prop_index = actor_get(actor_index)->meta.first_prop_index;
+			long prop_index;
+			struct prop_datum *prop;
+
+			do
+			{
+				prop_index = next_prop_index;
+				if (prop_index == NONE)
+				{
+					break;
+				}
+
+				prop = prop_get(prop_index);
+				next_prop_index = prop->next_prop_index;
+			}
+			while (prop->unit_index != unit_index &&
+				(!prop->swarm ||
+				 prop->actor_index == NONE ||
+				 prop->actor_index != target_actor_index));
+
+			if (prop_index != NONE)
+			{
+				result = prop_index;
+				if (prop->orphan_prop_index != NONE)
+				{
+					result = prop->orphan_prop_index;
+				}
+			}
+
+			if (result == NONE && create_if_missing && actor->meta.active)
+			{
+				boolean enemy =
+					game_team_is_enemy(actor->meta.team_index, unit->object.owner_team_index);
+				result = prop_new_unacknowledged(actor_index, unit_index, enemy);
+				if (result != NONE)
+				{
+					struct actor_position_data position;
+					struct prop_datum *prop = prop_get(result);
+
+					prop_position_refresh(
+						actor_index,
+						result,
+						&position,
+						FALSE,
+						update_status);
+					prop->required_ticks = TICKS_PER_SECOND;
+					prop->delay_requirement_decision = TRUE;
+
+					if (update_status)
+					{
+						prop_status_refresh(actor_index, result, &position);
+						if (prop->perception >= 2)
+						{
+							boolean expected =
+								actor_expected_acknowledgement(actor_index, result);
+
+							prop->state = _prop_state_acknowledged;
+							actor_perception_acknowledge(
+								actor_index,
+								result,
+								FALSE,
+								expected);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return result;
+}
