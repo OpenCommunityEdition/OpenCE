@@ -95,6 +95,11 @@ while silently deleting or reordering `.bss`.
 
 - `movsx`/`movzx`, partial-register operations, and signed branch opcodes reveal
   the real promotion boundaries.
+- Function parameter widths matter even when the x86 ABI still occupies a
+  four-byte stack slot. In `rasterizer_xbox_motion_sensor.obj`, changing a
+  render-target parameter from `long` to the proven `word` transformed
+  `movzx` into the target's `xor reg, reg; mov reg16, [memory]` sequence and
+  closed the entire remaining half of a 1,920-byte function.
 - Change signedness only where the target proves it. A `jle` versus `jbe`
   difference is often a type error; an ESI/EDI mirror is not.
 - Recover narrow accumulators instruction by instruction rather than relying
@@ -117,6 +122,22 @@ Stock XDK `D3DINLINE` under this compiler emits the January out-of-line D3D
 wrapper families when called normally. Address-taking forces a different
 standard-ABI body, and redefining `D3DINLINE` as plain `static` can emit a
 thunk. Prefer the stock header form and verify every emitted wrapper in the TU.
+One motion-sensor translation unit instantiated ten such wrappers exactly in a
+single build, including both 432-byte and 544-byte dispatchers. Treat the
+header recipe as a high-yield candidate generator, but still compare every
+wrapper and its relocation destinations independently.
+
+### Diagnose the first true divergence
+
+- Ignore downstream branch displacements and relocation-address drift until
+  the earliest semantic or instruction-length difference is closed.
+- Decode cdecl pushes right-to-left before blaming register allocation. A wrong
+  argument order can make a large suffix look like a scheduler problem.
+- If a small type correction makes a long suffix exact automatically, the
+  suffix was displacement drift, not a collection of independent problems.
+- Zero-byte intrinsics such as `_ReadWriteBarrier()` are measured controls, not
+  universal fixes. They can prevent desirable argument hoisting and make an
+  otherwise close function worse.
 
 ### Private ABI controls
 
@@ -168,6 +189,20 @@ Before marking an object `Matching`:
 6. Run the consolidated build, semantic audit, and progress report.
 7. Update the object ledger with retained and rejected experiments.
 8. Mark `Matching` only after all evidence passes.
+
+### Greenfield regression gates
+
+An empty skeleton has no previously exact code or owned data for a pre-edit
+manifest to protect. A correct reconstruction will therefore appear to the
+regression gate as a set of new functions, symbols, COMDATs, and data. Do not
+force that report green and do not waive its findings:
+
+- confirm that it reports no changed previously exact function or section;
+- classify every addition against the January target;
+- admit the object only after strict function, relocation, ownership,
+  consolidated-build, and semantic-progress checks pass;
+- immediately capture a post-admission manifest and verify it is stable, so
+  later edits are checked against the newly completed object.
 
 ## Original bugs
 
