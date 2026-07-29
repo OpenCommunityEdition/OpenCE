@@ -114,6 +114,44 @@
         },
         "objdiff_percent": 87.55173
       }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_hardware_geometry",
+      "function": "_rasterizer_vertex_buffer_new",
+      "class": "instruction-scheduling",
+      "evidence": "Target and candidate have equal 0x170 padded size and all 20 relocation identities/addresses. The remaining 11 normalized bytes are confined to the post-copy structure-field stores: VC7 chooses AX/CX for the type value, schedules the hardware-buffer reload at a different point, and moves one independent base-address store across the EDI restore. Broad declaration, field-order, barrier, helper, alias, qualifier, and topology matrices did not reproduce the target without regressing the exact prefix or relocation schedule.",
+      "measurements": {
+        "target": {
+          "size": 368,
+          "relocation_count": 20,
+          "normalized_sha256": "5442bf32f8b49c2a3ebab9e35337bd0f9c1cbbd9eb833e3788b0b93634672f55"
+        },
+        "base": {
+          "size": 368,
+          "relocation_count": 20,
+          "normalized_sha256": "bf6b5feafdc7750b7b3c8c4c309a5d08573eb1c12360276c11b1fe62941b09af"
+        },
+        "objdiff_percent": 97.47445
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_hardware_geometry",
+      "function": "_rasterizer_triangle_buffer_new",
+      "class": "instruction-scheduling",
+      "evidence": "Target and candidate have equal 0x160 padded size and all 24 relocation identities/addresses. The remaining eight normalized bytes are confined to the final four structure-field stores: the target reloads the hardware buffer into ECX before the offset/base stores, while VC7's current source reloads it into EAX after them. A preserved 160-case control-flow/barrier/field-order supersearch plus focused lifetime, alias, helper, qualifier, and initialization matrices found no legal-C form that changes only this schedule.",
+      "measurements": {
+        "target": {
+          "size": 352,
+          "relocation_count": 24,
+          "normalized_sha256": "e90e066bbde0d04c87a43f665fcd7a131ff0e0d1c7a5354b82062ae5b822396c"
+        },
+        "base": {
+          "size": 352,
+          "relocation_count": 24,
+          "normalized_sha256": "b0fdebbf1336f8336a37bb436ad10ea3ebbf9f105715dec74c87d16c283b457e"
+        },
+        "objdiff_percent": 98.203255
+      }
     }
   ]
 }
