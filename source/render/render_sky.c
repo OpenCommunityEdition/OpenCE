@@ -161,7 +161,7 @@ void render_sky(
 					{
 						struct animation *animation = TAG_BLOCK_GET_ELEMENT(
 							&animation_graph->animations,
-							sky_animation->animation_index,
+							i,
 							struct animation);
 
 						if (animation->node_count == model->nodes.count)
@@ -261,10 +261,19 @@ void render_sky(
 			view_matrix.position.x = render.camera.position.x * 0.9990234375f;
 			view_matrix.position.y = render.camera.position.y * 0.9990234375f;
 			view_matrix.position.z = render.camera.position.z * 0.9990234375f;
-			view_matrix.scale = 1.f / 1024.f;
+			{
+				long node_count = model->nodes.count;
 
-			for (i = 0; i < model->nodes.count; i++)
-				matrix4x3_multiply(&view_matrix, &node_matrices[i], &node_matrices[i]);
+				view_matrix.scale = 1.f / 1024.f;
+				for (i = 0; i < node_count; i++)
+				{
+					matrix4x3_multiply(
+						&view_matrix,
+						&node_matrices[i],
+						&node_matrices[i]);
+					node_count = model->nodes.count;
+				}
+			}
 
 			rasterizer_models_begin(TRUE);
 			csmemset(&render_model_record, 0, sizeof(render_model_record));
