@@ -560,11 +560,17 @@ def _capture_unit(
         state = "ABSENT_IN_BASE"
         accepted = False
         exception_identity = None
-        base_fingerprint = base["functions"].get(name)
+        exception = function_exceptions.get(name)
+        base_name = (
+            exception["entry"].get("base_function", name)
+            if exception is not None
+            else name
+        )
+        base_fingerprint = base["functions"].get(base_name)
         if base_fingerprint is not None:
             try:
                 target_info = section_info(target_obj, name)
-                base_info = section_info(base_obj, name)
+                base_info = section_info(base_obj, base_name)
                 exact = section_infos_equal(target_info, base_info)
             except CoffError as error:
                 raise GateError(
@@ -600,7 +606,6 @@ def _capture_unit(
                     state = "ORDINARY_REJECTED_STRICT_MISMATCH"
                     accepted = False
 
-        exception = function_exceptions.get(name)
         if exception is not None and exception["entry"].get("owner_function"):
             owner = exception["entry"]["owner_function"]
             try:

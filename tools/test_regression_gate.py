@@ -445,6 +445,65 @@ class RegressionGateTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("UNKNOWN", {item["kind"] for item in result["failures"]})
 
+    def test_semantic_alias_compares_explicit_base_function_strictly(self):
+        target = build_coff(
+            sections=[{
+                "name": ".text",
+                "size": 16,
+                "raw_data": b"\x31\xc0\xc3" + b"\x90" * 13,
+                "flags": CODE_FLAGS,
+            }],
+            symbols=[{
+                "name": "_first",
+                "value": 0,
+                "section": 1,
+                "type": 0x20,
+                "storage": 2,
+            }],
+        )
+        base = build_coff(
+            sections=[{
+                "name": ".text",
+                "size": 16,
+                "raw_data": b"\x31\xc0\xc3" + b"\x90" * 13,
+                "flags": CODE_FLAGS,
+            }],
+            symbols=[{
+                "name": "_sdk_first",
+                "value": 0,
+                "section": 1,
+                "type": 0x20,
+                "storage": 2,
+            }],
+        )
+        self.target_path.write_bytes(target)
+        self.base_path.write_bytes(base)
+        exception = {
+            "ledger": "semantic_matches",
+            "unit": "source/example",
+            "item": "_first",
+            "identity": "alias-proof",
+            "entry": {
+                "unit": "source/example",
+                "function": "_first",
+                "base_function": "_sdk_first",
+            },
+        }
+
+        unit = _capture_unit(
+            self.root,
+            self.unit_config,
+            {"_first": 3},
+            {},
+            [exception],
+        )
+
+        self.assertEqual(unit["functions"]["_first"]["state"], "STRICT_EXACT")
+        self.assertTrue(unit["functions"]["_first"]["accepted"])
+        self.assertEqual(
+            unit["functions"]["_first"]["exception_identity"], "alias-proof"
+        )
+
     def test_meaningful_and_padded_sizes_are_both_recorded(self):
         self._write_baseline_objects()
 
