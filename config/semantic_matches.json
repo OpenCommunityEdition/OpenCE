@@ -256,6 +256,11 @@
   },
   {
     "unit": "source/bitmaps/libtiff/tif_getimage",
+    "function": "_code_00058c40",
+    "reason": "hardened COFF comparison proves all 832 padded bytes and all 18 semantic relocations exact; objdiff reports static BSS symbol/relocation ownership false negatives"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_getimage",
     "function": "_code_00059180",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
