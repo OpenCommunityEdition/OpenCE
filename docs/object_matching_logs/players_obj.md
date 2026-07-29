@@ -95,3 +95,43 @@ production source is restored to `caa820ccd`.
 - Do not change optimization flags, add inline assembly/object patches, accept
   fuzzy objdiff percentages, or mark the TU `Matching` before the hardened
   110-section gate passes.
+
+## 2026-07-29 isolated follow-up
+
+The collision-safe follow-up is preserved on `codex/players-final-four` as
+source checkpoint `576d93f33` and full ledger commit `8dad10254`. The source
+checkpoint is deliberately **not integrated here** because `players.obj`
+remains incomplete; these measurements prevent later lanes from repeating the
+same work.
+
+- P01: rewriting the final iterator loop from `while` to explicit `for`
+  produced no bytes and was reverted.
+- P02: a Players-only `long` declaration for
+  `objects_get_activating_cluster_index` modeled January's measured cross-TU
+  return-ABI bug and reduced `_code_000a9ff0` from 287 to 11 normalized
+  differing bytes. The lane labels the preserved bug and documents the
+  corrected-build fix.
+- P03: moving the activation-result declaration before the iterator had no
+  effect and was reverted.
+- P04: the HCEA-PDB-backed `player_teleport_internal` local topology retained
+  `0x510`/61 and reduced `_code_000aa9e0` to 929 normalized differing bytes.
+- P05: restoring the scenario barrier, two BSP counters, and measured loop
+  topology retained `0x330`/52 and reduced
+  `_players_update_after_game` to 222 normalized differing bytes.
+- P06/P07: the historical 877-byte teleport candidate was reproduced, but it
+  depended on an unproven `volatile` pointer-store expression used only as a
+  codegen lever. It was rejected under campaign policy; the clean PDB-backed
+  P04 form was restored.
+- P08: recovered field/flag names and compile-time January layout assertions
+  were byte-neutral across the whole TU.
+
+Final isolated-lane gate: **106/110 sections**, **66/70 functions**, and
+**40/40 data sections** exact. The four residuals retain equal padded size and
+relocation count but receive no exact credit:
+
+| Function | Size / relocs | Candidate SHA-256 | Differing bytes |
+| --- | ---: | --- | ---: |
+| `_code_000a9ff0` | `0x170` / 22 | `d9ca587214fd10308b7a16a797d8a154102f2095fbf28324cb9e3e2da8d8483e` | 11 |
+| `_code_000aa9e0` | `0x510` / 61 | `d833e6d8f06cfdb556417d852c6a0717eecfdb2726f11a92d9241c15b363bbb0` | 929 |
+| `_players_update_after_game` | `0x330` / 52 | `6c0d80f1ab3c18aa8447682e0e9e7365486c42df02072c1a24c729a54306d7b7` | 222 |
+| `_players_update_before_game` | `0x6E0` / 101 | `51c2c7b42d12188a024fac2a2c5d030c194d6a91be0b4e3d57bdd5efe1dd1c8c` | 4 |
