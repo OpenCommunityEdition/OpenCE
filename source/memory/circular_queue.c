@@ -165,12 +165,12 @@ boolean circular_queue_dequeue_data(
 	long data_size,
 	boolean advance)
 {
-	/* NonMatching and not parked: target/candidate are 0x100/0xF0 padded
-	   bytes with all 12 relocation identities preserved. The meaningful-code
-	   delta is four bytes: January keeps FALSE in BL, later coalesces EBX with
-	   read_offset, and returns BL on failure; this TU folds FALSE into AL and
-	   rotates queue/read_offset through EBX/EDI. Five legal-C lifetime and
-	   control-flow shapes did not remove the padded-size mismatch. */
+	/* NonMatching: target/candidate are 0x100/0xF0 padded bytes with all
+	   12 relocation identities preserved. January keeps FALSE in BL, later
+	   coalesces EBX with read_offset, and returns BL on failure; this TU folds
+	   FALSE into AL and rotates queue/read_offset through EBX/EDI. The bounded
+	   legal-C search and its reopen criteria are recorded in
+	   docs/object_matching_logs/circular_queue_obj.md. */
 	long read_offset;
 	long contiguous_size;
 	boolean result;
