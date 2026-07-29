@@ -55,6 +55,14 @@ Each ledger must include:
   object-byte patches, or compiler-flag changes.
 - A parked residual must preserve enough evidence for another agent to
   reproduce the classification without redoing the full search.
+- Label a defect `BUG (original)` only when January binary/source evidence
+  proves the defective behavior belongs to the original game. A mistake or
+  omission in our reconstruction is not an original bug. Preserve proven
+  original behavior in the matching build and document the corrected-build
+  alternative in a comment without changing the matching token/line shape.
+- When retroactively documenting an old lane, state which experiment details
+  were not preserved. Never manufacture source variants, hashes, or outcomes
+  to make a historical matrix look complete.
 
 ## Minimal experiment row
 
@@ -63,4 +71,3 @@ Each ledger must include:
 |---|---|---:|---:|---|---|---|---|
 | E01 | ... | `0x.../0x...` | `N/N` | `...` | `+0x...: ...` | `K/K exact` | reverted |
 ```
-
