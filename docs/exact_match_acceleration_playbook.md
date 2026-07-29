@@ -35,6 +35,31 @@ whole-translation-unit regression audit.
    donor tools may propose source, but the unchanged strict comparator and
    regression gates decide admission.
 
+### Select closeouts from strict evidence, not the ordinary percentage
+
+Run `python -m tools.rank_object_closeouts` after regenerating the ordinary
+and semantic reports. The ranking deliberately combines:
+
+- the complete function inventory from the ordinary report;
+- the reviewed strict `accepted_ledger`;
+- object `Matching` status; and
+- the evidence-backed parked-function catalog.
+
+This prevents three recurring campaign mistakes:
+
+1. treating a differently numbered local jump-table label as unfinished code;
+2. repeatedly dispatching a one-function object whose only residual is already
+   a proven compiler tie; and
+3. overlooking a data-only closeout after every function is exact.
+
+The tool is a triage aid, not an admission oracle. `NEAR_CLOSEOUT` means the
+remaining work is unparked and bounded; it does not predict that source tuning
+will succeed. `LEDGER_REVIEW` means earlier object work exists and its
+do-not-repeat/reopen rules must be read before dispatch. `PROVEN_BLOCKED` means
+every remaining function is in the
+reviewed parked ledger and must not be reopened without satisfying its stated
+reopen criterion. Always read the object's Markdown ledger before editing.
+
 ## Evidence hierarchy
 
 From strongest to weakest:
