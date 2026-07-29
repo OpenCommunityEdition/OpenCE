@@ -127,7 +127,6 @@ void actor_perception_acknowledge(
 
 /* ---------- globals */
 
-struct data_array *prop_data = NULL;
 long data_002b7d78 = NONE;
 
 /* ---------- public code */

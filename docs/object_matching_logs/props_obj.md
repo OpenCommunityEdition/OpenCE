@@ -26,6 +26,7 @@ flag changes.
 | `_prop_new_unacknowledged` | Keep separate `next_prop_index` and `prop_index`, assign current from next, and test `next_prop_index` at the header | Reduced candidate from `0x230` to target-exact padded size `0x220`; kept 21/21 relocation identities and recovered January's `EDI` next / `EBX` current roles. |
 | `_prop_new_unacknowledged` | Nested allocation selection with an explicit `initialize_prop` join | Moved `datum_new` ahead of the reuse block to the target family and retained `0x220/0x220`, 21/21. Current candidate hash is `681249dad8d4...`; target is `4e1ed0d47f97...`. |
 | `_prop_new_unacknowledged` | Store chosen prop index before its distance in both scan arms | Recovered the target's local store order without changing exact size or relocation count. |
+| Object ownership | Keep `prop_data` declared only through the `extern` in `props.h` | The target `props.obj` carries `_prop_data` as an undefined external (`section=0`, `value=0`). Removing the local `= NULL` definition eliminated an incorrect 4-byte `.bss` section and reproduced the target symbol exactly without changing the 9/17 strict function result. The storage is supplied by the campaign's `linker_common.obj`. |
 
 ## Measured and reverted experiments
 
@@ -62,3 +63,10 @@ flag changes.
 The object remains parked at 9/17 exact until one of these explicit reopen
 conditions is available. The exact siblings and all target-owned non-code
 sections are invariants for every future experiment.
+
+Two select-any string COMDATs (`"prop"` and
+`"prop->orphan_prop_index == NONE"`) remain locally emitted while the split
+target records them as undefined external symbols owned elsewhere. They are
+recorded as csplit COMDAT-attribution differences, not target-owned data
+mismatches. The former local `_prop_data` BSS mismatch was not COMDAT noise
+and has been corrected as described above.
