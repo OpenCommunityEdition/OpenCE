@@ -313,7 +313,6 @@ symbols in this file:
 
 enum
 {
-	_triangle_buffer_type_precompiled_strip = 1,
 	MAXIMUM_RASTERIZER_DEBUG_MODEL_VERTICES = 2048,
 	MAXIMUM_RASTERIZER_DEBUG_MODEL_VERTEX_REFERENCES = 12,
 };
