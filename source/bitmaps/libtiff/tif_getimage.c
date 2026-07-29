@@ -42,56 +42,26 @@ extern void debug_free(void *, const char *, long);
 
 typedef	u_char RGBvalue;
 
-#pragma pack(push, 2)
-struct tif_getimage_globals {
-	float D4;
-	float D3;
-	float D2;
-	float D1;
-	u_long **PALmap;
-	u_long **BWmap;
-	float *refBlackWhite;
-	float *YCbCrCoeffs;
-	u_short YCbCrVertSampling;
-	u_short pad34;
-	u_short YCbCrHorizSampling;
-	u_short pad38;
-	char *filename;
-	int stoponerr;
-	u_short *bluecmap;
-	u_short *greencmap;
-	u_short *redcmap;
-	u_short orientation;
-	u_short pad62;
-	u_short photometric;
-	u_short pad66;
-	u_short samplesperpixel;
-	u_short pad70;
-	u_short bitspersample;
-};
-#pragma pack(pop)
-
-__declspec(align(4)) struct tif_getimage_globals bss_0031be54 = { 0 };
-
-#define D4 bss_0031be54.D4
-#define D3 bss_0031be54.D3
-#define D2 bss_0031be54.D2
-#define D1 bss_0031be54.D1
-#define PALmap bss_0031be54.PALmap
-#define BWmap bss_0031be54.BWmap
-#define refBlackWhite bss_0031be54.refBlackWhite
-#define YCbCrCoeffs bss_0031be54.YCbCrCoeffs
-#define YCbCrVertSampling bss_0031be54.YCbCrVertSampling
-#define YCbCrHorizSampling bss_0031be54.YCbCrHorizSampling
-#define filename bss_0031be54.filename
-#define stoponerr bss_0031be54.stoponerr
-#define bluecmap bss_0031be54.bluecmap
-#define greencmap bss_0031be54.greencmap
-#define redcmap bss_0031be54.redcmap
-#define orientation bss_0031be54.orientation
-#define photometric bss_0031be54.photometric
-#define samplesperpixel bss_0031be54.samplesperpixel
-#define bitspersample bss_0031be54.bitspersample
+static u_long width, height;
+static float D4 = { 0 };
+static float D3 = { 0 };
+static float D2 = { 0 };
+static float D1 = { 0 };
+static u_long **PALmap = { 0 };
+static u_long **BWmap = { 0 };
+static float *refBlackWhite = { 0 };
+static float *YCbCrCoeffs = { 0 };
+static u_short YCbCrVertSampling = { 0 };
+static u_short YCbCrHorizSampling = { 0 };
+static char *filename = { 0 };
+static int stoponerr = { 0 };
+static u_short *bluecmap = { 0 };
+static u_short *greencmap = { 0 };
+static u_short *redcmap = { 0 };
+static u_short orientation = { 0 };
+static u_short photometric = { 0 };
+static u_short samplesperpixel = { 0 };
+static u_short bitspersample = { 0 };
 
 /* January anonymous-symbol map, recovered from exact bodies and relocation
  * call graphs against the authentic libtiff 1.8 source above:
@@ -671,20 +641,18 @@ static
 makecmap(rmap, gmap, bmap)
 	u_short *rmap, *gmap, *bmap;
 {
-	register u_long **palmap;
 	register int i;
 	int nsamples = 8 / bitspersample;
 	register u_long *p;
 
-	palmap = (u_long **)debug_malloc(
+	PALmap = (u_long **)debug_malloc(
 	    256*sizeof (u_long *)+(256*nsamples*sizeof(u_long)), 0,
 	    TIF_GETIMAGE_FILE, 593);
-	PALmap = palmap;
-	if (palmap == NULL) {
+	if (PALmap == NULL) {
 		TIFFError(filename, "No space for Palette mapping table");
 		return (0);
 	}
-	p = (u_long *)(palmap + 256);
+	p = (u_long *)(PALmap + 256);
 	for (i = 0; i < 256; i++) {
 		PALmap[i] = p;
 #define	CMAP(x)	\
@@ -1094,10 +1062,18 @@ putRGBseparate16bittile(cp, br, bg, bb, Map, w, h, fromskew, toskew)
 static void
 initYCbCrConversion()
 {
+	float one_over_luma_green;
+	float product;
+
 	D1 = 2 - 2*LumaRed;
-	D2 = D1*LumaRed / LumaGreen;
+	one_over_luma_green = 1.0f / LumaGreen;
+	product = one_over_luma_green*LumaRed;
+	D2 = product*D1;
 	D3 = 2 - 2*LumaBlue;
-	D4 = D2*LumaBlue / LumaGreen;
+	product = one_over_luma_green*LumaBlue;
+	D4 = product*D2;
+
+	return;
 }
 
 static void
@@ -1114,18 +1090,13 @@ putRGBContigYCbCrClump(cp, pp, cw, ch, w, n, fromskew, toskew)
 	Cb = Code2V(pp[n],   refBlackWhite[2], refBlackWhite[3], 127);
 	Cr = Code2V(pp[n+1], refBlackWhite[4], refBlackWhite[5], 127);
 	for (j = 0; j < ch; j++) {
-		register double D1Cr = Cr*D1;
-		register double D3Cb = Cb*D3;
-		register double D4Cb = Cb*D4;
-		register float D2Cr = Cr*D2;
-
 		for (k = 0; k < cw; k++) {
 			float Y, R, G, B;
 			Y = Code2V(*pp++,
 			    refBlackWhite[0], refBlackWhite[1], 255);
-			R = D1Cr + Y;
-			B = D3Cb + Y;
-			G = Y - D4Cb - D2Cr;
+			R = Y + Cr*D1;
+			B = Y + Cb*D3;
+			G = Y - Cb*D4 - Cr*D2;
 			cp[k] = PACK(CLAMP(R,0,255),
 				     CLAMP(G,0,255),
 				     CLAMP(B,0,255));
@@ -1133,6 +1104,8 @@ putRGBContigYCbCrClump(cp, pp, cw, ch, w, n, fromskew, toskew)
 		cp += w+toskew;
 		pp += fromskew;
 	}
+
+	return;
 }
 #undef LumaBlue
 #undef LumaGreen
