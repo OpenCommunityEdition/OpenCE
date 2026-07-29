@@ -4,6 +4,10 @@ Every object that receives implementation or matching work must maintain one
 Markdown ledger in this directory. The filename is the object name with
 `_obj.md`, for example `players_obj.md`.
 
+General techniques that apply across translation units belong in
+`docs/exact_match_acceleration_playbook.md`; object-specific measurements stay
+in the individual ledger.
+
 The purpose is to make matching work cumulative. A new lane must be able to
 distinguish an untried evidence-backed source shape from a spelling that has
 already compiled to the same bytes.
