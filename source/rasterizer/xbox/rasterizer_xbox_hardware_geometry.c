@@ -65,17 +65,6 @@ symbols in this file:
 
 /* ---------- macros */
 
-/* ---------- structures */
-
-struct rasterizer_triangle_buffer
-{
-	short triangle_type;
-	short pad2;
-	long triangle_count;
-	void *triangles;
-	void *hardware_buffer;
-};
-
 /* ---------- prototypes */
 
 void rasterizer_error(
@@ -238,7 +227,7 @@ void rasterizer_vertex_buffer_delete(
 }
 
 boolean rasterizer_triangle_buffer_new(
-	struct rasterizer_triangle_buffer *triangle_buffer,
+	struct triangle_buffer *triangle_buffer,
 	short triangle_type,
 	long count,
 	void const *triangles)
@@ -329,11 +318,11 @@ failure:
 			locked_triangles,
 			triangles,
 			buffer_size);
-		triangle_buffer->triangle_type = triangle_type;
-		triangle_buffer->triangle_count = count;
-		triangle_buffer->triangles = (void *)triangles;
+		triangle_buffer->type = triangle_type;
+		triangle_buffer->count = count;
+		triangle_buffer->base_address = (void *)triangles;
 		_ReadWriteBarrier();
-		triangle_buffer->hardware_buffer = d3d_index_buffer;
+		triangle_buffer->hardware_format = d3d_index_buffer;
 	}
 	if (!success)
 		goto failure;
@@ -342,13 +331,13 @@ failure:
 }
 
 void rasterizer_triangle_buffer_delete(
-	struct rasterizer_triangle_buffer *triangle_buffer)
+	struct triangle_buffer *triangle_buffer)
 {
-	if (triangle_buffer && triangle_buffer->hardware_buffer)
+	if (triangle_buffer && triangle_buffer->hardware_format)
 	{
 		IDirect3DIndexBuffer8_Release(
-			(D3DIndexBuffer *)triangle_buffer->hardware_buffer);
-		triangle_buffer->hardware_buffer = 0;
+			(D3DIndexBuffer *)triangle_buffer->hardware_format);
+		triangle_buffer->hardware_format = 0;
 	}
 
 	return;

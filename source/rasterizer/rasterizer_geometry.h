@@ -47,6 +47,22 @@ struct vertex_buffer
 	void *hardware_format;
 };
 
+enum
+{
+	_triangle_buffer_type_triangles,
+	_triangle_buffer_type_precompiled_strip,
+	NUMBER_OF_TRIANGLE_BUFFER_TYPES,
+};
+
+struct triangle_buffer
+{
+	short type;
+	word pad;
+	long count;
+	void *base_address;
+	void *hardware_format;
+};
+
 /* ---------- prototypes/EXAMPLE.C */
 
 /* ---------- globals */
