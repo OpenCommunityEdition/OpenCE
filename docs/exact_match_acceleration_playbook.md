@@ -146,6 +146,30 @@ ECX/EDX or another caller-derived convention. External linkage, address-taking,
 or a stack frame can destroy that convention. Work from a forced-register
 caller outward; do not tune a private helper in isolation.
 
+### Compiler provenance before compiler hunting
+
+Do not attribute a stubborn register or scheduling residual to an unknown
+compiler patch until the target's own debug records have been checked.
+PDB 2.00 module streams can contain `S_COMPILE2_ST` records with independent
+front-end and back-end version triples. For the January `players.obj`, the
+record proves `13.0.9254` for both halves, matching the campaign compiler's
+reported build.
+
+Use this order:
+
+1. Decode the target compiland's compiler record.
+2. Compile the unchanged TU once with each genuinely distinct local compiler
+   binary.
+3. Compare normalized hashes for every residual, not just the first
+   instruction.
+4. If all variants are byte-identical, stop the compiler hunt and return to
+   source provenance or a demonstrated legal-C control.
+
+For Players, VC7 `13.00.9210` and `13.00.9254.1` emitted byte-identical
+candidate hashes for all four residuals. That falsifies the available
+patch-level lever and prevents repeated SDK downloads or speculative flag
+changes.
+
 ## Transfer and donor rules
 
 - A donor is usable only when its source text is resolved and its target

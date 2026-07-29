@@ -135,3 +135,32 @@ relocation count but receive no exact credit:
 | `_code_000aa9e0` | `0x510` / 61 | `d833e6d8f06cfdb556417d852c6a0717eecfdb2726f11a92d9241c15b363bbb0` | 929 |
 | `_players_update_after_game` | `0x330` / 52 | `6c0d80f1ab3c18aa8447682e0e9e7365486c42df02072c1a24c729a54306d7b7` | 222 |
 | `_players_update_before_game` | `0x6E0` / 101 | `51c2c7b42d12188a024fac2a2c5d030c194d6a91be0b4e3d57bdd5efe1dd1c8c` | 4 |
+
+### P20 compiler-provenance and patch-level falsification
+
+The January `cachebeta.pdb` module stream for
+`\halo\objects\halobetacache\players.obj` contains a 60-byte
+`S_COMPILE2_ST` record. Its front-end and back-end version triples are both
+`13.0.9254`, followed by the producer string
+`Microsoft (R) Optimizing Compiler`. This is target-authored evidence that the
+TU was compiled with the same numbered VC7 build used by the campaign.
+
+The unchanged retained source was then compiled once under the only two
+distinct local VC7 compiler binaries:
+
+| Compiler | `_code_000a9ff0` | `_code_000aa9e0` | `_players_update_before_game` | `_players_update_after_game` |
+|---|---|---|---|---|
+| `13.00.9254.1` | `d9ca5872...` | `d833e6d8...` | `51c2c7b4...` | `6c0d80f1...` |
+| `13.00.9210` | `d9ca5872...` | `d833e6d8...` | `51c2c7b4...` | `6c0d80f1...` |
+
+All four normalized candidate hashes were byte-identical across compiler
+binaries. The older 9210 compiler therefore supplies no code-generation
+control for this TU, while the target record materially weakens the hypothesis
+that an unidentified compiler build explains the residuals.
+
+Disposition: no source retained and no exact credit. Do not repeat a local
+compiler census or download nominally different 3911 kits without first
+proving that their `CL.Exe` hash is new. The remaining reopen conditions are
+authentic January/cross-build statement topology or a focused legal-C control
+that changes the measured register/lifetime window without moving any exact
+relocation.
