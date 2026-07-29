@@ -63,7 +63,7 @@ void observer_up_from_forward(
 
 /* ---------- globals */
 
-struct orbiting_camera_constants const rdata_0025724c =
+static struct orbiting_camera_constants const rdata_0025724c =
 {
 	DEGREES_TO_RADIANS(50.f),
 	1.f,
