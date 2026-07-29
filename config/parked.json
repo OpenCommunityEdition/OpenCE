@@ -40,25 +40,6 @@
       }
     },
     {
-      "unit": "source/camera/orbiting_camera",
-      "function": "_orbiting_camera_update",
-      "class": "instruction-scheduling",
-      "evidence": "Target and candidate have equal 0x470 padded size and 50 relocation identities. Five grounded assignment-order shapes leave the untouched source best at 99.51899%; the residual is one nine-byte scheduling window that interleaves the final zero-vector store with depth, field-of-view, and timer loads, after which instruction addresses realign.",
-      "measurements": {
-        "target": {
-          "size": 1136,
-          "relocation_count": 50,
-          "normalized_sha256": "908d34ea2543c87642a508552b21907f5aa137815b6abd711edf4816ff17188c"
-        },
-        "base": {
-          "size": 1136,
-          "relocation_count": 50,
-          "normalized_sha256": "b413e48816f598e702d4f838d2921f98928534b4b6b8a94a25eefe9008ce0a11"
-        },
-        "objdiff_percent": 99.51899
-      }
-    },
-    {
       "unit": "source/physics/point_physics",
       "function": "_point_physics_update",
       "class": "tu-context-optimization",
