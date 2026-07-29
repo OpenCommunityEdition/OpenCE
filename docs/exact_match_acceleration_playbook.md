@@ -1,0 +1,186 @@
+# Exact-match acceleration playbook
+
+This document records techniques with broader application to the January 2002
+Halo Xbox decompilation. Object-specific measurements remain in
+`docs/object_matching_logs/`; this file contains only controls, triage rules,
+and campaign practices that have survived strict comparison.
+
+The objective is faster reconstruction without lowering the bar. A candidate
+is not exact because it is correct, similar, the same size, or 99% fuzzy. The
+admission evidence remains XDK 3911 output, exact normalized bytes, exact
+relocation shape and resolved destinations, exact owned data/layout, and a
+whole-translation-unit regression audit.
+
+## Campaign strategy
+
+1. **Finish objects, not isolated functions.** Prefer a unit with a bounded
+   residual and known data ownership over a larger number of unrelated leaves.
+   Once an object is opened, carry it through code, data, ownership, regression,
+   documentation, and `Matching` admission unless a measured compiler tie
+   satisfies the parking standard.
+2. **Prioritize reusable foundations.** Scenario/BSP accessors, real-math
+   leaves, player/unit layouts, tag/object accessors, datum iterators, compiler
+   wrapper families, and complete donor translation units reduce later work.
+3. **Separate reconstruction from tuning.** First recover the January
+   semantics, types, call graph, private ABI, and owned data. Tune source shape
+   only after target size/relocation evidence says the structure is close.
+4. **Work atomic private-ABI clusters together.** Static helpers and their
+   callers can form a register-allocation fixed point. Splitting them across
+   lanes produces false blockers.
+5. **Use a bounded experiment budget.** Test one source factor at a time,
+   record the exact result, and stop repeating compiler-equivalent spellings.
+   A parked result needs explicit size, relocation, first-divergence, and
+   exhausted-control evidence.
+6. **Automate candidate generation, never acceptance.** Shape-transfer and
+   donor tools may propose source, but the unchanged strict comparator and
+   regression gates decide admission.
+
+## Evidence hierarchy
+
+From strongest to weakest:
+
+1. January target bytes, relocation metadata, linked addresses, and section
+   ownership.
+2. January sibling functions and exact donor translation units.
+3. January assert strings, source paths, help tables, tag definitions, and call
+   sites.
+4. XDK 3911 headers and synthetic compiler experiments under the exact flags.
+5. October Xbox, Halo PC/CEA/HCEX PDBs, community forks, and later-engine types.
+
+Levels 4 and 5 generate hypotheses. They do not override January evidence.
+Every imported field, enum, prototype, or name must be corroborated locally.
+
+## High-yield source controls
+
+### Ownership and alias modeling
+
+VC7 code generation depends on what it can prove about globals:
+
+- Aggregate storage can force address common-subexpression elimination or
+  destroy an index because sibling fields may alias.
+- Separate globals can preserve a live SIB index and eliminate reloads.
+- A one-field structure can retain field-oriented optimizer behavior while a
+  separate array supplies non-aliasing proof. This closed
+  `game_engine_multiplayer_sounds.obj`: it preserved `dec; mov; je` flags in
+  the update while producing SIB stores in the queue helper.
+- Static versus external linkage affects alias knowledge, section order,
+  symbol storage class, and whether zero-initialized data becomes `.bss` or a
+  tentative/common symbol.
+
+Always verify the full object. A linkage change can leave every function exact
+while silently deleting or reordering `.bss`.
+
+### Statement and branch order
+
+- VC7 often reflects the original failure-first versus success-first topology.
+  Reversing an `if` can fix multiple relocation-address regions at once.
+- Common stores in two branches may be tail-merged, but a constant-valued
+  branch can instead materialize an immediate store and grow the function.
+- Comparison polarity matters even when predicates are logically equivalent;
+  it controls `cmp` operand order, signed branches, and register lifetimes.
+- Use a single return when the target structure permits it. When the exact
+  source requires multiple source returns to reproduce a common compiler
+  epilogue, record that as an evidence-backed house-style exception.
+
+### Scalar stores versus aggregate operations
+
+- Field-wise stores give the scheduler independent operations and can reproduce
+  interleavings that `{0}`, aggregate assignment, `memset`, or `rep stos`
+  cannot.
+- Conversely, aggregate assignment is useful when the target uses `rep movs`
+  or a single calculated element address.
+- Preserve target load and store order before trying declaration-order noise.
+
+### Integer width and signedness
+
+- `movsx`/`movzx`, partial-register operations, and signed branch opcodes reveal
+  the real promotion boundaries.
+- Change signedness only where the target proves it. A `jle` versus `jbe`
+  difference is often a type error; an ESI/EDI mirror is not.
+- Recover narrow accumulators instruction by instruction rather than relying
+  on C's default integer promotions.
+
+### x87 controls
+
+- A value live after a store selects `fst`; a dead value selects `fstp`.
+- Source operand order controls non-commutative subtraction/division memory
+  forms. VC7 canonicalizes commutative addition/multiplication; spelling order
+  is not a lever there.
+- Passing, returning, or globally storing a floating result produces distinct
+  stack-staging patterns.
+- Never substitute mathematically equivalent expressions that change signed
+  zero, NaN payload/sign, intermediate precision, or rounding.
+
+### XDK inline wrappers
+
+Stock XDK `D3DINLINE` under this compiler emits the January out-of-line D3D
+wrapper families when called normally. Address-taking forces a different
+standard-ABI body, and redefining `D3DINLINE` as plain `static` can emit a
+thunk. Prefer the stock header form and verify every emitted wrapper in the TU.
+
+### Private ABI controls
+
+A source-static, non-address-taken, frameless helper can receive arguments in
+ECX/EDX or another caller-derived convention. External linkage, address-taking,
+or a stack frame can destroy that convention. Work from a forced-register
+caller outward; do not tune a private helper in isolation.
+
+## Transfer and donor rules
+
+- A donor is usable only when its source text is resolved and its target
+  machine shape is exact.
+- Derive every recipient callee/global substitution from the recipient target
+  relocations, never by name similarity.
+- Equal relocation-masked bytes can hide a wrong-callee wrapper. Destination
+  identity and addends remain strict.
+- Preserve target statement order; relocation sequence is often its strongest
+  surviving proof.
+- Reject stubs, unresolved donors, inconsistent substitution maps, prologue
+  mismatches, and data-ownership changes automatically.
+
+## Parking standard
+
+Park only when:
+
+- target and candidate padded size are exact;
+- relocation count, types, and destinations are exact, or a reviewed
+  representation-only difference has independently resolved destinations;
+- the remaining divergence is classified precisely;
+- legal-C controls appropriate to that class have been exhausted;
+- the object ledger records a reproducible first divergence and reopen
+  criterion.
+
+A 92% function with different size or relocations is structural work, not a
+compiler tie. A one-instruction scheduler swap can be parked only after the
+dependency and source-control search are documented.
+
+## Admission checklist
+
+Before marking an object `Matching`:
+
+1. Build with XDK 3911 and the repository flags.
+2. Compare every function with the hardened COFF comparator.
+3. Verify every owned `.data`, `.rdata`, and `.bss` span, including symbol
+   offsets, storage classes, and relocation destinations.
+4. Confirm the ordinary report does not hide a strict false positive.
+5. Run the whole-TU regression gate against a pre-edit snapshot. Review every
+   intentional ownership transition; never suppress unrelated failures.
+6. Run the consolidated build, semantic audit, and progress report.
+7. Update the object ledger with retained and rejected experiments.
+8. Mark `Matching` only after all evidence passes.
+
+## Original bugs
+
+Exact reconstruction preserves proven original behavior. Mark a defect
+`BUG (original)` only when January evidence proves it. In the matching source,
+retain the original behavior and add a concise comment describing a safe
+corrected-build alternative. Do not silently repair it and do not label our
+own reconstruction mistake as an original bug.
+
+## Prohibited shortcuts
+
+No inline assembly, volatile byte forcing, undefined aliasing, object-byte
+patches, compiler pragmas used only to force bytes, flag changes, fuzzy-only
+credit, or invented symbols/types. Compiler experiments belong in disposable
+worktrees; production admission must remain readable evidence-backed C.
+

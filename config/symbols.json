@@ -22418,6 +22418,7 @@
 { "file_offset": 4450580, "flags": 0, "name": "_bss_0043e914" },
 { "file_offset": 4450632, "flags": 0, "name": "_bss_0043e948" },
 { "file_offset": 4451192, "flags": 0, "name": "_bss_0043eb78" },
+{ "file_offset": 4451196, "flags": 0, "name": "_bss_0043eb7c" },
 { "file_offset": 4451240, "flags": 0, "name": "_bss_0043eba8" },
 { "file_offset": 4451504, "flags": 0, "name": "_bss_0043ecb0" },
 { "file_offset": 4451712, "flags": 0, "name": "_bss_0043ed80" },
