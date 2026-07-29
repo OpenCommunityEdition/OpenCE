@@ -10,7 +10,8 @@ per-object experiment matrix.
 - January target: `build/split/source/camera/orbiting_camera.obj`.
 - Current inventory: `_orbiting_camera_new` exact;
   `_orbiting_camera_update` residual (1/2 functions).
-- Target-owned `.rdata`: 60/60 bytes exact.
+- Ordinary report: `.rdata` 60/60 bytes at 100%. Revalidate its strict
+  section ownership before object admission.
 
 ## Parked residual
 

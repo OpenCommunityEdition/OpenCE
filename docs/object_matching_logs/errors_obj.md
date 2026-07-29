@@ -9,7 +9,9 @@ the mandatory per-object experiment format.
   `/O2 /Oy- /DDEBUG /Dxbox`.
 - January target: `build/split/source/cseries/errors.obj`.
 - Current inventory: 9/10 functions exact; `_error` is the only residual.
-- Target-owned `.bss`, `.data`, and `.rdata`: 501/501 bytes exact.
+- Ordinary report: `.bss`, `.data`, and `.rdata` total 501/501 bytes at
+  100%. Revalidate all three with the hardened section/ownership gate before
+  object admission.
 
 ## Parked residual
 
@@ -35,5 +37,5 @@ Reopen only with original local-variable provenance, an exact donor explaining
 the newline spill and EBX/ESI split, or a new legal-C frame/lifetime control
 that preserves the exact first `0x111` bytes and all 50 relocations.
 
-Disposition: 9/10 code and all target-owned data exact; object remains
-`NonMatching`.
+Disposition: 9/10 code credited; object remains `NonMatching`, and its data
+still requires a fresh hardened ownership gate at closeout.

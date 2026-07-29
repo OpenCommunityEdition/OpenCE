@@ -9,7 +9,9 @@ progress-report, and parked-ledger evidence.
   `/O2 /Oy- /DDEBUG /Dxbox`.
 - January target: `build/split/source/memory/hashtable.obj`.
 - Current inventory: 9/10 functions exact; 1,767/2,343 meaningful code bytes.
-- Target-owned data is 270/270 bytes exact.
+- Ordinary report: 270/270 data bytes at 100%. The historical park entry
+  contains no data-section proof, so strict ownership must be revalidated
+  before admission.
 - `_hashtable_grow` is the sole residual.
 
 ## Parked residual
@@ -35,5 +37,5 @@ Reopen with original local-expression provenance, a matching donor that
 anchors EAX/ECX at an isomorphic assertion, or a new defined-C dependency
 control that predicts the register choice before compilation.
 
-Disposition: 9/10 code and all target-owned data exact; object remains
-`NonMatching`.
+Disposition: 9/10 code credited; object remains `NonMatching`, and its data
+still requires a fresh hardened ownership gate at closeout.

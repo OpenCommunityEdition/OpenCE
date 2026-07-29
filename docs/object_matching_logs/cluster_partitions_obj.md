@@ -12,7 +12,9 @@ called out rather than reconstructed.
 - January target:
   `build/split/source/structures/cluster_partitions.obj`.
 - Current inventory: 13/14 functions exact; 1,533/1,715 meaningful code bytes.
-- Target-owned `.rdata`: 500/500 bytes exact.
+- Ordinary report: `.rdata` 500/500 bytes at 100%. Because the historical
+  park entry records only the code residual, rerun strict section/ownership
+  comparison before admitting the object.
 - `_reference_list_copy` is the sole residual.
 
 ## Parked residual
@@ -40,5 +42,6 @@ donor showing the required pointer live-range distinction, or a new legal-C
 dependency control not equivalent to the historical register-allocation
 sweep.
 
-Disposition: 13/14 code and all target-owned data are exact, but the object is
-**not** strict-complete and remains `NonMatching`.
+Disposition: 13/14 code is credited; historical data reporting is promising
+but not a substitute for a fresh strict ownership gate. The object is **not**
+strict-complete and remains `NonMatching`.
