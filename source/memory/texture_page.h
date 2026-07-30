@@ -75,7 +75,7 @@ long texture_page_texture_new(
 	boolean immediate);
 void texture_page_textures_cancel(
 	struct texture_page *texture_page);
-void texture_page_textures_end(
+boolean texture_page_textures_end(
 	struct texture_page *texture_page);
 void texture_page_texture_delete(
 	struct texture_page *texture_page,

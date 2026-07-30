@@ -558,7 +558,7 @@
 				{ "name": "source/models/model_definitions.c", "index": 184, "status": "Matching" },
 				{ "name": "source/models/model_animations.c", "index": 185, "status": "NonMatching" },
 				{ "name": "source/models/model_animation_definitions.c", "index": 186, "status": "Matching" },
-				{ "name": "source/memory/texture_page.c", "index": 187, "status": "NonMatching" },
+				{ "name": "source/memory/texture_page.c", "index": 187, "status": "Matching" },
 				{ "name": "source/memory/stack_memory_pool.c", "index": 188, "status": "NonMatching" },
 				{ "name": "source/memory/sl_list.c", "index": 189, "status": "Matching" },
 				{ "name": "source/memory/memory_pool.c", "index": 190, "status": "Matching" },
