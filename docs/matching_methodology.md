@@ -30,6 +30,12 @@ addend, ABI, build, and regression evidence.
 7. Run the strict semantic ledger before assigning work. A function already
    listed in `build/semantic_report.json` must not be reimplemented merely
    because objdiff displays a fuzzy percentage.
+8. When a target macro or expression is known from an exact donor, preserve
+   its **lvalue topology** as well as its arithmetic. VC7 can emit different
+   code for mathematically equivalent forms such as transforming a temporary
+   and transforming the destination member in place. Prefer the donor's
+   assignment destination, member access, and read-back pattern before
+   permuting commutative terms or adding artificial temporaries.
 
 ## Blocker classes
 
@@ -77,6 +83,7 @@ each entry is reverified against current objects during `ninja progress`.
 | `hashtable_remove` (`f2d30b9`) | A | Source-oriented comparison order, reload points, and the shared deletion path aligned 496 padded bytes and 20 relocations. | Exact; use comparison polarity and reload timing before register tuning. |
 | `csstrcasecmp` (`e5852f8`, `claude/csstrcasecmp-15`) | A then C | `if (c1 != c2)` reproduces the target operand order; `if (c2 != c1)` does not. The remainder is an ESI/EDI parameter/local permutation. | Land only evidence-backed logic changes; handle the remaining mirror through a forced-register caller or park. |
 | terminal tab stops (`a917110`) | A | Identical six-byte data still failed because `static` produced storage class 3 while the target symbol was external, class 2. | Exact after external linkage/name recovery; audit symbol class, not just bytes. |
+| `generate_private_key` (`public_key_crypt.obj`) | A | Applying the exact `SWAP4` donor arithmetic to a local temporary selected the wrong accumulator form across hundreds of equivalent expression trees. Assigning the helper result to `private_key->dwords[i]` and applying `SWAP4` directly to that same member preserved frontend lvalue provenance and reproduced January exactly. | Exact without assembly, volatility, undefined behavior, or flag changes; preserve donor lvalue topology before classifying a commutative residual as a register tie. |
 | `objects.obj` BSS ownership | A/E | Explicit zero initialization plus declaration order recovered the linked 13-byte layout (`object_name_list@0`, `object_memory_pool@4`, `object_globals@8`, debug byte `@12`) without changing any exact function. January PDB/public-symbol and cross-TU-reference evidence proves the first three globals are source-private; csplit had defaulted their manually split labels to external because `symbols.json` omitted `"static": true`. | Keep the globals source-static and mark exactly those three csplit symbols static. Regenerate the split target and require exact size, offsets, storage classes, and whole-TU regression; do not paper over the difference with a semantic allowlist. |
 | `tif_packbits.obj` (`7c9c092`) | A | Target linkage, RCSID ownership, `_csmemcpy`, and disassembly-proven TIFF field offsets were required. Repository header layout differed from the target object. | Five functions and data exact; raw offsets are acceptable only with explicit target-layout evidence. |
 | random-math globals (`aef5a7c`) | A | Replacing an anonymous address placeholder with the real externally linked 20-byte globals structure fixed BSS ownership and relocation addends. | Exact functions retained; model globals explicitly before function tuning. |

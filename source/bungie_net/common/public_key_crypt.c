@@ -40,6 +40,7 @@ symbols in this file:
 #include "bungie_net/common/64bit_math.h"
 #include "bungie_net/common/public_key_crypt.h"
 #include "bungie_net/common/random_numbers.h"
+#include "memory/byte_swapping.h"
 
 /* ---------- constants */
 
@@ -53,8 +54,8 @@ unsigned long randomprime(
 	unsigned long maximum);
 
 static unsigned long code_0006f630(
-	unsigned long exponent,
 	unsigned long base,
+	unsigned long exponent,
 	unsigned long modulus);
 static unsigned long code_0006f700(
 	unsigned long p,
@@ -137,16 +138,12 @@ void generate_private_key(
 
 	for (i = 0; i < 2; i++)
 	{
-		unsigned long value = code_0006f780(
+		private_key->dwords[i] = code_0006f780(
 			public_key->dwords[i],
 			p->dwords[i],
 			x->dwords[i]);
 
-		private_key->dwords[i] =
-			((value & 0xFF000000) >> 24) |
-			((value & 0x00FF0000) >> 8) |
-			((value & 0x0000FF00) << 8) |
-			((value & 0x000000FF) << 24);
+		private_key->dwords[i] = SWAP4(private_key->dwords[i]);
 	}
 
 	error(
@@ -163,8 +160,8 @@ void generate_private_key(
 /* ---------- private code */
 
 static unsigned long code_0006f630(
-	unsigned long exponent,
 	unsigned long base,
+	unsigned long exponent,
 	unsigned long modulus)
 {
 	struct qword_value s;
@@ -206,7 +203,7 @@ static unsigned long code_0006f700(
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\public_key_crypt.c", 113, x<(p-1));
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\public_key_crypt.c", 114, g<p);
 
-	return code_0006f630(x, g, p);
+	return code_0006f630(g, x, p);
 }
 
 static unsigned long code_0006f780(
@@ -217,5 +214,5 @@ static unsigned long code_0006f780(
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\public_key_crypt.c", 133, p>2);
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\public_key_crypt.c", 134, x<(p-1));
 
-	return code_0006f630(x, public_key, p);
+	return code_0006f630(public_key, x, p);
 }
