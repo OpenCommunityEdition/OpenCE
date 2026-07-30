@@ -17,7 +17,7 @@ symbols in this file:
 /* ---------- macros */
 
 #define VERTEX_SHADER_ENTRY(offset, instruction_bytes) \
-	{ 0, rdata_00293850 + (offset), 0xFFFFFFFF, (instruction_bytes) }
+	{ 0, (unsigned char const *)rdata_00293850 + (offset), 0xFFFFFFFF, (instruction_bytes) }
 
 /* ---------- structures */
 
@@ -25,11 +25,14 @@ symbols in this file:
 
 /* ---------- globals */
 
-/* The January object owns 67 compiled Xbox vertex-shader programs in a single
-34,628-byte read-only payload.  The payload is intentionally left unresolved
-here: it is generated shader microcode, not reviewable reconstructed source.
-This declaration still preserves the exact table layout and relocation graph. */
-extern unsigned char const rdata_00293850[];
+/* The January object owns 67 compiled Xbox vertex-shader programs in this
+34,628-byte read-only payload.  These are immutable Xbox shader instruction
+tokens, represented as dwords so the generated data remains inspectable and
+the compiler reproduces the original little-endian bytes. */
+unsigned long const rdata_00293850[] =
+{
+#include "rasterizer_xbox_vertex_shaders_data.inc"
+};
 
 struct vertex_shader_entry vertex_shader_table[NUMBER_OF_VERTEX_SHADERS] =
 {
