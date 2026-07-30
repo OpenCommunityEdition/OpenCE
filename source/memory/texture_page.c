@@ -196,25 +196,27 @@ long texture_page_texture_new(
 		"c:\\halo\\SOURCE\\memory\\texture_page.c",
 		96,
 		immediate || texture_page->contains_unsorted_textures);
-	texture_pixel_count = width*height;
 	if (
 		width <= texture_page->width &&
-		height <= texture_page->height &&
-		texture_page->texture_pixel_count+texture_pixel_count < texture_page->width*texture_page->height)
+		height <= texture_page->height)
 	{
-		texture_index = datum_new(texture_page->textures);
-		if (texture_index != NONE)
+		texture_pixel_count = width*height;
+		if (texture_page->texture_pixel_count+texture_pixel_count < texture_page->width*texture_page->height)
 		{
-			texture = texture_page_texture_get(texture_page, texture_index);
-			texture->width = width;
-			texture->height = height;
-			texture->sorted = !texture_page->contains_unsorted_textures;
-			texture_page->texture_pixel_count += texture_pixel_count;
-			if (immediate && !code_0010f790(texture_page))
+			texture_index = datum_new(texture_page->textures);
+			if (texture_index != NONE)
 			{
-				texture_page->texture_pixel_count -= texture_pixel_count;
-				datum_delete(texture_page->textures, texture_index);
-				return NONE;
+				texture = texture_page_texture_get(texture_page, texture_index);
+				texture->width = width;
+				texture->height = height;
+				texture->sorted = !texture_page->contains_unsorted_textures;
+				texture_page->texture_pixel_count += texture_pixel_count;
+				if (immediate && !code_0010f790(texture_page))
+				{
+					texture_page->texture_pixel_count -= texture_pixel_count;
+					datum_delete(texture_page->textures, texture_index);
+					return NONE;
+				}
 			}
 		}
 	}
@@ -249,18 +251,20 @@ void texture_page_textures_cancel(
 	return;
 }
 
-void texture_page_textures_end(
+boolean texture_page_textures_end(
 	struct texture_page *texture_page)
 {
 	short absolute_index;
 	struct texture_page_texture *texture;
+	boolean resort_succeeded;
 
 	code_0010f570(texture_page);
 	match_assert(
 		"c:\\halo\\SOURCE\\memory\\texture_page.c",
 		170,
 		texture_page->contains_unsorted_textures);
-	if (code_0010f790(texture_page))
+	resort_succeeded = code_0010f790(texture_page);
+	if (resort_succeeded)
 	{
 		texture = texture_page->textures->data;
 		for (absolute_index = 0; absolute_index < texture_page->textures->count; absolute_index++, texture++)
@@ -270,7 +274,7 @@ void texture_page_textures_end(
 		}
 		texture_page->contains_unsorted_textures = FALSE;
 	}
-	return;
+	return resort_succeeded;
 }
 
 void texture_page_texture_delete(
@@ -316,19 +320,25 @@ static void code_0010f570(
 	return;
 }
 
+static __inline struct texture_page *texture_page_verify_and_return(
+	struct texture_page *texture_page)
+{
+	code_0010f570(texture_page);
+	return texture_page;
+}
+
 static boolean code_0010f730(
 	short texture_index_a,
 	short texture_index_b)
 {
-	struct texture_page *texture_page_a = bss_00456628;
+	struct texture_page *texture_page_a;
 	struct texture_page *texture_page_b;
 	struct texture_page_texture *texture_a;
 	struct texture_page_texture *texture_b;
 	long height_difference;
 
-	code_0010f570(texture_page_a);
-	texture_page_b = bss_00456628;
-	code_0010f570(texture_page_b);
+	texture_page_a = texture_page_verify_and_return(bss_00456628);
+	texture_page_b = texture_page_verify_and_return(bss_00456628);
 	texture_a = datum_get(texture_page_b->textures, texture_index_a);
 	texture_b = datum_get(texture_page_a->textures, texture_index_b);
 	height_difference = (long)texture_b->height - (long)texture_a->height;
@@ -343,7 +353,7 @@ boolean code_0010f790(
 	struct texture_page_channel channels[MAXIMUM_TEXTURE_CHANNELS];
 	short texture_count;
 	word spacing;
-	long spacing_mask;
+	word spacing_mask;
 	short channel_count;
 	short sorted_texture_index;
 	struct texture_page_texture *texture;

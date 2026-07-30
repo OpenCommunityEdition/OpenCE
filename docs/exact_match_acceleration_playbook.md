@@ -164,6 +164,29 @@ wrapper and its relocation destinations independently.
   universal fixes. They can prevent desirable argument hoisting and make an
   otherwise close function worse.
 
+### Recover the type before tuning the schedule
+
+A value that stays live in a register longer than expected is often evidence
+of a wrong prototype or field width, not a mysterious compiler decision.
+Before trying declaration orders, barriers, or control-flow rewrites:
+
+- Check what the target returns in `EAX` or `AL`. If the target preserves a
+  meaningful value until `ret`, a function currently declared `void` may
+  actually return that value.
+- Check whether the target consistently reads, masks, or writes only the low
+  byte or low word. A `char`, `boolean`, `short`, or `word` may be the real
+  type even when a 32-bit placeholder produces correct gameplay behavior.
+- Prefer the smallest type that is supported by all call sites and target
+  instructions. Do not narrow a type merely because it happens to improve the
+  bytes.
+
+In `texture_page.obj`, recovering `spacing_mask` as a 16-bit `word` made a
+736-byte packing function exact. Recovering
+`texture_page_textures_end` as a `boolean` function explained why January kept
+the packing result in `AL` across the loop and made its remaining 112 bytes
+exact. In plain English: the compiler was not being stubborn; we had told it
+the wrong facts about the program.
+
 ### Private ABI controls
 
 A source-static, non-address-taken, frameless helper can receive arguments in
@@ -207,6 +230,22 @@ changes.
   surviving proof.
 - Reject stubs, unresolved donors, inconsistent substitution maps, prologue
   mismatches, and data-ownership changes automatically.
+
+### Candidate-only helper COMDATs
+
+An inlined helper can occasionally leave an unreferenced out-of-line COMDAT
+copy in the candidate object. Never dismiss it just because the target
+function compares equal. It is acceptable only after all of the following are
+proved:
+
+- the extra section is a discardable COMDAT with the expected selection rule;
+- no relocation in the object refers to it;
+- every target-owned function and data section remains strict-exact;
+- the ordinary link actually discards it; and
+- the consolidated link, semantic audit, and progress report remain clean.
+
+This is a linker-level representation difference, not permission to ignore
+extra ordinary code or data.
 
 ## Parking standard
 
