@@ -75,10 +75,10 @@ void generate_key_parameters(
 	struct public_key *x,
 	struct public_key *g)
 {
+	long i = 0;
 	long count = 2;
-	long i;
 
-	for (i = 0; count; i++, count--)
+	while (count)
 	{
 		unsigned long prime0;
 		unsigned long prime1;
@@ -101,6 +101,9 @@ void generate_key_parameters(
 			"c:\\halo\\SOURCE\\bungie_net\\common\\public_key_crypt.c",
 			163,
 			g->dwords[i] < (p->dwords[i] - 1));
+
+		i++;
+		count--;
 	}
 
 	return;
