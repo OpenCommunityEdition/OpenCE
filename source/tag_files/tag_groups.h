@@ -107,7 +107,6 @@ struct tag_reference_definition
 
 typedef char tag_reference_definition_size_assert[
 	sizeof(struct tag_reference_definition) == 0xC ? 1 : -1];
-
 struct tag_data
 {
 	long size;

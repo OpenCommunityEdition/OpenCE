@@ -94,6 +94,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "physics.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -103,6 +106,12 @@ symbols in this file:
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+real global_gravity = 0.0035651792f;
+real global_water_density = 1.0f;
+real global_air_density = 0.0011f;
+real global_physics_collision_depth = 0.2f;
+long depths_of_hell = 0;
 
 /* ---------- public code */
 
