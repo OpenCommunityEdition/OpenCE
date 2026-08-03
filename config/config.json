@@ -913,7 +913,7 @@
 				{ "name": "libs/libcmt/wcscoll.c", "index": 683, "status": "MISSING" },
 				{ "name": "libs/libcmt/wcscmp.c", "index": 684, "status": "MISSING" },
 				{ "name": "libs/libcmt/wcschr.c", "index": 685, "status": "MISSING" },
-				{ "name": "libs/libcmt/wcscat.c", "index": 686, "status": "MISSING" },
+				{ "name": "libs/libcmt/wcscat.c", "index": 686, "status": "Matching" },
 				{ "name": "libs/libcmt/strtok.c", "index": 687, "status": "MISSING" },
 				{ "name": "libs/libcmt/strstr.c", "index": 688, "status": "MISSING" },
 				{ "name": "libs/libcmt/strrchr.c", "index": 689, "status": "MISSING" },
