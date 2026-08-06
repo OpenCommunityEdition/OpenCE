@@ -27,23 +27,40 @@ a pre-experiment snapshot, which also recovered `_code_000d9040` and
 `_code_000d9210`. Worth repeating as a general caution: ship the source that
 produced the object, and re-derive the numbers from it.
 
-## Remaining: 26 functions, 16,208 bytes
+## 74/100 -> 93/100 (24,800/29,216 bytes, 84.9%)
 
-All 26 are absent rather than mismatched — not yet written. The work is
-concentrated in a few large game-settings handlers:
+Second external checkpoint, verified the same way: their C rebuilt with this
+repository's XDK CL, compared with `tools/coff_compare.py`. **93/100 functions
+exact, 24,800/29,216 bytes.** Reproduces exactly. The shipped header is byte
+identical to the repository's, so nothing outside this object is touched.
 
-| bytes | function |
-|--:|---|
-| 1408 | `_code_000dba40` |
-| 1408 | `_code_000db1f0` |
-| 1360 | `_code_000dd730` |
-| 1296 | `_code_000dcf40` |
-| 912 | `_code_000dc630` |
-| 848 | `_code_000dcbf0` |
-| 784 | `_code_000ddc80` |
-| 736 | `_code_000de890` |
+Clean against the prohibitions again -- the only pragma is the same
+`#pragma pack(push, 2)` around `event_handler_globals`.
 
-These are the option-spinner handlers with the heaviest assert traffic. Their
-mangled string symbols decode to the assert text verbatim (`?5` space, `?0`
-comma, `?4` period, `?8` apostrophe), so the semantics are largely readable off
-the symbol list before touching the disassembly.
+## Remaining: 7 functions, 4,416 bytes
+
+Split into two very different piles.
+
+**Four are written and are pure codegen ties** -- exact size *and* exact
+relocation count against January, so the shape and the call graph are already
+right and only instruction selection differs:
+
+| bytes | relocs | function |
+|--:|--:|---|
+| 1408 | 106 | `_code_000dba40` |
+| 1360 | 85 | `_code_000dd730` |
+| 160 | 7 | `_code_000df650` |
+| 160 | 7 | `_code_000df6f0` |
+
+The two 160-byte pair differ by nine normalized bytes each and are near
+identical to one another, so whatever fixes one very likely fixes both.
+
+**Three are absent** and are ordinary writing work: `_code_000dff10` (672),
+`_code_000df9d0` (384), `_code_000da080` (272).
+
+Worth trying on the four ties before anything else: the EAX return-value rule in
+`docs/house_rules.md` §6, and sweeping the signature factors *together* rather
+than one at a time. That combination is what closed both `matrix3x3_transpose`
+and `matrix3x3_from_forward_and_up` after each had been written off as an
+unreachable register permutation, and exact-size-with-exact-relocations is
+precisely the profile where a missed return type hides.
