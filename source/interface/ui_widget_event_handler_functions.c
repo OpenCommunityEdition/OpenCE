@@ -4852,21 +4852,14 @@ boolean code_000dd730(
 		option_spinner = list_item->child;
 		while (option_spinner && option_spinner->type != 2)
 			option_spinner = option_spinner->next;
-		if (*(long *)(profile + 0x34) <= 300)
+		switch (*(long *)(profile + 0x34))
 		{
-			if (*(long *)(profile + 0x34) == 300)
-				option_spinner->data3C.selected_index = 2;
-			else if (*(long *)(profile + 0x34) == 0)
-				option_spinner->data3C.selected_index = 0;
-			else if (*(long *)(profile + 0x34) == 150)
-				option_spinner->data3C.selected_index = 1;
-			else
-				option_spinner->data3C.selected_index = 0;
+		default: option_spinner->data3C.selected_index = 0; break;
+		case 0: option_spinner->data3C.selected_index = 0; break;
+		case 150: option_spinner->data3C.selected_index = 1; break;
+		case 300: option_spinner->data3C.selected_index = 2; break;
+		case 450: option_spinner->data3C.selected_index = 3; break;
 		}
-		else if (*(long *)(profile + 0x34) == 450)
-			option_spinner->data3C.selected_index = 3;
-		else
-			option_spinner->data3C.selected_index = 0;
 		return TRUE;
 	}
 	error(2, "failed to retrieve editable game variant");

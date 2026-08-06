@@ -37,30 +37,32 @@ identical to the repository's, so nothing outside this object is touched.
 Clean against the prohibitions again -- the only pragma is the same
 `#pragma pack(push, 2)` around `event_handler_globals`.
 
-## Remaining: 7 functions, 4,416 bytes
+## 93/100 -> 94/100 (26,160/29,216 bytes, 89.5%)
 
-Split into two very different piles.
+Third external checkpoint, verified the same way. **94/100 functions exact,
+26,160/29,216 bytes.** `_code_000dd730` (1,360 bytes) closed -- it was one of the
+four exact-size, exact-relocation ties.
 
-**Four are written and are pure codegen ties** -- exact size *and* exact
-relocation count against January, so the shape and the call graph are already
-right and only instruction selection differs:
+## Remaining: 6 functions, 3,056 bytes
+
+**Three written, pure codegen ties** -- exact size and exact relocation count, so
+shape and call graph are right and only instruction selection differs:
 
 | bytes | relocs | function |
 |--:|--:|---|
 | 1408 | 106 | `_code_000dba40` |
-| 1360 | 85 | `_code_000dd730` |
 | 160 | 7 | `_code_000df650` |
 | 160 | 7 | `_code_000df6f0` |
 
-The two 160-byte pair differ by nine normalized bytes each and are near
-identical to one another, so whatever fixes one very likely fixes both.
+The 160-byte pair are near identical to each other, so one insight should close
+both.
 
-**Three are absent** and are ordinary writing work: `_code_000dff10` (672),
+**Three absent**, ordinary writing work: `_code_000dff10` (672),
 `_code_000df9d0` (384), `_code_000da080` (272).
 
-Worth trying on the four ties before anything else: the EAX return-value rule in
-`docs/house_rules.md` §6, and sweeping the signature factors *together* rather
-than one at a time. That combination is what closed both `matrix3x3_transpose`
-and `matrix3x3_from_forward_and_up` after each had been written off as an
-unreachable register permutation, and exact-size-with-exact-relocations is
-precisely the profile where a missed return type hides.
+Still worth trying on the three ties: the EAX return-value rule in
+`docs/house_rules.md` §6, sweeping signature factors *together* rather than one
+at a time. That is what closed `matrix3x3_transpose` and
+`matrix3x3_from_forward_and_up` after both had been written off, and
+exact-size-with-exact-relocations is the profile where a missed return type
+hides.
