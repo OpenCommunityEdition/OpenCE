@@ -1085,13 +1085,19 @@ char *main_get_map_name(void);
 long _stricmp(char const *s1, char const *s2);
 void *global_network_game_client_get(void);
 void *network_game_client_get_game(void *client);
-long network_game_client_get_machine_index(void *client);
+short network_game_client_get_machine_index(void *client);
 boolean network_player_is_valid(void *player);
 boolean network_game_client_request_start_time_change(void *client, boolean start);
+boolean network_game_client_request_remove_player(void *client, void *player);
+void player_ui_clear_multiplayer_autojoin_for_local_player(short controller_index);
+void player_ui_autojoin_players_to_next_multiplayer_game(void);
+boolean network_game_should_accept_remote_connections(void);
 boolean network_game_client_initiate_join_game(void *client, void *server, struct network_game_join_descriptor *join_descriptor, struct transport_address *address);
 void *network_game_get_game(void);
-long network_game_client_get_local_machine_index(void);
+short network_game_client_get_local_machine_index(void);
 boolean network_game_client_update_local_player_data(void *client, struct network_player_data *player);
+boolean network_game_client_add_player(void *client, short controller_index);
+void network_event(char *format, ...);
 boolean player_ui_edit_profile_is_dirty(void);
 boolean player_ui_edit_profile_is_default_profile(void);
 boolean player_ui_edit_profile_name_is_dirty(void);
@@ -1241,7 +1247,21 @@ boolean widget_event_function_list_widget_goto_previous_item(struct widget_insta
 extern short player_spawn_count;
 wchar_t bss_00454af0[12] = { 0 };
 byte single_player_level_data[0x50] = { 0 };
-byte persistant_game_data_info[0x106] = { 0 };
+struct persistent_game_difficulty
+{
+	short value;
+};
+
+struct persistent_game_data_info
+{
+	char map_name[0x100];
+	struct persistent_game_difficulty difficulty;
+	byte map_index;
+	boolean valid;
+	boolean corrupted;
+};
+
+struct persistent_game_data_info persistant_game_data_info = { 0 };
 
 struct ui_widget_event_handler_function_table
 {
@@ -2184,6 +2204,84 @@ boolean code_000df830(
 	return TRUE;
 }
 
+boolean code_000df9d0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted)
+{
+	boolean result = TRUE;
+	void *client = global_network_game_client_get();
+
+	if (client)
+	{
+		short state;
+
+		if (network_game_client_get_state(client, &state) == 2)
+		{
+			byte *game = network_game_client_get_game(client);
+			short machine_index;
+			long machine_player_count;
+			byte *player;
+			long player_index;
+			byte *test_player;
+
+			player = NULL;
+			machine_index = network_game_client_get_local_machine_index();
+			machine_player_count = 0;
+
+			if ((short)machine_index != NONE)
+			{
+				test_player = game + 0x226;
+				for (player_index = 0; player_index < 16; player_index++, test_player += 0x20)
+				{
+					if (network_player_is_valid(test_player) &&
+						(short)(signed char)test_player[0x1C] == (short)machine_index)
+					{
+						machine_player_count++;
+						if ((short)(signed char)test_player[0x1D] == event->controller_index)
+						{
+							match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 4646, !player, "duplicate player registered in game");
+							player = test_player;
+						}
+					}
+				}
+
+				if (machine_player_count > 0)
+				{
+					if (player)
+					{
+						if (!network_game_client_request_remove_player(client, player))
+							error(2, "failed to request player removal");
+						player_ui_clear_multiplayer_autojoin_for_local_player((short)(signed char)player[0x1D]);
+					}
+
+					if (machine_player_count == 1)
+					{
+						if (global_network_game_server_get() && network_game_should_accept_remote_connections() == TRUE)
+						{
+							void *server = global_network_game_server_get();
+							if (server)
+								network_game_server_pause_countdown(server, TRUE);
+						}
+						else
+						{
+							dispose_global_network_game_client();
+							dispose_global_network_game_server();
+						}
+						result = TRUE;
+						player_ui_autojoin_players_to_next_multiplayer_game();
+					}
+					else
+						result = FALSE;
+				}
+			}
+		}
+		else
+			error(2, "can't request player removal from netgame_unjoin_player() unless we are in pregame");
+	}
+	return result;
+}
+
 boolean code_000dfb50(
 	struct widget_instance *widget,
 	struct event_record *event,
@@ -2472,7 +2570,7 @@ boolean code_000d9f90(
 	boolean *widget_deleted)
 {
 	struct network_player_data player_data;
-	long machine_index;
+	short machine_index;
 	byte *game;
 	long player_index;
 	byte *player;
@@ -2514,7 +2612,7 @@ boolean code_000df650(
 {
 	void *client = global_network_game_client_get();
 	byte *player;
-	long machine_index;
+	short machine_index;
 	long player_index;
 
 	if (client)
@@ -2546,7 +2644,7 @@ boolean code_000df6f0(
 {
 	void *client = global_network_game_client_get();
 	byte *player;
-	long machine_index;
+	short machine_index;
 	long player_index;
 
 	if (client)
@@ -2847,14 +2945,14 @@ boolean code_000dfdc0(
 
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 4860,
 		widget->type == 3, "expected column list for difficulty menu widget");
-	if (persistant_game_data_info[0x103] == TRUE &&
-		_stricmp((char *)persistant_game_data_info, main_get_map_name()) == 0)
+	if (persistant_game_data_info.valid == TRUE &&
+		_stricmp(persistant_game_data_info.map_name, main_get_map_name()) == 0)
 	{
 		difficulty_widget = widget_instance_get_nth_child(widget,
-			*(short *)(persistant_game_data_info + 0x100));
+			persistant_game_data_info.difficulty.value);
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 4865,
 			difficulty_widget != NULL, "failed to find 'difficulty' menu item");
-		widget->data3C.selected_index = *(short *)(persistant_game_data_info + 0x100);
+		widget->data3C.selected_index = persistant_game_data_info.difficulty.value;
 		widget->focused_child = difficulty_widget;
 		return TRUE;
 	}
@@ -3877,6 +3975,40 @@ boolean code_000d9210(
 		ui_play_audio_feedback_sound(4);
 	}
 	return result;
+}
+
+boolean code_000da080(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted)
+{
+	void *client;
+	short value;
+
+	match_assert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1618, event);
+	client = global_network_game_client_get();
+	if (!client)
+		return TRUE;
+	if (network_game_client_get_state(client, &value) != 2)
+		return TRUE;
+	{
+		byte *game = network_game_get_game();
+		short machine_index = network_game_client_get_local_machine_index();
+		match_assert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1627, game);
+		if ((short)machine_index != NONE)
+		{
+			for (value = 0; value < 16; value++)
+			{
+				if (network_player_is_valid(game + 0x226 + value * 0x20) &&
+					(short)(signed char)game[0x242 + value * 0x20] == (short)machine_index &&
+					(short)(signed char)game[0x243 + value * 0x20] == event->controller_index)
+					return TRUE;
+			}
+		}
+		if (!network_game_client_add_player(client, event->controller_index))
+			network_event("failed to send join request");
+	}
+	return TRUE;
 }
 
 boolean code_000da190(
@@ -5003,6 +5135,7 @@ boolean code_000dba40(
 	boolean *widget_deleted)
 {
 	byte *profile;
+	boolean result = TRUE;
 
 	profile = (byte *)player_ui_get_edit_playlist_profile();
 	if (profile)
@@ -5112,27 +5245,28 @@ boolean code_000dba40(
 		}
 
 		list_item = list_item->next;
-		if (!list_item)
-			goto suicide_done;
-		option_spinner = list_item->child;
-		while (option_spinner && option_spinner->type != 2)
-			option_spinner = option_spinner->next;
-		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 2574, option_spinner, "expected 'suicide penalty' option spinner list");
-		switch (option_spinner->data3C.selected_index)
+		if (list_item)
 		{
-		case 0:
-			*(long *)(profile + 0x34) = 0;
-	suicide_done:
-			break;
-		case 1: *(long *)(profile + 0x34) = 150; break;
-		case 2: *(long *)(profile + 0x34) = 300; break;
-		case 3: *(long *)(profile + 0x34) = 450; break;
-		default: error(2, "unknown option selected in 'suicide penalty' option spinner list"); break;
+			option_spinner = list_item->child;
+			while (option_spinner && option_spinner->type != 2)
+				option_spinner = option_spinner->next;
+			match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 2574, option_spinner, "expected 'suicide penalty' option spinner list");
+			switch (option_spinner->data3C.selected_index)
+			{
+			case 0: *(long *)(profile + 0x34) = 0; break;
+			case 1: *(long *)(profile + 0x34) = 150; break;
+			case 2: *(long *)(profile + 0x34) = 300; break;
+			case 3: *(long *)(profile + 0x34) = 450; break;
+			default: error(2, "unknown option selected in 'suicide penalty' option spinner list"); break;
+			}
 		}
-		return TRUE;
 	}
-	error(2, "failed to retrieve editable game variant");
-	return FALSE;
+	else
+	{
+		error(2, "failed to retrieve editable game variant");
+		result = FALSE;
+	}
+	return result;
 }
 
 boolean code_000d9990(
@@ -5288,4 +5422,108 @@ boolean code_000d9cf0(
 	}
 	error(2, "failed to retrieve user selected game variant");
 	return FALSE;
+}
+
+
+boolean code_000dff10(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted)
+{
+	byte profile[0x30];
+	short highest_level;
+	short highest_difficulty;
+	byte *definition;
+	long profile_index;
+	long level_index;
+
+	if (player_spawn_count >= 2)
+	{
+		memset(&persistant_game_data_info, 0, sizeof(persistant_game_data_info));
+		code_000d9040(widget, event, widget_deleted);
+		return TRUE;
+	}
+
+	profile_index = player_ui_get_active_player_profile_index(0);
+	memset(single_player_level_data, 0, sizeof(single_player_level_data));
+	if (profile_index != event_handler_functions.last_player1_profile_index)
+	{
+		memset(&persistant_game_data_info, 0, sizeof(persistant_game_data_info));
+		persistant_game_data_info.valid = game_state_test_persistent_storage(
+			persistant_game_data_info.map_name,
+			&persistant_game_data_info.difficulty.value,
+			&persistant_game_data_info.corrupted);
+		event_handler_functions.last_player1_profile_index = profile_index;
+	}
+
+	player_ui_get_active_player_profile(0, profile);
+	player_profile_get_highest_completed_solo_level(profile, &highest_level, &highest_difficulty);
+	for (level_index = 0; level_index < 10; level_index++)
+	{
+		register unsigned long level_flags;
+
+		((struct single_player_level_entry *)single_player_level_data)[level_index].map_name =
+			(&event_handler_functions.map_name)[level_index];
+		if (profile[0x1C + level_index] || level_index == highest_level + 1 || level_index == 0)
+		{
+			level_flags = (char)profile[0x1C + level_index];
+			((struct single_player_level_entry *)single_player_level_data)[level_index].unknown5 = (level_flags >> 1) & 1;
+			((struct single_player_level_entry *)single_player_level_data)[level_index].available = TRUE;
+			((struct single_player_level_entry *)single_player_level_data)[level_index].unknown6 = (level_flags >> 2) & 1;
+			((struct single_player_level_entry *)single_player_level_data)[level_index].unknown7 = (level_flags >> 3) & 1;
+		}
+	}
+
+	definition = tag_get(0x44654C61, widget->definition_tag_index);
+	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 603,
+		*(short *)definition == 2,
+		"expected a spinner list widget for 'solo level list' widget");
+	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 604,
+		*(long *)(definition + 0x3E0) == 3,
+		"expected 3 list items for 'solo level list' widget");
+	widget->generated_list = single_player_level_data;
+	widget->generated_count = 10;
+	widget->data3C.selected_index = PIN(player_ui_get_last_single_player_level_played(0), 0, 9);
+
+	if (persistant_game_data_info.valid == TRUE)
+	{
+		persistant_game_data_info.map_name[0xFF] = 0;
+		for (level_index = 0; level_index < 10; level_index++)
+		{
+			if (_stricmp(persistant_game_data_info.map_name,
+				(&event_handler_functions.map_name)[level_index]) == 0)
+			{
+				struct persistent_game_difficulty difficulty = persistant_game_data_info.difficulty;
+				persistant_game_data_info.map_index = (byte)level_index;
+				if (difficulty.value < 0)
+					persistant_game_data_info.difficulty.value = 0;
+				else
+				{
+					persistant_game_data_info.difficulty.value = 3;
+					if (difficulty.value <= 3)
+						persistant_game_data_info.difficulty.value = difficulty.value;
+				}
+				break;
+			}
+		}
+		if (level_index != 10)
+			return TRUE;
+		persistant_game_data_info.valid = FALSE;
+		return TRUE;
+	}
+	else if (persistant_game_data_info.corrupted == TRUE)
+	{
+		profile_index = player_ui_get_active_player_profile_index(0);
+		if (profile_index != NONE)
+		{
+			if (event_handler_functions.unknown3C == NONE)
+			{
+				display_error_deferred(39, NONE, TRUE, FALSE);
+				event_handler_functions.unknown3C = profile_index;
+			}
+			else
+				event_handler_functions.unknown3C = NONE;
+		}
+	}
+	return TRUE;
 }
