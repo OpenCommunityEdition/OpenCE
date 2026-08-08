@@ -962,7 +962,9 @@ boolean collision_prism_test_vector(
 	real t_out = 0.0f;
 	real t_in = 1.0f;
 	real d = plane3d_distance_to_point(&prism->plane, point);
-	real vn = dot_product3d(vector, &prism->plane.n);
+	real vn = prism->plane.n.k*vector->k;
+	vn += prism->plane.n.j*vector->j;
+	vn += prism->plane.n.i*vector->i;
 
 	if (vn != 0.0f)
 	{
