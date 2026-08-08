@@ -66,3 +66,32 @@ at a time. That is what closed `matrix3x3_transpose` and
 `matrix3x3_from_forward_and_up` after both had been written off, and
 exact-size-with-exact-relocations is the profile where a missed return type
 hides.
+
+## 94/100 -> 100/100 (29,216/29,216 bytes)
+
+The final checkpoint closes all six remaining functions. The three absent
+functions (`_code_000da080`, `_code_000df9d0`, and `_code_000dff10`) now have
+readable C bodies. `_code_000dba40` uses one function-wide result variable,
+which gives VC7 the same tail merge as January. `_code_000df650` and
+`_code_000df6f0` close from one shared type correction:
+`network_game_client_get_local_machine_index` returns `short`, and the locals
+which receive it are also `short`.
+
+The persistent-game data block is represented as one named 0x106-byte record
+with a two-byte difficulty subobject. Keeping that source-level object boundary
+produces January's 16-bit load and preserves the final write without changing
+the single csplit-owned data object.
+
+Independent admission audit on 2026-08-07 rebuilt the object with XDK 3911 and
+reproduced the checkpoint:
+
+- 100/100 functions pass `section_infos_equal`;
+- all 449 January-owned sections pass strict size, relocation-count,
+  normalized-byte, and relocation-identity comparison;
+- zero target-owned sections are unequal or missing from the candidate;
+- no prohibited assembly, `volatile`, `__forceinline`, optimization pragma, or
+  compiler-flag override is present.
+
+The candidate object contains additional compiler/debug sections, but they do
+not replace or alter any January-owned section. The object is therefore safe to
+mark `Matching`.

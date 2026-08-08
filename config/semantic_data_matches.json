@@ -189,5 +189,15 @@
       "relocation_count": 1,
       "normalized_sha256": "e94bb79478c95dce11c4a1f720a07ccbaa3a8d18b84acbe5605472d6f8635b74"
     }
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "symbol": "_data_00305ee0",
+    "reason": "the complete rebuilt object owns the exact 934-byte event-handler table; normalized bytes, relocation addresses and types, and independently resolved destinations are exact despite objdiff's csplit symbol attribution",
+    "measurements": {
+      "size": 934,
+      "relocation_count": 228,
+      "normalized_sha256": "c1040d667c392fd772fab34335ade456dac49ae864a8200c4560df63cec186fd"
+    }
   }
 ]
