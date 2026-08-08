@@ -49,3 +49,14 @@ Together these restore strict equality for all 20 functions.
 ## Admission gate
 
 Before admission, regenerate the full report on the integration worktree, compare the strict accepted-function ledger against the pre-transplant baseline, and require zero lost entries. Any data or sibling-function regression rejects the object despite its own 20/20 result.
+
+## House-rule compliance re-audit (2026-08-07)
+
+The completed source and header were re-read against `docs/house_rules.md` and
+Berthalamew's guidance.  Parameters are vertically formatted, typed structures
+replace raw access casts, `void` functions end with explicit `return;`, and the
+files contain no assembly, `volatile`, `__forceinline`, optimization pragma,
+or gratuitous alignment directive.  CRLF is consistent.  The measured
+multi-return collision predicates remain the documented exception: their
+January control-flow graphs require those exits, and forcing a cosmetic single
+exit would destroy strict equality.

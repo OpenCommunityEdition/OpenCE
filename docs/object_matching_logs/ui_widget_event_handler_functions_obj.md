@@ -95,3 +95,29 @@ reproduced the checkpoint:
 The candidate object contains additional compiler/debug sections, but they do
 not replace or alter any January-owned section. The object is therefore safe to
 mark `Matching`.
+
+## House-rule compliance re-audit (2026-08-07)
+
+The final 100-function source was audited after admission and its remaining
+convention debt was corrected without changing the reconstruction:
+
+- all 200 local declarations now put the no-argument `void` and every parameter
+  on separate lines;
+- the 23 raw `tag_get('DeLa', ...)` calls now use the typed
+  `ui_widget_definition_get()` subsystem macro;
+- the January-proven widget prefix is named through
+  `struct ui_widget_definition`, including `type` at `0x00` and `child_count`
+  at `0x3E0`, instead of repeating byte-offset casts;
+- a redundant local `_stricmp` declaration was removed in favor of the XDK CRT
+  declaration, eliminating the only compiler warning;
+- the source and new definition header were normalized to CRLF.
+
+The `#pragma pack(push, 2)` around `event_handler_globals` is deliberately
+retained: it expresses the recovered January data ABI and is therefore a real
+layout requirement, not a code-generation trick.  Existing multiple-return
+functions are likewise left in their measured January shapes where folding
+them to a single exit would change code.
+
+After these changes, the XDK 3911 rebuild is warning-free.  The hardened audit
+still reports 100/100 functions exact and 449/449 target-owned sections exact,
+with zero missing or unequal sections.

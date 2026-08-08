@@ -908,6 +908,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "interface/ui_widget_definitions.h"
 
 /* ---------- constants */
 
@@ -1026,104 +1027,243 @@ struct playlist_profile_item_options_prefix
 
 /* ---------- prototypes */
 
-void main_revert_map(void);
-void main_reset_map(void);
-void game_state_save_to_persistent_storage(void);
-void main_goto_main_menu(void);
-void main_run_demos(void);
-void xbox_dashboard_launch(void);
-void dispose_global_network_game_client(void);
-void dispose_global_network_game_server(void);
-void player_ui_clear_multiplayer_joins(void);
-void game_engine_playlist_initialize(void);
-void game_engine_playlist_next(long, long, long);
-void network_game_set_quickstart_local(void);
-void game_connection_set(long);
-void main_menu_switch_to_single_player(void);
-void player_ui_remember_player1_profile(long);
-void network_game_server_open_game(void *server);
-void network_game_server_pause_countdown(void *server, boolean pause);
-void *global_network_game_server_get(void);
-boolean xbox_demos_available(void);
-void ui_stop_main_menu_music(void);
-void player_ui_reset_single_player_local_player_controllers(void);
-void player_ui_clear_multiplayer_variant(void);
-void player_ui_end_editing_profile(void);
-void ui_widgets_pop_stack(short local_player_index);
-boolean ui_main_menu_music_active(void);
-void main_set_difficulty(word difficulty);
-void main_set_map_name(char *map_name);
-void main_defer_map_map_change(void);
-void player_ui_get_active_player_profile(short local_player_index, void *profile);
-void player_profile_get_highest_completed_solo_level(void *profile, short *level, short *difficulty);
-short player_ui_get_last_single_player_level_played(short local_player_index);
-void *widget_free(void *pointer);
-boolean create_global_network_game_client(void);
-boolean create_global_network_game_server(void);
-void game_engine_playlist_begin(void);
-void network_game_accept_remote_connections(boolean accept);
-void ui_start_main_menu_music(void);
-void error(long priority, char *format, ...);
-void playlist_profile_delete(long profile_index);
-void player_profile_delete(long profile_index);
-void player_ui_local_player_joined_multiplayer_game(word local_player_index);
-void ui_play_audio_feedback_sound(short feedback);
-void display_error_deferred(short error_code, short local_player_index, boolean modal, boolean pause_game_time);
-void player_ui_begin_editing_profile(long profile_index);
-long player_profile_new(short controller_index, wchar_t *name);
-wchar_t *player_ui_get_edit_playlist_profile(void);
-void *player_ui_get_edit_player_profile(void);
-boolean virtual_keyboard_launch(void *text, long maximum_length, long keyboard_type);
-void network_game_client_local_player_quit(word controller_index);
-void player_ui_set_single_player_local_player_controller(short local_player_index, short controller_index);
-struct widget_instance *widget_instance_get_topmost_parent(struct widget_instance *widget);
-struct widget_instance *widget_instance_get_nth_child(struct widget_instance *widget, long n);
-boolean transport_network_available(void);
-void display_error(short error_code, short local_player_index, boolean modal, boolean pause_game_time);
-short player_ui_get_single_player_local_player_controller(short local_player_index);
-char *main_get_map_name(void);
-long _stricmp(char const *s1, char const *s2);
-void *global_network_game_client_get(void);
-void *network_game_client_get_game(void *client);
-short network_game_client_get_machine_index(void *client);
-boolean network_player_is_valid(void *player);
-boolean network_game_client_request_start_time_change(void *client, boolean start);
-boolean network_game_client_request_remove_player(void *client, void *player);
-void player_ui_clear_multiplayer_autojoin_for_local_player(short controller_index);
-void player_ui_autojoin_players_to_next_multiplayer_game(void);
-boolean network_game_should_accept_remote_connections(void);
-boolean network_game_client_initiate_join_game(void *client, void *server, struct network_game_join_descriptor *join_descriptor, struct transport_address *address);
-void *network_game_get_game(void);
-short network_game_client_get_local_machine_index(void);
-boolean network_game_client_update_local_player_data(void *client, struct network_player_data *player);
-boolean network_game_client_add_player(void *client, short controller_index);
-void network_event(char *format, ...);
-boolean player_ui_edit_profile_is_dirty(void);
-boolean player_ui_edit_profile_is_default_profile(void);
-boolean player_ui_edit_profile_name_is_dirty(void);
-boolean player_ui_prompt_user_to_rename_edit_profile(void);
-boolean player_ui_save_profile(void);
-void ui_widget_delete(struct widget_instance *widget);
-void player_profiles_enumerate_available_to_local_player_index(short local_player_index, long *profile_count, long *profile_indices, boolean include_default);
-void playlist_profiles_enumerate_available_to_local_player_index(short local_player_index, long *profile_count, long *profile_indices);
-boolean saved_game_file_retrieve_last_used_multiplayer_variant_directory(char *directory_path);
-long saved_game_file_find_profile_index_for_directory_path(char *directory_path, short profile_type);
+void main_revert_map(
+	void);
+void main_reset_map(
+	void);
+void game_state_save_to_persistent_storage(
+	void);
+void main_goto_main_menu(
+	void);
+void main_run_demos(
+	void);
+void xbox_dashboard_launch(
+	void);
+void dispose_global_network_game_client(
+	void);
+void dispose_global_network_game_server(
+	void);
+void player_ui_clear_multiplayer_joins(
+	void);
+void game_engine_playlist_initialize(
+	void);
+void game_engine_playlist_next(
+	long,
+	long,
+	long);
+void network_game_set_quickstart_local(
+	void);
+void game_connection_set(
+	long);
+void main_menu_switch_to_single_player(
+	void);
+void player_ui_remember_player1_profile(
+	long);
+void network_game_server_open_game(
+	void *server);
+void network_game_server_pause_countdown(
+	void *server,
+	boolean pause);
+void *global_network_game_server_get(
+	void);
+boolean xbox_demos_available(
+	void);
+void ui_stop_main_menu_music(
+	void);
+void player_ui_reset_single_player_local_player_controllers(
+	void);
+void player_ui_clear_multiplayer_variant(
+	void);
+void player_ui_end_editing_profile(
+	void);
+void ui_widgets_pop_stack(
+	short local_player_index);
+boolean ui_main_menu_music_active(
+	void);
+void main_set_difficulty(
+	word difficulty);
+void main_set_map_name(
+	char *map_name);
+void main_defer_map_map_change(
+	void);
+void player_ui_get_active_player_profile(
+	short local_player_index,
+	void *profile);
+void player_profile_get_highest_completed_solo_level(
+	void *profile,
+	short *level,
+	short *difficulty);
+short player_ui_get_last_single_player_level_played(
+	short local_player_index);
+void *widget_free(
+	void *pointer);
+boolean create_global_network_game_client(
+	void);
+boolean create_global_network_game_server(
+	void);
+void game_engine_playlist_begin(
+	void);
+void network_game_accept_remote_connections(
+	boolean accept);
+void ui_start_main_menu_music(
+	void);
+void error(
+	long priority,
+	char *format,
+	...);
+void playlist_profile_delete(
+	long profile_index);
+void player_profile_delete(
+	long profile_index);
+void player_ui_local_player_joined_multiplayer_game(
+	word local_player_index);
+void ui_play_audio_feedback_sound(
+	short feedback);
+void display_error_deferred(
+	short error_code,
+	short local_player_index,
+	boolean modal,
+	boolean pause_game_time);
+void player_ui_begin_editing_profile(
+	long profile_index);
+long player_profile_new(
+	short controller_index,
+	wchar_t *name);
+wchar_t *player_ui_get_edit_playlist_profile(
+	void);
+void *player_ui_get_edit_player_profile(
+	void);
+boolean virtual_keyboard_launch(
+	void *text,
+	long maximum_length,
+	long keyboard_type);
+void network_game_client_local_player_quit(
+	word controller_index);
+void player_ui_set_single_player_local_player_controller(
+	short local_player_index,
+	short controller_index);
+struct widget_instance *widget_instance_get_topmost_parent(
+	struct widget_instance *widget);
+struct widget_instance *widget_instance_get_nth_child(
+	struct widget_instance *widget,
+	long n);
+boolean transport_network_available(
+	void);
+void display_error(
+	short error_code,
+	short local_player_index,
+	boolean modal,
+	boolean pause_game_time);
+short player_ui_get_single_player_local_player_controller(
+	short local_player_index);
+char *main_get_map_name(
+	void);
+void *global_network_game_client_get(
+	void);
+void *network_game_client_get_game(
+	void *client);
+short network_game_client_get_machine_index(
+	void *client);
+boolean network_player_is_valid(
+	void *player);
+boolean network_game_client_request_start_time_change(
+	void *client,
+	boolean start);
+boolean network_game_client_request_remove_player(
+	void *client,
+	void *player);
+void player_ui_clear_multiplayer_autojoin_for_local_player(
+	short controller_index);
+void player_ui_autojoin_players_to_next_multiplayer_game(
+	void);
+boolean network_game_should_accept_remote_connections(
+	void);
+boolean network_game_client_initiate_join_game(
+	void *client,
+	void *server,
+	struct network_game_join_descriptor *join_descriptor,
+	struct transport_address *address);
+void *network_game_get_game(
+	void);
+short network_game_client_get_local_machine_index(
+	void);
+boolean network_game_client_update_local_player_data(
+	void *client,
+	struct network_player_data *player);
+boolean network_game_client_add_player(
+	void *client,
+	short controller_index);
+void network_event(
+	char *format,
+	...);
+boolean player_ui_edit_profile_is_dirty(
+	void);
+boolean player_ui_edit_profile_is_default_profile(
+	void);
+boolean player_ui_edit_profile_name_is_dirty(
+	void);
+boolean player_ui_prompt_user_to_rename_edit_profile(
+	void);
+boolean player_ui_save_profile(
+	void);
+void ui_widget_delete(
+	struct widget_instance *widget);
+void player_profiles_enumerate_available_to_local_player_index(
+	short local_player_index,
+	long *profile_count,
+	long *profile_indices,
+	boolean include_default);
+void playlist_profiles_enumerate_available_to_local_player_index(
+	short local_player_index,
+	long *profile_count,
+	long *profile_indices);
+boolean saved_game_file_retrieve_last_used_multiplayer_variant_directory(
+	char *directory_path);
+long saved_game_file_find_profile_index_for_directory_path(
+	char *directory_path,
+	short profile_type);
 extern byte cached_variant_profile[0x144];
-boolean code_000dfbb0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-short network_game_client_get_state(void *client, short *state);
-boolean code_000d94c0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-void console_warning(char *format, ...);
-void saved_game_file_get_useable_untitled_profile_name(wchar_t *name);
-boolean saved_game_file_retrieve_last_used_multiplayer_map(char *map_name);
-wchar_t *ustrncpy(wchar_t *destination, wchar_t const *source, long count);
-void *ui_widget_realloc(void *pointer, word size, char *file, long line);
-long player_profile_number_of_available_primary_colors(void);
-void *tag_get(long group_tag, long tag_index);
-boolean player_profile_get(long profile_index, void *profile);
-void player_ui_set_active_player_profile(short controller_index, long profile_index, void *profile);
+boolean code_000dfbb0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+short network_game_client_get_state(
+	void *client,
+	short *state);
+boolean code_000d94c0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+void console_warning(
+	char *format,
+	...);
+void saved_game_file_get_useable_untitled_profile_name(
+	wchar_t *name);
+boolean saved_game_file_retrieve_last_used_multiplayer_map(
+	char *map_name);
+wchar_t *ustrncpy(
+	wchar_t *destination,
+	wchar_t const *source,
+	long count);
+void *ui_widget_realloc(
+	void *pointer,
+	word size,
+	char *file,
+	long line);
+long player_profile_number_of_available_primary_colors(
+	void);
+boolean player_profile_get(
+	long profile_index,
+	void *profile);
+void player_ui_set_active_player_profile(
+	short controller_index,
+	long profile_index,
+	void *profile);
 
-long player_ui_get_player1_last_used_profile_index(void);
-short player_ui_get_single_player_local_player_from_controller(short controller_index);
+long player_ui_get_player1_last_used_profile_index(
+	void);
+short player_ui_get_single_player_local_player_from_controller(
+	short controller_index);
 extern byte cached_player_profile[0x9C];
 
 long playlist_profile_new(
@@ -1137,109 +1277,412 @@ void saved_game_file_remember_last_used_multiplayer_variant_directory(
 struct game_variant_data *build_game_variant_slayer(
 	struct game_variant_data *variant);
 
-typedef boolean (*ui_widget_event_handler_function)(struct widget_instance *, struct event_record *, boolean *);
-boolean code_000d9020(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9040(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d91e0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9210(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9350(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d93b0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d93e0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d93f0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9400(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9410(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9430(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9480(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d94c0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9550(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9750(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9770(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9790(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9800(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9810(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9850(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9860(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9880(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9970(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9990(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9b60(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9cc0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9cf0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000d9f90(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000da080(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000da190(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000da2f0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000da320(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000da4e0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000da640(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000da780(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000da7a0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000da880(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000da8d0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dac70(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dae90(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000db1f0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000db770(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dba40(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dbfc0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dc2e0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dc4d0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dc590(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dc630(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dc9c0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dcbf0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dcf40(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dd450(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dd730(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000ddc80(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000ddf90(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000de190(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000de250(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000de360(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000de390(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000de490(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000de5c0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000de5e0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000de630(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000de6b0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000de890(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000deb70(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000ded40(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df080(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df0d0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df0f0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df200(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df340(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df390(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df3d0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df3e0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df560(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df650(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df6f0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df790(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df7b0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df7d0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df7f0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df810(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df820(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df830(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df880(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df8f0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df950(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000df9d0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dfb50(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dfba0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dfbb0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
+typedef boolean (*ui_widget_event_handler_function)(
+	struct widget_instance *,
+	struct event_record *,
+	boolean *);
+boolean code_000d9020(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9040(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d91e0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9210(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9350(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d93b0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d93e0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d93f0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9400(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9410(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9430(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9480(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d94c0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9550(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9750(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9770(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9790(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9800(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9810(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9850(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9860(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9880(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9970(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9990(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9b60(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9cc0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9cf0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000d9f90(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000da080(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000da190(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000da2f0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000da320(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000da4e0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000da640(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000da780(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000da7a0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000da880(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000da8d0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dac70(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dae90(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000db1f0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000db770(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dba40(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dbfc0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dc2e0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dc4d0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dc590(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dc630(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dc9c0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dcbf0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dcf40(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dd450(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dd730(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000ddc80(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000ddf90(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000de190(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000de250(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000de360(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000de390(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000de490(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000de5c0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000de5e0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000de630(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000de6b0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000de890(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000deb70(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000ded40(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df080(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df0d0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df0f0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df200(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df340(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df390(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df3d0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df3e0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df560(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df650(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df6f0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df790(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df7b0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df7d0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df7f0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df810(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df820(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df830(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df880(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df8f0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df950(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000df9d0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dfb50(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dfba0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dfbb0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
 boolean virtual_keyboard_last_exit_saved_text(
 	void);
-boolean code_000dfc40(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dfda0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dfdc0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dfea0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dfec0(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean code_000dff10(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean widget_event_function_list_widget_goto_next_item(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
-boolean widget_event_function_list_widget_goto_previous_item(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
+boolean code_000dfc40(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dfda0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dfdc0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dfea0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dfec0(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean code_000dff10(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean widget_event_function_list_widget_goto_next_item(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
+boolean widget_event_function_list_widget_goto_previous_item(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted);
 
 
 /* ---------- globals */
@@ -2453,19 +2896,19 @@ boolean code_000df0f0(
 	boolean *widget_deleted)
 {
 	long definition_tag_index = widget->definition_tag_index;
-	byte *definition = tag_get(0x44654C61, definition_tag_index);
+	struct ui_widget_definition *definition = ui_widget_definition_get(definition_tag_index);
 	long profile_index;
 
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 4111,
-		*(short *)definition == 0 && *(long *)(definition + 0x3E0) >= 3,
+		definition->type == 0 && definition->child_count >= 3,
 		"expected the multiplayer profile select screen to be a container w/ 3+ children");
 	{
-		byte *list_definition = tag_get(0x44654C61, widget->child->definition_tag_index);
+		struct ui_widget_definition *list_definition = ui_widget_definition_get(widget->child->definition_tag_index);
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 4114,
-			*(short *)list_definition == 2,
+			list_definition->type == 2,
 			"expected a spinner list widget for 'multiplayer profile list' widget");
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 4115,
-			*(long *)(list_definition + 0x3E0) == 3,
+			list_definition->child_count == 3,
 			"expected 3 list items for 'multiplayer profile list' widget");
 	}
 	widget = widget->child;
@@ -2493,12 +2936,12 @@ boolean code_000de390(
 		color_select_screen != NULL && color_select_screen->type == 2,
 		"expected the color select screen to contain a spinner list for the color picker");
 	{
-		byte *definition = tag_get(0x44654C61, color_select_screen->definition_tag_index);
+		struct ui_widget_definition *definition = ui_widget_definition_get(color_select_screen->definition_tag_index);
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3637,
-			*(short *)definition == 2,
+			definition->type == 2,
 			"expected a spinner list widget for 'player color picker list' widget");
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3638,
-			*(long *)(definition + 0x3E0) == 3,
+			definition->child_count == 3,
 			"expected 3 list items for 'player color picker list' widget");
 	}
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3644,
@@ -2721,14 +3164,14 @@ boolean code_000d9880(
 	boolean *widget_deleted)
 {
 	char map_name[256];
-	byte *definition = tag_get(0x44654C61, widget->definition_tag_index);
+	struct ui_widget_definition *definition = ui_widget_definition_get(widget->definition_tag_index);
 	short level_count = 13;
 
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1228,
-		*(short *)definition == 2,
+		definition->type == 2,
 		"expected a spinner list widget for 'multiplayer level list' widget");
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1229,
-		*(long *)(definition + 0x3E0) == 3,
+		definition->child_count == 3,
 		"expected 3 list items for 'multiplayer level list' widget");
 	widget->generated_list = event_handler_functions.multiplayer_levels;
 	widget->generated_count = level_count;
@@ -2757,20 +3200,20 @@ boolean code_000da640(
 
 	{
 		long definition_tag_index = widget->definition_tag_index;
-		byte *definition;
+		struct ui_widget_definition *definition;
 		event_handler_functions.profile_index = NONE;
-		definition = tag_get(0x44654C61, definition_tag_index);
+		definition = ui_widget_definition_get(definition_tag_index);
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1896,
-			*(short *)definition == 0 && *(long *)(definition + 0x3E0) >= 3,
+			definition->type == 0 && definition->child_count >= 3,
 			"expected the multiplayer profile select screen to be a container w/ 3+ children");
 	}
 	{
-		byte *list_definition = tag_get(0x44654C61, widget->child->definition_tag_index);
+		struct ui_widget_definition *list_definition = ui_widget_definition_get(widget->child->definition_tag_index);
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1899,
-			*(short *)list_definition == 2,
+			list_definition->type == 2,
 			"expected a spinner list widget for 'multiplayer profile list' widget");
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1900,
-			*(long *)(list_definition + 0x3E0) == 3,
+			list_definition->child_count == 3,
 			"expected 3 list items for 'multiplayer profile list' widget");
 	}
 	widget = widget->child;
@@ -2810,14 +3253,14 @@ boolean code_000de490(
 		"expected the player profile select screen to be a container widget");
 	{
 		long definition_tag_index = widget->child->definition_tag_index;
-		byte *definition;
+		struct ui_widget_definition *definition;
 		event_handler_functions.profile_index = NONE;
-		definition = tag_get(0x44654C61, definition_tag_index);
+		definition = ui_widget_definition_get(definition_tag_index);
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3677,
-			*(short *)definition == 2,
+			definition->type == 2,
 			"expected a spinner list widget for 'player profile list' widget");
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3678,
-			*(long *)(definition + 0x3E0) == 3,
+			definition->child_count == 3,
 			"expected 3 list items for 'player profile list' widget");
 	}
 	widget = widget->child;
@@ -2854,18 +3297,18 @@ boolean code_000df200(
 
 	{
 		long definition_tag_index = widget->definition_tag_index;
-		byte *definition = tag_get(0x44654C61, definition_tag_index);
+		struct ui_widget_definition *definition = ui_widget_definition_get(definition_tag_index);
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 4157,
-			*(short *)definition == 0 && *(long *)(definition + 0x3E0) >= 3,
+			definition->type == 0 && definition->child_count >= 3,
 			"expected the playlist profile select screen to be a container w/ 3+ children");
 	}
 	{
-		byte *list_definition = tag_get(0x44654C61, widget->child->definition_tag_index);
+		struct ui_widget_definition *list_definition = ui_widget_definition_get(widget->child->definition_tag_index);
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 4160,
-			*(short *)list_definition == 2,
+			list_definition->type == 2,
 			"expected a spinner list widget for 'playlist profile list' widget");
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 4161,
-			*(long *)(list_definition + 0x3E0) == 3,
+			list_definition->child_count == 3,
 			"expected 3 list items for 'playlist profile list' widget");
 	}
 	widget = widget->child;
@@ -2897,14 +3340,14 @@ boolean code_000de250(
 {
 	long color_count = player_profile_number_of_available_primary_colors();
 	struct player_profile_color_prefix *profile = player_ui_get_edit_player_profile();
-	byte *definition = tag_get(0x44654C61, widget->definition_tag_index);
+	struct ui_widget_definition *definition = ui_widget_definition_get(widget->definition_tag_index);
 	long index;
 
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3576,
-		*(short *)definition == 2,
+		definition->type == 2,
 		"expected a spinner list widget for 'player color picker list' widget");
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3577,
-		*(long *)(definition + 0x3E0) == 3,
+		definition->child_count == 3,
 		"expected 3 list items for 'player color picker list' widget");
 	widget->generated_list = ui_widget_realloc(widget->generated_list, color_count,
 		"c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3581);
@@ -3048,7 +3491,7 @@ boolean code_000d9b60(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	byte *definition;
+	struct ui_widget_definition *definition;
 	char directory_path[256];
 	long *profile_indices;
 	long profile_index;
@@ -3056,12 +3499,12 @@ boolean code_000d9b60(
 
 	event_handler_functions.profile_index = NONE;
 	memset(cached_variant_profile, -1, 0x144);
-	definition = tag_get(0x44654C61, widget->definition_tag_index);
+	definition = ui_widget_definition_get(widget->definition_tag_index);
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1384,
-		*(short *)definition == 2,
+		definition->type == 2,
 		"expected a spinner list widget for 'multiplayer settings list' widget");
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1385,
-		*(long *)(definition + 0x3E0) == 3,
+		definition->child_count == 3,
 		"expected 3 list items for 'multiplayer settings list' widget");
 	widget->generated_list = ui_widget_realloc(widget->generated_list, 0x190,
 		"c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1390);
@@ -3687,7 +4130,7 @@ boolean code_000da4e0(
 {
 	byte profile[0x30];
 	struct widget_instance *spinner_list;
-	byte *definition;
+	struct ui_widget_definition *definition;
 	short controller_index;
 	long *available_profiles;
 
@@ -3697,8 +4140,8 @@ boolean code_000da4e0(
 	while (spinner_list && spinner_list->type != 2)
 		spinner_list = spinner_list->next;
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1838, spinner_list, "failed to find the 1-wide spinner list for player profiles (expected it to be a child of this widget)");
-	definition = tag_get(0x44654C61, spinner_list->definition_tag_index);
-	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1845, *(long *)(definition + 0x3E0) == 0, "expected a code-generated 1-wide spinner list for 'mp player profile list' widget");
+	definition = ui_widget_definition_get(spinner_list->definition_tag_index);
+	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1845, definition->child_count == 0, "expected a code-generated 1-wide spinner list for 'mp player profile list' widget");
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1851, spinner_list->data3C.selected_index >= 0 && spinner_list->data3C.selected_index < (word)spinner_list->generated_count, "invalid multiplayer profile specified from 'mp player profile list' list widget");
 	available_profiles = spinner_list->generated_list;
 	if (!(available_profiles[spinner_list->data3C.selected_index] & 0x80000000))
@@ -3801,7 +4244,7 @@ boolean code_000d9040(
 	byte profile0[0x30];
 	short highest_levels[2];
 	short highest_difficulties[2];
-	byte *definition;
+	struct ui_widget_definition *definition;
 
 	memset(single_player_level_data, 0, 0x50);
 	{
@@ -3829,9 +4272,9 @@ boolean code_000d9040(
 		}
 	}
 
-	definition = tag_get(0x44654C61, widget->definition_tag_index);
-	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 689, *(short *)definition == 2, "expected a spinner list widget for 'solo level list' widget");
-	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 690, *(long *)(definition + 0x3E0) == 3, "expected 3 list items for 'solo level list' widget");
+	definition = ui_widget_definition_get(widget->definition_tag_index);
+	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 689, definition->type == 2, "expected a spinner list widget for 'solo level list' widget");
+	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 690, definition->child_count == 3, "expected 3 list items for 'solo level list' widget");
 	widget->generated_list = single_player_level_data;
 	widget->generated_count = 10;
 	widget->data3C.selected_index = PIN(player_ui_get_last_single_player_level_played(0), 0, 9);
@@ -4016,7 +4459,7 @@ boolean code_000da190(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	byte *definition = tag_get(0x44654C61, widget->definition_tag_index);
+	struct ui_widget_definition *definition = ui_widget_definition_get(widget->definition_tag_index);
 	long profile_count;
 	long last_profile_index;
 	long profile_index;
@@ -4026,17 +4469,17 @@ boolean code_000da190(
 	event_handler_functions.profile_index = NONE;
 	memset(cached_player_profile, NONE, 0x9C);
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1686,
-		*(short *)definition == 2,
+		definition->type == 2,
 		"expected a spinner list widget for 'player settings list' widget");
 	required_profile_count = 3;
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1688,
-		*(long *)(definition + 0x3E0) == 0 || *(long *)(definition + 0x3E0) == required_profile_count,
+		definition->child_count == 0 || definition->child_count == required_profile_count,
 		"expected either 1 or 3 list items for 'player settings list' widget");
 	widget->generated_list = ui_widget_realloc(widget->generated_list, 400,
 		"c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1693);
 	if (widget->generated_list)
 	{
-		if (*(long *)(definition + 0x3E0) != required_profile_count)
+		if (definition->child_count != required_profile_count)
 		{
 			profile_count = 100;
 			include_default = TRUE;
@@ -4051,7 +4494,7 @@ boolean code_000da190(
 			&profile_count,
 			widget->generated_list,
 			include_default);
-		if (*(long *)(definition + 0x3E0) == required_profile_count && (word)profile_count < (word)required_profile_count)
+		if (definition->child_count == required_profile_count && (word)profile_count < (word)required_profile_count)
 		{
 			long remaining_profile_count;
 			long profile_offset;
@@ -4091,7 +4534,7 @@ boolean code_000da320(
 	boolean *widget_deleted)
 {
 	byte profile[0x30];
-	byte *definition;
+	struct ui_widget_definition *definition;
 	struct widget_instance *spinner;
 	long profile_index;
 	long *profile_indices;
@@ -4099,19 +4542,19 @@ boolean code_000da320(
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1763,
 		event && event->controller_index != NONE,
 		"setting a player profile requires a valid controller index");
-	definition = tag_get(0x44654C61, widget->definition_tag_index);
+	definition = ui_widget_definition_get(widget->definition_tag_index);
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1772,
-		*(short *)definition == 0 && *(long *)(definition + 0x3E0) >= 3,
+		definition->type == 0 && definition->child_count >= 3,
 		"expected the player profile select screen to be a container w/ 3 or more children");
 	{
 		struct widget_instance *child = widget->child;
-		definition = tag_get(0x44654C61, child->definition_tag_index);
+		definition = ui_widget_definition_get(child->definition_tag_index);
 	}
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1775,
-		*(short *)definition == 2,
+		definition->type == 2,
 		"expected a spinner list widget for 'player profile list' widget");
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1776,
-		*(long *)(definition + 0x3E0) == 3,
+		definition->child_count == 3,
 		"expected 3 list items for 'player profile list' widget");
 	spinner = widget->child;
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1784,
@@ -5279,25 +5722,25 @@ boolean code_000d9990(
 	FILE *file;
 	struct widget_instance *level_select_screen;
 	struct widget_instance *level_list;
-	byte *definition;
+	struct ui_widget_definition *definition;
 	long level_index;
 
-	definition = tag_get(0x44654C61, widget->definition_tag_index);
+	definition = ui_widget_definition_get(widget->definition_tag_index);
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1280,
-		*(long *)(definition + 0x3E0) == 1,
+		definition->child_count == 1,
 		"expected a wrapper widget around the multiplayer level select screen");
 	level_select_screen = widget->child;
-	definition = tag_get(0x44654C61, level_select_screen->definition_tag_index);
+	definition = ui_widget_definition_get(level_select_screen->definition_tag_index);
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1285,
-		*(short *)definition == 0 && *(long *)(definition + 0x3E0) == 3,
+		definition->type == 0 && definition->child_count == 3,
 		"expected the multiplayer level select screen to be a container w/ 3 children");
 	level_list = level_select_screen->child;
-	definition = tag_get(0x44654C61, level_list->definition_tag_index);
+	definition = ui_widget_definition_get(level_list->definition_tag_index);
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1288,
-		*(short *)definition == 2,
+		definition->type == 2,
 		"expected a spinner list widget for 'multiplayer level list' widget");
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1289,
-		*(long *)(definition + 0x3E0) == 3,
+		definition->child_count == 3,
 		"expected 3 list items for 'multiplayer level list' widget");
 	level_list = widget->child->child;
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1298,
@@ -5359,27 +5802,27 @@ boolean code_000d9cf0(
 	char directory_path[256];
 	struct widget_instance *profile_select_screen;
 	struct widget_instance *profile_list;
-	byte *definition;
+	struct ui_widget_definition *definition;
 	long profile_index;
 	void *server;
 	FILE *file;
 
-	definition = tag_get(0x44654C61, widget->definition_tag_index);
+	definition = ui_widget_definition_get(widget->definition_tag_index);
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1465,
-		*(long *)(definition + 0x3E0) == 1,
+		definition->child_count == 1,
 		"expected a wrapper widget around the multiplayer profile select screen");
 	profile_select_screen = widget->child;
-	definition = tag_get(0x44654C61, profile_select_screen->definition_tag_index);
+	definition = ui_widget_definition_get(profile_select_screen->definition_tag_index);
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1470,
-		*(short *)definition == 0 && *(long *)(definition + 0x3E0) == 3,
+		definition->type == 0 && definition->child_count == 3,
 		"expected the multiplayer profile select screen to be a container w/ 3 children");
 	profile_list = profile_select_screen->child;
-	definition = tag_get(0x44654C61, profile_list->definition_tag_index);
+	definition = ui_widget_definition_get(profile_list->definition_tag_index);
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1473,
-		*(short *)definition == 2,
+		definition->type == 2,
 		"expected a spinner list widget for 'multiplayer profile list' widget");
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1474,
-		*(long *)(definition + 0x3E0) == 3,
+		definition->child_count == 3,
 		"expected 3 list items for 'multiplayer profile list' widget");
 	profile_list = widget->child->child;
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1483,
@@ -5433,7 +5876,7 @@ boolean code_000dff10(
 	byte profile[0x30];
 	short highest_level;
 	short highest_difficulty;
-	byte *definition;
+	struct ui_widget_definition *definition;
 	long profile_index;
 	long level_index;
 
@@ -5474,12 +5917,12 @@ boolean code_000dff10(
 		}
 	}
 
-	definition = tag_get(0x44654C61, widget->definition_tag_index);
+	definition = ui_widget_definition_get(widget->definition_tag_index);
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 603,
-		*(short *)definition == 2,
+		definition->type == 2,
 		"expected a spinner list widget for 'solo level list' widget");
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 604,
-		*(long *)(definition + 0x3E0) == 3,
+		definition->child_count == 3,
 		"expected 3 list items for 'solo level list' widget");
 	widget->generated_list = single_player_level_data;
 	widget->generated_count = 10;

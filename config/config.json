@@ -189,6 +189,7 @@
 					"source/interface/progress_bar.h",
 					"source/interface/terminal.h",
 					"source/interface/ui_widget.h",
+					"source/interface/ui_widget_definitions.h",
 					"source/interface/ui_widget_event_handler_functions.h",
 					"source/interface/ui_widget_game_data_input_functions.h",
 					"source/interface/ui_widget_group.h",

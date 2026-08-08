@@ -65,3 +65,13 @@ provenance problem, not a permanent compiler tie.
 
 Disposition: strict object complete; eligible for canonical admission after
 the whole-tree regression manifest check.
+
+## House-rule compliance re-audit (2026-08-07)
+
+The admitted source and header were re-read against `docs/house_rules.md` and
+Berthalamew's formatting/access guidance.  Parameters and no-argument `void`
+lists are vertically formatted, every `void` definition ends with an explicit
+`return;`, tag access goes through the typed
+`point_physics_definition_get()` macro, and there are no raw object accesses,
+alignment coercions, assembly, `volatile`, `__forceinline`, or optimization
+pragmas.  Files use CRLF consistently.  No compliance edit was required.
