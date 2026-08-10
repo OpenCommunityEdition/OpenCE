@@ -1030,7 +1030,6 @@ boolean collision_prism_test_vector(
 			if (vw != 0.0f)
 			{
 				real t_edge = wx / vw;
-				
 				if (vw < 0.0f)
 				{
 					if (t_out < t_edge)
