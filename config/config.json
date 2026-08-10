@@ -850,6 +850,16 @@
 		{
 			"name": "libcmt",
 			"guid": "{2B2D6441-A504-43EC-A305-DBA04B287D85}",
+			"options": {
+				"cflags": [
+					"/O1",
+					"/Gy"
+				],
+				"include_dirs": [
+					"xbox/include"
+				],
+				"defines": []
+			},
 			"objects": [
 				{ "name": "libs/libcmt/ieee87.c", "index": 624, "status": "MISSING" },
 				{ "name": "libs/libcmt/fpctrl.c", "index": 625, "status": "MISSING" },
