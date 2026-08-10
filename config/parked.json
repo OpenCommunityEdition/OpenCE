@@ -21,25 +21,6 @@
       }
     },
     {
-      "unit": "source/structures/cluster_partitions",
-      "function": "_reference_list_copy",
-      "class": "register-allocation",
-      "evidence": "Target and candidate have equal 0xC0 padded size and all nine relocation addresses; VC7 assigns source and destination pointer live ranges to opposite registers after eight legal-C shapes.",
-      "measurements": {
-        "target": {
-          "size": 192,
-          "relocation_count": 9,
-          "normalized_sha256": "28ab903006bf625bb291ffe9b82a710eabf80400b9d1f2403b78b04429904c8b"
-        },
-        "base": {
-          "size": 192,
-          "relocation_count": 9,
-          "normalized_sha256": "dcebabeded0e38211be7325fc38d98591a621f800556829f6184e38dbacf7c03"
-        },
-        "objdiff_percent": 95.3125
-      }
-    },
-    {
       "unit": "source/game/game_statistics",
       "function": "_game_statistics_record_kill",
       "class": "register-allocation",
