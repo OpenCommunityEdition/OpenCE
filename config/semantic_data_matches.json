@@ -199,5 +199,15 @@
       "relocation_count": 228,
       "normalized_sha256": "c1040d667c392fd772fab34335ade456dac49ae864a8200c4560df63cec186fd"
     }
+  },
+  {
+    "unit": "source/game/cheats",
+    "symbol": "_bss_0043d808",
+    "reason": "the rebuilt object owns the exact 3201-byte zero-initialized BSS layout; objdiff scores uninitialized COFF data heuristically even though logical bytes, size, relocation count, and symbol ownership are exact",
+    "measurements": {
+      "size": 3201,
+      "relocation_count": 0,
+      "normalized_sha256": "76d6c353527d212ec3799ea375f945e3ae3760257bd2ef5a75441090df0ddfac"
+    }
   }
 ]

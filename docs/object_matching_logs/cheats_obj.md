@@ -35,6 +35,13 @@ bodies `_sine` / `_cosine` / `_arctangent` from `real_math.h`, the shared litera
 `"r"` and `"result"`, and `__real@40c90fdb` / `__real@3fc00000` / `__real@3f4ccccd`.
 That is ordinary COMDAT attribution, not a difference in this object's content.
 
+The ordinary progress report assigns only 50% similarity to the 3201-byte `.bss`
+because the section has no file-backed payload.  The fail-closed semantic-data
+gate now records `_bss_0043d808` explicitly: target and candidate both have size
+3201, zero relocations, and the same logical-zero SHA-256
+`76d6c353527d212ec3799ea375f945e3ae3760257bd2ef5a75441090df0ddfac`.
+This is accounting for proven COFF equality, not fuzzy or assumed data credit.
+
 ---
 
 ## 1. Source order came free from the section table
