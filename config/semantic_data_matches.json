@@ -209,5 +209,15 @@
       "relocation_count": 0,
       "normalized_sha256": "76d6c353527d212ec3799ea375f945e3ae3760257bd2ef5a75441090df0ddfac"
     }
+  },
+  {
+    "unit": "source/sound/sound_classes",
+    "symbol": "_sound_classes",
+    "reason": "the rebuilt object owns the exact 2452-byte sound-class definition and name table; normalized bytes, all 51 relocation addresses/types, and independently resolved string destinations are exact despite csplit string-symbol attribution",
+    "measurements": {
+      "size": 2452,
+      "relocation_count": 51,
+      "normalized_sha256": "1ae64de7abb95c40952d3aacf88c68232070d4c19906bf32dfc8877bd6725abc"
+    }
   }
 ]
