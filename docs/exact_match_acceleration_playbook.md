@@ -89,6 +89,12 @@ while silently deleting or reordering `.bss`.
   cannot.
 - Conversely, aggregate assignment is useful when the target uses `rep movs`
   or a single calculated element address.
+- VC7 groups local-struct zero initialization by brace level. If member zero
+  is itself an aggregate, `= {0}` can produce one whole-struct zero live range,
+  while `= {{0}}` can split the first member's fill from the implicit trailing
+  fill. A target whose zero stores split exactly at that member boundary is
+  evidence for testing the extra brace; this closed
+  `telnet_console_initialize` without changing behavior.
 - Preserve target load and store order before trying declaration-order noise.
 
 ### Integer width and signedness
@@ -138,6 +144,12 @@ wrapper and its relocation destinations independently.
 - Zero-byte intrinsics such as `_ReadWriteBarrier()` are measured controls, not
   universal fixes. They can prevent desirable argument hoisting and make an
   otherwise close function worse.
+- A one-byte `push eax` where the reconstruction emits the two-byte `push 0`
+  after testing a result is evidence that the original passes the tested
+  result, not a literal. Preserving that value into the error arm can change a
+  large register-allocation suffix even when alignment leaves the padded size
+  unchanged. For size-exact functions containing a switch, inspect padding
+  and jump-table tails as well as the nominal body.
 
 ### Recover the type before tuning the schedule
 

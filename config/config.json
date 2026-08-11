@@ -544,7 +544,7 @@
 				{ "name": "source/objects/widgets/antenna_definitions.c", "index": 169, "status": "Matching" },
 				{ "name": "source/objects/widgets/antenna.c", "index": 170, "status": "NonMatching" },
 				{ "name": "source/objects/widgets/aleph.c", "index": 171, "status": "Matching" },
-				{ "name": "source/networking/telnet_console.c", "index": 172, "status": "NonMatching" },
+				{ "name": "source/networking/telnet_console.c", "index": 172, "status": "Matching" },
 				{ "name": "source/networking/network_server_message_handler.c", "index": 173, "status": "NonMatching" },
 				{ "name": "source/networking/network_server_manager.c", "index": 174, "status": "NonMatching" },
 				{ "name": "source/networking/network_messages.c", "index": 175, "status": "Matching" },

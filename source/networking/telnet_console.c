@@ -38,18 +38,351 @@ symbols in this file:
 	_bss_00456d00 (0000)
 */
 
+
 /* ---------- headers */
 
+#include "cseries.h"
+#include "bungie_net/network/transport.h"
+#include "networking/telnet_console.h"
+
 /* ---------- constants */
+
+enum
+{
+	MAXIMUM_TELNET_CLIENTS = 1,
+	TELNET_CLIENT_BUFFER_SIZE = 128,
+	TELNET_CONSOLE_PORT = 23,
+	_transport_endpoint_type_telnet = 0x12
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct transport_endpoint;
+
+struct telnet_client
+{
+	struct transport_endpoint *endpoint;
+	char buffer[TELNET_CLIENT_BUFFER_SIZE];
+};
+
+struct telnet_console_globals
+{
+	struct transport_endpoint *listening_endpoint;
+	struct telnet_client clients[MAXIMUM_TELNET_CLIENTS];
+	boolean initialized;
+};
+
 /* ---------- prototypes */
+
+struct transport_endpoint *create_transport_endpoint(
+	long type);
+void delete_transport_endpoint(
+	struct transport_endpoint *endpoint);
+short bind_endpoint(
+	struct transport_endpoint *endpoint,
+	struct transport_address *address);
+short listen_endpoint(
+	struct transport_endpoint *endpoint);
+struct transport_endpoint *accept_endpoint(
+	struct transport_endpoint *endpoint);
+boolean endpoint_readable(
+	struct transport_endpoint *endpoint,
+	long timeout);
+long read_endpoint(
+	struct transport_endpoint *endpoint,
+	void *buffer,
+	long size);
+long write_endpoint(
+	struct transport_endpoint *endpoint,
+	const void *buffer,
+	long size);
+
+boolean hs_compile_and_evaluate(
+	char *expression);
+
+void telnet_console_initialize(
+	void);
+void telnet_console_dispose(
+	void);
+
+static boolean code_001203c0(
+	char *buffer,
+	long size,
+	struct telnet_client *client);
 
 /* ---------- globals */
 
+struct telnet_console_globals bss_00456d00 = {0};
+
 /* ---------- public code */
 
+void telnet_console_initialize(
+	void)
+{
+	csmemset(&bss_00456d00, 0, sizeof(bss_00456d00));
+
+	bss_00456d00.listening_endpoint = create_transport_endpoint(_transport_endpoint_type_telnet);
+	if (bss_00456d00.listening_endpoint)
+	{
+		struct transport_address address = {{0}};
+
+		address.address_length = IPV4_ADDRESS_LENGTH;
+		address.port = TELNET_CONSOLE_PORT;
+
+		if (bind_endpoint(bss_00456d00.listening_endpoint, &address)==_transport_error_none)
+		{
+			if (listen_endpoint(bss_00456d00.listening_endpoint)==_transport_error_none)
+			{
+				bss_00456d00.initialized = TRUE;
+			}
+			else
+			{
+				error(2, "listen_endpoint() failed on telnet console endpoint");
+				delete_transport_endpoint(bss_00456d00.listening_endpoint);
+				bss_00456d00.listening_endpoint = NULL;
+			}
+		}
+		else
+		{
+			error(2, "bind_endpoint() failed on telnet console endpoint");
+			delete_transport_endpoint(bss_00456d00.listening_endpoint);
+			bss_00456d00.listening_endpoint = NULL;
+		}
+	}
+	else
+	{
+		error(2, "create_transport_endpoint() failed on telnet console endpoint");
+	}
+
+	return;
+}
+
+void telnet_console_dispose(
+	void)
+{
+	if (bss_00456d00.initialized)
+	{
+		if (bss_00456d00.listening_endpoint)
+			delete_transport_endpoint(bss_00456d00.listening_endpoint);
+		if (bss_00456d00.clients[0].endpoint)
+			delete_transport_endpoint(bss_00456d00.clients[0].endpoint);
+	}
+
+	csmemset(&bss_00456d00, 0, sizeof(bss_00456d00));
+
+	return;
+}
+
+void telnet_console_print(
+	char *string)
+{
+	if (bss_00456d00.initialized && string && string[0])
+	{
+		long length = csstrlen(string);
+
+		if (bss_00456d00.clients[0].endpoint)
+		{
+			long result = write_endpoint(bss_00456d00.clients[0].endpoint, "\r\n", 2);
+
+			if (result>0)
+			{
+				result = write_endpoint(bss_00456d00.clients[0].endpoint, string, length);
+				if (result>0)
+				{
+					if (bss_00456d00.clients[0].buffer[0])
+					{
+						result = write_endpoint(
+							bss_00456d00.clients[0].endpoint,
+							bss_00456d00.clients[0].buffer,
+							csstrlen(bss_00456d00.clients[0].buffer));
+					}
+
+					if (result>0)
+						return;
+				}
+			}
+
+			error(2, "connection lost to telnet client");
+			delete_transport_endpoint(bss_00456d00.clients[0].endpoint);
+			bss_00456d00.clients[0].endpoint = NULL;
+		}
+	}
+
+	return;
+}
+
+void telnet_console_process(
+	void)
+{
+	if (bss_00456d00.initialized)
+	{
+		char buffer[32];
+		long count;
+
+		if (endpoint_readable(bss_00456d00.listening_endpoint, 0))
+		{
+			struct transport_endpoint *endpoint = accept_endpoint(bss_00456d00.listening_endpoint);
+
+			if (endpoint)
+			{
+				long client_index;
+
+				for (client_index = 0; client_index<MAXIMUM_TELNET_CLIENTS; client_index++)
+				{
+					if (!bss_00456d00.clients[client_index].endpoint)
+					{
+						if (write_endpoint(
+							endpoint,
+							"Would you like to play a game?\r\n",
+							csstrlen("Would you like to play a game?\r\n"))<=0)
+						{
+							delete_transport_endpoint(endpoint);
+						}
+						else
+						{
+							bss_00456d00.clients[client_index].endpoint = endpoint;
+							bss_00456d00.clients[client_index].buffer[0] = 0;
+						}
+
+						break;
+					}
+				}
+
+				if (client_index==MAXIMUM_TELNET_CLIENTS)
+				{
+					write_endpoint(
+						endpoint,
+						"sorry - the maximum number of clients are already connected. goodbye!\r\n",
+						csstrlen("sorry - the maximum number of clients are already connected. goodbye!\r\n"));
+					delete_transport_endpoint(endpoint);
+				}
+			}
+		}
+
+		if (bss_00456d00.clients[0].endpoint &&
+			endpoint_readable(bss_00456d00.clients[0].endpoint, 0))
+		{
+			count = read_endpoint(bss_00456d00.clients[0].endpoint, buffer, sizeof(buffer));
+			if (count>0)
+			{
+				if (code_001203c0(buffer, count, bss_00456d00.clients))
+					return;
+
+				error(2, "error processing telnet client");
+			}
+			else
+			{
+				error(2, "connection lost to telnet client ('%s')", transport_error_to_string((short)count));
+			}
+
+			if (bss_00456d00.clients[0].endpoint)
+			{
+				delete_transport_endpoint(bss_00456d00.clients[0].endpoint);
+				bss_00456d00.clients[0].endpoint = NULL;
+			}
+		}
+	}
+
+	return;
+}
+
 /* ---------- private code */
+
+static boolean code_001203c0(
+	char *buffer,
+	long size,
+	struct telnet_client *client)
+{
+	boolean result = TRUE;
+	long index;
+
+	for (index = 0; result && index<size; index++)
+	{
+		char *character = buffer+index;
+		long length;
+
+		if (*character>0x7f)
+			continue;
+
+		if (isalnum(*character) || ispunct(*character) || *character==' ')
+		{
+			length = csstrlen(client->buffer)+1;
+			if (length>=TELNET_CLIENT_BUFFER_SIZE)
+			{
+				client->buffer[0] = 0;
+				length = write_endpoint(
+					client->endpoint,
+					"\r\noverflowed client buffer; resetting buffer\r\n",
+					csstrlen("\r\noverflowed client buffer; resetting buffer\r\n"));
+				if (length<=0)
+				{
+					error(2, "failed to write to telnet client ('%s')",
+						transport_error_to_string((short)length));
+					return FALSE;
+				}
+
+				return result;
+			}
+
+			client->buffer[length-1] = *character;
+			client->buffer[length] = 0;
+		}
+		else
+		{
+			switch (*character)
+			{
+			case 10:
+			case 13:
+				if (client->buffer[0])
+				{
+					char expression[TELNET_CLIENT_BUFFER_SIZE];
+
+					csstrncpy(expression, client->buffer, TELNET_CLIENT_BUFFER_SIZE-1);
+					expression[TELNET_CLIENT_BUFFER_SIZE-1] = 0;
+					client->buffer[0] = 0;
+
+					if (hs_compile_and_evaluate(expression))
+					{
+						if (write_endpoint(client->endpoint, "\r\n", 2)<=0)
+							result = FALSE;
+					}
+				}
+				continue;
+
+			case 8:
+				if (client->buffer[0])
+				{
+					length = csstrlen(client->buffer);
+					if (length>0)
+						client->buffer[length-1] = 0;
+				}
+				break;
+
+			case 4:
+				write_endpoint(
+					client->endpoint,
+					"\r\ngoodbye!\r\n",
+					csstrlen("\r\ngoodbye!\r\n"));
+				delete_transport_endpoint(client->endpoint);
+				client->endpoint = NULL;
+				index = size;
+				continue;
+
+			default:
+				continue;
+			}
+		}
+
+		length = write_endpoint(client->endpoint, character, 1);
+		if (length<=0)
+		{
+			error(2, "failed to write to telnet client ('%s')",
+				transport_error_to_string((short)length));
+			result = FALSE;
+		}
+	}
+
+	return result;
+}

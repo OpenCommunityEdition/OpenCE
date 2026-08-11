@@ -53,9 +53,9 @@ struct transport_address_data
 {
 	union
 	{
-		byte bytes[MAXIMUM_TRANSPORT_ADDRESS_LENGTH];
-		word words[MAXIMUM_TRANSPORT_ADDRESS_LENGTH / sizeof(word)];
 		unsigned long long_words[MAXIMUM_TRANSPORT_ADDRESS_LENGTH / sizeof(unsigned long)];
+		word words[MAXIMUM_TRANSPORT_ADDRESS_LENGTH / sizeof(word)];
+		byte bytes[MAXIMUM_TRANSPORT_ADDRESS_LENGTH];
 	};
 };
 
