@@ -12,6 +12,18 @@ prototype, field offset, constant, call, and source shape was independently
 gated against the January object. Cross-build evidence was used only as a map;
 January bytes remained the authority.
 
+## COMDAT ownership audit
+
+The candidate owns six select-any COMDATs that this csplit target leaves as
+undefined externals: the `state_data` assertion string, `30.0f`, and the four
+inline helpers `vector_from_points3d`, `magnitude_squared3d`,
+`distance_squared3d`, and `real_random_range`. This is attribution rather than
+new content. Each symbol has the same external name in the target, every use
+resolves to the same symbol and addend, and each candidate-owned body/data
+section is independently byte/relocation exact against its January owner in
+`action_alert.obj`. The four target-owned constants and strings in this object
+remain strict exact by owner.
+
 ## Final function inventory
 
 | Function | Padded bytes | Relocations | Result |
