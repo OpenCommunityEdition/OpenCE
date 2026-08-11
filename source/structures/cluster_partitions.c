@@ -128,9 +128,8 @@ void reference_list_remove(
 	return;
 }
 
-/* NonMatching: size and all nine relocations (including addresses) match the
- * January object. VC7 assigns the source and destination pointer live ranges
- * to opposite registers; eight legal-C source shapes did not break the tie. */
+/* The initialization and cursor-advance order preserve January's coalescing
+ * of the source cursor into EBX and the loop index into ESI. */
 void reference_list_copy(
 	struct data_array *result,
 	struct data_array *source)

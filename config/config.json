@@ -436,7 +436,7 @@
 				{ "name": "source/structures/structure_bsp_definitions.c", "index": 61, "status": "Matching" },
 				{ "name": "source/structures/leaf_map.c", "index": 62, "status": "NonMatching" },
 				{ "name": "source/structures/detail_object_definitions.c", "index": 63, "status": "Matching" },
-				{ "name": "source/structures/cluster_partitions.c", "index": 64, "status": "NonMatching" },
+				{ "name": "source/structures/cluster_partitions.c", "index": 64, "status": "Matching" },
 				{ "name": "source/structures/radiosity/radiosity_io.c", "index": 65, "status": "Matching" },
 				{ "name": "source/structures/radiosity/radiosity.c", "index": 66, "status": "Matching" },
 				{ "name": "source/structures/radiosity/intermediate_radiosity.c", "index": 67, "status": "Matching" },
