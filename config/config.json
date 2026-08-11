@@ -571,7 +571,7 @@
 				{ "name": "source/memory/fibonacci_heap.c", "index": 196, "status": "Matching" },
 				{ "name": "source/memory/data_packets.c", "index": 197, "status": "Matching" },
 				{ "name": "source/memory/data_packet_groups.c", "index": 198, "status": "Matching" },
-				{ "name": "source/memory/data_encoding.c", "index": 199, "status": "NonMatching" },
+				{ "name": "source/memory/data_encoding.c", "index": 199, "status": "Matching" },
 				{ "name": "source/memory/data_compress.c", "index": 200, "status": "Matching" },
 				{ "name": "source/memory/data.c", "index": 201, "status": "Matching" },
 				{ "name": "source/memory/crc.c", "index": 202, "status": "Matching" },

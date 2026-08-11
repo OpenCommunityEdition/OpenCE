@@ -131,6 +131,11 @@
   },
   {
     "unit": "source/memory/data_encoding",
+    "function": "_data_decode_memory",
+    "reason": "hardened COFF comparison proves all 304 padded bytes and all 19 semantic relocations exact; objdiff reports a local jump-table label encoding false negative"
+  },
+  {
+    "unit": "source/memory/data_encoding",
     "function": "_data_encode_memory",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },

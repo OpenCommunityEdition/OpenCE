@@ -287,6 +287,15 @@ that defined readable-C alternatives do not match. Record the safe initialized
 form and its measured result in the object log. Never introduce a new
 uninitialized value merely because it improves register allocation.
 
+Do not infer a fallback assignment merely because target code reloads a value
+after a fatal assertion or `system_exit`.  In `data_decode_memory`, that
+seemingly sensible repair was the sole cause of a whole-function register
+allocation mismatch; the January/October machine code plus an exact-unique
+HCEA PDB local record and HCEA PPC body showed that the original impossible
+default arm left its sole size local unassigned.  Remove such a repair only
+with the full original-bug evidence gate above, then state the safe corrected
+alternative in source and measure it in the object log.
+
 ## Prohibited shortcuts
 
 No inline assembly, volatile byte forcing, undefined aliasing, object-byte
