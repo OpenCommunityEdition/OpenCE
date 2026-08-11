@@ -40,25 +40,6 @@
       }
     },
     {
-      "unit": "source/memory/hashtable",
-      "function": "_hashtable_grow",
-      "class": "register-allocation",
-      "evidence": "Target and candidate have equal 0x240 padded size and all 27 relocation identities/addresses. Prior source-shape work reduced the residual to a two-byte EAX/ECX permutation in the commutative capacity_bits+growth_bits assertion; the surrounding code realigns.",
-      "measurements": {
-        "target": {
-          "size": 576,
-          "relocation_count": 27,
-          "normalized_sha256": "0a7974681ab4f334bda59ada858d9aed8aa9a8c9e9b9518270dd31e1f3a7e606"
-        },
-        "base": {
-          "size": 576,
-          "relocation_count": 27,
-          "normalized_sha256": "6759ee7ece561fdbeda3bedaf66c86487d96f4ae0c7e76b179171c990cc445ac"
-        },
-        "objdiff_percent": 99.94924
-      }
-    },
-    {
       "unit": "source/game/game_statistics",
       "function": "_game_statistics_record_kill",
       "class": "register-allocation",
