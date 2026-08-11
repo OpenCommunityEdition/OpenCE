@@ -2,25 +2,6 @@
   "version": 1,
   "entries": [
     {
-      "unit": "source/sound/sound_classes",
-      "function": "_sound_class_get",
-      "class": "register-allocation",
-      "evidence": "Target and candidate have equal 0xD0 padded size and 18 relocations; the remaining codegen is an ESI/EDI index-pointer mirror documented beside the function.",
-      "measurements": {
-        "target": {
-          "size": 208,
-          "relocation_count": 18,
-          "normalized_sha256": "94cb85335dd2d7a8df3858d5f19def3472fc2fe6869825370127078f852d65a0"
-        },
-        "base": {
-          "size": 208,
-          "relocation_count": 18,
-          "normalized_sha256": "6b1d112cd08fd123c3ce0cdc72232802444600c5e669463144181f64f4572c00"
-        },
-        "objdiff_percent": 88.59649
-      }
-    },
-    {
       "unit": "source/game/game_statistics",
       "function": "_game_statistics_record_kill",
       "class": "register-allocation",
