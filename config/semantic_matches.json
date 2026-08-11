@@ -518,5 +518,10 @@
     "unit": "source/interface/ui_widget_event_handler_functions",
     "function": "_code_000deb70",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
+  },
+  {
+    "unit": "source/networking/telnet_console",
+    "function": "_code_001203c0",
+    "reason": "hardened COFF comparison proves all 496 padded bytes and all 30 semantic relocations exact (SHA-256 320e28baa4ff4a0f80d2a37ce9c2107d66c72e2bf5c321c8f205d813d25fc398); objdiff reports a local jump-table label encoding false negative"
   }
 ]
