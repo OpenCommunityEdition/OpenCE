@@ -121,7 +121,7 @@ boolean action_search_setup_target(
 	csmemset(state_data, 0, sizeof(struct search_state_data));
 	if (!actor->input.vehicle_passenger)
 	{
-		state_data->pursuit_location.type = 0;
+		state_data->pursuit_location.type = _pursuit_location_target;
 		state_data->charging = must_charge;
 		actor->state.searching = TRUE;
 		success = TRUE;
@@ -160,7 +160,7 @@ boolean action_search_setup_pursuit(
 
 		state_data->tenacious = tenacious;
 		state_data->pursuit_location.firing_position_index = firing_position_index;
-		state_data->pursuit_location.type = 1;
+		state_data->pursuit_location.type = _pursuit_location_position;
 		state_data->pursuit_location.position = firing_position->position;
 		state_data->pursuit_location.surface_index = firing_position->surface_index;
 		state_data->pursuit_location.cluster_index = firing_position->cluster_index;
@@ -183,7 +183,7 @@ boolean action_search_setup_undirected(
 	csmemset(state_data, 0, sizeof(struct search_state_data));
 	if (actor->meta.swarm)
 	{
-		state_data->pursuit_location.type = 2;
+		state_data->pursuit_location.type = _pursuit_location_undirected;
 		actor->state.searching = TRUE;
 		success = TRUE;
 	}
@@ -211,8 +211,8 @@ void action_search_update(
 	{
 		state_data->sneaking = FALSE;
 		if ((definition->flags&FLAG(_actor_definition_sneak_uncovering_target_bit)) &&
-			state_data->pursuit_location.type == 0 &&
-			actor->target.target_type == 5 &&
+			state_data->pursuit_location.type == _pursuit_location_target &&
+			actor->target.target_type == _actor_target_uninspected_orphan &&
 			prop_get(actor->target.target_prop_index)->quantized_distance <= 2)
 		{
 			state_data->sneaking = TRUE;
@@ -231,7 +231,7 @@ void action_search_update(
 		}
 		if (actor->meta.unit_index != NONE)
 		{
-			if (state_data->pursuit_location.type == 0)
+			if (state_data->pursuit_location.type == _pursuit_location_target)
 			{
 				if (!actor->firing_positions.pursuit_communicated_lost_contact &&
 					(state_data->search_done ||
@@ -282,7 +282,7 @@ void action_search_flush_position_indices(
 	struct actor_datum *actor = actor_get(actor_index);
 	struct search_state_data *state_data = &actor->state.action_data.search;
 
-	if (state_data->pursuit_location.type == 1)
+	if (state_data->pursuit_location.type == _pursuit_location_position)
 	{
 		state_data->pursuit_location.firing_position_index = NONE;
 		state_data->search_done = TRUE;
@@ -310,8 +310,8 @@ void action_search_control(
 
 	if (actor->control.moving)
 	{
-		actor->orders.look.primary_priority = 3;
-		actor->orders.look.primary_direction.type = 0;
+		actor->orders.look.primary_priority = _primary_priority_aiming;
+		actor->orders.look.primary_direction.type = _direction_specification_movement;
 	}
 	else
 	{
@@ -320,38 +320,40 @@ void action_search_control(
 		if (state_data->search_desired_time - state_data->search_remaining_time <
 			minimum_search_time)
 		{
-			if (state_data->pursuit_location.type == 0)
+			if (state_data->pursuit_location.type == _pursuit_location_target)
 			{
-				actor->orders.look.primary_priority = 3;
-				actor->orders.look.primary_direction.type = 2;
+				actor->orders.look.primary_priority = _primary_priority_aiming;
+				actor->orders.look.primary_direction.type = _direction_specification_target;
 			}
-			else if (state_data->pursuit_location.type == 1)
+			else if (state_data->pursuit_location.type == _pursuit_location_position)
 			{
-				actor->orders.look.primary_priority = 3;
-				actor->orders.look.primary_direction.type = 3;
+				actor->orders.look.primary_priority = _primary_priority_aiming;
+				actor->orders.look.primary_direction.type = _direction_specification_point;
 				actor->orders.look.primary_direction.point = state_data->pursuit_location.position;
 			}
 			else
 			{
-				actor->orders.look.primary_priority = 1;
+				actor->orders.look.primary_priority = _primary_priority_facing;
 			}
 		}
 		else
 		{
-			actor->orders.look.primary_priority = 1;
+			actor->orders.look.primary_priority = _primary_priority_facing;
 		}
 	}
 	actor->orders.look.idle_look_type = 3;
 
-	if (state_data->pursuit_location.type == 0)
+	if (state_data->pursuit_location.type == _pursuit_location_target)
 	{
 		if (definition->flags&FLAG(_actor_definition_shoot_at_targets_last_location_bit))
 		{
-			actor->orders.combat.shoot_at_target = actor->target.target_type >= 5;
+			actor->orders.combat.shoot_at_target =
+				actor->target.target_type >= _actor_target_uninspected_orphan;
 		}
 		else
 		{
-			actor->orders.combat.shoot_at_target = actor->target.target_type >= 6;
+			actor->orders.combat.shoot_at_target =
+				actor->target.target_type >= _actor_target_definite_orphan;
 		}
 	}
 
@@ -371,7 +373,7 @@ void action_search_begin(
 	struct search_state_data *state_data = &actor->state.action_data.search;
 	long search_time;
 
-	if (state_data->pursuit_location.type == 0)
+	if (state_data->pursuit_location.type == _pursuit_location_target)
 	{
 		search_time = (long)(real_random_range(
 			definition->pursuit.target_location_time_lower_bound,
@@ -398,7 +400,7 @@ boolean action_search_perform(
 	if (!actor->meta.swarm && actor->meta.timeslice && !state_data->search_done)
 	{
 		state_data->at_destination = TRUE;
-		if (state_data->pursuit_location.type == 0 &&
+		if (state_data->pursuit_location.type == _pursuit_location_target &&
 			actor->target.target_prop_index != NONE)
 		{
 			real radius;
@@ -413,7 +415,7 @@ boolean action_search_perform(
 				&prop->body_position,
 				&actor->input.position.body_position) < radius*radius;
 		}
-		else if (state_data->pursuit_location.type == 1 &&
+		else if (state_data->pursuit_location.type == _pursuit_location_position &&
 			state_data->pursuit_location.firing_position_index != NONE)
 		{
 			real distance = distance_squared3d(
@@ -484,7 +486,8 @@ boolean action_search_perform(
 			}
 			if (!state_data->tenacious &&
 				searching_actor_count >=
-					(short)((state_data->pursuit_location.type == 1) ? 2 : 4))
+					(short)((state_data->pursuit_location.type ==
+						_pursuit_location_position) ? 2 : 4))
 			{
 				long last_perceived_time;
 
@@ -514,7 +517,7 @@ boolean action_search_perform(
 		{
 			actor_move_halt(actor_index);
 		}
-		else if (state_data->pursuit_location.type == 0)
+		else if (state_data->pursuit_location.type == _pursuit_location_target)
 		{
 			if (!actor_move_to_prop(actor_index, actor->target.target_prop_index, 2.5f))
 			{
@@ -522,7 +525,7 @@ boolean action_search_perform(
 				state_data->search_failed = TRUE;
 			}
 		}
-		else if (state_data->pursuit_location.type == 1)
+		else if (state_data->pursuit_location.type == _pursuit_location_position)
 		{
 			actor->firing_positions.current_position_index = NONE;
 			if (!actor_move_to_firing_position(
