@@ -97,6 +97,23 @@ while silently deleting or reordering `.bss`.
   `telnet_console_initialize` without changing behavior.
 - Preserve target load and store order before trying declaration-order noise.
 
+### Local lifetime is more important than local spelling
+
+Naming an expression does not necessarily change VC7 output; the optimizer can
+fold a short-lived alias immediately. What matters is where the value becomes
+live and how long it must survive. In `data_packets.obj`, naming
+`decoded_data + sizeof(short)` beside its final memory call did nothing across
+several experiments. Computing the same readable payload pointer *before* the
+range assert and keeping it live across validation plus an intervening integer
+encode changed no instruction by itself, but rotated three later scratch
+registers and closed a 768-byte function exactly.
+
+In plain English: do not keep renaming a value and expect different code. Move
+the point where the program genuinely needs to remember it, then measure the
+whole function. This is especially useful around asserts and calls, where an
+additional live pointer changes the compiler's interference graph without
+inventing operations.
+
 ### Integer width and signedness
 
 - `movsx`/`movzx`, partial-register operations, and signed branch opcodes reveal
@@ -262,6 +279,13 @@ Exact reconstruction preserves proven original behavior. Mark a defect
 retain the original behavior and add a concise comment describing a safe
 corrected-build alternative. Do not silently repair it and do not label our
 own reconstruction mistake as an original bug.
+
+An original uninitialized read is an exceptional case, not a general codegen
+lever. Preserve one only when the January control flow proves the read, an
+independent build or source lineage corroborates it, and a bounded search shows
+that defined readable-C alternatives do not match. Record the safe initialized
+form and its measured result in the object log. Never introduce a new
+uninitialized value merely because it improves register allocation.
 
 ## Prohibited shortcuts
 
