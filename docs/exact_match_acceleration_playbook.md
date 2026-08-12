@@ -122,6 +122,16 @@ whole function. This is especially useful around asserts and calls, where an
 additional live pointer changes the compiler's interference graph without
 inventing operations.
 
+The same rule applies to globals and narrowed values. Do not automatically
+cache a global member in a local merely because the C looks cleaner. In
+`errors.obj`, the invented cached `short` changed the value graph throughout
+the latter half of `_error`. Reading the global member directly, preserving
+the raw `long` sum for the array subscript, and narrowing only at the final
+published store reproduced January exactly. In plain English: two expressions
+can have the same numeric value while telling VC7 to remember different facts.
+Use target loads, store widths, and persistent registers to decide which fact
+the original source actually preserved.
+
 ### Integer width and signedness
 
 - `movsx`/`movzx`, partial-register operations, and signed branch opcodes reveal

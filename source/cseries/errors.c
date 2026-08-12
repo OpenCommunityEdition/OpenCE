@@ -144,7 +144,7 @@ void write_to_error_file(
 
 	if (error_globals.output_to_debug_file)
 	{
-		FILE* handle = fopen("d:\\debug.txt", "a+b");
+		FILE *handle = fopen("d:\\debug.txt", "a+b");
 		if (handle)
 		{
 			if (date)
@@ -207,7 +207,6 @@ void error(
 {
 	char string[1024];
 	char *newline;
-	short message_buffer_size;
 	long new_size;
 
 	match_assert(
@@ -261,8 +260,7 @@ void error(
 			write_to_error_file(string, TRUE);
 
 			new_size = csstrlen(string);
-			message_buffer_size = error_globals.message_buffer_size;
-			if (message_buffer_size+new_size >= ERROR_MESSAGE_BUFFER_MAXIMUM_SIZE)
+			if (error_globals.message_buffer_size+new_size >= ERROR_MESSAGE_BUFFER_MAXIMUM_SIZE)
 			{
 				long old_size;
 				long copy_size;
@@ -279,7 +277,14 @@ void error(
 				}
 
 				newline = strchr(error_globals.message_buffer+offset, '\n');
-				old_size = newline ? newline-error_globals.message_buffer+1 : error_globals.message_buffer_size;
+				if (!newline)
+				{
+					old_size = error_globals.message_buffer_size;
+				}
+				else
+				{
+					old_size = newline-error_globals.message_buffer+1;
+				}
 				copy_size = error_globals.message_buffer_size-old_size;
 				match_assert(
 					"c:\\halo\\SOURCE\\cseries\\errors.c",
@@ -297,15 +302,14 @@ void error(
 						copy_size);
 				}
 
-				message_buffer_size = (short)(prefix_size+copy_size);
-				error_globals.message_buffer[message_buffer_size] = 0;
-				error_globals.message_buffer_size = message_buffer_size;
+				error_globals.message_buffer[prefix_size+copy_size] = 0;
+				error_globals.message_buffer_size = (short)(prefix_size+copy_size);
 			}
 
-			if (message_buffer_size+new_size < ERROR_MESSAGE_BUFFER_MAXIMUM_SIZE)
+			if (error_globals.message_buffer_size+new_size < ERROR_MESSAGE_BUFFER_MAXIMUM_SIZE)
 			{
 				csstrcpy(
-					error_globals.message_buffer+message_buffer_size,
+					error_globals.message_buffer+error_globals.message_buffer_size,
 					string);
 				error_globals.message_buffer_size += (short)new_size;
 			}

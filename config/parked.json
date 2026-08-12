@@ -19,25 +19,6 @@
         },
         "objdiff_percent": 98.947365
       }
-    },
-    {
-      "unit": "source/cseries/errors",
-      "function": "_error",
-      "class": "tu-context-optimization",
-      "evidence": "Target and candidate have equal 0x270 padded size and all 50 relocation identities. The implementation is instruction-identical through the first 0x111 bytes; the residual tail is a consistent EBX/ESI/newline-spill allocation split. Five grounded declaration, scope, register-hint, and volatility shapes either emitted the unchanged baseline or regressed relocation addresses.",
-      "measurements": {
-        "target": {
-          "size": 624,
-          "relocation_count": 50,
-          "normalized_sha256": "61bf8aad11f19fd443093f2eba0bae2db27d90af0bc156ec78a530246ae47fd7"
-        },
-        "base": {
-          "size": 624,
-          "relocation_count": 50,
-          "normalized_sha256": "09377b04504056b8f2278b92bf682d5bd8be32a924e9e87c53cddd954f11ce53"
-        },
-        "objdiff_percent": 87.55173
-      }
     }
   ]
 }
