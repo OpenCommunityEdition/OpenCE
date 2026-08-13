@@ -1054,7 +1054,7 @@
 				{ "name": "libs/libcmt/wtox.c", "index": 814, "status": "MISSING" },
 				{ "name": "libs/libcmt/wctomb.c", "index": 815, "status": "Matching" },
 				{ "name": "libs/libcmt/wcstombs.c", "index": 816, "status": "Matching" },
-				{ "name": "libs/libcmt/wcstol.c", "index": 817, "status": "MISSING" },
+				{ "name": "libs/libcmt/wcstol.c", "index": 817, "status": "Matching" },
 				{ "name": "libs/libcmt/wcstod.c", "index": 818, "status": "MISSING" },
 				{ "name": "libs/libcmt/wchtodig.c", "index": 819, "status": "Matching" },
 				{ "name": "libs/libcmt/towupper.c", "index": 820, "status": "Matching" },

@@ -8163,7 +8163,7 @@
 { "file_offset": 1886604, "flags": 32, "name": "_code_001cc98c" },
 { "file_offset": 1886712, "flags": 32, "name": "_code_001cc9f8" },
 { "file_offset": 1886785, "flags": 32, "name": "__wtmpnam" },
-{ "file_offset": 1886972, "flags": 32, "name": "_code_001ccafc" },
+{ "file_offset": 1886972, "flags": 32, "name": "_wcstoxl" },
 { "file_offset": 1887425, "flags": 32, "name": "_wcstol" },
 { "file_offset": 1887448, "flags": 32, "name": "_wcstoul" },
 { "file_offset": 1887471, "flags": 32, "name": "_wcstod" },
