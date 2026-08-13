@@ -189,5 +189,15 @@
       "relocation_count": 1,
       "normalized_sha256": "e94bb79478c95dce11c4a1f720a07ccbaa3a8d18b84acbe5605472d6f8635b74"
     }
+  },
+  {
+    "unit": "source/game/cheats",
+    "symbol": "_bss_0043d808",
+    "reason": "the complete rebuilt object owns the exact 3201-byte zero-initialized cheat-command array plus trailing dead flag; the hardened comparator proves size, normalized payload, zero relocations, external owner spelling, storage class, and section-relative destination exact while objdiff does not credit the BSS section",
+    "measurements": {
+      "size": 3201,
+      "relocation_count": 0,
+      "normalized_sha256": "76d6c353527d212ec3799ea375f945e3ae3760257bd2ef5a75441090df0ddfac"
+    }
   }
 ]

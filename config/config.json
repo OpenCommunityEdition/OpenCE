@@ -681,7 +681,7 @@
 				{ "name": "source/game/game_engine.c", "index": 307, "status": "NonMatching" },
 				{ "name": "source/game/game_allegiance.c", "index": 308, "status": "NonMatching" },
 				{ "name": "source/game/game.c", "index": 309, "status": "NonMatching" },
-				{ "name": "source/game/cheats.c", "index": 310, "status": "NonMatching" },
+				{ "name": "source/game/cheats.c", "index": 310, "status": "Matching" },
 				{ "name": "source/game/aim_assist.c", "index": 311, "status": "NonMatching" },
 				{ "name": "source/effects/weather_particle_systems.c", "index": 312, "status": "NonMatching" },
 				{ "name": "source/effects/weather_particle_definitions.c", "index": 313, "status": "Matching" },
