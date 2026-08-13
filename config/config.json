@@ -990,7 +990,7 @@
 				{ "name": "libs/libcmt/tidtable.c", "index": 750, "status": "MISSING" },
 				{ "name": "libs/libcmt/thread.c", "index": 751, "status": "MISSING" },
 				{ "name": "libs/libcmt/mlock.c", "index": 752, "status": "MISSING" },
-				{ "name": "libs/libcmt/crt0init.c", "index": 753, "status": "MISSING" },
+				{ "name": "libs/libcmt/crt0init.c", "index": 753, "status": "Matching" },
 				{ "name": "libs/libcmt/crt0msg.c", "index": 754, "status": "MISSING" },
 				{ "name": "libs/libcmt/crt0fp.c", "index": 755, "status": "MISSING" },
 				{ "name": "libs/libcmt/crt0dat.c", "index": 756, "status": "MISSING" },
