@@ -975,7 +975,7 @@
 				{ "name": "libs/libcmt/_sftbuf.c", "index": 735, "status": "MISSING" },
 				{ "name": "libs/libcmt/_open.c", "index": 736, "status": "MISSING" },
 				{ "name": "libs/libcmt/_getbuf.c", "index": 737, "status": "MISSING" },
-				{ "name": "libs/libcmt/_freebuf.c", "index": 738, "status": "MISSING" },
+				{ "name": "libs/libcmt/_freebuf.c", "index": 738, "status": "Matching" },
 				{ "name": "libs/libcmt/_flswbuf.c", "index": 739, "status": "MISSING" },
 				{ "name": "libs/libcmt/_flsbuf.c", "index": 740, "status": "MISSING" },
 				{ "name": "libs/libcmt/_file.c", "index": 741, "status": "MISSING" },
