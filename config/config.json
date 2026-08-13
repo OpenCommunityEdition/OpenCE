@@ -914,7 +914,7 @@
 				{ "name": "libs/libcmt/wcspbrk.c", "index": 674, "status": "Matching" },
 				{ "name": "libs/libcmt/wcsnicmp.c", "index": 675, "status": "MISSING" },
 				{ "name": "libs/libcmt/wcsncpy.c", "index": 676, "status": "Matching" },
-				{ "name": "libs/libcmt/wcsncmp.c", "index": 677, "status": "MISSING" },
+				{ "name": "libs/libcmt/wcsncmp.c", "index": 677, "status": "Matching" },
 				{ "name": "libs/libcmt/wcsncat.c", "index": 678, "status": "Matching" },
 				{ "name": "libs/libcmt/wcslwr.c", "index": 679, "status": "MISSING" },
 				{ "name": "libs/libcmt/wcslen.c", "index": 680, "status": "Matching" },
