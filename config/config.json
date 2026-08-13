@@ -1060,7 +1060,7 @@
 				{ "name": "libs/libcmt/towupper.c", "index": 820, "status": "MISSING" },
 				{ "name": "libs/libcmt/towlower.c", "index": 821, "status": "MISSING" },
 				{ "name": "libs/libcmt/toupper.c", "index": 822, "status": "MISSING" },
-				{ "name": "libs/libcmt/tolower.c", "index": 823, "status": "MISSING" },
+				{ "name": "libs/libcmt/tolower.c", "index": 823, "status": "Matching" },
 				{ "name": "libs/libcmt/strtol.c", "index": 824, "status": "MISSING" },
 				{ "name": "libs/libcmt/mbtowc.c", "index": 825, "status": "MISSING" },
 				{ "name": "libs/libcmt/mbstowcs.c", "index": 826, "status": "MISSING" },
