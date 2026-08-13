@@ -895,7 +895,7 @@
 				{ "name": "libs/libcmt/cfout.c", "index": 655, "status": "MISSING" },
 				{ "name": "libs/libcmt/cfin.c", "index": 656, "status": "MISSING" },
 				{ "name": "libs/libcmt/wctime.c", "index": 657, "status": "Matching" },
-				{ "name": "libs/libcmt/wasctime.c", "index": 658, "status": "MISSING" },
+				{ "name": "libs/libcmt/wasctime.c", "index": 658, "status": "Matching" },
 				{ "name": "libs/libcmt/tzset.c", "index": 659, "status": "MISSING" },
 				{ "name": "libs/libcmt/timeset.c", "index": 660, "status": "MISSING" },
 				{ "name": "libs/libcmt/time.c", "index": 661, "status": "MISSING" },
