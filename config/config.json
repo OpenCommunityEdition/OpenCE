@@ -1044,7 +1044,7 @@
 				{ "name": "libs/libcmt/handler.c", "index": 804, "status": "MISSING" },
 				{ "name": "libs/libcmt/free.c", "index": 805, "status": "MISSING" },
 				{ "name": "libs/libcmt/delete.c", "index": 806, "status": "Matching", "options": { "cflags": [ "/O1", "/Gy", "/TP" ] } },
-				{ "name": "libs/libcmt/calloc.c", "index": 807, "status": "MISSING" },
+				{ "name": "libs/libcmt/calloc.c", "index": 807, "status": "Matching" },
 				{ "name": "libs/libcmt/wunlink.c", "index": 808, "status": "Matching" },
 				{ "name": "libs/libcmt/waccess.c", "index": 809, "status": "Matching" },
 				{ "name": "libs/libcmt/unlink.c", "index": 810, "status": "Matching" },
