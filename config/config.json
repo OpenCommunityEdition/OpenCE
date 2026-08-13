@@ -873,7 +873,7 @@
 				{ "name": "libs/libcmt/acos.c", "index": 633, "status": "MISSING" },
 				{ "name": "libs/libcmt/asin.c", "index": 634, "status": "MISSING" },
 				{ "name": "libs/libcmt/powhlp.c", "index": 635, "status": "MISSING" },
-				{ "name": "libs/libcmt/huge.c", "index": 636, "status": "MISSING" },
+				{ "name": "libs/libcmt/huge.c", "index": 636, "status": "Matching" },
 				{ "name": "libs/libcmt/genexcep.c", "index": 637, "status": "MISSING" },
 				{ "name": "libs/libcmt/ftol2.c", "index": 638, "status": "MISSING" },
 				{ "name": "libs/libcmt/frnd.c", "index": 639, "status": "MISSING" },
