@@ -110,6 +110,16 @@
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
+    "unit": "source/shaders/shaders",
+    "function": "_shader_get_vertex_shader_permutation",
+    "reason": "hardened COFF comparison proves all 288 padded bytes and all 18 semantic relocations exact; objdiff reports a local jump-table label encoding false negative"
+  },
+  {
+    "unit": "source/shaders/shaders",
+    "function": "_shader_is_decal",
+    "reason": "hardened COFF comparison proves all 144 padded bytes and all 10 semantic relocations exact; objdiff reports a local jump-table label encoding false negative"
+  },
+  {
     "unit": "source/rasterizer/xbox/rasterizer_xbox_errors",
     "function": "_rasterizer_error",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"

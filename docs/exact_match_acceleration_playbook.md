@@ -99,6 +99,14 @@ while silently deleting or reordering `.bss`.
 
 - VC7 often reflects the original failure-first versus success-first topology.
   Reversing an `if` can fix multiple relocation-address regions at once.
+- Tail-merging is sensitive to deliberately asymmetric source duplication.
+  If two switch cases must share a forward machine-code tail but an explicit
+  shared label sinks a callee-save or changes the prologue, keep the simple
+  early path's tiny terminal test locally and route the longer path forward to
+  the other case's copy. In `shaders.obj`, VC7 cross-jumped that readable
+  duplicate into one shared target tail while preserving the required ESI
+  lifetime. Verify relocation identities: this is a measured block-placement
+  control, not permission to duplicate arbitrary logic.
 - Common stores in two branches may be tail-merged, but a constant-valued
   branch can instead materialize an immediate store and grow the function.
 - Comparison polarity matters even when predicates are logically equivalent;
