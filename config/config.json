@@ -541,7 +541,7 @@
 				{ "name": "source/objects/widgets/cellular_automata2d.c", "index": 167, "status": "Matching" },
 				{ "name": "source/objects/widgets/cellular_automata.c", "index": 168, "status": "Matching" },
 				{ "name": "source/objects/widgets/antenna_definitions.c", "index": 169, "status": "Matching" },
-				{ "name": "source/objects/widgets/antenna.c", "index": 170, "status": "NonMatching" },
+				{ "name": "source/objects/widgets/antenna.c", "index": 170, "status": "Matching" },
 				{ "name": "source/objects/widgets/aleph.c", "index": 171, "status": "Matching" },
 				{ "name": "source/networking/telnet_console.c", "index": 172, "status": "Matching" },
 				{ "name": "source/networking/network_server_message_handler.c", "index": 173, "status": "NonMatching" },

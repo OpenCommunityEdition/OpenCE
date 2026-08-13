@@ -66,7 +66,7 @@ struct bitmap_group
 	real alpha_bias;
 	unsigned short mipmap_count;
 	short sprite_usage;
-	unsigned short sprite_spacing;
+	short sprite_spacing;
 	unsigned short unused;
 	struct tag_block sequences;
 	struct tag_block bitmap_data;
