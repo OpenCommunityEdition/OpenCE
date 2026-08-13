@@ -463,5 +463,95 @@
     "unit": "source/networking/telnet_console",
     "function": "_code_001203c0",
     "reason": "hardened COFF comparison proves all 496 padded bytes and all 30 semantic relocations exact; objdiff reports a switch-table/local-label encoding false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "function": "_code_000da7a0",
+    "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "function": "_code_000da8d0",
+    "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "function": "_code_000dac70",
+    "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "function": "_code_000dae90",
+    "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "function": "_code_000db1f0",
+    "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "function": "_code_000db770",
+    "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "function": "_code_000dba40",
+    "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "function": "_code_000dbfc0",
+    "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "function": "_code_000dc4d0",
+    "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "function": "_code_000dc630",
+    "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "function": "_code_000dc9c0",
+    "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "function": "_code_000dcbf0",
+    "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "function": "_code_000dcf40",
+    "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "function": "_code_000dd450",
+    "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "function": "_code_000dd730",
+    "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "function": "_code_000ddc80",
+    "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "function": "_code_000de6b0",
+    "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
+  },
+  {
+    "unit": "source/interface/ui_widget_event_handler_functions",
+    "function": "_code_000deb70",
+    "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   }
 ]
