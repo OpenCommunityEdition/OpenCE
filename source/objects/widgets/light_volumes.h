@@ -12,6 +12,7 @@ header included in hcex build.
 
 #include "cseries/cseries.h"
 #include "memory/data.h"
+#include "objects/widgets/widget_types.h"
 
 /* ---------- constants */
 
@@ -56,6 +57,11 @@ long light_volume_new(
 
 void light_volume_delete(
 	long light_volume_index);
+void light_volume_submit(
+	long object_index,
+	long light_volume_index,
+	struct render_lighting const *lighting,
+	struct render_animation const *animation);
 
 /* ---------- globals */
 

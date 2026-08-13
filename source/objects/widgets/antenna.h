@@ -8,6 +8,10 @@ header included in hcex build.
 #define __ANTENNA_H
 #pragma once
 
+/* ---------- headers */
+
+#include "objects/widgets/widget_types.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -25,8 +29,17 @@ void antennas_dispose_from_old_map(
 void antennas_dispose(
 	void);
 
+long antenna_new(
+	long definition_index);
 void antenna_delete(
 	long antenna_index);
+void antennas_update(
+	real delta);
+void antenna_render(
+	long object_index,
+	long antenna_index,
+	struct render_lighting const *lighting,
+	struct render_animation const *animation);
 
 /* ---------- globals */
 

@@ -12,6 +12,7 @@ header included in hcex build.
 
 #include "cseries/cseries.h"
 #include "memory/data.h"
+#include "objects/widgets/widget_types.h"
 
 /* ---------- constants */
 
@@ -56,6 +57,12 @@ long lightning_new(
 
 void lightning_delete(
 	long lightning_index);
+
+void lightning_submit(
+	long object_index,
+	long lightning_index,
+	struct render_lighting const *lighting,
+	struct render_animation const *animation);
 
 void lightning_render(
 	void);

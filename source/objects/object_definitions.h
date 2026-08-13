@@ -74,6 +74,15 @@ struct object_attachment_definition
 	long unused[4];
 };
 
+struct object_definition_widget
+{
+	struct tag_reference type;
+	long unused[4];
+};
+
+typedef char object_definition_widget_size_assert[
+	sizeof(struct object_definition_widget) == 0x20 ? 1 : -1];
+
 struct object_function_definition
 {
 	unsigned long flags;

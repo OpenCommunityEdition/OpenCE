@@ -529,7 +529,7 @@
 				{ "name": "source/objects/light_definitions.c", "index": 155, "status": "Matching" },
 				{ "name": "source/objects/damage_effect_definitions.c", "index": 156, "status": "Matching" },
 				{ "name": "source/objects/damage.c", "index": 157, "status": "NonMatching" },
-				{ "name": "source/objects/widgets/widgets.c", "index": 158, "status": "NonMatching" },
+				{ "name": "source/objects/widgets/widgets.c", "index": 158, "status": "Matching" },
 				{ "name": "source/objects/widgets/lightning_definitions.c", "index": 159, "status": "Matching" },
 				{ "name": "source/objects/widgets/lightning.c", "index": 160, "status": "NonMatching" },
 				{ "name": "source/objects/widgets/light_volumes.c", "index": 161, "status": "NonMatching" },
