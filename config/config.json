@@ -1008,7 +1008,7 @@
 				{ "name": "libs/libcmt/nlsdata2.c", "index": 768, "status": "Matching" },
 				{ "name": "libs/libcmt/nlsdata1.c", "index": 769, "status": "Matching" },
 				{ "name": "libs/libcmt/initcrit.c", "index": 770, "status": "MISSING" },
-				{ "name": "libs/libcmt/ctype.c", "index": 771, "status": "MISSING" },
+				{ "name": "libs/libcmt/ctype.c", "index": 771, "status": "Matching" },
 				{ "name": "libs/libcmt/cmiscdat.c", "index": 772, "status": "Matching" },
 				{ "name": "libs/libcmt/exsup3.c", "index": 773, "status": "MISSING" },
 				{ "name": "libs/libcmt/exsup.c", "index": 774, "status": "MISSING" },
