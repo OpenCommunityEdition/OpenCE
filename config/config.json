@@ -1019,7 +1019,7 @@
 				{ "name": "libs/libcmt/lseeki64.c", "index": 779, "status": "MISSING" },
 				{ "name": "libs/libcmt/ioinit.c", "index": 780, "status": "MISSING" },
 				{ "name": "libs/libcmt/write.c", "index": 781, "status": "MISSING" },
-				{ "name": "libs/libcmt/txtmode.c", "index": 782, "status": "MISSING" },
+				{ "name": "libs/libcmt/txtmode.c", "index": 782, "status": "Matching" },
 				{ "name": "libs/libcmt/setmode.c", "index": 783, "status": "MISSING" },
 				{ "name": "libs/libcmt/read.c", "index": 784, "status": "MISSING" },
 				{ "name": "libs/libcmt/osfinfo.c", "index": 785, "status": "MISSING" },
