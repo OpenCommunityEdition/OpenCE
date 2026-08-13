@@ -1040,7 +1040,7 @@
 				{ "name": "libs/libcmt/_newmode.c", "index": 800, "status": "MISSING" },
 				{ "name": "libs/libcmt/new.c", "index": 801, "status": "Matching", "options": { "cflags": [ "/O1", "/Gy", "/TP" ] } },
 				{ "name": "libs/libcmt/malloc.c", "index": 802, "status": "MISSING" },
-				{ "name": "libs/libcmt/heapinit.c", "index": 803, "status": "MISSING" },
+				{ "name": "libs/libcmt/heapinit.c", "index": 803, "status": "Matching" },
 				{ "name": "libs/libcmt/handler.c", "index": 804, "status": "MISSING" },
 				{ "name": "libs/libcmt/free.c", "index": 805, "status": "MISSING" },
 				{ "name": "libs/libcmt/delete.c", "index": 806, "status": "MISSING" },
