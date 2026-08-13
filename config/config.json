@@ -995,7 +995,7 @@
 				{ "name": "libs/libcmt/crt0fp.c", "index": 755, "status": "Matching" },
 				{ "name": "libs/libcmt/crt0dat.c", "index": 756, "status": "MISSING" },
 				{ "name": "libs/libcmt/crt0.c", "index": 757, "status": "MISSING" },
-				{ "name": "libs/libcmt/fp8.c", "index": 758, "status": "MISSING" },
+				{ "name": "libs/libcmt/fp8.c", "index": 758, "status": "Matching" },
 				{ "name": "libs/libcmt/chkstk.c", "index": 759, "status": "MISSING" },
 				{ "name": "libs/libcmt/wperror.c", "index": 760, "status": "MISSING" },
 				{ "name": "libs/libcmt/winxfltr.c", "index": 761, "status": "MISSING" },
