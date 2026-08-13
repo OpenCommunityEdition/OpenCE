@@ -40,25 +40,6 @@
       }
     },
     {
-      "unit": "source/physics/point_physics",
-      "function": "_point_physics_update",
-      "class": "tu-context-optimization",
-      "evidence": "Target and candidate have equal 0x570 padded size and 68 relocation identities. Five grounded low-byte/current-flags source shapes leave the untouched source best at 99.39632%; the residual begins with VC7 choosing a three-byte MOVZX from CL instead of a two-byte MOV ECX,EAX, shifting later relocation addresses by one byte, and includes commutative x87 operand-order choices. Forced byte forms introduce extra loads and spills.",
-      "measurements": {
-        "target": {
-          "size": 1392,
-          "relocation_count": 68,
-          "normalized_sha256": "5aca2728fa2d89a716057b07ccbcc1e00cbf126644391dcf1a534707f5cba88c"
-        },
-        "base": {
-          "size": 1392,
-          "relocation_count": 68,
-          "normalized_sha256": "93750650472a8e7cfc7dff5fd05b16a5d0b61d4ba611b324a6d1612ed82dbeb4"
-        },
-        "objdiff_percent": 99.39632
-      }
-    },
-    {
       "unit": "source/memory/hashtable",
       "function": "_hashtable_grow",
       "class": "register-allocation",
