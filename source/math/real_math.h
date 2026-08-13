@@ -909,7 +909,10 @@ __inline real_point2d *project_point3d(
 	match_assert("..\\math\\real_math.h", 859, projection>=_x && projection<=_z);
 	match_assert("..\\math\\real_math.h", 860, ~(sign&~1));
 
-	set_real_point2d(p2d, global_projection3d_mappings[projection][sign][0], global_projection3d_mappings[projection][sign][1]);
+	set_real_point2d(
+		p2d,
+		p3d->n[global_projection3d_mappings[projection][sign][0]],
+		p3d->n[global_projection3d_mappings[projection][sign][1]]);
 	return p2d;
 }
 
@@ -973,9 +976,9 @@ __inline real_point3d *point_from_line3d(
 	real t,
 	real_point3d *result)
 {
-	result->x = (v->i*t) + p->x;
-	result->y = (v->j*t) + p->y;
-	result->z = (v->k*t) + p->z;
+	result->x = v->i*t + p->x;
+	result->y = v->j*t + p->y;
+	result->z = v->k*t + p->z;
 	return result;
 }
 
