@@ -1000,7 +1000,7 @@
 				{ "name": "libs/libcmt/wperror.c", "index": 760, "status": "MISSING" },
 				{ "name": "libs/libcmt/winxfltr.c", "index": 761, "status": "MISSING" },
 				{ "name": "libs/libcmt/winsig.c", "index": 762, "status": "MISSING" },
-				{ "name": "libs/libcmt/syserr.c", "index": 763, "status": "MISSING" },
+				{ "name": "libs/libcmt/syserr.c", "index": 763, "status": "Matching" },
 				{ "name": "libs/libcmt/strerror.c", "index": 764, "status": "Matching" },
 				{ "name": "libs/libcmt/rand.c", "index": 765, "status": "Matching" },
 				{ "name": "libs/libcmt/qsort.c", "index": 766, "status": "MISSING" },
