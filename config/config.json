@@ -891,7 +891,7 @@
 				{ "name": "libs/libcmt/intrncvt.c", "index": 651, "status": "MISSING" },
 				{ "name": "libs/libcmt/fpinit.c", "index": 652, "status": "MISSING" },
 				{ "name": "libs/libcmt/cvt.c", "index": 653, "status": "MISSING" },
-				{ "name": "libs/libcmt/constpow.c", "index": 654, "status": "MISSING" },
+				{ "name": "libs/libcmt/constpow.c", "index": 654, "status": "Matching" },
 				{ "name": "libs/libcmt/cfout.c", "index": 655, "status": "MISSING" },
 				{ "name": "libs/libcmt/cfin.c", "index": 656, "status": "MISSING" },
 				{ "name": "libs/libcmt/wctime.c", "index": 657, "status": "Matching" },
