@@ -952,7 +952,7 @@
 				{ "name": "libs/libcmt/ungetwc.c", "index": 712, "status": "MISSING" },
 				{ "name": "libs/libcmt/ungetc.c", "index": 713, "status": "MISSING" },
 				{ "name": "libs/libcmt/stream.c", "index": 714, "status": "MISSING" },
-				{ "name": "libs/libcmt/sprintf.c", "index": 715, "status": "MISSING" },
+				{ "name": "libs/libcmt/sprintf.c", "index": 715, "status": "Matching" },
 				{ "name": "libs/libcmt/snwprint.c", "index": 716, "status": "MISSING" },
 				{ "name": "libs/libcmt/snprintf.c", "index": 717, "status": "Matching" },
 				{ "name": "libs/libcmt/rewind.c", "index": 718, "status": "MISSING" },
