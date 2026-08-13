@@ -935,7 +935,7 @@
 				{ "name": "libs/libcmt/strchr.c", "index": 695, "status": "MISSING" },
 				{ "name": "libs/libcmt/memmove.c", "index": 696, "status": "MISSING" },
 				{ "name": "libs/libcmt/memchr.c", "index": 697, "status": "MISSING" },
-				{ "name": "libs/libcmt/ncommode.c", "index": 698, "status": "MISSING" },
+				{ "name": "libs/libcmt/ncommode.c", "index": 698, "status": "Matching" },
 				{ "name": "libs/libcmt/wtmpfile.c", "index": 699, "status": "MISSING" },
 				{ "name": "libs/libcmt/woutput.c", "index": 700, "status": "MISSING" },
 				{ "name": "libs/libcmt/_wopen.c", "index": 701, "status": "MISSING" },
