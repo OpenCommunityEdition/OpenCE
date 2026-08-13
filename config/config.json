@@ -909,7 +909,7 @@
 				{ "name": "libs/libcmt/wcsupr.c", "index": 669, "status": "MISSING" },
 				{ "name": "libs/libcmt/wcstok.c", "index": 670, "status": "MISSING" },
 				{ "name": "libs/libcmt/wcsstr.c", "index": 671, "status": "MISSING" },
-				{ "name": "libs/libcmt/wcsspn.c", "index": 672, "status": "MISSING" },
+				{ "name": "libs/libcmt/wcsspn.c", "index": 672, "status": "Matching" },
 				{ "name": "libs/libcmt/wcsrchr.c", "index": 673, "status": "Matching" },
 				{ "name": "libs/libcmt/wcspbrk.c", "index": 674, "status": "Matching" },
 				{ "name": "libs/libcmt/wcsnicmp.c", "index": 675, "status": "MISSING" },
