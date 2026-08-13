@@ -903,7 +903,7 @@
 				{ "name": "libs/libcmt/gmtime.c", "index": 663, "status": "Matching" },
 				{ "name": "libs/libcmt/dtoxtime.c", "index": 664, "status": "MISSING" },
 				{ "name": "libs/libcmt/days.c", "index": 665, "status": "Matching" },
-				{ "name": "libs/libcmt/strnicmp.c", "index": 666, "status": "MISSING" },
+				{ "name": "libs/libcmt/strnicmp.c", "index": 666, "status": "Matching" },
 				{ "name": "libs/libcmt/stricmp.c", "index": 667, "status": "MISSING" },
 				{ "name": "libs/libcmt/wcsxfrm.c", "index": 668, "status": "Matching" },
 				{ "name": "libs/libcmt/wcsupr.c", "index": 669, "status": "Matching" },
