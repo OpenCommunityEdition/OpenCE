@@ -1066,7 +1066,7 @@
 				{ "name": "libs/libcmt/mbstowcs.c", "index": 826, "status": "Matching" },
 				{ "name": "libs/libcmt/iswctype.c", "index": 827, "status": "Matching" },
 				{ "name": "libs/libcmt/isctype.c", "index": 828, "status": "Matching" },
-				{ "name": "libs/libcmt/atox.c", "index": 829, "status": "MISSING" },
+				{ "name": "libs/libcmt/atox.c", "index": 829, "status": "Matching" },
 				{ "name": "libs/libcmt/atof.c", "index": 830, "status": "MISSING" },
 				{ "name": "libs/libcmt/_fptostr.c", "index": 831, "status": "MISSING" },
 				{ "name": "libs/libcmt/_ctype.c", "index": 832, "status": "Matching" },
