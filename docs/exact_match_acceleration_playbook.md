@@ -171,6 +171,18 @@ inventing operations.
   stack-staging patterns.
 - Never substitute mathematically equivalent expressions that change signed
   zero, NaN payload/sign, intermediate precision, or rounding.
+- When a shared inline vector helper matches standalone but changes scheduling
+  at one caller, preserve the donor's **expression surface**, including
+  apparently redundant parentheses.  In `collision_features.obj`, changing
+  `(v->i*t) + p->x` to the equally readable `v->i*t + p->x` altered inline IR
+  without changing the helper's standalone meaning and restored a January
+  `fstp`/address-formation boundary.  Treat this as a measured inline-context
+  lever, not a license for blind parenthesis permutations.
+- VC7 reassociates a one-expression commutative dot product, so merely reversing
+  its written terms may do nothing.  If January proves a specific x87 load/add
+  order, sequential accumulation can preserve it.  The exact
+  `collision_prism_test_vector` form initializes the `k` product, then adds
+  `j`, then `i`; every intermediate remains a normal `real` value.
 
 ### XDK inline wrappers
 
