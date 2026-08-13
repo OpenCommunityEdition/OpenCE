@@ -150,6 +150,21 @@
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
+    "unit": "source/memory/data_packets",
+    "function": "_code_0010a5f0",
+    "reason": "hardened COFF comparison proves all 464 padded bytes and all 27 semantic relocations exact; objdiff reports a local jump-table label encoding false negative"
+  },
+  {
+    "unit": "source/memory/data_packets",
+    "function": "_code_0010a7c0",
+    "reason": "hardened COFF comparison proves all 768 padded bytes and all 44 semantic relocations exact; objdiff reports a local jump-table label encoding false negative"
+  },
+  {
+    "unit": "source/memory/data_packets",
+    "function": "_code_0010aac0",
+    "reason": "hardened COFF comparison proves all 672 padded bytes and all 28 semantic relocations exact; objdiff reports a local jump-table label encoding false negative"
+  },
+  {
     "unit": "source/memory/byte_swapping",
     "function": "_code_00108010",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"

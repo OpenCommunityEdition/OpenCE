@@ -217,6 +217,9 @@ void code_0010a5f0(
 
 	field = fields;
 	total_size = 0;
+	/* BUG (original): a first version-ineligible field reads an indeterminate
+	 * field_size; later ineligible fields reuse the preceding size. A corrected
+	 * build should initialize field_size to zero before the loop. */
 	while (field->type != _data_packet_field_end)
 	{
 		if (field->type < 0 || field->type >= _data_packet_field_type_count)
@@ -244,7 +247,6 @@ void code_0010a5f0(
 			system_exit(-1);
 		}
 
-		field_size = 0;
 		if (packet_definition->version >= field->minimum_version &&
 			(packet_definition->version <= field->maximum_version || field->maximum_version == 0))
 		{
@@ -343,14 +345,14 @@ void code_0010a7c0(
 				break;
 			case _data_packet_field_data:
 			{
-				short data_size;
+				short data_size = *(short const *)decoded_data;
+				byte const *data = decoded_data + sizeof(short);
 
-				data_size = *(short const *)decoded_data;
 				match_assert("c:\\halo\\SOURCE\\memory\\data_packets.c", 253, data_size>=0 && data_size<=field->count);
 				if (data_size < 0 || data_size > field->count)
 					data_size = 0;
 				data_encode_integer(state, data_size, field->count);
-				data_encode_memory(state, decoded_data + sizeof(short), data_size, 1);
+				data_encode_memory(state, data, data_size, 1);
 				break;
 			}
 			case _data_packet_field_raw:
@@ -358,20 +360,23 @@ void code_0010a7c0(
 				break;
 			case _data_packet_field_array:
 			{
-				short element_count;
-				short element_size;
+				short element_count = *(short const *)decoded_data;
 				short element_field_count;
-				byte const *element;
+				byte const *element = decoded_data + sizeof(short);
 
-				element_count = *(short const *)decoded_data;
-				code_0010a5f0(packet_definition, NULL, field + 1, &element_field_count);
+				code_0010a5f0(
+					packet_definition,
+					NULL,
+					field + 1,
+					&element_field_count);
 				match_assert("c:\\halo\\SOURCE\\memory\\data_packets.c", 281, element_count>=0 && element_count<=field->count);
 				if (element_count < 0 || element_count > field->count)
 					element_count = 0;
 				data_encode_integer(state, element_count, field->count);
-				element = decoded_data + sizeof(short);
 				while (element_count-- > 0)
 				{
+					short element_size;
+
 					code_0010a7c0(
 						packet_definition,
 						state,
@@ -396,6 +401,7 @@ void code_0010a7c0(
 			switch (field->type)
 			{
 			case _data_packet_field_pad:
+				break;
 			case _data_packet_field_bytes:
 			case _data_packet_field_shorts:
 			case _data_packet_field_longs:

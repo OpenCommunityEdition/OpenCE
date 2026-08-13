@@ -101,7 +101,7 @@ void *data_decode_array(
 
 char *data_decode_string(
 	struct data_encoding_state *state,
-	long maximum_length);
+	word maximum_length);
 
 /* ---------- globals */
 
