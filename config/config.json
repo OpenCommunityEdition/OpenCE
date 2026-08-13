@@ -865,7 +865,7 @@
 				{ "name": "libs/libcmt/fpctrl.c", "index": 625, "status": "MISSING" },
 				{ "name": "libs/libcmt/87except.c", "index": 626, "status": "MISSING" },
 				{ "name": "libs/libcmt/util.c", "index": 627, "status": "MISSING" },
-				{ "name": "libs/libcmt/matherr.c", "index": 628, "status": "MISSING" },
+				{ "name": "libs/libcmt/matherr.c", "index": 628, "status": "Matching" },
 				{ "name": "libs/libcmt/ldexp.c", "index": 629, "status": "MISSING" },
 				{ "name": "libs/libcmt/ieeemisc.c", "index": 630, "status": "MISSING" },
 				{ "name": "libs/libcmt/fpexcept.c", "index": 631, "status": "MISSING" },
