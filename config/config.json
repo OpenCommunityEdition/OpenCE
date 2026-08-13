@@ -1064,7 +1064,7 @@
 				{ "name": "libs/libcmt/strtol.c", "index": 824, "status": "MISSING" },
 				{ "name": "libs/libcmt/mbtowc.c", "index": 825, "status": "Matching" },
 				{ "name": "libs/libcmt/mbstowcs.c", "index": 826, "status": "MISSING" },
-				{ "name": "libs/libcmt/iswctype.c", "index": 827, "status": "MISSING" },
+				{ "name": "libs/libcmt/iswctype.c", "index": 827, "status": "Matching" },
 				{ "name": "libs/libcmt/isctype.c", "index": 828, "status": "MISSING" },
 				{ "name": "libs/libcmt/atox.c", "index": 829, "status": "MISSING" },
 				{ "name": "libs/libcmt/atof.c", "index": 830, "status": "MISSING" },
