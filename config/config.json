@@ -954,7 +954,7 @@
 				{ "name": "libs/libcmt/stream.c", "index": 714, "status": "MISSING" },
 				{ "name": "libs/libcmt/sprintf.c", "index": 715, "status": "MISSING" },
 				{ "name": "libs/libcmt/snwprint.c", "index": 716, "status": "MISSING" },
-				{ "name": "libs/libcmt/snprintf.c", "index": 717, "status": "MISSING" },
+				{ "name": "libs/libcmt/snprintf.c", "index": 717, "status": "Matching" },
 				{ "name": "libs/libcmt/rewind.c", "index": 718, "status": "MISSING" },
 				{ "name": "libs/libcmt/putws.c", "index": 719, "status": "MISSING" },
 				{ "name": "libs/libcmt/printf.c", "index": 720, "status": "MISSING" },
