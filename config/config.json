@@ -905,7 +905,7 @@
 				{ "name": "libs/libcmt/days.c", "index": 665, "status": "MISSING" },
 				{ "name": "libs/libcmt/strnicmp.c", "index": 666, "status": "MISSING" },
 				{ "name": "libs/libcmt/stricmp.c", "index": 667, "status": "MISSING" },
-				{ "name": "libs/libcmt/wcsxfrm.c", "index": 668, "status": "MISSING" },
+				{ "name": "libs/libcmt/wcsxfrm.c", "index": 668, "status": "Matching" },
 				{ "name": "libs/libcmt/wcsupr.c", "index": 669, "status": "MISSING" },
 				{ "name": "libs/libcmt/wcstok.c", "index": 670, "status": "Matching" },
 				{ "name": "libs/libcmt/wcsstr.c", "index": 671, "status": "Matching" },
