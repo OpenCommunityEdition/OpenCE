@@ -746,8 +746,8 @@ void _rasterizer_dynamic_screen_geometry_add_multitexture_params_to_base(
 	struct rasterizer_dynamic_screen_geometry_parameters const *multitex_params);
 void _rasterizer_dynamic_unlit_geometry_draw(
 	struct shader const *shader,
-	short bitmap_index,
 	struct bitmap_data const *bitmap,
+	struct render_animation const *animation,
 	long dynamic_triangle_buffer_index,
 	long dynamic_vertex_buffer_index,
 	long vertex_count,
@@ -804,6 +804,8 @@ const struct rasterizer_global_defaults rasterizer_global_defaults =
 struct rasterizer_globals_definition rasterizer_globals =
 {
 	FALSE,
+	0,
+	0,
 	{ 0 },
 	0,
 	0,
@@ -1727,15 +1729,15 @@ void rasterizer_dynamic_lit_geometry_draw(
 
 void rasterizer_dynamic_unlit_geometry_draw(
 	struct shader const *shader,
-	short bitmap_index,
 	struct bitmap_data const *bitmap,
+	struct render_animation const *animation,
 	long dynamic_triangle_buffer_index,
 	long dynamic_vertex_buffer_index,
 	long vertex_count,
 	real_point3d const *centroid,
 	unsigned long geometry_flags)
 {
-	_rasterizer_dynamic_unlit_geometry_draw(shader, bitmap_index, bitmap, dynamic_triangle_buffer_index, dynamic_vertex_buffer_index, vertex_count, centroid, geometry_flags);
+	_rasterizer_dynamic_unlit_geometry_draw(shader, bitmap, animation, dynamic_triangle_buffer_index, dynamic_vertex_buffer_index, vertex_count, centroid, geometry_flags);
 	return;
 }
 

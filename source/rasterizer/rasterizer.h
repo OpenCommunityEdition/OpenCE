@@ -87,6 +87,7 @@ struct rasterizer_model_begin_parameters;
 struct detail_object_global_runtime_data;
 struct detail_object_render_data;
 struct bitmap_data;
+struct render_animation;
 struct shader;
 struct vertex_buffer;
 struct rasterizer_dynamic_screen_geometry_parameters;
@@ -102,7 +103,9 @@ struct rasterizer_frame_begin_parameters
 struct rasterizer_globals_definition
 {
 	boolean initialized;
-	byte reserved01[0x27];
+	byte reserved01;
+	short current_lock_operation;
+	byte reserved04[0x24];
 	/* updated asynchronously by the rasterizer and vertical-blank callback */
 	volatile unsigned long frame_index;
 	volatile unsigned long vertical_blank_index;
@@ -450,8 +453,8 @@ void rasterizer_dynamic_screen_geometry_add_multitexture_params_to_base(
 	struct rasterizer_dynamic_screen_geometry_parameters const *multitex_params);
 void rasterizer_dynamic_unlit_geometry_draw(
 	struct shader const *shader,
-	short bitmap_index,
 	struct bitmap_data const *bitmap,
+	struct render_animation const *animation,
 	long dynamic_triangle_buffer_index,
 	long dynamic_vertex_buffer_index,
 	long vertex_count,
