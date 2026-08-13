@@ -1047,7 +1047,7 @@
 				{ "name": "libs/libcmt/calloc.c", "index": 807, "status": "MISSING" },
 				{ "name": "libs/libcmt/wunlink.c", "index": 808, "status": "MISSING" },
 				{ "name": "libs/libcmt/waccess.c", "index": 809, "status": "MISSING" },
-				{ "name": "libs/libcmt/unlink.c", "index": 810, "status": "MISSING" },
+				{ "name": "libs/libcmt/unlink.c", "index": 810, "status": "Matching" },
 				{ "name": "libs/libcmt/dosmap.c", "index": 811, "status": "MISSING" },
 				{ "name": "libs/libcmt/xtow.c", "index": 812, "status": "MISSING" },
 				{ "name": "libs/libcmt/xtoa.c", "index": 813, "status": "MISSING" },
