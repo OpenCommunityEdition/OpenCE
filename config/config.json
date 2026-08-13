@@ -993,7 +993,7 @@
 				{ "name": "libs/libcmt/crt0init.c", "index": 753, "status": "Matching" },
 				{ "name": "libs/libcmt/crt0msg.c", "index": 754, "status": "MISSING" },
 				{ "name": "libs/libcmt/crt0fp.c", "index": 755, "status": "Matching" },
-				{ "name": "libs/libcmt/crt0dat.c", "index": 756, "status": "MISSING" },
+				{ "name": "libs/libcmt/crt0dat.c", "index": 756, "status": "Matching" },
 				{ "name": "libs/libcmt/crt0.c", "index": 757, "status": "MISSING" },
 				{ "name": "libs/libcmt/fp8.c", "index": 758, "status": "Matching" },
 				{ "name": "libs/libcmt/chkstk.c", "index": 759, "status": "MISSING" },
