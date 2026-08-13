@@ -899,7 +899,7 @@
 				{ "name": "libs/libcmt/tzset.c", "index": 659, "status": "MISSING" },
 				{ "name": "libs/libcmt/timeset.c", "index": 660, "status": "MISSING" },
 				{ "name": "libs/libcmt/time.c", "index": 661, "status": "Matching" },
-				{ "name": "libs/libcmt/localtim.c", "index": 662, "status": "MISSING" },
+				{ "name": "libs/libcmt/localtim.c", "index": 662, "status": "Matching" },
 				{ "name": "libs/libcmt/gmtime.c", "index": 663, "status": "Matching" },
 				{ "name": "libs/libcmt/dtoxtime.c", "index": 664, "status": "MISSING" },
 				{ "name": "libs/libcmt/days.c", "index": 665, "status": "Matching" },
