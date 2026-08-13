@@ -1004,7 +1004,7 @@
 				{ "name": "libs/libcmt/strerror.c", "index": 764, "status": "MISSING" },
 				{ "name": "libs/libcmt/rand.c", "index": 765, "status": "MISSING" },
 				{ "name": "libs/libcmt/qsort.c", "index": 766, "status": "MISSING" },
-				{ "name": "libs/libcmt/purevirt.c", "index": 767, "status": "MISSING" },
+				{ "name": "libs/libcmt/purevirt.c", "index": 767, "status": "Matching" },
 				{ "name": "libs/libcmt/nlsdata2.c", "index": 768, "status": "MISSING" },
 				{ "name": "libs/libcmt/nlsdata1.c", "index": 769, "status": "MISSING" },
 				{ "name": "libs/libcmt/initcrit.c", "index": 770, "status": "MISSING" },
