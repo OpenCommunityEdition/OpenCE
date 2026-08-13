@@ -124,7 +124,9 @@ symbols in this file:
 
 enum
 {
-	GAME_STATE_CPU_SIZE = 0x305000
+	GAME_STATE_CPU_SIZE = 0x305000,
+	GAME_STATE_GPU_SIZE = 0x40000,
+	GAME_STATE_SIZE = GAME_STATE_CPU_SIZE+GAME_STATE_GPU_SIZE
 };
 
 /* ---------- macros */
@@ -133,8 +135,18 @@ enum
 
 /* ---------- prototypes */
 
-void dummy(void);
-static void game_state_set_revert_time(void);
+void dummy(
+	void);
+static boolean code_001af4f0(
+	struct game_state_header *header,
+	boolean halt_on_error);
+static void code_001af650(
+	const char *name,
+	const char *type,
+	long size,
+	boolean gpu);
+static void game_state_set_revert_time(
+	void);
 
 /* ---------- globals */
 
@@ -154,9 +166,9 @@ struct
 	struct game_state_header *header; // 0x18
 } game_state_globals = { 0 };
 
-typedef void (*game_state_before_load_proc)();
-typedef void (*game_state_after_load_proc)();
-typedef void (*game_state_before_save_proc)();
+typedef void (*game_state_before_load_proc)(void);
+typedef void (*game_state_after_load_proc)(void);
+typedef void (*game_state_before_save_proc)(void);
 
 static game_state_before_save_proc before_save_procs[] =
 {
@@ -196,7 +208,7 @@ void dummy(
 void game_state_call_before_save_procs(
 	void)
 {
-	game_state_after_load_proc *proc = before_save_procs;
+	game_state_before_save_proc *proc = before_save_procs;
 	long i;
 
 	for (i =NUMBEROF(before_save_procs); i>0; i--, proc++)
@@ -210,7 +222,7 @@ void game_state_call_before_save_procs(
 void game_state_call_before_load_procs(
 	void)
 {
-	game_state_after_load_proc *proc = before_load_procs;
+	game_state_before_load_proc *proc = before_load_procs;
 	long i;
 
 	for (i =NUMBEROF(before_load_procs); i>0; i--, proc++)
@@ -360,6 +372,8 @@ void game_state_save_core(
 	{
 		console_printf(FALSE, "error writing '%s'", name);
 	}
+
+	return;
 }
 
 boolean game_state_reverted(
@@ -368,8 +382,101 @@ boolean game_state_reverted(
 	return (game_state_globals.revert_time==game_time_get());
 }
 
-// _code_001af4f0
-// _code_001af650
+static boolean code_001af4f0(
+	struct game_state_header *header,
+	boolean halt_on_error)
+{
+	boolean valid = FALSE;
+
+	if (csstrcmp(header->build_number, "01.01.14.2342"))
+	{
+		if (halt_on_error)
+		{
+			// Original bug: %d formats two string pointers. A non-matching bug-fix
+			// build should use %s for both values instead.
+			match_vassert(
+				"c:\\halo\\SOURCE\\saved games\\game_state.c",
+				405,
+				FALSE,
+				csprintf(temporary, "expected build #%d but got #%d", "01.01.14.2342", header->build_number));
+		}
+	}
+	else if (csstrcmp(header->map_name, tag_get_name(global_scenario_index)))
+	{
+		if (halt_on_error)
+		{
+			match_vassert(
+				"c:\\halo\\SOURCE\\saved games\\game_state.c",
+				409,
+				FALSE,
+				csprintf(temporary, "expected \"%s\" but got \"%s\"", tag_get_name(global_scenario_index), header->map_name));
+		}
+	}
+	else if (header->allocation_size_checksum != game_state_globals.allocation_size_checksum)
+	{
+		if (halt_on_error)
+		{
+			match_vassert(
+				"c:\\halo\\SOURCE\\saved games\\game_state.c",
+				413,
+				FALSE,
+				csprintf(temporary, "allocation checksum mismatch"));
+		}
+	}
+	else if (header->player_count != player_spawn_count)
+	{
+		if (halt_on_error)
+		{
+			match_vassert(
+				"c:\\halo\\SOURCE\\saved games\\game_state.c",
+				417,
+				FALSE,
+				csprintf(temporary, "expected #%d players but got #%d", player_spawn_count, header->player_count));
+		}
+	}
+	else if (header->cache_file_checksum != cache_files_get_checksum())
+	{
+		if (halt_on_error)
+		{
+			match_vassert(
+				"c:\\halo\\SOURCE\\saved games\\game_state.c",
+				422,
+				FALSE,
+				csprintf(temporary, "checksum from map file doesn't match"));
+		}
+	}
+	else
+	{
+		valid = TRUE;
+	}
+
+	return valid;
+}
+
+static void code_001af650(
+	const char *name,
+	const char *type,
+	long size,
+	boolean gpu)
+{
+	// The January compiler inlines this logger into both arena allocators while
+	// retaining one out-of-line copy under its private address-derived name.
+	FILE *file = bss_004d27b0;
+
+	if (!file)
+	{
+		file = fopen("d:\\gamestate.txt", "w");
+		bss_004d27b0 = file;
+	}
+
+	if (file)
+	{
+		fprintf(file, "% 40s% 20s% 10d%s\n", name, type, size, gpu ? "*" : "");
+		fflush(bss_004d27b0);
+	}
+
+	return;
+}
 
 static void game_state_set_revert_time(
 	void)
@@ -386,28 +493,36 @@ void *game_state_malloc(
 	long size)
 {
 	byte *pointer;
-	FILE *file;
 
 	match_assert("c:\\halo\\SOURCE\\saved games\\game_state.c", 153, !(size&3));
 	match_assert("c:\\halo\\SOURCE\\saved games\\game_state.c", 156, !game_state_globals.locked);
 	match_assert("c:\\halo\\SOURCE\\saved games\\game_state.c", 159, game_state_globals.cpu_allocation_size+size<=GAME_STATE_CPU_SIZE);
 
-	file = bss_004d27b0;
-
-	if (!file)
-	{
-		file = fopen("d:\\gamestate.txt", "w");
-		bss_004d27b0 = file;
-	}
-
-	if (file)
-	{
-		fprintf(file, "% 40s% 20s% 10d%s\n", name, type, size, "");
-		fflush(bss_004d27b0);
-	}
+	code_001af650(name, type, size, FALSE);
 
 	pointer = (byte *)game_state_globals.base_address+game_state_globals.cpu_allocation_size;
 	game_state_globals.cpu_allocation_size+= size;
+
+	crc_checksum_buffer((unsigned long *)&game_state_globals.allocation_size_checksum, &size, sizeof(size));
+
+	return pointer;
+}
+
+void *game_state_gpu_malloc(
+	const char *name,
+	const char *type,
+	long size)
+{
+	byte *pointer;
+
+	match_assert("c:\\halo\\SOURCE\\saved games\\game_state.c", 182, !(size&3));
+	match_assert("c:\\halo\\SOURCE\\saved games\\game_state.c", 185, !game_state_globals.locked);
+	match_assert("c:\\halo\\SOURCE\\saved games\\game_state.c", 188, game_state_globals.gpu_allocation_size+size<=GAME_STATE_GPU_SIZE);
+
+	code_001af650(name, type, size, TRUE);
+
+	game_state_globals.gpu_allocation_size+= size;
+	pointer = (byte *)game_state_globals.base_address-game_state_globals.gpu_allocation_size+GAME_STATE_SIZE;
 
 	crc_checksum_buffer((unsigned long *)&game_state_globals.allocation_size_checksum, &size, sizeof(size));
 
@@ -453,6 +568,56 @@ struct lruv_cache *game_state_lruv_cache_new(
 	lruv_initialize(cache, name, page_count, page_size_bits, maximum_block_count, delete_block_proc, locked_block_proc);
 
 	return cache;
+}
+
+void game_state_try_and_load_from_persistent_storage(
+	void)
+{
+	struct game_state_header header;
+
+	if (game_state_read_header_from_persistent_storage(
+			&header,
+			&header.checksum,
+			sizeof(header),
+			GAME_STATE_SIZE,
+			NULL)
+		&& code_001af4f0(&header, FALSE)
+		&& main_get_difficulty() == header.difficulty)
+	{
+		game_state_call_before_load_procs();
+		game_state_read_from_persistent_storage(
+			game_state_globals.base_address,
+			GAME_STATE_SIZE);
+		game_difficulty_level_set(main_get_difficulty());
+		game_state_call_after_load_procs();
+		game_state_save();
+	}
+
+	return;
+}
+
+void game_state_load_core(
+	const char *name)
+{
+	struct game_state_header header;
+
+	if (game_state_read_core_header(name, &header, sizeof(header))
+		&& code_001af4f0(&header, TRUE))
+	{
+		game_state_call_before_load_procs();
+		game_state_read_core(
+			name,
+			game_state_globals.base_address,
+			GAME_STATE_SIZE);
+		console_printf(FALSE, "loaded '%s'", name);
+		game_state_call_after_load_procs();
+	}
+	else
+	{
+		console_printf(FALSE, "couldn't open '%s'", name);
+	}
+
+	return;
 }
 
 void game_state_initialize(
