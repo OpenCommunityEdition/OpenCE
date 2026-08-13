@@ -734,7 +734,7 @@
 				{ "name": "source/camera/static_camera.c", "index": 360, "status": "Matching" },
 				{ "name": "source/camera/orbiting_camera.c", "index": 361, "status": "Matching" },
 				{ "name": "source/camera/observer.c", "index": 362, "status": "NonMatching" },
-				{ "name": "source/camera/following_camera.c", "index": 363, "status": "NonMatching" },
+				{ "name": "source/camera/following_camera.c", "index": 363, "status": "Matching" },
 				{ "name": "source/camera/flying_camera.c", "index": 364, "status": "Matching" },
 				{ "name": "source/camera/first_person_camera.c", "index": 365, "status": "Matching" },
 				{ "name": "source/camera/editor_flying_camera.c", "index": 366, "status": "NonMatching" },
