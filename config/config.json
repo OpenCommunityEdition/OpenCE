@@ -1014,7 +1014,7 @@
 				{ "name": "libs/libcmt/exsup.c", "index": 774, "status": "MISSING" },
 				{ "name": "libs/libcmt/sehprolg.c", "index": 775, "status": "MISSING" },
 				{ "name": "libs/libcmt/mbctype.c", "index": 776, "status": "MISSING" },
-				{ "name": "libs/libcmt/ismbspc.c", "index": 777, "status": "MISSING" },
+				{ "name": "libs/libcmt/ismbspc.c", "index": 777, "status": "Matching" },
 				{ "name": "libs/libcmt/wopen.c", "index": 778, "status": "MISSING" },
 				{ "name": "libs/libcmt/lseeki64.c", "index": 779, "status": "MISSING" },
 				{ "name": "libs/libcmt/ioinit.c", "index": 780, "status": "MISSING" },
