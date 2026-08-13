@@ -8066,7 +8066,7 @@
 { "file_offset": 1877891, "flags": 32, "name": "___toascii" },
 { "file_offset": 1877899, "flags": 32, "name": "___iscsymf" },
 { "file_offset": 1877960, "flags": 32, "name": "___iscsym" },
-{ "file_offset": 1878021, "flags": 32, "name": "_code_001ca805" },
+{ "file_offset": 1878021, "flags": 32, "name": "_strtoxl" },
 { "file_offset": 1878446, "flags": 32, "name": "_strtol" },
 { "file_offset": 1878469, "flags": 32, "name": "_strtoul" },
 { "file_offset": 1878492, "flags": 32, "name": "_fgets" },
