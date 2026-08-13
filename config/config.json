@@ -946,7 +946,7 @@
 				{ "name": "libs/libcmt/vswprint.c", "index": 706, "status": "MISSING" },
 				{ "name": "libs/libcmt/vsnwprnt.c", "index": 707, "status": "MISSING" },
 				{ "name": "libs/libcmt/vsnprint.c", "index": 708, "status": "Matching" },
-				{ "name": "libs/libcmt/vsprintf.c", "index": 709, "status": "MISSING" },
+				{ "name": "libs/libcmt/vsprintf.c", "index": 709, "status": "Matching" },
 				{ "name": "libs/libcmt/vfwprint.c", "index": 710, "status": "MISSING" },
 				{ "name": "libs/libcmt/vfprintf.c", "index": 711, "status": "MISSING" },
 				{ "name": "libs/libcmt/ungetwc.c", "index": 712, "status": "MISSING" },
