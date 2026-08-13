@@ -915,7 +915,7 @@
 				{ "name": "libs/libcmt/wcsnicmp.c", "index": 675, "status": "MISSING" },
 				{ "name": "libs/libcmt/wcsncpy.c", "index": 676, "status": "MISSING" },
 				{ "name": "libs/libcmt/wcsncmp.c", "index": 677, "status": "MISSING" },
-				{ "name": "libs/libcmt/wcsncat.c", "index": 678, "status": "MISSING" },
+				{ "name": "libs/libcmt/wcsncat.c", "index": 678, "status": "Matching" },
 				{ "name": "libs/libcmt/wcslwr.c", "index": 679, "status": "MISSING" },
 				{ "name": "libs/libcmt/wcslen.c", "index": 680, "status": "Matching" },
 				{ "name": "libs/libcmt/wcsicmp.c", "index": 681, "status": "MISSING" },
