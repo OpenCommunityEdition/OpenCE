@@ -1025,7 +1025,7 @@
 				{ "name": "libs/libcmt/osfinfo.c", "index": 785, "status": "MISSING" },
 				{ "name": "libs/libcmt/open.c", "index": 786, "status": "MISSING" },
 				{ "name": "libs/libcmt/lseek.c", "index": 787, "status": "MISSING" },
-				{ "name": "libs/libcmt/isatty.c", "index": 788, "status": "MISSING" },
+				{ "name": "libs/libcmt/isatty.c", "index": 788, "status": "Matching" },
 				{ "name": "libs/libcmt/fstat.c", "index": 789, "status": "MISSING" },
 				{ "name": "libs/libcmt/commit.c", "index": 790, "status": "MISSING" },
 				{ "name": "libs/libcmt/close.c", "index": 791, "status": "MISSING" },
