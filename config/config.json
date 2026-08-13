@@ -1051,7 +1051,7 @@
 				{ "name": "libs/libcmt/dosmap.c", "index": 811, "status": "MISSING" },
 				{ "name": "libs/libcmt/xtow.c", "index": 812, "status": "Matching" },
 				{ "name": "libs/libcmt/xtoa.c", "index": 813, "status": "MISSING" },
-				{ "name": "libs/libcmt/wtox.c", "index": 814, "status": "MISSING" },
+				{ "name": "libs/libcmt/wtox.c", "index": 814, "status": "Matching" },
 				{ "name": "libs/libcmt/wctomb.c", "index": 815, "status": "Matching" },
 				{ "name": "libs/libcmt/wcstombs.c", "index": 816, "status": "Matching" },
 				{ "name": "libs/libcmt/wcstol.c", "index": 817, "status": "Matching" },
