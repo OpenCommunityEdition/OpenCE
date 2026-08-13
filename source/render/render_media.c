@@ -33,10 +33,13 @@ symbols in this file:
 struct render_media_globals
 {
 	boolean initialized;
-	byte pad[3];
+	byte unused[3];
 	long render_target_index;
-	byte runtime_state[0x24];
+	byte unknown[36];
 };
+
+typedef char render_media_globals_size_assert[
+	sizeof(struct render_media_globals) == 44 ? 1 : -1];
 
 struct frame_level_of_detail
 {
@@ -51,15 +54,18 @@ struct frame_level_of_detail
 	real minimum_level;
 };
 
+typedef char frame_level_of_detail_size_assert[
+	sizeof(struct frame_level_of_detail) == 84 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
-static struct render_media_globals render_media_globals;
+struct render_media_globals bss_004c004c = {0};
 
 const real media_wave_amplitude = 0.05f;
 
-__declspec(align(8)) struct frame_level_of_detail standard_frame_level_of_detail =
+struct frame_level_of_detail standard_frame_level_of_detail =
 {
 	4,
 	0.0f,
@@ -72,7 +78,7 @@ __declspec(align(8)) struct frame_level_of_detail standard_frame_level_of_detail
 	2.0f
 };
 
-__declspec(align(8)) struct frame_level_of_detail render_target_frame_level_of_detail =
+struct frame_level_of_detail render_target_frame_level_of_detail =
 {
 	6,
 	0.0f,
@@ -87,24 +93,33 @@ __declspec(align(8)) struct frame_level_of_detail render_target_frame_level_of_d
 
 /* ---------- public code */
 
-void render_media_initialize_for_new_map(void)
+void render_media_initialize_for_new_map(
+	void)
 {
-	render_media_globals.initialized = TRUE;
-	render_media_globals.render_target_index = 0;
+	bss_004c004c.initialized = TRUE;
+	bss_004c004c.render_target_index = 0;
+
+	return;
 }
 
-void render_media_dispose_from_old_map(void)
+void render_media_dispose_from_old_map(
+	void)
 {
-	render_media_globals.initialized = FALSE;
+	bss_004c004c.initialized = FALSE;
+
+	return;
 }
 
-boolean render_media_build_render_target(void)
+boolean render_media_build_render_target(
+	void)
 {
 	return FALSE;
 }
 
-void render_media(void)
+void render_media(
+	void)
 {
+	return;
 }
 
 /* ---------- private code */
