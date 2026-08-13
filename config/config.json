@@ -980,7 +980,7 @@
 				{ "name": "libs/libcmt/_flsbuf.c", "index": 740, "status": "MISSING" },
 				{ "name": "libs/libcmt/_file.c", "index": 741, "status": "MISSING" },
 				{ "name": "libs/libcmt/_filwbuf.c", "index": 742, "status": "MISSING" },
-				{ "name": "libs/libcmt/_filbuf.c", "index": 743, "status": "MISSING" },
+				{ "name": "libs/libcmt/_filbuf.c", "index": 743, "status": "Matching" },
 				{ "name": "libs/libcmt/fputws.c", "index": 744, "status": "MISSING" },
 				{ "name": "libs/libcmt/fputwc.c", "index": 745, "status": "MISSING" },
 				{ "name": "libs/libcmt/fputc.c", "index": 746, "status": "MISSING" },
