@@ -209,5 +209,15 @@
       "relocation_count": 228,
       "normalized_sha256": "c1040d667c392fd772fab34335ade456dac49ae864a8200c4560df63cec186fd"
     }
+  },
+  {
+    "unit": "libs/libcmt/crt0msg",
+    "symbol": "_data_00319950",
+    "reason": "the complete authenticated CRT object owns an exact runtime-error pointer table; objdiff leaves the table uncredited even though the hardened comparator proves identical normalized bytes, all 18 relocation addresses/types/destinations/addends, and external owner spelling",
+    "measurements": {
+      "size": 144,
+      "relocation_count": 18,
+      "normalized_sha256": "25298d4d1ea85dfa6a4696577658216429876d7b7b59ed245667db872d9d79d2"
+    }
   }
 ]
