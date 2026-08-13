@@ -13,6 +13,7 @@ from tools.regression_gate import (
     _capture_unit,
     _function_code_evidence,
     _json_hash,
+    _object_fingerprint,
     compare_manifests,
     load_baseline,
 )
@@ -154,6 +155,89 @@ class RegressionGateTests(unittest.TestCase):
             {},
             [],
         )
+
+    def test_same_location_alias_inherits_unique_report_size(self):
+        self.target_path.write_bytes(build_coff(
+            sections=[{
+                "name": ".text",
+                "size": 16,
+                "raw_data": b"\x31\xc0\xc3" + b"\x90" * 13,
+                "flags": CODE_FLAGS,
+            }],
+            symbols=[
+                {
+                    "name": "_reported",
+                    "value": 0,
+                    "section": 1,
+                    "type": 0x20,
+                    "storage": 2,
+                },
+                {
+                    "name": "_legacy_alias",
+                    "value": 0,
+                    "section": 1,
+                    "type": 0x20,
+                    "storage": 2,
+                },
+            ],
+        ))
+
+        fingerprint = _object_fingerprint(
+            self.target_path,
+            {"_reported": 3},
+            {},
+            require_meaningful_sizes=True,
+        )
+
+        self.assertEqual(
+            fingerprint["functions"]["_legacy_alias"]["meaningful_size"], 3
+        )
+        self.assertEqual(
+            fingerprint["functions"]["_reported"]["meaningful_size"], 3
+        )
+
+    def test_same_location_alias_refuses_ambiguous_report_sizes(self):
+        self.target_path.write_bytes(build_coff(
+            sections=[{
+                "name": ".text",
+                "size": 16,
+                "raw_data": b"\x31\xc0\xc3" + b"\x90" * 13,
+                "flags": CODE_FLAGS,
+            }],
+            symbols=[
+                {
+                    "name": "_reported_one",
+                    "value": 0,
+                    "section": 1,
+                    "type": 0x20,
+                    "storage": 2,
+                },
+                {
+                    "name": "_reported_two",
+                    "value": 0,
+                    "section": 1,
+                    "type": 0x20,
+                    "storage": 2,
+                },
+                {
+                    "name": "_legacy_alias",
+                    "value": 0,
+                    "section": 1,
+                    "type": 0x20,
+                    "storage": 2,
+                },
+            ],
+        ))
+
+        with self.assertRaisesRegex(
+            GateError, "identical-location report candidates:.*_reported_one.*_reported_two"
+        ):
+            _object_fingerprint(
+                self.target_path,
+                {"_reported_one": 3, "_reported_two": 3},
+                {},
+                require_meaningful_sizes=True,
+            )
 
     @staticmethod
     def _manifest(unit):

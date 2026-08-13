@@ -374,13 +374,35 @@ def _object_fingerprint(
         except CoffError as error:
             raise GateError(f"cannot fingerprint function {name} in {path}: {error}") from error
         fingerprint["padded_size"] = int(strict_info["size"])
-        if require_meaningful_sizes and name not in meaningful_sizes:
-            raise GateError(
-                f"ordinary report has no meaningful size for target function "
-                f"{name} in {path}"
-            )
+        meaningful_size = meaningful_sizes.get(name)
+        if require_meaningful_sizes and meaningful_size is None:
+            # csplit can preserve multiple public names for one linked-image
+            # function even though objdiff reports that body once.  Inherit
+            # the report's meaningful size only when exactly one reported
+            # function symbol occupies the identical COFF section and offset.
+            # This resolves a name alias; it neither compares nor credits code.
+            alias_candidates = [
+                candidate_name
+                for candidate_name in meaningful_sizes
+                if candidate_name in function_symbols
+                and int(function_symbols[candidate_name]["section"])
+                == int(symbol["section"])
+                and int(function_symbols[candidate_name]["value"])
+                == int(symbol["value"])
+            ]
+            if len(alias_candidates) != 1:
+                detail = (
+                    "none" if not alias_candidates
+                    else ", ".join(sorted(alias_candidates))
+                )
+                raise GateError(
+                    f"ordinary report has no meaningful size for target function "
+                    f"{name} in {path}; identical-location report candidates: "
+                    f"{detail}"
+                )
+            meaningful_size = meaningful_sizes[alias_candidates[0]]
         fingerprint["meaningful_size"] = int(
-            meaningful_sizes.get(name, strict_info["size"])
+            strict_info["size"] if meaningful_size is None else meaningful_size
         )
         fingerprint["strict_relocations"] = copy.deepcopy(strict_info["relocations"])
         functions[name] = fingerprint
