@@ -1037,7 +1037,7 @@
 				{ "name": "libs/libcmt/llshr.c", "index": 797, "status": "MISSING" },
 				{ "name": "libs/libcmt/llmul.c", "index": 798, "status": "MISSING" },
 				{ "name": "libs/libcmt/lldiv.c", "index": 799, "status": "MISSING" },
-				{ "name": "libs/libcmt/_newmode.c", "index": 800, "status": "MISSING" },
+				{ "name": "libs/libcmt/_newmode.c", "index": 800, "status": "Matching" },
 				{ "name": "libs/libcmt/new.c", "index": 801, "status": "Matching", "options": { "cflags": [ "/O1", "/Gy", "/TP" ] } },
 				{ "name": "libs/libcmt/malloc.c", "index": 802, "status": "MISSING" },
 				{ "name": "libs/libcmt/heapinit.c", "index": 803, "status": "Matching" },
