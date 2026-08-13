@@ -1002,7 +1002,7 @@
 				{ "name": "libs/libcmt/winsig.c", "index": 762, "status": "MISSING" },
 				{ "name": "libs/libcmt/syserr.c", "index": 763, "status": "MISSING" },
 				{ "name": "libs/libcmt/strerror.c", "index": 764, "status": "MISSING" },
-				{ "name": "libs/libcmt/rand.c", "index": 765, "status": "MISSING" },
+				{ "name": "libs/libcmt/rand.c", "index": 765, "status": "Matching" },
 				{ "name": "libs/libcmt/qsort.c", "index": 766, "status": "MISSING" },
 				{ "name": "libs/libcmt/purevirt.c", "index": 767, "status": "Matching" },
 				{ "name": "libs/libcmt/nlsdata2.c", "index": 768, "status": "Matching" },
