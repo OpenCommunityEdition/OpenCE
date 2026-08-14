@@ -98,6 +98,18 @@ the different, smaller jump ordering that VC7 chooses for a `switch`.
   nonempty. That invariant is established by the same object's initialized
   data and count fields; it is not an unfixed user-input bug. No other
   original behavioral bug was found.
+- The production object also contains three unreferenced XDK-header
+  `IMAGE_COMDAT_SELECT_ANY` constants that csplit attributes to their linked
+  owners elsewhere: `_D3DPRIMITIVETOVERTEXCOUNT` (88 bytes, owned by
+  `rasterizer_xbox_decals.obj`), `_D3DSIMPLERENDERSTATEENCODE` (328 bytes,
+  owned by `progress_bar.obj`), and `_D3DTEXTUREDIRECTENCODE` (16 bytes,
+  owned by `headers.obj`). A tree-wide COFF audit found thirty candidate
+  copies of each symbol, zero relocations to these three copies from
+  `winxfltr.obj`, and strict-equal bytes and relocation inventories against
+  the one January-owned copy. The ordinary link discards the duplicates.
+  This is the documented candidate-only duplicate-COMDAT case in
+  `docs/exact_match_acceleration_playbook.md`, not newly owned runtime state
+  and not a comparator waiver.
 - The final acceptance run force-rebuilds this object, checks both code owners
   and all five data aliases with hardened `section_infos_equal`, builds the
   complete Halo and libcmt graphs, regenerates ordinary and semantic progress,
