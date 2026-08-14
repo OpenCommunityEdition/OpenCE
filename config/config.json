@@ -973,7 +973,7 @@
 				{ "name": "libs/libcmt/fclose.c", "index": 733, "status": "MISSING" },
 				{ "name": "libs/libcmt/closeall.c", "index": 734, "status": "MISSING" },
 				{ "name": "libs/libcmt/_sftbuf.c", "index": 735, "status": "Matching" },
-				{ "name": "libs/libcmt/_open.c", "index": 736, "status": "MISSING" },
+				{ "name": "libs/libcmt/_open.c", "index": 736, "status": "Matching" },
 				{ "name": "libs/libcmt/_getbuf.c", "index": 737, "status": "Matching" },
 				{ "name": "libs/libcmt/_freebuf.c", "index": 738, "status": "Matching" },
 				{ "name": "libs/libcmt/_flswbuf.c", "index": 739, "status": "MISSING" },
