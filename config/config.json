@@ -998,7 +998,7 @@
 				{ "name": "libs/libcmt/fp8.c", "index": 758, "status": "Matching" },
 				{ "name": "libs/libcmt/chkstk.c", "index": 759, "status": "MISSING" },
 				{ "name": "libs/libcmt/wperror.c", "index": 760, "status": "MISSING" },
-				{ "name": "libs/libcmt/winxfltr.c", "index": 761, "status": "MISSING" },
+				{ "name": "libs/libcmt/winxfltr.c", "index": 761, "status": "Matching" },
 				{ "name": "libs/libcmt/winsig.c", "index": 762, "status": "MISSING" },
 				{ "name": "libs/libcmt/syserr.c", "index": 763, "status": "Matching" },
 				{ "name": "libs/libcmt/strerror.c", "index": 764, "status": "Matching" },
