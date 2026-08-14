@@ -884,7 +884,7 @@
 				{ "name": "libs/libcmt/87fmod.c", "index": 644, "status": "MISSING" },
 				{ "name": "libs/libcmt/87disp.c", "index": 645, "status": "MISSING" },
 				{ "name": "libs/libcmt/87cdisp.c", "index": 646, "status": "MISSING" },
-				{ "name": "libs/libcmt/x10fout.c", "index": 647, "status": "Matching" },
+				{ "name": "libs/libcmt/x10fout.c", "index": 647, "status": "MISSING" },
 				{ "name": "libs/libcmt/tenpow.c", "index": 648, "status": "Matching" },
 				{ "name": "libs/libcmt/strgtold.c", "index": 649, "status": "MISSING" },
 				{ "name": "libs/libcmt/mantold.c", "index": 650, "status": "Matching" },
