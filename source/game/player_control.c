@@ -226,6 +226,18 @@ struct player_control_globals_data *bss_0043ee30;
 
 /* ---------- public code */
 
+short unit_get_local_player_index(
+	long unit_index)
+{
+	long player_index = unit_get(unit_index)->unit.player_index;
+
+	if (player_index!=NONE)
+		return player_get(player_index)->local_player_index;
+
+	return NONE;
+}
+
+
 void player_control_initialize(
 	void)
 {
