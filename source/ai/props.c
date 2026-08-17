@@ -308,11 +308,7 @@ static void code_00052a70(
 		  (actor->control.idle_minor_direction.prop_index == prop_index)));
 
 	prop = prop_get(actor->meta.first_prop_index);
-	if (actor->meta.first_prop_index == prop_index)
-	{
-		actor->meta.first_prop_index = prop->next_prop_index;
-	}
-	else
+	if (actor->meta.first_prop_index != prop_index)
 	{
 		long *previous_next_prop_index;
 
@@ -324,6 +320,10 @@ static void code_00052a70(
 		while (*previous_next_prop_index != prop_index);
 
 		*previous_next_prop_index = prop->next_prop_index;
+	}
+	else
+	{
+		actor->meta.first_prop_index = prop->next_prop_index;
 	}
 
 	return;
