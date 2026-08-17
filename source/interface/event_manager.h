@@ -8,6 +8,8 @@ header included in hcex build.
 #define __EVENT_MANAGER_H
 #pragma once
 
+#include "math/integer_math.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -17,8 +19,17 @@ header included in hcex build.
 struct event_record
 {
 	short type;
-	short __unknown2;
-	long data;
+	short controller_index;
+	union event_record_data
+	{
+		point2d stick;
+		struct event_record_button
+		{
+			byte index;
+			byte value;
+		} button;
+		long value;
+	} data;
 };
 
 /* ---------- prototypes/EVENT_MANAGER.C */

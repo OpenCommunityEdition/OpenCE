@@ -35,6 +35,17 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	_event_type_null,
+	_event_type_left_stick,
+	_event_type_right_stick,
+	_event_type_button,
+
+	STICK_EVENT_THRESHOLD = 29490,
+	STICK_EVENT_REPEAT_MILLISECONDS = 250
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -51,7 +62,8 @@ struct event_manager_state
 struct event_manager_globals
 {
 	struct event_manager_state state;
-	byte __unknown108[0x60];
+	unsigned long stick_event_times[NUMBER_OF_GAMEPAD_STICKS][MAXIMUM_GAMEPADS];
+	long previous_stick_axes[NUMBER_OF_GAMEPAD_STICKS][2][MAXIMUM_GAMEPADS];
 };
 
 typedef char verify_event_manager_state_size[
@@ -60,6 +72,10 @@ typedef char verify_event_manager_globals_size[
 	sizeof(struct event_manager_globals) == 0x168 ? 1 : -1];
 
 /* ---------- prototypes */
+
+static void code_000cb850(
+	struct event_record *event,
+	short controller_index);
 
 /* ---------- globals */
 
@@ -147,3 +163,201 @@ unsigned long event_manager_time_of_last_event(
 }
 
 /* ---------- private code */
+
+static void code_000cb850(
+	struct event_record *event,
+	short controller_index)
+{
+	unsigned long time;
+	boolean post = TRUE;
+
+	if (event_manager_globals.state.suppressed)
+		return;
+
+	time = system_milliseconds();
+
+	if (event->type == _event_type_left_stick)
+	{
+		long x = event->data.stick.x;
+		long y = event->data.stick.y;
+
+		if (ABS(x) < STICK_EVENT_THRESHOLD && ABS(y) < STICK_EVENT_THRESHOLD)
+		{
+			post = FALSE;
+		}
+		else if (!((ABS(x) >= STICK_EVENT_THRESHOLD &&
+				ABS(event_manager_globals.previous_stick_axes[_gamepad_stick_left][0][controller_index]) < STICK_EVENT_THRESHOLD) ||
+			(ABS(y) >= STICK_EVENT_THRESHOLD &&
+				ABS(event_manager_globals.previous_stick_axes[_gamepad_stick_left][1][controller_index]) < STICK_EVENT_THRESHOLD) ||
+			time - event_manager_globals.stick_event_times[_gamepad_stick_left][controller_index] >= STICK_EVENT_REPEAT_MILLISECONDS))
+		{
+			post = FALSE;
+		}
+		else
+		{
+			event_manager_globals.stick_event_times[_gamepad_stick_left][controller_index] = time;
+			post = TRUE;
+
+			if (ABS(x) >= STICK_EVENT_THRESHOLD)
+			{
+				switch (x >= 0 ? 1 : -1)
+				{
+				case 1:
+					x = event->data.stick.x = 32767;
+					break;
+				case -1:
+					x = event->data.stick.x = -32768;
+					break;
+				}
+			}
+			if (ABS(y) >= STICK_EVENT_THRESHOLD)
+			{
+				switch (y >= 0 ? 1 : -1)
+				{
+				case 1:
+					y = event->data.stick.y = 32767;
+					break;
+				case -1:
+					y = event->data.stick.y = -32768;
+					break;
+				}
+			}
+		}
+
+		event_manager_globals.previous_stick_axes[_gamepad_stick_left][0][controller_index] = x;
+		event_manager_globals.previous_stick_axes[_gamepad_stick_left][1][controller_index] = y;
+	}
+	else if (event->type == _event_type_right_stick)
+	{
+		long x = event->data.stick.x;
+		long y = event->data.stick.y;
+
+		if (ABS(x) < STICK_EVENT_THRESHOLD && ABS(y) < STICK_EVENT_THRESHOLD)
+		{
+			post = FALSE;
+		}
+		else if (!((ABS(x) >= STICK_EVENT_THRESHOLD &&
+				ABS(event_manager_globals.previous_stick_axes[_gamepad_stick_right][0][controller_index]) < STICK_EVENT_THRESHOLD) ||
+			(ABS(y) >= STICK_EVENT_THRESHOLD &&
+				ABS(event_manager_globals.previous_stick_axes[_gamepad_stick_right][1][controller_index]) < STICK_EVENT_THRESHOLD) ||
+			time - event_manager_globals.stick_event_times[_gamepad_stick_right][controller_index] >= STICK_EVENT_REPEAT_MILLISECONDS))
+		{
+			post = FALSE;
+		}
+		else
+		{
+			event_manager_globals.stick_event_times[_gamepad_stick_right][controller_index] = time;
+			post = TRUE;
+
+			if (ABS(x) >= STICK_EVENT_THRESHOLD)
+			{
+				switch (x >= 0 ? 1 : -1)
+				{
+				case 1:
+					x = event->data.stick.x = 32767;
+					break;
+				case -1:
+					x = event->data.stick.x = -32768;
+					break;
+				}
+			}
+			if (ABS(y) >= STICK_EVENT_THRESHOLD)
+			{
+				switch (y >= 0 ? 1 : -1)
+				{
+				case 1:
+					y = event->data.stick.y = 32767;
+					break;
+				case -1:
+					y = event->data.stick.y = -32768;
+					break;
+				}
+			}
+		}
+
+		event_manager_globals.previous_stick_axes[_gamepad_stick_right][0][controller_index] = x;
+		event_manager_globals.previous_stick_axes[_gamepad_stick_right][1][controller_index] = y;
+	}
+
+	if (post)
+	{
+		event->controller_index = controller_index;
+		csmemmove(
+			event_manager_globals.state.events[controller_index],
+			&event_manager_globals.state.events[controller_index][1],
+			sizeof(event_manager_globals.state.events[controller_index]) - sizeof(struct event_record));
+		event_manager_globals.state.events[controller_index][0] = *event;
+		if (event->type != _event_type_null)
+		{
+			event_manager_globals.state.time_of_last_event = time;
+		}
+	}
+
+	return;
+}
+
+void event_manager_update(
+	void)
+{
+	short gamepad_index;
+
+	if (!event_manager_globals.state.initialized)
+		return;
+
+	for (gamepad_index = 0; gamepad_index < MAXIMUM_GAMEPADS; gamepad_index++)
+	{
+		boolean posted = FALSE;
+
+		if (input_has_gamepad(gamepad_index))
+		{
+			struct gamepad_state const *state = input_get_gamepad_state(gamepad_index);
+
+			if (state)
+			{
+				struct event_record event;
+				short button_index;
+
+				if (state->sticks[_gamepad_stick_left].x != 0 ||
+					state->sticks[_gamepad_stick_left].y != 0)
+				{
+					event.type = _event_type_left_stick;
+					event.data.stick = state->sticks[_gamepad_stick_left];
+					code_000cb850(&event, gamepad_index);
+					posted = TRUE;
+				}
+
+				if (state->sticks[_gamepad_stick_right].x != 0 ||
+					state->sticks[_gamepad_stick_right].y != 0)
+				{
+					event.type = _event_type_right_stick;
+					event.data.stick = state->sticks[_gamepad_stick_right];
+					code_000cb850(&event, gamepad_index);
+					posted = TRUE;
+				}
+
+				for (button_index = 0; button_index < NUMBER_OF_GAMEPAD_BUTTONS; button_index++)
+				{
+					byte value = state->buttons[button_index];
+
+					if (value)
+					{
+						event.type = _event_type_button;
+						event.data.button.index = (byte)button_index;
+						event.data.button.value = value;
+						code_000cb850(&event, gamepad_index);
+						posted = TRUE;
+					}
+				}
+			}
+		}
+
+		if (!posted)
+		{
+			struct event_record event = {0};
+
+			code_000cb850(&event, gamepad_index);
+		}
+	}
+
+	return;
+}
