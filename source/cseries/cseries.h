@@ -197,16 +197,35 @@ void halt_and_catch_fire(void);
 
 /* ---------- prototypes/DEBUG_MEMORY.C */
 
-void debug_memory_manager_initialize(void);
+void debug_memory_manager_initialize(
+	void);
 /*void debug_memory_manager_dispose(void);*/
-void check_memory_status(struct memory_status *, const char *);
-void debug_check_memory(const char *, long);
-void debug_dump_memory_for_file(const char *);
-void debug_dump_memory_by_file(void);
-void *debug_malloc(unsigned int, boolean, const char *, long);
-void debug_free(void *, const char *, long);
-void *debug_realloc(void *, unsigned int, const char *, long);
-void debug_dump_memory(void);
+void check_memory_status(
+	struct memory_status *memory_status,
+	const char *location);
+void debug_check_memory(
+	const char *file,
+	long line);
+void debug_dump_memory_for_file(
+	const char *file);
+void debug_dump_memory_by_file(
+	void);
+void *debug_malloc(
+	unsigned int size,
+	boolean clear,
+	const char *file,
+	long line);
+void debug_free(
+	void *pointer,
+	const char *file,
+	long line);
+void *debug_realloc(
+	void *pointer,
+	unsigned int size,
+	const char *file,
+	long line);
+void debug_dump_memory(
+	void);
 
 /* ---------- prototypes/STACK_WALK_WINDOWS.C */
 

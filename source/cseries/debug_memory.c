@@ -109,7 +109,8 @@ enum
 	debug_memory_allocated_signature = 0x2D2D2D3E,
 	debug_memory_disposed_signature = 0x3C424144,
 	debug_memory_trailing_signature = 0x3C2D2D2D,
-	MAXIMUM_POINTER_SIZE = 0x10000000
+	MAXIMUM_POINTER_SIZE = 0x10000000,
+	MAXIMUM_FILES_WITH_POINTERS = 512
 };
 
 /* ---------- macros */
@@ -154,12 +155,24 @@ struct memory_status
 	unsigned long maximum_available_memory;
 };
 
+struct file_pointer_totals
+{
+	const char *file;
+	long pointer_count;
+	long minimum_size;
+	long maximum_size;
+	long total_size;
+};
+
 /* ---------- prototypes */
 
 unsigned long *get_global_local_random_seed_address(
 	void);
 unsigned short seed_random(
 	unsigned long *seed);
+int code_0007cdc0(
+	const void *a,
+	const void *b);
 static void code_0007ce40(
 	struct debug_memory_header *header,
 	const char *file,
@@ -224,6 +237,157 @@ void code_0007ccf0(
 
 	return;
 }
+
+void debug_dump_memory_for_file(
+	const char *file)
+{
+	struct debug_memory_header *header;
+	FILE *dump_file = NULL;
+	long total_size = 0;
+
+	header = data_002dcd0c.first_pointer;
+	debug_check_memory("c:\\halo\\SOURCE\\cseries\\debug_memory.c", 513);
+
+	for (;
+		header != NULL;
+		header = header->next)
+	{
+		if (!file || strstr(header->file, file))
+		{
+			if (dump_file == NULL)
+			{
+				dump_file = fopen("d:\\heap_dump.txt", "a+b");
+				if (dump_file != NULL)
+				{
+					fprintf(
+						dump_file,
+						"% 40s  % 6s % 10s % 10s\r\n",
+						"file",
+						"line",
+						"id",
+						"size");
+				}
+			}
+			if (dump_file != NULL)
+			{
+				fprintf(
+					dump_file,
+					"% 40s  % 6d % 10d % 10d bytes\r\n",
+					header->file,
+					header->line,
+					header->allocation_id,
+					header->size);
+			}
+			total_size += header->size;
+		}
+	}
+
+	if (dump_file != NULL)
+	{
+		fprintf(
+			dump_file,
+			"\r\nTotal Allocated: %d bytes\r\n\r\n",
+			total_size);
+		fclose(dump_file);
+	}
+
+	return;
+}
+
+#define debug_memory_globals data_002dcd0c
+#define current_heap_size total_pointer_size
+
+void debug_dump_memory_by_file(
+	void)
+{
+	struct file_pointer_totals files[MAXIMUM_FILES_WITH_POINTERS];
+	short file_count = 0;
+	long total_pointer_size = 0;
+	long pointer_count = 0;
+	struct debug_memory_header *header;
+	short file_index;
+	FILE *dump_file;
+	short i;
+
+	header = data_002dcd0c.first_pointer;
+	debug_check_memory("c:\\halo\\SOURCE\\cseries\\debug_memory.c", 553);
+
+	for (; header != NULL; header = header->next)
+	{
+		pointer_count++;
+		total_pointer_size += header->size;
+
+		for (file_index = 0; file_index < file_count; file_index++)
+		{
+			if (header->file == files[file_index].file)
+			{
+				files[file_index].pointer_count++;
+				files[file_index].total_size += header->size;
+				if (header->size < files[file_index].minimum_size)
+				{
+					files[file_index].minimum_size = header->size;
+				}
+				if (header->size > files[file_index].maximum_size)
+				{
+					files[file_index].maximum_size = header->size;
+				}
+				break;
+			}
+		}
+
+		if (file_index == file_count)
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\cseries\\debug_memory.c",
+				585,
+				file_count<MAXIMUM_FILES_WITH_POINTERS);
+			files[file_count].file = header->file;
+			files[file_count].pointer_count = 1;
+			files[file_count].total_size =
+				files[file_count].minimum_size =
+				files[file_count].maximum_size = header->size;
+			file_count++;
+		}
+	}
+
+	if (file_count != 0 &&
+		(dump_file = fopen("d:\\heap_dump.txt", "a+b")) != NULL)
+	{
+		qsort(
+			files,
+			file_count,
+			sizeof(struct file_pointer_totals),
+			code_0007cdc0);
+		for (i = 0; i < file_count; i++)
+		{
+			fprintf(
+				dump_file,
+				"File: %32s %8d bytes in %4d pointers. (Min: %8d Max: %8d Avg: %5.3f)\r\n",
+				files[i].file,
+				files[i].total_size,
+				files[i].pointer_count,
+				files[i].minimum_size,
+				files[i].maximum_size,
+				(double)files[i].total_size / files[i].pointer_count);
+		}
+		match_assert(
+			"c:\\halo\\SOURCE\\cseries\\debug_memory.c",
+			612,
+			total_pointer_size==debug_memory_globals.current_heap_size);
+		fprintf(
+			dump_file,
+			"\r\nTotal: %40d bytes in %4d pointers\r\n\r\nLargest Heap Size: %28d bytes\r\n\r\n",
+			total_pointer_size,
+			pointer_count,
+			data_002dcd0c.maximum_pointer_size);
+		fclose(dump_file);
+	}
+
+	return;
+}
+
+#undef current_heap_size
+#undef debug_memory_globals
 
 void debug_dump_memory(
 	void)
@@ -449,11 +613,14 @@ unsigned long code_0007cd90(
 	return checksum;
 }
 
-long code_0007cdc0(
-	struct debug_memory_header const *a,
-	struct debug_memory_header const *b)
+int code_0007cdc0(
+	const void *a,
+	const void *b)
 {
-	return (long)b->file - (long)a->file;
+	const struct file_pointer_totals *file_a = a;
+	const struct file_pointer_totals *file_b = b;
+
+	return file_b->total_size - file_a->total_size;
 }
 
 static void code_0007ce40(
@@ -536,7 +703,7 @@ static void code_0007cd40(
 	match_vassert(
 		"c:\\halo\\SOURCE\\cseries\\debug_memory.c",
 		199,
-		*(unsigned long *)((byte *)pointer + header->size) ==
+		*(unsigned long *)((byte *)(header + 1) + header->size) ==
 			debug_memory_trailing_signature,
 		csprintf(
 			temporary,
