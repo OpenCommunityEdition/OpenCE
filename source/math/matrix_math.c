@@ -93,6 +93,8 @@ symbols in this file:
 
 /* ---------- macros */
 
+#define realcmp(a, b) (fabs((a)-(b))<_real_epsilon)
+
 /* ---------- structures */
 
 /* ---------- prototypes */
@@ -263,14 +265,11 @@ void matrix4x3_from_orientation(
 	return;
 }
 
-/* NonMatching: target and candidate are both 0x70 bytes with no relocations.
-   Every instruction after the opening argument loads is exact; VC7 reverses
-   only the load/compare order of matrix and result in this reconstruction. */
-void matrix3x3_transpose(
+real_matrix3x3 *matrix3x3_transpose(
 	real_matrix3x3 const *matrix,
 	real_matrix3x3 *result)
 {
-	if (result == matrix)
+	if (matrix == result)
 	{
 		real temporary;
 
@@ -299,13 +298,44 @@ void matrix3x3_transpose(
 		result->up.k = matrix->up.k;
 	}
 
-	return;
+	return result;
 }
 
-/* NonMatching: target and candidate are both 0x70 bytes with no relocations.
-   The matrix values and cross-product order agree; the remaining difference
-   is VC7 register allocation and scheduling around the inlined cross product. */
-void matrix3x3_from_forward_and_up(
+real_matrix3x3 *matrix3x3_multiply(
+	real_matrix3x3 const *a,
+	real_matrix3x3 const *b,
+	real_matrix3x3 *result)
+{
+	real_matrix3x3 temporary;
+
+	if (a == result)
+	{
+		temporary = *a;
+		a = &temporary;
+	}
+
+	if (b == result)
+	{
+		temporary = *b;
+		b = &temporary;
+	}
+
+	result->forward.i = b->forward.i * a->forward.i + b->forward.j * a->left.i + a->up.i * b->forward.k;
+	result->forward.j = b->forward.j * a->left.j + b->forward.i * a->forward.j + b->forward.k * a->up.j;
+	result->forward.k = b->forward.j * a->left.k + b->forward.i * a->forward.k + b->forward.k * a->up.k;
+
+	result->left.i = b->left.j * a->left.i + a->forward.i * b->left.i + a->up.i * b->left.k;
+	result->left.j = b->left.k * a->up.j + b->left.j * a->left.j + b->left.i * a->forward.j;
+	result->left.k = b->left.k * a->up.k + b->left.j * a->left.k + b->left.i * a->forward.k;
+
+	result->up.i = b->up.i * a->forward.i + b->up.j * a->left.i + b->up.k * a->up.i;
+	result->up.j = b->up.k * a->up.j + b->up.j * a->left.j + b->up.i * a->forward.j;
+	result->up.k = b->up.k * a->up.k + b->up.j * a->left.k + b->up.i * a->forward.k;
+
+	return result;
+}
+
+real_matrix3x3 *matrix3x3_from_forward_and_up(
 	real_matrix3x3 *matrix,
 	real_vector3d const *forward,
 	real_vector3d const *up)
@@ -314,7 +344,244 @@ void matrix3x3_from_forward_and_up(
 	cross_product3d(up, forward, &matrix->left);
 	matrix->up = *up;
 
+	return matrix;
+}
+
+/* January keeps both next-index tables in one 14-byte .data blob. The 4x3
+table starts at offset 0 and the 3x3 table starts at offset 8. */
+static short data_0030790c[7] = { 1, 2, 0, 0, 1, 2, 0 };
+
+#define matrix4x3_next (data_0030790c)
+#define matrix3x3_next (data_0030790c+4)
+
+void matrix4x3_rotation_from_axis_and_angle(
+	real_matrix4x3 *matrix,
+	real_vector3d const *axis,
+	real sine,
+	real cosine)
+{
+	real_vector3d squared;
+	real_vector3d scaled;
+	real omc;
+
+	squared.i = axis->i * axis->i;
+	squared.j = axis->j * axis->j;
+	squared.k = axis->k * axis->k;
+
+	scaled.i = sine * axis->i;
+	scaled.j = sine * axis->j;
+	scaled.k = sine * axis->k;
+
+	matrix->scale = 1.f;
+
+	matrix->n[0][0] = (1.f - squared.i) * cosine + squared.i;
+
+	omc = 1.f - cosine;
+
+	matrix->n[0][1] = axis->j * axis->i * omc;
+	matrix->n[1][0] = matrix->n[0][1] - scaled.k;
+	matrix->n[0][1] = scaled.k + matrix->n[0][1];
+
+	matrix->n[1][1] = (1.f - squared.j) * cosine + squared.j;
+
+	matrix->n[0][2] = axis->k * axis->i * omc;
+	matrix->n[2][0] = matrix->n[0][2] + scaled.j;
+	matrix->n[0][2] = matrix->n[0][2] - scaled.j;
+
+	matrix->n[2][2] = (1.f - squared.k) * cosine + squared.k;
+
+	matrix->n[1][2] = axis->k * axis->j * omc;
+	matrix->n[2][1] = matrix->n[1][2] - scaled.i;
+	matrix->n[1][2] = scaled.i + matrix->n[1][2];
+
+	matrix->position.z = 0.f;
+	matrix->position.y = 0.f;
+	matrix->position.x = 0.f;
+
 	return;
+}
+
+void matrix3x3_from_axis_and_angle(
+	real_matrix3x3 *matrix,
+	real_vector3d const *axis,
+	real sine,
+	real cosine)
+{
+	real_vector3d squared;
+	real_vector3d scaled;
+	real omc;
+
+	squared.i = axis->i * axis->i;
+	squared.j = axis->j * axis->j;
+	squared.k = axis->k * axis->k;
+
+	scaled.i = sine * axis->i;
+	scaled.j = sine * axis->j;
+	scaled.k = sine * axis->k;
+
+	matrix->n[0][0] = (1.f - squared.i) * cosine + squared.i;
+
+	omc = 1.f - cosine;
+
+	matrix->n[0][1] = axis->j * axis->i * omc;
+	matrix->n[1][0] = matrix->n[0][1] - scaled.k;
+	matrix->n[0][1] = scaled.k + matrix->n[0][1];
+
+	matrix->n[1][1] = (1.f - squared.j) * cosine + squared.j;
+
+	matrix->n[0][2] = axis->k * axis->i * omc;
+	matrix->n[2][0] = matrix->n[0][2] + scaled.j;
+	matrix->n[0][2] = matrix->n[0][2] - scaled.j;
+
+	matrix->n[2][2] = (1.f - squared.k) * cosine + squared.k;
+
+	matrix->n[1][2] = axis->k * axis->j * omc;
+	matrix->n[2][1] = matrix->n[1][2] - scaled.i;
+	matrix->n[1][2] = scaled.i + matrix->n[1][2];
+
+	return;
+}
+
+void matrix4x3_rotation_to_quaternion(
+	real_matrix4x3 const *matrix,
+	real_quaternion *quaternion)
+{
+	real trace = matrix->n[0][0] + matrix->n[1][1] + matrix->n[2][2];
+
+	if (trace > 0.f)
+	{
+		real s = square_root(trace + 1.f);
+
+		quaternion->w = 0.5f * s;
+		s = 0.5f / s;
+
+		quaternion->v.i = (matrix->n[2][1] - matrix->n[1][2]) * s;
+		quaternion->v.j = (matrix->n[0][2] - matrix->n[2][0]) * s;
+		quaternion->v.k = (matrix->n[1][0] - matrix->n[0][1]) * s;
+	}
+	else
+	{
+		short i = 0;
+		short j, k;
+		real q[3];
+		real s;
+
+		if (matrix->n[1][1] > matrix->n[0][0])
+			i = 1;
+
+		if (matrix->n[2][2] > matrix->n[i][i])
+			i = 2;
+
+		j = matrix4x3_next[i];
+		k = matrix4x3_next[j];
+
+		s = square_root(matrix->n[i][i] - (matrix->n[k][k] + matrix->n[j][j]) + 1.f);
+
+		q[i] = s * 0.5f;
+
+		if (s != 0.f)
+			s = 0.5f / s;
+
+		q[j] = (matrix->n[i][j] + matrix->n[j][i]) * s;
+		q[k] = (matrix->n[i][k] + matrix->n[k][i]) * s;
+
+		quaternion->w = (matrix->n[k][j] - matrix->n[j][k]) * s;
+
+		quaternion->v.i = q[0];
+		quaternion->v.j = q[1];
+		quaternion->v.k = q[2];
+	}
+
+	return;
+}
+
+void matrix3x3_rotation_to_quaternion(
+	real_matrix3x3 const *matrix,
+	real_quaternion *quaternion)
+{
+	real trace = matrix->n[1][1] + matrix->n[0][0] + matrix->n[2][2];
+
+	if (trace > 0.f)
+	{
+		real s = square_root(trace + 1.f);
+
+		quaternion->w = 0.5f * s;
+		s = 0.5f / s;
+
+		quaternion->v.i = (matrix->n[2][1] - matrix->n[1][2]) * s;
+		quaternion->v.j = (matrix->n[0][2] - matrix->n[2][0]) * s;
+		quaternion->v.k = (matrix->n[1][0] - matrix->n[0][1]) * s;
+	}
+	else
+	{
+		short i = 0;
+		short j, k;
+		real q[3];
+		real s;
+
+		if (matrix->n[1][1] > matrix->n[0][0])
+			i = 1;
+
+		if (matrix->n[2][2] > matrix->n[i][i])
+			i = 2;
+
+		j = matrix3x3_next[i];
+		k = matrix3x3_next[j];
+
+		s = square_root(matrix->n[i][i] - (matrix->n[k][k] + matrix->n[j][j]) + 1.f);
+
+		q[i] = s * 0.5f;
+
+		if (s != 0.f)
+			s = 0.5f / s;
+
+		q[j] = (matrix->n[i][j] + matrix->n[j][i]) * s;
+		q[k] = (matrix->n[i][k] + matrix->n[k][i]) * s;
+
+		quaternion->w = (matrix->n[k][j] - matrix->n[j][k]) * s;
+
+		quaternion->v.i = q[0];
+		quaternion->v.j = q[1];
+		quaternion->v.k = q[2];
+	}
+
+	return;
+}
+
+real_matrix3x3 *matrix3x3_inverse(
+	real_matrix3x3 const *matrix,
+	real determinant,
+	real_matrix3x3 *result)
+{
+	real_matrix3x3 temporary;
+	real inverse;
+	short i, j;
+
+	if (matrix == result)
+	{
+		temporary = *matrix;
+		matrix = &temporary;
+	}
+
+	match_assert("c:\\halo\\SOURCE\\math\\matrix_math.c", 787, !realcmp(determinant, 0.0f));
+
+	inverse = 1.f / determinant;
+
+	for (i = 0; i < 3; i++)
+	{
+		for (j = 0; j < 3; j++)
+		{
+			short next_i = i < 2 ? i + 1 : 0;
+			short previous_i = i > 0 ? i - 1 : 2;
+			short next_j = j < 2 ? j + 1 : 0;
+			short previous_j = j > 0 ? j - 1 : 2;
+
+			result->n[j][i] = (matrix->n[next_i][next_j] * matrix->n[previous_i][previous_j]
+				- matrix->n[next_i][previous_j] * matrix->n[previous_i][next_j]) * inverse;
+		}
+	}
+
+	return result;
 }
 
 void matrix4x3_inverse(
@@ -382,6 +649,64 @@ void matrix4x3_rotation_from_vectors(
 
 	matrix->up = *up;
 	set_real_point3d(&matrix->position, 0.f, 0.f, 0.f);
+
+	return;
+}
+
+void matrix4x3_rotation_from_angles(
+	real_matrix4x3 *matrix,
+	real yaw,
+	real pitch,
+	real roll)
+{
+	real cosine_roll = cosine(roll);
+	real sine_roll = sine(roll);
+	real cosine_pitch = cosine(pitch);
+	real sine_pitch = sine(pitch);
+	real cosine_yaw = cosine(yaw);
+	real sine_yaw = sine(yaw);
+	real sine_pitch_cosine_roll = sine_pitch * cosine_roll;
+	real sine_pitch_sine_roll = sine_pitch * sine_roll;
+
+	matrix->scale = 1.f;
+	set_real_point3d(&matrix->position, 0.f, 0.f, 0.f);
+
+	matrix->n[0][0] = cosine_yaw * cosine_pitch;
+	matrix->n[0][1] = sine_yaw * cosine_roll - cosine_yaw * sine_pitch_sine_roll;
+	matrix->n[0][2] = cosine_yaw * sine_pitch_cosine_roll + sine_yaw * sine_roll;
+
+	matrix->n[1][0] = -(sine_yaw * cosine_pitch);
+	matrix->n[1][1] = sine_yaw * sine_pitch_sine_roll + cosine_yaw * cosine_roll;
+	matrix->n[1][2] = cosine_yaw * sine_roll - sine_yaw * sine_pitch_cosine_roll;
+
+	matrix->n[2][0] = -sine_pitch;
+	matrix->n[2][1] = -(cosine_pitch * sine_roll);
+	matrix->n[2][2] = cosine_pitch * cosine_roll;
+
+	return;
+}
+
+void matrix4x3_rotation_to_angles(
+	real_matrix4x3 *matrix,
+	real_euler_angles3d *angles)
+{
+	real cosine_pitch;
+
+	angles->pitch = -arcsine(matrix->n[2][0]);
+	cosine_pitch = cosine(angles->pitch);
+
+	if (cosine_pitch > 0.0001)
+	{
+		angles->roll = arctangent(-matrix->n[2][1] / cosine_pitch,
+			matrix->n[2][2] / cosine_pitch);
+		angles->yaw = arctangent(-matrix->n[1][0] / cosine_pitch,
+			matrix->n[0][0] / cosine_pitch);
+	}
+	else
+	{
+		angles->roll = 0.f;
+		angles->yaw = arctangent(matrix->n[0][1], matrix->n[1][1]);
+	}
 
 	return;
 }
