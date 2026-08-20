@@ -518,6 +518,20 @@ void actor_flush_position_indices(
 	return;
 }
 
+void actor_unit_control_crouch(
+	long actor_index,
+	boolean crouch)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (crouch)
+		actor->output.control_flags |= FLAG(_unit_control_crouch_modifier_bit);
+	else
+		actor->output.control_flags &= ~FLAG(_unit_control_crouch_modifier_bit);
+
+	return;
+}
+
 void actor_unit_control_jump(
 	long actor_index)
 {
@@ -528,12 +542,56 @@ void actor_unit_control_jump(
 	return;
 }
 
+void actor_unit_control_primary_trigger(
+	long actor_index,
+	boolean firing,
+	real analog_primary_trigger)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (firing)
+		actor->output.control_flags |= FLAG(_unit_control_weapon_primary_trigger_bit);
+	else
+		actor->output.control_flags &= ~FLAG(_unit_control_weapon_primary_trigger_bit);
+	actor->output.analog_primary_trigger = analog_primary_trigger;
+
+	return;
+}
+
+void actor_unit_control_secondary_trigger(
+	long actor_index,
+	boolean firing)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (firing)
+		actor->output.control_flags |= FLAG(_unit_control_weapon_secondary_trigger_bit);
+	else
+		actor->output.control_flags &= ~FLAG(_unit_control_weapon_secondary_trigger_bit);
+
+	return;
+}
+
 void actor_unit_control_throw_grenade(
 	long actor_index)
 {
 	struct actor_datum *actor = actor_get(actor_index);
 
 	actor->output.control_flags |= FLAG(_unit_control_throw_grenade_bit);
+
+	return;
+}
+
+void actor_unit_control_exact_facing(
+	long actor_index,
+	boolean exact_facing)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (exact_facing)
+		actor->output.control_flags |= FLAG(_unit_control_exact_facing_bit);
+	else
+		actor->output.control_flags &= ~FLAG(_unit_control_exact_facing_bit);
 
 	return;
 }
