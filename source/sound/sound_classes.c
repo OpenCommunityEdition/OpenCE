@@ -164,7 +164,7 @@ struct sound_class_definition *sound_class_get(
 
 /* ---------- globals */
 
-struct sound_class_runtime *sound_class_data;
+extern struct sound_class_runtime *sound_class_data;
 struct sound_class_definition sound_classes[NUMBER_OF_SOUND_CLASSES] =
 {
 	SOUND_CLASS_DEFINITION(6, 4, 100, 0, 4, 0, 0.5f, 1.4f, 8.f, 1.f, 1.f, 0),
@@ -237,9 +237,6 @@ char const *sound_class_names[NUMBER_OF_SOUND_CLASSES] =
 
 /* ---------- public code */
 
-/* NonMatching: target and candidate are both 0xD0 bytes with 18 relocations.
-   The first relocation is at +0x16 in the target and +0x13 in the candidate;
-   the remaining difference is an ESI/EDI index-pointer register mirror. */
 struct sound_class_definition *sound_class_get(
 	short class_index)
 {
@@ -263,7 +260,7 @@ struct sound_class_definition *sound_class_get(
 		134,
 		definition->maximum_number_per_object<=MAXIMUM_SOUND_INSTANCES_PER_OBJECT_PER_DEFINITION);
 
-	return definition;
+	return &sound_classes[class_index];
 }
 
 void sound_classes_initialize(

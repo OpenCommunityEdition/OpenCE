@@ -211,6 +211,16 @@
     }
   },
   {
+    "unit": "source/sound/sound_classes",
+    "symbol": "_sound_classes",
+    "reason": "the complete rebuilt object owns the exact sound-class definition and name tables; all 2452 normalized bytes and all 51 relocation addresses, types, addends, and independently resolved image destinations are exact, while csplit records shared empty and ambient strings as undefined image symbols and the compiler emits their select-any COMDAT owners locally",
+    "measurements": {
+      "size": 2452,
+      "relocation_count": 51,
+      "normalized_sha256": "1ae64de7abb95c40952d3aacf88c68232070d4c19906bf32dfc8877bd6725abc"
+    }
+  },
+  {
     "unit": "libs/libcmt/crt0msg",
     "symbol": "_data_00319950",
     "reason": "the complete authenticated CRT object owns an exact runtime-error pointer table; objdiff leaves the table uncredited even though the hardened comparator proves identical normalized bytes, all 18 relocation addresses/types/destinations/addends, and external owner spelling",

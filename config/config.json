@@ -386,7 +386,7 @@
 				{ "name": "source/sound/sound_environment_definitions.c", "index": 12, "status": "Matching" },
 				{ "name": "source/sound/sound_dsound_xbox.c", "index": 13, "status": "NonMatching" },
 				{ "name": "source/sound/sound_definitions.c", "index": 14, "status": "Matching" },
-				{ "name": "source/sound/sound_classes.c", "index": 15, "status": "NonMatching" },
+				{ "name": "source/sound/sound_classes.c", "index": 15, "status": "Matching" },
 				{ "name": "source/sound/ima_adpcm.c", "index": 16, "status": "NonMatching" },
 				{ "name": "source/sound/game_sound.c", "index": 17, "status": "NonMatching" },
 				{ "name": "source/sound/sound_import/sound_wave.c", "index": 18, "status": "Matching" },
