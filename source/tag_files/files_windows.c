@@ -126,12 +126,21 @@ symbols in this file:
 
 /* ---------- macros */
 
+/*
+ * The legacy accessor predates const-correct callers. It only validates and
+ * returns the reference storage; keep its required conversion at this one
+ * boundary and expose only a read-only view to this translation unit.
+ */
+#define file_reference_get_const_info(reference) \
+	((struct file_reference_info const *) \
+		file_reference_get_info((struct file_reference *)(reference)))
+
 /* ---------- structures */
 
 /* ---------- prototypes */
 
 static void code_00189ca0(
-	struct file_reference *file,
+	struct file_reference const *file,
 	const char *function_name);
 
 /* ---------- globals */
@@ -362,7 +371,8 @@ boolean file_get_last_modification_date(
 boolean file_exists(
 	const struct file_reference *file)
 {
-	struct file_reference_info *info = file_reference_get_info((struct file_reference *)file);
+	struct file_reference_info const *info =
+		file_reference_get_const_info(file);
 	boolean result = FALSE;
 	char full_path[MAXIMUM_FILENAME_LENGTH+1] = "";
 
@@ -373,7 +383,7 @@ boolean file_exists(
 	}
 	else if (GetLastError()!=ERROR_FILE_NOT_FOUND && GetLastError()!=ERROR_PATH_NOT_FOUND)
 	{
-		code_00189ca0((struct file_reference *)file, "file_exists");
+		code_00189ca0(file, "file_exists");
 	}
 
 	return result;
@@ -422,12 +432,13 @@ unsigned long file_get_position(
 	const struct file_reference *file)
 {
 	unsigned long position;
-	void *file_handle = file_reference_get_info((struct file_reference *)file)->file_handle;
+	void *file_handle = file_reference_get_const_info(file)->file_handle;
 
 	position = SetFilePointer(file_handle, 0, NULL, FILE_CURRENT);
 	if (position == (unsigned long)NONE)
 	{
-		struct file_reference_info *info = file_reference_get_info((struct file_reference *)file);
+		struct file_reference_info const *info =
+			file_reference_get_const_info(file);
 
 		error(_error_silent, "%s('%s') error 0x%08x", "file_get_position",
 			info->path, GetLastError());
@@ -441,13 +452,15 @@ boolean file_set_position(
 	const struct file_reference *file,
 	unsigned long position)
 {
-	struct file_reference_info *info = file_reference_get_info((struct file_reference *)file);
+	struct file_reference_info const *info =
+		file_reference_get_const_info(file);
 	boolean result;
 
 	result = SetFilePointer(info->file_handle, position, NULL, FILE_BEGIN) != (unsigned long)NONE;
 	if (!result)
 	{
-		struct file_reference_info *error_info = file_reference_get_info((struct file_reference *)file);
+		struct file_reference_info const *error_info =
+			file_reference_get_const_info(file);
 
 		error(_error_silent, "%s('%s') error 0x%08x", "file_set_position",
 			error_info->path, GetLastError());
@@ -461,12 +474,13 @@ unsigned long file_get_eof(
 	const struct file_reference *file)
 {
 	unsigned long size;
-	void *file_handle = file_reference_get_info((struct file_reference *)file)->file_handle;
+	void *file_handle = file_reference_get_const_info(file)->file_handle;
 
 	size = GetFileSize(file_handle, NULL);
 	if (size == (unsigned long)NONE)
 	{
-		struct file_reference_info *info = file_reference_get_info((struct file_reference *)file);
+		struct file_reference_info const *info =
+			file_reference_get_const_info(file);
 
 		error(_error_silent, "%s('%s') error 0x%08x", "file_get_eof",
 			info->path, GetLastError());
@@ -480,7 +494,8 @@ boolean file_set_eof(
 	const struct file_reference *file,
 	unsigned long position)
 {
-	struct file_reference_info *info = file_reference_get_info((struct file_reference *)file);
+	struct file_reference_info const *info =
+		file_reference_get_const_info(file);
 	boolean result;
 
 	if (file_set_position(file, position) && SetEndOfFile(info->file_handle))
@@ -489,10 +504,10 @@ boolean file_set_eof(
 	}
 	else
 	{
-		struct file_reference_info *error_info;
+		struct file_reference_info const *error_info;
 
 		result = FALSE;
-		error_info = file_reference_get_info((struct file_reference *)file);
+		error_info = file_reference_get_const_info(file);
 		error(_error_silent, "%s('%s') error 0x%08x", "file_set_eof",
 			error_info->path, GetLastError());
 		SetLastError(0);
@@ -522,10 +537,11 @@ boolean file_write_to_position(
 /* ---------- private code */
 
 static void code_00189ca0(
-	struct file_reference *file,
+	struct file_reference const *file,
 	const char *function_name)
 {
-	struct file_reference_info *info = file_reference_get_info(file);
+	struct file_reference_info const *info =
+		file_reference_get_const_info(file);
 
 	error(_error_silent, "%s('%s') error 0x%08x", function_name,
 		info->path, GetLastError());

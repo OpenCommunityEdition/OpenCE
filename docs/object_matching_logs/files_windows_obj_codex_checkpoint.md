@@ -113,3 +113,25 @@ device, forced inline, optimizer pragma/barrier, undefined type-punning, raw
 byte access, or byte forcing. Parameter formatting and explicit void returns
 follow the project rules. The unit remains `NonMatching` and no GitHub push is
 performed.
+
+## Const-corrective follow-up
+
+A later policy audit found ten call-site casts that discarded `const` solely
+to reach the legacy `file_reference_get_info` API. That API's implementation
+only validates the reference fields and returns the same storage; it performs
+no write. The corrective source therefore confines the unavoidable legacy
+conversion to one TU-local accessor boundary, immediately converts the result
+to `struct file_reference_info const *`, and exposes no writable pointer. All
+five const public paths and the private error reporter now retain const views
+throughout. A raw-cast audit finds no remaining call-site conversion; the one
+documented conversion is the accessor boundary itself.
+
+The forced XDK rebuild preserves all 20/27 strict-exact functions, including
+the six directly affected sections, with unchanged normalized hashes, padded
+sizes, and relocation semantics. The pre-correction regression manifest
+reports all 20 accepted functions `still_exact`, no changed nonexact function,
+no newly exact function, and no runtime data or symbol-ownership change. The
+only object delta is compiler type information in `.debug$S`, as expected from
+making every local reference-info view const; it receives no runtime matching
+credit. The 15 exact owned strings (337 bytes) and the unit's 20/27 code result
+are unchanged.
