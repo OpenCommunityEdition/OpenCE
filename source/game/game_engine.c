@@ -580,8 +580,6 @@ enum
 
 /* ---------- macros */
 
-#define GAME_ENGINE_CALLBACKS \
-	((struct game_engine_callback_view *)game_engine)
 #define game_engine_postgame_hud_definition_get(index) \
 	((struct game_engine_postgame_hud_definition *)tag_get('hudg', (index)))
 #define item_collection_definition_get(index) \
@@ -648,35 +646,6 @@ struct game_engine_hud_globals
 	long local_player_message_font_index;
 };
 
-struct game_engine_callback_view
-{
-	byte unused00[0x34];
-	void (*player_update_each_tick)(
-		long player_index);
-	void (*objective_weapon_update)(
-		long item_index,
-		struct weapon_datum *weapon);
-	byte unused3C[0x10];
-	void (*format_player_score)(
-		long player_index,
-		wchar_t *string);
-	void (*format_score_name)(
-		wchar_t *string);
-	void (*format_team_name)(
-		long team_index,
-		wchar_t *string);
-	byte unused58[0xC];
-	boolean (*format_message)(
-		long player_index,
-		long parameter1,
-		long parameter2,
-		wchar_t *message,
-		long message_character_count);
-	byte unused68[0x8];
-	void (*player_update)(
-		long player_index);
-};
-
 union game_engine_update_iterator
 {
 	struct data_iterator data;
@@ -699,34 +668,6 @@ typedef char verify_game_engine_hud_globals_local_player_message_font_index_offs
 	offsetof(
 		struct game_engine_hud_globals,
 		local_player_message_font_index) == 0x64 ? 1 : -1];
-typedef char verify_game_engine_callback_view_player_update_each_tick_offset[
-	offsetof(
-		struct game_engine_callback_view,
-		player_update_each_tick) == 0x34 ? 1 : -1];
-typedef char verify_game_engine_callback_view_objective_weapon_update_offset[
-	offsetof(
-		struct game_engine_callback_view,
-		objective_weapon_update) == 0x38 ? 1 : -1];
-typedef char verify_game_engine_callback_view_format_player_score_offset[
-	offsetof(
-		struct game_engine_callback_view,
-		format_player_score) == 0x4C ? 1 : -1];
-typedef char verify_game_engine_callback_view_format_score_name_offset[
-	offsetof(
-		struct game_engine_callback_view,
-		format_score_name) == 0x50 ? 1 : -1];
-typedef char verify_game_engine_callback_view_format_team_name_offset[
-	offsetof(
-		struct game_engine_callback_view,
-		format_team_name) == 0x54 ? 1 : -1];
-typedef char verify_game_engine_callback_view_format_message_offset[
-	offsetof(
-		struct game_engine_callback_view,
-		format_message) == 0x64 ? 1 : -1];
-typedef char verify_game_engine_callback_view_player_update_offset[
-	offsetof(
-		struct game_engine_callback_view,
-		player_update) == 0x70 ? 1 : -1];
 typedef char verify_game_engine_postgame_hud_definition_bitmap_group_index_offset[
 	offsetof(
 		struct game_engine_postgame_hud_definition,
@@ -1406,10 +1347,10 @@ static void code_0009d140(
 		long team0_score;
 		long team1_score;
 
-		GAME_ENGINE_CALLBACKS->format_team_name(
+		game_engine->format_team_name(
 			0,
 			&branch_storage.team_names[14]);
-		GAME_ENGINE_CALLBACKS->format_team_name(
+		game_engine->format_team_name(
 			1,
 			&branch_storage.team_names[0]);
 		team0_score = game_engine_get_team_score(0);
@@ -1481,7 +1422,7 @@ static void code_0009d140(
 
 	branch_storage.entry =
 		*code_0009a3b0(&branch_storage.entry, player_index);
-	GAME_ENGINE_CALLBACKS->format_player_score(player_index, score_string);
+	game_engine->format_player_score(player_index, score_string);
 
 	if (code_00096b30(&branch_storage.entry))
 	{
@@ -1936,7 +1877,7 @@ void code_0009e670(
 	else
 		score_name = L"";
 
-	GAME_ENGINE_CALLBACKS->format_score_name(score_string);
+	game_engine->format_score_name(score_string);
 	usprintf(row_string, L"\t%s\t%s\t%s", column_name, score_name, score_string);
 	code_000994f0(row_string, FALSE, 1, &color);
 
@@ -1971,7 +1912,7 @@ void code_0009e670(
 				team_colors[1].blue = 0.6f;
 				color.alpha = alpha;
 
-				GAME_ENGINE_CALLBACKS->format_player_score(
+				game_engine->format_player_score(
 					entry_player_index,
 					score_string);
 
@@ -2154,7 +2095,7 @@ void game_engine_post_rasterize_post_game(
 		{
 			long team_index = team_order[team_row];
 
-			GAME_ENGINE_CALLBACKS->format_team_name(
+			game_engine->format_team_name(
 				team_index,
 				score_string);
 			usnprintf(
@@ -2196,7 +2137,7 @@ void game_engine_post_rasterize_post_game(
 				unicode_string_list_get_string(string_list_index, 0x47) :
 				L"";
 
-		GAME_ENGINE_CALLBACKS->format_score_name(score_string);
+		game_engine->format_score_name(score_string);
 		usnprintf(
 			row_string,
 			NUMBEROF(row_string),
@@ -2265,7 +2206,7 @@ void game_engine_post_rasterize_post_game(
 
 			if (!postgame_statistic_get_rating(player_index, 1, 0))
 				draw_string_set_color(&hilite_color);
-			GAME_ENGINE_CALLBACKS->format_player_score(
+			game_engine->format_player_score(
 				player_index,
 				score_string);
 			usnprintf(row_string, NUMBEROF(row_string), L" \t \t \t%s", score_string);
@@ -2562,9 +2503,9 @@ static boolean code_0009b6a0(
 {
 	boolean result = FALSE;
 
-	if (GAME_ENGINE_CALLBACKS->format_message)
+	if (game_engine->format_message)
 	{
-		result = GAME_ENGINE_CALLBACKS->format_message(
+		result = game_engine->format_message(
 			player_index,
 			parameter1,
 			parameter2,
@@ -3688,16 +3629,6 @@ static void code_0009bdf0(
 	real_vector3d forward;
 	long source_flag_index;
 	long destination_flag_index;
-	union
-	{
-		byte allocation[56];
-		struct screen_flash_definition screen_flash;
-		struct
-		{
-			byte pad[12];
-			struct collision_plane point_test_result;
-		} collision;
-	} scratch;
 
 	if (player->unit_index == NONE)
 		return;
@@ -3756,6 +3687,7 @@ static void code_0009bdf0(
 
 		{
 			struct collision_feature_list features;
+			struct collision_plane point_test_result;
 			struct player_datum *unit_player;
 			real_point3d position;
 			real height;
@@ -3781,18 +3713,18 @@ static void code_0009bdf0(
 				collision_features_test_point(
 					&features,
 					&position,
-					&scratch.collision.point_test_result))
+					&point_test_result))
 			{
-				if (scratch.collision.point_test_result.object_index != NONE)
+				if (point_test_result.object_index != NONE)
 				{
 					if (TEST_FLAG(
 							_object_mask_unit,
 							object_get(
-								scratch.collision.point_test_result.object_index)
+								point_test_result.object_index)
 								->object.type))
 					{
 						struct unit_datum *blocking_unit = unit_get(
-							scratch.collision.point_test_result.object_index);
+							point_test_result.object_index);
 						if (blocking_unit->unit.player_index != NONE)
 						{
 							struct player_datum *blocking_player =
@@ -3834,30 +3766,23 @@ static void code_0009bdf0(
 			game_engine_play_multiplayer_sound(0x1B);
 			if (player->local_player_index != NONE)
 			{
-				long clear_index;
+				struct screen_flash_definition screen_flash = { 0 };
 
-				for (clear_index = 2;
-					clear_index < NUMBEROF(scratch.allocation);
-					clear_index++)
-				{
-					scratch.allocation[clear_index] = 0;
-				}
-
-				scratch.screen_flash.fade_function =
+				screen_flash.fade_function =
 					game_engine_teleport_flash_fade_function;
-				scratch.screen_flash.type =
+				screen_flash.type =
 					debug_player_color.teleporter_flash_type;
-				scratch.screen_flash.duration =
+				screen_flash.duration =
 					debug_player_color.teleporter_flash_duration;
-				scratch.screen_flash.priority = 2;
-				scratch.screen_flash.max_intensity =
+				screen_flash.priority = 2;
+				screen_flash.max_intensity =
 					debug_player_color.teleporter_flash_maximum_intensity;
-				scratch.screen_flash.zero_scale_factor = 0.0f;
-				scratch.screen_flash.screen_flash_color =
+				screen_flash.zero_scale_factor = 0.0f;
+				screen_flash.screen_flash_color =
 					debug_player_color.teleporter_flash_color;
 				player_effect_screen_flash(
 					player_index,
-					&scratch.screen_flash,
+					&screen_flash,
 					1.0f);
 			}
 		}
@@ -3942,10 +3867,10 @@ void game_engine_update(
 
 			code_0009bdf0(iterator.data.datum_index);
 
-			if (GAME_ENGINE_CALLBACKS->player_update_each_tick)
+			if (game_engine->player_update_each_tick)
 			{
 				void (*player_update)(long) =
-					GAME_ENGINE_CALLBACKS->player_update_each_tick;
+					game_engine->player_update_each_tick;
 				player_update(iterator.data.datum_index);
 			}
 		}
@@ -6656,14 +6581,14 @@ void code_00096ed0(
 		 * Slot 0x38 is populated by the CTF and oddball engines. It receives
 		 * each objective weapon during the per-tick item scan.
 		 */
-		if (GAME_ENGINE_CALLBACKS->objective_weapon_update)
+		if (game_engine->objective_weapon_update)
 		{
 			struct weapon_datum *weapon = weapon_try_and_get(iterator.index);
 
 			if (weapon && weapon_is_flag(iterator.index))
 			{
 				code_00096e30(iterator.index);
-				GAME_ENGINE_CALLBACKS->objective_weapon_update(
+				game_engine->objective_weapon_update(
 					iterator.index,
 					weapon);
 			}
@@ -7374,9 +7299,9 @@ void game_engine_postspawn_player_update(
 	if (!game_engine)
 		return;
 
-	if (GAME_ENGINE_CALLBACKS->player_update)
+	if (game_engine->player_update)
 	{
-		GAME_ENGINE_CALLBACKS->player_update(player_index);
+		game_engine->player_update(player_index);
 		return;
 	}
 

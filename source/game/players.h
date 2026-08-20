@@ -135,6 +135,8 @@ typedef char players_globals_size_assert[
 
 typedef char player_datum_team_index_offset_assert[
 	offsetof(struct player_datum, team_index) == 0x20 ? 1 : -1];
+typedef char player_datum_target_hold_time_offset_assert[
+	offsetof(struct player_datum, target_hold_time) == 0x80 ? 1 : -1];
 typedef char player_datum_statistics_offset_assert[
 	offsetof(struct player_datum, statistics) == 0x8C ? 1 : -1];
 typedef char player_datum_unknown_c8_offset_assert[

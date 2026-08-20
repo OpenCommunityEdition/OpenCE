@@ -32,6 +32,7 @@ enum
 
 struct game_globals;
 struct player_starting_location;
+struct weapon_datum;
 union real_argb_color;
 union real_point2d;
 union real_point3d;
@@ -85,6 +86,8 @@ struct game_variant
 };
 
 typedef char verify_game_variant_size[sizeof(struct game_variant) == 0x68 ? 1 : -1];
+typedef char verify_game_variant_unknown16_offset[
+	offsetof(struct game_variant, unknown16) == 0x16 ? 1 : -1];
 
 struct game_engine
 {
@@ -101,7 +104,11 @@ struct game_engine
 	void (*handle_server_message)(void *message);
 	void (*unknown2C)(void);
 	void (*post_rasterize_objects)(void);
-	void (*unknown34[2])(void);
+	void (*player_update_each_tick)(
+		long player_index);
+	void (*objective_weapon_update)(
+		long item_index,
+		struct weapon_datum *weapon);
 	boolean (*picking_up)(
 		long weapon_index,
 		long player_index);
@@ -111,7 +118,14 @@ struct game_engine
 	long (*get_player_score)(
 		long player_index,
 		boolean team_score);
-	void (*unknown4C[3])(void);
+	void (*format_player_score)(
+		long player_index,
+		wchar_t *string);
+	void (*format_score_name)(
+		wchar_t *string);
+	void (*format_team_name)(
+		long team_index,
+		wchar_t *string);
 	boolean (*allow_pick_up)(
 		long unit_index,
 		long weapon_index);
@@ -119,13 +133,20 @@ struct game_engine
 		long damaging_player_index,
 		long dead_player_index,
 		long damage_type);
-	void (*unknown60[2])(void);
+	void (*unknown60)(void);
+	boolean (*format_message)(
+		long player_index,
+		long parameter1,
+		long parameter2,
+		wchar_t *message,
+		long message_character_count);
 	float (*starting_location_rating)(
 		long player_index,
 		struct player_starting_location const *starting_location);
 	void (*prespawn_player_update)(
 		long player_index);
-	void (*unknown70)(void);
+	void (*player_update)(
+		long player_index);
 	void (*team_index_override)(void);
 	boolean (*player_can_see_goal)(
 		long player_index,
@@ -140,6 +161,20 @@ struct game_engine
 };
 
 typedef char verify_game_engine_size[sizeof(struct game_engine) == 0x88 ? 1 : -1];
+typedef char verify_game_engine_player_update_each_tick_offset[
+	offsetof(struct game_engine, player_update_each_tick) == 0x34 ? 1 : -1];
+typedef char verify_game_engine_objective_weapon_update_offset[
+	offsetof(struct game_engine, objective_weapon_update) == 0x38 ? 1 : -1];
+typedef char verify_game_engine_format_player_score_offset[
+	offsetof(struct game_engine, format_player_score) == 0x4C ? 1 : -1];
+typedef char verify_game_engine_format_score_name_offset[
+	offsetof(struct game_engine, format_score_name) == 0x50 ? 1 : -1];
+typedef char verify_game_engine_format_team_name_offset[
+	offsetof(struct game_engine, format_team_name) == 0x54 ? 1 : -1];
+typedef char verify_game_engine_format_message_offset[
+	offsetof(struct game_engine, format_message) == 0x64 ? 1 : -1];
+typedef char verify_game_engine_player_update_offset[
+	offsetof(struct game_engine, player_update) == 0x70 ? 1 : -1];
 
 /* ---------- prototypes/GAME_ENGINE.C */
 
