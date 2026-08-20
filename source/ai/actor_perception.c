@@ -250,9 +250,7 @@ symbols in this file:
 #include "cseries.h"
 
 #include "actor_definitions.h"
-#define actor_perception_create_orphan_from_friend actor_perception_create_orphan_from_friend_header_declaration
 #include "actors.h"
-#undef actor_perception_create_orphan_from_friend
 #include "ai_debug.h"
 #include "ai_profile.h"
 #include "encounters.h"
@@ -280,6 +278,20 @@ enum
 };
 
 /* ---------- macros */
+
+/*
+ * January's Actor Perception names these shared HCEX actor slots
+ * differently.  Keep the aliases typed through actor_datum rather than
+ * overlaying the datum with an incompatible structure type.
+ */
+#define actor_perception_preferred_target_prop_index(actor) \
+	((actor)->meta.interesting_orphan_index)
+
+#define actor_perception_target_weight_combat_status(actor) \
+	((actor)->state.combat_status)
+
+#define actor_perception_audibility_combat_status(actor) \
+	((actor)->state.mode)
 
 /* ---------- structures */
 
@@ -400,14 +412,6 @@ struct actor_danger_zone_view
 	real_point3d bounding_sphere_center;
 	short predicted_impact_ticks;
 	byte __unknown06A[2];
-};
-
-struct actor_combat_status_view
-{
-	byte __unknown000[0x6A];
-	short artificial_combat_status;
-	short friend_state;
-	short combat_status;
 };
 
 struct actor_perception_actor_view
@@ -700,18 +704,6 @@ struct actor_perception_responsible_unit_view
 	short team;
 };
 
-struct actor_visibility_actor_view
-{
-	byte __unknown000[6];
-	boolean force_active;
-	byte __unknown007[0x51];
-	long definition_index;
-	byte __unknown05C[0x130];
-	real_vector3d facing_vector;
-	real_vector3d looking_left_vector;
-	real_vector3d looking_up_vector;
-};
-
 struct actor_situation_counts
 {
 	char enemy_count;
@@ -956,6 +948,12 @@ typedef char actor_target_weight_firing_combat_range_offset_assert[
 	offsetof(struct actor_variant_definition, ranged_combat.combat_range_upper_bound) == 0xA0 ? 1 : -1];
 typedef char actor_target_weight_weapon_minimum_range_offset_assert[
 	offsetof(struct actor_target_weight_weapon_definition_view, minimum_target_range) == 0x40C ? 1 : -1];
+typedef char actor_perception_preferred_target_prop_index_offset_assert[
+	offsetof(struct actor_datum, meta.interesting_orphan_index) == 0x54 ? 1 : -1];
+typedef char actor_perception_audibility_combat_status_offset_assert[
+	offsetof(struct actor_datum, state.mode) == 0x6A ? 1 : -1];
+typedef char actor_perception_target_weight_combat_status_offset_assert[
+	offsetof(struct actor_datum, state.combat_status) == 0x6E ? 1 : -1];
 typedef char actor_emotion_actor_unit_offset_assert[
 	offsetof(struct actor_datum, meta.unit_index) == 0x18 ? 1 : -1];
 typedef char actor_emotion_actor_definition_offset_assert[
@@ -1050,14 +1048,6 @@ typedef char actor_perception_encounter_view_postcombat_timer_offset_assert[
 	offsetof(struct actor_perception_encounter_view, postcombat_timer) == 0x50 ? 1 : -1];
 typedef char actor_perception_encounter_view_corpse_ignore_time_offset_assert[
 	offsetof(struct actor_perception_encounter_view, corpse_ignore_time) == 0x58 ? 1 : -1];
-typedef char actor_visibility_actor_view_definition_index_offset_assert[
-	offsetof(struct actor_visibility_actor_view, definition_index) == 0x58 ? 1 : -1];
-typedef char actor_visibility_actor_view_facing_vector_offset_assert[
-	offsetof(struct actor_visibility_actor_view, facing_vector) == 0x18C ? 1 : -1];
-typedef char actor_visibility_actor_view_looking_left_vector_offset_assert[
-	offsetof(struct actor_visibility_actor_view, looking_left_vector) == 0x198 ? 1 : -1];
-typedef char actor_visibility_actor_view_looking_up_vector_offset_assert[
-	offsetof(struct actor_visibility_actor_view, looking_up_vector) == 0x1A4 ? 1 : -1];
 typedef char actor_visibility_variant_modified_vision_range_offset_assert[
 	offsetof(struct actor_variant_definition, ranged_combat.modified_vision_range) == 0x150 ? 1 : -1];
 typedef char actor_visibility_debug_info_size_assert[
@@ -1767,10 +1757,8 @@ real actor_compute_prop_target_weight(
 	long actor_index,
 	long prop_index)
 {
-	struct actor_perception_actor_view *actor =
-		(struct actor_perception_actor_view *)actor_get(actor_index);
-	struct actor_perception_prop_view *prop =
-		(struct actor_perception_prop_view *)prop_get(prop_index);
+	struct actor_datum *actor = actor_get(actor_index);
+	struct prop_datum *prop = prop_get(prop_index);
 	struct actor_definition *actor_definition;
 	struct actor_variant_definition *variant_definition;
 	struct actor_variant_definition *firing_variant;
@@ -1794,14 +1782,14 @@ real actor_compute_prop_target_weight(
 	}
 
 	actor_definition =
-		actor_definition_get(actor->definition_index);
+		actor_definition_get(actor->meta.definition_index);
 	variant_definition =
-		actor_variant_definition_get(actor->variant_definition_index);
+		actor_variant_definition_get(actor->meta.variant_definition_index);
 	weights.target_weight = 0;
 	weights.preferred_weight = 0;
 	weights.bonus_weight = 0.0f;
 
-	if (actor->swarm)
+	if (actor->meta.swarm)
 	{
 		range_weight = 0;
 		goto range_weight_done;
@@ -1817,7 +1805,7 @@ real actor_compute_prop_target_weight(
 	{
 		real maximum_range;
 
-		if (actor->berserk)
+		if (actor->emotions.berserk)
 			maximum_range =
 				variant_definition->ranged_combat.melee_range;
 		else
@@ -1837,7 +1825,7 @@ real actor_compute_prop_target_weight(
 			actor_definition->berserk.melee_leap_velocity == 0.0f)
 			range_weight = 0;
 		else if (prop->underwater !=
-			actor->underwater)
+			actor->input.underwater)
 			range_weight = 1;
 		else if (prop->distance < maximum_range)
 			range_weight = 3;
@@ -1861,7 +1849,7 @@ ranged_weapon_range_two:
 			goto range_weight_done;
 		}
 
-		if (prop->underwater != actor->underwater)
+		if (prop->underwater != actor->input.underwater)
 		{
 			range_weight = 2;
 			goto range_weight_done;
@@ -1889,7 +1877,7 @@ range_weight_done:
 		knowledge_weight = 1;
 	else
 	{
-		if (!actor->swarm &&
+		if (!actor->meta.swarm &&
 			prop->currently_damaging_me &&
 			prop->unreachable_ticks == 0)
 		{
@@ -1898,14 +1886,14 @@ range_weight_done:
 		else if (prop->state >= 2 &&
 			prop->state <= 3)
 		{
-			if (actor->swarm)
+			if (actor->meta.swarm)
 				knowledge_weight = 4;
 			else if (prop->unreachable_ticks > 0)
 			{
 				knowledge_weight = 3;
 			}
-			else if (prop->line_of_sight_result != 0 &&
-				prop->line_of_sight_result != 1)
+			else if (prop->line_of_sight != 0 &&
+				prop->line_of_sight != 1)
 			{
 				knowledge_weight = 3;
 			}
@@ -1940,16 +1928,17 @@ range_weight_done:
 		}
 	}
 
-	if (actor->target_prop_index == NONE)
+	if (actor->target.target_prop_index == NONE)
 	{
 		if (prop->player ||
-			prop_index == actor->preferred_target_prop_index)
+			prop_index ==
+				actor_perception_preferred_target_prop_index(actor))
 		{
 			weights.bonus_weight = 3.0f;
 		}
 	}
-	else if (prop_index == actor->target_prop_index &&
-		actor->artificial_combat_status >= 3)
+	else if (prop_index == actor->target.target_prop_index &&
+		actor_perception_target_weight_combat_status(actor) >= 3)
 	{
 		weights.target_weight = 1;
 	}
@@ -2176,12 +2165,9 @@ short actor_visibility_at_point(
 
 	if (line_of_sight == 0 || line_of_sight == 1)
 	{
-		struct actor_perception_actor_view *actor =
-			(struct actor_perception_actor_view *)actor_get(actor_index);
-		struct actor_visibility_actor_view *visibility_actor =
-			(struct actor_visibility_actor_view *)actor;
+		struct actor_datum *actor = actor_get(actor_index);
 		struct actor_definition *definition =
-			actor_definition_get(actor->definition_index);
+			actor_definition_get(actor->meta.definition_index);
 		struct actor_variant_definition *firing_variant =
 			actor_combat_get_firing_variant_definition(actor_index);
 		real maximum_distance =
@@ -2303,7 +2289,7 @@ perception_factor_ready:
 					if (distance_squared <
 						visible_distance_i * visible_distance_j)
 					{
-						if (!actor->swarm && use_maximum_distance)
+						if (!actor->meta.swarm && use_maximum_distance)
 						{
 							real_vector3d facing;
 							real pitch;
@@ -2311,15 +2297,15 @@ perception_factor_ready:
 							facing.i =
 								dot_product3d(
 									&direction,
-									&visibility_actor->facing_vector);
+									&actor->input.looking_vector);
 							facing.j =
 								dot_product3d(
 									&direction,
-									&visibility_actor->looking_left_vector);
+									&actor->input.looking_left_vector);
 							facing.k =
 								dot_product3d(
 									&direction,
-									&visibility_actor->looking_up_vector);
+									&actor->input.looking_up_vector);
 							pitch =
 								arctangent(
 									facing.k,
@@ -2383,10 +2369,9 @@ short actor_audibility_at_point(
 	real scale,
 	short line_of_sight)
 {
-	struct actor_perception_actor_view *actor =
-		(struct actor_perception_actor_view *)actor_get(actor_index);
+	struct actor_datum *actor = actor_get(actor_index);
 	struct actor_definition *definition =
-		actor_definition_get(actor->definition_index);
+		actor_definition_get(actor->meta.definition_index);
 	short result = 0;
 
 	if (source_type != 0 &&
@@ -2413,13 +2398,11 @@ short actor_audibility_at_point(
 			maximum_distance *= 0.8f;
 		}
 
-		if (((struct actor_combat_status_view *)actor)->
-			artificial_combat_status == 2)
+		if (actor_perception_audibility_combat_status(actor) == 2)
 		{
 			maximum_distance *= 0.7f;
 		}
-		else if (((struct actor_combat_status_view *)actor)->
-			artificial_combat_status == 1)
+		else if (actor_perception_audibility_combat_status(actor) == 1)
 		{
 			maximum_distance *= 0.4f;
 		}
@@ -2747,6 +2730,8 @@ next_emotion_prop:
 			actor->emotion_target_time = game_time_get();
 		}
 	}
+
+	return;
 }
 
 void actor_berserk(

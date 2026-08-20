@@ -851,7 +851,7 @@ boolean actor_path_at_destination(long actor_index);
 
 /* ---------- prototypes/ACTOR_PERCEPTION.C */
 
-void actor_perception_create_orphan_from_friend(
+boolean actor_perception_create_orphan_from_friend(
 	long actor_index,
 	long unit_index,
 	long friend_actor_index,
