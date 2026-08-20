@@ -20,6 +20,7 @@ header included in hcex build.
 
 struct player_profile;
 struct playlist_profile;
+struct game_variant;
 
 /* ---------- prototypes/PLAYER_UI.C */
 
@@ -44,6 +45,47 @@ boolean player0_look_pitch_is_inverted(
 boolean player0_joystick_set_is_normal(
 	void);
 void player_ui_end_editing_profile(
+	void);
+boolean player_ui_local_player_wants_to_play_multiplayer(
+	short local_player_index);
+void player_ui_clear_multiplayer_autojoin_for_local_player(
+	short local_player_index);
+short player_ui_get_last_single_player_level_played(
+	short local_player_index);
+short player_ui_get_single_player_local_player_controller(
+	short local_player_index);
+void player_ui_local_player_joined_multiplayer_game(
+	short local_player_index);
+boolean player_ui_rumble_disabled(
+	short local_player_index);
+boolean player_ui_get_path_to_local_player_profile_directory(
+	short local_player_index,
+	char *path);
+void player_ui_get_active_player_profile(
+	short local_player_index,
+	void *profile);
+void player_ui_activate_all_solo_levels(
+	void);
+void player_ui_set_game_variant(
+	struct game_variant *variant);
+boolean player_ui_game_variant_specified(
+	struct game_variant *variant);
+void player_ui_set_single_player_local_player_controller(
+	short local_player_index,
+	short controller_index);
+long player_ui_get_player1_last_used_profile_index(
+	void);
+boolean player_ui_edit_profile_is_default_profile(
+	void);
+void player_ui_remember_player1_profile(
+	boolean save);
+void player_ui_begin_editing_profile(
+	long profile_index);
+boolean player_ui_autolevel_enabled(
+	short controller_index);
+boolean player_ui_edit_profile_name_is_dirty(
+	void);
+boolean player_ui_prompt_user_to_rename_edit_profile(
 	void);
 
 /* ---------- globals */

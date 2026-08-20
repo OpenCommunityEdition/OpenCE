@@ -141,16 +141,22 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h"
+#include "text/unicode.h"
+#include "input/input.h"
+#include "networking/network_game_globals.h"
+#include "interface/virtual_keyboard.h"
 #include "player_ui.h"
 
 /* ---------- constants */
 
 enum
 {
-	NUMBER_OF_LOCAL_PLAYERS = 4,
+	MAXIMUM_NUMBER_OF_LOCAL_PLAYERS = 4,
 	PLAYER_UI_DISPOSE_SIZE = 0x230,
 	SAVED_GAME_FILE_TYPE_PLAYER_PROFILE = 0,
-	SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE = 1
+	SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE = 1,
+	NUMBER_OF_SAVED_GAME_FILE_TYPES = 2
 };
 
 /* ---------- macros */
@@ -159,27 +165,46 @@ enum
 
 struct player_ui_local_player
 {
-	byte unknown0[0x29];
+	byte unknown0[0x1c];
+	byte solo_levels[10];
+	short last_single_player_level;
+	byte unknown28;
 	byte joystick_set;
 	byte unknown2A;
 	boolean look_pitch_inverted;
-	byte unknown2C[4];
+	boolean rumble_disabled;
+	byte unknown2D;
+	boolean autolevel;
+	byte unknown2F;
 	long active_profile_index;
 	boolean autojoin_next_multiplayer_game;
 	byte unknown35[3];
 };
 
+struct player_ui_profile_data
+{
+	wchar_t name[12];
+	byte unknown18[0x50];
+};
+
+struct player_ui_edit_profile
+{
+	struct player_ui_profile_data current;
+	struct player_ui_profile_data original;
+	byte unknownD0[4];
+};
+
 struct player_ui_globals
 {
-	struct player_ui_local_player local_players[NUMBER_OF_LOCAL_PLAYERS];
-	boolean multiplayer_autojoin[NUMBER_OF_LOCAL_PLAYERS];
-	short single_player_controller[NUMBER_OF_LOCAL_PLAYERS];
-	byte unknownEC[0x68];
+	struct player_ui_local_player local_players[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+	boolean multiplayer_autojoin[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+	short single_player_controller[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+	byte multiplayer_variant[0x68];
 	boolean multiplayer_variant_specified;
 	byte unknown155[3];
 	long edit_profile_index;
-	byte edit_profile[0xD4];
-	byte unknown230[0x100];
+	struct player_ui_edit_profile edit_profile;
+	char player1_last_used_profile_directory[0x100];
 };
 
 /* ---------- prototypes */
@@ -190,11 +215,31 @@ void game_engine_dispose(
 	void);
 void game_set_game_variant(
 	struct game_variant *variant);
-short saved_game_file_get_type(
+word saved_game_file_get_type(
 	long profile_index);
+boolean player_profile_get_enclosing_directory_path(
+	long profile,
+	char *full_path);
+void player_profile_save(
+	long profile,
+	void *data);
+boolean saved_game_file_retrieve_player1_last_used_profile_directory(
+	char *directory);
+long saved_game_file_find_profile_index_for_directory_path(
+	char *directory,
+	long file_type);
+void saved_game_file_remember_player1_last_used_profile_directory(
+	char *directory);
+boolean player_profile_get(
+	long profile_index,
+	struct player_ui_profile_data *profile);
+boolean playlist_profile_get(
+	long profile_index,
+	struct player_ui_profile_data *profile);
 
 /* ---------- globals */
 
+long data_002fd5a4 = NONE;
 struct player_ui_globals player_ui_globals = { 0 };
 
 /* ---------- public code */
@@ -223,7 +268,7 @@ short player_ui_get_single_player_local_player_from_controller(
 	short result;
 
 	result = NONE;
-	for (local_player_index = 0; local_player_index < NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
+	for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
 	{
 		if (player_ui_globals.single_player_controller[local_player_index] == controller_index)
 		{
@@ -259,7 +304,7 @@ long player_ui_get_active_player_profile_index(
 {
 	long result;
 
-	if (local_player_index >= 0 && local_player_index < NUMBER_OF_LOCAL_PLAYERS)
+	if (local_player_index >= 0 && local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
 		result = player_ui_globals.local_players[local_player_index].active_profile_index;
 	else
 		result = NONE;
@@ -272,7 +317,7 @@ struct player_profile *player_ui_get_edit_player_profile(
 	struct player_profile *result;
 
 	if (saved_game_file_get_type(player_ui_globals.edit_profile_index) == SAVED_GAME_FILE_TYPE_PLAYER_PROFILE)
-		result = (struct player_profile *)player_ui_globals.edit_profile;
+		result = (struct player_profile *)&player_ui_globals.edit_profile;
 	else
 		result = NULL;
 	return result;
@@ -284,7 +329,7 @@ struct playlist_profile *player_ui_get_edit_playlist_profile(
 	struct playlist_profile *result;
 
 	if (saved_game_file_get_type(player_ui_globals.edit_profile_index) == SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE)
-		result = (struct playlist_profile *)player_ui_globals.edit_profile;
+		result = (struct playlist_profile *)&player_ui_globals.edit_profile;
 	else
 		result = NULL;
 	return result;
@@ -308,6 +353,333 @@ void player_ui_end_editing_profile(
 {
 	player_ui_globals.edit_profile_index = NONE;
 	return;
+}
+
+boolean player_ui_local_player_wants_to_play_multiplayer(
+	short local_player_index)
+{
+	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 167, (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
+
+	return player_ui_globals.local_players[local_player_index].autojoin_next_multiplayer_game;
+}
+
+void player_ui_clear_multiplayer_autojoin_for_local_player(
+	short local_player_index)
+{
+	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 175, (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
+
+	player_ui_globals.local_players[local_player_index].autojoin_next_multiplayer_game = FALSE;
+	return;
+}
+
+short player_ui_get_last_single_player_level_played(
+	short local_player_index)
+{
+	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 265, (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
+
+	return player_ui_globals.local_players[local_player_index].last_single_player_level;
+}
+
+short player_ui_get_single_player_local_player_controller(
+	short local_player_index)
+{
+	match_vassert("c:\\halo\\SOURCE\\interface\\player_ui.c", 132,
+		(local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS),
+		"invalid local player index");
+
+	return player_ui_globals.single_player_controller[local_player_index];
+}
+
+void player_ui_local_player_joined_multiplayer_game(
+	short local_player_index)
+{
+	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 157, (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
+
+	player_ui_globals.local_players[local_player_index].autojoin_next_multiplayer_game = TRUE;
+	player_ui_globals.multiplayer_autojoin[local_player_index] = TRUE;
+	return;
+}
+
+boolean player_ui_rumble_disabled(
+	short local_player_index)
+{
+	if (local_player_index == NONE)
+		return FALSE;
+
+	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 305, (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
+
+	return player_ui_globals.local_players[local_player_index].rumble_disabled;
+}
+
+boolean player_ui_get_path_to_local_player_profile_directory(
+	short local_player_index,
+	char *path)
+{
+	if (local_player_index >= 0 && local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+		return player_profile_get_enclosing_directory_path(
+			player_ui_globals.local_players[local_player_index].active_profile_index,
+			path);
+	return FALSE;
+}
+
+void player_ui_get_active_player_profile(
+	short local_player_index,
+	void *profile)
+{
+	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 238, (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS) && (profile != NULL));
+
+	csmemcpy(profile, &player_ui_globals.local_players[local_player_index], 0x30);
+	return;
+}
+
+void player_ui_activate_all_solo_levels(
+	void)
+{
+	long level_index;
+
+	level_index = 0;
+	do
+	{
+		player_ui_globals.local_players[0].solo_levels[level_index] |= 0xf;
+	}
+	while (++level_index < 10);
+
+	if (player_ui_globals.local_players[0].active_profile_index != NONE)
+		player_profile_save(
+			player_ui_globals.local_players[0].active_profile_index,
+			&player_ui_globals.local_players[0]);
+	return;
+}
+
+void player_ui_set_game_variant(
+	struct game_variant *variant)
+{
+	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 273, variant);
+
+	csmemcpy(player_ui_globals.multiplayer_variant, variant, 0x68);
+	player_ui_globals.multiplayer_variant_specified = TRUE;
+	return;
+}
+
+boolean player_ui_game_variant_specified(
+	struct game_variant *variant)
+{
+	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 284, variant);
+
+	if (player_ui_globals.multiplayer_variant_specified)
+		csmemcpy(variant, player_ui_globals.multiplayer_variant, 0x68);
+	return player_ui_globals.multiplayer_variant_specified;
+}
+
+void player_ui_set_single_player_local_player_controller(
+	short local_player_index,
+	short controller_index)
+{
+	match_vassert("c:\\halo\\SOURCE\\interface\\player_ui.c", 119,
+		(local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS),
+		"invalid local player index");
+	match_vassert("c:\\halo\\SOURCE\\interface\\player_ui.c", 121,
+		(controller_index>=0) && (controller_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS),
+		"invalid controller index");
+
+	player_ui_globals.single_player_controller[local_player_index] = controller_index;
+	return;
+}
+
+long player_ui_get_player1_last_used_profile_index(
+	void)
+{
+	if (!player_ui_globals.player1_last_used_profile_directory[0] &&
+		saved_game_file_retrieve_player1_last_used_profile_directory(
+			player_ui_globals.player1_last_used_profile_directory))
+	{
+		data_002fd5a4 = saved_game_file_find_profile_index_for_directory_path(
+			player_ui_globals.player1_last_used_profile_directory, 0);
+	}
+	return data_002fd5a4;
+}
+
+boolean player_ui_edit_profile_is_default_profile(
+	void)
+{
+	boolean result;
+
+	result = FALSE;
+	if (player_ui_globals.edit_profile_index != NONE)
+	{
+		long type = saved_game_file_get_type(player_ui_globals.edit_profile_index);
+
+		if (type>=0 && type<=SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE)
+			result = ((unsigned long)player_ui_globals.edit_profile_index>>30) & 1;
+		else
+			error(_error_silent, "unknown saved game file type being edited");
+	}
+
+	return result;
+}
+
+void player_ui_remember_player1_profile(
+	boolean save)
+{
+	if (data_002fd5a4 != player_ui_globals.local_players[0].active_profile_index)
+	{
+		if (player_ui_globals.local_players[0].active_profile_index==NONE ||
+			!player_profile_get_enclosing_directory_path(
+				player_ui_globals.local_players[0].active_profile_index,
+				player_ui_globals.player1_last_used_profile_directory))
+		{
+			error(_error_silent, "player 1 has no active player profile assigned");
+		}
+
+		data_002fd5a4 = player_ui_globals.local_players[0].active_profile_index;
+	}
+
+	if (save && player_ui_globals.player1_last_used_profile_directory[0])
+		saved_game_file_remember_player1_last_used_profile_directory(
+			player_ui_globals.player1_last_used_profile_directory);
+
+	return;
+}
+
+void player_ui_begin_editing_profile(
+	long profile_index)
+{
+	long type;
+
+	player_ui_globals.edit_profile_index = NONE;
+	type = saved_game_file_get_type(profile_index);
+
+	switch (type)
+	{
+		case SAVED_GAME_FILE_TYPE_PLAYER_PROFILE:
+			if (player_profile_get(profile_index, &player_ui_globals.edit_profile.original))
+			{
+				csmemcpy(&player_ui_globals.edit_profile.current,
+					&player_ui_globals.edit_profile.original, 0x30);
+			}
+			else
+			{
+				error(_error_silent, "failed to retrieve player profile #%08lX for editing", profile_index);
+				return;
+			}
+			break;
+
+		case SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE:
+			if (playlist_profile_get(profile_index, &player_ui_globals.edit_profile.original))
+			{
+				csmemcpy(&player_ui_globals.edit_profile.current,
+					&player_ui_globals.edit_profile.original, 0x68);
+			}
+			else
+			{
+				error(_error_silent, "failed to retrieve playlist profile #%08lX for editing", profile_index);
+				return;
+			}
+			break;
+
+		default:
+			error(_error_silent, "invalid profile index (#%08lX)", profile_index);
+			return;
+	}
+
+	player_ui_globals.edit_profile_index = profile_index;
+	return;
+}
+
+boolean player_ui_autolevel_enabled(
+	short controller_index)
+{
+	short local_player_index;
+
+	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 320, (controller_index>=0) && (controller_index<MAXIMUM_GAMEPADS));
+
+	if (network_game_is_active())
+		local_player_index = controller_index;
+	else
+		local_player_index = player_ui_get_single_player_local_player_from_controller(controller_index);
+
+	if (local_player_index == NONE)
+		return FALSE;
+
+	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 340, (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
+
+	return player_ui_globals.local_players[local_player_index].autolevel;
+}
+
+boolean player_ui_edit_profile_name_is_dirty(
+	void)
+{
+	boolean result;
+
+	result = FALSE;
+	if (player_ui_globals.edit_profile_index != NONE)
+	{
+		long type = saved_game_file_get_type(player_ui_globals.edit_profile_index);
+
+		switch (type)
+		{
+			case SAVED_GAME_FILE_TYPE_PLAYER_PROFILE:
+				if (ustrncmp(player_ui_globals.edit_profile.current.name,
+					player_ui_globals.edit_profile.original.name, 12)!=0)
+				{
+					result = TRUE;
+				}
+				break;
+
+			case SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE:
+				if (ustrncmp(player_ui_globals.edit_profile.current.name,
+					player_ui_globals.edit_profile.original.name, 12)!=0)
+				{
+					result = TRUE;
+				}
+				break;
+
+			default:
+				error(_error_silent, "unknown saved game file type being edited");
+				break;
+		}
+	}
+	else
+	{
+		error(_error_silent, "not currently editing a saved game file");
+	}
+
+	return result;
+}
+
+boolean player_ui_prompt_user_to_rename_edit_profile(
+	void)
+{
+	boolean result;
+
+	result = FALSE;
+	if (player_ui_globals.edit_profile_index != NONE)
+	{
+		long type = saved_game_file_get_type(player_ui_globals.edit_profile_index);
+
+		switch (type)
+		{
+			case SAVED_GAME_FILE_TYPE_PLAYER_PROFILE:
+				result = virtual_keyboard_launch(player_ui_globals.edit_profile.current.name,
+					sizeof(player_ui_globals.edit_profile.current.name), 10);
+				break;
+
+			case SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE:
+				result = virtual_keyboard_launch(player_ui_globals.edit_profile.current.name,
+					sizeof(player_ui_globals.edit_profile.current.name), 10);
+				break;
+
+			default:
+				error(_error_silent, "unknown saved game file type being edited");
+				break;
+		}
+	}
+	else
+	{
+		error(_error_silent, "not currently editing a saved game file");
+	}
+
+	return result;
 }
 
 /* ---------- private code */
