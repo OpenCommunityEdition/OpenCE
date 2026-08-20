@@ -11,10 +11,36 @@
 - The donor worktrees and the existing `game_engine_obj.md` ledger were treated
   as read-only. No divergent configuration, parks, shared-header, or unrelated
   documentation changes were imported.
-- `source/game/game_engine.h` is content-identical to the fresh base. Callback
-  typing, offset assertions, tag wrappers, and collision scratch typing are
-  localized to `source/game/game_engine.c`.
+- The recovery itself kept shared headers unchanged. The later policy
+  correction on `jonas/game-engine-policy-fix-20260820`, based on
+  `30dc49d4`, adds same-size named views to `source/game/game_engine.h` and
+  `source/game/players.h`; the bounded consumer proof for those two header
+  changes is recorded below.
 - `source/game/game_engine` remains `NonMatching`.
+
+## Policy correction
+
+The corrective pass removed the remaining incompatible-call and raw-layout
+accesses without tuning any residual function:
+
+- Both statistic sort callbacks now use the exact `qsort` comparator type and
+  read a typed `postgame_statistic_entry` view.
+- The game-engine callback table has a correctly typed `format_message` member
+  at offset `0x64`; the five-argument call no longer converts a no-argument
+  function pointer.
+- `game_engine_update` uses a union of `data_iterator` and `object_iterator`
+  and accesses only the active typed member.
+- The game-engine global team counter, the game-variant field at offset
+  `0x16`, and the player target-hold counter at offset `0x80` have named,
+  size-preserving typed members. Their former integer-address/byte-array
+  overlays are gone.
+- Item-collection permutation access is through a typed permutation pointer,
+  and the netgame-flag helpers now accept `real_point3d const *` directly.
+
+All layout-sensitive views retain compile-time size/offset checks. The pass
+adds no assembly, volatile access, force-inline directive, pragma, barrier,
+incompatible function-pointer cast, integer-address dereference, or byte-forcing
+construct.
 
 ## Strict improvement
 
@@ -99,19 +125,30 @@ functions: 165 strict exact, nine emitted residuals, and six omitted residuals.
 - Forced `game_engine.c` XDK 3911 compile: warning-free.
 - Full Halo and libcmt dependency graphs: green; the final aggregate build had
   no remaining work after the forced translation-unit rebuild.
-- Strict semantic report: 470 units, 3,773 functions evaluated, 3,631 semantic
-  exact, 97 hidden exact, 59,719 hidden code bytes, 39 ordinary-only findings
-  (38 structural and one rejected), zero unit errors, and 3,695 accepted exact.
-- Progress: 375/833 complete objects, 3,685/11,060 exact functions, and
-  448,699/2,198,102 code bytes overall; Halo is 273/468 objects and
-  3,518/7,574 functions; libcmt is 102/212 objects and 167/476 functions.
+- The policy-corrected translation unit remains 165/180 strict exact, with
+  23,974 meaningful and 25,232 padded exact code bytes. Every corrected exact
+  function retained its strict evidence; there is no exact-count loss.
+- Strict semantic report: 470 units, 3,865 functions evaluated, 3,725 semantic
+  exact, 99 hidden exact, 61,015 hidden code bytes, 39 ordinary-only findings
+  (38 structural and one rejected), zero unit errors, and 3,789 accepted exact.
+- Progress: 375/833 complete objects, 3,779/11,060 exact functions, and
+  461,115/2,198,102 code bytes overall; Halo is 273/468 objects and
+  3,612/7,574 functions; libcmt is 102/212 objects and 167/476 functions.
 - Admission audit: zero candidates, zero revocations, and only the pre-existing
   `source/shell/shell_xbox` contradiction.
 - Parked-function audit: three active, zero stale, zero invalid.
 - Tool tests: 179/179 pass.
-- Policy, house-style, scope, frozen-object, and Markdown audits pass.
-  `vehicles`, `ai_debug`, `ai_script`, `actions`, and `units` sources/config are
-  untouched; no existing Markdown file is modified or deleted.
+- A clean 569-object corrected-header rebuild was byte-for-byte reproducible
+  after timestamp normalization. A bounded original-header/corrected-header
+  A/B found raw deltas only in `game_engine.obj` and five consumers whose local
+  compiler-label spellings moved with header line numbers. All sections,
+  relocations, and meaningful symbol ownership in those five consumers were
+  identical. In particular, frozen `ai_debug.obj` and `units.obj` are
+  unchanged by the type correction; frozen `vehicles.obj`, `ai_script.obj`,
+  and `actions.obj` were normalized raw-identical across the A/B.
+- Policy, house-style, scope, frozen-object, and Markdown audits pass. No
+  frozen source or configuration file is touched, and this Codex checkpoint is
+  the only Markdown file modified.
 
 ## Disposition
 

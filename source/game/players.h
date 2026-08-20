@@ -86,7 +86,11 @@ struct player_datum
 	long state_message;
 	long state_message_player_index;
 	long unknown7c;
-	byte unknown80[4];
+	union
+	{
+		byte unknown80[4];
+		long target_hold_time;
+	};
 	long death_time;
 	long unknown88;
 	struct game_statistics statistics;

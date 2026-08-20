@@ -607,7 +607,7 @@ struct game_engine_goal
 struct game_engine_globals
 {
 	unsigned long flags;
-	byte unused4[4];
+	long next_team_index;
 	real postgame_timer;
 	real postgame_progress;
 	long postgame_state;
@@ -665,9 +665,22 @@ struct game_engine_callback_view
 	void (*format_team_name)(
 		long team_index,
 		wchar_t *string);
-	byte unused58[0x18];
+	byte unused58[0xC];
+	boolean (*format_message)(
+		long player_index,
+		long parameter1,
+		long parameter2,
+		wchar_t *message,
+		long message_character_count);
+	byte unused68[0x8];
 	void (*player_update)(
 		long player_index);
+};
+
+union game_engine_update_iterator
+{
+	struct data_iterator data;
+	struct object_iterator object;
 };
 
 struct game_engine_postgame_hud_definition
@@ -706,6 +719,10 @@ typedef char verify_game_engine_callback_view_format_team_name_offset[
 	offsetof(
 		struct game_engine_callback_view,
 		format_team_name) == 0x54 ? 1 : -1];
+typedef char verify_game_engine_callback_view_format_message_offset[
+	offsetof(
+		struct game_engine_callback_view,
+		format_message) == 0x64 ? 1 : -1];
 typedef char verify_game_engine_callback_view_player_update_offset[
 	offsetof(
 		struct game_engine_callback_view,
@@ -717,6 +734,8 @@ typedef char verify_game_engine_postgame_hud_definition_bitmap_group_index_offse
 typedef char verify_game_engine_goal_size[sizeof(struct game_engine_goal) == 0x20 ? 1 : -1];
 typedef char verify_game_engine_globals_postgame_timer_offset[
 	offsetof(struct game_engine_globals, postgame_timer) == 0x8 ? 1 : -1];
+typedef char verify_game_engine_globals_next_team_index_offset[
+	offsetof(struct game_engine_globals, next_team_index) == 0x4 ? 1 : -1];
 typedef char verify_game_engine_globals_postgame_progress_offset[
 	offsetof(struct game_engine_globals, postgame_progress) == 0xC ? 1 : -1];
 typedef char verify_game_engine_globals_postgame_state_offset[
@@ -818,13 +837,13 @@ void code_00096890(
 static boolean code_00096b30(
 	struct postgame_statistic_entry const *entry);
 
-long sort_statistic_buffer(
-	long entry0,
-	long entry1);
+int __cdecl sort_statistic_buffer(
+	void const *entry0_pointer,
+	void const *entry1_pointer);
 
-long sort_statistic_buffer_ranking(
-	long entry0,
-	long entry1);
+int __cdecl sort_statistic_buffer_ranking(
+	void const *entry0_pointer,
+	void const *entry1_pointer);
 
 static void code_00096ba0(
 	wchar_t const *string,
@@ -1683,8 +1702,7 @@ long populate_statistic_buffer(
 			entries,
 			player_count,
 			sizeof(*entries),
-			(int (__cdecl *)(void const *, void const *))
-				sort_statistic_buffer_ranking);
+			sort_statistic_buffer_ranking);
 	}
 	else
 	{
@@ -1692,8 +1710,7 @@ long populate_statistic_buffer(
 			entries,
 			player_count,
 			sizeof(*entries),
-			(int (__cdecl *)(void const *, void const *))
-				sort_statistic_buffer);
+			sort_statistic_buffer);
 	}
 
 	entry_index = 0;
@@ -2429,16 +2446,18 @@ long game_engine_remap_equipment(
 	return equipment_definition_index;
 }
 
-long sort_statistic_buffer(
-	long entry0,
-	long entry1)
+int __cdecl sort_statistic_buffer(
+	void const *entry0_pointer,
+	void const *entry1_pointer)
 {
+	struct postgame_statistic_entry const *entry0 = entry0_pointer;
+	struct postgame_statistic_entry const *entry1 = entry1_pointer;
 	long result = 0;
 	long entry0_value;
 	long entry1_value;
 
-	entry0_value = *(long *)(entry0 + sizeof(long));
-	entry1_value = *(long *)(entry1 + sizeof(long));
+	entry0_value = entry0->values[1];
+	entry1_value = entry1->values[1];
 	if (entry1_value < entry0_value)
 		return -1;
 	if (entry1_value > entry0_value)
@@ -2447,40 +2466,42 @@ long sort_statistic_buffer(
 	return result;
 }
 
-long sort_statistic_buffer_ranking(
-	long entry0,
-	long entry1)
+int __cdecl sort_statistic_buffer_ranking(
+	void const *entry0_pointer,
+	void const *entry1_pointer)
 {
+	struct postgame_statistic_entry const *entry0 = entry0_pointer;
+	struct postgame_statistic_entry const *entry1 = entry1_pointer;
 	long result = 0;
 	long entry0_value;
 	long entry1_value;
 
-	entry0_value = *(long *)(entry0 + 2 * sizeof(long));
-	entry1_value = *(long *)(entry1 + 2 * sizeof(long));
+	entry0_value = entry0->values[2];
+	entry1_value = entry1->values[2];
 	if (entry1_value < entry0_value)
 		result = -1;
 	else if (entry1_value > entry0_value)
 		result = 1;
 	else
 	{
-		entry0_value = *(long *)(entry0 + 3 * sizeof(long));
-		entry1_value = *(long *)(entry1 + 3 * sizeof(long));
+		entry0_value = entry0->values[3];
+		entry1_value = entry1->values[3];
 		if (entry1_value < entry0_value)
 			result = -1;
 		else if (entry1_value > entry0_value)
 			result = 1;
 		else
 		{
-			entry0_value = *(long *)(entry0 + 4 * sizeof(long));
-			entry1_value = *(long *)(entry1 + 4 * sizeof(long));
+			entry0_value = entry0->values[4];
+			entry1_value = entry1->values[4];
 			if (entry1_value < entry0_value)
 				result = 1;
 			else if (entry1_value > entry0_value)
 				result = -1;
 			else
 			{
-				entry0_value = *(long *)(entry0 + 5 * sizeof(long));
-				entry1_value = *(long *)(entry1 + 5 * sizeof(long));
+				entry0_value = entry0->values[5];
+				entry1_value = entry1->values[5];
 				if (entry1_value < entry0_value)
 					result = -1;
 				else if (entry1_value > entry0_value)
@@ -2541,18 +2562,9 @@ static boolean code_0009b6a0(
 {
 	boolean result = FALSE;
 
-	if (game_engine->unknown60[1])
+	if (GAME_ENGINE_CALLBACKS->format_message)
 	{
-		boolean (*format_message)(
-			long,
-			long,
-			long,
-			wchar_t *,
-			long) =
-				(boolean (*)(long, long, long, wchar_t *, long))
-					game_engine->unknown60[1];
-
-		result = format_message(
+		result = GAME_ENGINE_CALLBACKS->format_message(
 			player_index,
 			parameter1,
 			parameter2,
@@ -3709,7 +3721,7 @@ static void code_0009bdf0(
 
 	source_flag_index = NONE;
 	find_netgame_flags(
-		(float const *)&unit->object.position,
+		&unit->object.position,
 		0.5f,
 		0.0f,
 		6,
@@ -3868,7 +3880,7 @@ static void code_0009bdf0(
 				player_control_set_facing(player->local_player_index, &forward);
 
 			player->unknown70 = find_netgame_flag(
-				(float const *)&unit->object.position,
+				&unit->object.position,
 				1.0f,
 				0.0f,
 				6,
@@ -3888,7 +3900,7 @@ static void code_0009bdf0(
 void game_engine_update(
 	void)
 {
-	struct data_iterator iterator;
+	union game_engine_update_iterator iterator;
 	struct player_datum *player;
 
 	if (!game_engine)
@@ -3899,13 +3911,13 @@ void game_engine_update(
 	code_00096ed0();
 	code_0009b3a0();
 
-	data_iterator_new(&iterator, player_data);
-	while (data_iterator_next(&iterator))
+	data_iterator_new(&iterator.data, player_data);
+	while (data_iterator_next(&iterator.data))
 	{
-		code_0009b4f0(iterator.datum_index);
+		code_0009b4f0(iterator.data.datum_index);
 
 		{
-			long player_index = iterator.datum_index;
+			long player_index = iterator.data.datum_index;
 
 			if (game_engine)
 			{
@@ -3928,13 +3940,13 @@ void game_engine_update(
 				}
 			}
 
-			code_0009bdf0(iterator.datum_index);
+			code_0009bdf0(iterator.data.datum_index);
 
 			if (GAME_ENGINE_CALLBACKS->player_update_each_tick)
 			{
 				void (*player_update)(long) =
 					GAME_ENGINE_CALLBACKS->player_update_each_tick;
-				player_update(iterator.datum_index);
+				player_update(iterator.data.datum_index);
 			}
 		}
 
@@ -3970,8 +3982,8 @@ void game_engine_update(
 			game_engine_globals.postgame_state = 2;
 			game_engine_globals.postgame_timer = 5.0f;
 
-			data_iterator_new(&iterator, player_data);
-			player = (struct player_datum *)data_iterator_next(&iterator);
+			data_iterator_new(&iterator.data, player_data);
+			player = (struct player_datum *)data_iterator_next(&iterator.data);
 			while (player)
 			{
 				if (player->unit_index != NONE)
@@ -3979,17 +3991,16 @@ void game_engine_update(
 				if (player->local_player_index != NONE)
 					rumble_player_clear(player->local_player_index);
 
-				player = (struct player_datum *)data_iterator_next(&iterator);
+				player = (struct player_datum *)data_iterator_next(&iterator.data);
 			}
 
 			object_iterator_new(
-				(struct object_iterator *)&iterator,
+				&iterator.object,
 				_object_mask_vehicle,
 				0);
-			while (object_iterator_next((struct object_iterator *)&iterator))
+			while (object_iterator_next(&iterator.object))
 			{
-				object_delete(
-					((struct object_iterator *)&iterator)->index);
+				object_delete(iterator.object.index);
 			}
 
 			server = global_network_game_server_get();
@@ -4262,7 +4273,7 @@ wchar_t *get_place_name(
 }
 
 __declspec(noinline) long find_netgame_flags(
-	float const *position,
+	real_point3d const *position,
 	float radius,
 	float height,
 	short type,
@@ -4272,7 +4283,6 @@ __declspec(noinline) long find_netgame_flags(
 {
 	real radius_squared = radius * radius;
 	long found_count = 0;
-	real_point3d const *point = (real_point3d const *)position;
 	short flag_index;
 	struct scenario *scenario;
 
@@ -4295,13 +4305,13 @@ __declspec(noinline) long find_netgame_flags(
 		if (position)
 		{
 			if (radius >= 0.0f &&
-				distance_squared3d(&flag->position, point) > radius_squared)
+				distance_squared3d(&flag->position, position) > radius_squared)
 			{
 				continue;
 			}
 
 			if (height > 0.0f &&
-				fabs(flag->position.z - point->z) > height)
+				fabs(flag->position.z - position->z) > height)
 			{
 				continue;
 			}
@@ -4315,7 +4325,7 @@ __declspec(noinline) long find_netgame_flags(
 }
 
 __declspec(noinline) long find_netgame_flag(
-	float const *position,
+	real_point3d const *position,
 	float radius,
 	float height,
 	short type,
@@ -5889,7 +5899,7 @@ void game_engine_variant_cleanup(
 {
 	struct game_variant original = *variant;
 
-	*(short *)&variant->unused2[20] = 0;
+	variant->unknown16 = 0;
 	variant->engine_type = PIN(variant->engine_type, 1, 5);
 	variant->has_teams = !!variant->has_teams;
 	variant->unknown28 = !!variant->unknown28;
@@ -6137,7 +6147,7 @@ void game_engine_initialize_for_new_map(
 		code_0009ccf0();
 		game_engine_intialize_queued_sounds();
 		csmemset(global_goal, 0, sizeof(global_goal));
-		*(long *)game_engine_globals.unused4 = 0;
+		game_engine_globals.next_team_index = 0;
 		timeout_for_endgame_sound = 0;
 
 		if (game_engine->initialize_for_new_map &&
@@ -6170,7 +6180,7 @@ void game_engine_player_added(
 	if (game_engine)
 	{
 		struct player_datum *player = player_get(player_index);
-		long *next_team_index = (long *)game_engine_globals.unused4;
+		long *next_team_index = &game_engine_globals.next_team_index;
 
 		if (global_variant.has_teams)
 		{
@@ -6871,21 +6881,21 @@ static void code_0009a840(
 
 	if (player->unknown7c != target_player_index)
 	{
-		if (*(long *)player->unknown80 > 0)
-			(*(long *)player->unknown80)--;
-		if (*(long *)player->unknown80 == 0)
+		if (player->target_hold_time > 0)
+			player->target_hold_time--;
+		if (player->target_hold_time == 0)
 			player->unknown7c = target_player_index;
 	}
-	else if (*(long *)player->unknown80 < 15)
+	else if (player->target_hold_time < 15)
 	{
-		(*(long *)player->unknown80)++;
+		player->target_hold_time++;
 	}
 
 	if (player->unknown7c != NONE)
 	{
 		struct player_datum *target_player = player_get(player->unknown7c);
 		wchar_t target_name[12] = { 0 };
-		long hold_time = *(long *)player->unknown80;
+		long hold_time = player->target_hold_time;
 		real alpha;
 
 		if (hold_time >= 10)
@@ -7227,24 +7237,17 @@ static long code_0009b260(
 		get_global_random_seed_address(),
 		0,
 		(short)code_00097020(permutations));
-	byte *permutation_data = (byte *)permutations->address;
+	struct item_collection_permutation const *permutation =
+		permutations->address;
 	long permutation_index = 0;
 
 	while (permutation_index < permutation_count)
 	{
 		remaining_weight =
 			(long)((real)remaining_weight -
-				*(real *)(permutation_data +
-					permutation_index *
-						sizeof(struct item_collection_permutation) +
-					offsetof(struct item_collection_permutation, weight)));
+				permutation[permutation_index].weight);
 		if (remaining_weight < 0)
-		{
-			return *(long *)(permutation_data +
-				permutation_index *
-					sizeof(struct item_collection_permutation) +
-				offsetof(struct item_collection_permutation, item_index));
-		}
+			return permutation[permutation_index].item_index;
 
 		permutation_index++;
 	}

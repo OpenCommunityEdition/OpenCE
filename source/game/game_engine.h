@@ -40,7 +40,15 @@ union real_rgb_color;
 struct game_variant
 {
 	short variant_index;
-	byte unused2[0x16];
+	union
+	{
+		byte unused2[0x16];
+		struct
+		{
+			byte unused2_prefix[0x14];
+			short unknown16;
+		};
+	};
 	long engine_type;
 	boolean has_teams;
 	byte unused1D[3];
@@ -334,7 +342,7 @@ union real_rgb_color *game_engine_player_get_change_color(
 	long player_index);
 
 long find_netgame_flags(
-	float const *position,
+	union real_point3d const *position,
 	float radius,
 	float height,
 	short type,
@@ -343,7 +351,7 @@ long find_netgame_flags(
 	long *flag_indices);
 
 long find_netgame_flag(
-	float const *position,
+	union real_point3d const *position,
 	float radius,
 	float height,
 	short type,
