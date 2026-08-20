@@ -106,6 +106,7 @@ and whether it was retained or reverted.
 | B43 | `_code_00136900` | Adapt the complete polygon-helper topology from `5093ac1a`: recovered local ordering, clipped-polygon store order, direct child traversal, branch spelling, and the typed `edge2` alias, while retaining current campaign types and the shared cross helper. | **Strict exact:** 720/720 bytes, all 18 relocation addresses/destinations/order exact, SHA `d7e2964b9724f725ebd997f8789f3f01bbf22621041336e92e4083fbd115e41c`. All three exact siblings remain exact. | **Accepted.** This is the smallest measured donor-derived combination that resolves the residual without shared-header changes. |
 | B44 | `_code_00136900` | Remove only the typed alias from B43 and pass `&p0p2` directly, preserving every other recovered source choice. | Nonexact at 720/18, SHA `e109516d214a80fdaed105279d9c444e8837367300789119a5092177f2428908`; eight later relocations move two bytes early. | **Rejected and reverted.** This negative control proves the readable typed alias is necessary in the recovered topology. |
 | B45 | whole object | Remove the unused public callback typedefs and clip prototypes from `bsp3d.h`; keep the callback contracts local to `bsp3d.c`, where they are used. | A forced rebuild remains 4/4 strict exact and 7/7 target-owned data exact. Repository search finds no external consumer of those declarations, and `bsp3d.h` returns to the integrated-base blob. | **Accepted.** No shared-header churn or blast radius is required. |
+| B46 | both distance helpers | Replace the incompatible effective-type casts from `real_point3d *` to `real_vector3d *` with fully typed component expressions. Preserve point-first multiplication in the line helper and plane-first multiplication in the polygon helper. | A forced rebuild is byte-identical to B43: all 4 functions and all 7 target-owned data sections remain strict exact, including `_bsp3d_clip_line_to_leaves` SHA `5e810515...` and `_code_00136900` SHA `d7e2964b...`. | **Accepted.** The final source performs no point/vector pointer reinterpretation and remains strict-complete. |
 
 ## Data and ownership audit
 
@@ -140,6 +141,8 @@ There is no remaining data or ownership blocker in this object.
   surrounding polygon-helper topology is part of the legal-C control.
 - Do not duplicate or modify `cross_product3d`, `real_math.h`, or `bsp3d.h`;
   B42 and B45 prove those changes are unnecessary.
+- Do not reintroduce point/vector effective-type casts in the local distance
+  helpers. B46 proves natural typed component math is byte-exact.
 
 ## Resolution provenance
 
@@ -170,6 +173,8 @@ nor the topology without the alias is sufficient. B43 is the strict result.
 - final scope is only `source/physics/bsp3d.c`, its `Matching` status, and this
   Codex-owned ledger. `bsp3d.h`, shared math headers, frozen objects, and
   Claude-authored Markdown are unchanged.
+- both local distance helpers use fully typed point and plane component access;
+  no incompatible point/vector pointer reinterpretation remains.
 
 Disposition: strict-complete, full-build clean, regression-stable, and
 admitted without shared-header churn.

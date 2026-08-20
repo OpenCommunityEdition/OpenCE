@@ -83,14 +83,14 @@ static __inline real bsp3d_plane_distance_to_point(
 	real_plane3d const *plane,
 	real_point3d const *point)
 {
-	return dot_product3d((real_vector3d *)point, &plane->n) - plane->d;
+	return point->x*plane->n.i + point->y*plane->n.j + point->z*plane->n.k - plane->d;
 }
 
 static __inline real bsp3d_polygon_plane_distance_to_point(
 	real_plane3d const *plane,
 	real_point3d const *point)
 {
-	return dot_product3d(&plane->n, (real_vector3d *)point) - plane->d;
+	return plane->n.i*point->x + plane->n.j*point->y + plane->n.k*point->z - plane->d;
 }
 
 /* ---------- globals */
