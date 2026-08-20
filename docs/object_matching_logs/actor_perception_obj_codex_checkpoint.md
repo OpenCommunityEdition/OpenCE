@@ -24,10 +24,12 @@ Actor Perception or Claude-authored log.
 ## Strict gain
 
 The authoritative base had 22/44 strict-exact functions, 5,039 meaningful
-bytes, and 5,184 padded bytes. The checkpoint has 33/44 strict-exact
-functions, 10,532 meaningful bytes, and 10,752 padded bytes. This is a net
-gain of 11 functions, 5,493 meaningful bytes, and 5,568 padded bytes, with no
-lost baseline-exact function.
+bytes, and 5,184 padded bytes. The pre-policy checkpoint had 33/44
+strict-exact functions, 10,532 meaningful bytes, and 10,752 padded bytes. The
+defined-C correction below now has 32/44, 10,260 meaningful bytes, and 10,480
+padded bytes. This is a net gain of 10 functions, 5,221 meaningful bytes, and
+5,296 padded bytes. One baseline-exact function is deliberately withdrawn
+because its target bytes require reading indeterminate stack storage.
 
 | Newly exact function | Meaningful | Padded | Relocations |
 |---|---:|---:|---:|
@@ -50,10 +52,10 @@ the nine omitted residual implementations. They remain absent rather than
 justifying nonexact code or artificial data forcing. The candidate also has
 27 candidate-only sections (376 bytes: three DATA, 23 RDATA, and one
 DIRECTIVE); they receive zero target credit. The target/candidate symbol
-inventories are 369/284 entries. The target object SHA-256 is
+inventories are now 369/278 entries. The target object SHA-256 is
 `19704943ab15e64d0bebdfa0688a5779f3efca899bf8631f1f529a995da379e4`;
 the candidate object SHA-256 is
-`9466b765928e76bf47e625ce1377be349aaa20f8c4d9e5a335b655b20a057da4`.
+`13fd7726cc9007f8d8b7a8865c94f389cbdcd08427c8447a8e3fd840087a5ed2`.
 
 ## Residual census
 
@@ -82,7 +84,12 @@ park, or configuration credit.
 | `_code_0001f560` | `0x4F0/0x4F0` | `28/28` | `d5d6dc16f7ce3f4b6058ba7de1f6e19777132e760e2201c37a5c622f7452b699` | `_code_0001f470`, `_code_0001f4f0` |
 | `_code_000228b0` | `0x6D0/0x6D0` | `46/46` | `15890e02c1357a89ee3aa8dfc5c90e4a82f1794bcf6e4506f58479623e51673f` | `_code_0001dc00`, `_code_00020780` |
 
-The strict function states are therefore 33 `STRICT_EXACT`, two `NONEXACT`,
+One additional natural body is deliberately unaccepted after the defined-C
+policy correction. `_actor_perception_become_acknowledged` is `0x110/0x120`
+target/candidate padded bytes with `8/8` relocations; its legal candidate hash
+is `5ff3a44b490821b407684d11dee44e3538e1f787c63b5d13f31d2e82c0a4402e`.
+
+The strict function states are therefore 32 `STRICT_EXACT`, three `NONEXACT`,
 and nine `ABSENT_IN_BASE`. The historical donor already exhaustively measured
 the ordinary-C topology, declaration, Boolean, scalar/vector, x87-expression,
 and allocator families for the residuals. They should be reopened only with
@@ -97,21 +104,22 @@ or a defined-C dependency control not represented by that prior matrix.
 - Parameters are vertically formatted and every function has an explicit
   return. Generic object access and swarm datum access are confined to typed
   TU-local wrappers; tag access uses subsystem definition wrappers.
-- The shared-header localization preserves the 33/44 strict result from the
-  historical donor while avoiding any frozen-object dependency blast radius.
+- The shared-header localization and defined-C correction preserve 32/44
+  strict functions while avoiding any frozen-object dependency blast radius.
 - A forced XDK rebuild and repository-wide semantic report evaluate 3,739
   candidate functions across 470 units, find 3,602 semantic-exact and 3,666
   accepted functions, and report zero unit errors.
 - Ordinary objdiff reports 27 ordinary exact functions, 8,182 matched code
   bytes, four matched data bytes, and 31.891361% fuzzy similarity. The strict
   oracle additionally proves two ordinary false negatives and four local
-  static functions, producing the authoritative 33/44 count.
+  static functions, producing the pre-policy 33/44 count. The correction
+  intentionally withdraws one of those ordinary exact functions.
 - Full `halobetacache_build`, `libcmt_build`, semantic, progress, admission,
   and parked-function gates pass. Admission finds no new completion candidate;
   the parked manifest remains three active, zero stale, and zero invalid, with
   no Actor Perception entry.
-- The repository test suite passes 179/179. A forced clean post-commit
-  same-path regression reports all 33 accepted functions still exact, no
+- The repository test suite passes 179/179. The pre-policy forced clean
+  same-path regression reported all 33 accepted functions still exact, no
   changed nonexact function, and no code, non-code, symbol, or environment
   failure.
 
@@ -141,7 +149,7 @@ paths. `code_0001f560` also ends in an explicit `return;`; its expected
 nonexact candidate hash remains
 `d5d6dc16f7ce3f4b6058ba7de1f6e19777132e760e2201c37a5c622f7452b699`.
 
-The corrective forced rebuild preserves all 33 strict-exact functions. In
+The earlier ABI corrective rebuild preserved all 33 then-strict-exact functions. In
 particular, the four affected accepted functions retain these hashes:
 
 | Function | Normalized SHA-256 |
@@ -162,3 +170,43 @@ and 3,693 accepted functions, and reports zero unit errors. Admission remains
 zero candidates and zero revocations with only the established `shell_xbox`
 contradiction; parks remain three active, zero stale, and zero invalid. All
 179 tooling tests pass.
+
+## Defined-C acknowledgement correction
+
+The later policy audit found two issues in the acknowledgement pair and
+audited the complete added delta for the same classes:
+
+- `actor_perception_become_acknowledged` wrote only the one-byte `value`
+  members of two unions and then passed their four-byte `storage` members.
+  That reads inactive members and three indeterminate bytes per value. The
+  correction uses an initialized `long orphaned` and the initialized
+  `boolean expected_acknowledgement` directly. The target's `0x110`-byte hash
+  cannot be reproduced by defined C, so the function remains as a natural
+  `0x120`-byte nonexact body and its exact claim is withdrawn.
+- `actor_expected_acknowledgement` no longer casts two `real_point3d *`
+  values to unrelated `real_point2d *` values. Typed `real` deltas read the
+  declared `x` and `y` members and compute the horizontal squared distance.
+  The dot-product operands are exchanged, which is semantically identical,
+  to retain VC7's original x87 scheduling. The function remains strict-exact
+  at `0x180` padded bytes, 14 relocations, and normalized SHA-256
+  `7ef8c0e451193ae25b5f2678e163ac268c15608b248bb6edb3921f8b6d6f5557`.
+
+All other 32 accepted functions compare strict-exact against the target. The
+two pre-existing natural nonexact callers retain their prior hashes. All 60
+runtime non-code sections in the candidate retain their bytes, relocations,
+and owner identities; the strict target-owned boundary remains 36/76 sections
+and 813/2,002 bytes. No shared header, configuration, park entry, or frozen
+source changes in this correction.
+
+Because the scalar calculation no longer references the header's 2D helper
+chain, VC7 stops emitting three candidate-only code COMDATs:
+`_distance_squared2d`, `_magnitude_squared2d`, and
+`_vector_from_points2d`. They had no target counterparts and received no
+matching credit. Their three section symbols and three static function
+symbols disappear, reducing the candidate inventory from 284 to 278. VC7
+also renumbers eleven private `$L...` labels at unchanged offsets inside two
+otherwise byte-exact functions; no public or external consumer symbol is
+added, removed, or moved. The raw regression manifest therefore reports the
+one intentional exact withdrawal plus this compiler-only COMDAT/symbol/debug
+churn, while the direct section oracle proves the remaining 32 accepted
+functions and all runtime non-code unchanged.

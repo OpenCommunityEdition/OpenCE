@@ -293,6 +293,11 @@ enum
 #define actor_perception_audibility_combat_status(actor) \
 	((actor)->state.mode)
 
+#define actor_perception_distance_squared2d(a, b, delta_x, delta_y) \
+	((delta_x) = (b)->x - (a)->x, \
+		(delta_y) = (b)->y - (a)->y, \
+		(delta_x) * (delta_x) + (delta_y) * (delta_y))
+
 /* ---------- structures */
 
 union actor_perception_prop_actor_slot
@@ -1108,12 +1113,6 @@ typedef char actor_perception_refresh_list_entries_offset_assert[
 	offsetof(struct actor_perception_refresh_list, entries) == 4 ? 1 : -1];
 typedef char actor_perception_refresh_list_size_assert[
 	sizeof(struct actor_perception_refresh_list) == 0x604 ? 1 : -1];
-
-union actor_perception_boolean_slot
-{
-	boolean value;
-	long storage;
-};
 
 /*
  * Runtime perception values in the January actor definition. The shared
@@ -3145,14 +3144,12 @@ boolean actor_perception_become_acknowledged(
 
 	if (prop->state < 2 || prop->state > 3)
 	{
-		union actor_perception_boolean_slot orphaned;
-		union actor_perception_boolean_slot expected;
+		long orphaned = prop->orphan_prop_index != NONE;
 
-		orphaned.value = prop->orphan_prop_index != NONE;
-		expected.value =
+		expected_acknowledgement =
 			actor_expected_acknowledgement(actor_index, prop_index);
 
-		if (orphaned.value)
+		if (orphaned)
 		{
 			struct actor_perception_prop_view *orphan =
 				(struct actor_perception_prop_view *)prop_get(
@@ -3180,12 +3177,11 @@ boolean actor_perception_become_acknowledged(
 		}
 
 		prop->state = 3;
-			actor_perception_acknowledge(
+		actor_perception_acknowledge(
 			actor_index,
 			prop_index,
-			orphaned.storage,
-			expected.storage);
-		expected_acknowledgement = expected.value;
+			orphaned,
+			expected_acknowledgement);
 		result = TRUE;
 	}
 
@@ -3206,6 +3202,8 @@ boolean actor_expected_acknowledgement(
 	struct prop_iterator iterator;
 	struct actor_perception_prop_view *current_prop;
 	boolean result = FALSE;
+	real delta_x;
+	real delta_y;
 
 #line 3613 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
 	match_vassert(
@@ -3234,14 +3232,16 @@ boolean actor_expected_acknowledgement(
 							_prop_state_becoming_unacknowledged &&
 							current_prop->state <=
 							_prop_state_acknowledged)))) &&
-			distance_squared2d(
-				(real_point2d *)&current_prop->body_position,
-				(real_point2d *)&prop->body_position) < 6.25f &&
+			actor_perception_distance_squared2d(
+				&current_prop->body_position,
+				&prop->body_position,
+				delta_x,
+				delta_y) < 6.25f &&
 			fabs(current_prop->body_position.z - prop->body_position.z) <
 				1.5f &&
 			dot_product3d(
-				&prop->actor_to_prop,
-				&current_prop->actor_to_prop) > 0.5f)
+				&current_prop->actor_to_prop,
+				&prop->actor_to_prop) > 0.5f)
 		{
 			result = TRUE;
 		}
