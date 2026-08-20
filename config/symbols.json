@@ -5428,7 +5428,7 @@
 { "file_offset": 1296432, "flags": 32, "name": "_code_0013c830" },
 { "file_offset": 1296480, "flags": 32, "name": "_collision_log_initialize" },
 { "file_offset": 1296576, "flags": 32, "name": "_collision_log_enable" },
-{ "file_offset": 1296592, "flags": 32, "name": "_code_0013c8d0" },
+{ "file_offset": 1296592, "flags": 32, "name": "_collision_log_store_period" },
 { "file_offset": 1296720, "flags": 32, "name": "_collision_log_begin_period" },
 { "file_offset": 1296752, "flags": 32, "name": "_collision_log_continue_period" },
 { "file_offset": 1296784, "flags": 32, "name": "_collision_log_end_period" },

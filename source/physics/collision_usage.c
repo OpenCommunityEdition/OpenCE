@@ -112,16 +112,164 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "collision_usage.h"
+
 /* ---------- constants */
+
+enum
+{
+	NUMBER_OF_COLLISION_TIME_PERIODS = 3
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct collision_log
+{
+	long calls;
+	__int64 elapsed_time;
+};
+
+struct collision_function
+{
+	struct collision_log total_all_users;
+	struct collision_log usage_by_user[NUMBER_OF_COLLISION_USER_TYPES];
+};
+
+struct collision_period
+{
+	boolean reset_upon_next_use;
+	boolean valid;
+	long period_count;
+	struct collision_function function[NUMBER_OF_COLLISION_FUNCTION_TYPES];
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+char const *global_collision_function_names[] =
+{
+	"vector-structure",
+	"vector-objects",
+	"features-in-sphere",
+	"model-vector",
+	"object-bsp-vector",
+	"structure-bsp-vector",
+	"object-bsp-sphere",
+	"structure-bsp-sphere",
+	NULL
+};
+
+char const *global_collision_user_names[] =
+{
+	"????",
+	"ai-look",
+	"ai-los",
+	"ai-comm",
+	"ai-fire",
+	"ai-melee",
+	"aim",
+	"biped",
+	"melee",
+	"decal",
+	"areadmg",
+	"item",
+	"obsrv",
+	"pt-phys",
+	"proj",
+	"light",
+	"sound",
+	"veh",
+	"limp",
+	"object",
+	"ui",
+	"debug",
+	NULL
+};
+
+boolean global_collision_log_enable = TRUE;
+short collision_usage_current_period = NONE;
+
+boolean collision_log_render_enable = FALSE;
+boolean collision_log_detailed = FALSE;
+boolean collision_log_extended = FALSE;
+boolean collision_log_totals_only = FALSE;
+boolean collision_log_time = FALSE;
+
+short global_current_collision_user_depth = 0;
+
+short global_current_collision_users[MAXIMUM_COLLISION_USER_STACK_DEPTH];
+
+struct collision_period collision_usage_buffer[NUMBER_OF_COLLISION_TIME_PERIODS];
+struct collision_period collision_usage_current;
+
 /* ---------- public code */
+
+void collision_log_initialize(
+	void)
+{
+	memset(&collision_usage_buffer, 0, sizeof(collision_usage_buffer));
+
+	match_assert("c:\\halo\\SOURCE\\physics\\collision_usage.c", 150, global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
+
+	global_current_collision_users[global_current_collision_user_depth] = 0;
+	global_current_collision_user_depth = global_current_collision_user_depth + 1;
+
+	return;
+}
+
+void collision_log_enable(
+	boolean enable)
+{
+	global_collision_log_enable = enable;
+
+	return;
+}
+
+static void collision_log_store_period(
+	short time_period,
+	boolean unused)
+{
+	match_assert("c:\\halo\\SOURCE\\physics\\collision_usage.c", 167, collision_usage_current_period == NONE);
+	match_assert("c:\\halo\\SOURCE\\physics\\collision_usage.c", 168, (time_period >= 0) && (time_period < NUMBER_OF_COLLISION_TIME_PERIODS));
+
+	memset(&collision_usage_current, 0, sizeof(collision_usage_current));
+	collision_usage_current_period = time_period;
+
+	return;
+}
+
+void collision_log_begin_period(
+	short time_period)
+{
+	collision_log_store_period(time_period, TRUE);
+
+	return;
+}
+
+void collision_log_continue_period(
+	short time_period)
+{
+	collision_log_store_period(time_period, FALSE);
+
+	return;
+}
+
+void collision_log_end_period(
+	void)
+{
+	match_assert("c:\\halo\\SOURCE\\physics\\collision_usage.c", 198,
+		(collision_usage_current_period >= 0) && (collision_usage_current_period < NUMBER_OF_COLLISION_TIME_PERIODS));
+
+	collision_usage_current.reset_upon_next_use = TRUE;
+
+	collision_usage_buffer[collision_usage_current_period] = collision_usage_current;
+	collision_usage_current_period = NONE;
+
+	return;
+}
 
 /* ---------- private code */
