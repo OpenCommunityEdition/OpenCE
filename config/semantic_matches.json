@@ -558,5 +558,10 @@
     "unit": "source/render/render_contrails",
     "function": "_code_00177860",
     "reason": "hardened COFF comparison proves all 1952 padded bytes and all 57 semantic relocations exact (SHA-256 70d28d083222f55ac171cb1aa9676d018fb2bcae9ee54f09facee54755cef5e8); objdiff reports a switch-table/local-label encoding false negative"
+  },
+  {
+    "unit": "source/items/weapons",
+    "function": "_weapon_set_state",
+    "reason": "hardened COFF comparison proves all 432 padded bytes and all 21 semantic relocations exact (SHA-256 667efc085661d6b50a6fb3c778be5f3b44e05acfca0132acf3aa527b21f20b74); objdiff reports a switch-table/local-label encoding false negative"
   }
 ]
