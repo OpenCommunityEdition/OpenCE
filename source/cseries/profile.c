@@ -277,23 +277,72 @@ symbols in this file:
 enum
 {
 	MAXIMUM_PROFILE_SECTIONS = 256,
+	MAXIMUM_GAME_TICKS_PER_FRAME = 150,
+	MAXIMUM_PROFILE_FRAMES = 256,
+	MAXIMUM_PROFILE_WINDOWS = 4,
 };
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct profile_timer
+{
+	__int64 start;
+	__int64 end;
+	real total;
+	real frame_total;
+};
+
 struct profile_frame
 {
-	byte __unknown00[4392];
+	byte __unknown0000[4];
+	long frame_index;
+	long rasterizer_frame_index;
+	long vertical_blank_index;
+	short game_tick_count;
+	short window_count;
+	byte window_ids[MAXIMUM_PROFILE_WINDOWS];
+	struct profile_timer frame;
+	struct profile_timer game_ticks[MAXIMUM_GAME_TICKS_PER_FRAME];
+	struct profile_timer windows[MAXIMUM_PROFILE_WINDOWS];
+	struct profile_timer render;
+	struct profile_timer stall;
+	struct profile_timer texture;
+	struct profile_timer idle;
+	long seconds_elapsed;
+	short lapsed_frames;
+	byte __unknown0F06[2];
+	long lapsed_msec;
+	boolean lapsed_msec_valid;
+	char lapsed_reason[0x203];
+	long rasterizer_triangle_count;
+	long rasterizer_vertex_count;
+	long stall_count;
+	short stall_index;
+	byte __unknown111E[2];
+	real stall_msec;
+	byte __unknown1124[4];
+};
+
+struct profile_frame_iterator
+{
+	short current_buffer_index;
+	short next_buffer_index;
+};
+
+struct profile_frame_info
+{
+	long rasterizer_frame_index;
+	long vertical_blank_index;
 };
 
 struct profile_globals
 {
-	double gap__0;
+	__int64 timebase_frequency;
 	short stack_depth;
 	boolean initialized;
-	struct profile_section *section;
+	long history_index;
 	short section_count;
 	struct profile_section* sections[MAXIMUM_PROFILE_SECTIONS];
 	FILE* framedump_file;
@@ -302,11 +351,21 @@ struct profile_globals
 	boolean unk;
 	short current_frame_history_count;
 	short current_frame_history_index;
-	struct profile_frame frames[MAXIMUM_PROFILE_SECTIONS];
+	struct profile_frame frames[MAXIMUM_PROFILE_FRAMES];
 	struct profile_frame current_frame;
 };
 
 /* ---------- prototypes */
+
+static void code_0007ee30(
+	const char *name,
+	boolean active);
+void profile_dump(
+	const char *name,
+	long use_name,
+	long format_mode,
+	long maximum_section_count,
+	char *buffer);
 
 /* ---------- globals */
 
@@ -318,12 +377,189 @@ boolean profile_dump_lost_frames = FALSE;
 
 /* ---------- public code */
 
+void profile_dump_to_file(
+	const char *name)
+{
+	char buffer[0x2000];
+	long use_name;
+	FILE *file;
+
+	use_name = name && csstrlen(name);
+
+	file = fopen("d:\\profile.txt", "a+b");
+	if (file)
+	{
+		profile_dump(name, use_name, 0, 256, buffer);
+		fprintf(file, "%s\r\n", buffer);
+	}
+	fclose(file);
+
+	return;
+}
+
+void profile_rasterizer_stalls(
+	long stall_count,
+	short stall_index,
+	unsigned long stall_ticks,
+	long unused,
+	__int64 stall_timebase)
+{
+	real msec = (real)(stall_timebase*1000.0f/profile_globals.timebase_frequency);
+
+	profile_globals.current_frame.stall.start = 0;
+	profile_globals.current_frame.stall.end = stall_timebase;
+	profile_globals.current_frame.stall_count = stall_count;
+	profile_globals.current_frame.stall_index = stall_index;
+	profile_globals.current_frame.stall.total += msec;
+	profile_globals.current_frame.stall.frame_total += msec;
+	profile_globals.current_frame.stall_msec = (real)(stall_ticks*1000.0f/profile_globals.timebase_frequency);
+
+	return;
+}
+
+void profile_frame_get_messages(
+	struct profile_frame_iterator *iterator)
+{
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 1463, iterator);
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 1464, (iterator->current_buffer_index >= 0) && (iterator->current_buffer_index < profile_globals.current_frame_history_count));
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 1465, iterator->current_buffer_index != profile_globals.current_frame_history_index);
+
+	return;
+}
+
+long profile_frame_get_stalls(
+	struct profile_frame_iterator *iterator,
+	short *stall_index,
+	real *stall_msec)
+{
+	struct profile_frame *frame = &profile_globals.frames[iterator->current_buffer_index];
+
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 1480, (iterator->current_buffer_index >= 0) && (iterator->current_buffer_index < profile_globals.current_frame_history_count));
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 1481, iterator->current_buffer_index != profile_globals.current_frame_history_index);
+
+	*stall_index = frame->stall_index;
+	*stall_msec = frame->stall_msec;
+
+	return frame->stall_count;
+}
+
+void profile_lapsed_frames(
+	short frames,
+	boolean lapsed,
+	const char *reason)
+{
+	profile_globals.current_frame.lapsed_frames = frames;
+	profile_globals.current_frame.lapsed_msec_valid = frames>0 || !lapsed;
+
+	if (reason)
+	{
+		csstrcpy(profile_globals.current_frame.lapsed_reason, reason);
+	}
+
+	return;
+}
+
+short profile_find_game_value(
+	const char *name,
+	short *section_index_reference)
+{
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 1224, name && section_index_reference);
+
+	*section_index_reference = NONE;
+
+	return NONE;
+}
+
+void profile_sections_activate(
+	const char *name)
+{
+	code_0007ee30(name, TRUE);
+
+	return;
+}
+
+void profile_sections_deactivate(
+	const char *name)
+{
+	code_0007ee30(name, FALSE);
+
+	return;
+}
+
+void profile_frame_iterator_new(
+	struct profile_frame_iterator *iterator)
+{
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 1419, iterator);
+
+	iterator->current_buffer_index = NONE;
+	iterator->next_buffer_index = (profile_globals.current_frame_history_index+MAXIMUM_PROFILE_FRAMES-1)%MAXIMUM_PROFILE_FRAMES;
+
+	return;
+}
+
+boolean profile_frame_iterator_next(
+	struct profile_frame_iterator *iterator,
+	struct profile_frame_info *info)
+{
+	short buffer_index = iterator->next_buffer_index;
+	boolean result = FALSE;
+
+	iterator->current_buffer_index = buffer_index;
+
+	if (buffer_index!=NONE &&
+		buffer_index<profile_globals.current_frame_history_count)
+	{
+		result = TRUE;
+
+		if (info)
+		{
+			info->rasterizer_frame_index = profile_globals.frames[buffer_index].rasterizer_frame_index;
+			info->vertical_blank_index = profile_globals.frames[buffer_index].vertical_blank_index;
+		}
+
+		iterator->next_buffer_index = (iterator->current_buffer_index+MAXIMUM_PROFILE_FRAMES-1)%MAXIMUM_PROFILE_FRAMES;
+		if (iterator->next_buffer_index==profile_globals.current_frame_history_index)
+		{
+			iterator->next_buffer_index = NONE;
+		}
+	}
+
+	return result;
+}
+
+void profile_seconds_elapsed(
+	long seconds)
+{
+	profile_globals.current_frame.seconds_elapsed = seconds;
+
+	return;
+}
+
+void profile_lapsed_msec(
+	long msec)
+{
+	profile_globals.current_frame.lapsed_msec = msec;
+	profile_globals.current_frame.lapsed_msec_valid = msec>0;
+
+	return;
+}
+
+void profile_rasterizer_stats(
+	long triangle_count,
+	long vertex_count)
+{
+	profile_globals.current_frame.rasterizer_triangle_count = triangle_count;
+	profile_globals.current_frame.rasterizer_vertex_count = vertex_count;
+
+	return;
+}
+
 void profile_initialize(
 	void)
 {
 	short section_index = 0;
 
-	profile_globals.gap__0 = DOUBLE_MIN;
+	profile_globals.timebase_frequency = 733333333;
 
 	while (section_index<profile_globals.section_count)
 	{
@@ -334,7 +570,7 @@ void profile_initialize(
 	profile_globals.section_count = 0;
 	profile_globals.stack_depth = 0;
 	profile_globals.initialized = TRUE;
-	profile_globals.section = NULL;
+	profile_globals.history_index = 0;
 	profile_globals.current_frame_history_count = 0;
 	profile_globals.current_frame_history_index = 0;
 	profile_globals.lost_frame_count = 999;
@@ -345,4 +581,49 @@ void profile_initialize(
 
 /* ---------- private code */
 
+static void code_0007ee30(
+	const char *name,
+	boolean active)
+{
+	boolean all = csstrcmp(name, "*")==0;
+	boolean prefix = name[0]=='_';
+	short index;
 
+	for (index = 0; index<profile_globals.section_count; index++)
+	{
+		struct profile_section *section = profile_globals.sections[index];
+
+		if (!all)
+		{
+			if (prefix)
+			{
+				const char *pattern = name+1;
+
+				if (*pattern)
+				{
+					const char *section_name = section->name;
+
+					do
+					{
+						if (*pattern!=*section_name)
+							goto next_section;
+						pattern++;
+						section_name++;
+					}
+					while (*pattern);
+				}
+			}
+			else if (!strstr(section->name, name))
+			{
+				goto next_section;
+			}
+		}
+
+		section->active = active;
+
+next_section:
+		;
+	}
+
+	return;
+}
