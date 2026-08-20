@@ -177,6 +177,30 @@ real object_get_maximum_shield_vitality(
 	return result;
 }
 
+real object_get_actual_body_vitality(
+	long object_index,
+	boolean ignore_difficulty)
+{
+	real body_vitality = object_get(object_index)->object.body_vitality;
+	real result = object_get_maximum_body_vitality(object_index, ignore_difficulty);
+
+	result *= body_vitality;
+
+	return result;
+}
+
+real object_get_actual_shield_vitality(
+	long object_index,
+	boolean ignore_difficulty)
+{
+	real shield_vitality = object_get(object_index)->object.shield_vitality;
+	real result = object_get_maximum_shield_vitality(object_index, ignore_difficulty);
+
+	result *= shield_vitality;
+
+	return result;
+}
+
 void damage_data_new(
 	struct damage_data *damage_data,
 	long definition_index)
