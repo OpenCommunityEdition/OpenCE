@@ -69,21 +69,44 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "rasterizer.h"
+#include "rasterizer_geometry.h"
 
 /* ---------- constants */
+
+enum
+{
+	MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS = 384,
+	MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS2 = 32,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
+
+/* January's assert strings name this type and its sorted_index field, and pin
+the stride: the group array is walked with a 0xA0 element size. */
+struct transparent_geometry_group
+{
+	byte opaque00[0x54];
+	long dynamic_vertex_buffer_index;
+	struct vertex_buffer const *vertex_buffer;
+	byte opaque5c[0x34];
+	long sorted_index;
+	byte opaque94[0xC];
+};
+
+typedef char transparent_geometry_group_size_assert[
+	sizeof(struct transparent_geometry_group) == 0xA0 ? 1 : -1];
 
 #pragma pack(push, 1)
 struct rasterizer_transparent_geometry_globals
 {
 	byte opaque00[0x4];
 	unsigned long group_pending_flags[12];
-	void *groups;
-	void *groups2;
+	struct transparent_geometry_group *groups;
+	struct transparent_geometry_group *groups2;
 	long group_count;
 	long group_count2;
 	short *group_sorted_indices;
@@ -96,9 +119,25 @@ typedef char rasterizer_transparent_geometry_globals_size_assert[
 
 /* ---------- prototypes */
 
+short rasterizer_transparent_geometry_get_group_presorted_index(
+	struct transparent_geometry_group *group);
+void rasterizer_set_stencil_mode(
+	long stencil_mode);
+void rasterizer_transparent_geometry_dispose_aux_buffer(
+	void);
+
 /* ---------- globals */
 
 struct rasterizer_transparent_geometry_globals bss_004b8ad8;
+
+/* January reached these as individual file-scope variables; its assert strings
+name them. We pin the .bss layout with a struct because MSVC's allocation order
+for separate statics does not reproduce it, so alias the attested spellings. */
+#define transparent_geometry_groups bss_004b8ad8.groups
+#define transparent_geometry_group_count bss_004b8ad8.group_count
+#define transparent_geometry_group_sorted_indices bss_004b8ad8.group_sorted_indices
+#define transparent_geometry_groups2 bss_004b8ad8.groups2
+#define transparent_geometry_group_count2 bss_004b8ad8.group_count2
 
 /* ---------- public code */
 
@@ -116,6 +155,162 @@ void rasterizer_transparent_geometry_begin(
 void rasterizer_transparent_geometry_end(
 	void)
 {
+	return;
+}
+
+short rasterizer_transparent_geometry_get_primary_vertex_type(
+	struct transparent_geometry_group *group)
+{
+	short vertex_type = NONE;
+
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0xF4, group);
+
+	if (group->vertex_buffer)
+	{
+		vertex_type = group->vertex_buffer->type;
+	}
+	else if (group->dynamic_vertex_buffer_index!=NONE)
+	{
+		vertex_type = rasterizer_dynamic_vertices_get_type(group->dynamic_vertex_buffer_index);
+	}
+	else
+	{
+		error(_error_silent, "### ERROR transparent geometry group has no vertices");
+	}
+
+	return vertex_type;
+}
+
+void rasterizer_transparent_geometry_set_group_pending_status(
+	struct transparent_geometry_group *group,
+	boolean pending)
+{
+	short group_presorted_index = rasterizer_transparent_geometry_get_group_presorted_index(group);
+
+	if (group_presorted_index!=NONE)
+		BIT_VECTOR_SET_FLAG(bss_004b8ad8.group_pending_flags, group_presorted_index, !pending);
+
+	return;
+}
+
+boolean rasterizer_transparent_geometry_get_group_pending_status(
+	struct transparent_geometry_group *group)
+{
+	short group_presorted_index = rasterizer_transparent_geometry_get_group_presorted_index(group);
+	boolean pending = TRUE;
+
+	if (group_presorted_index!=NONE)
+		pending = !BIT_VECTOR_TEST_FLAG(bss_004b8ad8.group_pending_flags, group_presorted_index);
+
+	return pending;
+}
+
+short rasterizer_transparent_geometry_get_group_presorted_index(
+	struct transparent_geometry_group *group)
+{
+	short group_presorted_index = NONE;
+
+	if (group>=transparent_geometry_groups &&
+		group<transparent_geometry_groups+transparent_geometry_group_count)
+	{
+		group_presorted_index = (short)(group-transparent_geometry_groups);
+
+		match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0xCB,
+			group_presorted_index>=0 && group_presorted_index<transparent_geometry_group_count);
+		match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0xCC,
+			((unsigned long)group-(unsigned long)transparent_geometry_groups)%sizeof(struct transparent_geometry_group)==0);
+	}
+
+	return group_presorted_index;
+}
+
+void *rasterizer_transparent_geometry_get_group_from_presorted_index(
+	short group_presorted_index)
+{
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0xBC,
+		group_presorted_index>=0 && group_presorted_index<transparent_geometry_group_count);
+
+	return (byte *)bss_004b8ad8.groups + group_presorted_index*0xA0;
+}
+
+void *rasterizer_transparent_geometry_get_groups2(
+	short *group_count)
+{
+	if (group_count)
+		*group_count = (short)bss_004b8ad8.group_count2;
+
+	return bss_004b8ad8.groups2;
+}
+
+void *rasterizer_transparent_geometry_get_groups(
+	void)
+{
+	return transparent_geometry_groups;
+}
+
+struct transparent_geometry_group *rasterizer_transparent_geometry_new_group(
+	void)
+{
+	struct transparent_geometry_group *group = NULL;
+	long group_index = transparent_geometry_group_count;
+
+	if (group_index<MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS)
+	{
+		group = transparent_geometry_groups + group_index;
+		group->sorted_index = group_index;
+		transparent_geometry_group_count = group_index + 1;
+	}
+
+	return group;
+}
+
+struct transparent_geometry_group *rasterizer_transparent_geometry_new_group2(
+	void)
+{
+	struct transparent_geometry_group *group = NULL;
+	long group_index = transparent_geometry_group_count2;
+
+	if (group_index<MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS2)
+	{
+		group = transparent_geometry_groups2 + group_index;
+		group->sorted_index = group_index;
+		transparent_geometry_group_count2 = group_index + 1;
+	}
+
+	return group;
+}
+
+void rasterizer_transparent_geometry_stop(
+	void)
+{
+	rasterizer_set_stencil_mode(0);
+
+	return;
+}
+
+void rasterizer_transparent_geometry_dispose(
+	void)
+{
+	rasterizer_transparent_geometry_dispose_aux_buffer();
+
+	if (transparent_geometry_groups)
+		debug_free(transparent_geometry_groups,
+			"c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0x111);
+	transparent_geometry_groups = NULL;
+
+	if (transparent_geometry_group_sorted_indices)
+		debug_free(transparent_geometry_group_sorted_indices,
+			"c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0x114);
+	transparent_geometry_group_sorted_indices = NULL;
+
+	if (transparent_geometry_groups2)
+		debug_free(transparent_geometry_groups2,
+			"c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0x118);
+	transparent_geometry_groups2 = NULL;
+
+	transparent_geometry_group_count2 = 0;
+	transparent_geometry_group_count = 0;
+
 	return;
 }
 
