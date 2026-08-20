@@ -79,7 +79,7 @@ static void code_000cb850(
 
 /* ---------- globals */
 
-struct event_manager_globals event_manager_globals;
+struct event_manager_globals event_manager_globals = { 0 };
 
 /* ---------- public code */
 
