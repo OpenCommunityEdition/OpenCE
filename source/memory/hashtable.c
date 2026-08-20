@@ -249,15 +249,12 @@ void hashtable_remove(
 	return;
 }
 
-/* NonMatching: target and candidate are both 0x240 bytes with 27 exact
-relocations.  The only residual is an EAX/ECX permutation while evaluating
-the commutative capacity_bits+growth_bits assertion expression. */
 boolean hashtable_grow(
 	struct hashtable *table,
 	short growth_bits)
 {
-	short old_count = table->count;
 	short old_capacity_bits = table->capacity_bits;
+	short old_count = table->count;
 	unsigned long *old_used_slots = table->used_slots;
 	struct dynamic_array old_elements = table->elements;
 	short old_element_index;
