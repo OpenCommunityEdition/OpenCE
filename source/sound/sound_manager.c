@@ -218,18 +218,31 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "sound_environment_definitions.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct sound_platform_definition;
+
 struct sound_manager_globals
 {
-	unsigned char reserved0[0xC];
+	boolean initialized;
+	boolean enabled;
+	unsigned char reserved0[0x6];
+	struct sound_platform_definition *platform_definition;
 	long render_time;
-	unsigned char reserved1[0x168];
+	unsigned char reserved1[0x118];
+	struct sound_environment_definition sound_environment;
+	unsigned char reserved2[0x8];
 };
+
+typedef char verify_sound_manager_globals_size[
+	sizeof(struct sound_manager_globals) == 0x178 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -238,6 +251,34 @@ struct sound_manager_globals
 struct sound_manager_globals bss_004d2d60;
 
 /* ---------- public code */
+
+struct sound_platform_definition *current_platform_definition(
+	void)
+{
+	return bss_004d2d60.platform_definition;
+}
+
+void sound_enable(
+	boolean enabled)
+{
+	bss_004d2d60.enabled = enabled;
+
+	return;
+}
+
+boolean sound_is_active(
+	void)
+{
+	return bss_004d2d60.initialized && bss_004d2d60.enabled;
+}
+
+void sound_manager_set_sound_environment(
+	struct sound_environment_definition const *environment)
+{
+	bss_004d2d60.sound_environment = *environment;
+
+	return;
+}
 
 long sound_render_time(
 	void)
