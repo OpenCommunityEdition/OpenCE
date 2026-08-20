@@ -108,9 +108,9 @@ campaign's already-credited complete-object/function/byte totals.
 - Target object SHA-256:
   `763bfe6690fe6beff0897f0128880e2bbc5520e538e3568c2124ad6202aaed4b`.
 - Rebuilt object SHA-256:
-  `fab8f751990747ebad5bfc4200196c93604eb12b4a6a1320f82bce83defce7ca`.
+  `570c666b2bf3963c0af06abda25a4dea8765d15eaeeefb715fb9589aae35c3f6`.
 - `trees.c` SHA-256:
-  `6b2d479f27df710fbc73d10dda06a5d4c24b63e6963372612c7d0c9b34bbcc04`.
+  `235bd0c08a7705e7b27af5171e667488aaefc9bf98e8e8a2389cbb76ca3e2f3a`.
 - `trees.h` SHA-256:
   `b4ca57bae95fd4cfdcd43b94f72d568a279df6c02ef85a60597e6fc2b709667b`.
 - `deflate.h` SHA-256:
