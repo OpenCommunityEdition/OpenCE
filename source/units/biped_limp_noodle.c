@@ -42,4 +42,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+long biped_limp_noodle_get_max_relaxation_iterations(
+	void)
+{
+	return 20;
+}
+
 /* ---------- private code */
