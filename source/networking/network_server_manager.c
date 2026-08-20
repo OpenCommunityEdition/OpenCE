@@ -452,9 +452,13 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cseries/cseries_windows.h"
+#include "game/players.h"
 #include "main/main.h"
 #include "networking/network_connection.h"
+#include "networking/network_game_manager.h"
+#include "networking/network_messages.h"
 #include "networking/network_server_manager.h"
+#include "text/unicode.h"
 
 /* ---------- constants */
 
@@ -462,6 +466,10 @@ symbols in this file:
 
 enum
 {
+	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
+	MAXIMUM_NETWORK_PLAYER_COUNT = 16,
+	NETWORK_GAME_NAME_LENGTH = 16,
+	_network_game_client_machine_joined_bit = 1,
 	_network_game_client_machine_precached_bit = 3,
 };
 
@@ -472,6 +480,10 @@ enum
 };
 
 /* ---------- macros */
+
+#define network_machine_is_valid(machine) \
+	((machine) && (machine)->machine_index >= 0 && \
+	(machine)->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT)
 
 /* ---------- structures */
 
@@ -495,7 +507,41 @@ typedef char network_game_client_machine_size_assert[
 
 struct network_game
 {
-	char name[32];
+	wchar_t name[NETWORK_GAME_NAME_LENGTH];
+	byte opaque020[0xED];
+	char minimum_player_count;
+	byte maximum_player_count;
+	byte padding10F;
+	short difficulty;
+	short machine_count;
+	struct network_game_client_machine machines[MAXIMUM_NETWORK_MACHINE_COUNT];
+	short player_count;
+	struct network_player players[MAXIMUM_NETWORK_PLAYER_COUNT];
+	byte opaque426[2];
+	long random_seed;
+	long number_of_games_played;
+	boolean load_ui;
+	byte padding431[3];
+};
+
+struct network_game_server_client_machine
+{
+	struct network_connection *connection;
+	unsigned long last_received_update_sequence_number;
+	unsigned long stall_start_time;
+	short machine_index;
+	byte flags;
+	byte padding0F;
+};
+
+struct network_game_server_countdown_state
+{
+	struct countdown_timer timer;
+	byte opaque08[4];
+	boolean active;
+	boolean paused;
+	boolean complete;
+	byte padding0F;
 };
 
 struct network_game_server
@@ -505,13 +551,49 @@ struct network_game_server
 	byte flags;
 	byte __unknown07;
 	struct network_game game;
+	struct network_game_server_client_machine client_machines[MAXIMUM_NETWORK_MACHINE_COUNT];
+	byte opaque47C[0xC];
+	struct network_game_server_countdown_state countdown_state;
+	struct network_player queued_player;
+	boolean queued_player_valid;
+	byte padding4B9[3];
 };
+
+typedef char network_game_players_offset_assert[
+	offsetof(struct network_game, players) == 0x226 ? 1 : -1];
+typedef char network_game_size_assert[
+	sizeof(struct network_game) == 0x434 ? 1 : -1];
+typedef char network_game_server_client_machines_offset_assert[
+	offsetof(struct network_game_server, client_machines) == 0x43C ? 1 : -1];
+typedef char network_game_server_countdown_state_offset_assert[
+	offsetof(struct network_game_server, countdown_state) == 0x488 ? 1 : -1];
 
 /* ---------- prototypes */
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+unsigned long countdown_timer_update(
+	struct countdown_timer *timer)
+{
+	unsigned long update_time = system_milliseconds();
+	unsigned long last_update_time = timer->last_update_time;
+
+	timer->last_update_time = update_time;
+
+	if ((long)update_time > (long)last_update_time)
+	{
+		long elapsed_time = update_time - last_update_time;
+
+		if (elapsed_time < timer->time_remaining)
+			timer->time_remaining -= elapsed_time;
+		else
+			timer->time_remaining = 0;
+	}
+
+	return update_time;
+}
 
 struct network_connection *network_game_server_get_client_connection(
 	struct network_game_server *server)
@@ -538,12 +620,25 @@ struct network_game *network_game_server_get_game(
 	return &server->game;
 }
 
-char *network_game_server_get_game_name(
+wchar_t *network_game_server_get_game_name(
 	struct network_game_server *server)
 {
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x1E9, server);
 
 	return server->game.name;
+}
+
+boolean network_game_server_set_game_name(
+	struct network_game_server *server,
+	wchar_t const *name)
+{
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x1DD, server);
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x1DE, name);
+
+	ustrncpy(server->game.name, name, NETWORK_GAME_NAME_LENGTH - 1);
+	server->game.name[NETWORK_GAME_NAME_LENGTH - 1] = 0;
+
+	return FALSE;
 }
 
 short network_game_server_get_state(
@@ -615,6 +710,50 @@ boolean network_game_server_game_is_valid(
 	return game_is_valid;
 }
 
+boolean network_game_server_client_machine_is_joined_to_game(
+	struct network_game_server *server,
+	struct network_game_client_machine *machine)
+{
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x3CD, server);
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x3CE, machine);
+
+	return TEST_FLAG(machine->flags, _network_game_client_machine_joined_bit);
+}
+
+void network_game_server_queue_player_for_addition(
+	struct network_game_server *server,
+	struct network_player *player)
+{
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x5DE, server && player);
+
+	if (!server->queued_player_valid && network_player_is_valid(player))
+	{
+		csmemcpy(&server->queued_player, player, sizeof(server->queued_player));
+		server->queued_player_valid = TRUE;
+	}
+
+	return;
+}
+
+void network_game_server_begin_game_start_countdown(
+	struct network_game_server *server,
+	long time_remaining)
+{
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x5ED, server);
+
+	if (!server->countdown_state.active && !server->countdown_state.paused)
+	{
+		countdown_timer_set_time_remaining(
+			&server->countdown_state.timer,
+			time_remaining);
+		server->countdown_state.complete = FALSE;
+		server->countdown_state.active = TRUE;
+		network_event("server game start countdown started");
+	}
+
+	return;
+}
+
 void network_game_server_invalidate_network_machine(
 	struct network_game_client_machine *machine)
 {
@@ -622,6 +761,105 @@ void network_game_server_invalidate_network_machine(
 
 	csmemset(machine, 0, sizeof(*machine));
 	machine->machine_index = NONE;
+
+	return;
+}
+
+struct network_game_client_machine *network_game_server_get_client_machine(
+	struct network_game_server *server,
+	struct network_game_server_client_machine *client_machine,
+	long *machine_index)
+{
+	struct network_game_client_machine *machine;
+
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x701, server && client_machine);
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x702,
+		client_machine->machine_index<MAXIMUM_NETWORK_MACHINE_COUNT);
+
+	if (machine_index)
+		*machine_index = NONE;
+
+	machine = &server->game.machines[client_machine->machine_index];
+	if (machine_index)
+		*machine_index = machine->machine_index;
+
+	return machine;
+}
+
+struct network_connection *network_game_server_get_machine_connection(
+	struct network_game_server *server,
+	struct network_game_client_machine *machine)
+{
+	struct network_connection *connection = NULL;
+	long index;
+
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x72F,
+		server && network_machine_is_valid(machine));
+
+	for (index = 0; index < MAXIMUM_NETWORK_MACHINE_COUNT; index++)
+	{
+		if (server->client_machines[index].machine_index == machine->machine_index)
+		{
+			connection = server->client_machines[index].connection;
+			break;
+		}
+	}
+
+	return connection;
+}
+
+struct network_game_server_client_machine *network_game_server_get_client_machine_at_index(
+	struct network_game_server *server,
+	long index)
+{
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x741,
+		server && (index<MAXIMUM_NETWORK_MACHINE_COUNT));
+
+	return &server->client_machines[index];
+}
+
+long network_game_server_get_oldest_client_update_received(
+	struct network_game_server *server)
+{
+	unsigned long oldest_update = (unsigned long)NONE;
+	long index;
+
+	for (index = 0; index < MAXIMUM_NETWORK_MACHINE_COUNT; index++)
+	{
+		struct network_game_server_client_machine *client_machine =
+			&server->client_machines[index];
+
+		if (client_machine->machine_index >= 0 &&
+			client_machine->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT)
+		{
+			oldest_update = MIN(
+				oldest_update,
+				client_machine->last_received_update_sequence_number);
+		}
+	}
+
+	return oldest_update;
+}
+
+boolean network_game_server_game_can_start(
+	struct network_game_server *server)
+{
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x782, server);
+
+	return server->state == 0 &&
+		server->game.player_count >= server->game.minimum_player_count;
+}
+
+void network_game_server_pause_countdown(
+	struct network_game_server *server,
+	boolean pause_countdown)
+{
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x78C, server);
+
+	if (pause_countdown == TRUE)
+		csmemset(&server->countdown_state, 0, sizeof(server->countdown_state));
+
+	server->countdown_state.paused = pause_countdown;
 
 	return;
 }
