@@ -391,8 +391,8 @@ void profile_dump_to_file(
 	{
 		profile_dump(name, use_name, 0, 256, buffer);
 		fprintf(file, "%s\r\n", buffer);
+		fclose(file);
 	}
-	fclose(file);
 
 	return;
 }

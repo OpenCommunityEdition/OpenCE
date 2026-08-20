@@ -1,13 +1,14 @@
 # `profile.obj` Codex checkpoint
 
 This Codex-owned ledger records the bounded, header-free recovery of
-`source/cseries/profile.obj`. The unit remains `NonMatching`: 29 functions
+`source/cseries/profile.obj`. The unit remains `NonMatching`: 30 functions
 and most initialized data are still open. No pre-existing or Claude-authored
 Markdown was edited or deleted.
 
 ## Scope and donor boundary
 
 - Integration base: `664ce784eae6bbeded627097d9627fcc11091328`.
+- Safety-correction base: `472fe0e0b272d6da7e7c289a97ac80fca56c0b0a`.
 - The historical donor chain runs from `be2e5bc2` through `3c2a9168`; its
   final `profile.c` blob is `50f0976a1c647b9137e4bc798877453322f9c14c`.
 - The donor measured 30/44 exact functions. Thirteen of those bodies depend
@@ -24,8 +25,8 @@ Markdown was edited or deleted.
 ## Strict code result
 
 The untouched base had 0/44 strict-exact functions and zero credited code
-bytes. A forced candidate build accepts 15/44 functions totaling 1,244
-meaningful bytes, 1,360 padded bytes, and 94 relocations. Every accepted body
+bytes. A forced candidate build accepts 14/44 functions totaling 1,117
+meaningful bytes, 1,232 padded bytes, and 85 relocations. Every accepted body
 is ordinary objdiff exact and independently semantic-COFF exact; no exception
 ledger is used.
 
@@ -36,7 +37,6 @@ ledger is used.
 | `_profile_seconds_elapsed` | 13 | 16 | 1 | `3307464d0a4c3704ea054046b1a71de6ed4ab1c8c397d82e01d96e9777ce0123` |
 | `_profile_lapsed_frames` | 62 | 64 | 5 | `ca4109f0a47a4e1615b5acbe7ce2395ae95093eaf4623b63aa4322c81e28ad4f` |
 | `_profile_lapsed_msec` | 23 | 32 | 2 | `5bf0f905711f7dd660ef2cb05c51d2397e521d52bac526bbe8720e3ea8a18052` |
-| `_profile_dump_to_file` | 127 | 128 | 9 | `fa7272097cf84a7cc0f8e896d86de43e8776c37f79454e3446f4c23324107d74` |
 | `_code_0007ee30` | 158 | 160 | 6 | `c66e82fa92c13d13181e344026e596f60a55b1140e86644acad55433ad598e00` |
 | `_profile_sections_activate` | 20 | 32 | 1 | `e7f3fd1fde128eb17a46853feb1d41f3d7c7cc1aa969ce290690f1cf964ba22e` |
 | `_profile_sections_deactivate` | 20 | 32 | 1 | `f474d33b63b8b8a0bd493b57aa9c2ff259c18455d50cc748005b7d066869368b` |
@@ -47,11 +47,26 @@ ledger is used.
 | `_profile_frame_get_stalls` | 150 | 160 | 11 | `83423f3a3dca3dca554517e99af0c77514e603776046f06af5a7d2f32782c93d` |
 | `_profile_rasterizer_stalls` | 132 | 144 | 15 | `78d28326869a333768f8f1cdfe9126251575b2c3e92bfd0dd845d4197598e848` |
 
-Fourteen exact public functions have matching whole-symbol function type and
+Thirteen exact public functions have matching whole-symbol function type and
 external storage. The private `_code_0007ee30` code section is exact, but the
 target split symbol has external storage class 2 while the legal source-static
 definition has class 3. This checkpoint does not claim whole-symbol ownership
 for that helper.
+
+`profile_dump_to_file` remains a necessary public body because `hs.c` calls
+it. The target-shaped form called `fclose` even when `fopen` returned `NULL`.
+The retained implementation closes the stream only in the successful-open
+branch, so it is ordinary defined C but deliberately receives zero strict
+credit: it is 128 padded bytes with nine relocations and normalized SHA-256
+`c1c2e7ef1e9547f36d70b457fe9f1201fbd3cb5c4f4f6cebb277fd009dafaa21`
+rather than the target hash.
+
+One bounded advisory test moved the `profile_frame_get_stalls` range assertions
+ahead of forming the frame pointer. That changed the normalized function hash
+to `305f28e627e0d6e72a83a17ff25535dd1fd2c52187ee6ded07d46d0df6807dd0`,
+so the experiment was reverted. The exact body retains the original caller
+precondition that the iterator and its current index are valid on entry; its
+assertions reproduce the target diagnostics and are not a safety guard.
 
 ## Strict data and ownership boundary
 
@@ -87,10 +102,10 @@ one-per-line convention, no-argument functions use the project layout, and
 void functions end with explicit `return;`.
 
 The full Halo and libcmt build graphs pass. Semantic audit reports 470 units,
-3,836 functions evaluated, 3,696 semantic exact, 3,760 accepted exact, and
+3,865 functions evaluated, 3,724 semantic exact, 3,788 accepted exact, and
 zero unit errors. Campaign progress is 375/833 complete objects,
-3,749/11,060 exact functions, 458,886/2,198,102 exact code bytes, and
-1,803,156/4,176,062 matched data bytes. Admission reports zero candidates and
+3,777/11,060 exact functions, 460,855/2,198,102 exact code bytes, and
+1,803,160/4,176,062 matched data bytes. Admission reports zero candidates and
 zero revocations, with only the inherited `source/shell/shell_xbox`
 contradiction. Parked audit reports three active, zero stale, and zero
 invalid. The complete tool suite passes 179/179 tests.
