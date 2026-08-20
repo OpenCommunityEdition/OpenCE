@@ -65,6 +65,13 @@ typedef struct ct_data_s {
 
 typedef struct static_tree_desc_s  static_tree_desc;
 
+typedef struct zlib_length_code_tables_s {
+    uch codes[MAX_MATCH-MIN_MATCH+1];
+    int base_lengths[LENGTH_CODES];
+    uch alignment_padding[4];
+    int base_distances[D_CODES];
+} zlib_length_code_tables;
+
 typedef struct tree_desc_s {
     ct_data *dyn_tree;           /* the dynamic tree */
     int     max_code;            /* largest code with non zero frequency */
@@ -285,10 +292,10 @@ void _tr_stored_block OF((deflate_state *s, charf *buf, ulg stored_len,
 /* Inline versions of _tr_tally for speed: */
 
 #if defined(GEN_TREES_H) || !defined(STDC)
-  extern uch _length_code[];
+  extern zlib_length_code_tables _length_code;
   extern uch _dist_code[];
 #else
-  extern const uch _length_code[];
+  extern const zlib_length_code_tables _length_code;
   extern const uch _dist_code[];
 #endif
 
@@ -305,7 +312,7 @@ void _tr_stored_block OF((deflate_state *s, charf *buf, ulg stored_len,
     s->d_buf[s->last_lit] = dist; \
     s->l_buf[s->last_lit++] = len; \
     dist--; \
-    s->dyn_ltree[_length_code[len]+LITERALS+1].Freq++; \
+    s->dyn_ltree[_length_code.codes[len]+LITERALS+1].Freq++; \
     s->dyn_dtree[d_code(dist)].Freq++; \
     flush = (s->last_lit == s->lit_bufsize-1); \
   }
