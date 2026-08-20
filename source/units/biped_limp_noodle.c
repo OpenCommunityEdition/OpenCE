@@ -30,6 +30,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "math/real_math.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -48,4 +51,32 @@ long biped_limp_noodle_get_max_relaxation_iterations(
 	return 20;
 }
 
+void validate_real_vector3d_axes3(
+	real_vector3d *forward,
+	real_vector3d *left,
+	real_vector3d *up)
+{
+	match_assert("c:\\halo\\SOURCE\\units\\biped_limp_noodle.c", 535, forward);
+	match_assert("c:\\halo\\SOURCE\\units\\biped_limp_noodle.c", 535, left);
+	match_assert("c:\\halo\\SOURCE\\units\\biped_limp_noodle.c", 535, up);
+
+	if (normalize3d(forward) == 0.f)
+		*forward = *global_forward3d;
+	if (normalize3d(up) == 0.f)
+		*up = *global_up3d;
+
+	cross_product3d(up, forward, left);
+	if (normalize3d(left) == 0.f)
+		*left = *global_left3d;
+
+	cross_product3d(forward, left, up);
+	if (normalize3d(up) == 0.f)
+		*up = *global_up3d;
+
+	cross_product3d(up, forward, left);
+	if (normalize3d(left) == 0.f)
+		*left = *global_left3d;
+
+	return;
+}
 /* ---------- private code */
