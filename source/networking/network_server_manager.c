@@ -455,6 +455,7 @@ symbols in this file:
 #include "game/players.h"
 #include "main/main.h"
 #include "networking/network_connection.h"
+#include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
 #include "networking/network_messages.h"
 #include "networking/network_server_manager.h"
@@ -508,7 +509,9 @@ typedef char network_game_client_machine_size_assert[
 struct network_game
 {
 	wchar_t name[NETWORK_GAME_NAME_LENGTH];
-	byte opaque020[0xED];
+	byte opaque020[0xA0];
+	boolean teams;
+	byte opaque0C1[0x4C];
 	char minimum_player_count;
 	byte maximum_player_count;
 	byte padding10F;
@@ -561,6 +564,8 @@ struct network_game_server
 
 typedef char network_game_players_offset_assert[
 	offsetof(struct network_game, players) == 0x226 ? 1 : -1];
+typedef char network_game_teams_offset_assert[
+	offsetof(struct network_game, teams) == 0xC0 ? 1 : -1];
 typedef char network_game_size_assert[
 	sizeof(struct network_game) == 0x434 ? 1 : -1];
 typedef char network_game_server_client_machines_offset_assert[
@@ -593,6 +598,32 @@ unsigned long countdown_timer_update(
 	}
 
 	return update_time;
+}
+
+long countdown_timer_get_time_remaining(
+	struct countdown_timer *timer)
+{
+	long time_remaining;
+	unsigned long update_time = system_milliseconds();
+	unsigned long last_update_time = timer->last_update_time;
+
+	if ((long)update_time > (long)last_update_time)
+	{
+		long elapsed_time = update_time - last_update_time;
+
+		if (elapsed_time < timer->time_remaining)
+			timer->time_remaining -= elapsed_time;
+		else
+			timer->time_remaining = 0;
+	}
+
+	time_remaining = timer->time_remaining;
+	timer->last_update_time = update_time;
+
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x5F,
+		timer->time_remaining >= 0);
+
+	return time_remaining;
 }
 
 struct network_connection *network_game_server_get_client_connection(
@@ -752,6 +783,71 @@ void network_game_server_begin_game_start_countdown(
 	}
 
 	return;
+}
+
+boolean server_needs_more_teams(
+	struct network_game_server *server)
+{
+	boolean needs_more_teams = FALSE;
+
+	if (server->game.teams)
+	{
+		short player_count_by_team[2] = { 0, 0 };
+		long player_index;
+		long team_index;
+
+		for (player_index = 0;
+			player_index < MAXIMUM_NETWORK_PLAYER_COUNT;
+			player_index++)
+		{
+			struct network_player *player = &server->game.players[player_index];
+
+			if (network_player_is_valid(player) &&
+				player->team_index >= 0 && player->team_index < 2)
+			{
+				player_count_by_team[player->team_index]++;
+			}
+		}
+
+		for (team_index = 0; team_index < 2; team_index++)
+		{
+			if (player_count_by_team[team_index] == 0)
+			{
+				needs_more_teams = TRUE;
+				break;
+			}
+		}
+	}
+
+	return needs_more_teams;
+}
+
+boolean server_has_enough_machines(
+	struct network_game_server *server)
+{
+	boolean has_enough_machines;
+	long minimum_machine_count =
+		network_game_is_splitscreen_local() ? 1 : 2;
+	long machine_count = 0;
+	long client_machine_index;
+
+	for (client_machine_index = 0;
+		client_machine_index < MAXIMUM_NETWORK_MACHINE_COUNT;
+		client_machine_index++)
+	{
+		struct network_game_server_client_machine *client_machine =
+			&server->client_machines[client_machine_index];
+
+		if (client_machine->machine_index >= 0 &&
+			client_machine->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT)
+		{
+			machine_count++;
+		}
+	}
+
+	has_enough_machines = machine_count >= minimum_machine_count;
+
+	return has_enough_machines;
 }
 
 void network_game_server_invalidate_network_machine(
