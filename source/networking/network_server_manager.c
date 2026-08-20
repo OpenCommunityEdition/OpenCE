@@ -450,16 +450,180 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "cseries/cseries_windows.h"
+#include "main/main.h"
+#include "networking/network_connection.h"
+#include "networking/network_server_manager.h"
+
 /* ---------- constants */
+
+#define NETWORK_SERVER_MANAGER_FILE "c:\\halo\\SOURCE\\networking\\network_server_manager.c"
+
+enum
+{
+	_network_game_client_machine_precached_bit = 3,
+};
+
+enum
+{
+	_network_game_server_game_open_bit = 0,
+	_network_game_server_game_valid_bit,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct countdown_timer
+{
+	long time_remaining;
+	unsigned long last_update_time;
+};
+
+struct network_game_client_machine
+{
+	byte opaque00[0xE];
+	byte flags;
+	byte opaque0F[0x31];
+	char machine_index;
+	byte opaque41[3];
+};
+
+typedef char network_game_client_machine_size_assert[
+	sizeof(struct network_game_client_machine) == 0x44 ? 1 : -1];
+
+struct network_game
+{
+	char name[32];
+};
+
+struct network_game_server
+{
+	struct network_connection *connection;
+	short state;
+	byte flags;
+	byte __unknown07;
+	struct network_game game;
+};
 
 /* ---------- prototypes */
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+struct network_connection *network_game_server_get_client_connection(
+	struct network_game_server *server)
+{
+	if (server)
+		return server->connection;
+
+	return NULL;
+}
+
+struct network_connection *network_game_server_get_connection(
+	struct network_game_server *server)
+{
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x712, server);
+
+	return server->connection;
+}
+
+struct network_game *network_game_server_get_game(
+	struct network_game_server *server)
+{
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x769, server);
+
+	return &server->game;
+}
+
+char *network_game_server_get_game_name(
+	struct network_game_server *server)
+{
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x1E9, server);
+
+	return server->game.name;
+}
+
+short network_game_server_get_state(
+	struct network_game_server *server,
+	short *substate)
+{
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x1F2, server);
+
+	if (substate)
+		*substate = 0;
+
+	return server->state;
+}
+
+void countdown_timer_set_time_remaining(
+	struct countdown_timer *timer,
+	long time_remaining)
+{
+	unsigned long update_time = system_milliseconds();
+
+	timer->time_remaining = time_remaining;
+	timer->last_update_time = update_time;
+
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x95, timer->time_remaining >= 0);
+
+	return;
+}
+
+void network_game_server_client_machine_is_precached(
+	struct network_game_server *server,
+	struct network_game_client_machine *client_machine,
+	char const *map_name)
+{
+	char const *multiplayer_map_name = main_get_multiplayer_map_name();
+
+	if (!csstrcmp(multiplayer_map_name, map_name))
+		SET_FLAG(client_machine->flags, _network_game_client_machine_precached_bit, TRUE);
+
+	return;
+}
+
+boolean network_game_server_game_is_open(
+	struct network_game_server *server)
+{
+	boolean game_is_open;
+
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x214, server);
+
+	game_is_open = TEST_FLAG(server->flags, _network_game_server_game_open_bit);
+
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x217,
+		(TRUE == game_is_open) || (FALSE == game_is_open));
+
+	return game_is_open;
+}
+
+boolean network_game_server_game_is_valid(
+	struct network_game_server *server)
+{
+	boolean game_is_valid;
+
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x220, server);
+
+	game_is_valid = TEST_FLAG(server->flags, _network_game_server_game_valid_bit);
+
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x223,
+		(TRUE == game_is_valid) || (FALSE == game_is_valid));
+
+	return game_is_valid;
+}
+
+void network_game_server_invalidate_network_machine(
+	struct network_game_client_machine *machine)
+{
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x6C9, machine);
+
+	csmemset(machine, 0, sizeof(*machine));
+	machine->machine_index = NONE;
+
+	return;
+}
 
 /* ---------- private code */
