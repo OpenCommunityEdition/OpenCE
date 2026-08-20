@@ -181,16 +181,28 @@ struct player_ui_local_player
 	byte unknown35[3];
 };
 
-struct player_ui_profile_data
+struct player_profile
+{
+	wchar_t name[12];
+	byte unknown18[0x18];
+};
+
+struct playlist_profile
 {
 	wchar_t name[12];
 	byte unknown18[0x50];
 };
 
+union player_ui_edit_profile_data
+{
+	struct player_profile player;
+	struct playlist_profile playlist;
+};
+
 struct player_ui_edit_profile
 {
-	struct player_ui_profile_data current;
-	struct player_ui_profile_data original;
+	union player_ui_edit_profile_data current;
+	union player_ui_edit_profile_data original;
 	byte unknownD0[4];
 };
 
@@ -206,6 +218,13 @@ struct player_ui_globals
 	struct player_ui_edit_profile edit_profile;
 	char player1_last_used_profile_directory[0x100];
 };
+
+typedef char player_profile_size_assert[
+	sizeof(struct player_profile) == 0x30 ? 1 : -1];
+typedef char playlist_profile_size_assert[
+	sizeof(struct playlist_profile) == 0x68 ? 1 : -1];
+typedef char player_ui_edit_profile_size_assert[
+	sizeof(struct player_ui_edit_profile) == 0xD4 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -232,10 +251,10 @@ void saved_game_file_remember_player1_last_used_profile_directory(
 	char *directory);
 boolean player_profile_get(
 	long profile_index,
-	struct player_ui_profile_data *profile);
+	struct player_profile *profile);
 boolean playlist_profile_get(
 	long profile_index,
-	struct player_ui_profile_data *profile);
+	struct playlist_profile *profile);
 
 /* ---------- globals */
 
@@ -317,7 +336,7 @@ struct player_profile *player_ui_get_edit_player_profile(
 	struct player_profile *result;
 
 	if (saved_game_file_get_type(player_ui_globals.edit_profile_index) == SAVED_GAME_FILE_TYPE_PLAYER_PROFILE)
-		result = (struct player_profile *)&player_ui_globals.edit_profile;
+		result = &player_ui_globals.edit_profile.current.player;
 	else
 		result = NULL;
 	return result;
@@ -329,7 +348,7 @@ struct playlist_profile *player_ui_get_edit_playlist_profile(
 	struct playlist_profile *result;
 
 	if (saved_game_file_get_type(player_ui_globals.edit_profile_index) == SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE)
-		result = (struct playlist_profile *)&player_ui_globals.edit_profile;
+		result = &player_ui_globals.edit_profile.current.playlist;
 	else
 		result = NULL;
 	return result;
@@ -552,10 +571,14 @@ void player_ui_begin_editing_profile(
 	switch (type)
 	{
 		case SAVED_GAME_FILE_TYPE_PLAYER_PROFILE:
-			if (player_profile_get(profile_index, &player_ui_globals.edit_profile.original))
+			if (player_profile_get(
+				profile_index,
+				&player_ui_globals.edit_profile.original.player))
 			{
-				csmemcpy(&player_ui_globals.edit_profile.current,
-					&player_ui_globals.edit_profile.original, 0x30);
+				csmemcpy(
+					&player_ui_globals.edit_profile.current.player,
+					&player_ui_globals.edit_profile.original.player,
+					sizeof(struct player_profile));
 			}
 			else
 			{
@@ -565,10 +588,14 @@ void player_ui_begin_editing_profile(
 			break;
 
 		case SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE:
-			if (playlist_profile_get(profile_index, &player_ui_globals.edit_profile.original))
+			if (playlist_profile_get(
+				profile_index,
+				&player_ui_globals.edit_profile.original.playlist))
 			{
-				csmemcpy(&player_ui_globals.edit_profile.current,
-					&player_ui_globals.edit_profile.original, 0x68);
+				csmemcpy(
+					&player_ui_globals.edit_profile.current.playlist,
+					&player_ui_globals.edit_profile.original.playlist,
+					sizeof(struct playlist_profile));
 			}
 			else
 			{
@@ -619,16 +646,20 @@ boolean player_ui_edit_profile_name_is_dirty(
 		switch (type)
 		{
 			case SAVED_GAME_FILE_TYPE_PLAYER_PROFILE:
-				if (ustrncmp(player_ui_globals.edit_profile.current.name,
-					player_ui_globals.edit_profile.original.name, 12)!=0)
+				if (ustrncmp(
+					player_ui_globals.edit_profile.current.player.name,
+					player_ui_globals.edit_profile.original.player.name,
+					12)!=0)
 				{
 					result = TRUE;
 				}
 				break;
 
 			case SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE:
-				if (ustrncmp(player_ui_globals.edit_profile.current.name,
-					player_ui_globals.edit_profile.original.name, 12)!=0)
+				if (ustrncmp(
+					player_ui_globals.edit_profile.current.playlist.name,
+					player_ui_globals.edit_profile.original.playlist.name,
+					12)!=0)
 				{
 					result = TRUE;
 				}
@@ -660,13 +691,17 @@ boolean player_ui_prompt_user_to_rename_edit_profile(
 		switch (type)
 		{
 			case SAVED_GAME_FILE_TYPE_PLAYER_PROFILE:
-				result = virtual_keyboard_launch(player_ui_globals.edit_profile.current.name,
-					sizeof(player_ui_globals.edit_profile.current.name), 10);
+				result = virtual_keyboard_launch(
+					player_ui_globals.edit_profile.current.player.name,
+					sizeof(player_ui_globals.edit_profile.current.player.name),
+					10);
 				break;
 
 			case SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE:
-				result = virtual_keyboard_launch(player_ui_globals.edit_profile.current.name,
-					sizeof(player_ui_globals.edit_profile.current.name), 10);
+				result = virtual_keyboard_launch(
+					player_ui_globals.edit_profile.current.playlist.name,
+					sizeof(player_ui_globals.edit_profile.current.playlist.name),
+					10);
 				break;
 
 			default:

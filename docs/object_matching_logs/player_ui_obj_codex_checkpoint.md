@@ -120,3 +120,26 @@ Admission reports zero candidates and zero revocations, with only the inherited
 zero stale, and zero invalid entries. The complete tooling suite passes
 179/179 tests. A clean-commit forced-rebuild regression replay is required for
 the final handoff.
+
+## Typed edit-profile follow-up
+
+A later policy audit found that the two edit-profile getters cast the same
+generic buffer to unrelated incomplete structure types. The corrected model
+recovers the two layouts already established by the surrounding APIs: a
+48-byte player profile and a 104-byte playlist profile, each beginning with
+the twelve-character name. The current and original edit slots are now unions
+of those two complete types. Each saved-game-type branch writes, copies,
+compares, edits, and returns only its corresponding member; compile-time size
+checks preserve the 212-byte edit block and the 816-byte global layout. No
+cast, inactive-member read, raw offset, or writable type-punning escape remains.
+
+The forced XDK rebuild preserves all 31/42 strict-exact functions. The five
+directly affected accepted functions retain their normalized hashes, padded
+sizes, and relocation semantics, including both getters and
+`_player_ui_begin_editing_profile`. The pre-correction regression manifest
+reports all 31 accepted functions `still_exact`, no changed nonexact function,
+no newly exact function, and no runtime data or symbol-ownership change. The
+only object delta is compiler type information in `.debug$S`, expected from
+replacing the generic buffer description with the recovered union; it receives
+no runtime matching credit. The 1,366/2,004 strict target-owned data-byte result
+is unchanged.
