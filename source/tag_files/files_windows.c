@@ -116,7 +116,9 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cseries_windows.h"
+#include "errors.h"
 
+#define BUILDING_FILES_WINDOWS
 #include "files.h"
 #include "text/international_strings.h"
 
@@ -127,6 +129,10 @@ symbols in this file:
 /* ---------- structures */
 
 /* ---------- prototypes */
+
+static void code_00189ca0(
+	struct file_reference *file,
+	const char *function_name);
 
 /* ---------- globals */
 
@@ -215,6 +221,164 @@ void file_path_remove_name(
 	return;
 }
 
+void file_location_get_full_path(
+	short location,
+	const char *path,
+	char *full_path)
+{
+	match_assert("c:\\halo\\SOURCE\\tag_files\\files_windows.c", 788, path && full_path);
+
+	*full_path = 0;
+	if (!path[0] || !path[1] || !path[2] || !(isalpha)(path[0]) ||
+		path[1]!=':' || path[2]!='\\')
+	{
+		csstrcpy(full_path, "d:\\");
+	}
+	csstrcat(full_path, path);
+
+	return;
+}
+
+boolean file_create(
+	struct file_reference *file)
+{
+	struct file_reference_info *info = file_reference_get_info(file);
+	char full_path[MAXIMUM_FILENAME_LENGTH+1] = "";
+
+	file_location_get_full_path(info->location, info->path, full_path);
+
+	if (TEST_FLAG(info->flags, _has_filename_bit))
+	{
+		void *file_handle = CreateFileA(full_path, GENERIC_WRITE, 0, NULL,
+			CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+		if (file_handle != INVALID_HANDLE_VALUE)
+		{
+			CloseHandle(file_handle);
+			return TRUE;
+		}
+	}
+	else
+	{
+		if (CreateDirectoryA(info->path, NULL))
+			return TRUE;
+	}
+
+	{
+		struct file_reference_info *error_info = file_reference_get_info(file);
+
+		error(_error_silent, "%s('%s') error 0x%08x", "file_create",
+			error_info->path, GetLastError());
+		SetLastError(0);
+	}
+
+	return FALSE;
+}
+
+boolean file_delete(
+	struct file_reference *file)
+{
+	struct file_reference_info *info = file_reference_get_info(file);
+	char full_path[MAXIMUM_FILENAME_LENGTH+1] = "";
+
+	file_location_get_full_path(info->location, info->path, full_path);
+
+	if (TEST_FLAG(info->flags, _has_filename_bit))
+	{
+		if (SetFileAttributesA(full_path, FILE_ATTRIBUTE_NORMAL) &&
+			DeleteFileA(full_path))
+		{
+			return TRUE;
+		}
+	}
+	else
+	{
+		if (RemoveDirectoryA(full_path))
+			return TRUE;
+	}
+
+	{
+		struct file_reference_info *error_info = file_reference_get_info(file);
+
+		error(_error_silent, "%s('%s') error 0x%08x", "file_delete",
+			error_info->path, GetLastError());
+		SetLastError(0);
+	}
+
+	return FALSE;
+}
+
+boolean file_rename(
+	struct file_reference *file,
+	const char *new_name)
+{
+	struct file_reference_info *info = file_reference_get_info(file);
+	boolean result = FALSE;
+	char old_path[MAXIMUM_FILENAME_LENGTH+1] = "";
+	char new_path[MAXIMUM_FILENAME_LENGTH+1] = "";
+
+	file_location_get_full_path(info->location, info->path, old_path);
+	csstrcpy(new_path, old_path);
+	file_path_remove_name(new_path);
+	file_path_add_name(new_path, new_name);
+
+	if (MoveFileA(old_path, new_path))
+	{
+		file_path_remove_name(info->path);
+		file_path_add_name(info->path, new_name);
+		result = TRUE;
+	}
+
+	return result;
+}
+
+boolean file_get_last_modification_date(
+	struct file_reference *file,
+	struct file_last_modification_date *date)
+{
+	struct file_reference_info *info = file_reference_get_info(file);
+	char full_path[MAXIMUM_FILENAME_LENGTH+1] = "";
+	WIN32_FILE_ATTRIBUTE_DATA attribute_data;
+
+	csmemset(date, 0, sizeof(*date));
+	file_location_get_full_path(info->location, info->path, full_path);
+
+	if (GetFileAttributesExA(full_path, GetFileExInfoStandard, &attribute_data))
+	{
+		csmemcpy(date, &attribute_data.ftLastWriteTime, sizeof(*date));
+	}
+	else
+	{
+		struct file_reference_info *error_info = file_reference_get_info(file);
+
+		error(_error_silent, "%s('%s') error 0x%08x", "file_get_last_modification_date",
+			error_info->path, GetLastError());
+		SetLastError(0);
+	}
+
+	return TRUE;
+}
+
+boolean file_exists(
+	const struct file_reference *file)
+{
+	struct file_reference_info *info = file_reference_get_info((struct file_reference *)file);
+	boolean result = FALSE;
+	char full_path[MAXIMUM_FILENAME_LENGTH+1] = "";
+
+	file_location_get_full_path(info->location, info->path, full_path);
+	if (GetFileAttributesA(full_path) != (unsigned long)NONE)
+	{
+		result = TRUE;
+	}
+	else if (GetLastError()!=ERROR_FILE_NOT_FOUND && GetLastError()!=ERROR_PATH_NOT_FOUND)
+	{
+		code_00189ca0((struct file_reference *)file, "file_exists");
+	}
+
+	return result;
+}
+
 boolean file_read_only(
 	struct file_reference *file)
 {
@@ -229,6 +393,112 @@ boolean file_read_only(
 		read_only = TRUE;
 
 	return read_only;
+}
+
+boolean file_close(
+	struct file_reference *file)
+{
+	struct file_reference_info *info = file_reference_get_info(file);
+	boolean result = FALSE;
+
+	if (CloseHandle(info->file_handle))
+	{
+		info->file_handle = NULL;
+		result = TRUE;
+	}
+	else
+	{
+		struct file_reference_info *error_info = file_reference_get_info(file);
+
+		error(_error_silent, "%s('%s') error 0x%08x", "file_close",
+			error_info->path, GetLastError());
+		SetLastError(0);
+	}
+
+	return result;
+}
+
+unsigned long file_get_position(
+	const struct file_reference *file)
+{
+	unsigned long position;
+	void *file_handle = file_reference_get_info((struct file_reference *)file)->file_handle;
+
+	position = SetFilePointer(file_handle, 0, NULL, FILE_CURRENT);
+	if (position == (unsigned long)NONE)
+	{
+		struct file_reference_info *info = file_reference_get_info((struct file_reference *)file);
+
+		error(_error_silent, "%s('%s') error 0x%08x", "file_get_position",
+			info->path, GetLastError());
+		SetLastError(0);
+	}
+
+	return position;
+}
+
+boolean file_set_position(
+	const struct file_reference *file,
+	unsigned long position)
+{
+	struct file_reference_info *info = file_reference_get_info((struct file_reference *)file);
+	boolean result;
+
+	result = SetFilePointer(info->file_handle, position, NULL, FILE_BEGIN) != (unsigned long)NONE;
+	if (!result)
+	{
+		struct file_reference_info *error_info = file_reference_get_info((struct file_reference *)file);
+
+		error(_error_silent, "%s('%s') error 0x%08x", "file_set_position",
+			error_info->path, GetLastError());
+		SetLastError(0);
+	}
+
+	return result;
+}
+
+unsigned long file_get_eof(
+	const struct file_reference *file)
+{
+	unsigned long size;
+	void *file_handle = file_reference_get_info((struct file_reference *)file)->file_handle;
+
+	size = GetFileSize(file_handle, NULL);
+	if (size == (unsigned long)NONE)
+	{
+		struct file_reference_info *info = file_reference_get_info((struct file_reference *)file);
+
+		error(_error_silent, "%s('%s') error 0x%08x", "file_get_eof",
+			info->path, GetLastError());
+		SetLastError(0);
+	}
+
+	return size;
+}
+
+boolean file_set_eof(
+	const struct file_reference *file,
+	unsigned long position)
+{
+	struct file_reference_info *info = file_reference_get_info((struct file_reference *)file);
+	boolean result;
+
+	if (file_set_position(file, position) && SetEndOfFile(info->file_handle))
+	{
+		result = TRUE;
+	}
+	else
+	{
+		struct file_reference_info *error_info;
+
+		result = FALSE;
+		error_info = file_reference_get_info((struct file_reference *)file);
+		error(_error_silent, "%s('%s') error 0x%08x", "file_set_eof",
+			error_info->path, GetLastError());
+		SetLastError(0);
+	}
+
+	return result;
 }
 
 boolean file_read_from_position(
@@ -250,3 +520,16 @@ boolean file_write_to_position(
 }
 
 /* ---------- private code */
+
+static void code_00189ca0(
+	struct file_reference *file,
+	const char *function_name)
+{
+	struct file_reference_info *info = file_reference_get_info(file);
+
+	error(_error_silent, "%s('%s') error 0x%08x", function_name,
+		info->path, GetLastError());
+	SetLastError(0);
+
+	return;
+}
