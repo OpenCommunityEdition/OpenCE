@@ -648,4 +648,16 @@ void ui_widgets_safe_to_load(
 	return;
 }
 
+void code_000d4680(
+	void)
+{
+	return;
+}
+
+void code_000d4690(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
