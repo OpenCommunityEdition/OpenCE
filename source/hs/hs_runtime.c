@@ -382,7 +382,7 @@ union hs_conversion_result code_000ba2e0(
 long code_000ba300(
 	union hs_conversion_result value);
 long code_000ba310(
-	long value);
+	union hs_conversion_result value);
 long code_000ba320(
 	short object_name_index);
 long code_000ba360(
@@ -743,7 +743,7 @@ void code_000b9a10(
 {
 	struct hs_enum_definition *enum_definition;
 
-	enum_definition = &hs_enum_table[type];
+	enum_definition = &hs_enum_table[type-_hs_type_enum_game_difficulty];
 	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x27b,
 		HS_TYPE_IS_ENUM(type));
 	match_vassert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x27c,
@@ -832,11 +832,13 @@ long code_000ba300(
 }
 
 long code_000ba310(
-	long value)
+	union hs_conversion_result value)
 {
-	*(short *)&value = *(short *)&value;
+	union hs_conversion_result result;
 
-	return value;
+	result.short_integer = value.short_integer;
+
+	return result.long_integer;
 }
 
 long code_000ba320(
@@ -891,6 +893,8 @@ boolean hs_can_cast(
 	short actual_type,
 	short desired_type)
 {
+	short object_type;
+
 	match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x5a4,
 		actual_type==_hs_passthrough || hs_type_valid(actual_type));
 	match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x5a5,
@@ -903,12 +907,12 @@ boolean hs_can_cast(
 
 	if (HS_TYPE_IS_OBJECT_NAME(desired_type))
 	{
-		desired_type -= _hs_type_object_name;
+		object_type = desired_type - _hs_type_object_name;
 		if (HS_TYPE_IS_OBJECT_NAME(actual_type))
 		{
 			return code_000ba390(
 				actual_type-_hs_type_object_name,
-				desired_type);
+				object_type);
 		}
 		else if (!HS_TYPE_IS_OBJECT(actual_type))
 		{
@@ -924,12 +928,12 @@ boolean hs_can_cast(
 			return FALSE;
 		}
 
-		desired_type -= _hs_type_object;
+		object_type = desired_type - _hs_type_object;
 
 cast_object_type:
 		return code_000ba390(
 			actual_type-_hs_type_object,
-			desired_type);
+			object_type);
 	}
 	else
 	{

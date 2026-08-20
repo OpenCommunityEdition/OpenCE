@@ -3182,16 +3182,17 @@ void evaluator( \
 #define hud_message_text_definition_get(index) \
 	((struct hud_message_text_definition *)tag_get(hud_message_text_group_tag, (index)))
 
-#define HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(evaluator, arguments_type, expression) \
+#define HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(evaluator, arguments_type, real_index, expression) \
 void evaluator( \
 	short function_index, \
 	long thread_index, \
 	boolean initialize) \
 { \
-	arguments_type volatile const *arguments; \
-	arguments = (arguments_type volatile const *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	arguments_type const *arguments; \
+	arguments = (arguments_type const *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
+		real real_argument = arguments[real_index].real_value; \
 		expression; \
 		hs_return(thread_index, 0); \
 	} \
@@ -3208,24 +3209,6 @@ void evaluator( \
 	union hs_boolean_result result; \
 	result.value = 0; \
 	arguments = (arguments_type const *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
-	if (arguments) \
-	{ \
-		result.boolean = expression; \
-		hs_return(thread_index, result.value); \
-	} \
-	return; \
-}
-
-#define HS_EVALUATE_RETURN_BOOLEAN_VOLATILE(evaluator, arguments_type, expression) \
-void evaluator( \
-	short function_index, \
-	long thread_index, \
-	boolean initialize) \
-{ \
-	arguments_type volatile const *arguments; \
-	union hs_boolean_result result; \
-	result.value = 0; \
-	arguments = (arguments_type volatile const *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
 		result.boolean = expression; \
@@ -3439,28 +3422,28 @@ struct hs_arguments_real
 	real value;
 };
 
-struct hs_arguments_real_volatile_real
+struct hs_arguments_real_real
 {
 	real value0;
-	volatile real value1;
+	real value1;
 };
 
-struct hs_arguments_real_volatile_real_real
+struct hs_arguments_real_real_real
 {
 	real value0;
-	volatile real value1;
-	volatile real value2;
+	real value1;
+	real value2;
 };
 
-struct hs_arguments_real_volatile_real_real_real
+struct hs_arguments_real_real_real_real
 {
 	real value0;
-	volatile real value1;
-	volatile real value2;
-	volatile real value3;
+	real value1;
+	real value2;
+	real value3;
 };
 
-struct hs_arguments_word_word_word_volatile_real
+struct hs_arguments_word_word_word_real
 {
 	word value0;
 	word pad0;
@@ -3468,61 +3451,61 @@ struct hs_arguments_word_word_word_volatile_real
 	word pad1;
 	word value2;
 	word pad2;
-	volatile real value3;
+	real value3;
 };
 
-struct hs_arguments_word_word_long_volatile_real
+struct hs_arguments_word_word_long_real
 {
 	word value0;
 	word pad0;
 	word value1;
 	word pad1;
 	long value2;
-	volatile real value3;
+	real value3;
 };
 
-struct hs_arguments_real_volatile_real_real_real_boolean_real
+struct hs_arguments_real_real_real_real_boolean_real
 {
 	real value0;
-	volatile real value1;
-	volatile real value2;
-	volatile real value3;
+	real value1;
+	real value2;
+	real value3;
 	boolean value4;
 	byte pad4[3];
-	volatile real value5;
+	real value5;
 };
 
-struct hs_arguments_long_volatile_real_word
+struct hs_arguments_long_real_word
 {
 	long value0;
-	volatile real value1;
+	real value1;
 	word value2;
 };
 
-struct hs_arguments_long_volatile_real_real
+struct hs_arguments_long_real_real
 {
 	long value0;
-	volatile real value1;
-	volatile real value2;
+	real value1;
+	real value2;
 };
 
-struct hs_arguments_long_volatile_real_real_word
+struct hs_arguments_long_real_real_word
 {
 	long value0;
-	volatile real value1;
-	volatile real value2;
+	real value1;
+	real value2;
 	word value3;
 };
 
-struct hs_arguments_short_word_volatile_real_real_real
+struct hs_arguments_short_word_real_real_real
 {
 	short value0;
 	word pad0;
 	word value1;
 	word pad1;
-	volatile real value2;
-	volatile real value3;
-	volatile real value4;
+	real value2;
+	real value3;
+	real value4;
 };
 
 struct hs_arguments_word_word_word
@@ -4575,14 +4558,32 @@ long code_000b3b10(
 boolean tag_data_resize(
 	struct tag_data *data,
 	long size);
+boolean tag_block_resize(
+	struct tag_block *block,
+	long count);
+long tag_block_add_element(
+	struct tag_block *block);
+long hs_compile_expression(
+	long source_size,
+	char const *source,
+	char const **error_source,
+	char const **error_message);
+boolean hs_compile_postprocess(
+	char const **error_message,
+	char const **error_source);
+int isspace(
+	int character);
+boolean hs_scenario_merge(
+	struct scenario *scenario,
+	struct scenario *source_scenario);
 void code_000b2f00(
 	void);
 boolean code_000b3b60(
 	void);
 boolean code_000b3d10(
 	void);
-void hs_scenario_postprocess(
-	boolean force);
+boolean hs_scenario_postprocess(
+	boolean restore_syntax_data);
 void object_lists_dispose(
 	void);
 boolean game_safe_to_save(
@@ -4597,6 +4598,10 @@ boolean main_saving_map(
 	void);
 boolean game_state_reverted(
 	void);
+
+/* ---------- constants */
+
+#define MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO 19001
 
 /* ---------- globals */
 
@@ -4616,6 +4621,105 @@ extern char const *hs_script_type_names[];
 extern char const *hs_type_names[];
 
 /* ---------- public code */
+
+boolean hs_scenario_merge(
+	struct scenario *scenario,
+	struct scenario *source_scenario)
+{
+	boolean success = TRUE;
+	struct tag_block *source_files;
+	short source_file_index;
+
+	source_file_index = 0;
+	source_files = &source_scenario->hs_source_files;
+
+	for (; source_file_index<source_files->count; source_file_index++)
+	{
+		struct hs_source_file *source_file;
+		struct tag_block *files;
+		short file_index;
+
+		source_file = TAG_BLOCK_GET_ELEMENT(source_files, source_file_index, struct hs_source_file);
+		files = &scenario->hs_source_files;
+		for (file_index = 0; file_index<files->count; file_index++)
+		{
+			struct hs_source_file *file;
+
+			file = TAG_BLOCK_GET_ELEMENT(files, file_index, struct hs_source_file);
+			if (_stricmp(source_file->name, file->name) == 0)
+				break;
+		}
+		if (file_index == files->count)
+		{
+			short new_file_index;
+
+			new_file_index = tag_block_add_element(files);
+			if (new_file_index != NONE)
+			{
+				struct hs_source_file *file;
+
+				file = TAG_BLOCK_GET_ELEMENT(files, new_file_index, struct hs_source_file);
+				csstrcpy(file->name, source_file->name);
+				if (tag_data_resize(&file->source, source_file->source.size))
+				{
+					csmemcpy(file->source.address, source_file->source.address, source_file->source.size);
+				}
+				else
+				{
+					success = FALSE;
+				}
+			}
+			else
+			{
+				success = FALSE;
+			}
+		}
+	}
+	tag_block_resize(&scenario->hs_scripts, 0);
+
+	return success;
+}
+
+void code_000b2f00(
+	void)
+{
+	struct scenario *scenario;
+
+	scenario = global_scenario_index != NONE ? global_scenario_get() : NULL;
+	if (scenario &&
+		scenario->hs_syntax_data.size ==
+			sizeof(struct data_array)+MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO*sizeof(struct hs_syntax_node))
+	{
+		return;
+	}
+
+	hs_syntax_data = data_new(
+		"script node",
+		MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO,
+		sizeof(struct hs_syntax_node));
+	if (hs_syntax_data)
+	{
+		data_make_valid(hs_syntax_data);
+		if (scenario)
+		{
+			match_free("c:\\halo\\SOURCE\\hs\\hs.c", 336, scenario->hs_syntax_data.address);
+			scenario->hs_syntax_data.address = hs_syntax_data;
+			scenario->hs_syntax_data.size =
+				sizeof(struct data_array)+MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO*sizeof(struct hs_syntax_node);
+			tag_data_resize(&scenario->hs_string_constants, 0x400);
+			tag_block_resize(&scenario->hs_scripts, 0);
+		}
+		else
+		{
+			bss_00453468[0x11] = TRUE;
+		}
+	}
+	else
+	{
+		error(0, "couldn't allocate script syntax data");
+	}
+	return;
+}
 
 void hs_dispose(
 	void)
@@ -4935,14 +5039,14 @@ short hs_find_script_by_name(
 
 	if (global_scenario_index != NONE)
 	{
-		struct tag_block const *scripts;
+		struct scenario *scenario;
 
-		scripts = &global_scenario_get()->hs_scripts;
-		for (script_index = 0; script_index<scripts->count; script_index++)
+		scenario = global_scenario_get();
+		for (script_index = 0; script_index<scenario->hs_scripts.count; script_index++)
 		{
 			struct hs_script const *script;
 
-			script = TAG_BLOCK_GET_ELEMENT(scripts, script_index, struct hs_script);
+			script = TAG_BLOCK_GET_ELEMENT(&scenario->hs_scripts, script_index, struct hs_script);
 			if (csstrcmp(name, script->name) == 0)
 				return script_index;
 		}
@@ -4990,14 +5094,14 @@ short hs_find_tag_reference_by_index(
 
 	if (global_scenario_index != NONE)
 	{
-		struct tag_block const *references;
+		struct scenario *scenario;
 
-		references = &global_scenario_get()->hs_references;
-		for (reference_index = 0; reference_index<references->count; reference_index++)
+		scenario = global_scenario_get();
+		for (reference_index = 0; reference_index<scenario->hs_references.count; reference_index++)
 		{
 			struct hs_reference const *reference;
 
-			reference = TAG_BLOCK_GET_ELEMENT(references, reference_index, struct hs_reference);
+			reference = TAG_BLOCK_GET_ELEMENT(&scenario->hs_references, reference_index, struct hs_reference);
 			if (reference->reference.index == tag_index)
 				return reference_index;
 		}
@@ -5102,6 +5206,15 @@ static void code_000b3de0(
 	return;
 }
 
+static void code_000b3e80(
+	short function_index,
+	char *result)
+{
+	csstrcpy(result, hs_function_get(function_index)->help);
+
+	return;
+}
+
 void hs_help(
 	char const *function_name)
 {
@@ -5113,7 +5226,7 @@ void hs_help(
 	{
 		code_000b3de0(function_index, result);
 		console_printf(FALSE, result);
-		csstrcpy(result, hs_function_get(function_index)->help);
+		code_000b3e80(function_index, result);
 		console_printf(FALSE, result);
 	}
 	return;
@@ -5190,7 +5303,7 @@ static void code_000b33d0(
 		short result_index;
 		short new_result_count;
 
-		result_index = *(volatile short *)&bss_00453468[0];
+		result_index = *(short *)&bss_00453468[0];
 		new_result_count = (short)(result_index + 1);
 		enumeration_results[result_index] = token;
 		hs_enumeration_result_count = new_result_count;
@@ -5233,6 +5346,18 @@ void code_000b34d0(
 	return;
 }
 
+static void code_000b3450(
+	char const **names,
+	short first,
+	short last)
+{
+	short index;
+
+	for (index = first; index<last; index++)
+		code_000b33d0(names[index]);
+	return;
+}
+
 void code_000b3500(
 	void)
 {
@@ -5244,20 +5369,14 @@ void code_000b3500(
 void code_000b3520(
 	void)
 {
-	short type_index;
-
-	for (type_index = 0; type_index<5; type_index++)
-		code_000b33d0(hs_script_type_names[type_index]);
+	code_000b3450(hs_script_type_names, 0, 5);
 	return;
 }
 
 void code_000b3550(
 	void)
 {
-	short type_index;
-
-	for (type_index = 4; type_index<49; type_index++)
-		code_000b33d0(hs_type_names[type_index]);
+	code_000b3450(hs_type_names, 4, 49);
 	return;
 }
 
@@ -5711,10 +5830,11 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS(
 	code_000ad340,
 	struct hs_arguments_short_word,
 	hs_teleport_players_not_in_trigger_volume(arguments->value0, arguments->value1))
-HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	code_000ad690,
 	union hs_evaluation_argument,
-	hs_object_set_shield(arguments[0].long_value, arguments[1].real_value))
+	1,
+	hs_object_set_shield(arguments[0].long_value, real_argument))
 HS_EVALUATE_VOID_FROM_ARGUMENTS(
 	code_000ad6d0,
 	struct hs_arguments_long_string_string,
@@ -5723,22 +5843,69 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS(
 	code_000ad7e0,
 	struct hs_arguments_long_long_string,
 	hs_effect_new_from_object_marker(arguments->value0, arguments->value1, arguments->value2))
-HS_EVALUATE_RETURN_BOOLEAN_VOLATILE(
-	code_000ad8a0,
-	union hs_evaluation_argument,
-	hs_objects_can_see_object(arguments[0].long_value, arguments[1].long_value, arguments[2].real_value))
-HS_EVALUATE_RETURN_BOOLEAN_VOLATILE(
-	code_000ad8f0,
-	union hs_evaluation_argument,
-	hs_objects_can_see_flag(arguments[0].long_value, arguments[1].unsigned_short_value, arguments[2].real_value))
-HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+void code_000ad8a0(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	union hs_evaluation_argument const *arguments;
+	union hs_boolean_result result;
+
+	result.value = 0;
+	arguments = (union hs_evaluation_argument const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double degrees = arguments[2].real_value;
+
+		result.boolean = hs_objects_can_see_object(arguments[0].long_value, arguments[1].long_value, degrees);
+		hs_return(thread_index, result.value);
+	}
+
+	return;
+}
+void code_000ad8f0(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	union hs_evaluation_argument const *arguments;
+	union hs_boolean_result result;
+
+	result.value = 0;
+	arguments = (union hs_evaluation_argument const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double degrees = arguments[2].real_value;
+
+		result.boolean = hs_objects_can_see_flag(arguments[0].long_value, arguments[1].unsigned_short_value, degrees);
+		hs_return(thread_index, result.value);
+	}
+
+	return;
+}
+HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	code_000ad980,
 	union hs_evaluation_argument,
-	hs_sound_set_gain(arguments[0].long_value, arguments[1].real_value))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000add70,
-	struct hs_arguments_long_volatile_real_word,
-	objects_scripting_set_scale(arguments->value0, arguments->value1, arguments->value2))
+	1,
+	hs_sound_set_gain(arguments[0].long_value, real_argument))
+void code_000add70(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_long_real_word const *arguments;
+
+	arguments = (struct hs_arguments_long_real_word const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value1 = arguments->value1;
+
+		objects_scripting_set_scale(arguments->value0, value1, arguments->value2);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
 HS_EVALUATE_VOID_FROM_ARGUMENTS(
 	code_000addb0,
 	struct hs_arguments_long_string_long_string,
@@ -5752,142 +5919,457 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS(
 	code_000ae150,
 	struct hs_arguments_long_long_string_word,
 	scenery_animation_start_at_frame(arguments->value0, arguments->value1, arguments->value2, arguments->value3))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000ae720,
-	struct hs_arguments_long_volatile_real_real,
-	unit_scripting_set_maximum_vitality(arguments->value0, arguments->value1, arguments->value2))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000ae770,
-	struct hs_arguments_long_volatile_real_real,
-	units_scripting_set_maximum_vitality(arguments->value0, arguments->value1, arguments->value2))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000ae7c0,
-	struct hs_arguments_long_volatile_real_real,
-	unit_scripting_set_current_vitality(arguments->value0, arguments->value1, arguments->value2))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000ae810,
-	struct hs_arguments_long_volatile_real_real,
-	units_scripting_set_current_vitality(arguments->value0, arguments->value1, arguments->value2))
-HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+void code_000ae720(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_long_real_real const *arguments;
+
+	arguments = (struct hs_arguments_long_real_real const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value1 = arguments->value1;
+		double value2 = arguments->value2;
+
+		unit_scripting_set_maximum_vitality(arguments->value0, value1, value2);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+void code_000ae770(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_long_real_real const *arguments;
+
+	arguments = (struct hs_arguments_long_real_real const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value1 = arguments->value1;
+		double value2 = arguments->value2;
+
+		units_scripting_set_maximum_vitality(arguments->value0, value1, value2);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+void code_000ae7c0(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_long_real_real const *arguments;
+
+	arguments = (struct hs_arguments_long_real_real const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value1 = arguments->value1;
+		double value2 = arguments->value2;
+
+		unit_scripting_set_current_vitality(arguments->value0, value1, value2);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+void code_000ae810(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_long_real_real const *arguments;
+
+	arguments = (struct hs_arguments_long_real_real const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value1 = arguments->value1;
+		double value2 = arguments->value2;
+
+		units_scripting_set_current_vitality(arguments->value0, value1, value2);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	code_000aedd0,
 	union hs_evaluation_argument,
-	device_set_power(arguments[0].long_value, arguments[1].real_value))
-HS_EVALUATE_RETURN_BOOLEAN_VOLATILE(
-	code_000aee50,
-	union hs_evaluation_argument,
-	device_set_desired_position(arguments[0].long_value, arguments[1].real_value))
-HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	1,
+	device_set_power(arguments[0].long_value, real_argument))
+void code_000aee50(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	union hs_evaluation_argument const *arguments;
+	union hs_boolean_result result;
+
+	result.value = 0;
+	arguments = (union hs_evaluation_argument const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double position = arguments[1].real_value;
+
+		result.boolean = device_set_desired_position(arguments[0].long_value, position);
+		hs_return(thread_index, result.value);
+	}
+
+	return;
+}
+HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	code_000aeee0,
 	union hs_evaluation_argument,
-	device_set_actual_position(arguments[0].long_value, arguments[1].real_value))
-HS_EVALUATE_RETURN_BOOLEAN_VOLATILE(
-	code_000aef60,
-	union hs_evaluation_argument,
-	device_group_set_desired_value(arguments[0].short_value, arguments[1].real_value))
-HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	1,
+	device_set_actual_position(arguments[0].long_value, real_argument))
+void code_000aef60(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	union hs_evaluation_argument const *arguments;
+	union hs_boolean_result result;
+
+	result.value = 0;
+	arguments = (union hs_evaluation_argument const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double desired_value = arguments[1].real_value;
+
+		result.boolean = device_group_set_desired_value(arguments[0].short_value, desired_value);
+		hs_return(thread_index, result.value);
+	}
+
+	return;
+}
+HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	code_000aefb0,
 	union hs_evaluation_argument,
-	device_group_set_actual_value(arguments[0].short_value, arguments[1].real_value))
-HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	1,
+	device_group_set_actual_value(arguments[0].short_value, real_argument))
+HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	code_000b00b0,
 	union hs_evaluation_argument,
-	ai_scripting_vehicle_enterable_distance(arguments[0].long_value, arguments[1].real_value))
-HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	1,
+	ai_scripting_vehicle_enterable_distance(arguments[0].long_value, real_argument))
+HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	code_000b03b0,
 	union hs_evaluation_argument,
-	ai_scripting_follow_distance(arguments[0].long_value, arguments[1].real_value))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000b1640,
-	struct hs_arguments_long_volatile_real_real_word,
-	player_effect_screen_fade_in(arguments->value0, arguments->value1, arguments->value2, arguments->value3))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000b1690,
-	struct hs_arguments_long_volatile_real_real_word,
-	player_effect_screen_fade_out(arguments->value0, arguments->value1, arguments->value2, arguments->value3))
-HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	1,
+	ai_scripting_follow_distance(arguments[0].long_value, real_argument))
+void code_000b1640(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_long_real_real_word const *arguments;
+
+	arguments = (struct hs_arguments_long_real_real_word const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value1 = arguments->value1;
+		double value2 = arguments->value2;
+
+		player_effect_screen_fade_in(arguments->value0, value1, value2, arguments->value3);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+void code_000b1690(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_long_real_real_word const *arguments;
+
+	arguments = (struct hs_arguments_long_real_real_word const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value1 = arguments->value1;
+		double value2 = arguments->value2;
+
+		player_effect_screen_fade_out(arguments->value0, value1, value2, arguments->value3);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	code_000b17e0,
 	union hs_evaluation_argument,
-	cinematic_set_title_delayed(arguments[0].short_value, arguments[1].real_value))
-HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	1,
+	cinematic_set_title_delayed(arguments[0].short_value, real_argument))
+HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	code_000b1be0,
 	union hs_evaluation_argument,
-	scripted_sound_new(arguments[0].long_value, arguments[1].long_value, arguments[2].real_value))
-HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	2,
+	scripted_sound_new(arguments[0].long_value, arguments[1].long_value, real_argument))
+HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	code_000b1ce0,
 	union hs_evaluation_argument,
-	scripted_looping_sound_start(arguments[0].long_value, arguments[1].long_value, arguments[2].real_value))
-HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	2,
+	scripted_looping_sound_start(arguments[0].long_value, arguments[1].long_value, real_argument))
+HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	code_000b1d60,
 	union hs_evaluation_argument,
-	scripted_looping_sound_set_scale(arguments[0].long_value, arguments[1].real_value))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000b1e20,
-	struct hs_arguments_long_volatile_real_real,
-	debug_sound_classes_set_distances((char const *)arguments->value0, arguments->value1, arguments->value2))
-HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	1,
+	scripted_looping_sound_set_scale(arguments[0].long_value, real_argument))
+void code_000b1e20(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_long_real_real const *arguments;
+
+	arguments = (struct hs_arguments_long_real_real const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value1 = arguments->value1;
+		double value2 = arguments->value2;
+
+		debug_sound_classes_set_distances((char const *)arguments->value0, value1, value2);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	code_000b1e70,
 	union hs_evaluation_argument,
-	debug_sound_classes_set_wet((char const *)arguments[0].long_value, arguments[1].real_value))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000b1eb0,
-	struct hs_arguments_long_volatile_real_word,
-	sound_class_set_gain((char const *)arguments->value0, arguments->value1, arguments->value2))
-HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	1,
+	debug_sound_classes_set_wet((char const *)arguments[0].long_value, real_argument))
+void code_000b1eb0(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_long_real_word const *arguments;
+
+	arguments = (struct hs_arguments_long_real_word const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value1 = arguments->value1;
+
+		sound_class_set_gain((char const *)arguments->value0, value1, arguments->value2);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	code_000b2070,
 	union hs_evaluation_argument,
-	hud_unit_activate_nav_point_with_flag(arguments[0].unsigned_short_value, arguments[1].long_value, arguments[2].unsigned_short_value, arguments[3].real_value))
-HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	3,
+	hud_unit_activate_nav_point_with_flag(arguments[0].unsigned_short_value, arguments[1].long_value, arguments[2].unsigned_short_value, real_argument))
+HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	code_000b20c0,
 	union hs_evaluation_argument,
-	hud_unit_activate_nav_point_with_object(arguments[0].unsigned_short_value, arguments[1].long_value, arguments[2].long_value, arguments[3].real_value))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000b2110,
-	struct hs_arguments_word_word_word_volatile_real,
-	hud_activate_team_nav_point_with_flag(arguments->value0, arguments->value1, arguments->value2, arguments->value3))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000b2160,
-	struct hs_arguments_word_word_long_volatile_real,
-	hud_activate_team_nav_point_with_object(arguments->value0, arguments->value1, arguments->value2, arguments->value3))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000b2330,
-	struct hs_arguments_real_volatile_real_real,
-	scripted_player_effect_set_translation(arguments->value0, arguments->value1, arguments->value2))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000b2380,
-	struct hs_arguments_real_volatile_real_real,
-	scripted_player_effect_set_rotation(arguments->value0, arguments->value1, arguments->value2))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000b23d0,
-	struct hs_arguments_real_volatile_real,
-	scripted_player_effect_set_rumble(arguments->value0, arguments->value1))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000b2410,
-	struct hs_arguments_real_volatile_real,
-	scripted_player_effect_start(arguments->value0, arguments->value1))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000b2950,
-	struct hs_arguments_real_volatile_real_real_real,
-	rasterizer_model_ambient_reflection_tint(arguments->value0, arguments->value1, arguments->value2, arguments->value3))
-HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	3,
+	hud_unit_activate_nav_point_with_object(arguments[0].unsigned_short_value, arguments[1].long_value, arguments[2].long_value, real_argument))
+void code_000b2110(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_word_word_word_real const *arguments;
+
+	arguments = (struct hs_arguments_word_word_word_real const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value3 = arguments->value3;
+
+		hud_activate_team_nav_point_with_flag(arguments->value0, arguments->value1, arguments->value2, value3);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+void code_000b2160(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_word_word_long_real const *arguments;
+
+	arguments = (struct hs_arguments_word_word_long_real const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value3 = arguments->value3;
+
+		hud_activate_team_nav_point_with_object(arguments->value0, arguments->value1, arguments->value2, value3);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+void code_000b2330(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_real_real_real const *arguments;
+
+	arguments = (struct hs_arguments_real_real_real const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value1 = arguments->value1;
+		double value2 = arguments->value2;
+
+		scripted_player_effect_set_translation(arguments->value0, value1, value2);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+void code_000b2380(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_real_real_real const *arguments;
+
+	arguments = (struct hs_arguments_real_real_real const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value1 = arguments->value1;
+		double value2 = arguments->value2;
+
+		scripted_player_effect_set_rotation(arguments->value0, value1, value2);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+void code_000b23d0(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_real_real const *arguments;
+
+	arguments = (struct hs_arguments_real_real const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value1 = arguments->value1;
+
+		scripted_player_effect_set_rumble(arguments->value0, value1);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+void code_000b2410(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_real_real const *arguments;
+
+	arguments = (struct hs_arguments_real_real const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value1 = arguments->value1;
+
+		scripted_player_effect_start(arguments->value0, value1);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+void code_000b2950(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_real_real_real_real const *arguments;
+
+	arguments = (struct hs_arguments_real_real_real_real const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value1 = arguments->value1;
+		double value2 = arguments->value2;
+		double value3 = arguments->value3;
+
+		rasterizer_model_ambient_reflection_tint(arguments->value0, value1, value2, value3);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	code_000b29c0,
 	union hs_evaluation_argument,
-	rasterizer_script_screen_effect_set_value(arguments[0].unsigned_short_value, arguments[1].real_value))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000b2a40,
-	struct hs_arguments_short_word_volatile_real_real_real,
-	rasterizer_screen_effect_set_convolution(arguments->value0, arguments->value1, arguments->value2, arguments->value3, arguments->value4))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000b2aa0,
-	struct hs_arguments_real_volatile_real_real_real_boolean_real,
-	rasterizer_screen_effect_set_filter(arguments->value0, arguments->value1, arguments->value2, arguments->value3, arguments->value4, arguments->value5))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(
-	code_000b2b00,
-	struct hs_arguments_real_volatile_real_real,
-	rasterizer_screen_effect_set_filter_desaturation_tint(arguments->value0, arguments->value1, arguments->value2))
-HS_EVALUATE_VOID_FROM_VOLATILE_ARGUMENTS(
+	1,
+	rasterizer_script_screen_effect_set_value(arguments[0].unsigned_short_value, real_argument))
+void code_000b2a40(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_short_word_real_real_real const *arguments;
+
+	arguments = (struct hs_arguments_short_word_real_real_real const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value2 = arguments->value2;
+		double value3 = arguments->value3;
+		double value4 = arguments->value4;
+
+		rasterizer_screen_effect_set_convolution(arguments->value0, arguments->value1, value2, value3, value4);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+void code_000b2aa0(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_real_real_real_real_boolean_real const *arguments;
+
+	arguments = (struct hs_arguments_real_real_real_real_boolean_real const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value1 = arguments->value1;
+		double value2 = arguments->value2;
+		double value3 = arguments->value3;
+		double value5 = arguments->value5;
+
+		rasterizer_screen_effect_set_filter(arguments->value0, value1, value2, value3, arguments->value4, value5);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+void code_000b2b00(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_real_real_real const *arguments;
+
+	arguments = (struct hs_arguments_real_real_real const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double value1 = arguments->value1;
+		double value2 = arguments->value2;
+
+		rasterizer_screen_effect_set_filter_desaturation_tint(arguments->value0, value1, value2);
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	code_000b2b50,
 	union hs_evaluation_argument,
-	rasterizer_screen_effect_set_video(arguments[0].unsigned_short_value, arguments[1].real_value))
+	1,
+	rasterizer_screen_effect_set_video(arguments[0].unsigned_short_value, real_argument))
 
 void code_000ad710(
 	short function_index,
@@ -6102,6 +6584,203 @@ void code_000b3f00(
 		hs_return(thread_index, result.value);
 	}
 	return;
+}
+
+void code_000b3f50(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	union hs_real_value result;
+	union hs_evaluation_argument const *arguments;
+	real upper_bound;
+	real lower_bound;
+
+	arguments = (union hs_evaluation_argument const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		double upper = arguments[1].real_value;
+
+		upper_bound = (real)upper;
+		lower_bound = arguments[0].real_value;
+		result.real_value = real_seed_random_range(get_global_random_seed_address(), lower_bound, upper_bound);
+		hs_return(thread_index, result.long_value);
+	}
+	return;
+}
+
+boolean hs_scenario_postprocess(
+	boolean restore_syntax_data)
+{
+	boolean success = TRUE;
+	char const *error_source;
+	char const *error_message;
+	struct data_array *saved_syntax_data;
+	struct scenario *scenario;
+	boolean recompile;
+
+	scenario = global_scenario_get();
+	saved_syntax_data = hs_syntax_data;
+	code_000b2f00();
+	recompile = scenario->hs_scripts.count == 0 && scenario->hs_source_files.count>0;
+	hs_syntax_data = (struct data_array *)scenario->hs_syntax_data.address;
+	hs_syntax_data->data = (char *)hs_syntax_data+sizeof(struct data_array);
+	if (!recompile && hs_compile_postprocess(&error_message, &error_source))
+	{
+		if (scenario->hs_string_constants.size<0x400)
+		{
+			success = tag_data_resize(
+				&scenario->hs_string_constants,
+				scenario->hs_string_constants.size + 0x400);
+		}
+	}
+	else
+	{
+		if (recompile)
+			error(0, "recompiling scripts after scenarios were merged.");
+		else if (!error_message)
+			error(0, "an unspecified error occurred loading scripts");
+		else if (!error_source)
+			error(0, "%s", error_message);
+		else
+			error(0, "%s: %s", error_source, error_message);
+
+		if (code_000b3d10() && hs_compile_postprocess(&error_message, &error_source))
+		{
+			success = TRUE;
+		}
+		else
+		{
+			data_delete_all(hs_syntax_data);
+			if (!tag_block_resize(&scenario->hs_globals, 0) ||
+				!tag_block_resize(&scenario->hs_scripts, 0) ||
+				!tag_data_resize(&global_scenario_get()->hs_string_constants, 0x400))
+			{
+				error(0, "couldn't reset scripts.");
+			}
+			success = FALSE;
+		}
+	}
+	if (restore_syntax_data)
+		hs_syntax_data = saved_syntax_data;
+
+	return success;
+}
+
+boolean hs_compile_and_evaluate(
+	char const *expression)
+{
+	boolean success = FALSE;
+	char const *error_message;
+	char const *error_source;
+	char *character;
+	char buffer[1024];
+	char expanded[1024];
+
+	csstrncpy(buffer, expression, sizeof(buffer));
+	buffer[sizeof(buffer)-1] = 0;
+	if (strchr(buffer, ';'))
+		buffer[0] = 0;
+	character = buffer;
+	if (buffer[0] != 0)
+	{
+		do
+		{
+			if (!isspace(*character))
+			{
+			short type;
+			long expression_index;
+			char const *source;
+
+			type = 0;
+			source = expression;
+			hs_compile_initialize(FALSE);
+			if (buffer[0] != '(')
+			{
+				char *space;
+
+				space = strchr(buffer, ' ');
+				if (space)
+					*space = 0;
+				if (hs_find_global_by_name(buffer) == NONE)
+					type = 1;
+				else if (space)
+					type = 2;
+				if (space)
+					*space = ' ';
+			}
+			switch (type)
+			{
+			case 0:
+				break;
+			case 1:
+				sprintf(expanded, "(%s)", buffer);
+				source = expanded;
+				break;
+			case 2:
+				sprintf(expanded, "(set %s)", buffer);
+				source = expanded;
+				break;
+			default:
+				display_assert(NULL, "c:\\halo\\SOURCE\\hs\\hs.c", 1287, TRUE);
+				system_exit(-1);
+				break;
+			}
+			expression_index = hs_compile_expression(csstrlen(source), source, &error_source, &error_message);
+			if (expression_index != NONE)
+			{
+				success = TRUE;
+				hs_runtime_evaluate(expression_index);
+			}
+			else if (error_source)
+			{
+				if (error_message)
+				{
+					char *newline;
+
+					newline = strchr(error_message, '\n');
+					if (newline)
+						*newline = 0;
+				}
+				error(2, "%s: %s", error_source, error_message);
+			}
+			hs_compile_dispose();
+				break;
+			}
+			character++;
+		} while (*character != 0);
+	}
+	if (bss_00453468[0x10])
+	{
+		if (code_000b3b60())
+		{
+			struct scenario *scenario;
+
+			code_000b3d10();
+			if (hs_syntax_data)
+			{
+				hs_node_gc();
+				if (bss_00453468[0x11])
+				{
+					data_make_invalid(hs_syntax_data);
+					data_dispose(hs_syntax_data);
+					bss_00453468[0x11] = FALSE;
+				}
+				hs_syntax_data = NULL;
+			}
+			hs_runtime_dispose_from_old_map();
+			object_lists_dispose_from_old_map();
+			scenario = global_scenario_index != NONE ? global_scenario_get() : NULL;
+			code_000b2f00();
+			if (scenario && scenario->hs_syntax_data.size)
+				hs_scenario_postprocess(FALSE);
+			object_lists_initialize_for_new_map();
+			hs_runtime_initialize_for_new_map();
+		}
+		bss_00453468[0x10] = FALSE;
+	}
+
+	return success;
 }
 
 /* ---------- private code */
