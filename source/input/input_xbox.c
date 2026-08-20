@@ -111,9 +111,11 @@ symbols in this file:
 
 struct input_globals
 {
-	unsigned char reserved0[0x22D];
+	unsigned char reserved0[0x138];
+	boolean suppressed;
+	unsigned char reserved1[0xF4];
 	boolean frame_active;
-	unsigned char reserved1[0x1DE];
+	unsigned char reserved2[0x1DE];
 };
 
 /* ---------- prototypes */
@@ -123,6 +125,26 @@ struct input_globals
 struct input_globals bss_004536a0;
 
 /* ---------- public code */
+
+void code_000bebb0(
+	void)
+{
+	return;
+}
+
+void code_000bebc0(
+	void)
+{
+	return;
+}
+
+void input_suppress(
+	void)
+{
+	bss_004536a0.suppressed = TRUE;
+
+	return;
+}
 
 void input_activate(void)
 {
