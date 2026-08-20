@@ -14,7 +14,24 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct geosphere
+{
+	short segment_count;
+	short pad2;
+	real_point3d *vertices;
+	short *triangle_strip_vertex_indices;
+	short vertex_count;
+	short triangle_count;
+	short triangle_strip_count;
+	short pad18;
+};
+
 /* ---------- prototypes/GEOMETRY.C */
+
+struct geosphere *geosphere_new(
+	short segment_count);
+void geosphere_dispose(
+	struct geosphere *sphere);
 
 boolean convex_hull2d_test_point(short count, union real_point2d const *points, union real_point2d const *point, real epsilon);
 boolean convex_hull2d_test_circle(

@@ -432,4 +432,17 @@ boolean convex_polygon2d_verify(
 	return TRUE;
 }
 
+void geosphere_dispose(
+	struct geosphere *sphere)
+{
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 117, sphere);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 118, sphere->vertices);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 119, sphere->triangle_strip_vertex_indices);
+
+	match_free("c:\\halo\\SOURCE\\math\\geometry.c", 121, sphere->vertices);
+	match_free("c:\\halo\\SOURCE\\math\\geometry.c", 122, sphere->triangle_strip_vertex_indices);
+	match_free("c:\\halo\\SOURCE\\math\\geometry.c", 123, sphere);
+	return;
+}
+
 /* ---------- private code */
