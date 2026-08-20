@@ -30,6 +30,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "math/real_math.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -41,5 +44,30 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+boolean clip_empty_interval_by_solid_interval(
+	real *empty_t0,
+	real *empty_t1,
+	real solid_t0,
+	real solid_t1)
+{
+	real clipped_solid_t0;
+	real clipped_solid_t1;
+
+	if (*empty_t0 > solid_t1)
+		clipped_solid_t1 = *empty_t0;
+	else
+		clipped_solid_t1 = solid_t1;
+	solid_t1 = clipped_solid_t1;
+
+	clipped_solid_t0 = MIN(solid_t0, *empty_t1);
+
+	if (*empty_t1 - solid_t1 > clipped_solid_t0 - *empty_t0)
+		*empty_t0 = solid_t1;
+	else
+		*empty_t1 = clipped_solid_t0;
+
+	return *empty_t0 > *empty_t1;
+}
 
 /* ---------- private code */
