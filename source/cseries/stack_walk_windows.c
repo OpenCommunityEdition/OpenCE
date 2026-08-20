@@ -148,6 +148,12 @@ struct _stack_walk_globals stack_walk_globals =
 
 /* ---------- public code */
 
+long stack_walk_global_function_offset(
+	void)
+{
+	return stack_walk_globals.fixup==NONE ? 0 : stack_walk_globals.fixup;
+}
+
 void stack_walk_disregard_symbol_names(
 	boolean disregard)
 {
