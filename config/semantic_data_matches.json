@@ -201,6 +201,16 @@
     }
   },
   {
+    "unit": "source/interface/event_manager",
+    "symbol": "_event_manager_globals",
+    "reason": "the complete rebuilt object owns the exact 360-byte zero-initialized event-manager aggregate; csplit stores the zero payload physically while MSVC emits fileless BSS, but logical bytes, size, zero relocations, section flags and alignment, external owner spelling, storage class, and every section-relative code destination are exact",
+    "measurements": {
+      "size": 360,
+      "relocation_count": 0,
+      "normalized_sha256": "d3df611a0ed2e328b050d285287637c60643ba96ec09e4aaefaad7f2cd114b77"
+    }
+  },
+  {
     "unit": "source/interface/ui_widget_event_handler_functions",
     "symbol": "_data_00305ee0",
     "reason": "the complete rebuilt object owns the exact 934-byte event-handler table; normalized bytes, relocation addresses and types, and independently resolved destinations are exact despite objdiff's csplit symbol attribution",
