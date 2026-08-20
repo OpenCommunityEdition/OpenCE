@@ -13,35 +13,39 @@ REAL_MATH.C
 
 /* ---------- structures */
 
+struct real_math_constant_block
+{
+	real_matrix4x3 identity4x3;
+	real_matrix4x3 negative_identity4x3;
+	real_quaternion identity_quaternion;
+	real_rectangle3d null_rectangle3d;
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
-static const real_matrix4x3 private_identity4x3 =
+struct real_math_constant_block const rdata_0027afb0 =
 {
-	1.f,
 	{
-		{ 1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f }
+		1.f,
+		{
+			{ 1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f }
+		},
 	},
-};
-
-static const real_matrix4x3 private_negative_identity4x3 =
-{
-	1.f,
 	{
-		{ -1.f, 0.f, 0.f, 0.f, -1.f, 0.f, 0.f, 0.f, -1.f, 0.f, 0.f, 0.f }
+		1.f,
+		{
+			{ -1.f, 0.f, 0.f, 0.f, -1.f, 0.f, 0.f, 0.f, -1.f, 0.f, 0.f, 0.f }
+		},
 	},
-};
-
-static const real_quaternion private_identity_quaternion =
-{
-	{ { 0.f, 0.f, 0.f } },
-	1.f,
-};
-
-static const real_rectangle3d private_null_rectangle3d =
-{
-	{ REAL_MAX, REAL_MIN, REAL_MAX, REAL_MIN, REAL_MAX, REAL_MIN },
+	{
+		{ { 0.f, 0.f, 0.f } },
+		1.f,
+	},
+	{
+		{ REAL_MAX, REAL_MIN, REAL_MAX, REAL_MIN, REAL_MAX, REAL_MIN },
+	},
 };
 
 short const global_projection3d_mappings[3][2][2] =
@@ -60,44 +64,44 @@ short const global_projection3d_mappings[3][2][2] =
 	}
 };
 
-const real_point2d *global_origin2d = (const real_point2d *)&private_identity4x3.up;
-const real_point2d *global_x_axis2d = (const real_point2d *)&private_identity4x3.forward;
-const real_point2d *global_y_axis2d = (const real_point2d *)&private_identity4x3.left;
-const real_point2d *global_negative_x_axis2d = (const real_point2d *)&private_negative_identity4x3.forward;
-const real_point2d *global_negative_y_axis2d = (const real_point2d *)&private_negative_identity4x3.left;
+const real_point2d *global_origin2d = (const real_point2d *)&rdata_0027afb0.identity4x3.up;
+const real_point2d *global_x_axis2d = (const real_point2d *)&rdata_0027afb0.identity4x3.forward;
+const real_point2d *global_y_axis2d = (const real_point2d *)&rdata_0027afb0.identity4x3.left;
+const real_point2d *global_negative_x_axis2d = (const real_point2d *)&rdata_0027afb0.negative_identity4x3.forward;
+const real_point2d *global_negative_y_axis2d = (const real_point2d *)&rdata_0027afb0.negative_identity4x3.left;
 
-const real_vector2d *global_zero_vector2d = (const real_vector2d *)&private_identity4x3.up;
-const real_vector2d *global_forward2d = (const real_vector2d *)&private_identity4x3.forward;
-const real_vector2d *global_left2d = (const real_vector2d *)&private_identity4x3.left;
-const real_vector2d *global_backward2d = (const real_vector2d *)&private_negative_identity4x3.forward;
-const real_vector2d *global_right2d = (const real_vector2d *)&private_negative_identity4x3.left;
+const real_vector2d *global_zero_vector2d = (const real_vector2d *)&rdata_0027afb0.identity4x3.up;
+const real_vector2d *global_forward2d = (const real_vector2d *)&rdata_0027afb0.identity4x3.forward;
+const real_vector2d *global_left2d = (const real_vector2d *)&rdata_0027afb0.identity4x3.left;
+const real_vector2d *global_backward2d = (const real_vector2d *)&rdata_0027afb0.negative_identity4x3.forward;
+const real_vector2d *global_right2d = (const real_vector2d *)&rdata_0027afb0.negative_identity4x3.left;
 
-const real_point3d *global_origin3d = (const real_point3d *)&private_identity4x3.position;
+const real_point3d *global_origin3d = (const real_point3d *)&rdata_0027afb0.identity4x3.position;
 
-const real_point3d *global_x_axis3d = (const real_point3d *)&private_identity4x3.forward;
-const real_point3d *global_y_axis3d = (const real_point3d *)&private_identity4x3.left;
-const real_point3d *global_z_axis3d = (const real_point3d *)&private_identity4x3.up;
-const real_point3d *global_negative_x_axis3d = (const real_point3d *)&private_negative_identity4x3.forward;
-const real_point3d *global_negative_y_axis3d = (const real_point3d *)&private_negative_identity4x3.left;
-const real_point3d *global_negative_z_axis3d = (const real_point3d *)&private_negative_identity4x3.up;
+const real_point3d *global_x_axis3d = (const real_point3d *)&rdata_0027afb0.identity4x3.forward;
+const real_point3d *global_y_axis3d = (const real_point3d *)&rdata_0027afb0.identity4x3.left;
+const real_point3d *global_z_axis3d = (const real_point3d *)&rdata_0027afb0.identity4x3.up;
+const real_point3d *global_negative_x_axis3d = (const real_point3d *)&rdata_0027afb0.negative_identity4x3.forward;
+const real_point3d *global_negative_y_axis3d = (const real_point3d *)&rdata_0027afb0.negative_identity4x3.left;
+const real_point3d *global_negative_z_axis3d = (const real_point3d *)&rdata_0027afb0.negative_identity4x3.up;
 
-const real_vector3d *global_zero_vector3d = (const real_vector3d *)&private_identity4x3.position;
+const real_vector3d *global_zero_vector3d = (const real_vector3d *)&rdata_0027afb0.identity4x3.position;
 
-const real_vector3d *global_forward3d = (const real_vector3d *)&private_identity4x3.forward;
-const real_vector3d *global_left3d = (const real_vector3d *)&private_identity4x3.left;
-const real_vector3d *global_up3d = (const real_vector3d *)&private_identity4x3.up;
+const real_vector3d *global_forward3d = (const real_vector3d *)&rdata_0027afb0.identity4x3.forward;
+const real_vector3d *global_left3d = (const real_vector3d *)&rdata_0027afb0.identity4x3.left;
+const real_vector3d *global_up3d = (const real_vector3d *)&rdata_0027afb0.identity4x3.up;
 
-const real_vector3d *global_backward3d = (const real_vector3d *)&private_negative_identity4x3.forward;
-const real_vector3d *global_right3d = (const real_vector3d *)&private_negative_identity4x3.left;
-const real_vector3d *global_down3d = (const real_vector3d *)&private_negative_identity4x3.up;
+const real_vector3d *global_backward3d = (const real_vector3d *)&rdata_0027afb0.negative_identity4x3.forward;
+const real_vector3d *global_right3d = (const real_vector3d *)&rdata_0027afb0.negative_identity4x3.left;
+const real_vector3d *global_down3d = (const real_vector3d *)&rdata_0027afb0.negative_identity4x3.up;
 
-const real_euler_angles2d *global_zero_angles2d = (const real_euler_angles2d *)&private_identity4x3.up;
-const real_euler_angles3d *global_zero_angles3d = (const real_euler_angles3d *)&private_identity4x3.up;
-const real_quaternion *global_identity_quaternion = &private_identity_quaternion;
-const real_matrix4x3 *global_identity4x3 = &private_identity4x3;
-const real_matrix4x3 *global_negative_identity4x3 = &private_negative_identity4x3;
-const real_rectangle2d *global_null_rectangle2d = (const real_rectangle2d *)&private_null_rectangle3d;
-const real_rectangle3d *global_null_rectangle3d = &private_null_rectangle3d;
+const real_euler_angles2d *global_zero_angles2d = (const real_euler_angles2d *)&rdata_0027afb0.identity4x3.up;
+const real_euler_angles3d *global_zero_angles3d = (const real_euler_angles3d *)&rdata_0027afb0.identity4x3.up;
+const real_quaternion *global_identity_quaternion = &rdata_0027afb0.identity_quaternion;
+const real_matrix4x3 *global_identity4x3 = &rdata_0027afb0.identity4x3;
+const real_matrix4x3 *global_negative_identity4x3 = &rdata_0027afb0.negative_identity4x3;
+const real_rectangle2d *global_null_rectangle2d = (const real_rectangle2d *)&rdata_0027afb0.null_rectangle3d;
+const real_rectangle3d *global_null_rectangle3d = &rdata_0027afb0.null_rectangle3d;
 
 /* ---------- public code */
 
@@ -396,7 +400,6 @@ void vectors3d_from_euler_angles3d(
 	return;
 }
 
-// TODO: mismatch in calculating dot and 'a', funky compiler optimization
 boolean fast_vector_intersects_sphere(
 	real_point3d const *point,
 	real_vector3d const *vector,
@@ -405,6 +408,7 @@ boolean fast_vector_intersects_sphere(
 {
 	real_point3d p = {point->x-center->x, point->y-center->y, point->z - center->z};
 	real c = (p.x*p.x) + (p.y*p.y) + (p.z*p.z) - (radius*radius);
+	real_vector3d direction;
 
 	if (c < 0.f)
 	{
@@ -412,7 +416,10 @@ boolean fast_vector_intersects_sphere(
 	}
 	else
 	{
-		real b = vector->i*p.x + vector->j*p.y + vector->k*p.z;
+		real b;
+
+		direction = *vector;
+		b = direction.i*p.x + direction.j*p.y + direction.k*p.z;
 		
 		if (b >= 0.f)
 		{
@@ -420,7 +427,10 @@ boolean fast_vector_intersects_sphere(
 		}
 		else
 		{
-			real a = vector->i*vector->i + vector->j*vector->j + vector->k*vector->k;
+			real a =
+				direction.i*direction.i +
+				direction.j*direction.j +
+				direction.k*direction.k;
 			real disc = b * b - a * c;
 			
 			if (disc <= 0.f)
@@ -675,6 +685,213 @@ boolean point_in_sector3d(
 	return result;
 }
 
+boolean circle_intersects_cone2d(
+	real_point2d const *circle_center,
+	real circle_radius,
+	real_point2d const *cone_center,
+	real_vector2d const *cone_direction,
+	real cone_length,
+	real sine,
+	real cosine)
+{
+	real_vector2d offset;
+	real distance_squared;
+	real projection;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\math\\real_math.c",
+		2167,
+		sine>0.0f && cosine>=0.0f);
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\math\\real_math.c",
+		2168,
+		valid_realcmp(sine * sine + cosine * cosine, 1.0f),
+		csprintf(
+			temporary,
+			"%s, %s: assert_valid_real_sine_cosine(%f, %f)",
+			"sine",
+			"cosine",
+			sine,
+			cosine));
+
+	vector_from_points2d(cone_center, circle_center, &offset);
+	projection = dot_product2d(&offset, cone_direction);
+	distance_squared = offset.j * offset.j;
+	distance_squared += offset.i * offset.i;
+
+	return (boolean)(
+		projection >= -circle_radius &&
+		projection <= circle_radius + cone_length &&
+		(circle_radius * sine * 2.0f + projection) * projection +
+				circle_radius * circle_radius >=
+			distance_squared * cosine * cosine);
+}
+
+boolean circle_intersects_sector2d(
+	real_point2d const *circle_center,
+	real circle_radius,
+	real_point2d const *sector_center,
+	real_vector2d const *sector_direction,
+	real sector_radius,
+	real sine,
+	real cosine)
+{
+	real_vector2d offset;
+	real_point2d adjusted_center;
+	real projection;
+	real adjustment;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\math\\real_math.c",
+		2231,
+		sine>0.0f && cosine>=0.0f);
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\math\\real_math.c",
+		2232,
+		valid_realcmp(sine * sine + cosine * cosine, 1.0f),
+		csprintf(
+			temporary,
+			"%s, %s: assert_valid_real_sine_cosine(%f, %f)",
+			"sine",
+			"cosine",
+			sine,
+			cosine));
+
+	vector_from_points2d(sector_center, circle_center, &offset);
+	projection = dot_product2d(&offset, sector_direction);
+	if (projection >= -circle_radius &&
+		projection <= circle_radius + sector_radius)
+	{
+		adjustment = circle_radius / sine;
+		point_from_line2d(
+			sector_center,
+			sector_direction,
+			-adjustment,
+			&adjusted_center);
+		if (point_in_sector2d(
+			circle_center,
+			&adjusted_center,
+			sector_direction,
+			sector_radius + circle_radius + adjustment,
+			cosine))
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+boolean sphere_intersects_cone3d(
+	real_point3d const *sphere_center,
+	real sphere_radius,
+	real_point3d const *cone_center,
+	real_vector3d const *cone_direction,
+	real cone_length,
+	real sine,
+	real cosine)
+{
+	real_vector3d offset;
+	real distance_squared;
+	real projection;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\math\\real_math.c",
+		2199,
+		sine>0.0f && cosine>=0.0f);
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\math\\real_math.c",
+		2200,
+		valid_realcmp(sine * sine + cosine * cosine, 1.0f),
+		csprintf(
+			temporary,
+			"%s, %s: assert_valid_real_sine_cosine(%f, %f)",
+			"sine",
+			"cosine",
+			sine,
+			cosine));
+
+	vector_from_points3d(cone_center, sphere_center, &offset);
+	projection = offset.k * cone_direction->k;
+	projection += offset.j * cone_direction->j;
+	projection += offset.i * cone_direction->i;
+	distance_squared = offset.k * offset.k;
+	distance_squared += offset.j * offset.j;
+	distance_squared += offset.i * offset.i;
+
+	return (boolean)(
+		projection >= -sphere_radius &&
+		projection <= sphere_radius + cone_length &&
+		(sphere_radius * sine * 2.0f + projection) * projection +
+				sphere_radius * sphere_radius >=
+			distance_squared * cosine * cosine);
+}
+
+boolean sphere_intersects_sector3d(
+	real_point3d const *sphere_center,
+	real sphere_radius,
+	real_point3d const *sector_center,
+	real_vector3d const *sector_direction,
+	real sector_radius,
+	real sine,
+	real cosine)
+{
+	real_vector3d offset;
+	real_point3d adjusted_center;
+	real projection;
+	real adjustment;
+	real negative_adjustment;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\math\\real_math.c",
+		2269,
+		sine>0.0f && cosine>=0.0f);
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\math\\real_math.c",
+		2270,
+		valid_realcmp(sine * sine + cosine * cosine, 1.0f),
+		csprintf(
+			temporary,
+			"%s, %s: assert_valid_real_sine_cosine(%f, %f)",
+			"sine",
+			"cosine",
+			sine,
+			cosine));
+
+	vector_from_points3d(sector_center, sphere_center, &offset);
+	projection =
+		offset.k * sector_direction->k +
+		offset.i * sector_direction->i;
+	projection += offset.j * sector_direction->j;
+	if (projection >= -sphere_radius &&
+		projection <= sphere_radius + sector_radius)
+	{
+		adjustment = sphere_radius / sine;
+		negative_adjustment = -adjustment;
+		adjusted_center.x =
+			sector_direction->i * negative_adjustment + sector_center->x;
+		adjusted_center.y =
+			sector_direction->j * negative_adjustment + sector_center->y;
+		if (point_in_sector3d(
+			sphere_center,
+			&adjusted_center,
+			sector_direction,
+			(adjusted_center.z =
+				sector_direction->k * negative_adjustment + sector_center->z,
+			sector_radius + sphere_radius + adjustment),
+			cosine))
+		{
+			return (boolean)TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
 boolean point_in_triangle2d(
 	real_point2d const *point,
 	real_point2d const *triangle0,
@@ -707,6 +924,99 @@ boolean point_in_triangle2d(
 				*t0 = cross1 * inverse_determinant;
 				*t1 = cross0 * inverse_determinant;
 				result = TRUE;
+			}
+			else
+			{
+				result = FALSE;
+			}
+		}
+		else
+		{
+			result = FALSE;
+		}
+	}
+	else
+	{
+		result = FALSE;
+	}
+
+	return result;
+}
+
+boolean point_in_triangle3d(
+	real_point3d const *point,
+	real_point3d const *triangle0,
+	real_point3d const *triangle1,
+	real_point3d const *triangle2,
+	real *t0,
+	real *t1)
+{
+	real_vector3d edge0;
+	real_vector3d edge1;
+	real_vector3d offset;
+	real_vector3d normal;
+	real_point2d projected_edge0;
+	real_point2d projected_edge1;
+	real_point2d projected_offset;
+	real plane_distance;
+	real cross0;
+	real cross1;
+	real determinant;
+	boolean result;
+	short projection;
+	boolean projection_sign;
+
+	vector_from_points3d(triangle0, point, &offset);
+	vector_from_points3d(triangle0, triangle1, &edge0);
+	vector_from_points3d(triangle0, triangle2, &edge1);
+	cross_product3d(&edge0, &edge1, &normal);
+	plane_distance = dot_product3d(&normal, &offset);
+	if (plane_distance * plane_distance <
+		magnitude_squared3d(&normal) * _real_epsilon)
+	{
+		projection = projection_from_vector3d(&normal);
+		projection_sign = projection_sign_from_vector3d(&normal, projection);
+		project_point3d(
+			(real_point3d const *)&edge0,
+			projection,
+			projection_sign,
+			&projected_edge0);
+		project_point3d(
+			(real_point3d const *)&offset,
+			projection,
+			projection_sign,
+			&projected_offset);
+		cross0 = cross_product2d(
+			(real_vector2d const *)&projected_edge0,
+			(real_vector2d const *)&projected_offset);
+		if (cross0 >= 0.0f)
+		{
+			project_point3d(
+				(real_point3d const *)&edge1,
+				projection,
+				projection_sign,
+				&projected_edge1);
+			cross1 = cross_product2d(
+				(real_vector2d const *)&projected_offset,
+				(real_vector2d const *)&projected_edge1);
+			if (cross1 >= 0.0f)
+			{
+				determinant = cross_product2d(
+					(real_vector2d const *)&projected_edge0,
+					(real_vector2d const *)&projected_edge1);
+				if (cross0 + cross1 <= determinant)
+				{
+					real inverse_determinant;
+
+					inverse_determinant = 1.0f / determinant;
+					*t0 = cross1 * inverse_determinant;
+					*t1 = cross0 * inverse_determinant;
+					result = TRUE;
+				}
+				else
+				{
+					result = FALSE;
+				}
 			}
 			else
 			{
@@ -830,6 +1140,86 @@ boolean pill_intersects_triangle2d(
 	return result;
 }
 
+boolean pill_intersects_rectangle2d(
+	real_point2d const *pill_base,
+	real_vector2d const *pill_height,
+	real pill_width,
+	real_rectangle2d const *bounds)
+{
+	real_point2d edge_base;
+	real_vector2d edge_height;
+	boolean result;
+
+	result = TRUE;
+	if (pill_base->x < bounds->x0)
+	{
+		set_real_point2d(&edge_base, bounds->x0, bounds->y0);
+		set_real_vector2d(&edge_height, 0.0f, bounds->y1 - bounds->y0);
+		if (vector_intersects_pill2d(
+			&edge_base,
+			&edge_height,
+			pill_base,
+			pill_height,
+			pill_width))
+		{
+			return (boolean)TRUE;
+		}
+		result = FALSE;
+	}
+	if (pill_base->y < bounds->y0)
+	{
+		edge_base.x = bounds->x0;
+		edge_base.y = bounds->y0;
+		edge_height.i = bounds->x1 - bounds->x0;
+		edge_height.j = 0.0f;
+		if (vector_intersects_pill2d(
+			&edge_base,
+			&edge_height,
+			pill_base,
+			pill_height,
+			pill_width))
+		{
+			return TRUE;
+		}
+		result = FALSE;
+	}
+	if (pill_base->x > bounds->x1)
+	{
+		set_real_point2d(&edge_base, bounds->x1, bounds->y0);
+		set_real_vector2d(&edge_height, 0.0f, bounds->y1 - bounds->y0);
+		if (vector_intersects_pill2d(
+			&edge_base,
+			&edge_height,
+			pill_base,
+			pill_height,
+			pill_width))
+		{
+			return TRUE;
+		}
+		result = FALSE;
+	}
+	if (pill_base->y > bounds->y1)
+	{
+		edge_base.x = bounds->x0;
+		edge_base.y = bounds->y1;
+		edge_height.i = bounds->x1 - bounds->x0;
+		edge_height.j = 0.0f;
+		if (vector_intersects_pill2d(
+			&edge_base,
+			&edge_height,
+			pill_base,
+			pill_height,
+			pill_width))
+		{
+			return TRUE;
+		}
+		result = FALSE;
+	}
+
+	return result;
+}
+
+
 boolean sphere_intersects_rectangle3d(
 	real_point3d const *center,
 	real radius,
@@ -889,6 +1279,7 @@ boolean sphere_intersects_rectangle3d(
 
 	return dx * dx + dy * dy + dz * dz < radius * radius;
 }
+
 
 boolean vector_intersects_rectangle2d(
 	real_point2d const *point,
@@ -959,6 +1350,250 @@ boolean vector_intersects_rectangle2d(
 	}
 
 	return t_out >= 0.f && t_in <= 1.f;
+}
+
+boolean vector_intersects_pill2d(
+	real_point2d const *point,
+	real_vector2d const *vector,
+	real_point2d const *pill_base,
+	real_vector2d const *pill_height,
+	real pill_width)
+{
+	real_vector2d offset;
+	real cross;
+	real dot;
+	real vector_magnitude_squared;
+	real pill_magnitude_squared;
+	real inverse_cross;
+	real inverse_vector_magnitude_squared;
+	real inverse_pill_magnitude_squared;
+	real t0;
+	real t1;
+	real t0_start;
+	real t0_end;
+	real t1_start;
+	real t1_end;
+	real clamped_t0;
+	real clamped_t1;
+	real_point2d closest_point0;
+	real_point2d closest_point1;
+	real_vector2d closest_offset;
+	boolean t0_out_of_range;
+	boolean t1_out_of_range;
+
+	vector_from_points2d(point, pill_base, &offset);
+	cross = cross_product2d(vector, pill_height);
+	if (!(fabs(cross) < _real_epsilon))
+	{
+		inverse_cross = 1.0f / cross;
+		t0 = cross_product2d(&offset, pill_height) * inverse_cross;
+		t1 = cross_product2d(&offset, vector) * inverse_cross;
+		t0_out_of_range = t0 < 0.0f || t0 > 1.0f;
+		t1_out_of_range = t1 < 0.0f || t1 > 1.0f;
+		if (!t0_out_of_range && !t1_out_of_range)
+		{
+			return TRUE;
+		}
+
+		if (t0_out_of_range)
+		{
+			if (t0 < 0.0f)
+				clamped_t0 = 0.0f;
+			else
+				clamped_t0 = 1.0f;
+			point_from_line2d(point, vector, clamped_t0, &closest_point0);
+		}
+
+		if (t1_out_of_range)
+		{
+			if (t1 < 0.0f)
+				clamped_t1 = 0.0f;
+			else
+				clamped_t1 = 1.0f;
+			point_from_line2d(pill_base, pill_height, clamped_t1, &closest_point1);
+		}
+
+		return !((!t0_out_of_range ||
+				point_in_pill2d(
+					&closest_point0,
+					pill_base,
+					pill_height,
+					pill_width) == FALSE) &&
+			(!t1_out_of_range ||
+				point_in_pill2d(
+					&closest_point1,
+					point,
+					vector,
+					pill_width) == FALSE));
+	}
+
+	dot = dot_product2d(vector, pill_height);
+	vector_magnitude_squared = magnitude_squared2d(vector);
+	if (vector_magnitude_squared > _real_epsilon)
+	{
+		inverse_vector_magnitude_squared = 1.0f / vector_magnitude_squared;
+		t0_start =
+			dot_product2d(&offset, vector) *
+			inverse_vector_magnitude_squared;
+		t0_end =
+			inverse_vector_magnitude_squared * dot +
+			t0_start;
+		t0 =
+			(PIN(t0_start, 0.0f, 1.0f) +
+				PIN(t0_end, 0.0f, 1.0f)) *
+			0.5f;
+	}
+	else
+	{
+		t0 = 0.0f;
+	}
+
+	pill_magnitude_squared = magnitude_squared2d(pill_height);
+	if (pill_magnitude_squared > _real_epsilon)
+	{
+		inverse_pill_magnitude_squared = 1.0f / pill_magnitude_squared;
+		t1_start =
+			-dot_product2d(&offset, pill_height) *
+			inverse_pill_magnitude_squared;
+		t1_end =
+			inverse_pill_magnitude_squared * dot +
+			t1_start;
+		t1 =
+			(PIN(t1_start, 0.0f, 1.0f) +
+				PIN(t1_end, 0.0f, 1.0f)) *
+			0.5f;
+	}
+	else
+	{
+		t1 = 0.0f;
+	}
+
+	point_from_line2d(point, vector, t0, &closest_point0);
+	point_from_line2d(pill_base, pill_height, t1, &closest_point1);
+	vector_from_points2d(&closest_point0, &closest_point1, &closest_offset);
+	return magnitude_squared2d(&closest_offset) <= pill_width * pill_width;
+}
+
+
+#define VECTOR_INTERSECTS_LINE2D(point, vector, line_point, line_endpoint, t_in, t_out) \
+	do \
+	{ \
+		real_vector2d offset; \
+		real_vector2d line_vector; \
+		real numerator; \
+		real divisor; \
+		real t; \
+		vector_from_points2d((line_point), (point), &offset); \
+		vector_from_points2d((line_point), (line_endpoint), &line_vector); \
+		numerator = offset.i * line_vector.j - offset.j * line_vector.i; \
+		divisor = line_vector.i * (vector)->j - line_vector.j * (vector)->i; \
+		if (!(fabs(divisor) < _real_epsilon)) \
+		{ \
+			t = numerator / divisor; \
+			if (divisor > 0.0f) \
+			{ \
+				if (*(t_in) < t) \
+					*(t_in) = t; \
+			} \
+			else \
+			{ \
+				if (*(t_out) > t) \
+					*(t_out) = t; \
+			} \
+			if (*(t_in) > *(t_out)) \
+				return FALSE; \
+		} \
+		else if (numerator > 0.0f) \
+		{ \
+			return FALSE; \
+		} \
+	} while (0)
+
+boolean vector_intersects_triangle2d(
+	real_point2d const *point,
+	real_vector2d const *vector,
+	real_point2d const *triangle0,
+	real_point2d const *triangle1,
+	real_point2d const *triangle2)
+{
+	real t_in = 0.0f;
+	real t_out = 1.0f;
+
+	VECTOR_INTERSECTS_LINE2D(
+		point,
+		vector,
+		triangle0,
+		triangle1,
+		&t_in,
+		&t_out);
+
+	VECTOR_INTERSECTS_LINE2D(
+		point,
+		vector,
+		triangle1,
+		triangle2,
+		&t_in,
+		&t_out);
+
+	VECTOR_INTERSECTS_LINE2D(
+		point,
+		vector,
+		triangle2,
+		triangle0,
+		&t_in,
+		&t_out);
+
+	return TRUE;
+}
+
+#undef VECTOR_INTERSECTS_LINE2D
+
+boolean vector_intersects_triangle3d(
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real_point3d const *triangle0,
+	real_point3d const *triangle1,
+	real_point3d const *triangle2,
+	real *result)
+{
+	real_vector3d edge0;
+	real_vector3d edge1;
+	real_vector3d normal;
+	real_vector3d offset;
+	real_vector3d cross;
+	real denominator;
+	real inverse_denominator;
+	real t;
+	real t0;
+	real t1;
+	boolean intersects = FALSE;
+
+	vector_from_points3d(triangle0, triangle1, &edge0);
+	vector_from_points3d(triangle0, triangle2, &edge1);
+	cross_product3d(&edge0, &edge1, &normal);
+	denominator = dot_product3d(&normal, vector);
+	if (!(fabs(denominator) < _real_epsilon))
+	{
+		inverse_denominator = 1.0f / denominator;
+		vector_from_points3d(point, triangle0, &offset);
+		t = dot_product3d(&offset, &normal) * inverse_denominator;
+		if (t >= 0.0f && t <= 1.0f)
+		{
+			cross_product3d(&offset, vector, &cross);
+			t0 = dot_product3d(&cross, &edge1) * inverse_denominator;
+			if (t0 >= 0.0f && t0 <= 1.0f)
+			{
+				t1 = -dot_product3d(&cross, &edge0) * inverse_denominator;
+				if (t1 >= 0.0f && t0 + t1 <= 1.0f)
+				{
+					*result = t;
+					intersects = TRUE;
+				}
+			}
+		}
+	}
+
+	return intersects;
 }
 
 boolean vector_intersects_rectangle3d(
@@ -1116,6 +1751,86 @@ real dequantize_byte_to_real(
 	}
 	
 	return (max-min) * ((real)value / 255.f) + min;
+}
+
+byte quantize_real_to_byte_lower_bound(
+	real min,
+	real max,
+	real value)
+{
+	real range;
+	byte test;
+
+	range = max - min;
+	test = (byte)(long)(((value - min) / range) * 255.f);
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\math\\real_math.c",
+		2803,
+		min - _real_epsilon <= value &&
+			value <= max + _real_epsilon,
+		csprintf(
+			temporary,
+			"%lf is not between %lf and %lf",
+			value,
+			min,
+			max));
+
+	while (test > 0 &&
+		value < dequantize_byte_to_real(min, max, test))
+	{
+		test--;
+	}
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\math\\real_math.c",
+		2809,
+		dequantize_byte_to_real(min, max, test) <= value ||
+			(test == 0 &&
+				dequantize_byte_to_real(min, max, test) <= value + _real_epsilon),
+		"dequantize_byte_to_real(min, max, test)<=value || (test==0 && dequantize_byte_to_real(min, max, test)<=value+_real_epsilon)");
+
+	return test;
+}
+
+byte quantize_real_to_byte_upper_bound(
+	real min,
+	real max,
+	real value)
+{
+	real range;
+	byte test;
+
+	range = max - min;
+	test = (byte)(long)(((value - min) / range) * 255.f);
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\math\\real_math.c",
+		2823,
+		min - _real_epsilon <= value &&
+			value <= max + _real_epsilon,
+		csprintf(
+			temporary,
+			"%lf is not between %lf and %lf",
+			value,
+			min,
+			max));
+
+	while (test < UNSIGNED_CHAR_MAX &&
+		value > dequantize_byte_to_real(min, max, test))
+	{
+		test++;
+	}
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\math\\real_math.c",
+		2829,
+		dequantize_byte_to_real(min, max, test) >= value ||
+			(test == UNSIGNED_CHAR_MAX &&
+				dequantize_byte_to_real(min, max, test) >= value - _real_epsilon),
+		"dequantize_byte_to_real(min, max, test)>=value || (test==UNSIGNED_CHAR_MAX && dequantize_byte_to_real(min, max, test)>=value-_real_epsilon)");
+
+	return test;
 }
 
 byte_rectangle3d *quantize_real_to_byte_rectangle3d(
@@ -1304,6 +2019,42 @@ void normals_interpolate(
 	return;
 }
 
+boolean pin_normal_to_cone3d(
+	real_vector3d const *normal,
+	real_vector3d const *direction,
+	real sine,
+	real cosine,
+	real_vector3d *result)
+{
+	real_vector3d axis;
+	boolean pinned;
+
+	match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\math\\real_math.c", 515, normal);
+	match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\math\\real_math.c", 516, direction);
+
+	if (dot_product3d(normal, direction) >= cosine)
+	{
+		*result = *normal;
+		pinned = FALSE;
+	}
+	else
+	{
+		cross_product3d(direction, normal, &axis);
+		if (normalize3d(&axis) == 0.f)
+		{
+			perpendicular3d(direction, &axis);
+			normalize3d(&axis);
+		}
+
+		*result = *direction;
+		rotate_vector_about_axis(result, &axis, sine, cosine);
+		pinned = TRUE;
+	}
+
+	match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\math\\real_math.c", 540, result);
+	return pinned;
+}
+
 real_vector3d *reflect_vector3d(
 	real_vector3d const *incident,
 	real_vector3d const *normal,
@@ -1490,6 +2241,7 @@ real point_to_line_distance_squared3d(
 	return distance_squared;
 }
 
+
 boolean sphere_test_vector3d(
 	real_point3d const *center,
 	real radius,
@@ -1536,6 +2288,120 @@ boolean sphere_test_vector3d(
 
 	return FALSE;
 }
+
+boolean pill_test_vector3d(
+	real_point3d const *base,
+	real height,
+	real radius,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real *t,
+	real_vector3d *normal)
+{
+	real_vector2d x;
+	real xv;
+	real xx_rr;
+	real d;
+	real vv;
+	real n;
+	real height_fraction;
+	real top_z;
+	real_point3d top;
+	boolean result = FALSE;
+
+	x.i = point->x - base->x;
+	x.j = point->y - base->y;
+	xv = x.i*vector->i + x.j*vector->j;
+	xx_rr = x.i*x.i + x.j*x.j - radius*radius;
+	if (xx_rr <= 0.f)
+		n = 0.f;
+	else
+	{
+		d = vector->i*vector->i + vector->j*vector->j;
+		vv = xv*xv - d*xx_rr;
+		if (vv >= 0.f)
+		{
+			n = -(square_root(vv) + xv);
+			if (n <= d)
+				n /= d;
+			else
+				goto done;
+		}
+		else
+			goto done;
+	}
+
+	result = TRUE;
+	height_fraction = (point->z - base->z + n*vector->k) / (height*height);
+	if (height_fraction < 0.f)
+		result = sphere_test_vector3d(base, radius, point, vector, t, normal);
+	else if (height_fraction > 1.f)
+	{
+		top_z = base->z + height;
+		top.x = base->x;
+		top.y = base->y;
+		top.z = top_z;
+		result = sphere_test_vector3d(&top, radius, point, vector, t, normal);
+	}
+	else if (xv < 0.f)
+	{
+		*t = n;
+		normal->i = x.i + n*vector->i;
+		normal->j = x.j + n*vector->j;
+		fast_normalize2d((real_vector2d *)normal);
+		normal->k = 0.f;
+	}
+	else
+		result = FALSE;
+
+	if (result && dot_product3d(normal, vector) > 0.f)
+		result = FALSE;
+
+done:
+	return result;
+}
+
+
+boolean line_from_planes3d(
+	real_plane3d const *plane0,
+	real_plane3d const *plane1,
+	real_point3d *point,
+	real_vector3d *direction)
+{
+	real_vector3d local_direction;
+	real determinant;
+	real inverse_determinant;
+	real distance;
+
+	cross_product3d(&plane0->n, &plane1->n, direction);
+	determinant = magnitude_squared3d(direction);
+	if (!(fabs(determinant) < _real_epsilon))
+	{
+		cross_product3d(&plane1->n, direction, &local_direction);
+		distance = plane0->d;
+		point->x = local_direction.i * distance;
+		point->y = local_direction.j * distance;
+		point->z = local_direction.k * distance;
+
+		distance =
+			(cross_product3d(direction, &plane0->n, &local_direction),
+			 plane1->d);
+		inverse_determinant = 1.0f / determinant;
+		point->x =
+			(local_direction.i * distance + point->x) *
+			inverse_determinant;
+		point->y =
+			(local_direction.j * distance + point->y) *
+			inverse_determinant;
+		point->z =
+			(local_direction.k * distance + point->z) *
+			inverse_determinant;
+		return TRUE;
+	}
+
+	return FALSE;
+}
+
 
 boolean accelerate_to_velocity3d(
 	real_vector3d *velocity,
@@ -1605,6 +2471,98 @@ boolean accerate_to_position3d(
 	position->y = velocity->j + position->y;
 	position->z = velocity->k + position->z;
 	return FALSE;
+}
+
+boolean accelerate_to_position(
+	real *position,
+	real *velocity,
+	real target_position,
+	real maximum_velocity,
+	real acceleration,
+	real minimum_position,
+	real maximum_position,
+	boolean periodic)
+{
+	real current_position;
+	real current_velocity;
+	real delta;
+	real half_range;
+	real limit;
+	real speed;
+	real braking_distance;
+	real step_clamped;
+	real new_position;
+	real output_position;
+	real acceleration_squared;
+	boolean result;
+
+	current_position = *position;
+	current_velocity = *velocity;
+	acceleration_squared = acceleration * acceleration;
+	result = FALSE;
+	delta = target_position - current_position;
+
+	if (periodic)
+	{
+		half_range = (maximum_position - minimum_position) * 0.5f;
+		if (delta > half_range)
+		{
+			delta = delta - (half_range + half_range);
+		}
+		else if (delta < -half_range)
+		{
+			delta = half_range + half_range + delta;
+		}
+	}
+
+	limit = MIN(maximum_velocity, acceleration);
+
+	if (fabs(delta - current_velocity) <= limit)
+	{
+		current_velocity = 0.0f;
+		output_position = target_position;
+		if (target_position < minimum_position)
+			output_position = minimum_position;
+		else if (target_position > maximum_position)
+			output_position = maximum_position;
+		result = TRUE;
+	}
+	else
+	{
+		braking_distance = (maximum_velocity + maximum_velocity) * fabs(delta);
+		if (braking_distance >= acceleration_squared)
+			speed = acceleration;
+		else
+			speed = square_root(braking_distance);
+		if (delta < 0.0f)
+			speed = -speed;
+		step_clamped = speed - current_velocity;
+		if (fabs(step_clamped) > maximum_velocity)
+		{
+			if (step_clamped < 0.0f)
+				step_clamped = -maximum_velocity;
+			else
+				step_clamped = maximum_velocity;
+		}
+		current_velocity = current_velocity + step_clamped;
+		new_position = step_clamped * 0.5f + current_velocity + current_position;
+		if (periodic)
+		{
+			if (new_position < minimum_position)
+				new_position = maximum_position - minimum_position + new_position;
+			else if (new_position > maximum_position)
+				new_position = new_position - (maximum_position - minimum_position);
+		}
+		if (new_position < minimum_position)
+			new_position = minimum_position;
+		else if (new_position > maximum_position)
+			new_position = maximum_position;
+		output_position = new_position;
+	}
+
+	*velocity = current_velocity;
+	*position = output_position;
+	return result;
 }
 
 void accelerate_to_velocity(
