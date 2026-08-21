@@ -163,4 +163,35 @@ synthetic anchor, or byte-forcing expression.
 - Clean committed-state snapshot, object deletion and forced same-path
   rebuild, regression check, and final direct COFF comparison: pass.
 
+## Recorded committed-state replay
+
+The implementation commit is
+`43aec81f56c0fac5f6a7457701cfe7c7a6b989e0`. At that clean committed state,
+`source/hs/hs_library_external.c` resolves to Git blob
+`82b2dc5d3ccdd9e1c043ad0a142ae9ac5c4bbcdc`; its raw committed payload is
+3,285 bytes with SHA-256
+`04877d914fcfc8ac4b7918c80f68689d08909f0afc56dcefec49fa951b60b3d9`.
+`git status --short --branch` reported only the branch header and no changed or
+untracked path.
+
+The clean regression snapshot was written to
+`build/regression_hs_library_external_wave_20260821.json` with status
+`SNAPSHOT_WRITTEN`, commit
+`43aec81f56c0fac5f6a7457701cfe7c7a6b989e0`, and sole unit
+`source/hs/hs_library_external`. The generated candidate object path was
+resolved inside the worktree and its existing file was verified before
+`build/base/source/hs/hs_library_external.obj` was deleted. The regression
+check then invoked the normal repository Ninja/VC7 build edge for that unit.
+
+The committed-state check returned `ok: true`, no failures, no warnings, no
+newly exact functions, and no changed nonexact functions. Its `still_exact`
+set is exactly `_hs_not`, `_hs_object_destroy_by_name`, `_hs_print`, and
+`_hs_trigger_volume_test_objects_any`. A subsequent direct hardened comparison
+reported strict equality for all four code COMDATs, including every relocation
+address, type, destination, and addend. `_hs_object_create_anew` was absent.
+The replay object SHA-256 was
+`cf0b006f2ad30d73392c021bbf4253da8d63d1ed5c4b6431bf6964895ffae39d`;
+its only defined external code owners were the four retained functions, with
+no runtime `.rdata`, `.data`, `.bss`, or COMMON owner.
+
 Nothing is pushed or history-rewritten.
