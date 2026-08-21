@@ -50,15 +50,61 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "math/real_math.h"
+
 /* ---------- constants */
+
+enum
+{
+	COLLISION_DEBUG_SPRAY_COLUMNS = 40,
+	COLLISION_DEBUG_SPRAY_ROWS = 30,
+	COLLISION_DEBUG_SPRAY_COUNT = COLLISION_DEBUG_SPRAY_COLUMNS * COLLISION_DEBUG_SPRAY_ROWS,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct collision_debug_spray_cache
+{
+	real_vector3d normals[COLLISION_DEBUG_SPRAY_COUNT];
+	real_point3d points[COLLISION_DEBUG_SPRAY_COUNT];
+	unsigned long hit_flags[BIT_VECTOR_SIZE_IN_LONGS(COLLISION_DEBUG_SPRAY_COUNT)];
+};
+
+typedef char collision_debug_spray_cache_size_assert[
+	sizeof(struct collision_debug_spray_cache) == 0x7118 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+const real_point3d rdata_0028b2a8[NUMBER_OF_VERTICES_PER_CUBE] =
+{
+	{ -1.0f, -1.0f, -1.0f },
+	{ -1.0f, -1.0f,  1.0f },
+	{ -1.0f,  1.0f, -1.0f },
+	{ -1.0f,  1.0f,  1.0f },
+	{  1.0f, -1.0f, -1.0f },
+	{  1.0f, -1.0f,  1.0f },
+	{  1.0f,  1.0f, -1.0f },
+	{  1.0f,  1.0f,  1.0f },
+};
+
+boolean collision_debug_flag_front_facing_surfaces = TRUE;
+boolean collision_debug_flag_ignore_invisible_surfaces = TRUE;
+boolean collision_debug_flag_structure = TRUE;
+boolean collision_debug_flag_media = TRUE;
+boolean collision_debug_flag_objects = TRUE;
+real collision_debug_length = 100.0f;
+long collision_debug_ignore_object_index = NONE;
+
+struct collision_debug_spray_cache bss_00456ec0 = { 0 };
+real collision_debug_width = 0.0f;
+real collision_debug_height = 0.0f;
+boolean collision_debug_phantom_bsp = FALSE;
+boolean collision_debug_phantom_bsp_found = FALSE;
 
 /* ---------- public code */
 
