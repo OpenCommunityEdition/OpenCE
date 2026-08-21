@@ -247,6 +247,32 @@ Nothing is pushed or history-rewritten.
 
 ## Committed-state replay
 
-The committed delete/rebuild regression and direct-COFF replay are recorded
-additively after the implementation commit; no source change is permitted in
-that replay.
+Implementation commit `5d2869cdedd61a682a1d86f5e904c0224886e277`
+was clean before replay. Reading the source blob directly from that commit
+reproduced blob `5ecdeb8676d05d858b3e6712ef6a5735dc3cc50a`, its
+4,433-byte size, and stable payload SHA-256
+`e0684ce370e05499ca0152471d101a5954d9494c9cf93f370a255bca1f540117`.
+
+A one-unit regression snapshot was written from that clean commit and checked
+immediately. All five accepted `xbox_texture_cache.obj` functions were
+`still_exact`, with zero changed-nonexact or newly-exact entries, failures, or
+warnings.
+
+The resolved absolute path of only
+`build/base/source/cache/xbox_texture_cache.obj` was then verified to remain
+inside this worktree and to have the expected filename. That generated file
+was deleted and rebuilt through its normal same-path Ninja edge. The rebuilt
+object's phase-specific raw SHA-256 is
+`8d36cab3e17874246cd8f4eb50292fd999ce15af6876325fda3a893ab7b236b0`;
+the raw digest differs from the pre-commit phase because compiler metadata is
+timestamp-sensitive.
+
+The committed regression check again reports all five functions
+`still_exact`, with zero failures or warnings. Direct hardened comparison
+reproduces the two new normalized hashes, all three inherited hashes, every
+ordered relocation identity/addend, and both exact literal COMDATs.
+`_texture_cache_new`, both excluded callbacks, and every private body remain
+absent. `_bss_004d1198` remains an undefined value-zero external, the only
+runtime `.rdata` remains the two 42-byte literals, and no `.bss` or writable
+`.data` section is emitted. No source was changed during replay. Nothing is
+pushed or history-rewritten.
