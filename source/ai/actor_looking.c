@@ -165,16 +165,155 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
+#include "actors.h"
+#include "ai_debug.h"
+#include "main/console.h"
+#include "props.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
+#define ACTOR_LOOKING_DEBUG_PRINTING_ENABLED() (ai_debug.__unknown3C[97])
+
 /* ---------- structures */
+
+typedef char actor_looking_ai_debug_printing_offset_must_be_0x9D[
+	offsetof(struct ai_debug_state, __unknown3C) + 97 == 0x9D ? 1 : -1];
+typedef char actor_looking_actor_vehicle_index_offset_must_be_0x158[
+	offsetof(struct actor_datum, input.vehicle_index) == 0x158 ? 1 : -1];
+typedef char actor_looking_secondary_look_type_offset_must_be_0x544[
+	offsetof(struct actor_datum, control.secondary_look_type) == 0x544 ? 1 : -1];
+typedef char actor_looking_secondary_look_priority_offset_must_be_0x546[
+	offsetof(struct actor_datum, control.secondary_look_priority) == 0x546 ? 1 : -1];
+typedef char actor_looking_secondary_look_timer_offset_must_be_0x548[
+	offsetof(struct actor_datum, control.secondary_look_timer) == 0x548 ? 1 : -1];
+typedef char actor_looking_prop_unit_index_offset_must_be_0x18[
+	offsetof(struct prop_datum, unit_index) == 0x18 ? 1 : -1];
+typedef char actor_looking_prop_state_offset_must_be_0x24[
+	offsetof(struct prop_datum, state) == 0x24 ? 1 : -1];
+typedef char actor_looking_prop_enemy_offset_must_be_0x60[
+	offsetof(struct prop_datum, enemy) == 0x60 ? 1 : -1];
+typedef char actor_looking_prop_dead_ticks_offset_must_be_0x76[
+	offsetof(struct prop_datum, dead_ticks) == 0x76 ? 1 : -1];
+typedef char actor_looking_prop_vehicle_index_offset_must_be_0x110[
+	offsetof(struct prop_datum, vehicle_index) == 0x110 ? 1 : -1];
+typedef char actor_looking_prop_quantized_distance_offset_must_be_0x121[
+	offsetof(struct prop_datum, quantized_distance) == 0x121 ? 1 : -1];
+typedef char actor_looking_prop_quantized_speed_offset_must_be_0x123[
+	offsetof(struct prop_datum, quantized_speed) == 0x123 ? 1 : -1];
+typedef char actor_looking_prop_dead_offset_must_be_0x127[
+	offsetof(struct prop_datum, dead) == 0x127 ? 1 : -1];
+typedef char actor_looking_prop_shooting_offset_must_be_0x12F[
+	offsetof(struct prop_datum, shooting) == 0x12F ? 1 : -1];
 
 /* ---------- prototypes */
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+void actor_look_secondary_stop(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->control.secondary_look_type > 0 &&
+		ACTOR_LOOKING_DEBUG_PRINTING_ENABLED())
+	{
+		console_printf(
+			FALSE,
+			"%s: look-stop",
+			ai_debug_describe_actor(
+				actor_index,
+				NONE,
+				FALSE,
+				temporary,
+				NUMBEROF(temporary)));
+	}
+
+	actor->control.secondary_look_priority = _secondary_look_priority_none;
+	actor->control.secondary_look_type = _secondary_look_none;
+	actor->control.secondary_look_timer = 0;
+
+	return;
+}
+
+real actor_look_compute_prop_interest(
+	long actor_index,
+	long prop_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct prop_datum *prop = prop_get(prop_index);
+	real interest = 0.0f;
+	real weight;
+	short state = prop->state;
+
+	if (state >= _prop_state_becoming_unacknowledged &&
+		state <= _prop_state_acknowledged)
+	{
+		if (prop->dead)
+		{
+			interest = prop->dead_ticks < 210 ? 1.8f : 0.4f;
+		}
+		else if (prop->enemy)
+		{
+			interest = 2.0f;
+		}
+		else
+		{
+			interest = 1.0f;
+		}
+	}
+	else if (prop->enemy &&
+		state >= _prop_state_uninspected_orphan &&
+		state <= _prop_state_inspected_orphan)
+	{
+		interest = 1.5f;
+	}
+
+	if (prop->unit_index == actor->input.vehicle_index ||
+		prop->vehicle_index == actor->input.vehicle_index)
+	{
+		interest = 0.0f;
+	}
+
+	weight = prop->vehicle_index != NONE ? 1.5f : 1.0f;
+
+	switch (prop->quantized_speed)
+	{
+	case 1:
+		interest += weight * 0.5f;
+		break;
+	case 2:
+		interest += weight;
+		break;
+	case 3:
+		interest += weight * 2.0f;
+		break;
+	}
+
+	if (prop->shooting)
+	{
+		interest += weight * 2.0f;
+	}
+
+	switch (prop->quantized_distance)
+	{
+	case 1:
+		interest *= 0.6f;
+		break;
+	case 3:
+		interest *= 0.4f;
+		break;
+	case 4:
+		interest *= 0.2f;
+		break;
+	}
+
+	return interest;
+}
 
 /* ---------- private code */
