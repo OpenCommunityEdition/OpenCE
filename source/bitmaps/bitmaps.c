@@ -229,6 +229,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "bitmaps/bitmap_group.h"
 #include "math/integer_math.h"
 
 /* ---------- constants */
@@ -238,15 +239,18 @@ enum
 	NUMBER_OF_ENTRIES_IN_PALETTE = 256,
 	NUMBER_OF_BITMAP_TYPES = 3,
 	NUMBER_OF_BITMAP_FORMATS = 18,
+	_bitmap_has_power_of_two_dimensions_bit = 0,
 };
 
 /* ---------- macros */
 
 /* ---------- structures */
 
-struct bitmap_data;
-
 /* ---------- prototypes */
+
+boolean bitmap_verify(
+	struct bitmap_data *bitmap,
+	boolean repair);
 
 /* ---------- globals */
 
@@ -335,6 +339,22 @@ char const *bitmap_format_get_string(
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 135, bitmap_format_string_table[NUMBER_OF_BITMAP_FORMATS]==NULL);
 
 	return bitmap_format_string_table[format];
+}
+
+short bitmap_get_max_mipmap_count(
+	struct bitmap_data *bitmap)
+{
+	short mipmap_count = 0;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x368, bitmap_verify(bitmap, FALSE));
+
+	if (TEST_FLAG(bitmap->flags, _bitmap_has_power_of_two_dimensions_bit))
+	{
+		mipmap_count = floor_log2(
+			MAX(bitmap->width, MAX(bitmap->height, (short)bitmap->depth)));
+	}
+
+	return mipmap_count;
 }
 
 void bitmap_byte_swap_pixels(
