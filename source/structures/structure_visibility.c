@@ -99,6 +99,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -109,6 +111,18 @@ symbols in this file:
 
 /* ---------- globals */
 
+extern boolean debug_portals;
+extern boolean structures_use_pvs_for_vs;
+
 /* ---------- public code */
+
+void debug_pvs(
+	boolean on)
+{
+	debug_portals = on;
+	structures_use_pvs_for_vs = on;
+
+	return;
+}
 
 /* ---------- private code */
