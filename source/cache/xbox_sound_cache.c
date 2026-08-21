@@ -92,16 +92,134 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "memory/data.h"
+#include "memory/lruv_cache.h"
+#include "sound/sound_definitions.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct xbox_cache_sound_datum
+{
+	byte reserved000[5];
+	byte hardware_reference_count;
+	byte reserved006[2];
+	struct sound_permutation *sound;
+};
+
+struct xbox_sound_cache_globals_prefix
+{
+	byte reserved000[0x100];
+	struct data_array *cache_sounds;
+	byte *base_address;
+	struct lruv_cache *cache;
+};
+
+typedef char verify_xbox_cache_sound_hardware_reference_count_offset[
+	offsetof(
+		struct xbox_cache_sound_datum,
+		hardware_reference_count) == 0x5 ? 1 : -1];
+typedef char verify_xbox_cache_sound_sound_offset[
+	offsetof(
+		struct xbox_cache_sound_datum,
+		sound) == 0x8 ? 1 : -1];
+typedef char verify_xbox_cache_sound_datum_size[
+	sizeof(struct xbox_cache_sound_datum) == 0xC ? 1 : -1];
+typedef char verify_xbox_sound_cache_sounds_offset[
+	offsetof(
+		struct xbox_sound_cache_globals_prefix,
+		cache_sounds) == 0x100 ? 1 : -1];
+typedef char verify_xbox_sound_cache_base_address_offset[
+	offsetof(
+		struct xbox_sound_cache_globals_prefix,
+		base_address) == 0x104 ? 1 : -1];
+typedef char verify_xbox_sound_cache_cache_offset[
+	offsetof(
+		struct xbox_sound_cache_globals_prefix,
+		cache) == 0x108 ? 1 : -1];
+typedef char verify_xbox_sound_cache_globals_prefix_size[
+	sizeof(struct xbox_sound_cache_globals_prefix) == 0x10C ? 1 : -1];
+
 /* ---------- prototypes */
+
+void sound_cache_sound_delete(
+	struct sound_permutation *sound);
 
 /* ---------- globals */
 
+extern short assertion_count;
+extern struct xbox_sound_cache_globals_prefix bss_004d1088;
+
 /* ---------- public code */
+
+void sound_cache_delete(
+	void)
+{
+	data_dispose(bss_004d1088.cache_sounds);
+	lruv_delete(bss_004d1088.cache);
+	bss_004d1088.base_address = NULL;
+
+	return;
+}
+
+void sound_cache_open(
+	void)
+{
+	data_make_valid(bss_004d1088.cache_sounds);
+
+	return;
+}
+
+void sound_cache_idle(
+	void)
+{
+	lruv_idle(bss_004d1088.cache);
+	match_vassert(
+		"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
+		148,
+		assertion_count == 0,
+		"hardware sound reference count failure.");
+
+	return;
+}
+
+void sound_cache_sound_hardware_lock(
+	struct sound_permutation *sound)
+{
+	struct xbox_cache_sound_datum *cache_sound;
+
+	/* January Xbox and HCEA both identify unknown0 as cache_block_index. */
+	cache_sound = datum_get(bss_004d1088.cache_sounds, sound->unknown0);
+	if (cache_sound->hardware_reference_count < UNSIGNED_CHAR_MAX)
+	{
+		cache_sound->hardware_reference_count++;
+	}
+	else
+	{
+		assertion_count++;
+	}
+
+	return;
+}
+
+void sound_cache_close(
+	void)
+{
+	struct data_iterator iterator;
+	struct xbox_cache_sound_datum *cache_sound;
+
+	data_iterator_new(&iterator, bss_004d1088.cache_sounds);
+	while ((cache_sound = data_iterator_next(&iterator)) != NULL)
+	{
+		sound_cache_sound_delete(cache_sound->sound);
+	}
+	data_make_invalid(bss_004d1088.cache_sounds);
+
+	return;
+}
 
 /* ---------- private code */
