@@ -242,6 +242,46 @@ is performed.
 
 ## Clean committed-state replay
 
-Pending the required implementation-and-ledger commit. The verified deletion,
-normal one-unit rebuild, no-build regression check, and direct hardened
-comparison will be recorded in an additive replay-only ledger commit.
+Implementation-and-ledger commit
+`4a9c28db0fe843f67f2d58650925f7f9e142dd75` was clean before replay. Its
+committed translation-unit blob is exactly
+`b8ec0f7ad7c7e69cb6f99dfdd1a3e2c7fdbfd69a`; the shared header remains
+baseline blob `532b43c20142ab79919991f4bf6ab5e833b1fe0c`. `git status
+--short --branch` reported only the branch header and no changed or untracked
+path.
+
+A one-unit regression snapshot was captured from that exact clean commit at
+`build/regression_interface_color_pair_20260821.json`, with status
+`SNAPSHOT_WRITTEN` and sole unit `source/interface/interface`. The generated
+candidate path resolved to
+`C:\Users\isabe\Documents\Codex\2026-07-13\i-w\interface-color-triad-20260821\build\base\source\interface\interface.obj`.
+It was explicitly verified to begin inside the resolved isolated-worktree
+root. Before deletion it was 2,666 bytes with SHA-256
+`b926a4ff0c21d594e0da704619749b796cbdb2899d29885e03e980890fcf31ec`.
+That single file was deleted and a second existence check proved it absent.
+
+The untouched production Ninja graph then rebuilt the same path through
+exactly one `[1/1] CL` action, using the unchanged natural `/O2 /Oy- /DDEBUG
+/Dxbox` command and include graph. There was no source change, body retry, or
+alternate build edge. The immediate no-build regression check returned
+`ok: true`, no failures, no warnings, `changed_nonexact: []`, and
+`newly_exact: []`. Its `still_exact` set is exactly
+`_interface_initialize`, `_interface_dispose_from_old_map`,
+`_interface_dispose`, `_interface_set_bitmap_text_draw_mode`, and
+`_interface_get_rgb_color`. A subsequent dry build reported `ninja: no work
+to do.`
+
+Direct hardened January comparison after the rebuild returned
+`all_equal: true` for the complete five-body inventory. It reproduced all 173
+newly retained meaningful bytes, all 192 padded bytes, all 12 relocations, and
+each recorded normalized SHA-256. The rebuilt object is 2,666 bytes with
+phase-specific whole-file SHA-256
+`f864c078cb5e8f23f13ab9d28979c56d2ea60e7806ba4a4d70b74974c6460948`.
+
+An independent post-rebuild COFF ownership dump again found exactly five
+defined external code COMDATs and the sole four-byte compiler-owned float
+literal. It found no `.data`, `.bss`, or COMMON owner. The retained undefined
+runtime dependencies remain exactly as documented above. The final tracked
+change after replay is this additive ledger section only.
+
+Nothing is pushed, amended, or history-rewritten.
