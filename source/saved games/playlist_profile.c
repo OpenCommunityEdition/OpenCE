@@ -77,6 +77,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h"
 
 /* ---------- constants */
 
@@ -98,11 +99,29 @@ typedef char verify_playlist_profile_default_count_offset[
 
 /* ---------- prototypes */
 
+boolean delete_enumerated_saved_game_file(
+	long saved_game_file_index);
+
 /* ---------- globals */
 
 extern struct playlist_profile_runtime_globals_prefix bss_004d2858;
 
 /* ---------- public code */
+
+void playlist_profile_delete(
+	long playlist_profile_index)
+{
+	if (playlist_profile_index != NONE &&
+		!delete_enumerated_saved_game_file(playlist_profile_index))
+	{
+		error(
+			_error_silent,
+			"playlist_profile_delete() failed (profile index= #0x%lX)",
+			playlist_profile_index);
+	}
+
+	return;
+}
 
 word playlist_profile_number_of_default_profiles_on_disk(
 	void)
