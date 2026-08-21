@@ -101,18 +101,92 @@ symbols in this file:
 
 /* ---------- macros */
 
+#define xbox_game_state_globals bss_004d27d0
+#define INVALID_HANDLE_VALUE ((HANDLE)-1)
+
 /* ---------- structures */
+
+typedef void *HANDLE;
+
+struct xbox_game_state_globals_prefix
+{
+	boolean buffer_allocated;
+	byte reserved001[3];
+	void *buffer;
+	long buffer_size;
+	boolean file_open;
+	boolean file_valid_for_read;
+	byte reserved00E[2];
+	HANDLE handle;
+};
+
+typedef char verify_xbox_game_state_buffer_offset[
+	offsetof(struct xbox_game_state_globals_prefix, buffer) == 0x4 ? 1 : -1];
+typedef char verify_xbox_game_state_file_open_offset[
+	offsetof(struct xbox_game_state_globals_prefix, file_open) == 0xC ? 1 : -1];
+typedef char verify_xbox_game_state_handle_offset[
+	offsetof(struct xbox_game_state_globals_prefix, handle) == 0x10 ? 1 : -1];
+typedef char verify_xbox_game_state_globals_prefix_size[
+	sizeof(struct xbox_game_state_globals_prefix) == 0x14 ? 1 : -1];
 
 /* ---------- prototypes */
 
+void __stdcall XPhysicalFree(
+	void *address);
+int __stdcall CloseHandle(
+	HANDLE handle);
+
+HANDLE code_001b0270(
+	const char *path);
+
 /* ---------- globals */
 
+extern struct xbox_game_state_globals_prefix bss_004d27d0;
+
 /* ---------- public code */
+
+void game_state_free_buffer(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\game_state_xbox.c",
+		75,
+		xbox_game_state_globals.buffer_allocated);
+	XPhysicalFree(xbox_game_state_globals.buffer);
+	xbox_game_state_globals.buffer_allocated = FALSE;
+
+	return;
+}
+
+void game_state_close_file(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\game_state_xbox.c",
+		106,
+		xbox_game_state_globals.file_open);
+	CloseHandle(xbox_game_state_globals.handle);
+	xbox_game_state_globals.file_open = FALSE;
+
+	return;
+}
 
 const char *game_state_get_persistent_storage_filename(
 	void)
 {
 	return "savegame.bin";
+}
+
+void game_state_create_persistent_storage(
+	const char *path)
+{
+	HANDLE handle;
+
+	handle = code_001b0270(path);
+	if (handle != INVALID_HANDLE_VALUE)
+		CloseHandle(handle);
+
+	return;
 }
 
 /* ---------- private code */
