@@ -317,13 +317,13 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct mutex;
+struct mutex_reference;
 
 struct saved_game_files_globals
 {
 	struct file_reference memory_unit_mapfile;
-	struct mutex *general_mutex;
-	struct mutex *mapfile_mutex;
+	struct mutex_reference *general_mutex;
+	struct mutex_reference *mapfile_mutex;
 	short next_enumerated_profile_index;
 	boolean initialized;
 	boolean memory_units_dirty;
@@ -339,6 +339,8 @@ typedef char verify_saved_game_files_globals_size[
 
 void code_001b4b00(
 	void);
+void release_mutex(
+	struct mutex_reference *mutex_reference);
 
 /* ---------- globals */
 
@@ -356,6 +358,14 @@ void saved_game_files_notify_memory_units_changed(
 	void)
 {
 	saved_game_files_globals.memory_units_dirty = TRUE;
+
+	return;
+}
+
+void saved_game_files_release_mutex(
+	void)
+{
+	release_mutex(saved_game_files_globals.general_mutex);
 
 	return;
 }

@@ -16,7 +16,7 @@ header included in hcex build.
 
 /* ---------- prototypes/SAVED_GAME_FILES.C */
 
-void saved_game_files_take_mutex(void);
+boolean saved_game_files_take_mutex(void);
 void saved_game_files_release_mutex(void);
 void enumerate_memory_units_test(
 	void);
