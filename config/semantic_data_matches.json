@@ -239,5 +239,16 @@
       "relocation_count": 18,
       "normalized_sha256": "25298d4d1ea85dfa6a4696577658216429876d7b7b59ed245667db872d9d79d2"
     }
+  },
+  {
+    "unit": "source/render/render_particles",
+    "symbol": "_data_0030e180",
+    "allow_incomplete_unit": true,
+    "reason": "the incomplete rebuilt object owns the exact 1528-byte render-particles profile section; csplit names the string relocation as an undefined image symbol while MSVC emits the select-any string COMDAT locally, and the hardened comparator proves identical normalized bytes, relocation address/type/destination/addend, external owner spelling, and storage class",
+    "measurements": {
+      "size": 1528,
+      "relocation_count": 1,
+      "normalized_sha256": "806638334fff1341360b4dec7db0987871f376bc3999e26ff4bcd3a1755d2955"
+    }
   }
 ]
