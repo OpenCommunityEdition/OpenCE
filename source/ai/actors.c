@@ -299,8 +299,39 @@ typedef char actor_datum_output_control_flags_offset_assert[
 	offsetof(struct actor_datum, output.control_flags) == 0x6D0 ? 1 : -1];
 typedef char actor_datum_output_animation_impulse_offset_assert[
 	offsetof(struct actor_datum, output.animation.impulse) == 0x6EC ? 1 : -1];
+typedef char actor_datum_meta_encounterless_offset_assert[
+	offsetof(struct actor_datum, meta.encounterless) == 0x09 ? 1 : -1];
+typedef char actor_datum_meta_encounter_index_offset_assert[
+	offsetof(struct actor_datum, meta.encounter_index) == 0x34 ? 1 : -1];
+typedef char actor_datum_meta_first_prop_index_offset_assert[
+	offsetof(struct actor_datum, meta.first_prop_index) == 0x50 ? 1 : -1];
 
 /* ---------- prototypes */
+
+void actor_switch_props(
+	long actor_index,
+	long old_prop_index,
+	long new_prop_index);
+
+void prop_delete(
+	long actor_index,
+	long prop_index);
+
+void encounter_detach_actor(
+	long actor_index,
+	boolean died);
+
+void encounterless_attach_actor(
+	long actor_index);
+
+void encounterless_detach_actor(
+	long actor_index);
+
+void encounter_attach_actor(
+	long actor_index,
+	long encounter_index,
+	short squad_index,
+	boolean has_previous_team);
 
 /* ---------- globals */
 
@@ -518,6 +549,36 @@ void actor_flush_position_indices(
 	return;
 }
 
+void actor_change_encounter(
+	long actor_index,
+	long encounter_index,
+	short squad_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	actor_flush_position_indices(actor_index);
+
+	if (actor->meta.encounterless)
+	{
+		encounterless_detach_actor(actor_index);
+	}
+	else if (actor->meta.encounter_index != NONE)
+	{
+		encounter_detach_actor(actor_index, FALSE);
+	}
+
+	if (encounter_index == NONE)
+	{
+		encounterless_attach_actor(actor_index);
+	}
+	else
+	{
+		encounter_attach_actor(actor_index, encounter_index, squad_index, TRUE);
+	}
+
+	return;
+}
+
 void actor_unit_control_crouch(
 	long actor_index,
 	boolean crouch)
@@ -602,6 +663,20 @@ void actor_unit_control_stop_animation_impulse(
 	struct actor_datum *actor = actor_get(actor_index);
 
 	actor->output.animation.impulse = NONE;
+
+	return;
+}
+
+void actor_delete_props(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	while (actor->meta.first_prop_index != NONE)
+	{
+		actor_switch_props(actor_index, actor->meta.first_prop_index, NONE);
+		prop_delete(actor_index, actor->meta.first_prop_index);
+	}
 
 	return;
 }
