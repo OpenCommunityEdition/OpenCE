@@ -135,9 +135,10 @@ storage owner, or header change. The first player-queues candidate object was
 preserved throughout; this repair was not a body retry.
 
 The sole consumer-repair compile was compared against its preserved
-pre-repair object. All 48 runtime/debug section payloads and normalized
-relocations are identical, including `.debug$S`; all 26 external code symbols
-and runtime external ownership are also identical. In particular,
+pre-repair object. All 48 `.text`, `.rdata`, `.data`, and `.bss` section
+payloads and normalized relocations are identical. The `.debug$S` payload and
+relocations are also identical; all 26 external code symbols and runtime
+external ownership are also identical. In particular,
 `_network_game_client_end_frame` remains 400 padded bytes with 33 relocations
 and normalized SHA-256
 `a01a2921477fca242a21485cb1a890b9c330afef5907f481a1659a0c32807b79`.
@@ -157,9 +158,10 @@ Claude-owned file, or tracked deletion is in scope.
 - Complete 568-edge `halobetacache_build` and `libcmt_build`: pass.
 - Direct hardened comparison: all seven leaves pass with exact padded bytes
   and relocation identities.
-- Preserved consumer A/B proof: 48/48 runtime/debug section payloads and
-  normalized relocations, 26/26 external code symbols, and runtime ownership
-  are unchanged. Raw differences are limited to the COFF timestamp and six
+- Preserved consumer A/B proof: 48/48 `.text`, `.rdata`, `.data`, and `.bss`
+  section payloads and normalized relocations, the `.debug$S` payload and
+  relocations, 26/26 external code symbols, and runtime ownership are
+  unchanged. Raw differences are limited to the COFF timestamp and six
   equivalently resolved compiler-local `$L...` spellings.
 - Semantic audit: 470 units, 4,106 functions evaluated, 3,966 semantic exact,
   101 hidden exact, 36 ordinary-only, 4,027 accepted exact, and zero unit
