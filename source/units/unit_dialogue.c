@@ -90,4 +90,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+boolean unit_is_speaking(
+	long unit_index)
+{
+	return unit_get(unit_index)->unit.speech.current.priority > 0;
+}
+
 /* ---------- private code */
