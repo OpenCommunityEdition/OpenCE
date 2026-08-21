@@ -219,3 +219,27 @@ pre-existing Markdown, runtime-data owner, or deleted path is changed.
   pass.
 
 Nothing is pushed or history-rewritten.
+
+## Committed-state replay
+
+Implementation commit `a6f4c45d4bda952844a76b607c1f9d7f306003db`
+was clean before replay. Reading its three source/header blobs directly from
+Git reproduced every blob identity and stable payload SHA-256 recorded above.
+
+A one-unit regression snapshot was written from that commit and checked
+immediately. All eight accepted `game_sound.obj` functions were
+`still_exact`, with zero changed-nonexact or newly-exact entries, failures,
+or warnings. After verifying its resolved absolute path remained inside this
+worktree, only `build/base/source/sound/game_sound.obj` was deleted. Its
+normal single-object Ninja edge rebuilt it successfully, and the committed
+regression check returned the same clean result.
+
+Direct hardened COFF comparison after the forced rebuild again reports all
+eight accepted functions exact. In particular, the four new normalized
+hashes and all 14 new relocation identities/addends reproduce exactly. The
+rejected `_scripted_sound_time` symbol remains absent. The rebuilt object has
+no `.bss` or writable `.data`; the two inherited four-byte COMMON declarations
+remain externally owned, and the only new non-code definitions are the two
+compiler-owned float-literal COMDATs. Tracked status is clean after this
+ledger-only replay record. No worktree or junction was removed, and nothing
+was pushed or history-rewritten.
