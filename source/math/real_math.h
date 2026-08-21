@@ -478,6 +478,12 @@ boolean sphere_intersects_rectangle3d(
 	real_rectangle3d const *bounds);
 
 boolean vector_intersects_rectangle2d(real_point2d const *point, real_vector2d const *vector, real_rectangle2d const *bounds);
+long vector_intersects_pill3d(
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real_point3d const *pill_base,
+	real_vector3d const *pill_height,
+	real pill_width);
 boolean vector_intersects_rectangle3d(real_point3d const *point, real_vector3d const *vector, real_rectangle3d const *bounds);
 boolean pill_intersects_rectangle3d(real_point3d const *base, real_vector3d const *height, real width, real_rectangle3d const *bounds);
 
@@ -521,8 +527,18 @@ real_vector3d *vector3d_from_euler_angles2d(real_vector3d *vector, real_euler_an
 
 boolean point_in_pill2d(real_point2d const *point, real_point2d const *base, real_vector2d const *height, real width);
 real point_to_line_distance_squared3d(real_point3d const *point, real_point3d const *base, real_vector3d const *height);
+real vector_to_line_distance_squared3d(
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real_point3d const *line_point,
+	real_vector3d const *line_vector);
 
 boolean sphere_test_vector3d(real_point3d const *center, real radius, real_point3d const *point, real_vector3d const *vector, real *t, real_vector3d *normal);
+boolean point_from_planes3d(
+	real_plane3d const *plane0,
+	real_plane3d const *plane1,
+	real_plane3d const *plane2,
+	real_point3d *point);
 
 boolean accelerate_to_position(
 	real *position,

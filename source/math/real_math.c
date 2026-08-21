@@ -23,6 +23,14 @@ struct real_math_constant_block
 
 /* ---------- prototypes */
 
+static __inline real magnitude_squared3d_right_associated(
+	real_vector3d const *vector)
+{
+	return
+		vector->i * vector->i +
+		(vector->j * vector->j + vector->k * vector->k);
+}
+
 /* ---------- globals */
 
 struct real_math_constant_block const rdata_0027afb0 =
@@ -1381,6 +1389,137 @@ boolean vector_intersects_pill2d(
 	return magnitude_squared2d(&closest_offset) <= pill_width * pill_width;
 }
 
+long vector_intersects_pill3d(
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real_point3d const *pill_base,
+	real_vector3d const *pill_height,
+	real pill_width)
+{
+	real_vector3d offset;
+	real_vector3d cross;
+	real_vector3d numerator_cross;
+	real denominator;
+	real inverse_denominator;
+	real dot;
+	real vector_magnitude_squared;
+	real pill_magnitude_squared;
+	real inverse_vector_magnitude_squared;
+	real inverse_pill_magnitude_squared;
+	real t0;
+	real t1;
+	real t0_start;
+	real t0_end;
+	real t1_start;
+	real t1_end;
+	real clamped_t0;
+	real clamped_t1;
+	real_point3d closest_point0;
+	real_point3d closest_point1;
+	real_vector3d closest_offset;
+	boolean t0_out_of_range;
+	boolean t1_out_of_range;
+
+	vector_from_points3d(point, pill_base, &offset);
+	cross_product3d(vector, pill_height, &cross);
+	denominator = magnitude_squared3d_right_associated(&cross);
+	if (!(fabs(denominator) < _real_epsilon))
+	{
+		inverse_denominator = 1.0f / denominator;
+		scale_vector3d(&cross, inverse_denominator, &cross);
+		cross_product3d(&offset, pill_height, &numerator_cross);
+		t0 = dot_product3d(&numerator_cross, &cross);
+		cross_product3d(&offset, vector, &numerator_cross);
+		t1 = dot_product3d(&numerator_cross, &cross);
+		t0_out_of_range = t0 < 0.0f || t0 > 1.0f;
+		t1_out_of_range = t1 < 0.0f || t1 > 1.0f;
+		if (!t0_out_of_range && !t1_out_of_range)
+			goto closest_distance;
+
+		if (t0_out_of_range)
+		{
+			clamped_t0 = t0 < 0.0f ? 0.0f : 1.0f;
+			point_from_line3d(point, vector, clamped_t0, &closest_point0);
+		}
+		if (t1_out_of_range)
+		{
+			clamped_t1 = t1 < 0.0f ? 0.0f : 1.0f;
+			point_from_line3d(pill_base, pill_height, clamped_t1, &closest_point1);
+		}
+		if (t0_out_of_range &&
+			fast_vector_intersects_sphere(
+				pill_base,
+				pill_height,
+				&closest_point0,
+				pill_width))
+		{
+			goto intersection;
+		}
+		if (t1_out_of_range &&
+			fast_vector_intersects_sphere(
+				point,
+				vector,
+				&closest_point1,
+				pill_width))
+		{
+			goto intersection;
+		}
+		return FALSE;
+	}
+
+	dot = dot_product3d(vector, pill_height);
+	vector_magnitude_squared = magnitude_squared3d(vector);
+	if (vector_magnitude_squared > _real_epsilon)
+	{
+		inverse_vector_magnitude_squared = 1.0f / vector_magnitude_squared;
+		t0_start = offset.k * vector->k;
+		t0_start += offset.j * vector->j;
+		t0_start += offset.i * vector->i;
+		t0_start *= inverse_vector_magnitude_squared;
+		t0_end =
+			inverse_vector_magnitude_squared * dot +
+			t0_start;
+		t0 =
+			(PIN(t0_start, 0.0f, 1.0f) +
+				PIN(t0_end, 0.0f, 1.0f)) *
+			0.5f;
+	}
+	else
+	{
+		t0 = 0.0f;
+	}
+
+	pill_magnitude_squared = magnitude_squared3d(pill_height);
+	if (pill_magnitude_squared > _real_epsilon)
+	{
+		inverse_pill_magnitude_squared = 1.0f / pill_magnitude_squared;
+		t1_start =
+			-dot_product3d(&offset, pill_height) *
+			inverse_pill_magnitude_squared;
+		t1_end =
+			inverse_pill_magnitude_squared * dot +
+			t1_start;
+		t1 =
+			(PIN(t1_start, 0.0f, 1.0f) +
+				PIN(t1_end, 0.0f, 1.0f)) *
+			0.5f;
+	}
+	else
+	{
+		t1 = 0.0f;
+	}
+
+closest_distance:
+	point_from_line3d(point, vector, t0, &closest_point0);
+	point_from_line3d(pill_base, pill_height, t1, &closest_point1);
+	vector_from_points3d(&closest_point0, &closest_point1, &closest_offset);
+	if (!(magnitude_squared3d(&closest_offset) <= pill_width * pill_width))
+		return FALSE;
+
+intersection:
+	return TRUE;
+}
+
 
 #define VECTOR_INTERSECTS_LINE2D(point, vector, line_point, line_endpoint, t_in, t_out) \
 	do \
@@ -2148,6 +2287,140 @@ real point_to_line_distance_squared3d(
 	return distance_squared;
 }
 
+real vector_to_line_distance_squared3d(
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real_point3d const *line_point,
+	real_vector3d const *line_vector)
+{
+	real_vector3d offset;
+	real_vector3d cross;
+	real_vector3d numerator_cross0;
+	real_vector3d numerator_cross1;
+	real denominator;
+	real inverse_denominator;
+	real dot;
+	real vector_magnitude_squared;
+	real line_magnitude_squared;
+	real inverse_vector_magnitude_squared;
+	real inverse_line_magnitude_squared;
+	real t0;
+	real t1;
+	real t0_start;
+	real t0_end;
+	real t1_start;
+	real t1_end;
+	real clamped_t0;
+	real clamped_t1;
+	real d1;
+	real d0;
+	real_point3d closest_point0;
+	real_point3d closest_point1;
+	real_vector3d closest_offset;
+	boolean t0_out_of_range;
+	boolean t1_out_of_range;
+
+	vector_from_points3d(point, line_point, &offset);
+	cross_product3d(vector, line_vector, &cross);
+	denominator = magnitude_squared3d_right_associated(&cross);
+	if (!(fabs(denominator) < _real_epsilon))
+	{
+		inverse_denominator = 1.0f / denominator;
+		scale_vector3d(&cross, inverse_denominator, &cross);
+		cross_product3d(&offset, line_vector, &numerator_cross0);
+		t0 = dot_product3d(&numerator_cross0, &cross);
+		cross_product3d(&offset, vector, &numerator_cross1);
+		t1 = dot_product3d(&numerator_cross1, &cross);
+		t0_out_of_range = t0 < 0.0f || t0 > 1.0f;
+		t1_out_of_range = t1 < 0.0f || t1 > 1.0f;
+		if (t0_out_of_range || t1_out_of_range)
+		{
+			d0 = REAL_MAX;
+			d1 = REAL_MAX;
+			if (t0_out_of_range)
+			{
+				clamped_t0 = t0 < 0.0f ? 0.0f : 1.0f;
+				point_from_line3d(point, vector, clamped_t0, &closest_point0);
+				d0 = point_to_line_distance_squared3d(
+					&closest_point0,
+					line_point,
+					line_vector);
+			}
+			if (t1_out_of_range)
+			{
+				clamped_t1 = t1 < 0.0f ? 0.0f : 1.0f;
+				point_from_line3d(line_point, line_vector, clamped_t1, &closest_point1);
+				d1 = point_to_line_distance_squared3d(
+					&closest_point1,
+					point,
+					vector);
+			}
+			match_assert(
+				"c:\\halo\\SOURCE\\math\\real_math.c",
+				942,
+				(d0 < REAL_MAX) || (d1 < REAL_MAX));
+			return d0 > d1 ? d1 : d0;
+		}
+	}
+	else
+	{
+		dot = dot_product3d(vector, line_vector);
+		vector_magnitude_squared = magnitude_squared3d(vector);
+		if (vector_magnitude_squared > _real_epsilon)
+		{
+			inverse_vector_magnitude_squared = 1.0f / vector_magnitude_squared;
+			t0_start = offset.k * vector->k;
+			t0_start += offset.j * vector->j;
+			t0_start += offset.i * vector->i;
+			t0_start *= inverse_vector_magnitude_squared;
+			t0_end =
+				inverse_vector_magnitude_squared * dot +
+				t0_start;
+			t0 =
+				(PIN(t0_start, 0.0f, 1.0f) +
+					PIN(t0_end, 0.0f, 1.0f)) *
+				0.5f;
+		}
+		else
+		{
+			t0 = 0.0f;
+		}
+
+		line_magnitude_squared = magnitude_squared3d(line_vector);
+		if (line_magnitude_squared > _real_epsilon)
+		{
+			inverse_line_magnitude_squared = 1.0f / line_magnitude_squared;
+			t1_start =
+				-dot_product3d(&offset, line_vector) *
+				inverse_line_magnitude_squared;
+			t1_end =
+				inverse_line_magnitude_squared * dot +
+				t1_start;
+			t1 =
+				(PIN(t1_start, 0.0f, 1.0f) +
+					PIN(t1_end, 0.0f, 1.0f)) *
+				0.5f;
+		}
+		else
+		{
+			t1 = 0.0f;
+		}
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\math\\real_math.c",
+		986,
+		(t0 >= 0.0f) && (t0 <= 1.0f));
+	match_assert(
+		"c:\\halo\\SOURCE\\math\\real_math.c",
+		987,
+		(t1 >= 0.0f) && (t1 <= 1.0f));
+	point_from_line3d(point, vector, t0, &closest_point0);
+	point_from_line3d(line_point, line_vector, t1, &closest_point1);
+	vector_from_points3d(&closest_point0, &closest_point1, &closest_offset);
+	return magnitude_squared3d(&closest_offset);
+}
+
 
 boolean sphere_test_vector3d(
 	real_point3d const *center,
@@ -2191,6 +2464,46 @@ boolean sphere_test_vector3d(
 				}
 			}
 		}
+	}
+
+	return FALSE;
+}
+
+boolean point_from_planes3d(
+	real_plane3d const *plane0,
+	real_plane3d const *plane1,
+	real_plane3d const *plane2,
+	real_point3d *point)
+{
+	real_vector3d cross;
+	real determinant;
+	real distance;
+
+	cross_product3d(&plane0->n, &plane1->n, &cross);
+	determinant = dot_product3d(&cross, &plane2->n);
+	if (!(fabs(determinant) < _real_epsilon))
+	{
+		cross_product3d(&plane1->n, &plane2->n, &cross);
+		distance = plane0->d;
+		point->x = cross.i * distance;
+		point->y = cross.j * distance;
+		point->z = cross.k * distance;
+
+		distance =
+			(cross_product3d(&plane2->n, &plane0->n, &cross),
+			plane1->d);
+		point->x = cross.i * distance + point->x;
+		point->y = cross.j * distance + point->y;
+		point->z = cross.k * distance + point->z;
+
+		distance =
+			(cross_product3d(&plane0->n, &plane1->n, &cross),
+			plane2->d);
+		determinant = 1.0f / determinant;
+		point->x = (cross.i * distance + point->x) * determinant;
+		point->y = (cross.j * distance + point->y) * determinant;
+		point->z = (cross.k * distance + point->z) * determinant;
+		return TRUE;
 	}
 
 	return FALSE;
