@@ -222,16 +222,500 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
+#include "bitmaps/bitmap_group.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct rgb_color
+{
+	word red;
+	word green;
+	word blue;
+};
+
+struct hsv_color
+{
+	word hue;
+	word saturation;
+	word value;
+};
+
+struct argb_color
+{
+	word alpha;
+	word red;
+	word green;
+	word blue;
+};
+
+union real_hsv_color
+{
+	real n[3];
+	struct
+	{
+		real hue;
+		real saturation;
+		real value;
+	};
+};
+
 /* ---------- prototypes */
+
+void *bitmap_2d_address(
+	struct bitmap_data *bitmap,
+	short x,
+	short y,
+	short mipmap_index);
+long bitmap_get_pixel_count(
+	struct bitmap_data *bitmap);
 
 /* ---------- globals */
 
+real const rdata_00253d04 = 1.0f / 65535.0f;
+
 /* ---------- public code */
+
+void bitmap_fill(
+	struct bitmap_data *bitmap,
+	pixel32 fill_color)
+{
+	pixel32 *pixels = bitmap_2d_address(bitmap, 0, 0, 0);
+	long pixel_count = bitmap_get_pixel_count(bitmap);
+
+	while (pixel_count-- > 0)
+		*pixels++ = fill_color;
+	return;
+}
+
+void bitmap_alpha_to_rgb(
+	struct bitmap_data *bitmap)
+{
+	pixel32 *pixels = bitmap_2d_address(bitmap, 0, 0, 0);
+	long pixel_count = bitmap_get_pixel_count(bitmap);
+
+	while (pixel_count-- > 0)
+	{
+		/* byte is a character type, so this representation access is defined. */
+		byte alpha = ((byte *)pixels)[3];
+		unsigned long expanded = alpha;
+		expanded = (expanded << 8) | alpha;
+		expanded = (expanded << 8) | alpha;
+		expanded = (expanded << 8) | alpha;
+		*pixels++ = expanded;
+	}
+	return;
+}
+
+real real_rgb_color_brightness(
+	union real_rgb_color const *color)
+{
+	return
+		color->red * 0.299f +
+		color->green * 0.587f +
+		color->blue * 0.114f;
+}
+
+union real_hsv_color *real_rgb_color_to_real_hsv_color(
+	union real_rgb_color const *rgb,
+	union real_hsv_color *hsv)
+{
+	real value;
+	real minimum;
+	real delta;
+	real saturation;
+
+	if (rgb->green > rgb->blue)
+		value = rgb->green;
+	else
+		value = rgb->blue;
+	if (rgb->red > value)
+		value = rgb->red;
+	else
+	{
+		if (rgb->green > rgb->blue)
+			value = rgb->green;
+		else
+			value = rgb->blue;
+	}
+
+	if (rgb->green > rgb->blue)
+		minimum = rgb->blue;
+	else
+		minimum = rgb->green;
+	if (rgb->red > minimum)
+	{
+		if (rgb->green > rgb->blue)
+			minimum = rgb->blue;
+		else
+			minimum = rgb->green;
+	}
+	else
+		minimum = rgb->red;
+
+	delta = value - minimum;
+
+	if (!hsv)
+	{
+		display_assert(
+			"hsv",
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x8B2,
+			TRUE);
+		system_exit(-1);
+	}
+	if ((void const *)rgb == (void const *)hsv)
+	{
+		display_assert(
+			"rgb!=(real_rgb_color *)hsv",
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x8B3,
+			TRUE);
+		system_exit(-1);
+	}
+
+	hsv->value = value;
+	if (value == 0.0f)
+		saturation = 0.0f;
+	else
+		saturation = delta / value;
+	hsv->saturation = saturation;
+
+	if (saturation == 0.0f)
+	{
+		hsv->hue = 0.0f;
+		return hsv;
+	}
+	if (rgb->red == value)
+		hsv->hue = (rgb->green - rgb->blue) / delta;
+	else if (rgb->green == value)
+		hsv->hue = (rgb->blue - rgb->red) / delta + 2.0f;
+	else
+		hsv->hue = (rgb->red - rgb->green) / delta + 4.0f;
+
+	hsv->hue *= 1.0f / 6.0f;
+	if (hsv->hue < 0.0f)
+		hsv->hue += 1.0f;
+	return hsv;
+}
+
+union real_rgb_color *real_hsv_color_to_real_rgb_color(
+	union real_hsv_color *hsv,
+	union real_rgb_color *rgb)
+{
+	union real_hsv_color *source = hsv;
+	real scaled_hue = source->hue * 6.0f;
+	real p;
+	real q;
+	real t;
+	long truncated_sector;
+	long sector;
+
+	if (!rgb)
+	{
+		display_assert(
+			"rgb",
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x8DF,
+			TRUE);
+		system_exit(-1);
+	}
+	if ((void const *)rgb == (void const *)source)
+	{
+		display_assert(
+			"rgb!=(real_rgb_color *)hsv",
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x8E1,
+			TRUE);
+		system_exit(-1);
+	}
+
+	if (source->saturation == 0.0f)
+	{
+		rgb->red = rgb->green = rgb->blue = source->value;
+		return rgb;
+	}
+
+	truncated_sector = (long)scaled_hue;
+	sector = (real)truncated_sector > scaled_hue ? truncated_sector - 1 : truncated_sector;
+	scaled_hue -= sector;
+	p = (1.0f - source->saturation) * source->value;
+	q = (1.0f - scaled_hue * source->saturation) * source->value;
+	t = (1.0f - (1.0f - scaled_hue) * source->saturation) * source->value;
+
+	switch (sector)
+	{
+	case 0:
+		rgb->red = source->value;
+		rgb->green = t;
+		rgb->blue = p;
+		return rgb;
+	case 1:
+		rgb->red = q;
+		rgb->green = source->value;
+		rgb->blue = p;
+		return rgb;
+	case 2:
+		rgb->red = p;
+		rgb->green = source->value;
+		rgb->blue = t;
+		return rgb;
+	case 3:
+		rgb->red = p;
+		rgb->green = q;
+		rgb->blue = source->value;
+		return rgb;
+	case 4:
+		rgb->red = t;
+		rgb->green = p;
+		rgb->blue = source->value;
+		return rgb;
+	case 5:
+		rgb->red = source->value;
+		rgb->green = p;
+		rgb->blue = q;
+		return rgb;
+	default:
+		return rgb;
+	}
+}
+
+struct hsv_color *rgb_color_to_hsv_color(
+	struct rgb_color const *rgb,
+	struct hsv_color *hsv)
+{
+	real red = (real)(long)rgb->red * (1.0f / 65535.0f);
+	real green = (real)(long)rgb->green * (1.0f / 65535.0f);
+	real blue = (real)(long)rgb->blue * (1.0f / 65535.0f);
+	real value;
+	real minimum;
+	real delta;
+	real hue;
+	real saturation;
+
+	if (green > blue)
+		value = green;
+	else
+		value = blue;
+	if (red > value)
+		value = red;
+	else
+	{
+		if (green > blue)
+			value = green;
+		else
+			value = blue;
+	}
+
+	if (green > blue)
+		minimum = blue;
+	else
+		minimum = green;
+	if (red > minimum)
+	{
+		if (green > blue)
+			minimum = blue;
+		else
+			minimum = green;
+	}
+	else
+		minimum = red;
+
+	delta = value - minimum;
+
+	if (!hsv)
+	{
+		display_assert(
+			"hsv",
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x852,
+			TRUE);
+		system_exit(-1);
+	}
+	if ((void const *)rgb == (void const *)hsv)
+	{
+		display_assert(
+			"rgb!=(rgb_color *)hsv",
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x853,
+			TRUE);
+		system_exit(-1);
+	}
+
+	if (value == 0.0f)
+		saturation = 0.0f;
+	else
+		saturation = delta / value;
+
+	if (saturation == 0.0f)
+		hue = 0.0f;
+	else
+	{
+		if (red == value)
+			hue = (green - blue) / delta;
+		else if (green == value)
+			hue = (blue - red) / delta + 2.0f;
+		else
+			hue = (red - green) / delta + 4.0f;
+
+		hue *= 1.0f / 6.0f;
+		if (hue < 0.0f)
+			hue += 1.0f;
+	}
+
+	hsv->hue = (word)(long)(hue * 65536.0f);
+	hsv->saturation = (word)(long)(saturation * 65535.0f);
+	hsv->value = (word)(long)(value * 65535.0f);
+	return hsv;
+}
+
+struct rgb_color *hsv_color_to_rgb_color(
+	struct hsv_color const *hsv,
+	struct rgb_color *rgb)
+{
+	real scaled_hue;
+	real saturation;
+	real value;
+	real fraction;
+	real p;
+	real q;
+	real t;
+	real red;
+	real green;
+	real blue;
+	long truncated_sector;
+	long sector;
+
+	scaled_hue = (real)(long)hsv->hue * (1.0f / 65536.0f);
+	scaled_hue *= 6.0f;
+	saturation = (real)(long)hsv->saturation * (1.0f / 65535.0f);
+	value = (real)(long)hsv->value * (1.0f / 65535.0f);
+
+	if (!rgb)
+	{
+		display_assert(
+			"rgb",
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x886,
+			TRUE);
+		system_exit(-1);
+	}
+	if ((void const *)rgb == (void const *)hsv)
+	{
+		display_assert(
+			"rgb!=(rgb_color *)hsv",
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x888,
+			TRUE);
+		system_exit(-1);
+	}
+
+	if (saturation == 0.0f)
+		red = green = blue = value;
+	else
+	{
+		truncated_sector = (long)scaled_hue;
+		sector = (real)truncated_sector > scaled_hue ? truncated_sector - 1 : truncated_sector;
+		fraction = scaled_hue - (real)sector;
+		p = (1.0f - saturation) * value;
+		q = (1.0f - saturation * fraction) * value;
+		t = (1.0f - (1.0f - fraction) * saturation) * value;
+
+		switch (sector)
+		{
+		case 0:
+			red = value;
+			green = t;
+			blue = p;
+			break;
+		case 1:
+			red = q;
+			green = value;
+			blue = p;
+			break;
+		case 2:
+			red = p;
+			green = value;
+			blue = t;
+			break;
+		case 3:
+			red = p;
+			green = q;
+			blue = value;
+			break;
+		case 4:
+			red = t;
+			green = p;
+			blue = value;
+			break;
+		case 5:
+			red = value;
+			green = p;
+			blue = q;
+			break;
+		}
+	}
+
+	rgb->red = (word)(long)(red * 65535.0f);
+	rgb->green = (word)(long)(green * 65535.0f);
+	rgb->blue = (word)(long)(blue * 65535.0f);
+	return rgb;
+}
+
+union real_argb_color *argb_color_to_real_argb_color(
+	struct argb_color const *source,
+	union real_argb_color *result)
+{
+	result->alpha = (real)(long)source->alpha * rdata_00253d04;
+	result->red = (real)(long)source->red * rdata_00253d04;
+	result->green = (real)(long)source->green * rdata_00253d04;
+	result->blue = (real)(long)source->blue * rdata_00253d04;
+	return result;
+}
+
+union real_rgb_color *rgb_color_to_real_rgb_color(
+	struct rgb_color const *source,
+	union real_rgb_color *result)
+{
+	result->red = (real)(long)source->red * rdata_00253d04;
+	result->green = (real)(long)source->green * rdata_00253d04;
+	result->blue = (real)(long)source->blue * rdata_00253d04;
+	return result;
+}
+
+union real_argb_color *pixel32_to_real_argb_color(
+	pixel32 color,
+	union real_argb_color *result)
+{
+	unsigned long alpha = color >> 24;
+	unsigned long red = (color >> 16) & 0xFF;
+	unsigned long green = (color >> 8) & 0xFF;
+	unsigned long blue = color & 0xFF;
+
+	result->alpha = alpha * (1.0f / 255.0f);
+	result->red = red * (1.0f / 255.0f);
+	result->green = green * (1.0f / 255.0f);
+	result->blue = blue * (1.0f / 255.0f);
+	return result;
+}
+
+union real_rgb_color *pixel32_to_real_rgb_color(
+	pixel32 color,
+	union real_rgb_color *result)
+{
+	unsigned long red = (color >> 16) & 0xFF;
+	unsigned long green = (color >> 8) & 0xFF;
+	unsigned long blue = color & 0xFF;
+
+	result->red = red * (1.0f / 255.0f);
+	result->green = green * (1.0f / 255.0f);
+	result->blue = blue * (1.0f / 255.0f);
+	return result;
+}
 
 /* ---------- private code */
