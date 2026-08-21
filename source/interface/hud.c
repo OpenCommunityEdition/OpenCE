@@ -76,10 +76,14 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "game/game_engine.h"
+#include "game/players.h"
 #include "interface/hud_messaging.h"
 #include "interface/hud_unit.h"
 #include "interface/hud_weapon.h"
 #include "interface/motion_sensor.h"
+#include "memory/data.h"
+#include "saved games/game_state.h"
 
 /* ---------- constants */
 
@@ -105,12 +109,50 @@ void hud_dispose_nav_points_from_old_map(
 	void);
 void hud_dispose_nav_points(
 	void);
+void hud_messaging_initialize(
+	void);
+void hud_initialize_unit_interface(
+	void);
+void hud_initialize_weapon_interface(
+	void);
+void hud_initialize_nav_points(
+	void);
+void hud_update_weapon(
+	void);
+void hud_update_unit(
+	void);
+void hud_update_nav_points(
+	void);
+void hud_messaging_globals_update(
+	void);
+void hud_play_unit_sounds(
+	struct player_datum const *player,
+	boolean show_hud);
 
 /* ---------- globals */
 
 extern struct hud_scripted_globals *hud_scripted_globals;
 
 /* ---------- public code */
+
+void hud_initialize(
+	void)
+{
+	hud_scripted_globals = game_state_malloc(
+		"hud scripted globals",
+		NULL,
+		sizeof(*hud_scripted_globals));
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\hud.c",
+		87,
+		hud_scripted_globals);
+	hud_messaging_initialize();
+	hud_initialize_unit_interface();
+	hud_initialize_weapon_interface();
+	hud_initialize_nav_points();
+	motion_sensor_initialize();
+	return;
+}
 
 void hud_dispose(
 	void)
@@ -146,6 +188,34 @@ boolean scripted_show_hud_help_text(
 {
 	hud_scripted_globals->show_hud_help_text = show;
 	return hud_scripted_globals->show_hud_help_text;
+}
+
+void hud_update(
+	void)
+{
+	short local_player_index;
+	long player_index;
+
+	hud_update_weapon();
+	hud_update_unit();
+	hud_update_nav_points();
+	hud_messaging_globals_update();
+	if (game_engine_force_single_screen())
+	{
+		for (local_player_index = 0;
+			local_player_index < MAXIMUM_LOCAL_PLAYERS;
+			local_player_index++)
+		{
+			player_index = local_player_get_player_index(local_player_index);
+			if (player_index != NONE)
+			{
+				hud_play_unit_sounds(
+					datum_get(player_data, player_index),
+					FALSE);
+			}
+		}
+	}
+	return;
 }
 
 /* ---------- private code */
