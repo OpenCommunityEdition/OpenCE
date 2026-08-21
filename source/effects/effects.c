@@ -139,6 +139,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "memory/data.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -149,7 +152,39 @@ symbols in this file:
 
 /* ---------- globals */
 
+extern struct data_array *effect_data;
+extern struct data_array *effect_location_data;
+
 /* ---------- public code */
+
+void effects_initialize_for_new_map(
+	void)
+{
+	data_make_valid(effect_data);
+	data_make_valid(effect_location_data);
+
+	return;
+}
+
+void effects_dispose_from_old_map(
+	void)
+{
+	data_make_invalid(effect_data);
+	data_make_invalid(effect_location_data);
+
+	return;
+}
+
+void effects_dispose(
+	void)
+{
+	if (effect_data)
+		effect_data = NULL;
+	if (effect_location_data)
+		effect_location_data = NULL;
+
+	return;
+}
 
 void effects_disconnect_from_structure_bsp(
 	void)
