@@ -106,6 +106,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -119,3 +121,19 @@ symbols in this file:
 /* ---------- public code */
 
 /* ---------- private code */
+
+short heap_left_index(
+	short heap_index)
+{
+	short result = 2 * heap_index + 1;
+
+	return result;
+}
+
+short heap_right_index(
+	short heap_index)
+{
+	short result = 2 * (heap_index + 1);
+
+	return result;
+}

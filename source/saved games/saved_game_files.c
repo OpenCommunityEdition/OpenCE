@@ -346,6 +346,12 @@ extern struct saved_game_files_globals saved_game_files_globals;
 
 /* ---------- public code */
 
+word saved_game_file_get_type(
+	long profile_index)
+{
+	return profile_index & 0xF;
+}
+
 void saved_game_files_notify_memory_units_changed(
 	void)
 {

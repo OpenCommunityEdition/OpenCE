@@ -83,6 +83,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "math/real_math.h"
 
 /* ---------- constants */
 
@@ -114,6 +115,12 @@ short check_stack_buffer(
 	}
 
 	return NONE;
+}
+
+real hud_globals_get_scale(
+	boolean in_multiplayer)
+{
+	return 1.0f;
 }
 
 /* ---------- private code */

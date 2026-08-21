@@ -180,16 +180,46 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "cache/cache_files.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct cache_file_runtime_globals
+{
+	byte cached_map_file_storage[0x3048];
+	boolean copy_in_progress;
+	byte reserved0;
+	short copying_to_map_file_index;
+	char copying_to_map_file_name[32];
+	short open_map_file_index;
+	short blocking_request_index;
+	void *sleep_event;
+	void *thread;
+	void *requests;
+};
+
+typedef char verify_cache_file_copy_in_progress_offset[
+	offsetof(struct cache_file_runtime_globals, copy_in_progress) == 0x3048 ? 1 : -1];
+typedef char verify_cache_file_runtime_globals_size[
+	sizeof(struct cache_file_runtime_globals) == 0x307C ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+struct cache_file_runtime_globals bss_004cdff8 = { 0 };
+
 /* ---------- public code */
+
+boolean cache_files_precache_in_progress(
+	void)
+{
+	return bss_004cdff8.copy_in_progress;
+}
 
 /* ---------- private code */

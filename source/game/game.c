@@ -116,16 +116,72 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "game/game.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct game_options_prefix
+{
+	unsigned long flags;
+	short code_version;
+	short difficulty;
+};
+
+struct game_runtime_globals_prefix
+{
+	boolean map_loaded;
+	boolean active;
+	boolean players_are_double_speed;
+	boolean map_load_in_progress;
+	real loading_progress;
+	struct game_options_prefix options;
+};
+
+typedef char verify_game_runtime_globals_players_are_double_speed_offset[
+	offsetof(struct game_runtime_globals_prefix, players_are_double_speed) == 0x2 ? 1 : -1];
+typedef char verify_game_runtime_globals_difficulty_offset[
+	offsetof(struct game_runtime_globals_prefix, options) +
+		offsetof(struct game_options_prefix, difficulty) == 0xE ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+struct game_runtime_globals_prefix *bss_0043e48c = 0;
+
 /* ---------- public code */
+
+void game_set_players_are_double_speed(
+	boolean players_are_double_speed)
+{
+	bss_0043e48c->players_are_double_speed = players_are_double_speed;
+
+	return;
+}
+
+boolean game_players_are_double_speed(
+	void)
+{
+	return bss_0043e48c->players_are_double_speed;
+}
+
+void game_difficulty_level_set(
+	short difficulty)
+{
+	bss_0043e48c->options.difficulty = difficulty;
+
+	return;
+}
+
+short game_difficulty_level_get(
+	void)
+{
+	return bss_0043e48c->options.difficulty;
+}
 
 /* ---------- private code */

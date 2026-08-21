@@ -52,16 +52,43 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct input_abstraction_runtime_globals
+{
+	byte player_input_state_storage[0xD0];
+	unsigned long device_enumeration_startup_timer;
+	byte reserved[0xC];
+};
+
+typedef char verify_input_abstraction_device_timer_offset[
+	offsetof(struct input_abstraction_runtime_globals, device_enumeration_startup_timer) == 0xD0 ? 1 : -1];
+typedef char verify_input_abstraction_runtime_globals_size[
+	sizeof(struct input_abstraction_runtime_globals) == 0xE0 ? 1 : -1];
+
 /* ---------- prototypes */
+
+unsigned long system_milliseconds(
+	void);
 
 /* ---------- globals */
 
+struct input_abstraction_runtime_globals input_abstraction_globals = { 0 };
+
 /* ---------- public code */
+
+void input_abstraction_reset_controller_detection_timer(
+	void)
+{
+	input_abstraction_globals.device_enumeration_startup_timer = system_milliseconds();
+
+	return;
+}
 
 /* ---------- private code */

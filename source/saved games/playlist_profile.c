@@ -76,16 +76,40 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct playlist_profile_runtime_globals
+{
+	byte thread_input_storage[0x6C];
+	void *thread;
+	word number_of_default_profiles;
+	boolean initialized;
+	byte reserved;
+};
+
+typedef char verify_playlist_profile_default_count_offset[
+	offsetof(struct playlist_profile_runtime_globals, number_of_default_profiles) == 0x70 ? 1 : -1];
+typedef char verify_playlist_profile_runtime_globals_size[
+	sizeof(struct playlist_profile_runtime_globals) == 0x74 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+struct playlist_profile_runtime_globals bss_004d2858 = { 0 };
+
 /* ---------- public code */
+
+word playlist_profile_number_of_default_profiles_on_disk(
+	void)
+{
+	return bss_004d2858.number_of_default_profiles;
+}
 
 /* ---------- private code */
