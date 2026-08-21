@@ -23,7 +23,8 @@ The hardened COFF comparator proves identical padded bytes and exact
 relocation addresses, types, destinations, and addends. The target owns 6,032
 meaningful code bytes in 22 functions and 6,176 padded code bytes. Its fifteen
 non-code COMDATs contain 243 payload bytes (256 bytes in the progress metric);
-all remain outside this wave's credit. The final candidate defines no non-code
+all remain outside this wave's credit. The final candidate owns no runtime
+non-code data or storage: it emits no `.rdata`, `.data`, `.bss`, or COMMON
 symbol.
 
 ## Provenance and ABI
@@ -141,7 +142,8 @@ object-byte forcing.
 
 - Forced rebuild of the final retained source: pass. The only defined code
   symbols are `_action_charge_begin` and `_action_charge_update`; there is no
-  defined non-code symbol. Direct hardened comparison passes both functions.
+  runtime `.rdata`, `.data`, `.bss`, or COMMON ownership. Direct hardened
+  comparison passes both functions.
 - Complete `halobetacache_build` and `libcmt_build`: pass (568 remaining edges
   after the final translation unit's forced rebuild).
 - Semantic audit: 470 units, 4,074 functions evaluated, 3,934 semantic exact,
