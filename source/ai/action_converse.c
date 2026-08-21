@@ -103,7 +103,7 @@ boolean action_converse_setup(
 	state_data->run_to_distance = definition->run_to_distance;
 	state_data->run_to_unit_index = state_data->run_to_distance == 0.0f
 		? NONE
-		: conversation->unit_index;
+		: conversation->triggering_player_unit_index;
 	state_data->run_to_prop_index = NONE;
 	state_data->in_range = FALSE;
 
@@ -205,11 +205,11 @@ void action_converse_control(
 	{
 		prop_index = state_data->run_to_prop_index;
 	}
-	else if (conversation && conversation->unit_index != NONE)
+	else if (conversation && conversation->triggering_player_unit_index != NONE)
 	{
 		prop_index = prop_get_active_by_unit_index(
 			actor_index,
-			conversation->unit_index);
+			conversation->triggering_player_unit_index);
 	}
 
 	actor->orders.look.idle_look_type = 1;

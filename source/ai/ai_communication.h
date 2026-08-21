@@ -21,27 +21,42 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct ai_information_packet;
+
 /* The independently mapped prefix of the 0x64-byte conversation datum. */
 struct ai_conversation_datum_header
 {
 	short identifier;
 	short scenario_conversation_index;
-	byte priority;
-	boolean status_flags[5];
-	long start_time;
-	long unit_index;
+	boolean scripted;
+	boolean any_line_spoken;
+	boolean begun;
+	boolean finished;
+	boolean waiting_to_advance;
+	boolean told_to_advance;
+	byte reserved0A[2];
+	long creation_time;
+	long triggering_player_unit_index;
 };
 
 /* ---------- prototypes/AI_COMMUNICATION.C */
 
 void ai_communication_dispose(
 	void);
+void ai_communication_dispose_from_old_map(
+	void);
+void ai_communication_packet_new(
+	struct ai_information_packet *information);
 short ai_conversation_line(
+	short scenario_conversation_index);
+void ai_conversation_advance(
 	short scenario_conversation_index);
 void ai_conversation_finish(
 	long conversation_index,
 	boolean abort,
 	boolean force);
+void ai_conversation_stop(
+	short scenario_conversation_index);
 real ai_communication_get_player_rating(real unit_index, boolean test_line_of_sight, long *unit_index_reference, real *distance_reference);
 
 /* ---------- globals */

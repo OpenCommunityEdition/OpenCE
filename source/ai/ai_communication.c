@@ -544,7 +544,12 @@ symbols in this file:
 #include "cseries.h"
 #include "ai_communication.h"
 
+#include "ai.h"
+#include "ai_debug.h"
+#include "main/console.h"
 #include "memory/data.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
 
 /* ---------- constants */
 
@@ -559,6 +564,8 @@ enum
 };
 
 /* ---------- macros */
+
+#define ai_print_conversations (ai_debug.__unknown3C[99])
 
 /* ---------- structures */
 
@@ -618,6 +625,27 @@ struct ai_conversation_line_view
 
 typedef char ai_conversation_line_view_current_line_offset_assert[
 	offsetof(struct ai_conversation_line_view, current_line) == 0x48 ? 1 : -1];
+
+struct scenario_conversation_definition_view
+{
+	char name[32];
+	byte __unknown20[0x54];
+};
+
+typedef char ai_conversation_datum_header_size_assert[
+	sizeof(struct ai_conversation_datum_header) == 0x14 ? 1 : -1];
+typedef char ai_conversation_datum_header_any_line_spoken_offset_assert[
+	offsetof(struct ai_conversation_datum_header, any_line_spoken) == 0x5 ? 1 : -1];
+typedef char ai_conversation_datum_header_begun_offset_assert[
+	offsetof(struct ai_conversation_datum_header, begun) == 0x6 ? 1 : -1];
+typedef char ai_conversation_datum_header_waiting_to_advance_offset_assert[
+	offsetof(struct ai_conversation_datum_header, waiting_to_advance) == 0x8 ? 1 : -1];
+typedef char ai_conversation_datum_header_told_to_advance_offset_assert[
+	offsetof(struct ai_conversation_datum_header, told_to_advance) == 0x9 ? 1 : -1];
+typedef char scenario_conversation_definition_view_size_assert[
+	sizeof(struct scenario_conversation_definition_view) == 0x74 ? 1 : -1];
+typedef char ai_print_conversations_offset_assert[
+	offsetof(struct ai_debug_state, __unknown3C) + 99 == 0x9F ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -1188,6 +1216,28 @@ void ai_communication_dispose(
 	return;
 }
 
+void ai_communication_dispose_from_old_map(
+	void)
+{
+	data_make_invalid(conversation_data);
+	return;
+}
+
+void ai_communication_packet_new(
+	struct ai_information_packet *information)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\ai_communication.c",
+		0x300,
+		information);
+	csmemset(information, 0, sizeof(*information));
+	information->target_unit_index = NONE;
+	information->communication_type = NONE;
+	information->dialogue_type_index = NONE;
+	information->damage_category = NONE;
+	return;
+}
+
 char const *ai_communication_get_type_name(
 	short communication_type)
 {
@@ -1245,6 +1295,72 @@ short ai_conversation_line(
 	}
 
 	return line;
+}
+
+void ai_conversation_advance(
+	short scenario_conversation_index)
+{
+	struct data_iterator iterator;
+	struct ai_conversation_datum_header *conversation;
+
+	data_iterator_new(&iterator, conversation_data);
+	while ((conversation = (struct ai_conversation_datum_header *)
+		data_iterator_next(&iterator)) != NULL)
+	{
+		if (conversation->scenario_conversation_index == scenario_conversation_index)
+		{
+			if (ai_print_conversations)
+			{
+				struct scenario_conversation_definition_view *definition =
+					TAG_BLOCK_GET_ELEMENT(
+						&global_scenario_get()->ai_conversations,
+						scenario_conversation_index,
+						struct scenario_conversation_definition_view);
+
+				console_printf(
+					FALSE,
+					"%s: told to advance by scripting",
+					definition->name);
+			}
+
+			conversation->told_to_advance = TRUE;
+		}
+	}
+
+	return;
+}
+
+void ai_conversation_stop(
+	short scenario_conversation_index)
+{
+	struct data_iterator iterator;
+	struct ai_conversation_datum_header *conversation;
+
+	data_iterator_new(&iterator, conversation_data);
+	while ((conversation = (struct ai_conversation_datum_header *)
+		data_iterator_next(&iterator)) != NULL)
+	{
+		if (conversation->scenario_conversation_index == scenario_conversation_index)
+		{
+			if (ai_print_conversations)
+			{
+				struct scenario_conversation_definition_view *definition =
+					TAG_BLOCK_GET_ELEMENT(
+						&global_scenario_get()->ai_conversations,
+						scenario_conversation_index,
+						struct scenario_conversation_definition_view);
+
+				console_printf(
+					FALSE,
+					"%s: told to stop by scripting",
+					definition->name);
+			}
+
+			ai_conversation_finish(iterator.datum_index, FALSE, FALSE);
+		}
+	}
+
+	return;
 }
 
 /* ---------- private code */
