@@ -38,16 +38,96 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "math/real_math.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct scripted_camera_globals_view
+{
+	boolean enabled;
+	boolean first_update;
+	short mode;
+	short camera_point_index;
+	byte reserved06[2];
+	real timer;
+	byte reserved0C[0x28];
+	long relative_object_index;
+};
+
 /* ---------- prototypes */
+
+void scripted_camera_set(
+	short camera_point_index,
+	word transition_time,
+	long relative_object_index);
+void scripted_camera_set_camera_point_relative(
+	real_point3d const *position,
+	real_vector3d const *forward,
+	real_vector3d const *up,
+	real field_of_view,
+	word transition_time,
+	long relative_object_index);
 
 /* ---------- globals */
 
+extern struct scripted_camera_globals_view data_002dcb60;
+
 /* ---------- public code */
+
+void scripted_camera_enable(
+	boolean enabled)
+{
+	data_002dcb60.enabled = enabled;
+	data_002dcb60.first_update = TRUE;
+	return;
+}
+
+void scripted_camera_set_absolute(
+	short camera_point_index,
+	word transition_time)
+{
+	scripted_camera_set(camera_point_index, transition_time, NONE);
+	return;
+}
+
+void scripted_camera_set_camera_point_absolute(
+	real_point3d const *position,
+	real_vector3d const *forward,
+	real_vector3d const *up,
+	real field_of_view,
+	word transition_time)
+{
+	scripted_camera_set_camera_point_relative(
+		position,
+		forward,
+		up,
+		field_of_view,
+		transition_time,
+		NONE);
+	return;
+}
+
+short scripted_camera_next_camera_point(
+	void)
+{
+	return data_002dcb60.camera_point_index;
+}
+
+long scripted_camera_object_relative_to(
+	void)
+{
+	return data_002dcb60.relative_object_index;
+}
+
+short scripted_camera_time(
+	void)
+{
+	return (short)(data_002dcb60.timer * 30.f);
+}
 
 /* ---------- private code */
