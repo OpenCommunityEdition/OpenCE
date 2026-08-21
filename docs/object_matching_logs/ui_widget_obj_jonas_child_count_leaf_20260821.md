@@ -183,3 +183,55 @@ The clean committed-state snapshot, forced object deletion/rebuild, regression
 check, direct comparator, ownership replay, and committed source-payload
 authentication will be recorded additively only after the implementation and
 this ledger are committed. No push, amend, or history rewrite is performed.
+
+## Clean committed-state replay
+
+Implementation-and-ledger commit
+`c310c6b79c1c3e9d777912427eaf7f477ba1585a` was clean before replay. Its
+committed `source/interface/ui_widget.c` payload is exactly Git blob
+`7b07bd7e1dd54672d8a0b8a13e512c883978d656`. Re-reading that blob from the
+commit with `git cat-file blob` produced 22,270 bytes and SHA-256
+`b3edac25ffbe2d0cf7a3252fb37560e337923ea36a7d1a06268023efd895abfd`.
+Thus every changed source payload is authenticated from committed Git state,
+not from working-tree bytes. The shared header remained exact baseline blob
+`2155a5a4d1bfbb9a5e209557da01a2e189b2a207`.
+
+A one-unit regression snapshot was written from that exact clean commit to
+ignored artifact `build/regression_ui_widget_child_count_20260821.json`. It
+reported `SNAPSHOT_WRITTEN`, recorded commit
+`c310c6b79c1c3e9d777912427eaf7f477ba1585a`, and contained only
+`source/interface/ui_widget`.
+
+The candidate object path resolved to
+`C:\Users\isabe\Documents\Codex\2026-07-13\i-w\ui-widget-accessor-trio-20260821\build\base\source\interface\ui_widget.obj`.
+The resolved path was explicitly proven to begin beneath the isolated
+worktree root before deletion. The object was 1,449 bytes with pre-replay
+whole-file SHA-256
+`5d717663473f6d8a7ead7b57f289f5fdbd88ba796a0814d95260f075c60b68f5`.
+That single file was deleted, and a second existence check returned false.
+
+The untouched production Ninja graph then rebuilt the same path through one
+`[1/1] CL` action with the unchanged natural compiler, flags, and include
+graph. There was no source change, rejected-body resurrection, candidate
+retry, or alternate build edge. The immediate regression check returned
+`ok: true`, no failures, no warnings, `changed_nonexact: []`, and
+`newly_exact: []`. Its `still_exact` set is exactly
+`_ui_widgets_safe_to_load`, `_widget_instance_count_children`,
+`_code_000d4680`, and `_code_000d4690`.
+
+Direct hardened January comparison after replay returned `all_equal: true`
+for that complete four-body inventory. It reproduced the new leaf's 29
+meaningful bytes, 32 padded bytes, zero relocations, and normalized SHA-256
+`ae15477fb628a00d4f51a719438f430179585e7069e2e464dee76e2b0d39b60f`,
+as well as all three inherited no-op bodies. The rebuilt object remains 1,449
+bytes with phase-specific whole-file SHA-256
+`451639d39eea939b37a7dfd1990058c2554c5a704131f90b73dbd95ca666fb10`;
+the whole-file difference is expected compiler header metadata and is not an
+acceptance criterion. The January object remained SHA-256
+`783de6eb1bb30e272d656316fff549124cf64c47b80f928d34f818aac086af9b`.
+
+An independent post-rebuild COFF ownership parse found exactly the four
+documented external code owners plus inherited two-byte data owner
+`_dashboard_abort_error`. It found no other defined runtime owner and no
+undefined external. The only final tracked change after replay is this
+additive ledger section. Nothing is pushed, amended, or history-rewritten.
