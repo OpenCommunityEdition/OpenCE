@@ -94,6 +94,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "saved games/game_state.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -105,5 +108,11 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+const char *game_state_get_persistent_storage_filename(
+	void)
+{
+	return "savegame.bin";
+}
 
 /* ---------- private code */

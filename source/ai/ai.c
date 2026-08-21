@@ -205,8 +205,19 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void encounters_create_for_new_map(
+	void);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+void ai_place(
+	void)
+{
+	encounters_create_for_new_map();
+
+	return;
+}
 
 /* ---------- private code */

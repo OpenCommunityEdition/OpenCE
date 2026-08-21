@@ -309,12 +309,31 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "saved games/saved_game_files.h"
+#include "tag_files/files.h"
 
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct mutex;
+
+struct saved_game_files_globals
+{
+	struct file_reference memory_unit_mapfile;
+	struct mutex *general_mutex;
+	struct mutex *mapfile_mutex;
+	short next_enumerated_profile_index;
+	boolean initialized;
+	boolean memory_units_dirty;
+	boolean enumeration_in_progress;
+};
+
+typedef char verify_saved_game_files_globals_memory_units_dirty_offset[
+	offsetof(struct saved_game_files_globals, memory_units_dirty) == 0x117 ? 1 : -1];
+typedef char verify_saved_game_files_globals_size[
+	sizeof(struct saved_game_files_globals) == 0x11C ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -323,7 +342,17 @@ void code_001b4b00(
 
 /* ---------- globals */
 
+extern struct saved_game_files_globals saved_game_files_globals;
+
 /* ---------- public code */
+
+void saved_game_files_notify_memory_units_changed(
+	void)
+{
+	saved_game_files_globals.memory_units_dirty = TRUE;
+
+	return;
+}
 
 void enumerate_memory_units_test(
 	void)
