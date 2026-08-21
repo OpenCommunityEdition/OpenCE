@@ -170,6 +170,26 @@ read, undefined overflow, synthetic anchor, or object-byte forcing.
 
 ## Additive committed-payload and replay evidence
 
-Committed payload identities and the clean forced-replay result are recorded
-only after the source-bearing commit, in a later additive ledger-only commit.
-No push is performed.
+The source-bearing Jonas commit is
+`938eabc26f95e8bd6072c484d3fff1b0de537897`. Reading the production source
+payload directly back from that commit's Git tree authenticates
+`source/ai/ai.c` as blob `0cac8b1e755a27bd3f32894904be1e437c4b9cb7`,
+15,237 bytes, with payload SHA-256
+`d57b67538b816c33b481c5f740565dbc03844c11e38503613606d2b40983ba7a`.
+
+A clean one-unit regression snapshot was written at that exact commit. The
+resolved `build/base/source/ai/ai.obj` path was explicitly verified to be
+beneath the isolated worktree, the object was deleted, and Ninja rebuilt it
+from the committed source with the unchanged production recipe.
+
+The replayed `ai.obj` is 5,485 bytes with full-file SHA-256
+`e55465fa65aabc6d1ee7d9043ecf6f518dbd00e4daedded3141b021a4b2f976d`.
+Direct hardened comparison against the January object proves all 12/12
+accepted bodies strict, including `_ai_erase` at the recorded 208-byte / nine
+relocation shape and normalized hash. The clean snapshot check reports
+`failures: []`, `warnings: []`, `changed_nonexact: []`, and all twelve
+functions as `still_exact`; no body is newly exact or regressed during the
+replay.
+
+This replay evidence is added in a separate ledger-only commit. No amend,
+history rewrite, or push is performed.
