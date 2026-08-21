@@ -48,6 +48,9 @@ symbols in this file:
 #include "math/real_math.h"
 #undef real_random_range
 
+#include "actor_definitions.h"
+#include "actors.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -63,6 +66,24 @@ symbols in this file:
 void action_alert_begin(
 	long actor_index)
 {
+	return;
+}
+
+void action_alert_control(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition =
+		actor_definition_get(actor->meta.definition_index);
+
+	actor->orders.look.idle_look_type = 1;
+	if (TEST_FLAG(definition->flags,
+		_actor_definition_crouch_when_noncombat_bit))
+	{
+		actor->orders.move.stationary_crouch = TRUE;
+		actor->orders.move.moving_crouch = TRUE;
+	}
+
 	return;
 }
 
