@@ -23,9 +23,9 @@ this wave's credit.
 
 - Baseline `source/cutscene/recorded_animations.c` blob:
   `77be7d528f1d648acfc62919cad74a816c75b998`.
-- Retained source blob/SHA-256:
+- Retained source Git blob / SHA-256 of its committed Git-blob payload:
   `1da9a38950def1486c043e8d15c5a2bb773097fe` /
-  `4a1eedf2a9ccddd34e77a7800cca3536b22413109308cea45c93bda04e61dca5`.
+  `2dc00a8a7599b4a896fcc42ddcc1ecd02be488b312dfdd8b44546561669c73e5`.
 - January executable SHA-256:
   `4cc87b45f721270392a96f1674ed2b5cd4a7bb4355faeab4531d1cf1884d9520`.
 - January split `recorded_animations.obj` SHA-256:
