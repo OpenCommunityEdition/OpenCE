@@ -49,6 +49,9 @@ long unattached_impulse_sound_new(long definition_index, struct sound_location c
 long unspatialized_impulse_sound_new(long definition_index, real scale);
 long unattached_looping_sound_start(long definition_index, long period, real scale);
 void unattached_looping_sound_stop(long looping_sound_index);
+void scripted_sound_stop(long sound_index);
+void scripted_looping_sound_set_scale(long sound_index, real scale);
+void scripted_looping_sound_set_alternate(long sound_index, boolean alternate);
 
 /* ---------- globals */
 

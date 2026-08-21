@@ -101,12 +101,16 @@ symbols in this file:
 #include "objects/objects.h"
 #include "saved games/game_state.h"
 #include "sound/game_sound.h"
+#include "sound/sound_definitions.h"
+#include "sound/sound_manager.h"
 
 /* ---------- constants */
 
 enum
 {
 	MAXIMUM_GAME_LOOPING_SOUNDS = 1024,
+	_game_looping_sound_unattached_stop_bit = 1,
+	_game_looping_sound_alternate_bit = 3,
 };
 
 /* ---------- macros */
@@ -118,7 +122,7 @@ struct game_looping_sound_datum
 	struct datum_header header;
 	short unknown2;
 	unsigned long flags;
-	long unknown8;
+	real scale;
 	long definition_index;
 	long object_index;
 	long sound_index;
@@ -195,6 +199,81 @@ void game_sound_dispose_from_old_map(
 		game_sound_clear();
 		data_make_invalid(game_looping_sound_data);
 	}
+
+	return;
+}
+
+void scripted_sound_stop(
+	long sound_index)
+{
+	struct sound_definition *definition;
+
+	if (sound_index != NONE)
+	{
+		definition = sound_definition_get(sound_index);
+		if (definition->scripting_sound_index != NONE)
+		{
+			sound_stop_impulse(definition->scripting_sound_index);
+			definition->scripting_sound_index = NONE;
+			definition->scripting_time = NONE;
+		}
+	}
+
+	return;
+}
+
+void scripted_looping_sound_set_scale(
+	long sound_index,
+	real scale)
+{
+	struct looping_sound_definition *definition;
+	struct game_looping_sound_datum *looping_sound;
+
+	if (sound_index != NONE)
+	{
+		definition = looping_sound_definition_get(sound_index);
+		if (definition->scripting_sound_index != NONE)
+		{
+			looping_sound = datum_get(
+				game_looping_sound_data,
+				definition->scripting_sound_index);
+			looping_sound->scale = PIN(scale, 0.0f, 1.0f);
+		}
+	}
+
+	return;
+}
+
+void scripted_looping_sound_set_alternate(
+	long sound_index,
+	boolean alternate)
+{
+	struct looping_sound_definition *definition;
+	struct game_looping_sound_datum *looping_sound;
+
+	if (sound_index != NONE)
+	{
+		definition = looping_sound_definition_get(sound_index);
+		if (definition->scripting_sound_index != NONE)
+		{
+			looping_sound = datum_get(
+				game_looping_sound_data,
+				definition->scripting_sound_index);
+			SET_FLAG(looping_sound->flags, _game_looping_sound_alternate_bit, alternate);
+		}
+	}
+
+	return;
+}
+
+void unattached_looping_sound_stop(
+	long looping_sound_index)
+{
+	struct game_looping_sound_datum *looping_sound = datum_get(
+		game_looping_sound_data,
+		looping_sound_index);
+
+	SET_FLAG(looping_sound->flags, _game_looping_sound_unattached_stop_bit, TRUE);
 
 	return;
 }
