@@ -72,8 +72,8 @@ byte-forcing construct.
 
 ## Validation
 
-- Final source SHA-256:
-  `dc3461e7af198365282fc0e37ca89bedaad79dbf40f2ff26fba83aaa7ea7f505`.
+- Final tracked source Git blob:
+  `21aeb829b314c6383c42805bc137781b15e497a3`.
 - Complete Halo and libcmt build graphs pass.
 - Semantic audit: 470 units, 3,972 functions evaluated, 3,832 semantic exact,
   101 hidden exact, 36 ordinary-only, 3,893 accepted exact, and zero unit
