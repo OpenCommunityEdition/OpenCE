@@ -77,8 +77,63 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void terminal_initialize(
+	void);
+void hud_initialize(
+	void);
+void draw_string_initialize(
+	void);
+void first_person_weapons_initialize(
+	void);
+void draw_string_dispose_from_old_map(
+	void);
+void hud_dispose_from_old_map(
+	void);
+void first_person_weapons_dispose_from_old_map(
+	void);
+void draw_string_dispose(
+	void);
+void terminal_dispose(
+	void);
+void hud_dispose(
+	void);
+void first_person_weapons_dispose(
+	void);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+void interface_initialize(
+	void)
+{
+	terminal_initialize();
+	hud_initialize();
+	draw_string_initialize();
+	first_person_weapons_initialize();
+
+	return;
+}
+
+void interface_dispose_from_old_map(
+	void)
+{
+	draw_string_dispose_from_old_map();
+	hud_dispose_from_old_map();
+	first_person_weapons_dispose_from_old_map();
+
+	return;
+}
+
+void interface_dispose(
+	void)
+{
+	draw_string_dispose();
+	terminal_dispose();
+	hud_dispose();
+	first_person_weapons_dispose();
+
+	return;
+}
 
 /* ---------- private code */
