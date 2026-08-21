@@ -58,9 +58,42 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct detail_object_runtime_data
+{
+	byte reserved0000[0x520E];
+	boolean initialized;
+	byte reserved520F;
+};
+
+struct detail_object_global_runtime_data
+{
+	struct detail_object_runtime_data local_player_data[2];
+	real_vector4d default_z_reference_vector;
+};
+
+struct detail_object_globals
+{
+	boolean enabled;
+	byte pad01[3];
+	struct detail_object_global_runtime_data *runtime_data;
+	boolean fudge_vector;
+	byte pad09[3];
+	real fudge_offset;
+	real final_offset;
+};
+
+typedef char detail_object_runtime_data_size[
+	sizeof(struct detail_object_runtime_data) == 0x5210 ? 1 : -1];
+typedef char detail_object_global_runtime_data_size[
+	sizeof(struct detail_object_global_runtime_data) == 0xA430 ? 1 : -1];
+typedef char detail_object_globals_size[
+	sizeof(struct detail_object_globals) == 0x14 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+struct detail_object_globals debug_detail_objects = { 0 };
 
 /* ---------- public code */
 
@@ -73,6 +106,14 @@ void structure_detail_objects_dispose_from_old_map(
 void structure_detail_objects_dispose(
 	void)
 {
+	return;
+}
+
+void structure_detail_objects_flush(
+	void)
+{
+	debug_detail_objects.runtime_data->local_player_data[0].initialized = FALSE;
+
 	return;
 }
 
