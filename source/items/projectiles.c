@@ -114,6 +114,13 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "projectiles.h"
+
+#include "projectile_definitions.h"
+
+#include "physics/physics.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -157,3 +164,9 @@ void projectile_delete(
 }
 
 /* ---------- private code */
+
+real projectile_get_ballistic_acceleration(
+	struct projectile_definition const *definition)
+{
+	return -(definition->projectile.air_gravity_scale * global_gravity);
+}
