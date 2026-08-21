@@ -340,10 +340,19 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct widget_instance;
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+void code_000e0210(
+	struct widget_instance *widget)
+{
+	(void)widget;
+	return;
+}
 
 /* ---------- private code */
