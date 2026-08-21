@@ -104,14 +104,23 @@ byte representation as `boolean`. No private register ABI is inferred.
 ## January correction and typed layout
 
 HCEA supplies the readable named behavior and the complete 0x1C iterator
-layout. The independent January-PC reconstruction corrects one important
-source detail before the one-shot experiment: its disassembly-backed store
-table is `+0x10 = 0`, `+0x18 = -1`, `+0x14 = -1`, then `+0x11 = flag`.
-That file accidentally labels the initializer `encounter_iterator_next`, but
-its RVA commentary, 0x1C layout, call to `data_iterator_new`, and exact store
-table identify the actor initializer; the January PDB resolves the real name
-as `_actor_iterator_new`. The retained natural source follows that
-target-independent January order and is strict without a target-driven retry.
+layout. The distinct January-PC artifact is a readable reconstruction from PC
+disassembly, not authentic source. Before the one-shot experiment it supplied
+the independently versioned store table `+0x10 = 0`, `+0x18 = -1`,
+`+0x14 = -1`, then `+0x11 = flag`; that order differs from the HCEA Xbox
+source sequence. The PC file accidentally labels the initializer
+`encounter_iterator_next`, but its RVA commentary, 0x1C layout, call to
+`data_iterator_new`, and documented store table identify the actor
+initializer; the January target PDB resolves the real name as
+`_actor_iterator_new`.
+
+The first natural candidate used that PC-correlated readable assignment order
+as semantic reconstruction evidence: clear the phase, invalidate next and
+current handles, then publish the caller's filter byte. The order was frozen
+before candidate emission from a separate-version artifact, not selected by
+observing candidate bytes or by retrying a target-driven code-generation
+matrix. Its role is corroboration for the semantic statement order, not an
+authentic-source or compiler-emission claim.
 
 The translation-unit-local typed iterator contains the existing 0x10-byte
 `struct data_iterator`, `iterated_encounterless_list` at `+0x10`,
