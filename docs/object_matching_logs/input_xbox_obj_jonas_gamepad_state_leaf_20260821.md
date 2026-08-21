@@ -34,7 +34,7 @@ outside this wave's credit.
   `4ee5e62702096b8ca2119eea1778adae5da08e13`, 3,734 bytes, with Git-blob
   payload SHA-256
   `2a79ea5557d5bc2f377f13c8c90a08ade73c0203eea4ecb4577aff5c933a1014`.
-- The retained source's staged, and therefore commit-intended, Git blob is
+- The retained source's committed Git blob is
   `5cedda25dfa003d483f315b8c96c175b901b1971`, 5,045 bytes, with SHA-256 of
   the exact `git cat-file blob` payload
   `d634753900c75e18c61c32a61563cd4aec1e54f4c95a7cd141e1fce79e568f76`.
