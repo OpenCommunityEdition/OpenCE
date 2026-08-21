@@ -101,10 +101,29 @@ struct editor_camera_data
 	long unit_focus;
 };
 
+struct editor_flying_camera
+{
+	real_point3d position;
+	real_euler_angles2d orientation;
+	real roll;
+	real field_of_view;
+};
+
+struct editor_camera_focus
+{
+	real_point3d position;
+	real_euler_angles2d angles;
+};
+
 struct editor_camera_globals
 {
 	boolean scripted;
-	byte _unknown01[0x2b];
+	boolean use_roll;
+	boolean initialized;
+	byte _unknown03;
+	struct editor_camera_focus focus;
+	struct editor_flying_camera *camera;
+	byte _unknown1c[0x10];
 	short mode;
 };
 
@@ -124,10 +143,48 @@ extern struct editor_camera_constants const rdata_00256c64;
 
 /* ---------- public code */
 
+void editor_camera_get_focus(
+	real_point3d *position,
+	real_euler_angles2d *angles)
+{
+	match_assert("c:\\halo\\SOURCE\\camera\\editor_flying_camera.c", 120, position);
+	match_assert("c:\\halo\\SOURCE\\camera\\editor_flying_camera.c", 121, angles);
+
+	*position = bss_0031d438.focus.position;
+	*angles = bss_0031d438.focus.angles;
+
+	return;
+}
+
+void editor_camera_set_focus(
+	real_point3d const *position,
+	real_euler_angles2d const *angles)
+{
+	match_assert("c:\\halo\\SOURCE\\camera\\editor_flying_camera.c", 129, position);
+	match_assert("c:\\halo\\SOURCE\\camera\\editor_flying_camera.c", 130, angles);
+
+	bss_0031d438.focus.position = *position;
+	bss_0031d438.focus.angles = *angles;
+
+	return;
+}
+
 long editor_camera_get_speed(
 	void)
 {
 	return (long)data_002dcc28.speed;
+}
+
+boolean editor_camera_use_roll(
+	boolean new_use_roll)
+{
+	boolean previous_use_roll = bss_0031d438.use_roll;
+
+	bss_0031d438.use_roll = new_use_roll;
+	if (!new_use_roll && bss_0031d438.camera)
+		bss_0031d438.camera->roll = 0.0f;
+
+	return previous_use_roll;
 }
 
 long editor_camera_get_unit_focus(
