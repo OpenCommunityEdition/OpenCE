@@ -106,15 +106,36 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "memory/lruv_cache.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct rasterizer_decals_globals_prefix
+{
+	byte reserved0000[0x14];
+	struct lruv_cache *local_vertex_cache;
+};
+
+typedef char verify_rasterizer_decals_local_vertex_cache_offset[
+	offsetof(
+		struct rasterizer_decals_globals_prefix,
+		local_vertex_cache) == 0x14 ? 1 : -1];
+
 /* ---------- prototypes */
 
+void decals_unlock(
+	boolean permanent);
+
 /* ---------- globals */
+
+extern struct rasterizer_decals_globals_prefix bss_0045e8e8;
+
+#define local_vertex_cache bss_0045e8e8.local_vertex_cache
 
 /* ---------- public code */
 
@@ -133,6 +154,19 @@ void _rasterizer_decal_vertices_unlock(
 void _rasterizer_decals_initialize_for_new_map(
 	void)
 {
+	return;
+}
+
+void _rasterizer_decals_dispose_from_old_map(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_decals.c",
+		131,
+		local_vertex_cache);
+	decals_unlock(TRUE);
+	lruv_flush(local_vertex_cache);
+
 	return;
 }
 
