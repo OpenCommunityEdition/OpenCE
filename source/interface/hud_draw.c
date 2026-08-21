@@ -82,7 +82,15 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+
 /* ---------- constants */
+
+enum
+{
+	STACK_BUFFER_LENGTH = 0x80,
+	STACK_BUFFER_FILL = 0x62626262,
+};
 
 /* ---------- macros */
 
@@ -93,5 +101,19 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+short check_stack_buffer(
+	long *buffer)
+{
+	short index;
+
+	for (index = STACK_BUFFER_LENGTH-1; index>=0; index--)
+	{
+		if (buffer[index]!=STACK_BUFFER_FILL)
+			return index;
+	}
+
+	return NONE;
+}
 
 /* ---------- private code */

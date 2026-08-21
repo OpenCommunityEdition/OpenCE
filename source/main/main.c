@@ -546,7 +546,8 @@ typedef char main_globals_vblank_flip_deltas_offset_assert[
 
 /* ---------- prototypes */
 
-extern void create_local_players(void);
+extern void code_000ef8e0(
+	void);
 extern void code_000f1c20(void);
 extern void code_000f1ce0(void);
 
@@ -1210,7 +1211,7 @@ static void main_reset_map_private(
 		game_dispose_from_old_map();
 		input_flush();
 		game_initialize_for_new_map();
-		create_local_players();
+		code_000ef8e0();
 		game_time_start();
 		game_initial_pulse();
 		ui_widgets_disable_pause_game(30);

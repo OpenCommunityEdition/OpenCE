@@ -99,7 +99,7 @@ typedef char weather_particle_system_globals_size_assert[
 
 /* ---------- globals */
 
-static struct weather_particle_system_globals weather_globals;
+static struct weather_particle_system_globals bss_0043d590;
 
 /* ---------- public code */
 
@@ -121,10 +121,10 @@ void weather_particle_systems_initialize_for_new_map(
 	for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
 	{
 		match_assert("c:\\halo\\SOURCE\\effects\\weather_particle_systems.c", 91, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
-		weather_globals.local_players[local_player_index].particle_system_index = NONE;
+		bss_0043d590.local_players[local_player_index].particle_system_index = NONE;
 	}
 
-	weather_globals.active_system_count = 0;
+	bss_0043d590.active_system_count = 0;
 	data_make_valid(weather_particle_data);
 
 	return;

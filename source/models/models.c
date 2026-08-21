@@ -187,4 +187,10 @@ short model_get_marker_by_name(
 	return result;
 }
 
+void code_00113710(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */

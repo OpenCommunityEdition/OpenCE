@@ -105,6 +105,12 @@ void item_delete(
 	return;
 }
 
+void code_000e6150(
+	void)
+{
+	return;
+}
+
 boolean item_new(
 	long item_index)
 {

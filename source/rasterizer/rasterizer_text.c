@@ -118,6 +118,18 @@ extern struct hardware_character_cache bss_004b82c0;
 
 /* ---------- public code */
 
+void code_00172e80(
+	void)
+{
+	return;
+}
+
+void code_00172e90(
+	void)
+{
+	return;
+}
+
 void
 rasterizer_text_set_shadow_color(
 	pixel32 shadow_color)
