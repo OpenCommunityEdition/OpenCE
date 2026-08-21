@@ -39,7 +39,7 @@ SHA-256 authenticate that payload independently of the Git object ID.
 | Evidence | Git blob | Bytes | Payload SHA-256 |
 | --- | --- | ---: | --- |
 | baseline `source/structures/structure_render.c` | `8ca4b9df8006de6e8cb161fd9bafcc31b66873ff` | 2,709 | `34a07e8642c3037b7ccf4e9d0c3fb898e9aa58388ab072970432de07b5fd07c8` |
-| retained `source/structures/structure_render.c` | `95cd4a11785342bd098a4983c5a3aac99bed5138` | 4,327 | `3b2060002f75bdebf5a279a14e86bc75ae2504ea14a92b8d18f8e3943de54980` |
+| retained `source/structures/structure_render.c` | `95cd4a11785342bd098a4983c5a3aac99bed5138` | 4,234 | `588ac1f422d362a77e66ed53caad9b29b130b9c732207c2999a208cf8046c3c8` |
 | canonical `source/structures/structures.c` caller evidence | `6df8338b6db46ce5653aac68150a280bb4601220` | 2,364 | `daf1c271cb1a309d5b7574e393ef72ce2baba70e270365bb9312c1563e9610e4` |
 | canonical `source/cseries/cseries.h` width/type evidence | `3c91ac46ab275894a18ac4e839b38ae13022d91b` | 10,070 | `e994e965cd3f48cd47cebf0a39f41a1aac460e8b25544452a1fc4b302a0b7043` |
 | canonical `source/math/real_math.h` vector evidence | `f14567675126171a4b1c2d3052e8058c68c029c2` | 43,695 | `c5b4659b368565ff7db2f51536b631694d5db9df01631be8cc1385934e51cf01` |
@@ -174,8 +174,57 @@ remain unclaimed.
 - `git diff --check`, source-policy, deleted-path, protected-scope, and
   changed-path audits: pass.
 
-No committed-state replay is claimed in this implementation record. After the
-source commit exists, an additive ledger-only commit will record the actual
-clean snapshot, verified generated-object deletion, normal Ninja rebuild,
-regression check, direct comparator, rejected-symbol absence, and final object
-ownership. Nothing is pushed or history-rewritten.
+The implementation commit made no advance claim about committed-state replay.
+The additive record below supplies the actual clean snapshot, verified
+generated-object deletion, normal Ninja rebuild, regression check, direct
+comparator, rejected-symbol absence, and final object ownership.
+
+## Recorded committed-state replay
+
+The implementation commit is
+`39fa61f819d6d350741492a8ccc1b91bd96df806`. At that clean committed state,
+`source/structures/structure_render.c` resolves to Git blob
+`95cd4a11785342bd098a4983c5a3aac99bed5138`; its raw committed payload is
+4,234 bytes with SHA-256
+`588ac1f422d362a77e66ed53caad9b29b130b9c732207c2999a208cf8046c3c8`.
+`git status --short --branch` reported only the branch header and no changed or
+untracked path.
+
+This committed payload identity also corrects the implementation ledger's
+pre-commit measurement. That earlier row combined the filtered Git object ID
+with a direct measurement of the 4,327-byte working-tree CRLF payload, whose
+SHA-256 is
+`3b2060002f75bdebf5a279a14e86bc75ae2504ea14a92b8d18f8e3943de54980`.
+The authoritative raw Git-blob payload above is the retained identity. The
+correction is ledger-only and additive: source commit `39fa61f8` is preserved
+unchanged, with no amend or history rewrite.
+
+The clean regression snapshot was written to
+`build/regression_structure_render_fog_offset_20260821.json` with status
+`SNAPSHOT_WRITTEN`, commit
+`39fa61f819d6d350741492a8ccc1b91bd96df806`, and sole unit
+`source/structures/structure_render`. The generated object path was resolved
+inside this worktree. Its existing 1,324-byte file, SHA-256
+`ff18405b73a37ce712eb780744534b78e4282de0ed54920116d3e99674ec2d25`,
+was verified before `build/base/source/structures/structure_render.obj` was
+deleted; a second existence check proved it absent. The normal repository
+Ninja/VC7 edge then rebuilt that exact object path with the unchanged compile
+flags `/O2 /Oy- /DDEBUG /Dxbox`.
+
+The committed-state regression check returned `ok: true`, no failures, no
+warnings, no newly exact functions, and no changed nonexact functions. Its
+`still_exact` set is exactly `_structure_render_set_fog_offset`. A subsequent
+direct hardened comparison again reported strict equality at 80 padded bytes
+and nine relocations, including every address, type, symbolic destination,
+and addend. All eighteen rejected target code symbols are absent.
+
+The replay object is 1,324 bytes with SHA-256
+`1af917bb4221006f764a9ebe420d65b470dbdb6dfcf9327b1010fd8e19218907`.
+Its sole defined external code owner is
+`_structure_render_set_fog_offset`. Its only defined runtime non-code owners
+are the 43-byte assertion-expression literal and 45-byte source-path literal;
+there is no writable `.data`, `.bss`, COMMON, or aggregate owner.
+`_bss_004c0cd0`, `_display_assert`, `_system_exit`, and `__fltused` remain
+undefined externals. The worktree remained clean after replay.
+
+Nothing is pushed or history-rewritten.
