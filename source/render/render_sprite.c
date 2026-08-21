@@ -75,16 +75,67 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "math/real_math.h"
+#include "render/render.h"
+#include "render/render_debug.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct build_sprite_globals_data
+{
+	boolean initialized;
+	boolean debug_flag;
+	word pad02;
+	real screen_coverage;
+	short big_sprite_count;
+	word pad0A;
+	real screen_area_scale;
+	real_vector3d viewer_space_world_up;
+	real_vector3d viewer_space_world_forward;
+};
+
+typedef char build_sprite_globals_data_size_assert[
+	sizeof(struct build_sprite_globals_data) == 0x28 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+extern boolean debug_sprites;
+extern struct build_sprite_globals_data build_sprite_globals;
+
 /* ---------- public code */
+
+void build_sprite_prepare_for_window(void)
+{
+	char string[512];
+
+	if (debug_sprites)
+	{
+		sprintf(
+			string,
+			"   coverage: %.1f big sprites: %d",
+			build_sprite_globals.screen_coverage,
+			build_sprite_globals.big_sprite_count);
+		render_debug_string(FALSE, string);
+	}
+
+	build_sprite_globals.screen_coverage = 0.f;
+	build_sprite_globals.big_sprite_count = 0;
+	matrix4x3_transform_normal(
+		&render.frustum.world_to_view,
+		global_up3d,
+		&build_sprite_globals.viewer_space_world_up);
+	matrix4x3_transform_normal(
+		&render.frustum.world_to_view,
+		global_left3d,
+		&build_sprite_globals.viewer_space_world_forward);
+	return;
+}
 
 /* ---------- private code */
