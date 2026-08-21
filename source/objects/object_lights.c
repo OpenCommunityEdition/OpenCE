@@ -140,16 +140,60 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "math/real_math.h"
+#include "memory/data.h"
+#include "objects/object_lights.h"
+#include "structures/cluster_partitions.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct lights_game_globals
+{
+	boolean render_lights;
+	byte reserved01[3];
+};
+
+typedef char verify_lights_game_globals_size[
+	sizeof(struct lights_game_globals) == 0x4 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+extern struct data_array *light_data;
+extern struct cluster_partition light_cluster_partition;
+extern struct lights_game_globals *lights_game_globals;
+
 /* ---------- public code */
+
+void lights_dispose(
+	void)
+{
+	cluster_partition_delete(&light_cluster_partition);
+
+	return;
+}
+
+void lights_dispose_from_old_map(
+	void)
+{
+	data_make_invalid(light_data);
+	cluster_partition_make_invalid(&light_cluster_partition);
+
+	return;
+}
+
+boolean lights_enable(
+	boolean enable)
+{
+	lights_game_globals->render_lights = enable;
+
+	return enable;
+}
 
 /* ---------- private code */
