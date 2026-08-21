@@ -62,8 +62,11 @@ type-`0x20`, storage-class-2 definition ending in an ordinary cdecl `ret`.
 Three independent January call shapes agree. `ai_scripting_erase` pushes
 `FALSE`, squad, platoon, and encounter; `ai_scripting_erase_all` pushes
 `FALSE`, `NONE`, `NONE`, and `NONE`; and `ai_release_inactive_encounters`
-pushes `TRUE`, `NONE`, `NONE`, and the encounter. Each caller reclaims 16
-stack bytes. This proves four 32-bit cdecl arguments and the void return.
+pushes `TRUE`, `NONE`, `NONE`, and the encounter. The two scripting callers
+immediately reclaim 16 stack bytes. `ai_release_inactive_encounters` folds the
+four `ai_erase` argument slots into its later aggregate `add esp, 0x34`
+cleanup at `0x2E3AE`, after several cdecl calls. Together with the callee's
+plain `ret`, this proves four 32-bit cdecl arguments and a void return.
 
 ## Authenticated control and layout
 
@@ -91,9 +94,14 @@ raw-offset access. Compile-time checks prove its `0xC` size and `index` at
 `+0x14`. The accessed production actor layout is owned by
 `source/ai/actors.h` blob `e061b529b05c782b1220cff8a05dd89e6e2f3ed2`;
 new typed checks prove `meta.squad_index` at `+0x3A` and
-`meta.platoon_index` at `+0x3C`. The current helper implementations are
-independently present in `source/ai/encounters.c` above and
-`source/ai/actors.c` blob `e08b43bafa362cc567101cfef4fe6a62ff21a0b1`.
+`meta.platoon_index` at `+0x3C`. Canonical `source/ai/encounters.c` blob
+`5335791d253c6538c0e7d4b624c06726d11033f9` independently implements
+`encounter_actor_iterator_new`, `encounter_actor_iterator_next`, and
+`actor_iterator_new`. `_actor_iterator_next` and `_actor_erase` remain omitted
+from canonical source; their typed contracts and cdecl call edges are
+authenticated by the January target and clean HCEA sources.
+`source/ai/actors.c` blob `e08b43bafa362cc567101cfef4fe6a62ff21a0b1`
+is context evidence, not an `actor_erase` implementation donor.
 
 Clean HCEA independently supplies actor-layout blob
 `77a69f79b6a42cf0dac4462e434e634ce71f7bc3`, actor-iterator blob
