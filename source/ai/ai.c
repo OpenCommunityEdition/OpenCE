@@ -199,7 +199,20 @@ symbols in this file:
 
 #include "cseries.h"
 
+#include "ai/actors.h"
+#include "units/units.h"
+
+#include "memory/data.h"
+
+#include <stddef.h>
+
 /* ---------- constants */
+
+enum
+{
+	_ai_communication_vehicle_entry = 36,
+	_ai_communication_vehicle_exit = 37,
+};
 
 /* ---------- macros */
 
@@ -225,6 +238,10 @@ typedef char ai_globals_prefix_grenades_offset_assert[
 	offsetof(struct ai_globals_prefix, grenades_enabled) == 0x3B4 ? 1 : -1];
 typedef char ai_globals_prefix_size_assert[
 	sizeof(struct ai_globals_prefix) == 0x3B5 ? 1 : -1];
+typedef char ai_unit_actor_index_offset_assert[
+	offsetof(struct unit_datum, unit.actor_index) == 0x1A4 ? 1 : -1];
+typedef char ai_actor_last_vehicle_exit_forced_offset_assert[
+	offsetof(struct actor_datum, emotions.last_vehicle_exit_forced) == 0x38C ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -247,6 +264,15 @@ void ai_profile_dispose_from_old_map(
 	void);
 void ai_debug_dispose_from_old_map(
 	void);
+
+void ai_communication_event(
+	short type,
+	long unit_index,
+	long prop_index,
+	long object_index,
+	long position_index,
+	long structure_index,
+	void const *context);
 
 boolean code_000309a0(
 	boolean must_be_attacking);
@@ -308,6 +334,62 @@ void ai_globals_grenades_enabled(
 	match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x14C, ai_globals);
 
 	ai_globals->grenades_enabled = enabled;
+
+	return;
+}
+
+void ai_handle_enter_vehicle(
+	long unit_index,
+	long vehicle_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	(void)vehicle_index;
+
+	if (unit->unit.actor_index != NONE)
+	{
+		ai_communication_event(
+			_ai_communication_vehicle_entry,
+			unit_index,
+			NONE,
+			NONE,
+			NONE,
+			NONE,
+			NULL);
+	}
+
+	return;
+}
+
+void ai_handle_exit_vehicle(
+	long unit_index,
+	long vehicle_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	long actor_index = unit->unit.actor_index;
+	struct actor_datum *actor;
+
+	(void)vehicle_index;
+
+	if (actor_index == NONE)
+	{
+		return;
+	}
+
+	actor = actor_get(actor_index);
+	if (!actor->emotions.last_vehicle_exit_forced)
+	{
+		ai_communication_event(
+			_ai_communication_vehicle_exit,
+			unit_index,
+			NONE,
+			NONE,
+			NONE,
+			NONE,
+			NULL);
+	}
+
+	actor->emotions.last_vehicle_exit_forced = FALSE;
 
 	return;
 }
