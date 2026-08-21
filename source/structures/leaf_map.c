@@ -132,6 +132,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "structures/leaf_map.h"
+#include "cache/cache_files.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -143,5 +147,13 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void leaf_map_delete(
+	struct leaf_map *leaf_map)
+{
+	tag_block_resize(&leaf_map->leaves, 0);
+	tag_block_resize(&leaf_map->portals, 0);
+	return;
+}
 
 /* ---------- private code */
