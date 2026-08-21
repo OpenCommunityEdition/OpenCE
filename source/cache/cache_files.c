@@ -237,7 +237,7 @@ boolean cache_files_precache_map_loaded(
 boolean cache_files_precache_is_copying_map(
 	char const *map_name);
 void cache_files_precache_set_priority(
-	long priority);
+	boolean blocking);
 void display_error_damaged_media(
 	void);
 void texture_cache_open(

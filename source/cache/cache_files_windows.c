@@ -187,6 +187,8 @@ symbols in this file:
 
 /* ---------- macros */
 
+#define cache_file_globals bss_004cdff8
+
 /* ---------- structures */
 
 struct cache_file_runtime_globals_prefix
@@ -202,16 +204,41 @@ typedef char verify_cache_file_copy_in_progress_offset[
 
 /* ---------- prototypes */
 
+void cache_copy_queue_end(
+	void);
+void cache_copy_set_priority(
+	boolean blocking);
+
 /* ---------- globals */
 
 extern struct cache_file_runtime_globals_prefix bss_004cdff8;
 
 /* ---------- public code */
 
+void cache_files_precache_set_priority(
+	boolean blocking)
+{
+	cache_copy_set_priority(blocking);
+
+	return;
+}
+
 boolean cache_files_precache_in_progress(
 	void)
 {
 	return bss_004cdff8.copy_in_progress;
+}
+
+void cache_files_precache_map_queue_end(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\cache_files_windows.c",
+		1022,
+		cache_file_globals.copy_in_progress);
+	cache_copy_queue_end();
+
+	return;
 }
 
 /* ---------- private code */
