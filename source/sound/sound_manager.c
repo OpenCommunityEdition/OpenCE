@@ -219,6 +219,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "data.h"
 #include "sound_environment_definitions.h"
 
 /* ---------- constants */
@@ -227,13 +228,74 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct sound_platform_definition;
+struct platform_sound_channel_properties;
+struct platform_sound_listener_properties;
+struct sound_location;
+struct sound_permutation;
+struct sound_preferences;
+
+struct sound_platform_definition
+{
+	short platform_code;
+	byte reserved0[2];
+	boolean (*initialize)(
+		struct sound_preferences *preferences);
+	void (*dispose)(
+		void);
+	void (*set_listener_properties)(
+		struct platform_sound_listener_properties const *properties);
+	void (*begin_scene)(
+		void);
+	void (*end_scene)(
+		void);
+	void (*queue_sound_to_channel)(
+		short channel_index,
+		struct sound_permutation const *permutation,
+		long hardware_format,
+		boolean looping,
+		short playback_rate,
+		boolean cache_miss);
+	void (*channel_update)(
+		short channel_index,
+		boolean force,
+		short playback_rate);
+	void (*stop_channel)(
+		short channel_index);
+	short (*get_channel_state)(
+		short channel_index);
+	void (*set_pause)(
+		boolean paused);
+	void (*flush)(
+		void);
+	void (*set_channel_location)(
+		short channel_index,
+		boolean valid,
+		struct sound_location const *location,
+		real minimum_distance,
+		real maximum_distance,
+		boolean force,
+		short playback_rate);
+	void (*set_channel_properties)(
+		short channel_index,
+		struct platform_sound_channel_properties const *properties,
+		boolean gain_only,
+		boolean force,
+		short playback_rate);
+	void (*handle_audio_profile_changes)(
+		boolean surround_sound,
+		boolean headphones,
+		long speaker_configuration);
+	boolean (*hardware_reverb_enabled)(
+		void);
+};
 
 struct sound_manager_globals
 {
 	boolean initialized;
 	boolean enabled;
-	unsigned char reserved0[0x6];
+	boolean paused;
+	boolean idling;
+	long game_time_when_no_scripted_dialog_will_be_playing;
 	struct sound_platform_definition *platform_definition;
 	long render_time;
 	unsigned char reserved1[0x118];
@@ -243,10 +305,32 @@ struct sound_manager_globals
 
 typedef char verify_sound_manager_globals_size[
 	sizeof(struct sound_manager_globals) == 0x178 ? 1 : -1];
+typedef char verify_sound_platform_definition_size[
+	sizeof(struct sound_platform_definition) == 0x40 ? 1 : -1];
+typedef char verify_sound_platform_dispose_offset[
+	offsetof(struct sound_platform_definition, dispose) == 0x8 ? 1 : -1];
+typedef char verify_sound_platform_pause_offset[
+	offsetof(struct sound_platform_definition, set_pause) == 0x28 ? 1 : -1];
+typedef char verify_sound_manager_paused_offset[
+	offsetof(struct sound_manager_globals, paused) == 0x2 ? 1 : -1];
+typedef char verify_sound_manager_dialog_time_offset[
+	offsetof(
+		struct sound_manager_globals,
+		game_time_when_no_scripted_dialog_will_be_playing) == 0x4 ? 1 : -1];
 
 /* ---------- prototypes */
 
+long game_time_get(
+	void);
+void sound_cache_delete(
+	void);
+unsigned long system_milliseconds(
+	void);
+
 /* ---------- globals */
+
+extern struct data_array *looping_sound_data;
+extern struct data_array *sound_data;
 
 struct sound_manager_globals bss_004d2d60;
 
@@ -256,6 +340,32 @@ struct sound_platform_definition *current_platform_definition(
 	void)
 {
 	return bss_004d2d60.platform_definition;
+}
+
+void sound_dispose(
+	void)
+{
+	if (bss_004d2d60.initialized)
+	{
+		bss_004d2d60.platform_definition->dispose();
+		data_make_invalid(sound_data);
+		data_make_invalid(looping_sound_data);
+		bss_004d2d60.initialized = FALSE;
+	}
+
+	if (sound_data)
+	{
+		data_dispose(sound_data);
+	}
+
+	if (looping_sound_data)
+	{
+		data_dispose(looping_sound_data);
+	}
+
+	sound_cache_delete();
+
+	return;
 }
 
 void sound_enable(
@@ -272,6 +382,29 @@ boolean sound_is_active(
 	return bss_004d2d60.initialized && bss_004d2d60.enabled;
 }
 
+void sound_pause(
+	boolean paused)
+{
+	if (paused != bss_004d2d60.paused)
+	{
+		bss_004d2d60.paused = paused;
+		bss_004d2d60.platform_definition->set_pause(paused);
+
+		if (!paused)
+		{
+			bss_004d2d60.render_time = system_milliseconds();
+		}
+	}
+
+	return;
+}
+
+boolean sound_try_and_get(
+	long sound_index)
+{
+	return datum_try_and_get(sound_data, sound_index) != NULL;
+}
+
 void sound_manager_set_sound_environment(
 	struct sound_environment_definition const *environment)
 {
@@ -284,6 +417,15 @@ long sound_render_time(
 	void)
 {
 	return bss_004d2d60.render_time;
+}
+
+boolean sound_scripted_dialog_is_playing(
+	void)
+{
+	long game_time = game_time_get();
+
+	return game_time <
+		bss_004d2d60.game_time_when_no_scripted_dialog_will_be_playing;
 }
 
 void sound_initialize_for_new_map(
