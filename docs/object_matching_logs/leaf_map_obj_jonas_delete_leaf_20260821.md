@@ -71,7 +71,7 @@ storage and claims no data credit.
 Only `source/structures/leaf_map.c` and this new Jonas-owned ledger are
 changed. The final source Git blob is
 `182a6c5a6e8518aaf675b2e6bb134346bc6112a6`; its committed payload SHA-256 is
-`a6d89af27e5693ce77fb76c856bd4442591deadd4fc2e76d135dc1d5d324a1d8`.
+`ee85845e623b51b629c1e8a0b31b26d868b4461d5399275adf46cb523ec5236f`.
 No header, configuration, frozen-five source, semantic exception, parked
 record, pre-existing Markdown, Claude-owned file, or deletion is in scope.
 
