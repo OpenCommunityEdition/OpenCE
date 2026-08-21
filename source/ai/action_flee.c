@@ -40,7 +40,17 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "actors.h"
+#include "units/units.h"
+
 /* ---------- constants */
+
+enum
+{
+	_actor_panic_grenade_attached_to_us = 9,
+	_actor_panic_burning_to_death = 12,
+};
 
 /* ---------- macros */
 
@@ -51,5 +61,25 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void action_flee_end(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->meta.unit_index != NONE)
+	{
+		unit_stop_running_blindly(actor->meta.unit_index);
+	}
+
+	return;
+}
+
+boolean action_flee_blind_panic(
+	short panic_type)
+{
+	return panic_type >= _actor_panic_grenade_attached_to_us &&
+		panic_type <= _actor_panic_burning_to_death;
+}
 
 /* ---------- private code */
