@@ -24,9 +24,9 @@ bytes for both retained functions.
 
 - Baseline `connected_geometry.c` blob:
   `bd0916cb02d2cb9b291f25661119d1f7a8b3107d`.
-- Final `connected_geometry.c` blob/SHA-256:
+- Final `connected_geometry.c` blob/committed-blob SHA-256:
   `aa946fd89e24827de07ee3b2dd2f8747994fedde` /
-  `1ea486d619b99449c2da2768796972ffe1e54d2af099188b5d7f841cc1cc8e57`.
+  `865bce2e860d5b9c7c9e1c64283deadb40b22ebf45527f470d581fc7425a4866`.
 - Unchanged `memory/array.h` blob:
   `72b8e1ecfdf9541c3b8dc70448b04dbdf8bdff8c`.
 - Unchanged `structure_lens_flares.c` blob:

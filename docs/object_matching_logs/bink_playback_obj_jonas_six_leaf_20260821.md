@@ -28,9 +28,9 @@ outside this wave's credit.
 
 - Baseline `source/bink/bink_playback.c` blob:
   `1c430c68536282aa5c89914154ad400cedfef4d6`.
-- Retained source blob/SHA-256:
+- Retained source blob/committed-blob SHA-256:
   `05a29dc73419d1acd115fc67ebfc31c879fcba8a` /
-  `4bb471b652e103568d5fff442f7cfa6b492810910848d4bc0957078375999577`.
+  `2e941e0c2ae04cec82516a0548c7344ce864be826c46ac8d2263e4b90f643cfe`.
 - January executable SHA-256:
   `4cc87b45f721270392a96f1674ed2b5cd4a7bb4355faeab4531d1cf1884d9520`.
 - January split-object SHA-256:
@@ -98,8 +98,8 @@ or byte-offset dereference, pointer/integer reconstruction, pointer or union
 pun, inactive-union access, undefined overflow, volatile scheduling device,
 force-inline annotation, optimizer pragma/barrier, synthetic anchor, or
 object-byte forcing. The final COFF defines only the six requested code
-COMDATs plus debug metadata; it defines no `.rdata`, `.data`, `.bss`, COMMON
-symbol, or global storage.
+COMDATs, the standard `.drectve` section, and debug metadata; it defines no
+`.rdata`, `.data`, `.bss`, COMMON symbol, or global storage.
 
 - Complete `halobetacache_build` and `libcmt_build`: pass.
 - Direct hardened comparison: all six retained functions pass, including all

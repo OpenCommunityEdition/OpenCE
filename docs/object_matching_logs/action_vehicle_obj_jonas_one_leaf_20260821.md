@@ -28,9 +28,9 @@ fifteen functions and all 116 non-code bytes stay outside this wave's credit.
 
 - Baseline `source/ai/action_vehicle.c` blob:
   `77f976dc9617cb72d35c768e2fa2b839be7d7ad5`.
-- Retained source blob/SHA-256:
+- Retained source blob/committed-blob SHA-256:
   `21e056ab7bf30cb7f746e8a610ca15146a4785ae` /
-  `b7e4c267346e0c4e6426e4a3b5a44507a2fdf3ce5fbabc4191c48bd22dc1ba0a`.
+  `ef2f07e6e1a4ede19ce03b834a6de720c9cf1eca465299f3e80e39b1c3286308`.
 - January executable SHA-256:
   `4cc87b45f721270392a96f1674ed2b5cd4a7bb4355faeab4531d1cf1884d9520`.
 - January split-object SHA-256:
