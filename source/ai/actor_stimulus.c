@@ -79,12 +79,36 @@ symbols in this file:
 #include "cseries.h"
 
 #include "ai/actors.h"
+#include "ai/props.h"
 
 #include "memory/data.h"
 
 #include <stddef.h>
 
 /* ---------- constants */
+
+enum
+{
+	_actor_mode_asleep = 1,
+};
+
+enum
+{
+	_actor_panic_platoon_retreating = 6,
+};
+
+enum
+{
+	_ai_communication_sighted_enemy = 4,
+	_ai_communication_found_enemy = 5,
+	_ai_communication_advance = 22,
+	_ai_communication_retreat = 23,
+};
+
+enum
+{
+	_communication_hostility_enemy = 3,
+};
 
 /* ---------- macros */
 
@@ -102,8 +126,37 @@ typedef char actor_stimulus_suspicion_combat_status_offset_assert[
 	offsetof(struct actor_datum, stimuli.suspicion_combat_status) == 0x34A ? 1 : -1];
 typedef char actor_stimulus_suspicion_timer_offset_assert[
 	offsetof(struct actor_datum, stimuli.suspicion_timer) == 0x34C ? 1 : -1];
+typedef char actor_stimulus_actor_mode_offset_assert[
+	offsetof(struct actor_datum, state.mode) == 0x6A ? 1 : -1];
+typedef char actor_stimulus_actor_unit_index_offset_assert[
+	offsetof(struct actor_datum, meta.unit_index) == 0x18 ? 1 : -1];
+typedef char actor_stimulus_panic_type_offset_assert[
+	offsetof(struct actor_datum, stimuli.panic_type) == 0x308 ? 1 : -1];
+typedef char actor_stimulus_panic_prop_index_offset_assert[
+	offsetof(struct actor_datum, stimuli.panic_prop_index) == 0x30C ? 1 : -1];
+typedef char actor_stimulus_direction_size_assert[
+	sizeof(struct direction_specification) == 0x10 ? 1 : -1];
+typedef char actor_stimulus_direction_prop_index_offset_assert[
+	offsetof(struct direction_specification, prop_index) == 0x4 ? 1 : -1];
+typedef char actor_stimulus_direction_point_offset_assert[
+	offsetof(struct direction_specification, point) == 0x4 ? 1 : -1];
+typedef char actor_stimulus_prop_unit_index_offset_assert[
+	offsetof(struct prop_datum, unit_index) == 0x18 ? 1 : -1];
+typedef char actor_stimulus_prop_enemy_offset_assert[
+	offsetof(struct prop_datum, enemy) == 0x60 ? 1 : -1];
+typedef char actor_stimulus_prop_dead_offset_assert[
+	offsetof(struct prop_datum, dead) == 0x127 ? 1 : -1];
 
 /* ---------- prototypes */
+
+void ai_communication_event(
+	short type,
+	long unit_index,
+	long prop_index,
+	long object_index,
+	long position_index,
+	long structure_index,
+	void const *context);
 
 /* ---------- globals */
 
@@ -156,6 +209,106 @@ void actor_stimulus_vehicle_eviction(
 	struct actor_datum *actor = actor_get(actor_index);
 
 	actor->stimuli.vehicle_eviction = TRUE;
+	return;
+}
+
+void actor_stimulus_bumped(
+	long actor_index,
+	long prop_index)
+{
+	struct direction_specification direction;
+
+	direction.type = _direction_specification_prop;
+	direction.prop_index = prop_index;
+	actor_look_secondary(
+		actor_index,
+		_secondary_look_bumped_prop,
+		_secondary_look_priority_default,
+		&direction);
+
+	return;
+}
+
+void actor_stimulus_environmental_noise(
+	long actor_index,
+	long object_index,
+	real_point3d const *position,
+	short count)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct direction_specification direction;
+
+	if (actor->state.mode == _actor_mode_asleep)
+	{
+		return;
+	}
+
+	direction.type = _direction_specification_point;
+	direction.point = *position;
+	actor_look_secondary(
+		actor_index,
+		_secondary_look_environmental_noise,
+		_secondary_look_priority_default,
+		&direction);
+
+	return;
+}
+
+void actor_stimulus_prop_sighted(
+	long actor_index,
+	long prop_index,
+	boolean initial_acknowledgement)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct prop_datum *prop = prop_get(prop_index);
+
+	if (!prop->dead &&
+		actor->meta.unit_index != NONE &&
+		prop->enemy)
+	{
+		ai_communication_event(
+			initial_acknowledgement ?
+				_ai_communication_sighted_enemy :
+				_ai_communication_found_enemy,
+			actor->meta.unit_index,
+			prop->unit_index,
+			_communication_hostility_enemy,
+			NONE,
+			NONE,
+			NULL);
+	}
+
+	return;
+}
+
+void actor_stimulus_maneuvering(
+	long actor_index,
+	boolean advancing,
+	boolean flee)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->meta.unit_index != NONE)
+	{
+		ai_communication_event(
+			advancing ?
+				_ai_communication_advance :
+				_ai_communication_retreat,
+			actor->meta.unit_index,
+			NONE,
+			NONE,
+			NONE,
+			NONE,
+			NULL);
+	}
+
+	if (flee &&
+		actor->stimuli.panic_type < _actor_panic_platoon_retreating)
+	{
+		actor->stimuli.panic_type = _actor_panic_platoon_retreating;
+		actor->stimuli.panic_prop_index = NONE;
+	}
+
 	return;
 }
 
