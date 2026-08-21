@@ -32,16 +32,94 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "memory/array.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct connected_geometry_point
+{
+	float x;
+	float y;
+	float z;
+};
+
+struct connected_geometry_edge
+{
+	struct dynamic_array triangle_indices;
+	long point_indices[2];
+	long unused[2];
+};
+
+struct connected_geometry_triangle
+{
+	long edge_designators[3];
+	long coplanar_group_index;
+	long unused[2];
+};
+
+struct connected_geometry
+{
+	struct dynamic_array points;
+	struct dynamic_array edges;
+	struct dynamic_array triangles;
+};
+
+typedef char connected_geometry_dynamic_array_size_assert[
+	sizeof(struct dynamic_array) == 0xC ? 1 : -1];
+typedef char connected_geometry_point_size_assert[
+	sizeof(struct connected_geometry_point) == 0xC ? 1 : -1];
+typedef char connected_geometry_edge_size_assert[
+	sizeof(struct connected_geometry_edge) == 0x1C ? 1 : -1];
+typedef char connected_geometry_edge_point_indices_offset_assert[
+	offsetof(struct connected_geometry_edge, point_indices) == 0xC ? 1 : -1];
+typedef char connected_geometry_triangle_size_assert[
+	sizeof(struct connected_geometry_triangle) == 0x18 ? 1 : -1];
+typedef char connected_geometry_size_assert[
+	sizeof(struct connected_geometry) == 0x24 ? 1 : -1];
+typedef char connected_geometry_edges_offset_assert[
+	offsetof(struct connected_geometry, edges) == 0xC ? 1 : -1];
+typedef char connected_geometry_triangles_offset_assert[
+	offsetof(struct connected_geometry, triangles) == 0x18 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+void connected_geometry_new(
+	struct connected_geometry *geometry)
+{
+	dynamic_array_new(&geometry->points, sizeof(struct connected_geometry_point));
+	dynamic_array_new(&geometry->edges, sizeof(struct connected_geometry_edge));
+	dynamic_array_new(&geometry->triangles, sizeof(struct connected_geometry_triangle));
+
+	return;
+}
+
+void connected_geometry_delete(
+	struct connected_geometry *geometry)
+{
+	long edge_index;
+
+	for (edge_index = 0; edge_index < geometry->edges.count; edge_index++)
+	{
+		struct connected_geometry_edge *edge = dynamic_array_get_element(
+			&geometry->edges,
+			edge_index,
+			sizeof(*edge));
+		dynamic_array_delete(&edge->triangle_indices);
+	}
+
+	dynamic_array_delete(&geometry->points);
+	dynamic_array_delete(&geometry->edges);
+	dynamic_array_delete(&geometry->triangles);
+
+	return;
+}
 
 /* ---------- private code */
