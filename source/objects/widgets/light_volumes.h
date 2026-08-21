@@ -11,8 +11,10 @@ header included in hcex build.
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "math/real_math.h"
 #include "memory/data.h"
 #include "objects/widgets/widget_types.h"
+#include "tag_files/tag_groups.h"
 
 /* ---------- constants */
 
@@ -20,6 +22,8 @@ header included in hcex build.
 
 #define light_volume_get(light_volume_index) \
 	((struct light_volume_datum *)datum_get(bss_00456d90.light_volumes, (light_volume_index)))
+#define light_volume_definition_get(definition_index) \
+	((struct light_volume_definition *)tag_get('mgs2', (definition_index)))
 
 /* ---------- structures */
 
@@ -30,14 +34,61 @@ struct light_volume_datum
 	long definition_index;
 };
 
+struct light_volume_frame
+{
+	long unknown0[4];
+	real offset_from_marker;
+	real offset_exponent;
+	real length;
+	long unknown1[8];
+	real radius_hither;
+	real radius_yon;
+	real radius_exponent;
+	long unknown48[8];
+	real_argb_color color_hither;
+	real_argb_color color_yon;
+	real color_exponent;
+	real brightness_exponent;
+	long unknown90[8];
+};
+
+struct light_volume_definition
+{
+	char attachment_marker[32];
+	short type;
+	word flags;
+	long unknown24[4];
+	real near_fade_distance;
+	real far_fade_distance;
+	real perpendicular_brightness_scale;
+	real parallel_brightness_scale;
+	short brightness_scale_source;
+	word pad46;
+	long unknown48[5];
+	struct tag_reference map;
+	short sequence_index;
+	short count;
+	long unknown70[18];
+	short frame_animation_source;
+	word padBA;
+	long unknownBC[9];
+	long unknownE0[16];
+	struct tag_block frames;
+	long unknown12C[8];
+};
+
 struct light_volume_globals
 {
-	byte __unknown0[0xB0];
+	struct light_volume_frame frame_storage;
 	struct data_array *light_volumes;
 };
 
 typedef char light_volume_datum_size_assert[
 	sizeof(struct light_volume_datum) == 0x8 ? 1 : -1];
+typedef char light_volume_frame_size_assert[
+	sizeof(struct light_volume_frame) == 0xB0 ? 1 : -1];
+typedef char light_volume_definition_size_assert[
+	sizeof(struct light_volume_definition) == 0x14C ? 1 : -1];
 typedef char light_volume_globals_size_assert[
 	sizeof(struct light_volume_globals) == 0xB4 ? 1 : -1];
 

@@ -38,7 +38,10 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "math/real_math.h"
+#include "objects/objects.h"
+#include "render/render.h"
 #include "saved games/game_state.h"
+#include "shaders/shaders.h"
 
 /* ---------- constants */
 
@@ -46,15 +49,27 @@ symbols in this file:
 
 /* ---------- structures */
 
+typedef void (*light_volume_render_proc)(
+	long object_index,
+	long light_volume_index);
+
 /* ---------- prototypes */
 
 real code_001246a0(
 	real value,
 	real exponent);
+void light_volume_render(
+	long object_index,
+	long light_volume_index);
+void rasterizer_widget_submit(
+	long object_index,
+	long light_volume_index,
+	real_point3d const *centroid,
+	light_volume_render_proc render_proc);
 
 /* ---------- globals */
 
-struct light_volume_globals bss_00456d90;
+struct light_volume_globals bss_00456d90 = {0};
 
 /* ---------- public code */
 
@@ -129,4 +144,49 @@ real code_001246a0(
 		value = power(value, exponent);
 
 	return value;
+}
+
+void light_volume_submit(
+	long object_index,
+	long light_volume_index,
+	struct render_lighting const *lighting,
+	struct render_animation const *animation)
+{
+	struct light_volume_datum *light_volume;
+	struct light_volume_definition *definition;
+
+	(void)lighting;
+	if (object_index != NONE && light_volume_index != NONE)
+	{
+		light_volume = light_volume_get(light_volume_index);
+		definition = light_volume_definition_get(light_volume->definition_index);
+		if (definition->count > 0 && definition->frames.count > 0)
+		{
+			short source = definition->brightness_scale_source;
+			if (!source || !animation || animation->values[source - 1] > 0.f)
+			{
+				struct object_marker marker;
+				real_point3d delta;
+				real distance;
+
+				object_get_marker_by_name(object_index, definition->attachment_marker, &marker, 1);
+				delta.x = marker.matrix.position.x - render.camera.position.x;
+				delta.y = marker.matrix.position.y - render.camera.position.y;
+				delta.z = marker.matrix.position.z - render.camera.position.z;
+				distance =
+					render.camera.forward.i * delta.x +
+					(render.camera.forward.j * delta.y +
+					render.camera.forward.k * delta.z);
+
+				if (definition->far_fade_distance == 0.f || distance < definition->far_fade_distance)
+					rasterizer_widget_submit(
+						object_index,
+						light_volume_index,
+						&marker.matrix.position,
+						light_volume_render);
+			}
+		}
+	}
+
+	return;
 }
