@@ -69,11 +69,25 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "interface/interface.h"
+#include "math/real_math.h"
+#include "text/draw_string.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
+
+union argb_color
+{
+	word n[4];
+};
+typedef union argb_color argb_color;
+
+typedef char argb_color_size_assert[
+	sizeof(argb_color) == 0x8 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -99,6 +113,10 @@ void hud_dispose(
 	void);
 void first_person_weapons_dispose(
 	void);
+real_argb_color *interface_get_real_argb_color(
+	short interface_color_table_index,
+	short color_index,
+	real_argb_color *color);
 
 /* ---------- globals */
 
@@ -134,6 +152,43 @@ void interface_dispose(
 	first_person_weapons_dispose();
 
 	return;
+}
+
+void interface_set_bitmap_text_draw_mode(
+	short interface_font_index,
+	short style,
+	short justification,
+	unsigned long flags,
+	short color_table_index,
+	short color_index)
+{
+	long font_tag_index;
+	real_argb_color color;
+
+	font_tag_index = interface_get_tag_index(interface_font_index);
+	interface_get_real_argb_color(color_table_index, color_index, &color);
+	draw_string_set_draw_mode(font_tag_index, style, justification, flags, &color);
+
+	return;
+}
+
+argb_color *interface_get_rgb_color(
+	short interface_color_table_index,
+	short color_index,
+	argb_color *color)
+{
+	real_argb_color real_color;
+
+	interface_get_real_argb_color(
+		interface_color_table_index,
+		color_index,
+		&real_color);
+	color->n[0] = (word)(real_color.n[0] * 65535.0f);
+	color->n[1] = (word)(real_color.n[1] * 65535.0f);
+	color->n[2] = (word)(real_color.n[2] * 65535.0f);
+	color->n[3] = (word)(real_color.n[3] * 65535.0f);
+
+	return color;
 }
 
 /* ---------- private code */
