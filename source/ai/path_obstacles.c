@@ -71,10 +71,42 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct obstacle_disc
+{
+	short flags;
+	short obstacle_index;
+	long object_index;
+	real_point2d center;
+	real radius;
+};
+
+struct obstacles
+{
+	short obstacle_count;
+	short disc_count;
+	short disc_optional_count;
+	byte reserved6[2];
+	struct obstacle_disc discs[128];
+};
+
+typedef char obstacle_disc_size_assert[
+	sizeof(struct obstacle_disc) == 0x14 ? 1 : -1];
+typedef char obstacles_size_assert[
+	sizeof(struct obstacles) == 0xA08 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+void obstacles_new(
+	struct obstacles *obstacles)
+{
+	obstacles->obstacle_count = 0;
+	obstacles->disc_count = 0;
+	obstacles->disc_optional_count = 0;
+	return;
+}
 
 /* ---------- private code */
