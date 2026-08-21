@@ -304,3 +304,64 @@ snapshot, verified object deletion, normal Ninja rebuild, regression check,
 direct comparator, rejected-owner census, and final ownership evidence will
 be appended in one additive ledger-only commit. No push, amend, or history
 rewrite is performed.
+
+## Clean committed-state replay
+
+Implementation-and-ledger commit
+`5e24c10e0669c1213a92d899786a0860858d3733` was clean before replay and
+is authored and committed by Jonas Volman. Re-reading that commit proves
+retained source blob
+`0b8f78d817c58b827c0c49ccd7b6b0f7ccf09002`: 5,113 raw Git payload bytes
+with SHA-256
+`0c1832998cbfaf955608d0f00c6cf7182b47cf94666e83cfc0a830f874b416a2`.
+Its initial ledger blob is
+`d05222cd5c548e32487d436cff4e91453d1b8277`: 18,114 raw Git payload bytes
+with SHA-256
+`7c22c0d4ad7bcf5e2abfb20a6608db92e53c2877ec7b233f53e4655e81ed3291`.
+`git status --short --branch` printed only branch
+`jonas/game-state-xbox-triad-20260821` and no changed or untracked path.
+
+A one-unit committed-state snapshot was written at that exact clean commit.
+As explained above, snapshot/check used the ignored decoded-path parser view
+and `--no-build`; the actual compilation below used only the unmodified
+production Ninja edge. The committed-state snapshot manifest is an ignored
+391,199-byte file
+with phase-specific SHA-256
+`36e9ce6dc1d924461afbce7668ae8b6adf8144c467144709ae10ed05d8a83277`.
+
+The resolved generated path
+`build/base/source/saved games/game_state_xbox.obj` was first proven to be
+inside this isolated worktree. The snapshotted object was 2,593 bytes with
+SHA-256
+`917c9771d243fddf3e4f0c014d1d42a8fc75c82cff04b5aa0e5fe6c10089082e`.
+That exact file was deleted and a second existence check proved it absent.
+The normal repository Ninja target then executed exactly one `[1/1] CL`
+action for the same path with the unchanged natural VC7 flags.
+
+The immediate no-build regression check returned `ok: true`, zero failures,
+zero warnings, `changed_nonexact: []`, `newly_exact: []`, and exactly four
+`still_exact` functions:
+`_game_state_close_file`,
+`_game_state_create_persistent_storage`,
+`_game_state_free_buffer`, and
+`_game_state_get_persistent_storage_filename`.
+A normal Ninja dry run reports `ninja: no work to do.`
+
+Direct hardened January comparison again returned `all_equal: true` for all
+four emitted code COMDATs, including every padded byte and all 19 relocation
+addresses, types, destinations, and addends. The rebuilt object is 2,593 bytes
+with phase-specific SHA-256
+`c31c09edc5ea43accc7125ce2965d8ee3b1108bc5bdc89adcb0b93ea83a86a47`.
+
+The final external-owner census defines exactly the four accepted code
+COMDATs and the four exact 133-byte read-only string COMDATs recorded above.
+It defines no writable `.data`, `.bss`, COMMON, aggregate, or SDK lookup-table
+owner. `_XPhysicalFree@4`, `_system_exit`, `_display_assert`,
+`_bss_004d27d0`, `_CloseHandle@4`, and `_code_001b0270` remain undefined
+value-zero externals. Thus the private helper definition, owned Xbox BSS,
+initialization, disposal, enumeration, save, and every body outside the fixed
+triad remain absent.
+
+This section is the sole change in an additive Jonas ledger-only follow-up.
+The committed source blob remains unchanged. Nothing is pushed, amended, or
+history-rewritten.
