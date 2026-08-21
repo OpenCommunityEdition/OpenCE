@@ -104,15 +104,40 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+
 /* ---------- constants */
+
+enum
+{
+	MAXIMUM_ODDBALLS = 16,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct oddball_globals
+{
+	long score_to_win;
+	long team_score[MAXIMUM_ODDBALLS];
+	long individual_score[MAXIMUM_ODDBALLS];
+	long ball_spawn_timer[MAXIMUM_ODDBALLS];
+	long current_ball_owner[MAXIMUM_ODDBALLS];
+};
+
+typedef char verify_oddball_globals_size[
+	sizeof(struct oddball_globals) == 0x104 ? 1 : -1];
+typedef char verify_oddball_globals_ball_spawn_timer_offset[
+	offsetof(struct oddball_globals, ball_spawn_timer) == 0x84 ? 1 : -1];
+typedef char verify_oddball_globals_current_ball_owner_offset[
+	offsetof(struct oddball_globals, current_ball_owner) == 0xC4 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+struct oddball_globals bss_0043eba8 = { 0 };
 
 /* ---------- public code */
 
