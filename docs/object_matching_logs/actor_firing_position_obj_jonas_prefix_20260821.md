@@ -39,9 +39,10 @@ January COFF bytes, relocations, strings, assertion line, and x86 field loads
 remain authoritative. Stian's source is supporting disassembly annotation,
 not production code: none of its raw-address or byte-offset access is copied.
 
-Only `source/ai/actor_firing_position.c` and this newly created ledger are
-tracked changes. No header, configuration, frozen-object source, or
-pre-existing Markdown file is edited.
+The retained wave changes `source/ai/actor_firing_position.c`, its sole
+translation-unit-local caller declaration in `source/ai/action_guard.c`, and
+this newly created ledger. No header, configuration, frozen-object source,
+or pre-existing Markdown file is edited.
 
 ## Bounded compile result
 
@@ -88,10 +89,13 @@ The production bodies use `actor_get`, `global_scenario_get`, and
 `TAG_BLOCK_GET_ELEMENT`; no address is reconstructed. The group accessor
 retains January's assertion spelling and source line 1412. Existing
 `actor_discard_firing_position` consumers have the same long/short/boolean
-contract. The sole current group-accessor call passes normal mode `FALSE`;
-although its translation-unit-local declaration names that byte parameter
-differently, cdecl uses the same full argument slot and the retained January
-body reads the authenticated low word. No shared declaration was changed.
+contract. The sole current group-accessor call passes normal mode `FALSE`.
+HCEA and the January body establish the third argument as the short
+`group_selection_mode`, so the translation-unit-local declaration in
+`action_guard.c` was corrected from a byte boolean to that same short type.
+This removes a cross-translation-unit incompatible-function-type boundary;
+the forced caller rebuild leaves all twelve accepted `action_guard.obj`
+functions byte exact.
 
 ## Policy and validation
 

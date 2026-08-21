@@ -156,8 +156,8 @@ void actor_stimulus_suspicion(
 
 long actor_get_firing_position_group(
 	long actor_index,
-	short group,
-	boolean include_discarded);
+	short evaluation_mode,
+	short group_selection_mode);
 
 long actor_select_firing_position(
 	long actor_index,
