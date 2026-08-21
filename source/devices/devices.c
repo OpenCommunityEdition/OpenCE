@@ -100,6 +100,10 @@ enum
 
 /* ---------- prototypes */
 
+void device_group_set_actual_value(
+	short group_index,
+	real actual_value);
+
 /* ---------- globals */
 
 /* ---------- public code */
@@ -161,6 +165,44 @@ void device_one_sided_set(
 	}
 
 	return;
+}
+
+void device_set_actual_position(
+	long device_index,
+	real position)
+{
+	if (device_index != NONE)
+	{
+		struct device_datum *device = device_get(device_index);
+
+		if (device->device.position_group_index != NONE)
+		{
+			device_group_set_actual_value(
+				device->device.position_group_index,
+				position);
+		}
+	}
+
+	return;
+}
+
+boolean device_set_desired_position(
+	long device_index,
+	real position)
+{
+	if (device_index != NONE)
+	{
+		struct device_datum *device = device_get(device_index);
+
+		if (device->device.position_group_index != NONE)
+		{
+			return device_group_set_desired_value(
+				device->device.position_group_index,
+				position);
+		}
+	}
+
+	return FALSE;
 }
 
 void device_set_power(
