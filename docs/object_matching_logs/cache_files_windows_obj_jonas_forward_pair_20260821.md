@@ -167,3 +167,65 @@ normal Ninja rebuild, regression result, direct comparator, rejected-symbol
 absence, and final ownership from the preserved implementation commit.
 
 Nothing is pushed, amended, or history-rewritten.
+
+## Recorded committed-state replay
+
+The preserved implementation commit is
+`228f3f4ed16ee85b7fd284df33ab41705f54a184`. At that clean committed state,
+the retained source identities reproduce exactly:
+
+| Committed path | Git blob | Payload bytes | Payload SHA-256 |
+| --- | --- | ---: | --- |
+| `source/cache/cache_files_windows.c` | `0dfd86f7d9c0cdb614524e4927bec60d060d5b65` | 6,211 | `afe6f72a147215bbbe88e2febfd808c691161a8a740fbd06654151932d622887` |
+| `source/cache/cache_files.c` | `510bf8c15bf79c01b8438d3ac037266825725301` | 20,295 | `43ff5376f5f404f3d1bc99f107612f7e20b0733b35c46f06158efc508512e1ae` |
+| initial implementation ledger | `86d36539edfa99cab0ab00503ddcfe0b365018de` | 9,908 | `5a249c3edd00989c8cf5faf93a59700fa010c7231207ac88842cbd283388f258` |
+
+`git status --short --branch` reported only the branch header and no changed
+or untracked path. The clean one-unit snapshot was written to
+`build/regression_cache_files_windows_forward_pair_20260821.json` with status
+`SNAPSHOT_WRITTEN`, commit
+`228f3f4ed16ee85b7fd284df33ab41705f54a184`, and sole unit
+`source/cache/cache_files_windows`.
+
+The first snapshot invocation stopped before launching a build process because
+Windows denied the tool's default Ninja executable lookup (`WinError 5`). It
+created no manifest and emitted no object. Repeating the unchanged snapshot
+with the already authenticated explicit Ninja path succeeded. This was a
+transparent prerequisite-path correction, not a source or candidate-shape
+retry.
+
+The generated object resolved to
+`C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\cache-files-windows-forward-pair-20260821\\build\\base\\source\\cache\\cache_files_windows.obj`.
+Its resolved path was proved to remain inside this isolated worktree and its
+filename was checked before deletion. The existing 1,806-byte object had
+phase-specific raw SHA-256
+`12d23896147c10f440724f9b80e3b3c68f43062b5118bc1a3f552fe91625854d`.
+It was deleted, and a second existence check verified the generated path was
+absent. The normal same-path Ninja/VC7 edge then rebuilt it once with the
+unchanged `/O2 /Oy- /DDEBUG /Dxbox` flags. The replay object is 1,806 bytes
+with phase-specific raw SHA-256
+`3eea83fc0de34d1a261a7a08cb2de5cfcb1cd6f881201e92ad93f0435293ce51`.
+
+The committed regression check returned `ok: true`, with empty failures and
+warnings, no newly exact functions, and no changed nonexact functions. Its
+`still_exact` set is exactly:
+
+- `_cache_files_precache_in_progress`;
+- `_cache_files_precache_map_queue_end`;
+- `_cache_files_precache_set_priority`.
+
+A subsequent direct hardened comparison again accepted all three functions,
+including every padded extent, normalized byte stream, and all eight ordered
+relocation identities/addends. All 47 rejected target code symbols remain
+absent, and the candidate defines no extra code owner.
+
+Final ownership is unchanged: the only defined external code owners are the
+three functions above, and the only runtime non-code owners are the 36-byte
+assertion-expression and 43-byte source-path literals. There is no `.bss`,
+writable `.data`, COMMON symbol, or aggregate owner. `_bss_004cdff8`,
+`_cache_copy_set_priority`, `_cache_copy_queue_end`, `_display_assert`, and
+`_system_exit` remain undefined value-zero externals. No source changed during
+replay, and the worktree was clean after the replay checks.
+
+This section is an additive ledger-only correction to the implementation
+history. Nothing is pushed, amended, or history-rewritten.
