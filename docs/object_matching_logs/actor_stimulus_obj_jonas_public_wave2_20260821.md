@@ -179,8 +179,10 @@ barrier, synthetic anchor, or object-byte forcing.
 - Parked validation: three active, zero stale, and zero invalid entries.
 - Complete tooling suite: 179/179 tests pass; `git diff --check` is clean.
 
-After the Jonas source/ledger commit, a clean regression snapshot followed by
-deletion and forced rebuilding of `actor_stimulus.obj` will provide the final
-same-path committed-state reproducibility proof. The post-rebuild hardened
-comparison must remain strict for all eight accepted functions. Nothing is
-pushed.
+At clean Jonas commit
+`e2798097224a54483ea85fe33f9d543593790b98`, a regression snapshot was
+written for `source/ai/actor_stimulus`. The candidate object was then deleted
+and forced through the same Ninja/VC7 build edge. The committed-state check
+reports all eight functions `still_exact`, `changed_nonexact: []`, no failure,
+and no warning. The post-rebuild hardened comparison is strict for all eight
+accepted functions. Nothing is pushed.
