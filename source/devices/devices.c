@@ -84,8 +84,14 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "devices.h"
+#include "device_machines.h"
 
 /* ---------- constants */
+
+enum
+{
+	_device_position_changed_bit = 2,
+};
 
 /* ---------- macros */
 
@@ -100,6 +106,67 @@ symbols in this file:
 void devices_dispose(
 	void)
 {
+	return;
+}
+
+void device_set_never_appears_locked(
+	long device_index,
+	boolean never_appears_locked)
+{
+	if (device_index != NONE)
+	{
+		struct machine_datum *machine = machine_try_and_get(device_index);
+
+		if (machine != NULL)
+		{
+			if (never_appears_locked)
+			{
+				machine->machine.flags |= FLAG(_machine_never_appears_locked_bit);
+			}
+			else
+			{
+				machine->machine.flags &= ~FLAG(_machine_never_appears_locked_bit);
+			}
+		}
+	}
+
+	return;
+}
+
+void device_one_sided_set(
+	long device_index,
+	boolean one_sided)
+{
+	struct machine_datum *machine = machine_try_and_get(device_index);
+
+	if (machine != NULL)
+	{
+		if (one_sided)
+		{
+			machine->machine.flags |= FLAG(_machine_one_sided_bit);
+		}
+		else
+		{
+			machine->machine.flags &= ~FLAG(_machine_one_sided_bit);
+		}
+	}
+
+	return;
+}
+
+void device_set_power(
+	long device_index,
+	real power)
+{
+	if (device_index != NONE)
+	{
+		struct device_datum *device = device_get(device_index);
+
+		device->device.flags |= FLAG(_device_position_changed_bit);
+		device->device.power = power;
+		device_group_set_desired_value(device->device.power_group_index, power);
+	}
+
 	return;
 }
 
