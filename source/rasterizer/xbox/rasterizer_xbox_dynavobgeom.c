@@ -68,6 +68,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -76,14 +78,49 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void rasterizer_profile_begin(
+	short profile);
+
+void rasterizer_profile_end(
+	short profile);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+void _rasterizer_hud_begin(
+	void)
+{
+	rasterizer_profile_begin(27);
+	return;
+}
+
+void _rasterizer_hud_end(
+	void)
+{
+	rasterizer_profile_end(27);
+	return;
+}
 
 void _rasterizer_dynamic_lit_geometry_draw(
 	void const *vertices,
 	void const *parameters)
 {
+	return;
+}
+
+void _rasterizer_dynamic_screen_geometry_draw(
+	long primitive_type,
+	long vertex_type,
+	long dynamic_vertex_buffer_index,
+	long vertex_count)
+{
+	match_vassert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_dynavobgeom.c",
+		255,
+		FALSE,
+		"_rasterizer_dynamic_screen_geometry_draw not supported no mo'");
+
 	return;
 }
 
