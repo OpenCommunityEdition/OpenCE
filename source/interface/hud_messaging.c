@@ -114,7 +114,13 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+
+#include "game/game.h"
 #include "interface/hud_messaging.h"
+#include "saved games/game_state.h"
+
+#include <stddef.h>
 
 /* ---------- constants */
 
@@ -122,11 +128,81 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct hud_timer_data_definition
+{
+	long reference_time;
+	short ticks;
+	short flash_cutoff;
+	short position[2];
+	short corner;
+	boolean paused;
+	boolean enabled;
+};
+
+struct hud_messaging_globals_definition
+{
+	byte message_data_and_flash[0x1185];
+	byte magic_number;
+	byte reserved1186[0x12];
+	struct hud_timer_data_definition timer;
+};
+
+struct hud_messaging_parameters_definition
+{
+	byte data[0x120];
+};
+
+struct hud_globals_definition
+{
+	struct hud_messaging_parameters_definition messaging;
+};
+
+typedef char hud_timer_data_size_assert[
+	sizeof(struct hud_timer_data_definition) == 0x10 ? 1 : -1];
+typedef char hud_messaging_globals_size_assert[
+	sizeof(struct hud_messaging_globals_definition) == 0x11A8 ? 1 : -1];
+typedef char hud_messaging_magic_number_offset_assert[
+	offsetof(struct hud_messaging_globals_definition, magic_number) == 0x1185 ? 1 : -1];
+typedef char hud_messaging_timer_offset_assert[
+	offsetof(struct hud_messaging_globals_definition, timer) == 0x1198 ? 1 : -1];
+typedef char hud_messaging_timer_flash_cutoff_offset_assert[
+	offsetof(struct hud_messaging_globals_definition, timer.flash_cutoff) == 0x119E ? 1 : -1];
+typedef char hud_messaging_timer_enabled_offset_assert[
+	offsetof(struct hud_messaging_globals_definition, timer.enabled) == 0x11A7 ? 1 : -1];
+typedef char hud_messaging_parameters_size_assert[
+	sizeof(struct hud_messaging_parameters_definition) == 0x120 ? 1 : -1];
+typedef char hud_globals_messaging_offset_assert[
+	offsetof(struct hud_globals_definition, messaging) == 0 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+extern struct hud_messaging_globals_definition *bss_00453ab8;
+extern struct hud_globals_definition *hud_globals;
+extern struct hud_messaging_parameters_definition *hud_msg_def;
+extern long time_code_time;
+extern long time_code_stop_time;
+
 /* ---------- public code */
+
+void hud_messaging_initialize(
+	void)
+{
+	bss_00453ab8 = game_state_malloc(
+		"hud messaging",
+		NULL,
+		sizeof(*bss_00453ab8));
+	return;
+}
+
+void hud_messaging_initialize_for_new_map(
+	void)
+{
+	hud_msg_def = &hud_globals->messaging;
+	csmemset(bss_00453ab8, 0, sizeof(*bss_00453ab8));
+	return;
+}
 
 void hud_messaging_dispose_from_old_map(
 	void)
@@ -137,6 +213,40 @@ void hud_messaging_dispose_from_old_map(
 void hud_messaging_dispose(
 	void)
 {
+	return;
+}
+
+void scripted_hud_set_timer_warning_cutoff(
+	short minutes,
+	word seconds)
+{
+	bss_00453ab8->timer.flash_cutoff = 30 * (60 * minutes + seconds);
+	return;
+}
+
+void scripted_hud_show_timer(
+	boolean show)
+{
+	bss_00453ab8->timer.enabled = show;
+	return;
+}
+
+void scripted_hud_time_code_reset(
+	void)
+{
+	long time = game_time_get();
+
+	time_code_time = time;
+	if (time_code_stop_time != NONE)
+		time_code_stop_time = time;
+
+	return;
+}
+
+void hud_messaging_globals_update(
+	void)
+{
+	bss_00453ab8->magic_number = 0;
 	return;
 }
 
