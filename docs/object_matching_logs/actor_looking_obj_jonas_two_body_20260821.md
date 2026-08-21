@@ -36,8 +36,6 @@ functions and 10,428 meaningful code bytes remain outside this wave's credit.
   `4cc87b45f721270392a96f1674ed2b5cd4a7bb4355faeab4531d1cf1884d9520`.
 - January split `actor_looking.obj` SHA-256:
   `443e269f49461dcaf5ff3804fc8770cc5579798427289c60f56a1ce533a226de`.
-- Retained rebuilt object SHA-256:
-  `c1abd58b056218f94b6c95efe141f8234340238167d84f5866cfa8863366071a`.
 - The clean HCEA semantic oracle is commit
   `c168af2e747d3095d9a29418ae401f3a39544863`. Its two readable body blobs are
   `b03b1dc04e840790a7ee83deb4b481eda2cb6e88` and
@@ -149,8 +147,9 @@ generation forcing.
 After the source and ledger were committed, a clean committed-state regression
 snapshot/check passed. The built `actor_looking.obj` was then deleted and
 forced through the normal same-path Ninja edge; the post-rebuild regression
-check and direct hardened comparison again passed both functions, and the
-rebuilt object reproduced SHA-256
-`c1abd58b056218f94b6c95efe141f8234340238167d84f5866cfa8863366071a`.
-The committed source blob and stable payload SHA above were reproduced from
-`HEAD`. The final worktree was clean. No push was performed.
+check and direct hardened comparison again passed both functions, reproducing
+their padded sizes, normalized hashes, 24 relocations, and non-code ownership
+boundary. The raw object-container SHA is deliberately not a reproducibility
+criterion because VC7 writes the compile time into the COFF header. The
+committed source blob and stable payload SHA above were reproduced from `HEAD`.
+The final worktree was clean. No push was performed.
