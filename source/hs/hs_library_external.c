@@ -88,6 +88,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -96,8 +98,60 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+long object_index_from_name_index(
+	short name_index);
+boolean hs_trigger_volume_test_objects(
+	short trigger_volume_index,
+	long object_list_index,
+	boolean all);
+void hs_object_destroy(
+	long object_index);
+void terminal_printf(
+	union real_argb_color const *color,
+	char const *format,
+	...);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+boolean hs_not(
+	boolean value)
+{
+	return !value;
+}
+
+void hs_print(
+	char const *message)
+{
+	terminal_printf(global_real_argb_green, message);
+
+	return;
+}
+
+void hs_object_destroy_by_name(
+	short object_name_index)
+{
+	if (object_name_index != NONE)
+	{
+		long object_index;
+
+		object_index = object_index_from_name_index(object_name_index);
+		if (object_index != NONE)
+			hs_object_destroy(object_index);
+	}
+
+	return;
+}
+
+boolean hs_trigger_volume_test_objects_any(
+	short trigger_volume_index,
+	long object_list_index)
+{
+	return hs_trigger_volume_test_objects(
+		trigger_volume_index,
+		object_list_index,
+		FALSE);
+}
 
 /* ---------- private code */
