@@ -152,3 +152,16 @@ void glow_dispose(
 }
 
 /* ---------- private code */
+
+void point_from_parametric_line(
+	real_point3d const *point,
+	real_vector3d const *forward,
+	real t,
+	real_point3d *result)
+{
+	result->x = forward->i * t + point->x;
+	result->y = forward->j * t + point->y;
+	result->z = forward->k * t + point->y;
+
+	return;
+}
