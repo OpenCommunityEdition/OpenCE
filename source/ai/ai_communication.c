@@ -657,6 +657,8 @@ boolean code_000316a0(
 	long original_unit_index,
 	struct ai_information_packet *communication,
 	long reply_actor_index);
+boolean actor_is_fighting(
+	long actor_index);
 
 /* ---------- globals */
 
@@ -1184,6 +1186,45 @@ void ai_communication_dispose(
 	void)
 {
 	return;
+}
+
+char const *ai_communication_get_type_name(
+	short communication_type)
+{
+	char const *name = "<error>";
+
+	if (communication_type >= 0 &&
+		communication_type < NUMBER_OF_COMMUNICATION_TYPES)
+	{
+		name = global_communication_type_names[communication_type];
+	}
+
+	return name;
+}
+
+short ai_communication_get_type_by_name(
+	char const *name)
+{
+	short communication_type = NONE;
+	short index;
+
+	for (index = 0; index < NUMBER_OF_COMMUNICATION_TYPES; index++)
+	{
+		if (csstrcmp(global_communication_type_names[index], name) == 0)
+		{
+			communication_type = index;
+		}
+	}
+
+	return communication_type;
+}
+
+boolean code_00031550(
+	long original_unit_index,
+	struct ai_information_packet *communication,
+	long reply_actor_index)
+{
+	return actor_is_fighting(reply_actor_index);
 }
 
 short ai_conversation_line(
