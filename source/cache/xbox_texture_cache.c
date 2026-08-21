@@ -108,6 +108,8 @@ struct xbox_texture_cache_globals_prefix
 	struct data_array *textures;
 	byte reserved1604[4];
 	struct lruv_cache *cache;
+	boolean stolen_memory;
+	byte reserved160D[3];
 };
 
 typedef char verify_xbox_texture_cache_textures_offset[
@@ -118,14 +120,25 @@ typedef char verify_xbox_texture_cache_cache_offset[
 	offsetof(
 		struct xbox_texture_cache_globals_prefix,
 		cache) == 0x1608 ? 1 : -1];
+typedef char verify_xbox_texture_cache_stolen_memory_offset[
+	offsetof(
+		struct xbox_texture_cache_globals_prefix,
+		stolen_memory) == 0x160C ? 1 : -1];
 typedef char verify_xbox_texture_cache_globals_prefix_size[
-	sizeof(struct xbox_texture_cache_globals_prefix) == 0x160C ? 1 : -1];
+	sizeof(struct xbox_texture_cache_globals_prefix) == 0x1610 ? 1 : -1];
 
 /* ---------- prototypes */
+
+int __stdcall D3DDevice_IsBusy(
+	void);
+void __stdcall D3DDevice_KickPushBuffer(
+	void);
 
 /* ---------- globals */
 
 extern struct xbox_texture_cache_globals_prefix bss_004d1198;
+
+#define xbox_texture_cache_globals bss_004d1198
 
 /* ---------- public code */
 
@@ -150,6 +163,29 @@ void texture_cache_idle(
 	void)
 {
 	lruv_idle(bss_004d1198.cache);
+
+	return;
+}
+
+void texture_cache_flush(
+	void)
+{
+	D3DDevice_KickPushBuffer();
+	D3DDevice_IsBusy();
+	lruv_flush(xbox_texture_cache_globals.cache);
+
+	return;
+}
+
+void texture_cache_close(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\xbox_texture_cache.c",
+		133,
+		!xbox_texture_cache_globals.stolen_memory);
+	texture_cache_flush();
+	data_make_invalid(xbox_texture_cache_globals.textures);
 
 	return;
 }
