@@ -358,10 +358,12 @@ COMDATs and the four exact 133-byte read-only string COMDATs recorded above.
 It defines no writable `.data`, `.bss`, COMMON, aggregate, or SDK lookup-table
 owner. `_XPhysicalFree@4`, `_system_exit`, `_display_assert`,
 `_bss_004d27d0`, `_CloseHandle@4`, and `_code_001b0270` remain undefined
-value-zero externals. Thus the private helper definition, owned Xbox BSS,
-initialization, disposal, enumeration, save, and every body outside the fixed
-triad remain absent.
+value-zero externals. Thus the private helper definition and owned Xbox BSS
+remain absent, as do initialization, disposal, enumeration, save, and every
+other unreconstructed body. The inherited filename leaf is the only emitted
+body outside the fixed triad.
 
 This section is the sole change in an additive Jonas ledger-only follow-up.
-The committed source blob remains unchanged. Nothing is pushed, amended, or
-history-rewritten.
+An additional additive ledger-only wording correction explicitly acknowledges
+the inherited filename leaf in the final absence census. The committed source
+blob remains unchanged. Nothing is pushed, amended, or history-rewritten.
