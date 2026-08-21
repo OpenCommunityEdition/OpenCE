@@ -35,8 +35,13 @@ this wave's credit.
   `4cc87b45f721270392a96f1674ed2b5cd4a7bb4355faeab4531d1cf1884d9520`.
 - January split-object SHA-256:
   `6240548bf1ee72e09f15d1b48284092b17b6c096c11e8d294bbf71ae266acb57`.
-- Final rebuilt candidate-object SHA-256:
+- Pre-commit retained candidate-object SHA-256:
   `6078a1bc7b384310ed4125538addb75692c223153167ad1f7d1f393e5fe04d03`.
+- Committed delete/rebuild candidate-object SHA-256:
+  `b877999576947815ed8dc7704d12569667911fe4fa759a13bd4f2fff39cf297e`.
+  These phase-specific whole-object hashes include compiler debug metadata;
+  the normalized function hashes and relocation identities are the stable
+  acceptance authority.
 - Clean HCEA semantic donor commit:
   `c168af2e747d3095d9a29418ae401f3a39544863`. Its exact-name source files
   are tree-reachable with these stable blob/payload identities:
@@ -160,7 +165,9 @@ synthetic anchor, or object-byte forcing.
 - Complete tooling suite: 179/179 tests pass; `git diff --check`, protected-
   source, scope, and banned-construct checks are clean.
 
-A clean committed-state one-unit regression snapshot/check followed by
-verified deletion and forced rebuilding of `bitmaps.obj` provides the final
-same-path reproducibility proof. The post-rebuild hardened comparison remains
-strict for all four accepted functions. No push is performed.
+A clean committed-state one-unit regression snapshot at
+`ca880dbf7c83478112d1ee6125e4ae4e07adf294` and its initial check passed.
+Verified deletion and forced rebuilding of `bitmaps.obj` then reproduced all
+four accepted functions exactly; the post-rebuild regression check reports
+`changed_nonexact: []`, all four under `still_exact`, and no failures or
+warnings. No push is performed.
