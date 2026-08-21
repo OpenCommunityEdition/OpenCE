@@ -19,7 +19,7 @@ remains untouched.
 - January split-object SHA-256:
   `5be1b15bb8f628bd795b912bbea2f45b89cedd4b0f69b2ec99247a33ba408075`.
 - HCEA semantic oracle commit:
-  `c89106c4964f2df3a98ef7b4035d6750372797cd`. Its authenticated anonymous
+  `c168af2e747d3095d9a29418ae401f3a39544863`. Its authenticated anonymous
   camera-globals layout blob is
   `751d8b03e9cd57baabac4ee2923fc340cd323c4b`, and the enable-leaf blob is
   `1cf9cfc14b16fa0216f700413bf736fc1e40de39`.
