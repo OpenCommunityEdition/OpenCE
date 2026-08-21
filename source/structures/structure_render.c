@@ -90,12 +90,59 @@ symbols in this file:
 
 /* ---------- macros */
 
+#define structure_render_globals bss_004c0cd0
+
 /* ---------- structures */
+
+struct structure_render_globals_prefix
+{
+	boolean environment_geometry_valid;
+	long environment_triangles_index;
+	boolean fog_offset_valid;
+	real_vector3d fog_offset_vector;
+};
+
+typedef char verify_structure_render_environment_geometry_valid_offset[
+	offsetof(
+		struct structure_render_globals_prefix,
+		environment_geometry_valid) == 0x0 ? 1 : -1];
+typedef char verify_structure_render_environment_triangles_index_offset[
+	offsetof(
+		struct structure_render_globals_prefix,
+		environment_triangles_index) == 0x4 ? 1 : -1];
+typedef char verify_structure_render_fog_offset_valid_offset[
+	offsetof(
+		struct structure_render_globals_prefix,
+		fog_offset_valid) == 0x8 ? 1 : -1];
+typedef char verify_structure_render_fog_offset_vector_offset[
+	offsetof(
+		struct structure_render_globals_prefix,
+		fog_offset_vector) == 0xC ? 1 : -1];
+typedef char verify_structure_render_globals_prefix_size[
+	sizeof(struct structure_render_globals_prefix) == 0x18 ? 1 : -1];
 
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+extern struct structure_render_globals_prefix bss_004c0cd0;
+
 /* ---------- public code */
+
+void structure_render_set_fog_offset(
+	real_vector3d *vector_offset)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\structures\\structure_render.c",
+		103,
+		!structure_render_globals.fog_offset_valid);
+
+	structure_render_globals.fog_offset_valid = TRUE;
+	structure_render_globals.fog_offset_vector.i = vector_offset->i;
+	structure_render_globals.fog_offset_vector.j = vector_offset->j;
+	structure_render_globals.fog_offset_vector.k = vector_offset->k;
+
+	return;
+}
 
 /* ---------- private code */
