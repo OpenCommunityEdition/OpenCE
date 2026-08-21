@@ -197,20 +197,82 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct ai_globals_prefix
+{
+	boolean ai_active;
+	boolean ai_initialized_for_map;
+	byte reserved002[0xE];
+	boolean dialogue_triggers_enabled;
+	byte reserved011[0x3A3];
+	boolean grenades_enabled;
+};
+
+typedef char ai_globals_prefix_active_offset_assert[
+	offsetof(struct ai_globals_prefix, ai_active) == 0x0 ? 1 : -1];
+typedef char ai_globals_prefix_initialized_offset_assert[
+	offsetof(struct ai_globals_prefix, ai_initialized_for_map) == 0x1 ? 1 : -1];
+typedef char ai_globals_prefix_dialogue_offset_assert[
+	offsetof(struct ai_globals_prefix, dialogue_triggers_enabled) == 0x10 ? 1 : -1];
+typedef char ai_globals_prefix_grenades_offset_assert[
+	offsetof(struct ai_globals_prefix, grenades_enabled) == 0x3B4 ? 1 : -1];
+typedef char ai_globals_prefix_size_assert[
+	sizeof(struct ai_globals_prefix) == 0x3B5 ? 1 : -1];
+
 /* ---------- prototypes */
+
+void ai_communication_dispose_from_old_map(
+	void);
+void ai_script_dispose_from_old_map(
+	void);
 
 void encounters_create_for_new_map(
 	void);
+void encounters_dispose_from_old_map(
+	void);
+void props_dispose_from_old_map(
+	void);
+void actors_dispose_from_old_map(
+	void);
+void paths_dispose_from_old_map(
+	void);
+void ai_profile_dispose_from_old_map(
+	void);
+void ai_debug_dispose_from_old_map(
+	void);
+
+boolean code_000309a0(
+	boolean must_be_attacking);
 
 /* ---------- globals */
 
+extern struct ai_globals_prefix *ai_globals;
+
 /* ---------- public code */
+
+void ai_dispose_from_old_map(
+	void)
+{
+	ai_communication_dispose_from_old_map();
+	ai_script_dispose_from_old_map();
+	encounters_dispose_from_old_map();
+	props_dispose_from_old_map();
+	actors_dispose_from_old_map();
+	paths_dispose_from_old_map();
+	ai_profile_dispose_from_old_map();
+	ai_debug_dispose_from_old_map();
+
+	ai_globals->ai_initialized_for_map = FALSE;
+
+	return;
+}
 
 void ai_place(
 	void)
@@ -218,6 +280,48 @@ void ai_place(
 	encounters_create_for_new_map();
 
 	return;
+}
+
+void ai_globals_ai_active(
+	boolean enabled)
+{
+	match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x13A, ai_globals);
+
+	ai_globals->ai_active = enabled;
+
+	return;
+}
+
+void ai_globals_dialogue_triggers_enabled(
+	boolean enabled)
+{
+	match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x143, ai_globals);
+
+	ai_globals->dialogue_triggers_enabled = enabled;
+
+	return;
+}
+
+void ai_globals_grenades_enabled(
+	boolean enabled)
+{
+	match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x14C, ai_globals);
+
+	ai_globals->grenades_enabled = enabled;
+
+	return;
+}
+
+boolean ai_enemies_can_see_player(
+	void)
+{
+	return code_000309a0(FALSE);
+}
+
+boolean ai_enemies_attacking_player(
+	void)
+{
+	return code_000309a0(TRUE);
 }
 
 /* ---------- private code */
