@@ -213,7 +213,7 @@ constant spelling, or object-byte forcing.
 - Complete tooling suite: 179/179 tests pass; `git diff --check` is clean.
 
 A clean committed-state regression snapshot/check followed by deletion and
-forced rebuilding of `actor_combat.obj` is the final same-path reproducibility
-proof. The post-rebuild hardened comparison must remain strict for all four
-accepted functions, both rejected symbols must remain absent, and the object
-must continue to own no runtime data/storage. No push is performed.
+forced rebuilding of `actor_combat.obj` provided the final same-path
+reproducibility proof. The post-rebuild hardened comparison remained strict
+for all four accepted functions, both rejected symbols remained absent, and
+the object continued to own no runtime data/storage. No push was performed.
