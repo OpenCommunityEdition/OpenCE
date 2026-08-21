@@ -170,3 +170,21 @@ or object-byte/code-generation forcing.
 - Parked validation: three active, zero stale, and zero invalid entries.
 - Complete tooling suite: 179/179 tests pass; `git diff --check` and the
   source/config/header/protected/deleted-path scope audit are clean.
+
+## Committed-state replay
+
+Implementation commit `131d10b60c4b34e92431d9ce04ac0085a9acabaf`
+was clean before the replay. The source blob and stable payload SHA-256 above
+were reproduced directly from that commit. A one-unit regression snapshot
+and immediate check passed with all four accepted functions `still_exact`,
+zero changed/nonexact or newly-exact entries, zero failures, and zero
+warnings.
+
+The generated `build/base/source/interface/first_person_weapons.obj` was then
+deleted and rebuilt through its normal same-path Ninja edge. The post-rebuild
+regression check returned the same clean result, and direct hardened
+comparison again reproduced the two new exact hashes, both inherited disposal
+hashes, and all 19 new relocation identities/addends. The two rejected symbols
+remained absent, `_bss_00453cc8` remained an undefined value-zero external,
+and no `.bss` or writable `.data` section was emitted. The worktree was clean
+after the proof. No push or history rewrite was performed.
