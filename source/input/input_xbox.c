@@ -113,10 +113,27 @@ struct input_globals
 {
 	unsigned char reserved0[0x138];
 	boolean suppressed;
-	unsigned char reserved1[0xF4];
+	unsigned char reserved1[3];
+	void *gamepad_handles[MAXIMUM_GAMEPADS];
+	struct gamepad_state gamepad_states[MAXIMUM_GAMEPADS];
+	struct gamepad_state suppressed_gamepad_state;
+	unsigned char reserved2[0x19];
 	boolean frame_active;
-	unsigned char reserved2[0x1DE];
+	unsigned char reserved3[0x1DE];
 };
+
+typedef char verify_input_suppressed_offset[
+	offsetof(struct input_globals, suppressed) == 0x138 ? 1 : -1];
+typedef char verify_input_gamepad_handles_offset[
+	offsetof(struct input_globals, gamepad_handles) == 0x13C ? 1 : -1];
+typedef char verify_input_gamepad_states_offset[
+	offsetof(struct input_globals, gamepad_states) == 0x14C ? 1 : -1];
+typedef char verify_input_suppressed_gamepad_state_offset[
+	offsetof(struct input_globals, suppressed_gamepad_state) == 0x1EC ? 1 : -1];
+typedef char verify_input_frame_active_offset[
+	offsetof(struct input_globals, frame_active) == 0x22D ? 1 : -1];
+typedef char verify_input_globals_size[
+	sizeof(struct input_globals) == 0x40C ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -162,6 +179,26 @@ const struct mouse_state *input_get_mouse_state(void)
 boolean input_mouse_button_is_down(short button_index)
 {
 	return FALSE;
+}
+
+const struct gamepad_state *input_get_gamepad_state(
+	short gamepad_index)
+{
+	const struct gamepad_state *result = NULL;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\input\\input_xbox.c",
+		0x17B,
+		gamepad_index>=0 && gamepad_index<MAXIMUM_GAMEPADS);
+
+	if (bss_004536a0.gamepad_handles[gamepad_index])
+	{
+		result = bss_004536a0.suppressed
+			? &bss_004536a0.suppressed_gamepad_state
+			: &bss_004536a0.gamepad_states[gamepad_index];
+	}
+
+	return result;
 }
 
 void input_frame_end(
