@@ -68,7 +68,6 @@ extern void debug_free(void *pointer, const char *file, long line);
 #define TIFFWriteFloatArray code_00056280
 #define TIFFWriteNormalTag code_000562c0
 #define TIFFWritePerSampleShorts code_000565e0
-#define lseek _lseek
 #define write _write
 #define module (data_002b8688.module)
 
