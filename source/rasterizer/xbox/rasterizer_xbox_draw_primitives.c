@@ -224,4 +224,22 @@ symbols in this file:
 
 /* ---------- public code */
 
+void rasterizer_dynamic_geometry_end(
+	void)
+{
+	return;
+}
+
+void _rasterizer_dynamic_triangles_delete(
+	long triangle_buffer_index)
+{
+	return;
+}
+
+void _rasterizer_dynamic_vertices_delete(
+	long dynamic_vertex_buffer_index)
+{
+	return;
+}
+
 /* ---------- private code */

@@ -80,4 +80,11 @@ symbols in this file:
 
 /* ---------- public code */
 
+void _rasterizer_dynamic_lit_geometry_draw(
+	void const *vertices,
+	void const *parameters)
+{
+	return;
+}
+
 /* ---------- private code */

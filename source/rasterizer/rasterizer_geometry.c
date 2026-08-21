@@ -109,4 +109,13 @@ symbols in this file:
 
 /* ---------- public code */
 
+void rasterizer_geometry_byte_swap_vertices(
+	short type,
+	long count,
+	void *vertices,
+	long buffer_size)
+{
+	return;
+}
+
 /* ---------- private code */

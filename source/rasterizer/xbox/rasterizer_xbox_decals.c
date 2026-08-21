@@ -118,6 +118,18 @@ symbols in this file:
 
 /* ---------- public code */
 
+void rasterizer_decal_vertices_end_update(
+	void)
+{
+	return;
+}
+
+void _rasterizer_decal_vertices_unlock(
+	void)
+{
+	return;
+}
+
 void _rasterizer_decals_initialize_for_new_map(
 	void)
 {

@@ -66,6 +66,12 @@ symbols in this file:
 
 /* ---------- public code */
 
+void rasterizer_debug_drawing_end(
+	void)
+{
+	return;
+}
+
 void _rasterizer_debug_immediate_end(
 	void)
 {

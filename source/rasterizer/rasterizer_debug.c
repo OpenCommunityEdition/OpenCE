@@ -111,4 +111,10 @@ void rasterizer_debug_end(
 	return;
 }
 
+void rasterizer_debug_test(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */

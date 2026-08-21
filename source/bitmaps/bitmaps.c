@@ -244,6 +244,8 @@ enum
 
 /* ---------- structures */
 
+struct bitmap_data;
+
 /* ---------- prototypes */
 
 /* ---------- globals */
@@ -333,6 +335,12 @@ char const *bitmap_format_get_string(
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 135, bitmap_format_string_table[NUMBER_OF_BITMAP_FORMATS]==NULL);
 
 	return bitmap_format_string_table[format];
+}
+
+void bitmap_byte_swap_pixels(
+	struct bitmap_data *bitmap)
+{
+	return;
 }
 
 /* ---------- private code */

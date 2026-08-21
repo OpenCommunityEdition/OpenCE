@@ -223,6 +223,10 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct collision_result;
+struct decal_editor_geometry;
+union real_vector3d;
+
 /* ---------- prototypes */
 
 void rasterizer_decals_dispose(
@@ -254,6 +258,18 @@ void decals_dispose(
 	global_decal_data = NULL;
 	rasterizer_decals_dispose();
 
+	return;
+}
+
+void decal_new_from_media_collision(
+	long decal_definition_index,
+	struct collision_result const *collision,
+	union real_vector3d const *velocity,
+	float radius_modifier,
+	boolean permanent,
+	short forced_sequence_index,
+	struct decal_editor_geometry *editor_geometry)
+{
 	return;
 }
 

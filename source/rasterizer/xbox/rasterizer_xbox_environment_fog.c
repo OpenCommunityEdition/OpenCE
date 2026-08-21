@@ -134,4 +134,10 @@ symbols in this file:
 
 /* ---------- public code */
 
+void rasterizer_environment_fog_screen_window_end(
+	void)
+{
+	return;
+}
+
 /* ---------- private code */
