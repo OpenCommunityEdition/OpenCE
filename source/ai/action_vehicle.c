@@ -68,6 +68,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "actions.h"
+
+#include "actors.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -83,6 +88,16 @@ symbols in this file:
 void action_vehicle_update(
 	long actor_index)
 {
+	return;
+}
+
+void action_vehicle_flush_structure_indices(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	actor->state.action_data.vehicle.destination_surface_index = NONE;
+
 	return;
 }
 
