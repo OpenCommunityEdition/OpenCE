@@ -97,6 +97,8 @@ symbols in this file:
 #include "cseries.h"
 #include "physics.h"
 
+#include "physics_definitions.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -115,4 +117,32 @@ long depths_of_hell = 0;
 
 /* ---------- public code */
 
+boolean physics_test_point(
+	struct physics_instance const *instance,
+	real_point3d const *point)
+{
+	real_point3d local_point;
+	struct physics_definition const *physics;
+	short mass_point_index;
+
+	matrix4x3_inverse_transform_point(&instance->world_matrix, point, &local_point);
+	physics = instance->physics;
+
+	for (mass_point_index = 0;
+		mass_point_index < physics->mass_points.count;
+		mass_point_index++)
+	{
+		struct mass_point_definition const *mass_point = TAG_BLOCK_GET_ELEMENT(
+			&physics->mass_points,
+			mass_point_index,
+			struct mass_point_definition);
+
+		if (point_in_sphere(&local_point, &mass_point->position, mass_point->radius))
+			return TRUE;
+
+		physics = instance->physics;
+	}
+
+	return FALSE;
+}
 /* ---------- private code */

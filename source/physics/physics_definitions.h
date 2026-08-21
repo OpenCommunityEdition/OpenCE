@@ -27,6 +27,27 @@ enum
 
 /* ---------- structures */
 
+struct mass_point_definition
+{
+	char name[32];
+	short powered_mass_point_index;
+	short model_node_index;
+	unsigned long flags;
+	real relative_mass;
+	real mass;
+	real relative_density;
+	real density;
+	real_point3d position;
+	real_vector3d forward;
+	real_vector3d up;
+	short friction_type;
+	short pad;
+	real friction_parallel_scale;
+	real friction_perpendicular_scale;
+	real radius;
+	real unused[5];
+};
+
 struct physics_definition
 {
 	real radius;
@@ -54,6 +75,13 @@ struct physics_definition
 	struct tag_block powered_mass_points;
 	struct tag_block mass_points;
 };
+
+typedef char mass_point_definition_size_assert[
+	sizeof(struct mass_point_definition) == 0x80 ? 1 : -1];
+typedef char mass_point_definition_position_offset_assert[
+	offsetof(struct mass_point_definition, position) == 0x38 ? 1 : -1];
+typedef char mass_point_definition_radius_offset_assert[
+	offsetof(struct mass_point_definition, radius) == 0x68 ? 1 : -1];
 
 /* ---------- prototypes/EXAMPLE.C */
 
