@@ -23,9 +23,11 @@ that split `__unknown3C[105]` into `__unknown3C[104]` plus the named
 
 The local source instead uses the read-only
 `ACTION_UNCOVER_DEBUG_PRINTING_ENABLED()` accessor over the already declared
-`ai_debug.__unknown3C[104]` subobject. This is an actual `byte`, which
-`cseries.h` declares as `unsigned char`. A zero-emission compile-time
-assertion requires the member identity to remain at `+0xA4`. The independent
+`ai_debug.__unknown3C[104]` subobject. The frozen header declares that storage
+as `char[105]`; the accessor reads the actual one-byte character subobject and
+uses it only as a truth value, so it does not depend on signedness. A
+zero-emission compile-time assertion requires the member identity to remain at
+`+0xA4`. The independent
 `hs_globals_external.c` registration names that same address
 `ai_print_uncovering`. There is no cast, pointer arithmetic, write, union
 overlay, or helper body.
