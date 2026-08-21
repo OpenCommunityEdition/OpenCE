@@ -57,13 +57,13 @@ payloads, independently authenticating the Git object identifiers.
 
 | HCEA evidence | Git blob | Bytes | Payload SHA-256 |
 | --- | --- | ---: | --- |
-| point body | `a1a2b5c2fe7f17662a850419cc0b4bfa77384b15` | 380 | `30695672758f7e7c30a7519418f9f68e795a96c2240a59d76ed175283b0fa381` |
-| normal body | `7958ded7ae8668c4f805d91772c28b92cbce6fa4` | 1,234 | `9f01477792ec8765862688f700937b08058771d9aa0742dd6cb030e0548458ec` |
-| environment texcoord body | `e6e0490d2275dccc10243a350330c7763d789a6c` | 400 | `d41d4e02f6918886cb73deee323dd7ce6a8590bb45802c8d071d12aa3614c4cc` |
-| incident-radiosity body | `11f9a0a1078dca8db0a333c421a0f695622f5dc0` | 1,165 | `c6e43a89f85f93ca2a80298bf89a8671019552c6b15a6433ffb1a08794bfd926` |
-| lightmap texcoord body | `5199b6543f094cb1d2038c8b03d5e16f30e9c059` | 700 | `4b3f535e601d54d849e807175c8ea68d8c33334594e9a70e27ab65126dd1dc5a` |
-| environment compressed layout | `770a88dbee99031ddaa0eef33bf850b7658a327e` | 562 | `a7b15827a20dce506c19a3ddcf80397890740df7cbabe65b1f48e07167a00cb4` |
-| lightmap compressed layout | `360f0e93138ae0e4f9e310e3914dfade8b443b7d` | 502 | `a31e137b3b29b9fb01d00423c94cbacb652307aae6ca0994c2f4465be532afd4` |
+| point body | `a1a2b5c2fe7f17662a850419cc0b4bfa77384b15` | 369 | `419e1f51bf37ca36b8efec33e7057cfe84634b0f37eaacbdee94b2b213639294` |
+| normal body | `7958ded7ae8668c4f805d91772c28b92cbce6fa4` | 1,216 | `dbb8ce2b8135eec6932f519fcd64309132478240ba6ef86a315c431361d5820a` |
+| environment texcoord body | `e6e0490d2275dccc10243a350330c7763d789a6c` | 389 | `9529062e14062a54a526b54e77c464978ff43fde6ee1abb40a3bfe369d28b112` |
+| incident-radiosity body | `11f9a0a1078dca8db0a333c421a0f695622f5dc0` | 1,147 | `3bd7c7887654028386f0543ce639457c1869e81fea76d4b96b9c8dc4d9cdb9cd` |
+| lightmap texcoord body | `5199b6543f094cb1d2038c8b03d5e16f30e9c059` | 686 | `29112b8e96662412c6144e340fc9742aac3152d4bea67f255ae6445a97d7edf9` |
+| environment compressed layout | `770a88dbee99031ddaa0eef33bf850b7658a327e` | 547 | `28b8ecc28b780164e968fe2578aea9ccc34a6e52096e8598f9e8c6ac61a2cc89` |
+| lightmap compressed layout | `360f0e93138ae0e4f9e310e3914dfade8b443b7d` | 491 | `add8621fe5a857995a18d7a101385cb68a5fa5b1e4e8b59e6c44ca80c03df751` |
 
 HCEA supplies readable public intent, field names, and compressed-layout
 corroboration. It is not the PC byte authority. In particular, the HCEA
@@ -308,3 +308,15 @@ remain exactly `__fltused`, `_system_exit`, `_display_assert`, and
 this additive ledger paragraph only.
 
 Nothing is pushed, amended, or history-rewritten.
+
+## Post-integration provenance correction
+
+A read-only audit at clean canonical commit
+`75a9bbeb6ec99d6db100d8ce875d408782fa1078` re-read every cited HCEA object
+with `git cat-file blob` from the clean c168 worktree. The seven HCEA
+size/SHA-256 rows above now record those raw Git-blob payloads. Their earlier
+values had inadvertently described the CRLF checkout view while labeling it
+as raw Git data. Every Git object identifier and tree-reachability claim was
+already correct. This correction changes only this Jonas ledger; the retained
+source, candidate object, function identities, ownership result, and replay
+evidence are unchanged. No commit was amended or rewritten.
