@@ -42,13 +42,17 @@ partial-section data credit is claimed by the ordinary progress graph:
 
 ## Typed layout and policy audit
 
-The former opaque spans in `profile_section` are expanded into the donor's
-ordinary typed fields without changing the structure's `0x5F8` size.
-Compile-time assertions cover the complete size and every newly named field at
-offsets `0x18`, `0x1C`, `0x20`, `0x28`, `0x208`, `0x5C8`, `0x5CC`, `0x5D0`,
-`0x5D8`, `0x5DC`, `0x5E0`, `0x5E8`, `0x5EC`, and `0x5F0`.  The history arrays
-use the authentic 120-entry bound.  Both new functions use one parameter per
-line, readable typed C, house-formatted conditions, and explicit final returns.
+The former opaque spans in `profile_section` are expanded into ordinary typed
+fields at every offset actually accessed by the recovered code without
+changing the structure's `0x5F8` size. Target code proves those access widths
+and offsets; the beta PDB records that this module was compiled without debug
+information, so it cannot independently name the fields. The unused four-byte
+slots at `0x1C`, `0x5DC`, and `0x5EC` therefore remain honest opaque byte
+arrays rather than inferred integers. Compile-time assertions cover the
+complete size, every accessed field, and all three reserved slots from `0x18`
+through `0x5F0`. The history arrays use the target-proven 120-entry bound.
+Both new functions use one parameter per line, readable typed C,
+house-formatted conditions, and explicit final returns.
 
 The donor's thirteen exact `rdtsc` assembly bodies were rejected and remain
 absent, as do all volatile scheduling devices, force-inline annotations,

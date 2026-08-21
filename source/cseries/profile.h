@@ -38,7 +38,7 @@ struct profile_section
 	long field_C;
 	unsigned __int64 field_10;
 	long field_18;
-	long field_1C;
+	byte reserved1C[4];
 	__int64 field_20;
 	long field_28[MAXIMUM_PROFILE_HISTORY];
 	__int64 field_208[MAXIMUM_PROFILE_HISTORY];
@@ -46,10 +46,10 @@ struct profile_section
 	long field_5CC;
 	__int64 field_5D0;
 	long field_5D8;
-	long field_5DC;
+	byte reserved5DC[4];
 	__int64 field_5E0;
 	long field_5E8;
-	long field_5EC;
+	byte reserved5EC[4];
 	__int64 field_5F0;
 };
 
@@ -57,8 +57,8 @@ typedef char profile_section_size_assert[
 	sizeof(struct profile_section) == 0x5F8 ? 1 : -1];
 typedef char profile_section_field_18_offset_assert[
 	offsetof(struct profile_section, field_18) == 0x18 ? 1 : -1];
-typedef char profile_section_field_1C_offset_assert[
-	offsetof(struct profile_section, field_1C) == 0x1C ? 1 : -1];
+typedef char profile_section_reserved1C_offset_assert[
+	offsetof(struct profile_section, reserved1C) == 0x1C ? 1 : -1];
 typedef char profile_section_field_20_offset_assert[
 	offsetof(struct profile_section, field_20) == 0x20 ? 1 : -1];
 typedef char profile_section_field_28_offset_assert[
@@ -73,14 +73,14 @@ typedef char profile_section_field_5D0_offset_assert[
 	offsetof(struct profile_section, field_5D0) == 0x5D0 ? 1 : -1];
 typedef char profile_section_field_5D8_offset_assert[
 	offsetof(struct profile_section, field_5D8) == 0x5D8 ? 1 : -1];
-typedef char profile_section_field_5DC_offset_assert[
-	offsetof(struct profile_section, field_5DC) == 0x5DC ? 1 : -1];
+typedef char profile_section_reserved5DC_offset_assert[
+	offsetof(struct profile_section, reserved5DC) == 0x5DC ? 1 : -1];
 typedef char profile_section_field_5E0_offset_assert[
 	offsetof(struct profile_section, field_5E0) == 0x5E0 ? 1 : -1];
 typedef char profile_section_field_5E8_offset_assert[
 	offsetof(struct profile_section, field_5E8) == 0x5E8 ? 1 : -1];
-typedef char profile_section_field_5EC_offset_assert[
-	offsetof(struct profile_section, field_5EC) == 0x5EC ? 1 : -1];
+typedef char profile_section_reserved5EC_offset_assert[
+	offsetof(struct profile_section, reserved5EC) == 0x5EC ? 1 : -1];
 typedef char profile_section_field_5F0_offset_assert[
 	offsetof(struct profile_section, field_5F0) == 0x5F0 ? 1 : -1];
 
