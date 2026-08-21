@@ -548,9 +548,66 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	NUMBER_OF_COMMUNICATION_PRIORITIES = 8,
+	NUMBER_OF_COMMUNICATION_TEAMS = 4,
+	NUMBER_OF_COMMUNICATION_TYPES = 57,
+	NUMBER_OF_COMMUNICATION_TIMER_TYPES = 5,
+	NUMBER_OF_DIALOGUE_USAGES = 105,
+	NUMBER_OF_REPLY_USAGES = 46,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct ai_information_packet;
+
+struct dialogue_usage
+{
+	short communication_type;
+	short communication_priority;
+	short vocalization_type;
+	short animation_type;
+	short protagonist_type;
+	short protagonist_look_priority;
+	short recipient_look_direction;
+	short recipient_look_priority;
+	real weight;
+	real repeat_delay;
+	short flags;
+	short required_group;
+	short required_hostility;
+	short required_enemy_status;
+	short required_subject_race;
+	short required_cause_race;
+	short required_damage;
+};
+
+struct reply_usage
+{
+	short original_vocalization_type;
+	short original_damage_category;
+	short protagonist_type;
+	short vocalization_type;
+	short animation_type;
+	short communication_priority;
+	word flags;
+	real chance;
+	real player_chance;
+	real delay_time;
+	real repeat_delay;
+	boolean (*reply_filter)(
+		long original_unit_index,
+		struct ai_information_packet *communication,
+		long reply_actor_index);
+};
+
+typedef char dialogue_usage_size_assert[
+	sizeof(struct dialogue_usage) == 0x28 ? 1 : -1];
+typedef char reply_usage_size_assert[
+	sizeof(struct reply_usage) == 0x24 ? 1 : -1];
 
 struct ai_conversation_line_view
 {
@@ -564,7 +621,562 @@ typedef char ai_conversation_line_view_current_line_offset_assert[
 
 /* ---------- prototypes */
 
+boolean code_00031390(
+	long original_unit_index,
+	struct ai_information_packet *communication,
+	long reply_actor_index);
+boolean code_00031400(
+	long original_unit_index,
+	struct ai_information_packet *communication,
+	long reply_actor_index);
+boolean code_00031470(
+	long original_unit_index,
+	struct ai_information_packet *communication,
+	long reply_actor_index);
+boolean code_000314c0(
+	long original_unit_index,
+	struct ai_information_packet *communication,
+	long reply_actor_index);
+boolean code_00031550(
+	long original_unit_index,
+	struct ai_information_packet *communication,
+	long reply_actor_index);
+boolean code_00031570(
+	long original_unit_index,
+	struct ai_information_packet *communication,
+	long reply_actor_index);
+boolean code_000315b0(
+	long original_unit_index,
+	struct ai_information_packet *communication,
+	long reply_actor_index);
+boolean code_00031660(
+	long original_unit_index,
+	struct ai_information_packet *communication,
+	long reply_actor_index);
+boolean code_000316a0(
+	long original_unit_index,
+	struct ai_information_packet *communication,
+	long reply_actor_index);
+
 /* ---------- globals */
+
+short const communication_speech_priorities[NUMBER_OF_COMMUNICATION_PRIORITIES] =
+{
+	0, 3, 3, 3, 4, 5, 5, 8,
+};
+
+real const communication_notification_delays[NUMBER_OF_COMMUNICATION_PRIORITIES] =
+{
+	0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.3f,
+};
+
+short const communication_protagonist_default_look_priorities
+	[NUMBER_OF_COMMUNICATION_PRIORITIES] =
+{
+	0, 4, 4, 5, 6, 6, 6, 4,
+};
+
+short const communication_recipient_default_look_priorities
+	[NUMBER_OF_COMMUNICATION_PRIORITIES] =
+{
+	0, 3, 3, 4, 5, 5, 6, 4,
+};
+
+short const communication_player_speaking_priorities
+	[NUMBER_OF_COMMUNICATION_PRIORITIES] =
+{
+	0, 2, 3, 4, 4, 6, 6, 7,
+};
+
+short const communication_unit_prefer_silent_time = 60;
+
+real const communication_timer_tolerances
+	[NUMBER_OF_COMMUNICATION_TIMER_TYPES][2][NUMBER_OF_COMMUNICATION_PRIORITIES] =
+{
+	{
+		{ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f },
+		{ 0.0f, 0.0f, 4.0f, 4.5f, 2.5f, 2.0f, 0.0f, 5.0f },
+	},
+	{
+		{ 5.0f, 3.0f, 2.5f, 0.0f, 3.0f, 3.5f, 2.0f, 1.5f },
+		{ 0.0f, 4.5f, 4.5f, 2.5f, 2.0f, 0.0f, 0.3f, 1.0f },
+	},
+	{
+		{ 1.0f, 1.0f, 0.8f, 1.0f, 2.0f, 1.5f, 1.5f, 0.3f },
+		{ 0.0f, 0.5f, 0.5f, 0.5f, 1.3f, 0.2f, 1.0f, 1.0f },
+	},
+	{
+		{ 1.0f, 0.8f, 0.0f, 0.0f, 1.0f, 1.0f, 1.5f, 0.0f },
+		{ 0.0f, 1.5f, 1.5f, 1.0f, 0.0f, 0.0f, 0.5f, 0.0f },
+	},
+	{
+		{ 1.5f, 0.0f, 0.0f, 0.5f, 0.0f, 1.5f, 0.0f, 0.0f },
+		{ 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f },
+	},
+};
+
+real const communication_play_delays[NUMBER_OF_COMMUNICATION_TIMER_TYPES] =
+{
+	0.0f, 0.5f, 0.8f, 0.5f, 0.8f,
+};
+
+short const communication_player_additional_delay = 30;
+short const communication_overlap_time_modifier = 45;
+short const communication_timeout_low_priority_modifier = 30;
+short const communication_repeat_selection_time = 900;
+real const communication_player_absolute_range = 30.0f;
+real const communication_player_ideal_range_min = 3.0f;
+real const communication_player_ideal_range_max = 15.0f;
+real const communication_player_ideal_fov = 0.70710677f;
+real const communication_player_rating_low_priority = 2.0f;
+
+struct dialogue_usage const global_dialogue_table[NUMBER_OF_DIALOGUE_USAGES] =
+{
+	/* death */
+	{ 0, 3, 49, -1, 1, 6, 2, 1, 10.0f, 0.0f,
+		0, -1, 2, -1, -1, -1, -1 },
+	{ 0, 6, 51, -1, 1, 6, 3, 6, 20.0f, 0.0f,
+		66, -1, 2, -1, 1, -1, -1 },
+	{ 0, 2, 53, -1, 1, 1, 2, 1, 10.0f, 0.0f,
+		8, -1, 3, -1, -1, -1, -1 },
+	{ 0, 6, 55, -1, 1, 6, 3, 6, 20.0f, 0.0f,
+		74, -1, 3, -1, 1, -1, -1 },
+	{ 0, 2, 57, -1, 1, 1, 2, 1, 10.0f, 0.0f,
+		8, -1, 3, -1, 4, -1, -1 },
+	{ 0, 2, 59, -1, 1, 1, 2, 1, 40.0f, 0.0f,
+		8, -1, 3, -1, 8, -1, -1 },
+	{ 0, 2, 61, -1, 1, 1, 2, 1, 40.0f, 0.0f,
+		8, -1, 3, -1, 16, -1, -1 },
+	{ 0, 2, 63, -1, 1, 1, 2, 1, 40.0f, 0.0f,
+		8, -1, 3, -1, 64, -1, -1 },
+	{ 0, 2, 65, -1, 1, 1, 2, 1, 10.0f, 10.0f,
+		0, -1, 3, -1, -1, -1, 2 },
+	{ 0, 2, 67, -1, 1, 1, 2, 1, 10.0f, 10.0f,
+		0, -1, 3, -1, -1, -1, 10 },
+	{ 0, 2, 66, -1, 1, 1, 2, 1, 10.0f, 0.0f,
+		0, -1, 3, -1, -1, -1, 11 },
+	{ 0, 3, 68, -1, 1, 1, 2, 1, 20.0f, 0.0f,
+		0, -1, 3, -1, -1, -1, 5 },
+	{ 0, 3, 69, -1, 1, 1, 2, 1, 20.0f, 0.0f,
+		0, -1, 3, -1, -1, -1, 3 },
+	{ 0, 3, 70, -1, 1, 1, 2, 1, 20.0f, 0.0f,
+		0, -1, 3, -1, -1, -1, 4 },
+	{ 0, 3, 71, -1, 1, 1, 2, 1, 20.0f, 0.0f,
+		0, -1, 3, -1, -1, -1, 6 },
+	{ 0, 2, 72, -1, 1, 1, 2, 1, 20.0f, 0.0f,
+		0, -1, 3, -1, -1, -1, 7 },
+	{ 0, 2, 73, -1, 1, 1, 2, 1, 20.0f, 0.0f,
+		0, -1, 3, -1, -1, -1, 12 },
+	{ 0, 3, 74, -1, 1, 1, 2, 1, 30.0f, 0.0f,
+		0, -1, 3, -1, -1, -1, 9 },
+	{ 0, 2, 75, -1, 1, 1, 2, 1, 30.0f, 10.0f,
+		0, -1, 3, -1, -1, -1, 8 },
+	{ 0, 2, 96, -1, 2, 1, 3, 1, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	{ 0, 6, 97, -1, 2, 6, 3, 6, 15.0f, 0.0f,
+		66, -1, -1, -1, 1, -1, -1 },
+	{ 0, 3, 98, -1, 2, 5, 1, 1, 10.0f, 0.0f,
+		0, -1, 2, -1, -1, -1, -1 },
+	{ 0, 4, 99, -1, 2, 6, 3, 5, 20.0f, 0.0f,
+		66, -1, 2, -1, -1, 1, -1 },
+	{ 0, 2, 100, -1, 2, 1, 3, 1, 10.0f, 0.0f,
+		0, -1, 3, -1, -1, -1, -1 },
+	{ 0, 2, 101, -1, 2, 1, 3, 1, 10.0f, 0.0f,
+		0, -1, 3, -1, -1, 1, -1 },
+	{ 0, 2, 102, -1, 2, 1, 3, 1, 10.0f, 0.0f,
+		0, -1, 3, -1, -1, 4, -1 },
+	{ 0, 2, 103, -1, 2, 1, 3, 1, 40.0f, 0.0f,
+		0, -1, 3, -1, -1, 56, -1 },
+	{ 0, 2, 104, -1, 2, 1, 3, 1, 40.0f, 0.0f,
+		0, -1, 3, -1, -1, 64, -1 },
+	{ 0, 5, 105, -1, 2, 6, 3, 6, 30.0f, 0.0f,
+		2, -1, 4, -1, -1, -1, -1 },
+	/* killing_spree */
+	{ 1, 4, 76, -1, 0, 1, 2, 1, 30.0f, 0.0f,
+		8, -1, -1, -1, -1, -1, -1 },
+	/* damage */
+	{ 3, 3, 21, -1, 1, 1, 2, 1, 10.0f, 0.0f,
+		0, -1, 2, -1, -1, -1, -1 },
+	{ 3, 3, 22, -1, 1, 1, 2, 1, 10.0f, 0.0f,
+		2, -1, 2, -1, 1, -1, -1 },
+	{ 3, 3, 29, -1, 0, 5, 3, 1, 10.0f, 0.0f,
+		8, -1, 2, -1, -1, -1, -1 },
+	{ 3, 3, 31, -1, 0, 6, 3, 1, 10.0f, 5.0f,
+		0, -1, 2, -1, -1, 1, -1 },
+	/* hurt */
+	{ 2, 1, 23, -1, 1, 1, 0, 0, 10.0f, 10.0f,
+		0, -1, 3, -1, -1, -1, -1 },
+	{ 2, 2, 32, -1, 0, 5, 0, 0, 10.0f, 10.0f,
+		0, -1, 3, -1, -1, -1, -1 },
+	{ 2, 2, 35, -1, 0, 5, 0, 0, 10.0f, 10.0f,
+		0, -1, 3, -1, -1, -1, 2 },
+	{ 2, 2, 36, -1, 0, 5, 0, 0, 10.0f, 10.0f,
+		0, -1, 3, -1, -1, -1, 11 },
+	{ 2, 2, 37, -1, 0, 5, 0, 0, 10.0f, 10.0f,
+		0, -1, 3, -1, -1, -1, 10 },
+	{ 2, 3, 38, -1, 0, 5, 0, 0, 20.0f, 0.0f,
+		0, -1, 3, -1, -1, -1, 5 },
+	{ 2, 2, 40, -1, 0, 5, 0, 0, 20.0f, 0.0f,
+		0, -1, 3, -1, -1, -1, 4 },
+	{ 2, 3, 41, -1, 0, 5, 0, 0, 20.0f, 0.0f,
+		0, -1, 3, -1, -1, -1, 6 },
+	{ 2, 2, 42, -1, 0, 5, 0, 0, 20.0f, 0.0f,
+		0, -1, 3, -1, -1, -1, 7 },
+	{ 2, 2, 43, -1, 0, 5, 0, 0, 20.0f, 0.0f,
+		0, -1, 3, -1, -1, -1, 12 },
+	{ 2, 3, 44, -1, 0, 5, 0, 0, 30.0f, 0.0f,
+		0, -1, 3, -1, -1, -1, 9 },
+	{ 2, 2, 45, -1, 0, 5, 0, 0, 30.0f, 0.0f,
+		0, -1, 3, -1, -1, -1, 8 },
+	/* sighted_enemy */
+	{ 4, 5, 108, 3, 0, 6, 3, 6, 10.0f, 10.0f,
+		0, -1, -1, 0, -1, -1, -1 },
+	{ 4, 5, 109, 3, 0, 6, 3, 6, 10.0f, 25.0f,
+		0, -1, -1, 2, -1, -1, -1 },
+	/* found_enemy */
+	{ 5, 5, 110, 3, 0, 6, 3, 6, 10.0f, 25.0f,
+		0, -1, -1, 2, -1, -1, -1 },
+	/* unexpected_enemy */
+	{ 6, 3, 111, -1, 0, 6, 3, 4, 10.0f, 8.0f,
+		1, -1, -1, -1, -1, -1, -1 },
+	/* found_dead_friend */
+	{ 7, 5, 112, -1, 0, 6, 3, 6, 10.0f, 20.0f,
+		0, -1, -1, 4, -1, -1, -1 },
+	/* allegiance_changed */
+	{ 8, 6, 113, -1, 0, 6, 3, 6, 10.0f, 0.0f,
+		68, -1, 4, -1, -1, -1, -1 },
+	{ 8, 4, 114, -1, 0, 6, 3, 4, 10.0f, 0.0f,
+		64, -1, 2, -1, -1, -1, -1 },
+	/* sighted_friend_player */
+	{ 25, 4, 148, 3, 0, 6, 3, 5, 10.0f, 15.0f,
+		0, -1, -1, 4, -1, -1, -1 },
+	/* lost_contact */
+	{ 13, 4, 161, -1, 0, 0, 2, 1, 10.0f, 20.0f,
+		0, -1, -1, 3, -1, -1, -1 },
+	{ 13, 4, 127, -1, 0, 0, 2, 1, 15.0f, 20.0f,
+		0, 0, -1, 3, -1, -1, -1 },
+	/* alert_noncombat */
+	{ 15, 4, 125, -1, 0, 4, 2, 5, 10.0f, 20.0f,
+		0, -1, -1, 2, -1, -1, -1 },
+	/* blocked */
+	{ 14, 2, 129, 1, 0, 4, 2, 1, 10.0f, 0.0f,
+		0, 1, -1, -1, -1, -1, 0 },
+	/* search_start */
+	{ 16, 3, 131, -1, 0, 0, 2, 1, 10.0f, 8.0f,
+		0, 0, -1, 3, -1, -1, -1 },
+	/* search_query */
+	{ 17, 3, 132, -1, 0, 5, 2, 1, 10.0f, 25.0f,
+		0, 0, -1, 3, -1, -1, -1 },
+	/* search_report */
+	{ 18, 3, 134, -1, 0, 0, 2, 1, 10.0f, 25.0f,
+		0, 0, -1, 3, -1, -1, -1 },
+	/* search_abandon */
+	{ 19, 3, 135, -1, 0, 0, 2, 1, 10.0f, 8.0f,
+		0, 0, -1, 3, -1, -1, -1 },
+	/* search_group_abandon */
+	{ 20, 4, 136, -1, 0, 0, 2, 1, 10.0f, 0.0f,
+		0, 0, -1, 3, -1, -1, -1 },
+	/* uncover_start */
+	{ 21, 3, 137, 2, 0, 0, 2, 1, 10.0f, 30.0f,
+		0, 1, -1, 3, -1, -1, -1 },
+	/* cover */
+	{ 24, 2, 143, -1, 0, 0, 2, 1, 10.0f, 30.0f,
+		0, 1, -1, -1, -1, -1, -1 },
+	/* advance */
+	{ 22, 4, 139, 2, 0, 0, 2, 1, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* retreat */
+	{ 23, 4, 141, -1, 0, 0, 2, 1, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* shooting */
+	{ 26, 1, 149, -1, 0, 0, 0, 0, 10.0f, 10.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* shooting_vehicle */
+	{ 27, 1, 150, -1, 0, 0, 0, 0, 20.0f, 10.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* shooting_berserk */
+	{ 28, 2, 151, -1, 0, 0, 0, 0, 20.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* shooting_group */
+	{ 29, 2, 152, -1, 0, 0, 0, 0, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* shooting_traitor */
+	{ 30, 1, 153, -1, 0, 0, 0, 0, 30.0f, 10.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* flee */
+	{ 31, 3, 156, -1, 0, 0, 2, 1, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* flee_leader_died */
+	{ 32, 4, 158, -1, 0, 0, 2, 1, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* flee_idle */
+	{ 33, 3, 2, -1, 0, 0, 0, 0, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* attempted_flee */
+	{ 34, 2, 159, -1, 0, 4, 2, 5, 10.0f, 10.0f,
+		0, 1, -1, -1, -1, -1, -1 },
+	/* hiding_finished */
+	{ 35, 3, 162, -1, 0, 0, 2, 1, 10.0f, 30.0f,
+		0, 1, -1, 3, -1, -1, -1 },
+	/* vehicle_entry */
+	{ 36, 3, 163, -1, 0, 0, 0, 0, 10.0f, 10.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* vehicle_exit */
+	{ 37, 3, 164, -1, 0, 0, 0, 0, 10.0f, 10.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* vehicle_woohoo */
+	{ 38, 2, 165, 12, 2, 0, 0, 0, 10.0f, 25.0f,
+		48, -1, -1, -1, -1, -1, -1 },
+	/* vehicle_scared */
+	{ 39, 2, 166, 13, 2, 0, 0, 0, 10.0f, 25.0f,
+		48, -1, -1, -1, -1, -1, -1 },
+	/* vehicle_falling */
+	{ 40, 7, 10, 13, 2, 0, 0, 0, 10.0f, 0.0f,
+		48, -1, -1, -1, -1, -1, -1 },
+	/* grenade_sighted */
+	{ 11, 3, 117, -1, 0, 6, 4, 6, 10.0f, 4.0f,
+		0, 0, 3, -1, -1, -1, -1 },
+	/* grenade_startle */
+	{ 10, 3, 116, -1, 0, 6, 4, 6, 10.0f, 4.0f,
+		0, -1, -1, 4, -1, -1, -1 },
+	/* grenade_danger */
+	{ 12, 5, 118, -1, 0, 5, 4, 5, 10.0f, 4.0f,
+		0, 0, 3, -1, -1, -1, -1 },
+	{ 12, 5, 120, -1, 0, 5, 4, 5, 10.0f, 0.0f,
+		0, 0, 2, -1, -1, -1, -1 },
+	{ 12, 6, 119, -1, 0, 6, 4, 5, 10.0f, 0.0f,
+		0, -1, 1, -1, -1, -1, -1 },
+	/* surprise */
+	{ 41, 7, 177, -1, 0, 6, 2, 4, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* berserk */
+	{ 42, 7, 178, -1, 0, 4, 2, 1, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* melee */
+	{ 43, 7, 179, -1, 0, 4, 2, 1, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* grenade_throwing */
+	{ 9, 7, 115, -1, 0, 4, 2, 1, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* dive */
+	{ 44, 7, 180, -1, 0, 4, 2, 1, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* leap */
+	{ 47, 7, 182, -1, 0, 4, 2, 1, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* falling */
+	{ 46, 7, 10, -1, 0, 4, 2, 1, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* postcombat_alone */
+	{ 48, 3, 197, -1, 0, 5, 0, 0, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* postcombat_unscathed */
+	{ 49, 3, 198, -1, 0, 0, 0, 0, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* postcombat_wounded */
+	{ 50, 3, 199, -1, 0, 0, 0, 0, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* postcombat_massacre */
+	{ 51, 3, 201, -1, 0, 0, 0, 0, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* postcombat_triumph */
+	{ 52, 3, 203, -1, 0, 0, 0, 0, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* postcombat_check_enemy */
+	{ 53, 3, 189, -1, 0, 4, 2, 1, 10.0f, 0.0f,
+		0, -1, 3, -1, -1, -1, -1 },
+	/* postcombat_check_friend */
+	{ 54, 3, 190, -1, 0, 4, 2, 1, 10.0f, 0.0f,
+		0, -1, 2, -1, -1, -1, -1 },
+	/* postcombat_shoot_corpse */
+	{ 55, 3, 191, -1, 0, 4, 2, 1, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	{ 55, 6, 192, -1, 0, 4, 2, 1, 10.0f, 0.0f,
+		2, -1, -1, -1, -1, 1, -1 },
+	/* postcombat_celebrate */
+	{ 56, 3, 188, -1, 0, 4, 2, 1, 10.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+	/* sentinel */
+	{ -1, -1, -1, -1, -1, -1, -1, -1, 0.0f, 0.0f,
+		0, -1, -1, -1, -1, -1, -1 },
+};
+
+struct reply_usage const global_reply_table[NUMBER_OF_REPLY_USAGES] =
+{
+	{ 76, -1, 2, 92, -1, 2, 0, 0.0f, 1.0f, 0.7f, 30.0f,
+		code_00031390 },
+	{ 53, 2, 2, 81, -1, 2, 0, 0.0f, 0.5f, 0.7f, 60.0f,
+		code_00031390 },
+	{ 53, 11, 2, 82, -1, 2, 0, 0.0f, 0.6f, 0.7f, 60.0f,
+		code_00031390 },
+	{ 53, 10, 2, 83, -1, 2, 0, 0.0f, 0.6f, 0.7f, 60.0f,
+		code_00031390 },
+	{ 53, 5, 2, 84, -1, 2, 0, 0.0f, 0.8f, 0.7f, 60.0f,
+		code_00031390 },
+	{ 53, 3, 2, 85, -1, 2, 0, 0.5f, 0.9f, 0.7f, 60.0f,
+		code_00031390 },
+	{ 53, 4, 2, 86, -1, 2, 0, 0.0f, 1.0f, 0.7f, 60.0f,
+		code_00031390 },
+	{ 53, 6, 2, 87, -1, 2, 0, 0.0f, 1.0f, 0.7f, 60.0f,
+		code_00031390 },
+	{ 53, 7, 2, 88, -1, 2, 0, 0.0f, 0.9f, 0.7f, 60.0f,
+		code_00031390 },
+	{ 53, 12, 2, 89, -1, 2, 0, 0.0f, 0.6f, 0.7f, 60.0f,
+		code_00031390 },
+	{ 53, 9, 2, 90, -1, 2, 0, 0.0f, 0.8f, 0.7f, 60.0f,
+		code_00031390 },
+	{ 53, 8, 2, 91, -1, 2, 0, 0.0f, 1.0f, 0.7f, 60.0f,
+		code_00031390 },
+	{ 55, -1, 2, 56, -1, 4, 1, 1.0f, 1.0f, 0.3f, 0.0f,
+		code_00031390 },
+	{ 57, -1, 2, 58, -1, 2, 0, 0.8f, 0.6f, 0.5f, 30.0f,
+		code_00031390 },
+	{ 59, -1, 2, 60, -1, 2, 0, 0.8f, 0.6f, 0.5f, 20.0f,
+		code_00031390 },
+	{ 61, -1, 2, 62, -1, 2, 0, 0.8f, 0.6f, 0.5f, 20.0f,
+		code_00031390 },
+	{ 63, -1, 2, 64, -1, 2, 0, 0.8f, 0.6f, 0.5f, 20.0f,
+		code_00031390 },
+	{ 53, -1, 2, 54, -1, 2, 0, 0.6f, 0.4f, 0.5f, 30.0f,
+		code_00031390 },
+	{ 53, -1, 2, 80, -1, 2, 0, 0.0f, 0.4f, 0.7f, 40.0f,
+		code_00031390 },
+	{ 23, -1, 2, 24, -1, 1, 0, 0.8f, 0.0f, 0.7f, 20.0f,
+		NULL },
+	{ 32, -1, 4, 33, -1, 1, 0, 0.8f, 0.0f, 0.7f, 20.0f,
+		NULL },
+	{ 32, -1, 2, 34, -1, 1, 0, 0.8f, 0.0f, 0.7f, 20.0f,
+		NULL },
+	{ 51, -1, 2, 52, -1, 4, 1, 1.0f, 0.0f, 0.3f, 0.0f,
+		code_00031390 },
+	{ 49, -1, 2, 50, -1, 3, 0, 0.7f, 0.0f, 0.3f, 20.0f,
+		code_00031390 },
+	{ 29, -1, 3, 30, -1, 2, 0, 0.7f, 0.4f, 0.5f, 20.0f,
+		NULL },
+	{ 108, -1, 2, 123, -1, 3, 0, 0.8f, 0.0f, 0.7f, 20.0f,
+		code_00031390 },
+	{ 108, -1, 2, 124, -1, 3, 0, 0.8f, 0.0f, 0.7f, 20.0f,
+		code_00031400 },
+	{ 109, -1, 2, 123, -1, 3, 0, 0.8f, 0.0f, 0.7f, 20.0f,
+		code_00031390 },
+	{ 109, -1, 2, 124, -1, 3, 0, 0.8f, 0.0f, 0.7f, 20.0f,
+		code_00031400 },
+	{ 110, -1, 2, 123, -1, 3, 0, 0.8f, 0.0f, 0.7f, 20.0f,
+		code_00031390 },
+	{ 110, -1, 2, 124, -1, 3, 0, 0.8f, 0.0f, 0.7f, 20.0f,
+		code_00031400 },
+	{ 125, -1, 3, 126, -1, 3, 0, 0.7f, 0.0f, 0.5f, 15.0f,
+		NULL },
+	{ 127, -1, 2, 128, -1, 3, 0, 0.7f, 0.0f, 0.5f, 30.0f,
+		code_00031660 },
+	{ 129, -1, 3, 130, -1, 3, 0, 0.5f, 0.0f, 0.5f, 20.0f,
+		NULL },
+	{ 132, -1, 2, 133, -1, 3, 0, 1.0f, 0.0f, 0.3f, 20.0f,
+		code_00031470 },
+	{ 137, -1, 2, 138, -1, 3, 0, 1.0f, 0.0f, 0.3f, 20.0f,
+		code_000315b0 },
+	{ 139, -1, 2, 140, -1, 4, 0, 0.7f, 0.0f, 0.7f, 20.0f,
+		code_000314c0 },
+	{ 141, -1, 2, 142, -1, 4, 0, 0.7f, 0.0f, 0.7f, 20.0f,
+		code_000314c0 },
+	{ 156, -1, 2, 157, -1, 3, 0, 0.5f, 0.0f, 0.7f, 30.0f,
+		code_00031570 },
+	{ 156, -1, 4, 154, -1, 3, 0, 0.5f, 0.0f, 0.7f, 30.0f,
+		code_00031550 },
+	{ 158, -1, 4, 154, -1, 3, 0, 0.5f, 0.0f, 0.7f, 30.0f,
+		code_00031550 },
+	{ 159, -1, 2, 160, -1, 3, 0, 0.5f, 0.0f, 0.7f, 20.0f,
+		code_000316a0 },
+	{ 199, -1, 2, 200, -1, 3, 0, 0.8f, 0.0f, 0.5f, 0.0f,
+		NULL },
+	{ 201, -1, 2, 202, -1, 3, 0, 0.8f, 0.0f, 0.5f, 0.0f,
+		NULL },
+	{ 203, -1, 2, 204, -1, 3, 0, 0.8f, 0.0f, 0.5f, 0.0f,
+		NULL },
+	{ -1, -1, -1, -1, -1, -1, 0, 0.0f, 0.0f, 0.0f, 0.0f,
+		NULL },
+};
+
+char const *global_communication_priority_names[NUMBER_OF_COMMUNICATION_PRIORITIES] =
+{
+	"none",
+	"filler",
+	"chatter",
+	"talk",
+	"communicate",
+	"shout",
+	"yell",
+	"exclaim",
+};
+
+char const *global_communication_team_names[NUMBER_OF_COMMUNICATION_TEAMS] =
+{
+	"human",
+	"HUM",
+	"covenant",
+	"COV",
+};
+
+char const *global_communication_type_names[NUMBER_OF_COMMUNICATION_TYPES] =
+{
+	"death",
+	"killing_spree",
+	"hurt",
+	"damage",
+	"sighted_enemy",
+	"found_enemy",
+	"unexpected_enemy",
+	"found_dead_friend",
+	"allegiance_changed",
+	"grenade_throwing",
+	"grenade_startle",
+	"grenade_sighted",
+	"grenade_danger",
+	"lost_contact",
+	"blocked",
+	"alert_noncombat",
+	"search_start",
+	"search_query",
+	"search_report",
+	"search_abandon",
+	"search_group_abandon",
+	"uncover_start",
+	"advance",
+	"retreat",
+	"cover",
+	"sighted_friend_player",
+	"shooting",
+	"shooting_vehicle",
+	"shooting_berserk",
+	"shooting_group",
+	"shooting_traitor",
+	"flee",
+	"flee_leader_died",
+	"flee_idle",
+	"attempted_flee",
+	"hiding_finished",
+	"vehicle_entry",
+	"vehicle_exit",
+	"vehicle_woohoo",
+	"vehicle_scared",
+	"vehicle_falling",
+	"surprise",
+	"berserk",
+	"melee",
+	"dive",
+	"uncover_exclamation",
+	"falling",
+	"leap",
+	"postcombat_alone",
+	"postcombat_unscathed",
+	"postcombat_wounded",
+	"postcombat_massacre",
+	"postcombat_triumph",
+	"postcombat_check_enemy",
+	"postcombat_check_friend",
+	"postcombat_shoot_corpse",
+	"postcombat_celebrate",
+};
 
 /* ---------- public code */
 
