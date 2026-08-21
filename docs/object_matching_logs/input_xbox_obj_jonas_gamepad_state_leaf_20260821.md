@@ -108,8 +108,9 @@ January's only raw-string caller is `render/render_debug`, and the unchanged
 shared declaration remains compatible even though this wave rejected that
 body.
 
-The shared `struct gamepad_state` has ten analog-button values, ten threshold
-values, four button bytes, and two `point2d` sticks. Its natural 40-byte size
+The shared `struct gamepad_state` has eight analog-button values, eight
+threshold values, sixteen button bytes, and two `point2d` sticks. Its natural
+40-byte size
 and array stride are cross-TU stable under the unchanged public header.
 
 ## Typed storage boundary and exact relocation proof
