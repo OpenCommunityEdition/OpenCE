@@ -156,11 +156,28 @@ symbols in this file:
 
 #include "ai/path.h"
 
+#include <stddef.h>
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
+
+typedef char path_input_size_assert[
+	sizeof(struct path_input) == 0x48 ? 1 : -1];
+typedef char path_input_ignore_broken_surfaces_offset_assert[
+	offsetof(struct path_input, ignore_broken_surfaces) == 0x4 ? 1 : -1];
+typedef char path_input_ignore_source_object_index_offset_assert[
+	offsetof(struct path_input, ignore_source_object_index) == 0x8 ? 1 : -1];
+typedef char path_input_ignore_target_object_index_offset_assert[
+	offsetof(struct path_input, ignore_target_object_index) == 0xC ? 1 : -1];
+typedef char path_input_start_valid_offset_assert[
+	offsetof(struct path_input, start_valid) == 0x10 ? 1 : -1];
+typedef char path_input_start_point_offset_assert[
+	offsetof(struct path_input, start_point) == 0x14 ? 1 : -1];
+typedef char path_input_start_surface_index_offset_assert[
+	offsetof(struct path_input, start_surface_index) == 0x20 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -189,6 +206,39 @@ void paths_initialize_for_new_map(
 void paths_dispose_from_old_map(
 	void)
 {
+	return;
+}
+
+void path_input_new(
+	struct path_input *input,
+	real pathfinding_radius,
+	boolean ignore_broken_surfaces,
+	long ignore_source_object_index)
+{
+	csmemset(input, 0, sizeof(*input));
+	input->pathfinding_radius = pathfinding_radius;
+	input->ignore_broken_surfaces = ignore_broken_surfaces;
+	input->ignore_source_object_index = ignore_source_object_index;
+	input->ignore_target_object_index = NONE;
+	return;
+}
+
+void path_input_set_target_object(
+	struct path_input *input,
+	long target_object_index)
+{
+	input->ignore_target_object_index = target_object_index;
+	return;
+}
+
+void path_input_set_start(
+	struct path_input *input,
+	const real_point3d *start_point,
+	long start_surface_index)
+{
+	input->start_valid = TRUE;
+	input->start_point = *start_point;
+	input->start_surface_index = start_surface_index;
 	return;
 }
 
