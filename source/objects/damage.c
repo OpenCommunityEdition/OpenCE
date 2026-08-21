@@ -104,6 +104,9 @@ symbols in this file:
 #include "damage.h"
 #include "game/game_globals.h"
 #include "hs/object_lists.h"
+#include "object_definitions.h"
+#include "object_types.h"
+#include "physics/collision_model_definitions.h"
 
 /* ---------- constants */
 
@@ -148,6 +151,41 @@ void damage_dispose_from_old_map(void)
 
 void damage_render_debug(void)
 {
+	return;
+}
+
+void object_initialize_vitality(
+	long object_index,
+	real *custom_body_vitality,
+	real *custom_shield_vitality)
+{
+	struct object_datum *object = object_get(object_index);
+	struct object_definition *definition = object_definition_get(object->definition_index);
+	real maximum_body_vitality = 0.f;
+	real maximum_shield_vitality = 0.f;
+
+	if (definition->object.collision_model.index != NONE)
+	{
+		struct collision_model *collision_model =
+			collision_model_definition_get(definition->object.collision_model.index);
+
+		if (collision_model)
+		{
+			maximum_body_vitality = collision_model->resistance.maximum_body_vitality;
+			maximum_shield_vitality = collision_model->resistance.maximum_shield_vitality;
+		}
+	}
+
+	if (custom_body_vitality)
+		maximum_body_vitality = *custom_body_vitality;
+
+	if (custom_shield_vitality)
+		maximum_shield_vitality = *custom_shield_vitality;
+
+	object->object.maximum_body_vitality = maximum_body_vitality;
+	object->object.maximum_shield_vitality = maximum_shield_vitality;
+	object->object.body_vitality = maximum_body_vitality > 0.f ? 1.f : 0.f;
+	object->object.shield_vitality = maximum_shield_vitality > 0.f ? 1.f : 0.f;
 	return;
 }
 
@@ -231,6 +269,25 @@ boolean object_restore_body(
 	}
 
 	return restored;
+}
+
+void code_00126090(
+	long object_index)
+{
+	struct object_datum *object = object_get(object_index);
+	long child_object_index = object->object.first_child_object_index;
+
+	while (child_object_index != NONE)
+	{
+		long next_object_index = object_get(child_object_index)->object.next_object_index;
+
+		if (!object_type_handle_parent_destroyed(child_object_index))
+			code_00126090(child_object_index);
+
+		child_object_index = next_object_index;
+	}
+
+	return;
 }
 
 void object_can_take_damage(
