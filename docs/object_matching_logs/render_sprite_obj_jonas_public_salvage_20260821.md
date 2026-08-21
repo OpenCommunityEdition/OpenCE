@@ -29,7 +29,7 @@ compile.
   `77018fa33f47e856f581d224d5f130dcb3963363`.
 - Retained `render_sprite.c` Git blob / SHA-256:
   `a8e13a1f137e2075a24e40e65fc74bb65a47d82d` /
-  `894db08cd04587403049a88dbd33ad7a056b3711dca4b47788b59264bcc106df`.
+  `f2ab2f2d27ecfa2f6a7ee87c77c33032c544f0275256918412e8f83f114b6f29`.
 - January executable SHA-256:
   `4cc87b45f721270392a96f1674ed2b5cd4a7bb4355faeab4531d1cf1884d9520`.
 - January split `render_sprite.obj` SHA-256:
