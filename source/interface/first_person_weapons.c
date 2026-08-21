@@ -98,17 +98,72 @@ symbols in this file:
 
 #include "interface/first_person_weapons.h"
 
+#include "cseries/cseries.h"
+#include "items/weapon_definitions.h"
+#include "items/weapons.h"
+#include "models/model_animation_definitions.h"
+#include "networking/network_connection.h"
+#include "saved games/game_state.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct first_person_weapon
+{
+	boolean visible;
+	byte reserved0001[3];
+	long unit_index;
+	long weapon_index;
+	byte reserved000c[0x1080];
+	struct real_matrix4x3 node_matrices[MAXIMUM_NODES_PER_ANIMATION];
+	byte reserved1d8c[0x10C];
+	long current_sound_index;
+	short current_sound_state;
+	byte reserved1e9e[2];
+};
+
+typedef char verify_first_person_weapon_size[
+	sizeof(struct first_person_weapon) == 0x1EA0 ? 1 : -1];
+typedef char verify_first_person_weapon_node_matrices_offset[
+	offsetof(struct first_person_weapon, node_matrices) == 0x108C ? 1 : -1];
+typedef char verify_first_person_weapon_current_sound_index_offset[
+	offsetof(struct first_person_weapon, current_sound_index) == 0x1E98 ? 1 : -1];
+typedef char verify_first_person_weapon_current_sound_state_offset[
+	offsetof(struct first_person_weapon, current_sound_state) == 0x1E9C ? 1 : -1];
+typedef char verify_weapon_first_person_animations_index_offset[
+	offsetof(
+		struct weapon_definition,
+		weapon.interface_definition.first_person_animations.index) == 0x478 ? 1 : -1];
+typedef char verify_animation_graph_nodes_offset[
+	offsetof(struct animation_graph, nodes) == 0x68 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+extern struct first_person_weapon *bss_00453cc8;
+
+#define first_person_weapons bss_00453cc8
+
 /* ---------- public code */
+
+void first_person_weapons_initialize(
+	void)
+{
+	first_person_weapons = (struct first_person_weapon *)game_state_malloc(
+		"first person weapons",
+		NULL,
+		sizeof(*first_person_weapons) * MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\first_person_weapons.c",
+		240,
+		first_person_weapons);
+
+	return;
+}
 
 void first_person_weapons_dispose(
 	void)
@@ -120,6 +175,32 @@ void first_person_weapons_dispose_from_old_map(
 	void)
 {
 	return;
+}
+
+struct real_matrix4x3 *first_person_weapon_get_node_matrix(
+	short local_player_index,
+	short node_index)
+{
+	struct first_person_weapon *first_person_weapon;
+	struct weapon_datum *weapon;
+	struct weapon_definition *weapon_definition;
+	struct animation_graph *animation_graph;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\first_person_weapons.c",
+		1433,
+		local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+	first_person_weapon = &first_person_weapons[local_player_index];
+	weapon = weapon_get(first_person_weapon->weapon_index);
+	weapon_definition = weapon_definition_get(weapon->definition_index);
+	animation_graph = animation_graph_definition_get(
+		weapon_definition->weapon.interface_definition.first_person_animations.index);
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\first_person_weapons.c",
+		718,
+		node_index>=0 && node_index<animation_graph->nodes.count);
+
+	return &first_person_weapon->node_matrices[node_index];
 }
 
 /* ---------- private code */
