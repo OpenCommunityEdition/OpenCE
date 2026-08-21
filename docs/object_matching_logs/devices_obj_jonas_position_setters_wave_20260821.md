@@ -217,7 +217,45 @@ is changed. The five protected sources remain untouched:
 
 ## Clean committed-state replay
 
-The implementation-and-ledger commit, clean snapshot, verified same-path
-object deletion, normal Ninja rebuild, regression check, and final direct
-comparison are recorded only after the commit exists. No push, amend, or
-history rewrite is performed.
+Implementation-and-ledger commit
+`c64c0b34e66c6fc186cb4aadd09e4cf569a4b8ff` was clean before replay and is
+authored and committed by Jonas Volman. Re-reading its committed source blob
+produced exactly `1a8cd2fe9c7f021e359220fea3fdfd4d39267500`, 4,442 bytes,
+and payload SHA-256
+`cf09bc580e6152e802e8c3f9dea737fdc327762bbb5d6fead502a0c0e5c17a5f`.
+The shared header remained baseline blob
+`638221fd4dfd7ff7196b528798845ce0d194d997`.
+
+A one-unit regression snapshot was captured directly from that clean commit
+with status `SNAPSHOT_WRITTEN`, commit
+`c64c0b34e66c6fc186cb4aadd09e4cf569a4b8ff`, and sole unit
+`source/devices/devices`. The generated candidate path resolved to
+`build/base/source/devices/devices.obj` inside this isolated worktree. Before
+deletion it was 2,301 bytes with SHA-256
+`ab1a641c1e15e455006c3a77a4846ddb9c6ace7f5e2408ec383a6e1aa5cb45c0`.
+The resolved path was verified to remain under the worktree, deleted, and
+confirmed absent. Its untouched normal Ninja edge then performed exactly one
+`[1/1] CL` action with the repository's natural flags and no source change or
+retry.
+
+The immediate regression check returned `ok: true`, no failures, no warnings,
+`changed_nonexact: []`, and `newly_exact: []`. Its `still_exact` inventory is
+exactly the seven functions in the table above. Direct hardened January
+comparison again returned equality for all seven padded COMDATs and every
+relocation address, type, destination, and addend. In particular, the rebuilt
+actual setter remains 53 meaningful / 64 padded bytes with two relocations and
+hash `d0e53196194b9cab6dd3e748e0b9c4d81902b02b465dfd019ed632d338c9d836`;
+the desired setter remains 57 meaningful / 64 padded bytes with two
+relocations and hash
+`46aed102030b8a7a6ca51498138ebba7ce8952c3f05d2b9ea73affce0ade5b4f`.
+
+The replay object is 2,301 bytes with phase-specific whole-file SHA-256
+`4eabbd93203d3c48f0e60b79ee8bb95d54e09ce6a410449e695c8050068e284d`.
+It defines exactly the seven accepted external code owners.
+`_device_frontfacing` remains absent, as do the `"front"` and zero-float
+runtime COMDATs. The object has no runtime `.rdata`, writable `.data`, `.bss`,
+or COMMON owner; its remaining non-code sections are compiler directive/debug
+material only. Both position helpers, both object accessors,
+`_device_groups_data`, and `__fltused` remain undefined externals. The
+worktree was clean immediately after replay. No push, amend, or history
+rewrite is performed.
