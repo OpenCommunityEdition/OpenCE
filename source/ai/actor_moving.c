@@ -204,6 +204,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "ai/actors.h"
+#include "units/units.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -215,5 +219,39 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void actor_move_keep_moving_past_destination(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	actor->orders.move.destination.keep_moving = TRUE;
+	actor->control.path.destination_orders.keep_moving = TRUE;
+
+	return;
+}
+
+boolean actor_move_animation_busy(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->orders.move.animation.impulse == NONE)
+	{
+		long unit_index = actor->meta.unit_index;
+		if (unit_index == NONE || !unit_is_busy(unit_index))
+			return FALSE;
+	}
+
+	return TRUE;
+}
+
+boolean actor_path_has_path(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	return actor->control.path.path.valid;
+}
 
 /* ---------- private code */
