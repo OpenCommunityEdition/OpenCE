@@ -109,6 +109,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h"
 #include "math/real_math.h"
 #include "saved games/player_profile.h"
 
@@ -116,6 +117,7 @@ symbols in this file:
 
 enum
 {
+	_saved_game_file_type_player_profile = 0,
 	NUMBER_OF_AVAILABLE_PRIMARY_COLORS = 18,
 	NUMBER_OF_GOOD_RANDOM_COLORS = 3,
 	NUMBER_OF_RANDOM_COLORS = 17,
@@ -130,6 +132,14 @@ enum
 boolean saved_game_file_get_path_to_enclosing_directory(
 	long saved_game_file,
 	char *full_path);
+void saved_game_files_enumerate_available_to_local_player_index(
+	short local_player_index,
+	word saved_game_file_type,
+	word *number_of_profiles,
+	long *player_profile_indices,
+	boolean include_default_profiles);
+boolean delete_enumerated_saved_game_file(
+	long saved_game_file_index);
 
 /* ---------- globals */
 
@@ -156,6 +166,37 @@ long player_profile_primary_colors[NUMBER_OF_AVAILABLE_PRIMARY_COLORS] =
 };
 
 /* ---------- public code */
+
+void player_profiles_enumerate_available_to_local_player_index(
+	short local_player_index,
+	word *number_of_profiles,
+	long *player_profile_indices,
+	boolean include_default_profiles)
+{
+	saved_game_files_enumerate_available_to_local_player_index(
+		local_player_index,
+		_saved_game_file_type_player_profile,
+		number_of_profiles,
+		player_profile_indices,
+		include_default_profiles);
+
+	return;
+}
+
+void player_profile_delete(
+	long player_profile_index)
+{
+	if (player_profile_index != NONE &&
+		!delete_enumerated_saved_game_file(player_profile_index))
+	{
+		error(
+			_error_silent,
+			"player_profile_delete() failed (profile index= #0x%lX)",
+			player_profile_index);
+	}
+
+	return;
+}
 
 short player_profile_number_of_available_primary_colors(
 	void)
