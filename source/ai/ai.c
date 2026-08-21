@@ -200,6 +200,7 @@ symbols in this file:
 #include "cseries.h"
 
 #include "ai/actors.h"
+#include "ai/props.h"
 #include "units/units.h"
 
 #include "memory/data.h"
@@ -228,6 +229,16 @@ struct ai_globals_prefix
 	boolean grenades_enabled;
 };
 
+struct actor_iterator
+{
+	struct data_iterator encounter_iterator;
+	boolean iterated_encounterless_list;
+	boolean active_only;
+	byte pad[2];
+	long index;
+	long next_index;
+};
+
 typedef char ai_globals_prefix_active_offset_assert[
 	offsetof(struct ai_globals_prefix, ai_active) == 0x0 ? 1 : -1];
 typedef char ai_globals_prefix_initialized_offset_assert[
@@ -242,6 +253,32 @@ typedef char ai_unit_actor_index_offset_assert[
 	offsetof(struct unit_datum, unit.actor_index) == 0x1A4 ? 1 : -1];
 typedef char ai_actor_last_vehicle_exit_forced_offset_assert[
 	offsetof(struct actor_datum, emotions.last_vehicle_exit_forced) == 0x38C ? 1 : -1];
+typedef char ai_actor_iterator_size_assert[
+	sizeof(struct actor_iterator) == 0x1C ? 1 : -1];
+typedef char ai_actor_iterator_index_offset_assert[
+	offsetof(struct actor_iterator, index) == 0x14 ? 1 : -1];
+typedef char ai_actor_team_index_offset_assert[
+	offsetof(struct actor_datum, meta.team_index) == 0x3E ? 1 : -1];
+typedef char ai_unit_player_index_offset_assert[
+	offsetof(struct unit_datum, unit.player_index) == 0x1C8 ? 1 : -1];
+typedef char ai_unit_team_index_offset_assert[
+	offsetof(struct unit_datum, object.owner_team_index) == 0x68 ? 1 : -1];
+typedef char ai_prop_iterator_size_assert[
+	sizeof(struct prop_iterator) == 0x8 ? 1 : -1];
+typedef char ai_prop_iterator_index_offset_assert[
+	offsetof(struct prop_iterator, index) == 0x0 ? 1 : -1];
+typedef char ai_prop_team_index_offset_assert[
+	offsetof(struct prop_datum, team_index) == 0x12 ? 1 : -1];
+typedef char ai_prop_unit_index_offset_assert[
+	offsetof(struct prop_datum, unit_index) == 0x18 ? 1 : -1];
+typedef char ai_prop_target_weight_offset_assert[
+	offsetof(struct prop_datum, target_weight) == 0x50 ? 1 : -1];
+typedef char ai_prop_enemy_offset_assert[
+	offsetof(struct prop_datum, enemy) == 0x60 ? 1 : -1];
+typedef char ai_prop_ally_offset_assert[
+	offsetof(struct prop_datum, ally) == 0x61 ? 1 : -1];
+typedef char ai_prop_unopposable_enemy_offset_assert[
+	offsetof(struct prop_datum, unopposable_enemy) == 0xA4 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -273,6 +310,26 @@ void ai_communication_event(
 	long position_index,
 	long structure_index,
 	void const *context);
+
+void actor_iterator_new(
+	struct actor_iterator *iterator,
+	boolean active_only);
+struct actor_datum *actor_iterator_next(
+	struct actor_iterator *iterator);
+boolean game_team_is_enemy(
+	short team_index0,
+	short team_index1);
+boolean game_team_is_ally(
+	short team_index0,
+	short team_index1);
+boolean actor_compute_prop_unopposable(
+	long actor_index,
+	long prop_index);
+real actor_compute_prop_target_weight(
+	long actor_index,
+	long prop_index);
+void actor_stimulus_vehicle_eviction(
+	long actor_index);
 
 boolean code_000309a0(
 	boolean must_be_attacking);
@@ -334,6 +391,77 @@ void ai_globals_grenades_enabled(
 	match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x14C, ai_globals);
 
 	ai_globals->grenades_enabled = enabled;
+
+	return;
+}
+
+boolean ai_try_vehicle_eviction(
+	long actor_index,
+	long entering_unit_index,
+	boolean immediate)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean result = FALSE;
+
+	if (entering_unit_index != NONE)
+	{
+		struct unit_datum *entering_unit = unit_get(entering_unit_index);
+
+		if (entering_unit->unit.player_index != NONE &&
+			!game_team_is_enemy(
+				entering_unit->object.owner_team_index,
+				actor->meta.team_index))
+		{
+			result = TRUE;
+
+			if (immediate)
+				actor_stimulus_vehicle_eviction(actor_index);
+		}
+	}
+
+	return result;
+}
+
+void ai_update_team_status(
+	void)
+{
+	struct actor_iterator actor_iterator;
+	struct actor_datum *actor;
+
+	actor_iterator_new(&actor_iterator, TRUE);
+	actor = actor_iterator_next(&actor_iterator);
+
+	while (actor)
+	{
+		struct prop_iterator prop_iterator;
+		struct prop_datum *prop;
+
+		prop_iterator_new(&prop_iterator, actor_iterator.index);
+		prop = prop_iterator_next(&prop_iterator);
+
+		while (prop)
+		{
+			struct unit_datum *unit = unit_get(prop->unit_index);
+
+			prop->team_index = unit->object.owner_team_index;
+			prop->enemy = game_team_is_enemy(
+				actor->meta.team_index,
+				prop->team_index);
+			prop->ally = game_team_is_ally(
+				actor->meta.team_index,
+				prop->team_index);
+			prop->unopposable_enemy = actor_compute_prop_unopposable(
+				actor_iterator.index,
+				prop_iterator.index);
+			prop->target_weight = actor_compute_prop_target_weight(
+				actor_iterator.index,
+				prop_iterator.index);
+
+			prop = prop_iterator_next(&prop_iterator);
+		}
+
+		actor = actor_iterator_next(&actor_iterator);
+	}
 
 	return;
 }

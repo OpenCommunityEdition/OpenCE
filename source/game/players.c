@@ -446,7 +446,7 @@ void unit_enter_seat(
 	long unit_index,
 	long target_unit_index,
 	short seat_index);
-void ai_try_vehicle_eviction(
+boolean ai_try_vehicle_eviction(
 	long actor_index,
 	long entering_unit_index,
 	boolean immediate);
