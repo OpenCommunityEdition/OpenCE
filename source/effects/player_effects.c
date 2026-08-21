@@ -90,13 +90,31 @@ symbols in this file:
 
 #include "game/player_rumble.h"
 
+#include <stddef.h>
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct player_effect_datum
+{
+	byte reserved00[0xE4];
+	byte damage_indicator_ticks[4];
+	byte flags;
+	byte padE9[3];
+};
+
+typedef char player_effect_datum_size_assert[
+	sizeof(struct player_effect_datum) == 0xEC ? 1 : -1];
+typedef char player_effect_damage_indicator_ticks_offset_assert[
+	offsetof(struct player_effect_datum, damage_indicator_ticks) == 0xE4 ? 1 : -1];
+
 /* ---------- prototypes */
+
+struct player_effect_datum *player_effect_get(
+	short local_player_index);
 
 /* ---------- globals */
 
@@ -119,6 +137,18 @@ void scripted_player_effect_set_rumble(
 	real right_motor)
 {
 	rumble_player_set_scripted_values(left_motor, right_motor);
+	return;
+}
+
+void player_effect_clear_damage_indicators(
+	short local_player_index)
+{
+	struct player_effect_datum *effect = player_effect_get(local_player_index);
+
+	csmemset(
+		effect->damage_indicator_ticks,
+		0,
+		sizeof(effect->damage_indicator_ticks));
 	return;
 }
 
