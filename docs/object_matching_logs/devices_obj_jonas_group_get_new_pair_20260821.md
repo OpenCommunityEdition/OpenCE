@@ -254,4 +254,63 @@ performed.
 
 ## Clean committed-state replay
 
-Pending implementation-and-ledger commit and two-unit forced replay.
+Implementation-and-ledger commit
+`fe7be487044937a2fb51a9c1d2e8f4cef2cd23a6` was clean before replay and is
+authored and committed by Jonas Volman. Re-reading that commit proves devices
+source blob `b20ab75aa491468b606583165c727cabd8f4c2a6` and HS source blob
+`ed38056c21a03ca9c8402f330ba24d551132bd9c`; the shared devices header remains
+baseline blob `638221fd4dfd7ff7196b528798845ce0d194d997`.
+
+A two-unit regression snapshot was captured from that exact clean commit at
+`build/regression_devices_group_get_new_20260821.json`, with status
+`SNAPSHOT_WRITTEN` and units `source/devices/devices` and `source/hs/hs`.
+The first invocation's default Ninja token was denied by the host before any
+mutation; the successful snapshot used the same authenticated external Ninja
+1.13 executable that drove the earlier full build. This changed no source,
+configuration, object, or acceptance evidence.
+
+Both generated paths resolved inside the isolated-worktree root:
+
+- `C:\Users\isabe\Documents\Codex\2026-07-13\i-w\devices-group-touch-new-20260821\build\base\source\devices\devices.obj`
+  was 2,709 bytes with SHA-256
+  `b7c27295feda16d2b50a609c6b24aedc56717ef8a92b51d49c00c3bc0346fa0b`.
+- `C:\Users\isabe\Documents\Codex\2026-07-13\i-w\devices-group-touch-new-20260821\build\base\source\hs\hs.obj`
+  was 123,257 bytes with SHA-256
+  `386b16365f04e185966b7eff120bca1aa2135d51ff9619edcb569baa78d445d3`.
+
+Each resolved path was explicitly proved beneath the worktree root. Exactly
+those two files were deleted, and a second existence check proved both absent.
+The untouched production Ninja graph then rebuilt them through exactly two
+normal actions: `[1/2] CL build\base\source\devices\devices.obj` and
+`[2/2] CL build\base\source\hs\hs.obj`. There was no source change, body
+retry, alternate compile edge, or candidate tuning.
+
+The immediate no-build regression check returned `ok: true`, no failures, no
+warnings, `changed_nonexact: []`, and `newly_exact: []` for both units.
+Devices' `still_exact` set is exactly the nine functions in the inventory
+table above; all 442 previously accepted HS functions also remain in its
+`still_exact` set. A subsequent Ninja dry run reports `ninja: no work to do.`
+
+Direct hardened January comparison after rebuilding returns
+`all_equal: true` for all nine devices bodies. It independently reproduces the
+97 newly retained meaningful bytes, all 112 padded bytes, all four new
+relocations, and both normalized SHA-256 values. The replay `devices.obj` is
+2,709 bytes with phase-specific whole-file SHA-256
+`f72e5bb3176c551ffcd337cf683b1267acf012b3ee5ffa9a8c39b447a7c78db7`.
+
+The replay `hs.obj` is 123,257 bytes with phase-specific SHA-256
+`f7d353145b385120f205966c39ee44fcf57f57d3e3260cab147fb021ea4b2f8f`.
+Repeating the controlled semantic A/B against the pristine object again finds
+448 functions on each side with no vanished, appeared, or changed runtime
+function, and 38 runtime non-code sections on each side with no delta. The
+sole complete-object difference remains `.debug$S|anonymous=0` prototype type
+metadata.
+
+An independent post-rebuild COFF ownership census again finds exactly the
+nine defined external code COMDATs in the table and no runtime non-code
+section. Its undefined external inventory is exactly `__fltused`,
+`_data_make_invalid`, `_datum_get`, `_device_group_set_actual_value`,
+`_device_group_set_desired_value`, `_device_groups_data`,
+`_object_get_and_verify_type`, `_object_try_and_get_and_verify_type`, and
+`_tag_get`. The final tracked delta after replay is this additive ledger
+section only. Nothing is pushed, amended, or history-rewritten.
