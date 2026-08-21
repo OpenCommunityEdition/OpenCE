@@ -83,9 +83,16 @@ symbols in this file:
 #include "cseries.h"
 #include "actions.h"
 
+#include "actor_definitions.h"
+#include "actors.h"
 #include "math/real_math.h"
 
 /* ---------- constants */
+
+enum
+{
+	_actor_special_fire_situation_strafing = 3,
+};
 
 /* ---------- macros */
 
@@ -93,8 +100,47 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+struct actor_variant_definition *actor_combat_get_firing_variant_definition(
+	long actor_index);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+void action_charge_begin(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->state.action_data.charge.goal == _charge_goal_vehicle_strafing &&
+		actor_combat_get_firing_variant_definition(actor_index)->ranged_combat.special_fire_situation ==
+			_actor_special_fire_situation_strafing)
+	{
+		short charge_remaining = actor->control.special_fire_deny_attempts;
+
+		if (charge_remaining > 0)
+		{
+			actor->control.special_fire_deny_attempts = charge_remaining - 1;
+		}
+	}
+
+	return;
+}
+
+void action_charge_update(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->state.action_data.charge.goal == _charge_goal_melee_leaping &&
+		actor->state.action_data.charge.launched_leap &&
+		!actor->state.action_data.charge.launched_melee_attack &&
+		!actor->input.in_midair)
+	{
+		++actor->state.action_data.charge.leap_failure_timer;
+	}
+
+	return;
+}
 
 /* ---------- private code */
