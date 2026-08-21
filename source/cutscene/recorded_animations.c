@@ -86,16 +86,34 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "memory/data.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct recorded_animations_globals_prefix
+{
+	struct data_array *animation_threads;
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+extern struct recorded_animations_globals_prefix bss_00435ca4;
+
 /* ---------- public code */
+
+void recorded_animations_dispose_from_old_map(
+	void)
+{
+	data_make_invalid(bss_00435ca4.animation_threads);
+
+	return;
+}
 
 /* ---------- private code */
