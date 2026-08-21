@@ -148,6 +148,12 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	_point_light_connects_to_map_bit = 1,
+	_point_light_connected_to_map_bit = 2,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -158,8 +164,22 @@ struct lights_game_globals
 	byte reserved01[3];
 };
 
+struct light_datum_prefix
+{
+	struct datum_header header;
+	unsigned short flags;
+	long definition_index;
+	long rasterizer_light_index;
+	long marker;
+	long cluster_reference;
+};
+
 typedef char verify_lights_game_globals_size[
 	sizeof(struct lights_game_globals) == 0x4 ? 1 : -1];
+typedef char verify_light_datum_prefix_flags_offset[
+	offsetof(struct light_datum_prefix, flags) == 0x2 ? 1 : -1];
+typedef char verify_light_datum_prefix_cluster_reference_offset[
+	offsetof(struct light_datum_prefix, cluster_reference) == 0x10 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -179,6 +199,16 @@ void lights_dispose(
 	return;
 }
 
+void lights_initialize_for_new_map(
+	void)
+{
+	data_make_valid(light_data);
+	lights_game_globals->render_lights = TRUE;
+	cluster_partition_make_valid(&light_cluster_partition);
+
+	return;
+}
+
 void lights_dispose_from_old_map(
 	void)
 {
@@ -194,6 +224,62 @@ boolean lights_enable(
 	lights_game_globals->render_lights = enable;
 
 	return enable;
+}
+
+void light_delete(
+	long light_index)
+{
+	struct light_datum_prefix *light = datum_get(light_data, light_index);
+
+	cluster_partition_disconnect(
+		&light_cluster_partition,
+		light_index,
+		&light->cluster_reference);
+	datum_delete(light_data, light_index);
+
+	return;
+}
+
+void light_disconnect_from_map(
+	long light_index)
+{
+	struct light_datum_prefix *light = datum_get(light_data, light_index);
+
+	if (TEST_FLAG(light->flags, _point_light_connects_to_map_bit))
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\objects\\object_lights.c",
+			0x4D0,
+			TEST_FLAG(light->flags, _point_light_connected_to_map_bit));
+		cluster_partition_disconnect(
+			&light_cluster_partition,
+			light_index,
+			&light->cluster_reference);
+		SET_FLAG(light->flags, _point_light_connected_to_map_bit, FALSE);
+	}
+
+	return;
+}
+
+void lights_disconnect_from_structure_bsp(
+	void)
+{
+	long light_index;
+
+	for (light_index = data_next_index(light_data, NONE);
+		light_index != NONE;
+		light_index = data_next_index(light_data, light_index))
+	{
+		struct light_datum_prefix *light = datum_get(light_data, light_index);
+
+		if (TEST_FLAG(light->flags, _point_light_connected_to_map_bit))
+		{
+			light_disconnect_from_map(light_index);
+			SET_FLAG(light->flags, _point_light_connected_to_map_bit, TRUE);
+		}
+	}
+
+	return;
 }
 
 /* ---------- private code */
