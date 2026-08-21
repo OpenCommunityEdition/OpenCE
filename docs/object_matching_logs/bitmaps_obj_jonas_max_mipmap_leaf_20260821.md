@@ -48,19 +48,21 @@ this wave's credit.
 
   | HCEA file | Blob | Payload bytes | Payload SHA-256 |
   | --- | --- | ---: | --- |
-  | `src/bitmap_get_max_mipmap_count.c` | `aaf4c12658a5bc96c0ef184cba2e1aee47faff7b` | 903 | `4890af786f3ec56137b310f940d86a8cd8a8c56034b3964afc15fe1782c25a31` |
-  | `src/bitmap_mipmap_get_width.c` | `0fb448580269ad24cda71bf01fa2b652662e52a3` | 672 | `fdba81cb083df4d48717e5aef142c57b766ed81f04597ba439e0075f0ca3b24f` |
-  | `src/bitmap_mipmap_get_height.c` | `5d8d1d8828b80e4eb12dc74dcae2ff7ea46529b7` | 682 | `141abacaf26883557201a6e0b2cfb5d5b827707660a717ff9c3dc2b408bcce99` |
-  | `src/bitmap_mipmap_get_depth.c` | `3f7ad166ba4a23a5e58754a7d964a5186a4d9cf8` | 251 | `c02628e4faa2588b6d134e7c17d6b8941d39d6ac58895e50dac829c93e48d875` |
-  | `src/bitmap_mipmap_get_pixel_count.c` | `b8bb3ea9370d5331b0a5ca210bf9ff4ed106d806` | 1,141 | `d1e8bb025514e52c09cfd9c68be9f9eb9eb8df94fa4dd39df4420dff64b3d6fd` |
+  | `src/bitmap_get_max_mipmap_count.c` | `aaf4c12658a5bc96c0ef184cba2e1aee47faff7b` | 876 | `3fdd5738ece3be5cc6fa6253c56d9c5e2d37c7dad2304913bc45d03df3fff52f` |
+  | `src/bitmap_mipmap_get_width.c` | `0fb448580269ad24cda71bf01fa2b652662e52a3` | 654 | `2e262d1f3cf8d9500b836fd9cfeda65d386b453f9f354018fbc6723107231392` |
+  | `src/bitmap_mipmap_get_height.c` | `5d8d1d8828b80e4eb12dc74dcae2ff7ea46529b7` | 664 | `0ec18f06f9c3c4a7e4fea52a260acce0c4b6c177be9c7c98f3b33027bb1c95b6` |
+  | `src/bitmap_mipmap_get_depth.c` | `3f7ad166ba4a23a5e58754a7d964a5186a4d9cf8` | 241 | `147d9b49c25bd5408cdc3cb47d376c56f5c96519e349bd871e579b1f0ed16d81` |
+  | `src/bitmap_mipmap_get_pixel_count.c` | `b8bb3ea9370d5331b0a5ca210bf9ff4ed106d806` | 1,109 | `84dda70d2d72366b870fb7caa8cf29c9475f47b5815ceefa345ccf8fdf9a2189` |
 
-- Stian's independently readable PC bitmap topology is pinned at commit
+- Stian's independently readable, disassembly-backed retail-Xbox bitmap
+  reconstruction is pinned at commit
   `41c10616b69b982700e0913f21a5137807a03d0e`,
   `src/halo/bitmaps/bitmaps.c` blob
   `6410e8c031a8c2abf8c9b0ac13571ef6988a0770`, payload SHA-256
   `fa694d33004c24ebc53b96de0f72e45ef6bda0ca645a082226b7bddc94fea6f3`
-  (26,583 bytes). It corroborates the public mipmap topology; no raw-address
-  or byte-offset access is copied.
+  (26,583 bytes). It targets retail Xbox build 01.10.12.2276 and is neither
+  authentic source nor a PC donor. It corroborates the public mipmap
+  topology; no raw-address or byte-offset access is copied.
 - The unchanged typed layout comes from `source/bitmaps/bitmap_group.h` blob
   `9d5ee26d625b9895ba8d88ca02f91b7066165057`, payload SHA-256
   `b86ddcd46e4090df435eee5e47c248efd6ca746c7596bd838304bd73d90e72b5`.
@@ -83,10 +85,14 @@ short bitmap_get_max_mipmap_count(
 	struct bitmap_data *bitmap);
 ```
 
-No existing cross-TU caller or shared declaration names this currently absent
-body. The local non-const `bitmap_verify(struct bitmap_data *, boolean)`
-prototype agrees with the existing declaration in `bitmaps_quantitize.c` and
-January's one-pointer/one-boolean call ABI. No header repair is needed.
+No live reconstructed-source caller or shared declaration names this body.
+The January target has one cross-TU caller, `_code_000639f0` in
+`bitmap_extract.obj`: its `REL32` relocation is at caller offset `+0x56`, it
+passes one pointer, and it then compares and sign-extends `AX`, consistent with
+the signed-short `cdecl` return ABI. The local non-const
+`bitmap_verify(struct bitmap_data *, boolean)` prototype agrees with the
+existing declaration in `bitmaps_quantitize.c` and January's
+one-pointer/one-boolean call ABI. No header repair is needed.
 
 ## Authenticated behavior and relocation identity
 
@@ -112,9 +118,12 @@ The two `floor_log2` calls are January's natural nested-maximum emission, not
 a source anchor. The final candidate object contains the four accepted code
 COMDATs, existing source-owned palette/tables, ordinary compiler literals,
 debug metadata, and unresolved typed calls. The wave adds no source-defined
-global, `.data`, `.bss`, COMMON symbol, or runtime storage. Compiler-owned
-assertion text receives no data credit; campaign matched data remains
-1,835,088 bytes.
+global, writable `.data`, `.bss`, or COMMON symbol. It adds one exact
+compiler-owned runtime `.rdata` assertion literal,
+`bitmap_verify(bitmap, FALSE)\0`: 29 bytes, no relocations, normalized SHA-256
+`26ba2517be257ff738ab94bacf3967e9352b4aee9c18f712e15a300b5bbaf6bf`.
+That literal receives no data credit; campaign matched data remains 1,835,088
+bytes.
 
 ## One-shot rejection record
 
