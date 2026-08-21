@@ -31,7 +31,12 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "path_structure_bsp.h"
+
 #include "math/real_math.h"
+#include "physics/collision_bsp.h"
+#include "physics/collision_bsp_definitions.h"
+#include "structures/structure_bsp_definitions.h"
 
 /* ---------- constants */
 
@@ -44,6 +49,42 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+boolean structure_surfaces_are_equivalent(
+	struct structure_bsp const *structure,
+	real_point2d const *destination_point,
+	long destination_surface_index,
+	long test_surface_index)
+{
+	struct collision_bsp const *bsp;
+	real_point3d destination_point3d;
+	real_point3d test_point3d;
+	boolean result;
+
+	bsp = TAG_BLOCK_GET_ELEMENT(&structure->collision_bsp, 0, struct collision_bsp);
+	result = FALSE;
+
+	if (destination_surface_index != NONE && test_surface_index != NONE)
+	{
+		collision_surface_project_point2d(
+			bsp,
+			destination_surface_index,
+			_z,
+			TRUE,
+			destination_point,
+			&destination_point3d);
+		collision_surface_project_point2d(
+			bsp,
+			test_surface_index,
+			_z,
+			TRUE,
+			destination_point,
+			&test_point3d);
+		result = fabs(destination_point3d.z - test_point3d.z) < 0.05f;
+	}
+
+	return result;
+}
 
 boolean clip_empty_interval_by_solid_interval(
 	real *empty_t0,
@@ -68,6 +109,38 @@ boolean clip_empty_interval_by_solid_interval(
 		*empty_t1 = clipped_solid_t0;
 
 	return *empty_t0 > *empty_t1;
+}
+
+long structure_surface_index_from_point(
+	struct structure_bsp const *structure,
+	boolean ignore_broken_surfaces,
+	real_point2d const *known_point,
+	long known_surface_index,
+	real_point2d *point)
+{
+	struct path_collision_result result;
+
+	if (known_surface_index != NONE)
+	{
+		structure_test_line2d(
+			structure,
+			ignore_broken_surfaces,
+			known_point,
+			known_surface_index,
+			point,
+			NONE,
+			&result);
+
+		point->x = result.point.x;
+		point->y = result.point.y;
+
+		if (result.surface_index == NONE)
+			return known_surface_index;
+
+		return result.surface_index;
+	}
+
+	return NONE;
 }
 
 /* ---------- private code */
