@@ -45,7 +45,7 @@ struct mass_point_definition
 	real friction_parallel_scale;
 	real friction_perpendicular_scale;
 	real radius;
-	real unused[5];
+	byte reserved6C[0x14];
 };
 
 struct physics_definition

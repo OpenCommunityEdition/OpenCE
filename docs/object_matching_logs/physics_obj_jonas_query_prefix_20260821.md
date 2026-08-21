@@ -91,7 +91,9 @@ The retained function:
 
 `mass_point_definition` is added to `physics_definitions.h` with natural
 fields and compile-time proofs for size `0x80`, position offset `0x38`, and
-radius offset `0x68`. No raw padding view, byte-offset dereference, or tag
+radius offset `0x68`. The independently documented final 0x14-byte padding is
+kept as an opaque reserved array rather than assigned an unsupported semantic
+scalar type. No byte-offset dereference or tag
 address cast is used.
 
 ## Data and ownership boundary
