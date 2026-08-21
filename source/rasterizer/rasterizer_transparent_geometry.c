@@ -72,6 +72,8 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "rasterizer.h"
 #include "rasterizer_geometry.h"
+#include "shaders/shader_definitions.h"
+#include "shaders/shaders.h"
 
 /* ---------- constants */
 
@@ -79,6 +81,8 @@ enum
 {
 	MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS = 384,
 	MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS2 = 32,
+	SHADER_TYPE_TRANSPARENT_WATER = 7,
+	RASTERIZER_GEOMETRY_FIRST_PERSON_BIT = 7,
 };
 
 /* ---------- macros */
@@ -89,21 +93,48 @@ enum
 the stride: the group array is walked with a 0xA0 element size. */
 struct transparent_geometry_group
 {
-	byte opaque00[0x54];
+	unsigned long geometry_flags;
+	long object_index;
+	long source_object_index;
+	struct shader *shader;
+	byte opaque10[0x44];
 	long dynamic_vertex_buffer_index;
 	struct vertex_buffer const *vertex_buffer;
-	byte opaque5c[0x34];
+	byte opaque5c[0x14];
+	real z_sort;
+	byte opaque74[0x1C];
 	long sorted_index;
-	byte opaque94[0xC];
+	byte opaque94[9];
+	boolean cortana_hack;
+	byte opaque9e[2];
 };
 
 typedef char transparent_geometry_group_size_assert[
 	sizeof(struct transparent_geometry_group) == 0xA0 ? 1 : -1];
+typedef char transparent_geometry_group_geometry_flags_offset_assert[
+	offsetof(struct transparent_geometry_group, geometry_flags) == 0x0 ? 1 : -1];
+typedef char transparent_geometry_group_object_index_offset_assert[
+	offsetof(struct transparent_geometry_group, object_index) == 0x4 ? 1 : -1];
+typedef char transparent_geometry_group_source_object_index_offset_assert[
+	offsetof(struct transparent_geometry_group, source_object_index) == 0x8 ? 1 : -1];
+typedef char transparent_geometry_group_shader_offset_assert[
+	offsetof(struct transparent_geometry_group, shader) == 0xC ? 1 : -1];
+typedef char transparent_geometry_group_dynamic_vertex_buffer_index_offset_assert[
+	offsetof(struct transparent_geometry_group, dynamic_vertex_buffer_index) == 0x54 ? 1 : -1];
+typedef char transparent_geometry_group_vertex_buffer_offset_assert[
+	offsetof(struct transparent_geometry_group, vertex_buffer) == 0x58 ? 1 : -1];
+typedef char transparent_geometry_group_z_sort_offset_assert[
+	offsetof(struct transparent_geometry_group, z_sort) == 0x70 ? 1 : -1];
+typedef char transparent_geometry_group_sorted_index_offset_assert[
+	offsetof(struct transparent_geometry_group, sorted_index) == 0x90 ? 1 : -1];
+typedef char transparent_geometry_group_cortana_hack_offset_assert[
+	offsetof(struct transparent_geometry_group, cortana_hack) == 0x9D ? 1 : -1];
 
 #pragma pack(push, 1)
 struct rasterizer_transparent_geometry_globals
 {
-	byte opaque00[0x4];
+	short group_index;
+	short pad02;
 	unsigned long group_pending_flags[12];
 	struct transparent_geometry_group *groups;
 	struct transparent_geometry_group *groups2;
@@ -116,6 +147,18 @@ struct rasterizer_transparent_geometry_globals
 
 typedef char rasterizer_transparent_geometry_globals_size_assert[
 	sizeof(struct rasterizer_transparent_geometry_globals) == 0x4A ? 1 : -1];
+typedef char rasterizer_transparent_geometry_groups_offset_assert[
+	offsetof(struct rasterizer_transparent_geometry_globals, groups) == 0x34 ? 1 : -1];
+typedef char rasterizer_transparent_geometry_groups2_offset_assert[
+	offsetof(struct rasterizer_transparent_geometry_globals, groups2) == 0x38 ? 1 : -1];
+typedef char rasterizer_transparent_geometry_group_count_offset_assert[
+	offsetof(struct rasterizer_transparent_geometry_globals, group_count) == 0x3C ? 1 : -1];
+typedef char rasterizer_transparent_geometry_group_count2_offset_assert[
+	offsetof(struct rasterizer_transparent_geometry_globals, group_count2) == 0x40 ? 1 : -1];
+typedef char rasterizer_transparent_geometry_group_sorted_indices_offset_assert[
+	offsetof(struct rasterizer_transparent_geometry_globals, group_sorted_indices) == 0x44 ? 1 : -1];
+typedef char rasterizer_transparent_geometry_next_group_sorted_index_offset_assert[
+	offsetof(struct rasterizer_transparent_geometry_globals, next_group_sorted_index) == 0x48 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -124,6 +167,13 @@ short rasterizer_transparent_geometry_get_group_presorted_index(
 void rasterizer_set_stencil_mode(
 	long stencil_mode);
 void rasterizer_transparent_geometry_dispose_aux_buffer(
+	void);
+static void code_00173f70(
+	struct transparent_geometry_group *group);
+int __cdecl code_00173fa0(
+	void const *group_index1_pointer,
+	void const *group_index2_pointer);
+void code_00174120(
 	void);
 
 /* ---------- globals */
@@ -315,3 +365,139 @@ void rasterizer_transparent_geometry_dispose(
 }
 
 /* ---------- private code */
+
+static void code_00173f70(
+	struct transparent_geometry_group *group)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c",
+		0x192,
+		group);
+
+	return;
+}
+
+int __cdecl code_00173fa0(
+	void const *group_index1_pointer,
+	void const *group_index2_pointer)
+{
+	short const *group_index1 = group_index1_pointer;
+	short const *group_index2 = group_index2_pointer;
+	struct transparent_geometry_group *group1;
+	struct transparent_geometry_group *group2;
+	long comparison = 0;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c",
+		0x1AA,
+		group_index1 && (*group_index1)>=0 && (*group_index1)<transparent_geometry_group_count);
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c",
+		0x1AB,
+		group_index2 && (*group_index2)>=0 && (*group_index2)<transparent_geometry_group_count);
+
+	group1 = transparent_geometry_groups + *group_index1;
+	group2 = transparent_geometry_groups + *group_index2;
+
+	if (shader_is_water_decal(group1->shader))
+	{
+		comparison = -1;
+		goto cortana_tiebreak;
+	}
+	if (shader_is_water_decal(group2->shader))
+	{
+		comparison = 1;
+		goto cortana_tiebreak;
+	}
+
+	if (!group1->shader || group1->shader->base.type!=SHADER_TYPE_TRANSPARENT_WATER)
+	{
+		if (group2->shader && group2->shader->base.type==SHADER_TYPE_TRANSPARENT_WATER)
+		{
+			comparison = 1;
+			goto cortana_tiebreak;
+		}
+
+		if ((group1->geometry_flags & FLAG(RASTERIZER_GEOMETRY_FIRST_PERSON_BIT)) &&
+			!(group2->geometry_flags & FLAG(RASTERIZER_GEOMETRY_FIRST_PERSON_BIT)))
+		{
+			comparison = 1;
+			goto cortana_tiebreak;
+		}
+
+		if (!(group2->geometry_flags & FLAG(RASTERIZER_GEOMETRY_FIRST_PERSON_BIT)) ||
+			(group1->geometry_flags & FLAG(RASTERIZER_GEOMETRY_FIRST_PERSON_BIT)))
+		{
+			if (group1->z_sort>group2->z_sort)
+			{
+				comparison = 1;
+				goto cortana_tiebreak;
+			}
+			if (!(group1->z_sort<group2->z_sort))
+			{
+				if (group1->source_object_index>group2->source_object_index)
+				{
+					comparison = 1;
+					goto cortana_tiebreak;
+				}
+				if (group1->source_object_index>=group2->source_object_index)
+				{
+					goto cortana_tiebreak;
+				}
+			}
+		}
+	}
+	comparison = -1;
+
+	cortana_tiebreak:
+	if (group1->cortana_hack && !group2->cortana_hack)
+	{
+		return 1;
+	}
+	if (group2->cortana_hack && !group1->cortana_hack)
+	{
+		return -1;
+	}
+
+	return comparison;
+}
+
+void code_00174120(
+	void)
+{
+	short group_index;
+	struct transparent_geometry_group *group;
+
+	for (group_index = 0; group_index<transparent_geometry_group_count; group_index++)
+	{
+		group = transparent_geometry_groups + group_index;
+		code_00173f70(group);
+		transparent_geometry_group_sorted_indices[group_index] = group_index;
+	}
+
+	qsort(
+		transparent_geometry_group_sorted_indices,
+		transparent_geometry_group_count,
+		sizeof(*transparent_geometry_group_sorted_indices),
+		code_00173fa0);
+
+	{
+		long group_count = transparent_geometry_group_count;
+
+		if (group_count>0)
+		{
+			short *group_sorted_indices = transparent_geometry_group_sorted_indices;
+
+			group = transparent_geometry_groups;
+			group_index = 0;
+			do
+			{
+				group[group_sorted_indices[group_index]].sorted_index = group_index;
+				group_index++;
+			}
+			while (group_index<group_count);
+		}
+	}
+
+	return;
+}
