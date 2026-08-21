@@ -38,11 +38,11 @@ assertion and naturally inlines `light_disconnect_from_map` into the BSP
 walker, so those PC-authenticated details take precedence over HCEA's reduced
 body spelling.
 
-The final staged source identity is:
+The committed source identity is:
 
 | Path | Git blob | Stable payload bytes | Stable payload SHA-256 |
 | --- | --- | ---: | --- |
-| `source/objects/object_lights.c` | `5a43f11a3d4c9f7b9ed0f2d41d3c2c50502c7fec` | 6,857 | `4f1583481dabfece7689b1879eea831fd17432c35e3475f84fa663cc14d9210a` |
+| `source/objects/object_lights.c` | `5a43f11a3d4c9f7b9ed0f2d41d3c2c50502c7fec` | 6,685 | `2035c0c6c9d24c7edf8f81c6e40933ca023f1e83fe3b90f66fda69e4a0755fd5` |
 
 ## One-shot result
 
