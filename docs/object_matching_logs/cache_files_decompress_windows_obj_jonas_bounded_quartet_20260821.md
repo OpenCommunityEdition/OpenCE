@@ -158,6 +158,23 @@ optimizer pragma or barrier, synthetic anchor, or byte-forcing expression.
   scope checks pass. Only the translation unit and this new Jonas-owned ledger
   are tracked changes.
 
-The clean committed-state snapshot, forced object deletion/rebuild, regression
-check, and final direct COFF replay are recorded in an additive follow-up
-after the implementation commit. Nothing is pushed or history-rewritten.
+## Clean committed-state replay
+
+Implementation commit `0ab7cc0e2e0b08d57761793a8a0be78362413c96`
+was clean before the replay. Its committed source blob is the
+`0a50ca43de8db5c9201e476a1a62f10eb301c241` identity recorded above. A
+single-unit regression snapshot was captured directly from that clean commit.
+
+The generated
+`build/base/source/cache/cache_files_decompress_windows.obj` was then deleted
+and rebuilt through its normal same-path Ninja edge (`[1/1] CL`). The immediate
+regression check passed with both accepted functions `still_exact`, no newly
+exact or changed-nonexact function, and zero failures or warnings. Direct
+hardened comparison again reproduced both target hashes and all six relocation
+identities/addends. The rebuilt object still defines exactly the two accepted
+code symbols, no runtime non-code section, and an undefined value-zero
+`_data_00316838` external.
+
+The worktree was clean after the replay. This record is an additive ledger-only
+follow-up; no source or evidence was amended. Nothing is pushed or
+history-rewritten.
