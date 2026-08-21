@@ -107,12 +107,77 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "math/real_math.h"
+
+#include <stddef.h>
 
 /* ---------- constants */
+
+enum
+{
+	MAXIMUM_OBSTACLE_AVOIDANCE_STEPS = 128,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct obstacles;
+struct structure_bsp;
+
+struct obstacle_path_step
+{
+	real_point2d point;
+	long surface_index;
+	real_vector2d direction;
+	real distance;
+	short obstacle_index;
+	byte obstacle_direction_index;
+	byte reserved1B;
+	short obstructed_goal_step_indices[2];
+	real total_distance;
+	short previous_step_index;
+	byte reserved26[2];
+};
+
+struct obstacle_path
+{
+	real radius;
+	boolean ignore_broken_surfaces;
+	byte reserved5[3];
+	struct obstacles const *obstacles;
+	struct structure_bsp const *structure;
+	real_point2d goal;
+	long goal_surface_index;
+	short goal_obstacle_index;
+	short goal_step_index;
+	short best_goal_blocked_step_index;
+	byte reserved22[2];
+	real best_goal_blocked_distance;
+	boolean goal_found_exactly;
+	boolean finishing;
+	boolean ignore_optional;
+	byte reserved2B;
+	short step_count;
+	byte reserved2E[2];
+	struct obstacle_path_step steps[MAXIMUM_OBSTACLE_AVOIDANCE_STEPS];
+	short heap_count;
+	short heap[MAXIMUM_OBSTACLE_AVOIDANCE_STEPS];
+	byte reserved1532[2];
+};
+
+typedef char obstacle_path_step_size_assert[
+	sizeof(struct obstacle_path_step) == 0x28 ? 1 : -1];
+typedef char obstacle_path_size_assert[
+	sizeof(struct obstacle_path) == 0x1534 ? 1 : -1];
+typedef char obstacle_path_step_count_offset_assert[
+	offsetof(struct obstacle_path, step_count) == 0x2C ? 1 : -1];
+typedef char obstacle_path_steps_offset_assert[
+	offsetof(struct obstacle_path, steps) == 0x30 ? 1 : -1];
+typedef char obstacle_path_heap_count_offset_assert[
+	offsetof(struct obstacle_path, heap_count) == 0x1430 ? 1 : -1];
+typedef char obstacle_path_heap_offset_assert[
+	offsetof(struct obstacle_path, heap) == 0x1432 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -121,6 +186,23 @@ symbols in this file:
 /* ---------- public code */
 
 /* ---------- private code */
+
+struct obstacle_path_step *path_get_step(
+	struct obstacle_path *path,
+	short step_index)
+{
+	match_assert("c:\\halo\\SOURCE\\ai\\path_obstacle_avoidance.c", 40, step_index>=0 && step_index<path->step_count && path->step_count<=MAXIMUM_OBSTACLE_AVOIDANCE_STEPS);
+
+	return &path->steps[step_index];
+}
+
+short heap_parent_index(
+	short heap_index)
+{
+	match_assert("c:\\halo\\SOURCE\\ai\\path_obstacle_avoidance.c", 57, heap_index>0);
+
+	return (short)((heap_index - 1) >> 1);
+}
 
 short heap_left_index(
 	short heap_index)
