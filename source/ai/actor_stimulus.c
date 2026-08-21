@@ -76,16 +76,87 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
+#include "ai/actors.h"
+
+#include "memory/data.h"
+
+#include <stddef.h>
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+typedef char actor_stimulus_data_size_assert[
+	sizeof(struct actor_stimulus_data) == 0x64 ? 1 : -1];
+typedef char actor_stimuli_offset_assert[
+	offsetof(struct actor_datum, stimuli) == 0x2EC ? 1 : -1];
+typedef char actor_stimulus_vehicle_eviction_offset_assert[
+	offsetof(struct actor_datum, stimuli.vehicle_eviction) == 0x2ED ? 1 : -1];
+typedef char actor_stimulus_was_surprised_offset_assert[
+	offsetof(struct actor_datum, stimuli.was_surprised) == 0x2F0 ? 1 : -1];
+typedef char actor_stimulus_suspicion_combat_status_offset_assert[
+	offsetof(struct actor_datum, stimuli.suspicion_combat_status) == 0x34A ? 1 : -1];
+typedef char actor_stimulus_suspicion_timer_offset_assert[
+	offsetof(struct actor_datum, stimuli.suspicion_timer) == 0x34C ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+void actor_stimulus_clear(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	csmemset(&actor->stimuli, 0, sizeof(actor->stimuli));
+	return;
+}
+
+void actor_stimulus_suspicion(
+	long actor_index,
+	short suspicion_combat_status,
+	long suspicion_timer)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	short current_status = actor->stimuli.suspicion_combat_status;
+
+	if (current_status < suspicion_combat_status)
+	{
+		actor->stimuli.suspicion_combat_status = suspicion_combat_status;
+		actor->stimuli.suspicion_timer = suspicion_timer;
+	}
+	else if (current_status == suspicion_combat_status)
+	{
+		actor->stimuli.suspicion_timer = MAX(
+			actor->stimuli.suspicion_timer,
+			suspicion_timer);
+	}
+
+	return;
+}
+
+void actor_stimulus_was_surprised(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	actor->stimuli.was_surprised = TRUE;
+	return;
+}
+
+void actor_stimulus_vehicle_eviction(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	actor->stimuli.vehicle_eviction = TRUE;
+	return;
+}
 
 /* ---------- private code */
