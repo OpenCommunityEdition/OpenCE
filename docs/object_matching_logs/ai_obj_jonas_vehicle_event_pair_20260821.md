@@ -22,8 +22,11 @@ functions and all seven inherited exact functions.
 ## Provenance and signatures
 
 - The canonical baseline `source/ai/ai.c` blob is
-  `e87419ce28529e2a6672362cee8e68575b738f5f`; the retained source blob is
-  `6b5ec508389c499d940cf24e8fe9ba43edfe3f19`.
+  `e87419ce28529e2a6672362cee8e68575b738f5f`. Source-bearing implementation
+  commit `ac2e3cf6f6d7789ace3de2fcad93c591b574fb93` records the retained source as
+  Git blob `6b5ec508389c499d940cf24e8fe9ba43edfe3f19`; its committed payload is 9,878
+  bytes with SHA-256
+  `bf8069fcb41c256191dc016c11684c01cb2b099a6b15767358951cf8d6ff17cb`.
 - The January executable SHA-256 is
   `4cc87b45f721270392a96f1674ed2b5cd4a7bb4355faeab4531d1cf1884d9520`.
 - The January split `source/ai/ai.obj` SHA-256 is
@@ -34,11 +37,13 @@ functions and all seven inherited exact functions.
   `c168af2e747d3095d9a29418ae401f3a39544863`. Its exact function blobs are
   `d66ca8f834043f878ddec2f269748bf947acc421` (enter) and
   `b35a2d363ef8993196c3777f4c952a8164c04570` (exit).
-- The clean January-PC oracle is pinned at
+- The clean Stian PC disassembly reconstruction is pinned at
   `e638cf5fa17ed5308ac5c101ef65e9c69ced65f7`; its `src/halo/ai/ai.c` blob is
   `e273c750eea58d0e43daf1eb0a9037685cf01094`. Its VC7.1 verification gives
   100% instruction and operand scores to the same bodies at
-  `0x409A0..0x409D5` and `0x409E0..0x40A39`.
+  `0x409A0..0x409D5` and `0x409E0..0x40A39`. This is crossbuild
+  corroboration, not authentic source authority; the HCEA donors and January
+  COFF, disassembly, and callers remain authoritative.
 - The compiler is Microsoft 32-bit C/C++ Optimizing Compiler
   `13.00.9254.1` for 80x86. `CL.Exe` SHA-256 is
   `483e00c47bb08d699475a642bcff15b5b2036350b31c540e88a506baf101da11`.
