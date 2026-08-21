@@ -26,9 +26,9 @@ credit.
   SHA-256
   `515ab6640829235258023ff534b113787d9f77a2c648ff5a83ffa6d74aeb8601`.
 - Retained translation-unit blob:
-  `0a50ca43de8db5c9201e476a1a62f10eb301c241`, 9,335 payload bytes,
+  `0a50ca43de8db5c9201e476a1a62f10eb301c241`, 9,106 payload bytes,
   SHA-256
-  `21b32e0a089aaaa1c004786185022aa308e424005bb49ac78ee71300591ccea6`.
+  `7dcfd4901b6b6bfe79843d24232aab081aa1c989c5761e46c06829e98bd8bb4d`.
 - Compiler: Microsoft 32-bit C/C++ Optimizing Compiler `13.00.9254.1` for
   80x86. `xbox/bin/vc7/CL.Exe` has SHA-256
   `483e00c47bb08d699475a642bcff15b5b2036350b31c540e88a506baf101da11`.
@@ -69,11 +69,13 @@ It contains no catch-all state padding or offset-based access.
 
 The local cache-header definition is authenticated by canonical
 `source/cache/cache_files.c` blob
-`c2719b499e63517f04a4ff826bdc67b0b1e855ba` (payload SHA-256
-`7e397391419dfc6a661da575dc3d23655815f488393217dcb787101c86647691`).
+`c2719b499e63517f04a4ff826bdc67b0b1e855ba`, 20,292 payload bytes
+(payload SHA-256
+`b37bf25d7e8345eb5f89cc926951714911130fa5b3ab36d325153d9b32e39376`).
 The actual zlib type comes from `source/memory/zlib/zlib.h` blob
-`49f56b43bc6c5bc89b103c4760a23330d6525086` (payload SHA-256
-`7a13097001709cf69d7f1b7649fb6e93672164d92672b6f7b25fd43d3f220e49`).
+`49f56b43bc6c5bc89b103c4760a23330d6525086`, 40,898 payload bytes
+(payload SHA-256
+`56ff7663df8470fddf2e64a4a57da1d4e17d041f0b895a53ae5fab0d492d7e0b`).
 Compile-time checks fix the cache header at 0x800 and the PC offsets:
 
 | Field | Offset |
