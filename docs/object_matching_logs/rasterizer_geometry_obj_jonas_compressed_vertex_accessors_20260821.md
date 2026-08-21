@@ -263,4 +263,48 @@ rewrite is performed.
 
 ## Clean committed-state replay
 
-Pending the additive replay-only ledger commit.
+Implementation-and-ledger commit
+`99d385fd51b3d47c6320e81115f8132cdac36a56` was clean before replay. Its
+committed translation-unit blob is exactly
+`d12046aee23f4c5c9e7418ccecb095cafa154036`; re-reading the raw committed
+payload produced 6,087 bytes and the recorded SHA-256
+`78c6d52e34d12a358fa562bc2a1b2d21976e32774c6d29fe6bcd06593a8f5670`.
+The shared header remained baseline blob
+`b80e3b2ec396faafce1a88d40d65dfc162b1b8b3`. `git status --short --branch`
+reported only the branch header and no changed or untracked path.
+
+A one-unit regression snapshot was captured from that exact clean commit at
+`build/regression_rasterizer_geometry_accessors_20260821.json`, with status
+`SNAPSHOT_WRITTEN` and sole unit
+`source/rasterizer/rasterizer_geometry`. The generated candidate path resolved
+to
+`C:\Users\isabe\Documents\Codex\2026-07-13\i-w\rasterizer-geometry-accessor-five-20260821\build\base\source\rasterizer\rasterizer_geometry.obj`.
+It was explicitly verified to begin inside the resolved isolated-worktree
+root. Before deletion it was 4,112 bytes with SHA-256
+`63572bdcb0968adc5b325ea5137337433264b97a46ad185a19a2d2a18063e9e4`.
+That single file was deleted and a second existence check proved it absent.
+
+The untouched production Ninja graph then rebuilt the same path through
+exactly one `[1/1] CL` action, using the unchanged natural `/O2 /Oy- /DDEBUG
+/Dxbox` command and include graph. There was no source change, body retry, or
+alternate build edge. The immediate no-build regression check returned
+`ok: true`, no failures, no warnings, `changed_nonexact: []`, and
+`newly_exact: []`. Its `still_exact` set is exactly the five retained accessors
+and three inherited functions documented above.
+
+Direct hardened January comparison after the rebuild returned
+`all_equal: true` for the complete eight-body inventory. It reproduced all
+588 newly retained meaningful bytes, all 624 padded bytes, all 46 relocations,
+and each recorded normalized SHA-256. The rebuilt object is 4,112 bytes with
+phase-specific whole-file SHA-256
+`9f6634118018c64606f5ef479d100fb264fae410a535bc837b4b9dd169662efb`.
+
+An independent post-rebuild COFF ownership parse found exactly eight defined
+external code owners; the only defined runtime non-code owners are the three
+float literals and five assertion strings totaling 89 bytes. It found no
+`.data`, `.bss`, or COMMON owner. The undefined value-zero runtime externals
+remain exactly `__fltused`, `_system_exit`, `_display_assert`, and
+`_uncompress_int32_to_real_vector3d`. The final tracked change after replay is
+this additive ledger paragraph only.
+
+Nothing is pushed, amended, or history-rewritten.
