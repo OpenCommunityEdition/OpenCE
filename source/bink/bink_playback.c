@@ -114,16 +114,102 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "bink_playback.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct bink_playback_globals
+{
+	boolean initialized;
+	byte pad_0001[3];
+	unsigned long flags;
+	void *bink;
+	byte pad_000c[0xCC];
+};
+
+typedef void *(*rad_memory_allocate_proc)(unsigned long size);
+typedef void (*rad_memory_free_proc)(void *memory);
+
+typedef char bink_playback_globals_size_assert[
+	sizeof(struct bink_playback_globals) == 0xD8 ? 1 : -1];
+typedef char bink_playback_globals_flags_offset_assert[
+	offsetof(struct bink_playback_globals, flags) == 4 ? 1 : -1];
+typedef char bink_playback_globals_bink_offset_assert[
+	offsetof(struct bink_playback_globals, bink) == 8 ? 1 : -1];
+
 /* ---------- prototypes */
+
+void __stdcall RADSetMemory(
+	rad_memory_allocate_proc allocate,
+	rad_memory_free_proc release);
+
+void *code_001b55a0(
+	unsigned long size);
+void code_001b5790(
+	void *memory);
+void code_001b5e30(
+	void);
 
 /* ---------- globals */
 
+extern struct bink_playback_globals bink_globals;
+extern boolean global_frame_rate_throttle;
+
 /* ---------- public code */
+
+boolean bink_playback_active(
+	void)
+{
+	return bink_globals.bink && bink_globals.initialized;
+}
+
+boolean bink_playback_ui_rendering_inhibited(
+	void)
+{
+	return bink_globals.initialized &&
+		TEST_FLAG(bink_globals.flags, _bink_playback_dont_render_ui_bit);
+}
+
+boolean bink_playback_in_progress(
+	void)
+{
+	return bink_globals.bink != NULL;
+}
+
+void bink_playback_initialize(
+	void)
+{
+	csmemset(&bink_globals, 0, sizeof(bink_globals));
+	RADSetMemory(code_001b55a0, code_001b5790);
+	bink_globals.initialized = TRUE;
+
+	return;
+}
+
+void bink_playback_dispose(
+	void)
+{
+	if (bink_globals.initialized)
+	{
+		bink_playback_stop();
+		csmemset(&bink_globals, 0, sizeof(bink_globals));
+	}
+
+	return;
+}
+
+void bink_playback_update(
+	void)
+{
+	if (global_frame_rate_throttle)
+		code_001b5e30();
+
+	return;
+}
 
 /* ---------- private code */
