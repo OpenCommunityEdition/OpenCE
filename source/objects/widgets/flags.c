@@ -115,4 +115,12 @@ void flags_dispose(
 	return;
 }
 
+void flag_delete(
+	long flag_index)
+{
+	datum_delete(flag_data, flag_index);
+
+	return;
+}
+
 /* ---------- private code */
