@@ -178,8 +178,59 @@ required support for accepted code but receives no data-matching credit; all
 - `git diff --check`, source-policy, deleted-path, protected-scope, and
   changed-path audits: pass.
 
-No committed-state replay is claimed before an implementation commit exists.
-An additive ledger-only commit will record the actual clean snapshot, verified
-generated-object deletion, normal Ninja rebuild, regression check, direct
-comparator, rejected-symbol absence, and final ownership. Nothing is pushed or
-history-rewritten.
+The implementation commit made no advance claim about committed-state replay.
+The additive record below supplies the actual clean snapshot, verified object
+deletion, normal Ninja rebuild, regression check, direct comparator,
+rejected-symbol absence, and final ownership.
+
+## Recorded committed-state replay
+
+The implementation commit is
+`674085d43eaffd6f46bc81df9e51cbcc9bb78f2a`. At that clean committed state,
+`source/saved games/playlist_profile.c` resolves to Git blob
+`a2709b06c04e6fc062fadcf73c512d213643ac04`; its raw committed payload is
+3,483 bytes with SHA-256
+`faa645db6d3a039b4332eb3fede3f216ef6c7af5010621f08d9c288d8fde0161`.
+`git status --short --branch` reported only the branch header and no changed or
+untracked path.
+
+The initial direct regression snapshot invocation stopped before deletion or
+building because the current metadata parser looks for the decoded base path
+while generated Ninja correctly escapes the directory as `saved$ games`. The
+successful snapshot/check therefore used an ignored one-edge parser view with
+the decoded metadata path, exact generated compiler command, and byte-for-byte
+identical cflags. Both operations used the tool's hidden `--no-build` switch.
+The actual rebuild used the untouched production `build.ninja` and its genuine
+escaped-path edge; no tracked configuration or regression tool was edited.
+
+The clean snapshot was written to
+`build/regression_playlist_profile_delete_20260821.json` with status
+`SNAPSHOT_WRITTEN`, commit
+`674085d43eaffd6f46bc81df9e51cbcc9bb78f2a`, and sole unit
+`source/saved games/playlist_profile`. The generated candidate path was
+resolved inside this worktree. Its existing 1,296-byte file, SHA-256
+`dc34b7c3b8f4255ff1682f92f329a4c2fa2f98f49752119592618d36d757c5bd`,
+was verified before `build/base/source/saved games/playlist_profile.obj` was
+deleted; a second existence check proved it absent. The normal repository
+Ninja/VC7 edge then rebuilt that exact path with the unchanged compile flags
+`/O2 /Oy- /DDEBUG /Dxbox`.
+
+The committed-state regression check returned `ok: true`, no failures, no
+warnings, no newly exact functions, and no changed nonexact functions. Its
+`still_exact` set is exactly `_playlist_profile_delete` and
+`_playlist_profile_number_of_default_profiles_on_disk`. A subsequent direct
+hardened comparison again reported strict equality for both code COMDATs,
+including every padded byte and relocation address, type, destination, and
+addend. The rejected `_playlist_profile_get_display_name` definition is
+absent.
+
+The replay object is 1,296 bytes with phase-specific SHA-256
+`a493dd396038eee6ce44eb9ae1d25e3fc355996561fc390bdef989f4042daf51`.
+Its only defined external code owners are the retained delete and inherited
+default-count functions; its only runtime non-code owner is the canonical
+57-byte delete-failure literal. There is no writable `.data`, `.bss`, COMMON,
+or aggregate owner. `_bss_004d2858`, `_delete_enumerated_saved_game_file`,
+and `_error` remain undefined externals. The worktree remained clean after
+replay.
+
+Nothing is pushed, amended, or history-rewritten.
