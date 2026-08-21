@@ -38,8 +38,8 @@ functions and 10,428 meaningful code bytes remain outside this wave's credit.
   `443e269f49461dcaf5ff3804fc8770cc5579798427289c60f56a1ce533a226de`.
 - Retained rebuilt object SHA-256:
   `c1abd58b056218f94b6c95efe141f8234340238167d84f5866cfa8863366071a`.
-- The frozen local HCEA semantic cache is commit
-  `570c83fd9c365dad6f2a3e7041705d5b84c7847c`. Its two readable body blobs are
+- The clean HCEA semantic oracle is commit
+  `c168af2e747d3095d9a29418ae401f3a39544863`. Its two readable body blobs are
   `b36120c5d7f1c68cf92f58fbb0b64a4d86645280` and
   `1a66d136e129e6818fdf608ba18d7b63e9a6edef`. HCEA authenticates the named
   state transitions and interest calculation; January remains authoritative
