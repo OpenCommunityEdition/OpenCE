@@ -298,16 +298,396 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
+#include "bitmaps/bitmap_group.h"
+#include "cache/cache_files.h"
+#include "cseries/errors.h"
+#include "tag_files/tag_files.h"
+
 /* ---------- constants */
+
+enum
+{
+	_bitmap_group_type_sprites = 3,
+	_bitmap_group_type_interface_bitmaps = 4,
+	_bitmap_format_a8y8 = 3,
+	_bitmap_linear_bit = 4,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct bitmap_group_sprite
+{
+	short bitmap_index;
+	word pad02;
+	long unknown004;
+	real_rectangle2d bounds;
+	real_point2d registration_point;
+};
+
+struct bitmap_group_sequence
+{
+	char name[32];
+	short first_bitmap_index;
+	short bitmap_count;
+	long unknown024[4];
+	struct tag_block sprites;
+};
+
+typedef char bitmap_group_sprite_size_assert[
+	sizeof(struct bitmap_group_sprite) == 0x20 ? 1 : -1];
+typedef char bitmap_group_sequence_size_assert[
+	sizeof(struct bitmap_group_sequence) == 0x40 ? 1 : -1];
+
 /* ---------- prototypes */
+
+boolean code_00065210(
+	struct bitmap_data *bitmap,
+	boolean editing);
+void code_00065220(
+	struct tag_block *block,
+	long element_index);
+boolean code_00065240(
+	long bitmap_group_index,
+	boolean editing);
+
+void bitmap_delete(
+	struct bitmap_data *bitmap);
+boolean bitmap_verify(
+	struct bitmap_data *bitmap,
+	boolean repair);
+void texture_cache_bitmap_new(
+	long bitmap_group_index,
+	struct bitmap_data *bitmap);
+
+extern boolean find_all_fucked_up_shit;
 
 /* ---------- globals */
 
 /* ---------- public code */
 
+struct bitmap_data *bitmap_group_try_and_get_bitmap(
+	long bitmap_group_index,
+	short bitmap_index)
+{
+	struct bitmap_group *group = bitmap_group_get(bitmap_group_index);
+	struct bitmap_data *result = NULL;
+
+	if (group && bitmap_index >= 0 && bitmap_index < group->bitmap_data.count)
+	{
+		result = TAG_BLOCK_GET_ELEMENT(
+			&group->bitmap_data,
+			bitmap_index,
+			struct bitmap_data);
+	}
+
+	return result;
+}
+
+struct bitmap_data *bitmap_group_get_bitmap_from_sequence(
+	long bitmap_group_index,
+	short sequence_index,
+	short frame_index)
+{
+	struct bitmap_data *result = NULL;
+
+	if (bitmap_group_index != NONE)
+	{
+		short bitmap_index = NONE;
+		struct bitmap_group *group;
+
+		match_assert(
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_group.c",
+			0x2A6,
+			sequence_index>=0 && frame_index>=0);
+
+		group = bitmap_group_get(bitmap_group_index);
+		if (group)
+		{
+			if (group->sequences.count > 0)
+			{
+				struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
+					&group->sequences,
+					sequence_index % group->sequences.count,
+					struct bitmap_group_sequence);
+
+				if (sequence->bitmap_count > 0)
+				{
+					bitmap_index = (short)(frame_index % sequence->bitmap_count +
+						sequence->first_bitmap_index);
+				}
+				else if (sequence->sprites.count)
+				{
+					bitmap_index = TAG_BLOCK_GET_ELEMENT(
+						&sequence->sprites,
+						frame_index,
+						struct bitmap_group_sprite)->bitmap_index;
+				}
+			}
+
+			if (bitmap_index == NONE)
+				bitmap_index = frame_index;
+
+			if (bitmap_index >= 0 && bitmap_index < group->bitmap_data.count)
+			{
+				result = TAG_BLOCK_GET_ELEMENT(
+					&group->bitmap_data,
+					bitmap_index,
+					struct bitmap_data);
+			}
+		}
+	}
+
+	return result;
+}
+
 /* ---------- private code */
+
+boolean code_00065210(
+	struct bitmap_data *bitmap,
+	boolean editing)
+{
+	return TRUE;
+}
+
+void code_00065220(
+	struct tag_block *block,
+	long element_index)
+{
+	bitmap_delete(TAG_BLOCK_GET_ELEMENT(block, element_index, struct bitmap_data));
+	return;
+}
+
+boolean code_00065240(
+	long bitmap_group_index,
+	boolean editing)
+{
+	struct bitmap_group *group = bitmap_group_get(bitmap_group_index);
+	boolean result = TRUE;
+	short bitmap_index;
+	short sequence_index;
+
+	for (bitmap_index = 0;
+		bitmap_index < group->bitmap_data.count;
+		bitmap_index = (short)(bitmap_index + 1))
+	{
+		struct bitmap_data *bitmap = TAG_BLOCK_GET_ELEMENT(
+			&group->bitmap_data,
+			bitmap_index,
+			struct bitmap_data);
+
+		if (group->type == _bitmap_group_type_interface_bitmaps)
+			SET_FLAG(bitmap->flags, _bitmap_linear_bit, TRUE);
+
+		if (bitmap_verify(bitmap, FALSE))
+			texture_cache_bitmap_new(bitmap_group_index, bitmap);
+		else
+			result = FALSE;
+	}
+
+	for (sequence_index = 0;
+		sequence_index < group->sequences.count;
+		sequence_index = (short)(sequence_index + 1))
+	{
+		struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
+			&group->sequences,
+			sequence_index,
+			struct bitmap_group_sequence);
+
+		if (sequence_index < group->sequences.count - 1)
+		{
+			(void)TAG_BLOCK_GET_ELEMENT(
+				&group->sequences,
+				sequence_index + 1,
+				struct bitmap_group_sequence);
+		}
+
+		if (group->type == _bitmap_group_type_sprites &&
+			(sequence->first_bitmap_index || sequence->bitmap_count))
+		{
+			TAG_BLOCK_GET_ELEMENT(
+				&group->sequences,
+				sequence_index,
+				struct bitmap_group_sequence)->first_bitmap_index = 0;
+			TAG_BLOCK_GET_ELEMENT(
+				&group->sequences,
+				sequence_index,
+				struct bitmap_group_sequence)->bitmap_count = 0;
+		}
+	}
+
+	if (group->sequences.count > 0)
+	{
+		struct bitmap_group_sequence *last_sequence = TAG_BLOCK_GET_ELEMENT(
+			&group->sequences,
+			group->sequences.count - 1,
+			struct bitmap_group_sequence);
+
+		if (!last_sequence->bitmap_count && !last_sequence->sprites.count &&
+			!tag_block_resize(&group->sequences, group->sequences.count - 1))
+		{
+			error(
+				_error_immediate,
+				"### FATAL_ERROR failed to fix bitmap group '%s'",
+				tag_get_name(bitmap_group_index));
+			result = FALSE;
+		}
+	}
+
+	if (find_all_fucked_up_shit)
+	{
+		for (bitmap_index = 0;
+			bitmap_index < group->bitmap_data.count;
+			bitmap_index = (short)(bitmap_index + 1))
+		{
+			struct bitmap_data *bitmap = TAG_BLOCK_GET_ELEMENT(
+				&group->bitmap_data,
+				bitmap_index,
+				struct bitmap_data);
+
+			if (bitmap->format == _bitmap_format_a8y8)
+			{
+				error(
+					_error_silent,
+					"!!MUST BE FIXED: bitmap #%d of group '%s' has a8y8 format",
+					bitmap_index,
+					tag_get_name(bitmap_group_index));
+			}
+			if (TEST_FLAG(bitmap->flags, _bitmap_linear_bit) &&
+				!(bitmap->width & (bitmap->width - 1)) &&
+				!(bitmap->height & (bitmap->height - 1)))
+			{
+				error(
+					_error_silent,
+					"!!MUST BE FIXED: bitmap #%d of group '%s' is linear and power-of-two",
+					bitmap_index,
+					tag_get_name(bitmap_group_index));
+			}
+		}
+
+		if (group->bitmap_data.count < 1)
+		{
+			error(
+				_error_silent,
+				"!!MUST BE FIXED: ",
+				"bitmap group '%s' has %d bitmaps",
+				tag_get_name(bitmap_group_index),
+				group->bitmap_data.count);
+		}
+		if (group->sequences.count < 1)
+		{
+			error(
+				_error_silent,
+				"!!MUST BE FIXED: ",
+				"bitmap group '%s' has %d sequences",
+				tag_get_name(bitmap_group_index),
+				group->sequences.count);
+		}
+
+		for (sequence_index = 0;
+			sequence_index < group->sequences.count;
+			sequence_index = (short)(sequence_index + 1))
+		{
+			struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
+				&group->sequences,
+				sequence_index,
+				struct bitmap_group_sequence);
+			struct bitmap_group_sequence *next_sequence;
+			short sprite_index;
+
+			if (sequence_index < group->sequences.count - 1)
+			{
+				next_sequence = TAG_BLOCK_GET_ELEMENT(
+					&group->sequences,
+					sequence_index + 1,
+					struct bitmap_group_sequence);
+			}
+			else
+			{
+				next_sequence = NULL;
+			}
+
+			if (group->type == _bitmap_group_type_sprites)
+			{
+				if (sequence->first_bitmap_index || sequence->bitmap_count)
+				{
+					error(
+						_error_silent,
+						"!!MUST BE FIXED: bitmap group '%s' (type=%d) sequence #%d doesn't know it's a sprite sequence",
+						tag_get_name(bitmap_group_index),
+						group->type,
+						sequence_index);
+				}
+			}
+			else if (sequence->first_bitmap_index < 0 ||
+				sequence->first_bitmap_index >= group->bitmap_data.count ||
+				sequence->bitmap_count < 1 ||
+				sequence->first_bitmap_index + sequence->bitmap_count > group->bitmap_data.count ||
+				(sequence_index == 0 && sequence->first_bitmap_index != 0) ||
+				(next_sequence && next_sequence->first_bitmap_index !=
+					sequence->first_bitmap_index + sequence->bitmap_count))
+			{
+				error(
+					_error_silent,
+					"!!MUST BE FIXED: bitmap group '%s' sequence #%d references bitmaps [#%d..#%d]",
+					tag_get_name(bitmap_group_index),
+					sequence_index,
+					sequence->first_bitmap_index,
+					sequence->first_bitmap_index + sequence->bitmap_count);
+			}
+
+			if (group->type == _bitmap_group_type_sprites)
+			{
+				if (sequence->sprites.count < 1)
+				{
+					error(
+						_error_silent,
+						"!!MUST BE FIXED: bitmap group '%s' sequence #%d has %d sprites",
+						tag_get_name(bitmap_group_index),
+						sequence_index,
+						sequence->sprites.count);
+				}
+				else
+				{
+					sprite_index = 0;
+					for (;
+						sprite_index < sequence->sprites.count;
+						sprite_index = (short)(sprite_index + 1))
+					{
+						short sprite_bitmap_index = TAG_BLOCK_GET_ELEMENT(
+							&sequence->sprites,
+							sprite_index,
+							struct bitmap_group_sprite)->bitmap_index;
+
+						if (sprite_bitmap_index < 0 ||
+							sprite_bitmap_index >= group->bitmap_data.count)
+						{
+							error(
+								_error_silent,
+								"!!MUST BE FIXED: bitmap group '%s' sequence #%d sprite #%d references bitmap #%d",
+								tag_get_name(bitmap_group_index),
+								sequence_index,
+								sprite_index,
+								sprite_bitmap_index);
+						}
+					}
+				}
+			}
+			else if (sequence->sprites.count > 0)
+			{
+				error(
+					_error_silent,
+					"!!MUST BE FIXED: bitmap group '%s' (type=%d) sequence #%d has %d sprites",
+					tag_get_name(bitmap_group_index),
+					group->type,
+					sequence_index,
+					sequence->sprites.count);
+			}
+		}
+	}
+
+	return result;
+}
