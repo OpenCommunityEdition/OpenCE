@@ -238,8 +238,40 @@ path deletion is changed. The five protected sources remain untouched:
   metadata was added; direct January comparison supplies the acceptance
   proof.
 
-The final handoff additionally requires a clean committed-state one-unit
-snapshot, verified same-path deletion and normal Ninja rebuild of
-`particle_systems.obj`, an immediate regression check, direct ten-body
-comparator replay, rejected-symbol absence check, and committed Git-blob
-payload recheck. No push, amend, or history rewrite is performed.
+The clean committed-state replay below completes the final handoff. No push,
+amend, or history rewrite is performed.
+
+## Clean committed-state replay
+
+Implementation-and-ledger commit
+`a46ce4188c71f7360a6288238611847f82a9a286` was clean before replay. Its
+committed source blob is exactly
+`4c30ed4b6dfbd22779bd774515c31a243a38c213`; re-reading that blob produced
+5,241 bytes and the recorded payload SHA-256
+`b54b4c42c29aee64e1bc1d051fa7cfbd4b3c21bf1ee1718ab2499eaa8ae3c6f6`.
+The shared header remained the baseline blob
+`b3eb17fc90c5d80eb18e4f48adf4180fef7bbcf8`.
+
+A one-unit regression snapshot was captured directly from that clean commit.
+The resolved generated path
+`build/base/source/effects/particle_systems.obj` was verified inside this
+isolated worktree, deleted, confirmed absent, and rebuilt through its normal
+same-path Ninja edge. The rebuild executed exactly one `[1/1] CL` action with
+the repository's natural flags and no source change or retry.
+
+The immediate regression check passed with all ten accepted functions
+`still_exact`, `changed_nonexact: []`, `newly_exact: []`, and zero failures or
+warnings. Direct hardened January comparison again returned `all_equal: true`
+for the complete ten-body inventory, reproducing `_particle_systems_update` at
+113 meaningful / 128 padded bytes, ten relocations, and normalized SHA-256
+`0f7bfc79eebe2a66cf652a210cc5e93b4a5346066692e1411892b1fe88ec0518`.
+The rebuilt object is 4,388 bytes with phase-specific whole-file SHA-256
+`d8db2a72c8f98e1b84a0e9b4b412136dc975ec357d8a73dd75b5e4eab36bfc2b`.
+
+The rejected `_particle_system_new_unattached` symbol is absent. The rebuilt
+object defines exactly the ten accepted code functions, contains no `.bss` or
+writable `.data`, and still carries `_particle_systems` and
+`_system_particles` only as undefined value-zero externals. The replay
+therefore proves that removing the support-only shared-header prototype did
+not alter the retained COMDAT or any inherited body. This paragraph is an
+additive ledger-only follow-up to the implementation commit.
