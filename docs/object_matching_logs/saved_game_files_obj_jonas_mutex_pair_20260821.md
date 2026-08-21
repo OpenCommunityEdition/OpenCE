@@ -30,15 +30,16 @@ credit.
 - Baseline source/header blobs:
   `1554bbe133220cb81839e06cfc44da2dbea6af98` and
   `a2987f70ca4042934e8d68319d6bde7165f4888c`.
-- Final staged, and therefore intended committed, `saved_game_files.c` Git
-  blob: `385312669fdcf6e9e9e2af13a799a33530e39c51`; raw Git-blob payload is
+- Committed `saved_game_files.c` Git blob:
+  `385312669fdcf6e9e9e2af13a799a33530e39c51`; raw Git-blob payload is
   12,350 bytes with SHA-256
   `e25de25f5719c23848d7d6dbc4ece9fd817754c7c1156c2262294aa7ce6c8a9a`.
-- Final staged, and therefore intended committed, `saved_game_files.h` Git
-  blob: `5218f5d3aad875cd217e87e908f4e958ae952022`; raw Git-blob payload is 476
+- Committed `saved_game_files.h` Git blob:
+  `5218f5d3aad875cd217e87e908f4e958ae952022`; raw Git-blob payload is 476
   bytes with SHA-256
   `b6c3c76a608cc82506f146eb512dd6b83dcb08e183c01f39722f0b4c40b0c065`.
-  These are `git cat-file blob :path` identities, not CRLF checkout hashes.
+  Post-commit `git cat-file blob HEAD:path` verifies both identities; they are
+  raw Git payload hashes, not CRLF checkout hashes.
 - January executable SHA-256:
   `4cc87b45f721270392a96f1674ed2b5cd4a7bb4355faeab4531d1cf1884d9520`.
 - January split-object SHA-256:
