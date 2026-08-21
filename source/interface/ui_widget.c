@@ -625,6 +625,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+struct widget_instance;
+
 #include "cseries.h"
 #include "ui_widget.h"
 
@@ -633,6 +635,24 @@ symbols in this file:
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct widget_instance
+{
+	long definition_tag_index;
+	char const *name;
+	short local_player_index;
+	byte unknown0A[4];
+	short type;
+	boolean visible;
+	byte unknown11;
+	boolean disabled;
+	byte unknown13[9];
+	long unknown1C;
+	byte unknown20[12];
+	struct widget_instance *next;
+	struct widget_instance *parent;
+	struct widget_instance *child;
+};
 
 /* ---------- prototypes */
 
@@ -646,6 +666,21 @@ void ui_widgets_safe_to_load(
 	boolean safe)
 {
 	return;
+}
+
+int widget_instance_count_children(
+	struct widget_instance *widget)
+{
+	int count;
+	struct widget_instance *child;
+
+	count = 0;
+	if (widget)
+	{
+		for (child = widget->child; child; child = child->next)
+			count++;
+	}
+	return count;
 }
 
 void code_000d4680(
