@@ -126,6 +126,13 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
+#include "actor_definitions.h"
+#include "actors.h"
+#include "items/weapon_definitions.h"
+#include "items/weapons.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -137,5 +144,62 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void actor_combat_fire_wildly(
+	long actor_index,
+	short fire_ticks)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	actor->control.fire_state = _actor_fire_state_wild;
+	actor->control.fire_state_timer = fire_ticks;
+
+	return;
+}
+
+void actor_combat_disable_bursts(
+	long actor_index,
+	long disable_timer)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	actor->control.burst_disable_timer =
+		MAX(actor->control.burst_disable_timer, disable_timer);
+
+	return;
+}
+
+boolean actor_firing_blindly(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	return actor->control.fire_state == _actor_fire_state_wild;
+}
+
+struct actor_variant_definition *actor_combat_get_firing_variant_definition(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_variant_definition *firing_variant_definition =
+		actor_variant_definition_get(actor->meta.variant_definition_index);
+	long weapon_index = actor_get_weapon(actor_index);
+
+	if (weapon_index != NONE)
+	{
+		struct weapon_datum *weapon = weapon_get(weapon_index);
+		struct weapon_definition *weapon_definition =
+			weapon_definition_get(weapon->definition_index);
+
+		if (weapon_definition != NULL &&
+			weapon_definition->weapon.ai_firing_parameters.index != NONE)
+		{
+			firing_variant_definition = actor_variant_definition_get(
+				weapon_definition->weapon.ai_firing_parameters.index);
+		}
+	}
+
+	return firing_variant_definition;
+}
 
 /* ---------- private code */
