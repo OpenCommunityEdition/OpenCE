@@ -39,6 +39,7 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "math/real_math.h"
 #include "objects/objects.h"
+#include "rasterizer/rasterizer.h"
 #include "render/render.h"
 #include "saved games/game_state.h"
 #include "shaders/shaders.h"
@@ -46,12 +47,6 @@ symbols in this file:
 /* ---------- constants */
 
 /* ---------- macros */
-
-/* ---------- structures */
-
-typedef void (*light_volume_render_proc)(
-	long object_index,
-	long light_volume_index);
 
 /* ---------- prototypes */
 
@@ -61,11 +56,6 @@ real code_001246a0(
 void light_volume_render(
 	long object_index,
 	long light_volume_index);
-void rasterizer_widget_submit(
-	long object_index,
-	long light_volume_index,
-	real_point3d const *centroid,
-	light_volume_render_proc render_proc);
 
 /* ---------- globals */
 

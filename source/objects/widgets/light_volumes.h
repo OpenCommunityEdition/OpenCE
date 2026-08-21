@@ -91,6 +91,23 @@ typedef char light_volume_definition_size_assert[
 	sizeof(struct light_volume_definition) == 0x14C ? 1 : -1];
 typedef char light_volume_globals_size_assert[
 	sizeof(struct light_volume_globals) == 0xB4 ? 1 : -1];
+typedef char light_volume_datum_definition_index_offset_assert[
+	offsetof(struct light_volume_datum, definition_index) == 0x4 ? 1 : -1];
+typedef char light_volume_globals_light_volumes_offset_assert[
+	offsetof(struct light_volume_globals, light_volumes) == 0xB0 ? 1 : -1];
+typedef char light_volume_definition_attachment_marker_offset_assert[
+	offsetof(struct light_volume_definition, attachment_marker) == 0x0 ? 1 : -1];
+typedef char light_volume_definition_far_fade_distance_offset_assert[
+	offsetof(struct light_volume_definition, far_fade_distance) == 0x38 ? 1 : -1];
+typedef char light_volume_definition_brightness_scale_source_offset_assert[
+	offsetof(struct light_volume_definition, brightness_scale_source) == 0x44 ? 1 : -1];
+typedef char light_volume_definition_count_offset_assert[
+	offsetof(struct light_volume_definition, count) == 0x6E ? 1 : -1];
+typedef char light_volume_definition_frames_offset_assert[
+	offsetof(struct light_volume_definition, frames) == 0x120 ? 1 : -1];
+typedef char light_volume_definition_frames_count_offset_assert[
+	offsetof(struct light_volume_definition, frames) +
+		offsetof(struct tag_block, count) == 0x120 ? 1 : -1];
 
 /* ---------- prototypes/EXAMPLE.C */
 

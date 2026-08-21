@@ -758,8 +758,11 @@ void _rasterizer_dynamic_lit_geometry_draw(
 	void const *parameters);
 void _rasterizer_psuedo_dynamic_screen_quad_draw(
 	long dynamic_vertex_buffer_index);
-long _rasterizer_widget_submit(
-	long mode);
+void _rasterizer_widget_submit(
+	long object_index,
+	long widget_index,
+	real_point3d const *centroid,
+	rasterizer_widget_render_proc render_proc);
 void *_rasterizer_widget_begin(
 	long handle);
 void _rasterizer_profile_enable(
@@ -1748,10 +1751,18 @@ void rasterizer_psuedo_dynamic_screen_quad_draw(
 	return;
 }
 
-long rasterizer_widget_submit(
-	long mode)
+void rasterizer_widget_submit(
+	long object_index,
+	long widget_index,
+	real_point3d const *centroid,
+	rasterizer_widget_render_proc render_proc)
 {
-	return _rasterizer_widget_submit(mode);
+	_rasterizer_widget_submit(
+		object_index,
+		widget_index,
+		centroid,
+		render_proc);
+	return;
 }
 
 void *rasterizer_widget_begin(

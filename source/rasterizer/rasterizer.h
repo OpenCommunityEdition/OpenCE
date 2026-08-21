@@ -94,6 +94,10 @@ struct rasterizer_dynamic_screen_geometry_parameters;
 struct rasterizer_model_geometry_part;
 struct rasterizer_model_skinning;
 
+typedef void (*rasterizer_widget_render_proc)(
+	long object_index,
+	long widget_index);
+
 struct rasterizer_frame_begin_parameters
 {
 	real game_time_sec;
@@ -465,8 +469,11 @@ void rasterizer_dynamic_lit_geometry_draw(
 	void const *parameters);
 void rasterizer_psuedo_dynamic_screen_quad_draw(
 	long dynamic_vertex_buffer_index);
-long rasterizer_widget_submit(
-	long mode);
+void rasterizer_widget_submit(
+	long object_index,
+	long widget_index,
+	real_point3d const *centroid,
+	rasterizer_widget_render_proc render_proc);
 void *rasterizer_widget_begin(
 	long handle);
 void rasterizer_profile_enable(
