@@ -109,6 +109,18 @@ symbols in this file:
 
 /* ---------- public code */
 
+float uncompress_int8_to_real(
+	byte value)
+{
+	return (float)value * (1.0f / 255.0f);
+}
+
+float uncompress_int16_to_real(
+	short value)
+{
+	return ((float)value * 2.0f + 1.0f) * (1.0f / 65535.0f);
+}
+
 void rasterizer_geometry_byte_swap_vertices(
 	short type,
 	long count,
