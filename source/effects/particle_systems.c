@@ -105,6 +105,9 @@ void code_0008dd80(
 void code_0008e0d0(
 	struct particle_system_datum *system,
 	real delta_time);
+void code_0008e7f0(
+	real delta_time,
+	long system_index);
 
 /* ---------- globals */
 
@@ -217,6 +220,26 @@ void code_0008e310(
 {
 	particle_system_definition_get(system->definition_index);
 	code_0008e0d0(system, delta_time);
+
+	return;
+}
+
+void particle_systems_update(
+	real delta_time)
+{
+	long system_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\effects\\particle_systems.c",
+		0x232,
+		particle_systems && particle_systems->valid);
+
+	for (system_index = data_next_index(particle_systems, NONE);
+		system_index != NONE;
+		system_index = data_next_index(particle_systems, system_index))
+	{
+		code_0008e7f0(delta_time, system_index);
+	}
 
 	return;
 }
