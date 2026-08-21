@@ -50,15 +50,38 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "real_math.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct rasterizer_cinematic_screen_effect_state
+{
+	byte reserved00[0x38];
+	boolean has_control;
+	byte reserved39[0x2B];
+	real script_values[4];
+	real near_clip_distance;
+};
+
+typedef char rasterizer_cinematic_screen_effect_state_size_assert[
+	sizeof(struct rasterizer_cinematic_screen_effect_state) == 0x78 ? 1 : -1];
+typedef char rasterizer_cinematic_screen_effect_state_has_control_offset_assert[
+	offsetof(struct rasterizer_cinematic_screen_effect_state, has_control) == 0x38 ? 1 : -1];
+typedef char rasterizer_cinematic_screen_effect_state_script_values_offset_assert[
+	offsetof(struct rasterizer_cinematic_screen_effect_state, script_values) == 0x64 ? 1 : -1];
+typedef char rasterizer_cinematic_screen_effect_state_near_clip_distance_offset_assert[
+	offsetof(struct rasterizer_cinematic_screen_effect_state, near_clip_distance) == 0x74 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+extern struct rasterizer_cinematic_screen_effect_state *bss_004662f4;
 
 /* ---------- public code */
 
@@ -71,6 +94,41 @@ void rasterizer_screen_effects_dispose_from_old_map(
 void rasterizer_screen_effects_dispose(
 	void)
 {
+	return;
+}
+
+real rasterizer_script_screen_effect_get_value(
+	short effect_index)
+{
+	real value = 0.0f;
+
+	if (bss_004662f4 && effect_index >= 0 && effect_index < 4)
+	{
+		value = bss_004662f4->script_values[effect_index];
+	}
+
+	return value;
+}
+
+void rasterizer_screen_effect_stop(
+	void)
+{
+	if (bss_004662f4)
+	{
+		bss_004662f4->has_control = FALSE;
+	}
+
+	return;
+}
+
+void rasterizer_set_near_clip_distance(
+	real near_clip_distance)
+{
+	if (bss_004662f4)
+	{
+		bss_004662f4->near_clip_distance = near_clip_distance;
+	}
+
 	return;
 }
 
