@@ -75,16 +75,77 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "interface/hud_messaging.h"
+#include "interface/hud_unit.h"
+#include "interface/hud_weapon.h"
+#include "interface/motion_sensor.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct hud_scripted_globals
+{
+	boolean show_hud;
+	boolean show_hud_help_text;
+	byte reserved2[2];
+};
+
+typedef char hud_scripted_globals_size_assert[
+	sizeof(struct hud_scripted_globals) == 0x4 ? 1 : -1];
+typedef char hud_scripted_globals_show_hud_help_text_offset_assert[
+	offsetof(struct hud_scripted_globals, show_hud_help_text) == 0x1 ? 1 : -1];
+
 /* ---------- prototypes */
+
+void hud_dispose_nav_points_from_old_map(
+	void);
+void hud_dispose_nav_points(
+	void);
 
 /* ---------- globals */
 
+extern struct hud_scripted_globals *hud_scripted_globals;
+
 /* ---------- public code */
+
+void hud_dispose(
+	void)
+{
+	motion_sensor_dispose();
+	hud_dispose_nav_points();
+	hud_dispose_weapon_interface();
+	hud_dispose_unit_interface();
+	hud_messaging_dispose();
+	return;
+}
+
+void hud_dispose_from_old_map(
+	void)
+{
+	motion_sensor_dispose_from_old_map();
+	hud_dispose_nav_points_from_old_map();
+	hud_dispose_weapon_interface_from_old_map();
+	hud_dispose_unit_interface_from_old_map();
+	hud_messaging_dispose_from_old_map();
+	return;
+}
+
+boolean scripted_show_hud(
+	boolean show)
+{
+	hud_scripted_globals->show_hud = show;
+	return hud_scripted_globals->show_hud;
+}
+
+boolean scripted_show_hud_help_text(
+	boolean show)
+{
+	hud_scripted_globals->show_hud_help_text = show;
+	return hud_scripted_globals->show_hud_help_text;
+}
 
 /* ---------- private code */
