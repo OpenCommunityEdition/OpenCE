@@ -46,16 +46,47 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct rasterizer_water_visibility_globals
+{
+	boolean needs_update;
+	boolean visible_for_window;
+};
+
+typedef char verify_rasterizer_water_visibility_globals_size[
+	sizeof(struct rasterizer_water_visibility_globals) == 2 ? 1 : -1];
+typedef char verify_rasterizer_water_needs_update_offset[
+	offsetof(struct rasterizer_water_visibility_globals, needs_update) == 0 ? 1 : -1];
+typedef char verify_rasterizer_water_visible_for_window_offset[
+	offsetof(struct rasterizer_water_visibility_globals, visible_for_window) == 1 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+struct rasterizer_water_visibility_globals bss_004662e8;
+
 /* ---------- public code */
+
+void rasterizer_water_set_visibility_for_window(
+	boolean visibility)
+{
+	bss_004662e8.visible_for_window = visibility;
+
+	return;
+}
+
+boolean rasterizer_water_get_visibility_for_window(
+	void)
+{
+	return bss_004662e8.visible_for_window;
+}
 
 /* ---------- private code */
