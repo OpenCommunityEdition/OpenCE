@@ -14,7 +14,7 @@ Markdown file is edited.
 - January split-object SHA-256:
   `83f7953f8143a7f935c9ecceaeb2a8690c710b5665cf2a900040d901cb12f5f2`.
 - HCEA semantic-oracle commit:
-  `c89106c4964f2df3a98ef7b4035d6750372797cd`.
+  `c168af2e747d3095d9a29418ae401f3a39544863`.
 - HCEA supplied the no-argument `void` signatures, subsystem lifecycle intent,
   and call-order hypothesis only. The January split object is the sole byte,
   padding, tail-call, and relocation authority.
