@@ -50,7 +50,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
 #include "game/game_allegiance.h"
+#include "saved games/game_state.h"
 
 /* ---------- constants */
 
@@ -58,11 +60,60 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct game_allegiance_record
+{
+	short team1_index;
+	short team2_index;
+	short incident_threshold;
+	short incident_decay_time;
+	boolean team1_suspicious;
+	boolean team2_suspicious;
+	boolean currently_broken;
+	boolean status_changed;
+	boolean requires_communication;
+	byte reserved0D;
+	short current_incidents;
+	short current_incident_decay_time;
+};
+
+struct game_allegiance_globals
+{
+	short allegiance_count;
+	struct game_allegiance_record allegiances[8];
+	byte reserved92[2];
+	unsigned long ally_bitvector[4];
+	unsigned long friendly_bitvector[4];
+};
+
+typedef char game_allegiance_record_size_assert[
+	sizeof(struct game_allegiance_record) == 0x12 ? 1 : -1];
+typedef char game_allegiance_globals_size_assert[
+	sizeof(struct game_allegiance_globals) == 0xB4 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+extern struct game_allegiance_globals *bss_0043e490;
+
+#define game_allegiance_globals bss_0043e490
+
 /* ---------- public code */
+
+void game_allegiance_initialize(
+	void)
+{
+	game_allegiance_globals = game_state_malloc(
+		"game allegiance globals",
+		NULL,
+		sizeof(*game_allegiance_globals));
+	csmemset(
+		game_allegiance_globals,
+		0,
+		sizeof(*game_allegiance_globals));
+
+	return;
+}
 
 void game_allegiance_dispose(
 	void)
