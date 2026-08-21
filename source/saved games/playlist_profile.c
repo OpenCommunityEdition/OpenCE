@@ -84,25 +84,23 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct playlist_profile_runtime_globals
+struct playlist_profile_runtime_globals_prefix
 {
 	byte thread_input_storage[0x6C];
 	void *thread;
 	word number_of_default_profiles;
-	boolean initialized;
-	byte reserved;
 };
 
 typedef char verify_playlist_profile_default_count_offset[
-	offsetof(struct playlist_profile_runtime_globals, number_of_default_profiles) == 0x70 ? 1 : -1];
-typedef char verify_playlist_profile_runtime_globals_size[
-	sizeof(struct playlist_profile_runtime_globals) == 0x74 ? 1 : -1];
+	offsetof(
+		struct playlist_profile_runtime_globals_prefix,
+		number_of_default_profiles) == 0x70 ? 1 : -1];
 
 /* ---------- prototypes */
 
 /* ---------- globals */
 
-struct playlist_profile_runtime_globals bss_004d2858 = { 0 };
+extern struct playlist_profile_runtime_globals_prefix bss_004d2858;
 
 /* ---------- public code */
 

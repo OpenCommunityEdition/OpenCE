@@ -152,7 +152,7 @@ typedef char verify_game_runtime_globals_difficulty_offset[
 
 /* ---------- globals */
 
-struct game_runtime_globals_prefix *bss_0043e48c = 0;
+extern struct game_runtime_globals_prefix *bss_0043e48c;
 
 /* ---------- public code */
 

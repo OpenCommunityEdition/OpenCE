@@ -55,24 +55,40 @@ retained function.
 The retained code increases the semantic exact ledger by eleven functions.
 No owning object is marked complete.
 
-## Runtime-data ownership
+## Corrective runtime-data ownership audit
 
-The four newly defined runtime objects use explicit zero initialization so VC7
-emits external, section-relative `.bss` owners rather than COMMON symbols.
-Their complete target-owned sections are strict exact:
+A follow-up audit from authoritative integration commit
+`0a58d015f2dc58d1d9c3fc85d3618af2d8b4396f` withdraws all four BSS claims
+made by the original typed-leaf commit. Byte equality and matching synthetic
+csplit owner names do not authenticate the complete natural C types needed to
+define these objects:
 
-| Object | Owner | Bytes | Relocs | Normalized SHA-256 |
-| --- | --- | ---: | ---: | --- |
-| `game.obj` | `_bss_0043e48c` | 4 | 0 | `df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119` |
-| `input_abstraction.obj` | `_input_abstraction_globals` | 224 | 0 | `6eb69e26de2a26eda48af77d4cec893aa0cf4748a64cbefcfe11a22c1e680ad9` |
-| `playlist_profile.obj` | `_bss_004d2858` | 116 | 0 | `5b517952cbe9c4c147bc3f3434f9d82409e76d09ea58905aefe7fb5415912d9a` |
-| `cache_files_windows.obj` | `_bss_004cdff8` | 12,412 | 0 | `1a572ba8cb5486b4b5f81bfbd1aa501104c0e08130e63c09cda9dc5092c405bf` |
-| **Total** | | **12,756** | **0** | |
+| Object | Former owner | Withdrawn bytes | Why the definition is unauthenticated |
+| --- | --- | ---: | --- |
+| `game.obj` | `_bss_0043e48c` | 4 | HCEA authenticates the accessed pointee prefix and offsets, but not a complete natural owner declaration for the synthetic pointer symbol. |
+| `input_abstraction.obj` | `_input_abstraction_globals` | 224 | The former type was a `0xD0` byte prefix, one field, and `0xC` bytes of inferred trailing reserve. |
+| `playlist_profile.obj` | `_bss_004d2858` | 116 | The former type was a `0x6C` byte prefix plus inferred fields and padding. |
+| `cache_files_windows.obj` | `_bss_004cdff8` | 12,412 | The former type used a `0x3048` opaque byte prefix and inferred trailing fields solely to force the target section size. |
+| **Total** | | **12,756** | |
 
-Typed compile-time checks freeze the input timer at `0xD0`, playlist count at
-`0x70`, cache copy flag at `0x3048`, and the corresponding complete aggregate
-sizes.  The source accesses named typed fields; it contains no raw address or
-offset dereference.
+The complete-size assertions, inferred trailing fields, and all four storage
+definitions are removed. Minimal typed prefix views retain only the independently
+proven accessed offsets: game double-speed at `0x2`, game difficulty at `0xE`,
+the input timer at `0xD0`, playlist count at `0x70`, and cache copy flag at
+`0x3048`. Each owning symbol is now an undefined external with COFF section
+zero and external storage class; none of the four candidate objects emits a
+non-debug runtime-data section.
+
+This deliberately changes exact data from 12,756 bytes to zero while retaining
+all seven affected leaf functions:
+
+| Object | Exact code before | Exact code after | Exact data before | Exact data after |
+| --- | ---: | ---: | ---: | ---: |
+| `game.obj` | 55 meaningful / 96 padded, 4 functions | same | 4 | 0 |
+| `input_abstraction.obj` | 11 meaningful / 16 padded, 1 function | same | 224 | 0 |
+| `playlist_profile.obj` | 7 meaningful / 16 padded, 1 function | same | 116 | 0 |
+| `cache_files_windows.obj` | 6 meaningful / 16 padded, 1 function | same | 12,412 | 0 |
+| **Total** | **79 meaningful / 144 padded, 7 functions** | **same** | **12,756** | **0** |
 
 `hud_globals_get_scale` has one reviewed representation-only ownership detail.
 January's csplit object represents `__real@3f800000` as an undefined external
@@ -94,13 +110,13 @@ The emitted mismatch was removed without source-shape tuning or retry.
 
 ## Source and policy audit
 
-- Every retained definition is ordinary readable typed C with an explicit
+- Every retained function definition is ordinary readable typed C with an explicit
   final return.
 - No inferred ABI, assembly, volatile scheduling device, optimizer pragma or
   barrier, force-inline annotation, synthetic anchor, type-pun, raw
   dereference, undefined behavior, or byte-forcing construct is present.
 - No configuration, semantic exception, parked-function record, frozen large
-  object, or pre-existing Markdown file is changed.
+  object, or Markdown outside this Jonas-owned ledger is changed.
 - `vehicles.obj`, `ai_debug.obj`, `ai_script.obj`, `actions.obj`, and
   `units.obj` were kept source- and configuration-identical.  Their clean
   authoritative/current regression comparison reports no function, runtime
@@ -111,20 +127,20 @@ The emitted mismatch was removed without source-shape tuning or retry.
 
 - Full `halobetacache_build`, `libcmt_build`, semantic-report, and progress
   graphs pass with zero semantic unit errors.
-- Semantic audit: 470 units, 3,937 functions evaluated, 3,798 semantic exact,
-  3,859 accepted exact, and zero unit errors.
-- Progress: 375/833 complete objects, 3,846/11,060 exact functions,
-  464,554/2,198,102 exact code bytes, and 1,846,712/4,176,062 matched data
-  bytes.
-- The pre-edit whole-TU regression gate reports the eleven intended newly
-  exact functions, the four reviewed target-exact BSS additions, compiler
-  debug records, and symbol additions.  It reports no changed nonexact
-  function.  The two pre-existing exact saved-game functions and HUD stack
-  check independently remain strict exact.
+- Semantic audit after correction: 470 units, 3,943 functions evaluated,
+  3,803 semantic exact, 3,864 accepted exact, and zero unit errors.
+- Progress before/after correction: code remains 467,867/2,198,102 bytes and
+  3,851/11,060 functions; data moves from 1,847,564 to 1,834,808 of 4,176,062
+  bytes, exactly `-12,756`.
+- The authoritative pre-correction regression manifest reports only the
+  intentional BSS removals, debug/section-index changes, and symbol definitions
+  becoming undefined. It reports `changed_nonexact: []`. Direct hardened
+  comparison proves all seven affected functions retain the padded sizes,
+  relocation identities, and hashes in the strict-results table above.
 - Admission audit: zero candidates and zero revocations; only the inherited
   `source/shell/shell_xbox` contradiction remains.
 - Parked audit: three active, zero stale, and zero invalid entries.
 - Tool suite: 179/179 tests pass.
 
-A clean post-commit regression snapshot/check is required and recorded in the
-final handoff.  No GitHub push is performed.
+A clean post-correction commit regression snapshot/check is required and
+recorded in the final handoff. No GitHub push is performed.

@@ -189,30 +189,22 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct cache_file_runtime_globals
+struct cache_file_runtime_globals_prefix
 {
 	byte cached_map_file_storage[0x3048];
 	boolean copy_in_progress;
-	byte reserved0;
-	short copying_to_map_file_index;
-	char copying_to_map_file_name[32];
-	short open_map_file_index;
-	short blocking_request_index;
-	void *sleep_event;
-	void *thread;
-	void *requests;
 };
 
 typedef char verify_cache_file_copy_in_progress_offset[
-	offsetof(struct cache_file_runtime_globals, copy_in_progress) == 0x3048 ? 1 : -1];
-typedef char verify_cache_file_runtime_globals_size[
-	sizeof(struct cache_file_runtime_globals) == 0x307C ? 1 : -1];
+	offsetof(
+		struct cache_file_runtime_globals_prefix,
+		copy_in_progress) == 0x3048 ? 1 : -1];
 
 /* ---------- prototypes */
 
 /* ---------- globals */
 
-struct cache_file_runtime_globals bss_004cdff8 = { 0 };
+extern struct cache_file_runtime_globals_prefix bss_004cdff8;
 
 /* ---------- public code */
 

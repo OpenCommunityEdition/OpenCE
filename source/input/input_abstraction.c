@@ -60,17 +60,16 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct input_abstraction_runtime_globals
+struct input_abstraction_runtime_globals_prefix
 {
 	byte player_input_state_storage[0xD0];
 	unsigned long device_enumeration_startup_timer;
-	byte reserved[0xC];
 };
 
 typedef char verify_input_abstraction_device_timer_offset[
-	offsetof(struct input_abstraction_runtime_globals, device_enumeration_startup_timer) == 0xD0 ? 1 : -1];
-typedef char verify_input_abstraction_runtime_globals_size[
-	sizeof(struct input_abstraction_runtime_globals) == 0xE0 ? 1 : -1];
+	offsetof(
+		struct input_abstraction_runtime_globals_prefix,
+		device_enumeration_startup_timer) == 0xD0 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -79,7 +78,7 @@ unsigned long system_milliseconds(
 
 /* ---------- globals */
 
-struct input_abstraction_runtime_globals input_abstraction_globals = { 0 };
+extern struct input_abstraction_runtime_globals_prefix input_abstraction_globals;
 
 /* ---------- public code */
 
