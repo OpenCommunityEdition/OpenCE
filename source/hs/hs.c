@@ -4157,7 +4157,7 @@ real device_get_power(
 real device_get_position(
 	long device_index);
 real device_group_get_value(
-	unsigned short device_group_index);
+	short device_group_index);
 real ai_scripting_living_fraction(
 	long ai_reference);
 real ai_scripting_strength(

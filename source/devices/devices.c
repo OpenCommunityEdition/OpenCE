@@ -84,6 +84,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "devices.h"
+#include "device_definitions.h"
 #include "device_machines.h"
 #include "memory/data.h"
 
@@ -97,6 +98,18 @@ enum
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct device_group_datum
+{
+	short identifier;
+	word flags;
+	real actual_value;
+};
+
+typedef char device_group_datum_size_assert[
+	sizeof(struct device_group_datum) == 0x8 ? 1 : -1];
+typedef char device_group_datum_actual_value_offset_assert[
+	offsetof(struct device_group_datum, actual_value) == 0x4 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -120,6 +133,20 @@ void devices_dispose_from_old_map(
 	data_make_invalid(device_groups_data);
 
 	return;
+}
+
+boolean device_new(
+	long device_index)
+{
+	struct device_datum *device;
+
+	device = device_get(device_index);
+	device_definition_get(device->definition_index);
+	device->device.position_group_index = NONE;
+	device->device.power_group_index = NONE;
+	device->object.flags |= FLAG(_object_shadowless_bit);
+
+	return TRUE;
 }
 
 void device_set_never_appears_locked(
@@ -165,6 +192,16 @@ void device_one_sided_set(
 	}
 
 	return;
+}
+
+real device_group_get_value(
+	short group_index)
+{
+	struct device_group_datum *group;
+
+	group = datum_get(device_groups_data, group_index);
+
+	return group->actual_value;
 }
 
 void device_set_actual_position(
