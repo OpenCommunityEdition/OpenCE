@@ -92,16 +92,66 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "memory/data.h"
+#include "memory/lruv_cache.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct xbox_texture_cache_globals_prefix
+{
+	byte reserved0000[0x1600];
+	struct data_array *textures;
+	byte reserved1604[4];
+	struct lruv_cache *cache;
+};
+
+typedef char verify_xbox_texture_cache_textures_offset[
+	offsetof(
+		struct xbox_texture_cache_globals_prefix,
+		textures) == 0x1600 ? 1 : -1];
+typedef char verify_xbox_texture_cache_cache_offset[
+	offsetof(
+		struct xbox_texture_cache_globals_prefix,
+		cache) == 0x1608 ? 1 : -1];
+typedef char verify_xbox_texture_cache_globals_prefix_size[
+	sizeof(struct xbox_texture_cache_globals_prefix) == 0x160C ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+extern struct xbox_texture_cache_globals_prefix bss_004d1198;
+
 /* ---------- public code */
+
+void texture_cache_delete(
+	void)
+{
+	data_dispose(bss_004d1198.textures);
+	lruv_delete(bss_004d1198.cache);
+
+	return;
+}
+
+void texture_cache_open(
+	void)
+{
+	data_make_valid(bss_004d1198.textures);
+
+	return;
+}
+
+void texture_cache_idle(
+	void)
+{
+	lruv_idle(bss_004d1198.cache);
+
+	return;
+}
 
 /* ---------- private code */
