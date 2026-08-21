@@ -236,3 +236,49 @@ A clean committed-state snapshot followed by verified same-path deletion,
 normal Ninja rebuilding, regression checking, and direct seven-body comparison
 is the final reproducibility proof. No push, amend, or history rewrite is
 performed.
+
+## Clean committed-state replay
+
+Implementation-and-ledger commit
+`89ee4bd1895b644ddc0e014b5698e53056ec18fc` was clean before replay. Its
+committed source blob is exactly
+`5d665339daa0d606e34c43e80b9c9f2fefe79d52`; re-reading the Git object
+produced 6,607 bytes and the recorded payload SHA-256
+`77b0e12f2c91b0ef79abd6c3d51e3d9be56d3e7e53bea5303a3379c5672909da`.
+The shared header remained baseline blob
+`210ea1b1597fc03e339a27fdc31714c99a7c3921`.
+
+A one-unit regression snapshot was captured directly from that clean commit.
+Because the generated Ninja edge correctly escapes the directory space as
+`saved$ games` while the current regression metadata parser looks for the
+decoded base path, snapshot/check used an ignored one-edge parser view with
+the exact generated compiler command and cflags. Both operations used
+`--no-build`; the actual rebuild below used the unmodified generated
+`build.ninja` and its genuine production edge. No configuration or regression
+tool was edited.
+
+The resolved generated path
+`build/base/source/saved games/player_profile.obj` was verified inside this
+isolated worktree, deleted, confirmed absent, and rebuilt through its normal
+same-path Ninja target. The rebuild executed exactly one `[1/1] CL` action
+with the repository's natural flags and no source change or retry.
+
+The immediate regression check passed with all seven accepted functions
+`still_exact`, `changed_nonexact: []`, `newly_exact: []`, and zero failures or
+warnings. Direct hardened January comparison again returned
+`all_equal: true` for the complete seven-body inventory. In particular it
+reproduced enumerate at 31 meaningful / 32 padded bytes, one relocation, and
+normalized SHA-256
+`f6ace3d32df95a8dc3d144fa0ed8ce370d5ad42c12267e7c58c33f2beb2f682f`,
+and delete at 44 meaningful / 48 padded bytes, three relocations, and
+normalized SHA-256
+`b099e605e5fd63851afdaa68d6526ee3a02ac42f3428698ad84750109fb00846`.
+The rebuilt object is 3,054 bytes with phase-specific whole-file SHA-256
+`e503b1468ba5dc614cb83f95da4ff4e03a4d0b470629d7d6dd2bf5b3be6b2375`.
+
+The rejected `_player_profile_get_argb_color`, precluded
+`_player_profile_save`, and private `_code_001b15f0` definitions are absent
+from the rebuilt object. It defines no `.bss` or COMMON symbol, retains only
+the pre-existing exact 72-byte primary-color `.data`, and adds only the exact
+delete-error compiler COMDAT with zero standalone data credit. This section
+is an additive ledger-only follow-up to the implementation commit.
