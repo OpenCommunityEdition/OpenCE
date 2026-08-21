@@ -29,11 +29,15 @@ receive zero data credit.
 - January split `path_obstacle_avoidance.obj`: 28,413 bytes, SHA-256
   `773fcf3c4c50847f26051520cb99edd537ecbc8d810752be010d233acc009303`.
 - Clean HCEA source oracle commit:
-  `c168af2e747d3095d9a29418ae401f3a39544863`. Relevant tree blobs are
-  `f583b65e74fb286a0f8cf112ad31ab721bd6144b` (`path_get_step.c`),
-  `04370106c8187e453773b665b65b5ced43764556` (`heap_parent_index.c`),
-  `019f323f786eba8c2a3d4c06087d9444b3630120` (`obstacle_path.h`), and
-  `129512bb3d81c656f3f41ba877f929022571a84c` (`step.h`).
+  `c168af2e747d3095d9a29418ae401f3a39544863`. Direct raw blob reads fix
+  every donor payload:
+
+  | HCEA path | Git blob | Bytes | Payload SHA-256 |
+  | --- | --- | ---: | --- |
+  | `src/path_get_step.c` | `f583b65e74fb286a0f8cf112ad31ab721bd6144b` | 159 | `e959e23a713a9ed71d09e19cd4dd1d6d7bf0ca18b2d430f6c266d8969cc4bc2b` |
+  | `src/heap_parent_index.c` | `04370106c8187e453773b665b65b5ced43764556` | 113 | `307ae6ac583793d44ff19cc37dfca69f61a983e476c3e4630fcc15ab87412588` |
+  | `src/headers/obstacle_path.h` | `019f323f786eba8c2a3d4c06087d9444b3630120` | 1,627 | `c1e546dd942e5bb9056b50dfc365ef29b60cb10fcc07de8ead947401f792cfa5` |
+  | `src/headers/step.h` | `129512bb3d81c656f3f41ba877f929022571a84c` | 853 | `caec4d1575c9c0f988d2c10bdfe3f68acef4fc1096a216c54d78c666469a0c5d` |
 - Compiler: Microsoft 32-bit C/C++ Optimizing Compiler `13.00.9254.1` for
   80x86. `CL.Exe` SHA-256 is
   `483e00c47bb08d699475a642bcff15b5b2036350b31c540e88a506baf101da11`.
@@ -125,9 +129,34 @@ The complete 569-action `halobetacache_build` and `libcmt_build` set passes
 
 ## Committed source payload
 
-The source payload to be committed is Git blob
-`fcd39d015449806d05d920911297cd676fb84076`, 5,822 bytes, with SHA-256
-`7ea36eca4b9822ecf30aea4c1f6c5b546eda6aacfc7cf411f228a45ad70bc2f5`.
-It is the only changed source file. The committed-state object deletion and
-normal rebuild replay is intentionally recorded in an additive ledger-only
-commit after this source-plus-ledger commit; history will not be amended.
+Implementation commit `d7fd626130f22fd4ab966ece10fa13877100255c`
+commits `source/ai/path_obstacle_avoidance.c` as Git blob
+`fcd39d015449806d05d920911297cd676fb84076`. A direct `git cat-file blob`
+read measures the committed payload at 5,690 bytes with SHA-256
+`1425e619d840c5806ad89513a66bc0ba7e369c9ba7fd93ca231521af478f8a53`.
+This committed-blob identity supersedes the preliminary working-filesystem
+measurement in the first ledger version; Git's clean filter made that
+working-tree byte count unsuitable as committed-payload evidence.
+
+The implementation commit changes exactly that source file and this new
+ledger. It changes no header, configuration, storage definition, semantic
+exception, parked record, or protected source.
+
+## Committed-state replay
+
+Replay began from clean committed implementation snapshot
+`d7fd626130f22fd4ab966ece10fa13877100255c`. The committed source blob and raw
+payload identity above were independently re-read. Only
+`build/base/source/ai/path_obstacle_avoidance.obj` was deleted, and the normal
+generated build rule recreated it in one action.
+
+The replay object is 1,868 bytes with SHA-256
+`0b98950ed394205c8aa867b02467ba0ccd6da36a3dac6c98a38948036e64024f`.
+The hardened direct comparator again reports strict equality for
+`_path_get_step`, `_heap_parent_index`, `_heap_left_index`, and
+`_heap_right_index`, including padded bytes and every relocation identity.
+The whole-object SHA is not the acceptance criterion; despite its difference
+from the initial emission, the accepted COMDAT measurements and normalized
+hashes are unchanged. The tracked source remained clean against the committed
+blob throughout replay. This replay/provenance correction is additive and
+ledger-only; the implementation commit is not amended.
