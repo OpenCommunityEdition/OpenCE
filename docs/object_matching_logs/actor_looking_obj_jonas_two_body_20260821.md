@@ -40,8 +40,8 @@ functions and 10,428 meaningful code bytes remain outside this wave's credit.
   `c1abd58b056218f94b6c95efe141f8234340238167d84f5866cfa8863366071a`.
 - The clean HCEA semantic oracle is commit
   `c168af2e747d3095d9a29418ae401f3a39544863`. Its two readable body blobs are
-  `b36120c5d7f1c68cf92f58fbb0b64a4d86645280` and
-  `1a66d136e129e6818fdf608ba18d7b63e9a6edef`. HCEA authenticates the named
+  `b03b1dc04e840790a7ee83deb4b481eda2cb6e88` and
+  `6518634db779fffceb4f3390d7de6e9a5ac02435`. HCEA authenticates the named
   state transitions and interest calculation; January remains authoritative
   for the debug branch, PC signatures, exact code shape, literals, and COFF
   ownership.
