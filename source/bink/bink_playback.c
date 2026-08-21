@@ -126,10 +126,19 @@ symbols in this file:
 struct bink_playback_globals
 {
 	boolean initialized;
-	byte pad_0001[3];
+	boolean needs_decode;
+	byte pad_0002[2];
 	unsigned long flags;
 	void *bink;
-	byte pad_000c[0xCC];
+	byte pad_000c[0x24];
+	long rendered_frame_count;
+	byte pad_0034[0xA4];
+};
+
+struct bink_playback_saved_state
+{
+	unsigned long available_memory_kilobytes;
+	boolean frame_rate_throttle;
 };
 
 typedef void *(*rad_memory_allocate_proc)(unsigned long size);
@@ -141,6 +150,12 @@ typedef char bink_playback_globals_flags_offset_assert[
 	offsetof(struct bink_playback_globals, flags) == 4 ? 1 : -1];
 typedef char bink_playback_globals_bink_offset_assert[
 	offsetof(struct bink_playback_globals, bink) == 8 ? 1 : -1];
+typedef char bink_playback_globals_needs_decode_offset_assert[
+	offsetof(struct bink_playback_globals, needs_decode) == 1 ? 1 : -1];
+typedef char bink_playback_globals_rendered_frame_count_offset_assert[
+	offsetof(struct bink_playback_globals, rendered_frame_count) == 0x30 ? 1 : -1];
+typedef char bink_playback_saved_state_frame_rate_throttle_offset_assert[
+	offsetof(struct bink_playback_saved_state, frame_rate_throttle) == 4 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -152,12 +167,27 @@ void *code_001b55a0(
 	unsigned long size);
 void code_001b5790(
 	void *memory);
+void code_001b5860(
+	void);
+void code_001b5cc0(
+	void);
+void code_001b5d20(
+	void);
 void code_001b5e30(
 	void);
+void event_manager_suppress(
+	boolean suppress);
+void main_menu_load(
+	void);
+void attract_mode_reset_timer(
+	void);
+void __stdcall BinkClose(
+	void *bink);
 
 /* ---------- globals */
 
 extern struct bink_playback_globals bink_globals;
+extern struct bink_playback_saved_state data_0031693c;
 extern boolean global_frame_rate_throttle;
 
 /* ---------- public code */
@@ -191,6 +221,36 @@ void bink_playback_initialize(
 	return;
 }
 
+void bink_playback_stop(
+	void)
+{
+	boolean saved_frame_rate_throttle;
+
+	if (!bink_globals.initialized)
+		return;
+
+	if (TEST_FLAG(bink_globals.flags, _bink_playback_prevent_events_to_ui_bit))
+		event_manager_suppress(FALSE);
+
+	if (bink_globals.bink)
+	{
+		BinkClose(bink_globals.bink);
+		bink_globals.bink = NULL;
+	}
+
+	code_001b5cc0();
+
+	if (TEST_FLAG(bink_globals.flags, _bink_playback_return_to_main_menu_when_finished_bit))
+		main_menu_load();
+
+	saved_frame_rate_throttle = data_0031693c.frame_rate_throttle;
+	bink_globals.flags = 0;
+	global_frame_rate_throttle = saved_frame_rate_throttle;
+	attract_mode_reset_timer();
+
+	return;
+}
+
 void bink_playback_dispose(
 	void)
 {
@@ -199,6 +259,30 @@ void bink_playback_dispose(
 		bink_playback_stop();
 		csmemset(&bink_globals, 0, sizeof(bink_globals));
 	}
+
+	return;
+}
+
+void bink_playback_render(
+	void)
+{
+	if (!bink_globals.initialized || !bink_globals.bink)
+		return;
+
+	if (global_frame_rate_throttle)
+		bink_globals.needs_decode = TRUE;
+	else if (!bink_globals.needs_decode)
+		goto skip_decode;
+
+	code_001b5d20();
+	bink_globals.needs_decode = FALSE;
+
+skip_decode:
+	code_001b5860();
+	bink_globals.rendered_frame_count++;
+
+	if (!global_frame_rate_throttle)
+		code_001b5e30();
 
 	return;
 }
