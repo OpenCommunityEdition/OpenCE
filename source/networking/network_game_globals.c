@@ -119,6 +119,14 @@ symbols in this file:
 struct network_game_server;
 struct network_game_client;
 
+struct player_action_collection
+{
+	struct player_action actions[MAXIMUM_LOCAL_PLAYERS];
+};
+
+typedef char network_player_action_collection_size_assert[
+	sizeof(struct player_action_collection) == 0x80 ? 1 : -1];
+
 #pragma pack(push, 2)
 struct player_action_collection_definition
 {
@@ -246,7 +254,7 @@ boolean network_game_client_write(
 	void *address,
 	long flags);
 void update_client_build_client_update(
-	void *update);
+	struct player_action_collection *action_collection);
 
 unsigned long *get_global_local_random_seed_address(
 	void);
@@ -583,7 +591,7 @@ boolean network_game_client_start_frame(
 boolean network_game_client_end_frame(
 	void)
 {
-	byte update[0x80];
+	struct player_action_collection update;
 	struct client_game_update_message message;
 	byte remote_server_address[0x18];
 	unsigned long now;
@@ -604,7 +612,7 @@ boolean network_game_client_end_frame(
 		{
 			network_game_client_get_next_update_number(global_network_game_client);
 			network_game_client_get_game(global_network_game_client);
-			update_client_build_client_update(update);
+			update_client_build_client_update(&update);
 
 			if (network_client_get_oos(global_network_game_client))
 			{
@@ -617,7 +625,7 @@ boolean network_game_client_end_frame(
 					global_network_game_client) & 0x7FFFFFFF;
 			}
 
-			csmemcpy(message.update, update, sizeof(update));
+			csmemcpy(message.update, &update, sizeof(update));
 			message.local_player_count = local_player_count();
 			encoded_message = create_network_game_message(
 				_message_client_game_update,

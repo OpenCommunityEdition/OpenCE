@@ -102,16 +102,156 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "game/players.h"
+#include "memory/data.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
+#define update_server_globals bss_0043ee60.server
+#define update_client_globals bss_0043ee60.client
+
 /* ---------- structures */
+
+struct player_action_collection
+{
+	struct player_action actions[MAXIMUM_LOCAL_PLAYERS];
+};
+
+struct update_server_globals_prefix
+{
+	boolean initialized;
+	byte __padding01[3];
+	long next_update_number_to_build;
+	struct data_array *queues;
+};
+
+struct update_client_globals_prefix
+{
+	boolean initialized;
+	byte __padding01[3];
+	long next_update_number_to_dequeue;
+	long latest_update_number_received;
+	struct player_action_collection saved_action_collection;
+	long current_local_player;
+	struct data_array *queues;
+};
+
+struct player_queues_runtime_globals_prefix
+{
+	struct update_server_globals_prefix server;
+	byte __reserved000c[0x4104];
+	struct update_client_globals_prefix client;
+};
+
+typedef char player_action_collection_size_assert[
+	sizeof(struct player_action_collection) == 0x80 ? 1 : -1];
+typedef char update_server_globals_queues_offset_assert[
+	offsetof(struct update_server_globals_prefix, queues) == 0x8 ? 1 : -1];
+typedef char update_client_globals_saved_actions_offset_assert[
+	offsetof(struct update_client_globals_prefix, saved_action_collection) == 0xC ? 1 : -1];
+typedef char update_client_globals_current_local_player_offset_assert[
+	offsetof(struct update_client_globals_prefix, current_local_player) == 0x8C ? 1 : -1];
+typedef char update_client_globals_queues_offset_assert[
+	offsetof(struct update_client_globals_prefix, queues) == 0x90 ? 1 : -1];
+typedef char player_queues_runtime_globals_client_offset_assert[
+	offsetof(struct player_queues_runtime_globals_prefix, client) == 0x4110 ? 1 : -1];
 
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+extern struct player_queues_runtime_globals_prefix bss_0043ee60;
+
 /* ---------- public code */
+
+void update_server_add_player(
+	long player_index)
+{
+	long queue_index;
+
+	queue_index = datum_new_at_index(update_server_globals.queues, player_index);
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\player_queues_new.c",
+		0xEB,
+		queue_index!=NONE);
+
+	return;
+}
+
+void update_client_add_player(
+	long player_index)
+{
+	long queue_index;
+
+	queue_index = datum_new_at_index(update_client_globals.queues, player_index);
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\player_queues_new.c",
+		0x182,
+		queue_index!=NONE);
+
+	return;
+}
+
+void update_client_queue(
+	struct player_action const *action,
+	long ticks_to_apply_action_to)
+{
+	update_client_globals.saved_action_collection.actions[
+		update_client_globals.current_local_player] = *action;
+	++update_client_globals.current_local_player;
+
+	return;
+}
+
+void update_client_queue_push(
+	long ticks_to_apply_nothingness_to)
+{
+	update_client_globals.current_local_player = 0;
+	csmemset(
+		&update_client_globals.saved_action_collection,
+		0,
+		sizeof(update_client_globals.saved_action_collection));
+
+	return;
+}
+
+long update_client_get_maximum_actions(
+	void)
+{
+	return update_client_globals.latest_update_number_received -
+		update_client_globals.next_update_number_to_dequeue + 1;
+}
+
+void update_client_build_client_update(
+	struct player_action_collection *action_collection)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\player_queues_new.c",
+		0x244,
+		action_collection && update_client_globals.initialized);
+	csmemcpy(
+		action_collection,
+		&update_client_globals.saved_action_collection,
+		sizeof(*action_collection));
+
+	return;
+}
+
+long player_new_queue(
+	long player_index)
+{
+	long queue_index;
+
+	queue_index = datum_new_at_index(update_server_globals.queues, player_index);
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\player_queues_new.c",
+		0x292,
+		queue_index!=NONE);
+
+	return queue_index;
+}
 
 /* ---------- private code */
