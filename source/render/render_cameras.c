@@ -128,6 +128,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "render/render_cameras.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -139,5 +142,12 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void render_camera_new(
+	struct render_camera *camera)
+{
+	csmemset(camera, 0, sizeof(*camera));
+	return;
+}
 
 /* ---------- private code */
