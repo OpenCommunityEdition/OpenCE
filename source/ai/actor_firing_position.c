@@ -150,16 +150,227 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
+#include "actors.h"
+#include "ai_scenario_definitions.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
+
 /* ---------- constants */
+
+enum
+{
+	_firing_point_evaluation_mode_fight = 0,
+	_firing_point_evaluation_mode_panic,
+	_firing_point_evaluation_mode_cover,
+	_firing_point_evaluation_mode_uncover,
+	_firing_point_evaluation_mode_guard,
+	_firing_point_evaluation_mode_pursue,
+	_firing_point_evaluation_mode_avoid,
+	NUMBER_OF_FIRING_POINT_EVALUATION_MODES,
+};
+
+enum
+{
+	_firing_position_group_normal = 0,
+	_firing_position_group_when_searching,
+	_firing_position_group_when_not_searching,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct firing_position_definition
+{
+	real_point3d position;
+	byte unresolved[2];
+	short cluster_index;
+	byte unresolved2[4];
+	long surface_index;
+};
+
+typedef char actor_firing_position_definition_size_assert[
+	sizeof(struct firing_position_definition) == 0x18 ? 1 : -1];
+typedef char actor_firing_position_scenario_encounters_offset_assert[
+	offsetof(struct scenario, ai_encounters) == 0x42C ? 1 : -1];
+typedef char actor_firing_position_encounter_squads_offset_assert[
+	offsetof(struct encounter_definition, squads) == 0x80 ? 1 : -1];
+typedef char actor_firing_position_encounter_firing_positions_offset_assert[
+	offsetof(struct encounter_definition, firing_positions) == 0x98 ? 1 : -1];
+typedef char actor_firing_position_encounter_size_assert[
+	sizeof(struct encounter_definition) == 0xB0 ? 1 : -1];
+typedef char actor_firing_position_squad_groups_offset_assert[
+	offsetof(struct squad_definition, firing_position_groups) == 0x54 ? 1 : -1];
+typedef char actor_firing_position_squad_size_assert[
+	sizeof(struct squad_definition) == 0xE8 ? 1 : -1];
+typedef char actor_firing_position_actor_encounter_offset_assert[
+	offsetof(struct actor_datum, meta.encounter_index) == 0x34 ? 1 : -1];
+typedef char actor_firing_position_actor_squad_offset_assert[
+	offsetof(struct actor_datum, meta.squad_index) == 0x3A ? 1 : -1];
+typedef char actor_firing_position_actor_searching_offset_assert[
+	offsetof(struct actor_datum, state.searching) == 0x98 ? 1 : -1];
+typedef char actor_firing_position_actor_defending_offset_assert[
+	offsetof(struct actor_datum, emotions.currently_defending) == 0x374 ? 1 : -1];
+typedef char actor_discarded_firing_position_size_assert[
+	sizeof(struct actor_discarded_firing_position) == 4 ? 1 : -1];
+typedef char actor_firing_position_discard_cursor_offset_assert[
+	offsetof(struct actor_datum, firing_positions.next_discarded_firing_positions_entry) == 0x3C6 ? 1 : -1];
+typedef char actor_firing_position_discard_ring_offset_assert[
+	offsetof(struct actor_datum, firing_positions.discarded_firing_positions) == 0x3C8 ? 1 : -1];
+typedef char actor_firing_position_discard_index_offset_assert[
+	offsetof(struct actor_datum, firing_positions.discarded_firing_positions) +
+		offsetof(struct actor_discarded_firing_position, index) == 0x3CA ? 1 : -1];
+typedef char actor_firing_position_last_discard_valid_offset_assert[
+	offsetof(struct actor_datum, firing_positions.last_discarded_firing_position_valid) == 0x3D8 ? 1 : -1];
+typedef char actor_firing_position_last_discard_temporary_offset_assert[
+	offsetof(struct actor_datum, firing_positions.last_discarded_firing_position_temporary) == 0x3D9 ? 1 : -1];
+typedef char actor_firing_position_last_discard_point_offset_assert[
+	offsetof(struct actor_datum, firing_positions.last_discarded_firing_position) == 0x3DC ? 1 : -1];
 
 /* ---------- prototypes */
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+long actor_get_firing_position_group(
+	long actor_index,
+	short evaluation_mode,
+	short group_selection_mode)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	long result = 0;
+
+	if (actor->meta.encounter_index != NONE)
+	{
+		struct encounter_definition *encounter = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->ai_encounters,
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->meta.encounter_index),
+			struct encounter_definition);
+		struct squad_definition *squad = TAG_BLOCK_GET_ELEMENT(
+			&encounter->squads,
+			actor->meta.squad_index,
+			struct squad_definition);
+		boolean searching = actor->state.searching;
+		short index;
+
+		switch (group_selection_mode)
+		{
+		case _firing_position_group_when_searching:
+			searching = TRUE;
+			break;
+		case _firing_position_group_when_not_searching:
+			searching = FALSE;
+			break;
+		}
+
+		if (evaluation_mode == _firing_point_evaluation_mode_panic)
+			index = _firing_position_group_defending_guard;
+		else if (evaluation_mode == _firing_point_evaluation_mode_guard)
+			index = actor->emotions.currently_defending
+				? _firing_position_group_defending_guard
+				: _firing_position_group_attacking_guard;
+		else if (evaluation_mode == _firing_point_evaluation_mode_pursue)
+			index = _firing_position_group_pursuing;
+		else if (actor->emotions.currently_defending)
+			index = searching
+				? _firing_position_group_defending_search
+				: _firing_position_group_defending;
+		else
+			index = searching
+				? _firing_position_group_attacking_search
+				: _firing_position_group_attacking;
+
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\actor_firing_position.c",
+			1412,
+			(index >= 0) && (index < NUMBER_OF_FIRING_POSITION_GROUPS));
+		result = squad->firing_position_groups[index];
+	}
+
+	return result;
+}
+
+void actor_clear_discarded_firing_positions(
+	long actor_index,
+	boolean clear_temporary_only)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	long index;
+
+	actor->firing_positions.next_discarded_firing_positions_entry = 0;
+	for (index = 0; index < NUMBER_OF_DISCARDED_FIRING_POSITIONS_PER_ACTOR; index++)
+		actor->firing_positions.discarded_firing_positions[index].index = NONE;
+
+	if (actor->firing_positions.last_discarded_firing_position_valid &&
+		(!clear_temporary_only || actor->firing_positions.last_discarded_firing_position_temporary))
+	{
+		actor->firing_positions.last_discarded_firing_position_valid = FALSE;
+	}
+
+	return;
+}
+
+void actor_discard_firing_position(
+	long actor_index,
+	short firing_position_index,
+	boolean temporary)
+{
+	if (firing_position_index != NONE)
+	{
+		struct actor_datum *actor = actor_get(actor_index);
+		struct encounter_definition *encounter;
+		struct firing_position_definition *firing_position;
+
+		actor->firing_positions.discarded_firing_positions[
+			actor->firing_positions.next_discarded_firing_positions_entry].temporary = temporary;
+		actor->firing_positions.discarded_firing_positions[
+			actor->firing_positions.next_discarded_firing_positions_entry].index = firing_position_index;
+		actor->firing_positions.next_discarded_firing_positions_entry =
+			(actor->firing_positions.next_discarded_firing_positions_entry + 1) %
+			NUMBER_OF_DISCARDED_FIRING_POSITIONS_PER_ACTOR;
+
+		encounter = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->ai_encounters,
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->meta.encounter_index),
+			struct encounter_definition);
+		firing_position = TAG_BLOCK_GET_ELEMENT(
+			&encounter->firing_positions,
+			firing_position_index,
+			struct firing_position_definition);
+
+		actor->firing_positions.last_discarded_firing_position_temporary = temporary;
+		actor->firing_positions.last_discarded_firing_position_valid = TRUE;
+		actor->firing_positions.last_discarded_firing_position = firing_position->position;
+	}
+
+	return;
+}
+
+boolean actor_firing_position_discarded(
+	long actor_index,
+	short firing_position_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean result = FALSE;
+
+	if (firing_position_index != NONE)
+	{
+		short index;
+
+		for (index = 0; index < NUMBER_OF_DISCARDED_FIRING_POSITIONS_PER_ACTOR; index++)
+		{
+			if (firing_position_index == actor->firing_positions.discarded_firing_positions[index].index)
+			{
+				result = TRUE;
+				break;
+			}
+		}
+	}
+
+	return result;
+}
 
 /* ---------- private code */
