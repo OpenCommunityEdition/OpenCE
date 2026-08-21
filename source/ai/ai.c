@@ -239,6 +239,13 @@ struct actor_iterator
 	long next_index;
 };
 
+struct encounter_actor_iterator
+{
+	long encounter_index;
+	long index;
+	long next_index;
+};
+
 typedef char ai_globals_prefix_active_offset_assert[
 	offsetof(struct ai_globals_prefix, ai_active) == 0x0 ? 1 : -1];
 typedef char ai_globals_prefix_initialized_offset_assert[
@@ -257,6 +264,14 @@ typedef char ai_actor_iterator_size_assert[
 	sizeof(struct actor_iterator) == 0x1C ? 1 : -1];
 typedef char ai_actor_iterator_index_offset_assert[
 	offsetof(struct actor_iterator, index) == 0x14 ? 1 : -1];
+typedef char ai_encounter_actor_iterator_size_assert[
+	sizeof(struct encounter_actor_iterator) == 0xC ? 1 : -1];
+typedef char ai_encounter_actor_iterator_index_offset_assert[
+	offsetof(struct encounter_actor_iterator, index) == 0x4 ? 1 : -1];
+typedef char ai_actor_squad_index_offset_assert[
+	offsetof(struct actor_datum, meta.squad_index) == 0x3A ? 1 : -1];
+typedef char ai_actor_platoon_index_offset_assert[
+	offsetof(struct actor_datum, meta.platoon_index) == 0x3C ? 1 : -1];
 typedef char ai_actor_team_index_offset_assert[
 	offsetof(struct actor_datum, meta.team_index) == 0x3E ? 1 : -1];
 typedef char ai_unit_player_index_offset_assert[
@@ -316,6 +331,14 @@ void actor_iterator_new(
 	boolean active_only);
 struct actor_datum *actor_iterator_next(
 	struct actor_iterator *iterator);
+void encounter_actor_iterator_new(
+	struct encounter_actor_iterator *iterator,
+	long encounter_index);
+struct actor_datum *encounter_actor_iterator_next(
+	struct encounter_actor_iterator *iterator);
+void actor_erase(
+	long actor_index,
+	boolean immediate);
 boolean game_team_is_enemy(
 	short team_index0,
 	short team_index1);
@@ -391,6 +414,48 @@ void ai_globals_grenades_enabled(
 	match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x14C, ai_globals);
 
 	ai_globals->grenades_enabled = enabled;
+
+	return;
+}
+
+void ai_erase(
+	long encounter_index,
+	long platoon_index,
+	long squad_index,
+	boolean immediate)
+{
+	if (!ai_globals->ai_initialized_for_map)
+		return;
+
+	if (encounter_index == NONE)
+	{
+		struct actor_iterator iterator;
+
+		actor_iterator_new(&iterator, FALSE);
+		while (actor_iterator_next(&iterator))
+			actor_erase(iterator.index, immediate);
+	}
+	else
+	{
+		struct encounter_actor_iterator iterator;
+		struct actor_datum *actor;
+
+		encounter_actor_iterator_new(&iterator, encounter_index);
+		actor = encounter_actor_iterator_next(&iterator);
+
+		while (actor)
+		{
+			if ((platoon_index == NONE ||
+				actor->meta.platoon_index == platoon_index) &&
+				(squad_index == NONE ||
+				actor->meta.squad_index == squad_index))
+			{
+				actor_erase(iterator.index, immediate);
+			}
+
+			actor = encounter_actor_iterator_next(&iterator);
+		}
+	}
 
 	return;
 }
