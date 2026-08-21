@@ -87,6 +87,13 @@ Compile-time checks freeze server queues at `+0x8`, client globals at
 `+0x8C`, and client queues at client `+0x90`. The aggregate is declared
 `extern`; this translation unit defines no BSS or ordinary data storage.
 
+The later HCEA donor layout is not the January layout: HCEA models two player
+actions in a 0x40-byte collection, with current local player at client
+`+0x54` and queues at client `+0x58`. January PC COFF and disassembly instead
+prove four actions in a 0x80-byte collection, with those fields at `+0x8C`
+and `+0x90`. January therefore governs the compatible TU-local collection and
+client-prefix layout used by both the definition and its repaired consumer.
+
 The hardened comparator proves identical padded bytes and exact relocation
 addresses, types, destinations, order, and addends. The exact grouped-BSS
 addends are server queues `+8`, client initialized `+16656`, queue counters
@@ -128,14 +135,16 @@ storage owner, or header change. The first player-queues candidate object was
 preserved throughout; this repair was not a body retry.
 
 The sole consumer-repair compile was compared against its preserved
-pre-repair object. All 48 runtime `.text`, `.rdata`, `.data`, and `.bss`
-sections, all 26 external code symbols, and runtime external ownership are
-byte/relocation identical. In particular, `_network_game_client_end_frame`
-remains 400 padded bytes with 33 relocations and normalized SHA-256
+pre-repair object. All 48 runtime/debug section payloads and normalized
+relocations are identical, including `.debug$S`; all 26 external code symbols
+and runtime external ownership are also identical. In particular,
+`_network_game_client_end_frame` remains 400 padded bytes with 33 relocations
+and normalized SHA-256
 `a01a2921477fca242a21485cb1a890b9c330afef5907f481a1659a0c32807b79`.
-Only compiler debug type/symbol records in `.debug$S` change to describe the
-now-correct local type; this expected debug-only structural delta carries no
-runtime or matching credit.
+The raw objects differ only in the COFF timestamp and six compiler-local
+`$L...` symbol-table spellings. Those six locals retain identical values,
+storage classes, and resolved relocation targets; no section payload or
+normalized-relocation evidence drifts.
 
 ## Scope and validation
 
@@ -148,9 +157,10 @@ Claude-owned file, or tracked deletion is in scope.
 - Complete 568-edge `halobetacache_build` and `libcmt_build`: pass.
 - Direct hardened comparison: all seven leaves pass with exact padded bytes
   and relocation identities.
-- Preserved consumer A/B proof: 48/48 runtime sections and 26/26 external code
-  symbols are unchanged, with identical runtime ownership; only debug type
-  records differ.
+- Preserved consumer A/B proof: 48/48 runtime/debug section payloads and
+  normalized relocations, 26/26 external code symbols, and runtime ownership
+  are unchanged. Raw differences are limited to the COFF timestamp and six
+  equivalently resolved compiler-local `$L...` spellings.
 - Semantic audit: 470 units, 4,106 functions evaluated, 3,966 semantic exact,
   101 hidden exact, 36 ordinary-only, 4,027 accepted exact, and zero unit
   errors.
