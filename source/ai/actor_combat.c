@@ -135,6 +135,11 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	_actor_fire_target_none = 0,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -175,6 +180,35 @@ boolean actor_firing_blindly(
 	struct actor_datum *actor = actor_get(actor_index);
 
 	return actor->control.fire_state == _actor_fire_state_wild;
+}
+
+boolean actor_combat_currently_firing_burst(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean result = FALSE;
+
+	if (actor->control.current_fire_target_type > _actor_fire_target_none)
+	{
+		result = actor->control.fire_state == _actor_fire_state_bursting;
+	}
+
+	return result;
+}
+
+void *actor_get_weapon_definition(
+	long actor_index)
+{
+	struct weapon_definition *result = NULL;
+	long weapon_index = actor_get_weapon(actor_index);
+
+	if (weapon_index != NONE)
+	{
+		struct weapon_datum *weapon = weapon_get(weapon_index);
+		result = weapon_definition_get(weapon->definition_index);
+	}
+
+	return result;
 }
 
 struct actor_variant_definition *actor_combat_get_firing_variant_definition(
