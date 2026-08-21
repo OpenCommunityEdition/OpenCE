@@ -153,6 +153,7 @@ typedef char verify_game_runtime_globals_difficulty_offset[
 /* ---------- globals */
 
 extern struct game_runtime_globals_prefix *bss_0043e48c;
+extern short player_spawn_count;
 
 /* ---------- public code */
 
@@ -182,6 +183,12 @@ short game_difficulty_level_get(
 	void)
 {
 	return bss_0043e48c->options.difficulty;
+}
+
+boolean game_is_cooperative(
+	void)
+{
+	return player_spawn_count > 1;
 }
 
 /* ---------- private code */
