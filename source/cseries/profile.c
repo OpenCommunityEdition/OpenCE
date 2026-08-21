@@ -357,6 +357,10 @@ struct profile_globals
 
 /* ---------- prototypes */
 
+void code_0007dd20(
+	void);
+void find_profile_section(
+	struct profile_section *section);
 static void code_0007ee30(
 	const char *name,
 	boolean active);
@@ -580,6 +584,86 @@ void profile_initialize(
 }
 
 /* ---------- private code */
+
+void code_0007dd20(
+	void)
+{
+	if (profile_global_enable)
+	{
+		short index;
+
+		for (index = 0; index<profile_globals.section_count; index++)
+		{
+			struct profile_section *section = profile_globals.sections[index];
+
+			if (section->active)
+			{
+				section->field_20 -= section->field_208[profile_globals.history_index];
+				section->field_18 -= section->field_28[profile_globals.history_index];
+				section->field_208[profile_globals.history_index] = section->field_5D0;
+				section->field_28[profile_globals.history_index] = section->field_5CC;
+				section->field_20 += section->field_5D0;
+				section->field_18 += section->field_5CC;
+
+				if (section->field_5D0>section->field_5F0)
+					section->field_5F0 = section->field_5D0;
+				if (section->field_5CC>section->field_5E8)
+					section->field_5E8 = section->field_5CC;
+
+				section->field_5E0 += section->field_5D0;
+				section->field_5D8 += section->field_5CC;
+				section->field_5D0 = 0;
+				section->field_5CC = 0;
+				section->field_5C8++;
+			}
+		}
+	}
+
+	profile_globals.history_index = (profile_globals.history_index+1)%MAXIMUM_PROFILE_HISTORY;
+	profile_globals.initialized = FALSE;
+
+	return;
+}
+
+void find_profile_section(
+	struct profile_section *section)
+{
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 559, section);
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 560, section->active);
+
+	if (section->section_index!=NONE)
+	{
+		match_vassert("c:\\halo\\SOURCE\\cseries\\profile.c", 566,
+			section->section_index >= 0 &&
+			section->section_index < profile_globals.section_count &&
+			profile_globals.sections[section->section_index] == section,
+			"don't call profile_enter_private(), call profile_enter()");
+	}
+	else
+	{
+		match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 570, profile_globals.section_count<MAXIMUM_PROFILE_SECTIONS);
+
+		section->section_index = profile_globals.section_count;
+		profile_globals.section_count++;
+		profile_globals.sections[section->section_index] = section;
+
+		csmemset(section->field_208, 0, sizeof(section->field_208));
+		csmemset(section->field_28, 0, sizeof(section->field_28));
+
+		section->field_18 = 0;
+		section->field_20 = 0;
+		section->stack_depth = NONE;
+		section->field_5C8 = 0;
+		section->field_5D0 = 0;
+		section->field_5CC = 0;
+		section->field_5E0 = 0;
+		section->field_5D8 = 0;
+		section->field_5F0 = 0;
+		section->field_5E8 = 0;
+	}
+
+	return;
+}
 
 static void code_0007ee30(
 	const char *name,
