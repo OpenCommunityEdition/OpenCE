@@ -85,6 +85,7 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "devices.h"
 #include "device_machines.h"
+#include "memory/data.h"
 
 /* ---------- constants */
 
@@ -106,6 +107,14 @@ enum
 void devices_dispose(
 	void)
 {
+	return;
+}
+
+void devices_dispose_from_old_map(
+	void)
+{
+	data_make_invalid(device_groups_data);
+
 	return;
 }
 
