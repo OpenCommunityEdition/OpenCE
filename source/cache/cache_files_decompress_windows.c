@@ -219,16 +219,92 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "memory/zlib/zlib.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct cache_file_header
+{
+	unsigned long header_signature;
+	long version;
+	long file_length;
+	byte reservedC[4];
+	long tag_data_offset;
+	long tag_data_size;
+	byte reserved18[8];
+	char name[0x20];
+	char build[0x20];
+	byte reserved60[4];
+	unsigned long checksum;
+	byte reserved68[0x794];
+	unsigned long footer_signature;
+};
+
+struct simple_decompressor_definition
+{
+	char src_name[260];
+	struct cache_file_header header;
+	unsigned long flags;
+	z_stream zlib_stream;
+	byte *zlib_buffer;
+	long zlib_buffer_size;
+	byte *next_allocation;
+	void *copy_start_event;
+	void *copy_stop_event;
+	void *copy_complete_event;
+	void *progress_update_event;
+	void *copy_thread;
+	void *allocated_buffer;
+	void *read_buffers[8];
+	void *write_buffers[1];
+	boolean blocking;
+};
+
+typedef char verify_cache_file_header_size[
+	sizeof(struct cache_file_header) == 0x800 ? 1 : -1];
+typedef char verify_simple_decompressor_zlib_stream_offset[
+	offsetof(struct simple_decompressor_definition, zlib_stream) == 0x908 ? 1 : -1];
+typedef char verify_simple_decompressor_copy_stop_event_offset[
+	offsetof(struct simple_decompressor_definition, copy_stop_event) == 0x950 ? 1 : -1];
+typedef char verify_simple_decompressor_copy_complete_event_offset[
+	offsetof(struct simple_decompressor_definition, copy_complete_event) == 0x954 ? 1 : -1];
+typedef char verify_simple_decompressor_copy_thread_offset[
+	offsetof(struct simple_decompressor_definition, copy_thread) == 0x95C ? 1 : -1];
+typedef char verify_simple_decompressor_blocking_offset[
+	offsetof(struct simple_decompressor_definition, blocking) == 0x988 ? 1 : -1];
+
 /* ---------- prototypes */
+
+int __stdcall SetEvent(
+	void *event);
+unsigned long __stdcall WaitForSingleObject(
+	void *object,
+	unsigned long milliseconds);
 
 /* ---------- globals */
 
+extern struct simple_decompressor_definition *data_00316838;
+
 /* ---------- public code */
+
+boolean cache_copy_compressed_file_complete(
+	void)
+{
+	return WaitForSingleObject(data_00316838->copy_complete_event, 0) == 0;
+}
+
+void cache_copy_queue_end(
+	void)
+{
+	if (WaitForSingleObject(data_00316838->copy_complete_event, 0))
+		SetEvent(data_00316838->copy_stop_event);
+
+	return;
+}
 
 /* ---------- private code */
