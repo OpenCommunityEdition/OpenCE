@@ -205,4 +205,44 @@ performed.
 
 ## Clean committed-state replay
 
-Pending implementation-and-ledger commit and one-unit forced replay.
+Implementation-and-ledger commit
+`ac099fb06359d119c8cee7c693cf23f1a5823e30` was clean before replay and is
+authored and committed by Jonas Volman. Re-reading that commit proves the
+translation-unit blob is exactly
+`59998ac653193eab009533938261656e897e1e44`; no shared header changed.
+
+A one-unit regression snapshot was captured from that exact clean commit at
+`build/regression_rasterizer_dynavobgeom_trio_20260821.json`, with status
+`SNAPSHOT_WRITTEN` and sole unit
+`source/rasterizer/xbox/rasterizer_xbox_dynavobgeom`. The generated candidate
+path resolved to
+`C:\Users\isabe\Documents\Codex\2026-07-13\i-w\rasterizer-dynavobgeom-trio-20260821\build\base\source\rasterizer\xbox\rasterizer_xbox_dynavobgeom.obj`.
+It was explicitly proved to begin within the resolved isolated-worktree root.
+Before deletion it was 2,166 bytes with SHA-256
+`6bebcc200901e1d70561621fd7c7afd857d0102ff3148c7b3700575e3f8a950f`.
+Exactly that file was deleted, and a second existence check proved it absent.
+
+The untouched production Ninja graph rebuilt the same path through exactly
+one `[1/1] CL` action with the natural flags and include graph. There was no
+source change, body retry, alternate edge, or candidate tuning. The immediate
+no-build regression check returned `ok: true`, no failures, no warnings,
+`changed_nonexact: []`, and `newly_exact: []`. Its `still_exact` set is exactly
+`__rasterizer_dynamic_lit_geometry_draw`,
+`__rasterizer_dynamic_screen_geometry_draw`, `__rasterizer_hud_begin`, and
+`__rasterizer_hud_end`. A subsequent Ninja dry run reports
+`ninja: no work to do.`
+
+Direct hardened January comparison after rebuilding again returns
+`all_equal: true` for all four padded COMDATs and every relocation address,
+type, destination, addend, and order. It reproduces all 51 newly retained
+meaningful bytes, all 80 padded bytes, all six relocations, and every recorded
+normalized SHA-256. The replay object remains 2,166 bytes with phase-specific
+whole-file SHA-256
+`1fe4edc9c7a726aae4e85a6a06cad4b86e4c882a4aba1559722abfae76b877ae`.
+
+An independent post-rebuild ownership census again finds exactly the four
+defined code COMDATs and only the exact 62- and 61-byte assertion-literal
+`.rdata` COMDATs. It finds no writable `.data`, `.bss`, or COMMON owner. The
+undefined runtime dependencies and zero-data-credit boundary remain exactly
+as documented above. The final tracked change after replay is this additive
+ledger section only. Nothing is pushed, amended, or history-rewritten.
