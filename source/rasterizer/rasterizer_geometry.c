@@ -95,6 +95,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "math/real_math.h"
 #include "rasterizer_geometry.h"
 
 /* ---------- constants */
@@ -103,7 +104,27 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct environment_vertex_compressed
+{
+	real_point3d position;
+	unsigned long normal;
+	unsigned long binormal;
+	unsigned long tangent;
+	real_point2d texcoord;
+};
+
+struct environment_lightmap_vertex_compressed
+{
+	unsigned long incident_radiosity;
+	short lightmap_u;
+	short lightmap_v;
+};
+
 /* ---------- prototypes */
+
+real_vector3d *uncompress_int32_to_real_vector3d(
+	real_vector3d *result,
+	unsigned long compressed);
 
 /* ---------- globals */
 
@@ -127,6 +148,71 @@ void rasterizer_geometry_byte_swap_vertices(
 	void *vertices,
 	long buffer_size)
 {
+	return;
+}
+
+void environment_vertex_compressed_get_point(
+	struct environment_vertex_compressed const *vertex,
+	real_point3d *point)
+{
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 438, vertex);
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 439, point);
+
+	*point = vertex->position;
+
+	return;
+}
+
+void environment_vertex_compressed_get_normal(
+	struct environment_vertex_compressed const *vertex,
+	real_vector3d *normal)
+{
+	real_vector3d decompressed_normal;
+
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 450, vertex);
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 451, normal);
+
+	*normal = *uncompress_int32_to_real_vector3d(&decompressed_normal, vertex->normal);
+
+	return;
+}
+
+void environment_vertex_compressed_get_texcoord(
+	struct environment_vertex_compressed const *vertex,
+	real_point2d *texcoord)
+{
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 462, vertex);
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 463, texcoord);
+
+	*texcoord = vertex->texcoord;
+
+	return;
+}
+
+void environment_lightmap_vertex_compressed_get_incident_radiosity(
+	struct environment_lightmap_vertex_compressed const *vertex,
+	real_vector3d *normal)
+{
+	real_vector3d decompressed_normal;
+
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 474, vertex);
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 475, normal);
+
+	*normal = *uncompress_int32_to_real_vector3d(&decompressed_normal, vertex->incident_radiosity);
+
+	return;
+}
+
+void environment_lightmap_vertex_compressed_get_texcoord(
+	struct environment_lightmap_vertex_compressed const *vertex,
+	real_point2d *texcoord)
+{
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 486, vertex);
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 487, texcoord);
+
+	texcoord->n[0] = ((float)vertex->lightmap_u * 2.0f + 1.0f) * (1.0f / 65535.0f);
+	texcoord->n[1] = ((float)vertex->lightmap_v * 2.0f + 1.0f) * (1.0f / 65535.0f);
+
 	return;
 }
 
