@@ -209,7 +209,7 @@ changes. No shared header, configuration, semantic exception, parked record,
 completion label, storage size/definition, protected-five source, pre-existing
 Markdown, Claude-owned file, or tracked deletion is changed. The protected
 five are `source/units/vehicles.c`, `source/ai/ai_debug.c`,
-`source/hs/ai_script.c`, `source/ai/actions.c`, and `source/units/units.c`.
+`source/ai/ai_script.c`, `source/ai/actions.c`, and `source/units/units.c`.
 
 ## Validation
 
