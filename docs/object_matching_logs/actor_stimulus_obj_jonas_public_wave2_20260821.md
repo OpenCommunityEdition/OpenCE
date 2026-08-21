@@ -76,11 +76,14 @@ void actor_stimulus_maneuvering(
 	boolean flee);
 ```
 
-The translation-unit-local `ai_communication_event` declaration exactly
-matches the established production declaration in `actor_perception.c` and
-the action translation units: one `short`, five `long` parameters, then a
-`void const *` context. No shared-header or calling-convention repair is
-needed.
+The translation-unit-local `ai_communication_event` declaration matches the
+PC shape in `actor_perception.c`: one `short`, five `long` parameters, then a
+`void const *` context. January authenticates argument 7 as a pointer-sized
+slot and arguments 4 through 6 as dword stack slots with low-word selector
+semantics; HCEA expresses those selectors with narrower semantic types.
+`action_guard.c`, `action_search.c`, `action_uncover.c`, and `action_wait.c`
+retain inherited Boolean final-parameter drift and pass only `FALSE` at their
+current call sites. No shared header is changed.
 
 ## Authenticated behavior and relocation topology
 
@@ -137,8 +140,8 @@ The sole natural candidate object, SHA-256
 `7bef6a4fe6456bc7b0f741252ad74758aff8006b5dfa997634dcc639fdec3e81`,
 was strict for all eight accepted functions. A subsequent ABI audit found
 that its HCEA-semantic local communication prototype used narrower names/types
-than this repository's production declarations even though all stack slots
-were byte-equivalent. The first object was preserved. Under explicit
+than the PC-shaped declaration in `actor_perception.c` even though all stack
+slots were byte-equivalent. The first object was preserved. Under explicit
 policy-only authorization, only that prototype and its now-unused `ai.h`
 include were repaired; no function body, expression, order, or body-local type
 changed. The validation-replay object, raw SHA-256
