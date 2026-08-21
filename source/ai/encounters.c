@@ -282,8 +282,11 @@ symbols in this file:
 #include "cseries.h"
 #include "encounters.h"
 
+#include "actors.h"
 #include "memory/data.h"
 #include "saved games/game_state.h"
+
+#include <stddef.h>
 
 /* ---------- constants */
 
@@ -298,9 +301,63 @@ enum
 
 /* ---------- structures */
 
+struct encounter_iterator
+{
+	struct data_iterator data;
+	long index;
+	boolean active_only;
+};
+
+struct encounter_actor_iterator
+{
+	long encounter_index;
+	long index;
+	long next_index;
+};
+
+struct encounter_ai_globals_prefix
+{
+	boolean ai_active;
+	boolean ai_initialized_for_map;
+	boolean ai_has_control_data;
+	boolean time_given_this_frame;
+	short last_highest_service_timer;
+	short current_highest_service_timer;
+	long first_encounterless_actor_index;
+};
+
+typedef char encounter_iterator_size_assert[
+	sizeof(struct encounter_iterator) == 0x18 ? 1 : -1];
+typedef char encounter_iterator_index_offset_assert[
+	offsetof(struct encounter_iterator, index) == 0x10 ? 1 : -1];
+typedef char encounter_iterator_active_only_offset_assert[
+	offsetof(struct encounter_iterator, active_only) == 0x14 ? 1 : -1];
+typedef char encounter_actor_iterator_size_assert[
+	sizeof(struct encounter_actor_iterator) == 0xC ? 1 : -1];
+typedef char encounter_actor_iterator_index_offset_assert[
+	offsetof(struct encounter_actor_iterator, index) == 0x4 ? 1 : -1];
+typedef char encounter_actor_iterator_next_index_offset_assert[
+	offsetof(struct encounter_actor_iterator, next_index) == 0x8 ? 1 : -1];
+typedef char encounter_ai_globals_initialized_offset_assert[
+	offsetof(struct encounter_ai_globals_prefix, ai_initialized_for_map) == 0x1 ? 1 : -1];
+typedef char encounter_ai_globals_encounterless_actor_offset_assert[
+	offsetof(struct encounter_ai_globals_prefix, first_encounterless_actor_index) == 0x8 ? 1 : -1];
+typedef char encounter_datum_active_offset_assert[
+	offsetof(struct encounter_datum, active) == 0xD ? 1 : -1];
+typedef char encounter_datum_first_actor_index_offset_assert[
+	offsetof(struct encounter_datum, first_actor_index) == 0x14 ? 1 : -1];
+typedef char encounter_datum_blind_offset_assert[
+	offsetof(struct encounter_datum, blind) == 0x40 ? 1 : -1];
+typedef char encounter_datum_deaf_offset_assert[
+	offsetof(struct encounter_datum, deaf) == 0x41 ? 1 : -1];
+typedef char actor_datum_next_actor_index_offset_assert[
+	offsetof(struct actor_datum, meta.next_actor_index) == 0x2C ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+extern struct encounter_ai_globals_prefix *ai_globals;
 
 struct data_array *encounter_data;
 struct platoon_datum *platoon_array;
@@ -338,6 +395,94 @@ void encounters_dispose_from_old_map(
 {
 	data_make_invalid(encounter_data);
 	data_make_invalid(pursuit_data);
+	return;
+}
+
+void encounter_iterator_new(
+	struct encounter_iterator *iterator,
+	boolean active_only)
+{
+	if (ai_globals->ai_initialized_for_map)
+	{
+		data_iterator_new(&iterator->data, encounter_data);
+		iterator->active_only = active_only;
+	}
+
+	return;
+}
+
+struct encounter_datum *encounter_iterator_next(
+	struct encounter_iterator *iterator)
+{
+	struct encounter_datum *result = NULL;
+
+	if (ai_globals->ai_initialized_for_map)
+	{
+		do
+		{
+			result = (struct encounter_datum *)data_iterator_next(&iterator->data);
+		} while (result && iterator->active_only && !result->active);
+
+		iterator->index = iterator->data.datum_index;
+	}
+
+	return result;
+}
+
+void encounter_actor_iterator_new(
+	struct encounter_actor_iterator *iterator,
+	long encounter_index)
+{
+	if (!ai_globals->ai_initialized_for_map)
+		return;
+
+	iterator->encounter_index = encounter_index;
+	iterator->index = NONE;
+	if (encounter_index == NONE)
+		iterator->next_index = ai_globals->first_encounterless_actor_index;
+	else
+		iterator->next_index = encounter_get(encounter_index)->first_actor_index;
+
+	return;
+}
+
+struct actor_datum *encounter_actor_iterator_next(
+	struct encounter_actor_iterator *iterator)
+{
+	struct actor_datum *result = NULL;
+
+	if (ai_globals->ai_initialized_for_map)
+	{
+		long next_index = iterator->next_index;
+
+		iterator->index = next_index;
+		if (next_index != NONE)
+		{
+			result = actor_get(next_index);
+			iterator->next_index = result->meta.next_actor_index;
+		}
+	}
+
+	return result;
+}
+
+void encounter_set_blind(
+	long encounter_index,
+	boolean blind)
+{
+	if (ai_globals->ai_initialized_for_map)
+		encounter_get(encounter_index)->blind = blind;
+
+	return;
+}
+
+void encounter_set_deaf(
+	long encounter_index,
+	boolean deaf)
+{
+	if (ai_globals->ai_initialized_for_map)
+		encounter_get(encounter_index)->deaf = deaf;
+
 	return;
 }
 
