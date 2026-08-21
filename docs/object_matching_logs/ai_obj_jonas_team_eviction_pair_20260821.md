@@ -200,4 +200,45 @@ synthetic anchor, or object-byte forcing.
 - `git diff --check`, deleted-path, protected-scope, and changed-line
   banned-construct checks pass.
 
+## Additive committed-payload and replay evidence
+
+The source-bearing Jonas commit is
+`7191704d39ca3c2b59098790760ce490ecd99d10`. Reading the payloads back from
+that commit's Git tree authenticates every changed production source:
+
+- `source/ai/ai.c`: blob
+  `f5a5de883e41c754802eaaa67a41c403fa0eb66a`, 13,560 bytes, payload
+  SHA-256
+  `870720baba2926abda4994c595787b98090e93e998d77055aa2f50f1d5424103`.
+- `source/game/players.c`: blob
+  `0d99a0c07cb4d1d5c9b29565d21ffbcf5442d643`, 88,907 bytes, payload
+  SHA-256
+  `2941bbdde2cfd2a29b19476c17b146008305605228b2ff8934edb95877f87ae7`.
+
+A clean two-unit regression snapshot was written at that exact commit. The
+resolved `build/base/source/ai/ai.obj` and
+`build/base/source/game/players.obj` paths were verified to be beneath the
+isolated worktree, both objects were deleted, and Ninja rebuilt both from the
+committed sources with the unchanged production recipes.
+
+The replayed `ai.obj` is 4,961 bytes with full-file SHA-256
+`5134c6383a0a8574af2c5947a835fb4f363ce2d12f5f61b3da3f8bc6dada843f`.
+Direct hardened comparison against the January object proves all 11/11
+accepted AI bodies strict, including the selected bodies at their recorded
+112/5 and 224/11 shapes and hashes.
+
+The replayed `players.obj` is 44,753 bytes with full-file SHA-256
+`3548ef3366f0b96e60ffe3cff0f294f45e897332867783477b737ee79a46203f`.
+The controlled comparison against the exact 44,752-byte canonical baseline
+again proves 82/82 runtime code sections, 39/39 runtime non-code sections,
+the directive section, and all 227 external ownership records exact. Eighteen
+of 19 debug sections remain exact and the sole difference is again the
+authenticated `.debug$S|anonymous=0` CodeView type record. The local return
+type correction therefore has no runtime or external-ownership drift.
+
+Checking the replay against the clean committed snapshot reports
+`failures: []`, `warnings: []`, and `changed_nonexact: []` for both translation
+units. All 11 accepted AI functions and all accepted player functions are
+`still_exact`; neither unit has a newly exact or regressed body in the replay.
+
 No push is performed.
