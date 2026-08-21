@@ -246,16 +246,177 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "actions.h"
+
+#include "actors.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+typedef void (*action_obey_individual_iterator_proc)(
+	long actor_index,
+	long unit_index,
+	short command_list_index,
+	struct obey_individual_simple_control *simple_control,
+	struct obey_individual_complex_control *complex_control,
+	void *user_data);
+
+typedef char action_obey_simple_control_size_assert[
+	sizeof(struct obey_individual_simple_control) == 0x24 ? 1 : -1];
+typedef char action_obey_complex_control_size_assert[
+	sizeof(struct obey_individual_complex_control) == 0x58 ? 1 : -1];
+typedef char action_obey_state_size_assert[
+	sizeof(struct obey_state_data) == 0x84 ? 1 : -1];
+typedef char action_obey_state_offset_assert[
+	offsetof(struct actor_datum, state.action_data.obey) == 0x9C ? 1 : -1];
+
 /* ---------- prototypes */
+
+void code_00005250(
+	long actor_index,
+	long unit_index,
+	short command_list_index,
+	struct obey_individual_simple_control *simple_control,
+	struct obey_individual_complex_control *complex_control,
+	void *user_data);
+void code_00005290(
+	long actor_index,
+	long unit_index,
+	short command_list_index,
+	struct obey_individual_simple_control *simple_control,
+	struct obey_individual_complex_control *complex_control,
+	void *user_data);
+void code_000052e0(
+	long actor_index,
+	long unit_index,
+	short command_list_index,
+	struct obey_individual_simple_control *simple_control,
+	struct obey_individual_complex_control *complex_control,
+	void *user_data);
+void code_00005300(
+	long actor_index,
+	long unit_index,
+	short command_list_index,
+	struct obey_individual_simple_control *simple_control,
+	struct obey_individual_complex_control *complex_control,
+	void *user_data);
+void code_00005350(
+	long actor_index,
+	boolean initialize_structures,
+	struct obey_state_data *state_data,
+	action_obey_individual_iterator_proc iterator,
+	void *user_data);
+void code_00007840(
+	long actor_index,
+	long unit_index,
+	short command_list_index,
+	struct obey_individual_simple_control *simple_control,
+	struct obey_individual_complex_control *complex_control,
+	void *user_data);
+void actor_action_change(
+	long actor_index,
+	long new_action_type,
+	struct action_state_data *new_action_data);
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+void action_obey_flush_command_indices(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct obey_state_data *state_data = &actor->state.action_data.obey;
+	struct scenario *scenario = global_scenario_get();
+
+	if (state_data->command_list_index < 0 ||
+		state_data->command_list_index >= scenario->ai_command_lists.count)
+	{
+		state_data->command_list_index = NONE;
+		state_data->finished = TRUE;
+		actor_action_change(actor_index, _actor_action_none, NULL);
+	}
+	else
+	{
+		code_00005350(
+			actor_index,
+			FALSE,
+			state_data,
+			code_00005250,
+			NULL);
+	}
+
+	return;
+}
+
+void action_obey_advance_command_list(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct obey_state_data *state_data = &actor->state.action_data.obey;
+
+	code_00005350(
+		actor_index,
+		FALSE,
+		state_data,
+		code_000052e0,
+		NULL);
+
+	return;
+}
+
+void action_obey_begin(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct obey_state_data *state_data = &actor->state.action_data.obey;
+
+	code_00005350(
+		actor_index,
+		FALSE,
+		state_data,
+		code_00005290,
+		NULL);
+
+	return;
+}
+
+void action_obey_end(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct obey_state_data *state_data = &actor->state.action_data.obey;
+
+	code_00005350(
+		actor_index,
+		FALSE,
+		state_data,
+		code_00005300,
+		NULL);
+
+	return;
+}
+
+void action_obey_update(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct obey_state_data *state_data = &actor->state.action_data.obey;
+
+	code_00005350(
+		actor_index,
+		FALSE,
+		state_data,
+		code_00007840,
+		NULL);
+
+	return;
+}
 
 /* ---------- private code */
