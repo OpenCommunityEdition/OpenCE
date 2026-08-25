@@ -148,15 +148,56 @@ The following pre-commit gates passed:
 - parked-function validation: three active, zero stale, zero invalid;
 - the complete Python tooling suite: 179/179 tests.
 
-The report tools were reused from an already authenticated local worktree
-after the fresh worktree's ignored `build/tools` directory was absent. No
-network payload was accepted and no tracked tooling or configuration changed.
+The pre-commit report was first generated with already authenticated local
+copies because the fresh worktree's ignored `build/tools` directory was
+absent. During the later committed snapshot, Ninja correctly rejected those
+copies as not recorded by this worktree's build log and attempted the pinned
+download rules. The sandboxed attempt failed before changing the report or
+object. The command was then rerun with approved network access and refreshed
+exactly the configured `csplit` v0.0.2 and `objdiff-cli` v3.3.1 release
+artifacts. No tracked tooling or configuration changed.
 
-## Commit and replay status
+## Committed replay
 
-This initial ledger intentionally makes no committed-state replay claim. After
-the source and this new ledger are committed together, an additive ledger-only
-commit will record the clean snapshot, verified object deletion, normal Ninja
-rebuild, regression result, direct 189/129 census, final ownership, committed
-Git payload identities, and no-work check. The implementation commit will not
-be amended or rewritten.
+The source and initial new ledger were committed together as
+`4c9c2845b7325d79b797743c4b2a388b056b81a5` (`Recover typed Units
+projectile ray`). It preserves these committed payload identities:
+
+- `source/units/units.c`: blob
+  `482ffd13a13e2268b072dd5389773b6488be7ace`, 237,595 bytes, payload
+  SHA-256
+  `4bff914c89623045267bbe8325c1d2461f958572f68938bae80609e5081b7c7a`;
+- initial ledger: blob `4461a5e153f80a19962b732f95623ec82ec64f7c`,
+  7,875 bytes, payload SHA-256
+  `25dc4b1a82175cf0de9609f0b34e1a94826d74ba466d77c49ec72995d2c5055c`.
+
+At that clean commit, the Units regression snapshot was written to the ignored
+audit directory. The manifest is 5,800,991 bytes, SHA-256
+`dc170bb9dfaa61e576caef7e4b2cd2f3775f4a35c5e68c79eb4711616cc17cca`,
+and pins commit `4c9c2845b7325d79b797743c4b2a388b056b81a5`.
+
+The generated object path was resolved to the current worktree, verified to
+remain under that root, hashed, removed with literal-path semantics, and
+confirmed absent. One ordinary production rebuild followed:
+
+```text
+[1/1] CL build\base\source\units\units.obj
+```
+
+The replay object is 132,255 bytes, SHA-256
+`ec4611c269823bf720cdccff3296e43b97ff998e8a277d7a1abceb21e80f0f7d`.
+The raw SHA differs from the immutable first-shot object only through normal
+COFF emission metadata; the strict function, relocation, and runtime-owner
+views are identical.
+
+The committed regression check returned `ok: true`, 154 `still_exact`, zero
+failures, zero warnings, zero `newly_exact`, and zero `changed_nonexact`.
+Independent direct checks repeated 154 exact, 11 emitted nonexact, and 24
+absent functions across all 189 target code owners. The projectile function
+remained `all_equal: true`. All 207 first-shot non-code identities were present
+in the replay with zero addition, removal, or acceptance-view change. A final
+Ninja dry run reported no work.
+
+This replay evidence is recorded by one additive ledger-only commit. The
+implementation commit is not amended, rebased, or rewritten; no source changes
+occur after the strict first-shot retain.
