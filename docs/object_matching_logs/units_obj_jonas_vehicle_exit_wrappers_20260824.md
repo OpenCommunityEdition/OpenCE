@@ -112,7 +112,32 @@ The January executable SHA-256 remains
 
 ## Committed replay
 
-No committed-state replay is claimed in this initial ledger revision. It will
-be appended additively after the implementation commit, clean snapshot,
-verified object deletion, ordinary one-unit rebuild, regression check, direct
-189/129 census, and final no-work check.
+The source and initial ledger were committed together as
+`c4439ca0c3da324f1fe25c95b56e760e05892d23` (`Recover Units vehicle exit
+wrappers`). The committed source blob is
+`45e28394c8073ab4eebea1892855d7665b29ca6a` (239,929 bytes), and the initial
+ledger blob is `eeb9a9daace7b682876aab11c0cb92f361e946dc` (6,249 bytes).
+
+At that clean commit, the Units regression snapshot was written to the
+ignored audit directory. The 5,822,224-byte manifest has SHA-256
+`69f7b3bfde165bd3c347ae9cdf8b08d76d395703e7c720ccaf6ca2f631fc072c`
+and pins the exact implementation commit.
+
+The generated object path was resolved and proven to stay under this
+worktree, its pre-delete SHA-256 was recorded, it was removed with literal
+path semantics, and absence was verified. One ordinary production rebuild
+then ran exactly:
+
+```text
+[1/1] CL build\base\source\units\units.obj
+```
+
+The replay object is 133,262 bytes with SHA-256
+`5549ed55262b957bc14358cb756c7e03ca5f6991c8f4f75149cf2f9d2be235b1`.
+The committed regression check returned `ok: true`, exactly 156
+`still_exact`, zero failures, zero warnings, zero `newly_exact`, and zero
+`changed_nonexact`. Independent checks repeated both retained functions as
+`all_equal`, kept `unit_try_and_exit_seat` absent, reproduced the complete
+156/11/22 function census and 123/0/6 target-data census, and preserved the
+runtime-owner inventory. A final Ninja dry run reported no work. The tracked
+worktree was clean before this additive replay-only ledger update.
