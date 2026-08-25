@@ -783,7 +783,60 @@ struct unit_initial_weapon
 typedef char unit_initial_weapon_size_assert[
 	sizeof(struct unit_initial_weapon) == 0x24 ? 1 : -1];
 
+/* This tag-block element layout is carried locally because this bounded wave
+ * does not own the shared game-globals header. */
+struct game_globals_falling_damage
+{
+	byte unused0[0x48];
+	long unknown48;
+	byte unused4c[0x20];
+	struct tag_reference flaming_death_damage_effect;
+	byte unused1[0x1C];
+};
+typedef char game_globals_falling_damage_size_check[
+	sizeof(struct game_globals_falling_damage) == 0x98 ? 1 : -1];
+typedef char game_globals_flaming_death_offset_check[
+	offsetof(struct game_globals_falling_damage, flaming_death_damage_effect) == 0x6C ? 1 : -1];
+
 /* ---------- prototypes */
+
+void player_died(
+	long player_index);
+void actor_died(
+	long actor_index);
+void actor_swarm_unit_died(
+	long swarm_actor_index,
+	long unit_index);
+
+void unit_detach_from_parent(
+	long unit_index);
+void unit_start_running_blindly(
+	long unit_index);
+void unit_start_flaming_to_death(
+	long unit_index,
+	long attacker_object_index);
+void unit_flame_to_death(
+	long unit_index);
+boolean unit_unsuspecting(
+	long unit_index,
+	real_point3d const *point);
+void unit_impact_melee_damage(
+	long unit_index,
+	long target_object_index,
+	short node_index,
+	short region_index,
+	short material_index,
+	real_point3d const *position,
+	real_vector3d const *object_normal,
+	struct location const *location);
+void unit_cause_melee_damage(
+	long unit_index,
+	boolean melee_hit,
+	long target_object_index,
+	short node_index,
+	short region_index,
+	short material_index,
+	real_vector3d const *object_normal);
 
 static char const *base_seat_label_get(short base_seat_index);
 static short seat_label_to_base_seat_index(char const *seat_label);
@@ -1267,6 +1320,7 @@ real unit_get_zoom_magnification(
 
 	return magnification;
 }
+
 
 boolean unit_controllable(
 	long unit_index)
@@ -2934,6 +2988,47 @@ void unit_shield_sapping_update(
 	return;
 }
 
+void unit_detach_from_parent(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	if (unit->object.parent_object_index != NONE)
+	{
+		real_point3d parent_origin;
+		real_point3d unit_origin;
+		real_vector3d velocity;
+
+		unit_get(unit->object.parent_object_index);
+		object_get_origin(
+			unit->object.parent_object_index,
+			&parent_origin);
+		object_get_origin(unit_index, &unit_origin);
+		vector_from_points3d(&parent_origin, &unit_origin, &velocity);
+		if (normalize3d(&velocity) == 0.f)
+		{
+			velocity = unit->object.forward;
+		}
+		scale_vector3d(&velocity, 0.020000001f, &velocity);
+
+		object_detach(unit_index);
+		unit_origin = unit->object.position;
+		scenario_ensure_point_within_world(&unit_origin);
+		object_set_position(unit_index, &unit_origin, NULL, NULL);
+
+		SET_FLAG(unit->object.flags, _object_at_rest_bit, FALSE);
+		SET_FLAG(unit->unit.flags, _unit_attached_melee_attack_bit, FALSE);
+		add_vectors3d(
+			&velocity,
+			&unit->object.translational_velocity,
+			&unit->object.translational_velocity);
+		object_set_visibility(unit_index, TRUE);
+		object_compute_node_matrices(unit_index);
+	}
+
+	return;
+}
+
 boolean unit_get_current_flashlight_state(
 	long unit_index)
 {
@@ -2945,6 +3040,47 @@ boolean unit_get_current_flashlight_state(
 	}
 
 	return flashlight_on;
+}
+
+void unit_start_running_blindly(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	if (!TEST_FLAG(unit->unit.flags, _unit_running_blindly_bit))
+	{
+		real angle_range;
+		real_vector3d run_vector;
+
+		SET_FLAG(unit->unit.flags, _unit_running_blindly_bit, TRUE);
+		if (unit->unit.actor_index != NONE)
+		{
+			if (actor_get_running_blind_vector(unit->unit.actor_index, &run_vector))
+			{
+				unit->unit.run_blindly_angle = 0.0f;
+				angle_range = DEGREES_TO_RADIANS(25.0f);
+				goto randomize_angle;
+			}
+		}
+
+		{
+			real_euler_angles2d facing_angles;
+
+			euler_angles2d_from_vector3d(&facing_angles, &unit->object.forward);
+			if (facing_angles.yaw > _pi)
+				facing_angles.yaw -= 2.0f * _pi;
+			unit->unit.run_blindly_angle = facing_angles.yaw;
+			angle_range = DEGREES_TO_RADIANS(100.0f);
+		}
+
+randomize_angle:
+		unit->unit.run_blindly_angle += real_seed_random_range(
+			get_global_random_seed_address(),
+			-angle_range,
+			angle_range);
+	}
+
+	return;
 }
 
 void unit_stop_running_blindly(
@@ -3067,6 +3203,105 @@ void scripting_magic_melee_attack(
 	void)
 {
 	unit_melee_attack_begin(player_get(0)->unit_index, FALSE, 0);
+
+	return;
+}
+
+void unit_impact_melee_damage(
+	long unit_index,
+	long target_object_index,
+	short node_index,
+	short region_index,
+	short material_index,
+	real_point3d const *position,
+	real_vector3d const *object_normal,
+	struct location const *location)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition =
+		unit_definition_get(unit->definition_index);
+	struct object_datum *target_object = object_get(target_object_index);
+
+	if (TEST_FLAG(
+		unit_definition->unit.flags,
+		_unit_impact_melee_die_on_shield_bit) &&
+		target_object->object.type==_object_type_biped &&
+		target_object->object.shield_vitality>0.f)
+	{
+		struct unit_definition *target_unit_definition =
+			unit_definition_get(target_object->definition_index);
+
+		if (TEST_FLAG(
+			target_unit_definition->unit.flags,
+			_unit_shields_fry_infection_forms_bit))
+		{
+			unit_cause_melee_damage(
+				unit_index,
+				TRUE,
+				target_object_index,
+				node_index,
+				region_index,
+				material_index,
+				object_normal);
+			object_deplete_body(unit_index);
+			object_delete(unit_index);
+
+			return;
+		}
+	}
+
+	if (TEST_FLAG(
+		unit_definition->unit.flags,
+		_unit_impact_melee_attaches_bit) &&
+		TEST_FLAG(
+			_object_mask_biped | _object_mask_vehicle,
+			target_object->object.type) &&
+		!TEST_FLAG(target_object->object.damage_flags, _object_dead_bit))
+	{
+		long parent_object_index = target_object->object.parent_object_index;
+
+		while (parent_object_index!=NONE)
+		{
+			struct object_datum *parent_object = object_get(parent_object_index);
+
+			if (parent_object_index==unit_index ||
+				parent_object->object.type!=_object_type_vehicle)
+			{
+				return;
+			}
+
+			parent_object_index = parent_object->object.parent_object_index;
+		}
+
+		{
+			real_vector3d left;
+			real_vector3d *forward = &unit->object.forward;
+
+			unit->object.translational_velocity = *global_zero_vector3d;
+			unit->object.angular_velocity = *global_zero_vector3d;
+			*forward = *object_normal;
+			forward->i = -forward->i;
+			forward->j = -forward->j;
+			forward->k = -forward->k;
+
+			cross_product3d(&unit->object.up, forward, &left);
+			if (normalize3d(&left)==0.f)
+			{
+				cross_product3d(global_up3d, forward, &left);
+				if (normalize3d(&left)==0.f)
+				{
+					left = *global_forward3d;
+				}
+			}
+
+			cross_product3d(forward, &left, &unit->object.up);
+			object_translate(unit_index, position, location);
+			object_attach_to_node(target_object_index, unit_index, node_index);
+			SET_FLAG(unit->object.flags, _object_at_rest_bit, TRUE);
+			SET_FLAG(unit->unit.flags, _unit_attached_melee_attack_bit, TRUE);
+			unit_melee_attack_begin(unit_index, TRUE, FALSE);
+		}
+	}
 
 	return;
 }
@@ -4150,6 +4385,7 @@ boolean unit_update(
 	return TRUE;
 }
 
+
 void unit_unzoom(
 	long unit_index)
 {
@@ -4345,6 +4581,74 @@ void unit_record_damage(
 				}
 			}
 		}
+	}
+
+	return;
+}
+
+void unit_flame_to_death(
+	long unit_index)
+{
+	struct game_globals_falling_damage *falling_damage;
+	struct unit_datum *unit;
+
+	unit = unit_get(unit_index);
+	falling_damage = TAG_BLOCK_GET_ELEMENT(
+		&scenario_get_game_globals()->falling_damage,
+		0,
+		struct game_globals_falling_damage);
+
+	{
+		struct unit_datum *running_unit = unit_get(unit_index);
+
+		running_unit->unit.flags &= ~FLAG(_unit_running_blindly_bit);
+	}
+	unit->unit.flags &= ~FLAG(_unit_ignore_hard_pings_bit);
+	unit->object.damage_flags &= ~FLAG(_object_cannot_take_damage_bit);
+
+	if (falling_damage &&
+		falling_damage->flaming_death_damage_effect.index != NONE)
+	{
+		struct object_datum *attacker = object_try_and_get(
+			unit->unit.flaming_death_attacker_object_index);
+		struct damage_data damage_data;
+
+		damage_data_new(
+			&damage_data,
+			falling_damage->flaming_death_damage_effect.index);
+
+		if (attacker)
+		{
+			damage_data.owner_player_index = attacker->object.owner_player_index;
+			if (attacker->object.owner_object_index == NONE)
+			{
+				damage_data.owner_object_index =
+					unit->unit.flaming_death_attacker_object_index;
+			}
+			else
+			{
+				damage_data.owner_object_index =
+					attacker->object.owner_object_index;
+			}
+			damage_data.owner_team_index = attacker->object.owner_team_index;
+		}
+
+		object_cause_damage(
+			&damage_data,
+			unit_index,
+			NONE,
+			NONE,
+			NONE,
+			NULL);
+	}
+
+	if (!TEST_FLAG(unit->object.damage_flags, _object_dead_bit))
+	{
+		error(
+			_error_silent,
+			"WARNING: %s tried to die from flaming to death but couldn't",
+			tag_name_strip_path(tag_get_name(unit->definition_index)));
+		SET_FLAG(unit->object.damage_flags, _object_die_act_of_god_bit, TRUE);
 	}
 
 	return;
@@ -5743,6 +6047,46 @@ static void code_0019ea70(
 
 	return;
 }
+void unit_start_flaming_to_death(
+	long unit_index,
+	long attacker_object_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	unit_drop_current_weapon(unit_index, TRUE);
+
+	SET_FLAG(unit->unit.flags, _unit_ignore_hard_pings_bit, TRUE);
+	SET_FLAG(unit->object.damage_flags, _object_dead_bit, FALSE);
+	SET_FLAG(unit->object.damage_flags, _object_cannot_take_damage_bit, TRUE);
+
+	if (unit->unit.flaming_death_delay==0)
+	{
+		short random_delay =
+			seed_random_range(get_global_random_seed_address(), 60, 150);
+		long delay;
+
+		if (random_delay<1)
+		{
+			delay = 1;
+		}
+		else if (random_delay>255)
+		{
+			delay = 255;
+		}
+		else
+		{
+			delay = random_delay;
+		}
+
+		unit->unit.flaming_death_delay = (byte)delay;
+		unit->unit.flaming_death_attacker_object_index = attacker_object_index;
+
+		unit_start_running_blindly(unit_index);
+	}
+
+	return;
+}
+
 static void code_0019bf70(
 	real position,
 	real velocity,
@@ -7655,15 +7999,6 @@ static void unit_drop_item(
 static void unit_cause_continuous_melee_damage(
 	long unit_index)
 {
-	struct collision_model_test_vector_result vector_result;
-	real_point3d collision_origin;
-	real_point3d collision_point;
-
-	struct collision_model_instance instance;
-	real_vector3d collision_vector;
-	real_plane3d collision_plane;
-	struct damage_data damage_data;
-
 	struct unit_datum *unit = unit_get(unit_index);
 	struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
 
@@ -7671,6 +8006,13 @@ static void unit_cause_continuous_melee_damage(
 		unit->object.parent_object_index!=NONE &&
 		unit_definition->unit.melee_damage.index!=NONE)
 	{
+		struct collision_model_test_vector_result vector_result;
+		struct damage_data damage_data;
+		real_plane3d collision_plane;
+		real_point3d collision_point;
+		struct collision_model_instance instance;
+		real_point3d collision_origin;
+		real_vector3d collision_vector;
 		boolean collision_passed = FALSE;
 
 		if (unit->unit.melee_continuous_damage_effect_timer==0)
@@ -7695,7 +8037,7 @@ static void unit_cause_continuous_melee_damage(
 					point_from_line3d(&collision_origin, &collision_vector, vector_result.bsp_result.t, &collision_point);
 					matrix4x3_transform_plane(&instance.matrices[vector_result.node_index], vector_result.bsp_result.plane, &collision_plane);
 					
-					if (0>vector_result.bsp_result.plane_designator)
+					if (vector_result.bsp_result.plane_designator & LONG_MIN)
 					{
 						plane3d_negate(&collision_plane, &collision_plane);
 					}
@@ -7895,60 +8237,108 @@ static void unit_running_blind(
 	{
 		real angular_acceleration_this_tick;
 
-		real negative_angle_allowed = 1.f;
 		real positive_angle_allowed = 1.f;
+		real negative_angle_allowed = 1.f;
 
 		if (actor_controlled)
 		{
 			real negative_angle_bounds_dist = DEGREES_TO_RADIANS(45)-unit->unit.run_blindly_angle;
 			real positive_angle_bounds_dist = DEGREES_TO_RADIANS(45)+unit->unit.run_blindly_angle;
 
-			negative_angle_allowed = MIN(1.f, negative_angle_bounds_dist / DEGREES_TO_RADIANS(13.5f));
-			positive_angle_allowed = MIN(1.f, positive_angle_bounds_dist / DEGREES_TO_RADIANS(13.5f));
+			negative_angle_allowed = MIN(negative_angle_allowed, negative_angle_bounds_dist / DEGREES_TO_RADIANS(13.5f));
+			positive_angle_allowed = MIN(positive_angle_allowed, positive_angle_bounds_dist / DEGREES_TO_RADIANS(13.5f));
 		}
 
 		{
 			real negative_velocity_bounds_dist = DEGREES_TO_RADIANS(12.f)-unit->unit.run_blindly_angle_delta;
 			real positive_velocity_bounds_dist = DEGREES_TO_RADIANS(12.f)+unit->unit.run_blindly_angle_delta;
 
-			negative_angle_allowed = MIN(negative_angle_allowed, negative_velocity_bounds_dist / DEGREES_TO_RADIANS(3.6f));
-			positive_angle_allowed = MIN(positive_velocity_bounds_dist / DEGREES_TO_RADIANS(3.6f), positive_angle_allowed);
+			negative_angle_allowed = MIN(negative_angle_allowed, negative_velocity_bounds_dist * 15.915494f);
+			positive_angle_allowed = MIN(positive_angle_allowed, positive_velocity_bounds_dist * 15.915494f);
 
 		}
 
-		if (negative_angle_allowed>=positive_angle_allowed)
+		if (negative_angle_allowed<positive_angle_allowed)
 		{
-			if (positive_angle_allowed>-1.f)
+			if (negative_angle_allowed<-1.f)
 			{
-				real max_allowed = MIN(1.f, positive_angle_allowed);
-				angular_acceleration_this_tick = real_random_range(-DEGREES_TO_RADIANS(1.2f) * max_allowed, DEGREES_TO_RADIANS(1.2f));
+				angular_acceleration_this_tick = -0.020943951f;
 			}
 			else
 			{
-				angular_acceleration_this_tick = DEGREES_TO_RADIANS(1.2f);
+				real min_allowed = MIN(1.f, negative_angle_allowed);
+				angular_acceleration_this_tick = real_random_range(-0.020943951f, 0.020943951f * min_allowed);
 			}
-		}
-		else if (negative_angle_allowed<-1.f)
-		{
-			angular_acceleration_this_tick = -DEGREES_TO_RADIANS(1.2f);
 		}
 		else
 		{
-			real min_allowed = MIN(1.f, negative_angle_allowed);
-			angular_acceleration_this_tick = real_random_range(-DEGREES_TO_RADIANS(1.2f), DEGREES_TO_RADIANS(1.2f) * min_allowed);
+			if (positive_angle_allowed<-1.f)
+			{
+				angular_acceleration_this_tick = 0.020943951f;
+			}
+			else
+			{
+				real max_allowed = MIN(1.f, positive_angle_allowed);
+				angular_acceleration_this_tick = real_random_range(-0.020943951f * max_allowed, 0.020943951f);
+			}
 		}
 
 		unit->unit.run_blindly_angle_delta+=angular_acceleration_this_tick;
 	}
 
 	unit->unit.run_blindly_angle += unit->unit.run_blindly_angle_delta;
-	unit->unit.run_blindly_angle += 2.f * (-PIN(unit->unit.run_blindly_angle, -_pi, _pi));
+
+	if (unit->unit.run_blindly_angle < -_pi)
+	{
+		unit->unit.run_blindly_angle += 2.f*_pi;
+	}
+	else if (unit->unit.run_blindly_angle > _pi)
+	{
+		unit->unit.run_blindly_angle -= 2.f*_pi;
+	}
 	
 	rotate_vector_about_axis(run_vector, global_up3d, sine(unit->unit.run_blindly_angle), cosine(unit->unit.run_blindly_angle));
 
 	match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\units\\units.c", 9612, run_vector)
 
 	return;
+}
+
+boolean unit_unsuspecting(
+	long unit_index,
+	real_point3d const *point)
+{
+	struct unit_datum *unit = unit_try_and_get(unit_index);
+
+	if (unit!=NULL &&
+		unit->object.type==_object_type_biped)
+	{
+		struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
+
+		if (!TEST_FLAG(unit_definition->unit.flags, _unit_never_unsuspecting_bit))
+		{
+			real_vector3d direction;
+
+			vector_from_points3d(point, &unit->object.bounding_sphere_center, &direction);
+
+			if (dot_product3d(&direction, &unit->unit.looking_vector)>0.f)
+			{
+				return TRUE;
+			}
+			else
+			{
+				char const *base_seat_label =
+					base_seat_labels[_unit_base_seat_asleep];
+
+				if (csstrcmp(base_seat_label, unit_get_seat_label(unit_index))==0)
+				{
+					return TRUE;
+				}
+			}
+		}
+	}
+
+	return FALSE;
 }
 
 static boolean unit_integrated_night_vision_is_active(
