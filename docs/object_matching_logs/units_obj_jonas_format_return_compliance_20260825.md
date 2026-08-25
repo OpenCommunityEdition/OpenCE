@@ -131,3 +131,64 @@ the helper fingerprint, full owner A/B, and a final Ninja dry run will be
 repeated before one additive ledger-only replay commit. The same clean
 snapshot/delete/rebuild/check sequence will then run at corrected HEAD. No
 push, amend, rebase, history rewrite, or worktree removal is performed.
+
+## Clean implementation-state replay
+
+Implementation-and-initial-ledger commit
+`4b8dde75de74f12d04daa3043ca6c999fc6840ba` was authored by Jonas Volman
+`<theunknowentity@gmail.com>` and was clean before replay. Re-reading that
+commit proves:
+
+- retained source blob `c2ef1a3b08bec91cc2c534443f09732b6f3003cd`,
+  263,873 raw Git-payload bytes;
+- initial ledger blob `93b76a3dd07725e64381d274643a4bc04d970811`,
+  6,708 raw Git-payload bytes; and
+- exactly the intended source and new-ledger paths in the implementation
+  commit.
+
+A fresh one-unit accepted-state snapshot was written with `--no-build` at that
+exact clean commit. The ignored manifest
+`build/audit/units_format_return_impl_replay_20260825.json` is 6,041,088 bytes
+with phase-specific SHA-256
+`d722b9c80306d36cddaea475caed58a935f77f066ce4f1c4011c407c9d9cef5d`
+and pins the full implementation commit.
+
+The generated object resolved to `build/base/source/units/units.obj`. Its
+absolute normalized path was proven equal to the expected path and proven to
+begin with this exact isolated worktree root. The snapshotted first-shot object
+was 143,149 bytes with SHA-256
+`709dbe8426c1eecde42023ad6daa8e79998b65678b5bd35bcf967ab16f751522`.
+Only that verified file was removed with `Remove-Item -LiteralPath`, and
+immediate verification proved it absent. Its ordinary target then ran exactly:
+
+```text
+[1/1] CL build\base\source\units\units.obj
+units.c
+```
+
+The replay object is again 143,149 bytes with metadata-phase SHA-256
+`04ada3854225594f0d7cab4f152100c06e5288d43d858818242c6575665f5edf`.
+The expected raw-object hash difference is confined to rebuild metadata; the
+complete runtime acceptance view is unchanged.
+
+The immediate regression check returned `ok: true`, exactly 168
+`still_exact`, zero failures, zero warnings, zero `newly_exact`, and zero
+`changed_nonexact`. Independent direct replay proofs also passed:
+
+- the complete code census remains 168 exact / 12 emitted nonexact / 9 absent,
+  totaling 32,320 exact padded bytes and 1,387 relocation identities;
+- `_code_00198400` remains strict exact at 448 padded bytes, 24 relocation
+  records, and normalized SHA-256 `6b902fccee7d...`;
+- the complete target runtime-data census remains 126 exact / zero present
+  nonexact / three absent, totaling 6,471 exact bytes and seven relocations;
+- all 211 first-shot code owners and all 184 first-shot runtime-data owners are
+  present in the replay with zero additions, removals, or changed hardened
+  fingerprints; and
+- the generated Units-object Ninja dry run reports `ninja: no work to do`.
+
+Only this new ledger is modified for the additive replay record. After the
+ledger-only commit, the same clean snapshot/delete/rebuild/check sequence will
+be repeated at corrected HEAD so the handed-off branch itself is the final
+replay authority. No source change, candidate retry, tuning, header/protected
+source/config/storage edit, amend, push, history rewrite, or worktree removal
+occurred after the implementation commit.
