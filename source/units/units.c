@@ -655,6 +655,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "cseries/profile.h"
 #include "effects/effects.h"
+#include "effects/material_effect_definitions.h"
 #include "game/cheats.h"
 #include "game/game_globals.h"
 #include "game/game_engine.h"
@@ -668,6 +669,7 @@ symbols in this file:
 #include "main/console.h"
 #include "models/model_animation_definitions.h"
 #include "objects/damage.h"
+#include "objects/damage_effect_definitions.h"
 #include "objects/object_lights.h"
 #include "physics/collision_bsp.h"
 #include "physics/collision_models.h"
@@ -686,6 +688,19 @@ enum
 	_equipment_powerup_grenade = 6,
 };
 
+enum
+{
+	_unit_add_weapon_normal = 0,
+	_unit_add_weapon_starting,
+	_unit_add_weapon_replace,
+};
+
+enum
+{
+	NUMBER_OF_UNIT_ANIMATION_IMPULSES = 14,
+	_unit_seat_unknown8_bit = 8,
+};
+
 /* ---------- macros */
 
 #define unit_get_current_weapon_index(unit_index) unit_inventory_get_weapon((unit_index), unit_get((unit_index))->unit.current_weapon_index)
@@ -701,6 +716,21 @@ struct unit_globals
 	char pad[3];
 };
 
+struct unit_acceleration_plan
+{
+	boolean at_rest;
+	char pad[3];
+	real initial_position;
+	real initial_velocity;
+	real acceleration;
+	real acceleration_time;
+	real coast_time;
+	real deceleration;
+	real deceleration_time;
+};
+typedef char unit_acceleration_plan_size_check[
+	sizeof(struct unit_acceleration_plan) == 0x20 ? 1 : -1];
+
 /* ---------- prototypes */
 
 static char const *base_seat_label_get(short base_seat_index);
@@ -708,6 +738,56 @@ static short seat_label_to_base_seat_index(char const *seat_label);
 static char const *base_weapon_label_get(short base_weapon_index);
 
 static void unit_refresh_illumination(long unit_index);
+
+static boolean code_00197e30(
+	struct unit_acceleration_plan *plan,
+	real delta_time,
+	real position,
+	real *new_position,
+	real velocity,
+	real *new_velocity);
+static void code_0019bf70(
+	real position,
+	real velocity,
+	real maximum_velocity,
+	real maximum_acceleration,
+	struct unit_acceleration_plan *plan);
+static void code_0019c460(
+	struct unit_acceleration_plan *first_plan,
+	struct unit_acceleration_plan *second_plan,
+	real maximum_velocity,
+	real maximum_acceleration);
+
+static void code_0019b600(
+	long unit_index,
+	short material_type,
+	long damage_effect_index);
+static void code_0019a170(long unit_index);
+static short code_0019a640(long unit_index);
+
+static short code_00198e40(
+	short animation_impulse,
+	short *interpolation_frame_count);
+static boolean code_00198fd0(
+	long unit_index,
+	long animation_impulse);
+
+static boolean code_00198170(struct unit_animation *animation);
+static boolean code_001981f0(short state);
+static short code_00198230(short new_state, short old_state);
+static long code_00198190(short state);
+static void code_0019b0b0(
+	long unit_index,
+	long animation_graph_index,
+	short animation_index);
+static void code_0019ea70(
+	long unit_index,
+	real_vector2d const *alignment_vector);
+
+void player_control_set_desired_weapon(
+	long unit_index,
+	short desired_weapon_index);
+boolean valid_real_normal2d(real_vector2d const *normal);
 
 static void unit_adjust_for_seat_change(long unit_index);
 static short unit_weapon_next_index(long unit_index, short current_index, short delta);
@@ -3757,32 +3837,1466 @@ static boolean unit_set_or_test_seat_and_weapon_label(
 	return result;
 }
 
+static boolean code_00197e30(
+	struct unit_acceleration_plan *plan,
+	real delta_time,
+	real position,
+	real *new_position,
+	real velocity,
+	real *new_velocity)
+{
+	boolean result = plan->at_rest;
+	real current_position = position;
+	real current_velocity = velocity;
+	real time;
+	real remaining_time;
+
+	if (result)
+	{
+		goto store_result;
+	}
+	remaining_time = delta_time;
+	if (!(remaining_time > 0.f))
+	{
+		goto store_result;
+	}
+
+	if (plan->acceleration_time>0.f)
+	{
+		time = MIN(remaining_time, plan->acceleration_time);
+		current_position +=
+			(time*plan->acceleration*0.5f + current_velocity)*time;
+		current_velocity += time*plan->acceleration;
+		remaining_time -= time;
+	}
+
+	if (!(remaining_time > 0.f))
+	{
+		goto store_result;
+	}
+
+	if (plan->coast_time>0.f)
+	{
+		time = MIN(remaining_time, plan->coast_time);
+		current_position += current_velocity*time;
+		remaining_time -= time;
+	}
+
+	if (!(remaining_time > 0.f))
+	{
+		goto store_result;
+	}
+
+	if (plan->deceleration_time>0.f)
+	{
+		time = MIN(remaining_time, plan->deceleration_time);
+		current_position +=
+			(0.5f*time*plan->deceleration + current_velocity)*time;
+		current_velocity += time*plan->deceleration;
+		remaining_time -= time;
+	}
+
+	if (remaining_time > 0.f)
+	{
+		result = TRUE;
+	}
+
+store_result:
+	*new_position = current_position;
+	*new_velocity = current_velocity;
+
+	return result;
+}
+void unit_set_actively_controlled(
+	long unit_index,
+	boolean actively_controlled)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	short weapon_index;
+
+	if (unit->unit.actor_index!=NONE ||
+		unit->unit.swarm_actor_index!=NONE ||
+		unit->unit.player_index!=NONE)
+	{
+		actively_controlled = TRUE;
+	}
+
+	actively_controlled =
+		!TEST_FLAG(unit->object.damage_flags, _object_dead_bit) &&
+		actively_controlled;
+
+	SET_FLAG(unit->unit.flags, _unit_actively_controlled_bit, actively_controlled);
+	SET_FLAG(unit->unit.flags, _unit_controllable_bit, actively_controlled);
+
+	for (weapon_index = 0; weapon_index<MAXIMUM_WEAPONS_PER_UNIT; ++weapon_index)
+	{
+		long weapon_object_index = unit->unit.weapon_object_indices[weapon_index];
+
+		if (weapon_object_index!=NONE)
+		{
+			item_in_unit_inventory(weapon_object_index, unit_index);
+		}
+	}
+
+	code_0019a170(unit_index);
+
+	return;
+}
+static void code_0019a170(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
+	long child_object_index = unit->object.first_child_object_index;
+
+	while (child_object_index!=NONE)
+	{
+		struct object_datum *child_object = object_get(child_object_index);
+
+		if (TEST_FLAG(_object_mask_unit, child_object->object.type))
+		{
+			struct unit_datum *child_unit = (struct unit_datum *)child_object;
+
+			if (child_unit->unit.parent_seat_index!=NONE)
+			{
+				struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+					&unit_definition->unit.seats,
+					child_unit->unit.parent_seat_index,
+					struct unit_seat);
+
+				if (TEST_FLAG(seat->flags, _unit_seat_driver_bit) &&
+					!TEST_FLAG(unit->unit.flags, _unit_actively_controlled_bit) &&
+					unit->unit.driver_object_index==NONE)
+				{
+					unit->unit.driver_object_index = child_object_index;
+
+					if (TEST_FLAG(seat->flags, _unit_seat_gunner_bit) &&
+						unit->unit.gunner_object_index==NONE)
+					{
+						unit->unit.gunner_object_index = child_object_index;
+					}
+				}
+				else if (TEST_FLAG(seat->flags, _unit_seat_gunner_bit) &&
+					(unit->unit.gunner_object_index==NONE ||
+					unit->unit.gunner_object_index==unit->unit.driver_object_index))
+				{
+					unit->unit.gunner_object_index = child_object_index;
+				}
+			}
+		}
+
+		child_object_index = child_object->object.next_object_index;
+	}
+
+	return;
+}
+static short code_0019a640(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	short result = NONE;
+	short weapon_index;
+
+	for (weapon_index = 0; weapon_index<MAXIMUM_WEAPONS_PER_UNIT; ++weapon_index)
+	{
+		if (unit->unit.weapon_object_indices[weapon_index]==NONE)
+		{
+			result = weapon_index;
+			break;
+		}
+	}
+
+	return result;
+}
+boolean unit_add_weapon_to_inventory(
+	long unit_index,
+	long weapon_index,
+	long is_starting_weapon)
+{
+	struct weapon_datum *weapon = weapon_get(weapon_index);
+	struct unit_datum *unit = unit_get(unit_index);
+	short inventory_index;
+	boolean added = FALSE;
+	short mode = (short)is_starting_weapon;
+
+	if (TEST_FLAG(weapon->object.flags, _object_connected_to_map_bit) &&
+		weapon->object.parent_object_index==NONE &&
+		unit_can_use_weapon(unit_index, weapon_index) &&
+		game_engine_picking_up(unit_index, weapon_index))
+	{
+		if (mode==_unit_add_weapon_replace)
+		{
+			unit_delete_all_weapons(unit_index);
+		}
+
+		inventory_index = code_0019a640(unit_index);
+
+		if (inventory_index!=NONE)
+		{
+			object_disconnect_from_map(weapon_index);
+			object_set_visibility(weapon_index, FALSE);
+			item_in_unit_inventory(weapon_index, unit_index);
+
+			unit->unit.weapon_object_indices[inventory_index] = weapon_index;
+			unit->unit.weapon_last_used_at_game_time[inventory_index] = 0;
+
+			switch (mode)
+			{
+			case _unit_add_weapon_normal:
+				unit->unit.desired_weapon_index =
+					unit_weapon_next_index(unit_index, unit->unit.current_weapon_index, 0);
+				break;
+
+			case _unit_add_weapon_starting:
+				if (!TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit))
+				{
+					player_control_set_desired_weapon(unit_index, inventory_index);
+				}
+
+			case _unit_add_weapon_replace:
+				unit->unit.desired_weapon_index = inventory_index;
+				break;
+			}
+
+			added = TRUE;
+		}
+	}
+
+	return added;
+}
+static short code_00198e40(
+	short animation_impulse,
+	short *interpolation_frame_count)
+{
+	short index = NONE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		5364,
+		animation_impulse>=0 && animation_impulse<NUMBER_OF_UNIT_ANIMATION_IMPULSES);
+
+	switch (animation_impulse)
+	{
+	case 0:
+		index = _unit_weapon_class_animation_berserk;
+		break;
+	case 1:
+		index = _unit_weapon_class_animation_signal_move;
+		break;
+	case 2:
+		index = _unit_weapon_class_animation_signal_attack;
+		break;
+	case 3:
+		index = _unit_weapon_class_animation_signal_warn;
+		break;
+	case 4:
+		index = _unit_weapon_class_animation_surprise_front;
+		break;
+	case 5:
+		index = _unit_weapon_class_animation_surprise_back;
+		break;
+	case 6:
+		index = _unit_weapon_class_animation_evade_left;
+		break;
+	case 7:
+		index = _unit_weapon_class_animation_evade_right;
+		break;
+	case 8:
+		index = _unit_weapon_class_animation_diving_front;
+		break;
+	case 9:
+		index = _unit_weapon_class_animation_diving_back;
+		break;
+	case 10:
+		index = _unit_weapon_class_animation_diving_left;
+		break;
+	case 11:
+		index = _unit_weapon_class_animation_diving_right;
+		break;
+	case 12:
+		index = _unit_weapon_class_animation_celebrate;
+		break;
+	case 13:
+		index = _unit_weapon_class_animation_panic;
+		break;
+	default:
+		display_assert(NULL, "c:\\halo\\SOURCE\\units\\units.c", 5383, TRUE);
+		system_exit(-1);
+		break;
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		5385,
+		index!=NONE);
+
+	if (interpolation_frame_count!=NULL)
+	{
+		switch (animation_impulse)
+		{
+		case 4:
+		case 5:
+		case 8:
+		case 9:
+		case 10:
+		case 11:
+			*interpolation_frame_count = 3;
+			break;
+		case 0:
+		case 1:
+		case 2:
+		case 3:
+		case 6:
+		case 7:
+		case 12:
+		case 13:
+			*interpolation_frame_count = 6;
+			break;
+		default:
+			display_assert(NULL, "c:\\halo\\SOURCE\\units\\units.c", 5412, TRUE);
+			system_exit(-1);
+			break;
+		}
+	}
+
+	return index;
+}
+static boolean code_00198fd0(
+	long unit_index,
+	long animation_impulse)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	boolean result = FALSE;
+
+	switch (unit->unit.animation.state)
+	{
+	case _unit_state_hard_ping:
+	case _unit_state_dying_airborne:
+	case _unit_state_dying:
+	case _unit_state_entering_seat:
+	case _unit_state_exiting_seat:
+	case _unit_state_ai_impulse:
+	case _unit_state_melee_attack:
+	case _unit_state_melee_airborne:
+	case _unit_state_melee_continuous:
+	case _unit_state_throw_grenade:
+	case _unit_state_resurrect_front:
+	case _unit_state_resurrect_back:
+	case _unit_state_leap_start:
+	case _unit_state_leap_melee:
+		return result;
+	default:
+		break;
+	}
+
+	if (unit->object.parent_object_index!=NONE)
+	{
+		struct unit_datum *parent_unit;
+		struct unit_definition *parent_unit_definition;
+		struct unit_seat *seat;
+
+		if (unit->unit.parent_seat_index!=NONE)
+		{
+			parent_unit = unit_try_and_get(unit->object.parent_object_index);
+			if (parent_unit!=NULL)
+			{
+				long impulse_index;
+
+				parent_unit_definition = unit_definition_get(parent_unit->definition_index);
+				seat = TAG_BLOCK_GET_ELEMENT(
+					&parent_unit_definition->unit.seats,
+					unit->unit.parent_seat_index,
+					struct unit_seat);
+				impulse_index = (short)animation_impulse;
+
+				if (impulse_index>=12 &&
+					impulse_index<=13)
+				{
+					return (boolean)TEST_FLAG(seat->flags, _unit_seat_unknown8_bit);
+				}
+			}
+		}
+	}
+	else
+	{
+		long impulse_index = (short)animation_impulse;
+
+		if (impulse_index>=12 &&
+			impulse_index<=13)
+		{
+			return FALSE;
+		}
+
+		result = TRUE;
+	}
+
+	return result;
+}
+boolean unit_start_animation_impulse(
+	long unit_index,
+	short animation_impulse,
+	real_vector2d *alignment_vector)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition;
+	struct animation_graph *animation_graph;
+	struct animation_graph_unit_seat *unit_seat;
+	struct animation_graph_weapon_class *weapon_class;
+	short interpolation_frame_count;
+	short animation_type;
+	short animation_index;
+	long animation_graph_index;
+	boolean result = FALSE;
+
+	if (code_00198fd0(unit_index, animation_impulse))
+	{
+		unit_definition = unit_definition_get(unit->definition_index);
+		animation_graph = animation_graph_definition_get(
+			unit_definition->object.animation_graph.index);
+		unit_seat = TAG_BLOCK_GET_ELEMENT(
+			&animation_graph->unit_seats,
+			unit->unit.animation.seat_index,
+			struct animation_graph_unit_seat);
+		weapon_class = TAG_BLOCK_GET_ELEMENT(
+			&unit_seat->weapon_classes,
+			unit->unit.animation.weapon_index,
+			struct animation_graph_weapon_class);
+		animation_type = code_00198e40(
+			animation_impulse,
+			&interpolation_frame_count);
+
+		if (animation_type>=0 &&
+			animation_type<weapon_class->animations.count)
+		{
+			animation_index =
+				animation_graph_animation_index_get(&weapon_class->animations)
+					[animation_type].animation_index;
+
+			if (animation_index!=NONE)
+			{
+				object_start_interpolation(
+					unit_index,
+					interpolation_frame_count);
+				animation_graph_index =
+					unit_definition->object.animation_graph.index;
+				animation_index =
+					animation_choose_random_permutation_internal(
+						TRUE,
+						animation_graph_index,
+						animation_index);
+				code_0019b0b0(
+					unit_index,
+					unit_definition->object.animation_graph.index,
+					animation_index);
+				SET_FLAG(
+					unit->unit.animation.flags,
+					_unit_animation_postpone_weapon_ik_until_interpolation_ends_bit,
+					TRUE);
+				unit->unit.animation.state = _unit_state_ai_impulse;
+
+				if (alignment_vector!=NULL &&
+					unit->object.type==_object_type_biped &&
+					unit->object.parent_object_index==NONE)
+				{
+					code_0019ea70(unit_index, alignment_vector);
+				}
+
+				result = TRUE;
+			}
+		}
+	}
+
+	return result;
+}
+static void code_0019b600(
+	long unit_index,
+	short material_type,
+	long damage_effect_index)
+{
+	struct material_definition *material_definition =
+		scenario_material_definition_get(material_type);
+
+	if (material_definition->melee_hit_sound.index!=NONE)
+	{
+		object_impulse_sound_new(
+			unit_index,
+			material_definition->melee_hit_sound.index,
+			NONE,
+			global_origin3d,
+			global_forward3d,
+			1.f);
+	}
+
+	if (damage_effect_index!=NONE)
+	{
+		struct damage_effect_definition *damage_effect_definition =
+			damage_effect_definition_get(damage_effect_index);
+
+		if (damage_effect_definition->sound.index!=NONE)
+		{
+			object_impulse_sound_new(
+				unit_index,
+				damage_effect_definition->sound.index,
+				NONE,
+				global_origin3d,
+				global_forward3d,
+				1.f);
+		}
+	}
+
+	return;
+}
+void unit_cause_melee_damage(
+	long unit_index,
+	boolean melee_hit,
+	long target_object_index,
+	short node_index,
+	short region_index,
+	short material_index,
+	real_vector3d const *object_normal)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition =
+		unit_definition_get(unit->definition_index);
+
+	if (unit_definition->unit.melee_damage.index!=NONE)
+	{
+		struct object_marker marker;
+		real_point3d melee_position;
+		long damage_effect_index;
+
+		if (object_get_marker_by_name(unit_index, "melee", &marker, 1)==1)
+		{
+			struct collision_result collision;
+			real_vector3d collision_vector;
+			real_point3d const *collision_origin;
+
+			melee_position = marker.matrix.position;
+			match_assert(
+				"c:\\halo\\SOURCE\\units\\units.c",
+				8640,
+				global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
+
+			global_current_collision_users[global_current_collision_user_depth++] = 7;
+			collision_origin = &unit->object.bounding_sphere_center;
+			vector_from_points3d(collision_origin, &melee_position, &collision_vector);
+			if (collision_test_vector(
+				_collision_test_for_projectiles_flags,
+				collision_origin,
+				&collision_vector,
+				NONE,
+				&collision))
+			{
+				melee_position = *collision_origin;
+			}
+
+			match_assert(
+				"c:\\halo\\SOURCE\\units\\units.c",
+				8648,
+				global_current_collision_user_depth > 1);
+			--global_current_collision_user_depth;
+		}
+		else
+		{
+			melee_position = unit->object.bounding_sphere_center;
+		}
+
+		damage_effect_index = unit_definition->unit.melee_damage.index;
+		{
+			long weapon_index = unit_inventory_get_weapon(
+				unit_index,
+				unit_get(unit_index)->unit.current_weapon_index);
+
+			if (weapon_index!=NONE)
+			{
+				struct weapon_definition *weapon_definition =
+					weapon_definition_get(weapon_get(weapon_index)->definition_index);
+
+				if (TEST_FLAG(
+					weapon_definition->weapon.flags,
+					_weapon_non_players_use_melee_damage_bit))
+				{
+					damage_effect_index =
+						weapon_definition->weapon.melee_attack_damage.index;
+				}
+			}
+		}
+
+		{
+			struct damage_data damage_data;
+
+			damage_data_new(&damage_data, damage_effect_index);
+			damage_data.location = unit->object.location;
+			damage_data.owner_object_index = unit_index;
+			damage_data.owner_team_index = unit->object.owner_team_index;
+			damage_data.owner_player_index = unit->unit.player_index;
+			damage_data.origin = melee_position;
+			damage_data.epicenter = unit->object.bounding_sphere_center;
+
+			if (target_object_index==NONE)
+			{
+				area_of_effect_cause_damage(&damage_data, NONE);
+			}
+			else
+			{
+				object_cause_damage(
+					&damage_data,
+					target_object_index,
+					node_index,
+					region_index,
+					material_index,
+					object_normal);
+			}
+
+			if (!melee_hit && damage_data.material_type!=NONE)
+			{
+				long hit_material_type = damage_data.material_type;
+
+				code_0019b600(
+					unit_index,
+					hit_material_type,
+					damage_effect_index);
+			}
+		}
+	}
+
+	unit->unit.melee_attack_state = 0;
+
+	return;
+}
+static void code_0019ea70(
+	long unit_index,
+	real_vector2d const *alignment_vector)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	if (unit->object.parent_object_index==NONE)
+	{
+		match_vassert(
+			"c:\\halo\\SOURCE\\units\\units.c",
+			9353,
+			valid_real_normal2d(alignment_vector),
+			csprintf(
+				temporary,
+				"%s: assert_valid_real_normal2d(%f, %f)",
+				"alignment_vector",
+				alignment_vector->i,
+				alignment_vector->j));
+
+		set_real_vector3d(
+			&unit->object.forward,
+			alignment_vector->i,
+			alignment_vector->j,
+			0.f);
+		unit->object.up = *global_up3d;
+
+		match_assert_valid_real_vector3d_axes2(
+			"c:\\halo\\SOURCE\\units\\units.c",
+			9357,
+			&unit->object.forward,
+			&unit->object.up);
+	}
+
+	return;
+}
+static void code_0019bf70(
+	real position,
+	real velocity,
+	real maximum_velocity,
+	real maximum_acceleration,
+	struct unit_acceleration_plan *plan)
+{
+	boolean moving_positive;
+	real acceleration_time;
+	real coasting_velocity;
+	real discriminant;
+	real first_root;
+	real half_time;
+	real half_velocity;
+	real maximum_velocity_time;
+	real negative_acceleration;
+	real second_root;
+	real second_time;
+	real stopping_position;
+	real time;
+
+	plan->acceleration = REAL_MAX;
+	plan->acceleration_time = REAL_MAX;
+	plan->coast_time = REAL_MAX;
+	plan->deceleration = REAL_MAX;
+	plan->deceleration_time = REAL_MAX;
+	plan->initial_position = position;
+	plan->initial_velocity = velocity;
+	plan->at_rest = fabs(position)<0.001f && fabs(velocity)<0.001f;
+
+	if (plan->at_rest)
+	{
+		plan->acceleration = 0.f;
+		plan->acceleration_time = 0.f;
+		plan->coast_time = 0.f;
+		plan->deceleration = 0.f;
+		plan->deceleration_time = 0.f;
+		goto plan_complete;
+	}
+
+	time = fabs(velocity) / maximum_acceleration;
+	moving_positive = velocity>0.f;
+	half_time = time*0.5f;
+	if (half_time*velocity*0.5f + position<0.f)
+	{
+		code_0019bf70(
+			-position,
+			-velocity,
+			maximum_velocity,
+			maximum_acceleration,
+			plan);
+		plan->initial_position *= -1.f;
+		plan->initial_velocity *= -1.f;
+		plan->acceleration *= -1.f;
+		plan->deceleration *= -1.f;
+		goto validate_plan;
+	}
+
+	half_velocity = velocity*0.5f;
+	stopping_position = half_velocity*time + position;
+	if (stopping_position<0.f)
+	{
+		match_vassert(
+			"c:\\halo\\SOURCE\\units\\units.c",
+			0x7b7,
+			plan->initial_position > -0.001f,
+			"plan->initial_p > -1e-03f");
+		match_vassert(
+			"c:\\halo\\SOURCE\\units\\units.c",
+			0x7b8,
+			plan->initial_velocity < 0.f,
+			"plan->initial_v < 0");
+		plan->acceleration = 0.f;
+		plan->acceleration_time = 0.f;
+		plan->deceleration =
+			plan->initial_velocity*plan->initial_velocity /
+			(plan->initial_position + plan->initial_position);
+		plan->deceleration_time =
+			-(plan->initial_velocity / plan->deceleration);
+		plan->coast_time = 0.f;
+		goto validate_plan;
+	}
+
+	if (moving_positive)
+	{
+		acceleration_time = square_root(stopping_position / maximum_acceleration);
+	}
+	else
+	{
+		negative_acceleration = -maximum_acceleration;
+		velocity += velocity;
+		position =
+			velocity*velocity - negative_acceleration*stopping_position*4.f;
+		match_vassert(
+			"c:\\halo\\SOURCE\\units\\units.c",
+			0x7eb,
+			position >= 0.f,
+			"disc >= 0");
+		second_root = square_root(position);
+		first_root =
+			(-velocity - second_root) /
+			(negative_acceleration + negative_acceleration);
+		second_time =
+			(second_root - velocity) /
+			(negative_acceleration + negative_acceleration);
+		if (first_root>=0.f &&
+			(second_time<0.f || first_root<second_time))
+		{
+			acceleration_time = first_root;
+		}
+		else if (0.f>second_time)
+		{
+			acceleration_time = 0.f;
+			goto apply_velocity_limit;
+		}
+		else
+		{
+			acceleration_time = second_time;
+		}
+	}
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x7fa,
+		acceleration_time >= 0.f,
+		"t >= 0");
+
+apply_velocity_limit:
+	if (maximum_velocity>0.f)
+	{
+		maximum_velocity_time =
+			(moving_positive ?
+				maximum_velocity :
+				maximum_velocity + plan->initial_velocity) /
+			maximum_acceleration;
+		maximum_velocity_time = MAX(0.f, maximum_velocity_time);
+		first_root = MIN(acceleration_time, maximum_velocity_time);
+	}
+	else
+	{
+		first_root = acceleration_time;
+	}
+
+	plan->acceleration = -maximum_acceleration;
+	plan->deceleration = maximum_acceleration;
+	if (moving_positive)
+	{
+		plan->acceleration_time = first_root + time;
+		plan->deceleration_time = first_root;
+	}
+	else
+	{
+		plan->acceleration_time = first_root;
+		plan->deceleration_time = first_root + time;
+	}
+
+	if (first_root<acceleration_time)
+	{
+		coasting_velocity =
+			plan->acceleration*plan->acceleration_time +
+			plan->initial_velocity;
+		discriminant =
+			((acceleration_time - first_root)*coasting_velocity)*2.f -
+			(acceleration_time - first_root)*
+			(acceleration_time - first_root)*maximum_acceleration;
+		match_vassert(
+			"c:\\halo\\SOURCE\\units\\units.c",
+			0x850,
+			coasting_velocity < 0.f,
+			"coasting_vel < 0");
+		plan->coast_time = discriminant / coasting_velocity;
+		match_vassert(
+			"c:\\halo\\SOURCE\\units\\units.c",
+			0x852,
+			plan->coast_time >= 0.f,
+			"plan->coast_t >= 0");
+		match_vassert(
+			"c:\\halo\\SOURCE\\units\\units.c",
+			0x853,
+			plan->coast_time + first_root >= acceleration_time,
+			"plan->coast_t + actual_t >= t");
+	}
+	else
+	{
+		plan->coast_time = 0.f;
+	}
+
+validate_plan:
+	match_vassert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x85c,
+		REAL_MAX != plan->acceleration,
+		"REAL_MAX != plan->accel_a");
+	match_vassert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x85d,
+		REAL_MAX != plan->acceleration_time,
+		"REAL_MAX != plan->accel_t");
+	match_vassert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x85e,
+		REAL_MAX != plan->coast_time,
+		"REAL_MAX != plan->coast_t");
+	match_vassert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x85f,
+		REAL_MAX != plan->deceleration,
+		"REAL_MAX != plan->decel_a");
+	match_vassert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x860,
+		REAL_MAX != plan->deceleration_time,
+		"REAL_MAX != plan->decel_t");
+
+plan_complete:
+	return;
+}
+static void code_0019c460(
+	struct unit_acceleration_plan *first_plan,
+	struct unit_acceleration_plan *second_plan,
+	real maximum_velocity,
+	real maximum_acceleration)
+{
+	real acceleration_time;
+	real adjustment;
+	real discriminant;
+	real first_total_time;
+	real peak_velocity;
+	real second_total_time;
+	real time_extension;
+	real time_factor;
+	struct unit_acceleration_plan *adjust_plan = NULL;
+
+	if (first_plan->at_rest || second_plan->at_rest)
+	{
+		goto overlap_complete;
+	}
+
+	first_total_time =
+		first_plan->deceleration_time +
+		first_plan->coast_time +
+		first_plan->acceleration_time;
+	second_total_time =
+		second_plan->deceleration_time +
+		second_plan->coast_time +
+		second_plan->acceleration_time;
+	if (first_plan->acceleration_time>0.f &&
+		first_total_time<second_total_time)
+	{
+		time_extension = second_total_time - first_total_time;
+		adjust_plan = first_plan;
+	}
+	else if (second_plan->acceleration_time>0.f &&
+		second_total_time<first_total_time)
+	{
+		time_extension = first_total_time - second_total_time;
+		adjust_plan = second_plan;
+	}
+
+	if (!adjust_plan)
+	{
+		goto overlap_complete;
+	}
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x8ae,
+		time_extension > 0.f,
+		"t_extension > 0");
+	time_factor =
+		(time_extension + adjust_plan->coast_time) *
+		maximum_acceleration;
+	peak_velocity =
+		adjust_plan->acceleration_time*adjust_plan->acceleration +
+		adjust_plan->initial_velocity;
+	discriminant =
+		time_factor*time_factor -
+		(real)((-time_extension)*fabs(peak_velocity)) *
+		maximum_acceleration*4.f;
+	match_vassert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x8c4,
+		discriminant >= 0.f,
+		"disc >= 0");
+	adjustment =
+		(square_root(discriminant) - time_factor) /
+		(maximum_acceleration + maximum_acceleration);
+	adjustment = MIN(
+		adjustment,
+		MIN(adjust_plan->acceleration_time, adjust_plan->deceleration_time));
+	if (!(adjustment>0.f))
+	{
+		goto overlap_complete;
+	}
+
+	acceleration_time = adjust_plan->acceleration_time - adjustment;
+	peak_velocity =
+		acceleration_time*adjust_plan->acceleration +
+		adjust_plan->initial_velocity;
+	adjust_plan->acceleration_time = acceleration_time;
+	adjust_plan->deceleration_time -= adjustment;
+	adjust_plan->coast_time =
+		((peak_velocity + peak_velocity +
+			adjustment*adjust_plan->acceleration)*adjustment) /
+		peak_velocity;
+	match_vassert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x8d8,
+		(acceleration_time >= 0.f) &&
+		(adjust_plan->deceleration_time >= 0.f),
+		"(adjust_plan->accel_t >= 0) && (adjust_plan->decel_t >= 0)");
+
+overlap_complete:
+	return;
+}
+void unit_euler_aiming_update(
+	real_matrix4x3 const *orientation,
+	real_vector3d *aiming_vector,
+	real_vector3d const *desired_aiming_vector,
+	real_vector3d *aiming_velocity,
+	real_rectangle2d const *aiming_bounds,
+	real angular_velocity_limit,
+	real angular_acceleration_limit)
+{
+	boolean aiming_yaw_in_bounds;
+	boolean pitch_complete;
+	boolean yaw_complete;
+	boolean yaw_wraps;
+	real angle;
+	real aiming_pitch_velocity;
+	real aiming_yaw_velocity;
+	real dot_product;
+	real_euler_angles2d aiming_error;
+	real_euler_angles2d aiming_angles;
+	real_euler_angles2d end_angular_velocity;
+	real_euler_angles2d desired_aiming_angles;
+	real_vector3d clamped_desired_aiming_vector;
+	real_vector3d local_aiming_vector;
+	real_vector3d local_desired_aiming_vector;
+	struct unit_acceleration_plan pitch_plan;
+	struct unit_acceleration_plan yaw_plan;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		2402,
+		angular_velocity_limit >= 0.0f);
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		2403,
+		(angular_acceleration_limit > 0.0f) &&
+		(angular_acceleration_limit < 10000.0f));
+
+	if (orientation)
+	{
+		matrix4x3_inverse_transform_normal(
+			orientation,
+			aiming_vector,
+			&local_aiming_vector);
+		matrix4x3_inverse_transform_normal(
+			orientation,
+			desired_aiming_vector,
+			&local_desired_aiming_vector);
+	}
+	else
+	{
+		local_aiming_vector = *aiming_vector;
+		local_desired_aiming_vector = *desired_aiming_vector;
+	}
+
+	yaw_wraps =
+		(aiming_bounds->x1 - aiming_bounds->x0) - 2.f * _pi >
+		-_real_epsilon;
+	euler_angles2d_from_vector3d(&aiming_angles, &local_aiming_vector);
+	euler_angles2d_from_vector3d(
+		&desired_aiming_angles,
+		&local_desired_aiming_vector);
+
+	aiming_yaw_in_bounds = TRUE;
+	if (yaw_wraps)
+	{
+		if (desired_aiming_angles.yaw < aiming_bounds->x0)
+		{
+			desired_aiming_angles.yaw += 2.f * _pi;
+			match_assert(
+				"c:\\halo\\SOURCE\\units\\units.c",
+				2433,
+				desired_aiming_angles.yaw <= aiming_bounds->x1);
+		}
+		else if (desired_aiming_angles.yaw > aiming_bounds->x1)
+		{
+			desired_aiming_angles.yaw -= 2.f * _pi;
+			match_assert(
+				"c:\\halo\\SOURCE\\units\\units.c",
+				2438,
+				desired_aiming_angles.yaw >= aiming_bounds->x0);
+		}
+	}
+	else if (desired_aiming_angles.yaw < aiming_bounds->x0)
+	{
+		desired_aiming_angles.yaw = aiming_bounds->x0;
+		aiming_yaw_in_bounds = FALSE;
+	}
+	else if (desired_aiming_angles.yaw > aiming_bounds->x1)
+	{
+		desired_aiming_angles.yaw = aiming_bounds->x1;
+		aiming_yaw_in_bounds = FALSE;
+	}
+
+	if (desired_aiming_angles.pitch < aiming_bounds->y0)
+	{
+		desired_aiming_angles.pitch = aiming_bounds->y0;
+	}
+	else if (desired_aiming_angles.pitch > aiming_bounds->y1)
+	{
+		desired_aiming_angles.pitch = aiming_bounds->y1;
+	}
+	else if (aiming_yaw_in_bounds)
+	{
+		clamped_desired_aiming_vector = *desired_aiming_vector;
+		goto desired_aiming_vector_ready;
+	}
+
+	vector3d_from_euler_angles2d(
+		&clamped_desired_aiming_vector,
+		&desired_aiming_angles);
+	if (orientation)
+	{
+		matrix4x3_transform_normal(
+			orientation,
+			&clamped_desired_aiming_vector,
+			&clamped_desired_aiming_vector);
+		normalize3d(&clamped_desired_aiming_vector);
+	}
+
+desired_aiming_vector_ready:
+	{
+		real angular_speed;
+		real_vector3d velocity_axis;
+
+		velocity_axis = *aiming_velocity;
+		angular_speed = normalize3d(&velocity_axis);
+		if (angular_speed != 0.f)
+		{
+			real_euler_angles2d rotated_angles;
+			real_vector3d rotated_aiming_vector;
+
+			rotated_aiming_vector = local_aiming_vector;
+			rotate_vector_about_axis(
+				&rotated_aiming_vector,
+				&velocity_axis,
+				sine(angular_speed),
+				cosine(angular_speed));
+			euler_angles2d_from_vector3d(&rotated_angles, &rotated_aiming_vector);
+			aiming_yaw_velocity = rotated_angles.yaw - aiming_angles.yaw;
+			aiming_pitch_velocity = rotated_angles.pitch - aiming_angles.pitch;
+		}
+		else
+		{
+			aiming_yaw_velocity = 0.f;
+			aiming_pitch_velocity = 0.f;
+		}
+	}
+
+	aiming_error.yaw = aiming_angles.yaw - desired_aiming_angles.yaw;
+	aiming_error.pitch = aiming_angles.pitch - desired_aiming_angles.pitch;
+	if (yaw_wraps)
+	{
+		if (aiming_error.yaw > _pi)
+		{
+			aiming_error.yaw -= 2.f * _pi;
+		}
+		else if (aiming_error.yaw < -_pi)
+		{
+			aiming_error.yaw += 2.f * _pi;
+		}
+	}
+
+	code_0019bf70(
+		aiming_error.yaw,
+		aiming_yaw_velocity,
+		angular_velocity_limit,
+		angular_acceleration_limit,
+		&yaw_plan);
+	code_0019bf70(
+		aiming_error.pitch,
+		aiming_pitch_velocity,
+		angular_velocity_limit,
+		angular_acceleration_limit,
+		&pitch_plan);
+	code_0019c460(
+		&yaw_plan,
+		&pitch_plan,
+		angular_velocity_limit,
+		angular_acceleration_limit);
+
+	yaw_complete = code_00197e30(
+		&yaw_plan,
+		1.f,
+		aiming_error.yaw,
+		&aiming_error.yaw,
+		aiming_yaw_velocity,
+		&end_angular_velocity.yaw);
+	pitch_complete = code_00197e30(
+		&pitch_plan,
+		1.f,
+		aiming_error.pitch,
+		&aiming_error.pitch,
+		aiming_pitch_velocity,
+		&end_angular_velocity.pitch);
+
+	if (yaw_complete && pitch_complete)
+	{
+		*aiming_vector = clamped_desired_aiming_vector;
+		*aiming_velocity = *global_zero_vector3d;
+	}
+	else
+	{
+		real_euler_angles2d end_aiming_angles;
+		real_vector3d end_aiming_vector;
+
+		end_aiming_angles.yaw = aiming_error.yaw + desired_aiming_angles.yaw;
+		end_aiming_angles.pitch = aiming_error.pitch + desired_aiming_angles.pitch;
+
+		if (yaw_wraps)
+		{
+			if (end_aiming_angles.yaw < aiming_bounds->x0)
+			{
+				end_aiming_angles.yaw += 2.f * _pi;
+				match_assert(
+					"c:\\halo\\SOURCE\\units\\units.c",
+					2725,
+					end_aiming_angles.yaw <= aiming_bounds->x1);
+			}
+			else if (end_aiming_angles.yaw > aiming_bounds->x1)
+			{
+				end_aiming_angles.yaw -= 2.f * _pi;
+				match_assert(
+					"c:\\halo\\SOURCE\\units\\units.c",
+					2730,
+					end_aiming_angles.yaw >= aiming_bounds->x0);
+			}
+		}
+		else
+		{
+			end_aiming_angles.yaw = PIN(
+				end_aiming_angles.yaw,
+				aiming_bounds->x0,
+				aiming_bounds->x1);
+		}
+
+		end_aiming_angles.pitch = PIN(
+			end_aiming_angles.pitch,
+			aiming_bounds->y0,
+			aiming_bounds->y1);
+		match_assert(
+			"c:\\halo\\SOURCE\\units\\units.c",
+			2739,
+			(end_aiming_angles.yaw >= aiming_bounds->x0) &&
+			(end_aiming_angles.yaw <= aiming_bounds->x1));
+		match_assert(
+			"c:\\halo\\SOURCE\\units\\units.c",
+			2740,
+			(end_aiming_angles.pitch >= aiming_bounds->y0) &&
+			(end_aiming_angles.pitch <= aiming_bounds->y1));
+
+		vector3d_from_euler_angles2d(&end_aiming_vector, &end_aiming_angles);
+		{
+			real_euler_angles2d further_angles;
+			real_vector3d further_vector;
+
+			further_angles.yaw =
+				end_angular_velocity.yaw + end_aiming_angles.yaw;
+			further_angles.pitch =
+				end_angular_velocity.pitch + end_aiming_angles.pitch;
+			vector3d_from_euler_angles2d(&further_vector, &further_angles);
+
+			dot_product = PIN(
+				dot_product3d(&further_vector, &end_aiming_vector),
+				-1.f,
+				1.f);
+			cross_product3d(
+				&end_aiming_vector,
+				&further_vector,
+				aiming_velocity);
+		}
+		normalize3d(aiming_velocity);
+		angle = MIN(arccosine(dot_product), angular_velocity_limit);
+		scale_vector3d(aiming_velocity, angle, aiming_velocity);
+
+		if (orientation)
+		{
+			matrix4x3_transform_normal(
+				orientation,
+				&end_aiming_vector,
+				aiming_vector);
+			normalize3d(aiming_vector);
+		}
+		else
+		{
+			*aiming_vector = end_aiming_vector;
+		}
+	}
+
+	match_assert_valid_real_normal3d(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		2793,
+		aiming_vector);
+
+	return;
+}
+static boolean code_00198170(
+	struct unit_animation *animation)
+{
+	boolean result = !animation->action;
+
+	if (animation->state>=_unit_state_hard_ping)
+	{
+		if (animation->state<=_unit_state_resurrect_back ||
+			animation->state==_unit_state_leap_melee)
+		{
+			result = FALSE;
+		}
+	}
+
+	return result;
+}
+static boolean code_001981f0(
+	short state)
+{
+	boolean result = TRUE;
+
+	switch (state)
+	{
+	case _unit_state_melee_attack:
+	case _unit_state_melee_airborne:
+	case _unit_state_melee_continuous:
+	case _unit_state_throw_grenade:
+	case _unit_state_leap_start:
+	case _unit_state_leap_melee:
+		result = FALSE;
+		break;
+	default:
+		break;
+	}
+
+	return result;
+}
+static short code_00198230(
+	short new_state,
+	short old_state)
+{
+	short result = 6;
+
+	if ((new_state==_unit_state_idle ||
+		new_state==_unit_state_turn_left ||
+		new_state==_unit_state_turn_right) &&
+		(old_state==_unit_state_idle ||
+		old_state==_unit_state_turn_left ||
+		old_state==_unit_state_turn_right))
+	{
+		result = 1;
+	}
+
+	if (new_state==_unit_state_land_hard ||
+		new_state==_unit_state_land_soft)
+	{
+		result = 2;
+	}
+
+	return result;
+}
+static long code_00198190(
+	short state)
+{
+	long result = NONE;
+
+	switch (state)
+	{
+	case _unit_state_idle:
+	case _unit_state_turn_left:
+	case _unit_state_turn_right:
+	case _unit_state_flying_front:
+	case _unit_state_flying_back:
+	case _unit_state_flying_left:
+	case _unit_state_flying_right:
+	case _unit_state_airborne:
+	case _unit_state_land_soft:
+	case _unit_state_land_hard:
+	case _unit_state_opening:
+	case _unit_state_closing:
+		result = _unit_weapon_class_animation_aiming_still;
+		break;
+	case _unit_state_move_front:
+	case _unit_state_move_back:
+	case _unit_state_move_left:
+	case _unit_state_move_right:
+	case _unit_state_stunned_move_front:
+	case _unit_state_stunned_move_back:
+	case _unit_state_stunned_move_left:
+	case _unit_state_stunned_move_right:
+	case _unit_state_slide_front:
+	case _unit_state_slide_back:
+	case _unit_state_slide_left:
+	case _unit_state_slide_right:
+		result = _unit_weapon_class_animation_aiming_moving;
+		break;
+	default:
+		break;
+	}
+
+	return result;
+}
+static void code_0019b0b0(
+	long unit_index,
+	long animation_graph_index,
+	short animation_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	unit->object.animation.animation_graph_index = animation_graph_index;
+	unit->object.animation.state.index = animation_index;
+	unit->object.animation.state.frame_index = 0;
+
+	if (debug_unit_all_animations)
+	{
+		char const *animation_name = "<none>";
+
+		if (animation_graph_index != NONE)
+		{
+			struct animation_graph *animation_graph =
+				animation_graph_definition_get(animation_graph_index);
+
+			if (animation_index != NONE)
+			{
+				struct animation *animation = TAG_BLOCK_GET_ELEMENT(
+					&animation_graph->animations,
+					animation_index,
+					struct animation);
+				animation_name = animation->name;
+			}
+		}
+
+		if (ai_debug.selected_actor_index == NONE ||
+			unit->unit.actor_index == ai_debug.selected_actor_index ||
+			unit->unit.swarm_actor_index == ai_debug.selected_actor_index)
+		{
+			console_printf(
+				FALSE,
+				"%s: animation %s",
+				tag_name_strip_path(tag_get_name(unit->definition_index)),
+				animation_name);
+		}
+	}
+
+	return;
+}
 boolean unit_animation_set_state(
 	long unit_index,
 	short new_state)
 {
-	short interpolation_frame_count;
-
 	struct unit_datum *unit = unit_get(unit_index);
-	struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
-	struct animation_graph *animation_graph = animation_graph_definition_get(unit_definition->object.animation_graph.index);
-	struct animation_graph_unit_seat *unit_seat = TAG_BLOCK_GET_ELEMENT(&animation_graph->unit_seats, unit->unit.animation.seat_index, struct animation_graph_unit_seat);
-	struct animation_graph_weapon_class *weapon_class = TAG_BLOCK_GET_ELEMENT(&unit_seat->weapon_classes, unit->unit.animation.weapon_index, struct animation_graph_weapon_class);
-	struct animation_graph_weapon_type *weapon_type = TAG_BLOCK_GET_ELEMENT(&weapon_class->weapon_types, unit->unit.animation.weapon_type_index, struct animation_graph_weapon_type);
-	
-	boolean valid_state = unit->unit.animation.state!=NONE;
-	boolean v1 = FALSE;
+	struct unit_definition *unit_definition =
+		unit_definition_get(unit->definition_index);
+	struct animation_graph *animation_graph =
+		animation_graph_definition_get(
+			unit_definition->object.animation_graph.index);
+	struct animation_graph_unit_seat *unit_seat =
+		TAG_BLOCK_GET_ELEMENT(
+			&animation_graph->unit_seats,
+			unit->unit.animation.seat_index,
+			struct animation_graph_unit_seat);
+	struct animation_graph_weapon_class *weapon_class =
+		TAG_BLOCK_GET_ELEMENT(
+			&unit_seat->weapon_classes,
+			unit->unit.animation.weapon_index,
+			struct animation_graph_weapon_class);
+	struct animation_graph_weapon_type *weapon_type =
+		TAG_BLOCK_GET_ELEMENT(
+			&weapon_class->weapon_types,
+			unit->unit.animation.weapon_type_index,
+			struct animation_graph_weapon_type);
+	long interpolation_frame_count;
+	boolean old_state_is_none =
+		unit->unit.animation.state == NONE;
+	boolean changed_state = FALSE;
 	boolean result = TRUE;
 
-	if (unit->unit.animation.state!=NONE || new_state!=unit->unit.animation.state)
-	{
-		boolean valid_animation_index;
-		long animation_index;
+	(void)weapon_type;
 
+	if (old_state_is_none ||
+		new_state != unit->unit.animation.state)
+	{
+		short animation_index;
 		long weapon_class_animation_index = NONE;
 		long unit_seat_animation_index = NONE;
 
-		if (unit->unit.animation.state==_unit_state_throw_grenade)
+		if (unit->unit.animation.state ==
+			_unit_state_throw_grenade)
 		{
 			unit_throw_grenade_release(unit_index, TRUE);
 		}
@@ -3802,16 +5316,16 @@ boolean unit_animation_set_state(
 			weapon_class_animation_index = _unit_weapon_class_animation_turning_right;
 			break;
 		case _unit_state_move_front:
-			weapon_class_animation_index = _unit_weapon_class_animation_diving_front;
+			weapon_class_animation_index = _unit_weapon_class_animation_moving_front;
 			break;
 		case _unit_state_move_back:
-			weapon_class_animation_index = _unit_weapon_class_animation_diving_back;
+			weapon_class_animation_index = _unit_weapon_class_animation_moving_back;
 			break;
 		case _unit_state_move_left:
-			weapon_class_animation_index = _unit_weapon_class_animation_diving_left;
+			weapon_class_animation_index = _unit_weapon_class_animation_moving_left;
 			break;
 		case _unit_state_move_right:
-			weapon_class_animation_index = _unit_weapon_class_animation_diving_right;
+			weapon_class_animation_index = _unit_weapon_class_animation_moving_right;
 			break;
 		case _unit_state_stunned_move_front:
 			weapon_class_animation_index = _unit_weapon_class_animation_moving_wounded_front;
@@ -3939,38 +5453,492 @@ boolean unit_animation_set_state(
 			}
 		}
 
-		valid_animation_index = animation_index >= 0 && animation_index <animation_graph->animations.count;
-		
-		if (debug_unit_animations && unit->object.type==_object_type_biped && !valid_animation_index)
+		if (debug_unit_animations &&
+			unit->object.type == _object_type_biped &&
+			animation_index == NONE)
 		{
-			/*
-			if (weapon_class_animation_index == NONE)
-				Format = &Format_;
+			char const *weapon_animation_name;
+			char const *seat_or_weapon_class_name;
+
+			if (weapon_class_animation_index != NONE)
+			{
+				weapon_animation_name = animation_list_get_string(
+						&weapon_class_animation_list,
+						weapon_class_animation_index);
+			}
 			else
-				Format = j_animation_list_get_string(word_12C47CC, weapon_class_animation_index);
-			if (unit_seat_animation_index == -1)
-				element_with_size_2 = weapon_class;
+			{
+				weapon_animation_name = "";
+			}
+
+			if (unit_seat_animation_index != NONE)
+			{
+				seat_or_weapon_class_name = animation_list_get_string(
+						&unit_seat_animation_list,
+						unit_seat_animation_index);
+			}
 			else
-				element_with_size_2 = j_animation_list_get_string(&dword_12C47D4, unit_seat_animation_index);
-			v2 = sub_86262C(unit_definition + 56);
-			v3 = j_tag_name_strip_path(v2);
-			
+			{
+				seat_or_weapon_class_name = weapon_class->label;
+			}
+
 			console_warning(
 				"MISSING: %s '%s %s %s'",
-				tag_name_strip_path(unit_definition->object.animation_graph.name),
+				tag_name_strip_path(
+					unit_definition->object.animation_graph.name),
 				unit_seat->label,
-				weapon_class->label,
-				animation_list_get_string(weapon_class_animation_list, aiming_screen_index);
-				*/
+				seat_or_weapon_class_name,
+				weapon_animation_name);
+		}
+
+		if (animation_index == NONE)
+		{
+			result = code_001981f0(new_state);
+		}
+
+		if (result)
+		{
+			short chosen_animation_index =
+				animation_choose_random_permutation_internal(
+					TRUE,
+					unit_definition->object.animation_graph.index,
+					animation_index);
+
+			code_0019b0b0(
+				unit_index,
+				unit_definition->object.animation_graph.index,
+				chosen_animation_index);
+
+			interpolation_frame_count =
+				code_00198230(
+					new_state,
+					unit->unit.animation.state);
+
+			changed_state = TRUE;
 		}
 	}
 
 	if (result)
 	{
+		short aiming_screen_animation_index =
+			(short)code_00198190(new_state);
 
+		if (old_state_is_none ||
+			aiming_screen_animation_index !=
+				(short)code_00198190(
+					unit->unit.animation.state))
+		{
+			short animation_index;
+
+			if (aiming_screen_animation_index >= 0 &&
+				aiming_screen_animation_index <
+					weapon_class->animations.count)
+			{
+				animation_index =
+					animation_graph_animation_index_get(
+						&weapon_class->animations)
+						[aiming_screen_animation_index].animation_index;
+			}
+			else
+			{
+				animation_index = NONE;
+			}
+
+			unit->unit.animation.aiming_screen_index =
+				animation_choose_random_permutation_internal(
+					TRUE,
+					unit_definition->object.animation_graph.index,
+					animation_index);
+
+			if (debug_unit_animations &&
+				unit->object.type == _object_type_biped &&
+				unit->unit.animation.aiming_screen_index == NONE &&
+				aiming_screen_animation_index != NONE)
+			{
+				console_warning(
+					"MISSING: %s '%s %s %s'",
+					tag_name_strip_path(
+						unit_definition->object.animation_graph.name),
+					unit_seat->label,
+					weapon_class->label,
+					animation_list_get_string(
+						&weapon_class_animation_list,
+						aiming_screen_animation_index));
+			}
+		}
+
+		if (old_state_is_none)
+		{
+			short animation_index;
+
+			if (_unit_seat_animation_looking >= 0 &&
+				_unit_seat_animation_looking <
+					unit_seat->animations.count)
+			{
+				animation_index =
+					animation_graph_animation_index_get(
+						&unit_seat->animations)
+						[_unit_seat_animation_looking].animation_index;
+			}
+			else
+			{
+				animation_index = NONE;
+			}
+
+			unit->unit.animation.looking_screen_index =
+				animation_choose_random_permutation_internal(
+					TRUE,
+					unit_definition->object.animation_graph.index,
+					animation_index);
+
+			if (debug_unit_animations &&
+				unit->object.type == _object_type_biped &&
+				unit->unit.animation.looking_screen_index == NONE)
+			{
+				console_warning(
+					"MISSING: %s '%s %s'",
+					tag_name_strip_path(
+						unit_definition->object.animation_graph.name),
+					unit_seat->label,
+					animation_list_get_string(
+						&unit_seat_animation_list,
+						_unit_seat_animation_looking));
+			}
+		}
+
+		if (changed_state)
+		{
+			object_start_interpolation(
+				unit_index,
+				(short)interpolation_frame_count);
+		}
+
+		unit->unit.animation.state = (char)new_state;
 	}
 
 	return result;
+}
+void unit_preprocess_node_orientations(
+	long unit_index,
+	struct real_orientation *node_orientations)
+{
+	struct unit_datum *unit;
+	struct animation_graph *animation_graph;
+	struct animation_graph_unit_seat *unit_seat;
+	real_matrix4x3 matrix;
+	real_euler_angles2d relative_looking_angles;
+	real_euler_angles2d relative_aiming_angles;
+	struct unit_definition *unit_definition;
+
+	unit = unit_get(unit_index);
+	unit_definition = unit_definition_get(unit->definition_index);
+	animation_graph = animation_graph_definition_get(
+		unit_definition->object.animation_graph.index);
+
+	if (unit->unit.animation.action_animation.index != NONE)
+	{
+		replacement_animation_apply(
+			TAG_BLOCK_GET_ELEMENT(
+				&animation_graph->animations,
+				unit->unit.animation.action_animation.index,
+				struct animation),
+			unit->unit.animation.action_animation.frame_index,
+			node_orientations);
+	}
+
+	if (unit->unit.animation.overlay_action_animation.index != NONE)
+	{
+		overlay_animation_apply(
+			TAG_BLOCK_GET_ELEMENT(
+				&animation_graph->animations,
+				unit->unit.animation.overlay_action_animation.index,
+				struct animation),
+			unit->unit.animation.overlay_action_animation.frame_index,
+			node_orientations);
+	}
+
+	if (unit->unit.animation.soft_ping_animation.index != NONE)
+	{
+		overlay_animation_apply(
+			TAG_BLOCK_GET_ELEMENT(
+				&animation_graph->animations,
+				unit->unit.animation.soft_ping_animation.index,
+				struct animation),
+			unit->unit.animation.soft_ping_animation.frame_index,
+			node_orientations);
+	}
+
+	unit_verify_vectors(unit_index, "unit-preprocess-nodes");
+	unit->unit.animation.aiming_with_euler_screen = FALSE;
+	unit->unit.animation.looking_with_euler_screen = FALSE;
+
+	if (!TEST_FLAG(unit_definition->unit.flags, _unit_simple_creature_bit) &&
+		unit->unit.animation.seat_index != NONE)
+	{
+		unit_seat = TAG_BLOCK_GET_ELEMENT(
+			&animation_graph->unit_seats,
+			unit->unit.animation.seat_index,
+			struct animation_graph_unit_seat);
+
+		if (unit->unit.animation.emotion_index != NONE)
+		{
+			short animation_index;
+
+			if (_unit_seat_animation_emotions < unit_seat->animations.count)
+			{
+				animation_index = animation_graph_animation_index_get(
+					&unit_seat->animations)[_unit_seat_animation_emotions].animation_index;
+			}
+			else
+			{
+				animation_index = NONE;
+			}
+
+			if (unit->unit.override_emotion_animation_index != NONE)
+			{
+				animation_index = unit->unit.override_emotion_animation_index;
+			}
+
+			if (animation_index != NONE)
+			{
+				struct animation *animation = TAG_BLOCK_GET_ELEMENT(
+					&animation_graph->animations,
+					animation_index,
+					struct animation);
+
+				if (unit->unit.animation.emotion_index >= 0 &&
+					unit->unit.animation.emotion_index < animation->frame_count)
+				{
+					overlay_animation_apply(
+						animation,
+						unit->unit.animation.emotion_index,
+						node_orientations);
+				}
+			}
+		}
+
+		if (unit->unit.mouth_aperture > 0.f &&
+			_unit_seat_animation_mouth_aperture < unit_seat->animations.count)
+		{
+			short animation_index;
+
+			animation_index = animation_graph_animation_index_get(
+				&unit_seat->animations)[_unit_seat_animation_mouth_aperture].animation_index;
+
+			if (animation_index != NONE)
+			{
+				struct animation *animation = TAG_BLOCK_GET_ELEMENT(
+					&animation_graph->animations,
+					animation_index,
+					struct animation);
+
+				overlay_animation_apply_scaled(
+					animation,
+					0,
+					unit->unit.mouth_aperture,
+					node_orientations);
+			}
+		}
+
+		if (TEST_FLAG(
+			unit->unit.animation.flags,
+			_unit_animation_showing_acceleration_bit))
+		{
+			short animation_index;
+			long acceleration_animation_index;
+			long acceleration_animation_count;
+			real *acceleration;
+
+			acceleration = unit->unit.seat_acceleration.n;
+			acceleration_animation_index =
+				_unit_seat_animation_acceleration_front_back;
+			acceleration_animation_count =
+				_unit_seat_animation_push_impact -
+				_unit_seat_animation_acceleration_front_back;
+
+			do
+			{
+				if (acceleration_animation_index >= 0 &&
+					acceleration_animation_index < unit_seat->animations.count)
+				{
+					animation_index = animation_graph_animation_index_get(
+						&unit_seat->animations)[acceleration_animation_index].animation_index;
+
+					if (animation_index != NONE)
+					{
+						struct animation *animation = TAG_BLOCK_GET_ELEMENT(
+							&animation_graph->animations,
+							animation_index,
+							struct animation);
+
+						overlay_animation_apply_continuous(
+							animation,
+							(animation->frame_count - 1) * *acceleration,
+							node_orientations);
+					}
+				}
+
+				++acceleration_animation_index;
+				++acceleration;
+			}
+			while (--acceleration_animation_count != 0);
+		}
+
+		if (!TEST_FLAG(unit_definition->unit.flags, _unit_has_no_aiming_bit) &&
+			code_00198170(&unit->unit.animation))
+		{
+			struct animation_graph_weapon_class *weapon_class =
+				TAG_BLOCK_GET_ELEMENT(
+					&unit_seat->weapon_classes,
+					unit->unit.animation.weapon_index,
+					struct animation_graph_weapon_class);
+
+			relative_aiming_angles = *global_zero_angles2d;
+
+			if (unit->unit.animation.aiming_screen_index != NONE)
+			{
+				struct animation *animation;
+				real_vector3d relative_aiming_vector;
+				struct animation_aiming_screen_bounds const *aiming_bounds =
+					&weapon_class->aiming_screen_bounds;
+
+				match_assert_valid_real_normal3d(
+					"c:\\halo\\SOURCE\\units\\units.c",
+					1648,
+					&unit->unit.aiming_vector);
+
+				matrix.scale = 1.f;
+				object_get_orientation(
+					unit_index,
+					&matrix.forward,
+					&matrix.up);
+				cross_product3d(
+					&matrix.up,
+					&matrix.forward,
+					&matrix.left);
+				matrix.position = *global_origin3d;
+				matrix4x3_inverse_transform_normal(
+					&matrix,
+					&unit->unit.aiming_vector,
+					&relative_aiming_vector);
+
+				match_assert_valid_real_vector3d(
+					"c:\\halo\\SOURCE\\units\\units.c",
+					1661,
+					&relative_aiming_vector);
+
+				euler_angles2d_from_vector3d(
+					&relative_aiming_angles,
+					&relative_aiming_vector);
+
+				match_assert_valid_real(
+					"c:\\halo\\SOURCE\\units\\units.c",
+					1664,
+					relative_aiming_angles.pitch);
+				match_assert_valid_real(
+					"c:\\halo\\SOURCE\\units\\units.c",
+					1665,
+					relative_aiming_angles.yaw);
+
+				unit->unit.animation.aiming_with_euler_screen = TRUE;
+				unit->unit.animation.aiming_screen_bounds.x0 =
+					-(aiming_bounds->negative_yaw_frame_count *
+					aiming_bounds->negative_yaw_delta);
+				unit->unit.animation.aiming_screen_bounds.x1 =
+					aiming_bounds->positive_yaw_frame_count *
+					aiming_bounds->positive_yaw_delta;
+				unit->unit.animation.aiming_screen_bounds.y0 =
+					-(aiming_bounds->negative_pitch_frame_count *
+					aiming_bounds->negative_pitch_delta);
+				unit->unit.animation.aiming_screen_bounds.y1 =
+					aiming_bounds->positive_pitch_frame_count *
+					aiming_bounds->positive_pitch_delta;
+				animation = TAG_BLOCK_GET_ELEMENT(
+					&animation_graph->animations,
+					unit->unit.animation.aiming_screen_index,
+					struct animation);
+
+				aiming_screen_apply(
+					animation,
+					aiming_bounds,
+					relative_aiming_angles.yaw,
+					relative_aiming_angles.pitch,
+					node_orientations);
+			}
+
+			if ((unit->unit.current_weapon_index != NONE ||
+				unit->unit.player_index != NONE) &&
+				unit->unit.animation.looking_screen_index != NONE)
+			{
+				struct animation *animation;
+				real_vector3d relative_looking_vector;
+				struct animation_aiming_screen_bounds const *looking_bounds =
+					&unit_seat->looking_screen_bounds;
+
+				matrix.scale = 1.f;
+				object_get_orientation(
+					unit_index,
+					&matrix.forward,
+					&matrix.up);
+				cross_product3d(
+					&matrix.up,
+					&matrix.forward,
+					&matrix.left);
+				matrix.position = *global_origin3d;
+				matrix4x3_inverse_transform_normal(
+					&matrix,
+					&unit->unit.looking_vector,
+					&relative_looking_vector);
+
+				match_assert_valid_real_vector3d(
+					"c:\\halo\\SOURCE\\units\\units.c",
+					1703,
+					&relative_looking_vector);
+
+				euler_angles2d_from_vector3d(
+					&relative_looking_angles,
+					&relative_looking_vector);
+				relative_looking_angles.yaw -= relative_aiming_angles.yaw;
+				relative_looking_angles.pitch -= relative_aiming_angles.pitch;
+
+				match_assert_valid_real(
+					"c:\\halo\\SOURCE\\units\\units.c",
+					1710,
+					relative_looking_angles.pitch);
+				match_assert_valid_real(
+					"c:\\halo\\SOURCE\\units\\units.c",
+					1711,
+					relative_looking_angles.yaw);
+
+				unit->unit.animation.looking_with_euler_screen = TRUE;
+				unit->unit.animation.looking_screen_bounds.x0 =
+					-(looking_bounds->negative_yaw_frame_count *
+					looking_bounds->negative_yaw_delta);
+				unit->unit.animation.looking_screen_bounds.x1 =
+					looking_bounds->positive_yaw_frame_count *
+					looking_bounds->positive_yaw_delta;
+				unit->unit.animation.looking_screen_bounds.y0 =
+					-(looking_bounds->negative_pitch_frame_count *
+					looking_bounds->negative_pitch_delta);
+				unit->unit.animation.looking_screen_bounds.y1 =
+					looking_bounds->positive_pitch_frame_count *
+					looking_bounds->positive_pitch_delta;
+				animation = TAG_BLOCK_GET_ELEMENT(
+					&animation_graph->animations,
+					unit->unit.animation.looking_screen_index,
+					struct animation);
+
+				aiming_screen_apply(
+					animation,
+					looking_bounds,
+					relative_looking_angles.yaw,
+					relative_looking_angles.pitch,
+					node_orientations);
+			}
+		}
+	}
+
+	return;
 }
 
 void unit_postprocess_node_matrices(
