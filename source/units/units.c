@@ -774,6 +774,15 @@ struct unit_control_data
 typedef char unit_control_data_size_assert[
 	sizeof(struct unit_control_data) == 0x40 ? 1 : -1];
 
+struct unit_initial_weapon
+{
+	struct tag_reference weapon;
+	long unused[5];
+};
+
+typedef char unit_initial_weapon_size_assert[
+	sizeof(struct unit_initial_weapon) == 0x24 ? 1 : -1];
+
 /* ---------- prototypes */
 
 static char const *base_seat_label_get(short base_seat_index);
@@ -865,6 +874,10 @@ static void unit_cause_continuous_melee_damage(long unit_index);
 
 static long unit_get_weapon(struct unit_datum *unit, short index);
 static void unit_drop_item(long unit_index, long item_index);
+static void code_0019b410(
+	long unit_index);
+static void code_0019b4c0(
+	long unit_index);
 
 static void unit_verify_vectors(long unit_index, char const *debugstring);
 static void unit_running_blind(long unit_index, real_vector3d *run_vector);
@@ -875,6 +888,23 @@ boolean game_team_is_enemy(
 	short team_index0,
 	short team_index1);
 boolean ai_handle_killing_spree(long unit_index, short killing_spree_count);
+void ai_create_mounted_weapons_for_unit(
+	long unit_index);
+void unit_dialogue_determine_variant(
+	long unit_index);
+void player_died(
+	long player_index);
+void actor_died(
+	long actor_index);
+void actor_swarm_unit_died(
+	long swarm_actor_index,
+	long unit_index);
+void unit_detach_from_parent(
+	long unit_index);
+void unit_exit_seat_end(
+	long unit_index);
+
+extern char const *base_seat_labels[NUMBER_OF_UNIT_BASE_SEATS];
 
 /* ---------- globals */
 
@@ -2118,6 +2148,204 @@ boolean unit_solo_player_integrated_night_vision_is_active(
 	return active;
 }
 
+// HCEX identifies this private helper as unit_create_initial_weapons; the
+// January body below is independently proven against the Xbox object.
+void code_001a1f50(
+	long unit_index)
+{
+	short initial_weapon_index;
+	struct object_placement_data placement_data;
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
+
+	for (initial_weapon_index = 0;
+		initial_weapon_index < unit_definition->unit.initial_weapons.count;
+		initial_weapon_index++)
+	{
+		struct unit_initial_weapon *initial_weapon = TAG_BLOCK_GET_ELEMENT(
+			&unit_definition->unit.initial_weapons,
+			initial_weapon_index,
+			struct unit_initial_weapon);
+
+		if (initial_weapon->weapon.index!=NONE)
+		{
+			long weapon_index;
+
+			object_placement_data_new(
+				&placement_data,
+				initial_weapon->weapon.index,
+				unit_index);
+			weapon_index = object_new(&placement_data);
+
+			if (weapon_index!=NONE)
+			{
+				struct weapon_datum *weapon = weapon_get(weapon_index);
+
+				if ((game_engine_running() &&
+					unit_has_weapon_definition_index(unit_index, weapon->definition_index)) ||
+					!unit_add_weapon_to_inventory(unit_index, weapon_index, FALSE))
+				{
+					object_delete(weapon_index);
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+boolean unit_new(
+	long unit_index)
+{
+	boolean result;
+	short seat_index;
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition =
+		unit_definition_get(unit->definition_index);
+	result = FALSE;
+
+	if (unit_definition->object.animation_graph.index!=NONE)
+	{
+		unit->unit.equipment_object_index = NONE;
+		csmemset(
+			unit->unit.weapon_object_indices,
+			NONE,
+			sizeof(unit->unit.weapon_object_indices));
+
+		unit->unit.current_weapon_index = NONE;
+		unit->unit.desired_weapon_index = NONE;
+		unit->unit.current_grenade_index = NONE;
+		unit->unit.desired_grenade_index = NONE;
+		unit->unit.current_zoom_level = NONE;
+		unit->unit.desired_zoom_level = NONE;
+		unit->unit.player_index = NONE;
+		unit->unit.actor_index = NONE;
+		unit->unit.swarm_actor_index = NONE;
+		unit->unit.swarm_next_unit_index = NONE;
+		unit->unit.swarm_prev_unit_index = NONE;
+		unit->unit.parent_seat_index = NONE;
+		unit->unit.driver_object_index = NONE;
+		unit->unit.gunner_object_index = NONE;
+
+		unit->unit.animation.flags = 0;
+		unit->unit.animation.seat_index = NONE;
+		unit->unit.animation.weapon_index = NONE;
+		unit->unit.animation.weapon_type_index = NONE;
+		unit->unit.animation.state = NONE;
+		unit->unit.animation.action = 0;
+		unit->unit.animation.overlay_action = 0;
+		unit->unit.animation.aiming_screen_index = NONE;
+		unit->unit.animation.looking_screen_index = NONE;
+		unit->unit.animation.action_animation.index = NONE;
+		unit->unit.animation.overlay_action_animation.index = NONE;
+		unit->unit.animation.soft_ping_animation.index = NONE;
+		unit->unit.animation.base_seat_index = _unit_base_seat_stand;
+		unit->unit.animation.last_ping_animation_index = NONE;
+		unit->unit.animation.emotion_index = NONE;
+		unit->unit.override_emotion_animation_index = NONE;
+		unit->unit.magic_seat_index = NONE;
+		unit->unit.animation.aiming_with_euler_screen = FALSE;
+		csmemset(
+			&unit->unit.animation.aiming_screen_bounds,
+			0,
+			sizeof(unit->unit.animation.aiming_screen_bounds));
+		unit->unit.animation.looking_with_euler_screen = FALSE;
+		csmemset(
+			&unit->unit.animation.looking_screen_bounds,
+			0,
+			sizeof(unit->unit.animation.looking_screen_bounds));
+
+		match_assert_valid_real_normal3d(
+			"c:\\halo\\SOURCE\\units\\units.c",
+			393,
+			&unit->object.forward);
+
+		unit->unit.desired_facing_vector =
+			unit->unit.desired_aiming_vector =
+			unit->unit.aiming_vector =
+			unit->unit.desired_looking_vector =
+			unit->unit.looking_vector = unit->object.forward;
+
+		unit->unit.persistent_control_timer = 0;
+		unit->unit.dialogue_index = NONE;
+		SET_FLAG(unit->unit.flags, _unit_must_set_up_dialogue_bit, TRUE);
+		csmemset(&unit->unit.speech, 0, sizeof(unit->unit.speech));
+		unit->unit.speech.last_speech_finished_time = NONE;
+		unit_dialogue_determine_variant(unit_index);
+		csmemset(unit->unit.attackers, NONE, sizeof(unit->unit.attackers));
+
+		unit->unit.last_damage_category = 0;
+		unit->unit.delayed_damage_timer = 0;
+		unit->unit.delayed_damage_peak = 0.f;
+		unit->unit.killing_spree_count = 0;
+		unit->unit.delayed_damage_attacker_object_index = NONE;
+		unit->unit.time_of_death = NONE;
+		unit->unit.fake_encounter_index = NONE;
+		unit->unit.fake_squad_index = NONE;
+		unit->unit.integrated_light_battery = 1.f;
+		unit->unit.flaming_death_delay = 0;
+		unit->unit.flaming_death_attacker_object_index = NONE;
+		unit->unit.killing_spree_last_time = NONE;
+
+		if (unit_definition->unit.grenade_type>=0 &&
+			unit_definition->unit.grenade_type<NUMBER_OF_UNIT_GRENADE_TYPES &&
+			unit_definition->unit.grenade_count>=0)
+		{
+			unit->unit.grenade_counts[unit_definition->unit.grenade_type] =
+				(char)unit_definition->unit.grenade_count;
+		}
+
+		unit->object.flags |=
+			FLAG(_object_dynamic_lighting_recompute_bit) |
+			FLAG(_object_static_lighting_recompute_bit);
+
+		if (unit_definition->unit.feign_death_threshold>0.f &&
+			unit_definition->unit.feign_death_time>0.f &&
+			unit_definition->unit.feign_death_chance>0.f)
+		{
+			SET_FLAG(
+				unit->unit.flags,
+				_unit_feign_death_allowed_bit,
+				real_seed_random(get_global_random_seed_address()) <
+					unit_definition->unit.feign_death_chance);
+		}
+
+		if (!game_engine_running() &&
+			(unit->object.owner_team_index==0 ||
+			unit->object.owner_team_index==NONE))
+		{
+			unit->object.owner_team_index = unit_definition->unit.default_team;
+		}
+
+		unit_set_or_test_seat_and_weapon_label(
+			unit_index,
+			base_seat_labels[_unit_base_seat_stand],
+			NULL,
+			TRUE);
+		code_001a1f50(unit_index);
+
+		for (seat_index = 0;
+			seat_index<unit_definition->unit.seats.count;
+			seat_index++)
+		{
+			struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+				&unit_definition->unit.seats,
+				seat_index,
+				struct unit_seat);
+
+			if (seat->built_in_actor_reference.index!=NONE)
+			{
+				ai_create_mounted_weapons_for_unit(unit_index);
+				break;
+			}
+		}
+
+		result = TRUE;
+	}
+
+	return result;
+}
+
 boolean unit_has_weapon(
 	long unit_index,
 	long weapon_index)
@@ -2155,6 +2383,205 @@ void unit_destroy(
 {
 	object_destroy(unit_index);
 	unit_test_spawning(unit_index);
+
+	return;
+}
+
+static void code_0019b4c0(
+	long unit_index)
+{
+	struct unit_datum *unit;
+	struct weapon_datum *weapon;
+	long *weapon_object_index;
+	long weapon_index;
+	short inventory_index;
+
+	unit = unit_get(unit_index);
+	inventory_index = 0;
+	weapon_object_index = unit->unit.weapon_object_indices;
+	do
+	{
+		weapon_index = *weapon_object_index;
+		if (weapon_index != NONE &&
+			inventory_index != unit->unit.current_weapon_index)
+		{
+			weapon = weapon_get(weapon_index);
+			if (TEST_FLAG(weapon->object.flags, _object_connected_to_map_bit))
+			{
+				display_assert(
+					csprintf(
+						temporary,
+						"a %s tried to drop a %s which was connected to the map.",
+						tag_get_name(unit->definition_index),
+						tag_get_name(weapon->definition_index)),
+					"c:\\halo\\SOURCE\\units\\units.c",
+					8505,
+					TRUE);
+				system_exit(-1);
+			}
+
+			unit_drop_item(unit_index, weapon_index);
+			if (inventory_index == unit->unit.desired_weapon_index)
+				unit->unit.desired_weapon_index = unit->unit.current_weapon_index;
+
+			*weapon_object_index = NONE;
+			if (!weapon_can_be_fired(weapon_index))
+				object_delete(weapon_index);
+		}
+
+		inventory_index++;
+		weapon_object_index++;
+	} while (inventory_index < MAXIMUM_WEAPONS_PER_UNIT);
+
+	return;
+}
+
+void unit_died(
+	long unit_index,
+	boolean feigned)
+{
+	struct unit_datum *unit;
+	struct unit_datum *fresh_unit;
+	struct unit_definition *unit_definition;
+	struct actor_datum *actor;
+	long equipment_index;
+
+	unit = unit_get(unit_index);
+	if (!feigned)
+	{
+		unit->unit.feign_death_timer = 0;
+		object_set_garbage(unit_index, TRUE);
+		if (unit->unit.player_index != NONE)
+		{
+			player_died(unit->unit.player_index);
+			unit->unit.player_index = NONE;
+		}
+
+		if (unit->unit.actor_index != NONE)
+		{
+			actor = actor_get(unit->unit.actor_index);
+			unit->unit.fake_encounter_index = actor->meta.encounter_index;
+			unit->unit.fake_squad_index = actor->meta.squad_index;
+			actor_died(unit->unit.actor_index);
+			unit->unit.actor_index = NONE;
+		}
+
+		if (unit->unit.swarm_actor_index != NONE)
+		{
+			actor = actor_get(unit->unit.swarm_actor_index);
+			unit->unit.fake_encounter_index = actor->meta.encounter_index;
+			unit->unit.fake_squad_index = actor->meta.squad_index;
+			actor_swarm_unit_died(unit->unit.swarm_actor_index, unit_index);
+			unit->unit.swarm_actor_index = NONE;
+		}
+
+		unit->unit.time_of_death = game_time_get();
+	}
+	else
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\units\\units.c",
+			5099,
+			unit->unit.feign_death_timer > 0);
+		unit_definition = unit_definition_get(unit->definition_index);
+		if (real_seed_random(get_global_random_seed_address()) <
+			unit_definition->unit.feign_death_repeat_chance)
+		{
+			SET_FLAG(unit->unit.flags, _unit_feign_death_allowed_bit, TRUE);
+		}
+		else
+		{
+			SET_FLAG(unit->unit.flags, _unit_feign_death_allowed_bit, FALSE);
+		}
+	}
+
+	unit->unit.flags &= ~(
+		FLAG(_unit_actively_controlled_bit) |
+		FLAG(_unit_active_camouflaged_bit));
+	unit->unit.control_flags = 0;
+	if (unit->unit.current_weapon_index != NONE)
+	{
+		weapon_owner_update(
+			unit_inventory_get_weapon(
+				unit_index,
+				(word)unit_get(unit_index)->unit.current_weapon_index),
+			0,
+			0.0f);
+	}
+
+	fresh_unit = unit_get(unit_index);
+	fresh_unit->unit.flags &= ~FLAG(_unit_running_blindly_bit);
+	if (unit->object.parent_object_index != NONE)
+	{
+		if (unit->unit.parent_seat_index != NONE)
+			unit_exit_seat_end(unit_index);
+		else
+			unit_detach_from_parent(unit_index);
+	}
+
+	unit->unit.speech.queued.priority = 0;
+	code_0019b4c0(unit_index);
+	fresh_unit = unit_get(unit_index);
+	if (fresh_unit->unit.equipment_object_index != NONE)
+	{
+		equipment_index = fresh_unit->unit.equipment_object_index;
+		unit_drop_item(unit_index, equipment_index);
+		fresh_unit->unit.equipment_object_index = NONE;
+	}
+
+	code_0019b410(unit_index);
+	if (unit->unit.weapon_drop_delay_ticks == 0)
+		unit_drop_current_weapon(unit_index, TRUE);
+
+	unit->unit.animation.overlay_action_animation.index = NONE;
+	unit->unit.animation.action_animation.index = NONE;
+	unit->unit.melee_attack_state = 0;
+	if (unit->unit.grenade_throw_state == 1)
+		unit->unit.grenade_throw_state = 0;
+
+	return;
+}
+
+static void code_0019b410(
+	long unit_index)
+{
+	struct unit_datum *unit;
+	struct object_placement_data placement_data;
+	unsigned long grenade_count_negative_base;
+	char *grenade_count;
+	long grenade_object_index;
+	long grenade_type_count;
+	struct game_globals_grenade *grenade;
+
+	unit = unit_get(unit_index);
+	grenade_count = unit->unit.grenade_counts;
+	grenade_count_negative_base =
+		0u - (unsigned long)unit->unit.grenade_counts;
+	grenade_type_count = NUMBER_OF_UNIT_GRENADE_TYPES;
+	do
+	{
+		grenade = TAG_BLOCK_GET_ELEMENT(
+			&scenario_get_game_globals()->grenades,
+			grenade_count_negative_base + (unsigned long)grenade_count,
+			struct game_globals_grenade);
+		while (*grenade_count > 0)
+		{
+			object_placement_data_new(
+				&placement_data,
+				grenade->item.index,
+				unit_index);
+			grenade_object_index = object_new(&placement_data);
+			if (grenade_object_index != NONE)
+			{
+				object_disconnect_from_map(grenade_object_index);
+				unit_drop_item(unit_index, grenade_object_index);
+			}
+
+			(*grenade_count)--;
+		}
+
+		grenade_count++;
+	} while (--grenade_type_count);
 
 	return;
 }
@@ -2328,6 +2755,71 @@ void unit_scripting_set_seat(
 	{
 		struct unit_datum *unit = unit_get(unit_index);
 		unit->unit.magic_seat_index = seat_label_to_base_seat_index(seat_label);
+	}
+
+	return;
+}
+
+void unit_handle_deleted_object(
+	long unit_index,
+	long deleted_object_index)
+{
+	struct unit_datum *unit;
+	short weapon_index;
+	long *weapon_object_index;
+
+	unit = unit_get(unit_index);
+	if (unit->unit.grenade_object_index==deleted_object_index)
+	{
+		unit->unit.grenade_object_index = NONE;
+	}
+
+	if (unit->unit.driver_object_index==deleted_object_index)
+	{
+		unit->unit.driver_object_index = NONE;
+	}
+
+	if (unit->unit.gunner_object_index==deleted_object_index)
+	{
+		unit->unit.gunner_object_index = NONE;
+	}
+
+	weapon_index = 0;
+	weapon_object_index = unit->unit.weapon_object_indices;
+	do
+	{
+		if (*weapon_object_index==deleted_object_index)
+		{
+			*weapon_object_index = NONE;
+			if (weapon_index==unit->unit.desired_weapon_index)
+			{
+				unit->unit.desired_weapon_index = NONE;
+			}
+
+			if (weapon_index==unit->unit.current_weapon_index)
+			{
+				unit->unit.current_weapon_index = NONE;
+			}
+		}
+
+		++weapon_index;
+		++weapon_object_index;
+	}
+	while (weapon_index<MAXIMUM_WEAPONS_PER_UNIT);
+
+	if (unit->unit.current_weapon_index==NONE)
+	{
+		unit->unit.desired_weapon_index = unit_weapon_next_index(unit_index, NONE, 0);
+	}
+
+	if (unit->unit.equipment_object_index==deleted_object_index)
+	{
+		unit->unit.equipment_object_index = NONE;
+	}
+
+	if (unit->unit.delayed_damage_attacker_object_index==deleted_object_index)
+	{
+		unit->unit.delayed_damage_attacker_object_index = NONE;
 	}
 
 	return;
@@ -7106,10 +7598,6 @@ static void unit_drop_item(
 	long unit_index,
 	long item_index)
 {
-	real_vector3d unit_velocity;
-	real_vector3d item_velocity;
-	real_point3d camera_position;
-
 	struct unit_datum *unit = unit_get(unit_index);
 	struct item_datum *item = item_get(item_index);
 	
@@ -7130,19 +7618,29 @@ static void unit_drop_item(
 	item->object.translational_velocity = *global_zero_vector3d;
 	item->object.angular_velocity = *global_zero_vector3d;
 
-	random_vector_in_cone3d(&unit->unit.aiming_vector, 0.f, 0.39269909f, &item_velocity);
-	
-	scale_vector3d(&item_velocity, real_random_range(0.026666667f, 0.040000003f), &item_velocity);
-	object_get_velocities(unit_index, &unit_velocity, NULL);
-	add_vectors3d(&item_velocity, &unit_velocity, &item_velocity);
-	
-	item_accelerate(item_index, &item_velocity, FALSE);
-
-	unit_get_camera_position(unit_index, &camera_position);
-	
-	if (!object_force_inside_bsp(item_index, &camera_position) && !game_engine_running())
 	{
-		object_delete(item_index);
+		real_vector3d item_velocity;
+
+		random_vector_in_cone3d(&unit->unit.aiming_vector, 0.f, 0.39269909f, &item_velocity);
+		scale_vector3d(&item_velocity, real_random_range(0.026666667f, 0.040000003f), &item_velocity);
+		{
+			real_vector3d unit_velocity;
+			object_get_velocities(unit_index, &unit_velocity, NULL);
+			add_vectors3d(&item_velocity, &unit_velocity, &item_velocity);
+		}
+
+		item->item.ignore_object_index = unit_index;
+		item_accelerate(item_index, &item_velocity, FALSE);
+	}
+
+	{
+		real_point3d camera_position;
+		unit_get_camera_position(unit_index, &camera_position);
+
+		if (!object_force_inside_bsp(item_index, &camera_position) && !game_engine_running())
+		{
+			object_delete(item_index);
+		}
 	}
 
 	if (TEST_FLAG(unit->unit.flags, _unit_doesnt_drop_items_bit))
