@@ -960,6 +960,14 @@ void unit_detach_from_parent(
 	long unit_index);
 void unit_exit_seat_end(
 	long unit_index);
+short actors_spawn_from_unit(
+	long unit_index,
+	long actor_variant_definition_index,
+	short actor_count,
+	real throw_velocity);
+short animation_choose_random_permutation(
+	long animation_graph_index,
+	short animation_index);
 
 extern char const *base_seat_labels[NUMBER_OF_UNIT_BASE_SEATS];
 
@@ -1476,6 +1484,38 @@ boolean unit_gunned_by_ai(
 	}
 
 	return unit->unit.actor_index!=NONE;
+}
+
+short unit_test_spawning(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	short spawned_actor_count = 0;
+
+	if (!TEST_FLAG(unit->unit.flags, _unit_spawned_actors_bit))
+	{
+		struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
+
+		if (unit_definition->unit.spawned_actor_variant.index!=NONE)
+		{
+			spawned_actor_count = random_range(
+				unit_definition->unit.spawn_actor_lower_bound,
+				unit_definition->unit.spawn_actor_upper_bound + 1);
+
+			if (spawned_actor_count>0)
+			{
+				spawned_actor_count = actors_spawn_from_unit(
+					unit_index,
+					unit_definition->unit.spawned_actor_variant.index,
+					spawned_actor_count,
+					unit_definition->unit.spawn_throw_velocity * 0.033333335f);
+			}
+
+			SET_FLAG(unit->unit.flags, _unit_spawned_actors_bit, TRUE);
+		}
+	}
+
+	return spawned_actor_count;
 }
 
 long unit_scripting_unit_riders(
@@ -3900,6 +3940,63 @@ void unit_scripting_enter_vehicle(
 	}
 
 	return;
+}
+
+boolean unit_try_and_exit_seat(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	boolean result = FALSE;
+
+	if (unit->object.parent_object_index!=NONE &&
+		unit->unit.parent_seat_index!=NONE)
+	{
+		if (unit->object.type==_object_type_vehicle)
+		{
+			unit_exit_seat_end(unit_index);
+		}
+		else if (!unit_animation_busy(&unit->unit.animation))
+		{
+			struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
+			struct animation_graph *animation_graph = animation_graph_definition_get(unit_definition->object.animation_graph.index);
+			struct animation_graph_unit_seat *unit_seat = TAG_BLOCK_GET_ELEMENT(
+				&animation_graph->unit_seats,
+				unit->unit.animation.seat_index,
+				struct animation_graph_unit_seat);
+
+			if (unit_seat->animations.count>8)
+			{
+				short animation_index = animation_graph_animation_index_get(&unit_seat->animations)[8].animation_index;
+
+				if (animation_index!=NONE)
+				{
+					struct unit_datum *parent_unit = unit_get(unit->object.parent_object_index);
+
+					if (parent_unit->unit.driver_object_index==unit_index)
+					{
+						unit_open(unit->object.parent_object_index);
+					}
+
+					animation_index = animation_choose_random_permutation(
+						unit_definition->object.animation_graph.index,
+						animation_index);
+
+					code_0019b0b0(
+						unit_index,
+						unit_definition->object.animation_graph.index,
+						animation_index);
+					object_set_visibility(unit_index, TRUE);
+					unit->unit.animation.state = _unit_state_exiting_seat;
+					ai_handle_exit_vehicle(
+						unit_index,
+						unit->object.parent_object_index);
+					result = TRUE;
+				}
+			}
+		}
+	}
+
+	return result;
 }
 
 short vehicle_scripting_unload(
