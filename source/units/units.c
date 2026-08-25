@@ -893,6 +893,10 @@ void player_control_set_desired_weapon(
 	long unit_index,
 	short desired_weapon_index);
 boolean valid_real_normal2d(real_vector2d const *normal);
+void biped_stop_melee_attack(long unit_index);
+void first_person_weapon_message_from_unit(long unit_index, short message_type);
+void weapon_stop_reload(long weapon_index);
+boolean weapon_prevents_grenade_throwing(long weapon_index);
 
 static void unit_adjust_for_seat_change(long unit_index);
 static short unit_weapon_next_index(long unit_index, short current_index, short delta);
@@ -3160,6 +3164,112 @@ short unit_get_custom_animation_time(
 	return 0;
 }
 
+boolean unit_start_user_animation(
+	long unit_index,
+	long animation_graph_index,
+	char const *animation_name,
+	boolean interpolate)
+{
+	boolean animation_started = FALSE;
+
+	if (unit_index != NONE)
+	{
+		if (animation_graph_index != NONE)
+		{
+			struct unit_datum *unit;
+			struct animation_graph *animation_graph;
+			short base_animation_index;
+
+			unit = unit_get(unit_index);
+			(void)unit_definition_get(unit->definition_index);
+			animation_graph =
+				animation_graph_definition_get(animation_graph_index);
+			base_animation_index = animation_graph_get_animation_by_name(
+				animation_graph_index,
+				animation_name);
+
+			if (base_animation_index != NONE)
+			{
+				struct animation *animation;
+				short animation_index =
+					animation_choose_random_permutation_internal(
+						TRUE,
+						animation_graph_index,
+						base_animation_index);
+
+				animation = TAG_BLOCK_GET_ELEMENT(
+					&animation_graph->animations,
+					animation_index,
+					struct animation);
+
+				if (animation->type != _animation_overlay &&
+					animation->type == _animation_base)
+				{
+					boolean animation_allowed = TRUE;
+
+					if (unit->unit.animation.state ==
+							_unit_state_user_animation &&
+						unit->object.animation.state.index != NONE)
+					{
+						struct animation *current_animation =
+							TAG_BLOCK_GET_ELEMENT(
+								&animation_graph->animations,
+								unit->object.animation.state.index,
+								struct animation);
+
+						if (current_animation->runtime_parent_animation_index ==
+							animation->runtime_parent_animation_index)
+						{
+							if (unit->object.animation.state.frame_index + 2 ==
+								current_animation->private_key_frame_index)
+							{
+								--unit->object.animation.state.frame_index;
+								animation_allowed = FALSE;
+							}
+
+							else if (unit->object.animation.state.frame_index <
+								current_animation->private_key_frame_index)
+							{
+								animation_allowed = FALSE;
+							}
+						}
+					}
+
+					if (animation_allowed)
+					{
+						if (interpolate)
+						{
+							object_start_interpolation(unit_index, 6);
+						}
+
+						unit->unit.animation.state =
+							_unit_state_user_animation;
+						code_0019b0b0(
+							unit_index,
+							animation_graph_index,
+							animation_index);
+						SET_FLAG(
+							unit->unit.animation.flags,
+							_unit_animation_postpone_weapon_ik_until_interpolation_ends_bit,
+							TRUE);
+						object_compute_node_matrices_recursive(unit_index);
+						animation_started = TRUE;
+					}
+				}
+			}
+			else
+			{
+				console_warning(
+					"the animation '%s' doesn't exist in the graph '%s'",
+					animation_name,
+					tag_get_name(animation_graph_index));
+			}
+		}
+	}
+
+	return animation_started;
+}
+
 boolean unit_set_seat(
 	long unit_index,
 	char const *seat_label)
@@ -3197,6 +3307,260 @@ void unit_stop_custom_animation(
 	}
 
 	return;
+}
+
+boolean unit_melee_attack_begin(
+	long unit_index,
+	boolean continuous,
+	real_vector2d const *alignment_vector)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition =
+		unit_definition_get(unit->definition_index);
+	char previous_animation_state = unit->unit.animation.state;
+	boolean result = FALSE;
+
+	switch (previous_animation_state)
+	{
+	case _unit_state_hard_ping:
+	case _unit_state_dying_airborne:
+	case _unit_state_dying:
+	case _unit_state_entering_seat:
+	case _unit_state_exiting_seat:
+	case _unit_state_ai_impulse:
+	case _unit_state_melee_attack:
+	case _unit_state_melee_airborne:
+	case _unit_state_melee_continuous:
+	case _unit_state_throw_grenade:
+	case _unit_state_resurrect_front:
+	case _unit_state_resurrect_back:
+	case _unit_state_leap_start:
+	case _unit_state_leap_melee:
+		break;
+
+	default:
+		{
+			boolean limping = FALSE;
+			short new_animation_state;
+
+			if (unit->object.type==_object_type_biped)
+			{
+				struct biped_datum *biped = (struct biped_datum *)unit;
+				limping = TEST_FLAG(
+					biped->biped.flags,
+					_biped_limping_bit);
+			}
+
+			if (continuous)
+			{
+				new_animation_state = _unit_state_melee_continuous;
+			}
+			else if (previous_animation_state==_unit_state_leap_airborne)
+			{
+				new_animation_state = _unit_state_leap_melee;
+			}
+			else
+			{
+				new_animation_state = limping ?
+					_unit_state_melee_airborne :
+					_unit_state_melee_attack;
+			}
+
+			if (unit_animation_set_state(unit_index, new_animation_state) || continuous)
+			{
+				if (TEST_FLAG(
+					unit_definition->unit.flags,
+					_unit_melee_attack_is_fatal_bit))
+				{
+					unit->unit.animation.state = _unit_state_dying;
+				}
+
+				if (alignment_vector)
+				{
+					code_0019ea70(unit_index, alignment_vector);
+				}
+
+				if (continuous)
+				{
+					unit->unit.melee_attack_state = 4;
+					unit->unit.melee_continuous_damage_effect_timer = 0;
+				}
+				else
+				{
+					unit->unit.melee_attack_state = 1;
+				}
+				result = TRUE;
+			}
+		}
+		break;
+	}
+
+	return result;
+}
+
+boolean unit_leap_begin(
+	long unit_index,
+	real_vector2d const *alignment_vector)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	boolean result = FALSE;
+
+	switch (unit->unit.animation.state)
+	{
+	case _unit_state_hard_ping:
+	case _unit_state_dying_airborne:
+	case _unit_state_dying:
+	case _unit_state_entering_seat:
+	case _unit_state_exiting_seat:
+	case _unit_state_ai_impulse:
+	case _unit_state_melee_attack:
+	case _unit_state_melee_airborne:
+	case _unit_state_melee_continuous:
+	case _unit_state_throw_grenade:
+	case _unit_state_resurrect_front:
+	case _unit_state_resurrect_back:
+	case _unit_state_leap_start:
+	case _unit_state_leap_melee:
+		break;
+
+	default:
+		{
+			boolean biped_limping = FALSE;
+
+			if (unit->object.type==_object_type_biped)
+			{
+				biped_limping = TEST_FLAG(
+					((struct biped_datum *)unit)->biped.flags,
+					_biped_limping_bit);
+			}
+
+			if (!biped_limping &&
+				unit_animation_set_state(unit_index, _unit_state_leap_start))
+			{
+				if (alignment_vector)
+				{
+					code_0019ea70(unit_index, alignment_vector);
+				}
+
+				result = TRUE;
+			}
+		}
+		break;
+	}
+
+	return result;
+}
+
+boolean unit_throw_grenade_begin(
+	long unit_index,
+	real_vector2d const *alignment_vector)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition =
+		unit_definition_get(unit->definition_index);
+	long weapon_index = unit_get_current_weapon_index(unit_index);
+	boolean result = FALSE;
+
+	if (unit_get_grenade_count(
+		unit_index,
+		unit_get_current_grenade_type(unit_index)) > 0)
+	{
+		switch (unit->unit.animation.state)
+		{
+		case _unit_state_hard_ping:
+		case _unit_state_dying_airborne:
+		case _unit_state_dying:
+		case _unit_state_entering_seat:
+		case _unit_state_exiting_seat:
+		case _unit_state_ai_impulse:
+		case _unit_state_melee_attack:
+		case _unit_state_melee_airborne:
+		case _unit_state_melee_continuous:
+		case _unit_state_throw_grenade:
+		case _unit_state_resurrect_front:
+		case _unit_state_resurrect_back:
+		case _unit_state_leap_start:
+		case _unit_state_leap_melee:
+			break;
+
+		default:
+			if (!weapon_prevents_grenade_throwing(weapon_index))
+			{
+				struct animation_graph *animation_graph;
+				struct animation *animation;
+				struct game_globals_grenade *grenade;
+
+				if (weapon_index != NONE)
+				{
+					weapon_stop_reload(weapon_index);
+				}
+
+				biped_stop_melee_attack(unit_index);
+				unit->unit.animation.action = 0;
+				unit->unit.animation.action_animation.index = NONE;
+
+				if (unit_animation_set_state(
+					unit_index,
+					_unit_state_throw_grenade))
+				{
+					unit->unit.grenade_throw_state =
+						_unit_grenade_throw_wind_up;
+					unit->unit.grenade_throw_ticks = 0;
+
+					animation_graph = animation_graph_definition_get(
+						unit_definition->object.animation_graph.index);
+					animation = TAG_BLOCK_GET_ELEMENT(
+						&animation_graph->animations,
+						unit->object.animation.state.index,
+						struct animation);
+					unit->unit.grenade_throw_full_power_ticks =
+						animation->private_key_frame_index -
+						unit->object.animation.state.frame_index + 1;
+
+					if (alignment_vector)
+					{
+						code_0019ea70(unit_index, alignment_vector);
+					}
+					else
+					{
+						real_vector2d forward;
+
+						forward.i = unit->unit.aiming_vector.i;
+						forward.j = unit->unit.aiming_vector.j;
+						if (normalize2d(&forward) > 0.f)
+						{
+							code_0019ea70(unit_index, &forward);
+						}
+					}
+
+					first_person_weapon_message_from_unit(unit_index, 0x11);
+					player_control_unzoom(unit_index);
+
+					grenade = TAG_BLOCK_GET_ELEMENT(
+						&scenario_get_game_globals()->grenades,
+						unit->unit.current_grenade_index,
+						struct game_globals_grenade);
+					if (grenade->throwing_effect.index != NONE)
+					{
+						effect_new_from_object(
+							grenade->throwing_effect.index,
+							unit_index,
+							unit_index,
+							NONE,
+							0.f,
+							0.f,
+							NULL,
+							NULL);
+					}
+
+					result = TRUE;
+				}
+			}
+			break;
+		}
+	}
+
+	return result;
 }
 
 void scripting_magic_melee_attack(
