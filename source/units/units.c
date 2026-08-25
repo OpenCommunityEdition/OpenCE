@@ -679,8 +679,14 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "saved games/game_state.h"
 #include "sound/game_sound.h"
+#include "vehicles.h"
 
 /* ---------- constants */
+
+enum
+{
+	_unit_region_destroyed_head_bit = 9,
+};
 
 enum
 {
@@ -730,6 +736,25 @@ struct unit_acceleration_plan
 };
 typedef char unit_acceleration_plan_size_check[
 	sizeof(struct unit_acceleration_plan) == 0x20 ? 1 : -1];
+
+struct unit_control_data
+{
+	char animation_state;
+	char aiming_speed;
+	word control_flags;
+	short weapon_index;
+	short grenade_index;
+	short zoom_level;
+	short pad;
+	real_vector3d throttle;
+	real primary_trigger;
+	real_vector3d facing_vector;
+	real_vector3d aiming_vector;
+	real_vector3d looking_vector;
+};
+
+typedef char unit_control_data_size_assert[
+	sizeof(struct unit_control_data) == 0x40 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -909,6 +934,25 @@ void unit_kill_no_statistics(
 void unit_delete(
 	long unit_index)
 {
+	return;
+}
+
+void unit_handle_region_destroyed(
+	long object_index,
+	short region_index,
+	unsigned long damage_flags)
+{
+	struct unit_datum *unit = unit_get(object_index);
+
+	if (!TEST_FLAG(unit->object.damage_flags, _object_dead_bit))
+	{
+		unit_scream(
+			object_index,
+			TEST_FLAG(damage_flags, _unit_region_destroyed_head_bit) ?
+				_unit_scream_destroyed_head :
+				_unit_scream_destroyed_limb);
+	}
+
 	return;
 }
 
@@ -3280,6 +3324,118 @@ void unit_get_camera_position(
 	{
 		biped_get_sight_position(unit_index, 0.f, NULL, NULL, NULL, camera_position);
 	}
+
+	return;
+}
+
+void unit_estimate_position(
+	long unit_index,
+	short estimate_mode,
+	real_point3d const *body_position,
+	real_vector3d *desired_facing,
+	real_vector3d *desired_gun_offset,
+	real_point3d *estimated_position)
+{
+	struct unit_datum *unit;
+	real_point3d reference_position;
+
+	unit = unit_get(unit_index);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		5297,
+		body_position && estimated_position);
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		5298,
+		(estimate_mode >= 0) &&
+		(estimate_mode < NUMBER_OF_UNIT_ESTIMATE_POSITION_MODES));
+
+	if (unit->object.parent_object_index == NONE &&
+		!TEST_FLAG(unit->object.damage_flags, _object_dead_bit))
+	{
+		if (unit->object.type == _object_type_biped)
+		{
+			biped_get_sight_position(
+				unit_index,
+				estimate_mode,
+				body_position,
+				desired_facing,
+				desired_gun_offset,
+				estimated_position);
+
+			return;
+		}
+	}
+	else if (unit->object.type == _object_type_biped &&
+		unit->object.parent_object_index != NONE)
+	{
+		struct object_datum *parent_object =
+			object_get(unit->object.parent_object_index);
+
+		if (parent_object->object.type == _object_type_vehicle &&
+			vehicle_find_pathfinding_surface_index(
+				unit->object.parent_object_index,
+				&reference_position) != NONE)
+		{
+			goto apply_delta;
+		}
+	}
+
+	object_get_origin(unit_index, &reference_position);
+
+apply_delta:
+	unit_get_camera_position(unit_index, estimated_position);
+	add_vectors3d(
+		vector_from_points3d(
+			&reference_position,
+			body_position,
+			(real_vector3d *)&reference_position),
+		(real_vector3d *)estimated_position,
+		(real_vector3d *)estimated_position);
+
+	return;
+}
+
+void unit_debug_ninja_rope(
+	long unit_index)
+{
+	struct collision_result collision;
+	real_point3d origin;
+	real_vector3d direction;
+	struct unit_datum *unit;
+
+	unit = unit_get(unit_index);
+	unit_get_camera_position(unit_index, &origin);
+	scale_vector3d(&unit->unit.aiming_vector, 25.f, &direction);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		6648,
+		global_current_collision_user_depth <
+			MAXIMUM_COLLISION_USER_STACK_DEPTH);
+	global_current_collision_users[global_current_collision_user_depth++] = 21;
+
+	if (collision_test_vector(
+		FLAG(_collision_test_back_facing_surfaces_bit) |
+			FLAG(_collision_test_structure_bit),
+		&origin,
+		&direction,
+		unit_index,
+		&collision))
+	{
+		if (collision.plane.n.k > 0.95f)
+		{
+			collision.point.z += 0.25f;
+			object_translate(unit_index, &collision.point, NULL);
+		}
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		6657,
+		global_current_collision_user_depth > 1);
+	--global_current_collision_user_depth;
 
 	return;
 }
@@ -6041,6 +6197,86 @@ void unit_postprocess_node_matrices(
 			}
 		}
 	}
+
+	return;
+}
+
+void unit_control(
+	long unit_index,
+	struct unit_control_data const *control_data)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x5e1,
+		magnitude3d(&control_data->throttle)<=3.0f);
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x5e2,
+		control_data->animation_state>=0 &&
+		control_data->animation_state<NUMBER_OF_UNIT_ANIMATION_STATES);
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x5e3,
+		control_data->aiming_speed>=0 &&
+		control_data->aiming_speed<NUMBER_OF_UNIT_AIMING_SPEEDS);
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x5e4,
+		VALID_FLAGS(control_data->control_flags, NUMBER_OF_UNIT_CONTROL_FLAGS));
+	match_assert_valid_real_normal3d(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x5e5,
+		&control_data->facing_vector);
+	match_assert_valid_real_normal3d(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x5e6,
+		&control_data->aiming_vector);
+	match_assert_valid_real_normal3d(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x5e7,
+		&control_data->looking_vector);
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x5e8,
+		control_data->weapon_index==NONE ||
+			(control_data->weapon_index>=0 &&
+			control_data->weapon_index<MAXIMUM_WEAPONS_PER_UNIT));
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x5e9,
+		control_data->grenade_index==NONE ||
+			(control_data->grenade_index>=0 &&
+			control_data->grenade_index<NUMBER_OF_UNIT_GRENADE_TYPES));
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x5ea,
+		control_data->zoom_level==NONE || (control_data->zoom_level>=0));
+	match_assert_valid_real(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0x5eb,
+		control_data->primary_trigger);
+
+	unit->unit.throttle = control_data->throttle;
+	unit->unit.primary_trigger = control_data->primary_trigger;
+	unit->unit.aiming_speed = control_data->aiming_speed;
+	if (control_data->weapon_index!=NONE)
+	{
+		unit->unit.desired_weapon_index = control_data->weapon_index;
+	}
+	if (control_data->grenade_index!=NONE)
+	{
+		unit->unit.desired_grenade_index = (char)control_data->grenade_index;
+	}
+	unit->unit.desired_zoom_level = (char)control_data->zoom_level;
+	unit->unit.control_flags = control_data->control_flags;
+	unit->unit.desired_looking_vector = control_data->looking_vector;
+	unit->unit.desired_aiming_vector = control_data->aiming_vector;
+	unit->unit.desired_facing_vector = control_data->facing_vector;
+	unit->unit.animation.desired_state = control_data->animation_state;
+
+	unit_verify_vectors(unit_index, "unit-control");
 
 	return;
 }
