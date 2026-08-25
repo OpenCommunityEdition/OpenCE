@@ -145,6 +145,41 @@ graph are unchanged.
 
 ## Committed replay
 
-Committed-state snapshot, verified deletion, normal rebuild, regression,
-direct-comparison, and corrected-HEAD replay evidence will be appended in a
-separate additive ledger-only commit. No advance replay claim is made here.
+The implementation and initial ledger were committed together as
+`4265f987837c8cd73413721dc4834dcf98a776af` (`Recover Units typed
+declaration pair`). The committed source blob is
+`3fd40fa3885b465b0169d86ae3ac506304a508c8` (242,674 bytes; payload SHA-256
+`bac4b65e699f7c83155dbda832380bedc889f51382579e741039067e8ade84dc`).
+The initial ledger blob is `4a2951ca3c9806bbcebd4b5d7ed4dbf8f5c8620f`
+(7,167 bytes).
+
+At the clean implementation commit, `tools.regression_gate` wrote the
+5,845,001-byte ignored snapshot
+`build/audit/units_typed_declaration_pair_replay.json`, SHA-256
+`6679240f3c6759d545bff1ed1fe4f2f4415f58749506ca258098731c32519ee9`.
+The manifest pins exact commit `4265f987...` and the full accepted Units
+function, non-code, and symbol inventory.
+
+The generated object resolved to
+`build/base/source/units/units.obj` under this exact worktree. Its pre-delete
+SHA-256 was `6a91533d...`; the resolved absolute path was checked to remain
+inside the worktree, the single file was removed with literal-path semantics,
+and absence was verified. One ordinary rebuild then ran exactly:
+
+```text
+[1/1] CL build\base\source\units\units.obj
+```
+
+The replay object is 134,343 bytes with phase-specific raw SHA-256
+`4642f063446f09e96c28c0ac66d759363c5c40a533e9e07d4abd7873cf83c53b`.
+The expected raw-object difference from the first shot is confined to COFF
+timestamp metadata; hardened section comparison is unchanged.
+
+The committed regression check returned `ok: true`, exactly 158
+`still_exact`, zero failures, zero warnings, zero `newly_exact`, and zero
+`changed_nonexact`. Independent strict comparison repeated both retained
+bodies as `all_equal: true` and reproduced the complete 158 exact / 11
+emitted-nonexact / 20 absent function census. The 121 inherited exact target
+data sections and runtime owner inventory remain preserved. A final Ninja dry
+run reported no work, and the tracked worktree was clean before this additive
+ledger-only update.
