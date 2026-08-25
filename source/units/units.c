@@ -3850,6 +3850,101 @@ void unit_impact_melee_damage(
 	return;
 }
 
+void unit_scripting_enter_vehicle(
+	long unit_index,
+	long vehicle_index,
+	char const *seat_name)
+{
+	if (unit_index!=NONE && vehicle_index!=NONE && csstrlen(seat_name)>0)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+
+		if (!TEST_FLAG(unit->object.damage_flags, _object_dead_bit))
+		{
+			if (unit->object.parent_object_index!=NONE)
+			{
+				if (unit->unit.parent_seat_index!=NONE)
+				{
+					unit_exit_seat_end(unit_index);
+				}
+
+				if (unit->object.parent_object_index!=NONE)
+				{
+					return;
+				}
+			}
+
+			{
+				struct unit_datum *vehicle = unit_get(vehicle_index);
+				struct unit_definition *vehicle_definition = unit_definition_get(vehicle->definition_index);
+				short seat_index;
+
+				for (seat_index = 0; seat_index<vehicle_definition->unit.seats.count; ++seat_index)
+				{
+					struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+						&vehicle_definition->unit.seats,
+						seat_index,
+						struct unit_seat);
+
+					if (!_stricmp(seat_name, seat->label) &&
+						!unit_seat_filled(vehicle_index, seat_index) &&
+						(unit->object.type==_object_type_vehicle ||
+							unit_set_or_test_seat_and_weapon_label(unit_index, seat->label, NULL, FALSE)))
+					{
+						unit_enter_seat(unit_index, vehicle_index, seat_index);
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+short vehicle_scripting_unload(
+	long vehicle_index,
+	char const *seat_name)
+{
+	long unloaded_count = 0;
+
+	if (vehicle_index!=NONE)
+	{
+		struct unit_datum *vehicle = unit_get(vehicle_index);
+		struct unit_definition *vehicle_definition = unit_definition_get(vehicle->definition_index);
+		boolean unload_all = !seat_name || csstrlen(seat_name)==0;
+		struct object_iterator iterator;
+		struct unit_datum *unit;
+
+		object_iterator_new(&iterator, _object_mask_unit, 0);
+
+		while ((unit = object_iterator_next(&iterator))!=NULL)
+		{
+			if (unit->object.parent_object_index==vehicle_index)
+			{
+				struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+					&vehicle_definition->unit.seats,
+					unit->unit.parent_seat_index,
+					struct unit_seat);
+				char lower_seat_name[256];
+
+				csstrcpy(lower_seat_name, seat->label);
+				strlwr(lower_seat_name);
+
+				if (unload_all || strstr(lower_seat_name, seat_name))
+				{
+					if (unit_try_and_exit_seat(iterator.index))
+					{
+						++unloaded_count;
+					}
+				}
+			}
+		}
+	}
+
+	return (short)unloaded_count;
+}
+
 void unit_scripting_exit_vehicle(
 	long unit_index)
 {
