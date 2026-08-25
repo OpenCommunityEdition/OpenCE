@@ -3415,6 +3415,96 @@ void unit_detach_from_parent(
 	return;
 }
 
+long units_debug_get_next_unit(
+	long current_object_index)
+{
+	struct object_iterator iterator;
+	struct unit_datum *unit;
+	long result = NONE;
+
+	if (current_object_index != NONE)
+	{
+		object_iterator_new(&iterator, _object_mask_unit, 0);
+
+		while ((unit = (struct unit_datum *)object_iterator_next(&iterator)) != NULL)
+		{
+			if (iterator.index == current_object_index)
+			{
+				break;
+			}
+		}
+
+		while ((unit = (struct unit_datum *)object_iterator_next(&iterator)) != NULL)
+		{
+			if (unit->unit.actor_index == NONE &&
+				unit->unit.swarm_actor_index == NONE &&
+				!TEST_FLAG(unit->object.damage_flags, _object_dead_bit))
+			{
+				result = iterator.index;
+				break;
+			}
+		}
+	}
+
+	if (result == NONE)
+	{
+		object_iterator_new(&iterator, _object_mask_unit, 0);
+
+		while ((unit = (struct unit_datum *)object_iterator_next(&iterator)) != NULL)
+		{
+			if (unit->unit.actor_index == NONE &&
+				unit->unit.swarm_actor_index == NONE &&
+				!TEST_FLAG(unit->object.damage_flags, _object_dead_bit))
+			{
+				return iterator.index;
+			}
+		}
+	}
+
+	return result;
+}
+
+long units_debug_get_closest_unit(
+	long reference_object_index)
+{
+	struct object_iterator iterator;
+	struct object_datum *object;
+	long closest_index = NONE;
+	real closest_distance = REAL_MAX;
+
+	object_iterator_new(&iterator, _object_mask_biped, 0);
+	while ((object = (struct object_datum *)object_iterator_next(&iterator)) != NULL)
+	{
+		if (iterator.index != reference_object_index &&
+			!TEST_FLAG(object->object.damage_flags, _object_dead_bit))
+		{
+			real distance;
+
+			if (reference_object_index != NONE)
+			{
+				real_point3d reference_origin;
+				real_point3d object_origin;
+
+				object_get_origin(reference_object_index, &reference_origin);
+				object_get_origin(iterator.index, &object_origin);
+				distance = distance3d(&reference_origin, &object_origin);
+			}
+			else
+			{
+				distance = 0.f;
+			}
+
+			if (distance < closest_distance)
+			{
+				closest_index = iterator.index;
+				closest_distance = distance;
+			}
+		}
+	}
+
+	return closest_index;
+}
+
 boolean unit_get_current_flashlight_state(
 	long unit_index)
 {
