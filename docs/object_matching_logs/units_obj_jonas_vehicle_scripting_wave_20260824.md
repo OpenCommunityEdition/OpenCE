@@ -202,3 +202,82 @@ object deletion, normal one-edge rebuild, immediate regression check, direct
 two-candidate/support comparison, full 189/129 census, storage audit, and
 no-work dry run will be appended in one additive ledger-only commit. No
 amend, push, history rewrite, or worktree removal is authorized.
+
+## Actual committed-state forced replay
+
+Implementation-and-initial-ledger commit
+`d6dcf78a11f5f4088499d15f71d80a82ccdf6868` was authored and committed by
+Jonas Volman `<theunknowentity@gmail.com>`. Its committed source is blob
+`5c6a24b10a40bfc82251481910ed0480c5e72b42`: 227,841 raw Git payload
+bytes with SHA-256
+`83c4c23ca574f0f6f2aceae134a24643aa3898dbfced8faabef8697a7bcddd51`.
+Its initial ledger is blob `55885b77f3bd2c82e6d821d9b4e33916cadce9f3`:
+10,867 raw Git payload bytes with SHA-256
+`6d43e641416fb1822f366e67924acc065b59f6c207f882f39ffae56d1f053ae3`.
+
+`git status --porcelain=v1 --untracked-files=all` printed no path at that
+implementation commit, and a Units-object Ninja dry run printed
+`ninja: no work to do`. A fresh one-unit committed-state snapshot was then
+captured with `--no-build` from that exact clean commit:
+
+```text
+build/regression_units_vehicle_scripting_committed_20260824.json
+commit: d6dcf78a11f5f4088499d15f71d80a82ccdf6868
+size: 5,726,400 bytes
+SHA-256: 6da5ae8628f9d770c38ed26b49de06cfc433756d73f9969ce2851c458c15157a
+```
+
+The generated object path resolved to
+`C:\Users\isabe\Documents\Codex\2026-07-13\i-w\units-vehicle-scripting-wave-20260824\build\base\source\units\units.obj`.
+Its normalized absolute path was proven to begin with this isolated
+worktree's normalized absolute root before deletion. The snapshotted object
+was 128,583 bytes with SHA-256
+`b61b7a504c1bbb22ab10a3b43b9a6a984a5b86975da799c661d387ee8c613a5c`.
+Only that exact file was deleted, and absence was verified.
+
+A normal one-target Ninja rebuild then ran exactly one
+`[1/1] CL build\\base\\source\\units\\units.obj` edge and succeeded without
+a Units warning. The rebuilt object is again 128,583 bytes. Its
+phase-specific whole-file SHA-256 is
+`73fe4f705eb53f33f780633d240ae85a8dd943b857ca2fb39006e8cfa055825a`;
+the whole-object hash difference is confined to rebuild metadata. Every
+runtime acceptance fingerprint is unchanged.
+
+The immediate committed-state regression check is authoritative for all
+captured function, non-code, relocation, and symbol-ownership evidence:
+
+```text
+ok: true
+failures: 0
+warnings: 0
+still_exact: 149
+newly_exact: 0
+changed_nonexact: 0
+```
+
+Independent replay proofs also passed:
+
+- the two-name candidate comparison remains all exact with the same padded
+  sizes, relocation counts, destinations, addends, and normalized hashes;
+- `unit_enter_seat` remains the same 592-byte / 34-relocation nonexact support
+  body with no credit;
+- complete function census: 149 exact / 11 present nonexact / 29 absent
+  across all 189 January function owners;
+- complete target-data census: 123 exact / zero present nonexact / six absent
+  across all 129 January non-code owners, totaling 6,359 exact logical bytes
+  and seven relocations;
+- first-shot versus replay status across all 189 function owners and all 129
+  non-code owners has zero change;
+- `.data` remains strict at 1,564 bytes and seven relocations;
+  `_unit_globals` remains strict at four BSS bytes and zero relocations;
+- both candidates and the support definition remain value-zero type-`0x20`
+  external storage-class-`2` owners; all excluded linkage remains at the
+  recorded absent, undefined-external, or inherited-nonexact boundary;
+- the committed source blob remains
+  `5c6a24b10a40bfc82251481910ed0480c5e72b42`;
+- a final Units-object Ninja dry run reports `ninja: no work to do`.
+
+Only this ledger is modified for the additive replay record. No source
+tuning, additional candidate compile, header/protected/config/storage change,
+adjudication, amend, push, history rewrite, or worktree removal occurred after
+the implementation commit.
