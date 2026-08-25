@@ -244,3 +244,82 @@ Ninja rebuild, and rerun the manifest, two-name comparator, full 189/129
 census, semantic audit, and ownership checks. Actual replay evidence will be
 appended here in a separate additive Jonas ledger-only commit. No amend, push,
 history rewrite, or worktree removal is authorized.
+
+## Actual committed-state forced replay
+
+The Jonas implementation-and-initial-ledger commit is
+`d30957950be81a14e77e6d48fe9027555dd8e3d5`. Both author and committer are
+Jonas Volman `<jonas.volman@openai.com>`. Its committed translation unit is
+blob `6dd52f4b3e95d6af36e3386583d1850bc8aa42f9`: 244,151 raw Git-payload
+bytes, payload SHA-256
+`418e49550322751e79a126c62cdd2b67620589424d8c31252bd881f6d15b6c5a`.
+The initial ledger is blob `82e76cee2d292d299f028387dffe0edec2a760fc`:
+13,040 bytes, payload SHA-256
+`f35cc06fe7b4606340f2ef80d14d85775165248c11779b80f741453d58612748`.
+
+Tracked state was clean at that commit, and an explicit one-target Ninja dry
+run reported `ninja: no work to do`. The gate's built-in `--no-build` mode then
+captured this clean implementation-state snapshot:
+
+```text
+build/regression_units_weapon_state_committed_0fab_20260824.json
+commit: d30957950be81a14e77e6d48fe9027555dd8e3d5
+size: 5,870,179 bytes
+SHA-256: bd8ba3d8bc1b030539b7c50b9752a33574cecdf38b37a62ffdd84e219c17212c
+```
+
+The generated object resolved to
+`C:\Users\isabe\Documents\Codex\2026-07-13\i-w\units-weapon-state-private-helper-0fab-20260824\build\base\source\units\units.obj`.
+Its normalized absolute path was proven to begin with the isolated worktree
+root, and its basename was proven exactly `units.obj`. Before deletion it was
+135,029 bytes with whole-file SHA-256
+`27cd0b50aed14274efc52fa4946fdb63508af647ec7ccfb553262761bd51734d`.
+Only that verified generated file was removed, and absence was checked.
+
+One ordinary one-target Ninja rebuild then ran exactly:
+
+```text
+[1/1] CL build\base\source\units\units.obj
+```
+
+The replay object is again 135,029 bytes with phase-specific whole-file
+SHA-256
+`7d1ce04910c59429534476118594ee9d96dd2099bcf8a13d7321979feeda605b`.
+The whole-file difference is confined to normal COFF build metadata; every
+runtime acceptance fingerprint is unchanged.
+
+The committed regression check is authoritative for all captured function,
+non-code, relocation, and symbol-owner evidence:
+
+```text
+ok: true
+failures: 0
+warnings: 0
+still_exact: 158
+newly_exact: 0
+changed_nonexact: 0
+```
+
+Independent replay proofs also passed:
+
+- direct two-name hardened comparison remains `all_equal: true`, reproducing
+  both normalized hashes, 656 padded bytes, and 41 relocation identities;
+- complete function census remains 158 exact / 11 present nonexact / 20
+  absent, 30,384 exact padded bytes and 1,320 exact relocations;
+- complete target-data census remains 123 exact / zero present nonexact / six
+  absent, 6,359 exact logical bytes and seven relocations;
+- the helper remains the intended private owner: January csplit external
+  storage class 2 and natural candidate static storage class 3, both
+  value-zero type-`0x20`; the public dispatcher remains value-zero type-`0x20`
+  external storage class 2;
+- `_unit_animation_start_action` remains a normal undefined external in the
+  candidate, preserving the bounded support boundary;
+- semantic audit again reports 4,085 semantic exact, 112 hidden exact / 64,495
+  hidden code bytes, 4,146 accepted exact, and zero unit errors;
+- the complete Halo and libcmt targets report no work, the committed source
+  blob is unchanged, and the final one-target Ninja dry run reports no work.
+
+This appended record is ledger-only. No source change, candidate retry, body
+tuning, helper forcing, header/protected/config/storage edit, adjudication,
+amend, push, history rewrite, or worktree removal occurred after the
+implementation commit.
