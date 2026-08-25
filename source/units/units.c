@@ -660,6 +660,8 @@ symbols in this file:
 #include "game/game_engine.h"
 #include "game/players.h"
 #include "hs/object_lists.h"
+#include "items/equipment.h"
+#include "items/equipment_definitions.h"
 #include "items/projectiles.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
@@ -677,6 +679,12 @@ symbols in this file:
 #include "sound/game_sound.h"
 
 /* ---------- constants */
+
+enum
+{
+	_equipment_powerup_none = 0,
+	_equipment_powerup_grenade = 6,
+};
 
 /* ---------- macros */
 
@@ -1286,6 +1294,47 @@ boolean unit_approve_weapon_pickup(
 	return approved;
 }
 
+boolean unit_approve_weapon_swap(
+	long unit_index,
+	long weapon_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct weapon_datum *weapon = weapon_get(weapon_index);
+	boolean approved;
+	short inventory_index;
+
+	weapon_definition_get(weapon->definition_index);
+	approved = TRUE;
+	if (unit_get_current_weapon_index(unit_index)!=NONE)
+	{
+		for (inventory_index = 0;
+			inventory_index<MAXIMUM_WEAPONS_PER_UNIT;
+			++inventory_index)
+		{
+			long inventory_weapon_index =
+				unit->unit.weapon_object_indices[inventory_index];
+
+			if (inventory_weapon_index!=NONE)
+			{
+				struct weapon_datum *inventory_weapon =
+					weapon_get(inventory_weapon_index);
+
+				if (weapon->definition_index==inventory_weapon->definition_index &&
+					(inventory_index!=unit->unit.current_weapon_index ||
+					!(inventory_weapon->weapon.age>0.f) ||
+					!(weapon->weapon.age<inventory_weapon->weapon.age)))
+				{
+					approved = FALSE;
+				}
+			}
+		}
+
+		return approved;
+	}
+
+	return FALSE;
+}
+
 boolean unit_has_weapon_definition_index(
 	long unit_index,
 	long weapon_definition_index)
@@ -1435,6 +1484,109 @@ short unit_add_grenade_type_to_inventory(
 	unit->unit.current_grenade_index = grenade_type;
 
 	return unit->unit.grenade_counts[grenade_type];
+}
+
+boolean unit_add_grenade_to_inventory(
+	long unit_index,
+	long equipment_index)
+{
+	struct item_datum *equipment = equipment_get(equipment_index);
+	struct equipment_definition *equipment_definition =
+		equipment_definition_get(equipment->definition_index);
+	struct unit_datum *unit = unit_get(unit_index);
+	struct game_globals_grenade *grenade = TAG_BLOCK_GET_ELEMENT(
+		&scenario_get_game_globals()->grenades,
+		equipment_definition->equipment.grenade_type,
+		struct game_globals_grenade);
+	long local_player_index;
+	boolean result = FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		7282,
+		equipment_definition->equipment.powerup_type==_equipment_powerup_grenade);
+
+	if (grenade &&
+		unit->unit.grenade_counts[equipment_definition->equipment.grenade_type] <
+			grenade->maximum_count)
+	{
+		++unit->unit.grenade_counts[equipment_definition->equipment.grenade_type];
+
+		if (player_index_from_unit_index(unit_index)==NONE)
+		{
+			local_player_index = NONE;
+		}
+		else
+		{
+			local_player_index =
+				player_get(player_index_from_unit_index(unit_index))->local_player_index;
+		}
+
+		if (local_player_index!=NONE)
+		{
+			equipment_handle_pickup(equipment_index);
+		}
+
+		object_delete(equipment_index);
+		result = TRUE;
+	}
+
+	return result;
+}
+
+boolean unit_add_equipment_to_inventory(
+	long unit_index,
+	long equipment_index,
+	short replace)
+{
+	struct item_datum *equipment = equipment_get(equipment_index);
+	struct equipment_definition *equipment_definition =
+		equipment_definition_get(equipment->definition_index);
+	struct unit_datum *unit = unit_get(unit_index);
+	long local_player_index;
+	boolean result = FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		7329,
+		equipment_definition->equipment.powerup_type!=_equipment_powerup_none);
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		7330,
+		equipment_definition->equipment.powerup_type!=_equipment_powerup_grenade);
+
+	if (unit->unit.equipment_object_index!=NONE && replace==TRUE)
+	{
+		object_delete(unit->unit.equipment_object_index);
+		unit->unit.equipment_object_index = NONE;
+	}
+
+	if (unit->unit.equipment_object_index==NONE)
+	{
+		object_disconnect_from_map(equipment_index);
+		object_set_visibility(equipment_index, FALSE);
+
+		if (player_index_from_unit_index(unit_index)==NONE)
+		{
+			local_player_index = NONE;
+		}
+		else
+		{
+			local_player_index =
+				player_get(player_index_from_unit_index(unit_index))->local_player_index;
+		}
+
+		if (local_player_index!=NONE)
+		{
+			equipment_handle_pickup(equipment_index);
+		}
+
+		item_in_unit_inventory(equipment_index, unit_index);
+		unit->unit.equipment_object_index = equipment_index;
+		result = TRUE;
+	}
+
+	return result;
 }
 
 void unit_scripting_doesnt_drop_items(
@@ -1831,6 +1983,78 @@ long unit_scripting_unit_gunner(
 	}
 
 	return gunner_object_index;
+}
+
+void unit_shield_sapping_update(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition =
+		unit_definition_get(unit->definition_index);
+
+	if (unit->unit.animation.state == _unit_state_shield_sapping)
+	{
+		struct animation_graph *animation_graph =
+			animation_graph_definition_get(
+				unit->object.animation.animation_graph_index);
+		struct animation *animation = TAG_BLOCK_GET_ELEMENT(
+			&animation_graph->animations,
+			unit->object.animation.state.index,
+			struct animation);
+
+		/*
+		 * Original bug: January compares the animation index to the loop
+		 * frame. A behavior-corrected build would use state.frame_index.
+		 */
+		if (unit->object.animation.state.index >=
+			animation->private_loop_frame_index)
+		{
+			struct data_iterator iterator;
+			struct player_datum *player;
+			boolean shield_sapped = FALSE;
+
+			data_iterator_new(&iterator, player_data);
+			while ((player = data_iterator_next(&iterator)) != NULL)
+			{
+				if (player->unit_index != NONE)
+				{
+					struct unit_datum *player_unit =
+						unit_get(player->unit_index);
+
+					if (distance_squared3d(
+						&player_unit->object.bounding_sphere_center,
+						&unit->object.bounding_sphere_center) < 16.f)
+					{
+						struct damage_data damage_data;
+
+						damage_data_new(
+							&damage_data,
+							unit_definition->unit.melee_damage.index);
+						damage_data.owner_object_index = unit_index;
+						object_cause_damage(
+							&damage_data,
+							player->unit_index,
+							NONE,
+							NONE,
+							NONE,
+							NULL);
+						shield_sapped = TRUE;
+					}
+				}
+			}
+
+			if (!shield_sapped)
+			{
+				unit->unit.shield_sap_timeout++;
+			}
+			else
+			{
+				unit->unit.shield_sap_timeout = 0;
+			}
+		}
+	}
+
+	return;
 }
 
 boolean unit_get_current_flashlight_state(
@@ -3129,6 +3353,17 @@ void unit_ready_desired_weapon(
 	return;
 }
 
+short unit_inventory_next_weapon(
+	long unit_index,
+	short current_index,
+	short delta)
+{
+	return unit_weapon_next_index(
+		unit_index,
+		current_index,
+		delta);
+}
+
 boolean unit_drop_current_weapon(
 	long unit_index,
 	boolean immediate)
@@ -3136,7 +3371,7 @@ boolean unit_drop_current_weapon(
 	struct unit_datum *unit = unit_get(unit_index);
 	struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
 	long current_weapon_index = unit_get_current_weapon_index(unit_index);
-	long next_index = unit_weapon_next_index(unit_index, unit->unit.current_weapon_index, 1);
+	short next_index = unit_weapon_next_index(unit_index, unit->unit.current_weapon_index, 1);
 
 	boolean result = FALSE;
 
@@ -3237,7 +3472,6 @@ static short unit_weapon_next_index(
 	short current_index,
 	short delta)
 {
-	long selected_weapon_last_used_at_game_time;
 	short inventory_index;
 	
 	struct unit_datum *unit = unit_get(unit_index);
@@ -3254,35 +3488,35 @@ static short unit_weapon_next_index(
 	
 	do
 	{
-		boolean current_weapon_must_be_readied;
-		boolean select_weapon;
-		long current_weapon_last_used_at_game_time = unit->unit.weapon_object_indices[inventory_index];
+		long current_weapon_index = unit->unit.weapon_object_indices[inventory_index];
 
-		unit_get(unit_index);
-		weapon_get(unit_index);
-
-		if (current_weapon_last_used_at_game_time !=NONE && unit_can_use_weapon(unit_index, current_weapon_last_used_at_game_time))
+		if (current_weapon_index != NONE && unit_can_use_weapon(unit_index, current_weapon_index))
 		{
-			selected_weapon_last_used_at_game_time = unit->unit.weapon_last_used_at_game_time[inventory_index];
-
-			if (delta || selected_weapon_index == NONE || selected_weapon_last_used_at_game_time < current_weapon_last_used_at_game_time)
+			if (delta ||
+				selected_weapon_index == NONE ||
+				unit->unit.weapon_last_used_at_game_time[selected_weapon_index] <
+					unit->unit.weapon_last_used_at_game_time[inventory_index])
 			{
 				selected_weapon_index = inventory_index;
 			}
 
-			if (weapon_must_be_readied(current_weapon_last_used_at_game_time) || inventory_index != current_index)
+			if (weapon_must_be_readied(unit->unit.weapon_object_indices[inventory_index]) ||
+				inventory_index != current_index)
 			{
 				break;
 			}
 		}
 
-		if (delta>=0)
+		if (delta<0)
 		{
-			inventory_index = inventory_index == (MAXIMUM_WEAPONS_PER_UNIT-1) ? 0 : inventory_index+1;
+			inventory_index =
+				inventory_index == 0 ?
+					MAXIMUM_WEAPONS_PER_UNIT-1 :
+					inventory_index-1;
 		}
 		else
 		{
-			inventory_index = inventory_index ? inventory_index-1 : (MAXIMUM_WEAPONS_PER_UNIT-1);
+			inventory_index = inventory_index == (MAXIMUM_WEAPONS_PER_UNIT-1) ? 0 : inventory_index+1;
 		}
 
 	}
