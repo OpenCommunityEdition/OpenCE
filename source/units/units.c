@@ -647,6 +647,7 @@ symbols in this file:
 #include "units.h"
 
 #include "bipeds.h"
+#include "biped_definitions.h"
 #include "unit_definitions.h"
 
 #include "ai/actors.h"
@@ -735,6 +736,11 @@ enum
 	_unit_record_damage_driver_seat_type = 9,
 };
 
+enum
+{
+	_unit_debug_function_active_bit = 2,
+};
+
 /* ---------- macros */
 
 #define unit_get_current_weapon_index(unit_index) unit_inventory_get_weapon((unit_index), unit_get((unit_index))->unit.current_weapon_index)
@@ -783,6 +789,15 @@ struct unit_control_data
 
 typedef char unit_control_data_size_assert[
 	sizeof(struct unit_control_data) == 0x40 ? 1 : -1];
+
+struct unit_animation_update_data
+{
+	char state_desired;
+	boolean crouching;
+};
+
+typedef char unit_animation_update_data_size_assert[
+	sizeof(struct unit_animation_update_data) == 0x2 ? 1 : -1];
 
 struct unit_initial_weapon
 {
@@ -894,11 +909,21 @@ static boolean code_00198fd0(
 static boolean code_00198170(struct unit_animation *animation);
 static boolean code_001981f0(short state);
 static short code_00198230(short new_state, short old_state);
+static boolean code_00198050(struct unit_animation *animation);
+static boolean code_00197f90(
+	struct unit_animation *animation,
+	short desired_state);
+static boolean code_00198070(struct unit_animation *animation);
 static long code_00198190(short state);
 static void code_0019b0b0(
 	long unit_index,
 	long animation_graph_index,
 	short animation_index);
+static short code_0019b160(
+	struct animation_state *animation,
+	long animation_graph_index,
+	long unit_index);
+static char const *code_0019dff0(long unit_index);
 static void code_0019ea70(
 	long unit_index,
 	real_vector2d const *alignment_vector);
@@ -933,6 +958,9 @@ static boolean unit_set_or_test_seat_and_weapon_label(
 boolean unit_animation_set_state(
 	long unit_index,
 	short new_state);
+short unit_update_animation(
+	long unit_index,
+	struct unit_animation_update_data const *data);
 
 static boolean unit_verify_inventory(long unit_index);
 static void unit_throw_grenade_release(long unit_index, boolean premature);
@@ -6193,6 +6221,111 @@ static void unit_throw_grenade_move_to_hand(
 	return;
 }
 
+static boolean code_00198050(
+	struct unit_animation *animation)
+{
+	boolean result = FALSE;
+
+	if (animation->state>=_unit_state_turn_right &&
+		animation->state<=_unit_state_move_front)
+	{
+		result = TRUE;
+	}
+
+	return result;
+}
+
+static boolean code_00197f90(
+	struct unit_animation *animation,
+	short desired_state)
+{
+	boolean result = TRUE;
+
+	switch (animation->state)
+	{
+	case _unit_state_ai_impulse:
+	case _unit_state_melee_attack:
+	case _unit_state_melee_airborne:
+	case _unit_state_throw_grenade:
+	case _unit_state_resurrect_front:
+	case _unit_state_resurrect_back:
+	case _unit_state_leap_start:
+	case _unit_state_leap_melee:
+		if (desired_state!=_unit_state_hard_ping)
+		{
+			return FALSE;
+		}
+		break;
+
+	case _unit_state_dying_airborne:
+	case _unit_state_dying:
+		{
+			long state = desired_state;
+
+			if (state<_unit_state_dying_airborne ||
+				state>_unit_state_dying)
+			{
+				goto state_not_allowed;
+			}
+
+			return TRUE;
+		}
+
+	case _unit_state_turn_left:
+	case _unit_state_turn_right:
+	case _unit_state_opening:
+	case _unit_state_closing:
+		if (desired_state!=_unit_state_idle)
+		{
+			break;
+		}
+		/* fall through */
+	case _unit_state_hard_ping:
+	case _unit_state_entering_seat:
+	case _unit_state_exiting_seat:
+	case _unit_state_user_animation:
+	state_not_allowed:
+		result = FALSE;
+		break;
+
+	default:
+		break;
+	}
+
+	return result;
+}
+
+static boolean code_00198070(
+	struct unit_animation *animation)
+{
+	boolean result = TRUE;
+
+	switch (animation->state)
+	{
+	case _unit_state_gesture:
+	case _unit_state_turn_left:
+	case _unit_state_turn_right:
+	case _unit_state_hard_ping:
+	case _unit_state_entering_seat:
+	case _unit_state_exiting_seat:
+	case _unit_state_user_animation:
+	case _unit_state_ai_impulse:
+	case _unit_state_melee_attack:
+	case _unit_state_melee_airborne:
+	case _unit_state_throw_grenade:
+	case _unit_state_resurrect_front:
+	case _unit_state_resurrect_back:
+	case _unit_state_leap_start:
+	case _unit_state_leap_melee:
+		result = FALSE;
+		break;
+	default:
+		break;
+	}
+
+	return result;
+}
+
 static boolean code_001980d0(
 	struct unit_animation *animation)
 {
@@ -7830,6 +7963,379 @@ static void code_0019b0b0(
 
 	return;
 }
+
+static short code_0019b160(
+	struct animation_state *animation,
+	long animation_graph_index,
+	long unit_index)
+{
+	long sound_index;
+	short result = animation_update_internal(
+		1,
+		animation_graph_index,
+		animation,
+		&sound_index);
+
+	if (sound_index!=NONE)
+	{
+		object_impulse_sound_new(
+			unit_index,
+			sound_index,
+			0,
+			global_origin3d,
+			global_forward3d,
+			1.f);
+	}
+
+	return result;
+}
+
+static char const *code_0019dff0(
+	long unit_index)
+{
+	long weapon_index = unit_inventory_get_weapon(
+		unit_index,
+		unit_get(unit_index)->unit.current_weapon_index);
+	char const *weapon_label;
+
+	if (weapon_index==NONE)
+	{
+		weapon_label = "unarmed";
+	}
+	else
+	{
+		weapon_label = weapon_get_label(weapon_index);
+	}
+
+	return weapon_label;
+}
+
+short unit_update_animation(
+	long unit_index,
+	struct unit_animation_update_data const *data)
+{
+	struct unit_datum *unit;
+	struct unit_definition *unit_definition;
+	short desired_state;
+	word result;
+	boolean apply_state;
+	short desired_base_seat_index;
+	short animation_update_result;
+	boolean can_change_animation;
+	struct biped_datum *biped;
+	struct biped_definition *biped_definition;
+	struct model *model;
+	struct animation_graph *animation_graph;
+	struct animation *animation;
+	struct unit_datum *parent_unit;
+	struct unit_definition *parent_definition;
+	struct unit_seat *seat;
+	real_vector3d root_velocity;
+	real_matrix4x3 world_matrix;
+
+	unit = unit_get(unit_index);
+	unit_definition = unit_definition_get(unit->definition_index);
+	desired_state = data->state_desired;
+	result = 0;
+	apply_state = FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		0xb61,
+		desired_state>=0 && desired_state<NUMBER_OF_UNIT_STATES);
+
+	desired_base_seat_index = NONE;
+
+	if (unit->object.parent_object_index==NONE &&
+		!TEST_FLAG(
+			unit->object.functions_active_flags,
+			_unit_debug_function_active_bit))
+	{
+		switch (unit->unit.animation.desired_state)
+		{
+		case _unit_animation_state_asleep:
+			desired_base_seat_index = _unit_base_seat_asleep;
+			break;
+		case _unit_animation_state_alert:
+		case _unit_animation_state_suspicious:
+			desired_base_seat_index = _unit_base_seat_alert;
+			break;
+		case _unit_animation_state_in_combat:
+		{
+			boolean use_combat_variant;
+
+			use_combat_variant = data->crouching!=0;
+			desired_base_seat_index =
+				use_combat_variant +
+					_unit_base_seat_stand;
+			break;
+		}
+		case _unit_animation_state_wary:
+			desired_base_seat_index = _unit_base_seat_stand;
+			break;
+		case _unit_animation_state_flee:
+			desired_base_seat_index = _unit_base_seat_flee;
+			break;
+		case _unit_animation_state_flaming:
+			desired_base_seat_index = _unit_base_seat_flaming;
+			break;
+		default:
+			break;
+		}
+
+		match_assert(
+			"c:\\halo\\SOURCE\\units\\units.c",
+			0xb73,
+			desired_base_seat_index!=NONE);
+
+		if (unit->unit.player_index!=NONE &&
+			magic_base_animation_seat_index!=NONE)
+		{
+			if (magic_base_animation_seat_index<0)
+			{
+				desired_base_seat_index = _unit_base_seat_asleep;
+			}
+			else
+			{
+				desired_base_seat_index = MIN(
+					magic_base_animation_seat_index,
+					NUMBER_OF_UNIT_ANIMATION_STATES-1);
+			}
+		}
+
+		if (unit->unit.magic_seat_index!=NONE)
+		{
+			desired_base_seat_index = unit->unit.magic_seat_index;
+		}
+		if (TEST_FLAG(
+			unit->unit.control_flags,
+			_unit_control_force_alert_bit))
+		{
+			desired_base_seat_index = _unit_base_seat_alert;
+		}
+		if (unit->unit.flaming_death_delay>0)
+		{
+			desired_base_seat_index = _unit_base_seat_flaming;
+		}
+
+		if (unit->unit.animation.base_seat_index!=desired_base_seat_index)
+		{
+			can_change_animation = code_00197f90(
+				&unit->unit.animation,
+				desired_state);
+			if (can_change_animation)
+			{
+				unit_set_or_test_seat_and_weapon_label(
+					unit_index,
+					base_seat_label_get(desired_base_seat_index),
+					code_0019dff0(unit_index),
+					TRUE);
+			}
+		}
+	}
+
+	if (unit->unit.animation.soft_ping_animation.index!=NONE)
+	{
+		animation_update_result = code_0019b160(
+			&unit->unit.animation.soft_ping_animation,
+			unit_definition->object.animation_graph.index,
+			unit_index);
+		if (animation_update_result==2)
+		{
+			unit->unit.animation.soft_ping_animation.index = NONE;
+		}
+	}
+
+	if (unit->object.animation.state.index!=NONE)
+	{
+		animation_update_result = code_0019b160(
+			&unit->object.animation.state,
+			unit->object.animation.animation_graph_index,
+			unit_index);
+
+		if (animation_update_result==1)
+		{
+			switch (unit->unit.animation.state)
+			{
+			case _unit_state_throw_grenade:
+				unit_throw_grenade_release(unit_index, FALSE);
+				break;
+			case _unit_state_melee_attack:
+			case _unit_state_melee_airborne:
+			case _unit_state_leap_melee:
+				unit_cause_melee_damage(
+					unit_index,
+					FALSE,
+					NONE,
+					NONE,
+					NONE,
+					NONE,
+					FALSE);
+				break;
+			default:
+				break;
+			}
+		}
+		else if (animation_update_result==2)
+		{
+			switch (unit->unit.animation.state)
+			{
+			case _unit_state_dying:
+				if (TEST_FLAG(
+						unit_definition->unit.flags,
+						_unit_is_destroyed_after_dying_bit))
+				{
+					if (TEST_FLAG(unit->object.flags, _object_at_rest_bit))
+					{
+						goto destroy_unit;
+					}
+					if (unit->object.type!=_object_type_biped)
+					{
+						goto finish_dying;
+					}
+
+					biped = biped_get(unit_index);
+					biped_definition =
+						biped_definition_get(biped->definition_index);
+					if (!TEST_FLAG(biped->biped.flags, _biped_limping_bit) ||
+						TEST_FLAG(
+							biped_definition->biped.flags,
+							_biped_has_no_dying_airborne_bit))
+					{
+	destroy_unit:
+						unit_destroy(unit_index);
+						goto finish_dying_animation;
+					}
+				}
+
+	start_limp_body:
+				if (unit->object.type==_object_type_biped)
+				{
+					biped_start_limp_body_physics(unit_index);
+				}
+				goto finish_dying;
+
+	finish_dying:
+				SET_FLAG(
+					unit->unit.animation.flags,
+					_unit_animation_ignore_translation_bit,
+					TRUE);
+				--unit->object.animation.state.frame_index;
+	finish_dying_animation:
+				break;
+
+			case _unit_state_exiting_seat:
+				model = model_definition_get(
+					unit_definition->object.model.index);
+				animation_graph = animation_graph_definition_get(
+					unit->object.animation.animation_graph_index);
+				animation = TAG_BLOCK_GET_ELEMENT(
+					&animation_graph->animations,
+					unit->object.animation.state.index,
+					struct animation);
+
+				animation_get_root_velocity(
+					model,
+					animation,
+					unit->object.animation.state.frame_index,
+					&root_velocity);
+				object_get_world_matrix(unit_index, &world_matrix);
+				matrix4x3_transform_vector(
+					&world_matrix,
+					&root_velocity,
+					&root_velocity);
+				unit_exit_seat_end(unit_index);
+				add_vectors3d(
+					&unit->object.translational_velocity,
+					&root_velocity,
+					&unit->object.translational_velocity);
+				break;
+
+			case _unit_state_entering_seat:
+				parent_unit = unit_get(unit->object.parent_object_index);
+				parent_definition = unit_definition_get(parent_unit->definition_index);
+				seat = TAG_BLOCK_GET_ELEMENT(
+					&parent_definition->unit.seats,
+					unit->unit.parent_seat_index,
+					struct unit_seat);
+
+				object_set_visibility(
+					unit_index,
+					!TEST_FLAG(seat->flags, _unit_seat_invisible_bit));
+				if (parent_unit->unit.driver_object_index==unit_index)
+				{
+					unit_close(unit->object.parent_object_index);
+				}
+				break;
+
+			case _unit_state_opening:
+			case _unit_state_closing:
+				--unit->object.animation.state.frame_index;
+				break;
+
+			case _unit_state_leap_start:
+				result = TRUE;
+				desired_state = _unit_state_leap_airborne;
+				break;
+
+			default:
+				break;
+			}
+
+			if (!code_00198070(&unit->unit.animation))
+			{
+				apply_state = TRUE;
+			}
+		}
+	}
+
+	if (unit->unit.animation.action_animation.index!=NONE)
+	{
+		animation_update_result = code_0019b160(
+			&unit->unit.animation.action_animation,
+			unit_definition->object.animation_graph.index,
+			unit_index);
+		if (animation_update_result==2)
+		{
+			object_start_interpolation(unit_index, 6);
+			unit = unit_get(unit_index);
+			unit->unit.animation.action = FALSE;
+			unit->unit.animation.action_animation.index = NONE;
+		}
+	}
+
+	if (unit->unit.animation.overlay_action_animation.index!=NONE)
+	{
+		animation_update_result = code_0019b160(
+			&unit->unit.animation.overlay_action_animation,
+			unit_definition->object.animation_graph.index,
+			unit_index);
+
+		switch (animation_update_result)
+		{
+		case 2:
+		case 4:
+			if (!code_00198050(&unit->unit.animation))
+			{
+				unit->unit.animation.overlay_action = FALSE;
+				unit->unit.animation.overlay_action_animation.index = NONE;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (apply_state ||
+		(desired_state!=unit->unit.animation.state &&
+		code_00197f90(&unit->unit.animation, desired_state)))
+	{
+		unit_animation_set_state(unit_index, desired_state);
+	}
+
+	return result;
+}
+
 boolean unit_animation_set_state(
 	long unit_index,
 	short new_state)
