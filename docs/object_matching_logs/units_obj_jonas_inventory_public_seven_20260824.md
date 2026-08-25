@@ -396,3 +396,75 @@ verified generated-object deletion, normal Ninja rebuild, regression check,
 direct seven-name comparison, full 189/129 census, and final owner audit will
 be appended in a separate ledger-only commit. No amend, push, or history
 rewrite is authorized.
+
+## Actual committed-state forced replay
+
+The implementation commit is
+`07b7a5ca17c974a497993dabd4ca9caaa13d08ab`. Its committed source payload is
+unchanged from the retained evidence above:
+`686c23e90655f970b9bcedb9aa3447123d006c72`, 124,248 raw bytes, SHA-256
+`ca8d3e1843354436bcede267243dcc84b9d752c9aa39d09b1c122ea3bf2311bb`.
+The initial committed ledger payload is
+`bc6601e571b25d520ce1eb4bb7c47e79cb570eda`, 19,619 raw bytes, SHA-256
+`46ebc2479afbd04ec08a20c49c67c675ea6263278f22f6e967ab1ef89161976c`.
+
+The worktree was clean at that implementation commit. Ninja first confirmed
+that `build\base\source\units\units.obj` had no work pending. Because the
+copied Ninja log still wanted to refresh the unrelated downloader edges, the
+repository gate's built-in `--no-build` capture was used only after that
+explicit object up-to-date proof and after the exact local report had passed.
+The resulting clean implementation-state snapshot is:
+
+```text
+build/regression_units_inventory_public_seven_replay_20260824.json
+commit: 07b7a5ca17c974a497993dabd4ca9caaa13d08ab
+size: 4,546,705 bytes
+SHA-256: 1d7aff878b457c80c6e42c5637acfe2b076a1080d63a748a3b075f32a0b2d729
+```
+
+The generated object resolved to
+`C:\Users\isabe\Documents\Codex\2026-07-13\i-w\units-inventory-public-six-20260824\build\base\source\units\units.obj`,
+which was verified to remain beneath the isolated lane root. Before deletion
+it was 75,827 bytes with whole-file SHA-256
+`881b98385530cc6f62fa6234346483d6c615bffeee303658ae0b721ae6ec70bf`.
+That exact file was deleted and absence was verified. A normal one-target
+Ninja rebuild then ran exactly one `CL ... units.c` edge and succeeded.
+
+The rebuilt object is again 75,827 bytes. Its whole-file SHA-256 is
+`6b395323ef1904c22472b3cd16058134b6229b3b7152bd06ee9eb93223e20ccf`;
+the whole-file difference is confined to non-runtime COFF build metadata.
+The committed-state regression check is authoritative for its captured
+fingerprints and reports:
+
+```text
+ok: true
+failures: 0
+warnings: 0
+still_exact: 104
+newly_exact: 0
+changed_nonexact: 0
+```
+
+That check covers every captured function, runtime non-code section,
+relocation, and symbol-owner record. A post-check Ninja dry run reports
+`ninja: no work to do`.
+
+Independent direct replay proofs also passed:
+
+- seven-name hardened comparison: `all_equal: true` for all seven retained
+  code COMDATs, including every relocation identity;
+- complete underscore-function census: 104 exact / 8 present nonexact /
+  77 absent, exactly matching the initial retained classification;
+- complete January target-data census: 63 exact / 0 present nonexact /
+  66 absent, preserving all 60 inherited accepted sections and the three
+  newly exact strings;
+- cross-object `__real@41800000` comparison: `all_equal: true`, four bytes,
+  zero relocations, unchanged select-any ownership evidence;
+- no writable `.data`, `.bss`, COMMON, function-owner, runtime-literal, or
+  undefined-external ownership drift from the implementation-state snapshot;
+- committed source blob unchanged; only this ledger is modified for the
+  additive replay record.
+
+This is the actual replay, not a prewritten claim. No source change, amend,
+push, history rewrite, body tuning, or protected neighboring-path edit was
+made after the implementation commit.
