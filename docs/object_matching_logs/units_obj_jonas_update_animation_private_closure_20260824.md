@@ -243,3 +243,58 @@ Ninja edge, and checked immediately. Direct function/data censuses, support
 hashes, runtime-owner fingerprints, and a final Ninja dry run will be repeated
 before one additive ledger-only replay commit. No push, amend, rebase, history
 rewrite, or worktree removal is performed.
+
+## Clean committed-state replay
+
+Implementation-and-initial-ledger commit
+`ad04fa05982260ccb89bcc4edce8daa34fe876f4` was authored and committed by
+Jonas Volman and was clean before replay. Re-reading that commit proves:
+
+- retained source blob `52dac812e29575758ab8e9a0b6e943620a086012`,
+  251,430 raw Git-payload bytes, payload SHA-256
+  `c3a940ea50e38f99695d4a558b94a22690124ce9a91814e2f464e38f4a94fab8`;
+- initial ledger blob `48ae5fff2488221d7a5ddae0f755e317330e3ad7`,
+  13,355 raw Git-payload bytes, payload SHA-256
+  `51caa3369df7c9009e1c465207948a2ed8cbb82e20dbaf501b7cf7510ba50964`.
+
+A fresh one-unit accepted-state snapshot was written with `--no-build` at
+that exact clean commit. The ignored manifest
+`build/audit/regression_units_uua_private_committed_20260824.json` is
+5,931,514 bytes with phase-specific SHA-256
+`e992b69a7cf421ab761376488e2c00e950a2205f451d5bc2919457fd21483cb2`
+and pins the full implementation commit.
+
+The generated path resolved to
+`build/base/source/units/units.obj`, was proven equal to the expected absolute
+path, and was proven to remain inside this isolated worktree. The snapshotted
+first-shot object was 138,052 bytes with SHA-256
+`8d3474ca185a7dff2c7dc86c2a6018f6f4c66b972f11df4018f26e9bf06b7e88`.
+Only that exact file was removed with `Remove-Item -LiteralPath`; immediate
+verification proved it absent. The normal generated target then ran exactly:
+
+```text
+[1/1] CL build\base\source\units\units.obj
+```
+
+The replay object is again 138,052 bytes with metadata-phase SHA-256
+`0600356cab6a7f729a7076436f9ecc70c1961980dcf5677d4845942407e0b081`.
+The raw object-container hash differs through normal COFF emission metadata;
+the complete runtime acceptance view is identical.
+
+The immediate committed regression check returned `ok: true`, exactly 160
+`still_exact`, zero failures, zero warnings, zero `newly_exact`, and zero
+`changed_nonexact`. Independent direct comparison repeated:
+
+- 160 exact / 13 emitted nonexact / 16 absent across the 189 ordinary target
+  function owners;
+- 125 exact / zero present-nonexact / four absent across all 129 January
+  non-code owners;
+- all six emitted closure bodies reproduce the first-shot padded bytes,
+  normalized hashes, relocation sequences, and support/exact dispositions;
+- all 213 first-shot non-code identities are present in the replay, with zero
+  addition, removal, or cross-object acceptance-view mutation.
+
+A final generated Units-object Ninja dry run reports `ninja: no work to do`.
+Only this additive replay record is changed after implementation; no source,
+header, protected path, configuration, storage owner, matching metadata, or
+other ledger is modified.
