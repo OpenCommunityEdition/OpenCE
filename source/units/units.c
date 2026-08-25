@@ -3866,6 +3866,46 @@ void unit_scripting_exit_vehicle(
 	return;
 }
 
+void unit_adjust_projectile_ray(
+	long unit_index,
+	real_point3d *origin,
+	real_vector3d *direction,
+	real *velocity,
+	boolean adjust_origin,
+	boolean use_aiming_vector)
+{
+	struct unit_datum *unit;
+	real projection;
+	real_vector3d relative;
+
+	unit = unit_get(unit_index);
+	if (use_aiming_vector)
+	{
+		*direction = unit->unit.aiming_vector;
+	}
+
+	if (adjust_origin)
+	{
+		real_point3d camera_position;
+
+		unit_get_camera_position(unit_index, &camera_position);
+		vector_from_points3d(&camera_position, origin, &relative);
+		projection =
+			((relative.i*direction->i + relative.k*direction->k) +
+			 relative.j*direction->j);
+		point_from_line3d(&camera_position, direction, projection, origin);
+	}
+
+	{
+		real_vector3d object_velocity;
+
+		object_get_velocities(unit_index, &object_velocity, NULL);
+		*velocity = dot_product3d(direction, &object_velocity);
+	}
+
+	return;
+}
+
 void unit_render_debug(
 	long unit_index)
 {
