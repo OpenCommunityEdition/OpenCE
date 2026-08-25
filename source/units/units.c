@@ -936,6 +936,10 @@ static void code_0019ea70(
 void player_control_set_desired_weapon(
 	long unit_index,
 	short desired_weapon_index);
+boolean ai_try_vehicle_eviction(
+	long actor_index,
+	long entering_unit_index,
+	boolean immediate);
 boolean valid_real_normal2d(real_vector2d const *normal);
 void biped_stop_melee_attack(long unit_index);
 void first_person_weapon_message_from_unit(long unit_index, short message_type);
@@ -4471,6 +4475,132 @@ void unit_abort_animation(
 	unit_animation_set_state(unit_index, _unit_state_idle);
 
 	return;
+}
+
+short unit_find_nearby_seat(
+	long unit_index,
+	long target_unit_index,
+	short *parent_seat_index)
+{
+	enum
+	{
+		_unit_nearby_seat_none = 0,
+		_unit_nearby_seat_occupied,
+		_unit_nearby_seat_available,
+	};
+	enum
+	{
+		_unit_seat_requires_driver_bit = 9,
+	};
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_datum *target_unit = unit_get(target_unit_index);
+	struct unit_definition *target_unit_definition =
+		unit_definition_get(target_unit->definition_index);
+	short best_state = _unit_nearby_seat_none;
+	short best_seat_index = NONE;
+	boolean best_seat_is_driver;
+
+	if (!TEST_FLAG(target_unit->object.damage_flags, _object_dead_bit) &&
+		!TEST_FLAG(target_unit->unit.flags, _unit_not_enterable_by_player_bit))
+	{
+		short seat_index;
+		real best_distance = REAL_MAX;
+		best_seat_is_driver = FALSE;
+
+		for (seat_index = 0;
+			seat_index < target_unit_definition->unit.seats.count;
+			seat_index++)
+		{
+			struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+				&target_unit_definition->unit.seats,
+				seat_index,
+				struct unit_seat);
+			real_point3d unit_entrance_position;
+			real_point3d seat_position;
+
+			if (unit_get_seat_entrance_point(
+				unit_index,
+				target_unit_index,
+				seat_index,
+				&unit_entrance_position,
+				&seat_position,
+				NULL))
+			{
+				real entrance_distance = distance3d(
+					&unit_entrance_position,
+					&unit->object.bounding_sphere_center);
+				real seat_distance = distance3d(
+					&seat_position,
+					&unit->object.bounding_sphere_center);
+				real distance = MIN(entrance_distance, seat_distance);
+
+				if (distance < 1.f &&
+					(!TEST_FLAG(seat->flags, _unit_seat_requires_driver_bit) ||
+						target_unit->unit.driver_object_index != NONE) &&
+					seat->label[0] != 0 &&
+					unit_set_or_test_seat_and_weapon_label(
+						unit_index,
+						seat->label,
+						NULL,
+						FALSE))
+				{
+					long occupant_unit_index = NONE;
+					short seat_state = _unit_nearby_seat_none;
+
+					if (unit_can_enter_seat(
+						unit_index,
+						target_unit_index,
+						seat_index,
+						&occupant_unit_index))
+					{
+						seat_state = _unit_nearby_seat_available;
+					}
+					else if (occupant_unit_index != NONE)
+					{
+						struct unit_datum *occupant = unit_get(occupant_unit_index);
+
+						if (occupant->unit.actor_index != NONE &&
+							ai_try_vehicle_eviction(
+								occupant->unit.actor_index,
+								unit_index,
+								FALSE))
+						{
+							seat_state = _unit_nearby_seat_occupied;
+						}
+					}
+
+					if (seat_state != _unit_nearby_seat_none)
+					{
+						boolean seat_is_driver = TEST_FLAG(
+							seat->flags,
+							_unit_seat_driver_bit);
+						real distance_scale = 1.f;
+
+						if (best_seat_is_driver && !seat_is_driver)
+							distance_scale = 1.5f;
+
+						if (best_seat_index == NONE ||
+							seat_state > best_state ||
+							distance * distance_scale < best_distance)
+						{
+							best_state = seat_state;
+							best_seat_index = seat_index;
+							best_seat_is_driver = seat_is_driver;
+							best_distance = distance;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		4088,
+		parent_seat_index != NULL);
+	*parent_seat_index = best_seat_index;
+
+	return best_state;
 }
 
 short vehicle_scripting_find_available_seats(
