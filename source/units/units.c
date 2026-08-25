@@ -720,6 +720,11 @@ enum
 	NUMBER_OF_VEHICLE_SEAT_DESIRE_TYPES,
 };
 
+enum
+{
+	_unit_record_damage_driver_seat_type = 9,
+};
+
 /* ---------- macros */
 
 #define unit_get_current_weapon_index(unit_index) unit_inventory_get_weapon((unit_index), unit_get((unit_index))->unit.current_weapon_index)
@@ -869,6 +874,7 @@ static boolean unit_integrated_night_vision_is_active(long unit_index);
 boolean game_team_is_enemy(
 	short team_index0,
 	short team_index1);
+boolean ai_handle_killing_spree(long unit_index, short killing_spree_count);
 
 /* ---------- globals */
 
@@ -3696,6 +3702,158 @@ void unit_unzoom(
 	unit->unit.desired_zoom_level = NONE;
 	unit->unit.integrated_night_vision_power = 0.f;
 	player_control_unzoom(unit_index);
+
+	return;
+}
+
+void unit_record_damage(
+	long unit_index,
+	real damage_amount,
+	short damage_type,
+	boolean notify_ai,
+	long attacker_player_index,
+	short attacker_team,
+	long killing_object_index)
+{
+	struct unit_datum *unit;
+	struct unit_datum *attacker_unit;
+	long attacker_unit_index;
+	long player_unit_index;
+	long controlling_unit_index;
+	long game_time;
+	short attacker_index;
+	short preserved_attacker_index;
+	short best_new_attacker_index;
+	boolean found_attacker;
+
+	unit = unit_get(unit_index);
+	found_attacker = FALSE;
+	game_time = game_time_get();
+	for (attacker_index = 0;
+		attacker_index < MAXIMUM_ATTACKERS_PER_UNIT;
+		attacker_index++)
+	{
+		struct unit_attacker *attacker =
+			&unit->unit.attackers[attacker_index];
+
+		if ((attacker_player_index != NONE &&
+			attacker->player_index == attacker_player_index) ||
+			attacker->object_index == killing_object_index)
+		{
+			attacker->game_time_stamp = game_time;
+			found_attacker = TRUE;
+			attacker->damage_inflicted += damage_amount;
+		}
+	}
+
+	if (!found_attacker)
+	{
+		best_new_attacker_index = NONE;
+		for (attacker_index = 0;
+			attacker_index < MAXIMUM_ATTACKERS_PER_UNIT;
+			attacker_index++)
+		{
+			if (unit->unit.attackers[attacker_index].game_time_stamp == NONE)
+			{
+				best_new_attacker_index = attacker_index;
+				break;
+			}
+		}
+
+		if (best_new_attacker_index == NONE)
+		{
+			preserved_attacker_index = 0;
+			for (attacker_index = 1;
+				attacker_index < MAXIMUM_ATTACKERS_PER_UNIT;
+				attacker_index++)
+			{
+				if (unit->unit.attackers[attacker_index].damage_inflicted >
+					unit->unit.attackers[preserved_attacker_index].damage_inflicted)
+				{
+					preserved_attacker_index = attacker_index;
+				}
+			}
+
+			best_new_attacker_index = NONE;
+			for (attacker_index = 0;
+				attacker_index < MAXIMUM_ATTACKERS_PER_UNIT;
+				attacker_index++)
+			{
+				if (attacker_index != preserved_attacker_index &&
+					(best_new_attacker_index == NONE ||
+					unit->unit.attackers[attacker_index].game_time_stamp <
+						unit->unit.attackers[best_new_attacker_index].game_time_stamp))
+				{
+					best_new_attacker_index = attacker_index;
+				}
+			}
+
+			match_assert(
+				"c:\\halo\\SOURCE\\units\\units.c",
+				4972,
+				best_new_attacker_index!=NONE);
+		}
+
+		unit->unit.attackers[best_new_attacker_index].player_index = attacker_player_index;
+		unit->unit.attackers[best_new_attacker_index].object_index = killing_object_index;
+		unit->unit.attackers[best_new_attacker_index].damage_inflicted = damage_amount;
+		unit->unit.attackers[best_new_attacker_index].game_time_stamp = game_time;
+	}
+
+	attacker_unit = NULL;
+	attacker_unit_index = killing_object_index;
+	if (notify_ai && attacker_team != NONE &&
+		game_team_is_enemy(unit->object.owner_team_index, attacker_team))
+	{
+		if (attacker_player_index != NONE)
+		{
+			player_unit_index = player_get(attacker_player_index)->unit_index;
+			if (player_unit_index != NONE)
+			{
+				attacker_unit_index = player_unit_index;
+				attacker_unit = unit_get(player_unit_index);
+			}
+		}
+
+		if (attacker_unit == NULL)
+		{
+			attacker_unit_index = killing_object_index;
+			attacker_unit = unit_try_and_get(killing_object_index);
+		}
+
+		if (attacker_unit != NULL)
+		{
+			if (damage_type == _unit_record_damage_driver_seat_type)
+				controlling_unit_index = attacker_unit->unit.driver_object_index;
+			else
+				controlling_unit_index = attacker_unit->unit.gunner_object_index;
+
+			if (controlling_unit_index != NONE)
+			{
+				attacker_unit_index = controlling_unit_index;
+				attacker_unit = unit_get(controlling_unit_index);
+			}
+
+			if (!TEST_FLAG(attacker_unit->object.damage_flags, _object_dead_bit))
+			{
+				game_time = game_time_get();
+				if (attacker_unit->unit.killing_spree_last_time == NONE ||
+					attacker_unit->unit.killing_spree_last_time + 120 < game_time)
+				{
+					attacker_unit->unit.killing_spree_count = 0;
+				}
+
+				attacker_unit->unit.killing_spree_count++;
+				attacker_unit->unit.killing_spree_last_time = game_time;
+				if (ai_handle_killing_spree(
+					attacker_unit_index,
+					attacker_unit->unit.killing_spree_count))
+				{
+					attacker_unit->unit.killing_spree_count = 0;
+				}
+			}
+		}
+	}
 
 	return;
 }
