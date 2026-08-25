@@ -309,3 +309,68 @@ normal same-path rebuild, immediate regression check, direct strict
 comparison, ownership census, and dry run will be appended in one additive
 ledger-only commit. No push, amend, history rewrite, or worktree removal is
 performed.
+
+## Clean committed-state replay
+
+Implementation-and-ledger commit
+`11e2ba084b214255e70f617d08155261ca77133c` was clean before replay and is
+authored and committed by Jonas Volman. Re-reading that commit proves the
+retained source blob
+`b0c6fd683b271214a2a663cedb3ce58f860fd253`: 123,077 raw Git payload bytes
+with SHA-256
+`00c9968113b551607c64651e117e0f421a52717e67a79e7f8cf01dd7a0f93383`.
+Its initial ledger blob is
+`9d3738c7373c96c9aea6a9ca9c5185811d02566e`: 18,534 raw Git payload bytes
+with SHA-256
+`1ca3a4cf47213aed02025613ad1208e7cfccc306d5878287224ca7e025bf32ad`.
+`git status --porcelain=v1 --untracked-files=all` printed no path.
+
+A fresh one-unit committed-state snapshot was written with `--no-build` at
+that exact clean commit. The ignored manifest
+`build/regression_units_postprocess_committed_20260824.json` is 4,509,319
+bytes with phase-specific SHA-256
+`8d721b8a1940d8667fc27d8979e94f38cd376d7e7428b0ee968d1fdd4cdd2454`.
+
+The resolved generated path
+`build/base/source/units/units.obj` was proven to begin with this isolated
+worktree's resolved root. The snapshotted object was 73,886 bytes with
+SHA-256
+`d4642f98a8271d3e67ce4b5ed801c997f0e102010558188d53e9cb4f41e7bf9e`.
+That exact file was deleted with `Remove-Item -LiteralPath`, and a second
+existence check proved it absent. The normal generated Ninja target then
+executed exactly one `[1/1] CL build\base\source\units\units.obj` action with
+the unchanged natural VC7 rule and flags.
+
+The immediate no-build regression check returned `ok: true`, zero failures,
+zero warnings, `changed_nonexact: []`, `newly_exact: []`, and exactly 100
+`still_exact` functions. That set contains the three retained functions and
+all 97 inherited strict functions.
+
+Direct hardened January comparison again returned `all_equal: true` for
+`_code_001980d0`, `_code_00198130`, and
+`_unit_postprocess_node_matrices`, including every padded byte and all 21
+relocation identities. The complete direct target code-owner census is
+100/189 exact, 10 emitted nonexact, and 79 absent. Removing the retained trio
+from the exact set leaves the 97 inherited strict owners. Rejected
+`_code_00198050` remains absent.
+
+The rebuilt symbol table records `_code_001980d0` and `_code_00198130` as
+storage-class-3 private definitions and the public postprocess callback as a
+storage-class-2 external definition. `_code_00198050` has no symbol. This
+reconfirms the intended private/public linkage convention after a clean
+rebuild.
+
+The rebuilt aggregate `.data` owner is again strict at 1,564 bytes, seven
+relocations, and normalized SHA-256
+`6ed61c39a648905cf23b12b916e2adadfe97b6e5aa492c29a14c7265809ef1a7`.
+`_unit_globals` is again strict at four BSS bytes, zero relocations, and
+normalized SHA-256
+`df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119`.
+The rebuilt object is 73,886 bytes with phase-specific SHA-256
+`a43fbc43eddd93702e576e50c90fc36dd1c6a01dbe0fe530bfc5f468df2840cc`;
+the whole-object hash change is the expected COFF timestamp effect.
+
+A normal Ninja dry run reports `ninja: no work to do.` The source blob is
+unchanged. This section is the sole change in an additive Jonas ledger-only
+follow-up. Nothing is pushed, amended, history-rewritten, or removed from the
+worktree.
