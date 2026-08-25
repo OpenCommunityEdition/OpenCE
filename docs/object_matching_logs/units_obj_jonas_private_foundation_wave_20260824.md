@@ -183,7 +183,27 @@ hardened semantic comparison proves all 97 inherited exact functions and all
 
 ## Committed-state replay
 
-The clean committed-state snapshot, forced same-path object rebuild, direct
-comparison, and ledger-only replay record will be appended after the
-implementation-and-ledger commit. Nothing is pushed, amended, removed from
-history, or force-updated.
+Implementation-and-ledger commit
+`75d41e5269d6a3403b062ca8fcca4b61d018355a` was clean before replay. Its
+committed translation-unit blob is
+`06a743350d6d4edbde971fe49b9ccd60e9d5a2b8`, 166,957 payload bytes. A
+single-unit committed regression snapshot was captured from that exact clean
+commit.
+
+The generated `build/base/source/units/units.obj` was then deleted after its
+resolved absolute path was checked inside the isolated worktree and rebuilt
+through the normal same-path Ninja edge. Ninja reported exactly `[1/1] CL`.
+The replay object is 100,335 bytes with phase-specific raw SHA-256
+`9fd2217d94301cb94ea69de1aec1ff9af8997cca50d54200c30c0de8892ea4b8`.
+
+The clean committed-state regression check passes with all 112 accepted
+functions `still_exact`, no newly exact or changed-nonexact function, zero
+failures, and zero warnings. The hardened census again reports 112/189 strict
+external functions and 94/129 strict external data sections. Direct semantic
+audit again reports 4,039 semantic exact, 104 hidden exact, 4,100 accepted
+exact, and zero unit errors. All fifteen normalized hashes, 217 relocation
+identities/addends, `.data`/`.bss` ownership, and inherited exact sections are
+reproduced.
+
+This record is an additive Jonas-owned ledger-only follow-up. Nothing is
+pushed, amended, removed from history, or force-updated.
