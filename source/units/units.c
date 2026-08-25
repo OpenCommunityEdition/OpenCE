@@ -896,8 +896,10 @@ static void code_0019b600(
 	long unit_index,
 	short material_type,
 	long damage_effect_index);
-static void code_0019a170(long unit_index);
-static short code_0019a640(long unit_index);
+static void code_0019a170(
+	long unit_index);
+static short code_0019a640(
+	long unit_index);
 
 static short code_00198e40(
 	short animation_impulse,
@@ -906,15 +908,22 @@ static boolean code_00198fd0(
 	long unit_index,
 	long animation_impulse);
 
-static boolean code_00198170(struct unit_animation *animation);
-static boolean code_001981f0(short state);
-static short code_00198230(short new_state, short old_state);
-static boolean code_00198050(struct unit_animation *animation);
+static boolean code_00198170(
+	struct unit_animation *animation);
+static boolean code_001981f0(
+	short state);
+static short code_00198230(
+	short new_state,
+	short old_state);
+static boolean code_00198050(
+	struct unit_animation *animation);
 static boolean code_00197f90(
 	struct unit_animation *animation,
 	short desired_state);
-static boolean code_00198070(struct unit_animation *animation);
-static long code_00198190(short state);
+static boolean code_00198070(
+	struct unit_animation *animation);
+static long code_00198190(
+	short state);
 static void code_0019b0b0(
 	long unit_index,
 	long animation_graph_index,
@@ -928,7 +937,8 @@ static short code_0019b160(
 	struct animation_state *animation,
 	long animation_graph_index,
 	long unit_index);
-static char const *code_0019dff0(long unit_index);
+static char const *code_0019dff0(
+	long unit_index);
 static void code_0019ea70(
 	long unit_index,
 	real_vector2d const *alignment_vector);
@@ -940,11 +950,17 @@ boolean ai_try_vehicle_eviction(
 	long actor_index,
 	long entering_unit_index,
 	boolean immediate);
-boolean valid_real_normal2d(real_vector2d const *normal);
-void biped_stop_melee_attack(long unit_index);
-void first_person_weapon_message_from_unit(long unit_index, short message_type);
-void weapon_stop_reload(long weapon_index);
-boolean weapon_prevents_grenade_throwing(long weapon_index);
+boolean valid_real_normal2d(
+	real_vector2d const *normal);
+void biped_stop_melee_attack(
+	long unit_index);
+void first_person_weapon_message_from_unit(
+	long unit_index,
+	short message_type);
+void weapon_stop_reload(
+	long weapon_index);
+boolean weapon_prevents_grenade_throwing(
+	long weapon_index);
 
 static void unit_adjust_for_seat_change(long unit_index);
 static short unit_weapon_next_index(long unit_index, short current_index, short delta);
@@ -995,7 +1011,9 @@ static boolean unit_integrated_night_vision_is_active(long unit_index);
 boolean game_team_is_enemy(
 	short team_index0,
 	short team_index1);
-boolean ai_handle_killing_spree(long unit_index, short killing_spree_count);
+boolean ai_handle_killing_spree(
+	long unit_index,
+	short killing_spree_count);
 void ai_create_mounted_weapons_for_unit(
 	long unit_index);
 void unit_dialogue_determine_variant(
@@ -3145,6 +3163,8 @@ static void code_00198400(
 			break;
 		}
 	}
+
+	return;
 }
 
 void unit_handle_weapon_state_change(
