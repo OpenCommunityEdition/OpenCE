@@ -1515,6 +1515,61 @@ long unit_scripting_unit_riders(
 	return object_list_index;
 }
 
+boolean unit_scripting_vehicle_test_seat_list(
+	long vehicle_index,
+	char const *seat_name,
+	long object_list_index)
+{
+	boolean result = FALSE;
+
+	if (vehicle_index!=NONE)
+	{
+		short seat_index;
+		struct unit_datum *vehicle = unit_get(vehicle_index);
+		struct unit_definition *vehicle_definition = unit_definition_get(vehicle->definition_index);
+
+		for (seat_index = 0; seat_index<vehicle_definition->unit.seats.count; ++seat_index)
+		{
+			struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(&vehicle_definition->unit.seats, seat_index, struct unit_seat);
+
+			if (!_stricmp(seat_name, seat->label))
+			{
+				struct object_iterator iterator;
+				struct unit_datum *unit;
+
+				object_iterator_new(&iterator, _object_mask_unit, 0);
+				unit = object_iterator_next(&iterator);
+
+				while (unit)
+				{
+					if (unit->object.parent_object_index==vehicle_index &&
+						unit->unit.parent_seat_index==seat_index)
+					{
+						long reference_index;
+						long object_index = object_list_get_first(object_list_index, &reference_index);
+
+						while (object_index!=NONE && iterator.index!=object_index)
+						{
+							object_index = object_list_get_next(object_list_index, &reference_index);
+						}
+
+						if (iterator.index==object_index)
+						{
+							result = TRUE;
+						}
+
+						break;
+					}
+
+					unit = object_iterator_next(&iterator);
+				}
+			}
+		}
+	}
+
+	return result;
+}
+
 boolean unit_scripting_vehicle_test_seat(
 	long vehicle_index,
 	char const *seat_name,
@@ -2783,6 +2838,131 @@ boolean unit_can_enter_seat(
 	return result;
 }
 
+boolean unit_enter_seat(
+	long unit_index,
+	long target_unit_index,
+	short seat_index)
+{
+	boolean result = FALSE;
+
+	if (unit_can_enter_seat(unit_index, target_unit_index, seat_index, NULL))
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+		real_vector3d offset;
+		struct unit_definition *unit_definition;
+		struct animation_graph *animation_graph;
+		struct animation_graph_unit_seat *animation_seat;
+
+		{
+			struct unit_datum *target_unit = unit_get(target_unit_index);
+			struct unit_definition *target_unit_definition =
+				unit_definition_get(target_unit->definition_index);
+			struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+				&target_unit_definition->unit.seats,
+				seat_index,
+				struct unit_seat);
+			real_point3d origin;
+			struct object_marker seat_marker;
+			struct unit_datum *updated_unit;
+			long weapon_index;
+			char const *weapon_label;
+
+			match_assert(
+				"c:\\halo\\SOURCE\\units\\units.c",
+				4245,
+				unit->object.parent_object_index==NONE);
+
+			object_get_origin(unit_index, &origin);
+			object_get_marker_by_name(
+				target_unit_index,
+				seat->marker_name,
+				&seat_marker,
+				1);
+			vector_from_points3d(
+				&seat_marker.matrix.position,
+				&origin,
+				&offset);
+			matrix4x3_inverse_transform_vector(
+				&seat_marker.matrix,
+				&offset,
+				&offset);
+			object_attach_to_marker(
+				target_unit_index,
+				seat->marker_name,
+				unit_index,
+				"");
+
+			unit->unit.parent_seat_index = seat_index;
+			unit->object.parent_object_index = target_unit_index;
+			code_0019a170(target_unit_index);
+
+			updated_unit = unit_get(unit_index);
+			updated_unit->unit.desired_weapon_index = unit_weapon_next_index(
+				unit_index,
+				updated_unit->unit.current_weapon_index,
+				0);
+			unit_ready_desired_weapon(unit_index, TRUE);
+			weapon_index = unit_get_current_weapon_index(unit_index);
+			weapon_label = weapon_index==NONE ?
+				"unarmed" : weapon_get_label(weapon_index);
+			if (!unit_set_or_test_seat_and_weapon_label(
+				unit_index,
+				seat->label,
+				weapon_label,
+				TRUE))
+			{
+				unit_set_or_test_seat_and_weapon_label(
+					unit_index,
+					seat->label,
+					NULL,
+					TRUE);
+			}
+		}
+
+		unit_definition = unit_definition_get(unit->definition_index);
+		animation_graph = animation_graph_definition_get(
+			unit_definition->object.animation_graph.index);
+		animation_seat = TAG_BLOCK_GET_ELEMENT(
+			&animation_graph->unit_seats,
+			unit->unit.animation.seat_index,
+			struct animation_graph_unit_seat);
+		if (animation_seat->animations.count>_unit_seat_animation_seat_enter)
+		{
+			short animation_index = animation_graph_animation_index_get(
+				&animation_seat->animations)
+					[_unit_seat_animation_seat_enter].animation_index;
+
+			if (animation_index!=NONE)
+			{
+				long animation_graph_index;
+
+				object_start_interpolation(unit_index, 6);
+				animation_graph_index =
+					unit_definition->object.animation_graph.index;
+				animation_index = animation_choose_random_permutation_internal(
+					TRUE,
+					animation_graph_index,
+					animation_index);
+				animation_graph_index =
+					unit_definition->object.animation_graph.index;
+				code_0019b0b0(
+					unit_index,
+					animation_graph_index,
+					animation_index);
+				unit->unit.animation.state = _unit_state_entering_seat;
+				object_offset_interpolation(unit_index, &offset);
+				object_compute_node_matrices_recursive(unit_index);
+			}
+		}
+
+		ai_handle_enter_vehicle(unit_index, target_unit_index);
+		unit_unzoom(unit_index);
+		result = TRUE;
+	}
+
+	return result;
+}
+
 void unit_impulse(
 	long unit_index,
 	long impulse_index,
@@ -3879,6 +4059,83 @@ short vehicle_scripting_find_available_seats(
 	}
 
 	return available_seat_count;
+}
+
+short vehicle_scripting_load_magic(
+	long vehicle_index,
+	char const *seat_name,
+	long object_list_index)
+{
+	long loaded_count = 0;
+
+	if (vehicle_index!=NONE)
+	{
+		struct unit_datum *vehicle = unit_get(vehicle_index);
+		struct unit_definition *vehicle_definition = unit_definition_get(vehicle->definition_index);
+		short available_seat_indices[16];
+		short available_seat_count;
+		long reference_index;
+		long unit_index;
+
+		available_seat_count = vehicle_scripting_find_available_seats(
+			vehicle_index,
+			seat_name,
+			NONE,
+			available_seat_indices,
+			NUMBEROF(available_seat_indices));
+		unit_index = object_list_get_first(object_list_index, &reference_index);
+
+		while (unit_index!=NONE)
+		{
+			struct object_datum *object = object_get(unit_index);
+
+			if (TEST_FLAG(_object_mask_unit, object->object.type) &&
+				!TEST_FLAG(vehicle->object.damage_flags, _object_dead_bit))
+			{
+				struct unit_datum *unit = (struct unit_datum *)object;
+				short available_seat_index;
+
+				for (available_seat_index = 0;
+					available_seat_index<available_seat_count;
+					++available_seat_index)
+				{
+					short seat_index = available_seat_indices[available_seat_index];
+
+					if (seat_index!=NONE)
+					{
+						struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+							&vehicle_definition->unit.seats,
+							seat_index,
+							struct unit_seat);
+
+						if ((unit->object.type==_object_type_vehicle ||
+							unit_set_or_test_seat_and_weapon_label(unit_index, seat->label, NULL, FALSE)))
+						{
+							if (unit->object.parent_object_index!=NONE)
+							{
+								if (unit->unit.parent_seat_index!=NONE)
+								{
+									unit_exit_seat_end(unit_index);
+								}
+							}
+
+							if (unit->object.parent_object_index==NONE &&
+								unit_enter_seat(unit_index, vehicle_index, seat_index))
+							{
+								available_seat_indices[available_seat_index] = NONE;
+								++loaded_count;
+								break;
+							}
+						}
+					}
+				}
+			}
+
+			unit_index = object_list_get_next(object_list_index, &reference_index);
+		}
+	}
+
+	return (short)loaded_count;
 }
 
 void unit_open(
