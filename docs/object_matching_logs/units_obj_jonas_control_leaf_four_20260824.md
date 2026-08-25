@@ -34,7 +34,7 @@ Frozen payloads:
 | Artifact | Git object / size | Raw payload SHA-256 |
 |---|---:|---|
 | Baseline `source/units/units.c` at `1ab99d0f` | `686c23e90655f970b9bcedb9aa3447123d006c72`, 124,248 bytes | `ca8d3e1843354436bcede267243dcc84b9d752c9aa39d09b1c122ea3bf2311bb` |
-| Retained `source/units/units.c` | `aa54b954662bc1d474dcf1fbcd3b2ef528dfdac6`, 134,732 bytes | `cc53d548f978e158cf425fe778e6e18478e89f8171d4c895688543f32786fa61` |
+| Retained `source/units/units.c` | `aa54b954662bc1d474dcf1fbcd3b2ef528dfdac6`, 130,267 bytes | `0e857632d91f74b0061b037b890b0fe3844cab8351717edf9452057ddcf7845e` |
 | January csplit `source/units/units.obj` | 138,090 bytes | `e6a24ca597147dacff1f06806613d6bcfa4fa48f359dfbf542c34935f674b19f` |
 | Clean first-wave candidate `units.obj` | 75,827 bytes | `6b395323ef1904c22472b3cd16058134b6229b3b7152bd06ee9eb93223e20ccf` |
 | One-shot retained candidate `units.obj` | 82,512 bytes | `395d1dd3ca0b71ecfa93a58bde8dbd87a7f649dbb728177cdd7ef6aadc573bbb` |
@@ -249,3 +249,81 @@ regression check, direct four-name comparison, full 189/129 census, and owner
 audit. The actual replay evidence will be appended to this same new ledger in
 a separate additive ledger-only Jonas commit. No amend, push, history rewrite,
 or worktree removal is authorized.
+
+## Actual committed-state forced replay
+
+The Jonas implementation commit is
+`297ee6f382596b51b46d83c0c6756a5d663fe00b`. Its committed source payload
+is the retained blob recorded above: `aa54b954662bc1d474dcf1fbcd3b2ef528dfdac6`,
+130,267 raw bytes, SHA-256
+`0e857632d91f74b0061b037b890b0fe3844cab8351717edf9452057ddcf7845e`.
+The initial committed ledger payload is
+`368a90ee76e20b20c95d562e84263156e390ca42`, 14,017 raw bytes, SHA-256
+`abe9f4cf119f4f4a67a1e58117a49bd8db2b30de67c68620d1b21311a01ca90c`.
+The retained-source raw values correct the initial table's checkout-byte
+measurement; the Git blob identity was already correct and no source byte
+changed after the implementation commit.
+
+The tracked and untracked production state was clean at that commit. An
+explicit one-target Ninja invocation first reported `ninja: no work to do`.
+Because the copied Ninja log still wanted to refresh unrelated downloader
+edges, the repository gate's built-in `--no-build` capture was then used only
+after this exact object up-to-date proof and after the local objdiff report had
+passed. The clean implementation-state snapshot is:
+
+```text
+build/regression_units_control_leaf_four_replay_20260824.json
+commit: 297ee6f382596b51b46d83c0c6756a5d663fe00b
+size: 4,697,046 bytes
+SHA-256: 4b0ab79389116b9fa0a2996c47b3e5db703d943e4b93325455fabe8ebf29e71e
+```
+
+The generated object resolved to
+`C:\Users\isabe\Documents\Codex\2026-07-13\i-w\units-control-leaf-wave-20260824\build\base\source\units\units.obj`.
+The absolute path was verified to remain under the isolated lane root. Before
+deletion it was 82,512 bytes with whole-file SHA-256
+`395d1dd3ca0b71ecfa93a58bde8dbd87a7f649dbb728177cdd7ef6aadc573bbb`.
+Only that verified generated file was removed, and its absence was checked. A
+normal one-target Ninja rebuild then ran exactly one `CL ... units.c` edge and
+succeeded.
+
+The rebuilt object is again 82,512 bytes. Its whole-file SHA-256 is
+`7a8482b438452c21435e4006e8a24fdb8b035c885e955ac85d0cdb82db6e7a98`;
+the whole-file difference is confined to non-runtime COFF build metadata. The
+committed-state regression check is authoritative for captured runtime
+fingerprints and reports:
+
+```text
+ok: true
+failures: 0
+warnings: 0
+still_exact: 108
+newly_exact: 0
+changed_nonexact: 0
+```
+
+That check covers every captured function, runtime non-code section,
+relocation, and symbol-owner record. A post-check Ninja dry run again reports
+`ninja: no work to do`.
+
+Independent replay proofs also passed:
+
+- direct four-name hardened comparison: `all_equal: true`, retaining the
+  exact 1,600 padded bytes and all 102 normalized relocation identities;
+- complete underscore-function census: 108 exact / 8 present nonexact / 73
+  absent, with exactly the four frozen gains and zero regression from the 104
+  inherited exact functions;
+- complete January target-data census: 77 exact / 0 present nonexact / 52
+  absent, preserving all 63 inherited exact owners and all 14 exact string
+  gains;
+- the four candidate select-any float COMDATs remain exact to their separate
+  January natural owners with selection 2, four bytes, and zero relocations;
+- no writable `.data`, `.bss`, COMMON, runtime owner, undefined-external, or
+  function-owner drift from the implementation-state snapshot;
+- the committed source blob is unchanged; only this new ledger is modified
+  for the additive replay record.
+
+This is the actual replay, not a prewritten claim. No source change, retry,
+body tuning, amend, push, history rewrite, protected-path edit, shared-header
+edit, storage edit, or worktree removal occurred after the implementation
+commit.
