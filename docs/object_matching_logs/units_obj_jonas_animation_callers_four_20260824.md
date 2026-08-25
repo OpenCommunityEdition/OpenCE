@@ -229,3 +229,74 @@ Ninja rebuild, and rerun the manifest, direct four-name comparison, full
 189/129 census, and ownership checks. Actual replay evidence will be appended
 here in a separate additive Jonas ledger-only commit. No amend, push, history
 rewrite, or worktree removal is authorized.
+
+## Actual committed-state forced replay
+
+The Jonas implementation-and-initial-ledger commit is
+`3662bdeec7db0791961f5ccfb50d8601c64146da`. Both author and committer are
+Jonas Volman `<jonas.volman@openai.com>`. Its committed translation unit is
+the retained blob `dc7af5fb096d5e370776c69307b5cfce51543c64`: 206,705 raw Git payload
+bytes, SHA-256
+`99b355ab3cccb97e0ee1d476b980899b72c39d828595b391f56fb127bcb262a0`.
+The initial ledger is blob `3895b5981ebe1a9398eff42e105fae84a6df2926`: 12,568 raw Git payload
+bytes, SHA-256
+`e5211a090abb37cced8af363db29727b9e28dea6503031060f8b3e7177efb913`.
+
+Tracked and untracked production state was clean at that commit. An explicit
+one-target Ninja dry run reported `ninja: no work to do`. A clean
+implementation-state snapshot was then captured with the gate's built-in
+`--no-build` mode from that exact commit:
+
+```text
+build/regression_units_animation_callers_committed_20260824.json
+commit: 3662bdeec7db0791961f5ccfb50d8601c64146da
+size: 5,571,542 bytes
+SHA-256: 31ab97a2ea7474e052356e9c562f261ad185e84d4a03b3bbd4c7ba1fc08796d3
+```
+
+The generated object resolved to
+`C:\Users\isabe\Documents\Codex\2026-07-13\i-w\units-animation-callers-wave-20260824\build\base\source\units\units.obj`.
+Its normalized absolute path was proven to begin with the normalized isolated
+worktree root, and its basename was proven to be exactly `units.obj`. Before
+deletion it was 121,081 bytes with whole-file SHA-256
+`399cfc9eb8df46c9d646fb6da705674ea92b51eabce651c7d70c60e39c408658`.
+Only that verified generated file was removed, and absence was checked.
+
+A normal one-target Ninja rebuild then ran exactly one
+`[1/1] CL build\base\source\units\units.obj` edge and succeeded. The replay
+object is again 121,081 bytes with phase-specific whole-file SHA-256
+`34f8f9ed4deda71cfbe44f6a06baca251a0e0ca0f7be3d1d5038a1a4478abf9d`.
+The whole-file difference is confined to build metadata; the fail-closed
+runtime evidence is unchanged.
+
+The immediate committed-state regression check is authoritative for every
+captured function, non-code section, relocation, and symbol-owner record:
+
+```text
+ok: true
+failures: 0
+warnings: 0
+still_exact: 137
+newly_exact: 0
+changed_nonexact: 0
+```
+
+Independent replay proofs also passed:
+
+- direct four-name hardened comparison: `all_equal: true`, reproducing all
+  four normalized hashes, 1,248 padded bytes, and 52 relocation identities;
+- complete January function census: 137 exact / 12 present nonexact / 40
+  absent, 22,928 exact padded bytes and 1,008 exact relocations;
+- complete January target-data census: 115 exact / zero present nonexact / 14
+  absent, 6,155 exact logical bytes and seven relocations;
+- `.data` remains 1,564 bytes / seven relocations and `_unit_globals` remains
+  four BSS bytes / zero relocations;
+- semantic audit again reports 4,064 semantic exact, 110 hidden exact, 4,125
+  accepted exact, and zero unit errors;
+- the committed source blob is unchanged, the replay object is up to date,
+  and a final one-target Ninja dry run reports `ninja: no work to do`.
+
+This appended record is ledger-only. No source change, helper addition,
+candidate retry, tuning, header/protected/config/storage edit, amend, push,
+history rewrite, or worktree removal occurred after the implementation
+commit.
