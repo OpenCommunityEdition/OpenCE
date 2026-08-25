@@ -706,6 +706,16 @@ enum
 
 enum
 {
+	_unit_weapon_overlay_primary_recoil = 1,
+	_unit_weapon_overlay_secondary_recoil,
+	_unit_weapon_overlay_primary_charged,
+	_unit_weapon_overlay_secondary_charged,
+	_unit_weapon_overlay_primary_chamber,
+	_unit_weapon_overlay_secondary_chamber,
+};
+
+enum
+{
 	NUMBER_OF_UNIT_ANIMATION_IMPULSES = 14,
 	_unit_seat_unknown8_bit = 8,
 };
@@ -843,6 +853,10 @@ static short seat_label_to_base_seat_index(char const *seat_label);
 static char const *base_weapon_label_get(short base_weapon_index);
 
 static void unit_refresh_illumination(long unit_index);
+
+void unit_animation_start_action(
+	long unit_index,
+	short action);
 
 static boolean code_00197e30(
 	struct unit_acceleration_plan *plan,
@@ -3020,6 +3034,126 @@ void unit_impulse(
 		unit->object.translational_velocity.i += scale*impulse->i;
 		unit->object.translational_velocity.j += scale*impulse->j;
 		unit->object.translational_velocity.k += scale*impulse->k;
+	}
+
+	return;
+}
+
+static void code_00198400(
+	long unit_index,
+	short overlay_action)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	if (overlay_action >= unit->unit.animation.overlay_action)
+	{
+		switch (unit->unit.animation.state)
+		{
+			case _unit_state_hard_ping:
+			case _unit_state_dying_airborne:
+			case _unit_state_dying:
+			case _unit_state_entering_seat:
+			case _unit_state_exiting_seat:
+			case _unit_state_ai_impulse:
+			case _unit_state_melee_attack:
+			case _unit_state_melee_airborne:
+			case _unit_state_melee_continuous:
+			case _unit_state_throw_grenade:
+			case _unit_state_resurrect_front:
+			case _unit_state_resurrect_back:
+			case _unit_state_leap_start:
+			case _unit_state_leap_melee:
+				break;
+
+			default:
+			{
+				struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
+				struct animation_graph *animation_graph = animation_graph_definition_get(unit_definition->object.animation_graph.index);
+				struct animation_graph_unit_seat *unit_seat = TAG_BLOCK_GET_ELEMENT(&animation_graph->unit_seats, unit->unit.animation.seat_index, struct animation_graph_unit_seat);
+				struct animation_graph_weapon_class *weapon_class = TAG_BLOCK_GET_ELEMENT(&unit_seat->weapon_classes, unit->unit.animation.weapon_index, struct animation_graph_weapon_class);
+				struct animation_graph_weapon_type *weapon_type = TAG_BLOCK_GET_ELEMENT(&weapon_class->weapon_types, unit->unit.animation.weapon_type_index, struct animation_graph_weapon_type);
+				short anim_slot = NONE;
+				short animation_index;
+
+				switch (overlay_action)
+				{
+					case 1: anim_slot = _unit_weapon_class_animation_diving_front; break;
+					case 2: anim_slot = _unit_weapon_class_animation_diving_back; break;
+					case 3: anim_slot = _unit_weapon_class_animation_diving_left; break;
+					case 4: anim_slot = _unit_weapon_class_animation_diving_right; break;
+					case 5: anim_slot = _unit_weapon_class_animation_turning_left; break;
+					case 6: anim_slot = _unit_weapon_class_animation_turning_right; break;
+				}
+
+				animation_index = (anim_slot>=0 && anim_slot<weapon_type->animations.count) ? animation_graph_animation_index_get(&weapon_type->animations)[anim_slot].animation_index : NONE;
+
+				if (animation_index != NONE)
+				{
+					long graph_index = unit_definition->object.animation_graph.index;
+
+					unit->unit.animation.overlay_action_animation.index = animation_choose_random_permutation_internal(TRUE, graph_index, animation_index);
+					unit->unit.animation.overlay_action_animation.frame_index = 0;
+					unit->unit.animation.overlay_action = (char)overlay_action;
+				}
+				else if (debug_unit_animations && unit->object.type==_object_type_biped && unit->unit.animation.aiming_screen_index==NONE)
+				{
+					console_warning("MISSING: %s '%s %s'",
+						tag_name_strip_path(unit_definition->object.animation_graph.name),
+						unit_seat->label,
+						weapon_class->label,
+						weapon_type->label,
+						animation_list_get_string(&weapon_type_animation_list, anim_slot));
+				}
+			}
+			break;
+		}
+	}
+}
+
+void unit_handle_weapon_state_change(
+	long unit_index,
+	short weapon_state)
+{
+	short action = NONE;
+	short overlay_action = NONE;
+
+	switch (weapon_state)
+	{
+	case 5:
+		action = 5;
+		break;
+	case 6:
+		action = 6;
+		break;
+	case 3:
+		overlay_action = _unit_weapon_overlay_primary_chamber;
+		break;
+	case 4:
+		overlay_action = _unit_weapon_overlay_secondary_chamber;
+		break;
+	case 1:
+		overlay_action = _unit_weapon_overlay_primary_recoil;
+		break;
+	case 2:
+		overlay_action = _unit_weapon_overlay_secondary_recoil;
+		break;
+	case 7:
+		overlay_action = _unit_weapon_overlay_primary_charged;
+		break;
+	case 8:
+		overlay_action = _unit_weapon_overlay_secondary_charged;
+		break;
+	default:
+		break;
+	}
+
+	if (action != NONE)
+	{
+		unit_animation_start_action(unit_index, action);
+	}
+	else if (overlay_action != NONE)
+	{
+		code_00198400(unit_index, overlay_action);
 	}
 
 	return;
