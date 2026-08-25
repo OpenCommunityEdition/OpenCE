@@ -265,3 +265,62 @@ deleted, rebuilt once by its normal Ninja edge, and checked immediately. Direct
 six-name comparison, the complete 189/129 census, owner audit, and Ninja dry
 run will then be appended in a ledger-only Jonas commit. No push, amend,
 history rewrite, or worktree removal will occur.
+
+## Committed-state clean rebuild replay
+
+The implementation boundary was committed by Jonas as
+`16558eb9f1b8c4109c61ac9f239ef2717723efb6`. The worktree was tracked-clean
+before replay. The committed `source/units/units.c` is Git blob
+`79774642b701994cf793b9c0cae352f5c5a8e9e1`, 196,256 raw blob bytes with
+SHA-256 `0d22caf2e3191b03c6066bc346b467658c2cebe49d105fb3944d8f7c8a9e5083`.
+The frozen checkout source hash remained
+`c1f69715902abc6bc95f237c717e069c7cccfac3e8862d59147c74b4aa8c65e1`.
+
+The normal one-unit Ninja target first reported `no work to do`. A fresh
+`--no-build` regression snapshot was then captured at the implementation
+commit:
+
+| Replay input | Value |
+|---|---|
+| Manifest | `build/regression_units_inventory_weapon_closure_replay_20260824.json` |
+| Manifest size | 5,480,323 bytes |
+| Manifest SHA-256 | `0e378fa06e9b4ec2f898a9d8be04f3c1071db38377de3d5cefc2d919885fa0be` |
+| Pre-delete object size | 116,680 bytes |
+| Pre-delete object SHA-256 | `14ba19e40c149b390e1a241ee12459ada02efd0ed384f3c16b23f76a59592f75` |
+
+The generated path was resolved as
+`C:\Users\isabe\Documents\Codex\2026-07-13\i-w\units-inventory-weapon-closure-20260824\build\base\source\units\units.obj`
+and checked to be both inside this isolated worktree and exactly the frozen
+one-unit output. That single file was deleted with literal-path PowerShell;
+absence was verified. One normal Ninja invocation produced exactly one edge:
+
+```text
+[1/1] CL build\base\source\units\units.obj
+units.c
+```
+
+The immediate `--no-build` regression check returned `ok: true`, no failures,
+no warnings, 133 `still_exact` functions, and empty `changed_nonexact` and
+`newly_exact` lists. The rebuilt object is again 116,680 bytes. Its raw SHA-256
+is `b46e97b0bb6acbd5621a5607496c0fb00a7109e2326db3e9f95604861bf40788`.
+The raw first-shot and replay hashes differ only at COFF header bytes 4 and 5,
+within the four-byte compile timestamp (`2026-08-25T03:58:03Z` versus
+`2026-08-25T04:07:11Z`). All other 116,678 bytes are identical. Zeroing the
+four timestamp bytes gives the same whole-object SHA-256 for both artifacts:
+`6a38868b0e4400222421035bc052c654ebb7a3b24e6cc588b6f378908b3e7f75`.
+
+Direct target comparison after the rebuild repeated all six strict results,
+including the same padded sizes, relocation counts, and normalized section
+hashes in the table above. The complete name-based census also repeated
+exactly: 133/189 strict functions, 12 nonexact, 44 absent, 21,536 exact padded
+bytes, and 941 exact relocations; 113/129 strict data owners, zero nonexact,
+16 absent, 6,066 exact bytes, and seven exact relocations. The gains were the
+same six functions and two read-only strings, with no function or data-owner
+regression and no writable-storage change.
+
+A final Ninja dry run reported `no work to do`. The committed source blob and
+checkout hash were unchanged after replay. Only this ledger was then modified
+for the additive replay record. The unreleased `source/units/units.h`
+declaration remains untouched; `unit_ready_desired_weapon` and dependent
+`code_001a2030` remain explicitly deferred until a future wave authorizes that
+header cleanup.
