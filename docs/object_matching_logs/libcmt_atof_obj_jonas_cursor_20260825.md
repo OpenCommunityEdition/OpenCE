@@ -86,9 +86,9 @@ C1 recreates the authenticated donor exactly except for these fixed changes:
 -#include <string.h>
 @@
  double __cdecl atof(
- 	char const *string)
+     char const *string)
  {
- 	struct floating_point_input result;
+     struct floating_point_input result;
 +	char const *end;
 @@
 -	return _fltin2(&result, string, strlen(string), 0, 0)->double_value;
