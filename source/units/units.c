@@ -668,6 +668,7 @@ symbols in this file:
 #include "items/weapons.h"
 #include "main/console.h"
 #include "models/model_animation_definitions.h"
+#include "models/model_definitions.h"
 #include "objects/damage.h"
 #include "objects/damage_effect_definitions.h"
 #include "objects/object_lights.h"
@@ -676,6 +677,8 @@ symbols in this file:
 #include "physics/collision_usage.h"
 #include "physics/collisions.h"
 #include "physics/physics_definitions.h"
+#include "render/render.h"
+#include "render/render_debug.h"
 #include "scenario/scenario.h"
 #include "saved games/game_state.h"
 #include "sound/game_sound.h"
@@ -705,6 +708,16 @@ enum
 {
 	NUMBER_OF_UNIT_ANIMATION_IMPULSES = 14,
 	_unit_seat_unknown8_bit = 8,
+};
+
+enum
+{
+	_vehicle_seat_desire_not_driver,
+	_vehicle_seat_desire_gunner,
+	_vehicle_seat_desire_passenger,
+	_vehicle_seat_desire_driver,
+	_vehicle_seat_desire_any,
+	NUMBER_OF_VEHICLE_SEAT_DESIRE_TYPES,
 };
 
 /* ---------- macros */
@@ -853,6 +866,10 @@ static void unit_running_blind(long unit_index, real_vector3d *run_vector);
 
 static boolean unit_integrated_night_vision_is_active(long unit_index);
 
+boolean game_team_is_enemy(
+	short team_index0,
+	short team_index1);
+
 /* ---------- globals */
 
 short magic_base_animation_seat_index = NONE;
@@ -979,6 +996,188 @@ void unit_persistent_control(
 	unit->unit.persistent_control_timer = control_ticks;
 
 	return;
+}
+
+boolean unit_get_seat_entrance_point(
+	long unit_index,
+	long target_unit_index,
+	short seat_index,
+	real_point3d *entry_position,
+	real_point3d *exit_position,
+	real_point3d *seat_transform)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition =
+		unit_definition_get(unit->definition_index);
+	struct model *model = model_definition_get(
+		unit_definition->object.model.index);
+	real_matrix4x3 entrance_matrix;
+	struct object_marker seat_marker;
+	real_matrix4x3 root_matrix;
+	struct object_marker enter_hint_marker;
+	char enter_hint_marker_name[256];
+	struct animation_graph *animation_graph = animation_graph_definition_get(
+		unit_definition->object.animation_graph.index);
+	struct unit_datum *target_unit = unit_get(target_unit_index);
+	struct unit_definition *target_unit_definition =
+		unit_definition_get(target_unit->definition_index);
+	struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+		&target_unit_definition->unit.seats,
+		seat_index,
+		struct unit_seat);
+	short animation_seat_index;
+	boolean result;
+
+	result = FALSE;
+	animation_seat_index = 0;
+	if (animation_graph->unit_seats.count > 0)
+	{
+		do
+		{
+			struct animation_graph_unit_seat *animation_seat = TAG_BLOCK_GET_ELEMENT(
+				&animation_graph->unit_seats,
+				animation_seat_index,
+				struct animation_graph_unit_seat);
+
+			if (!_stricmp(animation_seat->label, seat->label))
+			{
+				if (animation_seat_index != NONE)
+				{
+					animation_seat = TAG_BLOCK_GET_ELEMENT(
+						&animation_graph->unit_seats,
+						animation_seat_index,
+						struct animation_graph_unit_seat);
+
+					if (animation_seat->animations.count >
+						_unit_seat_animation_seat_enter)
+					{
+						short animation_index = animation_graph_animation_index_get(
+							&animation_seat->animations)
+								[_unit_seat_animation_seat_enter].animation_index;
+
+						if (animation_index != NONE)
+						{
+							struct animation *animation = TAG_BLOCK_GET_ELEMENT(
+								&animation_graph->animations,
+								animation_index,
+								struct animation);
+
+							object_get_marker_by_name(
+								target_unit_index,
+								seat->marker_name,
+								&seat_marker,
+								1);
+							animation_get_root_matrix(model, animation, 0, &root_matrix);
+							matrix4x3_multiply(
+								&seat_marker.matrix,
+								&root_matrix,
+								&entrance_matrix);
+
+							csstrcpy(enter_hint_marker_name, seat->marker_name);
+							csstrcat(enter_hint_marker_name, " enter-hint");
+							object_get_marker_by_name(
+								target_unit_index,
+								enter_hint_marker_name,
+								&enter_hint_marker,
+								1);
+
+							if (exit_position)
+							{
+								*exit_position = seat_marker.matrix.position;
+							}
+							if (entry_position)
+							{
+								*entry_position = entrance_matrix.position;
+							}
+							if (seat_transform)
+							{
+								*seat_transform = enter_hint_marker.matrix.position;
+							}
+
+							result = TRUE;
+						}
+					}
+				}
+
+				break;
+			}
+
+			animation_seat_index++;
+		}
+		while (animation_seat_index < animation_graph->unit_seats.count);
+	}
+
+	return result;
+}
+
+boolean unit_get_melee_range_and_ticks(
+	long unit_index,
+	boolean secondary,
+	short *melee_tick,
+	real *attack_time,
+	short *frame_count,
+	real *damage_time)
+{
+	boolean result;
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition =
+		unit_definition_get(unit->definition_index);
+	struct animation_graph *animation_graph;
+	struct animation_graph_unit_seat *animation_seat;
+	struct animation_graph_weapon_class *weapon_class;
+	long weapon_class_animation_index;
+	short animation_index;
+
+	model_definition_get(unit_definition->object.model.index);
+	animation_graph = animation_graph_definition_get(
+		unit_definition->object.animation_graph.index);
+	animation_seat = TAG_BLOCK_GET_ELEMENT(
+		&animation_graph->unit_seats,
+		unit->unit.animation.seat_index,
+		struct animation_graph_unit_seat);
+	weapon_class = TAG_BLOCK_GET_ELEMENT(
+		&animation_seat->weapon_classes,
+		unit->unit.animation.weapon_index,
+		struct animation_graph_weapon_class);
+
+	weapon_class_animation_index = secondary ?
+		_unit_weapon_class_animation_melee_airborne :
+		_unit_weapon_class_animation_melee_attack;
+	if (VALID_INDEX(
+		weapon_class_animation_index,
+		weapon_class->animations.count))
+	{
+		animation_index = animation_graph_animation_index_get(
+			&weapon_class->animations)
+				[weapon_class_animation_index].animation_index;
+	}
+	else
+	{
+		animation_index = NONE;
+	}
+
+	result = FALSE;
+	if (animation_index != NONE)
+	{
+		struct animation *animation = TAG_BLOCK_GET_ELEMENT(
+			&animation_graph->animations,
+			animation_index,
+			struct animation);
+
+		animation_get_x_offsets(animation, attack_time, damage_time);
+		if (melee_tick)
+		{
+			*melee_tick = animation->private_key_frame_index;
+		}
+		if (frame_count)
+		{
+			*frame_count = animation->frame_count;
+		}
+
+		result = TRUE;
+	}
+
+	return result;
 }
 
 boolean unit_set_user_animation(
@@ -2041,6 +2240,58 @@ boolean unit_has_animation_to_enter_seat(
 	return has_animation;
 }
 
+boolean unit_can_enter_seat(
+	long unit_index,
+	long target_unit_index,
+	short seat_index,
+	long *occupant_unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_datum *target_unit = unit_get(target_unit_index);
+	long occupant_index = NONE;
+	boolean result = TRUE;
+	long child_object_index;
+
+	if (unit_index==target_unit_index)
+	{
+		result = FALSE;
+	}
+
+	child_object_index = target_unit->object.first_child_object_index;
+
+	while (child_object_index!=NONE)
+	{
+		struct object_datum *child_object = object_get(child_object_index);
+
+		if (TEST_FLAG(_object_mask_unit, child_object->object.type))
+		{
+			struct unit_datum *child_unit = unit_get(child_object_index);
+
+			if (child_unit->unit.parent_seat_index==seat_index)
+			{
+				occupant_index = child_object_index;
+				result = FALSE;
+			}
+			else if (unit->unit.player_index!=NONE &&
+				game_team_is_enemy(
+					unit->object.owner_team_index,
+					child_object->object.owner_team_index))
+			{
+				result = FALSE;
+			}
+		}
+
+		child_object_index = child_object->object.next_object_index;
+	}
+
+	if (occupant_unit_index)
+	{
+		*occupant_unit_index = occupant_index;
+	}
+
+	return result;
+}
+
 void unit_impulse(
 	long unit_index,
 	long impulse_index,
@@ -2338,12 +2589,199 @@ void unit_scripting_exit_vehicle(
 	return;
 }
 
+void unit_render_debug(
+	long unit_index)
+{
+	struct unit_datum *unit;
+	struct unit_definition *unit_definition;
+	real_point3d camera_position;
+	real_point3d origin;
+
+	unit = unit_get(unit_index);
+	unit_definition = unit_definition_get(unit->definition_index);
+
+	if (debug_objects_unit_vectors)
+	{
+		unit_get_camera_position(unit_index, &camera_position);
+		object_get_origin(unit_index, &origin);
+		origin.z += 0.1f;
+
+		render_debug_vector(
+			TRUE,
+			&camera_position,
+			&unit->unit.aiming_vector,
+			1.f,
+			global_real_argb_white);
+		render_debug_vector(
+			TRUE,
+			&camera_position,
+			&unit->unit.desired_aiming_vector,
+			0.5f,
+			global_real_argb_red);
+		render_debug_vector(
+			TRUE,
+			&origin,
+			&unit->object.forward,
+			1.f,
+			global_real_argb_white);
+		render_debug_vector(
+			TRUE,
+			&origin,
+			&unit->unit.desired_facing_vector,
+			0.5f,
+			global_real_argb_red);
+	}
+
+	if (debug_objects_unit_seats)
+	{
+		long player_unit_index =
+			player_get(local_player_get_player_index(render.local_player_index))->unit_index;
+
+		if (player_unit_index!=NONE)
+		{
+			short seat_index;
+
+			for (seat_index = 0;
+				seat_index<unit_definition->unit.seats.count;
+				seat_index++)
+			{
+				real_point3d seat_position;
+
+				if (unit_get_seat_entrance_point(
+					player_unit_index,
+					unit_index,
+					seat_index,
+					&camera_position,
+					&origin,
+					&seat_position))
+				{
+					render_debug_point(
+						TRUE,
+						&camera_position,
+						0.25f,
+						global_real_argb_red);
+					render_debug_point(
+						TRUE,
+						&origin,
+						0.25f,
+						global_real_argb_blue);
+					render_debug_point(
+						TRUE,
+						&seat_position,
+						0.25f,
+						global_real_argb_yellow);
+				}
+			}
+		}
+	}
+
+	if (debug_objects_unit_mouth_apeture)
+	{
+		struct object_marker marker;
+		real mouth_aperture;
+
+		/*
+		 * BUG (original): January ignores the marker count and consumes the
+		 * output even when the requested head marker is absent. A safe,
+		 * intentionally nonmatching build should render only when this call
+		 * returns a value greater than zero.
+		 */
+		object_get_marker_by_name(unit_index, "head", &marker, 1);
+		mouth_aperture = unit->unit.mouth_aperture;
+		origin = marker.matrix.position;
+		render_debug_string_at_point(
+			FALSE,
+			&origin,
+			csprintf(temporary, "%.2f", mouth_aperture),
+			global_real_argb_orange);
+	}
+
+	return;
+}
+
 void unit_abort_animation(
 	long unit_index)
 {
 	unit_animation_set_state(unit_index, _unit_state_idle);
 
 	return;
+}
+
+short vehicle_scripting_find_available_seats(
+	long vehicle_index,
+	char const *seat_substring_name,
+	short seat_desire_type,
+	short *seat_indices,
+	short maximum_seat_count)
+{
+	struct unit_datum *vehicle = unit_get(vehicle_index);
+	struct unit_definition *vehicle_definition = unit_definition_get(vehicle->definition_index);
+	boolean match_all_seats;
+	short available_seat_count;
+	short seat_index;
+
+	match_assert("c:\\halo\\SOURCE\\units\\units.c", 6031, seat_substring_name);
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		6032,
+		(seat_desire_type == NONE) || ((seat_desire_type >= 0) && (seat_desire_type < NUMBER_OF_VEHICLE_SEAT_DESIRE_TYPES)));
+
+	match_all_seats = !seat_substring_name || csstrlen(seat_substring_name)==0;
+	available_seat_count = 0;
+
+	for (seat_index = 0; seat_index<vehicle_definition->unit.seats.count; ++seat_index)
+	{
+		struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+			&vehicle_definition->unit.seats,
+			seat_index,
+			struct unit_seat);
+		boolean seat_matches_desire = TRUE;
+		char lower_seat_name[256];
+
+		if (available_seat_count>=maximum_seat_count)
+		{
+			break;
+		}
+
+		csstrcpy(lower_seat_name, seat->label);
+		strlwr(lower_seat_name);
+
+		if (!match_all_seats && !strstr(lower_seat_name, seat_substring_name))
+		{
+			continue;
+		}
+
+		switch (seat_desire_type)
+		{
+		case _vehicle_seat_desire_not_driver:
+			seat_matches_desire = !TEST_FLAG(seat->flags, _unit_seat_driver_bit);
+			break;
+
+		case _vehicle_seat_desire_gunner:
+			seat_matches_desire = TEST_FLAG(seat->flags, _unit_seat_gunner_bit);
+			break;
+
+		case _vehicle_seat_desire_passenger:
+			seat_matches_desire =
+				!TEST_FLAG(seat->flags, _unit_seat_driver_bit) &&
+				!TEST_FLAG(seat->flags, _unit_seat_gunner_bit);
+			break;
+
+		case _vehicle_seat_desire_driver:
+			seat_matches_desire = TEST_FLAG(seat->flags, _unit_seat_driver_bit);
+			break;
+
+		default:
+			break;
+		}
+
+		if (seat_matches_desire && !unit_seat_filled(vehicle_index, seat_index))
+		{
+			seat_indices[available_seat_count++] = seat_index;
+		}
+	}
+
+	return available_seat_count;
 }
 
 void unit_open(
