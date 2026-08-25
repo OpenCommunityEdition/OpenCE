@@ -715,6 +715,10 @@ static short unit_weapon_next_index(long unit_index, short current_index, short 
 static void unit_throw_grenade_move_to_hand(long unit_index);
 
 
+static boolean code_001980d0(
+	struct unit_animation *animation);
+static boolean code_00198130(
+	struct unit_animation *animation);
 static boolean unit_animation_busy(struct unit_animation *animation);
 
 static boolean unit_set_or_test_seat_and_weapon_label(
@@ -3574,6 +3578,71 @@ static void unit_throw_grenade_move_to_hand(
 	return;
 }
 
+static boolean code_001980d0(
+	struct unit_animation *animation)
+{
+	boolean result = animation->soft_ping_animation.index==NONE;
+
+	if (animation->action)
+	{
+		result = FALSE;
+	}
+
+	switch (animation->state)
+	{
+	case _unit_state_flying_front:
+	case _unit_state_flying_back:
+	case _unit_state_flying_left:
+	case _unit_state_flying_right:
+	case _unit_state_hard_ping:
+	case _unit_state_dying_airborne:
+	case _unit_state_dying:
+	case _unit_state_entering_seat:
+	case _unit_state_exiting_seat:
+	case _unit_state_user_animation:
+	case _unit_state_ai_impulse:
+	case _unit_state_melee_attack:
+	case _unit_state_melee_airborne:
+	case _unit_state_melee_continuous:
+	case _unit_state_throw_grenade:
+	case _unit_state_resurrect_front:
+	case _unit_state_resurrect_back:
+	case _unit_state_leap_start:
+	case _unit_state_leap_airborne:
+	case _unit_state_leap_melee:
+		result = FALSE;
+		break;
+	default:
+		break;
+	}
+
+	return result;
+}
+
+static boolean code_00198130(
+	struct unit_animation *animation)
+{
+	boolean result = TRUE;
+
+	switch (animation->state)
+	{
+	case _unit_state_hard_ping:
+	case _unit_state_dying_airborne:
+	case _unit_state_dying:
+	case _unit_state_entering_seat:
+	case _unit_state_exiting_seat:
+	case _unit_state_ai_impulse:
+	case _unit_state_resurrect_front:
+	case _unit_state_resurrect_back:
+		result = FALSE;
+		break;
+	default:
+		break;
+	}
+
+	return result;
+}
+
 static boolean unit_animation_busy(
 	struct unit_animation *animation)
 {
@@ -3902,6 +3971,110 @@ boolean unit_animation_set_state(
 	}
 
 	return result;
+}
+
+void unit_postprocess_node_matrices(
+	long unit_index,
+	real_matrix4x3 *node_matrices)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition =
+		unit_definition_get(unit->definition_index);
+	struct animation_graph *animation_graph;
+	struct animation_graph_unit_seat *unit_seat;
+	struct animation_graph_weapon_class *weapon_class;
+	struct animation_graph_ik_point *ik_point;
+	struct animation_graph_ik_point *weapon_ik_point;
+	struct unit_animation *animation;
+	struct tag_block *ik_points;
+	struct tag_block *weapon_ik_points;
+	short ik_point_index;
+	long ik_element_index;
+	boolean weapon_ik_active;
+
+	if (!TEST_FLAG(unit_definition->unit.flags, _unit_simple_creature_bit) &&
+		unit->unit.animation.seat_index!=NONE)
+	{
+		animation_graph = animation_graph_definition_get(
+			unit_definition->object.animation_graph.index);
+		unit_seat = TAG_BLOCK_GET_ELEMENT(
+				&animation_graph->unit_seats,
+				unit->unit.animation.seat_index,
+				struct animation_graph_unit_seat);
+		weapon_class = TAG_BLOCK_GET_ELEMENT(
+				&unit_seat->weapon_classes,
+				unit->unit.animation.weapon_index,
+				struct animation_graph_weapon_class);
+
+		if (unit->object.parent_object_index!=NONE &&
+			code_00198130(&unit->unit.animation))
+		{
+			ik_points = &unit_seat->ik_points;
+			ik_point_index = 0;
+			if (ik_points->count>0)
+			{
+				ik_element_index = 0;
+				do
+				{
+					ik_point = TAG_BLOCK_GET_ELEMENT(
+							ik_points,
+							ik_element_index,
+							struct animation_graph_ik_point);
+
+					object_inverse_kinematics(
+						unit_index,
+						ik_point->marker_name,
+						unit->object.parent_object_index,
+						ik_point->attached_to_marker_name,
+						node_matrices);
+
+					++ik_point_index;
+					ik_element_index = ik_point_index;
+				}
+				while (ik_element_index<ik_points->count);
+			}
+		}
+
+		if (unit->unit.current_weapon_index!=NONE)
+		{
+			animation = &unit->unit.animation;
+			weapon_ik_active = code_001980d0(animation);
+			if (weapon_ik_active)
+			{
+				long weapon_ik_point_index = 0;
+				weapon_ik_points = &weapon_class->ik_points;
+				if (weapon_ik_points->count>0)
+				{
+					ik_element_index = 0;
+					do
+					{
+						weapon_ik_point = TAG_BLOCK_GET_ELEMENT(
+								weapon_ik_points,
+								ik_element_index,
+								struct animation_graph_ik_point);
+
+						object_inverse_kinematics(
+							unit_index,
+							weapon_ik_point->marker_name,
+							unit_get_current_weapon_index(unit_index),
+							weapon_ik_point->attached_to_marker_name,
+							node_matrices);
+
+						++weapon_ik_point_index;
+						ik_element_index = (short)weapon_ik_point_index;
+					}
+					while (ik_element_index<weapon_ik_points->count);
+				}
+
+				SET_FLAG(
+					animation->flags,
+					_unit_animation_postpone_weapon_ik_until_interpolation_ends_bit,
+					FALSE);
+			}
+		}
+	}
+
+	return;
 }
 
 static boolean unit_verify_inventory(
