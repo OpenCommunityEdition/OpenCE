@@ -190,3 +190,64 @@ the nearby-seat fingerprint, and a final Ninja dry run will be repeated before
 one additive ledger-only replay commit. The same sequence will then be run at
 corrected HEAD. No push, amend, rebase, history rewrite, or worktree removal is
 performed.
+
+## Clean implementation-state replay
+
+Implementation-and-initial-ledger commit
+`3bd306deefd5b3a692a8b3d2e25fe1f2ef947216` was authored by Jonas Volman
+`<theunknowentity@gmail.com>` and was clean before replay. Re-reading that
+commit proves:
+
+- retained source blob `a2d6ae15ed26a052c99290d65f7168b01e2ba074`,
+  263,830 raw Git-payload bytes;
+- initial ledger blob `297dc72eb75fd298946fec3992d69aadc7b3b545`,
+  9,798 raw Git-payload bytes; and
+- exactly the intended source and new-ledger paths in the implementation
+  commit.
+
+A fresh one-unit accepted-state snapshot was written with `--no-build` at that
+exact clean commit. The ignored manifest
+`build/audit/units_nearby_seat_impl_replay_20260825.json` is 6,041,088 bytes
+with phase-specific SHA-256
+`85db62ebfbebf88d93152c896223432e1cbabe76919ccaeb4138fdf66e0c8e88` and
+pins the full implementation commit.
+
+The generated object resolved to `build/base/source/units/units.obj`. Its
+absolute normalized path was proven equal to the expected path and proven to
+begin with this exact isolated worktree root. The snapshotted first-shot object
+was 143,148 bytes with SHA-256
+`b3528d6f6d78dde2a3e776000b2f1d30042f7fe9e267d843500ed98791090fa9`.
+Only that verified file was
+removed with `Remove-Item -LiteralPath`, and immediate verification proved it
+absent. Its ordinary target then ran exactly:
+
+```text
+[1/1] CL build\base\source\units\units.obj
+units.c
+```
+
+The replay object is again 143,148 bytes with metadata-phase SHA-256
+`da62a19afdf6b5f1e6f3b4d0f4b9fb3eea7c5207a068a176c22d16f9b8426457`.
+The expected raw-object hash difference is confined to rebuild metadata; the
+complete runtime acceptance view is unchanged.
+
+The immediate regression check returned `ok: true`, exactly 168
+`still_exact`, zero failures, zero warnings, zero `newly_exact`, and zero
+`changed_nonexact`. Independent direct replay proofs also passed:
+
+- `_unit_find_nearby_seat` remains strict exact at 656 padded bytes, 16
+  relocation records, and normalized SHA-256 `106fadafcdc9...`;
+- complete code census remains 168 exact / 12 emitted nonexact / 9 absent,
+  with the nearby-seat function as the sole gain over the authenticated
+  167-owner baseline and zero loss;
+- complete target runtime-data census remains 126 exact / zero present
+  nonexact / three absent, with the assertion literal as the sole gain over
+  the authenticated 125-owner baseline and zero loss; and
+- a final generated Units-object Ninja dry run reports `ninja: no work to do`.
+
+Only this new ledger is modified for the additive replay record. After the
+ledger-only commit, the same clean snapshot/delete/rebuild/check sequence will
+be repeated at corrected HEAD so the handed-off branch itself is the final
+replay authority. No source change, candidate retry, tuning,
+header/protected/config/storage edit, amend, push, history rewrite, or worktree
+removal occurred after the implementation commit.
