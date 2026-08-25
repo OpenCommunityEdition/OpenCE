@@ -207,3 +207,66 @@ consumer A/B, and a final Ninja dry run will be repeated before one additive
 ledger-only replay commit.  The same clean snapshot/delete/rebuild/check
 sequence will then run at corrected HEAD.  No push, amend, rebase, history
 rewrite, or worktree removal is performed.
+
+## Clean implementation-state replay
+
+Implementation-and-initial-ledger commit
+`3e15e24ca05de36314f2d3fce20f44d672c746b1` was authored by Jonas Volman
+`<theunknowentity@gmail.com>` and was clean before replay.  Re-reading that
+commit proves the retained Cinematics, Rasterizer header, and Rasterizer
+source blobs remain `86e4ff0aaaede41aace50be6f5448064df14d905`,
+`50abf28f18e1637ed4263e8a6cb1adf402bf3f73`, and
+`bf3333f8d94d7d41e3a0ebd51f0d56806eb691f2`.  The initial ledger blob is
+`0850cbc14692e06e2564b3acb8005716930dd043`, and the implementation commit
+contains exactly the three intended source paths plus this new ledger.
+
+A fresh two-unit accepted-state snapshot was written with `--no-build` at
+that exact clean commit.  The ignored manifest
+`build/audit/cinematics_draw_quad_impl_replay_20260825.json` is 1,559,597
+bytes with SHA-256
+`a14b1121e99bb2157fcfa1768ab6098bc3062847a51e8254fd6cb63bd866c217`
+and pins the full implementation commit.
+
+The generated Cinematics and Rasterizer object paths resolved to
+`build/base/source/cutscene/cinematics.obj` and
+`build/base/source/rasterizer/rasterizer.obj`.  Both absolute normalized paths
+were proven to begin with this isolated worktree root.  The snapshotted
+objects retained the immutable first-shot SHA-256 identities
+`f46ac016c7e34940a8d53b372831b4713a8d5296477719f1863dd33d73667325`
+and `3de8f9f3332eed6fec8a0b8f89a803f462d045434d224b7bdab46020eb55e7ab`.
+Only those two verified files were removed with `Remove-Item -LiteralPath`,
+and immediate verification proved both absent.  Their ordinary targets then
+ran exactly:
+
+```text
+[1/2] CL build\base\source\cutscene\cinematics.obj
+[2/2] CL build\base\source\rasterizer\rasterizer.obj
+```
+
+The rebuilt objects are again 6,057 and 43,911 bytes.  Their expected raw
+metadata-phase SHA-256 identities are
+`508adbca09699179a3eeb351d609aee9c7d6e5717fb08ea969e01b2523257ca0`
+and `b6fe8ca8fc6a8a53edbb77506b4848eaaa256f546f78d490e6645f943e2f091b`;
+the complete runtime acceptance view is unchanged.
+
+The immediate regression check returned `ok: true`, zero failures, zero
+warnings, zero `newly_exact`, and zero changed nonexact functions.  It records
+all 15 emitted Cinematics target owners, including `_draw_quad`, and all 131
+Rasterizer report owners as `still_exact`.  Independent direct replay proofs
+also passed:
+
+- `_draw_quad` remains strict exact at 336 padded bytes, nine relocation
+  records, and normalized SHA-256 `98221d0a3037338...`;
+- the Rasterizer wrapper remains strict exact at 16 padded bytes, one
+  relocation, and normalized SHA-256 `6fde8ac9ac079976...`;
+- the complete 16-consumer baseline-to-replay comparison still has zero
+  changed or removed code/runtime owners, with `_draw_quad` the only
+  addition; and
+- a final generated two-object Ninja dry run reports `ninja: no work to do`.
+
+Only this new ledger is modified for the additive replay record.  After the
+ledger-only commit, the same clean snapshot/delete/rebuild/check sequence will
+be repeated at corrected HEAD so the handed-off branch itself is the final
+replay authority.  No source change, candidate retry, tuning, header-scope
+expansion, configuration edit, amend, push, history rewrite, or worktree
+removal occurred after the implementation commit.
