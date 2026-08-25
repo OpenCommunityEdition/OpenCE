@@ -140,3 +140,48 @@ source is changed. No committed-state replay is claimed yet; it will be added
 only after a clean Jonas implementation commit, verified object deletion,
 normal one-unit rebuild, regression check, direct hardened comparison, and
 additive ledger-only commit.
+
+## Committed-state replay
+
+Jonas implementation commit
+`d2d0f93a7397a3fc7571c009a8763a9ae25c2792` records the retained typed body
+and this NEW ledger without amending or rewriting history. At that commit,
+`source/units/units.c` is committed Git blob
+`085a7ae2cb224656f071ced32326a21bd8ecaf3f`, 132,872 raw Git-payload bytes,
+SHA-256
+`af080b6491c40e3e3f64253c38799d3fccc50ad009c659bc991278d53a71e85d`.
+The initial committed ledger is blob
+`ebd33945af99c4fe09f67bd94e87ecf11308ea02`, 7,872 raw Git-payload bytes,
+SHA-256
+`6dbcf5e09f1560e92e6d744f4a89dd3ca03b03db2a01be737aa890466bb5ca07`.
+
+A clean regression snapshot was written at that exact commit with `--no-build`
+to
+`build/regression_units_typed_damage_record_committed_20260824.json`; the
+manifest SHA-256 is
+`ed78bc4d17f4f0912fb06df7b8ec7b707a50ffaf3b3b7c75ab116d5a47523fb8`.
+The generated `build/base/source/units/units.obj` path was resolved and proved
+inside this isolated worktree, its pre-delete raw SHA-256 was
+`384d4e016340573b63e9a20f2bcce6c765c7c84035299c8ead1b68056ada6853`,
+and the exact object was deleted and verified absent. A normal production
+Ninja edge then performed exactly one `[1/1] CL` rebuild. The rebuilt raw
+object SHA-256 is
+`675423a0a2396ceb3c049776d5ce97b2cb58e4d9b2ff2faacf69bf264cf30b70`;
+the raw hash changes with the COFF timestamp, while the accepted sections do
+not.
+
+The no-build regression check is `ok: true`: all 108 accepted functions are
+`still_exact`, including `_unit_record_damage`; failures, warnings,
+`changed_nonexact`, and `newly_exact` are empty. A separate hardened census
+again reports 108/189 exact, eight emitted nonexact, and 73 absent target code
+owners. Direct comparison of `_unit_record_damage` remains exactly 592 padded
+bytes, 14 relocations, and normalized SHA-256
+`5822b73bd7216a1f01894d55c61360f8a72b4858ff9effee7bf37ac7901adfbc`.
+The 1,564-byte/7-relocation `_unit_update_section` aggregate remains strict
+with normalized SHA-256
+`6ed61c39a648905cf23b12b916e2adadfe97b6e5aa492c29a14c7265809ef1a7`;
+the 4-byte/zero-relocation `_unit_globals` BSS remains strict with normalized
+SHA-256
+`df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119`.
+The production object target is now a Ninja no-op and the tracked worktree is
+clean. This replay adds evidence only; the accepted source is unchanged.
