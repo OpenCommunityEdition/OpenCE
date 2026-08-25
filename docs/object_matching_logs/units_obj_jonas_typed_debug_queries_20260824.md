@@ -204,3 +204,79 @@ regression gate, direct two-name comparison, complete 189/129 censuses,
 runtime-owner A/B, and no-work dry run. Actual replay evidence will be
 appended to this ledger in one additive ledger-only commit. No amend, push,
 history rewrite, configuration change, or worktree removal is authorized.
+
+## Actual implementation-state forced replay
+
+The implementation and initial ledger were committed together as
+`14bc0fdf21173f6ba2deb142a97edb02b1b65e78` (`Recover Units typed debug
+queries`), authored by Jonas Volman `<theunknowentity@gmail.com>`. The
+committed source is blob `26a4f43aebcb230a7e3100ad0a29a52b7276ecab`
+(244,693 raw Git-payload bytes). The initial ledger is blob
+`b5a3db82f5240310c9bae61182500189630588e2` (11,251 bytes).
+
+The tracked and untracked production state was clean at that implementation
+commit. An explicit one-target Ninja dry run first reported
+`ninja: no work to do`. The regression gate then captured the existing,
+already-proven object with its hidden `--no-build` mode, avoiding both a
+second candidate emission and the copied log's unrelated downloader edges:
+
+```text
+build/audit/units_typed_debug_queries_impl_replay_20260824.json
+commit: 14bc0fdf21173f6ba2deb142a97edb02b1b65e78
+size: 5,862,336 bytes
+SHA-256: 0385133d98b148fe5ade6be50b0314a8c6bd59695e9b7edd4dc567fbde004617
+```
+
+The generated object resolved to
+`C:\Users\isabe\Documents\Codex\2026-07-13\i-w\units-debug-query-typed-20260824\build\base\source\units\units.obj`.
+Its normalized absolute path was proven to begin with this exact isolated
+worktree root before deletion. The snapshotted object was 135,341 bytes with
+SHA-256
+`9bd0c61cf76e79bc31d18229baca148ee40861e00a18e2b0b91ad88f168c43ea`.
+Only that verified file was removed with literal-path semantics, and absence
+was checked.
+
+One ordinary one-target rebuild then ran exactly:
+
+```text
+[1/1] CL build\base\source\units\units.obj
+units.c
+```
+
+The replay object is again 135,341 bytes with phase-specific whole-file
+SHA-256
+`327ae4f35469fa0007bf05f7d04898f59729f4abeab546e0a4465e8f546cfd0a`.
+The raw-object hash difference is confined to rebuild metadata; the immediate
+fail-closed comparison of every accepted function, runtime non-code section,
+relocation, and symbol owner returned:
+
+```text
+ok: true
+failures: 0
+warnings: 0
+still_exact: 160
+newly_exact: 0
+changed_nonexact: 0
+```
+
+Independent replay proofs also passed:
+
+- direct two-name hardened comparison: `all_equal: true`, preserving the
+  exact 448 padded bytes, 14 relocation records, and both target hashes;
+- complete established function census: 160 exact / 11 emitted nonexact / 18
+  absent, with no loss from the authenticated 158-owner pre-wave exact set;
+- complete target-data census: 121 exact / two present nonexact / six absent
+  across all 129 January runtime-data sections;
+- runtime-owner A/B: 180 owners on both sides, all common, zero added, zero
+  removed, and zero changed acceptance fingerprints;
+- writable `.data` and `_unit_globals` BSS remain the exact measurements
+  recorded above; and
+- a final Units-object Ninja dry run reports `ninja: no work to do`.
+
+The committed source blob is unchanged. Only this new ledger is modified for
+the additive replay record. After the additive ledger-only commit, the same
+clean snapshot/delete/rebuild/check sequence will be repeated at corrected
+HEAD so the handed-off branch itself, rather than merely its implementation
+parent, is the final replay authority. No source change, retry, tuning,
+header/protected/config/storage edit, amend, push, history rewrite, or
+worktree removal occurred after the implementation commit.
