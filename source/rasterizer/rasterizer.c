@@ -757,7 +757,8 @@ void _rasterizer_dynamic_lit_geometry_draw(
 	void const *vertices,
 	void const *parameters);
 void _rasterizer_psuedo_dynamic_screen_quad_draw(
-	long dynamic_vertex_buffer_index);
+	struct rasterizer_dynamic_screen_geometry_parameters *parameters,
+	struct dynamic_screen_vertex *vertices);
 void _rasterizer_widget_submit(
 	long object_index,
 	long widget_index,
@@ -1745,9 +1746,10 @@ void rasterizer_dynamic_unlit_geometry_draw(
 }
 
 void rasterizer_psuedo_dynamic_screen_quad_draw(
-	long dynamic_vertex_buffer_index)
+	struct rasterizer_dynamic_screen_geometry_parameters *parameters,
+	struct dynamic_screen_vertex *vertices)
 {
-	_rasterizer_psuedo_dynamic_screen_quad_draw(dynamic_vertex_buffer_index);
+	_rasterizer_psuedo_dynamic_screen_quad_draw(parameters, vertices);
 	return;
 }
 

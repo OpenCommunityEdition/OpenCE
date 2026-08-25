@@ -78,6 +78,12 @@ enum
 	NUMBER_OF_RASTERIZER_PROFILES,
 };
 
+enum rasterizer_lock_operation
+{
+	_rasterizer_lock_unlocked = 0,
+	_rasterizer_lock_cinematics = 8,
+};
+
 
 /* ---------- macros */
 
@@ -104,6 +110,43 @@ struct rasterizer_frame_begin_parameters
 	real dt;
 };
 
+struct dynamic_screen_vertex
+{
+	real_point2d position;
+	real_point2d texture_coordinates;
+	pixel32 color;
+};
+
+typedef char verify_dynamic_screen_vertex_size[
+	sizeof(struct dynamic_screen_vertex) == 0x14 ? 1 : -1];
+
+struct rasterizer_dynamic_screen_geometry_parameters
+{
+	void *meter_parameters;
+	real_vector2d const *offset;
+	boolean map_anchor_screen[3];
+	byte pad0B;
+	struct bitmap_data *map[3];
+	boolean map_wrapped[3];
+	byte pad1B;
+	real_point2d const *map_offset[3];
+	real_vector2d map_scale[3];
+	real_vector2d map_texture_scale[3];
+	real_rgb_color const *map_tint[3];
+	real_argb_color plasma_fade;
+	boolean doing_plasma_effect;
+	byte pad75[3];
+	real const *map_fade[3];
+	short map0_to_1_blend_function;
+	short map1_to_2_blend_function;
+	short framebuffer_blend_function;
+	boolean point_sampled;
+	byte pad8B;
+};
+
+typedef char verify_rasterizer_dynamic_screen_geometry_parameters_size[
+	sizeof(struct rasterizer_dynamic_screen_geometry_parameters) == 0x8C ? 1 : -1];
+
 struct rasterizer_globals_definition
 {
 	boolean initialized;
@@ -127,6 +170,8 @@ typedef char verify_rasterizer_globals_size[
 	sizeof(struct rasterizer_globals_definition) == 0x68 ? 1 : -1];
 typedef char verify_rasterizer_globals_initialized_offset[
 	offsetof(struct rasterizer_globals_definition, initialized) == 0x00 ? 1 : -1];
+typedef char verify_rasterizer_globals_lock_operation_offset[
+	offsetof(struct rasterizer_globals_definition, current_lock_operation) == 0x02 ? 1 : -1];
 typedef char verify_rasterizer_globals_framerate_throttle_offset[
 	offsetof(struct rasterizer_globals_definition, framerate_throttle) == 0x3D ? 1 : -1];
 typedef char verify_rasterizer_globals_near_clip_distance_offset[
@@ -468,7 +513,8 @@ void rasterizer_dynamic_lit_geometry_draw(
 	void const *vertices,
 	void const *parameters);
 void rasterizer_psuedo_dynamic_screen_quad_draw(
-	long dynamic_vertex_buffer_index);
+	struct rasterizer_dynamic_screen_geometry_parameters *parameters,
+	struct dynamic_screen_vertex *vertices);
 void rasterizer_widget_submit(
 	long object_index,
 	long widget_index,

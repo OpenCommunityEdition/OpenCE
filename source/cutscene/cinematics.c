@@ -55,13 +55,16 @@ symbols in this file:
 #include "cseries.h"
 #include "cinematics.h"
 #include "ai/ai.h"
+#include "bitmaps/bitmap_group.h"
 #include "game/game.h"
+#include "game/game_globals.h"
 #include "game/players.h"
 #include "interface/ui_widget.h"
 #include "items/projectiles.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_cinematics.h"
 #include "saved games/game_state.h"
+#include "scenario/scenario.h"
 
 /* ---------- constants */
 
@@ -74,6 +77,9 @@ symbols in this file:
 void cinematic_set_title_delayed(
 	short title_index,
 	real delay);
+void draw_quad(
+	rectangle2d *rectangle,
+	pixel32 color);
 
 /* ---------- globals */
 
@@ -223,3 +229,71 @@ void cinematic_set_title(
 }
 
 /* ---------- private code */
+
+void draw_quad(
+	rectangle2d *rectangle,
+	pixel32 color)
+{
+	struct bitmap_data *map;
+	real_point2d positions[4];
+	struct rasterizer_dynamic_screen_geometry_parameters parameters;
+	struct dynamic_screen_vertex vertices[4];
+	real_point2d *position;
+	struct dynamic_screen_vertex *vertex;
+	short vertex_index;
+	struct game_globals *game_globals;
+	struct game_globals_rasterizer_data *rasterizer_data;
+
+	global_scenario_get();
+	game_globals = scenario_get_game_globals();
+	rasterizer_data = game_globals->rasterizer_data.count
+		? TAG_BLOCK_GET_ELEMENT(
+			&game_globals->rasterizer_data,
+			0,
+			struct game_globals_rasterizer_data)
+		: NULL;
+	map = TAG_BLOCK_GET_ELEMENT(
+		&bitmap_group_get(rasterizer_data->default_textures[0].index)->bitmap_data,
+		1,
+		struct bitmap_data);
+
+	rasterizer_globals.current_lock_operation = _rasterizer_lock_cinematics;
+
+	positions[0].x = (real)rectangle->x0;
+	positions[0].y = (real)rectangle->y0;
+	positions[1].x = (real)rectangle->x1;
+	positions[1].y = (real)rectangle->y0;
+	positions[2].x = (real)rectangle->x1;
+	positions[2].y = (real)rectangle->y1;
+	positions[3].x = (real)rectangle->x0;
+	positions[3].y = (real)rectangle->y1;
+
+	position = positions;
+	vertex = vertices;
+	for (vertex_index = 0; vertex_index < NUMBEROF(vertices); vertex_index++)
+	{
+		vertex->position.x = position->x;
+		vertex->color = color;
+		vertex->texture_coordinates.x = 0.0f;
+		vertex->texture_coordinates.y = 0.0f;
+		vertex->position.y = position->y;
+		position++;
+		vertex++;
+	}
+
+	csmemset(&parameters, 0, sizeof(parameters));
+	parameters.framebuffer_blend_function = 0;
+	parameters.map_texture_scale[0].j = 1.0f;
+	parameters.map_texture_scale[0].i = 1.0f;
+	parameters.map_scale[0].j = 1.0f;
+	parameters.map_scale[0].i = 1.0f;
+	parameters.meter_parameters = NULL;
+	parameters.point_sampled = FALSE;
+	parameters.map[0] = map;
+
+	rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
+
+	rasterizer_globals.current_lock_operation = _rasterizer_lock_unlocked;
+
+	return;
+}
