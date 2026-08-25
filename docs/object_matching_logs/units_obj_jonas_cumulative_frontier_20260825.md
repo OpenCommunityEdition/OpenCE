@@ -291,3 +291,31 @@ Without an authorized shared-interface package, a final corrected-HEAD Units
 replay must reproduce the current 168/12/9 code census, 126/0/3 data census,
 4,156 accepted semantic functions, 4,130 campaign functions, and 501,438
 accepted code bytes. No raw or whole-object hash alone can satisfy that replay.
+
+## Cumulative-frontier implementation replay
+
+The cumulative index was committed at clean documentation-only HEAD
+`8cfed82d8801cb09a503f89a7a5735bc007290f0`. A fresh one-unit no-build
+snapshot at that exact commit wrote
+`build/audit/units_cumulative_frontier_impl_replay.json`, 6,041,088 bytes,
+with SHA-256
+`e861b12d29ca3072c30379bb3ad388f9d187f130075d2088a82d6372821275db`.
+
+The generated object resolved to the exact expected path under this worktree.
+Before removal it was 143,136 bytes with phase-specific raw SHA-256
+`984f05dfd8ce7e949f5ccca13676cc02b70e8ba6474b7d0bbedc3190b615862f`.
+The resolved absolute path was proven to begin with the worktree root, only
+that file was removed with literal-path semantics, and immediate verification
+proved it absent. Its ordinary Ninja edge then ran exactly:
+
+```text
+[1/1] CL build\base\source\units\units.obj
+```
+
+The replay object was again 143,136 bytes with phase-specific raw SHA-256
+`2ef3d76a2ccd5f81da7cf8e347fc4400dd0e7939afe316fa987870d8428d859c`.
+The expected whole-object difference is COFF emission metadata. The immediate
+fail-closed regression check returned `ok: true`, 168 `still_exact`, zero
+failures, zero warnings, zero newly exact owners, and zero changed nonexact
+owners. This section is the sole change in the additive replay commit; no
+source, header, configuration, or accepted-object decision changed.
