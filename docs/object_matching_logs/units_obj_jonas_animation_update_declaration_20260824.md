@@ -177,3 +177,58 @@ and checked immediately. Direct code/data censuses, the helper fingerprint,
 and a final Ninja dry run will be repeated before one additive ledger-only
 replay commit. No push, amend, rebase, history rewrite, or worktree removal is
 performed.
+
+## Clean committed-state replay
+
+Implementation-and-initial-ledger commit
+`c06ef5c666a047643dbdbfa6673036836d5fb2c3` was authored by Jonas Volman and
+was clean before replay. Re-reading that commit proves:
+
+- retained source blob `725b1cd35f667fc64e4f5b3fd17fcfe5a8d18219`,
+  258,535 raw Git-payload bytes;
+- initial ledger blob `7d1410814f3614d404524691428b4494f5e8779f`,
+  8,988 raw Git-payload bytes; and
+- exactly the two intended tracked paths in the implementation commit.
+
+A fresh one-unit accepted-state snapshot was written with `--no-build` at
+that exact clean commit. The ignored manifest
+`build/audit/units_animation_update_decl_replay.json` is 6,002,245 bytes with
+phase-specific SHA-256
+`dbf1d2257271766186312b8ab0327baf5daa2c52dcc8722cda9397890e97ea0e`
+and pins the full implementation commit.
+
+The generated path resolved to
+`build/base/source/units/units.obj`, was proven equal to the expected absolute
+path, and was proven to remain inside this isolated worktree. The snapshotted
+first-shot object was 140,882 bytes with SHA-256
+`7255882655eec4e6ea755242b7c6bf3c9c67f7b997d173320a732f10e4f5d27b`.
+Only that exact file was removed with `Remove-Item -LiteralPath`; immediate
+verification proved it absent. Its normal generated target then ran exactly:
+
+```text
+[1/1] CL build\base\source\units\units.obj
+```
+
+The replay object is again 140,882 bytes with metadata-phase SHA-256
+`8a3cdcc88c71a825b393a662adec65081364b4568f0bff0697a5853beb592879`.
+The expected whole-file difference is normal COFF emission metadata; the
+complete runtime acceptance view is identical.
+
+The immediate committed regression check returned `ok: true`, exactly 165
+`still_exact`, zero failures, zero warnings, zero `newly_exact`, and zero
+`changed_nonexact`. Independent direct comparison repeated:
+
+- 165 exact / 12 emitted nonexact / 12 absent across all 189 ordinary target
+  function owners;
+- `_code_0019b160` strict at 80 padded bytes, four identical relocation
+  records, and normalized SHA-256 `31a801fff65c...`;
+- 125 exact / zero present-nonexact / four absent across all 129 January
+  non-code owners; and
+- a final generated Units-object Ninja dry run reports `ninja: no work to do`.
+
+Only this ledger is modified for the additive replay record. After the
+ledger-only commit, the same clean snapshot/delete/rebuild/check sequence will
+be repeated at corrected HEAD so the handed-off branch itself is the final
+replay authority. No source change, candidate retry, tuning,
+header/protected/config/storage edit, amend, push, history rewrite, or
+worktree removal occurred after the implementation commit.
