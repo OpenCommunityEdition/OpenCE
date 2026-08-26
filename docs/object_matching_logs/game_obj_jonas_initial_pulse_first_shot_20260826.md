@@ -291,5 +291,37 @@ before this additive replay record.
 
 ## Cumulative-HEAD closure
 
-The cumulative integration replay will be recorded append-only after the two
-isolated commits are integrated into `jonas/units-integration-20260824`.
+The authoritative `jonas/units-integration-20260824` branch was cleanly
+fast-forwarded from `6296c9960d4f07e3f695fad765c2a69566523b75` through the
+implementation and isolated replay commits to
+`c6404ded998241fd9a29653b88c96683c2d2771e`. The committed source blob,
+function scope, and protected-path exclusion are unchanged.
+
+Before cumulative replay, the cumulative worktree retained its 1,812-byte
+pre-pulse `game.obj`, SHA-256
+`b287a0e6c09aebed3837f6401441796858e32448bdcbd074a254cc1cc1d0dec8`.
+That artifact was preserved. The selected-object dry run named exactly one CL
+edge, and the ordinary edge then rebuilt the unchanged committed source once.
+
+The cumulative replay object is 2,261 bytes with phase-specific whole-file
+SHA-256
+`060ebff3c30c393e5542229a37eb81e71f00a98681eae21a152889cd3bbe18cc`.
+Its four-byte raw-size difference from the isolated replay is confined to
+path/debug container metadata. Direct hardened comparison again proves all
+seven accepted functions, including the pulse's complete padded section and
+six ordered relocations.
+
+The cumulative clean manifest is 559,164 bytes, SHA-256
+`7a1916b9e272a5c81f6aae8a1e1dc86e3a8fd75bcfc056e36a1ce4fc31d4405c`.
+Its immediate check is clean with all seven functions under `still_exact` and
+empty failure, warning, `newly_exact`, and `changed_nonexact` lists.
+
+The cumulative canonical reports reproduce the isolated 1,574,841-byte
+`build/report.json` hash
+`9856b039c85d9ff81c5da851e95d390896550a9a8c991befd4b92b78c7512498`
+and 2,986,342-byte `build/semantic_report.json` hash
+`005d4c02b6cc2979a288beda3b3bd6c1d160c7f0098abe89dbf11e6ba449219d`.
+Every campaign, object, function, relocation, semantic, admission, park, test,
+JSON, source-policy, protected-path, no-deletion, and no-pending-work result
+above is reproduced at cumulative HEAD. No push, amend, rebase, history
+rewrite, or worktree removal occurs.
