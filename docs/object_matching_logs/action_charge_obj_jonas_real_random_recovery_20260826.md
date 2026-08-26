@@ -166,3 +166,78 @@ no work afterward.
 
 This section is the only tracked post-implementation change. No push is
 performed.
+
+## Corrected cumulative-HEAD closure
+
+The cumulative branch was fast-forwarded from
+`c07cbfb90b8bf67a86cb28bc6f3a1dffed70a486` through the isolated
+implementation and replay-ledger commits to
+`450249b0ead2989462f6e7d1218f0ad9ebd0a7d6`. The implementation source blob
+remains `3e76470cf8be066072239845cbf08e37aeffa458`; no protected source, shared
+header, storage declaration, configuration, semantic ledger, parked manifest,
+or object-status file changed during integration.
+
+From that clean corrected HEAD, the resolved cumulative
+`build/base/source/ai/action_charge.obj` was verified inside the cumulative
+worktree and literally deleted. The Ninja dry run exposed exactly one expected
+compiler edge, and the normal rebuild reported exactly
+`[1/1] CL build\base\source\ai\action_charge.obj`. The preserved corrected
+replay is
+`build/audit/action_charge_real_random_corrected_head_replay_20260826.obj`,
+1,393 bytes, raw SHA-256
+`f78c30bbff7d78d9b9f576a4b36a1bd5831ef8ba54e1f373b3ebf9102477cb13`.
+
+Direct hardened comparison again reports `all_equal: true` for
+`_real_random`, `_action_charge_begin`, and `_action_charge_update`. The
+accepted corrected delta remains exactly one function, 13 meaningful bytes,
+16 padded bytes, and two relocations, with no changed non-exact function and
+no runtime-data gain or regression.
+
+The isolated and cumulative raw objects are root- and timestamp-sensitive.
+VC7's `.debug$S` record embeds the absolute output-object path: it is 194
+bytes in the isolated `action-charge-three-leaf-20260821` worktree and 182
+bytes in `units-integration-20260824`, exactly accounting for the twelve-byte
+object-size difference. After report regeneration, the cross-worktree
+manifest check reports only this `.debug$S` difference. All three accepted
+functions are `still_exact`, `changed_nonexact` is empty, and every modeled
+production code and runtime non-code record is stable.
+
+The corrected clean manifest is
+`build/audit/action_charge_real_random_corrected_head_manifest_20260826.json`,
+250,738 bytes, SHA-256
+`a5a9efe588d81de5e8dce55df5a44cbe4627dc0c09500e67f9df4db6da0a616e`.
+Its no-build self-check has no failures or warnings, no newly exact or changed
+non-exact entries, and retains all three functions in `still_exact`.
+
+Regenerated corrected artifacts are:
+
+- `action_charge_real_random_corrected_head_report_20260826.json`: 1,573,815
+  bytes, SHA-256
+  `4ccad6c2d5fd4d48c0e4755d3dd07fddac6a800d15b41620bc01667440b4d6fe`;
+- `action_charge_real_random_corrected_head_semantic_20260826.json`: 2,972,764
+  bytes, SHA-256
+  `2408321ac6feeab0c9b2ff8de676fd408d3cdb369419ec3afcd7e896f6590a9d`;
+- `action_charge_real_random_corrected_head_admission_20260826.json`: 384
+  bytes, SHA-256
+  `f0aa45c22cc604fb74abc388b06dd79a27e7a0b498a5d28837a9e785680c9a36`;
+- `action_charge_real_random_corrected_head_parked_20260826.json`: 3,950
+  bytes, SHA-256
+  `cfac03aea5be607c19a6a40bcdbc1164e71ffb0179602af4bd37b3fd50e26d1d`.
+
+The hardened semantic audit evaluates 4,246 functions, accepts 4,165 exact
+functions, and reports zero unit errors. Campaign progress is 375/833 objects,
+4,139/11,060 exact functions, 502,200/2,198,102 meaningful code bytes, and
+1,835,088/4,176,062 matched data bytes. Halo progress is 273/468 objects,
+3,972/7,574 exact functions, 489,286/1,770,166 meaningful code bytes, and
+1,829,896/3,923,451 matched data bytes. `action_charge.obj` is 3/22 exact with
+164 meaningful exact code bytes and no data credit.
+
+Admission remains zero candidates and zero revocations; only the inherited
+`source/shell/shell_xbox` completion-label contradiction remains. Parks remain
+three active / zero stale / zero invalid. The selected object and complete
+Halo/libcmt dry runs and normal invocations all report no work, and all 179
+tooling tests pass.
+
+The approval-gated Units package remains frozen. This closure does not
+constitute its required exact approval phrase and authorizes no edit to Units
+or its protected neighbors. No push is performed.
