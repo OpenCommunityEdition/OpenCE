@@ -568,5 +568,15 @@
     "unit": "source/ai/path_smoothing",
     "function": "_code_00051190",
     "reason": "hardened COFF comparison proves all 128 padded bytes and all 5 semantic relocations exact (SHA-256 a58fa4f6cf9598874c2a0d1fb60f226f65dea7f5cbc7182a682b2faefc62580f); the nonexact caller remains solely as the private-ABI source scaffold"
+  },
+  {
+    "unit": "source/rasterizer/rasterizer_debug",
+    "function": "_rasterizer_debug_line",
+    "reason": "hardened COFF comparison proves all 32 padded bytes and the REL32 relocation to _rasterizer_debug_line_shaded exact (SHA-256 60f8ba4857cfb47aa739f77d4df9844fae5d61fb4292d7d92b25c28166a7a0d7)"
+  },
+  {
+    "unit": "source/rasterizer/rasterizer_debug",
+    "function": "_rasterizer_debug_triangle",
+    "reason": "hardened COFF comparison proves all 32 padded bytes and the REL32 relocation to _rasterizer_debug_triangle_shaded exact (SHA-256 1b0df8cc752bec5820c858223f553d6f62fc7e39bac45bbb9b209d0f980a148a)"
   }
 ]

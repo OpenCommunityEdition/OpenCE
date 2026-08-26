@@ -88,6 +88,19 @@ typedef char rasterizer_debug_data_size_assert[
 
 /* ---------- prototypes */
 
+void rasterizer_debug_line_shaded(
+	real_point3d const *p0,
+	real_point3d const *p1,
+	real_argb_color const *color0,
+	real_argb_color const *color1);
+void rasterizer_debug_triangle_shaded(
+	real_point3d const *p0,
+	real_point3d const *p1,
+	real_point3d const *p2,
+	real_argb_color const *color0,
+	real_argb_color const *color1,
+	real_argb_color const *color2);
+
 /* ---------- globals */
 
 struct rasterizer_debug_data bss_004662f8;
@@ -114,6 +127,37 @@ void rasterizer_debug_end(
 void rasterizer_debug_test(
 	void)
 {
+	return;
+}
+
+void rasterizer_debug_line(
+	real_point3d const *p0,
+	real_point3d const *p1,
+	real_argb_color const *color)
+{
+	rasterizer_debug_line_shaded(
+		p0,
+		p1,
+		color,
+		color);
+
+	return;
+}
+
+void rasterizer_debug_triangle(
+	real_point3d const *p0,
+	real_point3d const *p1,
+	real_point3d const *p2,
+	real_argb_color const *color)
+{
+	rasterizer_debug_triangle_shaded(
+		p0,
+		p1,
+		p2,
+		color,
+		color,
+		color);
+
 	return;
 }
 
