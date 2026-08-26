@@ -114,6 +114,8 @@ symbols in this file:
 	_bss_0043e48c (0000)
 */
 
+struct game_options;
+
 /* ---------- headers */
 
 #include "cseries/cseries.h"
@@ -124,6 +126,15 @@ symbols in this file:
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct game_options
+{
+	unsigned long flags;
+	short code_version;
+	short difficulty;
+	unsigned long random_seed;
+	char map_name[256];
+};
 
 struct game_options_prefix
 {
@@ -142,6 +153,16 @@ struct game_runtime_globals_prefix
 	struct game_options_prefix options;
 };
 
+typedef char verify_game_options_size[
+	sizeof(struct game_options) == 0x10C ? 1 : -1];
+typedef char verify_game_options_code_version_offset[
+	offsetof(struct game_options, code_version) == 0x4 ? 1 : -1];
+typedef char verify_game_options_difficulty_offset[
+	offsetof(struct game_options, difficulty) == 0x6 ? 1 : -1];
+typedef char verify_game_options_random_seed_offset[
+	offsetof(struct game_options, random_seed) == 0x8 ? 1 : -1];
+typedef char verify_game_options_map_name_offset[
+	offsetof(struct game_options, map_name) == 0xC ? 1 : -1];
 typedef char verify_game_runtime_globals_players_are_double_speed_offset[
 	offsetof(struct game_runtime_globals_prefix, players_are_double_speed) == 0x2 ? 1 : -1];
 typedef char verify_game_runtime_globals_difficulty_offset[
@@ -156,6 +177,16 @@ extern struct game_runtime_globals_prefix *bss_0043e48c;
 extern short player_spawn_count;
 
 /* ---------- public code */
+
+void game_options_new(
+	struct game_options *options)
+{
+	csmemset(options, 0, sizeof(*options));
+	options->code_version = 0;
+	options->difficulty = _game_difficulty_level_normal;
+	options->random_seed = 0xDEADBEEF;
+	return;
+}
 
 void game_set_players_are_double_speed(
 	boolean players_are_double_speed)
