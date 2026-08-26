@@ -417,4 +417,11 @@ void rasterizer_spin_end(
 	return;
 }
 
+void _rasterizer_set_vblank_callback(
+	void (*callback)(unsigned long))
+{
+	D3DDevice_SetVerticalBlankCallback(callback);
+	return;
+}
+
 /* ---------- private code */
