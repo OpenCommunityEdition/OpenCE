@@ -64,14 +64,17 @@ typed current-tree contracts, Claude's Units carrier, the Units animation
 closure ledgers, and the corresponding later-build Stian wrapper at commit
 `237dbff18bef78c9a5a6785f7c6023ba1c6f79d8`.
 
-Stian's translated sketch spells the outer wrapper `void`, but it is weaker
-later-build evidence with stale neighboring return metadata. The frozen
-current-tree spelling used `short`: `_animation_update_internal` is
-independently authenticated as short-return, and the immediately adjacent
-exact `_animation_choose_random_permutation` is the same fixed-kind forwarding
-pattern with an untouched-EAX short return. January's bytes are compatible
-with that typed passthrough. The target COFF external storage class overrides
-HCEA's source-scope annotation.
+The outer return type remains underdetermined. January leaves EAX untouched
+after the call and has no inbound relocation to `_animation_update`, so both a
+`void` forwarding body and a `short` passthrough can emit the exact bytes. The
+frozen first shot used `short`, supported by the authenticated short-return
+callee and the adjacent fixed-kind random-permutation wrapper. A later
+cross-build audit found two Stian `void` wrappers at 100.0 VC71 verification,
+which is material contrary semantic evidence; HCEA's exported correspondence
+does not record the return type. Because this wave is rejected, neither type
+is retained, and its exact emission must not be treated as return-type
+authority for a future wave. The target COFF external storage class still
+overrides HCEA's source-scope annotation.
 
 ## Exact target and typed packet
 
