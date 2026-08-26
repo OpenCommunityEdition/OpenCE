@@ -155,14 +155,30 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "math/real_math.h"
 
 /* ---------- constants */
 
 /* ---------- macros */
 
+#define error_geometry_file bss_004561b4
+
 /* ---------- structures */
 
+struct error_geometry_globals
+{
+	char filename[64];
+	real_matrix4x3 transform;
+};
+
+typedef char verify_error_geometry_globals_size[
+	sizeof(struct error_geometry_globals) == 0x74 ? 1 : -1];
+typedef char verify_error_geometry_transform_offset[
+	offsetof(struct error_geometry_globals, transform) == 0x40 ? 1 : -1];
+
 /* ---------- prototypes */
+
+extern struct error_geometry_globals data_00307850;
 
 /* ---------- globals */
 
@@ -181,5 +197,27 @@ void error_geometry_dispose(
 
 	return;
 }
+
+void error_geometry_initialize(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\tool\\error_geometry.c",
+		0x44,
+		error_geometry_file==NULL);
+	remove(data_00307850.filename);
+	return;
+}
+
+struct error_geometry_globals data_00307850 =
+{
+	"debug.wrl",
+	{
+		1.f,
+		{
+			{ 1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f }
+		}
+	}
+};
 
 /* ---------- private code */
