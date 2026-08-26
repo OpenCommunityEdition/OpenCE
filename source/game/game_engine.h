@@ -132,7 +132,7 @@ struct game_engine
 	void (*player_damaged_player)(
 		long damaging_player_index,
 		long dead_player_index,
-		long damage_type);
+		boolean damage_type);
 	void (*unknown60)(void);
 	boolean (*format_message)(
 		long player_index,
@@ -427,7 +427,7 @@ void ticks_to_unicode_time_string(
 void game_engine_player_damaged_player(
 	long damaging_player_index,
 	long dead_player_index,
-	long damage_type);
+	boolean damage_type);
 
 boolean game_engine_player_is_out_of_lives(
 	long player_index);

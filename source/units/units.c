@@ -741,6 +741,55 @@ enum
 	_unit_debug_function_active_bit = 2,
 };
 
+enum
+{
+	_unit_damage_animation_soft_ping = 0,
+	_unit_damage_animation_hard_ping,
+	_unit_damage_animation_soft_kill,
+	_unit_damage_animation_hard_kill,
+};
+
+enum
+{
+	_unit_damage_direction_front = 0,
+	_unit_damage_direction_left,
+	_unit_damage_direction_right,
+	_unit_damage_direction_back,
+};
+
+enum
+{
+	_unit_damage_part_head = 2,
+};
+
+/* January computes these direction-cone limits from single-precision pi, then
+   promotes the rounded results for the double-precision fabs comparisons. */
+#define UNIT_DAMAGE_REAR_CONE_ANGLE 0.7853981852531433
+#define UNIT_DAMAGE_FRONT_CONE_ANGLE 2.159845009446144
+
+enum
+{
+	_unit_damage_aftermath_lethal_bit = 0,
+	_unit_damage_aftermath_player_damage_type_bit = 4,
+	_unit_damage_aftermath_died_instantly_bit = 6,
+};
+
+#define UNIT_DAMAGE_AFTERMATH_ANIMATION_FLAGS_MASK \
+	(FLAG(1) | FLAG(3) | FLAG(7))
+
+/* January-authenticated damage flag values; the owning shared headers are
+   outside this wave, so the used values stay translation-unit local. */
+enum
+{
+	_damage_data_suppress_unit_reaction_bit = 4,
+};
+
+enum
+{
+	_damage_definition_pings_resistant_units_bit = 2,
+	_damage_definition_does_not_ping_units_bit = 4,
+};
+
 /* ---------- macros */
 
 #define unit_get_current_weapon_index(unit_index) unit_inventory_get_weapon((unit_index), unit_get((unit_index))->unit.current_weapon_index)
@@ -962,8 +1011,10 @@ void weapon_stop_reload(
 boolean weapon_prevents_grenade_throwing(
 	long weapon_index);
 
-static void unit_adjust_for_seat_change(long unit_index);
 static short unit_weapon_next_index(long unit_index, short current_index, short delta);
+static void unit_ready_desired_weapon(
+	long unit_index,
+	boolean immediate);
 
 static void unit_throw_grenade_move_to_hand(long unit_index);
 
@@ -1029,6 +1080,20 @@ void unit_detach_from_parent(
 	long unit_index);
 void unit_exit_seat_end(
 	long unit_index);
+void ai_handle_death(
+	long unit_index,
+	long killer_object_index,
+	short damage_category);
+boolean unit_make_damage_sound(
+	long unit_index,
+	struct damage_data *damage_data,
+	boolean died,
+	boolean died_instantly,
+	real body_damage,
+	real shield_damage);
+void biped_exit_seat_end(
+	long biped_index,
+	long parent_unit_index);
 short actors_spawn_from_unit(
 	long unit_index,
 	long actor_variant_definition_index,
@@ -2947,6 +3012,20 @@ boolean unit_can_enter_seat(
 	return result;
 }
 
+static void code_001a2030(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	unit->unit.desired_weapon_index = unit_weapon_next_index(
+		unit_index,
+		unit->unit.current_weapon_index,
+		0);
+	unit_ready_desired_weapon(unit_index, TRUE);
+
+	return;
+}
+
 boolean unit_enter_seat(
 	long unit_index,
 	long target_unit_index,
@@ -3070,6 +3149,127 @@ boolean unit_enter_seat(
 	}
 
 	return result;
+}
+
+void unit_exit_seat_end(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	long parent_unit_index = unit->object.parent_object_index;
+
+	if (parent_unit_index!=NONE && unit->unit.parent_seat_index!=NONE)
+	{
+		struct unit_datum *parent_unit = unit_get(parent_unit_index);
+		struct unit_definition *parent_unit_definition =
+			unit_definition_get(parent_unit->definition_index);
+		struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+			&parent_unit_definition->unit.seats,
+			unit->unit.parent_seat_index,
+			struct unit_seat);
+		real_matrix4x3 *unit_node_matrix = object_get_node_matrix(unit_index, 0);
+		struct object_marker seat_marker;
+		real_vector3d relative_position;
+		real_vector3d exit_offset;
+		struct unit_definition *unit_definition;
+		struct model *model;
+		struct model_node *root_node;
+		real_point3d root_translation;
+		real_matrix4x3 const *root_inverse_matrix;
+		real_matrix4x3 const *updated_unit_node_matrix;
+		real_point3d position;
+		real_matrix4x3 matrix;
+		struct real_orientation *node_orientations;
+
+		object_get_marker_by_name(
+			parent_unit_index,
+			seat->marker_name,
+			&seat_marker,
+			1);
+		vector_from_points3d(
+			&seat_marker.matrix.position,
+			&unit_node_matrix->position,
+			&relative_position);
+		matrix4x3_inverse_transform_vector(
+			&seat_marker.matrix,
+			&relative_position,
+			&exit_offset);
+
+		unit_definition = unit_definition_get(unit->definition_index);
+		model = model_definition_get(unit_definition->object.model.index);
+		root_node = TAG_BLOCK_GET_ELEMENT(&model->nodes, 0, struct model_node);
+		root_inverse_matrix = &root_node->runtime_default_inverse_matrix;
+		root_translation = root_node->default_translation;
+
+		if (parent_unit->unit.driver_object_index==unit_index &&
+			parent_unit->unit.animation.state!=_unit_state_opening &&
+			unit->object.parent_object_index!=NONE)
+		{
+			unit_animation_set_state(
+				unit->object.parent_object_index,
+				_unit_state_opening);
+		}
+
+		unit->unit.last_vehicle_index = parent_unit_index;
+		unit->unit.game_time_at_last_vehicle_exit = game_time_get();
+		if (unit->unit.driver_object_index==unit_index)
+		{
+			unit->unit.driver_object_index = NONE;
+		}
+		if (unit->unit.gunner_object_index==unit_index)
+		{
+			unit->unit.gunner_object_index = NONE;
+		}
+
+		object_detach(unit_index);
+		position.x = relative_position.i + unit->object.position.x;
+		position.y = relative_position.j + unit->object.position.y;
+		position.z = relative_position.k + unit->object.position.z -
+			root_translation.z;
+		object_set_position(unit_index, &position, NULL, NULL);
+
+		updated_unit_node_matrix = object_get_node_matrix(unit_index, 0);
+		matrix4x3_multiply(
+			updated_unit_node_matrix,
+			root_inverse_matrix,
+			&matrix);
+		unit->object.forward = matrix.forward;
+		unit->object.up = matrix.up;
+		object_set_visibility(unit_index, TRUE);
+		unit->unit.parent_seat_index = NONE;
+		unit->unit.animation.base_seat_index = _unit_base_seat_stand;
+
+		if (parent_unit->unit.driver_object_index==unit_index)
+		{
+			parent_unit->unit.driver_object_index = NONE;
+		}
+		if (parent_unit->unit.gunner_object_index==unit_index)
+		{
+			parent_unit->unit.gunner_object_index = NONE;
+		}
+
+		code_0019a170(parent_unit_index);
+		code_001a2030(unit_index);
+
+		{
+			struct unit_animation_update_data animation_update_data;
+
+			animation_update_data.state_desired = _unit_state_airborne;
+			animation_update_data.crouching = FALSE;
+			unit_update_animation(unit_index, &animation_update_data);
+		}
+		node_orientations = object_header_block_get(
+			unit_index,
+			&unit->object.original_node_orientations);
+		node_orientations->translation = root_translation;
+
+		if (unit->object.type==_object_type_biped)
+		{
+			biped_exit_seat_end(unit_index, parent_unit_index);
+		}
+		object_compute_node_matrices_recursive(unit_index);
+	}
+
+	return;
 }
 
 void unit_impulse(
@@ -5846,6 +6046,787 @@ void unit_record_damage(
 	return;
 }
 
+void code_001a0cf0(
+	long unit_index,
+	boolean killed,
+	boolean feign_death,
+	boolean suppress_random_death_frame,
+	boolean suppress_hard_ping,
+	boolean force_hard_ping,
+	real damage_direction_angle,
+	short damage_part,
+	real_vector2d const *alignment_vector)
+{
+	struct unit_datum *unit;
+	struct unit_definition *unit_definition;
+	struct animation_graph *animation_graph;
+	boolean ping;
+	boolean hard_ping;
+	short damage_direction;
+	short damage_animation_index;
+	short animation_index;
+	short damage_animation_type;
+	short animation_state;
+	boolean apply_animation;
+	struct biped_datum *biped;
+	struct biped_definition *biped_definition;
+	struct animation *animation;
+	short quarter_frame_count;
+	short random_frame;
+	long front_animation_index;
+	word animation_flags;
+
+	unit = unit_get(unit_index);
+	unit_definition = unit_definition_get(unit->definition_index);
+
+	if (killed)
+	{
+		feign_death = FALSE;
+		ping = TRUE;
+
+		if (unit_definition->unit.hard_death_threshold>0.f &&
+			unit->object.current_body_damage>
+				unit_definition->unit.hard_death_threshold)
+		{
+			hard_ping = TRUE;
+		}
+		else
+		{
+			hard_ping = FALSE;
+		}
+	}
+	else if (feign_death)
+	{
+		killed = TRUE;
+		ping = TRUE;
+		hard_ping = FALSE;
+	}
+	else
+	{
+		ping =
+			unit->object.current_body_damage>
+				unit_definition->unit.soft_ping_threshold ||
+			unit->object.current_shield_damage>
+				unit_definition->unit.soft_ping_threshold;
+		hard_ping =
+			unit->object.current_body_damage>
+				unit_definition->unit.hard_ping_threshold;
+
+		if (suppress_hard_ping ||
+			TEST_FLAG(unit->unit.flags, _unit_ignore_hard_pings_bit))
+		{
+			hard_ping = FALSE;
+		}
+	}
+
+	if (force_hard_ping)
+	{
+		hard_ping = TRUE;
+		ping = TRUE;
+	}
+
+	if (damage_part==NONE)
+	{
+		damage_part = 0;
+	}
+
+	if (fabs(damage_direction_angle)<UNIT_DAMAGE_REAR_CONE_ANGLE)
+	{
+		damage_direction = _unit_damage_direction_back;
+	}
+	else if (fabs(damage_direction_angle)>UNIT_DAMAGE_FRONT_CONE_ANGLE)
+	{
+		damage_direction = _unit_damage_direction_front;
+	}
+	else if (damage_direction_angle>0.f)
+	{
+		damage_direction = _unit_damage_direction_left;
+	}
+	else
+	{
+		damage_direction = _unit_damage_direction_right;
+	}
+
+	if (game_engine_running() &&
+		damage_part==_unit_damage_part_head &&
+		hard_ping &&
+		killed)
+	{
+		damage_direction = _unit_damage_direction_left;
+	}
+
+	if (!ping && !killed)
+	{
+		return;
+	}
+
+	{
+		unit_definition = unit_definition_get(unit->definition_index);
+		animation_graph = animation_graph_definition_get(
+			unit_definition->object.animation_graph.index);
+
+		if (!hard_ping && !killed)
+		{
+			if (unit->unit.animation.soft_ping_animation.index!=NONE &&
+				unit->unit.animation.soft_ping_animation.frame_index<=
+					unit_definition->unit.runtime_soft_ping_minimum_interrupt_ticks)
+			{
+				return;
+			}
+
+			damage_animation_index = build_damage_animation_index(
+				_unit_damage_animation_soft_ping,
+				damage_direction,
+				damage_part);
+
+			{
+				long animation_graph_index;
+				long selected_damage_animation_index;
+
+				if (damage_animation_index>=0 &&
+					damage_animation_index<
+						animation_graph->unit_damage_animations.count)
+				{
+					selected_damage_animation_index =
+						animation_graph_animation_index_get(
+							&animation_graph->unit_damage_animations)
+							[damage_animation_index].animation_index;
+				}
+				else
+				{
+					selected_damage_animation_index = NONE;
+				}
+				animation_graph_index =
+					unit_definition->object.animation_graph.index;
+
+				animation_index = animation_choose_random_permutation_internal(
+					TRUE,
+					animation_graph_index,
+					selected_damage_animation_index);
+			}
+
+			if (animation_index==NONE)
+			{
+				return;
+			}
+
+			unit->unit.animation.soft_ping_animation.index = animation_index;
+			unit->unit.animation.soft_ping_animation.frame_index = 0;
+
+			return;
+		}
+		else
+		{
+			animation_state = killed ? _unit_state_dying : _unit_state_hard_ping;
+
+			if (killed)
+			{
+				damage_animation_type =
+					hard_ping ?
+						_unit_damage_animation_hard_kill :
+						_unit_damage_animation_soft_kill;
+			}
+			else
+			{
+				damage_animation_type = _unit_damage_animation_hard_ping;
+			}
+
+			apply_animation =
+				killed ||
+				code_00197f90(
+					&unit->unit.animation,
+					animation_state);
+
+			if (unit->unit.animation.state==_unit_state_hard_ping &&
+				unit->object.animation.state.frame_index>
+					unit_definition->unit.runtime_hard_ping_minimum_interrupt_ticks)
+			{
+				apply_animation = TRUE;
+			}
+
+			if (!killed)
+			{
+				if (TEST_FLAG(
+					unit->object.functions_active_flags,
+					_unit_debug_function_active_bit))
+				{
+					apply_animation = FALSE;
+				}
+
+				if (unit->object.parent_object_index!=NONE)
+				{
+					return;
+				}
+			}
+
+			if (!apply_animation)
+			{
+				return;
+			}
+
+			if (killed)
+			{
+				char const *seat_label =
+					base_seat_labels[_unit_base_seat_stand];
+
+				unit_set_or_test_seat_and_weapon_label(
+					unit_index,
+					seat_label,
+					code_0019dff0(unit_index),
+					TRUE);
+			}
+
+			if (animation_state==_unit_state_dying &&
+				unit->object.type==_object_type_biped)
+			{
+				biped = biped_get(unit_index);
+				biped_definition = biped_definition_get(biped->definition_index);
+
+				if (TEST_FLAG(biped->biped.flags, _biped_limping_bit) &&
+					!TEST_FLAG(
+						biped_definition->biped.flags,
+						_biped_has_no_dying_airborne_bit))
+				{
+					animation_state = _unit_state_dying_airborne;
+
+					if (unit_animation_set_state(
+						unit_index,
+						_unit_state_dying_airborne))
+					{
+						goto apply_alignment;
+					}
+				}
+			}
+
+			damage_animation_index = build_damage_animation_index(
+				damage_animation_type,
+				damage_direction,
+				damage_part);
+
+			{
+				long animation_graph_index;
+				long selected_damage_animation_index;
+
+				if (damage_animation_index>=0 &&
+					damage_animation_index<
+						animation_graph->unit_damage_animations.count)
+				{
+					selected_damage_animation_index =
+						animation_graph_animation_index_get(
+							&animation_graph->unit_damage_animations)
+							[damage_animation_index].animation_index;
+				}
+				else
+				{
+					selected_damage_animation_index = NONE;
+				}
+				animation_graph_index =
+					unit_definition->object.animation_graph.index;
+
+				animation_index = animation_choose_random_permutation_internal(
+					TRUE,
+					animation_graph_index,
+					selected_damage_animation_index);
+			}
+
+			if (animation_index!=NONE)
+			{
+				if (unit->unit.animation.state==_unit_state_throw_grenade)
+				{
+					unit_throw_grenade_release(unit_index, TRUE);
+				}
+
+				object_start_interpolation(unit_index, 3);
+				unit->unit.animation.state = (char)animation_state;
+				code_0019b0b0(
+					unit_index,
+					unit_definition->object.animation_graph.index,
+					animation_index);
+				SET_FLAG(
+					unit->unit.animation.flags,
+					_unit_animation_postpone_weapon_ik_until_interpolation_ends_bit,
+					TRUE);
+
+				if (killed)
+				{
+					if (!suppress_random_death_frame && !feign_death)
+					{
+						animation = TAG_BLOCK_GET_ELEMENT(
+							&animation_graph->animations,
+							animation_index,
+							struct animation);
+						quarter_frame_count = animation->frame_count>>2;
+						random_frame = random_range(
+							quarter_frame_count,
+							(animation->frame_count>>1) + quarter_frame_count);
+						unit->unit.weapon_drop_delay_ticks = (char)random_frame;
+						unit->unit.weapon_drop_delay_ticks =
+							MAX((char)random_frame, 1);
+					}
+					else
+					{
+						unit->unit.weapon_drop_delay_ticks = 0;
+					}
+				}
+
+				if (damage_direction!=_unit_damage_direction_front)
+				{
+					animation = TAG_BLOCK_GET_ELEMENT(
+						&animation_graph->animations,
+						animation_index,
+						struct animation);
+
+					if (build_damage_animation_index(
+						damage_animation_type,
+						_unit_damage_direction_front,
+						damage_part)>=0 &&
+						build_damage_animation_index(
+							damage_animation_type,
+							_unit_damage_direction_front,
+							damage_part)<
+							animation_graph->unit_damage_animations.count)
+					{
+						front_animation_index =
+							animation_graph_animation_index_get(
+								&animation_graph->unit_damage_animations)
+								[build_damage_animation_index(
+									damage_animation_type,
+									_unit_damage_direction_front,
+									damage_part)].animation_index;
+					}
+					else
+					{
+						front_animation_index = NONE;
+					}
+
+					if (animation->runtime_parent_animation_index==
+						front_animation_index)
+					{
+						damage_direction = _unit_damage_direction_front;
+					}
+				}
+
+				if (killed)
+				{
+					SET_FLAG(
+						unit->unit.animation.flags,
+						_unit_animation_fallen_on_front_bit,
+						damage_direction==_unit_damage_direction_back);
+				}
+			}
+			else if (killed)
+			{
+				animation_flags = unit->unit.animation.flags;
+
+				animation_flags &=
+					~FLAG(_unit_animation_fallen_on_front_bit);
+				animation_flags |=
+					FLAG(_unit_animation_ignore_translation_bit);
+				unit->unit.animation.flags = animation_flags;
+
+				if (TEST_FLAG(
+					unit_definition->unit.flags,
+					_unit_is_destroyed_after_dying_bit))
+				{
+					unit_destroy(unit_index);
+				}
+			}
+		}
+	}
+
+apply_alignment:
+	if (alignment_vector!=NULL &&
+		!TEST_FLAG(
+			unit_definition->unit.flags,
+			_unit_does_not_reorient_during_pings_bit) &&
+		unit->object.type==_object_type_biped &&
+		unit->object.parent_object_index==NONE &&
+		(hard_ping || killed))
+	{
+		real_vector2d transformed_alignment;
+
+		switch (damage_direction)
+		{
+		case _unit_damage_direction_back:
+			transformed_alignment = *alignment_vector;
+			code_0019ea70(unit_index, &transformed_alignment);
+			return;
+
+		case _unit_damage_direction_front:
+			transformed_alignment.i = -alignment_vector->i;
+			transformed_alignment.j = -alignment_vector->j;
+			code_0019ea70(unit_index, &transformed_alignment);
+			return;
+
+		case _unit_damage_direction_left:
+			transformed_alignment.i = -alignment_vector->j;
+			transformed_alignment.j = alignment_vector->i;
+			code_0019ea70(unit_index, &transformed_alignment);
+			return;
+
+		case _unit_damage_direction_right:
+			transformed_alignment.i = alignment_vector->j;
+			transformed_alignment.j = -alignment_vector->i;
+			code_0019ea70(unit_index, &transformed_alignment);
+			return;
+
+		default:
+			display_assert(
+				NULL,
+				"c:\\halo\\SOURCE\\units\\units.c",
+				4562,
+				TRUE);
+			system_exit(-1);
+			code_0019ea70(unit_index, &transformed_alignment);
+			return;
+		}
+	}
+
+	return;
+}
+
+void unit_damage_aftermath(
+	long unit_index,
+	struct damage_data *damage_data,
+	unsigned long damage_flags,
+	real shield_damage,
+	real body_damage,
+	long unused,
+	long animation_index)
+{
+	struct unit_datum *unit;
+	struct unit_definition *unit_definition;
+	struct damage_definition *damage_definition;
+	real total_damage;
+	boolean lethal;
+	boolean feigned;
+	boolean instantaneous;
+
+	unit = unit_get(unit_index);
+	unit_definition = unit_definition_get(unit->definition_index);
+	damage_definition = &damage_effect_definition_get(
+		damage_data->definition_index)->damage;
+	total_damage = shield_damage + body_damage;
+	lethal = TEST_FLAG(
+		damage_flags,
+		_unit_damage_aftermath_lethal_bit);
+	feigned = FALSE;
+
+	(void)unused;
+
+	if (debug_damage_taken && unit->unit.player_index != NONE)
+	{
+		char const *owner_name = "<unknown>";
+		char const *damage_name = "<unknown>";
+
+		if (damage_data->owner_object_index != NONE)
+		{
+			struct object_datum *owner_object =
+				object_get(damage_data->owner_object_index);
+			struct object_definition *owner_definition =
+				object_definition_get(owner_object->definition_index);
+			char const *separator = strrchr(
+				owner_definition->object.model.name,
+				'\\');
+
+			if (separator)
+			{
+				owner_name = separator + 1;
+			}
+		}
+
+		if (damage_data->definition_index != NONE)
+		{
+			char const *tag_name =
+				tag_get_name(damage_data->definition_index);
+			char const *separator = strrchr(
+				tag_name,
+				'\\');
+
+			if (separator)
+			{
+				damage_name = separator + 1;
+			}
+		}
+
+		console_printf(
+			FALSE,
+			"p%d: body %.2f shld %.2f from %s %s",
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(unit->unit.player_index),
+			body_damage,
+			shield_damage,
+			owner_name,
+			damage_name);
+	}
+
+	{
+		real vitality =
+			unit->object.recent_shield_damage +
+			unit->object.recent_body_damage;
+
+		if (vitality > 0.f)
+		{
+			unit->unit.last_damage_category = damage_definition->category;
+			unit->unit.delayed_damage_timer = 45;
+			if (vitality < unit->unit.delayed_damage_peak)
+			{
+				vitality = unit->unit.delayed_damage_peak;
+			}
+			unit->unit.delayed_damage_peak = vitality;
+
+			if (damage_data->owner_object_index != NONE)
+			{
+				unit->unit.delayed_damage_attacker_object_index =
+					damage_data->owner_object_index;
+			}
+		}
+	}
+
+	if (TEST_FLAG(unit->unit.flags, _unit_active_camouflaged_bit))
+	{
+		unit->unit.active_camouflage -=
+			damage_definition->active_camouflage_damage;
+
+		if (unit->unit.active_camouflage < 0.f)
+		{
+			unit->unit.active_camouflage = 0.f;
+		}
+	}
+
+	instantaneous =
+		lethal &&
+		damage_definition->instantaneous_acceleration >= 2.f;
+
+	if (!lethal &&
+		TEST_FLAG(unit->unit.flags, _unit_feign_death_allowed_bit) &&
+		unit_definition->unit.feign_death_threshold > 0.f &&
+		unit_definition->unit.feign_death_time > 0.f &&
+		unit->object.body_vitality > 0.f &&
+		unit->object.recent_body_damage >
+			unit_definition->unit.feign_death_threshold)
+	{
+		real feign_death_ticks =
+			(real_random_range(0.f, 1.f) +
+				unit_definition->unit.feign_death_time) * TICKS_PER_SECOND;
+
+		SET_FLAG(unit->object.damage_flags, _object_dead_bit, TRUE);
+		feigned = TRUE;
+		unit->unit.feign_death_timer = (short)MAX(
+			1.f,
+			feign_death_ticks);
+		match_assert(
+			"c:\\halo\\SOURCE\\units\\units.c",
+			0x1284,
+			unit->unit.feign_death_timer > 0);
+	}
+
+	if (!TEST_FLAG(
+			damage_data->flags,
+			_damage_data_suppress_unit_reaction_bit) &&
+		(lethal ||
+			feigned ||
+			!TEST_FLAG(unit->object.damage_flags, _object_dead_bit)) &&
+		!TEST_FLAG(unit->unit.flags, _unit_impervious_bit) &&
+		!TEST_FLAG(
+			damage_definition->flags,
+			_damage_definition_does_not_ping_units_bit))
+	{
+		real_vector2d damage_direction;
+		real_vector2d unit_forward;
+		boolean resists_pings;
+		boolean animation_flag;
+		boolean direction_valid;
+		real angle;
+
+		damage_direction.i = damage_data->direction.i;
+		damage_direction.j = damage_data->direction.j;
+		unit_forward.i = unit->object.forward.i;
+		unit_forward.j = unit->object.forward.j;
+		resists_pings = FALSE;
+		animation_flag = FALSE;
+		direction_valid = FALSE;
+		angle = 0.f;
+
+		if (normalize2d(&damage_direction) > 0.f &&
+			normalize2d(&unit_forward) > 0.f)
+		{
+			angle = signed_angle_between_vectors2d(
+				&damage_direction,
+				&unit_forward);
+			direction_valid = TRUE;
+		}
+
+		if (TEST_FLAG(
+				unit_definition->unit.flags,
+				_unit_resists_pings_bit) &&
+			!TEST_FLAG(
+				damage_definition->flags,
+				_damage_definition_pings_resistant_units_bit))
+		{
+			resists_pings = TRUE;
+		}
+
+		if (unit->unit.flaming_death_delay > 0)
+		{
+			resists_pings = TRUE;
+		}
+
+		if (damage_flags & UNIT_DAMAGE_AFTERMATH_ANIMATION_FLAGS_MASK)
+		{
+			animation_flag = TRUE;
+		}
+
+		code_001a0cf0(
+			unit_index,
+			lethal,
+			feigned,
+			instantaneous,
+			resists_pings,
+			animation_flag,
+			angle,
+			(short)animation_index,
+			direction_valid ? &damage_direction : NULL);
+	}
+
+	{
+		long owner_player_index = damage_data->owner_player_index;
+		long player_index = unit->unit.player_index;
+
+		if (owner_player_index != NONE && player_index != NONE)
+		{
+			game_engine_player_damaged_player(
+				owner_player_index,
+				player_index,
+				TEST_FLAG(
+					damage_flags,
+					_unit_damage_aftermath_player_damage_type_bit));
+		}
+	}
+
+	if (damage_data->owner_player_index != NONE ||
+		damage_data->owner_object_index != NONE)
+	{
+		unit_record_damage(
+			unit_index,
+			total_damage,
+			damage_definition->category,
+			lethal,
+			damage_data->owner_player_index,
+			damage_data->owner_team_index,
+			damage_data->owner_object_index);
+	}
+
+	if (!TEST_FLAG(
+			damage_data->flags,
+			_damage_data_suppress_unit_reaction_bit) &&
+		(TEST_FLAG(
+				damage_flags,
+				_unit_damage_aftermath_lethal_bit) ||
+			body_damage > 0.f ||
+			shield_damage > 0.f))
+	{
+		unit_make_damage_sound(
+			unit_index,
+			damage_data,
+			lethal | feigned,
+			TEST_FLAG(
+				damage_flags,
+				_unit_damage_aftermath_died_instantly_bit),
+			body_damage,
+			shield_damage);
+	}
+
+	if (body_damage > 0.f || shield_damage > 0.f)
+	{
+		unit_unzoom(unit_index);
+	}
+
+	if (unit->object.type == _object_type_biped)
+	{
+		if (lethal)
+		{
+			ai_handle_death(
+				unit_index,
+				damage_data->owner_object_index,
+				damage_definition->category);
+		}
+		else if (!TEST_FLAG(unit->object.damage_flags, _object_dead_bit))
+		{
+			ai_handle_damage(
+				unit_index,
+				damage_data->owner_object_index,
+				damage_definition->category,
+				total_damage,
+				&damage_data->direction,
+				FALSE);
+		}
+	}
+
+	if (unit->unit.player_index != NONE &&
+		damage_definition->stun > 0.f &&
+		(game_engine_running() || stun_enable))
+	{
+		struct game_globals_player_information *player_information =
+			TAG_BLOCK_GET_ELEMENT(
+				&scenario_get_game_globals()->player_information,
+				0,
+				struct game_globals_player_information);
+		real stun_increment =
+			damage_definition->stun * damage_data->scale;
+		real maximum_stun =
+			damage_definition->maximum_stun * damage_data->scale;
+		short stun_ticks;
+		short minimum_stun_ticks;
+		short maximum_stun_ticks;
+
+		if (stun_increment < 0.f)
+		{
+			stun_increment = 0.f;
+		}
+		if (maximum_stun < 0.f)
+		{
+			maximum_stun = 0.f;
+		}
+		else if (maximum_stun >= 1.f)
+		{
+			maximum_stun = 1.f;
+		}
+
+		if (unit->unit.body_stun < maximum_stun)
+		{
+			unit->unit.body_stun += stun_increment;
+			if (unit->unit.body_stun > maximum_stun)
+			{
+				unit->unit.body_stun = maximum_stun;
+			}
+		}
+
+		stun_ticks = (short)(
+			damage_definition->stun_time * TICKS_PER_SECOND);
+		minimum_stun_ticks = (short)(
+			player_information->minimum_stun_time * TICKS_PER_SECOND);
+		maximum_stun_ticks = (short)(
+			player_information->maximum_stun_time * TICKS_PER_SECOND);
+
+		if (unit->unit.body_stun_ticks < minimum_stun_ticks)
+		{
+			unit->unit.body_stun_ticks = minimum_stun_ticks;
+		}
+		unit->unit.body_stun_ticks += stun_ticks;
+		if (unit->unit.body_stun_ticks > maximum_stun_ticks)
+		{
+			unit->unit.body_stun_ticks = maximum_stun_ticks;
+		}
+	}
+
+	if (lethal || feigned)
+	{
+		unit_died(unit_index, feigned);
+	}
+
+	return;
+}
+
 void unit_flame_to_death(
 	long unit_index)
 {
@@ -6188,7 +7169,7 @@ long unit_inventory_get_weapon(
 	return unit_get_weapon(unit, index);
 }
 
-void unit_ready_desired_weapon(
+static void unit_ready_desired_weapon(
 	long unit_index,
 	boolean immediate)
 {
@@ -6347,15 +7328,6 @@ static void unit_refresh_illumination(
 		unit->unit.self_illumination = parent_unit->unit.self_illumination;
 	}
 
-	return;
-}
-
-static void unit_adjust_for_seat_change(
-	long unit_index)
-{
-	struct unit_datum *unit = unit_get(unit_index);
-	unit->unit.desired_weapon_index = unit_weapon_next_index(unit_index, unit->unit.current_weapon_index, 0);
-	unit_ready_desired_weapon(unit_index, TRUE);
 	return;
 }
 
@@ -7145,9 +8117,56 @@ static boolean code_00198fd0(
 
 	return result;
 }
+
+boolean unit_test_animation_impulse(
+	long unit_index,
+	long animation_impulse)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition;
+	struct animation_graph *animation_graph;
+	struct animation_graph_unit_seat *unit_seat;
+	struct animation_graph_weapon_class *weapon_class;
+	short interpolation_frame_count;
+	short animation_type;
+
+	if (code_00198fd0(unit_index, animation_impulse))
+	{
+		unit_definition = unit_definition_get(unit->definition_index);
+		animation_graph = animation_graph_definition_get(
+			unit_definition->object.animation_graph.index);
+		unit_seat = TAG_BLOCK_GET_ELEMENT(
+			&animation_graph->unit_seats,
+			unit->unit.animation.seat_index,
+			struct animation_graph_unit_seat);
+		weapon_class = TAG_BLOCK_GET_ELEMENT(
+			&unit_seat->weapon_classes,
+			unit->unit.animation.weapon_index,
+			struct animation_graph_weapon_class);
+		animation_type = code_00198e40(
+			animation_impulse,
+			&interpolation_frame_count);
+
+		if (animation_type>=0 && animation_type<weapon_class->animations.count)
+		{
+			animation_type =
+				animation_graph_animation_index_get(&weapon_class->animations)
+					[animation_type].animation_index;
+		}
+		else
+		{
+			animation_type = NONE;
+		}
+
+		return (boolean)(animation_type!=NONE);
+	}
+
+	return FALSE;
+}
+
 boolean unit_start_animation_impulse(
 	long unit_index,
-	short animation_impulse,
+	long animation_impulse,
 	real_vector2d *alignment_vector)
 {
 	struct unit_datum *unit = unit_get(unit_index);
