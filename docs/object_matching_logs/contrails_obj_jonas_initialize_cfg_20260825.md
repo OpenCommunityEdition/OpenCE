@@ -177,6 +177,29 @@ candidate, configuration, compiler, or retry followed.
 No semantic exception, regression adjudication, park entry, symbol-ownership
 entry, object-status change, or configuration edit is needed.
 
+## Committed-state replay
+
+Implementation commit `0cddfec893012c494372b48dcb53e0492e0f2316`
+was clean before replay. Its strict manifest is
+`build/audit/contrails_init_cfg_committed_20260825.json`, 294,398 bytes,
+SHA-256
+`fa5adfb20e6f34502892305be746354dae3701f829a8cbdcc52332d021660819`.
+
+The resolved replay target was verified inside the isolated worktree and
+`build/base/source/effects/contrails.obj` was literally deleted. Ninja then
+ran exactly one compiler edge to recreate it. The rebuilt object was preserved
+as `build/audit/contrails_init_cfg_committed_replay_20260825.obj`, 2,920
+bytes, raw SHA-256
+`d18cba5ca4d9627a85c06f46a1c44df817b297954c726d7e17e829c9766a43ad`.
+It differs from the first-shot raw object only at COFF header offsets `+4` and
+`+5`, the low bytes of the compile timestamp. Every modeled section, symbol,
+meaningful and padded code byte, and relocation is identical.
+
+The committed-manifest regression check is fully clean: no failures, warnings,
+newly exact, or changed-nonexact entries, and all 6/6 functions are in
+`still_exact`. Direct hardened comparison again proves all six emitted
+functions strict exact. Full Halo and libcmt dry-run closure reports no work.
+
 ## Do-not-repeat and residual disposition
 
 Do not retry nested/flattened Boolean-equivalent spellings of the accepted
@@ -194,5 +217,5 @@ compiler, or strict comparator changes; it is otherwise closed exact.
 
 `contrails.obj` remains active and `NonMatching` at 6/19 exact functions,
 226/4,220 meaningful and 256 padded exact code bytes, with no new data credit.
-Committed-state delete/rebuild and corrected-HEAD replay evidence is recorded
-in the ledger-only closure commit after the implementation commit.
+Corrected cumulative-HEAD replay evidence follows after integration; this
+committed-state evidence is the ledger-only closure for the isolated branch.
