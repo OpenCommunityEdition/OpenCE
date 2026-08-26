@@ -216,10 +216,39 @@ declaration, protected-file edit, or shared-header edit is part of this wave.
 
 ## Committed-state replay
 
-The committed-state literal delete/rebuild replay is intentionally deferred
-until the implementation-and-ledger commit exists. Its evidence will be added
-in a ledger-only follow-up; the frozen first-shot source and object remain
-unchanged until then.
+Implementation-and-ledger commit
+`26cb817387e16de6a1d2b111e2b2bdc36a4b1773` was clean before replay. Its
+committed source blob is
+`c2b037841dc6c0d0456a1bf26170ea6695b16d90`. The clean committed manifest is
+`build/audit/actor_type_infection_helper_pair_committed_20260825.json`,
+410,160 bytes, SHA-256
+`3cf3750d686e510944736eefbd24fb611e669a51a7e50c6810a333dd800abbe6`.
+
+The resolved generated object path was verified inside the isolated worktree,
+then `build/base/source/ai/actor_type_infection.obj` was literally deleted.
+The Ninja dry run exposed exactly one expected compiler edge, and the normal
+rebuild reported exactly
+`[1/1] CL build\base\source\ai\actor_type_infection.obj`. The rebuilt object
+was preserved as
+`build/audit/actor_type_infection_helper_pair_committed_replay_20260825.obj`,
+12,633 bytes, raw SHA-256
+`677febb26b554cb66cea4038b8dcbf500ecd80ecaa2046134dc546522008eb51`.
+
+The replay and first-shot raw objects differ only at COFF header offsets
+`+0x4` and `+0x5`, compile-timestamp bytes. Every modeled section, symbol,
+meaningful and padded byte, and relocation is identical. The committed
+manifest check has no failures or warnings, no newly exact or changed-nonexact
+entries, and places all three accepted functions in `still_exact`.
+
+Direct hardened comparison again proves `_infection_decide_action`,
+`_code_000273b0`, and `_code_00027410` strict exact; the caller remains
+nonexact and zero-credit. The semantic audit again reports 4,161 accepted
+exact functions and zero unit errors, and campaign progress remains at the
+documented +2 functions / +181 meaningful bytes. Halo and libcmt report no
+work, admission remains zero candidates and zero revocations, parks remain
+three active / zero stale / zero invalid, and all 179 tooling tests pass. The
+isolated Git worktree was clean throughout the replay; this section is the
+only ledger-only follow-up change.
 
 ## Corrected cumulative-HEAD closure
 
