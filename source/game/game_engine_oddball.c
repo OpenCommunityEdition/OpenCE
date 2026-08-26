@@ -105,6 +105,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "players.h"
 
 /* ---------- constants */
 
@@ -204,6 +205,14 @@ void code_000a1820(
 void code_000a1b80(
 	void)
 {
+	return;
+}
+
+void code_000a1650(
+	long player_index)
+{
+	player_get(player_index);
+
 	return;
 }
 

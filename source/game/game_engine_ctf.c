@@ -118,6 +118,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "players.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -199,6 +202,14 @@ void code_0009f2c0(
 void code_0009f2d0(
 	void)
 {
+	return;
+}
+
+void code_0009ec80(
+	long player_index)
+{
+	player_get(player_index);
+
 	return;
 }
 
