@@ -139,8 +139,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define local_random_direction3d local_random_direction3d_inline
 #include "cseries/cseries.h"
 #include "memory/data.h"
+#include "math/real_math.h"
+#undef local_random_direction3d
 
 /* ---------- constants */
 
@@ -190,6 +193,14 @@ void effects_disconnect_from_structure_bsp(
 	void)
 {
 	return;
+}
+
+real_vector3d *local_random_direction3d(
+	real_vector3d *direction)
+{
+	return seed_random_direction3d(
+		get_global_local_random_seed_address(),
+		direction);
 }
 
 /* ---------- private code */
