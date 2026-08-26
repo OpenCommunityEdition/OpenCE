@@ -138,5 +138,11 @@ failures, zero warnings, 175 `still_exact` identities, and empty deltas;
 the final dry run reports `ninja: no work to do`. Only this ledger changes
 in the additive replay commit.
 
+## Cumulative integration replay
 
-(appended after the implementation commit)
+Merged into `jonas/units-integration-20260824` as `a55e405a`. At that HEAD
+a one-unit snapshot (`build/audit/units_enter_seat_cumulative_replay.json`)
+was captured, the generated object containment-deleted and rebuilt by one
+ordinary edge, and the immediate check returned `ok: true`, zero failures,
+zero warnings, 175 `still_exact` identities. Direct census at cumulative
+HEAD: units 175/10/4 code, 128/0/1 data.
