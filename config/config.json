@@ -747,7 +747,7 @@
 				{ "name": "source/bungie_net/network/transport_endpoint_set_winsock.c", "index": 373, "status": "NonMatching" },
 				{ "name": "source/bungie_net/network/transport_dns_winsock.c", "index": 374, "status": "Matching" },
 				{ "name": "source/bungie_net/network/transport_address.c", "index": 375, "status": "Matching" },
-				{ "name": "source/bungie_net/common/thread_win32.c", "index": 376, "status": "NonMatching" },
+				{ "name": "source/bungie_net/common/thread_win32.c", "index": 376, "status": "Matching" },
 				{ "name": "source/bungie_net/common/random_numbers.c", "index": 377, "status": "Matching" },
 				{ "name": "source/bungie_net/common/public_key_crypt.c", "index": 378, "status": "Matching" },
 				{ "name": "source/bungie_net/common/prime_numbers.c", "index": 379, "status": "NonMatching" },
