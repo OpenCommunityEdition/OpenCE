@@ -127,6 +127,23 @@ enum
 
 /* ---------- structures */
 
+struct thread_reference;
+
+struct player_profile_runtime_globals
+{
+	byte thread_input_storage[0x64];
+	struct thread_reference *thread;
+	boolean initialized;
+	byte pad[3];
+};
+
+typedef char verify_player_profile_thread_offset[
+	offsetof(struct player_profile_runtime_globals, thread) == 0x64 ? 1 : -1];
+typedef char verify_player_profile_initialized_offset[
+	offsetof(struct player_profile_runtime_globals, initialized) == 0x68 ? 1 : -1];
+typedef char verify_player_profile_globals_size[
+	sizeof(struct player_profile_runtime_globals) == 0x6C ? 1 : -1];
+
 /* ---------- prototypes */
 
 boolean saved_game_file_get_path_to_enclosing_directory(
@@ -140,6 +157,10 @@ void saved_game_files_enumerate_available_to_local_player_index(
 	boolean include_default_profiles);
 boolean delete_enumerated_saved_game_file(
 	long saved_game_file_index);
+boolean thread_has_exited(
+	struct thread_reference *thread_reference);
+void dispose_thread(
+	struct thread_reference *thread_reference);
 
 /* ---------- globals */
 
@@ -165,7 +186,32 @@ long player_profile_primary_colors[NUMBER_OF_AVAILABLE_PRIMARY_COLORS] =
 	0x00F5999E,
 };
 
+extern struct player_profile_runtime_globals player_profile_globals;
+
 /* ---------- public code */
+
+void player_profiles_dispose(
+	void)
+{
+	if (player_profile_globals.thread)
+	{
+		error(
+			_error_silent,
+			"waiting for asynchronous player profile writes to finish...");
+		while (!thread_has_exited(player_profile_globals.thread))
+		{
+		}
+		dispose_thread(player_profile_globals.thread);
+		player_profile_globals.thread = NULL;
+	}
+
+	csmemset(
+		&player_profile_globals,
+		0,
+		sizeof(player_profile_globals));
+
+	return;
+}
 
 void player_profiles_enumerate_available_to_local_player_index(
 	short local_player_index,
