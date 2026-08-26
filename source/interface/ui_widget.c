@@ -637,6 +637,8 @@ struct widget_instance;
 
 /* ---------- structures */
 
+struct stack_memory_pool;
+
 struct ui_widget_runtime_globals_prefix
 {
 	byte reserved0000[0x2C];
@@ -704,8 +706,13 @@ struct widget_instance
 
 /* ---------- prototypes */
 
+void dispose_pointer(
+	struct stack_memory_pool *pool,
+	void *pointer);
+
 /* ---------- globals */
 
+extern struct stack_memory_pool *widget_memory_pool;
 extern struct ui_widget_bss_prefix bss_00454240;
 
 short dashboard_abort_error = NONE;
@@ -747,6 +754,14 @@ int widget_instance_count_children(
 			count++;
 	}
 	return count;
+}
+
+void widget_free(
+	void *ptr)
+{
+	dispose_pointer(widget_memory_pool, ptr);
+
+	return;
 }
 
 void main_menu_active(
