@@ -4403,7 +4403,7 @@ void game_engine_end_game(
 void game_engine_player_damaged_player(
 	long damaging_player_index,
 	long dead_player_index,
-	long damage_type)
+	boolean damage_type)
 {
 	match_assert("c:\\halo\\SOURCE\\game\\game_engine.c", 0xA20, dead_player_index != NONE);
 

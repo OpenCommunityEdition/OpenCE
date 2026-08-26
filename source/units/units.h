@@ -581,8 +581,13 @@ void unit_estimate_position(
 void unit_get_center_of_mass(
 	long unit_index,
 	real_point3d *center_of_mass);
-boolean unit_test_animation_impulse(long unit_index, short animation_impulse);
-boolean unit_start_animation_impulse(long unit_index, short animation_impulse, real_vector2d *alignment_vector);
+boolean unit_test_animation_impulse(
+	long unit_index,
+	long animation_impulse);
+boolean unit_start_animation_impulse(
+	long unit_index,
+	long animation_impulse,
+	real_vector2d *alignment_vector);
 long unit_get_aiming_unit_index(long unit_index);
 void unit_get_aiming_vector(
 	long unit_index,
@@ -680,7 +685,6 @@ boolean unit_set_seat(
 	long unit_index,
 	char const *seat_label);
 
-void unit_ready_desired_weapon(long unit_index, boolean immediate);
 
 boolean unit_can_use_weapon(
 	long unit_index,
