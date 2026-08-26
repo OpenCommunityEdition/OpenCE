@@ -209,3 +209,64 @@ isolated sizes, hashes, progress counts, and zero-error semantic counts above.
 
 This replay-record update changes documentation only. The cumulative
 fast-forward and same-path replay are recorded after integration.
+
+## Cumulative integration and replay
+
+The authoritative `jonas/units-integration-20260824` branch was cleanly
+fast-forwarded from `6ad4b7185af77f492cb7468b30931c7d2c620f92` through the
+thread commits to `2f7a8169`. The thread-specific cumulative-base diff is
+exactly `config/config.json`, `config/semantic_data_matches.json`, this ledger,
+and `source/bungie_net/common/thread_win32.c`; it has no deletion and no
+intersection with the eight protected Units package paths.
+
+The previously stale cumulative object was preserved before replacement:
+4,835 bytes, SHA-256
+`5c93b00edb416154adce90e4fbb416aa424afbe1f7ca27feec3e2bf13a738edf`.
+After configuration regeneration, its resolved path and hash were checked,
+the object was deleted, a dry run showed exactly one production compiler
+edge, and the accepted source was rebuilt once.
+
+A cross-worktree manifest comparison then intentionally failed closed on the
+absolute-versus-relative compiler command spelling and the expected CodeView
+source-path record. Direct runtime comparison was already exact, but neither
+diagnostic was waived. A clean same-worktree cumulative manifest was captured
+at `bd3b48ddbf797ef6b80e627d7a49eb535d75b328`: 207,795 bytes, SHA-256
+`993cfffd48d2f02c15d1869375f2caf2857b7934c3abd399488ff17c74d9d547`.
+
+The live preimage for the final same-path replay was preserved at 4,911 bytes,
+SHA-256
+`f7104ad522ec6228a346e952bd695b4568092e63b71460478735dc8fbc9de895`.
+Its path and hash were checked before deletion. The dry run showed exactly one
+absolute-path XDK compiler edge, and the final replay object was produced once
+at 4,911 bytes with phase-specific SHA-256
+`3cf2ca0f8f30d6c3629233e17e7994ea44c63155e16fc19928028b203144b8c0`.
+The cumulative same-worktree gate then passed with no failures or warnings,
+all nine functions under `still_exact`, and empty `newly_exact` and
+`changed_nonexact` arrays. Direct comparison again proves all nine functions,
+all 62 relocations, the 1,544-byte BSS logical hash and flags, and the complete
+normalized BSS symbol inventory.
+
+While this replay was running, the independently authorized Units shared-
+interface package was merged as the second parent of `bd3b48dd`. Its changes
+to `source/units/units.c`, `units.h`, `source/game/game_engine.c`, and
+`game_engine.h` are not part of the thread wave. The combined cumulative
+reports therefore include both accepted advances:
+
+- `build/report.json`: 1,575,192 bytes, SHA-256
+  `fa4ffd548c1916868d66650cc7037af9d657ce471964f50412d317ee4e3dc667`;
+- `build/semantic_report.json`: 2,991,676 bytes, SHA-256
+  `040bb97823d28dc80a4b71190791673ed524aed414b07fee6d49a4aea1179f81`.
+
+Combined cumulative progress is 376/833 complete objects, 4167/11060
+functions, 506,149/2,198,102 code bytes, and 1,836,756/4,176,062 data bytes.
+The semantic scan evaluates 4272 functions: 4132 are semantic exact, 114 are
+hidden exact for 64,705 bytes, 4193 are accepted exact, and there are zero
+unit errors. `thread_win32` remains individually complete at 9/9 functions,
+892/892 code bytes, and 1704/1704 data bytes.
+
+Admission remains zero candidates and zero revocations, with only the
+inherited unrelated `shell_xbox` contradiction. Parks remain three active,
+zero stale, and zero invalid. All 179 tooling tests and 15 JSON parses pass;
+the complete Halo and libcmt graphs and the `all_source` dry run report no
+pending work. The worktree is tracked-clean apart from this additive replay
+record. No push or history rewrite was performed.
