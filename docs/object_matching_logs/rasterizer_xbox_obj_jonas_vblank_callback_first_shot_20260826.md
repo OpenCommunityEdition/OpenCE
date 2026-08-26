@@ -333,3 +333,43 @@ invalid and reproduce the 3,950-byte first-shot file and hash. All 179 tooling
 tests and all 14 selected JSON parses pass. The complete Halo-plus-libcmt
 graph and `all_source` dry run report no pending compile work, and the tracked
 worktree is otherwise clean before this additive replay record.
+
+## Corrected cumulative-HEAD closure
+
+The authoritative `jonas/units-integration-20260824` branch was cleanly
+fast-forwarded from `592fb2d8bb1539aedff3fc508e60905820b26dbe` through the
+implementation commit and isolated replay record
+`4e003ced6f88a9b2a351f6b40afe8e1d09abd461`. The committed source blob,
+public-header state, function scope, and protected-path exclusion are
+unchanged.
+
+Before corrected replay, the cumulative worktree still held its 2,003-byte
+callback-free `rasterizer_xbox.obj`, SHA-256
+`65c7a81a7ce2141f83f891841b64e01ebd37cd2bfb8137c760dda84947441c87`.
+That artifact was preserved. Its resolved path was proved inside the
+cumulative worktree, the literal file was deleted, absence was verified, and
+the selected-object dry run named exactly one edge. The ordinary edge rebuilt
+the committed source once.
+
+The corrected cumulative object is 2,212 bytes with phase-specific SHA-256
+`5ccf3d155681cb038dde4491b0320e7825ef39361257a439e854b3e567d450f1`.
+Direct hardened comparison again proves exactly the four strict-table
+functions, their complete padded sections, normalized bytes, and the one
+ordered relocation. The public caller remains independently strict. The
+external, inherited XDK rdata, and zero-BSS/COMMON inventories remain
+identical to the isolated replay.
+
+The cumulative clean manifest is 1,718,407 bytes with SHA-256
+`f99a423e3f852d4dc21a9dc128a02294681b9569e8c22247a8752887a6429652`.
+Its immediate check is clean with the four functions under `still_exact` and
+empty failure, warning, `newly_exact`, and `changed_nonexact` lists.
+
+The cumulative canonical reports reproduce the isolated 1,574,677-byte
+`build/report.json` hash
+`c94383071ef2cc959304387a85fda378f6503b1d95d1bcb180e93ca266b4362a`
+and 2,984,352-byte `build/semantic_report.json` hash
+`de53121c842c40f723ba60346ea5388e17d4604ba534a3a8d810a7ea9420418f`.
+Every campaign, object, semantic, admission, park, test, JSON, source-policy,
+protected-path, no-deletion, and no-pending-source-work result above is
+reproduced at the cumulative head. No push, amend, rebase, history rewrite,
+or worktree removal occurs.
