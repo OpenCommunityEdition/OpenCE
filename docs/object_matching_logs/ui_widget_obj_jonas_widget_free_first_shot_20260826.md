@@ -278,3 +278,43 @@ The tracked scope is exactly `source/interface/ui_widget.c` plus this new
 ledger. There are no deletions. The complete `source/units/**` tree and all
 eight protected paths have zero intersection with the wave. No push, amend,
 rebase, history rewrite, or worktree removal is performed.
+
+## Clean committed-state replay
+
+The implementation-and-ledger commit is
+`576085eeffa6bf0cc1577c541f57b1ff5750f7c2`, authored and committed by
+Jonas Volman. It retains source blob
+`6e75ddbbbc76591f30444f88c5537cecd431d60a`, leaves the public header
+unchanged, and was tracked-clean before replay.
+
+The post-validation object was preserved as
+`ui_widget.pre-committed-replay.obj`: 3,419 bytes, SHA-256
+`7a8053392960f92c82128ec86531cec26057ae28f7e3305756391ea64aa24efa`.
+The resolved production object path was proved inside the isolated worktree,
+that literal file was deleted, and absence was verified. The selected-object
+dry run named exactly one edge. The unchanged committed source then rebuilt
+through exactly the ordinary one-object action. This is a reproducibility
+replay, not a candidate or tuning pass.
+
+The 3,419-byte committed replay object has phase-specific whole-file SHA-256
+`e41018da8c4be7d10bf098d2de6327c71d0069cb1f53c943d61651eeefa80b6f`.
+Direct hardened comparison again proves all twelve complete padded functions,
+all ten ordered relocations, and every normalized hash in the strict table.
+The defined-function, undefined-external, inherited runtime-data, and
+zero-BSS/COMMON inventories are unchanged.
+
+A clean accepted-state manifest was captured at the committed source. It is
+2,003,384 bytes with SHA-256
+`22704ec53a669d7a9317add3cd83f1e5677e5301117291f64d098300f9da6491`.
+Its immediate check has no failures or warnings, empty `newly_exact` and
+`changed_nonexact` arrays, and exactly the twelve strict-table functions under
+`still_exact`.
+
+The canonical report and semantic-report sizes and hashes reproduce the
+first-shot values, as do every object, function, byte, and semantic count.
+Admission remains zero candidates / zero revocations plus the inherited
+unrelated `shell_xbox` contradiction. Parks remain three active / zero stale /
+zero invalid. All 179 tooling tests and all 14 selected JSON parses pass. The
+complete Halo-plus-libcmt graph and `all_source` dry run report no pending
+compile work, and the tracked worktree is otherwise clean before this
+additive replay record.
