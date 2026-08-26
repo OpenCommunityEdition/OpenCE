@@ -299,3 +299,30 @@ census remains 174/11/4 and 128/0/1. A final `halobetacache_build` /
 `libcmt_build` dry run reports `ninja: no work to do`. This appended record
 is the sole change in the final additive ledger-only commit; nothing is
 pushed, amended, rebased, or removed.
+
+## Cumulative integration replay
+
+The wave branch was merged into `jonas/units-integration-20260824` as merge
+commit `bd3b48dd` (clean, no overlapping paths with the concurrent
+thread-Win32 and recorded-animations waves). At cumulative HEAD `04e252e0`
+a fresh 33-unit snapshot was captured with `--no-build`
+(`build/audit/units_shared_interface_cumulative_replay_20260826.json`,
+SHA-256
+`b0bbb793e9ab337b544c92382de3ff8781013012defb253f92ce8c0f758539e7`).
+All 33 affected objects were containment-proven, deleted, and rebuilt by
+one ordinary Ninja invocation after a dry run again listed exactly 33 CL
+edges; the immediate check returned `ok: true`, zero failures, zero
+warnings, 877 `still_exact` identities, and empty deltas. Direct censuses
+at cumulative HEAD: units 174/11/4 code and 128/0/1 data; game_engine
+164/10/6 + 81/0/2; thread_win32 9/0/0 + 8/0/0; the full 33-object table
+matches the wave record with units the only changed row. Semantic audit:
+4,193 accepted exact, zero unit errors (the +7 over the 278d55f9 baseline
+is this package's five external gains plus the concurrent thread/recorded
+waves). `halobetacache_build`/`libcmt_build` report no work; 179/179
+tooling tests pass. Operational notes: the generated CL command line is
+respelled to this worktree's absolute compiler path when built from this
+lane's shell (CreateProcess rejects the relative form there; same binary,
+same flags), and this worktree's `cachebeta.exe` carries a pre-existing
+future (2033) timestamp, so the csplit/report/progress chain re-runs on
+every default-target build by design; build-target dry runs are the
+no-work criterion, as in prior waves.
