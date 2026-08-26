@@ -187,3 +187,40 @@ The tracked scope is exactly `source/devices/devices.c` plus this new ledger.
 There are no deletions. The complete `source/units/**` tree and the eight-path
 protected guard have zero intersection with the wave. No push, amend, rebase,
 history rewrite, or worktree removal is performed.
+
+## Clean committed-state replay
+
+The implementation-and-ledger commit is
+`ec3faec3e537190fb2a14ab5c261cdc09b24ff5e`, authored and committed by
+Jonas Volman. It retains source blob
+`28c313e9741531798d4adbb70251ca62fa758eca` and was tracked-clean before
+replay.
+
+The first artifact was preserved again as `pre-committed-replay.obj`. The
+resolved production object path was proved inside the isolated worktree, that
+literal file was deleted, absence was verified, and the selected-object dry
+run again named one edge. The unchanged committed source then rebuilt through
+exactly the ordinary one-object action. This is a reproducibility replay, not
+a candidate or tuning pass.
+
+The 3,070-byte committed replay object has phase-specific whole-file SHA-256
+`aae25827050e960dff9f2e97b8c84c0c0cd80a7493f6e46d9f0d937c1a76b1d8`.
+Direct hardened comparison again proves all ten complete padded functions,
+the 17 ordered relocations, and every normalized hash in the table strict.
+Its defined-function, undefined-external, and zero-runtime-data inventories
+are unchanged.
+
+A clean accepted-state manifest was captured at the committed source. It is
+299,637 bytes with SHA-256
+`edd35e28e63f5a3ea0ec1aa43895ad17819333ea598d3c4227883ebee02a67e0`.
+Its immediate no-build check has no failures or warnings, empty
+`newly_exact` and `changed_nonexact` arrays, and exactly the ten table entries
+under `still_exact`.
+
+The canonical report and semantic-report sizes and hashes reproduce the
+first-shot values, as do all object, function, byte, and semantic counts.
+Admission remains zero candidates / zero revocations plus the inherited
+unrelated `shell_xbox` contradiction. Parks remain three active / zero stale /
+zero invalid. All 179 tooling tests and all 14 selected JSON parses pass. The
+complete Halo-plus-libcmt graph reports no work, and the tracked worktree is
+otherwise clean before this additive replay record.
