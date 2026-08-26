@@ -16,6 +16,12 @@ header included in hcex build.
 
 /* ---------- prototypes/MODELS.C */
 
+void model_interpolate_node_orientations(
+	struct model const *model,
+	struct real_orientation *original_node_orientations,
+	struct real_orientation *target_node_orientations,
+	short frame_index,
+	short frame_count);
 void model_get_node_orientations(
 	struct model const *model,
 	struct real_orientation *node_orientations);

@@ -80,6 +80,45 @@ symbols in this file:
 
 /* ---------- public code */
 
+void model_interpolate_node_orientations(
+	struct model const *model,
+	struct real_orientation *original_node_orientations,
+	struct real_orientation *target_node_orientations,
+	short frame_index,
+	short frame_count)
+{
+	real fraction = (real)(frame_index + 1) / (real)frame_count;
+	real inverse_fraction = 1.f - fraction;
+	short node_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\models\\models.c",
+		579,
+		frame_count>0);
+	match_assert(
+		"c:\\halo\\SOURCE\\models\\models.c",
+		580,
+		frame_index<frame_count);
+
+	for (node_index = 0; node_index < model->nodes.count; node_index++)
+	{
+		struct real_orientation *target = &target_node_orientations[node_index];
+		struct real_orientation *original = &original_node_orientations[node_index];
+
+		target->scale = original->scale * inverse_fraction + target->scale * fraction;
+		quaternions_interpolate_and_normalize(
+			&original->rotation,
+			&target->rotation,
+			fraction,
+			&target->rotation);
+		target->translation.x = original->translation.x * inverse_fraction + target->translation.x * fraction;
+		target->translation.y = original->translation.y * inverse_fraction + target->translation.y * fraction;
+		target->translation.z = original->translation.z * inverse_fraction + target->translation.z * fraction;
+	}
+
+	return;
+}
+
 void model_get_node_orientations(
 	struct model const *model,
 	real_orientation *node_orientations)
