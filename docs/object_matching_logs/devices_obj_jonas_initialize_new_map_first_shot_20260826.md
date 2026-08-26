@@ -224,3 +224,40 @@ unrelated `shell_xbox` contradiction. Parks remain three active / zero stale /
 zero invalid. All 179 tooling tests and all 14 selected JSON parses pass. The
 complete Halo-plus-libcmt graph reports no work, and the tracked worktree is
 otherwise clean before this additive replay record.
+
+## Corrected cumulative-HEAD closure
+
+The authoritative `jonas/units-integration-20260824` branch was cleanly
+fast-forwarded from `9b21e117818b51806a747d6bb45a8cb231e2d919` through the
+implementation commit and isolated replay record
+`67b517f0664ed4f62c96058174415af051916462`. The committed source blob and
+scope are unchanged.
+
+Before corrected replay, the cumulative worktree still held its 2,703-byte
+wrapper-free `devices.obj`, SHA-256
+`1399338d41f1af83e7d19475eaffae9fa4f78723074cbc3448fe6878ac45246b`.
+That artifact was preserved. Its resolved path was proved inside the
+cumulative worktree, the literal file was deleted, absence was verified, and
+the selected-object dry run named one edge. The ordinary edge rebuilt the
+committed source once.
+
+The corrected cumulative object is 3,061 bytes with phase-specific SHA-256
+`e7eabe6e69d47f91f38d27f454527567589284676ce136f8efcb4716b1828ff7`.
+Direct hardened comparison again proves exactly the ten table functions,
+their complete padded sections, normalized bytes, and all 17 ordered
+relocations strict. The external function/data inventories remain identical
+to the isolated replay.
+
+The cumulative clean manifest is 299,637 bytes with SHA-256
+`0c6b56c9bc71777f66c34c50feabef631dd9ccf84b840e3284795f61a10f7536`.
+Its immediate check is clean with the ten functions under `still_exact` and
+empty failure, warning, `newly_exact`, and `changed_nonexact` lists.
+
+The cumulative canonical reports reproduce the isolated 1,574,309-byte
+`build/report.json` hash
+`701f8d1959cfc6514ed67ed705008c2e664f0ce973214d39b2bb72756dcb4f62`
+and 2,976,794-byte `build/semantic_report.json` hash
+`4394653c7eb131584e94925ed6c74144d53370a540513b9c3a593570dffa1529`.
+Every campaign, object, semantic, admission, park, test, JSON, source-policy,
+protected-path, and no-deletion result above is reproduced at the cumulative
+head. No push, amend, rebase, history rewrite, or worktree removal occurs.
