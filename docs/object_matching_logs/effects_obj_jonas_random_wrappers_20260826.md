@@ -196,3 +196,62 @@ comparator exception, or alternate compiler flag.
 Only `source/effects/effects.c` and this Jonas-owned ledger are selected for
 the implementation commit. The approval-gated Units package and its protected
 neighbors remain frozen. No push is performed.
+
+## Committed-state replay
+
+Implementation-and-ledger commit
+`d12a39d6dd729a7c9388b15938da419fa7f337f3` is clean. Its committed source
+blob is `bdb54a97a223726bfd274ccf9c85b81a32789a8c`, containing only the accepted
+direction wrapper.
+
+The existing generated object was deliberately not snapshotted as the
+committed baseline because it was the preserved paired candidate and still
+contained the rejected real wrapper. Instead, the resolved
+`build/base/source/effects/effects.obj` path was first verified to remain
+inside the isolated worktree. The file was literally deleted, its absence was
+confirmed, and the Ninja dry run exposed exactly one expected compiler edge.
+The normal replay reported exactly
+`[1/1] CL build\base\source\effects\effects.obj`.
+
+The preserved committed replay is
+`build/audit/effects_direction_committed_replay_20260826.obj`, 2,024 bytes,
+raw SHA-256
+`1fc62d96938596dd821d7fd1f98bdaed9000709377ef25a3574795ed568e6c24`.
+Direct hardened comparison against January and against the frozen paired
+object reports `all_equal: true` for the accepted direction wrapper and all
+four inherited sentinels.
+
+The selected object has eleven sections: `.drectve`, `.debug$S`, four
+associative `.debug$F` records, and five selection-1 `.text` COMDATs. Its only
+defined external owners are the five accepted functions. The rejected
+`_real_local_random`, both renamed-inline spellings, and `__fltused` are
+absent. The effect pools, lifecycle callees, local-seed getter, and
+`_seed_random_direction3d` remain ordinary undefined references. There is no
+candidate runtime non-code section or COMMON owner.
+
+A no-build comparison against the clean pre-wave cumulative manifest reports
+exactly `_local_random_direction3d` as `NEWLY_EXACT`, all four inherited
+functions as `still_exact`, and `changed_nonexact: []`. The remaining generic
+failures are the expected new symbol inventory and `.debug$S` compiler record;
+there is no runtime code or data regression and no adjudication or comparator
+exception.
+
+The committed replay report is
+`build/audit/effects_direction_committed_report_20260826.json`, 1,559,973
+bytes, SHA-256
+`fa36924e2a871ac2a3b20c3fdb679032d980ed60ec1d98178eb21c6db00362aa`.
+It reports exactly 5/41 functions and 109/11,332 meaningful code bytes.
+
+The clean selected-unit snapshot is
+`build/audit/effects_direction_committed_manifest_20260826.json`, 683,674
+bytes, SHA-256
+`be47f0972c5c35fd2788ac7db122ade335efc33a572608aee6abe26cd987f9b0`.
+Its no-build self-check has no failures or warnings, no newly exact or changed
+non-exact entry, and lists all five accepted functions as `still_exact`.
+
+The selected object dry run reports no work, `git diff --check` passes, and
+all 179 tooling tests pass. Whole-campaign report generation, semantic
+admission, complete Halo/libcmt graph checks, and the corrected replay are
+deferred to the cumulative-HEAD closure so the older isolated worktree cannot
+compile unrelated historical outputs. This section is the only tracked
+post-implementation change. Units remains frozen and no push is performed.
