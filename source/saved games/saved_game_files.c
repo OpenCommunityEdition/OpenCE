@@ -339,6 +339,12 @@ typedef char verify_saved_game_files_globals_size[
 
 void code_001b4b00(
 	void);
+void dispose_mutex(
+	struct mutex_reference *mutex_reference);
+void player_profiles_dispose(
+	void);
+void playlist_profiles_dispose(
+	void);
 void release_mutex(
 	struct mutex_reference *mutex_reference);
 
@@ -347,6 +353,28 @@ void release_mutex(
 extern struct saved_game_files_globals saved_game_files_globals;
 
 /* ---------- public code */
+
+void saved_game_files_dispose(
+	void)
+{
+	if (saved_game_files_globals.general_mutex)
+	{
+		dispose_mutex(saved_game_files_globals.general_mutex);
+		saved_game_files_globals.general_mutex = NULL;
+	}
+
+	if (saved_game_files_globals.mapfile_mutex)
+	{
+		dispose_mutex(saved_game_files_globals.mapfile_mutex);
+		saved_game_files_globals.mapfile_mutex = NULL;
+	}
+
+	player_profiles_dispose();
+	playlist_profiles_dispose();
+	saved_game_files_globals.initialized = FALSE;
+
+	return;
+}
 
 word saved_game_file_get_type(
 	long profile_index)

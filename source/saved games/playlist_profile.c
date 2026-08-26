@@ -85,28 +85,79 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct thread_reference;
+
 struct playlist_profile_runtime_globals_prefix
 {
 	byte thread_input_storage[0x6C];
-	void *thread;
+	struct thread_reference *thread;
 	word number_of_default_profiles;
+	boolean initialized;
+	byte pad;
 };
 
+typedef char verify_playlist_profile_thread_offset[
+	offsetof(struct playlist_profile_runtime_globals_prefix, thread) == 0x6C ? 1 : -1];
 typedef char verify_playlist_profile_default_count_offset[
 	offsetof(
 		struct playlist_profile_runtime_globals_prefix,
 		number_of_default_profiles) == 0x70 ? 1 : -1];
+typedef char verify_playlist_profile_initialized_offset[
+	offsetof(
+		struct playlist_profile_runtime_globals_prefix,
+		initialized) == 0x72 ? 1 : -1];
+typedef char verify_playlist_profile_globals_size[
+	sizeof(struct playlist_profile_runtime_globals_prefix) == 0x74 ? 1 : -1];
 
 /* ---------- prototypes */
 
 boolean delete_enumerated_saved_game_file(
 	long saved_game_file_index);
+boolean thread_has_exited(
+	struct thread_reference *thread_reference);
+void dispose_thread(
+	struct thread_reference *thread_reference);
 
 /* ---------- globals */
 
 extern struct playlist_profile_runtime_globals_prefix bss_004d2858;
 
 /* ---------- public code */
+
+void playlist_profiles_initialize(
+	void)
+{
+	csmemset(
+		&bss_004d2858,
+		0,
+		sizeof(bss_004d2858));
+	bss_004d2858.initialized = TRUE;
+
+	return;
+}
+
+void playlist_profiles_dispose(
+	void)
+{
+	if (bss_004d2858.thread)
+	{
+		error(
+			_error_silent,
+			"waiting for asynchronous playlist profile writes to finish...");
+		while (!thread_has_exited(bss_004d2858.thread))
+		{
+		}
+		dispose_thread(bss_004d2858.thread);
+		bss_004d2858.thread = NULL;
+	}
+
+	csmemset(
+		&bss_004d2858,
+		0,
+		sizeof(bss_004d2858));
+
+	return;
+}
 
 void playlist_profile_delete(
 	long playlist_profile_index)
