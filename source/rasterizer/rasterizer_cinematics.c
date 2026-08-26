@@ -97,6 +97,22 @@ void rasterizer_screen_effects_dispose(
 	return;
 }
 
+void rasterizer_script_screen_effect_set_value(
+	word effect_index,
+	real value)
+{
+	short signed_effect_index = (short)effect_index;
+
+	if (bss_004662f4 &&
+		signed_effect_index >= 0 &&
+		signed_effect_index < 4)
+	{
+		bss_004662f4->script_values[signed_effect_index] = value;
+	}
+
+	return;
+}
+
 real rasterizer_script_screen_effect_get_value(
 	short effect_index)
 {
