@@ -563,5 +563,10 @@
     "unit": "source/items/weapons",
     "function": "_weapon_set_state",
     "reason": "hardened COFF comparison proves all 432 padded bytes and all 21 semantic relocations exact (SHA-256 667efc085661d6b50a6fb3c778be5f3b44e05acfca0132acf3aa527b21f20b74); objdiff reports a switch-table/local-label encoding false negative"
+  },
+  {
+    "unit": "source/ai/path_smoothing",
+    "function": "_code_00051190",
+    "reason": "hardened COFF comparison proves all 128 padded bytes and all 5 semantic relocations exact (SHA-256 a58fa4f6cf9598874c2a0d1fb60f226f65dea7f5cbc7182a682b2faefc62580f); the nonexact caller remains solely as the private-ABI source scaffold"
   }
 ]
