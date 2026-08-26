@@ -104,9 +104,25 @@ struct recorded_animations_globals_prefix
 
 /* ---------- globals */
 
+extern void *animation_threads_debug;
 extern struct recorded_animations_globals_prefix bss_00435ca4;
 
 /* ---------- public code */
+
+void recorded_animations_dispose(
+	void)
+{
+	if (animation_threads_debug)
+	{
+		match_free(
+			"c:\\halo\\SOURCE\\cutscene\\recorded_animations.c",
+			123,
+			animation_threads_debug);
+		animation_threads_debug = NULL;
+	}
+
+	return;
+}
 
 void recorded_animations_dispose_from_old_map(
 	void)
