@@ -338,6 +338,7 @@ void encounter_attach_actor(
 struct data_array *swarm_data = NULL;
 struct data_array *swarm_component_data = NULL;
 struct data_array *actor_data = NULL;
+long global_updating_actor_index = NONE;
 
 /* ---------- public code */
 
@@ -575,6 +576,14 @@ void actor_change_encounter(
 	{
 		encounter_attach_actor(actor_index, encounter_index, squad_index, TRUE);
 	}
+
+	return;
+}
+
+void code_0002a150(
+	void)
+{
+	global_updating_actor_index = NONE;
 
 	return;
 }
