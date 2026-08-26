@@ -3040,6 +3040,7 @@ boolean unit_enter_seat(
 		struct unit_definition *unit_definition;
 		struct animation_graph *animation_graph;
 		struct animation_graph_unit_seat *animation_seat;
+		long animation_graph_index;
 
 		{
 			struct unit_datum *target_unit = unit_get(target_unit_index);
@@ -3108,8 +3109,9 @@ boolean unit_enter_seat(
 		}
 
 		unit_definition = unit_definition_get(unit->definition_index);
+		animation_graph_index = unit_definition->object.animation_graph.index;
 		animation_graph = animation_graph_definition_get(
-			unit_definition->object.animation_graph.index);
+			animation_graph_index);
 		animation_seat = TAG_BLOCK_GET_ELEMENT(
 			&animation_graph->unit_seats,
 			unit->unit.animation.seat_index,
@@ -3122,8 +3124,6 @@ boolean unit_enter_seat(
 
 			if (animation_index!=NONE)
 			{
-				long animation_graph_index;
-
 				object_start_interpolation(unit_index, 6);
 				animation_graph_index =
 					unit_definition->object.animation_graph.index;
