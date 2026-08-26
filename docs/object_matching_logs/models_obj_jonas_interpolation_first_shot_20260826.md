@@ -117,3 +117,16 @@ The remaining six target functions are `_code_00112db0`,
 `_model_find_marker`, `_render_model`, and `_model_build_tangent_matrices`.
 They require separate evidence-led waves; this first-shot recovery does not
 speculate about them.
+
+## Integrated committed-state replay
+
+The isolated source recovery was committed as
+`1c7991beeec35abb910e6123e1aa2b40a8cd2eb5` and integrated into the cumulative
+branch as `79b1672813477f362c8f4dc13012a7f7f2bffb88`.
+
+The cumulative XDK rebuild reproduces the 265-byte / 272-byte function and all
+ten relocations exactly.  Its clean accepted-state manifest is
+`outputs/models_interpolation_evidence_20260826/regression-post-admission-cumulative.json`.
+Immediate same-path replay reports all six accepted functions under
+`still_exact`, with zero failures, warnings, newly exact functions, or changed
+nonexact functions.  No push was performed.
