@@ -116,10 +116,21 @@ typedef char device_group_datum_actual_value_offset_assert[
 void device_group_set_actual_value(
 	short group_index,
 	real actual_value);
+void code_00084f70(
+	void);
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+void devices_initialize_for_new_map(
+	void)
+{
+	data_make_valid(device_groups_data);
+	code_00084f70();
+
+	return;
+}
 
 void devices_dispose(
 	void)
