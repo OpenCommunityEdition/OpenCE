@@ -252,7 +252,44 @@ only ledger-only follow-up change.
 
 ## Corrected cumulative-HEAD closure
 
-Integration and the corrected cumulative-HEAD replay are intentionally
-deferred until the isolated committed-state replay passes. The approval-gated
-Units package remains frozen throughout; this ledger does not constitute the
-required exact approval phrase.
+The isolated implementation and replay-ledger commits integrate on
+`jonas/units-integration-20260824` as
+`8954d845ed41c677b8970d51959b6965b15776a6` and
+`8d60349a3aab5dd1582f1df7940323cf46c0149b`. The latter is the corrected
+implementation/replay HEAD used below. Its committed translation-unit blob is
+still `c2b037841dc6c0d0456a1bf26170ea6695b16d90`; the normal cumulative CRLF
+checkout has working-file SHA-256
+`c81a7d18c873522ad87819c323d1058d95cdf859a56b65cb8764f3a629641b91`.
+
+The resolved cumulative object path was verified inside the worktree,
+literally deleted, and rebuilt through exactly one expected XDK edge. That
+first corrected-HEAD object is 12,618 bytes with raw SHA-256
+`0dea5c72ea134d439735be58d6ab26843bed667bbe50b4f772849c4a074fbec8`.
+After the ordinary and semantic reports were regenerated, a clean corrected
+manifest was captured as
+`build/audit/actor_type_infection_helper_pair_corrected_head_20260825.json`,
+410,160 bytes, SHA-256
+`54839715e705a1349a7273d5147d531ee2f0381873b51fb74be34e7a4bc98e30`.
+
+The generated object was then path-checked, literally deleted, and rebuilt a
+second time through the same one-edge dry run and normal Ninja edge. The
+second corrected-HEAD replay is 12,618 bytes with raw SHA-256
+`d839b3ecfcf1ce7a895d85bf140fe58728d87a0615e2b9cb60ba12994a465304`.
+The two corrected raw objects differ only at COFF header offset `+0x4`, one
+compile-timestamp byte.
+
+The corrected-manifest check is fully clean: no failures, warnings, newly
+exact, or changed-nonexact entries, and all three accepted functions are
+`still_exact`. Direct hardened comparison again proves their normalized
+bytes and all 36 ordered relocation semantics exact; `_code_00027470` remains
+nonexact support and receives zero credit. Final reports reproduce the same
++2-function / +181-meaningful-byte gain, 4,161 accepted semantic functions,
+and zero unit errors. Halo and libcmt report no work, admission remains zero
+candidates and zero revocations, parks remain three active / zero stale /
+zero invalid, and the complete tooling suite passes 179/179. The cumulative
+worktree is otherwise clean.
+
+The approval-gated Units package remains frozen after integration. This
+ledger does not constitute the required exact approval phrase and does not
+authorize any edit to the Units shared-header package or its protected
+neighbors.
