@@ -237,3 +237,74 @@ The `ai.obj`, complete Halo, and complete libcmt dry runs all report no work
 after replay.
 
 No push is performed.
+
+## Corrected cumulative-HEAD closure
+
+The cumulative branch was fast-forwarded from
+`66c5e5f298f17454a2dda8d41d086e7d1e7d3acf` to the isolated committed replay
+HEAD `9bd2fdcf89996d99c53671ed97221d67dc3e260e`. The implementation source blob
+remains `f9d573a7f1607ab733f213c65d29574f8da6014f`; no protected source, shared
+header, storage declaration, configuration, semantic ledger, or object-status
+file changed during integration.
+
+From that clean corrected HEAD, the resolved cumulative
+`build/base/source/ai/ai.obj` was literally deleted. The Ninja dry run exposed
+exactly one expected `CL build\base\source\ai\ai.obj` edge, and the normal
+rebuild invoked that edge once. The preserved corrected replay is
+`build/audit/ai_dispose_corrected_head_replay_20260826.obj`, 6,111 bytes, raw
+SHA-256
+`93834ba3adeed5ac1d44992708bef29e616e882d48b84c894d25cc85393d303c`.
+
+Direct hardened comparison against January again reports `all_equal: true`
+for `_ai_dispose` and all twelve inherited exact functions. In particular,
+`_ai_dispose` remains 48 padded bytes with eight zero-addend REL32
+relocations and normalized SHA-256
+`7579c4adfd589894c9532699fb833fb56e1eae85732fee895baec0dbbfa0ecb9`.
+The accepted corrected delta therefore remains exactly one function, 40
+meaningful bytes, 48 padded bytes, and eight relocations, with no changed
+non-exact function and no runtime-data gain or regression.
+
+The isolated and cumulative raw objects are not expected to be byte-identical:
+their compile timestamps differ, and VC7 records the absolute output-object
+path in `.debug$S`. The
+isolated record is 173 bytes and names the
+`ai-dispose-one-shot-20260826` worktree; the cumulative record is 171 bytes
+and names `units-integration-20260824`. Byte inspection accounts for the
+entire two-byte size difference in this root-specific debug record. After the
+authoritative report was regenerated, a cross-worktree manifest check reports
+only that `.debug$S` difference: all thirteen accepted functions are
+`still_exact`, `changed_nonexact` is empty, and every modeled production code
+and runtime non-code record is stable. An earlier transient function-evidence
+warning was solely the stale pre-integration `build/report.json` acceptance
+record and disappeared when that report was refreshed.
+
+The clean corrected manifest is
+`build/audit/ai_dispose_corrected_head_manifest_20260826.json`, 948,837 bytes,
+SHA-256
+`c50c546c887c1b3ff8da84301fed950aac09d8530c1c1c522230b97fa9316f0c`.
+Its no-build self-check has no failures or warnings, no newly exact or changed
+non-exact entries, and retains all thirteen functions in `still_exact`.
+
+Regenerated corrected artifacts reproduce the isolated committed results:
+
+- `ai_dispose_corrected_head_report_20260826.json`: 1,573,794 bytes, SHA-256
+  `e5ff99e6040312590e3c23477cdab998570104de9130b8cf92f8f3290a97caa1`;
+- `ai_dispose_corrected_head_semantic_20260826.json`: 2,972,122 bytes,
+  SHA-256
+  `42369eab1e0249d62307f972f7f0db85ae9d1fba68cf1c1bbc1ea86fddc2ac01`;
+- `ai_dispose_corrected_head_admission_20260826.json`: 384 bytes, SHA-256
+  `f0aa45c22cc604fb74abc388b06dd79a27e7a0b498a5d28837a9e785680c9a36`;
+- `ai_dispose_corrected_head_parked_20260826.json`: 3,950 bytes, SHA-256
+  `cfac03aea5be607c19a6a40bcdbc1164e71ffb0179602af4bd37b3fd50e26d1d`.
+
+The semantic audit remains 4,164 accepted exact functions with zero unit
+errors. Campaign progress remains 375/833 objects, 4,138/11,060 functions,
+and 502,187/2,198,102 meaningful code bytes; Halo remains 273/468 objects,
+3,971/7,574 functions, and 489,273/1,770,166 meaningful code bytes. Admission
+remains zero candidates and zero revocations, parks remain three active / zero
+stale / zero invalid, the direct AI object and complete Halo/libcmt dry runs
+and normal invocations all report no work, and all 179 tooling tests pass.
+
+The approval-gated Units package remains frozen. This closure does not
+constitute its required exact approval phrase and authorizes no edit to Units
+or its protected neighbors. No push is performed.
