@@ -202,4 +202,38 @@ The named report, semantic, admission, and parked artifacts are preserved as
 semantic-ledger, parked-manifest, header, storage declaration, protected file,
 or shared-interface edit is part of this wave.
 
+## Committed-state replay
+
+Implementation-and-ledger commit
+`c2ed180a119e2a6e89ed465634f335ce33421208` was clean before replay. Its
+committed source blob is `f9d573a7f1607ab733f213c65d29574f8da6014f`.
+The clean committed manifest is
+`build/audit/ai_dispose_committed_20260826.json`, SHA-256
+`fa73db0b391abaaf2b98112a8d04ecd3c58c7cd7afc408f67eece2cebfd40f38`.
+
+The resolved generated object path was verified inside the isolated worktree,
+then `build/base/source/ai/ai.obj` was literally deleted. The Ninja dry run
+exposed exactly one expected compiler edge, and the normal rebuild reported
+exactly `[1/1] CL build\base\source\ai\ai.obj`. The rebuilt object was
+preserved as `build/audit/ai_dispose_committed_replay_20260826.obj`, 6,113
+bytes, raw SHA-256
+`2dcf1d284f78321ad032c3302a3b9cb9c7b6cb8f8db5ccfabd6c65942446f525`.
+
+The replay and first-shot raw objects differ at exactly COFF header offsets
+`+0x4` and `+0x5`, compile-timestamp bytes. Every modeled section, symbol,
+meaningful and padded byte, and relocation is identical. Direct hardened
+comparison again reports all thirteen functions exact. The committed manifest
+check has no failures or warnings, no newly exact or changed-nonexact entries,
+and places all thirteen functions in `still_exact`; its replay JSON has
+SHA-256
+`807f6be6d0bb319b129cabdaeb45972bcccd1e57b433eeaa1d0417cf0f75e468`.
+
+Replay semantic, admission, and parked audits reproduce the accepted results
+exactly. Their preserved SHA-256 values are, respectively,
+`42369eab1e0249d62307f972f7f0db85ae9d1fba68cf1c1bbc1ea86fddc2ac01`,
+`f0aa45c22cc604fb74abc388b06dd79a27e7a0b498a5d28837a9e785680c9a36`,
+and `cfac03aea5be607c19a6a40bcdbc1164e71ffb0179602af4bd37b3fd50e26d1d`.
+The `ai.obj`, complete Halo, and complete libcmt dry runs all report no work
+after replay.
+
 No push is performed.
