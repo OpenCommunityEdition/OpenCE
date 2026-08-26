@@ -154,6 +154,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -164,6 +166,20 @@ symbols in this file:
 
 /* ---------- globals */
 
+FILE *bss_004561b4 = NULL;
+
 /* ---------- public code */
+
+void error_geometry_dispose(
+	void)
+{
+	if (bss_004561b4)
+	{
+		fclose(bss_004561b4);
+		bss_004561b4 = NULL;
+	}
+
+	return;
+}
 
 /* ---------- private code */
