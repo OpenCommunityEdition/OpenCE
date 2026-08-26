@@ -246,4 +246,43 @@ rebase, history rewrite, or worktree removal is performed.
 
 ## Actual committed-state forced replay
 
-(appended after the implementation commit)
+Implementation commit `fdb6a8997989038017e09e4e827534e628ea2db5` was
+authored and committed by Jonas Volman `<theunknowentity@gmail.com>` and was
+clean before replay. The committed blobs are exactly the retained
+identities above (`units.c a62d26fd`, `units.h 0184ad19`,
+`game_engine.c f63f8a84`, `game_engine.h 8d052670`).
+
+A fresh 33-unit accepted-state snapshot was written with `--no-build` at
+that exact clean commit:
+`build/audit/units_shared_interface_impl_replay_20260826.json`,
+38,674,324 bytes, SHA-256
+`8b764d7d9e73b4cce9771bb460bc3356b4a961b01ed5defba126b9f3844469d9`,
+pinning commit `fdb6a899`.
+
+All 33 generated objects were containment-proven (each resolved absolute
+path begins with this worktree root, basename `.obj`), hashed, deleted with
+literal-path semantics, and verified absent. A dry run again listed exactly
+33 CL edges and nothing else; one ordinary Ninja invocation rebuilt all 33
+(sole diagnostic: the inherited `ai_debug.c(293)` C4047). The immediate
+committed-state regression check returned:
+
+```text
+ok: true
+failures: 0
+warnings: 0
+still_exact: 877 identities across the 33 units
+newly_exact: none    changed_nonexact: none
+```
+
+Independent replay proofs: all six package owners again strict exact by
+direct hardened comparison; the complete Units census again 174 exact / 11
+emitted nonexact / 4 absent; whole-object raw hashes moved only in the COFF
+timestamp phase (e.g. `game_engine.obj` 97,824 bytes,
+`4806536057caa6bc...` → `761d90341873e03d...`). Final
+`halobetacache_build`, `libcmt_build`, and per-object dry runs all report
+`ninja: no work to do`. Only this ledger is modified for the additive replay
+record; the corrected-HEAD replay follows in the same record below.
+
+## Corrected-HEAD replay
+
+(appended after the ledger-only commit)
