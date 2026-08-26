@@ -291,3 +291,45 @@ The tracked scope is exactly
 deletions. The complete `source/units/**` tree and all eight protected paths
 have zero intersection with the wave. No push, amend, rebase, history rewrite,
 or worktree removal is performed.
+
+## Clean committed-state replay
+
+The implementation-and-ledger commit is
+`5f8e7df2cfca8f9eee37392b948fcb003729b878`, authored and committed by
+Jonas Volman. It retains C blob
+`8ece4b731294f1deaf3725245c50c00b2c95184c`, leaves the public header
+unchanged, and was tracked-clean before replay.
+
+The post-validation object was preserved as `pre-committed-replay.obj`:
+2,221 bytes, SHA-256
+`1b8eaabb36b2c8e5991723789a8ee706e9cedcbed4839c8c72e95f2b0074fdf6`.
+The resolved production object path was proved inside the isolated worktree,
+that literal file was deleted, and absence was verified. The selected-object
+dry run named exactly one edge. The unchanged committed source then rebuilt
+through exactly the ordinary one-object action. This is a reproducibility
+replay, not a candidate or tuning pass.
+
+The 2,221-byte committed replay object has phase-specific whole-file SHA-256
+`13c7706a994819a126efe3b2cb12ed06a2dd0e0f23cb6957d18160c3fd9c0001`.
+Direct hardened comparison again proves all four complete padded functions,
+their single ordered relocation, and every normalized hash in the strict
+table. The already-exact public caller in `source/rasterizer/rasterizer.obj`
+also remains strict. The defined-function, undefined-external, inherited XDK
+rdata, and zero-BSS/COMMON inventories are unchanged.
+
+A clean accepted-state manifest was captured at the committed source. It is
+1,718,407 bytes with SHA-256
+`7524c7ef24333452f0918f78abcfd826339838db40e985b039581fc55fbaecab`.
+Its immediate check has no failures or warnings, empty `newly_exact` and
+`changed_nonexact` arrays, and exactly the four strict-table functions under
+`still_exact`.
+
+The canonical report and semantic-report sizes and hashes reproduce the
+first-shot values, as do every object, function, byte, and semantic count.
+Admission remains zero candidates / zero revocations plus the inherited
+unrelated `shell_xbox` contradiction; its output reproduces the 384-byte
+first-shot file and hash. Parks remain three active / zero stale / zero
+invalid and reproduce the 3,950-byte first-shot file and hash. All 179 tooling
+tests and all 14 selected JSON parses pass. The complete Halo-plus-libcmt
+graph and `all_source` dry run report no pending compile work, and the tracked
+worktree is otherwise clean before this additive replay record.
