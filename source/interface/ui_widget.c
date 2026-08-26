@@ -628,6 +628,7 @@ symbols in this file:
 struct widget_instance;
 
 #include "cseries.h"
+#include "errors.h"
 #include "ui_widget.h"
 
 /* ---------- constants */
@@ -635,6 +636,53 @@ struct widget_instance;
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct ui_widget_runtime_globals_prefix
+{
+	byte reserved0000[0x2C];
+	real fade_to_black;
+	byte reserved0030[0x2C];
+	void *initialization_thread;
+	byte reserved0060[4];
+	boolean debug_show_path;
+	byte reserved0065;
+	boolean main_menu_music_active;
+	byte reserved0067;
+};
+
+struct ui_widget_bss_prefix
+{
+	byte reserved0000[0x800];
+	struct ui_widget_runtime_globals_prefix widget_globals;
+	boolean we_are_at_the_main_menu;
+};
+
+typedef char verify_ui_widget_fade_to_black_offset[
+	offsetof(
+		struct ui_widget_runtime_globals_prefix,
+		fade_to_black) == 0x2C ? 1 : -1];
+typedef char verify_ui_widget_initialization_thread_offset[
+	offsetof(
+		struct ui_widget_runtime_globals_prefix,
+		initialization_thread) == 0x5C ? 1 : -1];
+typedef char verify_ui_widget_debug_show_path_offset[
+	offsetof(
+		struct ui_widget_runtime_globals_prefix,
+		debug_show_path) == 0x64 ? 1 : -1];
+typedef char verify_ui_widget_main_menu_music_active_offset[
+	offsetof(
+		struct ui_widget_runtime_globals_prefix,
+		main_menu_music_active) == 0x66 ? 1 : -1];
+typedef char verify_ui_widget_runtime_globals_prefix_size[
+	sizeof(struct ui_widget_runtime_globals_prefix) == 0x68 ? 1 : -1];
+typedef char verify_ui_widget_globals_offset[
+	offsetof(
+		struct ui_widget_bss_prefix,
+		widget_globals) == 0x800 ? 1 : -1];
+typedef char verify_ui_widget_main_menu_active_offset[
+	offsetof(
+		struct ui_widget_bss_prefix,
+		we_are_at_the_main_menu) == 0x868 ? 1 : -1];
 
 struct widget_instance
 {
@@ -658,6 +706,8 @@ struct widget_instance
 
 /* ---------- globals */
 
+extern struct ui_widget_bss_prefix bss_00454240;
+
 short dashboard_abort_error = NONE;
 
 /* ---------- public code */
@@ -665,6 +715,22 @@ short dashboard_abort_error = NONE;
 void ui_widgets_safe_to_load(
 	boolean safe)
 {
+	return;
+}
+
+void ui_widgets_set_fade_value(
+	real value)
+{
+	bss_00454240.widget_globals.fade_to_black = value;
+
+	return;
+}
+
+void ui_widget_debug_show_path(
+	boolean show)
+{
+	bss_00454240.widget_globals.debug_show_path = show;
+
 	return;
 }
 
@@ -681,6 +747,42 @@ int widget_instance_count_children(
 			count++;
 	}
 	return count;
+}
+
+void main_menu_active(
+	boolean active)
+{
+	bss_00454240.we_are_at_the_main_menu = active;
+
+	return;
+}
+
+boolean main_menu_is_active(
+	void)
+{
+	return bss_00454240.we_are_at_the_main_menu;
+}
+
+void ui_widget_load_progress_widget(
+	void)
+{
+	error(
+		_error_silent,
+		"the old loading progress screen has been replaced with glowy halo gravy");
+
+	return;
+}
+
+boolean filesystem_check_thread_is_active(
+	void)
+{
+	return bss_00454240.widget_globals.initialization_thread != NULL;
+}
+
+boolean ui_main_menu_music_active(
+	void)
+{
+	return bss_00454240.widget_globals.main_menu_music_active;
 }
 
 void code_000d4680(
