@@ -112,7 +112,7 @@ void dispose_mutex(
 
 /* ---------- globals */
 
-struct thread_globals bss_0031c728;
+struct thread_globals bss_0031c728 = {0};
 extern struct mutex_reference bss_0031cd30;
 
 /* ---------- public code */
