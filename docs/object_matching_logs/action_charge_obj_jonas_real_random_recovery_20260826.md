@@ -135,3 +135,34 @@ worktree does not rebuild unrelated historical outputs.
 Only `source/ai/action_charge.c` and this Jonas-owned ledger are changed. The
 approval-gated Units package and its protected neighbors remain frozen. No
 push is performed.
+
+## Committed-state replay
+
+Implementation-and-ledger commit
+`8ed01222d5e1eec38b3a7a8801c05e52926c753e` was clean before replay. Its
+committed source blob remains
+`3e76470cf8be066072239845cbf08e37aeffa458`. The clean selected-unit manifest
+is `build/audit/action_charge_real_random_committed_20260826.json`, 250,738
+bytes, SHA-256
+`0fa2c07f0859a868f37e10c0ae0f6094d02a265d26522a00d8f025eaf90945ac`.
+
+The resolved generated object path was verified to remain inside the isolated
+worktree. `build/base/source/ai/action_charge.obj` was literally deleted, its
+absence was confirmed, the Ninja dry run exposed exactly one expected compiler
+edge, and the normal rebuild reported exactly
+`[1/1] CL build\base\source\ai\action_charge.obj`. The preserved committed
+replay is 1,405 bytes with raw SHA-256
+`97d6ffb9f5f320010affd46b659c0de3a2012be0a8376e2e8c9b6697fb9e696f`.
+
+The replay and frozen recovery objects have identical length and differ at
+exactly COFF header offsets `+0x4` and `+0x5`, compile-timestamp bytes. Every
+modeled section, symbol, meaningful and padded byte, and relocation is
+identical. Direct hardened comparison again reports `all_equal: true` for all
+three accepted functions. The committed manifest check has no failures or
+warnings, no newly exact or changed-nonexact entry, and places
+`_action_charge_begin`, `_action_charge_update`, and `_real_random` in
+`still_exact`. Both the selected object dry run and normal invocation report
+no work afterward.
+
+This section is the only tracked post-implementation change. No push is
+performed.
