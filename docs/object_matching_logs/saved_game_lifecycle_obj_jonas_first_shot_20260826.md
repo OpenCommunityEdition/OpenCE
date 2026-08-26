@@ -215,3 +215,82 @@ the complete frozen evidence packet remain preserved under
 normal cumulative build/report, semantic audit, whole-TU regression check,
 tool tests, and object-admission/parked gates follow after integration. No
 push, amend, or history rewrite is performed.
+
+## Cumulative integration and clean replay
+
+Implementation-and-ledger commit
+`bf5fe2ce` was merged into the cumulative branch by merge commit
+`6e549e75`. The cumulative branch already contained the independently
+authorized Units enter-seat work, and later advanced to clean documentation
+commit `f4cc3e14`; neither change overlaps the three saved-game owners.
+
+The first cumulative production rebuild ran exactly the three normal Ninja
+CL edges. Direct hardened comparison reproduced all four new bodies, all 13
+inherited exact bodies, and both new waiting-string COMDATs. The complete
+Halo plus libcmt build graph then reported no further work.
+
+The canonical report and semantic audit were regenerated. At combined clean
+HEAD `f4cc3e14` they record:
+
+- ordinary report: 377/833 complete objects, 4,085/11,060 exact functions,
+  452,814/2,198,102 meaningful code bytes, and
+  1,811,278/4,176,062 matched data bytes;
+- semantic progress: 376/833 linked objects after the inherited
+  `shell_xbox` contradiction is rejected, 4,172/11,060 functions,
+  507,024/2,198,102 code bytes, and 1,836,756/4,176,062 data bytes;
+- strict semantic audit: 470 units, 4,276 functions evaluated, 4,137 semantic
+  exact, 114 hidden exact / 64,705 hidden code bytes, 4,198 accepted exact,
+  36 ordinary-only, 35 structurally accepted, one rejected, and zero unit
+  errors.
+
+The final saved-game unit rows independently read:
+
+- `player_profile.obj`: 8/22 functions, 360/4,119 meaningful code bytes,
+  72/1,644 data bytes;
+- `playlist_profile.obj`: 4/14 functions, 169/2,637 meaningful code bytes,
+  0/1,137 data bytes;
+- `saved_game_files.obj`: 5/46 functions, 111/12,068 meaningful code bytes,
+  0/6,156 data bytes.
+
+Final canonical artifacts are:
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `build/report.json` | 1,575,296 | `65d90e5f3647fc963b415f28f886b37572ad087384684c04fc3453c05d45af6d` |
+| `build/semantic_report.json` | 2,995,098 | `72bd04189031272dfa9bcbb5c36a839183e77a19370c442b7d8c56834457e300` |
+| accepted three-unit manifest | 1,997,357 | `66775e69a6868d3e8c4d970e263a661ce1425bdf39d9c6adb7f341671ed286b6` |
+
+The regression gate's first pre-change manifest rejected the deliberate new
+functions and symbol sections as unadjudicated evidence, as designed; it was
+not used as acceptance. After the reviewed report admitted the four exact
+functions, a clean accepted-state manifest was captured at
+`build/audit/saved-game-lifecycle-cumulative-20260826/accepted-state-manifest.json`.
+
+Each resolved generated object path was verified under this cumulative
+worktree, deleted with literal-path semantics, confirmed absent, and rebuilt
+through its normal production Ninja edge. The replay objects are:
+
+| Object | Bytes | Replay SHA-256 |
+| --- | ---: | --- |
+| `player_profile.obj` | 3,805 | `4d77f62a101196daae16736f8754d388065b4e8eaaf82e334a883c159e348e56` |
+| `playlist_profile.obj` | 2,306 | `3d742c063077555e9a145d07a8eaea3f031eaada45168a5b52366e7e6ac8941c` |
+| `saved_game_files.obj` | 2,044 | `676ad01e564e932d4f3e6e451ab977c3aaea251eae2513d4e98f4791a5945806` |
+
+The phase-specific raw hashes differ from the first artifacts only because of
+COFF debug records. Hardened replay comparison is again strict for all 17
+accepted functions. The accepted-state whole-TU check has `failures: []`,
+`warnings: []`, no newly exact or changed-nonexact entry, and the complete
+17-function inventory under `still_exact`.
+
+Final cumulative gates also pass:
+
+- object admission: zero candidates, zero revocations, and only the inherited
+  unrelated `source/shell/shell_xbox` completion-label contradiction;
+- parked functions: three active, zero stale, zero invalid;
+- complete tooling suite: 179/179 tests;
+- all configuration/report JSON parsing, `git diff --check`, saved-game wave
+  scope, protected-path, banned-construct, and deletion reviews are clean.
+
+This cumulative replay section is additive documentation only. The three
+accepted source blobs remain the frozen first-shot blobs. No push is
+performed.
