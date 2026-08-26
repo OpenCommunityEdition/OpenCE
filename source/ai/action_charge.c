@@ -81,11 +81,14 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+
+#define real_random real_random_inline
 #include "actions.h"
 
 #include "actor_definitions.h"
 #include "actors.h"
 #include "math/real_math.h"
+#undef real_random
 
 /* ---------- constants */
 
@@ -141,6 +144,13 @@ void action_charge_update(
 	}
 
 	return;
+}
+
+real real_random(
+	void)
+{
+	return real_seed_random(
+		get_global_random_seed_address());
 }
 
 /* ---------- private code */
