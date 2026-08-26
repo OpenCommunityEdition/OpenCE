@@ -43,6 +43,8 @@ short model_get_marker_by_name(
 	boolean mirrored_flag,
 	struct object_marker *markers,
 	short maximum_marker_count);
+void model_build_tangent_matrices(
+	struct model *model);
 
 /* ---------- globals */
 

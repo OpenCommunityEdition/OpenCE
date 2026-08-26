@@ -74,6 +74,17 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct model_geometry
+{
+	byte reserved[0x24];
+	struct tag_block parts;
+};
+
+struct model_geometry_part
+{
+	byte reserved[0x68];
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
@@ -224,6 +235,31 @@ short model_get_marker_by_name(
 	}
 
 	return result;
+}
+
+void model_build_tangent_matrices(
+	struct model *model)
+{
+	short geometry_index;
+
+	for (geometry_index = 0; geometry_index < model->geometries.count; geometry_index++)
+	{
+		struct model_geometry *geometry = TAG_BLOCK_GET_ELEMENT(
+			&model->geometries,
+			geometry_index,
+			struct model_geometry);
+		short part_index;
+
+		for (part_index = 0; part_index < geometry->parts.count; part_index++)
+		{
+			struct model_geometry_part *part = TAG_BLOCK_GET_ELEMENT(
+				&geometry->parts,
+				part_index,
+				struct model_geometry_part);
+		}
+	}
+
+	return;
 }
 
 void code_00113710(
