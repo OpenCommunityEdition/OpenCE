@@ -395,5 +395,60 @@ replay record is additive documentation only.
 
 ## Corrected cumulative-HEAD closure
 
-Pending clean isolated replay and fast-forward integration. This section
-will be filled only from the authoritative cumulative HEAD.
+The authoritative `jonas/units-integration-20260824` branch was
+fast-forwarded from `7fe9098ef01e777b5303464c09cb34eb987e76e7` through the
+two isolated commits to
+`a8e5a00eaa3fae4091ff46e38cc81ddcbd72bcfd`. Integration changed only the
+error-geometry source and this ledger. The committed source blob remains
+`16d450c3a87a6184729acd2b91664902df90f8cb`; both files check out with CRLF,
+and no Units source, protected neighbor, Units/game-engine interface,
+configuration, semantic ledger, or parked record changed.
+
+At that clean cumulative HEAD, the prior 883-byte dispose-only object was
+proved inside the cumulative worktree, preserved, deleted literally, and
+confirmed absent. The normal selected-object edge ran once and reported
+exactly:
+
+```text
+[1/1] CL build\base\source\tool\error_geometry.obj
+error_geometry.c
+```
+
+The corrected replay is preserved at
+`build/audit/error_geometry_initialize_corrected_head_replay_20260826.obj`,
+1,913 bytes, with phase-specific raw SHA-256
+`de42ee6a1001d93713033a2fbdb7bca2d20cb5192528221537131c831728feb5`.
+
+Direct hardened comparison again proves both complete code sections, all ten
+ordered relocations, and their normalized hashes exact. Direct owner
+comparisons again prove the 116-byte data owner, four-byte BSS, and both
+assertion COMDATs exact. The selected-object dry run reports no work.
+
+The cumulative canonical outputs reproduce the isolated hashes exactly:
+
+- `build/report.json`:
+  `b8a1e632fcc38eb5f968404086d8c586b6ee7bd33548b0c0cf71e1e8e156bfb6`;
+- `build/semantic_report.json`:
+  `926f5872b4512ac9b51133b2e751907f996d0b1c2215a0e553866b802f1d01ca`.
+
+The corrected clean snapshot is
+`build/audit/error_geometry_initialize_corrected_head_manifest_20260826.json`,
+696,503 bytes, SHA-256
+`83c9e4a6868496d93b7efac9c8f1b6d57989ab82361d7d24b692e2c152e2021d`.
+Its immediate no-build check is fully clean: dispose and initialize are the
+two `still_exact` functions, `changed_nonexact` and `newly_exact` are empty,
+and there are no failures or warnings.
+
+The complete Halo-plus-libcmt graph is current and returns exit zero with no
+work after the corrected replay. Semantic audit and progress reproduce the
+full-validation counts above. Object admission remains zero candidates / zero
+revocations, with only the inherited unrelated `shell_xbox` contradiction.
+Parked validation remains three active / zero stale / zero invalid, all 179
+tooling tests pass, and all 55 relevant JSON files parse.
+
+Final tracked scope from the pre-wave base is exactly this source plus this
+ledger, with no deletion. The exact eight-path Units/shared/protected guard,
+the complete `source/units/**` tree, and all headers have zero intersection.
+The cumulative worktree is otherwise clean before this additive closure
+record. No push, amend, rebase, history rewrite, or worktree removal is
+performed.
