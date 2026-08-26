@@ -500,9 +500,10 @@ long csstrcasecmp(
 	const char *s1,
 	const char *s2)
 {
-	register int c1;
+	int c1;
 	int c2;
-	int offset;
+	const char *first;
+	const char *second;
 
 	cseries_match_assert("c:\\halo\\SOURCE\\cseries\\cseries.c", 397, s1 && s2);
 
@@ -511,15 +512,17 @@ long csstrcasecmp(
 	if (c1 == 0)
 		goto c1_zero;
 
-	offset = s1 - s2;
+	second = s2;
+	first = s1;
 loop:
 	if (c2 == 0)
 		goto c2_zero;
-	if (c2 != c1)
+	if (c1 != c2)
 		goto not_equal;
-	s2++;
-	c1 = towlower(s2[offset]);
-	c2 = towlower(*s2);
+	second++;
+	first++;
+	c1 = towlower(*first);
+	c2 = towlower(*second);
 	if (c1 != 0)
 		goto loop;
 
