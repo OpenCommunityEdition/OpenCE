@@ -130,3 +130,54 @@ the candidate object dry run reports no work, and the changed production path
 is only `source/ai/action_charge.c`. Whole-campaign reports, regression
 snapshot/check, and cumulative-tree validation are recorded in a committed
 replay after integration.
+
+## Committed cumulative replay
+
+The evidence branch was merged into `jonas/units-integration-20260824` at
+`b08d30922a82ee675400a8d9f78aaef99dbe8dcf`. The cumulative compiler replay
+produced a 3,676-byte object with raw SHA-256
+`C11BB3BF615299968C93F4BB4857A12B4955D11B8255C6A45F99508E63595CDF`.
+Raw object hashes differ normally with the COFF timestamp; hardened comparison
+again reports `all_equal: true` for all fifteen code owners and all three
+constant owners. The cumulative owner table still contains exactly fifteen
+target-owned functions and no candidate-only function, `.data`, `.bss`, or
+COMMON owner.
+
+The regenerated ordinary report records the unit as:
+
+- 15/22 matched functions;
+- 643/6,032 meaningful code bytes;
+- twelve functions and 479 code bytes above the pre-wave 3/22 state;
+- 256 target data bytes represented as one aggregate report section.
+
+The three constant COMDATs are independently strict exact, but the ordinary
+report does not expose partial per-COMDAT data credit inside its aggregate
+`.rdata` measure. The semantic-data gate intentionally permits incomplete-unit
+credit only when a verified owner spans the entire remaining data gap. These
+three owners span 16 of 256 bytes, so matched campaign data remains unchanged;
+no exception, accounting change, or overstated 16-byte claim is introduced.
+
+A committed `tools.regression_gate` snapshot/check for
+`source/ai/action_charge` reports:
+
+- all fifteen functions `still_exact`;
+- `changed_nonexact: []`;
+- `newly_exact: []` after the committed snapshot;
+- no failures and no warnings.
+
+The cumulative verification set passes:
+
+- `halobetacache_build libcmt_build`: no work after the replay object;
+- semantic report: 470 units, 4,288 functions evaluated, 4,210 accepted exact,
+  and zero unit errors;
+- campaign progress: 507,503 / 2,198,102 code bytes, 4,184 / 11,060
+  functions, and 1,836,756 / 4,176,062 data bytes;
+- Halo category: 494,589 / 1,770,166 code bytes and 4,017 / 7,574 functions;
+- tooling tests: 179/179 passed;
+- `git diff --check`: clean.
+
+The fail-closed admission audit reports zero completion candidates and zero
+revocations. Its sole contradiction is the already-known
+`source/shell/shell_xbox` completion label, whose `_main` false positive is
+independently rejected by existing semantic policy; this wave neither touches
+nor changes it. No push is performed.
