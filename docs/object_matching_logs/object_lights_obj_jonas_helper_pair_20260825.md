@@ -214,8 +214,38 @@ protected-file, or shared-header edit is part of this wave.
 
 ## Committed-state replay
 
-Pending clean implementation-and-ledger commit and literal delete/rebuild
-replay.
+Implementation-and-ledger commit
+`e2d438853a1f2875f8b7c8a7edc78404d08d219d` was clean before replay. Its
+committed source blob is
+`12362d2a85bdacf09ce7a108a2302eab7512e832`. The clean committed manifest is
+`build/audit/object_lights_helper_pair_committed_20260825.json`, 846,079
+bytes, SHA-256
+`af0067cb2a367b2969e119d38f63d104c9dc30c1de39d4cf76ba5aa682767314`.
+
+The resolved generated object path was verified inside the isolated worktree,
+then `build/base/source/objects/object_lights.obj` was literally deleted. The
+Ninja dry run exposed exactly one expected compiler edge, and the normal
+rebuild reported exactly
+`[1/1] CL build\base\source\objects\object_lights.obj`. The rebuilt object was
+preserved as
+`build/audit/object_lights_helper_pair_committed_replay_20260825.obj`, 3,946
+bytes, raw SHA-256
+`79bb50dfbfb47a8e6764c72ea0c36023c55aa775f9651eb162f5b221e5aa25a7`.
+
+The replay and first-shot raw objects differ only at COFF header offsets
+`+0x4` and `+0x5`, compile-timestamp bytes. Every modeled section, symbol,
+meaningful and padded byte, and relocation is identical. The committed
+manifest check has no failures or warnings, no newly exact or
+changed-nonexact entries, and places all nine accepted functions in
+`still_exact`.
+
+Direct hardened comparison again proves the two helpers and seven inherited
+functions strict exact. Regenerated reports reproduce 4,163 accepted semantic
+functions, 4,137 campaign functions, 502,147 meaningful bytes, and zero unit
+errors. Admission remains zero candidates and zero revocations, parks remain
+three active / zero stale / zero invalid, Halo and libcmt again report no
+work, and all 179 tooling tests pass. This section is the only tracked
+follow-up change.
 
 ## Corrected cumulative-HEAD closure
 
