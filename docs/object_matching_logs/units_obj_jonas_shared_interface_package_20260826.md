@@ -285,4 +285,17 @@ record; the corrected-HEAD replay follows in the same record below.
 
 ## Corrected-HEAD replay
 
-(appended after the ledger-only commit)
+At clean ledger-only commit `7d171ff392e0add9c769841ff3cc2f272a7efff5` a
+fresh 33-unit snapshot was captured with `--no-build`
+(`build/audit/units_shared_interface_head_replay_20260826.json`, SHA-256
+`bc2a03137876c7e43bb3f778b90a5c56be6dd411fbb8010c2c48079e5d4de09f`,
+pinning `7d171ff3`). The same containment-proven deletion of all 33
+generated objects, the exactly-33-CL-edge dry-run proof, and one ordinary
+Ninja rebuild were repeated. The immediate check against the corrected-HEAD
+snapshot returned `ok: true`, zero failures, zero warnings, 877
+`still_exact` identities, and empty `newly_exact`/`changed_nonexact`. All
+six package owners remain strict exact by direct comparison and the Units
+census remains 174/11/4 and 128/0/1. A final `halobetacache_build` /
+`libcmt_build` dry run reports `ninja: no work to do`. This appended record
+is the sole change in the final additive ledger-only commit; nothing is
+pushed, amended, rebased, or removed.
