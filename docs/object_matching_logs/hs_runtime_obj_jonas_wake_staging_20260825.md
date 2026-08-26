@@ -155,11 +155,13 @@ the wave's sole ordinary candidate compile, after which the first-shot object
 is copied immediately under ignored `build/audit/` before inspection.
 
 Acceptance requires the three projected owners to reproduce their January
-meaningful/padded sizes, normalized hashes, symbol properties, and ordered
-relocation address/type/destination/addend records. The complete baseline
-manifest must retain all 25 accepted functions and every other code, runtime
-non-code, and symbol owner. No unexpected constant, storage, or symbol may
-appear.
+meaningful/padded sizes, normalized hashes, and ordered relocation
+address/type/destination/addend records. The two public callers must reproduce
+their January symbol properties, while private `_code_000ba090` must preserve
+the baseline static symbol tuple: csplit's external target owner is synthetic
+and is not linkage provenance. The complete baseline manifest must retain all
+25 accepted functions and every other code, runtime non-code, and symbol owner.
+No unexpected constant, storage, or symbol may appear.
 
 Any difference fails closed: C1 is inverse-reverted wholesale with no retry or
 tuning, and only this ledger records the rejection. No separate staging-local,
