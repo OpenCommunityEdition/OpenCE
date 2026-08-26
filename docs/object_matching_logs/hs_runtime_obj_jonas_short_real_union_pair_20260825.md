@@ -206,7 +206,10 @@ The one-unit regression check found all 25 inherited accepted functions in
 `still_exact`, with empty `newly_exact` and `changed_nonexact` lists. Its sole
 failure was `.debug$S|anonymous=0`, the expected compiler debug/timestamp
 metadata change between the copied cumulative object and a fresh isolated
-compile. No code owner, runtime constant/storage owner, symbol contract, or
+compile. An independent baseline-to-shot COFF census found the same 73
+sections and 168 symbols, identical symbol tuples, and identical bytes for
+every section except `.debug$S`, whose metadata payload changed from 179 to
+183 bytes. No code owner, runtime constant/storage owner, symbol contract, or
 ordered relocation changed; the requested pair's unchanged normalized hashes
 also prove that the raw-object difference grants no runtime result.
 
