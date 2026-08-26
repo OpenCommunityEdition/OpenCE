@@ -120,6 +120,7 @@ struct game_options;
 
 #include "cseries/cseries.h"
 #include "game/game.h"
+#include "memory/data.h"
 
 /* ---------- constants */
 
@@ -171,9 +172,16 @@ typedef char verify_game_runtime_globals_difficulty_offset[
 
 /* ---------- prototypes */
 
+void game_engine_game_starting(
+	void);
+
+void game_engine_player_added(
+	long player_index);
+
 /* ---------- globals */
 
 extern struct game_runtime_globals_prefix *bss_0043e48c;
+extern struct data_array *player_data;
 extern short player_spawn_count;
 
 /* ---------- public code */
@@ -185,6 +193,19 @@ void game_options_new(
 	options->code_version = 0;
 	options->difficulty = _game_difficulty_level_normal;
 	options->random_seed = 0xDEADBEEF;
+	return;
+}
+
+void game_initial_pulse(
+	void)
+{
+	struct data_iterator iterator;
+
+	data_iterator_new(&iterator, player_data);
+	while (data_iterator_next(&iterator))
+		game_engine_player_added(iterator.datum_index);
+	game_engine_game_starting();
+
 	return;
 }
 
