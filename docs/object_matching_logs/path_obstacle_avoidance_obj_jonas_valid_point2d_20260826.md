@@ -122,3 +122,51 @@ standard `__fltused` marker) and `.debug$S`; neither carries runtime data
 credit.  No adjudication or comparator relaxation is added.  Clean
 post-admission replay on the cumulative branch is required before final
 integration validation.
+
+## Integration and committed-state validation
+
+The isolated implementation is commit
+`5f46fa48f30b3b93bef63214ddd43e1b46b4bcd4`.  It was cherry-picked into the
+authoritative cumulative branch as
+`f8e3800861693e7d7f33264c00bae523c2afdfb0`.  The committed source blob is
+`697bb107d31d90911ed95e1b072b03cef968c761`.
+
+The normal cumulative Ninja edge rebuilt only
+`build/base/source/ai/path_obstacle_avoidance.obj`.  Its phase-local raw
+SHA-256 is
+`76E339138D47427296428EFF67EC4FC57E5E8B7E0D22DB8648E81D5EA855A383`.
+Direct hardened comparison again proves `_valid_real_point2d` and all four
+inherited functions strict, including every padded byte and ordered
+relocation.
+
+Fresh objdiff and strict semantic reports complete without unit errors.  The
+semantic report evaluates 4,299 functions and accepts 4,217 exact functions.
+Current campaign progress is:
+
+- all code: 508,297 / 2,198,102 meaningful bytes and 4,191 / 11,060
+  functions;
+- Halo code: 495,383 / 1,770,166 meaningful bytes and 4,024 / 7,574
+  functions;
+- all data: 1,836,756 / 4,176,062 bytes;
+- Halo data: 1,831,564 / 3,923,451 bytes;
+- file completion: 377 / 833 overall and 275 / 468 Halo.
+
+Relative to the immediately preceding cumulative report, this recovery adds
+60 meaningful code bytes and one function.  The additional 187 bytes, one
+function, and one complete object visible relative to the older turn-opening
+report are the separately integrated `cseries.obj` closeout, not part of this
+wave.
+
+The full `halobetacache_build` and `libcmt_build` gates report no work pending.
+Object admission reports zero candidates or revocations; the sole
+`shell_xbox` completion-label contradiction is pre-existing.  Parked-function
+validation remains 3 active, zero stale, and zero invalid.  The complete
+tooling suite passes 179/179 tests.  Source-policy scans and `git diff --check`
+are clean, and no protected Units source was touched.
+
+The post-admission cumulative regression manifest is preserved at
+`outputs/path_obstacle_valid_point2d_evidence_20260826/regression-post-admission-cumulative.json`,
+SHA-256
+`36152977639A301CC6A573173660C69525EE08484F53C806A0644C5416A859BD`.
+Its immediate replay reports all five accepted functions as `still_exact`,
+with no newly exact or changed nonexact functions, failures, or warnings.
