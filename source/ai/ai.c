@@ -297,11 +297,17 @@ typedef char ai_prop_unopposable_enemy_offset_assert[
 
 /* ---------- prototypes */
 
+void ai_communication_dispose(
+	void);
 void ai_communication_dispose_from_old_map(
+	void);
+void ai_script_dispose(
 	void);
 void ai_script_dispose_from_old_map(
 	void);
 
+void encounters_dispose(
+	void);
 void encounters_create_for_new_map(
 	void);
 void encounters_dispose_from_old_map(
@@ -312,7 +318,11 @@ void actors_dispose_from_old_map(
 	void);
 void paths_dispose_from_old_map(
 	void);
+void ai_profile_dispose(
+	void);
 void ai_profile_dispose_from_old_map(
+	void);
+void ai_debug_dispose(
 	void);
 void ai_debug_dispose_from_old_map(
 	void);
@@ -362,6 +372,21 @@ boolean code_000309a0(
 extern struct ai_globals_prefix *ai_globals;
 
 /* ---------- public code */
+
+void ai_dispose(
+	void)
+{
+	ai_communication_dispose();
+	ai_script_dispose();
+	encounters_dispose();
+	props_dispose();
+	actors_dispose();
+	paths_dispose();
+	ai_profile_dispose();
+	ai_debug_dispose();
+
+	return;
+}
 
 void ai_dispose_from_old_map(
 	void)
