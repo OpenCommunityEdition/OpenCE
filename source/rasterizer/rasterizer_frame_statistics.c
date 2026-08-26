@@ -135,6 +135,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "errors.h"
 #include "rasterizer.h"
 
 /* ---------- constants */
@@ -148,13 +149,48 @@ struct rasterizer_frame_statistics_globals
 	byte data[0x170];
 };
 
+struct rasterizer_frame_statistics_private_globals_prefix
+{
+	byte reserved000[0x740];
+	word *temp_buffer;
+};
+
+typedef char verify_rasterizer_frame_statistics_temp_buffer_offset[
+	offsetof(
+		struct rasterizer_frame_statistics_private_globals_prefix,
+		temp_buffer) == 0x740 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
 extern struct rasterizer_frame_statistics_globals rasterizer_frame_statistics;
+extern struct rasterizer_frame_statistics_private_globals_prefix bss_00466320;
+
+#define rasterizer_frame_statistics_temp_buffer bss_00466320.temp_buffer
 
 /* ---------- public code */
+
+boolean rasterizer_frame_statistics_initialize(
+	void)
+{
+	boolean success = TRUE;
+
+	rasterizer_frame_statistics_temp_buffer = match_malloc(
+		"c:\\halo\\SOURCE\\rasterizer\\rasterizer_frame_statistics.c",
+		41,
+		sizeof(word) *
+			RASTERIZER_MAXIMUM_TRIANGLES_PER_TRIANGLE_BUFFER *
+			NUMBER_OF_VERTICES_PER_TRIANGLE);
+
+	if (!rasterizer_frame_statistics_temp_buffer)
+	{
+		error(_error_silent, "### ERROR out of memory");
+		success = FALSE;
+	}
+
+	return success;
+}
 
 void rasterizer_frame_statistics_begin(
 	void)
@@ -167,6 +203,22 @@ void rasterizer_frame_statistics_begin(
 void rasterizer_frame_statistics_end(
 	void)
 {
+	return;
+}
+
+void rasterizer_frame_statistics_dispose(
+	void)
+{
+	word *temp_buffer = rasterizer_frame_statistics_temp_buffer;
+
+	if (temp_buffer)
+	{
+		match_free(
+			"c:\\halo\\SOURCE\\rasterizer\\rasterizer_frame_statistics.c",
+			837,
+			temp_buffer);
+	}
+
 	return;
 }
 

@@ -585,9 +585,13 @@ void rasterizer_lights_end(
 
 /* ---------- prototypes/RASTERIZER_FRAME_STATISTICS.C */
 
+boolean rasterizer_frame_statistics_initialize(
+	void);
 void rasterizer_frame_statistics_begin(
 	void);
 void rasterizer_frame_statistics_end(
+	void);
+void rasterizer_frame_statistics_dispose(
 	void);
 
 /* ---------- prototypes/RASTERIZER_TRANSPARENT_GEOMETRY.C */
