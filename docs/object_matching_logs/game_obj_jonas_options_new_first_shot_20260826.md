@@ -313,12 +313,117 @@ tracked deletion changes. The exact protected eight-path guard and the full
 
 ## Clean committed-state replay
 
-The final retained source will be committed before any second normal object
-invocation. From that exact clean commit, an accepted-state snapshot, literal
-object deletion, and one ordinary selected-object replay will prove that
-`_game_options_new` and all five inherited sentinels remain strict while
-`_game_options_verify` is absent. Full Halo-plus-libcmt, semantic, progress,
-admission, parks, JSON, and 179-test validation will then be recorded
-additively. The same literal replay and gates remain mandatory after
-fast-forward integration into the cumulative branch. No push, amend, rebase,
-history rewrite, or worktree removal is performed.
+Implementation-and-ledger commit
+`f109c2b36930586024f387cb309f87ad1c098edf` is clean and authored by
+Jonas Volman. The committed source blob is exactly the final retained blob
+`b900496902dfe978beafe03e80af7005b7d7a4ec`. Its physical payload remains
+6,011 bytes with 225 CRLF and zero bare-LF endings. The initial ledger blob is
+`119dc37be85d54a32bb9541abcc4928d3595dfb2`; its pre-replay checked-out
+payload was 17,044 bytes with 324 CRLF and zero bare-LF endings, SHA-256
+`0507ce331fecc60d4e0a56e2368dea85bbf604021e1d65b7f32bd23c713a6865`.
+
+No second uncommitted candidate compile occurred. From that exact clean
+committed withdrawal state, the existing 1,959-byte first artifact was proved
+inside the isolated worktree and preserved again as
+`pre-committed-replay.obj`. The resolved
+`build/base/source/game/game.obj` path was verified relative to the worktree,
+exactly that literal file was removed, and absence was proved. The selected
+object dry run named one edge, and the unchanged ordinary edge then reported
+exactly:
+
+```text
+[1/1] CL build\base\source\game\game.obj
+game.c
+```
+
+This is a committed withdrawal/reproducibility replay, not a source-shape or
+tuning retry. The result is preserved at
+`build/audit/game_options_pair_first_shot_20260826/committed-replay.obj`,
+1,812 bytes, SHA-256
+`3c87f3a0a50f93fa70d406cc4821668d72c1bd0a8f73410abc8078ad549284ac`.
+The smaller raw object reflects only the deliberate removal of the rejected
+verifier COMDAT and associated compiler-debug records.
+
+Direct hardened comparison again proves `_game_options_new` and all five
+sentinels strict, including all 176 padded code bytes and all six ordered
+relocations. The constructor remains 48 bytes / one `REL32` relocation with
+normalized SHA-256
+`38dc2b2eccc7f378ebffdabbd7b8d3c0efeba231c33bc1385d99538d96443ae5`.
+The other five functions retain every frozen hash in the table above.
+
+The replay's complete external defined inventory is exactly:
+
+```text
+_game_difficulty_level_get
+_game_difficulty_level_set
+_game_is_cooperative
+_game_options_new
+_game_players_are_double_speed
+_game_set_players_are_double_speed
+```
+
+Its undefined inventory is exactly `_bss_0043e48c`, `_csmemset`, and
+`_player_spawn_count`. `_game_options_verify` is absent from the object symbol
+table and the final base-function inventory. No external runtime data, string,
+BSS, COMMON, or initialized owner is emitted. The selected-object and complete
+Halo-plus-libcmt dry runs finish with `ninja: no work to do`.
+
+The complete Halo-plus-libcmt graph first completed the isolated support
+worktree's 568 catch-up edges with exit zero; `game.obj` was already current
+and was not rebuilt in that graph. The canonical report was then regenerated
+directly from the committed replay:
+
+- `build/report.json`: 1,574,250 bytes, SHA-256
+  `33592df7dbc45a9c76df1a30655add120857de1b86ba9c2a6f7d4f5cc53d8827`;
+- `build/semantic_report.json`: 2,975,414 bytes, SHA-256
+  `ccf0d48e93ede975352491ba877f272fc93ffece82311507337964b6d486102d`.
+
+The direct report records `game.obj` at 6/27 exact functions and 114/3,217
+meaningful code bytes, with all 2,492 target non-code bytes uncredited. A
+post-replay check against the frozen pre-wave manifest now reports only
+`_game_options_new` as `NEWLY_EXACT` and has `changed_nonexact: []`; its
+reviewed generic failures remain the inherited-function compiler identities,
+debug sections, and enlarged symbol set. No adjudication is used.
+
+The clean accepted-state manifest is
+`build/audit/game_options_pair_first_shot_20260826/committed-manifest.json`,
+551,382 bytes, SHA-256
+`c7dbf48e1006e9f71c0cab724c686220f4fac21243dfc75fdfb03984862d26f3`.
+Its immediate no-build self-check has no failure or warning, empty
+`newly_exact` and `changed_nonexact` arrays, and exactly the six retained
+functions in `still_exact`. Its target-function record classifies the verifier
+as `ABSENT_IN_BASE`, while the base function and symbol inventories contain no
+verifier owner.
+
+The strict semantic audit reports 470 units, 4,250 functions evaluated, 3,479
+missing, 4,108 semantic exact, 114 hidden exact / 64,705 hidden code bytes, 36
+ordinary-only, 35 structurally accepted, one rejected, zero unit errors, 12
+local skips, and 4,169 accepted exact functions.
+
+Campaign progress is:
+
+- all categories: 375/833 matched objects, 4,143/11,060 functions,
+  502,347/2,198,102 meaningful code bytes, and 1,835,208/4,176,062 data
+  bytes;
+- Halo: 273/468 matched objects, 3,976/7,574 functions,
+  489,433/1,770,166 meaningful code bytes, and 1,830,016/3,923,451 data
+  bytes;
+- libcmt: 102/212 matched objects, 167/476 functions, 12,914/55,015 code
+  bytes, and 5,192/8,637 data bytes.
+
+Object admission remains zero candidates and zero revocations, with only the
+inherited unrelated `source/shell/shell_xbox` completion-label contradiction.
+Park validation remains three active, zero stale, and zero invalid entries.
+The complete tooling suite passes 179/179 tests. All 60 recursively selected
+configuration, canonical-report, and audit JSON files parse. The tracked
+worktree is clean before this additive replay record.
+
+## Corrected cumulative-HEAD closure
+
+The isolated replay record will be committed before fast-forward integration.
+At the resulting clean cumulative HEAD, the same literal selected-object
+deletion and one ordinary replay must reproduce the six strict functions and
+verifier absence. Canonical report, semantic, progress, admission, parks,
+JSON, tests, exact two-file scope, and the protected Units/shared-path guard
+will then be recorded additively. No push, amend, rebase, history rewrite, or
+worktree removal is performed.
