@@ -107,9 +107,14 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
-#include "math/real_math.h"
 
+#define valid_real_point2d valid_real_point2d_inline
+#include "math/real_math.h"
+#undef valid_real_point2d
+
+#undef memcpy
 #include <stddef.h>
+#include <string.h>
 
 /* ---------- constants */
 
@@ -218,4 +223,20 @@ short heap_right_index(
 	short result = 2 * (heap_index + 1);
 
 	return result;
+}
+
+boolean valid_real_point2d(
+	real_point2d const *point)
+{
+	real x_value = point->x;
+	real y_value;
+	unsigned long x_bits;
+	unsigned long y_bits;
+
+	memcpy(&x_bits, &x_value, sizeof(x_bits));
+
+	return (x_bits & 0x7F800000) != 0x7F800000 &&
+		(y_value = point->y,
+		memcpy(&y_bits, &y_value, sizeof(y_bits)),
+		(y_bits & 0x7F800000) != 0x7F800000);
 }
