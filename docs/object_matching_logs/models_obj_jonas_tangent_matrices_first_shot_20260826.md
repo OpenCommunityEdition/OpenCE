@@ -93,3 +93,16 @@ The isolated progress gate reports:
 The five remaining target functions are `_code_00112db0`,
 `_model_get_node_matrices`, `_model_node_matrices_from_orientations`,
 `_model_find_marker`, and `_render_model`.
+
+## Integration replay
+
+The isolated recovery is committed as
+`a073514cda4cb78cbc317e4fbd10ced460c45f03` and was cherry-picked into the
+cumulative campaign as `6b2294301a99b3ed053a098b983df5d25a61af4f`.
+
+The accepted cumulative state is frozen in
+`outputs/models_tangent_evidence_20260826/regression-post-admission-cumulative.json`.
+Its immediate replay reports all seven accepted `models.obj` functions as
+`still_exact`, with no newly exact functions, changed nonexact functions,
+failures, or warnings.  No protected Units source was touched and nothing was
+pushed.
