@@ -279,3 +279,69 @@ Admission remains zero candidates / zero revocations plus the inherited
 unrelated `shell_xbox` contradiction. Parks remain three active / zero stale /
 zero invalid. All 179 tooling tests pass, and all selected JSON files parse.
 The tracked worktree was otherwise clean before this additive replay record.
+
+## Corrected cumulative-HEAD closure
+
+The isolated replay record is commit
+`2b25f7cd3ca10e64922c85487a9fa70288650dd3`. The authoritative
+`jonas/units-integration-20260824` branch was cleanly fast-forwarded from
+`ea21f77bab8fbc719115dfc80a3a35f80e1ece02` through both isolated commits.
+The committed source remains blob
+`4b8701acfc443808777a59cb27fb0ce1570e2f86`, with 6,450 physical bytes,
+226 CRLF endings, zero bare LF endings, and SHA-256
+`de6617a6b9b34281892b3bb160b267252a22088cab8826e1896e6eb523692688`.
+
+Before corrected replay, the cumulative worktree still held its 4,096-byte
+stripify-free `rasterizer_geometry.obj`, SHA-256
+`c9af67d09178b8f5a18f025ad7c2c3c8bd4d8cd314bbb6abcfd6b31aaae6158c`.
+That artifact was preserved. Its resolved path was proved inside the
+cumulative worktree, exactly that literal file was deleted, absence was
+verified, and the selected-object dry run named one edge. The unchanged
+ordinary edge then reported:
+
+```text
+[1/1] CL build\base\source\rasterizer\rasterizer_geometry.obj
+rasterizer_geometry.c
+```
+
+The corrected replay is preserved as
+`build/audit/rasterizer_geometry_stripify_corrected_head_20260826/corrected-replay.obj`,
+4,338 bytes, SHA-256
+`6e1ec94eb90bc3daf4cd030f4c179a7b07642d98aba8de29b97b6aa146850d52`.
+Its raw size and hash differ from the isolated replay because the compiler
+debug records encode a different absolute worktree/output path. Direct
+hardened comparison proves identical runtime evidence: all nine padded
+function sections, every normalized hash in the table, and every ordered
+relocation identity are strict.
+
+The corrected clean manifest is 460,754 bytes, SHA-256
+`39af33774b5cce9cd53d54a2a40a916a76851d6173f859f3770977de3e35870f`.
+Its immediate no-build check is fully clean: exactly nine `still_exact`
+functions, empty `newly_exact` and `changed_nonexact` arrays, and no failure or
+warning.
+
+The cumulative canonical outputs reproduce the isolated results byte for
+byte:
+
+- `build/report.json`: 1,574,280 bytes, SHA-256
+  `ea4fbffd31ffc708bdc691b3a1e35c5bab5ef0148af61321ca361d71d2280cc1`;
+- `build/semantic_report.json`: 2,976,116 bytes, SHA-256
+  `76386592b31ee8aeb78081c731281f74c9df5d61b01f16b3b7185c647484704f`.
+
+They reproduce 9/19 exact functions and 642/4,054 meaningful code bytes for
+the object, 4,170 accepted semantic functions, 4,144/11,060 campaign
+functions, and 502,350/2,198,102 meaningful campaign code bytes. Halo remains
+at 3,977/7,574 functions and 489,436/1,770,166 meaningful code bytes.
+
+The complete source-object graph returns `ninja: no work to do`. Admission is
+zero candidates / zero revocations plus the inherited unrelated `shell_xbox`
+contradiction. Parks are three active / zero stale / zero invalid. All 179
+tooling tests pass, and all 59 recursively selected configuration, canonical,
+and audit JSON files parse.
+
+Final tracked scope from the pre-wave base is exactly
+`source/rasterizer/rasterizer_geometry.c` plus this ledger, with zero tracked
+deletion. No header, configuration, existing ledger, semantic record, parked
+record, Units source, or protected/shared interface changed. The cumulative
+worktree was otherwise clean before this additive closure record. No push,
+amend, rebase, history rewrite, or worktree removal is performed.
