@@ -195,3 +195,48 @@ object will then be removed with literal-path containment checks, rebuilt once
 through its ordinary edge, and checked immediately with the regression gate
 and hardened six-function comparator. Replay facts will be added only in a
 second ledger-only commit, followed by the same corrected-HEAD replay.
+
+## Clean implementation-state replay
+
+Implementation-and-initial-ledger commit
+`03c1bcb84d7316e0fd14ac3d150a71bd9565b495` was authored by Jonas Volman
+`<theunknowentity@gmail.com>` and was clean before replay. Its retained source
+blob is the frozen `97f5af1b4597a8f3e3a4b079435a0c5e1fda28d0`, and the commit contains
+exactly the requested source path plus this new ledger.
+
+A one-unit accepted-state snapshot was written with `--no-build` at that exact
+commit. The ignored manifest
+`build/audit/rasterizer_setter_impl_replay_20260825.json` is 169,736 bytes,
+SHA-256 `5a5bb4aad3affb7fdaa1424f5d006e2a32117170fa93a3d003917f340d95b601`,
+and pins the full implementation commit.
+
+The generated object resolved to the absolute path
+`C:\Users\isabe\Documents\Codex\2026-07-13\i-w\rasterizer-setter-abi-repair-20260825\build\base\source\rasterizer\rasterizer_cinematics.obj`.
+That normalized path was proven equal to the isolated worktree root plus the
+single expected relative path before deletion. Its pre-delete SHA-256 remained
+the immutable first-shot identity
+`8f7e37f679669cb553e7c6ae2e2949938e1081c20a65358b29bb291a29e95298`.
+Only that verified file was removed with `Remove-Item -LiteralPath`, and an
+immediate check proved it absent. Its ordinary Ninja edge then ran exactly:
+
+```text
+[1/1] CL build\base\source\rasterizer\rasterizer_cinematics.obj
+```
+
+The rebuilt object has raw metadata-phase SHA-256
+`25a4b0d34d423ad935a77e1e5ba97915fd3430267f10881e84122a1344a1b097`.
+The expected raw difference from the first shot is compiler debug/timestamp
+metadata; the complete runtime acceptance view is unchanged.
+
+The immediate regression check returned `ok: true`, zero failures and zero
+warnings. It records all six accepted owners as `still_exact`, with empty
+`newly_exact` and `changed_nonexact` lists. The independent hardened comparator
+again returned `all_equal: true`, including the setter's 48 padded bytes,
+normalized SHA-256 `9a2d886587d1d61f...`, and sole relocation. A generated
+one-object Ninja dry run reports `ninja: no work to do`.
+
+Only this ledger changes for the additive replay record. After the ledger-only
+commit, the same clean snapshot, verified literal delete, single ordinary
+rebuild, regression check, hardened comparison, and full-build dry run will be
+repeated at corrected HEAD. No source change, retry, tuning, header/config
+edit, amend, push, rebase, history rewrite, or worktree removal occurred.
