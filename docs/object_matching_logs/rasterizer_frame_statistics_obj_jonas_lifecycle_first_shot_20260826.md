@@ -78,6 +78,67 @@ The current campaign's hardened relocation comparator, whole-TU regression,
 semantic-progress, admission, and park tools were used as validation
 infrastructure, never as matching authority or an exception.
 
+The direct Claude donor repository at
+`C:\halo-worktrees\claude-ai-conversation-2` was also audited at commit
+`0e1fc785b7f5fb8c8d6fec8cae667005aa663957`. Its only dirty file was the
+reviewed working `tools/equivalence/leaf_cache.json`; no dirty production
+source was consumed. Relevant documentation and tooling identities are:
+
+- `AGENTS.md`: `b301779d99253e9273011c89214985d2321253076aacdc562205f3af46fd458c`;
+- `CLAUDE.md`: `c62ae42b467ee4954519af61d711575b110299da33115140448cf260308e699a`;
+- `docs/references/prototype-inference.md`:
+  `ebd2a3e72206a2b727a70adf269fa5932f1392ced43a303167b969e6042be5b2`;
+- `docs/references/kb-update-policy.md`:
+  `4c9e2a4ae5b521f14ea45c6debe01c73e88258b35f6b51f50e53354528e0ea42`;
+- `docs/ghidra-live-delinker.md`:
+  `87069190158c3f6a05bf542aa5626b488539d8890df8f508b6d5d537ed6ddbae`;
+- `docs/verification_policy.md`:
+  `1a394e10a67b29926e6d82aa1303327e336053413f55a1b2ff545d8bebdf5922`;
+- `tools/audit/check_arg_counts.py`:
+  `3e5842ca9b8f7c16142a0b35fa4417a49405d51ff422ce879ea38dea22c8ef32`;
+- `tools/verify/vc71_scores.json`:
+  `93e71b2f0907266c259b4e9fdf823136d0e8d27409fbc52d8f1f37f68457e35c`;
+- working `tools/equivalence/leaf_cache.json`:
+  `e6ccf76b86864210331042cd1cd541b3de3319125b02d0d4483eb93b0eacaf6a`;
+- `kb.json`: `6c5f1d3dc73686770b7888d656042cbbf43a9e3fa0289d4cc637e8cbf759ba52`.
+
+That repository's dispose donor is blob
+`65bba802bcf97ca39f807e34630c70a29340e56b`, raw SHA-256
+`2e25413c068da9c7477a9609a7f12601feeb2e6291992e902da1218a8d352fa7`.
+Its canonical donor XBE is 3,395,584 bytes with SHA-256
+`a3402b021833dd2a3c368786f239480d68a6394bdf540569fab18340a83ab827`.
+These materials authenticate source shape and intent only; the January COFF
+remains authoritative for ABI, section extent, relocation identities, and
+matching credit.
+
+The clean HCEA cache at commit
+`570c83fd9c365dad6f2a3e7041705d5b84c7847c` contributes these separately
+pinned later-build sources: initialize blob
+`18a2bfe7c4fb69d43a6a368c1a9fb4e250ee64ea`, dispose blob
+`7ac4a9583d0f8fec83f323934b57dd17afedd143`, begin blob
+`310f2a8d27f9153031a45ea9fb6b1981da2d378d`, and end blob
+`4d0c011030b9c8fe653839e9e9adae2db70f292e`, all under
+`src/blam/rasterizer/`. Its `README.MD` SHA-256 is
+`e6960053faa47d59fb22cc9af1565a9c6e5b4a23390f8025f897f8a10a275ec0`.
+HCEA initialize is only a true return and HCEA dispose is empty, so neither
+body was transplanted; their names and zero-parameter static metadata are
+corroboration only.
+
+The clean correspondence repository
+`C:\halo-worktrees\fable-crossbuild-bridge` at
+`bf520b6938d256ecc9a55d93e994a9f5dd389ec1` was reviewed as well.
+`EVIDENCE_MODEL.md`, `REPRODUCTION.md`, and `FINAL_REPORT.md` have SHA-256
+values `2520a4a0b516752cc1e74bc92a2e494f1b425044de3eb124ad6b214cdff9c607`,
+`6ed5dddd92e6c33f602ed911e5af328a1057c57186da41e135acb07536caf25`,
+and `0bb6498b9ba55a28eaa47990a5cf9a1a1b090ba77d83606e3be48808d5ba13f1`.
+Its correspondence JSON SHA-256 is
+`c6ea66d530438fba92d27790001c631d973d41e7fb6bacb21a4525763ec6cfbc`,
+and its exact-tier ranking SHA-256 is
+`f3fdc2e18c2f173f0bc9c6bec5aa6c8250ed92c99137f79a8d4a5c0d295e2476`.
+Both lifecycle names are classified `exact_unique`, cdecl, and zero-argument,
+while the documents explicitly preserve the rule that cross-build evidence
+cannot replace January/XDK strict comparison.
+
 The complete reachable campaign history and registered production-worktree
 census revealed no retained definition of either lifecycle function at the
 frozen cumulative head. Earlier occurrences were declarations, callers,
@@ -240,3 +301,44 @@ in `source/rasterizer/rasterizer.h`, and this ledger. There are no deletions.
 The complete `source/units/**` tree and all eight protected paths have zero
 intersection with the wave. No push, amend, rebase, history rewrite, or
 worktree removal is performed.
+
+## Clean committed-state replay
+
+The implementation-and-ledger commit is
+`d2cf306781e22ff35d9609af98f861a68d0da9fd`, authored and committed by
+Jonas Volman. It retains C blob
+`a66aa545fcb0cef1f21018a1a96189e49530a5e6` and header blob
+`269e89c6961a10665a52199bda510734708b60b9`, and the tracked worktree was
+clean before replay.
+
+The post-validation object was preserved as `pre-committed-replay.obj`:
+2,322 bytes, SHA-256
+`d16f9121377f25d6995ff115d1f941e4b5bbe2795eef831986b73d7cfea6bd63`.
+The resolved production object path was proved inside the isolated worktree,
+that literal file was deleted, and absence was verified. The selected-object
+dry run named exactly one edge. The unchanged committed source then rebuilt
+through exactly the ordinary one-object action. This is a reproducibility
+replay, not a candidate or tuning pass.
+
+The 2,322-byte committed replay object has phase-specific whole-file SHA-256
+`c57c0b6321afe971af7676d449dcf93268a9103b8dc609f7d03fe9c121ec8876`.
+Direct hardened comparison again proves all four complete padded functions,
+all ten ordered relocations, and every normalized hash in the strict table.
+The defined-function, external, two-string, inherited tentative-COMMON, and
+zero-BSS inventories are unchanged.
+
+A clean accepted-state manifest was captured at the committed source. It is
+551,786 bytes with SHA-256
+`11bbd0586c1b135cd3f864eda83a60bbdbf618a90f3c7c14b4a7530695ae149b`.
+Its immediate check has no failures or warnings, empty `newly_exact` and
+`changed_nonexact` arrays, and exactly the four strict-table functions under
+`still_exact`.
+
+The canonical report and semantic-report sizes and hashes reproduce the
+first-shot values, as do every object, function, byte, and semantic count.
+Admission remains zero candidates / zero revocations plus the inherited
+unrelated `shell_xbox` contradiction. Parks remain three active / zero stale /
+zero invalid. All 179 tooling tests and all 14 selected JSON parses pass. The
+complete Halo-plus-libcmt graph and `all_source` dry run report no pending
+compile work, and the tracked worktree is otherwise clean before this
+additive replay record.
