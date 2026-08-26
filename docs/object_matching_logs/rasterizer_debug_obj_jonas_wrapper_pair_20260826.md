@@ -122,3 +122,26 @@ The two shaded routines are large private implementation bodies and should be
 recovered with their common state/primitive helper surface rather than tuned as
 isolated external cdecl leaves. Reopen them only after freezing caller, global,
 literal, and relocation ownership together.
+
+## Post-integration verification
+
+The accepted recovery was integrated at cumulative commit
+`41766c50b50fcaf9583180a0b9449432fdc86682`. A normal rebuild reproduced all
+five strict functions. The clean post-admission regression manifest is
+`outputs/rasterizer_debug_wrapper_evidence_20260826/regression-post-admission.json`;
+its immediate replay passed with no failures, warnings, newly exact functions,
+or changed nonexact functions.
+
+The refreshed campaign gates report:
+
+- semantic audit: 470 units, 4,296 evaluated functions, 4,213 accepted exact,
+  zero unit errors;
+- object admission: zero candidates and zero revoked objects;
+- parked-function validation: three active, zero stale, zero invalid;
+- tooling suite: 179/179 tests pass;
+- all code: 507,676 / 2,198,102 bytes and 4,187 / 11,060 functions;
+- Halo code: 494,762 / 1,770,166 bytes and 4,020 / 7,574 functions;
+- completed files: unchanged at 376 / 833 overall and 274 / 468 Halo.
+
+Relative to the frozen pre-wave metrics, this is exactly the intended gain of
+57 code bytes and two functions with no data or completed-object movement.
