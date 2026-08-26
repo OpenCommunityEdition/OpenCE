@@ -420,10 +420,72 @@ worktree is clean before this additive replay record.
 
 ## Corrected cumulative-HEAD closure
 
-The isolated replay record will be committed before fast-forward integration.
-At the resulting clean cumulative HEAD, the same literal selected-object
-deletion and one ordinary replay must reproduce the six strict functions and
-verifier absence. Canonical report, semantic, progress, admission, parks,
-JSON, tests, exact two-file scope, and the protected Units/shared-path guard
-will then be recorded additively. No push, amend, rebase, history rewrite, or
-worktree removal is performed.
+The isolated replay record is commit
+`6a68f0145b2c61c924cf769e5d98d3f87d90ef5e`. The authoritative
+`jonas/units-integration-20260824` branch was fast-forwarded from
+`728cac58b177e9305c3392244baa96a2f08a6f29` through both isolated commits to
+that exact clean HEAD. The committed source remains blob
+`b900496902dfe978beafe03e80af7005b7d7a4ec`, 6,011 physical bytes, 225 CRLF,
+zero bare LF, and SHA-256
+`3c0112a3bec47104543b18183627f86b68e687428906b7dcede9b0336def90a8`.
+
+Before corrected replay, the cumulative worktree still held the prior
+1,614-byte constructor-free `game.obj`, SHA-256
+`0cdd35be92dd969f12f142d5592dec2dd2f7b73c8a505eb54b0e95500f3e7276`.
+Its resolved path was proved inside the cumulative worktree, the artifact was
+preserved, exactly that literal file was removed, and absence was confirmed.
+The unchanged selected-object edge then ran once and reported exactly:
+
+```text
+[1/1] CL build\base\source\game\game.obj
+game.c
+```
+
+The corrected replay is preserved at
+`build/audit/game_options_new_corrected_head_replay_20260826.obj`, 1,812
+bytes, with phase-specific raw SHA-256
+`b287a0e6c09aebed3837f6401441796858e32448bdcbd074a254cc1cc1d0dec8`.
+Its raw hash differs from the isolated replay because compiler-debug records
+embed the absolute output path. Direct hardened comparison proves identical
+runtime evidence: all six complete padded function sections, all six ordered
+relocations, and every normalized hash are strict. The defined inventory is
+exactly the same six retained functions; the undefined inventory is exactly
+`_bss_0043e48c`, `_csmemset`, and `_player_spawn_count`; the verifier is
+absent; no runtime data owner is introduced.
+
+The corrected clean manifest is
+`build/audit/game_options_new_corrected_head_manifest_20260826.json`, 551,382
+bytes, SHA-256
+`d9d5b9eeb217f68b5705ea9d583aa6ac0ba82143b744fd47e4f711927d217e15`.
+Its immediate no-build check is fully clean: all six retained functions are
+`still_exact`, `newly_exact` and `changed_nonexact` are empty, and there are
+no failures or warnings. Its verifier record remains `ABSENT_IN_BASE`, with no
+base verifier function or symbol owner.
+
+The cumulative canonical outputs reproduce the isolated results byte for
+byte:
+
+- `build/report.json`: 1,574,250 bytes, SHA-256
+  `33592df7dbc45a9c76df1a30655add120857de1b86ba9c2a6f7d4f5cc53d8827`;
+- `build/semantic_report.json`: 2,975,414 bytes, SHA-256
+  `ccf0d48e93ede975352491ba877f272fc93ffece82311507337964b6d486102d`.
+
+The complete Halo-plus-libcmt graph returns exit zero with no work after the
+corrected replay. Semantic audit and campaign progress reproduce all isolated
+counts: 4,169 accepted semantic functions; 4,143/11,060 campaign functions;
+502,347/2,198,102 meaningful code bytes; 1,835,208/4,176,062 data bytes;
+and Halo at 3,976/7,574 functions and 489,433/1,770,166 code bytes.
+
+Object admission remains zero candidates / zero revocations with only the
+inherited unrelated `shell_xbox` contradiction. Parks remain three active /
+zero stale / zero invalid. All 179 tooling tests pass, and all 58 recursively
+selected cumulative configuration, canonical-report, and audit JSON files
+parse.
+
+Final tracked scope from the pre-wave base is exactly
+`source/game/game.c` plus this ledger, with zero tracked deletion. No header,
+configuration, existing ledger, semantic record, or parked record changed.
+The exact eight-path Units/shared/protected guard and the complete
+`source/units/**` tree have zero intersection. The cumulative worktree was
+otherwise clean before this additive closure record. No push, amend, rebase,
+history rewrite, or worktree removal is performed.
