@@ -82,12 +82,36 @@ symbols in this file:
 
 #include "cseries.h"
 
+#define square_root square_root_inline
+#define scale_vector2d scale_vector2d_inline
+#define magnitude_squared2d magnitude_squared2d_inline
+#define magnitude2d magnitude2d_inline
+#define normalize2d normalize2d_inline
+#define dot_product2d dot_product2d_inline
+#define point_from_line3d point_from_line3d_inline
+#define scale_vector3d scale_vector3d_inline
+#define magnitude3d magnitude3d_inline
+#define normalize3d normalize3d_inline
+#define dot_product3d dot_product3d_inline
+#define subtract_vectors3d subtract_vectors3d_inline
 #define real_random real_random_inline
 #include "actions.h"
 
 #include "actor_definitions.h"
 #include "actors.h"
 #include "math/real_math.h"
+#undef square_root
+#undef scale_vector2d
+#undef magnitude_squared2d
+#undef magnitude2d
+#undef normalize2d
+#undef dot_product2d
+#undef point_from_line3d
+#undef scale_vector3d
+#undef magnitude3d
+#undef normalize3d
+#undef dot_product3d
+#undef subtract_vectors3d
 #undef real_random
 
 /* ---------- constants */
@@ -144,6 +168,126 @@ void action_charge_update(
 	}
 
 	return;
+}
+
+real square_root(
+	real x)
+{
+	return sqrt(x);
+}
+
+real_vector2d *scale_vector2d(
+	real_vector2d const *a,
+	real c,
+	real_vector2d *result)
+{
+	result->i = c*a->i;
+	result->j = c*a->j;
+
+	return result;
+}
+
+real magnitude_squared2d(
+	real_vector2d const *v)
+{
+	return v->i*v->i + v->j*v->j;
+}
+
+real magnitude2d(
+	real_vector2d const *v)
+{
+	return square_root(magnitude_squared2d(v));
+}
+
+real normalize2d(
+	real_vector2d *v)
+{
+	real magnitude = magnitude2d(v);
+
+	if (!(_real_epsilon>fabs(magnitude-0.f)))
+	{
+		scale_vector2d(v, 1.f / magnitude, v);
+	}
+	else
+	{
+		magnitude = 0.f;
+	}
+
+	return magnitude;
+}
+
+real dot_product2d(
+	real_vector2d const *a,
+	real_vector2d const *b)
+{
+	return a->i*b->i + a->j*b->j;
+}
+
+real_point3d *point_from_line3d(
+	real_point3d const *p,
+	real_vector3d const *v,
+	real t,
+	real_point3d *result)
+{
+	result->x = v->i*t + p->x;
+	result->y = v->j*t + p->y;
+	result->z = v->k*t + p->z;
+
+	return result;
+}
+
+real_vector3d *scale_vector3d(
+	real_vector3d const *a,
+	real c,
+	real_vector3d *result)
+{
+	result->i = c*a->i;
+	result->j = c*a->j;
+	result->k = c*a->k;
+
+	return result;
+}
+
+real magnitude3d(
+	real_vector3d const *v)
+{
+	return square_root(v->i*v->i + v->j*v->j + v->k*v->k);
+}
+
+real normalize3d(
+	real_vector3d *v)
+{
+	real magnitude = magnitude3d(v);
+
+	if (!(_real_epsilon>fabs(magnitude-0.f)))
+	{
+		scale_vector3d(v, 1.f / magnitude, v);
+	}
+	else
+	{
+		magnitude = 0.f;
+	}
+
+	return magnitude;
+}
+
+real dot_product3d(
+	real_vector3d const *a,
+	real_vector3d const *b)
+{
+	return a->i*b->i + a->j*b->j + a->k*b->k;
+}
+
+real_vector3d *subtract_vectors3d(
+	real_vector3d const *a,
+	real_vector3d const *b,
+	real_vector3d *result)
+{
+	result->i = a->i-b->i;
+	result->j = a->j-b->j;
+	result->k = a->k-b->k;
+
+	return result;
 }
 
 real real_random(
