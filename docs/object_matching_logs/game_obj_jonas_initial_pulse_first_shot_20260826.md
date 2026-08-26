@@ -246,6 +246,50 @@ rewrite, or worktree removal is performed.
 
 ## Committed-state replay
 
-The clean committed-state manifest, forced selected-object replay, exact
-comparison, full reports, tests, and cumulative integration replay will be
-recorded append-only after the implementation-and-ledger commit.
+The implementation-and-ledger commit is
+`1a2dbe87b17f09d2c2c33fd6cf92c41347c24644`, authored and committed by Jonas
+Volman. It retains source blob `22040601a6eec509ed822e9420089e36f4e29e75`
+and first-shot ledger blob `47c84a8b73ecaa4065e6a6d540dec82c8c69a585`.
+The tracked worktree was clean before replay.
+
+A clean accepted-state regression snapshot was captured at that exact commit.
+The manifest is 559,164 bytes, SHA-256
+`d87e7f4bc39594b3204dbbd9b9596cc0703f5f93c16809a57f8e798678a9045f`.
+Its immediate check has no failures or warnings, empty `newly_exact` and
+`changed_nonexact` arrays, and all seven strict functions under `still_exact`.
+
+The resolved production path was proved inside the isolated worktree, the
+literal generated object was cleaned, and the selected-object dry run named
+exactly one CL edge. The unchanged committed all-CRLF source then rebuilt once
+through that ordinary edge. This was a reproducibility replay, not a candidate
+or tuning pass.
+
+The 2,257-byte committed replay object has phase-specific whole-file SHA-256
+`f74bced559905bd2700b21e22de58fde0a515bfa229a49df85c03fa58c0d60cc`.
+The raw hash differs from the first candidate because VC7 writes compile-time
+and debug metadata into the COFF container. Runtime evidence reproduces
+exactly: the hardened symbolic-relocation-aware comparator passes the pulse
+and all six frozen sentinels, and the pulse retains all 80 padded bytes, its
+normalized hash, and its six ordered relocations.
+
+The accepted-state manifest check after rebuild again has no failures or
+warnings, empty `newly_exact` and `changed_nonexact` arrays, and all seven
+strict functions under `still_exact`. Canonical report and semantic-report
+sizes, hashes, progress counts, and semantic counts reproduce the first-shot
+values. The phase admission result is 384 bytes, SHA-256
+`f0aa45c22cc604fb74abc388b06dd79a27e7a0b498a5d28837a9e785680c9a36`;
+it reproduces zero candidates / zero revocations plus the inherited unrelated
+`shell_xbox` contradiction. The phase parks result is 3,950 bytes, SHA-256
+`cfac03aea5be607c19a6a40bcdbc1164e71ffb0179602af4bd37b3fd50e26d1d`;
+it reproduces three active / zero stale / zero invalid.
+
+All 179 tooling tests and all 14 selected JSON parses pass again. The complete
+Halo-plus-libcmt graph and `all_source` dry run report no pending compile work.
+The source-policy scan is clean, the cumulative-base diff has no deletion or
+protected-path intersection, and the tracked worktree is otherwise clean
+before this additive replay record.
+
+## Cumulative-HEAD closure
+
+The cumulative integration replay will be recorded append-only after the two
+isolated commits are integrated into `jonas/units-integration-20260824`.
