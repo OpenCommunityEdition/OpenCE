@@ -226,3 +226,56 @@ audit JSON files parse.
 The exact eight-path protected guard and the complete `source/units/**` tree
 have zero intersection with this wave. No push, amend, rebase, history rewrite,
 or worktree removal is performed.
+
+## Clean committed-state replay
+
+The implementation-and-ledger commit is
+`b5ab0e9bc0a1870bec5f0cabe7e147d4f59888d4`, authored and committed by
+Jonas Volman. The committed source remains blob
+`4b8701acfc443808777a59cb27fb0ce1570e2f86`, with the physical size, line
+endings, and SHA-256 recorded above. The initial ledger blob is
+`f5ca2f1681a965b04c0654ae7c500125473d4935`.
+
+The tracked worktree was clean at that commit. The 4,349-byte first artifact
+was preserved again as `pre-committed-replay.obj`. The resolved production
+object path was proved inside the isolated worktree, exactly that literal
+artifact was deleted, absence was verified, and the selected-object dry run
+again named one edge. The unchanged ordinary edge then reported:
+
+```text
+[1/1] CL build\base\source\rasterizer\rasterizer_geometry.obj
+rasterizer_geometry.c
+```
+
+This is a clean committed reproducibility replay, not a source-shape or tuning
+retry. The 4,349-byte result is preserved as `committed-replay.obj`, SHA-256
+`34d5f78f96304d9bb6ea876a2d95107b54b8888aa88ea5df5698ee241bac5405`.
+Its raw hash differs from the first artifact because the COFF producer embeds
+phase-specific compiler/debug metadata. Direct hardened comparison proves
+identical runtime evidence: all nine complete padded function sections, every
+normalized hash in the table, and all ordered relocations remain strict.
+
+The replay's external defined-function inventory is exactly the nine
+functions in the table. Its undefined inventory remains exactly `__fltused`,
+`_display_assert`, `_system_exit`, and
+`_uncompress_int32_to_real_vector3d`. No source-defined runtime data, BSS,
+COMMON owner, or string is introduced.
+
+The clean accepted-state manifest is 460,754 bytes, SHA-256
+`81f53f62845e0e142de5ff2175d889c6be3d404d08efb0f6786686eb96133960`.
+Its immediate no-build self-check has no failure or warning, empty
+`newly_exact` and `changed_nonexact` arrays, and exactly the nine functions in
+the table under `still_exact`.
+
+The replayed canonical outputs are 1,574,280-byte `build/report.json`,
+SHA-256
+`ea4fbffd31ffc708bdc691b3a1e35c5bab5ef0148af61321ca361d71d2280cc1`,
+and 2,976,116-byte `build/semantic_report.json`, SHA-256
+`76386592b31ee8aeb78081c731281f74c9df5d61b01f16b3b7185c647484704f`.
+They reproduce every first-shot object, semantic, and campaign count above.
+The complete source-object graph returns `ninja: no work to do` after replay.
+
+Admission remains zero candidates / zero revocations plus the inherited
+unrelated `shell_xbox` contradiction. Parks remain three active / zero stale /
+zero invalid. All 179 tooling tests pass, and all selected JSON files parse.
+The tracked worktree was otherwise clean before this additive replay record.
