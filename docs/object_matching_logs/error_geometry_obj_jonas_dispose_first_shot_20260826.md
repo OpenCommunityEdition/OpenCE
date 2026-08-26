@@ -305,3 +305,48 @@ The remaining validation gates pass:
 This replay and validation record is additive documentation only. The source
 blob remains the implementation commit's blob, no configuration or semantic
 exception is added, Units remains frozen, and no push is performed.
+
+## Corrected cumulative-HEAD closure
+
+The authoritative `jonas/units-integration-20260824` branch was
+fast-forwarded from `ab860d8aefe3de47d9d4264ec1afe4ce09f92cad` through the
+two isolated commits to
+`9f2c28b3e8cd9060f80d7c03f78dbd91aca11df8`. Integration changed only the
+error-geometry source and this ledger. The committed source blob remains
+`74e919f62df07122dfed4593b452d55bc114d546`; no Units source, protected
+neighbor, shared interface, configuration, semantic ledger, or parked record
+changed.
+
+At that clean cumulative HEAD, the prior 475-byte skeleton object was proved
+inside the cumulative worktree, deleted literally, and confirmed absent. The
+normal selected-object edge ran once and reported exactly one CL action. The
+corrected replay is preserved at
+`build/audit/error_geometry_corrected_head_replay_20260826.obj`, 883 bytes,
+with phase-specific raw SHA-256
+`7f51c4041e550fff928bb9bc5b2e31bff05558aff0f8520fca056fd28b53fb33`.
+
+Direct hardened comparison again proves the function's 32 padded bytes and
+three relocations exact. Resolved data comparison again proves the four-byte
+BSS owner exact. The cumulative report and semantic-report hashes reproduce
+the isolated results exactly:
+
+- `build/report.json`:
+  `addfef1785f72cf37544f918b2baa642de1e7c4c4f3128a71f7cf4e9c12c862a`;
+- `build/semantic_report.json`:
+  `f47167943caa27ae2262a8bef6f7cc2021ced5aa2b6979d2813823d93aba1e29`.
+
+The corrected clean snapshot is
+`build/audit/error_geometry_corrected_head_manifest_20260826.json`, 679,299
+bytes, SHA-256
+`94f16ca0e76993f48d69045adafa01ce903eeac0f43df8e4cad720214512a7d2`.
+Its no-build check is fully clean: `_error_geometry_dispose` is the sole
+`still_exact` function, `changed_nonexact` and `newly_exact` are empty, and
+there are no failures or warnings.
+
+The cumulative semantic audit and progress reproduce the full-validation
+counts above. Object admission remains zero candidates / zero revocations,
+parked validation remains three active / zero stale / zero invalid, all 179
+tooling tests pass, and the selected-object dry run reports no work. The
+authoritative worktree is clean apart from this additive record before its
+final evidence commit. No push, amend, rebase, history rewrite, or worktree
+removal is performed.
