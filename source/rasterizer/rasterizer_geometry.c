@@ -151,6 +151,13 @@ void rasterizer_geometry_byte_swap_vertices(
 	return;
 }
 
+boolean rasterizer_geometry_stripify(
+	struct triangle_buffer *triangle_buffer,
+	struct vertex_buffer *vertex_buffer)
+{
+	return TRUE;
+}
+
 void environment_vertex_compressed_get_point(
 	struct environment_vertex_compressed const *vertex,
 	real_point3d *point)
