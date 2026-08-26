@@ -102,18 +102,19 @@ void contrails_initialize(
 {
 	contrail_data = game_state_data_new("contrail", 256, 0x44);
 	contrail_point_data = game_state_data_new("contrail point", 1024, 0x38);
-	if (contrail_data)
-	{
-		if (contrail_point_data)
-			return;
-		contrail_data = NULL;
-	}
-	else if (contrail_point_data)
+	if (contrail_data && contrail_point_data)
+		return;
+
+	if (contrail_point_data)
 	{
 		contrail_point_data = NULL;
 		error(_error_immediate, "couldn't allocate contrail globals");
 		return;
 	}
+
+	if (contrail_data)
+		contrail_data = NULL;
+
 	error(_error_immediate, "couldn't allocate contrail globals");
 
 	return;
