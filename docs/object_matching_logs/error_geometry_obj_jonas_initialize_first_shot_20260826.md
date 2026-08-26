@@ -330,8 +330,68 @@ tracked-scope/deletion/diff checks are clean before adding this ledger.
 
 ## Clean committed-state replay
 
-Pending the implementation-and-ledger commit. This section will be filled
-only from a clean committed replay of the frozen source blob.
+Implementation-and-ledger commit
+`4c361d7f1d218775ebedcf194e25c856fb72d5dc` is clean and authored by
+Jonas Volman. Its committed source blob is exactly the frozen candidate blob
+`16d450c3a87a6184729acd2b91664902df90f8cb`; no C token or Git source blob
+changed after the first production compile.
+
+The final physical-format audit identified mixed line endings left by patch
+application. The source and new ledger were mechanically normalized to the
+repository-required CRLF convention before replay: the source now has 223
+CRLF and zero bare-LF endings, and the implementation-phase ledger had 339
+CRLF and zero bare-LF endings before this additive section. Git's normal text
+filter reproduced the same committed
+source and ledger blobs, the index remained content-clean, and the C token
+stream was unchanged. This was a house-format correction, not a candidate,
+codegen, or source-shape retry.
+
+A one-unit accepted-state snapshot was captured without building from that
+exact clean commit at
+`build/audit/error_geometry_initialize_first_shot_20260826/committed-manifest.json`.
+It is 696,503 bytes with SHA-256
+`d030471af94e680cdc4faa8c79c1ade520ad58b1d6e42d69295d539edc1f0c47`.
+
+The resolved `build/base/source/tool/error_geometry.obj` path was proved
+inside the isolated worktree. The exact 1,921-byte first object was preserved,
+exactly that literal path was removed, and absence was verified. The unchanged
+normal selected-object edge then reported exactly:
+
+```text
+[1/1] CL build\base\source\tool\error_geometry.obj
+error_geometry.c
+```
+
+The replay is preserved at
+`build/audit/error_geometry_initialize_first_shot_20260826/committed-replay.obj`,
+1,921 bytes, phase-specific raw SHA-256
+`1b858211ccaee070c9caf61462df41a62a5a72eea28da9a7d9cf5ba9e27eb83f`.
+Its raw object hash differs from the first artifact only in compiler-debug
+records. The admitted runtime evidence is identical.
+
+Direct hardened comparison again returns `all_equal: true` for both complete
+code sections: 64/7 and 32/3 padded bytes/relocations with their frozen
+hashes. Direct owner comparisons again return equality for `_data_00307850`
+(116/0), `_bss_004561b4` (4/0), and both string COMDATs (26/0 and 37/0),
+including every normalized hash. The clean manifest check has no failure or
+warning, no newly exact or changed-nonexact entry, and exactly
+`_error_geometry_dispose` and `_error_geometry_initialize` in `still_exact`.
+The selected-object Ninja dry run reports `ninja: no work to do`.
+
+The canonical report and semantic audit were regenerated directly from the
+replay object and reproduce the pre-commit hashes and counts exactly:
+
+- `build/report.json`: 1,574,220 bytes, SHA-256
+  `b8a1e632fcc38eb5f968404086d8c586b6ee7bd33548b0c0cf71e1e8e156bfb6`;
+- `build/semantic_report.json`: 2,974,776 bytes, SHA-256
+  `926f5872b4512ac9b51133b2e751907f996d0b1c2215a0e553866b802f1d01ca`.
+
+Progress reproduces 4,142 accepted campaign functions and 502,302 meaningful
+code / 1,835,208 data bytes. Admission remains zero candidates and zero
+revocations with the one inherited `shell_xbox` contradiction. Parks remain
+three active, zero stale, and zero invalid. The complete tooling suite again
+passes 179/179 tests. The implementation commit is otherwise clean, and this
+replay record is additive documentation only.
 
 ## Corrected cumulative-HEAD closure
 
