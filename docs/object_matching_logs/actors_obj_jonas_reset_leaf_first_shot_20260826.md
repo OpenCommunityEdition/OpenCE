@@ -318,3 +318,46 @@ union pun, inactive-union access, undefined signed overflow, volatile or
 `register` scheduling device, force-inline annotation, optimizer pragma or
 barrier, synthetic anchor, object-byte forcing, or compiler-control change.
 No push, amend, rebase, history rewrite, or worktree removal is performed.
+
+## Clean committed-state replay
+
+The implementation-and-ledger commit is
+`ff5313485ec116714bb2ae7cf594072de992ff47`, authored and committed by Jonas
+Volman. It retains source blob `598cbbad64526c85329bd759deaa9c7b20e2f151`
+and first-shot ledger blob `e99d32015e9ec979f1c7cf2f55d22a164d1a84d8`.
+The tracked worktree was clean before replay.
+
+A clean accepted-state regression snapshot was captured at that exact commit.
+The manifest is 1,351,284 bytes, SHA-256
+`2782efd9ded5077a097b2666c5f613aa13434455c7b54c49d05a161385649f86`.
+Its immediate check has no failures or warnings, empty `newly_exact` and
+`changed_nonexact` arrays, and all 24 strict functions under `still_exact`.
+
+The live first-shot object was preserved again as
+`pre-committed-replay.obj`: 8,671 bytes, SHA-256
+`6dc70ce36d9dcbe293fd5db5103f9c67fc72e9cc4ed55a0609da3469f6eb9840`.
+The resolved production path was proved inside the isolated worktree, the
+literal generated file was removed, absence was verified, and the selected-
+object dry run named exactly one CL edge. The unchanged committed source then
+rebuilt once through that ordinary edge. This was a reproducibility replay,
+not a candidate or tuning pass.
+
+The 8,671-byte committed replay object has phase-specific whole-file SHA-256
+`44993b4e1ef3c8d04b53cc96840e1c86cc17d0db1df0144006e789e667001401`.
+The raw hash differs because VC7 writes compile-time/debug metadata into the
+COFF container. Runtime evidence reproduces exactly: the hardened comparator
+passes all 24 functions; `_code_0002a150` retains its 16 padded bytes,
+normalized hash, and sole `DIR32` relocation; and the external data owner
+retains type 0, storage 2, flags `0xC0300040`, four `FF` bytes, and zero
+relocations.
+
+The accepted-state manifest check after rebuild again has no failures or
+warnings, empty `newly_exact` and `changed_nonexact` arrays, and all 24 strict
+functions under `still_exact`. Canonical report and semantic-report sizes,
+hashes, progress counts, and semantic counts reproduce the first-shot values.
+Admission reproduces zero candidates / zero revocations plus the inherited
+unrelated `shell_xbox` contradiction. Parks reproduce three active / zero
+stale / zero invalid. All 179 tooling tests and all 14 selected JSON parses
+pass again. The complete Halo-plus-libcmt graph and `all_source` dry run report
+no pending compile work, and the tracked worktree is otherwise clean before
+this additive replay record.
