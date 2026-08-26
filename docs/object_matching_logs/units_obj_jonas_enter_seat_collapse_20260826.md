@@ -129,5 +129,14 @@ the fold into `jonas/units-integration-20260824` and a cumulative replay
 there. No push, amend, rebase, or history rewrite.
 
 ## Actual committed-state forced replay
+Implementation commit `b34e67e6222f94abc20c2ab71b408e3f31c16c45` (author and
+committer Jonas Volman) was clean before replay. A fresh one-unit snapshot
+(`build/audit/units_enter_seat_impl_replay.json`) pins that commit; the
+generated object was containment-deleted and rebuilt by exactly one
+ordinary `[1/1] CL` edge; the immediate check returned `ok: true`, zero
+failures, zero warnings, 175 `still_exact` identities, and empty deltas;
+the final dry run reports `ninja: no work to do`. Only this ledger changes
+in the additive replay commit.
+
 
 (appended after the implementation commit)
