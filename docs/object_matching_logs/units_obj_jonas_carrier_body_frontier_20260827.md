@@ -204,10 +204,20 @@ problems in both trees.
   of locals missing, with every subsequent slot displaced.
 - **`_unit_preprocess_node_orientations`** (139 ev): frame slots displaced the
   same way.
-- **`_unit_died`** (113 ev, 608 vs 624): a real structural miss near `0xe1` —
-  January clears two unit flag bits (`and ecx,0xffffffee`), zeroes the dword at
-  `+0x1b8` and compares `[ebx+0x2a2]` against `NONE`, where our source emits an
-  assert path instead.
+- **`_unit_died`** (113 ev, 608 vs 624): decoded, and it is **block placement,
+  not a missing statement**. Our source's statement order is already January's;
+  the whole common tail (`flags &= ~(…)`, `control_flags = 0`, the
+  `current_weapon_index` guard) is byte-for-byte correct. The difference is that
+  January **sinks the `feigned` arm past the common tail**, giving
+  `[!feigned arm][common tail][feigned arm → jmp back to 0xe1]`, where we emit
+  the ordinary `[!feigned arm][jmp tail][feigned arm][common tail]`. The two
+  arms' bodies, the `match_assert(…, 5099, …)` expansion and the two
+  `SET_FLAG` tails at `0x1c0`/`0x1d0` are all identical between the builds.
+  Measured: **inverting the arms to `if (feigned) … else …` reaches the target's
+  624 bytes exactly but is wrong** — it moves the feigned arm inline and pushes
+  the first divergence from `0x5b` all the way back to `0x1b` (110 events).
+  Keep the current `if (!feigned)` order; the residual is cold-block sinking.
+  `feigned==FALSE` is inert.
 - **`_unit_update`** (243 ev with the carrier body): structural, lowest value.
 
 ## 9. Method note
