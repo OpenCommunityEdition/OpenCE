@@ -327,3 +327,41 @@ zero stale / zero invalid and the same 3,950-byte file/hash. All 179 tooling
 tests and all 14 selected JSON parses pass again. The complete Halo-plus-
 libcmt graph and `all_source` dry run report no pending compile work, and the
 tracked worktree is otherwise clean before this additive replay record.
+
+## Cumulative-HEAD closure
+
+The authoritative `jonas/units-integration-20260824` branch was cleanly
+fast-forwarded from `48e165be32b1234f16e2cbd82ec40cbfa8a3c156` through the
+implementation and isolated replay commits to
+`dad2972a13db8e0ad8769b9097f12320145eaa72`. The committed source/header
+blobs, function scope, and protected-path exclusion are unchanged.
+
+Before cumulative replay, the cumulative worktree retained its 3,422-byte
+predicate-free `ui_widget.obj`, SHA-256
+`0b7e92f921c20a07e69affa5ac17244ed65448faedd890a53f242fb03448cab5`.
+That artifact was preserved. Its resolved path was proved inside the
+cumulative worktree, the literal file was deleted, absence was verified, and
+the selected-object dry run named exactly one edge. The ordinary edge rebuilt
+the committed source once.
+
+The cumulative replay object is 3,611 bytes with phase-specific SHA-256
+`25b873e20aa936ca92e23b2f0836274bc87e6429155c8748cf5cf65af1283ccf`.
+Direct hardened comparison again proves all thirteen strict-table functions,
+their complete padded sections, normalized bytes, and ten ordered
+relocations. Runtime non-code and external-symbol inventories remain
+unchanged.
+
+The cumulative clean manifest is 2,005,299 bytes, SHA-256
+`bb91b0c05535d4e014a6f24275a8d6ef184a5e65729901cc22a60cef9efd4a74`.
+Its immediate check is clean with all thirteen functions under `still_exact`
+and empty failure, warning, `newly_exact`, and `changed_nonexact` lists.
+
+The cumulative canonical reports reproduce the isolated 1,574,703-byte
+`build/report.json` hash
+`fa911c1adc7726698881426674b28622e8ff020656a360d629262ee4af4781a0`
+and 2,985,068-byte `build/semantic_report.json` hash
+`d9ad2bb37d3e7ae99d4d5c3c2cda0d2e0706ba67df727b7d06903946ed779df3`.
+Every campaign, object, semantic, admission, park, test, JSON, source-policy,
+protected-path, no-deletion, and no-pending-source-work result above is
+reproduced at the cumulative head. No push, amend, rebase, history rewrite,
+or worktree removal occurs.
