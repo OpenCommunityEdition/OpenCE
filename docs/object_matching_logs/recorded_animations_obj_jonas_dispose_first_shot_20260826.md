@@ -324,3 +324,51 @@ three active / zero stale / zero invalid and the same 3,950-byte file/hash.
 All 179 tooling tests and all 14 selected JSON parses pass again. The complete
 Halo-plus-libcmt graph and `all_source` dry run report no pending work, and the
 tracked worktree is otherwise clean before this additive replay record.
+
+## Corrected cumulative-HEAD closure
+
+The authoritative `jonas/units-integration-20260824` branch was cleanly
+fast-forwarded from `278d55f9e57f8ccac6d5ced80c22fa29db688f79` through the
+symbol preflight, implementation commit, and isolated replay record
+`724376b444c87c289bdec60df30659a652127da8`. The committed source blob,
+public-header state, three-path tracked scope, and protected-path exclusion are
+unchanged.
+
+Before corrected replay, the cumulative worktree held its 845-byte
+dispose-free `recorded_animations.obj`, SHA-256
+`5b4ef51c2104670eb51c37ffc6adcd96f60277797d33470d25152b62e0f83578`.
+That artifact was preserved. Its resolved path was proved identical to the
+expected absolute path and inside the cumulative worktree. The literal file
+was deleted, absence was verified, and the selected-object dry run named one
+edge. The ordinary edge rebuilt the unchanged committed source exactly once.
+
+The corrected cumulative object is 1,429 bytes with phase-specific SHA-256
+`5cdd9c89438c062086dd56ac44abb4ab6d3a5ba13d30845f73533a1a241179f9`.
+After the fast-forwarded symbol-label change regenerated the split target,
+direct hardened comparison again proves the two strict-table functions, their
+complete padded sections, all six ordered relocations, and the exact 46-byte
+path COMDAT. The runtime-data and target-owned-storage inventories remain
+uncredited and unchanged.
+
+The cumulative clean manifest is 292,054 bytes with SHA-256
+`855f096eab3a7a90db68594d7056d124030956ddafde70f5f8017e4d6b07457b`.
+Its immediate check is clean with both functions under `still_exact` and empty
+failure, warning, `newly_exact`, and `changed_nonexact` lists.
+
+The cumulative canonical report reproduces the 1,574,896-byte SHA-256
+`0a750e16200e329ee8196686c843b3d59338719528deb8f00b72d28880e1f2f5`;
+the semantic report reproduces the 2,987,040-byte SHA-256
+`0fd25c994525fa6d318a805cffe17ebb1e3c1cf431354e0e7a6e412e99799298`.
+Every object, function, code-byte, data-byte, and semantic count above is
+reproduced at the cumulative head. Admission remains zero candidates / zero
+revocations plus the unrelated inherited `shell_xbox` contradiction and the
+same 384-byte file/hash. Parks remain three active / zero stale / zero invalid
+and reproduce the 3,950-byte file/hash. All 179 tooling tests and all 14
+selected JSON parses pass. The complete Halo-plus-libcmt graph and
+`all_source` dry run report no pending work.
+
+The cumulative-base diff is exactly `config/symbols.json`,
+`source/cutscene/recorded_animations.c`, and this ledger, with no deletion,
+unexpected path, `source/units/**` intersection, or protected-path
+intersection. No push, amend, rebase, history rewrite, or worktree removal is
+performed.
