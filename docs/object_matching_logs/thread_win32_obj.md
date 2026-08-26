@@ -181,5 +181,31 @@ source-policy scan, and the protected-path audit pass; none of the eight Units
 package protected paths is changed. No push, history rewrite, or protected
 Units edit is part of this closeout.
 
-The clean committed-state replay and cumulative fast-forward are recorded in
-the final section after integration.
+## Clean committed-state replay
+
+The implementation and admission tip is
+`76d2f34a73855fb955c87b473f6d0e64b85f5fc8`. A clean accepted-state
+manifest was captured there: 207,627 bytes, SHA-256
+`2136be218ed874d257799c03292d8ef482f48ec7cadb89180c35a8029927d2e2`.
+It records all nine functions as `STRICT_EXACT`, the seven string sections as
+`STRICT_EXACT`, and the BSS as the narrowly identified `SEMANTIC_EXACT`
+physical-representation case.
+
+The pre-replay live object was preserved at 4,929 bytes with SHA-256
+`49629923ad41147690903cacea302b55a36fb2dbb52fbde53b0df415daa5e40`.
+Its resolved path and hash were checked before deletion. A Ninja dry run then
+showed exactly one production compiler edge for `thread_win32.obj`; the clean
+committed source was rebuilt once and preserved at 4,929 bytes with phase-
+specific SHA-256
+`baa1df51376e755598a2a358fdfa82740d3b89ef2fbe4005f906de7e9a94a657`.
+
+The whole-TU manifest replay has no failures or warnings, empty
+`newly_exact` and `changed_nonexact` arrays, and all nine functions under
+`still_exact`. Direct hardened comparison again proves every function in the
+table, the exact BSS logical hash and flags, and the normalized BSS symbol
+inventory: external `_bss_0031c728` at offset zero plus undefined external
+`_bss_0031cd30`. Regenerated ordinary and semantic reports reproduce the
+isolated sizes, hashes, progress counts, and zero-error semantic counts above.
+
+This replay-record update changes documentation only. The cumulative
+fast-forward and same-path replay are recorded after integration.
