@@ -200,6 +200,41 @@ newly exact, or changed-nonexact entries, and all 6/6 functions are in
 `still_exact`. Direct hardened comparison again proves all six emitted
 functions strict exact. Full Halo and libcmt dry-run closure reports no work.
 
+## Corrected cumulative-HEAD closure
+
+The isolated commits integrate on `jonas/units-integration-20260824` as
+implementation commit `ecf73592` and replay-ledger commit `1adee65b`. At
+corrected HEAD `1adee65b508cdbdee577219f40c5ecd67d51bed9`, the resolved
+cumulative `contrails.obj` path was verified inside the worktree, literally
+deleted, and rebuilt through the one expected XDK edge.
+
+The first corrected-HEAD replay object is 2,919 bytes with raw SHA-256
+`c691f5d81498be25ac1516405030461371a35ae9d3adc7a33050ee80a5c2367a`.
+After reports were regenerated, a clean corrected-HEAD manifest was written as
+`build/audit/contrails_init_cfg_corrected_head_20260825.json`, 294,398 bytes,
+SHA-256
+`abd730449d2cbd9b4c1dc52c3fd1c24a78fc06ec0b447ba7345d6080c22a12e6`.
+The object was then literally deleted and rebuilt a second time. That replay
+is 2,919 bytes with raw SHA-256
+`ff716ea43acd9b2bb64fb0e77833f218a54cd81ed70cacabfb2b1f9def4529a3`.
+The two raw objects differ only at COFF header offset `+4`, a compile-timestamp
+byte.
+
+The corrected-manifest check is fully clean after the second rebuild: no
+failures, warnings, newly exact, or changed-nonexact entries, with all 6/6
+functions in `still_exact`. Direct hardened comparison again proves the six
+function sections and all twenty-five relocations exact. Unlike the isolated
+LF worktree, the normal cumulative CRLF checkout reproduces the baseline
+183-byte `.debug$S` section; the pre-wave gate therefore has no failures and
+only the expected `NEWLY_EXACT` review warning.
+
+Final cumulative closure regenerates csplit, ordinary and semantic reports,
+then confirms the same +1 function / +109 meaningful-byte gain. Full Halo and
+libcmt dry-run closure reports no work; admission remains zero candidates and
+zero revocations; parks remain 3 active / 0 stale / 0 invalid; and the complete
+tooling suite remains 179/179 passing. The cumulative worktree is otherwise
+clean.
+
 ## Do-not-repeat and residual disposition
 
 Do not retry nested/flattened Boolean-equivalent spellings of the accepted
