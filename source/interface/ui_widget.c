@@ -629,6 +629,7 @@ struct widget_instance;
 
 #include "cseries.h"
 #include "errors.h"
+#include "event_manager.h"
 #include "ui_widget.h"
 
 /* ---------- constants */
@@ -718,6 +719,17 @@ extern struct ui_widget_bss_prefix bss_00454240;
 short dashboard_abort_error = NONE;
 
 /* ---------- public code */
+
+boolean event_controller_index_compatible_with_widget(
+	struct event_record const *event,
+	struct widget_instance const *widget)
+{
+	short widget_controller_index;
+
+	widget_controller_index = widget->local_player_index;
+	return widget_controller_index == NONE ||
+		widget_controller_index == event->controller_index;
+}
 
 void ui_widgets_safe_to_load(
 	boolean safe)

@@ -21,6 +21,9 @@ header included in hcex build.
 
 /* ---------- prototypes/UI_WIDGET.C */
 
+boolean event_controller_index_compatible_with_widget(
+	struct event_record const *event,
+	struct widget_instance const *widget);
 void set_ui_plasma_effect_color(real a, real r, real g, real b);
 void ui_widgets_initialize(void);
 void ui_widgets_safe_to_load(boolean safe);
