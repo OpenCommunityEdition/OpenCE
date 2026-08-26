@@ -249,8 +249,36 @@ follow-up change.
 
 ## Corrected cumulative-HEAD closure
 
-Pending integration and literal corrected-HEAD replay on
-`jonas/units-integration-20260824`.
+The isolated implementation and replay-ledger commits were cherry-picked as
+`eeddf92d` and `427bc7a8`.  The resulting corrected implementation/replay HEAD
+was `427bc7a86ed32d85fdc14ddad2919c641601ba98`; the source blob remained
+`12362d2a85bdacf09ce7a108a2302eab7512e832`.
+
+From that clean cumulative HEAD, `object_lights.obj` was literally deleted and
+rebuilt through its single production edge.  The first corrected object was
+3,929 bytes with SHA-256
+`d6dceb8d0b274cdd2711ee35534284b5fdf1e616fad6dec68829dec6f2c16e74`.
+The corrected manifest,
+`build/audit/object_lights_helper_pair_corrected_head_20260825.json`, was
+846,079 bytes with SHA-256
+`8bafe1c0bb99d8e4fb24c02feac5f78ed95b0473aadacb35da377efdd45fb9a1`.
+
+A second literal delete/rebuild produced a 3,929-byte replay object with
+SHA-256
+`b9601e3556446f8d342694d1e7d020fd56cc2ac7f23268e1177586f244767821`.
+The two corrected raw objects differed only at COFF timestamp offset `+0x4`.
+The corrected manifest check was fully clean and kept all nine exact functions:
+the accepted delta remained two functions, 48 meaningful bytes, 64 padded
+bytes, and four relocations, with no changed non-exact function or runtime-data
+regression.
+
+Final report generation accepted 4,163 semantic-exact functions with zero unit
+errors.  Campaign progress was 375/833 objects, 4,137/11,060 functions, and
+502,147/2,198,102 code bytes; Halo progress was 273/468 objects,
+3,970/7,574 functions, and 489,233/1,770,166 code bytes.  Admission remained
+zero candidates and zero revocations, parks remained three active / zero stale
+/ zero invalid, both Halo and libcmt reported no work, and all 179 tooling tests
+passed.  The cumulative worktree was otherwise clean.
 
 The approval-gated Units package remains frozen. This ledger does not
 constitute the required exact approval phrase and does not authorize any edit
