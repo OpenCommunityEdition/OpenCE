@@ -287,3 +287,43 @@ assembly, volatile/register spelling, compiler control, pointer/integer pun,
 raw-offset cast, undefined behavior, synthetic anchor, byte forcing, or
 storage definition. No push, amend, rebase, history rewrite, or worktree
 removal is performed.
+
+## Clean committed-state replay
+
+The implementation-and-ledger commit is
+`d9a5951a39458ca8378aa9c42987534292e0825e`, authored and committed by
+Jonas Volman. It retains C blob
+`0ed3bc65babe900e3e8c03790092a747e3c721f5` and header blob
+`96ed581a1155b92e155bd70c0e851d860124db06`. The tracked worktree was clean
+before replay.
+
+The post-validation object was preserved as `pre-committed-replay.obj`:
+3,621 bytes, SHA-256
+`588cef308b20b9144a50e9bc9c1f9cfafa9971e799fa5b69218fec1d494f4609`.
+The resolved live path was again proved inside the isolated worktree, that
+literal file was deleted, absence was verified, and the selected-object dry
+run named exactly one edge. The unchanged committed source then rebuilt once
+through the ordinary one-object action. This was a reproducibility replay,
+not a candidate or tuning pass.
+
+The 3,621-byte committed replay object has phase-specific whole-file SHA-256
+`cd38d4a9c831bb6fcb1bbd9b9ca587437e0971b825ca7b7ff8cc77c3487bb6bc`.
+Direct hardened comparison again proves all thirteen complete padded
+functions, all ten ordered relocations, and every normalized hash in the
+strict table. The runtime non-code and external-symbol inventories remain
+unchanged.
+
+The clean accepted-state manifest is 2,005,299 bytes, SHA-256
+`568c3a8b7fe5f63dc7cd0ea960c1f3d140e9e1a8ddcc45a54d116168c0a0045f`.
+Its immediate check has no failures or warnings, empty `newly_exact` and
+`changed_nonexact` arrays, and exactly the thirteen strict-table functions
+under `still_exact`.
+
+Canonical report and semantic-report sizes, hashes, progress counts, and
+semantic counts reproduce the first-shot values. Admission reproduces zero
+candidates / zero revocations plus the inherited unrelated `shell_xbox`
+contradiction and the same 384-byte file/hash. Parks reproduce three active /
+zero stale / zero invalid and the same 3,950-byte file/hash. All 179 tooling
+tests and all 14 selected JSON parses pass again. The complete Halo-plus-
+libcmt graph and `all_source` dry run report no pending compile work, and the
+tracked worktree is otherwise clean before this additive replay record.
