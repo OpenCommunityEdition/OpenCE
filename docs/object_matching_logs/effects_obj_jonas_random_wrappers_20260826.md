@@ -255,3 +255,84 @@ admission, complete Halo/libcmt graph checks, and the corrected replay are
 deferred to the cumulative-HEAD closure so the older isolated worktree cannot
 compile unrelated historical outputs. This section is the only tracked
 post-implementation change. Units remains frozen and no push is performed.
+
+## Corrected cumulative-HEAD closure
+
+The authoritative cumulative branch was fast-forwarded from
+`b32677b1d358a95f770a2e7c10753afc133bb8f5` through the isolated
+implementation and replay-ledger commits to
+`5b43703466edc7b206ae07dac9e32bc20e57805f`. The implementation source blob
+remains `bdb54a97a223726bfd274ccf9c85b81a32789a8c`; integration changed only
+`source/effects/effects.c` and this ledger. No protected source, shared header,
+storage declaration, configuration, semantic ledger, parked manifest, or
+object-status file changed.
+
+From that clean corrected HEAD, the resolved cumulative
+`build/base/source/effects/effects.obj` was verified inside the cumulative
+worktree and literally deleted. Its absence was confirmed, the Ninja dry run
+exposed exactly one expected compiler edge, and the normal rebuild reported
+exactly `[1/1] CL build\base\source\effects\effects.obj`. The preserved
+corrected replay is
+`build/audit/effects_direction_corrected_head_replay_20260826.obj`, 2,019
+bytes, raw SHA-256
+`079585dc360f2ba5955add6936b2de3fcda365b4d11700da3c5e33814b880071`.
+
+Direct hardened comparison against January again reports `all_equal: true`
+for `_local_random_direction3d` and all four inherited sentinels. The rejected
+real wrapper and both inline aliases remain absent, and the corrected object
+still owns no runtime non-code section or COMMON symbol. The accepted delta is
+exactly one function, 23 meaningful bytes, 32 padded bytes, and two
+relocations, with no changed non-exact function and no data gain or regression.
+
+The isolated and cumulative raw objects differ only in root-sensitive debug
+metadata and their COFF timestamps. VC7's `.debug$S` record embeds the
+absolute output-object path: it is 186 bytes in
+`effects-lifecycle-wave-20260820` and 181 bytes in
+`units-integration-20260824`, exactly accounting for the five-byte object-size
+difference. A cross-worktree manifest check reports only this `.debug$S`
+record. All five accepted functions are `still_exact`,
+`changed_nonexact` is empty, and every modeled production code and runtime
+non-code record is stable.
+
+The corrected clean selected-unit manifest is
+`build/audit/effects_direction_corrected_head_manifest_20260826.json`,
+683,674 bytes, SHA-256
+`822f0da8e5f44df61715f316d5d04b0b935fab6c7b86241774f8da0912430df8`.
+Its no-build self-check has no failures or warnings, no newly exact or changed
+non-exact entry, and retains all five functions in `still_exact`.
+
+Regenerated corrected artifacts are:
+
+- `effects_direction_corrected_head_report_20260826.json`: 1,573,846 bytes,
+  SHA-256
+  `d62a21364aa7cfc351aa135335cdc7d8a6fd039b89c618fe5ef198658909c7fd`;
+- `effects_direction_corrected_head_semantic_20260826.json`: 2,973,430 bytes,
+  SHA-256
+  `feb1b5a8133f197d8de218429cf5879c65ef4aa68f55e5ae2f403724a8eff787`;
+- `effects_direction_corrected_head_admission_20260826.json`: 384 bytes,
+  SHA-256
+  `f0aa45c22cc604fb74abc388b06dd79a27e7a0b498a5d28837a9e785680c9a36`;
+- `effects_direction_corrected_head_parked_20260826.json`: 3,950 bytes,
+  SHA-256
+  `cfac03aea5be607c19a6a40bcdbc1164e71ffb0179602af4bd37b3fd50e26d1d`.
+
+The hardened semantic audit scans 470 units, evaluates 4,247 functions,
+finds 4,105 semantic-exact and 114 hidden-exact functions, accepts 4,166 exact
+functions, and reports zero unit errors. `effects.obj` is 5/41 exact with 109
+of 11,332 meaningful code bytes and no data credit.
+
+Campaign progress is 375/833 objects, 4,140/11,060 exact functions,
+502,223/2,198,102 meaningful code bytes, and 1,835,088/4,176,062 matched data
+bytes. Halo progress is 273/468 objects, 3,973/7,574 exact functions,
+489,309/1,770,166 meaningful code bytes, and 1,829,896/3,923,451 matched data
+bytes.
+
+Admission remains zero candidates and zero revocations; only the inherited
+`source/shell/shell_xbox` completion-label contradiction remains. Parks remain
+three active / zero stale / zero invalid. The selected object and complete
+`halobetacache_build` and `libcmt_build` dry runs and normal invocations all
+report no work, and all 179 tooling tests pass.
+
+The approval-gated Units package remains frozen. This closure does not
+constitute its required exact approval phrase and authorizes no edit to Units
+or its protected neighbors. No push is performed.
