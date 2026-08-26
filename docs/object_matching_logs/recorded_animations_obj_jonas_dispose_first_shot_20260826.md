@@ -272,3 +272,55 @@ deletions. The complete `source/units/**` tree and all eight protected paths
 have zero intersection with the wave. `git diff --check` and the source-policy
 scan pass. No push, amend, rebase, history rewrite, or worktree removal is
 performed.
+
+## Clean committed-state replay
+
+The implementation-and-ledger commit is
+`8abd4eada92f3b56a9f476418a5e45ee0e95b0dc`, authored and committed by
+Jonas Volman. It follows the separate authenticated-symbol preflight commit
+`1b41ef13523486ea09ce04500ff76b574ed00d41`, retains C blob
+`cf840f9dfb7a70c5b80a1cd6dd4534b778bb8898`, leaves the public header
+unchanged, and was tracked-clean before replay.
+
+A fresh accepted-state manifest was captured at that clean commit. It is
+292,054 bytes with SHA-256
+`d3c335aa7622a193ed8d913499d656bae26a32c5f3f4958d208a96fb1b592717`.
+Its immediate check has no failures or warnings, empty `newly_exact` and
+`changed_nonexact` arrays, and exactly the two strict-table functions under
+`still_exact`.
+
+The post-validation object was preserved as `pre-committed-replay.obj`:
+1,439 bytes, SHA-256
+`e7c394f65485c8c0d850604b5cb1ce4444d36b77628bb0c81b7aebab3daf0863`.
+The resolved production object path was proved identical to the expected
+absolute path and inside the isolated worktree. That literal file was deleted,
+and absence was verified. The selected-object dry run named one edge, and the
+unchanged committed source then rebuilt through exactly one ordinary action:
+
+```text
+[1/1] CL build\base\source\cutscene\recorded_animations.obj
+recorded_animations.c
+```
+
+This is a reproducibility replay, not a candidate or tuning pass. The 1,439-
+byte committed replay object has phase-specific SHA-256
+`20cbac9f51003a72f95bf49fdd38099d2d4a87bfaa78ebf2fe492271915e9a6b`.
+Direct hardened comparison again proves both complete padded functions, their
+six ordered relocations, and the exact path COMDAT with every normalized hash
+in the strict tables above. The differing whole-file COFF hash is confined to
+phase-specific compiler/debug metadata and changes no admitted evidence.
+
+The accepted-state manifest check after replay again has no failures or
+warnings. It retains both functions under `still_exact` and empty
+`newly_exact` and `changed_nonexact` arrays. The label-normalized split target
+is 12,543 bytes with SHA-256
+`e21a14fcbba6f5ccbcad6dc97e8d195c29dba6113ef543e18aebbddcf3f8a5a9`.
+
+The canonical report and semantic-report sizes, hashes, object/function/byte
+counts, and semantic counts reproduce the first-shot values. Admission
+reproduces zero candidates / zero revocations plus the inherited unrelated
+`shell_xbox` contradiction and the same 384-byte file/hash. Parks reproduce
+three active / zero stale / zero invalid and the same 3,950-byte file/hash.
+All 179 tooling tests and all 14 selected JSON parses pass again. The complete
+Halo-plus-libcmt graph and `all_source` dry run report no pending work, and the
+tracked worktree is otherwise clean before this additive replay record.
