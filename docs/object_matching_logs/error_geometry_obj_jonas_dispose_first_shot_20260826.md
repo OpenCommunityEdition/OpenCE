@@ -214,3 +214,94 @@ selected for the implementation commit. No header, configuration, semantic
 ledger, parked record, completion label, protected source, Units source, or
 tracked deletion is changed. No push, amend, rebase, history rewrite, or
 worktree removal is performed.
+
+## Clean committed-state replay
+
+Implementation-and-ledger commit
+`8084c8774fbd9fc30a2b2fd0f4bfdaf75b407ddc` is clean and authored by
+Jonas Volman. Its committed source blob is the frozen candidate blob
+`74e919f62df07122dfed4593b452d55bc114d546`; no source byte was changed
+after the first production compile.
+
+The current no-build report and semantic audit were generated directly from
+the accepted object graph. A one-unit whole-TU snapshot was then captured
+from that exact clean commit at
+`build/audit/error_geometry_first_shot_20260826/committed-manifest.json`.
+It is 679,299 bytes with SHA-256
+`1b844f053686078aa617117c68839b1651b1f3a29ffddd6c872cf843e219d695`.
+
+The resolved
+`build/base/source/tool/error_geometry.obj` path was proved inside the
+isolated worktree. Exactly that file was deleted with literal-path semantics,
+and absence was verified. The unchanged normal edge then reported exactly:
+
+```text
+[1/1] CL build\base\source\tool\error_geometry.obj
+error_geometry.c
+```
+
+The replay is preserved at
+`build/audit/error_geometry_first_shot_20260826/committed-replay.obj`, 887
+bytes, phase-specific raw SHA-256
+`1f08d830da9e2e03b0d397cf897c74e2f09cefb8c2655916c53cc8b61003bd22`.
+Its raw object hash differs from the first candidate because VC7 compiler
+debug records are phase-specific. The runtime evidence does not differ.
+
+Direct hardened comparison again returns `all_equal: true` for the complete
+32-byte function section and all three relocations. The resolved data
+comparison again returns exact equality for the four-byte BSS. The clean
+one-unit manifest check has no failure or warning, no newly exact or changed
+nonexact entry, and exactly `_error_geometry_dispose` in `still_exact`. The
+selected-object Ninja dry run reports `ninja: no work to do`.
+
+## Full validation
+
+The complete `halobetacache_build` plus `libcmt_build` graph completed all
+568 required actions with exit zero. The already-current error-geometry
+replay was not recompiled during that graph validation.
+
+The copied worktree's Ninja log made the `progress` phony target consider the
+already present `csplit.exe` and `objdiff-cli.exe` download edges stale. The
+attempted refresh was denied by network policy before report generation. The
+authenticated local binaries were then invoked directly with the exact rule
+commands: objdiff report generation, `tools.audit_semantic_matches`, and
+`configure.py progress`. No download, source change, split regeneration, or
+object rebuild was required.
+
+The final canonical report is 1,574,133 bytes with SHA-256
+`addfef1785f72cf37544f918b2baa642de1e7c4c4f3128a71f7cf4e9c12c862a`.
+It records 1/17 error-geometry functions, 29/6,455 meaningful code bytes, and
+4/1,528 data bytes. The semantic ledger independently accepts the function
+from both `objdiff` and `semantic-coff` evidence.
+
+The strict semantic audit reports 470 units, 4,248 functions evaluated,
+4,106 semantic exact, 114 hidden exact / 64,705 hidden code bytes, 4,167
+accepted exact, 36 ordinary-only, 35 structurally accepted, one rejected,
+and zero unit errors. Its generated report is 2,974,100 bytes with SHA-256
+`f47167943caa27ae2262a8bef6f7cc2021ced5aa2b6979d2813823d93aba1e29`.
+
+Final campaign progress is:
+
+- all categories: 375/833 matched objects, 4,141/11,060 functions,
+  502,252/2,198,102 meaningful code bytes, and 1,835,092/4,176,062 data
+  bytes;
+- Halo: 273/468 matched objects, 3,974/7,574 functions,
+  489,338/1,770,166 meaningful code bytes, and 1,829,900/3,923,451 data
+  bytes;
+- libcmt: 102/212 matched objects, 167/476 functions, 12,914/55,015 code
+  bytes, and 5,192/8,637 data bytes.
+
+The remaining validation gates pass:
+
+- object-admission audit: zero candidates and zero revocations; only the
+  inherited unrelated `source/shell/shell_xbox` completion-label
+  contradiction remains;
+- parked-function validation: three active, zero stale, zero invalid;
+- complete tooling suite: 179/179 tests pass;
+- all configuration, report, semantic, and parked JSON files parse;
+- `git diff --check`, tracked-path scope, deleted-path, protected-source,
+  Units/shared-header, storage-owner, and banned-construct reviews are clean.
+
+This replay and validation record is additive documentation only. The source
+blob remains the implementation commit's blob, no configuration or semantic
+exception is added, Units remains frozen, and no push is performed.
