@@ -283,3 +283,21 @@ void lights_disconnect_from_structure_bsp(
 }
 
 /* ---------- private code */
+
+long code_00129100(
+	long *reference_index,
+	short cluster_index)
+{
+	return cluster_partition_get_first_datum(
+		&light_cluster_partition,
+		reference_index,
+		cluster_index);
+}
+
+long code_00129120(
+	long *reference_index)
+{
+	return cluster_partition_get_next_datum(
+		&light_cluster_partition,
+		reference_index);
+}
