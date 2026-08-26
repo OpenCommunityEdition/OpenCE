@@ -92,9 +92,9 @@ struct thread_reference *code_0006fc30(
 struct mutex_reference *code_0006fc60(
 	void);
 boolean create_thread(
-	long priority_flags,
+	word flags,
 	LPTHREAD_START_ROUTINE function,
-	void *parameter,
+	void *function_input,
 	struct thread_reference **thread_reference);
 boolean thread_has_exited(
 	struct thread_reference *thread_reference);
@@ -118,53 +118,51 @@ extern struct mutex_reference bss_0031cd30;
 /* ---------- public code */
 
 boolean create_thread(
-	long priority_flags,
+	word flags,
 	LPTHREAD_START_ROUTINE function,
-	void *parameter,
+	void *function_input,
 	struct thread_reference **thread_reference)
 {
+	boolean success = FALSE;
 	struct thread_reference *reference;
-	long priority;
+	unsigned long unused_thread_id;
 
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\thread_win32.c", 0x6B, function);
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\thread_win32.c", 0x6C, thread_reference);
 
 	reference = code_0006fc30();
-
-	if (reference)
+	if (reference && (reference->handle = CreateThread(
+		NULL,
+		0x4000,
+		function,
+		function_input,
+		CREATE_SUSPENDED,
+		&unused_thread_id))!=NULL)
 	{
-		reference->handle = CreateThread(
-			NULL,
-			0x4000,
-			function,
-			parameter,
-			CREATE_SUSPENDED,
-			(unsigned long *)&function);
-		if (reference->handle)
+		long priority = THREAD_PRIORITY_NORMAL;
+
+		if (TEST_FLAG(flags, 1))
 		{
-			priority = 0;
-			if (TEST_FLAG(priority_flags, 1))
-				priority = THREAD_PRIORITY_BELOW_NORMAL;
-			else if (TEST_FLAG(priority_flags, 2))
-				priority = THREAD_PRIORITY_ABOVE_NORMAL;
+			priority = THREAD_PRIORITY_BELOW_NORMAL;
+		}
+		else if (TEST_FLAG(flags, 2))
+		{
+			priority = THREAD_PRIORITY_ABOVE_NORMAL;
+		}
 
-			if (SetThreadPriority(reference->handle, priority) &&
-				ResumeThread(reference->handle) != (unsigned long)-1)
-			{
-				*thread_reference = reference;
-				return TRUE;
-			}
-
+		if (SetThreadPriority(reference->handle, priority) && ResumeThread(reference->handle)!=-1)
+		{
+			success = TRUE;
+		}
+		else
+		{
 			CloseHandle(reference->handle);
-			/* Original bug: the reserved slot remains marked in use here. A
-			   nonmatching robustness fix would also clear reference->in_use. */
-			*thread_reference = NULL;
-			return FALSE;
+			reference = NULL;
 		}
 	}
 
 	*thread_reference = reference;
-	return FALSE;
+	return success;
 }
 
 boolean thread_has_exited(
