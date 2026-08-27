@@ -89,6 +89,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "objects/objects.h"
 
 /* ---------- constants */
 
@@ -106,8 +107,6 @@ long object_list_get_first(
 long object_list_get_next(
 	long object_list_index,
 	long *reference_index);
-void object_predict(
-	long object_index);
 boolean hs_trigger_volume_test_objects(
 	short trigger_volume_index,
 	long object_list_index,
@@ -181,6 +180,23 @@ void hs_objects_predict(
 		object_predict(object_index);
 		object_index = object_list_get_next(object_list_index, &reference_index);
 	}
+
+	return;
+}
+
+void hs_objects_delete_by_definition(
+	long definition_index)
+{
+	struct object_iterator iterator;
+	struct object_datum *object;
+
+	object_iterator_new(&iterator, _object_mask_all, 0);
+	while ((object = object_iterator_next(&iterator)) != NULL)
+	{
+		if (object->definition_index == definition_index)
+			object_delete(iterator.index);
+	}
+	objects_memory_compact();
 
 	return;
 }
