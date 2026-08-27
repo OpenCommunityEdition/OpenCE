@@ -92,12 +92,22 @@ symbols in this file:
 #include "objects/damage.h"
 #include "objects/objects.h"
 #include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
 
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct scenario_cutscene_flag
+{
+	long runtime_unused;
+	char name[TAG_STRING_LENGTH];
+	real_point3d position;
+	real_euler_angles2d facing;
+	byte unused[0x24];
+};
 
 /* ---------- prototypes */
 
@@ -119,6 +129,9 @@ void terminal_printf(
 	union real_argb_color const *color,
 	char const *format,
 	...);
+void area_of_effect_cause_damage(
+	struct damage_data *damage,
+	long unlucky_object_index);
 
 /* ---------- globals */
 
@@ -219,6 +232,25 @@ void hs_objects_delete_by_definition(
 			object_delete(iterator.index);
 	}
 	objects_memory_compact();
+
+	return;
+}
+
+void hs_damage_new(
+	long damage_effect_index,
+	short cutscene_flag_index)
+{
+	struct scenario_cutscene_flag *cutscene_flag;
+	struct damage_data damage;
+
+	cutscene_flag = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->cutscene_flags,
+		cutscene_flag_index,
+		struct scenario_cutscene_flag);
+	damage_data_new(&damage, damage_effect_index);
+	damage.origin = damage.epicenter = cutscene_flag->position;
+	scenario_location_from_point(&damage.location, &cutscene_flag->position);
+	area_of_effect_cause_damage(&damage, NONE);
 
 	return;
 }
