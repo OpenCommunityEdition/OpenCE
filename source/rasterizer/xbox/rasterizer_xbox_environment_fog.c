@@ -172,6 +172,20 @@ void rasterizer_environment_fog_screen_window_begin(
 	return;
 }
 
+void rasterizer_environment_fog_screen_dispose(
+	void)
+{
+	if (rasterizer_environment_fog_screen_globals.opaque_model_submit_parameters)
+	{
+		debug_free(
+			rasterizer_environment_fog_screen_globals.opaque_model_submit_parameters,
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment_fog.c",
+			0x117);
+	}
+
+	return;
+}
+
 void rasterizer_environment_fog_screen_model_end(
 	void)
 {
