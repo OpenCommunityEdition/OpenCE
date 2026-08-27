@@ -66,10 +66,12 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define local_random_range local_random_range_inline
 #include "effects/contrails.h"
 
 #include "cseries/errors.h"
 #include "saved games/game_state.h"
+#undef local_random_range
 
 /* ---------- constants */
 
@@ -153,6 +155,16 @@ void contrails_disconnect_from_structure_bsp(
 	void)
 {
 	return;
+}
+
+short local_random_range(
+	short lower_bound,
+	short upper_bound)
+{
+	return seed_random_range(
+		get_global_local_random_seed_address(),
+		lower_bound,
+		upper_bound);
 }
 
 /* ---------- private code */
