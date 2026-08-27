@@ -93,9 +93,12 @@ symbols in this file:
 #include "objects/damage.h"
 #include "objects/objects.h"
 #include "effects/effects.h"
+#include "game/player_control.h"
+#include "game/players.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "sound/sound_definitions.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
@@ -176,6 +179,12 @@ long effect_new_attached_from_markers(
 	real scale_b,
 	real_rgb_color const *color,
 	struct effect_vector_field const *impulse_field);
+boolean player_teleport(
+	long player_index,
+	long source_unit_index,
+	real_point3d const *position);
+void unit_exit_seat_end(
+	long unit_index);
 
 /* ---------- globals */
 
@@ -504,10 +513,170 @@ boolean hs_trigger_volume_test_objects_any(
 		FALSE);
 }
 
+void hs_object_create_anew(
+	short object_name_index)
+{
+	if (object_name_index != NONE)
+	{
+		long object_index;
+
+		object_index = object_index_from_name_index(object_name_index);
+		if (object_index != NONE)
+			hs_object_destroy(object_index);
+
+		hs_object_create(object_name_index);
+	}
+
+	return;
+}
+
 void hs_object_create_anew_containing(
 	char const *name_string)
 {
 	code_000b8eb0(name_string, hs_object_create_anew);
+
+	return;
+}
+
+static void code_000b9500(
+	long object_index,
+	short cutscene_flag_index,
+	boolean set_position,
+	boolean set_facing)
+{
+	if (object_index != NONE)
+	{
+		struct object_datum *object;
+		struct scenario_cutscene_flag *flag;
+		struct player_datum *player;
+		struct unit_datum *unit;
+		real_vector3d forward;
+
+		object = object_get(object_index);
+		flag = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->cutscene_flags,
+			cutscene_flag_index,
+			struct scenario_cutscene_flag);
+		player = NULL;
+
+		match_assert_valid_real_point3d(
+			"c:\\halo\\SOURCE\\hs\\hs_library_external.c",
+			0x1CC,
+			&flag->position);
+
+		if (set_position && object->object.parent_object_index != NONE)
+		{
+			unit = unit_try_and_get(object_index);
+			if (unit)
+				unit_exit_seat_end(object_index);
+			else
+				object_detach(object_index);
+		}
+
+		vector3d_from_euler_angles2d(&forward, &flag->facing);
+		match_assert_valid_real_normal3d(
+			"c:\\halo\\SOURCE\\hs\\hs_library_external.c",
+			0x1DF,
+			&forward);
+
+		object_reset(object_index);
+		unit = unit_try_and_get(object_index);
+		if (unit)
+		{
+			long player_index;
+			real_vector3d unit_forward;
+
+			player_index = player_index_from_unit_index(object_index);
+			if (unit->object.parent_object_index != NONE)
+			{
+				real_matrix4x3 inverse_matrix;
+
+				matrix4x3_inverse(
+					object_get_node_matrix(
+						unit->object.parent_object_index,
+						unit->object.parent_node_index),
+					&inverse_matrix);
+				matrix4x3_transform_normal(
+					&inverse_matrix,
+					&forward,
+					&unit_forward);
+			}
+			else
+				unit_forward = forward;
+
+			if (set_facing)
+			{
+				unit->unit.desired_facing_vector = forward;
+				unit->unit.desired_aiming_vector = forward;
+				unit->unit.desired_looking_vector = forward;
+			}
+
+			if (player_index != NONE)
+			{
+				player = player_get(player_index);
+				if (set_position)
+					player_teleport(player_index, NONE, &flag->position);
+
+				if (set_facing && player->local_player_index != NONE)
+					player_control_set_facing(
+						player->local_player_index,
+						&unit_forward);
+			}
+		}
+
+		object_set_position(
+			object_index,
+			set_position && !player ? &flag->position : NULL,
+			set_facing && !player ? &forward : NULL,
+			NULL);
+	}
+
+	return;
+}
+
+void hs_object_teleport(
+	long object_index,
+	short cutscene_flag_index)
+{
+	code_000b9500(object_index, cutscene_flag_index, TRUE, TRUE);
+
+	return;
+}
+
+void hs_object_set_facing(
+	long object_index,
+	short cutscene_flag_index)
+{
+	code_000b9500(object_index, cutscene_flag_index, FALSE, TRUE);
+
+	return;
+}
+
+void hs_teleport_players_not_in_trigger_volume(
+	short trigger_volume_index,
+	short cutscene_flag_index)
+{
+	long player_index;
+
+	for (player_index = data_next_index(player_data, NONE);
+		player_index != NONE;
+		player_index = data_next_index(player_data, player_index))
+	{
+		struct player_datum *player;
+
+		player = player_get(player_index);
+		if (player->unit_index != NONE &&
+			!scenario_trigger_volume_test_object(
+				trigger_volume_index,
+				player->unit_index))
+		{
+			code_000b9500(
+				player->unit_index,
+				cutscene_flag_index,
+				TRUE,
+				TRUE);
+		}
+	}
 
 	return;
 }
