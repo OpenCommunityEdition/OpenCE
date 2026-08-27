@@ -71,18 +71,24 @@ enum
 
 /* ---------- prototypes */
 
-short bitmap_format_get_bits_per_pixel(short format);
+short bitmap_format_get_bits_per_pixel(
+	short format);
 void *bitmap_2d_address(
 	struct bitmap_data *bitmap,
 	short x,
 	short y,
 	short mipmap_index);
-struct bitmap_data *bitmap_2d_new(short width, short height, short mipmap_count, short format);
-void bitmap_delete(struct bitmap_data *bitmap);
+struct bitmap_data *bitmap_2d_new(
+	short width,
+	short height,
+	short mipmap_count,
+	short format);
+void bitmap_delete(
+	struct bitmap_data *bitmap);
 
 /* ---------- globals */
 
-char bss_0031c320[512];
+char bss_0031c320[512] = {0};
 
 /* ---------- public code */
 
@@ -117,13 +123,13 @@ tiff_export(
 {
 	char const *error_message = NULL;
 	long tiff_format;
-	long photometric;
-	long samples_per_pixel;
+	short photometric;
+	short samples_per_pixel;
 	char path[256];
 	TIFF *tiff;
 	long row_size;
 	byte *row_buffer;
-	long y;
+	short y;
 
 	switch (bitmap->format)
 	{
@@ -150,19 +156,15 @@ tiff_export(
 	tiff = TIFFOpen(
 		file_reference_get_name(file, 0xD, path),
 		"w");
-	if (!tiff)
-		return "failed to open tiff";
-
+	if (tiff)
 	{
-		long row_bits = bitmap_format_get_bits_per_pixel((short)tiff_format) * bitmap->width;
-		row_size = (short)((row_bits + ((row_bits >> 31) & 7)) >> 3);
-	}
-	row_buffer = debug_malloc(row_size, FALSE, "c:\\halo\\SOURCE\\bitmaps\\tiff_file.c", 107);
-	if (!row_buffer)
-	{
-		TIFFClose(tiff);
-		return "out of memory";
-	}
+		{
+			long row_bits = bitmap_format_get_bits_per_pixel((short)tiff_format) * bitmap->width;
+			row_size = (short)((row_bits + ((row_bits >> 31) & 7)) >> 3);
+		}
+		row_buffer = debug_malloc(row_size, FALSE, "c:\\halo\\SOURCE\\bitmaps\\tiff_file.c", 107);
+		if (row_buffer)
+		{
 
 	TIFFSetField(tiff, TIFFTAG_IMAGEWIDTH, bitmap->width);
 	TIFFSetField(tiff, TIFFTAG_IMAGELENGTH, bitmap->height);
@@ -176,22 +178,10 @@ tiff_export(
 	for (y = 0; y < bitmap->height; y++)
 	{
 		byte *source_row = bitmap_2d_address(bitmap, 0, (short)y, 0);
-		long x;
+		short x;
 
 		switch (bitmap->format)
 		{
-		case _bitmap_format_r5g6b5:
-			for (x = 0; x < bitmap->width; x++)
-			{
-				word pixel = ((word *)source_row)[x];
-				byte high = (byte)(pixel >> 8);
-				row_buffer[x * 4 + 2] = ((byte)(pixel >> 2) & 7) | (byte)(pixel << 3);
-				row_buffer[x * 4 + 1] = ((high >> 1) & 3) | ((byte)(pixel >> 5) << 2);
-				row_buffer[x * 4] = (high & 0xF8) | (high >> 5);
-				row_buffer[x * 4 + 3] = 0xFF;
-			}
-			break;
-
 		case _bitmap_format_a1r5g5b5:
 			for (x = 0; x < bitmap->width; x++)
 			{
@@ -200,6 +190,17 @@ tiff_export(
 				row_buffer[x * 4 + 2] = (((byte)pixel & 0x1F) | ((byte)pixel << 1)) << 2;
 				row_buffer[x * 4 + 1] = ((middle & 0x1F) | (middle << 1)) << 2;
 				row_buffer[x * 4] = (((byte)(pixel >> 7) & 0xFB) | (byte)(pixel >> 8)) & 0xFC;
+				row_buffer[x * 4 + 3] = 0xFF;
+			}
+			break;
+
+		case _bitmap_format_r5g6b5:
+			for (x = 0; x < bitmap->width; x++)
+			{
+				word pixel = ((word *)source_row)[x];
+				row_buffer[x * 4 + 2] = ((byte)(pixel >> 2) & 7) | (byte)(pixel << 3);
+				row_buffer[x * 4 + 1] = ((byte)(pixel >> 9) & 3) | ((byte)(pixel >> 5) << 2);
+				row_buffer[x * 4] = ((byte)(pixel >> 8) & 0xF8) | (byte)(pixel >> 13);
 				row_buffer[x * 4 + 3] = 0xFF;
 			}
 			break;
@@ -251,8 +252,20 @@ tiff_export(
 		}
 	}
 
-	debug_free(row_buffer, "c:\\halo\\SOURCE\\bitmaps\\tiff_file.c", 231);
-	TIFFClose(tiff);
+			debug_free(row_buffer, "c:\\halo\\SOURCE\\bitmaps\\tiff_file.c", 231);
+			TIFFClose(tiff);
+		}
+		else
+		{
+			error_message = "out of memory";
+			TIFFClose(tiff);
+		}
+	}
+	else
+	{
+		error_message = "failed to open tiff";
+	}
+
 	return error_message;
 }
 
@@ -277,176 +290,179 @@ tiff_import(
 	rectangle2d bounds;
 	short width;
 	short height;
-	struct bitmap_data *bitmap;
-	byte *scanline;
-	long y;
+	struct bitmap_data *bitmap = NULL;
+	byte *scanline = NULL;
+	short y;
 
-	if (!file_exists(file))
-		return "file does not exist";
+	if (file_exists(file))
+	{
+		tiff = TIFFOpen(file_reference_get_name(file, 0xD, path), "r");
+		if (tiff)
+		{
+			scanline_size = TIFFScanlineSize(tiff);
+			TIFFGetFieldDefaulted(tiff, TIFFTAG_BITSPERSAMPLE, &bits_per_sample);
+			TIFFGetFieldDefaulted(tiff, TIFFTAG_ORIENTATION, &orientation);
+			TIFFGetFieldDefaulted(tiff, TIFFTAG_SAMPLESPERPIXEL, &samples_per_pixel);
+			TIFFGetField(tiff, TIFFTAG_PLANARCONFIG, &planar_config);
+			TIFFGetField(tiff, TIFFTAG_PHOTOMETRIC, &photometric);
+			TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &image_width);
+			TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &image_height);
 
-	tiff = TIFFOpen(file_reference_get_name(file, 0xD, path), "r");
-	if (!tiff)
+			if (requested_bounds)
+				bounds = *requested_bounds;
+			else
+			{
+				bounds.y0 = 0;
+				bounds.x0 = 0;
+				bounds.x1 = (short)image_width;
+				bounds.y1 = (short)image_height;
+			}
+
+			if (orientation == ORIENTATION_TOPLEFT)
+			{
+				if (bits_per_sample != 8 ||
+				(samples_per_pixel != 4 && samples_per_pixel != 3 &&
+				samples_per_pixel != 2 && samples_per_pixel != 1))
+				{
+					_snprintf(
+					bss_0031c320,
+					NUMBEROF(bss_0031c320),
+					"unsupported bits per sample (%d) or sample count (%d)",
+					bits_per_sample,
+					samples_per_pixel);
+					error_message = bss_0031c320;
+					goto cleanup;
+				}
+
+				if (format != NONE && format != _bitmap_format_a8r8g8b8)
+				{
+					error_message = "unsupported format";
+					goto cleanup;
+				}
+
+				if (planar_config == PLANARCONFIG_CONTIG)
+				{
+					width = rectangle2d_width(&bounds);
+					height = rectangle2d_height(&bounds);
+					if (width < 0 || width > 30000 || height < 0 || height > 30000)
+					{
+						error_message = "TIFF too large";
+						goto cleanup;
+					}
+
+					bitmap = bitmap_2d_new(width, height, 0, _bitmap_format_a8r8g8b8);
+					scanline = debug_malloc(
+						scanline_size,
+						FALSE,
+						"c:\\halo\\SOURCE\\bitmaps\\tiff_file.c",
+						319);
+					if (!bitmap || !scanline)
+					{
+						error_message = "out of memory";
+						goto cleanup;
+					}
+
+					*bitmap_result = bitmap;
+					for (y = bounds.y0; y < bounds.y1; y++)
+					{
+						long source_y;
+						short x;
+
+						source_y = y < 0 ? 0 : (y > image_height - 1 ? image_height - 1 : y);
+
+						if (TIFFReadScanline(tiff, scanline, source_y, 0) < 0)
+						{
+							error_message = "failed to read TIFF scan line";
+							goto cleanup;
+						}
+
+						switch (samples_per_pixel)
+						{
+						case 1:
+							{
+								unsigned long *destination = bitmap_2d_address(bitmap, 0, (short)(y - bounds.y0), 0);
+								for (x = bounds.x0; x < bounds.x1; x++)
+								{
+									long source_x = x < 0 ? 0 : (x > image_width - 1 ? image_width - 1 : x);
+									byte value = scanline[source_x];
+									destination[x - bounds.x0] =
+										(value << 24) | (value << 16) | (value << 8) | value;
+								}
+							}
+							break;
+						case 2:
+							{
+								unsigned long *destination = bitmap_2d_address(bitmap, 0, (short)(y - bounds.y0), 0);
+								for (x = bounds.x0; x < bounds.x1; x++)
+								{
+									long source_x = x < 0 ? 0 : (x > image_width - 1 ? image_width - 1 : x);
+									byte *pixel = scanline + source_x * 2;
+									destination[x - bounds.x0] =
+										(pixel[1] << 24) | (pixel[0] << 16) | (pixel[0] << 8) | pixel[0];
+								}
+							}
+							break;
+						case 3:
+							{
+								unsigned long *destination = bitmap_2d_address(bitmap, 0, (short)(y - bounds.y0), 0);
+								for (x = bounds.x0; x < bounds.x1; x++)
+								{
+									long source_x = x < 0 ? 0 : (x > image_width - 1 ? image_width - 1 : x);
+									byte *pixel = scanline + source_x * 3;
+									destination[x - bounds.x0] =
+										0xFF000000 | (pixel[0] << 16) | (pixel[1] << 8) | pixel[2];
+								}
+							}
+							break;
+						case 4:
+							{
+								unsigned long *destination = bitmap_2d_address(bitmap, 0, (short)(y - bounds.y0), 0);
+								for (x = bounds.x0; x < bounds.x1; x++)
+								{
+									long source_x = x < 0 ? 0 : (x > image_width - 1 ? image_width - 1 : x);
+									byte *pixel = scanline + source_x * 4;
+									destination[x - bounds.x0] =
+										(pixel[3] << 24) | (pixel[0] << 16) | (pixel[1] << 8) | pixel[2];
+								}
+							}
+							break;
+						default:
+							display_assert(NULL, "c:\\halo\\SOURCE\\bitmaps\\tiff_file.c", 406, TRUE);
+							system_exit(-1);
+							break;
+						}
+					}
+
+				cleanup:
+					/*
+					 * Original bug preserved: on a scan-line failure, bitmap_result still points
+					 * at the bitmap deleted below. A non-matching safety fix would assign
+					 * *bitmap_result = NULL after bitmap_delete().
+					 */
+					if (error_message && bitmap)
+						bitmap_delete(bitmap);
+					if (scanline)
+						debug_free(scanline, "c:\\halo\\SOURCE\\bitmaps\\tiff_file.c", 422);
+					TIFFClose(tiff);
+					return error_message;
+				}
+				else
+				{
+					error_message = "unsupported TIFF photometric, planar configuration";
+					goto cleanup;
+				}
+			}
+			else
+			{
+				error_message = "unsupported TIFF orientation (must be top left)";
+				goto cleanup;
+			}
+		}
+
 		return "not a TIFF file";
-
-	scanline_size = TIFFScanlineSize(tiff);
-	TIFFGetFieldDefaulted(tiff, TIFFTAG_BITSPERSAMPLE, &bits_per_sample);
-	TIFFGetFieldDefaulted(tiff, TIFFTAG_ORIENTATION, &orientation);
-	TIFFGetFieldDefaulted(tiff, TIFFTAG_SAMPLESPERPIXEL, &samples_per_pixel);
-	TIFFGetField(tiff, TIFFTAG_PLANARCONFIG, &planar_config);
-	TIFFGetField(tiff, TIFFTAG_PHOTOMETRIC, &photometric);
-	TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &image_width);
-	TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &image_height);
-
-	if (requested_bounds)
-		bounds = *requested_bounds;
-	else
-	{
-		bounds.y0 = 0;
-		bounds.x0 = 0;
-		bounds.y1 = (short)image_height;
-		bounds.x1 = (short)image_width;
 	}
 
-	if (orientation != ORIENTATION_TOPLEFT)
-	{
-		TIFFClose(tiff);
-		return "unsupported TIFF orientation (must be top left)";
-	}
-
-	if (bits_per_sample != 8 ||
-		(samples_per_pixel != 1 && samples_per_pixel != 2 &&
-		 samples_per_pixel != 3 && samples_per_pixel != 4))
-	{
-		snprintf(
-			bss_0031c320,
-			NUMBEROF(bss_0031c320),
-			"unsupported bits per sample (%d) or sample count (%d)",
-			bits_per_sample,
-			samples_per_pixel);
-		TIFFClose(tiff);
-		return bss_0031c320;
-	}
-
-	if (format != NONE && format != _bitmap_format_a8r8g8b8)
-	{
-		TIFFClose(tiff);
-		return "unsupported format";
-	}
-
-	if (planar_config != PLANARCONFIG_CONTIG)
-	{
-		TIFFClose(tiff);
-		return "unsupported TIFF photometric, planar configuration";
-	}
-
-	width = rectangle2d_width(&bounds);
-	height = rectangle2d_height(&bounds);
-	if (width < 0 || width > 30000 || height < 0 || height > 30000)
-	{
-		TIFFClose(tiff);
-		return "TIFF too large";
-	}
-
-	bitmap = bitmap_2d_new(width, height, 0, _bitmap_format_a8r8g8b8);
-	scanline = debug_malloc(
-		scanline_size,
-		FALSE,
-		"c:\\halo\\SOURCE\\bitmaps\\tiff_file.c",
-		319);
-	if (!bitmap || !scanline)
-	{
-		error_message = "out of memory";
-		goto cleanup;
-	}
-
-	*bitmap_result = bitmap;
-	for (y = bounds.y0; y < bounds.y1; y++)
-	{
-		long source_y;
-		long x;
-
-		if (y < 0)
-			source_y = 0;
-		else if (y > image_height - 1)
-			source_y = image_height - 1;
-		else
-			source_y = y;
-
-		if (TIFFReadScanline(tiff, scanline, source_y, 0) < 0)
-		{
-			error_message = "failed to read TIFF scan line";
-			goto cleanup;
-		}
-
-		switch (samples_per_pixel)
-		{
-		case 1:
-			{
-				unsigned long *destination = bitmap_2d_address(bitmap, 0, (short)(y - bounds.y0), 0);
-				for (x = bounds.x0; x < bounds.x1; x++)
-				{
-					long source_x = x < 0 ? 0 : (x > image_width - 1 ? image_width - 1 : x);
-					byte value = scanline[source_x];
-				destination[x - bounds.x0] =
-					(value << 24) | (value << 16) | (value << 8) | value;
-				}
-			}
-			break;
-		case 2:
-			{
-				unsigned long *destination = bitmap_2d_address(bitmap, 0, (short)(y - bounds.y0), 0);
-				for (x = bounds.x0; x < bounds.x1; x++)
-				{
-					long source_x = x < 0 ? 0 : (x > image_width - 1 ? image_width - 1 : x);
-					byte *pixel = scanline + source_x * 2;
-				destination[x - bounds.x0] =
-					(pixel[1] << 24) | (pixel[0] << 16) | (pixel[0] << 8) | pixel[0];
-				}
-			}
-			break;
-		case 3:
-			{
-				unsigned long *destination = bitmap_2d_address(bitmap, 0, (short)(y - bounds.y0), 0);
-				for (x = bounds.x0; x < bounds.x1; x++)
-				{
-					long source_x = x < 0 ? 0 : (x > image_width - 1 ? image_width - 1 : x);
-					byte *pixel = scanline + source_x * 3;
-				destination[x - bounds.x0] =
-					0xFF000000 | (pixel[0] << 16) | (pixel[1] << 8) | pixel[2];
-				}
-			}
-			break;
-		case 4:
-			{
-				unsigned long *destination = bitmap_2d_address(bitmap, 0, (short)(y - bounds.y0), 0);
-				for (x = bounds.x0; x < bounds.x1; x++)
-				{
-					long source_x = x < 0 ? 0 : (x > image_width - 1 ? image_width - 1 : x);
-					byte *pixel = scanline + source_x * 4;
-				destination[x - bounds.x0] =
-					(pixel[3] << 24) | (pixel[0] << 16) | (pixel[1] << 8) | pixel[2];
-				}
-			}
-			break;
-		default:
-			display_assert(NULL, "c:\\halo\\SOURCE\\bitmaps\\tiff_file.c", 406, TRUE);
-			system_exit(-1);
-			break;
-		}
-	}
-
-cleanup:
-	/*
-	 * Original bug preserved: on a scan-line failure, bitmap_result still points
-	 * at the bitmap deleted below. A non-matching safety fix would assign
-	 * *bitmap_result = NULL after bitmap_delete().
-	 */
-	if (error_message && bitmap)
-		bitmap_delete(bitmap);
-	if (scanline)
-		debug_free(scanline, "c:\\halo\\SOURCE\\bitmaps\\tiff_file.c", 422);
-	TIFFClose(tiff);
-	return error_message;
+	return "file does not exist";
 }
 
 /* ---------- private code */
