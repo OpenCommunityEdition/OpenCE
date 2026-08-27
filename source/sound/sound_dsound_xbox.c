@@ -234,16 +234,38 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
+#include <xtl.h>
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct dsound_globals_header
+{
+	boolean initialized;
+	byte reserved001[0x789B];
+	LPDIRECTSOUND direct_sound;
+};
+
+typedef char dsound_globals_header_direct_sound_offset_assert[
+	offsetof(struct dsound_globals_header, direct_sound) == 0x789C ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+extern struct dsound_globals_header dsound_globals;
+
 /* ---------- public code */
+
+LPDIRECTSOUND dsound_get(
+	void)
+{
+	return dsound_globals.initialized ? dsound_globals.direct_sound : NULL;
+}
 
 /* ---------- private code */
