@@ -558,6 +558,13 @@ boolean network_game_client_advertised_game_is_valid(
 	struct network_advertised_game *advertised_game);
 void network_game_client_game_shutdown(
 	struct network_game_client *client);
+void network_game_client_reset(
+	struct network_game_client *client,
+	boolean leave_connection_open);
+void network_game_client_rejected_by_game(
+	struct network_game_client *client,
+	void *source_address,
+	unsigned short rejection_code);
 
 struct network_machine *network_game_client_get_machine(
 	struct network_game_client *client);
@@ -955,6 +962,60 @@ boolean network_game_client_write(
 		message_size,
 		address,
 		flags);
+}
+
+void network_game_client_rejected_by_game(
+	struct network_game_client *client,
+	void *source_address,
+	unsigned short rejection_code)
+{
+	const char *reason = "<unknown>";
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x35A,
+		client && source_address);
+
+	client->state = 0;
+
+	switch (rejection_code)
+	{
+	case 0:
+		reason = "_rejection_code_version_too_old";
+		break;
+
+	case 1:
+		reason = "_rejection_code_version_too_new";
+		break;
+
+	case 2:
+		reason = "_rejection_code_bad_join_token";
+		break;
+
+	case 3:
+		reason = "_rejection_code_bad_password";
+		break;
+
+	case 4:
+		reason = "_rejection_code_game_is_full";
+		break;
+
+	case 5:
+		reason = "_rejection_code_game_is_closed";
+		break;
+
+	case 6:
+		reason = "_rejection_code_blacklisted_machine";
+		break;
+	}
+
+	network_event(
+		"unable to join game: reason= #%d/%s",
+		rejection_code,
+		reason);
+	network_game_client_reset(client, TRUE);
+
+	return;
 }
 
 /* ---------- private code */
