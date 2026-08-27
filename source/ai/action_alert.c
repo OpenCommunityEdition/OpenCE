@@ -42,10 +42,14 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define vector_from_points3d vector_from_points3d_inline
+#define magnitude_squared3d magnitude_squared3d_inline
 #define real_random_range real_random_range_inline
 #include "cseries.h"
 #include "actions.h"
 #include "math/real_math.h"
+#undef vector_from_points3d
+#undef magnitude_squared3d
 #undef real_random_range
 
 #include "actor_definitions.h"
@@ -95,6 +99,23 @@ real real_random_range(
 		get_global_random_seed_address(),
 		lower_bound,
 		upper_bound);
+}
+
+real_vector3d *vector_from_points3d(
+	real_point3d const *a,
+	real_point3d const *b,
+	real_vector3d *result)
+{
+	result->i = b->x - a->x;
+	result->j = b->y - a->y;
+	result->k = b->z - a->z;
+	return result;
+}
+
+real magnitude_squared3d(
+	real_vector3d const *v)
+{
+	return v->i * v->i + v->j * v->j + v->k * v->k;
 }
 
 /* ---------- private code */
