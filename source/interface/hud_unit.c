@@ -66,17 +66,43 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
 #include "interface/hud_unit.h"
 
 /* ---------- constants */
 
+enum
+{
+	_hud_panel_health_dont_show_bit = 0,
+	_hud_panel_health_blink_bit,
+	_hud_panel_shield_dont_show_bit,
+	_hud_panel_shield_blink_bit,
+	_hud_panel_motion_sensor_dont_show_bit,
+	_hud_panel_motion_sensor_blink_bit
+};
+
 /* ---------- macros */
 
+#define UNIT_HUD_GLOBALS bss_00453ac0
+
 /* ---------- structures */
+
+struct unit_hud_globals
+{
+	byte reserved[0x160];
+	long script_flags;
+};
+
+typedef char unit_hud_globals_script_flags_offset_assert[
+	offsetof(struct unit_hud_globals, script_flags) == 0x160 ? 1 : -1];
+typedef char unit_hud_globals_size_assert[
+	sizeof(struct unit_hud_globals) == 0x164 ? 1 : -1];
 
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+extern struct unit_hud_globals *bss_00453ac0;
 
 /* ---------- public code */
 
@@ -107,6 +133,72 @@ void hud_dispose_unit_interface_from_old_map(
 void hud_dispose_unit_interface(
 	void)
 {
+	return;
+}
+
+void scripted_hud_show_health(
+	boolean show)
+{
+	SET_FLAG(
+		UNIT_HUD_GLOBALS->script_flags,
+		_hud_panel_health_dont_show_bit,
+		!show);
+
+	return;
+}
+
+void scripted_hud_blink_health(
+	boolean blink)
+{
+	SET_FLAG(
+		UNIT_HUD_GLOBALS->script_flags,
+		_hud_panel_health_blink_bit,
+		blink);
+
+	return;
+}
+
+void scripted_hud_show_shield(
+	boolean show)
+{
+	SET_FLAG(
+		UNIT_HUD_GLOBALS->script_flags,
+		_hud_panel_shield_dont_show_bit,
+		!show);
+
+	return;
+}
+
+void scripted_hud_blink_shield(
+	boolean blink)
+{
+	SET_FLAG(
+		UNIT_HUD_GLOBALS->script_flags,
+		_hud_panel_shield_blink_bit,
+		blink);
+
+	return;
+}
+
+void scripted_hud_show_motion_sensor(
+	boolean show)
+{
+	SET_FLAG(
+		UNIT_HUD_GLOBALS->script_flags,
+		_hud_panel_motion_sensor_dont_show_bit,
+		!show);
+
+	return;
+}
+
+void scripted_hud_blink_motion_sensor(
+	boolean blink)
+{
+	SET_FLAG(
+		UNIT_HUD_GLOBALS->script_flags,
+		_hud_panel_motion_sensor_blink_bit,
+		blink);
+
 	return;
 }
 
