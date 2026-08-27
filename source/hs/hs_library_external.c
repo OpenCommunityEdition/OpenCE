@@ -123,6 +123,10 @@ boolean hs_trigger_volume_test_objects(
 	short trigger_volume_index,
 	long object_list_index,
 	boolean all);
+void hs_object_create(
+	short object_name_index);
+void hs_object_create_anew(
+	short object_name_index);
 void hs_object_destroy(
 	long object_index);
 void terminal_printf(
@@ -162,6 +166,53 @@ void hs_object_destroy_by_name(
 		if (object_index != NONE)
 			hs_object_destroy(object_index);
 	}
+
+	return;
+}
+
+static void code_000b8eb0(
+	char const *name_string,
+	void (*iterator)(short object_name_index))
+{
+	struct scenario *scenario;
+	struct tag_block *object_names;
+	short object_name_index;
+
+	scenario = global_scenario_get();
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_library_external.c",
+		0x197,
+		iterator);
+	object_names = &scenario->object_names;
+	for (object_name_index = 0;
+		object_name_index < object_names->count;
+		object_name_index++)
+	{
+		struct scenario_object_name *object_name;
+
+		object_name = TAG_BLOCK_GET_ELEMENT(
+			object_names,
+			object_name_index,
+			struct scenario_object_name);
+		if (strstr(object_name->name, name_string))
+			iterator(object_name_index);
+	}
+
+	return;
+}
+
+void hs_object_create_containing(
+	char const *name_string)
+{
+	code_000b8eb0(name_string, hs_object_create);
+
+	return;
+}
+
+void hs_object_destroy_containing(
+	char const *name_string)
+{
+	code_000b8eb0(name_string, hs_object_destroy_by_name);
 
 	return;
 }
@@ -287,6 +338,14 @@ boolean hs_trigger_volume_test_objects_any(
 		trigger_volume_index,
 		object_list_index,
 		FALSE);
+}
+
+void hs_object_create_anew_containing(
+	char const *name_string)
+{
+	code_000b8eb0(name_string, hs_object_create_anew);
+
+	return;
 }
 
 /* ---------- private code */
