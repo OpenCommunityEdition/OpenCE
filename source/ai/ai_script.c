@@ -456,6 +456,11 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+short ai_conversation_status(
+	short scenario_conversation_index);
+void ai_scripting_maneuver(
+	long ai_index);
+
 /* ---------- globals */
 
 /* ---------- public code */
@@ -494,6 +499,20 @@ short ai_scripting_conversation_line(
 	short conversation_index)
 {
 	return ai_conversation_line(conversation_index);
+}
+
+short ai_scripting_conversation_status(
+	short conversation_index)
+{
+	return ai_conversation_status(conversation_index);
+}
+
+void ai_scripting_retreat(
+	long ai_reference)
+{
+	ai_scripting_maneuver(ai_reference);
+
+	return;
 }
 
 /* ---------- private code */
