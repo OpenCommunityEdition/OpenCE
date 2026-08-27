@@ -97,6 +97,8 @@ typedef char detail_object_globals_size[
 
 struct detail_object_globals debug_detail_objects = { 0 };
 
+#define detail_object_global_runtime_data debug_detail_objects.runtime_data
+
 /* ---------- public code */
 
 void structure_detail_objects_dispose_from_old_map(
@@ -126,4 +128,20 @@ real dot_product4d(
 	real_vector4d const *b)
 {
 	return a->i*b->i + a->j*b->j + a->k*b->k + a->l*b->l;
+}
+
+void structure_detail_objects_initialize_for_new_map(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\structures\\structure_detail_objects.c",
+		0x6D,
+		detail_object_global_runtime_data);
+	csmemset(
+		detail_object_global_runtime_data,
+		0,
+		sizeof(*detail_object_global_runtime_data));
+	detail_object_global_runtime_data->local_player_data[0].initialized = FALSE;
+
+	return;
 }
