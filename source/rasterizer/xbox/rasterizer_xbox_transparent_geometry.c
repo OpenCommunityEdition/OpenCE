@@ -159,3 +159,17 @@ real_vector4d *subtract_vectors4d(
 
 	return result;
 }
+
+real_vector4d *offset_vector4d(
+	real_vector4d const *base,
+	real_vector4d const *vector,
+	real scale,
+	real_vector4d *result)
+{
+	result->i = vector->i*scale + base->i;
+	result->j = vector->j*scale + base->j;
+	result->k = vector->k*scale + base->k;
+	result->l = vector->l*scale + base->l;
+
+	return result;
+}
