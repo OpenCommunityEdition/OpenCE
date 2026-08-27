@@ -204,9 +204,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define arccosine arccosine_inline
 #include "cseries/cseries.h"
 #include "ai/actors.h"
 #include "units/units.h"
+#undef arccosine
 
 /* ---------- constants */
 
@@ -252,6 +254,12 @@ boolean actor_path_has_path(
 	struct actor_datum *actor = actor_get(actor_index);
 
 	return actor->control.path.path.valid;
+}
+
+real arccosine(
+	real x)
+{
+	return acos(x);
 }
 
 /* ---------- private code */
