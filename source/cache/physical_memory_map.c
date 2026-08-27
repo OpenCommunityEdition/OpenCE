@@ -29,7 +29,7 @@ symbols in this file:
 002A77F8 001e:
 	??_C@_0BO@DKDCAKMK@page_status?5?$DN?$DN?5PAGE_READWRITE?$AA@ (0000)
 004D1074 0010:
-	_bss_004d1074 (0000)
+	_physical_memory_map_globals (0000)
 */
 
 /* ---------- headers */
@@ -68,7 +68,8 @@ static struct physical_memory_map_globals physical_memory_map_globals;
 
 /* ---------- public code */
 
-void physical_memory_allocate(void)
+void physical_memory_allocate(
+	void)
 {
 	physical_memory_map_globals.game_state_base_address = XPhysicalAlloc(GAME_STATE_SIZE, GAME_STATE_BASE_ADDRESS & 0x7FFFFFFF, 0, PAGE_READWRITE);
 #line 46 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"
@@ -85,9 +86,12 @@ void physical_memory_allocate(void)
 	physical_memory_map_globals.sound_cache_base_address = XPhysicalAlloc(SOUND_CACHE_SIZE, -1, 0, PAGE_READWRITE);
 #line 58 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"
 	match_assert(__FILE__, __LINE__, physical_memory_map_globals.sound_cache_base_address);
+
+	return;
 }
 
-void physical_memory_verify(void)
+void physical_memory_verify(
+	void)
 {
 	byte *address;
 	unsigned long page_status;
@@ -109,9 +113,12 @@ void physical_memory_verify(void)
 #line 86 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"
 		match_assert(__FILE__, __LINE__, page_status == PAGE_READWRITE);
 	}
+
+	return;
 }
 
-void physical_memory_free(void)
+void physical_memory_free(
+	void)
 {
 	if (physical_memory_map_globals.game_state_base_address)
 		XPhysicalFree(physical_memory_map_globals.game_state_base_address);
@@ -121,24 +128,30 @@ void physical_memory_free(void)
 		XPhysicalFree(physical_memory_map_globals.texture_cache_base_address);
 	if (physical_memory_map_globals.sound_cache_base_address)
 		XPhysicalFree(physical_memory_map_globals.sound_cache_base_address);
+
+	return;
 }
 
-void *physical_memory_get_game_state_base_address(void)
+void *physical_memory_get_game_state_base_address(
+	void)
 {
 	return physical_memory_map_globals.game_state_base_address;
 }
 
-void *physical_memory_get_tag_cache_base_address(void)
+void *physical_memory_get_tag_cache_base_address(
+	void)
 {
 	return physical_memory_map_globals.tag_cache_base_address;
 }
 
-void *physical_memory_get_texture_cache_base_address(void)
+void *physical_memory_get_texture_cache_base_address(
+	void)
 {
 	return physical_memory_map_globals.texture_cache_base_address;
 }
 
-void *physical_memory_get_sound_cache_base_address(void)
+void *physical_memory_get_sound_cache_base_address(
+	void)
 {
 	return physical_memory_map_globals.sound_cache_base_address;
 }

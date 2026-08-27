@@ -22619,7 +22619,7 @@
 { "file_offset": 5034800, "flags": 0, "name": "_bss_004cd330" },
 { "file_offset": 5038064, "flags": 0, "name": "_decompressor_print_timing" },
 { "file_offset": 5038072, "flags": 0, "name": "_bss_004cdff8" },
-{ "file_offset": 5050484, "flags": 0, "name": "_bss_004d1074" },
+{ "file_offset": 5050484, "flags": 0, "name": "_physical_memory_map_globals" },
 { "file_offset": 5050504, "flags": 0, "name": "_bss_004d1088" },
 { "file_offset": 5050776, "flags": 0, "name": "_bss_004d1198" },
 { "file_offset": 5056424, "flags": 0, "name": "_texture_cache_debug_options" },
