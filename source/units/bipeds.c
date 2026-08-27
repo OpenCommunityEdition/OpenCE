@@ -235,6 +235,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "models/model_animation_definitions.h"
+#include "units/bipeds.h"
 
 /* ---------- constants */
 
@@ -287,6 +288,18 @@ void bipeds_dispose(
 void biped_delete(
 	long biped_index)
 {
+	return;
+}
+
+void biped_stop_melee_attack(
+	long biped_index)
+{
+	struct biped_datum *biped;
+
+	biped = biped_try_and_get(biped_index);
+	if (biped)
+		biped->biped.player_melee_ticks = 0;
+
 	return;
 }
 
