@@ -369,9 +369,63 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	MAXIMUM_NETWORK_MACHINE_COUNT = 4
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct network_machine
+{
+	byte __unknown0[0x40];
+	char machine_index;
+	byte __padding41[3];
+};
+
+struct network_game
+{
+	byte __unknown0[0x114];
+	struct network_machine machines[MAXIMUM_NETWORK_MACHINE_COUNT];
+	byte __unknown224[0x210];
+};
+
+struct network_game_client
+{
+	unsigned short machine_index;
+	byte __padding2[2];
+	byte available_games[0x828];
+	void *connection;
+	byte __padding830[0x2C];
+	struct network_game game;
+	byte __paddingC90[8];
+	unsigned long next_update_number;
+	byte __paddingC9C[8];
+	short seconds_to_game_start;
+	short state;
+	short error;
+	byte __paddingCAA[2];
+	boolean out_of_sync;
+};
+
+typedef char network_machine_size_assert[
+	sizeof(struct network_machine) == 0x44 ? 1 : -1];
+typedef char network_game_size_assert[
+	sizeof(struct network_game) == 0x434 ? 1 : -1];
+typedef char network_game_client_connection_offset_assert[
+	offsetof(struct network_game_client, connection) == 0x82C ? 1 : -1];
+typedef char network_game_client_game_offset_assert[
+	offsetof(struct network_game_client, game) == 0x85C ? 1 : -1];
+typedef char network_game_client_next_update_number_offset_assert[
+	offsetof(struct network_game_client, next_update_number) == 0xC98 ? 1 : -1];
+typedef char network_game_client_seconds_to_game_start_offset_assert[
+	offsetof(struct network_game_client, seconds_to_game_start) == 0xCA4 ? 1 : -1];
+typedef char network_game_client_error_offset_assert[
+	offsetof(struct network_game_client, error) == 0xCA8 ? 1 : -1];
+typedef char network_game_client_out_of_sync_offset_assert[
+	offsetof(struct network_game_client, out_of_sync) == 0xCAC ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -381,6 +435,12 @@ boolean network_connection_write(
 	unsigned short message_size,
 	void *address,
 	long flags);
+void network_connection_keep_alive(
+	void *connection);
+void network_connection_get_address(
+	void *connection,
+	void *address,
+	boolean include_port);
 
 boolean network_game_client_write(
 	void *connection,
@@ -389,9 +449,165 @@ boolean network_game_client_write(
 	void *address,
 	long flags);
 
+struct network_machine *network_game_client_get_machine(
+	struct network_game_client *client);
+short network_game_client_get_machine_index(
+	struct network_game_client *client);
+void *network_game_client_get_available_games(
+	struct network_game_client *client);
+short network_game_client_get_error(
+	struct network_game_client *client);
+short network_game_client_get_seconds_to_game_start(
+	struct network_game_client *client);
+void network_game_client_keep_alive(
+	struct network_game_client *client);
+void *network_game_client_get_connection(
+	struct network_game_client *client);
+void network_game_client_get_remote_server_address(
+	struct network_game_client *client,
+	void *address);
+struct network_game *network_game_client_get_game(
+	struct network_game_client *client);
+boolean network_game_client_server_has_started_game(
+	struct network_game_client *client);
+long network_game_client_get_next_update_number(
+	struct network_game_client *client);
+boolean network_client_get_oos(
+	struct network_game_client *client);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+struct network_machine *network_game_client_get_machine(
+	struct network_game_client *client)
+{
+	if (client && client->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT)
+		return &client->game.machines[client->machine_index];
+
+	return NULL;
+}
+
+short network_game_client_get_machine_index(
+	struct network_game_client *client)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x1FD,
+		client);
+
+	return client->machine_index;
+}
+
+void *network_game_client_get_available_games(
+	struct network_game_client *client)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x2AC,
+		client);
+
+	return client->available_games;
+}
+
+short network_game_client_get_error(
+	struct network_game_client *client)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x2B4,
+		client);
+
+	return client->error;
+}
+
+short network_game_client_get_seconds_to_game_start(
+	struct network_game_client *client)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x2BC,
+		client);
+
+	return client->seconds_to_game_start;
+}
+
+void network_game_client_keep_alive(
+	struct network_game_client *client)
+{
+	network_connection_keep_alive(client->connection);
+
+	return;
+}
+
+void *network_game_client_get_connection(
+	struct network_game_client *client)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x4B3,
+		client);
+
+	return client->connection;
+}
+
+void network_game_client_get_remote_server_address(
+	struct network_game_client *client,
+	void *address)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x4BC,
+		client);
+
+	network_connection_get_address(client->connection, address, FALSE);
+
+	return;
+}
+
+struct network_game *network_game_client_get_game(
+	struct network_game_client *client)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x4CD,
+		client);
+
+	return &client->game;
+}
+
+boolean network_game_client_server_has_started_game(
+	struct network_game_client *client)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x4D5,
+		client);
+
+	return client->next_update_number > 0;
+}
+
+long network_game_client_get_next_update_number(
+	struct network_game_client *client)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x4DD,
+		client);
+
+	return client->next_update_number;
+}
+
+boolean network_client_get_oos(
+	struct network_game_client *client)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x4E5,
+		client);
+
+	return client->out_of_sync;
+}
 
 boolean network_game_client_write(
 	void *connection,
