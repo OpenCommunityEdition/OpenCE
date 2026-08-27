@@ -302,6 +302,53 @@ boolean hs_unit_can_see_object(
 	return result;
 }
 
+boolean hs_unit_can_see_flag(
+	long unit_index,
+	short cutscene_flag_index,
+	real degrees)
+{
+	boolean result;
+
+	result = FALSE;
+	if (cutscene_flag_index)
+	{
+		result = unit_can_see_point(
+			unit_index,
+			&TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->cutscene_flags,
+				cutscene_flag_index,
+				struct scenario_cutscene_flag)->position,
+			DEGREES_TO_RADIANS(degrees));
+	}
+
+	return result;
+}
+
+boolean hs_objects_can_see_flag(
+	long object_list_index,
+	short cutscene_flag_index,
+	real degrees)
+{
+	long reference_index;
+	long unit_index;
+
+	unit_index = object_list_get_first(object_list_index, &reference_index);
+	while (unit_index != NONE)
+	{
+		if (unit_try_and_get(unit_index) &&
+			hs_unit_can_see_flag(unit_index, cutscene_flag_index, degrees))
+		{
+			return TRUE;
+		}
+
+		unit_index = object_list_get_next(
+			object_list_index,
+			&reference_index);
+	}
+
+	return FALSE;
+}
+
 boolean code_000b8c80(
 	long object_index)
 {
@@ -385,6 +432,25 @@ void hs_object_create(
 		}
 		else
 			object_new_by_name(object_name_index);
+	}
+
+	return;
+}
+
+void hs_object_destroy(
+	long object_index)
+{
+	if (object_index != NONE)
+	{
+		if (!code_000b8c80(object_index))
+		{
+			object_delete(object_index);
+			return;
+		}
+
+		error(
+			_error_silent,
+			"### ERROR a script tried to delete the player (or the horse he rode in on, or his six-shooter)");
 	}
 
 	return;
