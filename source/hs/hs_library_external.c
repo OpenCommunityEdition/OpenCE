@@ -89,14 +89,21 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "main/console.h"
 #include "objects/damage.h"
 #include "objects/objects.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#include "sound/sound_definitions.h"
 
 /* ---------- constants */
 
 /* ---------- macros */
+
+#define hs_sound_definition_get(index) \
+	((struct hs_sound_definition *)tag_get(SOUND_DEFINITION_TAG, (index)))
+#define hs_looping_sound_definition_get(index) \
+	((struct hs_looping_sound_definition *)tag_get(LOOPING_SOUND_DEFINITION_TAG, (index)))
 
 /* ---------- structures */
 
@@ -107,6 +114,25 @@ struct scenario_cutscene_flag
 	real_point3d position;
 	real_euler_angles2d facing;
 	byte unused[0x24];
+};
+
+struct hs_sound_definition
+{
+	byte unused00[0x28];
+	real gain;
+};
+
+struct hs_looping_sound_track
+{
+	long unknown0;
+	real gain;
+	byte unused08[0x98];
+};
+
+struct hs_looping_sound_definition
+{
+	byte unused00[0x3C];
+	struct tag_block tracks;
 };
 
 /* ---------- prototypes */
@@ -326,6 +352,64 @@ void hs_damage_object(
 			NONE,
 			NULL);
 	}
+
+	return;
+}
+
+static real *code_000b9330(
+	char const *tag_name)
+{
+	long sound_index;
+	struct hs_sound_definition *sound;
+	struct hs_looping_sound_definition *looping_sound;
+	struct hs_looping_sound_track *track;
+
+	sound_index = tag_loaded(SOUND_DEFINITION_TAG, tag_name);
+	if (sound_index != NONE)
+	{
+		sound = hs_sound_definition_get(sound_index);
+		return &sound->gain;
+	}
+
+	sound_index = tag_loaded(LOOPING_SOUND_DEFINITION_TAG, tag_name);
+	if (sound_index != NONE)
+	{
+		looping_sound = hs_looping_sound_definition_get(sound_index);
+		if (looping_sound->tracks.count > 0)
+		{
+			track = TAG_BLOCK_GET_ELEMENT(
+				&looping_sound->tracks,
+				0,
+				struct hs_looping_sound_track);
+			return &track->gain;
+		}
+	}
+
+	console_printf(FALSE, "the sound '%s' does not exist", tag_name);
+	return NULL;
+}
+
+real hs_sound_get_gain(
+	char const *tag_name)
+{
+	real *gain_reference;
+
+	gain_reference = code_000b9330(tag_name);
+	if (gain_reference)
+		return *gain_reference;
+
+	return 0.f;
+}
+
+void hs_sound_set_gain(
+	char const *tag_name,
+	real gain)
+{
+	real *gain_reference;
+
+	gain_reference = code_000b9330(tag_name);
+	if (gain_reference)
+		*gain_reference = gain;
 
 	return;
 }
