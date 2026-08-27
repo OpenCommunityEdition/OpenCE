@@ -123,6 +123,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "errors.h"
 #include "real_math.h"
 
 /* ---------- constants */
@@ -157,6 +158,29 @@ struct rasterizer_environment_fog_screen_globals bss_00465ad0 = { 0 };
 #define rasterizer_environment_fog_screen_globals bss_00465ad0
 
 /* ---------- public code */
+
+boolean rasterizer_environment_fog_screen_initialize(
+	void)
+{
+	boolean result = TRUE;
+
+	rasterizer_environment_fog_screen_globals.opaque_model_submit_parameters =
+		debug_malloc(
+			0x5000,
+			FALSE,
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment_fog.c",
+			0xF8);
+	rasterizer_environment_fog_screen_globals.opaque_model_count = 0;
+	if (!rasterizer_environment_fog_screen_globals.opaque_model_submit_parameters)
+	{
+		error(
+			_error_silent,
+			"### ERROR failed to allocate opaque model geometry buffer for environment fog screen");
+		result = FALSE;
+	}
+
+	return result;
+}
 
 void rasterizer_environment_fog_screen_window_end(
 	void)
