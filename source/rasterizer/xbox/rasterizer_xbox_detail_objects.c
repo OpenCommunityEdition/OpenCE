@@ -80,8 +80,18 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void rasterizer_profile_end(
+	short profile);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+void _rasterizer_detail_objects_end(
+	void)
+{
+	rasterizer_profile_end(21);
+	return;
+}
 
 /* ---------- private code */
