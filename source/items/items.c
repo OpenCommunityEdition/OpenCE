@@ -63,7 +63,12 @@ symbols in this file:
 #include "cseries.h"
 
 #include "game/game.h"
+#include "effects/effects.h"
+#include "game/players.h"
+#include "items/item_definitions.h"
 #include "items.h"
+#include "scenario/scenario.h"
+#include "units/units.h"
 #undef valid_real_vector3d_axes3
 #undef valid_real_matrix4x3
 
@@ -142,6 +147,112 @@ boolean dangerous_items_near_player(
 	}
 
 	return FALSE;
+}
+
+void item_in_unit_inventory(
+	long item_index,
+	long owner_unit_index)
+{
+	struct item_datum *item = item_get(item_index);
+
+	if (owner_unit_index != NONE)
+	{
+		struct unit_datum *unit = unit_get(owner_unit_index);
+
+		item->item.flags |= FLAG(_item_attached_to_unit_bit);
+		if (unit->unit.player_index != NONE)
+		{
+			item->item.flags |= FLAG(_item_belongs_to_player_bit);
+		}
+		else
+		{
+			item->item.flags &= ~FLAG(_item_belongs_to_player_bit);
+		}
+
+		item->object.owner_player_index = unit->unit.player_index;
+		object_set_garbage(item_index, FALSE);
+		item->item.flags &=
+			~(FLAG(_item_on_structure_bit) | FLAG(_item_does_not_accelerate_bit));
+		item->object.location.leaf_index = NONE;
+		item->object.location.cluster_index = NONE;
+		scenario_location_award_bonus(&item->object.location);
+
+		return;
+	}
+
+	item->item.flags &=
+		~(FLAG(_item_attached_to_unit_bit) | FLAG(_item_belongs_to_player_bit));
+
+	return;
+}
+
+void item_get_position_even_if_in_inventory(
+	long item_index,
+	real_point3d *position)
+{
+	struct item_datum *item = item_try_and_get(item_index);
+
+	position->x = 0.f;
+	position->y = 0.f;
+	position->z = 0.f;
+
+	if (!item)
+	{
+		return;
+	}
+
+	if (TEST_FLAG(item->item.flags, _item_attached_to_unit_bit))
+	{
+		long player_index = item->object.owner_player_index;
+		struct player_datum *player;
+		struct unit_datum *unit;
+
+		if (player_index == NONE)
+		{
+			return;
+		}
+
+		player = player_get(player_index);
+		if (player->unit_index == NONE)
+		{
+			return;
+		}
+
+		unit = unit_get(player->unit_index);
+		*position = unit->object.bounding_sphere_center;
+
+		return;
+	}
+
+	*position = item->object.bounding_sphere_center;
+
+	return;
+}
+
+void item_detonate(
+	long item_index)
+{
+	struct item_datum *item = item_get(item_index);
+	struct item_definition *definition = item_definition_get(item->definition_index);
+
+	if (!item->item.detonation_ticks)
+	{
+		effect_new_from_object(
+			definition->item.detonating_effect.index,
+			item_index,
+			item_index,
+			NONE,
+			0.f,
+			0.f,
+			NULL,
+			NULL);
+		item->item.detonation_ticks =
+			(short)(real_random_range(
+				definition->item.detonation_delay_timer_lower_bound,
+				definition->item.detonation_delay_timer_upper_bound) * TICKS_PER_SECOND);
+	}
+
+	return;
 }
 
 /* ---------- private code */
