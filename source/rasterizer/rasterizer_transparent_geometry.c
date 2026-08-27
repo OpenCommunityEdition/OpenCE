@@ -83,6 +83,7 @@ enum
 	MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS2 = 32,
 	SHADER_TYPE_TRANSPARENT_WATER = 7,
 	RASTERIZER_GEOMETRY_FIRST_PERSON_BIT = 7,
+	_rasterizer_target_render_primary = 0,
 };
 
 /* ---------- macros */
@@ -145,6 +146,19 @@ struct rasterizer_transparent_geometry_globals
 };
 #pragma pack(pop)
 
+struct rasterizer_transparent_geometry_debug_options
+{
+	byte pad00[0x88];
+	boolean field_88;
+	byte pad89[3];
+};
+
+struct rasterizer_transparent_geometry_window_parameters
+{
+	short rasterizer_target;
+	short window_index;
+};
+
 typedef char rasterizer_transparent_geometry_globals_size_assert[
 	sizeof(struct rasterizer_transparent_geometry_globals) == 0x4A ? 1 : -1];
 typedef char rasterizer_transparent_geometry_groups_offset_assert[
@@ -175,10 +189,27 @@ int __cdecl code_00173fa0(
 	void const *group_index2_pointer);
 void code_00174120(
 	void);
+void rasterizer_profile_begin(
+	short profile);
+void rasterizer_profile_end(
+	short profile);
+void rasterizer_transparent_geometry_groups_begin(
+	void);
+void rasterizer_transparent_geometry_groups_end(
+	void);
+void rasterizer_transparent_geometry_group_draw(
+	struct transparent_geometry_group *group,
+	boolean dirty);
+void rasterizer_set_frustum_z(
+	real z_near,
+	real z_far);
 
 /* ---------- globals */
 
 struct rasterizer_transparent_geometry_globals bss_004b8ad8;
+
+extern struct rasterizer_transparent_geometry_debug_options rasterizer_debug_options;
+extern struct rasterizer_transparent_geometry_window_parameters global_window_parameters;
 
 /* January reached these as individual file-scope variables; its assert strings
 name them. We pin the .bss layout with a struct because MSVC's allocation order
@@ -188,6 +219,7 @@ for separate statics does not reproduce it, so alias the attested spellings. */
 #define transparent_geometry_group_sorted_indices bss_004b8ad8.group_sorted_indices
 #define transparent_geometry_groups2 bss_004b8ad8.groups2
 #define transparent_geometry_group_count2 bss_004b8ad8.group_count2
+#define transparent_geometry_group_index bss_004b8ad8.group_index
 
 /* ---------- public code */
 
@@ -498,6 +530,96 @@ void code_00174120(
 			while (group_index<group_count);
 		}
 	}
+
+	return;
+}
+
+void rasterizer_transparent_geometry_draw(
+	boolean water)
+{
+	long profile = water
+		? _rasterizer_profile_water
+		: _rasterizer_profile_queued_transparents;
+
+	rasterizer_profile_begin((short)profile);
+	if (transparent_geometry_group_count > 0)
+	{
+		boolean first_person_flag = FALSE;
+
+		if (water)
+		{
+			code_00174120();
+			transparent_geometry_group_index = 0;
+			if (global_window_parameters.window_index != NONE)
+			{
+				rasterizer_debug_options.field_88 = TRUE;
+			}
+		}
+
+		rasterizer_transparent_geometry_groups_begin();
+		rasterizer_debug_options.field_88 = FALSE;
+		while (transparent_geometry_group_index < transparent_geometry_group_count)
+		{
+			struct transparent_geometry_group *group =
+				transparent_geometry_groups +
+				transparent_geometry_group_sorted_indices[
+					transparent_geometry_group_index];
+
+			if (water)
+			{
+				struct shader *shader = group->shader;
+
+				if (!shader ||
+					(shader->base.type != SHADER_TYPE_TRANSPARENT_WATER &&
+						!shader_is_water_decal(shader)))
+				{
+					break;
+				}
+			}
+
+			if (TEST_FLAG(group->geometry_flags, RASTERIZER_GEOMETRY_FIRST_PERSON_BIT))
+			{
+				match_assert(
+					"c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c",
+					0x154,
+					!water);
+				match_assert(
+					"c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c",
+					0x155,
+					global_window_parameters.rasterizer_target==_rasterizer_target_render_primary);
+				if (!first_person_flag)
+				{
+					rasterizer_set_stencil_mode(0);
+					rasterizer_set_frustum_z(
+						rasterizer_globals.first_person_weapon_near_clip_distance,
+						rasterizer_globals.first_person_weapon_far_clip_distance);
+					first_person_flag = TRUE;
+				}
+			}
+			else
+			{
+				match_assert(
+					"c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c",
+					0x163,
+					!first_person_flag);
+			}
+
+			rasterizer_transparent_geometry_group_draw(group, FALSE);
+			transparent_geometry_group_index++;
+		}
+
+		if (!water && global_window_parameters.window_index != NONE)
+		{
+			rasterizer_debug_options.field_88 = TRUE;
+		}
+		rasterizer_transparent_geometry_groups_end();
+		rasterizer_debug_options.field_88 = FALSE;
+		if (first_person_flag)
+		{
+			rasterizer_set_frustum_z(0.0f, 0.0f);
+		}
+	}
+	rasterizer_profile_end((short)profile);
 
 	return;
 }
