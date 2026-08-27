@@ -181,7 +181,9 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#define signed_angular_difference signed_angular_difference_inline
 #include "game/game.h"
+#undef signed_angular_difference
 #include "game/player_control.h"
 #include "players.h"
 
@@ -537,6 +539,25 @@ void player_control_set_desired_weapon(
 		}
 	}
 	return;
+}
+
+real signed_angular_difference(
+	real angle1,
+	real angle2)
+{
+	real result = angle2 - angle1;
+
+	if (result >= _pi)
+	{
+		result -= _pi * 2.f;
+	}
+
+	if (result <= -_pi)
+	{
+		result += _pi * 2.f;
+	}
+
+	return result;
 }
 
 void player_control_set_facing(
