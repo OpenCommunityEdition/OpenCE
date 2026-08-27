@@ -365,6 +365,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -373,8 +375,37 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+boolean network_connection_write(
+	void *connection,
+	void *message,
+	unsigned short message_size,
+	void *address,
+	long flags);
+
+boolean network_game_client_write(
+	void *connection,
+	void *message,
+	unsigned short message_size,
+	void *address,
+	long flags);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+boolean network_game_client_write(
+	void *connection,
+	void *message,
+	unsigned short message_size,
+	void *address,
+	long flags)
+{
+	return network_connection_write(
+		connection,
+		message,
+		message_size,
+		address,
+		flags);
+}
 
 /* ---------- private code */
