@@ -106,6 +106,8 @@ long object_list_get_first(
 long object_list_get_next(
 	long object_list_index,
 	long *reference_index);
+void object_predict(
+	long object_index);
 boolean hs_trigger_volume_test_objects(
 	short trigger_volume_index,
 	long object_list_index,
@@ -165,6 +167,22 @@ long hs_object_list_get_element(
 	}
 
 	return object_index;
+}
+
+void hs_objects_predict(
+	long object_list_index)
+{
+	long reference_index;
+	long object_index;
+
+	object_index = object_list_get_first(object_list_index, &reference_index);
+	while (object_index != NONE)
+	{
+		object_predict(object_index);
+		object_index = object_list_get_next(object_list_index, &reference_index);
+	}
+
+	return;
 }
 
 boolean hs_trigger_volume_test_objects_any(
