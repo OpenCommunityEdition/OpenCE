@@ -405,6 +405,17 @@ struct network_advertised_game
 	boolean valid;
 };
 
+struct data_array;
+
+struct data_iterator
+{
+	struct data_array *data;
+	short absolute_index;
+	short pad;
+	long datum_index;
+	unsigned long signature;
+};
+
 struct network_game_client
 {
 	unsigned short machine_index;
@@ -436,6 +447,10 @@ typedef char network_advertised_game_update_time_offset_assert[
 	offsetof(struct network_advertised_game, update_time) == 0x2C ? 1 : -1];
 typedef char network_advertised_game_valid_offset_assert[
 	offsetof(struct network_advertised_game, valid) == 0xE1 ? 1 : -1];
+typedef char data_iterator_size_assert[
+	sizeof(struct data_iterator) == 0x10 ? 1 : -1];
+typedef char data_iterator_datum_index_offset_assert[
+	offsetof(struct data_iterator, datum_index) == 8 ? 1 : -1];
 typedef char network_game_client_connection_offset_assert[
 	offsetof(struct network_game_client, connection) == 0x82C ? 1 : -1];
 typedef char network_game_client_connection_attempt_time_offset_assert[
@@ -497,6 +512,18 @@ void network_game_reset_to_pregame_ui(
 	void);
 void network_game_client_all_local_players_have_quit(
 	void);
+short local_player_get_next(
+	short local_player_index);
+void display_error(
+	short error_code,
+	short local_player_index,
+	boolean modal,
+	boolean pause_game_time);
+void data_iterator_new(
+	struct data_iterator *iterator,
+	struct data_array *data);
+void *data_iterator_next(
+	struct data_iterator *iterator);
 
 boolean network_game_client_write(
 	void *connection,
@@ -509,6 +536,10 @@ boolean code_001141c0(
 	void);
 void network_game_client_dispose(
 	struct network_game_client *client);
+void network_game_client_game_out_of_sync(
+	struct network_game_client *client);
+long unstrip_player_index(
+	long player_index);
 
 short network_game_client_get_state(
 	struct network_game_client *client,
@@ -556,6 +587,8 @@ boolean network_client_get_oos(
 
 /* ---------- globals */
 
+extern struct data_array *player_data;
+
 boolean allow_out_of_sync = FALSE;
 boolean network_game_client_dont_use_directly_in_use = FALSE;
 
@@ -599,6 +632,51 @@ void network_game_client_dispose(
 	network_event("network client disposed");
 
 	return;
+}
+
+void network_game_client_game_out_of_sync(
+	struct network_game_client *client)
+{
+	short local_player_index;
+
+	if (!allow_out_of_sync)
+	{
+		network_event("local machine is out of sync with the server");
+
+		if (!client->out_of_sync)
+		{
+			for (local_player_index = local_player_get_next(NONE);
+				local_player_index != NONE;
+				local_player_index = local_player_get_next(local_player_index))
+			{
+				display_error(8, local_player_index, TRUE, FALSE);
+			}
+		}
+
+		client->out_of_sync = TRUE;
+	}
+
+	return;
+}
+
+long unstrip_player_index(
+	long player_index)
+{
+	struct data_iterator iterator;
+	long result = NONE;
+
+	data_iterator_new(&iterator, player_data);
+
+	while (data_iterator_next(&iterator))
+	{
+		if ((iterator.datum_index & 0xFFFF) == (player_index & 0xFFFF))
+		{
+			result = iterator.datum_index;
+			break;
+		}
+	}
+
+	return result;
 }
 
 short network_game_client_get_state(
