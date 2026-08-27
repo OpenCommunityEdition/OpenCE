@@ -90,6 +90,15 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	_playback_animation_state_set = 2,
+	_playback_aiming_speed_set,
+	_playback_control_flags_set,
+	_playback_weapon_index_set,
+	_playback_throttle_set,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -98,6 +107,12 @@ struct direction_playback_controller
 {
 	short yaw;
 	short pitch;
+};
+
+struct animation_event_header
+{
+	byte time_delta : 2;
+	byte event_type : 6;
 };
 
 struct animation_playback_controller
@@ -175,3 +190,94 @@ void byte_swap_recording_stream(
 }
 
 /* ---------- private code */
+
+void code_00081ef0(
+	struct animation_playback_controller *animation_state,
+	struct recorded_unit_control *control,
+	struct animation_event_header const *header,
+	byte const **playback_stream)
+{
+	byte const *event_data = *playback_stream;
+
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 25, control);
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 25, header);
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 25, header->event_type==_playback_animation_state_set);
+
+	control->byte_field0 = *event_data;
+	(*playback_stream)++;
+
+	return;
+}
+
+void code_00081f80(
+	struct animation_playback_controller *animation_state,
+	struct recorded_unit_control *control,
+	struct animation_event_header const *header,
+	byte const **playback_stream)
+{
+	byte const *event_data = *playback_stream;
+
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 26, control);
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 26, header);
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 26, header->event_type==_playback_aiming_speed_set);
+
+	control->byte_field1 = *event_data;
+	(*playback_stream)++;
+
+	return;
+}
+
+void code_00082010(
+	struct animation_playback_controller *animation_state,
+	struct recorded_unit_control *control,
+	struct animation_event_header const *header,
+	byte const **playback_stream)
+{
+	byte const *event_data = *playback_stream;
+
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 27, control);
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 27, header);
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 27, header->event_type==_playback_control_flags_set);
+
+	memcpy(&control->word_field2, event_data, sizeof(control->word_field2));
+	*playback_stream += sizeof(control->word_field2);
+
+	return;
+}
+
+void code_000820a0(
+	struct animation_playback_controller *animation_state,
+	struct recorded_unit_control *control,
+	struct animation_event_header const *header,
+	byte const **playback_stream)
+{
+	byte const *event_data = *playback_stream;
+
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 28, control);
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 28, header);
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 28, header->event_type==_playback_weapon_index_set);
+
+	memcpy(&control->word_field4, event_data, sizeof(control->word_field4));
+	*playback_stream += sizeof(control->word_field4);
+
+	return;
+}
+
+void code_00082130(
+	struct animation_playback_controller *animation_state,
+	struct recorded_unit_control *control,
+	struct animation_event_header const *header,
+	byte const **playback_stream)
+{
+	byte const *event_data = *playback_stream;
+
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 33, control);
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 35, header);
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 36, header->event_type==_playback_throttle_set);
+
+	memcpy(&control->vector2d_field12, event_data, sizeof(control->vector2d_field12));
+	control->long_field20 = 0;
+	*playback_stream += sizeof(control->vector2d_field12);
+
+	return;
+}
