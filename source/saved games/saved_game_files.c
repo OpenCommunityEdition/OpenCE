@@ -339,6 +339,8 @@ typedef char verify_saved_game_files_globals_size[
 
 void code_001b4b00(
 	void);
+void code_001b31f0(
+	void);
 void dispose_mutex(
 	struct mutex_reference *mutex_reference);
 void player_profiles_dispose(
@@ -394,6 +396,14 @@ void saved_game_files_release_mutex(
 	void)
 {
 	release_mutex(saved_game_files_globals.general_mutex);
+
+	return;
+}
+
+void code_001b31f0(
+	void)
+{
+	release_mutex(saved_game_files_globals.mapfile_mutex);
 
 	return;
 }
