@@ -58,10 +58,14 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define valid_real_matrix4x3 items_valid_real_matrix4x3_inline
+#define valid_real_vector3d_axes3 items_valid_real_vector3d_axes3_inline
 #include "cseries.h"
 
 #include "game/game.h"
 #include "items.h"
+#undef valid_real_vector3d_axes3
+#undef valid_real_matrix4x3
 
 /* ---------- constants */
 
@@ -141,3 +145,26 @@ boolean dangerous_items_near_player(
 }
 
 /* ---------- private code */
+
+boolean valid_real_vector3d_axes3(
+	real_vector3d const *forward,
+	real_vector3d const *left,
+	real_vector3d const *up)
+{
+	return
+		valid_real_normal3d(forward) &&
+		valid_real_normal3d(left) &&
+		valid_real_normal3d(up) &&
+		valid_realcmp(dot_product3d(forward, left), 0.f) &&
+		valid_realcmp(dot_product3d(left, up), 0.f) &&
+		valid_realcmp(dot_product3d(up, forward), 0.f);
+}
+
+boolean valid_real_matrix4x3(
+	real_matrix4x3 const *matrix)
+{
+	return
+		valid_real(matrix->scale) &&
+		valid_real_vector3d_axes3(&matrix->forward, &matrix->left, &matrix->up) &&
+		valid_real_point3d(&matrix->position);
+}
