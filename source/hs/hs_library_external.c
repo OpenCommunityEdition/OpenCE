@@ -100,6 +100,12 @@ symbols in this file:
 
 long object_index_from_name_index(
 	short name_index);
+long object_list_get_first(
+	long object_list_index,
+	long *reference_index);
+long object_list_get_next(
+	long object_list_index,
+	long *reference_index);
 boolean hs_trigger_volume_test_objects(
 	short trigger_volume_index,
 	long object_list_index,
@@ -142,6 +148,23 @@ void hs_object_destroy_by_name(
 	}
 
 	return;
+}
+
+long hs_object_list_get_element(
+	long object_list_index,
+	short element_index)
+{
+	long reference_index;
+	long object_index;
+
+	object_index = object_list_get_first(object_list_index, &reference_index);
+	while (element_index > 0 && object_index != NONE)
+	{
+		object_index = object_list_get_next(object_list_index, &reference_index);
+		element_index--;
+	}
+
+	return object_index;
 }
 
 boolean hs_trigger_volume_test_objects_any(
