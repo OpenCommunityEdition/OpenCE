@@ -404,6 +404,21 @@ void progress_bar_enable(
 	return;
 }
 
+struct d3dx_matrix *D3DXMatrixIdentity(
+	struct d3dx_matrix *output)
+{
+	output->elements[0][1] = output->elements[0][2] =
+		output->elements[0][3] = output->elements[1][0] =
+		output->elements[1][2] = output->elements[1][3] =
+		output->elements[2][0] = output->elements[2][1] =
+		output->elements[2][3] = output->elements[3][0] =
+		output->elements[3][1] = output->elements[3][2] = 0.0f;
+	output->elements[0][0] = output->elements[1][1] =
+		output->elements[2][2] = output->elements[3][3] = 1.0f;
+
+	return output;
+}
+
 void progress_bar_display(
 	real progress)
 {
