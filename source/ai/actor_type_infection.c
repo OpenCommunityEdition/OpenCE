@@ -161,6 +161,12 @@ struct unit_control_data
 	real_vector3d looking_vector;
 };
 
+struct projectile_aim_direction
+{
+	real_vector2d horizontal;
+	real vertical;
+};
+
 typedef char swarm_component_datum_size_check[
 	sizeof(struct swarm_component_datum) == 0x40 ? 1 : -1];
 typedef char swarm_wander_control_size_check[
@@ -177,6 +183,8 @@ typedef char unit_control_data_throttle_offset_check[
 	offsetof(struct unit_control_data, throttle) == 0x0C ? 1 : -1];
 typedef char unit_control_data_facing_offset_check[
 	offsetof(struct unit_control_data, facing_vector) == 0x1C ? 1 : -1];
+typedef char projectile_aim_direction_size_check[
+	sizeof(struct projectile_aim_direction) == sizeof(real_vector3d) ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -187,6 +195,21 @@ static short code_00027410(
 real real_random_range(
 	real lower_bound,
 	real upper_bound);
+boolean projectile_aim_ballistic(
+	real base_velocity,
+	real gravity_scale,
+	real_point3d const *origin,
+	real_point3d const *target_point,
+	real *target_velocity_min,
+	real *target_ballistic_fraction_min,
+	real *forced_velocity,
+	boolean lob,
+	struct projectile_aim_direction *result_aim_direction,
+	real *result_velocity,
+	real *result_ticks,
+	real *result_distance,
+	real *result_vertical_velocity,
+	real *result_horizontal_velocity);
 
 void infection_decide_action(
 	long actor_index);
@@ -194,9 +217,9 @@ void code_00027470(
 	long actor_index);
 void infection_swarm_aim_jump(
 	long actor_index,
-	void *arg1,
-	void *arg2,
-	void *arg3);
+	long unit_index,
+	real jump_magnitude,
+	real_vector3d *jump_velocity);
 
 void unit_detach_from_parent(
 	long unit_index);
@@ -887,6 +910,139 @@ void code_00027470(
 			control.aiming_vector = facing;
 			control.looking_vector = facing;
 			unit_control(unit_index, &control);
+		}
+	}
+
+	return;
+}
+
+void infection_swarm_aim_jump(
+	long actor_index,
+	long unit_index,
+	real jump_magnitude,
+	real_vector3d *jump_velocity)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct swarm_datum *swarm;
+	short member_index;
+
+	if (actor->meta.swarm_cache_index == NONE)
+	{
+		return;
+	}
+
+	swarm = swarm_get(actor->meta.swarm_cache_index);
+	for (member_index = 0; member_index < swarm->unit_count; member_index++)
+	{
+		if (swarm->unit_indices[member_index] == unit_index)
+		{
+			struct unit_datum *unit = unit_get(unit_index);
+			struct swarm_component_datum *swarm_component = swarm_component_get(
+				swarm->component_indices[member_index]);
+			word component_flags = swarm_component->flags;
+
+			if (TEST_FLAG(component_flags, _swarm_component_attacking_in_melee_bit) &&
+				swarm_component->combat_target_prop_index != NONE)
+			{
+				struct prop_datum *prop = prop_get(
+					swarm_component->combat_target_prop_index);
+				real target_velocity_min = 0.06f;
+				real target_ballistic_fraction_min = 0.8f;
+				struct projectile_aim_direction aim_direction;
+				real vertical_velocity;
+				real horizontal_velocity;
+
+				jump_magnitude = MAX(jump_magnitude, 0.12f);
+
+				if (projectile_aim_ballistic(
+					jump_magnitude,
+					1.f,
+					&swarm_component->position,
+					&prop->center_of_mass,
+					&target_velocity_min,
+					&target_ballistic_fraction_min,
+					NULL,
+					FALSE,
+					&aim_direction,
+					NULL,
+					NULL,
+					NULL,
+					&vertical_velocity,
+					&horizontal_velocity))
+				{
+					real magnitude_squared;
+
+					if (normalize2d(&aim_direction.horizontal) == 0.f)
+					{
+						aim_direction.horizontal.i = actor->input.facing_vector.i;
+						aim_direction.horizontal.j = actor->input.facing_vector.j;
+						aim_direction.vertical = actor->input.facing_vector.k;
+						if (normalize2d(&aim_direction.horizontal) == 0.f)
+						{
+							aim_direction.horizontal.i = global_forward3d->i;
+							aim_direction.horizontal.j = global_forward3d->j;
+							aim_direction.vertical = global_forward3d->k;
+						}
+					}
+
+					if (!prop->flying && vertical_velocity > 0.075f)
+					{
+						vertical_velocity = 0.075f;
+					}
+
+					set_real_vector3d(
+						jump_velocity,
+						aim_direction.horizontal.i * horizontal_velocity,
+						aim_direction.horizontal.j * horizontal_velocity,
+						vertical_velocity);
+					magnitude_squared =
+						jump_velocity->i * jump_velocity->i +
+						jump_velocity->j * jump_velocity->j +
+						jump_velocity->k * jump_velocity->k;
+					if (magnitude_squared > jump_magnitude * jump_magnitude)
+					{
+						real scale = jump_magnitude / square_root(magnitude_squared);
+
+						scale_vector3d(jump_velocity, scale, jump_velocity);
+					}
+				}
+			}
+			else if (TEST_FLAG(component_flags, _swarm_component_obey_bit) &&
+				TEST_FLAG(component_flags, _swarm_component_obey_desire_jump_bit))
+			{
+				if (TEST_FLAG(
+						swarm_component->obey.simple_control_flags,
+						_obey_simple_jump_bit) &&
+					TEST_FLAG(
+						swarm_component->obey.simple_control_flags,
+						_obey_simple_jump_targeted_bit))
+				{
+					real_vector2d flat_direction;
+
+					flat_direction.i = unit->object.forward.i;
+					flat_direction.j = unit->object.forward.j;
+					if (normalize2d(&flat_direction) == 0.f)
+					{
+						flat_direction.i = unit->object.up.i;
+						flat_direction.j = unit->object.up.j;
+						if (normalize2d(&flat_direction) == 0.f)
+						{
+							flat_direction = *global_forward2d;
+						}
+					}
+
+					set_real_vector3d(
+						jump_velocity,
+						swarm_component->obey.jump.target_horizontal_vel * flat_direction.i,
+						swarm_component->obey.jump.target_horizontal_vel * flat_direction.j,
+						swarm_component->obey.jump.target_vertical_vel);
+				}
+
+				SET_FLAG(
+					swarm_component->flags,
+					_swarm_component_obey_desire_jump_bit,
+					FALSE);
+			}
 		}
 	}
 

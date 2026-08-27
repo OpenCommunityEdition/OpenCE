@@ -235,15 +235,21 @@ void actor_type_swarm_control(
 
 void actor_type_swarm_aim_jump(
 	long actor_index,
-	void *arg1,
-	void *arg2,
-	void *arg3)
+	long unit_index,
+	real jump_magnitude,
+	real_vector3d *jump_velocity)
 {
 	struct actor_type_definition *actor_type_definition = code_00028c10(actor_get(actor_index)->meta.type);
 
 	match_assert("c:\\halo\\SOURCE\\ai\\actor_types.c", 157, actor_type_definition->swarm);
 	if (actor_type_definition->swarm_aim_jump)
-		actor_type_definition->swarm_aim_jump(actor_index, arg1, arg2, arg3);
+	{
+		actor_type_definition->swarm_aim_jump(
+			actor_index,
+			unit_index,
+			jump_magnitude,
+			jump_velocity);
+	}
 
 	return;
 }

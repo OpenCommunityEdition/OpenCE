@@ -36,14 +36,16 @@ enum
 
 /* ---------- structures */
 
+union real_vector3d;
+
 typedef void (*actor_initialize_proc)(long actor_index);
 typedef void (*actor_decide_action_proc)(long actor_index);
 typedef void (*actor_swarm_control_proc)(long actor_index);
 typedef void (*actor_swarm_aim_jump_proc)(
 	long actor_index,
-	void *arg1,
-	void *arg2,
-	void *arg3);
+	long unit_index,
+	float jump_magnitude,
+	union real_vector3d *jump_velocity);
 
 struct actor_type_definition
 {
@@ -87,9 +89,9 @@ void actor_type_swarm_control(
 	long actor_index);
 void actor_type_swarm_aim_jump(
 	long actor_index,
-	void *arg1,
-	void *arg2,
-	void *arg3);
+	long unit_index,
+	float jump_magnitude,
+	union real_vector3d *jump_velocity);
 
 /* ---------- globals */
 
