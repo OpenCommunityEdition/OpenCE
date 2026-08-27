@@ -396,6 +396,14 @@ struct network_game
 	byte __unknown224[0x210];
 };
 
+struct network_advertised_game
+{
+	byte __unknown0[0x2C];
+	unsigned long update_time;
+	byte __unknown30[0xB1];
+	boolean valid;
+};
+
 struct network_game_client
 {
 	unsigned short machine_index;
@@ -420,6 +428,10 @@ typedef char network_machine_size_assert[
 	sizeof(struct network_machine) == 0x44 ? 1 : -1];
 typedef char network_game_size_assert[
 	sizeof(struct network_game) == 0x434 ? 1 : -1];
+typedef char network_advertised_game_update_time_offset_assert[
+	offsetof(struct network_advertised_game, update_time) == 0x2C ? 1 : -1];
+typedef char network_advertised_game_valid_offset_assert[
+	offsetof(struct network_advertised_game, valid) == 0xE1 ? 1 : -1];
 typedef char network_game_client_connection_offset_assert[
 	offsetof(struct network_game_client, connection) == 0x82C ? 1 : -1];
 typedef char network_game_client_connection_attempt_time_offset_assert[
@@ -475,6 +487,8 @@ void network_game_client_switch_to_postgame(
 void network_game_client_countdown_timer_update(
 	struct network_game_client *client,
 	short seconds_to_game_start);
+boolean network_game_client_advertised_game_is_valid(
+	struct network_advertised_game *advertised_game);
 
 struct network_machine *network_game_client_get_machine(
 	struct network_game_client *client);
@@ -576,6 +590,20 @@ void network_game_client_countdown_timer_update(
 	client->seconds_to_game_start = seconds_to_game_start;
 
 	return;
+}
+
+boolean network_game_client_advertised_game_is_valid(
+	struct network_advertised_game *advertised_game)
+{
+	boolean valid = TRUE;
+
+	if (!advertised_game->valid ||
+		(long)(system_milliseconds() - advertised_game->update_time) > 6000)
+	{
+		valid = FALSE;
+	}
+
+	return valid;
 }
 
 struct network_machine *network_game_client_get_machine(
