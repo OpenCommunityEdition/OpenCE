@@ -454,14 +454,25 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct ai_script_globals_prefix
+{
+	boolean ai_active;
+	boolean ai_initialized_for_map;
+};
+
 /* ---------- prototypes */
 
 short ai_conversation_status(
 	short scenario_conversation_index);
+void ai_debug_select_actor(
+	long encounter_index,
+	long actor_index);
 void ai_scripting_maneuver(
 	long ai_index);
 
 /* ---------- globals */
+
+extern struct ai_script_globals_prefix *ai_globals;
 
 /* ---------- public code */
 
@@ -511,6 +522,17 @@ void ai_scripting_retreat(
 	long ai_reference)
 {
 	ai_scripting_maneuver(ai_reference);
+
+	return;
+}
+
+void ai_scripting_deselect(
+	void)
+{
+	if (ai_globals->ai_initialized_for_map)
+	{
+		ai_debug_select_actor(NONE, NONE);
+	}
 
 	return;
 }
