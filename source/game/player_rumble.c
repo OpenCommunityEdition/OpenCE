@@ -40,13 +40,19 @@ symbols in this file:
 
 #include "game/player_rumble.h"
 
+#include "game/players.h"
+#include "input/input.h"
+#include "interface/player_ui.h"
+#include "math/periodic_functions.h"
+#include "saved games/game_state.h"
+
 /* ---------- constants */
 
 enum
 {
-	MAXIMUM_LOCAL_PLAYERS = 4,
 	MAXIMUM_RUMBLE_IMPULSES = 8,
-	NUMBER_OF_RUMBLE_MOTORS = 2
+	NUMBER_OF_RUMBLE_MOTORS = 2,
+	MAXIMUM_RUMBLE_MOTOR_VALUE = 65535
 };
 
 /* ---------- macros */
@@ -85,18 +91,14 @@ struct rumble_globals
 	real scripted_scale;
 };
 
+struct rumble_motor_values
+{
+	word left;
+	word right;
+};
+
 /* ---------- prototypes */
 
-void *game_state_malloc(
-	const char *name,
-	const char *type,
-	long size);
-boolean input_has_gamepad(
-	short gamepad_index);
-void input_set_gamepad_rumbler_state(
-	short gamepad_index,
-	word left_motor,
-	word right_motor);
 void rumble_initialize(
 	void);
 void rumble_initialize_for_new_map(
@@ -114,6 +116,11 @@ void rumble_player_continuous(
 	short local_player_index,
 	real left_motor,
 	real right_motor);
+void rumble_update(
+	void);
+
+static struct rumble_motor_values code_000a91a0(
+	struct rumble_player *player);
 
 /* ---------- globals */
 
@@ -303,4 +310,124 @@ void rumble_dispose_from_old_map(
 	return;
 }
 
+void rumble_update(
+	void)
+{
+	short local_player_index;
+	long impulse_index;
+
+	for (local_player_index = 0;
+		local_player_index < MAXIMUM_LOCAL_PLAYERS;
+		local_player_index++)
+	{
+		struct rumble_player *player =
+			&bss_00453404->players[local_player_index];
+		struct rumble_motor_values motors = code_000a91a0(player);
+		long player_index;
+
+		for (impulse_index = 0;
+			impulse_index < MAXIMUM_RUMBLE_IMPULSES;
+			impulse_index++)
+		{
+			player->impulse_time[impulse_index] += 1.0f / 30.0f;
+		}
+
+		player_index = local_player_get_player_index(local_player_index);
+		if (player_index != NONE)
+		{
+			long controller_index = player_get(player_index)->local_player_index;
+
+			if (controller_index != NONE)
+			{
+				if (!player_ui_rumble_disabled(
+					player_ui_get_single_player_local_player_from_controller(
+						(short)controller_index)))
+				{
+					input_set_gamepad_rumbler_state(
+						(short)controller_index,
+						motors.left,
+						motors.right);
+				}
+				else
+				{
+					input_set_gamepad_rumbler_state(
+						(short)controller_index,
+						0,
+						0);
+				}
+			}
+		}
+		else
+		{
+			input_set_gamepad_rumbler_state(local_player_index, 0, 0);
+		}
+	}
+
+	return;
+}
+
 /* ---------- private code */
+
+/* NonMatching: the readable mixer is required for January's private EAX
+ * helper convention, which makes rumble_update strict-exact. The remaining
+ * mixer difference is limited to VC7 float-to-integer lowering: the ordinary
+ * build emits 19 relocations against January's 12. Do not replace the casts
+ * with assembly, /QIfist, volatile forcing, or representation tricks. */
+static struct rumble_motor_values code_000a91a0(
+	struct rumble_player *player)
+{
+	struct rumble_motor_values values;
+	real motors[NUMBER_OF_RUMBLE_MOTORS];
+	real value;
+	long impulse_index;
+	long motor_index;
+
+	motors[0] = player->continuous_left;
+	motors[1] = player->continuous_right;
+
+	for (impulse_index = 0;
+		impulse_index < MAXIMUM_RUMBLE_IMPULSES;
+		impulse_index++)
+	{
+		real time = player->impulse_time[impulse_index];
+
+		for (motor_index = 0;
+			motor_index < NUMBER_OF_RUMBLE_MOTORS;
+			motor_index++)
+		{
+			struct rumble_motor *motor =
+				&player->impulses[impulse_index].motors[motor_index];
+
+			if (motor->duration > time)
+			{
+				value = PIN(1.0f - time / motor->duration, 0.0f, 1.0f);
+				motors[motor_index] +=
+					transition_function_evaluate(
+						motor->transition_function,
+						value) * motor->scale;
+			}
+		}
+	}
+
+	if (bss_00453404->scripted_scale != 0.0f)
+	{
+		motors[0] += bss_00453404->scripted_left_motor *
+			bss_00453404->scripted_scale;
+		motors[1] += bss_00453404->scripted_right_motor *
+			bss_00453404->scripted_scale;
+	}
+
+	value = PIN(
+		motors[0] * (real)MAXIMUM_RUMBLE_MOTOR_VALUE,
+		0.0f,
+		(real)MAXIMUM_RUMBLE_MOTOR_VALUE);
+	values.left = (word)(long)value;
+
+	value = PIN(
+		motors[1] * (real)MAXIMUM_RUMBLE_MOTOR_VALUE,
+		0.0f,
+		(real)MAXIMUM_RUMBLE_MOTOR_VALUE);
+	values.right = (word)(long)value;
+
+	return values;
+}
