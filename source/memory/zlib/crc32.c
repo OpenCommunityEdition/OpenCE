@@ -39,7 +39,8 @@ local void make_crc_table OF((void));
   the information needed to generate CRC's on data a byte at a time for all
   combinations of CRC register values and incoming bytes.
 */
-local void make_crc_table()
+local void make_crc_table(
+    void)
 {
   uLong c;
   int n, k;
@@ -60,12 +61,14 @@ local void make_crc_table()
     crc_table[n] = c;
   }
   crc_table_empty = 0;
+
+  return;
 }
 #else
 /* ========================================================================
  * Table of CRC-32's of all single-byte values (made by make_crc_table)
  */
-local const uLongf crc_table[256] = {
+const uLongf rdata_0027b378[256] = {
   0x00000000L, 0x77073096L, 0xee0e612cL, 0x990951baL, 0x076dc419L,
   0x706af48fL, 0xe963a535L, 0x9e6495a3L, 0x0edb8832L, 0x79dcb8a4L,
   0xe0d5e91eL, 0x97d2d988L, 0x09b64c2bL, 0x7eb17cbdL, 0xe7b82d07L,
@@ -119,12 +122,14 @@ local const uLongf crc_table[256] = {
   0x5d681b02L, 0x2a6f2b94L, 0xb40bbe37L, 0xc30c8ea1L, 0x5a05df1bL,
   0x2d02ef8dL
 };
+#define crc_table rdata_0027b378
 #endif
 
 /* =========================================================================
  * This function can be used by asm versions of crc32()
  */
-const uLongf * ZEXPORT get_crc_table()
+const uLongf * ZEXPORT get_crc_table(
+    void)
 {
 #ifdef DYNAMIC_CRC_TABLE
   if (crc_table_empty) make_crc_table();
@@ -139,10 +144,10 @@ const uLongf * ZEXPORT get_crc_table()
 #define DO8(buf)  DO4(buf); DO4(buf);
 
 /* ========================================================================= */
-uLong ZEXPORT crc32(crc, buf, len)
-    uLong crc;
-    const Bytef *buf;
-    uInt len;
+uLong ZEXPORT crc32(
+    uLong crc,
+    const Bytef *buf,
+    uInt len)
 {
     if (buf == Z_NULL) return 0L;
 #ifdef DYNAMIC_CRC_TABLE
