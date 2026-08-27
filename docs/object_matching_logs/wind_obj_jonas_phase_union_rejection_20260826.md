@@ -72,3 +72,61 @@ overlap in the same compile.
 The separate `_code_0017f750` residual remains behind the already documented
 defined-C representation boundary. The old inactive-union type-pun is not an
 admissible closeout technique.
+
+## Seed-pointer and spline-local follow-up (2026-08-26)
+
+This follow-up used the archived Wave 1 source/object, the January object, and
+the later HCEA source at commit
+`570c83fd9c365dad6f2a3e7041705d5b84c7847c`. HCEA independently preserves the
+same two-phase algorithm: eight seeded samples on each of three axes, followed
+by seven cyclic cubic-spline samples between each pair of seeds.
+
+### Wave 2: loop-carried seed pointer
+
+January begins with `EBX = &wind_globals.variance[0][0]`, copies that pointer to
+`ESI` for each axis sweep, advances `ESI` by `0x300` per axis, and advances
+`EBX` by `0x60` per keyframe. The rejected phase-union candidate instead kept
+an integer keyframe in `EBX` and recomputed the destination address. Wave 2
+changed only this seed phase to typed pointer induction:
+
+- a loop-carried `real_vector3d *seed_result` advances by eight samples;
+- a scoped `real_vector3d *axis_result` advances by 64 samples;
+- the existing eight- and three-iteration down-counters are retained;
+- the spline phase is byte-for-byte the prior Wave 1 source.
+
+The candidate object is preserved as
+`build/audit/wind_seed_pointer_candidate_20260826.obj`, SHA-256
+`0162B29C40F77C6366058258355E3F1444F5508DE1CB9E70406672E5637C4477`.
+`_code_0017fbd0` remains `384/384` padded bytes and `9/9` relocations, with
+candidate normalized SHA-256
+`2d347230e014cb89311ff20da2b7d20c36ff6698c0933a5abb5db08ce85d15ad`
+versus target
+`1d5cd879825797c62a8f525b3f47ac10ee86b61f82da861f5ae6e6db4afa41ff`.
+
+The seed topology is confirmed. The first three relocation identities and
+addresses are now exact (`0x0A`, `0x22`, `0x28`), and the seed loop from
+`mov ebx,4` through its backward branch has the target instruction order and
+register roles. The remaining prefix bytes are only the downstream-frame
+effects: target uses a `0x38` frame and seed-counter slot `-0x10`, while this
+candidate still uses `0x3C` and `-0x14` because its untouched spline phase
+retains one extra dword lifetime.
+
+### Wave 3: explicit target-named spline locals
+
+With the seed topology frozen, Wave 3 replaced only the spline phase with
+explicit long-lived keyframe, next-keyframe, cyclic-index, result-pointer,
+substep, axis, and down-counter locals inferred from the January stack map.
+This was rejected. It over-described the value graph, expanding the frame to
+`0x44` and the function to `416/384` padded bytes. Relocations stayed `9/9`,
+but the candidate normalized SHA-256 was
+`d83ac4f474154dbb767ddc060be707f8798e5290de557c5172799457dd86d7d1`.
+The complete object is preserved as
+`build/audit/wind_target_shaped_spline_candidate_20260826.obj`, SHA-256
+`DD05700DE1B18AECA9C9E1D7865120FA9DC920171D3D2FA9B7EDFB226D62E0DC`.
+
+Do not repeat explicit one-local-per-target-stack-slot reconstruction. The
+next legal reopen must keep the Wave 2 seed pointer topology and explain the
+single extra spline dword through a *smaller* source value graph or a proven
+phase-local overlap. Production `wind.c` and `wind.obj` were restored exactly
+to the cumulative pre-wave state; no function credit or matching-status change
+is claimed.
