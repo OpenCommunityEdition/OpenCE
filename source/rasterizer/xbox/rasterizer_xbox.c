@@ -424,4 +424,33 @@ void _rasterizer_set_vblank_callback(
 	return;
 }
 
+enum
+{
+	INVALID_RASTERIZER_HARDWARE_STATE = -1,
+};
+
+struct rasterizer_hardware_state_cache
+{
+	short vertex_shader_index;
+	short reserved2;
+	short stencil_mode;
+};
+
+/* January's anonymous six-byte owner is preserved for relocation identity;
+ * consumers use the typed semantic alias below. */
+struct rasterizer_hardware_state_cache data_0030ceec =
+{
+	INVALID_RASTERIZER_HARDWARE_STATE,
+	0,
+	INVALID_RASTERIZER_HARDWARE_STATE,
+};
+
+#define rasterizer_state_cache data_0030ceec
+
+short rasterizer_get_stencil_mode(
+	void)
+{
+	return rasterizer_state_cache.stencil_mode;
+}
+
 /* ---------- private code */
