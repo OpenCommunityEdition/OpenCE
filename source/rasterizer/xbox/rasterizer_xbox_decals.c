@@ -170,4 +170,12 @@ void _rasterizer_decals_dispose_from_old_map(
 	return;
 }
 
+void rasterizer_decal_vertices_begin_update(
+	void)
+{
+	lruv_idle(local_vertex_cache);
+
+	return;
+}
+
 /* ---------- private code */
