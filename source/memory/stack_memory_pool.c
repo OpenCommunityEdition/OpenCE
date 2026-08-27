@@ -756,37 +756,48 @@ static void *code_0010e490(
 {
 	struct stack_memory_pool_block *block;
 	struct stack_memory_pool_block *next_block;
-	void *free_space = NULL;
 
 	block = pool->first_block;
-	if (
-		block &&
-		(unsigned long)((byte *)block-pool->base_address) >= allocation_size)
+	if (!block)
 	{
-		free_space = pool->base_address;
+		return NULL;
 	}
-	else if (block)
+	if (
+		allocation_size <=
+		(unsigned long)((byte *)block-pool->base_address))
 	{
-		next_block = block->next;
-		while (next_block)
+		return pool->base_address;
+	}
+
+	next_block = block->next;
+	if (!next_block)
+	{
+		return NULL;
+	}
+
+	while (TRUE)
+	{
+		match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x22F, block);
+		if (
+			allocation_size <=
+			(unsigned long)(
+				(byte *)next_block-
+				((byte *)block+(block->size_and_flags&0x7FFFFFFF))))
 		{
-			match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x22F, block);
-			if (
-				(unsigned long)(
-					(byte *)next_block-
-					((byte *)block+(block->size_and_flags&0x7FFFFFFF))) >=
-				allocation_size)
-			{
-				free_space =
-					(byte *)block+(block->size_and_flags&0x7FFFFFFF);
-				*previous_block = block;
-				break;
-			}
-			block = next_block;
-			next_block = next_block->next;
+			break;
+		}
+
+		block = next_block;
+		next_block = next_block->next;
+		if (!next_block)
+		{
+			return NULL;
 		}
 	}
-	return free_space;
+
+	*previous_block = block;
+
+	return (byte *)block+(block->size_and_flags&0x7FFFFFFF);
 }
 
 static boolean code_0010e510(
