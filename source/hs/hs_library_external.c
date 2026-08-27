@@ -89,7 +89,9 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "objects/damage.h"
 #include "objects/objects.h"
+#include "scenario/scenario.h"
 
 /* ---------- constants */
 
@@ -217,6 +219,30 @@ void hs_objects_delete_by_definition(
 			object_delete(iterator.index);
 	}
 	objects_memory_compact();
+
+	return;
+}
+
+void hs_damage_object(
+	long damage_effect_index,
+	long object_index)
+{
+	if (object_index != NONE)
+	{
+		struct damage_data damage;
+
+		damage_data_new(&damage, damage_effect_index);
+		object_get_origin(object_index, &damage.origin);
+		damage.epicenter = damage.origin;
+		scenario_location_from_point(&damage.location, &damage.origin);
+		object_cause_damage(
+			&damage,
+			object_index,
+			NONE,
+			NONE,
+			NONE,
+			NULL);
+	}
 
 	return;
 }
