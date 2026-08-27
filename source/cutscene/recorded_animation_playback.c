@@ -83,6 +83,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "math/real_math.h"
 
 #undef memcpy
 #include <string.h>
@@ -106,7 +107,22 @@ struct animation_playback_controller
 	struct direction_playback_controller looking_control;
 };
 
-struct recorded_unit_control;
+struct recorded_unit_control
+{
+	byte byte_field0;
+	byte byte_field1;
+	short word_field2;
+	short word_field4;
+	short version2_field;
+	short version3_field;
+	short unused_field10;
+	real_vector2d vector2d_field12;
+	long long_field20;
+	long version1_field;
+	real_vector3d vector3d_field28;
+	real_vector3d vector3d_field40;
+	real_vector3d vector3d_field52;
+};
 
 /* ---------- prototypes */
 
@@ -129,6 +145,20 @@ void recorded_animation_initialize_event_stream(
 		unit_control,
 		playback_stream,
 		unit_control_data_version);
+
+	memcpy(animation_state, *playback_stream, sizeof(*animation_state));
+	*playback_stream += sizeof(*animation_state);
+
+	return;
+}
+
+void recorded_animation_initialize_event_stream_with_size(
+	struct animation_playback_controller *animation_state,
+	struct recorded_unit_control *unit_control,
+	byte **playback_stream)
+{
+	memcpy(unit_control, *playback_stream, sizeof(*unit_control));
+	*playback_stream += sizeof(*unit_control);
 
 	memcpy(animation_state, *playback_stream, sizeof(*animation_state));
 	*playback_stream += sizeof(*animation_state);
