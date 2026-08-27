@@ -1,5 +1,5 @@
 #ifndef lint
-static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_compress.c,v 1.26 92/02/10 19:06:13 sam Exp $";
+char data_002b7ef8[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_compress.c,v 1.26 92/02/10 19:06:13 sam Exp $";
 #endif
 
 /*
@@ -112,11 +112,10 @@ static struct cscheme CompressionSchemes[] = {
 };
 #define	NSCHEMES (sizeof (CompressionSchemes) / sizeof (CompressionSchemes[0]))
 
-static struct cscheme const *
-findScheme(scheme)
-	int scheme;
+static struct cscheme const *code_000535f0(
+	int scheme)
 {
-	register struct cscheme const *c;
+	struct cscheme const *c;
 
 	for (c = CompressionSchemes; c < &CompressionSchemes[NSCHEMES]; c++)
 		if (c->scheme == scheme)
@@ -124,93 +123,85 @@ findScheme(scheme)
 	return ((struct cscheme const *)0);
 }
 
-static int
-TIFFNoEncode(tif, method)
-	TIFF *tif;
-	char *method;
+static int code_00053610(
+	TIFF *tif,
+	char *method)
 {
-	struct cscheme const *c = findScheme(tif->tif_dir.td_compression);
+	struct cscheme const *c = code_000535f0(tif->tif_dir.td_compression);
 	TIFFError(tif->tif_name,
 	    "%s %s encoding is not implemented", c->name, method);
 	return (-1);
 }
 
-int
-TIFFNoRowEncode(tif, pp, cc, s)
-	TIFF *tif;
-	u_char *pp;
-	int cc;
-	u_int s;
+int TIFFNoRowEncode(
+	TIFF *tif,
+	u_char *pp,
+	int cc,
+	u_int s)
 {
-	return (TIFFNoEncode(tif, "scanline"));
+	return (code_00053610(tif, "scanline"));
 }
 
-int
-TIFFNoStripEncode(tif, pp, cc, s)
-	TIFF *tif;
-	u_char *pp;
-	int cc;
-	u_int s;
+int TIFFNoStripEncode(
+	TIFF *tif,
+	u_char *pp,
+	int cc,
+	u_int s)
 {
-	return (TIFFNoEncode(tif, "strip"));
+	return (code_00053610(tif, "strip"));
 }
 
-int
-TIFFNoTileEncode(tif, pp, cc, s)
-	TIFF *tif;
-	u_char *pp;
-	int cc;
-	u_int s;
+int TIFFNoTileEncode(
+	TIFF *tif,
+	u_char *pp,
+	int cc,
+	u_int s)
 {
-	return (TIFFNoEncode(tif, "tile"));
+	return (code_00053610(tif, "tile"));
 }
 
-int
-TIFFNoDecode(tif, method)
-	TIFF *tif;
-	char *method;
+int TIFFNoDecode(
+	TIFF *tif,
+	char *method)
 {
-	struct cscheme const *c = findScheme(tif->tif_dir.td_compression);
+	struct cscheme const *c = code_000535f0(tif->tif_dir.td_compression);
 	TIFFError(tif->tif_name,
 	    "%s %s decoding is not implemented", c->name, method);
 	return (-1);
 }
 
-int
-TIFFNoRowDecode(tif, pp, cc, s)
-	TIFF *tif;
-	u_char *pp;
-	int cc;
-	u_int s;
+int TIFFNoRowDecode(
+	TIFF *tif,
+	u_char *pp,
+	int cc,
+	u_int s)
 {
 	return (TIFFNoDecode(tif, "scanline"));
 }
 
-int
-TIFFNoStripDecode(tif, pp, cc, s)
-	TIFF *tif;
-	u_char *pp;
-	int cc;
-	u_int s;
+int TIFFNoStripDecode(
+	TIFF *tif,
+	u_char *pp,
+	int cc,
+	u_int s)
 {
 	return (TIFFNoDecode(tif, "strip"));
 }
 
-int
-TIFFNoTileDecode(tif, pp, cc, s)
-	TIFF *tif;
-	u_char *pp;
-	int cc;
-	u_int s;
+int TIFFNoTileDecode(
+	TIFF *tif,
+	u_char *pp,
+	int cc,
+	u_int s)
 {
 	return (TIFFNoDecode(tif, "tile"));
 }
 
-TIFFSetCompressionScheme(tif, scheme)
-	TIFF *tif;
-	int scheme;
+int TIFFSetCompressionScheme(
+	TIFF *tif,
+	int scheme)
 {
-	struct cscheme const *c = findScheme(scheme);
+	struct cscheme const *c = code_000535f0(scheme);
 
 	if (!c) {
 		TIFFError(tif->tif_name,
