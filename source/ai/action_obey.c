@@ -246,12 +246,14 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define random_range random_range_inline
 #include "cseries.h"
 #include "actions.h"
 
 #include "actors.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#undef random_range
 
 /* ---------- constants */
 
@@ -417,6 +419,16 @@ void action_obey_update(
 		NULL);
 
 	return;
+}
+
+short random_range(
+	short lower_bound,
+	short upper_bound)
+{
+	return seed_random_range(
+		get_global_random_seed_address(),
+		lower_bound,
+		upper_bound);
 }
 
 /* ---------- private code */
