@@ -63,9 +63,11 @@ symbols in this file:
 /* ---------- headers */
 
 #define set_real_point2d set_real_point2d_inline
+#define project_point3d project_point3d_inline
 #include "cseries.h"
 #include "path.h"
 #undef set_real_point2d
+#undef project_point3d
 
 /* ---------- constants */
 
@@ -119,6 +121,22 @@ real_point2d *set_real_point2d(
 	p->x = x;
 	p->y = y;
 	return p;
+}
+
+real_point2d *project_point3d(
+	real_point3d const *p3d,
+	short projection,
+	boolean sign,
+	real_point2d *p2d)
+{
+	match_assert("..\\math\\real_math.h", 859, projection>=_x && projection<=_z);
+	match_assert("..\\math\\real_math.h", 860, ~(sign&~1));
+
+	set_real_point2d_inline(
+		p2d,
+		p3d->n[global_projection3d_mappings[projection][sign][0]],
+		p3d->n[global_projection3d_mappings[projection][sign][1]]);
+	return p2d;
 }
 
 /* ---------- private code */
