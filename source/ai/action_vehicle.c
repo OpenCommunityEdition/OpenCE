@@ -69,7 +69,9 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#define negate_vector2d negate_vector2d_inline
 #include "actions.h"
+#undef negate_vector2d
 
 #include "actors.h"
 
@@ -84,6 +86,16 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+real_vector2d *negate_vector2d(
+	real_vector2d const *a,
+	real_vector2d *result)
+{
+	result->i = -a->i;
+	result->j = -a->j;
+
+	return result;
+}
 
 void action_vehicle_update(
 	long actor_index)
