@@ -78,7 +78,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define nonuniform_cubic_spline glow_nonuniform_cubic_spline_inline
+#define nonuniform_cubic_spline_vector3d glow_nonuniform_cubic_spline_vector3d_inline
 #include "objects/widgets/glow.h"
+#undef nonuniform_cubic_spline_vector3d
+#undef nonuniform_cubic_spline
 
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
@@ -162,6 +166,75 @@ void point_from_parametric_line(
 	result->x = forward->i * t + point->x;
 	result->y = forward->j * t + point->y;
 	result->z = forward->k * t + point->y;
+
+	return;
+}
+
+real nonuniform_cubic_spline(
+	real f0,
+	real f1,
+	real f2,
+	real f3,
+	real t0,
+	real t1,
+	real t2,
+	real t3,
+	real t)
+{
+	match_assert("..\\math\\real_math.h", 1530, t>= t0 && t <= t3);
+
+	f3 = (f3 - f2) / (t3 - t2);
+	f2 = (f2 - f1) / (t2 - t1);
+	f1 = (f1 - f0) / (t1 - t0);
+	f3 = (f3 - f2) / (t3 - t1);
+	f2 = (f2 - f1) / (t2 - t0);
+	f3 = (f3 - f2) / (t3 - t0);
+
+	return f0 + (t - t0) * (f1 + (t - t1) * (f2 + (t - t2) * f3));
+}
+
+void nonuniform_cubic_spline_vector3d(
+	real_vector3d *result,
+	real_vector3d const *f0,
+	real_vector3d const *f1,
+	real_vector3d const *f2,
+	real_vector3d const *f3,
+	real t0,
+	real t1,
+	real t2,
+	real t3,
+	real t)
+{
+	result->i = nonuniform_cubic_spline(
+		f0->i,
+		f1->i,
+		f2->i,
+		f3->i,
+		t0,
+		t1,
+		t2,
+		t3,
+		t);
+	result->j = nonuniform_cubic_spline(
+		f0->j,
+		f1->j,
+		f2->j,
+		f3->j,
+		t0,
+		t1,
+		t2,
+		t3,
+		t);
+	result->k = nonuniform_cubic_spline(
+		f0->k,
+		f1->k,
+		f2->k,
+		f3->k,
+		t0,
+		t1,
+		t2,
+		t3,
+		t);
 
 	return;
 }
