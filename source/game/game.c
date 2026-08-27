@@ -119,7 +119,9 @@ struct game_options;
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#define set_random_seed set_random_seed_inline
 #include "game/game.h"
+#undef set_random_seed
 #include "memory/data.h"
 
 /* ---------- constants */
@@ -241,6 +243,14 @@ boolean game_is_cooperative(
 	void)
 {
 	return player_spawn_count > 1;
+}
+
+void set_random_seed(
+	unsigned long seed)
+{
+	*get_global_random_seed_address() = seed;
+
+	return;
 }
 
 /* ---------- private code */
