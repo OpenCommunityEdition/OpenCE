@@ -143,6 +143,47 @@ struct input_globals bss_004536a0;
 
 /* ---------- public code */
 
+short fix_dead_zone(
+	short value,
+	short dead_range)
+{
+	if (value > dead_range)
+	{
+		return (short)((value - dead_range) * SHORT_MAX / (SHORT_MAX - dead_range));
+	}
+
+	if (value < -dead_range)
+	{
+		return (short)((value + dead_range) * SHORT_MIN / (SHORT_MIN + dead_range));
+	}
+
+	return 0;
+}
+
+void update_ticks(
+	byte *ticks,
+	boolean down)
+{
+	long value;
+
+	if (down)
+	{
+		value = *ticks + 1;
+		if (value > UNSIGNED_CHAR_MAX)
+		{
+			value = UNSIGNED_CHAR_MAX;
+		}
+	}
+	else
+	{
+		value = 0;
+	}
+
+	*ticks = (byte)value;
+
+	return;
+}
+
 void code_000bebb0(
 	void)
 {
@@ -163,20 +204,26 @@ void input_suppress(
 	return;
 }
 
-void input_activate(void)
+void input_activate(
+	void)
 {
+	return;
 }
 
-void input_deactivate(void)
+void input_deactivate(
+	void)
 {
+	return;
 }
 
-const struct mouse_state *input_get_mouse_state(void)
+const struct mouse_state *input_get_mouse_state(
+	void)
 {
 	return NULL;
 }
 
-boolean input_mouse_button_is_down(short button_index)
+boolean input_mouse_button_is_down(
+	short button_index)
 {
 	return FALSE;
 }
