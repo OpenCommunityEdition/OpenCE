@@ -62,16 +62,65 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 /* ---------- constants */
+
+enum
+{
+	_rasterizer_profile_environment_shadows = 4,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct rasterizer_model_begin_parameters;
+
+struct rasterizer_environment_shadows_globals
+{
+	byte unknown000[68];
+	struct rasterizer_model_begin_parameters const *model;
+};
+
 /* ---------- prototypes */
+
+void rasterizer_profile_begin(
+	short profile);
+
+void rasterizer_profile_end(
+	short profile);
 
 /* ---------- globals */
 
+struct rasterizer_environment_shadows_globals bss_0046628c = { 0 };
+
+#define rasterizer_environment_shadows_globals bss_0046628c
+
 /* ---------- public code */
+
+void _rasterizer_environment_shadows_begin(
+	void)
+{
+	rasterizer_profile_begin(_rasterizer_profile_environment_shadows);
+
+	return;
+}
+
+void _rasterizer_environment_shadow_model_end(
+	void)
+{
+	rasterizer_environment_shadows_globals.model = 0;
+
+	return;
+}
+
+void _rasterizer_environment_shadows_end(
+	void)
+{
+	rasterizer_profile_end(_rasterizer_profile_environment_shadows);
+
+	return;
+}
 
 /* ---------- private code */
