@@ -1,0 +1,8 @@
+# dbg32 build and run artifacts (regenerated per run)
+dbg32.obj
+dbg32.exe
+dbg_result.txt
+dbg_cmd.u16
+dbg_dir.u16
+dbg_bp.txt
+dbg_*.obj
