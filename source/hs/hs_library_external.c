@@ -89,12 +89,15 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "main/console.h"
+#include "memory/data.h"
 #include "objects/damage.h"
 #include "objects/objects.h"
 #include "effects/effects.h"
 #include "game/player_control.h"
 #include "game/players.h"
+#include "items/items.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "sound/sound_definitions.h"
@@ -108,6 +111,8 @@ symbols in this file:
 	((struct hs_sound_definition *)tag_get(SOUND_DEFINITION_TAG, (index)))
 #define hs_looping_sound_definition_get(index) \
 	((struct hs_looping_sound_definition *)tag_get(LOOPING_SOUND_DEFINITION_TAG, (index)))
+#define hs_item_datum_from_object(object) \
+	((struct item_datum *)(object))
 
 /* ---------- structures */
 
@@ -143,6 +148,11 @@ struct hs_looping_sound_definition
 
 long object_index_from_name_index(
 	short name_index);
+long object_list_new(
+	void);
+void object_list_add(
+	long object_list_index,
+	long object_index);
 long object_list_get_first(
 	long object_list_index,
 	long *reference_index);
@@ -188,6 +198,8 @@ void unit_exit_seat_end(
 
 /* ---------- globals */
 
+extern unsigned long hs_debug_data[];
+
 /* ---------- public code */
 
 boolean hs_not(
@@ -200,6 +212,180 @@ void hs_print(
 	char const *message)
 {
 	terminal_printf(global_real_argb_green, message);
+
+	return;
+}
+
+long hs_players(
+	void)
+{
+	long object_list_index;
+	long player_index;
+
+	object_list_index = object_list_new();
+	for (player_index = data_next_index(player_data, NONE);
+		player_index != NONE;
+		player_index = data_next_index(player_data, player_index))
+	{
+		struct player_datum *player;
+
+		player = player_get(player_index);
+		if (player->unit_index != NONE)
+			object_list_add(object_list_index, player->unit_index);
+	}
+
+	return object_list_index;
+}
+
+boolean hs_trigger_volume_test_objects(
+	short trigger_volume_index,
+	long object_list_index,
+	boolean all)
+{
+	long reference_index;
+	long object_index;
+	boolean result;
+
+	result = all;
+	object_index = object_list_get_first(object_list_index, &reference_index);
+	while (object_index != NONE)
+	{
+		if (scenario_trigger_volume_test_object(
+			trigger_volume_index,
+			object_index))
+		{
+			if (!result)
+			{
+				result = TRUE;
+				break;
+			}
+		}
+		else if (result)
+		{
+			result = FALSE;
+			break;
+		}
+
+		object_index = object_list_get_next(
+			object_list_index,
+			&reference_index);
+	}
+
+	BIT_VECTOR_SET_FLAG(hs_debug_data, trigger_volume_index, result);
+
+	return result;
+}
+
+boolean hs_unit_can_see_object(
+	long unit_index,
+	long object_index,
+	real degrees)
+{
+	boolean result;
+
+	result = FALSE;
+	if (object_index != NONE)
+	{
+		real_point3d target_point;
+
+		if (unit_try_and_get(object_index))
+			unit_get_head_position(object_index, &target_point);
+		else
+			target_point = object_get(object_index)->object.bounding_sphere_center;
+
+		result = unit_can_see_point(
+			unit_index,
+			&target_point,
+			DEGREES_TO_RADIANS(degrees));
+	}
+
+	return result;
+}
+
+boolean code_000b8c80(
+	long object_index)
+{
+	struct object_datum *object;
+	boolean result;
+
+	object = object_get(object_index);
+	result = player_index_from_unit_index(object_index) != NONE;
+	if (!result)
+	{
+		long child_object_index;
+
+		child_object_index = object->object.first_child_object_index;
+		while (child_object_index != NONE)
+		{
+			struct object_datum *child_object;
+
+			child_object = object_get(child_object_index);
+			if (code_000b8c80(child_object_index))
+			{
+				result = TRUE;
+				break;
+			}
+
+			child_object_index = child_object->object.next_object_index;
+		}
+	}
+
+	if (!result)
+	{
+		long parent_object_index;
+
+		parent_object_index = object->object.parent_object_index;
+		while (parent_object_index != NONE)
+		{
+			struct object_datum *parent_object;
+
+			parent_object = object_get(parent_object_index);
+			if (player_index_from_unit_index(parent_object_index) != NONE)
+			{
+				result = TRUE;
+				break;
+			}
+
+			parent_object_index = parent_object->object.parent_object_index;
+		}
+	}
+
+	if (!result &&
+		TEST_FLAG(_object_mask_item, object->object.type) &&
+		TEST_FLAG(
+			hs_item_datum_from_object(object)->item.flags,
+			_item_belongs_to_player_bit))
+	{
+		result = TRUE;
+	}
+
+	return result;
+}
+
+void hs_object_create(
+	short object_name_index)
+{
+	if (object_name_index != NONE)
+	{
+		long object_index;
+
+		object_index = object_index_from_name_index(object_name_index);
+		if (object_index != NONE)
+		{
+			struct scenario_object_name *object_name;
+
+			object_name = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->object_names,
+				object_name_index,
+				struct scenario_object_name);
+			error(
+				_error_silent,
+				"WARNING: object_create - '%s' already exists",
+				object_name->name);
+		}
+		else
+			object_new_by_name(object_name_index);
+	}
 
 	return;
 }
@@ -501,6 +687,16 @@ void hs_sound_set_gain(
 		*gain_reference = gain;
 
 	return;
+}
+
+boolean hs_trigger_volume_test_objects_all(
+	short trigger_volume_index,
+	long object_list_index)
+{
+	return hs_trigger_volume_test_objects(
+		trigger_volume_index,
+		object_list_index,
+		TRUE);
 }
 
 boolean hs_trigger_volume_test_objects_any(
