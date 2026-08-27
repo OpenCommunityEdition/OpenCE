@@ -776,7 +776,6 @@ static void code_0007d060(
 	long line)
 {
 	struct debug_memory_header *previous;
-	struct debug_memory_header *next;
 
 	if (header == data_002dcd0c.first_pointer)
 	{
@@ -795,13 +794,12 @@ static void code_0007d060(
 			"c:\\halo\\SOURCE\\cseries\\debug_memory.c",
 			446,
 			previous);
-		next = header->next;
-		previous->next = next;
+		previous->next = header->next;
 		previous->checksum = code_0007cd90(previous);
-		if (next != NULL)
+		if (previous->next != NULL)
 		{
-			next->previous = previous;
-			next->checksum = code_0007cd90(next);
+			previous->next->previous = previous;
+			previous->next->checksum = code_0007cd90(previous->next);
 		}
 	}
 
