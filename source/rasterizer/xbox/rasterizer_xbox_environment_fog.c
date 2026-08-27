@@ -128,15 +128,44 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct rasterizer_environment_fog_screen_globals
+{
+	unsigned char unknown000[592];
+	void *opaque_model_submit_parameters;
+	long opaque_model_count;
+	unsigned char unknown600[44];
+	void *model;
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+struct rasterizer_environment_fog_screen_globals bss_00465ad0 = { 0 };
+
+#define rasterizer_environment_fog_screen_globals bss_00465ad0
 
 /* ---------- public code */
 
 void rasterizer_environment_fog_screen_window_end(
 	void)
 {
+	return;
+}
+
+void rasterizer_environment_fog_screen_window_begin(
+	void)
+{
+	rasterizer_environment_fog_screen_globals.opaque_model_count = 0;
+
+	return;
+}
+
+void rasterizer_environment_fog_screen_model_end(
+	void)
+{
+	rasterizer_environment_fog_screen_globals.model = 0;
+
 	return;
 }
 
