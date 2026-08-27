@@ -30,16 +30,19 @@ The read-only donor census is:
   `1c306e7aebf6e9f3409f3c6831bbb646b42027a04791cc3fd0238b47edfdbb2`.
 
 It measured all eight nearby target-only real-math COMDATs against every
-same-name rebuilt object. Only this pair had independently exact donors:
+same-name rebuilt object. This arithmetic-only pair had independently exact
+donors:
 
 | function | January extent | relocations | normalized SHA-256 | exact donors |
 |---|---:|---:|---|---|
 | `_plane3d_negate` | 41 meaningful / 48 padded | 0 | `60392482a07c013f93b88ca13741bbde11eb04529befb7377d6704adbbfa5dc1` | `bsp3d.obj`, `collision_bsp.obj`, `collision_features.obj`, `units.obj` |
 | `_plane3d_distance_to_point` | 34 meaningful / 48 padded | 0 | `084ae3079dcf600c296c5564f85d95268126224a8992aaf3eb314f60a259a852` | `breakable_surfaces.obj`, `bsp3d.obj`, `collision_features.obj`, `scenario.obj` |
 
-The other six helpers were excluded before compilation. Their available
-same-name donors were nonexact or absent: `_projection_from_vector3d`,
-`_projection_sign_from_vector3d`, `_project_point2d`, `_triple_product3d`,
+`_projection_sign_from_vector3d` also had two exact donors, but its
+assertion-bearing 85-meaningful / 96-padded section and five relocations were
+deferred to a separate wave. The other five helpers were excluded before
+compilation because their available same-name donors were nonexact or absent:
+`_projection_from_vector3d`, `_project_point2d`, `_triple_product3d`,
 `_plane2d_from_points`, and `_plane3d_from_point_and_normal`.
 
 Claude's `near-complete`, `finish-hs`, and `untried` branches were read before
