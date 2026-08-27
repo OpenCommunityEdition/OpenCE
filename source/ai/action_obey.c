@@ -247,12 +247,18 @@ symbols in this file:
 /* ---------- headers */
 
 #define random_range random_range_inline
+#define vector_from_points2d vector_from_points2d_inline
+#define cross_product3d cross_product3d_inline
+#define negate_vector3d negate_vector3d_inline
 #include "cseries.h"
 #include "actions.h"
 
 #include "actors.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#undef negate_vector3d
+#undef cross_product3d
+#undef vector_from_points2d
 #undef random_range
 
 /* ---------- constants */
@@ -429,6 +435,43 @@ short random_range(
 		get_global_random_seed_address(),
 		lower_bound,
 		upper_bound);
+}
+
+real_vector2d *vector_from_points2d(
+	real_point2d const *a,
+	real_point2d const *b,
+	real_vector2d *result)
+{
+	result->i = b->x-a->x;
+	result->j = b->y-a->y;
+
+	return result;
+}
+
+real_vector3d *cross_product3d(
+	real_vector3d const *a,
+	real_vector3d const *b,
+	real_vector3d *result)
+{
+	real k = a->i*b->j - a->j*b->i;
+	real j = a->k*b->i - a->i*b->k;
+	real i = a->j*b->k - a->k*b->j;
+	result->i = i;
+	result->j = j;
+	result->k = k;
+
+	return result;
+}
+
+real_vector3d *negate_vector3d(
+	real_vector3d const *a,
+	real_vector3d *result)
+{
+	result->i = -a->i;
+	result->j = -a->j;
+	result->k = -a->k;
+
+	return result;
 }
 
 /* ---------- private code */
