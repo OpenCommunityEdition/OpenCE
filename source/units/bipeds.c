@@ -303,4 +303,17 @@ void biped_stop_melee_attack(
 	return;
 }
 
+void biped_disconnect_from_structure_bsp(
+	long biped_index)
+{
+	struct biped_datum *biped;
+
+	biped = biped_get(biped_index);
+	biped->biped.support_surface_index = NONE;
+	biped->biped.pathfinding_surface_index = NONE;
+	biped->biped.last_pathfinding_surface_index = NONE;
+
+	return;
+}
+
 /* ---------- private code */
