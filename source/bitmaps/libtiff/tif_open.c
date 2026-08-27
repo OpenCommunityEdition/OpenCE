@@ -1,5 +1,5 @@
 #ifndef lint
-static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_open.c,v 1.33 92/02/14 13:40:51 sam Exp $";
+char data_002dae60[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_open.c,v 1.33 92/02/14 13:40:51 sam Exp $";
 #endif
 
 /*
@@ -32,10 +32,13 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_open.c,v 1.
 #include "tiffioP.h"
 #include "prototypes.h"
 
+#define write _write
+
 #if USE_PROTOTYPES
-extern	int TIFFDefaultDirectory(TIFF*);
+extern int TIFFDefaultDirectory(
+	TIFF *tif);
 #else
-extern	int TIFFDefaultDirectory();
+extern int TIFFDefaultDirectory();
 #endif
 
 static long typemask[13] = {
@@ -68,7 +71,7 @@ static int bigTypeshift[13] = {
 	0,		/* TIFF_FLOAT */
 	0,		/* TIFF_DOUBLE */
 };
-static int litTypeshift[13] = {
+int bss_0031bea0[13] = {
 	0,		/* TIFF_NOTYPE */
 	0,		/* TIFF_BYTE */
 	0,		/* TIFF_ASCII */
@@ -84,14 +87,19 @@ static int litTypeshift[13] = {
 	0,		/* TIFF_DOUBLE */
 };
 
+#define litTypeshift bss_0031bea0
+
 /*
  * Initialize the bit fill order, the
  * shift & mask tables, and the byte
  * swapping state according to the file
  * contents and the machine architecture.
  */
-static
-DECLARE3(TIFFInitOrder, register TIFF*, tif, int, magic, int, bigendian)
+static void
+TIFFInitOrder(
+	TIFF *tif,
+	int magic,
+	int bigendian)
 {
 	/* XXX how can we deduce this dynamically? */
 	tif->tif_fillorder = FILLORDER_MSB2LSB;
@@ -106,10 +114,13 @@ DECLARE3(TIFFInitOrder, register TIFF*, tif, int, magic, int, bigendian)
 		if (bigendian)
 			tif->tif_flags |= TIFF_SWAB;
 	}
+	return;
 }
 
 static int
-DECLARE2(getMode, char*, mode, char*, module)
+getMode(
+	char *mode,
+	char *module)
 {
 	int m = -1;
 
@@ -136,8 +147,9 @@ DECLARE2(getMode, char*, mode, char*, module)
  * Open a TIFF file for read/writing.
  */
 TIFF *
-TIFFOpen(name, mode)
-	char *name, *mode;
+TIFFOpen(
+	char *name,
+	char *mode)
 {
 	static char module[] = "TIFFOpen";
 	int m, fd;
@@ -157,9 +169,10 @@ TIFFOpen(name, mode)
  * Open a TIFF file descriptor for read/writing.
  */
 TIFF *
-TIFFFdOpen(fd, name, mode)
-	int fd;
-	char *name, *mode;
+TIFFFdOpen(
+	int fd,
+	char *name,
+	char *mode)
 {
 	static char module[] = "TIFFFdOpen";
 	TIFF *tif;
@@ -289,12 +302,13 @@ bad:
 	TIFFClose(tif);
 	return ((TIFF *)0);
 bad2:
-	(void) close(fd);
+	(void) _close(fd);
 	return ((TIFF *)0);
 }
 
-TIFFScanlineSize(tif)
-	TIFF *tif;
+int
+TIFFScanlineSize(
+	TIFF *tif)
 {
 	TIFFDirectory *td = &tif->tif_dir;
 	long scanline;
@@ -313,8 +327,8 @@ TIFFScanlineSize(tif)
  * Return open file's name.
  */
 char *
-TIFFFileName(tif)
-	TIFF *tif;
+TIFFFileName(
+	TIFF *tif)
 {
 	return (tif->tif_name);
 }
@@ -323,8 +337,8 @@ TIFFFileName(tif)
  * Return open file's I/O descriptor.
  */
 int
-TIFFFileno(tif)
-	TIFF *tif;
+TIFFFileno(
+	TIFF *tif)
 {
 	return (tif->tif_fd);
 }
@@ -333,8 +347,8 @@ TIFFFileno(tif)
  * Return read/write mode.
  */
 int
-TIFFGetMode(tif)
-	TIFF *tif;
+TIFFGetMode(
+	TIFF *tif)
 {
 	return (tif->tif_mode);
 }
@@ -344,8 +358,8 @@ TIFFGetMode(tif)
  * tiles; zero if organized as strips.
  */
 int
-TIFFIsTiled(tif)
-	TIFF *tif;
+TIFFIsTiled(
+	TIFF *tif)
 {
 	return (isTiled(tif));
 }
@@ -354,8 +368,8 @@ TIFFIsTiled(tif)
  * Return current row being read/written.
  */
 long
-TIFFCurrentRow(tif)
-	TIFF *tif;
+TIFFCurrentRow(
+	TIFF *tif)
 {
 	return (tif->tif_row);
 }
@@ -364,8 +378,8 @@ TIFFCurrentRow(tif)
  * Return index of the current directory.
  */
 int
-TIFFCurrentDirectory(tif)
-	TIFF *tif;
+TIFFCurrentDirectory(
+	TIFF *tif)
 {
 	return (tif->tif_curdir);
 }
@@ -374,8 +388,8 @@ TIFFCurrentDirectory(tif)
  * Return current strip.
  */
 int
-TIFFCurrentStrip(tif)
-	TIFF *tif;
+TIFFCurrentStrip(
+	TIFF *tif)
 {
 	return (tif->tif_curstrip);
 }
@@ -384,8 +398,8 @@ TIFFCurrentStrip(tif)
  * Return current tile.
  */
 int
-TIFFCurrentTile(tif)
-	TIFF *tif;
+TIFFCurrentTile(
+	TIFF *tif)
 {
 	return (tif->tif_curtile);
 }
