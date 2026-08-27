@@ -746,22 +746,22 @@ static void code_0007cf50(
 static void code_0007cfc0(
 	struct debug_memory_header *header)
 {
-	struct debug_memory_header *first = data_002dcd0c.first_pointer;
-
-	if (first == NULL || header < data_002dcd0c.minimum_pointer)
+	if (data_002dcd0c.first_pointer == NULL ||
+		header < data_002dcd0c.minimum_pointer)
 	{
 		data_002dcd0c.minimum_pointer = header;
 	}
-	if (first == NULL || header > data_002dcd0c.maximum_pointer)
+	if (data_002dcd0c.first_pointer == NULL ||
+		header > data_002dcd0c.maximum_pointer)
 	{
 		data_002dcd0c.maximum_pointer = header;
 	}
 
-	header->next = first;
-	if (first != NULL)
+	header->next = data_002dcd0c.first_pointer;
+	if (data_002dcd0c.first_pointer != NULL)
 	{
-		first->previous = header;
-		first->checksum = code_0007cd90(first);
+		data_002dcd0c.first_pointer->previous = header;
+		header->next->checksum = code_0007cd90(header->next);
 	}
 	header->previous = NULL;
 	data_002dcd0c.first_pointer = header;
