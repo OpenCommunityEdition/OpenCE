@@ -182,7 +182,9 @@ symbols in this file:
 
 #include "cseries.h"
 #define signed_angular_difference signed_angular_difference_inline
+#define limit2d limit2d_inline
 #include "game/game.h"
+#undef limit2d
 #undef signed_angular_difference
 #include "game/player_control.h"
 #include "players.h"
@@ -558,6 +560,25 @@ real signed_angular_difference(
 	}
 
 	return result;
+}
+
+boolean limit2d(
+	real_vector2d *vector,
+	real length)
+{
+	real dot = vector->i * vector->i + vector->j * vector->j;
+
+	if (dot > length * length)
+	{
+		scale_vector2d(
+			vector,
+			length / square_root(dot),
+			vector);
+
+		return TRUE;
+	}
+
+	return FALSE;
 }
 
 void player_control_set_facing(
