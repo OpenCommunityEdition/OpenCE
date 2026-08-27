@@ -951,6 +951,120 @@ boolean point_in_triangle2d(
 	return result;
 }
 
+boolean point_in_triangle3d(
+	real_point3d const *point,
+	real_point3d const *triangle0,
+	real_point3d const *triangle1,
+	real_point3d const *triangle2,
+	real *t0,
+	real *t1)
+{
+	real_point3d edge0;
+	real_point3d edge1;
+	real_point3d offset;
+	real_vector3d normal;
+	real_point2d projected_edge0;
+	real_point2d projected_edge1;
+	real_point2d projected_offset;
+	real plane_distance;
+	real cross0;
+	real cross1;
+	real determinant;
+	short projection;
+	boolean projection_sign;
+	boolean result;
+
+	offset.x = point->x - triangle0->x;
+	offset.y = point->y - triangle0->y;
+	offset.z = point->z - triangle0->z;
+	edge0.x = triangle1->x - triangle0->x;
+	edge0.y = triangle1->y - triangle0->y;
+	edge0.z = triangle1->z - triangle0->z;
+	edge1.x = triangle2->x - triangle0->x;
+	edge1.y = triangle2->y - triangle0->y;
+	edge1.z = triangle2->z - triangle0->z;
+	{
+		real normal_k;
+		real normal_j;
+		real normal_i;
+
+		normal_k = edge0.x * edge1.y - edge0.y * edge1.x;
+		normal_j = edge0.z * edge1.x - edge0.x * edge1.z;
+		normal_i = edge0.y * edge1.z - edge0.z * edge1.y;
+		normal.i = normal_i;
+		normal.j = normal_j;
+		normal.k = normal_k;
+	}
+	plane_distance =
+		normal.i * offset.x +
+		normal.j * offset.y +
+		normal.k * offset.z;
+	if (plane_distance * plane_distance <
+		(normal.i * normal.i + normal.j * normal.j + normal.k * normal.k) *
+		_real_epsilon)
+	{
+		projection = projection_from_vector3d(&normal);
+		projection_sign = projection_sign_from_vector3d(&normal, projection);
+		project_point3d(
+			&edge0,
+			projection,
+			projection_sign,
+			&projected_edge0);
+		project_point3d(
+			&offset,
+			projection,
+			projection_sign,
+			&projected_offset);
+		cross0 =
+			projected_edge0.x * projected_offset.y -
+			projected_edge0.y * projected_offset.x;
+		if (cross0 >= 0.0f)
+		{
+			project_point3d(
+				&edge1,
+				projection,
+				projection_sign,
+				&projected_edge1);
+			cross1 =
+				projected_offset.x * projected_edge1.y -
+				projected_offset.y * projected_edge1.x;
+			if (cross1 >= 0.0f)
+			{
+				determinant =
+					projected_edge0.x * projected_edge1.y -
+					projected_edge0.y * projected_edge1.x;
+				if (cross0 + cross1 <= determinant)
+				{
+					real inverse_determinant;
+
+					inverse_determinant = 1.0f / determinant;
+					*t0 = cross1 * inverse_determinant;
+					*t1 = cross0 * inverse_determinant;
+					result = TRUE;
+				}
+				else
+				{
+					result = FALSE;
+				}
+			}
+			else
+			{
+				result = FALSE;
+			}
+		}
+		else
+		{
+			result = FALSE;
+		}
+	}
+	else
+	{
+		result = FALSE;
+	}
+
+	return result;
+}
+
 boolean circle_intersects_triangle2d(
 	real_point2d const *center,
 	real radius,
@@ -1193,6 +1307,175 @@ boolean sphere_intersects_rectangle3d(
 	}
 
 	return dx * dx + dy * dy + dz * dz < radius * radius;
+}
+
+boolean sphere_intersects_triangle3d(
+	real_point3d const *center,
+	real radius,
+	real_point3d const *triangle0,
+	real_point3d const *triangle1,
+	real_point3d const *triangle2)
+{
+	real_vector3d center_offset;
+	real_vector3d edge01;
+	real_vector3d edge12;
+	real_vector3d edge20;
+	real_vector3d normal;
+	real_vector3d cross;
+	real plane_dot;
+	real normal_magnitude_squared;
+	boolean result;
+
+	result = TRUE;
+	vector_from_points3d(triangle0, center, &center_offset);
+	vector_from_points3d(triangle0, triangle1, &edge01);
+	vector_from_points3d(triangle1, triangle2, &edge12);
+	cross_product3d(&edge01, &edge12, &normal);
+	plane_dot = dot_product3d(&normal, &center_offset);
+	normal_magnitude_squared = magnitude_squared3d(&normal);
+	if (plane_dot * plane_dot > normal_magnitude_squared * radius * radius)
+	{
+		return FALSE;
+	}
+
+	cross_product3d(&center_offset, &edge01, &cross);
+	if (dot_product3d(&normal, &cross) > 0.0f)
+	{
+		if (fast_vector_intersects_sphere(triangle0, &edge01, center, radius))
+		{
+			return TRUE;
+		}
+		result = FALSE;
+	}
+
+	vector_from_points3d(triangle1, center, &center_offset);
+	cross_product3d(&center_offset, &edge12, &cross);
+	if (dot_product3d(&normal, &cross) > 0.0f)
+	{
+		if (fast_vector_intersects_sphere(triangle1, &edge12, center, radius))
+		{
+			return TRUE;
+		}
+		result = FALSE;
+	}
+
+	vector_from_points3d(triangle2, triangle0, &edge20);
+	vector_from_points3d(triangle2, center, &center_offset);
+	cross_product3d(&center_offset, &edge20, &cross);
+	if (dot_product3d(&normal, &cross) < 0.0f)
+	{
+		if (fast_vector_intersects_sphere(triangle2, &edge20, center, radius))
+		{
+			return TRUE;
+		}
+		result = FALSE;
+	}
+
+	return result;
+}
+
+boolean pill_intersects_triangle3d(
+	real_point3d const *pill_base,
+	real_vector3d const *pill_height,
+	real pill_width,
+	real_point3d const *triangle0,
+	real_point3d const *triangle1,
+	real_point3d const *triangle2)
+{
+	real_vector3d edge12;
+	real_vector3d edge01;
+	real_vector3d normal;
+	real_vector3d edge20;
+	real_vector3d cross;
+	real_vector3d offset;
+	real_point3d projected_point;
+	real t;
+	real closest_t;
+	real plane_distance;
+	boolean outside;
+
+	vector_from_points3d(triangle0, triangle1, &edge01);
+	outside = FALSE;
+	vector_from_points3d(triangle1, triangle2, &edge12);
+	vector_from_points3d(pill_base, triangle0, &offset);
+	cross_product3d(&edge01, &edge12, &normal);
+	t = dot_product3d(&normal, &offset) / dot_product3d(&normal, pill_height);
+
+	if (t < 0.0f)
+	{
+		closest_t = 0.0f;
+	}
+	else if (t > 1.0f)
+	{
+		closest_t = 1.0f;
+	}
+	else
+	{
+		closest_t = t;
+	}
+	point_from_line3d(pill_base, pill_height, closest_t, &projected_point);
+	vector_from_points3d(triangle0, &projected_point, &offset);
+	cross_product3d(&edge01, &offset, &cross);
+
+	if (dot_product3d(&cross, &normal) < 0.0f)
+	{
+		if ((boolean)vector_intersects_pill3d(
+			triangle0,
+			&edge01,
+			pill_base,
+			pill_height,
+			pill_width))
+		{
+return_true:
+			return TRUE;
+		}
+		outside = TRUE;
+	}
+
+	vector_from_points3d(triangle1, &projected_point, &offset);
+	cross_product3d(&edge12, &offset, &cross);
+	if (dot_product3d(&cross, &normal) < 0.0f)
+	{
+		if ((boolean)vector_intersects_pill3d(
+			triangle1,
+			&edge12,
+			pill_base,
+			pill_height,
+			pill_width))
+		{
+			return TRUE;
+		}
+		outside = TRUE;
+	}
+
+	vector_from_points3d(triangle2, triangle0, &edge20);
+	vector_from_points3d(triangle2, &projected_point, &offset);
+	cross_product3d(&edge20, &offset, &cross);
+	if (dot_product3d(&cross, &normal) < 0.0f)
+	{
+		if ((boolean)vector_intersects_pill3d(
+			triangle2,
+			&edge20,
+			pill_base,
+			pill_height,
+			pill_width))
+		{
+			return TRUE;
+		}
+		return FALSE;
+	}
+
+	if (outside)
+	{
+		return FALSE;
+	}
+	if (t > 0.0f && t < 1.0f)
+	{
+		goto return_true;
+	}
+	plane_distance = dot_product3d(&normal, &offset);
+	return plane_distance * plane_distance <=
+		magnitude_squared3d(&normal) * pill_width * pill_width;
 }
 
 
@@ -2469,6 +2752,95 @@ boolean sphere_test_vector3d(
 	return FALSE;
 }
 
+boolean pill_test_vector3d(
+	real_point3d const *base,
+	real height,
+	real radius,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real *t,
+	real_vector3d *normal)
+{
+	real_vector2d x;
+	real xv;
+	real xx_rr;
+	real d;
+	real vv;
+	real n;
+	real height_fraction;
+	real top_z;
+	real_point3d top;
+	boolean result = FALSE;
+
+	x.i = point->x - base->x;
+	x.j = point->y - base->y;
+	xv = x.i * vector->i + x.j * vector->j;
+	xx_rr = x.i * x.i + x.j * x.j - radius * radius;
+	if (xx_rr <= 0.0f)
+	{
+		n = 0.0f;
+	}
+	else
+	{
+		d = vector->i * vector->i + vector->j * vector->j;
+		vv = xv * xv - d * xx_rr;
+		if (vv >= 0.0f)
+		{
+			n = -(square_root(vv) + xv);
+			if (n <= d)
+			{
+				n = n / d;
+			}
+			else
+			{
+				goto done;
+			}
+		}
+		else
+		{
+			goto done;
+		}
+	}
+
+	result = TRUE;
+	height_fraction =
+		(point->z - base->z + n * vector->k) / (height * height);
+	if (height_fraction < 0.0f)
+	{
+		result = sphere_test_vector3d(base, radius, point, vector, t, normal);
+	}
+	else if (height_fraction > 1.0f)
+	{
+		top_z = base->z + height;
+		top.x = base->x;
+		top.y = base->y;
+		top.z = top_z;
+		result = sphere_test_vector3d(&top, radius, point, vector, t, normal);
+	}
+	else if (xv < 0.0f)
+	{
+		*t = n;
+		x.i = x.i + n * vector->i;
+		x.j = x.j + n * vector->j;
+		fast_normalize2d(&x);
+		normal->i = x.i;
+		normal->j = x.j;
+		normal->k = 0.0f;
+	}
+	else
+	{
+		result = FALSE;
+	}
+
+	if (result && dot_product3d(normal, vector) > 0.0f)
+	{
+		result = FALSE;
+	}
+
+done:
+	return result;
+}
+
 boolean point_from_planes3d(
 	real_plane3d const *plane0,
 	real_plane3d const *plane1,
@@ -2547,6 +2919,116 @@ boolean line_from_planes3d(
 	}
 
 	return FALSE;
+}
+
+void angular_accelerate_to_position(
+	real_vector3d *position,
+	real_vector3d const *position_desired,
+	real_vector3d *angular_velocity,
+	real angular_velocity_magnitude_maximum,
+	real angular_acceleration_magnitude_maximum)
+{
+	real cosine_value;
+	real speed;
+	real speed_squared;
+	real_vector3d axis;
+	real_vector3d delta;
+	real delta_magnitude_squared;
+	real angle;
+
+	if (angular_acceleration_magnitude_maximum <= 0.0f &&
+		angular_velocity_magnitude_maximum <= 0.0f)
+	{
+		*angular_velocity = *global_zero_vector3d;
+		*position = *position_desired;
+		return;
+	}
+
+	cosine_value =
+		position_desired->k * position->k +
+		position->i * position_desired->i +
+		position_desired->j * position->j;
+	if (cosine_value < -1.0f)
+	{
+		cosine_value = -1.0f;
+	}
+	else if (cosine_value > 1.0f)
+	{
+		cosine_value = 1.0f;
+	}
+
+	speed_squared = arccosine(cosine_value);
+	speed_squared =
+		speed_squared * angular_acceleration_magnitude_maximum +
+		speed_squared * angular_acceleration_magnitude_maximum;
+	if (speed_squared >=
+		angular_velocity_magnitude_maximum *
+		angular_velocity_magnitude_maximum)
+	{
+		speed = angular_velocity_magnitude_maximum;
+	}
+	else
+	{
+		speed = square_root(speed_squared);
+	}
+
+	axis.i =
+		position_desired->k * position->j -
+		position->k * position_desired->j;
+	axis.j =
+		position->k * position_desired->i -
+		position_desired->k * position->i;
+	axis.k =
+		position->i * position_desired->j -
+		position_desired->i * position->j;
+	normalize3d(&axis);
+
+	axis.i = axis.i * speed;
+	axis.j = axis.j * speed;
+	axis.k = axis.k * speed;
+	delta.i = axis.i - angular_velocity->i;
+	delta.j = axis.j - angular_velocity->j;
+	delta.k = axis.k - angular_velocity->k;
+	delta_magnitude_squared =
+		delta.k * delta.k +
+		delta.j * delta.j +
+		delta.i * delta.i;
+	if (delta_magnitude_squared <
+		angular_acceleration_magnitude_maximum *
+		angular_acceleration_magnitude_maximum)
+	{
+		if (speed < 1.0000001e-6f)
+		{
+			*angular_velocity = *global_zero_vector3d;
+			*position = *position_desired;
+			return;
+		}
+		*angular_velocity = axis;
+	}
+	else
+	{
+		angular_acceleration_magnitude_maximum =
+			angular_acceleration_magnitude_maximum /
+			square_root(delta_magnitude_squared);
+		angular_velocity->i =
+			delta.i * angular_acceleration_magnitude_maximum +
+			angular_velocity->i;
+		angular_velocity->j =
+			delta.j * angular_acceleration_magnitude_maximum +
+			angular_velocity->j;
+		angular_velocity->k =
+			delta.k * angular_acceleration_magnitude_maximum +
+			angular_velocity->k;
+	}
+
+	axis = *angular_velocity;
+	angle = normalize3d(&axis);
+	if (angle != 0.0f)
+	{
+		rotate_vector_about_axis(position, &axis, sine(angle), cosine(angle));
+		normalize3d(position);
+	}
+	return;
 }
 
 
