@@ -204,3 +204,9 @@ real_vector4d *set_real_vector4d(
 
 	return vector;
 }
+
+boolean local_random_boolean(
+	void)
+{
+	return local_random() > 0x8000;
+}
