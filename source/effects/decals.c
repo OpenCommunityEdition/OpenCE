@@ -212,9 +212,14 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define plane3d_negate plane3d_negate_inline
+#define plane3d_distance_to_point plane3d_distance_to_point_inline
 #include "effects/decals.h"
-
 #include "cseries/cseries.h"
+#include "math/real_math.h"
+#undef plane3d_negate
+#undef plane3d_distance_to_point
+
 #include "memory/data.h"
 
 /* ---------- constants */
@@ -271,6 +276,28 @@ void decal_new_from_media_collision(
 	struct decal_editor_geometry *editor_geometry)
 {
 	return;
+}
+
+real_plane3d *plane3d_negate(
+	real_plane3d const *p1,
+	real_plane3d *plane)
+{
+	plane->n.i = -p1->n.i;
+	plane->n.j = -p1->n.j;
+	plane->n.k = -p1->n.k;
+	plane->d = -p1->d;
+
+	return plane;
+}
+
+real plane3d_distance_to_point(
+	real_plane3d const *plane,
+	real_point3d const *point)
+{
+	return point->x * plane->n.i
+		+ point->y * plane->n.j
+		+ point->z * plane->n.k
+		- plane->d;
 }
 
 /* ---------- private code */
