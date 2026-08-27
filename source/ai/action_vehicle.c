@@ -70,7 +70,9 @@ symbols in this file:
 
 #include "cseries.h"
 #define negate_vector2d negate_vector2d_inline
+#define point_from_line2d point_from_line2d_inline
 #include "actions.h"
+#undef point_from_line2d
 #undef negate_vector2d
 
 #include "actors.h"
@@ -86,6 +88,18 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+real_point2d *point_from_line2d(
+	real_point2d const *p,
+	real_vector2d const *v,
+	real t,
+	real_point2d *result)
+{
+	result->x = t*v->i + p->x;
+	result->y = t*v->j + p->y;
+
+	return result;
+}
 
 real_vector2d *negate_vector2d(
 	real_vector2d const *a,
