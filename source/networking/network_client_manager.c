@@ -376,6 +376,10 @@ enum
 
 /* ---------- macros */
 
+#define network_machine_is_valid(machine) \
+	((machine) && (machine)->machine_index >= 0 && \
+	(machine)->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT)
+
 /* ---------- structures */
 
 struct network_machine
@@ -398,7 +402,9 @@ struct network_game_client
 	byte __padding2[2];
 	byte available_games[0x828];
 	void *connection;
-	byte __padding830[0x2C];
+	byte __padding830[4];
+	unsigned long connection_attempt_time;
+	byte __padding838[0x24];
 	struct network_game game;
 	byte __paddingC90[8];
 	unsigned long next_update_number;
@@ -416,6 +422,8 @@ typedef char network_game_size_assert[
 	sizeof(struct network_game) == 0x434 ? 1 : -1];
 typedef char network_game_client_connection_offset_assert[
 	offsetof(struct network_game_client, connection) == 0x82C ? 1 : -1];
+typedef char network_game_client_connection_attempt_time_offset_assert[
+	offsetof(struct network_game_client, connection_attempt_time) == 0x834 ? 1 : -1];
 typedef char network_game_client_game_offset_assert[
 	offsetof(struct network_game_client, game) == 0x85C ? 1 : -1];
 typedef char network_game_client_next_update_number_offset_assert[
@@ -441,6 +449,13 @@ void network_connection_get_address(
 	void *connection,
 	void *address,
 	boolean include_port);
+unsigned long system_milliseconds(
+	void);
+void game_engine_switch_to_postgame(
+	void);
+void network_event(
+	char *format,
+	...);
 
 boolean network_game_client_write(
 	void *connection,
@@ -448,6 +463,18 @@ boolean network_game_client_write(
 	unsigned short message_size,
 	void *address,
 	long flags);
+
+short network_game_client_get_state(
+	struct network_game_client *client,
+	short *state_data);
+boolean network_game_client_set_machine(
+	struct network_game_client *client,
+	struct network_machine *machine);
+void network_game_client_switch_to_postgame(
+	struct network_game_client *client);
+void network_game_client_countdown_timer_update(
+	struct network_game_client *client,
+	short seconds_to_game_start);
 
 struct network_machine *network_game_client_get_machine(
 	struct network_game_client *client);
@@ -478,6 +505,78 @@ boolean network_client_get_oos(
 /* ---------- globals */
 
 /* ---------- public code */
+
+short network_game_client_get_state(
+	struct network_game_client *client,
+	short *state_data)
+{
+	unsigned long elapsed_time;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0xF9,
+		client);
+
+	if (state_data)
+	{
+		*state_data = 0;
+
+		if (client->state == 1)
+		{
+			elapsed_time = system_milliseconds() * 100 -
+				client->connection_attempt_time * 100;
+			*state_data = (short)(elapsed_time / 120000);
+		}
+	}
+
+	return client->state;
+}
+
+boolean network_game_client_set_machine(
+	struct network_game_client *client,
+	struct network_machine *machine)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x1E1,
+		client && (client->machine_index<MAXIMUM_NETWORK_MACHINE_COUNT) && network_machine_is_valid(machine));
+
+	csmemcpy(
+		&client->game.machines[client->machine_index],
+		machine,
+		sizeof(*machine));
+
+	return TRUE;
+}
+
+void network_game_client_switch_to_postgame(
+	struct network_game_client *client)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x48C,
+		client);
+
+	game_engine_switch_to_postgame();
+	client->state = 4;
+	network_event("switching to postgame");
+
+	return;
+}
+
+void network_game_client_countdown_timer_update(
+	struct network_game_client *client,
+	short seconds_to_game_start)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x5C3,
+		client);
+
+	client->seconds_to_game_start = seconds_to_game_start;
+
+	return;
+}
 
 struct network_machine *network_game_client_get_machine(
 	struct network_game_client *client)
