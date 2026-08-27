@@ -60,6 +60,32 @@ SHA-256
 The parameter-order family is therefore closed and was fully reverted before
 the unlink wave.
 
+## Random-fill lifetime follow-up
+
+After the unlink admission, January's random-fill disassembly supplied one
+additional bounded hypothesis. The target restores its cached `current` and
+`end` registers before the odd-byte branch, then addresses the last byte from
+the original pointer and size. Two ordinary source forms were measured in
+separate evidence waves:
+
+1. writing the last byte directly as `pointer + size - 1`; and
+2. placing `current`, `end`, and the word-fill loop in a nested block before
+   that direct final store.
+
+VC7 canonicalized both forms to the same 96-byte helper and the same semantic
+`EAX`/`EBX` private ABI. Their raw object SHA-256 values were
+`92394a55905bfe3c92592236d366e43b86dad18053e4a9b7f9447b420cbe7f49`
+and
+`97b3e1c7b3dee176abf05b94f9cb980627db2f47c10da3924a9560e7a9bec96e`.
+Neither changed an accepted sibling, and neither made a function exact. Both
+were reverted; a clean rebuild returns all 15 accepted functions to
+`still_exact` with no changed nonexact function.
+
+This closes formal-order, equivalent final-address, and lexical-scope controls
+for `_code_0007cf50`. Reopen it only with original-source provenance or a
+caller-lifetime topology that demonstrably changes VC7's private convention;
+do not repeat those three families.
+
 ## Validation
 
 - Strict comparator: `_code_0007d060` passes padded bytes, normalized bytes,
