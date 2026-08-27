@@ -80,3 +80,16 @@ the unlink wave.
 - `git diff --check`, parse-only XDK compilation, and the forbidden-construct
   audit pass. No configuration, semantic exception, completion label, header,
   protected source, or Units source changed.
+
+## Clean committed-state replay
+
+Implementation commit `0671bb1003c44a99f833f7f948b3459a44ae3c35`
+was clean before replay. A fresh fail-closed snapshot at that commit was
+written to
+`build/audit/debug_memory_unlink_reload_regression_20260826.json`. The sole
+generated object was resolved inside the isolated worktree, removed with a
+literal verified path, rebuilt through its ordinary Ninja edge, and checked
+immediately. All 15 accepted functions report `still_exact`, with zero
+failures, warnings, newly exact functions, or changed nonexact functions.
+Independent strict comparison again proves `_code_0007d060` at 224/224 padded
+bytes, 14/14 relocations, and normalized SHA-256 `609ad851cc6695b2...`.
