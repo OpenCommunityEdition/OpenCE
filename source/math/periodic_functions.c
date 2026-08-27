@@ -223,6 +223,7 @@ real periodic_function_evaluate(
 	real time)
 {
 	long index;
+	byte *table;
 	real fraction;
 	real first_value;
 	real second_value;
@@ -236,34 +237,39 @@ real periodic_function_evaluate(
 		157,
 		function_type>=0 && function_type<NUMBER_OF_PERIODIC_FUNCTIONS);
 
-	if (!bss_004561bc.function_tables_initialized)
-		return 0.0f;
-
-	time *= 25.6f;
-	fraction = (real)fmod((double)time, 1.0);
-	index = (long)(time-fraction);
-	first_value = bss_004561bc.periodic_function_tables[function_type][index&PERIODIC_FUNCTION_TABLE_MASK] * (1.0f/255.0f);
-	second_value = bss_004561bc.periodic_function_tables[function_type][(index+1)&PERIODIC_FUNCTION_TABLE_MASK] * (1.0f/255.0f);
-
-	if ((function_type == _periodic_function_slide ||
-		function_type == _periodic_function_slide_variable_period) &&
-		first_value > 0.75f && second_value < 0.25f)
+	if (bss_004561bc.function_tables_initialized)
 	{
-		second_value += 1.0f;
+		time *= 25.6f;
+		fraction = (real)fmod((double)time, 1.0);
+		index = (long)(time-fraction);
+		table = bss_004561bc.periodic_function_tables[function_type];
+		first_value = table[index&PERIODIC_FUNCTION_TABLE_MASK] * (1.0f/255.0f);
+		second_value = table[(index+1)&PERIODIC_FUNCTION_TABLE_MASK] * (1.0f/255.0f);
+
+		if (((1 << function_type)&0xC0) != 0)
+		{
+			if (first_value > 0.75f && second_value < 0.25f)
+				second_value += 1.0f;
+
+			result = (1.0f-fraction)*first_value + second_value*fraction;
+			if (result > 1.0f)
+				return result-1.0f;
+
+			return result;
+		}
+
+		return (1.0f-fraction)*first_value + second_value*fraction;
 	}
 
-	result = first_value*(1.0f-fraction) + second_value*fraction;
-	if (result > 1.0f)
-		result -= 1.0f;
-
-	return result;
+	return 0.0f;
 }
 
 real transition_function_evaluate(
 	short function_type,
 	real value)
 {
-	short index;
+	long index;
+	byte *table;
 	real fraction;
 	real first_value;
 	real second_value;
@@ -281,21 +287,22 @@ real transition_function_evaluate(
 		216,
 		function_type>=0 && function_type<NUMBER_OF_TRANSITION_FUNCTIONS);
 
-	if (!bss_004561bc.function_tables_initialized)
-		return 0.0f;
-
-	value *= (real)(PERIODIC_FUNCTION_TABLE_SIZE-1);
-	fraction = (real)fmod((double)value, 1.0);
-	index = (short)(value-0.5f);
-	if (index == PERIODIC_FUNCTION_TABLE_SIZE-1)
+	if (bss_004561bc.function_tables_initialized)
 	{
-		return bss_004561bc.transition_function_tables[function_type][index] * (1.0f/255.0f);
+		table = bss_004561bc.transition_function_tables[function_type];
+		value *= (real)(PERIODIC_FUNCTION_TABLE_SIZE-1);
+		fraction = (real)fmod((double)value, 1.0);
+		index = (long)(value-0.5f);
+		if ((short)index == PERIODIC_FUNCTION_TABLE_SIZE-1)
+			return table[PERIODIC_FUNCTION_TABLE_SIZE-1] * (1.0f/255.0f);
+
+		first_value = table[(short)index] * (1.0f/255.0f);
+		second_value = table[(short)index+1] * (1.0f/255.0f);
+
+		return first_value*(1.0f-fraction) + second_value*fraction;
 	}
 
-	first_value = bss_004561bc.transition_function_tables[function_type][index] * (1.0f/255.0f);
-	second_value = bss_004561bc.transition_function_tables[function_type][index+1] * (1.0f/255.0f);
-
-	return first_value*(1.0f-fraction) + second_value*fraction;
+	return 0.0f;
 }
 
 /* ---------- private code */
@@ -317,11 +324,11 @@ static void code_000fa050(
 		frequencies[0] = (real)index;
 		frequencies[1] = real_seed_random(get_global_random_seed_address());
 		frequencies[1] = (frequencies[1]+1.0f)*0.25f;
-		frequencies[0] = (real)cos(frequencies[0]*0.044791f);
+		frequencies[0] = (real)cos(frequencies[0]*0.044792242f);
 		frequencies[0] = (frequencies[0]+1.0f)*amplitudes[2] + frequencies[1];
 		frequencies[1] = (real)cos((real)index*0.03129321f);
 		frequencies[1] = (frequencies[1]+1.0f)*amplitudes[1] + frequencies[0];
-		frequencies[2] = (real)cos((real)index*0.025157287f);
+		frequencies[2] = (real)cos((real)index*0.025157286f);
 		frequencies[2] = (frequencies[2]+1.0f)*amplitudes[0] + frequencies[1];
 		sum += frequencies[2];
 	}
@@ -393,7 +400,7 @@ void code_000fa280(
 	code_000fa050(random_values);
 	for (index = 0; index < PERIODIC_FUNCTION_TABLE_SIZE; index++)
 	{
-		x = index*(28.0f/PERIODIC_FUNCTION_TABLE_SIZE);
+		x = index*0.027343748f;
 		random_x = random_values[index]*28.0f;
 		switch (function_type)
 		{
@@ -411,26 +418,26 @@ void code_000fa280(
 			break;
 		case _periodic_function_diagonal_wave:
 			result = (real)fmod((double)x, 1.0);
-			break;
 		case _periodic_function_diagonal_wave_variable_period:
-			result = (real)fmod((double)random_x, 1.0);
+			if (function_type == _periodic_function_diagonal_wave_variable_period)
+				result = (real)fmod((double)random_x, 1.0);
+			if (result <= 0.5f)
+				result *= 2.0f;
+			else
+				result = 1.0f-(result-0.5f)*2.0f;
 			break;
 		case _periodic_function_slide:
 		case _periodic_function_slide_variable_period:
 			result = (real)fmod(
 				(double)(function_type == _periodic_function_slide ? x : random_x),
 				1.0);
-			if (result <= 0.5f)
-				result *= 2.0f;
-			else
-				result = 1.0f-(result-0.5f)*2.0f;
 			break;
 		case _periodic_function_noise:
 			result = real_seed_random(get_global_random_seed_address());
 			break;
 		case _periodic_function_jitter:
 		case _periodic_function_wander:
-			result = ((real)cos(x*0.897598f)*(real)cos(x*25.132742f) +
+			result = ((real)cos(x*0.89759791f)*(real)cos(x*25.132742f) +
 				(real)cos(x*43.9823f)*(real)sin(x*1.5707964f))*0.5f +
 				(real)sin(x*3.1415927f)*(real)cos(x*6.2831855f);
 			break;
@@ -450,8 +457,7 @@ void code_000fa280(
 		values[index] = result;
 	}
 
-	range = function_type == _periodic_function_slide ||
-		function_type == _periodic_function_slide_variable_period
+	range = ((1 << function_type)&0xC0) != 0
 		? 0.0f
 		: maximum-minimum;
 	for (index = 0; index < PERIODIC_FUNCTION_TABLE_SIZE; index++)
