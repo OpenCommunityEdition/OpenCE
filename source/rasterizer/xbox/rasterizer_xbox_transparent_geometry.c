@@ -139,9 +139,25 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct rasterizer_xbox_transparent_geometry_globals
+{
+	long unknown0;
+	void *auxiliary_buffer;
+	boolean unknown8;
+	byte unknown9[7];
+};
+
+typedef char rasterizer_xbox_transparent_geometry_globals_size_assert[
+	sizeof(struct rasterizer_xbox_transparent_geometry_globals) == 16 ? 1 : -1];
+
 /* ---------- prototypes */
 
+unsigned long __stdcall D3DResource_Release(
+	void *resource);
+
 /* ---------- globals */
+
+struct rasterizer_xbox_transparent_geometry_globals bss_004662d8 = { 0 };
 
 /* ---------- public code */
 
@@ -172,4 +188,16 @@ real_vector4d *offset_vector4d(
 	result->l = vector->l*scale + base->l;
 
 	return result;
+}
+
+void rasterizer_transparent_geometry_dispose_aux_buffer(
+	void)
+{
+	if (bss_004662d8.auxiliary_buffer)
+	{
+		D3DResource_Release(bss_004662d8.auxiliary_buffer);
+		bss_004662d8.auxiliary_buffer = NULL;
+	}
+
+	return;
 }
