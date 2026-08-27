@@ -36,6 +36,7 @@ symbols in this file:
 
 #include "objects/widgets/light_volumes.h"
 
+#include "bitmaps/bitmaps.h"
 #include "cseries/cseries.h"
 #include "math/real_math.h"
 #include "objects/objects.h"
@@ -50,6 +51,9 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+static struct light_volume_frame *code_00124490(
+	struct light_volume_definition *definition,
+	long object_index);
 real code_001246a0(
 	real value,
 	real exponent);
@@ -126,6 +130,91 @@ void light_volume_delete(
 
 /* ---------- private code */
 
+static struct light_volume_frame *code_00124490(
+	struct light_volume_definition *definition,
+	long object_index)
+{
+	real function_value;
+	struct light_volume_frame *result;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\widgets\\light_volumes.c",
+		110,
+		definition);
+
+	result = TAG_BLOCK_GET_ELEMENT(
+		&definition->frames,
+		0,
+		struct light_volume_frame);
+
+	if (definition->frames.count > 1)
+	{
+		struct light_volume_frame *frame0;
+		struct light_volume_frame *frame1;
+		real inverse_function_value;
+
+		frame0 = TAG_BLOCK_GET_ELEMENT(
+			&definition->frames,
+			0,
+			struct light_volume_frame);
+		frame1 = TAG_BLOCK_GET_ELEMENT(
+			&definition->frames,
+			0,
+			struct light_volume_frame);
+
+		if (object_get_function_value(
+			object_index,
+			definition->frame_animation_source - 1,
+			&function_value))
+		{
+			result = &bss_00456d90.frame_storage;
+			inverse_function_value = 1.0f - function_value;
+
+			bss_00456d90.frame_storage.offset_from_marker =
+				frame0->offset_from_marker * inverse_function_value + frame1->offset_from_marker * function_value;
+			bss_00456d90.frame_storage.offset_exponent =
+				frame0->offset_exponent * inverse_function_value + frame1->offset_exponent * function_value;
+			bss_00456d90.frame_storage.length =
+				frame0->length * inverse_function_value + frame1->length * function_value;
+			bss_00456d90.frame_storage.radius_hither =
+				frame0->radius_hither * inverse_function_value + frame1->radius_hither * function_value;
+			bss_00456d90.frame_storage.radius_yon =
+				frame0->radius_yon * inverse_function_value + frame1->radius_yon * function_value;
+			bss_00456d90.frame_storage.radius_exponent =
+				frame0->radius_exponent * inverse_function_value + frame1->radius_exponent * function_value;
+			bss_00456d90.frame_storage.color_hither.alpha =
+				frame0->color_hither.alpha * inverse_function_value + frame1->color_hither.alpha * function_value;
+			bss_00456d90.frame_storage.color_hither.red =
+				frame0->color_hither.red * inverse_function_value + frame1->color_hither.red * function_value;
+			bss_00456d90.frame_storage.color_hither.green =
+				frame0->color_hither.green * inverse_function_value + frame1->color_hither.green * function_value;
+			bss_00456d90.frame_storage.color_hither.blue =
+				frame0->color_hither.blue * inverse_function_value + frame1->color_hither.blue * function_value;
+			bss_00456d90.frame_storage.color_yon.alpha =
+				frame0->color_yon.alpha * inverse_function_value + frame1->color_yon.alpha * function_value;
+			bss_00456d90.frame_storage.color_yon.red =
+				frame0->color_yon.red * inverse_function_value + frame1->color_yon.red * function_value;
+			bss_00456d90.frame_storage.color_yon.green =
+				frame0->color_yon.green * inverse_function_value + frame1->color_yon.green * function_value;
+			bss_00456d90.frame_storage.color_yon.blue =
+				frame0->color_yon.blue * inverse_function_value + frame1->color_yon.blue * function_value;
+			bss_00456d90.frame_storage.color_exponent =
+				frame0->color_exponent * inverse_function_value + frame1->color_exponent * function_value;
+			bss_00456d90.frame_storage.brightness_exponent =
+				frame0->brightness_exponent * inverse_function_value + frame1->brightness_exponent * function_value;
+		}
+	}
+	else
+	{
+		result = TAG_BLOCK_GET_ELEMENT(
+			&definition->frames,
+			0,
+			struct light_volume_frame);
+	}
+
+	return result;
+}
+
 real code_001246a0(
 	real value,
 	real exponent)
@@ -134,6 +223,142 @@ real code_001246a0(
 		value = power(value, exponent);
 
 	return value;
+}
+
+void light_volume_render(
+	long object_index,
+	long light_volume_index)
+{
+	struct light_volume_datum *light_volume;
+	struct light_volume_definition *definition;
+	struct light_volume_frame *frame;
+	struct object_marker marker;
+	real_point3d delta;
+	real parallel_factor;
+	real angle_brightness;
+	real intensity;
+
+	if (object_index != NONE && light_volume_index != NONE)
+	{
+		light_volume = light_volume_get(light_volume_index);
+		definition = light_volume_definition_get(light_volume->definition_index);
+		if (definition->count > 0 && definition->frames.count > 0)
+		{
+			real distance_fade = 1.f;
+
+			frame = code_00124490(definition, object_index);
+			object_get_marker_by_name(object_index, definition->attachment_marker, &marker, 1);
+			delta.x = marker.matrix.position.x - render.camera.position.x;
+			delta.y = marker.matrix.position.y - render.camera.position.y;
+			delta.z = marker.matrix.position.z - render.camera.position.z;
+
+			parallel_factor =
+				marker.matrix.forward.i * render.camera.forward.i +
+				(render.camera.forward.j * marker.matrix.forward.j +
+				render.camera.forward.k * marker.matrix.forward.k);
+			parallel_factor = ABS(parallel_factor);
+
+			if (definition->far_fade_distance > 0.f)
+			{
+				real depth =
+					delta.x * render.camera.forward.i +
+					(render.camera.forward.j * delta.y +
+					render.camera.forward.k * delta.z);
+				real fade =
+					(depth - definition->far_fade_distance) /
+					(definition->near_fade_distance - definition->far_fade_distance);
+
+				distance_fade = PIN(fade, 0.f, 1.f);
+			}
+
+			angle_brightness =
+				definition->perpendicular_brightness_scale * (1.f - parallel_factor) +
+				definition->parallel_brightness_scale * parallel_factor;
+			angle_brightness = PIN(angle_brightness, 0.f, 1.f);
+
+			intensity = angle_brightness * distance_fade;
+			{
+				real function_value;
+
+				if (object_get_function_value(object_index, definition->brightness_scale_source - 1, &function_value))
+					intensity *= function_value;
+			}
+
+			if (
+				intensity > 0.f &&
+				(frame->color_hither.alpha > 0.f || frame->color_yon.alpha > 0.f) &&
+				(frame->radius_hither > 0.f || frame->radius_yon > 0.f))
+			{
+				short count;
+				long sprite_index;
+
+				rasterizer_widget_begin(5, 1);
+				rasterizer_widget_set_texture(
+					0,
+					definition->map.index,
+					definition->sequence_index);
+				count = definition->count;
+				if (count > 0)
+				{
+					sprite_index = 0;
+					do
+					{
+						real offset_fraction;
+						real radius_fraction;
+						real color_fraction;
+						real brightness_fraction;
+						real radius;
+						real offset;
+						real_argb_color color;
+						real_point3d position;
+
+						offset_fraction = (real)sprite_index / (real)(definition->count - 1);
+						offset_fraction = code_001246a0(
+							offset_fraction,
+							frame->offset_exponent);
+						radius_fraction = code_001246a0(
+							offset_fraction,
+							frame->radius_exponent);
+						radius =
+							(1.f - radius_fraction) * frame->radius_hither +
+							frame->radius_yon * radius_fraction;
+						color_fraction = code_001246a0(
+							offset_fraction,
+							frame->color_exponent);
+						brightness_fraction = code_001246a0(
+							offset_fraction,
+							frame->brightness_exponent);
+
+						offset = frame->length * offset_fraction + frame->offset_from_marker;
+						position.x = marker.matrix.forward.i * offset + marker.matrix.position.x;
+						position.y = marker.matrix.forward.j * offset + marker.matrix.position.y;
+						position.z = marker.matrix.forward.k * offset + marker.matrix.position.z;
+
+						rgb_colors_interpolate(
+							&color.rgb,
+							definition->flags & 3,
+							&frame->color_hither.rgb,
+							&frame->color_yon.rgb,
+							color_fraction);
+						color.alpha =
+							((1.f - brightness_fraction) * frame->color_hither.alpha +
+							frame->color_yon.alpha * brightness_fraction) * intensity;
+						rasterizer_widget_draw_sprite3d(
+							&position,
+							radius,
+							NULL,
+							0.0f,
+							real_argb_color_to_pixel32(&color));
+						sprite_index++;
+					}
+					while (--count);
+				}
+				rasterizer_widget_end();
+			}
+		}
+	}
+
+	return;
 }
 
 void light_volume_submit(

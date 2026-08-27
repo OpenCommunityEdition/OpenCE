@@ -764,14 +764,17 @@ void _rasterizer_widget_submit(
 	long widget_index,
 	real_point3d const *centroid,
 	rasterizer_widget_render_proc render_proc);
-void *_rasterizer_widget_begin(
-	long handle);
+void _rasterizer_widget_begin(
+	short type,
+	word flags);
 void _rasterizer_profile_enable(
 	boolean enable);
 void _rasterizer_screen_flash(
 	void);
-void _rasterizer_widget_set_texture(
-	long handle);
+boolean _rasterizer_widget_set_texture(
+	short stage_index,
+	long bitmap_group_index,
+	short sequence_index);
 void _rasterizer_widget_set_tint_factor(
 	long handle);
 long _rasterizer_widget_set_zbuffer_enable(
@@ -779,8 +782,12 @@ long _rasterizer_widget_set_zbuffer_enable(
 	long enable);
 short _rasterizer_widget_draw_sprite2d(
 	long dynamic_vertex_buffer_index);
-long _rasterizer_widget_draw_sprite3d(
-	long zbuffer_result);
+void _rasterizer_widget_draw_sprite3d(
+	real_point3d const *point,
+	real radius,
+	real_vector2d const *scale,
+	real rotation,
+	unsigned long color);
 void _rasterizer_widget_submit_occlusion_test(
 	long handle);
 long _rasterizer_widget_get_occlusion_test_result(
@@ -1767,17 +1774,25 @@ void rasterizer_widget_submit(
 	return;
 }
 
-void *rasterizer_widget_begin(
-	long handle)
+void rasterizer_widget_begin(
+	short type,
+	word flags)
 {
-	return _rasterizer_widget_begin(handle);
+	_rasterizer_widget_begin(
+		type,
+		flags);
+	return;
 }
 
-void rasterizer_widget_set_texture(
-	long handle)
+boolean rasterizer_widget_set_texture(
+	short stage_index,
+	long bitmap_group_index,
+	short sequence_index)
 {
-	_rasterizer_widget_set_texture(handle);
-	return;
+	return _rasterizer_widget_set_texture(
+		stage_index,
+		bitmap_group_index,
+		sequence_index);
 }
 
 void rasterizer_widget_set_tint_factor(
@@ -1800,10 +1815,20 @@ short rasterizer_widget_draw_sprite2d(
 	return _rasterizer_widget_draw_sprite2d(dynamic_vertex_buffer_index);
 }
 
-long rasterizer_widget_draw_sprite3d(
-	long zbuffer_result)
+void rasterizer_widget_draw_sprite3d(
+	real_point3d const *point,
+	real radius,
+	real_vector2d const *scale,
+	real rotation,
+	unsigned long color)
 {
-	return _rasterizer_widget_draw_sprite3d(zbuffer_result);
+	_rasterizer_widget_draw_sprite3d(
+		point,
+		radius,
+		scale,
+		rotation,
+		color);
+	return;
 }
 
 void rasterizer_widget_submit_occlusion_test(
