@@ -122,6 +122,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "real_math.h"
+
 /* ---------- constants */
 
 enum
@@ -185,4 +188,19 @@ void _rasterizer_environment_fog_end(
 	rasterizer_profile_end(_rasterizer_profile_environment_fog);
 
 	return;
+}
+
+real_vector4d *set_real_vector4d(
+	real_vector4d *vector,
+	real i,
+	real j,
+	real k,
+	real l)
+{
+	vector->i = i;
+	vector->j = j;
+	vector->k = k;
+	vector->l = l;
+
+	return vector;
 }
