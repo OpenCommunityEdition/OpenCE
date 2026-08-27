@@ -92,6 +92,7 @@ symbols in this file:
 #include "main/console.h"
 #include "objects/damage.h"
 #include "objects/objects.h"
+#include "effects/effects.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "sound/sound_definitions.h"
@@ -162,6 +163,19 @@ void terminal_printf(
 void area_of_effect_cause_damage(
 	struct damage_data *damage,
 	long unlucky_object_index);
+long effect_new_attached_from_markers(
+	long definition_index,
+	long owner_object_index,
+	long object_index,
+	short node_index,
+	short marker_count,
+	char const **marker_names,
+	real_point3d const *marker_points,
+	real_vector3d const *marker_forwards,
+	real scale_a,
+	real scale_b,
+	real_rgb_color const *color,
+	struct effect_vector_field const *impulse_field);
 
 /* ---------- globals */
 
@@ -309,6 +323,72 @@ void hs_objects_delete_by_definition(
 			object_delete(iterator.index);
 	}
 	objects_memory_compact();
+
+	return;
+}
+
+void hs_effect_new(
+	long effect_definition_index,
+	short cutscene_flag_index)
+{
+	struct scenario_cutscene_flag *cutscene_flag;
+	real_vector3d forward;
+
+	cutscene_flag = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->cutscene_flags,
+		cutscene_flag_index,
+		struct scenario_cutscene_flag);
+	vector3d_from_euler_angles2d(&forward, &cutscene_flag->facing);
+	effect_new_unattached_from_markers(
+		effect_definition_index,
+		NONE,
+		global_zero_vector3d,
+		1,
+		NULL,
+		&cutscene_flag->position,
+		&forward,
+		1.f,
+		1.f,
+		NULL,
+		NULL,
+		TRUE);
+
+	return;
+}
+
+void hs_effect_new_from_object_marker(
+	long effect_definition_index,
+	long object_index,
+	char const *marker_name)
+{
+	if (effect_definition_index != NONE)
+	{
+		if (object_index != NONE)
+		{
+			struct object_marker marker;
+
+			if (object_get_marker_by_name(
+				object_index,
+				marker_name,
+				&marker,
+				1))
+			{
+				effect_new_attached_from_markers(
+					effect_definition_index,
+					NONE,
+					object_index,
+					marker.node_index,
+					1,
+					&marker_name,
+					&marker.matrix.position,
+					&marker.matrix.forward,
+					1.f,
+					1.f,
+					NULL,
+					NULL);
+			}
+		}
+	}
 
 	return;
 }
