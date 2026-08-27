@@ -100,6 +100,9 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#define dequantize_byte_to_real structure_visibility_dequantize_byte_to_real_external
+#include "math/real_math.h"
+#undef dequantize_byte_to_real
 
 /* ---------- constants */
 
@@ -126,3 +129,31 @@ void debug_pvs(
 }
 
 /* ---------- private code */
+
+static __inline real dequantize_byte_to_real(
+	real min,
+	real max,
+	byte value)
+{
+	if (value == UNSIGNED_CHAR_MAX)
+	{
+		return max;
+	}
+
+	return (max - min) * ((real)value / 255.f) + min;
+}
+
+real_rectangle3d *dequantize_byte_to_real_rectangle3d(
+	real_rectangle3d const *parent,
+	byte_rectangle3d const *compressed_rectangle,
+	real_rectangle3d *result)
+{
+	result->x0 = dequantize_byte_to_real(parent->x0, parent->x1, compressed_rectangle->x0);
+	result->x1 = dequantize_byte_to_real(parent->x0, parent->x1, compressed_rectangle->x1);
+	result->y0 = dequantize_byte_to_real(parent->y0, parent->y1, compressed_rectangle->y0);
+	result->y1 = dequantize_byte_to_real(parent->y0, parent->y1, compressed_rectangle->y1);
+	result->z0 = dequantize_byte_to_real(parent->z0, parent->z1, compressed_rectangle->z0);
+	result->z1 = dequantize_byte_to_real(parent->z0, parent->z1, compressed_rectangle->z1);
+
+	return result;
+}
