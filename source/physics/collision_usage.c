@@ -272,4 +272,12 @@ void collision_log_end_period(
 	return;
 }
 
+void collision_log_start_time(
+	LARGE_INTEGER *start_time)
+{
+	QueryPerformanceCounter(start_time);
+
+	return;
+}
+
 /* ---------- private code */

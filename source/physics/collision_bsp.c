@@ -160,8 +160,8 @@ typedef char collision_bsp_test_vector_context_size_assert[
 
 struct collision_bsp_usage_times
 {
-	__int64 vector;
-	__int64 sphere;
+	LARGE_INTEGER vector;
+	LARGE_INTEGER sphere;
 };
 
 /* ---------- prototypes */
@@ -630,7 +630,7 @@ boolean collision_bsp_test_sphere(
 	result->vertex_count = 0;
 
 	code_001383e0(&context, 0);
-	collision_log_end_time(collision_function, bss_00456eb0.sphere);
+	collision_log_end_time(collision_function, bss_00456eb0.sphere.QuadPart);
 
 	return result->surface_count > 0 || result->edge_count > 0;
 }
@@ -668,7 +668,7 @@ boolean collision_bsp_test_vector(
 
 	t = PIN(maximum_t, 0.f, 1.f);
 	return_value = code_00138700(&context, 0, 0, t);
-	collision_log_end_time(collision_function, bss_00456eb0.vector);
+	collision_log_end_time(collision_function, bss_00456eb0.vector.QuadPart);
 
 	return return_value;
 }

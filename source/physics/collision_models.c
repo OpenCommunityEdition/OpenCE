@@ -156,7 +156,7 @@ boolean collision_model_test_point(
 	return FALSE;
 }
 
-static __int64 collision_model_test_vector_time;
+static LARGE_INTEGER collision_model_test_vector_time;
 
 boolean collision_model_test_vector(
 		struct collision_model_instance const *instance,
@@ -212,7 +212,7 @@ boolean collision_model_test_vector(
 		}
 	}
 
-	collision_log_end_time(3, collision_model_test_vector_time);
+	collision_log_end_time(3, collision_model_test_vector_time.QuadPart);
 
 	return return_value;
 }
