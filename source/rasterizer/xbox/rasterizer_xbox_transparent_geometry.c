@@ -130,6 +130,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "real_math.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -143,3 +146,16 @@ symbols in this file:
 /* ---------- public code */
 
 /* ---------- private code */
+
+real_vector4d *subtract_vectors4d(
+	real_vector4d const *a,
+	real_vector4d const *b,
+	real_vector4d *result)
+{
+	result->i = a->i-b->i;
+	result->j = a->j-b->j;
+	result->k = a->k-b->k;
+	result->l = a->l-b->l;
+
+	return result;
+}
