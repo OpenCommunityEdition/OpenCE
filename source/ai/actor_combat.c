@@ -129,12 +129,16 @@ symbols in this file:
 #define cosine cosine_inline
 #define sine sine_inline
 #define tangent tangent_inline
+#define cross_product2d cross_product2d_inline
+#define add_vectors3d add_vectors3d_inline
 #include "cseries.h"
 
 #include "actor_definitions.h"
 #include "actors.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
+#undef add_vectors3d
+#undef cross_product2d
 #undef cosine
 #undef sine
 #undef tangent
@@ -258,6 +262,25 @@ real tangent(
 	real angle)
 {
 	return tan(angle);
+}
+
+real cross_product2d(
+	real_vector2d const *a,
+	real_vector2d const *b)
+{
+	return a->i*b->j - a->j*b->i;
+}
+
+real_vector3d *add_vectors3d(
+	real_vector3d const *a,
+	real_vector3d const *b,
+	real_vector3d *result)
+{
+	result->i = a->i+b->i;
+	result->j = a->j+b->j;
+	result->k = a->k+b->k;
+
+	return result;
 }
 
 /* ---------- private code */
