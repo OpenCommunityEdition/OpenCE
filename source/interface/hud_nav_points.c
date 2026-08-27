@@ -241,6 +241,9 @@ struct hud_nav_object_datum
 	word damage_flags;
 };
 
+#define hud_nav_object_try_and_get(object_index) \
+	((struct hud_nav_object_datum *)object_try_and_get_and_verify_type((object_index), _object_mask_all))
+
 /* ---------- prototypes */
 
 void code_000c61d0(
@@ -762,9 +765,7 @@ void hud_render_nav_points(
 				break;
 
 			case _hud_nav_point_type_object:
-				if (!object_try_and_get_and_verify_type(
-						nav_point->reference_index,
-						_object_mask_all))
+				if (!hud_nav_object_try_and_get(nav_point->reference_index))
 					continue;
 
 				{
@@ -854,9 +855,7 @@ void code_000c61d0(
 			case _hud_nav_point_type_object:
 				{
 					struct hud_nav_object_datum *object =
-						(struct hud_nav_object_datum *)object_try_and_get_and_verify_type(
-							nav_point->reference_index,
-							_object_mask_all);
+						hud_nav_object_try_and_get(nav_point->reference_index);
 
 					reference_object_index = nav_point->reference_index;
 					if (!object || TEST_FLAG(object->damage_flags, _object_dead_bit))
@@ -887,7 +886,7 @@ void code_000c61d0(
 				break;
 
 			default:
-				continue;
+				break;
 			}
 
 			position.z += nav_point->z_offset;
