@@ -167,3 +167,61 @@ hashes above are the reproducible code identities.
 
 A final committed-state snapshot and forced same-path rebuild/check are
 performed after the local checkpoint commit. Nothing is pushed.
+
+## HCEA short-width follow-up (2026-08-26)
+
+The user-supplied HCEA corpus was refreshed at commit
+`570c83fd9c365dad6f2a3e7041705d5b84c7847c`. Its
+`src/blam/ai/action_uncover_perform.c` adds two source facts that were absent
+from the earlier PDB-only packet: the later-build selector is declared to
+return `int16_t`, its receiving local is `int16_t`, and the pursuit point is
+spelled as three indexed `n[]` assignments. These are cross-build hypotheses;
+January code remains authoritative.
+
+The clean pre-wave regression manifest is
+`build/audit/action_uncover_short_return_baseline_20260826.json`, SHA-256
+`6fefc18d013dd0bd3250b91a0ade399fd2c7a120b058cee97377d3a17508acba`.
+The preserved preimage object has SHA-256
+`c9af8e7d7d762362e93db4a0a15d380d8f04ab0f64039755a23bab5d97569999`.
+All candidate source packets passed VC7 `/Zs` before their ordinary compile.
+
+Three evidence-separated measurements were made:
+
+| Candidate | Source SHA-256 | Object SHA-256 | Normalized perform SHA-256 | Result |
+| --- | --- | --- | --- | --- |
+| HCEA scalar point copy, short selector return and local | `5e44b5ceeda63c464f4c256582a67a944dd0f0b0edc2c1d9f1135ee2687779d0` | `9607a4d247ce07b7bf7cf76cc64948eba677deef98f19a505fb540ab5f04d509` | `1a81f8957d0af644dc2fb00a9b59b28f127819bed8cdffdb0d7edcf459736a54` | rejected |
+| Aggregate point copy, short selector return and local | `a86776739746ae14fca69bd4cc90729583e7134cbfbb5b3f53200285b414a6bd` | `597fe15cb624f8a1c06bf0785136b7d2e8644a9c5f4936b34f4a27f15d105ac5` | `1ad7a09e123a93efdc1ea16451b49765676871fb5b11e0ac2ffd2a215fe63e67` | rejected |
+| Aggregate point copy, January `long` selector return, short local | `5d3c695fb508e98af777e90ec3144c5c8abb2d247033ce373d5bb346bc448aaa` | `24be90ad9b6f332a3e848b5603447f86f05172560f66ec4300a1cdd5a721083d` | `300bba8c0c0ea302c17b22c44e2cbb8da3ad2e8031ee7cb9546e84e4faf5fa56` | rejected |
+
+The first artifact proves the indexed scalar spelling is not January's
+source shape. It replaces the compact source-base `lea` with three full
+displacement loads, adds four bytes before the selector call, and shifts that
+relocation from `+262` to `+266`.
+
+The two aggregate artifacts restore the 544-byte envelope and every
+relocation through the selector call. Narrowing the receiving local does
+produce January's desired post-call order exactly:
+`add esp, 0x18; mov ebx, eax`. It also requires a three-byte sign extension
+before `actor_change_firing_position`, shifting only that final relocation
+from January `+504` to candidate `+507`. Restoring the selector declaration to
+`long` does not remove that consumer-side extension. Thus HCEA's short width
+is later-build drift, not January's exact ABI.
+
+Both aggregate artifacts retain the other known residual: January loads all
+three pursuit-point dwords through one compact base `lea` before any of the
+three destination stores, while VC7 interleaves each load and store. The
+fresh HCEA source therefore closes the provenance question but supplies no
+legal-C spelling that satisfies both scheduling windows simultaneously. The
+prior aggregate, scalar-lifetime, representation-copy, alias, helper, field-
+order, and scope do-not-repeat list remains in force.
+
+No rejected perform body or perform-owned data is retained. The source was
+restored byte-for-byte to its pre-wave Git state and rebuilt normally. The
+restored object SHA-256 is
+`558369011d594c5e95ef4b43db52e15ebceddae92b87fa88a95b213a75b4f70d`.
+The frozen regression gate passes with all eight accepted functions under
+`still_exact`, no changed nonexact function, no failure, and no warning.
+`action_uncover.obj` remains 8/9 exact and incomplete. Reopen only for a new
+January-side source/provenance record or a defined-C control that produces the
+compact load-all/store-all point copy without introducing the final
+sign-extension tradeoff.
