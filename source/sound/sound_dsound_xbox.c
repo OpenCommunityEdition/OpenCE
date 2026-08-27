@@ -262,6 +262,12 @@ extern struct dsound_globals_header dsound_globals;
 
 /* ---------- public code */
 
+long dsound_angle_from_angle(
+	float angle)
+{
+	return (long)(angle * 57.29578f);
+}
+
 LPDIRECTSOUND dsound_get(
 	void)
 {
