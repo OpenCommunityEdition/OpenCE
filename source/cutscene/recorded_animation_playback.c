@@ -84,17 +84,57 @@ symbols in this file:
 
 #include "cseries.h"
 
+#undef memcpy
+#include <string.h>
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct direction_playback_controller
+{
+	short yaw;
+	short pitch;
+};
+
+struct animation_playback_controller
+{
+	struct direction_playback_controller facing_control;
+	struct direction_playback_controller aiming_control;
+	struct direction_playback_controller looking_control;
+};
+
+struct recorded_unit_control;
+
 /* ---------- prototypes */
+
+void recorded_animation_initialize_unit_control(
+	struct recorded_unit_control *unit_control,
+	byte **stream,
+	byte unit_control_data_version);
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+void recorded_animation_initialize_event_stream(
+	struct animation_playback_controller *animation_state,
+	struct recorded_unit_control *unit_control,
+	byte **playback_stream,
+	byte unit_control_data_version)
+{
+	recorded_animation_initialize_unit_control(
+		unit_control,
+		playback_stream,
+		unit_control_data_version);
+
+	memcpy(animation_state, *playback_stream, sizeof(*animation_state));
+	*playback_stream += sizeof(*animation_state);
+
+	return;
+}
 
 void byte_swap_recording_stream(
 	void *stream,
