@@ -82,11 +82,33 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct animation_playback_controller;
+struct recorded_unit_control;
+
 /* ---------- prototypes */
+
+void recorded_animation_initialize_unit_control(
+	struct recorded_unit_control *unit_control,
+	byte **stream,
+	byte unit_control_data_version);
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+void recorded_animation_initialize_event_stream_v1(
+	struct animation_playback_controller *animation_state,
+	struct recorded_unit_control *unit_control,
+	byte **playback_stream,
+	byte unit_control_data_version)
+{
+	recorded_animation_initialize_unit_control(
+		unit_control,
+		playback_stream,
+		unit_control_data_version);
+
+	return;
+}
 
 void byte_swap_recording_stream_v1(
 	void *stream,
