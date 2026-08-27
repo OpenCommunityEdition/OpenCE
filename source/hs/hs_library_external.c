@@ -168,6 +168,26 @@ long hs_object_list_get_element(
 	return object_index;
 }
 
+void hs_object_set_shield(
+	long object_index,
+	real shield_vitality)
+{
+	if (object_index != NONE)
+	{
+		struct object_datum *object;
+
+		object = object_get(object_index);
+		if (shield_vitality < 0.f)
+			shield_vitality = 0.f;
+		else if (shield_vitality > 1.f)
+			shield_vitality = 1.f;
+		object->object.shield_vitality =
+			object->object.maximum_shield_vitality * shield_vitality;
+	}
+
+	return;
+}
+
 void hs_objects_predict(
 	long object_list_index)
 {
