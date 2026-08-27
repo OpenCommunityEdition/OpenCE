@@ -156,6 +156,8 @@ boolean collision_model_test_point(
 	return FALSE;
 }
 
+static __int64 collision_model_test_vector_time;
+
 boolean collision_model_test_vector(
 		struct collision_model_instance const *instance,
 		unsigned long flags,
@@ -165,8 +167,6 @@ boolean collision_model_test_vector(
 {
 	short node_index;
 	boolean return_value = FALSE;
-
-	static __int64 collision_model_test_vector_time;
 
 	collision_log_usage(3);
 	collision_log_start_time(&collision_model_test_vector_time);
