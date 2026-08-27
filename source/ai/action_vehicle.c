@@ -79,7 +79,9 @@ symbols in this file:
 #undef distance_squared2d
 #undef distance2d
 
+#define object_get_bounding_sphere object_get_bounding_sphere_inline
 #include "actors.h"
+#undef object_get_bounding_sphere
 
 /* ---------- constants */
 
@@ -92,6 +94,22 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void object_get_bounding_sphere(
+	long object_index,
+	real_point3d *center,
+	real *radius)
+{
+	struct object_datum *object = object_get(object_index);
+
+	match_assert("..\\objects\\objects.h", 535, center);
+	match_assert("..\\objects\\objects.h", 536, radius);
+
+	*center = object->object.bounding_sphere_center;
+	*radius = object->object.bounding_sphere_radius;
+
+	return;
+}
 
 real_point2d *point_from_line2d(
 	real_point2d const *p,
