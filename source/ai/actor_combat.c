@@ -126,12 +126,18 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define cosine cosine_inline
+#define sine sine_inline
+#define tangent tangent_inline
 #include "cseries.h"
 
 #include "actor_definitions.h"
 #include "actors.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
+#undef cosine
+#undef sine
+#undef tangent
 
 /* ---------- constants */
 
@@ -234,6 +240,24 @@ struct actor_variant_definition *actor_combat_get_firing_variant_definition(
 	}
 
 	return firing_variant_definition;
+}
+
+real sine(
+	real angle)
+{
+	return sin(angle);
+}
+
+real cosine(
+	real angle)
+{
+	return cos(angle);
+}
+
+real tangent(
+	real angle)
+{
+	return tan(angle);
 }
 
 /* ---------- private code */
