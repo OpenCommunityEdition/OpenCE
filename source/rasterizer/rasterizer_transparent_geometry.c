@@ -324,6 +324,33 @@ void *rasterizer_transparent_geometry_get_groups2(
 	return bss_004b8ad8.groups2;
 }
 
+struct transparent_geometry_group *rasterizer_transparent_geometry_next_group(
+	struct transparent_geometry_group *group)
+{
+	short next_group_sorted_index;
+	short group_sorted_index;
+
+	if (group)
+	{
+		group_sorted_index = (short)group->sorted_index;
+		next_group_sorted_index = (short)(group_sorted_index + 1);
+
+		match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0x89,
+			group->sorted_index>=0 && group->sorted_index<transparent_geometry_group_count);
+
+		if (next_group_sorted_index<transparent_geometry_group_count)
+		{
+			match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0x8D,
+				next_group_sorted_index>=0);
+
+			return transparent_geometry_groups +
+				transparent_geometry_group_sorted_indices[next_group_sorted_index];
+		}
+	}
+
+	return NULL;
+}
+
 void *rasterizer_transparent_geometry_get_groups(
 	void)
 {
