@@ -128,6 +128,11 @@ void hud_messaging_globals_update(
 void hud_play_unit_sounds(
 	struct player_datum const *player,
 	boolean show_hud);
+void hud_add_item_message(
+	short local_player_index,
+	long item_definition_index,
+	short quantity,
+	char message_offset);
 
 /* ---------- globals */
 
@@ -215,6 +220,71 @@ void hud_update(
 			}
 		}
 	}
+	return;
+}
+
+void hud_picked_up_grenade(
+	short local_player_index,
+	long grenade_definition_index)
+{
+	if (local_player_index != NONE)
+	{
+		hud_add_item_message(
+			local_player_index,
+			grenade_definition_index,
+			1,
+			-1);
+	}
+
+	return;
+}
+
+void hud_picked_up_ammunition(
+	short local_player_index,
+	long weapon_definition_index,
+	short ammunition_count)
+{
+	if (local_player_index != NONE)
+	{
+		hud_add_item_message(
+			local_player_index,
+			weapon_definition_index,
+			ammunition_count,
+			1);
+	}
+
+	return;
+}
+
+void hud_picked_up_weapon(
+	short local_player_index,
+	long weapon_definition_index)
+{
+	if (local_player_index != NONE)
+	{
+		hud_add_item_message(
+			local_player_index,
+			weapon_definition_index,
+			0,
+			0);
+	}
+
+	return;
+}
+
+void hud_picked_up_powerup(
+	short local_player_index,
+	long powerup_definition_index)
+{
+	if (local_player_index != NONE)
+	{
+		hud_add_item_message(
+			local_player_index,
+			powerup_definition_index,
+			0,
+			0);
+	}
+
 	return;
 }
 
