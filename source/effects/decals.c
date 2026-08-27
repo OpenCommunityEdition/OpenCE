@@ -212,11 +212,13 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define projection_sign_from_vector3d projection_sign_from_vector3d_inline
 #define plane3d_negate plane3d_negate_inline
 #define plane3d_distance_to_point plane3d_distance_to_point_inline
 #include "effects/decals.h"
 #include "cseries/cseries.h"
 #include "math/real_math.h"
+#undef projection_sign_from_vector3d
 #undef plane3d_negate
 #undef plane3d_distance_to_point
 
@@ -276,6 +278,16 @@ void decal_new_from_media_collision(
 	struct decal_editor_geometry *editor_geometry)
 {
 	return;
+}
+
+boolean projection_sign_from_vector3d(
+	real_vector3d const *n,
+	short projection)
+{
+	match_assert("..\\math\\real_math.h", 848,
+		projection>=_x && projection<=_z);
+
+	return n->n[projection] > 0.0f;
 }
 
 real_plane3d *plane3d_negate(
