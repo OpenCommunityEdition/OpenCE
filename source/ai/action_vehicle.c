@@ -70,11 +70,13 @@ symbols in this file:
 
 #include "cseries.h"
 #define distance2d distance2d_inline
+#define distance_squared2d distance_squared2d_inline
 #define negate_vector2d negate_vector2d_inline
 #define point_from_line2d point_from_line2d_inline
 #include "actions.h"
 #undef point_from_line2d
 #undef negate_vector2d
+#undef distance_squared2d
 #undef distance2d
 
 #include "actors.h"
@@ -101,6 +103,15 @@ real_point2d *point_from_line2d(
 	result->y = t*v->j + p->y;
 
 	return result;
+}
+
+real distance_squared2d(
+	real_point2d const *a,
+	real_point2d const *b)
+{
+	real_vector2d v;
+
+	return magnitude_squared2d(vector_from_points2d(a, b, &v));
 }
 
 real distance2d(
