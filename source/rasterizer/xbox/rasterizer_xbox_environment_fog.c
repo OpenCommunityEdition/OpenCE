@@ -124,6 +124,11 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	_rasterizer_profile_environment_fog = 17,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -138,6 +143,9 @@ struct rasterizer_environment_fog_screen_globals
 };
 
 /* ---------- prototypes */
+
+void rasterizer_profile_end(
+	short profile);
 
 /* ---------- globals */
 
@@ -170,3 +178,11 @@ void rasterizer_environment_fog_screen_model_end(
 }
 
 /* ---------- private code */
+
+void _rasterizer_environment_fog_end(
+	void)
+{
+	rasterizer_profile_end(_rasterizer_profile_environment_fog);
+
+	return;
+}
