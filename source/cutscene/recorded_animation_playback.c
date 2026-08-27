@@ -97,6 +97,16 @@ enum
 	_playback_control_flags_set,
 	_playback_weapon_index_set,
 	_playback_throttle_set,
+	_playback_vector_char_difference_set,
+	_playback_vector_short_difference_set = 15,
+};
+
+enum
+{
+	_control_vector_facing_bit,
+	_control_vector_aiming_bit,
+	_control_vector_looking_bit,
+	NUMBER_OF_CONTROL_VECTORS,
 };
 
 /* ---------- macros */
@@ -113,6 +123,18 @@ struct animation_event_header
 {
 	byte time_delta : 2;
 	byte event_type : 6;
+};
+
+struct vector_char_difference_data
+{
+	char delta_yaw;
+	char delta_pitch;
+};
+
+struct vector_short_difference_data
+{
+	short delta_yaw;
+	short delta_pitch;
 };
 
 struct animation_playback_controller
@@ -278,6 +300,183 @@ void code_00082130(
 	memcpy(&control->vector2d_field12, event_data, sizeof(control->vector2d_field12));
 	control->long_field20 = 0;
 	*playback_stream += sizeof(control->vector2d_field12);
+
+	return;
+}
+
+static void code_000821d0(
+	struct vector_char_difference_data const *event_data,
+	struct direction_playback_controller *control)
+{
+	control->yaw += event_data->delta_yaw;
+	if (control->yaw > 1000)
+	{
+		control->yaw -= 1000;
+	}
+	else if (control->yaw < -1000)
+	{
+		control->yaw += 1000;
+	}
+	control->pitch += event_data->delta_pitch;
+
+	return;
+}
+
+static void code_00082210(
+	struct vector_short_difference_data const *event_data,
+	struct direction_playback_controller *control)
+{
+	control->yaw += event_data->delta_yaw;
+	if (control->yaw > 1000)
+	{
+		control->yaw -= 1000;
+	}
+	else if (control->yaw < -1000)
+	{
+		control->yaw += 1000;
+	}
+	control->pitch += event_data->delta_pitch;
+
+	return;
+}
+
+static void code_00082250(
+	real_vector3d *vector,
+	struct direction_playback_controller const *controller)
+{
+	real_euler_angles2d angles;
+
+	angles.yaw = (real)controller->yaw * 0.0031415927f;
+	angles.pitch = (real)controller->pitch * 0.0031415927f;
+	vector3d_from_euler_angles2d(vector, &angles);
+
+	return;
+}
+
+void code_00082290(
+	struct animation_playback_controller *animation_state,
+	struct recorded_unit_control *control,
+	struct animation_event_header const *header,
+	byte const **playback_stream)
+{
+	void const *serialized_event_data = *playback_stream;
+	struct vector_char_difference_data const *event_data = serialized_event_data;
+	word event_type;
+	word update_facing;
+
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 100, control);
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 102, header);
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 103, header->event_type>=_playback_vector_char_difference_set&&header->event_type-_playback_vector_char_difference_set<FLAG(NUMBER_OF_CONTROL_VECTORS));
+
+	event_type = header->event_type - _playback_vector_char_difference_set;
+	update_facing = event_type & FLAG(_control_vector_facing_bit);
+	if (update_facing)
+	{
+		code_000821d0(event_data, &animation_state->facing_control);
+		code_00082250(&control->vector3d_field28, &animation_state->facing_control);
+	}
+
+	if (event_type & FLAG(_control_vector_aiming_bit))
+	{
+		if (update_facing)
+		{
+			animation_state->aiming_control = animation_state->facing_control;
+			control->vector3d_field40 = control->vector3d_field28;
+		}
+		else
+		{
+			code_000821d0(event_data, &animation_state->aiming_control);
+			code_00082250(&control->vector3d_field40, &animation_state->aiming_control);
+		}
+	}
+
+	if (event_type & FLAG(_control_vector_looking_bit))
+	{
+		if (update_facing)
+		{
+			animation_state->looking_control = animation_state->facing_control;
+			control->vector3d_field52 = control->vector3d_field28;
+			*playback_stream += sizeof(struct vector_char_difference_data);
+			return;
+		}
+
+		if (event_type & FLAG(_control_vector_aiming_bit))
+		{
+			animation_state->looking_control = animation_state->aiming_control;
+			control->vector3d_field52 = control->vector3d_field40;
+			*playback_stream += sizeof(struct vector_char_difference_data);
+			return;
+		}
+
+		code_000821d0(event_data, &animation_state->looking_control);
+		code_00082250(&control->vector3d_field52, &animation_state->looking_control);
+	}
+
+	*playback_stream += sizeof(struct vector_char_difference_data);
+
+	return;
+}
+
+void code_00082490(
+	struct animation_playback_controller *animation_state,
+	struct recorded_unit_control *control,
+	struct animation_event_header const *header,
+	byte const **playback_stream)
+{
+	void const *serialized_event_data = *playback_stream;
+	struct vector_short_difference_data const *event_data = serialized_event_data;
+	word event_type;
+	word update_facing;
+
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 160, control);
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 162, header);
+	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c", 163, header->event_type>=_playback_vector_short_difference_set&&header->event_type-_playback_vector_short_difference_set<FLAG(NUMBER_OF_CONTROL_VECTORS));
+
+	event_type = header->event_type - _playback_vector_short_difference_set;
+	update_facing = event_type & FLAG(_control_vector_facing_bit);
+	if (update_facing)
+	{
+		code_00082210(event_data, &animation_state->facing_control);
+		code_00082250(&control->vector3d_field28, &animation_state->facing_control);
+	}
+
+	if (event_type & FLAG(_control_vector_aiming_bit))
+	{
+		if (update_facing)
+		{
+			animation_state->aiming_control = animation_state->facing_control;
+			control->vector3d_field40 = control->vector3d_field28;
+		}
+		else
+		{
+			code_00082210(event_data, &animation_state->aiming_control);
+			code_00082250(&control->vector3d_field40, &animation_state->aiming_control);
+		}
+	}
+
+	if (event_type & FLAG(_control_vector_looking_bit))
+	{
+		if (update_facing)
+		{
+			animation_state->looking_control = animation_state->facing_control;
+			control->vector3d_field52 = control->vector3d_field28;
+			*playback_stream += sizeof(struct vector_short_difference_data);
+			return;
+		}
+
+		if (event_type & FLAG(_control_vector_aiming_bit))
+		{
+			animation_state->looking_control = animation_state->aiming_control;
+			control->vector3d_field52 = control->vector3d_field40;
+			*playback_stream += sizeof(struct vector_short_difference_data);
+			return;
+		}
+
+		code_00082210(event_data, &animation_state->looking_control);
+		code_00082250(&control->vector3d_field52, &animation_state->looking_control);
+	}
+
+	*playback_stream += sizeof(struct vector_short_difference_data);
 
 	return;
 }
