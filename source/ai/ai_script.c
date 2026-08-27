@@ -444,6 +444,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "ai/ai_communication.h"
 #include "ai/ai_script.h"
 
 /* ---------- constants */
@@ -486,6 +488,12 @@ void ai_scripting_reconnect(
 	void)
 {
 	return;
+}
+
+short ai_scripting_conversation_line(
+	short conversation_index)
+{
+	return ai_conversation_line(conversation_index);
 }
 
 /* ---------- private code */
