@@ -62,8 +62,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define set_real_point2d set_real_point2d_inline
 #include "cseries.h"
 #include "path.h"
+#undef set_real_point2d
 
 /* ---------- constants */
 
@@ -107,6 +109,16 @@ void obstacles_new(
 	obstacles->disc_count = 0;
 	obstacles->disc_optional_count = 0;
 	return;
+}
+
+real_point2d *set_real_point2d(
+	real_point2d *p,
+	real x,
+	real y)
+{
+	p->x = x;
+	p->y = y;
+	return p;
 }
 
 /* ---------- private code */
