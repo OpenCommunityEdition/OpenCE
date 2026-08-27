@@ -183,7 +183,9 @@ symbols in this file:
 #include "cseries.h"
 #define signed_angular_difference signed_angular_difference_inline
 #define limit2d limit2d_inline
+#define interpolate_scalar interpolate_scalar_inline
 #include "game/game.h"
+#undef interpolate_scalar
 #undef limit2d
 #undef signed_angular_difference
 #include "game/player_control.h"
@@ -579,6 +581,21 @@ boolean limit2d(
 	}
 
 	return FALSE;
+}
+
+void interpolate_scalar(
+	real *current,
+	real desired,
+	real maximum_speed)
+{
+	real difference = desired - *current;
+
+	*current += PIN(
+		difference,
+		-maximum_speed,
+		maximum_speed);
+
+	return;
 }
 
 void player_control_set_facing(
