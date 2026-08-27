@@ -64,12 +64,16 @@ symbols in this file:
 
 #define set_real_point2d set_real_point2d_inline
 #define project_point3d project_point3d_inline
+#define distance_squared2d distance_squared2d_inline
+#define point_in_circle point_in_circle_inline
 #define distance_squared3d distance_squared3d_inline
 #define point_in_sphere point_in_sphere_inline
 #include "cseries.h"
 #include "path.h"
 #undef set_real_point2d
 #undef project_point3d
+#undef distance_squared2d
+#undef point_in_circle
 #undef distance_squared3d
 #undef point_in_sphere
 
@@ -141,6 +145,14 @@ real_point2d *project_point3d(
 		p3d->n[global_projection3d_mappings[projection][sign][0]],
 		p3d->n[global_projection3d_mappings[projection][sign][1]]);
 	return p2d;
+}
+
+boolean point_in_circle(
+	real_point2d const *point,
+	real_point2d const *center,
+	real radius)
+{
+	return distance_squared2d_inline(point, center) <= (radius * radius);
 }
 
 boolean point_in_sphere(
