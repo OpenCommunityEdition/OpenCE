@@ -218,6 +218,7 @@ boolean build_structure_lens_flares(
 	real_point3d *points = NULL;
 	short *hull_indices = NULL;
 	struct temporary_lens_flare_marker *temp_markers = NULL;
+	struct tag_block *clusters;
 	short lightmap_index;
 	short cluster_index;
 
@@ -230,6 +231,8 @@ boolean build_structure_lens_flares(
 		!tag_block_resize(&structure_bsp->lens_flare_markers, 0))
 	{
 		error(_error_silent, "### ERROR failed to clear lens flares and/or markers from structure_bsp");
+		/* January has a distinct cold failure epilogue here. Keep this early
+		 * return instead of folding it into the ordinary cleanup return. */
 		return FALSE;
 	}
 
@@ -237,21 +240,19 @@ boolean build_structure_lens_flares(
 	points = match_malloc("c:\\halo\\SOURCE\\structures\\structure_lens_flares.c", 75, sizeof(*points) * MAXIMUM_TRIANGLES_PER_CONNECTED_GEOMETRY_COPLANAR_GROUP * NUMBER_OF_VERTICES_PER_TRIANGLE);
 	hull_indices = match_malloc("c:\\halo\\SOURCE\\structures\\structure_lens_flares.c", 76, sizeof(*hull_indices) * MAXIMUM_TRIANGLES_PER_CONNECTED_GEOMETRY_COPLANAR_GROUP * NUMBER_OF_VERTICES_PER_TRIANGLE);
 
-	if (!projected_points || !points || !hull_indices)
+	if (structure_bsp && projected_points && points && hull_indices)
 	{
-		error(_error_silent, "### ERROR failed to allocate temporary buffers for lens flare placement");
-		result = FALSE;
-		goto cleanup;
-	}
-
-	for (cluster_index = 0; cluster_index < structure_bsp->clusters.count; cluster_index++)
+	clusters = &structure_bsp->clusters;
+	for (cluster_index = 0; cluster_index < clusters->count; cluster_index++)
 	{
-		struct structure_cluster_lens_flare_data *cluster = TAG_BLOCK_GET_ELEMENT(
-			&structure_bsp->clusters,
+		TAG_BLOCK_GET_ELEMENT(
+			clusters,
 			cluster_index,
-			struct structure_cluster_lens_flare_data);
-		cluster->first_lens_flare_marker_index = 0;
-		cluster->lens_flare_marker_count = 0;
+			struct structure_cluster_lens_flare_data)->first_lens_flare_marker_index = 0;
+		TAG_BLOCK_GET_ELEMENT(
+			clusters,
+			cluster_index,
+			struct structure_cluster_lens_flare_data)->lens_flare_marker_count = 0;
 	}
 
 	for (lightmap_index = 0; lightmap_index < structure_bsp->lightmaps.count; lightmap_index++)
@@ -332,34 +333,32 @@ boolean build_structure_lens_flares(
 
 			if (lens_flare_index == structure_bsp->lens_flares.count)
 			{
-				long new_lens_flare_index;
 				struct structure_lens_flare *lens_flare;
 
-				if (structure_bsp->lens_flares.count >= 256)
+				if (structure_bsp->lens_flares.count < 256)
+				{
+					/* Original bug: the returned index is dereferenced without a
+					 * NONE check. A hardened build should test the return value
+					 * before TAG_BLOCK_GET_ELEMENT. */
+					lens_flare = TAG_BLOCK_GET_ELEMENT(
+						&structure_bsp->lens_flares,
+						tag_block_add_element(&structure_bsp->lens_flares),
+						struct structure_lens_flare);
+					tag_reference_set(
+						&lens_flare->lens_flare,
+						lens_flare_reference->group_tag,
+						lens_flare_reference->name);
+					lens_flare->lens_flare.index = lens_flare_reference->index;
+				}
+				else
 				{
 					error(_error_silent, "### WARNING failed to add lens flare to structure_bsp (max=#%d)", 256);
-					continue;
+					lens_flare_index = NONE;
 				}
-
-				new_lens_flare_index = tag_block_add_element(&structure_bsp->lens_flares);
-				if (new_lens_flare_index == NONE)
-				{
-					error(_error_silent, "### WARNING failed to add lens flare to structure_bsp (max=#%d)", 256);
-					continue;
-				}
-
-				lens_flare_index = (short)new_lens_flare_index;
-				lens_flare = TAG_BLOCK_GET_ELEMENT(
-					&structure_bsp->lens_flares,
-					lens_flare_index,
-					struct structure_lens_flare);
-				tag_reference_set(
-					&lens_flare->lens_flare,
-					lens_flare_reference->group_tag,
-					lens_flare_reference->name);
-				lens_flare->lens_flare.index = lens_flare_reference->index;
 			}
 
+			if (lens_flare_index != NONE)
+			{
 			connected_geometry_new(&geometry);
 			for (surface_offset = 0; surface_offset < material->surface_count; surface_offset++)
 			{
@@ -401,23 +400,41 @@ boolean build_structure_lens_flares(
 						triangle_index,
 						sizeof(*triangle));
 					real_point3d *triangle_points[3];
-					short vertex_index;
+					long edge_designator;
+					struct connected_geometry_edge *edge;
 
 					if (triangle->coplanar_group_index != coplanar_group_index)
 						continue;
 
-					for (vertex_index = 0; vertex_index < 3; vertex_index++)
-					{
-						long edge_designator = triangle->edge_designators[vertex_index];
-						struct connected_geometry_edge *edge = dynamic_array_get_element(
-							&geometry.edges,
-							edge_designator & LONG_MAX,
-							sizeof(*edge));
-						triangle_points[vertex_index] = dynamic_array_get_element(
-							&geometry.points,
-							edge->point_indices[(edge_designator & LONG_MIN) != 0],
-							sizeof(*triangle_points[vertex_index]));
-					}
+					edge_designator = triangle->edge_designators[0];
+					edge = dynamic_array_get_element(
+						&geometry.edges,
+						edge_designator & LONG_MAX,
+						sizeof(*edge));
+					triangle_points[0] = dynamic_array_get_element(
+						&geometry.points,
+						edge->point_indices[(edge_designator & LONG_MIN) != 0],
+						sizeof(*triangle_points[0]));
+
+					edge_designator = triangle->edge_designators[1];
+					edge = dynamic_array_get_element(
+						&geometry.edges,
+						edge_designator & LONG_MAX,
+						sizeof(*edge));
+					triangle_points[1] = dynamic_array_get_element(
+						&geometry.points,
+						edge->point_indices[(edge_designator & LONG_MIN) != 0],
+						sizeof(*triangle_points[1]));
+
+					edge_designator = triangle->edge_designators[2];
+					edge = dynamic_array_get_element(
+						&geometry.edges,
+						edge_designator & LONG_MAX,
+						sizeof(*edge));
+					triangle_points[2] = dynamic_array_get_element(
+						&geometry.points,
+						edge->point_indices[(edge_designator & LONG_MIN) != 0],
+						sizeof(*triangle_points[2]));
 
 					if (point_count == 0)
 					{
@@ -442,16 +459,27 @@ boolean build_structure_lens_flares(
 
 					match_assert("c:\\halo\\SOURCE\\structures\\structure_lens_flares.c", 218,
 						point_count+2<MAXIMUM_TRIANGLES_PER_CONNECTED_GEOMETRY_COPLANAR_GROUP*NUMBER_OF_VERTICES_PER_TRIANGLE);
-					for (vertex_index = 0; vertex_index < 3; vertex_index++)
-					{
-						points[point_count] = *triangle_points[vertex_index];
-						project_point3d(
-							triangle_points[vertex_index],
-							projection_axis,
-							projection_sign,
-							&projected_points[point_count]);
-						point_count++;
-					}
+					points[point_count] = *triangle_points[0];
+					project_point3d(
+						triangle_points[0],
+						projection_axis,
+						projection_sign,
+						&projected_points[point_count]);
+					point_count++;
+					points[point_count] = *triangle_points[1];
+					project_point3d(
+						triangle_points[1],
+						projection_axis,
+						projection_sign,
+						&projected_points[point_count]);
+					point_count++;
+					points[point_count] = *triangle_points[2];
+					project_point3d(
+						triangle_points[2],
+						projection_axis,
+						projection_sign,
+						&projected_points[point_count]);
+					point_count++;
 				}
 
 				hull_count = convex_hull2d(point_count, projected_points, hull_indices);
@@ -466,7 +494,8 @@ boolean build_structure_lens_flares(
 					short s_max;
 					short t_min;
 					short t_max;
-					short t;
+					long t_count;
+					long t_grid;
 
 					for (hull_index = 0; hull_index < hull_count; hull_index++)
 					{
@@ -512,49 +541,83 @@ boolean build_structure_lens_flares(
 						t_max = (short)(real)floor(PIN(bounds.y1 / lens_flare_spacing, -1000.f, 1000.f));
 					}
 
-					for (t = t_min; t <= t_max; t++)
+					if (t_min <= t_max)
 					{
-						short s;
-						for (s = s_min; s <= s_max; s++)
+						t_count = (unsigned short)(t_max - t_min + 1);
+						t_grid = t_min;
+						do
 						{
-							real_point3d position = origin;
-							real_point2d projected_position;
-							long marker_index;
-							struct structure_lens_flare_marker *marker;
-
-							point_from_line3d(&position, &s_axis, (real)s * lens_flare_spacing, &position);
-							point_from_line3d(&position, &t_axis, (real)t * lens_flare_spacing, &position);
-							project_point3d(&position, projection_axis, projection_sign, &projected_position);
-							if (!convex_hull2d_test_point_indexed(
-								hull_count,
-								hull_indices,
-								projected_points,
-								&projected_position,
-								0.f))
-								continue;
-
-							marker_index = tag_block_add_element(&structure_bsp->lens_flare_markers);
-							if (marker_index == NONE)
+							if (s_min <= s_max)
 							{
-								error(_error_silent, "### WARNING failed to add lens flare marker to structure_bsp (max=#%d)",
-									structure_bsp->lens_flare_markers.definition->maximum_element_count);
-								continue;
+								long s_count = (unsigned short)(s_max - s_min + 1);
+								long s_grid = s_min;
+								real t_distance = (real)t_grid * lens_flare_spacing;
+								real_vector3d t_offset;
+
+								t_offset.i = t_axis.i * t_distance;
+								t_offset.j = t_axis.j * t_distance;
+								t_offset.k = t_axis.k * t_distance;
+								do
+								{
+									real_point3d position = origin;
+									real_point2d projected_position;
+									real s_distance = (real)s_grid * lens_flare_spacing;
+									long marker_index;
+									struct structure_lens_flare_marker *marker;
+
+									position.x = s_axis.i * s_distance + position.x;
+									position.y = s_axis.j * s_distance + position.y;
+									position.z = s_axis.k * s_distance + position.z;
+									position.x = t_offset.i + position.x;
+									position.y = t_offset.j + position.y;
+									position.z = t_offset.k + position.z;
+									project_point3d(&position, projection_axis, projection_sign, &projected_position);
+									if (convex_hull2d_test_point_indexed(
+										hull_count,
+										hull_indices,
+										projected_points,
+										&projected_position,
+										0.f))
+									{
+										marker_index = tag_block_add_element(&structure_bsp->lens_flare_markers);
+										if (marker_index != NONE)
+										{
+											marker = TAG_BLOCK_GET_ELEMENT(
+												&structure_bsp->lens_flare_markers,
+												marker_index,
+												struct structure_lens_flare_marker);
+											marker->position = position;
+											marker->direction[0] = (char)(real)floor(plane.n.i * 127.5f);
+											marker->direction[1] = (char)(real)floor(plane.n.j * 127.5f);
+											marker->direction[2] = (char)(real)floor(plane.n.k * 127.5f);
+											marker->lens_flare_index = (byte)lens_flare_index;
+										}
+										else
+										{
+											error(_error_silent, "### WARNING failed to add lens flare marker to structure_bsp (max=#%d)",
+												structure_bsp->lens_flare_markers.definition->maximum_element_count);
+										}
+									}
+
+									s_grid++;
+									s_count--;
+								}
+								while (s_count != 0);
 							}
 
-							marker = TAG_BLOCK_GET_ELEMENT(
-								&structure_bsp->lens_flare_markers,
-								marker_index,
-								struct structure_lens_flare_marker);
-							marker->position = position;
-							marker->direction[0] = (char)(real)floor(plane.n.i * 127.5f);
-							marker->direction[1] = (char)(real)floor(plane.n.j * 127.5f);
-							marker->direction[2] = (char)(real)floor(plane.n.k * 127.5f);
-							marker->lens_flare_index = (byte)lens_flare_index;
+							t_grid++;
+							t_count--;
 						}
+						while (t_count != 0);
 					}
-				}
+			}
 			}
 			connected_geometry_delete(&geometry);
+			}
+			else
+			{
+				error(_error_silent, "### WARNING failed to add lens flare to structure_bsp (max=#%d)", 256);
+			}
 		}
 	}
 
@@ -562,13 +625,8 @@ boolean build_structure_lens_flares(
 		"c:\\halo\\SOURCE\\structures\\structure_lens_flares.c",
 		363,
 		sizeof(*temp_markers) * structure_bsp->lens_flare_markers.count);
-	if (!temp_markers)
+	if (temp_markers)
 	{
-		error(_error_silent, "### ERROR failed to sort lens flare markers by cluster (out of memory)");
-		result = FALSE;
-		goto cleanup;
-	}
-
 	{
 		long marker_index;
 		for (marker_index = 0; marker_index < structure_bsp->lens_flare_markers.count; marker_index++)
@@ -581,10 +639,10 @@ boolean build_structure_lens_flares(
 			real_point3d test_point = marker->position;
 			real offset = 1.f / 65536.f;
 
+			direction.i = (real)marker->direction[0] * (1.f / 127.f);
+			direction.j = (real)marker->direction[1] * (1.f / 127.f);
+			direction.k = (real)marker->direction[2] * (1.f / 127.f);
 			csmemcpy(&temp_markers[marker_index], marker, sizeof(*marker));
-		direction.i = (real)marker->direction[0] * (1.f / 127.f);
-		direction.j = (real)marker->direction[1] * (1.f / 127.f);
-		direction.k = (real)marker->direction[2] * (1.f / 127.f);
 
 			do
 			{
@@ -616,7 +674,7 @@ boolean build_structure_lens_flares(
 				continue;
 
 			cluster = TAG_BLOCK_GET_ELEMENT(
-				&structure_bsp->clusters,
+				clusters,
 				temporary_marker->cluster_index,
 				struct structure_cluster_lens_flare_data);
 			if (temporary_marker->cluster_index != cluster_index)
@@ -636,37 +694,50 @@ boolean build_structure_lens_flares(
 			cluster->lens_flare_marker_count++;
 		}
 
-		if (!tag_block_resize(&structure_bsp->lens_flare_markers, marker_write_index))
+		if (tag_block_resize(&structure_bsp->lens_flare_markers, marker_write_index))
+		{
+			for (cluster_index = 0; cluster_index < clusters->count; cluster_index++)
+			{
+				struct structure_cluster_lens_flare_data *cluster = TAG_BLOCK_GET_ELEMENT(
+					clusters,
+					cluster_index,
+					struct structure_cluster_lens_flare_data);
+				if (cluster->lens_flare_marker_count)
+				{
+					match_assert("c:\\halo\\SOURCE\\structures\\structure_lens_flares.c", 444,
+						cluster->first_lens_flare_marker_index<structure_bsp->lens_flare_markers.count);
+					match_assert("c:\\halo\\SOURCE\\structures\\structure_lens_flares.c", 445,
+						cluster->first_lens_flare_marker_index+cluster->lens_flare_marker_count<=structure_bsp->lens_flare_markers.count);
+				}
+			}
+		}
+		else
 		{
 			error(_error_silent, "### ERROR failed to resize lens flare marker block");
 			result = FALSE;
 		}
 	}
 
-	for (cluster_index = 0; cluster_index < structure_bsp->clusters.count; cluster_index++)
+	match_free("c:\\halo\\SOURCE\\structures\\structure_lens_flares.c", 455, temp_markers);
+	}
+	else
 	{
-		struct structure_cluster_lens_flare_data *cluster = TAG_BLOCK_GET_ELEMENT(
-			&structure_bsp->clusters,
-			cluster_index,
-			struct structure_cluster_lens_flare_data);
-		if (cluster->lens_flare_marker_count)
-		{
-			match_assert("c:\\halo\\SOURCE\\structures\\structure_lens_flares.c", 444,
-				cluster->first_lens_flare_marker_index<structure_bsp->lens_flare_markers.count);
-			match_assert("c:\\halo\\SOURCE\\structures\\structure_lens_flares.c", 445,
-				cluster->first_lens_flare_marker_index+cluster->lens_flare_marker_count<=structure_bsp->lens_flare_markers.count);
-		}
+		error(_error_silent, "### ERROR failed to sort lens flare markers by cluster (out of memory)");
+		result = FALSE;
+	}
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate temporary buffers for lens flare placement");
+		result = FALSE;
 	}
 
-cleanup:
-	if (temp_markers)
-		match_free("c:\\halo\\SOURCE\\structures\\structure_lens_flares.c", 459, temp_markers);
 	if (projected_points)
-		match_free("c:\\halo\\SOURCE\\structures\\structure_lens_flares.c", 463, projected_points);
+		match_free("c:\\halo\\SOURCE\\structures\\structure_lens_flares.c", 470, projected_points);
 	if (points)
-		match_free("c:\\halo\\SOURCE\\structures\\structure_lens_flares.c", 465, points);
+		match_free("c:\\halo\\SOURCE\\structures\\structure_lens_flares.c", 471, points);
 	if (hull_indices)
-		match_free("c:\\halo\\SOURCE\\structures\\structure_lens_flares.c", 467, hull_indices);
+		match_free("c:\\halo\\SOURCE\\structures\\structure_lens_flares.c", 472, hull_indices);
 
 	if (result)
 		fprintf(stdout, "done\r\n");
