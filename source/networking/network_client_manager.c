@@ -371,7 +371,8 @@ symbols in this file:
 
 enum
 {
-	MAXIMUM_NETWORK_MACHINE_COUNT = 4
+	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
+	_error_silent = 2
 };
 
 /* ---------- macros */
@@ -414,14 +415,17 @@ struct network_game_client
 	unsigned long connection_attempt_time;
 	byte __padding838[0x24];
 	struct network_game game;
-	byte __paddingC90[8];
+	unsigned long join_in_progress;
+	byte __paddingC94[4];
 	unsigned long next_update_number;
-	byte __paddingC9C[8];
+	unsigned long __unknownC9C;
+	byte __paddingCA0[4];
 	short seconds_to_game_start;
 	short state;
 	short error;
 	byte __paddingCAA[2];
 	boolean out_of_sync;
+	boolean connection_silent;
 };
 
 typedef char network_machine_size_assert[
@@ -438,14 +442,20 @@ typedef char network_game_client_connection_attempt_time_offset_assert[
 	offsetof(struct network_game_client, connection_attempt_time) == 0x834 ? 1 : -1];
 typedef char network_game_client_game_offset_assert[
 	offsetof(struct network_game_client, game) == 0x85C ? 1 : -1];
+typedef char network_game_client_join_in_progress_offset_assert[
+	offsetof(struct network_game_client, join_in_progress) == 0xC90 ? 1 : -1];
 typedef char network_game_client_next_update_number_offset_assert[
 	offsetof(struct network_game_client, next_update_number) == 0xC98 ? 1 : -1];
+typedef char network_game_client_unknownC9C_offset_assert[
+	offsetof(struct network_game_client, __unknownC9C) == 0xC9C ? 1 : -1];
 typedef char network_game_client_seconds_to_game_start_offset_assert[
 	offsetof(struct network_game_client, seconds_to_game_start) == 0xCA4 ? 1 : -1];
 typedef char network_game_client_error_offset_assert[
 	offsetof(struct network_game_client, error) == 0xCA8 ? 1 : -1];
 typedef char network_game_client_out_of_sync_offset_assert[
 	offsetof(struct network_game_client, out_of_sync) == 0xCAC ? 1 : -1];
+typedef char network_game_client_connection_silent_offset_assert[
+	offsetof(struct network_game_client, connection_silent) == 0xCAD ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -461,6 +471,8 @@ void network_connection_get_address(
 	void *connection,
 	void *address,
 	boolean include_port);
+void network_connection_delete(
+	void *connection);
 unsigned long system_milliseconds(
 	void);
 void game_engine_switch_to_postgame(
@@ -468,6 +480,23 @@ void game_engine_switch_to_postgame(
 void network_event(
 	char *format,
 	...);
+boolean network_game_is_splitscreen_local(
+	void);
+boolean transport_network_available(
+	void);
+void error(
+	short priority,
+	const char *format,
+	...);
+void display_error_when_main_menu_loaded(
+	short error_code);
+void network_game_reset_for_next_round(
+	struct network_game *game,
+	boolean load_ui);
+void network_game_reset_to_pregame_ui(
+	void);
+void network_game_client_all_local_players_have_quit(
+	void);
 
 boolean network_game_client_write(
 	void *connection,
@@ -475,6 +504,11 @@ boolean network_game_client_write(
 	unsigned short message_size,
 	void *address,
 	long flags);
+
+boolean code_001141c0(
+	void);
+void network_game_client_dispose(
+	struct network_game_client *client);
 
 short network_game_client_get_state(
 	struct network_game_client *client,
@@ -484,11 +518,15 @@ boolean network_game_client_set_machine(
 	struct network_machine *machine);
 void network_game_client_switch_to_postgame(
 	struct network_game_client *client);
+boolean network_game_client_switch_to_pregame(
+	struct network_game_client *client);
 void network_game_client_countdown_timer_update(
 	struct network_game_client *client,
 	short seconds_to_game_start);
 boolean network_game_client_advertised_game_is_valid(
 	struct network_advertised_game *advertised_game);
+void network_game_client_game_shutdown(
+	struct network_game_client *client);
 
 struct network_machine *network_game_client_get_machine(
 	struct network_game_client *client);
@@ -518,7 +556,50 @@ boolean network_client_get_oos(
 
 /* ---------- globals */
 
+boolean allow_out_of_sync = FALSE;
+boolean network_game_client_dont_use_directly_in_use = FALSE;
+
 /* ---------- public code */
+
+boolean code_001141c0(
+	void)
+{
+	boolean connected = TRUE;
+
+	if (!network_game_is_splitscreen_local())
+	{
+		connected = transport_network_available();
+
+		if (!connected)
+		{
+			error(_error_silent, "network connection went down!");
+			display_error_when_main_menu_loaded(6);
+		}
+	}
+
+	return connected;
+}
+
+void network_game_client_dispose(
+	struct network_game_client *client)
+{
+	if (client)
+	{
+		if (client->connection)
+			network_connection_delete(client->connection);
+
+		match_assert(
+			"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+			0xB2,
+			network_game_client_dont_use_directly_in_use);
+
+		network_game_client_dont_use_directly_in_use = FALSE;
+	}
+
+	network_event("network client disposed");
+
+	return;
+}
 
 short network_game_client_get_state(
 	struct network_game_client *client,
@@ -578,6 +659,32 @@ void network_game_client_switch_to_postgame(
 	return;
 }
 
+boolean network_game_client_switch_to_pregame(
+	struct network_game_client *client)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x499,
+		client);
+
+	if (client->state != 2)
+	{
+		network_game_reset_for_next_round(&client->game, TRUE);
+		network_connection_keep_alive(client->connection);
+		client->next_update_number = 0;
+		client->join_in_progress = TRUE;
+		client->__unknownC9C = 0;
+		client->connection_silent = FALSE;
+		client->state = 2;
+		client->out_of_sync = FALSE;
+		network_event("switching to pregame");
+		network_game_reset_to_pregame_ui();
+		network_connection_keep_alive(client->connection);
+	}
+
+	return TRUE;
+}
+
 void network_game_client_countdown_timer_update(
 	struct network_game_client *client,
 	short seconds_to_game_start)
@@ -604,6 +711,27 @@ boolean network_game_client_advertised_game_is_valid(
 	}
 
 	return valid;
+}
+
+void network_game_client_game_shutdown(
+	struct network_game_client *client)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x3FC,
+		client);
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x662,
+		client);
+
+	if (client->error == 0)
+		client->error = 8;
+
+	network_event("the game host is shutting down");
+	network_game_client_all_local_players_have_quit();
+
+	return;
 }
 
 struct network_machine *network_game_client_get_machine(
