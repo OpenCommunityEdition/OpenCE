@@ -49,7 +49,9 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#define dot_product4d dot_product4d_inline
 #include "math/real_math.h"
+#undef dot_product4d
 #include "structures.h"
 
 /* ---------- constants */
@@ -118,3 +120,10 @@ void structure_detail_objects_flush(
 }
 
 /* ---------- private code */
+
+real dot_product4d(
+	real_vector4d const *a,
+	real_vector4d const *b)
+{
+	return a->i*b->i + a->j*b->j + a->k*b->k + a->l*b->l;
+}
