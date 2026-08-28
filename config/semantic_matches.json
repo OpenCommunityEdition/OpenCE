@@ -583,5 +583,10 @@
     "unit": "source/cutscene/recorded_animation_playback",
     "function": "_recorded_animation_apply_event_stream",
     "reason": "hardened COFF comparison proves all 496 padded bytes and all 34 semantic relocations exact (SHA-256 4e8a5bd6f5b73b358df9e82beed6a1a08aa23ee6f84b353aa3026df37f1b441b); objdiff reports a switch-table/local-label encoding false negative"
+  },
+  {
+    "unit": "source/camera/camera_scripting",
+    "function": "_scripted_camera_update",
+    "reason": "hardened COFF comparison proves all 1664 padded bytes and all 82 semantic relocations exact (SHA-256 cb504e5b44213920854f97d593ab2361bda073fcb0ffef531347b0c4b8565e06); objdiff reports a switch-table/local-label encoding false negative"
   }
 ]

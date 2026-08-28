@@ -741,7 +741,7 @@
 				{ "name": "source/camera/director.c", "index": 367, "status": "NonMatching" },
 				{ "name": "source/camera/dead_camera.c", "index": 368, "status": "NonMatching" },
 				{ "name": "source/camera/camera_track_definitions.c", "index": 369, "status": "Matching" },
-				{ "name": "source/camera/camera_scripting.c", "index": 370, "status": "NonMatching" },
+				{ "name": "source/camera/camera_scripting.c", "index": 370, "status": "Matching" },
 				{ "name": "source/camera/bored_camera.c", "index": 371, "status": "Matching" },
 				{ "name": "source/bungie_net/network/transport_endpoint_winsock.c", "index": 372, "status": "NonMatching" },
 				{ "name": "source/bungie_net/network/transport_endpoint_set_winsock.c", "index": 373, "status": "NonMatching" },
