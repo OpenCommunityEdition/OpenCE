@@ -239,7 +239,7 @@ struct game_globals_falling_damage
 struct _vehicle_datum
 {
 	word flags;
-	word unknown426;
+	short unknown426;
 	byte unknown428;
 	byte unknown429;
 	byte unknown42a;
@@ -2486,13 +2486,15 @@ boolean vehicle_update(
 
 	if (vehicle->object.parent_object_index!=NONE)
 	{
+		unsigned long *object_flags = &vehicle->object.flags;
+
 		vehicle->object.angular_velocity.i = 0.0f;
 		vehicle->object.angular_velocity.j = 0.0f;
 		vehicle->object.angular_velocity.k = 0.0f;
 		vehicle->object.translational_velocity.i = 0.0f;
 		vehicle->object.translational_velocity.j = 0.0f;
 		vehicle->object.translational_velocity.k = 0.0f;
-		vehicle->object.flags &= ~FLAG(_object_at_rest_bit);
+		*object_flags &= ~FLAG(_object_at_rest_bit);
 		goto animate;
 	}
 

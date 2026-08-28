@@ -103,6 +103,55 @@ owners/topology were restored.
   count; instruction scheduling, branch layout, and relocation placement remain
   the high-leverage closeout.
 
+## Exhaustive tree and live-Claude audit (2026-08-27)
+
+The Vehicles baseline was re-audited after the earlier 33/39 summary proved too
+shallow. The repository has 1,421 attached worktrees containing
+`source/units/vehicles.c`, but only ten unique source hashes. The current ledger
+is a superset of the older `claude-finish-hs`, `claude-near-complete`, and
+`work/libcmt-stream` ledgers. The furthest historical verified result remains
+**34/39 exact, 9,776/17,232 target text bytes (56.7%)** at `5a0a12c4`; the
+current policy-compliant result remains **33/39 exact, 9,008/17,232 (52.3%)**.
+The sole lost exact owner is `_code_001a6290`, whose historical source requires
+the prohibited `.ij` union overlay. This distinction must accompany future
+Vehicles status reports.
+
+Claude's live session was inspected read-only, including its transcript,
+`MEMORY.md`, `units-package-frozen-packet.md`, active `work/halo-exact` lane,
+and clean landed `units-wave-20260828` tree. Claude was closing `units.obj`, not
+editing Vehicles. No Claude file, worktree, index, build product, or process was
+mutated. The landed Vehicles commit in that tree is `77296510`; its source is
+semantically the same 33/39 checkpoint as this integration tree.
+
+The local HCEA donor at
+`build/audit/refs/halocea/src/blam/units/vehicle_update.c` was also read in full.
+It confirms the semantic names `stop_time` for `unknown426`, `upending_type`
+for `unknown429`, and `upending_ticks` for `unknown42a`, but its PPC-oriented
+source topology is not a byte-source oracle for January PC. Two isolated donor
+shapes were measured and rejected:
+
+- direct scalar steering grows `_vehicle_update` from 2,320 to 2,336 bytes and
+  perturbs the frame/register topology;
+- the plain local upending clamp shrinks it to 2,304 bytes. Explicit typed
+  pointer branches and a `MIN` form also shrink it to 2,304 bytes, with the
+  former losing one relocation.
+
+Two lawful January-PC improvements survive this audit:
+
+- `unknown426` is now a signed `short`, changing the late stop-time predicate
+  from candidate `jbe` to January's `jle` without changing the 33/6/0 census;
+- a typed pointer to `vehicle->object.flags` in the seated/parked branch makes
+  VC7 emit January's exact six zero stores followed by the in-place
+  `and [ebx+4], ~FLAG(_object_at_rest_bit)`. The previous direct field spelling
+  hoisted a load/and pair ahead of the zero stores and used a later store.
+
+Direct `cross_product3d`, two commutative operand-order rewrites in the local
+cross helper, aggregate and setter forms for `_code_001a6290`, and the donor
+steering/upending shapes are measured negatives and should not be repeated.
+The remaining `vehicle_update` differences are now concentrated in three x87
+operand-selection pairs, the upending clamp/tick scheduler tie, jump-table
+representation, and padding/relocation placement.
+
 ---
 
 # Historical Claude/Jonas research ledger
