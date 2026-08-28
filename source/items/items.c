@@ -61,31 +61,109 @@ symbols in this file:
 #define valid_real_matrix4x3 items_valid_real_matrix4x3_inline
 #define valid_real_vector3d_axes3 items_valid_real_vector3d_axes3_inline
 #define object_get_type items_object_get_type_inline
+#define point_from_line3d items_point_from_line3d_inline
 #include "cseries.h"
 
+#include "cseries/profile.h"
+#include "effects/material_effects.h"
 #include "game/game.h"
 #include "effects/effects.h"
 #include "game/players.h"
 #include "game/game_engine.h"
 #include "items/item_definitions.h"
 #include "items.h"
+#include "physics/breakable_surfaces.h"
 #include "physics/collision_bsp_definitions.h"
 #include "physics/collision_usage.h"
+#include "physics/collisions.h"
+#include "physics/physics.h"
 #include "scenario/scenario.h"
+#include "sound/game_sound.h"
 #include "units/units.h"
 #undef object_get_type
+#undef point_from_line3d
 #undef valid_real_vector3d_axes3
 #undef valid_real_matrix4x3
 
 /* ---------- constants */
 
+enum
+{
+	_item_definition_always_maintains_z_up_bit = 0,
+	_item_definition_destroyed_by_explosions_bit,
+	_item_definition_antigravity_bit,
+};
+
+enum
+{
+	_collision_surface_breakable_bit = 3,
+};
+
+enum
+{
+	ITEM_UPDATE_COLLISION_TEST_FLAGS = 0x1FF3E9,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
 
+union item_update_scratch
+{
+	struct object_marker marker;
+	struct
+	{
+		byte pad[0x1C];
+		struct collision_result result;
+	} collision;
+};
+
+typedef char item_update_scratch_size_assert[
+	sizeof(union item_update_scratch) == 0x6C ? 1 : -1];
+
+union item_update_work
+{
+	real_matrix4x3 matrix;
+	struct
+	{
+		byte pad[8];
+		struct sound_location location;
+	} sound;
+};
+
+typedef char item_update_work_size_assert[
+	sizeof(union item_update_work) == sizeof(real_matrix4x3) ? 1 : -1];
+
+struct item_update_storage
+{
+	union item_update_scratch scratch;
+	union item_update_work work;
+};
+
+typedef char item_update_storage_size_assert[
+	sizeof(struct item_update_storage) == 0xA0 ? 1 : -1];
+
+struct item_update_vectors
+{
+	real_vector3d velocity;
+	real_point3d candidate;
+};
+
+typedef char item_update_vectors_size_assert[
+	sizeof(struct item_update_vectors) == 0x18 ? 1 : -1];
+
 /* ---------- prototypes */
 
+real_point3d *point_from_line3d(
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real scale,
+	real_point3d *result);
+
 /* ---------- globals */
+
+real const rdata_00278fb0 = 0.1f;
+struct profile_section data_00306498 = { "item_update", NONE, TRUE };
 
 /* ---------- public code */
 
@@ -467,4 +545,481 @@ void item_accelerate(
 	--global_current_collision_user_depth;
 
 	return;
+}
+
+static void code_000e6900(
+	long item_index,
+	real_vector3d const *normal,
+	real_point3d const *position,
+	real_point3d *new_position)
+{
+	struct item_datum *item = item_get(item_index);
+	struct object_marker marker;
+	real_vector3d new_forward;
+	real_matrix4x3 ground_point_matrix;
+	real scale;
+
+	match_assert("c:\\halo\\SOURCE\\items\\items.c", 713, normal);
+	if (!object_get_marker_by_name(item_index, "ground point", &marker, 1))
+	{
+		return;
+	}
+
+	if (!position)
+	{
+		position = &marker.matrix.position;
+	}
+	if (!new_position)
+	{
+		new_position = &marker.matrix.position;
+	}
+
+	scale = square_root(
+		2.f * (dot_product3d(&marker.matrix.up, normal) + 1.f));
+	if (scale > 0.01)
+	{
+		real_quaternion rotation;
+		real inverse_scale;
+
+		match_assert("c:\\halo\\SOURCE\\items\\items.c", 732, scale>0);
+		cross_product3d(&marker.matrix.up, normal, &rotation.v);
+		inverse_scale = 1.f / scale;
+		scale_vector3d(&rotation.v, inverse_scale, &rotation.v);
+		rotation.w = scale * 0.5f;
+		quaternion_transform_point(
+			&rotation,
+			(real_point3d const *)&marker.matrix.forward,
+			(real_point3d *)&new_forward);
+	}
+	else
+	{
+		real_vector3d cross;
+
+		cross_product3d(normal, &marker.matrix.forward, &cross);
+		cross_product3d(&cross, normal, &new_forward);
+	}
+
+	normalize3d(&new_forward);
+	matrix4x3_from_point_and_vectors(
+		&ground_point_matrix,
+		position,
+		&new_forward,
+		normal);
+	match_assert(
+		"c:\\halo\\SOURCE\\items\\items.c",
+		755,
+		valid_real_matrix4x3(&ground_point_matrix));
+	object_align_marker_to_matrix(
+		object_get(item_index),
+		&marker,
+		&ground_point_matrix);
+	*new_position = item->object.position;
+
+	return;
+}
+
+boolean item_update(
+	long item_index)
+{
+	struct item_datum *item;
+	struct item_definition *definition;
+	struct item_update_storage storage;
+	struct item_update_vectors vectors;
+
+	item = item_get(item_index);
+	definition = item_definition_get(item->definition_index);
+	profile_enter(data_00306498);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\items\\items.c",
+		174,
+		global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
+	global_current_collision_users[global_current_collision_user_depth++] =
+		_collision_user_items;
+
+	if (TEST_FLAG(item->object.flags, _object_connected_to_map_bit) &&
+		item->object.parent_object_index == NONE)
+	{
+		if (TEST_FLAG(
+				definition->item.flags,
+				_item_definition_always_maintains_z_up_bit) &&
+			!(fabs(item->object.up.k - 1.f) < 0.0001f))
+		{
+			item->object.up = *global_up3d;
+			cross_product3d(
+				&item->object.up,
+				&item->object.forward,
+				&vectors.velocity);
+			cross_product3d(
+				&vectors.velocity,
+				&item->object.up,
+				&item->object.forward);
+			if (normalize3d(&item->object.forward) == 0.f)
+			{
+				item->object.forward = *global_forward3d;
+			}
+		}
+
+		if (!TEST_FLAG(item->object.flags, _object_at_rest_bit))
+		{
+			vectors.velocity = item->object.translational_velocity;
+			if (!TEST_FLAG(
+					definition->item.flags,
+					_item_definition_antigravity_bit))
+			{
+				vectors.velocity.k -= global_gravity;
+			}
+
+			vectors.candidate.x = item->object.position.x + vectors.velocity.i;
+			vectors.candidate.y = item->object.position.y + vectors.velocity.j;
+			vectors.candidate.z = item->object.position.z + vectors.velocity.k;
+
+			if (collision_test_line(
+					ITEM_UPDATE_COLLISION_TEST_FLAGS,
+					&item->object.position,
+					&vectors.candidate,
+					item->item.ignore_object_index,
+					&storage.scratch.collision.result))
+			{
+				struct collision_result *collision;
+				real impact_scale;
+
+				collision = &storage.scratch.collision.result;
+				vectors.candidate.x += collision->plane.n.i * 0.05f;
+				vectors.candidate.y += collision->plane.n.j * 0.05f;
+				vectors.candidate.z += collision->plane.n.k * 0.05f;
+
+				impact_scale = magnitude3d(&vectors.velocity);
+				impact_scale /= rdata_00278fb0;
+				if (impact_scale >= 0.f)
+				{
+					if (impact_scale > 1.f)
+					{
+						impact_scale = 1.f;
+					}
+				}
+				else
+				{
+					impact_scale = 0.f;
+				}
+
+				if (definition->item.material_effects.index != NONE &&
+					material_effect_visible(&collision->point))
+				{
+					material_effect_new(
+						definition->item.material_effects.index,
+						8,
+						collision->material_type,
+						&collision->point,
+						&collision->plane.n,
+						&collision->location,
+						impact_scale);
+				}
+
+				if (definition->item.collision_sound.index != NONE)
+				{
+					storage.work.sound.location.position = vectors.candidate;
+					storage.work.sound.location.forward = collision->plane.n;
+					storage.work.sound.location.translational_velocity =
+						*global_zero_vector3d;
+					storage.work.sound.location.game_location = item->object.location;
+					unattached_impulse_sound_new(
+						definition->item.collision_sound.index,
+						&storage.work.sound.location,
+						impact_scale);
+				}
+
+				if ((collision->type == _collision_result_structure ||
+					(collision->type == _collision_result_object &&
+						TEST_FLAG(
+							_object_mask_scenery | _object_mask_device,
+							object_get_type(collision->object_index)))) &&
+					collision->plane.n.k > 0.7071f &&
+					-(collision->plane.n.k * vectors.velocity.k +
+						(collision->plane.n.j * vectors.velocity.j +
+							collision->plane.n.i * vectors.velocity.i)) < 0.05f)
+				{
+					real angular_dot;
+
+					vectors.candidate = collision->point;
+					code_000e6900(
+						item_index,
+						&collision->plane.n,
+						&collision->point,
+						&vectors.candidate);
+					vectors.velocity.i = 0.f;
+					vectors.velocity.j = 0.f;
+					vectors.velocity.k = 0.f;
+					angular_dot =
+						item->object.angular_velocity.i * collision->plane.n.i +
+						(collision->plane.n.j * item->object.angular_velocity.j +
+							item->object.angular_velocity.k * collision->plane.n.k);
+					scale_vector3d(
+						&collision->plane.n,
+						angular_dot,
+						&item->object.angular_velocity);
+
+					if (!game_engine_running() &&
+						item->object.owner_player_index == NONE)
+					{
+						object_set_garbage(item_index, TRUE);
+					}
+
+					item->object.flags |= FLAG(_object_at_rest_bit);
+					switch (collision->type)
+					{
+					case _collision_result_structure:
+						item->item.flags |= FLAG(_item_on_structure_bit);
+						item->item.rested_surface_index =
+							(short)collision->surface_index;
+						item->item.bsp_index =
+							global_structure_bsp_index_get();
+						break;
+
+					case _collision_result_object:
+					{
+						real_matrix4x3 const *support_matrix;
+
+						item->item.flags |= FLAG(_item_on_object_bit);
+						item->item.item_on_rest_object_index =
+							collision->object_index;
+						support_matrix = object_get_node_matrix(
+							collision->object_index,
+							0);
+						matrix4x3_inverse_transform_point(
+							support_matrix,
+							&collision->point,
+							&item->item.item_rest_object_offset);
+						break;
+					}
+
+					default:
+						match_assert(
+							"c:\\halo\\SOURCE\\items\\items.c",
+							283,
+							!"unreachable");
+						break;
+					}
+
+					item->item.rotation_axis = collision->plane.n;
+					code_000e6370(item_index);
+					item->item.ignore_object_index = NONE;
+				}
+				else
+				{
+					real reflection;
+
+					reflection = -(
+						collision->plane.n.k * vectors.velocity.k * 1.4f -
+						(collision->plane.n.i * vectors.velocity.i * -1.4f -
+							collision->plane.n.j * vectors.velocity.j * 1.4f));
+					if (collision->type != _collision_result_structure &&
+						reflection >= 1.5f)
+					{
+						reflection = 1.5f;
+					}
+					vectors.velocity.i += collision->plane.n.i * reflection;
+					vectors.velocity.j += collision->plane.n.j * reflection;
+					vectors.velocity.k += collision->plane.n.k * reflection;
+					vectors.candidate = collision->point;
+					if (collision_test_point(
+							ITEM_UPDATE_COLLISION_TEST_FLAGS,
+							&vectors.candidate,
+							item_index))
+					{
+						point_from_line3d(
+							&collision->point,
+							&collision->plane.n,
+							0.05f,
+							&vectors.candidate);
+					}
+					collision_test_point(
+						ITEM_UPDATE_COLLISION_TEST_FLAGS,
+						&vectors.candidate,
+						item_index);
+				}
+			}
+
+			item->object.translational_velocity = vectors.velocity;
+			object_translate(
+				item_index,
+				&vectors.candidate,
+				&storage.scratch.collision.result.location);
+		}
+		else if (!TEST_FLAG(
+			definition->item.flags,
+			_item_definition_antigravity_bit))
+		{
+			object_get_marker_by_name(
+				item_index,
+				"ground point",
+				&storage.scratch.marker,
+				1);
+
+			if (TEST_FLAG(item->item.flags, _item_on_structure_bit) &&
+				(word)item->item.rested_surface_index != (word)NONE &&
+				item->item.bsp_index == global_structure_bsp_index_get())
+			{
+				struct collision_bsp *collision_bsp;
+				struct collision_surface const *surface;
+
+				collision_bsp = global_collision_bsp_get();
+				surface = TAG_BLOCK_GET_ELEMENT(
+					&collision_bsp->surfaces,
+					item->item.rested_surface_index,
+					struct collision_surface);
+				if (TEST_FLAG(surface->flags, _collision_surface_breakable_bit) &&
+					!breakable_surface_extant(
+						surface->breakable_surface_index))
+				{
+					scale_vector3d(
+						global_down3d,
+						global_gravity,
+						(real_vector3d *)&vectors.candidate);
+					item->item.flags &= ~FLAG(_item_on_structure_bit);
+					item->item.rested_surface_index = NONE;
+					goto accelerate;
+				}
+				goto damp_angular;
+			}
+			else if (TEST_FLAG(item->item.flags, _item_on_object_bit))
+			{
+				if (!object_try_and_get(item->item.item_on_rest_object_index))
+				{
+					scale_vector3d(
+						global_down3d,
+						global_gravity,
+						(real_vector3d *)&vectors.candidate);
+					item->item.flags &= ~FLAG(_item_on_object_bit);
+					goto accelerate;
+				}
+				else
+				{
+					real_matrix4x3 const *support_matrix;
+
+					support_matrix = object_get_node_matrix(
+						item->item.item_on_rest_object_index,
+						0);
+					matrix4x3_transform_point(
+						support_matrix,
+						&item->item.item_rest_object_offset,
+						(real_point3d *)&vectors.velocity);
+					code_000e6900(
+						item_index,
+						&item->item.rotation_axis,
+						(real_point3d const *)&vectors.velocity,
+						NULL);
+				}
+			}
+
+			goto damp_angular;
+		accelerate:
+			item_accelerate(
+				item_index,
+				(real_vector3d const *)&vectors.candidate,
+				FALSE);
+
+		damp_angular:
+			item->object.angular_velocity.i *= 0.9f;
+			item->object.angular_velocity.j *= 0.9f;
+			item->object.angular_velocity.k *= 0.9f;
+			code_000e6370(item_index);
+		}
+
+		if (TEST_FLAG(
+				item->item.flags,
+				_item_has_nonzero_angular_velocity_bit))
+		{
+			if (!TEST_FLAG(item->object.flags, _object_at_rest_bit) ||
+				!object_get_marker_by_name(
+					item_index,
+					"ground point",
+					&storage.scratch.marker,
+					1))
+			{
+				rotate_vector_about_axis(
+					&item->object.forward,
+					&item->item.rotation_axis,
+					item->item.rotation_sine,
+					item->item.rotation_cosine);
+				rotate_vector_about_axis(
+					&item->object.up,
+					&item->item.rotation_axis,
+					item->item.rotation_sine,
+					item->item.rotation_cosine);
+			}
+			else
+			{
+				storage.work.matrix = storage.scratch.marker.matrix;
+				rotate_vector_about_axis(
+					&storage.work.matrix.forward,
+					&item->item.rotation_axis,
+					item->item.rotation_sine,
+					item->item.rotation_cosine);
+				rotate_vector_about_axis(
+					&storage.work.matrix.up,
+					&item->item.rotation_axis,
+					item->item.rotation_sine,
+					item->item.rotation_cosine);
+				cross_product3d(
+					&storage.work.matrix.up,
+					&storage.work.matrix.forward,
+					&storage.work.matrix.left);
+				cross_product3d(
+					&storage.work.matrix.left,
+					&storage.work.matrix.up,
+					&storage.work.matrix.forward);
+				normalize3d(&storage.work.matrix.forward);
+				normalize3d(&storage.work.matrix.left);
+				normalize3d(&storage.work.matrix.up);
+				object_align_marker_to_matrix(
+					object_get(item_index),
+					&storage.scratch.marker,
+					&storage.work.matrix);
+			}
+
+			normalize3d(&item->object.up);
+			cross_product3d(
+				&item->object.up,
+				&item->object.forward,
+				&vectors.velocity);
+			cross_product3d(
+				&vectors.velocity,
+				&item->object.up,
+				&item->object.forward);
+			normalize3d(&item->object.forward);
+		}
+	}
+
+	if (item->item.detonation_ticks > 0)
+	{
+		--item->item.detonation_ticks;
+		if (item->item.detonation_ticks == 0)
+		{
+			effect_new_from_object(
+				definition->item.detonation_effect.index,
+				item_index,
+				item_index,
+				NONE,
+				0.f,
+				0.f,
+				NULL,
+				NULL);
+			object_delete(item_index);
+		}
+	}
+
+	if (TEST_FLAG(item->item.flags, _item_attached_to_unit_bit))
+	{
+		item->item.last_owned_time = game_time_get();
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\items\\items.c",
+		468,
+		global_current_collision_user_depth > 1);
+	--global_current_collision_user_depth;
+	profile_exit(data_00306498);
+
+	return TRUE;
 }
