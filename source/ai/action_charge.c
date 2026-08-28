@@ -99,6 +99,7 @@ symbols in this file:
 
 #include "actor_definitions.h"
 #include "actors.h"
+#include "game/game.h"
 #include "math/real_math.h"
 #undef square_root
 #undef scale_vector2d
@@ -118,6 +119,10 @@ symbols in this file:
 
 enum
 {
+	_action_charge_idle_look_type = 4,
+	_action_charge_primary_priority_exact_facing = 4,
+	_action_charge_primary_priority_aiming = 5,
+	_action_charge_primary_priority_locked_aiming = 7,
 	_actor_special_fire_situation_strafing = 3,
 };
 
@@ -168,6 +173,102 @@ void action_charge_update(
 	}
 
 	return;
+}
+
+void action_charge_control(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct charge_state_data *state_data = &actor->state.action_data.charge;
+	struct actor_definition *definition = actor_definition_get(actor->meta.definition_index);
+
+	actor->orders.look.primary_direction.type = _direction_specification_target;
+	actor->orders.look.idle_look_type = _action_charge_idle_look_type;
+
+	if ((state_data->goal == _charge_goal_melee ||
+		state_data->goal == _charge_goal_melee_leaping) &&
+		state_data->alignment_incorrect &&
+		!actor->control.moving &&
+		!actor_path_has_path(actor_index))
+	{
+		actor->orders.look.primary_priority = _action_charge_primary_priority_exact_facing;
+	}
+	else
+	{
+		short priority = _action_charge_primary_priority_aiming;
+
+		if (actor->state.combat_status >= 5 &&
+			state_data->goal != _charge_goal_stalking)
+		{
+			actor->orders.look.primary_priority = _action_charge_primary_priority_locked_aiming;
+		}
+		else
+		{
+			actor->orders.look.primary_priority = priority;
+		}
+	}
+
+	if (state_data->goal == _charge_goal_stalking)
+	{
+		actor->orders.move.stationary_crouch = !state_data->stalking_catch_target;
+		actor->orders.move.moving_crouch = !state_data->stalking_catch_target;
+	}
+	else if (!actor->orders.move.panicked &&
+		TEST_FLAG(definition->flags, _actor_definition_defensive_crouch_while_charging_bit))
+	{
+		actor->orders.move.stationary_crouch = actor->emotions.defensive_crouch;
+		actor->orders.move.moving_crouch = actor->emotions.defensive_crouch;
+	}
+	else
+	{
+		actor->orders.move.stationary_crouch = FALSE;
+		actor->orders.move.moving_crouch = FALSE;
+	}
+
+	if (state_data->leap_pending)
+	{
+		actor->orders.move.jump = TRUE;
+		actor->orders.move.jump_leap = state_data->leap_vertical_velocity < state_data->leap_horizontal_velocity * 0.7f;
+		actor->orders.move.jump_targeted = TRUE;
+		actor->orders.move.jump_alignment_vector = state_data->leap_alignment_vector;
+		actor->orders.move.jump_target_horizontal_vel = state_data->leap_horizontal_velocity;
+		actor->orders.move.jump_target_vertical_vel = state_data->leap_vertical_velocity;
+		state_data->launched_leap = TRUE;
+		state_data->leap_pending = FALSE;
+		state_data->leap_start_time = game_time_get();
+		state_data->leap_failure_timer = 0;
+	}
+
+	if (TEST_FLAG(definition->flags, _actor_definition_berserk_use_panic_movement_bit) &&
+		(actor->emotions.berserk ||
+		state_data->goal == _charge_goal_melee ||
+		state_data->goal == _charge_goal_melee_leaping))
+	{
+		actor->orders.move.panicked = state_data->advancing && !actor->orders.move.moving_crouch;
+	}
+
+	actor->orders.move.move_face_exactly = TRUE;
+	actor->orders.move.dive_into_cover = FALSE;
+	actor->orders.move.emerge_from_cover = FALSE;
+	actor->orders.combat.shoot_at_target = state_data->goal != _charge_goal_stalking;
+
+	return;
+}
+
+boolean action_charge_is_leaping(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct charge_state_data *state_data = &actor->state.action_data.charge;
+	boolean result = FALSE;
+
+	if (state_data->goal == _charge_goal_melee_leaping &&
+		state_data->launched_leap)
+	{
+		result = state_data->leap_start_time + 30 >= game_time_get();
+	}
+
+	return result;
 }
 
 real square_root(

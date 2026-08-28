@@ -79,6 +79,35 @@ strict exact; its projection-bounds body remained non-exact at 208 bytes,
 again removed. Reopen the two residual functions only with a new authentic
 source topology or debug-scope evidence.
 
+### Follow-up warning-condition donor
+
+A separate bounded follow-up screened the independently preserved PC donor for
+`_code_00174fc0`, later named `render_camera_check_warning_condition`. The
+donor comes from
+`research-cache/stian-halo-complete-history-20260828/src/halo/render/render_cameras.c`,
+introducing commit `2de9e367583618a51c240592aba70afd0bb7be9d`, file blob
+`6df6626845b1efa9c01d121d670229eba20d5765`, and payload SHA-256
+`8b66b63bf0e8a7f8cd80356fc433da9261864569c83333f9e294eeef5a017992`.
+
+The sole code-producing typed-C candidate is rejected and fully removed:
+
+| Measurement | January | Candidate |
+| --- | ---: | ---: |
+| padded bytes | 160 | 176 |
+| relocations | 13 | 13 |
+| normalized SHA-256 | `7280c3e18a305d7cb7f5b2173139805adccdd9f64eac43d848bdea943d1ba663` | `fd6eff2cad87236914502058adece1afcda9805eac755e47c0b608fdc9d5c7a1` |
+
+The first opcode proves an ABI/source-boundary mismatch: January begins
+`mov si,ax`, carrying the value in the return register, while an ordinary
+external typed-C definition must load it from `[ebp+8]`. Every later candidate
+offset shifts and the section grows by one padded block. The donor also
+materializes separate BSS owners `_render_camera_warnings_initialized` and
+`_render_camera_warning_values` where January relocates into
+`_bss_004b8b28+272` and `_bss_004b8b28+16`. The frozen candidate object SHA-256
+is `a1990b582d549d8e53c6ae0aff0312d4782b69615593f9a29a85c8a72e1a585d`.
+Reopen only with an authentic January caller/inlining topology and canonical
+storage ownership; an external-body spelling retry cannot repair this ABI.
+
 ## Policy and validation
 
 The retained source is readable typed C with one parameter per line and
