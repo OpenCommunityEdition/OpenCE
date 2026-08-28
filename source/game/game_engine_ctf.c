@@ -119,17 +119,48 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "game_engine.h"
 #include "players.h"
+#include "items/weapons.h"
+#include "text/unicode.h"
 
 /* ---------- constants */
+
+enum
+{
+	_ctf_weapon_handled_bit = 6,
+	_multiplayer_sound_capture_the_flag = 0x16,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct scenario_netgame_flag;
+
+struct ctf_globals
+{
+	struct scenario_netgame_flag *flags[2];
+	long weapon_indices[2];
+	long scores[2];
+	long score_to_win;
+	boolean flag_warnings[2];
+	byte pad1E[2];
+	long flag_warning_ticks[2];
+	long flag_swap_timer;
+	long next_flag_failure_time;
+};
+
+typedef char verify_ctf_globals_scores_offset[
+	offsetof(struct ctf_globals, scores) == 0x10 ? 1 : -1];
+typedef char verify_ctf_globals_size[
+	sizeof(struct ctf_globals) == 0x30 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+extern struct ctf_globals bss_0043e914;
 
 /* ---------- public code */
 
@@ -211,6 +242,65 @@ void code_0009ec80(
 	player_get(player_index);
 
 	return;
+}
+
+void code_0009ecb0(
+	void)
+{
+	game_engine_play_multiplayer_sound(
+		_multiplayer_sound_capture_the_flag);
+
+	return;
+}
+
+boolean code_0009ee80(
+	long unit_index,
+	long weapon_index)
+{
+	boolean allow_pick_up = TRUE;
+	long player_index = player_index_from_unit_index(unit_index);
+
+	if (player_index != NONE && weapon_index != NONE)
+	{
+		struct player_datum *player = player_get(player_index);
+		struct weapon_datum *weapon = weapon_try_and_get(weapon_index);
+
+		if (weapon &&
+			weapon_is_flag(weapon_index) &&
+			!TEST_FLAG(weapon->weapon.flags, _ctf_weapon_handled_bit) &&
+			weapon->object.owner_team_index == player->team_index)
+		{
+			allow_pick_up = FALSE;
+		}
+	}
+
+	return allow_pick_up;
+}
+
+wchar_t *code_0009f3d0(
+	long player_index,
+	wchar_t *buffer)
+{
+	struct player_datum *player = player_get(player_index);
+
+	usprintf(
+		buffer,
+		L"%d",
+		player->statistics.multiplayer_statistics.ctf_statistics.flag_scores);
+
+	return buffer;
+}
+
+wchar_t *code_0009f470(
+	long team_index,
+	wchar_t *buffer)
+{
+	usprintf(
+		buffer,
+		L"%d",
+		bss_0043e914.scores[team_index]);
+
+	return buffer;
 }
 
 /* ---------- private code */

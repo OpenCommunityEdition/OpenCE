@@ -219,6 +219,16 @@ struct progress_bar_mode
 	unsigned char padding1[3];
 };
 
+enum d3d_texture_stage_state_type
+{
+	_d3dtss_deferred_max= 22,
+	_d3dtss_bumpenvmat00= 22,
+	_d3dtss_bumpenvloffset= 27,
+	_d3dtss_texcoordindex= 28,
+	_d3dtss_bordercolor= 29,
+	_d3dtss_colorkeycolor= 30
+};
+
 struct tga_image
 {
 	unsigned char reserved[4];
@@ -268,6 +278,28 @@ void __stdcall D3DDevice_SetVertexData2f(
 	unsigned long register_index,
 	real x,
 	real y);
+
+void __fastcall D3DDevice_SetTextureState_Deferred(
+	unsigned long stage,
+	enum d3d_texture_stage_state_type type,
+	unsigned long value);
+
+void __stdcall D3DDevice_SetTextureState_BumpEnv(
+	unsigned long stage,
+	enum d3d_texture_stage_state_type type,
+	unsigned long value);
+
+void __stdcall D3DDevice_SetTextureState_TexCoordIndex(
+	unsigned long stage,
+	unsigned long value);
+
+void __stdcall D3DDevice_SetTextureState_BorderColor(
+	unsigned long stage,
+	unsigned long value);
+
+void __stdcall D3DDevice_SetTextureState_ColorKeyColor(
+	unsigned long stage,
+	unsigned long value);
 
 /* ---------- globals */
 
@@ -417,6 +449,35 @@ struct d3dx_matrix *D3DXMatrixIdentity(
 		output->elements[2][2] = output->elements[3][3] = 1.0f;
 
 	return output;
+}
+
+void SetTextureStageStateSmart(
+	unsigned long stage,
+	enum d3d_texture_stage_state_type type,
+	unsigned long value)
+{
+	if (type < _d3dtss_deferred_max)
+	{
+		D3DDevice_SetTextureState_Deferred(stage, type, value);
+	}
+	else if (type == _d3dtss_texcoordindex)
+	{
+		D3DDevice_SetTextureState_TexCoordIndex(stage, value);
+	}
+	else if (type == _d3dtss_bordercolor)
+	{
+		D3DDevice_SetTextureState_BorderColor(stage, value);
+	}
+	else if (type == _d3dtss_colorkeycolor)
+	{
+		D3DDevice_SetTextureState_ColorKeyColor(stage, value);
+	}
+	else if ((type >= _d3dtss_bumpenvmat00) && (type <= _d3dtss_bumpenvloffset))
+	{
+		D3DDevice_SetTextureState_BumpEnv(stage, type, value);
+	}
+
+	return;
 }
 
 void progress_bar_display(

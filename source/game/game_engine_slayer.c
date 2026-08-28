@@ -76,7 +76,16 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 
+#include "game/game_engine.h"
+#include "game/players.h"
+
 /* ---------- constants */
+
+enum
+{
+	_multiplayer_sound_slayer = 0x15,
+	_multiplayer_sound_team_slayer = 0x23,
+};
 
 /* ---------- macros */
 
@@ -154,6 +163,34 @@ void code_000a3e40(
 	void)
 {
 	return;
+}
+
+void code_000a3d90(
+	long player_index)
+{
+	struct player_datum *player = player_get(player_index);
+
+	player->unknown88 = NONE;
+
+	return;
+}
+
+void code_000a3dd0(
+	void)
+{
+	game_engine_play_multiplayer_sound(
+		game_engine_has_teams()
+			? _multiplayer_sound_team_slayer
+			: _multiplayer_sound_slayer);
+
+	return;
+}
+
+boolean code_000a3e50(
+	long unit_index,
+	long weapon_index)
+{
+	return TRUE;
 }
 
 /* ---------- private code */
