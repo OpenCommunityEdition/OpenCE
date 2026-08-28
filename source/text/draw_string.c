@@ -101,6 +101,7 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "interface/interface.h"
+#include "math/integer_math.h"
 #include "math/real_math.h"
 #include "text/draw_string.h"
 #include "text/font_group.h"
@@ -122,7 +123,12 @@ enum
 
 struct draw_string_globals
 {
-	byte __unknown0[0x20];
+	byte __unknown0[8];
+	point2d pick_point;
+	short best_pick_string_index;
+	short best_pick_distance;
+	short last_string_index;
+	byte __unknown12[14];
 	long localization_string_list_index;
 	long font_index;
 	unsigned long flags;
@@ -138,7 +144,41 @@ struct draw_string_globals
 	byte __unknown6A[0x8E];
 };
 
+struct parse_string_state;
+struct font_character;
+
+typedef void (*draw_character_proc)(
+	struct parse_string_state *state,
+	struct font_header *font,
+	struct font_character *character,
+	unsigned long color,
+	short x0,
+	short y0,
+	short x,
+	short y,
+	short dx,
+	short dy);
+
 /* ---------- prototypes */
+
+void code_0018ac80(
+	struct parse_string_state *state,
+	struct font_header *font,
+	struct font_character *character,
+	unsigned long color,
+	short x0,
+	short y0,
+	short x,
+	short y,
+	short dx,
+	short dy);
+void draw_string(
+	draw_character_proc draw_character,
+	rectangle2d const *bounds,
+	point2d *cursor_reference,
+	rectangle2d const *clip,
+	short height_adjust,
+	char const *string);
 
 /* ---------- globals */
 
@@ -283,6 +323,20 @@ void draw_string_set_highlight(
 	draw_string_globals.highlight_end = end;
 
 	return;
+}
+
+short draw_string_pick(
+	rectangle2d const *bounds,
+	char const *string,
+	point2d const *point)
+{
+	draw_string_globals.pick_point = *point;
+	draw_string_globals.best_pick_distance = SHORT_MAX;
+	draw_string_globals.best_pick_string_index = 0;
+	draw_string_globals.last_string_index = 0;
+
+	draw_string(code_0018ac80, bounds, NULL, NULL, 0, string);
+	return (word)draw_string_globals.best_pick_string_index;
 }
 
 /* ---------- private code */
