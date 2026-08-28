@@ -578,5 +578,10 @@
     "unit": "source/rasterizer/rasterizer_debug",
     "function": "_rasterizer_debug_triangle",
     "reason": "hardened COFF comparison proves all 32 padded bytes and the REL32 relocation to _rasterizer_debug_triangle_shaded exact (SHA-256 1b0df8cc752bec5820c858223f553d6f62fc7e39bac45bbb9b209d0f980a148a)"
+  },
+  {
+    "unit": "source/cutscene/recorded_animation_playback",
+    "function": "_recorded_animation_apply_event_stream",
+    "reason": "hardened COFF comparison proves all 496 padded bytes and all 34 semantic relocations exact (SHA-256 4e8a5bd6f5b73b358df9e82beed6a1a08aa23ee6f84b353aa3026df37f1b441b); objdiff reports a switch-table/local-label encoding false negative"
   }
 ]
