@@ -142,6 +142,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "units/vehicles.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -185,3 +188,15 @@ void vehicle_delete(
 }
 
 /* ---------- private code */
+
+boolean vehicle_build_update(
+	void)
+{
+	return TRUE;
+}
+
+boolean vehicle_parse_update(
+	void)
+{
+	return TRUE;
+}
