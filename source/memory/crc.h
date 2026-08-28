@@ -16,8 +16,12 @@ header included in hcex build.
 
 /* ---------- prototypes/CRC.C */
 
-void crc_new(unsigned long *crc_reference);
-void crc_checksum_buffer(unsigned long *crc_reference, void const *buffer, long buffer_size);
+void crc_new(
+	unsigned long *crc_reference);
+void crc_checksum_buffer(
+	unsigned long *crc_reference,
+	void const *buffer,
+	long buffer_size);
 
 /* ---------- globals */
 

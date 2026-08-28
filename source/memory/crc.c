@@ -40,18 +40,23 @@ struct crc_globals
 /* ---------- globals */
 
 #pragma bss_seg(".bss")
-struct crc_globals crc_state;
+struct crc_globals bss_00456220;
 #pragma bss_seg()
+
+#define crc_state bss_00456220
 
 /* ---------- public code */
 
-void crc_new(unsigned long *crc_reference)
+void crc_new(
+	unsigned long *crc_reference)
 {
 	*crc_reference = 0xFFFFFFFF;
+	return;
 }
 
 /* Initializes the CRC-32 lookup table; the private function has no surviving PDB name. */
-__declspec(noinline) static void code_001088e0(unsigned long *crc_table)
+__declspec(noinline) static void code_001088e0(
+	unsigned long *crc_table)
 {
 	unsigned long byte_index;
 	long byte_count;
@@ -76,9 +81,14 @@ __declspec(noinline) static void code_001088e0(unsigned long *crc_table)
 		byte_index++;
 		crc_table++;
 	} while (--byte_count);
+
+	return;
 }
 
-void crc_checksum_buffer(unsigned long *crc_reference, void const *buffer, long buffer_size)
+void crc_checksum_buffer(
+	unsigned long *crc_reference,
+	void const *buffer,
+	long buffer_size)
 {
 	unsigned long crc;
 	unsigned long table_index;
@@ -105,6 +115,7 @@ void crc_checksum_buffer(unsigned long *crc_reference, void const *buffer, long 
 	}
 
 	*crc_reference = crc;
+	return;
 }
 
 /* ---------- private code */
