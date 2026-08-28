@@ -60,6 +60,7 @@ symbols in this file:
 
 #define valid_real_matrix4x3 items_valid_real_matrix4x3_inline
 #define valid_real_vector3d_axes3 items_valid_real_vector3d_axes3_inline
+#define object_get_type items_object_get_type_inline
 #include "cseries.h"
 
 #include "game/game.h"
@@ -69,6 +70,7 @@ symbols in this file:
 #include "items.h"
 #include "scenario/scenario.h"
 #include "units/units.h"
+#undef object_get_type
 #undef valid_real_vector3d_axes3
 #undef valid_real_matrix4x3
 
@@ -83,6 +85,12 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+short object_get_type(
+	long object_index)
+{
+	return object_header_get(object_index)->type;
+}
 
 void items_initialize(
 	void)
