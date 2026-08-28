@@ -1160,8 +1160,14 @@ static void code_001a6290(
 		force.j = lift*vehicle->object.up.j+thrust*vehicle->object.forward.j;
 		force.k = lift*vehicle->object.up.k+thrust*vehicle->object.forward.k;
 
-		velocity.i = vehicle->object.translational_velocity.i;
-		velocity.j = vehicle->object.translational_velocity.j;
+		{
+			real *destination = velocity.n;
+			real const *source = vehicle->object.translational_velocity.n;
+			short component_index;
+
+			for (component_index = 0; component_index<2; component_index++)
+				destination[component_index] = source[component_index];
+		}
 
 		yaw = (facing.i*velocity.j-facing.j*velocity.i)*(_pi*0.5f)/
 			(real)fabs(definition->unknown2f8);
@@ -1576,7 +1582,6 @@ static void code_001a7ac0(
 	real_vector3d facing;
 	real_vector3d ground;
 	real_vector3d axis;
-	real_vector3d scaled;
 	real_vector3d force;
 	real_vector3d torque;
 	real throttle;
@@ -1585,7 +1590,6 @@ static void code_001a7ac0(
 	real lift;
 	real dot;
 	real yaw;
-	real angle;
 	real scale;
 
 	if (TEST_FLAG(vehicle->vehicle.flags, 1))
@@ -1609,9 +1613,10 @@ static void code_001a7ac0(
 
 	vehicle->vehicle.unknown444 += PIN(factor*(1.0f-throttle*throttle)*
 		vehicle->unit.seat_power[0]-vehicle->vehicle.unknown444, -0.05f, 0.05f);
-	vehicle->vehicle.unknown448 = throttle*throttle*vehicle->unit.seat_power[0];
 
 	facing = vehicle->unit.desired_facing_vector;
+
+	vehicle->vehicle.unknown448 = throttle*throttle*vehicle->unit.seat_power[0];
 
 	ground.i = -(facing.k*facing.i);
 	ground.j = -(facing.k*facing.j);
@@ -1640,21 +1645,26 @@ static void code_001a7ac0(
 
 	yaw_vectors(&ground, &facing, sine(yaw), cosine(yaw));
 
-	matrix4x3_rotation_from_vectors(&vehicle_rotation, &vehicle->object.forward,
-		&vehicle->object.up);
-	matrix4x3_rotation_from_vectors(&desired_rotation, &facing, &ground);
-	matrix4x3_inverse(&desired_rotation, &desired_rotation);
-	matrix4x3_multiply(&vehicle_rotation, &desired_rotation, &rotation);
-	matrix4x3_rotation_to_quaternion(&rotation, &quaternion);
-	quaternion_to_angle_and_vector(&quaternion, &angle, &axis);
+	{
+		real angle;
+		real_vector3d scaled;
 
-	scale = physics->radius*physics->radius*physics->mass*0.05f;
+		matrix4x3_rotation_from_vectors(&vehicle_rotation, &vehicle->object.forward,
+			&vehicle->object.up);
+		matrix4x3_rotation_from_vectors(&desired_rotation, &facing, &ground);
+		matrix4x3_inverse(&desired_rotation, &desired_rotation);
+		matrix4x3_multiply(&vehicle_rotation, &desired_rotation, &rotation);
+		matrix4x3_rotation_to_quaternion(&rotation, &quaternion);
+		quaternion_to_angle_and_vector(&quaternion, &angle, &axis);
 
-	scale_vector3d(&axis, angle*(1.0f/30), &scaled);
+		scale = physics->radius*physics->radius*physics->mass*0.05f;
 
-	torque.i = (scaled.i-vehicle->object.angular_velocity.i)*scale;
-	torque.j = (scaled.j-vehicle->object.angular_velocity.j)*scale;
-	torque.k = (scaled.k-vehicle->object.angular_velocity.k)*scale;
+		scale_vector3d(&axis, angle*(1.0f/30), &scaled);
+
+		torque.i = (scaled.i-vehicle->object.angular_velocity.i)*scale;
+		torque.j = (scaled.j-vehicle->object.angular_velocity.j)*scale;
+		torque.k = (scaled.k-vehicle->object.angular_velocity.k)*scale;
+	}
 
 	force.i *= vehicle->unit.seat_power[0];
 	force.j *= vehicle->unit.seat_power[0];
@@ -1664,7 +1674,7 @@ static void code_001a7ac0(
 	torque.j *= vehicle->unit.seat_power[0];
 	torque.k *= vehicle->unit.seat_power[0];
 
-	physics_update(vehicle_index, NULL, mass_points, &torque, &force);
+	physics_update(vehicle_index, NULL, mass_points, &force, &torque);
 	code_001a6710(vehicle_index);
 
 	return;
@@ -2197,8 +2207,12 @@ static void code_001a7e60(
 
 	if (water_depth<0.5f && vehicle->object.up.k>-0.2f)
 	{
+		real_vector3d const *object_forward = &vehicle->object.forward;
+		real_vector3d const *object_up = &vehicle->object.up;
+		real_vector3d const *object_angular_velocity =
+			&vehicle->object.angular_velocity;
 		matrix4x3_from_point_and_vectors(&matrix, &vehicle->object.position,
-			&vehicle->object.forward, &vehicle->object.up);
+			object_forward, object_up);
 		matrix4x3_inverse_transform_vector(&matrix,
 			&vehicle->object.translational_velocity, &local_velocity);
 
@@ -2238,8 +2252,8 @@ static void code_001a7e60(
 
 		if (vehicle->vehicle.unknown444>0.0f)
 		{
-			real current = dot_product3d(&vehicle->object.up,
-				&vehicle->object.angular_velocity);
+			real current = dot_product3d(object_up,
+				object_angular_velocity);
 			long sign = steering!=0.0f ? (steering<0.0f ? -1 : 1) : 0;
 			real desired = square_root((real)(fabs(steering)*0.0069813174f))*sign;
 			real error;
@@ -2252,9 +2266,9 @@ static void code_001a7e60(
 			torque = error*physics->zz_moment;
 			torque *= vehicle->vehicle.unknown444;
 
-			magic_torque.i += vehicle->object.up.i*torque;
-			magic_torque.j += vehicle->object.up.j*torque;
-			magic_torque.k += vehicle->object.up.k*torque;
+			magic_torque.i += object_up->i*torque;
+			magic_torque.j += object_up->j*torque;
+			magic_torque.k += object_up->k*torque;
 		}
 
 		if (vehicle->vehicle.unknown444<1.0f)
@@ -2266,15 +2280,15 @@ static void code_001a7e60(
 			real torque_a;
 			real torque_b;
 
-			cross_product3d(&vehicle->object.up, &vehicle->object.forward, &left);
-			forward2d.i = vehicle->object.forward.i;
-			forward2d.j = vehicle->object.forward.j;
+			vehicle_cross_product3d_target(object_up, object_forward, &left);
+			forward2d.i = object_forward->i;
+			forward2d.j = object_forward->j;
 			left2d.i = left.i;
 			left2d.j = left.j;
 			normalize2d(&forward2d);
 			normalize2d(&left2d);
 
-			if (vehicle->object.up.k>0.0f)
+			if (object_up->k>0.0f)
 			{
 				real_vector2d level_torque;
 				real_vector2d alignment;
@@ -2286,10 +2300,10 @@ static void code_001a7e60(
 				real weight_a;
 				real weight_b;
 
-				up.i = vehicle->object.up.i;
-				up.j = vehicle->object.up.j;
-				angular_velocity.i = vehicle->object.angular_velocity.i;
-				angular_velocity.j = vehicle->object.angular_velocity.j;
+				up.i = object_up->i;
+				up.j = object_up->j;
+				angular_velocity.i = object_angular_velocity->i;
+				angular_velocity.j = object_angular_velocity->j;
 				alignment.i = dot_product2d(&up, &forward2d);
 				alignment.j = dot_product2d(&up, &left2d);
 				rate.i = dot_product2d(&angular_velocity, &left2d);
@@ -2310,7 +2324,7 @@ static void code_001a7e60(
 				control_torque.j += vehicle->unit.throttle.j*
 					PIN(weight_b+1.0f, 0.3f, 2.5f)*0.0015514038f;
 				{
-					real level_scale = (1.0f-vehicle->object.up.k)*0.0038785094f;
+					real level_scale = (1.0f-object_up->k)*0.0038785094f;
 
 					torque_a = level_scale*level_torque.i;
 					torque_b = level_scale*level_torque.j;
@@ -2335,9 +2349,9 @@ static void code_001a7e60(
 				torque.i += left.i*left_scale;
 				torque.j += left.j*left_scale;
 				torque.k += left.k*left_scale;
-				torque.i += vehicle->object.forward.i*forward_scale;
-				torque.j += vehicle->object.forward.j*forward_scale;
-				torque.k += vehicle->object.forward.k*forward_scale;
+				torque.i += object_forward->i*forward_scale;
+				torque.j += object_forward->j*forward_scale;
+				torque.k += object_forward->k*forward_scale;
 
 				magic_torque.i += torque.i*scale;
 				magic_torque.j += torque.j*scale;
@@ -2347,13 +2361,13 @@ static void code_001a7e60(
 
 		if (TEST_FLAG(vehicle->vehicle.flags, 3))
 		{
-			real speed = dot_product3d(&vehicle->object.forward,
+			real speed = dot_product3d(object_forward,
 				&vehicle->object.translational_velocity)/definition->unknown2f8;
 			real_vector3d left;
 
 			speed = PIN(speed, 0.0f, 1.0f);
 
-			cross_product3d(&vehicle->object.up, &vehicle->object.forward, &left);
+			cross_product3d(object_up, object_forward, &left);
 
 			if (speed>0.0f)
 			{

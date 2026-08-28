@@ -1,8 +1,8 @@
-# `source/units/vehicles.obj` — current integration checkpoint (2026-08-27)
+# `source/units/vehicles.obj` — current integration checkpoint (2026-08-28)
 
-**Current source result: 33 of 39 functions byte-exact; all 39 written.**
-**Exact target text: 9,008 / 17,232 bytes (52.3%).**
-**Five of the six residuals are size- and relocation-exact.**
+**Current source result: 34 of 39 functions byte-exact; all 39 written.**
+**Exact target text: 9,776 / 17,232 bytes (56.7%).**
+**All five residuals are size- and relocation-exact.**
 **Object status remains `NonMatching`.**
 
 This checkpoint supersedes the status line in the historical Claude ledger below,
@@ -35,13 +35,13 @@ The strict whole-unit scratch gate reports:
 | target owner | target size | relocation result | status |
 |---|---:|---:|---|
 | `_code_001a5e50` | 1,088 | 32 / 32 | residual bytes |
-| `_code_001a6290` | 768 | 22 / 22 | candidate is 752 bytes |
+| `_code_001a6290` | 768 | 22 / 22 | **strict exact** |
 | `_code_001a6910` | 656 | 22 / 22 | residual bytes |
 | `_code_001a7ac0` | 928 | 34 / 34 | residual bytes |
 | `_code_001a7e60` | 2,464 | 91 / 91 | residual bytes |
 | `_vehicle_update` | 2,320 | 98 / 98 | residual bytes |
 
-Everything else is strict-exact: 33 exact, 6 residual, 0 unwritten.
+Everything else is strict-exact: 34 exact, 5 residual, 0 unwritten.
 `vehicle_update` advanced from the committed 704-byte / 51-relocation
 scaffold to exact target size and relocation count. With relocation operands
 zeroed, its body differs from January in 1,458 byte positions, and its
@@ -52,33 +52,62 @@ The newer `code_001a7e60` source was also adopted. A lawful pair of explicit
 `real_vector2d` temporaries replaces the historical `.ij` union view and
 retains the target's exact 2,464-byte size and 91-relocation count.
 
-## No-punning decision for `code_001a6290`
+## Lawful no-punning recovery for `code_001a6290`
 
 The historical 34th exact owner depends on assigning
 `vehicle->object.translational_velocity.ij` through a union overlay added to
-`real_vector3d`. That overlay was not restored because the current campaign
+`real_vector3d`. That overlay remains rejected because the current campaign
 rules prohibit union-based type punning.
 
-Two lawful alternatives were measured:
+The same exact owner is now recovered with ordinary typed C89. A block-scoped
+two-component copy binds the existing arrays through `real` pointers and lets
+VC7 unroll the bounded loop:
+
+```c
+{
+	real *destination = velocity.n;
+	real const *source = vehicle->object.translational_velocity.n;
+	short component_index;
+
+	for (component_index = 0; component_index<2; component_index++)
+		destination[component_index] = source[component_index];
+}
+```
+
+This produces the exact 768 padded bytes, 22 relocations, relocation addresses
+and destinations, and normalized SHA-256
+`5a4da1a1ed51e2c14b8e44966fdc685a249d0d12fa8ee6287a04b7ed7c743694`.
+It emits no helper owner and changes no other target owner.
+
+The measured alternatives explain why the typed-pointer topology matters:
 
 - explicit `i` / `j` assignments: 752 bytes, 22 relocations;
+- aggregate initialization: 768 bytes, but 266 differing byte positions;
+- the same bounded array loop without typed pointer aliases: 768/22 with only
+  two commutative x87 operand bytes residual;
 - `memcpy` of the two components: 768 bytes, but 23 relocations because VC7
-  emits an unwanted `_csmemcpy` call.
+  emits an unwanted `_csmemcpy` call;
+- a by-value projection helper: 768/22, but it emits an invented 32-byte helper
+  owner and remains 497 byte positions residual.
 
-The `memcpy` experiment was rejected. The tree retains the clear 752-byte
-source rather than violating the no-punning rule or accepting a false
-size-only improvement.
+The exact bounded typed copy is retained; the union overlay, `memcpy`, aggregate,
+and helper variants remain rejected.
 
 ## Admission evidence
 
 - one production target compile:
   `ninja build\\base\\source\\units\\vehicles.obj` — passed;
 - strict scratch whole-unit census:
-  `33 exact, 6 residual, 0 unwritten`;
+  `34 exact, 5 residual, 0 unwritten`;
 - exact text:
-  `9,008 / 17,232 bytes`;
-- prior-branch named-function comparison:
-  28 newly exact, no named exact owner lost;
+  `9,776 / 17,232 bytes`;
+- immediate-parent named-function comparison:
+  one newly exact owner, no named exact owner lost;
+- `code_001a7ac0` remains residual but improves from 752 to 744 differing
+  relocation-zeroed byte positions, with the target `0xf8` frame restored;
+- `code_001a7e60` remains 2,464 bytes / 91 relocations with the predecessor
+  candidate's `0xa0` frame and improves from 1,354 to 1,340 differing byte
+  positions; January's `0x94` frame remains residual;
 - `git diff --check` — passed;
 - raw `tag_get` and raw/casted `vehicle_get` uses in
   `source/units/vehicles.c` — zero.
@@ -93,7 +122,6 @@ owners/topology were restored.
 
 - `code_001a5e50`: target size/topology exact; residual is a local-slot
   permutation.
-- `code_001a6290`: 16 bytes short under the lawful component-copy form.
 - `code_001a6910`: target size/topology exact; two independent stores remain
   ordered differently.
 - `code_001a7ac0`: target size/topology exact; one compiler spill/temp slot
@@ -131,12 +159,9 @@ artifacts reproduce the historical 34/39 result:
 
 All seven use source blob `bbd210ec7c232f0f6deb758aed48e151a4a6946d`
 and ledger blob `f728ddb68effaeb177eb631b8020a6afe2b06149`.
-The furthest historical verified result therefore remains **34/39 exact,
-9,776/17,232 target text bytes (56.7%)** at `5a0a12c4`; the current
-policy-compliant result remains **33/39 exact, 9,008/17,232 (52.3%)**. The sole
-lost exact owner is `_code_001a6290`, whose historical source requires the
-prohibited `.ij` union overlay. This distinction must accompany future Vehicles
-status reports.
+The furthest historical verified result was **34/39 exact, 9,776/17,232 target
+text bytes (56.7%)** at `5a0a12c4`. The current policy-compliant source now
+reaches the same strict result without the prohibited `.ij` union overlay.
 
 `work/campaign-integration` preserves one additional hybrid artifact: source
 SHA-256 `2d13229e...`, base-object SHA-256 `e4b36179...`, 34/39 exact. It combines
@@ -149,8 +174,9 @@ Claude's live session was inspected read-only, including its transcript,
 `MEMORY.md`, `units-package-frozen-packet.md`, active `work/halo-exact` lane,
 and clean landed `units-wave-20260828` tree. Claude was closing `units.obj`, not
 editing Vehicles. No Claude file, worktree, index, build product, or process was
-mutated. The landed Vehicles commit in that tree is `77296510`; its source is
-semantically the same 33/39 checkpoint as this integration tree.
+mutated. The landed Vehicles commit in that tree is `77296510` and corresponds
+to the pre-wave 33/39 baseline; it does not contain the 2026-08-28
+`code_001a6290`, `code_001a7ac0`, or `code_001a7e60` changes described here.
 
 The local HCEA donor at
 `build/audit/refs/halocea/src/blam/units/vehicle_update.c` was also read in full.
@@ -190,10 +216,9 @@ relocation addresses remain part of the strict gate.
 | owner | candidate bytes / relocations | differing byte positions | relocation sequence |
 |---|---:|---:|---|
 | `_code_001a5e50` | 1,088 / 32 | 22 | destinations and addresses exact |
-| `_code_001a6290` | 752 / 22 | 550 | destinations exact; addresses residual |
 | `_code_001a6910` | 656 / 22 | 8 | destinations and addresses exact |
-| `_code_001a7ac0` | 928 / 34 | 752 | destinations and addresses residual |
-| `_code_001a7e60` | 2,464 / 91 | 1,354 | destinations exact; addresses residual |
+| `_code_001a7ac0` | 928 / 34 | 744 | destinations and addresses residual |
+| `_code_001a7e60` | 2,464 / 91 | 1,340 | destinations exact; addresses residual |
 | `_vehicle_update` | 2,320 / 98 | 1,458 | destinations and addresses residual |
 
 ### Frozen lawful residual wave (2026-08-27)
@@ -223,9 +248,67 @@ No candidate below displaced the production source:
   helper collapsed the caller back to the current 752-byte / 550-distance form
   while still emitting the extra owner. Both were rejected.
 
-The result of this wave is therefore documentation and a corrected source
-comment, not a byte-code admission. The production Vehicles object remains the
-lawful 33/39 checkpoint.
+At the end of that 2026-08-27 wave the result was documentation and a corrected
+source comment, not a byte-code admission; the production Vehicles object was
+still the lawful 33/39 checkpoint.
+
+### Exact typed-copy wave and `code_001a7ac0` reconciliation (2026-08-28)
+
+The bounded typed-pointer copy documented above closes `_code_001a6290`
+strictly without restoring the historical union overlay. It advances the lawful
+object from 33/39 to **34/39 exact** and restores the same 9,776 exact target
+bytes as the historical prohibited checkpoint.
+
+Three independently attested `code_001a7ac0` corrections ride this exact wave:
+
+- `angle` and `scaled` now live only in the orientation/torque block, moving the
+  frame from `0xfc` to January's `0xf8`;
+- `facing = desired_facing_vector` precedes the thrust assignment, matching the
+  HCEA human-plane source order and January's emitted schedule;
+- `physics_update` receives `&force` before `&torque`, as proved both by
+  January's cdecl push order and HCEA's prototype/call. The old reversed call was
+  a semantic reconstruction error.
+
+Together these retain 928 bytes / 34 relocations and reduce the strict
+relocation-zeroed distance from 752 to **744**, with normalized SHA-256
+`1e63b25f54f1c82b6625d2f7fba608082a924668f42cbfc399a0a01d0d702bac`.
+The owner remains residual because relocation addresses/destinations and the
+axis/angle slot chain still differ.
+
+The relevant HCEA donor is commit
+`570c83fd9c365dad6f2a3e7041705d5b84c7847c`,
+`src/blam/game/update_human_plane_physics.c`. Its semantics were used only as a
+hypothesis and every adopted shape was independently checked against January PC
+disassembly and the strict COFF gate.
+
+The same wave also admits a semantics-preserving `code_001a7e60` refinement.
+Inside the water gate, typed `const` pointers now give the target-like lifetime
+to the object's forward, up, and angular-velocity vectors. The first leveling
+cross uses the existing target-oriented typed helper; the later cross keeps its
+ordinary helper call. This preserves the target-sized 2,464-byte body and
+91-relocation count and the predecessor candidate's `0xa0` frame while reducing
+the relocation-zeroed distance from 1,354 to **1,340**. January's frame is
+`0x94`; relocation destinations remain exact, relocation addresses remain
+residual, and the normalized SHA-256 is
+`c0c804247f7b3902aabd78270c604e42a87e6e06637fbe69450a86c7303f4e6f`.
+
+The typed pointer model and the up-by-forward cross are corroborated by
+`src/blam/game/update_alien_scout_physics.c` at the same HCEA commit and by
+January's address-materialization schedule. A broader direct-PD rewrite was
+rejected after semantic review: its apparent 1,326-byte-position result counted
+one control-torque component twice. Corrected direct-PD forms shrink the owner
+and are worse than this retained source.
+
+### Correction to the historical `code_001a5e50` slot interpretation
+
+The historical ledger later describes January's quaternion output at
+`[ebp-0x40]` as `desired.left`. That is disproved by the complete address map:
+January's `desired` matrix is based at `[ebp-0x28]`, so `desired.left` is fixed at
+`[ebp-0x1c]`. The `[ebp-0x40]` quaternion output is a distinct/reused rotation
+axis vector, which the HCEA donor independently corroborates. This corrects the
+role labels but does not improve the current lawful owner: 778 additional
+split-scope, typed-role, alias-safe partition, component, and pointer-lifetime
+probes found no candidate below the committed 22 differing bytes.
 
 ---
 
