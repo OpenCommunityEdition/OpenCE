@@ -10267,8 +10267,8 @@ boolean unit_animation_set_state(
 			struct animation_graph_weapon_class);
 	long interpolation_frame_count;
 	boolean old_state_is_none;
-	boolean changed_state = FALSE;
-	boolean result = TRUE;
+	boolean changed_state;
+	boolean result;
 
 	TAG_BLOCK_GET_ELEMENT(
 		&weapon_class->weapon_types,
@@ -10276,6 +10276,8 @@ boolean unit_animation_set_state(
 		struct animation_graph_weapon_type);
 
 	old_state_is_none = unit->unit.animation.state == NONE;
+	changed_state = FALSE;
+	result = TRUE;
 
 	if (old_state_is_none ||
 		new_state != unit->unit.animation.state)
@@ -10482,9 +10484,11 @@ boolean unit_animation_set_state(
 
 		if (animation_index == NONE)
 		{
-			if (!code_001981f0(new_state))
+			result = code_001981f0(new_state);
+
+			if (!result)
 			{
-				return FALSE;
+				return result;
 			}
 		}
 
