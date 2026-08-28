@@ -9921,7 +9921,6 @@ short unit_update_animation(
 	short desired_state;
 	word result;
 	boolean apply_state;
-	short desired_base_seat_index;
 	short animation_update_result;
 	boolean can_change_animation;
 	struct biped_datum *biped;
@@ -9946,13 +9945,15 @@ short unit_update_animation(
 		0xb61,
 		desired_state>=0 && desired_state<NUMBER_OF_UNIT_STATES);
 
-	desired_base_seat_index = NONE;
-
 	if (unit->object.parent_object_index==NONE &&
 		!TEST_FLAG(
 			unit->object.damage_flags,
 			_object_dead_bit))
 	{
+		short desired_base_seat_index;
+
+		desired_base_seat_index = NONE;
+
 		switch (unit->unit.animation.desired_state)
 		{
 		case _unit_animation_state_asleep:
@@ -10082,6 +10083,11 @@ short unit_update_animation(
 		{
 			switch (unit->unit.animation.state)
 			{
+			case _unit_state_leap_start:
+				result = TRUE;
+				desired_state = _unit_state_leap_airborne;
+				break;
+
 			case _unit_state_dying:
 				if (TEST_FLAG(
 						unit_definition->unit.flags,
@@ -10152,6 +10158,11 @@ short unit_update_animation(
 					&unit->object.translational_velocity);
 				break;
 
+			case _unit_state_opening:
+			case _unit_state_closing:
+				--unit->object.animation.state.frame_index;
+				break;
+
 			case _unit_state_entering_seat:
 				parent_unit = unit_get(unit->object.parent_object_index);
 				parent_definition = unit_definition_get(parent_unit->definition_index);
@@ -10167,16 +10178,6 @@ short unit_update_animation(
 				{
 					unit_close(unit->object.parent_object_index);
 				}
-				break;
-
-			case _unit_state_opening:
-			case _unit_state_closing:
-				--unit->object.animation.state.frame_index;
-				break;
-
-			case _unit_state_leap_start:
-				result = TRUE;
-				desired_state = _unit_state_leap_airborne;
 				break;
 
 			default:
@@ -10198,10 +10199,12 @@ short unit_update_animation(
 			unit_index);
 		if (animation_update_result==2)
 		{
+			struct unit_datum *interpolated_unit;
+
 			object_start_interpolation(unit_index, 6);
-			unit = unit_get(unit_index);
-			unit->unit.animation.action = FALSE;
-			unit->unit.animation.action_animation.index = NONE;
+			interpolated_unit = unit_get(unit_index);
+			interpolated_unit->unit.animation.action = FALSE;
+			interpolated_unit->unit.animation.action_animation.index = NONE;
 		}
 	}
 
