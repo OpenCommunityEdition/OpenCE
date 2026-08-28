@@ -57,6 +57,196 @@
         },
         "objdiff_percent": 98.203255
       }
+    },
+    {
+      "unit": "source/ai/action_converse",
+      "function": "_action_converse_perform",
+      "class": "asm-implemented",
+      "evidence": "Parked under asm-implemented: our source implements this function with MSVC inline assembly, so it is byte-identical to January by construction rather than by reconstruction. This violates the campaign's standing 'no asm' rule, and the two rules interact badly - an assembly transcription always compares exact, so section_infos_equal cannot distinguish it from a genuine C recovery; only reading the source can. Parked rather than deleted so the exact tally stops counting it as a C reconstruction while the bytes remain reproducible. Same treatment as the pre-existing vendored-assembly park for matrix4x3_multiply. To unpark, replace the __asm with C that gates exact. Audit and full inventory: research/asm_credited_functions_audit.md. Inline __asm embedded mid-body in an otherwise-C function - the subtler risk, since it reads as C at a glance.",
+      "measurements": {
+        "target": {
+          "size": 256,
+          "relocation_count": 8,
+          "normalized_sha256": "7a3fad8fb69307c132558b906832d4d31f0334734fc76d18fe773189b5a38d5d"
+        },
+        "base": {
+          "size": 256,
+          "relocation_count": 8,
+          "normalized_sha256": "7a3fad8fb69307c132558b906832d4d31f0334734fc76d18fe773189b5a38d5d"
+        },
+        "objdiff_percent": 100
+      }
+    },
+    {
+      "unit": "source/camera/director",
+      "function": "_director_initialize_for_new_map",
+      "class": "asm-implemented",
+      "evidence": "Parked under asm-implemented: our source implements this function with MSVC inline assembly, so it is byte-identical to January by construction rather than by reconstruction. This violates the campaign's standing 'no asm' rule, and the two rules interact badly - an assembly transcription always compares exact, so section_infos_equal cannot distinguish it from a genuine C recovery; only reading the source can. Parked rather than deleted so the exact tally stops counting it as a C reconstruction while the bytes remain reproducible. Same treatment as the pre-existing vendored-assembly park for matrix4x3_multiply. To unpark, replace the __asm with C that gates exact. Audit and full inventory: research/asm_credited_functions_audit.md. Worst case in the set: the loop body, the bounds assert, all three switch arms and the pointer walk are hand-written asm, including '_emit 07ch / _emit 006h' to plant a raw jl opcode and a comment stating the original TU 'keeps the zero constant in bx'. That is a transcription of January's listing, not a reconstruction of its source. Note objdiff reports 90.48% fuzzy here even though the strict comparator says exact.",
+      "measurements": {
+        "target": {
+          "size": 208,
+          "relocation_count": 19,
+          "normalized_sha256": "70b72e43999f76618be8ead0ece3d3a9facba546b477b5245a1f0d2f88e9c6c6"
+        },
+        "base": {
+          "size": 208,
+          "relocation_count": 19,
+          "normalized_sha256": "70b72e43999f76618be8ead0ece3d3a9facba546b477b5245a1f0d2f88e9c6c6"
+        },
+        "objdiff_percent": 90.47619
+      }
+    },
+    {
+      "unit": "source/cseries/cseries",
+      "function": "_stristr",
+      "class": "asm-implemented",
+      "evidence": "Parked under asm-implemented: our source implements this function with MSVC inline assembly, so it is byte-identical to January by construction rather than by reconstruction. This violates the campaign's standing 'no asm' rule, and the two rules interact badly - an assembly transcription always compares exact, so section_infos_equal cannot distinguish it from a genuine C recovery; only reading the source can. Parked rather than deleted so the exact tally stops counting it as a C reconstruction while the bytes remain reproducible. Same treatment as the pre-existing vendored-assembly park for matrix4x3_multiply. To unpark, replace the __asm with C that gates exact. Audit and full inventory: research/asm_credited_functions_audit.md. Whole body is a single __asm block; no C remains. 2026-08-16 recovery attempt: expressible in C but a near-miss at 72/96. Semantically-correct C reaches 85 bytes off naively, 74 after moving the empty-needle return to the tail (the branch-polarity lever), and 72 with a while(*haystack) loop; prologue, csstrlen call, search loop and _strnicmp call all land correctly. Residue is a spill preference: January holds the first needle character in bl across the function and spills length into the dead needle parameter slot [ebp+0xc]; we keep length in ebx and spill the character to [ebp+0xf]. Measured inert: declaration order both ways, register on either/both locals, int/long/unsigned long length (int regresses to 103), length scoped inside the if, character hoisted out of the loop, continue- and while-form loops, length computed before the guard. Same spill class as the standing parks. Not replaced - swapping a byte-exact asm body for a 72-byte residual is not a recovery. See research/asm_credited_functions_audit.md. 2026-08-16 spill-flip attempt, refined: the 72-byte while(*haystack) form is STRUCTURALLY WRONG - it rotates the loop, duplicating the load/test at the back edge and forcing lea eax,[esi-1] instead of dec esi/mov eax,esi. The structurally correct form is the for(;;) at 74/96, whose loop body matches January instruction-for-instruction (load, inc, test, je, cmp, jne back-edge, strnicmp, test, jne back-edge, dec, return). Byte count is therefore the wrong metric here; 74 is closer than 72. With that structure fixed the residue is isolated to a single free-register contest: esi and edi hold haystack and needle in both builds, and exactly one of {first, length} can have ebx because both live ranges span a call (first across csstrlen, length across _strnicmp). January gives ebx to first (mov bl,[edi], cmp al,bl) and spills length into the dead needle slot [ebp+0xc]; we give ebx to length and spill first to [ebp+0xf] - which is also inside the dead needle slot, so both compilers reuse the same storage and differ only in which value wins the register. Additional inert levers measured this round: char/byte/unsigned char for the first character and the loop character, long/unsigned long/const long for the length, assignment inside the while condition, pointer-compare-before-increment, and length computed before the guard. Same free-register-preference class as the register-allocation parks; reachable in principle, lever not found. 2026-08-16 c2 debugger result (NEGATIVE, closes a line of investigation): built tools/c2dbg32/repro_stristr.c, a single-function TU reproducing the tie exactly (96B, ndiff 74, same mov ebx,eax for length and same spill of first to [ebp+0xf]), and breakpointed every mapped allocator site during its compile. The machinery runs - interference dispatch 0x1074d343 x6, relation 0x107091ae x8, overlap probe 0x10735a41 x5, interference test 0x1070943b x3, coalescing copy 0x10701961 x15, leaf-register write 0x10715873 x2, preference store 0x1075f5f2 x5, finalizer 0x107144cf x3 - but it never touches the registers in question: both leaf-register writes assign register byte 1, and ALL FIFTEEN coalescing copies propagate register byte 1 (ecx==1 at every hit). ebx/esi/edi are 3/6/7 zero-based and never appear. The mapped sites allocate the eax-family scratch class; the callee-saved assignment and the spill choice are made in a pass that is still unmapped. Further breakpoint work on these VAs therefore cannot reach this tie (nor the sibling register-mirror and spill parks). Progress needs the callee-saved/spill pass located from scratch - the entry point is the code that decides a live range is memory-resident, not the code that stamps [node+0x28]. See tools/c2dbg32/IR_LAYOUT.md. 2026-08-16 CORRECTION to this entry's earlier c2 claims: 0x10715873 does NOT write a physical register. Four probes differing only in the C type of the spilled locals show the byte it stamps into node[+0x28] is uniform across every node in a compile and tracks operand size - char->1, short->2, int->3, __int64->4 (13/13/13/7 hits, one distinct value each). It is an operand WIDTH class, not a register; thirteen simultaneously-live values cannot share one register. This also resolves the 'discrepancy' noted during the original record_kill work (rwprobe used short fields, every write showed al=2 while the code used ecx) - that was the width of a short, not a register quirk. Consequently the earlier 'read the register write' and 'traced the preferred-register argument' results for this function are WITHDRAWN: the physical-register assignment site and the spill decision are both still unlocated. The mechanism narrative (both candidate registers free, outcome set upstream) stands on the instruction-level evidence, but no compiler-internal site has been confirmed to make it. See tools/c2dbg32/IR_LAYOUT.md.",
+      "measurements": {
+        "target": {
+          "size": 96,
+          "relocation_count": 2,
+          "normalized_sha256": "8068cc55c81c4109e4d2eef813744d2c42fbea33b53c93a8c192bb7ad03e0428"
+        },
+        "base": {
+          "size": 96,
+          "relocation_count": 2,
+          "normalized_sha256": "8068cc55c81c4109e4d2eef813744d2c42fbea33b53c93a8c192bb7ad03e0428"
+        },
+        "objdiff_percent": 100
+      }
+    },
+    {
+      "unit": "source/effects/particles",
+      "function": "_code_0008fcd0",
+      "class": "asm-implemented",
+      "evidence": "Parked under asm-implemented: our source implements this function with MSVC inline assembly, so it is byte-identical to January by construction rather than by reconstruction. This violates the campaign's standing 'no asm' rule, and the two rules interact badly - an assembly transcription always compares exact, so section_infos_equal cannot distinguish it from a genuine C recovery; only reading the source can. Parked rather than deleted so the exact tally stops counting it as a C reconstruction while the bytes remain reproducible. Same treatment as the pre-existing vendored-assembly park for matrix4x3_multiply. To unpark, replace the __asm with C that gates exact. Audit and full inventory: research/asm_credited_functions_audit.md. Whole body is a single __asm block; no C remains.",
+      "measurements": {
+        "target": {
+          "size": 16,
+          "relocation_count": 1,
+          "normalized_sha256": "41eed58c9a0765d9d594f1473bc1c296a81493ee3d057b5d8313a81cc9f1b470"
+        },
+        "base": {
+          "size": 16,
+          "relocation_count": 1,
+          "normalized_sha256": "41eed58c9a0765d9d594f1473bc1c296a81493ee3d057b5d8313a81cc9f1b470"
+        },
+        "objdiff_percent": 100
+      }
+    },
+    {
+      "unit": "source/effects/particles",
+      "function": "_code_0008ff30",
+      "class": "asm-implemented",
+      "evidence": "Parked under asm-implemented: our source implements this function with MSVC inline assembly, so it is byte-identical to January by construction rather than by reconstruction. This violates the campaign's standing 'no asm' rule, and the two rules interact badly - an assembly transcription always compares exact, so section_infos_equal cannot distinguish it from a genuine C recovery; only reading the source can. Parked rather than deleted so the exact tally stops counting it as a C reconstruction while the bytes remain reproducible. Same treatment as the pre-existing vendored-assembly park for matrix4x3_multiply. To unpark, replace the __asm with C that gates exact. Audit and full inventory: research/asm_credited_functions_audit.md. Whole body is a single __asm block; no C remains.",
+      "measurements": {
+        "target": {
+          "size": 80,
+          "relocation_count": 6,
+          "normalized_sha256": "959a33a1ae57de3e7dd04e07b55a619b337b744570172bfc142f692253108258"
+        },
+        "base": {
+          "size": 80,
+          "relocation_count": 6,
+          "normalized_sha256": "959a33a1ae57de3e7dd04e07b55a619b337b744570172bfc142f692253108258"
+        },
+        "objdiff_percent": 100
+      }
+    },
+    {
+      "unit": "source/objects/object_shadows",
+      "function": "_code_0012b870",
+      "class": "asm-implemented",
+      "evidence": "Parked under asm-implemented: our source implements this function with MSVC inline assembly, so it is byte-identical to January by construction rather than by reconstruction. This violates the campaign's standing 'no asm' rule, and the two rules interact badly - an assembly transcription always compares exact, so section_infos_equal cannot distinguish it from a genuine C recovery; only reading the source can. Parked rather than deleted so the exact tally stops counting it as a C reconstruction while the bytes remain reproducible. Same treatment as the pre-existing vendored-assembly park for matrix4x3_multiply. To unpark, replace the __asm with C that gates exact. Audit and full inventory: research/asm_credited_functions_audit.md. __declspec(naked): no C body exists at all.",
+      "measurements": {
+        "target": {
+          "size": 16,
+          "relocation_count": 1,
+          "normalized_sha256": "1603316925ff3734e5b16c1fdce605135a996f0f0a5a1094f4551c0c79b29988"
+        },
+        "base": {
+          "size": 16,
+          "relocation_count": 1,
+          "normalized_sha256": "1603316925ff3734e5b16c1fdce605135a996f0f0a5a1094f4551c0c79b29988"
+        },
+        "objdiff_percent": 100
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_active_camouflage",
+      "function": "_code_00148dd0",
+      "class": "asm-implemented",
+      "evidence": "Parked under asm-implemented: our source implements this function with MSVC inline assembly, so it is byte-identical to January by construction rather than by reconstruction. This violates the campaign's standing 'no asm' rule, and the two rules interact badly - an assembly transcription always compares exact, so section_infos_equal cannot distinguish it from a genuine C recovery; only reading the source can. Parked rather than deleted so the exact tally stops counting it as a C reconstruction while the bytes remain reproducible. Same treatment as the pre-existing vendored-assembly park for matrix4x3_multiply. To unpark, replace the __asm with C that gates exact. Audit and full inventory: research/asm_credited_functions_audit.md. __declspec(naked): no C body exists at all. 2026-08-16 recovery attempt: PROVABLY not expressible in C. The argument registers are live on entry (push eax with no preceding load) and the symbol is cdecl-decorated (_code_00148xxx, no @N) while the body does callee cleanup (ret 4). No standard convention produces that pair - measured: compiling the same body as __stdcall emits _code_00148xxx@4 and stops matching the target name. The only C route is VC7's private convention for a static with in-TU call sites, and these have no references anywhere in the tree, so an unreferenced static is eliminated. Park is now backed by proof rather than judgement.",
+      "measurements": {
+        "target": {
+          "size": 16,
+          "relocation_count": 1,
+          "normalized_sha256": "da3274ee297466e512d4f578a729fd2a12e86cc08fec77580ea60253bc65e8a8"
+        },
+        "base": {
+          "size": 16,
+          "relocation_count": 1,
+          "normalized_sha256": "da3274ee297466e512d4f578a729fd2a12e86cc08fec77580ea60253bc65e8a8"
+        },
+        "objdiff_percent": 100
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_active_camouflage",
+      "function": "_code_00148de0",
+      "class": "asm-implemented",
+      "evidence": "Parked under asm-implemented: our source implements this function with MSVC inline assembly, so it is byte-identical to January by construction rather than by reconstruction. This violates the campaign's standing 'no asm' rule, and the two rules interact badly - an assembly transcription always compares exact, so section_infos_equal cannot distinguish it from a genuine C recovery; only reading the source can. Parked rather than deleted so the exact tally stops counting it as a C reconstruction while the bytes remain reproducible. Same treatment as the pre-existing vendored-assembly park for matrix4x3_multiply. To unpark, replace the __asm with C that gates exact. Audit and full inventory: research/asm_credited_functions_audit.md. __declspec(naked): no C body exists at all. 2026-08-16 recovery attempt: PROVABLY not expressible in C. The argument registers are live on entry (push eax with no preceding load) and the symbol is cdecl-decorated (_code_00148xxx, no @N) while the body does callee cleanup (ret 4). No standard convention produces that pair - measured: compiling the same body as __stdcall emits _code_00148xxx@4 and stops matching the target name. The only C route is VC7's private convention for a static with in-TU call sites, and these have no references anywhere in the tree, so an unreferenced static is eliminated. Park is now backed by proof rather than judgement.",
+      "measurements": {
+        "target": {
+          "size": 16,
+          "relocation_count": 1,
+          "normalized_sha256": "da3274ee297466e512d4f578a729fd2a12e86cc08fec77580ea60253bc65e8a8"
+        },
+        "base": {
+          "size": 16,
+          "relocation_count": 1,
+          "normalized_sha256": "da3274ee297466e512d4f578a729fd2a12e86cc08fec77580ea60253bc65e8a8"
+        },
+        "objdiff_percent": 100
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_active_camouflage",
+      "function": "_code_00148df0",
+      "class": "asm-implemented",
+      "evidence": "Parked under asm-implemented: our source implements this function with MSVC inline assembly, so it is byte-identical to January by construction rather than by reconstruction. This violates the campaign's standing 'no asm' rule, and the two rules interact badly - an assembly transcription always compares exact, so section_infos_equal cannot distinguish it from a genuine C recovery; only reading the source can. Parked rather than deleted so the exact tally stops counting it as a C reconstruction while the bytes remain reproducible. Same treatment as the pre-existing vendored-assembly park for matrix4x3_multiply. To unpark, replace the __asm with C that gates exact. Audit and full inventory: research/asm_credited_functions_audit.md. __declspec(naked): no C body exists at all. 2026-08-16 recovery attempt: PROVABLY not expressible in C. The argument registers are live on entry (push eax with no preceding load) and the symbol is cdecl-decorated (_code_00148xxx, no @N) while the body does callee cleanup (ret 4). No standard convention produces that pair - measured: compiling the same body as __stdcall emits _code_00148xxx@4 and stops matching the target name. The only C route is VC7's private convention for a static with in-TU call sites, and these have no references anywhere in the tree, so an unreferenced static is eliminated. Park is now backed by proof rather than judgement.",
+      "measurements": {
+        "target": {
+          "size": 16,
+          "relocation_count": 1,
+          "normalized_sha256": "db1d1b9bf1eb9c529b3d3187b7a89d8d35944820bb41637558be9520fed5cfa4"
+        },
+        "base": {
+          "size": 16,
+          "relocation_count": 1,
+          "normalized_sha256": "db1d1b9bf1eb9c529b3d3187b7a89d8d35944820bb41637558be9520fed5cfa4"
+        },
+        "objdiff_percent": 100
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_active_camouflage",
+      "function": "_code_00148e00",
+      "class": "asm-implemented",
+      "evidence": "Parked under asm-implemented: our source implements this function with MSVC inline assembly, so it is byte-identical to January by construction rather than by reconstruction. This violates the campaign's standing 'no asm' rule, and the two rules interact badly - an assembly transcription always compares exact, so section_infos_equal cannot distinguish it from a genuine C recovery; only reading the source can. Parked rather than deleted so the exact tally stops counting it as a C reconstruction while the bytes remain reproducible. Same treatment as the pre-existing vendored-assembly park for matrix4x3_multiply. To unpark, replace the __asm with C that gates exact. Audit and full inventory: research/asm_credited_functions_audit.md. __declspec(naked): no C body exists at all. 2026-08-16 recovery attempt: PROVABLY not expressible in C. The argument registers are live on entry (push eax with no preceding load) and the symbol is cdecl-decorated (_code_00148xxx, no @N) while the body does callee cleanup (ret 4). No standard convention produces that pair - measured: compiling the same body as __stdcall emits _code_00148xxx@4 and stops matching the target name. The only C route is VC7's private convention for a static with in-TU call sites, and these have no references anywhere in the tree, so an unreferenced static is eliminated. Park is now backed by proof rather than judgement.",
+      "measurements": {
+        "target": {
+          "size": 16,
+          "relocation_count": 1,
+          "normalized_sha256": "c9740afccf5e7e01a66dfdb669d22a8462ac214622a1e8eff90b803ddb2d68c5"
+        },
+        "base": {
+          "size": 16,
+          "relocation_count": 1,
+          "normalized_sha256": "c9740afccf5e7e01a66dfdb669d22a8462ac214622a1e8eff90b803ddb2d68c5"
+        },
+        "objdiff_percent": 100
+      }
     }
   ]
 }

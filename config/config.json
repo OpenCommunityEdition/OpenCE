@@ -655,7 +655,7 @@
 				{ "name": "source/hs/object_lists.c", "index": 281, "status": "Matching" },
 				{ "name": "source/hs/hs_scenario_definitions.c", "index": 282, "status": "Matching" },
 				{ "name": "source/hs/hs_runtime.c", "index": 283, "status": "NonMatching" },
-				{ "name": "source/hs/hs_library_external.c", "index": 284, "status": "NonMatching" },
+				{ "name": "source/hs/hs_library_external.c", "index": 284, "status": "Matching" },
 				{ "name": "source/hs/hs_globals_external.c", "index": 285, "status": "Matching" },
 				{ "name": "source/hs/hs_compile.c", "index": 286, "status": "NonMatching" },
 				{ "name": "source/hs/hs.c", "index": 287, "status": "NonMatching" },

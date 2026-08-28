@@ -134,6 +134,34 @@ class ParkedFunctionsTests(unittest.TestCase):
         self.assertEqual(result["summary"]["invalid"], 1)
         self.assertEqual(result["invalid"][0]["reason"], "function is now semantically exact")
 
+    def test_asm_implemented_entry_stays_active_when_exact(self):
+        """asm bodies match by construction, so exactness must not unpark them."""
+        self.base_path.write_bytes(self.target_path.read_bytes())
+        self.report["units"][0]["functions"][0]["fuzzy_match_percent"] = 100.0
+        measurements = self._measurements()
+        measurements["base"] = dict(measurements["target"])
+        measurements["objdiff_percent"] = 100.0
+        entry = dict(self.entry)
+        entry["class"] = "asm-implemented"
+        entry["measurements"] = measurements
+        self._write_inputs([entry])
+        result = self._validate()
+        self.assertEqual(result["summary"]["invalid"], 0)
+        self.assertEqual(result["summary"]["stale"], 0)
+        self.assertEqual(len(result["active"]), 1)
+
+    def test_asm_implemented_entry_is_invalid_when_not_exact(self):
+        """A drifted transcription is the failure mode worth reporting."""
+        entry = dict(self.entry)
+        entry["class"] = "asm-implemented"
+        self._write_inputs([entry])
+        result = self._validate()
+        self.assertEqual(result["summary"]["invalid"], 1)
+        self.assertEqual(
+            result["invalid"][0]["reason"],
+            "asm-implemented function no longer matches the target",
+        )
+
     def test_duplicate_key_is_invalid(self):
         self._write_inputs([self.entry, self.entry])
         result = self._validate()

@@ -18,7 +18,24 @@ ALLOWED_CLASSES = {
     "private-register-convention",
     "register-allocation",
     "tu-context-optimization",
+    # Not compiler output at all (e.g. vendored __asm bodies); the evidence
+    # must identify the external origin.  Added for matrix4x3_multiply,
+    # parked in 2fdddb42 with this class but without the allowlist entry.
+    "vendored-assembly",
+    # Our source implements the function in inline or __declspec(naked)
+    # __asm, so it is byte-identical by construction rather than by
+    # reconstruction.  See ASM_IMPLEMENTED_CLASS below: entries in this class
+    # are expected to compare exact, which is precisely why they are parked.
+    "asm-implemented",
 }
+
+# The ordinary manifest records functions we cannot yet match.  Membership is
+# therefore invalidated when a function starts matching.  ``asm-implemented``
+# inverts that: the body is transcribed assembly, so it always matches, and the
+# park records provenance rather than a codegen gap.  Exactness must not
+# invalidate those entries, and non-exactness must, because a non-matching
+# asm body means the transcription has drifted from the target.
+ASM_IMPLEMENTED_CLASS = "asm-implemented"
 
 
 class ParkedFunctionsError(RuntimeError):
@@ -106,7 +123,17 @@ def validate_parked_functions(project_root, report_path, config_path, manifest_p
             invalid.append({"key": key, "reason": f"cannot measure function: {error}"})
             continue
 
-        if section_infos_equal(target_info, base_info):
+        is_exact = section_infos_equal(target_info, base_info)
+        if entry.get("class") == ASM_IMPLEMENTED_CLASS:
+            # Inverted expectation: an asm body matches by construction, so
+            # only a *non*-matching one is news (the transcription drifted).
+            if not is_exact:
+                invalid.append({
+                    "key": key,
+                    "reason": "asm-implemented function no longer matches the target",
+                })
+                continue
+        elif is_exact:
             invalid.append({"key": key, "reason": "function is now semantically exact"})
             continue
 

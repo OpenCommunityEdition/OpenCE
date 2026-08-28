@@ -295,10 +295,15 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
     ###
     # Build rules
     ###
+    # /showIncludes + deps=msvc so a header edit rebuilds its dependents.
+    # Without it ninja sees only the .c file, and every object built before a
+    # header change silently stays stale - which is how a render_sky.c
+    # regression survived five days of "whole-board" measurements.
     n.rule(
         name="cl",
-        command=f"{wrapper_cmd}xbox/bin/vc7/CL.Exe /nologo /c $cflags /Fo$out $in",
+        command=f"{wrapper_cmd}xbox/bin/vc7/CL.Exe /nologo /c /showIncludes $cflags /Fo$out $in",
         description="CL $out",
+        deps="msvc",
     )
     n.newline()
     

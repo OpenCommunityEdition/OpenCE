@@ -92,6 +92,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "main/console.h"
 #include "memory/data.h"
+#include "models/model_definitions.h"
 #include "objects/damage.h"
 #include "objects/objects.h"
 #include "effects/effects.h"
@@ -302,6 +303,34 @@ boolean hs_unit_can_see_object(
 	return result;
 }
 
+boolean hs_objects_can_see_object(
+	long object_list_index,
+	long object_index,
+	real degrees)
+{
+	long reference_index;
+	long unit_index;
+	boolean result;
+
+	result = FALSE;
+	unit_index = object_list_get_first(object_list_index, &reference_index);
+	while (unit_index != NONE)
+	{
+		if (unit_try_and_get(unit_index) &&
+			hs_unit_can_see_object(unit_index, object_index, degrees))
+		{
+			result = TRUE;
+			break;
+		}
+
+		unit_index = object_list_get_next(
+			object_list_index,
+			&reference_index);
+	}
+
+	return result;
+}
+
 boolean hs_unit_can_see_flag(
 	long unit_index,
 	short cutscene_flag_index,
@@ -471,6 +500,47 @@ void hs_object_destroy_by_name(
 	return;
 }
 
+void hs_object_destroy_all(
+	void)
+{
+	{
+		struct data_iterator iterator;
+		struct player_datum *player;
+
+		data_iterator_new(&iterator, player_data);
+		for (player = data_iterator_next(&iterator);
+			player != NULL;
+			player = data_iterator_next(&iterator))
+		{
+			if (player->unit_index != NONE &&
+				object_get_ultimate_parent(player->unit_index) !=
+					player->unit_index)
+			{
+				unit_exit_seat_end(player->unit_index);
+			}
+		}
+	}
+
+	{
+		struct object_iterator iterator;
+		struct object_datum *object;
+
+		object_iterator_new(&iterator, _object_mask_all, 0);
+		for (object = object_iterator_next(&iterator);
+			object != NULL;
+			object = object_iterator_next(&iterator))
+		{
+			if (object->object.parent_object_index == NONE &&
+				!code_000b8c80(iterator.index))
+			{
+				object_delete(iterator.index);
+			}
+		}
+	}
+
+	return;
+}
+
 static void code_000b8eb0(
 	char const *name_string,
 	void (*iterator)(short object_name_index))
@@ -550,6 +620,57 @@ void hs_object_set_shield(
 			shield_vitality = 1.f;
 		object->object.shield_vitality =
 			object->object.maximum_shield_vitality * shield_vitality;
+	}
+
+	return;
+}
+
+void hs_object_set_permutation(
+	long object_index,
+	char const *region_name,
+	char *permutation_name)
+{
+	if (object_index != NONE)
+	{
+		struct object_datum *object;
+		struct object_definition *object_definition;
+		short desired_region_index;
+
+		object = object_get(object_index);
+		object_definition = object_definition_get(object->definition_index);
+		desired_region_index = NONE;
+		if (strcmp(region_name, ""))
+		{
+			if (object_definition->object.model.index != NONE)
+			{
+				struct model *model;
+				short region_index;
+
+				model = model_definition_get(
+					object_definition->object.model.index);
+				for (region_index = 0;
+					region_index < model->regions.count;
+					region_index++)
+				{
+					struct model_region *region;
+
+					region = TAG_BLOCK_GET_ELEMENT(
+						&model->regions,
+						region_index,
+						struct model_region);
+					if (!_stricmp(region->name, region_name))
+					{
+						desired_region_index = region_index;
+						break;
+					}
+				}
+			}
+		}
+		object_permute_region(
+			object_index,
+			permutation_name,
+			desired_region_index,
+			TRUE);
 	}
 
 	return;

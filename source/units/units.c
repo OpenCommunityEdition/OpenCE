@@ -1080,6 +1080,12 @@ void unit_detach_from_parent(
 	long unit_index);
 void unit_exit_seat_end(
 	long unit_index);
+void aiming_screen_apply(
+	struct animation const *animation,
+	struct animation_aiming_screen_bounds const *aiming_screen_bounds,
+	real yaw,
+	real pitch,
+	struct real_orientation *node_orientations);
 void ai_handle_death(
 	long unit_index,
 	long killer_object_index,
@@ -9448,6 +9454,7 @@ void unit_euler_aiming_update(
 	real_vector3d clamped_desired_aiming_vector;
 	real_vector3d local_aiming_vector;
 	real_vector3d local_desired_aiming_vector;
+	real_vector3d further_vector;
 	struct unit_acceleration_plan pitch_plan;
 	struct unit_acceleration_plan yaw_plan;
 
@@ -9677,7 +9684,6 @@ desired_aiming_vector_ready:
 		vector3d_from_euler_angles2d(&end_aiming_vector, &end_aiming_angles);
 		{
 			real_euler_angles2d further_angles;
-			real_vector3d further_vector;
 
 			further_angles.yaw =
 				end_angular_velocity.yaw + end_aiming_angles.yaw;
@@ -9685,10 +9691,8 @@ desired_aiming_vector_ready:
 				end_angular_velocity.pitch + end_aiming_angles.pitch;
 			vector3d_from_euler_angles2d(&further_vector, &further_angles);
 
-			dot_product = PIN(
-				dot_product3d(&further_vector, &end_aiming_vector),
-				-1.f,
-				1.f);
+			dot_product = dot_product3d(&further_vector, &end_aiming_vector);
+			dot_product = PIN(dot_product, -1.f, 1.f);
 			cross_product3d(
 				&end_aiming_vector,
 				&further_vector,
@@ -10261,15 +10265,16 @@ boolean unit_animation_set_state(
 			unit->unit.animation.weapon_index,
 			struct animation_graph_weapon_class);
 	long interpolation_frame_count;
-	boolean old_state_is_none =
-		unit->unit.animation.state == NONE;
-	boolean changed_state = FALSE;
+	boolean old_state_is_none;
+	short changed_state = FALSE;
 	boolean result = TRUE;
 
 	TAG_BLOCK_GET_ELEMENT(
 		&weapon_class->weapon_types,
 		unit->unit.animation.weapon_type_index,
 		struct animation_graph_weapon_type);
+
+	old_state_is_none = unit->unit.animation.state == NONE;
 
 	if (old_state_is_none ||
 		new_state != unit->unit.animation.state)
@@ -10784,7 +10789,6 @@ void unit_preprocess_node_orientations(
 
 			if (unit->unit.animation.aiming_screen_index != NONE)
 			{
-				struct animation *animation;
 				real_vector3d relative_aiming_vector;
 				struct animation_aiming_screen_bounds const *aiming_bounds =
 					&weapon_class->aiming_screen_bounds;
@@ -10840,13 +10844,11 @@ void unit_preprocess_node_orientations(
 				unit->unit.animation.aiming_screen_bounds.y1 =
 					aiming_bounds->positive_pitch_frame_count *
 					aiming_bounds->positive_pitch_delta;
-				animation = TAG_BLOCK_GET_ELEMENT(
-					&animation_graph->animations,
-					unit->unit.animation.aiming_screen_index,
-					struct animation);
-
 				aiming_screen_apply(
-					animation,
+					TAG_BLOCK_GET_ELEMENT(
+						&animation_graph->animations,
+						unit->unit.animation.aiming_screen_index,
+						struct animation),
 					aiming_bounds,
 					relative_aiming_angles.yaw,
 					relative_aiming_angles.pitch,
@@ -10857,7 +10859,6 @@ void unit_preprocess_node_orientations(
 				unit->unit.player_index != NONE) &&
 				unit->unit.animation.looking_screen_index != NONE)
 			{
-				struct animation *animation;
 				real_vector3d relative_looking_vector;
 				struct animation_aiming_screen_bounds const *looking_bounds =
 					&unit_seat->looking_screen_bounds;
@@ -10910,13 +10911,11 @@ void unit_preprocess_node_orientations(
 				unit->unit.animation.looking_screen_bounds.y1 =
 					looking_bounds->positive_pitch_frame_count *
 					looking_bounds->positive_pitch_delta;
-				animation = TAG_BLOCK_GET_ELEMENT(
-					&animation_graph->animations,
-					unit->unit.animation.looking_screen_index,
-					struct animation);
-
 				aiming_screen_apply(
-					animation,
+					TAG_BLOCK_GET_ELEMENT(
+						&animation_graph->animations,
+						unit->unit.animation.looking_screen_index,
+						struct animation),
 					looking_bounds,
 					relative_looking_angles.yaw,
 					relative_looking_angles.pitch,
