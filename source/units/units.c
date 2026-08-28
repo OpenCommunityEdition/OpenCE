@@ -5758,7 +5758,7 @@ boolean unit_update(
 			if (looking_velocity_limit==0.f && looking_angular_acceleration_limit==0.f)
 			{
 				unit->unit.looking_vector = unit->unit.desired_looking_vector;
-				unit_clip_to_aiming_bounds(unit_index, &unit->unit.aiming_vector, FALSE);
+				unit_clip_to_aiming_bounds(unit_index, &unit->unit.looking_vector, FALSE);
 				unit->unit.looking_velocity = *global_zero_vector3d;
 
 				unit_verify_vectors(unit_index, "unit-update-look-set");
@@ -5774,7 +5774,7 @@ boolean unit_update(
 
 				unit_euler_aiming_update(
 					&matrix,
-					&unit->unit.aiming_vector,
+					&unit->unit.looking_vector,
 					&unit->unit.desired_looking_vector,
 					&unit->unit.looking_velocity,
 					&unit->unit.animation.looking_screen_bounds,
@@ -6012,11 +6012,9 @@ boolean unit_update(
 
 	if (TEST_FLAG(unit->unit.flags, _unit_desired_integrated_light_on_bit))
 	{
-		light_change_state = TRUE;
-
-		if (TEST_FLAG(unit->unit.flags, _unit_integrated_light_on_bit))
+		if (!TEST_FLAG(unit->unit.flags, _unit_integrated_light_on_bit))
 		{
-			light_change_state = FALSE;
+			light_change_state = TRUE;
 		}
 
 		SET_FLAG(unit->unit.flags, _unit_desired_integrated_light_on_bit, FALSE);
@@ -9444,17 +9442,17 @@ void unit_euler_aiming_update(
 	boolean yaw_complete;
 	boolean yaw_wraps;
 	real angle;
-	real aiming_pitch_velocity;
-	real aiming_yaw_velocity;
 	real dot_product;
 	real_euler_angles2d aiming_error;
+	real_euler_angles2d aiming_angular_velocity;
 	real_euler_angles2d aiming_angles;
+	real_euler_angles2d end_aiming_angles;
 	real_euler_angles2d end_angular_velocity;
 	real_euler_angles2d desired_aiming_angles;
 	real_vector3d clamped_desired_aiming_vector;
 	real_vector3d local_aiming_vector;
 	real_vector3d local_desired_aiming_vector;
-	real_vector3d further_vector;
+	real_vector3d end_aiming_vector;
 	struct unit_acceleration_plan pitch_plan;
 	struct unit_acceleration_plan yaw_plan;
 
@@ -9569,13 +9567,13 @@ desired_aiming_vector_ready:
 				sine(angular_speed),
 				cosine(angular_speed));
 			euler_angles2d_from_vector3d(&rotated_angles, &rotated_aiming_vector);
-			aiming_yaw_velocity = rotated_angles.yaw - aiming_angles.yaw;
-			aiming_pitch_velocity = rotated_angles.pitch - aiming_angles.pitch;
+			aiming_angular_velocity.yaw = rotated_angles.yaw - aiming_angles.yaw;
+			aiming_angular_velocity.pitch = rotated_angles.pitch - aiming_angles.pitch;
 		}
 		else
 		{
-			aiming_yaw_velocity = 0.f;
-			aiming_pitch_velocity = 0.f;
+			aiming_angular_velocity.yaw = 0.f;
+			aiming_angular_velocity.pitch = 0.f;
 		}
 	}
 
@@ -9595,13 +9593,13 @@ desired_aiming_vector_ready:
 
 	code_0019bf70(
 		aiming_error.yaw,
-		aiming_yaw_velocity,
+		aiming_angular_velocity.yaw,
 		angular_velocity_limit,
 		angular_acceleration_limit,
 		&yaw_plan);
 	code_0019bf70(
 		aiming_error.pitch,
-		aiming_pitch_velocity,
+		aiming_angular_velocity.pitch,
 		angular_velocity_limit,
 		angular_acceleration_limit,
 		&pitch_plan);
@@ -9616,14 +9614,14 @@ desired_aiming_vector_ready:
 		1.f,
 		aiming_error.yaw,
 		&aiming_error.yaw,
-		aiming_yaw_velocity,
+		aiming_angular_velocity.yaw,
 		&end_angular_velocity.yaw);
 	pitch_complete = code_00197e30(
 		&pitch_plan,
 		1.f,
 		aiming_error.pitch,
 		&aiming_error.pitch,
-		aiming_pitch_velocity,
+		aiming_angular_velocity.pitch,
 		&end_angular_velocity.pitch);
 
 	if (yaw_complete && pitch_complete)
@@ -9633,9 +9631,6 @@ desired_aiming_vector_ready:
 	}
 	else
 	{
-		real_euler_angles2d end_aiming_angles;
-		real_vector3d end_aiming_vector;
-
 		end_aiming_angles.yaw = aiming_error.yaw + desired_aiming_angles.yaw;
 		end_aiming_angles.pitch = aiming_error.pitch + desired_aiming_angles.pitch;
 
@@ -9684,6 +9679,7 @@ desired_aiming_vector_ready:
 		vector3d_from_euler_angles2d(&end_aiming_vector, &end_aiming_angles);
 		{
 			real_euler_angles2d further_angles;
+			real_vector3d further_vector;
 
 			further_angles.yaw =
 				end_angular_velocity.yaw + end_aiming_angles.yaw;
@@ -9691,7 +9687,7 @@ desired_aiming_vector_ready:
 				end_angular_velocity.pitch + end_aiming_angles.pitch;
 			vector3d_from_euler_angles2d(&further_vector, &further_angles);
 
-			dot_product = dot_product3d(&further_vector, &end_aiming_vector);
+			dot_product = dot_product3d(&end_aiming_vector, &further_vector);
 			dot_product = PIN(dot_product, -1.f, 1.f);
 			cross_product3d(
 				&end_aiming_vector,
@@ -10517,7 +10513,7 @@ boolean unit_animation_set_state(
 				(short)code_00198190(
 					unit->unit.animation.state))
 		{
-			short animation_index;
+			long animation_index;
 
 			if (aiming_screen_animation_index >= 0 &&
 				aiming_screen_animation_index <
@@ -10555,9 +10551,12 @@ boolean unit_animation_set_state(
 						aiming_screen_animation_index));
 			}
 
+			interpolation_frame_count = 6;
+			changed_state = TRUE;
+
 			if (old_state_is_none)
 			{
-			short animation_index;
+			long animation_index;
 
 			if (_unit_seat_animation_looking >= 0 &&
 				_unit_seat_animation_looking <
@@ -10593,9 +10592,6 @@ boolean unit_animation_set_state(
 						_unit_seat_animation_looking));
 			}
 			}
-
-			interpolation_frame_count = 6;
-			changed_state = TRUE;
 		}
 
 		if (changed_state)
@@ -10618,8 +10614,6 @@ void unit_preprocess_node_orientations(
 	struct animation_graph *animation_graph;
 	struct animation_graph_unit_seat *unit_seat;
 	real_matrix4x3 matrix;
-	real_euler_angles2d relative_looking_angles;
-	real_euler_angles2d relative_aiming_angles;
 	struct unit_definition *unit_definition;
 
 	unit = unit_get(unit_index);
@@ -10737,24 +10731,22 @@ void unit_preprocess_node_orientations(
 			_unit_animation_showing_acceleration_bit))
 		{
 			short animation_index;
-			long acceleration_animation_index;
-			long acceleration_animation_count;
-			real *acceleration;
+			long acceleration_index;
 
-			acceleration = unit->unit.seat_acceleration.n;
-			acceleration_animation_index =
-				_unit_seat_animation_acceleration_front_back;
-			acceleration_animation_count =
-				_unit_seat_animation_push_impact -
-				_unit_seat_animation_acceleration_front_back;
-
-			do
+			for (acceleration_index = 0;
+				acceleration_index < _unit_seat_animation_push_impact -
+					_unit_seat_animation_acceleration_front_back;
+				acceleration_index++)
 			{
-				if (acceleration_animation_index >= 0 &&
-					acceleration_animation_index < unit_seat->animations.count)
+				if (_unit_seat_animation_acceleration_front_back +
+						acceleration_index >= 0 &&
+					_unit_seat_animation_acceleration_front_back +
+						acceleration_index < unit_seat->animations.count)
 				{
 					animation_index = animation_graph_animation_index_get(
-						&unit_seat->animations)[acceleration_animation_index].animation_index;
+						&unit_seat->animations)[
+							_unit_seat_animation_acceleration_front_back +
+							acceleration_index].animation_index;
 
 					if (animation_index != NONE)
 					{
@@ -10765,20 +10757,18 @@ void unit_preprocess_node_orientations(
 
 						overlay_animation_apply_continuous(
 							animation,
-							(animation->frame_count - 1) * *acceleration,
+							(animation->frame_count - 1) *
+								unit->unit.seat_acceleration.n[acceleration_index],
 							node_orientations);
 					}
 				}
-
-				++acceleration_animation_index;
-				++acceleration;
 			}
-			while (--acceleration_animation_count != 0);
 		}
 
 		if (!TEST_FLAG(unit_definition->unit.flags, _unit_has_no_aiming_bit) &&
 			code_00198170(&unit->unit.animation))
 		{
+			real_euler_angles2d relative_aiming_angles;
 			struct animation_graph_weapon_class *weapon_class =
 				TAG_BLOCK_GET_ELEMENT(
 					&unit_seat->weapon_classes,
@@ -10855,71 +10845,75 @@ void unit_preprocess_node_orientations(
 					node_orientations);
 			}
 
-			if ((unit->unit.current_weapon_index != NONE ||
-				unit->unit.player_index != NONE) &&
-				unit->unit.animation.looking_screen_index != NONE)
+			if (unit->unit.current_weapon_index != NONE ||
+				unit->unit.player_index != NONE)
 			{
-				real_vector3d relative_looking_vector;
 				struct animation_aiming_screen_bounds const *looking_bounds =
 					&unit_seat->looking_screen_bounds;
 
-				matrix.scale = 1.f;
-				object_get_orientation(
-					unit_index,
-					&matrix.forward,
-					&matrix.up);
-				cross_product3d(
-					&matrix.up,
-					&matrix.forward,
-					&matrix.left);
-				matrix.position = *global_origin3d;
-				matrix4x3_inverse_transform_normal(
-					&matrix,
-					&unit->unit.looking_vector,
-					&relative_looking_vector);
+				if (unit->unit.animation.looking_screen_index != NONE)
+				{
+					real_vector3d relative_looking_vector;
+					real_euler_angles2d relative_looking_angles;
 
-				match_assert_valid_real_vector3d(
-					"c:\\halo\\SOURCE\\units\\units.c",
-					1703,
-					&relative_looking_vector);
+					matrix.scale = 1.f;
+					object_get_orientation(
+						unit_index,
+						&matrix.forward,
+						&matrix.up);
+					cross_product3d(
+						&matrix.up,
+						&matrix.forward,
+						&matrix.left);
+					matrix.position = *global_origin3d;
+					matrix4x3_inverse_transform_normal(
+						&matrix,
+						&unit->unit.looking_vector,
+						&relative_looking_vector);
 
-				euler_angles2d_from_vector3d(
-					&relative_looking_angles,
-					&relative_looking_vector);
-				relative_looking_angles.yaw -= relative_aiming_angles.yaw;
-				relative_looking_angles.pitch -= relative_aiming_angles.pitch;
+					match_assert_valid_real_vector3d(
+						"c:\\halo\\SOURCE\\units\\units.c",
+						1703,
+						&relative_looking_vector);
 
-				match_assert_valid_real(
-					"c:\\halo\\SOURCE\\units\\units.c",
-					1710,
-					relative_looking_angles.pitch);
-				match_assert_valid_real(
-					"c:\\halo\\SOURCE\\units\\units.c",
-					1711,
-					relative_looking_angles.yaw);
+					euler_angles2d_from_vector3d(
+						&relative_looking_angles,
+						&relative_looking_vector);
+					relative_looking_angles.yaw -= relative_aiming_angles.yaw;
+					relative_looking_angles.pitch -= relative_aiming_angles.pitch;
 
-				unit->unit.animation.looking_with_euler_screen = TRUE;
-				unit->unit.animation.looking_screen_bounds.x0 =
-					-(looking_bounds->negative_yaw_frame_count *
-					looking_bounds->negative_yaw_delta);
-				unit->unit.animation.looking_screen_bounds.x1 =
-					looking_bounds->positive_yaw_frame_count *
-					looking_bounds->positive_yaw_delta;
-				unit->unit.animation.looking_screen_bounds.y0 =
-					-(looking_bounds->negative_pitch_frame_count *
-					looking_bounds->negative_pitch_delta);
-				unit->unit.animation.looking_screen_bounds.y1 =
-					looking_bounds->positive_pitch_frame_count *
-					looking_bounds->positive_pitch_delta;
-				aiming_screen_apply(
-					TAG_BLOCK_GET_ELEMENT(
-						&animation_graph->animations,
-						unit->unit.animation.looking_screen_index,
-						struct animation),
-					looking_bounds,
-					relative_looking_angles.yaw,
-					relative_looking_angles.pitch,
-					node_orientations);
+					match_assert_valid_real(
+						"c:\\halo\\SOURCE\\units\\units.c",
+						1710,
+						relative_looking_angles.pitch);
+					match_assert_valid_real(
+						"c:\\halo\\SOURCE\\units\\units.c",
+						1711,
+						relative_looking_angles.yaw);
+
+					unit->unit.animation.looking_with_euler_screen = TRUE;
+					unit->unit.animation.looking_screen_bounds.x0 =
+						-(looking_bounds->negative_yaw_frame_count *
+						looking_bounds->negative_yaw_delta);
+					unit->unit.animation.looking_screen_bounds.x1 =
+						looking_bounds->positive_yaw_frame_count *
+						looking_bounds->positive_yaw_delta;
+					unit->unit.animation.looking_screen_bounds.y0 =
+						-(looking_bounds->negative_pitch_frame_count *
+						looking_bounds->negative_pitch_delta);
+					unit->unit.animation.looking_screen_bounds.y1 =
+						looking_bounds->positive_pitch_frame_count *
+						looking_bounds->positive_pitch_delta;
+					aiming_screen_apply(
+						TAG_BLOCK_GET_ELEMENT(
+							&animation_graph->animations,
+							unit->unit.animation.looking_screen_index,
+							struct animation),
+						looking_bounds,
+						relative_looking_angles.yaw,
+						relative_looking_angles.pitch,
+						node_orientations);
+				}
 			}
 		}
 	}
