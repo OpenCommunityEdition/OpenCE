@@ -4631,6 +4631,7 @@ void unit_place(
 		if (unit->unit.animation.state==_unit_state_dying)
 		{
 			unsigned long object_flags;
+			unsigned long unit_flags;
 			long death_frame_index;
 			struct animation_graph *animation_graph;
 			struct animation *animation;
@@ -4653,12 +4654,13 @@ void unit_place(
 				&animation_graph->animations,
 				unit->object.animation.state.index,
 				struct animation);
+			object_flags = unit->object.flags;
 			death_frame_index = MAX(0, animation->frame_count - 4);
 			SET_FLAG(unit->object.damage_flags, _object_dead_bit, TRUE);
-			SET_FLAG(unit->unit.flags, _unit_placed_here_dead_bit, TRUE);
-			object_flags = unit->object.flags;
-			unit->object.flags = object_flags | FLAG(_object_cannot_be_garbage_bit);
+			unit_flags = unit->unit.flags | FLAG(_unit_placed_here_dead_bit);
 			unit->object.animation.state.frame_index = (short)death_frame_index;
+			unit->unit.flags = unit_flags;
+			unit->object.flags = object_flags | FLAG(_object_cannot_be_garbage_bit);
 			unit->unit.time_of_death = game_time_get();
 			unit->object.body_vitality = 0.f;
 			unit->object.shield_vitality = 0.f;
