@@ -1218,6 +1218,108 @@ void units_update(
 	return;
 }
 
+enum
+{
+	_unit_function_none = 0,
+	_unit_function_driver_seat_power,
+	_unit_function_gunner_seat_power,
+	_unit_function_aiming_change,
+	_unit_function_mouth_aperture,
+	_unit_function_integrated_light_power,
+	_unit_function_can_blink,
+	_unit_function_shield_sapping,
+	NUMBER_OF_UNIT_FUNCTION_MODES,
+};
+
+void unit_export_function_values(
+	long unit_index)
+{
+	struct unit_datum *unit;
+	struct unit_definition *unit_definition;
+	short *function_mode;
+	real *function_value;
+	long function_count;
+
+	unit = unit_get(unit_index);
+	unit_definition = unit_definition_get(unit->definition_index);
+	function_value = unit->object.incoming_function_values;
+	function_mode = unit_definition->unit.function_modes;
+	function_count = NUMBEROF(unit->object.incoming_function_values);
+
+	do
+	{
+		if (*function_mode != _unit_function_none)
+		{
+			real value = 0.f;
+
+			switch (*function_mode)
+			{
+			case _unit_function_driver_seat_power:
+				value = unit->unit.seat_power[0];
+				break;
+			case _unit_function_gunner_seat_power:
+				value = unit->unit.seat_power[1];
+				break;
+			case _unit_function_aiming_change:
+				value = unit->unit.aiming_change * (1.f / 255.f);
+				break;
+			case _unit_function_mouth_aperture:
+				value = unit->unit.mouth_aperture;
+				break;
+			case _unit_function_integrated_light_power:
+				value = unit->unit.integrated_light_power;
+				break;
+			case _unit_function_can_blink:
+				value =
+					!TEST_FLAG(unit->object.damage_flags, _object_dead_bit) &&
+					!TEST_FLAG(unit->unit.flags, _unit_cannot_blink_bit) ?
+					1.f : 0.f;
+				break;
+			case _unit_function_shield_sapping:
+			{
+				struct animation_graph *animation_graph = animation_graph_definition_get(
+					unit->object.animation.animation_graph_index);
+				struct animation *animation = TAG_BLOCK_GET_ELEMENT(
+					&animation_graph->animations,
+					unit->object.animation.state.index,
+					struct animation);
+				boolean before_private_loop;
+
+				/*
+				The January executable compares and divides the animation index here.
+				That is almost certainly an original bug: frame_index would measure
+				progress through the animation. Preserve index for exact behavior; a
+				corrected build may replace both uses below with state.frame_index.
+				*/
+				before_private_loop =
+					unit->object.animation.state.index <
+					animation->private_loop_frame_index;
+				if (!before_private_loop)
+				{
+					value = 1.f - unit->unit.shield_sap_timeout * (1.f / 90.f);
+				}
+				else
+				{
+					value =
+						(real)unit->object.animation.state.index /
+						(real)animation->private_loop_frame_index;
+				}
+				break;
+			}
+			}
+
+			*function_value = value;
+		}
+
+		function_mode++;
+		function_value++;
+		function_count--;
+	}
+	while (function_count != 0);
+
+	return;
+}
+
 void unit_persistent_control(
 	long unit_index,
 	long control_ticks,
@@ -3294,6 +3396,104 @@ void unit_impulse(
 	return;
 }
 
+void unit_animation_start_action(
+	long unit_index,
+	short action)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	if (action==0)
+	{
+		unit->unit.animation.action = 0;
+		unit->unit.animation.action_animation.index = NONE;
+	}
+	else
+	{
+		struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
+		struct animation_graph *animation_graph = animation_graph_definition_get(unit_definition->object.animation_graph.index);
+		struct animation_graph_unit_seat *unit_seat = TAG_BLOCK_GET_ELEMENT(&animation_graph->unit_seats, unit->unit.animation.seat_index, struct animation_graph_unit_seat);
+		struct animation_graph_weapon_class *weapon_class = TAG_BLOCK_GET_ELEMENT(&unit_seat->weapon_classes, unit->unit.animation.weapon_index, struct animation_graph_weapon_class);
+		struct animation_graph_weapon_type *weapon_type = TAG_BLOCK_GET_ELEMENT(&weapon_class->weapon_types, unit->unit.animation.weapon_type_index, struct animation_graph_weapon_type);
+		long action_index = action;
+		long animation_graph_index;
+		short animation_index = NONE;
+		short weapon_class_animation_index = NONE;
+		short weapon_type_animation_index = NONE;
+		short interpolation_frame_count;
+
+		switch (action_index)
+		{
+		case 1:
+			weapon_class_animation_index = _unit_weapon_class_animation_disarm;
+			break;
+		case 2:
+			weapon_class_animation_index = _unit_weapon_class_animation_drop;
+			break;
+		case 3:
+			weapon_class_animation_index = _unit_weapon_class_animation_ready;
+			break;
+		case 4:
+			weapon_class_animation_index = _unit_weapon_class_animation_put_away;
+			break;
+		case 5:
+			weapon_type_animation_index = 0;
+			goto lookup_weapon_type_animation;
+		case 6:
+			weapon_type_animation_index = 1;
+			goto lookup_weapon_type_animation;
+		case 7:
+			weapon_type_animation_index = 8;
+			goto lookup_weapon_type_animation;
+		case 8:
+			weapon_class_animation_index = _unit_weapon_class_animation_throw_grenade;
+			break;
+		case 9:
+			weapon_type_animation_index = 9;
+		lookup_weapon_type_animation:
+			if (weapon_type_animation_index<weapon_type->animations.count)
+			{
+				animation_index = animation_graph_animation_index_get(&weapon_type->animations)[weapon_type_animation_index].animation_index;
+			}
+			else
+			{
+				animation_index = NONE;
+			}
+			break;
+		default:
+			break;
+		}
+
+		if (weapon_class_animation_index!=NONE)
+		{
+			if (weapon_class_animation_index<weapon_class->animations.count)
+			{
+				animation_index = animation_graph_animation_index_get(&weapon_class->animations)[weapon_class_animation_index].animation_index;
+			}
+			else
+			{
+				animation_index = NONE;
+			}
+		}
+
+		interpolation_frame_count = action_index==7 ? 0 : 6;
+
+		if (animation_index!=NONE)
+		{
+			if (interpolation_frame_count>0)
+			{
+				object_start_interpolation(unit_index, interpolation_frame_count);
+			}
+
+			animation_graph_index = unit_definition->object.animation_graph.index;
+			unit->unit.animation.action_animation.index = animation_choose_random_permutation_internal(TRUE, animation_graph_index, animation_index);
+			unit->unit.animation.action_animation.frame_index = 0;
+			unit->unit.animation.action = (char)action;
+		}
+	}
+
+	return;
+}
+
 static void code_00198400(
 	long unit_index,
 	short overlay_action)
@@ -4365,6 +4565,101 @@ void unit_impact_melee_damage(
 			SET_FLAG(unit->object.flags, _object_at_rest_bit, TRUE);
 			SET_FLAG(unit->unit.flags, _unit_attached_melee_attack_bit, TRUE);
 			unit_melee_attack_begin(unit_index, TRUE, FALSE);
+		}
+	}
+
+	return;
+}
+
+void code_001a0cf0(
+	long unit_index,
+	boolean killed,
+	boolean feign_death,
+	boolean suppress_random_death_frame,
+	boolean suppress_hard_ping,
+	boolean force_hard_ping,
+	real damage_direction_angle,
+	short damage_part,
+	real_vector2d const *alignment_vector);
+
+enum
+{
+	_scenario_unit_dead_bit = 0,
+};
+
+struct scenario_unit_datum
+{
+	real body_vitality;
+	unsigned long flags;
+};
+typedef char scenario_unit_datum_size_check[
+	sizeof(struct scenario_unit_datum) == 0x08 ? 1 : -1];
+
+void object_deplete_shield(
+	long object_index);
+
+void unit_place(
+	long unit_index,
+	struct scenario_unit_datum const *scenario_unit)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition =
+		unit_definition_get(unit->definition_index);
+
+	if (scenario_unit->body_vitality>0.f)
+	{
+		unit->object.body_vitality = scenario_unit->body_vitality;
+	}
+
+	if (TEST_FLAG(scenario_unit->flags, _scenario_unit_dead_bit))
+	{
+		code_001a0cf0(
+			unit_index,
+			TRUE,
+			FALSE,
+			FALSE,
+			FALSE,
+			FALSE,
+			FALSE,
+			NONE,
+			FALSE);
+
+		if (unit->unit.animation.state==_unit_state_dying)
+		{
+			unsigned long object_flags;
+			long death_frame_index;
+			struct animation_graph *animation_graph;
+			struct animation *animation;
+
+			unit_delete_all_weapons(unit_index);
+			csmemset(
+				unit->unit.grenade_counts,
+				0,
+				sizeof(unit->unit.grenade_counts));
+
+			if (unit->unit.equipment_object_index!=NONE)
+			{
+				object_delete(unit->unit.equipment_object_index);
+				unit->unit.equipment_object_index = NONE;
+			}
+
+			animation_graph = animation_graph_definition_get(
+				unit_definition->object.animation_graph.index);
+			animation = TAG_BLOCK_GET_ELEMENT(
+				&animation_graph->animations,
+				unit->object.animation.state.index,
+				struct animation);
+			death_frame_index = MAX(0, animation->frame_count - 4);
+			SET_FLAG(unit->object.damage_flags, _object_dead_bit, TRUE);
+			SET_FLAG(unit->unit.flags, _unit_placed_here_dead_bit, TRUE);
+			object_flags = unit->object.flags;
+			unit->object.flags = object_flags | FLAG(_object_cannot_be_garbage_bit);
+			unit->object.animation.state.frame_index = (short)death_frame_index;
+			unit->unit.time_of_death = game_time_get();
+			unit->object.body_vitality = 0.f;
+			unit->object.shield_vitality = 0.f;
+			object_deplete_shield(unit_index);
+			object_compute_node_matrices_recursive(unit_index);
 		}
 	}
 
@@ -8074,50 +8369,53 @@ static boolean code_00198fd0(
 	case _unit_state_resurrect_back:
 	case _unit_state_leap_start:
 	case _unit_state_leap_melee:
-		return result;
-	default:
+		result = FALSE;
 		break;
-	}
 
-	if (unit->object.parent_object_index!=NONE)
-	{
-		struct unit_datum *parent_unit;
-		struct unit_definition *parent_unit_definition;
-		struct unit_seat *seat;
-
-		if (unit->unit.parent_seat_index!=NONE)
+	default:
+		if (unit->object.parent_object_index!=NONE)
 		{
-			parent_unit = unit_try_and_get(unit->object.parent_object_index);
-			if (parent_unit!=NULL)
+			struct unit_datum *parent_unit;
+			struct unit_definition *parent_unit_definition;
+			struct unit_seat *seat;
+
+			if (unit->unit.parent_seat_index!=NONE)
 			{
-				long impulse_index;
-
-				parent_unit_definition = unit_definition_get(parent_unit->definition_index);
-				seat = TAG_BLOCK_GET_ELEMENT(
-					&parent_unit_definition->unit.seats,
-					unit->unit.parent_seat_index,
-					struct unit_seat);
-				impulse_index = (short)animation_impulse;
-
-				if (impulse_index>=12 &&
-					impulse_index<=13)
+				parent_unit = unit_try_and_get(unit->object.parent_object_index);
+				if (parent_unit!=NULL)
 				{
-					return (boolean)TEST_FLAG(seat->flags, _unit_seat_unknown8_bit);
+					long impulse_index;
+
+					parent_unit_definition = unit_definition_get(parent_unit->definition_index);
+					seat = TAG_BLOCK_GET_ELEMENT(
+						&parent_unit_definition->unit.seats,
+						unit->unit.parent_seat_index,
+						struct unit_seat);
+					impulse_index = (short)animation_impulse;
+
+					if (impulse_index>=12 &&
+						impulse_index<=13)
+					{
+						result = (boolean)TEST_FLAG(seat->flags, _unit_seat_unknown8_bit);
+					}
 				}
 			}
 		}
-	}
-	else
-	{
-		long impulse_index = (short)animation_impulse;
-
-		if (impulse_index>=12 &&
-			impulse_index<=13)
+		else
 		{
-			return FALSE;
-		}
+			long impulse_index = (short)animation_impulse;
 
-		result = TRUE;
+			if (impulse_index>=12 &&
+				impulse_index<=13)
+			{
+				result = FALSE;
+			}
+			else
+			{
+				result = TRUE;
+			}
+		}
+		break;
 	}
 
 	return result;
@@ -8401,6 +8699,330 @@ void unit_cause_melee_damage(
 
 	return;
 }
+
+/* insert verbatim into source/units/units.c immediately after the closing
+   brace of unit_cause_melee_damage (line 8403) and before
+   'static void code_0019ea70(' */
+enum
+{
+	_damage_data_melee_bit = 0,
+	_damage_data_affects_source_bit = 3,
+};
+
+enum
+{
+	_collision_result_breakable_surface_bit = 3,
+};
+
+void breakable_surface_damage(
+	short breakable_surface_index,
+	struct damage_data *damage_data,
+	long seed_surface_index);
+void machine_try_to_open_with_damage(
+	long machine_index);
+void vehicle_accelerate(
+	long vehicle_index,
+	real_vector3d const *acceleration);
+
+void unit_cause_player_melee_damage(
+	long unit_index)
+{
+	struct unit_datum *unit;
+	struct unit_definition *unit_definition;
+	real_vector3d *facing;
+	long best_object_index;
+	short hit_material_type;
+	short breakable_surface_index;
+	long breakable_surface_seed_surface_index;
+	long melee_response_effect_index;
+	real_point3d ray_origin;
+	short best_object_type;
+	real best_object_fraction;
+	long outer_index;
+	long outer_count;
+
+	unit = unit_get(unit_index);
+	unit_definition = unit_definition_get(unit->definition_index);
+	best_object_index = NONE;
+	hit_material_type = NONE;
+	breakable_surface_index = NONE;
+	melee_response_effect_index = NONE;
+
+	{
+		struct object_marker marker;
+
+		object_get_marker_by_name(unit_index, "head", &marker, 1);
+		ray_origin = marker.matrix.position;
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		8729,
+		global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
+	global_current_collision_users[global_current_collision_user_depth++] = 8;
+	facing = &unit->unit.aiming_vector;
+
+	{
+		real_vector3d perpendicular;
+		real_vector3d cross;
+		struct collision_result collision;
+		real_vector3d ray;
+
+		normalize3d(perpendicular3d(facing, &perpendicular));
+		cross_product3d(facing, &perpendicular, &cross);
+
+		outer_index = -2;
+		outer_count = 5;
+		do
+		{
+			long inner_index = -2;
+			long inner_count = 5;
+
+			do
+			{
+				real inner_component_i = cross.i * (real)inner_index;
+
+				ray.i = facing->i * 0.8f +
+					(inner_component_i + (real)outer_index * perpendicular.i) * 0.1f;
+				inner_component_i = cross.j * (real)inner_index;
+				ray.j = unit->unit.aiming_vector.j * 0.8f +
+					(inner_component_i + (real)outer_index * perpendicular.j) * 0.1f;
+				ray.k = unit->unit.aiming_vector.k * 0.8f +
+					((real)outer_index * perpendicular.k + (real)inner_index * cross.k) * 0.1f;
+
+				if (collision_test_vector(
+					_collision_test_for_projectiles_flags,
+					&ray_origin,
+					&ray,
+					unit_index,
+					&collision))
+				{
+					switch (collision.type)
+					{
+					case _collision_result_structure:
+						if (best_object_index==NONE)
+						{
+							hit_material_type = collision.material_type;
+							if (TEST_FLAG(
+								collision.flags,
+								_collision_result_breakable_surface_bit))
+							{
+								breakable_surface_index =
+									collision.breakable_surface_index;
+								breakable_surface_seed_surface_index =
+									collision.surface_index;
+							}
+						}
+						break;
+
+					case _collision_result_object:
+					{
+						long hit_object_index = collision.object_index;
+						struct object_datum *hit_object = object_get(hit_object_index);
+
+						if (hit_object->object.type!=_object_type_weapon &&
+							hit_object->object.parent_object_index!=NONE)
+						{
+							hit_object_index = hit_object->object.parent_object_index;
+							hit_object = object_get(hit_object_index);
+						}
+
+						if (best_object_index==NONE ||
+							(hit_object->object.type==_object_type_biped &&
+							best_object_type==_object_type_biped &&
+							best_object_fraction>collision.t) ||
+							(hit_object->object.type==_object_type_biped &&
+							best_object_type!=_object_type_biped))
+						{
+							best_object_index = hit_object_index;
+							best_object_type = hit_object->object.type;
+							hit_material_type = collision.material_type;
+							best_object_fraction = collision.t;
+						}
+					}
+						break;
+					}
+				}
+
+				++inner_index;
+				--inner_count;
+			}
+			while (inner_count!=0);
+
+			++outer_index;
+			--outer_count;
+		}
+		while (outer_count!=0);
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\units.c",
+		8797,
+		global_current_collision_user_depth > 1);
+	--global_current_collision_user_depth;
+
+	{
+		short index = unit_get(unit_index)->unit.current_weapon_index;
+		struct unit_datum *current_unit;
+		long melee_damage_effect_index = NONE;
+
+		current_unit = unit_get(unit_index);
+		if (index!=NONE)
+		{
+			long weapon_index;
+
+			match_assert(
+				"c:\\halo\\SOURCE\\units\\units.c",
+				8371,
+				index>=0 && index<MAXIMUM_WEAPONS_PER_UNIT);
+			weapon_index = current_unit->unit.weapon_object_indices[index];
+			if (weapon_index!=NONE)
+			{
+				struct weapon_definition *weapon_definition =
+					weapon_definition_get(weapon_get(weapon_index)->definition_index);
+
+				melee_damage_effect_index =
+					weapon_definition->weapon.melee_attack_damage.index;
+				melee_response_effect_index =
+					weapon_definition->weapon.melee_attack_response.index;
+			}
+		}
+
+		if (melee_damage_effect_index==NONE)
+		{
+			melee_damage_effect_index = unit_definition->unit.melee_damage.index;
+		}
+
+		if (best_object_index!=NONE)
+		{
+			struct object_datum *best_object = object_get(best_object_index);
+
+			if (best_object->object.type==_object_type_vehicle)
+			{
+				struct object_definition *best_object_definition =
+					object_definition_get(best_object->definition_index);
+				real_vector3d acceleration;
+				real acceleration_scale =
+					best_object_definition->object.acceleration_scale * 0.035f;
+
+				acceleration.i = acceleration_scale * unit->unit.aiming_vector.i;
+				acceleration.j = acceleration_scale * unit->unit.aiming_vector.j;
+				acceleration.k = acceleration_scale * unit->unit.aiming_vector.k;
+				vehicle_accelerate(best_object_index, &acceleration);
+			}
+		}
+
+		if (melee_damage_effect_index!=NONE)
+		{
+			struct damage_data damage_data;
+
+			damage_data_new(&damage_data, melee_damage_effect_index);
+			SET_FLAG(damage_data.flags, _damage_data_melee_bit, TRUE);
+			damage_data.location = unit->object.location;
+			damage_data.owner_object_index = unit_index;
+			damage_data.owner_team_index = unit->object.owner_team_index;
+			damage_data.owner_player_index = unit->unit.player_index;
+			damage_data.origin = ray_origin;
+			damage_data.epicenter = unit->object.bounding_sphere_center;
+			damage_data.direction = unit->unit.aiming_vector;
+			damage_data.material_type = hit_material_type;
+
+			if (best_object_index==NONE)
+			{
+				if (breakable_surface_index!=NONE)
+				{
+					breakable_surface_damage(
+						breakable_surface_index,
+						&damage_data,
+						breakable_surface_seed_surface_index);
+				}
+			}
+			else
+			{
+				struct object_datum *best_object = object_get(best_object_index);
+				struct game_globals_player_information *player_information;
+
+				if (best_object->object.type==_object_type_machine)
+				{
+					machine_try_to_open_with_damage(best_object_index);
+				}
+
+				player_information = TAG_BLOCK_GET_ELEMENT(
+					&scenario_get_game_globals()->player_information,
+					0,
+					struct game_globals_player_information);
+				if (player_information->run_forward_speed>0.f)
+				{
+					damage_data.scale =
+						dot_product3d(
+							&unit->object.translational_velocity,
+							&unit->object.forward) * 30.f /
+						player_information->run_forward_speed;
+					if (damage_data.scale<0.f)
+					{
+						damage_data.scale = 0.f;
+					}
+					else if (damage_data.scale>1.f)
+					{
+						damage_data.scale = 1.f;
+					}
+				}
+
+				if (unit->object.type==_object_type_biped &&
+					biped_get(unit_index)->biped.airborne_ticks>15)
+				{
+					damage_data.scale = 1.5f;
+				}
+
+				if (object_get(best_object_index)->object.type==_object_type_biped)
+				{
+					object_cause_damage(
+						&damage_data,
+						best_object_index,
+						NONE,
+						NONE,
+						NONE,
+						NULL);
+				}
+			}
+		}
+
+		if (hit_material_type!=NONE)
+		{
+			code_0019b600(
+				unit_index,
+				hit_material_type,
+				melee_damage_effect_index);
+			if (melee_response_effect_index!=NONE)
+			{
+				struct damage_data damage_data;
+
+				damage_data_new(&damage_data, melee_response_effect_index);
+				damage_data.direction.i = -unit->unit.aiming_vector.i;
+				damage_data.epicenter = unit->object.bounding_sphere_center;
+				damage_data.direction.j = -unit->unit.aiming_vector.j;
+				damage_data.direction.k = -unit->unit.aiming_vector.k;
+				SET_FLAG(
+					damage_data.flags,
+					_damage_data_affects_source_bit,
+					TRUE);
+				damage_data.origin = unit->object.bounding_sphere_center;
+				object_cause_damage(
+					&damage_data,
+					unit_index,
+					NONE,
+					NONE,
+					NONE,
+					NULL);
+			}
+		}
+	}
+
+	unit->unit.melee_attack_state = 0;
+
+	return;
+}
+
 static void code_0019ea70(
 	long unit_index,
 	real_vector2d const *alignment_vector)
