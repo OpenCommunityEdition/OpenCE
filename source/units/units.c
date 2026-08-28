@@ -10134,9 +10134,8 @@ short unit_update_animation(
 					animation,
 					unit->object.animation.state.frame_index,
 					&root_velocity);
-				object_get_world_matrix(unit_index, &world_matrix);
 				matrix4x3_transform_vector(
-					&world_matrix,
+					object_get_world_matrix(unit_index, &world_matrix),
 					&root_velocity,
 					&root_velocity);
 				unit_exit_seat_end(unit_index);
@@ -10251,25 +10250,23 @@ boolean unit_animation_set_state(
 			&unit_seat->weapon_classes,
 			unit->unit.animation.weapon_index,
 			struct animation_graph_weapon_class);
-	struct animation_graph_weapon_type *weapon_type =
-		TAG_BLOCK_GET_ELEMENT(
-			&weapon_class->weapon_types,
-			unit->unit.animation.weapon_type_index,
-			struct animation_graph_weapon_type);
 	long interpolation_frame_count;
 	boolean old_state_is_none =
 		unit->unit.animation.state == NONE;
 	boolean changed_state = FALSE;
 	boolean result = TRUE;
 
-	(void)weapon_type;
+	TAG_BLOCK_GET_ELEMENT(
+		&weapon_class->weapon_types,
+		unit->unit.animation.weapon_type_index,
+		struct animation_graph_weapon_type);
 
 	if (old_state_is_none ||
 		new_state != unit->unit.animation.state)
 	{
 		short animation_index;
-		long weapon_class_animation_index = NONE;
-		long unit_seat_animation_index = NONE;
+		short weapon_class_animation_index = NONE;
+		short unit_seat_animation_index = NONE;
 
 		if (unit->unit.animation.state ==
 			_unit_state_throw_grenade)
@@ -10327,6 +10324,45 @@ boolean unit_animation_set_state(
 		case _unit_state_slide_right:
 			weapon_class_animation_index = _unit_weapon_class_animation_sliding_right;
 			break;
+		case _unit_state_airborne:
+			weapon_class_animation_index = _unit_weapon_class_animation_airborne;
+			break;
+		case _unit_state_land_soft:
+			weapon_class_animation_index = _unit_weapon_class_animation_land_soft;
+			break;
+		case _unit_state_land_hard:
+			weapon_class_animation_index = _unit_weapon_class_animation_land_hard;
+			break;
+		case _unit_state_throw_grenade:
+			weapon_class_animation_index = _unit_weapon_class_animation_throw_grenade;
+			break;
+		case _unit_state_melee_attack:
+			weapon_class_animation_index = _unit_weapon_class_animation_melee_attack;
+			break;
+		case _unit_state_melee_airborne:
+			weapon_class_animation_index = _unit_weapon_class_animation_melee_airborne;
+			break;
+		case _unit_state_melee_continuous:
+			weapon_class_animation_index = _unit_weapon_class_animation_melee_continuous;
+			break;
+		case _unit_state_resurrect_front:
+			weapon_class_animation_index = _unit_weapon_class_animation_resurrect_front;
+			break;
+		case _unit_state_resurrect_back:
+			weapon_class_animation_index = _unit_weapon_class_animation_resurrect_back;
+			break;
+		case _unit_state_feeding:
+			weapon_class_animation_index = _unit_weapon_class_animation_feeding;
+			break;
+		case _unit_state_leap_start:
+			weapon_class_animation_index = _unit_weapon_class_animation_leap_start;
+			break;
+		case _unit_state_leap_airborne:
+			weapon_class_animation_index = _unit_weapon_class_animation_leap_airborne;
+			break;
+		case _unit_state_leap_melee:
+			weapon_class_animation_index = _unit_weapon_class_animation_leap_melee;
+			break;
 		case _unit_state_flying_front:
 			unit_seat_animation_index = _unit_seat_animation_flying_front;
 			break;
@@ -10339,56 +10375,17 @@ boolean unit_animation_set_state(
 		case _unit_state_flying_right:
 			unit_seat_animation_index = _unit_seat_animation_flying_right;
 			break;
-		case _unit_state_airborne:
-			weapon_class_animation_index = _unit_weapon_class_animation_airborne;
-			break;
-		case _unit_state_land_soft:
-			weapon_class_animation_index = _unit_weapon_class_animation_land_soft;
-			break;
-		case _unit_state_land_hard:
-			weapon_class_animation_index = _unit_weapon_class_animation_land_hard;
-			break;
 		case _unit_state_dying_airborne:
 			unit_seat_animation_index = _unit_seat_animation_airborne_dead;
 			break;
 		case _unit_state_dying:
 			unit_seat_animation_index = _unit_seat_animation_landing_dead;
 			break;
-		case _unit_state_melee_attack:
-			weapon_class_animation_index = _unit_weapon_class_animation_melee_attack;
-			break;
-		case _unit_state_melee_airborne:
-			weapon_class_animation_index = _unit_weapon_class_animation_melee_airborne;
-			break;
-		case _unit_state_melee_continuous:
-			weapon_class_animation_index = _unit_weapon_class_animation_melee_continuous;
-			break;
-		case _unit_state_throw_grenade:
-			weapon_class_animation_index = _unit_weapon_class_animation_throw_grenade;
-			break;
-		case _unit_state_resurrect_front:
-			weapon_class_animation_index = _unit_weapon_class_animation_resurrect_front;
-			break;
-		case _unit_state_resurrect_back:
-			weapon_class_animation_index = _unit_weapon_class_animation_resurrect_back;
-			break;
-		case _unit_state_feeding:
-			weapon_class_animation_index = _unit_weapon_class_animation_feeding;
-			break;
 		case _unit_state_opening:
 			unit_seat_animation_index = _unit_seat_animation_opening;
 			break;
 		case _unit_state_closing:
 			unit_seat_animation_index = _unit_seat_animation_closing;
-			break;
-		case _unit_state_leap_start:
-			weapon_class_animation_index = _unit_weapon_class_animation_leap_start;
-			break;
-		case _unit_state_leap_airborne:
-			weapon_class_animation_index = _unit_weapon_class_animation_leap_airborne;
-			break;
-		case _unit_state_leap_melee:
-			weapon_class_animation_index = _unit_weapon_class_animation_leap_melee;
 			break;
 		case _unit_state_hovering:
 			unit_seat_animation_index = _unit_seat_animation_hovering;
@@ -10469,10 +10466,12 @@ boolean unit_animation_set_state(
 
 		if (animation_index == NONE)
 		{
-			result = code_001981f0(new_state);
+			if (!code_001981f0(new_state))
+			{
+				return FALSE;
+			}
 		}
 
-		if (result)
 		{
 			short chosen_animation_index =
 				animation_choose_random_permutation_internal(
@@ -10494,7 +10493,6 @@ boolean unit_animation_set_state(
 		}
 	}
 
-	if (result)
 	{
 		short aiming_screen_animation_index =
 			(short)code_00198190(new_state);
@@ -10541,10 +10539,9 @@ boolean unit_animation_set_state(
 						&weapon_class_animation_list,
 						aiming_screen_animation_index));
 			}
-		}
 
-		if (old_state_is_none)
-		{
+			if (old_state_is_none)
+			{
 			short animation_index;
 
 			if (_unit_seat_animation_looking >= 0 &&
@@ -10580,6 +10577,10 @@ boolean unit_animation_set_state(
 						&unit_seat_animation_list,
 						_unit_seat_animation_looking));
 			}
+			}
+
+			interpolation_frame_count = 6;
+			changed_state = TRUE;
 		}
 
 		if (changed_state)
