@@ -9965,19 +9965,15 @@ short unit_update_animation(
 			desired_base_seat_index = _unit_base_seat_asleep;
 			break;
 		case _unit_animation_state_alert:
+			desired_base_seat_index = _unit_base_seat_alert;
+			break;
 		case _unit_animation_state_suspicious:
 			desired_base_seat_index = _unit_base_seat_alert;
 			break;
 		case _unit_animation_state_in_combat:
-		{
-			boolean use_combat_variant;
-
-			use_combat_variant = data->crouching!=0;
 			desired_base_seat_index =
-				use_combat_variant +
-					_unit_base_seat_stand;
+				(data->crouching != FALSE) + _unit_base_seat_stand;
 			break;
-		}
 		case _unit_animation_state_wary:
 			desired_base_seat_index = _unit_base_seat_stand;
 			break;
@@ -10265,6 +10261,7 @@ static boolean unit_animation_set_state(
 			&unit_seat->weapon_classes,
 			unit->unit.animation.weapon_index,
 			struct animation_graph_weapon_class);
+	long animation_graph_index;
 	short interpolation_frame_count;
 	boolean old_state_is_none;
 	boolean changed_state;
@@ -10493,13 +10490,17 @@ static boolean unit_animation_set_state(
 		}
 
 		{
+			animation_graph_index =
+				unit_definition->object.animation_graph.index;
+			animation_index =
+				animation_choose_random_permutation_internal(
+					TRUE,
+					animation_graph_index,
+					animation_index);
 			code_0019b0b0(
 				unit_index,
 				unit_definition->object.animation_graph.index,
-				animation_choose_random_permutation_internal(
-					TRUE,
-					unit_definition->object.animation_graph.index,
-					animation_index));
+				animation_index);
 
 			interpolation_frame_count =
 				code_00198230(
@@ -10535,10 +10536,12 @@ static boolean unit_animation_set_state(
 				animation_index = NONE;
 			}
 
+			animation_graph_index =
+				unit_definition->object.animation_graph.index;
 			unit->unit.animation.aiming_screen_index =
 				animation_choose_random_permutation_internal(
 					TRUE,
-					unit_definition->object.animation_graph.index,
+					animation_graph_index,
 					animation_index);
 
 			if (debug_unit_animations &&
@@ -10578,10 +10581,12 @@ static boolean unit_animation_set_state(
 				animation_index = NONE;
 			}
 
+			animation_graph_index =
+				unit_definition->object.animation_graph.index;
 			unit->unit.animation.looking_screen_index =
 				animation_choose_random_permutation_internal(
 					TRUE,
-					unit_definition->object.animation_graph.index,
+					animation_graph_index,
 					animation_index);
 
 			if (debug_unit_animations &&
