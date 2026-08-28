@@ -546,6 +546,7 @@ symbols in this file:
 
 #include "ai.h"
 #include "ai_debug.h"
+#include "actor_definitions.h"
 #include "actors.h"
 #include "main/console.h"
 #include "memory/data.h"
@@ -565,6 +566,15 @@ enum
 	NUMBER_OF_COMMUNICATION_TIMER_TYPES = 5,
 	NUMBER_OF_DIALOGUE_USAGES = 105,
 	NUMBER_OF_REPLY_USAGES = 46,
+	_actor_mode_alert = 2,
+	_unit_speech_idle = 1,
+	_ai_information_look_unit = 1,
+	_ai_information_look_object = 2,
+	_ai_information_allegiance = 1,
+	_ai_communication_priority_communicate = 4,
+	_ai_sound_volume_medium = 1,
+	_ai_sound_volume_loud = 2,
+	_ai_sound_volume_shout = 3,
 };
 
 /* ---------- macros */
@@ -655,6 +665,16 @@ struct ai_communication_globals_view
 	byte recent_conversations[0x100];
 };
 
+struct actor_iterator
+{
+	struct data_iterator encounter_iterator;
+	boolean iterated_encounterless_list;
+	boolean active_only;
+	byte pad[2];
+	long index;
+	long next_index;
+};
+
 typedef char ai_conversation_datum_header_size_assert[
 	sizeof(struct ai_conversation_datum_header) == 0x14 ? 1 : -1];
 typedef char ai_conversation_datum_header_any_line_spoken_offset_assert[
@@ -669,6 +689,22 @@ typedef char scenario_conversation_definition_view_size_assert[
 	sizeof(struct scenario_conversation_definition_view) == 0x74 ? 1 : -1];
 typedef char ai_print_conversations_offset_assert[
 	offsetof(struct ai_debug_state, __unknown3C) + 99 == 0x9F ? 1 : -1];
+typedef char ai_communication_unit_speech_item_size_assert[
+	sizeof(struct unit_speech_item) == 0x30 ? 1 : -1];
+typedef char ai_communication_unit_speech_item_ai_offset_assert[
+	offsetof(struct unit_speech_item, ai) == 0x10 ? 1 : -1];
+typedef char ai_communication_actor_mode_offset_assert[
+	offsetof(struct actor_datum, state.mode) == 0x6A ? 1 : -1];
+typedef char ai_communication_actor_unit_index_offset_assert[
+	offsetof(struct actor_datum, meta.unit_index) == 0x18 ? 1 : -1];
+typedef char ai_communication_actor_idle_combat_offset_assert[
+	offsetof(struct actor_datum, control.idle_vocalization_combat) == 0x6CC ? 1 : -1];
+typedef char ai_communication_actor_idle_timer_offset_assert[
+	offsetof(struct actor_datum, control.idle_vocalization_timer) == 0x6CE ? 1 : -1];
+typedef char ai_communication_actor_iterator_size_assert[
+	sizeof(struct actor_iterator) == 0x1C ? 1 : -1];
+typedef char ai_communication_actor_iterator_index_offset_assert[
+	offsetof(struct actor_iterator, index) == 0x14 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -708,8 +744,71 @@ boolean code_000316a0(
 	long original_unit_index,
 	struct ai_information_packet *communication,
 	long reply_actor_index);
+static void code_000318c0(
+	long actor_index,
+	short type,
+	short priority,
+	long look_unit_index,
+	long prop_index);
+static void code_00031970(
+	long actor_index,
+	short type,
+	short priority,
+	long object_index);
 boolean actor_is_fighting(
 	long actor_index);
+static void code_000322f0(
+	long actor_index);
+static void code_000324b0(
+	long actor_index,
+	long prop_index,
+	struct ai_information_packet *information);
+short unit_test_speech(
+	long unit_index,
+	short priority,
+	boolean allow_recursive_lookup,
+	boolean allow_queue,
+	long *unit_last_speech_time,
+	short *vocalization_type_reference,
+	long *sound_definition_index_reference);
+void unit_speak(
+	long unit_index,
+	short play_type,
+	struct unit_speech_item const *speech_item);
+void ai_handle_allegiance_broken_notification(
+	short team1_index,
+	short team2_index,
+	boolean broken);
+void actor_iterator_new(
+	struct actor_iterator *iterator,
+	boolean active_only);
+struct actor_datum *actor_iterator_next(
+	struct actor_iterator *iterator);
+boolean game_team_is_enemy(
+	short team_index0,
+	short team_index1);
+long prop_get_base_by_unit_index(
+	long actor_index,
+	long unit_index,
+	boolean create_if_missing,
+	boolean update_status);
+void actor_perception_find_sense_position(
+	long actor_index,
+	real_point3d const *position,
+	long prop_index,
+	struct actor_position_data *sense_position);
+short actor_audibility_at_point(
+	long actor_index,
+	struct actor_position_data const *position,
+	real_point3d const *source_position,
+	struct location const *source_location,
+	short source_type,
+	real scale,
+	short line_of_sight);
+void actor_handle_communication(
+	long actor_index,
+	long prop_index,
+	struct ai_information_packet *information);
 
 extern short global_communication_table_indices[NUMBER_OF_COMMUNICATION_TYPES];
 extern struct ai_communication_globals_view *ai_globals;
@@ -1530,6 +1629,138 @@ boolean code_000315b0(
 	return result;
 }
 
+static void code_000318c0(
+	long actor_index,
+	short type,
+	short priority,
+	long look_unit_index,
+	long prop_index)
+{
+	struct direction_specification direction;
+	short prop_state;
+
+	if (actor_index != NONE &&
+		priority > 0 &&
+		look_unit_index != NONE &&
+		unit_try_and_get(look_unit_index))
+	{
+		if (prop_index == NONE)
+		{
+			prop_index = prop_get_active_by_unit_index(
+				actor_index,
+				look_unit_index);
+			if (prop_index == NONE)
+			{
+				goto look_at_point;
+			}
+		}
+
+		prop_state = prop_get(prop_index)->state;
+		if (prop_state >= _prop_state_becoming_unacknowledged &&
+			prop_state <= _prop_state_acknowledged &&
+			prop_index != NONE)
+		{
+			direction.type = _direction_specification_prop;
+			direction.prop_index = prop_index;
+		}
+		else
+		{
+		look_at_point:
+			direction.type = _direction_specification_point;
+			unit_get_head_position(
+				look_unit_index,
+				&direction.point);
+		}
+
+		actor_look_secondary(
+			actor_index,
+			type,
+			priority,
+			&direction);
+	}
+
+	return;
+}
+
+static void code_00031970(
+	long actor_index,
+	short type,
+	short priority,
+	long object_index)
+{
+	struct direction_specification direction;
+
+	if (actor_index != NONE &&
+		priority > 0 &&
+		object_index != NONE &&
+		object_try_and_get(object_index))
+	{
+		direction.type = _direction_specification_object;
+		direction.object_index = object_index;
+		actor_look_secondary(
+			actor_index,
+			type,
+			priority,
+			&direction);
+	}
+
+	return;
+}
+
+static void code_000322f0(
+	long actor_index)
+{
+	struct actor_datum *actor;
+	struct actor_definition *definition;
+	struct unit_datum *unit;
+	boolean in_combat;
+	short speech_offset;
+	real delay;
+
+	actor = actor_get(actor_index);
+	definition = actor_definition_get(actor->meta.definition_index);
+	in_combat = actor_in_combat(actor_index);
+	speech_offset = 0;
+	if (actor->meta.unit_index != NONE)
+	{
+		unit = unit_get(actor->meta.unit_index);
+		if (unit->unit.speech.current.priority > 0)
+		{
+			speech_offset = unit->unit.speech.sound_timer;
+		}
+	}
+
+	if (in_combat)
+	{
+		real maximum_delay;
+		real minimum_delay;
+
+		maximum_delay = definition->communication.idle_combat_time_upper_bound;
+		minimum_delay = definition->communication.idle_combat_time_lower_bound;
+		delay = real_seed_random_range(
+			get_global_random_seed_address(),
+			minimum_delay,
+			maximum_delay);
+	}
+	else
+	{
+		real maximum_delay;
+		real minimum_delay;
+
+		maximum_delay = definition->communication.idle_noncombat_time_upper_bound;
+		minimum_delay = definition->communication.idle_noncombat_time_lower_bound;
+		delay = real_seed_random_range(
+			get_global_random_seed_address(),
+			minimum_delay,
+			maximum_delay);
+	}
+
+	actor->control.idle_vocalization_combat = in_combat;
+	actor->control.idle_vocalization_timer =
+		(short)(delay * 30.0f + (real)speech_offset);
+	return;
+}
+
 short ai_conversation_line(
 	short scenario_conversation_index)
 {
@@ -1610,6 +1841,202 @@ void ai_conversation_stop(
 			}
 
 			ai_conversation_finish(iterator.datum_index, FALSE, FALSE);
+		}
+	}
+
+	return;
+}
+
+void actor_communication_update(
+	long actor_index)
+{
+	struct actor_datum *actor;
+	boolean in_combat;
+
+	actor = actor_get(actor_index);
+	if (actor->state.mode >= _actor_mode_alert &&
+		ai_globals->dialogue_triggers_enabled)
+	{
+		in_combat = actor_in_combat(actor_index);
+		if (actor->control.idle_vocalization_timer == 0 ||
+			actor->control.idle_vocalization_combat != in_combat)
+		{
+			code_000322f0(actor_index);
+		}
+
+		if (actor->control.idle_vocalization_timer > 0 &&
+			--actor->control.idle_vocalization_timer == 0)
+		{
+			long sound_definition_index = NONE;
+			long vocalization_type = in_combat != FALSE;
+			short play_type = unit_test_speech(
+				actor->meta.unit_index,
+				_unit_speech_idle,
+				TRUE,
+				FALSE,
+				NULL,
+				(short *)&vocalization_type,
+				&sound_definition_index);
+			if (play_type > 0)
+			{
+				struct unit_speech_item speech_item;
+
+				csmemset(&speech_item, 0, sizeof(speech_item));
+				speech_item.vocalization_type = (short)vocalization_type;
+				speech_item.sound_definition_index = sound_definition_index;
+				speech_item.priority = _unit_speech_idle;
+				ai_communication_packet_new(&speech_item.ai);
+				unit_speak(actor->meta.unit_index, play_type, &speech_item);
+			}
+		}
+	}
+
+	return;
+}
+
+static void code_000324b0(
+	long actor_index,
+	long prop_index,
+	struct ai_information_packet *information)
+{
+	struct prop_datum *prop;
+	short type;
+
+	if (information->look_type > 0)
+	{
+		prop = prop_get(prop_index);
+		type = _secondary_look_communicated_direction;
+		if (information->look_type == _ai_information_look_unit &&
+			information->look_data.unit.unit_index == prop->unit_index)
+		{
+			type = _secondary_look_communicating_prop;
+		}
+
+		switch (information->look_type)
+		{
+		case _ai_information_look_unit:
+			code_000318c0(
+				actor_index,
+				type,
+				information->look_priority,
+				information->look_data.unit.unit_index,
+				NONE);
+			break;
+
+		case _ai_information_look_object:
+			code_00031970(
+				actor_index,
+				type,
+				information->look_priority,
+				information->look_data.object.object_index);
+			break;
+		}
+	}
+
+	return;
+}
+
+void ai_communication_notify(
+	long unit_index,
+	short priority,
+	short vocalization_type,
+	struct ai_information_packet *ai_information)
+{
+	long sound_volume;
+	struct unit_datum *unit;
+	struct location const *sound_location;
+	short speaker_team;
+	long parent_object_index;
+	real_point3d speaker_head;
+	struct actor_iterator actors;
+	struct actor_datum *actor;
+	long prop_index;
+	struct prop_datum *prop;
+	struct actor_position_data sense_position;
+
+	switch (ai_information->information_type)
+	{
+	case _ai_information_allegiance:
+		ai_handle_allegiance_broken_notification(
+			ai_information->information_data.allegiance.team1_index,
+			ai_information->information_data.allegiance.team2_index,
+			ai_information->information_data.allegiance.broken);
+		break;
+	}
+
+	if (ai_information->information_type != 0 ||
+		ai_information->look_priority > 0)
+	{
+		unit = unit_get(unit_index);
+		sound_location = &unit->object.location;
+		speaker_team = unit->object.owner_team_index;
+		sound_volume = _ai_sound_volume_medium;
+		unit_get_head_position(unit_index, &speaker_head);
+
+		if (ai_information->dialogue_type_index != NONE)
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\ai_communication.c",
+				0x894,
+				(ai_information->dialogue_type_index >= 0) && (ai_information->dialogue_type_index < global_dialogue_event_count));
+			if (global_dialogue_table[ai_information->dialogue_type_index].communication_priority >=
+				_ai_communication_priority_communicate)
+			{
+				sound_volume = _ai_sound_volume_shout;
+			}
+		}
+
+		if (unit->object.parent_object_index != NONE)
+		{
+			parent_object_index = object_get_ultimate_parent(unit_index);
+			sound_location = &object_get(parent_object_index)->object.location;
+		}
+
+		actor_iterator_new(&actors, TRUE);
+		actor = actor_iterator_next(&actors);
+		while (actor)
+		{
+			if (actor->meta.unit_index != unit_index &&
+				!game_team_is_enemy(actor->meta.team_index, speaker_team) &&
+				!(distance_squared3d(
+					&actor->input.position.head_position,
+					&speaker_head) > 900.0f))
+			{
+				prop_index = prop_get_base_by_unit_index(
+					actors.index,
+					unit_index,
+					TRUE,
+					TRUE);
+				if (prop_index != NONE)
+				{
+					prop = prop_get(prop_index);
+					actor_perception_find_sense_position(
+						actors.index,
+						&speaker_head,
+						prop_index,
+						&sense_position);
+					if (actor_audibility_at_point(
+						actors.index,
+						&sense_position,
+						&speaker_head,
+						sound_location,
+						(short)sound_volume,
+						1.0f,
+						prop->line_of_sight) >= _ai_sound_volume_loud)
+					{
+						actor_handle_communication(
+							actors.index,
+							prop_index,
+							ai_information);
+						code_000324b0(
+							actors.index,
+							prop_index,
+							ai_information);
+					}
+				}
+			}
+
+			actor = actor_iterator_next(&actors);
 		}
 	}
 
