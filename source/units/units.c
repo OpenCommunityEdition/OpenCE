@@ -1231,6 +1231,9 @@ enum
 	NUMBER_OF_UNIT_FUNCTION_MODES,
 };
 
+void _ReadWriteBarrier(void);
+#pragma intrinsic(_ReadWriteBarrier)
+
 void unit_export_function_values(
 	long unit_index)
 {
@@ -1242,6 +1245,7 @@ void unit_export_function_values(
 
 	unit = unit_get(unit_index);
 	unit_definition = unit_definition_get(unit->definition_index);
+	_ReadWriteBarrier();
 	function_value = unit->object.incoming_function_values;
 	function_mode = unit_definition->unit.function_modes;
 	function_count = NUMBEROF(unit->object.incoming_function_values);
