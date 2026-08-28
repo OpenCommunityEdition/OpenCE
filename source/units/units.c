@@ -961,7 +961,7 @@ static boolean code_00198170(
 	struct unit_animation *animation);
 static boolean code_001981f0(
 	short state);
-static short code_00198230(
+static long code_00198230(
 	short new_state,
 	short old_state);
 static boolean code_00198050(
@@ -9761,11 +9761,11 @@ static boolean code_001981f0(
 
 	return result;
 }
-static short code_00198230(
+static long code_00198230(
 	short new_state,
 	short old_state)
 {
-	short result = 6;
+	long result = 6;
 
 	if ((new_state==_unit_state_idle ||
 		new_state==_unit_state_turn_left ||
@@ -10267,7 +10267,7 @@ boolean unit_animation_set_state(
 			struct animation_graph_weapon_class);
 	long interpolation_frame_count;
 	boolean old_state_is_none;
-	short changed_state = FALSE;
+	boolean changed_state = FALSE;
 	boolean result = TRUE;
 
 	TAG_BLOCK_GET_ELEMENT(
@@ -10489,16 +10489,13 @@ boolean unit_animation_set_state(
 		}
 
 		{
-			short chosen_animation_index =
-				animation_choose_random_permutation_internal(
-					TRUE,
-					unit_definition->object.animation_graph.index,
-					animation_index);
-
 			code_0019b0b0(
 				unit_index,
 				unit_definition->object.animation_graph.index,
-				chosen_animation_index);
+				animation_choose_random_permutation_internal(
+					TRUE,
+					unit_definition->object.animation_graph.index,
+					animation_index));
 
 			interpolation_frame_count =
 				code_00198230(
