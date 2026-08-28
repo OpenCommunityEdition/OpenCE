@@ -105,6 +105,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "items/weapons.h"
 #include "players.h"
 
 /* ---------- constants */
@@ -212,6 +213,17 @@ void code_000a1650(
 	long player_index)
 {
 	player_get(player_index);
+
+	return;
+}
+
+void code_000a1b90(
+	long weapon_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\game_engine_oddball.c",
+		0x3C8,
+		weapon_is_flag(weapon_index));
 
 	return;
 }

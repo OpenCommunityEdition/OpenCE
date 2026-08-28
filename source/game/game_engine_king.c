@@ -81,17 +81,32 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "game_engine.h"
 #include "players.h"
 
 /* ---------- constants */
+
+enum
+{
+	MAXIMUM_KING_SCORE_SLOTS = 16,
+	_multiplayer_sound_team_king_of_the_hill = 0x20,
+	_multiplayer_sound_king_of_the_hill = 0x24,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct king_globals_prefix
+{
+	long scores[MAXIMUM_KING_SCORE_SLOTS];
+};
+
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+extern struct king_globals_prefix bss_0043e948;
 
 /* ---------- public code */
 
@@ -161,6 +176,43 @@ void code_000a03c0(
 	player_get(player_index);
 
 	return;
+}
+
+void code_000a03f0(
+	void)
+{
+	game_engine_play_multiplayer_sound(
+		game_engine_has_teams() ?
+			_multiplayer_sound_team_king_of_the_hill :
+			_multiplayer_sound_king_of_the_hill);
+
+	return;
+}
+
+wchar_t *code_000a0d40(
+	long player_index,
+	wchar_t *buffer)
+{
+	struct player_datum *player = player_get(player_index);
+
+	ticks_to_unicode_time_string(
+		player->statistics.multiplayer_statistics.king_statistics.time_on_hill,
+		256,
+		buffer);
+
+	return buffer;
+}
+
+wchar_t *code_000a0de0(
+	long team_index,
+	wchar_t *buffer)
+{
+	ticks_to_unicode_time_string(
+		bss_0043e948.scores[team_index],
+		256,
+		buffer);
+
+	return buffer;
 }
 
 /* ---------- private code */

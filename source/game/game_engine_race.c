@@ -103,6 +103,8 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "players.h"
+#include "text/unicode.h"
 
 /* ---------- constants */
 
@@ -194,6 +196,29 @@ void code_000a2ea0(
 	void)
 {
 	return;
+}
+
+void code_000a29c0(
+	long player_index)
+{
+	player_get(player_index)->unknown88 = 0;
+
+	return;
+}
+
+wchar_t *code_000a34a0(
+	long player_index,
+	wchar_t *string)
+{
+	struct player_datum *player;
+
+	player = player_get(player_index);
+	usprintf(
+		string,
+		L"%d",
+		player->statistics.multiplayer_statistics.race_statistics.laps);
+
+	return string;
 }
 
 /* ---------- private code */
