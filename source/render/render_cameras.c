@@ -139,6 +139,12 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+boolean render_camera_view_to_screen(
+	const struct render_camera *camera,
+	const struct render_frustum *frustum,
+	const real_point3d *view_point,
+	real_point2d *screen_point);
+
 /* ---------- globals */
 
 /* ---------- public code */
@@ -148,6 +154,79 @@ void render_camera_new(
 {
 	csmemset(camera, 0, sizeof(*camera));
 	return;
+}
+
+void render_camera_screen_to_view(
+	const struct render_camera *camera,
+	const struct render_frustum *frustum,
+	const real_point2d *screen_point,
+	real_vector3d *view_vector)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		1018,
+		camera);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		1019,
+		frustum);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		1020,
+		screen_point);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		1021,
+		view_vector);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		1028,
+		frustum->projection_valid);
+
+	view_vector->n[0] =
+		(screen_point->n[0] - frustum->projection_matrix[2][0]) /
+		frustum->projection_matrix[0][0];
+	view_vector->n[1] =
+		-((frustum->projection_matrix[2][1] + screen_point->n[1]) /
+		frustum->projection_matrix[1][1]);
+	view_vector->n[2] = -1.0f;
+	return;
+}
+
+boolean render_camera_world_to_screen(
+	const struct render_camera *camera,
+	const struct render_frustum *frustum,
+	const real_point3d *world_point,
+	real_point2d *screen_point)
+{
+	real_point3d view_point;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		961,
+		camera);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		962,
+		frustum);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		963,
+		world_point);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		964,
+		screen_point);
+
+	matrix4x3_transform_point(
+		&frustum->world_to_view,
+		world_point,
+		&view_point);
+	return render_camera_view_to_screen(
+		camera,
+		frustum,
+		&view_point,
+		screen_point);
 }
 
 /* ---------- private code */
