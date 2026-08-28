@@ -961,7 +961,7 @@ static boolean code_00198170(
 	struct unit_animation *animation);
 static boolean code_001981f0(
 	short state);
-static long code_00198230(
+static short code_00198230(
 	short new_state,
 	short old_state);
 static boolean code_00198050(
@@ -1031,7 +1031,7 @@ static boolean unit_set_or_test_seat_and_weapon_label(
 	char const *weapon_label,
 	boolean change_flag);
 
-boolean unit_animation_set_state(
+static boolean unit_animation_set_state(
 	long unit_index,
 	short new_state);
 short unit_update_animation(
@@ -9761,11 +9761,11 @@ static boolean code_001981f0(
 
 	return result;
 }
-static long code_00198230(
+static short code_00198230(
 	short new_state,
 	short old_state)
 {
-	long result = 6;
+	short result = 6;
 
 	if ((new_state==_unit_state_idle ||
 		new_state==_unit_state_turn_left ||
@@ -10245,7 +10245,7 @@ short unit_update_animation(
 	return result;
 }
 
-boolean unit_animation_set_state(
+static boolean unit_animation_set_state(
 	long unit_index,
 	short new_state)
 {
@@ -10265,7 +10265,7 @@ boolean unit_animation_set_state(
 			&unit_seat->weapon_classes,
 			unit->unit.animation.weapon_index,
 			struct animation_graph_weapon_class);
-	long interpolation_frame_count;
+	short interpolation_frame_count;
 	boolean old_state_is_none;
 	boolean changed_state;
 	boolean result;
@@ -10604,7 +10604,7 @@ boolean unit_animation_set_state(
 		{
 			object_start_interpolation(
 				unit_index,
-				(short)interpolation_frame_count);
+				interpolation_frame_count);
 		}
 
 		unit->unit.animation.state = (char)new_state;
