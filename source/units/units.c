@@ -983,9 +983,9 @@ short animation_update_internal(
 	struct animation_state *state,
 	long *sound_index);
 static short code_0019b160(
-	struct animation_state *animation,
+	long unit_index,
 	long animation_graph_index,
-	long unit_index);
+	struct animation_state *animation);
 static char const *code_0019dff0(
 	long unit_index);
 static void code_0019ea70(
@@ -9872,9 +9872,9 @@ static void code_0019b0b0(
 }
 
 static short code_0019b160(
-	struct animation_state *animation,
+	long unit_index,
 	long animation_graph_index,
-	long unit_index)
+	struct animation_state *animation)
 {
 	long sound_index;
 	short result = animation_update_internal(
@@ -10037,9 +10037,9 @@ short unit_update_animation(
 	if (unit->unit.animation.soft_ping_animation.index!=NONE)
 	{
 		animation_update_result = code_0019b160(
-			&unit->unit.animation.soft_ping_animation,
+			unit_index,
 			unit_definition->object.animation_graph.index,
-			unit_index);
+			&unit->unit.animation.soft_ping_animation);
 		if (animation_update_result==2)
 		{
 			unit->unit.animation.soft_ping_animation.index = NONE;
@@ -10049,9 +10049,9 @@ short unit_update_animation(
 	if (unit->object.animation.state.index!=NONE)
 	{
 		animation_update_result = code_0019b160(
-			&unit->object.animation.state,
+			unit_index,
 			unit->object.animation.animation_graph_index,
-			unit_index);
+			&unit->object.animation.state);
 
 		if (animation_update_result==1)
 		{
@@ -10191,9 +10191,9 @@ short unit_update_animation(
 	if (unit->unit.animation.action_animation.index!=NONE)
 	{
 		animation_update_result = code_0019b160(
-			&unit->unit.animation.action_animation,
+			unit_index,
 			unit_definition->object.animation_graph.index,
-			unit_index);
+			&unit->unit.animation.action_animation);
 		if (animation_update_result==2)
 		{
 			struct unit_datum *interpolated_unit;
@@ -10208,9 +10208,9 @@ short unit_update_animation(
 	if (unit->unit.animation.overlay_action_animation.index!=NONE)
 	{
 		animation_update_result = code_0019b160(
-			&unit->unit.animation.overlay_action_animation,
+			unit_index,
 			unit_definition->object.animation_graph.index,
-			unit_index);
+			&unit->unit.animation.overlay_action_animation);
 
 		switch (animation_update_result)
 		{
