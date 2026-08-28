@@ -10484,11 +10484,11 @@ boolean unit_animation_set_state(
 
 		if (animation_index == NONE)
 		{
-			result = code_001981f0(new_state);
-
-			if (!result)
+			if (!code_001981f0(new_state))
 			{
-				return result;
+				result = FALSE;
+
+				goto done;
 			}
 		}
 
@@ -10610,6 +10610,7 @@ boolean unit_animation_set_state(
 		unit->unit.animation.state = (char)new_state;
 	}
 
+done:
 	return result;
 }
 void unit_preprocess_node_orientations(
