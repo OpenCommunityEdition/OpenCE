@@ -2849,6 +2849,27 @@ void unit_died(
 	if (!feigned)
 	{
 		unit->unit.feign_death_timer = 0;
+	}
+	else
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\units\\units.c",
+			5099,
+			unit->unit.feign_death_timer > 0);
+		unit_definition = unit_definition_get(unit->definition_index);
+		if (real_seed_random(get_global_random_seed_address()) <
+			unit_definition->unit.feign_death_repeat_chance)
+		{
+			SET_FLAG(unit->unit.flags, _unit_feign_death_allowed_bit, TRUE);
+		}
+		else
+		{
+			SET_FLAG(unit->unit.flags, _unit_feign_death_allowed_bit, FALSE);
+		}
+	}
+
+	if (!feigned)
+	{
 		object_set_garbage(unit_index, TRUE);
 		if (unit->unit.player_index != NONE)
 		{
@@ -2875,23 +2896,6 @@ void unit_died(
 		}
 
 		unit->unit.time_of_death = game_time_get();
-	}
-	else
-	{
-		match_assert(
-			"c:\\halo\\SOURCE\\units\\units.c",
-			5099,
-			unit->unit.feign_death_timer > 0);
-		unit_definition = unit_definition_get(unit->definition_index);
-		if (real_seed_random(get_global_random_seed_address()) <
-			unit_definition->unit.feign_death_repeat_chance)
-		{
-			SET_FLAG(unit->unit.flags, _unit_feign_death_allowed_bit, TRUE);
-		}
-		else
-		{
-			SET_FLAG(unit->unit.flags, _unit_feign_death_allowed_bit, FALSE);
-		}
 	}
 
 	unit->unit.flags &= ~(
@@ -5698,8 +5702,8 @@ boolean unit_update(
 			aim_scale = 1.f;
 		}
 
-		aiming_velocity_limit = (aim_scale*unit_definition->unit.aiming_velocity_maximum)/TICKS_PER_SECOND;
-		aiming_angular_acceleration_limit = (aim_scale*unit_definition->unit.aiming_acceleration_maximum)/(TICKS_PER_SECOND*TICKS_PER_SECOND);
+		aiming_velocity_limit = aim_scale*unit_definition->unit.aiming_velocity_maximum/TICKS_PER_SECOND;
+		aiming_angular_acceleration_limit = aim_scale*unit_definition->unit.aiming_acceleration_maximum/(TICKS_PER_SECOND*TICKS_PER_SECOND);
 		previous_aiming_vector = unit->unit.aiming_vector;
 
 		if (aiming_velocity_limit==0.f && aiming_angular_acceleration_limit==0.f)
@@ -5835,62 +5839,63 @@ boolean unit_update(
 				break;
 			}
 		}
+
+		if (unit->unit.current_weapon_index!=NONE)
+		{
+			long flags = 0;
+			real primary_trigger = unit->unit.primary_trigger;
+
+			if (unit->unit.current_weapon_index==unit->unit.desired_weapon_index)
+			{
+				boolean const time_remaining = unit->unit.persistent_control_timer>0 && TEST_FLAG(unit->unit.persistent_control_flags, 11);
+
+				if (!jetpack_cheat_active)
+				{
+					if (allow_integrated_lights && TEST_FLAG(unit->unit.control_flags, _unit_control_integrated_light_bit))
+					{
+						SET_FLAG(flags, 0, TRUE);
+					}
+					if (TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit))
+					{
+						SET_FLAG(flags, 1, TRUE);
+					}
+					if (TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_secondary_trigger_bit))
+					{
+						SET_FLAG(flags, 2, TRUE);
+					}
+				}
+
+				if (TEST_FLAG(unit_definition_get(unit->definition_index)->unit.flags, _unit_integrated_light_controls_weapon_directly_bit))
+				{
+					weapon_set_integrated_light_power(unit_get_current_weapon_index(unit_index), unit->unit.integrated_light_power);
+				}
+
+				if (TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_reload_bit))
+				{
+					SET_FLAG(flags, 3, TRUE);
+				}
+				if (unit_animation_busy(&unit->unit.animation) && !time_remaining)
+				{
+					SET_FLAG(flags, 4, TRUE);
+				}
+				if (unit->object.type==_object_type_biped && ((struct biped_datum *)unit)->biped.player_melee_ticks > 0)
+				{
+					SET_FLAG(flags, 4, TRUE);
+				}
+				if (unit->unit.current_zoom_level!=NONE)
+				{
+					SET_FLAG(flags, 6, TRUE);
+				}
+			}
+			else
+			{
+				SET_FLAG(flags, 5, TRUE);
+			}
+
+			weapon_owner_update(unit_get_current_weapon_index(unit_index), flags, primary_trigger);
+		}
 	}
 
-	if (unit->unit.current_weapon_index!=NONE)
-	{
-		long flags = 0;
-		real primary_trigger = unit->unit.primary_trigger;
-
-		if (unit->unit.current_weapon_index==unit->unit.desired_weapon_index)
-		{
-			boolean const time_remaining = unit->unit.persistent_control_timer>0 && TEST_FLAG(unit->unit.persistent_control_flags, 11);
-
-			if (!jetpack_cheat_active)
-			{
-				if (allow_integrated_lights && TEST_FLAG(unit->unit.control_flags, _unit_control_integrated_light_bit))
-				{
-					SET_FLAG(flags, 0, TRUE);
-				}
-				if (TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit))
-				{
-					SET_FLAG(flags, 1, TRUE);
-				}
-				if (TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_secondary_trigger_bit))
-				{
-					SET_FLAG(flags, 2, TRUE);
-				}
-			}
-
-			if (TEST_FLAG(unit_definition_get(unit->definition_index)->unit.flags, _unit_integrated_light_controls_weapon_directly_bit))
-			{
-				weapon_set_integrated_light_power(unit_get_current_weapon_index(unit_index), unit->unit.integrated_light_power);
-			}
-
-			if (TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_reload_bit))
-			{
-				SET_FLAG(flags, 3, TRUE);
-			}
-			if (unit_animation_busy(&unit->unit.animation) && !time_remaining)
-			{
-				SET_FLAG(flags, 4, TRUE);
-			}
-			if (unit->object.type==_object_type_biped && ((struct biped_datum *)unit)->biped.player_melee_ticks > 0)
-			{
-				SET_FLAG(flags, 4, TRUE);
-			}
-			if (unit->unit.current_zoom_level!=NONE)
-			{
-				SET_FLAG(flags, 6, TRUE);
-			}
-		}
-		else
-		{
-			SET_FLAG(flags, 5, TRUE);
-		}
-
-		weapon_owner_update(unit_get_current_weapon_index(unit_index), flags, primary_trigger);
-	}
 
 	match_assert_valid_real_vector3d_axes2("c:\\halo\\SOURCE\\units\\units.c", 1155, &unit->object.forward, &unit->object.up);
 	match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\units\\units.c", 1156, &unit->unit.aiming_vector);
