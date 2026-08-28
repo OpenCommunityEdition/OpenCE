@@ -508,7 +508,7 @@ void item_accelerate(
 	{
 		real acceleration_magnitude = magnitude3d(acceleration);
 		real_vector3d rotation_axis;
-		real rotation_magnitude;
+		double rotation_magnitude;
 
 		if (acceleration_magnitude < 0.0001f)
 		{
@@ -527,7 +527,7 @@ void item_accelerate(
 		rotation_magnitude =
 			real_seed_random(get_global_random_seed_address()) *
 			acceleration_magnitude * 1.5707964f;
-		scale_vector3d(&rotation_axis, rotation_magnitude, &rotation_axis);
+		scale_vector3d(&rotation_axis, (real)rotation_magnitude, &rotation_axis);
 		add_vectors3d(
 			&item->object.angular_velocity,
 			&rotation_axis,

@@ -23,13 +23,17 @@ _ap = argparse.ArgumentParser()
 _ap.add_argument('--unit', default='source/units/units')
 _ap.add_argument('functions', nargs='*')
 _ap.add_argument('-v', action='store_true')
+_ap.add_argument(
+    '--base',
+    help='override the candidate object path (default build/base/<unit>.obj); '
+         'lets a gate.py --edits probe be walked without a rebuild')
 _ap.add_argument('--max-events', type=int, default=40,
                 help='cap on printed events (0 = all). A low cap can hide a '
                      'systematic cause: render_actor looks like 3953 unrelated '
                      'events but is one frame-layout difference repeated.')
 _ARGS = _ap.parse_args()
 t_obj = cc.load(open(f'build/split/{_ARGS.unit}.obj', 'rb').read())
-b_obj = cc.load(open(f'build/base/{_ARGS.unit}.obj', 'rb').read())
+b_obj = cc.load(open(_ARGS.base or f'build/base/{_ARGS.unit}.obj', 'rb').read())
 
 REGS = ['eax', 'ecx', 'edx', 'ebx', 'esi', 'edi']
 SUB = {'al': 'eax', 'ah': 'eax', 'ax': 'eax', 'cl': 'ecx', 'ch': 'ecx', 'cx': 'ecx',
