@@ -103,6 +103,7 @@ symbols in this file:
 #include "sound/game_sound.h"
 #include "sound/sound_definitions.h"
 #include "sound/sound_manager.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
@@ -274,6 +275,47 @@ void unattached_looping_sound_stop(
 		looping_sound_index);
 
 	SET_FLAG(looping_sound->flags, _game_looping_sound_unattached_stop_bit, TRUE);
+
+	return;
+}
+
+long unattached_looping_sound_start(
+	long definition_index,
+	long period,
+	real scale)
+{
+	long looping_sound_index;
+	struct game_looping_sound_datum *looping_sound;
+
+	looping_sound_definition_get(definition_index);
+	looping_sound_index = game_looping_sound_new(
+		period,
+		definition_index,
+		"",
+		NONE);
+	if (looping_sound_index != NONE)
+	{
+		looping_sound = datum_get(
+			game_looping_sound_data,
+			looping_sound_index);
+		SET_FLAG(looping_sound->flags, 0, TRUE);
+		looping_sound->scale = scale;
+	}
+
+	return looping_sound_index;
+}
+
+void game_sound_set_mouth_aperture(
+	long object_index,
+	real mouth_aperture)
+{
+	if (game_looping_sound_data->valid)
+	{
+		if (object_try_and_get_and_verify_type(object_index, _object_mask_unit))
+		{
+			unit_set_mouth_aperture(object_index, mouth_aperture);
+		}
+	}
 
 	return;
 }

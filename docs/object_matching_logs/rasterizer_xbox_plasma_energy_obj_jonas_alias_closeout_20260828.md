@@ -116,3 +116,9 @@ exception, or byte forcing was attempted. No assembly, `volatile`,
 `register`, pragma, intrinsic, barrier, raw address, pointer pun, undefined
 behavior, or synthetic owner was added. The completion is entirely the
 evidence-backed correction of five target symbol identities.
+
+During the subsequent motion-sensor alias integration, the five historical
+plasma entries in `config/semantic_matches.json` were removed. Their former
+anonymous target owners no longer exist after this wave's symbol correction,
+and all five wrappers now earn strict direct credit, so retaining the semantic
+aliases would be both redundant and stale.
