@@ -6750,26 +6750,27 @@ apply_alignment:
 		{
 		case _unit_damage_direction_back:
 			transformed_alignment = *alignment_vector;
-			code_0019ea70(unit_index, &transformed_alignment);
-			return;
+			break;
 
 		case _unit_damage_direction_front:
 			transformed_alignment.i = -alignment_vector->i;
 			transformed_alignment.j = -alignment_vector->j;
-			code_0019ea70(unit_index, &transformed_alignment);
-			return;
+			break;
 
 		case _unit_damage_direction_left:
 			transformed_alignment.i = -alignment_vector->j;
 			transformed_alignment.j = alignment_vector->i;
-			code_0019ea70(unit_index, &transformed_alignment);
-			return;
+			break;
 
 		case _unit_damage_direction_right:
+		{
+			real negated_i;
+
+			negated_i = -alignment_vector->i;
 			transformed_alignment.i = alignment_vector->j;
-			transformed_alignment.j = -alignment_vector->i;
-			code_0019ea70(unit_index, &transformed_alignment);
-			return;
+			transformed_alignment.j = negated_i;
+			break;
+		}
 
 		default:
 			display_assert(
@@ -6778,9 +6779,10 @@ apply_alignment:
 				4562,
 				TRUE);
 			system_exit(-1);
-			code_0019ea70(unit_index, &transformed_alignment);
-			return;
+			break;
 		}
+
+		code_0019ea70(unit_index, &transformed_alignment);
 	}
 
 	return;
@@ -7958,11 +7960,11 @@ static boolean unit_set_or_test_seat_and_weapon_label(
 
 		if (!seat_label || !_stricmp(seat_label, unit_seat->label))
 		{
-			long weapon_class_index;
+			short weapon_class_index;
 
 			for (weapon_class_index = 0; weapon_class_index<unit_seat->weapon_classes.count; ++weapon_class_index)
 			{
-				long weapon_type_index;
+				short weapon_type_index;
 
 				struct animation_graph_weapon_class *weapon_class = TAG_BLOCK_GET_ELEMENT(&unit_seat->weapon_classes, weapon_class_index, struct animation_graph_weapon_class);
 
@@ -7970,7 +7972,7 @@ static boolean unit_set_or_test_seat_and_weapon_label(
 				{
 					struct animation_graph_weapon_type *weapon_type = TAG_BLOCK_GET_ELEMENT(&weapon_class->weapon_types, weapon_type_index, struct animation_graph_weapon_type);
 					
-					if (*weapon_label=='\0' ||
+					if (!weapon_label ||
 						!strcmp(weapon_label, "unarmed") &&
 						weapon_type->label[0]=='\0'||
 						!_stricmp(weapon_label, weapon_type->label))
@@ -7981,7 +7983,7 @@ static boolean unit_set_or_test_seat_and_weapon_label(
 								unit_seat->animations.count <= 2 ?
 								NONE :
 								animation_graph_animation_index_get(&unit_seat->animations)[2].animation_index;
-							boolean showing_acceleration = TRUE;
+							boolean showing_acceleration;
 							
 							if (anim_2==NONE)
 							{
@@ -8000,9 +8002,12 @@ static boolean unit_set_or_test_seat_and_weapon_label(
 									if (anim_4==NONE)
 									{
 										showing_acceleration = FALSE;
+										goto acceleration_determined;
 									}
 								}
 							}
+							showing_acceleration = TRUE;
+							acceleration_determined:
 
 							if (unit->unit.animation.state!=_unit_state_user_animation)
 							{
@@ -8010,9 +8015,9 @@ static boolean unit_set_or_test_seat_and_weapon_label(
 							}
 
 							unit->unit.animation.seat_index = seat_index;
-							unit->unit.animation.weapon_type_index = weapon_type_index;
 							unit->unit.animation.base_seat_index = seat_label_to_base_seat_index(seat_label);
 							unit->unit.animation.weapon_index = weapon_class_index;
+							unit->unit.animation.weapon_type_index = weapon_type_index;
 
 							SET_FLAG(unit->unit.animation.flags, _unit_animation_showing_acceleration_bit, showing_acceleration);
 						}
@@ -8786,13 +8791,13 @@ void unit_cause_player_melee_damage(
 
 			do
 			{
-				real inner_component_i = cross.i * (real)inner_index;
+				double inner_component_i = cross.i * (real)inner_index;
 
 				ray.i = facing->i * 0.8f +
-					(inner_component_i + (real)outer_index * perpendicular.i) * 0.1f;
+					((real)inner_component_i + (real)outer_index * perpendicular.i) * 0.1f;
 				inner_component_i = cross.j * (real)inner_index;
 				ray.j = unit->unit.aiming_vector.j * 0.8f +
-					(inner_component_i + (real)outer_index * perpendicular.j) * 0.1f;
+					((real)inner_component_i + (real)outer_index * perpendicular.j) * 0.1f;
 				ray.k = unit->unit.aiming_vector.k * 0.8f +
 					((real)outer_index * perpendicular.k + (real)inner_index * cross.k) * 0.1f;
 
