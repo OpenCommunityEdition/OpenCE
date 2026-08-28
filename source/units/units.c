@@ -5366,9 +5366,9 @@ boolean unit_update(
 						long sound_index = unit->unit.current_zoom_level==NONE ? weapon_definition->weapon.zoom_out_sound.index : weapon_definition->weapon.zoom_in_sound.index;
 						real scale = 1.f;
 
-						if (unit->unit.current_zoom_level!=NONE && unit->unit.current_zoom_level>1)
+						if (unit->unit.current_zoom_level!=NONE && weapon_definition->weapon.zoom_level_count>1)
 						{
-							scale = (real)unit->unit.current_zoom_level/(real)(unit->unit.current_zoom_level-1);
+							scale = (real)unit->unit.current_zoom_level/(real)(weapon_definition->weapon.zoom_level_count-1);
 						}
 
 						if (sound_index!=NONE)
@@ -6247,8 +6247,8 @@ void code_001a0cf0(
 			if (!killed)
 			{
 				if (TEST_FLAG(
-					unit->object.functions_active_flags,
-					_unit_debug_function_active_bit))
+					unit->object.damage_flags,
+					_object_dead_bit))
 				{
 					apply_animation = FALSE;
 				}
@@ -7695,7 +7695,11 @@ static boolean unit_set_or_test_seat_and_weapon_label(
 										unit_seat->animations.count <= 4 ?
 										NONE :
 										animation_graph_animation_index_get(&unit_seat->animations)[4].animation_index;
-									showing_acceleration = FALSE;
+
+									if (anim_4==NONE)
+									{
+										showing_acceleration = FALSE;
+									}
 								}
 							}
 
@@ -7704,6 +7708,7 @@ static boolean unit_set_or_test_seat_and_weapon_label(
 								unit->unit.animation.state = NONE;
 							}
 
+							unit->unit.animation.seat_index = seat_index;
 							unit->unit.animation.weapon_type_index = weapon_type_index;
 							unit->unit.animation.base_seat_index = seat_label_to_base_seat_index(seat_label);
 							unit->unit.animation.weapon_index = weapon_class_index;
@@ -9312,8 +9317,8 @@ short unit_update_animation(
 
 	if (unit->object.parent_object_index==NONE &&
 		!TEST_FLAG(
-			unit->object.functions_active_flags,
-			_unit_debug_function_active_bit))
+			unit->object.damage_flags,
+			_object_dead_bit))
 	{
 		switch (unit->unit.animation.desired_state)
 		{
@@ -10490,14 +10495,8 @@ static void unit_throw_grenade_release(
 	boolean premature)
 {
 	real_vector3d initial_velocity;
-	real_point3d origin;
-	real_vector3d forward;
-	real_vector3d left;
-	real_vector3d up;
-	real_point3d new_grenade_origin;
-	real_point3d camera_position;
 
-	struct unit_datum* unit = unit_get(unit_index);
+	struct unit_datum *unit = unit_get(unit_index);
 	struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
 
 	if (unit->unit.grenade_throw_state==_unit_grenade_throw_in_hand)
@@ -10511,7 +10510,9 @@ static void unit_throw_grenade_release(
 			// Get new grenade origin from the actor
 			if (unit->unit.actor_index!=NONE)
 			{
-				object_get_origin(grenade_index, &origin);
+				real_point3d origin;
+
+				object_get_origin(unit->unit.grenade_object_index, &origin);
 				actor_aim_grenade(unit->unit.actor_index, &origin, &initial_velocity);
 			}
 			// Calculate the new position if unit is not an actor
@@ -10519,6 +10520,10 @@ static void unit_throw_grenade_release(
 			{
 				if (unit->unit.player_index!=NONE)
 				{
+					real_vector3d forward;
+					real_vector3d left;
+					real_vector3d up;
+					real_point3d camera_position;
 					struct game_globals_player_information* player_information = TAG_BLOCK_GET_ELEMENT(
 						&scenario_get_game_globals()->player_information,
 						0,
@@ -10573,11 +10578,15 @@ static void unit_throw_grenade_release(
 			unit->unit.grenade_throw_state = _unit_grenade_throw_ending;
 			unit->unit.grenade_object_index = NONE;
 
-			unit_get_camera_position(unit_index, &new_grenade_origin);
-			
-			if (!object_force_inside_bsp(grenade_index, &new_grenade_origin))
 			{
-				object_delete(grenade_index);
+				real_point3d new_grenade_origin;
+
+				unit_get_camera_position(unit_index, &new_grenade_origin);
+
+				if (!object_force_inside_bsp(grenade_index, &new_grenade_origin))
+				{
+					object_delete(grenade_index);
+				}
 			}
 		}
 		else
