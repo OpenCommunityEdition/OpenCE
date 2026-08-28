@@ -43,9 +43,10 @@ The strict whole-unit scratch gate reports:
 
 Everything else is strict-exact: 33 exact, 6 residual, 0 unwritten.
 `vehicle_update` advanced from the committed 704-byte / 51-relocation
-scaffold to exact target size and relocation count. Its normalized body still
-differs in 2,005 bytes, and its relocation address/destination sequences are not
-yet exact, so it receives no exact credit.
+scaffold to exact target size and relocation count. With relocation operands
+zeroed, its body differs from January in 1,458 byte positions, and its
+relocation address/destination sequences are not yet exact, so it receives no
+exact credit.
 
 The newer `code_001a7e60` source was also adopted. A lawful pair of explicit
 `real_vector2d` temporaries replaces the historical `.ij` union view and
@@ -107,14 +108,42 @@ owners/topology were restored.
 
 The Vehicles baseline was re-audited after the earlier 33/39 summary proved too
 shallow. The repository has 1,421 attached worktrees containing
-`source/units/vehicles.c`, but only ten unique source hashes. The current ledger
-is a superset of the older `claude-finish-hs`, `claude-near-complete`, and
-`work/libcmt-stream` ledgers. The furthest historical verified result remains
-**34/39 exact, 9,776/17,232 target text bytes (56.7%)** at `5a0a12c4`; the
-current policy-compliant result remains **33/39 exact, 9,008/17,232 (52.3%)**.
-The sole lost exact owner is `_code_001a6290`, whose historical source requires
-the prohibited `.ij` union overlay. This distinction must accompany future
-Vehicles status reports.
+`source/units/vehicles.c`: 29 Claude-named trees and 1,392 other trees, but only
+ten unique working-source hashes. The repository history adds 65 commits that
+touch Vehicles. Across 1,383 refs, 1,369 tips contain the source and collapse to
+only eight tip blobs; the 14 refs carrying a Vehicles ledger collapse to five
+ledger blobs. The current ledger is a strict superset of the older
+`claude-finish-hs`, `claude-near-complete`, and `work/libcmt-stream` ledgers.
+
+A separate read-only build-artifact census indexed 1,995 non-Claude
+`vehicles.obj` files. It found 1,028 base-side objects (963 byte-identical copies
+of the January target), 1,019 tiny legacy/stub objects, only nine full candidate
+shapes, and three tiny test objects. Seven independently preserved full
+artifacts reproduce the historical 34/39 result:
+
+- `work/game-engine-20`;
+- `work/cluster-partitions-admission`;
+- `work/point-physics-regression-baseline`;
+- `work/hashtable-admission-audit-20260811`;
+- `work/upstream-point-physics-integration`;
+- `work/cluster-partitions-admission-baseline`;
+- `work/upstream-collision-features-integration`.
+
+All seven use source blob `bbd210ec7c232f0f6deb758aed48e151a4a6946d`
+and ledger blob `f728ddb68effaeb177eb631b8020a6afe2b06149`.
+The furthest historical verified result therefore remains **34/39 exact,
+9,776/17,232 target text bytes (56.7%)** at `5a0a12c4`; the current
+policy-compliant result remains **33/39 exact, 9,008/17,232 (52.3%)**. The sole
+lost exact owner is `_code_001a6290`, whose historical source requires the
+prohibited `.ij` union overlay. This distinction must accompany future Vehicles
+status reports.
+
+`work/campaign-integration` preserves one additional hybrid artifact: source
+SHA-256 `2d13229e...`, base-object SHA-256 `e4b36179...`, 34/39 exact. It combines
+the prohibited exact `_code_001a6290` with the full 2,320-byte / 98-relocation
+`_vehicle_update`. The latter is byte-identical to the current reconstruction,
+so the hybrid contains no unintegrated `vehicle_update` progress. It was read
+only and was not admitted.
 
 Claude's live session was inspected read-only, including its transcript,
 `MEMORY.md`, `units-package-frozen-packet.md`, active `work/halo-exact` lane,
@@ -151,6 +180,52 @@ steering/upending shapes are measured negatives and should not be repeated.
 The remaining `vehicle_update` differences are now concentrated in three x87
 operand-selection pairs, the upending clamp/tick scheduler tie, jump-table
 representation, and padding/relocation placement.
+
+### Current residual distances
+
+Distances below compare relocation-zeroed owner bytes against January. Exact
+relocation counts alone do not make an owner exact; destination identity and
+relocation addresses remain part of the strict gate.
+
+| owner | candidate bytes / relocations | differing byte positions | relocation sequence |
+|---|---:|---:|---|
+| `_code_001a5e50` | 1,088 / 32 | 22 | destinations and addresses exact |
+| `_code_001a6290` | 752 / 22 | 550 | destinations exact; addresses residual |
+| `_code_001a6910` | 656 / 22 | 8 | destinations and addresses exact |
+| `_code_001a7ac0` | 928 / 34 | 752 | destinations and addresses residual |
+| `_code_001a7e60` | 2,464 / 91 | 1,354 | destinations exact; addresses residual |
+| `_vehicle_update` | 2,320 / 98 | 1,458 | destinations and addresses residual |
+
+### Frozen lawful residual wave (2026-08-27)
+
+All edits in this wave were compiled only through `tools/campaign/gate.py` into
+untracked `scratch/` objects. Claude's active trees remained strictly read only.
+No candidate below displaced the production source:
+
+- Three source-level attempts to reproduce January's duplicated upending
+  load/increment/store scheduler all reduced `_vehicle_update` to 2,304 bytes
+  and 97 relocations. A terminal-local variant also collapsed to an integer
+  self-copy and was rejected.
+- Passing direct typed cross-product inputs either reproduced the current
+  1,458-byte distance or worsened it to 1,470. A caller-local cross-product
+  shape worsened it to 1,469.
+- For `_code_001a7e60`, the only genuinely untried scalar control combined a
+  pre-negated `rate_forward` with `pd_b` formed before `pd_a`. It improved that
+  isolated 2,432-byte packet from 2,042 to 2,021 differing positions, but the
+  packet remained 32 bytes short and substantially worse than the current
+  2,464-byte / 1,354-distance source. Combining it with the current lawful body
+  produced 2,416 bytes / 91 relocations / 1,599 differing positions. Direct
+  vector inputs produced 2,448 / 91 / 1,592. All were rejected.
+- A by-value `real_vector3d` projection helper made `_code_001a6290` 768 bytes
+  with 22 relocations and reduced its distance from 550 to 497, but VC7 also
+  emitted an unmatched 32-byte `_vehicle_horizontal_velocity` code owner. That
+  violates strict object topology and the no-invented-symbol rule. A two-scalar
+  helper collapsed the caller back to the current 752-byte / 550-distance form
+  while still emitting the extra owner. Both were rejected.
+
+The result of this wave is therefore documentation and a corrected source
+comment, not a byte-code admission. The production Vehicles object remains the
+lawful 33/39 checkpoint.
 
 ---
 

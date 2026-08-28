@@ -2463,11 +2463,10 @@ static void code_001a8800(
 	return;
 }
 
-/* NOTE: incomplete. This is scaffolding, not a reconstruction -- January's
-vehicle_update is 2320 bytes. It exists so the file-static _code_* helpers it
-calls are emitted at all: MSVC discards an unreferenced static, and the register
-convention it gives them is chosen from their call sites. With this caller in
-place each static can be reconstructed and gated on its own. */
+/* Full semantic reconstruction. January's vehicle_update is 2320 bytes; this
+body has the same padded size and 98 relocations. The remaining residual is
+instruction scheduling, branch layout, and relocation placement. Keep the
+file-static call topology intact while closing it. */
 
 boolean vehicle_update(
 	long vehicle_index)
