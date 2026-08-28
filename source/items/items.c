@@ -66,8 +66,11 @@ symbols in this file:
 #include "game/game.h"
 #include "effects/effects.h"
 #include "game/players.h"
+#include "game/game_engine.h"
 #include "items/item_definitions.h"
 #include "items.h"
+#include "physics/collision_bsp_definitions.h"
+#include "physics/collision_usage.h"
 #include "scenario/scenario.h"
 #include "units/units.h"
 #undef object_get_type
@@ -265,6 +268,36 @@ void item_detonate(
 
 /* ---------- private code */
 
+static void code_000e6370(
+	long item_index)
+{
+	struct item_datum *item = item_get(item_index);
+	real angular_velocity_magnitude = magnitude3d(&item->object.angular_velocity);
+
+	if (angular_velocity_magnitude != 0.f)
+	{
+		item->item.flags |= FLAG(_item_has_nonzero_angular_velocity_bit);
+		if (!TEST_FLAG(item->object.flags, _object_at_rest_bit))
+		{
+			scale_vector3d(
+				&item->object.angular_velocity,
+				1.f / angular_velocity_magnitude,
+				&item->item.rotation_axis);
+		}
+
+		item->item.rotation_sine = sine(angular_velocity_magnitude);
+		item->item.rotation_cosine = cosine(angular_velocity_magnitude);
+	}
+	else
+	{
+		item->item.flags &= ~FLAG(_item_has_nonzero_angular_velocity_bit);
+		item->item.rotation_sine = 0.f;
+		item->item.rotation_cosine = 1.f;
+	}
+
+	return;
+}
+
 boolean valid_real_vector3d_axes3(
 	real_vector3d const *forward,
 	real_vector3d const *left,
@@ -286,4 +319,152 @@ boolean valid_real_matrix4x3(
 		valid_real(matrix->scale) &&
 		valid_real_vector3d_axes3(&matrix->forward, &matrix->left, &matrix->up) &&
 		valid_real_point3d(&matrix->position);
+}
+
+void item_accelerate(
+	long item_index,
+	real_vector3d const *acceleration,
+	boolean detonates_explosives)
+{
+	struct item_datum *item = item_get(item_index);
+	struct item_definition *definition = item_definition_get(item->definition_index);
+
+	if (TEST_FLAG(item->item.flags, _item_does_not_accelerate_bit))
+	{
+		return;
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\items\\items.c",
+		536,
+		global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
+	global_current_collision_users[global_current_collision_user_depth++] =
+		_collision_user_items;
+
+	if (item->object.parent_object_index == NONE)
+	{
+	if (detonates_explosives &&
+		!game_engine_running() &&
+		TEST_FLAG(definition->item.flags, 1))
+	{
+		item_detonate(item_index);
+	}
+
+	if (TEST_FLAG(item->item.flags, _item_on_structure_bit))
+	{
+		if (!(magnitude_squared3d(acceleration) < 0.0001f))
+		{
+			struct object_marker marker;
+
+			if (object_get_marker_by_name(item_index, "ground point", &marker, 1))
+			{
+				struct collision_bsp *collision_bsp;
+				struct collision_surface const *surface;
+				real_point3d new_position;
+				real_plane3d plane;
+				real distance_above;
+
+				collision_bsp = global_collision_bsp_get();
+				surface = TAG_BLOCK_GET_ELEMENT(
+					&collision_bsp->surfaces,
+					item->item.rested_surface_index,
+					struct collision_surface);
+				bsp3d_get_plane_from_designator(
+					&collision_bsp->bsp3d,
+					surface->plane_designator,
+					&plane);
+
+				distance_above =
+					0.05f - (plane3d_distance_to_point(&plane, &marker.matrix.position));
+				point_from_line3d(
+					&marker.matrix.position,
+					&plane.n,
+					distance_above,
+					&new_position);
+				object_translate(item_index, &new_position, NULL);
+			}
+
+			item->object.flags &= ~FLAG(_object_at_rest_bit);
+			item->item.flags &= ~FLAG(_item_on_structure_bit);
+		}
+	}
+	else
+	{
+		item->object.flags &= ~FLAG(_object_at_rest_bit);
+	}
+
+	add_vectors3d(
+		&item->object.translational_velocity,
+		acceleration,
+		&item->object.translational_velocity);
+
+	if (item->item.ignore_object_index == NONE &&
+		TEST_FLAG(item->item.flags, _item_on_structure_bit) &&
+		magnitude_squared3d(acceleration) < 0.0001f)
+	{
+		struct object_marker marker;
+		real_vector3d rotation_axis;
+		real_vector3d scaled_rotation_axis;
+		real rotation_magnitude;
+
+		if (object_get_marker_by_name(item_index, "ground point", &marker, 1))
+		{
+			rotation_axis = marker.matrix.up;
+		}
+		else
+		{
+			rotation_axis = *global_up3d;
+		}
+
+		rotation_magnitude = real_random_range(-1.5707964f, 1.5707964f);
+		scale_vector3d(
+			&rotation_axis,
+			rotation_magnitude,
+			&scaled_rotation_axis);
+		add_vectors3d(
+			&item->object.angular_velocity,
+			&scaled_rotation_axis,
+			&item->object.angular_velocity);
+	}
+	else
+	{
+		real acceleration_magnitude = magnitude3d(acceleration);
+		real_vector3d rotation_axis;
+		real rotation_magnitude;
+
+		if (acceleration_magnitude < 0.0001f)
+		{
+			acceleration_magnitude =
+				real_seed_random(get_global_random_seed_address());
+		}
+
+		cross_product3d(global_up3d, acceleration, &rotation_axis);
+		if (!(normalize3d(&rotation_axis) > 0.f))
+		{
+			seed_random_direction3d(
+				get_global_random_seed_address(),
+				&rotation_axis);
+		}
+
+		rotation_magnitude =
+			real_seed_random(get_global_random_seed_address()) *
+			acceleration_magnitude * 1.5707964f;
+		scale_vector3d(&rotation_axis, rotation_magnitude, &rotation_axis);
+		add_vectors3d(
+			&item->object.angular_velocity,
+			&rotation_axis,
+			&item->object.angular_velocity);
+	}
+
+	code_000e6370(item_index);
+	object_set_garbage(item_index, FALSE);
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\items\\items.c",
+		651,
+		global_current_collision_user_depth > 1);
+	--global_current_collision_user_depth;
+
+	return;
 }
