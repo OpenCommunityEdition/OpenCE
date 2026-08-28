@@ -546,10 +546,14 @@ symbols in this file:
 
 #include "ai.h"
 #include "ai_debug.h"
+#include "actors.h"
 #include "main/console.h"
 #include "memory/data.h"
+#include "props.h"
+#include "saved games/game_state.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
@@ -632,6 +636,25 @@ struct scenario_conversation_definition_view
 	byte __unknown20[0x54];
 };
 
+struct dialogue_event_status
+{
+	long last_time_spoken;
+	long disable_until_time;
+};
+
+struct ai_communication_globals_view
+{
+	byte __unknown00[0x10];
+	boolean dialogue_triggers_enabled;
+	byte __unknown11[3];
+	long last_chatter_time[2];
+	long last_talk_time[2];
+	long last_shout_time[2];
+	short recent_conversation_count;
+	short recent_conversation_next_index;
+	byte recent_conversations[0x100];
+};
+
 typedef char ai_conversation_datum_header_size_assert[
 	sizeof(struct ai_conversation_datum_header) == 0x14 ? 1 : -1];
 typedef char ai_conversation_datum_header_any_line_spoken_offset_assert[
@@ -687,6 +710,9 @@ boolean code_000316a0(
 	long reply_actor_index);
 boolean actor_is_fighting(
 	long actor_index);
+
+extern short global_communication_table_indices[NUMBER_OF_COMMUNICATION_TYPES];
+extern struct ai_communication_globals_view *ai_globals;
 
 /* ---------- globals */
 
@@ -1208,11 +1234,148 @@ char const *global_communication_type_names[NUMBER_OF_COMMUNICATION_TYPES] =
 	"postcombat_celebrate",
 };
 
+short global_dialogue_event_count = 0;
+struct dialogue_event_status *global_dialogue_events = NULL;
+short global_reply_event_count = 0;
+struct dialogue_event_status *global_reply_events = NULL;
+
 /* ---------- public code */
+
+void ai_communication_initialize(
+	void)
+{
+	struct dialogue_usage const *dialogue;
+	struct reply_usage const *reply;
+	short *communication_table_index;
+	short communication_type;
+	short communication_type_index;
+	short dialogue_index;
+
+	global_dialogue_event_count = 0;
+	dialogue = global_dialogue_table;
+	do
+	{
+		dialogue++;
+		global_dialogue_event_count++;
+	}
+	while (dialogue->communication_type != NONE);
+
+	if (global_dialogue_events == NULL)
+	{
+		global_dialogue_events = (struct dialogue_event_status *)game_state_malloc(
+			"ai communication dialogue",
+			NULL,
+			16 * global_dialogue_event_count);
+		match_vassert(
+			"c:\\halo\\SOURCE\\ai\\ai_communication.c",
+			0x286,
+			global_dialogue_events,
+			"ai_communication_initialize: unable to allocate comm dialogue status table");
+	}
+
+	global_reply_event_count = 0;
+	reply = global_reply_table;
+	do
+	{
+		reply++;
+		global_reply_event_count++;
+	}
+	while (reply->original_vocalization_type != NONE);
+
+	if (global_reply_events == NULL)
+	{
+		global_reply_events = (struct dialogue_event_status *)game_state_malloc(
+			"ai communication replies",
+			NULL,
+			16 * global_reply_event_count);
+		match_vassert(
+			"c:\\halo\\SOURCE\\ai\\ai_communication.c",
+			0x293,
+			global_reply_events,
+			"ai_communication_initialize: unable to allocate comm reply status table");
+	}
+
+	communication_type_index = 0;
+	communication_table_index = global_communication_table_indices;
+	while (communication_type_index < NUMBER_OF_COMMUNICATION_TYPES)
+	{
+		dialogue_index = 0;
+		*communication_table_index = NONE;
+		dialogue = global_dialogue_table;
+		communication_type = 0;
+
+		while (communication_type != NONE)
+		{
+			if (communication_type == communication_type_index)
+			{
+				*communication_table_index = dialogue_index;
+				break;
+			}
+
+			dialogue++;
+			communication_type = dialogue->communication_type;
+			dialogue_index++;
+		}
+
+		communication_type_index++;
+		communication_table_index++;
+	}
+
+	conversation_data = game_state_data_new("ai conversation", 8, 100);
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\ai_communication.c",
+		0x2A8,
+		conversation_data);
+	return;
+}
 
 void ai_communication_dispose(
 	void)
 {
+	return;
+}
+
+void ai_communication_initialize_for_new_map(
+	void)
+{
+	short event_index;
+
+	ai_globals->dialogue_triggers_enabled = TRUE;
+	csmemset(ai_globals->last_chatter_time, 0, sizeof(ai_globals->last_chatter_time));
+	csmemset(ai_globals->last_talk_time, 0, sizeof(ai_globals->last_talk_time));
+	csmemset(ai_globals->last_shout_time, 0, sizeof(ai_globals->last_shout_time));
+
+	event_index = 0;
+	if (((long)global_dialogue_event_count << 1) > 0)
+	{
+		do
+		{
+			global_dialogue_events[event_index].disable_until_time = NONE;
+			global_dialogue_events[event_index].last_time_spoken = NONE;
+			event_index = (short)(event_index + 1);
+		}
+		while ((long)event_index < (long)global_dialogue_event_count << 1);
+	}
+
+	event_index = 0;
+	if (((long)global_reply_event_count << 1) > 0)
+	{
+		do
+		{
+			global_reply_events[event_index].disable_until_time = NONE;
+			global_reply_events[event_index].last_time_spoken = NONE;
+			event_index = (short)(event_index + 1);
+		}
+		while ((long)event_index < (long)global_reply_event_count << 1);
+	}
+
+	ai_globals->recent_conversation_count = 0;
+	ai_globals->recent_conversation_next_index = 0;
+	csmemset(
+		ai_globals->recent_conversations,
+		0,
+		sizeof(ai_globals->recent_conversations));
+	data_make_valid(conversation_data);
 	return;
 }
 
@@ -1269,12 +1432,102 @@ short ai_communication_get_type_by_name(
 	return communication_type;
 }
 
+boolean code_000314c0(
+	long original_unit_index,
+	struct ai_information_packet *communication,
+	long reply_actor_index)
+{
+	struct unit_datum *original_unit;
+	struct actor_datum *original_actor;
+	struct actor_datum *reply_actor;
+	long original_actor_index;
+	boolean result;
+
+	result = FALSE;
+	if (code_00031390(
+		original_unit_index,
+		communication,
+		reply_actor_index))
+	{
+		original_unit = unit_get(original_unit_index);
+		original_actor_index = original_unit->unit.actor_index;
+		if (original_actor_index != NONE && reply_actor_index != NONE)
+		{
+			original_actor = actor_get(original_actor_index);
+			reply_actor = actor_get(reply_actor_index);
+			result = original_actor->meta.encounter_index != NONE &&
+				original_actor->meta.encounter_index == reply_actor->meta.encounter_index &&
+				original_actor->meta.platoon_index == reply_actor->meta.platoon_index;
+		}
+	}
+
+	return result;
+}
+
 boolean code_00031550(
 	long original_unit_index,
 	struct ai_information_packet *communication,
 	long reply_actor_index)
 {
 	return actor_is_fighting(reply_actor_index);
+}
+
+boolean code_00031570(
+	long original_unit_index,
+	struct ai_information_packet *communication,
+	long reply_actor_index)
+{
+	boolean result;
+
+	result = FALSE;
+	if (code_00031390(
+		original_unit_index,
+		communication,
+		reply_actor_index) &&
+		actor_is_fighting(reply_actor_index))
+	{
+		result = TRUE;
+	}
+
+	return result;
+}
+
+boolean code_000315b0(
+	long original_unit_index,
+	struct ai_information_packet *communication,
+	long reply_actor_index)
+{
+	struct unit_datum *original_unit;
+	struct actor_datum *original_actor;
+	struct actor_datum *reply_actor;
+	struct prop_datum *original_prop;
+	struct prop_datum *reply_prop;
+	long original_actor_index;
+	boolean result;
+
+	result = FALSE;
+	if (code_00031390(
+		original_unit_index,
+		communication,
+		reply_actor_index))
+	{
+		original_unit = unit_get(original_unit_index);
+		original_actor_index = original_unit->unit.actor_index;
+		if (original_actor_index != NONE && reply_actor_index != NONE)
+		{
+			original_actor = actor_get(original_actor_index);
+			reply_actor = actor_get(reply_actor_index);
+			if (original_actor->target.target_prop_index != NONE &&
+				reply_actor->target.target_prop_index != NONE)
+			{
+				original_prop = prop_get(original_actor->target.target_prop_index);
+				reply_prop = prop_get(reply_actor->target.target_prop_index);
+				result = original_prop->unit_index == reply_prop->unit_index;
+			}
+		}
+	}
+
+	return result;
 }
 
 short ai_conversation_line(
