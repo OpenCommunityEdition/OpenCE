@@ -142,8 +142,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define set_real_quaternion vehicles_set_real_quaternion_inline
 #include "cseries/cseries.h"
 #include "units/vehicles.h"
+#undef set_real_quaternion
 
 /* ---------- constants */
 
@@ -199,4 +201,19 @@ boolean vehicle_parse_update(
 	void)
 {
 	return TRUE;
+}
+
+real_quaternion *set_real_quaternion(
+	real_quaternion *quaternion,
+	real i,
+	real j,
+	real k,
+	real w)
+{
+	quaternion->v.i = i;
+	quaternion->v.j = j;
+	quaternion->v.k = k;
+	quaternion->w = w;
+
+	return quaternion;
 }
