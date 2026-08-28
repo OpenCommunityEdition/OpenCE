@@ -145,15 +145,102 @@ symbols in this file:
 #define set_real_quaternion vehicles_set_real_quaternion_inline
 #include "cseries/cseries.h"
 #include "units/vehicles.h"
+#include "units/vehicle_definitions.h"
+#include "scenario/scenario_definitions.h"
 #undef set_real_quaternion
 
 /* ---------- constants */
+
+enum
+{
+	_vehicle_hovering_bit = 1,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct scenario_object_permutation
+{
+	unsigned long change_colors[4];
+	byte region_permutations[8];
+	unsigned long unused[2];
+};
+
+struct scenario_unit_datum
+{
+	real body_vitality;
+	unsigned long flags;
+	unsigned long unused[2];
+};
+
+struct scenario_vehicle_datum
+{
+	struct scenario_object_datum object;
+	struct scenario_object_permutation permutation;
+	struct scenario_unit_datum unit;
+	byte multiplayer_team_index;
+	byte unused_byte;
+	word multiplayer_spawn_flags;
+	long unused[7];
+};
+
+struct vehicle_definition
+{
+	struct unit_definition unit;
+	unsigned long flags;
+};
+
+struct _vehicle_runtime_data
+{
+	word flags;
+	short stop_time;
+	byte airborne_ticks;
+	byte upending_type;
+	byte upending_ticks;
+	byte on_ground_ticks;
+	real speed;
+	real slide;
+	real turn;
+	real wheel;
+	real left_tread;
+	real right_tread;
+	real hover;
+	real thrust;
+	byte suspension[8];
+	real_point3d hover_position;
+};
+
+struct vehicle_runtime_datum
+{
+	struct unit_datum unit;
+	struct _vehicle_runtime_data vehicle;
+};
+
+typedef char scenario_object_permutation_size_assert[
+	sizeof(struct scenario_object_permutation) == 0x20 ? 1 : -1];
+typedef char scenario_unit_datum_size_assert[
+	sizeof(struct scenario_unit_datum) == 0x10 ? 1 : -1];
+typedef char scenario_vehicle_datum_size_assert[
+	sizeof(struct scenario_vehicle_datum) == 0x78 ? 1 : -1];
+typedef char scenario_vehicle_permutation_offset_assert[
+	offsetof(struct scenario_vehicle_datum, permutation) == 0x28 ? 1 : -1];
+typedef char scenario_vehicle_unit_offset_assert[
+	offsetof(struct scenario_vehicle_datum, unit) == 0x48 ? 1 : -1];
+typedef char vehicle_definition_flags_offset_assert[
+	offsetof(struct vehicle_definition, flags) == 0x2F0 ? 1 : -1];
+typedef char vehicle_unit_datum_size_assert[
+	sizeof(struct unit_datum) == 0x424 ? 1 : -1];
+typedef char vehicle_runtime_flags_offset_assert[
+	offsetof(struct vehicle_runtime_datum, vehicle.flags) == 0x424 ? 1 : -1];
+typedef char vehicle_runtime_hover_position_offset_assert[
+	offsetof(struct vehicle_runtime_datum, vehicle.hover_position) == 0x454 ? 1 : -1];
+
 /* ---------- prototypes */
+
+void unit_place(
+	long unit_index,
+	struct scenario_unit_datum *scenario_unit);
 
 /* ---------- globals */
 
@@ -190,6 +277,75 @@ void vehicle_delete(
 }
 
 /* ---------- private code */
+
+void vehicle_place(
+	long vehicle_index,
+	struct scenario_vehicle_datum *scenario_vehicle)
+{
+	unit_place(
+		vehicle_index,
+		&scenario_vehicle->unit);
+	object_add_scenario_permutation(
+		vehicle_index,
+		&scenario_vehicle->permutation);
+
+	return;
+}
+
+boolean vehicle_causes_collision_damage(
+	long vehicle_index)
+{
+	struct unit_datum *vehicle;
+	struct vehicle_definition *definition;
+
+	vehicle = vehicle_get(vehicle_index);
+	definition = vehicle_specific_definition_get(vehicle->definition_index);
+
+	return TEST_FLAG(
+		definition->flags,
+		_vehicle_causes_collision_damage_bit);
+}
+
+boolean vehicle_is_flipped(
+	long vehicle_index)
+{
+	struct unit_datum *vehicle;
+
+	vehicle = vehicle_get(vehicle_index);
+
+	return vehicle->object.up.k < 0.2f;
+}
+
+void vehicle_hover(
+	long vehicle_index,
+	boolean hover)
+{
+	if (vehicle_index != NONE)
+	{
+		struct vehicle_runtime_datum *vehicle;
+
+		vehicle = vehicle_runtime_get(vehicle_index);
+		if (hover)
+		{
+			object_get_origin(
+				vehicle_index,
+				&vehicle->vehicle.hover_position);
+			SET_FLAG(
+				vehicle->vehicle.flags,
+				_vehicle_hovering_bit,
+				TRUE);
+		}
+		else
+		{
+			SET_FLAG(
+				vehicle->vehicle.flags,
+				_vehicle_hovering_bit,
+				FALSE);
+		}
+	}
+
+	return;
+}
 
 boolean vehicle_build_update(
 	void)
