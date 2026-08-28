@@ -11158,6 +11158,7 @@ static void unit_throw_grenade_release(
 					real_vector3d left;
 					real_vector3d up;
 					real_point3d camera_position;
+					double origin_scale;
 					struct game_globals_player_information* player_information = TAG_BLOCK_GET_ELEMENT(
 						&scenario_get_game_globals()->player_information,
 						0,
@@ -11173,9 +11174,12 @@ static void unit_throw_grenade_release(
 					normalize3d(cross_product3d(&forward, &up, &left));
 					
 					unit_get_camera_position(unit_index, &camera_position);
-					point_from_line3d(&camera_position, &forward, player_information->grenade_origin.i, &camera_position);
-					point_from_line3d(&camera_position, &up, player_information->grenade_origin.j, &camera_position);
-					point_from_line3d(&camera_position, &left, player_information->grenade_origin.k, &camera_position);
+					origin_scale = player_information->grenade_origin.i;
+					point_from_line3d(&camera_position, &forward, (real)origin_scale, &camera_position);
+					origin_scale = player_information->grenade_origin.j;
+					point_from_line3d(&camera_position, &up, (real)origin_scale, &camera_position);
+					origin_scale = player_information->grenade_origin.k;
+					point_from_line3d(&camera_position, &left, (real)origin_scale, &camera_position);
 					
 					object_translate(grenade_index, &camera_position, NULL);
 				}
