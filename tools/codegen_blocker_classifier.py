@@ -15,13 +15,28 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from .coff_compare import (
-	CoffError,
-	load,
-	relocation_infos_equal,
-	section_info,
-	section_infos_equal,
-)
+try:
+	from .coff_compare import (
+		CoffError,
+		load,
+		relocation_infos_equal,
+		section_info,
+		section_infos_equal,
+	)
+	from . import coff_compare as _coff_compare
+except ImportError:
+	# Script invocation: python tools/codegen_blocker_classifier.py
+	import os
+	import sys
+	sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+	from coff_compare import (
+		CoffError,
+		load,
+		relocation_infos_equal,
+		section_info,
+		section_infos_equal,
+	)
+	import coff_compare as _coff_compare
 
 
 VERSION = 1
@@ -449,6 +464,77 @@ def _classify_scheduling_tie(target, candidate, metadata):
 		"No measured legal-C control moved an independent scheduling tie; keep parked.")
 
 
+_DECIMAL_IMMEDIATE_RE = re.compile(r"\$(-?)(\d+)\b")
+_DECIMAL_DISPLACEMENT_RE = re.compile(r"(^|[\s,])(-?)(\d+)\(")
+_PAREN_SPACE_RE = re.compile(r"\(([^)]*)\)")
+
+
+def _llvm_style_operands(operands):
+	"""Rewrite capstone AT&T operands into llvm-objdump conventions.
+
+	The measured rule signatures were written against llvm-objdump output:
+	hex immediates and displacements (``$0x10``, ``0x8(%ebp)``) and no spaces
+	inside SIB expressions (``(%eax,%ebx,8)``).  capstone prints decimal and
+	spaced forms.  Only the spelling is changed; SIB scales stay decimal in
+	both producers.
+	"""
+	operands = _PAREN_SPACE_RE.sub(
+		lambda match: "(" + match.group(1).replace(", ", ",") + ")", operands)
+	operands = _DECIMAL_IMMEDIATE_RE.sub(
+		lambda match: "$" + match.group(1) + hex(int(match.group(2))), operands)
+	operands = _DECIMAL_DISPLACEMENT_RE.sub(
+		lambda match: match.group(1) + match.group(2)
+		+ hex(int(match.group(3))) + "(", operands)
+	return operands
+
+
+def _capstone_instructions(obj, function_name):
+	"""Disassemble one function COMDAT with capstone, relocation slots masked.
+
+	Masking the four addend bytes at every relocation address before decoding
+	keeps csplit targets (which store linked addresses) and rebuilt candidates
+	(which store link-time addends) from producing spurious operand
+	differences.  Both sides are masked identically, so equality remains
+	meaningful; the relocation identities themselves are still compared by the
+	strict metadata.
+	"""
+	try:
+		import capstone
+	except ImportError as error:
+		raise ClassifierError(
+			"neither llvm-objdump nor capstone is available") from error
+	fn = None
+	for item in obj["symbols"]:
+		if item["name"] == function_name and item["section"] > 0:
+			fn = item
+			break
+	if fn is None:
+		raise ClassifierError(
+			f"section-relative symbol {function_name!r} not found")
+	section = obj["sections"][fn["section"] - 1]
+	raw = bytearray(_coff_compare._section_bytes(obj, section))[:section["size"]]
+	for index in range(section["reloc_count"]):
+		offset = section["reloc"] + index * 10
+		address = int.from_bytes(obj["data"][offset:offset + 4], "little")
+		if address + 4 <= len(raw):
+			raw[address:address + 4] = b"\0\0\0\0"
+	engine = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
+	engine.syntax = capstone.CS_OPT_SYNTAX_ATT
+	engine.skipdata = True
+	instructions = []
+	for decoded in engine.disasm(bytes(raw), 0):
+		instructions.append({
+			"address": decoded.address,
+			"bytes": decoded.bytes.hex(),
+			"mnemonic": decoded.mnemonic.lower(),
+			"operands": _normalize_operands(
+				_llvm_style_operands(decoded.op_str)),
+		})
+	if not instructions:
+		raise ClassifierError(f"no instructions found for {function_name!r}")
+	return instructions
+
+
 def _run_objdump(objdump, object_path, function_name):
 	command = [
 		str(objdump), "-d", "-r", "--symbolize-operands",
@@ -464,17 +550,28 @@ def _run_objdump(objdump, object_path, function_name):
 	return instructions
 
 
-def evidence_from_object(object_path, function_name, objdump=None):
-	"""Measure one COFF function and attach llvm-objdump disassembly evidence."""
+def evidence_from_object(object_path, function_name, objdump=None, backend="auto"):
+	"""Measure one COFF function and attach disassembly evidence.
+
+	``backend`` selects the disassembler: ``"objdump"`` requires llvm-objdump,
+	``"capstone"`` uses the in-process capstone port, and ``"auto"`` prefers
+	llvm-objdump when present and falls back to capstone.  Both producers of a
+	comparison must use the same backend; mixing them is not meaningful.
+	"""
 	object_path = Path(object_path)
 	try:
-		measurement = section_info(load(object_path), function_name)
+		obj = load(object_path)
+		measurement = section_info(obj, function_name)
 	except (CoffError, OSError) as error:
 		raise ClassifierError(str(error)) from error
-	objdump = objdump or shutil.which("llvm-objdump") or shutil.which("llvm-objdump.exe")
-	if not objdump:
+	if backend != "capstone":
+		objdump = objdump or shutil.which("llvm-objdump") or shutil.which("llvm-objdump.exe")
+	if backend == "objdump" and not objdump:
 		raise ClassifierError("llvm-objdump was not found; pass --objdump")
-	measurement["instructions"] = _run_objdump(objdump, object_path, function_name)
+	if backend != "capstone" and objdump:
+		measurement["instructions"] = _run_objdump(objdump, object_path, function_name)
+	else:
+		measurement["instructions"] = _capstone_instructions(obj, function_name)
 	return measurement
 
 
@@ -484,13 +581,17 @@ def main(argv=None):
 	parser.add_argument("candidate")
 	parser.add_argument("function")
 	parser.add_argument("--objdump")
+	parser.add_argument(
+		"--backend", choices=("auto", "objdump", "capstone"), default="auto")
 	parser.add_argument("--output", type=Path)
 	args = parser.parse_args(argv)
 	try:
 		target = evidence_from_object(
-			args.target, args.function, objdump=args.objdump)
+			args.target, args.function, objdump=args.objdump,
+			backend=args.backend)
 		candidate = evidence_from_object(
-			args.candidate, args.function, objdump=args.objdump)
+			args.candidate, args.function, objdump=args.objdump,
+			backend=args.backend)
 		result = classify(target, candidate)
 	except ClassifierError as error:
 		parser.error(str(error))

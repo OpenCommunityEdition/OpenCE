@@ -1,7 +1,16 @@
 import hashlib
+import subprocess
+import sys
 import unittest
+from pathlib import Path
 
-from tools.codegen_blocker_classifier import classify, parse_disassembly
+from tools.codegen_blocker_classifier import (
+	_capstone_instructions,
+	_llvm_style_operands,
+	classify,
+	parse_disassembly,
+)
+from tools.coff_compare import build_coff, load
 
 
 def instruction(mnemonic, operands="", address=0):
@@ -31,6 +40,46 @@ def evidence(instructions, size=32, relocations=None, sha=None):
 
 
 class CodegenBlockerClassifierTests(unittest.TestCase):
+	def test_direct_script_invocation_reaches_cli(self):
+		script = Path(__file__).with_name("codegen_blocker_classifier.py")
+		completed = subprocess.run(
+			[sys.executable, str(script), "--help"],
+			capture_output=True,
+			text=True,
+			check=False,
+		)
+		self.assertEqual(completed.returncode, 0, completed.stderr)
+		self.assertIn("--backend", completed.stdout)
+
+	def test_capstone_backend_emits_llvm_style_evidence(self):
+		obj = load(build_coff(
+			sections=[{
+				"name": ".text",
+				"size": 4,
+				"raw_data": b"\x55\x8b\xec\xc3",
+				"flags": 0xE0000060,
+			}],
+			symbols=[{
+				"name": "_f",
+				"value": 0,
+				"section": 1,
+				"type": 0x20,
+				"storage": 2,
+			}],
+		))
+		instructions = _capstone_instructions(obj, "_f")
+		self.assertEqual(
+			[item["mnemonic"] for item in instructions],
+			["pushl", "movl", "retl"],
+		)
+		self.assertEqual(instructions[1]["operands"], "%esp, %ebp")
+
+	def test_capstone_operands_are_normalized_like_llvm_objdump(self):
+		self.assertEqual(
+			_llvm_style_operands("$16, 8(%eax, %ebx, 4)"),
+			"$0x10, 0x8(%eax,%ebx,4)",
+		)
+
 	def test_parse_llvm_objdump_instruction_and_ignore_relocation(self):
 		parsed = parse_disassembly("""
 00000000 <_f>:

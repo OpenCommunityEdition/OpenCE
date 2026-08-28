@@ -23,6 +23,11 @@ SYMBOL_ENTRY_SIZE    = 18
 RELOC_ENTRY_SIZE     = 10
 SECTION_HEADER_SIZE  = 40
 
+# Undefined externals that the VC7 linker resolves to absolute zero.  Their
+# relocation records vanish from the linked image, so a csplit reconstruction
+# cannot carry them even when the linked bytes are identical.
+LINK_ABSOLUTE_ZERO_SYMBOLS = frozenset({"__except_list"})
+
 # â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _c_string(data, strtab_off, strtab_len, name_off):
@@ -232,7 +237,21 @@ def _defined_noncode_destination(obj, source_section_number, target, addend):
         and item["type"] != 0x20
     ]
     if not anchors:
-        return None
+        # Compiler-generated local data such as an SEH scope table has no
+        # external owner.  Admit a static owner only for the unambiguous
+        # whole-section case; producer-specific names are still compared via
+        # the relocation-normalized destination proof below.
+        statics = [
+            item for item in obj["symbols"]
+            if item["section"] == target_section_number
+            and item["storage"] == 3
+            and item["type"] != 0x20
+            and not item["name"].startswith(".")
+        ]
+        if len(statics) == 1 and statics[0]["value"] == 0:
+            anchors = statics
+        else:
+            return None
 
     nearest_value = max(item["value"] for item in anchors)
     nearest = [item for item in anchors if item["value"] == nearest_value]
@@ -252,6 +271,49 @@ def _defined_noncode_destination(obj, source_section_number, target, addend):
         section["name"],
         anchor["name"],
         destination_offset - anchor["value"],
+    ]
+
+
+def _normalized_destination(obj, source_section_number, dest_section,
+                            destination_offset):
+    """Return fail-closed identity for a relocated non-code destination.
+
+    MSVC can name an SEH scope table with compiler-local symbols while csplit
+    re-anchors the same entries to their owning function.  Mask the relocated
+    dwords and resolve every table relocation back into the referencing code
+    section.  Any external, out-of-range, or otherwise unproved destination
+    rejects this fallback.
+    """
+    data = _section_bytes(obj, dest_section)
+    resolved = []
+    source_section = obj["sections"][source_section_number - 1]
+    for index in range(dest_section["reloc_count"]):
+        offset = dest_section["reloc"] + index * RELOC_ENTRY_SIZE
+        address, target_index, relocation_type = struct.unpack_from(
+            "<LLH", obj["data"], offset)
+        if target_index not in obj["by_index"]:
+            return None
+        if address + 4 > dest_section["size"]:
+            return None
+        target = obj["by_index"][target_index]
+        addend = struct.unpack_from("<i", data, address)[0]
+        if target["section"] != source_section_number:
+            return None
+        target_offset = target["value"] + addend
+        if not 0 <= target_offset <= source_section["size"]:
+            return None
+        data[address:address + 4] = b"\0\0\0\0"
+        resolved.append([
+            address,
+            relocation_type,
+            "source-section",
+            target_offset,
+        ])
+    return [
+        dest_section["name"],
+        destination_offset,
+        hashlib.sha256(data).hexdigest(),
+        resolved,
     ]
 
 
@@ -289,6 +351,13 @@ def section_info_by_number(obj, fn_sec_num):
                 f"relocation address {address} outside section {fn_sec_num} size {section['size']}")
         addend = struct.unpack_from("<i", raw, address)[0]
         raw[address:address + 4] = b"\0\0\0\0"
+
+        if target["name"] in LINK_ABSOLUTE_ZERO_SYMBOLS \
+                and target["section"] == 0:
+            # The linker resolves this undefined external to zero and removes
+            # the relocation.  The bytes remain part of normalized equality;
+            # only the unobservable object-file relocation is omitted.
+            continue
 
         sec_no = target["section"]
         raw_target = target["value"] + addend
@@ -337,11 +406,21 @@ def section_info_by_number(obj, fn_sec_num):
         if defined_destination is not None:
             relocation["symbolic_target"] = [
                 "symbol", target["name"], addend]
+            destination_section = obj["sections"][target["section"] - 1]
+            if destination_section["reloc_count"]:
+                normalized = _normalized_destination(
+                    obj,
+                    fn_sec_num,
+                    destination_section,
+                    target["value"] + addend,
+                )
+                if normalized is not None:
+                    relocation["resolved_destination_normalized"] = normalized
         relocs.append(relocation)
 
     return {
         "size": section["size"],
-        "relocation_count": section["reloc_count"],
+        "relocation_count": len(relocs),
         "normalized_sha256": hashlib.sha256(raw).hexdigest(),
         "relocations": relocs,
     }
@@ -373,6 +452,11 @@ def relocation_infos_equal(left, right):
             right_symbolic = right_item["target"]
         if left_symbolic is not None and left_symbolic == right_symbolic:
             continue
+
+        left_normalized = left_item.get("resolved_destination_normalized")
+        right_normalized = right_item.get("resolved_destination_normalized")
+        if left_normalized is not None and left_normalized == right_normalized:
+            continue
         return False
     return True
 
@@ -385,6 +469,28 @@ def section_infos_equal(left, right):
         and left["normalized_sha256"] == right["normalized_sha256"]
         and relocation_infos_equal(left["relocations"], right["relocations"])
     )
+
+
+def image_symbol_addresses(entries):
+    """Build a fail-closed name-to-image-address map.
+
+    A ``static`` COMDAT function emitted by several translation units can
+    legitimately carry one name at several final addresses.  Such a name is
+    unusable as address evidence: resolving through it would silently choose
+    one instance.  Drop only names observed at distinct addresses; repeated
+    records for the same name and address remain unambiguous.
+    """
+    addresses = {}
+    ambiguous = set()
+    for entry in entries:
+        name = entry["name"]
+        address = int(entry["file_offset"])
+        if name in addresses and addresses[name] != address:
+            ambiguous.add(name)
+        addresses[name] = address
+    for name in ambiguous:
+        del addresses[name]
+    return addresses
 
 
 def section_info_resolved(obj, section_symbol_name, symbol_addresses):

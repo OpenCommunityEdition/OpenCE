@@ -31,6 +31,7 @@ from .coff_compare import (
     IMAGE_SCN_CNT_UNINITIALIZED_DATA,
     RELOC_ENTRY_SIZE,
     SYMBOL_ENTRY_SIZE,
+    image_symbol_addresses,
     load,
     section_info,
     section_info_by_number,
@@ -470,13 +471,7 @@ def _report_ordinary_percentages(
 
 
 def _symbol_addresses(entries: Sequence[Mapping[str, Any]]) -> Dict[str, int]:
-    addresses: Dict[str, int] = {}
-    for entry in entries:
-        name = entry["name"]
-        if name in addresses:
-            raise GateError(f"duplicate image symbol address for {name}")
-        addresses[name] = int(entry["file_offset"])
-    return addresses
+    return image_symbol_addresses(entries)
 
 
 def _exception_records(

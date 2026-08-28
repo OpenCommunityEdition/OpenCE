@@ -855,6 +855,139 @@ class TestCoffCompare(unittest.TestCase):
         )
 
 
+class TestImageSymbolAddresses(unittest.TestCase):
+    """Repeated COMDAT names are dropped only when address-ambiguous."""
+
+    def test_unique_names_are_mapped(self):
+        self.assertEqual(
+            coff_compare.image_symbol_addresses([
+                {"name": "_a", "file_offset": 0x1000},
+                {"name": "_b", "file_offset": 0x2000},
+            ]),
+            {"_a": 0x1000, "_b": 0x2000},
+        )
+
+    def test_name_repeated_at_one_address_is_kept(self):
+        self.assertEqual(
+            coff_compare.image_symbol_addresses([
+                {"name": "_a", "file_offset": 0x1000},
+                {"name": "_a", "file_offset": 0x1000},
+            ]),
+            {"_a": 0x1000},
+        )
+
+    def test_name_at_several_addresses_is_dropped(self):
+        self.assertEqual(
+            coff_compare.image_symbol_addresses([
+                {"name": "_D3DDevice_SetRenderState", "file_offset": 0x15D220},
+                {"name": "_D3DDevice_SetRenderState", "file_offset": 0x15E2B0},
+                {"name": "_unambiguous", "file_offset": 0x3000},
+            ]),
+            {"_unambiguous": 0x3000},
+        )
+
+
+class TestLinkAbsoluteZeroAndSehScopeTables(unittest.TestCase):
+    """SEH object spellings compare only through complete destination proof."""
+
+    @staticmethod
+    def _seh_pair(filter_offset=0x51, handler_offset=0x63):
+        import struct
+
+        def obj(style, filter_value, handler_value):
+            code_size = 0x90
+            code = bytearray(b"\x90" * code_size)
+            code[6:10] = b"\x00" * 4
+            code[0x11:0x15] = b"\x00" * 4
+            table = bytearray(b"\xff\xff\xff\xff" + b"\x00" * 8)
+            code_relocations = bytearray()
+            table_relocations = bytearray()
+            symbols = [
+                {"name": ".text", "value": 0, "section": 1,
+                 "type": 0, "storage": 3},
+                {"name": "_main", "value": 0, "section": 1,
+                 "type": 0x20, "storage": 2},
+            ]
+            if style == "split":
+                symbols.append({
+                    "name": "_rdata_00", "value": 0, "section": 2,
+                    "type": 0, "storage": 3,
+                })
+                scope_table_symbol = 2
+                struct.pack_into("<i", table, 4, filter_value)
+                struct.pack_into("<i", table, 8, handler_value)
+                for address in (4, 8):
+                    table_relocations += struct.pack("<LLH", address, 1, 6)
+            else:
+                symbols.append({
+                    "name": "$T18229", "value": 0, "section": 2,
+                    "type": 0, "storage": 3,
+                })
+                scope_table_symbol = 2
+                symbols.append({
+                    "name": "$L1", "value": filter_value, "section": 1,
+                    "type": 0, "storage": 6,
+                })
+                symbols.append({
+                    "name": "$L2", "value": handler_value, "section": 1,
+                    "type": 0, "storage": 6,
+                })
+                for address, symbol_index in ((4, 3), (8, 4)):
+                    table_relocations += struct.pack(
+                        "<LLH", address, symbol_index, 6)
+                symbols.append({
+                    "name": "__except_list", "value": 0, "section": 0,
+                    "type": 0, "storage": 2,
+                })
+                code_relocations += struct.pack("<LLH", 0x11, 5, 6)
+            code_relocations += struct.pack(
+                "<LLH", 6, scope_table_symbol, 6)
+            return coff_compare.load(coff_compare.build_coff(
+                sections=[
+                    {
+                        "name": ".text",
+                        "size": code_size,
+                        "raw_data": bytes(code),
+                        "reloc_data": bytes(code_relocations),
+                        "flags": 0xE0000060,
+                    },
+                    {
+                        "name": ".rdata",
+                        "size": 12,
+                        "raw_data": bytes(table),
+                        "reloc_data": bytes(table_relocations),
+                        "flags": 0x40000040,
+                    },
+                ],
+                symbols=symbols,
+            ))
+
+        return (
+            obj("split", filter_offset, handler_offset),
+            obj("msvc", filter_offset, handler_offset),
+        )
+
+    def test_scope_table_spellings_compare_equal(self):
+        split, msvc = self._seh_pair()
+        self.assertTrue(coff_compare.section_infos_equal(
+            coff_compare.section_info(split, "_main"),
+            coff_compare.section_info(msvc, "_main"),
+        ))
+
+    def test_except_list_relocation_is_dropped_from_count(self):
+        _, msvc = self._seh_pair()
+        info = coff_compare.section_info(msvc, "_main")
+        self.assertEqual(info["relocation_count"], 1)
+
+    def test_different_scope_handler_offset_stays_unequal(self):
+        split, _ = self._seh_pair()
+        _, other = self._seh_pair(handler_offset=0x60)
+        self.assertFalse(coff_compare.section_infos_equal(
+            coff_compare.section_info(split, "_main"),
+            coff_compare.section_info(other, "_main"),
+        ))
+
+
 if __name__ == "__main__":
     unittest.main()
 

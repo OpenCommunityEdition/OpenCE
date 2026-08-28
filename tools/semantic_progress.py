@@ -12,6 +12,7 @@ from typing import Any, Dict, List
 
 from .coff_compare import (
     CoffError,
+    image_symbol_addresses,
     load,
     section_info,
     section_info_by_number,
@@ -488,14 +489,7 @@ def apply_semantic_data_matches(
     entries = json.loads(manifest_path.read_text(encoding="utf-8"))
     objdiff = json.loads(objdiff_config_path.read_text(encoding="utf-8"))
     symbol_entries = json.loads(symbol_manifest_path.read_text(encoding="utf-8"))
-    symbol_addresses = {}
-    for item in symbol_entries:
-        name = item["name"]
-        address = int(item["file_offset"])
-        if name in symbol_addresses:
-            raise SemanticProgressError(
-                f"duplicate image symbol address for {name}")
-        symbol_addresses[name] = address
+    symbol_addresses = image_symbol_addresses(symbol_entries)
 
     report_units = {unit["name"]: unit for unit in report.get("units", [])}
     config_units = {unit["name"]: unit for unit in objdiff.get("units", [])}
