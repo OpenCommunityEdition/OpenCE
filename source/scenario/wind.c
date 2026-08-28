@@ -137,9 +137,11 @@ static void code_0017f750(
 	real const axis_scale[3] = { 0.1f, 0.2f, 0.07f };
 	real magnitude = maximum_magnitude * (1.f / 3.f);
 	long axis_index;
+	long axes_remaining = 3;
 
 	*wind = *global_zero_vector3d;
-	for (axis_index = 0; axis_index < 3; axis_index++)
+	axis_index = 0;
+	do
 	{
 		real sample_key = (real)fabs(
 			((axis_scale[axis_index] * wind_globals.time * local_variation_rate)
@@ -151,7 +153,9 @@ static void code_0017f750(
 		wind->i += wind_globals.variance[axis_index][(short)sample_index].i;
 		wind->j += wind_globals.variance[axis_index][(short)sample_index].j;
 		wind->k += wind_globals.variance[axis_index][(short)sample_index].k;
+		axis_index++;
 	}
+	while (--axes_remaining);
 
 	wind->i *= magnitude;
 	wind->j *= magnitude;

@@ -9,6 +9,7 @@ import coff_compare as cc
 
 ap = argparse.ArgumentParser()
 ap.add_argument('unit')
+ap.add_argument('--source')
 ap.add_argument('--edits')
 ap.add_argument('--fn', action='append', default=[])
 ap.add_argument('--disas')
@@ -16,7 +17,8 @@ ap.add_argument('--all', action='store_true')
 a = ap.parse_args()
 
 unit = a.unit.replace('\\', '/')
-src = unit + '.c'
+unit_src = unit + '.c'
+src = a.source or unit_src
 bn = open('build.ninja').read()
 # the "build <obj>: cl <src>" line may be wrapped with a $ continuation, so match
 # on the object path alone rather than requiring the leading "build " on that line
@@ -42,7 +44,7 @@ obj = f'scratch/_gate_{os.getpid()}.obj'
 if os.path.exists(obj):
     os.remove(obj)
 cl = r'C:\halo-worktrees\claude-finish-hs-20260816\xbox\bin\vc7\CL.Exe'
-incdir = os.path.dirname(src)
+incdir = os.path.dirname(unit_src)
 cmd = [cl, '/nologo', '/c'] + toks + ['/I' + incdir, '/Fo' + obj, scratch_src]
 r = subprocess.run(cmd, capture_output=True, text=True)
 if not os.path.exists(obj) or r.returncode != 0:

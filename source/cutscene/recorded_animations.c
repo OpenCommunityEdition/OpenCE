@@ -87,13 +87,71 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h"
+#include "cutscene/recorded_animation_definitions.h"
+#include "game/players.h"
 #include "memory/data.h"
+#include "objects/objects.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
-/* ---------- macros */
+enum
+{
+	_recording_thread_finished_bit = 0,
+	_recording_thread_unit_was_controlled_bit = 2,
+	RECORDED_ANIMATION_VERSION = 4,
+};
 
 /* ---------- structures */
+
+struct animation_thread
+{
+	short identifier;
+	short pad2;
+	long unit_index;
+	word ticks_left;
+	word flags;
+	long relative_ticks;
+	byte *event_stream;
+	byte controller[0x40];
+	byte animation_state[0xC];
+	short version;
+	short pad62;
+};
+
+struct animation_thread_debug
+{
+	boolean active;
+	byte pad1[3];
+	byte *event_stream;
+	long event_stream_size;
+	short animation_index;
+	short padE;
+};
+
+struct animation_playback
+{
+	void (*initialize_event_stream)(
+		void *animation_state,
+		void *controller,
+		byte **event_stream,
+		byte unit_control_data_version);
+};
+
+struct recorded_animation_playback_data
+{
+	void *unused[4];
+	struct animation_playback *playback_codec[RECORDED_ANIMATION_VERSION];
+};
+
+/* ---------- macros */
+
+#define animation_threads_debug_get(index) \
+	(animation_threads_debug + ((index) & 0xFFFF))
+#define playback_codec (data_002dd160.playback_codec)
 
 struct recorded_animations_globals_prefix
 {
@@ -102,10 +160,22 @@ struct recorded_animations_globals_prefix
 
 /* ---------- prototypes */
 
+static struct animation_thread *code_000836c0(
+	long unit_index,
+	long *thread_index_reference);
+static boolean code_000839a0(
+	long unit_index,
+	short animation_index,
+	word extra_flags);
+
+extern boolean recorded_animation_controlling_unit(
+	long unit_index);
+
 /* ---------- globals */
 
-extern void *animation_threads_debug;
+extern struct animation_thread_debug *animation_threads_debug;
 extern struct recorded_animations_globals_prefix bss_00435ca4;
+extern struct recorded_animation_playback_data data_002dd160;
 
 /* ---------- public code */
 
@@ -132,4 +202,172 @@ void recorded_animations_dispose_from_old_map(
 	return;
 }
 
+boolean recorded_animation_play(
+	long unit_index,
+	short animation_index)
+{
+	return code_000839a0(unit_index, animation_index, 0);
+}
+
+boolean recorded_animation_play_and_delete(
+	long unit_index,
+	short animation_index)
+{
+	return code_000839a0(unit_index, animation_index, 1 << 3);
+}
+
+boolean recorded_animation_play_and_hover(
+	long unit_index,
+	short animation_index)
+{
+	return code_000839a0(unit_index, animation_index, 1 << 4);
+}
+
 /* ---------- private code */
+
+static struct animation_thread *code_000836c0(
+	long unit_index,
+	long *thread_index_reference)
+{
+	long thread_index = NONE;
+	struct data_iterator iterator;
+	struct animation_thread *thread;
+
+	data_iterator_new(&iterator, bss_00435ca4.animation_threads);
+
+	thread = data_iterator_next(&iterator);
+	while (thread)
+	{
+		if (thread->unit_index == unit_index)
+		{
+			thread_index = iterator.datum_index;
+			break;
+		}
+
+		thread = data_iterator_next(&iterator);
+	}
+
+	if (thread_index_reference)
+		*thread_index_reference = thread_index;
+
+	return thread;
+}
+
+static boolean code_000839a0(
+	long unit_index,
+	short animation_index,
+	word extra_flags)
+{
+	boolean result = FALSE;
+	long thread_index;
+	struct animation_thread *thread;
+	struct recorded_animation_definition const *animation;
+	struct animation_thread_debug *debug;
+	struct animation_playback *playback;
+
+	if (unit_index != NONE)
+	{
+		if (animation_index != NONE && animation_index < global_scenario_get()->recorded_animations.count)
+		{
+			object_get_and_verify_type(unit_index, _object_mask_unit);
+			player_index_from_unit_index(unit_index);
+
+			thread = code_000836c0(unit_index, &thread_index);
+			animation = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->recorded_animations,
+				animation_index,
+				struct recorded_animation_definition);
+
+			if (!recorded_animation_controlling_unit(unit_index))
+			{
+				if (!thread)
+				{
+					thread_index = datum_new(bss_00435ca4.animation_threads);
+					if (thread_index != NONE)
+						thread = datum_get(bss_00435ca4.animation_threads, thread_index);
+				}
+
+				if (thread)
+				{
+					thread->unit_index = unit_index;
+					thread->relative_ticks = 0;
+					thread->ticks_left = animation->length_in_ticks;
+					thread->event_stream = tag_data_get_pointer(
+						&animation->event_stream,
+						0,
+						animation->event_stream.size);
+
+					debug = animation_threads_debug_get(thread_index);
+					debug->active = TRUE;
+					debug->event_stream = thread->event_stream;
+					debug->event_stream_size = animation->event_stream.size;
+					debug->animation_index = animation_index;
+
+					thread->version = animation->version - 1;
+					thread->flags &= ~(1 << _recording_thread_finished_bit);
+					match_assert(
+						"c:\\halo\\SOURCE\\cutscene\\recorded_animations.c",
+						233,
+						animation->version>0&&animation->version<=RECORDED_ANIMATION_VERSION&&playback_codec[animation->version-1]);
+
+					playback = playback_codec[thread->version];
+					playback->initialize_event_stream(
+						thread->animation_state,
+						thread->controller,
+						&thread->event_stream,
+						animation->unit_control_data_version);
+
+					unit_set_actively_controlled(unit_index, TRUE);
+					if (unit_controllable(unit_index))
+						thread->flags |= 1 << _recording_thread_unit_was_controlled_bit;
+					else
+						thread->flags &= ~(1 << _recording_thread_unit_was_controlled_bit);
+
+					unit_set_controllable(unit_index, FALSE);
+					unit_set_possessed(unit_index, TRUE);
+					object_set_automatic_deactivation(unit_index, FALSE);
+					thread->flags |= extra_flags;
+					result = TRUE;
+				}
+				else
+				{
+					error(_error_silent, "Could not allocate space for a new animation");
+				}
+			}
+			else if (thread)
+			{
+				char const *playing_name;
+
+				debug = animation_threads_debug_get(thread_index);
+				playing_name = "<unknown>";
+				if (debug->active)
+				{
+					playing_name = TAG_BLOCK_GET_ELEMENT(
+						&global_scenario_get()->recorded_animations,
+						debug->animation_index,
+						struct recorded_animation_definition)->name;
+				}
+
+				error(
+					_error_silent,
+					"trying to play %s while %s is playing",
+					animation->name,
+					playing_name);
+			}
+			else
+			{
+				error(_error_silent, "can't play animation on unit");
+			}
+		}
+		else
+		{
+			error(_error_silent, "this animation doesn't exist");
+		}
+	}
+	else
+	{
+		error(_error_silent, "unit doesn't exist");
+	}
+
+	return result;
+}

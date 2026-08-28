@@ -1,5 +1,5 @@
-"""For each named unit, try every branch's version of its .c file and report
-any version that gates strictly better than the one on this branch.
+"""For each named unit, compile every branch's version of its .c file from
+scratch and report any version that gates strictly better than the current one.
 
 Four objects were advanced this session by finding work already done in another
 lane; this automates the search.
@@ -23,8 +23,11 @@ def unique_blobs(path):
     return blobs
 
 
-def gate(unit):
-    r = subprocess.run(GATE + [unit], capture_output=True, text=True)
+def gate(unit, source=None):
+    command = GATE + [unit]
+    if source:
+        command += ['--source', source]
+    r = subprocess.run(command, capture_output=True, text=True)
     if 'COMPILE FAILED' in r.stdout:
         return None, 'compile-fail'
     m = re.search(r'== exact (\d+)\s+residual (\d+)\s+unwritten (\d+)', r.stdout)
@@ -49,27 +52,27 @@ def sweep(unit):
         return
     cur = subprocess.run(['git', 'rev-parse', f'HEAD:{path}'], capture_output=True, text=True).stdout.strip()
     blobs = unique_blobs(path)
-    orig = open(path, 'rb').read()
     base_score, base_desc = gate(unit)
     print(f'\n=== {unit}   ({len(blobs)} unique blobs)   current: {base_desc}', flush=True)
     best = (base_score, 'CURRENT', base_desc)
+    scratch_source = f'scratch/_branch_sweep_{os.getpid()}.c'
     try:
         for blob, brs in blobs.items():
             if blob == cur:
                 continue
             content = subprocess.run(['git', 'cat-file', 'blob', blob], capture_output=True).stdout
-            open(path, 'wb').write(content)
-            score, desc = gate(unit)
+            open(scratch_source, 'wb').write(content)
+            score, desc = gate(unit, scratch_source)
             tag = brs[0] + (f' (+{len(brs)-1})' if len(brs) > 1 else '')
             better = score is not None and base_score is not None and score > base_score
             print(f'    {blob[:8]} {tag:52s} {desc}{"   <== BETTER" if better else ""}', flush=True)
             if score is not None and (best[0] is None or score > best[0]):
                 best = (score, tag, desc)
     finally:
-        open(path, 'wb').write(orig)
-        # no ninja here: gate.py compiles to its own scratch object, so the sweep
-        # never reads build/base. Skipping it keeps concurrent sweeps safe (one
-        # ninja per build dir at a time) - run a full ninja when the sweep ends.
+        if os.path.exists(scratch_source):
+            os.remove(scratch_source)
+        # The sweep never edits the production source or reads build/base.
+        # gate.py compiles each branch blob to its own scratch object.
     if best[1] != 'CURRENT':
         print(f'    >>> BEST: {best[1]}  {best[2]}', flush=True)
 
