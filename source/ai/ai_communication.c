@@ -555,6 +555,7 @@ symbols in this file:
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#include "tag_files/tag_files.h"
 #include "units/units.h"
 
 /* ---------- constants */
@@ -568,14 +569,27 @@ enum
 	NUMBER_OF_DIALOGUE_USAGES = 105,
 	NUMBER_OF_REPLY_USAGES = 46,
 	MAXIMUM_CONVERSATION_PARTICIPANTS = 8,
+	MAXIMUM_DIALOGUE_VARIANTS_PER_CONVERSATION_PARTICIPANT = 6,
 	MAXIMUM_RECENT_CONVERSATIONS = 16,
 	_ai_conversation_stop_if_anyone_dies_bit = 0,
+	_ai_conversation_line_addressee_look_back_bit = 0,
+	_ai_conversation_line_everyone_look_at_speaker_bit = 1,
+	_ai_conversation_line_everyone_look_at_addressee_bit = 2,
+	_ai_conversation_line_wait_after_until_told_to_advance_bit = 3,
+	_ai_conversation_line_wait_until_speaker_nearby_bit = 4,
+	_ai_conversation_line_wait_until_everyone_nearby_bit = 5,
+	_ai_conversation_address_player = 1,
+	_ai_conversation_address_participant = 2,
+	_ai_conversation_selection_radio = 6,
+	_ai_conversation_selection_radio_sargeant = 7,
 	_actor_mode_alert = 2,
 	_unit_speech_idle = 1,
+	_ai_information_none = 0,
 	_ai_information_look_unit = 1,
 	_ai_information_look_object = 2,
 	_ai_information_allegiance = 1,
 	_ai_communication_priority_communicate = 4,
+	_ai_communication_priority_yell = 6,
 	_ai_sound_volume_medium = 1,
 	_ai_sound_volume_loud = 2,
 	_ai_sound_volume_shout = 3,
@@ -584,6 +598,8 @@ enum
 /* ---------- macros */
 
 #define ai_print_conversations (ai_debug.__unknown3C[99])
+#define ai_conversation_driver_get(index) \
+	((struct ai_conversation_driver_datum_view *)datum_get(conversation_data, (index)))
 
 /* ---------- structures */
 
@@ -644,6 +660,26 @@ struct ai_conversation_line_view
 typedef char ai_conversation_line_view_current_line_offset_assert[
 	offsetof(struct ai_conversation_line_view, current_line) == 0x48 ? 1 : -1];
 
+struct ai_conversation_driver_datum_view
+{
+	struct ai_conversation_datum_header header;
+	unsigned long participant_bitmask;
+	short dialogue_indices[MAXIMUM_CONVERSATION_PARTICIPANTS];
+	long actor_indices[MAXIMUM_CONVERSATION_PARTICIPANTS];
+	short current_line;
+	short line_participant_index;
+	short line_delay_timer;
+	word line_flags;
+	long line_actor_index;
+	long line_unit_index;
+	long line_address_unit_index;
+	long line_sound_index;
+	boolean line_unspatialized;
+	boolean line_spoken;
+	boolean line_finished;
+	boolean line_advance;
+};
+
 struct ai_conversation_datum_view
 {
 	short identifier;
@@ -678,9 +714,40 @@ struct scenario_conversation_definition_view
 {
 	char name[32];
 	word flags;
-	byte __unknown22[0x2E];
+	word pad22;
+	real trigger_distance;
+	real run_to_player_distance;
+	byte __unknown2C[0x24];
 	struct tag_block participants;
-	byte __unknown5C[0x18];
+	struct tag_block lines;
+	struct tag_block unused;
+};
+
+struct scenario_conversation_participant_view
+{
+	word pad00;
+	word flags;
+	short selection_type;
+	short actor_type;
+	short preexisting_object_name_index;
+	short new_attach_object_name_index;
+	byte __unknown0C[0x0C];
+	short dialogue_variants[MAXIMUM_DIALOGUE_VARIANTS_PER_CONVERSATION_PARTICIPANT];
+	char ai_index_name[32];
+	long runtime_ai_index;
+	byte __unknown48[0x0C];
+};
+
+struct scenario_conversation_line_view
+{
+	word flags;
+	short participant_index;
+	short address_type;
+	short address_participant_index;
+	long unknown08;
+	real delay_time;
+	byte __unknown10[0x0C];
+	struct tag_reference dialogue[MAXIMUM_DIALOGUE_VARIANTS_PER_CONVERSATION_PARTICIPANT];
 };
 
 struct recent_conversation_view
@@ -742,6 +809,24 @@ typedef char scenario_conversation_definition_view_size_assert[
 	sizeof(struct scenario_conversation_definition_view) == 0x74 ? 1 : -1];
 typedef char scenario_conversation_definition_participants_offset_assert[
 	offsetof(struct scenario_conversation_definition_view, participants) == 0x50 ? 1 : -1];
+typedef char scenario_conversation_definition_lines_offset_assert[
+	offsetof(struct scenario_conversation_definition_view, lines) == 0x5C ? 1 : -1];
+typedef char scenario_conversation_participant_view_size_assert[
+	sizeof(struct scenario_conversation_participant_view) == 0x54 ? 1 : -1];
+typedef char scenario_conversation_line_view_size_assert[
+	sizeof(struct scenario_conversation_line_view) == 0x7C ? 1 : -1];
+typedef char ai_conversation_driver_datum_view_size_assert[
+	sizeof(struct ai_conversation_driver_datum_view) == 0x64 ? 1 : -1];
+typedef char ai_conversation_driver_participant_bitmask_offset_assert[
+	offsetof(struct ai_conversation_driver_datum_view, participant_bitmask) == 0x14 ? 1 : -1];
+typedef char ai_conversation_driver_actor_indices_offset_assert[
+	offsetof(struct ai_conversation_driver_datum_view, actor_indices) == 0x28 ? 1 : -1];
+typedef char ai_conversation_driver_line_flags_offset_assert[
+	offsetof(struct ai_conversation_driver_datum_view, line_flags) == 0x4E ? 1 : -1];
+typedef char ai_conversation_driver_line_unit_index_offset_assert[
+	offsetof(struct ai_conversation_driver_datum_view, line_unit_index) == 0x54 ? 1 : -1];
+typedef char ai_conversation_driver_line_address_unit_index_offset_assert[
+	offsetof(struct ai_conversation_driver_datum_view, line_address_unit_index) == 0x58 ? 1 : -1];
 typedef char recent_conversation_view_size_assert[
 	sizeof(struct recent_conversation_view) == 0x10 ? 1 : -1];
 typedef char ai_print_conversations_offset_assert[
@@ -815,6 +900,12 @@ static void code_00031970(
 long code_00031d50(
 	short scenario_conversation_index,
 	boolean scripted);
+static boolean code_00031e80(
+	long conversation_index);
+static boolean code_00032030(
+	long conversation_index);
+static struct scenario_conversation_definition_view *code_000322c0(
+	long conversation_index);
 boolean actor_is_fighting(
 	long actor_index);
 static void code_000322f0(
@@ -835,6 +926,14 @@ void unit_speak(
 	long unit_index,
 	short play_type,
 	struct unit_speech_item const *speech_item);
+boolean sound_scripted_dialog_is_playing(
+	void);
+void scripted_sound_new(
+	long definition_index,
+	long source_object_index,
+	real scale);
+long scripted_sound_time(
+	long definition_index);
 void ai_handle_allegiance_broken_notification(
 	short team1_index,
 	short team2_index,
@@ -2354,6 +2453,306 @@ void ai_conversation_unit_died(
 	return;
 }
 
+static boolean code_00031e80(
+	long conversation_index)
+{
+	struct ai_conversation_driver_datum_view *conversation;
+	struct scenario_conversation_definition_view *definition;
+	struct scenario_conversation_participant_view *participant;
+	struct scenario_conversation_line_view *line;
+	struct actor_datum *actor;
+	short participant_index;
+	long speaker_actor_index;
+	boolean result;
+
+	conversation = ai_conversation_driver_get(conversation_index);
+	definition = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_conversations,
+		conversation->header.scenario_conversation_index,
+		struct scenario_conversation_definition_view);
+	line = TAG_BLOCK_GET_ELEMENT(
+		&definition->lines,
+		conversation->current_line,
+		struct scenario_conversation_line_view);
+	participant_index = line->participant_index;
+	result = FALSE;
+	if (participant_index >= 0 &&
+		participant_index < definition->participants.count &&
+		(conversation->participant_bitmask & FLAG(participant_index)) != 0)
+	{
+		participant = TAG_BLOCK_GET_ELEMENT(
+			&definition->participants,
+			participant_index,
+			struct scenario_conversation_participant_view);
+		speaker_actor_index =
+			conversation->actor_indices[line->participant_index];
+		conversation->line_participant_index = line->participant_index;
+		if (speaker_actor_index == NONE)
+		{
+			conversation->line_actor_index = NONE;
+			conversation->line_unit_index = NONE;
+			conversation->line_address_unit_index = NONE;
+			conversation->line_unspatialized = TRUE;
+		}
+		else
+		{
+			actor = actor_get(speaker_actor_index);
+			conversation->line_actor_index = speaker_actor_index;
+			conversation->line_unit_index = actor->meta.unit_index;
+			conversation->line_address_unit_index = NONE;
+
+			switch (line->address_type)
+			{
+			case _ai_conversation_address_player:
+				conversation->line_address_unit_index =
+					conversation->header.triggering_player_unit_index;
+				break;
+
+			case _ai_conversation_address_participant:
+				if (line->address_participant_index >= 0 &&
+					line->address_participant_index < definition->participants.count &&
+					conversation->actor_indices[line->address_participant_index] != NONE)
+				{
+					actor = actor_get(
+						conversation->actor_indices[line->address_participant_index]);
+					conversation->line_address_unit_index = actor->meta.unit_index;
+				}
+				break;
+			}
+
+			conversation->line_unspatialized =
+				participant->selection_type == _ai_conversation_selection_radio ||
+				participant->selection_type ==
+					_ai_conversation_selection_radio_sargeant;
+		}
+
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\ai_communication.c",
+			0x146B,
+			(conversation->dialogue_indices[line->participant_index] >= 0) &&
+			(conversation->dialogue_indices[line->participant_index] <
+				MAXIMUM_DIALOGUE_VARIANTS_PER_CONVERSATION_PARTICIPANT));
+		conversation->line_sound_index = line->dialogue[
+			conversation->dialogue_indices[line->participant_index]].index;
+		conversation->line_delay_timer = (short)(long)(line->delay_time * 30.0f);
+		conversation->line_flags = line->flags;
+		conversation->line_advance = FALSE;
+		conversation->line_finished = FALSE;
+		conversation->line_spoken = FALSE;
+		result = TRUE;
+	}
+
+	return result;
+}
+
+static boolean code_00032030(
+	long conversation_index)
+{
+	struct ai_conversation_driver_datum_view *conversation;
+	struct scenario_conversation_definition_view *definition;
+	struct actor_datum *actor;
+	struct unit_datum *unit;
+	long sound_definition_index;
+	long speaking_unit_index;
+	long speech_sound_definition_index;
+	long participant_actor_index;
+	short vocalization_type;
+	short play_type;
+	short participant_index;
+	short flags;
+	short delay_timer;
+	boolean busy;
+
+	conversation = ai_conversation_driver_get(conversation_index);
+	definition = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_conversations,
+		conversation->header.scenario_conversation_index,
+		struct scenario_conversation_definition_view);
+	if (!conversation->line_advance)
+	{
+		if (!conversation->line_spoken)
+		{
+			busy = FALSE;
+			sound_definition_index = conversation->line_sound_index;
+			if (sound_definition_index != NONE)
+			{
+				flags = conversation->line_flags;
+				if ((flags &
+					(FLAG(_ai_conversation_line_wait_until_speaker_nearby_bit) |
+					FLAG(_ai_conversation_line_wait_until_everyone_nearby_bit))) != 0)
+				{
+					participant_index = 0;
+					while ((long)participant_index < definition->participants.count)
+					{
+						participant_actor_index =
+							conversation->actor_indices[participant_index];
+						if (participant_actor_index != NONE)
+						{
+							actor = actor_get(participant_actor_index);
+							flags = conversation->line_flags;
+							if (((flags & FLAG(
+								_ai_conversation_line_wait_until_everyone_nearby_bit)) != 0 ||
+								((flags & FLAG(
+									_ai_conversation_line_wait_until_speaker_nearby_bit)) != 0 &&
+								participant_actor_index == conversation->line_actor_index)) &&
+								actor->state.action == _actor_action_converse &&
+								actor->state.action_data.converse.run_to_unit_index != NONE &&
+								!actor->state.action_data.converse.in_range &&
+								!actor->state.action_data.converse.failed)
+							{
+								busy = TRUE;
+							}
+						}
+
+						participant_index = (short)(participant_index + 1);
+					}
+				}
+
+				if (sound_scripted_dialog_is_playing())
+				{
+					busy = TRUE;
+				}
+
+				if (!busy)
+				{
+					speaking_unit_index = conversation->line_unit_index;
+					if (speaking_unit_index == NONE ||
+						conversation->line_unspatialized)
+					{
+						scripted_sound_new(
+							conversation->line_sound_index,
+							NONE,
+							1.0f);
+					}
+					else
+					{
+						speech_sound_definition_index = conversation->line_sound_index;
+						vocalization_type = NONE;
+						play_type = unit_test_speech(
+							speaking_unit_index,
+							_ai_communication_priority_yell,
+							FALSE,
+							TRUE,
+							NULL,
+							&vocalization_type,
+							&speech_sound_definition_index);
+						if (play_type == TRUE)
+						{
+							busy = TRUE;
+						}
+						else if (play_type > 0)
+						{
+							struct unit_speech_item speech_item;
+							long line_sound_index;
+
+							csmemset(&speech_item, 0, sizeof(speech_item));
+							line_sound_index = conversation->line_sound_index;
+							speech_item.vocalization_type = NONE;
+							speech_item.ai.communication_type = NONE;
+							speech_item.ai.damage_category = NONE;
+							speech_item.ai.dialogue_type_index = NONE;
+							speech_item.ai.target_unit_index =
+								conversation->line_address_unit_index;
+							speech_item.priority = _ai_communication_priority_yell;
+							speech_item.sound_definition_index = line_sound_index;
+							speech_item.ai.look_priority = TRUE;
+							speech_item.ai.look_type = _ai_information_look_unit;
+							speech_item.ai.look_data.unit.unit_index =
+								conversation->line_unit_index;
+							speech_item.ai.information_type = _ai_information_none;
+
+							if (ai_print_conversations)
+							{
+								console_printf(
+									FALSE,
+									"%s: speak %s",
+									definition->name,
+									tag_get_name(line_sound_index));
+							}
+
+							unit_speak(
+								conversation->line_unit_index,
+								play_type,
+								&speech_item);
+						}
+					}
+				}
+			}
+
+			if (!busy)
+			{
+				conversation->line_spoken = TRUE;
+				conversation->header.any_line_spoken = TRUE;
+			}
+		}
+
+		if (conversation->line_spoken)
+		{
+			if (!conversation->line_finished)
+			{
+				if (conversation->line_unit_index == NONE)
+				{
+					sound_definition_index = conversation->line_sound_index;
+					conversation->line_finished =
+						sound_definition_index == NONE ||
+							scripted_sound_time(sound_definition_index) == 0;
+				}
+				else
+				{
+					unit = unit_get(conversation->line_unit_index);
+					conversation->line_finished =
+						unit->unit.speech.current.priority !=
+							_ai_communication_priority_yell;
+				}
+			}
+
+			if (conversation->line_finished)
+			{
+				delay_timer = conversation->line_delay_timer;
+				if (delay_timer > 0)
+				{
+					conversation->line_delay_timer = (short)(delay_timer - 1);
+					return conversation->line_advance;
+				}
+
+				conversation->line_advance = TRUE;
+				if ((conversation->line_flags & FLAG(
+					_ai_conversation_line_wait_after_until_told_to_advance_bit)) != 0)
+				{
+					if (!conversation->header.waiting_to_advance)
+					{
+						conversation->header.waiting_to_advance = TRUE;
+						conversation->header.told_to_advance = FALSE;
+					}
+
+					if (conversation->header.told_to_advance)
+					{
+						conversation->header.waiting_to_advance = FALSE;
+					}
+					else
+					{
+						conversation->line_advance = FALSE;
+					}
+				}
+			}
+		}
+	}
+
+	return conversation->line_advance;
+}
+
+static struct scenario_conversation_definition_view *code_000322c0(
+	long conversation_index)
+{
+	struct ai_conversation_driver_datum_view *conversation;
+
+	conversation = ai_conversation_driver_get(conversation_index);
+	return TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_conversations,
+		conversation->header.scenario_conversation_index,
+		struct scenario_conversation_definition_view);
+}
+
 boolean ai_conversation(
 	short scenario_conversation_index,
 	boolean scripted)
@@ -2442,6 +2841,157 @@ boolean ai_conversation(
 	}
 
 	return result;
+}
+
+void ai_conversation_update(
+	void)
+{
+	struct data_iterator iterator;
+	struct ai_conversation_driver_datum_view *conversation;
+	long time;
+
+	time = game_time_get();
+	data_iterator_new(&iterator, conversation_data);
+	conversation = (struct ai_conversation_driver_datum_view *)data_iterator_next(&iterator);
+	while (conversation)
+	{
+		struct scenario_conversation_definition_view *definition;
+
+		definition = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->ai_conversations,
+			conversation->header.scenario_conversation_index,
+			struct scenario_conversation_definition_view);
+		if (!conversation->header.begun)
+		{
+			boolean continue_trying;
+
+			continue_trying = TRUE;
+			if ((time - conversation->header.creation_time) % 30 == 0)
+			{
+				if (ai_print_conversations)
+				{
+					console_printf(
+						FALSE,
+						"%s: trying to begin",
+						definition->name);
+				}
+
+				code_00034020(iterator.datum_index, &continue_trying);
+			}
+
+			if (!conversation->header.begun && !continue_trying)
+			{
+				if (ai_print_conversations)
+				{
+					console_printf(
+						FALSE,
+						"%s: unable to begin, and no point in continuing",
+						definition->name);
+				}
+
+				ai_conversation_finish(iterator.datum_index, TRUE, FALSE);
+			}
+		}
+
+		if (conversation->header.begun && !conversation->header.finished)
+		{
+			boolean perform;
+
+			perform = conversation->current_line >= 0 &&
+				conversation->current_line < definition->lines.count;
+			while (!perform || code_00032030(iterator.datum_index))
+			{
+				if (perform)
+				{
+					code_000322c0(iterator.datum_index);
+				}
+
+				conversation->current_line++;
+				if (conversation->current_line < definition->lines.count)
+				{
+					perform = code_00031e80(iterator.datum_index);
+				}
+				else
+				{
+					if (ai_print_conversations)
+					{
+						console_printf(
+							FALSE,
+							"%s: no more lines to play",
+							definition->name);
+					}
+
+					conversation->header.finished = TRUE;
+					break;
+				}
+			}
+		}
+
+		if (conversation->header.finished)
+		{
+			ai_conversation_finish(iterator.datum_index, FALSE, TRUE);
+		}
+		else if (conversation->header.begun)
+		{
+			short participant_index;
+
+			for (participant_index = 0;
+				participant_index < definition->participants.count;
+				participant_index++)
+			{
+				if (TEST_FLAG(conversation->participant_bitmask, participant_index) &&
+					conversation->actor_indices[participant_index] != NONE)
+				{
+					struct actor_datum *actor;
+					long actor_unit_index;
+					long speaker_unit_index;
+
+					actor = actor_get(conversation->actor_indices[participant_index]);
+					actor->external_orders.conversation_index = iterator.datum_index;
+					actor_unit_index = actor->meta.unit_index;
+					actor->external_orders.conversation_attention_unit_index = NONE;
+					speaker_unit_index = conversation->line_unit_index;
+					if (actor_unit_index == speaker_unit_index)
+					{
+						actor->external_orders.conversation_attention_unit_index =
+							conversation->line_address_unit_index;
+					}
+					else
+					{
+						long address_unit_index;
+
+						address_unit_index = conversation->line_address_unit_index;
+						if (actor_unit_index == address_unit_index &&
+							TEST_FLAG(
+								conversation->line_flags,
+								_ai_conversation_line_addressee_look_back_bit))
+						{
+							actor->external_orders.conversation_attention_unit_index =
+								speaker_unit_index;
+						}
+						else if (TEST_FLAG(
+							conversation->line_flags,
+							_ai_conversation_line_everyone_look_at_speaker_bit))
+						{
+							actor->external_orders.conversation_attention_unit_index =
+								speaker_unit_index;
+						}
+						else if (TEST_FLAG(
+							conversation->line_flags,
+							_ai_conversation_line_everyone_look_at_addressee_bit))
+						{
+							actor->external_orders.conversation_attention_unit_index =
+								address_unit_index;
+						}
+					}
+				}
+			}
+		}
+
+		conversation = (struct ai_conversation_driver_datum_view *)data_iterator_next(&iterator);
+	}
+
+	return;
 }
 
 /* ---------- private code */
