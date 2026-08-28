@@ -109,7 +109,9 @@ struct ai_debug_state
 {
 	boolean enter_debugger;
 	boolean select_this_actor;
-	char __unknown02[16];
+	char __unknown02[6];
+	boolean flee_always;
+	char __unknown09[9];
 	char selected_squad_name[32];
 	int selected_squad_index;
 	int selected_actor_index;
@@ -195,6 +197,9 @@ struct ai_debug_state
 	long last_render_id;
 	char __unknownF8[547380];
 };
+
+typedef char ai_debug_state_flee_always_offset_assert[
+	offsetof(struct ai_debug_state, flee_always) == 0x8 ? 1 : -1];
 
 struct actor_debug_info
 {
@@ -307,19 +312,31 @@ struct actor_debug_info
 
 /* ---------- prototypes/AI_DEBUG.C */
 
-void ai_debug_initialize(void);
+void ai_debug_initialize(
+	void);
 
-void ai_debug_initialize_for_new_map(void);
+void ai_debug_initialize_for_new_map(
+	void);
 
-void ai_debug_change_selected_encounter(boolean a1);
+void ai_debug_change_selected_encounter(
+	boolean a1);
 
-void ai_debug_change_selected_actor(boolean a1);
+void ai_debug_change_selected_actor(
+	boolean a1);
 
-char *ai_debug_describe_actor(long actor_index, long unit_index, boolean include_squad, char *buffer, long bufsize);
+char *ai_debug_describe_actor(
+	long actor_index,
+	long unit_index,
+	boolean include_squad,
+	char *buffer,
+	long bufsize);
 
-struct path_debug_storage *ai_debug_get_last_path(long);
+struct path_debug_storage *ai_debug_get_last_path(
+	long actor_index);
 
-boolean ai_debug_highlight_cluster(short index, real_argb_color const **highlight_color);
+boolean ai_debug_highlight_cluster(
+	short index,
+	real_argb_color const **highlight_color);
 
 /* ---------- globals */
 

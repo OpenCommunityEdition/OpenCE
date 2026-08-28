@@ -56,15 +56,27 @@ struct action_specification
 	real_argb_color const *const *color;
 	unsigned long data_size;
 	short action_class;
-	void(*begin)(long);
-	boolean(*perform)(long);
-	void(*update)(long);
-	void(*control)(long);
-	void(*end)(long);
-	void(*modify_color)(long, real_argb_color *);
-	void(*replace_prop)(long, long, long);
-	void(*flush_position_indices)(long);
-	void(*flush_structure_indices)(long);
+	void (*begin)(
+		long actor_index);
+	boolean (*perform)(
+		long actor_index);
+	void (*update)(
+		long actor_index);
+	void (*control)(
+		long actor_index);
+	void (*end)(
+		long actor_index);
+	void (*modify_color)(
+		long actor_index,
+		real_argb_color *color);
+	void (*replace_prop)(
+		long actor_index,
+		long invalid_prop_index,
+		long replacement_prop_index);
+	void (*flush_position_indices)(
+		long actor_index);
+	void (*flush_structure_indices)(
+		long actor_index);
 };
 
 struct sleep_state_data
@@ -392,9 +404,9 @@ boolean actor_action_handle_panic_from_burning_to_death(
 	long actor_index);
 boolean actor_action_handle_panic_transition(
 	long actor_index,
-	boolean panic_from_unopposable,
-	boolean panic_from_damage,
-	short panic_type);
+	short minimum_panic_type,
+	boolean communicate_failure,
+	short force_panic_type);
 boolean actor_action_handle_berserking_from_attacking_mode(
 	long actor_index);
 boolean actor_action_handle_berserking_from_damage(
@@ -414,7 +426,7 @@ boolean actor_action_handle_active_cover_seeking(
 	boolean allow_active_cover);
 boolean actor_action_handle_danger_avoidance(
 	long actor_index);
-void actor_action_handle_vehicle_entry(
+boolean actor_action_handle_vehicle_entry(
 	long actor_index);
 boolean actor_action_handle_vehicle_exit(
 	long actor_index);
@@ -430,24 +442,37 @@ boolean actor_action_handle_evasion(
 	long actor_index);
 boolean actor_action_can_stop_guarding(
 	long actor_index,
-	short combat_action,
-	short guard_action);
+	short guard_investigate_threshold,
+	short cower_investigate_threshold);
 boolean actor_action_handle_done_fleeing(
 	long actor_index);
 boolean actor_action_consider_grenade(
 	long actor_index);
-void actor_action_handle_exit_pursuit(
+boolean actor_action_handle_exit_pursuit(
 	long actor_index);
 boolean actor_action_can_stop_conversing(
 	long actor_index);
+boolean actor_action_try_to_enter_vehicle(
+	long actor_index,
+	long vehicle_index,
+	char const *seat_substring_name,
+	short seat_desire_type,
+	short precomputed_seat_count,
+	short *precomputed_seat_indices);
 
-struct pursuit_location *actor_get_pursuit_location(long actor_index);
+struct pursuit_location *actor_get_pursuit_location(
+	long actor_index);
 
-real_argb_color *actor_action_debug_color(long actor_index);
+real_argb_color *actor_action_debug_color(
+	long actor_index);
 
 /* ---------- prototypes/ACTION_OBEY.C */
 
-void action_obey_describe_command(struct scenario *scenario, struct ai_command_definition *command, char *string, long string_size);
+void action_obey_describe_command(
+	struct scenario *scenario,
+	struct ai_command_definition *command,
+	char *string,
+	long string_size);
 
 /* ---------- prototypes/ACTION_FIGHT.C */
 
