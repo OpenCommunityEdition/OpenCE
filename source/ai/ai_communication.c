@@ -812,6 +812,9 @@ static void code_00031970(
 	short type,
 	short priority,
 	long object_index);
+long code_00031d50(
+	short scenario_conversation_index,
+	boolean scripted);
 boolean actor_is_fighting(
 	long actor_index);
 static void code_000322f0(
@@ -866,6 +869,9 @@ void actor_handle_communication(
 	long actor_index,
 	long prop_index,
 	struct ai_information_packet *information);
+boolean code_00034020(
+	long conversation_index,
+	boolean *continue_trying);
 
 extern short global_communication_table_indices[NUMBER_OF_COMMUNICATION_TYPES];
 extern struct ai_communication_globals_view *ai_globals;
@@ -2346,6 +2352,96 @@ void ai_conversation_unit_died(
 	}
 	ai_conversation_finish(iterator.datum_index, FALSE, FALSE);
 	return;
+}
+
+boolean ai_conversation(
+	short scenario_conversation_index,
+	boolean scripted)
+{
+	struct scenario *scenario;
+	long conversation_index;
+	boolean result;
+
+	scenario = global_scenario_get();
+	result = FALSE;
+	if (scenario_conversation_index >= 0 &&
+		scenario_conversation_index < scenario->ai_conversations.count)
+	{
+		conversation_index = code_00031d50(
+			scenario_conversation_index,
+			scripted);
+		if (ai_print_conversations)
+		{
+			console_printf(
+				FALSE,
+				"%s: script tried to start conversation",
+				TAG_BLOCK_GET_ELEMENT(
+					&global_scenario_get()->ai_conversations,
+					scenario_conversation_index,
+					struct scenario_conversation_definition_view)->name);
+		}
+
+		if (conversation_index == NONE)
+		{
+			error(
+				2,
+				"WARNING: too many executing conversations (ran out of MAXIMUM_CONVERSATIONS_PER_MAP %d)",
+				128);
+		}
+		else
+		{
+			boolean continue_trying;
+
+			continue_trying = FALSE;
+			if (code_00034020(conversation_index, &continue_trying))
+			{
+				if (ai_print_conversations)
+				{
+					console_printf(
+						FALSE,
+						"%s: begun successfully",
+						TAG_BLOCK_GET_ELEMENT(
+							&global_scenario_get()->ai_conversations,
+							scenario_conversation_index,
+							struct scenario_conversation_definition_view)->name);
+				}
+
+				result = TRUE;
+			}
+			else if (continue_trying)
+			{
+				if (ai_print_conversations)
+				{
+					console_printf(
+						FALSE,
+						"%s: can't begin yet but will remember and keep trying it",
+						TAG_BLOCK_GET_ELEMENT(
+							&global_scenario_get()->ai_conversations,
+							scenario_conversation_index,
+							struct scenario_conversation_definition_view)->name);
+				}
+
+				result = TRUE;
+			}
+			else
+			{
+				if (ai_print_conversations)
+				{
+					console_printf(
+						FALSE,
+						"%s: could not start, and not set to keep trying... aborting (status 5)",
+						TAG_BLOCK_GET_ELEMENT(
+							&global_scenario_get()->ai_conversations,
+							scenario_conversation_index,
+							struct scenario_conversation_definition_view)->name);
+				}
+
+				ai_conversation_finish(conversation_index, TRUE, FALSE);
+			}
+		}
+	}
+
+	return result;
 }
 
 /* ---------- private code */

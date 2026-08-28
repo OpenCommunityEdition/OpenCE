@@ -57,7 +57,11 @@ void ai_conversation_finish(
 	boolean force);
 void ai_conversation_stop(
 	short scenario_conversation_index);
-real ai_communication_get_player_rating(real unit_index, boolean test_line_of_sight, long *unit_index_reference, real *distance_reference);
+real ai_communication_get_player_rating(
+	long unit_index,
+	boolean test_line_of_sight,
+	long *unit_index_reference,
+	real *distance_reference);
 
 /* ---------- globals */
 
