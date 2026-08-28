@@ -1036,7 +1036,7 @@ static boolean unit_animation_set_state(
 	short new_state);
 short unit_update_animation(
 	long unit_index,
-	struct unit_animation_update_data const *data);
+	struct unit_animation_update_data *data);
 
 static boolean unit_verify_inventory(long unit_index);
 static void unit_throw_grenade_release(long unit_index, boolean premature);
@@ -5601,7 +5601,7 @@ boolean unit_update(
 		real aim_scale;
 		real aiming_velocity_limit;
 		real aiming_angular_acceleration_limit;
-		real_vector3d previous_aiming_vector;
+		real_vector3d last_aiming_vector;
 
 		if (!TEST_FLAG(unit->object.damage_flags, _object_dead_bit))
 		{
@@ -5704,7 +5704,7 @@ boolean unit_update(
 
 		aiming_velocity_limit = aim_scale*unit_definition->unit.aiming_velocity_maximum/TICKS_PER_SECOND;
 		aiming_angular_acceleration_limit = aim_scale*unit_definition->unit.aiming_acceleration_maximum/(TICKS_PER_SECOND*TICKS_PER_SECOND);
-		previous_aiming_vector = unit->unit.aiming_vector;
+		last_aiming_vector = unit->unit.aiming_vector;
 
 		if (aiming_velocity_limit==0.f && aiming_angular_acceleration_limit==0.f)
 		{
@@ -5717,15 +5717,15 @@ boolean unit_update(
 		}
 		else if (unit->unit.animation.aiming_with_euler_screen)
 		{
-			real_matrix4x3 matrix;
+			real_matrix4x3 object_matrix;
 
-			matrix.scale = 1.f;
-			object_get_orientation(unit_index, &matrix.forward, &matrix.up);
-			cross_product3d(&matrix.up, &matrix.forward, &matrix.left);
-			matrix.position = *global_origin3d;
+			object_matrix.scale = 1.f;
+			object_get_orientation(unit_index, &object_matrix.forward, &object_matrix.up);
+			cross_product3d(&object_matrix.up, &object_matrix.forward, &object_matrix.left);
+			object_matrix.position = *global_origin3d;
 
 			unit_euler_aiming_update(
-				&matrix,
+				&object_matrix,
 				&unit->unit.aiming_vector,
 				&unit->unit.desired_aiming_vector,
 				&unit->unit.aiming_velocity,
@@ -5747,7 +5747,7 @@ boolean unit_update(
 		}
 
 		{
-			real angle = angle_between_vectors3d(&unit->unit.aiming_vector, &previous_aiming_vector);
+			real angle = angle_between_vectors3d(&unit->unit.aiming_vector, &last_aiming_vector);
 			real change = angle / (unit_definition->unit.aiming_velocity_maximum/TICKS_PER_SECOND);
 				
 			unit->unit.aiming_change = (byte)(PIN(change, 0.f, 1.f) * 255.f);
@@ -5769,15 +5769,15 @@ boolean unit_update(
 			}
 			else if (unit->unit.animation.looking_with_euler_screen)
 			{
-				real_matrix4x3 matrix;
+				real_matrix4x3 object_matrix;
 
-				matrix.scale = 1.f;
-				object_get_orientation(unit_index, &matrix.forward, &matrix.up);
-				cross_product3d(&matrix.up, &matrix.forward, &matrix.left);
-				matrix.position = *global_origin3d;
+				object_matrix.scale = 1.f;
+				object_get_orientation(unit_index, &object_matrix.forward, &object_matrix.up);
+				cross_product3d(&object_matrix.up, &object_matrix.forward, &object_matrix.left);
+				object_matrix.position = *global_origin3d;
 
 				unit_euler_aiming_update(
-					&matrix,
+					&object_matrix,
 					&unit->unit.looking_vector,
 					&unit->unit.desired_looking_vector,
 					&unit->unit.looking_velocity,
@@ -9919,7 +9919,7 @@ static char const *code_0019dff0(
 
 short unit_update_animation(
 	long unit_index,
-	struct unit_animation_update_data const *data)
+	struct unit_animation_update_data *data)
 {
 	struct unit_datum *unit;
 	struct unit_definition *unit_definition;
@@ -9936,8 +9936,8 @@ short unit_update_animation(
 	struct unit_datum *parent_unit;
 	struct unit_definition *parent_definition;
 	struct unit_seat *seat;
-	real_vector3d root_velocity;
-	real_matrix4x3 world_matrix;
+	real_vector3d exit_velocity;
+	real_matrix4x3 old_world_matrix;
 
 	unit = unit_get(unit_index);
 	unit_definition = unit_definition_get(unit->definition_index);
@@ -9955,9 +9955,7 @@ short unit_update_animation(
 			unit->object.damage_flags,
 			_object_dead_bit))
 	{
-		short desired_base_seat_index;
-
-		desired_base_seat_index = NONE;
+		short desired_base_seat_index = NONE;
 
 		switch (unit->unit.animation.desired_state)
 		{
@@ -9982,8 +9980,6 @@ short unit_update_animation(
 			break;
 		case _unit_animation_state_flaming:
 			desired_base_seat_index = _unit_base_seat_flaming;
-			break;
-		default:
 			break;
 		}
 
@@ -10147,15 +10143,15 @@ short unit_update_animation(
 					model,
 					animation,
 					unit->object.animation.state.frame_index,
-					&root_velocity);
+					&exit_velocity);
 				matrix4x3_transform_vector(
-					object_get_world_matrix(unit_index, &world_matrix),
-					&root_velocity,
-					&root_velocity);
+					object_get_world_matrix(unit_index, &old_world_matrix),
+					&exit_velocity,
+					&exit_velocity);
 				unit_exit_seat_end(unit_index);
 				add_vectors3d(
 					&unit->object.translational_velocity,
-					&root_velocity,
+					&exit_velocity,
 					&unit->object.translational_velocity);
 				break;
 
