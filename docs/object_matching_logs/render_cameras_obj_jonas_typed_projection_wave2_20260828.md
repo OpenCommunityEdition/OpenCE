@@ -68,14 +68,16 @@ compiler-control tuning:
 
 | Function/body | Candidate padded/relocs/hash | January padded/relocs/hash |
 | --- | --- | --- |
-| `_render_camera_hack_frustum_z` HCEA body | 304 / 18 / `4cdfe41d…` | 288 / 17 / `f9d9dd9b…` |
-| `_render_frustum_get_projection_bounds` HCEA body | 208 / 14 / `4ff8c42f…` | 208 / 14 / `525c19ab…` |
-| `_render_camera_screen_to_view` HCEA store order | 256 / 20 / `62b840cd…` | 256 / 20 / `e77a8e2a…` |
+| `_render_camera_hack_frustum_z` HCEA body | 304 / 18 / `4cdfe41dd00b0f1ebb04c8cd0ae0d706821a8a92044ba8ccdae45b9fbd195f06` | 288 / 17 / `f9d9dd9ba7ae0736efc8d3fbf3b4b4e6a4e76eda77f40b5de246a73035e9a562` |
+| `_render_frustum_get_projection_bounds` HCEA body | 208 / 14 / `4ff8c42f8c72394e1ff30a96258c78f30400776374ed567f395eb821531eb5d1` | 208 / 14 / `525c19abec84c4ab23551ac7a70791fe39cb59e6adfbfde56e8a00004f61a02b` |
+| `_render_camera_screen_to_view` HCEA store order | 256 / 20 / `62b840cd3cc0a0457c6be2f477f6ded4f1c91724797be8ee732394df678fe125` | 256 / 20 / `e77a8e2a091747f035f6eaa403984bae2d352cf92d51a55c24db898a8340a24a` |
 
 File-history review then exposed a separately preserved PC source body, not a
 spelling permutation. It was emitted once. Its screen-to-view store order was
 strict exact; its projection-bounds body remained non-exact at 208 bytes,
-14 relocations, and normalized SHA-256 `017cb0c9…`, so projection bounds was
+14 relocations, and normalized SHA-256
+`017cb0c99bc2f53b0383086b12f4a020175d3f373e10d87d5004a3acaf03e2e4`,
+so projection bounds was
 again removed. Reopen the two residual functions only with a new authentic
 source topology or debug-scope evidence.
 

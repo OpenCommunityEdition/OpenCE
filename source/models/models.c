@@ -148,6 +148,43 @@ void model_get_node_orientations(
 	return;
 }
 
+short model_find_marker(
+	long model_index,
+	char const *name)
+{
+	if (model_index != NONE && name && *name)
+	{
+		struct model *model = model_definition_get(model_index);
+		short lower_bound = 0;
+		short upper_bound = (short)model->markers.count - 1;
+
+		while (lower_bound <= upper_bound)
+		{
+			short marker_index = (short)((lower_bound + upper_bound) / 2);
+			struct model_marker *marker = TAG_BLOCK_GET_ELEMENT(
+				&model->markers,
+				marker_index,
+				struct model_marker);
+			long comparison = _stricmp(name, marker->name);
+
+			if (comparison == 0)
+			{
+				return marker_index;
+			}
+			if (comparison < 0)
+			{
+				upper_bound = marker_index - 1;
+			}
+			else
+			{
+				lower_bound = marker_index + 1;
+			}
+		}
+	}
+
+	return NONE;
+}
+
 real_matrix4x3 *model_get_default_inverse_matrix(
 	struct model *model,
 	short node_index)
