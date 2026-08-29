@@ -424,6 +424,14 @@ real evaluate_piecewise_linear_function(
 	return result;
 }
 
+long player_control_get_aiming_unit_index(
+	short local_player_index)
+{
+	struct player_control *control = player_control_get(local_player_index);
+
+	return unit_get_aiming_unit_index(control->unit_index);
+}
+
 long player_control_get_unit_index(
 	short local_player_index)
 {
