@@ -178,6 +178,14 @@ typedef char path_input_start_point_offset_assert[
 	offsetof(struct path_input, start_point) == 0x14 ? 1 : -1];
 typedef char path_input_start_surface_index_offset_assert[
 	offsetof(struct path_input, start_surface_index) == 0x20 ? 1 : -1];
+typedef char path_state_destination_valid_offset_assert[
+	offsetof(struct path_state, destination_valid) == 0x4C ? 1 : -1];
+typedef char path_state_destination_offset_assert[
+	offsetof(struct path_state, destination) == 0x50 ? 1 : -1];
+typedef char path_destination_surface_index_offset_assert[
+	offsetof(struct path_destination, surface_index) == 0xC ? 1 : -1];
+typedef char path_destination_target_radius_offset_assert[
+	offsetof(struct path_destination, target_radius) == 0x10 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -239,6 +247,20 @@ void path_input_set_start(
 	input->start_valid = TRUE;
 	input->start_point = *start_point;
 	input->start_surface_index = start_surface_index;
+	return;
+}
+
+void path_state_destination(
+	struct path_state *state,
+	real_point3d const *destination_point,
+	long destination_surface_index,
+	real destination_accept_radius)
+{
+	state->destination_valid = TRUE;
+	state->destination.point = *destination_point;
+	state->destination.surface_index = destination_surface_index;
+	state->destination.target_radius = destination_accept_radius;
+
 	return;
 }
 
