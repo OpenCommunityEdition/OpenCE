@@ -61,6 +61,17 @@ enum
 
 /* ---------- macros */
 
+/* One element of unit_definition::dialogue_variants. January proves the
+ * 0x18-byte stride and the dialogue tag index at offset 0x14.
+ */
+struct unit_dialogue_variant
+{
+	short variant_number;
+	short pad;
+	char __unknown04[16];
+	long dialogue_index;
+};
+
 #define unit_definition_get(index) ((struct unit_definition *)tag_get(UNIT_DEFINITION_TAG, index))
 
 /* ---------- structures */

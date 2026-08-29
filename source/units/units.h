@@ -570,6 +570,13 @@ void unit_destroy(
 	long unit_index);
 void unit_died(long unit_index, boolean feigned);
 void unit_get_head_position(long unit_index, union real_point3d *head_position);
+char const *unit_get_speech_priority_name(
+	word priority);
+char const *unit_describe_speech(
+	long unit_index,
+	boolean abbreviated,
+	long buffer_size,
+	char *buffer);
 void unit_get_camera_position(long unit_index, real_point3d *camera_position);
 void unit_estimate_position(
 	long unit_index,

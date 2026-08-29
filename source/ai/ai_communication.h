@@ -62,6 +62,8 @@ real ai_communication_get_player_rating(
 	boolean test_line_of_sight,
 	long *unit_index_reference,
 	real *distance_reference);
+short ai_communication_get_type_by_name(
+	char const *name);
 
 /* ---------- globals */
 

@@ -27,6 +27,10 @@ file has inline function assertions.
 
 /* ---------- structures */
 
+struct actor_datum;
+struct actor_iterator;
+struct encounter_actor_iterator;
+
 struct encounter_datum
 {
 	short identifier;
@@ -119,6 +123,17 @@ void encounters_dispose(
 void encounters_dispose_from_old_map(
 	void);
 void encounter_compute_activation_cluster_bit_vector(long encounter_index, boolean update_actor_dormancy, long bit_vector_size, unsigned long const *active_area, unsigned long *bit_vector);
+
+void encounter_build_firing_position_owner_actor_indices(
+	long encounter_index,
+	long *owner_actor_indices);
+boolean encounter_pursuit_position_already_examined(
+	long encounter_index,
+	long actor_index,
+	short firing_position_index,
+	long start_time,
+	short *examined_count,
+	boolean flag);
 
 /* ---------- globals */
 

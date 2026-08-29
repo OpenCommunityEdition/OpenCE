@@ -18,6 +18,13 @@ header included in hcex build.
 
 enum
 {
+	// only the two bits ai_debug.c reads are named; the rest are unidentified
+	_encounter_3d_firing_positions_bit = 5,
+	_encounter_manual_structure_bsp_index_bit = 6,
+};
+
+enum
+{
 	_squad_unused_bit = 0,
 	_squad_never_search_bit,
 	_squad_timer_starts_immediately_bit,
@@ -113,6 +120,17 @@ struct squad_definition
 	struct tag_block unused_block;
 };
 
+/* element of encounter_definition.firing_positions; 0x18 from the call site,
+group_index at 0xc and the tag index at 0x14 from code_00041220 */
+struct firing_position
+{
+	real_point3d position;
+	short group_index;
+	short pad;
+	long __unknown10;
+	long field_14;
+};
+
 struct encounter_definition
 {
 	char name[TAG_STRING_LENGTH+1];
@@ -130,6 +148,16 @@ struct encounter_definition
 	struct tag_block platoons;
 	struct tag_block firing_positions;
 	struct tag_block player_starting_locations;
+};
+
+// element of squad_definition.starting_locations; the 0x1C size comes from the
+// call site and the field at 0x18 from the string "reset the actor variant in
+// all %d starting locations"
+struct actor_starting_location
+{
+	unsigned char __unknown00[0x18];
+	short actor_variant_index;
+	word pad;
 };
 
 struct platoon_definition

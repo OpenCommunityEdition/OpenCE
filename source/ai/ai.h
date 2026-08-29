@@ -104,6 +104,12 @@ void ai_handle_exit_vehicle(
 
 /* ---------- globals */
 
+void ai_index_to_string(
+	long ai_index,
+	struct scenario *scenario,
+	char *buffer,
+	long size);
+
 /* ---------- public code */
 
 #endif // __AI_H

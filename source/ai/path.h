@@ -112,7 +112,13 @@ struct path_node
 	short quantized_cost_estimate;
 	short depth;
 	short heap_location;
+	short last_render_id;
+	real closest_distance_to_attractor;
+	real_point3d closest_point_to_attractor;
 };
+
+typedef char path_node_size_assert[
+	sizeof(struct path_node) == 0x44 ? 1 : -1];
 
 struct path_heap_element
 {
@@ -138,6 +144,17 @@ struct path_state
 	short hash_table[PATH_HASH_TABLE_SIZE];
 };
 
+struct path_avoidance_obstacles
+{
+	char __unknown00[0xC08];
+};
+
+struct path_avoidance_path
+{
+	long field_00;
+	char __unknown04[0x1530];
+};
+
 struct path_debug_storage
 {
 	long actor_index;
@@ -149,10 +166,87 @@ struct path_debug_storage
 	short path_traverse_result;
 	short path_build_result;
 	struct path_state path_state;
-	char __unknown[51676];
+	char __unknown140A0[0x5C];
+	short raw_step_count;
+	word pad_140FE;
+	struct path_step raw_steps[64];
+	short smoothed_step_count;
+	word pad_14502;
+	struct path_step smoothed_steps[4];
+	short avoided_step_count;
+	word pad_14546;
+	struct path_step avoided_steps[4];
+	word pad_14588;
+	short avoidance_path_count;
+	struct path_avoidance_obstacles avoidance_obstacles[4];
+	struct path_avoidance_path avoidance_paths[4];
 };
 
+typedef char path_state_node_count_offset_assert[
+	offsetof(struct path_state, node_count) == 0x80 ? 1 : -1];
+typedef char path_state_node_list_offset_assert[
+	offsetof(struct path_state, node_list) == 0x84 ? 1 : -1];
+typedef char path_state_hash_table_offset_assert[
+	offsetof(struct path_state, hash_table) == 0x1208A ? 1 : -1];
+typedef char path_state_size_assert[
+	sizeof(struct path_state) == 0x1408C ? 1 : -1];
+
+typedef char path_debug_storage_size_assert[
+	sizeof(struct path_debug_storage) == 0x1CA7C ? 1 : -1];
+typedef char path_debug_storage_raw_steps_offset_assert[
+	offsetof(struct path_debug_storage, raw_steps) == 0x14100 ? 1 : -1];
+typedef char path_debug_storage_avoided_steps_offset_assert[
+	offsetof(struct path_debug_storage, avoided_steps) == 0x14548 ? 1 : -1];
+
 /* ---------- prototypes/PATH.C */
+
+// argument order is read off the call sites in ai_debug_update; every parameter
+// is dword-sized, so the middle names of path_input_new are not pinned by it
+void path_input_new(
+	struct path_input *input,
+	real pathfinding_radius,
+	boolean ignore_broken_surfaces,
+	long ignore_source_object_index);
+void path_input_set_start(
+	struct path_input *input,
+	real_point3d const *point,
+	long surface_index);
+void path_input_set_search_bounds(
+	struct path_input *input,
+	real maximum_distance);
+void path_input_set_attractor(
+	struct path_input *input,
+	real_point3d const *point,
+	real radius,
+	long object_index,
+	real weight);
+
+void path_state_new(
+	struct path_input const *input,
+	struct path_state *state,
+	struct path_debug_storage *debug);
+void path_state_destination(
+	struct path_state *state,
+	real_point3d const *point,
+	long surface_index,
+	real target_radius);
+void path_state_find(
+	struct path_state *state);
+void path_state_build_path(
+	struct path_state *state,
+	boolean *complete);
+
+struct path_node *path_get_node(
+	struct path_state *state,
+	short node_index);
+short path_node_from_hash_table(
+	struct path_state *state,
+	long surface_index);
+real path_attractor_weight(
+	struct path_state *state,
+	real_point3d const *point,
+	real_point3d const *previous_point,
+	real *closest_distance);
 
 void paths_initialize(
 	void);

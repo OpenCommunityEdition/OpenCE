@@ -144,6 +144,16 @@ struct scenario_starting_profile
 typedef char scenario_starting_profile_size_assert[
 	sizeof(struct scenario_starting_profile) == 0x68 ? 1 : -1];
 
+struct encounter_player_starting_location
+{
+	real_point3d position;
+	real facing;
+	short team_index;
+	word pad12;
+	short game_types[4];
+	char __unknown1c[24];
+};
+
 struct scenario
 {
 	struct tag_reference ugly_structure_bsp;

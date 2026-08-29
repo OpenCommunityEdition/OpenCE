@@ -597,7 +597,7 @@ enum
 
 /* ---------- macros */
 
-#define ai_print_conversations (ai_debug.__unknown3C[99])
+#define ai_print_conversations (ai_debug.print_conversations)
 #define ai_conversation_driver_get(index) \
 	((struct ai_conversation_driver_datum_view *)datum_get(conversation_data, (index)))
 
@@ -830,7 +830,7 @@ typedef char ai_conversation_driver_line_address_unit_index_offset_assert[
 typedef char recent_conversation_view_size_assert[
 	sizeof(struct recent_conversation_view) == 0x10 ? 1 : -1];
 typedef char ai_print_conversations_offset_assert[
-	offsetof(struct ai_debug_state, __unknown3C) + 99 == 0x9F ? 1 : -1];
+	offsetof(struct ai_debug_state, print_conversations) == 0x9F ? 1 : -1];
 typedef char ai_communication_unit_speech_item_size_assert[
 	sizeof(struct unit_speech_item) == 0x30 ? 1 : -1];
 typedef char ai_communication_unit_speech_item_ai_offset_assert[

@@ -857,6 +857,13 @@ boolean actor_perception_create_orphan_from_friend(
 	long friend_actor_index,
 	long friend_prop_index);
 
+// prototypes/ACTOR_LOOKING.C
+void actor_looking_test_validity(
+	long actor_index,
+	real_vector3d const *vector,
+	boolean *aiming_valid,
+	boolean *looking_valid);
+
 void actor_get_vision_distances(long actor_index, real maximum_vision_distance, real perception_factor, real horizontal_angle, real *full_distance_reference, real *partial_distance_reference);
 
 void actor_berserk(

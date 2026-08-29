@@ -18,6 +18,18 @@ header included in hcex build.
 
 enum
 {
+	MAXIMUM_AI_DEBUG_LINEOFFIRE_PILLS = 16,
+	MAXIMUM_AI_DEBUG_IDLE_LOOK_PROPS = 32,
+	NUMBER_OF_AI_DEBUG_COMMUNICATION_TYPES = 57,
+	NUMBER_OF_AI_DEBUG_VOCALIZATION_TYPES = 209,
+	MAXIMUM_AI_DEBUG_LINEOFSIGHT_POINTS = 16384,
+	MAXIMUM_AI_DEBUG_LINEOFSIGHT_PAIRS = 8192,
+	NUMBER_OF_AI_DEBUG_ACTOR_RECORDS = 512,
+	MAXIMUM_AI_DEBUG_PATH_STORAGE = 32,
+};
+
+enum
+{
 	_firing_disabled = 0,
 	_firing_busy,
 	_firing_wrong_target,
@@ -105,29 +117,109 @@ enum
 
 /* ---------- structures */
 
-struct ai_debug_unknown_state
+/* cleared whole by ai_debug_select_encounter, so one object in the original.
+Only the three members code_00041220 reads are named. */
+struct ai_debug_block_7D384
 {
-	char __unknown0[1648];
+	char __unknown000[67];
+	boolean field_043;
+	char __unknown044[1464];
+	boolean field_5FC;
+	char __unknown5FD[7];
+	real_point3d field_604;
+	char __unknown610[96];
 };
 
-struct ai_debug_firing_position
+struct ai_debug_actor_record
 {
-	boolean pursuit_position;
-	boolean evaluated;
-	char __unknown2[62];
+	boolean field_00;
+	boolean field_01;
+	char __unknown02[34];
+	real_point3d field_24;
+	char __unknown30[4];
+	boolean field_34;
+	char __unknown35[3];
+	real field_38;
+	real field_3C;
+};
+
+struct ai_debug_lineofsight_pair
+{
+	short start_index;
+	short end_index;
+	short reference_count;
 };
 
 struct ai_debug_state
 {
 	boolean enter_debugger;
 	boolean select_this_actor;
-	char __unknown02[6];
+	boolean fix_defending_guard_firing_positions;
+	boolean fix_actor_variants;
+	boolean fast_los;
+	boolean evaluate_all_positions;
+	boolean ignore_player;
+	boolean invisible_player;
 	boolean flee_always;
-	char __unknown09[9];
+	boolean force_all_active;
+	boolean disable_wounded_sounds;
+	boolean blind;
+	boolean deaf;
+	boolean force_vocalizations;
+	boolean force_crouch;
+	boolean path_disable_obstacle_avoidance;
+	boolean path_disable_smoothing;
+	boolean oversteer_disable;
 	char selected_squad_name[32];
 	int selected_squad_index;
 	int selected_actor_index;
-	char __unknown3C[105];
+	boolean path;
+	boolean path_start_freeze;
+	boolean path_end_freeze;
+	boolean path_flood;
+	real path_maximum_radius;
+	boolean path_attractor;
+	char __unknown45[3];
+	real path_attractor_radius;
+	real path_attractor_weight;
+	real path_accept_radius;
+	unsigned long communication_suppress_vector[BIT_VECTOR_SIZE_IN_LONGS(NUMBER_OF_AI_DEBUG_COMMUNICATION_TYPES)];
+	unsigned long communication_ignore_vector[BIT_VECTOR_SIZE_IN_LONGS(NUMBER_OF_AI_DEBUG_COMMUNICATION_TYPES)];
+	unsigned long communication_focus_vector[BIT_VECTOR_SIZE_IN_LONGS(NUMBER_OF_AI_DEBUG_VOCALIZATION_TYPES)];
+	char __unknown80[4];
+	boolean communication_focus_enable;
+	boolean communication_random_disabled;
+	boolean communication_timeout_disabled;
+	boolean communication_unit_repeat_disabled;
+	boolean ballistic_lineoffire_freeze;
+	boolean print_major_upgrade;
+	boolean print_pursuit_checks;
+	boolean print_rules;
+	boolean print_rule_values;
+	boolean print_respawn;
+	boolean print_evaluation_statistics;
+	boolean print_communication;
+	boolean print_communication_player;
+	boolean print_vocalizations;
+	boolean print_placement;
+	boolean print_speech;
+	boolean print_speech_timers;
+	boolean print_allegiance;
+	boolean print_lost_speech;
+	boolean print_migration;
+	boolean print_automatic_migration;
+	boolean print_scripting;
+	boolean print_surprise;
+	boolean print_command_lists;
+	boolean print_damage_modifiers;
+	boolean print_secondary_looking;
+	boolean print_oversteer;
+	boolean print_conversations;
+	boolean print_killing_sprees;
+	boolean print_acknowledgement;
+	boolean print_unfinished_paths;
+	boolean print_bsp_transition;
+	boolean print_uncovering;
 	boolean render;
 	boolean render_all_actors;
 	boolean render_inactive_actors;
@@ -209,39 +301,112 @@ struct ai_debug_state
 	long last_render_id;
 	boolean lineoffire_valid;
 	boolean lineoffire_success;
-	real_point3d lineoffire_origin;
+	char __unknownFA[2];
+	real_point3d lineoffire_start;
 	real_vector3d lineoffire_vector;
-	long lineoffire_numpills;
-	boolean lineoffire_pillhit[16];
-	real_point3d lineoffire_pillbase[16];
-	real_vector3d lineoffire_pilldirectedheight[16];
-	real lineoffire_pillwidth[16];
-	boolean lineofsight_overflow;
-	long lineofsight_numpoints;
-	char __unknown2F0[262144];
-	long field_42F0;
-	char __unknown42F4[50472];
+	long lineoffire_pill_count;
+	boolean lineoffire_pill_hit[MAXIMUM_AI_DEBUG_LINEOFFIRE_PILLS];
+	real_point3d lineoffire_pill_start[MAXIMUM_AI_DEBUG_LINEOFFIRE_PILLS];
+	real_vector3d lineoffire_pill_vector[MAXIMUM_AI_DEBUG_LINEOFFIRE_PILLS];
+	real lineoffire_pill_radius[MAXIMUM_AI_DEBUG_LINEOFFIRE_PILLS];
+	boolean lineofsight_overflowed;
+	char __unknown2E9[3];
+	long lineofsight_point_count;
+	real_point3d lineofsight_point[MAXIMUM_AI_DEBUG_LINEOFSIGHT_POINTS];
+	short lineofsight_point_reference_count[MAXIMUM_AI_DEBUG_LINEOFSIGHT_POINTS];
+	short lineofsight_point_key[MAXIMUM_AI_DEBUG_LINEOFSIGHT_POINTS];
+	long lineofsight_pair_count;
+	struct ai_debug_lineofsight_pair lineofsight_pair[MAXIMUM_AI_DEBUG_LINEOFSIGHT_PAIRS];
+	boolean ballistic_lineoffire_valid;
+	boolean ballistic_lineoffire_success;
+	char __unknown4C2F6[2];
+	real_point3d ballistic_lineoffire_start;
+	real_vector3d ballistic_lineoffire_vector;
+	long ballistic_lineoffire_pill_count;
+	real_point3d ballistic_lineoffire_pill_start[MAXIMUM_AI_DEBUG_LINEOFFIRE_PILLS];
+	real_vector3d ballistic_lineoffire_pill_end[MAXIMUM_AI_DEBUG_LINEOFFIRE_PILLS];
+	real ballistic_lineoffire_pill_radius[MAXIMUM_AI_DEBUG_LINEOFFIRE_PILLS];
+	long ballistic_lineoffire_point_count;
+	// the bound is not provable from the object -- nothing references the end of
+	// this array. 64 leaves the 16 bytes below, which are equally unaccounted for.
+	real_point3d ballistic_lineoffire_point[64];
+	char __unknown4C7D8[16];
+	boolean path_start_valid;
+	char __unknown4C7E9[3];
+	real_point3d path_start_point;
+	long path_start_surface_index;
+	long path_start_unit_index;
+	boolean path_end_valid;
+	char __unknown4C801[3];
+	real_point3d path_end_point;
+	long path_end_surface_index;
+	real field_4C814;
+	boolean field_4C818;
+	char __unknown4C819[3];
 	struct path_state path_state;
-	struct path_result path;
-	struct path_debug_storage path_debug;
-	char __unknown_after_path_debug[16384];
-	boolean firing_position_context_valid;
-	byte pad[3];
-	struct ai_debug_unknown_state field_7D384;
-	struct ai_debug_firing_position firing_positions[512];
-	char __unknown859F4[32];
+	boolean field_608A8;
+	char __unknown608A9[91];
+	struct path_debug_storage path_storage;
+	boolean field_7D380;
+	char __unknown7D381[3];
+	struct ai_debug_block_7D384 field_7D384;
+	struct ai_debug_actor_record actor_record[NUMBER_OF_AI_DEBUG_ACTOR_RECORDS];
+	long field_859F4;
+	boolean field_859F8;
+	boolean field_859F9;
+	char __unknown859FA[2];
+	real_vector3d field_859FC;
+	real_vector3d field_85A08;
 	boolean idle_look_valid;
-	long prop_idle_actor_index;
-	short prop_idle_look_count;
-	long prop_idle_look_indicies[32];
-	real prop_idle_look_distances[32];
-	boolean field_85B20;
+	char __unknown85A15[3];
+	long idle_look_unit_index;
+	short idle_look_prop_count;
+	char __unknown85A1E[2];
+	long idle_look_prop_index[MAXIMUM_AI_DEBUG_IDLE_LOOK_PROPS];
+	real idle_look_prop_weight[MAXIMUM_AI_DEBUG_IDLE_LOOK_PROPS];
+	boolean speak_valid;
 	boolean field_85B21;
 	boolean field_85B22;
-	long speaking_unit_index;
+	char __unknown85B23[1];
+	long speak_unit_index;
 	short field_85B28;
-	short vocalization_type;
+	short speak_vocalization_type;
 };
+
+typedef char ai_debug_state_path_offset_assert[
+	offsetof(struct ai_debug_state, path) == 0x3C ? 1 : -1];
+typedef char ai_debug_state_print_speech_offset_assert[
+	offsetof(struct ai_debug_state, print_speech) == 0x93 ? 1 : -1];
+typedef char ai_debug_state_render_offset_assert[
+	offsetof(struct ai_debug_state, render) == 0xA5 ? 1 : -1];
+typedef char ai_debug_state_last_render_id_offset_assert[
+	offsetof(struct ai_debug_state, last_render_id) == 0xF4 ? 1 : -1];
+typedef char ai_debug_state_ballistic_lineoffire_valid_offset_assert[
+	offsetof(struct ai_debug_state, ballistic_lineoffire_valid) == 0x4C2F4 ? 1 : -1];
+typedef char ai_debug_state_ballistic_lineoffire_point_count_offset_assert[
+	offsetof(struct ai_debug_state, ballistic_lineoffire_point_count) == 0x4C4D4 ? 1 : -1];
+typedef char ai_debug_state_field_859F4_offset_assert[
+	offsetof(struct ai_debug_state, field_859F4) == 0x859F4 ? 1 : -1];
+typedef char ai_debug_state_path_state_offset_assert[
+	offsetof(struct ai_debug_state, path_state) == 0x4C81C ? 1 : -1];
+typedef char ai_debug_state_path_storage_offset_assert[
+	offsetof(struct ai_debug_state, path_storage) == 0x60904 ? 1 : -1];
+typedef char ai_debug_state_field_7D3C7_offset_assert[
+	offsetof(struct ai_debug_state, field_7D384.field_043) == 0x7D3C7 ? 1 : -1];
+typedef char ai_debug_state_field_7D980_offset_assert[
+	offsetof(struct ai_debug_state, field_7D384.field_5FC) == 0x7D980 ? 1 : -1];
+typedef char ai_debug_state_field_7D988_offset_assert[
+	offsetof(struct ai_debug_state, field_7D384.field_604) == 0x7D988 ? 1 : -1];
+typedef char ai_debug_state_actor_record_offset_assert[
+	offsetof(struct ai_debug_state, actor_record) == 0x7D9F4 ? 1 : -1];
+typedef char ai_debug_actor_record_size_assert[
+	sizeof(struct ai_debug_actor_record) == 0x40 ? 1 : -1];
+typedef char ai_debug_actor_record_field_24_offset_assert[
+	offsetof(struct ai_debug_actor_record, field_24) == 0x24 ? 1 : -1];
+typedef char ai_debug_actor_record_field_3C_offset_assert[
+	offsetof(struct ai_debug_actor_record, field_3C) == 0x3C ? 1 : -1];
+typedef char ai_debug_state_field_7D380_offset_assert[
+	offsetof(struct ai_debug_state, field_7D380) == 0x7D380 ? 1 : -1];
 
 struct actor_debug_info
 {
@@ -369,17 +534,41 @@ void ai_debug_clear_storage(
 void ai_debug_actor_deleted(
 	long actor_index);
 
+void ai_debug_initialize_for_new_map(
+	void);
+
+void ai_debug_render(
+	void);
+
+// hs.c declares this as (long, char const *); the object shows the actor comes
+// from ai_debug.selected_actor_index and both parameters are names
+void ai_debug_vocalize(
+	char const *priority_name,
+	char const *vocalization_name);
+
+void ai_debug_change_selected_encounter(
+	boolean a1);
+
+void ai_debug_change_selected_actor(
+	boolean a1);
+
+void ai_debug_select_encounter(
+	long encounter_index);
+void ai_debug_select_actor(
+	long encounter_index,
+	long actor_index);
+
+char *ai_debug_describe_actor(
+	long actor_index,
+	long unit_index,
+	boolean include_squad,
+	char *buffer,
+	long bufsize);
+
 struct path_debug_storage *ai_debug_get_last_path(
 	long actor_index);
 
 struct path_debug_storage *ai_debug_get_path_storage(
-	long actor_index);
-
-void ai_debug_select_encounter(
-	long encounter_index);
-
-void ai_debug_select_actor(
-	long encounter_index,
 	long actor_index);
 
 void ai_debug_sound_point_set(
@@ -405,28 +594,8 @@ boolean ai_debug_highlight_cluster(
 void ai_debug_lineofsight_reset(
 	void);
 
-char *ai_debug_describe_actor(
-	long actor_index,
-	long unit_index,
-	boolean include_squad,
-	char *buffer,
-	long bufsize);
-
-void ai_debug_vocalize(
-	char const *speech_priority_name,
-	char const *vocalization_type_name);
-
 void ai_debug_speak(
 	char const *vocalization_type_name);
-
-void ai_debug_initialize_for_new_map(
-	void);
-
-void ai_debug_change_selected_encounter(
-	boolean a1);
-
-void ai_debug_change_selected_actor(
-	boolean a1);
 
 /* ---------- globals */
 
@@ -434,9 +603,11 @@ extern struct ai_debug_state ai_debug;
 extern struct actor_debug_info *actor_debug_array;
 extern struct path_debug_storage *actor_path_debug_array;
 
+
 extern real_point3d global_ai_debug_drawstack_next_position;
 extern real_point3d global_ai_debug_drawstack_last_position;
 extern real global_ai_debug_drawstack_height;
+extern short global_ai_debug_string_position;
 extern real_argb_color global_temporary_render_color;
 
 /* ---------- public code */

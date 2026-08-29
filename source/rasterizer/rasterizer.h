@@ -147,12 +147,19 @@ struct rasterizer_dynamic_screen_geometry_parameters
 typedef char verify_rasterizer_dynamic_screen_geometry_parameters_size[
 	sizeof(struct rasterizer_dynamic_screen_geometry_parameters) == 0x8C ? 1 : -1];
 
+struct rasterizer_globals_reserved04
+{
+	byte __unknown04[8];
+	rectangle2d frame_bounds;
+	byte __unknown14[4];
+};
+
 struct rasterizer_globals_definition
 {
 	boolean initialized;
 	byte reserved01;
 	short current_lock_operation;
-	byte reserved04[0x14];
+	struct rasterizer_globals_reserved04 reserved04;
 	unsigned __int64 fps_accumulation_frame_index;
 	byte reserved20[8];
 	/* updated asynchronously by the rasterizer and vertical-blank callback */
@@ -174,6 +181,8 @@ typedef char verify_rasterizer_globals_initialized_offset[
 	offsetof(struct rasterizer_globals_definition, initialized) == 0x00 ? 1 : -1];
 typedef char verify_rasterizer_globals_lock_operation_offset[
 	offsetof(struct rasterizer_globals_definition, current_lock_operation) == 0x02 ? 1 : -1];
+typedef char verify_rasterizer_globals_frame_bounds_offset[
+	offsetof(struct rasterizer_globals_definition, reserved04.frame_bounds) == 0x0C ? 1 : -1];
 typedef char verify_rasterizer_globals_fps_accumulation_frame_index_offset[
 	offsetof(struct rasterizer_globals_definition, fps_accumulation_frame_index) == 0x18 ? 1 : -1];
 typedef char verify_rasterizer_globals_framerate_throttle_offset[
