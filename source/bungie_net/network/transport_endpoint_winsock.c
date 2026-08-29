@@ -276,16 +276,92 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+
+#include "bungie_net/network/transport.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
+#define TRANSPORT_ENDPOINT_WINSOCK_FILE "c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_winsock.c"
+
 /* ---------- structures */
 
+struct transport_endpoint
+{
+	long socket;
+	byte flags;
+	char type;
+	short error;
+};
+
 /* ---------- prototypes */
+
+struct transport_endpoint *accept_endpoint(
+	struct transport_endpoint *listening_endpoint);
+void delete_transport_endpoint(
+	struct transport_endpoint *endpoint);
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+long get_endpoint_type(
+	struct transport_endpoint const *ep)
+{
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x12C, ep);
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x12D, transport_initialized);
+
+	return ep->type;
+}
+
+long endpoint_connected(
+	struct transport_endpoint const *ep)
+{
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x426, ep);
+
+	return ep->flags & 1;
+}
+
+long endpoint_blocking(
+	struct transport_endpoint const *ep)
+{
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x436, ep);
+
+	return ~(ep->flags >> 4) & 1;
+}
+
+short get_endpoint_error(
+	struct transport_endpoint const *ep)
+{
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x43E, ep);
+
+	return ep->error;
+}
+
+long endpoint_equivalent(
+	struct transport_endpoint const *a,
+	struct transport_endpoint const *b)
+{
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x447, a);
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x448, b);
+
+	if (a->socket != -1 && a->socket == b->socket)
+		return TRUE;
+
+	return FALSE;
+}
+
+short reject_endpoint(
+	struct transport_endpoint *listening_endpoint)
+{
+	struct transport_endpoint *endpoint = accept_endpoint(listening_endpoint);
+
+	if (endpoint)
+		delete_transport_endpoint(endpoint);
+
+	return 0;
+}
 
 /* ---------- private code */
