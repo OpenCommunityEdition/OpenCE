@@ -299,6 +299,52 @@ void render_debug_collision_vertex(
 	return;
 }
 
+void render_debug_collision_edge(
+	struct collision_bsp *bsp,
+	long edge_index,
+	real_matrix4x3 const *matrix,
+	real_argb_color const *color)
+{
+	struct collision_edge const *edge;
+	struct collision_vertex const *vertex0;
+	struct collision_vertex const *vertex1;
+	real_point3d const *point0;
+	real_point3d const *point1;
+	real_point3d transformed_point0;
+	real_point3d transformed_point1;
+
+	edge = TAG_BLOCK_GET_ELEMENT(
+		&bsp->edges,
+		edge_index,
+		struct collision_edge);
+	vertex0 = TAG_BLOCK_GET_ELEMENT(
+		&bsp->vertices,
+		edge->vertex_indices[0],
+		struct collision_vertex);
+	vertex1 = TAG_BLOCK_GET_ELEMENT(
+		&bsp->vertices,
+		edge->vertex_indices[1],
+		struct collision_vertex);
+	point0 = &vertex0->point;
+	point1 = &vertex1->point;
+
+	if (matrix)
+	{
+		point0 = matrix4x3_transform_point(
+			matrix,
+			point0,
+			&transformed_point0);
+		point1 = matrix4x3_transform_point(
+			matrix,
+			point1,
+			&transformed_point1);
+	}
+
+	render_debug_line(TRUE, point0, point1, color);
+
+	return;
+}
+
 void render_debug_collision_surface(
 	struct collision_bsp *bsp,
 	long surface_index,
