@@ -341,6 +341,14 @@ struct winsock_sockaddr
 	byte data[14];
 };
 
+struct winsock_sockaddr_in
+{
+	word family;
+	word port;
+	unsigned long address;
+	byte zero[8];
+};
+
 /* ---------- prototypes */
 
 struct transport_endpoint *accept_endpoint(
@@ -351,6 +359,14 @@ long __stdcall accept(
 	long *address_length);
 long __stdcall closesocket(
 	long socket);
+long __stdcall getpeername(
+	long socket,
+	struct winsock_sockaddr_in *address,
+	long *address_length);
+long __stdcall getsockname(
+	long socket,
+	struct winsock_sockaddr_in *address,
+	long *address_length);
 void code_000713a0(
 	void);
 void delete_transport_endpoint(
@@ -498,6 +514,63 @@ long endpoint_equivalent(
 		return TRUE;
 
 	return FALSE;
+}
+
+short get_endpoint_address(
+	struct transport_endpoint *ep,
+	struct transport_address *address)
+{
+	long error = _transport_error_none;
+	long address_length = sizeof(struct winsock_sockaddr_in);
+	struct winsock_sockaddr_in socket_address;
+	unsigned long network_address;
+	word network_port;
+
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0xF7, ep && address);
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0xF8, transport_initialized);
+
+	if (ep->socket != INVALID_SOCKET)
+	{
+		if (getpeername(ep->socket, &socket_address, &address_length) == 0)
+		{
+			if (socket_address.family == 2)
+			{
+				network_address = socket_address.address;
+				network_port = socket_address.port;
+				address->address.long_words[0] =
+					(((network_address & 0xFF0000) | (network_address >> 16)) >> 8) |
+					(((network_address & 0xFF00) | (network_address << 16)) << 8);
+				address->address_length = IPV4_ADDRESS_LENGTH;
+				address->port = (word)((network_port << 8) | (network_port >> 8));
+			}
+			else
+			{
+				winsock_error_to_string(WSAGetLastError());
+				error = _transport_error_address_unknown;
+			}
+		}
+		else if (getsockname(ep->socket, &socket_address, &address_length) == 0 &&
+			socket_address.family == 2)
+		{
+			network_address = socket_address.address;
+			network_port = socket_address.port;
+			address->address.long_words[0] =
+				(((network_address & 0xFF0000) | (network_address >> 16)) >> 8) |
+				(((network_address & 0xFF00) | (network_address << 16)) << 8);
+			address->address_length = IPV4_ADDRESS_LENGTH;
+			address->port = (word)((network_port << 8) | (network_port >> 8));
+		}
+		else
+		{
+			winsock_error_to_string(WSAGetLastError());
+			error = _transport_error_address_unknown;
+		}
+	}
+	else
+		error = _transport_error_address_unknown;
+
+	ep->error = (short)error;
+	return (short)error;
 }
 
 void disconnect_endpoint(
