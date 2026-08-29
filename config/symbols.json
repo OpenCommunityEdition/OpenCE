@@ -22245,7 +22245,7 @@
 { "file_offset": 3234776, "flags": 0, "name": "_global_speech_priority_names" },
 { "file_offset": 3234824, "flags": 0, "name": "_magic_base_animation_seat_index" },
 { "file_offset": 3234832, "flags": 0, "name": "_unit_update_section" },
-{ "file_offset": 3236360, "flags": 0, "name": "`unit_update'::`114'::last_time" },
+{ "file_offset": 3236360, "flags": 0, "name": "?last_time@?HC@??unit_update@@9@9" },
 { "file_offset": 3236364, "flags": 0, "name": "_base_seat_labels" },
 { "file_offset": 3236392, "flags": 0, "name": "_data_00316228" },
 { "file_offset": 3237920, "flags": 0, "name": "_data_00316820" },
