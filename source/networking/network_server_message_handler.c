@@ -246,16 +246,61 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct network_connection;
+struct network_game_client_machine;
+struct network_game_server;
+
+struct network_message
+{
+	word header;
+};
+
 /* ---------- prototypes */
+
+struct network_connection *network_game_server_get_machine_connection(
+	struct network_game_server *server,
+	struct network_game_client_machine *machine);
+boolean network_connection_write(
+	struct network_connection *connection,
+	void *message,
+	word message_size,
+	void *address,
+	long flags);
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+boolean network_game_server_send_message_to_machine(
+	struct network_game_server *server,
+	struct network_game_client_machine *machine,
+	struct network_message *message)
+{
+	boolean result = FALSE;
+	struct network_connection *connection =
+		network_game_server_get_machine_connection(server, machine);
+
+	if (connection)
+	{
+		word message_size = message->header >> 4;
+
+		result = network_connection_write(
+			connection,
+			message,
+			message_size,
+			NULL,
+			1);
+	}
+
+	return result;
+}
 
 /* ---------- private code */
