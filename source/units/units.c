@@ -5566,7 +5566,9 @@ boolean unit_update(
 			{
 				if (unit->object.body_vitality>0.f)
 				{
-					short new_state = TEST_FLAG(unit->unit.animation.flags, 3) ? _unit_state_resurrect_front : _unit_state_resurrect_back;
+					short new_state = TEST_FLAG(
+							unit->unit.animation.flags,
+							_unit_animation_fallen_on_front_bit) ? _unit_state_resurrect_front : _unit_state_resurrect_back;
 
 					SET_FLAG(unit->object.damage_flags, _object_dead_bit, FALSE);
 
@@ -5579,7 +5581,10 @@ boolean unit_update(
 					);
 					unit_animation_set_state(unit_index, new_state);
 
-					SET_FLAG(unit->unit.animation.flags, 2, FALSE);
+					SET_FLAG(
+						unit->unit.animation.flags,
+						_unit_animation_ignore_translation_bit,
+						FALSE);
 
 					if (unit->object.type==_object_type_biped)
 					{
