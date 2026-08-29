@@ -51,11 +51,15 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "game/game.h"
 #include "real_math.h"
+#include "saved games/game_state.h"
 
 /* ---------- constants */
 
 /* ---------- macros */
+
+#define cinematic_screen_effect_globals bss_004662f4
 
 /* ---------- structures */
 
@@ -101,6 +105,27 @@ extern struct rasterizer_cinematic_screen_effect_state *bss_004662f4;
 extern const struct rasterizer_global_defaults_prefix rasterizer_global_defaults;
 
 /* ---------- public code */
+
+real code_0016d140(
+	void)
+{
+	return (real)game_time_get() * (1.0f / TICKS_PER_SECOND);
+}
+
+void rasterizer_screen_effects_initialize(
+	void)
+{
+	cinematic_screen_effect_globals = game_state_malloc(
+		"screen effect filth",
+		NULL,
+		sizeof(*cinematic_screen_effect_globals));
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\rasterizer_cinematics.c",
+		54,
+		cinematic_screen_effect_globals);
+
+	return;
+}
 
 void rasterizer_screen_effects_dispose_from_old_map(
 	void)
