@@ -120,6 +120,7 @@ symbols in this file:
 
 enum
 {
+	MAXIMUM_DISC_COUNT = 128,
 	MAXIMUM_OBSTACLE_AVOIDANCE_STEPS = 128,
 };
 
@@ -127,8 +128,26 @@ enum
 
 /* ---------- structures */
 
-struct obstacles;
 struct structure_bsp;
+
+struct obstacle_disc
+{
+	short flags;
+	short obstacle_index;
+	long object_index;
+	real_point2d center;
+	real radius;
+	byte reserved14[4];
+};
+
+struct obstacles
+{
+	short obstacle_count;
+	short disc_count;
+	short disc_optional_count;
+	byte reserved6[2];
+	struct obstacle_disc discs[MAXIMUM_DISC_COUNT];
+};
 
 struct obstacle_path_step
 {
@@ -173,6 +192,16 @@ struct obstacle_path
 
 typedef char obstacle_path_step_size_assert[
 	sizeof(struct obstacle_path_step) == 0x28 ? 1 : -1];
+typedef char obstacle_disc_size_assert[
+	sizeof(struct obstacle_disc) == 0x18 ? 1 : -1];
+typedef char obstacle_disc_obstacle_index_offset_assert[
+	offsetof(struct obstacle_disc, obstacle_index) == 0x2 ? 1 : -1];
+typedef char obstacles_size_assert[
+	sizeof(struct obstacles) == 0xC08 ? 1 : -1];
+typedef char obstacles_disc_count_offset_assert[
+	offsetof(struct obstacles, disc_count) == 0x2 ? 1 : -1];
+typedef char obstacles_discs_offset_assert[
+	offsetof(struct obstacles, discs) == 0x8 ? 1 : -1];
 typedef char obstacle_path_size_assert[
 	sizeof(struct obstacle_path) == 0x1534 ? 1 : -1];
 typedef char obstacle_path_step_count_offset_assert[
@@ -186,11 +215,37 @@ typedef char obstacle_path_heap_offset_assert[
 
 /* ---------- prototypes */
 
+struct obstacle_disc const *obstacles_get_disc(
+	struct obstacles const *obstacles,
+	short disc_index);
+
 /* ---------- globals */
 
 /* ---------- public code */
 
 /* ---------- private code */
+
+struct obstacle_disc const *obstacles_get_disc(
+	struct obstacles const *obstacles,
+	short disc_index)
+{
+	match_assert(
+		"c:\\halo\\source\\ai\\path.h",
+		0x18C,
+		disc_index>=0 && disc_index<obstacles->disc_count && obstacles->disc_count<=MAXIMUM_DISC_COUNT);
+
+	return &obstacles->discs[disc_index];
+}
+
+long obstacle_from_disc(
+	struct obstacles const *obstacles,
+	short disc_index)
+{
+	if (disc_index != NONE)
+		return obstacles_get_disc(obstacles, disc_index)->obstacle_index;
+
+	return NONE;
+}
 
 struct obstacle_path_step *path_get_step(
 	struct obstacle_path *path,
@@ -199,6 +254,18 @@ struct obstacle_path_step *path_get_step(
 	match_assert("c:\\halo\\SOURCE\\ai\\path_obstacle_avoidance.c", 40, step_index>=0 && step_index<path->step_count && path->step_count<=MAXIMUM_OBSTACLE_AVOIDANCE_STEPS);
 
 	return &path->steps[step_index];
+}
+
+unsigned short path_get_step_index(
+	struct obstacle_path *path,
+	short heap_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\path_obstacle_avoidance.c",
+		0x31,
+		heap_index>=0 && heap_index<path->heap_count && path->heap_count<=MAXIMUM_OBSTACLE_AVOIDANCE_STEPS);
+
+	return path->heap[heap_index];
 }
 
 short heap_parent_index(
@@ -223,6 +290,20 @@ short heap_right_index(
 	short result = 2 * (heap_index + 1);
 
 	return result;
+}
+
+real heap_cost(
+	struct obstacle_path *path,
+	short heap_index)
+{
+	short step_index = path_get_step_index(path, heap_index);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\path_obstacle_avoidance.c",
+		0x28,
+		step_index>=0 && step_index<path->step_count && path->step_count<=MAXIMUM_OBSTACLE_AVOIDANCE_STEPS);
+
+	return path->steps[step_index].total_distance;
 }
 
 boolean valid_real_point2d(
