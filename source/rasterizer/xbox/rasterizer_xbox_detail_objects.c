@@ -72,7 +72,16 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "cseries/errors.h"
+#include <xtl.h>
+
 /* ---------- constants */
+
+enum
+{
+	DETAIL_OBJECT_VERTEX_BUFFER_SIZE = 0x20000,
+};
 
 /* ---------- macros */
 
@@ -80,17 +89,82 @@ symbols in this file:
 
 /* ---------- prototypes */
 
+void rasterizer_error(
+	long error_result,
+	char const *format,
+	...);
+
 void rasterizer_profile_end(
 	short profile);
 
 /* ---------- globals */
 
+extern D3DDevice *global_d3d_device;
+D3DVertexBuffer *bss_0045e904 = NULL;
+
+#define local_d3d_vertex_buffer bss_0045e904
+
 /* ---------- public code */
+
+boolean rasterizer_detail_objects_initialize(
+	void)
+{
+	boolean success;
+	long result;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_detail_objects.c",
+		0x62,
+		global_d3d_device);
+	result = IDirect3DDevice8_CreateVertexBuffer(
+		global_d3d_device,
+		DETAIL_OBJECT_VERTEX_BUFFER_SIZE,
+		D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY,
+		0,
+		D3DPOOL_DEFAULT,
+		&local_d3d_vertex_buffer);
+	if (result >= 0)
+	{
+		success = TRUE;
+	}
+	else
+	{
+		success = FALSE;
+		rasterizer_error(
+			result,
+			"IDirect3DDevice8_CreateVertexBuffer(global_d3d_device, RASTERIZER_MAXIMUM_DETAIL_OBJECTS_PER_FRAME*NUMBER_OF_VERTICES_PER_QUADRILATERAL*sizeof(struct detail_object_vertex), RASTERIZER_DYNAMIC_BUFFER_USAGE, 0, RASTERIZER_DYNAMIC_BUFFER_POOL, &local_d3d_vertex_buffer)");
+		error(
+			_error_silent,
+			"### ERROR rasterizer_detail_objects_initialize failed");
+	}
+
+	return success;
+}
 
 void _rasterizer_detail_objects_end(
 	void)
 {
 	rasterizer_profile_end(21);
+	return;
+}
+
+void rasterizer_detail_objects_dispose(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_detail_objects.c",
+		0x77,
+		local_d3d_vertex_buffer);
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_detail_objects.c",
+		0x78,
+		global_d3d_device);
+	if (local_d3d_vertex_buffer)
+	{
+		IDirect3DVertexBuffer8_Release(local_d3d_vertex_buffer);
+		local_d3d_vertex_buffer = NULL;
+	}
+
 	return;
 }
 
