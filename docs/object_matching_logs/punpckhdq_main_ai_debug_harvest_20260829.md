@@ -65,6 +65,14 @@ No-argument prototypes use explicit `void`, parameters are one per line, C89
 declarations precede statements, subsystem tag-block access stays typed, and
 all retained functions have explicit terminal returns.
 
+After integration, an exhaustive strict census compared every available
+punpckhdq rebuilt object against both the January split target and the current
+canonical rebuild. It covered 466 comparable objects and 7,534 target function
+owners and found zero donor-exact function still absent from canonical. An
+unfiltered section-owner pass found only the non-function `.text` owner in
+`physics_variables.obj`; that unit's seven listed functions are already 7/7
+strict-exact in canonical.
+
 - Strict object gate: `23 exact / 2 residual / 35 unwritten` of 60 listed.
 - Full Ninja graph: passes; 470 units scanned and zero unit errors.
 - Semantic report: 4,806 functions evaluated, 4,682 semantic exact, 4,692
