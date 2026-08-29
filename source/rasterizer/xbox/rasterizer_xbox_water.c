@@ -75,6 +75,15 @@ struct rasterizer_water_visibility_globals bss_004662e8;
 
 /* ---------- public code */
 
+void rasterizer_water_set_visibility_for_frame(
+	boolean visibility)
+{
+	bss_004662e8.needs_update = !visibility;
+	bss_004662e8.visible_for_window = visibility;
+
+	return;
+}
+
 void rasterizer_water_set_visibility_for_window(
 	boolean visibility)
 {

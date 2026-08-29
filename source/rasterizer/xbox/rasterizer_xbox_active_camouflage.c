@@ -48,6 +48,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 #include <xtl.h>
 
 /* ---------- constants */
@@ -56,11 +58,50 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct rasterizer_active_camouflage_visibility_globals
+{
+	boolean visible_for_frame;
+	boolean visible_for_window;
+	word pad;
+	word state;
+};
+
+typedef char verify_rasterizer_active_camouflage_visibility_globals_size[
+	sizeof(struct rasterizer_active_camouflage_visibility_globals) == 6 ? 1 : -1];
+typedef char verify_rasterizer_active_camouflage_visible_for_frame_offset[
+	offsetof(
+		struct rasterizer_active_camouflage_visibility_globals,
+		visible_for_frame) == 0 ? 1 : -1];
+typedef char verify_rasterizer_active_camouflage_visible_for_window_offset[
+	offsetof(
+		struct rasterizer_active_camouflage_visibility_globals,
+		visible_for_window) == 1 ? 1 : -1];
+typedef char verify_rasterizer_active_camouflage_state_offset[
+	offsetof(
+		struct rasterizer_active_camouflage_visibility_globals,
+		state) == 4 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+struct rasterizer_active_camouflage_visibility_globals bss_0045e8e0 = { 0 };
+
 /* ---------- public code */
+
+void rasterizer_active_camouflage_set_visibility(
+	boolean visibility)
+{
+	bss_0045e8e0.visible_for_frame = visibility;
+
+	if (!visibility)
+	{
+		bss_0045e8e0.state = 0;
+		bss_0045e8e0.visible_for_window = FALSE;
+	}
+
+	return;
+}
 
 /*
 These are custom-ABI callback thunks. D3D arguments arrive in registers and a

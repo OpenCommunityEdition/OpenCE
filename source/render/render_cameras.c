@@ -193,6 +193,12 @@ void render_camera_screen_to_view(
 	return;
 }
 
+real render_camera_get_adjusted_field_of_view_tangent(
+	real field_of_view)
+{
+	return tangent(field_of_view * 0.5f) * 0.85f;
+}
+
 boolean render_camera_world_to_screen(
 	const struct render_camera *camera,
 	const struct render_frustum *frustum,
