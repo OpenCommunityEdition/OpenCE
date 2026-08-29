@@ -203,6 +203,27 @@ void free_symbol_table(
 	return;
 }
 
+long base_address_from_symbol_name(
+	char const *name,
+	struct debug_symbol_table *symbol_table)
+{
+	long base_address = NONE;
+	long symbol_index;
+	char const *symbol_name;
+
+	for (symbol_index = 1; symbol_index < symbol_table->number_of_symbols; symbol_index++)
+	{
+		symbol_name = symbol_table->string_storage + symbol_table->symbols[symbol_index].name_string_offset;
+
+		if (csstrcmp(name, symbol_name)==0)
+		{
+			base_address = symbol_table->symbols[symbol_index].rva_base;
+		}
+	}
+
+	return base_address;
+}
+
 void stack_walk_dispose(
 	void)
 {
