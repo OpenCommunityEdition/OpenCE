@@ -88,6 +88,9 @@ symbols in this file:
 /* ---------- headers */
 
 #include "editor_flying_camera.h"
+#include "flying_camera.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
 
 /* ---------- constants */
 
@@ -106,14 +109,6 @@ struct editor_camera_data
 	long unit_focus;
 };
 
-struct editor_flying_camera
-{
-	real_point3d position;
-	real_euler_angles2d orientation;
-	real roll;
-	real field_of_view;
-};
-
 struct editor_camera_focus
 {
 	real_point3d position;
@@ -127,7 +122,7 @@ struct editor_camera_globals
 	boolean initialized;
 	byte _unknown03;
 	struct editor_camera_focus focus;
-	struct editor_flying_camera *camera;
+	struct flying_camera *camera;
 	byte _unknown1c[0x10];
 	short mode;
 	byte _unknown2e[0x4A];
@@ -145,6 +140,35 @@ struct editor_camera_constants
 	real field_of_view_by_mode[7];
 };
 
+struct editor_camera_player_starting_location
+{
+	real_point3d position;
+	real facing;
+	short team_index;
+	short structure_bsp_reference_index;
+	byte _unknown14[0x20];
+};
+
+typedef char editor_camera_player_starting_location_size_assert[
+	sizeof(struct editor_camera_player_starting_location) == 0x34 ? 1 : -1];
+
+typedef void (*editor_camera_update_function)(
+	struct flying_camera *camera,
+	struct flying_camera_action const *controls,
+	struct camera_command *result);
+typedef void (*editor_camera_translate_function)(
+	struct flying_camera *camera);
+
+struct editor_camera_dispatch_data
+{
+	struct render_globals *custom_render;
+	editor_camera_update_function update_functions[2];
+	editor_camera_translate_function translate_functions[2][2];
+};
+
+typedef char editor_camera_dispatch_translate_functions_offset_assert[
+	offsetof(struct editor_camera_dispatch_data, translate_functions) == 0xC ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
@@ -152,8 +176,58 @@ struct editor_camera_constants
 extern struct editor_camera_data data_002dcc28;
 extern struct editor_camera_globals bss_0031d438;
 extern struct editor_camera_constants const rdata_00256c64;
+extern struct editor_camera_dispatch_data editor_custom_render;
 
 /* ---------- public code */
+
+void editor_camera_new(
+	struct flying_camera *camera,
+	short local_player_index)
+{
+	real_vector3d forward;
+
+	if (!bss_0031d438.initialized)
+	{
+		if (global_scenario_get()->players.count &&
+			global_scenario_get()->players.address)
+		{
+			struct editor_camera_player_starting_location *starting_location =
+				TAG_BLOCK_GET_ELEMENT(
+					&global_scenario_get()->players,
+					0,
+					struct editor_camera_player_starting_location);
+
+			bss_0031d438.focus.position = starting_location->position;
+			bss_0031d438.focus.angles.yaw = starting_location->facing;
+		}
+		else
+		{
+			csmemset(
+				&bss_0031d438.focus,
+				0,
+				sizeof(bss_0031d438.focus));
+		}
+	}
+
+	bss_0031d438.initialized = TRUE;
+	vector3d_from_euler_angles2d(
+		&forward,
+		&bss_0031d438.focus.angles);
+	flying_camera_new_from_point_and_vector(
+		camera,
+		&bss_0031d438.focus.position,
+		&forward);
+
+	if (!local_player_index)
+		bss_0031d438.camera = camera;
+	if (bss_0031d438.mode)
+	{
+		editor_custom_render.translate_functions[bss_0031d438.mode][1](
+			camera);
+	}
+
+	return;
+}
 
 void editor_camera_get_focus(
 	real_point3d *position,
@@ -209,7 +283,7 @@ boolean editor_camera_use_roll(
 
 	bss_0031d438.use_roll = new_use_roll;
 	if (!new_use_roll && bss_0031d438.camera)
-		bss_0031d438.camera->roll = 0.0f;
+		bss_0031d438.camera->facing.roll = 0.0f;
 
 	return previous_use_roll;
 }
