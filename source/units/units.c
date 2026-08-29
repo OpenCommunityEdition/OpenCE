@@ -1237,32 +1237,24 @@ enum
 	NUMBER_OF_UNIT_FUNCTION_MODES,
 };
 
-void _ReadWriteBarrier(void);
-#pragma intrinsic(_ReadWriteBarrier)
-
 void unit_export_function_values(
 	long unit_index)
 {
-	struct unit_datum *unit;
-	struct unit_definition *unit_definition;
-	short *function_mode;
-	real *function_value;
-	long function_count;
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition = unit_definition_get(
+		unit->definition_index);
+	long function_index;
 
-	unit = unit_get(unit_index);
-	unit_definition = unit_definition_get(unit->definition_index);
-	_ReadWriteBarrier();
-	function_value = unit->object.incoming_function_values;
-	function_mode = unit_definition->unit.function_modes;
-	function_count = NUMBEROF(unit->object.incoming_function_values);
-
-	do
+	for (function_index = 0;
+		function_index < NUMBEROF(unit->object.incoming_function_values);
+		function_index++)
 	{
-		if (*function_mode != _unit_function_none)
+		if (unit_definition->unit.function_modes[function_index] !=
+			_unit_function_none)
 		{
 			real value = 0.f;
 
-			switch (*function_mode)
+			switch (unit_definition->unit.function_modes[function_index])
 			{
 			case _unit_function_driver_seat_power:
 				value = unit->unit.seat_power[0];
@@ -1293,6 +1285,8 @@ void unit_export_function_values(
 					&animation_graph->animations,
 					unit->object.animation.state.index,
 					struct animation);
+				short private_loop_frame_index =
+					animation->private_loop_frame_index;
 				boolean before_private_loop;
 
 				/*
@@ -1303,7 +1297,7 @@ void unit_export_function_values(
 				*/
 				before_private_loop =
 					unit->object.animation.state.index <
-					animation->private_loop_frame_index;
+					private_loop_frame_index;
 				if (!before_private_loop)
 				{
 					value = 1.f - unit->unit.shield_sap_timeout * (1.f / 90.f);
@@ -1312,20 +1306,15 @@ void unit_export_function_values(
 				{
 					value =
 						(real)unit->object.animation.state.index /
-						(real)animation->private_loop_frame_index;
+						(real)private_loop_frame_index;
 				}
 				break;
 			}
 			}
 
-			*function_value = value;
+			unit->object.incoming_function_values[function_index] = value;
 		}
-
-		function_mode++;
-		function_value++;
-		function_count--;
 	}
-	while (function_count != 0);
 
 	return;
 }
