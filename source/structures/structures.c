@@ -68,9 +68,37 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct structure_runtime_globals
+{
+	boolean initialized;
+	boolean cluster_marker_initialized;
+	byte reserved0002[2];
+	long cluster_marker;
+	long cluster_magic_numbers[MAXIMUM_CLUSTERS_PER_STRUCTURE];
+};
+
+typedef char verify_structure_cluster_marker_initialized_offset[
+	offsetof(
+		struct structure_runtime_globals,
+		cluster_marker_initialized) == 0x1 ? 1 : -1];
+typedef char verify_structure_cluster_marker_offset[
+	offsetof(
+		struct structure_runtime_globals,
+		cluster_marker) == 0x4 ? 1 : -1];
+typedef char verify_structure_cluster_magic_numbers_offset[
+	offsetof(
+		struct structure_runtime_globals,
+		cluster_magic_numbers) == 0x8 ? 1 : -1];
+typedef char verify_structure_runtime_globals_size[
+	sizeof(struct structure_runtime_globals) == 0x808 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+struct structure_runtime_globals bss_004c1100;
+
+#define structure_globals bss_004c1100
 
 /* ---------- public code */
 
@@ -103,6 +131,31 @@ void structures_dispose(
 {
 	structure_decals_dispose();
 	structure_detail_objects_dispose();
+	return;
+}
+
+void structure_cluster_marker_begin(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\structures\\structures.c",
+		0x103,
+		!structure_globals.cluster_marker_initialized);
+	structure_globals.cluster_marker++;
+	structure_globals.cluster_marker_initialized = TRUE;
+
+	return;
+}
+
+void structure_cluster_marker_end(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\structures\\structures.c",
+		0x130,
+		structure_globals.cluster_marker_initialized);
+	structure_globals.cluster_marker_initialized = FALSE;
+
 	return;
 }
 

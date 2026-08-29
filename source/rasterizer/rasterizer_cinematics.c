@@ -59,15 +59,26 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct rasterizer_cinematic_screen_effect_parameters
+{
+	byte reserved00[0x14];
+	real_rgb_color filter_desaturation_tint;
+	byte reserved20[0x18];
+};
+
 struct rasterizer_cinematic_screen_effect_state
 {
-	byte reserved00[0x38];
+	struct rasterizer_cinematic_screen_effect_parameters parameters;
 	boolean has_control;
 	byte reserved39[0x2B];
 	real script_values[4];
 	real near_clip_distance;
 };
 
+typedef char rasterizer_cinematic_screen_effect_parameters_size_assert[
+	sizeof(struct rasterizer_cinematic_screen_effect_parameters) == 0x38 ? 1 : -1];
+typedef char rasterizer_cinematic_screen_effect_parameters_tint_offset_assert[
+	offsetof(struct rasterizer_cinematic_screen_effect_parameters, filter_desaturation_tint) == 0x14 ? 1 : -1];
 typedef char rasterizer_cinematic_screen_effect_state_size_assert[
 	sizeof(struct rasterizer_cinematic_screen_effect_state) == 0x78 ? 1 : -1];
 typedef char rasterizer_cinematic_screen_effect_state_has_control_offset_assert[
@@ -124,6 +135,23 @@ real rasterizer_script_screen_effect_get_value(
 	}
 
 	return value;
+}
+
+void rasterizer_screen_effect_set_filter_desaturation_tint(
+	real red,
+	real green,
+	real blue)
+{
+	struct rasterizer_cinematic_screen_effect_state *globals = bss_004662f4;
+
+	if (globals)
+	{
+		globals->parameters.filter_desaturation_tint.red = red;
+		globals->parameters.filter_desaturation_tint.green = green;
+		globals->parameters.filter_desaturation_tint.blue = blue;
+	}
+
+	return;
 }
 
 void rasterizer_screen_effect_stop(

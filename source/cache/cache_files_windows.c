@@ -185,22 +185,69 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	MAXIMUM_SIMULTANEOUS_CACHE_REQUESTS = 512,
+};
+
 /* ---------- macros */
 
 #define cache_file_globals bss_004cdff8
 
 /* ---------- structures */
 
+struct cache_file_request_prefix
+{
+	byte reserved00[0x1C];
+	boolean blocking;
+	boolean pending;
+	byte reserved1E[2];
+};
+
 struct cache_file_runtime_globals_prefix
 {
 	byte cached_map_file_storage[0x3048];
 	boolean copy_in_progress;
+	byte reserved3049;
+	short copying_to_map_file_index;
+	char copying_to_map_file_name[32];
+	short open_map_file_index;
+	short blocking_request_index;
+	void *sleep_event;
+	void *thread;
+	struct cache_file_request_prefix *requests;
 };
 
+typedef char verify_cache_file_request_size[
+	sizeof(struct cache_file_request_prefix) == 0x20 ? 1 : -1];
+typedef char verify_cache_file_request_blocking_offset[
+	offsetof(
+		struct cache_file_request_prefix,
+		blocking) == 0x1C ? 1 : -1];
+typedef char verify_cache_file_request_pending_offset[
+	offsetof(
+		struct cache_file_request_prefix,
+		pending) == 0x1D ? 1 : -1];
 typedef char verify_cache_file_copy_in_progress_offset[
 	offsetof(
 		struct cache_file_runtime_globals_prefix,
 		copy_in_progress) == 0x3048 ? 1 : -1];
+typedef char verify_cache_file_copying_map_index_offset[
+	offsetof(
+		struct cache_file_runtime_globals_prefix,
+		copying_to_map_file_index) == 0x304A ? 1 : -1];
+typedef char verify_cache_file_copying_map_name_offset[
+	offsetof(
+		struct cache_file_runtime_globals_prefix,
+		copying_to_map_file_name) == 0x304C ? 1 : -1];
+typedef char verify_cache_file_open_map_index_offset[
+	offsetof(
+		struct cache_file_runtime_globals_prefix,
+		open_map_file_index) == 0x306C ? 1 : -1];
+typedef char verify_cache_file_requests_offset[
+	offsetof(
+		struct cache_file_runtime_globals_prefix,
+		requests) == 0x3078 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -208,12 +255,32 @@ void cache_copy_queue_end(
 	void);
 void cache_copy_set_priority(
 	boolean blocking);
+const char *tag_name_strip_path(
+	const char *name);
+unsigned long __stdcall SleepEx(
+	unsigned long milliseconds,
+	long alertable);
 
 /* ---------- globals */
 
 extern struct cache_file_runtime_globals_prefix bss_004cdff8;
 
 /* ---------- public code */
+
+void cache_files_dispose(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\cache_files_windows.c",
+		207,
+		cache_file_globals.open_map_file_index==NONE);
+	match_free(
+		"c:\\halo\\SOURCE\\cache\\cache_files_windows.c",
+		209,
+		cache_file_globals.requests);
+
+	return;
+}
 
 void cache_files_precache_set_priority(
 	boolean blocking)
@@ -229,6 +296,20 @@ boolean cache_files_precache_in_progress(
 	return bss_004cdff8.copy_in_progress;
 }
 
+boolean cache_files_precache_is_copying_map(
+	const char *map_name)
+{
+	if (cache_file_globals.copying_to_map_file_index != NONE &&
+		strcmp(
+			cache_file_globals.copying_to_map_file_name,
+			tag_name_strip_path(map_name)) == 0)
+	{
+		return TRUE;
+	}
+
+	return FALSE;
+}
+
 void cache_files_precache_map_queue_end(
 	void)
 {
@@ -237,6 +318,47 @@ void cache_files_precache_map_queue_end(
 		1022,
 		cache_file_globals.copy_in_progress);
 	cache_copy_queue_end();
+
+	return;
+}
+
+void cache_file_promote_read(
+	short request_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\cache_files_windows.c",
+		614,
+		request_index>=0 && request_index<MAXIMUM_SIMULTANEOUS_CACHE_REQUESTS);
+	cache_file_globals.requests[request_index].blocking = TRUE;
+
+	return;
+}
+
+void cache_file_block_until_not_busy(
+	void)
+{
+	boolean busy;
+	short request_index;
+
+	do
+	{
+		SleepEx(0, TRUE);
+		busy = FALSE;
+		for (request_index = 0;
+			request_index < MAXIMUM_SIMULTANEOUS_CACHE_REQUESTS;
+			request_index++)
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\cache\\cache_files_windows.c",
+				614,
+				request_index>=0 && request_index<MAXIMUM_SIMULTANEOUS_CACHE_REQUESTS);
+			if (cache_file_globals.requests[request_index].pending)
+			{
+				busy = TRUE;
+			}
+		}
+	}
+	while (busy);
 
 	return;
 }
