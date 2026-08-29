@@ -230,6 +230,43 @@ void device_set_never_appears_locked(
 	return;
 }
 
+void device_group_set_actual_value(
+	short group_index,
+	real actual_value)
+{
+	struct device_group_datum *group;
+	struct device_datum *device;
+	struct object_iterator iterator;
+
+	if (actual_value < 0.0f)
+		actual_value = 0.0f;
+	else if (actual_value > 1.0f)
+		actual_value = 1.0f;
+
+	group = datum_get(device_groups_data, group_index);
+	group->actual_value = actual_value;
+
+	object_iterator_new(&iterator, _object_mask_device, 0);
+	while ((device = object_iterator_next(&iterator)) != NULL)
+	{
+		if (device->device.power_group_index == group_index)
+		{
+			device->device.flags |= FLAG(_device_position_changed_bit);
+			device->device.power = actual_value;
+			device->device.power_velocity = 0.0f;
+		}
+
+		if (device->device.position_group_index == group_index)
+		{
+			device->device.flags |= FLAG(_device_position_changed_bit);
+			device->device.position = actual_value;
+			device->device.position_velocity = 0.0f;
+		}
+	}
+
+	return;
+}
+
 void device_one_sided_set(
 	long device_index,
 	boolean one_sided)
