@@ -122,6 +122,7 @@ struct game_options;
 #define set_random_seed set_random_seed_inline
 #include "game/game.h"
 #undef set_random_seed
+#include "game/game_engine.h"
 #include "memory/data.h"
 
 /* ---------- constants */
@@ -346,6 +347,7 @@ void numeric_countdown_timer_update(
 /* ---------- globals */
 
 extern struct game_runtime_globals_prefix *bss_0043e48c;
+extern struct game_variant game_variant_global;
 extern struct data_array *player_data;
 extern short player_spawn_count;
 
@@ -400,6 +402,32 @@ short game_difficulty_level_get(
 	void)
 {
 	return bss_0043e48c->options.difficulty;
+}
+
+void game_set_game_variant(
+	struct game_variant *variant)
+{
+	if (!variant)
+	{
+		csmemset(&game_variant_global, 0, sizeof(game_variant_global));
+	}
+	else
+	{
+		game_variant_global = *variant;
+	}
+
+	return;
+}
+
+void game_set_game_engine_index(
+	short index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\game.c",
+		0x311,
+		!"this is broken and should get updated for the variants, ask michael");
+
+	return;
 }
 
 boolean game_is_cooperative(
