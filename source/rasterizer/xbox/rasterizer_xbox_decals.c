@@ -115,12 +115,19 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct decal_d3d_vertex_buffer;
+
 struct rasterizer_decals_globals_prefix
 {
-	byte reserved0000[0x14];
+	byte reserved0000[0x10];
+	struct decal_d3d_vertex_buffer *local_d3d_vertex_buffer;
 	struct lruv_cache *local_vertex_cache;
 };
 
+typedef char verify_rasterizer_decals_local_d3d_vertex_buffer_offset[
+	offsetof(
+		struct rasterizer_decals_globals_prefix,
+		local_d3d_vertex_buffer) == 0x10 ? 1 : -1];
 typedef char verify_rasterizer_decals_local_vertex_cache_offset[
 	offsetof(
 		struct rasterizer_decals_globals_prefix,
@@ -131,10 +138,16 @@ typedef char verify_rasterizer_decals_local_vertex_cache_offset[
 void decals_unlock(
 	boolean permanent);
 
+unsigned long __stdcall D3DResource_Release(
+	void *resource);
+
 /* ---------- globals */
 
 extern struct rasterizer_decals_globals_prefix bss_0045e8e8;
+struct d3d_device;
+extern struct d3d_device *global_d3d_device;
 
+#define local_d3d_vertex_buffer bss_0045e8e8.local_d3d_vertex_buffer
 #define local_vertex_cache bss_0045e8e8.local_vertex_cache
 
 /* ---------- public code */
@@ -174,6 +187,31 @@ void rasterizer_decal_vertices_begin_update(
 	void)
 {
 	lruv_idle(local_vertex_cache);
+
+	return;
+}
+
+void _rasterizer_decals_dispose(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_decals.c",
+		0x99,
+		local_vertex_cache);
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_decals.c",
+		0x9A,
+		local_d3d_vertex_buffer);
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_decals.c",
+		0x9B,
+		global_d3d_device);
+	if (local_d3d_vertex_buffer)
+	{
+		D3DResource_Release(local_d3d_vertex_buffer);
+		local_d3d_vertex_buffer = NULL;
+	}
+	lruv_delete(local_vertex_cache);
 
 	return;
 }
