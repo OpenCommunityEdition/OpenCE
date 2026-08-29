@@ -161,6 +161,8 @@ boolean thread_has_exited(
 	struct thread_reference *thread_reference);
 void dispose_thread(
 	struct thread_reference *thread_reference);
+void code_001b14d0(
+	void);
 
 /* ---------- globals */
 
@@ -293,6 +295,19 @@ long player_profile_get_random_color(
 		get_global_local_random_seed_address(),
 		0,
 		NUMBER_OF_RANDOM_COLORS);
+}
+
+void player_profiles_initialize(
+	void)
+{
+	csmemset(
+		&player_profile_globals,
+		0,
+		sizeof(player_profile_globals));
+	player_profile_globals.initialized = TRUE;
+	code_001b14d0();
+
+	return;
 }
 
 /* ---------- private code */
