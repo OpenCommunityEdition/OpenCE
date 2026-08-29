@@ -299,6 +299,43 @@ void render_debug_collision_vertex(
 	return;
 }
 
+void render_debug_collision_surface(
+	struct collision_bsp *bsp,
+	long surface_index,
+	real_matrix4x3 const *matrix,
+	real_argb_color const *color)
+{
+	struct collision_surface const *surface;
+	long first_edge_index;
+	long edge_index;
+
+	surface = TAG_BLOCK_GET_ELEMENT(
+		&bsp->surfaces,
+		surface_index,
+		struct collision_surface);
+	first_edge_index = surface->first_edge_index;
+	edge_index = first_edge_index;
+
+	do
+	{
+		struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(
+			&bsp->edges,
+			edge_index,
+			struct collision_edge);
+		boolean const reverse = edge->surface_indices[1] == surface_index;
+
+		render_debug_collision_edge(
+			bsp,
+			edge_index,
+			matrix,
+			color);
+		edge_index = edge->edge_indices[reverse];
+	}
+	while (edge_index != first_edge_index);
+
+	return;
+}
+
 void render_debug_collision_bsp(
 	struct collision_bsp *bsp,
 	real_matrix4x3 const *matrix)
