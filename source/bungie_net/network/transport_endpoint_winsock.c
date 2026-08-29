@@ -288,6 +288,7 @@ enum
 	_transport_type_tcp,
 	MAXIMUM_PENDING_CONNECTIONS = 32,
 	MAXIMUM_SOCKETS_PER_SET = 64,
+	MAXIMUM_ENDPOINT_THREADS = 64,
 };
 
 /* ---------- macros */
@@ -303,6 +304,23 @@ struct transport_endpoint
 	byte flags;
 	char type;
 	short error;
+};
+
+struct thread_reference;
+
+struct endpoint_thread_reference
+{
+	struct thread_reference *thread;
+	boolean dispose;
+	byte pad[3];
+};
+
+struct transport_endpoint_winsock_globals
+{
+	void *unknown0;
+	long unknown4;
+	struct endpoint_thread_reference endpoint_threads[MAXIMUM_ENDPOINT_THREADS];
+	long last_error;
 };
 
 struct winsock_fd_set
@@ -327,6 +345,8 @@ void code_000713a0(
 	void);
 void delete_transport_endpoint(
 	struct transport_endpoint *endpoint);
+void dispose_thread(
+	struct thread_reference *thread);
 long __stdcall listen(
 	long socket,
 	long backlog);
@@ -346,7 +366,33 @@ char const *winsock_error_to_string(
 
 /* ---------- globals */
 
+struct transport_endpoint_winsock_globals bss_0031ce38 = {0};
+
 /* ---------- public code */
+
+void code_000713a0(
+	void)
+{
+	long endpoint_thread_index = 0;
+
+	do
+	{
+		struct endpoint_thread_reference *endpoint_thread =
+			&bss_0031ce38.endpoint_threads[endpoint_thread_index];
+
+		if (endpoint_thread->thread && endpoint_thread->dispose)
+		{
+			dispose_thread(endpoint_thread->thread);
+			endpoint_thread->thread = NULL;
+			endpoint_thread->dispose = FALSE;
+		}
+
+		endpoint_thread_index++;
+	}
+	while (endpoint_thread_index < MAXIMUM_ENDPOINT_THREADS);
+
+	return;
+}
 
 struct transport_endpoint *create_transport_endpoint(
 	long type)
