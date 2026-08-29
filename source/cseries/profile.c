@@ -361,6 +361,8 @@ void code_0007dd20(
 	void);
 void find_profile_section(
 	struct profile_section *section);
+void code_0007edc0(
+	void);
 static void code_0007ee30(
 	const char *name,
 	boolean active);
@@ -660,6 +662,23 @@ void find_profile_section(
 		section->field_5D8 = 0;
 		section->field_5F0 = 0;
 		section->field_5E8 = 0;
+	}
+
+	return;
+}
+
+void code_0007edc0(
+	void)
+{
+	if (profile_globals.unk)
+	{
+		if (profile_globals.framedump_file)
+		{
+			fprintf(profile_globals.framedump_file, "\r\n");
+			fflush(profile_globals.framedump_file);
+		}
+
+		profile_globals.unk = FALSE;
 	}
 
 	return;
