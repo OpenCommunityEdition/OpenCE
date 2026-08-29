@@ -98,6 +98,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+#include "rasterizer/rasterizer.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -109,5 +112,22 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void rasterizer_model_ambient_reflection_tint(
+	real alpha,
+	real red,
+	real green,
+	real blue)
+{
+	if (global_rasterizer_model_ambient_reflection_tint)
+	{
+		global_rasterizer_model_ambient_reflection_tint->alpha = alpha;
+		global_rasterizer_model_ambient_reflection_tint->red = red;
+		global_rasterizer_model_ambient_reflection_tint->green = green;
+		global_rasterizer_model_ambient_reflection_tint->blue = blue;
+	}
+
+	return;
+}
 
 /* ---------- private code */
