@@ -91,6 +91,11 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	NUMBER_OF_EDITOR_CAMERA_SPEED_STEPS = 5
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -125,7 +130,14 @@ struct editor_camera_globals
 	struct editor_flying_camera *camera;
 	byte _unknown1c[0x10];
 	short mode;
+	byte _unknown2e[0x4A];
+	unsigned long speed_step;
 };
+
+typedef char editor_camera_globals_speed_step_offset_assert[
+	offsetof(struct editor_camera_globals, speed_step) == 0x78 ? 1 : -1];
+typedef char editor_camera_globals_size_assert[
+	sizeof(struct editor_camera_globals) == 0x7C ? 1 : -1];
 
 struct editor_camera_constants
 {
@@ -165,6 +177,21 @@ void editor_camera_set_focus(
 
 	bss_0031d438.focus.position = *position;
 	bss_0031d438.focus.angles = *angles;
+
+	return;
+}
+
+void editor_camera_bump_speed(
+	void)
+{
+	bss_0031d438.speed_step =
+		(bss_0031d438.speed_step + 1) % NUMBER_OF_EDITOR_CAMERA_SPEED_STEPS;
+	data_002dcc28.speed =
+		(real)rdata_00256c64.speed_steps[bss_0031d438.speed_step];
+	terminal_printf(
+		global_real_argb_white,
+		"speed is now x%f",
+		data_002dcc28.speed);
 
 	return;
 }
