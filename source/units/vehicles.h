@@ -36,6 +36,9 @@ void vehicles_dispose(
 	void);
 void vehicle_delete(
 	long vehicle_index);
+long vehicle_find_pathfinding_surface_index(
+	long vehicle_index,
+	real_point3d *position);
 
 /* ---------- globals */
 

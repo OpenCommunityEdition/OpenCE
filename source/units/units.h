@@ -764,6 +764,8 @@ boolean unit_throw_grenade_begin(long unit_index, real_vector2d const *alignment
 /* ---------- prototypes/UNIT_DIALOGUE.C */
 
 boolean unit_scream(long unit_index, short scream_type);
+void unit_dialogue_update(
+	long unit_index);
 
 
 /* ---------- globals */

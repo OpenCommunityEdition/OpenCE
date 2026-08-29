@@ -60,6 +60,18 @@ enum
 
 enum
 {
+	_weapon_control_integrated_light_bit = 0,
+	_weapon_control_primary_trigger_bit,
+	_weapon_control_secondary_trigger_bit,
+	_weapon_control_reload_bit,
+	_weapon_control_user_busy_bit,
+	_weapon_control_user_switching_weapons_bit,
+	_weapon_control_zoomed_bit,
+	NUMBER_OF_WEAPON_CONTROL_FLAGS,
+};
+
+enum
+{
 	_first_person_weapon_message_primary_fire = 0,
 	_first_person_weapon_message_secondary_fire,
 	_first_person_weapon_message_primary_misfire,

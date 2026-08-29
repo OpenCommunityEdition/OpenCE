@@ -767,22 +767,10 @@ enum
 #define UNIT_DAMAGE_REAR_CONE_ANGLE 0.7853981852531433
 #define UNIT_DAMAGE_FRONT_CONE_ANGLE 2.159845009446144
 
-enum
-{
-	_unit_damage_aftermath_lethal_bit = 0,
-	_unit_damage_aftermath_player_damage_type_bit = 4,
-	_unit_damage_aftermath_died_instantly_bit = 6,
-};
-
 #define UNIT_DAMAGE_AFTERMATH_ANIMATION_FLAGS_MASK \
-	(FLAG(1) | FLAG(3) | FLAG(7))
-
-/* January-authenticated damage flag values; the owning shared headers are
-   outside this wave, so the used values stay translation-unit local. */
-enum
-{
-	_damage_data_suppress_unit_reaction_bit = 4,
-};
+	(FLAG(_object_being_damaged_region_destroyed_bit) | \
+	 FLAG(_object_being_damaged_shield_depleted_bit) | \
+	 FLAG(_object_being_damaged_force_hard_ping_bit))
 
 enum
 {
@@ -5844,21 +5832,21 @@ boolean unit_update(
 
 			if (unit->unit.current_weapon_index==unit->unit.desired_weapon_index)
 			{
-				boolean const time_remaining = unit->unit.persistent_control_timer>0 && TEST_FLAG(unit->unit.persistent_control_flags, 11);
+				boolean const time_remaining = unit->unit.persistent_control_timer>0 && TEST_FLAG(unit->unit.persistent_control_flags, _unit_control_weapon_primary_trigger_bit);
 
 				if (!jetpack_cheat_active)
 				{
 					if (allow_integrated_lights && TEST_FLAG(unit->unit.control_flags, _unit_control_integrated_light_bit))
 					{
-						SET_FLAG(flags, 0, TRUE);
+						SET_FLAG(flags, _weapon_control_integrated_light_bit, TRUE);
 					}
 					if (TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit))
 					{
-						SET_FLAG(flags, 1, TRUE);
+						SET_FLAG(flags, _weapon_control_primary_trigger_bit, TRUE);
 					}
 					if (TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_secondary_trigger_bit))
 					{
-						SET_FLAG(flags, 2, TRUE);
+						SET_FLAG(flags, _weapon_control_secondary_trigger_bit, TRUE);
 					}
 				}
 
@@ -5869,24 +5857,24 @@ boolean unit_update(
 
 				if (TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_reload_bit))
 				{
-					SET_FLAG(flags, 3, TRUE);
+					SET_FLAG(flags, _weapon_control_reload_bit, TRUE);
 				}
 				if (unit_animation_busy(&unit->unit.animation) && !time_remaining)
 				{
-					SET_FLAG(flags, 4, TRUE);
+					SET_FLAG(flags, _weapon_control_user_busy_bit, TRUE);
 				}
 				if (unit->object.type==_object_type_biped && ((struct biped_datum *)unit)->biped.player_melee_ticks > 0)
 				{
-					SET_FLAG(flags, 4, TRUE);
+					SET_FLAG(flags, _weapon_control_user_busy_bit, TRUE);
 				}
 				if (unit->unit.current_zoom_level!=NONE)
 				{
-					SET_FLAG(flags, 6, TRUE);
+					SET_FLAG(flags, _weapon_control_zoomed_bit, TRUE);
 				}
 			}
 			else
 			{
-				SET_FLAG(flags, 5, TRUE);
+				SET_FLAG(flags, _weapon_control_user_switching_weapons_bit, TRUE);
 			}
 
 			weapon_owner_update(unit_get_current_weapon_index(unit_index), flags, primary_trigger);
@@ -5902,7 +5890,7 @@ boolean unit_update(
 	{
 		short seat_index;
 
-		if (TEST_FLAG(unit->unit.animation.flags, 1))
+		if (TEST_FLAG(unit->unit.animation.flags, _unit_animation_showing_acceleration_bit))
 		{
 			unit_seat_update(unit_index);
 			unit->unit.seat_acceleration.i = unit->unit.seat_desired_acceleration.i*0.3f + unit->unit.seat_acceleration.i*0.7f;
@@ -5917,7 +5905,7 @@ boolean unit_update(
 
 			if (seat_index==0)
 			{
-				if (unit->unit.driver_object_index!=NONE || TEST_FLAG(unit->unit.flags, 0))
+				if (unit->unit.driver_object_index!=NONE || TEST_FLAG(unit->unit.flags, _unit_actively_controlled_bit))
 				{
 					v96 = TRUE;
 				}
@@ -6818,7 +6806,7 @@ void unit_damage_aftermath(
 	total_damage = shield_damage + body_damage;
 	lethal = TEST_FLAG(
 		damage_flags,
-		_unit_damage_aftermath_lethal_bit);
+		_object_being_damaged_body_depleted_bit);
 	feigned = FALSE;
 
 	(void)unused;
@@ -6931,7 +6919,7 @@ void unit_damage_aftermath(
 
 	if (!TEST_FLAG(
 			damage_data->flags,
-			_damage_data_suppress_unit_reaction_bit) &&
+			_damage_silent_bit) &&
 		(lethal ||
 			feigned ||
 			!TEST_FLAG(unit->object.damage_flags, _object_dead_bit)) &&
@@ -7008,7 +6996,7 @@ void unit_damage_aftermath(
 				player_index,
 				TEST_FLAG(
 					damage_flags,
-					_unit_damage_aftermath_player_damage_type_bit));
+					_object_being_damaged_by_friendly_bit));
 		}
 	}
 
@@ -7027,10 +7015,10 @@ void unit_damage_aftermath(
 
 	if (!TEST_FLAG(
 			damage_data->flags,
-			_damage_data_suppress_unit_reaction_bit) &&
+			_damage_silent_bit) &&
 		(TEST_FLAG(
 				damage_flags,
-				_unit_damage_aftermath_lethal_bit) ||
+				_object_being_damaged_body_depleted_bit) ||
 			body_damage > 0.f ||
 			shield_damage > 0.f))
 	{
@@ -7040,7 +7028,7 @@ void unit_damage_aftermath(
 			lethal | feigned,
 			TEST_FLAG(
 				damage_flags,
-				_unit_damage_aftermath_died_instantly_bit),
+				_object_being_damaged_killed_instantly_bit),
 			body_damage,
 			shield_damage);
 	}
@@ -7726,7 +7714,7 @@ static void unit_throw_grenade_move_to_hand(
 
 	object_get_marker_by_name(unit_index, "left hand", &marker, 1);
 	object_placement_data_new(&placement_data, grenades->projectile.index, unit_index);
-	SET_FLAG(placement_data.flags, 1, TRUE);
+	SET_FLAG(placement_data.flags, _new_object_never_automatically_delete_bit, TRUE);
 	placement_data.forward= unit_get(unit_index)->unit.aiming_vector;
 	normalize3d(perpendicular3d(&placement_data.forward, &placement_data.up));
 
@@ -8722,12 +8710,6 @@ void unit_cause_melee_damage(
    'static void code_0019ea70(' */
 enum
 {
-	_damage_data_melee_bit = 0,
-	_damage_data_affects_source_bit = 3,
-};
-
-enum
-{
 	_collision_result_breakable_surface_bit = 3,
 };
 
@@ -8934,7 +8916,7 @@ void unit_cause_player_melee_damage(
 			struct damage_data damage_data;
 
 			damage_data_new(&damage_data, melee_damage_effect_index);
-			SET_FLAG(damage_data.flags, _damage_data_melee_bit, TRUE);
+			SET_FLAG(damage_data.flags, _damage_area_of_effect_bit, TRUE);
 			damage_data.location = unit->object.location;
 			damage_data.owner_object_index = unit_index;
 			damage_data.owner_team_index = unit->object.owner_team_index;
@@ -9021,7 +9003,7 @@ void unit_cause_player_melee_damage(
 				damage_data.direction.k = -unit->unit.aiming_vector.k;
 				SET_FLAG(
 					damage_data.flags,
-					_damage_data_affects_source_bit,
+					_damage_from_weapon_bit,
 					TRUE);
 				damage_data.origin = unit->object.bounding_sphere_center;
 				object_cause_damage(
@@ -11468,7 +11450,7 @@ static void unit_cause_continuous_melee_damage(
 			damage_data.origin = collision_point;
 			damage_data.direction = unit->object.forward;
 
-			SET_FLAG(damage_data.flags, 1, TRUE);
+			SET_FLAG(damage_data.flags, _damage_create_localized_effect_bit, TRUE);
 			unit->unit.melee_continuous_damage_effect_timer = 10;
 
 			object_cause_damage(

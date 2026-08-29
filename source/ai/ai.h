@@ -95,6 +95,12 @@ void ai_find_inactive_encounters(unsigned char *working_memory, short working_me
 boolean ai_release_inactive_encounters(char *result_description, unsigned char *more_to_release, unsigned char *working_memory, short working_memory_size);
 
 void ai_handle_damage(long unit_index, long shooter_object_index, short damage_category, float fraction, union real_vector3d *damage_velocity, boolean delayed);
+void ai_handle_enter_vehicle(
+	long unit_index,
+	long vehicle_index);
+void ai_handle_exit_vehicle(
+	long unit_index,
+	long vehicle_index);
 
 /* ---------- globals */
 

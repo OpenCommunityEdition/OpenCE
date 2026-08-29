@@ -14,6 +14,32 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum
+{
+	_object_being_damaged_body_depleted_bit = 0,
+	_object_being_damaged_region_destroyed_bit,
+	_object_being_damaged_body_destroyed_bit,
+	_object_being_damaged_shield_depleted_bit,
+	_object_being_damaged_by_friendly_bit,
+	_object_being_damaged_multiplied_by_difficulty_bit,
+	_object_being_damaged_killed_instantly_bit,
+	_object_being_damaged_force_hard_ping_bit,
+	NUMBER_OF_OBJECT_BEING_DAMAGED_FLAGS,
+};
+
+enum
+{
+	_damage_area_of_effect_bit = 0,
+	_damage_create_localized_effect_bit,
+	_damage_kill_instantly_bit,
+	_damage_from_weapon_bit,
+	_damage_silent_bit,
+	_damage_bypasses_shields_bit,
+	_damage_damaged_one_object_bit,
+	_damage_no_statistics_bit,
+	NUMBER_OF_DAMAGE_DATA_FLAGS,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -58,6 +84,12 @@ void object_destroy(
 	long object_index);
 void damage_data_new(struct damage_data *damage_data, long definition_index);
 boolean object_restore_body(long object_index);
+
+void object_deplete_body(
+	long object_index);
+void area_of_effect_cause_damage(
+	struct damage_data *damage,
+	long unlucky_object_index);
 
 void object_cause_damage(struct damage_data *damage_data, long object_index, short node_index, short region_index, short material_index, real_vector3d const *object_normal);
 
