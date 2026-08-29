@@ -161,7 +161,8 @@ enum
 
 /* ---------- prototypes */
 
-extern void stack_walk(boolean);
+extern void stack_walk(
+	long levels_to_ignore);
 
 /* ---------- globals */
 

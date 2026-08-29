@@ -138,6 +138,11 @@ struct _stack_walk_globals
 
 /* ---------- prototypes */
 
+void stack_walk_with_context(
+	boolean disregard_symbol_names,
+	short levels_to_ignore,
+	void *context);
+
 /* ---------- globals */
 
 struct _stack_walk_globals stack_walk_globals =
@@ -158,6 +163,18 @@ void stack_walk_disregard_symbol_names(
 	boolean disregard)
 {
 	stack_walk_globals.disregard_symbol_names = disregard;
+	return;
+}
+
+void stack_walk(
+	long levels_to_ignore)
+{
+	stack_walk_with_context(
+		FALSE,
+		(short)(levels_to_ignore + 1),
+		NULL);
+
+	return;
 }
 
 void free_symbol_table(
@@ -178,6 +195,7 @@ void free_symbol_table(
 	symbol_table->number_of_symbols = 0;
 	symbol_table->string_storage = NULL;
 	symbol_table->symbols = NULL;
+	return;
 }
 
 void stack_walk_dispose(
@@ -186,6 +204,7 @@ void stack_walk_dispose(
 	stack_walk_globals.fixup = NONE;
 	stack_walk_globals.disregard_symbol_names = FALSE;
 	free_symbol_table(&stack_walk_globals.symbol_table);
+	return;
 }
 
 /* ---------- private code */
