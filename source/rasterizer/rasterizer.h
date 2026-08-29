@@ -152,7 +152,9 @@ struct rasterizer_globals_definition
 	boolean initialized;
 	byte reserved01;
 	short current_lock_operation;
-	byte reserved04[0x24];
+	byte reserved04[0x14];
+	unsigned __int64 fps_accumulation_frame_index;
+	byte reserved20[8];
 	/* updated asynchronously by the rasterizer and vertical-blank callback */
 	volatile unsigned long frame_index;
 	volatile unsigned long vertical_blank_index;
@@ -172,6 +174,8 @@ typedef char verify_rasterizer_globals_initialized_offset[
 	offsetof(struct rasterizer_globals_definition, initialized) == 0x00 ? 1 : -1];
 typedef char verify_rasterizer_globals_lock_operation_offset[
 	offsetof(struct rasterizer_globals_definition, current_lock_operation) == 0x02 ? 1 : -1];
+typedef char verify_rasterizer_globals_fps_accumulation_frame_index_offset[
+	offsetof(struct rasterizer_globals_definition, fps_accumulation_frame_index) == 0x18 ? 1 : -1];
 typedef char verify_rasterizer_globals_framerate_throttle_offset[
 	offsetof(struct rasterizer_globals_definition, framerate_throttle) == 0x3D ? 1 : -1];
 typedef char verify_rasterizer_globals_near_clip_distance_offset[

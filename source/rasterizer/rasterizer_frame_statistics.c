@@ -135,6 +135,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/cseries_windows.h"
 #include "errors.h"
 #include "rasterizer.h"
 
@@ -153,12 +154,28 @@ struct rasterizer_frame_statistics_private_globals_prefix
 {
 	byte reserved000[0x740];
 	word *temp_buffer;
+	byte reserved744[4];
+	unsigned __int64 fps_accumulation_time;
+	unsigned __int64 fps_accumulation_frame_index;
+};
+
+struct rasterizer_frame_statistics_debug_options_prefix
+{
+	boolean fps_accumulation;
 };
 
 typedef char verify_rasterizer_frame_statistics_temp_buffer_offset[
 	offsetof(
 		struct rasterizer_frame_statistics_private_globals_prefix,
 		temp_buffer) == 0x740 ? 1 : -1];
+typedef char verify_rasterizer_frame_statistics_accumulation_time_offset[
+	offsetof(
+		struct rasterizer_frame_statistics_private_globals_prefix,
+		fps_accumulation_time) == 0x748 ? 1 : -1];
+typedef char verify_rasterizer_frame_statistics_accumulation_frame_index_offset[
+	offsetof(
+		struct rasterizer_frame_statistics_private_globals_prefix,
+		fps_accumulation_frame_index) == 0x750 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -166,6 +183,7 @@ typedef char verify_rasterizer_frame_statistics_temp_buffer_offset[
 
 extern struct rasterizer_frame_statistics_globals rasterizer_frame_statistics;
 extern struct rasterizer_frame_statistics_private_globals_prefix bss_00466320;
+extern struct rasterizer_frame_statistics_debug_options_prefix rasterizer_debug_options;
 
 #define rasterizer_frame_statistics_temp_buffer bss_00466320.temp_buffer
 
@@ -196,6 +214,17 @@ void rasterizer_frame_statistics_begin(
 	void)
 {
 	memset(&rasterizer_frame_statistics, 0, sizeof(rasterizer_frame_statistics));
+
+	return;
+}
+
+void rasterizer_fps_accumulate(
+	void)
+{
+	rasterizer_debug_options.fps_accumulation = TRUE;
+	bss_00466320.fps_accumulation_time = system_milliseconds();
+	bss_00466320.fps_accumulation_frame_index =
+		rasterizer_globals.fps_accumulation_frame_index;
 
 	return;
 }
