@@ -376,6 +376,11 @@ void dispose_thread(
 long __stdcall listen(
 	long socket,
 	long backlog);
+long __stdcall send(
+	long socket,
+	void const *buffer,
+	long length,
+	long flags);
 long __stdcall select(
 	long ignored,
 	struct winsock_fd_set *readable,
@@ -453,6 +458,47 @@ long get_endpoint_type(
 	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x12D, transport_initialized);
 
 	return ep->type;
+}
+
+long write_endpoint(
+	struct transport_endpoint *ep,
+	void const *buffer,
+	long length)
+{
+	long result;
+
+	match_assert(
+		TRANSPORT_ENDPOINT_WINSOCK_FILE,
+		0x350,
+		ep && buffer && (length > 0));
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x351, transport_initialized);
+
+	result = send(ep->socket, buffer, length, 0);
+	if (result == INVALID_SOCKET)
+	{
+		switch (WSAGetLastError())
+		{
+		case 0x2733:
+			ep->error = _transport_result_operation_would_block;
+			return _transport_result_operation_would_block;
+
+		case 0x2744:
+		case 0x2745:
+		case 0x2746:
+		case 0x2749:
+		case 0x274A:
+		case 0x274C:
+			ep->flags &= ~1;
+			ep->error = _transport_error_connection_lost;
+			return _transport_error_connection_lost;
+
+		default:
+			ep->error = _transport_error_endpoint_io;
+			return _transport_error_endpoint_io;
+		}
+	}
+
+	return result;
 }
 
 long endpoint_connected(
