@@ -167,6 +167,21 @@ extern struct player_queues_runtime_globals_prefix bss_0043ee60;
 
 /* ---------- public code */
 
+void update_client_delete(
+	void)
+{
+	if (update_client_globals.queues)
+	{
+		data_dispose(update_client_globals.queues);
+		update_client_globals.queues = NULL;
+	}
+	update_client_globals.latest_update_number_received = NONE;
+	update_client_globals.next_update_number_to_dequeue = 0;
+	update_client_globals.initialized = FALSE;
+
+	return;
+}
+
 void update_server_add_player(
 	long player_index)
 {
@@ -252,6 +267,28 @@ long player_new_queue(
 		queue_index!=NONE);
 
 	return queue_index;
+}
+
+void update_server_delete(
+	void)
+{
+	if (update_server_globals.queues)
+	{
+		data_dispose(update_server_globals.queues);
+		update_server_globals.queues = NULL;
+	}
+	update_server_globals.initialized = FALSE;
+	update_server_globals.next_update_number_to_build = 0;
+	if (update_client_globals.queues)
+	{
+		data_dispose(update_client_globals.queues);
+		update_client_globals.queues = NULL;
+	}
+	update_client_globals.next_update_number_to_dequeue = 0;
+	update_client_globals.initialized = FALSE;
+	update_client_globals.latest_update_number_received = NONE;
+
+	return;
 }
 
 /* ---------- private code */

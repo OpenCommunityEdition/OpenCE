@@ -142,6 +142,12 @@ typedef char verify_animation_graph_nodes_offset[
 
 /* ---------- prototypes */
 
+short animation_update_internal(
+	short animation_type,
+	long animation_graph_index,
+	struct animation_state *state,
+	long *sound_index);
+
 /* ---------- globals */
 
 extern struct first_person_weapon *bss_00453cc8;
@@ -149,6 +155,18 @@ extern struct first_person_weapon *bss_00453cc8;
 #define first_person_weapons bss_00453cc8
 
 /* ---------- public code */
+
+short animation_update_render_only(
+	long animation_graph_index,
+	struct animation_state *state,
+	long *sound_index)
+{
+	return animation_update_internal(
+		0,
+		animation_graph_index,
+		state,
+		sound_index);
+}
 
 void first_person_weapons_initialize(
 	void)

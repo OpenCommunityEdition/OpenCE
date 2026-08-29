@@ -141,15 +141,41 @@ symbols in this file:
 
 #define local_random_direction3d local_random_direction3d_inline
 #include "cseries/cseries.h"
+#include "cseries/errors.h"
 #include "memory/data.h"
 #include "math/real_math.h"
+#include "saved games/game_state.h"
 #undef local_random_direction3d
 
 /* ---------- constants */
 
+enum effect_datum_flags
+{
+	_effect_stopped_bit = 3,
+	_effect_invisible_bit = 4,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct effect_datum_header
+{
+	short identifier;
+	word flags;
+};
+
+struct effects_information
+{
+	short effect_count;
+	short location_count;
+	short active_effect_count;
+};
+
+typedef char effect_datum_header_size_assert[
+	sizeof(struct effect_datum_header) == 0x4 ? 1 : -1];
+typedef char effects_information_size_assert[
+	sizeof(struct effects_information) == 0x6 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -159,6 +185,17 @@ extern struct data_array *effect_data;
 extern struct data_array *effect_location_data;
 
 /* ---------- public code */
+
+void effects_initialize(
+	void)
+{
+	effect_data = game_state_data_new("effect", 0x100, 0xFC);
+	effect_location_data = game_state_data_new("effect location", 0x200, 0x3C);
+	if (!effect_data || !effect_location_data)
+		error(_error_immediate, "couldn't allocate effect globals");
+
+	return;
+}
 
 void effects_initialize_for_new_map(
 	void)
@@ -185,6 +222,32 @@ void effects_dispose(
 		effect_data = NULL;
 	if (effect_location_data)
 		effect_location_data = NULL;
+
+	return;
+}
+
+void effects_information_get(
+	struct effects_information *information)
+{
+	long effect_index;
+
+	information->effect_count = effect_data->actual_count;
+	information->location_count = effect_location_data->actual_count;
+	information->active_effect_count = 0;
+
+	for (effect_index = data_next_index(effect_data, NONE);
+		effect_index != NONE;
+		effect_index = data_next_index(effect_data, effect_index))
+	{
+		short flags = ((struct effect_datum_header *)datum_get(
+			effect_data,
+			effect_index))->flags;
+		if ((flags & (1u << _effect_stopped_bit)) == 0 &&
+			(flags & (1u << _effect_invisible_bit)) == 0)
+		{
+			information->active_effect_count++;
+		}
+	}
 
 	return;
 }
