@@ -96,6 +96,7 @@ enum
 	_device_position_changed_bit = 2,
 	_device_group_can_change_only_once_bit = 0,
 	_device_group_changed_once_bit = 1,
+	_device_group_runtime_bit = 2,
 };
 
 /* ---------- macros */
@@ -146,6 +147,33 @@ void devices_initialize_for_new_map(
 {
 	data_make_valid(device_groups_data);
 	code_00084f70();
+
+	return;
+}
+
+void device_delete(
+	long device_index)
+{
+	struct device_datum *device;
+	struct device_group_datum *group;
+	short group_index;
+
+	device = device_get(device_index);
+	group_index = device->device.power_group_index;
+	if (group_index != NONE)
+	{
+		group = datum_get(device_groups_data, group_index);
+		if (TEST_FLAG(group->flags, _device_group_runtime_bit))
+			datum_delete(device_groups_data, group_index);
+	}
+
+	group_index = device->device.position_group_index;
+	if (group_index != NONE)
+	{
+		group = datum_get(device_groups_data, group_index);
+		if (TEST_FLAG(group->flags, _device_group_runtime_bit))
+			datum_delete(device_groups_data, group_index);
+	}
 
 	return;
 }
