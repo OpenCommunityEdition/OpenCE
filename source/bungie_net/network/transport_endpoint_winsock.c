@@ -307,12 +307,23 @@ struct transport_endpoint
 };
 
 struct thread_reference;
+struct mutex_reference;
 
 struct endpoint_thread_reference
 {
 	struct thread_reference *thread;
 	boolean dispose;
 	byte pad[3];
+};
+
+struct connect_process_input
+{
+	struct transport_endpoint *ep;
+	long unknown4[6];
+	struct thread_reference *thread;
+	struct mutex_reference *mutex;
+	boolean cancelled;
+	byte pad25[3];
 };
 
 struct transport_endpoint_winsock_globals
@@ -371,6 +382,8 @@ void code_000713a0(
 	void);
 void delete_transport_endpoint(
 	struct transport_endpoint *endpoint);
+void disconnect_endpoint(
+	struct transport_endpoint *ep);
 void dispose_thread(
 	struct thread_reference *thread);
 long __stdcall listen(
@@ -381,6 +394,11 @@ long __stdcall send(
 	void const *buffer,
 	long length,
 	long flags);
+boolean take_mutex(
+	struct mutex_reference *mutex_reference,
+	unsigned long timeout_ms);
+void release_mutex(
+	struct mutex_reference *mutex_reference);
 long __stdcall select(
 	long ignored,
 	struct winsock_fd_set *readable,
@@ -634,6 +652,34 @@ void disconnect_endpoint(
 	}
 
 	ep->flags &= ~1;
+	return;
+}
+
+void cancel_connect_process(
+	struct connect_process_input *input)
+{
+	match_assert(
+		TRANSPORT_ENDPOINT_WINSOCK_FILE,
+		0x298,
+		input && input->ep && input->thread);
+
+	code_000713a0();
+	if (take_mutex(input->mutex, 1000))
+	{
+		disconnect_endpoint(input->ep);
+		input->ep->error = _transport_error_none;
+		input->cancelled = TRUE;
+		release_mutex(input->mutex);
+	}
+	else
+	{
+		match_vassert(
+			TRANSPORT_ENDPOINT_WINSOCK_FILE,
+			0x2A5,
+			FALSE,
+			"!\"unable to get mutex in cancel_connect_process()!\"");
+	}
+
 	return;
 }
 
