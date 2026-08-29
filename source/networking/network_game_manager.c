@@ -102,7 +102,9 @@ struct network_machine
 
 struct network_game
 {
-	byte __unknown0[0x10D];
+	wchar_t name[16];
+	byte map[0x84];
+	byte __unknownA4[0x69];
 	byte game_mode;
 	byte maximum_player_count;
 	byte __padding10F;
@@ -138,6 +140,9 @@ long player_new(
 	long unit_index,
 	short controller_index,
 	struct network_player const *player);
+void network_game_invalidate_machine(
+	struct network_game *game,
+	short machine_index);
 
 /* ---------- globals */
 
@@ -340,6 +345,61 @@ void network_game_reset_for_next_round(
 
 	game_time_end();
 	return;
+}
+
+void network_game_invalidate(
+	struct network_game *game)
+{
+	long machine_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_game_manager.c",
+		0x23,
+		game);
+
+	csmemset(game, 0, sizeof(*game));
+	csmemset(game->map, 0, sizeof(game->map));
+	game->machine_count = 0;
+	game->player_count = 0;
+
+	for (machine_index = 0; machine_index < 4; machine_index++)
+		network_game_invalidate_machine(game, (short)machine_index);
+
+	csmemset(game->players, NONE, sizeof(game->players));
+	game->game_mode = 2;
+	game->maximum_player_count = 16;
+	game->load_ui = FALSE;
+
+	return;
+}
+
+boolean network_game_update_player(
+	struct network_game *game,
+	struct network_player *player)
+{
+	struct network_player *current_player;
+	boolean result = FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_game_manager.c",
+		0x101,
+		game && player);
+
+	if (network_game_player_is_valid(player, game))
+	{
+		current_player = &game->players[player->player_list_index];
+		if (current_player->controller_index == player->controller_index &&
+			current_player->machine_index == player->machine_index)
+		{
+			csmemcpy(current_player, player, sizeof(*current_player));
+			result = TRUE;
+		}
+	}
+
+	if (!result)
+		error(2, "tried to update a player with indvalid data");
+
+	return result;
 }
 
 /* ---------- private code */

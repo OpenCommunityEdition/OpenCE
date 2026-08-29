@@ -128,6 +128,8 @@ struct game_options;
 
 /* ---------- macros */
 
+#define game_globals bss_0043e48c
+
 /* ---------- structures */
 
 struct game_options
@@ -179,6 +181,167 @@ void game_engine_game_starting(
 
 void game_engine_player_added(
 	long player_index);
+
+void recorded_animations_dispose(
+	void);
+void cinematic_dispose(
+	void);
+void hs_dispose(
+	void);
+void cheats_dispose(
+	void);
+void ui_widgets_dispose(
+	void);
+void editor_dispose(
+	void);
+void ai_dispose(
+	void);
+void player_effect_dispose(
+	void);
+void rumble_dispose(
+	void);
+void game_sound_dispose(
+	void);
+void sound_classes_dispose(
+	void);
+void game_engine_dispose(
+	void);
+void particle_systems_dispose(
+	void);
+void weather_particle_systems_dispose(
+	void);
+void effects_dispose(
+	void);
+void particles_dispose(
+	void);
+void contrails_dispose(
+	void);
+void players_dispose(
+	void);
+void decals_dispose(
+	void);
+void breakable_surfaces_dispose(
+	void);
+void structures_dispose(
+	void);
+void render_dispose(
+	void);
+void objects_dispose(
+	void);
+void director_dispose(
+	void);
+void interface_dispose(
+	void);
+void game_allegiance_dispose(
+	void);
+void saved_game_files_dispose(
+	void);
+void event_manager_dispose(
+	void);
+void input_abstraction_dispose(
+	void);
+void player_ui_dispose(
+	void);
+void game_state_dispose(
+	void);
+void telnet_console_dispose(
+	void);
+void transport_dispose(
+	void);
+void bink_playback_dispose(
+	void);
+void progress_bar_dispose(
+	void);
+
+void rasterizer_dispose_from_old_map(
+	void);
+void game_state_dispose_from_old_map(
+	void);
+void cheats_dispose_from_old_map(
+	void);
+void recorded_animations_dispose_from_old_map(
+	void);
+void hs_dispose_from_old_map(
+	void);
+void cinematic_dispose_from_old_map(
+	void);
+void editor_dispose_from_old_map(
+	void);
+void ai_dispose_from_old_map(
+	void);
+void player_effect_dispose_from_old_map(
+	void);
+void rumble_dispose_from_old_map(
+	void);
+void point_physics_dispose_from_old_map(
+	void);
+void particle_systems_dispose_from_old_map(
+	void);
+void weather_particle_systems_dispose_from_old_map(
+	void);
+void decals_dispose_from_old_map(
+	void);
+void breakable_surfaces_dispose_from_old_map(
+	void);
+void structures_dispose_from_old_map(
+	void);
+void render_dispose_from_old_map(
+	void);
+void objects_dispose_from_old_map(
+	void);
+void director_dispose_from_old_map(
+	void);
+void observer_dispose_from_old_map(
+	void);
+void interface_dispose_from_old_map(
+	void);
+void players_dispose_from_old_map(
+	void);
+void contrails_dispose_from_old_map(
+	void);
+void particles_dispose_from_old_map(
+	void);
+void effects_dispose_from_old_map(
+	void);
+void game_sound_dispose_from_old_map(
+	void);
+void sound_classes_dispose_from_old_map(
+	void);
+void sound_dispose_from_old_map(
+	void);
+void game_allegiance_dispose_from_old_map(
+	void);
+void update_server_delete(
+	void);
+void game_engine_dispose_from_old_map(
+	void);
+void scenario_dispose_from_old_map(
+	void);
+void ui_widgets_close_all(
+	void);
+void ui_widgets_safe_to_load(
+	boolean safe);
+
+void collision_log_begin_period(
+	short period);
+void collision_log_end_period(
+	void);
+void particles_update(
+	real dt);
+void contrails_update(
+	real dt);
+void particle_systems_update(
+	real dt);
+void widgets_update(
+	real dt);
+void game_sound_update(
+	real dt);
+void scenario_frame_update(
+	real dt);
+void rasterizer_frame_update(
+	real dt);
+void numeric_countdown_timer_update(
+	void);
 
 /* ---------- globals */
 
@@ -249,6 +412,121 @@ void set_random_seed(
 	unsigned long seed)
 {
 	*get_global_random_seed_address() = seed;
+
+	return;
+}
+
+void game_dispose(
+	void)
+{
+	recorded_animations_dispose();
+	cinematic_dispose();
+	hs_dispose();
+	cheats_dispose();
+	ui_widgets_dispose();
+	editor_dispose();
+	ai_dispose();
+	player_effect_dispose();
+	rumble_dispose();
+	game_sound_dispose();
+	sound_classes_dispose();
+	game_engine_dispose();
+	particle_systems_dispose();
+	weather_particle_systems_dispose();
+	effects_dispose();
+	particles_dispose();
+	contrails_dispose();
+	players_dispose();
+	decals_dispose();
+	breakable_surfaces_dispose();
+	structures_dispose();
+	render_dispose();
+	objects_dispose();
+	director_dispose();
+	interface_dispose();
+	game_allegiance_dispose();
+	game_time_dispose();
+	saved_game_files_dispose();
+	event_manager_dispose();
+	input_abstraction_dispose();
+	player_ui_dispose();
+	game_state_dispose();
+	telnet_console_dispose();
+	transport_dispose();
+	bink_playback_dispose();
+	progress_bar_dispose();
+
+	return;
+}
+
+void game_dispose_from_old_map(
+	void)
+{
+	rasterizer_dispose_from_old_map();
+	game_state_dispose_from_old_map();
+	cheats_dispose_from_old_map();
+	recorded_animations_dispose_from_old_map();
+	hs_dispose_from_old_map();
+	cinematic_dispose_from_old_map();
+	editor_dispose_from_old_map();
+	ai_dispose_from_old_map();
+	player_effect_dispose_from_old_map();
+	rumble_dispose_from_old_map();
+	point_physics_dispose_from_old_map();
+	particle_systems_dispose_from_old_map();
+	weather_particle_systems_dispose_from_old_map();
+	decals_dispose_from_old_map();
+	breakable_surfaces_dispose_from_old_map();
+	structures_dispose_from_old_map();
+	render_dispose_from_old_map();
+	objects_dispose_from_old_map();
+	director_dispose_from_old_map();
+	observer_dispose_from_old_map();
+	interface_dispose_from_old_map();
+	players_dispose_from_old_map();
+	contrails_dispose_from_old_map();
+	particles_dispose_from_old_map();
+	effects_dispose_from_old_map();
+	game_sound_dispose_from_old_map();
+	sound_classes_dispose_from_old_map();
+	sound_dispose_from_old_map();
+	game_allegiance_dispose_from_old_map();
+	update_server_delete();
+	game_engine_dispose_from_old_map();
+	scenario_dispose_from_old_map();
+	game_time_dispose_from_old_map();
+	ui_widgets_close_all();
+	ui_widgets_safe_to_load(FALSE);
+	game_globals->active = FALSE;
+
+	return;
+}
+
+void game_frame(
+	real dt)
+{
+	real frame_dt;
+
+	if (game_globals->players_are_double_speed)
+		frame_dt = dt * 0.5f;
+	else
+		frame_dt = dt;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\game.c",
+		585,
+		game_globals->active);
+
+	collision_log_begin_period(1);
+	particles_update(frame_dt);
+	contrails_update(frame_dt);
+	particle_systems_update(frame_dt);
+	widgets_update(frame_dt);
+	game_sound_update(frame_dt);
+	scenario_frame_update(frame_dt);
+	rasterizer_frame_update(frame_dt);
+	numeric_countdown_timer_update();
+	collision_log_end_period();
 
 	return;
 }

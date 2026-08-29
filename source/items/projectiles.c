@@ -119,6 +119,7 @@ symbols in this file:
 
 #include "projectile_definitions.h"
 
+#include "objects/objects.h"
 #include "physics/physics.h"
 
 /* ---------- constants */
@@ -157,10 +158,41 @@ void projectiles_dispose(
 	return;
 }
 
+void projectiles_delete_all(
+	void)
+{
+	struct object_iterator iterator;
+
+	object_iterator_new(&iterator, _object_mask_projectile, 0);
+	while (object_iterator_next(&iterator))
+	{
+		object_delete(iterator.index);
+	}
+
+	return;
+}
+
 void projectile_delete(
 	long projectile_index)
 {
 	return;
+}
+
+boolean dangerous_projectiles_near_player(
+	void)
+{
+	struct object_iterator iterator;
+	struct object_datum *projectile;
+
+	object_iterator_new(&iterator, _object_mask_projectile, 0);
+	projectile = (struct object_datum *)object_iterator_next(&iterator);
+	if (projectile)
+	{
+		projectile_definition_get(projectile->definition_index);
+		return TRUE;
+	}
+
+	return FALSE;
 }
 
 /* ---------- private code */

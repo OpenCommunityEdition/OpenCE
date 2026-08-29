@@ -642,15 +642,20 @@ struct stack_memory_pool;
 
 struct ui_widget_runtime_globals_prefix
 {
-	byte reserved0000[0x2C];
+	byte reserved0000[0x24];
+	long pause_disabled_ticks;
+	short main_menu_deferred_error_code;
+	short pause_game_time_count;
 	real fade_to_black;
 	byte reserved0030[0x2C];
 	void *initialization_thread;
-	byte reserved0060[4];
+	short filesystem_check_result;
+	boolean initialized;
+	boolean dont_load_children_recursive;
 	boolean debug_show_path;
-	byte reserved0065;
+	boolean processing_inhibited;
 	boolean main_menu_music_active;
-	byte reserved0067;
+	boolean sound_paused;
 };
 
 struct ui_widget_bss_prefix
@@ -664,14 +669,26 @@ typedef char verify_ui_widget_fade_to_black_offset[
 	offsetof(
 		struct ui_widget_runtime_globals_prefix,
 		fade_to_black) == 0x2C ? 1 : -1];
+typedef char verify_ui_widget_pause_disabled_ticks_offset[
+	offsetof(
+		struct ui_widget_runtime_globals_prefix,
+		pause_disabled_ticks) == 0x24 ? 1 : -1];
 typedef char verify_ui_widget_initialization_thread_offset[
 	offsetof(
 		struct ui_widget_runtime_globals_prefix,
 		initialization_thread) == 0x5C ? 1 : -1];
+typedef char verify_ui_widget_initialized_offset[
+	offsetof(
+		struct ui_widget_runtime_globals_prefix,
+		initialized) == 0x62 ? 1 : -1];
 typedef char verify_ui_widget_debug_show_path_offset[
 	offsetof(
 		struct ui_widget_runtime_globals_prefix,
 		debug_show_path) == 0x64 ? 1 : -1];
+typedef char verify_ui_widget_processing_inhibited_offset[
+	offsetof(
+		struct ui_widget_runtime_globals_prefix,
+		processing_inhibited) == 0x65 ? 1 : -1];
 typedef char verify_ui_widget_main_menu_music_active_offset[
 	offsetof(
 		struct ui_widget_runtime_globals_prefix,
@@ -736,6 +753,22 @@ void ui_widgets_safe_to_load(
 {
 	return;
 }
+
+#define widget_globals bss_00454240.widget_globals
+
+void ui_widgets_inhibit_processing(
+	boolean inhibit)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+		1174,
+		widget_globals.initialized);
+	widget_globals.processing_inhibited = inhibit;
+
+	return;
+}
+
+#undef widget_globals
 
 void ui_widgets_set_fade_value(
 	real value)
@@ -811,6 +844,22 @@ boolean ui_main_menu_music_active(
 {
 	return bss_00454240.widget_globals.main_menu_music_active;
 }
+
+#define widget_globals bss_00454240.widget_globals
+
+void ui_widgets_disable_pause_game(
+	long duration_ticks)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+		2519,
+		duration_ticks>=0);
+	widget_globals.pause_disabled_ticks = duration_ticks;
+
+	return;
+}
+
+#undef widget_globals
 
 void code_000d4680(
 	void)

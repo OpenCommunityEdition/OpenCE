@@ -105,6 +105,11 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	MAXIMUM_BUFFERED_KEYSTROKES = 64
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -119,7 +124,12 @@ struct input_globals
 	struct gamepad_state suppressed_gamepad_state;
 	unsigned char reserved2[0x19];
 	boolean frame_active;
-	unsigned char reserved3[0x1DE];
+	unsigned char reserved3[0xA];
+	byte key_ticks[NUMBER_OF_KEYS];
+	byte key_latches[NUMBER_OF_KEYS];
+	short buffered_key_read_index;
+	short buffered_key_write_index;
+	struct key_stroke buffered_keys[MAXIMUM_BUFFERED_KEYSTROKES];
 };
 
 typedef char verify_input_suppressed_offset[
@@ -132,6 +142,16 @@ typedef char verify_input_suppressed_gamepad_state_offset[
 	offsetof(struct input_globals, suppressed_gamepad_state) == 0x1EC ? 1 : -1];
 typedef char verify_input_frame_active_offset[
 	offsetof(struct input_globals, frame_active) == 0x22D ? 1 : -1];
+typedef char verify_input_key_ticks_offset[
+	offsetof(struct input_globals, key_ticks) == 0x238 ? 1 : -1];
+typedef char verify_input_key_latches_offset[
+	offsetof(struct input_globals, key_latches) == 0x2A0 ? 1 : -1];
+typedef char verify_input_buffered_key_read_index_offset[
+	offsetof(struct input_globals, buffered_key_read_index) == 0x308 ? 1 : -1];
+typedef char verify_input_buffered_key_write_index_offset[
+	offsetof(struct input_globals, buffered_key_write_index) == 0x30A ? 1 : -1];
+typedef char verify_input_buffered_keys_offset[
+	offsetof(struct input_globals, buffered_keys) == 0x30C ? 1 : -1];
 typedef char verify_input_globals_size[
 	sizeof(struct input_globals) == 0x40C ? 1 : -1];
 
@@ -140,6 +160,8 @@ typedef char verify_input_globals_size[
 /* ---------- globals */
 
 struct input_globals bss_004536a0;
+
+#define input_globals bss_004536a0
 
 /* ---------- public code */
 
@@ -216,6 +238,31 @@ void input_deactivate(
 	return;
 }
 
+void input_flush(
+	void)
+{
+	csmemset(
+		input_globals.gamepad_states,
+		0,
+		sizeof(input_globals.gamepad_states));
+	csmemset(
+		input_globals.key_ticks,
+		0,
+		sizeof(input_globals.key_ticks));
+	csmemset(
+		input_globals.key_latches,
+		0,
+		sizeof(input_globals.key_latches));
+	input_globals.buffered_key_read_index = 0;
+	input_globals.buffered_key_write_index = 0;
+	csmemset(
+		input_globals.buffered_keys,
+		0,
+		sizeof(input_globals.buffered_keys));
+
+	return;
+}
+
 const struct mouse_state *input_get_mouse_state(
 	void)
 {
@@ -226,6 +273,17 @@ boolean input_mouse_button_is_down(
 	short button_index)
 {
 	return FALSE;
+}
+
+boolean input_has_gamepad(
+	short gamepad_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\input\\input_xbox.c",
+		0x171,
+		gamepad_index>=0 && gamepad_index<MAXIMUM_GAMEPADS);
+
+	return input_globals.gamepad_handles[gamepad_index] != NULL;
 }
 
 const struct gamepad_state *input_get_gamepad_state(
