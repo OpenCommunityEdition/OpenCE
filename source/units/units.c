@@ -5473,33 +5473,36 @@ boolean unit_update(
 
 		if (TEST_FLAG(unit->unit.flags, _unit_active_camouflaged_bit))
 		{
-			boolean set = FALSE;
 			real active_camo_change_this_tick;
 
 			if (game_engine_running() &&
-				unit->unit.cause_for_camo_regrowth && 
-				unit->unit.cause_for_camo_regrowth==cause_for_camo_regrowth_shot_fired)
+				unit->unit.cause_for_camo_regrowth)
 			{
-				long weapon_index = unit_get_current_weapon_index(unit_index);
-
-				if (weapon_index!=NONE)
+				if (unit->unit.cause_for_camo_regrowth==cause_for_camo_regrowth_shot_fired)
 				{
-					struct weapon_datum *weapon = weapon_get(weapon_index);
-					struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
+					boolean set = FALSE;
+					long weapon_index = unit_get_current_weapon_index(unit_index);
 
-					if (weapon_definition->weapon.active_camo_regrowth_rate!=0.f)
+					if (weapon_index!=NONE)
 					{
-						active_camo_change_this_tick = weapon_definition->weapon.active_camo_regrowth_rate;
-						set = TRUE;
+						struct weapon_datum *weapon = weapon_get(weapon_index);
+						struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
+
+						if (weapon_definition->weapon.active_camo_regrowth_rate!=0.f)
+						{
+							active_camo_change_this_tick = weapon_definition->weapon.active_camo_regrowth_rate;
+							set = TRUE;
+						}
 					}
+
+					if (!set)
+						active_camo_change_this_tick = 1.f/120.f;
 				}
+				else
+					active_camo_change_this_tick = 1.f/120.f;
 			}
-
-			if (!set)
-			{
+			else
 				active_camo_change_this_tick = 1.f/120.f;
-			}
-
 
 			unit->unit.active_camouflage += active_camo_change_this_tick;
 
