@@ -329,6 +329,7 @@ struct transparent_geometry_group *rasterizer_transparent_geometry_next_group(
 {
 	short next_group_sorted_index;
 	short group_sorted_index;
+	struct transparent_geometry_group *next_group = group;
 
 	if (group)
 	{
@@ -343,12 +344,16 @@ struct transparent_geometry_group *rasterizer_transparent_geometry_next_group(
 			match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0x8D,
 				next_group_sorted_index>=0);
 
-			return transparent_geometry_groups +
+			next_group = transparent_geometry_groups +
 				transparent_geometry_group_sorted_indices[next_group_sorted_index];
+		}
+		else
+		{
+			next_group = NULL;
 		}
 	}
 
-	return NULL;
+	return next_group;
 }
 
 void *rasterizer_transparent_geometry_get_groups(
