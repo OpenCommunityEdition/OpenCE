@@ -105,8 +105,15 @@ symbols in this file:
 
 enum
 {
+	RASTERIZER_GEOMETRY_NO_FOG_BIT = 2,
+	RASTERIZER_GEOMETRY_ATMOSPHERIC_FOG_BUT_NO_PLANAR_FOG_BIT = 6,
 	RASTERIZER_GEOMETRY_FIRST_PERSON_BIT = 7,
+	RASTERIZER_STENCIL_MODE_WRITE = 1,
 	RASTERIZER_STENCIL_MODE_REJECT = 2,
+	RENDER_MODEL_EFFECT_NONE = 0,
+	RENDER_MODEL_EFFECT_ACTIVE_CAMOUFLAGE = 1,
+	RENDER_MODEL_EFFECT_TRANSPARENT_ZBUFFERED = 2,
+	RASTERIZER_STATISTICS_MODE_ENABLED = 2,
 };
 
 /* ---------- macros */
@@ -117,28 +124,83 @@ enum
 
 struct rasterizer_models_debug_options_prefix
 {
-	byte reserved00[0x0C];
+	byte reserved00[2];
+	short statistics_mode;
+	byte reserved04[8];
 	boolean draw_models;
+	byte reserved0D[0x34];
+	boolean active_camouflage;
+};
+
+struct rasterizer_model_skinning_parameters
+{
+	void const *node_matrices;
+	short node_matrix_count;
+	word pad06;
+};
+
+struct rasterizer_model_lighting_parameters
+{
+	byte data[0x74];
+};
+
+struct rasterizer_model_effect_parameters
+{
+	short type;
+	word pad02;
+	real intensity;
 };
 
 struct rasterizer_model_begin_parameters
 {
 	unsigned long geometry_flags;
+	byte reserved04[4];
+	struct rasterizer_model_skinning_parameters skinning;
+	struct rasterizer_model_lighting_parameters lighting;
+	byte animation[8];
+	struct rasterizer_model_effect_parameters effect;
 };
 
 struct rasterizer_models_private_globals_prefix
 {
 	byte reserved000[0xB0];
 	struct rasterizer_model_begin_parameters const *parameters;
-	byte reservedB4[6];
+	boolean parameters_queued;
+	byte reservedB5[3];
+	short model_effect_type;
 	boolean sky;
-	byte reservedBB;
+	boolean planar_fog;
 	boolean environment_fog_screen;
 	boolean do_not_change_z_stencil_states;
 };
 
+struct rasterizer_models_frame_statistics_prefix
+{
+	byte reserved000[0xD4];
+	unsigned long model_count;
+	byte reserved0D8[0x78];
+	unsigned long skinning_work;
+	unsigned long lighting_work;
+	byte reserved158[8];
+	unsigned long skinning_work_accumulated;
+	unsigned long lighting_work_accumulated;
+};
+
 typedef char verify_rasterizer_models_draw_models_offset[
 	offsetof(struct rasterizer_models_debug_options_prefix, draw_models) == 0x0C
+		? 1 : -1];
+typedef char verify_rasterizer_models_active_camouflage_offset[
+	offsetof(
+		struct rasterizer_models_debug_options_prefix,
+		active_camouflage) == 0x41 ? 1 : -1];
+typedef char verify_rasterizer_model_parameters_skinning_offset[
+	offsetof(struct rasterizer_model_begin_parameters, skinning) == 0x08
+		? 1 : -1];
+typedef char verify_rasterizer_model_parameters_lighting_offset[
+	offsetof(struct rasterizer_model_begin_parameters, lighting) == 0x10
+		? 1 : -1];
+typedef char verify_rasterizer_model_parameters_effect_offset[
+	offsetof(struct rasterizer_model_begin_parameters, effect) == 0x8C
 		? 1 : -1];
 typedef char verify_rasterizer_models_sky_offset[
 	offsetof(struct rasterizer_models_private_globals_prefix, sky) == 0xBA
@@ -146,6 +208,10 @@ typedef char verify_rasterizer_models_sky_offset[
 typedef char verify_rasterizer_models_parameters_offset[
 	offsetof(struct rasterizer_models_private_globals_prefix, parameters) == 0xB0
 		? 1 : -1];
+typedef char verify_rasterizer_models_effect_type_offset[
+	offsetof(
+		struct rasterizer_models_private_globals_prefix,
+		model_effect_type) == 0xB8 ? 1 : -1];
 typedef char verify_rasterizer_models_environment_fog_screen_offset[
 	offsetof(
 		struct rasterizer_models_private_globals_prefix,
@@ -154,6 +220,13 @@ typedef char verify_rasterizer_models_do_not_change_states_offset[
 	offsetof(
 		struct rasterizer_models_private_globals_prefix,
 		do_not_change_z_stencil_states) == 0xBD ? 1 : -1];
+typedef char verify_rasterizer_models_window_fog_offset[
+	offsetof(struct rasterizer_window_begin_parameters, fog) == 0x1E8
+		? 1 : -1];
+typedef char verify_rasterizer_models_statistics_skinning_offset[
+	offsetof(
+		struct rasterizer_models_frame_statistics_prefix,
+		skinning_work) == 0x150 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -168,12 +241,20 @@ void rasterizer_set_stencil_mode(
 void rasterizer_set_frustum_z(
 	real z_near,
 	real z_far);
+void rasterizer_set_model_skinning(
+	struct rasterizer_model_skinning_parameters const *skinning);
+void rasterizer_set_model_lighting(
+	struct rasterizer_model_lighting_parameters const *lighting);
+boolean rasterizer_environment_fog_screen_model_begin(
+	struct rasterizer_model_begin_parameters const *parameters);
 
 /* ---------- globals */
 
 extern struct rasterizer_models_debug_options_prefix rasterizer_debug_options;
 extern struct rasterizer_models_private_globals_prefix bss_00465d68;
 extern boolean data_0030cefb;
+extern struct rasterizer_window_begin_parameters global_window_parameters;
+extern struct rasterizer_models_frame_statistics_prefix rasterizer_frame_statistics;
 
 /* ---------- public code */
 
@@ -256,6 +337,103 @@ void _rasterizer_model_end(
 			rasterizer_set_frustum_z(0.0f, 0.0f);
 		}
 		local_parameters = NULL;
+	}
+
+	return;
+}
+
+void _rasterizer_model_begin(
+	struct rasterizer_model_begin_parameters const *parameters,
+	boolean do_not_change_z_stencil_states)
+{
+	unsigned long skinning_work;
+	unsigned long lighting_work;
+	real camera_plane_distance;
+
+	if (rasterizer_debug_options.draw_models)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+			587,
+			parameters);
+		if (TEST_FLAG(
+				parameters->geometry_flags,
+				RASTERIZER_GEOMETRY_FIRST_PERSON_BIT) &&
+			!do_not_change_z_stencil_states)
+		{
+			rasterizer_set_stencil_mode(RASTERIZER_STENCIL_MODE_WRITE);
+			rasterizer_set_frustum_z(
+				rasterizer_globals.first_person_weapon_near_clip_distance,
+				rasterizer_globals.first_person_weapon_far_clip_distance);
+		}
+
+		local_parameters = parameters;
+		bss_00465d68.parameters_queued = FALSE;
+		bss_00465d68.do_not_change_z_stencil_states =
+			do_not_change_z_stencil_states;
+
+		if (rasterizer_debug_options.active_camouflage &&
+			global_window_parameters.rasterizer_target == 0 &&
+			parameters->effect.type == RENDER_MODEL_EFFECT_ACTIVE_CAMOUFLAGE &&
+			parameters->effect.intensity > 0.0f)
+		{
+			bss_00465d68.model_effect_type =
+				RENDER_MODEL_EFFECT_ACTIVE_CAMOUFLAGE;
+		}
+		else if (parameters->effect.type ==
+			RENDER_MODEL_EFFECT_TRANSPARENT_ZBUFFERED)
+		{
+			bss_00465d68.model_effect_type =
+				RENDER_MODEL_EFFECT_TRANSPARENT_ZBUFFERED;
+		}
+		else
+		{
+			skinning_work = rasterizer_frame_statistics.skinning_work;
+			rasterizer_set_model_skinning(&parameters->skinning);
+			skinning_work =
+				rasterizer_frame_statistics.skinning_work - skinning_work;
+			lighting_work = rasterizer_frame_statistics.lighting_work;
+			rasterizer_set_model_lighting(&parameters->lighting);
+			rasterizer_frame_statistics.skinning_work_accumulated +=
+				skinning_work;
+			rasterizer_frame_statistics.lighting_work_accumulated +=
+				rasterizer_frame_statistics.lighting_work - lighting_work;
+			bss_00465d68.model_effect_type = RENDER_MODEL_EFFECT_NONE;
+		}
+
+		camera_plane_distance =
+			global_window_parameters.camera.position.x *
+				global_window_parameters.fog.plane.n.i +
+			global_window_parameters.camera.position.y *
+				global_window_parameters.fog.plane.n.j +
+			global_window_parameters.camera.position.z *
+				global_window_parameters.fog.plane.n.k -
+			global_window_parameters.fog.plane.d;
+		bss_00465d68.planar_fog =
+			global_window_parameters.fog.planar_mode &&
+			!TEST_FLAG(
+				parameters->geometry_flags,
+				RASTERIZER_GEOMETRY_NO_FOG_BIT) &&
+			(!TEST_FLAG(
+				parameters->geometry_flags,
+				RASTERIZER_GEOMETRY_ATMOSPHERIC_FOG_BUT_NO_PLANAR_FOG_BIT) ||
+			camera_plane_distance < 0.0f);
+
+		if (!bss_00465d68.sky &&
+			rasterizer_environment_fog_screen_model_begin(parameters))
+		{
+			bss_00465d68.environment_fog_screen = TRUE;
+		}
+		else
+		{
+			bss_00465d68.environment_fog_screen = FALSE;
+		}
+
+		if (rasterizer_debug_options.statistics_mode ==
+			RASTERIZER_STATISTICS_MODE_ENABLED)
+		{
+			rasterizer_frame_statistics.model_count++;
+		}
 	}
 
 	return;
