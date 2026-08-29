@@ -69,9 +69,13 @@ void collision_log_enable(bool);
 void collision_log_render(void);
 void collision_log_start_time(
 	LARGE_INTEGER *start_time);
-void collision_log_end_time(short collision_function, __int64 end_time);
-void collision_log_usage(short);
-void collision_log_display(char *);
+void collision_log_end_time(
+	short collision_function,
+	__int64 end_time);
+void collision_log_usage(
+	short collision_function);
+void collision_log_display(
+	char *buffer);
 void collision_log_begin_period(short);
 void collision_log_end_period(void);
 

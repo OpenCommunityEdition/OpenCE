@@ -114,6 +114,8 @@ symbols in this file:
 
 #include "cseries.h"
 #include "collision_usage.h"
+#include "editor/editor_stubs.h"
+#include "game/game.h"
 
 /* ---------- constants */
 
@@ -144,6 +146,13 @@ struct collision_period
 	boolean valid;
 	long period_count;
 	struct collision_function function[NUMBER_OF_COLLISION_FUNCTION_TYPES];
+};
+
+struct collision_overall_usage
+{
+	short user_index;
+	struct collision_log total_all_periods;
+	struct collision_log usage_by_period[NUMBER_OF_COLLISION_TIME_PERIODS];
 };
 
 /* ---------- prototypes */
@@ -207,6 +216,23 @@ struct collision_period collision_usage_buffer[NUMBER_OF_COLLISION_TIME_PERIODS]
 struct collision_period collision_usage_current;
 
 /* ---------- public code */
+
+int code_0013c830(
+	void const *left_pointer,
+	void const *right_pointer)
+{
+	struct collision_overall_usage const *left = left_pointer;
+	struct collision_overall_usage const *right = right_pointer;
+	long left_calls = left->total_all_periods.calls;
+	long right_calls = right->total_all_periods.calls;
+
+	if (left_calls > right_calls)
+	{
+		return -1;
+	}
+
+	return left_calls < right_calls;
+}
 
 void collision_log_initialize(
 	void)
@@ -272,10 +298,123 @@ void collision_log_end_period(
 	return;
 }
 
+static long code_0013d090(
+	short collision_function)
+{
+	short user;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\physics\\collision_usage.c",
+		403,
+		global_current_collision_user_depth > 0);
+
+	user = global_current_collision_users[global_current_collision_user_depth];
+	match_assert(
+		"c:\\halo\\SOURCE\\physics\\collision_usage.c",
+		406,
+		user >= 0 && user < NUMBER_OF_COLLISION_USER_TYPES);
+	match_assert(
+		"c:\\halo\\SOURCE\\physics\\collision_usage.c",
+		407,
+		collision_function >= 0 &&
+			collision_function < NUMBER_OF_COLLISION_FUNCTION_TYPES);
+
+	if (!game_in_progress() || game_in_editor() || !global_collision_log_enable)
+	{
+		return NONE;
+	}
+
+	if (collision_usage_current_period == NONE)
+	{
+		return NONE;
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\physics\\collision_usage.c",
+		424,
+		collision_usage_current_period >= 0 &&
+			collision_usage_current_period < NUMBER_OF_COLLISION_TIME_PERIODS);
+
+	return user;
+}
+
 void collision_log_start_time(
 	LARGE_INTEGER *start_time)
 {
 	QueryPerformanceCounter(start_time);
+
+	return;
+}
+
+void collision_log_end_time(
+	short collision_function,
+	__int64 start_time)
+{
+	LARGE_INTEGER end_time;
+	short user;
+
+	QueryPerformanceCounter(&end_time);
+	user = code_0013d090(collision_function);
+	if (user != NONE)
+	{
+		__int64 elapsed_time = end_time.QuadPart - start_time;
+
+		collision_usage_current.function[collision_function]
+			.total_all_users.elapsed_time += elapsed_time;
+		collision_usage_current.function[collision_function]
+			.usage_by_user[user].elapsed_time += elapsed_time;
+	}
+
+	return;
+}
+
+void collision_log_usage(
+	short collision_function)
+{
+	short user;
+
+	user = code_0013d090(collision_function);
+	if (user != NONE)
+	{
+		collision_usage_current.function[collision_function]
+			.total_all_users.calls++;
+		collision_usage_current.function[collision_function]
+			.usage_by_user[user].calls++;
+	}
+
+	return;
+}
+
+void collision_log_display(
+	char *buffer)
+{
+	if (collision_usage_buffer[0].reset_upon_next_use)
+	{
+		sprintf(
+			buffer + strlen(buffer),
+			"sphere % 3df % 3db, str-vec % 3d/% 3d, obj-vec % 3d/% 3d|n",
+			collision_usage_buffer[0]
+				.function[_collision_function_vector_bounds_object]
+				.total_all_users.calls,
+			collision_usage_buffer[0]
+				.function[_collision_function_sphere_intersect_bsp_structure]
+				.total_all_users.calls +
+				collision_usage_buffer[0]
+					.function[_collision_function_sphere_intersect_bsp_object]
+					.total_all_users.calls,
+			collision_usage_buffer[0]
+				.function[_collision_function_vector_structure]
+				.total_all_users.calls,
+			collision_usage_buffer[0]
+				.function[_collision_function_vector_intersect_bsp_structure]
+				.total_all_users.calls,
+			collision_usage_buffer[0]
+				.function[_collision_function_vector_objects]
+				.total_all_users.calls,
+			collision_usage_buffer[0]
+				.function[_collision_function_vector_intersect_bsp_object]
+				.total_all_users.calls);
+	}
 
 	return;
 }
