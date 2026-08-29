@@ -80,6 +80,7 @@ symbols in this file:
 #include "collision_bsp.h"
 #include "collision_bsp_definitions.h"
 #include "collision_usage.h"
+#include "render/render_debug.h"
 #include "scenario/scenario.h"
 #include "tag_files/tag_groups.h"
 
@@ -266,6 +267,36 @@ short collision_surface_polygon(
 	while (edge_index != first_edge_index);
 
 	return point_count;
+}
+
+void render_debug_collision_vertex(
+	struct collision_bsp *bsp,
+	long vertex_index,
+	real_matrix4x3 const *matrix,
+	real scale,
+	real_argb_color const *color)
+{
+	struct collision_vertex const *vertex;
+	real_point3d const *point;
+	real_point3d transformed_point;
+
+	vertex = TAG_BLOCK_GET_ELEMENT(
+		&bsp->vertices,
+		vertex_index,
+		struct collision_vertex);
+	point = &vertex->point;
+
+	if (matrix)
+	{
+		point = matrix4x3_transform_point(
+			matrix,
+			point,
+			&transformed_point);
+	}
+
+	render_debug_point(TRUE, point, scale, color);
+
+	return;
 }
 
 void render_debug_collision_bsp(
