@@ -87,6 +87,7 @@ symbols in this file:
 #include "device_definitions.h"
 #include "device_machines.h"
 #include "memory/data.h"
+#include "saved games/game_state.h"
 
 /* ---------- constants */
 
@@ -124,6 +125,21 @@ void code_00084f70(
 /* ---------- globals */
 
 /* ---------- public code */
+
+void devices_initialize(
+	void)
+{
+	device_groups_data = game_state_data_new(
+		"device groups",
+		1024,
+		sizeof(struct device_group_datum));
+	match_assert(
+		"c:\\halo\\SOURCE\\devices\\devices.c",
+		72,
+		device_groups_data);
+
+	return;
+}
 
 void devices_initialize_for_new_map(
 	void)
