@@ -103,7 +103,15 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	RASTERIZER_GEOMETRY_FIRST_PERSON_BIT = 7,
+	RASTERIZER_STENCIL_MODE_REJECT = 2,
+};
+
 /* ---------- macros */
+
+#define local_parameters bss_00465d68.parameters
 
 /* ---------- structures */
 
@@ -113,10 +121,20 @@ struct rasterizer_models_debug_options_prefix
 	boolean draw_models;
 };
 
+struct rasterizer_model_begin_parameters
+{
+	unsigned long geometry_flags;
+};
+
 struct rasterizer_models_private_globals_prefix
 {
-	byte reserved000[0xBA];
+	byte reserved000[0xB0];
+	struct rasterizer_model_begin_parameters const *parameters;
+	byte reservedB4[6];
 	boolean sky;
+	byte reservedBB;
+	boolean environment_fog_screen;
+	boolean do_not_change_z_stencil_states;
 };
 
 typedef char verify_rasterizer_models_draw_models_offset[
@@ -125,6 +143,17 @@ typedef char verify_rasterizer_models_draw_models_offset[
 typedef char verify_rasterizer_models_sky_offset[
 	offsetof(struct rasterizer_models_private_globals_prefix, sky) == 0xBA
 		? 1 : -1];
+typedef char verify_rasterizer_models_parameters_offset[
+	offsetof(struct rasterizer_models_private_globals_prefix, parameters) == 0xB0
+		? 1 : -1];
+typedef char verify_rasterizer_models_environment_fog_screen_offset[
+	offsetof(
+		struct rasterizer_models_private_globals_prefix,
+		environment_fog_screen) == 0xBC ? 1 : -1];
+typedef char verify_rasterizer_models_do_not_change_states_offset[
+	offsetof(
+		struct rasterizer_models_private_globals_prefix,
+		do_not_change_z_stencil_states) == 0xBD ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -132,6 +161,13 @@ void rasterizer_profile_begin(
 	short profile);
 void rasterizer_profile_end(
 	short profile);
+void rasterizer_environment_fog_screen_model_end(
+	void);
+void rasterizer_set_stencil_mode(
+	long stencil_mode);
+void rasterizer_set_frustum_z(
+	real z_near,
+	real z_far);
 
 /* ---------- globals */
 
@@ -193,6 +229,33 @@ void _rasterizer_models_end(
 		{
 			rasterizer_profile_end(_rasterizer_profile_models);
 		}
+	}
+
+	return;
+}
+
+void _rasterizer_model_end(
+	void)
+{
+	if (rasterizer_debug_options.draw_models)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+			1491,
+			local_parameters);
+		if (bss_00465d68.environment_fog_screen)
+		{
+			rasterizer_environment_fog_screen_model_end();
+		}
+		if (TEST_FLAG(
+				local_parameters->geometry_flags,
+				RASTERIZER_GEOMETRY_FIRST_PERSON_BIT) &&
+			!bss_00465d68.do_not_change_z_stencil_states)
+		{
+			rasterizer_set_stencil_mode(RASTERIZER_STENCIL_MODE_REJECT);
+			rasterizer_set_frustum_z(0.0f, 0.0f);
+		}
+		local_parameters = NULL;
 	}
 
 	return;
