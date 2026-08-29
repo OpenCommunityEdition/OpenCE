@@ -408,16 +408,98 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "cache/cache_files.h"
+#include "memory/data.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct hs_compile_globals_prefix
+{
+	boolean initialized;
+	byte reserved0001[3];
+	long source_size;
+	char *compiled_source;
+	byte reserved000C[0x0C];
+	boolean error_occurred;
+	byte reserved0019[3];
+	char const *error;
+	byte reserved0020[0x105];
+	boolean compiling_scenario;
+};
+
+typedef char verify_hs_compile_initialized_offset[
+	offsetof(struct hs_compile_globals_prefix, initialized) == 0x00 ? 1 : -1];
+typedef char verify_hs_compile_source_size_offset[
+	offsetof(struct hs_compile_globals_prefix, source_size) == 0x04 ? 1 : -1];
+typedef char verify_hs_compile_compiled_source_offset[
+	offsetof(struct hs_compile_globals_prefix, compiled_source) == 0x08 ? 1 : -1];
+typedef char verify_hs_compile_error_occurred_offset[
+	offsetof(struct hs_compile_globals_prefix, error_occurred) == 0x18 ? 1 : -1];
+typedef char verify_hs_compile_error_offset[
+	offsetof(struct hs_compile_globals_prefix, error) == 0x1C ? 1 : -1];
+typedef char verify_hs_compile_compiling_scenario_offset[
+	offsetof(struct hs_compile_globals_prefix, compiling_scenario) == 0x125 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+extern struct hs_compile_globals_prefix bss_00453480;
+extern struct data_array *hs_syntax_data;
+
 /* ---------- public code */
+
+#define hs_compile_globals bss_00453480
+
+void hs_compile_initialize(
+	boolean compiling_scenario)
+{
+	struct scenario *scenario;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x5B,
+		!hs_compile_globals.initialized);
+	hs_compile_globals.initialized = TRUE;
+	hs_compile_globals.compiled_source = NULL;
+	hs_compile_globals.source_size = 0;
+	hs_compile_globals.compiling_scenario = compiling_scenario;
+	hs_compile_globals.error_occurred = FALSE;
+	hs_compile_globals.error = NULL;
+	if (compiling_scenario)
+	{
+		scenario = global_scenario_get();
+		tag_block_resize(&scenario->hs_scripts, 0);
+		tag_block_resize(&scenario->hs_globals, 0);
+		tag_block_resize(&scenario->hs_references, 0);
+		tag_data_resize(&scenario->hs_string_constants, 0);
+		data_delete_all(hs_syntax_data);
+	}
+
+	return;
+}
+
+#undef hs_compile_globals
+
+boolean hs_verify_source_offset(
+	long source_offset)
+{
+	boolean valid;
+
+	valid = TRUE;
+	if (source_offset < 0 || source_offset >= bss_00453480.source_size)
+	{
+		bss_00453480.error = "bad source offset (you need to recompile.)";
+		valid = FALSE;
+	}
+	return valid;
+}
 
 /* ---------- private code */
