@@ -132,6 +132,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+#include "math/real_math.h"
+#include "render/render_debug.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -143,5 +147,32 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void render_debug_quaternion(
+	boolean immediate,
+	const real_point3d *point,
+	const real_quaternion *quaternion,
+	real size)
+{
+	real_matrix4x3 matrix;
+
+	matrix4x3_from_point_and_quaternion(&matrix, point, quaternion);
+	render_debug_matrix(immediate, &matrix, size);
+	return;
+}
+
+void render_debug_vectors(
+	boolean immediate,
+	const real_point3d *point,
+	const real_vector3d *forward,
+	const real_vector3d *up,
+	real size)
+{
+	real_matrix4x3 matrix;
+
+	matrix4x3_from_point_and_vectors(&matrix, point, forward, up);
+	render_debug_matrix(immediate, &matrix, size);
+	return;
+}
 
 /* ---------- private code */
