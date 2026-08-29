@@ -143,6 +143,11 @@ void stack_walk_with_context(
 	short levels_to_ignore,
 	void *context);
 
+void load_symbol_table(
+	char const *map_path,
+	struct debug_symbol_table *symbol_table,
+	char const *timestamp);
+
 /* ---------- globals */
 
 struct _stack_walk_globals stack_walk_globals =
@@ -204,6 +209,22 @@ void stack_walk_dispose(
 	stack_walk_globals.fixup = NONE;
 	stack_walk_globals.disregard_symbol_names = FALSE;
 	free_symbol_table(&stack_walk_globals.symbol_table);
+	return;
+}
+
+void stack_walk_initialize(
+	void)
+{
+	load_symbol_table(
+		"d:\\cachebeta.map",
+		&stack_walk_globals.symbol_table,
+		"Mon Dec 17 12:49:36 2001");
+
+	if (stack_walk_globals.fixup==NONE)
+	{
+		stack_walk_globals.fixup = 0;
+	}
+
 	return;
 }
 
