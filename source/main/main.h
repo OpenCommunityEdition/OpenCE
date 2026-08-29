@@ -104,6 +104,9 @@ void main_set_game_connection_to_film_playback(
 short main_get_current_solo_level(
 	void);
 
+char const *main_get_solo_level_name(
+	short level);
+
 void main_run_demos(
 	void);
 
@@ -131,7 +134,22 @@ void main_queue_map_name(
 boolean main_taking_screenshot(
 	void);
 
+void main_movie_start(
+	float frames_per_second);
+
 void main_movie_stop(
+	void);
+
+void main_save_current_solo_map(
+	char const *map_name);
+
+void main_load_ui_scenario(
+	boolean precache_resources);
+
+void main_menu_load(
+	void);
+
+void main_present_frame(
 	void);
 
 void main_print_version(

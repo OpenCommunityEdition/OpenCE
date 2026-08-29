@@ -336,6 +336,7 @@ symbols in this file:
 #include "main.h"
 #include "real_math.h"
 #include "game.h"
+#include "game_engine.h"
 #include "integer_math.h"
 #include "input.h"
 #include "shell.h"
@@ -353,6 +354,10 @@ symbols in this file:
 #include "saved games/player_profile.h"
 #include "rasterizer/rasterizer.h"
 #include "main/d3d_intimacy.h"
+#include "camera/director.h"
+#include "hs/hs.h"
+#include "render/render.h"
+#include "tag_files/files.h"
 
 /* ---------- constants */
 
@@ -437,7 +442,6 @@ struct _main_globals
 
 struct _main_globals
 {
-	byte reserved00[0xB0];
 	unsigned long frame_start_milliseconds;
 	byte reservedB4[4];
 	unsigned long rasterizer_frame_index;
@@ -447,10 +451,10 @@ struct _main_globals
 	short connection;
 	byte __unknownDE[2];
 	struct bitmap_data *movie;
-	byte __unknownE4[12];
-	boolean save_map;
-	boolean rename_map;
-	byte __unknownF2[2];
+	long recording_start_tick;
+	long recording_stop_tick;
+	long recording_frame_index;
+	real recording_dt;
 	boolean reset_map;
 	boolean defer_map_change;
 	boolean revert_map;
@@ -470,13 +474,13 @@ struct _main_globals
 	boolean load_core;
 	boolean load_core_at_startup;
 	short switch_to_structure_bsp_index;
-	boolean __unknown112;
+	boolean main_menu_scenario_loaded;
 	boolean want_to_be_at_main_menu;
 	boolean run_xdemos;
 	byte __unknown115;
 	boolean halt_time_scale;
 	boolean restart_time;
-	byte __unknown118;
+	boolean load_last_solo_level;
 	boolean skip;
 	short skip_ticks;
 	short loss_timer;
@@ -496,53 +500,71 @@ struct _main_globals
 };
 
 typedef char main_globals_size_assert[
-	sizeof(struct _main_globals) == 0x6D0 ? 1 : -1];
+	sizeof(struct _main_globals) == 0x620 ? 1 : -1];
 typedef char main_globals_frame_start_milliseconds_offset_assert[
-	offsetof(struct _main_globals, frame_start_milliseconds) == 0xB0 ? 1 : -1];
+	offsetof(struct _main_globals, frame_start_milliseconds) == 0x00 ? 1 : -1];
 typedef char main_globals_rasterizer_frame_index_offset_assert[
-	offsetof(struct _main_globals, rasterizer_frame_index) == 0xB8 ? 1 : -1];
+	offsetof(struct _main_globals, rasterizer_frame_index) == 0x08 ? 1 : -1];
 typedef char main_globals_rasterizer_vertical_blank_index_offset_assert[
-	offsetof(struct _main_globals, rasterizer_vertical_blank_index) == 0xBC ? 1 : -1];
+	offsetof(struct _main_globals, rasterizer_vertical_blank_index) == 0x0C ? 1 : -1];
 typedef char main_globals_seconds_elapsed_offset_assert[
-	offsetof(struct _main_globals, seconds_elapsed) == 0xD8 ? 1 : -1];
+	offsetof(struct _main_globals, seconds_elapsed) == 0x28 ? 1 : -1];
 typedef char main_globals_connection_offset_assert[
-	offsetof(struct _main_globals, connection) == 0xDC ? 1 : -1];
+	offsetof(struct _main_globals, connection) == 0x2C ? 1 : -1];
 typedef char main_globals_movie_offset_assert[
-	offsetof(struct _main_globals, movie) == 0xE0 ? 1 : -1];
+	offsetof(struct _main_globals, movie) == 0x30 ? 1 : -1];
 typedef char main_globals_defer_map_change_offset_assert[
-	offsetof(struct _main_globals, defer_map_change) == 0xF5 ? 1 : -1];
+	offsetof(struct _main_globals, defer_map_change) == 0x45 ? 1 : -1];
 typedef char main_globals_reset_map_offset_assert[
-	offsetof(struct _main_globals, reset_map) == 0xF4 ? 1 : -1];
+	offsetof(struct _main_globals, reset_map) == 0x44 ? 1 : -1];
 typedef char main_globals_revert_map_offset_assert[
-	offsetof(struct _main_globals, revert_map) == 0xF6 ? 1 : -1];
+	offsetof(struct _main_globals, revert_map) == 0x46 ? 1 : -1];
 typedef char main_globals_skip_cinematic_offset_assert[
-	offsetof(struct _main_globals, skip_cinematic) == 0xF7 ? 1 : -1];
+	offsetof(struct _main_globals, skip_cinematic) == 0x47 ? 1 : -1];
 typedef char main_globals_saving_map_offset_assert[
-	offsetof(struct _main_globals, saving_map) == 0xF8 ? 1 : -1];
+	offsetof(struct _main_globals, saving_map) == 0x48 ? 1 : -1];
 typedef char main_globals_save_map_safely_offset_assert[
-	offsetof(struct _main_globals, save_map_safely) == 0xF9 ? 1 : -1];
+	offsetof(struct _main_globals, save_map_safely) == 0x49 ? 1 : -1];
 typedef char main_globals_won_map_offset_assert[
-	offsetof(struct _main_globals, won_map) == 0x10A ? 1 : -1];
+	offsetof(struct _main_globals, won_map) == 0x5A ? 1 : -1];
 typedef char main_globals_halt_time_scale_offset_assert[
-	offsetof(struct _main_globals, halt_time_scale) == 0x116 ? 1 : -1];
+	offsetof(struct _main_globals, halt_time_scale) == 0x66 ? 1 : -1];
 typedef char main_globals_respawn_timer_offset_assert[
-	offsetof(struct _main_globals, respawn_timer) == 0x11E ? 1 : -1];
+	offsetof(struct _main_globals, respawn_timer) == 0x6E ? 1 : -1];
 typedef char main_globals_loss_timer_offset_assert[
-	offsetof(struct _main_globals, loss_timer) == 0x11C ? 1 : -1];
+	offsetof(struct _main_globals, loss_timer) == 0x6C ? 1 : -1];
 typedef char main_globals_allow_persistent_storage_offset_assert[
-	offsetof(struct _main_globals, allow_persistent_storage) == 0x124 ? 1 : -1];
+	offsetof(struct _main_globals, allow_persistent_storage) == 0x74 ? 1 : -1];
 typedef char main_globals_soloplayer_map_name_offset_assert[
-	offsetof(struct _main_globals, soloplayer_map_name) == 0x125 ? 1 : -1];
+	offsetof(struct _main_globals, soloplayer_map_name) == 0x75 ? 1 : -1];
 typedef char main_globals_multiplayer_map_name_offset_assert[
-	offsetof(struct _main_globals, multiplayer_map_name) == 0x225 ? 1 : -1];
+	offsetof(struct _main_globals, multiplayer_map_name) == 0x175 ? 1 : -1];
 typedef char main_globals_core_name_offset_assert[
-	offsetof(struct _main_globals, core_name) == 0x425 ? 1 : -1];
+	offsetof(struct _main_globals, core_name) == 0x375 ? 1 : -1];
 typedef char main_globals_d3d_flip_count_offset_assert[
-	offsetof(struct _main_globals, d3d_flip_count) == 0x4A8 ? 1 : -1];
+	offsetof(struct _main_globals, d3d_flip_count) == 0x3F8 ? 1 : -1];
 typedef char main_globals_vblank_flip_delta_index_offset_assert[
-	offsetof(struct _main_globals, vblank_flip_delta_index) == 0x4AC ? 1 : -1];
+	offsetof(struct _main_globals, vblank_flip_delta_index) == 0x3FC ? 1 : -1];
 typedef char main_globals_vblank_flip_deltas_offset_assert[
-	offsetof(struct _main_globals, vblank_flip_deltas) == 0x4AE ? 1 : -1];
+	offsetof(struct _main_globals, vblank_flip_deltas) == 0x3FE ? 1 : -1];
+
+struct game_options
+{
+	unsigned long flags;
+	short code_version;
+	short difficulty;
+	unsigned long random_seed;
+	char map_name[256];
+};
+
+typedef char game_options_size_assert[
+	sizeof(struct game_options) == 0x10C ? 1 : -1];
+
+struct _main_window_storage
+{
+	struct render_window window;
+	byte reservedAC[4];
+};
 
 /* ---------- prototypes */
 
@@ -551,14 +573,51 @@ extern void code_000ef8e0(
 extern void code_000f1c20(void);
 extern void code_000f1ce0(void);
 
+extern void code_000f0350(
+	struct game_options *options);
+extern void scripted_camera_set(
+	word camera_point_index0,
+	word camera_point_index1,
+	long transition_time);
+extern struct bitmap_data *bitmap_2d_new(
+	short width,
+	short height,
+	short mipmap_count,
+	short format);
+extern char const *tiff_export(
+	struct file_reference *file,
+	struct bitmap_data *bitmap);
+extern short global_screenshot_count;
+extern void hs_runtime_initialize_for_new_map(
+	void);
+
 extern void main_rasterizer_throttle(void);
 extern void main_pregame_render(void);
 extern void main_present_frame(void);
 
 /* ---------- globals */
 
-static struct _main_globals main_globals;
-extern short global_difficulty_level;
+short global_difficulty_level = 1;
+short player_spawn_count = 1;
+byte global_frame_rate_throttle = 1;
+short global_screenshot_size = 1;
+
+static char const *scenario_paths[10] =
+{
+	"levels\\a10\\a10",
+	"levels\\a30\\a30",
+	"levels\\a50\\a50",
+	"levels\\b30\\b30",
+	"levels\\b40\\b40",
+	"levels\\c10\\c10",
+	"levels\\c20\\c20",
+	"levels\\c40\\c40",
+	"levels\\d20\\d20",
+	"levels\\d40\\d40"
+};
+
+static struct _main_window_storage window_storage = { 0 };
+static struct _main_globals main_globals = { 0 };
 
 /* ---------- public code */
 
@@ -813,7 +872,7 @@ void main_menu_unload(
 {
 	ui_stop_main_menu_music();
 	main_menu_active(FALSE);
-	main_globals.__unknown112 = FALSE;
+	main_globals.main_menu_scenario_loaded = FALSE;
 	return;
 }
 
@@ -823,6 +882,50 @@ extern void update_server_new(
 	void);
 extern void update_server_start(
 	void);
+
+void main_menu_load(
+	void)
+{
+	if (!main_globals.main_menu_scenario_loaded)
+		main_load_ui_scenario(FALSE);
+	main_screen_shell_load();
+	main_menu_precache_resources();
+	update_server_delete();
+	update_server_new();
+	update_server_start();
+	game_time_dispose_from_old_map();
+	game_time_initialize_for_new_map();
+	game_time_start();
+	hs_runtime_dispose_from_old_map();
+	hs_runtime_initialize_for_new_map();
+	main_globals.want_to_be_at_main_menu = FALSE;
+
+	return;
+}
+
+void main_present_frame(
+	void)
+{
+	struct file_reference reference;
+	char path[512];
+	char const *error_message;
+
+	render_frame_present(NULL, main_globals.movie);
+	if (global_screenshot_count <= 0 && main_globals.movie)
+	{
+		_snprintf(
+			path,
+			NUMBEROF(path),
+			"movie\\frame%06d.tga",
+			main_globals.recording_frame_index++);
+		file_reference_create_from_path(&reference, path, FALSE);
+		error_message = tiff_export(&reference, main_globals.movie);
+		if (error_message)
+			error(_error_silent, error_message);
+	}
+
+	return;
+}
 
 void main_menu_ensure_player_queues_exist(
 	void)
@@ -860,6 +963,17 @@ short main_get_current_solo_level(
 	void)
 {
 	return main_get_solo_level_from_name(main_globals.soloplayer_map_name);
+}
+
+char const *main_get_solo_level_name(
+	short level)
+{
+	char const *result = NULL;
+
+	if (level >= 0 && level < NUMBEROF(scenario_paths))
+		result = scenario_paths[level];
+
+	return result;
 }
 
 void main_run_demos(
@@ -965,12 +1079,30 @@ void main_queue_map_name(
 	return;
 }
 
-extern short global_screenshot_count;
-
 boolean main_taking_screenshot(
 	void)
 {
 	return global_screenshot_count > 0 || main_globals.movie != NULL;
+}
+
+void main_movie_start(
+	real frames_per_second)
+{
+	match_assert("c:\\halo\\SOURCE\\main\\main.c", 2715, main_globals.movie==NULL);
+
+	main_globals.movie = bitmap_2d_new(640, 480, 0, 10);
+	if (main_globals.movie)
+	{
+		directory_create_or_delete_contents("movie");
+		main_globals.recording_frame_index = 0;
+		if (frames_per_second > 0.0001f)
+			main_globals.recording_dt = 1.0f / frames_per_second;
+		else
+			main_globals.recording_dt = 1.0f / 30.0f;
+		game_time_set_speed(1.0f);
+	}
+
+	return;
 }
 
 extern void bitmap_delete(
@@ -991,6 +1123,56 @@ void main_print_version(
 	void)
 {
 	console_printf(FALSE, "halobeta xbox 01.01.14.2342 Jan 14 2002 12:49:20");
+	return;
+}
+
+void main_save_current_solo_map(
+	char const *map_name)
+{
+	FILE *file;
+
+	if ((short)main_get_solo_level_from_name(map_name) != NONE)
+	{
+		file = fopen("z:\\last_solo.txt", "w");
+		if (file)
+		{
+			fwrite(map_name, 1, csstrlen(map_name) + 1, file);
+			fclose(file);
+		}
+		else
+		{
+			error(_error_silent, "Couldn't create a file to write the current solo map to");
+		}
+	}
+
+	return;
+}
+
+void main_load_ui_scenario(
+	boolean precache_resources)
+{
+	struct game_options options;
+
+	game_precache_new_map("levels\\ui\\ui", TRUE);
+	match_assert("c:\\halo\\SOURCE\\main\\main.c", 1092,
+		!main_globals.main_menu_scenario_loaded);
+	game_options_new(&options);
+	csstrncpy(options.map_name, "levels\\ui\\ui", NUMBEROF(options.map_name) - 1);
+	options.map_name[NUMBEROF(options.map_name) - 1] = 0;
+	game_precache_new_map(options.map_name, TRUE);
+	game_dispose_from_old_map();
+	game_unload();
+	game_engine_dispose();
+	game_set_game_variant(NULL);
+	main_globals.main_menu_scenario_loaded = TRUE;
+	code_000f0350(&options);
+	director_script_camera(TRUE);
+	scripted_camera_set(0, 0, NONE);
+	main_menu_active(TRUE);
+	main_globals.load_last_solo_level = TRUE;
+	if (precache_resources)
+		main_menu_precache_resources();
+
 	return;
 }
 
@@ -1300,7 +1482,7 @@ void main_loop(
 
 			}
 
-			if (main_globals.rename_map)
+			if (main_globals.defer_map_change)
 			{
 
 			}
@@ -1337,7 +1519,7 @@ void main_loop(
 				main_menu_load();
 			}
 
-			if (main_globals.__unknown118)
+			if (main_globals.load_last_solo_level)
 			{
 				main_load_last_solo_map();
 			}
