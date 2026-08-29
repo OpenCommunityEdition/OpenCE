@@ -75,6 +75,11 @@ struct rasterizer_cinematic_screen_effect_state
 	real near_clip_distance;
 };
 
+struct rasterizer_global_defaults_prefix
+{
+	real near_clip_distance;
+};
+
 typedef char rasterizer_cinematic_screen_effect_parameters_size_assert[
 	sizeof(struct rasterizer_cinematic_screen_effect_parameters) == 0x38 ? 1 : -1];
 typedef char rasterizer_cinematic_screen_effect_parameters_tint_offset_assert[
@@ -93,6 +98,7 @@ typedef char rasterizer_cinematic_screen_effect_state_near_clip_distance_offset_
 /* ---------- globals */
 
 extern struct rasterizer_cinematic_screen_effect_state *bss_004662f4;
+extern const struct rasterizer_global_defaults_prefix rasterizer_global_defaults;
 
 /* ---------- public code */
 
@@ -174,6 +180,20 @@ void rasterizer_set_near_clip_distance(
 	}
 
 	return;
+}
+
+real rasterizer_get_near_clip_distance(
+	void)
+{
+	real near_clip_distance = rasterizer_global_defaults.near_clip_distance;
+	struct rasterizer_cinematic_screen_effect_state *globals = bss_004662f4;
+
+	if (globals && globals->near_clip_distance > 0.0f)
+	{
+		near_clip_distance = globals->near_clip_distance;
+	}
+
+	return near_clip_distance;
 }
 
 /* ---------- private code */
