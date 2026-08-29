@@ -282,9 +282,18 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	_transport_type_udp = 0x11,
+	_transport_type_tcp,
+	MAXIMUM_PENDING_CONNECTIONS = 32,
+	MAXIMUM_SOCKETS_PER_SET = 64,
+};
+
 /* ---------- macros */
 
 #define TRANSPORT_ENDPOINT_WINSOCK_FILE "c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_winsock.c"
+#define INVALID_SOCKET ((long)-1)
 
 /* ---------- structures */
 
@@ -296,16 +305,74 @@ struct transport_endpoint
 	short error;
 };
 
+struct winsock_fd_set
+{
+	unsigned long count;
+	long sockets[MAXIMUM_SOCKETS_PER_SET];
+};
+
+struct winsock_timeval
+{
+	long seconds;
+	long microseconds;
+};
+
 /* ---------- prototypes */
 
 struct transport_endpoint *accept_endpoint(
 	struct transport_endpoint *listening_endpoint);
+long __stdcall closesocket(
+	long socket);
+void code_000713a0(
+	void);
 void delete_transport_endpoint(
 	struct transport_endpoint *endpoint);
+long __stdcall listen(
+	long socket,
+	long backlog);
+long __stdcall select(
+	long ignored,
+	struct winsock_fd_set *readable,
+	struct winsock_fd_set *writeable,
+	struct winsock_fd_set *exceptions,
+	struct winsock_timeval *timeout);
+long __stdcall WSAGetLastError(
+	void);
+long __stdcall __WSAFDIsSet(
+	long socket,
+	struct winsock_fd_set *set);
+char const *winsock_error_to_string(
+	long error);
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+struct transport_endpoint *create_transport_endpoint(
+	long type)
+{
+	struct transport_endpoint *ep = NULL;
+
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0xCE, transport_initialized);
+	code_000713a0();
+
+	if (type == _transport_type_udp || type == _transport_type_tcp)
+	{
+		ep = match_malloc(
+			TRANSPORT_ENDPOINT_WINSOCK_FILE,
+			0xD4,
+			sizeof(*ep));
+		if (ep)
+		{
+			ep->error = _transport_error_none;
+			ep->type = (char)type;
+			ep->socket = INVALID_SOCKET;
+			ep->flags = 0;
+		}
+	}
+
+	return ep;
+}
 
 long get_endpoint_type(
 	struct transport_endpoint const *ep)
@@ -322,6 +389,30 @@ long endpoint_connected(
 	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x426, ep);
 
 	return ep->flags & 1;
+}
+
+boolean endpoint_writeable(
+	struct transport_endpoint *ep,
+	word timeout)
+{
+	struct winsock_fd_set writeable;
+	struct winsock_timeval timeval;
+
+	match_assert(
+		TRANSPORT_ENDPOINT_WINSOCK_FILE,
+		0x417,
+		ep && (ep->socket != INVALID_SOCKET));
+
+	timeval.seconds = 0;
+	timeval.microseconds = timeout * MILLISECONDS_PER_SECOND;
+	writeable.sockets[0] = ep->socket;
+	writeable.count = 1;
+
+	if (select(1, NULL, &writeable, NULL, &timeval) > 0 &&
+		__WSAFDIsSet(ep->socket, &writeable))
+		return TRUE;
+
+	return FALSE;
 }
 
 long endpoint_blocking(
@@ -351,6 +442,63 @@ long endpoint_equivalent(
 		return TRUE;
 
 	return FALSE;
+}
+
+void disconnect_endpoint(
+	struct transport_endpoint *ep)
+{
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x221, ep);
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x222, transport_initialized);
+
+	if (ep->socket != INVALID_SOCKET)
+	{
+		if (closesocket(ep->socket) != 0)
+			winsock_error_to_string(WSAGetLastError());
+
+		ep->socket = INVALID_SOCKET;
+	}
+
+	ep->flags &= ~1;
+	return;
+}
+
+short listen_endpoint(
+	struct transport_endpoint *ep)
+{
+	long error = _transport_error_none;
+
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x2B0, ep);
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x2B1, transport_initialized);
+
+	if (ep->socket != INVALID_SOCKET)
+	{
+		if (listen(ep->socket, MAXIMUM_PENDING_CONNECTIONS) == 0)
+		{
+			ep->flags |= 2;
+		}
+		else
+		{
+			winsock_error_to_string(WSAGetLastError());
+			error = _transport_error_listen_failed;
+		}
+	}
+	else
+		error = _transport_error_bad_endpoint;
+
+	ep->error = (short)error;
+	return (short)error;
+}
+
+void delete_transport_endpoint(
+	struct transport_endpoint *ep)
+{
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0xE4, ep);
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0xE5, transport_initialized);
+
+	disconnect_endpoint(ep);
+	match_free(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0xE8, ep);
+	code_000713a0();
+	return;
 }
 
 short reject_endpoint(
