@@ -31,41 +31,39 @@ struct object_shadow
 
 /* ---------- prototypes */
 
-void _ReadWriteBarrier(void);
-#pragma intrinsic(_ReadWriteBarrier)
-
 /* ---------- globals */
 
 /* ---------- public code */
 
-__declspec(naked) void *code_0012b870(void)
+static void *code_0012b870(
+	long object_index)
 {
-	__asm
-	{
-		push NONE
-		push eax
-		call object_get_and_verify_type
-		add esp, 8
-		ret
-	}
+	return object_get_and_verify_type(object_index, _object_mask_all);
 }
 
-void code_0012b880(long object_index, void const *context, struct object_shadow *shadow)
+void code_0012b880(
+	long object_index,
+	void const *context,
+	struct object_shadow *shadow)
 {
 	while (object_index != NONE)
 	{
 		struct object_datum *object = object_get(object_index);
 
-		object_get(object_index);
+		code_0012b870(object_index);
 		code_0012b880(object->object.first_child_object_index, context, shadow);
 		object_index = object->object.next_object_index;
 	}
 }
 
-boolean object_build_shadow(long object_index, void const *context, struct object_shadow *shadow)
+boolean object_build_shadow(
+	long object_index,
+	void const *context,
+	struct object_shadow *shadow)
 {
 	struct object_datum *object = object_get(object_index);
 	struct object_definition *definition = object_definition_get(object->definition_index);
+	boolean result = FALSE;
 
 	shadow->object_bounding_radius = definition->object.bounding_radius;
 	shadow->bounds.x0 = REAL_MAX;
@@ -77,16 +75,14 @@ boolean object_build_shadow(long object_index, void const *context, struct objec
 	shadow->count = 0;
 	shadow->unknown1 = 0;
 
-	object_get(object_index);
+	code_0012b870(object_index);
 	code_0012b880(object->object.first_child_object_index, context, shadow);
 	if (shadow->count > 0)
 	{
-		_ReadWriteBarrier();
-		return TRUE;
+		result = TRUE;
 	}
 
-	_ReadWriteBarrier();
-	return FALSE;
+	return result;
 }
 
 /* ---------- private code */

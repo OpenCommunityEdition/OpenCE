@@ -154,25 +154,6 @@
       }
     },
     {
-      "unit": "source/objects/object_shadows",
-      "function": "_code_0012b870",
-      "class": "asm-implemented",
-      "evidence": "Parked under asm-implemented: our source implements this function with MSVC inline assembly, so it is byte-identical to January by construction rather than by reconstruction. This violates the campaign's standing 'no asm' rule, and the two rules interact badly - an assembly transcription always compares exact, so section_infos_equal cannot distinguish it from a genuine C recovery; only reading the source can. Parked rather than deleted so the exact tally stops counting it as a C reconstruction while the bytes remain reproducible. Same treatment as the pre-existing vendored-assembly park for matrix4x3_multiply. To unpark, replace the __asm with C that gates exact. Audit and full inventory: research/asm_credited_functions_audit.md. __declspec(naked): no C body exists at all.",
-      "measurements": {
-        "target": {
-          "size": 16,
-          "relocation_count": 1,
-          "normalized_sha256": "1603316925ff3734e5b16c1fdce605135a996f0f0a5a1094f4551c0c79b29988"
-        },
-        "base": {
-          "size": 16,
-          "relocation_count": 1,
-          "normalized_sha256": "1603316925ff3734e5b16c1fdce605135a996f0f0a5a1094f4551c0c79b29988"
-        },
-        "objdiff_percent": 100
-      }
-    },
-    {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_active_camouflage",
       "function": "_code_00148dd0",
       "class": "asm-implemented",

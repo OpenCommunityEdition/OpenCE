@@ -3,20 +3,22 @@
 Found incidentally 2026-08-16 while reading `source/camera/director.c` for an
 unrelated reconstruction. The audit is now resolved by parking the affected
 functions so assembly transcriptions are not credited as C reconstructions.
+`object_shadows.code_0012b870` was subsequently recovered in ordinary C and
+removed from the parked inventory on 2026-08-29.
 
 ## The standing rule
 
 The campaign rule is *no asm, no volatile, no casts intended to alter codegen,
 no byte-forcing, readable code only* — and, separately, *never credit anything
 that is not byte-identical*. The second rule is being honoured. The first is
-not, in ten functions across six units, and the two interact badly: an assembly transcription will
+not, in nine functions across five units, and the two interact badly: an assembly transcription will
 always be byte-identical, so the strict comparator cannot distinguish a genuine
 C reconstruction from a transcribed listing. The gate is not a defence here;
 only reading the source is.
 
 ## Inventory
 
-Ten functions contain inline or naked `__asm` and compare
+Nine functions contain inline or naked `__asm` and compare
 `EXACT` by `section_infos_equal`:
 
 | unit | function | asm blocks | kind |
@@ -30,7 +32,6 @@ Ten functions contain inline or naked `__asm` and compare
 | `rasterizer/xbox/…active_camouflage` | `code_00148de0` | 1 | `__declspec(naked)` |
 | `rasterizer/xbox/…active_camouflage` | `code_00148df0` | 1 | `__declspec(naked)` |
 | `rasterizer/xbox/…active_camouflage` | `code_00148e00` | 1 | `__declspec(naked)` |
-| `objects/object_shadows` | `code_0012b870` | 1 | `__declspec(naked)` |
 
 Reproduce with:
 
@@ -59,7 +60,7 @@ buried mid-body.
 
 ## Resolution (owner chose: park them)
 
-All ten are now parked in `config/parked.json` under a new class
+All nine remaining functions are parked in `config/parked.json` under a new class
 **`asm-implemented`**, so they no longer count as C reconstructions.
 
 Parking these required a deliberate change to `tools/parked_functions.py`,
@@ -78,6 +79,27 @@ inverts the expectation for this class only:
 Two regression tests cover both directions
 (`test_asm_implemented_entry_stays_active_when_exact`,
 `test_asm_implemented_entry_is_invalid_when_not_exact`).
+
+## Ordinary-C recovery: object shadows
+
+On 2026-08-29, `source/objects/object_shadows.c` replaced the naked assembly
+owner with a typed static helper:
+
+```
+static void *code_0012b870(
+	long object_index)
+{
+	return object_get_and_verify_type(object_index, _object_mask_all);
+}
+```
+
+Restoring its two in-TU call sites gives VC7 the original private calling
+convention naturally. The resulting 16-byte section is strictly exact,
+including its single relocation. The same change removed both
+`_ReadWriteBarrier` calls from `object_build_shadow`; an ordinary local result
+preserves that function's original branch topology. The complete object now
+gates 3/3 exact with no assembly, intrinsic, pragma, barrier, or attribute, so
+the obsolete `asm-implemented` park was deleted.
 
 Unparking one means replacing its `__asm` with C that gates exact.
 
