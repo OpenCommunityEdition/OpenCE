@@ -107,9 +107,37 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct rasterizer_models_debug_options_prefix
+{
+	byte reserved00[0x0C];
+	boolean draw_models;
+};
+
+struct rasterizer_models_private_globals_prefix
+{
+	byte reserved000[0xBA];
+	boolean sky;
+};
+
+typedef char verify_rasterizer_models_draw_models_offset[
+	offsetof(struct rasterizer_models_debug_options_prefix, draw_models) == 0x0C
+		? 1 : -1];
+typedef char verify_rasterizer_models_sky_offset[
+	offsetof(struct rasterizer_models_private_globals_prefix, sky) == 0xBA
+		? 1 : -1];
+
 /* ---------- prototypes */
 
+void rasterizer_profile_begin(
+	short profile);
+void rasterizer_profile_end(
+	short profile);
+
 /* ---------- globals */
+
+extern struct rasterizer_models_debug_options_prefix rasterizer_debug_options;
+extern struct rasterizer_models_private_globals_prefix bss_00465d68;
+extern boolean data_0030cefb;
 
 /* ---------- public code */
 
@@ -131,3 +159,41 @@ void rasterizer_model_ambient_reflection_tint(
 }
 
 /* ---------- private code */
+
+void _rasterizer_models_begin(
+	boolean sky)
+{
+	if (rasterizer_debug_options.draw_models)
+	{
+		data_0030cefb = TRUE;
+		bss_00465d68.sky = sky;
+		if (sky)
+		{
+			rasterizer_profile_begin(_rasterizer_profile_model_sky);
+		}
+		else
+		{
+			rasterizer_profile_begin(_rasterizer_profile_models);
+		}
+	}
+
+	return;
+}
+
+void _rasterizer_models_end(
+	void)
+{
+	if (rasterizer_debug_options.draw_models)
+	{
+		if (bss_00465d68.sky)
+		{
+			rasterizer_profile_end(_rasterizer_profile_model_sky);
+		}
+		else
+		{
+			rasterizer_profile_end(_rasterizer_profile_models);
+		}
+	}
+
+	return;
+}
