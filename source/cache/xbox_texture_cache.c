@@ -93,29 +93,94 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cache/physical_memory_map.h"
 #include "memory/data.h"
 #include "memory/lruv_cache.h"
+#include "tag_files/tag_groups.h"
 
 /* ---------- constants */
+
+enum
+{
+	_bitmap_cached_bit = 7,
+	XBOX_TEXTURE_CACHE_PAGE_COUNT = 0x580,
+	XBOX_TEXTURE_CACHE_PAGE_SIZE_BITS = 14,
+	XBOX_TEXTURE_CACHE_ENTRY_SIZE = 0x20,
+	XBOX_TEXTURE_CACHE_SIZE = 0x1600000,
+	XBOX_TEXTURE_CACHE_PROTECTION = 0x404,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct bitmap_data
+{
+	unsigned long bitmap_class;
+	short width;
+	short height;
+	unsigned short depth;
+	short type;
+	short format;
+	unsigned short flags;
+	short registration_point_x;
+	short registration_point_y;
+	unsigned short mipmap_count;
+	unsigned short reserved16;
+	unsigned long pixel_data_offset;
+	unsigned long pixel_data_size;
+	long bitmap_tag_index;
+	long cache_block_index;
+	void *hardware_format;
+	void *base_address;
+};
+
+struct xbox_bitmap_group_prefix
+{
+	byte reserved0000[0x30];
+	struct tag_data processed_pixel_data;
+};
+
 struct xbox_texture_cache_globals_prefix
 {
 	byte reserved0000[0x1600];
 	struct data_array *textures;
-	byte reserved1604[4];
+	void *base_address;
 	struct lruv_cache *cache;
 	boolean stolen_memory;
 	byte reserved160D[3];
 };
 
+typedef char verify_bitmap_data_flags_offset[
+	offsetof(struct bitmap_data, flags) == 0xE ? 1 : -1];
+typedef char verify_bitmap_data_pixel_data_offset_offset[
+	offsetof(struct bitmap_data, pixel_data_offset) == 0x18 ? 1 : -1];
+typedef char verify_bitmap_data_pixel_data_size_offset[
+	offsetof(struct bitmap_data, pixel_data_size) == 0x1C ? 1 : -1];
+typedef char verify_bitmap_data_bitmap_tag_index_offset[
+	offsetof(struct bitmap_data, bitmap_tag_index) == 0x20 ? 1 : -1];
+typedef char verify_bitmap_data_cache_block_index_offset[
+	offsetof(struct bitmap_data, cache_block_index) == 0x24 ? 1 : -1];
+typedef char verify_bitmap_data_hardware_format_offset[
+	offsetof(struct bitmap_data, hardware_format) == 0x28 ? 1 : -1];
+typedef char verify_bitmap_data_base_address_offset[
+	offsetof(struct bitmap_data, base_address) == 0x2C ? 1 : -1];
+typedef char verify_bitmap_data_size[
+	sizeof(struct bitmap_data) == 0x30 ? 1 : -1];
+typedef char verify_xbox_bitmap_group_pixel_data_file_offset[
+	(offsetof(
+		struct xbox_bitmap_group_prefix,
+		processed_pixel_data) +
+	 offsetof(struct tag_data, file_offset)) == 0x38 ? 1 : -1];
+
 typedef char verify_xbox_texture_cache_textures_offset[
 	offsetof(
 		struct xbox_texture_cache_globals_prefix,
 		textures) == 0x1600 ? 1 : -1];
+typedef char verify_xbox_texture_cache_base_address_offset[
+	offsetof(
+		struct xbox_texture_cache_globals_prefix,
+		base_address) == 0x1604 ? 1 : -1];
 typedef char verify_xbox_texture_cache_cache_offset[
 	offsetof(
 		struct xbox_texture_cache_globals_prefix,
@@ -133,6 +198,18 @@ int __stdcall D3DDevice_IsBusy(
 	void);
 void __stdcall D3DDevice_KickPushBuffer(
 	void);
+void __stdcall XPhysicalProtect(
+	void *address,
+	unsigned long size,
+	unsigned long protection);
+
+long bitmap_get_pixel_data_size(
+	struct bitmap_data *bitmap);
+
+boolean code_001ae840(
+	long block_index);
+void code_001ae880(
+	long block_index);
 
 /* ---------- globals */
 
@@ -167,12 +244,114 @@ void texture_cache_idle(
 	return;
 }
 
+void texture_cache_bitmap_new(
+	long bitmap_tag_index,
+	struct bitmap_data *bitmap)
+{
+	struct xbox_bitmap_group_prefix *bitmap_group;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\xbox_texture_cache.c",
+		157,
+		!TEST_FLAG(bitmap->flags, _bitmap_cached_bit));
+	SET_FLAG(bitmap->flags, _bitmap_cached_bit, TRUE);
+	bitmap->cache_block_index = NONE;
+	bitmap->base_address = NULL;
+	bitmap->hardware_format = NULL;
+	bitmap_group = tag_get('bitm', bitmap_tag_index);
+	bitmap->pixel_data_offset +=
+		bitmap_group->processed_pixel_data.file_offset;
+	bitmap->pixel_data_size = bitmap_get_pixel_data_size(bitmap);
+	bitmap->bitmap_tag_index = bitmap_tag_index;
+	bitmap->base_address = NULL;
+	bitmap->hardware_format = NULL;
+	bitmap->cache_block_index = NONE;
+
+	return;
+}
+
+void texture_cache_bitmap_delete(
+	struct bitmap_data *bitmap)
+{
+	long cache_block_index;
+
+	if (TEST_FLAG(bitmap->flags, _bitmap_cached_bit))
+	{
+		cache_block_index = bitmap->cache_block_index;
+		if (cache_block_index != NONE)
+		{
+			lruv_block_delete(
+				xbox_texture_cache_globals.cache,
+				cache_block_index);
+		}
+		SET_FLAG(bitmap->flags, _bitmap_cached_bit, FALSE);
+		bitmap->cache_block_index = NONE;
+		bitmap->base_address = NULL;
+	}
+
+	return;
+}
+
+void texture_cache_return_memory(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\xbox_texture_cache.c",
+		345,
+		xbox_texture_cache_globals.stolen_memory);
+	lruv_resize(
+		xbox_texture_cache_globals.cache,
+		XBOX_TEXTURE_CACHE_PAGE_COUNT);
+	XPhysicalProtect(
+		physical_memory_get_texture_cache_base_address(),
+		XBOX_TEXTURE_CACHE_SIZE,
+		XBOX_TEXTURE_CACHE_PROTECTION);
+	xbox_texture_cache_globals.stolen_memory = FALSE;
+
+	return;
+}
+
 void texture_cache_flush(
 	void)
 {
 	D3DDevice_KickPushBuffer();
 	D3DDevice_IsBusy();
 	lruv_flush(xbox_texture_cache_globals.cache);
+
+	return;
+}
+
+void texture_cache_new(
+	void)
+{
+	xbox_texture_cache_globals.textures = data_new(
+		"xbox texture",
+		XBOX_TEXTURE_CACHE_PAGE_COUNT,
+		XBOX_TEXTURE_CACHE_ENTRY_SIZE);
+	match_vassert(
+		"c:\\halo\\SOURCE\\cache\\xbox_texture_cache.c",
+		98,
+		xbox_texture_cache_globals.textures != NULL,
+		"xbox_texture_cache_globals.textures");
+	xbox_texture_cache_globals.cache = lruv_new(
+		"xbox texture cache",
+		XBOX_TEXTURE_CACHE_PAGE_COUNT,
+		XBOX_TEXTURE_CACHE_PAGE_SIZE_BITS,
+		XBOX_TEXTURE_CACHE_PAGE_COUNT,
+		code_001ae880,
+		code_001ae840);
+	match_vassert(
+		"c:\\halo\\SOURCE\\cache\\xbox_texture_cache.c",
+		102,
+		xbox_texture_cache_globals.cache != NULL,
+		"xbox_texture_cache_globals.cache");
+	xbox_texture_cache_globals.base_address =
+		physical_memory_get_texture_cache_base_address();
+	match_vassert(
+		"c:\\halo\\SOURCE\\cache\\xbox_texture_cache.c",
+		105,
+		xbox_texture_cache_globals.base_address != NULL,
+		"xbox_texture_cache_globals.base_address");
 
 	return;
 }
