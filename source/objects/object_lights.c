@@ -183,6 +183,17 @@ typedef char verify_light_datum_prefix_cluster_reference_offset[
 
 /* ---------- prototypes */
 
+struct bitmap_data;
+
+void profile_texture_start(
+	void);
+void profile_texture_end(
+	void);
+void *_texture_cache_bitmap_get_hardware_format(
+	struct bitmap_data *bitmap,
+	boolean block,
+	boolean load);
+
 /* ---------- globals */
 
 extern struct data_array *light_data;
@@ -190,6 +201,21 @@ extern struct cluster_partition light_cluster_partition;
 extern struct lights_game_globals *lights_game_globals;
 
 /* ---------- public code */
+
+void *texture_cache_bitmap_load(
+	struct bitmap_data *bitmap)
+{
+	void *hardware_format;
+
+	profile_texture_start();
+	hardware_format = _texture_cache_bitmap_get_hardware_format(
+		bitmap,
+		TRUE,
+		TRUE);
+	profile_texture_end();
+
+	return hardware_format;
+}
 
 void lights_dispose(
 	void)
