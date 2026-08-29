@@ -54,6 +54,8 @@ symbols in this file:
 
 #include "interface/hud_weapon.h"
 
+#include <string.h>
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -79,3 +81,14 @@ void hud_dispose_weapon_interface(
 }
 
 /* ---------- private code */
+
+char *strip_path_name(
+	char *path)
+{
+	char *name = strrchr(path, '\\');
+
+	if (name)
+		return name + 1;
+
+	return path;
+}
