@@ -5011,3 +5011,48 @@ Current gates:
 - no assembly, new `volatile`, `register`, optimization pragma, intrinsic,
   barrier, attribute, byte forcing, raw address access, object patch, tool
   exception, comparator exception, or compiler-flag change.
+
+## Exhaustive later-tree census and `_code_00041220` minimization (2026-08-29)
+
+An exhaustive read-only census checked 1,487 registered worktrees, 1,077 built
+`build/base/source/ai/ai_debug.obj` artifacts, and 1,056 distinct object hashes.
+A second filesystem scan covered `C:\halo-worktrees`, `C:\tmp`, and the complete
+Codex workspace; its six unregistered build artifacts were all older 11/60
+objects. The only artifact strictly ahead of current canonical was:
+
+`C:\Users\isabe\Documents\Codex\2026-07-13\i-w\work\ai-debug-salvage-20260813\build\base\source\ai\ai_debug.obj`
+
+Its raw object SHA-256 is
+`f1cabaaba68b527cd93884ce3de293e0f48bbf854aa91cd6b35b25261f74792e`.
+It measures 57/60 strict functions and 16,464 padded exact bytes, adding only
+`_code_00041220` (2,336 bytes) and losing none of canonical's 56 exact owners.
+Transplanting that function's dirty source into the clean canonical integration
+tree reproduced the same 57/60 result exactly.
+
+The 57th match is not admissible under the house rules. It depends on a one-use
+local function-pointer alias of `ai_debug_drawstack`, followed immediately by a
+call through that alias. Replacing only that alias with the direct typed call
+returns the object to 56/60. The alias has no semantic selection or callback
+purpose and fails the hard-prohibition test: it would not plausibly exist in the
+2001 source for a reason other than suppressing one inline decision. It is
+therefore recorded as byte-forcing evidence, not credited or retained.
+
+The remaining source changes are ordinary typed C and were minimized separately.
+They recover target-backed branch structure, color-pointer indirection, local
+lifetimes, assignment order, and the two-arm pursuit/evaluation rendering
+topology. With the prohibited alias removed, they preserve the complete 56-owner
+exact set and improve the open `_code_00041220` residual as follows:
+
+| measurement | previous canonical | retained ordinary-C subset |
+|---|---:|---:|
+| candidate bytes | 2,544 | 2,448 |
+| candidate relocations | 201 | 185 |
+| target bytes / relocations | 2,336 / 169 | 2,336 / 169 |
+| candidate normalized SHA-256 | `f9220b2efb233322e1a1536ffee0b60af13fc8d05e4e465b25b2eab065fbc4e9` | `46fab4ca08429eb923a46d573915c2419659690a1c74226612503413cd647f59` |
+
+This is a 112-byte and 16-relocation reduction with no strict regression, but it
+earns zero new credit. The remaining difference is exactly one surplus inlined
+`ai_debug_drawstack` body. A naturally justified source/context lifetime must
+make that site a direct call; a function-pointer alias, invented wrapper, forced
+inline/noinline control, or other optimization-only construct is not an
+acceptable closeout.

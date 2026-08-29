@@ -5791,19 +5791,32 @@ static void code_00041220(
 
 		csmemset(owner_flags, 0, sizeof(owner_flags));
 
-		if (ai_debug.selected_actor_index!=NONE &&
-			actor_get(ai_debug.selected_actor_index)->meta.encounter_index==
-				ai_debug.selected_squad_index)
+		if (ai_debug.selected_actor_index==NONE)
 		{
-			real_argb_color const *group_color[MAXIMUM_NUMBER_OF_FIRING_POSITION_GROUPS-1] =
+			goto default_firing_position_colors;
+		}
+		if (actor_get(ai_debug.selected_actor_index)->meta.encounter_index!=
+			ai_debug.selected_squad_index)
+		{
+default_firing_position_colors:
+			if (!game_in_editor())
 			{
-				global_real_argb_red,
-				global_real_argb_orange,
-				global_real_argb_green,
-				global_real_argb_blue,
-				global_real_argb_lightblue,
-				global_real_argb_green,
-				global_real_argb_aqua
+				num_firing_position_colors = 1;
+				colors[0] = &global_ai_debug_firing_position_colors[
+					position->group_index%global_ai_debug_firing_position_color_count];
+			}
+		}
+		else
+		{
+			real_argb_color const *const *group_color[MAXIMUM_NUMBER_OF_FIRING_POSITION_GROUPS-1] =
+			{
+				&global_real_argb_red,
+				&global_real_argb_orange,
+				&global_real_argb_green,
+				&global_real_argb_blue,
+				&global_real_argb_lightblue,
+				&global_real_argb_green,
+				&global_real_argb_aqua
 			};
 			struct actor_datum *actor = actor_get(ai_debug.selected_actor_index);
 			struct encounter_definition *actor_encounter = TAG_BLOCK_GET_ELEMENT(
@@ -5812,37 +5825,43 @@ static void code_00041220(
 				struct encounter_definition);
 			struct squad_definition *squad = TAG_BLOCK_GET_ELEMENT(&actor_encounter->squads,
 				actor->meta.squad_index, struct squad_definition);
+			short default_attacking_group;
+			short default_defending_group;
 			short attacking_group;
 			short defending_group;
+			short current_group = actor->emotions.currently_defending ? 5 : 2;
 
-			if (TEST_FLAG(squad->firing_position_groups[
-				actor->emotions.currently_defending ? 5 : 2], position->group_index))
+			if (TEST_FLAG(squad->firing_position_groups[current_group],
+				position->group_index))
 			{
 				colors[0] = global_real_argb_green;
 				num_firing_position_colors = 1;
 			}
 
-			attacking_group = actor->emotions.currently_defending ? 3 : 0;
-			defending_group = actor->emotions.currently_defending ? 4 : 1;
+			default_attacking_group = actor->emotions.currently_defending ? 3 : 0;
+			default_defending_group = actor->emotions.currently_defending ? 4 : 1;
 
 			if (actor->state.searching)
 			{
-				short swap = attacking_group;
-
-				attacking_group = defending_group;
-				defending_group = swap;
+				attacking_group = default_defending_group;
+				defending_group = default_attacking_group;
+			}
+			else
+			{
+				attacking_group = default_attacking_group;
+				defending_group = default_defending_group;
 			}
 
 			if (TEST_FLAG(squad->firing_position_groups[attacking_group],
 				position->group_index))
 			{
-				colors[num_firing_position_colors++] = group_color[attacking_group];
+				colors[num_firing_position_colors++] = *group_color[attacking_group];
 			}
 			else if (TEST_FLAG(squad->firing_position_groups[defending_group],
 				position->group_index))
 			{
 				owner_flags[num_firing_position_colors] = TRUE;
-				colors[num_firing_position_colors++] = group_color[defending_group];
+				colors[num_firing_position_colors++] = *group_color[defending_group];
 			}
 
 			if (TEST_FLAG(squad->firing_position_groups[6], position->group_index))
@@ -5852,8 +5871,7 @@ static void code_00041220(
 
 			if (!num_firing_position_colors)
 			{
-				colors[0] = global_real_argb_white;
-				num_firing_position_colors = 1;
+				colors[num_firing_position_colors++] = global_real_argb_white;
 			}
 			else
 			{
@@ -5861,26 +5879,18 @@ static void code_00041220(
 					num_firing_position_colors < MAXIMUM_NUMBER_OF_FIRING_POSITION_GROUPS);
 			}
 		}
-		else if (!game_in_editor())
-		{
-			colors[0] = &global_ai_debug_firing_position_colors[
-				position->group_index%global_ai_debug_firing_position_color_count];
-			num_firing_position_colors = 1;
-		}
-
 		owner_actor_index = &owner_actor_indices[index];
 
 		if (*owner_actor_index!=NONE)
 		{
 			real_point3d polygon[4];
+			actor_get(*owner_actor_index);
 
 			polygon[0].z = polygon[1].z = polygon[2].z = polygon[3].z = position->position.z+0.05f;
 			polygon[0].x = polygon[3].x = position->position.x-0.375f;
 			polygon[1].x = polygon[2].x = position->position.x+0.375f;
 			polygon[0].y = polygon[1].y = position->position.y-0.375f;
 			polygon[2].y = polygon[3].y = position->position.y+0.375f;
-
-			actor_get(*owner_actor_index);
 
 			render_debug_polygon(polygon, 4, actor_action_debug_color(*owner_actor_index));
 		}
@@ -5889,8 +5899,11 @@ static void code_00041220(
 		{
 			real_argb_color const *color = position->field_14==NONE ?
 				global_real_argb_red : global_real_argb_white;
-			real_point3d p0 = position->position;
-			real_point3d p1 = position->position;
+			real_point3d p0;
+			real_point3d p1;
+
+			p1 = position->position;
+			p0 = position->position;
 
 			p0.z = p0.z+0.5f;
 			p1.z = p1.z-0.5f;
@@ -5955,8 +5968,11 @@ static void code_00041220(
 
 			examined = encounter_pursuit_position_already_examined(encounter_index,
 				ai_debug.selected_actor_index, index,
-				history_start_time==NONE ? 0 : history_start_time, &examined_count, FALSE) &&
-				ai_debug.selected_actor_index!=NONE;
+				history_start_time==NONE ? 0 : history_start_time, &examined_count, FALSE);
+			if (ai_debug.selected_actor_index==NONE)
+			{
+				examined = FALSE;
+			}
 
 			render_debug_string_at_point(TRUE, ai_debug_drawstack(),
 				csprintf(temporary, "%d", examined_count),
@@ -5995,9 +6011,9 @@ static void code_00041220(
 			}
 			else if (ai_debug.actor_record[index].field_38>0.f)
 			{
+				string_color = global_real_argb_white;
 				color = *owner_actor_index==ai_debug.selected_actor_index ?
 					global_real_argb_yellow : global_real_argb_blue;
-				string_color = global_real_argb_white;
 			}
 			else
 			{
@@ -6009,10 +6025,15 @@ static void code_00041220(
 				render_debug_string_at_point(TRUE, ai_debug_drawstack(),
 					csprintf(temporary, "%3.2f", ai_debug.actor_record[index].field_38),
 					string_color);
-			}
 
-			render_debug_string_at_point(TRUE, ai_debug_drawstack(),
-				csprintf(temporary, "%3.2f", ai_debug.actor_record[index].field_3C), color);
+				render_debug_string_at_point(TRUE, ai_debug_drawstack(),
+					csprintf(temporary, "%3.2f", ai_debug.actor_record[index].field_3C), color);
+			}
+			else
+			{
+				render_debug_string_at_point(TRUE, ai_debug_drawstack(),
+					csprintf(temporary, "%3.2f", ai_debug.actor_record[index].field_3C), color);
+			}
 		}
 	}
 
