@@ -74,7 +74,8 @@ struct rasterizer_cinematic_screen_effect_state
 {
 	struct rasterizer_cinematic_screen_effect_parameters parameters;
 	boolean has_control;
-	byte reserved39[0x2B];
+	boolean initialized;
+	byte reserved3A[0x2A];
 	real script_values[4];
 	real near_clip_distance;
 };
@@ -92,6 +93,8 @@ typedef char rasterizer_cinematic_screen_effect_state_size_assert[
 	sizeof(struct rasterizer_cinematic_screen_effect_state) == 0x78 ? 1 : -1];
 typedef char rasterizer_cinematic_screen_effect_state_has_control_offset_assert[
 	offsetof(struct rasterizer_cinematic_screen_effect_state, has_control) == 0x38 ? 1 : -1];
+typedef char rasterizer_cinematic_screen_effect_state_initialized_offset_assert[
+	offsetof(struct rasterizer_cinematic_screen_effect_state, initialized) == 0x39 ? 1 : -1];
 typedef char rasterizer_cinematic_screen_effect_state_script_values_offset_assert[
 	offsetof(struct rasterizer_cinematic_screen_effect_state, script_values) == 0x64 ? 1 : -1];
 typedef char rasterizer_cinematic_screen_effect_state_near_clip_distance_offset_assert[
@@ -166,6 +169,30 @@ real rasterizer_script_screen_effect_get_value(
 	}
 
 	return value;
+}
+
+void rasterizer_screen_effect_start(
+	boolean clear)
+{
+	struct rasterizer_cinematic_screen_effect_state *globals =
+		cinematic_screen_effect_globals;
+
+	if (globals)
+	{
+		if (clear || !globals->initialized)
+		{
+			csmemset(
+				&globals->parameters,
+				0,
+				sizeof(globals->parameters));
+			globals = cinematic_screen_effect_globals;
+			globals->initialized = TRUE;
+		}
+
+		globals->has_control = TRUE;
+	}
+
+	return;
 }
 
 void rasterizer_screen_effect_set_filter_desaturation_tint(
