@@ -113,6 +113,18 @@ void hud_dispose(
 	void);
 void first_person_weapons_dispose(
 	void);
+void cinematic_render(
+	void);
+void code_000cf2f0(
+	void);
+void hud_render_timer(
+	void);
+void terminal_draw(
+	void);
+void main_framerate_render(
+	void);
+void code_000cea10(
+	void);
 real_argb_color *interface_get_real_argb_color(
 	short interface_color_table_index,
 	short color_index,
@@ -189,6 +201,19 @@ argb_color *interface_get_rgb_color(
 	color->n[3] = (word)(real_color.n[3] * 65535.0f);
 
 	return color;
+}
+
+void interface_draw_fullscreen_overlays(
+	void)
+{
+	cinematic_render();
+	code_000cf2f0();
+	hud_render_timer();
+	terminal_draw();
+	main_framerate_render();
+	code_000cea10();
+
+	return;
 }
 
 /* ---------- private code */
