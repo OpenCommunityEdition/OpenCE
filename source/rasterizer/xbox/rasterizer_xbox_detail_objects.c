@@ -621,6 +621,8 @@ void _rasterizer_detail_objects_rebuild_vertices(
 		while ((short)layer_index < detail_object_view_data->layer_count);
 	}
 
+	IDirect3DVertexBuffer8_Unlock(local_d3d_vertex_buffer);
+
 	return;
 }
 
