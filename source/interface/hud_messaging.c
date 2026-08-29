@@ -395,6 +395,29 @@ void scripted_hud_show_timer(
 	return;
 }
 
+void scripted_hud_pause_timer(
+	boolean paused)
+{
+	struct hud_timer_data_definition *timer = &bss_00453ab8->timer;
+	short now;
+
+	timer->paused = paused;
+	if (timer->ticks > 0)
+	{
+		if (paused)
+		{
+			now = (short)game_time_get();
+			timer->ticks += timer->reference_time - now;
+			return;
+		}
+
+		now = (short)game_time_get();
+		timer->ticks += now - timer->reference_time;
+	}
+
+	return;
+}
+
 void scripted_hud_time_code_reset(
 	void)
 {
