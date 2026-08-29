@@ -182,6 +182,11 @@ boolean code_00138700(
 	long node_index,
 	long stack_depth,
 	real maximum_t);
+void render_debug_collision_edge(
+	struct collision_bsp *bsp,
+	long edge_index,
+	real_matrix4x3 const *matrix,
+	real_argb_color const *color);
 
 /* ---------- globals */
 
@@ -261,6 +266,24 @@ short collision_surface_polygon(
 	while (edge_index != first_edge_index);
 
 	return point_count;
+}
+
+void render_debug_collision_bsp(
+	struct collision_bsp *bsp,
+	real_matrix4x3 const *matrix)
+{
+	long edge_index;
+
+	for (edge_index = 0; edge_index < bsp->edges.count; edge_index++)
+	{
+		render_debug_collision_edge(
+			bsp,
+			edge_index,
+			matrix,
+			global_real_argb_green);
+	}
+
+	return;
 }
 
 real collision_edge_length(
