@@ -105,6 +105,18 @@ enum
 
 /* ---------- structures */
 
+struct ai_debug_unknown_state
+{
+	char __unknown0[1648];
+};
+
+struct ai_debug_firing_position
+{
+	boolean pursuit_position;
+	boolean evaluated;
+	char __unknown2[62];
+};
+
 struct ai_debug_state
 {
 	boolean enter_debugger;
@@ -195,11 +207,41 @@ struct ai_debug_state
 	boolean render_vector_avoidance_intermediate;
 	boolean render_postcombat;
 	long last_render_id;
-	char __unknownF8[547380];
+	boolean lineoffire_valid;
+	boolean lineoffire_success;
+	real_point3d lineoffire_origin;
+	real_vector3d lineoffire_vector;
+	long lineoffire_numpills;
+	boolean lineoffire_pillhit[16];
+	real_point3d lineoffire_pillbase[16];
+	real_vector3d lineoffire_pilldirectedheight[16];
+	real lineoffire_pillwidth[16];
+	boolean lineofsight_overflow;
+	long lineofsight_numpoints;
+	char __unknown2F0[262144];
+	long field_42F0;
+	char __unknown42F4[50472];
+	struct path_state path_state;
+	struct path_result path;
+	struct path_debug_storage path_debug;
+	char __unknown_after_path_debug[16384];
+	boolean firing_position_context_valid;
+	byte pad[3];
+	struct ai_debug_unknown_state field_7D384;
+	struct ai_debug_firing_position firing_positions[512];
+	char __unknown859F4[32];
+	boolean idle_look_valid;
+	long prop_idle_actor_index;
+	short prop_idle_look_count;
+	long prop_idle_look_indicies[32];
+	real prop_idle_look_distances[32];
+	boolean field_85B20;
+	boolean field_85B21;
+	boolean field_85B22;
+	long speaking_unit_index;
+	short field_85B28;
+	short vocalization_type;
 };
-
-typedef char ai_debug_state_flee_always_offset_assert[
-	offsetof(struct ai_debug_state, flee_always) == 0x8 ? 1 : -1];
 
 struct actor_debug_info
 {
@@ -315,14 +357,53 @@ struct actor_debug_info
 void ai_debug_initialize(
 	void);
 
-void ai_debug_initialize_for_new_map(
+void ai_debug_dispose(
 	void);
 
-void ai_debug_change_selected_encounter(
-	boolean a1);
+void ai_debug_dispose_from_old_map(
+	void);
 
-void ai_debug_change_selected_actor(
-	boolean a1);
+void ai_debug_clear_storage(
+	void);
+
+void ai_debug_actor_deleted(
+	long actor_index);
+
+struct path_debug_storage *ai_debug_get_last_path(
+	long actor_index);
+
+struct path_debug_storage *ai_debug_get_path_storage(
+	long actor_index);
+
+void ai_debug_select_encounter(
+	long encounter_index);
+
+void ai_debug_select_actor(
+	long encounter_index,
+	long actor_index);
+
+void ai_debug_sound_point_set(
+	void);
+
+void ai_debug_lineoffire_new(
+	real_point3d const *origin,
+	real_vector3d const *vector);
+
+void ai_debug_lineoffire_addpill(
+	real_point3d const *base,
+	real_vector3d const *directedheight,
+	real width,
+	boolean hit);
+
+void ai_debug_lineoffire_success(
+	boolean success);
+
+boolean ai_debug_highlight_cluster(
+	short index,
+	real_argb_color const **highlight_color);
+
+void ai_debug_lineofsight_reset(
+	void);
 
 char *ai_debug_describe_actor(
 	long actor_index,
@@ -331,12 +412,21 @@ char *ai_debug_describe_actor(
 	char *buffer,
 	long bufsize);
 
-struct path_debug_storage *ai_debug_get_last_path(
-	long actor_index);
+void ai_debug_vocalize(
+	char const *speech_priority_name,
+	char const *vocalization_type_name);
 
-boolean ai_debug_highlight_cluster(
-	short index,
-	real_argb_color const **highlight_color);
+void ai_debug_speak(
+	char const *vocalization_type_name);
+
+void ai_debug_initialize_for_new_map(
+	void);
+
+void ai_debug_change_selected_encounter(
+	boolean a1);
+
+void ai_debug_change_selected_actor(
+	boolean a1);
 
 /* ---------- globals */
 

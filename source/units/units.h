@@ -763,6 +763,20 @@ boolean unit_throw_grenade_begin(long unit_index, real_vector2d const *alignment
 
 /* ---------- prototypes/UNIT_DIALOGUE.C */
 
+short unit_test_speech(
+	long unit_index,
+	short priority,
+	boolean allow_recursive_lookup,
+	boolean allow_queue,
+	long *unit_last_speech_time,
+	short *vocalization_type_reference,
+	long *sound_definition_index_reference);
+void unit_speak(
+	long unit_index,
+	short play_type,
+	struct unit_speech_item const *speech_item);
+short unit_get_speech_priority_by_name(
+	char const *name);
 boolean unit_scream(long unit_index, short scream_type);
 void unit_dialogue_update(
 	long unit_index);

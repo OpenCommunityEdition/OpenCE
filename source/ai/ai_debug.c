@@ -29,6 +29,7 @@ AI_DEBUG.C
 #include "text/draw_string.h"
 #include "units/bipeds.h"
 #include "units/biped_definitions.h"
+#include "units/dialogue_definitions.h"
 #include "units/units.h"
 #include "units/unit_definitions.h"
 
@@ -239,7 +240,150 @@ struct path_debug_storage *ai_debug_get_last_path(
 		}
 	}
 
-	return found_path_index!=NONE ? &actor_path_debug_array[found_path_index] : NULL;
+	return found_path_index==NONE ? NULL : &actor_path_debug_array[found_path_index];
+}
+
+struct path_debug_storage *ai_debug_get_path_storage(
+	long actor_index)
+{
+	short path_index;
+
+	struct path_debug_storage *found_path = NULL;
+	short found_path_index = NONE;
+
+	for (path_index = 0; path_index<MAXIMUM_NUMBER_OF_ACTOR_PATHS; ++path_index)
+	{
+		struct path_debug_storage const *path = &actor_path_debug_array[path_index];
+
+		if (path->actor_index==actor_index && !path->failure)
+		{
+			found_path_index = path_index;
+			break;
+		}
+
+		if (found_path_index==NONE && !path->valid)
+		{
+			found_path_index = path_index;
+		}
+	}
+
+	if (found_path_index==NONE)
+	{
+		short best_path_index = NONE;
+		long best_path_time = LONG_MAX;
+
+		for (path_index = 0; path_index<MAXIMUM_NUMBER_OF_ACTOR_PATHS; ++path_index)
+		{
+			struct path_debug_storage const *path = &actor_path_debug_array[path_index];
+
+			match_assert("c:\\halo\\SOURCE\\ai\\ai_debug.c", 291, path->valid);
+
+			if (path->path_time < best_path_time)
+			{
+				best_path_time = path->path_time;
+				best_path_index = path_index;
+			}
+		}
+
+		found_path_index = best_path_index;
+	}
+
+	if (found_path_index!=NONE)
+	{
+		found_path = &actor_path_debug_array[found_path_index];
+
+		memset(found_path, 0, sizeof(*found_path));
+		found_path->valid = TRUE;
+		found_path->actor_index = actor_index;
+		found_path->path_time = game_time_get();
+	}
+
+	return found_path;
+}
+
+void ai_debug_select_encounter(
+	long encounter_index)
+{
+	if (ai_debug.selected_squad_index != encounter_index)
+	{
+		ai_debug.selected_squad_index = encounter_index;
+		ai_debug.firing_position_context_valid = FALSE;
+		memset(&ai_debug.field_7D384, 0, sizeof(ai_debug.field_7D384));
+		memset(&ai_debug.firing_positions, 0, sizeof(ai_debug.firing_positions));
+
+		ai_debug_select_actor(encounter_index, NONE);
+	}
+
+	return;
+}
+
+void ai_debug_select_actor(
+	long encounter_index,
+	long actor_index)
+{
+	if (ai_debug.selected_squad_index != encounter_index
+	|| ai_debug.selected_actor_index != actor_index)
+	{
+		short firing_position_index;
+
+		ai_debug_select_encounter(encounter_index);
+		ai_debug.selected_actor_index = actor_index;
+		ai_debug.firing_position_context_valid = FALSE;
+
+		for (firing_position_index = 0; firing_position_index<NUMBEROF(ai_debug.firing_positions); ++firing_position_index)
+		{
+			ai_debug.firing_positions[firing_position_index].evaluated = FALSE;
+		}
+
+		ai_debug.idle_look_valid = actor_index != NONE;
+		ai_debug.prop_idle_actor_index = actor_index;
+		ai_debug.prop_idle_look_count = 0;
+	}
+
+	return;
+}
+
+void ai_debug_sound_point_set(
+	void)
+{
+	return;
+}
+
+void ai_debug_lineoffire_new(
+	real_point3d const *origin,
+	real_vector3d const *vector)
+{
+	ai_debug.lineoffire_valid = TRUE;
+	ai_debug.lineoffire_success = FALSE;
+	ai_debug.lineoffire_origin = *origin;
+	ai_debug.lineoffire_vector = *vector;
+	ai_debug.lineoffire_numpills = 0;
+	return;
+}
+
+void ai_debug_lineoffire_addpill(
+	real_point3d const *base,
+	real_vector3d const *directedheight,
+	real width,
+	boolean hit)
+{
+	match_assert("c:\\halo\\SOURCE\\ai\\ai_debug.c", 4036, ai_debug.lineoffire_valid);
+
+	if (ai_debug.lineoffire_numpills<16)
+	{
+		ai_debug.lineoffire_pillhit[ai_debug.lineoffire_numpills] = hit;
+		ai_debug.lineoffire_pillbase[ai_debug.lineoffire_numpills] = *base;
+		ai_debug.lineoffire_pilldirectedheight[ai_debug.lineoffire_numpills] = *directedheight;
+		ai_debug.lineoffire_pillwidth[ai_debug.lineoffire_numpills++] = width;
+	}
+	return;
+}
+
+void ai_debug_lineoffire_success(
+	boolean success)
+{
+	ai_debug.lineoffire_success = success;
+	return;
 }
 
 boolean ai_debug_highlight_cluster(
@@ -285,6 +429,161 @@ boolean ai_debug_highlight_cluster(
 	}
 
 	return result;
+}
+
+void ai_debug_lineofsight_reset(
+	void)
+{
+	ai_debug.lineofsight_numpoints = 0;
+	ai_debug.field_42F0 = 0;
+	return;
+}
+
+char *ai_debug_describe_actor(
+	long actor_index,
+	long unit_index,
+	boolean include_squad,
+	char *buffer,
+	long bufsize)
+{
+	char const *tag_name;
+
+	char actor_string[256];
+	char object_name[256];
+
+	strcpy(actor_string, "");
+
+	if (include_squad && actor_index!=NONE)
+	{
+		struct actor_datum *actor = actor_get(actor_index);
+		unit_index = actor->meta.unit_index;
+
+		if (actor->meta.encounter_index==NONE)
+		{
+			csstrcpy(actor_string, "encounterless ");
+		}
+		else
+		{
+			struct encounter_definition const *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->ai_encounters,
+				DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->meta.encounter_index),
+				struct encounter_definition);
+			struct squad_definition const *squad_definition = TAG_BLOCK_GET_ELEMENT(
+				&encounter_definition->squads,
+				actor->meta.squad_index,
+				struct squad_definition);
+			struct platoon_definition const *platoon_definition = actor->meta.platoon_index!=NONE ?
+				TAG_BLOCK_GET_ELEMENT(&encounter_definition->platoons, actor->meta.platoon_index, struct platoon_definition) :
+				NULL;
+
+			if (platoon_definition==NULL)
+			{
+				sprintf(actor_string, "%s/%s ", encounter_definition->name, squad_definition->name);
+			}
+			else
+			{
+				sprintf(
+					actor_string,
+					"%s/(%s) %s ",
+					encounter_definition->name,
+					platoon_definition->name,
+					squad_definition->name);
+			}
+		}
+	}
+
+	tag_name = "";
+	strcpy(object_name, "");
+
+	if (unit_index!=NONE)
+	{
+		struct unit_datum const *unit = unit_get(unit_index);
+		struct unit_definition const *unit_definition = unit_definition_get(unit->definition_index);
+
+		tag_name = tag_name_strip_path(unit_definition->object.model.name);
+
+		if (unit->object.name_index!=NONE)
+		{
+			struct scenario_object_name const *scenario_object_name = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->object_names,
+				unit->object.name_index,
+				struct scenario_object_name);
+			sprintf(object_name, " (%s)", scenario_object_name->name);
+		}
+	}
+
+	_snprintf(buffer, bufsize, "%s%s%s", actor_string, tag_name, object_name);
+
+	return buffer;
+}
+
+void ai_debug_vocalize(
+	char const *speech_priority_name,
+	char const *vocalization_type_name)
+{
+	if (ai_debug.selected_actor_index!=NONE)
+	{
+		struct actor_datum const *actor = actor_get(ai_debug.selected_actor_index);
+
+		ai_debug.render_speech = TRUE;
+
+		if (actor->meta.unit_index!=NONE)
+		{
+			short speech_priority = unit_get_speech_priority_by_name(speech_priority_name);
+			short vocalization_type = dialogue_get_vocalization_type_by_name(vocalization_type_name);
+
+			if (speech_priority > 0 && vocalization_type != NONE)
+			{
+				long sound_definition_index_reference = NONE;
+				short play_type = unit_test_speech(
+					actor->meta.unit_index,
+					speech_priority,
+					TRUE,
+					TRUE,
+					NULL,
+					&vocalization_type,
+					&sound_definition_index_reference);
+
+				if (play_type)
+				{
+					struct unit_speech_item speech_item;
+
+					memset(&speech_item, 0, sizeof(speech_item));
+
+					speech_item.priority = speech_priority;
+					speech_item.vocalization_type = vocalization_type;
+					speech_item.sound_definition_index = sound_definition_index_reference;
+
+					ai_communication_packet_new(&speech_item.ai);
+					unit_speak(actor->meta.unit_index, play_type, &speech_item);
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+void ai_debug_speak(
+	char const *vocalization_type_name)
+{
+	if (ai_debug.selected_actor_index!=NONE)
+	{
+		struct actor_datum const *actor = actor_get(ai_debug.selected_actor_index);
+		short vocalization_type = dialogue_get_vocalization_type_by_name(vocalization_type_name);
+
+		if (actor->meta.unit_index!=NONE && vocalization_type!=NONE)
+		{
+			ai_debug.render_speech = TRUE;
+			ai_debug.field_85B20 = TRUE;
+			ai_debug.field_85B28 = FALSE;
+			ai_debug.field_85B21 = FALSE;
+			ai_debug.speaking_unit_index = actor->meta.unit_index;
+			ai_debug.vocalization_type = vocalization_type;
+		}
+	}
+
+	return;
 }
 
 // TODO: remove this!!!!!
