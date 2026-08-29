@@ -335,10 +335,20 @@ struct winsock_timeval
 	long microseconds;
 };
 
+struct winsock_sockaddr
+{
+	word family;
+	byte data[14];
+};
+
 /* ---------- prototypes */
 
 struct transport_endpoint *accept_endpoint(
 	struct transport_endpoint *listening_endpoint);
+long __stdcall accept(
+	long socket,
+	struct winsock_sockaddr *address,
+	long *address_length);
 long __stdcall closesocket(
 	long socket);
 void code_000713a0(
@@ -533,6 +543,45 @@ short listen_endpoint(
 
 	ep->error = (short)error;
 	return (short)error;
+}
+
+struct transport_endpoint *accept_endpoint(
+	struct transport_endpoint *listening_endpoint)
+{
+	struct transport_endpoint *ep = NULL;
+	long address_length = sizeof(struct winsock_sockaddr);
+	struct winsock_sockaddr address;
+	long socket;
+
+	match_vassert(
+		TRANSPORT_ENDPOINT_WINSOCK_FILE,
+		0x2D1,
+		listening_endpoint,
+		"listening_endpoint && (listening_endpoint->socket >= 0)");
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x2D2, transport_initialized);
+
+	socket = accept(
+		listening_endpoint->socket,
+		&address,
+		&address_length);
+	if (socket != INVALID_SOCKET)
+	{
+		ep = create_transport_endpoint(listening_endpoint->type);
+		if (ep)
+		{
+			ep->socket = socket;
+			ep->flags |= 1;
+		}
+		else
+			listening_endpoint->error = _transport_error_out_of_memory;
+	}
+	else
+	{
+		winsock_error_to_string(WSAGetLastError());
+		listening_endpoint->error = _transport_error_unknown;
+	}
+
+	return ep;
 }
 
 void delete_transport_endpoint(
