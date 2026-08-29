@@ -73,6 +73,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "bitmaps/bitmap_group.h"
 #include "cseries/errors.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
@@ -86,6 +87,9 @@ enum
 {
 	DETAIL_OBJECT_VERTEX_BUFFER_SIZE = 0x20000,
 	MAXIMUM_DETAIL_OBJECTS_PER_FRAME = 0x1000,
+	MAXIMUM_DETAIL_OBJECT_TYPES_PER_COLLECTION = 16,
+	MAXIMUM_DETAIL_OBJECT_SPRITES_PER_COLLECTION = 128,
+	DETAIL_OBJECT_CELL_SIZE = 8,
 };
 
 /* ---------- macros */
@@ -126,17 +130,47 @@ struct detail_object_vertex
 
 struct detail_object_type_definition
 {
-	byte reserved00[0x22];
+	char name[32];
+	byte sequence_index;
+	byte flags;
 	byte first_sprite_index;
 	byte sprite_count;
-	byte reserved24[0x3C];
+	real color_override_factor;
+	long unused28[2];
+	real near_fade_distance;
+	real far_fade_distance;
+	real size_min;
+	real size_max;
+	byte reserved40[0x20];
 };
 
 struct detail_object_collection_definition
 {
-	byte reserved00[0x44];
+	short collection_type;
+	word pad02;
+	real global_z_offset;
+	long unused08[11];
+	struct tag_reference map;
 	struct tag_block type_definitions;
-	byte reserved50[0x30];
+	long unused50[12];
+};
+
+struct detail_object_bitmap_group_sprite
+{
+	short bitmap_index;
+	word pad02;
+	long unknown004;
+	real_rectangle2d bounds;
+	real_point2d registration_point;
+};
+
+struct detail_object_bitmap_group_sequence
+{
+	char name[32];
+	short first_bitmap_index;
+	short bitmap_count;
+	long unknown024[4];
+	struct tag_block sprites;
 };
 
 struct scenario_detail_object_collection_palette_entry
@@ -213,6 +247,10 @@ typedef char detail_object_type_definition_size_assert[
 	sizeof(struct detail_object_type_definition) == 0x60 ? 1 : -1];
 typedef char detail_object_collection_definition_size_assert[
 	sizeof(struct detail_object_collection_definition) == 0x80 ? 1 : -1];
+typedef char detail_object_bitmap_group_sprite_size_assert[
+	sizeof(struct detail_object_bitmap_group_sprite) == 0x20 ? 1 : -1];
+typedef char detail_object_bitmap_group_sequence_size_assert[
+	sizeof(struct detail_object_bitmap_group_sequence) == 0x40 ? 1 : -1];
 typedef char detail_object_palette_entry_size_assert[
 	sizeof(struct scenario_detail_object_collection_palette_entry) == 0x30 ? 1 : -1];
 typedef char structure_detail_object_data_size_assert[
@@ -242,6 +280,18 @@ short main_get_window_count(
 
 void rasterizer_set_pixel_shader(
 	struct pixel_shader_definition const *definition);
+
+void rasterizer_set_texture(
+	short stage,
+	short bitmap_type,
+	short bitmap_index,
+	long bitmap_definition_index,
+	short bitmap_sequence_index);
+
+void rasterizer_set_vertex_shader_permutation(
+	short vertex_shader_index,
+	short vertex_type,
+	short permutation_index);
 
 /* ---------- globals */
 
@@ -569,6 +619,304 @@ void _rasterizer_detail_objects_rebuild_vertices(
 			layer_index++;
 		}
 		while ((short)layer_index < detail_object_view_data->layer_count);
+	}
+
+	return;
+}
+
+void _rasterizer_detail_objects_draw(
+	struct detail_object_view_data const *detail_object_view_data)
+{
+	real frame_data[MAXIMUM_DETAIL_OBJECT_SPRITES_PER_COLLECTION][4];
+	real type_data[MAXIMUM_DETAIL_OBJECT_TYPES_PER_COLLECTION][4];
+	struct scenario *scenario;
+	struct tag_block *palette;
+	struct detail_object_layer_data *layer;
+	struct scenario_detail_object_collection_palette_entry *palette_entry;
+	struct detail_object_collection_definition *collection;
+	struct detail_object_type_definition *type_definition;
+	struct detail_object_bitmap_group_sprite *sprite;
+	struct detail_object_cell_data *cell;
+	struct bitmap_data *bitmap_data;
+	real *constants;
+	real_vector4d const *z_reference_vector;
+	struct tag_block *type_definitions;
+	real range;
+	real frame_scale;
+	long layer_index;
+	long sprite_index;
+	long frame_count;
+	long cell_index;
+	boolean success;
+
+	success = TRUE;
+	if (!rasterizer_debug_options.detail_objects)
+	{
+		return;
+	}
+	if (main_get_window_count() > 1)
+	{
+		return;
+	}
+
+	scenario = global_scenario_get();
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_detail_objects.c",
+		0x132,
+		detail_object_view_data);
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_detail_objects.c",
+		0x133,
+		global_d3d_device);
+
+	layer_index = 0;
+	if (detail_object_view_data->layer_count > 0)
+	{
+		palette = &scenario->detail_object_collection_palette;
+		do
+		{
+			struct
+			{
+				long counter;
+				struct bitmap_group *bitmap;
+			} state;
+
+			layer = &detail_object_view_data->layers[(short)layer_index];
+			palette_entry = TAG_BLOCK_GET_ELEMENT(
+				palette,
+				layer->collection_definition_index,
+				struct scenario_detail_object_collection_palette_entry);
+			collection = detail_object_collection_definition_get(
+				palette_entry->collection.index);
+			state.bitmap = bitmap_group_get(collection->map.index);
+			rasterizer_set_texture(
+				0,
+				0,
+				1,
+				collection->map.index,
+				0);
+			IDirect3DDevice8_SetTextureStageState(
+				global_d3d_device,
+				0,
+				D3DTSS_ADDRESSU,
+				D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(
+				global_d3d_device,
+				0,
+				D3DTSS_ADDRESSV,
+				D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(
+				global_d3d_device,
+				0,
+				D3DTSS_MAGFILTER,
+				D3DTEXF_LINEAR);
+			IDirect3DDevice8_SetTextureStageState(
+				global_d3d_device,
+				0,
+				D3DTSS_MINFILTER,
+				D3DTEXF_LINEAR);
+			IDirect3DDevice8_SetTextureStageState(
+				global_d3d_device,
+				0,
+				D3DTSS_MIPFILTER,
+				D3DTEXF_LINEAR);
+			if (collection->collection_type != NONE)
+			{
+				rasterizer_set_vertex_shader_permutation(
+					0x21,
+					0xB,
+					collection->collection_type);
+			}
+
+			frame_count = 0;
+			state.counter = 0;
+			type_definitions = &collection->type_definitions;
+			if (type_definitions->count > 0)
+			{
+				long type_index = 0;
+				struct detail_object_bitmap_group_sequence *type_sequence;
+
+				do
+				{
+					type_definition = TAG_BLOCK_GET_ELEMENT(
+						type_definitions,
+						type_index,
+						struct detail_object_type_definition);
+					type_sequence = TAG_BLOCK_GET_ELEMENT(
+						&state.bitmap->sequences,
+						type_definition->sequence_index,
+						struct detail_object_bitmap_group_sequence);
+					bitmap_data = TAG_BLOCK_GET_ELEMENT(
+						&state.bitmap->bitmap_data,
+						type_sequence->first_bitmap_index,
+						struct bitmap_data);
+					range = type_definition->far_fade_distance -
+						type_definition->near_fade_distance;
+					frame_scale = type_definition->size_min;
+					if (range > 0.0f)
+					{
+						range = 1.0f / range;
+					}
+					constants = type_data[type_index];
+					constants[0] = range * type_definition->far_fade_distance;
+					constants[1] = -range;
+					constants[2] = (real)bitmap_data->width * frame_scale;
+					constants[3] = (real)bitmap_data->height * frame_scale;
+					state.counter++;
+					type_index = (short)state.counter;
+				}
+				while (type_index < type_definitions->count);
+			}
+
+			state.counter = 0;
+			if (state.bitmap->sequences.count > 0)
+			{
+				long sequence_index = 0;
+
+				do
+				{
+					{
+						struct detail_object_bitmap_group_sequence *sequence =
+							TAG_BLOCK_GET_ELEMENT(
+							&state.bitmap->sequences,
+							sequence_index,
+							struct detail_object_bitmap_group_sequence);
+
+						sprite_index = 0;
+						if (sequence->sprites.count > 0)
+						{
+							do
+							{
+								sprite = TAG_BLOCK_GET_ELEMENT(
+									&sequence->sprites,
+									(short)sprite_index,
+									struct detail_object_bitmap_group_sprite);
+								TAG_BLOCK_GET_ELEMENT(
+									&state.bitmap->bitmap_data,
+									sprite->bitmap_index,
+									struct bitmap_data);
+								constants = frame_data[(short)frame_count];
+								frame_count++;
+								constants[0] = sprite->bounds.x0;
+								constants[1] = sprite->bounds.y0;
+								constants[2] = sprite->bounds.x1 - sprite->bounds.x0;
+								constants[3] = sprite->bounds.y1 - sprite->bounds.y0;
+								sprite_index++;
+							}
+							while ((short)sprite_index < sequence->sprites.count);
+						}
+					}
+					state.counter++;
+					sequence_index = (short)state.counter;
+				}
+				while (sequence_index < state.bitmap->sequences.count);
+			}
+
+			if (IDirect3DDevice8_SetVertexShaderConstant(
+				global_d3d_device,
+				-0x4B,
+				type_data,
+				type_definitions->count) >= 0 && success)
+			{
+				success = TRUE;
+			}
+			else
+			{
+				success = FALSE;
+				rasterizer_error(
+					0,
+					"IDirect3DDevice8_SetVertexShaderConstant(global_d3d_device, VSH_CONSTANTS__DETAILOBJ_TYPEDATA_OFFSET, vsh_constants__detailobj_typedata, collection_definition->type_definitions.count)");
+			}
+			if (IDirect3DDevice8_SetVertexShaderConstant(
+				global_d3d_device,
+				-0x24,
+				frame_data,
+				(short)frame_count) >= 0 && success)
+			{
+				success = TRUE;
+			}
+			else
+			{
+				success = FALSE;
+				rasterizer_error(
+					0,
+					"IDirect3DDevice8_SetVertexShaderConstant(global_d3d_device, VSH_CONSTANTS__DETAILOBJ_FRAMEDATA_OFFSET, vsh_constants__detailobj_framedata, frame_count)");
+			}
+
+			cell_index = 0;
+			if (layer->cell_count > 0)
+			{
+				do
+				{
+					cell = &layer->cells[(short)cell_index];
+					match_assert(
+						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_detail_objects.c",
+						0x18A,
+						cell->z_reference_vector);
+					if (IDirect3DDevice8_SetVertexData4f(
+						global_d3d_device,
+						2,
+						(real)(cell->cell_x * DETAIL_OBJECT_CELL_SIZE),
+						(real)(cell->cell_y * DETAIL_OBJECT_CELL_SIZE),
+						(cell->cell_z * (real)DETAIL_OBJECT_CELL_SIZE),
+						1.0f) >= 0 && success)
+					{
+						success = TRUE;
+					}
+					else
+					{
+						success = FALSE;
+						rasterizer_error(
+							0,
+							"IDirect3DDevice8_SetVertexData4f(global_d3d_device, 2, (real)(cell->cell_x*DETAIL_OBJECT_CELL_SIZE), (real)(cell->cell_y*DETAIL_OBJECT_CELL_SIZE), (cell->cell_z*(real)DETAIL_OBJECT_CELL_SIZE), 1.0f)");
+					}
+					z_reference_vector = cell->z_reference_vector;
+					if (IDirect3DDevice8_SetVertexData4f(
+						global_d3d_device,
+						3,
+						z_reference_vector->i,
+						z_reference_vector->j,
+						z_reference_vector->k,
+						z_reference_vector->l) >= 0 && success)
+					{
+						success = TRUE;
+					}
+					else
+					{
+						success = FALSE;
+						rasterizer_error(
+							0,
+							"IDirect3DDevice8_SetVertexData4f(global_d3d_device, 3, cell->z_reference_vector->i, cell->z_reference_vector->j, cell->z_reference_vector->k, cell->z_reference_vector->l)");
+					}
+					if (IDirect3DDevice8_DrawVertices(
+						global_d3d_device,
+						D3DPT_QUADLIST,
+						cell->first_vertex_index,
+						cell->detail_object_count * NUMBER_OF_VERTICES_PER_QUADRILATERAL) >= 0 && success)
+					{
+						success = TRUE;
+					}
+					else
+					{
+						success = FALSE;
+						rasterizer_error(
+							0,
+							"IDirect3DDevice8_DrawVertices(global_d3d_device, D3DPT_QUADLIST, cell->internal__first_vertex_index, cell->detail_object_count*NUMBER_OF_VERTICES_PER_QUADRILATERAL)");
+					}
+					cell_index++;
+				}
+				while ((short)cell_index < layer->cell_count);
+			}
+
+			layer_index++;
+		}
+		while ((short)layer_index < detail_object_view_data->layer_count);
+		if (!success)
+		{
+			error(
+				_error_silent,
+				"### ERROR rasterizer_detail_objects_draw failed");
+		}
 	}
 
 	return;
