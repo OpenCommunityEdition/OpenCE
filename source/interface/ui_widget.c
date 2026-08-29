@@ -732,10 +732,25 @@ void dispose_pointer(
 
 extern struct stack_memory_pool *widget_memory_pool;
 extern struct ui_widget_bss_prefix bss_00454240;
+extern real_argb_color ui_plasma_effect_color;
 
 short dashboard_abort_error = NONE;
 
 /* ---------- public code */
+
+void set_ui_plasma_effect_color(
+	real alpha,
+	real red,
+	real green,
+	real blue)
+{
+	ui_plasma_effect_color.alpha = alpha;
+	ui_plasma_effect_color.red = red;
+	ui_plasma_effect_color.green = green;
+	ui_plasma_effect_color.blue = blue;
+
+	return;
+}
 
 boolean event_controller_index_compatible_with_widget(
 	struct event_record const *event,
