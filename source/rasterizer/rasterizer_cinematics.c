@@ -65,9 +65,23 @@ symbols in this file:
 
 struct rasterizer_cinematic_screen_effect_parameters
 {
-	byte reserved00[0x14];
+	short convolution_extra_passes;
+	short convolution_type;
+	real convolution_radius;
+	struct bitmap_data *convolution_mask;
+	real filter_light_enhancement_intensity;
+	real filter_desaturation_intensity;
 	real_rgb_color filter_desaturation_tint;
-	byte reserved20[0x18];
+	boolean filter_desaturation_is_additive;
+	boolean filter_light_enhancement_uses_convolution_mask;
+	boolean filter_desaturation_uses_convolution_mask;
+	boolean video_on;
+	short video_overbright_mode;
+	byte reserved26[2];
+	struct bitmap_data *video_scanline_map;
+	real video_noise_intensity;
+	real video_noise_map_scale;
+	struct bitmap_data *video_noise_map;
 };
 
 struct rasterizer_cinematic_screen_effect_state
@@ -75,7 +89,12 @@ struct rasterizer_cinematic_screen_effect_state
 	struct rasterizer_cinematic_screen_effect_parameters parameters;
 	boolean has_control;
 	boolean initialized;
-	byte reserved3A[0x2A];
+	byte reserved3A[2];
+	real convolution_radius[2];
+	real convolution_time[2];
+	real filter_light_enhancement_intensity[2];
+	real filter_desaturation_intensity[2];
+	real filter_time[2];
 	real script_values[4];
 	real near_clip_distance;
 };
@@ -89,18 +108,31 @@ typedef char rasterizer_cinematic_screen_effect_parameters_size_assert[
 	sizeof(struct rasterizer_cinematic_screen_effect_parameters) == 0x38 ? 1 : -1];
 typedef char rasterizer_cinematic_screen_effect_parameters_tint_offset_assert[
 	offsetof(struct rasterizer_cinematic_screen_effect_parameters, filter_desaturation_tint) == 0x14 ? 1 : -1];
+typedef char rasterizer_cinematic_screen_effect_parameters_video_on_offset_assert[
+	offsetof(struct rasterizer_cinematic_screen_effect_parameters, video_on) == 0x23 ? 1 : -1];
+typedef char rasterizer_cinematic_screen_effect_parameters_video_scanline_map_offset_assert[
+	offsetof(struct rasterizer_cinematic_screen_effect_parameters, video_scanline_map) == 0x28 ? 1 : -1];
+typedef char rasterizer_cinematic_screen_effect_parameters_video_noise_map_offset_assert[
+	offsetof(struct rasterizer_cinematic_screen_effect_parameters, video_noise_map) == 0x34 ? 1 : -1];
 typedef char rasterizer_cinematic_screen_effect_state_size_assert[
 	sizeof(struct rasterizer_cinematic_screen_effect_state) == 0x78 ? 1 : -1];
 typedef char rasterizer_cinematic_screen_effect_state_has_control_offset_assert[
 	offsetof(struct rasterizer_cinematic_screen_effect_state, has_control) == 0x38 ? 1 : -1];
 typedef char rasterizer_cinematic_screen_effect_state_initialized_offset_assert[
 	offsetof(struct rasterizer_cinematic_screen_effect_state, initialized) == 0x39 ? 1 : -1];
+typedef char rasterizer_cinematic_screen_effect_state_convolution_radius_offset_assert[
+	offsetof(struct rasterizer_cinematic_screen_effect_state, convolution_radius) == 0x3C ? 1 : -1];
+typedef char rasterizer_cinematic_screen_effect_state_filter_time_offset_assert[
+	offsetof(struct rasterizer_cinematic_screen_effect_state, filter_time) == 0x5C ? 1 : -1];
 typedef char rasterizer_cinematic_screen_effect_state_script_values_offset_assert[
 	offsetof(struct rasterizer_cinematic_screen_effect_state, script_values) == 0x64 ? 1 : -1];
 typedef char rasterizer_cinematic_screen_effect_state_near_clip_distance_offset_assert[
 	offsetof(struct rasterizer_cinematic_screen_effect_state, near_clip_distance) == 0x74 ? 1 : -1];
 
 /* ---------- prototypes */
+
+short main_get_window_count(
+	void);
 
 /* ---------- globals */
 
@@ -193,6 +225,111 @@ void rasterizer_screen_effect_start(
 	}
 
 	return;
+}
+
+struct rasterizer_cinematic_screen_effect_state *rasterizer_screen_effect_get_cinematic_parameters(
+	struct rasterizer_cinematic_screen_effect_state *parameters)
+{
+	struct rasterizer_cinematic_screen_effect_state *result;
+
+	result = parameters;
+	if (cinematic_screen_effect_globals && cinematic_screen_effect_globals->has_control)
+	{
+		real convolution_fraction;
+		real filter_fraction;
+
+		if (cinematic_screen_effect_globals->convolution_time[1] !=
+			cinematic_screen_effect_globals->convolution_time[0])
+		{
+			convolution_fraction = PIN(
+				(code_0016d140() - cinematic_screen_effect_globals->convolution_time[0]) /
+					(cinematic_screen_effect_globals->convolution_time[1] -
+						cinematic_screen_effect_globals->convolution_time[0]),
+				0.0f,
+				1.0f);
+		}
+		else
+		{
+			convolution_fraction = 1.0f;
+		}
+
+		if (cinematic_screen_effect_globals->filter_time[1] !=
+			cinematic_screen_effect_globals->filter_time[0])
+		{
+			filter_fraction = PIN(
+				(code_0016d140() - cinematic_screen_effect_globals->filter_time[0]) /
+					(cinematic_screen_effect_globals->filter_time[1] -
+						cinematic_screen_effect_globals->filter_time[0]),
+				0.0f,
+				1.0f);
+		}
+		else
+		{
+			filter_fraction = 1.0f;
+		}
+
+		scalars_interpolate(
+			cinematic_screen_effect_globals->convolution_radius[0],
+			cinematic_screen_effect_globals->convolution_radius[1],
+			convolution_fraction,
+			&cinematic_screen_effect_globals->parameters.convolution_radius);
+		scalars_interpolate_and_clamp_0_to_1(
+			cinematic_screen_effect_globals->filter_light_enhancement_intensity[0],
+			cinematic_screen_effect_globals->filter_light_enhancement_intensity[1],
+			filter_fraction,
+			&cinematic_screen_effect_globals->parameters.filter_light_enhancement_intensity);
+		scalars_interpolate_and_clamp_0_to_1(
+			cinematic_screen_effect_globals->filter_desaturation_intensity[0],
+			cinematic_screen_effect_globals->filter_desaturation_intensity[1],
+			filter_fraction,
+			&cinematic_screen_effect_globals->parameters.filter_desaturation_intensity);
+
+		if (csmemcmp(
+			&cinematic_screen_effect_globals->parameters.filter_desaturation_tint,
+			global_real_rgb_black,
+			sizeof(cinematic_screen_effect_globals->parameters.filter_desaturation_tint)) == 0)
+		{
+			parameters = cinematic_screen_effect_globals;
+			parameters->parameters.filter_desaturation_tint = *global_real_rgb_green;
+		}
+		else
+		{
+			parameters = cinematic_screen_effect_globals;
+		}
+
+		if (parameters->parameters.convolution_radius <= _real_epsilon)
+		{
+			parameters->parameters.convolution_radius = 0.0f;
+			parameters->parameters.convolution_type = 0;
+			parameters->parameters.convolution_extra_passes = 0;
+		}
+		else
+		{
+			if (main_get_window_count() > 1)
+			{
+				display_assert(
+					"### FATAL_ERROR screen effects can't use convolution when main_get_window_count>1\r\nmaybe you forgot to turn off the cinematic screen effect?",
+					"c:\\halo\\SOURCE\\rasterizer\\rasterizer_cinematics.c",
+					336,
+					TRUE);
+				system_exit(-1);
+			}
+
+			parameters = cinematic_screen_effect_globals;
+		}
+
+		if (parameters->parameters.filter_light_enhancement_intensity <= _real_epsilon &&
+			parameters->parameters.filter_desaturation_intensity <= _real_epsilon &&
+			filter_fraction >= 1.0f)
+		{
+			parameters->parameters.filter_light_enhancement_intensity = 0.0f;
+			parameters->parameters.filter_desaturation_intensity = 0.0f;
+		}
+
+		return parameters;
+	}
+
+	return result;
 }
 
 void rasterizer_screen_effect_set_filter_desaturation_tint(
