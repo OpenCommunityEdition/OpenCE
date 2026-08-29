@@ -240,6 +240,7 @@ enum
 	NUMBER_OF_BITMAP_TYPES = 3,
 	NUMBER_OF_BITMAP_FORMATS = 18,
 	_bitmap_has_power_of_two_dimensions_bit = 0,
+	_bitmap_allocated_bit = 6,
 };
 
 /* ---------- macros */
@@ -251,6 +252,15 @@ enum
 boolean bitmap_verify(
 	struct bitmap_data *bitmap,
 	boolean repair);
+void rasterizer_bitmap_changed(
+	struct bitmap_data *bitmap);
+void rasterizer_bitmap_delete(
+	struct bitmap_data *bitmap);
+short bitmap_format_get_bits_per_pixel(
+	short format);
+long bitmap_mipmap_get_pixel_count(
+	struct bitmap_data *bitmap,
+	short mipmap_index);
 
 /* ---------- globals */
 
@@ -341,6 +351,40 @@ char const *bitmap_format_get_string(
 	return bitmap_format_string_table[format];
 }
 
+void bitmap_changed(
+	struct bitmap_data *bitmap)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x179, bitmap);
+	rasterizer_bitmap_changed(bitmap);
+
+	return;
+}
+
+void bitmap_delete(
+	struct bitmap_data *bitmap)
+{
+	if (bitmap)
+	{
+		rasterizer_bitmap_delete(bitmap);
+		if (TEST_FLAG(bitmap->flags, _bitmap_allocated_bit))
+		{
+			if (bitmap->base_address)
+			{
+				debug_free(
+					bitmap->base_address,
+					"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
+					0x18B);
+			}
+			debug_free(
+				bitmap,
+				"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
+				0x18E);
+		}
+	}
+
+	return;
+}
+
 short bitmap_get_max_mipmap_count(
 	struct bitmap_data *bitmap)
 {
@@ -355,6 +399,33 @@ short bitmap_get_max_mipmap_count(
 	}
 
 	return mipmap_count;
+}
+
+long bitmap_get_pixel_count(
+	struct bitmap_data *bitmap)
+{
+	long pixel_count = 0;
+	short mipmap_index;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x378, bitmap_verify(bitmap, FALSE));
+
+	for (mipmap_index = 0; mipmap_index <= (short)bitmap->mipmap_count; mipmap_index++)
+	{
+		pixel_count += bitmap_mipmap_get_pixel_count(bitmap, mipmap_index);
+	}
+
+	return pixel_count;
+}
+
+long bitmap_get_pixel_data_size(
+	struct bitmap_data *bitmap)
+{
+	long pixel_count;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x38A, bitmap_verify(bitmap, FALSE));
+
+	pixel_count = bitmap_get_pixel_count(bitmap);
+	return pixel_count * bitmap_format_get_bits_per_pixel(bitmap->format) / 8;
 }
 
 void bitmap_byte_swap_pixels(
