@@ -247,8 +247,17 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "game/players.h"
+#include "networking/network_messages.h"
 
 /* ---------- constants */
+
+enum
+{
+	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
+	NETWORK_MESSAGE_BUFFER_SIZE = 0x600,
+	NETWORK_GAME_SETTINGS_SIZE = 0x434,
+};
 
 /* ---------- macros */
 
@@ -256,11 +265,18 @@ symbols in this file:
 
 struct network_connection;
 struct network_game_client_machine;
+struct network_game;
 struct network_game_server;
+struct network_game_server_client_machine;
 
 struct network_message
 {
 	word header;
+};
+
+struct message_server_game_settings_update
+{
+	byte opaque[NETWORK_GAME_SETTINGS_SIZE];
 };
 
 /* ---------- prototypes */
@@ -274,6 +290,21 @@ boolean network_connection_write(
 	word message_size,
 	void *address,
 	long flags);
+struct network_game_server_client_machine *network_game_server_get_client_machine_at_index(
+	struct network_game_server *server,
+	long index);
+boolean network_game_server_client_machine_is_joined_to_game(
+	struct network_game_server *server,
+	struct network_game_server_client_machine *machine);
+struct network_connection *network_game_server_get_client_connection(
+	struct network_game_server_client_machine *machine);
+boolean network_connection_active(
+	struct network_connection *connection);
+struct network_game *network_game_server_get_game(
+	struct network_game_server *server);
+void network_event(
+	char *format,
+	...);
 
 /* ---------- globals */
 
@@ -298,6 +329,135 @@ boolean network_game_server_send_message_to_machine(
 			message_size,
 			NULL,
 			1);
+	}
+
+	return result;
+}
+
+boolean network_game_server_send_message_to_all_machines(
+	struct network_game_server *server,
+	struct network_message *message)
+{
+	byte message_buffer[NETWORK_MESSAGE_BUFFER_SIZE];
+	boolean result = TRUE;
+	word message_length;
+	long machine_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_server_message_handler.c",
+		0x187,
+		server && message);
+
+	message_length = message->header >> 4;
+	for (machine_index = 0; machine_index < MAXIMUM_NETWORK_MACHINE_COUNT; machine_index++)
+	{
+		struct network_game_server_client_machine *machine =
+			network_game_server_get_client_machine_at_index(server, machine_index);
+
+		if (network_game_server_client_machine_is_joined_to_game(server, machine))
+		{
+			struct network_connection *connection =
+				network_game_server_get_client_connection(machine);
+
+			if (connection && network_connection_active(connection))
+			{
+				match_assert(
+					"c:\\halo\\SOURCE\\networking\\network_server_message_handler.c",
+					0x19A,
+					message_length<=sizeof(message_buffer));
+
+				csmemcpy(message_buffer, message, message_length);
+				if (!network_connection_write(
+					connection,
+					message_buffer,
+					message_length,
+					NULL,
+					1))
+				{
+					network_event(
+						"network_game_server_write() failed in network_game_server_send_message_to_all_machines()");
+					result = FALSE;
+				}
+			}
+		}
+	}
+
+	return result;
+}
+
+boolean network_game_server_send_player_joined_info_ingame(
+	struct network_game_server *server,
+	struct network_player *player)
+{
+	struct network_player message;
+	void *encoded_message;
+	boolean result;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_server_message_handler.c",
+		0x1B0,
+		server && player);
+
+	message = *player;
+	encoded_message = create_network_game_message(
+		_message_server_add_player_ingame,
+		&message,
+		sizeof(message));
+	if (encoded_message)
+	{
+		result = network_game_server_send_message_to_all_machines(server, encoded_message);
+		if (!result)
+		{
+			network_event(
+				"network_game_server_send_message_to_all_machines() failed in network_game_server_send_player_joined_info_ingame()");
+		}
+
+		return result;
+	}
+
+	network_event("failed to create a message_server_add_player_ingame message");
+	return FALSE;
+}
+
+boolean network_game_server_send_game_data_pregame(
+	struct network_game_server *server)
+{
+	struct message_server_game_settings_update message;
+	struct network_game *game;
+	void *encoded_message;
+	boolean result = FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_server_message_handler.c",
+		0x1C8,
+		server);
+
+	game = network_game_server_get_game(server);
+	if (game)
+	{
+		csmemcpy(&message, game, sizeof(message));
+		encoded_message = create_network_game_message(
+			_message_server_game_settings_update,
+			&message,
+			sizeof(message));
+		if (encoded_message)
+		{
+			result = network_game_server_send_message_to_all_machines(server, encoded_message);
+			if (!result)
+			{
+				network_event(
+					"failed to send message_server_game_settings_update message to all machines");
+			}
+		}
+		else
+		{
+			network_event("failed to create a message_server_game_settings_update message");
+		}
+	}
+	else
+	{
+		network_event(
+			"failed to handle a message_server_game_settings_update because their was no server game");
 	}
 
 	return result;
