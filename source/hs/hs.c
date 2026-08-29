@@ -4137,7 +4137,7 @@ void unit_scripting_set_seat(
 	long unit_index,
 	char const *seat_name);
 void device_group_change_only_once_more_set(
-	short device_group_index,
+	long device_group_index,
 	boolean change_only_once_more);
 void unit_set_emotion(
 	long unit_index,

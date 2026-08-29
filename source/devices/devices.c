@@ -93,6 +93,8 @@ symbols in this file:
 enum
 {
 	_device_position_changed_bit = 2,
+	_device_group_can_change_only_once_bit = 0,
+	_device_group_changed_once_bit = 1,
 };
 
 /* ---------- macros */
@@ -213,6 +215,30 @@ real device_group_get_value(
 	group = datum_get(device_groups_data, group_index);
 
 	return group->actual_value;
+}
+
+void device_group_change_only_once_more_set(
+	long group_index,
+	boolean change_only_once_more)
+{
+	if (group_index != NONE)
+	{
+		struct device_group_datum *group;
+
+		group = datum_get(device_groups_data, group_index);
+		if (change_only_once_more)
+		{
+			group->flags |= FLAG(_device_group_can_change_only_once_bit);
+		}
+		else
+		{
+			group->flags &= ~FLAG(_device_group_can_change_only_once_bit);
+		}
+
+		group->flags &= ~FLAG(_device_group_changed_once_bit);
+	}
+
+	return;
 }
 
 void device_set_actual_position(
