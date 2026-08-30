@@ -86,6 +86,11 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
+};
+
 /* ---------- macros */
 
 #define network_machine_is_valid(machine) \
@@ -95,7 +100,7 @@ symbols in this file:
 
 struct network_machine
 {
-	byte __unknown0[0x40];
+	wchar_t name[32];
 	char machine_index;
 	byte __padding41[3];
 };
@@ -142,7 +147,7 @@ long player_new(
 	struct network_player const *player);
 void network_game_invalidate_machine(
 	struct network_game *game,
-	short machine_index);
+	word machine_index);
 
 /* ---------- globals */
 
@@ -266,6 +271,29 @@ boolean network_player_is_valid(
 	}
 
 	return FALSE;
+}
+
+void network_game_invalidate_machine(
+	struct network_game *game,
+	word machine_index)
+{
+	long player_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_game_manager.c",
+		0x40,
+		game && (machine_index<MAXIMUM_NETWORK_MACHINE_COUNT));
+
+	game->machines[machine_index].machine_index = NONE;
+	game->machines[machine_index].name[0] = 0;
+
+	for (player_index = 0; player_index < 16; player_index++)
+	{
+		if (game->players[player_index].machine_index == machine_index)
+			network_game_invalidate_player(&game->players[player_index]);
+	}
+
+	return;
 }
 
 boolean network_game_spawn_player(
