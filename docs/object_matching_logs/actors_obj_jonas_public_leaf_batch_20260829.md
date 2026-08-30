@@ -139,3 +139,33 @@ exceptions, parked records, completion labels, and build rules are untouched.
 Full cumulative build, semantic, progress, admission, park, protected-Units,
 and test results are recorded after the retained implementation-and-ledger
 commit so the authoritative hashes and counts refer to committed state.
+
+## Committed cumulative validation
+
+The implementation-and-ledger commit is
+`fae120929afbaeab5f854b47f278a9acbf7e1b46`. From that committed source,
+the complete `halobetacache_build`, `libcmt_build`, report, semantic-report,
+and progress graph passes. The generated reports are:
+
+- `build/report.json`: 1,599,033 bytes, SHA-256
+  `5e3fb65e727801f3d29a03602a9c997038a466894c986af418642c8fbd7c8bfe`;
+- `build/semantic_report.json`: 3,267,073 bytes, SHA-256
+  `2e71fed15f6b1b42f00a5c28ee836613adc38f3fbd0e3cf6add8514e53589739`.
+
+The strict semantic audit scans 470 units and evaluates 4,918 functions:
+4,801 semantic exact, 131 hidden exact / 78,940 hidden code bytes, one
+ordinary-only, one structural, zero rejected, 12 local skips, 2,811 missing,
+4,811 accepted exact, and zero unit errors.
+
+Campaign progress is 384/833 linked objects, 4,772/11,060 functions, 606,270
+of 2,198,102 code bytes, and 1,856,050 of 4,176,062 data bytes. This is a
+gain of one function and 83 meaningful / 96 padded code bytes over the
+pre-wave cumulative board. Admission is zero candidates, zero contradictions,
+and zero revocations. Parks are 12 active, zero stale, and zero invalid.
+
+All 212 tooling tests pass. The protected Units sentinel
+`_unit_preprocess_node_orientations` remains strict exact at 1,920 padded
+bytes, 87 ordered relocations, and normalized SHA-256
+`5d5c8edc492fb8ab6ea83e1ccaa4cb2798da51ae4a17182fa848878bed05a7ed`.
+The tracked worktree is clean apart from the pre-existing ignored/untracked
+`scratch/` research directory.
