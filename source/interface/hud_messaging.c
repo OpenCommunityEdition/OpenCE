@@ -162,6 +162,8 @@ struct hud_state_message_definition
 	byte reserved[0x40];
 };
 
+struct icon_hud_element_definition;
+
 struct hud_state_message_text_info_definition
 {
 	short string_index;
@@ -169,11 +171,17 @@ struct hud_state_message_text_info_definition
 	byte reserved3;
 };
 
+union hud_state_message_info_definition
+{
+	struct icon_hud_element_definition const *icon;
+	struct hud_state_message_text_info_definition text;
+};
+
 struct hud_state_message_runtime_definition
 {
 	wchar_t message_buffer[MAXIMUM_HUD_STATE_MESSAGE_TEXT_LENGTH];
 	byte reserved200[4];
-	struct hud_state_message_text_info_definition info[8];
+	union hud_state_message_info_definition info[8];
 	struct hud_state_message_definition *state_message;
 	boolean valid;
 	byte is_text_flags;
@@ -249,6 +257,8 @@ typedef char hud_message_size_assert[
 	sizeof(struct hud_message_definition) == 0x8C ? 1 : -1];
 typedef char hud_state_message_text_info_size_assert[
 	sizeof(struct hud_state_message_text_info_definition) == 4 ? 1 : -1];
+typedef char hud_state_message_info_size_assert[
+	sizeof(union hud_state_message_info_definition) == 4 ? 1 : -1];
 typedef char hud_state_message_runtime_size_assert[
 	sizeof(struct hud_state_message_runtime_definition) == 0x22C ? 1 : -1];
 typedef char hud_state_message_runtime_info_offset_assert[
@@ -481,6 +491,26 @@ void scripted_hud_time_code_reset(
 }
 
 void
+hud_set_state_message_icon(
+	short local_player_index,
+	short custom_icon_index,
+	struct icon_hud_element_definition const *icon)
+{
+	struct hud_messaging_datum_definition *datum =
+		&bss_00453ab8->message_data[local_player_index];
+
+	if (datum->state_message.valid &&
+		!hud_scripted_globals->show_hud_help_text &&
+		datum->state_message.state_message)
+	{
+		datum->state_message.info[custom_icon_index].icon = icon;
+		datum->state_message.is_text_flags &= ~(1 << custom_icon_index);
+	}
+
+	return;
+}
+
+void
 hud_set_state_message_text(
 	short local_player_index,
 	short custom_icon_index,
@@ -494,8 +524,8 @@ hud_set_state_message_text(
 		!hud_scripted_globals->show_hud_help_text &&
 		datum->state_message.state_message)
 	{
-		datum->state_message.info[custom_icon_index].string_index = icon_string_index;
-		datum->state_message.info[custom_icon_index].uses_scenario_names = uses_scenario_names;
+		datum->state_message.info[custom_icon_index].text.string_index = icon_string_index;
+		datum->state_message.info[custom_icon_index].text.uses_scenario_names = uses_scenario_names;
 		datum->state_message.is_text_flags |= 1 << custom_icon_index;
 	}
 
