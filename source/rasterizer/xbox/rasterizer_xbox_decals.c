@@ -232,4 +232,17 @@ void _rasterizer_decal_vertices_delete(
 	return;
 }
 
+void _rasterizer_decals_flush(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_decals.c",
+		0x8E,
+		local_vertex_cache);
+	decals_unlock(FALSE);
+	lruv_flush(local_vertex_cache);
+
+	return;
+}
+
 /* ---------- private code */
