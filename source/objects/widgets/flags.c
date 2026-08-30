@@ -85,9 +85,28 @@ struct flag_datum_prefix
 	short updates_since_last_render;
 	long object_index;
 	long definition_index;
+	real_point3d first_attachment;
+	struct flag_vertex_datum
+	{
+		real_point3d position;
+		real_vector3d velocity;
+	} vertices[225];
+	struct flag_cell_datum
+	{
+		short tesselation;
+	} cells[196];
 };
 
-struct flag_definition;
+struct flag_definition
+{
+	unsigned long flags;
+	short trailing_edge_shape;
+	short trailing_edge_offset;
+	short attached_edge_shape;
+	short padA;
+	short width;
+	short height;
+};
 
 /* ---------- prototypes */
 
@@ -100,6 +119,16 @@ void flag_render_proper(
 	struct flag_definition *definition,
 	struct render_lighting const *lighting,
 	struct render_animation const *animation);
+struct flag_vertex_datum *flag_datum_get_vertex(
+	struct flag_datum_prefix *flag,
+	struct flag_definition *definition,
+	short x,
+	short y);
+struct flag_cell_datum *flag_datum_get_cell(
+	struct flag_datum_prefix *flag,
+	struct flag_definition *definition,
+	short x,
+	short y);
 
 /* ---------- globals */
 
@@ -202,3 +231,47 @@ void flag_render(
 }
 
 /* ---------- private code */
+
+struct flag_vertex_datum *flag_datum_get_vertex(
+	struct flag_datum_prefix *flag,
+	struct flag_definition *definition,
+	short x,
+	short y)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\widgets\\flags.c",
+		96,
+		flag && definition);
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\widgets\\flags.c",
+		97,
+		x>=0 && x<definition->width);
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\widgets\\flags.c",
+		98,
+		y>=0 && y<definition->height);
+
+	return &flag->vertices[x * definition->height + y];
+}
+
+struct flag_cell_datum *flag_datum_get_cell(
+	struct flag_datum_prefix *flag,
+	struct flag_definition *definition,
+	short x,
+	short y)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\widgets\\flags.c",
+		109,
+		flag && definition);
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\widgets\\flags.c",
+		110,
+		x>=0 && x<definition->width-1);
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\widgets\\flags.c",
+		111,
+		y>=0 && y<definition->height-1);
+
+	return &flag->cells[x * (definition->height - 1) + y];
+}
