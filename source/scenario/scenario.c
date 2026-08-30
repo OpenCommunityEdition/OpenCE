@@ -1331,7 +1331,7 @@ static void code_0017f370(
 
 void scenario_get_atmospheric_fog(
 	short local_player_index,
-	long sky_index,
+	short sky_index,
 	real_point3d *camera_point,
 	struct render_fog *render_fog)
 {

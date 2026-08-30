@@ -70,18 +70,159 @@ symbols in this file:
 #include "ui_widget.h"
 #include "bink_playback.h"
 #include "game.h"
+#include "game_engine.h"
+#include "editor_stubs.h"
+#include "render_debug.h"
 
 /* ---------- constants */
 
+enum
+{
+	_render_target_primary = 0,
+	_render_target_secondary,
+};
+
+enum
+{
+	_decal_layer_primary = 0,
+	_decal_layer_secondary,
+	_decal_layer_light,
+	_decal_layer_alpha_tested,
+	_decal_layer_water,
+};
+
+enum
+{
+	_render_planar_fog_mode_fully_fogged = 2,
+};
+
 /* ---------- macros */
+
+#define RASTERIZER_TARGET_RENDER_PRIMARY_WIDTH 640
+#define RASTERIZER_TARGET_RENDER_PRIMARY_HEIGHT 480
 
 /* ---------- structures */
 
+struct render_mirror
+{
+	real_plane3d plane;
+	real index_of_refraction;
+	real depth;
+	short cluster_index;
+	word pad;
+};
+
 /* ---------- prototypes */
+
+static void code_00174410(
+	const struct render_window *window,
+	long window_type);
+static void code_001746f0(
+	short local_player_index,
+	const struct render_camera *camera,
+	const struct render_frustum *frustum,
+	const struct render_camera *rasterizer_camera,
+	const struct render_frustum *rasterizer_frustum,
+	short rasterizer_target,
+	boolean has_mirror);
+static void code_00174ae0(
+	struct render_window *window,
+	const point2d *screenshot_combined_index);
+
+void structure_visibility_find_camera(
+	const struct render_camera *camera);
+boolean structure_visibility_find_mirror(
+	const struct render_camera *camera,
+	const struct render_frustum *frustum,
+	struct render_mirror *mirror);
+void structure_visibility_compute(
+	void);
+void structure_get_planar_fog(
+	short cluster_index,
+	struct render_fog *fog);
+void render_camera_build_frustum_bounds(
+	const struct render_camera *camera,
+	real_rectangle2d *frustum_bounds);
+void render_camera_mirror(
+	const struct render_camera *camera,
+	const struct render_mirror *mirror,
+	struct render_camera *result);
+void player_effect_get_screen_flash(
+	short local_player_index,
+	struct render_screen_flash *screen_flash);
+void build_sprite_prepare_for_window(
+	void);
+void render_sky(
+	void);
+void first_person_weapon_render_update(
+	void);
+void lights_preprocess_scene(
+	void);
+void render_objects(
+	void);
+void structure_render_preprocess(
+	void);
+void structure_render_lightmaps(
+	void);
+void rasterizer_lens_flares_submit_occlusion_tests(
+	void);
+void render_object_shadows(
+	void);
+void lights_render_diffuse(
+	void);
+void structure_render_diffuse_texture(
+	void);
+void lights_render_specular(
+	void);
+void structure_render_specular_lightmaps(
+	void);
+void structure_render_reflection_lightmap_masks(
+	void);
+void structure_render_reflection_mirrors(
+	void);
+void structure_render_reflections(
+	void);
+void structure_render_transparent_geometry(
+	void);
+void structure_render_fog(
+	void);
+void weather_particle_systems_render(
+	void);
+void render_particles(
+	void);
+void particle_systems_render(
+	void);
+void rasterizer_transparent_geometry_draw(
+	boolean water);
+void structure_render_detail_objects(
+	void);
+void rasterizer_transparent_geometry_stop(
+	void);
+void structure_render_fog_screen(
+	void);
+void rasterizer_lens_flares_draw(
+	void);
+void interface_draw_screen(
+	void);
+void interface_draw_fullscreen_overlays(
+	void);
+void rasterizer_debug_draw(
+	void);
+void render_debug(
+	void);
+void progress_bar_eachframe(
+	void);
+short main_get_window_count(
+	void);
 
 /* ---------- globals */
 
 struct render_globals render;
+
+static boolean bss_004b8b22;
+
+extern short global_screenshot_count;
+extern short global_screenshot_size;
 
 boolean render_contrails_enabled = TRUE;
 boolean render_particles_enabled = TRUE;
@@ -124,12 +265,45 @@ void render_dispose(
 }
 
 static void code_00174410(
-	void)
+	const struct render_window *window,
+	long window_type)
 {
+	struct rasterizer_window_begin_parameters parameters;
+
+	profile_render_window_start(NULL);
+	memset(&parameters, 0, sizeof(parameters));
+
+	render.camera = window->render_camera;
+	render_camera_build_frustum(&render.camera, NULL, &render.frustum, TRUE);
+
+	parameters.camera = window->rasterizer_camera;
+	render_camera_build_frustum(&parameters.camera, NULL, &parameters.frustum, TRUE);
+
+	parameters.rasterizer_target = _render_target_primary;
+	parameters.suppress_clear = window_type == 0;
+	parameters.window_index = NONE;
+	rasterizer_window_begin(&parameters);
+
+	switch (window_type)
+	{
+	case 0:
+		interface_draw_fullscreen_overlays();
+		rasterizer_debug_draw();
+		break;
+
+	case 1:
+		game_engine_nonplayer_post_rasterize();
+		break;
+
+	default:
+		match_assert("c:\\halo\\SOURCE\\render\\render.c", 287, !"unreachable");
+		break;
+	}
+
 	rasterizer_window_end();
 	profile_render_window_end();
-	rasterizer_windows_end();
-	rasterizer_frame_end();
+
+	return;
 }
 
 void render_frame_pregame(
@@ -191,6 +365,342 @@ struct rendered_cluster *rendered_cluster_get(
 {
 	match_assert("c:\\halo\\SOURCE\\render\\render.c", 592, rendered_cluster_index>=0 && rendered_cluster_index<render.rendered_cluster_count);
 	return &render.rendered_clusters[rendered_cluster_index];
+}
+
+static void code_001746f0(
+	short local_player_index,
+	const struct render_camera *camera,
+	const struct render_frustum *frustum,
+	const struct render_camera *rasterizer_camera,
+	const struct render_frustum *rasterizer_frustum,
+	short rasterizer_target,
+	boolean has_mirror)
+{
+	struct rasterizer_window_begin_parameters parameters;
+	short rendered_cluster_index;
+
+	profile_render_window_start((void *)TRUE);
+	render.scene_index++;
+	memset(&parameters, 0, sizeof(parameters));
+
+	render.local_player_index = local_player_index;
+	render.camera = *camera;
+	render.frustum = *frustum;
+	parameters.camera = *rasterizer_camera;
+	parameters.frustum = *rasterizer_frustum;
+	parameters.rasterizer_target = rasterizer_target;
+	parameters.has_mirror = has_mirror;
+	parameters.window_index = render.window_index;
+	parameters.fog = render.fog;
+
+	structure_visibility_compute();
+	player_effect_get_screen_flash(local_player_index, &parameters.screen_flash);
+	rasterizer_window_begin(&parameters);
+
+	if (!bink_playback_in_progress())
+	{
+		build_sprite_prepare_for_window();
+		render_sky();
+		first_person_weapon_render_update();
+		lights_preprocess_scene();
+		render_objects();
+		structure_render_preprocess();
+		structure_render_lightmaps();
+		rasterizer_lens_flares_submit_occlusion_tests();
+		render_object_shadows();
+		lights_render_diffuse();
+
+		rasterizer_decals_begin(_decal_layer_light);
+		for (rendered_cluster_index = 0;
+			rendered_cluster_index < render.rendered_cluster_count;
+			rendered_cluster_index++)
+		{
+			rasterizer_decals_draw(rendered_cluster_get(rendered_cluster_index)->cluster_index);
+		}
+		rasterizer_decals_end();
+
+		rasterizer_decals_begin(_decal_layer_alpha_tested);
+		for (rendered_cluster_index = 0;
+			rendered_cluster_index < render.rendered_cluster_count;
+			rendered_cluster_index++)
+		{
+			rasterizer_decals_draw(rendered_cluster_get(rendered_cluster_index)->cluster_index);
+		}
+		rasterizer_decals_end();
+
+		structure_render_diffuse_texture();
+
+		rasterizer_decals_begin(_decal_layer_primary);
+		for (rendered_cluster_index = 0;
+			rendered_cluster_index < render.rendered_cluster_count;
+			rendered_cluster_index++)
+		{
+			rasterizer_decals_draw(rendered_cluster_get(rendered_cluster_index)->cluster_index);
+		}
+		rasterizer_decals_end();
+
+		rasterizer_decals_begin(_decal_layer_secondary);
+		for (rendered_cluster_index = 0;
+			rendered_cluster_index < render.rendered_cluster_count;
+			rendered_cluster_index++)
+		{
+			rasterizer_decals_draw(rendered_cluster_get(rendered_cluster_index)->cluster_index);
+		}
+		rasterizer_decals_end();
+
+		lights_render_specular();
+		structure_render_specular_lightmaps();
+		structure_render_reflection_lightmap_masks();
+		structure_render_reflection_mirrors();
+		structure_render_reflections();
+		structure_render_transparent_geometry();
+		structure_render_fog();
+		game_engine_post_rasterize_objects();
+		weather_particle_systems_render();
+		render_particles();
+		particle_systems_render();
+		render_contrails_normal();
+		rasterizer_transparent_geometry_draw(TRUE);
+
+		rasterizer_decals_begin(_decal_layer_water);
+		for (rendered_cluster_index = 0;
+			rendered_cluster_index < render.rendered_cluster_count;
+			rendered_cluster_index++)
+		{
+			rasterizer_decals_draw(rendered_cluster_get(rendered_cluster_index)->cluster_index);
+		}
+		rasterizer_decals_end();
+
+		structure_render_detail_objects();
+		rasterizer_transparent_geometry_draw(FALSE);
+		rasterizer_transparent_geometry_stop();
+		structure_render_fog_screen();
+		rasterizer_lens_flares_draw();
+		interface_draw_screen();
+		rasterizer_screen_flash();
+		render_ui_widgets(local_player_index, &rasterizer_camera->viewport_bounds);
+	}
+
+	bink_playback_render();
+	render_camera_debug_frustum(&render.camera, &render.frustum);
+	render_debug();
+	editor_render();
+	rasterizer_debug_draw();
+	rasterizer_window_end();
+	profile_render_window_end();
+
+	return;
+}
+
+static void code_00174ae0(
+	struct render_window *window,
+	const point2d *screenshot_combined_index)
+{
+	struct render_camera *camera;
+	boolean has_mirror;
+	real_rectangle2d frustum_bounds;
+	struct render_frustum frustum;
+	struct render_frustum rasterizer_frustum;
+	struct render_mirror mirror;
+
+	camera = &window->render_camera;
+	has_mirror = FALSE;
+
+	structure_visibility_find_camera(camera);
+	render.fog.runtime_flags = 0;
+	scenario_get_atmospheric_fog(
+		window->local_player_index,
+		(word)render.visible_sky_index,
+		&camera->position,
+		&render.fog);
+	structure_get_planar_fog((short)render.cluster_index, &render.fog);
+
+	if (render.fog.atmospheric_maximum_distance != 0.0f &&
+		render.visible_sky_index == NONE &&
+		render.fog.planar_maximum_distance > render.fog.atmospheric_maximum_distance)
+	{
+		render.fog.planar_maximum_distance = render.fog.atmospheric_maximum_distance;
+	}
+
+	if (render.fog.atmospheric_maximum_density == 1.0f &&
+		render.fog.atmospheric_maximum_distance != 0.0f)
+	{
+		window->render_camera.z_far = MIN(
+			window->render_camera.z_far,
+			render.fog.atmospheric_maximum_distance);
+	}
+
+	if (render.fog.planar_mode == _render_planar_fog_mode_fully_fogged &&
+		render.fog.planar_maximum_distance != 0.0f)
+	{
+		window->render_camera.z_far = MIN(
+			window->render_camera.z_far,
+			render.fog.planar_maximum_distance);
+	}
+
+	if (window->render_camera.z_far <= window->render_camera.z_near)
+	{
+		if (!bss_004b8b22)
+		{
+			error(2, "### ERROR something is wrong with the fog in the sky tag or the fog tag");
+			bss_004b8b22 = TRUE;
+		}
+
+		window->render_camera.z_far = window->render_camera.z_near + 0.01f;
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render.c",
+		187,
+		!memcmp(&window->render_camera.viewport_bounds,
+			&window->rasterizer_camera.viewport_bounds,
+			sizeof(rectangle2d)));
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render.c",
+		188,
+		!memcmp(&window->render_camera.window_bounds,
+			&window->rasterizer_camera.window_bounds,
+			sizeof(rectangle2d)));
+
+	render_camera_build_frustum_bounds(camera, &frustum_bounds);
+
+	if (screenshot_combined_index != NULL)
+	{
+		long tile_count;
+
+		tile_count = global_screenshot_count * global_screenshot_size;
+		if (tile_count > 0)
+		{
+			real tile_width;
+			real tile_height;
+			real_rectangle2d adjusted_bounds;
+
+			tile_width = (frustum_bounds.x1 - frustum_bounds.x0) / (real)tile_count;
+			tile_height = (frustum_bounds.y1 - frustum_bounds.y0) / (real)tile_count;
+			adjusted_bounds.x0 =
+				(real)screenshot_combined_index->x * tile_width + frustum_bounds.x0;
+			adjusted_bounds.y0 =
+				(real)(tile_count - screenshot_combined_index->y - 1) * tile_height + frustum_bounds.y0;
+			adjusted_bounds.x1 = adjusted_bounds.x0 + tile_width;
+			adjusted_bounds.y1 = adjusted_bounds.y0 + tile_height;
+			frustum_bounds = adjusted_bounds;
+		}
+	}
+
+	render_camera_build_frustum(camera, &frustum_bounds, &frustum, TRUE);
+	render_camera_build_frustum(
+		&window->rasterizer_camera,
+		&frustum_bounds,
+		&rasterizer_frustum,
+		TRUE);
+
+	if (main_get_window_count() == 1)
+	{
+		if (structure_visibility_find_mirror(camera, &frustum, &mirror))
+		{
+			short saved_cluster_index;
+			struct render_camera mirror_camera;
+			struct render_frustum mirror_frustum;
+
+			saved_cluster_index = (short)render.cluster_index;
+			match_assert("c:\\halo\\SOURCE\\render\\render.c", 225, window->render_camera.viewport_bounds.x0==0);
+			match_assert("c:\\halo\\SOURCE\\render\\render.c", 226, window->render_camera.viewport_bounds.y0==0);
+			match_assert("c:\\halo\\SOURCE\\render\\render.c", 227, window->render_camera.viewport_bounds.x1==RASTERIZER_TARGET_RENDER_PRIMARY_WIDTH);
+			match_assert("c:\\halo\\SOURCE\\render\\render.c", 228, window->render_camera.viewport_bounds.y1==RASTERIZER_TARGET_RENDER_PRIMARY_HEIGHT);
+
+			render_camera_mirror(camera, &mirror, &mirror_camera);
+			render_camera_build_frustum(
+				&mirror_camera,
+				&frustum_bounds,
+				&mirror_frustum,
+				TRUE);
+
+			rasterizer_profile_enable(FALSE);
+			render.cluster_index = mirror.cluster_index;
+			code_001746f0(
+				NONE,
+				&mirror_camera,
+				&mirror_frustum,
+				&mirror_camera,
+				&mirror_frustum,
+				_render_target_secondary,
+				FALSE);
+			render.cluster_index = saved_cluster_index;
+			rasterizer_profile_enable(TRUE);
+			has_mirror = TRUE;
+		}
+	}
+
+	code_001746f0(
+		window->local_player_index,
+		camera,
+		&frustum,
+		&window->rasterizer_camera,
+		&rasterizer_frustum,
+		_render_target_primary,
+		has_mirror);
+
+	return;
+}
+
+void render_frame(
+	struct render_window *windoze,
+	short window_count,
+	const point2d *screenshot_page_index,
+	const point2d *screenshot_index,
+	struct bitmap_data *screenshot_bitmap,
+	real time_delta_since_tick_sec)
+{
+	struct rasterizer_frame_begin_parameters parameters;
+	short window_index;
+	struct render_window *window;
+	point2d screenshot_combined_index;
+
+	render.frame_index++;
+	render.time_delta_since_tick_sec = time_delta_since_tick_sec;
+	memset(&parameters, 0, sizeof(parameters));
+	parameters.game_time_sec = (real)game_time_get() * (1.0f / TICKS_PER_SECOND);
+	rasterizer_frame_begin(&parameters);
+	rasterizer_windows_begin();
+
+	for (window_index = 0; window_index < window_count; window_index++)
+	{
+		long window_type;
+
+		window = &windoze[window_index];
+		render.window_index = window_index;
+		if (window->console_window)
+		{
+			window_type = 0;
+		}
+		else if (window->local_player_index != NONE)
+		{
+			if (screenshot_index != NULL && screenshot_page_index != NULL)
+			{
+				screenshot_combined_index.x =
+					screenshot_page_index->x * global_screenshot_size + screenshot_index->x;
+				screenshot_combined_index.y =
+					screenshot_page_index->y * global_screenshot_size + screenshot_index->y;
+			}
+
+			code_00174ae0(
+				window,
+				screenshot_index != NULL ? &screenshot_combined_index : NULL);
+			continue;
+		}
+		else
+		{
+			window_type = 1;
+		}
+
+		code_00174410(window, window_type);
+	}
+
+	progress_bar_eachframe();
+	rasterizer_windows_end();
+	rasterizer_frame_end();
+
+	return;
 }
 
 /* ---------- private code */

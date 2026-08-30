@@ -461,7 +461,7 @@
 				{ "name": "source/render/render_debug.c", "index": 87, "status": "NonMatching" },
 				{ "name": "source/render/render_contrails.c", "index": 88, "status": "Matching" },
 				{ "name": "source/render/render_cameras.c", "index": 89, "status": "NonMatching" },
-				{ "name": "source/render/render.c", "index": 90, "status": "NonMatching" },
+				{ "name": "source/render/render.c", "index": 90, "status": "Matching" },
 				{ "name": "source/rasterizer/rasterizer_transparent_geometry.c", "index": 91, "status": "NonMatching" },
 				{ "name": "source/rasterizer/rasterizer_text.c", "index": 92, "status": "NonMatching" },
 				{ "name": "source/rasterizer/rasterizer_swizzle.c", "index": 93, "status": "NonMatching" },
