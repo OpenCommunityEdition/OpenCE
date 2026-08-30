@@ -35,6 +35,16 @@ struct ai_script_platoon_iterator
 	long last_platoon_index;
 };
 
+struct ai_script_actor_reference_iterator
+{
+	long encounter_index;
+	long squad_index;
+	long platoon_index;
+	long actor_encounter_index;
+	long actor_index;
+	long next_actor_index;
+};
+
 /* ---------- prototypes/AI_SCRIPT.C */
 
 void ai_script_initialize(
@@ -61,6 +71,19 @@ void ai_scripting_attach_unit(
 void ai_scripting_magically_see_unit(
 	long ai_reference,
 	long unit_index);
+void ai_index_actor_iterator_new(
+	long ai_reference,
+	struct ai_script_actor_reference_iterator *iterator);
+struct actor_datum *ai_index_actor_iterator_next(
+	struct ai_script_actor_reference_iterator *iterator);
+void ai_scripting_go_to_vehicle(
+	long ai_reference,
+	long unit_index,
+	char const *seat_substring_name);
+void ai_scripting_go_to_vehicle_override(
+	long ai_reference,
+	long unit_index,
+	char const *seat_substring_name);
 
 /* ---------- globals */
 

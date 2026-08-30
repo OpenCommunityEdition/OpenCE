@@ -445,6 +445,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "ai/actions.h"
 #include "ai/actor_iterators.h"
 #include "ai/actor_looking.h"
 #include "ai/ai_communication.h"
@@ -459,6 +460,7 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "units/units.h"
+#include "units/vehicle_scripting.h"
 
 /* ---------- constants */
 
@@ -490,11 +492,12 @@ struct actor_iterator
 	long next_index;
 };
 
-struct ai_script_actor_reference_iterator
+struct ai_script_vehicle_candidate
 {
-	byte storage[16];
 	long actor_index;
-	byte tail[4];
+	real distance_squared;
+	boolean already_going_to_vehicle;
+	byte pad[3];
 };
 
 struct ai_script_conversation_definition
@@ -505,6 +508,10 @@ struct ai_script_conversation_definition
 
 typedef char ai_script_actor_iterator_size_assert[
 	sizeof(struct actor_iterator) == 0x1C ? 1 : -1];
+typedef char ai_script_actor_reference_iterator_size_assert[
+	sizeof(struct ai_script_actor_reference_iterator) == 0x18 ? 1 : -1];
+typedef char ai_script_actor_reference_iterator_actor_index_offset_assert[
+	offsetof(struct ai_script_actor_reference_iterator, actor_index) == 0x10 ? 1 : -1];
 typedef char ai_script_vehicle_enterable_size_assert[
 	sizeof(struct ai_script_vehicle_enterable) == 0xC ? 1 : -1];
 typedef char ai_script_vehicle_enterable_radius_offset_assert[
@@ -515,6 +522,12 @@ typedef char ai_script_vehicle_enterable_actor_type_offset_assert[
 	offsetof(struct ai_script_vehicle_enterable, actor_type_bitmask) == 0xA ? 1 : -1];
 typedef char ai_script_platoon_iterator_size_assert[
 	sizeof(struct ai_script_platoon_iterator) == 0xC ? 1 : -1];
+typedef char ai_script_vehicle_candidate_size_assert[
+	sizeof(struct ai_script_vehicle_candidate) == 0xC ? 1 : -1];
+typedef char ai_script_vehicle_candidate_distance_offset_assert[
+	offsetof(struct ai_script_vehicle_candidate, distance_squared) == 0x4 ? 1 : -1];
+typedef char ai_script_vehicle_candidate_state_offset_assert[
+	offsetof(struct ai_script_vehicle_candidate, already_going_to_vehicle) == 0x8 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -525,11 +538,6 @@ void ai_debug_select_actor(
 	long actor_index);
 void ai_scripting_maneuver(
 	long ai_index);
-void ai_index_actor_iterator_new(
-	long ai_reference,
-	struct ai_script_actor_reference_iterator *iterator);
-struct actor_datum *ai_index_actor_iterator_next(
-	struct ai_script_actor_reference_iterator *iterator);
 boolean ai_conversation(
 	short conversation_index,
 	boolean scripted);
@@ -548,6 +556,14 @@ static long code_000439c0(
 	short count_type,
 	long *original_count_reference,
 	real *strength_reference);
+static int code_00044ea0(
+	void const *candidate0,
+	void const *candidate1);
+static void code_00047160(
+	long ai_reference,
+	long unit_index,
+	char const *seat_substring_name,
+	boolean override_previous_vehicles);
 
 /* ---------- globals */
 
@@ -1097,7 +1113,158 @@ void ai_scripting_stop_looking(
 	return;
 }
 
+void ai_scripting_go_to_vehicle(
+	long ai_reference,
+	long unit_index,
+	char const *seat_substring_name)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+		ai_index_to_string(
+			ai_reference,
+			global_scenario_get(),
+			ai_name,
+			sizeof(ai_name));
+		error(
+			_error_silent,
+			"%s: ai_go_to_vehicle %s 0x%04X %s",
+			hs_runtime_get_executing_thread_name(),
+			ai_name,
+			unit_index & UNSIGNED_SHORT_MAX,
+			seat_substring_name);
+	}
+
+	code_00047160(ai_reference, unit_index, seat_substring_name, FALSE);
+
+	return;
+}
+
+void ai_scripting_go_to_vehicle_override(
+	long ai_reference,
+	long unit_index,
+	char const *seat_substring_name)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+		ai_index_to_string(
+			ai_reference,
+			global_scenario_get(),
+			ai_name,
+			sizeof(ai_name));
+		error(
+			_error_silent,
+			"%s: ai_go_to_vehicle_override %s 0x%04X %s",
+			hs_runtime_get_executing_thread_name(),
+			ai_name,
+			unit_index & UNSIGNED_SHORT_MAX,
+			seat_substring_name);
+	}
+
+	code_00047160(ai_reference, unit_index, seat_substring_name, TRUE);
+
+	return;
+}
+
 /* ---------- private code */
+
+static int code_00044ea0(
+	void const *candidate0,
+	void const *candidate1)
+{
+	struct ai_script_vehicle_candidate const *vehicle0 = candidate0;
+	struct ai_script_vehicle_candidate const *vehicle1 = candidate1;
+
+	if (vehicle0->already_going_to_vehicle != vehicle1->already_going_to_vehicle)
+		return vehicle0->already_going_to_vehicle ? 1 : -1;
+
+	if (vehicle0->distance_squared < vehicle1->distance_squared)
+		return -1;
+
+	if (vehicle0->distance_squared > vehicle1->distance_squared)
+		return 1;
+
+	return 0;
+}
+
+static void code_00047160(
+	long ai_reference,
+	long unit_index,
+	char const *seat_substring_name,
+	boolean override_previous_vehicles)
+{
+	struct unit_datum *vehicle;
+	real_point3d vehicle_origin;
+	short seat_indices[16];
+	struct ai_script_vehicle_candidate candidates[64];
+	struct ai_script_actor_reference_iterator iterator;
+	struct actor_datum *actor;
+	short candidate_count;
+	short available_seat_count;
+	short candidate_index;
+
+	vehicle = unit_try_and_get(unit_index);
+	if (ai_reference == NONE || vehicle == NULL)
+		return;
+
+	candidate_count = 0;
+	object_get_origin(unit_index, &vehicle_origin);
+	available_seat_count = vehicle_scripting_find_available_seats(
+		unit_index,
+		seat_substring_name,
+		NONE,
+		seat_indices,
+		NUMBEROF(seat_indices));
+	if (available_seat_count <= 0)
+		return;
+
+	ai_index_actor_iterator_new(ai_reference, &iterator);
+	actor = ai_index_actor_iterator_next(&iterator);
+	while (actor)
+	{
+		if ((word)candidate_count < NUMBEROF(candidates))
+		{
+			real dx;
+			real dy;
+			real dz;
+
+			candidates[candidate_count].actor_index = iterator.actor_index;
+			dx = vehicle_origin.x - actor->input.position.body_position.x;
+			dy = vehicle_origin.y - actor->input.position.body_position.y;
+			dz = vehicle_origin.z - actor->input.position.body_position.z;
+
+			candidates[candidate_count].distance_squared =
+				dy * dy + (dx * dx + dz * dz);
+			candidates[candidate_count].already_going_to_vehicle =
+				actor->state.action == _actor_action_vehicle;
+			candidate_count++;
+		}
+
+		actor = ai_index_actor_iterator_next(&iterator);
+	}
+
+	qsort(candidates, candidate_count, sizeof(candidates[0]), code_00044ea0);
+
+	for (candidate_index = 0; candidate_index < candidate_count; candidate_index++)
+	{
+		if (candidates[candidate_index].already_going_to_vehicle &&
+			!override_previous_vehicles)
+		{
+			break;
+		}
+
+		actor_action_try_to_enter_vehicle(
+			candidates[candidate_index].actor_index,
+			unit_index,
+			NULL,
+			NONE,
+			available_seat_count,
+			seat_indices);
+	}
+
+	return;
+}
 
 static void code_000432b0(
 	long ai_reference,

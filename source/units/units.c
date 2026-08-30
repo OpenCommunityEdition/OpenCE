@@ -11751,3 +11751,7 @@ static boolean unit_integrated_night_vision_is_active(
 
 	return active;
 }
+
+/* Verify the public seat-helper declaration without perturbing this legacy
+ * translation unit's authenticated function-declaration order. */
+#include "vehicle_scripting.h"
