@@ -126,3 +126,32 @@ Units, Vehicles, Matrix Math, AI Debug, campaign configuration, semantic
 exceptions, parked records, completion labels, and build rules are untouched.
 Full cumulative build, semantic, progress, admission, park, protected-Units,
 and test evidence is recorded after the implementation-and-ledger commit.
+
+## Committed cumulative validation
+
+The implementation-and-ledger commit is
+`c4dd400802d8e95019f094143c9cdca0dce54f70`. From that committed source,
+the complete Halo and libcmt graphs, report, semantic report, and progress
+generation pass. The canonical outputs are:
+
+- `build/report.json`: 1,599,060 bytes, SHA-256
+  `8f6b39f8d4a96a706570f4055b93e4554dc70214eede9bdc69fe5911f3fb1117`;
+- `build/semantic_report.json`: 3,267,705 bytes, SHA-256
+  `e9a9aa1f1044a58634547bba4dbba90029fdadfbe0cfc061bd9450b2bdaf3691`.
+
+The semantic audit scans 470 units and evaluates 4,919 functions: 4,802
+semantic exact, 131 hidden exact / 78,940 hidden code bytes, one ordinary-
+only, one structural, zero rejected, 12 local skips, 2,810 missing, 4,812
+accepted exact, and zero unit errors.
+
+Campaign progress is 384/833 linked objects, 4,773/11,060 functions, 606,332
+of 2,198,102 code bytes, and 1,856,050 of 4,176,062 data bytes. Admission is
+zero candidates, zero contradictions, and zero revocations. Parks remain 12
+active, zero stale, and zero invalid. All 212 tooling tests pass.
+
+The protected Units sentinel `_unit_preprocess_node_orientations` remains
+strict exact at 1,920 padded bytes, 87 ordered relocations, and normalized
+SHA-256
+`5d5c8edc492fb8ab6ea83e1ccaa4cb2798da51ae4a17182fa848878bed05a7ed`.
+The tracked worktree is clean apart from the pre-existing untracked
+`scratch/` research directory.
