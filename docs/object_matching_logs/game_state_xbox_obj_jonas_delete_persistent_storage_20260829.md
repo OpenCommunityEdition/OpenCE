@@ -74,3 +74,20 @@ parked ledger is 12 active / 0 stale / 0 invalid; and all 205 tooling tests
 pass. `_unit_preprocess_node_orientations` remains strict exact at 1,920
 padded bytes and 87 relocations, normalized SHA-256
 `5d5c8edc492fb8ab6ea83e1ccaa4cb2798da51ae4a17182fa848878bed05a7ed`.
+
+## Bounded adjacent rejection
+
+After the exact deletion leaf was integrated, the independently public-cdecl
+`game_state_read_core_header` HCEA topology was reconciled with January's
+1,024-byte PC path buffer and compiled once. Target and candidate both emit
+128 padded bytes and the same five ordered relocation identities. The first
+four relocation addresses are exact; candidate `CloseHandle` is at `+0x6C`
+instead of January's `+0x6D`. January's normalized SHA-256 is
+`f8442ec838d3920fe4f124ee3b18cc9d552dcaf02c06d69ab8134fc63ab5ad65`;
+the candidate is
+`dd5b12faec53da7b4a3481a62bf37b11f74774f5da6f040a591774665d34c4ce`.
+
+The body and support declarations were removed completely, the production
+object was rebuilt, and all five retained exact functions reverified. Reopen
+that function only with distinct original declaration/control-flow provenance;
+do not tune the result comparison, declaration order, or boolean spelling.
