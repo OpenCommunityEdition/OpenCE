@@ -366,6 +366,8 @@ typedef char encounter_ai_globals_encounterless_actor_offset_assert[
 	offsetof(struct encounter_ai_globals_prefix, first_encounterless_actor_index) == 0x8 ? 1 : -1];
 typedef char encounter_datum_active_offset_assert[
 	offsetof(struct encounter_datum, active) == 0xD ? 1 : -1];
+typedef char encounter_datum_status_dirty_offset_assert[
+	offsetof(struct encounter_datum, status_dirty) == 0x28 ? 1 : -1];
 typedef char encounter_datum_first_actor_index_offset_assert[
 	offsetof(struct encounter_datum, first_actor_index) == 0x14 ? 1 : -1];
 typedef char encounter_datum_blind_offset_assert[
@@ -376,6 +378,9 @@ typedef char actor_datum_next_actor_index_offset_assert[
 	offsetof(struct actor_datum, meta.next_actor_index) == 0x2C ? 1 : -1];
 
 /* ---------- prototypes */
+
+void encounter_update_status(
+	long encounter_index);
 
 /* ---------- globals */
 
@@ -535,6 +540,22 @@ void encounterless_activate(
 		actor->meta.encounterless);
 	actor->meta.encounterless_active_timer = 90;
 	actor_set_active(actor_index, TRUE);
+
+	return;
+}
+
+void encounters_update_dirty_status(
+	void)
+{
+	struct encounter_iterator iterator;
+	struct encounter_datum *encounter;
+
+	encounter_iterator_new(&iterator, FALSE);
+	while ((encounter = encounter_iterator_next(&iterator)) != NULL)
+	{
+		if (encounter->status_dirty)
+			encounter_update_status(iterator.index);
+	}
 
 	return;
 }
