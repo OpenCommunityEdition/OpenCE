@@ -62,3 +62,25 @@ parked ledger is 12 active / 0 stale / 0 invalid; and all 205 tooling tests
 pass. `_unit_preprocess_node_orientations` remains strict exact at 1,920
 padded bytes and 87 relocations, normalized SHA-256
 `5d5c8edc492fb8ab6ea83e1ccaa4cb2798da51ae4a17182fa848878bed05a7ed`.
+
+## Bounded follow-up rejection
+
+After the exact function was integrated, the independently reconstructed
+Pastudan/Stian `network_game_add_machine` topology was translated to the same
+typed layout and compiled once. Its five relocation identities match, but its
+result-local lifetime emits 160 padded bytes with normalized SHA-256
+`bd5b337266de2c4258ff01a2ca62eb1b38dc45ba92c7f93b3c08ea020690a163`;
+January is 144 bytes with normalized SHA-256
+`a8500707a9241a576e5623712fb1ae114e2b721ba8abb7bc494090160ef44ab6`.
+The candidate was removed completely. Reopen that function only with a
+distinct authentic source topology, not declaration or return-shape tuning.
+
+The target-version `network_game_remove_machine` donor was also translated
+once. Candidate and January both have 224 padded bytes and eight relocation
+identities, but every call-site relocation after the player-validity block is
+five bytes early. The candidate normalized SHA-256 is
+`271b106000698902266256858b6d2ccd6242f705d8c20cb0a338749919189e9a`;
+January is
+`f666ba18f1fe223e9a2e861c73d1cdf3d80a0ce992b635e792e2bcb79a1d6f5d`.
+That body was also removed without a retry. Reopen only with provenance for
+the missing five-byte source/control-flow cue.

@@ -68,6 +68,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "interface/hud_unit.h"
+#include "saved games/game_state.h"
 
 /* ---------- constants */
 
@@ -84,6 +85,7 @@ enum
 /* ---------- macros */
 
 #define UNIT_HUD_GLOBALS bss_00453ac0
+#define unit_hud_globals bss_00453ac0
 
 /* ---------- structures */
 
@@ -121,6 +123,22 @@ void code_000c65a0(
 void unit_hud_shield_meter_mapper_init(
 	void)
 {
+	return;
+}
+
+void hud_initialize_unit_interface(
+	void)
+{
+	unit_hud_globals = game_state_malloc(
+		"hud unit interface",
+		NULL,
+		sizeof(*unit_hud_globals));
+
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\hud_unit.c",
+		0x110,
+		unit_hud_globals);
+
 	return;
 }
 
