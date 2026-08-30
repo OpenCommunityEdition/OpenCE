@@ -101,6 +101,22 @@ void hud_initialize_weapon_interface(
 	return;
 }
 
+void hud_initialize_weapon_interface_for_new_map(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
+		0x73,
+		weapon_hud_globals);
+
+	csmemset(
+		weapon_hud_globals,
+		NONE,
+		sizeof(*weapon_hud_globals));
+
+	return;
+}
+
 void hud_dispose_weapon_interface_from_old_map(
 	void)
 {

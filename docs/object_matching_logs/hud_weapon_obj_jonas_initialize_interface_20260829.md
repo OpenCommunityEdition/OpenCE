@@ -80,3 +80,34 @@ parked ledger is 12 active / 0 stale / 0 invalid; and all 205 tooling tests
 pass. `_unit_preprocess_node_orientations` remains strict exact at 1,920
 padded bytes and 87 relocations, normalized SHA-256
 `5d5c8edc492fb8ab6ea83e1ccaa4cb2798da51ae4a17182fa848878bed05a7ed`.
+
+## New-map reset continuation
+
+After the allocator was integrated and pushed at commit `397c7cb2`, its
+adjacent new-map reset was treated as an independent one-shot function.
+January bytes prove a null assertion at source line `0x73`, followed by
+`csmemset(weapon_hud_globals, -1, 0x1E4)`. The same natural topology appears
+in the authenticated Stian/Pastudan donor family and is consistent with the
+typed HCEA state owner.
+
+The production C uses the already proven typed pointer, house assertion,
+`NONE`, and `sizeof(*weapon_hud_globals)`. Its first and only compile is strict
+exact:
+
+| Function | Padded bytes | Relocations | Normalized SHA-256 |
+| --- | ---: | ---: | --- |
+| `_hud_initialize_weapon_interface_for_new_map` | 64/64 | 7/7 | `719b9e897833a78791c35b1255ce9abb95efb7ad97084955578c51fd8d24c111` |
+
+The original allocator remains independently exact at 64 bytes and seven
+relocations. The retained-only object gate advances to five exact, zero
+residual, and eleven unwritten functions. No alternate spelling, declaration,
+loop, lifetime, compiler, or tool shape was tried.
+
+The continuation's full Ninja graph also passes. The semantic scan evaluates
+4,884 functions across 470 units, with 4,757 semantic exact, 129 hidden exact,
+4,767 accepted exact, and zero unit errors. Progress advances to 4,728/11,060
+exact functions and 599,247/2,198,102 meaningful code bytes while remaining
+at 382/833 linked objects and 1,856,018/4,176,062 data bytes. Admission remains
+0/0/0, the parked ledger remains 12 active / 0 stale / 0 invalid, all 205
+tooling tests pass, and the protected Units function remains strict exact at
+1,920 bytes / 87 relocations with hash `5d5c8edc492fb8ab6ea83e1ccaa4cb2798da51ae4a17182fa848878bed05a7ed`.
