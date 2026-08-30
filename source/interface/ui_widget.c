@@ -858,6 +858,23 @@ struct widget_instance *widget_instance_get_nth_child(
 	return result;
 }
 
+void widget_instance_set_visibility_recursive(
+	struct widget_instance *widget,
+	boolean visible)
+{
+	struct widget_instance *child;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+		1859,
+		widget);
+	widget->visible = visible;
+	for (child = widget->child; child; child = child->next)
+		widget_instance_set_visibility_recursive(child, visible);
+
+	return;
+}
+
 void *ui_widget_realloc(
 	void *pointer,
 	word size,
