@@ -64,10 +64,12 @@ newly named map aggregate required `&game->map` at one inherited `csmemset`.
 Correcting that type-only expression produced the one and only candidate
 packet. Its ignored immutable artifacts are:
 
-- source `scratch/_gate_9696.c`, 13,369 bytes, Git hash
+- source `build/audit/network_game_manager_creator_comparator_first_shot_20260830/candidate.c`,
+  13,369 bytes, Git hash
   `ae347dc8a86ec92be4a54f363cec6367485d4193`, SHA-256
   `6bb4439ffe915450e75d5c0b97016a61f92225560f1459e22d7e3dc129ac8631`;
-- object `scratch/_gate_9696.obj`, 9,985 bytes, SHA-256
+- object `build/audit/network_game_manager_creator_comparator_first_shot_20260830/candidate.obj`,
+  9,985 bytes, SHA-256
   `69fa689554f506776dcfaf00fdcade0f6dd2a52a2da0c86e186b39fea42b5645`.
 
 The full gate reported 13 exact inherited functions, two residual candidates,
