@@ -748,3 +748,40 @@ chain-consumer hits the field decodes as pointers and unrelated constants.
 The per-hit "which IR node is which instruction" correlation therefore
 remains unsolved, and it is still the prerequisite for any node-level
 differential.
+
+### C1 profiling: first attempt, and why it did not work yet
+
+`probes/c1_sampler.py` is a self-contained differential EIP profiler (64-bit
+Python driving a WOW64 `CL.Exe`: Toolhelp thread enumeration, `SuspendThread`,
+`Wow64GetThreadContext`, `ResumeThread`). It profiles `probes/m6only.c`
+against `probes/m6none.c` — identical headers and locals, cross product
+removed — so that header parsing, which dominates a small TU, cancels and
+expression-building code stands out.
+
+**It currently collects zero samples.** Diagnosed rather than guessed:
+
+```
+iters=1  threads_seen=4  opened=0  suspended=0  ctx_ok=0
+```
+
+Two independent faults:
+
+1. **`OpenThread` fails for every thread** (`THREAD_SUSPEND_RESUME |
+   THREAD_GET_CONTEXT`), so no context is ever read.
+2. **`iters=1`** — the sampling loop gets a single pass before the compile
+   exits. Python-side Toolhelp snapshotting (tens of ms) is far too coarse
+   for a sub-second compile, so even with fault 1 fixed the sample count
+   would be negligible.
+
+The fix for both is the approach the older `acc_sampler.py` took and this one
+did not: **launch CL suspended via `CreateProcess` so the thread handle is in
+hand** (no Toolhelp, no `OpenThread`), resume, and tight-loop on that one
+handle; then accumulate over many compiles for statistics.
+
+**Cheaper alternative worth trying first:** a differential *breakpoint*
+profile using dbg32, which already works on C1 (C1 breakpoints fire — see
+above). Plant C1 function prologues 7 at a time plus a control, run
+`m6only.c` vs `m6none.c`, and compare hit counts. It reuses a proven harness
+instead of a new sampler, at the cost of many runs to cover C1's 400 KB
+`.text`. Expect the signal to be small: one extra expression against a
+parse-dominated profile.
