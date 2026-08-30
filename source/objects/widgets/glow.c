@@ -86,6 +86,8 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
+#include "memory/data.h"
+#include "objects/objects.h"
 #include "saved games/game_state.h"
 
 /* ---------- constants */
@@ -93,6 +95,48 @@ symbols in this file:
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct glow_particle
+{
+	struct datum_header header;
+	short parent_marker_index;
+	long index;
+	real initial_angle;
+	real_argb_color color;
+	real distance_to_object;
+	real initial_size;
+	real present_size;
+	real t;
+	real_point3d position;
+	real_vector3d initial_velocity;
+	real_vector3d present_velocity;
+	short ticks_in_existence;
+	short lifetime;
+	unsigned long flags;
+	real fade;
+	struct glow_particle *next;
+	struct glow_particle *previous;
+};
+
+struct glow_datum
+{
+	struct datum_header header;
+	boolean initialized;
+	byte pad3;
+	short number_of_markers;
+	short pad6;
+	struct object_marker markers[5];
+	long definition_index;
+	short bitmap_dimension;
+	short marker_order[5];
+	real total_time;
+	real marker_time_index[5];
+	short number_of_particles;
+	short pad24E;
+	struct glow_particle *head_particle;
+	struct glow_particle *tail_particle;
+	short accumulated_trailing_particle_generation_ticks;
+};
 
 /* ---------- prototypes */
 
@@ -152,6 +196,24 @@ void glow_dispose_from_old_map(
 void glow_dispose(
 	void)
 {
+	return;
+}
+
+void glow_delete(
+	long glow_index)
+{
+	struct glow_datum *glow = datum_get(glow_globals.glow_data, glow_index);
+	struct glow_particle *particle = glow->head_particle;
+
+	while (particle)
+	{
+		struct glow_particle *next = particle->next;
+
+		datum_delete(glow_globals.glow_particle_data, particle->index);
+		particle = next;
+	}
+
+	datum_delete(glow_globals.glow_data, glow_index);
 	return;
 }
 
