@@ -647,7 +647,10 @@ struct ui_widget_runtime_globals_prefix
 	short main_menu_deferred_error_code;
 	short pause_game_time_count;
 	real fade_to_black;
-	byte reserved0030[0x2C];
+	byte reserved0030[0x18];
+	short deferred_dashboard_error_code;
+	boolean deferred_dashboard_optional;
+	byte reserved004B[0x11];
 	void *initialization_thread;
 	short filesystem_check_result;
 	boolean initialized;
@@ -677,6 +680,14 @@ typedef char verify_ui_widget_main_menu_deferred_error_code_offset[
 	offsetof(
 		struct ui_widget_runtime_globals_prefix,
 		main_menu_deferred_error_code) == 0x28 ? 1 : -1];
+typedef char verify_ui_widget_deferred_dashboard_error_code_offset[
+	offsetof(
+		struct ui_widget_runtime_globals_prefix,
+		deferred_dashboard_error_code) == 0x48 ? 1 : -1];
+typedef char verify_ui_widget_deferred_dashboard_optional_offset[
+	offsetof(
+		struct ui_widget_runtime_globals_prefix,
+		deferred_dashboard_optional) == 0x4A ? 1 : -1];
 typedef char verify_ui_widget_initialization_thread_offset[
 	offsetof(
 		struct ui_widget_runtime_globals_prefix,
@@ -890,6 +901,23 @@ void display_error_when_main_menu_loaded(
 	error(
 		_error_silent,
 		"there is already an error message queued for display at the main menu; ignoring this one");
+	return;
+}
+
+void display_error_abort_to_dashboard_deferred(
+	short error_code,
+	boolean optional)
+{
+	if (bss_00454240.widget_globals.deferred_dashboard_error_code == NONE)
+	{
+		bss_00454240.widget_globals.deferred_dashboard_error_code = error_code;
+		bss_00454240.widget_globals.deferred_dashboard_optional = optional;
+		return;
+	}
+
+	error(
+		_error_silent,
+		"there is already a deferred dashbaord error queued; ignoring this one!");
 	return;
 }
 
