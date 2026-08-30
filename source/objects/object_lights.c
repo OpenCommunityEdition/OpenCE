@@ -156,6 +156,9 @@ enum
 
 /* ---------- macros */
 
+#define light_get(index) \
+	((struct light_datum_prefix *)datum_get(light_data, (index)))
+
 /* ---------- structures */
 
 struct lights_game_globals
@@ -174,12 +177,42 @@ struct light_datum_prefix
 	long cluster_reference;
 };
 
+struct rasterizer_lens_flare_submit_parameters
+{
+	struct lens_flare_definition *definition;
+	real_point3d position;
+	unsigned long compressed_direction;
+	unsigned long compressed_up;
+	unsigned long compressed_light_color;
+	short light_identifier;
+	short light_index;
+	short lens_flare_index;
+	byte compressed_window_index;
+	byte compressed_light_scale;
+	long internal_occlusion_pixels;
+};
+
+struct lights_globals
+{
+	boolean marker_initialized;
+	byte pad1[3];
+	long marker;
+	short scene_point_light_count;
+	short padA;
+	long scene_point_lights[128];
+	struct rasterizer_lens_flare_submit_parameters queued_lens_flares[8];
+	short queued_lens_flare_count;
+	short pad34E;
+};
+
 typedef char verify_lights_game_globals_size[
 	sizeof(struct lights_game_globals) == 0x4 ? 1 : -1];
 typedef char verify_light_datum_prefix_flags_offset[
 	offsetof(struct light_datum_prefix, flags) == 0x2 ? 1 : -1];
 typedef char verify_light_datum_prefix_cluster_reference_offset[
 	offsetof(struct light_datum_prefix, cluster_reference) == 0x10 ? 1 : -1];
+typedef char verify_lights_globals_size[
+	sizeof(struct lights_globals) == 0x350 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -199,6 +232,7 @@ void *_texture_cache_bitmap_get_hardware_format(
 extern struct data_array *light_data;
 extern struct cluster_partition light_cluster_partition;
 extern struct lights_game_globals *lights_game_globals;
+static struct lights_globals lights_globals;
 
 /* ---------- public code */
 
@@ -325,6 +359,49 @@ void lights_reconnect_to_structure_bsp(
 			light_reconnect_to_map(light_index);
 		}
 	}
+
+	return;
+}
+
+void light_marker_begin(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\object_lights.c",
+		0x664,
+		!lights_globals.marker_initialized);
+	lights_globals.marker++;
+	lights_globals.marker_initialized = TRUE;
+
+	return;
+}
+
+boolean light_mark(
+	long light_index)
+{
+	struct light_datum_prefix *light = light_get(light_index);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\object_lights.c",
+		0x67F,
+		lights_globals.marker_initialized);
+	if (light->marker != lights_globals.marker)
+	{
+		light->marker = lights_globals.marker;
+		return TRUE;
+	}
+
+	return FALSE;
+}
+
+void light_marker_end(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\object_lights.c",
+		0x68E,
+		lights_globals.marker_initialized);
+	lights_globals.marker_initialized = FALSE;
 
 	return;
 }
