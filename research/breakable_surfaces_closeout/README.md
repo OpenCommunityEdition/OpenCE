@@ -122,6 +122,42 @@ argument order / read-`normal`-vs-copy / d-before-n, caller statement
 order, nesting the cross into the plane construction, and reversed cross
 arguments (13 lines, worse).
 
+### Second negative wave, measured in the TRUE (flat-dot) basin
+
+Every earlier caller/helper sweep in this session ran in the refuted
+grouped-dot basin and is void.  These were re-run, or run for the first
+time, against unmodified production headers -- so none of them carries any
+board risk, and none of them moved the 20 lines:
+
+* **dot_product3d expression trees** (12 forms): only the three that group
+  the j,k terms as a unit reach 4 lines, and all three are refuted
+  tree-wide.  Reverse term order is inert -- VC7 canonicalizes commutative
+  addition ORDER but not explicit GROUPING.
+* **Attested historical spellings** (8 forms, from the corpus census):
+  per-product parens on the dot, and `plane3d_distance_to_point` written
+  out longhand without the helper (both plane-first and point-first, with
+  and without parens).  All 20.
+* **Call-site structure** (7 forms): swapping the s/t distance order in the
+  seed arm (28) or the else arm (860), naming the seed arm's results,
+  reversing the x0/x1 copy direction (24), decl/init split of the else
+  arm's `s`/`t` (inert), both arms reversed together (868).
+* **Dataflow / use-count** (4 forms, the units.obj lesson): reading the
+  cross operands from `s_plane.n` instead of `s_normal` (55), building
+  s_plane before the cross (55), crossing straight into `t_plane.n` (894).
+* **scale_vector3d structure** -- the single common producer of the three
+  slots every divergent site reads (5 forms): operand order within each
+  product, named temps before the stores, reading the source vector into
+  locals first (all inert), whole-vector local copy (953).
+* **cross_product3d implementations** (8 forms) and **per-component
+  accumulation** (6 forms): inert or worse.
+
+Roughly 65 source shapes have now been measured in the correct basin
+across every structural class -- helper text, helper structure, upstream
+producers, caller structure, call-site order, and dataflow.  The residual
+does not move.  That is not a proof of unreachability, but it does mean
+the next attempt should come from the compiler side (below), not from
+another source lottery.
+
 ### C2 debugger mapping against micro_m6 (2026-08-30, session 3)
 
 Target: `probes/m6only.c`, a single-function TU whose entire FP output is
