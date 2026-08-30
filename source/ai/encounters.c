@@ -280,6 +280,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "ai/actor_iterators.h"
 #include "encounters.h"
 
 #include "actors.h"

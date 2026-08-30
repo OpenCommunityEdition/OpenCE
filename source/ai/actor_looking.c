@@ -166,6 +166,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "ai/actor_looking.h"
 
 #include "actors.h"
 #include "ai_debug.h"

@@ -445,6 +445,8 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "ai/actor_iterators.h"
+#include "ai/actor_looking.h"
 #include "ai/ai_communication.h"
 #include "ai/ai_debug.h"
 #include "ai/encounters.h"
@@ -477,6 +479,16 @@ struct ai_script_globals_prefix
 	boolean ai_initialized_for_map;
 };
 
+struct actor_iterator
+{
+	struct data_iterator encounter_iterator;
+	boolean iterated_encounterless_list;
+	boolean active_only;
+	byte pad[2];
+	long index;
+	long next_index;
+};
+
 struct ai_script_actor_reference_iterator
 {
 	byte storage[16];
@@ -489,6 +501,19 @@ struct ai_script_conversation_definition
 	char name[32];
 	byte unknown[84];
 };
+
+typedef char ai_script_actor_iterator_size_assert[
+	sizeof(struct actor_iterator) == 0x1C ? 1 : -1];
+typedef char ai_script_vehicle_enterable_size_assert[
+	sizeof(struct ai_script_vehicle_enterable) == 0xC ? 1 : -1];
+typedef char ai_script_vehicle_enterable_radius_offset_assert[
+	offsetof(struct ai_script_vehicle_enterable, radius) == 0x4 ? 1 : -1];
+typedef char ai_script_vehicle_enterable_team_offset_assert[
+	offsetof(struct ai_script_vehicle_enterable, team_bitmask) == 0x8 ? 1 : -1];
+typedef char ai_script_vehicle_enterable_actor_type_offset_assert[
+	offsetof(struct ai_script_vehicle_enterable, actor_type_bitmask) == 0xA ? 1 : -1];
+typedef char ai_script_platoon_iterator_size_assert[
+	sizeof(struct ai_script_platoon_iterator) == 0xC ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -668,6 +693,81 @@ void ai_scripting_set_blind(
 	return;
 }
 
+void ai_scripting_vehicle_enterable_distance(
+	long unit_index,
+	real distance)
+{
+	if (ai_debug.print_scripting)
+	{
+		error(
+			_error_silent,
+			"%s: ai_vehicle_enterable_distance <some vehicle>",
+			hs_runtime_get_executing_thread_name());
+	}
+
+	if (unit_index != NONE)
+	{
+		struct ai_script_vehicle_enterable *vehicle_enterable =
+			ai_scripting_find_vehicle_enterable(unit_index);
+		if (vehicle_enterable)
+			vehicle_enterable->radius = distance;
+	}
+
+	return;
+}
+
+void ai_scripting_vehicle_enterable_team(
+	long unit_index,
+	long team_index)
+{
+	short team = team_index;
+
+	if (ai_debug.print_scripting)
+	{
+		error(
+			_error_silent,
+			"%s: ai_vehicle_enterable_team <some vehicle> %d",
+			hs_runtime_get_executing_thread_name(),
+			team);
+	}
+
+	if (unit_index != NONE)
+	{
+		struct ai_script_vehicle_enterable *vehicle_enterable =
+			ai_scripting_find_vehicle_enterable(unit_index);
+		if (vehicle_enterable)
+			vehicle_enterable->team_bitmask |= 1 << team;
+	}
+
+	return;
+}
+
+void ai_scripting_vehicle_enterable_actor_type(
+	long unit_index,
+	long actor_type)
+{
+	short type = actor_type;
+
+	if (ai_debug.print_scripting)
+	{
+		error(
+			_error_silent,
+			"%s: ai_vehicle_enterable_actor_type <some vehicle> %d",
+			hs_runtime_get_executing_thread_name(),
+			type);
+	}
+
+	if (unit_index != NONE)
+	{
+		struct ai_script_vehicle_enterable *vehicle_enterable =
+			ai_scripting_find_vehicle_enterable(unit_index);
+		if (vehicle_enterable)
+			vehicle_enterable->actor_type_bitmask |= 1 << type;
+	}
+
+	return;
+}
+
 void ai_scripting_detach_unit(
 	long unit_index)
 {
@@ -777,6 +877,56 @@ real ai_scripting_strength(
 	real strength = 0.0f;
 	code_000439c0(ai_reference, _ai_count_living, NULL, &strength);
 	return strength;
+}
+
+boolean ai_scripting_is_attacking(
+	long ai_reference)
+{
+	struct ai_script_platoon_iterator iterator;
+	struct platoon_datum *platoon;
+	boolean attacking = FALSE;
+
+	if (ai_reference != NONE)
+	{
+		ai_index_platoon_iterator_new(ai_reference, &iterator);
+
+		platoon = ai_index_platoon_iterator_next(&iterator);
+		while (platoon)
+		{
+			if (!platoon->defending)
+			{
+				attacking = TRUE;
+				break;
+			}
+
+			platoon = ai_index_platoon_iterator_next(&iterator);
+		}
+	}
+
+	return attacking;
+}
+
+short ai_scripting_going_to_vehicle(
+	long unit_index)
+{
+	struct actor_iterator iterator;
+	struct actor_datum *actor;
+	short count = 0;
+
+	actor_iterator_new(&iterator, TRUE);
+	actor = actor_iterator_next(&iterator);
+	while (actor)
+	{
+		if (actor->state.action == _actor_action_vehicle &&
+			actor->state.action_data.vehicle.vehicle_index == unit_index)
+		{
+			count++;
+		}
+
+		actor = actor_iterator_next(&iterator);
+	}
+
+	return count;
 }
 
 void ai_scripting_allegiance_remove(
@@ -889,6 +1039,27 @@ void ai_scripting_conversation_advance(
 	}
 
 	ai_conversation_advance(conversation);
+
+	return;
+}
+
+void ai_scripting_stop_looking(
+	long unit_index)
+{
+	if (ai_debug.print_scripting)
+	{
+		error(
+			_error_silent,
+			"%s: ai_stop_looking <some unit>",
+			hs_runtime_get_executing_thread_name());
+	}
+
+	if (unit_index != NONE)
+	{
+		long actor_index = unit_get(unit_index)->unit.actor_index;
+		if (actor_index != NONE)
+			actor_look_secondary_stop(actor_index);
+	}
 
 	return;
 }
