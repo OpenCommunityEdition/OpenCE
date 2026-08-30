@@ -22570,6 +22570,7 @@
 { "file_offset": 4611752, "flags": 0, "name": "_rasterizer_profile_callback_end_times" },
 { "file_offset": 4611880, "flags": 0, "name": "_rasterizer_profile_elapsed_state" },
 { "file_offset": 4612472, "flags": 0, "name": "_rasterizer_profile_start_times" },
+{ "file_offset": 4612728, "flags": 0, "name": "_local_profile_enable" },
 { "file_offset": 4612748, "flags": 0, "name": "_bss_0046628c" },
 { "file_offset": 4612824, "flags": 0, "name": "_bss_004662d8" },
 { "file_offset": 4612840, "flags": 0, "name": "_bss_004662e8" },

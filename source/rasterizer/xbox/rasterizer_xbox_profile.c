@@ -175,6 +175,7 @@ static volatile __int64 rasterizer_profile_callback_elapsed_times[MAXIMUM_RASTER
 
 extern struct rasterizer_profile_globals data_0030cf00;
 extern struct rasterizer_window_parameters global_window_parameters;
+extern short local_profile_enable;
 
 /* ---------- public code */
 
@@ -207,6 +208,29 @@ void rasterizer_profile_window_begin(
 {
 	data_0030cf00.window_index = global_window_parameters.window_index;
 	data_0030cf00.active_profile_index = NONE;
+
+	return;
+}
+
+void _rasterizer_profile_enable(
+	boolean enable)
+{
+	if (enable)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_profile.c",
+			244,
+			local_profile_enable>0);
+		local_profile_enable--;
+	}
+	else
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_profile.c",
+			249,
+			local_profile_enable<100);
+		local_profile_enable++;
+	}
 
 	return;
 }
