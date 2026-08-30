@@ -727,6 +727,12 @@ struct widget_instance
 void dispose_pointer(
 	struct stack_memory_pool *pool,
 	void *pointer);
+void *pool_resize_pointer(
+	struct stack_memory_pool *pool,
+	void *pointer,
+	long allocation_size,
+	char const *file,
+	unsigned long line);
 
 /* ---------- globals */
 
@@ -814,6 +820,20 @@ int widget_instance_count_children(
 			count++;
 	}
 	return count;
+}
+
+void *ui_widget_realloc(
+	void *pointer,
+	word size,
+	char const *file,
+	unsigned long line)
+{
+	return pool_resize_pointer(
+		widget_memory_pool,
+		pointer,
+		size,
+		file,
+		line);
 }
 
 void widget_free(
