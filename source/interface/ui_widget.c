@@ -971,4 +971,17 @@ real_rgb_color get_ui_rgb_white(
 	return result;
 }
 
+real_argb_color get_ui_argb_white(
+	void)
+{
+	real_argb_color result;
+
+	result = *global_real_argb_white;
+	result.red = global_ui_white_red;
+	result.green = global_ui_white_green;
+	result.blue = global_ui_white_blue;
+
+	return result;
+}
+
 /* ---------- private code */
