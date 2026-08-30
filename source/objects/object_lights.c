@@ -308,6 +308,27 @@ void lights_disconnect_from_structure_bsp(
 	return;
 }
 
+void lights_reconnect_to_structure_bsp(
+	void)
+{
+	long light_index;
+
+	for (light_index = data_next_index(light_data, NONE);
+		light_index != NONE;
+		light_index = data_next_index(light_data, light_index))
+	{
+		struct light_datum_prefix *light = datum_get(light_data, light_index);
+
+		if (TEST_FLAG(light->flags, _point_light_connected_to_map_bit))
+		{
+			SET_FLAG(light->flags, _point_light_connected_to_map_bit, FALSE);
+			light_reconnect_to_map(light_index);
+		}
+	}
+
+	return;
+}
+
 /* ---------- private code */
 
 long code_00129100(
