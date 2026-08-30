@@ -82,6 +82,11 @@ enum
 	_hud_panel_motion_sensor_blink_bit
 };
 
+enum
+{
+	MAXIMUM_NUMBER_OF_LOCAL_PLAYERS = 4,
+};
+
 /* ---------- macros */
 
 #define UNIT_HUD_GLOBALS bss_00453ac0
@@ -89,12 +94,37 @@ enum
 
 /* ---------- structures */
 
+struct unit_hud_state
+{
+	float last_shield_vitality;
+	float last_body_vitality;
+	float fade_time;
+	long last_shield_hit_time;
+	long last_shield_flash_time;
+	long last_health_flash_time;
+	long last_motion_sensor_flash_time;
+	long last_unit_index;
+	word auxilary_active_type_flags;
+	short auxilary_flash_time[1];
+	word sound_flags;
+	byte pad26[2];
+	long last_sound_handles[12];
+};
+
 struct unit_hud_globals
 {
-	byte reserved[0x160];
+	struct unit_hud_state hud_states[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
 	long script_flags;
 };
 
+typedef char unit_hud_state_auxilary_flash_time_offset_assert[
+	offsetof(struct unit_hud_state, auxilary_flash_time) == 0x22 ? 1 : -1];
+typedef char unit_hud_state_sound_flags_offset_assert[
+	offsetof(struct unit_hud_state, sound_flags) == 0x24 ? 1 : -1];
+typedef char unit_hud_state_last_sound_handles_offset_assert[
+	offsetof(struct unit_hud_state, last_sound_handles) == 0x28 ? 1 : -1];
+typedef char unit_hud_state_size_assert[
+	sizeof(struct unit_hud_state) == 0x58 ? 1 : -1];
 typedef char unit_hud_globals_script_flags_offset_assert[
 	offsetof(struct unit_hud_globals, script_flags) == 0x160 ? 1 : -1];
 typedef char unit_hud_globals_size_assert[
@@ -138,6 +168,56 @@ void hud_initialize_unit_interface(
 		"c:\\halo\\SOURCE\\interface\\hud_unit.c",
 		0x110,
 		unit_hud_globals);
+
+	return;
+}
+
+void hud_initialize_unit_interface_for_new_map(
+	void)
+{
+	short local_player_index;
+	struct unit_hud_state *hud_state;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\hud_unit.c",
+		0x11B,
+		unit_hud_globals);
+	csmemset(
+		unit_hud_globals,
+		0,
+		sizeof(*unit_hud_globals));
+
+	for (local_player_index = 0;
+		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
+		local_player_index++)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\interface\\hud_unit.c",
+			0x106,
+			local_player_index>=0 &&
+				local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+		match_assert(
+			"c:\\halo\\SOURCE\\interface\\hud_unit.c",
+			0x107,
+			unit_hud_globals);
+
+		hud_state = &unit_hud_globals->hud_states[local_player_index];
+		csmemset(
+			hud_state->auxilary_flash_time,
+			NONE,
+			sizeof(hud_state->auxilary_flash_time));
+		hud_state->last_body_vitality = -1.0f;
+		hud_state->last_shield_vitality = -1.0f;
+		hud_state->last_health_flash_time = NONE;
+		hud_state->last_motion_sensor_flash_time = NONE;
+		hud_state->fade_time = -1.0f;
+		hud_state->last_unit_index = NONE;
+		hud_state->sound_flags = 0;
+		csmemset(
+			hud_state->last_sound_handles,
+			NONE,
+			sizeof(hud_state->last_sound_handles));
+	}
 
 	return;
 }
