@@ -54,6 +54,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "bitmaps/s3tc/s3tc.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -67,3 +69,64 @@ symbols in this file:
 /* ---------- public code */
 
 /* ---------- private code */
+
+void DecodeBlockAlpha3(
+	struct s3tc_block_alpha3 *source,
+	struct s3tc_color colors[S3TC_BLOCK_PIXELS])
+{
+	long pixel;
+	long alpha[8];
+	unsigned long bitmap = 0;
+
+	DecodeBlockRGB(&source->rgb, colors);
+
+	alpha[0] = source->alpha0;
+	alpha[1] = source->alpha1;
+
+	if (alpha[0] > alpha[1])
+	{
+		alpha[2] = (6 * alpha[0] + 1 * alpha[1]) / 7;
+		alpha[3] = (5 * alpha[0] + 2 * alpha[1]) / 7;
+		alpha[4] = (4 * alpha[0] + 3 * alpha[1]) / 7;
+		alpha[5] = (3 * alpha[0] + 4 * alpha[1]) / 7;
+		alpha[6] = (2 * alpha[0] + 5 * alpha[1]) / 7;
+		alpha[7] = (1 * alpha[0] + 6 * alpha[1]) / 7;
+	}
+	else
+	{
+		alpha[2] = (4 * alpha[0] + 1 * alpha[1]) / 5;
+		alpha[3] = (3 * alpha[0] + 2 * alpha[1]) / 5;
+		alpha[4] = (2 * alpha[0] + 3 * alpha[1]) / 5;
+		alpha[5] = (1 * alpha[0] + 4 * alpha[1]) / 5;
+		alpha[6] = 0;
+		alpha[7] = 255;
+	}
+
+	for (pixel = 0; pixel < S3TC_BLOCK_PIXELS; ++pixel)
+	{
+		if ((pixel & 7) == 0)
+		{
+			if (pixel == 0)
+			{
+				bitmap = source->alpha_bitmap[2];
+				bitmap <<= 8;
+				bitmap |= source->alpha_bitmap[1];
+				bitmap <<= 8;
+				bitmap |= source->alpha_bitmap[0];
+			}
+			else
+			{
+				bitmap = source->alpha_bitmap[5];
+				bitmap <<= 8;
+				bitmap |= source->alpha_bitmap[4];
+				bitmap <<= 8;
+				bitmap |= source->alpha_bitmap[3];
+			}
+		}
+
+		colors[pixel].rgba[S3TC_ALPHA] = (byte)alpha[bitmap & 7];
+		bitmap >>= 3;
+	}
+
+	return;
+}
