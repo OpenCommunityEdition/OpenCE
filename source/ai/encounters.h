@@ -134,6 +134,15 @@ boolean encounter_pursuit_position_already_examined(
 	long start_time,
 	short *examined_count,
 	boolean flag);
+void encounter_set_respawn(
+	long encounter_index,
+	boolean respawn);
+void encounter_set_deaf(
+	long encounter_index,
+	boolean deaf);
+void encounter_set_blind(
+	long encounter_index,
+	boolean blind);
 
 /* ---------- globals */
 

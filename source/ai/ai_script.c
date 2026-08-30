@@ -450,6 +450,7 @@ symbols in this file:
 #include "ai/encounters.h"
 #include "ai/ai_script.h"
 #include "cseries/errors.h"
+#include "game/game_allegiance.h"
 #include "hs/hs.h"
 #include "memory/data.h"
 #include "scenario/scenario.h"
@@ -589,6 +590,84 @@ void ai_scripting_deselect(
 	return;
 }
 
+void ai_scripting_set_respawn(
+	long ai_reference,
+	boolean respawn)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+		ai_index_to_string(
+			ai_reference,
+			global_scenario_get(),
+			ai_name,
+			sizeof(ai_name));
+		error(
+			_error_silent,
+			"%s: ai_set_respawn %s %s",
+			hs_runtime_get_executing_thread_name(),
+			ai_name,
+			respawn ? "on" : "off");
+	}
+
+	if (ai_reference != NONE)
+		encounter_set_respawn(ai_reference & UNSIGNED_SHORT_MAX, respawn);
+
+	return;
+}
+
+void ai_scripting_set_deaf(
+	long ai_reference,
+	boolean deaf)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+		ai_index_to_string(
+			ai_reference,
+			global_scenario_get(),
+			ai_name,
+			sizeof(ai_name));
+		error(
+			_error_silent,
+			"%s: ai_set_deaf %s %s",
+			hs_runtime_get_executing_thread_name(),
+			ai_name,
+			deaf ? "on" : "off");
+	}
+
+	if (ai_reference != NONE)
+		encounter_set_deaf(ai_reference & UNSIGNED_SHORT_MAX, deaf);
+
+	return;
+}
+
+void ai_scripting_set_blind(
+	long ai_reference,
+	boolean blind)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+		ai_index_to_string(
+			ai_reference,
+			global_scenario_get(),
+			ai_name,
+			sizeof(ai_name));
+		error(
+			_error_silent,
+			"%s: ai_set_blind %s %s",
+			hs_runtime_get_executing_thread_name(),
+			ai_name,
+			blind ? "on" : "off");
+	}
+
+	if (ai_reference != NONE)
+		encounter_set_blind(ai_reference & UNSIGNED_SHORT_MAX, blind);
+
+	return;
+}
+
 void ai_scripting_detach_unit(
 	long unit_index)
 {
@@ -698,6 +777,26 @@ real ai_scripting_strength(
 	real strength = 0.0f;
 	code_000439c0(ai_reference, _ai_count_living, NULL, &strength);
 	return strength;
+}
+
+void ai_scripting_allegiance_remove(
+	short team1_index,
+	short team2_index)
+{
+	if (ai_debug.print_scripting)
+	{
+		error(
+			_error_silent,
+			"%s: ai_allegiance_remove %d %d",
+			hs_runtime_get_executing_thread_name(),
+			team1_index,
+			team2_index);
+	}
+
+	if (team1_index != NONE && team2_index != NONE)
+		game_allegiance_remove(team1_index, team2_index);
+
+	return;
 }
 
 boolean ai_scripting_conversation(
