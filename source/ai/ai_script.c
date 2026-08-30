@@ -454,6 +454,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "game/game_allegiance.h"
 #include "hs/hs.h"
+#include "hs/object_lists.h"
 #include "memory/data.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
@@ -610,6 +611,38 @@ void ai_scripting_deselect(
 	if (ai_globals->ai_initialized_for_map)
 	{
 		ai_debug_select_actor(NONE, NONE);
+	}
+
+	return;
+}
+
+void ai_scripting_attach_units(
+	long object_list_index,
+	long ai_reference)
+{
+	long reference_index;
+	long unit_index = object_list_get_first(object_list_index, &reference_index);
+
+	while (unit_index != NONE)
+	{
+		ai_scripting_attach_unit(unit_index, ai_reference);
+		unit_index = object_list_get_next(object_list_index, &reference_index);
+	}
+
+	return;
+}
+
+void ai_scripting_magically_see_units(
+	long ai_reference,
+	long object_list_index)
+{
+	long reference_index;
+	long unit_index = object_list_get_first(object_list_index, &reference_index);
+
+	while (unit_index != NONE)
+	{
+		ai_scripting_magically_see_unit(ai_reference, unit_index);
+		unit_index = object_list_get_next(object_list_index, &reference_index);
 	}
 
 	return;

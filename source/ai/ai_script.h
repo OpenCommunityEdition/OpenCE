@@ -55,6 +55,12 @@ struct platoon_datum *ai_index_platoon_iterator_next(
 	struct ai_script_platoon_iterator *iterator);
 struct ai_script_vehicle_enterable *ai_scripting_find_vehicle_enterable(
 	long vehicle_index);
+void ai_scripting_attach_unit(
+	long unit_index,
+	long ai_reference);
+void ai_scripting_magically_see_unit(
+	long ai_reference,
+	long unit_index);
 
 /* ---------- globals */
 
