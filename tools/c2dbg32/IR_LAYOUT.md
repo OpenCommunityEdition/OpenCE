@@ -707,3 +707,44 @@ canonicalised — neither of which the ~65 tested shapes reached. The next
 question is not "which frame decides" (answered: none of them) but "what
 does the canonicaliser key on", which lives in the front end / early
 optimiser, above everything mapped here.
+
+## The front end (C1.Dll) is reachable (2026-08-30)
+
+`dbg32` planted breakpoints only when C2.Dll loaded, hard-coded to base
+`0x10700000`. Planting is now matched on the top 12 address bits of whichever
+module just loaded, so front-end and back-end breakpoints can be mixed in one
+`dbg_bp.txt`.
+
+Measured, `probes/m6only.c`:
+
+```
+module @0x10600000 loaded, planted 4 bps     <- C1.Dll (the C front end)
+module @0x10700000 loaded, planted 1 bps     <- C2.Dll
+done. hit counts: e a 1 0 0                  <- C2 control + two C1 sites firing
+```
+
+So **C1.Dll runs in-process, loads before C2, and is debuggable with the same
+instrument.** Fixed bases: C1.Dll `0x10600000` (.text `0x10601000`, size
+`0x61a88`), C1xx.Dll `0x10400000`, C2.Dll `0x10700000`.
+
+This matters because the frame walk (previous sections) ended by showing that
+no frame in the C2 lowering/encoding path chooses between commutative
+operands — the order arrives already fixed. Whatever fixes it is at or above
+the C1/C2 boundary, and that is now observable rather than off-limits.
+
+**Honest scope note.** Reaching C1 is not the same as mapping it. There are
+no anchors in C1 comparable to the ones this file records for C2: no known
+node layout, no opcode band, no encoder. Finding the commutative
+canonicaliser there is a from-scratch reverse-engineering effort over a
+400 KB `.text`, not a continuation of the existing map. The realistic first
+step is a sampler/profile over a C1 compile to find hot expression-building
+code, exactly as `BACKEND_MODULE_MAP.md` describes doing for C2 — start from
+frequency, not from guessed addresses.
+
+**Also discarded this session (do not re-read it as fact):** `node[+0x34]`
+is NOT a frame displacement. The values `0x10` / `0x04` seen for two operand
+nodes matched two members' displacements by coincidence; read across all 46
+chain-consumer hits the field decodes as pointers and unrelated constants.
+The per-hit "which IR node is which instruction" correlation therefore
+remains unsolved, and it is still the prerequisite for any node-level
+differential.

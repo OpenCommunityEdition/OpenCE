@@ -85,6 +85,7 @@ static WCHAR cmdw[16384];
 static WCHAR dirw[4096];
 static char bpbuf[4096];
 static DWORD bps[8]; static BYTE orig[8]; static int nbp;
+static int planted[8];  /* per-bp: armed yet? (bps may live in different modules) */
 static DWORD hits[8];
 static int maxhits=250;
 /* gate mode: bp[0] is a per-function counter (uncapped, lightweight); the
@@ -349,11 +350,19 @@ void entry(void){
     if(de.code==3){ /* CREATE_PROCESS */
       g_proc=de.u.CreateProcessInfo.hProcess;
     } else if(de.code==6){ /* LOAD_DLL */
-      if((DWORD)de.u.LoadDll.base==0x10700000){
-        int np = g_gate_lo ? 1 : nbp; /* gate mode: plant only bp0 (the counter) up front */
-        for(i=0;i<nbp;i++){ DWORD rd; ReadProcessMemory(g_proc,(LPVOID)bps[i],&orig[i],1,&rd); }
-        for(i=0;i<np;i++) plant(g_proc,bps[i],0xCC);
-        puts_("c2 loaded @0x10700000, planted "); hex_((DWORD)np,1); puts_(" bps\n");
+      { /* Plant any breakpoint that lives in the module just loaded, matched on
+           the top 12 address bits.  C2.Dll is fixed at 0x10700000 and C1.Dll at
+           0x10600000, so front-end and back-end breakpoints can be mixed freely. */
+        DWORD mbase=(DWORD)de.u.LoadDll.base; int np=0;
+        for(i=0;i<nbp;i++){
+          DWORD rd;
+          if(planted[i]) continue;
+          if((bps[i]&0xfff00000)!=(mbase&0xfff00000)) continue;
+          if(g_gate_lo && i!=0) continue;   /* gate mode arms bp0 only up front */
+          ReadProcessMemory(g_proc,(LPVOID)bps[i],&orig[i],1,&rd);
+          plant(g_proc,bps[i],0xCC); planted[i]=1; np++; }
+        if(np>0){ puts_("module @"); hx(mbase); puts_(" loaded, planted ");
+          hex_((DWORD)np,1); puts_(" bps"); putc_('\n'); }
         if(nwp>0){
           hth=OpenThread(0x1FFFFF,0,de.tid);
           arm_wp(hth); CloseHandle(hth);
