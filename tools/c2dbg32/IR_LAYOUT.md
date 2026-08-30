@@ -644,3 +644,66 @@ particular ordering input is not.
 **Next target**: the code that links operands into `[node+0x28]`. That is
 where a commutative pair acquires its order, and it is the last frame
 between here and an answer.
+
+## The last frame: no frame in the lowering path chooses (2026-08-30)
+
+Continuing back from the chain-head consumer, the node whose `[+0x28]` holds
+the operand chain is opcode `0x275` (read live: `[ebp] = {link, 0x275,
+0x1004010d, …, [+0x28] = chain head}`, and `[+0x28]` matched the `edi`/`ebx`
+the consumer used).
+
+Sweeping the 73 static creation sites for `0x275` (validated harness: a
+known-firing control in every batch) finds **exactly one** that executes:
+
+```
+10760f63: mov  edx, [esi+8]
+10760f66: cmp  dword [edx+4], 0x249     ; operand-opcode test
+10760f6d: jne  0x107d64d3
+10760f73: mov  cl, byte [eax+8]
+10760f78: cmp  cl, 3                    ; operand-kind test
+10760f7a: je   0x10760e84               ; <- alternate construction path
+10760f80: push 0x275                    ; opcode
+10760f85: lea  edx, [esp+0x18]          ; out/descriptor slot
+10760f8a: call 0x10763ac3               ; the node maker
+```
+
+The alternate path at `0x10760e84` *does* order two operands explicitly
+(`esi` then `edi`, read from two different stack slots via each operand's
+`[+0x18]`, combined by `0x10703953`). It looked like the decision.
+
+**It is not: measured over the m6only compile it takes ZERO hits.**
+
+| site | what | hits |
+|---|---|---:|
+| `0x10760f73` | the operand-kind test | 30 |
+| `0x10760f80` | the `0x275` build | 30 |
+| `0x10760e84` | alternate ordering path | **0** |
+| `0x10763ac3` | node maker | 48 |
+
+So every arithmetic node here is built by the same call, with the operand
+order already fixed in what the caller hands over.
+
+### Conclusion of the frame walk
+
+Across every frame now examined — encoder `0x107455e6`, fld-node creation
+`0x10707995` / `0x1070db1d` / `0x10710332`, the chain-head consumer
+`0x10736518`, and the arithmetic-node build `0x10760f80` — **no frame
+applies a rule that picks between the two commutative operands.** Each one
+propagates an order established earlier: the consumer takes the chain head,
+the builder takes what it is given, and the one site that *would* order a
+pair explicitly never runs.
+
+The order therefore originates in the expression tree as canonicalised
+upstream of lowering. That is measured, and it explains the source result
+(~65 shapes inert, every operand text order among them) far better than
+"scheduler tie" did.
+
+**What it does NOT license.** This is not a proof of "below source
+visibility". The identical-compiler theorem still holds: January's build got
+the other order from this same binary, so something upstream differed. Since
+operand *text* order is canonicalised away, the difference has to be in
+expression-tree shape or in surrounding context that changes how the tree is
+canonicalised — neither of which the ~65 tested shapes reached. The next
+question is not "which frame decides" (answered: none of them) but "what
+does the canonicaliser key on", which lives in the front end / early
+optimiser, above everything mapped here.
