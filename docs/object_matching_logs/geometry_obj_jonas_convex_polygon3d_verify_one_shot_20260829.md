@@ -115,11 +115,17 @@ The sole production invocation reported exactly:
 [1/1] CL build\base\source\math\geometry.obj
 ```
 
-The ignored first artifact is
+At measurement time the ignored first artifact was
 `build/base/source/math/geometry.obj`, 5,713 bytes, raw SHA-256
 `d369a809ba0a5a89cb84a939eab524e72d4f8347d503adaa06c53728e3d7b1a4`.
-It remains available only as audit evidence and is not an admitted build
-product.
+It was not an admitted build product. The initial baseline object had been
+borrowed through a hardlink rather than copied; after the complete comparison
+and disassembly evidence above had been extracted, a later source-identical
+base rebuild through the other link replaced this ignored file. The current
+path is therefore not the candidate artifact, and this ledger does not claim
+that the raw object remains available. The normalized packet hashes, sizes,
+ordered relocation records, and first-divergence evidence were all captured
+before that replacement.
 
 Direct hardened comparison reports all seven inherited packets still exact
 in this candidate object. Only `_convex_polygon3d_verify` is unequal.
@@ -157,9 +163,10 @@ caller or anchor, byte patch, comparator exception, or semantic exception.
 
 ## Validation
 
-- Direct `tools.coff_compare` on the preserved first artifact reports the new
-  owner unequal exactly as tabulated above and all seven inherited geometry
-  packets equal. No exact packet was lost.
+- Direct `tools.coff_compare` on the first artifact reported the new owner
+  unequal exactly as tabulated above and all seven inherited geometry packets
+  equal. No exact packet was lost. As recorded above, the shared ignored
+  hardlink was replaced only after these results had been extracted.
 - Final working-file Git hashes equal both base blobs. `git diff` has no
   production-source change, no deleted path, and no path under protected
   Units or any other excluded object.
@@ -171,11 +178,10 @@ caller or anchor, byte patch, comparator exception, or semantic exception.
 - Park validation reports 12 active entries, zero stale, and zero invalid.
 - `git diff --check`, retained-path review, and source-policy scan pass.
 
-No full production graph was rebuilt after the rejected shot: doing so would
-have emitted this translation unit a second time despite there being no
-retained production change. The source-identical base already carried a clean
-full report; the bounded miss path requires source reversion, evidence, and
-an additive ledger rather than a redundant rebuild.
+No second candidate was compiled and no full production graph was rebuilt in
+this lane after the rejected shot. The source-identical base already carried
+a clean full report; the bounded miss path requires source reversion,
+evidence, and an additive ledger rather than a redundant candidate rebuild.
 
 No completion, admission, parked-object, or semantic-exception record is
 changed. No push, amend, rebase, history rewrite, or worktree removal is
