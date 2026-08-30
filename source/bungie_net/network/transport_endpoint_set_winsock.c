@@ -119,6 +119,7 @@ symbols in this file:
 extern long global_key_depth;
 extern XNADDR global_address;
 extern XNKID global_key_id;
+extern XNKEY global_key;
 
 /* ---------- public code */
 
@@ -137,6 +138,16 @@ XNKID transport_get_key_id(
 		0xE0,
 		global_key_depth > 0);
 	return global_key_id;
+}
+
+XNKEY transport_get_key(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0xE7,
+		global_key_depth > 0);
+	return global_key;
 }
 
 /* ---------- private code */
