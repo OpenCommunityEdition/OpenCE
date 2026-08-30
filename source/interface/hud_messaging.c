@@ -162,10 +162,22 @@ struct hud_state_message_definition
 	byte reserved[0x40];
 };
 
+struct hud_state_message_text_info_definition
+{
+	short string_index;
+	boolean uses_scenario_names;
+	byte reserved3;
+};
+
 struct hud_state_message_runtime_definition
 {
 	wchar_t message_buffer[MAXIMUM_HUD_STATE_MESSAGE_TEXT_LENGTH];
-	byte reserved200[0x2C];
+	byte reserved200[4];
+	struct hud_state_message_text_info_definition info[8];
+	struct hud_state_message_definition *state_message;
+	boolean valid;
+	byte is_text_flags;
+	byte reserved22A[2];
 };
 
 struct hud_messaging_datum_definition
@@ -235,8 +247,18 @@ typedef char hud_message_valid_offset_assert[
 	offsetof(struct hud_message_definition, valid) == 0x82 ? 1 : -1];
 typedef char hud_message_size_assert[
 	sizeof(struct hud_message_definition) == 0x8C ? 1 : -1];
+typedef char hud_state_message_text_info_size_assert[
+	sizeof(struct hud_state_message_text_info_definition) == 4 ? 1 : -1];
 typedef char hud_state_message_runtime_size_assert[
 	sizeof(struct hud_state_message_runtime_definition) == 0x22C ? 1 : -1];
+typedef char hud_state_message_runtime_info_offset_assert[
+	offsetof(struct hud_state_message_runtime_definition, info) == 0x204 ? 1 : -1];
+typedef char hud_state_message_runtime_state_message_offset_assert[
+	offsetof(struct hud_state_message_runtime_definition, state_message) == 0x224 ? 1 : -1];
+typedef char hud_state_message_runtime_valid_offset_assert[
+	offsetof(struct hud_state_message_runtime_definition, valid) == 0x228 ? 1 : -1];
+typedef char hud_state_message_runtime_is_text_flags_offset_assert[
+	offsetof(struct hud_state_message_runtime_definition, is_text_flags) == 0x229 ? 1 : -1];
 typedef char hud_messaging_datum_state_message_offset_assert[
 	offsetof(struct hud_messaging_datum_definition, state_message) == 0x230 ? 1 : -1];
 typedef char hud_messaging_datum_size_assert[
@@ -454,6 +476,28 @@ void scripted_hud_time_code_reset(
 	time_code_time = time;
 	if (time_code_stop_time != NONE)
 		time_code_stop_time = time;
+
+	return;
+}
+
+void
+hud_set_state_message_text(
+	short local_player_index,
+	short custom_icon_index,
+	short icon_string_index,
+	boolean uses_scenario_names)
+{
+	struct hud_messaging_datum_definition *datum =
+		&bss_00453ab8->message_data[local_player_index];
+
+	if (datum->state_message.valid &&
+		!hud_scripted_globals->show_hud_help_text &&
+		datum->state_message.state_message)
+	{
+		datum->state_message.info[custom_icon_index].string_index = icon_string_index;
+		datum->state_message.info[custom_icon_index].uses_scenario_names = uses_scenario_names;
+		datum->state_message.is_text_flags |= 1 << custom_icon_index;
+	}
 
 	return;
 }
