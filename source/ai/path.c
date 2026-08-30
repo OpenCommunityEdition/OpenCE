@@ -186,6 +186,8 @@ typedef char path_destination_surface_index_offset_assert[
 	offsetof(struct path_destination, surface_index) == 0xC ? 1 : -1];
 typedef char path_destination_target_radius_offset_assert[
 	offsetof(struct path_destination, target_radius) == 0x10 ? 1 : -1];
+typedef char path_node_surface_index_offset_assert[
+	offsetof(struct path_node, surface_index) == 0x8 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -262,6 +264,25 @@ void path_state_destination(
 	state->destination.target_radius = destination_accept_radius;
 
 	return;
+}
+
+short path_node_from_hash_table(
+	struct path_state *state,
+	long surface_index)
+{
+	short node_index;
+	short slot;
+
+	slot = (short)((surface_index & 0x1FF) << 3);
+	do
+	{
+		node_index = state->hash_table[slot];
+		slot = (short)((slot + 1) & 0xFFF);
+	}
+	while (node_index != NONE &&
+		state->node_list[node_index].surface_index != surface_index);
+
+	return node_index;
 }
 
 /* ---------- private code */
