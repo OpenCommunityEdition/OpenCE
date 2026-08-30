@@ -72,6 +72,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+
+#include <xtl.h>
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -82,11 +86,25 @@ symbols in this file:
 
 /* ---------- globals */
 
+extern D3DDevice *global_d3d_device;
+
 /* ---------- public code */
 
 void _rasterizer_widget_end(
 	void)
 {
+	return;
+}
+
+void _rasterizer_widget_set_zbuffer_enable(
+	boolean zbuffer_enable)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_widgets.c",
+		0x14E,
+		global_d3d_device);
+	D3DDevice_SetRenderState_ZEnable(zbuffer_enable);
+
 	return;
 }
 
