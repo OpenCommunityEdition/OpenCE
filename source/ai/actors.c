@@ -414,6 +414,47 @@ void actors_dispose_from_old_map(
 	return;
 }
 
+void actor_set_team(
+	long actor_index,
+	short team_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->meta.swarm)
+	{
+		if (actor->meta.swarm_cache_index != NONE)
+		{
+			struct swarm_datum *swarm = swarm_get(actor->meta.swarm_cache_index);
+			short unit_index;
+
+			for (unit_index = 0; unit_index < swarm->unit_count; unit_index++)
+			{
+				struct unit_datum *unit = unit_get(swarm->unit_indices[unit_index]);
+
+				unit->object.owner_team_index = team_index;
+			}
+		}
+		else
+		{
+			long unit_index = actor->meta.swarm_unit_index;
+
+			while (unit_index != NONE)
+			{
+				struct unit_datum *unit = unit_get(unit_index);
+
+				unit->object.owner_team_index = team_index;
+				unit_index = unit->unit.swarm_next_unit_index;
+			}
+		}
+	}
+	else if (actor->meta.unit_index != NONE)
+	{
+		unit_get(actor->meta.unit_index)->object.owner_team_index = team_index;
+	}
+
+	return;
+}
+
 boolean actor_has_unlimited_grenades(
 	long actor_index)
 {
