@@ -71,9 +71,22 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h"
 #include "bitmaps/bitmap_group.h"
+#include "rasterizer/rasterizer.h"
+#include <xtl.h>
 
 /* ---------- constants */
+
+enum
+{
+	NUMBER_OF_BITMAP_FORMATS = 18,
+	_bitmap_type_2d = 0,
+	_bitmap_type_3d,
+	_bitmap_type_cube_map,
+	_bitmap_has_power_of_two_dimensions_bit = 0,
+	_bitmap_compressed_bit = 1,
+};
 
 /* ---------- macros */
 
@@ -83,31 +96,640 @@ symbols in this file:
 
 void texture_cache_bitmap_delete(
 	struct bitmap_data *bitmap);
-unsigned long __stdcall D3DResource_Release(
-	void *resource);
+short rasterizer_xbox_bitmap_get_max_mipmap_count(
+	struct bitmap_data *bitmap);
+void rasterizer_error(
+	long error_result,
+	char const *format,
+	...);
+void *bitmap_mipmap_address(
+	struct bitmap_data *bitmap,
+	short mipmap_index);
+void *bitmap_cube_map_address(
+	struct bitmap_data *bitmap,
+	short x,
+	short y,
+	short face_index,
+	short mipmap_index);
+short bitmap_mipmap_get_width(
+	struct bitmap_data *bitmap,
+	short mipmap_index);
+short bitmap_mipmap_get_height(
+	struct bitmap_data *bitmap,
+	short mipmap_index);
+short bitmap_mipmap_get_depth(
+	struct bitmap_data *bitmap,
+	short mipmap_index);
+long bitmap_mipmap_get_pixel_data_size(
+	struct bitmap_data *bitmap,
+	short mipmap_index);
+short bitmap_format_get_bits_per_pixel(
+	short format);
+void rasterizer_xbox_bitmap_swizzle2d_byte(
+	void *destination,
+	void const *source,
+	short width,
+	short height);
+void rasterizer_xbox_bitmap_swizzle2d_word(
+	void *destination,
+	void const *source,
+	short width,
+	short height);
+void rasterizer_xbox_bitmap_swizzle2d_long(
+	void *destination,
+	void const *source,
+	short width,
+	short height);
+void rasterizer_xbox_bitmap_swizzle3d_byte(
+	void *destination,
+	void const *source,
+	short width,
+	short height,
+	short depth);
+void rasterizer_xbox_bitmap_swizzle3d_word(
+	void *destination,
+	void const *source,
+	short width,
+	short height,
+	short depth);
+void rasterizer_xbox_bitmap_swizzle3d_long(
+	void *destination,
+	void const *source,
+	short width,
+	short height,
+	short depth);
 
-void __stdcall code_00157c90(
-	void *resource,
-	void *locked_region);
-long __stdcall code_00157cc0(
-	void *resource,
-	void *locked_region);
-void __stdcall code_00157cd0(
-	void *resource,
-	void *locked_region);
-long __stdcall code_00157d00(
-	void *resource,
-	void *locked_region);
-void __stdcall code_00157d10(
-	void *resource,
-	void *locked_region,
-	long face_index);
-long __stdcall code_00157d40(
-	void *resource,
-	void *locked_region,
-	long face_index);
+static void rasterizer_bitmap_2d_changed(
+	struct bitmap_data *bitmap);
+static void rasterizer_bitmap_3d_changed(
+	struct bitmap_data *bitmap);
+static void rasterizer_bitmap_cube_map_changed(
+	struct bitmap_data *bitmap);
 
 /* ---------- globals */
+
+extern D3DDevice *global_d3d_device;
+
+static struct
+{
+	D3DFORMAT formats[NUMBER_OF_BITMAP_FORMATS];
+	short face_mappings[NUMBER_OF_FACES_PER_CUBE];
+} const rasterizer_bitmap_format_table =
+{
+	{
+		D3DFMT_A8,
+		D3DFMT_L8,
+		D3DFMT_AL8,
+		D3DFMT_A8L8,
+		D3DFMT_UNKNOWN,
+		D3DFMT_UNKNOWN,
+		D3DFMT_R5G6B5,
+		D3DFMT_UNKNOWN,
+		D3DFMT_A1R5G5B5,
+		D3DFMT_A4R4G4B4,
+		D3DFMT_X8R8G8B8,
+		D3DFMT_A8R8G8B8,
+		D3DFMT_UNKNOWN,
+		D3DFMT_UNKNOWN,
+		D3DFMT_DXT1,
+		D3DFMT_DXT3,
+		D3DFMT_DXT5,
+		D3DFMT_P8,
+	},
+	{
+		D3DCUBEMAP_FACE_POSITIVE_X,
+		D3DCUBEMAP_FACE_POSITIVE_Y,
+		D3DCUBEMAP_FACE_NEGATIVE_X,
+		D3DCUBEMAP_FACE_NEGATIVE_Y,
+		D3DCUBEMAP_FACE_POSITIVE_Z,
+		D3DCUBEMAP_FACE_NEGATIVE_Z,
+	},
+};
+
+/* ---------- public code */
+
+boolean rasterizer_bitmap_new(
+	struct bitmap_data *bitmap)
+{
+	boolean success = TRUE;
+	long result;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_bitmaps.c",
+		51,
+		bitmap);
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_bitmaps.c",
+		52,
+		TEST_FLAG(bitmap->flags, _bitmap_has_power_of_two_dimensions_bit));
+
+	bitmap->mipmap_count =
+		rasterizer_xbox_bitmap_get_max_mipmap_count(bitmap);
+	if (global_d3d_device)
+	{
+	switch (bitmap->type)
+	{
+	case _bitmap_type_2d:
+		result = IDirect3DDevice8_CreateTexture(
+			global_d3d_device,
+			bitmap->width,
+			bitmap->height,
+			(short)bitmap->mipmap_count + 1,
+			0,
+			rasterizer_bitmap_format_table.formats[bitmap->format],
+			D3DPOOL_MANAGED,
+			&(IDirect3DTexture8 *)bitmap->hardware_format);
+		if (result >= 0)
+		{
+			success = TRUE;
+		}
+		else
+		{
+			success = FALSE;
+			rasterizer_error(
+				result,
+				"IDirect3DDevice8_CreateTexture(global_d3d_device, bitmap->width, bitmap->height, bitmap->mipmap_count+1, 0, rasterizer_bitmap_format_table[bitmap->format], D3DPOOL_MANAGED, &(IDirect3DTexture8*)bitmap->hardware_format)");
+		}
+		break;
+
+	case _bitmap_type_3d:
+		result = IDirect3DDevice8_CreateVolumeTexture(
+			global_d3d_device,
+			bitmap->width,
+			bitmap->height,
+			(short)bitmap->depth,
+			(short)bitmap->mipmap_count + 1,
+			0,
+			rasterizer_bitmap_format_table.formats[bitmap->format],
+			D3DPOOL_MANAGED,
+			&(IDirect3DVolumeTexture8 *)bitmap->hardware_format);
+		if (result >= 0)
+		{
+			success = TRUE;
+		}
+		else
+		{
+			success = FALSE;
+			rasterizer_error(
+				result,
+				"IDirect3DDevice8_CreateVolumeTexture(global_d3d_device, bitmap->width, bitmap->height, bitmap->depth, bitmap->mipmap_count+1, 0, rasterizer_bitmap_format_table[bitmap->format], D3DPOOL_MANAGED, &(IDirect3DVolumeTexture8*)bitmap->hardware_format)");
+		}
+		break;
+
+	case _bitmap_type_cube_map:
+		result = IDirect3DDevice8_CreateCubeTexture(
+			global_d3d_device,
+			bitmap->width,
+			(short)bitmap->mipmap_count + 1,
+			0,
+			rasterizer_bitmap_format_table.formats[bitmap->format],
+			D3DPOOL_MANAGED,
+			&(IDirect3DCubeTexture8 *)bitmap->hardware_format);
+		if (result >= 0)
+		{
+			success = TRUE;
+		}
+		else
+		{
+			success = FALSE;
+			rasterizer_error(
+				result,
+				"IDirect3DDevice8_CreateCubeTexture(global_d3d_device, bitmap->width, bitmap->mipmap_count+1, 0, rasterizer_bitmap_format_table[bitmap->format], D3DPOOL_MANAGED, &(IDirect3DCubeTexture8*)bitmap->hardware_format)");
+		}
+		break;
+
+	default:
+		match_vassert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_bitmaps.c",
+			91,
+			FALSE,
+			"### ERROR unsupported bitmap type");
+		break;
+	}
+
+	if (!bitmap->hardware_format)
+		success = FALSE;
+	if (!success)
+	{
+		bitmap->hardware_format = NULL;
+		error(
+			_error_silent,
+			"### ERROR failed to create bitmap hardware format");
+	}
+	return success;
+	}
+
+	bitmap->hardware_format = NULL;
+	return TRUE;
+}
+
+/* ---------- private code */
+
+static void rasterizer_bitmap_2d_changed(
+	struct bitmap_data *bitmap)
+{
+	D3DLOCKED_RECT d3d_locked_rect;
+	short width;
+	short height;
+	short mipmap_index;
+	void *source;
+	void *destination;
+	boolean success = TRUE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_bitmaps.c",
+		0x8D,
+		bitmap);
+
+	if (global_d3d_device &&
+		bitmap->base_address &&
+		bitmap->hardware_format)
+	{
+		mipmap_index = 0;
+check_mipmap:
+		if (mipmap_index > (short)bitmap->mipmap_count)
+			goto mipmaps_done;
+		{
+			if (!(IDirect3DTexture8_LockRect(
+					(IDirect3DTexture8 *)bitmap->hardware_format,
+					mipmap_index,
+					&d3d_locked_rect,
+					NULL,
+					D3DLOCK_NOOVERWRITE) >= 0 && success))
+			{
+				rasterizer_error(
+					0,
+					"IDirect3DTexture8_LockRect((IDirect3DTexture8*)bitmap->hardware_format, mipmap_index, &d3d_locked_rect, NULL, D3DLOCK_NOOVERWRITE)");
+			}
+			else if (d3d_locked_rect.pBits)
+			{
+				goto check_surface;
+			}
+
+failed_lock:
+			error(
+				_error_silent,
+				"### ERROR failed to lock surface");
+			success = FALSE;
+			goto loop_continue;
+
+check_surface:
+			{
+				source = bitmap_mipmap_address(bitmap, mipmap_index);
+				destination = d3d_locked_rect.pBits;
+				width = bitmap_mipmap_get_width(bitmap, mipmap_index);
+				height = bitmap_mipmap_get_height(bitmap, mipmap_index);
+				if (TEST_FLAG(bitmap->flags, _bitmap_compressed_bit))
+				{
+					csmemcpy(
+						destination,
+						source,
+						bitmap_mipmap_get_pixel_data_size(
+							bitmap,
+							mipmap_index));
+				}
+				else
+				{
+					switch (bitmap_format_get_bits_per_pixel(
+						(unsigned short)bitmap->format) / 8)
+					{
+					case 4:
+						rasterizer_xbox_bitmap_swizzle2d_long(
+							destination,
+							source,
+							width,
+							height);
+						break;
+
+					case 2:
+						rasterizer_xbox_bitmap_swizzle2d_word(
+							destination,
+							source,
+							width,
+							height);
+						break;
+
+					case 1:
+						rasterizer_xbox_bitmap_swizzle2d_byte(
+							destination,
+							source,
+							width,
+							height);
+						break;
+
+					default:
+						match_vassert(
+							"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_bitmaps.c",
+							0xB1,
+							FALSE,
+							"### ERROR uncompressed bitmap format does not have 1,2 or 4 bytes per pixel");
+						break;
+					}
+				}
+				success = TRUE;
+			}
+
+			IDirect3DTexture8_UnlockRect(
+				(IDirect3DTexture8 *)bitmap->hardware_format,
+				mipmap_index);
+		loop_continue:
+			mipmap_index++;
+			if (success)
+				goto check_mipmap;
+		}
+mipmaps_done:
+
+		if (!success)
+		{
+			error(
+				_error_silent,
+				"### ERROR failed to change bitmap hardware format");
+		}
+	}
+
+	return;
+}
+
+static void rasterizer_bitmap_3d_changed(
+	struct bitmap_data *bitmap)
+{
+	D3DLOCKED_BOX d3d_locked_box;
+	short width;
+	short height;
+	short depth;
+	short mipmap_index;
+	short slice_index;
+	long slice_size;
+	byte *source;
+	byte *destination;
+	boolean success = TRUE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_bitmaps.c",
+		0xCB,
+		bitmap);
+
+	if (global_d3d_device &&
+		bitmap->base_address &&
+		bitmap->hardware_format)
+	{
+		mipmap_index = 0;
+check_mipmap:
+		if (mipmap_index > (short)bitmap->mipmap_count)
+			goto mipmaps_done;
+		{
+			if (!(IDirect3DVolumeTexture8_LockBox(
+					(IDirect3DVolumeTexture8 *)bitmap->hardware_format,
+					mipmap_index,
+					&d3d_locked_box,
+					NULL,
+					D3DLOCK_NOOVERWRITE) >= 0 && success))
+			{
+				rasterizer_error(
+					0,
+					"IDirect3DVolumeTexture8_LockBox((IDirect3DVolumeTexture8*)bitmap->hardware_format, mipmap_index, &d3d_locked_box, NULL, D3DLOCK_NOOVERWRITE)");
+			}
+			else if (d3d_locked_box.pBits)
+			{
+				goto check_surface;
+			}
+
+failed_lock:
+			error(
+				_error_silent,
+				"### ERROR failed to lock surface");
+			success = FALSE;
+			goto loop_continue;
+
+check_surface:
+			{
+				source = bitmap_mipmap_address(bitmap, mipmap_index);
+				destination = d3d_locked_box.pBits;
+				width = bitmap_mipmap_get_width(bitmap, mipmap_index);
+				height = bitmap_mipmap_get_height(bitmap, mipmap_index);
+				depth = bitmap_mipmap_get_depth(bitmap, mipmap_index);
+				if (TEST_FLAG(bitmap->flags, _bitmap_compressed_bit))
+				{
+					if (depth > 0)
+					{
+						for (slice_index = 0;
+							slice_index < depth;
+							slice_index++)
+						{
+							slice_size =
+								bitmap_mipmap_get_pixel_data_size(
+									bitmap,
+									mipmap_index) / depth;
+							csmemcpy(
+								destination,
+								source,
+								slice_size);
+							source += slice_size;
+							destination += d3d_locked_box.SlicePitch;
+						}
+					}
+				}
+				else
+				{
+					switch (bitmap_format_get_bits_per_pixel(
+						(unsigned short)bitmap->format) / 8)
+					{
+					case 4:
+						rasterizer_xbox_bitmap_swizzle3d_long(
+							destination,
+							source,
+							width,
+							height,
+							depth);
+						break;
+
+					case 2:
+						rasterizer_xbox_bitmap_swizzle3d_word(
+							destination,
+							source,
+							width,
+							height,
+							depth);
+						break;
+
+					case 1:
+						rasterizer_xbox_bitmap_swizzle3d_byte(
+							destination,
+							source,
+							width,
+							height,
+							depth);
+						break;
+
+					default:
+						match_vassert(
+							"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_bitmaps.c",
+							0xF9,
+							FALSE,
+							"### ERROR uncompressed bitmap format does not have 1,2 or 4 bytes per pixel");
+						break;
+					}
+				}
+				success = TRUE;
+			}
+
+			IDirect3DVolumeTexture8_UnlockBox(
+				(IDirect3DVolumeTexture8 *)bitmap->hardware_format,
+				mipmap_index);
+		loop_continue:
+			mipmap_index++;
+			if (success)
+				goto check_mipmap;
+		}
+mipmaps_done:
+
+		if (!success)
+		{
+			error(
+				_error_silent,
+				"### ERROR failed to change bitmap hardware format");
+		}
+	}
+
+	return;
+}
+
+static void rasterizer_bitmap_cube_map_changed(
+	struct bitmap_data *bitmap)
+{
+	D3DLOCKED_RECT d3d_locked_rect;
+	short face_index;
+	short width;
+	short height;
+	short mipmap_index;
+	void *source;
+	void *destination;
+	boolean success = TRUE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_bitmaps.c",
+		0x114,
+		bitmap);
+
+	if (global_d3d_device &&
+		bitmap->base_address &&
+		bitmap->hardware_format)
+	{
+		mipmap_index = 0;
+check_mipmap:
+		if (mipmap_index > (short)bitmap->mipmap_count)
+			goto mipmaps_done;
+		{
+			for (face_index = 0;
+				success && face_index < NUMBER_OF_FACES_PER_CUBE;
+				face_index++)
+			{
+				if (!(IDirect3DCubeTexture8_LockRect(
+						(IDirect3DCubeTexture8 *)bitmap->hardware_format,
+						(D3DCUBEMAP_FACES)rasterizer_bitmap_format_table.face_mappings[face_index],
+						mipmap_index,
+						&d3d_locked_rect,
+						NULL,
+						D3DLOCK_NOOVERWRITE) >= 0 && success))
+				{
+					rasterizer_error(
+						0,
+						"IDirect3DCubeTexture8_LockRect((IDirect3DCubeTexture8*)bitmap->hardware_format, face_mapping_table[face_index], mipmap_index, &d3d_locked_rect, NULL, D3DLOCK_NOOVERWRITE)");
+				}
+				else if (d3d_locked_rect.pBits)
+				{
+					goto check_surface;
+				}
+
+				error(
+					_error_silent,
+					"### ERROR failed to lock surface");
+				success = FALSE;
+				continue;
+
+check_surface:
+				{
+					source = bitmap_cube_map_address(
+						bitmap,
+						0,
+						0,
+						face_index,
+						mipmap_index);
+					destination = d3d_locked_rect.pBits;
+					width = bitmap_mipmap_get_width(bitmap, mipmap_index);
+					height = bitmap_mipmap_get_height(bitmap, mipmap_index);
+					if (TEST_FLAG(bitmap->flags, _bitmap_compressed_bit))
+					{
+						csmemcpy(
+							destination,
+							source,
+							bitmap_mipmap_get_pixel_data_size(
+								bitmap,
+								mipmap_index) /
+								NUMBER_OF_FACES_PER_CUBE);
+					}
+					else
+					{
+						switch (bitmap_format_get_bits_per_pixel(
+							(unsigned short)bitmap->format) / 8)
+						{
+						case 4:
+							rasterizer_xbox_bitmap_swizzle2d_long(
+								destination,
+								source,
+								width,
+								height);
+							break;
+
+						case 2:
+							rasterizer_xbox_bitmap_swizzle2d_word(
+								destination,
+								source,
+								width,
+								height);
+							break;
+
+						case 1:
+							rasterizer_xbox_bitmap_swizzle2d_byte(
+								destination,
+								source,
+								width,
+								height);
+							break;
+
+						default:
+							match_vassert(
+								"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_bitmaps.c",
+								0x13F,
+								FALSE,
+								"### ERROR uncompressed bitmap format does not have 1,2 or 4 bytes per pixel");
+							break;
+						}
+					}
+					success = TRUE;
+				}
+
+				IDirect3DCubeTexture8_UnlockRect(
+					(IDirect3DCubeTexture8 *)bitmap->hardware_format,
+					(D3DCUBEMAP_FACES)rasterizer_bitmap_format_table.face_mappings[face_index],
+					mipmap_index);
+			}
+			mipmap_index++;
+			if (success)
+				goto check_mipmap;
+		}
+mipmaps_done:
+
+		if (!success)
+		{
+			error(
+				_error_silent,
+				"### ERROR failed to change bitmap hardware format");
+		}
+	}
+
+	return;
+}
 
 /* ---------- public code */
 
@@ -117,55 +739,46 @@ void rasterizer_bitmap_delete(
 	texture_cache_bitmap_delete(bitmap);
 	if (bitmap && bitmap->hardware_format)
 	{
-		D3DResource_Release(bitmap->hardware_format);
+		IDirect3DBaseTexture8_Release(
+			(IDirect3DBaseTexture8 *)bitmap->hardware_format);
 		bitmap->hardware_format = NULL;
 	}
 
 	return;
 }
 
-/* ---------- private code */
-
-void __stdcall code_00157c90(
-	void *resource,
-	void *locked_region)
+void rasterizer_bitmap_changed(
+	struct bitmap_data *bitmap)
 {
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_bitmaps.c",
+		0x70,
+		bitmap);
+
+	rasterizer_globals.current_lock_operation = 1;
+	switch (bitmap->type)
+	{
+	case _bitmap_type_2d:
+		rasterizer_bitmap_2d_changed(bitmap);
+		break;
+
+	case _bitmap_type_3d:
+		rasterizer_bitmap_3d_changed(bitmap);
+		break;
+
+	case _bitmap_type_cube_map:
+		rasterizer_bitmap_cube_map_changed(bitmap);
+		break;
+
+	default:
+		match_vassert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_bitmaps.c",
+			0x80,
+			FALSE,
+			"### ERROR unsupported bitmap type");
+		break;
+	}
+	rasterizer_globals.current_lock_operation = 0;
+
 	return;
-}
-
-long __stdcall code_00157cc0(
-	void *resource,
-	void *locked_region)
-{
-	return 0;
-}
-
-void __stdcall code_00157cd0(
-	void *resource,
-	void *locked_region)
-{
-	return;
-}
-
-long __stdcall code_00157d00(
-	void *resource,
-	void *locked_region)
-{
-	return 0;
-}
-
-void __stdcall code_00157d10(
-	void *resource,
-	void *locked_region,
-	long face_index)
-{
-	return;
-}
-
-long __stdcall code_00157d40(
-	void *resource,
-	void *locked_region,
-	long face_index)
-{
-	return 0;
 }
