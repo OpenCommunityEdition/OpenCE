@@ -291,6 +291,12 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	_actor_mode_braindead = 0,
+	_actor_mode_alert = 2,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -332,6 +338,13 @@ void encounter_attach_actor(
 	long encounter_index,
 	short squad_index,
 	boolean has_previous_team);
+
+void code_00029e70(
+	long actor_index);
+
+void actor_set_dormant(
+	long actor_index,
+	boolean dormant);
 
 /* ---------- globals */
 
@@ -685,6 +698,28 @@ void actor_delete_props(
 	{
 		actor_switch_props(actor_index, actor->meta.first_prop_index, NONE);
 		prop_delete(actor_index, actor->meta.first_prop_index);
+	}
+
+	return;
+}
+
+void actor_braindead(
+	long actor_index,
+	boolean braindead)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (braindead)
+	{
+		actor->state.mode = _actor_mode_braindead;
+		actor->state.action = _actor_action_none;
+		actor_delete_props(actor_index);
+		code_00029e70(actor_index);
+		actor_set_dormant(actor_index, FALSE);
+	}
+	else if (actor->state.mode == _actor_mode_braindead)
+	{
+		actor->state.mode = _actor_mode_alert;
 	}
 
 	return;
