@@ -362,6 +362,17 @@ void actor_set_dormant(
 	long actor_index,
 	boolean dormant);
 
+void actor_swarm_detach_from_unit(
+	long actor_index,
+	long unit_index);
+
+void actor_delete(
+	long actor_index,
+	boolean died);
+
+void actor_died(
+	long actor_index);
+
 /* ---------- globals */
 
 struct data_array *swarm_data = NULL;
@@ -791,6 +802,51 @@ void actors_freeze(
 	while (actor_iterator_next(&iterator))
 	{
 		code_00029e70(iterator.index);
+	}
+
+	return;
+}
+
+void actor_erase(
+	long actor_index,
+	boolean immediate)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->meta.swarm)
+	{
+		long unit_index = actor->meta.swarm_unit_index;
+
+		while (unit_index != NONE)
+		{
+			actor_swarm_detach_from_unit(actor_index, unit_index);
+			if (immediate)
+			{
+				object_delete_immediately(unit_index);
+			}
+			else
+			{
+				object_delete(unit_index);
+			}
+
+			unit_index = actor->meta.swarm_unit_index;
+		}
+
+		actor_delete(actor_index, TRUE);
+	}
+	else
+	{
+		long unit_index = actor->meta.unit_index;
+
+		actor_died(actor_index);
+		if (immediate)
+		{
+			object_delete_immediately(unit_index);
+		}
+		else
+		{
+			object_delete(unit_index);
+		}
 	}
 
 	return;
