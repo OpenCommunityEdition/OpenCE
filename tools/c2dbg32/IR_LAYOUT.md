@@ -596,3 +596,51 @@ The decision itself — *which* of a commutative pair is handed to
 `0x10708c34` to become the load — is made in the caller of these sites. That
 caller is the next target, and it is now one frame away rather than
 unlocated.
+
+## The deciding frame: it does not decide — it takes the chain head (2026-08-30)
+
+One frame back from the fld-node creation, at `0x10736518`-`0x1073653d`
+(the function that calls the `0x24e` creator `0x10707951`/`0x10707995`):
+
+```
+10736518: mov  edi, [ebp+0x28]   ; operand chain of the node being lowered
+1073651b: mov  eax, edi
+1073651d: call 0x10703bae        ; accessor on the FIRST operand
+10736522: mov  ebx, eax          ;   -> kept
+1073652c: mov  eax, [edi]        ; [+0] is the link: the SECOND operand
+1073652e: call 0x10703bae        ;   -> result DISCARDED (called for effect)
+10736533: xor  edi, edi
+10736535: mov  di, word [ebp+0xa]
+10736539: mov  ecx, ebx          ; the FIRST operand is what becomes the load
+1073653b: mov  edx, esi          ; esi = opcode (tested against 0x285 / 0x276 above)
+1073653d: call 0x10707951        ; build the fld node for it
+```
+
+Live confirmation (breakpoint `0x1073652c`, `probes/m6only.c`, 46 hits): at
+each hit `edi` = `ebx` = the chain head, itself a node with `[+4] = 0x24e`,
+`[+8] = 0x10040002`, a symbol pointer at `[+0x18]`, and `[+0]` = the link to
+the next operand (0x20 further on in the observed case).
+
+**So this frame applies no rule at all.** It takes the *head* of the operand
+chain and materialises that one as the load; the second operand is visited
+only for its side effect and stays as the memory operand. The commutative
+operand role is therefore decided by **the order of the operand chain**,
+which is fixed when the arithmetic node's operands are linked — upstream of
+here.
+
+This is consistent with, and explains, the source-level result recorded in
+`docs/object_matching_logs/breakable_surfaces_obj.md`: roughly 65 source
+shapes, including every operand text order inside the helpers, are inert.
+Writing `b->i*a->k` instead of `a->k*b->i` cannot help, because the two
+operands are canonicalised into the chain before this point; only something
+that changes the *chain order* changes which one is loaded.
+
+**Still open.** Which chain element corresponds to which source operand for
+the specific tied instruction is not established — that needs the per-hit
+correlation noted in the previous section (46 creations, no reliable
+hit-to-instruction mapping yet). So the mechanism is now known while the
+particular ordering input is not.
+
+**Next target**: the code that links operands into `[node+0x28]`. That is
+where a commutative pair acquires its order, and it is the last frame
+between here and an answer.
