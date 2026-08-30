@@ -126,6 +126,25 @@ real_vector3d *uncompress_int32_to_real_vector3d(
 	real_vector3d *result,
 	unsigned long compressed);
 
+/* Bungie's own float-to-long conversion helper, recovered verbatim from the
+   historical cseries.h.  January inlines it at every conversion below;
+   ordinary C conversions lower through a 64-bit fistp under this compiler
+   and cannot reproduce those chains.  Admitted by owner ruling 2026-08-30,
+   kept unit-local so a shared-header __inline cannot perturb other units. */
+static __inline long fast_ftol(
+	float d)
+{
+	long result;
+
+	__asm
+	{
+		fld d
+		fistp result
+	}
+
+	return result;
+}
+
 /* ---------- globals */
 
 /* ---------- public code */
@@ -221,6 +240,43 @@ void environment_lightmap_vertex_compressed_get_texcoord(
 	texcoord->n[1] = ((float)vertex->lightmap_v * 2.0f + 1.0f) * (1.0f / 65535.0f);
 
 	return;
+}
+
+
+byte compress_real_to_int8(
+	real z)
+{
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 42, z>=0.0f && z<=1.0f);
+
+	z = z * 255.0f;
+
+	return (byte)fast_ftol(z);
+}
+
+byte compress_real_to_int8_clamp(
+	real z)
+{
+	z = PIN(z, 0.0f, 1.0f) * 255.0f;
+
+	return (byte)fast_ftol(z);
+}
+
+short compress_real_to_int16(
+	real z)
+{
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 55, z>=-1.0f && z<=1.0f);
+
+	z = (real)floor(z * 32767.5f);
+
+	return (short)fast_ftol(z);
+}
+
+short compress_real_to_int16_clamp(
+	real z)
+{
+	z = (real)floor(PIN(z, -1.0f, 1.0f) * 32767.5f);
+
+	return (short)fast_ftol(z);
 }
 
 /* ---------- private code */
