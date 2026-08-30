@@ -112,6 +112,24 @@ static DWORD wphits[4];
    addresses. This answers "where in memory is the code being assembled?", which
    neither INT3 nor a watchpoint can, because the buffer address is what you are
    looking for in the first place. */
+/* --- arm a watchpoint at a RUNTIME-DISCOVERED address (dbg_armwp.txt) ---
+   "<hexpattern> @N +<hexoff> <len>": at the Nth hit of bp0, scan the
+   debuggee for <hexpattern>; on the first match, program a write
+   watchpoint at match+<hexoff>.  This is the instrument for "who writes
+   this byte?" when the address only exists at run time -- arena/heap
+   buffers move between runs, so such an address cannot be written into
+   dbg_wp.txt up front. */
+/* dbg_armreg.txt: "<reg> <hexoff> <hit> <len>" e.g. "ebp 18 3 4" --
+   at the Nth hit of bp0, take <reg> from the trapping context and arm a
+   write watchpoint at reg+off.  IR node addresses shift ~1MB per run, so
+   this is the only way to watch a node field. */
+static char aregbuf[128];
+static int areg_idx=-1; static DWORD areg_off=0, areg_hit=0, areg_len=4;
+
+static char armbuf[256];
+static BYTE armpat[64]; static int armlen=0;
+static DWORD arm_after=0, arm_off=0, arm_wplen=1; static int armed=0;
+
 static char scanbuf[512];
 static BYTE scanpat[64]; static int scanlen=0; static DWORD scan_after=0;
 static BYTE scanwin[4096];
@@ -147,6 +165,35 @@ static void do_scan(void){
   flush();
 }
 
+/* First address in the debuggee matching pat[0..patlen), or 0. Same sweep
+   as do_scan but returns instead of printing. */
+static DWORD find_first(const BYTE* pat, int patlen){
+  MBI m; DWORD addr=0x10000;
+  if(patlen<=0) return 0;
+  while(addr < 0x7ff00000){
+    if(VirtualQueryEx(g_proc,(LPVOID)addr,&m,sizeof(m))!=sizeof(m)) break;
+    if(m.State==0x1000 && !(m.Protect & 0x101)){
+      DWORD base=(DWORD)m.Base, size=m.RegionSize, off=0;
+      while(off < size){
+        DWORD want = (size-off > sizeof(scanwin)) ? (DWORD)sizeof(scanwin) : (size-off);
+        DWORD rd=0;
+        if(ReadProcessMemory(g_proc,(LPVOID)(base+off),scanwin,want,&rd) && rd>=(DWORD)patlen){
+          DWORD i; int j;
+          for(i=0;i+(DWORD)patlen<=rd;i++){
+            for(j=0;j<patlen;j++) if(scanwin[i+j]!=pat[j]) break;
+            if(j==patlen) return base+off+i;
+          }
+        }
+        if(want<=(DWORD)patlen) break;
+        off += want-(DWORD)patlen;
+      }
+    }
+    addr = (DWORD)m.Base + m.RegionSize;
+    if(m.RegionSize==0) break;
+  }
+  return 0;
+}
+
 static int readfile(const WCHAR* path, void* buf, int cap){
   HANDLE h=CreateFileW(path,GENERIC_READ,1,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
   DWORD sz,rd; if(h==(HANDLE)-1)return -1;
@@ -171,6 +218,8 @@ static const WCHAR P_BP[]  = {'d','b','g','_','b','p','.','t','x','t',0};
 static const WCHAR P_OUT[] = {'d','b','g','_','r','e','s','u','l','t','.','t','x','t',0};
 static const WCHAR P_GATE[]= {'d','b','g','_','g','a','t','e','.','t','x','t',0};
 static const WCHAR P_WP[]  = {'d','b','g','_','w','p','.','t','x','t',0};
+static const WCHAR P_AREG[]= {'d','b','g','_','a','r','m','r','e','g','.','t','x','t',0};
+static const WCHAR P_ARM[] = {'d','b','g','_','a','r','m','w','p','.','t','x','t',0};
 static const WCHAR P_SCAN[]= {'d','b','g','_','s','c','a','n','.','t','x','t',0};
 
 static DWORD pend_tid[16]; static DWORD pend_addr[16]; static int npend;
@@ -242,8 +291,48 @@ void entry(void){
       if(hi<0) hi=d; else { scanpat[scanlen++]=(BYTE)((hi<<4)|d); hi=-1; }
       p++; } }
 
+  n=readfile(P_ARM,armbuf,sizeof(armbuf)-1); if(n<0)n=0; armbuf[n]=0;
+  { char* p=armbuf; int hi=-1;
+    while(*p && armlen<(int)sizeof(armpat)){
+      char c=*p; int d=-1;
+      if(c>='0'&&c<='9')d=c-'0'; else if(c>='a'&&c<='f')d=c-'a'+10;
+      else if(c>='A'&&c<='F')d=c-'A'+10;
+      else break;
+      if(hi<0) hi=d; else { armpat[armlen++]=(BYTE)((hi<<4)|d); hi=-1; }
+      p++; }
+    while(*p){
+      if(*p=='@'){ p++; arm_after=parsedec(&p); continue; }
+      if(*p=='+'){ p++; arm_off=parsehex(p);
+        while(*p&&*p!=' '&&*p!='\t'&&*p!='\n'&&*p!='\r')p++; continue; }
+      if(*p>='1'&&*p<='9'){ arm_wplen=parsedec(&p); continue; }
+      p++; }
+    if(arm_wplen!=1&&arm_wplen!=2&&arm_wplen!=4) arm_wplen=1;
+    if(arm_after==0) arm_after=1; }
+
+  n=readfile(P_AREG,aregbuf,sizeof(aregbuf)-1); if(n<0)n=0; aregbuf[n]=0;
+  if(aregbuf[0]){ char* p=aregbuf; char r0,r1,r2;
+    while(*p==' ')p++;
+    r0=p[0]; r1=p[1]; r2=p[2];
+    if(r0=='e'){
+      if(r1=='a'&&r2=='x')areg_idx=0; else if(r1=='b'&&r2=='x')areg_idx=1;
+      else if(r1=='c'&&r2=='x')areg_idx=2; else if(r1=='d'&&r2=='x')areg_idx=3;
+      else if(r1=='s'&&r2=='i')areg_idx=4; else if(r1=='d'&&r2=='i')areg_idx=5;
+      else if(r1=='b'&&r2=='p')areg_idx=6; else if(r1=='s'&&r2=='p')areg_idx=7; }
+    while(*p&&*p!=' ')p++;
+    areg_off=parsehex(p); while(*p==' ')p++;
+    while(*p&&*p!=' ')p++;
+    areg_hit=parsedec(&p); areg_len=parsedec(&p);
+    if(areg_len!=1&&areg_len!=2&&areg_len!=4)areg_len=4;
+    if(areg_hit==0)areg_hit=1; }
+
   puts_("bp count="); hex_((DWORD)nbp,1); putc_('\n');
   for(i=0;i<nbp;i++){ puts_("  bp"); hex_((DWORD)i,1); puts_("="); hx(bps[i]); putc_('\n'); }
+  if(armlen>0){ puts_("armwp: scan "); hex_((DWORD)armlen,1);
+    puts_(" bytes at bp0 hit "); hex_(arm_after,1); puts_(", watch match+");
+    hx(arm_off); putc_('/'); hex_(arm_wplen,1); putc_('\n'); }
+  if(areg_idx>=0){ puts_("armreg: at bp0 hit "); hex_(areg_hit,1);
+    puts_(" watch reg["); hex_((DWORD)areg_idx,1); puts_("]+"); hx(areg_off);
+    putc_('/'); hex_(areg_len,1); putc_('\n'); }
   if(g_gate_lo){ puts_("gate mode: bp0 counts; dump bp1+ while count in ["); hex_(g_gate_lo,1);
     puts_(".."); hex_(g_gate_hi,1); puts_("]\n"); }
   flush();
@@ -284,6 +373,31 @@ void entry(void){
         memset(&ctx,0,sizeof(ctx)); ctx.ContextFlags=CTX_FULL;
         GetThreadContext(hth,&ctx);
         hits[bi]++;
+        if(areg_idx>=0 && !armed && bi==0 && hits[0]>=areg_hit){
+          DWORD rv[8]; DWORD wa;
+          rv[0]=ctx.Eax; rv[1]=ctx.Ebx; rv[2]=ctx.Ecx; rv[3]=ctx.Edx;
+          rv[4]=ctx.Esi; rv[5]=ctx.Edi; rv[6]=ctx.Ebp; rv[7]=ctx.Esp;
+          wa = rv[areg_idx] + areg_off;
+          armed=1;
+          puts_("ARMREG at bp0 hit "); hex_(hits[0],1); puts_(": reg=");
+          hx(rv[areg_idx]); puts_(" -> watch "); hx(wa); putc_('/');
+          hex_(areg_len,1); putc_('\n');
+          if(nwp<4){ wps[nwp]=wa; wplen[nwp]=areg_len; nwp++; arm_wp(hth); }
+          flush();
+        }
+        if(armlen>0 && !armed && bi==0 && hits[0]>=arm_after){
+          DWORD found=find_first(armpat,armlen);
+          armed=1;
+          puts_("ARMWP scan at bp0 hit "); hex_(hits[0],1); puts_(": ");
+          if(found){
+            DWORD wa=found+arm_off;
+            hx(found); puts_(" -> watch "); hx(wa); putc_('/');
+            hex_(arm_wplen,1); putc_('\n');
+            if(nwp<4){ wps[nwp]=wa; wplen[nwp]=arm_wplen; nwp++; arm_wp(hth); }
+            else puts_("   (no free debug register)\n");
+          } else puts_("no match\n");
+          flush();
+        }
         if(g_gate_lo && bi==0){ /* the per-function gate: count, arm/disarm window, no heavy dump */
           DWORD cur=0,rd=0; g_gate_count++; heavy=0; uncapped=1;
           if(g_gate_count==g_gate_lo){ for(i=1;i<nbp;i++) plant(g_proc,bps[i],0xCC); }

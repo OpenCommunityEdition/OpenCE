@@ -6,3 +6,11 @@ dbg_cmd.u16
 dbg_dir.u16
 dbg_bp.txt
 dbg_*.obj
+dbg_run*.txt
+dbg_scan.txt
+dbg_wp.txt
+dbg_armwp.txt
+dbg_armreg.txt
+dbg_gate.txt
+dbg_lab.obj
+dbg_cross.obj

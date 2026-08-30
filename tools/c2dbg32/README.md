@@ -104,6 +104,69 @@ breakpoint a site that hands you the pointer, read it from the dump, then re-run
 with that address in `dbg_wp.txt` (allocation is deterministic across runs of
 the same compile).
 
+## Runtime-resolved watchpoints (`dbg_armwp.txt`, `dbg_armreg.txt`)
+
+`dbg_wp.txt` programs DR0..DR3 when C2 loads, so it can only watch an
+address you already know. Compiler-internal addresses are not knowable then:
+the arena base shifts about 1 MB between runs, so IR nodes and the code
+buffer land somewhere new every time (their *offsets* are stable, only the
+base moves). These two modes resolve the address at run time instead.
+
+**`dbg_armwp.txt` — find the address by pattern, then watch it:**
+
+```
+558bec83ec188d45f450 @59 +1a 1
+```
+
+At the 59th hit of bp0, sweep the debuggee for that byte string; on the
+first match, program a 1-byte write watchpoint at `match + 0x1a`. Use it to
+watch a byte of emitted code: scan for the function's prologue, offset to
+the instruction you care about. Choose a pattern distinctive to the
+compiled output — a short generic prologue also matches CL.Exe's own code,
+and the first match wins.
+
+**`dbg_armreg.txt` — take the address from a register:**
+
+```
+ebp 18 3 4
+```
+
+At the 3rd hit of bp0, read `ebp` from the trapping context and watch
+`ebp + 0x18` for 4 bytes. This is the one for IR node fields: breakpoint a
+site that holds the node in a register, and watch the field from there.
+
+Both arm once, print the resolved address, and coexist with the INT3
+breakpoints and with `dbg_wp.txt` (up to four watchpoints total).
+
+### Worked example: what wrote this instruction byte?
+
+Against `research/breakable_surfaces_closeout/probes/m6only.c`, whose
+`fld [ebp-0x10]` at function offset 0x18 carries the breakable-surfaces
+operand tie, `558bec83ec188d45f450 @59 +1a 1` reports
+
+```
+ARMWP scan at bp0 hit b: 0x02892640 -> watch 0x0289265a/1
+WP0 #1 @0x0289265a now=0x000000f0 writer_eip=0x10781c2b
+```
+
+`0xf0` is the displacement encoding `[ebp-0x10]`, i.e. the tied operand,
+and the writer chain reads: inlined <=8-byte copy loop at `0x10781c18`
+(store at `0x10781c29`), called from the byte-append `0x10781bbc`, called
+from `emit_bytes` at `0x10750023` (which also feeds the optional listing
+hook at `0x10750f56` when `[0x10894e6c]` is set).
+
+Watching the byte in its *staging* buffer instead (`0x001af496`, a stack
+address, stable across runs) gives the encoder itself: `0x107455da`
+`mov byte ptr [edx], al`, which advances the emit cursor `[0x1088b788]`.
+Its owner `0x107455e6` reads `edx = [ebp+4]` — the node opcode — and
+range-checks `edx - 0x249 <= 0x11`, confirming both the documented FP
+opcode band and that **`ebp` is the IR node pointer** there.
+
+**What this settles:** the encoder only renders node fields. The operand
+role is already fixed in the node graph before it runs, so the decision
+lives upstream in lowering. `dbg_armreg.txt` on that node's operand
+pointer is the way in.
+
 ## Memory pattern scan (`dbg_scan.txt`)
 
 Watchpoints answer "who writes this address?" — but only once you know the
