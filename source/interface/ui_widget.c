@@ -840,6 +840,24 @@ int widget_instance_count_children(
 	return count;
 }
 
+struct widget_instance *widget_instance_get_nth_child(
+	struct widget_instance *widget,
+	int n)
+{
+	int i;
+	struct widget_instance *result;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+		1050,
+		widget);
+	result = widget->child;
+	for (i = 0; i < n && result; i++)
+		result = result->next;
+
+	return result;
+}
+
 void *ui_widget_realloc(
 	void *pointer,
 	word size,
