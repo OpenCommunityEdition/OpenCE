@@ -89,6 +89,8 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "memory/data.h"
 #include "objects/objects.h"
+#include "render/render.h"
+#include "render/render_sprite.h"
 #include "saved games/game_state.h"
 
 /* ---------- constants */
@@ -400,5 +402,43 @@ void nonuniform_cubic_spline_vector3d(
 		t3,
 		t);
 
+	return;
+}
+
+void glow_render(
+	long object_index,
+	long glow_index)
+{
+	struct glow_datum *glow;
+	struct glow_definition *definition;
+	struct build_sprite_data sprite_data;
+	struct glow_particle *particle;
+
+	glow = datum_get(glow_globals.glow_data, glow_index);
+	definition = tag_get(GLOW_TAG, glow->definition_index);
+	build_sprites_begin(
+		&sprite_data,
+		glow->number_of_particles,
+		definition->texture.index,
+		&global_shader_effect_additive,
+		0);
+
+	for (particle = glow->head_particle; particle; particle = particle->next)
+	{
+		build_sprite(
+			&sprite_data,
+			0,
+			0,
+			0,
+			&particle->position,
+			&glow->markers[particle->parent_marker_index].matrix.forward,
+			0.0f,
+			particle->present_size,
+			&particle->color,
+			particle->fade,
+			0);
+	}
+
+	build_sprites_end(&sprite_data);
 	return;
 }
