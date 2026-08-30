@@ -144,7 +144,9 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "memory/data.h"
 #include "math/real_math.h"
+#include "objects/objects.h"
 #include "saved games/game_state.h"
+#include "scenario/scenario.h"
 #undef local_random_direction3d
 
 /* ---------- constants */
@@ -172,12 +174,49 @@ struct effects_information
 	short active_effect_count;
 };
 
+struct effect_datum
+{
+	struct effect_datum_header header;
+	byte _unknown04[0x0C];
+	struct location location;
+	byte _unknown18[0x24];
+	long object_index;
+	byte _unknown40[0x1C];
+	long location_datum_indices[32];
+	byte _unknownDC[0x20];
+};
+
+struct effect_location_datum
+{
+	short identifier;
+	short node_designator;
+	long next_instance_location_index;
+	real_matrix4x3 matrix;
+};
+
 typedef char effect_datum_header_size_assert[
 	sizeof(struct effect_datum_header) == 0x4 ? 1 : -1];
 typedef char effects_information_size_assert[
 	sizeof(struct effects_information) == 0x6 ? 1 : -1];
+typedef char effect_datum_location_offset_assert[
+	offsetof(struct effect_datum, location) == 0x10 ? 1 : -1];
+typedef char effect_datum_object_index_offset_assert[
+	offsetof(struct effect_datum, object_index) == 0x3C ? 1 : -1];
+typedef char effect_datum_location_indices_offset_assert[
+	offsetof(struct effect_datum, location_datum_indices) == 0x5C ? 1 : -1];
+typedef char effect_datum_size_assert[
+	sizeof(struct effect_datum) == 0xFC ? 1 : -1];
+typedef char effect_location_datum_matrix_offset_assert[
+	offsetof(struct effect_location_datum, matrix) == 0x08 ? 1 : -1];
+typedef char effect_location_datum_size_assert[
+	sizeof(struct effect_location_datum) == 0x3C ? 1 : -1];
 
 /* ---------- prototypes */
+
+struct effect_location_datum *effect_location_get_next_instance(
+	struct effect_datum const *effect,
+	long *location_datum_index,
+	short camera_mode);
 
 /* ---------- globals */
 
@@ -255,6 +294,55 @@ void effects_information_get(
 void effects_disconnect_from_structure_bsp(
 	void)
 {
+	return;
+}
+
+void effects_reconnect_to_structure_bsp(
+	void)
+{
+	long effect_index;
+
+	for (effect_index = data_next_index(effect_data, NONE);
+		effect_index != NONE;
+		effect_index = data_next_index(effect_data, effect_index))
+	{
+		struct effect_datum *effect =
+			(struct effect_datum *)datum_get(effect_data, effect_index);
+
+		if (effect->object_index == NONE)
+		{
+			long location_datum_index = effect->location_datum_indices[0];
+			struct effect_location_datum *instance = NULL;
+
+			if (location_datum_index != NONE)
+			{
+				instance = (struct effect_location_datum *)datum_get(
+					effect_location_data,
+					location_datum_index);
+				location_datum_index = instance->next_instance_location_index;
+				if (instance->node_designator != NONE &&
+					(instance->node_designator & (1u << 15)) != 0)
+				{
+					instance = effect_location_get_next_instance(
+						effect,
+						&location_datum_index,
+						0);
+				}
+			}
+
+			if (instance)
+			{
+				scenario_location_from_point(
+					&effect->location,
+					&instance->matrix.position);
+			}
+			else
+			{
+				effect_delete(effect_index);
+			}
+		}
+	}
+
 	return;
 }
 

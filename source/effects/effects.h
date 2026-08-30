@@ -18,6 +18,8 @@ header included in hcex build.
 
 void effects_disconnect_from_structure_bsp(
 	void);
+void effects_reconnect_to_structure_bsp(
+	void);
 long effect_new_looping(
 	long definition_index,
 	long object_index,
