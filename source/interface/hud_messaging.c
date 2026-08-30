@@ -432,6 +432,20 @@ void scripted_hud_time_code_show(
 	return;
 }
 
+void scripted_hud_time_code_start(
+	boolean start)
+{
+	if (start)
+	{
+		time_code_time += game_time_get() - time_code_stop_time;
+		time_code_stop_time = NONE;
+		return;
+	}
+	time_code_stop_time = game_time_get();
+
+	return;
+}
+
 void scripted_hud_time_code_reset(
 	void)
 {
