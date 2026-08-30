@@ -673,6 +673,10 @@ typedef char verify_ui_widget_pause_disabled_ticks_offset[
 	offsetof(
 		struct ui_widget_runtime_globals_prefix,
 		pause_disabled_ticks) == 0x24 ? 1 : -1];
+typedef char verify_ui_widget_main_menu_deferred_error_code_offset[
+	offsetof(
+		struct ui_widget_runtime_globals_prefix,
+		main_menu_deferred_error_code) == 0x28 ? 1 : -1];
 typedef char verify_ui_widget_initialization_thread_offset[
 	offsetof(
 		struct ui_widget_runtime_globals_prefix,
@@ -872,6 +876,21 @@ boolean filesystem_check_thread_is_active(
 	void)
 {
 	return bss_00454240.widget_globals.initialization_thread != NULL;
+}
+
+void display_error_when_main_menu_loaded(
+	short error_code)
+{
+	if (bss_00454240.widget_globals.main_menu_deferred_error_code == NONE)
+	{
+		bss_00454240.widget_globals.main_menu_deferred_error_code = error_code;
+		return;
+	}
+
+	error(
+		_error_silent,
+		"there is already an error message queued for display at the main menu; ignoring this one");
+	return;
 }
 
 boolean ui_main_menu_music_active(
