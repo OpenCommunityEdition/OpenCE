@@ -416,9 +416,9 @@ void entry(void){
         { DWORD rd; ReadProcessMemory(g_proc,(LPVOID)ctx.Esp,membuf,32,&rd);
           puts_("        stk:"); for(i=0;i<8;i++){ putc_(' '); hx(((DWORD*)membuf)[i]); } putc_('\n'); }
         /* dump memory each GP register points at (IR node records) */
-        { DWORD regs[6]; const char* nm[6]; int r; regs[0]=ctx.Eax;nm[0]="eax";regs[1]=ctx.Ebx;nm[1]="ebx";
-          regs[2]=ctx.Ecx;nm[2]="ecx";regs[3]=ctx.Edx;nm[3]="edx";regs[4]=ctx.Esi;nm[4]="esi";regs[5]=ctx.Edi;nm[5]="edi";
-          for(r=0;r<6;r++){ DWORD rd=0; if(regs[r]>0x10000 && regs[r]<0x7ff00000 &&
+        { DWORD regs[7]; const char* nm[7]; int r; regs[0]=ctx.Eax;nm[0]="eax";regs[1]=ctx.Ebx;nm[1]="ebx";
+          regs[2]=ctx.Ecx;nm[2]="ecx";regs[3]=ctx.Edx;nm[3]="edx";regs[4]=ctx.Esi;nm[4]="esi";regs[5]=ctx.Edi;nm[5]="edi";regs[6]=ctx.Ebp;nm[6]="ebp";
+          for(r=0;r<7;r++){ DWORD rd=0; if(regs[r]>0x10000 && regs[r]<0x7ff00000 &&
               ReadProcessMemory(g_proc,(LPVOID)regs[r],membuf,96,&rd) && rd>=96){
               int j; puts_("        ["); puts_(nm[r]); puts_("]@"); hx(regs[r]); puts_(":");
               for(j=0;j<24;j++){ putc_(' '); hx(((DWORD*)membuf)[j]); } putc_('\n'); } } }

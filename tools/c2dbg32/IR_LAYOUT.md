@@ -474,3 +474,61 @@ So this global is a fixed slot on this path, not the advancing code cursor the
 x87 work took it for. Locating the integer emit buffer is a prerequisite for the
 "watch the modrm byte, get the register emitter" approach, which is otherwise the
 most direct route to the per-value register code now that watchpoints exist.
+
+## FP operand encoder: node view at 0x107455e6 (2026-08-30)
+
+Read with the new runtime-resolved watchpoints (see README) against
+`research/breakable_surfaces_closeout/probes/m6only.c`, a 96-byte TU whose
+whole FP output is one `cross_product3d` expansion and which reproduces the
+breakable_surfaces commutative-operand tie.
+
+### The encode chain, end to end
+
+| site | role |
+|---|---|
+| `0x107455e6` | FP operand encoder entry. `mov edx,[ebp+4]` then `lea eax,[edx-0x249]; cmp eax,0x11` — confirms the 0x249-0x25a band **and that `ebp` is the IR node**. `ebp` is loaded at `0x107455ee`, so breakpoint `0x107455fc` to have the node in hand. |
+| `0x107455ad` | byte dispatch, `jmp [ecx*4 + 0x107455c0]` (that address is the TABLE, not code — do not disassemble it) |
+| `0x107455da` | `mov byte ptr [edx], al` — the actual byte store |
+| `[0x1088b788]` / `[0x1088b784]` | staging cursor / staging base. **Not the code buffer**: their difference is the bytes staged for the current instruction (2 while encoding a modrm). The earlier note that `0x1088b788` "is not the emit cursor" was right for integer code and right here too — it is the *instruction staging* cursor. |
+| `0x10750023` | `emit_bytes(ecx=src, edx=len)`; calls the listing hook `0x10750f56` when `[0x10894e6c]` is set, then appends |
+| `0x10781bbc` -> `0x10781c18` | append -> inlined <=8-byte copy loop (`mov dl,[ecx]; mov [eax],dl; inc/inc/dec; jne`), falling back to `0x107012a0` for longer runs |
+| code buffer descriptor (in `ebx` at the append) | `[ebx+0x0c]` = current length, `[ebx+0x14]`/`[+0x18]` = base. Verified: length read exactly `0x18` as the tied `fld` was appended at function offset 0x18. |
+
+### Node view at the encoder
+
+Hits repeat with **period 18** for this TU (4 passes + 4). Of the 18 nodes
+per pass, exactly **three** carry a non-zero operand pointer at `+0x18`, and
+those three point at symbol nodes **0x60 apart** (one node stride) — one per
+variable, in allocation order (`result`, `a`, `b` for this TU). The other 15
+are opcode `0x250` with `+0x18 == 0`.
+
+So at this site `node[+0x18]` is a **per-variable symbol pointer**, not a
+per-member operand. Member/displacement selection happens elsewhere.
+
+Differential, `a`-referencing node vs `b`-referencing node (identical
+opcode `0x24e`, identical flags `+0x08 = 0x10040002`, identical `+0x14`):
+
+| off | a-node | b-node | result-node |
+|---|---|---|---|
+| +0x18 | `…49d4` | `…4a34` | `…4974` (the three symbols, +0x60 apart) |
+| +0x20 | ptr | ptr | ptr |
+| +0x24 | `0x249` | `0x1` | `0x24e` |
+| +0x28 | `0x10040007` | `0x1004010d` | `0x10040002` |
+| +0x34 | `0x10` | `0x04` | `0x10` |
+| +0x38 | `0xf` | `0` | ptr |
+| +0x40..+0x58 | populated | different | different |
+
+Two independent captures (this site and the byte emitter) agree on these
+fields, so the differential is reproducible.
+
+**Not yet decoded — do not over-read.** `+0x34` is tempting because `0x10`
+equals the tied instruction's displacement (`fld [ebp-0x10]`), but the
+`result` node also carries `0x10` while `result` is a parameter at
+`[ebp+8]`, so a pure-displacement reading is already falsified. Which field
+encodes the operand role is open.
+
+**What is settled**: the encoder only renders node fields, so the operand
+role is fixed in the node graph before it runs. The decision is upstream in
+lowering. Watching it needs `dbg_armreg.txt` armed at a *lowering* site, not
+at the encoder — arming at encode time is too late by construction, which is
+why the write is never caught there.
