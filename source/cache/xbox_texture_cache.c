@@ -97,6 +97,7 @@ symbols in this file:
 #include "memory/data.h"
 #include "memory/lruv_cache.h"
 #include "tag_files/tag_groups.h"
+#include <xtl.h>
 
 /* ---------- constants */
 
@@ -191,13 +192,8 @@ typedef char verify_xbox_texture_cache_stolen_memory_offset[
 		stolen_memory) == 0x160C ? 1 : -1];
 typedef char verify_xbox_texture_cache_globals_prefix_size[
 	sizeof(struct xbox_texture_cache_globals_prefix) == 0x1610 ? 1 : -1];
-
 /* ---------- prototypes */
 
-int __stdcall D3DDevice_IsBusy(
-	void);
-void __stdcall D3DDevice_KickPushBuffer(
-	void);
 void __stdcall XPhysicalProtect(
 	void *address,
 	unsigned long size,
@@ -214,6 +210,7 @@ void code_001ae880(
 /* ---------- globals */
 
 extern struct xbox_texture_cache_globals_prefix bss_004d1198;
+extern D3DDevice global_d3d_device;
 
 #define xbox_texture_cache_globals bss_004d1198
 
@@ -314,8 +311,8 @@ void texture_cache_return_memory(
 void texture_cache_flush(
 	void)
 {
-	D3DDevice_KickPushBuffer();
-	D3DDevice_IsBusy();
+	IDirect3DDevice8_KickPushBuffer(&global_d3d_device);
+	IDirect3DDevice8_IsBusy(&global_d3d_device);
 	lruv_flush(xbox_texture_cache_globals.cache);
 
 	return;
