@@ -85,3 +85,26 @@ reconstruction, pointer or union pun, undefined behavior, synthetic anchor,
 or byte forcing. Units, Vehicles, Matrix Math, AI Debug, configuration,
 semantic exceptions, parked records, completion labels, and build rules are
 untouched. Full cumulative gates are recorded after commit.
+
+## Committed cumulative validation
+
+The implementation-and-ledger commit is
+`6fa7217959e1ea194e1d03b03a5a74c1b68de934`. The complete Halo/libcmt
+graphs, report, semantic report, and progress generation pass. Canonical
+outputs are `build/report.json`, 1,599,315 bytes, SHA-256
+`68c298505b1a29fc9cec03ecd896fa9cccb45201329df1cb813153bab0be44fa`,
+and `build/semantic_report.json`, 3,269,715 bytes, SHA-256
+`719622b90eb05da8ae33f234a61f3581286e7b5796cb636403790212f17aee47`.
+
+The semantic audit scans 470 units and evaluates 4,922 functions: 4,805
+semantic exact, 131 hidden exact / 78,940 hidden code bytes, 4,815 accepted
+exact, one ordinary-only, one structural, zero rejected, 12 local skips,
+2,807 missing, and zero unit errors.
+
+Campaign progress is 384/833 linked objects, 4,776/11,060 functions, 607,354
+of 2,198,102 code bytes, and 1,856,050 of 4,176,062 data bytes. Admission is
+zero candidates, contradictions, and revocations. Parks are 12 active, zero
+stale, and zero invalid. All 212 tests pass. The protected Units sentinel
+remains strict exact at 1,920 padded bytes, 87 ordered relocations, and
+normalized SHA-256
+`5d5c8edc492fb8ab6ea83e1ccaa4cb2798da51ae4a17182fa848878bed05a7ed`.
