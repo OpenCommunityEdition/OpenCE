@@ -987,6 +987,36 @@ class TestLinkAbsoluteZeroAndSehScopeTables(unittest.TestCase):
             coff_compare.section_info(other, "_main"),
         ))
 
+    def test_scope_table_data_sections_compare_source_relative(self):
+        split, msvc = self._seh_pair()
+        self.assertTrue(coff_compare.section_infos_equal(
+            coff_compare.section_info_source_relative(
+                split, "_rdata_00", "_main"),
+            coff_compare.section_info_source_relative(
+                msvc, "$T18229", "_main"),
+        ))
+
+    def test_source_relative_scope_table_keeps_handler_difference(self):
+        split, _ = self._seh_pair()
+        _, other = self._seh_pair(handler_offset=0x60)
+        self.assertFalse(coff_compare.section_infos_equal(
+            coff_compare.section_info_source_relative(
+                split, "_rdata_00", "_main"),
+            coff_compare.section_info_source_relative(
+                other, "$T18229", "_main"),
+        ))
+
+    def test_source_relative_scope_table_requires_whole_function(self):
+        split, _ = self._seh_pair()
+        main = next(
+            item for item in split["symbols"] if item["name"] == "_main")
+        main["value"] = 1
+        with self.assertRaisesRegex(
+            coff_compare.CoffError, "whole-section function"
+        ):
+            coff_compare.section_info_source_relative(
+                split, "_rdata_00", "_main")
+
 
 if __name__ == "__main__":
     unittest.main()

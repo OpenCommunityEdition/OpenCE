@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 import tempfile
 import unittest
@@ -468,6 +469,170 @@ class SemanticDataProgressTests(unittest.TestCase):
 
         self.assertEqual(len(notes), 1)
         self.assertEqual(self.report["units"][0]["measures"]["matched_data"], 16)
+
+    @staticmethod
+    def _group_object(first=b"1234567", second=b"abcdefghijkl"):
+        return build_coff(
+            sections=[
+                {
+                    "name": ".rdata",
+                    "size": len(first),
+                    "raw_data": first,
+                    "flags": 0x40301040,
+                },
+                {
+                    "name": ".rdata",
+                    "size": len(second),
+                    "raw_data": second,
+                    "flags": 0x40401040,
+                },
+            ],
+            symbols=[
+                {
+                    "name": "_first", "value": 0, "section": 1,
+                    "type": 0, "storage": 2,
+                },
+                {
+                    "name": "_second", "value": 0, "section": 2,
+                    "type": 0, "storage": 2,
+                },
+            ],
+        )
+
+    @staticmethod
+    def _group_member(symbol, raw, flags, padded_size):
+        snapshot = {
+            "section": ".rdata",
+            "size": len(raw),
+            "padded_size": padded_size,
+            "flags": flags,
+            "relocation_count": 0,
+            "normalized_sha256": hashlib.sha256(raw).hexdigest(),
+            "owner": {"value": 0, "type": 0, "storage": 2},
+        }
+        return {
+            "symbol": symbol,
+            "measurements": {"target": snapshot, "base": snapshot},
+        }
+
+    def test_grouped_aligned_data_sections_credit_full_report_span(self):
+        first = b"1234567"
+        second = b"abcdefghijkl"
+        self.target_path.write_bytes(self._group_object(first, second))
+        self.base_path.write_bytes(self._group_object(first, second))
+        self.manifest_path.write_text(json.dumps([{
+            "unit": "data_unit",
+            "group": "aligned-rdata",
+            "members": [
+                self._group_member(
+                    "_first", first, 0x40301040, 8),
+                self._group_member(
+                    "_second", second, 0x40401040, 16),
+            ],
+        }]), encoding="utf-8")
+        self.report["units"][0]["measures"] = self._measures(24, 0)
+        self.report["units"][0]["sections"] = [{
+            "name": ".rdata",
+            "size": 24,
+            "fuzzy_match_percent": 50.0,
+        }]
+        self.report["categories"][0]["measures"] = self._measures(32, 8)
+
+        notes = self._apply()
+
+        self.assertEqual(
+            notes, ["data_unit:aligned-rdata (+24 data bytes)"])
+        self.assertEqual(
+            self.report["units"][0]["measures"]["matched_data"], 24)
+
+    def test_grouped_data_member_change_refuses_credit(self):
+        first = b"1234567"
+        second = b"abcdefghijkl"
+        self.target_path.write_bytes(self._group_object(first, second))
+        self.base_path.write_bytes(
+            self._group_object(first, b"X" + second[1:]))
+        self.manifest_path.write_text(json.dumps([{
+            "unit": "data_unit",
+            "group": "aligned-rdata",
+            "members": [
+                self._group_member(
+                    "_first", first, 0x40301040, 8),
+                self._group_member(
+                    "_second", second, 0x40401040, 16),
+            ],
+        }]), encoding="utf-8")
+        self.report["units"][0]["measures"] = self._measures(24, 0)
+        self.report["units"][0]["sections"] = [{
+            "name": ".rdata",
+            "size": 24,
+            "fuzzy_match_percent": 50.0,
+        }]
+
+        with self.assertRaisesRegex(
+            SemanticProgressError, "group member is no longer exact"
+        ):
+            self._apply()
+
+    def test_grouped_data_repeated_section_refuses_credit(self):
+        first = b"1234567"
+        second = b"abcdefghijkl"
+        self.target_path.write_bytes(self._group_object(first, second))
+        self.base_path.write_bytes(self._group_object(first, second))
+        self.manifest_path.write_text(json.dumps([{
+            "unit": "data_unit",
+            "group": "aligned-rdata",
+            "members": [
+                self._group_member(
+                    "_first", first, 0x40301040, 8),
+                self._group_member(
+                    "_first", first, 0x40301040, 8),
+            ],
+        }]), encoding="utf-8")
+        self.report["units"][0]["measures"] = self._measures(16, 0)
+        self.report["units"][0]["sections"] = [{
+            "name": ".rdata",
+            "size": 16,
+            "fuzzy_match_percent": 50.0,
+        }]
+
+        with self.assertRaisesRegex(
+            SemanticProgressError, "repeats a section"
+        ):
+            self._apply()
+
+    def test_grouped_data_requires_complete_report_section_coverage(self):
+        first = b"1234567"
+        second = b"abcdefghijkl"
+        self.target_path.write_bytes(self._group_object(first, second))
+        self.base_path.write_bytes(self._group_object(first, second))
+        self.manifest_path.write_text(json.dumps([{
+            "unit": "data_unit",
+            "group": "aligned-rdata",
+            "members": [
+                self._group_member(
+                    "_first", first, 0x40301040, 8),
+                self._group_member(
+                    "_second", second, 0x40401040, 16),
+            ],
+        }]), encoding="utf-8")
+        self.report["units"][0]["measures"] = self._measures(28, 0)
+        self.report["units"][0]["sections"] = [
+            {
+                "name": ".rdata",
+                "size": 24,
+                "fuzzy_match_percent": 50.0,
+            },
+            {
+                "name": ".data",
+                "size": 4,
+                "fuzzy_match_percent": 50.0,
+            },
+        ]
+
+        with self.assertRaisesRegex(
+            SemanticProgressError, "does not cover the reported"
+        ):
+            self._apply()
 
 
 class SymbolOwnershipSnapshotTests(unittest.TestCase):

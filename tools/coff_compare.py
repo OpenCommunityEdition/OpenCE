@@ -555,6 +555,83 @@ def section_info_resolved(obj, section_symbol_name, symbol_addresses):
     }
 
 
+def section_info_source_relative(
+    obj,
+    section_symbol_name,
+    source_function_name,
+):
+    """Describe a data section whose relocations all target one function.
+
+    Compiler-generated tables such as an SEH scope table can use private
+    producer-specific owner and local-label names.  The linked-image split
+    can instead anchor the same destinations to the public function plus
+    addends.  This helper accepts neither spelling on trust: both owners must
+    be unique whole-section symbols, and every relocation must resolve inside
+    the named source function.  Missing or mixed provenance fails closed.
+    """
+    section_owners = [
+        item for item in obj["symbols"]
+        if item["name"] == section_symbol_name and item["section"] > 0
+    ]
+    source_owners = [
+        item for item in obj["symbols"]
+        if item["name"] == source_function_name and item["section"] > 0
+    ]
+    if len(section_owners) != 1:
+        raise CoffError(
+            f"expected one section owner {section_symbol_name!r}, "
+            f"found {len(section_owners)}")
+    if len(source_owners) != 1:
+        raise CoffError(
+            f"expected one source function {source_function_name!r}, "
+            f"found {len(source_owners)}")
+
+    owner = section_owners[0]
+    source_owner = source_owners[0]
+    if owner["value"] != 0:
+        raise CoffError(
+            f"section owner {section_symbol_name!r} is not at offset zero")
+    if source_owner["value"] != 0 or source_owner["type"] != 0x20:
+        raise CoffError(
+            f"source function {source_function_name!r} is not a "
+            f"whole-section function")
+
+    section = obj["sections"][owner["section"] - 1]
+    source_section = obj["sections"][source_owner["section"] - 1]
+    if section["flags"] & IMAGE_SCN_CNT_CODE:
+        raise CoffError(
+            f"section owner {section_symbol_name!r} names code")
+    if not source_section["flags"] & IMAGE_SCN_CNT_CODE:
+        raise CoffError(
+            f"source function {source_function_name!r} does not name code")
+
+    normalized = _normalized_destination(
+        obj,
+        source_owner["section"],
+        section,
+        owner["value"],
+    )
+    if normalized is None:
+        raise CoffError(
+            f"section {section_symbol_name!r} does not resolve wholly "
+            f"inside {source_function_name!r}")
+
+    relocations = [
+        {
+            "address": item[0],
+            "type": item[1],
+            "target": [item[2], item[3]],
+        }
+        for item in normalized[3]
+    ]
+    return {
+        "size": section["size"],
+        "relocation_count": len(relocations),
+        "normalized_sha256": normalized[2],
+        "relocations": relocations,
+    }
+
+
 # â”€â”€ COFF fixture builder (synthetic) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def build_coff(machine=0x14C, sections=None, symbols=None, strtab=None):

@@ -12,11 +12,13 @@ from typing import Any, Dict, List
 
 from .coff_compare import (
     CoffError,
+    IMAGE_SCN_CNT_CODE,
     image_symbol_addresses,
     load,
     section_info,
     section_info_by_number,
     section_info_resolved,
+    section_info_source_relative,
     section_infos_equal,
 )
 
@@ -467,6 +469,45 @@ def apply_semantic_matches(
     return credited
 
 
+def _unique_defined_symbol(obj, name, description):
+    matches = [
+        item for item in obj["symbols"]
+        if item["name"] == name and item["section"] > 0
+    ]
+    if len(matches) != 1:
+        raise CoffError(
+            f"expected one {description} {name!r}, found {len(matches)}")
+    return matches[0]
+
+
+def _semantic_data_member_snapshot(owner, section, info):
+    if int(section["flags"]) & IMAGE_SCN_CNT_CODE:
+        raise CoffError(
+            f"semantic data owner {owner['name']!r} names code")
+    alignment_code = (int(section["flags"]) >> 20) & 0xF
+    if alignment_code == 0:
+        alignment = 1
+    elif 1 <= alignment_code <= 14:
+        alignment = 1 << (alignment_code - 1)
+    else:
+        raise CoffError(
+            f"invalid COFF section alignment code {alignment_code}")
+    padded_size = (int(section["size"]) + alignment - 1) & ~(alignment - 1)
+    return {
+        "section": section["name"],
+        "size": info["size"],
+        "padded_size": padded_size,
+        "flags": int(section["flags"]),
+        "relocation_count": info["relocation_count"],
+        "normalized_sha256": info["normalized_sha256"],
+        "owner": {
+            "value": int(owner["value"]),
+            "type": int(owner["type"]),
+            "storage": int(owner["storage"]),
+        },
+    }
+
+
 def apply_semantic_data_matches(
     report: Dict[str, Any],
     project_root: Path,
@@ -478,10 +519,11 @@ def apply_semantic_data_matches(
 
     A manifest entry is accepted only when the target and rebuilt data
     sections have identical normalized bytes, relocation locations/types,
-    and independently resolved final image destinations.  The credited
-    section must account for the unit's entire remaining unmatched data.  An
-    incomplete unit requires an explicit manifest opt-in so partial spans are
-    never credited accidentally.
+    and independently resolved destinations.  A grouped entry additionally
+    snapshots every member's flags, alignment-derived padded extent, and
+    producer-specific owner.  Its members must account for the unit's entire
+    remaining unmatched data.  An incomplete unit requires an explicit
+    manifest opt-in so partial spans are never credited accidentally.
     """
     if not manifest_path.is_file():
         return []
@@ -498,7 +540,6 @@ def apply_semantic_data_matches(
 
     for entry in entries:
         unit_name = entry["unit"]
-        section_symbol = entry["symbol"]
         if unit_name not in report_units or unit_name not in config_units:
             raise SemanticProgressError(
                 f"semantic data match unit not found: {unit_name}")
@@ -511,35 +552,129 @@ def apply_semantic_data_matches(
             raise SemanticProgressError(
                 f"semantic data unit is not marked complete: {unit_name}")
 
-        try:
-            target_info = section_info_resolved(
-                load(project_root / config_unit["target_path"]),
-                section_symbol,
-                symbol_addresses,
-            )
-            base_info = section_info_resolved(
-                load(project_root / config_unit["base_path"]),
-                section_symbol,
-                symbol_addresses,
-            )
-        except (CoffError, KeyError, OSError) as error:
-            raise SemanticProgressError(
-                f"cannot verify semantic data match {unit_name}:{section_symbol}: "
-                f"{error}") from error
-        if target_info != base_info:
-            raise SemanticProgressError(
-                f"semantic data match is no longer exact: "
-                f"{unit_name}:{section_symbol}")
+        members = entry.get("members")
+        if members:
+            section_label = entry.get("group", "data-section-group")
+            target = load(project_root / config_unit["target_path"])
+            base = load(project_root / config_unit["base_path"])
+            credited_size = 0
+            target_section_numbers = set()
+            base_section_numbers = set()
+            grouped_sections = {}
 
-        expected = entry.get("measurements", {})
-        snapshot = {
-            key: target_info[key]
-            for key in ("size", "relocation_count", "normalized_sha256")
-        }
-        if expected != snapshot:
-            raise SemanticProgressError(
-                f"semantic data target snapshot changed: "
-                f"{unit_name}:{section_symbol}")
+            for member in members:
+                target_symbol = member["symbol"]
+                base_symbol = member.get("base_symbol", target_symbol)
+                source_function = member.get("source_function")
+                base_source_function = member.get(
+                    "base_source_function", source_function)
+
+                try:
+                    if source_function:
+                        target_info = section_info_source_relative(
+                            target, target_symbol, source_function)
+                        base_info = section_info_source_relative(
+                            base, base_symbol, base_source_function)
+                    else:
+                        target_info = section_info(target, target_symbol)
+                        base_info = section_info(base, base_symbol)
+
+                    target_owner = _unique_defined_symbol(
+                        target, target_symbol, "semantic data target owner")
+                    base_owner = _unique_defined_symbol(
+                        base, base_symbol, "semantic data base owner")
+                    target_section = target["sections"][
+                        target_owner["section"] - 1]
+                    base_section = base["sections"][base_owner["section"] - 1]
+                except (CoffError, KeyError, OSError) as error:
+                    raise SemanticProgressError(
+                        f"cannot verify semantic data group member "
+                        f"{unit_name}:{target_symbol}: {error}") from error
+
+                if target_owner["section"] in target_section_numbers \
+                        or base_owner["section"] in base_section_numbers:
+                    raise SemanticProgressError(
+                        f"semantic data group repeats a section: "
+                        f"{unit_name}:{target_symbol}")
+                target_section_numbers.add(target_owner["section"])
+                base_section_numbers.add(base_owner["section"])
+
+                if not section_infos_equal(target_info, base_info):
+                    raise SemanticProgressError(
+                        f"semantic data group member is no longer exact: "
+                        f"{unit_name}:{target_symbol}")
+
+                target_snapshot = _semantic_data_member_snapshot(
+                    target_owner, target_section, target_info)
+                base_snapshot = _semantic_data_member_snapshot(
+                    base_owner, base_section, base_info)
+                for key in ("section", "size", "padded_size", "flags"):
+                    if target_snapshot[key] != base_snapshot[key]:
+                        raise SemanticProgressError(
+                            f"semantic data group member layout differs: "
+                            f"{unit_name}:{target_symbol} ({key})")
+
+                expected = member.get("measurements", {})
+                snapshot = {
+                    "target": target_snapshot,
+                    "base": base_snapshot,
+                }
+                if expected != snapshot:
+                    raise SemanticProgressError(
+                        f"semantic data group member snapshot changed: "
+                        f"{unit_name}:{target_symbol}")
+                credited_size += target_snapshot["padded_size"]
+                grouped_sections[target_snapshot["section"]] = (
+                    grouped_sections.get(target_snapshot["section"], 0)
+                    + target_snapshot["padded_size"])
+
+            unmatched_sections = {}
+            for report_section in report_unit.get("sections", []):
+                if report_section.get("name") == ".text" \
+                        or float(report_section.get(
+                            "fuzzy_match_percent", 0.0)) == 100.0:
+                    continue
+                name = report_section["name"]
+                unmatched_sections[name] = (
+                    unmatched_sections.get(name, 0)
+                    + int(report_section.get("size", 0)))
+            if grouped_sections != unmatched_sections:
+                raise SemanticProgressError(
+                    f"semantic data group does not cover the reported "
+                    f"unmatched sections: {unit_name}:{section_label}")
+        else:
+            section_symbol = entry["symbol"]
+            section_label = section_symbol
+            try:
+                target_info = section_info_resolved(
+                    load(project_root / config_unit["target_path"]),
+                    section_symbol,
+                    symbol_addresses,
+                )
+                base_info = section_info_resolved(
+                    load(project_root / config_unit["base_path"]),
+                    section_symbol,
+                    symbol_addresses,
+                )
+            except (CoffError, KeyError, OSError) as error:
+                raise SemanticProgressError(
+                    f"cannot verify semantic data match "
+                    f"{unit_name}:{section_symbol}: {error}") from error
+            if target_info != base_info:
+                raise SemanticProgressError(
+                    f"semantic data match is no longer exact: "
+                    f"{unit_name}:{section_symbol}")
+
+            expected = entry.get("measurements", {})
+            snapshot = {
+                key: target_info[key]
+                for key in ("size", "relocation_count", "normalized_sha256")
+            }
+            if expected != snapshot:
+                raise SemanticProgressError(
+                    f"semantic data target snapshot changed: "
+                    f"{unit_name}:{section_symbol}")
+            credited_size = target_info["size"]
 
         unit_measures = report_unit["measures"]
         unmatched_data = (
@@ -548,10 +683,10 @@ def apply_semantic_data_matches(
         )
         if unmatched_data == 0:
             continue
-        if unmatched_data != target_info["size"]:
+        if unmatched_data != credited_size:
             raise SemanticProgressError(
                 f"semantic data section does not cover all unmatched data: "
-                f"{unit_name}:{section_symbol} covers {target_info['size']}, "
+                f"{unit_name}:{section_label} covers {credited_size}, "
                 f"remaining {unmatched_data}")
 
         _credit_data(report["measures"], unmatched_data)
@@ -567,6 +702,6 @@ def apply_semantic_data_matches(
             _credit_data(categories[category_id]["measures"], unmatched_data)
 
         credited.append(
-            f"{unit_name}:{section_symbol} (+{unmatched_data} data bytes)")
+            f"{unit_name}:{section_label} (+{unmatched_data} data bytes)")
 
     return credited

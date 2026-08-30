@@ -260,5 +260,83 @@
       "relocation_count": 1,
       "normalized_sha256": "806638334fff1341360b4dec7db0987871f376bc3999e26ff4bcd3a1755d2955"
     }
+  },
+  {
+    "unit": "source/shell/shell_xbox",
+    "group": "aligned-rdata",
+    "reason": "the complete rebuilt object owns the exact two string COMDATs and compiler-generated SEH scope table; the grouped verifier proves each payload, alignment-derived padded extent, flags, owner snapshot, relocation address/type, and source-relative handler destination while objdiff merges the aligned sections and attributes the private scope-table labels differently",
+    "members": [
+      {
+        "symbol": "??_C@_06GAOAIMNN@xdemo?5?$AA@",
+        "measurements": {
+          "target": {
+            "section": ".rdata",
+            "size": 7,
+            "padded_size": 8,
+            "flags": 1076891712,
+            "relocation_count": 0,
+            "normalized_sha256": "2d636beaf6ef18262eb352ea8a00f3b1b0ee3628666eb07e679892eca5f08b5e",
+            "owner": { "value": 0, "type": 0, "storage": 2 }
+          },
+          "base": {
+            "section": ".rdata",
+            "size": 7,
+            "padded_size": 8,
+            "flags": 1076891712,
+            "relocation_count": 0,
+            "normalized_sha256": "2d636beaf6ef18262eb352ea8a00f3b1b0ee3628666eb07e679892eca5f08b5e",
+            "owner": { "value": 0, "type": 0, "storage": 2 }
+          }
+        }
+      },
+      {
+        "symbol": "??_C@_06PFFNFMJI@XDEMOS?$AA@",
+        "measurements": {
+          "target": {
+            "section": ".rdata",
+            "size": 7,
+            "padded_size": 8,
+            "flags": 1076891712,
+            "relocation_count": 0,
+            "normalized_sha256": "798ec2f79c908eed7153344688b0def452386891f2deae50826a2658182e9bd5",
+            "owner": { "value": 0, "type": 0, "storage": 2 }
+          },
+          "base": {
+            "section": ".rdata",
+            "size": 7,
+            "padded_size": 8,
+            "flags": 1076891712,
+            "relocation_count": 0,
+            "normalized_sha256": "798ec2f79c908eed7153344688b0def452386891f2deae50826a2658182e9bd5",
+            "owner": { "value": 0, "type": 0, "storage": 2 }
+          }
+        }
+      },
+      {
+        "symbol": "_rdata_002a0a88",
+        "base_symbol": "$T18261",
+        "source_function": "_main",
+        "measurements": {
+          "target": {
+            "section": ".rdata",
+            "size": 12,
+            "padded_size": 16,
+            "flags": 1077940288,
+            "relocation_count": 2,
+            "normalized_sha256": "3414421b183188342209566fad4e0c0723070b4030630dde685ba70281e92725",
+            "owner": { "value": 0, "type": 0, "storage": 2 }
+          },
+          "base": {
+            "section": ".rdata",
+            "size": 12,
+            "padded_size": 16,
+            "flags": 1077940288,
+            "relocation_count": 2,
+            "normalized_sha256": "3414421b183188342209566fad4e0c0723070b4030630dde685ba70281e92725",
+            "owner": { "value": 0, "type": 0, "storage": 3 }
+          }
+        }
+      }
+    ]
   }
 ]
