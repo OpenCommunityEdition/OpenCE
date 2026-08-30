@@ -167,6 +167,8 @@ void *code_001b55a0(
 	unsigned long size);
 void code_001b5790(
 	void *memory);
+void code_001b5850(
+	void);
 void code_001b5860(
 	void);
 void code_001b5cc0(
@@ -297,3 +299,9 @@ void bink_playback_update(
 }
 
 /* ---------- private code */
+
+void code_001b5850(
+	void)
+{
+	return;
+}
