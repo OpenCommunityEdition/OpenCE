@@ -418,6 +418,20 @@ void scripted_hud_pause_timer(
 	return;
 }
 
+void scripted_hud_time_code_show(
+	boolean show)
+{
+	if (show)
+	{
+		time_code_time = game_time_get();
+		time_code_stop_time = time_code_time;
+		return;
+	}
+	time_code_time = NONE;
+
+	return;
+}
+
 void scripted_hud_time_code_reset(
 	void)
 {
