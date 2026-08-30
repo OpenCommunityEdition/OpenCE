@@ -98,4 +98,3 @@ owners and 848 matched data bytes and pass the hardened relocation comparator.
 No assembly, `volatile`, `register`, pragma, intrinsic, attribute, raw
 address/offset access, punning, undefined behavior, byte forcing, object
 patching, compiler flag, comparator exception, or storage rehoming was used.
-
