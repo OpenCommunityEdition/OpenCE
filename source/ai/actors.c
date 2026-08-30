@@ -296,9 +296,16 @@ enum
 {
 	_actor_mode_braindead = 0,
 	_actor_mode_alert = 2,
+	_actor_switch_props_fire_target_none = 0,
+	_actor_switch_props_fire_target_prop,
+	_actor_switch_props_destination_prop = 5,
 };
 
 /* ---------- macros */
+
+#define actor_switch_props_swarm_component_get(index) \
+	((struct actor_switch_props_swarm_component_datum *)datum_get( \
+		swarm_component_data, (index)))
 
 /* ---------- structures */
 
@@ -317,6 +324,21 @@ typedef char actor_iterator_size_assert[
 typedef char actor_iterator_index_offset_assert[
 	offsetof(struct actor_iterator, index) == 0x14 ? 1 : -1];
 
+struct actor_switch_props_swarm_component_datum
+{
+	short identifier;
+	word flags;
+	real_point3d position;
+	long surface_index;
+	long combat_target_prop_index;
+	byte unknown_tail[SWARM_COMPONENT_DATUM_SIZE - 0x18];
+};
+
+typedef char actor_switch_props_swarm_component_datum_size_assert[
+	sizeof(struct actor_switch_props_swarm_component_datum) == SWARM_COMPONENT_DATUM_SIZE ? 1 : -1];
+typedef char actor_switch_props_swarm_component_target_prop_offset_assert[
+	offsetof(struct actor_switch_props_swarm_component_datum, combat_target_prop_index) == 0x14 ? 1 : -1];
+
 typedef char actor_datum_output_control_flags_offset_assert[
 	offsetof(struct actor_datum, output.control_flags) == 0x6D0 ? 1 : -1];
 typedef char actor_datum_output_animation_impulse_offset_assert[
@@ -334,6 +356,11 @@ void actor_switch_props(
 	long actor_index,
 	long old_prop_index,
 	long new_prop_index);
+
+void actor_action_replace_prop(
+	long actor_index,
+	long invalid_prop_index,
+	long replacement_prop_index);
 
 void prop_delete(
 	long actor_index,
@@ -608,6 +635,117 @@ void actor_derive_target_information(
 			target_actor_index,
 			target_prop_index);
 	}
+
+	return;
+}
+
+void actor_switch_props(
+	long actor_index,
+	long old_prop_index,
+	long new_prop_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	short component_index;
+
+	if (actor->target.target_prop_index == old_prop_index)
+	{
+		actor->target.target_prop_index = new_prop_index;
+
+		if (new_prop_index == NONE)
+			actor->target.target_type = _actor_target_none;
+	}
+
+	if (actor->control.current_fire_target_type == _actor_switch_props_fire_target_prop &&
+		actor->control.current_fire_target_prop_index == old_prop_index)
+	{
+		actor->control.current_fire_target_prop_index = new_prop_index;
+
+		if (new_prop_index == NONE)
+			actor->control.current_fire_target_type = _actor_switch_props_fire_target_none;
+	}
+
+	if (actor->control.grenade_current_prop_index == old_prop_index)
+		actor->control.grenade_current_prop_index = new_prop_index;
+
+	if (actor->stimuli.surprise_prop_index == old_prop_index)
+		actor->stimuli.surprise_prop_index = new_prop_index;
+
+	if (actor->stimuli.panic_prop_index == old_prop_index)
+		actor->stimuli.panic_prop_index = new_prop_index;
+
+	if (actor->stimuli.combat_transition_prop_index == old_prop_index)
+		actor->stimuli.combat_transition_prop_index = new_prop_index;
+
+	if (actor->emotions.unopposable_retreat_prop_index == old_prop_index)
+	{
+		if (new_prop_index == NONE)
+			actor->emotions.unopposable_retreat_timer = 0;
+
+		actor->emotions.unopposable_retreat_prop_index = new_prop_index;
+	}
+
+	if (actor->external_orders.pursuit_group_prop_index == old_prop_index)
+		actor->external_orders.pursuit_group_prop_index = new_prop_index;
+
+	if (actor->external_orders.postcombat_prop_index == old_prop_index)
+	{
+		actor->external_orders.postcombat_prop_index = new_prop_index;
+
+		if (new_prop_index == NONE)
+			actor->external_orders.postcombat_type = _actor_postcombat_none;
+	}
+
+	if (actor->control.path.destination_orders.destination_type ==
+			_actor_switch_props_destination_prop &&
+		actor->control.path.destination_orders.prop.prop_index == old_prop_index)
+	{
+		if (new_prop_index == NONE)
+		{
+			actor->control.path.destination_orders.destination_type = _actor_destination_none;
+			actor->control.path.destination_orders.ignore_target_object_index = NONE;
+		}
+		else
+		{
+			actor->control.path.destination_orders.prop.prop_index = new_prop_index;
+		}
+	}
+
+	if (actor->control.secondary_look_direction.type == _direction_specification_prop &&
+		actor->control.secondary_look_direction.prop_index == old_prop_index)
+	{
+		actor->control.secondary_look_direction.prop_index = new_prop_index;
+	}
+
+	if (actor->control.idle_major_direction.type == _direction_specification_prop &&
+		actor->control.idle_major_direction.prop_index == old_prop_index)
+	{
+		actor->control.idle_major_direction.prop_index = new_prop_index;
+	}
+
+	if (actor->control.idle_minor_direction.type == _direction_specification_prop &&
+		actor->control.idle_minor_direction.prop_index == old_prop_index)
+	{
+		actor->control.idle_minor_direction.prop_index = new_prop_index;
+	}
+
+	if (actor->meta.swarm && actor->meta.swarm_cache_index != NONE)
+	{
+		struct swarm_datum *swarm = swarm_get(actor->meta.swarm_cache_index);
+
+		for (component_index = 0;
+			component_index < swarm->unit_count;
+			component_index++)
+		{
+			struct actor_switch_props_swarm_component_datum *component =
+				actor_switch_props_swarm_component_get(
+					swarm->component_indices[component_index]);
+
+			if (component->combat_target_prop_index == old_prop_index)
+				component->combat_target_prop_index = new_prop_index;
+		}
+	}
+
+	actor_action_replace_prop(actor_index, old_prop_index, new_prop_index);
 
 	return;
 }
