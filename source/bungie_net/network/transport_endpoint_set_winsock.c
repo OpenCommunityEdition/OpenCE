@@ -112,11 +112,39 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct transport_endpoint;
+
+struct transport_endpoint_set
+{
+	fd_set sockets;
+	struct transport_endpoint **ep_array;
+	long max_endpoints;
+	long last_endpoint_index;
+	long current_endpoint_index;
+	long needs_compaction;
+};
+
+typedef char winsock_fd_set_size_assert[
+	sizeof(fd_set) == 0x104 ? 1 : -1];
+typedef char transport_endpoint_set_ep_array_offset_assert[
+	offsetof(struct transport_endpoint_set, ep_array) == 0x104 ? 1 : -1];
+typedef char transport_endpoint_set_max_endpoints_offset_assert[
+	offsetof(struct transport_endpoint_set, max_endpoints) == 0x108 ? 1 : -1];
+typedef char transport_endpoint_set_last_endpoint_index_offset_assert[
+	offsetof(struct transport_endpoint_set, last_endpoint_index) == 0x10C ? 1 : -1];
+typedef char transport_endpoint_set_current_endpoint_index_offset_assert[
+	offsetof(struct transport_endpoint_set, current_endpoint_index) == 0x110 ? 1 : -1];
+typedef char transport_endpoint_set_needs_compaction_offset_assert[
+	offsetof(struct transport_endpoint_set, needs_compaction) == 0x114 ? 1 : -1];
+typedef char transport_endpoint_set_size_assert[
+	sizeof(struct transport_endpoint_set) == 0x118 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
 
 extern long global_key_depth;
+extern boolean transport_initialized;
 extern XNADDR global_address;
 extern XNKID global_key_id;
 extern XNKEY global_key;
@@ -181,6 +209,20 @@ void transport_pop_key(
 	{
 		XNetUnregisterKey(&global_key_id);
 	}
+}
+
+long count_endpoints_in_set(
+	struct transport_endpoint_set *set)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x289,
+		set);
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x28A,
+		transport_initialized);
+	return set->last_endpoint_index + 1;
 }
 
 /* ---------- private code */
