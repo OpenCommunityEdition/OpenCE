@@ -103,15 +103,41 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "observer.h"
 
+#include "game/players.h"
+#include "networking/network_connection.h"
+#include "scenario/scenario.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct observer
+{
+	byte reserved000[0x74];
+	struct observer_result result;
+	byte reserved0b0[0x1EC];
+};
+
+struct observer_globals
+{
+	real dtime;
+	struct observer local_players[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+};
+
+typedef char observer_result_offset_assert[
+	offsetof(struct observer, result) == 0x74 ? 1 : -1];
+typedef char observer_size_assert[
+	sizeof(struct observer) == 0x29C ? 1 : -1];
+typedef char observer_globals_size_assert[
+	sizeof(struct observer_globals) == 0xA74 ? 1 : -1];
+
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+extern struct observer_globals bss_0031d4b8;
 
 /* ---------- public code */
 
@@ -124,6 +150,30 @@ void observer_initialize(
 void observer_dispose_from_old_map(
 	void)
 {
+	return;
+}
+
+void observer_reconnect_to_structure_bsp(
+	void)
+{
+	short local_player_index;
+
+	for (local_player_index = 0;
+		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
+		local_player_index++)
+	{
+		if (local_player_get_player_index(local_player_index) != NONE)
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\camera\\observer.c",
+				0x72,
+				local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+			scenario_location_from_point(
+				&bss_0031d4b8.local_players[local_player_index].result.location,
+				&bss_0031d4b8.local_players[local_player_index].result.position);
+		}
+	}
+
 	return;
 }
 
