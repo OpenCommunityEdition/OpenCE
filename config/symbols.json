@@ -7242,7 +7242,7 @@
 { "file_offset": 1763248, "flags": 32, "name": "_code_001ae7b0" },
 { "file_offset": 1763296, "flags": 32, "name": "_IDirect3DDevice8_IsBusy@4" },
 { "file_offset": 1763312, "flags": 32, "name": "_IDirect3DDevice8_KickPushBuffer@4" },
-{ "file_offset": 1763328, "flags": 32, "name": "_code_001ae800" },
+{ "file_offset": 1763328, "flags": 32, "name": "_IDirect3DBaseTexture8_IsBusy@4" },
 { "file_offset": 1763344, "flags": 32, "name": "_code_001ae810" },
 { "file_offset": 1763360, "flags": 32, "name": "_texture_cache_flush" },
 { "file_offset": 1763392, "flags": 32, "name": "_code_001ae840" },
