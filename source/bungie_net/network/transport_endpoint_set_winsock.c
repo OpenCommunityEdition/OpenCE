@@ -150,4 +150,18 @@ XNKEY transport_get_key(
 	return global_key;
 }
 
+void transport_pop_key(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x66,
+		global_key_depth > 0);
+	global_key_depth--;
+	if (global_key_depth == 0)
+	{
+		XNetUnregisterKey(&global_key_id);
+	}
+}
+
 /* ---------- private code */
