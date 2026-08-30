@@ -161,6 +161,23 @@ struct rasterizer_profile_elapsed_state
 	volatile __int64 elapsed_times[NUMBER_OF_RASTERIZER_PROFILES];
 };
 
+struct rasterizer_profile_debug_options_prefix
+{
+	byte reserved00[2];
+	short mode;
+	byte reserved04[0x48];
+	boolean enabled;
+};
+
+typedef char rasterizer_profile_debug_mode_offset_assert[
+	offsetof(
+		struct rasterizer_profile_debug_options_prefix,
+		mode) == 2 ? 1 : -1];
+typedef char rasterizer_profile_debug_enabled_offset_assert[
+	offsetof(
+		struct rasterizer_profile_debug_options_prefix,
+		enabled) == 0x4C ? 1 : -1];
+
 /* ---------- prototypes */
 
 long __stdcall QueryPerformanceFrequency(
@@ -174,6 +191,7 @@ static volatile __int64 rasterizer_profile_callback_end_times[MAXIMUM_RASTERIZER
 static volatile __int64 rasterizer_profile_callback_elapsed_times[MAXIMUM_RASTERIZER_PROFILE_CALLBACKS];
 
 extern struct rasterizer_profile_globals data_0030cf00;
+extern struct rasterizer_profile_debug_options_prefix rasterizer_debug_options;
 extern struct rasterizer_window_parameters global_window_parameters;
 extern short local_profile_enable;
 
@@ -259,3 +277,10 @@ void rasterizer_profile_dispose(
 }
 
 /* ---------- private code */
+
+boolean code_0015eef0(
+	void)
+{
+	return rasterizer_debug_options.mode == 3 ||
+		rasterizer_debug_options.enabled;
+}
