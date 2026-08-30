@@ -160,6 +160,16 @@
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
+    "unit": "source/bitmaps/libtiff/tif_dirwrite",
+    "function": "_TIFFWriteNormalTag",
+    "reason": "hardened COFF comparison proves all 800 padded bytes and all 30 semantic relocations exact; objdiff reports an internal jump-table relocation encoding false negative"
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_dirwrite",
+    "function": "_TIFFWriteDirectory",
+    "reason": "hardened COFF comparison proves all 1760 padded bytes and all 56 semantic relocations exact; objdiff reports internal jump-table relocation encoding false negatives"
+  },
+  {
     "unit": "source/bitmaps/libtiff/tif_aux",
     "function": "_TIFFVGetFieldDefaulted",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
