@@ -135,6 +135,12 @@ void __stdcall XPhysicalFree(
 	void *address);
 int __stdcall CloseHandle(
 	HANDLE handle);
+int __stdcall DeleteFileA(
+	const char *path);
+
+boolean player_ui_get_path_to_local_player_profile_directory(
+	short local_player_index,
+	char *full_path);
 
 HANDLE code_001b0270(
 	const char *path);
@@ -175,6 +181,17 @@ const char *game_state_get_persistent_storage_filename(
 	void)
 {
 	return "savegame.bin";
+}
+
+void code_001b0240(
+	void)
+{
+	char path[256];
+
+	if (player_ui_get_path_to_local_player_profile_directory(0, path))
+		DeleteFileA(path);
+
+	return;
 }
 
 void game_state_create_persistent_storage(
