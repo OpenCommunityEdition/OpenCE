@@ -4220,7 +4220,7 @@ void debug_dump_memory_by_file(
 	void);
 void profile_initialize(
 	void);
-void ai_profile_change_render_spray(
+short ai_profile_change_render_spray(
 	void);
 void ai_debug_sound_point_set(
 	void);

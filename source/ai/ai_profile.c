@@ -86,9 +86,16 @@ symbols in this file:
 #include "ai/encounters.h"
 #include "ai/props.h"
 
+#include "main/console.h"
 #include "memory/data.h"
 
 /* ---------- constants */
+
+enum
+{
+	NUMBER_OF_AI_METERS = 28,
+	NUMBER_OF_AI_RENDER_SPRAYS = 3,
+};
 
 /* ---------- macros */
 
@@ -96,10 +103,27 @@ symbols in this file:
 
 struct ai_profile_globals
 {
-	long __unknown0;
+	short __unknown0;
+	short render_spray;
 	boolean enabled;
 	byte __unknown5[7];
 	byte map_data[0xEE0];
+};
+
+typedef short (*ai_meter_sample_proc)(
+	void);
+
+struct ai_meter_definition
+{
+	short meter_id;
+	short __unknown2;
+	ai_meter_sample_proc sample_proc;
+};
+
+struct ai_meter_definitions
+{
+	struct ai_meter_definition meters[NUMBER_OF_AI_METERS];
+	char const *render_spray_names[NUMBER_OF_AI_RENDER_SPRAYS];
 };
 
 /* ---------- prototypes */
@@ -107,6 +131,7 @@ struct ai_profile_globals
 /* ---------- globals */
 
 struct ai_profile_globals ai_profile;
+extern struct ai_meter_definitions global_ai_meter_definitions;
 
 /* ---------- public code */
 
@@ -135,6 +160,19 @@ void ai_profile_dispose_from_old_map(
 	void)
 {
 	return;
+}
+
+short ai_profile_change_render_spray(
+	void)
+{
+	ai_profile.render_spray =
+		(ai_profile.render_spray + 1) % NUMBER_OF_AI_RENDER_SPRAYS;
+	console_printf(
+		FALSE,
+		"AI line-spray: %s",
+		global_ai_meter_definitions.render_spray_names[ai_profile.render_spray]);
+
+	return ai_profile.render_spray;
 }
 
 short code_00041f40(

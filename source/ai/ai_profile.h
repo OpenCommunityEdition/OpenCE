@@ -25,7 +25,8 @@ void ai_profile_dispose(
 	void);
 void ai_profile_dispose_from_old_map(
 	void);
-void ai_profile_change_render_spray(void);
+short ai_profile_change_render_spray(
+	void);
 
 /* ---------- globals */
 
