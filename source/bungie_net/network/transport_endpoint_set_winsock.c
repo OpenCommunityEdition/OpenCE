@@ -102,6 +102,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
+
 #include <xtl.h>
 
 /* ---------- constants */
@@ -114,7 +116,9 @@ symbols in this file:
 
 /* ---------- globals */
 
+extern long global_key_depth;
 extern XNADDR global_address;
+extern XNKID global_key_id;
 
 /* ---------- public code */
 
@@ -123,6 +127,16 @@ XNADDR *transport_get_xnaddr(
 {
 	*address = global_address;
 	return address;
+}
+
+XNKID transport_get_key_id(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0xE0,
+		global_key_depth > 0);
+	return global_key_id;
 }
 
 /* ---------- private code */
