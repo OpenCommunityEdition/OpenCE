@@ -84,6 +84,7 @@ symbols in this file:
 #undef nonuniform_cubic_spline_vector3d
 #undef nonuniform_cubic_spline
 
+#include "bitmaps/bitmap_group.h"
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "memory/data.h"
@@ -91,6 +92,12 @@ symbols in this file:
 #include "saved games/game_state.h"
 
 /* ---------- constants */
+
+enum
+{
+	GLOW_TAG = 'glw!',
+	_bitmap_group_type_sprites = 3,
+};
 
 /* ---------- macros */
 
@@ -138,7 +145,57 @@ struct glow_datum
 	short accumulated_trailing_particle_generation_ticks;
 };
 
+struct glow_definition
+{
+	char attachment_marker[32];
+	short number_of_particles;
+	byte _unknown022[0x122];
+	struct tag_reference texture;
+};
+
+struct bitmap_group_sprite
+{
+	short bitmap_index;
+	word pad02;
+	long unknown004;
+	real_rectangle2d bounds;
+	real_point2d registration_point;
+};
+
+struct bitmap_group_sequence
+{
+	char name[32];
+	short first_bitmap_index;
+	short bitmap_count;
+	long unknown024[4];
+	struct tag_block sprites;
+};
+
+typedef char glow_datum_definition_index_offset_assert[
+	offsetof(struct glow_datum, definition_index) == 0x224 ? 1 : -1];
+typedef char glow_datum_bitmap_dimension_offset_assert[
+	offsetof(struct glow_datum, bitmap_dimension) == 0x228 ? 1 : -1];
+typedef char glow_datum_number_of_particles_offset_assert[
+	offsetof(struct glow_datum, number_of_particles) == 0x24C ? 1 : -1];
+typedef char glow_datum_size_assert[
+	sizeof(struct glow_datum) == 0x25C ? 1 : -1];
+typedef char glow_definition_texture_offset_assert[
+	offsetof(struct glow_definition, texture) == 0x144 ? 1 : -1];
+typedef char glow_definition_size_assert[
+	sizeof(struct glow_definition) == 0x154 ? 1 : -1];
+typedef char bitmap_group_sequences_offset_assert[
+	offsetof(struct bitmap_group, sequences) == 0x54 ? 1 : -1];
+typedef char bitmap_group_sprite_size_assert[
+	sizeof(struct bitmap_group_sprite) == 0x20 ? 1 : -1];
+typedef char bitmap_group_sequence_size_assert[
+	sizeof(struct bitmap_group_sequence) == 0x40 ? 1 : -1];
+
 /* ---------- prototypes */
+
+struct bitmap_data *bitmap_group_get_bitmap_from_sequence(
+	long bitmap_group_index,
+	short sequence_index,
+	short frame_index);
 
 /* ---------- globals */
 
@@ -197,6 +254,51 @@ void glow_dispose(
 	void)
 {
 	return;
+}
+
+long glow_new(
+	long definition_index)
+{
+	long glow_index = NONE;
+
+	if (definition_index != NONE)
+	{
+		glow_index = datum_new(glow_globals.glow_data);
+		if (glow_index != NONE)
+		{
+			struct glow_datum *glow =
+				(struct glow_datum *)datum_get(
+					glow_globals.glow_data,
+					glow_index);
+			struct glow_definition *definition =
+				(struct glow_definition *)tag_get(GLOW_TAG, definition_index);
+			struct bitmap_group *sprite_group =
+				bitmap_group_get(definition->texture.index);
+
+			if (sprite_group->type == _bitmap_group_type_sprites)
+			{
+				struct bitmap_group_sprite *sprite = TAG_BLOCK_GET_ELEMENT(
+					&TAG_BLOCK_GET_ELEMENT(
+						&sprite_group->sequences,
+						0,
+						struct bitmap_group_sequence)->sprites,
+					0,
+					struct bitmap_group_sprite);
+				struct bitmap_data *bitmap =
+					bitmap_group_get_bitmap_from_sequence(
+						definition->texture.index,
+						0,
+						sprite->bitmap_index);
+
+				glow->definition_index = definition_index;
+				glow->number_of_particles = definition->number_of_particles;
+				glow->bitmap_dimension = (short)(long)(
+					(sprite->bounds.x1 - sprite->bounds.x0) * bitmap->width);
+			}
+		}
+	}
+
+	return glow_index;
 }
 
 void glow_delete(
