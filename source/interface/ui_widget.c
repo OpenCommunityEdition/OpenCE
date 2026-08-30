@@ -754,6 +754,9 @@ void *pool_resize_pointer(
 extern struct stack_memory_pool *widget_memory_pool;
 extern struct ui_widget_bss_prefix bss_00454240;
 extern real_argb_color ui_plasma_effect_color;
+extern real global_ui_white_red;
+extern real global_ui_white_green;
+extern real global_ui_white_blue;
 
 short dashboard_abort_error = NONE;
 
@@ -953,6 +956,19 @@ void code_000d4690(
 	void)
 {
 	return;
+}
+
+real_rgb_color get_ui_rgb_white(
+	void)
+{
+	real_rgb_color result;
+
+	result = *global_real_rgb_white;
+	result.red = global_ui_white_red;
+	result.green = global_ui_white_green;
+	result.blue = global_ui_white_blue;
+
+	return result;
 }
 
 /* ---------- private code */
