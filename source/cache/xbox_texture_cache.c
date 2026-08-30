@@ -152,6 +152,16 @@ struct xbox_texture_cache_globals_prefix
 	byte reserved160D[3];
 };
 
+struct xbox_texture_cache_texture
+{
+	short identifier;
+	short read_request_handle;
+	boolean loaded;
+	byte reserved005[3];
+	struct bitmap_data *bitmap;
+	D3DBaseTexture hardware_format;
+};
+
 typedef char verify_bitmap_data_flags_offset[
 	offsetof(struct bitmap_data, flags) == 0xE ? 1 : -1];
 typedef char verify_bitmap_data_pixel_data_offset_offset[
@@ -192,6 +202,20 @@ typedef char verify_xbox_texture_cache_stolen_memory_offset[
 		stolen_memory) == 0x160C ? 1 : -1];
 typedef char verify_xbox_texture_cache_globals_prefix_size[
 	sizeof(struct xbox_texture_cache_globals_prefix) == 0x1610 ? 1 : -1];
+typedef char verify_xbox_texture_cache_texture_loaded_offset[
+	offsetof(
+		struct xbox_texture_cache_texture,
+		loaded) == 0x4 ? 1 : -1];
+typedef char verify_xbox_texture_cache_texture_bitmap_offset[
+	offsetof(
+		struct xbox_texture_cache_texture,
+		bitmap) == 0x8 ? 1 : -1];
+typedef char verify_xbox_texture_cache_texture_hardware_format_offset[
+	offsetof(
+		struct xbox_texture_cache_texture,
+		hardware_format) == 0xC ? 1 : -1];
+typedef char verify_xbox_texture_cache_texture_size[
+	sizeof(struct xbox_texture_cache_texture) == 0x20 ? 1 : -1];
 /* ---------- prototypes */
 
 void __stdcall XPhysicalProtect(
@@ -367,3 +391,34 @@ void texture_cache_close(
 }
 
 /* ---------- private code */
+
+void code_001ae880(
+	long block_index)
+{
+	struct xbox_texture_cache_texture *texture;
+	struct xbox_texture_cache_texture *cache_entry;
+
+	texture = datum_get(
+		xbox_texture_cache_globals.textures,
+		block_index);
+	do
+	{
+		cache_entry = datum_get(
+			xbox_texture_cache_globals.textures,
+			block_index);
+	}
+	while (!cache_entry->loaded ||
+		IDirect3DBaseTexture8_IsBusy(&cache_entry->hardware_format));
+
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\xbox_texture_cache.c",
+		0x187,
+		texture->bitmap->cache_block_index==block_index);
+	texture->bitmap->cache_block_index = NONE;
+	texture->bitmap->base_address = NULL;
+	datum_delete(
+		xbox_texture_cache_globals.textures,
+		block_index);
+
+	return;
+}
