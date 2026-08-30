@@ -446,9 +446,21 @@ symbols in this file:
 
 #include "cseries.h"
 #include "ai/ai_communication.h"
+#include "ai/encounters.h"
 #include "ai/ai_script.h"
+#include "memory/data.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
 
 /* ---------- constants */
+
+enum
+{
+	_ai_count_living = 0,
+	_ai_count_swarm,
+	_ai_count_nonswarm,
+	NUMBER_OF_AI_COUNT_TYPES,
+};
 
 /* ---------- macros */
 
@@ -469,6 +481,11 @@ void ai_debug_select_actor(
 	long actor_index);
 void ai_scripting_maneuver(
 	long ai_index);
+static long code_000439c0(
+	long ai_reference,
+	short count_type,
+	long *original_count_reference,
+	real *strength_reference);
 
 /* ---------- globals */
 
@@ -537,4 +554,178 @@ void ai_scripting_deselect(
 	return;
 }
 
+short ai_scripting_swarm_count(
+	long ai_reference)
+{
+	return code_000439c0(ai_reference, _ai_count_swarm, NULL, NULL);
+}
+
+short ai_scripting_nonswarm_count(
+	long ai_reference)
+{
+	return code_000439c0(ai_reference, _ai_count_nonswarm, NULL, NULL);
+}
+
+short ai_scripting_living_count(
+	long ai_reference)
+{
+	return code_000439c0(ai_reference, _ai_count_living, NULL, NULL);
+}
+
+real ai_scripting_living_fraction(
+	long ai_reference)
+{
+	real result = 0.0f;
+	long original_count;
+	long count = code_000439c0(
+		ai_reference,
+		_ai_count_living,
+		&original_count,
+		NULL);
+
+	if (original_count > 0)
+		result = (real)count / (real)original_count;
+
+	return result;
+}
+
+real ai_scripting_strength(
+	long ai_reference)
+{
+	real strength = 0.0f;
+	code_000439c0(ai_reference, _ai_count_living, NULL, &strength);
+	return strength;
+}
+
 /* ---------- private code */
+
+static long code_000439c0(
+	long ai_reference,
+	short count_type,
+	long *original_count_reference,
+	real *strength_reference)
+{
+	long count = 0;
+	long original_count = 0;
+	real strength = 0.0f;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\ai_script.c",
+		1029,
+		(count_type >= 0) && (count_type < NUMBER_OF_AI_COUNT_TYPES));
+
+	if (ai_reference != NONE)
+	{
+		struct scenario *scenario = global_scenario_get();
+
+		switch ((unsigned long)ai_reference >> 30)
+		{
+		case 0:
+		{
+			long encounter_index = ai_reference & UNSIGNED_SHORT_MAX;
+			if (VALID_INDEX(encounter_index, scenario->ai_encounters.count))
+			{
+				struct encounter_datum *encounter = encounter_get(encounter_index);
+
+				switch (count_type)
+				{
+				case _ai_count_living:
+					count = encounter->current_count;
+					break;
+				case _ai_count_swarm:
+					count = encounter->current_swarm_count;
+					break;
+				case _ai_count_nonswarm:
+					count = FLOOR(encounter->current_count - encounter->current_swarm_count, 0);
+					break;
+				default:
+					match_assert("c:\\halo\\SOURCE\\ai\\ai_script.c", 1060, !"unreachable");
+					break;
+				}
+
+				original_count = encounter->original_count;
+				strength = encounter->current_strength_fraction;
+			}
+			break;
+		}
+		case 1:
+		{
+			long encounter_index = ai_reference & UNSIGNED_SHORT_MAX;
+			if (VALID_INDEX(encounter_index, scenario->ai_encounters.count))
+			{
+				struct encounter_datum *encounter = encounter_get(encounter_index);
+				short platoon_index = (ai_reference >> 16) & UNSIGNED_CHAR_MAX;
+
+				if (VALID_INDEX(platoon_index, encounter->platoon_count))
+				{
+					struct platoon_datum *platoon = encounter_get_platoon(encounter, platoon_index);
+
+					switch (count_type)
+					{
+					case _ai_count_living:
+						count = platoon->current_count;
+						break;
+					case _ai_count_swarm:
+						count = platoon->current_swarm_count;
+						break;
+					case _ai_count_nonswarm:
+						count = FLOOR(platoon->current_count - platoon->current_swarm_count, 0);
+						break;
+					default:
+						match_assert("c:\\halo\\SOURCE\\ai\\ai_script.c", 1096, !"unreachable");
+						break;
+					}
+
+					original_count = platoon->original_count;
+					strength = platoon->current_strength_fraction;
+				}
+			}
+			break;
+		}
+		case 2:
+		{
+			long encounter_index = ai_reference & UNSIGNED_SHORT_MAX;
+			if (VALID_INDEX(encounter_index, scenario->ai_encounters.count))
+			{
+				struct encounter_datum *encounter = encounter_get(encounter_index);
+				short squad_index = (ai_reference >> 16) & UNSIGNED_CHAR_MAX;
+
+				if (VALID_INDEX(squad_index, encounter->squad_count))
+				{
+					struct squad_datum *squad = encounter_get_squad(encounter, squad_index);
+
+					switch (count_type)
+					{
+					case _ai_count_living:
+						count = squad->current_count;
+						break;
+					case _ai_count_swarm:
+						count = squad->current_swarm_count;
+						break;
+					case _ai_count_nonswarm:
+						count = FLOOR(squad->current_count - squad->current_swarm_count, 0);
+						break;
+					default:
+						match_assert("c:\\halo\\SOURCE\\ai\\ai_script.c", 1133, !"unreachable");
+						break;
+					}
+
+					original_count = squad->original_count;
+					strength = squad->current_strength_fraction;
+				}
+			}
+			break;
+		}
+		default:
+			match_assert("c:\\halo\\SOURCE\\ai\\ai_script.c", 1143, !"unreachable");
+			break;
+		}
+	}
+
+	if (original_count_reference)
+		*original_count_reference = original_count;
+	if (strength_reference)
+		*strength_reference = strength;
+
+	return count;
+}
