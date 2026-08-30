@@ -102,11 +102,14 @@ symbols in this file:
 
 #include "cseries.h"
 #include "damage.h"
+#include "effects/effects.h"
+#include "game/cheats.h"
 #include "game/game_globals.h"
 #include "hs/object_lists.h"
 #include "object_definitions.h"
 #include "object_types.h"
 #include "physics/collision_model_definitions.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
@@ -119,6 +122,25 @@ struct damage_globals
 	byte unknown[0x48];
 	long debug_object_index;
 };
+
+typedef char object_deplete_body_definition_index_offset_assert[
+	offsetof(struct object_datum, definition_index) == 0x00 ? 1 : -1];
+typedef char object_deplete_body_type_offset_assert[
+	offsetof(struct object_datum, object) + offsetof(struct _object_datum, type) == 0x64 ? 1 : -1];
+typedef char object_deplete_body_damage_flags_offset_assert[
+	offsetof(struct object_datum, object) + offsetof(struct _object_datum, damage_flags) == 0xB6 ? 1 : -1];
+typedef char object_deplete_body_next_object_offset_assert[
+	offsetof(struct object_datum, object) + offsetof(struct _object_datum, next_object_index) == 0xC4 ? 1 : -1];
+typedef char object_deplete_body_first_child_offset_assert[
+	offsetof(struct object_datum, object) + offsetof(struct _object_datum, first_child_object_index) == 0xC8 ? 1 : -1];
+typedef char object_deplete_body_player_index_offset_assert[
+	offsetof(struct unit_datum, unit) + offsetof(struct _unit_datum, player_index) == 0x1C8 ? 1 : -1];
+typedef char object_deplete_body_parent_seat_offset_assert[
+	offsetof(struct unit_datum, unit) + offsetof(struct _unit_datum, parent_seat_index) == 0x2A0 ? 1 : -1];
+typedef char object_deplete_body_collision_model_offset_assert[
+	offsetof(struct object_definition, object) + offsetof(struct _object_definition, collision_model) + offsetof(struct tag_reference, index) == 0x7C ? 1 : -1];
+typedef char object_deplete_body_effect_offset_assert[
+	offsetof(struct collision_model, resistance) + offsetof(struct damage_resistance, body_depleted_effect) + offsetof(struct tag_reference, index) == 0xB4 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -269,6 +291,67 @@ boolean object_restore_body(
 	}
 
 	return restored;
+}
+
+void object_deplete_body(
+	long object_index)
+{
+	struct object_datum *object;
+	word damage_flags;
+
+	object = object_get(object_index);
+	damage_flags = object->object.damage_flags;
+	if (!TEST_FLAG(damage_flags, _object_dead_bit))
+	{
+		struct object_definition *definition;
+		long collision_model_index;
+
+		SET_FLAG(damage_flags, _object_dead_bit, TRUE);
+		object->object.damage_flags = damage_flags;
+
+		definition = object_definition_get(object->definition_index);
+		collision_model_index = definition->object.collision_model.index;
+		if (collision_model_index != NONE)
+		{
+			struct collision_model *collision_model;
+
+			collision_model = collision_model_definition_get(collision_model_index);
+			effect_new_from_object(
+				collision_model->resistance.body_depleted_effect.index,
+				object_index,
+				object_index,
+				NONE,
+				0.f,
+				0.f,
+				NULL,
+				NULL);
+		}
+
+		if (object->object.type == _object_type_vehicle)
+		{
+			long unit_index;
+
+			unit_index = object->object.first_child_object_index;
+			while (unit_index != NONE)
+			{
+				struct unit_datum *unit;
+
+				unit = (struct unit_datum *)object_get(unit_index);
+				if (unit->object.type == _object_type_biped &&
+					(unit->unit.player_index == NONE || !cheat.deathless_player) &&
+					unit->unit.parent_seat_index != NONE)
+				{
+					unit_kill(unit_index);
+				}
+
+				unit_index = unit->object.next_object_index;
+			}
+		}
+
+		object_deplete_shield(object_index);
+	}
+
+	return;
 }
 
 void code_00126090(
