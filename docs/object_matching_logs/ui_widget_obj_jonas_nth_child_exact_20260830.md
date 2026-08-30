@@ -146,4 +146,3 @@ payload SHA-256
 `76cb765279af58cd98513e0c03d31ce804c1a6eb91d96d24be1c716b1e26d39c`.
 `build/semantic_report.json` is 3,289,745 bytes with SHA-256
 `39dc7e394c1290bfc727dc6f9ad71951b597dddb1d0b2388ffc83af6eb7aba32`.
-
