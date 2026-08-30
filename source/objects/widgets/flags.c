@@ -65,6 +65,7 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "memory/data.h"
+#include "objects/objects.h"
 #include "saved games/game_state.h"
 #include "tag_files/tag_groups.h"
 
@@ -94,6 +95,11 @@ void flag_update(
 	struct flag_datum_prefix *flag,
 	struct flag_definition *definition,
 	real delta);
+void flag_render_proper(
+	struct flag_datum_prefix *flag,
+	struct flag_definition *definition,
+	struct render_lighting const *lighting,
+	struct render_animation const *animation);
 
 /* ---------- globals */
 
@@ -164,6 +170,33 @@ void flags_update(
 			flag_update(flag, definition, delta);
 		}
 	}
+
+	return;
+}
+
+void flag_render(
+	long object_index,
+	long flag_index,
+	struct render_lighting const *lighting,
+	struct render_animation const *animation)
+{
+	struct flag_datum_prefix *flag;
+	struct flag_definition *definition;
+
+	object_get(object_index);
+	flag = datum_get(flag_data, flag_index);
+	definition = tag_get('flag', flag->definition_index);
+	flag->object_index = object_index;
+
+	if (flag->updates_since_last_render > 5 || !flag->initialized)
+	{
+		flag_update(flag, definition, 5.0f);
+		flag->initialized = TRUE;
+	}
+
+	flag->updates_since_last_render = 0;
+	if (!flag->noop)
+		flag_render_proper(flag, definition, lighting, animation);
 
 	return;
 }
