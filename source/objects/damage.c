@@ -141,6 +141,8 @@ typedef char object_deplete_body_collision_model_offset_assert[
 	offsetof(struct object_definition, object) + offsetof(struct _object_definition, collision_model) + offsetof(struct tag_reference, index) == 0x7C ? 1 : -1];
 typedef char object_deplete_body_effect_offset_assert[
 	offsetof(struct collision_model, resistance) + offsetof(struct damage_resistance, body_depleted_effect) + offsetof(struct tag_reference, index) == 0xB4 ? 1 : -1];
+typedef char object_destroy_effect_offset_assert[
+	offsetof(struct collision_model, resistance) + offsetof(struct damage_resistance, body_destroyed_effect) + offsetof(struct tag_reference, index) == 0xC8 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -369,6 +371,41 @@ void code_00126090(
 
 		child_object_index = next_object_index;
 	}
+
+	return;
+}
+
+void object_destroy(
+	long object_index)
+{
+	struct object_datum *object;
+	struct object_definition *definition;
+	long collision_model_index;
+
+	object = object_get(object_index);
+	definition = object_definition_get(object->definition_index);
+
+	object_deplete_body(object_index);
+
+	collision_model_index = definition->object.collision_model.index;
+	if (collision_model_index != NONE)
+	{
+		struct collision_model *collision_model;
+
+		collision_model = collision_model_definition_get(collision_model_index);
+		effect_new_from_object(
+			collision_model->resistance.body_destroyed_effect.index,
+			object_index,
+			object_index,
+			NONE,
+			0.f,
+			0.f,
+			NULL,
+			NULL);
+	}
+
+	code_00126090(object_index);
+	object_delete(object_index);
 
 	return;
 }
