@@ -280,6 +280,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "ai/actor_activation.h"
 #include "ai/actor_iterators.h"
 #include "encounters.h"
 
@@ -519,6 +520,21 @@ void actor_iterator_new(
 	iterator->next_index = NONE;
 	iterator->index = NONE;
 	iterator->active_only = active_only;
+
+	return;
+}
+
+void encounterless_activate(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\encounters.c",
+		0x720,
+		actor->meta.encounterless);
+	actor->meta.encounterless_active_timer = 90;
+	actor_set_active(actor_index, TRUE);
 
 	return;
 }
