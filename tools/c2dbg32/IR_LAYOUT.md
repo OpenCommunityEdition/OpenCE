@@ -532,3 +532,67 @@ role is fixed in the node graph before it runs. The decision is upstream in
 lowering. Watching it needs `dbg_armreg.txt` armed at a *lowering* site, not
 at the encoder — arming at encode time is too late by construction, which is
 why the write is never caught there.
+
+## Lowering: where an fld node's operand pointer is written (2026-08-30)
+
+Caught with `dbg_armreg.txt` armed at *node creation* rather than at encode
+time (arming at the encoder is too late by construction — see the previous
+section; the only writes visible there are the arena clear `0x107010e6` and
+the heap free fill `0xfeeefeee` from ntdll at teardown).
+
+### How to get there
+
+The FP opcode constants are written as immediates, so creation sites are
+findable statically: search `.text` for the little-endian imm32 and keep the
+`mov dword ptr [reg+4], <op>` / `push <op>` forms. For `0x24e` that is 186
+candidates; probing them 8 at a time under the debugger (with a known-firing
+address as a control) shows which execute. For `probes/m6only.c` exactly one
+`0x24e` creation site fires: **`0x10707995` `mov dword ptr [eax+4], 0x24e`**,
+46 hits, called from **`0x10736542`** — the per-node codegen region already
+known around `0x10735135`.
+
+Arming `dbg_armreg.txt` as `eax 18 1 4` at that site watches the new node's
+operand slot from birth.
+
+### The write
+
+Two sites write an fld node's operand pointer, and both are the same idiom:
+
+```
+        call 0x10708c34            ; produce the operand (symbol) -> eax
+        mov  edi, eax
+        call 0x107019f4            ; NODE CONSTRUCTOR -> eax
+        mov  dword [eax+4], 0x24d  ; opcode (fld)
+        mov  word  [eax+0xa], si   ; class/reg field, copied from [ecx+0xa]
+        mov  dword [eax+0x18], edi ; <-- the operand pointer
+        mov  dword [eax+0x1c], edi ; <-- duplicated into the use slot
+```
+
+| site | store | reported writer_eip |
+|---|---|---|
+| A | `0x1070db1d` | `0x1070db20` |
+| B | `0x10710332` | `0x10710335` |
+
+- **`0x107019f4` is the node constructor.** This independently confirms the
+  same address recorded from the earlier POGO/allocator work.
+- **`0x10708c34`** produces the operand the load will reference.
+- `node[+0x18]` and `node[+0x1c]` both receive it — the def/use pair.
+- `node[+0xa]` is copied from another node's `+0xa`, consistent with the
+  earlier reading of `[+0xa]` as an already-assigned class/register field.
+
+### Caveat — what this does and does not prove
+
+The watched address was a node slot that the arena **recycled**: the stores
+caught above write into a freshly constructed node (`eax` straight out of
+`0x107019f4`) that reused the watched memory, and they write opcode `0x24d`
+while the node originally armed on was `0x24e`. So this is a sound capture of
+*the general fld-node-creation path and where the operand pointer is
+written*, but it is **not** proof that these particular executions built the
+tied instruction's node. Tying a specific site execution to the tied `fld`
+still needs a per-hit correlation (arm at each of the 46 creations in turn,
+or extend `dbg_armreg` with a value filter).
+
+The decision itself — *which* of a commutative pair is handed to
+`0x10708c34` to become the load — is made in the caller of these sites. That
+caller is the next target, and it is now one frame away rather than
+unlocated.
