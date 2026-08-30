@@ -271,6 +271,10 @@ typedef char hud_state_message_runtime_is_text_flags_offset_assert[
 	offsetof(struct hud_state_message_runtime_definition, is_text_flags) == 0x229 ? 1 : -1];
 typedef char hud_messaging_datum_state_message_offset_assert[
 	offsetof(struct hud_messaging_datum_definition, state_message) == 0x230 ? 1 : -1];
+typedef char hud_messaging_datum_leave_first_line_blank_offset_assert[
+	offsetof(struct hud_messaging_datum_definition, leave_first_line_blank) == 0x45E ? 1 : -1];
+typedef char hud_messaging_datum_custom_message_offset_assert[
+	offsetof(struct hud_messaging_datum_definition, custom_message) == 0x45F ? 1 : -1];
 typedef char hud_messaging_datum_size_assert[
 	sizeof(struct hud_messaging_datum_definition) == 0x460 ? 1 : -1];
 typedef char hud_messaging_globals_size_assert[
@@ -528,6 +532,30 @@ hud_set_state_message_text(
 		datum->state_message.info[custom_icon_index].text.uses_scenario_names = uses_scenario_names;
 		datum->state_message.is_text_flags |= 1 << custom_icon_index;
 	}
+
+	return;
+}
+
+void
+hud_enable_custom_state_message(
+	short local_player_index,
+	boolean enabled)
+{
+	struct hud_messaging_datum_definition *datum =
+		&bss_00453ab8->message_data[local_player_index];
+
+	datum->leave_first_line_blank |= datum->state_message.valid != enabled;
+	datum->state_message.valid = enabled;
+	datum->state_message.state_message = NULL;
+	if (enabled)
+	{
+		datum->state_message.state_message = NULL;
+		ustrncpy(
+			datum->state_message.message_buffer,
+			L"",
+			MAXIMUM_HUD_STATE_MESSAGE_TEXT_LENGTH - 1);
+	}
+	datum->custom_message = enabled;
 
 	return;
 }
