@@ -178,6 +178,18 @@ void projectile_delete(
 	return;
 }
 
+void projectile_set_target_object_index(
+	long projectile_index,
+	long target_object_index)
+{
+	struct projectile_datum *projectile;
+
+	projectile = projectile_get(projectile_index);
+	projectile->projectile.target_object_index = target_object_index;
+
+	return;
+}
+
 boolean dangerous_projectiles_near_player(
 	void)
 {
