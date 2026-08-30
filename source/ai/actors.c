@@ -283,6 +283,7 @@ symbols in this file:
 #include "cseries.h"
 #include "actors.h"
 #include "actor_definitions.h"
+#include "actor_iterators.h"
 #include "actor_types.h"
 #include "props.h"
 
@@ -300,6 +301,21 @@ enum
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct actor_iterator
+{
+	struct data_iterator encounter_iterator;
+	boolean iterated_encounterless_list;
+	boolean active_only;
+	byte pad[2];
+	long index;
+	long next_index;
+};
+
+typedef char actor_iterator_size_assert[
+	sizeof(struct actor_iterator) == 0x1C ? 1 : -1];
+typedef char actor_iterator_index_offset_assert[
+	offsetof(struct actor_iterator, index) == 0x14 ? 1 : -1];
 
 typedef char actor_datum_output_control_flags_offset_assert[
 	offsetof(struct actor_datum, output.control_flags) == 0x6D0 ? 1 : -1];
@@ -720,6 +736,20 @@ void actor_braindead(
 	else if (actor->state.mode == _actor_mode_braindead)
 	{
 		actor->state.mode = _actor_mode_alert;
+	}
+
+	return;
+}
+
+void actors_freeze(
+	void)
+{
+	struct actor_iterator iterator;
+
+	actor_iterator_new(&iterator, TRUE);
+	while (actor_iterator_next(&iterator))
+	{
+		code_00029e70(iterator.index);
 	}
 
 	return;
