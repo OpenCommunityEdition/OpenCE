@@ -446,11 +446,15 @@ symbols in this file:
 
 #include "cseries.h"
 #include "ai/ai_communication.h"
+#include "ai/ai_debug.h"
 #include "ai/encounters.h"
 #include "ai/ai_script.h"
+#include "cseries/errors.h"
+#include "hs/hs.h"
 #include "memory/data.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
@@ -472,6 +476,19 @@ struct ai_script_globals_prefix
 	boolean ai_initialized_for_map;
 };
 
+struct ai_script_actor_reference_iterator
+{
+	byte storage[16];
+	long actor_index;
+	byte tail[4];
+};
+
+struct ai_script_conversation_definition
+{
+	char name[32];
+	byte unknown[84];
+};
+
 /* ---------- prototypes */
 
 short ai_conversation_status(
@@ -481,6 +498,24 @@ void ai_debug_select_actor(
 	long actor_index);
 void ai_scripting_maneuver(
 	long ai_index);
+void ai_index_actor_iterator_new(
+	long ai_reference,
+	struct ai_script_actor_reference_iterator *iterator);
+struct actor_datum *ai_index_actor_iterator_next(
+	struct ai_script_actor_reference_iterator *iterator);
+boolean ai_conversation(
+	short conversation_index,
+	boolean scripted);
+void actor_delete(
+	long actor_index,
+	boolean died);
+void actor_kill(
+	long actor_index,
+	boolean silent,
+	boolean delayed);
+static void code_000432b0(
+	long ai_reference,
+	boolean silent);
 static long code_000439c0(
 	long ai_reference,
 	short count_type,
@@ -554,6 +589,74 @@ void ai_scripting_deselect(
 	return;
 }
 
+void ai_scripting_detach_unit(
+	long unit_index)
+{
+	if (ai_debug.print_scripting)
+	{
+		error(
+			_error_silent,
+			"%s: ai_detach_unit 0x%04X",
+			hs_runtime_get_executing_thread_name(),
+			unit_index & UNSIGNED_SHORT_MAX);
+	}
+
+	if (unit_index != NONE)
+	{
+		long actor_index = unit_get(unit_index)->unit.actor_index;
+		if (actor_index != NONE)
+			actor_delete(actor_index, FALSE);
+	}
+
+	return;
+}
+
+void ai_scripting_kill(
+	long ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+		ai_index_to_string(
+			ai_reference,
+			global_scenario_get(),
+			ai_name,
+			sizeof(ai_name));
+		error(
+			_error_silent,
+			"%s: ai_kill %s",
+			hs_runtime_get_executing_thread_name(),
+			ai_name);
+	}
+
+	code_000432b0(ai_reference, FALSE);
+
+	return;
+}
+
+void ai_scripting_kill_silent(
+	long ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+		ai_index_to_string(
+			ai_reference,
+			global_scenario_get(),
+			ai_name,
+			sizeof(ai_name));
+		error(
+			_error_silent,
+			"%s: ai_kill_silent %s",
+			hs_runtime_get_executing_thread_name(),
+			ai_name);
+	}
+
+	code_000432b0(ai_reference, TRUE);
+
+	return;
+}
+
 short ai_scripting_swarm_count(
 	long ai_reference)
 {
@@ -597,7 +700,117 @@ real ai_scripting_strength(
 	return strength;
 }
 
+boolean ai_scripting_conversation(
+	long conversation_index)
+{
+	short conversation = conversation_index;
+
+	if (ai_debug.print_scripting)
+	{
+		struct scenario *scenario;
+		char const *conversation_name;
+
+		scenario = global_scenario_get();
+		conversation_name = "<error>";
+		if (VALID_INDEX(conversation, scenario->ai_conversations.count))
+		{
+			conversation_name = TAG_BLOCK_GET_ELEMENT(
+				&scenario->ai_conversations,
+				conversation,
+				struct ai_script_conversation_definition)->name;
+		}
+
+		error(
+			_error_silent,
+			"%s: ai_conversation %s",
+			hs_runtime_get_executing_thread_name(),
+			conversation_name);
+	}
+
+	return ai_conversation(conversation, TRUE);
+}
+
+void ai_scripting_conversation_stop(
+	long conversation_index)
+{
+	short conversation = conversation_index;
+
+	if (ai_debug.print_scripting)
+	{
+		struct scenario *scenario;
+		char const *conversation_name;
+
+		scenario = global_scenario_get();
+		conversation_name = "<error>";
+		if (VALID_INDEX(conversation, scenario->ai_conversations.count))
+		{
+			conversation_name = TAG_BLOCK_GET_ELEMENT(
+				&scenario->ai_conversations,
+				conversation,
+				struct ai_script_conversation_definition)->name;
+		}
+
+		error(
+			_error_silent,
+			"%s: ai_conversation_stop %s",
+			hs_runtime_get_executing_thread_name(),
+			conversation_name);
+	}
+
+	ai_conversation_stop(conversation);
+
+	return;
+}
+
+void ai_scripting_conversation_advance(
+	long conversation_index)
+{
+	short conversation = conversation_index;
+
+	if (ai_debug.print_scripting)
+	{
+		struct scenario *scenario;
+		char const *conversation_name;
+
+		scenario = global_scenario_get();
+		conversation_name = "<error>";
+		if (VALID_INDEX(conversation, scenario->ai_conversations.count))
+		{
+			conversation_name = TAG_BLOCK_GET_ELEMENT(
+				&scenario->ai_conversations,
+				conversation,
+				struct ai_script_conversation_definition)->name;
+		}
+
+		error(
+			_error_silent,
+			"%s: ai_conversation_advance %s",
+			hs_runtime_get_executing_thread_name(),
+			conversation_name);
+	}
+
+	ai_conversation_advance(conversation);
+
+	return;
+}
+
 /* ---------- private code */
+
+static void code_000432b0(
+	long ai_reference,
+	boolean silent)
+{
+	struct ai_script_actor_reference_iterator iterator;
+
+	if (ai_reference == NONE)
+		return;
+
+	ai_index_actor_iterator_new(ai_reference, &iterator);
+	while (ai_index_actor_iterator_next(&iterator))
+		actor_kill(iterator.actor_index, silent, FALSE);
+
+	return;
+}
 
 static long code_000439c0(
 	long ai_reference,
