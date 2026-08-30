@@ -78,8 +78,11 @@ The Scenario comparison reported only the expected configuration fingerprint
 change and debug-record churn from the corrected public prototype.  There were
 no newly non-exact functions: all 46 Scenario functions remained exact.
 
-These findings are classified, not suppressed.  A clean post-admission
-manifest is captured after the commit and must check stable before integration.
+These findings are classified, not suppressed.  Clean post-admission manifests
+were captured from commit `c831f8fdde237754ec9b015a42ea66aa04a26fef`.
+Immediate checks passed with no failures or warnings: all 13 Render functions
+and all 46 Scenario functions remained exact, with no newly exact or changed
+non-exact owners.
 
 ## Validation
 
