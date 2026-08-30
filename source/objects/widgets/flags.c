@@ -64,7 +64,9 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
+#include "memory/data.h"
 #include "saved games/game_state.h"
+#include "tag_files/tag_groups.h"
 
 /* ---------- constants */
 
@@ -72,7 +74,26 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct flag_datum_prefix
+{
+	struct datum_header header;
+	boolean noop;
+	boolean initialized;
+	boolean update_state;
+	byte pad5;
+	short updates_since_last_render;
+	long object_index;
+	long definition_index;
+};
+
+struct flag_definition;
+
 /* ---------- prototypes */
+
+void flag_update(
+	struct flag_datum_prefix *flag,
+	struct flag_definition *definition,
+	real delta);
 
 /* ---------- globals */
 
@@ -119,6 +140,30 @@ void flag_delete(
 	long flag_index)
 {
 	datum_delete(flag_data, flag_index);
+
+	return;
+}
+
+void flags_update(
+	real delta)
+{
+	long flag_index;
+
+	for (flag_index = data_next_index(flag_data, NONE);
+		flag_index != NONE;
+		flag_index = data_next_index(flag_data, flag_index))
+	{
+		struct flag_datum_prefix *flag = datum_get(flag_data, flag_index);
+		struct flag_definition *definition = tag_get('flag', flag->definition_index);
+
+		flag->updates_since_last_render++;
+		if (flag->object_index != NONE &&
+			flag->updates_since_last_render < 5 &&
+			delta != 0.0f)
+		{
+			flag_update(flag, definition, delta);
+		}
+	}
 
 	return;
 }
