@@ -102,6 +102,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include <xtl.h>
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -112,6 +114,15 @@ symbols in this file:
 
 /* ---------- globals */
 
+extern XNADDR global_address;
+
 /* ---------- public code */
+
+XNADDR *transport_get_xnaddr(
+	XNADDR *address)
+{
+	*address = global_address;
+	return address;
+}
 
 /* ---------- private code */
