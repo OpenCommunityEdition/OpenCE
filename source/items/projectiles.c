@@ -238,6 +238,24 @@ void projectile_handle_deleted_object(
 	return;
 }
 
+boolean projectile_handle_parent_destroyed(
+	long projectile_index)
+{
+	struct projectile_datum *projectile;
+
+	projectile = projectile_get(projectile_index);
+	match_assert(
+		"c:\\halo\\SOURCE\\items\\projectiles.c",
+		1845,
+		projectile->object.parent_object_index != NONE);
+	projectile->projectile.arming_time = 1.0f;
+	projectile->projectile.detonation_timer = 1.0f;
+	projectile->projectile.flags &= ~FLAG(_projectile_attached_bit);
+	object_detach(projectile_index);
+
+	return TRUE;
+}
+
 boolean dangerous_projectiles_near_player(
 	void)
 {

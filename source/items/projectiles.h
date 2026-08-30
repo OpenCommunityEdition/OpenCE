@@ -28,6 +28,10 @@ struct _projectile_datum
 	short hit_material_type;
 	long ignore_object_index;
 	long target_object_index;
+	long tracer_attachment_index;
+	real detonation_timer;
+	real detonation_timer_delta;
+	real arming_time;
 };
 
 struct projectile_datum
@@ -40,6 +44,14 @@ struct projectile_datum
 
 typedef char projectile_target_object_index_offset_assert[
 	offsetof(struct projectile_datum, projectile.target_object_index) == 0x1E8
+		? 1
+		: -1];
+typedef char projectile_detonation_timer_offset_assert[
+	offsetof(struct projectile_datum, projectile.detonation_timer) == 0x1F0
+		? 1
+		: -1];
+typedef char projectile_arming_time_offset_assert[
+	offsetof(struct projectile_datum, projectile.arming_time) == 0x1F8
 		? 1
 		: -1];
 
