@@ -785,3 +785,42 @@ above). Plant C1 function prologues 7 at a time plus a control, run
 instead of a new sampler, at the cost of many runs to cover C1's 400 KB
 `.text`. Expect the signal to be small: one extra expression against a
 parse-dominated profile.
+
+### C1 sampler fixed (suspended launch) — and what it did and did not show
+
+`probes/c1_sampler2.py` replaces the failed Toolhelp version. It launches
+`CL.Exe` with `CREATE_SUSPENDED` so the main thread handle is owned outright
+(no Toolhelp, no `OpenThread`), resumes it, then tight-loops
+Suspend / `Wow64GetThreadContext` / Resume on that one handle, accumulating
+over N compiles. Std handles go to `NUL`.
+
+**It works:** 333,991 samples inside C1.Dll for `m6only.c` against 163,140
+for the control `m6none.c` over 6 runs each. C1 does roughly twice the work
+when the cross-product expression is present, which is itself informative —
+the `__inline` expansion is front-end work, not purely back-end.
+
+**Two methodological traps, both caught by verification rather than assumed:**
+
+1. **Int3-padding "function starts" are labels, not entry points.** The
+   sampler attributes samples to the nearest preceding non-`0xCC` byte. Five
+   top-ranked such addresses were breakpointed and took **zero hits** — they
+   are data, jump-table entries or mid-function alignment. Use them for
+   bucketing if you like, but never as breakpoint targets. Raw sampled EIPs
+   are always real instruction addresses and are the valid targets.
+2. **The top differential EIPs are hot shared parser code, not
+   expression-specific.** Breakpointing the five highest-excess raw EIPs
+   (three of which showed `ctrl=0` in the profile) fires in *both* the
+   with-expression and control compiles, at the 250-hit cap in both. The
+   profile's "excess" is largely the with-expression compile doing more of
+   everything; per-sample normalisation did not remove it, and the hit cap
+   masked the rest.
+
+`dbg32`'s hit-count line now prints 8 hex digits instead of 1, so counts are
+readable rather than truncated (250 previously printed as `a`).
+
+**What a next attempt needs.** Raise `maxhits` and add a count-only mode (no
+heavy dump) so differential hit counts are meaningful; profile a control that
+is closer in total work (e.g. the same expression with non-commutative
+operators) so the difference isolates commutativity rather than volume; and
+attribute via real call targets (`call rel32` decoding) rather than int3
+boundaries. Only then is a candidate list worth breakpointing.

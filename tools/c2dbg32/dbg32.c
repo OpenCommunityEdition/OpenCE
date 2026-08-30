@@ -483,7 +483,7 @@ void entry(void){
     }
     ContinueDebugEvent(de.pid,de.tid,status);
   }
-  puts_("done. hit counts:"); for(i=0;i<nbp;i++){ putc_(' '); hex_(hits[i],1); } putc_('\n');
+  puts_("done. hit counts:"); for(i=0;i<nbp;i++){ putc_(' '); hex_(hits[i],8); } putc_('\n');
   if(nwp>0){ puts_("wp hit counts:"); for(i=0;i<nwp;i++){ putc_(' '); hex_(wphits[i],1); } putc_('\n'); }
   flush(); CloseHandle(g_out); ExitProcess(0);
 }
