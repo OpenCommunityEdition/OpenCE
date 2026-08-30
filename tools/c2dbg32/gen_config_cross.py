@@ -44,4 +44,10 @@ def main(bp_vas, src=SRC):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    argv = sys.argv[1:]
+    src = SRC
+    if '--src' in argv:
+        i = argv.index('--src')
+        src = argv[i + 1]
+        argv = argv[:i] + argv[i + 2:]
+    main(argv, src)
