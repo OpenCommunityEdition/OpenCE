@@ -81,11 +81,27 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	_saved_game_file_type_play_list = 1,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
 
 struct thread_reference;
+
+struct playlist_profile_data_prefix
+{
+	byte reserved0000[0x68];
+	boolean first_time;
+};
+
+typedef char verify_playlist_profile_first_time_offset[
+	offsetof(struct playlist_profile_data_prefix, first_time) == 0x68 ? 1 : -1];
+typedef char verify_playlist_profile_data_size[
+	sizeof(struct playlist_profile_data_prefix) == 0x69 ? 1 : -1];
 
 struct playlist_profile_runtime_globals_prefix
 {
@@ -117,10 +133,19 @@ boolean thread_has_exited(
 	struct thread_reference *thread_reference);
 void dispose_thread(
 	struct thread_reference *thread_reference);
+void code_001b1c10(
+	void);
+void saved_game_files_enumerate_available_to_local_player_index(
+	short local_player_index,
+	word saved_game_file_type,
+	word *number_of_profiles,
+	long *player_profile_indices,
+	boolean include_default_profiles);
 
 /* ---------- globals */
 
 extern struct playlist_profile_runtime_globals_prefix bss_004d2858;
+extern struct playlist_profile_data_prefix data_003168c8;
 
 /* ---------- public code */
 
@@ -178,6 +203,27 @@ word playlist_profile_number_of_default_profiles_on_disk(
 	void)
 {
 	return bss_004d2858.number_of_default_profiles;
+}
+
+void playlist_profiles_enumerate_available_to_local_player_index(
+	short local_player_index,
+	word *number_of_profiles,
+	long *playlist_profile_indices)
+{
+	if (data_003168c8.first_time == TRUE)
+	{
+		code_001b1c10();
+		data_003168c8.first_time = FALSE;
+	}
+
+	saved_game_files_enumerate_available_to_local_player_index(
+		local_player_index,
+		_saved_game_file_type_play_list,
+		number_of_profiles,
+		playlist_profile_indices,
+		TRUE);
+
+	return;
 }
 
 /* ---------- private code */
