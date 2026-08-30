@@ -487,13 +487,20 @@ void *debug_malloc(
 		code_0007cfc0(header);
 
 		pointer = header + 1;
-		csmemset(pointer, clear ? 0 : 0xCA, size);
+		if (clear)
+		{
+			csmemset(pointer, 0, size);
+		}
+		else
+		{
+			csmemset(pointer, 0xCA, size);
+		}
 	}
 
 	if (pointer != NULL)
 	{
 		data_002dcd0c.total_pointer_size += size;
-		if (data_002dcd0c.total_pointer_size > data_002dcd0c.maximum_pointer_size)
+		if (data_002dcd0c.maximum_pointer_size < data_002dcd0c.total_pointer_size)
 		{
 			data_002dcd0c.maximum_pointer_size = data_002dcd0c.total_pointer_size;
 		}
