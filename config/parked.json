@@ -228,6 +228,25 @@
         },
         "objdiff_percent": 100
       }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_hardware_bitmaps",
+      "function": "_rasterizer_bitmap_new",
+      "class": "instruction-scheduling",
+      "evidence": "Target and candidate have equal 0x190 padded size and all 26 relocation identities/addresses. They are instruction-identical through +0x159 and differ in exactly one normalized byte: VC7 directs the final failure JNE to a second byte-identical bitmap->hardware_format = NULL / return TRUE epilogue, while January directs it to the first epilogue. More than 50 ordinary-C control-flow shapes covering shared and split returns, branch polarity, goto topology, success materialization, and local lifetimes either preserve this one-byte duplicate-epilogue branch-threading choice or regress earlier exact code. The retained source is the plain semantic form; no asm, volatile/register forcing, pragmas, barriers, undefined behavior, byte patch, or comparator exception is used.",
+      "measurements": {
+        "target": {
+          "size": 400,
+          "relocation_count": 26,
+          "normalized_sha256": "041cef84e2a13eeae0fccfaef6e8e897a5c5926bf850bc6c10bc245f3df8a82d"
+        },
+        "base": {
+          "size": 400,
+          "relocation_count": 26,
+          "normalized_sha256": "719469460357f06cde7f452e16e02ba79ac639e85e0fad244f8e01cb7bd5efcd"
+        },
+        "objdiff_percent": 99.96377
+      }
     }
   ]
 }
