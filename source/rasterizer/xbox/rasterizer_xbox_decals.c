@@ -216,4 +216,20 @@ void _rasterizer_decals_dispose(
 	return;
 }
 
+void _rasterizer_decal_vertices_delete(
+	long cache_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_decals.c",
+		0x106,
+		cache_index!=NONE);
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_decals.c",
+		0x107,
+		local_vertex_cache);
+	lruv_block_delete(local_vertex_cache, cache_index);
+
+	return;
+}
+
 /* ---------- private code */
