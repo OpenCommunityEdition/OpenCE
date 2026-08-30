@@ -39,7 +39,7 @@ symbols in this file:
 00128F90 00b0:
 	_lights_disconnect_from_structure_bsp (0000)
 00129040 0020:
-	_code_00129040 (0000)
+	_light_attenuation (0000)
 00129060 00a0:
 	_code_00129060 (0000)
 00129100 0020:
@@ -330,6 +330,13 @@ void lights_reconnect_to_structure_bsp(
 }
 
 /* ---------- private code */
+
+real light_attenuation(
+	real radius,
+	real distance)
+{
+	return 1.0f - (distance * distance) / (radius * radius);
+}
 
 long code_00129100(
 	long *reference_index,

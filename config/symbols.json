@@ -5147,7 +5147,7 @@
 { "file_offset": 1215696, "flags": 32, "name": "_light_particle" },
 { "file_offset": 1216304, "flags": 32, "name": "_light_disconnect_from_map" },
 { "file_offset": 1216400, "flags": 32, "name": "_lights_disconnect_from_structure_bsp" },
-{ "file_offset": 1216576, "flags": 32, "name": "_code_00129040" },
+{ "file_offset": 1216576, "flags": 32, "name": "_light_attenuation" },
 { "file_offset": 1216608, "flags": 32, "name": "_code_00129060" },
 { "file_offset": 1216768, "flags": 32, "name": "_code_00129100" },
 { "file_offset": 1216800, "flags": 32, "name": "_code_00129120" },
