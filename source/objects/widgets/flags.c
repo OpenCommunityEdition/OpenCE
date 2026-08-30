@@ -71,6 +71,21 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum trailing_edge_shape
+{
+	_trailing_edge_shape_flat,
+	_trailing_edge_shape_concave_triangular,
+	_trailing_edge_shape_convex_triangular,
+	_trailing_edge_shape_trapezoid_short_top,
+	_trailing_edge_shape_trapezoid_short_bottom
+};
+
+enum tesselate
+{
+	_tesselate_top_left = 2,
+	_tesselate_bottom_left = 3
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -129,6 +144,13 @@ struct flag_cell_datum *flag_datum_get_cell(
 	struct flag_definition *definition,
 	short x,
 	short y);
+void flag_tesselate_region(
+	struct flag_definition *definition,
+	struct flag_datum_prefix *flag,
+	short x,
+	short y,
+	short size,
+	short tesselation);
 
 /* ---------- globals */
 
@@ -274,4 +296,64 @@ struct flag_cell_datum *flag_datum_get_cell(
 		y>=0 && y<definition->height-1);
 
 	return &flag->cells[x * (definition->height - 1) + y];
+}
+
+void flag_set_trailing_shape(
+	struct flag_definition *definition,
+	struct flag_datum_prefix *flag)
+{
+	short trailing_edge_shape;
+	short split;
+	short x;
+
+	trailing_edge_shape = definition->trailing_edge_shape;
+	if (trailing_edge_shape == _trailing_edge_shape_flat)
+		return;
+
+	if (trailing_edge_shape == _trailing_edge_shape_trapezoid_short_top ||
+		trailing_edge_shape == _trailing_edge_shape_trapezoid_short_bottom)
+	{
+		split = definition->height - 1;
+	}
+	else
+	{
+		split = definition->height >> 1;
+	}
+
+	x = MAX(
+		0,
+		definition->width + definition->trailing_edge_offset - split - 1);
+
+	if (trailing_edge_shape == _trailing_edge_shape_trapezoid_short_top)
+	{
+		flag_tesselate_region(
+			definition, flag, x, 0, split, _tesselate_bottom_left);
+		return;
+	}
+
+	if (trailing_edge_shape == _trailing_edge_shape_trapezoid_short_bottom)
+	{
+		flag_tesselate_region(
+			definition, flag, x, 0, split, _tesselate_top_left);
+		return;
+	}
+
+	if (trailing_edge_shape == _trailing_edge_shape_concave_triangular)
+	{
+		flag_tesselate_region(
+			definition, flag, x, 0, split, _tesselate_top_left);
+		flag_tesselate_region(
+			definition, flag, x, split, split, _tesselate_bottom_left);
+		return;
+	}
+
+	if (trailing_edge_shape == _trailing_edge_shape_convex_triangular)
+	{
+		flag_tesselate_region(
+			definition, flag, x, 0, split, _tesselate_bottom_left);
+		flag_tesselate_region(
+			definition, flag, x, split, split, _tesselate_top_left);
+	}
+
+	return;
 }
