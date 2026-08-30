@@ -123,6 +123,25 @@ extern XNKEY global_key;
 
 /* ---------- public code */
 
+void transport_push_key(
+	const XNKEY *key,
+	const XNKID *key_id)
+{
+	int error;
+
+	global_key = *key;
+	global_key_id = *key_id;
+	if (global_key_depth == 0)
+	{
+		error = XNetRegisterKey(&global_key_id, &global_key);
+		match_assert(
+			"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+			0x5C,
+			0 == error);
+	}
+	global_key_depth++;
+}
+
 XNADDR *transport_get_xnaddr(
 	XNADDR *address)
 {
