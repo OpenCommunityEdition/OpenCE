@@ -240,6 +240,11 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	NUMBER_OF_SOUND_SAMPLE_RATES = 2
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -259,8 +264,20 @@ typedef char dsound_globals_header_direct_sound_offset_assert[
 /* ---------- globals */
 
 extern struct dsound_globals_header dsound_globals;
+extern unsigned long const sound_sample_rate_samples_per_second[NUMBER_OF_SOUND_SAMPLE_RATES];
 
 /* ---------- public code */
+
+unsigned long sound_samples_per_second(
+	short sample_rate)
+{
+	match_assert(
+		"c:\\halo\\source\\sound\\sound_definitions.h",
+		0x135,
+		sample_rate>=0 && sample_rate<NUMBER_OF_SOUND_SAMPLE_RATES);
+
+	return sound_sample_rate_samples_per_second[sample_rate];
+}
 
 long dsound_angle_from_angle(
 	float angle)
