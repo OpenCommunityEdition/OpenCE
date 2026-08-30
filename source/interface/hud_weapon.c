@@ -52,7 +52,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
 #include "interface/hud_weapon.h"
+#include "saved games/game_state.h"
 
 #include <string.h>
 
@@ -60,13 +62,44 @@ symbols in this file:
 
 /* ---------- macros */
 
+#define weapon_hud_globals bss_00453ac4
+
 /* ---------- structures */
+
+struct weapon_hud_globals
+{
+	byte reserved[0x1E0];
+	long script_flags;
+};
+
+typedef char weapon_hud_globals_script_flags_offset_assert[
+	offsetof(struct weapon_hud_globals, script_flags) == 0x1E0 ? 1 : -1];
+typedef char weapon_hud_globals_size_assert[
+	sizeof(struct weapon_hud_globals) == 0x1E4 ? 1 : -1];
 
 /* ---------- prototypes */
 
 /* ---------- globals */
 
+extern struct weapon_hud_globals *bss_00453ac4;
+
 /* ---------- public code */
+
+void hud_initialize_weapon_interface(
+	void)
+{
+	weapon_hud_globals = game_state_malloc(
+		"hud weapon interface",
+		NULL,
+		sizeof(*weapon_hud_globals));
+
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
+		0x6B,
+		weapon_hud_globals);
+
+	return;
+}
 
 void hud_dispose_weapon_interface_from_old_map(
 	void)
