@@ -77,6 +77,68 @@ results through float locals (`sub esp, 0xc`, `fstp [ebp-N]`, integer copy
 to `result->`), which neither spelling reproduces. Left unwritten rather
 than landed non-exact.
 
+## The vector3d pair: reconstructed, size/relocation exact, 2 instructions short
+
+`_compress_real_vector3d_to_int32` (544) and `..._clamp` (512) are now
+written. Both measure **size exact, relocations exact (38/38, address for
+address), 181/181 and 164/164 instructions**, sha differing at a single
+transposition. Not exact; no credit.
+
+Recovered structure (both, from January's bytes):
+
+```c
+unsigned long compress_real_vector3d_to_int32(
+	real_vector3d const *v)
+{
+	long i, j, k;
+	real_vector3d v2;
+
+	match_assert(FILE, 69, v);
+	match_vassert(FILE, 78, <all three components in [-1,1]>,
+		csprintf(temporary, "invalid vector= [%f %f %f] 0x%x%x%x",
+			v->i, v->j, v->k,
+			*((long *)&v->i), *((long *)&v->j), *((long *)&v->k)));
+
+	i = fast_ftol((real)floor(v->i * 1023.5f)) & 0x7ff;
+	j = fast_ftol((real)floor(v->j * 1023.5f)) & 0x7ff;
+	k = fast_ftol((real)floor(v->k * 511.5f)) & 0x3ff;
+
+	v2 = *uncompress_int32_to_real_vector3d(&v2, ((k << 11) | j) << 11 | i);
+
+	match_assert(FILE, 92, fabs(v2.i - v->i)<0.01f);   /* 93, 94 for j, k */
+
+	return ((k << 11) | j) << 11 | i;
+}
+```
+
+Pinned by the target: 11/11/10-bit fields with `1023.5f`/`511.5f` scales and
+`0x7ff`/`0x3ff` masks; the pack is `((k << 11) | j) << 11 | i`; the debug
+round trip is a **self-referencing** aggregate copy through the same local
+(`&v2` in, `*result` back into `v2`); the message buffer is the global
+`temporary` and the format is exactly 36 bytes including NUL, which is what
+fixes `0x%x%x%x` rather than a spaced form. The clamp twin folds
+`PIN(x, -1.0f, 1.0f)` into the same multiply and asserts at lines 104 and
+118-120.
+
+### The one unsolved instruction
+
+Two spellings bracket the target and neither reaches it:
+
+| form | frame | copy block | differing |
+| --- | --- | --- | ---: |
+| one local, self-copy (**landed**) | `sub esp,0x10` correct | loads/stores interleaved | 10 insns |
+| separate `decompressed` local | `sub esp,0x1c` (+12) | grouped: all three loads, then stores — **correct** | 2 bytes |
+
+January needs *both*: a single 12-byte slot **and** the aliasing-safe
+grouped copy. The landed form is the faithful one — by the campaign's
+frame-layout law a frame-size mismatch is structural, so the byte-closer
+two-local variant is the wrong reconstruction despite measuring nearer.
+
+Measured inert on the copy schedule, all at 10 differing instructions:
+copying through a named pointer, that pointer scoped to an inner block,
+declaring `v2` before the integer locals, and both combined. Naming the
+packed value in a local regresses to 528 bytes.
+
 ## Remaining
 
 `_rasterizer_geometry_get_vertex_size` (enum, above),
