@@ -235,9 +235,15 @@ symbols in this file:
 
 #include "cseries.h"
 #include "models/model_animation_definitions.h"
+#include "units/biped_definitions.h"
 #include "units/bipeds.h"
 
 /* ---------- constants */
+
+enum
+{
+	_biped_limp_body_physics_active_bit = 5,
+};
 
 /* ---------- macros */
 
@@ -314,6 +320,38 @@ void biped_disconnect_from_structure_bsp(
 	biped->biped.last_pathfinding_surface_index = NONE;
 
 	return;
+}
+
+void biped_stop_limp_body_physics(
+	long biped_index)
+{
+	struct biped_datum *biped;
+	struct biped_definition *definition;
+
+	biped = biped_get(biped_index);
+	definition = biped_definition_get(biped->definition_index);
+	if (TEST_FLAG(definition->biped.flags, _biped_uses_limp_body_physics_bit) &&
+		TEST_FLAG(biped->biped.flags, _biped_limp_body_physics_active_bit))
+	{
+		SET_FLAG(biped->object.flags, _object_do_not_recompute_node_matrices_bit, FALSE);
+		SET_FLAG(biped->biped.flags, _biped_limp_body_physics_active_bit, FALSE);
+	}
+
+	return;
+}
+
+boolean biped_flying_through_air(
+	long biped_index)
+{
+	struct biped_datum *biped;
+	struct biped_definition *definition;
+
+	biped = biped_get(biped_index);
+	definition = biped_definition_get(biped->definition_index);
+
+	return biped->biped.airborne_ticks > 3 &&
+		(!TEST_FLAG(definition->biped.flags, _biped_flying_bit) ||
+		TEST_FLAG(biped->object.damage_flags, _object_dead_bit));
 }
 
 /* ---------- private code */
