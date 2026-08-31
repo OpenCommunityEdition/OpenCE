@@ -68,6 +68,12 @@ struct connected_geometry
 	struct dynamic_array triangles;
 };
 
+typedef boolean (*connected_geometry_group_predicate)(
+	void *predicate_data,
+	struct connected_geometry *geometry,
+	struct connected_geometry_triangle *triangle,
+	long group_index);
+
 typedef char connected_geometry_dynamic_array_size_assert[
 	sizeof(struct dynamic_array) == 0xC ? 1 : -1];
 typedef char connected_geometry_point_size_assert[
@@ -123,3 +129,66 @@ void connected_geometry_delete(
 }
 
 /* ---------- private code */
+
+void connected_geometry_group_recursive(
+	struct connected_geometry *geometry,
+	connected_geometry_group_predicate predicate,
+	void *predicate_data,
+	long group_index,
+	long triangle_index)
+{
+	struct connected_geometry_triangle *triangle;
+	long *edge_designator;
+	struct connected_geometry_edge *edge;
+	long edge_triangle_index;
+	short edge_triangle_counter;
+	long edge_designator_count;
+
+	triangle = dynamic_array_get_element(
+		&geometry->triangles,
+		triangle_index,
+		sizeof(*triangle));
+	if (triangle->coplanar_group_index == NONE &&
+		(predicate == NULL ||
+			predicate(predicate_data, geometry, triangle, group_index)))
+	{
+		triangle->coplanar_group_index = group_index;
+		edge_designator = triangle->edge_designators;
+		edge_designator_count = 3;
+		do
+		{
+			if (*edge_designator != NONE)
+			{
+				edge = dynamic_array_get_element(
+					&geometry->edges,
+					*edge_designator & LONG_MAX,
+					sizeof(*edge));
+				edge_triangle_counter = 0;
+				if (edge->triangle_indices.count > 0)
+				{
+					edge_triangle_index = 0;
+					do
+					{
+						connected_geometry_group_recursive(
+							geometry,
+							predicate,
+							predicate_data,
+							group_index,
+							*(long *)dynamic_array_get_element(
+								&edge->triangle_indices,
+								edge_triangle_index,
+								sizeof(long)));
+						edge_triangle_counter++;
+						edge_triangle_index = (long)edge_triangle_counter;
+					}
+					while (edge_triangle_index < edge->triangle_indices.count);
+				}
+			}
+			edge_designator++;
+			edge_designator_count--;
+		}
+		while (edge_designator_count != 0);
+	}
+
+	return;
+}
