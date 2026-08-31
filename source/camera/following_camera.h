@@ -34,10 +34,17 @@ struct following_camera
 	real distance_scale;
 };
 
+struct following_camera_control;
+struct following_camera_result;
+
 /* ---------- prototypes/FOLLOWING_CAMERA.C */
 
 void following_camera_new(
 	struct following_camera *camera);
+void following_camera_update(
+	struct following_camera *camera,
+	struct following_camera_control const *controls,
+	struct following_camera_result *result);
 void following_camera_deterministic(
 	long unit_index,
 	real_point3d *position,

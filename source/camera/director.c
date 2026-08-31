@@ -119,11 +119,18 @@ symbols in this file:
 
 #include "director.h"
 
+#include "dead_camera.h"
+#include "editor_flying_camera.h"
 #include "first_person_camera.h"
+#include "flying_camera.h"
 #include "following_camera.h"
 #include "observer.h"
+#include "orbiting_camera.h"
 
 #include "editor/editor_stubs.h"
+#include "game/player_control.h"
+#include "game/players.h"
+#include "main/console.h"
 #include "saved games/game_state.h"
 
 #include "units/unit_definitions.h"
@@ -137,20 +144,10 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-void following_camera_update(
-	void *camera,
-	void *command,
-	void *result);
 void scripted_camera_update(
 	void *camera,
 	void *command,
 	void *result);
-void director_initialize_variables(
-	short local_player_index);
-void director_choose_camera(
-	short local_player_index,
-	boolean initialize,
-	boolean key);
 
 /* ---------- globals */
 
@@ -371,6 +368,266 @@ void director_save_camera(
 	return;
 }
 
+static void director_set_camera(
+	short local_player_index,
+	director_camera_update_proc camera_proc,
+	boolean interpolate)
+{
+	struct director *director = director_get(local_player_index);
+
+	director->camera_proc = camera_proc;
+	director->debug_input_scale = 1.f;
+	director->debug_controls = FALSE;
+	if (interpolate)
+		director->camera_change_pause = 1.f;
+
+	return;
+}
+
+static void director_initialize_variables(
+	short local_player_index)
+{
+	short variable_index;
+	struct director *director = director_get(local_player_index);
+
+	for (variable_index = 0;
+		variable_index < NUMBER_OF_DIRECTOR_VARIABLES;
+		variable_index++)
+	{
+		director->debug_variables[variable_index].value = variables[variable_index].initial_value;
+		director->debug_variables[variable_index].delta = 0.f;
+		director->debug_variables[variable_index].velocity = 0.f;
+	}
+
+	return;
+}
+
+static void director_rotate_cameras(
+	short local_player_index,
+	short const *camera_modes,
+	short camera_mode_count)
+{
+	short camera_mode;
+	struct director *director = director_get(local_player_index);
+
+	director->camera_mode_index = (director->camera_mode_index + 1) % camera_mode_count;
+	camera_mode = camera_modes[director->camera_mode_index];
+	switch (camera_mode)
+	{
+	case _camera_following:
+		following_camera_new((struct following_camera *)director->camera_data);
+		director_set_camera(
+			local_player_index,
+			(director_camera_update_proc)following_camera_update,
+			TRUE);
+		break;
+
+	case _camera_orbiting:
+		orbiting_camera_new(
+			(struct orbiting_camera *)director->camera_data,
+			director->command.focus_distance,
+			&director->command.forward);
+		director_set_camera(
+			local_player_index,
+			(director_camera_update_proc)orbiting_camera_update,
+			TRUE);
+		break;
+
+	case _camera_flying:
+		flying_camera_new_from_point_and_vector(
+			(struct flying_camera *)director->camera_data,
+			&director->command.focus_position,
+			&director->command.forward);
+		director_set_camera(
+			local_player_index,
+			(director_camera_update_proc)flying_camera_update,
+			TRUE);
+		break;
+
+	case _camera_editor:
+		break;
+
+	case _camera_first_person:
+		first_person_camera_new((struct first_person_camera *)director->camera_data);
+		director_set_camera(
+			local_player_index,
+			(director_camera_update_proc)first_person_camera_update,
+			TRUE);
+		break;
+
+	default:
+		display_assert(NULL, "c:\\halo\\SOURCE\\camera\\director.c", 512, TRUE);
+		system_exit(NONE);
+		break;
+	}
+
+	console_printf(
+		FALSE,
+		"%s camera",
+		director_camera_mode_names[camera_modes[director->camera_mode_index]]);
+	return;
+}
+
+static void director_choose_game_perspective(
+	short local_player_index,
+	boolean force)
+{
+	director_perspective perspective;
+	short following;
+	long unit_index;
+	struct director *director = director_get(local_player_index);
+
+	unit_index = player_control_get_unit_index(local_player_index);
+	following = director_desired_perspective(unit_index, &perspective);
+	if (force || director->seat_state != perspective)
+	{
+		if (following == TRUE)
+		{
+			if (force || director->camera_proc == (director_camera_update_proc)first_person_camera_update)
+			{
+				following_camera_new((struct following_camera *)director->camera_data);
+				director_set_camera(
+					local_player_index,
+					(director_camera_update_proc)following_camera_update,
+					!force);
+			}
+		}
+		else if (force || director->camera_proc == (director_camera_update_proc)following_camera_update)
+		{
+			first_person_camera_new((struct first_person_camera *)director->camera_data);
+			director_set_camera(
+				local_player_index,
+				(director_camera_update_proc)first_person_camera_update,
+				!force);
+		}
+
+		director->seat_state = perspective;
+	}
+
+	return;
+}
+
+static void director_choose_camera_game(
+	short local_player_index,
+	boolean initialize,
+	boolean key)
+{
+	struct director *director = director_get(local_player_index);
+
+	if (initialize)
+	{
+		first_person_camera_new((struct first_person_camera *)director->camera_data);
+		director_set_camera(
+			local_player_index,
+			(director_camera_update_proc)first_person_camera_update,
+			FALSE);
+		return;
+	}
+	else
+	{
+		struct player_datum *player = player_get(local_player_get_player_index(local_player_index));
+		boolean use_dead_camera = player->unit_index == NONE && player->statistics.deaths > 0;
+
+		if (key)
+			director_rotate_cameras(local_player_index, director_game_camera_modes, 3);
+		if (!director_camera_scripted->camera_scripted)
+		{
+			director_choose_game_perspective(local_player_index, initialize);
+			if (use_dead_camera)
+			{
+				if (director->camera_proc != (director_camera_update_proc)dead_camera_update)
+				{
+					dead_camera_new(
+						(struct dead_camera *)director->camera_data,
+						local_player_index,
+						NONE);
+					director_set_camera(
+						local_player_index,
+						(director_camera_update_proc)dead_camera_update,
+						TRUE);
+				}
+			}
+			else if (director->camera_proc == (director_camera_update_proc)dead_camera_update)
+			{
+				director_choose_game_perspective(local_player_index, TRUE);
+			}
+		}
+	}
+
+	return;
+}
+
+static void director_choose_camera_editor(
+	short local_player_index,
+	boolean initialize,
+	boolean key)
+{
+	struct director *director = director_get(local_player_index);
+
+	if (initialize || director->camera_proc != (director_camera_update_proc)editor_camera_update)
+	{
+		editor_camera_new(
+			(struct flying_camera *)director->camera_data,
+			local_player_index);
+		director_set_camera(
+			local_player_index,
+			(director_camera_update_proc)editor_camera_update,
+			FALSE);
+	}
+
+	return;
+}
+
+static void director_choose_camera_script_camera_record(
+	short local_player_index,
+	boolean initialize,
+	boolean key)
+{
+	if (initialize)
+	{
+		struct director *director = director_get(local_player_index);
+
+		first_person_camera_new((struct first_person_camera *)director->camera_data);
+		director_set_camera(
+			local_player_index,
+			(director_camera_update_proc)first_person_camera_update,
+			FALSE);
+	}
+	else if (key)
+	{
+		director_rotate_cameras(
+			local_player_index,
+			director_script_camera_record_camera_modes,
+			4);
+	}
+
+	return;
+}
+
+static void director_choose_camera(
+	short local_player_index,
+	boolean initialize,
+	boolean key)
+{
+	switch (director_globals.game_mode)
+	{
+	case _director_mode_game:
+	case _director_mode_netgame:
+		director_choose_camera_game(local_player_index, initialize, key);
+		return;
+
+	case _director_mode_editor:
+		director_choose_camera_editor(local_player_index, initialize, key);
+		return;
+
+	case _director_mode_script_camera_record:
+		director_choose_camera_script_camera_record(local_player_index, initialize, key);
+		return;
+	}
+
+	return;
+}
+
 void director_initialize_for_new_map(
 	void)
 {
@@ -382,11 +639,11 @@ void director_initialize_for_new_map(
 		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
 		local_player_index++)
 	{
-		struct director *camera = director_get(local_player_index);
+		struct director *director = director_get(local_player_index);
 
-		camera->camera_change_pause = 0.f;
-		camera->bored_time = 0;
-		camera->bored = FALSE;
+		director->bored = FALSE;
+		director->bored_time = 0;
+		director->camera_change_pause = 0.f;
 		director_choose_camera(local_player_index, TRUE, FALSE);
 		director_initialize_variables(local_player_index);
 	}

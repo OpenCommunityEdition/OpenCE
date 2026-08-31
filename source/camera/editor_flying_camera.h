@@ -20,12 +20,18 @@ header included in hcex build.
 /* ---------- structures */
 
 struct flying_camera;
+struct flying_camera_action;
+struct camera_command;
 
 /* ---------- prototypes/EDITOR_FLYING_CAMERA.C */
 
 void editor_camera_new(
 	struct flying_camera *camera,
 	short local_player_index);
+void editor_camera_update(
+	struct flying_camera *camera,
+	struct flying_camera_action const *controls,
+	struct camera_command *result);
 
 long editor_camera_get_speed(
 	void);

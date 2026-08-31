@@ -11,6 +11,7 @@ header included in hcex build.
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "camera/observer.h"
 #include "math/real_math.h"
 #include "networking/network_connection.h"
 
@@ -97,7 +98,7 @@ struct director
 	byte pad53;
 	short seat_state;
 	director_perspective perspective;
-	byte command[0x68];
+	struct observer_command command;
 	boolean debug_controls;
 	byte padC1[3];
 	real debug_input_scale;
