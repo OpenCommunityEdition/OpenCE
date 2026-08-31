@@ -5,7 +5,7 @@ symbols in this file:
 001088D0 0010:
 	_crc_new (0000)
 001088E0 0040:
-	_code_001088e0 (0000)
+	_crc_table_init (0000)
 00108920 0080:
 	_crc_checksum_buffer (0000)
 0027D2E4 000f:
@@ -13,7 +13,7 @@ symbols in this file:
 0027D2F4 001c:
 	??_C@_0BM@FPJPBIIF@c?3?2halo?2SOURCE?2memory?2crc?4c?$AA@ (0000)
 00456220 0401:
-	_bss_00456220 (0000)
+	_crc_globals (0000)
 */
 
 /* ---------- headers */
@@ -40,10 +40,8 @@ struct crc_globals
 /* ---------- globals */
 
 #pragma bss_seg(".bss")
-struct crc_globals bss_00456220;
+struct crc_globals crc_globals;
 #pragma bss_seg()
-
-#define crc_state bss_00456220
 
 /* ---------- public code */
 
@@ -54,8 +52,8 @@ void crc_new(
 	return;
 }
 
-/* Initializes the CRC-32 lookup table; the private function has no surviving PDB name. */
-__declspec(noinline) static void code_001088e0(
+/* The descriptive private name follows the recovered cross-build CRC implementation. */
+static void crc_table_init(
 	unsigned long *crc_table)
 {
 	unsigned long byte_index;
@@ -95,10 +93,10 @@ void crc_checksum_buffer(
 
 	match_assert("c:\\halo\\SOURCE\\memory\\crc.c", 42, buffer_size>=0);
 
-	if (!crc_state.initialized)
+	if (!crc_globals.initialized)
 	{
-		code_001088e0(crc_state.table);
-		crc_state.initialized = TRUE;
+		crc_table_init(crc_globals.table);
+		crc_globals.initialized = TRUE;
 	}
 
 	crc = *crc_reference;
@@ -107,7 +105,7 @@ void crc_checksum_buffer(
 		do
 		{
 			table_index = (*(byte const *)buffer ^ crc) & 0xFF;
-			table_index = crc_state.table[table_index];
+			table_index = crc_globals.table[table_index];
 			crc >>= 8;
 			buffer = (byte const *)buffer + 1;
 			crc ^= table_index;

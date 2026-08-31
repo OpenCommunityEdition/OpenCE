@@ -367,6 +367,28 @@
         "base": { "size": 144, "relocation_count": 7, "normalized_sha256": "6a23f54863687bd0996b1997d252d5206513dee16b478876afb34a216307d309" },
         "objdiff_percent": 87.083336
       }
+    },
+    {
+      "unit": "source/memory/lrar_cache",
+      "function": "_lrar_allocate",
+      "class": "tu-context-optimization",
+      "evidence": "The retained allocation is the natural typed source: every block lookup calls the same private lrar_get_block helper, and all six formerly address-named private routines now have descriptive LRA-family names. The prior 12/12 result is rejected because it required __declspec(noinline) plus two selectively hand-expanded copies of lrar_get_block's validation body. With those source-shaping controls removed, 11/12 functions remain strict exact. January calls lrar_get_block at offsets +131 and +207, while this incomplete reconstruction's VC7 translation unit inlines the helper validation paths and grows the function from 784 bytes/27 relocations to 1056 bytes/47 relocations. The fail-closed classifier reports UNKNOWN; the narrower TU-context label records only the directly observed selective-inlining boundary, not a claimed recipe. The published Marathon source was checked as a first-party style analogue but contains no LRAR implementation. Reopen only with original LRAR source, a historically supported call-graph restoration, or another natural source form; never restore noinline, duplicated helper bodies, pragmas, barriers, volatile controls, or dead code for byte credit.",
+      "measurements": {
+        "target": { "size": 784, "relocation_count": 27, "normalized_sha256": "a34c14dad0afc2a3462c738ca6153c3b46d2bdd0164b176dd208295594f86663" },
+        "base": { "size": 1056, "relocation_count": 47, "normalized_sha256": "8a2fe453345af3d00eaf476f17eedbfc67629d8af6d6a036cc097d669dcc3652" },
+        "objdiff_percent": 67.61811
+      }
+    },
+    {
+      "unit": "source/game/game_engine",
+      "function": "_game_engine_validate_map_netgame_flags",
+      "class": "tu-context-optimization",
+      "evidence": "The descriptive private map-validator name is absent from January's PDB; it is corroborated only as a semantic label by the corresponding Stian Xbox lift plus January's call position and NETGAME MAP FAILURE string cluster. The former exact result is rejected because it depended on definition-local __declspec(noinline) attributes on find_netgame_flags/find_netgame_flag with no original-source provenance. Natural C leaves both scan helpers strict exact, but VC7 inlines the exact find_netgame_flags body through the private required-flag validator, expanding this caller from January's 640 bytes/52 relocations to 1104 bytes/60 relocations. Six target-only functions prove this translation unit is incomplete, making altered whole-TU optimizer context plausible but not establishing it as the cause. The fail-closed classifier reports UNKNOWN; the TU-context label records the directly observed nested-inlining boundary and does not assert a source recipe. Reopen only after recovering missing same-TU call-graph context or finding first-party source evidence; never reintroduce noinline or other compiler controls solely to recover exact bytes.",
+      "measurements": {
+        "target": { "size": 640, "relocation_count": 52, "normalized_sha256": "b3bce6413d9406f83ea59885922cd47be96d95e3fad738820f5802d54dbde7f8" },
+        "base": { "size": 1104, "relocation_count": 60, "normalized_sha256": "de767fa67df3d2a492eea148ae2b672336b474dd808ca04347637c5a2a0309ab" },
+        "objdiff_percent": 10.130045
+      }
     }
   ]
 }

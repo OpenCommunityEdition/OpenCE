@@ -564,7 +564,7 @@
 				{ "name": "source/memory/memory_pool.c", "index": 190, "status": "Matching" },
 				{ "name": "source/memory/lruv_cache.c", "index": 191, "status": "NonMatching" },
 				{ "name": "source/memory/lru_cache.c", "index": 192, "status": "Matching" },
-				{ "name": "source/memory/lrar_cache.c", "index": 193, "status": "Matching" },
+				{ "name": "source/memory/lrar_cache.c", "index": 193, "status": "NonMatching" },
 				{ "name": "source/memory/lra_cache.c", "index": 194, "status": "NonMatching" },
 				{ "name": "source/memory/hashtable.c", "index": 195, "status": "Matching" },
 				{ "name": "source/memory/fibonacci_heap.c", "index": 196, "status": "Matching" },

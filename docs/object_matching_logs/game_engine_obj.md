@@ -207,13 +207,15 @@ prefixes; `-` means the candidate symbol is absent.
   credit is given to that missing dependency.
 - GE04 retains the recovered ranking comparator and the measured
   first-eligible-player team scan. Both are strict exact ordinary C.
-- GE05 retains the five map validators. The first build proved four leaf
-  validators exact but expanded `_code_0009ccf0` to `1104` bytes and `60`
+- GE05 recovered the five map validators. The first build proved four leaf
+  validators exact but expanded `game_engine_validate_map_netgame_flags` to `1104` bytes and `60`
   relocations because `find_netgame_flags` was inlined through
   `_code_0009cbe0`. The target dispatcher is `640` bytes and `52` relocations
-  and calls `find_netgame_flags`. The donor declaration's
-  `__declspec(noinline)` was therefore restored as target-backed topology;
-  `_code_0009ccf0` then became strict exact without any prior regression.
+  and calls `find_netgame_flags`. GE05 historically restored the donor's
+  `__declspec(noinline)` and made the caller strict exact. The 2026-08-31
+  credibility audit supersedes that decision: the attribute has no original-
+  source provenance, is rejected as compiler steering, and the natural caller
+  is now honestly fuzzy-parked.
 - GE06 replaces imported/Common storage with ordinary typed zero-initialized
   definitions. The resulting `.bss` has the target's exact `1,148`-byte
   layout: `global_goal[32]` at `0`, `global_variant` at `1024`,
@@ -262,12 +264,12 @@ prefixes; `-` means the candidate symbol is absent.
   `0x54`/`0x64` are exposed through an offset-asserted
   `game_engine_hud_globals` view. The three formatter callbacks at
   `game_engine + 0x4C/+0x50/+0x54` are likewise named and offset-asserted.
-  The target-backed non-inline boundary on `find_netgame_flags` is kept only
-  on its definition, rather than leaking into the public header. Removing
-  that boundary was measured in GE05a to inline the scan into
-  `_code_0009ccf0`, expanding the exact target function from `640` to `1104`
-  bytes; the definition-local attribute is therefore an unavoidable
-  recovered call boundary, not a byte-forcing control.
+  The former definition-local non-inline boundary on `find_netgame_flags`
+  was measured in GE05a to prevent nested inlining into the map validator,
+  but that code-generation effect is not source provenance. It is removed;
+  the resulting `640/1104` target/base discrepancy is recorded in
+  `game_engine_obj_jonas_no_fake_inline_cleanup_20260831.md` without exact
+  credit.
 - GE11 restores the natural postgame renderer and its private display
   topology. The renderer's ordinary call to `_code_0009cb60` recovers that
   helper's target-private emission boundary and makes its complete `128`
@@ -304,8 +306,8 @@ prefixes; `-` means the candidate symbol is absent.
 | GE02 | Recover typed objective-weapon callback scan and goal getter | `592/592` | target-equal per function | All three strict exact | `130/130` prior exact | retained |
 | GE03 | Recover remap/prediction and local HUD fade helpers | `1,600/1,600` | target-equal per function | All four strict exact | `133/133` prior exact | retained |
 | GE04 | Recover ranking comparator and team-presence scan | `320/320` | target-equal per function | Both strict exact | `137/137` prior exact | retained |
-| GE05a | Recover five map validators without the donor `noinline` declaration | `_code_0009ccf0 640/1104` | `52/60` | `find_netgame_flags` body inlined into dispatcher | `139/139` prior exact | rejected |
-| GE05b | Restore target-backed `find_netgame_flags` non-inline boundary | `1,088/1,088` | target-equal per function | All five strict exact | `139/139` prior exact | retained |
+| GE05a | Recover five map validators without the donor `noinline` declaration | `game_engine_validate_map_netgame_flags 640/1104` | `52/60` | `find_netgame_flags` body inlined into dispatcher | `139/139` prior exact | retained after 2026-08-31 credibility review |
+| GE05b | Restore donor `find_netgame_flags` non-inline boundary | `1,088/1,088` | target-equal per function | All five strict exact | `139/139` prior exact | superseded; fake exactness rejected |
 | GE06 | Own the complete typed zero-initialized data layout | `.bss 1,148/1,148` | `0/0` | Strict section info exact | `144/144` prior exact | retained |
 | GE07 | Recover HUD formatting, dispatch, score wrappers, and player-added topology | `3,232/3,232` exact bytes | target-equal per exact function | Eight strict-exact functions; one `144`-byte helper parked | `144/144` prior exact | retained |
 | GE08 | Recover statistic ranking and weighted starting-equipment helpers | `1,120/1,120` exact bytes | target-equal per exact function | Four strict-exact functions; five coupled callers remain parked | `152/152` prior exact | retained |
@@ -334,7 +336,7 @@ The six retained post-GE12 functions are:
 
 | ID | Commit | Exact function | Recovered source topology | Result |
 |---|---|---|---|---|
-| GE13 | `e808f2bde7747b02a4c637e19aeba4fa1c03036f` | `_code_0009bdf0` | Order the independent teleporter-flash stores as fade function, type, duration, priority, intensity, scale, and color; keep the target-backed non-inline boundary on `find_netgame_flag` | `160/180` exact |
+| GE13 | `e808f2bde7747b02a4c637e19aeba4fa1c03036f` | `_code_0009bdf0` | Order the independent teleporter-flash stores as fade function, type, duration, priority, intensity, scale, and color; the unrelated historical `find_netgame_flag` non-inline attribute was removed by the later credibility audit without changing this function | `160/180` exact |
 | GE14 | `bca69538a4d344230a8290331407ef4351ebc8ba` | `_code_0009b4f0` | Use the existing `game_engine_has_shield(player_index)` predicate and private linkage, then zero both shield fields only for a live unit | `161/180` exact |
 | GE15 | `519f5d2e4db98b26bb2238d745eed52209c1d014` | `_game_engine_postspawn_player_update` | Use the exact `code_00097c00()` infinite-grenade predicate before restoring both starting grenade counts | `162/180` exact |
 | GE16 | `0594405e063dde6a9d29e7ceccc8f5167b2f7c29` | `_code_0009cc20` | Recover the private prototype's second parameter as `short`, not `long` | `163/180` exact |

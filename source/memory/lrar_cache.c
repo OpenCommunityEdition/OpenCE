@@ -3,21 +3,21 @@ LRAR_CACHE.C
 
 symbols in this file:
 0010BFA0 0010:
-	_code_0010bfa0 (0000)
+	_lrar_default_lock_proc (0000)
 0010BFB0 0010:
-	_code_0010bfb0 (0000)
+	_lrar_default_unlock_proc (0000)
 0010BFC0 0020:
-	_code_0010bfc0 (0000)
+	_lrar_unlock_block (0000)
 0010BFE0 0060:
-	_code_0010bfe0 (0000)
+	_lrar_verify_block (0000)
 0010C040 0050:
-	_code_0010c040 (0000)
+	_lrar_verify_cache (0000)
 0010C090 01b0:
 	_lrar_new (0000)
 0010C240 0040:
 	_lrar_dispose (0000)
 0010C280 0050:
-	_code_0010c280 (0000)
+	_lrar_get_block (0000)
 0010C2D0 0140:
 	_lrar_flush (0000)
 0010C410 0310:
@@ -97,20 +97,20 @@ typedef char lrar_cache_block_size_assert[sizeof(struct lrar_cache_block) == 0x1
 
 /* ---------- prototypes */
 
-void code_0010bfa0(
+static void lrar_default_lock_proc(
 	short *reference,
 	short value);
-void code_0010bfb0(
-	short *reference);
-static void code_0010bfc0(
+static void lrar_default_unlock_proc(
+	void *reference);
+static void lrar_unlock_block(
 	struct lrar_cache *cache,
 	struct lrar_cache_block *block);
-static void code_0010bfe0(
+static void lrar_verify_block(
 	struct lrar_cache *cache,
 	struct lrar_cache_block *block);
-static void code_0010c040(
+static void lrar_verify_cache(
 	struct lrar_cache *cache);
-static __declspec(noinline) struct lrar_cache_block *code_0010c280(
+static struct lrar_cache_block *lrar_get_block(
 	struct lrar_cache *cache,
 	short block_index);
 
@@ -118,7 +118,7 @@ static __declspec(noinline) struct lrar_cache_block *code_0010c280(
 
 /* ---------- public code */
 
-void code_0010bfa0(
+static void lrar_default_lock_proc(
 	short *reference,
 	short value)
 {
@@ -127,15 +127,15 @@ void code_0010bfa0(
 	return;
 }
 
-void code_0010bfb0(
-	short *reference)
+static void lrar_default_unlock_proc(
+	void *reference)
 {
-	*reference = NONE;
+	*(short *)reference = NONE;
 
 	return;
 }
 
-static void code_0010bfc0(
+static void lrar_unlock_block(
 	struct lrar_cache *cache,
 	struct lrar_cache_block *block)
 {
@@ -182,8 +182,8 @@ struct lrar_cache *lrar_new(
 
 	if (!lock_proc || !unlock_proc)
 	{
-		lock_proc = code_0010bfa0;
-		unlock_proc = code_0010bfb0;
+		lock_proc = lrar_default_lock_proc;
+		unlock_proc = lrar_default_unlock_proc;
 	}
 
 	match_assert(
@@ -225,7 +225,7 @@ struct lrar_cache *lrar_new(
 			cache->unlock_proc = unlock_proc;
 			cache->lock_proc = lock_proc;
 			cache->signature = _lrar_cache_signature;
-			code_0010c040(cache);
+			lrar_verify_cache(cache);
 		}
 		else
 		{
@@ -243,7 +243,7 @@ struct lrar_cache *lrar_new(
 void lrar_dispose(
 	struct lrar_cache *cache)
 {
-	code_0010c040(cache);
+	lrar_verify_cache(cache);
 	debug_free(
 		cache->blocks,
 		"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
@@ -262,18 +262,12 @@ void lrar_flush(
 	short block_index;
 	struct lrar_cache_block *block;
 
-	code_0010c040(cache);
+	lrar_verify_cache(cache);
 	block_index = cache->first_block_index;
 	while (block_index != NONE)
 	{
-		code_0010c040(cache);
-		match_assert(
-			"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
-			0x16E,
-			block_index>=0 && block_index<cache->block_count);
-		block = &cache->blocks[block_index];
-		code_0010bfe0(cache, block);
-		code_0010bfc0(cache, block);
+		block = lrar_get_block(cache, block_index);
+		lrar_unlock_block(cache, block);
 
 		if (block_index == cache->last_block_index)
 		{
@@ -308,7 +302,7 @@ short lrar_allocate(
 	struct lrar_cache_block *new_block;
 	struct lrar_cache_block *test_block;
 
-	code_0010c040(cache);
+	lrar_verify_cache(cache);
 	alignment_mask = FLAG(cache->alignment_bit)-1;
 	if (size&alignment_mask)
 	{
@@ -332,7 +326,7 @@ short lrar_allocate(
 			}
 			else
 			{
-				block = code_0010c280(cache, cache->last_block_index);
+				block = lrar_get_block(cache, cache->last_block_index);
 				search_address = block->address+block->size;
 			}
 
@@ -351,12 +345,12 @@ short lrar_allocate(
 
 			if (block_index != NONE)
 			{
-				block = code_0010c280(cache, block_index);
+				block = lrar_get_block(cache, block_index);
 				while (block_index == new_block_index ||
 					(search_address <= block->address &&
 					adjusted_new_block_address+size > block->address))
 				{
-					code_0010bfc0(cache, block);
+					lrar_unlock_block(cache, block);
 					block->signature = NONE;
 					block_index++;
 					if (block_index >= cache->block_count)
@@ -364,13 +358,7 @@ short lrar_allocate(
 						block_index = 0;
 					}
 
-					code_0010c040(cache);
-					match_assert(
-						"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
-						0x16E,
-						block_index>=0 && block_index<cache->block_count);
-					block = &cache->blocks[block_index];
-					code_0010bfe0(cache, block);
+					block = lrar_get_block(cache, block_index);
 				}
 			}
 
@@ -425,15 +413,7 @@ unsigned long lrar_block_address(
 	struct lrar_cache *cache,
 	short block_index)
 {
-	struct lrar_cache_block *block;
-
-	code_0010c040(cache);
-	match_assert(
-		"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
-		0x16E,
-		block_index>=0 && block_index<cache->block_count);
-	block = &cache->blocks[block_index];
-	code_0010bfe0(cache, block);
+	struct lrar_cache_block *block = lrar_get_block(cache, block_index);
 
 	return block->address;
 }
@@ -444,22 +424,16 @@ void lrar_deallocate(
 {
 	struct lrar_cache_block *block;
 
-	code_0010c040(cache);
-	code_0010c040(cache);
-	match_assert(
-		"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
-		0x16E,
-		block_index>=0 && block_index<cache->block_count);
-	block = &cache->blocks[block_index];
-	code_0010bfe0(cache, block);
-	code_0010bfc0(cache, block);
+	lrar_verify_cache(cache);
+	block = lrar_get_block(cache, block_index);
+	lrar_unlock_block(cache, block);
 
 	return;
 }
 
 /* ---------- private code */
 
-static void code_0010bfe0(
+static void lrar_verify_block(
 	struct lrar_cache *cache,
 	struct lrar_cache_block *block)
 {
@@ -484,7 +458,7 @@ static void code_0010bfe0(
 	return;
 }
 
-static void code_0010c040(
+static void lrar_verify_cache(
 	struct lrar_cache *cache)
 {
 	boolean valid =
@@ -506,19 +480,19 @@ static void code_0010c040(
 	return;
 }
 
-static __declspec(noinline) struct lrar_cache_block *code_0010c280(
+static struct lrar_cache_block *lrar_get_block(
 	struct lrar_cache *cache,
 	short block_index)
 {
 	struct lrar_cache_block *block;
 
-	code_0010c040(cache);
+	lrar_verify_cache(cache);
 	match_assert(
 		"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
 		0x16E,
 		block_index>=0 && block_index<cache->block_count);
 	block = &cache->blocks[block_index];
-	code_0010bfe0(cache, block);
+	lrar_verify_block(cache, block);
 
 	return block;
 }

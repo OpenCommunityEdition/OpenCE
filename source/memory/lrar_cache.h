@@ -22,7 +22,7 @@ typedef void (*lrar_lock_proc)(
 typedef void (*lrar_unlock_proc)(
 	void *reference);
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/LRAR_CACHE.C */
 
 struct lrar_cache *lrar_new(
 	char const *name,

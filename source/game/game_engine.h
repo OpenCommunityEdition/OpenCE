@@ -388,8 +388,8 @@ union real_rgb_color *game_engine_player_get_change_color(
 
 long find_netgame_flags(
 	union real_point3d const *position,
-	float radius,
-	float height,
+	real radius,
+	real height,
 	short type,
 	short index,
 	long maximum_count,
@@ -397,8 +397,8 @@ long find_netgame_flags(
 
 long find_netgame_flag(
 	union real_point3d const *position,
-	float radius,
-	float height,
+	real radius,
+	real height,
 	short type,
 	short index);
 

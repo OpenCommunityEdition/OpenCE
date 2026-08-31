@@ -339,7 +339,7 @@ symbols in this file:
 0009CC80 0070:
 	_code_0009cc80 (0000)
 0009CCF0 0280:
-	_code_0009ccf0 (0000)
+	_game_engine_validate_map_netgame_flags (0000)
 0009CF70 0010:
 	_game_engine_playlist_initialize (0000)
 0009CF80 0080:
@@ -800,7 +800,7 @@ static void code_00098510(
 
 static void code_0009cc20(
 	short game_type,
-	short parameter1,
+	short unused_team_index,
 	short minimum_count,
 	char const *error_message);
 
@@ -835,7 +835,7 @@ void code_0009e670(
 void code_00099b90(
 	void);
 
-void code_0009ccf0(
+static void game_engine_validate_map_netgame_flags(
 	void);
 
 void game_engine_intialize_queued_sounds(
@@ -4188,10 +4188,10 @@ wchar_t *get_place_name(
 	return L"";
 }
 
-__declspec(noinline) long find_netgame_flags(
+long find_netgame_flags(
 	real_point3d const *position,
-	float radius,
-	float height,
+	real radius,
+	real height,
 	short type,
 	short index,
 	long maximum_count,
@@ -4240,10 +4240,10 @@ __declspec(noinline) long find_netgame_flags(
 	return found_count;
 }
 
-__declspec(noinline) long find_netgame_flag(
+long find_netgame_flag(
 	real_point3d const *position,
-	float radius,
-	float height,
+	real radius,
+	real height,
 	short type,
 	short index)
 {
@@ -6060,7 +6060,7 @@ void game_engine_initialize_for_new_map(
 {
 	if (game_engine)
 	{
-		code_0009ccf0();
+		game_engine_validate_map_netgame_flags();
 		game_engine_intialize_queued_sounds();
 		csmemset(global_goal, 0, sizeof(global_goal));
 		game_engine_globals.next_team_index = 0;
@@ -6680,7 +6680,7 @@ static void code_0009cbe0(
 	return;
 }
 
-void code_0009ccf0(
+static void game_engine_validate_map_netgame_flags(
 	void)
 {
 	code_0009cbe0(
@@ -6730,6 +6730,11 @@ void code_0009ccf0(
 		3,
 		"NETGAME MAP FAILURE: duplicate race track flag [team %d]");
 
+	/* BUG (preserved for exact matching): January passes team index zero for
+	 * both CTF checks, and code_0009cc20 never reads that formal parameter.
+	 * A corrected build should filter starting locations by an authoritatively
+	 * recovered team-index field before reporting per-team counts.
+	 */
 	code_0009cc20(
 		1,
 		0,
@@ -7391,7 +7396,7 @@ void game_engine_postspawn_player_update(
 
 static void code_0009cc20(
 	short game_type,
-	short parameter1,
+	short unused_team_index,
 	short minimum_count,
 	char const *error_message)
 {
