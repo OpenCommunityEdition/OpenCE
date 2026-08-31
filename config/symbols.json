@@ -13745,7 +13745,7 @@
 { "file_offset": 2442344, "flags": 0, "name": "??_C@_0BA@EHGOIBMN@rgb_lower_bound?$AA@" },
 { "file_offset": 2442360, "flags": 0, "name": "??_C@_09BIGBFPOL@rgb_scale?$AA@" },
 { "file_offset": 2442376, "flags": 0, "name": "??_C@_0EB@GJHMFKH@?$CD?$CD?$CD?5WARNING?5importing?5special?9ef@" },
-{ "file_offset": 2442444, "flags": 0, "name": "_rdata_002544cc" },
+{ "file_offset": 2442444, "flags": 0, "name": "_bitmap_format_bits_per_pixel_table", "static": true },
 { "file_offset": 2442464, "flags": 0, "name": "??_C@_0BE@NMMIDGBH@palettized?5bump?5map?$AA@" },
 { "file_offset": 2442484, "flags": 0, "name": "??_C@_0BG@OOFEMLJA@true?9color?5with?5alpha?$AA@" },
 { "file_offset": 2442508, "flags": 0, "name": "??_C@_0L@BOBKAIGE@true?9color?$AA@" },

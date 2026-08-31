@@ -46,6 +46,7 @@ symbols in this file:
 
 #include "cseries.h"
 
+#include "bitmaps/bitmaps.h"
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/libtiff/tiffio.h"
 #include "math/integer_math.h"
@@ -71,8 +72,6 @@ enum
 
 /* ---------- prototypes */
 
-short bitmap_format_get_bits_per_pixel(
-	short format);
 void *bitmap_2d_address(
 	struct bitmap_data *bitmap,
 	short x,

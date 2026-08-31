@@ -22,6 +22,9 @@ boolean bitmap_verify(
 	struct bitmap_data *bitmap,
 	boolean repair);
 
+short bitmap_format_get_bits_per_pixel(
+	short format);
+
 void *bitmap_2d_address(
 	struct bitmap_data *bitmap,
 	short x,

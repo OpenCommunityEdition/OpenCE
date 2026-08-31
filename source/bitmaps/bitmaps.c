@@ -229,6 +229,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "bitmaps/bitmaps.h"
 #include "bitmaps/bitmap_group.h"
 #include "math/integer_math.h"
 
@@ -256,8 +257,6 @@ void rasterizer_bitmap_changed(
 	struct bitmap_data *bitmap);
 void rasterizer_bitmap_delete(
 	struct bitmap_data *bitmap);
-short bitmap_format_get_bits_per_pixel(
-	short format);
 long bitmap_mipmap_get_pixel_count(
 	struct bitmap_data *bitmap,
 	short mipmap_index);
@@ -331,6 +330,29 @@ static char const *bitmap_format_string_table[NUMBER_OF_BITMAP_FORMATS + 1] =
 	NULL,
 };
 
+static char const bitmap_format_bits_per_pixel_table[NUMBER_OF_BITMAP_FORMATS + 1] =
+{
+	8,
+	8,
+	8,
+	16,
+	0,
+	0,
+	16,
+	0,
+	16,
+	16,
+	32,
+	32,
+	0,
+	0,
+	4,
+	8,
+	8,
+	8,
+	NONE,
+};
+
 /* ---------- public code */
 
 char const *bitmap_type_get_string(
@@ -349,6 +371,15 @@ char const *bitmap_format_get_string(
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 135, bitmap_format_string_table[NUMBER_OF_BITMAP_FORMATS]==NULL);
 
 	return bitmap_format_string_table[format];
+}
+
+short bitmap_format_get_bits_per_pixel(
+	short format)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0xA6, format>=0 && format<NUMBER_OF_BITMAP_FORMATS);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0xA7, bitmap_format_bits_per_pixel_table[format]!=0);
+
+	return bitmap_format_bits_per_pixel_table[format];
 }
 
 void bitmap_changed(

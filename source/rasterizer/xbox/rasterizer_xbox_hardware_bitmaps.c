@@ -72,6 +72,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
+#include "bitmaps/bitmaps.h"
 #include "bitmaps/bitmap_group.h"
 #include "rasterizer/rasterizer.h"
 #include <xtl.h>
@@ -123,8 +124,6 @@ short bitmap_mipmap_get_depth(
 long bitmap_mipmap_get_pixel_data_size(
 	struct bitmap_data *bitmap,
 	short mipmap_index);
-short bitmap_format_get_bits_per_pixel(
-	short format);
 void rasterizer_xbox_bitmap_swizzle2d_byte(
 	void *destination,
 	void const *source,
