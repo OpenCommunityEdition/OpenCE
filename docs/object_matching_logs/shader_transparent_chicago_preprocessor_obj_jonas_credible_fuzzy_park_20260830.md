@@ -49,7 +49,9 @@ relocation destinations, and owns exact data.
 Twenty-eight documented source/compiler experiments did not reproduce the joint
 allocation. Several explicit attempts to anchor `TRUE` merely hoisted a memory
 store or changed wider control flow. Under the current house rule, the coherent
-source is parked rather than replacing it with compiler steering.
+source is parked rather than replacing it with compiler steering. This is a
+work-queue disposition, not byte-match credit: the object remains
+`NonMatching` until the residual is genuinely closed.
 
 ## Reopen criteria
 

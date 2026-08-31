@@ -293,6 +293,6 @@ evidence; do not resume blind allocation steering.
 ## Disposition
 
 Credible fuzzy park: 1/2 functions strictly exact, the remaining function
-parked at 96.15504%, and the complete owned data exact. Accepted as complete
-under the current house rule, without claiming byte identity for the parked
-function.
+parked at 96.15504%, and the complete owned data exact. The object remains
+`NonMatching` and receives no byte-complete credit; parking records the honest
+frontier and removes it from the active easy-match queue.
