@@ -71,7 +71,7 @@
   },
   {
     "unit": "source/memory/zlib/deflate",
-    "symbol": "_data_003079f8",
+    "symbol": "?my_version@?1??deflateInit2_@@9@9",
     "reason": "the complete zlib 1.1.3 object owns an exact relocated data word that objdiff does not fully credit",
     "measurements": {
       "size": 4,
