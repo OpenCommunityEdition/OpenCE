@@ -47,6 +47,17 @@ boolean structure_test_line2d(
 	long p1_surface_index,
 	struct path_collision_result *result);
 
+boolean structure_test_pill2d(
+	struct structure_bsp const *structure,
+	boolean ignore_broken_surfaces,
+	real_point2d const *p0,
+	long p0_surface_index,
+	real_point2d const *p1,
+	long p1_surface_index,
+	real radius,
+	unsigned long flags,
+	struct path_collision_result *result);
+
 long structure_surface_index_from_point(
 	struct structure_bsp const *structure,
 	boolean ignore_broken_surfaces,

@@ -235,6 +235,13 @@ void path_state_find(
 void path_state_build_path(
 	struct path_state *state,
 	boolean *complete);
+void path_smooth(
+	struct path_state *state,
+	short raw_step_count,
+	struct path_step const *raw_steps,
+	short *smoothed_step_count,
+	struct path_step *smoothed_steps,
+	boolean *steps_finish_path);
 
 struct path_node *path_get_node(
 	struct path_state *state,

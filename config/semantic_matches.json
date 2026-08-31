@@ -486,8 +486,8 @@
   },
   {
     "unit": "source/ai/path_smoothing",
-    "function": "_code_00051190",
-    "reason": "hardened COFF comparison proves all 128 padded bytes and all 5 semantic relocations exact (SHA-256 a58fa4f6cf9598874c2a0d1fb60f226f65dea7f5cbc7182a682b2faefc62580f); the nonexact caller remains solely as the private-ABI source scaffold"
+    "function": "_surface_is_walkable",
+    "reason": "hardened COFF comparison proves all 128 padded bytes and all 5 semantic relocations exact (SHA-256 a58fa4f6cf9598874c2a0d1fb60f226f65dea7f5cbc7182a682b2faefc62580f); the private name is recovered from the source-backed path-smoothing helper cluster"
   },
   {
     "unit": "source/rasterizer/rasterizer_debug",
