@@ -59,25 +59,6 @@
       }
     },
     {
-      "unit": "source/game/game_statistics",
-      "function": "_game_statistics_record_kill",
-      "class": "register-allocation",
-      "evidence": "Target and candidate have equal 0x2A0 padded size and all 22 relocation identities. Prior grounded reconstruction leaves an ESI/EDX zero-register permutation for three death-statistic stores and one independent last-kill-time load scheduled seven bytes apart.",
-      "measurements": {
-        "target": {
-          "size": 672,
-          "relocation_count": 22,
-          "normalized_sha256": "faed51b584f65f1a0f97f4416a0f599800dceeb2352a80dcf565d92d37724a69"
-        },
-        "base": {
-          "size": 672,
-          "relocation_count": 22,
-          "normalized_sha256": "ee9e334b928000272d26bfd08725d09579bb7e258685b0074a5608c54fa704f0"
-        },
-        "objdiff_percent": 98.947365
-      }
-    },
-    {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_hardware_geometry",
       "function": "_rasterizer_vertex_buffer_new",
       "class": "instruction-scheduling",

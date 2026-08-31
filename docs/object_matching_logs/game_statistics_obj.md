@@ -24,6 +24,54 @@ No experiment used inline assembly, `_emit`, volatile byte forcing, undefined
 behavior, object-byte patching, comparator weakening, gratuitous alignment
 pragmas, or compiler-flag changes.
 
+## Superseding exact closure (2026-08-31)
+
+The former register-allocation park documented below is superseded.  Fable
+commit `79275995c484a2637aa5db570030d42a9e02685d` supplied two ordinary source
+corrections, and both were independently re-applied and revalidated at
+canonical checkpoint `c71441a02e26a238bcc5e8643a8f903b2dfa63b7`:
+
+1. Initialize `attacker_index` before taking the `attacker` pointer.  The donor
+   experiment swept all 360 legal orders of the six loop-setup initializers;
+   this one adjacent swap was the unique exact order.
+2. Preserve the natural array decay of the typed `short kills[4]` member in a
+   block-local `short *kills`, then increment `kills[0]`.  This keeps the
+   credited-kill source order without an intrinsic barrier: XDK 3911 cannot
+   prove that the pointer increment is disjoint from the adjacent
+   `last_kill_time` field, so it does not hoist that load ahead of the kill
+   increment.
+
+Both changes preserve the existing logic and names.  They add no cast, inline
+assembly, intrinsic, volatile access, dead branch, fake dependency, or manual
+byte control.  The pointer type follows directly from the authenticated
+`struct game_statistics::kills` declaration in `source/game/game.h`; the local
+has an ordinary semantic purpose and is not an address-named artifact.
+
+`tools/campaign/gate.py source/game/game_statistics --all` reports all four
+target functions exact.  A direct hardened `tools/coff_compare.py` invocation
+over all four functions reports `all_equal: true`:
+
+| Function | Meaningful / padded bytes | Relocations T/B | Normalized SHA-256 | Result |
+|---|---:|---:|---|---|
+| `_game_statistics_start` | `8/16` | `1/1` | `4eb29bc953165a2d51bef0bb3528cd233ddf8a287aaf2beb597b6c4e135976ce` | strict exact |
+| `_game_statistics_stop` | `132/144` | `6/6` | `8557a20c7974bd29c33d99a8cd1404b45e3a2211bd9d27c47f47c90502f64a5a` | strict exact |
+| `_game_statistics_record_damage` | `1/16` | `0/0` | `499f1f307c1cb989f968a6b7fcaec591e1828877223d0b0e7e8e8b76cde8c9ca` | strict exact |
+| `_game_statistics_record_kill` | `661/672` | `22/22` | `faed51b584f65f1a0f97f4416a0f599800dceeb2352a80dcf565d92d37724a69` | strict exact |
+
+The owned `_game_statistics_active` BSS datum is also strict exact: `1/1`
+byte, zero relocations, normalized SHA-256
+`6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d`.
+Baseline-versus-candidate whole-object fingerprints preserve all 30 symbol
+records, every section owner, both exact sibling functions, `.drectve`, BSS,
+both `.debug$F` sections, and both compiler-constant `.rdata` sections.  The
+only `.debug$S` byte differences are the four decimal PID characters in the
+gate's temporary object path (`_gate_39136.obj` versus `_gate_35768.obj`);
+logical size, section inventory, and ownership are unchanged.
+
+The stale source-level `NonMatching` comment and superseded park entry were
+removed, and the translation unit was admitted as `Matching` after the
+canonical verification pass.
+
 ## Exhaustive provenance review
 
 The January target and all surviving project history were inspected before
@@ -353,13 +401,18 @@ Reopen only for one of:
 3. a newly demonstrated defined-C dependency/lifetime control not represented
    by E01-E46.
 
-## Disposition and matching safety
+## Historical disposition and matching safety (superseded 2026-08-31)
 
 `_game_statistics_record_kill` remains `NonMatching` and is recorded in
 `config/parked.json` as a register-allocation fixed point.
 
-Safe to mark `Matching`: **no**.
+Safe to mark `Matching` under the former candidate: **no**.
 
 The equal size, relocation parity, three-byte residual, and semantic
 equivalence are strong evidence for a compiler tie, but they are not
 byte-for-byte identity and therefore are not match credit.
+
+The superseding two-change candidate documented at the top of this ledger is
+byte-for-byte exact and source-plausible.  It is safe for the canonical
+orchestrator to accept once campaign metadata is updated under the normal
+admission workflow.

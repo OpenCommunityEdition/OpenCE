@@ -86,10 +86,6 @@ void game_statistics_record_damage(
 	return;
 }
 
-/* NonMatching: target and candidate are both 0x2a0 padded bytes with all 22
-   relocation identities preserved. The remaining January codegen differences
-   are an ESI/EDX zero-register permutation for the three death-statistic
-   stores and one independent last-kill-time load scheduled seven bytes apart. */
 void game_statistics_record_kill(
 	long dead_unit_index,
 	long killing_player_index,
@@ -135,8 +131,8 @@ void game_statistics_record_kill(
 			best_attacker_index = NONE;
 			best_damage = REAL_MIN;
 			killer_attacker_index = NONE;
-			attacker = dead_unit->unit.attackers;
 			attacker_index = 0;
+			attacker = dead_unit->unit.attackers;
 			attackers = attacker;
 			for (;
 				attacker_index < MAXIMUM_ATTACKERS_PER_UNIT;
@@ -179,7 +175,9 @@ void game_statistics_record_kill(
 
 				if (game_team_is_enemy(dead_team_index, (short)credited_player->team_index))
 				{
-					credited_player->statistics.kills[0]++;
+					short *kills = credited_player->statistics.kills;
+
+					kills[0]++;
 					credited_player->statistics.kills_in_a_row++;
 					if (credited_player->statistics.last_kill_time >= assist_time)
 						credited_player->statistics.multiple_kills++;
