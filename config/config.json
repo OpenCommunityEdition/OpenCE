@@ -665,7 +665,7 @@
 				{ "name": "source/game/player_queues_new.c", "index": 291, "status": "NonMatching" },
 				{ "name": "source/game/player_control.c", "index": 292, "status": "NonMatching" },
 				{ "name": "source/game/game_time.c", "index": 293, "status": "Matching" },
-				{ "name": "source/game/game_statistics.c", "index": 294, "status": "Matching" },
+				{ "name": "source/game/game_statistics.c", "index": 294, "status": "NonMatching" },
 				{ "name": "source/game/game_globals.c", "index": 295, "status": "Matching" },
 				{ "name": "source/game/game_engine_terminator.c", "index": 296, "status": "Matching" },
 				{ "name": "source/game/game_engine_stub.c", "index": 297, "status": "Matching" },

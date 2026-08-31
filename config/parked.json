@@ -2,6 +2,25 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/game/game_statistics",
+      "function": "_game_statistics_record_kill",
+      "class": "instruction-scheduling",
+      "evidence": "The retained ordinary C keeps the source-authentic attacker-loop initialization order recovered by Fable and uses the direct typed statistics.kills[0] increment corroborated by the later Sapien/HCEA topology. It has the exact 672-byte padded envelope and all 22 relocation identities. The only residual is the independent credited-kill schedule at +0x1AE: January increments kills[0] before loading last_kill_time, while VC7 hoists that load first. A one-use block-local short * alias makes the function byte-exact solely by hiding the adjacent-field alias relationship from the optimizer; no Bungie, HCEA, PDB, or local semantic provenance supports that carrier, so it is rejected under the anti-fake-match rule. No barrier, volatile access, assembly, fake dependency, or optimizer-only alias is retained. Reopen only for authoritative January source/local-lifetime evidence or a naturally semantic same-compiler donor.",
+      "measurements": {
+        "target": {
+          "size": 672,
+          "relocation_count": 22,
+          "normalized_sha256": "faed51b584f65f1a0f97f4416a0f599800dceeb2352a80dcf565d92d37724a69"
+        },
+        "base": {
+          "size": 672,
+          "relocation_count": 22,
+          "normalized_sha256": "c83a7c0613ccce274d91ca76f8f2315496ee2b9eefa91862c84160ff35ce5c0b"
+        },
+        "objdiff_percent": 99.04306
+      }
+    },
+    {
       "unit": "source/cutscene/recorded_animations",
       "function": "_recorded_animation_play_internal",
       "class": "instruction-scheduling",

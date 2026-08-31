@@ -11,11 +11,11 @@ symbols in this file:
 000527D0 0010:
 	_props_dispose_from_old_map (0000)
 000527E0 0260:
-	_code_000527e0 (0000)
+	_prop_add (0000)
 00052A40 0030:
-	_code_00052a40 (0000)
+	_prop_new_blank (0000)
 00052A70 0140:
-	_code_00052a70 (0000)
+	_prop_remove (0000)
 00052BB0 0030:
 	_prop_iterator_new (0000)
 00052BE0 0030:
@@ -23,7 +23,7 @@ symbols in this file:
 00052C10 0220:
 	_prop_new_unacknowledged (0000)
 00052E30 00e0:
-	_code_00052e30 (0000)
+	_prop_setup_orphan (0000)
 00052F10 00d0:
 	_prop_orphan_transition (0000)
 00052FE0 00f0:
@@ -61,7 +61,7 @@ symbols in this file:
 0024F064 002e:
 	??_C@_0CO@FIFBOHNC@parent_prop?9?$DOowner_actor_index?5?$DN@ (0000)
 002B7D78 0004:
-	_data_002b7d78 (0000)
+	_last_prop_data_full_warn_time (0000)
 */
 
 /* ---------- headers */
@@ -114,7 +114,7 @@ void prop_status_refresh(
 	struct actor_position_data *position);
 /* ---------- globals */
 
-long data_002b7d78 = NONE;
+long last_prop_data_full_warn_time = NONE;
 
 /* ---------- public code */
 
@@ -152,22 +152,23 @@ void props_dispose_from_old_map(
 
 /* ---------- private code */
 
-static void code_000527e0(
+static void prop_add(
 	long actor_index,
-	long prop_index,
-	long unit_index)
+	long unit_index,
+	long prop_index)
 {
 	if (prop_index == NONE)
 	{
 		long game_time = game_time_get();
 
-		if (data_002b7d78 == NONE || game_time >= data_002b7d78 + TICKS_PER_SECOND * 30)
+		if (last_prop_data_full_warn_time == NONE ||
+			game_time >= last_prop_data_full_warn_time + TICKS_PER_SECOND * 30)
 		{
 			error(
 				_error_silent,
 				"AI knowledge database (%d entries) is full (warns once every 30 sec)",
 				768);
-			data_002b7d78 = game_time;
+			last_prop_data_full_warn_time = game_time;
 		}
 	}
 	else
@@ -197,6 +198,7 @@ static void code_000527e0(
 			struct unit_datum *prop_unit = unit_get(unit_index);
 			struct unit_definition *unit_definition =
 				unit_definition_get(prop_unit->definition_index);
+			boolean dead;
 
 			match_assert(
 				"c:\\halo\\SOURCE\\ai\\props.c",
@@ -212,11 +214,12 @@ static void code_000527e0(
 			prop->ally = game_team_is_ally(actor->meta.team_index, prop->team_index);
 			prop->ally_status_changed =
 				game_team_ally_status_changed(actor->meta.team_index, prop->team_index);
-			prop->dead = TEST_FLAG(prop_unit->object.damage_flags, _object_dead_bit);
+			dead = TEST_FLAG(prop_unit->object.damage_flags, _object_dead_bit);
+			prop->dead = dead;
 			prop->suicide_radius = unit_definition->unit.ai_danger_radius;
 			prop->really_dead =
-				prop->dead && prop_unit->unit.feign_death_timer == 0;
-			prop->dead_ticks = prop->dead ? 1000 : 0;
+				dead && prop_unit->unit.feign_death_timer == 0;
+			prop->dead_ticks = dead ? 1000 : 0;
 			prop->player = prop_unit->object.owner_player_index != NONE;
 
 			if (prop_unit->unit.swarm_actor_index != NONE)
@@ -230,20 +233,20 @@ static void code_000527e0(
 				prop->actor_index = prop_unit->unit.actor_index;
 			}
 
-			if (!prop->player)
+			if (prop->player)
 			{
-				if (prop->actor_index == NONE)
-				{
-					prop->type = NONE;
-				}
-				else
-				{
-					prop->type = actor_get(prop->actor_index)->meta.type;
-				}
+				prop->type = 6;
 			}
 			else
 			{
-				prop->type = 6;
+				if (prop->actor_index != NONE)
+				{
+					prop->type = actor_get(prop->actor_index)->meta.type;
+				}
+				else
+				{
+					prop->type = NONE;
+				}
 			}
 		}
 
@@ -254,17 +257,17 @@ static void code_000527e0(
 	return;
 }
 
-long code_00052a40(
+long prop_new_blank(
 	long actor_index)
 {
 	long prop_index = datum_new(prop_data);
 
-	code_000527e0(actor_index, prop_index, NONE);
+	prop_add(actor_index, NONE, prop_index);
 
 	return prop_index;
 }
 
-static void code_00052a70(
+static void prop_remove(
 	long actor_index,
 	long prop_index)
 {
@@ -440,25 +443,25 @@ scan_complete:
 			prop->parent_prop_index == NONE);
 
 		actor_switch_props(actor_index, prop_index, NONE);
-		code_00052a70(actor_index, prop_index);
+		prop_remove(actor_index, prop_index);
 		identifier = prop->identifier;
 		memset(prop, 0, sizeof(*prop));
 		prop->identifier = identifier;
 	}
 
 initialize_prop:
-	code_000527e0(actor_index, prop_index, unit_index);
+	prop_add(actor_index, unit_index, prop_index);
 
 	return prop_index;
 }
 
-static void code_00052e30(
+static void prop_setup_orphan(
 	long actor_index,
-	long prop_index,
-	long parent_prop_index)
+	long orphan_prop_index,
+	long source_prop_index)
 {
-	struct prop_datum *parent_prop = prop_get(parent_prop_index);
-	struct prop_datum *prop = prop_get(prop_index);
+	struct prop_datum *source_prop = prop_get(source_prop_index);
+	struct prop_datum *prop = prop_get(orphan_prop_index);
 	short identifier;
 	long owner_actor_index;
 	long next_prop_index;
@@ -469,7 +472,7 @@ static void code_00052e30(
 	next_prop_index = prop->next_prop_index;
 	preserved_parent_prop_index = prop->parent_prop_index;
 
-	memcpy(prop, parent_prop, sizeof(*prop));
+	memcpy(prop, source_prop, sizeof(*prop));
 	prop->owner_actor_index = owner_actor_index;
 	prop->next_prop_index = next_prop_index;
 	prop->identifier = identifier;
@@ -496,7 +499,7 @@ long prop_orphan_transition(
 {
 	long prop_index = datum_new(prop_data);
 
-	code_000527e0(actor_index, prop_index, NONE);
+	prop_add(actor_index, NONE, prop_index);
 	if (prop_index != NONE)
 	{
 		struct prop_datum *parent_prop = prop_get(parent_prop_index);
@@ -511,7 +514,7 @@ long prop_orphan_transition(
 			0x156,
 			parent_prop->orphan_prop_index == NONE);
 
-		code_00052e30(actor_index, prop_index, parent_prop_index);
+		prop_setup_orphan(actor_index, prop_index, parent_prop_index);
 		parent_prop->orphan_prop_index = prop_index;
 		prop->parent_prop_index = parent_prop_index;
 	}
@@ -521,17 +524,17 @@ long prop_orphan_transition(
 
 long prop_orphan_from_friend(
 	long actor_index,
-	long parent_prop_index,
-	long friend_prop_index)
+	long unacknowledged_prop_index,
+	long friend_acknowledged_prop_index)
 {
 	long prop_index = datum_new(prop_data);
 
-	code_000527e0(actor_index, prop_index, NONE);
+	prop_add(actor_index, NONE, prop_index);
 	if (prop_index != NONE)
 	{
-		struct prop_datum *parent_prop = prop_get(parent_prop_index);
+		struct prop_datum *parent_prop = prop_get(unacknowledged_prop_index);
 		struct prop_datum *prop = prop_get(prop_index);
-		struct prop_datum *friend_prop = prop_get(friend_prop_index);
+		struct prop_datum *friend_prop = prop_get(friend_acknowledged_prop_index);
 
 		match_assert(
 			"c:\\halo\\SOURCE\\ai\\props.c",
@@ -542,9 +545,9 @@ long prop_orphan_from_friend(
 			0x16e,
 			parent_prop->orphan_prop_index == NONE);
 
-		code_00052e30(actor_index, prop_index, friend_prop_index);
+		prop_setup_orphan(actor_index, prop_index, friend_acknowledged_prop_index);
 		parent_prop->orphan_prop_index = prop_index;
-		prop->parent_prop_index = parent_prop_index;
+		prop->parent_prop_index = unacknowledged_prop_index;
 
 		if (friend_prop->state >= _prop_state_uninspected_orphan &&
 			friend_prop->state <= _prop_state_inspected_orphan)
@@ -558,10 +561,10 @@ long prop_orphan_from_friend(
 
 void prop_orphan_update_information(
 	long actor_index,
-	long prop_index,
-	long parent_prop_index)
+	long orphan_prop_index,
+	long friend_acknowledged_prop_index)
 {
-	code_00052e30(actor_index, prop_index, parent_prop_index);
+	prop_setup_orphan(actor_index, orphan_prop_index, friend_acknowledged_prop_index);
 
 	return;
 }
@@ -570,7 +573,7 @@ void prop_delete(
 	long actor_index,
 	long prop_index)
 {
-	code_00052a70(actor_index, prop_index);
+	prop_remove(actor_index, prop_index);
 	datum_delete(prop_data, prop_index);
 
 	return;

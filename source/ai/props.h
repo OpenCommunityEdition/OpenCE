@@ -161,6 +161,23 @@ void prop_delete(
 	long prop_index);
 void prop_iterator_new(struct prop_iterator *iterator, long actor_index);
 struct prop_datum *prop_iterator_next(struct prop_iterator *iterator);
+long prop_new_blank(
+	long actor_index);
+long prop_new_unacknowledged(
+	long actor_index,
+	long unit_index,
+	boolean enemy);
+long prop_orphan_transition(
+	long actor_index,
+	long parent_prop_index);
+long prop_orphan_from_friend(
+	long actor_index,
+	long unacknowledged_prop_index,
+	long friend_acknowledged_prop_index);
+void prop_orphan_update_information(
+	long actor_index,
+	long orphan_prop_index,
+	long friend_acknowledged_prop_index);
 long prop_get_active_by_unit_index(
 	long actor_index,
 	long unit_index);

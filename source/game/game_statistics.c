@@ -175,9 +175,7 @@ void game_statistics_record_kill(
 
 				if (game_team_is_enemy(dead_team_index, (short)credited_player->team_index))
 				{
-					short *kills = credited_player->statistics.kills;
-
-					kills[0]++;
+					credited_player->statistics.kills[0]++;
 					credited_player->statistics.kills_in_a_row++;
 					if (credited_player->statistics.last_kill_time >= assist_time)
 						credited_player->statistics.multiple_kills++;

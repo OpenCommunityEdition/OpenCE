@@ -24,9 +24,34 @@ No experiment used inline assembly, `_emit`, volatile byte forcing, undefined
 behavior, object-byte patching, comparator weakening, gratuitous alignment
 pragmas, or compiler-flag changes.
 
-## Superseding exact closure (2026-08-31)
+## Policy correction and current disposition (2026-08-31)
 
-The former register-allocation park documented below is superseded.  Fable
+The exact admission described in the historical section below is revoked under
+the campaign's newer anti-fake-match rule.  Fable commit
+`79275995c484a2637aa5db570030d42a9e02685d` found two byte-closing changes, but
+only the loop-initialization order is retained.  The one-use block-local
+`short *kills` alias is an optimizer carrier: its only effect is to obscure the
+alias relationship between `kills[0]` and the adjacent `last_kill_time` field
+so that VC7 preserves January's store/load schedule.  No Bungie source, HCEA
+source, PDB local, or other authentic semantic evidence supports that local.
+
+The canonical source therefore uses the direct typed member increment
+`credited_player->statistics.kills[0]++`.  It gates at 3 exact / 1 residual;
+`_game_statistics_record_kill` remains 672/672 bytes with 22/22 relocation
+identities and base normalized SHA-256
+`c83a7c0613ccce274d91ca76f8f2315496ee2b9eefa91862c84160ff35ce5c0b`.
+The sole residual is the independent schedule at `+0x1AE`: January increments
+`kills[0]` before loading `last_kill_time`, while VC7 hoists the load first.
+Objdiff reports 99.04306% for the function and 99.211296% for the unit.
+
+The unit is `NonMatching` and the residual is active in
+`config/parked.json`.  The exact carrier result below remains only as negative
+experimental history; it is not admissible match credit.
+
+## Rejected exact candidate (historical, 2026-08-31)
+
+The former register-allocation park documented below was temporarily
+superseded.  Fable
 commit `79275995c484a2637aa5db570030d42a9e02685d` supplied two ordinary source
 corrections, and both were independently re-applied and revalidated at
 canonical checkpoint `c71441a02e26a238bcc5e8643a8f903b2dfa63b7`:
@@ -41,11 +66,10 @@ canonical checkpoint `c71441a02e26a238bcc5e8643a8f903b2dfa63b7`:
    `last_kill_time` field, so it does not hoist that load ahead of the kill
    increment.
 
-Both changes preserve the existing logic and names.  They add no cast, inline
-assembly, intrinsic, volatile access, dead branch, fake dependency, or manual
-byte control.  The pointer type follows directly from the authenticated
-`struct game_statistics::kills` declaration in `source/game/game.h`; the local
-has an ordinary semantic purpose and is not an address-named artifact.
+The first change preserves the existing logic and is retained.  The second
+uses a valid pointer type but is rejected because the local has no independent
+semantic role: it is consumed once and exists only to steer alias analysis and
+instruction scheduling.
 
 `tools/campaign/gate.py source/game/game_statistics --all` reports all four
 target functions exact.  A direct hardened `tools/coff_compare.py` invocation
@@ -68,9 +92,9 @@ only `.debug$S` byte differences are the four decimal PID characters in the
 gate's temporary object path (`_gate_39136.obj` versus `_gate_35768.obj`);
 logical size, section inventory, and ownership are unchanged.
 
-The stale source-level `NonMatching` comment and superseded park entry were
-removed, and the translation unit was admitted as `Matching` after the
-canonical verification pass.
+The source-level `NonMatching` comment and park entry were temporarily removed
+for this candidate.  The policy correction above restores both classifications
+after rejecting the carrier.
 
 ## Exhaustive provenance review
 
@@ -401,7 +425,7 @@ Reopen only for one of:
 3. a newly demonstrated defined-C dependency/lifetime control not represented
    by E01-E46.
 
-## Historical disposition and matching safety (superseded 2026-08-31)
+## Historical disposition and matching safety
 
 `_game_statistics_record_kill` remains `NonMatching` and is recorded in
 `config/parked.json` as a register-allocation fixed point.
@@ -412,7 +436,7 @@ The equal size, relocation parity, three-byte residual, and semantic
 equivalence are strong evidence for a compiler tie, but they are not
 byte-for-byte identity and therefore are not match credit.
 
-The superseding two-change candidate documented at the top of this ledger is
-byte-for-byte exact and source-plausible.  It is safe for the canonical
-orchestrator to accept once campaign metadata is updated under the normal
-admission workflow.
+The two-change candidate documented above is byte-for-byte exact but is not
+source-admissible under the current anti-fake-match rule.  The direct-member
+source, current park entry, and `NonMatching` unit classification are the
+canonical disposition.
