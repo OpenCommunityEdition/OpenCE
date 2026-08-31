@@ -60,9 +60,41 @@ device pointer in the header wrapper.
 - Punpckhdq's source has the same six anonymous labels and no implementation:
   `../../research-cache/punpckhdq-halo-full-history-20260828/source/rasterizer/xbox/rasterizer_xbox_debug.c`.
 - Baboon, Demon, Nimbus, and the local Halo PC Restored archive contain no
-  matching rasterizer immediate-mode implementation.  Xboxrecomp PR #5 was
-  not present in the local research cache; it must be evaluated separately if
-  a concrete source or ABI reference is later supplied.
+  matching rasterizer immediate-mode implementation.
+
+### XboxRecomp PR #5 disposition
+
+The user-supplied [XboxRecomp PR #5](https://github.com/sp00nznet/xboxrecomp/pull/5)
+was inspected from its Git ref `refs/pull/5/head` rather than inferred from its
+title.  The PR head is
+`23aaddf990fdd869c31d569c45500443364849a0`; its 35-commit range begins after
+`32da23872a552b12b4a932c9d5a6e952bb3f24bb`.  The exact changed-path list in
+that range contains repository metadata plus kernel, generic recompilation,
+naming, runtime-template, and test files; it has no change under `src/d3d`, no
+XDK header/library, and no Halo source or
+`rasterizer_xbox_debug` file.  Consequently it cannot establish the January
+XDK 3911 ABI, header-inline ownership, or immediate-mode source for this
+object.
+
+Two commits were read closely because their messages mention the relevant
+domains:
+
+- [`35b0ea9ca41369c74e20387a5527e35bfca025fe`](https://github.com/sp00nznet/xboxrecomp/commit/35b0ea9ca41369c74e20387a5527e35bfca025fe)
+  changes `tools/recomp/__main__.py`, `tools/recomp/translator.py`, and
+  `tools/ghidra_naming/merge_names.py`.  It adds a generic
+  `--manual-functions` mechanism so a recompilation project can substitute a
+  host implementation for generated code.  Its D3D8 reference is an emulator
+  integration example, not evidence for a title's original C source or calling
+  convention.
+- [`4fe454c17bbba0247f1a024c576e6942981b1a15`](https://github.com/sp00nznet/xboxrecomp/commit/4fe454c17bbba0247f1a024c576e6942981b1a15)
+  changes `src/kernel/kernel.h`, `src/kernel/kernel_bridge.c`, and
+  `src/kernel/xbox_memory_layout.c` to map the NV2A aperture and bridge kernel
+  setup calls.  It explicitly treats the bridge as non-register-semantic, so
+  it is not evidence for any of the six XDK wrapper ABIs.
+
+This source is therefore a negative provenance result.  Its manual-override
+facility is specifically not a justification for injecting an unowned wrapper
+into Halo source merely because the wrapper bytes can be reproduced.
 
 ## Negative controls and reopening condition
 
