@@ -125,11 +125,6 @@
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
-    "unit": "source/camera/director",
-    "function": "_director_initialize_for_new_map",
-    "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
-  },
-  {
     "unit": "source/bungie_net/network/transport_address",
     "function": "_transport_error_to_string",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"

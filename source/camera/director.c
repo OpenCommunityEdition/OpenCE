@@ -3,7 +3,7 @@ DIRECTOR.C
 
 symbols in this file:
 000747D0 0040:
-	_code_000747d0 (0000)
+	_director_get (0000)
 00074810 0020:
 	_director_initialize (0000)
 00074830 0010:
@@ -25,41 +25,51 @@ symbols in this file:
 00074B20 00f0:
 	_director_desired_perspective (0000)
 00074C10 0060:
-	_code_00074c10 (0000)
+	_director_set_camera (0000)
 00074C70 0070:
-	_code_00074c70 (0000)
+	_director_initialize_variables (0000)
 00074CE0 0220:
-	_code_00074ce0 (0000)
+	_director_process_variables (0000)
 00074F00 0070:
 	_director_dispose_from_old_map (0000)
 00074F70 0150:
 	_director_load_camera (0000)
 000750C0 0130:
-	_code_000750c0 (0000)
+	_director_rotate_cameras (0000)
 000751F0 0060:
 	_director_camera_deterministic (0000)
 00075250 00d0:
-	_code_00075250 (0000)
+	_director_choose_game_perspective (0000)
 00075320 0130:
 	_director_script_camera (0000)
 00075450 01c0:
-	_code_00075450 (0000)
+	_director_choose_camera_game (0000)
 00075610 00b0:
-	_code_00075610 (0000)
+	_director_choose_camera_editor (0000)
 000756C0 00c0:
-	_code_000756c0 (0000)
+	_director_choose_camera_script_camera_record (0000)
 00075780 03c0:
-	_code_00075780 (0000)
+	_director_update_controls (0000)
 00075B40 0050:
-	_code_00075b40 (0000)
+	_director_choose_camera (0000)
 00075B90 00d0:
 	_director_initialize_for_new_map (0000)
 00075C60 01f0:
 	_director_update (0000)
 00075E50 0020:
 	_director_initialize_for_saved_game (0000)
-00256B18 0020:
-	_rdata_00256b18 (0000)
+00256B18 0008:
+	_director_game_camera_modes (0000)
+00256B20 0008:
+	_director_script_camera_record_camera_modes (0000)
+00256B28 0004:
+	__real@3cf5c28f (0000)
+00256B2C 0004:
+	_friction (0000)
+00256B30 0004:
+	__real@41c80000 (0000)
+00256B34 0004:
+	__real@3fa66666 (0000)
 00256B38 000d:
 	??_C@_0N@PCFDPHGK@first?5person?$AA@ (0000)
 00256B48 0007:
@@ -96,8 +106,10 @@ symbols in this file:
 	__real@37a4b5be (0000)
 00256C60 0004:
 	__real@b824b5be (0000)
-002DCBA0 0088:
-	_data_002dcba0 (0000)
+002DCBA0 0018:
+	_director_camera_mode_names (0000)
+002DCBB8 0070:
+	_variables (0000)
 0031D048 03ea:
 	_director_globals (0000)
 	_director_camera_switch_fast (03e8)
@@ -133,20 +145,60 @@ void scripted_camera_update(
 	void *camera,
 	void *command,
 	void *result);
-void code_00074c70(
-	void);
-void code_00075450(
-	void);
-void code_00075610(
-	void);
-void code_000756c0(
-	void);
+void director_initialize_variables(
+	short local_player_index);
+void director_choose_camera(
+	short local_player_index,
+	boolean initialize,
+	boolean key);
 
 /* ---------- globals */
 
-struct director_player_globals director_globals[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+short const director_game_camera_modes[3] =
+{
+	_camera_first_person,
+	_camera_flying,
+	_camera_following
+};
+
+short const director_script_camera_record_camera_modes[4] =
+{
+	_camera_first_person,
+	_camera_flying,
+	_camera_following,
+	_camera_orbiting
+};
+
+real const friction = 5.f;
+
+char const *director_camera_mode_names[NUMBER_OF_DIRECTOR_CAMERA_MODES] =
+{
+	"following",
+	"orbiting",
+	"flying",
+	"editor",
+	"first person"
+};
+
+struct director_variable_definition variables[NUMBER_OF_DIRECTOR_VARIABLES] =
+{
+	{ 5, 4, NONE, { 0, 0 }, 0.15f, 0.f, -REAL_MAX, REAL_MAX, TRUE, { 0, 0, 0 } },
+	{ 6, 7, NONE, { 0, 0 }, 0.075f, 0.f, -REAL_MAX, REAL_MAX, FALSE, { 0, 0, 0 } },
+	{ 1, 0, NONE, { 0, 0 }, 0.075f, 0.f, -REAL_MAX, REAL_MAX, TRUE, { 0, 0, 0 } },
+	{ 3, 2, NONE, { 0, 0 }, 0.075f, 0.f, -REAL_MAX, REAL_MAX, TRUE, { 0, 0, 0 } }
+};
+
+struct director_globals director_globals;
+boolean director_camera_switch_fast;
 
 /* ---------- public code */
+
+static struct director *director_get(
+	short local_player_index)
+{
+	match_assert("c:\\halo\\SOURCE\\camera\\director.c", 179, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+	return &director_globals.local_players[local_player_index];
+}
 
 void director_initialize(
 	void)
@@ -169,10 +221,11 @@ void director_dispose_from_old_map(
 
 	for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
 	{
-		match_assert("c:\\halo\\SOURCE\\camera\\director.c", 179, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
-		director_globals[local_player_index].camera.update = NULL;
-		director_globals[local_player_index].camera.unknown_c4 = 1.f;
-		director_globals[local_player_index].camera.unknown_c0 = FALSE;
+		struct director *director = director_get(local_player_index);
+
+		director->camera_proc = NULL;
+		director->debug_input_scale = 1.f;
+		director->debug_controls = FALSE;
 	}
 
 	director_camera_scripted->camera_scripted = FALSE;
@@ -182,51 +235,46 @@ void director_dispose_from_old_map(
 void director_inhibit_facing(
 	short local_player_index)
 {
-	match_assert("c:\\halo\\SOURCE\\camera\\director.c", 179, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
-	director_globals[local_player_index].camera.inhibit_facing = TRUE;
+	director_get(local_player_index)->inhibited_facing = TRUE;
 	return;
 }
 
 void director_inhibit_input(
 	short local_player_index)
 {
-	match_assert("c:\\halo\\SOURCE\\camera\\director.c", 179, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
-	director_globals[local_player_index].camera.inhibit_input = TRUE;
+	director_get(local_player_index)->inhibited_input = TRUE;
 	return;
 }
 
 boolean director_inhibited_facing(
 	short local_player_index)
 {
-	match_assert("c:\\halo\\SOURCE\\camera\\director.c", 179, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
-	return director_globals[local_player_index].camera.inhibit_facing;
+	return director_get(local_player_index)->inhibited_facing;
 }
 
 boolean director_inhibited_input(
 	short local_player_index)
 {
-	match_assert("c:\\halo\\SOURCE\\camera\\director.c", 179, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
-	return director_globals[local_player_index].camera.inhibit_input;
+	return director_get(local_player_index)->inhibited_input;
 }
 
 director_perspective director_get_perspective(
 	short local_player_index)
 {
-	struct director_camera_state *camera;
+	struct director *camera;
 
-	match_assert("c:\\halo\\SOURCE\\camera\\director.c", 179, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
-	camera = &director_globals[local_player_index].camera;
+	camera = director_get(local_player_index);
 
-	if (camera->update == first_person_camera_update)
+	if (camera->camera_proc == first_person_camera_update)
 	{
-		if (camera->transition == 0.f)
+		if (camera->camera_change_pause == 0.f)
 			camera->perspective = 0;
 	}
-	else if (camera->update == following_camera_update)
+	else if (camera->camera_proc == following_camera_update)
 	{
 		camera->perspective = 1;
 	}
-	else if (camera->update == scripted_camera_update)
+	else if (camera->camera_proc == scripted_camera_update)
 	{
 		camera->perspective = 2;
 	}
@@ -293,10 +341,10 @@ void director_set_mode(
 	short mode)
 {
 	match_assert("c:\\halo\\SOURCE\\camera\\director.c", 384, mode>=0 && mode<NUMBER_OF_DIRECTOR_GAME_MODES);
-	if (director_globals[0].mode != mode)
+	if (director_globals.game_mode != mode)
 	{
-		director_globals[0].mode = mode;
-		director_globals[0].mode_changed = TRUE;
+		director_globals.game_mode = mode;
+		director_globals.initialize_camera = TRUE;
 	}
 
 	return;
@@ -328,86 +376,20 @@ void director_initialize_for_new_map(
 {
 	short local_player_index;
 
-	/* These private helpers use translation-unit register conventions. */
-	__asm
+	director_globals.game_mode = game_in_editor() ? _director_mode_editor : _director_mode_game;
+	director_globals.initialize_camera = FALSE;
+	for (local_player_index = 0;
+		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
+		local_player_index++)
 	{
-		call game_in_editor
-		neg al
-		mov edi, offset director_globals+54h
-		sbb eax, eax
-		and eax, 2
-		xor ebx, ebx
-		mov word ptr [director_globals+4], ax
-		mov byte ptr [director_globals+6], bl
+		struct director *camera = director_get(local_player_index);
+
+		camera->camera_change_pause = 0.f;
+		camera->bored_time = 0;
+		camera->bored = FALSE;
+		director_choose_camera(local_player_index, TRUE, FALSE);
+		director_initialize_variables(local_player_index);
 	}
-
-	local_player_index = 0;
-	do
-	{
-		/* The original TU keeps the zero constant in bx for this assertion. */
-		__asm
-		{
-			cmp si, bx
-			_emit 07ch
-			_emit 006h
-		}
-		if (local_player_index >= MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
-		{
-			display_assert("local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS", "c:\\halo\\SOURCE\\camera\\director.c", 179, TRUE);
-			system_exit(NONE);
-		}
-		__asm
-		{
-			mov byte ptr [edi+4], bl
-			mov dword ptr [edi], ebx
-			mov dword ptr [edi-48h], ebx
-		}
-
-		switch (director_globals[0].mode)
-		{
-		case 0:
-		case 1:
-			__asm
-			{
-				push ebx
-				push 1
-				mov eax, esi
-				call code_00075450
-				add esp, 8
-			}
-			break;
-
-		case 2:
-			__asm
-			{
-				push ebx
-				push 1
-				call code_00075610
-				add esp, 8
-			}
-			break;
-
-		case 4:
-			__asm
-			{
-				push ebx
-				mov al, 1
-				call code_000756c0
-				add esp, 4
-			}
-			break;
-		}
-
-		__asm
-		{
-			mov eax, esi
-			call code_00074c70
-		}
-
-		local_player_index++;
-		__asm add edi, 0f8h
-	}
-	while (local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
 
 	return;
 }

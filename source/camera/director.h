@@ -16,9 +16,33 @@ header included in hcex build.
 
 /* ---------- constants */
 
-enum
+enum director_game_mode
 {
+	_director_mode_game = 0,
+	_director_mode_netgame,
+	_director_mode_editor,
+	_director_mode_scripted,
+	_director_mode_script_camera_record,
 	NUMBER_OF_DIRECTOR_GAME_MODES = 5
+};
+
+enum director_camera_mode
+{
+	_camera_following = 0,
+	_camera_orbiting,
+	_camera_flying,
+	_camera_editor,
+	_camera_first_person,
+	NUMBER_OF_DIRECTOR_CAMERA_MODES
+};
+
+enum director_variable
+{
+	_variable_height = 0,
+	_variable_roll,
+	_variable_forward,
+	_variable_right,
+	NUMBER_OF_DIRECTOR_VARIABLES
 };
 
 /* ---------- macros */
@@ -38,32 +62,55 @@ struct director_scripting_globals
 	byte pad[3];
 };
 
-struct director_camera_state
+struct director_variable_instance
 {
-	byte pad0[4];
-	real transition;
-	director_camera_update_proc update;
-	byte padC[0x40];
-	long unknown_4c;
-	boolean unknown_50;
-	boolean inhibit_facing;
-	boolean inhibit_input;
-	byte pad53[3];
-	director_perspective perspective;
-	byte pad58[0x68];
-	boolean unknown_c0;
-	byte padC1[3];
-	real unknown_c4;
-	byte padC8[0x28];
+	real value;
+	real velocity;
+	real delta;
 };
 
-struct director_player_globals
+struct director_variable_definition
 {
-	byte pad0[4];
-	short mode;
-	boolean mode_changed;
+	short negative_bit;
+	short positive_bit;
+	short reset_bit;
+	byte pad6[2];
+	real scale;
+	real initial_value;
+	real minimum;
+	real maximum;
+	boolean has_hyper_scale;
+	byte pad19[3];
+};
+
+struct director
+{
+	short camera_mode_index;
+	byte pad2[2];
+	real camera_change_pause;
+	director_camera_update_proc camera_proc;
+	byte camera_data[0x40];
+	long bored_time;
+	boolean bored;
+	boolean inhibited_facing;
+	boolean inhibited_input;
+	byte pad53;
+	short seat_state;
+	director_perspective perspective;
+	byte command[0x68];
+	boolean debug_controls;
+	byte padC1[3];
+	real debug_input_scale;
+	struct director_variable_instance debug_variables[NUMBER_OF_DIRECTOR_VARIABLES];
+};
+
+struct director_globals
+{
+	real dtime;
+	short game_mode;
+	boolean initialize_camera;
 	byte pad7;
-	struct director_camera_state camera;
+	struct director local_players[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
 };
 
 /* ---------- prototypes/DIRECTOR.C */
@@ -105,7 +152,13 @@ void director_initialize_for_saved_game(
 /* ---------- globals */
 
 extern struct director_scripting_globals *director_camera_scripted;
-extern struct director_player_globals director_globals[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+extern struct director_globals director_globals;
+extern boolean director_camera_switch_fast;
+extern short const director_game_camera_modes[3];
+extern short const director_script_camera_record_camera_modes[4];
+extern real const friction;
+extern char const *director_camera_mode_names[NUMBER_OF_DIRECTOR_CAMERA_MODES];
+extern struct director_variable_definition variables[NUMBER_OF_DIRECTOR_VARIABLES];
 
 /* ---------- public code */
 

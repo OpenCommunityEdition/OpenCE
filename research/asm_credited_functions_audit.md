@@ -3,11 +3,12 @@
 Found incidentally 2026-08-16 while reading `source/camera/director.c` for an
 unrelated reconstruction. The initial audit parked the affected functions so
 assembly transcriptions were not credited as C reconstructions. Subsequent
-source-credibility work recovered `object_shadows.code_0012b870` and
-`action_converse_perform` in ordinary C. On 2026-08-30 the four Active
-Camouflage transcriptions were deleted after stock-XDK owner evidence exposed
-their address-placeholder premise as false. Four assembly implementations now
-remain parked: Director, `stristr`, and two Particles functions.
+source-credibility work recovered `object_shadows.code_0012b870`,
+`action_converse_perform`, and `director_initialize_for_new_map` in ordinary C.
+On 2026-08-30 the four Active Camouflage transcriptions were also deleted after
+stock-XDK owner evidence exposed their address-placeholder premise as false.
+Three assembly implementations now remain parked: `stristr` and two Particles
+functions.
 
 ## The standing rule
 
@@ -16,19 +17,17 @@ no byte-forcing, readable code only* — and, separately, *never credit anything
 that is not byte-identical*. At discovery, the first rule was violated in nine
 functions across five units, and the two rules interacted badly: an assembly
 transcription will always be byte-identical, so the strict comparator cannot
-distinguish a genuine C recovery from a transcribed listing. Four such
+distinguish a genuine C recovery from a transcribed listing. Three such
 implementations remain, explicitly parked and excluded from credit. The gate
 is not a defence here; only reading the source is.
 
 ## Historical inventory at discovery
 
-Nine functions contain inline or naked `__asm` and compare
+Seven functions contain whole-body or naked `__asm` and compare
 `EXACT` by `section_infos_equal`:
 
 | unit | function | asm blocks | kind |
 |---|---|---|---|
-| `ai/action_converse` | `action_converse_perform` | 3 | inline, inside C |
-| `camera/director` | `director_initialize_for_new_map` | 8 | inline, inside C |
 | `cseries/cseries` | `stristr` | 1 | whole body |
 | `effects/particles` | `code_0008fcd0` | 1 | whole body |
 | `effects/particles` | `code_0008ff30` | 1 | whole body |
@@ -47,21 +46,20 @@ then gate each enclosing function.
 
 ## Why this matters more than the count suggests
 
-`director_initialize_for_new_map` is the clearest case. It is not a C function
-with an asm hint — the loop body, the assert, the switch arms and the pointer
-walk are all hand-written asm, including `_emit 07ch / _emit 006h` to plant a
-raw `jl` opcode, and comments that say the original TU "keeps the zero constant
-in bx". That is a transcription of January's listing, not a reconstruction of
-January's source. It will never stop matching, and it teaches the project
-nothing about what the original C looked like.
+`director_initialize_for_new_map` was the clearest case when this inventory was
+opened. It was not a C function with an asm hint — the loop body, assert,
+switch arms and pointer walk were all hand-written asm, including `_emit 07ch /
+_emit 006h` to plant a raw `jl` opcode, and comments claimed the original TU
+"keeps the zero constant in bx". That transcription was removed on 2026-08-30;
+see the ordinary-C recovery below.
 
 The former `__declspec(naked)` cases were unambiguous by construction: a naked
 function has no C body at all.
 
 The inline cases (`action_converse_perform`, `director_initialize_for_new_map`)
-were the subtler risk, because the function reads as C at a glance and the asm
-is buried mid-body. Action Converse is now ordinary fuzzy C;
-`director_initialize_for_new_map` remains parked assembly.
+were the subtler risk, because each function read as C at a glance while the
+assembly was buried mid-body. Both are now ordinary fuzzy C. The remaining
+inventory is visibly whole-body assembly.
 
 ## Initial resolution (owner chose: park them)
 
@@ -85,6 +83,45 @@ Two regression tests cover both directions
 (`test_asm_implemented_entry_stays_active_when_exact`,
 `test_asm_implemented_entry_is_invalid_when_not_exact`).
 
+## Ordinary-C recovery: Director new-map initialization
+
+On 2026-08-30, all eight assembly blocks were removed from
+`source/camera/director.c::director_initialize_for_new_map`, including the raw
+branch-byte emission, manually staged registers, direct structure offsets,
+private-call setup, and pointer walk. The retained source is a coherent typed C
+routine: select the authenticated game/editor mode, clear `initialize_camera`,
+reset each local player's `camera_change_pause`, `bored_time`, and `bored`
+state, then call `director_choose_camera(local_player_index, TRUE, FALSE)` and
+`director_initialize_variables(local_player_index)`.
+
+This shape is independently corroborated by the January control flow and data
+offsets, HCEA's Director reconstruction, and the stianeklund and pastudan
+histories. The authenticated `director_game_mode` constants, full Director
+layout, and field names replace numeric switch labels, unknown-member names,
+and the prior overlapping pseudo-array layout. Ten adjacent address
+placeholders were mapped to authenticated semantic Director helper names. The
+remaining 64-byte accessor, whose original name was unavailable, is named
+`director_get` by the repository's getter convention and implemented as a typed
+static helper.
+
+The former transcription was 208 padded bytes with 19 relocations and matched
+January by construction. The ordinary-C candidate is 128 padded bytes with ten
+relocations and an objdiff fuzzy score of 55.460316%. All 13 inherited sibling
+exact functions remain strict exact. In addition, `director_get` now gates its
+64 padded bytes and five relocations exact and inlines naturally into its
+callers. Thus the invalid assembly-backed exact owner was replaced in the count
+by a genuine ordinary-C exact helper. January also inlined the 80-byte
+`director_choose_camera` wrapper and propagated the private conventions of its
+callees, whose definitions are still missing from this translation unit. The
+source deliberately retains that natural wrapper call instead of manually
+reproducing its inline schedule.
+
+Accordingly, the function remains parked, but its class is now
+`tu-context-optimization`. Reopen it only when ordinary-C definitions for the
+named private helper cluster can restore the original VC7 translation-unit
+context naturally. Full measurements and provenance are recorded in
+`docs/object_matching_logs/director_obj_jonas_ordinary_c_credibility_recovery_20260830.md`.
+
 ## Ordinary-C recovery: object shadows
 
 On 2026-08-29, `source/objects/object_shadows.c` replaced the naked assembly
@@ -106,7 +143,9 @@ preserves that function's original branch topology. The complete object now
 gates 3/3 exact with no assembly, intrinsic, pragma, barrier, or attribute, so
 the obsolete `asm-implemented` park was deleted.
 
-Unparking one means replacing its `__asm` with C that gates exact.
+Unparking an `asm-implemented` entry means replacing its `__asm` with C that
+gates exact. Replacing the asm with honest nonexact C is still a credibility
+recovery, but the function must remain parked under the correct residual class.
 
 ## Recovery attempt, 2026-08-16 (stristr + the four naked thunks)
 
@@ -222,8 +261,9 @@ options are:
    they stop counting toward the exact tally, exactly as `matrix4x3_multiply`
    does. This is the option that matches existing precedent.
 2. **Re-reconstruct in C** — treat each as unwritten and find the real source
-   shape. `stristr` and the small naked helpers look tractable; the
-   `director_initialize_for_new_map` loop is a real piece of work.
+   shape. `stristr` and the small naked helpers look tractable. The Director
+   recovery above demonstrates that honest fuzzy C is preferable to retaining
+   a transcribed exact body even when missing TU context prevents admission.
 3. **Leave and document** — accept them as knowingly-transcribed, but record it
    so the headline "N functions byte-exact" is not read as "N functions
    reconstructed in C".
