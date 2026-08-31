@@ -12,3 +12,8 @@ matching status.
 Files with dates in their names are retained research snapshots. Their
 hard-coded inputs intentionally document the evidence wave they were written
 for, while all imports and repository paths are portable.
+
+For a source-level credibility pass, run `python tools/fake_match_scan.py`.
+It reports deterministic review leads for inert, contradictory, or explicit
+codegen-steering constructs without treating a heuristic hit as proof. See
+`docs/fake_match_review.md` for scope, vendored exclusions, and exit codes.
