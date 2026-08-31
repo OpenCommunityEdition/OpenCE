@@ -41,7 +41,7 @@ symbols in this file:
 001A9560 0070:
 	_tag_iterator_next (0000)
 001A95D0 00f0:
-	_code_001a95d0 (0000)
+	_cache_get_tag_instance (0000)
 001A96C0 0100:
 	_cache_file_header_verify (0000)
 001A97C0 0090:
@@ -216,7 +216,7 @@ typedef char verify_cache_file_header_size[
 
 /* ---------- prototypes */
 
-static struct cache_file_tag_instance *code_001a95d0(
+static struct cache_file_tag_instance *cache_get_tag_instance(
 	long tag_index);
 void cache_files_dispose(
 	void);
@@ -277,7 +277,7 @@ char const *data_00316820[] =
 
 /* ---------- private code */
 
-static struct cache_file_tag_instance *code_001a95d0(
+static struct cache_file_tag_instance *cache_get_tag_instance(
 	long tag_index)
 {
 	short absolute_index;
@@ -737,7 +737,6 @@ boolean scenario_structure_bsp_load(
 	struct scenario_structure_bsp_reference *reference)
 {
 	struct cache_file_tag_instance *tag_instance;
-	struct scenario_structure_bsp_reference *bsp_reference;
 	byte *tag_cache_base_address;
 
 	tag_cache_base_address = physical_memory_get_tag_cache_base_address();
@@ -745,31 +744,33 @@ boolean scenario_structure_bsp_load(
 		tag_cache_base_address + cache_file_globals.header.tag_data_size,
 		0xCD,
 		0x01600000 - cache_file_globals.header.tag_data_size);
-	/* Preserve the target's parameter-home reload before cache_file_read. */
-	bsp_reference = *(struct scenario_structure_bsp_reference * volatile *)&reference;
-	cache_file_read(
-		NONE,
-		bsp_reference->file_offset,
-		bsp_reference->file_size,
-		bsp_reference->base_address,
-		(boolean *)((byte *)&reference + 3),
-		TRUE);
-	while (!*((boolean *)((byte *)&reference + 3)))
 	{
-		SwitchToThread();
-		if (system_milliseconds() - sound_render_time() > 33)
+		boolean read_complete;
+
+		cache_file_read(
+			NONE,
+			reference->file_offset,
+			reference->file_size,
+			reference->base_address,
+			&read_complete,
+			TRUE);
+		while (!read_complete)
 		{
-			sound_idle();
+			SwitchToThread();
+			if (system_milliseconds() - sound_render_time() > 33)
+			{
+				sound_idle();
+			}
 		}
 	}
 
-	cache_file_globals.structure_bsp_header = bsp_reference->base_address;
+	cache_file_globals.structure_bsp_header = reference->base_address;
 	match_assert(
 		"c:\\halo\\SOURCE\\cache\\cache_files.c",
 		0xE0,
 		cache_file_globals.structure_bsp_header->signature==CACHE_FILE_STRUCTURE_BSP_HEADER_SIGNATURE);
 	structure_bsp_header_register_vertex_buffers(cache_file_globals.structure_bsp_header);
-	tag_instance = code_001a95d0(bsp_reference->structure_bsp.index);
+	tag_instance = cache_get_tag_instance(reference->structure_bsp.index);
 	match_assert(
 		"c:\\halo\\SOURCE\\cache\\cache_files.c",
 		0xEA,
@@ -789,7 +790,7 @@ void scenario_structure_bsp_unload(
 	struct cache_file_tag_instance *tag_instance;
 
 	structure_bsp_header_deregister_vertex_buffers(cache_file_globals.structure_bsp_header);
-	tag_instance = code_001a95d0(reference->structure_bsp.index);
+	tag_instance = cache_get_tag_instance(reference->structure_bsp.index);
 	match_assert(
 		"c:\\halo\\SOURCE\\cache\\cache_files.c",
 		256,
@@ -811,7 +812,7 @@ void *tag_get(
 	char expected_group[16];
 	char returned_group[16];
 
-	struct cache_file_tag_instance *tag_instance = code_001a95d0(tag_index);
+	struct cache_file_tag_instance *tag_instance = cache_get_tag_instance(tag_index);
 	match_vassert(
 		"c:\\halo\\SOURCE\\cache\\cache_files.c",
 		298,
@@ -838,11 +839,11 @@ void *tag_get(
 char *tag_get_name(
 	long tag_index)
 {
-	return code_001a95d0(tag_index)->name;
+	return cache_get_tag_instance(tag_index)->name;
 }
 
 unsigned long tag_get_group_tag(
 	long tag_index)
 {
-	return code_001a95d0(tag_index)->group_tag;
+	return cache_get_tag_instance(tag_index)->group_tag;
 }
