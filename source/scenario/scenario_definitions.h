@@ -36,6 +36,20 @@ enum
 	_scenario_trigger_volume_type_oriented,
 };
 
+enum netgame_flag_type
+{
+	_netgame_flag_ctf_flag = 0,
+	_netgame_flag_ctf_vehicle,
+	_netgame_flag_oddball_ball_spawn,
+	_netgame_flag_race_track,
+	_netgame_flag_race_vehicle,
+	_netgame_flag_vegas_bank,
+	_netgame_flag_teleporter_source,
+	_netgame_flag_teleporter_target,
+	_netgame_flag_hill,
+	NUMBER_OF_NETGAME_FLAG_TYPES,
+};
+
 /* ---------- macros */
 
 #define scenario_definition_get(index) ((struct scenario *)tag_get(SCENARIO_TAG, (index)))

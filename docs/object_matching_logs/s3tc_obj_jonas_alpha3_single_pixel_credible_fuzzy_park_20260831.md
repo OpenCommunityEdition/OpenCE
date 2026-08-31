@@ -22,6 +22,14 @@ and normalized SHA-256
 
 ## Provenance and ABI
 
+The strongest type evidence is the local Halo Symbol Atlas entry that maps
+January's own RVA `0x60160` to an exact-equivalent typed original-Xbox symbol.
+Windows DbgHelp demangles it as a `cdecl` routine taking a const Alpha3 block,
+an output color, and `short, short` coordinates. Exact records from original
+Xbox builds dated 2001-08-15, 2001-09-25, and 2001-09-26 independently give
+the same const-input and short-coordinate types for the RGB and Alpha3
+single-pixel helpers; no typed exact record uses long or mixed widths.
+
 The local HaloCEA reference at commit `c168af2e`, including
 `C:\Users\isabe\Documents\Codex\2026-07-13\i-w\work\halocea-reference\src\DecodeBlockAlpha3__single_pixel.c`
 supplies the exact-name single-texel DXT5 algorithm: decode RGB first, build
@@ -44,7 +52,8 @@ January compares this function's row as `cmp di, 2`; neighboring RGB and
 Alpha4 single-pixel functions use `SI`, `BX`, `BL`, and `movsx ..., si`; and
 the HCEA donor plus its callers consistently use signed 16-bit coordinates.
 The owner-header declarations and retained Alpha3 definition therefore use
-`short u, short v`. The prototype belongs in `source/bitmaps/s3tc/s3tc.h`,
+const input pointers and `short u, short v`. The prototype belongs in
+`source/bitmaps/s3tc/s3tc.h`,
 the translation unit's associated header, because the helper is
 target-external and called from other bitmap code.
 

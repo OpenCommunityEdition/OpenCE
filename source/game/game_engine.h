@@ -28,6 +28,21 @@ enum
 	_game_variant_always_invisible_bit,
 };
 
+enum game_engine_type
+{
+	game_engine_none = 0,
+	game_engine_ctf,
+	game_engine_slayer,
+	game_engine_oddball,
+	game_engine_king,
+	game_engine_race,
+	game_engine_terminator,
+	game_engine_stub,
+	number_of_game_engines,
+	first_usable_game_engine_index = game_engine_ctf,
+	last_usable_game_engine_index = game_engine_race,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -391,7 +406,7 @@ long find_netgame_flags(
 	real radius,
 	real height,
 	short type,
-	short index,
+	short team_index,
 	long maximum_count,
 	long *flag_indices);
 
@@ -400,7 +415,7 @@ long find_netgame_flag(
 	real radius,
 	real height,
 	short type,
-	short index);
+	short team_index);
 
 boolean game_engine_should_end_game(
 	void);

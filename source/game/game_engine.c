@@ -157,9 +157,9 @@ symbols in this file:
 00098450 0020:
 	_game_engine_test_trait (0000)
 00098470 00a0:
-	_code_00098470 (0000)
+	_netgame_flag_verify_no_team_duplicates (0000)
 00098510 0070:
-	_code_00098510 (0000)
+	_netgame_flag_verify_team_range (0000)
 00098580 0070:
 	_game_engine_playlist_next (0000)
 000985F0 0090:
@@ -333,13 +333,13 @@ symbols in this file:
 0009CB60 0080:
 	_code_0009cb60 (0000)
 0009CBE0 0040:
-	_code_0009cbe0 (0000)
+	_netgame_flag_verify_team_exists (0000)
 0009CC20 0060:
-	_code_0009cc20 (0000)
+	_netgame_verify_spawn_points (0000)
 0009CC80 0070:
-	_code_0009cc80 (0000)
+	_netgame_verify_equipment (0000)
 0009CCF0 0280:
-	_game_engine_validate_map_netgame_flags (0000)
+	_game_engine_verify_current_map (0000)
 0009CF70 0010:
 	_game_engine_playlist_initialize (0000)
 0009CF80 0080:
@@ -685,7 +685,7 @@ struct scenario_netgame_flag
 	real_point3d position;
 	real facing;
 	short type;
-	short index;
+	short team_index;
 	byte unused[0x80];
 };
 
@@ -788,23 +788,23 @@ static long code_0009a490(
 	struct postgame_statistic_entry *output,
 	long maximum_count);
 
-void code_00098470(
+static void netgame_flag_verify_no_team_duplicates(
 	short flag_type,
 	char const *error_message);
 
-static void code_00098510(
+static void netgame_flag_verify_team_range(
 	short flag_type,
 	short minimum_index,
 	short maximum_index,
 	char const *error_message);
 
-static void code_0009cc20(
+static void netgame_verify_spawn_points(
 	short game_type,
 	short unused_team_index,
 	short minimum_count,
 	char const *error_message);
 
-static void code_0009cc80(
+static void netgame_verify_equipment(
 	short game_type,
 	char const *error_message);
 
@@ -835,7 +835,7 @@ void code_0009e670(
 void code_00099b90(
 	void);
 
-static void game_engine_validate_map_netgame_flags(
+static void game_engine_verify_current_map(
 	void);
 
 void game_engine_intialize_queued_sounds(
@@ -3643,7 +3643,7 @@ static void game_engine_update_teleporter(
 		&unit->object.position,
 		0.5f,
 		0.0f,
-		6,
+		_netgame_flag_teleporter_source,
 		NONE,
 		1,
 		&source_flag_index);
@@ -3662,8 +3662,8 @@ static void game_engine_update_teleporter(
 		NULL,
 		0.0f,
 		0.0f,
-		7,
-		source_flag->index,
+		_netgame_flag_teleporter_target,
+		source_flag->team_index,
 		1,
 		&destination_flag_index);
 	if (destination_flag_index != NONE)
@@ -3799,7 +3799,7 @@ static void game_engine_update_teleporter(
 				&unit->object.position,
 				1.0f,
 				0.0f,
-				6,
+				_netgame_flag_teleporter_source,
 				NONE);
 		}
 		return;
@@ -3808,7 +3808,7 @@ static void game_engine_update_teleporter(
 	console_printf(
 		FALSE,
 		"failed to teleport %d",
-		source_flag->index);
+		source_flag->team_index);
 
 	return;
 }
@@ -4193,7 +4193,7 @@ long find_netgame_flags(
 	real radius,
 	real height,
 	short type,
-	short index,
+	short team_index,
 	long maximum_count,
 	long *flag_indices)
 {
@@ -4215,7 +4215,7 @@ long find_netgame_flags(
 		if (type != NONE && type != flag->type)
 			continue;
 
-		if (index != NONE && index != flag->index)
+		if (team_index != NONE && team_index != flag->team_index)
 			continue;
 
 		if (position)
@@ -4245,11 +4245,18 @@ long find_netgame_flag(
 	real radius,
 	real height,
 	short type,
-	short index)
+	short team_index)
 {
 	long flag_index = NONE;
 
-	find_netgame_flags(position, radius, height, type, index, 1, &flag_index);
+	find_netgame_flags(
+		position,
+		radius,
+		height,
+		type,
+		team_index,
+		1,
+		&flag_index);
 
 	return flag_index;
 }
@@ -6060,7 +6067,7 @@ void game_engine_initialize_for_new_map(
 {
 	if (game_engine)
 	{
-		game_engine_validate_map_netgame_flags();
+		game_engine_verify_current_map();
 		game_engine_intialize_queued_sounds();
 		csmemset(global_goal, 0, sizeof(global_goal));
 		game_engine_globals.next_team_index = 0;
@@ -6455,7 +6462,7 @@ long game_engine_remap_object_definition(
 
 /* ---------- private code */
 
-void code_00098470(
+static void netgame_flag_verify_no_team_duplicates(
 	short flag_type,
 	char const *error_message)
 {
@@ -6485,12 +6492,12 @@ void code_00098470(
 				struct scenario_netgame_flag);
 
 			if (flag_type == duplicate->type &&
-				duplicate->index == flag->index)
+				duplicate->team_index == flag->team_index)
 			{
 				error(
 					_error_silent,
 					error_message,
-					duplicate->index);
+					duplicate->team_index);
 			}
 		}
 	}
@@ -6589,7 +6596,7 @@ void code_00096ed0(
 	return;
 }
 
-static void code_00098510(
+static void netgame_flag_verify_team_range(
 	short flag_type,
 	short minimum_index,
 	short maximum_index,
@@ -6608,20 +6615,20 @@ static void code_00098510(
 			struct scenario_netgame_flag);
 
 		if (flag_type == flag->type &&
-			(flag->index < minimum_index ||
-				flag->index > maximum_index))
+			(flag->team_index < minimum_index ||
+				flag->team_index > maximum_index))
 		{
 			error(
 				_error_silent,
 				error_message,
-				flag->index);
+				flag->team_index);
 		}
 	}
 
 	return;
 }
 
-static void code_0009cc80(
+static void netgame_verify_equipment(
 	short game_type,
 	char const *error_message)
 {
@@ -6654,7 +6661,7 @@ static void code_0009cc80(
 	return;
 }
 
-static void code_0009cbe0(
+static void netgame_flag_verify_team_exists(
 	short flag_type,
 	short flag_index,
 	char const *error_message)
@@ -6680,106 +6687,107 @@ static void code_0009cbe0(
 	return;
 }
 
-static void game_engine_validate_map_netgame_flags(
+static void game_engine_verify_current_map(
 	void)
 {
-	code_0009cbe0(
-		0,
+	netgame_flag_verify_team_exists(
+		_netgame_flag_ctf_flag,
 		0,
 		"NETGAME MAP FAILURE: missing ctf flag [team %d]");
-	code_0009cbe0(
-		0,
+	netgame_flag_verify_team_exists(
+		_netgame_flag_ctf_flag,
 		1,
 		"NETGAME MAP FAILURE: missing ctf flag [team %d]");
 
-	code_00098470(
-		0,
+	netgame_flag_verify_no_team_duplicates(
+		_netgame_flag_ctf_flag,
 		"NETGAME MAP FAILURE: duplicate ctf flag [team %d]");
-	code_00098510(
-		0,
+	netgame_flag_verify_team_range(
+		_netgame_flag_ctf_flag,
 		0,
 		1,
 		"NETGAME MAP FAILURE: ctf flag out of range [team %d]");
 
-	code_0009cbe0(
-		8,
+	netgame_flag_verify_team_exists(
+		_netgame_flag_hill,
 		0,
 		"NETGAME MAP FAILURE: missing hill flag [team %d]");
-	code_0009cbe0(
-		8,
+	netgame_flag_verify_team_exists(
+		_netgame_flag_hill,
 		1,
 		"NETGAME MAP FAILURE: missing hill flag [team %d]");
-	code_0009cbe0(
-		2,
+	netgame_flag_verify_team_exists(
+		_netgame_flag_oddball_ball_spawn,
 		0,
 		"NETGAME MAP FAILURE: missing oddball flag [team %d]");
-	code_0009cbe0(
-		2,
+	netgame_flag_verify_team_exists(
+		_netgame_flag_oddball_ball_spawn,
 		1,
 		"NETGAME MAP FAILURE: missing oddball flag [team %d]");
-	code_0009cbe0(
-		3,
+	netgame_flag_verify_team_exists(
+		_netgame_flag_race_track,
 		0,
 		"NETGAME MAP FAILURE: missing race flag [team %d]");
-	code_0009cbe0(
-		3,
+	netgame_flag_verify_team_exists(
+		_netgame_flag_race_track,
 		1,
 		"NETGAME MAP FAILURE: missing race flag [team %d]");
 
-	code_00098470(
-		3,
+	netgame_flag_verify_no_team_duplicates(
+		_netgame_flag_race_track,
 		"NETGAME MAP FAILURE: duplicate race track flag [team %d]");
 
 	/* BUG (preserved for exact matching): January passes team index zero for
-	 * both CTF checks, and code_0009cc20 never reads that formal parameter.
+	 * both CTF checks, and netgame_verify_spawn_points never reads that
+	 * formal parameter.
 	 * A corrected build should filter starting locations by an authoritatively
 	 * recovered team-index field before reporting per-team counts.
 	 */
-	code_0009cc20(
-		1,
+	netgame_verify_spawn_points(
+		game_engine_ctf,
 		0,
 		4,
 		"NETGAME MAP FAILURE: failed to find enough spawn points for ctf team 0 (%d/%d)");
-	code_0009cc20(
-		1,
+	netgame_verify_spawn_points(
+		game_engine_ctf,
 		0,
 		4,
 		"NETGAME MAP FAILURE: failed to find enough spawn points for ctf team 1 (%d/%d)");
-	code_0009cc20(
-		2,
+	netgame_verify_spawn_points(
+		game_engine_slayer,
 		0,
 		4,
 		"NETGAME MAP FAILURE: failed to find enough spawn points for slayer %d/%d");
-	code_0009cc20(
-		3,
+	netgame_verify_spawn_points(
+		game_engine_oddball,
 		0,
 		4,
 		"NETGAME MAP FAILURE: failed to find enough spawn points for oddball %d/%d");
-	code_0009cc20(
-		4,
+	netgame_verify_spawn_points(
+		game_engine_king,
 		0,
 		4,
 		"NETGAME MAP FAILURE: failed to find enough spawn points for king %d/%d");
-	code_0009cc20(
-		5,
+	netgame_verify_spawn_points(
+		game_engine_race,
 		0,
 		4,
 		"NETGAME MAP FAILURE: failed to find enough spawn points for race %d/%d");
 
-	code_0009cc80(
-		1,
+	netgame_verify_equipment(
+		game_engine_ctf,
 		"NETGAME MAP FAILURE: failed to find any equipment for ctf");
-	code_0009cc80(
-		2,
+	netgame_verify_equipment(
+		game_engine_slayer,
 		"NETGAME MAP FAILURE: failed to find any equipment for slayer");
-	code_0009cc80(
-		3,
+	netgame_verify_equipment(
+		game_engine_oddball,
 		"NETGAME MAP FAILURE: failed to find any equipment for oddball");
-	code_0009cc80(
-		4,
+	netgame_verify_equipment(
+		game_engine_king,
 		"NETGAME MAP FAILURE: failed to find any equipment for king");
-	code_0009cc80(
-		5,
+	netgame_verify_equipment(
+		game_engine_race,
 		"NETGAME MAP FAILURE: failed to find any equipment for race");
 
 	return;
@@ -7394,7 +7402,7 @@ void game_engine_postspawn_player_update(
 
 
 
-static void code_0009cc20(
+static void netgame_verify_spawn_points(
 	short game_type,
 	short unused_team_index,
 	short minimum_count,

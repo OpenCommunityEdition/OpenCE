@@ -132,7 +132,7 @@ void DecodeBlockAlpha3(
 }
 
 void DecodeBlockAlpha3__single_pixel(
-	struct s3tc_block_alpha3 *source,
+	struct s3tc_block_alpha3 const *source,
 	struct s3tc_color *color,
 	short u,
 	short v)

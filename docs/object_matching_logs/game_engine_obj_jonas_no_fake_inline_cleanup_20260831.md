@@ -7,13 +7,21 @@ Two definition-local `__declspec(noinline)` attributes were removed from
 remain strict exact. One caller loses exactness and is honestly fuzzy-parked
 instead of preserving a manufactured exact result.
 
-The affected dispatcher is now named
-`game_engine_validate_map_netgame_flags`. January's PDB authenticates both
-`find_netgame_*` names but contains no public symbol at dispatcher offset
-642288. The dispatcher name is therefore a descriptive private name,
-corroborated by the corresponding cross-build reconstruction and its NETGAME
-MAP FAILURE strings, not claimed as a recovered January public label. Source
-and `config/symbols.json` both mark it static.
+The affected dispatcher is now named `game_engine_verify_current_map`.
+January's PDB authenticates both `find_netgame_*` names but contains no public
+symbol at dispatcher offset 642288. The dispatcher and five validator names
+come from the corresponding verbose-symbol HCEA build, whose
+`netgame_verify_spawn_points` -> `netgame_verify_equipment` ->
+`game_engine_verify_current_map` cluster matches January's relative order and
+signatures. They are strong cross-build authentic-name evidence, not claimed
+as January PDB labels. All six routines are private to `game_engine.c` and are
+marked static in source and `config/symbols.json`.
+
+The same HCEA symbol/type corpus and the independent demon reconstruction
+corroborate `scenario_netgame_flag.team_index`, the `netgame_flag_type` enum,
+and the `game_engine_type` enum. Source now uses those semantic names and enum
+constants in place of raw integers. These source-only corrections do not
+alter the target-proven behavior.
 
 ## Why the old exact result is rejected
 
@@ -26,7 +34,7 @@ With natural C:
 
 | Function | Target | Base | Relocations T/B | objdiff |
 |---|---:|---:|---:|---:|
-| `_game_engine_validate_map_netgame_flags` | 640 | 1104 | 52/60 | 10.130045% |
+| `_game_engine_verify_current_map` | 640 | 1104 | 52/60 | 10.130045% |
 
 - target normalized SHA-256:
   `b3bce6413d9406f83ea59885922cd47be96d95e3fad738820f5802d54dbde7f8`
@@ -52,7 +60,7 @@ compiler directive added solely for bytes.
 
 The two CTF spawn-count checks look suspicious: both pass team index zero, and
 the validation helper never reads that formal parameter. January disassembly
-confirms both `4, 0, 1` call packets and confirms that the callee never reads
+confirms both `4, 0, game_engine_ctf` call packets and confirms that the callee never reads
 the second argument. This is therefore target-proven vestigial/original
 behavior rather than a coincidental match. Source names the formal
 `unused_team_index` and carries the required `BUG (preserved for exact
