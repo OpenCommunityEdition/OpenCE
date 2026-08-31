@@ -101,6 +101,7 @@ symbols in this file:
 #include "objects/object_definitions.h"
 #include "objects/objects.h"
 #include "physics_definitions.h"
+#include "render/render_debug.h"
 
 /* ---------- constants */
 
@@ -185,6 +186,65 @@ boolean physics_get_features_in_sphere(
 	return features->count[_collision_feature_sphere] ||
 		features->count[_collision_feature_cylinder] ||
 		features->count[_collision_feature_prism];
+}
+
+void render_debug_physics(
+	struct physics_instance *instance)
+{
+	struct object_datum *object = object_get(instance->object_index);
+	struct object_definition *definition = object_definition_get(object->definition_index);
+	real_point3d center_of_mass;
+	short mass_point_index;
+
+	matrix4x3_transform_point(
+		&instance->world_matrix,
+		&instance->physics->center_of_mass,
+		&center_of_mass);
+
+	render_debug_vectors(
+		TRUE,
+		&center_of_mass,
+		&instance->world_matrix.forward,
+		&instance->world_matrix.up,
+		definition->object.bounding_radius);
+
+	for (mass_point_index = 0;
+		mass_point_index < instance->physics->mass_points.count;
+		mass_point_index++)
+	{
+		struct mass_point_definition const *mass_point = TAG_BLOCK_GET_ELEMENT(
+			&instance->physics->mass_points,
+			mass_point_index,
+			struct mass_point_definition);
+		real_point3d position;
+		real_vector3d forward;
+		real_vector3d up;
+
+		matrix4x3_transform_point(
+			&instance->world_matrix,
+			&mass_point->position,
+			&position);
+		matrix4x3_transform_normal(
+			&instance->world_matrix,
+			&mass_point->forward,
+			&forward);
+		matrix4x3_transform_normal(
+			&instance->world_matrix,
+			&mass_point->up,
+			&up);
+
+		render_debug_sphere(
+			TRUE,
+			&position,
+			mass_point->radius,
+			global_real_argb_white);
+		render_debug_vectors(
+			TRUE,
+			&position,
+			&forward,
+			&up,
+			mass_point->radius * 0.5f);
+	}
 }
 
 boolean physics_instance_new(
