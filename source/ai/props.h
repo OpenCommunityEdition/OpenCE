@@ -156,6 +156,9 @@ struct prop_iterator
 
 void props_dispose(
 	void);
+void prop_delete(
+	long actor_index,
+	long prop_index);
 void prop_iterator_new(struct prop_iterator *iterator, long actor_index);
 struct prop_datum *prop_iterator_next(struct prop_iterator *iterator);
 long prop_get_active_by_unit_index(

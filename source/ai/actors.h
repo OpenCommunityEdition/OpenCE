@@ -851,6 +851,10 @@ long actor_target_unit_index(
 void actor_derive_target_information(
 	long actor_index,
 	long target_actor_index);
+void actor_switch_props(
+	long actor_index,
+	long old_prop_index,
+	long new_prop_index);
 void actor_flush_position_indices(
 	long actor_index);
 void actor_unit_control_jump(
@@ -888,11 +892,31 @@ boolean actor_path_at_destination(long actor_index);
 
 /* ---------- prototypes/ACTOR_PERCEPTION.C */
 
+boolean actor_expected_acknowledgement(
+	long actor_index,
+	long prop_index);
+void actor_perception_acknowledge(
+	long actor_index,
+	long prop_index,
+	boolean had_orphan,
+	boolean expected_acknowledgement);
+boolean actor_perception_become_acknowledged(
+	long actor_index,
+	long prop_index,
+	boolean *expected_acknowledgement_out);
 boolean actor_perception_create_orphan_from_friend(
 	long actor_index,
 	long unit_index,
 	long friend_actor_index,
 	long friend_prop_index);
+
+/* ---------- prototypes/ACTOR_STIMULUS.C */
+
+void actor_stimulus_prop_acknowledged(
+	long actor_index,
+	long prop_index,
+	boolean reappearance,
+	boolean expected_acknowledgement);
 
 // prototypes/ACTOR_LOOKING.C
 void actor_looking_test_validity(
