@@ -896,6 +896,8 @@ symbols in this file:
 #include "cseries.h"
 #include "hs.h"
 
+#include "camera/director.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -1041,7 +1043,6 @@ extern byte debug_unit_all_animations[];
 extern byte debug_unit_animations[];
 extern byte debug_unit_illumination[];
 extern byte decals_enabled[];
-extern byte director_camera_switch_fast[];
 extern byte display_framerate[];
 extern byte display_precache_progress[];
 extern byte display_vblank_deltas[];
@@ -1532,7 +1533,7 @@ struct hs_external_global_definition data_002e07c8[442] =
 	{ "debug_player_teleport", _hs_type_boolean, 0, debug_render_player_teleport },
 	{ "texture_cache_graph", _hs_type_boolean, 0, texture_cache_debug_options },
 	{ "texture_cache_list", _hs_type_boolean, 0, texture_cache_debug_options + 0x1 },
-	{ "director_camera_switch_fast", _hs_type_boolean, 0, director_camera_switch_fast },
+	{ "director_camera_switch_fast", _hs_type_boolean, 0, &director_camera_switch_fast },
 	{ "debug_recording", _hs_type_boolean, 0, debug_recording },
 	{ "debug_recording_newlines", _hs_type_short_integer, 0, debug_recording_newlines },
 	{ "debug_player_color", _hs_type_short_integer, 0, debug_player_color },
