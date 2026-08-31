@@ -65,9 +65,9 @@ source of truth.  Every target entry is marked `"static": true`; no
 | --- | --- | --- |
 | `code_0010b9f0` | `lra_default_update_proc` | `16 / 0 / 21c4d57ab9cba336579640a56fa4aeaf0e225122d873fb5cea4f59d9982a2b13` |
 | `code_0010ba00` | `lra_default_delete_proc` | `16 / 0 / 8c6f9b23a045e09d762bfe2dd6abd3487d313d1e3bc01e643fde3f3cc0c39a72` |
-| `code_0010ba10` | `lra_delete_block` | `32 / 0 / 70e14824c183c54f34216b7d7a95c2b9d9882ff1e75b9c6d338c8cac0a9ec2c0` |
-| `code_0010ba30` | `lra_verify_block` | `128 / 6 / 6aab6630fbe789fb85fbbd0ee4c035918e521ebe2d1f713156b27cc2a6240aa6` |
-| `code_0010bab0` | `lra_verify_cache` | `128 / 11 / 20efb86936868f30cf8ccc34d63d1a924c9f0c5b761276072325b430ad267562` |
+| `code_0010ba10` | `lra_block_delete` | `32 / 0 / 70e14824c183c54f34216b7d7a95c2b9d9882ff1e75b9c6d338c8cac0a9ec2c0` |
+| `code_0010ba30` | `verify_lra_cache_block` | `128 / 6 / 6aab6630fbe789fb85fbbd0ee4c035918e521ebe2d1f713156b27cc2a6240aa6` |
+| `code_0010bab0` | `verify_lra_cache` | `128 / 11 / 20efb86936868f30cf8ccc34d63d1a924c9f0c5b761276072325b430ad267562` |
 | `code_0010bdf0` | `lra_block_offset` | `32 / 1 / b3e71fb5aa448be835c2a6905d8bc0bca66881aa5338cb6c33d7db2bb90329ce` |
 
 Their prototypes remain in the translation unit's private-prototype section.

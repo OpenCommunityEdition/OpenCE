@@ -5,7 +5,7 @@ symbols in this file:
 001088D0 0010:
 	_crc_new (0000)
 001088E0 0040:
-	_crc_table_init (0000)
+	_build_crc_table (0000)
 00108920 0080:
 	_crc_checksum_buffer (0000)
 0027D2E4 000f:
@@ -53,7 +53,7 @@ void crc_new(
 }
 
 /* The descriptive private name follows the recovered cross-build CRC implementation. */
-static void crc_table_init(
+static void build_crc_table(
 	unsigned long *crc_table)
 {
 	unsigned long byte_index;
@@ -95,7 +95,7 @@ void crc_checksum_buffer(
 
 	if (!crc_globals.initialized)
 	{
-		crc_table_init(crc_globals.table);
+		build_crc_table(crc_globals.table);
 		crc_globals.initialized = TRUE;
 	}
 
