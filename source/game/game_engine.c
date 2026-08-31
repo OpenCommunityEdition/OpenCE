@@ -219,7 +219,7 @@ symbols in this file:
 000994D0 0020:
 	_game_engine_override_game_variant (0000)
 000994F0 01a0:
-	_code_000994f0 (0000)
+	_rasterize_in_game_score_draw_line (0000)
 00099690 0060:
 	_game_engine_hud_draw_messages (0000)
 000996F0 0080:
@@ -1449,11 +1449,11 @@ static void code_0009d140(
 	return;
 }
 
-static void code_000994f0(
+static void rasterize_in_game_score_draw_line(
 	wchar_t const *string,
 	boolean brighten,
-	long row_index,
-	real_argb_color *color)
+	real_argb_color *color,
+	long row_index)
 {
 	rectangle2d bounds = render.camera.window_bounds;
 	short narrow_tab_stops[3];
@@ -1489,8 +1489,8 @@ static void code_000994f0(
 	if (font_index != NONE)
 	{
 		struct font_header *font = font_definition_get(font_index);
-		long line_height = font->leading_height;
 		long row_offset = 4 * (splitscreen == FALSE) + 4;
+		long line_height = font->leading_height;
 
 		if (!splitscreen)
 			line_height += font->descending_height;
@@ -1846,7 +1846,7 @@ void code_0009e670(
 	color.red = 0.7f;
 	color.green = 0.7f;
 	color.blue = 0.7f;
-	code_000994f0(title_string, FALSE, 0, &color);
+	rasterize_in_game_score_draw_line(title_string, FALSE, &color, 0);
 
 	color.alpha = alpha;
 	color.red = 0.5f;
@@ -1867,7 +1867,7 @@ void code_0009e670(
 
 	game_engine->format_score_name(score_string);
 	usprintf(row_string, L"\t%s\t%s\t%s", column_name, score_name, score_string);
-	code_000994f0(row_string, FALSE, 1, &color);
+	rasterize_in_game_score_draw_line(row_string, FALSE, &color, 1);
 
 	entry_index = 0;
 	if (entry_count > 0)
@@ -1957,11 +1957,11 @@ void code_0009e670(
 				else
 					row_color = &color;
 
-				code_000994f0(
+				rasterize_in_game_score_draw_line(
 					row_string,
 					is_current_player,
-					entry_index + 2,
-					row_color);
+					row_color,
+					entry_index + 2);
 			}
 
 			entry_index++;

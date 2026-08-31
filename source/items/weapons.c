@@ -526,6 +526,66 @@ boolean weapon_reloading(
 	return result;
 }
 
+short weapon_rotate_zoom_level(
+	long weapon_index,
+	short zoom_level)
+{
+	struct weapon_datum *weapon = weapon_get(weapon_index);
+	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
+
+	if (!weapon_reloading(weapon_index))
+	{
+		if (zoom_level>=0 && zoom_level<weapon_definition->weapon.zoom_level_count-1)
+			zoom_level++;
+		else
+			zoom_level = zoom_level==weapon_definition->weapon.zoom_level_count-1 ? NONE : 0;
+	}
+
+	return zoom_level;
+}
+
+real weapon_get_zoom_magnification(
+	long weapon_index,
+	short zoom_level)
+{
+	real magnification = 1.0f;
+	struct weapon_datum *weapon = weapon_get(weapon_index);
+	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
+
+	if (zoom_level>=0 && zoom_level<weapon_definition->weapon.zoom_level_count)
+	{
+		real zoom_fraction = weapon_definition->weapon.zoom_level_count>1 ? (real)zoom_level/(weapon_definition->weapon.zoom_level_count-1) : 0.0f;
+		real minimum_magnification = weapon_definition->weapon.zoom_magnification_minimum>0.0f ? weapon_definition->weapon.zoom_magnification_minimum : 1.0f;
+		real maximum_magnification = weapon_definition->weapon.zoom_magnification_maximum>0.0f ? weapon_definition->weapon.zoom_magnification_maximum : 1.0f;
+
+		magnification = power(maximum_magnification/minimum_magnification, zoom_fraction)*minimum_magnification;
+
+		match_assert_valid_real("c:\\halo\\SOURCE\\items\\weapons.c", 1442, magnification);
+		match_assert("c:\\halo\\SOURCE\\items\\weapons.c", 1443, magnification>0.0f);
+	}
+
+	return magnification;
+}
+
+real weapon_get_field_of_view(
+	long weapon_index,
+	real field_of_view,
+	short zoom_level)
+{
+	real result = field_of_view;
+	real magnification = weapon_get_zoom_magnification(weapon_index, zoom_level);
+
+	if (magnification!=1.0f)
+	{
+		real zoom_field_of_view = field_of_view/magnification;
+
+		if (zoom_field_of_view>_pi/100.f && zoom_field_of_view<_pi-_pi/100.f)
+			result = zoom_field_of_view;
+	}
+
+	return result;
+}
+
 real weapon_estimate_time_to_target(
 	long weapon_index,
 	short trigger_index,

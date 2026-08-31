@@ -41,7 +41,7 @@ symbols in this file:
 0000B2D0 00e0:
 	_actor_action_allow_cover_seeking (0000)
 0000B3B0 0170:
-	_code_0000b3b0 (0000)
+	_actor_action_determine_pursuit_options (0000)
 0000B520 0090:
 	_actor_action_can_stop_guarding (0000)
 0000B5B0 0090:
@@ -1838,7 +1838,7 @@ boolean actor_action_deny_transition(
 	return deny_transition;
 }
 
-static void code_0000b3b0(
+static void actor_action_determine_pursuit_options(
 	long actor_index,
 	short desire_target_search,
 	short desire_pursuit,
@@ -1855,11 +1855,6 @@ static void code_0000b3b0(
 	boolean *wait_after_pursuit)
 {
 	struct actor_datum *actor = actor_get(actor_index);
-
-	/* This argument was present in the January prototype, but the body never
-	 * reads it.  Keep the original interface: callers use it while deciding
-	 * the inputs supplied to this policy helper. */
-	(void)controlled_by_group;
 
 	if (desire_target_search == 2 ||
 		(desire_target_search == 1 && controlling_group))
@@ -3178,7 +3173,7 @@ boolean actor_action_handle_lost_contact(
 				}
 			}
 
-			code_0000b3b0(
+			actor_action_determine_pursuit_options(
 				actor_index,
 				desire_target_search,
 				desire_pursuit,

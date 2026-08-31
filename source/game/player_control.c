@@ -221,10 +221,6 @@ void player_aiming_vector_from_facing(
 	long player_index,
 	real_vector3d *facing_direction,
 	real_euler_angles2d const *facing_angles);
-real weapon_get_field_of_view(
-	long weapon_index,
-	real field_of_view,
-	short zoom_level);
 
 /* ---------- globals */
 

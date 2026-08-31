@@ -210,6 +210,10 @@ boolean weapon_overcharged(
 real weapon_get_zoom_magnification(
 	long weapon_index,
 	short zoom_level);
+real weapon_get_field_of_view(
+	long weapon_index,
+	real field_of_view,
+	short zoom_level);
 boolean weapon_is_flag(long weapon_index);
 
 char const *weapon_get_label(long weapon_index);
