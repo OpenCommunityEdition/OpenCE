@@ -51,7 +51,7 @@ symbols in this file:
 00031BC0 0190:
 	_ai_conversation_finish (0000)
 00031D50 0130:
-	_code_00031d50 (0000)
+	_ai_conversation_new (0000)
 00031E80 01b0:
 	_code_00031e80 (0000)
 00032030 0290:
@@ -596,6 +596,8 @@ enum
 	_ai_sound_volume_medium = 1,
 	_ai_sound_volume_loud = 2,
 	_ai_sound_volume_shout = 3,
+	_ai_communication_team_human = 0,
+	_ai_communication_team_covenant = 1,
 };
 
 #define COMMUNICATION_CLOSE_DISTANCE 5.0f
@@ -902,9 +904,6 @@ static void code_00031970(
 	short type,
 	short priority,
 	long object_index);
-long code_00031d50(
-	short scenario_conversation_index,
-	boolean scripted);
 static boolean code_00031e80(
 	long conversation_index);
 static boolean code_00032030(
@@ -1926,6 +1925,25 @@ static boolean reply_filter_flee_leader(
 	return result;
 }
 
+short actor_communication_team(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	short race = actor_type_get_race(actor->meta.type);
+	short communication_team = NONE;
+
+	if (TEST_FLAG(race, _race_human_bit))
+	{
+		communication_team = _ai_communication_team_human;
+	}
+	else if (TEST_FLAG(race, _race_covenant_bit))
+	{
+		communication_team = _ai_communication_team_covenant;
+	}
+
+	return communication_team;
+}
+
 static void code_000318c0(
 	long actor_index,
 	short type,
@@ -2002,6 +2020,73 @@ static void code_00031970(
 	}
 
 	return;
+}
+
+short ai_conversation_status(
+	short scenario_conversation_index)
+{
+	struct data_iterator iterator;
+	struct ai_conversation_datum_header *conversation;
+	short status = 0;
+
+	data_iterator_new(&iterator, conversation_data);
+	while ((conversation = (struct ai_conversation_datum_header *)
+		data_iterator_next(&iterator)) != NULL)
+	{
+		if (conversation->scenario_conversation_index == scenario_conversation_index)
+		{
+			short conversation_status;
+
+			if (!conversation->begun)
+			{
+				conversation_status = 1;
+			}
+			else if (!conversation->any_line_spoken)
+			{
+				conversation_status = 2;
+			}
+			else
+			{
+				conversation_status = conversation->waiting_to_advance ? 4 : 3;
+			}
+
+			status = MAX(status, conversation_status);
+		}
+	}
+
+	if (!status)
+	{
+		struct recent_conversation_view *recent_conversation;
+		long latest_finish_time = NONE;
+		short latest_index = NONE;
+		short index;
+
+		for (index = 0; index < ai_globals->recent_conversation_count; index++)
+		{
+			if (ai_globals->recent_conversations[index].scenario_conversation_index ==
+				scenario_conversation_index &&
+				ai_globals->recent_conversations[index].finish_time > latest_finish_time)
+			{
+				latest_index = index;
+				latest_finish_time = ai_globals->recent_conversations[index].finish_time;
+			}
+		}
+
+		if (latest_index != NONE)
+		{
+			recent_conversation = &ai_globals->recent_conversations[latest_index];
+			if (recent_conversation->unable_to_begin)
+			{
+				status = 5;
+			}
+			else
+			{
+				status = recent_conversation->finished_successfully ? 6 : 7;
+			}
+		}
+	}
+
+	return status;
 }
 
 static void code_000322f0(
@@ -2588,6 +2673,73 @@ void ai_conversation_unit_died(
 	return;
 }
 
+long ai_conversation_new(
+	short scenario_conversation_index,
+	boolean scripted)
+{
+	struct data_iterator iterator;
+	struct ai_conversation_datum_view *conversation;
+	long conversation_index = datum_new(conversation_data);
+
+	if (conversation_index == NONE && scripted)
+	{
+		boolean overwrite_scripted = TRUE;
+		long overwrite_creation_time = LONG_MAX;
+		long overwrite_conversation_index = NONE;
+
+		data_iterator_new(&iterator, conversation_data);
+		while ((conversation = (struct ai_conversation_datum_view *)
+			data_iterator_next(&iterator)) != NULL)
+		{
+			if (conversation->scripted < overwrite_scripted ||
+				conversation->creation_time < overwrite_creation_time)
+			{
+				overwrite_creation_time = conversation->creation_time;
+				overwrite_conversation_index = iterator.datum_index;
+				overwrite_scripted = conversation->scripted;
+			}
+		}
+
+		if (overwrite_conversation_index != NONE)
+		{
+			if (ai_print_conversations)
+			{
+				struct scenario_conversation_definition_view *definition =
+					TAG_BLOCK_GET_ELEMENT(
+						&global_scenario_get()->ai_conversations,
+						scenario_conversation_index,
+						struct scenario_conversation_definition_view);
+
+				console_printf(
+					FALSE,
+					"%s: this conversation is already running or trying to run, overwrite it",
+					definition->name);
+			}
+
+			ai_conversation_finish(
+				overwrite_conversation_index,
+				FALSE,
+				FALSE);
+			conversation_index = datum_new_at_index(
+				conversation_data,
+				overwrite_conversation_index);
+		}
+	}
+
+	if (conversation_index != NONE)
+	{
+		conversation = (struct ai_conversation_datum_view *)datum_get(
+			conversation_data,
+			conversation_index);
+		conversation->scenario_conversation_index = scenario_conversation_index;
+		conversation->line_index = NONE;
+		conversation->scripted = scripted;
+		conversation->creation_time = game_time_get();
+	}
+
+	return conversation_index;
+}
+
 static boolean code_00031e80(
 	long conversation_index)
 {
@@ -2901,7 +3053,7 @@ boolean ai_conversation(
 	if (scenario_conversation_index >= 0 &&
 		scenario_conversation_index < scenario->ai_conversations.count)
 	{
-		conversation_index = code_00031d50(
+		conversation_index = ai_conversation_new(
 			scenario_conversation_index,
 			scripted);
 		if (ai_print_conversations)

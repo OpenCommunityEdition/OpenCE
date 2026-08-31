@@ -531,8 +531,6 @@ typedef char ai_script_vehicle_candidate_state_offset_assert[
 
 /* ---------- prototypes */
 
-short ai_conversation_status(
-	short scenario_conversation_index);
 void ai_debug_select_actor(
 	long encounter_index,
 	long actor_index);

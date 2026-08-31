@@ -568,7 +568,7 @@
 { "file_offset": 203472, "flags": 32, "name": "_ai_conversation_line" },
 { "file_offset": 203568, "flags": 32, "name": "_ai_conversation_advance" },
 { "file_offset": 203712, "flags": 32, "name": "_ai_conversation_finish" },
-{ "file_offset": 204112, "flags": 32, "name": "_code_00031d50" },
+{ "file_offset": 204112, "flags": 32, "name": "_ai_conversation_new" },
 { "file_offset": 204416, "flags": 32, "name": "_code_00031e80" },
 { "file_offset": 204848, "flags": 32, "name": "_code_00032030" },
 { "file_offset": 205504, "flags": 32, "name": "_code_000322c0" },

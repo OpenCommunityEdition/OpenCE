@@ -32,6 +32,29 @@ enum
 	NUMBER_OF_ACTOR_PURSUIT_SETTINGS = 3,
 };
 
+enum actor_race
+{
+	_race_player_bit = 0,
+	_race_human_bit,
+	_race_covenant_bit,
+	_race_floodcombat_bit,
+	_race_floodcarrier_bit,
+	_race_floodinfection_bit,
+	_race_sentinel_bit,
+	NUMBER_OF_ACTOR_RACE_FLAGS,
+
+	_race_none = 0x0,
+	_race_player = 0x1,
+	_race_human = 0x2,
+	_race_covenant = 0x4,
+	_race_floodcombat = 0x8,
+	_race_floodcarrier = 0x10,
+	_race_floodinfection = 0x20,
+	_race_flood = 0x38,
+	_race_sentinel = 0x40,
+	_race_all = 0x7F,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */

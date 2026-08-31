@@ -119,6 +119,13 @@ void ai_communication_dispose_from_old_map(
 	void);
 void ai_communication_packet_new(
 	struct ai_information_packet *information);
+short actor_communication_team(
+	long actor_index);
+short ai_conversation_status(
+	short scenario_conversation_index);
+long ai_conversation_new(
+	short scenario_conversation_index,
+	boolean scripted);
 short ai_conversation_line(
 	short scenario_conversation_index);
 void ai_conversation_advance(
