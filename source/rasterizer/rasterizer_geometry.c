@@ -323,3 +323,20 @@ unsigned long compress_real_vector3d_to_int32_clamp(
 }
 
 /* ---------- private code */
+
+real_vector3d *uncompress_int32_to_real_vector3d(
+	real_vector3d *result,
+	unsigned long compressed)
+{
+	real_vector3d v;
+
+	v.i = ((real)(long)(compressed<<21) * (1.0f/1048576.0f) + 1.0f) * (1.0f/2047.0f);
+	compressed >>= 11;
+	v.j = ((real)(long)(compressed<<21) * (1.0f/1048576.0f) + 1.0f) * (1.0f/2047.0f);
+	compressed >>= 11;
+	v.k = ((real)(long)(compressed<<22) * (1.0f/2097152.0f) + 1.0f) * (1.0f/1023.0f);
+
+	*result = v;
+
+	return result;
+}

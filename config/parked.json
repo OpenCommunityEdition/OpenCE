@@ -988,6 +988,63 @@
         },
         "objdiff_percent": 99.29274
       }
+    },
+    {
+      "unit": "source/rasterizer/rasterizer_geometry",
+      "function": "_uncompress_int32_to_real_vector3d",
+      "class": "instruction-scheduling",
+      "evidence": "Equal 144-byte padded size, 9/9 relocations with identical destinations, and 49/49 instructions. The sole divergence is one dependency-free transposition: January emits `fadd __real@3f800000` before `shl eax, 0x16`, the candidate emits them in the opposite order, which also shifts that one relocation's address by three bytes. The bit fields, scales, masks, destructive shift sequence and the local real_vector3d copied out through *result are all confirmed. Measured inert: folding the second shift into the k expression, long-hand assignment, hoisting the shift ahead of j, and a division form of the k scale.",
+      "measurements": {
+        "target": {
+          "size": 144,
+          "relocation_count": 9,
+          "normalized_sha256": "aa4a69683e5f1148413f6029acfc993341346b93b86809dcb5450896dcc3944d"
+        },
+        "base": {
+          "size": 144,
+          "relocation_count": 9,
+          "normalized_sha256": "8199ac81b23a4607ed8191dbe2f95cb11da85761ecf353514714f8261562b55f"
+        },
+        "objdiff_percent": 95.0
+      }
+    },
+    {
+      "unit": "source/rasterizer/rasterizer_geometry",
+      "function": "_compress_real_vector3d_to_int32",
+      "class": "instruction-scheduling",
+      "evidence": "Equal 544-byte padded size, 38/38 relocations address-for-address identical, and 181/181 instructions. The sole divergence is the debug round-trip's aggregate copy: January issues all three dword loads from the returned pointer before any store, the candidate interleaves load and store per component. Two spellings bracket the target and neither reaches it - one local gives January's correct sub esp,0x10 frame with the interleaved copy, a separate decompressed local gives the grouped copy with a 12-byte-too-large frame. The one-local form is retained because a frame-size mismatch is structural. Measured inert: copying through a named pointer, that pointer scoped to an inner block, declaring v2 first, and combinations.",
+      "measurements": {
+        "target": {
+          "size": 544,
+          "relocation_count": 38,
+          "normalized_sha256": "1bb3b5c9d4712b2fc2ec7e9dc9f3f8e791496a82595ca154ca76719067cd60a7"
+        },
+        "base": {
+          "size": 544,
+          "relocation_count": 38,
+          "normalized_sha256": "e0b39fc94ba068043e045bae7c75a86a90a7853fe417e0bfe894324d4e6811e5"
+        },
+        "objdiff_percent": 96.34682
+      }
+    },
+    {
+      "unit": "source/rasterizer/rasterizer_geometry",
+      "function": "_compress_real_vector3d_to_int32_clamp",
+      "class": "instruction-scheduling",
+      "evidence": "Equal 512-byte padded size, 38/38 relocations address-for-address identical, and 164/164 instructions. Same single divergence and the same exhausted control set as its non-clamp twin above; the two share the round-trip block verbatim.",
+      "measurements": {
+        "target": {
+          "size": 512,
+          "relocation_count": 38,
+          "normalized_sha256": "ba84758e70f380dff5a1f53fc34fd72500d77f38cdef7529edeff8c5ccdffe3c"
+        },
+        "base": {
+          "size": 512,
+          "relocation_count": 38,
+          "normalized_sha256": "8983acf2b5bc6570cede768472facdfc4bd6d012eb30038ed0d53f04341fc3a5"
+        },
+        "objdiff_percent": 94.8
+      }
     }
   ]
 }
