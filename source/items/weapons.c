@@ -205,6 +205,7 @@ symbols in this file:
 
 #include "weapon_definitions.h"
 #include "projectile_definitions.h"
+#include "projectiles.h"
 
 #include "cache/cache_files.h"
 #include "cseries/profile.h"
@@ -227,9 +228,6 @@ symbols in this file:
 
 boolean game_engine_running(
 	void);
-real projectile_estimate_time_to_target(
-	struct projectile_definition *projectile,
-	real distance);
 real transition_function_evaluate(
 	short function_type,
 	real value);

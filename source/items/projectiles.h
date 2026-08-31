@@ -21,6 +21,8 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct projectile_definition;
+
 struct _projectile_datum
 {
 	unsigned long flags;
@@ -71,6 +73,9 @@ void projectile_delete(
 	long projectile_index);
 boolean dangerous_projectiles_near_player(
 	void);
+real projectile_estimate_time_to_target(
+	struct projectile_definition const *definition,
+	real target_distance);
 void projectile_set_target_object_index(
 	long projectile_index,
 	long target_object_index);
