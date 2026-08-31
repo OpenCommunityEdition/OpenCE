@@ -247,6 +247,25 @@
         },
         "objdiff_percent": 99.96377
       }
+    },
+    {
+      "unit": "source/memory/lra_cache",
+      "function": "_lra_allocate",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked under the current house rule after the complete E1-E50 source-shape corpus, two compatible VC7 builds, all committed/dirty LRA bodies, 1,092 rebuilt artifacts, the later Claude naming/line-anchor audit, and the open Marathon source were reviewed. January carries a zero through the allocator loop and duplicates the initial pass/deletion stores; VC7 instead merges/rematerializes them, leaving the honest C 32 padded bytes short with identical four relocation destinations but addresses 0x13/0x5F/0x83/0x88 versus 0x13/0x6B/0x89/0x8E. The only 400-byte form used _ReadWriteBarrier() as a codegen anchor and is rejected as fake compiler steering. Its barrier-free ordinary-C remainder stayed 368 bytes and worsened normalized distance from 320 to 331 bytes (SHA f719c088...), so the simpler coherent early-return source is retained. Reopen only for authoritative January source/locals, a real donor with the same loop-carried-zero dependency, a compatible original C2/QFE, or a newly proven meaningful C topology outside the exhausted families.",
+      "measurements": {
+        "target": {
+          "size": 400,
+          "relocation_count": 4,
+          "normalized_sha256": "93beee39f5b398662960640adbdef20b5569e5407bff1526a6021970f3001e2f"
+        },
+        "base": {
+          "size": 368,
+          "relocation_count": 4,
+          "normalized_sha256": "bd671ca359d22c92b9d24e5428f9c62f6fc4397f1643ed41d5a7df44ccdaa9ef"
+        },
+        "objdiff_percent": 65.6755
+      }
     }
   ]
 }

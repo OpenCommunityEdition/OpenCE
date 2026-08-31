@@ -88,87 +88,6 @@ long lra_full(
 	return FALSE;
 }
 
-static void lra_default_update_proc(
-	long *address,
-	long new_address)
-{
-	*address = new_address;
-
-	return;
-}
-
-static void lra_default_delete_proc(
-	long *address)
-{
-	*address = 0;
-
-	return;
-}
-
-static void lra_delete_block(
-	struct lra_block *block,
-	struct lra_cache *cache)
-{
-	if (!TEST_FLAG(block->signature, _lra_block_deleted_bit))
-	{
-		cache->delete_proc(block->address);
-		block->signature = (block->signature&~FLAG(_lra_block_locked_bit))|FLAG(_lra_block_deleted_bit);
-	}
-
-	return;
-}
-
-static void lra_verify_block(
-	struct lra_block *block,
-	struct lra_cache *cache)
-{
-	long block_offset;
-
-	match_vassert(
-		"c:\\halo\\SOURCE\\memory\\lra_cache.c",
-		398,
-		(block->signature&~(FLAG(_lra_block_locked_bit)|FLAG(_lra_block_deleted_bit)))==LRA_BLOCK_SIGNATURE &&
-			block->size>=0 && block->size<cache->size &&
-			(block_offset=(char *)block-(char *)cache->base_address)>=0 &&
-			block->size+block_offset<=cache->size &&
-			(block_offset=(block->next ? (char *)block->next-(char *)cache->base_address : 0))>=0 &&
-			(unsigned long)(block_offset+sizeof(struct lra_block))<=(unsigned long)cache->size,
-		csprintf(temporary, "lra cache %s @%p block @%p appears to be corrupt", cache->name, cache, block));
-
-	return;
-}
-
-static void lra_verify_cache(
-	struct lra_cache *cache)
-{
-	struct lra_block *last_block;
-
-	match_assert("c:\\halo\\SOURCE\\memory\\lra_cache.c", 408, cache);
-
-	match_vassert(
-		"c:\\halo\\SOURCE\\memory\\lra_cache.c",
-		418,
-		cache->signature==LRA_CACHE_SIGNATURE && cache->base_address && cache->size>=0,
-		csprintf(temporary, "lra cache %s @%p appears to be corrupt", cache->name, cache));
-
-	last_block = cache->last_block;
-	if (last_block)
-	{
-		lra_verify_block(last_block, cache);
-	}
-
-	return;
-}
-
-static long lra_block_offset(
-	struct lra_cache *cache,
-	struct lra_block *block)
-{
-	lra_verify_block(block, cache);
-
-	return (long)((char *)block - (char *)cache->base_address);
-}
-
 struct lra_cache *lra_new(
 	char const *name,
 	long size,
@@ -414,3 +333,84 @@ void *lra_allocate(
 }
 
 /* ---------- private code */
+
+static void lra_default_update_proc(
+	long *address,
+	long new_address)
+{
+	*address = new_address;
+
+	return;
+}
+
+static void lra_default_delete_proc(
+	long *address)
+{
+	*address = 0;
+
+	return;
+}
+
+static void lra_delete_block(
+	struct lra_block *block,
+	struct lra_cache *cache)
+{
+	if (!TEST_FLAG(block->signature, _lra_block_deleted_bit))
+	{
+		cache->delete_proc(block->address);
+		block->signature = (block->signature&~FLAG(_lra_block_locked_bit))|FLAG(_lra_block_deleted_bit);
+	}
+
+	return;
+}
+
+static void lra_verify_block(
+	struct lra_block *block,
+	struct lra_cache *cache)
+{
+	long block_offset;
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\memory\\lra_cache.c",
+		398,
+		(block->signature&~(FLAG(_lra_block_locked_bit)|FLAG(_lra_block_deleted_bit)))==LRA_BLOCK_SIGNATURE &&
+			block->size>=0 && block->size<cache->size &&
+			(block_offset=(char *)block-(char *)cache->base_address)>=0 &&
+			block->size+block_offset<=cache->size &&
+			(block_offset=(block->next ? (char *)block->next-(char *)cache->base_address : 0))>=0 &&
+			(unsigned long)(block_offset+sizeof(struct lra_block))<=(unsigned long)cache->size,
+		csprintf(temporary, "lra cache %s @%p block @%p appears to be corrupt", cache->name, cache, block));
+
+	return;
+}
+
+static void lra_verify_cache(
+	struct lra_cache *cache)
+{
+	struct lra_block *last_block;
+
+	match_assert("c:\\halo\\SOURCE\\memory\\lra_cache.c", 408, cache);
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\memory\\lra_cache.c",
+		418,
+		cache->signature==LRA_CACHE_SIGNATURE && cache->base_address && cache->size>=0,
+		csprintf(temporary, "lra cache %s @%p appears to be corrupt", cache->name, cache));
+
+	last_block = cache->last_block;
+	if (last_block)
+	{
+		lra_verify_block(last_block, cache);
+	}
+
+	return;
+}
+
+static long lra_block_offset(
+	struct lra_cache *cache,
+	struct lra_block *block)
+{
+	lra_verify_block(block, cache);
+
+	return (long)((char *)block - (char *)cache->base_address);
+}
