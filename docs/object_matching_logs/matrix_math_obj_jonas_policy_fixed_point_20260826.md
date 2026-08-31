@@ -41,7 +41,25 @@ The same ledger records the exhausted legal-C/intrinsic search:
 - an external 35/35 package achieves equality only by transcribing the target
   into assembly and splicing the assembled function into the COFF object.
 
-## Decision
+## Independent PC/Xbox/Digsite corroboration (2026-08-31)
+
+User-supplied testimony from a discussion with Stian and Aerocatia adds an
+independent binary-family cross-check. Aerocatia reports that Halo PC contains
+three CPU-selected implementations (SSE, 3DNow, and an apparent C fallback),
+that the PC SSE implementation and Xbox XBE implementation use the same
+assembly, and that the Xbox difference at the end is an x87 multiplication of
+the scalar scale. Aerocatia further reports the same SSE instruction stream in
+the 2020 Digsite PC build despite its roughly twenty-years-newer compiler.
+
+That is the expected fingerprint of a preserved hand-written kernel plus a C
+wrapper/tail: the compiler can change without changing the SSE schedule, while
+the target-specific scalar C tail can still be emitted as x87. This testimony
+corroborates the stronger AP-930 primary-source attribution and the previously
+recorded Oct-2001 debug-XBE prologue identity. It is recorded as testimony until
+the compared executables, addresses, hashes, and build identifiers are attached
+to the repository.
+
+## Historical decision (superseded 2026-08-31)
 
 No candidate was compiled and no production source was changed.  The only
 known exact implementation requires mechanisms prohibited by the current house
@@ -53,4 +71,20 @@ Keep configuration index 226 `NonMatching`.  Reopen only if the project policy
 explicitly changes to admit original vendor assembly, or if independent
 original-source provenance proves that the January body came from a legal-C
 source other than the identified AP-930 kernel.
+
+## Current decision
+
+The explicit 2026-08-31 house rule now permits sparse inline assembly in helper
+and math functions, and the new PC/Xbox/Digsite evidence independently supports
+the already authenticated AP-930 source topology. The historical exact hybrid
+from commit `96e8e4ecb` is therefore restored: four ordinary C pointer locals,
+one inline SSE block, and the ordinary C statement
+`result->scale = a->scale * b->scale`. XDK VC7 emits the wrapper, x87 tail, and
+epilogue itself; there is no standalone assembler, byte directive, COFF splice,
+or object post-processing.
+
+`matrix_math.obj` is consequently eligible for `Matching` at 35/35. The
+function remains listed under `asm-implemented` solely so the exact-match
+campaign transparently distinguishes an authenticated original-assembly
+recovery from an ordinary-C reconstruction.
 

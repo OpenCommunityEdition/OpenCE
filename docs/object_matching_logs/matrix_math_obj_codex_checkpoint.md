@@ -1,5 +1,11 @@
 # `source/math/matrix_math.obj` Codex checkpoint
 
+> **Superseded 2026-08-31.** This checkpoint's one absent function and former
+> no-assembly disposition were closed after the owner admitted authenticated
+> helper/math inline assembly. See
+> `matrix_math_obj_jonas_vendored_kernel_recovery_20260831.md` for the 35/35
+> recovery, provenance, and current gates.
+
 This is a new Codex-owned ledger for the 2026-08-20 checkpoint. It does not
 replace or modify the historical `matrix_math_obj.md` carried on older Claude
 branches.

@@ -444,6 +444,25 @@
         "base": { "size": 64, "relocation_count": 3, "normalized_sha256": "3b67f561243fc178ef970c0e26668272cdfd5b49b5f94800b85cbeeb4e051c6f" },
         "objdiff_percent": 100.0
       }
+    },
+    {
+      "unit": "source/math/matrix_math",
+      "function": "_matrix4x3_multiply",
+      "class": "asm-implemented",
+      "evidence": "Authenticated original-assembly recovery admitted under the 2026-08-31 house rule that helper and math functions may sparingly use inline assembly. Intel Application Note AP-930 (June 1999, order 245045-001) publishes the matching PIII_Mult00_3x3_3x3 kernel as naked hand-written SSE assembly; January adapts that schedule for the 4x3 position row. A user-supplied 2026-08-31 discussion adds independent cross-platform testimony from Aerocatia: Halo PC selects SSE, 3DNow, or apparent-C variants; the PC SSE and Xbox XBE instruction streams are the same except that Xbox leaves the final scalar scale product to x87, and the same SSE stream survives in a PC executable produced with the roughly twenty-years-newer 2020 Digsite compiler. The recovered source therefore retains the hand-scheduled SSE kernel in one __asm block and leaves result->scale = a->scale * b->scale as ordinary C. Four natural pointer locals reproduce VC7's wrapper and parameter-slot homes. The campaign compiler emits the exact 336-byte, zero-relocation target with no object splicing, alternate assembler, byte directives, or post-processing. This park is provenance accounting for admitted original assembly, not a fuzzy-codegen exception; it remains valid only while the compiled function stays exact.",
+      "measurements": {
+        "target": {
+          "size": 336,
+          "relocation_count": 0,
+          "normalized_sha256": "0436d82fe1070f30523ce8798bcce3b7625099794f5d0ab3fbf9a9c33802314e"
+        },
+        "base": {
+          "size": 336,
+          "relocation_count": 0,
+          "normalized_sha256": "0436d82fe1070f30523ce8798bcce3b7625099794f5d0ab3fbf9a9c33802314e"
+        },
+        "objdiff_percent": 100.0
+      }
     }
   ]
 }

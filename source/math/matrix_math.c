@@ -926,6 +926,96 @@ real_plane3d *matrix4x3_inverse_transform_plane(
 	return result;
 }
 
+void matrix4x3_multiply(
+	real_matrix4x3 const *a,
+	real_matrix4x3 const *b,
+	real_matrix4x3 *result)
+{
+	real const *a_elements = a->n[0];
+	real const *b_elements = b->n[0];
+	real *result_elements = result->n[0];
+	real const *a_scale = &a->scale;
+
+	__asm
+	{
+		mov ecx, a_elements
+		mov edx, b_elements
+		mov eax, result_elements
+
+		movss xmm2, dword ptr [ecx + 0x20]
+		movhps xmm2, qword ptr [ecx + 0x18]
+		movss xmm3, dword ptr [edx]
+		movss xmm4, dword ptr [edx + 0x4]
+		movss xmm0, dword ptr [ecx]
+		movhps xmm0, qword ptr [ecx + 0x4]
+		shufps xmm2, xmm2, 0x36
+		shufps xmm3, xmm3, 0x0
+		movss xmm1, dword ptr [ecx + 0xC]
+		movhps xmm1, qword ptr [ecx + 0x10]
+		shufps xmm4, xmm4, 0x0
+		mulps xmm3, xmm0
+		movss xmm5, dword ptr [edx + 0x8]
+		movss xmm6, dword ptr [edx + 0xC]
+		mulps xmm4, xmm1
+		shufps xmm5, xmm5, 0x0
+		mulps xmm5, xmm2
+		shufps xmm6, xmm6, 0x0
+		mulps xmm6, xmm0
+		addps xmm3, xmm4
+		movss xmm7, dword ptr [edx + 0x10]
+		movss xmm4, dword ptr [edx + 0x1C]
+		shufps xmm7, xmm7, 0x0
+		addps xmm3, xmm5
+		mulps xmm7, xmm1
+		shufps xmm4, xmm4, 0x0
+		movss xmm5, dword ptr [edx + 0x14]
+		shufps xmm5, xmm5, 0x0
+		mulps xmm4, xmm1
+		mulps xmm5, xmm2
+		addps xmm6, xmm7
+		movss xmm7, dword ptr [edx + 0x18]
+		movss dword ptr [eax], xmm3
+		movhps qword ptr [eax + 0x4], xmm3
+		addps xmm6, xmm5
+		shufps xmm7, xmm7, 0x0
+		movss xmm5, dword ptr [edx + 0x20]
+		mulps xmm7, xmm0
+		shufps xmm5, xmm5, 0x0
+		movss dword ptr [eax + 0xC], xmm6
+		mulps xmm5, xmm2
+		addps xmm7, xmm4
+		movhps qword ptr [eax + 0x10], xmm6
+		addps xmm7, xmm5
+		shufps xmm7, xmm7, 0x8F
+		movhps qword ptr [eax + 0x18], xmm7
+		movss dword ptr [eax + 0x20], xmm7
+		movss xmm3, dword ptr [edx + 0x24]
+		movss xmm4, dword ptr [edx + 0x28]
+		movss xmm5, dword ptr [edx + 0x2C]
+		shufps xmm3, xmm3, 0x0
+		shufps xmm4, xmm4, 0x0
+		shufps xmm5, xmm5, 0x0
+		mulps xmm3, xmm0
+		mulps xmm4, xmm1
+		mulps xmm5, xmm2
+		movss xmm6, dword ptr [ecx + 0x24]
+		addps xmm3, xmm4
+		movhps xmm6, qword ptr [ecx + 0x28]
+		addps xmm3, xmm5
+		mov ecx, a_scale
+		movss xmm5, dword ptr [ecx]
+		shufps xmm5, xmm5, 0x0
+		mulps xmm3, xmm5
+		addps xmm3, xmm6
+		movss dword ptr [eax + 0x24], xmm3
+		movhps qword ptr [eax + 0x28], xmm3
+	}
+
+	result->scale = a->scale * b->scale;
+
+	return;
+}
+
 real
 matrix3x3_determinant(
 	real_matrix3x3 const *matrix)

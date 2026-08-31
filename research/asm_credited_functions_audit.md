@@ -7,20 +7,25 @@ source-credibility work recovered `object_shadows.code_0012b870`,
 `action_converse_perform`, and `director_initialize_for_new_map` in ordinary C.
 On 2026-08-30 the four Active Camouflage transcriptions were also deleted after
 stock-XDK owner evidence exposed their address-placeholder premise as false.
-Three assembly implementations now remain parked: `stristr` and two Particles
-functions.
+On 2026-08-31 the authenticated Intel AP-930 `matrix4x3_multiply` kernel was
+restored under the owner's new narrow rule permitting sparse inline assembly in
+helper and math functions. Four assembly implementations now remain parked for
+provenance accounting: `stristr`, two Particles functions, and
+`matrix4x3_multiply`.
 
 
 ## The standing rule
 
-The campaign rule is *no asm, no volatile, no casts intended to alter codegen,
-no byte-forcing, readable code only* — and, separately, *never credit anything
-that is not byte-identical*. At discovery, the first rule was violated in nine
-functions across five units, and the two rules interacted badly: an assembly
-transcription will always be byte-identical, so the strict comparator cannot
-distinguish a genuine C recovery from a transcribed listing. Three such
-implementations remain, explicitly parked and excluded from credit. The gate
-is not a defence here; only reading the source is.
+The default campaign rule remains *no asm, no volatile, no casts intended to
+alter codegen, no byte-forcing, readable code only* — and, separately, *never
+credit anything that is not byte-identical*. The 2026-08-31 owner rule adds one
+narrow exception: helper and math functions may sparingly retain inline
+assembly when independent evidence shows that assembly was original source.
+`matrix4x3_multiply` qualifies through the published Intel kernel, its January
+instruction identity, the cross-build Xbox wrapper, and PC/Xbox/Digsite
+corroboration. The `asm-implemented` park remains the audit boundary: a strict
+comparator cannot distinguish authenticated original assembly from an invented
+transcription, so provenance still has to be read and recorded explicitly.
 
 ## Historical inventory at discovery
 
