@@ -3012,10 +3012,7 @@ void actor_perception_tried_to_uncover(
 		struct prop_datum *prop = prop_get(prop_index);
 
 		prop->tried_to_uncover = TRUE;
-		if (prop_index != actor->target.target_prop_index)
-		{
-		}
-		else
+		if (prop_index == actor->target.target_prop_index)
 		{
 			actor_situation_update_target_status(actor_index);
 			actor_situation_combat_status_update(actor_index);
@@ -3035,10 +3032,7 @@ void actor_perception_tried_to_search(
 		struct prop_datum *prop = prop_get(prop_index);
 
 		prop->tried_to_search = TRUE;
-		if (prop_index != actor->target.target_prop_index)
-		{
-		}
-		else
+		if (prop_index == actor->target.target_prop_index)
 		{
 			actor_situation_update_target_status(actor_index);
 			actor_situation_combat_status_update(actor_index);
@@ -3072,10 +3066,7 @@ void actor_perception_abandoned_search(
 			prop->state = _prop_state_inspected_orphan;
 
 		prop->abandoned_search = TRUE;
-		if (prop_index != actor->target.target_prop_index)
-		{
-		}
-		else
+		if (prop_index == actor->target.target_prop_index)
 		{
 			actor_situation_update_target_status(actor_index);
 			actor_situation_combat_status_update(actor_index);
