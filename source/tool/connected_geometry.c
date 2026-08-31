@@ -68,6 +68,27 @@ struct connected_geometry
 	struct dynamic_array triangles;
 };
 
+struct intermediate_geometry_triangle
+{
+	long unused_before_vertex_indices[2];
+	long vertex_indices[3];
+	long unused_after_vertex_indices[8];
+};
+
+struct intermediate_geometry_vertex
+{
+	long unused_before_point[2];
+	struct connected_geometry_point point;
+	long unused_after_point[15];
+};
+
+struct intermediate_geometry
+{
+	long unused_before_triangles[77];
+	struct dynamic_array triangles;
+	struct dynamic_array vertices;
+};
+
 typedef boolean (*connected_geometry_group_predicate)(
 	void *predicate_data,
 	struct connected_geometry *geometry,
@@ -90,8 +111,27 @@ typedef char connected_geometry_edges_offset_assert[
 	offsetof(struct connected_geometry, edges) == 0xC ? 1 : -1];
 typedef char connected_geometry_triangles_offset_assert[
 	offsetof(struct connected_geometry, triangles) == 0x18 ? 1 : -1];
+typedef char intermediate_geometry_triangle_size_assert[
+	sizeof(struct intermediate_geometry_triangle) == 0x34 ? 1 : -1];
+typedef char intermediate_geometry_triangle_vertex_indices_offset_assert[
+	offsetof(struct intermediate_geometry_triangle, vertex_indices) == 0x8 ? 1 : -1];
+typedef char intermediate_geometry_vertex_size_assert[
+	sizeof(struct intermediate_geometry_vertex) == 0x50 ? 1 : -1];
+typedef char intermediate_geometry_vertex_point_offset_assert[
+	offsetof(struct intermediate_geometry_vertex, point) == 0x8 ? 1 : -1];
+typedef char intermediate_geometry_triangles_offset_assert[
+	offsetof(struct intermediate_geometry, triangles) == 0x134 ? 1 : -1];
+typedef char intermediate_geometry_vertices_offset_assert[
+	offsetof(struct intermediate_geometry, vertices) == 0x140 ? 1 : -1];
 
 /* ---------- prototypes */
+
+long connected_geometry_add_triangle(
+	struct connected_geometry *geometry,
+	struct connected_geometry_point const *point0,
+	struct connected_geometry_point const *point1,
+	struct connected_geometry_point const *point2,
+	boolean report_duplicates);
 
 /* ---------- globals */
 
@@ -189,6 +229,37 @@ void connected_geometry_group_recursive(
 		}
 		while (edge_designator_count != 0);
 	}
+
+	return;
+}
+
+void connected_geometry_add_intermediate_triangle(
+	struct connected_geometry *geometry,
+	struct intermediate_geometry *intermediate_geometry,
+	long triangle_index,
+	boolean report_duplicates)
+{
+	struct intermediate_geometry_triangle *triangle;
+
+	triangle = dynamic_array_get_element(
+		&intermediate_geometry->triangles,
+		triangle_index,
+		sizeof(*triangle));
+	connected_geometry_add_triangle(
+		geometry,
+		&((struct intermediate_geometry_vertex *)dynamic_array_get_element(
+			&intermediate_geometry->vertices,
+			triangle->vertex_indices[0],
+			sizeof(struct intermediate_geometry_vertex)))->point,
+		&((struct intermediate_geometry_vertex *)dynamic_array_get_element(
+			&intermediate_geometry->vertices,
+			triangle->vertex_indices[1],
+			sizeof(struct intermediate_geometry_vertex)))->point,
+		&((struct intermediate_geometry_vertex *)dynamic_array_get_element(
+			&intermediate_geometry->vertices,
+			triangle->vertex_indices[2],
+			sizeof(struct intermediate_geometry_vertex)))->point,
+		report_duplicates);
 
 	return;
 }
