@@ -946,11 +946,6 @@ struct actor_datum *actor_iterator_next(
 boolean game_team_is_enemy(
 	short team_index0,
 	short team_index1);
-long prop_get_base_by_unit_index(
-	long actor_index,
-	long unit_index,
-	boolean create_if_missing,
-	boolean update_status);
 void actor_perception_find_sense_position(
 	long actor_index,
 	real_point3d const *position,

@@ -135,9 +135,6 @@ boolean actor_nearby_firing_positions(
 	long surface_index,
 	boolean allow_outside_range);
 
-void actor_move_halt(
-	long actor_index);
-
 void actor_move_to_point(
 	long actor_index,
 	real_point3d const *point,

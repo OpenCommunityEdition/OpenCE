@@ -161,6 +161,11 @@ struct prop_datum *prop_iterator_next(struct prop_iterator *iterator);
 long prop_get_active_by_unit_index(
 	long actor_index,
 	long unit_index);
+long prop_get_base_by_unit_index(
+	long actor_index,
+	long unit_index,
+	boolean create_if_missing,
+	boolean update_status);
 
 /* ---------- globals */
 

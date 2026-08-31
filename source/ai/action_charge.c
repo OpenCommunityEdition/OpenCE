@@ -141,11 +141,6 @@ enum
 struct actor_variant_definition *actor_combat_get_firing_variant_definition(
 	long actor_index);
 
-boolean actor_move_to_prop(
-	long actor_index,
-	long prop_index,
-	real acceptance_radius);
-
 void actor_move_keep_moving_past_destination(
 	long actor_index);
 

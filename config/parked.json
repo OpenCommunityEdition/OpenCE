@@ -61,8 +61,8 @@
     {
       "unit": "source/ai/action_converse",
       "function": "_action_converse_perform",
-      "class": "asm-implemented",
-      "evidence": "Parked under asm-implemented: our source implements this function with MSVC inline assembly, so it is byte-identical to January by construction rather than by reconstruction. This violates the campaign's standing 'no asm' rule, and the two rules interact badly - an assembly transcription always compares exact, so section_infos_equal cannot distinguish it from a genuine C recovery; only reading the source can. Parked rather than deleted so the exact tally stops counting it as a C reconstruction while the bytes remain reproducible. Same treatment as the pre-existing vendored-assembly park for matrix4x3_multiply. To unpark, replace the __asm with C that gates exact. Audit and full inventory: research/asm_credited_functions_audit.md. Inline __asm embedded mid-body in an otherwise-C function - the subtler risk, since it reads as C at a glance.",
+      "class": "register-allocation",
+      "evidence": "The gameplay inline-assembly transcription was removed under the house rule limiting sparse assembly to helper/math code. The retained ordinary-C reconstruction has the same 0x100 padded size and eight relocation identities as January. Five grounded C shapes were exhausted; the remaining packet difference is VC7 retaining the shared TRUE value in EBX/BL while the lawful source folds the four uses into immediate operands. The clean semantic C is therefore parked as a register-allocation residual rather than forcing exact bytes.",
       "measurements": {
         "target": {
           "size": 256,
@@ -72,9 +72,9 @@
         "base": {
           "size": 256,
           "relocation_count": 8,
-          "normalized_sha256": "7a3fad8fb69307c132558b906832d4d31f0334734fc76d18fe773189b5a38d5d"
+          "normalized_sha256": "288862a662942eb5b03ee84809dbd6b6aea1c023d52915f2bc373192e7c212cb"
         },
-        "objdiff_percent": 100
+        "objdiff_percent": 93.14815
       }
     },
     {

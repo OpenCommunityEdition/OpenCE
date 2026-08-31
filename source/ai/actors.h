@@ -836,6 +836,12 @@ long actor_aim_grenade(long actor_index, real_point3d const *origin, real_vector
 /* ---------- prototypes/ACTOR_MOVING.C */
 
 boolean actor_move_animation_busy(long actor_index);
+boolean actor_move_to_prop(
+	long actor_index,
+	long prop_index,
+	real distance);
+boolean actor_move_halt(
+	long actor_index);
 
 void actor_look_secondary(
 	long actor_index,

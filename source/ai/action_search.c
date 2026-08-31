@@ -73,14 +73,6 @@ void ai_communication_event(
 long actor_target_unit_index(
 	long actor_index);
 
-void actor_move_halt(
-	long actor_index);
-
-boolean actor_move_to_prop(
-	long actor_index,
-	long prop_index,
-	real distance);
-
 boolean actor_move_to_firing_position(
 	long actor_index,
 	word firing_position_index,
