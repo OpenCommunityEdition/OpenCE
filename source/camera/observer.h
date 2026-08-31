@@ -14,6 +14,22 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum observer_command_flags
+{
+	_observer_command_valid_bit,
+	_observer_command_force_under_media_bit,
+	_observer_command_force_above_media_bit,
+	_observer_command_force_time_bit,
+	_observer_command_ignore_obstructions_bit,
+	_observer_command_freeze_camera_bit,
+	NUMBER_OF_OBSERVER_COMMAND_FLAGS
+};
+
+enum
+{
+	NUMBER_OF_OBSERVER_COMMAND_PARAMETERS = 5
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -39,9 +55,9 @@ struct observer_command
 	real_vector3d up;
 	real_vector3d focus_velocity;
 	real timer;
-	byte parameter_flags[5];
+	byte parameter_flags[NUMBER_OF_OBSERVER_COMMAND_PARAMETERS];
 	byte pad51[3];
-	real parameter_timers[5];
+	real parameter_timers[NUMBER_OF_OBSERVER_COMMAND_PARAMETERS];
 };
 
 typedef char observer_command_size_assert[
@@ -58,9 +74,20 @@ void observer_dispose_from_old_map(
 	void);
 void observer_initialize_for_new_map(
 	void);
+void observer_reconnect_to_structure_bsp(
+	void);
 
 struct observer_result const *observer_get_camera(
 	short local_player_index);
+boolean observer_command_has_finished(
+	short local_player_index);
+
+void observer_up_from_forward(
+	real_vector3d const *forward,
+	real_vector3d *up);
+void observer_set_camera(
+	short local_player_index,
+	struct observer_command *command);
 
 /* ---------- globals */
 

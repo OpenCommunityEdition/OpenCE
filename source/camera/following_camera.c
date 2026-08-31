@@ -41,6 +41,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "following_camera.h"
+#include "observer.h"
 
 #include "static_camera.h"
 
@@ -110,10 +111,6 @@ typedef char unit_camera_track_size_assert[
 	sizeof(struct unit_camera_track) == 0x1C ? 1 : -1];
 
 /* ---------- prototypes */
-
-void observer_up_from_forward(
-	real_vector3d const *forward,
-	real_vector3d *up);
 
 static struct unit_camera const *code_00077f20(
 	long unit_index);

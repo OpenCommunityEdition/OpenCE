@@ -232,8 +232,6 @@ void decals_reconnect_to_structure_bsp(
 	void);
 void structure_decals_reconnect_to_structure_bsp(
 	void);
-void observer_reconnect_to_structure_bsp(
-	void);
 void players_reconnect_to_structure_bsp(
 	void);
 void sound_reconnect_to_structure_bsp(

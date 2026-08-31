@@ -19,7 +19,7 @@ symbols in this file:
 0010E430 0060:
 	_code_0010e430 (0000)
 0010E490 0080:
-	_code_0010e490 (0000)
+	_stack_memory_pool_find_space_between_blocks (0000)
 0010E510 00a0:
 	_code_0010e510 (0000)
 0010E5B0 0040:
@@ -177,7 +177,7 @@ static long code_0010e3e0(
 	struct stack_memory_pool *pool);
 static void code_0010e430(
 	struct stack_memory_pool *pool);
-static void *code_0010e490(
+static void *stack_memory_pool_find_space_between_blocks(
 	struct stack_memory_pool *pool,
 	unsigned long allocation_size,
 	struct stack_memory_pool_block **previous_block);
@@ -275,7 +275,6 @@ void stack_memory_pool_reset(
 		code_0010e360(pool);
 		code_0010e3e0(pool);
 		code_0010e430(pool);
-		code_0010e490(pool, sizeof(*block), &block);
 		code_0010e510(block);
 		code_0010e5b0(block);
 		code_0010e5f0(block);
@@ -749,55 +748,49 @@ static void code_0010e430(
 	return;
 }
 
-static void *code_0010e490(
+static void *stack_memory_pool_find_space_between_blocks(
 	struct stack_memory_pool *pool,
 	unsigned long allocation_size,
 	struct stack_memory_pool_block **previous_block)
 {
 	struct stack_memory_pool_block *block;
 	struct stack_memory_pool_block *next_block;
+	void *result = NULL;
 
-	block = pool->first_block;
-	if (!block)
-	{
-		return NULL;
-	}
 	if (
-		allocation_size <=
-		(unsigned long)((byte *)block-pool->base_address))
+		pool->first_block &&
+		(unsigned long)((byte *)pool->first_block-pool->base_address) >=
+		allocation_size)
 	{
-		return pool->base_address;
+		result = pool->base_address;
 	}
-
-	next_block = block->next;
-	if (!next_block)
+	else
 	{
-		return NULL;
-	}
-
-	while (TRUE)
-	{
-		match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x22F, block);
-		if (
-			allocation_size <=
-			(unsigned long)(
-				(byte *)next_block-
-				((byte *)block+(block->size_and_flags&0x7FFFFFFF))))
+		block = pool->first_block;
+		if (block)
 		{
-			break;
-		}
+			next_block = block->next;
+			while (next_block)
+			{
+				match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x22F, block);
+				if (
+					(unsigned long)(
+						(byte *)next_block-
+						((byte *)block+(block->size_and_flags&0x7FFFFFFF))) >=
+					allocation_size)
+				{
+					result = (byte *)block+(block->size_and_flags&0x7FFFFFFF);
+					*previous_block = block;
+					break;
+				}
 
-		block = next_block;
-		next_block = next_block->next;
-		if (!next_block)
-		{
-			return NULL;
+				block = next_block;
+				next_block = next_block->next;
+			}
 		}
 	}
 
-	*previous_block = block;
-
-	return (byte *)block+(block->size_and_flags&0x7FFFFFFF);
+	return result;
 }
 
 static boolean code_0010e510(
@@ -1098,7 +1091,7 @@ static struct stack_memory_pool_block *code_0010ea00(
 		code_0010e6a0(pool);
 		if (code_0010e360(pool) < aligned_block_size)
 		{
-			free_space = code_0010e490(
+			free_space = stack_memory_pool_find_space_between_blocks(
 				pool,
 				aligned_block_size,
 				&free_space_in_pool_previous);

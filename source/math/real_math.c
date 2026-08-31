@@ -2944,10 +2944,7 @@ void angular_accelerate_to_position(
 		return;
 	}
 
-	cosine_value =
-		position_desired->k * position->k +
-		position->i * position_desired->i +
-		position_desired->j * position->j;
+	cosine_value = dot_product3d(position, position_desired);
 	if (cosine_value < -1.0f)
 	{
 		cosine_value = -1.0f;
@@ -2972,27 +2969,12 @@ void angular_accelerate_to_position(
 		speed = square_root(speed_squared);
 	}
 
-	axis.i =
-		position_desired->k * position->j -
-		position->k * position_desired->j;
-	axis.j =
-		position->k * position_desired->i -
-		position_desired->k * position->i;
-	axis.k =
-		position->i * position_desired->j -
-		position_desired->i * position->j;
+	cross_product3d(position, position_desired, &axis);
 	normalize3d(&axis);
 
-	axis.i = axis.i * speed;
-	axis.j = axis.j * speed;
-	axis.k = axis.k * speed;
-	delta.i = axis.i - angular_velocity->i;
-	delta.j = axis.j - angular_velocity->j;
-	delta.k = axis.k - angular_velocity->k;
-	delta_magnitude_squared =
-		delta.k * delta.k +
-		delta.j * delta.j +
-		delta.i * delta.i;
+	scale_vector3d(&axis, speed, &axis);
+	subtract_vectors3d(&axis, angular_velocity, &delta);
+	delta_magnitude_squared = magnitude_squared3d(&delta);
 	if (delta_magnitude_squared <
 		angular_acceleration_magnitude_maximum *
 		angular_acceleration_magnitude_maximum)

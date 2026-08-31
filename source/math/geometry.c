@@ -203,6 +203,9 @@ symbols in this file:
 
 /* ---------- globals */
 
+real global_convex_hull3d_delta = 0.01f;
+real global_convex_hull3d_epsilon = 0.001f;
+
 /* ---------- public code */
 
 boolean convex_hull3d_verify(void)
@@ -235,45 +238,110 @@ real vector_intersect_plane3d(
 		-(vector->i*plane->n.i + vector->j*plane->n.j + vector->k*plane->n.k);
 }
 
+boolean convex_hull2d_verify(
+	short vertex_count,
+	real_point2d const *vertices,
+	short index_count,
+	short const *indices)
+{
+	real total_angle = 0.f;
+	short index;
+	register real_point2d const *point_base = vertices;
+	register short const *index_base = indices;
+
+	for (index = 0; index < index_count; index++)
+	{
+		long previous_index = index - 1 >= 0 ? index - 1 : index_count - 1;
+		real_point2d const *previous = point_base + index_base[previous_index];
+		real_point2d const *current = point_base + index_base[index];
+		real_vector2d edge_previous;
+		real_vector2d edge_next;
+		long next_index;
+		real_point2d const *next;
+
+		next_index = index + 1 < index_count ? index + 1 : 0;
+		next = point_base + index_base[next_index];
+		edge_previous.i = current->x - previous->x;
+		edge_previous.j = current->y - previous->y;
+		edge_next.i = next->x - current->x;
+		edge_next.j = next->y - current->y;
+		if (cross_product2d(&edge_previous, &edge_next) < 0.f)
+		{
+			return FALSE;
+		}
+		total_angle += angle_between_vectors2d(&edge_previous, &edge_next);
+	}
+
+	return fabs(total_angle - 2.f*_pi) < 0.001f;
+}
+
 boolean convex_hull2d_test_circle(
 	short count,
 	real_point2d const *points,
 	real_point2d const *center,
 	real radius)
 {
-	short index = 0;
+	short index;
 	boolean result = TRUE;
 	register real_point2d const *point_base = points;
 	register real_point2d const *circle_center = center;
 	real radius_squared = radius*radius;
 
-	if (count > 0)
+	for (index = 0; index < count; index++)
 	{
-		do
-		{
-			long next_index = index + 1 < count ? index + 1 : 0;
-			real_vector2d edge;
-			real_vector2d offset;
-			real edge_length_squared;
-			real cross;
+		long next_index = index + 1 < count ? index + 1 : 0;
+		real_vector2d edge;
+		real_vector2d offset;
+		real edge_length_squared;
+		real cross;
 
-			edge.i = point_base[next_index].x - point_base[index].x;
-			edge.j = point_base[next_index].y - point_base[index].y;
-			offset.i = circle_center->x - point_base[index].x;
-			offset.j = circle_center->y - point_base[index].y;
-			edge_length_squared = magnitude_squared2d(&edge);
-			if (edge_length_squared > 0.f)
+		edge.i = point_base[next_index].x - point_base[index].x;
+		edge.j = point_base[next_index].y - point_base[index].y;
+		offset.i = circle_center->x - point_base[index].x;
+		offset.j = circle_center->y - point_base[index].y;
+		edge_length_squared = edge.i*edge.i;
+		edge_length_squared += edge.j*edge.j;
+		if (edge_length_squared != 0.f)
+		{
+			cross = cross_product2d(&offset, &edge);
+			if (cross > 0.f && cross*cross > edge_length_squared*radius_squared)
 			{
-				cross = cross_product2d(&edge, &offset);
-				if (cross > 0.f && cross*cross > edge_length_squared*radius_squared)
-				{
-					result = FALSE;
-					break;
-				}
+				result = FALSE;
+				break;
 			}
-			index++;
 		}
-		while (index < count);
+	}
+
+	return result;
+}
+
+boolean convex_hull2d_test_point(
+	short count,
+	real_point2d const *points,
+	real_point2d const *point,
+	real epsilon)
+{
+	short index;
+	boolean result = TRUE;
+	register real_point2d const *point_base = points;
+
+	for (index = 0; index < count; index++)
+	{
+		real_point2d const *current = point_base + index;
+		long next_index = index + 1 < count ? index + 1 : 0;
+		real_point2d const *next = point_base + next_index;
+		real_vector2d edge;
+		real_vector2d offset;
+
+		edge.i = next->x - current->x;
+		edge.j = next->y - current->y;
+		offset.i = point->x - current->x;
+		offset.j = point->y - current->y;
+		if (cross_product2d(&edge, &offset) < -epsilon)
+		{
+			result = FALSE;
+			break;
+		}
 	}
 
 	return result;
@@ -286,29 +354,28 @@ boolean convex_hull2d_test_point_indexed(
 	real_point2d const *point,
 	real epsilon)
 {
-	short index = 0;
+	short index;
 	boolean result = TRUE;
 	register short const *index_base = indices;
 	register real_point2d const *point_base = points;
 
-	if (count > 0)
+	for (index = 0; index < count; index++)
 	{
-			do
-		{
-			real_point2d const *current = point_base + index_base[index];
-			long next_index = index + 1 < count ? index + 1 : 0;
-			real_point2d const *next = point_base + index_base[next_index];
+		real_point2d const *current = point_base + index_base[index];
+		long next_index = index + 1 < count ? index + 1 : 0;
+		real_point2d const *next = point_base + index_base[next_index];
+		real_vector2d edge;
+		real_vector2d offset;
 
-			if (
-				(next->x - current->x)*(point->y - current->y) -
-				(next->y - current->y)*(point->x - current->x) < -epsilon)
-			{
-				result = FALSE;
-				break;
-			}
-			index++;
+		edge.i = next->x - current->x;
+		edge.j = next->y - current->y;
+		offset.i = point->x - current->x;
+		offset.j = point->y - current->y;
+		if (cross_product2d(&edge, &offset) < -epsilon)
+		{
+			result = FALSE;
+			break;
 		}
-		while (index < count);
 	}
 
 	return result;
@@ -361,30 +428,36 @@ boolean convex_hull2d_test_vector(
 	{
 		do
 		{
-			short next_index = index + 1 < count ? index + 1 : 0;
-			real edge_i = points[next_index].x - points[index].x;
-			real edge_j = points[next_index].y - points[index].y;
-			real offset_i = origin->x - points[index].x;
-			real offset_j = origin->y - points[index].y;
-			real denominator = edge_j*vector->i - edge_i*vector->j;
-			real numerator = offset_j*edge_i - offset_i*edge_j;
+			long next_index = index + 1 < count ? index + 1 : 0;
+			real_vector2d edge;
+			real_vector2d offset;
+			real denominator;
+			real numerator;
+
+			edge.i = points[next_index].x - points[index].x;
+			edge.j = points[next_index].y - points[index].y;
+			offset.i = origin->x - points[index].x;
+			offset.j = origin->y - points[index].y;
+			denominator = edge.j*vector->i - edge.i*vector->j;
+			numerator = edge.i*offset.j - offset.i*edge.j;
 
 			if (!(fabs(denominator) < _real_epsilon))
 			{
 				real distance = numerator / denominator;
-				if (denominator <= 0.f)
+
+				if (denominator > 0.f)
 				{
-					if (distance < maximum)
+					if (minimum < distance)
 					{
-						maximum = distance;
+						minimum = distance;
 					}
 				}
-				else if (distance > minimum)
+				else if (maximum > distance)
 				{
-					minimum = distance;
+					maximum = distance;
 				}
 
-				if (maximum < minimum)
+				if (minimum > maximum)
 				{
 					return FALSE;
 				}

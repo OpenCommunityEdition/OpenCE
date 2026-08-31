@@ -51,6 +51,7 @@ symbols in this file:
 #undef valid_real_normal3d
 #undef valid_real_vector3d_axes2
 #undef valid_real_vector3d
+#include "observer.h"
 
 /* ---------- constants */
 
@@ -82,10 +83,6 @@ float real_seed_random_range(
 	float upper_bound);
 long player_control_get_aiming_unit_index(
 	short local_player_index);
-void observer_up_from_forward(
-	real_vector3d const *forward,
-	real_vector3d *up);
-
 boolean valid_real_vector3d(
 	real_vector3d const *v);
 boolean valid_real_normal3d(

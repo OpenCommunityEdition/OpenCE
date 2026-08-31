@@ -74,10 +74,6 @@ struct dead_camera_constants
 
 /* ---------- prototypes */
 
-void observer_up_from_forward(
-	real_vector3d const *forward,
-	real_vector3d *up);
-
 static boolean code_000740b0(
 	long player_index);
 static long code_00074120(

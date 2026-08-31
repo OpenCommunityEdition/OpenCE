@@ -15,6 +15,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "flying_camera.h"
+#include "observer.h"
 #include "static_camera.h"
 
 /* ---------- constants */
@@ -31,10 +32,6 @@ struct rasterizer_debug_options
 };
 
 /* ---------- prototypes */
-
-void observer_up_from_forward(
-	real_vector3d const *forward,
-	real_vector3d *up);
 
 /* ---------- globals */
 

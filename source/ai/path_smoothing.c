@@ -179,13 +179,9 @@ static void find_avoidance_point(
 	real magnitude;
 	real_vector2d direction;
 
-	center_to_tangent[0].i = tangent_points[0].x - center->x;
-	center_to_tangent[0].j = tangent_points[0].y - center->y;
-	center_to_tangent[1].i = tangent_points[1].x - center->x;
-	center_to_tangent[1].j = tangent_points[1].y - center->y;
-	cross =
-		center_to_tangent[1].j*center_to_tangent[0].i -
-		center_to_tangent[0].j*center_to_tangent[1].i;
+	vector_from_points2d(center, &tangent_points[0], &center_to_tangent[0]);
+	vector_from_points2d(center, &tangent_points[1], &center_to_tangent[1]);
+	cross = cross_product2d(&center_to_tangent[0], &center_to_tangent[1]);
 
 	if (!(fabs(cross) < _real_epsilon))
 	{

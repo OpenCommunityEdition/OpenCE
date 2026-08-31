@@ -23,6 +23,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "first_person_camera.h"
+#include "observer.h"
 #include "static_camera.h"
 
 #include "objects/objects.h"
@@ -53,9 +54,6 @@ struct first_person_camera_result
 
 /* ---------- prototypes */
 
-void observer_up_from_forward(
-	real_vector3d const *forward,
-	real_vector3d *up);
 long player_control_get_unit_index(
 	short local_player_index);
 void player_control_get_facing_direction(

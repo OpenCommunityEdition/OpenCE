@@ -15,6 +15,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "orbiting_camera.h"
+#include "observer.h"
 #include "static_camera.h"
 #include "camera/director.h"
 #include "objects/objects.h"
@@ -57,9 +58,6 @@ struct orbiting_camera_constants
 void player_control_get_unit_camera_info(
 	short local_player_index,
 	struct unit_camera_info *camera_info);
-void observer_up_from_forward(
-	real_vector3d const *forward,
-	real_vector3d *up);
 
 /* ---------- globals */
 
