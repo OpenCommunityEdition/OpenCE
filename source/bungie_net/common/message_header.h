@@ -23,7 +23,18 @@ enum message_header_byte_order
 	_message_header_byte_order_host,
 };
 
+enum message_type
+{
+	_message_type_packet = 3,
+};
+
 /* ---------- macros */
+
+#define GET_MESSAGE_FLAGS(message) ((message) & MESSAGE_FLAG_BITS_MASK)
+#define GET_MESSAGE_TYPE(message) (((message) >> 2) & 3)
+#define GET_MESSAGE_SIZE(message) ((message) >> 4)
+#define SET_MESSAGE_FLAGS(message, flags) \
+	((message) = ((message) & ~MESSAGE_FLAG_BITS_MASK) | (flags))
 
 /* ---------- structures */
 

@@ -266,6 +266,63 @@
         },
         "objdiff_percent": 98.809525
       }
+    },
+    {
+      "unit": "source/bungie_net/common/key_agreement",
+      "function": "_key_agreement_get_packet_type",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked after a bounded ordinary-C type and expression audit. The retained private helper has the exact four relocation identities and the authentic January assertion/file strings; it reads the key-agreement packet type from the final encoded message byte after requiring `_message_type_packet`. The compiler strength-reduces `GET_MESSAGE_TYPE` to `and al, 0x0C; cmp al, 0x0C`, while January emits `shr al, 2; and al, 3; cmp al, 3`, leaving a 64-byte candidate against the 80-byte target. `key_agreement_get_packet_type` is a descriptive inferred private name: Stian/Pastudan's research-only `key_agreement_peek_packet_type` refers instead to the separate public `_is_message_encryption_key_message` predicate and was deliberately not misapplied here. No volatile/register forcing, barrier, pragma, assembly, or artificial dependency was admitted.",
+      "measurements": {
+        "target": {
+          "size": 80,
+          "relocation_count": 4,
+          "normalized_sha256": "17992eecb37a652d03f0088ce5123c158674116e7b2c88fe56083c3627f03278"
+        },
+        "base": {
+          "size": 64,
+          "relocation_count": 4,
+          "normalized_sha256": "c85c2f19f63571e94b0334e0868eb18f2f2ec585b54cdf229b114e38c0c79eb3"
+        },
+        "objdiff_percent": 95.75
+      }
+    },
+    {
+      "unit": "source/bungie_net/common/key_agreement",
+      "function": "_initiate_key_exchange",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked with the simplest coherent Diffie-Hellman initiation flow: generate parameters and public key, build into the same-TU 0x200-byte buffer, byte-swap the header, write the complete message, and return the write result. Target and retained source have equal 128-byte padded size and the same six relocation identities. January preserves a preinitialized byte-sized TRUE result and a larger local frame; retaining `boolean result = TRUE; return result;` solely to influence code generation lacked independent source provenance and was rejected under the source-credibility rule. Direct `return TRUE`/`FALSE` is retained even though it scores lower. No exact candidate was found or rejected, and no compiler-steering construct is present.",
+      "measurements": {
+        "target": {
+          "size": 128,
+          "relocation_count": 6,
+          "normalized_sha256": "dd522968df4407b121545dc0bc712ea05f9e82a71fb21fcb1c46474c55defb9d"
+        },
+        "base": {
+          "size": 128,
+          "relocation_count": 6,
+          "normalized_sha256": "193bbbb3b54c0db91978f2077f02bde2b3be2f86ebdb0cdef3489da18be109fc"
+        },
+        "objdiff_percent": 69.57895
+      }
+    },
+    {
+      "unit": "source/bungie_net/common/key_agreement",
+      "function": "_complete_key_exchange",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked as an explicitly labeled January-disassembly reconstruction, not recovered named source. The retained typed C has the exact 416-byte padded envelope, 17 relocation identities, message-type gate, packet-tail dispatch, packet-group decode calls, type-zero secret generation ranges [0xFF, prime limb - 2], finalize reply through the same-TU 0x200-byte buffer, and type-one/private-key completion semantics proved by January control flow and canonical public-key/data-packet APIs. The long/short union overlays are the canonical interface bridge already used by `network_messages.c`: January initializes full-word stack slots while packet-group APIs consume `short *`. Bounded local-scope/type/order variants only moved independent calls and stores; the retained form is the simplest semantically coherent equal-envelope source. Pastudan's opaque `FUN_00080620` body was never copied. No exact candidate was found or rejected, and no volatile, barrier, pragma, assembly, pointer-address trick, or forced lifetime is present.",
+      "measurements": {
+        "target": {
+          "size": 416,
+          "relocation_count": 17,
+          "normalized_sha256": "53856558cb7b53bc40e2c4dd12c3bfe285e4dc90bb5d3c27ab1680c4cb50377f"
+        },
+        "base": {
+          "size": 416,
+          "relocation_count": 17,
+          "normalized_sha256": "b1abf287400c1b3843364d05327512ff963fce5fb159f46f73100852027a411a"
+        },
+        "objdiff_percent": 84.85987
+      }
     }
   ]
 }

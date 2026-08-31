@@ -14,7 +14,14 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+struct transport_endpoint;
+
+/* ---------- prototypes/TRANSPORT_ENDPOINT_WINSOCK.C */
+
+long write_endpoint(
+	struct transport_endpoint *endpoint,
+	void const *buffer,
+	long size);
 
 /* ---------- globals */
 
