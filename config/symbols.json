@@ -2233,7 +2233,7 @@
 { "file_offset": 637600, "flags": 32, "name": "_code_0009baa0" },
 { "file_offset": 637904, "flags": 32, "name": "_game_engine_postspawn_player_update" },
 { "file_offset": 638240, "flags": 32, "name": "_game_engine_get_damage_multiplier" },
-{ "file_offset": 638448, "flags": 32, "name": "_code_0009bdf0" },
+{ "file_offset": 638448, "flags": 32, "name": "_game_engine_update_teleporter", "static": true },
 { "file_offset": 639440, "flags": 32, "name": "_game_engine_get_distance_rating_for_spawn" },
 { "file_offset": 639808, "flags": 32, "name": "_code_0009c340" },
 { "file_offset": 640096, "flags": 32, "name": "_code_0009c460" },
