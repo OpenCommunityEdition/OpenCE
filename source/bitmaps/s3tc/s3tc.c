@@ -130,3 +130,61 @@ void DecodeBlockAlpha3(
 
 	return;
 }
+
+void DecodeBlockAlpha3__single_pixel(
+	struct s3tc_block_alpha3 *source,
+	struct s3tc_color *color,
+	short u,
+	short v)
+{
+	word alpha[8];
+	unsigned long bitmap;
+	long shift;
+
+	DecodeBlockRGB__single_pixel(&source->rgb, color, u, v);
+
+	alpha[0] = source->alpha0;
+	alpha[1] = source->alpha1;
+
+	if (alpha[0] > alpha[1])
+	{
+		alpha[2] = (6 * alpha[0] + alpha[1]) / 7;
+		alpha[3] = (5 * alpha[0] + 2 * alpha[1]) / 7;
+		alpha[4] = (4 * alpha[0] + 3 * alpha[1]) / 7;
+		alpha[5] = (3 * alpha[0] + 4 * alpha[1]) / 7;
+		alpha[6] = (2 * alpha[0] + 5 * alpha[1]) / 7;
+		alpha[7] = (alpha[0] + 6 * alpha[1]) / 7;
+	}
+	else
+	{
+		alpha[2] = (4 * alpha[0] + alpha[1]) / 5;
+		alpha[3] = (3 * alpha[0] + 2 * alpha[1]) / 5;
+		alpha[4] = (2 * alpha[0] + 3 * alpha[1]) / 5;
+		alpha[5] = (alpha[0] + 4 * alpha[1]) / 5;
+		alpha[6] = 0;
+		alpha[7] = 255;
+	}
+
+	if (v < 2)
+	{
+		bitmap = source->alpha_bitmap[2];
+		bitmap <<= 8;
+		bitmap |= source->alpha_bitmap[1];
+		bitmap <<= 8;
+		bitmap |= source->alpha_bitmap[0];
+		shift = 3 * (4 * v + u);
+	}
+	else
+	{
+		bitmap = source->alpha_bitmap[5];
+		bitmap <<= 8;
+		bitmap |= source->alpha_bitmap[4];
+		bitmap <<= 8;
+		bitmap |= source->alpha_bitmap[3];
+		shift = 3 * (4 * (v - 2) + u);
+	}
+
+	color->rgba[S3TC_ALPHA] = (byte)alpha[(bitmap >> shift) & 7];
+
+	return;
+}

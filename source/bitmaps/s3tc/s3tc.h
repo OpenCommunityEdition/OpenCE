@@ -51,7 +51,7 @@ typedef char s3tc_block_alpha3_rgb_offset_assert[
 typedef char s3tc_block_alpha3_size_assert[
 	sizeof(struct s3tc_block_alpha3) == 0x10 ? 1 : -1];
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/S3TC.C */
 
 void DecodeBlockRGB(
 	struct s3tc_block_rgb *source,
@@ -59,6 +59,16 @@ void DecodeBlockRGB(
 void DecodeBlockAlpha3(
 	struct s3tc_block_alpha3 *source,
 	struct s3tc_color colors[S3TC_BLOCK_PIXELS]);
+void DecodeBlockRGB__single_pixel(
+	struct s3tc_block_rgb *source,
+	struct s3tc_color *color,
+	short u,
+	short v);
+void DecodeBlockAlpha3__single_pixel(
+	struct s3tc_block_alpha3 *source,
+	struct s3tc_color *color,
+	short u,
+	short v);
 
 /* ---------- globals */
 
