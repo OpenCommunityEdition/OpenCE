@@ -43,6 +43,12 @@ enum game_engine_type
 	last_usable_game_engine_index = game_engine_race,
 };
 
+enum get_score_type
+{
+	_get_score_individual = 0,
+	_get_score_team,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -134,13 +140,13 @@ struct game_engine
 	void (*unknown44)(void);
 	long (*get_player_score)(
 		long player_index,
-		boolean team_score);
-	void (*format_player_score)(
+		enum get_score_type score_type);
+	wchar_t *(*format_player_score)(
 		long player_index,
 		wchar_t *string);
-	void (*format_score_name)(
+	wchar_t *(*format_score_name)(
 		wchar_t *string);
-	void (*format_team_name)(
+	wchar_t *(*format_team_name)(
 		long team_index,
 		wchar_t *string);
 	boolean (*allow_pick_up)(
