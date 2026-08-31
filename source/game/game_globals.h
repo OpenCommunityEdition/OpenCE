@@ -209,6 +209,30 @@ struct game_globals_multiplayer_information
 	byte tag_padding[56];
 };
 
+struct game_globals_player_control
+{
+	real magnetism_friction;
+	real magnetism_adhesion;
+	real magnetism_inconsequential_target_scale;
+	real magnetism_unused[13];
+	real look_acceleration_time;
+	real look_acceleration_scale;
+	real look_pegging_threshold;
+	real look_default_pitch_rate;
+	real look_default_yaw_rate;
+	real look_autolevel_scale;
+	real look_unused[5];
+	short minimum_weapon_swap_ticks;
+	short minimum_autolevel_enabled_ticks;
+	real minimum_vehicle_flipping_angle;
+	struct tag_block look_function;
+};
+
+typedef char game_globals_player_control_size_assert[
+	sizeof(struct game_globals_player_control) == 0x80 ? 1 : -1];
+typedef char game_globals_player_control_flipping_angle_offset_assert[
+	offsetof(struct game_globals_player_control, minimum_vehicle_flipping_angle) == 0x70 ? 1 : -1];
+
 typedef char verify_game_globals_multiplayer_information_size[sizeof(struct game_globals_multiplayer_information) == 0xA0 ? 1 : -1];
 typedef char verify_game_globals_multiplayer_sounds_offset[offsetof(struct game_globals_multiplayer_information, sounds) == 0x5C ? 1 : -1];
 
@@ -218,7 +242,7 @@ struct game_globals
 	long unused0[61];
 	struct tag_block sounds;
 	struct tag_block camera;
-	struct tag_block player_control;
+	struct tag_block player_control; // game_globals_player_control
 	struct tag_block difficulty_information;
 	struct tag_block grenades;					// game_globals_grenade
 	struct tag_block rasterizer_data;			// game_globals_rasterizer_data

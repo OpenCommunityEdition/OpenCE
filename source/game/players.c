@@ -13,7 +13,7 @@ symbols in this file:
 000A95E0 0020:
 	_machine_get_player_list (0000)
 000A9600 0050:
-	_code_000a9600 (0000)
+	_machine_add_player (0000)
 000A9650 0060:
 	_local_player_exists (0000)
 000A96B0 0050:
@@ -51,9 +51,9 @@ symbols in this file:
 000A9B70 0050:
 	_any_player_is_dead (0000)
 000A9BC0 0040:
-	_code_000a9bc0 (0000)
+	_is_player_in_trigger (0000)
 000A9C00 00e0:
-	_code_000a9c00 (0000)
+	_player_pseudo_kill (0000)
 000A9CE0 0120:
 	_player_control_fix_for_loaded_game_state (0000)
 000A9E00 0050:
@@ -63,31 +63,31 @@ symbols in this file:
 000A9F10 0070:
 	_placement_data_set_change_color (0000)
 000A9F80 0070:
-	_code_000a9f80 (0000)
+	_unit_create_starting_weapon (0000)
 000A9FF0 0170:
-	_code_000a9ff0 (0000)
+	_players_compute_combined_pvs (0000)
 000AA160 0020:
-	_code_000aa160 (0000)
+	_players_compute_local_player_count (0000)
 000AA180 0010:
-	_code_000aa180 (0000)
+	_player_examine_nearby_unit (0000)
 000AA190 0090:
 	_unit_should_autopick_weapon (0000)
 000AA220 0020:
-	_code_000aa220 (0000)
+	_player_reset_action_result (0000)
 000AA240 00c0:
-	_code_000aa240 (0000)
+	_player_handle_weapon_swap (0000)
 000AA300 00b0:
-	_code_000aa300 (0000)
+	_player_over_shield_screen_effect (0000)
 000AA3B0 00b0:
-	_code_000aa3b0 (0000)
+	_player_active_camo_screen_effect (0000)
 000AA460 0090:
-	_code_000aa460 (0000)
+	_player_health_pack_screen_effect (0000)
 000AA4F0 0040:
-	_code_000aa4f0 (0000)
+	_player_powerup_on (0000)
 000AA530 0030:
-	_code_000aa530 (0000)
+	_player_powerup_additional (0000)
 000AA560 0030:
-	_code_000aa560 (0000)
+	_player_powerup_off (0000)
 000AA590 0070:
 	_players_handle_deleted_object (0000)
 000AA600 0020:
@@ -101,23 +101,23 @@ symbols in this file:
 000AA8D0 0110:
 	_player_aiming_vector_from_facing (0000)
 000AA9E0 0510:
-	_code_000aa9e0 (0000)
+	_player_teleport_internal (0000)
 000AAEF0 0060:
 	_player_teleport (0000)
 000AAF50 00d0:
 	_find_best_starting_location_index (0000)
 000AB020 0330:
-	_code_000ab020 (0000)
+	_player_spawn (0000)
 000AB350 00f0:
-	_code_000ab350 (0000)
+	_player_set_action_result (0000)
 000AB440 0250:
-	_code_000ab440 (0000)
+	_player_handle_action (0000)
 000AB690 00f0:
 	_player_handle_powerup (0000)
 000AB780 00a0:
 	_player_handle_powerup_minor (0000)
 000AB820 0070:
-	_code_000ab820 (0000)
+	_player_update_powerups (0000)
 000AB890 01a0:
 	_players_debug_render (0000)
 000ABA30 0090:
@@ -125,25 +125,25 @@ symbols in this file:
 000ABAC0 01d0:
 	_players_respawn_coop (0000)
 000ABC90 0140:
-	_code_000abc90 (0000)
+	_player_teleport_on_bsp_switch (0000)
 000ABDD0 02e0:
 	_players_reconnect_to_structure_bsp (0000)
 000AC0B0 01c0:
-	_code_000ac0b0 (0000)
+	_player_examine_nearby_vehicle (0000)
 000AC270 00b0:
-	_code_000ac270 (0000)
+	_player_examine_nearby_device (0000)
 000AC320 0150:
-	_code_000ac320 (0000)
+	_player_handle_powerup_equipment (0000)
 000AC470 06e0:
 	_players_update_before_game (0000)
 000ACB50 0320:
-	_code_000acb50 (0000)
+	_player_examine_nearby_item (0000)
 000ACE70 00f0:
-	_code_000ace70 (0000)
+	_player_examine_nearby_objects (0000)
 000ACF60 0330:
 	_players_update_after_game (0000)
 0025CED8 006c:
-	_rdata_0025ced8 (0000)
+	_adjustment_weights (0000)
 0025CF44 001a:
 	??_C@_0BK@OOAKICCI@players_update_after_game?$AA@ (0000)
 0025CF60 001b:
@@ -219,15 +219,17 @@ symbols in this file:
 0025D730 0004:
 	__real@3c360b61 (0000)
 002DEE08 0c18:
-	_data_002dee08 (0000)
+	_players_static_data (0000)
 00453408 005d:
-	_bss_00453408 (0000)
+	_machine_to_player_table (0000)
 	_debug_render_player_teleport (005c)
 */
 
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/profile.h"
+#include "ai/ai.h"
 #include "ai/ai_debug.h"
 #include "ai/ai_scenario_definitions.h"
 #include "camera/observer.h"
@@ -241,11 +243,19 @@ symbols in this file:
 #include "game_engine.h"
 #include "input.h"
 #include "interface/hud.h"
+#include "interface/hud_messaging.h"
+#include "interface/hud_unit.h"
+#include "interface/hud_weapon.h"
+#include "interface/player_ui.h"
+#include "interface/ui_widget.h"
 #include "items/equipment.h"
 #include "items/equipment_definitions.h"
+#include "items/projectiles.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
+#include "main/main.h"
 #include "objects/damage.h"
+#include "objects/damage_effect_definitions.h"
 #include "physics/collisions.h"
 #include "real_math.h"
 #include "render/render_debug.h"
@@ -256,6 +266,8 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "structures/structure_bsp_definitions.h"
+#include "tag_files/tag_groups.h"
+#include "text/text_group.h"
 #include "text/unicode.h"
 #include "units/biped_definitions.h"
 #include "units/bipeds.h"
@@ -265,17 +277,11 @@ symbols in this file:
 
 /* ---------- constants */
 
-enum equipment_powerup_type
-{
-	_equipment_powerup_double_speed = 1,
-	_equipment_powerup_overshield,
-	_equipment_powerup_active_camouflage,
-	_equipment_powerup_full_spectrum_vision,
-	_equipment_powerup_health
-};
-
 enum
 {
+	NETWORK_GAME_MAXIMUM_PLAYER_COUNT = 16,
+	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
+	MULTIPLAYER_GAME_TEXT_YOU_WERE_TELEFRAGGED = 183,
 	_collision_test_for_player_teleport_flags =
 		FLAG(_collision_test_front_facing_surfaces_bit) |
 		FLAG(_collision_test_ignore_invisible_surfaces_bit) |
@@ -291,55 +297,9 @@ enum
 
 /* ---------- structures */
 
-struct _players_vehicle_datum
-{
-	byte unknown_state;
-	byte pad[3];
-};
-
-struct players_vehicle_datum
-{
-	long definition_index;
-	struct _object_datum object;
-	struct _unit_datum unit;
-	long unknown424;
-	struct _players_vehicle_datum vehicle;
-};
-
-struct _vehicle_datum
-{
-	byte flags;
-	byte unused425[3];
-	byte unknown_state;
-	char approach_type;
-	byte unknown42A;
-	byte unused42B;
-};
-
-struct vehicle_datum
-{
-	long definition_index;
-	struct _object_datum object;
-	struct _unit_datum unit;
-	struct _vehicle_datum vehicle;
-};
-
-struct player_vehicle_difficulty_information
-{
-	byte unused[0x70];
-	real vehicle_ram_angle;
-	byte unused74[0xC];
-};
-
-struct scenario_player_starting_location
-{
-	real_point3d position;
-	real facing;
-	short team_index;
-	short structure_bsp_reference_index;
-	byte unused[0x20];
-};
-
+/* These scenario records are consumed only by Players.  The broader scenario
+   header intentionally cannot own them yet: older consumers still carry their
+   own incompatible partial definitions. */
 struct scenario_bsp_switch_trigger_volume
 {
 	short trigger_volume_index;
@@ -357,6 +317,45 @@ struct scenario_cutscene_flag
 	byte unused[0x24];
 };
 
+struct unit_control_data
+{
+	char animation_state;
+	char aiming_speed;
+	word control_flags;
+	short weapon_index;
+	short grenade_index;
+	short zoom_level;
+	short pad;
+	real_vector3d throttle;
+	real primary_trigger;
+	real_vector3d facing_vector;
+	real_vector3d aiming_vector;
+	real_vector3d looking_vector;
+};
+
+typedef char unit_control_data_size_assert[
+	sizeof(struct unit_control_data) == 0x40 ? 1 : -1];
+
+/* Players needs the vehicle control prefix only.  VEHICLES.C owns the full
+   runtime datum, which has not yet been made a shared definition. */
+struct _players_vehicle_datum
+{
+	word flags;
+	short unknown426;
+	byte unknown_state;
+	char approach_type;
+	byte unknown42A;
+	byte unused42B;
+};
+
+struct players_vehicle_datum
+{
+	long definition_index;
+	struct _object_datum object;
+	struct _unit_datum unit;
+	struct _players_vehicle_datum vehicle;
+};
+
 struct player_screen_flash_parameters
 {
 	short type;
@@ -367,159 +366,60 @@ struct player_screen_flash_parameters
 	real duration;
 };
 
-struct screen_flash_definition
+struct players_static_data
 {
-	short type;
-	short priority;
-	unsigned long unused1[3];
-	real duration;
-	short fade_function;
-	word pad;
-	unsigned long unused2[2];
-	real max_intensity;
-	real zero_scale_factor;
-	real_argb_color screen_flash_color;
+	struct profile_section update_before_game_profile;
+	struct profile_section update_after_game_profile;
+	struct player_screen_flash_parameters screen_flash_parameters[2];
 };
+
+typedef char players_static_data_size_assert[
+	sizeof(struct players_static_data) == 0xC18 ? 1 : -1];
+typedef char players_static_data_screen_flash_offset_assert[
+	offsetof(struct players_static_data, screen_flash_parameters) == 0xBF0 ? 1 : -1];
 
 /* ---------- prototypes */
 
-void game_statistics_record_kill(
-	long dead_unit_index,
-	long killing_player_index,
-	long damage_type,
-	short killing_team_index);
-void hud_fix_unit_data(
-	short old_local_player_index,
-	short new_local_player_index);
-void hud_fix_weapon_data(
-	short old_local_player_index,
-	short new_local_player_index);
-short player_ui_get_single_player_local_player_controller(
-	short local_player_index);
-real game_engine_get_starting_location_rating(
-	long player_index,
-	struct scenario_player_starting_location *starting_location);
-boolean code_000aa9e0(
-	long player_index,
-	long source_unit_index,
-	real_point3d const *position);
-void unit_exit_seat_end(
-	long unit_index);
-void hud_picked_up_powerup(
-	short local_player_index,
-	long powerup_definition_index);
-void hud_picked_up_weapon(
-	short local_player_index,
-	long weapon_definition_index);
-void hud_picked_up_grenade(
-	short local_player_index,
-	long grenade_definition_index);
-void hud_picked_up_ammunition(
-	short local_player_index,
-	long weapon_definition_index,
-	short ammunition_count);
-void player_effect_screen_flash(
-	long player_index,
-	struct screen_flash_definition const *screen_flash,
-	real scale);
-boolean object_double_charge_shield(
-	long object_index);
-void device_touched(
-	long device_index,
-	long unit_index);
-boolean unit_add_equipment_to_inventory(
-	long unit_index,
-	long equipment_index,
-	boolean replace);
-boolean unit_add_grenade_to_inventory(
-	long unit_index,
-	long equipment_index);
-boolean unit_approve_weapon_swap(
-	long unit_index,
-	long weapon_index);
-boolean unit_can_enter_seat(
-	long unit_index,
-	long target_unit_index,
-	short seat_index,
-	long *occupant_unit_index);
-void unit_enter_seat(
-	long unit_index,
-	long target_unit_index,
-	short seat_index);
-boolean ai_try_vehicle_eviction(
-	long actor_index,
-	long entering_unit_index,
-	boolean immediate);
-boolean weapon_handle_potential_inventory_item(
-	long inventory_item_index,
-	long weapon_index,
-	short local_player_index,
-	short *ammunition_count);
-void _ReadWriteBarrier(void);
-#pragma intrinsic(_ReadWriteBarrier)
-void observer_obsolete_position(
-	short local_player_index);
-boolean biped_fix_position(
-	long unit_index,
-	long seat_index,
-	real_point3d *initial_position,
-	real_point3d *final_position,
-	real scale,
-	boolean keep_basis,
-	boolean dont_teleport,
-	boolean scale_by_height);
-short unit_find_nearby_seat(
-	long unit_index,
-	long target_unit_index,
-	short *seat_index);
-boolean dangerous_projectiles_near_player(
-	void);
-boolean ai_enemies_attacking_player(
-	void);
-
-static long code_000a9bc0(
+static long is_player_in_trigger(
 	short bsp_switch_trigger_volume_index,
 	long object_index);
-static void code_000aa220(
+static void player_reset_action_result(
 	long player_index);
-static boolean code_000aa240(
+static boolean player_handle_weapon_swap(
 	long player_index);
-static void code_000aa300(
+static void player_over_shield_screen_effect(
 	long player_index);
-static void code_000aa3b0(
+static void player_active_camo_screen_effect(
 	long player_index);
-static void code_000aa460(
+static void player_health_pack_screen_effect(
 	long player_index);
-static void code_000aa4f0(
+static void player_powerup_on(
 	long player_index,
 	short powerup_type);
-static void code_000aa530(
+static void player_powerup_additional(
 	long player_index,
 	short powerup_type);
-static void code_000aa560(
+static void player_powerup_off(
 	long player_index,
-	long powerup_type);
-static __declspec(noinline) void code_000ab350(
+	short powerup_type);
+static void player_set_action_result(
 	long player_index,
 	short action_result,
 	long object_index,
 	short seat_index);
-static boolean code_000ab440(
+static boolean player_handle_action(
 	long player_index);
-static void code_000ab820(
+static void player_update_powerups(
 	long player_index);
-static void code_000ac0b0(
+static void player_examine_nearby_vehicle(
 	long player_index,
 	long vehicle_index);
-static void code_000acb50(
+static void player_examine_nearby_item(
 	long player_index,
 	long item_index);
-static void code_000ace70(
+static void player_examine_nearby_objects(
 	long player_index);
-void code_000ac320(
-	long player_index,
-	long equipment_index);
-static void code_000abc90(
+static void player_teleport_on_bsp_switch(
 	long player_index,
 	long source_unit_index,
 	real_point3d const *position);
@@ -528,13 +428,30 @@ static void code_000abc90(
 
 struct data_array *player_data;
 extern struct data_array *team_data;
-byte bss_00453408[0x5C] = { 0 };
+long machine_to_player_table[MAXIMUM_NETWORK_MACHINE_COUNT][MAXIMUM_LOCAL_PLAYERS] = { 0 };
+static boolean players_lost_map_started = FALSE;
+static short over_shield_screen_flash_fade_function = 0;
+static real over_shield_screen_flash_alpha = 0.f;
+static real over_shield_screen_flash_green = 0.f;
+static short active_camo_screen_flash_fade_function = 0;
+static real active_camo_screen_flash_alpha = 0.f;
+static real active_camo_screen_flash_blue = 0.f;
 extern short player_spawn_count;
-extern byte data_002dee08[];
 boolean debug_render_player_teleport = FALSE;
-/* Exact: January owns this external 9-point co-op teleport search table in
-   Players.obj .rdata (0x6C bytes, no relocations). */
-real_point3d const rdata_0025ced8[9] =
+struct players_static_data players_static_data =
+{
+	{ "players_update_before_game", NONE, TRUE },
+	{ "players_update_after_game", NONE, TRUE },
+	{
+		{ 5, 0, 1.0f, 0.8f, 0.8f, 2.0f },
+		{ 2, 0, 1.0f, 0.35f, 0.35f, 2.0f },
+	},
+};
+
+/* January owns this nine-point co-op teleport search table in Players.obj
+   .rdata (0x6C bytes, no relocations); HCEA independently authenticates the
+   name, element type, and values. */
+static real_point3d const adjustment_weights[9] =
 {
 	{ { 1.f, 0.f, 0.f } },
 	{ { 0.f, 1.f, 0.f } },
@@ -547,12 +464,10 @@ real_point3d const rdata_0025ced8[9] =
 	{ { 0.57735026f, -0.57735026f, -0.57735026f } },
 };
 
-#define PLAYER_SCREEN_FLASH_PARAMETERS(offset) \
-	((struct player_screen_flash_parameters *)(data_002dee08 + (offset)))
-#define PLAYER_SCREEN_FLASH_FADE_FUNCTION(offset) \
-	(*(short *)((byte *)bss_00453408 + (offset)))
-#define PLAYER_SCREEN_FLASH_COLOR(offset) \
-	(*(real *)((byte *)bss_00453408 + (offset)))
+#define PLAYERS_UPDATE_BEFORE_GAME_PROFILE \
+	(players_static_data.update_before_game_profile)
+#define PLAYERS_UPDATE_AFTER_GAME_PROFILE \
+	(players_static_data.update_after_game_profile)
 
 /* ---------- public code */
 
@@ -578,6 +493,8 @@ void players_initialize(
 		sizeof(players_globals->local_players));
 	players_globals->unknown0 = NONE;
 	players_globals->local_player_count = 0;
+	players_globals->local_player_triggered_switch =
+		_local_player_triggered_switch_none;
 
 	player_control_initialize();
 
@@ -605,11 +522,13 @@ void players_initialize_for_new_map(
 	players_globals->double_speed_ticks = 0;
 	players_globals->all_dead = FALSE;
 	players_globals->pending_teleport_starting_location_index = NONE;
+	players_globals->local_player_triggered_switch =
+		_local_player_triggered_switch_none;
 	players_globals->respawn_failure = 0;
 	data_make_valid(player_data);
 	data_make_valid(team_data);
 	csmemset(
-		bss_00453408,
+		machine_to_player_table,
 		NONE,
 		0x40);
 
@@ -641,7 +560,7 @@ void players_dispose(
 long *machine_get_player_list(
 	long machine_index)
 {
-	return (long *)(bss_00453408 + ((machine_index & 0xFFFF) << 4));
+	return machine_to_player_table[DATUM_INDEX_TO_ABSOLUTE_INDEX(machine_index)];
 }
 
 boolean local_player_exists(
@@ -714,7 +633,7 @@ short players_get_respawn_failure(
 	return players_globals->respawn_failure;
 }
 
-__declspec(noinline) long local_player_get_player_index(
+long local_player_get_player_index(
 	short local_player_index)
 {
 	match_assert(
@@ -760,7 +679,7 @@ short local_player_count(
 	return players_globals->local_player_count;
 }
 
-__declspec(noinline) short local_player_get_next(
+short local_player_get_next(
 	short local_player_index)
 {
 	short result;
@@ -1067,12 +986,12 @@ short player_get_starting_location_count(
 	return starting_location_count;
 }
 
-struct scenario_player_starting_location *player_get_starting_location(
+struct player_starting_location *player_get_starting_location(
 	short starting_location_index)
 {
 	struct scenario *scenario;
 	struct encounter_definition *encounter;
-	struct scenario_player_starting_location *starting_location;
+	struct player_starting_location *starting_location;
 	short structure_bsp_reference_index;
 
 	scenario = global_scenario_get();
@@ -1082,7 +1001,7 @@ struct scenario_player_starting_location *player_get_starting_location(
 		starting_location = TAG_BLOCK_GET_ELEMENT(
 			&scenario->players,
 			starting_location_index,
-			struct scenario_player_starting_location);
+			struct player_starting_location);
 	}
 
 	if (ai_debug.selected_squad_index != NONE)
@@ -1098,7 +1017,7 @@ struct scenario_player_starting_location *player_get_starting_location(
 			starting_location = TAG_BLOCK_GET_ELEMENT(
 				&encounter->player_starting_locations,
 				starting_location_index,
-				struct scenario_player_starting_location);
+				struct player_starting_location);
 			structure_bsp_reference_index = encounter->runtime_structure_bsp_reference_index;
 			if (structure_bsp_reference_index >= 0 &&
 				structure_bsp_reference_index < scenario->structure_bsp_references.count)
@@ -1111,7 +1030,7 @@ struct scenario_player_starting_location *player_get_starting_location(
 	return starting_location;
 }
 
-static long code_000a9bc0(
+static long is_player_in_trigger(
 	short bsp_switch_trigger_volume_index,
 	long object_index)
 {
@@ -1152,16 +1071,15 @@ boolean valid_real_vector2d(
 	return valid_real(vector->i) && valid_real(vector->j);
 }
 
-static void code_000a9600(
+static void machine_add_player(
 	long machine_index,
 	long player_index)
 {
 	long *machine_player_list;
 	long machine_player_index;
 
-	machine_index &= 0xFFFF;
-	machine_index <<= 4;
-	machine_player_list = (long *)((byte *)bss_00453408 + machine_index);
+	machine_player_list =
+		machine_to_player_table[DATUM_INDEX_TO_ABSOLUTE_INDEX(machine_index)];
 	for (machine_player_index = 0;
 		machine_player_index < MAXIMUM_LOCAL_PLAYERS;
 		machine_player_index++)
@@ -1222,7 +1140,7 @@ long player_new(
 		player->team_index = 1;
 
 		player2 = player_get(player_index);
-		player2->action_result = 0;
+		player2->action_result = _player_action_result_reload;
 		player2->action_object_index = NONE;
 		player->unknown_cc = NONE;
 		player->unknown_d1 = FALSE;
@@ -1231,7 +1149,7 @@ long player_new(
 			csmemcpy(&player->network_player_data, network_player, sizeof(struct network_player));
 	}
 
-	code_000a9600(machine_index, player_index);
+	machine_add_player(machine_index, player_index);
 
 	return player_index;
 }
@@ -1241,7 +1159,7 @@ long find_best_starting_location_index(
 {
 	struct scenario *scenario;
 	struct encounter_definition *encounter;
-	struct scenario_player_starting_location *starting_location;
+	struct player_starting_location *starting_location;
 	short starting_location_count;
 	short starting_location_index;
 	short best_starting_location_index;
@@ -1283,17 +1201,17 @@ long find_best_starting_location_index(
 	return best_starting_location_index;
 }
 
-void code_000ab020(
+static void player_spawn(
 	long player_index)
 {
 	struct player_datum *player;
-	struct game_globals *volatile game_globals;
+	struct game_globals *game_globals;
 	struct player_datum *player2;
 	struct unit_datum *unit;
 	struct scenario *scenario;
 	struct game_globals_player_information *player_information;
 	struct game_globals_multiplayer_information *multiplayer_information;
-	struct scenario_player_starting_location *starting_location;
+	struct player_starting_location *starting_location;
 	struct object_placement_data placement_data;
 	real_rgb_color change_color;
 	real_rgb_color change_color_storage;
@@ -1443,7 +1361,7 @@ void code_000ab020(
 		0,
 		sizeof(player->powerup_durations));
 	player2 = player_get(player_index);
-	player2->action_result = 0;
+	player2->action_result = _player_action_result_reload;
 	player2->action_object_index = NONE;
 	if (player->local_player_index != NONE)
 		observer_obsolete_position(player->local_player_index);
@@ -1452,8 +1370,8 @@ void code_000ab020(
 }
 
 /* Exact: January emits this private dead-unit replacement helper from the
-   reconstructed code_000aa9e0 caller below. */
-static void code_000a9c00(
+   reconstructed player_teleport_internal caller below. */
+static void player_pseudo_kill(
 	long player_index,
 	long replacement_dead_unit_index)
 {
@@ -1498,12 +1416,10 @@ static void code_000a9c00(
 	return;
 }
 
-/* NonMatching: exact 0x170 padded size and all 22 relocation identities.
-   The residual is a single instruction-scheduling window after
-   objects_get_activating_cluster_index: January hoists &iterator before
-   storing EAX and loading player_data. This body remains dormant from the
-   exact-credit ledger. */
-static void code_000a9ff0(
+/* Matching status is tracked in the Players object log; this is the ordinary
+   combined-PVS calculation used by the game loop. */
+/* Residual instruction scheduling is recorded in the matching log. */
+static void players_compute_combined_pvs(
 	unsigned long *combined_pvs,
 	boolean local_player_only)
 {
@@ -1521,8 +1437,7 @@ static void code_000a9ff0(
 	csmemset(combined_pvs, 0, 0x40);
 	if (!game_in_editor())
 	{
-		activating_cluster_index =
-			((long (*)(void))objects_get_activating_cluster_index)();
+		activating_cluster_index = objects_get_activating_cluster_index();
 		data_iterator_new(&iterator, player_data);
 		while (player = data_iterator_next(&iterator))
 		{
@@ -1593,14 +1508,14 @@ static void code_000a9ff0(
 	return;
 }
 
-static boolean code_000ab440(
+static boolean player_handle_action(
 	long player_index)
 {
 	struct player_datum *player;
 	struct unit_datum *unit;
 	struct unit_datum *nearby_unit;
 	struct item_datum *equipment;
-	struct vehicle_datum *target_vehicle;
+	struct players_vehicle_datum *target_vehicle;
 	real_matrix4x3 player_matrix;
 	real_matrix4x3 target_matrix;
 	real_point3d *player_position;
@@ -1615,12 +1530,12 @@ static boolean code_000ab440(
 	result = FALSE;
 	switch (player->action_result)
 	{
-	case 10:
+	case _player_action_result_touch_device:
 		device_touched(player->action_object_index, player->unit_index);
 		result = TRUE;
 		break;
 
-	case 5:
+	case _player_action_result_swap_for_powerup:
 		unit_drop_current_equipment(player->unit_index);
 		if (unit_add_equipment_to_inventory(
 			player->unit_index,
@@ -1635,8 +1550,8 @@ static boolean code_000ab440(
 		result = TRUE;
 		break;
 
-	case 8:
-	case 9:
+	case _player_action_result_enter_vehicle:
+	case _player_action_result_evict_from_vehicle:
 	{
 		long nearby_unit_index;
 
@@ -1665,9 +1580,9 @@ static boolean code_000ab440(
 		break;
 	}
 
-	case 11:
+	case _player_action_result_flip_vehicle:
 		unit = unit_get(player->unit_index);
-		target_vehicle = (struct vehicle_datum *)vehicle_get(
+		target_vehicle = (struct players_vehicle_datum *)vehicle_get(
 			player->action_object_index);
 		unit->unit.last_vehicle_index = player->action_object_index;
 		unit->unit.game_time_at_last_vehicle_exit = game_time_get();
@@ -1692,7 +1607,7 @@ static boolean code_000ab440(
 			approach_type = (dot > 0.f) + 1;
 		}
 
-		SET_FLAG(target_vehicle->vehicle.flags, 4, TRUE);
+		SET_FLAG(target_vehicle->vehicle.flags, _vehicle_upending_bit, TRUE);
 		target_vehicle->vehicle.approach_type = approach_type;
 		target_vehicle->vehicle.unknown42A = 0;
 		result = TRUE;
@@ -1702,13 +1617,8 @@ static boolean code_000ab440(
 	return result;
 }
 
-/* NonMatching foundation: exact 0x510 padded size and all 61 relocation
-   identities, with residual register allocation and block-layout differences.
-   This semantic caller is retained because it authentically emits the exact
-   private code_000a9c00 helper, the exact header-inline random_direction3d
-   leaf, and references the exact source-owned rdata_0025ced8 table. The caller
-   body remains dormant from the exact-credit ledger. */
-boolean code_000aa9e0(
+/* Matching status is tracked in the Players object log. */
+boolean player_teleport_internal(
 	long player_index,
 	long source_unit_index,
 	real_point3d const *position)
@@ -1741,24 +1651,21 @@ boolean code_000aa9e0(
 	pointers.biped = biped_get(player_unit_index);
 	result = FALSE;
 
-	if (*(volatile long *)&source_unit_index != NONE)
+	if (source_unit_index != NONE)
 	{
 		match_vassert(
 			"c:\\halo\\SOURCE\\game\\players.c",
 			0x4FB,
 			local_player_count()>1,
 			"source_unit_index==NONE || local_player_count()>1");
-		if (object_get_ultimate_parent(
-			*(volatile long *)&source_unit_index) !=
-			*(volatile long *)&source_unit_index)
+		if (object_get_ultimate_parent(source_unit_index) != source_unit_index)
 		{
 			real scale;
 			real collision_height;
 
 			source_root_object_index =
-				object_get_ultimate_parent(
-					*(volatile long *)&source_unit_index);
-			unit_get(*(volatile long *)&source_unit_index);
+				object_get_ultimate_parent(source_unit_index);
+			unit_get(source_unit_index);
 			pointers.source_root_object = object_get(source_root_object_index);
 
 			best_adjustment_vector =
@@ -1807,7 +1714,7 @@ boolean code_000aa9e0(
 
 			matrix4x3_transform_point(
 				&placement_matrix,
-				&rdata_0025ced8[adjustment_index],
+				&adjustment_weights[adjustment_index],
 				&adjusted_position);
 			result = biped_fix_position(
 				player_unit_index,
@@ -1854,7 +1761,7 @@ boolean code_000aa9e0(
 
 			adjustment_index++;
 		}
-		while (adjustment_index < NUMBEROF(rdata_0025ced8));
+	while (adjustment_index < NUMBEROF(adjustment_weights));
 			goto placement_complete;
 		}
 		else
@@ -1885,7 +1792,7 @@ boolean code_000aa9e0(
 
 placement_complete:
 
-	(*(struct player_datum *volatile *)&player)->cluster_index = NONE;
+	player->cluster_index = NONE;
 	if (!result)
 		goto failure;
 
@@ -1943,7 +1850,7 @@ placement_complete:
 		respawn_effect_index = player_information->coop_respawn_effect.index;
 		if (respawn_effect_index != NONE)
 		{
-			code_000a9ff0(players_globals->combined_pvs, FALSE);
+			players_compute_combined_pvs(players_globals->combined_pvs, FALSE);
 			effect_new_from_object(
 				respawn_effect_index,
 				player_unit_index,
@@ -1964,7 +1871,7 @@ failure:
 		"c:\\halo\\SOURCE\\game\\players.c",
 		0x5AB,
 		player->local_player_index!=NONE);
-	code_000a9c00(player_index, source_unit_index);
+	player_pseudo_kill(player_index, source_unit_index);
 
 	return result;
 }
@@ -1987,7 +1894,7 @@ boolean player_teleport(
 	{
 		if (biped->object.parent_object_index != NONE)
 			unit_exit_seat_end(unit_index);
-		result = code_000aa9e0(player_index, source_unit_index, position);
+		result = player_teleport_internal(player_index, source_unit_index, position);
 	}
 
 	return result;
@@ -2085,17 +1992,15 @@ void players_debug_render(
 	return;
 }
 
-static void code_000ab820(
+static void player_update_powerups(
 	long player_index)
 {
 	struct player_datum *player;
-	struct unit_datum *unit;
 	short *powerup_duration;
 	long powerup_index;
 	long remaining_powerups;
 
 	player = player_get(player_index);
-	_ReadWriteBarrier();
 	powerup_index = 0;
 	powerup_duration = player->powerup_durations;
 	remaining_powerups = NUMBER_OF_PLAYER_POWERUPS;
@@ -2105,17 +2010,7 @@ static void code_000ab820(
 		{
 			(*powerup_duration)--;
 			if (*powerup_duration == 0)
-			{
-				player = player_get(player_index);
-				unit = unit_get(player->unit_index);
-				if (powerup_index == _player_powerup_active_camouflage)
-				{
-					SET_FLAG(
-						unit->unit.flags,
-						_unit_active_camouflaged_bit,
-						FALSE);
-				}
-			}
+				player_powerup_off(player_index, (short)powerup_index);
 		}
 
 		powerup_index++;
@@ -2162,26 +2057,10 @@ void debug_player_teleport(
 	if (unit_index != NONE && target_unit_index != NONE)
 	{
 		target_unit = unit_get(target_unit_index);
-		code_000aa9e0(
+		player_teleport_internal(
 			player_index_from_unit_index(unit_index),
 			target_unit_index,
 			&target_unit->object.bounding_sphere_center);
-	}
-
-	/* These dead calls intentionally keep VC7's private-ABI helper bodies
-	   emitted; their real call sites are manually inlined for exact codegen. */
-	if (0)
-	{
-		code_000aa220(0);
-		code_000aa240(0);
-		code_000aa4f0(0, 0);
-		code_000aa530(0, 0);
-		code_000aa560(0, 0);
-		code_000ab440(0);
-		code_000ab820(0);
-		code_000ac0b0(0, 0);
-		code_000acb50(0, 0);
-		code_000ace70(0);
 	}
 
 	return;
@@ -2268,7 +2147,7 @@ boolean players_respawn_coop(
 		{
 			if (player->unit_index == NONE)
 			{
-				code_000ab020(iterator.datum_index);
+				player_spawn(iterator.datum_index);
 				if (player->unit_index != NONE)
 				{
 					result = player_teleport(
@@ -2294,7 +2173,7 @@ result_complete:
 	return result;
 }
 
-static void code_000abc90(
+static void player_teleport_on_bsp_switch(
 	long player_index,
 	long source_unit_index,
 	real_point3d const *position)
@@ -2304,8 +2183,7 @@ static void code_000abc90(
 	struct biped_datum *source_biped;
 	struct scenario_bsp_switch_trigger_volume *bsp_switch;
 	long unit_index;
-	volatile boolean outside_switch_trigger;
-	boolean inside_switch_trigger;
+	boolean outside_switch_trigger;
 	boolean teleport_succeeded;
 
 	player = player_get(player_index);
@@ -2323,18 +2201,9 @@ static void code_000abc90(
 				&global_scenario_get()->bsp_switch_trigger_volumes,
 				players_globals->pending_teleport_starting_location_index,
 				struct scenario_bsp_switch_trigger_volume);
-			inside_switch_trigger = scenario_trigger_volume_test_object(
+			outside_switch_trigger = !scenario_trigger_volume_test_object(
 				bsp_switch->trigger_volume_index,
 				unit_index);
-			if (inside_switch_trigger)
-			{
-				outside_switch_trigger = TRUE;
-				outside_switch_trigger = FALSE;
-			}
-			else
-			{
-				outside_switch_trigger = TRUE;
-			}
 		}
 		else
 		{
@@ -2357,7 +2226,7 @@ static void code_000abc90(
 
 			if (biped->object.parent_object_index == NONE)
 			{
-				teleport_succeeded = code_000aa9e0(
+				teleport_succeeded = player_teleport_internal(
 					player_index,
 					source_unit_index,
 					position);
@@ -2440,7 +2309,7 @@ void players_reconnect_to_structure_bsp(
 			if (player_unit_index != NONE &&
 				players_globals->pending_teleport_starting_location_index != NONE)
 			{
-				if (code_000a9bc0(
+				if (is_player_in_trigger(
 					players_globals->pending_teleport_starting_location_index,
 					player_unit_index))
 				{
@@ -2455,16 +2324,14 @@ void players_reconnect_to_structure_bsp(
 							&global_structure_bsp_get()->leaves,
 							scenario_leaf_index_from_point(&biped_base) & LONG_MAX,
 							struct structure_leaf);
-						cluster_index =
-							*(volatile short *)&leaf->cluster_index;
+						cluster_index = leaf->cluster_index;
 						if (cluster_index != NONE)
 						{
 							if (!teleport_position_valid)
 								teleport_position = biped_base;
 							else
 								teleport_position.z =
-									*(volatile real *)&adjustment_or_width +
-									teleport_position.z;
+									adjustment_or_width + teleport_position.z;
 							source_unit_index = player->unit_index;
 							found_player = TRUE;
 						}
@@ -2489,7 +2356,7 @@ void players_reconnect_to_structure_bsp(
 				if (player->unit_index != NONE &&
 					player->unit_index != source_unit_index)
 				{
-					code_000abc90(
+					player_teleport_on_bsp_switch(
 						player_index,
 						source_unit_index,
 						&teleport_position);
@@ -2513,7 +2380,7 @@ boolean unit_should_autopick_weapon(
 	long weapon_index)
 {
 	struct weapon_datum *weapon;
-	struct weapon_definition *volatile weapon_definition;
+	struct weapon_definition *weapon_definition;
 	long weapon_count;
 
 	weapon = weapon_try_and_get(weapon_index);
@@ -2534,7 +2401,7 @@ boolean unit_should_autopick_weapon(
 	return TRUE;
 }
 
-long code_000aa160(
+static long players_compute_local_player_count(
 	void)
 {
 	long local_player_count = 0;
@@ -2551,27 +2418,20 @@ long code_000aa160(
 	return local_player_count;
 }
 
-void code_000aa180(
-	void)
-{
-	return;
-}
-
-/* Exact-emission foundation: the players_update_after_game call is inlined,
-   while VC7 also emits this private helper with January's register ABI. */
-static void code_000aa220(
+/* Reset the per-tick interaction proposal before scanning nearby objects. */
+static void player_reset_action_result(
 	long player_index)
 {
 	struct player_datum *player;
 
 	player = player_get(player_index);
-	player->action_result = 0;
+	player->action_result = _player_action_result_reload;
 	player->action_object_index = NONE;
 
 	return;
 }
 
-static boolean code_000aa240(
+static boolean player_handle_weapon_swap(
 	long player_index)
 {
 	struct player_datum *player;
@@ -2584,7 +2444,7 @@ static boolean code_000aa240(
 	result = FALSE;
 	switch (player->action_result)
 	{
-	case 6:
+	case _player_action_result_swap_for_weapon:
 		if (unit_drop_current_weapon(player->unit_index, TRUE) &&
 			unit_add_weapon_to_inventory(
 				player->unit_index,
@@ -2600,7 +2460,7 @@ static boolean code_000aa240(
 		result = TRUE;
 		break;
 
-	case 7:
+	case _player_action_result_add_weapon_to_inventory:
 		if (unit_add_weapon_to_inventory(
 			player->unit_index,
 			player->action_object_index,
@@ -2623,14 +2483,13 @@ boolean player_handle_powerup(
 	short duration)
 {
 	struct player_datum *player;
-	long powerup_index;
 	struct unit_datum *unit;
 
 	player = player_get(player_index);
 	match_assert("c:\\halo\\SOURCE\\game\\players.c", 0xAEE,
 		powerup_type>=0 && powerup_type<NUMBER_OF_PLAYER_POWERUPS);
 
-	if (powerup_type == 0)
+	if (powerup_type == _player_powerup_active_camouflage)
 	{
 		long unit_index = player->unit_index;
 
@@ -2639,30 +2498,12 @@ boolean player_handle_powerup(
 			return FALSE;
 	}
 
-	powerup_index = powerup_type;
-	if (player->powerup_durations[powerup_index] == 0)
-	{
-		struct player_datum *powerup_player;
-
-		powerup_player = player_get(player_index);
-		unit = unit_get(powerup_player->unit_index);
-		if (powerup_index == 0)
-		{
-			SET_FLAG(unit->unit.flags, _unit_active_camouflaged_bit, TRUE);
-			unit->unit.cause_for_camo_regrowth = (short)powerup_index;
-		}
-	}
+	if (player->powerup_durations[powerup_type] == 0)
+		player_powerup_on(player_index, powerup_type);
 	else if (!game_engine_running())
-	{
-		struct player_datum *powerup_player;
+		player_powerup_additional(player_index, powerup_type);
 
-		powerup_player = player_get(player_index);
-		unit = unit_get(powerup_player->unit_index);
-		if (powerup_index == 0)
-			SET_FLAG(unit->unit.flags, _unit_super_camouflaged_bit, TRUE);
-	}
-
-	player->powerup_durations[powerup_index] += duration;
+	player->powerup_durations[powerup_type] += duration;
 
 	return TRUE;
 }
@@ -2673,34 +2514,21 @@ void player_handle_powerup_minor(
 	short duration)
 {
 	struct player_datum *player;
-	struct unit_datum *unit;
-	long powerup_index;
 
 	player = player_get(player_index);
 	match_assert("c:\\halo\\SOURCE\\game\\players.c", 0xB19,
 		powerup_type>=0 && powerup_type<NUMBER_OF_PLAYER_POWERUPS);
 
-	powerup_index = powerup_type;
-	if (player->powerup_durations[powerup_index] == 0)
-	{
-		struct player_datum *powerup_player;
+	if (player->powerup_durations[powerup_type] == 0)
+		player_powerup_on(player_index, powerup_type);
 
-		powerup_player = player_get(player_index);
-		unit = unit_get(powerup_player->unit_index);
-		if (powerup_index == 0)
-		{
-			SET_FLAG(unit->unit.flags, _unit_active_camouflaged_bit, TRUE);
-			unit->unit.cause_for_camo_regrowth = (short)powerup_index;
-		}
-	}
-
-	player->powerup_durations[powerup_index] =
-		MAX(player->powerup_durations[powerup_index], duration);
+	player->powerup_durations[powerup_type] =
+		MAX(player->powerup_durations[powerup_type], duration);
 
 	return;
 }
 
-static void code_000aa300(
+static void player_over_shield_screen_effect(
 	long player_index)
 {
 	struct player_datum *player;
@@ -2713,23 +2541,23 @@ static void code_000aa300(
 			struct screen_flash_definition screen_flash = { 0 };
 
 			screen_flash.fade_function =
-				PLAYER_SCREEN_FLASH_FADE_FUNCTION(0x44);
+				over_shield_screen_flash_fade_function;
 			screen_flash.type =
-				PLAYER_SCREEN_FLASH_PARAMETERS(0xBF0)->type;
+				players_static_data.screen_flash_parameters[0].type;
 			screen_flash.priority = 2;
 			screen_flash.duration =
-				PLAYER_SCREEN_FLASH_PARAMETERS(0xBF0)->duration;
+				players_static_data.screen_flash_parameters[0].duration;
 			screen_flash.max_intensity =
-				PLAYER_SCREEN_FLASH_PARAMETERS(0xBF0)->maximum_intensity;
+				players_static_data.screen_flash_parameters[0].maximum_intensity;
 			screen_flash.zero_scale_factor = 0.f;
 			screen_flash.screen_flash_color.alpha =
-				PLAYER_SCREEN_FLASH_COLOR(0x48);
+				over_shield_screen_flash_alpha;
 			screen_flash.screen_flash_color.red =
-				PLAYER_SCREEN_FLASH_PARAMETERS(0xBF0)->red;
+				players_static_data.screen_flash_parameters[0].red;
 			screen_flash.screen_flash_color.green =
-				PLAYER_SCREEN_FLASH_COLOR(0x4C);
+				over_shield_screen_flash_green;
 			screen_flash.screen_flash_color.blue =
-				PLAYER_SCREEN_FLASH_PARAMETERS(0xBF0)->green;
+				players_static_data.screen_flash_parameters[0].green;
 			player_effect_screen_flash(player_index, &screen_flash, 1.f);
 		}
 	}
@@ -2737,7 +2565,7 @@ static void code_000aa300(
 	return;
 }
 
-static void code_000aa3b0(
+static void player_active_camo_screen_effect(
 	long player_index)
 {
 	struct player_datum *player;
@@ -2750,23 +2578,23 @@ static void code_000aa3b0(
 			struct screen_flash_definition screen_flash = { 0 };
 
 			screen_flash.fade_function =
-				PLAYER_SCREEN_FLASH_FADE_FUNCTION(0x50);
+				active_camo_screen_flash_fade_function;
 			screen_flash.type =
-				PLAYER_SCREEN_FLASH_PARAMETERS(0xC04)->type;
+				players_static_data.screen_flash_parameters[1].type;
 			screen_flash.priority = 2;
 			screen_flash.duration =
-				PLAYER_SCREEN_FLASH_PARAMETERS(0xC04)->duration;
+				players_static_data.screen_flash_parameters[1].duration;
 			screen_flash.max_intensity =
-				PLAYER_SCREEN_FLASH_PARAMETERS(0xC04)->maximum_intensity;
+				players_static_data.screen_flash_parameters[1].maximum_intensity;
 			screen_flash.zero_scale_factor = 0.f;
 			screen_flash.screen_flash_color.alpha =
-				PLAYER_SCREEN_FLASH_COLOR(0x54);
+				active_camo_screen_flash_alpha;
 			screen_flash.screen_flash_color.red =
-				PLAYER_SCREEN_FLASH_PARAMETERS(0xC04)->red;
+				players_static_data.screen_flash_parameters[1].red;
 			screen_flash.screen_flash_color.green =
-				PLAYER_SCREEN_FLASH_PARAMETERS(0xC04)->green;
+				players_static_data.screen_flash_parameters[1].green;
 			screen_flash.screen_flash_color.blue =
-				PLAYER_SCREEN_FLASH_COLOR(0x58);
+				active_camo_screen_flash_blue;
 			player_effect_screen_flash(player_index, &screen_flash, 1.f);
 		}
 	}
@@ -2774,7 +2602,7 @@ static void code_000aa3b0(
 	return;
 }
 
-static void code_000aa460(
+static void player_health_pack_screen_effect(
 	long player_index)
 {
 	struct player_datum *player;
@@ -2803,9 +2631,9 @@ static void code_000aa460(
 	return;
 }
 
-/* VC7 inlines this helper into player_handle_powerup_minor while retaining
-   the January-exact private body and register ABI. */
-static void code_000aa4f0(
+/* HCEA authenticates this helper and both callers. Keep the ordinary call
+   topology even when VC7 chooses to inline one call site. */
+static void player_powerup_on(
 	long player_index,
 	short powerup_type)
 {
@@ -2814,7 +2642,7 @@ static void code_000aa4f0(
 
 	player = player_get(player_index);
 	unit = unit_get(player->unit_index);
-	if (powerup_type == 0)
+	if (powerup_type == _player_powerup_active_camouflage)
 	{
 		SET_FLAG(unit->unit.flags, _unit_active_camouflaged_bit, TRUE);
 		unit->unit.cause_for_camo_regrowth = powerup_type;
@@ -2823,10 +2651,8 @@ static void code_000aa4f0(
 	return;
 }
 
-/* Exact-emission foundations: these private helpers match January when their
-   powerup-update callers are present. Unreferenced helpers are currently
-   elided by VC7. */
-static void code_000aa530(
+/* HCEA authenticates the additional/off helpers and their call topology. */
+static void player_powerup_additional(
 	long player_index,
 	short powerup_type)
 {
@@ -2835,52 +2661,28 @@ static void code_000aa530(
 
 	player = player_get(player_index);
 	unit = unit_get(player->unit_index);
-	if (powerup_type == 0)
+	if (powerup_type == _player_powerup_active_camouflage)
 		SET_FLAG(unit->unit.flags, _unit_super_camouflaged_bit, TRUE);
 
 	return;
 }
 
-static void code_000aa560(
+static void player_powerup_off(
 	long player_index,
-	long powerup_type)
+	short powerup_type)
 {
 	struct player_datum *player;
 	struct unit_datum *unit;
 
 	player = player_get(player_index);
 	unit = unit_get(player->unit_index);
-	if ((short)powerup_type == 0)
+	if (powerup_type == _player_powerup_active_camouflage)
 		SET_FLAG(unit->unit.flags, _unit_active_camouflaged_bit, FALSE);
 
 	return;
 }
 
-static __inline real player_action_distance3d(
-	real_point3d const *a,
-	real_point3d const *b)
-{
-	real_vector3d v;
-
-	vector_from_points3d(a, b, &v);
-	return square_root(v.j*v.j + v.i*v.i + v.k*v.k);
-}
-
-static __inline real player_action_new_distance3d(
-	real_point3d const *a,
-	real_point3d const *b)
-{
-	real_vector3d v;
-	real magnitude_squared;
-
-	vector_from_points3d(a, b, &v);
-	magnitude_squared = v.k*v.k;
-	magnitude_squared += v.j*v.j;
-	magnitude_squared += v.i*v.i;
-	return square_root(magnitude_squared);
-}
-
-static __declspec(noinline) void code_000ab350(
+static void player_set_action_result(
 	long player_index,
 	short action_result,
 	long object_index,
@@ -2896,7 +2698,7 @@ static __declspec(noinline) void code_000ab350(
 
 	player = player_get(player_index);
 	set_action = TRUE;
-	if (action_result != 11)
+	if (action_result != _player_action_result_flip_vehicle)
 	{
 		if (action_result == player->action_result)
 		{
@@ -2904,10 +2706,10 @@ static __declspec(noinline) void code_000ab350(
 			current_position =
 				&object_get(player->action_object_index)->object.position;
 			new_position = &object_get(object_index)->object.position;
-			current_distance = player_action_distance3d(
+			current_distance = distance3d(
 				unit_position,
 				current_position);
-			new_distance = player_action_new_distance3d(
+			new_distance = distance3d(
 				unit_position,
 				new_position);
 			if (!(current_distance > new_distance))
@@ -2927,31 +2729,28 @@ static __declspec(noinline) void code_000ab350(
 	return;
 }
 
-static void code_000ac0b0(
+static void player_examine_nearby_vehicle(
 	long player_index,
 	long vehicle_index)
 {
 	struct player_datum *player;
-	struct vehicle_datum *vehicle;
-	struct vehicle_datum *test_vehicle;
+	struct players_vehicle_datum *vehicle;
 	struct unit_datum *unit;
-	struct player_vehicle_difficulty_information *difficulty_information;
-	real vehicle_ram_angle;
+	struct game_globals_player_control *player_control;
+	real flipping_angle;
 	short seat_state;
 
 	player = player_get(player_index);
-	vehicle = (struct vehicle_datum *)vehicle_get(vehicle_index);
+	vehicle = (struct players_vehicle_datum *)vehicle_get(vehicle_index);
 	if (!TEST_FLAG(vehicle->object.damage_flags, _object_dead_bit))
 	{
-		difficulty_information = TAG_BLOCK_GET_ELEMENT(
-			(struct tag_block *)((byte *)scenario_get_game_globals() + 0x110),
+		player_control = TAG_BLOCK_GET_ELEMENT(
+			&scenario_get_game_globals()->player_control,
 			0,
-			struct player_vehicle_difficulty_information);
-		vehicle_ram_angle =
-			(_pi * 0.5f) - difficulty_information->vehicle_ram_angle;
-		test_vehicle = (struct vehicle_datum *)vehicle_get(vehicle_index);
-		if (*(real *)((byte *)test_vehicle + 0x38) >
-			cosine(vehicle_ram_angle))
+			struct game_globals_player_control);
+		flipping_angle =
+			(_pi * 0.5f) - player_control->minimum_vehicle_flipping_angle;
+		if (vehicle->object.up.k > cosine(flipping_angle))
 		{
 			if (!unit_overcharged(player->unit_index))
 			{
@@ -2959,7 +2758,7 @@ static void code_000ac0b0(
 				if (magnitude_squared3d(&unit->object.translational_velocity) < 0.01f)
 				{
 					if (magnitude_squared3d(
-						&((struct vehicle_datum *)vehicle_get(
+						&((struct players_vehicle_datum *)vehicle_get(
 							vehicle_index))->object.angular_velocity) <
 						0.01f)
 					{
@@ -2972,7 +2771,7 @@ static void code_000ac0b0(
 							&seat_index);
 						switch (seat_state)
 						{
-						case 2:
+						case _unit_nearby_seat_available:
 							if (seat_index == NONE)
 							{
 								display_assert(
@@ -2982,14 +2781,14 @@ static void code_000ac0b0(
 									TRUE);
 								system_exit(-1);
 							}
-							code_000ab350(
+							player_set_action_result(
 								player_index,
-								8,
+								_player_action_result_enter_vehicle,
 								vehicle_index,
 								seat_index);
 							break;
 
-						case 1:
+						case _unit_nearby_seat_occupied:
 							if (seat_index == NONE)
 							{
 								display_assert(
@@ -2999,9 +2798,9 @@ static void code_000ac0b0(
 									TRUE);
 								system_exit(-1);
 							}
-							code_000ab350(
+							player_set_action_result(
 								player_index,
-								9,
+								_player_action_result_evict_from_vehicle,
 								vehicle_index,
 								seat_index);
 							break;
@@ -3010,17 +2809,21 @@ static void code_000ac0b0(
 				}
 			}
 		}
-		else if (!TEST_FLAG(vehicle->vehicle.flags, 4) &&
+		else if (!TEST_FLAG(vehicle->vehicle.flags, _vehicle_upending_bit) &&
 			vehicle->unit.driver_object_index == NONE)
 		{
-			code_000ab350(player_index, 11, vehicle_index, NONE);
+			player_set_action_result(
+				player_index,
+				_player_action_result_flip_vehicle,
+				vehicle_index,
+				NONE);
 		}
 	}
 
 	return;
 }
 
-static void code_000acb50(
+static void player_examine_nearby_item(
 	long player_index,
 	long item_index)
 {
@@ -3075,7 +2878,7 @@ static void code_000acb50(
 	if (equipment)
 	{
 		equipment_definition = equipment_definition_get(equipment->definition_index);
-		if (equipment_definition->equipment.powerup_type == 6)
+		if (equipment_definition->equipment.powerup_type == _equipment_powerup_grenade)
 		{
 			if (unit_add_grenade_to_inventory(player->unit_index, item_index))
 			{
@@ -3084,17 +2887,18 @@ static void code_000acb50(
 					equipment->definition_index);
 			}
 		}
-		else if (equipment_definition->equipment.powerup_type != 0)
+		else if (equipment_definition->equipment.powerup_type != _equipment_powerup_none)
 		{
 			current_equipment_index = unit_get_current_equipment(player->unit_index);
 			if (current_equipment_index == NONE)
 			{
-				code_000ac320(player_index, item_index);
+				player_handle_powerup_equipment(player_index, item_index);
 			}
 			else
 			{
-				/* Original bug: the current equipment is verified, but its
-				 * definition is not used. To fix this, pass
+				/* BUG (original): January code and the HCEA disassembly both
+				 * re-fetch the current equipment but then use the nearby
+				 * equipment's definition again. A corrected build should pass
 				 * equipment_get(current_equipment_index)->definition_index to
 				 * equipment_definition_get below. */
 				equipment_get(current_equipment_index);
@@ -3103,7 +2907,11 @@ static void code_000acb50(
 				if (equipment_definition->equipment.powerup_type !=
 					current_equipment_definition->equipment.powerup_type)
 				{
-					code_000ab350(player_index, 5, item_index, NONE);
+					player_set_action_result(
+						player_index,
+						_player_action_result_swap_for_powerup,
+						item_index,
+						NONE);
 				}
 			}
 		}
@@ -3177,15 +2985,23 @@ static void code_000acb50(
 			unit_approve_weapon_swap(player->unit_index, weapon_item_index))
 		{
 			current_weapon = weapon_try_and_get(current_weapon_index);
-			if (*(volatile long *)&weapon_count == 1 &&
+			if (weapon_count == 1 &&
 				current_weapon &&
 				current_weapon->definition_index != weapon->definition_index)
 			{
-				code_000ab350(player_index, 7, weapon_item_index, NONE);
+				player_set_action_result(
+					player_index,
+					_player_action_result_add_weapon_to_inventory,
+					weapon_item_index,
+					NONE);
 			}
 			else
 			{
-				code_000ab350(player_index, 6, weapon_item_index, NONE);
+				player_set_action_result(
+					player_index,
+					_player_action_result_swap_for_weapon,
+					weapon_item_index,
+					NONE);
 			}
 		}
 	}
@@ -3193,7 +3009,7 @@ static void code_000acb50(
 	return;
 }
 
-void code_000ac270(
+static void player_examine_nearby_device(
 	long player_index,
 	long device_index)
 {
@@ -3210,17 +3026,21 @@ void code_000ac270(
 		&camera_position,
 		&unit->unit.aiming_vector,
 		&device->object.bounding_sphere_center,
-		*(volatile real *)&device->object.bounding_sphere_radius) &&
+		device->object.bounding_sphere_radius) &&
 		device_frontfacing(device_index, &camera_position, &unit->unit.aiming_vector) &&
 		device_can_change_position(device_index))
 	{
-		code_000ab350(player_index, 10, device_index, NONE);
+		player_set_action_result(
+			player_index,
+			_player_action_result_touch_device,
+			device_index,
+			NONE);
 	}
 
 	return;
 }
 
-void code_000ac320(
+void player_handle_powerup_equipment(
 	long player_index,
 	long equipment_index)
 {
@@ -3248,13 +3068,13 @@ void code_000ac320(
 	{
 		if (!object_double_charge_shield(player->unit_index))
 			return;
-		code_000aa300(player_index);
+		player_over_shield_screen_effect(player_index);
 	}
 	else if (powerup_type == _equipment_powerup_health)
 	{
 		if (!object_restore_body(player->unit_index))
 			return;
-		code_000aa460(player_index);
+		player_health_pack_screen_effect(player_index);
 	}
 	else
 	{
@@ -3280,7 +3100,7 @@ void code_000ac320(
 		if (!player_handle_powerup(player_index, (short)powerup_index, duration))
 			return;
 		if ((short)powerup_index == 0)
-			code_000aa3b0(player_index);
+			player_active_camo_screen_effect(player_index);
 	}
 
 	equipment = equipment_get(equipment_index);
@@ -3315,7 +3135,7 @@ void players_handle_deleted_object(
 	return;
 }
 
-static void code_000ace70(
+static void player_examine_nearby_objects(
 	long player_index)
 {
 	struct player_datum *player;
@@ -3348,16 +3168,16 @@ static void code_000ace70(
 					continue;
 
 				case _object_type_vehicle:
-					code_000ac0b0(player_index, object_indices[object_number]);
+					player_examine_nearby_vehicle(player_index, object_indices[object_number]);
 					break;
 
 				case _object_type_weapon:
 				case _object_type_equipment:
-					code_000acb50(player_index, object_indices[object_number]);
+					player_examine_nearby_item(player_index, object_indices[object_number]);
 					break;
 
 				case _object_type_control:
-					code_000ac270(player_index, object_indices[object_number]);
+					player_examine_nearby_device(player_index, object_indices[object_number]);
 					break;
 				}
 			}
@@ -3367,7 +3187,7 @@ static void code_000ace70(
 	return;
 }
 
-static long code_000a9f80(
+static long unit_create_starting_weapon(
 	struct scenario_starting_profile_weapon const *starting_weapon,
 	long unit_index)
 {
@@ -3428,7 +3248,7 @@ void player_add_equipment(
 
 			if (starting_profile->primary_weapon.weapon.index != NONE)
 			{
-				weapon_index = code_000a9f80(
+				weapon_index = unit_create_starting_weapon(
 					&starting_profile->primary_weapon,
 					unit_index);
 				if (weapon_index != NONE &&
@@ -3444,7 +3264,7 @@ void player_add_equipment(
 
 			if (starting_profile->secondary_weapon.weapon.index != NONE)
 			{
-				weapon_index = code_000a9f80(
+				weapon_index = unit_create_starting_weapon(
 					&starting_profile->secondary_weapon,
 					unit_index);
 				if (weapon_index != NONE &&
@@ -3536,6 +3356,365 @@ void player_aiming_vector_from_facing(
 			}
 		}
 	}
+
+	return;
+}
+
+void players_update_before_game(
+	void)
+{
+	struct player_action actions[NETWORK_GAME_MAXIMUM_PLAYER_COUNT];
+	struct data_iterator iterator;
+	struct player_datum *player;
+	struct unit_datum *unit;
+	struct player_action *action;
+	struct unit_control_data control_data;
+	struct unit_control_data *control_data_pointer;
+	long weapon_index;
+	short action_index;
+
+	profile_enter(PLAYERS_UPDATE_BEFORE_GAME_PROFILE);
+	if (update_client_dequeue(actions))
+	{
+		data_iterator_new(&iterator, player_data);
+		while (player = data_iterator_next(&iterator))
+		{
+			action_index = (short)iterator.datum_index;
+			action = &actions[action_index];
+			match_assert(
+				"c:\\halo\\SOURCE\\game\\players.c",
+				0x256,
+				action_index >= 0 && action_index < NETWORK_GAME_MAXIMUM_PLAYER_COUNT);
+			match_assert_valid_real(
+				"c:\\halo\\SOURCE\\game\\players.c",
+				0x25B,
+				action->desired_facing.pitch);
+			match_assert_valid_real(
+				"c:\\halo\\SOURCE\\game\\players.c",
+				0x25C,
+				action->desired_facing.yaw);
+			match_vassert(
+				"c:\\halo\\SOURCE\\game\\players.c",
+				0x25D,
+				valid_real_vector2d(&action->throttle),
+				csprintf(
+					temporary,
+					"%s: assert_valid_real_vector2d(%f, %f)",
+					"&action->throttle",
+					action->throttle.i,
+					action->throttle.j));
+			match_assert_valid_real(
+				"c:\\halo\\SOURCE\\game\\players.c",
+				0x25E,
+				action->primary_trigger);
+			match_assert(
+				"c:\\halo\\SOURCE\\game\\players.c",
+				0x260,
+				action->desired_weapon_index == NONE ||
+				(action->desired_weapon_index >= 0 &&
+				action->desired_weapon_index <= MAXIMUM_WEAPONS_PER_UNIT));
+			match_assert(
+				"c:\\halo\\SOURCE\\game\\players.c",
+				0x261,
+				action->desired_grenade_index == NONE ||
+				(action->desired_grenade_index >= 0 &&
+				action->desired_grenade_index <= NUMBER_OF_UNIT_GRENADE_TYPES));
+			match_assert(
+				"c:\\halo\\SOURCE\\game\\players.c",
+				0x262,
+				action->desired_zoom_level == NONE || action->desired_zoom_level >= 0);
+
+			if (player->unit_index == NONE && !game_in_editor())
+			{
+				if (game_engine_running())
+				{
+					if (game_engine_should_spawn_player(iterator.datum_index))
+					{
+						game_engine_prespawn_player_update(iterator.datum_index);
+						player_spawn(iterator.datum_index);
+						if (player->unit_index != NONE)
+							game_engine_postspawn_player_update(iterator.datum_index);
+						else
+							player->respawn_timer = 1;
+					}
+				}
+				else if (!main_menu_is_active())
+				{
+					if (player->statistics.deaths == 0)
+						player_spawn(iterator.datum_index);
+					else if (!players_globals->all_dead)
+						main_respawn(players_globals->respawn_failed);
+				}
+			}
+
+			if (player->unit_index != NONE && unit_controllable(player->unit_index))
+			{
+				unit = unit_get(player->unit_index);
+				if (!players_globals->input_disabled)
+				{
+					if (TEST_FLAG(action->control_flags, _unit_control_action_bit) &&
+						unit->object.parent_object_index == NONE &&
+						!player_handle_action(iterator.datum_index))
+					{
+						SET_FLAG(action->control_flags, _unit_control_weapon_reload_bit, TRUE);
+					}
+
+					if (TEST_FLAG(action->control_flags, _unit_control_swap_weapons_bit) &&
+						unit->object.parent_object_index == NONE)
+					{
+						if (!player->swapped_weapons)
+							player->swapped_weapons = player_handle_weapon_swap(iterator.datum_index);
+					}
+					else
+					{
+						player->swapped_weapons = FALSE;
+					}
+
+					if (TEST_FLAG(action->control_flags, _unit_control_use_equipment_bit) &&
+						unit->unit.equipment_object_index != NONE)
+					{
+						player_handle_powerup_equipment(
+							iterator.datum_index,
+							unit->unit.equipment_object_index);
+						unit_delete_current_equipment(player->unit_index);
+					}
+
+					weapon_index = unit_inventory_get_weapon(
+						player->unit_index,
+						unit->unit.current_weapon_index);
+					if (weapon_index != NONE && weapon_must_be_readied(weapon_index))
+					{
+						if (TEST_FLAG(action->control_flags, _unit_control_weapon_primary_trigger_bit) ||
+							TEST_FLAG(action->control_flags, _unit_control_weapon_secondary_trigger_bit))
+						{
+							unit_drop_current_weapon(player->unit_index, TRUE);
+						}
+						action->desired_weapon_index = unit->unit.current_weapon_index;
+					}
+
+					control_data.control_flags = (word)action->control_flags;
+					player_aiming_vector_from_facing(
+						iterator.datum_index,
+						&control_data.aiming_vector,
+						&action->desired_facing);
+					control_data.facing_vector =
+						control_data.looking_vector = control_data.aiming_vector;
+					control_data.throttle.i = action->throttle.i;
+					control_data.throttle.j = action->throttle.j;
+					control_data.throttle.k = 0.f;
+					control_data.primary_trigger = action->primary_trigger;
+					control_data.animation_state = _unit_animation_state_in_combat;
+					control_data.weapon_index = action->desired_weapon_index;
+					control_data.grenade_index = action->desired_grenade_index;
+					control_data.zoom_level = action->desired_zoom_level;
+					control_data.aiming_speed = 0;
+
+					match_assert(
+						"c:\\halo\\SOURCE\\game\\players.c",
+						0x2E3,
+						control_data.weapon_index == NONE ||
+						(control_data.weapon_index >= 0 &&
+						control_data.weapon_index <= MAXIMUM_WEAPONS_PER_UNIT));
+					match_assert(
+						"c:\\halo\\SOURCE\\game\\players.c",
+						0x2E4,
+						control_data.grenade_index == NONE ||
+						(control_data.grenade_index >= 0 &&
+						control_data.grenade_index <= NUMBER_OF_UNIT_GRENADE_TYPES));
+					match_assert(
+						"c:\\halo\\SOURCE\\game\\players.c",
+						0x2E5,
+						control_data.zoom_level == NONE || control_data.zoom_level >= 0);
+					control_data_pointer = &control_data;
+				}
+				else if (unit->unit.swarm_actor_index == NONE &&
+					unit->unit.actor_index == NONE)
+				{
+					struct unit_control_data inhibited_control_data;
+
+					inhibited_control_data.animation_state = _unit_animation_state_in_combat;
+					inhibited_control_data.aiming_speed = 0;
+					inhibited_control_data.control_flags = 0;
+					inhibited_control_data.weapon_index = NONE;
+					inhibited_control_data.grenade_index = NONE;
+					inhibited_control_data.zoom_level = NONE;
+					inhibited_control_data.throttle = *global_zero_vector3d;
+					inhibited_control_data.facing_vector = unit->unit.desired_facing_vector;
+					inhibited_control_data.aiming_vector = unit->unit.desired_aiming_vector;
+					inhibited_control_data.primary_trigger = 0.f;
+					inhibited_control_data.looking_vector = unit->unit.desired_looking_vector;
+					control_data_pointer = &inhibited_control_data;
+				}
+				else
+				{
+					control_data_pointer = NULL;
+				}
+
+				if (control_data_pointer)
+					unit_control(player->unit_index, control_data_pointer);
+			}
+		}
+
+		players_compute_combined_pvs(players_globals->combined_pvs_local, TRUE);
+		players_compute_combined_pvs(players_globals->combined_pvs, FALSE);
+		players_globals->local_player_count = (short)players_compute_local_player_count();
+	}
+	else
+	{
+		display_assert(NULL, "c:\\halo\\SOURCE\\game\\players.c", 0x30B, TRUE);
+		system_exit(-1);
+	}
+
+	profile_exit(PLAYERS_UPDATE_BEFORE_GAME_PROFILE);
+
+	return;
+}
+
+void players_update_after_game(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	struct unit_datum *unit;
+	struct object_datum *root_object;
+	struct tag_block *bsp_switch_trigger_volumes;
+	struct scenario_bsp_switch_trigger_volume *bsp_switch_trigger_volume;
+	long telefrag_ticks;
+	long root_object_index;
+	long message_list_index;
+	short bsp_switch_trigger_volume_index;
+
+	profile_enter(PLAYERS_UPDATE_AFTER_GAME_PROFILE);
+
+	if (players_globals->double_speed_ticks > 0)
+	{
+		players_globals->double_speed_ticks--;
+		if (players_globals->double_speed_ticks == 0)
+			game_set_players_are_double_speed(FALSE);
+	}
+
+	data_iterator_new(&iterator, player_data);
+	while (player = data_iterator_next(&iterator))
+	{
+		if (!player->is_blocking_teleporter)
+		{
+			if (player->telefrag_timeout > 0)
+				player->telefrag_timeout--;
+		}
+		else
+		{
+			telefrag_ticks = player->telefrag_timeout;
+			if (telefrag_ticks >= 90)
+			{
+				if (player->unit_index != NONE)
+				{
+					unit = unit_get(player->unit_index);
+					if (!TEST_FLAG(unit->object.damage_flags, _object_die_act_of_god_bit))
+					{
+						if (player->local_player_index != NONE)
+						{
+							message_list_index = tag_loaded(
+								UNICODE_STRING_LIST_TAG,
+								"ui\\multiplayer_game_text");
+							hud_print_message(
+								player->local_player_index,
+								message_list_index != NONE
+									? unicode_string_list_get_string(
+										message_list_index,
+										MULTIPLAYER_GAME_TEXT_YOU_WERE_TELEFRAGGED)
+									: L"");
+						}
+
+						player_telefrag_effect_stop(iterator.datum_index);
+						unit_kill(player->unit_index);
+					}
+				}
+			}
+			else
+			{
+				player_telefrag_effect_start(
+					iterator.datum_index,
+					(real)telefrag_ticks * (1.f / 90.f));
+			}
+		}
+
+		player->is_blocking_teleporter = FALSE;
+		if (player->unit_index != NONE)
+			player_update_powerups(iterator.datum_index);
+
+		if (player->unit_index != NONE)
+		{
+			root_object_index = object_get_ultimate_parent(player->unit_index);
+			root_object = object_get(root_object_index);
+			if (!TEST_FLAG(root_object->object.flags, _object_outside_of_map_bit))
+			{
+				bsp_switch_trigger_volumes = &global_scenario_get()->bsp_switch_trigger_volumes;
+				for (bsp_switch_trigger_volume_index = 0;
+					bsp_switch_trigger_volume_index < bsp_switch_trigger_volumes->count;
+					bsp_switch_trigger_volume_index++)
+				{
+					bsp_switch_trigger_volume = TAG_BLOCK_GET_ELEMENT(
+						bsp_switch_trigger_volumes,
+						bsp_switch_trigger_volume_index,
+						struct scenario_bsp_switch_trigger_volume);
+					if (bsp_switch_trigger_volume->source_structure_bsp_index ==
+						global_structure_bsp_index &&
+						scenario_trigger_volume_test_object(
+							bsp_switch_trigger_volume->trigger_volume_index,
+							player->unit_index))
+					{
+						if (players_globals->local_player_triggered_switch !=
+							_local_player_triggered_switch_none &&
+							players_globals->local_player_triggered_switch !=
+							(byte)player->local_player_index)
+						{
+							error(
+								2,
+								"!!!WARNING!!! teleported player triggering a bsp switch!!!");
+						}
+
+						players_globals->bsp_check_recursive_switch_ticks = 0;
+						players_globals->local_player_triggered_switch =
+							(byte)player->local_player_index;
+						players_globals->pending_teleport_starting_location_index =
+							bsp_switch_trigger_volume_index;
+						main_switch_structure_bsp(
+							bsp_switch_trigger_volume->destination_structure_bsp_index);
+					}
+				}
+			}
+		}
+
+		player_reset_action_result(iterator.datum_index);
+		player_examine_nearby_objects(iterator.datum_index);
+	}
+
+	if (players_globals->local_player_triggered_switch !=
+		_local_player_triggered_switch_none)
+	{
+		players_globals->bsp_check_recursive_switch_ticks++;
+		if (players_globals->bsp_check_recursive_switch_ticks > 0xC)
+		{
+			players_globals->local_player_triggered_switch =
+				_local_player_triggered_switch_none;
+			players_globals->bsp_check_recursive_switch_ticks = 0;
+		}
+	}
+
+	if (players_globals->all_dead)
+	{
+		if (!game_engine_running() && !players_lost_map_started)
+		{
+			main_lost_map();
+			players_lost_map_started = TRUE;
+		}
+	}
+	else if (players_lost_map_started)
+	{
+		players_lost_map_started = FALSE;
+	}
+
+	profile_exit(PLAYERS_UPDATE_AFTER_GAME_PROFILE);
 
 	return;
 }

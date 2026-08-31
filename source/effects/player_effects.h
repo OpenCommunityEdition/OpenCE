@@ -13,6 +13,8 @@ header included in hcex build.
 #include "cseries/cseries.h"
 #include "math/real_math.h"
 
+struct screen_flash_definition;
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -32,5 +34,14 @@ void player_effect_dispose_from_old_map(
 void scripted_player_effect_set_rumble(
 	real left_motor,
 	real right_motor);
+void player_effect_screen_flash(
+	long player_index,
+	struct screen_flash_definition const *screen_flash,
+	real scale);
+void player_telefrag_effect_stop(
+	long player_index);
+void player_telefrag_effect_start(
+	long player_index,
+	real intensity);
 
 #endif // __PLAYER_EFFECTS_H

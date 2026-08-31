@@ -19,6 +19,20 @@ header included in hcex build.
 void hud_load(
 	boolean load);
 
+void hud_picked_up_powerup(
+	short local_player_index,
+	long powerup_definition_index);
+void hud_picked_up_grenade(
+	short local_player_index,
+	long grenade_definition_index);
+void hud_picked_up_ammunition(
+	short local_player_index,
+	long weapon_definition_index,
+	short ammunition_count);
+void hud_picked_up_weapon(
+	short local_player_index,
+	long weapon_definition_index);
+
 /* ---------- globals */
 
 /* ---------- public code */

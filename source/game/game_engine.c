@@ -618,15 +618,6 @@ struct game_engine_stage
 	struct game_variant variant;
 };
 
-struct player_starting_location
-{
-	real_point3d position;
-	real facing;
-	short team_index;
-	word pad12;
-	short game_types[4];
-};
-
 struct postgame_statistic_entry
 {
 	long values[7];
@@ -689,9 +680,6 @@ typedef char verify_game_engine_stage_variant_offset[
 	offsetof(struct game_engine_stage, variant) == 0x40 ? 1 : -1];
 typedef char verify_game_engine_stage_size[
 	sizeof(struct game_engine_stage) == 0xA8 ? 1 : -1];
-typedef char verify_player_starting_location_game_types_offset[
-	offsetof(struct player_starting_location, game_types) == 0x14 ? 1 : -1];
-
 struct scenario_netgame_flag
 {
 	real_point3d position;
@@ -3731,8 +3719,8 @@ static void game_engine_update_teleporter(
 							{
 								struct player_datum *blocking_player =
 									player_get(blocking_unit->unit.player_index);
-								blocking_player->unknown_d0 = TRUE;
-								blocking_player->unknown_c8++;
+								blocking_player->is_blocking_teleporter = TRUE;
+								blocking_player->telefrag_timeout++;
 							}
 						}
 					}

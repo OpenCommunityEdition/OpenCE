@@ -694,12 +694,6 @@ enum
 
 enum
 {
-	_equipment_powerup_none = 0,
-	_equipment_powerup_grenade = 6,
-};
-
-enum
-{
 	_unit_add_weapon_normal = 0,
 	_unit_add_weapon_starting,
 	_unit_add_weapon_replace,
@@ -4990,12 +4984,6 @@ short unit_find_nearby_seat(
 	long target_unit_index,
 	short *parent_seat_index)
 {
-	enum
-	{
-		_unit_nearby_seat_none = 0,
-		_unit_nearby_seat_occupied,
-		_unit_nearby_seat_available,
-	};
 	enum
 	{
 		_unit_seat_requires_driver_bit = 9,

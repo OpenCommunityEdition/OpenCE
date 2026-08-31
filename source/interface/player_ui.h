@@ -28,6 +28,8 @@ void player_ui_dispose(
 	void);
 void player_ui_reset_single_player_local_player_controllers(
 	void);
+short player_ui_get_single_player_local_player_controller(
+	short local_player_index);
 short player_ui_get_single_player_local_player_from_controller(
 	short controller_index);
 void player_ui_autojoin_players_to_next_multiplayer_game(

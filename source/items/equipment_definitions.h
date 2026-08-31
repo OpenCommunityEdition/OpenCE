@@ -17,6 +17,18 @@ enum
 	EQUIPMENT_DEFINITION_TAG = 'eqip',
 };
 
+enum equipment_powerup_type
+{
+	_equipment_powerup_none = 0,
+	_equipment_powerup_double_speed,
+	_equipment_powerup_overshield,
+	_equipment_powerup_active_camouflage,
+	_equipment_powerup_full_spectrum_vision,
+	_equipment_powerup_health,
+	_equipment_powerup_grenade,
+	NUMBER_OF_EQUIPMENT_POWERUP_TYPES,
+};
+
 /* ---------- macros */
 
 #define equipment_definition_get(index) ((struct equipment_definition *)tag_get(EQUIPMENT_DEFINITION_TAG, (index)))

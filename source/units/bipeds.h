@@ -95,6 +95,15 @@ void biped_get_sight_position(
 	real_vector3d const *desired_gun_offset,
 	real_point3d *sight_position);
 void biped_get_physics_pill(long biped_index, real_point3d *base, real *height, real *width);
+boolean biped_fix_position(
+	long unit_index,
+	long seat_index,
+	real_point3d *initial_position,
+	real_point3d *final_position,
+	real scale,
+	boolean keep_basis,
+	boolean dont_teleport,
+	boolean scale_by_height);
 
 void biped_stop_limp_body_physics(long biped_index);
 void biped_start_limp_body_physics(

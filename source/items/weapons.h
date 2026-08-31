@@ -215,6 +215,11 @@ boolean weapon_is_flag(long weapon_index);
 char const *weapon_get_label(long weapon_index);
 
 void weapon_ready(long weapon_index);
+boolean weapon_handle_potential_inventory_item(
+	long inventory_item_index,
+	long weapon_index,
+	short local_player_index,
+	short *ammunition_count);
 void weapon_unready(long weapon_index);
 boolean weapon_put_away(long weapon_index, boolean immediate);
 

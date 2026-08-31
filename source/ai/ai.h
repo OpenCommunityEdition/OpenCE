@@ -90,6 +90,13 @@ struct ai_information_packet
 void ai_globals_dialogue_triggers_enabled(
 	boolean enabled);
 
+boolean ai_enemies_attacking_player(
+	void);
+boolean ai_try_vehicle_eviction(
+	long actor_index,
+	long entering_unit_index,
+	boolean immediate);
+
 boolean ai_release_inactive_swarms(char *result_description, unsigned char *more_to_release, unsigned char *working_memory, short working_memory_size);
 void ai_find_inactive_encounters(unsigned char *working_memory, short working_memory_size);
 boolean ai_release_inactive_encounters(char *result_description, unsigned char *more_to_release, unsigned char *working_memory, short working_memory_size);

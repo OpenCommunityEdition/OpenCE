@@ -99,6 +99,9 @@ boolean device_frontfacing(
 	long device_index,
 	real_point3d const *position,
 	real_vector3d const *facing);
+void device_touched(
+	long device_index,
+	long unit_index);
 void device_effect_new(
 	long device_index,
 	long effect_index);

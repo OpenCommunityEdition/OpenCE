@@ -19,6 +19,13 @@ enum
 	NUMBER_OF_UNIT_USER_ANIMATIONS = 2,
 };
 
+enum unit_nearby_seat_result
+{
+	_unit_nearby_seat_none = 0,
+	_unit_nearby_seat_occupied,
+	_unit_nearby_seat_available,
+};
+
 enum
 {
 	MAXIMUM_ATTACKERS_PER_UNIT = 4,
@@ -334,6 +341,8 @@ enum
 
 /* ---------- structures */
 
+struct unit_control_data;
+
 struct unit_animation
 {
 	word flags;
@@ -520,6 +529,8 @@ void unit_kill_no_statistics(
 	long unit_index);
 void unit_delete(
 	long unit_index);
+void unit_exit_seat_end(
+	long unit_index);
 void units_update(void);
 
 short unit_get_zoom_level(
@@ -630,10 +641,17 @@ void unit_delete_current_equipment(
 	long unit_index);
 void unit_delete_all_weapons(
 	long unit_index);
+boolean unit_add_equipment_to_inventory(
+	long unit_index,
+	long equipment_index,
+	boolean replace);
 boolean unit_add_weapon_to_inventory(
 	long unit_index,
 	long weapon_index,
 	long is_starting_weapon);
+boolean unit_add_grenade_to_inventory(
+	long unit_index,
+	long equipment_index);
 short unit_get_weapon_count(
 	long unit_index);
 boolean unit_get_current_flashlight_state(
@@ -702,6 +720,9 @@ boolean unit_set_seat(
 boolean unit_can_use_weapon(
 	long unit_index,
 	long weapon_index);
+boolean unit_approve_weapon_swap(
+	long unit_index,
+	long weapon_index);
 boolean unit_solo_player_integrated_night_vision_is_active(
 	void);
 short unit_get_animation_frames_remaining(
@@ -709,6 +730,22 @@ short unit_get_animation_frames_remaining(
 	short *animation_state);
 boolean unit_overcharged(
 	long unit_index);
+short unit_find_nearby_seat(
+	long unit_index,
+	long target_unit_index,
+	short *seat_index);
+boolean unit_can_enter_seat(
+	long unit_index,
+	long target_unit_index,
+	short seat_index,
+	long *occupant_unit_index);
+boolean unit_enter_seat(
+	long unit_index,
+	long target_unit_index,
+	short seat_index);
+void unit_control(
+	long unit_index,
+	struct unit_control_data const *control_data);
 boolean unit_has_weapon(
 	long unit_index,
 	long weapon_index);

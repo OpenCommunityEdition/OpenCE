@@ -73,6 +73,21 @@ struct scenario_object_name
 	short runtime_scenario_datum_index;
 };
 
+struct player_starting_location
+{
+	real_point3d position;
+	real facing;
+	short team_index;
+	short structure_bsp_reference_index;
+	short game_types[4];
+	byte unused1C[0x18];
+};
+
+typedef char player_starting_location_size_assert[
+	sizeof(struct player_starting_location) == 0x34 ? 1 : -1];
+typedef char player_starting_location_game_types_offset_assert[
+	offsetof(struct player_starting_location, game_types) == 0x14 ? 1 : -1];
+
 struct scenario_cutscene_camera_point
 {
 	long flags;

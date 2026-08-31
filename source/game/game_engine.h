@@ -8,6 +8,8 @@ header included in hcex build.
 #define __GAME_ENGINE_H
 #pragma once
 
+#include "math/real_math.h"
+
 /* ---------- constants */
 
 enum
@@ -295,6 +297,14 @@ boolean game_engine_display_team_indicators(
 
 boolean game_engine_can_score(
 	void);
+
+real game_engine_get_starting_location_rating(
+	long player_index,
+	struct player_starting_location const *starting_location);
+boolean game_engine_should_spawn_player(
+	long player_index);
+void game_engine_postspawn_player_update(
+	long player_index);
 
 boolean game_engine_allow_pick_up(
 	long unit_index,

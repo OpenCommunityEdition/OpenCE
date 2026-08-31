@@ -223,9 +223,6 @@ void infection_swarm_aim_jump(
 
 void unit_detach_from_parent(
 	long unit_index);
-void unit_control(
-	long unit_index,
-	struct unit_control_data const *control_data);
 
 /* ---------- globals */
 

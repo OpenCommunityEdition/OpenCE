@@ -21,6 +21,9 @@ void hud_messaging_dispose_from_old_map(
 void hud_messaging_dispose(
 	void);
 void scripted_hud_messages_clear(void);
+void hud_print_message(
+	short local_player_index,
+	wchar_t const *message);
 
 /* ---------- globals */
 

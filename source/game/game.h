@@ -119,6 +119,12 @@ struct game_statistics
 
 /* ---------- prototypes/GAME.C */
 
+void game_statistics_record_kill(
+	long dead_unit_index,
+	long killing_player_index,
+	long damage_type,
+	short killing_team_index);
+
 void game_initialize(void);
 void game_dispose(void);
 void game_precache_new_map(char *map_name, boolean blocking);

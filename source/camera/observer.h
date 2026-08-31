@@ -49,6 +49,9 @@ typedef char observer_command_size_assert[
 
 /* ---------- prototypes/OBSERVER.C */
 
+void observer_obsolete_position(
+	short local_player_index);
+
 void observer_initialize(
 	void);
 void observer_dispose_from_old_map(

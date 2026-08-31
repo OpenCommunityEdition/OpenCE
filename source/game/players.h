@@ -20,6 +20,24 @@ enum
 	_player_powerup_full_spectrum_vision,
 	NUMBER_OF_PLAYER_POWERUPS,
 	MAXIMUM_LOCAL_PLAYERS = 4,
+	_local_player_triggered_switch_none = 0xF,
+};
+
+enum player_action_result
+{
+	_player_action_result_reload = 0,
+	_player_action_result_pickup_powerup,
+	_player_action_result_pickup_weapon,
+	_player_action_result_exit_vehicle,
+	_player_action_result_swap_for_grenades,
+	_player_action_result_swap_for_powerup,
+	_player_action_result_swap_for_weapon,
+	_player_action_result_add_weapon_to_inventory,
+	_player_action_result_enter_vehicle,
+	_player_action_result_evict_from_vehicle,
+	_player_action_result_touch_device,
+	_player_action_result_flip_vehicle,
+	NUMBER_OF_PLAYER_ACTION_RESULTS,
 };
 
 
@@ -94,9 +112,9 @@ struct player_datum
 	long death_time;
 	long unknown88;
 	struct game_statistics statistics;
-	long unknown_c8;
+	long telefrag_timeout;
 	long unknown_cc;
-	boolean unknown_d0;
+	boolean is_blocking_teleporter;
 	boolean unknown_d1;
 	byte pad_d2[2];
 };
@@ -113,7 +131,15 @@ struct players_globals
 	short pending_teleport_starting_location_index;
 	short respawn_failure;
 	boolean respawn_failed;
-	byte pad2F;
+	union
+	{
+		byte bsp_switch_state;
+		struct
+		{
+			byte local_player_triggered_switch : 4;
+			byte bsp_check_recursive_switch_ticks : 4;
+		};
+	};
 	unsigned long combined_pvs[16];
 	unsigned long combined_pvs_local[16];
 };
@@ -139,12 +165,12 @@ typedef char player_datum_target_hold_time_offset_assert[
 	offsetof(struct player_datum, target_hold_time) == 0x80 ? 1 : -1];
 typedef char player_datum_statistics_offset_assert[
 	offsetof(struct player_datum, statistics) == 0x8C ? 1 : -1];
-typedef char player_datum_unknown_c8_offset_assert[
-	offsetof(struct player_datum, unknown_c8) == 0xC8 ? 1 : -1];
+typedef char player_datum_telefrag_timeout_offset_assert[
+	offsetof(struct player_datum, telefrag_timeout) == 0xC8 ? 1 : -1];
 typedef char player_datum_unknown_cc_offset_assert[
 	offsetof(struct player_datum, unknown_cc) == 0xCC ? 1 : -1];
-typedef char player_datum_unknown_d0_offset_assert[
-	offsetof(struct player_datum, unknown_d0) == 0xD0 ? 1 : -1];
+typedef char player_datum_is_blocking_teleporter_offset_assert[
+	offsetof(struct player_datum, is_blocking_teleporter) == 0xD0 ? 1 : -1];
 typedef char player_datum_unknown_d1_offset_assert[
 	offsetof(struct player_datum, unknown_d1) == 0xD1 ? 1 : -1];
 typedef char player_datum_size_assert[
@@ -167,10 +193,10 @@ void players_initialize(
 
 boolean local_player_exists(
 	long local_player_index);
-__declspec(noinline) long local_player_get_player_index(
+long local_player_get_player_index(
 	short local_player_index);
 
-__declspec(noinline) short local_player_get_next(
+short local_player_get_next(
 	short local_player_index);
 
 short local_player_count(
@@ -205,9 +231,30 @@ void player_add_equipment(
 	short starting_profile_index,
 	boolean reset_equipment);
 
+boolean player_teleport_internal(
+	long player_index,
+	long source_unit_index,
+	real_point3d const *position);
+
+/* January's target is a one-instruction stub. Keep the authenticated ABI but
+   do not fabricate a C body until provenance explains that implementation. */
+boolean player_examine_nearby_unit(
+	long player_unit_index,
+	long nearby_unit_index);
+
+void players_update_before_game(
+	void);
+void players_update_after_game(
+	void);
+void player_handle_powerup_equipment(
+	long player_index,
+	long equipment_index);
+
 /* ---------- prototypes/PLAYER_QUEUES_NEW.C */
 
 void update_queues_reset_and_fill_with_lies(void);
+boolean update_client_dequeue(
+	struct player_action *actions);
 
 /* ---------- globals */
 

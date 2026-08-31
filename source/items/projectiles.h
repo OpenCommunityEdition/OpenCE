@@ -69,6 +69,8 @@ void projectiles_delete_all(
 	void);
 void projectile_delete(
 	long projectile_index);
+boolean dangerous_projectiles_near_player(
+	void);
 void projectile_set_target_object_index(
 	long projectile_index,
 	long target_object_index);
