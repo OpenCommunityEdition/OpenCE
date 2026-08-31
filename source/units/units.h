@@ -498,6 +498,12 @@ struct unit_datum
 
 /* ---------- prototypes/UNITS.C */
 
+struct unit_control_data;
+
+void unit_control(
+	long unit_index,
+	struct unit_control_data const *control_data);
+
 void units_initialize(
 	void);
 void units_initialize_for_new_map(

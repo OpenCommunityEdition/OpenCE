@@ -18,6 +18,9 @@ header included in hcex build.
 
 void recorded_animations_clear_debug_storage(void);
 
+boolean recorded_animation_controlling_unit(
+	long unit_index);
+
 /* ---------- globals */
 
 /* ---------- public code */

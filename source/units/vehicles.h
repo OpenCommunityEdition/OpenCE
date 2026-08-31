@@ -26,6 +26,10 @@ struct vehicle_runtime_datum;
 
 /* ---------- prototypes/VEHICLES.C */
 
+void vehicle_hover(
+	long vehicle_index,
+	boolean hover);
+
 void vehicles_initialize(
 	void);
 void vehicles_initialize_for_new_map(

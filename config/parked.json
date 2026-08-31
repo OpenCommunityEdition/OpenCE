@@ -2,6 +2,25 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/cutscene/recorded_animations",
+      "function": "_recorded_animation_play_internal",
+      "class": "instruction-scheduling",
+      "evidence": "The retained ordinary-C reconstruction has the same 0x280 padded size and all 38 relocation identities as January. The residual is confined to four independent instructions after tag_data_get_pointer: January loads animation_threads_debug before storing the returned event stream and masks the thread index before materializing &thread->event_stream; VC7 emits the store before the external-global load and materializes the field address before the mask. Making only animation_threads_debug static produces exact function bytes but a wrong 9-byte BSS owner with wrong symbol offsets/linkage. Making all three BSS definitions static restores the byte count but still gives wrong named offsets and removes the external _debug_recording owner required by hs_globals_external. Temporary-local and statement-order variants either enlarge the residual or change register allocation across the rest of the function. The natural, link-correct source is therefore parked rather than accepting a function-only false positive.",
+      "measurements": {
+        "target": {
+          "size": 640,
+          "relocation_count": 38,
+          "normalized_sha256": "df113ef0763a2a945aaf24c999e7976d55b0f998719fff88ba52585d73eb1a7c"
+        },
+        "base": {
+          "size": 640,
+          "relocation_count": 38,
+          "normalized_sha256": "21d8285c6b390376e50a99d6b6de987fbbaf585cafe83d99973a40c5072c0be7"
+        },
+        "objdiff_percent": 98.57143
+      }
+    },
+    {
       "unit": "source/game/game_statistics",
       "function": "_game_statistics_record_kill",
       "class": "register-allocation",
