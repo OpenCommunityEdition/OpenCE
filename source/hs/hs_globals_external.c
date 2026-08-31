@@ -896,8 +896,6 @@ symbols in this file:
 #include "cseries.h"
 #include "hs.h"
 
-#include "camera/director.h"
-
 /* ---------- constants */
 
 /* ---------- macros */
@@ -1043,6 +1041,7 @@ extern byte debug_unit_all_animations[];
 extern byte debug_unit_animations[];
 extern byte debug_unit_illumination[];
 extern byte decals_enabled[];
+extern boolean director_camera_switch_fast;
 extern byte display_framerate[];
 extern byte display_precache_progress[];
 extern byte display_vblank_deltas[];
