@@ -404,6 +404,14 @@ short game_difficulty_level_get(
 	return bss_0043e48c->options.difficulty;
 }
 
+short game_difficulty_level_get_ignore_easy(
+	void)
+{
+	short difficulty = bss_0043e48c->options.difficulty;
+
+	return difficulty > _game_difficulty_level_normal ? difficulty : _game_difficulty_level_normal;
+}
+
 void game_set_game_variant(
 	struct game_variant *variant)
 {

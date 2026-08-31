@@ -2778,6 +2778,7 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "ai/ai_scenario_definitions.h"
 #include "cutscene/recorded_animation_definitions.h"
+#include "game/game.h"
 #include "interface/interface.h"
 #include "tag_files/files.h"
 
@@ -3779,10 +3780,6 @@ short ai_scripting_conversation_line(
 short ai_scripting_conversation_status(
 	word conversation_index);
 short scripted_camera_time(
-	void);
-short game_difficulty_level_get_ignore_easy(
-	void);
-short game_difficulty_level_get(
 	void);
 short global_structure_bsp_index_get(
 	void);
