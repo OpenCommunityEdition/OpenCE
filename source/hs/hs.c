@@ -6170,42 +6170,16 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	union hs_evaluation_argument,
 	3,
 	hud_unit_activate_nav_point_with_object(arguments[0].unsigned_short_value, arguments[1].long_value, arguments[2].long_value, real_argument))
-void code_000b2110(
-	short function_index,
-	long thread_index,
-	boolean initialize)
-{
-	struct hs_arguments_word_word_word_real const *arguments;
-
-	arguments = (struct hs_arguments_word_word_word_real const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
-	if (arguments)
-	{
-		double value3 = arguments->value3;
-
-		hud_activate_team_nav_point_with_flag(arguments->value0, arguments->value1, arguments->value2, value3);
-		hs_return(thread_index, 0);
-	}
-
-	return;
-}
-void code_000b2160(
-	short function_index,
-	long thread_index,
-	boolean initialize)
-{
-	struct hs_arguments_word_word_long_real const *arguments;
-
-	arguments = (struct hs_arguments_word_word_long_real const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
-	if (arguments)
-	{
-		double value3 = arguments->value3;
-
-		hud_activate_team_nav_point_with_object(arguments->value0, arguments->value1, arguments->value2, value3);
-		hs_return(thread_index, 0);
-	}
-
-	return;
-}
+HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
+	code_000b2110,
+	union hs_evaluation_argument,
+	3,
+	hud_activate_team_nav_point_with_flag(arguments[0].unsigned_short_value, arguments[1].unsigned_short_value, arguments[2].unsigned_short_value, real_argument))
+HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
+	code_000b2160,
+	union hs_evaluation_argument,
+	3,
+	hud_activate_team_nav_point_with_object(arguments[0].unsigned_short_value, arguments[1].unsigned_short_value, arguments[2].long_value, real_argument))
 void code_000b2330(
 	short function_index,
 	long thread_index,
@@ -6315,9 +6289,9 @@ void code_000b2a40(
 	arguments = (struct hs_arguments_short_word_real_real_real const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
 	if (arguments)
 	{
-		double value2 = arguments->value2;
-		double value3 = arguments->value3;
-		double value4 = arguments->value4;
+		real value2 = arguments->value2;
+		real value3 = arguments->value3;
+		real value4 = arguments->value4;
 
 		rasterizer_screen_effect_set_convolution(arguments->value0, arguments->value1, value2, value3, value4);
 		hs_return(thread_index, 0);

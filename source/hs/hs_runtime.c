@@ -371,12 +371,12 @@ union hs_conversion_result code_000ba260(
 	union hs_conversion_result value);
 union hs_conversion_result code_000ba280(
 	union hs_conversion_result value);
-long code_000ba290(
-	long value);
+union hs_conversion_result code_000ba290(
+	union hs_conversion_result value);
 union hs_conversion_result code_000ba2b0(
 	union hs_conversion_result value);
-long code_000ba2c0(
-	long value);
+union hs_conversion_result code_000ba2c0(
+	union hs_conversion_result value);
 union hs_conversion_result code_000ba2e0(
 	union hs_conversion_result value);
 long code_000ba300(
@@ -507,15 +507,15 @@ void hs_evaluate_wake(
 	long wake_thread_index;
 	struct hs_thread_datum *thread;
 	struct hs_syntax_node *script_name_node;
+	long script_name_node_index;
 
 	thread = datum_get(hs_thread_data, thread_index);
-	script_name_node = datum_get(
+	script_name_node_index = ((struct hs_syntax_node *)datum_get(
 		hs_syntax_data,
 		((struct hs_syntax_node *)datum_get(
 			hs_syntax_data,
-			((struct hs_syntax_node *)datum_get(
-				hs_syntax_data,
-				thread->stack->expression_index))->data))->next_node_index);
+			thread->stack->expression_index))->data))->next_node_index;
+	script_name_node = datum_get(hs_syntax_data, script_name_node_index);
 
 	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x22c,
 		function_index==_hs_function_wake);
@@ -582,7 +582,6 @@ static void code_000ba090(
 	long thread_index)
 {
 	struct hs_thread_datum *thread;
-	struct hs_syntax_node *syntax;
 
 	thread = datum_get(hs_thread_data, thread_index);
 	if (thread->sleep_until != NONE)
@@ -597,8 +596,7 @@ static void code_000ba090(
 		{
 			if (thread->stack->expression_index != NONE)
 			{
-				syntax = datum_get(hs_syntax_data, thread->stack->expression_index);
-				if (syntax->index == 0x14)
+				if (((struct hs_syntax_node *)datum_get(hs_syntax_data, thread->stack->expression_index))->index == 0x14)
 				{
 					code_000b9f20(thread_index);
 					return;
@@ -608,10 +606,9 @@ static void code_000ba090(
 			if (thread->stack->previous &&
 				thread->stack->previous->expression_index != NONE)
 			{
-				syntax = datum_get(
+				if (((struct hs_syntax_node *)datum_get(
 					hs_syntax_data,
-					thread->stack->previous->expression_index);
-				if (syntax->index == 0x14)
+					thread->stack->previous->expression_index))->index == 0x14)
 				{
 					code_000b9f20(thread_index);
 					code_000b9f20(thread_index);
@@ -791,13 +788,15 @@ union hs_conversion_result code_000ba280(
 	return result;
 }
 
-long code_000ba290(
-	long value)
+union hs_conversion_result code_000ba290(
+	union hs_conversion_result value)
 {
-	value = *(short *)&value;
-	*(real *)&value = (real)*(long *)&value;
+	union hs_conversion_result result;
 
-	return value;
+	result.long_integer = value.short_integer;
+	result.real = result.long_integer;
+
+	return result;
 }
 
 union hs_conversion_result code_000ba2b0(
@@ -808,13 +807,15 @@ union hs_conversion_result code_000ba2b0(
 	return value;
 }
 
-long code_000ba2c0(
-	long value)
+union hs_conversion_result code_000ba2c0(
+	union hs_conversion_result value)
 {
-	value = *(short *)&value+1;
-	*(real *)&value = (real)*(long *)&value;
+	union hs_conversion_result result;
 
-	return value;
+	result.long_integer = value.short_integer+1;
+	result.real = result.long_integer;
+
+	return result;
 }
 
 union hs_conversion_result code_000ba2e0(
@@ -878,8 +879,8 @@ static boolean code_000ba390(
 	word actual_type_mask;
 	word desired_type_mask;
 
-	desired_type_mask = hs_object_type_masks[desired_type];
 	actual_type_mask = hs_object_type_masks[actual_type];
+	desired_type_mask = hs_object_type_masks[desired_type];
 
 	match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x599,
 		actual_type>=0 && actual_type<NUMBER_OF_HS_OBJECT_TYPES);
