@@ -199,6 +199,8 @@ char const *animation_list_get_string(struct animation_list const *animation_lis
 
 /* ---------- prototypes/MODEL_ANIMATIONS.C */
 
+struct animation_state;
+
 short animation_loop_frame_index(
 	struct animation const *animation);
 short animation_second_key_frame_index(
@@ -249,6 +251,11 @@ short animation_choose_random_permutation_internal(
 	long render_or_affects_game_state,
 	long animation_graph_index,
 	short animation_index);
+short animation_update_internal(
+	short animation_type,
+	long animation_graph_index,
+	struct animation_state *state,
+	long *sound_index);
 
 void animation_get_node_orientations(
 	struct model const *model,

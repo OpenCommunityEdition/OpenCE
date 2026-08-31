@@ -51,20 +51,6 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-short animation_update_internal(
-	short animation_type,
-	long animation_graph_index,
-	struct animation_state *state,
-	boolean unknown);
-
-short animation_choose_random_permutation_internal(
-	short animation_type,
-	long animation_graph_index,
-	short animation_index);
-short animation_graph_get_animation_by_name(
-	long animation_graph_index,
-	char const *animation_name);
-
 static void code_00134eb0(
 	long object_index,
 	long animation_graph_index,

@@ -138,13 +138,6 @@ long __stdcall XSetNicknameW(
 	long preserve_case);
 wchar_t const *network_game_get_random_player_name(
 	void);
-boolean network_game_player_is_local(
-	struct network_player const *player);
-long player_new(
-	long machine_index,
-	long unit_index,
-	short controller_index,
-	struct network_player const *player);
 void network_game_invalidate_machine(
 	struct network_game *game,
 	word machine_index);

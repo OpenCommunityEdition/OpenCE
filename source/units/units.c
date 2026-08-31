@@ -959,11 +959,6 @@ static void code_0019b0b0(
 	long unit_index,
 	long animation_graph_index,
 	short animation_index);
-short animation_update_internal(
-	short animation_type,
-	long animation_graph_index,
-	struct animation_state *state,
-	long *sound_index);
 static short code_0019b160(
 	long unit_index,
 	long animation_graph_index,

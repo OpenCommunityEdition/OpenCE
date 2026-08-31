@@ -140,14 +140,6 @@ typedef char verify_weapon_first_person_animations_index_offset[
 typedef char verify_animation_graph_nodes_offset[
 	offsetof(struct animation_graph, nodes) == 0x68 ? 1 : -1];
 
-/* ---------- prototypes */
-
-short animation_update_internal(
-	short animation_type,
-	long animation_graph_index,
-	struct animation_state *state,
-	long *sound_index);
-
 /* ---------- globals */
 
 extern struct first_person_weapon *bss_00453cc8;

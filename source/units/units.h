@@ -644,7 +644,7 @@ void unit_delete_all_weapons(
 boolean unit_add_equipment_to_inventory(
 	long unit_index,
 	long equipment_index,
-	boolean replace);
+	short replace);
 boolean unit_add_weapon_to_inventory(
 	long unit_index,
 	long weapon_index,

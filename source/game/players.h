@@ -191,6 +191,12 @@ void player_control_unzoom(long unit_index);
 void players_initialize(
 	void);
 
+long player_new(
+	long machine_index,
+	long player_index,
+	short local_player_index,
+	struct network_player const *network_player);
+
 boolean local_player_exists(
 	long local_player_index);
 long local_player_get_player_index(
