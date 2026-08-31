@@ -3,9 +3,9 @@ PRIME_NUMBERS.C
 
 symbols in this file:
 0006F3A0 0020:
-	_compare_prime_numbers_descending (0000)
+	_compare_ulongs_descending (0000)
 0006F3C0 0160:
-	_generate_prime_numbers (0000)
+	_primegen (0000)
 0006F520 0050:
 	_randomprime (0000)
 0006F570 00c0:
@@ -22,6 +22,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "bungie_net/common/64bit_math.h"
+#include "bungie_net/common/prime_numbers.h"
 #include "bungie_net/common/random_numbers.h"
 
 /* ---------- constants */
@@ -32,13 +33,6 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-unsigned long *generate_prime_numbers(
-	unsigned long maximum,
-	unsigned long *num_primes);
-
-void probable_prime64(
-	struct qword_value *result);
-
 /* ---------- globals */
 
 /* ---------- public code */
@@ -48,7 +42,7 @@ unsigned long randomprime(
 {
 	unsigned long result = 0;
 	unsigned long prime_count;
-	unsigned long *primes = generate_prime_numbers(maximum, &prime_count);
+	unsigned long *primes = primegen(maximum, &prime_count);
 
 	if (primes)
 	{
@@ -61,7 +55,7 @@ unsigned long randomprime(
 
 /* ---------- private code */
 
-int compare_prime_numbers_descending(
+static int compare_ulongs_descending(
 	void const *left,
 	void const *right)
 {
@@ -75,7 +69,7 @@ int compare_prime_numbers_descending(
 }
 /* NonMatching foundation: this source preserves the January count model,
  * including an in-bounds trailing slot for prime 2. */
-unsigned long *generate_prime_numbers(
+unsigned long *primegen(
 	unsigned long maximum,
 	unsigned long *num_primes)
 {
@@ -154,7 +148,7 @@ unsigned long *generate_prime_numbers(
 		}
 
 		primes[odd_count] = 2;
-		qsort(primes, total_count, sizeof(*primes), compare_prime_numbers_descending);
+		qsort(primes, total_count, sizeof(*primes), compare_ulongs_descending);
 
 		if (*num_primes < total_count)
 		{
@@ -188,7 +182,7 @@ void probable_prime64(
 	do
 	{
 		prime = 0;
-		primes = generate_prime_numbers(0xFFFF, &prime_count);
+		primes = primegen(0xFFFF, &prime_count);
 
 		if (primes)
 		{

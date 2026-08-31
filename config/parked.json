@@ -323,6 +323,25 @@
         },
         "objdiff_percent": 65.6755
       }
+    },
+    {
+      "unit": "source/bungie_net/common/prime_numbers",
+      "function": "_primegen",
+      "class": "tu-context-optimization",
+      "evidence": "Fuzzy-parked under the source-credibility rule after the E1-E27 ordinary-C corpus, the Stian and Pastudan sieve donors, the January symbol atlas, compatible VC7 builds, and the later donor-lifetime packet were exhausted. The retained coherent sieve has the target 352-byte padded envelope, all 12 relocation destinations/types in order, three strict-exact siblings, and all 72 owned rdata bytes exact. January keeps odd_count in EBX and num_primes in ESI while assigning three distinct stack lifetimes; the available compiler instead emits a two-slot frame for the natural source. A pre-allocation k initialization improves the score to 91.14815% but creates the third slot by a different, explicitly non-original lifetime route, so it is rejected. A separate statement move can manufacture exact bytes but has no credible source rationale and is also rejected. The production source therefore remains the simplest donor-consistent C. Reopen only for authoritative local-variable provenance, an original-source donor with the same simultaneous allocation, or a verified compatible compiler/QFE that naturally emits it.",
+      "measurements": {
+        "target": {
+          "size": 352,
+          "relocation_count": 12,
+          "normalized_sha256": "2428a7a00be6ab6f96efe9dda273d824a0cc9829aeeb2dd5f4c9b35b2b7992b1"
+        },
+        "base": {
+          "size": 352,
+          "relocation_count": 12,
+          "normalized_sha256": "66e1c7859e354a6bf7caccb70b260e99d516be6a94837571ecc60dd5b43edda6"
+        },
+        "objdiff_percent": 81.614815
+      }
     }
   ]
 }
