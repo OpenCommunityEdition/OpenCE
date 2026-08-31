@@ -155,6 +155,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "ai/path.h"
+#include "scenario/scenario.h"
 
 #include <stddef.h>
 
@@ -182,6 +183,10 @@ typedef char path_state_destination_valid_offset_assert[
 	offsetof(struct path_state, destination_valid) == 0x4C ? 1 : -1];
 typedef char path_state_destination_offset_assert[
 	offsetof(struct path_state, destination) == 0x50 ? 1 : -1];
+typedef char path_state_debug_offset_assert[
+	offsetof(struct path_state, debug) == 0x48 ? 1 : -1];
+typedef char path_state_structure_offset_assert[
+	offsetof(struct path_state, structure) == 0x64 ? 1 : -1];
 typedef char path_destination_surface_index_offset_assert[
 	offsetof(struct path_destination, surface_index) == 0xC ? 1 : -1];
 typedef char path_destination_target_radius_offset_assert[
@@ -249,6 +254,19 @@ void path_input_set_start(
 	input->start_valid = TRUE;
 	input->start_point = *start_point;
 	input->start_surface_index = start_surface_index;
+	return;
+}
+
+void path_state_new(
+	struct path_input const *input,
+	struct path_state *state,
+	struct path_debug_storage *debug)
+{
+	csmemset(state, 0, sizeof(*state));
+	state->structure = global_structure_bsp_get();
+	state->input = *input;
+	state->debug = debug;
+
 	return;
 }
 

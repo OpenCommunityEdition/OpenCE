@@ -422,6 +422,17 @@
         "base": { "size": 448, "relocation_count": 1, "normalized_sha256": "db57324424c861cd2aa46b18de4452ba9f44e124138cbc496e7884d616d70c79" },
         "objdiff_percent": 94.13816
       }
+    },
+    {
+      "unit": "source/effects/decals",
+      "function": "_decal_update",
+      "class": "unclassified",
+      "evidence": "The retained helper is coherent typed decal-aging source under the HCEA/PDB-authenticated private name `static void decal_update(long)`. It resets decal intensity, preserves permanent decals, fades finite-lifetime decals with cseries flag macros, releases locked-count ownership once, and deletes expired rasterizer vertices. Defining the helper in the same translation unit is required: VC7 rejects an undefined static prototype with C2129, and the complete private definition naturally gives the strict-exact public decals_update wrapper its January EDI live-in call convention without a fabricated ABI declaration. The remaining helper residual combines register/x87 scheduling with January's 32-bit inline FISTP conversion; ordinary C emits __ftol2, while /QIfist emits the wrong qword FISTP. No inline assembly, compiler flag, volatile access, register forcing, dead dependency, or fake control flow is retained. Reopen only for authoritative January source or a natural same-compiler helper/math spelling that emits the dword conversion and surrounding schedule.",
+      "measurements": {
+        "target": { "size": 400, "relocation_count": 25, "normalized_sha256": "dcc6a629481fabd93292d708b860675421698d6ef2dc9e0679b57331d784d35f" },
+        "base": { "size": 384, "relocation_count": 26, "normalized_sha256": "1ab3a89f52527a51460b6a1afa552e825fe26353faf14970500d56510166cf27" },
+        "objdiff_percent": 94.21311
+      }
     }
   ]
 }

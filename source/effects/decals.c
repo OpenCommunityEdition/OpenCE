@@ -222,11 +222,29 @@ symbols in this file:
 #undef plane3d_negate
 #undef plane3d_distance_to_point
 
+#include "cseries/errors.h"
+#include "effects/decal_definitions.h"
+#include "game/game.h"
 #include "memory/data.h"
+#include "rasterizer/rasterizer.h"
+#include "structures/structures.h"
 
 /* ---------- constants */
 
+enum
+{
+	NUMBER_OF_DECAL_LAYERS = 5,
+};
+
+enum
+{
+	_decal_locked_bit,
+	_decal_permanent_bit,
+};
+
 /* ---------- macros */
+
+#define DECAL_GET(index) ((struct decal_datum *)datum_get(global_decal_data, (index)))
 
 /* ---------- structures */
 
@@ -234,17 +252,63 @@ struct collision_result;
 struct decal_editor_geometry;
 union real_vector3d;
 
+struct decal_datum
+{
+	struct datum_header header;
+	word flags;
+	short cluster_index;
+	short layer;
+	real_point3d position;
+	long creation_time;
+	byte sequence_index;
+	byte unused_was_frames_remaining;
+	byte sprite_index;
+	byte bitmap_index;
+	real lifetime;
+	real decay_time;
+	pixel32 color;
+	byte intensity;
+	byte pad;
+	short quad_count;
+	long definition_index;
+	long prev_decal_index;
+	long next_decal_index;
+};
+
+typedef char verify_decal_datum_size[
+	sizeof(struct decal_datum) == 0x38 ? 1 : -1];
+typedef char verify_decal_datum_flags_offset[
+	offsetof(struct decal_datum, flags) == 0x2 ? 1 : -1];
+typedef char verify_decal_datum_creation_time_offset[
+	offsetof(struct decal_datum, creation_time) == 0x14 ? 1 : -1];
+typedef char verify_decal_datum_intensity_offset[
+	offsetof(struct decal_datum, intensity) == 0x28 ? 1 : -1];
+typedef char verify_decal_datum_definition_index_offset[
+	offsetof(struct decal_datum, definition_index) == 0x2C ? 1 : -1];
+
+struct decal_globals
+{
+	long first_decal_indices[NUMBER_OF_DECAL_LAYERS][MAXIMUM_CLUSTERS_PER_STRUCTURE];
+	long first_disconnected_decal_index;
+	long locked_count;
+	long permanent_count;
+};
+
+typedef char verify_decal_globals_size[
+	sizeof(struct decal_globals) == 0x280C ? 1 : -1];
+typedef char verify_decal_globals_locked_count_offset[
+	offsetof(struct decal_globals, locked_count) == 0x2804 ? 1 : -1];
+
 /* ---------- prototypes */
 
-void rasterizer_decals_dispose(
-	void);
-void rasterizer_decals_dispose_from_old_map(
-	void);
+static void decal_update(
+	long decal_index);
 
 /* ---------- globals */
 
 extern struct data_array *global_decal_data;
-static void *decal_globals;
+static struct decal_globals *decal_globals;
+static boolean decal_locked_count_reported;
 
 /* ---------- public code */
 
@@ -312,4 +376,71 @@ real plane3d_distance_to_point(
 		- plane->d;
 }
 
+void decals_update(
+	void)
+{
+	if (global_decal_data->valid)
+	{
+		struct data_iterator iterator;
+
+		data_iterator_new(&iterator, global_decal_data);
+
+		while (data_iterator_next(&iterator))
+		{
+			decal_update(iterator.datum_index);
+		}
+	}
+
+	return;
+}
+
 /* ---------- private code */
+
+static void decal_update(
+	long decal_index)
+{
+	struct decal_datum *decal = DECAL_GET(decal_index);
+	real elapsed = (game_time_get() - decal->creation_time) * (1.0f / TICKS_PER_SECOND);
+
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 307, decal->definition_index!=NONE);
+
+	decal_definition_get(decal->definition_index);
+
+	decal->intensity = 255;
+
+	if (!TEST_FLAG(decal->flags, _decal_permanent_bit))
+	{
+		if (decal->lifetime != 0.0f && elapsed >= decal->lifetime)
+		{
+			if (TEST_FLAG(decal->flags, _decal_locked_bit))
+			{
+				SET_FLAG(decal->flags, _decal_locked_bit, FALSE);
+
+				if (--decal_globals->locked_count < 0 && !decal_locked_count_reported)
+				{
+					error(_error_silent,
+						"### ERROR decals: locked count is invalid (#%d) -- tell Bernie!!",
+						decal_globals->locked_count);
+					decal_locked_count_reported = TRUE;
+				}
+			}
+
+			rasterizer_decal_vertices_delete(decal_index);
+		}
+		else if (decal->lifetime > 0.0f && decal->decay_time > 0.0f)
+		{
+			real f = decal->lifetime - elapsed;
+
+			if (f < decal->decay_time)
+			{
+				f /= decal->decay_time;
+
+				match_assert("..\\bitmaps\\bitmaps_inlines.h", 322, f>=0.0f && f<=1.0f);
+
+				decal->intensity = (byte)(f * 255.0f);
+			}
+		}
+	}
+
+	return;
+}

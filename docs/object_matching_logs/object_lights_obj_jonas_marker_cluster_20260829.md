@@ -1,5 +1,22 @@
 # `object_lights.obj` marker cluster (2026-08-29)
 
+## Policy correction (2026-08-31)
+
+The exact-credit disposition below is superseded.  HCEA's Release PDB
+cross-build records authenticate `light_marker_begin`, `light_mark`, and
+`light_marker_end` as `static` helpers in `object_lights.obj`.  The 2026-08-29
+source exposed them externally, which forced VC7 to emit exact standalone
+sections even though their real same-TU owner, `lights_preprocess_scene`, was
+unwritten.
+
+Their source and `config/symbols.json` linkage are now corrected to `static`.
+VC7 consequently omits the uncalled helpers, and all three are classified
+unwritten rather than exact.  This intentionally revokes 3 functions and 224
+padded bytes under the private-linkage and anti-fake-match rules.  The natural
+typed bodies remain source groundwork for a future link-closed
+`lights_preprocess_scene` packet.  Everything below records the historical
+experiment and must not be used as current match credit.
+
 ## Result
 
 `source/objects/object_lights.obj` advances from 12/43 to 15/43 strict-exact

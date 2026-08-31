@@ -49,13 +49,13 @@ symbols in this file:
 00129140 0040:
 	_code_00129140 (0000)
 00129180 0060:
-	_code_00129180 (0000)
+	_light_unmarked (0000)
 001291E0 0060:
 	_code_001291e0 (0000)
 00129240 0040:
 	_code_00129240 (0000)
 00129280 0110:
-	_code_00129280 (0000)
+	_render_debug_light (0000)
 00129390 00e0:
 	_lights_queue_lens_flare (0000)
 00129470 0230:
@@ -141,6 +141,9 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h"
+#include "render/render.h"
+#include "saved games/game_state.h"
 #include "math/real_math.h"
 #include "memory/data.h"
 #include "objects/object_lights.h"
@@ -157,7 +160,7 @@ enum
 /* ---------- macros */
 
 #define light_get(index) \
-	((struct light_datum_prefix *)datum_get(light_data, (index)))
+	((struct light_datum *)datum_get(light_data, (index)))
 
 /* ---------- structures */
 
@@ -167,14 +170,34 @@ struct lights_game_globals
 	byte reserved01[3];
 };
 
-struct light_datum_prefix
+struct light_datum
 {
 	struct datum_header header;
-	unsigned short flags;
+	word flags;
 	long definition_index;
 	long rasterizer_light_index;
 	long marker;
 	long cluster_reference;
+	real_rgb_color current_color;
+	byte reserved20[0xC];
+	long object_index;
+	real_point3d position;
+	real_vector3d forward;
+	real_vector3d up;
+	real radius;
+	long parent_light_index;
+	short attachment_marker_index;
+	short function_index;
+	union
+	{
+		short color_function_index;
+		struct
+		{
+			real_point3d relative_position;
+			real_vector3d relative_forward;
+		} node;
+	};
+	real intensity_scale;
 };
 
 struct rasterizer_lens_flare_submit_parameters
@@ -207,10 +230,12 @@ struct lights_globals
 
 typedef char verify_lights_game_globals_size[
 	sizeof(struct lights_game_globals) == 0x4 ? 1 : -1];
-typedef char verify_light_datum_prefix_flags_offset[
-	offsetof(struct light_datum_prefix, flags) == 0x2 ? 1 : -1];
-typedef char verify_light_datum_prefix_cluster_reference_offset[
-	offsetof(struct light_datum_prefix, cluster_reference) == 0x10 ? 1 : -1];
+typedef char verify_light_datum_flags_offset[
+	offsetof(struct light_datum, flags) == 0x2 ? 1 : -1];
+typedef char verify_light_datum_cluster_reference_offset[
+	offsetof(struct light_datum, cluster_reference) == 0x10 ? 1 : -1];
+typedef char verify_light_datum_size[
+	sizeof(struct light_datum) == 0x7C ? 1 : -1];
 typedef char verify_lights_globals_size[
 	sizeof(struct lights_globals) == 0x350 ? 1 : -1];
 
@@ -251,6 +276,38 @@ void *texture_cache_bitmap_load(
 	return hardware_format;
 }
 
+void lights_initialize(
+	void)
+{
+	light_data = game_state_data_new(
+		"lights",
+		MAXIMUM_LIGHTS_PER_MAP,
+		sizeof(struct light_datum));
+	lights_game_globals = game_state_malloc(
+		"lights globals",
+		NULL,
+		sizeof(struct lights_game_globals));
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\object_lights.c",
+		0xC2,
+		light_data);
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\object_lights.c",
+		0xC3,
+		lights_game_globals);
+	lights_game_globals->render_lights = TRUE;
+	if (light_data)
+	{
+		cluster_partition_new(&light_cluster_partition, "light");
+	}
+	else
+	{
+		error(_error_silent, "couldn't allocate memory for object lights.");
+	}
+
+	return;
+}
+
 void lights_dispose(
 	void)
 {
@@ -289,7 +346,7 @@ boolean lights_enable(
 void light_delete(
 	long light_index)
 {
-	struct light_datum_prefix *light = datum_get(light_data, light_index);
+	struct light_datum *light = datum_get(light_data, light_index);
 
 	cluster_partition_disconnect(
 		&light_cluster_partition,
@@ -303,7 +360,7 @@ void light_delete(
 void light_disconnect_from_map(
 	long light_index)
 {
-	struct light_datum_prefix *light = datum_get(light_data, light_index);
+	struct light_datum *light = datum_get(light_data, light_index);
 
 	if (TEST_FLAG(light->flags, _point_light_connects_to_map_bit))
 	{
@@ -330,7 +387,7 @@ void lights_disconnect_from_structure_bsp(
 		light_index != NONE;
 		light_index = data_next_index(light_data, light_index))
 	{
-		struct light_datum_prefix *light = datum_get(light_data, light_index);
+		struct light_datum *light = datum_get(light_data, light_index);
 
 		if (TEST_FLAG(light->flags, _point_light_connected_to_map_bit))
 		{
@@ -351,7 +408,7 @@ void lights_reconnect_to_structure_bsp(
 		light_index != NONE;
 		light_index = data_next_index(light_data, light_index))
 	{
-		struct light_datum_prefix *light = datum_get(light_data, light_index);
+		struct light_datum *light = datum_get(light_data, light_index);
 
 		if (TEST_FLAG(light->flags, _point_light_connected_to_map_bit))
 		{
@@ -363,7 +420,7 @@ void lights_reconnect_to_structure_bsp(
 	return;
 }
 
-void light_marker_begin(
+static void light_marker_begin(
 	void)
 {
 	match_assert(
@@ -376,10 +433,10 @@ void light_marker_begin(
 	return;
 }
 
-boolean light_mark(
+static boolean light_mark(
 	long light_index)
 {
-	struct light_datum_prefix *light = light_get(light_index);
+	struct light_datum *light = light_get(light_index);
 
 	match_assert(
 		"c:\\halo\\SOURCE\\objects\\object_lights.c",
@@ -394,7 +451,7 @@ boolean light_mark(
 	return FALSE;
 }
 
-void light_marker_end(
+static void light_marker_end(
 	void)
 {
 	match_assert(
