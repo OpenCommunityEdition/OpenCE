@@ -98,6 +98,18 @@ class ParkedFunctionsTests(unittest.TestCase):
         self.assertEqual(result["summary"], {"active": 1, "stale": 0, "invalid": 0})
         self.assertEqual(result["active_keys"], ["unit:_fn"])
 
+    def test_unclassified_entry_is_active_without_inventing_a_recipe(self):
+        entry = copy.deepcopy(self.entry)
+        entry["class"] = "unclassified"
+        entry["evidence"] = (
+            "The retained source is semantically grounded, but the fail-closed "
+            "classifier found no defensible blocker mechanism or recipe."
+        )
+        self._write_inputs([entry])
+        result = self._validate()
+        self.assertEqual(result["summary"], {"active": 1, "stale": 0, "invalid": 0})
+        self.assertEqual(result["active"][0]["class"], "unclassified")
+
     def test_changed_object_hash_reopens_entry(self):
         self.base_path.write_bytes(self._object(b"\x00" * 16))
         result = self._validate()

@@ -98,6 +98,16 @@ relocation placeholders differently. Credit only through the hardened
 semantic comparator and the reviewed `config/semantic_matches.json` allowlist;
 each entry is reverified against current objects during `ninja progress`.
 
+### F. Credible but unclassified residual
+
+The retained source can be semantically and historically grounded even when
+the fail-closed classifier cannot distinguish a remaining source-width,
+optimizer-context, register, or scheduling cause. Park such a case as
+`unclassified` instead of inventing a specific mechanism. An unclassified
+park carries no code-generation recipe and grants no exact credit; its ledger
+must state the positive source evidence, the unresolved machine differences,
+and the evidence required to reopen it.
+
 ## Case catalog
 
 | Case | Class | Evidence and source lever | Outcome / next action |

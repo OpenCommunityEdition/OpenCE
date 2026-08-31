@@ -1,4 +1,4 @@
-"""Validate and list functions parked on documented compiler-codegen ties.
+"""Validate and list functions parked on documented credible residuals.
 
 The manifest is deliberately evidence-only: it does not decide which function
 should be worked next.  Queue tooling can consume the validated ``active``
@@ -14,6 +14,10 @@ from .coff_compare import CoffError, load, section_info, section_infos_equal
 
 
 ALLOWED_CLASSES = {
+    # The fail-closed classifier found no defensible mechanism.  This class is
+    # intentionally recipe-free: it permits an honest fuzzy park without
+    # laundering an unknown source/codegen gap into a more specific claim.
+    "unclassified",
     "instruction-scheduling",
     "private-register-convention",
     "register-allocation",

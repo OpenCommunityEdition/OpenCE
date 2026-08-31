@@ -389,6 +389,17 @@
         "base": { "size": 1104, "relocation_count": 60, "normalized_sha256": "de767fa67df3d2a492eea148ae2b672336b474dd808ca04347637c5a2a0309ab" },
         "objdiff_percent": 10.130045
       }
+    },
+    {
+      "unit": "source/bitmaps/s3tc/s3tc",
+      "function": "_DecodeBlockAlpha3__single_pixel",
+      "class": "unclassified",
+      "evidence": "The retained function is coherent DXT5 alpha-decoding C with the target's named block structures and sole relocation, rather than a byte-oriented construction. January-family evidence and the HCEA cross-build reconstruction both support signed 16-bit pixel coordinates, but HCEA is LLM re-sourced and is not original source. A bounded width grid tested long/long (432 bytes, 93.677635%), long/short (448 bytes, 94.13816%), short/long (432 bytes, 93.2829%), and short/short (448 bytes, 94.13816%); the source-backed short/short signature is retained instead of selecting a full-width spelling merely because it matches the target size envelope. The remaining tail differs in argument promotion, register use, and accumulator scheduling, while the fail-closed classifier reports UNKNOWN. Reopen only with authentic Microsoft/Bungie source or evidence that naturally explains the promotions and tail schedule; never use artificial widths, dead logic, barriers, volatile qualifiers, or compiler controls for byte credit.",
+      "measurements": {
+        "target": { "size": 432, "relocation_count": 1, "normalized_sha256": "b869ae2d8e5be4b6efe4fef80b120931dfc7da90d6d9c21a03a60b019f8e6ba5" },
+        "base": { "size": 448, "relocation_count": 1, "normalized_sha256": "db57324424c861cd2aa46b18de4452ba9f44e124138cbc496e7884d616d70c79" },
+        "objdiff_percent": 94.13816
+      }
     }
   ]
 }
