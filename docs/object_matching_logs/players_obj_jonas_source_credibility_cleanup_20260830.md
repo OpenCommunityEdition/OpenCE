@@ -10,9 +10,9 @@ The current focused measurement, rebuilt from this lane, is:
 
 | Measure | Result |
 |---|---:|
-| shared exact functions | 52 / 70 |
-| shared exact code bytes | 7,744 / 15,904 |
-| shared residual functions | 17 / 70 |
+| shared exact functions | 52 / 69 |
+| shared exact code bytes | 7,744 / 15,888 |
+| shared residual functions | 17 / 69 |
 | residual code bytes | 8,144 |
 | target-only functions | 1 |
 | comparator errors | 0 |
@@ -41,13 +41,27 @@ are `static`; `player_teleport_internal` and `player_handle_powerup_equipment`
 remain external and are declared in
 `players.h`.  Declarations for other subsystems live in their owner headers.
 
-`player_examine_nearby_unit` is deliberately **target-only**, despite its
-one-byte January target body being `ret`. The atlas and two independent donor
-trees authenticate a boolean two-handle ABI, but the no-argument C no-op that
-would reproduce `ret` is a contradictory fake. Donor source disagrees on
-behavior: one has a full interaction implementation while another records the
-XBE as a stub. We retain only the header ABI and do not grant matching credit
-until first-party provenance explains the stub.
+`player_examine_nearby_unit` is deliberately **target-only**. The January
+COFF section is exactly `C3` followed by 15 alignment NOPs, as reproduced by
+`python tools/audit/disasm_coff_function_20260826.py
+_player_examine_nearby_unit build/split/source/game/players.obj
+build/base/source/game/players.obj` before the candidate body was removed.
+The name/ABI evidence is concrete: the local Stian KB declaration at
+`../../research-cache/stian-halo-cseries-20260820/kb.json:18220` says
+`bool player_examine_nearby_unit(int player_unit_handle, int
+nearby_unit_handle)`, and the related metadata name is at
+`../../research-cache/stian-halo-cseries-20260820/kb_meta.json:6249`. Both donor
+sources call that two-handle boolean form
+(`../../research-cache/stian-halo-cseries-20260820/src/halo/game/players.c:3225`;
+`../../research-cache/pastudan-halo-20260828/src/halo/game/players.c:2029`);
+Pastudan explicitly records the XBE as a single-`ret` stub at
+`../../research-cache/pastudan-halo-20260828/src/halo/game/players.c:456-462`.
+Stian instead supplies an interaction body at
+`../../research-cache/stian-halo-cseries-20260820/src/halo/game/players.c:814`,
+proving that donor logic cannot be used as an original-source oracle. A no-argument C no-op that
+reproduces `ret` contradicts the ABI, while a boolean `return FALSE` does not
+reproduce the target. We retain only the header ABI and grant no credit until
+first-party provenance explains the stub.
 
 The local vehicle projection intentionally remains private to `players.c`.
 `VEHICLES.C` still has a larger independent runtime definition, so publishing
@@ -77,12 +91,31 @@ player in bits 0–3 and the recursive-switch tick count in bits 4–7, which is
 the VC7/x86 declaration order used by the target.  These names and fields are
 semantic inferences, not proof of strict object matching.
 
-## Residual frontier
+## Residual frontier and parks
 
-Sixteen residual functions (7,904 bytes) are unclassified; one,
-`_player_handle_powerup` (240 bytes), has a control-flow/return-shape blocker.
-The natural forms are parked rather than tuned with aliases, barriers, inert
-branches, raw byte emission, or forced inlining.
+The 17 shared residuals total 8,144 bytes: 16 are unclassified (7,904 bytes)
+and `_player_handle_powerup` is the 240-byte control-flow/return-shape case.
+Only four have evidence sufficient for `config/parked.json`:
+
+| Function | Class | Target / base size, relocs | Target / base normalized SHA-256 |
+|---|---|---|---|
+| `_players_compute_combined_pvs` | instruction-scheduling | 368/22; 368/22 | `9e3ab79a...` / `82b53aac...` |
+| `_player_teleport_on_bsp_switch` | instruction-scheduling | 320/21; 320/21 | `73f7fae1...` / `6a0e944e...` |
+| `_players_reconnect_to_structure_bsp` | instruction-scheduling | 736/40; 736/40 | `de7f7f71...` / `f11d3315...` |
+| `_unit_should_autopick_weapon` | register-allocation | 144/7; 144/7 | `1c1da7cd...` / `6a23f548...` |
+
+The manifest contains the complete hashes, relocation counts, measured fuzzy
+percentages, and reopen evidence. The other 13 residuals are merely **left
+fuzzy and active**, not parked: `_players_initialize`,
+`_players_initialize_for_new_map`, `_player_teleport_internal`,
+`_player_set_action_result`, `_player_handle_powerup`,
+`_player_handle_powerup_minor`, `_player_update_powerups`,
+`_player_examine_nearby_vehicle`, `_player_examine_nearby_device`,
+`_player_examine_nearby_item`, `_player_examine_nearby_objects`, and
+`_players_update_before_game` / `_players_update_after_game` (the latter two
+count as two owners). `_player_teleport_internal` is expressly an active
+structural residual (1,296/61 target versus 1,312/62 base), not a compiler-tie
+park. The target-only stub is not parkable.
 
 ## Validation
 
@@ -90,6 +123,7 @@ branches, raw byte emission, or forced inlining.
 ninja halobetacache_build
 python -m tools.residual_frontier --unit source/game/players
 python tools/fake_match_scan.py source/game/players.c source/game/players.h --fail-on-findings
+python -m tools.parked_functions
 git diff --check
 ```
 

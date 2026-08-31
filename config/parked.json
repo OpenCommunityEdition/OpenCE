@@ -323,6 +323,50 @@
         },
         "objdiff_percent": 84.85987
       }
+    },
+    {
+      "unit": "source/game/players",
+      "function": "_players_compute_combined_pvs",
+      "class": "instruction-scheduling",
+      "evidence": "The typed combined-PVS routine has equal 368-byte sections and the same 22 relocation identities as January. The remaining difference begins after objects_get_activating_cluster_index: January loads player_data and prepares the iterator before the result home, while the retained ordinary C stores the call result first; all subsequent relocation targets remain the same schedule shifted by that window. The natural direct call replaces the former cast/codegen lever. Prior bounded source-shape evidence is in docs/object_matching_logs/players_obj.md under _code_000a9ff0; current source/provenance is also corroborated by ../../research-cache/halocea-full-blobs-20260830/src/blam/game/players_compute_combined_pvs.c. Reopen only with an authentic statement/lifetime form, never with barriers, aliases, or dead code.",
+      "measurements": {
+        "target": { "size": 368, "relocation_count": 22, "normalized_sha256": "9e3ab79a5087c8d11b97f52c30afc3f596faa4aa6122480dc9f16d247be8ca9f" },
+        "base": { "size": 368, "relocation_count": 22, "normalized_sha256": "82b53aacde9159b3131bf4c6318eb83423cad5b9b34e640096a551974b889bba" },
+        "objdiff_percent": 86.75781
+      }
+    },
+    {
+      "unit": "source/game/players",
+      "function": "_player_teleport_on_bsp_switch",
+      "class": "instruction-scheduling",
+      "evidence": "The clean typed BSP-switch teleport has equal 320-byte sections and all 21 relocation identities. The remaining packet is a prologue/local-home and call-scheduling difference; target and base retain the same calls, strings, and global references. The old volatile double-write is rejected as inert compiler steering. The prior bounded schedule analysis is in docs/object_matching_logs/players_obj.md; the workspace-local HCEA topology is at ../../research-cache/halocea-full-blobs-20260830/src/blam/game/player_teleport_on_bsp_switch.c:31. Reopen only with first-party local-lifetime evidence or a naturally explanatory caller shape.",
+      "measurements": {
+        "target": { "size": 320, "relocation_count": 21, "normalized_sha256": "73f7fae1e4082fd761f5db63b3648a2b5ca519901a19abd8499126c231447c5c" },
+        "base": { "size": 320, "relocation_count": 21, "normalized_sha256": "6a0e944e17ba05d12ccc28139b4f2f1b08b0269b79dfab7869c3db5e14b6eef7" },
+        "objdiff_percent": 83.31193
+      }
+    },
+    {
+      "unit": "source/game/players",
+      "function": "_players_reconnect_to_structure_bsp",
+      "class": "instruction-scheduling",
+      "evidence": "The retained typed reconnection flow has equal 736-byte sections and all 40 relocation identities. Its remaining variation is scheduling around iterator/leaf/teleport temporaries; no relocation ownership differs. The previous volatile field reads are removed as invalid source. Semantic topology is independently present at ../../research-cache/halocea-full-blobs-20260830/src/blam/game/players_reconnect_to_structure_bsp.c; the strict historical boundary is docs/object_matching_logs/players_obj.md. Reopen only with provenance for the temporary lifetime/order, not a codegen control.",
+      "measurements": {
+        "target": { "size": 736, "relocation_count": 40, "normalized_sha256": "de7f7f7138236ad854dd13a4d754a97a5041c10d9dbef3260d18cffcb8eb886b" },
+        "base": { "size": 736, "relocation_count": 40, "normalized_sha256": "f11d3315e7512d470ca979b7cba3155b740ea99178c1ae924414a98be35aa74c" },
+        "objdiff_percent": 98.64103
+      }
+    },
+    {
+      "unit": "source/game/players",
+      "function": "_unit_should_autopick_weapon",
+      "class": "register-allocation",
+      "evidence": "The ordinary typed pickup predicate has equal 144-byte sections and all seven relocation identities; divergence is only the register/lifetime arrangement between the two unit_approve_weapon_pickup calls. The removed volatile weapon-definition pointer was a codegen-only alias with no game-state semantics. The credibility cleanup log records the rejection; source retains the direct typed pointer. Reopen only with authenticated local-lifetime evidence, not register, volatile, barrier, or inline controls.",
+      "measurements": {
+        "target": { "size": 144, "relocation_count": 7, "normalized_sha256": "1c1da7cda8b1b98ddf4579327d112f3078eb5e2ca2d69aba7cea8f568610999f" },
+        "base": { "size": 144, "relocation_count": 7, "normalized_sha256": "6a23f54863687bd0996b1997d252d5206513dee16b478876afb34a216307d309" },
+        "objdiff_percent": 87.083336
+      }
     }
   ]
 }
