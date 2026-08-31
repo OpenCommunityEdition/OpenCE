@@ -351,19 +351,10 @@ typedef char actor_datum_meta_first_prop_index_offset_assert[
 
 /* ---------- prototypes */
 
-void actor_switch_props(
-	long actor_index,
-	long old_prop_index,
-	long new_prop_index);
-
 void actor_action_replace_prop(
 	long actor_index,
 	long invalid_prop_index,
 	long replacement_prop_index);
-
-void prop_delete(
-	long actor_index,
-	long prop_index);
 
 void encounter_detach_actor(
 	long actor_index,

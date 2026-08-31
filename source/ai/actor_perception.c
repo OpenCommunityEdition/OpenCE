@@ -1145,12 +1145,6 @@ boolean actor_compute_prop_unopposable(
 	long actor_index,
 	long prop_index);
 
-void actor_stimulus_prop_acknowledged(
-	long actor_index,
-	long prop_index,
-	long stimulus,
-	boolean initial_acknowledgement);
-
 long ai_get_responsible_unit(
 	long object_index,
 	boolean include_self);
@@ -1247,10 +1241,6 @@ boolean vehicle_causes_collision_damage(
 boolean game_team_is_enemy(
 	short team_index0,
 	short team_index1);
-
-boolean actor_expected_acknowledgement(
-	long actor_index,
-	long prop_index);
 
 short ai_test_line_of_sight(
 	struct actor_position_data const *position,
@@ -1479,8 +1469,8 @@ done:
 void actor_perception_acknowledge(
 	long actor_index,
 	long prop_index,
-	long stimulus,
-	boolean initial_acknowledgement)
+	boolean had_orphan,
+	boolean expected_acknowledgement)
 {
 	struct prop_datum *prop = prop_get(prop_index);
 
@@ -1499,8 +1489,8 @@ void actor_perception_acknowledge(
 	actor_stimulus_prop_acknowledged(
 		actor_index,
 		prop_index,
-		stimulus,
-		initial_acknowledgement);
+		had_orphan,
+		expected_acknowledgement);
 
 	return;
 }
@@ -3130,23 +3120,21 @@ boolean actor_perception_become_acknowledged(
 	long prop_index,
 	boolean *expected_acknowledgement_out)
 {
-	struct actor_perception_prop_view *prop =
-		(struct actor_perception_prop_view *)prop_get(prop_index);
+	struct prop_datum *prop = prop_get(prop_index);
 	boolean result = FALSE;
 	boolean expected_acknowledgement = FALSE;
 
-	if (prop->state < 2 || prop->state > 3)
+	if (prop->state < _prop_state_becoming_unacknowledged ||
+		prop->state > _prop_state_acknowledged)
 	{
-		long orphaned = prop->orphan_prop_index != NONE;
+		boolean had_orphan = prop->orphan_prop_index != NONE;
 
 		expected_acknowledgement =
 			actor_expected_acknowledgement(actor_index, prop_index);
 
-		if (orphaned)
+		if (had_orphan)
 		{
-			struct actor_perception_prop_view *orphan =
-				(struct actor_perception_prop_view *)prop_get(
-					prop->orphan_prop_index);
+			struct prop_datum *orphan = prop_get(prop->orphan_prop_index);
 
 			prop->target_weight = orphan->target_weight;
 			prop->look_interest = orphan->look_interest;
@@ -3169,11 +3157,11 @@ boolean actor_perception_become_acknowledged(
 			prop->orphan_prop_index = NONE;
 		}
 
-		prop->state = 3;
+		prop->state = _prop_state_acknowledged;
 		actor_perception_acknowledge(
 			actor_index,
 			prop_index,
-			orphaned,
+			had_orphan,
 			expected_acknowledgement);
 		result = TRUE;
 	}

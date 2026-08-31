@@ -102,10 +102,6 @@ boolean actor_perception_desire_prop(
 	real distance_squared,
 	short required_ticks,
 	boolean *replace);
-void actor_switch_props(
-	long actor_index,
-	long old_prop_index,
-	long new_prop_index);
 void prop_position_refresh(
 	long actor_index,
 	long prop_index,
@@ -116,15 +112,6 @@ void prop_status_refresh(
 	long actor_index,
 	long prop_index,
 	struct actor_position_data *position);
-boolean actor_expected_acknowledgement(
-	long actor_index,
-	long prop_index);
-void actor_perception_acknowledge(
-	long actor_index,
-	long prop_index,
-	boolean force,
-	boolean expected);
-
 /* ---------- globals */
 
 long data_002b7d78 = NONE;
@@ -724,7 +711,7 @@ long prop_get_base_by_unit_index(
 						prop_status_refresh(actor_index, result, &position);
 						if (prop->perception >= 2)
 						{
-							boolean expected =
+							boolean expected_acknowledgement =
 								actor_expected_acknowledgement(actor_index, result);
 
 							prop->state = _prop_state_acknowledged;
@@ -732,7 +719,7 @@ long prop_get_base_by_unit_index(
 								actor_index,
 								result,
 								FALSE,
-								expected);
+								expected_acknowledgement);
 						}
 					}
 				}
