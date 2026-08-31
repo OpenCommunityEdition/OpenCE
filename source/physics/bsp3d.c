@@ -69,7 +69,7 @@ short convex_polygon3d_clip_to_plane(
 	real epsilon,
 	boolean keep_degenerate);
 
-long code_00136900(
+long bsp3d_clip_polygon_to_leaves_recursive(
 	struct bsp3d const *bsp,
 	long node_index,
 	long plane_designator,
@@ -212,7 +212,7 @@ long bsp3d_clip_polygon_to_leaves(
 	bsp3d_polygon_leaf_proc proc,
 	void *context)
 {
-	long result = code_00136900(
+	long result = bsp3d_clip_polygon_to_leaves_recursive(
 		bsp,
 		node_index,
 		NONE,
@@ -227,7 +227,7 @@ long bsp3d_clip_polygon_to_leaves(
 
 /* ---------- private code */
 
-long code_00136900(
+long bsp3d_clip_polygon_to_leaves_recursive(
 	struct bsp3d const *bsp,
 	long node_index,
 	long plane_designator,
@@ -352,7 +352,7 @@ long code_00136900(
 			}
 			else
 			{
-				intersected_leaf_count += code_00136900(
+				intersected_leaf_count += bsp3d_clip_polygon_to_leaves_recursive(
 					bsp,
 					node->children[child_index],
 					plane_designator,

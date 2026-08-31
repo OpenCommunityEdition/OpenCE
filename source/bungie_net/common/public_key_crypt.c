@@ -53,15 +53,15 @@ symbols in this file:
 unsigned long randomprime(
 	unsigned long maximum);
 
-static unsigned long code_0006f630(
+static unsigned long x_exp_y_mod_n(
 	unsigned long base,
 	unsigned long exponent,
 	unsigned long modulus);
-static unsigned long code_0006f700(
+static unsigned long generate_diffie_hellman_public_key(
 	unsigned long p,
 	unsigned long x,
 	unsigned long g);
-static unsigned long code_0006f780(
+static unsigned long generate_diffie_hellman_private_key(
 	unsigned long public_key,
 	unsigned long p,
 	unsigned long x);
@@ -118,7 +118,7 @@ void generate_public_key(
 	long i;
 
 	for (i = 0; i < 2; i++)
-		public_key->dwords[i] = code_0006f700(p->dwords[i], x->dwords[i], g->dwords[i]);
+		public_key->dwords[i] = generate_diffie_hellman_public_key(p->dwords[i], x->dwords[i], g->dwords[i]);
 
 	error(
 		2,
@@ -141,7 +141,7 @@ void generate_private_key(
 
 	for (i = 0; i < 2; i++)
 	{
-		private_key->dwords[i] = code_0006f780(
+		private_key->dwords[i] = generate_diffie_hellman_private_key(
 			public_key->dwords[i],
 			p->dwords[i],
 			x->dwords[i]);
@@ -162,7 +162,7 @@ void generate_private_key(
 
 /* ---------- private code */
 
-static unsigned long code_0006f630(
+static unsigned long x_exp_y_mod_n(
 	unsigned long base,
 	unsigned long exponent,
 	unsigned long modulus)
@@ -197,7 +197,7 @@ static unsigned long code_0006f630(
 	return (unsigned long)s.qword;
 }
 
-static unsigned long code_0006f700(
+static unsigned long generate_diffie_hellman_public_key(
 	unsigned long p,
 	unsigned long x,
 	unsigned long g)
@@ -206,10 +206,10 @@ static unsigned long code_0006f700(
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\public_key_crypt.c", 113, x<(p-1));
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\public_key_crypt.c", 114, g<p);
 
-	return code_0006f630(g, x, p);
+	return x_exp_y_mod_n(g, x, p);
 }
 
-static unsigned long code_0006f780(
+static unsigned long generate_diffie_hellman_private_key(
 	unsigned long public_key,
 	unsigned long p,
 	unsigned long x)
@@ -217,5 +217,5 @@ static unsigned long code_0006f780(
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\public_key_crypt.c", 133, p>2);
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\public_key_crypt.c", 134, x<(p-1));
 
-	return code_0006f630(public_key, x, p);
+	return x_exp_y_mod_n(public_key, x, p);
 }

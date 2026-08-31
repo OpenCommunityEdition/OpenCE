@@ -182,10 +182,10 @@ typedef char verify_rasterizer_frame_statistics_accumulation_frame_index_offset[
 /* ---------- globals */
 
 extern struct rasterizer_frame_statistics_globals rasterizer_frame_statistics;
-extern struct rasterizer_frame_statistics_private_globals_prefix bss_00466320;
+extern struct rasterizer_frame_statistics_private_globals_prefix rasterizer_frame_statistics_private_globals;
 extern struct rasterizer_frame_statistics_debug_options_prefix rasterizer_debug_options;
 
-#define rasterizer_frame_statistics_temp_buffer bss_00466320.temp_buffer
+#define rasterizer_frame_statistics_temp_buffer rasterizer_frame_statistics_private_globals.temp_buffer
 
 /* ---------- public code */
 
@@ -222,8 +222,8 @@ void rasterizer_fps_accumulate(
 	void)
 {
 	rasterizer_debug_options.fps_accumulation = TRUE;
-	bss_00466320.fps_accumulation_time = system_milliseconds();
-	bss_00466320.fps_accumulation_frame_index =
+	rasterizer_frame_statistics_private_globals.fps_accumulation_time = system_milliseconds();
+	rasterizer_frame_statistics_private_globals.fps_accumulation_frame_index =
 		rasterizer_globals.fps_accumulation_frame_index;
 
 	return;

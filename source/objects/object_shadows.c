@@ -35,13 +35,13 @@ struct object_shadow
 
 /* ---------- public code */
 
-static void *code_0012b870(
+static void *object_shadow_get_object(
 	long object_index)
 {
 	return object_get_and_verify_type(object_index, _object_mask_all);
 }
 
-void code_0012b880(
+void object_build_shadow_recursive(
 	long object_index,
 	void const *context,
 	struct object_shadow *shadow)
@@ -50,8 +50,8 @@ void code_0012b880(
 	{
 		struct object_datum *object = object_get(object_index);
 
-		code_0012b870(object_index);
-		code_0012b880(object->object.first_child_object_index, context, shadow);
+		object_shadow_get_object(object_index);
+		object_build_shadow_recursive(object->object.first_child_object_index, context, shadow);
 		object_index = object->object.next_object_index;
 	}
 }
@@ -75,8 +75,8 @@ boolean object_build_shadow(
 	shadow->count = 0;
 	shadow->unknown1 = 0;
 
-	code_0012b870(object_index);
-	code_0012b880(object->object.first_child_object_index, context, shadow);
+	object_shadow_get_object(object_index);
+	object_build_shadow_recursive(object->object.first_child_object_index, context, shadow);
 	if (shadow->count > 0)
 	{
 		result = TRUE;

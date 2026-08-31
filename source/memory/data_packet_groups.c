@@ -85,12 +85,12 @@ struct packet_header_byte_swap_data
 
 /* ---------- globals */
 
-char const *bss_00456624 = NULL;
+char const *global_data_packet_groups_error_string = NULL;
 
-struct packet_header_byte_swap_data data_00309e38 =
+struct packet_header_byte_swap_data packet_header_bs =
 {
 	{ _begin_bs_array, 1, _1byte, _end_bs_array },
-	{ "packet_header", sizeof(struct packet_header), data_00309e38.codes, BYTE_SWAP_DEFINITION_SIGNATURE, FALSE }
+	{ "packet_header", sizeof(struct packet_header), packet_header_bs.codes, BYTE_SWAP_DEFINITION_SIGNATURE, FALSE }
 };
 
 /* ---------- public code */
@@ -129,8 +129,8 @@ void data_packet_group_initialize(
 char const *data_packet_groups_get_error(
 	void)
 {
-	char const *result = bss_00456624;
-	bss_00456624 = NULL;
+	char const *result = global_data_packet_groups_error_string;
+	global_data_packet_groups_error_string = NULL;
 
 	match_assert("c:\\halo\\SOURCE\\memory\\data_packet_groups.c", 57, result);
 
@@ -162,7 +162,7 @@ boolean data_packet_group_append_packet_header(
 	if (*encoded_packet_size + sizeof(struct packet_header) < group_definition->maximum_encoded_packet_size)
 	{
 		packet_header->packet_type = (char)packet_type;
-		byte_swap_data(&data_00309e38.definition, packet_header, 1);
+		byte_swap_data(&packet_header_bs.definition, packet_header, 1);
 		++*encoded_packet_size;
 	}
 	else
@@ -170,7 +170,7 @@ boolean data_packet_group_append_packet_header(
 		error = "couldn't append header to encoded packet";
 	}
 
-	bss_00456624 = error;
+	global_data_packet_groups_error_string = error;
 
 	return error==NULL;
 }
@@ -213,7 +213,7 @@ boolean data_packet_group_encode_packet(
 			encoded_packet_size,
 			(short)packet_type))
 		{
-			error = bss_00456624;
+			error = global_data_packet_groups_error_string;
 		}
 	}
 	else
@@ -221,7 +221,7 @@ boolean data_packet_group_encode_packet(
 		error = "couldn't encode packet";
 	}
 
-	bss_00456624 = error;
+	global_data_packet_groups_error_string = error;
 
 	return error==NULL;
 }
@@ -255,7 +255,7 @@ boolean data_packet_group_decode_packet(
 	{
 		struct packet_header *packet_header = (struct packet_header *)((byte const *)encoded_packet + *encoded_packet_size - sizeof(struct packet_header));
 
-		byte_swap_data(&data_00309e38.definition, packet_header, 1);
+		byte_swap_data(&packet_header_bs.definition, packet_header, 1);
 
 		if (packet_header->packet_type>=0 && packet_header->packet_type<group_definition->packet_type_count)
 		{
@@ -296,7 +296,7 @@ boolean data_packet_group_decode_packet(
 		error = "got packet with no header";
 	}
 
-	bss_00456624 = error;
+	global_data_packet_groups_error_string = error;
 
 	return error==NULL;
 }

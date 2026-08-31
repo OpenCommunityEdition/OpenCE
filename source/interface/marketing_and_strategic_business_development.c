@@ -18,8 +18,8 @@ static void clean_up_for_image_launch(void);
 
 /* ---------- globals */
 
-static boolean bss_00453ccc;
-static boolean data_002fd5a0 = TRUE;
+static boolean demos_available;
+static boolean check_for_demos = TRUE;
 
 /* ---------- public code */
 
@@ -28,20 +28,20 @@ boolean xbox_demos_available(
 {
 	struct file_reference file;
 	
-	if (data_002fd5a0==TRUE)
+	if (check_for_demos==TRUE)
 	{
 		if (file_reference_create_from_path(&file, "d:\\XDemos\\XDemos.xbe", FALSE))
 		{
 			if (file_exists(&file))
 			{
-				bss_00453ccc = TRUE;
+				demos_available = TRUE;
 			}
 		}
 
-		data_002fd5a0 = FALSE;
+		check_for_demos = FALSE;
 	}
 
-	return bss_00453ccc;
+	return demos_available;
 }
 
 /* must include here to preserve order */

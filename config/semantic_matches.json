@@ -66,22 +66,22 @@
   },
   {
     "unit": "source/memory/data_packets",
-    "function": "_code_0010a5f0",
+    "function": "__data_packet_verify",
     "reason": "hardened COFF comparison proves all 464 padded bytes and all 27 semantic relocations exact; objdiff reports a local jump-table label encoding false negative"
   },
   {
     "unit": "source/memory/data_packets",
-    "function": "_code_0010a7c0",
+    "function": "__data_packet_encode",
     "reason": "hardened COFF comparison proves all 768 padded bytes and all 44 semantic relocations exact; objdiff reports a local jump-table label encoding false negative"
   },
   {
     "unit": "source/memory/data_packets",
-    "function": "_code_0010aac0",
+    "function": "__data_packet_decode",
     "reason": "hardened COFF comparison proves all 672 padded bytes and all 28 semantic relocations exact; objdiff reports a local jump-table label encoding false negative"
   },
   {
     "unit": "source/memory/byte_swapping",
-    "function": "_code_00108010",
+    "function": "__byte_swap_data",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
@@ -96,7 +96,7 @@
   },
   {
     "unit": "source/interface/ui_widget_text_search_and_replace_functions",
-    "function": "_code_000e4aa0",
+    "function": "_widget_controller",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
@@ -141,7 +141,7 @@
   },
   {
     "unit": "source/bitmaps/libtiff/tif_next",
-    "function": "_code_0005b9b0",
+    "function": "_NeXTDecode",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
@@ -376,102 +376,102 @@
   },
   {
     "unit": "source/networking/telnet_console",
-    "function": "_code_001203c0",
+    "function": "_process_telnet_client_buffer",
     "reason": "hardened COFF comparison proves all 496 padded bytes and all 30 semantic relocations exact; objdiff reports a switch-table/local-label encoding false negative"
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "function": "_code_000da7a0",
+    "function": "_playlist_profile_set_game_engine",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "function": "_code_000da8d0",
+    "function": "_playlist_profile_change_ctf_rules",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "function": "_code_000dac70",
+    "function": "_playlist_profile_change_koth_rules",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "function": "_code_000dae90",
+    "function": "_playlist_profile_change_slayer_rules",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "function": "_code_000db1f0",
+    "function": "_playlist_profile_change_oddball_rules",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "function": "_code_000db770",
+    "function": "_playlist_profile_change_racing_rules",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "function": "_code_000dba40",
+    "function": "_playlist_profile_change_player_options",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "function": "_code_000dbfc0",
+    "function": "_playlist_profile_change_item_options",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "function": "_code_000dc4d0",
+    "function": "_playlist_profile_initialize_game_engine",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "function": "_code_000dc630",
+    "function": "_playlist_profile_initialize_ctf_rules",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "function": "_code_000dc9c0",
+    "function": "_playlist_profile_initialize_koth_rules",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "function": "_code_000dcbf0",
+    "function": "_playlist_profile_initialize_slayer_rules",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "function": "_code_000dcf40",
+    "function": "_playlist_profile_initialize_oddball_rules",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "function": "_code_000dd450",
+    "function": "_playlist_profile_initialize_racing_rules",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "function": "_code_000dd730",
+    "function": "_playlist_profile_initialize_player_options",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "function": "_code_000ddc80",
+    "function": "_playlist_profile_initialize_item_options",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "function": "_code_000de6b0",
+    "function": "_player_profile_initialize_controller_settings",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "function": "_code_000deb70",
+    "function": "_player_profile_change_controller_settings",
     "reason": "hardened COFF comparison proves exact bytes and relocation destinations; objdiff reports a local-symbol ownership false negative"
   },
   {
     "unit": "source/render/render_contrails",
-    "function": "_code_00177860",
+    "function": "_render_contrail",
     "reason": "hardened COFF comparison proves all 1952 padded bytes and all 57 semantic relocations exact (SHA-256 70d28d083222f55ac171cb1aa9676d018fb2bcae9ee54f09facee54755cef5e8); objdiff reports a switch-table/local-label encoding false negative"
   },
   {

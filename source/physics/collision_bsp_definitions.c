@@ -141,7 +141,7 @@ typedef char collision_bsp_definition_data_size_assert[
  * split target encodes its 22 internal pointers relative to the unrelated
  * breakable_surface_effect_enabled symbol at a uniform +6 displacement;
  * correct source-level pointers relocate against data_0030c9c0 instead. */
-struct collision_bsp_definition_data data_0030c9c0 =
+struct collision_bsp_definition_data global_collision_bsp_definition_data =
 {
 	{
 		{ _tag_field_long_integer, 0, "plane*", NULL },
@@ -151,7 +151,7 @@ struct collision_bsp_definition_data data_0030c9c0 =
 	},
 	{
 		"bsp3d node", 0, 0x20000, sizeof(struct bsp3d_node), NULL,
-		data_0030c9c0.bsp3d_node_fields, NULL, NULL, NULL, NULL, NULL,
+		global_collision_bsp_definition_data.bsp3d_node_fields, NULL, NULL, NULL, NULL, NULL,
 	},
 	{
 		{ _tag_field_real_plane3d, 0, "plane*", NULL },
@@ -159,19 +159,19 @@ struct collision_bsp_definition_data data_0030c9c0 =
 	},
 	{
 		"plane", 0, 0x10000, sizeof(real_plane3d), NULL,
-		data_0030c9c0.plane_fields, NULL, NULL, NULL, NULL, NULL,
+		global_collision_bsp_definition_data.plane_fields, NULL, NULL, NULL, NULL, NULL,
 	},
 	{ "contains double-sided surfaces" },
-	{ 1, data_0030c9c0.leaf_flag_names },
+	{ 1, global_collision_bsp_definition_data.leaf_flag_names },
 	{
-		{ _tag_field_word_flags, 0, "flags*", &data_0030c9c0.leaf_flags },
+		{ _tag_field_word_flags, 0, "flags*", &global_collision_bsp_definition_data.leaf_flags },
 		{ _tag_field_short_integer, 0, "bsp2d reference count*", NULL },
 		{ _tag_field_long_integer, 0, "first bsp2d reference*", NULL },
 		{ _tag_field_terminator, 0, NULL, NULL },
 	},
 	{
 		"leaf", 0, 0x10000, 8, NULL,
-		data_0030c9c0.leaf_fields, NULL, NULL, NULL, NULL, NULL,
+		global_collision_bsp_definition_data.leaf_fields, NULL, NULL, NULL, NULL, NULL,
 	},
 	{
 		{ _tag_field_real_plane2d, 0, "plane*", NULL },
@@ -181,31 +181,31 @@ struct collision_bsp_definition_data data_0030c9c0 =
 	},
 	{
 		"bsp2d node", 0, 0xFFFF, sizeof(struct bsp2d_node), NULL,
-		data_0030c9c0.bsp2d_node_fields, NULL, NULL, NULL, NULL, NULL,
+		global_collision_bsp_definition_data.bsp2d_node_fields, NULL, NULL, NULL, NULL, NULL,
 	},
 	{
-		{ _tag_field_long_integer, 0, "plane*", &data_0030c9c0.plane_block },
-		{ _tag_field_long_integer, 0, "bsp2d node*", &data_0030c9c0.bsp2d_node_block },
+		{ _tag_field_long_integer, 0, "plane*", &global_collision_bsp_definition_data.plane_block },
+		{ _tag_field_long_integer, 0, "bsp2d node*", &global_collision_bsp_definition_data.bsp2d_node_block },
 		{ _tag_field_terminator, 0, NULL, NULL },
 	},
 	{
 		"bsp2d reference", 0, 0x20000, 8, NULL,
-		data_0030c9c0.bsp2d_reference_fields, NULL, NULL, NULL, NULL, NULL,
+		global_collision_bsp_definition_data.bsp2d_reference_fields, NULL, NULL, NULL, NULL, NULL,
 	},
 	{ "two sided", "invisible", "climbable", "breakable" },
-	{ 4, data_0030c9c0.surface_flag_names },
+	{ 4, global_collision_bsp_definition_data.surface_flag_names },
 	0,
 	{
 		{ _tag_field_long_integer, 0, "plane*", NULL },
 		{ _tag_field_long_integer, 0, "first edge*", NULL },
-		{ _tag_field_byte_flags, 0, "flags*", &data_0030c9c0.surface_flags },
+		{ _tag_field_byte_flags, 0, "flags*", &global_collision_bsp_definition_data.surface_flags },
 		{ _tag_field_char_integer, 0, "breakable surface*", NULL },
 		{ _tag_field_short_integer, 0, "material*", NULL },
 		{ _tag_field_terminator, 0, NULL, NULL },
 	},
 	{
 		"surface", 0, 0x20000, sizeof(struct collision_surface), NULL,
-		data_0030c9c0.surface_fields, NULL, NULL, NULL, NULL, NULL,
+		global_collision_bsp_definition_data.surface_fields, NULL, NULL, NULL, NULL, NULL,
 	},
 	0,
 	{
@@ -219,7 +219,7 @@ struct collision_bsp_definition_data data_0030c9c0 =
 	},
 	{
 		"edge", 0, 0x40000, sizeof(struct collision_edge), NULL,
-		data_0030c9c0.edge_fields, NULL, NULL, NULL, NULL, NULL,
+		global_collision_bsp_definition_data.edge_fields, NULL, NULL, NULL, NULL, NULL,
 	},
 	{
 		{ _tag_field_real_point3d, 0, "point*", NULL },
@@ -228,20 +228,20 @@ struct collision_bsp_definition_data data_0030c9c0 =
 	},
 	{
 		"vertex", 0, 0x20000, sizeof(struct collision_vertex), NULL,
-		data_0030c9c0.vertex_fields, NULL, NULL, NULL, NULL, NULL,
+		global_collision_bsp_definition_data.vertex_fields, NULL, NULL, NULL, NULL, NULL,
 	},
 };
 
 struct tag_field global_collision_bsp_fields[9] =
 {
-	{ _tag_field_block, 0, "bsp3d nodes*", &data_0030c9c0.bsp3d_node_block },
-	{ _tag_field_block, 0, "planes*", &data_0030c9c0.plane_block },
-	{ _tag_field_block, 0, "leaves*", &data_0030c9c0.leaf_block },
-	{ _tag_field_block, 0, "bsp2d references*", &data_0030c9c0.bsp2d_reference_block },
-	{ _tag_field_block, 0, "bsp2d nodes*", &data_0030c9c0.bsp2d_node_block },
-	{ _tag_field_block, 0, "surfaces*", &data_0030c9c0.surface_block },
-	{ _tag_field_block, 0, "edges*", &data_0030c9c0.edge_block },
-	{ _tag_field_block, 0, "vertices*", &data_0030c9c0.vertex_block },
+	{ _tag_field_block, 0, "bsp3d nodes*", &global_collision_bsp_definition_data.bsp3d_node_block },
+	{ _tag_field_block, 0, "planes*", &global_collision_bsp_definition_data.plane_block },
+	{ _tag_field_block, 0, "leaves*", &global_collision_bsp_definition_data.leaf_block },
+	{ _tag_field_block, 0, "bsp2d references*", &global_collision_bsp_definition_data.bsp2d_reference_block },
+	{ _tag_field_block, 0, "bsp2d nodes*", &global_collision_bsp_definition_data.bsp2d_node_block },
+	{ _tag_field_block, 0, "surfaces*", &global_collision_bsp_definition_data.surface_block },
+	{ _tag_field_block, 0, "edges*", &global_collision_bsp_definition_data.edge_block },
+	{ _tag_field_block, 0, "vertices*", &global_collision_bsp_definition_data.vertex_block },
 	{ _tag_field_terminator, 0, NULL, NULL },
 };
 

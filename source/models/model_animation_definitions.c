@@ -298,7 +298,7 @@ typedef char verify_animation_list_size[
 typedef char verify_animation_list_animations_offset[
 	offsetof(struct animation_list, animations) == 0x04 ? 1 : -1];
 
-struct animation_list_entry data_00309e80[] =
+struct animation_list_entry weapon_type_animation_list_entries[] =
 {
 	{ "reload-1", _animation_replacement },
 	{ "reload-2", _animation_replacement },
@@ -312,7 +312,7 @@ struct animation_list_entry data_00309e80[] =
 	{ "overheat", _animation_overlay },
 };
 
-struct animation_list weapon_type_animation_list = { NUMBEROF(data_00309e80), data_00309e80 };
+struct animation_list weapon_type_animation_list = { NUMBEROF(weapon_type_animation_list_entries), weapon_type_animation_list_entries };
 
 struct animation_list_entry weapon_class_animation_list_entries[] =
 {

@@ -333,10 +333,10 @@ typedef char bitmap_group_sequence_size_assert[
 
 /* ---------- prototypes */
 
-boolean code_00065210(
+boolean postprocess_bitmap(
 	struct bitmap_data *bitmap,
 	boolean editing);
-void code_00065220(
+void delete_bitmap(
 	struct tag_block *block,
 	long element_index);
 
@@ -424,14 +424,14 @@ struct bitmap_data *bitmap_group_get_bitmap_from_sequence(
 
 /* ---------- private code */
 
-boolean code_00065210(
+boolean postprocess_bitmap(
 	struct bitmap_data *bitmap,
 	boolean editing)
 {
 	return TRUE;
 }
 
-void code_00065220(
+void delete_bitmap(
 	struct tag_block *block,
 	long element_index)
 {

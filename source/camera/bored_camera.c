@@ -91,9 +91,9 @@ boolean valid_real_vector3d_axes2(
 	real_vector3d const *forward,
 	real_vector3d const *up);
 
-static long code_00073000(
+static long bored_camera_shot_threshold_milliseconds(
 	long boredom_count);
-static long code_00073020(
+static long bored_camera_shot_duration_milliseconds(
 	long boredom_count);
 float real_local_random_range(
 	float lower_bound,
@@ -125,7 +125,7 @@ void bored_camera_update(
 	camera->timer_milliseconds += camera->last_update_milliseconds - now;
 	camera->last_update_milliseconds = now;
 
-	if (camera->timer_milliseconds < code_00073000(camera->boredom_count))
+	if (camera->timer_milliseconds < bored_camera_shot_threshold_milliseconds(camera->boredom_count))
 	{
 		struct player_control_unit_camera_info camera_info;
 		long aiming_unit_index;
@@ -170,7 +170,7 @@ void bored_camera_update(
 			result->depth = real_local_random_range(1.f, 6.f);
 			result->velocity = *global_zero_vector3d;
 
-			timer_milliseconds = code_00073020(camera->boredom_count);
+			timer_milliseconds = bored_camera_shot_duration_milliseconds(camera->boredom_count);
 			camera->timer_milliseconds = timer_milliseconds;
 			result->flags = FLAG(0);
 			result->timer = (real)timer_milliseconds;
@@ -229,13 +229,13 @@ void bored_camera_update(
 
 /* ---------- private code */
 
-static long code_00073000(
+static long bored_camera_shot_threshold_milliseconds(
 	long boredom_count)
 {
 	return MIN(boredom_count, 3) * 1000;
 }
 
-static long code_00073020(
+static long bored_camera_shot_duration_milliseconds(
 	long boredom_count)
 {
 	return MIN(boredom_count + 1, 3) * 10000;

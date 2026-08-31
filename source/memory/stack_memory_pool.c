@@ -161,66 +161,66 @@ struct stack_memory_pool
 
 /* ---------- prototypes */
 
-static void code_0010e270(
+static void memory_block_set_size_and_index(
 	long slot_index,
 	struct stack_memory_pool_block *block,
 	long block_size);
-static unsigned long code_0010e2b0(
+static unsigned long memory_block_get_real_size(
 	struct stack_memory_pool_block *block);
-static unsigned long code_0010e2e0(
+static unsigned long memory_block_get_user_size(
 	struct stack_memory_pool_block *block);
-static long code_0010e330(
+static long memory_block_get_pool_index(
 	struct stack_memory_pool_block *block);
-static unsigned long code_0010e360(
+static unsigned long stack_memory_pool_free_space_at_end_of_pool(
 	struct stack_memory_pool *pool);
-static long code_0010e3e0(
+static long stack_memory_pool_find_first_unused_memory_block(
 	struct stack_memory_pool *pool);
-static void code_0010e430(
+static void stack_memory_pool_set_next_block_index(
 	struct stack_memory_pool *pool);
 static void *stack_memory_pool_find_space_between_blocks(
 	struct stack_memory_pool *pool,
 	unsigned long allocation_size,
 	struct stack_memory_pool_block **previous_block);
-static boolean code_0010e510(
+static boolean memory_block_valid(
 	struct stack_memory_pool_block *block);
-static void code_0010e5b0(
+static void memory_block_lock(
 	struct stack_memory_pool_block *block);
-static void code_0010e5f0(
+static void memory_block_unlock(
 	struct stack_memory_pool_block *block);
-static boolean code_0010e630(
+static boolean memory_block_is_locked(
 	struct stack_memory_pool_block *block);
-static void *code_0010e670(
+static void *memory_block_get_user_address(
 	struct stack_memory_pool_block *block);
-static void code_0010e6a0(
+static void stack_memory_pool_compact(
 	struct stack_memory_pool *pool);
-static boolean code_0010e770(
+static boolean stack_memory_pool_valid_block(
 	struct stack_memory_pool *pool,
 	struct stack_memory_pool_block *block);
-static void code_0010e7f0(
+static void stack_memory_pool_dispose_block(
 	struct stack_memory_pool_block *block,
 	struct stack_memory_pool *pool);
-static void *code_0010e890(
+static void *stack_memory_pool_lock_block(
 	struct stack_memory_pool_block *block,
 	struct stack_memory_pool *pool);
-static void code_0010e960(
+static void stack_memory_pool_unlock_block(
 	struct stack_memory_pool *pool,
 	struct stack_memory_pool_block *block);
-static struct stack_memory_pool_block *code_0010ea00(
+static struct stack_memory_pool_block *stack_memory_pool_allocate(
 	long allocation_size,
 	struct stack_memory_pool *pool,
 	char const *file,
 	unsigned long line);
-static struct stack_memory_pool_block *code_0010eef0(
+static struct stack_memory_pool_block *stack_memory_pool_new_block(
 	long allocation_size,
 	struct stack_memory_pool *pool,
 	char const *file,
 	unsigned long line);
-static struct stack_memory_pool_block *code_0010ef10(
+static struct stack_memory_pool_block *stack_memory_pool_new_block_clear(
 	long allocation_size,
 	struct stack_memory_pool *pool,
 	char const *file,
 	unsigned long line);
-static struct stack_memory_pool_block *code_0010ef70(
+static struct stack_memory_pool_block *stack_memory_pool_resize_block(
 	struct stack_memory_pool *pool,
 	unsigned long allocation_size,
 	struct stack_memory_pool_block *block,
@@ -268,27 +268,27 @@ void stack_memory_pool_reset(
 	if (FALSE)
 	{
 		struct stack_memory_pool_block *block = pool->first_block;
-		code_0010e270(0, block, sizeof(*block));
-		code_0010e2b0(block);
-		code_0010e2e0(block);
-		code_0010e330(block);
-		code_0010e360(pool);
-		code_0010e3e0(pool);
-		code_0010e430(pool);
-		code_0010e510(block);
-		code_0010e5b0(block);
-		code_0010e5f0(block);
-		code_0010e630(block);
-		code_0010e670(block);
-		code_0010e6a0(pool);
-		code_0010e770(pool, block);
-		code_0010e7f0(block, pool);
-		code_0010e890(block, pool);
-		code_0010e960(pool, block);
-		code_0010ea00(sizeof(*block), pool, __FILE__, __LINE__);
-		code_0010eef0(sizeof(*block), pool, __FILE__, __LINE__);
-		code_0010ef10(sizeof(*block), pool, __FILE__, __LINE__);
-		code_0010ef70(pool, sizeof(*block), block, __FILE__, __LINE__);
+		memory_block_set_size_and_index(0, block, sizeof(*block));
+		memory_block_get_real_size(block);
+		memory_block_get_user_size(block);
+		memory_block_get_pool_index(block);
+		stack_memory_pool_free_space_at_end_of_pool(pool);
+		stack_memory_pool_find_first_unused_memory_block(pool);
+		stack_memory_pool_set_next_block_index(pool);
+		memory_block_valid(block);
+		memory_block_lock(block);
+		memory_block_unlock(block);
+		memory_block_is_locked(block);
+		memory_block_get_user_address(block);
+		stack_memory_pool_compact(pool);
+		stack_memory_pool_valid_block(pool, block);
+		stack_memory_pool_dispose_block(block, pool);
+		stack_memory_pool_lock_block(block, pool);
+		stack_memory_pool_unlock_block(pool, block);
+		stack_memory_pool_allocate(sizeof(*block), pool, __FILE__, __LINE__);
+		stack_memory_pool_new_block(sizeof(*block), pool, __FILE__, __LINE__);
+		stack_memory_pool_new_block_clear(sizeof(*block), pool, __FILE__, __LINE__);
+		stack_memory_pool_resize_block(pool, sizeof(*block), block, __FILE__, __LINE__);
 	}
 
 	return;
@@ -300,7 +300,7 @@ void dispose_handle(
 {
 	unsigned long block_size;
 
-	if (!code_0010e770(pool, block))
+	if (!stack_memory_pool_valid_block(pool, block))
 	{
 		display_assert(
 			"not a valid handle, or handle is locked",
@@ -311,7 +311,7 @@ void dispose_handle(
 	}
 	match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x22F, block);
 	block_size = block->size_and_flags&0x7FFFFFFF;
-	code_0010e7f0(block, pool);
+	stack_memory_pool_dispose_block(block, pool);
 	pool->bytes_used -= block_size;
 	pool->block_count--;
 	return;
@@ -325,7 +325,7 @@ void lock_handle(
 
 	match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0xF7, h);
 	block = *h;
-	if (!code_0010e770(pool, block))
+	if (!stack_memory_pool_valid_block(pool, block))
 	{
 		display_assert(
 			"not a valid handle, or handle is already locked",
@@ -334,7 +334,7 @@ void lock_handle(
 			TRUE);
 		system_exit(-1);
 	}
-	*h = code_0010e890(block, pool);
+	*h = stack_memory_pool_lock_block(block, pool);
 	return;
 }
 
@@ -357,7 +357,7 @@ void unlock_handle(
 		pool_block = pool->blocks[block_index];
 		if (pool_block)
 		{
-			if (!code_0010e510(pool_block))
+			if (!memory_block_valid(pool_block))
 			{
 				display_assert(
 					"memory_block_valid(block)",
@@ -382,7 +382,7 @@ void unlock_handle(
 			TRUE);
 		system_exit(-1);
 	}
-	code_0010e960(pool, block);
+	stack_memory_pool_unlock_block(pool, block);
 	return;
 }
 
@@ -395,7 +395,7 @@ void dispose_pointer(
 
 	match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x197, p);
 	block = (struct stack_memory_pool_block *)((byte *)p-0x1C);
-	if (!code_0010e770(pool, block))
+	if (!stack_memory_pool_valid_block(pool, block))
 	{
 		display_assert(
 			"invalid pointer",
@@ -406,7 +406,7 @@ void dispose_pointer(
 	}
 	match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x22F, block);
 	block_size = block->size_and_flags&0x7FFFFFFF;
-	code_0010e7f0(block, pool);
+	stack_memory_pool_dispose_block(block, pool);
 	pool->bytes_used -= block_size;
 	pool->block_count--;
 	return;
@@ -421,7 +421,7 @@ struct stack_memory_pool_block *pool_new_handle(
 {
 	struct stack_memory_pool_block *block;
 
-	block = code_0010ea00(allocation_size, pool, file, line);
+	block = stack_memory_pool_allocate(allocation_size, pool, file, line);
 	if (block)
 	{
 		pool->bytes_used += block->size_and_flags&0x7FFFFFFF;
@@ -447,13 +447,13 @@ struct stack_memory_pool_block *pool_new_handle_clear(
 {
 	struct stack_memory_pool_block *block;
 
-	block = code_0010ea00(allocation_size, pool, file, line);
+	block = stack_memory_pool_allocate(allocation_size, pool, file, line);
 	if (block)
 	{
 		match_vassert(
 			"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
 			0x23F,
-			code_0010e510(block),
+			memory_block_valid(block),
 			"memory_block_valid(block)");
 		csmemset(block->data, 0, allocation_size);
 		pool->bytes_used += block->size_and_flags&0x7FFFFFFF;
@@ -484,7 +484,7 @@ boolean pool_resize_handle(
 
 	match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0xC1, h);
 	block = *h;
-	result = code_0010e770(pool, block);
+	result = stack_memory_pool_valid_block(pool, block);
 	if (!result)
 	{
 		display_assert(
@@ -498,7 +498,7 @@ boolean pool_resize_handle(
 	{
 		match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x22F, block);
 		old_block_size = block->size_and_flags&0x7FFFFFFF;
-		new_block = code_0010ef70(pool, allocation_size, block, file, line);
+		new_block = stack_memory_pool_resize_block(pool, allocation_size, block, file, line);
 		if (new_block)
 		{
 			*h = new_block;
@@ -509,7 +509,7 @@ boolean pool_resize_handle(
 			if (
 				(new_block->size_and_flags&0x7FFFFFFF) >
 				(unsigned long)pool->largest_block_size)
-				pool->largest_block_size = code_0010e2b0(new_block);
+				pool->largest_block_size = memory_block_get_real_size(new_block);
 		}
 		else
 		{
@@ -529,14 +529,14 @@ void *pool_new_pointer(
 	struct stack_memory_pool_block *block;
 	void *pointer = NULL;
 
-	block = code_0010ea00(allocation_size, pool, file, line);
+	block = stack_memory_pool_allocate(allocation_size, pool, file, line);
 	if (block)
 	{
-		code_0010e890(block, pool);
+		stack_memory_pool_lock_block(block, pool);
 		match_vassert(
 			"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
 			0x23F,
-			code_0010e510(block),
+			memory_block_valid(block),
 			"memory_block_valid(block)");
 		pool->bytes_used += block->size_and_flags&0x7FFFFFFF;
 		pointer = block->data;
@@ -561,21 +561,21 @@ void *pool_new_pointer_clear(
 	struct stack_memory_pool_block *block;
 	void *pointer = NULL;
 
-	block = code_0010ea00(allocation_size, pool, file, line);
+	block = stack_memory_pool_allocate(allocation_size, pool, file, line);
 	if (block)
 	{
 		match_vassert(
 			"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
 			0x23F,
-			code_0010e510(block),
+			memory_block_valid(block),
 			"memory_block_valid(block)");
 		pointer = block->data;
 		csmemset(pointer, 0, allocation_size);
-		code_0010e890(block, pool);
+		stack_memory_pool_lock_block(block, pool);
 		match_vassert(
 			"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
 			0x23F,
-			code_0010e510(block),
+			memory_block_valid(block),
 			"memory_block_valid(block)");
 		pool->bytes_used += block->size_and_flags&0x7FFFFFFF;
 		pool->block_count++;
@@ -614,21 +614,21 @@ void *pool_resize_pointer(
 		old_block_size = block->size_and_flags&0x7FFFFFFF;
 	}
 
-	new_block = code_0010ef70(pool, allocation_size, block, file, line);
+	new_block = stack_memory_pool_resize_block(pool, allocation_size, block, file, line);
 	if (new_block)
 	{
 		match_vassert(
 			"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
 			0x215,
-			code_0010e510(new_block),
+			memory_block_valid(new_block),
 			"memory_block_valid(block)");
 		locked = (new_block->size_and_flags>>31)&1;
 		if (!locked)
-			code_0010e890(new_block, pool);
+			stack_memory_pool_lock_block(new_block, pool);
 		match_vassert(
 			"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
 			0x23F,
-			code_0010e510(new_block),
+			memory_block_valid(new_block),
 			"memory_block_valid(block)");
 
 		pointer = new_block->data;
@@ -654,7 +654,7 @@ void *pool_resize_pointer(
 
 /* ---------- private code */
 
-static void code_0010e270(
+static void memory_block_set_size_and_index(
 	long slot_index,
 	struct stack_memory_pool_block *block,
 	long block_size)
@@ -667,28 +667,28 @@ static void code_0010e270(
 	return;
 }
 
-static unsigned long code_0010e2b0(
+static unsigned long memory_block_get_real_size(
 	struct stack_memory_pool_block *block)
 {
 	match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x22F, block);
 	return block->size_and_flags&0x7FFFFFFF;
 }
 
-static unsigned long code_0010e2e0(
+static unsigned long memory_block_get_user_size(
 	struct stack_memory_pool_block *block)
 {
 	match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x237, block);
-	return code_0010e2b0(block)-sizeof(*block);
+	return memory_block_get_real_size(block)-sizeof(*block);
 }
 
-static long code_0010e330(
+static long memory_block_get_pool_index(
 	struct stack_memory_pool_block *block)
 {
 	match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x24A, block);
 	return block->slot_index;
 }
 
-static unsigned long code_0010e360(
+static unsigned long stack_memory_pool_free_space_at_end_of_pool(
 	struct stack_memory_pool *pool)
 {
 	struct stack_memory_pool_block *block;
@@ -705,7 +705,7 @@ static unsigned long code_0010e360(
 	return pool->size-(block->size_and_flags&0x7FFFFFFF)+(unsigned long)pool->base_address-(unsigned long)pool->last_block;
 }
 
-static long code_0010e3e0(
+static long stack_memory_pool_find_first_unused_memory_block(
 	struct stack_memory_pool *pool)
 {
 	unsigned long block_index;
@@ -726,7 +726,7 @@ static long code_0010e3e0(
 	return result;
 }
 
-static void code_0010e430(
+static void stack_memory_pool_set_next_block_index(
 	struct stack_memory_pool *pool)
 {
 	long block_index;
@@ -793,7 +793,7 @@ static void *stack_memory_pool_find_space_between_blocks(
 	return result;
 }
 
-static boolean code_0010e510(
+static boolean memory_block_valid(
 	struct stack_memory_pool_block *block)
 {
 	unsigned long block_size;
@@ -843,53 +843,53 @@ static boolean code_0010e510(
 	}
 }
 
-static void code_0010e5b0(
+static void memory_block_lock(
 	struct stack_memory_pool_block *block)
 {
 	match_vassert(
 		"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
 		0x203,
-		code_0010e510(block),
+		memory_block_valid(block),
 		"memory_block_valid(block)");
 	block->size_and_flags |= 0x80000000;
 	return;
 }
 
-static void code_0010e5f0(
+static void memory_block_unlock(
 	struct stack_memory_pool_block *block)
 {
 	match_vassert(
 		"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
 		0x20C,
-		code_0010e510(block),
+		memory_block_valid(block),
 		"memory_block_valid(block)");
 	block->size_and_flags &= 0x7FFFFFFF;
 	return;
 }
 
-static boolean code_0010e630(
+static boolean memory_block_is_locked(
 	struct stack_memory_pool_block *block)
 {
 	match_vassert(
 		"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
 		0x215,
-		code_0010e510(block),
+		memory_block_valid(block),
 		"memory_block_valid(block)");
 	return (block->size_and_flags>>31)&1;
 }
 
-static void *code_0010e670(
+static void *memory_block_get_user_address(
 	struct stack_memory_pool_block *block)
 {
 	match_vassert(
 		"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
 		0x23F,
-		code_0010e510(block),
+		memory_block_valid(block),
 		"memory_block_valid(block)");
 	return block->data;
 }
 
-static void code_0010e6a0(
+static void stack_memory_pool_compact(
 	struct stack_memory_pool *pool)
 {
 	struct stack_memory_pool_block *block;
@@ -909,7 +909,7 @@ static void code_0010e6a0(
 	previous_size = 0;
 	do
 	{
-		if (!code_0010e510(block))
+		if (!memory_block_valid(block))
 		{
 			display_assert(
 				"memory_block_valid(block)",
@@ -938,7 +938,7 @@ static void code_0010e6a0(
 	return;
 }
 
-static boolean code_0010e770(
+static boolean stack_memory_pool_valid_block(
 	struct stack_memory_pool *pool,
 	struct stack_memory_pool_block *block)
 {
@@ -953,9 +953,9 @@ static boolean code_0010e770(
 	if (
 		(byte *)block >= pool->base_address &&
 		(byte *)block < pool->base_address+pool->size &&
-		code_0010e510(block))
+		memory_block_valid(block))
 	{
-		block_index = code_0010e330(block);
+		block_index = memory_block_get_pool_index(block);
 		if (block_index < pool->maximum_block_count)
 		{
 			pool_block = pool->blocks[block_index];
@@ -972,7 +972,7 @@ static boolean code_0010e770(
 	return valid;
 }
 
-static void code_0010e7f0(
+static void stack_memory_pool_dispose_block(
 	struct stack_memory_pool_block *block,
 	struct stack_memory_pool *pool)
 {
@@ -981,7 +981,7 @@ static void code_0010e7f0(
 	match_vassert(
 		"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
 		0x2D3,
-		code_0010e770(pool, block),
+		stack_memory_pool_valid_block(pool, block),
 		"stack_memory_pool_valid_block(pool, reference)");
 	match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x24A, block);
 	block_index = block->slot_index;
@@ -998,28 +998,28 @@ static void code_0010e7f0(
 	return;
 }
 
-static void *code_0010e890(
+static void *stack_memory_pool_lock_block(
 	struct stack_memory_pool_block *block,
 	struct stack_memory_pool *pool)
 {
 	match_vassert(
 		"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
 		0x2E5,
-		code_0010e770(pool, block) && !code_0010e630(block),
+		stack_memory_pool_valid_block(pool, block) && !memory_block_is_locked(block),
 		"stack_memory_pool_valid_block(pool, reference) && !memory_block_is_locked(reference)");
-	code_0010e5b0(block);
-	return code_0010e670(block);
+	memory_block_lock(block);
+	return memory_block_get_user_address(block);
 }
 
-static void code_0010e960(
+static void stack_memory_pool_unlock_block(
 	struct stack_memory_pool *pool,
 	struct stack_memory_pool_block *block)
 {
 	boolean locked;
 
-	if (code_0010e770(pool, block))
+	if (stack_memory_pool_valid_block(pool, block))
 	{
-		if (!code_0010e510(block))
+		if (!memory_block_valid(block))
 		{
 			display_assert(
 				"memory_block_valid(block)",
@@ -1040,7 +1040,7 @@ static void code_0010e960(
 	system_exit(-1);
 
 unlock_block:
-	if (!code_0010e510(block))
+	if (!memory_block_valid(block))
 	{
 		display_assert(
 			"memory_block_valid(block)",
@@ -1053,7 +1053,7 @@ unlock_block:
 	return;
 }
 
-static struct stack_memory_pool_block *code_0010ea00(
+static struct stack_memory_pool_block *stack_memory_pool_allocate(
 	long allocation_size,
 	struct stack_memory_pool *pool,
 	char const *file,
@@ -1086,10 +1086,10 @@ static struct stack_memory_pool_block *code_0010ea00(
 	free_space = NULL;
 	while (aligned_block_size&3)
 		aligned_block_size++;
-	if (code_0010e360(pool) < aligned_block_size)
+	if (stack_memory_pool_free_space_at_end_of_pool(pool) < aligned_block_size)
 	{
-		code_0010e6a0(pool);
-		if (code_0010e360(pool) < aligned_block_size)
+		stack_memory_pool_compact(pool);
+		if (stack_memory_pool_free_space_at_end_of_pool(pool) < aligned_block_size)
 		{
 			free_space = stack_memory_pool_find_space_between_blocks(
 				pool,
@@ -1111,7 +1111,7 @@ static struct stack_memory_pool_block *code_0010ea00(
 	{
 		long block_index;
 
-		block_index = code_0010e3e0(pool);
+		block_index = stack_memory_pool_find_first_unused_memory_block(pool);
 		pool->next_block_index = block_index;
 		if (block_index == NONE)
 		{
@@ -1141,10 +1141,10 @@ static struct stack_memory_pool_block *code_0010ea00(
 			0x370,
 			pool->last_block);
 		pool->blocks[pool->next_block_index] =
-			(struct stack_memory_pool_block *)((byte *)pool->last_block+code_0010e2b0(pool->last_block));
+			(struct stack_memory_pool_block *)((byte *)pool->last_block+memory_block_get_real_size(pool->last_block));
 	}
 
-	code_0010e270(
+	memory_block_set_size_and_index(
 		pool->next_block_index,
 		pool->blocks[pool->next_block_index],
 		aligned_block_size);
@@ -1194,20 +1194,20 @@ static struct stack_memory_pool_block *code_0010ea00(
 				block->next->previous = block;
 		}
 	}
-	code_0010e430(pool);
+	stack_memory_pool_set_next_block_index(pool);
 	return block;
 }
 
-static struct stack_memory_pool_block *code_0010eef0(
+static struct stack_memory_pool_block *stack_memory_pool_new_block(
 	long allocation_size,
 	struct stack_memory_pool *pool,
 	char const *file,
 	unsigned long line)
 {
-	return code_0010ea00(allocation_size, pool, file, line);
+	return stack_memory_pool_allocate(allocation_size, pool, file, line);
 }
 
-static struct stack_memory_pool_block *code_0010ef10(
+static struct stack_memory_pool_block *stack_memory_pool_new_block_clear(
 	long allocation_size,
 	struct stack_memory_pool *pool,
 	char const *file,
@@ -1215,20 +1215,20 @@ static struct stack_memory_pool_block *code_0010ef10(
 {
 	struct stack_memory_pool_block *block;
 
-	block = code_0010ea00(allocation_size, pool, file, line);
+	block = stack_memory_pool_allocate(allocation_size, pool, file, line);
 	if (block)
 	{
 		match_vassert(
 			"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
 			0x23F,
-			code_0010e510(block),
+			memory_block_valid(block),
 			"memory_block_valid(block)");
 		csmemset(block->data, 0, allocation_size);
 	}
 	return block;
 }
 
-static struct stack_memory_pool_block *code_0010ef70(
+static struct stack_memory_pool_block *stack_memory_pool_resize_block(
 	struct stack_memory_pool *pool,
 	unsigned long allocation_size,
 	struct stack_memory_pool_block *block,
@@ -1241,29 +1241,29 @@ static struct stack_memory_pool_block *code_0010ef70(
 	{
 		if (!block)
 		{
-			new_block = code_0010ea00(allocation_size, pool, file, line);
+			new_block = stack_memory_pool_allocate(allocation_size, pool, file, line);
 		}
 		else
 		{
 			match_vassert(
 				"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
 				0x2B4,
-				code_0010e770(pool, block),
+				stack_memory_pool_valid_block(pool, block),
 				"stack_memory_pool_valid_block(pool, reference)");
-			if (code_0010e2e0(block) >= allocation_size)
+			if (memory_block_get_user_size(block) >= allocation_size)
 			{
 				new_block = block;
 			}
 			else
 			{
-				new_block = code_0010ea00(allocation_size, pool, file, line);
+				new_block = stack_memory_pool_allocate(allocation_size, pool, file, line);
 				if (new_block)
 				{
 					csmemcpy(
-						code_0010e670(new_block),
-						code_0010e670(block),
-						code_0010e2e0(block));
-					code_0010e7f0(block, pool);
+						memory_block_get_user_address(new_block),
+						memory_block_get_user_address(block),
+						memory_block_get_user_size(block));
+					stack_memory_pool_dispose_block(block, pool);
 				}
 			}
 		}

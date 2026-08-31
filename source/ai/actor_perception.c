@@ -1124,7 +1124,7 @@ struct actor_perception_definition_view
 
 /* ---------- prototypes */
 
-long code_0001dbc0(
+long actor_perception_qsort_compare_optional_props(
 	void const *a,
 	void const *b);
 
@@ -1202,23 +1202,23 @@ void actor_stimulus_enter_combat_perceived_enemy(
 	long actor_index,
 	long prop_index);
 
-static long code_00020210(
+static long actor_perception_unit_from_swarm(
 	long swarm_actor_index,
 	long actor_index,
 	long existing_unit_index,
 	boolean mark,
 	struct actor_position_data const *position);
 
-static boolean code_00020780(
+static boolean actor_perception_assess_vehicle_danger(
 	long actor_index,
 	long vehicle_index,
 	boolean mark,
 	struct actor_position_data const *position);
 
-void code_00023290(
+void actor_perception_refresh(
 	long actor_index);
 
-void code_000228b0(
+void actor_perception_refresh_test_object(
 	long actor_index,
 	long object_index,
 	struct actor_perception_refresh_list *friend_list,
@@ -1271,7 +1271,7 @@ short actor_audibility_at_point(
 	real scale,
 	short line_of_sight);
 
-static boolean code_0001dc00(
+static boolean actor_perception_assess_suicide_danger(
 	long actor_index,
 	long object_index,
 	real suicide_radius,
@@ -1319,7 +1319,7 @@ short const global_acknowledgement_speeds[4][4] =
 	{ 0, 3, 4, 4 }
 };
 
-long data_002b6ae0 = NONE;
+long last_refresh_overflow_warning_time = NONE;
 
 /* ---------- public code */
 
@@ -1972,7 +1972,7 @@ typedef char actor_emotion_priority_prop_visibility_offset_assert[
 typedef char actor_emotion_priority_prop_friend_attacking_offset_assert[
 	offsetof(struct actor_emotion_priority_prop_view, friend_attacking) == 0x12F ? 1 : -1];
 
-static long code_0001f4f0(
+static long actor_emotion_assess_unopposable_danger(
 	long prop_index)
 {
 	struct actor_emotion_priority_prop_view *prop;
@@ -2094,7 +2094,7 @@ typedef char actor_emotion_prop_distance_offset_assert[
 typedef char actor_emotion_prop_driver_offset_assert[
 	offsetof(struct actor_emotion_prop_view, dangerous_vehicle_driver) == 0x136 ? 1 : -1];
 
-static short code_0001f470(
+static short actor_emotion_get_unopposable_enemy(
 	struct actor_emotion_target *targets,
 	long unit_index,
 	long actor_index,
@@ -2446,7 +2446,7 @@ short actor_audibility_at_point(
 	return result;
 }
 
-void code_0001f560(
+void actor_emotion_unopposable_retreat(
 	long actor_index)
 {
 	struct actor_emotion_target targets[16];
@@ -2471,7 +2471,7 @@ void code_0001f560(
 	while (prop != NULL)
 	{
 		short priority =
-			(short)code_0001f4f0(iterator.index);
+			(short)actor_emotion_assess_unopposable_danger(iterator.index);
 
 		if (priority > 0)
 			goto add_direct_emotion_target;
@@ -2480,7 +2480,7 @@ void code_0001f560(
 
 add_direct_emotion_target:
 		{
-			short target_index = (short)code_0001f470(
+			short target_index = (short)actor_emotion_get_unopposable_enemy(
 				targets,
 				prop->unit_index,
 				actor_index,
@@ -2539,7 +2539,7 @@ consider_friend_emotion_target:
 						target_prop->state <= _prop_state_acknowledged &&
 						target_prop->unopposable)
 					{
-						short target_index = (short)code_0001f470(
+						short target_index = (short)actor_emotion_get_unopposable_enemy(
 							targets,
 							friend_target_prop->unit_index,
 							actor_index,
@@ -3287,7 +3287,7 @@ void actor_perception_find_sense_position(
 	return;
 }
 
-static long code_00020210(
+static long actor_perception_unit_from_swarm(
 	long swarm_actor_index,
 	long actor_index,
 	long existing_unit_index,
@@ -3450,7 +3450,7 @@ void prop_position_refresh(
 
 				prop->swarm_unit_selected_time = current_time;
 				new_unit_index =
-					code_00020210(
+					actor_perception_unit_from_swarm(
 						prop->actor_index,
 						actor_index,
 						prop->unit_index,
@@ -3559,7 +3559,7 @@ update_actor_to_prop:
 	return;
 }
 
-static boolean code_00020780(
+static boolean actor_perception_assess_vehicle_danger(
 	long actor_index,
 	long vehicle_index,
 	boolean mark,
@@ -3664,7 +3664,7 @@ static boolean code_00020780(
 
 
 
-void code_000228b0(
+void actor_perception_refresh_test_object(
 	long actor_index,
 	long object_index,
 	struct actor_perception_refresh_list *enemy_list,
@@ -3718,7 +3718,7 @@ void code_000228b0(
 				if (unit_actor_index != NONE)
 				{
 					unit_index =
-						code_00020210(
+						actor_perception_unit_from_swarm(
 							unit_actor_index,
 							actor_index,
 							NONE,
@@ -3775,7 +3775,7 @@ void code_000228b0(
 						unit->unit.animation.state ==
 							0x1E))
 				{
-					code_0001dc00(
+					actor_perception_assess_suicide_danger(
 						actor_index,
 						unit_index,
 						suicide_radius,
@@ -3931,7 +3931,7 @@ create_prop:
 
 				if (vehicle->unit.driver_object_index == NONE)
 				{
-					code_00020780(
+					actor_perception_assess_vehicle_danger(
 						actor_index,
 						object_index,
 						FALSE,
@@ -4034,7 +4034,7 @@ create_prop:
 object_done:
 		if (current_object->object.first_child_object_index != NONE)
 		{
-			code_000228b0(
+			actor_perception_refresh_test_object(
 				actor_index,
 				current_object->object.first_child_object_index,
 				enemy_list,
@@ -4342,7 +4342,7 @@ boolean actor_situation_try_new_target(
 
 /* ---------- private code */
 
-long code_0001dbc0(
+long actor_perception_qsort_compare_optional_props(
 	void const *a,
 	void const *b)
 {
@@ -4358,7 +4358,7 @@ long code_0001dbc0(
 	return 0;
 }
 
-static boolean code_0001dc00(
+static boolean actor_perception_assess_suicide_danger(
 	long actor_index,
 	long object_index,
 	real suicide_radius,

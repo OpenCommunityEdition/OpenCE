@@ -62,7 +62,7 @@ void player_control_get_facing_direction(
 real player_control_get_field_of_view(
 	short local_player_index);
 
-static void code_000773c0(
+static void first_person_camera_for_unit_and_vector(
 	long unit_index,
 	real_vector3d const *forward,
 	struct camera_command *result);
@@ -133,7 +133,7 @@ void first_person_camera_fake(
 	struct unit_datum *unit;
 
 	unit = unit_get(unit_index);
-	code_000773c0(unit_index, &unit->unit.aiming_vector, result);
+	first_person_camera_for_unit_and_vector(unit_index, &unit->unit.aiming_vector, result);
 	return;
 }
 
@@ -149,7 +149,7 @@ void first_person_camera_update(
 	match_assert("c:\\halo\\SOURCE\\camera\\first_person_camera.c", 157, camera);
 	match_assert("c:\\halo\\SOURCE\\camera\\first_person_camera.c", 158, result);
 	player_control_get_facing_direction(action->local_player_index, &facing_direction);
-	code_000773c0(unit_index, &facing_direction, &result->command);
+	first_person_camera_for_unit_and_vector(unit_index, &facing_direction, &result->command);
 	result->command.field_of_view = player_control_get_field_of_view(action->local_player_index);
 	if (camera->field_of_view != result->command.field_of_view)
 	{
@@ -163,7 +163,7 @@ void first_person_camera_update(
 
 /* ---------- private code */
 
-static void code_000773c0(
+static void first_person_camera_for_unit_and_vector(
 	long unit_index,
 	real_vector3d const *forward,
 	struct camera_command *result)

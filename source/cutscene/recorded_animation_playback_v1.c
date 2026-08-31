@@ -213,43 +213,43 @@ void recorded_animation_initialize_unit_control(
 	byte **stream,
 	byte unit_control_data_version);
 
-void code_00082910(
+void apply_animation_state(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *event,
 	byte const **playback_stream);
-void code_000829c0(
+void apply_aiming_speed(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *event,
 	byte const **playback_stream);
-void code_00082a70(
+void apply_control_flags(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *event,
 	byte const **playback_stream);
-void code_00082b20(
+void apply_weapon_index(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *event,
 	byte const **playback_stream);
-void code_00082bd0(
+void apply_throttle(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *event,
 	byte const **playback_stream);
-void code_00082c90(
+void apply_facing_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *event,
 	byte const **playback_stream);
-void code_00082d50(
+void apply_aiming_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *event,
 	byte const **playback_stream);
-void code_00082e10(
+void apply_looking_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *event,
 	byte const **playback_stream);
-void code_00082ed0(
+void apply_angle_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *event,
 	byte const **playback_stream);
-void code_00082fe0(
+void apply_multi_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *event,
 	byte const **playback_stream);
@@ -261,27 +261,27 @@ struct recorded_animation_playback_v1_data data_002dd030 =
 	{
 		NULL,
 		NULL,
-		code_00082910,
-		code_000829c0,
-		code_00082a70,
-		code_00082b20,
-		code_00082bd0,
+		apply_animation_state,
+		apply_aiming_speed,
+		apply_control_flags,
+		apply_weapon_index,
+		apply_throttle,
 		NULL,
 		NULL,
-		code_00082c90,
-		code_00082d50,
-		code_00082e10,
-		code_00082fe0,
-		code_00082fe0,
-		code_00082fe0,
-		code_00082fe0,
-		code_00082ed0,
-		code_00082ed0,
-		code_00082ed0,
-		code_00082ed0,
-		code_00082ed0,
-		code_00082ed0,
-		code_00082ed0,
+		apply_facing_vector,
+		apply_aiming_vector,
+		apply_looking_vector,
+		apply_multi_vector,
+		apply_multi_vector,
+		apply_multi_vector,
+		apply_multi_vector,
+		apply_angle_vector,
+		apply_angle_vector,
+		apply_angle_vector,
+		apply_angle_vector,
+		apply_angle_vector,
+		apply_angle_vector,
+		apply_angle_vector,
 	},
 	{ _2byte, _2byte },
 	{
@@ -420,7 +420,7 @@ void byte_swap_recording_stream_v1(
 
 /* ---------- private code */
 
-void code_00082910(
+void apply_animation_state(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *anim_event_v1,
 	byte const **playback_stream)
@@ -439,7 +439,7 @@ void code_00082910(
 	return;
 }
 
-void code_000829c0(
+void apply_aiming_speed(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *anim_event_v1,
 	byte const **playback_stream)
@@ -458,7 +458,7 @@ void code_000829c0(
 	return;
 }
 
-void code_00082a70(
+void apply_control_flags(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *anim_event_v1,
 	byte const **playback_stream)
@@ -477,7 +477,7 @@ void code_00082a70(
 	return;
 }
 
-void code_00082b20(
+void apply_weapon_index(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *anim_event_v1,
 	byte const **playback_stream)
@@ -496,7 +496,7 @@ void code_00082b20(
 	return;
 }
 
-void code_00082bd0(
+void apply_throttle(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *anim_event_v1,
 	byte const **playback_stream)
@@ -516,7 +516,7 @@ void code_00082bd0(
 	return;
 }
 
-void code_00082c90(
+void apply_facing_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *anim_event_v1,
 	byte const **playback_stream)
@@ -535,7 +535,7 @@ void code_00082c90(
 	return;
 }
 
-void code_00082d50(
+void apply_aiming_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *anim_event_v1,
 	byte const **playback_stream)
@@ -554,7 +554,7 @@ void code_00082d50(
 	return;
 }
 
-void code_00082e10(
+void apply_looking_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *anim_event_v1,
 	byte const **playback_stream)
@@ -573,7 +573,7 @@ void code_00082e10(
 	return;
 }
 
-void code_00082ed0(
+void apply_angle_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *anim_event_v1,
 	byte const **playback_stream)
@@ -608,7 +608,7 @@ void code_00082ed0(
 	return;
 }
 
-void code_00082fe0(
+void apply_multi_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *anim_event_v1,
 	byte const **playback_stream)

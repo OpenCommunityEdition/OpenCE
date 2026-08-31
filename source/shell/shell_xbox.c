@@ -46,7 +46,7 @@ void rasterizer_preinitialize__fill_you_up_with_the_devils_cock(
 
 /* ---------- globals */
 
-char bss_004c08a8[8] = { 0 };
+char faked_xbox_command_line[8] = { 0 };
 
 /* ---------- public code */
 
@@ -60,8 +60,8 @@ boolean shell_platform_initialize(
 		launch_data_type == LDT_TITLE &&
 		!csstrcmp((const char *)launch_data.Data, "XDEMOS"))
 	{
-		csstrncat(bss_004c08a8, "xdemo ", NUMBEROF(bss_004c08a8) - 1);
-		bss_004c08a8[NUMBEROF(bss_004c08a8) - 1] = '\0';
+		csstrncat(faked_xbox_command_line, "xdemo ", NUMBEROF(faked_xbox_command_line) - 1);
+		faked_xbox_command_line[NUMBEROF(faked_xbox_command_line) - 1] = '\0';
 	}
 
 	return TRUE;
@@ -93,7 +93,7 @@ shell_screen_pause(
 const char *shell_get_command_line(
 	void)
 {
-	return bss_004c08a8;
+	return faked_xbox_command_line;
 }
 
 void

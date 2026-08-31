@@ -568,12 +568,12 @@ struct _main_window_storage
 
 /* ---------- prototypes */
 
-extern void code_000ef8e0(
+extern void create_local_players(
 	void);
-extern void code_000f1c20(void);
-extern void code_000f1ce0(void);
+extern void main_setup_connection(void);
+extern void main_initialize_time(void);
 
-extern void code_000f0350(
+extern void main_new_map(
 	struct game_options *options);
 extern void scripted_camera_set(
 	word camera_point_index0,
@@ -841,7 +841,7 @@ void main_goto_main_menu(
 	return;
 }
 
-void code_000efde0(
+void main_queue_map_private(
 	void)
 {
 	real progress;
@@ -1003,7 +1003,7 @@ void main_set_difficulty(
 	return;
 }
 
-long code_000ef8a0(
+long sort_controllers_ascending(
 	short const *a,
 	short const *b)
 {
@@ -1165,7 +1165,7 @@ void main_load_ui_scenario(
 	game_engine_dispose();
 	game_set_game_variant(NULL);
 	main_globals.main_menu_scenario_loaded = TRUE;
-	code_000f0350(&options);
+	main_new_map(&options);
 	director_script_camera(TRUE);
 	scripted_camera_set(0, 0, NONE);
 	main_menu_active(TRUE);
@@ -1201,7 +1201,7 @@ extern void game_state_load_core(
 extern void game_state_save_core(
 	char const *name);
 
-void code_000f05a0(
+void main_revert_map_private(
 	void)
 {
 	game_state_revert();
@@ -1210,7 +1210,7 @@ void code_000f05a0(
 	return;
 }
 
-void code_000f05c0(
+void main_skip_cinematic_private(
 	void)
 {
 	if (cinematic_can_be_skipped())
@@ -1223,7 +1223,7 @@ void code_000f05c0(
 	return;
 }
 
-void code_000f06a0(
+void main_saving_map_private(
 	void)
 {
 	game_state_save();
@@ -1232,7 +1232,7 @@ void code_000f06a0(
 	return;
 }
 
-void code_000f07a0(
+void main_switch_to_structure_bsp_private(
 	void)
 {
 	scenario_switch_structure_bsp(main_globals.switch_to_structure_bsp_index);
@@ -1241,7 +1241,7 @@ void code_000f07a0(
 	return;
 }
 
-void code_000f07d0(
+void main_lost_map_private(
 	void)
 {
 	if (!game_time_get_paused())
@@ -1256,7 +1256,7 @@ void code_000f07d0(
 	return;
 }
 
-void code_000f0810(
+void main_respawn_private(
 	void)
 {
 	if (!game_time_get_paused() && !cinematic_in_progress())
@@ -1270,7 +1270,7 @@ void code_000f0810(
 	return;
 }
 
-void code_000f08b0(
+void main_load_core_private(
 	void)
 {
 	game_state_load_core(main_globals.core_name);
@@ -1278,7 +1278,7 @@ void code_000f08b0(
 	return;
 }
 
-void code_000f08d0(
+void main_save_core_private(
 	void)
 {
 	game_state_save_core(main_globals.core_name);
@@ -1286,7 +1286,7 @@ void code_000f08d0(
 	return;
 }
 
-void code_000f0930(
+void main_run_demos_private(
 	void)
 {
 	main_globals.run_xdemos = FALSE;
@@ -1294,7 +1294,7 @@ void code_000f0930(
 	return;
 }
 
-void code_000f0850(
+void main_won_map_private(
 	void)
 {
 	short level;
@@ -1327,7 +1327,7 @@ extern void dispose_global_network_game_client(
 extern void dispose_global_network_game_server(
 	void);
 
-void code_000f0b60(
+void main_exit(
 	void)
 {
 	switch (main_globals.connection)
@@ -1352,7 +1352,7 @@ void code_000f0b60(
 	return;
 }
 
-void code_000f0bb0(
+void main_reset_time(
 	void)
 {
 	unsigned long frame_index;
@@ -1371,7 +1371,7 @@ boolean code_000f0be0(
 	return rasterizer_globals.framerate_throttle;
 }
 
-void code_000f1ce0(
+void main_initialize_time(
 	void)
 {
 	main_globals.frame_start_milliseconds = system_milliseconds();
@@ -1393,7 +1393,7 @@ static void main_reset_map_private(
 		game_dispose_from_old_map();
 		input_flush();
 		game_initialize_for_new_map();
-		code_000ef8e0();
+		create_local_players();
 		game_time_start();
 		game_initial_pulse();
 		ui_widgets_disable_pause_game(30);
@@ -1441,8 +1441,8 @@ void main_loop(
 	debug_keys_initialize();
 	game_initialize();
 	console_startup();
-	code_000f1c20();
-	code_000f1ce0();
+	main_setup_connection();
+	main_initialize_time();
 
 	while (TRUE)
 	{
@@ -1532,7 +1532,7 @@ void main_loop(
 
 			if (main_globals.skip)
 			{
-				code_000f05f0();
+				main_skip_private();
 			}
 
 			if (main_globals.queue_map)
@@ -1792,7 +1792,7 @@ void main_loop(
 
 		input_frame_end();
 		profile_frame_end();
-		code_000f0940();
+		main_frame_rate_debug();
 		
 		if (main_globals.restart_time)
 		{

@@ -377,7 +377,7 @@ extern real global_gravity;
 
 /* ---------- globals */
 
-static struct profile_section data_00316228 = {"vehicle_update", NONE, TRUE};
+static struct profile_section vehicle_update_section = {"vehicle_update", NONE, TRUE};
 
 /* ---------- code */
 
@@ -971,7 +971,7 @@ long vehicle_find_pathfinding_surface_index(
 	return surface_index;
 }
 
-static void code_001a4fa0(
+static void compute_airborne_ticks(
 	long vehicle_index,
 	struct vehicle_mass_point_state *mass_points,
 	void *state)
@@ -1005,14 +1005,14 @@ static void code_001a4fa0(
 	return;
 }
 
-static real_vector3d *code_001a5810(
+static real_vector3d *compute_acceleration(
 	real_vector3d *a,
 	real_vector3d *b,
 	real_vector3d *result,
 	real maximum,
 	real minimum);
 
-static void code_001a5e50(
+static void update_alien_fighter_physics_new(
 	long vehicle_index,
 	struct vehicle_powered_mass_point_state *state,
 	struct vehicle_mass_point_state *mass_points)
@@ -1040,7 +1040,7 @@ static void code_001a5e50(
 		else
 			throttle = -(vehicle->vehicle.unknown42c/definition->unknown2fc);
 
-		code_001a5810(&torque, &vehicle->object.translational_velocity, &axis,
+		compute_acceleration(&torque, &vehicle->object.translational_velocity, &axis,
 			throttle*definition->unknown300, throttle*definition->unknown304);
 
 		scale_vector3d(&axis, physics->mass, &thrust);
@@ -1123,7 +1123,7 @@ static void code_001a5e50(
 	return;
 }
 
-static void code_001a6290(
+static void update_alien_fighter_physics_old(
 	long vehicle_index,
 	struct vehicle_mass_point_state *mass_points,
 	struct vehicle_powered_mass_point_state *state)
@@ -1219,7 +1219,7 @@ static void code_001a6290(
 	return;
 }
 
-static void code_001a6590(
+static void slowly_stop_vehicle(
 	long vehicle_index)
 {
 	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
@@ -1273,7 +1273,7 @@ static void code_001a6590(
 	return;
 }
 
-static real_vector3d *code_001a5810(
+static real_vector3d *compute_acceleration(
 	real_vector3d *a,
 	real_vector3d *b,
 	real_vector3d *result,
@@ -1296,7 +1296,7 @@ static real_vector3d *code_001a5810(
 	return result;
 }
 
-static void code_001a6910(
+static void create_ghost_effect(
 	long vehicle_index)
 {
 	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
@@ -1367,7 +1367,7 @@ static void code_001a6910(
 }
 
 
-static void code_001a6710(
+static void create_pelican_effect(
 	long vehicle_index)
 {
 	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
@@ -1565,7 +1565,7 @@ void vehicle_preprocess_node_orientations(
 	return;
 }
 
-static void code_001a7ac0(
+static void update_human_plane_physics(
 	long vehicle_index,
 	struct vehicle_powered_mass_point_state *state,
 	struct vehicle_mass_point_state *mass_points)
@@ -1596,7 +1596,7 @@ static void code_001a7ac0(
 	{
 		csmemset(mass_points, 0,
 			physics->mass_points.count*sizeof(struct vehicle_mass_point_state));
-		code_001a6710(vehicle_index);
+		create_pelican_effect(vehicle_index);
 
 		return;
 	}
@@ -1675,12 +1675,12 @@ static void code_001a7ac0(
 	torque.k *= vehicle->unit.seat_power[0];
 
 	physics_update(vehicle_index, NULL, mass_points, &force, &torque);
-	code_001a6710(vehicle_index);
+	create_pelican_effect(vehicle_index);
 
 	return;
 }
 
-static boolean code_001a6dc0(
+static boolean update_suspension(
 	long vehicle_index)
 {
 	boolean result = FALSE;
@@ -1790,7 +1790,7 @@ static boolean code_001a6dc0(
 	return result;
 }
 
-static void code_001a6ba0(
+static void create_crashing_effects(
 	long vehicle_index,
 	real_vector3d const *previous_velocity,
 	struct vehicle_mass_point_state *mass_points)
@@ -1857,7 +1857,7 @@ static void code_001a6ba0(
 	return;
 }
 
-static void code_001a4f50(
+static void update_turret_physics(
 	long vehicle_index,
 	struct vehicle_mass_point_state *mass_points)
 {
@@ -1866,7 +1866,7 @@ static void code_001a4f50(
 	return;
 }
 
-static void code_001a70e0(
+static void create_slipping_effects(
 	long vehicle_index,
 	struct vehicle_powered_mass_point_state *state,
 	struct vehicle_mass_point_state *mass_points)
@@ -1923,7 +1923,7 @@ static void code_001a70e0(
 	return;
 }
 
-static void code_001a58e0(
+static void update_human_tank_physics(
 	long vehicle_index,
 	struct vehicle_mass_point_state *mass_points,
 	struct vehicle_powered_mass_point_state *state)
@@ -2028,7 +2028,7 @@ static real vehicle_triple_product3d_target(
 		return cross.i*normal->i+j_term+cross.k*normal->k;
 	}
 }
-static void code_001a5b40(
+static void update_human_boat_physics(
 	long vehicle_index,
 	struct vehicle_mass_point_state *mass_points,
 	struct vehicle_powered_mass_point_state *state)
@@ -2128,7 +2128,7 @@ static void code_001a5b40(
 	return;
 }
 
-static void code_001a5a30(
+static void update_human_jeep_physics(
 	long vehicle_index,
 	struct vehicle_mass_point_state *mass_points,
 	struct vehicle_powered_mass_point_state *state)
@@ -2168,7 +2168,7 @@ static void code_001a5a30(
 	return;
 }
 
-static void code_001a7e60(
+static void update_alien_scout_physics(
 	long vehicle_index,
 	real steering,
 	struct vehicle_powered_mass_point_state *state,
@@ -2453,12 +2453,12 @@ static void code_001a7e60(
 		vehicle->vehicle.unknown444 = target;
 	}
 
-	code_001a6910(vehicle_index);
+	create_ghost_effect(vehicle_index);
 
 	return;
 }
 
-static void code_001a8800(
+static void update_alien_fighter_physics(
 	long vehicle_index,
 	struct vehicle_powered_mass_point_state *state,
 	struct vehicle_mass_point_state *mass_points)
@@ -2468,11 +2468,11 @@ static void code_001a8800(
 	struct physics_definition *physics = physics_definition_get(definition->object.physics.index);
 
 	if (physics->radius>0.0f)
-		code_001a6290(vehicle_index, mass_points, state);
+		update_alien_fighter_physics_old(vehicle_index, mass_points, state);
 	else
-		code_001a5e50(vehicle_index, state, mass_points);
+		update_alien_fighter_physics_new(vehicle_index, state, mass_points);
 
-	code_001a6910(vehicle_index);
+	create_ghost_effect(vehicle_index);
 
 	return;
 }
@@ -2495,7 +2495,7 @@ boolean vehicle_update(
 	vehicle = vehicle_runtime_get(vehicle_index);
 	definition = vehicle_specific_definition_get(vehicle->definition_index);
 
-	profile_enter(data_00316228);
+	profile_enter(vehicle_update_section);
 
 	if (vehicle->object.parent_object_index!=NONE)
 	{
@@ -2700,32 +2700,32 @@ seek_speed:
 		switch (definition->vehicle_type)
 		{
 		case _vehicle_type_human_tank:
-			code_001a58e0(vehicle_index, mass_points, powered_mass_points);
+			update_human_tank_physics(vehicle_index, mass_points, powered_mass_points);
 			break;
 		case _vehicle_type_human_jeep:
-			code_001a5a30(vehicle_index, mass_points, powered_mass_points);
+			update_human_jeep_physics(vehicle_index, mass_points, powered_mass_points);
 			break;
 		case _vehicle_type_human_boat:
-			code_001a5b40(vehicle_index, mass_points, powered_mass_points);
+			update_human_boat_physics(vehicle_index, mass_points, powered_mass_points);
 			break;
 		case _vehicle_type_human_plane:
-			code_001a7ac0(vehicle_index, powered_mass_points, mass_points);
+			update_human_plane_physics(vehicle_index, powered_mass_points, mass_points);
 			break;
 		case _vehicle_type_alien_scout:
-			code_001a7e60(vehicle_index, steering_angle, powered_mass_points, mass_points);
+			update_alien_scout_physics(vehicle_index, steering_angle, powered_mass_points, mass_points);
 			break;
 		case _vehicle_type_alien_fighter:
-			code_001a8800(vehicle_index, powered_mass_points, mass_points);
+			update_alien_fighter_physics(vehicle_index, powered_mass_points, mass_points);
 			break;
 		case _vehicle_type_turret:
-			code_001a4f50(vehicle_index, mass_points);
+			update_turret_physics(vehicle_index, mass_points);
 			break;
 		}
 
-		code_001a70e0(vehicle_index, powered_mass_points, mass_points);
-		if (!code_001a6dc0(vehicle_index))
-			code_001a6ba0(vehicle_index, &previous_velocity, mass_points);
-		code_001a4fa0(vehicle_index, mass_points, powered_mass_points);
+		create_slipping_effects(vehicle_index, powered_mass_points, mass_points);
+		if (!update_suspension(vehicle_index))
+			create_crashing_effects(vehicle_index, &previous_velocity, mass_points);
+		compute_airborne_ticks(vehicle_index, mass_points, powered_mass_points);
 
 		if (TEST_FLAG(vehicle->object.flags, _object_at_rest_bit))
 			vehicle->vehicle.unknown426 = 15;
@@ -2756,8 +2756,8 @@ seek_speed:
 	}
 	else if (vehicle->vehicle.unknown426>0)
 	{
-		code_001a6590(vehicle_index);
-		code_001a6dc0(vehicle_index);
+		slowly_stop_vehicle(vehicle_index);
+		update_suspension(vehicle_index);
 	}
 
 	match_assert("c:\\halo\\SOURCE\\units\\vehicles.c", 372,
@@ -2806,7 +2806,7 @@ animate:
 		}
 	}
 
-	profile_exit(data_00316228);
+	profile_exit(vehicle_update_section);
 
 	return TRUE;
 }

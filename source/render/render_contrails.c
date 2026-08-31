@@ -72,9 +72,9 @@ typedef char verify_contrail_vertex_size[
 
 /* ---------- prototypes */
 
-void code_00178000(
+void render_contrails(
 	unsigned long render_mode_flags);
-void code_00177860(
+void render_contrail(
 	struct contrail_datum *contrail,
 	struct contrail_definition *definition,
 	short instance_index);
@@ -126,7 +126,7 @@ real contrail_fade(
 	return result;
 }
 
-void code_00177860(
+void render_contrail(
 	struct contrail_datum *contrail,
 	struct contrail_definition *definition,
 	short instance_index)
@@ -457,7 +457,7 @@ void code_00177860(
 	return;
 }
 
-void code_00178000(
+void render_contrails(
 	unsigned long render_mode_flags)
 {
 	if (render_contrails_enabled)
@@ -478,7 +478,7 @@ void code_00178000(
 				if (((1 << definition->render_type) & render_mode_flags) &&
 					contrail->contrail_point_counts[instance_index] >= 2)
 				{
-					code_00177860(contrail, definition, instance_index);
+					render_contrail(contrail, definition, instance_index);
 				}
 			}
 		}
@@ -490,21 +490,21 @@ void code_00178000(
 void render_contrails_ground_mapped(
 	void)
 {
-	code_00178000(_contrail_render_mode_ground_mapped);
+	render_contrails(_contrail_render_mode_ground_mapped);
 	return;
 }
 
 void render_contrails_media_mapped(
 	void)
 {
-	code_00178000(_contrail_render_mode_media_mapped);
+	render_contrails(_contrail_render_mode_media_mapped);
 	return;
 }
 
 void render_contrails_normal(
 	void)
 {
-	code_00178000(_contrail_render_mode_normal);
+	render_contrails(_contrail_render_mode_normal);
 	return;
 }
 

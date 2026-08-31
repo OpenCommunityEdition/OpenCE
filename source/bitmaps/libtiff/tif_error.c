@@ -1,5 +1,5 @@
 #ifndef lint
-char data_002b8758[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_error.c,v 1.13 92/02/10 19:06:34 sam Exp $";
+char tif_error_rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_error.c,v 1.13 92/02/10 19:06:34 sam Exp $";
 #endif
 
 /*
@@ -33,7 +33,7 @@ char data_002b8758[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_error.c,v 
 #include "tiffioP.h"
 #include "prototypes.h"
 
-static void code_00057030(
+static void defaultHandler(
 	char *module,
 	char *fmt,
 	va_list ap)
@@ -46,7 +46,7 @@ static void code_00057030(
 	return;
 }
 
-static TIFFErrorHandler _errorHandler = code_00057030;
+static TIFFErrorHandler _errorHandler = defaultHandler;
 
 TIFFErrorHandler TIFFSetErrorHandler(
 	TIFFErrorHandler handler)

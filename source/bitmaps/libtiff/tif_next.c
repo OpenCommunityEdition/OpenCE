@@ -36,17 +36,17 @@ static char rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_next.c,v 1.
 extern void *csmemcpy(void *destination, const void *source, unsigned long size);
 
 #if USE_PROTOTYPES
-static	int code_0005b9b0(TIFF *, u_char *, int, u_int);
+static	int NeXTDecode(TIFF *, u_char *, int, u_int);
 #else
-static	int code_0005b9b0();
+static	int NeXTDecode();
 #endif
 
 TIFFInitNeXT(tif)
 	TIFF *tif;
 {
-	tif->tif_decoderow = code_0005b9b0;
-	tif->tif_decodestrip = code_0005b9b0;
-	tif->tif_decodetile = code_0005b9b0;
+	tif->tif_decoderow = NeXTDecode;
+	tif->tif_decodestrip = NeXTDecode;
+	tif->tif_decodetile = NeXTDecode;
 	return (1);
 }
 
@@ -64,7 +64,7 @@ TIFFInitNeXT(tif)
 #define WHITE   	((1<<2)-1)
 
 static int
-code_0005b9b0(tif, buf, occ, s)
+NeXTDecode(tif, buf, occ, s)
 	TIFF *tif;
 	u_char *buf;
 	int occ;

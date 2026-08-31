@@ -114,7 +114,7 @@ void render_model(
 
 /* ---------- globals */
 
-real bss_004c04f8[MAXIMUM_SKIES_PER_SCENARIO] = {0.f};
+real render_sky_globals[MAXIMUM_SKIES_PER_SCENARIO] = {0.f};
 
 /* ---------- public code */
 
@@ -167,9 +167,9 @@ void render_sky(
 						if (animation->node_count == model->nodes.count)
 						{
 							real phase = (real)fmod(
-								(double)(render.time_delta_since_tick_sec / sky_animation->period + bss_004c04f8[i]),
+								(double)(render.time_delta_since_tick_sec / sky_animation->period + render_sky_globals[i]),
 								1.0);
-							bss_004c04f8[i] = phase;
+							render_sky_globals[i] = phase;
 							overlay_animation_apply_continuous(
 								animation,
 								animation->frame_count * phase,

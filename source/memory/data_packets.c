@@ -59,13 +59,13 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-void code_0010a5f0(
+void _data_packet_verify(
 	struct data_packet_definition *packet_definition,
 	short *packet_size,
 	struct data_packet_field *fields,
 	short *field_count);
 
-void code_0010a7c0(
+void _data_packet_encode(
 	struct data_packet_definition *packet_definition,
 	struct data_encoding_state *state,
 	short packet_version,
@@ -74,7 +74,7 @@ void code_0010a7c0(
 	struct data_packet_field *fields,
 	short *field_count);
 
-void code_0010aac0(
+void _data_packet_decode(
 	struct data_packet_definition *packet_definition,
 	struct data_encoding_state *state,
 	short packet_version,
@@ -100,7 +100,7 @@ void data_packet_verify(
 
 	if (!packet_definition->initialized)
 	{
-		code_0010a5f0(packet_definition, &packet_size, packet_definition->fields, &field_count);
+		_data_packet_verify(packet_definition, &packet_size, packet_definition->fields, &field_count);
 		if (packet_size != packet_definition->size)
 		{
 			display_assert(
@@ -146,7 +146,7 @@ boolean data_packet_encode(
 		byte version_byte = (byte)version;
 		data_encode_memory(&state, &version_byte, 1, 1);
 	}
-	code_0010a7c0(
+	_data_packet_encode(
 		packet_definition,
 		&state,
 		version,
@@ -184,7 +184,7 @@ boolean data_packet_decode(
 		version = data_decode_byte(&state);
 	if (version <= packet_definition->version)
 	{
-		code_0010aac0(
+		_data_packet_decode(
 			packet_definition,
 			&state,
 			version,
@@ -205,7 +205,7 @@ boolean data_packet_decode(
 
 /* ---------- private code */
 
-void code_0010a5f0(
+void _data_packet_verify(
 	struct data_packet_definition *packet_definition,
 	short *packet_size,
 	struct data_packet_field *fields,
@@ -277,7 +277,7 @@ void code_0010a5f0(
 				short element_size;
 				short element_field_count;
 
-				code_0010a5f0(packet_definition, &element_size, field + 1, &element_field_count);
+				_data_packet_verify(packet_definition, &element_size, field + 1, &element_field_count);
 				field_size = sizeof(short) + field->count * element_size;
 				field += element_field_count;
 				break;
@@ -303,7 +303,7 @@ void code_0010a5f0(
 	return;
 }
 
-void code_0010a7c0(
+void _data_packet_encode(
 	struct data_packet_definition *packet_definition,
 	struct data_encoding_state *state,
 	short packet_version,
@@ -364,7 +364,7 @@ void code_0010a7c0(
 				short element_field_count;
 				byte const *element = decoded_data + sizeof(short);
 
-				code_0010a5f0(
+				_data_packet_verify(
 					packet_definition,
 					NULL,
 					field + 1,
@@ -377,7 +377,7 @@ void code_0010a7c0(
 				{
 					short element_size;
 
-					code_0010a7c0(
+					_data_packet_encode(
 						packet_definition,
 						state,
 						packet_version,
@@ -438,7 +438,7 @@ void code_0010a7c0(
 	return;
 }
 
-void code_0010aac0(
+void _data_packet_decode(
 	struct data_packet_definition *packet_definition,
 	struct data_encoding_state *state,
 	short packet_version,
@@ -523,14 +523,14 @@ void code_0010aac0(
 				byte *element;
 
 				element_count = (short)data_decode_integer(state, field->count);
-				code_0010a5f0(packet_definition, NULL, field + 1, &element_field_count);
+				_data_packet_verify(packet_definition, NULL, field + 1, &element_field_count);
 				if (element_count < 0 || element_count > field->count)
 					element_count = 0;
 				*(short *)decoded_data = element_count;
 				element = decoded_data + sizeof(short);
 				while (element_count-- > 0)
 				{
-					code_0010aac0(
+					_data_packet_decode(
 						packet_definition,
 						state,
 						packet_version,

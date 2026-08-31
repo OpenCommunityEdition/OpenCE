@@ -145,7 +145,7 @@ struct connected_geometry_plane *plane3d_from_points(
 	struct connected_geometry_point const *point0,
 	struct connected_geometry_point const *point1,
 	struct connected_geometry_point const *point2);
-boolean code_000f3220(
+boolean triangle_coplanar(
 	void *predicate_data,
 	struct connected_geometry *geometry,
 	struct connected_geometry_triangle *triangle,
@@ -332,7 +332,7 @@ long connected_geometry_group_coplanar(
 			{
 				connected_geometry_group_recursive(
 					geometry,
-					code_000f3220,
+					triangle_coplanar,
 					&plane,
 					group_count,
 					triangle_index);

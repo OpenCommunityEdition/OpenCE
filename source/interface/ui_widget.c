@@ -981,13 +981,13 @@ void ui_widgets_disable_pause_game(
 
 #undef widget_globals
 
-void code_000d4680(
+void widget_instance_reload_recursive(
 	void)
 {
 	return;
 }
 
-void code_000d4690(
+void ui_widget_reload_by_tag(
 	void)
 {
 	return;

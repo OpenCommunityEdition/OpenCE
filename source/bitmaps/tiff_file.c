@@ -87,7 +87,7 @@ void bitmap_delete(
 
 /* ---------- globals */
 
-char bss_0031c320[512] = {0};
+char error_message_buffer[512] = {0};
 
 /* ---------- public code */
 
@@ -324,12 +324,12 @@ tiff_import(
 				samples_per_pixel != 2 && samples_per_pixel != 1))
 				{
 					_snprintf(
-					bss_0031c320,
-					NUMBEROF(bss_0031c320),
+					error_message_buffer,
+					NUMBEROF(error_message_buffer),
 					"unsupported bits per sample (%d) or sample count (%d)",
 					bits_per_sample,
 					samples_per_pixel);
-					error_message = bss_0031c320;
+					error_message = error_message_buffer;
 					goto cleanup;
 				}
 

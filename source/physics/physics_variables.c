@@ -32,7 +32,7 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-static real code_00143f40(
+static real physics_variable_position_get_seek_direction(
 	real *limits,
 	real position,
 	boolean wrap,
@@ -154,12 +154,12 @@ physics_variable_position_update_seek(
 	real target,
 	real delta)
 {
-	real direction = code_00143f40(limits, *position, wrap, target);
+	real direction = physics_variable_position_get_seek_direction(limits, *position, wrap, target);
 
 	if (direction != 0.f)
 	{
 		physics_variable_position_update(position, limits, wrap, direction * delta);
-		if (code_00143f40(limits, *position, wrap, target) == direction)
+		if (physics_variable_position_get_seek_direction(limits, *position, wrap, target) == direction)
 			return FALSE;
 	}
 
@@ -195,7 +195,7 @@ physics_variable_update_seek(
 	real delta)
 {
 	real *parameters = velocity;
-	real direction = code_00143f40(parameters, *position, update_velocity, target);
+	real direction = physics_variable_position_get_seek_direction(parameters, *position, update_velocity, target);
 
 	if (direction != 0.f)
 	{
@@ -204,7 +204,7 @@ physics_variable_update_seek(
 			(struct physics_variable_speed_parameters *)(parameters + 2),
 			direction * delta);
 		physics_variable_position_update(position, parameters, update_velocity, *range);
-		if (code_00143f40(parameters, *position, update_velocity, target) == direction)
+		if (physics_variable_position_get_seek_direction(parameters, *position, update_velocity, target) == direction)
 			return FALSE;
 	}
 
@@ -217,7 +217,7 @@ physics_variable_update_seek(
 /* ---------- private code */
 
 static real
-code_00143f40(
+physics_variable_position_get_seek_direction(
 	real *limits,
 	real position,
 	boolean wrap,

@@ -76,7 +76,7 @@ void vector_tree_delete(
 	dynamic_array_delete(&tree->nodes);
 }
 
-static boolean code_00100040(
+static boolean vectors_equal(
 	struct vector_tree *tree,
 	const void *vector,
 	const void *other_vector,
@@ -93,7 +93,7 @@ static boolean code_00100040(
 	return TRUE;
 }
 
-static void code_00100080(
+static void vector_tree_add_node(
 	struct vector_tree *tree,
 	struct vector_tree_node **node_reference)
 {
@@ -141,7 +141,7 @@ boolean vector_tree_find(
 		else
 		{
 			component_index++;
-			if (code_00100040(tree, vector, other_vector, component_index))
+			if (vectors_equal(tree, vector, other_vector, component_index))
 			{
 				*index_reference = node;
 				return TRUE;
@@ -152,6 +152,6 @@ boolean vector_tree_find(
 	}
 
 	*node_index_reference = tree->nodes.count;
-	code_00100080(tree, index_reference);
+	vector_tree_add_node(tree, index_reference);
 	return FALSE;
 }

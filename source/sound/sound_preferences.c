@@ -25,7 +25,7 @@ symbols in this file:
 
 /* ---------- globals */
 
-struct sound_preferences data_00317a84 =
+struct sound_preferences default_sound_preferences =
 {
 	0,
 	{ 10, 51, 10, 10 },
@@ -39,7 +39,7 @@ short sound_channel_type_flags[4] = { 8, 9, 10, 14 };
 
 void read_sound_preferences(struct sound_preferences **preferences)
 {
-	*preferences = &data_00317a84;
+	*preferences = &default_sound_preferences;
 }
 
 void write_sound_preferences(void)

@@ -584,7 +584,7 @@ struct network_game_message_packet_definitions data_0030aa68 =
 	},
 };
 
-static byte bss_004566f0[0x604];
+static byte network_game_message_buffer[0x604];
 
 /* ---------- public code */
 
@@ -614,7 +614,7 @@ void network_event(
 	return;
 }
 
-static boolean code_0011af00(
+static boolean encode_network_game_message(
 	const void *message_struct,
 	void *encoded_message,
 	short *encoded_message_size,
@@ -786,9 +786,9 @@ void *create_network_game_message(
 		break;
 	}
 
-	if (code_0011af00(message_struct, encoded_message, &encoded_message_size.encoded, message_type, 1))
+	if (encode_network_game_message(message_struct, encoded_message, &encoded_message_size.encoded, message_type, 1))
 	{
-		message = create_message(3, encoded_message, encoded_message_size.value, bss_004566f0, sizeof(bss_004566f0));
+		message = create_message(3, encoded_message, encoded_message_size.value, network_game_message_buffer, sizeof(network_game_message_buffer));
 		if (!message)
 		{
 			network_event("create_message() failed");

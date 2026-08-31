@@ -107,7 +107,7 @@ void telnet_console_initialize(
 void telnet_console_dispose(
 	void);
 
-static boolean code_001203c0(
+static boolean process_telnet_client_buffer(
 	char *buffer,
 	long size,
 	struct telnet_client *client);
@@ -267,7 +267,7 @@ void telnet_console_process(
 			count = read_endpoint(bss_00456d00.clients[0].endpoint, buffer, sizeof(buffer));
 			if (count>0)
 			{
-				if (code_001203c0(buffer, count, bss_00456d00.clients))
+				if (process_telnet_client_buffer(buffer, count, bss_00456d00.clients))
 					return;
 
 				error(2, "error processing telnet client");
@@ -290,7 +290,7 @@ void telnet_console_process(
 
 /* ---------- private code */
 
-static boolean code_001203c0(
+static boolean process_telnet_client_buffer(
 	char *buffer,
 	long size,
 	struct telnet_client *client)

@@ -1,5 +1,5 @@
 #ifndef lint
-char data_002b7ef8[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_compress.c,v 1.26 92/02/10 19:06:13 sam Exp $";
+char tif_compress_rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_compress.c,v 1.26 92/02/10 19:06:13 sam Exp $";
 #endif
 
 /*
@@ -112,7 +112,7 @@ static struct cscheme CompressionSchemes[] = {
 };
 #define	NSCHEMES (sizeof (CompressionSchemes) / sizeof (CompressionSchemes[0]))
 
-static struct cscheme const *code_000535f0(
+static struct cscheme const *findScheme(
 	int scheme)
 {
 	struct cscheme const *c;
@@ -123,11 +123,11 @@ static struct cscheme const *code_000535f0(
 	return ((struct cscheme const *)0);
 }
 
-static int code_00053610(
+static int TIFFNoEncode(
 	TIFF *tif,
 	char *method)
 {
-	struct cscheme const *c = code_000535f0(tif->tif_dir.td_compression);
+	struct cscheme const *c = findScheme(tif->tif_dir.td_compression);
 	TIFFError(tif->tif_name,
 	    "%s %s encoding is not implemented", c->name, method);
 	return (-1);
@@ -139,7 +139,7 @@ int TIFFNoRowEncode(
 	int cc,
 	u_int s)
 {
-	return (code_00053610(tif, "scanline"));
+	return (TIFFNoEncode(tif, "scanline"));
 }
 
 int TIFFNoStripEncode(
@@ -148,7 +148,7 @@ int TIFFNoStripEncode(
 	int cc,
 	u_int s)
 {
-	return (code_00053610(tif, "strip"));
+	return (TIFFNoEncode(tif, "strip"));
 }
 
 int TIFFNoTileEncode(
@@ -157,14 +157,14 @@ int TIFFNoTileEncode(
 	int cc,
 	u_int s)
 {
-	return (code_00053610(tif, "tile"));
+	return (TIFFNoEncode(tif, "tile"));
 }
 
 int TIFFNoDecode(
 	TIFF *tif,
 	char *method)
 {
-	struct cscheme const *c = code_000535f0(tif->tif_dir.td_compression);
+	struct cscheme const *c = findScheme(tif->tif_dir.td_compression);
 	TIFFError(tif->tif_name,
 	    "%s %s decoding is not implemented", c->name, method);
 	return (-1);
@@ -201,7 +201,7 @@ int TIFFSetCompressionScheme(
 	TIFF *tif,
 	int scheme)
 {
-	struct cscheme const *c = code_000535f0(scheme);
+	struct cscheme const *c = findScheme(scheme);
 
 	if (!c) {
 		TIFFError(tif->tif_name,

@@ -17,7 +17,7 @@ SHELL.C
 
 /* ---------- globals */
 
-static boolean bss_004c08a4;
+static boolean application_paused;
 
 /* ---------- public code */
 
@@ -73,15 +73,15 @@ void shell_dispose(
 boolean shell_application_is_paused(
 	void)
 {
-	return bss_004c08a4;
+	return application_paused;
 }
 
 void shell_application_pause(
 	boolean paused)
 {
-	if (bss_004c08a4!=paused)
+	if (application_paused!=paused)
 	{
-		bss_004c08a4 = paused;
+		application_paused = paused;
 		shell_screen_pause(paused);
 	}
 

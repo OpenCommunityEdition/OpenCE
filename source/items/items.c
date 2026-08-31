@@ -162,8 +162,8 @@ real_point3d *point_from_line3d(
 
 /* ---------- globals */
 
-real const rdata_00278fb0 = 0.1f;
-struct profile_section data_00306498 = { "item_update", NONE, TRUE };
+real const item_maximum_impact_velocity = 0.1f;
+struct profile_section item_update_section = { "item_update", NONE, TRUE };
 
 /* ---------- public code */
 
@@ -203,7 +203,7 @@ void item_delete(
 	return;
 }
 
-void code_000e6150(
+void verify_item_location(
 	void)
 {
 	return;
@@ -346,7 +346,7 @@ void item_detonate(
 
 /* ---------- private code */
 
-static void code_000e6370(
+static void item_adjust_for_angular_velocity_change(
 	long item_index)
 {
 	struct item_datum *item = item_get(item_index);
@@ -534,7 +534,7 @@ void item_accelerate(
 			&item->object.angular_velocity);
 	}
 
-	code_000e6370(item_index);
+	item_adjust_for_angular_velocity_change(item_index);
 	object_set_garbage(item_index, FALSE);
 	}
 
@@ -547,7 +547,7 @@ void item_accelerate(
 	return;
 }
 
-static void code_000e6900(
+static void item_align_to_normal_and_point(
 	long item_index,
 	real_vector3d const *normal,
 	real_point3d const *position,
@@ -628,7 +628,7 @@ boolean item_update(
 
 	item = item_get(item_index);
 	definition = item_definition_get(item->definition_index);
-	profile_enter(data_00306498);
+	profile_enter(item_update_section);
 
 	match_assert(
 		"c:\\halo\\SOURCE\\items\\items.c",
@@ -690,7 +690,7 @@ boolean item_update(
 				vectors.candidate.z += collision->plane.n.k * 0.05f;
 
 				impact_scale = magnitude3d(&vectors.velocity);
-				impact_scale /= rdata_00278fb0;
+				impact_scale /= item_maximum_impact_velocity;
 				if (impact_scale >= 0.f)
 				{
 					if (impact_scale > 1.f)
@@ -742,7 +742,7 @@ boolean item_update(
 					real angular_dot;
 
 					vectors.candidate = collision->point;
-					code_000e6900(
+					item_align_to_normal_and_point(
 						item_index,
 						&collision->plane.n,
 						&collision->point,
@@ -802,7 +802,7 @@ boolean item_update(
 					}
 
 					item->item.rotation_axis = collision->plane.n;
-					code_000e6370(item_index);
+					item_adjust_for_angular_velocity_change(item_index);
 					item->item.ignore_object_index = NONE;
 				}
 				else
@@ -904,7 +904,7 @@ boolean item_update(
 						support_matrix,
 						&item->item.item_rest_object_offset,
 						(real_point3d *)&vectors.velocity);
-					code_000e6900(
+					item_align_to_normal_and_point(
 						item_index,
 						&item->item.rotation_axis,
 						(real_point3d const *)&vectors.velocity,
@@ -923,7 +923,7 @@ boolean item_update(
 			item->object.angular_velocity.i *= 0.9f;
 			item->object.angular_velocity.j *= 0.9f;
 			item->object.angular_velocity.k *= 0.9f;
-			code_000e6370(item_index);
+			item_adjust_for_angular_velocity_change(item_index);
 		}
 
 		if (TEST_FLAG(
@@ -1019,7 +1019,7 @@ boolean item_update(
 		468,
 		global_current_collision_user_depth > 1);
 	--global_current_collision_user_depth;
-	profile_exit(data_00306498);
+	profile_exit(item_update_section);
 
 	return TRUE;
 }

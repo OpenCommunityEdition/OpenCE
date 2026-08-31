@@ -51,10 +51,10 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-static struct light_volume_frame *code_00124490(
+static struct light_volume_frame *light_volume_interpolate_frames(
 	struct light_volume_definition *definition,
 	long object_index);
-real code_001246a0(
+real pow1(
 	real value,
 	real exponent);
 void light_volume_render(
@@ -130,7 +130,7 @@ void light_volume_delete(
 
 /* ---------- private code */
 
-static struct light_volume_frame *code_00124490(
+static struct light_volume_frame *light_volume_interpolate_frames(
 	struct light_volume_definition *definition,
 	long object_index)
 {
@@ -215,7 +215,7 @@ static struct light_volume_frame *code_00124490(
 	return result;
 }
 
-real code_001246a0(
+real pow1(
 	real value,
 	real exponent)
 {
@@ -246,7 +246,7 @@ void light_volume_render(
 		{
 			real distance_fade = 1.f;
 
-			frame = code_00124490(definition, object_index);
+			frame = light_volume_interpolate_frames(definition, object_index);
 			object_get_marker_by_name(object_index, definition->attachment_marker, &marker, 1);
 			delta.x = marker.matrix.position.x - render.camera.position.x;
 			delta.y = marker.matrix.position.y - render.camera.position.y;
@@ -313,19 +313,19 @@ void light_volume_render(
 						real_point3d position;
 
 						offset_fraction = (real)sprite_index / (real)(definition->count - 1);
-						offset_fraction = code_001246a0(
+						offset_fraction = pow1(
 							offset_fraction,
 							frame->offset_exponent);
-						radius_fraction = code_001246a0(
+						radius_fraction = pow1(
 							offset_fraction,
 							frame->radius_exponent);
 						radius =
 							(1.f - radius_fraction) * frame->radius_hither +
 							frame->radius_yon * radius_fraction;
-						color_fraction = code_001246a0(
+						color_fraction = pow1(
 							offset_fraction,
 							frame->color_exponent);
-						brightness_fraction = code_001246a0(
+						brightness_fraction = pow1(
 							offset_fraction,
 							frame->brightness_exponent);
 

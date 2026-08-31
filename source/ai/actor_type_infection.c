@@ -188,9 +188,9 @@ typedef char projectile_aim_direction_size_check[
 
 /* ---------- prototypes */
 
-static short code_000273b0(
+static short infection_wander_pause_time(
 	short movement_type);
-static short code_00027410(
+static short infection_wander_move_time(
 	short movement_type);
 real real_random_range(
 	real lower_bound,
@@ -213,7 +213,7 @@ boolean projectile_aim_ballistic(
 
 void infection_decide_action(
 	long actor_index);
-void code_00027470(
+void infection_swarm_control(
 	long actor_index);
 void infection_swarm_aim_jump(
 	long actor_index,
@@ -238,7 +238,7 @@ struct actor_type_definition actor_type_infection =
 	{ 0, 0 },
 	NULL,
 	infection_decide_action,
-	code_00027470,
+	infection_swarm_control,
 	infection_swarm_aim_jump
 };
 
@@ -300,7 +300,7 @@ void infection_decide_action(
 	return;
 }
 
-static short code_000273b0(
+static short infection_wander_pause_time(
 	short movement_type)
 {
 	real scale = 1.f;
@@ -325,7 +325,7 @@ static short code_000273b0(
 	return MIN(result, 255);
 }
 
-static short code_00027410(
+static short infection_wander_move_time(
 	short movement_type)
 {
 	real scale = 1.f;
@@ -347,7 +347,7 @@ static short code_00027410(
 	return MIN(result, 255);
 }
 
-void code_00027470(
+void infection_swarm_control(
 	long actor_index)
 {
 	struct actor_datum *actor = actor_get(actor_index);
@@ -626,7 +626,7 @@ void code_00027470(
 							real distance_squared;
 							real angle;
 
-							swarm_component->wander.move_ticks = (byte)code_00027410(movement_type);
+							swarm_component->wander.move_ticks = (byte)infection_wander_move_time(movement_type);
 							vector_from_points3d(
 								&swarm_component->position,
 								&swarm->swarm_center,
@@ -656,7 +656,7 @@ void code_00027470(
 						swarm_component->wander.move_ticks--;
 						if (!swarm_component->wander.move_ticks)
 						{
-							swarm_component->wander.pause_ticks = (byte)code_000273b0(movement_type);
+							swarm_component->wander.pause_ticks = (byte)infection_wander_pause_time(movement_type);
 						}
 						else
 						{

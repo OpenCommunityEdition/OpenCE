@@ -1,7 +1,7 @@
 [
   {
     "unit": "source/physics/collision_bsp_definitions",
-    "symbol": "_data_0030c9c0",
+    "symbol": "_global_collision_bsp_definition_data",
     "reason": "csplit represents 22 internal pointers through the preceding external image symbol; resolved image destinations, normalized bytes, relocation addresses, and relocation types are exact",
     "measurements": {
       "size": 900,
@@ -11,7 +11,7 @@
   },
   {
     "unit": "source/hs/hs_globals_external",
-    "symbol": "_data_002e07c8",
+    "symbol": "_hs_external_global_definitions",
     "reason": "csplit and the rebuilt object express internal table pointers through different symbols; resolved image destinations, normalized bytes, relocation addresses, and relocation types are exact",
     "measurements": {
       "size": 7076,
@@ -41,7 +41,7 @@
   },
   {
     "unit": "source/models/model_animation_definitions",
-    "symbol": "_data_00309e80",
+    "symbol": "_weapon_type_animation_list_entries",
     "reason": "the complete rebuilt object has exact normalized data and resolved relocations despite internal-symbol expression differences",
     "measurements": {
       "size": 1288,
@@ -51,7 +51,7 @@
   },
   {
     "unit": "source/memory/byte_swapping",
-    "symbol": "_data_00309da8",
+    "symbol": "_byte_bs_codes",
     "reason": "the complete rebuilt object has exact normalized data and resolved relocations despite internal-symbol expression differences",
     "measurements": {
       "size": 144,
@@ -141,7 +141,7 @@
   },
   {
     "unit": "source/bitmaps/libtiff/tif_print",
-    "symbol": "_data_002daf98",
+    "symbol": "_tif_print_rcsid",
     "reason": "the complete RCS-pinned libtiff object owns an exact data section, including both pointer tables; objdiff leaves one word uncredited despite identical normalized bytes, relocation addresses and types, and independently resolved image destinations",
     "measurements": {
       "size": 164,
@@ -222,7 +222,7 @@
   },
   {
     "unit": "source/interface/ui_widget_event_handler_functions",
-    "symbol": "_data_00305ee0",
+    "symbol": "_event_handler_function_list",
     "reason": "the complete rebuilt object owns the exact 934-byte event-handler table; normalized bytes, relocation addresses and types, and independently resolved destinations are exact despite objdiff's csplit symbol attribution",
     "measurements": {
       "size": 934,
@@ -252,7 +252,7 @@
   },
   {
     "unit": "source/render/render_particles",
-    "symbol": "_data_0030e180",
+    "symbol": "_render_particles_section",
     "allow_incomplete_unit": true,
     "reason": "the incomplete rebuilt object owns the exact 1528-byte render-particles profile section; csplit names the string relocation as an undefined image symbol while MSVC emits the select-any string COMDAT locally, and the hardened comparator proves identical normalized bytes, relocation address/type/destination/addend, external owner spelling, and storage class",
     "measurements": {

@@ -93,7 +93,7 @@ typedef char verify_riff_byte_swap_globals_size[
 /* ---------- globals */
 
 /* The target .data section is four-byte aligned; XDK 3911 otherwise emits eight. */
-__declspec(align(4)) struct riff_byte_swap_globals data_003169cc=
+__declspec(align(4)) struct riff_byte_swap_globals riff_bs=
 {
 	{
 		_begin_bs_array, 1,
@@ -103,7 +103,7 @@ __declspec(align(4)) struct riff_byte_swap_globals data_003169cc=
 	{
 		"riff container chunk",
 		sizeof(struct riff_container_chunk),
-		data_003169cc.container_chunk_codes,
+		riff_bs.container_chunk_codes,
 		BYTE_SWAP_DEFINITION_SIGNATURE,
 		FALSE,
 	},
@@ -115,7 +115,7 @@ __declspec(align(4)) struct riff_byte_swap_globals data_003169cc=
 	{
 		"riff chunk type",
 		sizeof(tag),
-		data_003169cc.chunk_type_codes,
+		riff_bs.chunk_type_codes,
 		BYTE_SWAP_DEFINITION_SIGNATURE,
 		FALSE,
 	},
@@ -127,7 +127,7 @@ __declspec(align(4)) struct riff_byte_swap_globals data_003169cc=
 	{
 		"riff chunk length",
 		sizeof(long),
-		data_003169cc.chunk_length_codes,
+		riff_bs.chunk_length_codes,
 		BYTE_SWAP_DEFINITION_SIGNATURE,
 		FALSE,
 	},
@@ -139,14 +139,14 @@ __declspec(align(4)) struct riff_byte_swap_globals data_003169cc=
 	{
 		"riff chunk",
 		RIFF_FORMAT_CHUNK_SIZE,
-		data_003169cc.chunk_codes,
+		riff_bs.chunk_codes,
 		BYTE_SWAP_DEFINITION_SIGNATURE,
 		FALSE,
 	},
 };
 
-#define riff_container_chunk_byte_swap_definition data_003169cc.container_chunk_definition
-#define riff_chunk_type_byte_swap_definition data_003169cc.chunk_type_definition
+#define riff_container_chunk_byte_swap_definition riff_bs.container_chunk_definition
+#define riff_chunk_type_byte_swap_definition riff_bs.chunk_type_definition
 
 /* ---------- public code */
 

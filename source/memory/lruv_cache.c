@@ -122,11 +122,11 @@ struct lruv_cache_hole
 
 /* ---------- prototypes */
 
-void code_0010cd70(
+void lruv_cache_verify(
 	struct lruv_cache *cache,
 	boolean verify_blocks);
 
-static long code_0010cd50(
+static long lruv_cache_bytes_to_pages(
 	struct lruv_cache *cache,
 	long size);
 
@@ -198,7 +198,7 @@ void lruv_initialize(
 	cache->last_block_index = NONE;
 	cache->tick = 1;
 
-	code_0010cd70(cache, TRUE);
+	lruv_cache_verify(cache, TRUE);
 
 	return;
 }
@@ -206,7 +206,7 @@ void lruv_initialize(
 void lruv_delete(
 	struct lruv_cache *cache)
 {
-	code_0010cd70(cache, TRUE);
+	lruv_cache_verify(cache, TRUE);
 	data_dispose(cache->blocks);
 	csmemset(cache, 0, sizeof(*cache));
 	match_free("c:\\halo\\SOURCE\\memory\\lruv_cache.c", 163, cache);
@@ -217,7 +217,7 @@ void lruv_delete(
 void lruv_idle(
 	struct lruv_cache *cache)
 {
-	code_0010cd70(cache, FALSE);
+	lruv_cache_verify(cache, FALSE);
 	cache->tick++;
 
 	return;
@@ -232,7 +232,7 @@ void lruv_block_delete(
 	struct lruv_cache_block *previous_block;
 
 	block = datum_get(cache->blocks, block_index);
-	code_0010cd70(cache, TRUE);
+	lruv_cache_verify(cache, TRUE);
 
 	if (cache->delete_block_proc)
 		cache->delete_block_proc(block_index);
@@ -266,7 +266,7 @@ void lruv_block_delete(
 	}
 
 	datum_delete(cache->blocks, block_index);
-	code_0010cd70(cache, TRUE);
+	lruv_cache_verify(cache, TRUE);
 
 	return;
 }
@@ -277,7 +277,7 @@ void lruv_block_touch(
 {
 	struct lruv_cache_block *block;
 
-	code_0010cd70(cache, FALSE);
+	lruv_cache_verify(cache, FALSE);
 	block = datum_get(cache->blocks, block_index);
 	block->last_used_tick = cache->tick;
 
@@ -290,7 +290,7 @@ void *lruv_block_get_address(
 {
 	struct lruv_cache_block *block;
 
-	code_0010cd70(cache, FALSE);
+	lruv_cache_verify(cache, FALSE);
 	block = datum_get(cache->blocks, block_index);
 
 	return (void *)(block->first_page_index << cache->page_size_bits);
@@ -302,7 +302,7 @@ boolean lruv_block_touched(
 {
 	struct lruv_cache_block *block;
 
-	code_0010cd70(cache, FALSE);
+	lruv_cache_verify(cache, FALSE);
 	block = datum_get(cache->blocks, block_index);
 
 	return block->last_used_tick == cache->tick;
@@ -316,7 +316,7 @@ void lruv_cache_get_page_usage(
 	struct lruv_cache_block *block;
 	byte usage;
 
-	code_0010cd70(cache, TRUE);
+	lruv_cache_verify(cache, TRUE);
 	csmemset(page_usage, 0, cache->page_count);
 
 	data_iterator_new(&iterator, cache->blocks);
@@ -350,7 +350,7 @@ void lruv_resize(
 		"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
 		603,
 		new_page_count>0);
-	code_0010cd70(cache, TRUE);
+	lruv_cache_verify(cache, TRUE);
 
 	data_iterator_new(&iterator, cache->blocks);
 	while ((block = data_iterator_next(&iterator)) != NULL)
@@ -386,7 +386,7 @@ void lruv_debug_to_file(
 	boolean locked;
 	const char *block_name;
 
-	code_0010cd70(cache, TRUE);
+	lruv_cache_verify(cache, TRUE);
 	stream = fopen(path, "w+");
 	if (stream)
 	{
@@ -514,7 +514,7 @@ void lruv_flush(
 {
 	struct data_iterator iterator;
 
-	code_0010cd70(cache, TRUE);
+	lruv_cache_verify(cache, TRUE);
 	data_iterator_new(&iterator, cache->blocks);
 	while (data_iterator_next(&iterator))
 		lruv_block_delete(cache, iterator.datum_index);
@@ -552,7 +552,7 @@ long lruv_block_new(
 	long found_page_count;
 	long new_block_index;
 
-	desired_page_count = code_0010cd50(cache, size);
+	desired_page_count = lruv_cache_bytes_to_pages(cache, size);
 	found_hole = FALSE;
 	oldest_unlocked_block_index = NONE;
 	match_assert(
@@ -750,7 +750,7 @@ long lruv_block_new(
 		new_block->first_page_index = found_first_page_index;
 		new_block->page_count = desired_page_count;
 		new_block->last_used_tick = cache->tick;
-		code_0010cd70(cache, TRUE);
+		lruv_cache_verify(cache, TRUE);
 	}
 
 	return new_block_index;
@@ -759,7 +759,7 @@ long lruv_block_new(
 
 /* ---------- private code */
 
-static long code_0010cd50(
+static long lruv_cache_bytes_to_pages(
 	struct lruv_cache *cache,
 	long size)
 {
@@ -774,7 +774,7 @@ static long code_0010cd50(
 	return page_count;
 }
 
-void code_0010cd70(
+void lruv_cache_verify(
 	struct lruv_cache *cache,
 	boolean verify_blocks)
 {

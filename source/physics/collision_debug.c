@@ -80,7 +80,7 @@ typedef char collision_debug_spray_cache_size_assert[
 
 /* ---------- globals */
 
-const real_point3d rdata_0028b2a8[NUMBER_OF_VERTICES_PER_CUBE] =
+const real_point3d collision_debug_cube_vertices[NUMBER_OF_VERTICES_PER_CUBE] =
 {
 	{ -1.0f, -1.0f, -1.0f },
 	{ -1.0f, -1.0f,  1.0f },
@@ -100,7 +100,7 @@ boolean collision_debug_flag_objects = TRUE;
 real collision_debug_length = 100.0f;
 long collision_debug_ignore_object_index = NONE;
 
-struct collision_debug_spray_cache bss_00456ec0 = { 0 };
+struct collision_debug_spray_cache collision_debug_spray_globals = { 0 };
 real collision_debug_width = 0.0f;
 real collision_debug_height = 0.0f;
 boolean collision_debug_phantom_bsp = FALSE;

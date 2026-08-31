@@ -179,7 +179,7 @@ void write_to_error_file(
 	return;
 }
 
-void code_0007d9d0(
+void reset_error_state(
 	void)
 {
 	error_globals.delayed = FALSE;

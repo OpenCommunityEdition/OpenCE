@@ -34,7 +34,7 @@ extern short seed_random_range(unsigned long *seed, short lower_bound, short upp
 
 /* ---------- globals */
 
-static unsigned long bss_00453ad8;
+static unsigned long attract_mode_countdown_timer;
 static char bss_00453ae8[128];
 
 short data_002e4c84 = NONE;
@@ -62,7 +62,7 @@ boolean attract_mode_should_start(
 		unsigned long current_time = system_milliseconds();
 		unsigned long time_since_last_event = event_manager_time_of_last_event();
 		
-		time_since_last_event = MAX(bss_00453ad8, time_since_last_event);
+		time_since_last_event = MAX(attract_mode_countdown_timer, time_since_last_event);
 		time_elapsed = current_time-time_since_last_event;
 	
 		if (time_elapsed>=ATTRACT_MODE_COUNTDOWN-MUSIC_FADE_TIME)
@@ -92,7 +92,7 @@ boolean attract_mode_should_start(
 void attract_mode_reset_timer(
 	void)
 {
-	bss_00453ad8 = system_milliseconds();
+	attract_mode_countdown_timer = system_milliseconds();
 
 	return;
 }
@@ -217,7 +217,7 @@ void attract_mode_start(
 
 	if (!bink_playback_active())
 	{
-		bss_00453ad8 = system_milliseconds();
+		attract_mode_countdown_timer = system_milliseconds();
 	}
 
 	return;

@@ -157,7 +157,7 @@ struct shader_lens_flare_fields_transparent
 
 /* ---------- prototypes */
 
-long code_00183bb0(
+long compare_lens_flare_markers_by_cluster(
 	struct temporary_lens_flare_marker const *a,
 	struct temporary_lens_flare_marker const *b);
 boolean build_structure_lens_flares(
@@ -645,7 +645,7 @@ boolean build_structure_lens_flares(
 		temp_markers,
 		structure_bsp->lens_flare_markers.count,
 		sizeof(*temp_markers),
-		(int (__cdecl *)(const void *, const void *))code_00183bb0);
+		(int (__cdecl *)(const void *, const void *))compare_lens_flare_markers_by_cluster);
 
 	{
 		for (marker_index = 0; marker_index < structure_bsp->lens_flare_markers.count; marker_index++)
@@ -731,7 +731,7 @@ boolean build_structure_lens_flares(
 
 /* ---------- private code */
 
-long code_00183bb0(
+long compare_lens_flare_markers_by_cluster(
 	struct temporary_lens_flare_marker const *a,
 	struct temporary_lens_flare_marker const *b)
 {

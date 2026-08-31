@@ -68,7 +68,7 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-void code_00108010(
+void _byte_swap_data(
 	struct byte_swap_definition *definition,
 	void *data,
 	byte_swap_code *codes,
@@ -77,12 +77,12 @@ void code_00108010(
 
 /* ---------- globals */
 
-byte_swap_code data_00309da8[] = { _begin_bs_array, 1, 1, _end_bs_array };
+byte_swap_code byte_bs_codes[] = { _begin_bs_array, 1, 1, _end_bs_array };
 struct byte_swap_definition byte_bs_definition =
 {
 	"byte",
 	1,
-	data_00309da8,
+	byte_bs_codes,
 	BYTE_SWAP_DEFINITION_SIGNATURE,
 	FALSE
 };
@@ -179,7 +179,7 @@ void byte_swap_memory(
 	return;
 }
 
-void code_00108010(
+void _byte_swap_data(
 	struct byte_swap_definition *definition,
 	void *data,
 	byte_swap_code *codes,
@@ -277,7 +277,7 @@ void code_00108010(
 				break;
 
 			case _begin_bs_array:
-				code_00108010(
+				_byte_swap_data(
 					definition,
 					data ? (byte *)data+offset : NULL,
 					codes+code_index,
@@ -290,7 +290,7 @@ void code_00108010(
 			case _extern_bs_definition:
 			{
 				struct byte_swap_definition *external_definition = (struct byte_swap_definition *)codes[code_index+1];
-				code_00108010(
+				_byte_swap_data(
 					external_definition,
 					data ? (byte *)data+offset : NULL,
 					external_definition->codes,
@@ -353,7 +353,7 @@ long byte_swap_codes_size(
 	definition.size = 0;
 	definition.codes = codes;
 	definition.signature = BYTE_SWAP_DEFINITION_SIGNATURE;
-	code_00108010(&definition, NULL, codes, (long *)&name, (long *)&codes);
+	_byte_swap_data(&definition, NULL, codes, (long *)&name, (long *)&codes);
 
 	return (long)name;
 }
@@ -371,7 +371,7 @@ void byte_swap_data(
 
 	if (!definition->verified && definition->size>=0)
 	{
-		code_00108010(
+		_byte_swap_data(
 			definition,
 			NULL,
 			definition->codes,
@@ -396,7 +396,7 @@ void byte_swap_data(
 	{
 		for (index = 0; index<data_count; index++)
 		{
-			code_00108010(
+			_byte_swap_data(
 				definition,
 				(byte *)data+definition->size*index,
 				definition->codes,

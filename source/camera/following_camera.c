@@ -112,9 +112,9 @@ typedef char unit_camera_track_size_assert[
 
 /* ---------- prototypes */
 
-static struct unit_camera const *code_00077f20(
+static struct unit_camera const *unit_camera_get(
 	long unit_index);
-static void code_00078120(
+static void camera_track_splut(
 	struct unit_camera const *camera,
 	real pitch,
 	real_vector3d *offset);
@@ -162,12 +162,12 @@ void following_camera_deterministic(
 	real horizontal_magnitude;
 
 	unit = unit_get(unit_index);
-	camera = code_00077f20(unit_index);
+	camera = unit_camera_get(unit_index);
 	unit_get_camera_position(unit_index, position);
 	*forward = unit->unit.aiming_vector;
 
 	pitch = arcsine(forward->k);
-	code_00078120(camera, pitch, &offset);
+	camera_track_splut(camera, pitch, &offset);
 
 	forward_x = forward->i;
 	forward_y = forward->j;
@@ -261,7 +261,7 @@ void following_camera_update(
 			magnitude3d(&command->forward) < 1.0001f,
 			"magnitude3d(&result->forward) > 0.9999f && magnitude3d(&result->forward) < 1.0001f");
 
-		code_00078120(camera_info.camera, facing.pitch, &track_offset);
+		camera_track_splut(camera_info.camera, facing.pitch, &track_offset);
 		command->depth = magnitude3d(&track_offset);
 		command->offset.i =
 			(command->depth * cosine(facing.pitch) + track_offset.i) * camera->distance_scale;
@@ -322,7 +322,7 @@ void following_camera_update(
 
 /* ---------- private code */
 
-static struct unit_camera const *code_00077f20(
+static struct unit_camera const *unit_camera_get(
 	long unit_index)
 {
 	struct unit_datum *unit;
@@ -361,7 +361,7 @@ static struct unit_camera const *code_00077f20(
 	return camera;
 }
 
-static void code_00078120(
+static void camera_track_splut(
 	struct unit_camera const *camera,
 	real pitch,
 	real_vector3d *offset)

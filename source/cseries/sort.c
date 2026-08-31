@@ -30,11 +30,11 @@ enum
 
 /* ---------- prototypes */
 
-static void code_00080360(
+static void shortsort_2byte(
 	word *hi,
 	word *lo,
 	boolean (*compare)(word, word));
-static void code_000803c0(
+static void shortsort_4byte(
 	long *hi,
 	long *lo,
 	boolean (*compare)(long, long));
@@ -76,7 +76,7 @@ void qsort_2byte(
 		size = hi-lo+1;
 		if (size<=QSORT_CUTOFF)
 		{
-			code_00080360(hi, lo, compare);
+			shortsort_2byte(hi, lo, compare);
 		}
 		else
 		{
@@ -178,7 +178,7 @@ void qsort_4byte(
 		size = hi-lo+1;
 		if (size<=QSORT_CUTOFF)
 		{
-			code_000803c0(hi, lo, compare);
+			shortsort_4byte(hi, lo, compare);
 		}
 		else
 		{
@@ -258,7 +258,7 @@ void qsort_4byte(
 
 /* ---------- private code */
 
-static void code_00080360(
+static void shortsort_2byte(
 	word *hi,
 	word *lo,
 	boolean (*compare)(word, word))
@@ -285,7 +285,7 @@ static void code_00080360(
 	return;
 }
 
-static void code_000803c0(
+static void shortsort_4byte(
 	long *hi,
 	long *lo,
 	boolean (*compare)(long, long))

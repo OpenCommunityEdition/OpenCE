@@ -35,7 +35,7 @@ void *_texture_cache_bitmap_get_hardware_format(
 	boolean block,
 	boolean load);
 
-static void code_001ad870(long sound_definition_index);
+static void predicted_resources_sound_precache(long sound_definition_index);
 
 /* ---------- globals */
 
@@ -69,7 +69,7 @@ void predicted_resources_precache(
 			break;
 
 		case _predicted_resource_sound:
-			code_001ad870(predicted_resource->tag_index);
+			predicted_resources_sound_precache(predicted_resource->tag_index);
 			break;
 		}
 	}
@@ -79,7 +79,7 @@ void predicted_resources_precache(
 
 /* ---------- private code */
 
-static void code_001ad870(
+static void predicted_resources_sound_precache(
 	long sound_definition_index)
 {
 	struct sound_definition *sound_definition;

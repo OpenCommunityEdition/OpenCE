@@ -96,7 +96,7 @@ void rasterizer_error(
 
 /* ---------- globals */
 
-short const rdata_0029c2f8[] =
+short const vertex_shader_translation_tables[] =
 {
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, 0, -1, -1,
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, -1,
@@ -155,7 +155,7 @@ short const rdata_0029c2f8[] =
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 33, 11,
 };
 
-struct rasterizer_vertex_shader_runtime_globals data_0030d3b8 =
+struct rasterizer_vertex_shader_runtime_globals vertex_shader_runtime_globals =
 {
 	NONE,
 	0,
@@ -195,37 +195,37 @@ void rasterizer_set_vertex_shader_permutation(
 
 	switch (vertex_shader_index)
 	{
-	case 0: translation_table = rdata_0029c2f8 + 0x000 / sizeof(short); break;
-	case 1: translation_table = rdata_0029c2f8 + 0x018 / sizeof(short); break;
-	case 4: permutation_count = 2; translation_table = rdata_0029c2f8 + 0x030 / sizeof(short); break;
-	case 38: translation_table = rdata_0029c2f8 + 0x060 / sizeof(short); break;
-	case 65: translation_table = rdata_0029c2f8 + 0x078 / sizeof(short); permutation_count = 4; break;
-	case 56: translation_table = rdata_0029c2f8 + 0x0D8 / sizeof(short); break;
-	case 16: translation_table = rdata_0029c2f8 + 0x0F0 / sizeof(short); break;
-	case 49: translation_table = rdata_0029c2f8 + 0x108 / sizeof(short); break;
-	case 29: translation_table = rdata_0029c2f8 + 0x120 / sizeof(short); break;
-	case 40: translation_table = rdata_0029c2f8 + 0x138 / sizeof(short); break;
-	case 21: translation_table = rdata_0029c2f8 + 0x150 / sizeof(short); permutation_count = 3; break;
-	case 58: translation_table = rdata_0029c2f8 + 0x198 / sizeof(short); break;
-	case 42: translation_table = rdata_0029c2f8 + 0x1B0 / sizeof(short); permutation_count = 3; break;
-	case 51: translation_table = rdata_0029c2f8 + 0x1F8 / sizeof(short); break;
-	case 6: translation_table = rdata_0029c2f8 + 0x210 / sizeof(short); break;
-	case 8: translation_table = rdata_0029c2f8 + 0x228 / sizeof(short); break;
-	case 37: translation_table = rdata_0029c2f8 + 0x240 / sizeof(short); permutation_count = 6; break;
-	case 10: translation_table = rdata_0029c2f8 + 0x2D0 / sizeof(short); permutation_count = 4; break;
-	case 64: translation_table = rdata_0029c2f8 + 0x330 / sizeof(short); break;
-	case 39: translation_table = rdata_0029c2f8 + 0x348 / sizeof(short); break;
-	case 13: translation_table = rdata_0029c2f8 + 0x360 / sizeof(short); break;
-	case 5: translation_table = rdata_0029c2f8 + 0x378 / sizeof(short); break;
-	case 24: translation_table = rdata_0029c2f8 + 0x390 / sizeof(short); permutation_count = 6; break;
-	case 20: translation_table = rdata_0029c2f8 + 0x420 / sizeof(short); break;
-	case 23: translation_table = rdata_0029c2f8 + 0x438 / sizeof(short); break;
-	case 46: translation_table = rdata_0029c2f8 + 0x450 / sizeof(short); break;
-	case 43: translation_table = rdata_0029c2f8 + 0x468 / sizeof(short); permutation_count = 3; break;
-	case 25: translation_table = rdata_0029c2f8 + 0x4B0 / sizeof(short); break;
-	case 22: translation_table = rdata_0029c2f8 + 0x4C8 / sizeof(short); break;
-	case 15: translation_table = rdata_0029c2f8 + 0x4E0 / sizeof(short); break;
-	case 33: translation_table = rdata_0029c2f8 + 0x4F8 / sizeof(short); permutation_count = 2; break;
+	case 0: translation_table = vertex_shader_translation_tables + 0x000 / sizeof(short); break;
+	case 1: translation_table = vertex_shader_translation_tables + 0x018 / sizeof(short); break;
+	case 4: permutation_count = 2; translation_table = vertex_shader_translation_tables + 0x030 / sizeof(short); break;
+	case 38: translation_table = vertex_shader_translation_tables + 0x060 / sizeof(short); break;
+	case 65: translation_table = vertex_shader_translation_tables + 0x078 / sizeof(short); permutation_count = 4; break;
+	case 56: translation_table = vertex_shader_translation_tables + 0x0D8 / sizeof(short); break;
+	case 16: translation_table = vertex_shader_translation_tables + 0x0F0 / sizeof(short); break;
+	case 49: translation_table = vertex_shader_translation_tables + 0x108 / sizeof(short); break;
+	case 29: translation_table = vertex_shader_translation_tables + 0x120 / sizeof(short); break;
+	case 40: translation_table = vertex_shader_translation_tables + 0x138 / sizeof(short); break;
+	case 21: translation_table = vertex_shader_translation_tables + 0x150 / sizeof(short); permutation_count = 3; break;
+	case 58: translation_table = vertex_shader_translation_tables + 0x198 / sizeof(short); break;
+	case 42: translation_table = vertex_shader_translation_tables + 0x1B0 / sizeof(short); permutation_count = 3; break;
+	case 51: translation_table = vertex_shader_translation_tables + 0x1F8 / sizeof(short); break;
+	case 6: translation_table = vertex_shader_translation_tables + 0x210 / sizeof(short); break;
+	case 8: translation_table = vertex_shader_translation_tables + 0x228 / sizeof(short); break;
+	case 37: translation_table = vertex_shader_translation_tables + 0x240 / sizeof(short); permutation_count = 6; break;
+	case 10: translation_table = vertex_shader_translation_tables + 0x2D0 / sizeof(short); permutation_count = 4; break;
+	case 64: translation_table = vertex_shader_translation_tables + 0x330 / sizeof(short); break;
+	case 39: translation_table = vertex_shader_translation_tables + 0x348 / sizeof(short); break;
+	case 13: translation_table = vertex_shader_translation_tables + 0x360 / sizeof(short); break;
+	case 5: translation_table = vertex_shader_translation_tables + 0x378 / sizeof(short); break;
+	case 24: translation_table = vertex_shader_translation_tables + 0x390 / sizeof(short); permutation_count = 6; break;
+	case 20: translation_table = vertex_shader_translation_tables + 0x420 / sizeof(short); break;
+	case 23: translation_table = vertex_shader_translation_tables + 0x438 / sizeof(short); break;
+	case 46: translation_table = vertex_shader_translation_tables + 0x450 / sizeof(short); break;
+	case 43: translation_table = vertex_shader_translation_tables + 0x468 / sizeof(short); permutation_count = 3; break;
+	case 25: translation_table = vertex_shader_translation_tables + 0x4B0 / sizeof(short); break;
+	case 22: translation_table = vertex_shader_translation_tables + 0x4C8 / sizeof(short); break;
+	case 15: translation_table = vertex_shader_translation_tables + 0x4E0 / sizeof(short); break;
+	case 33: translation_table = vertex_shader_translation_tables + 0x4F8 / sizeof(short); permutation_count = 2; break;
 	default:
 		match_vassert(
 			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_vertex_shaders_runtime.c",
@@ -249,9 +249,9 @@ void rasterizer_set_vertex_shader_permutation(
 
 	vertex_shader_index =
 		translation_table[vertex_type * permutation_count + permutation_index];
-	if (vertex_shader_index != data_0030d3b8.current_vertex_shader_index)
+	if (vertex_shader_index != vertex_shader_runtime_globals.current_vertex_shader_index)
 	{
-		if (data_0030d3b8.packed_shaders[1].offset == 0)
+		if (vertex_shader_runtime_globals.packed_shaders[1].offset == 0)
 		{
 			offset = 0;
 			for (packed_shader_index = 0; packed_shader_index < 3; packed_shader_index++)
@@ -260,7 +260,7 @@ void rasterizer_set_vertex_shader_permutation(
 
 				if (IDirect3DDevice8_GetVertexShaderSize(
 					global_d3d_device,
-					vertex_shader_table[data_0030d3b8.packed_shaders[packed_shader_index].vertex_shader_index].handle,
+					vertex_shader_table[vertex_shader_runtime_globals.packed_shaders[packed_shader_index].vertex_shader_index].handle,
 					&size) >= 0 && success)
 					success = TRUE;
 				else
@@ -270,7 +270,7 @@ void rasterizer_set_vertex_shader_permutation(
 						0,
 						"IDirect3DDevice8_GetVertexShaderSize(global_d3d_device, vertex_shader_table[packed_shaders[packed_shader_index].vertex_shader_index].handle, &size)");
 				}
-				data_0030d3b8.packed_shaders[packed_shader_index].offset = offset;
+				vertex_shader_runtime_globals.packed_shaders[packed_shader_index].offset = offset;
 				offset += size;
 			}
 			match_vassert(
@@ -283,18 +283,18 @@ void rasterizer_set_vertex_shader_permutation(
 		for (packed_shader_index = 0; packed_shader_index < 3; packed_shader_index++)
 		{
 			if (vertex_shader_index ==
-				data_0030d3b8.packed_shaders[packed_shader_index].vertex_shader_index)
+				vertex_shader_runtime_globals.packed_shaders[packed_shader_index].vertex_shader_index)
 				break;
 		}
 
 		if (packed_shader_index < 3)
 		{
-			if (data_0030d3b8.packed_shaders[packed_shader_index].loaded)
+			if (vertex_shader_runtime_globals.packed_shaders[packed_shader_index].loaded)
 			{
 				if (IDirect3DDevice8_SelectVertexShader(
 					global_d3d_device,
 					0,
-					data_0030d3b8.packed_shaders[packed_shader_index].offset) >= 0 && success)
+					vertex_shader_runtime_globals.packed_shaders[packed_shader_index].offset) >= 0 && success)
 				{
 					success = TRUE;
 					goto set_current_vertex_shader;
@@ -310,10 +310,10 @@ void rasterizer_set_vertex_shader_permutation(
 			}
 			else
 			{
-				offset = data_0030d3b8.packed_shaders[packed_shader_index].offset;
+				offset = vertex_shader_runtime_globals.packed_shaders[packed_shader_index].offset;
 				handle =
 					vertex_shader_table[
-						data_0030d3b8.packed_shaders[packed_shader_index].vertex_shader_index].handle;
+						vertex_shader_runtime_globals.packed_shaders[packed_shader_index].vertex_shader_index].handle;
 				match_vassert(
 					"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_vertex_shaders_runtime.c",
 					956,
@@ -331,7 +331,7 @@ void rasterizer_set_vertex_shader_permutation(
 				if (IDirect3DDevice8_SelectVertexShader(global_d3d_device, handle, offset) >= 0 && success)
 				{
 					success = TRUE;
-					data_0030d3b8.packed_shaders[packed_shader_index].loaded = TRUE;
+					vertex_shader_runtime_globals.packed_shaders[packed_shader_index].loaded = TRUE;
 				}
 				else
 				{
@@ -339,7 +339,7 @@ void rasterizer_set_vertex_shader_permutation(
 					rasterizer_error(
 						0,
 						"IDirect3DDevice8_SelectVertexShader(global_d3d_device, (DWORD)handle, (UINT)offset)");
-					data_0030d3b8.packed_shaders[packed_shader_index].loaded = TRUE;
+					vertex_shader_runtime_globals.packed_shaders[packed_shader_index].loaded = TRUE;
 				}
 			}
 		}
@@ -362,7 +362,7 @@ void rasterizer_set_vertex_shader_permutation(
 			}
 
 			for (packed_shader_index = 0; packed_shader_index < 3; packed_shader_index++)
-				data_0030d3b8.packed_shaders[packed_shader_index].loaded = FALSE;
+				vertex_shader_runtime_globals.packed_shaders[packed_shader_index].loaded = FALSE;
 		}
 
 		if (rasterizer_debug_options.vertex_shader_statistics)
@@ -370,7 +370,7 @@ void rasterizer_set_vertex_shader_permutation(
 				vertex_shader_table[vertex_shader_index].instruction_count;
 
 	set_current_vertex_shader:
-		data_0030d3b8.current_vertex_shader_index = vertex_shader_index;
+		vertex_shader_runtime_globals.current_vertex_shader_index = vertex_shader_index;
 		if (!success)
 			error(2, "### ERROR rasterizer_set_vertex_shader failed");
 	}

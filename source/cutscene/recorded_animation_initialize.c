@@ -74,12 +74,12 @@ extern struct byte_swap_definition long_bs_definition;
 
 /* ---------- globals */
 
-struct recorded_animation_layout_data data_002dce10 =
+struct recorded_animation_layout_data real_vector2d_bs_codes =
 {
 	{ _4byte, _4byte },
-	{ "real_vector2d", sizeof(real_vector2d), data_002dce10.real_vector2d_codes, BYTE_SWAP_DEFINITION_SIGNATURE, FALSE },
+	{ "real_vector2d", sizeof(real_vector2d), real_vector2d_bs_codes.real_vector2d_codes, BYTE_SWAP_DEFINITION_SIGNATURE, FALSE },
 	{ _4byte, _4byte, _4byte },
-	{ "real_vector3d", sizeof(real_vector3d), data_002dce10.real_vector3d_codes, BYTE_SWAP_DEFINITION_SIGNATURE, FALSE },
+	{ "real_vector3d", sizeof(real_vector3d), real_vector2d_bs_codes.real_vector3d_codes, BYTE_SWAP_DEFINITION_SIGNATURE, FALSE },
 	0, /* the original independently declared version table begins on an 8-byte data boundary */
 	{
 		{ &byte_bs_definition, sizeof(byte), offsetof(struct recorded_unit_control, byte_field0) },
@@ -87,10 +87,10 @@ struct recorded_animation_layout_data data_002dce10 =
 		{ &word_bs_definition, sizeof(short), offsetof(struct recorded_unit_control, word_field2) },
 		{ &word_bs_definition, sizeof(short), offsetof(struct recorded_unit_control, word_field4) },
 		{ &word_bs_definition, sizeof(short), NONE },
-		{ &data_002dce10.real_vector2d_definition, sizeof(real_vector2d), offsetof(struct recorded_unit_control, vector2d_field12) },
-		{ &data_002dce10.real_vector3d_definition, sizeof(real_vector3d), offsetof(struct recorded_unit_control, vector3d_field28) },
-		{ &data_002dce10.real_vector3d_definition, sizeof(real_vector3d), offsetof(struct recorded_unit_control, vector3d_field40) },
-		{ &data_002dce10.real_vector3d_definition, sizeof(real_vector3d), offsetof(struct recorded_unit_control, vector3d_field52) },
+		{ &real_vector2d_bs_codes.real_vector2d_definition, sizeof(real_vector2d), offsetof(struct recorded_unit_control, vector2d_field12) },
+		{ &real_vector2d_bs_codes.real_vector3d_definition, sizeof(real_vector3d), offsetof(struct recorded_unit_control, vector3d_field28) },
+		{ &real_vector2d_bs_codes.real_vector3d_definition, sizeof(real_vector3d), offsetof(struct recorded_unit_control, vector3d_field40) },
+		{ &real_vector2d_bs_codes.real_vector3d_definition, sizeof(real_vector3d), offsetof(struct recorded_unit_control, vector3d_field52) },
 		{ NULL, NONE, NONE },
 	},
 	{
@@ -106,10 +106,10 @@ struct recorded_animation_layout_data data_002dce10 =
 		{ NULL, NONE, NONE },
 	},
 	{
-		data_002dce10.version0_fields,
-		data_002dce10.version1_fields,
-		data_002dce10.version2_fields,
-		data_002dce10.version3_fields,
+		real_vector2d_bs_codes.version0_fields,
+		real_vector2d_bs_codes.version1_fields,
+		real_vector2d_bs_codes.version2_fields,
+		real_vector2d_bs_codes.version3_fields,
 	},
 };
 
@@ -121,7 +121,7 @@ void recorded_animation_byteswap_unit_control(byte **stream, byte unit_control_d
 
 	for (version_index = 0; version_index < MAX(unit_control_data_version, 1); version_index++)
 	{
-		struct recorded_animation_control_field *field = data_002dce10.fields_by_version[version_index];
+		struct recorded_animation_control_field *field = real_vector2d_bs_codes.fields_by_version[version_index];
 
 		while (field->size != NONE)
 		{
@@ -144,7 +144,7 @@ void recorded_animation_initialize_unit_control(
 
 	for (version_index = 0; version_index < MAX(unit_control_data_version, 1); version_index++)
 	{
-		struct recorded_animation_control_field *field = data_002dce10.fields_by_version[version_index];
+		struct recorded_animation_control_field *field = real_vector2d_bs_codes.fields_by_version[version_index];
 
 		while (field->size != NONE)
 		{
@@ -171,7 +171,7 @@ void recorded_animation_write_unit_control(
 
 	for (version_index = 0; version_index < MAX(unit_control_data_version, 1); version_index++)
 	{
-		struct recorded_animation_control_field *field = data_002dce10.fields_by_version[version_index];
+		struct recorded_animation_control_field *field = real_vector2d_bs_codes.fields_by_version[version_index];
 
 		while (field->size != NONE)
 		{

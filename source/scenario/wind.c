@@ -105,12 +105,12 @@ typedef char structure_weather_palette_entry_direction_offset_assert[
 
 /* ---------- prototypes */
 
-static void code_0017f750(
+static void wind_variance_get(
 	real_point3d const *position,
 	real_vector3d *wind,
 	real local_variation_rate,
 	real maximum_magnitude);
-void code_0017fbd0(
+void wind_variance_initialize(
 	void);
 
 /* ---------- globals */
@@ -128,7 +128,7 @@ void wind_dispose_from_old_map(
 	return;
 }
 
-static void code_0017f750(
+static void wind_variance_get(
 	real_point3d const *position,
 	real_vector3d *wind,
 	real local_variation_rate,
@@ -277,7 +277,7 @@ void scenario_get_current_from_weather_palette(
 					: definition->local_variation_weight;
 			real_vector3d variance;
 
-			code_0017f750(
+			wind_variance_get(
 				position,
 				&variance,
 				definition->local_variation_rate,
@@ -320,7 +320,7 @@ void wind_initialize_for_new_map(
 		!wind_globals.initialized);
 	memset(&wind_globals, 0, sizeof(wind_globals));
 	wind_globals.initialized = TRUE;
-	code_0017fbd0();
+	wind_variance_initialize();
 
 	return;
 }

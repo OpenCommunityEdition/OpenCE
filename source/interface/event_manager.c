@@ -73,7 +73,7 @@ typedef char verify_event_manager_globals_size[
 
 /* ---------- prototypes */
 
-static void code_000cb850(
+static void queue_event(
 	struct event_record *event,
 	short controller_index);
 
@@ -164,7 +164,7 @@ unsigned long event_manager_time_of_last_event(
 
 /* ---------- private code */
 
-static void code_000cb850(
+static void queue_event(
 	struct event_record *event,
 	short controller_index)
 {
@@ -322,7 +322,7 @@ void event_manager_update(
 				{
 					event.type = _event_type_left_stick;
 					event.data.stick = state->sticks[_gamepad_stick_left];
-					code_000cb850(&event, gamepad_index);
+					queue_event(&event, gamepad_index);
 					posted = TRUE;
 				}
 
@@ -331,7 +331,7 @@ void event_manager_update(
 				{
 					event.type = _event_type_right_stick;
 					event.data.stick = state->sticks[_gamepad_stick_right];
-					code_000cb850(&event, gamepad_index);
+					queue_event(&event, gamepad_index);
 					posted = TRUE;
 				}
 
@@ -344,7 +344,7 @@ void event_manager_update(
 						event.type = _event_type_button;
 						event.data.button.index = (byte)button_index;
 						event.data.button.value = value;
-						code_000cb850(&event, gamepad_index);
+						queue_event(&event, gamepad_index);
 						posted = TRUE;
 					}
 				}
@@ -355,7 +355,7 @@ void event_manager_update(
 		{
 			struct event_record event = {0};
 
-			code_000cb850(&event, gamepad_index);
+			queue_event(&event, gamepad_index);
 		}
 	}
 
