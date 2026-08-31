@@ -309,7 +309,7 @@ symbols in this file:
 0009BD20 00d0:
 	_game_engine_get_damage_multiplier (0000)
 0009BDF0 03e0:
-	_code_0009bdf0 (0000)
+	_game_engine_update_teleporter (0000)
 0009C1D0 0170:
 	_game_engine_get_distance_rating_for_spawn (0000)
 0009C340 0120:
@@ -887,7 +887,7 @@ static boolean code_0009a940(
 static void code_0009b4f0(
 	long player_index);
 
-static void code_0009bdf0(
+static void game_engine_update_teleporter(
 	long player_index);
 
 void code_00096ed0(
@@ -3618,7 +3618,7 @@ void game_engine_nonplayer_post_rasterize(
 	return;
 }
 
-static void code_0009bdf0(
+static void game_engine_update_teleporter(
 	long player_index)
 {
 	struct scenario *scenario = global_scenario_get();
@@ -3687,7 +3687,6 @@ static void code_0009bdf0(
 
 		{
 			struct collision_feature_list features;
-			struct collision_plane point_test_result;
 			struct player_datum *unit_player;
 			real_point3d position;
 			real height;
@@ -3702,62 +3701,66 @@ static void code_0009bdf0(
 				&height,
 				&radius);
 			position = destination_flag->position;
-			if (collision_get_features_in_sphere(
-					0x200380,
-					&position,
-					height + radius * 2.0f,
-					height,
-					radius,
-					NONE,
-					&features) &&
-				collision_features_test_point(
-					&features,
-					&position,
-					&point_test_result))
 			{
-				if (point_test_result.object_index != NONE)
+				struct collision_plane point_test_result;
+
+				if (collision_get_features_in_sphere(
+						0x200380,
+						&position,
+						height + radius * 2.0f,
+						height,
+						radius,
+						NONE,
+						&features) &&
+					collision_features_test_point(
+						&features,
+						&position,
+						&point_test_result))
 				{
-					if (TEST_FLAG(
-							_object_mask_unit,
-							object_get(
-								point_test_result.object_index)
-								->object.type))
+					if (point_test_result.object_index != NONE)
 					{
-						struct unit_datum *blocking_unit = unit_get(
-							point_test_result.object_index);
-						if (blocking_unit->unit.player_index != NONE)
+						if (TEST_FLAG(
+								_object_mask_unit,
+								object_get(
+									point_test_result.object_index)
+									->object.type))
 						{
-							struct player_datum *blocking_player =
-								player_get(blocking_unit->unit.player_index);
-							blocking_player->unknown_d0 = TRUE;
-							blocking_player->unknown_c8++;
+							struct unit_datum *blocking_unit = unit_get(
+								point_test_result.object_index);
+							if (blocking_unit->unit.player_index != NONE)
+							{
+								struct player_datum *blocking_player =
+									player_get(blocking_unit->unit.player_index);
+								blocking_player->unknown_d0 = TRUE;
+								blocking_player->unknown_c8++;
+							}
 						}
 					}
-				}
 
-				if (game_engine_teleport_message_ticks > 0)
-				{
-					game_engine_teleport_message_ticks--;
+					if (game_engine_teleport_message_ticks > 0)
+					{
+						game_engine_teleport_message_ticks--;
+						return;
+					}
+
+					game_engine_teleport_message_ticks = 120;
+					{
+						long string_list_index =
+							tag_loaded('ustr', "ui\\multiplayer_game_text");
+						wchar_t const *message;
+
+						if (string_list_index != NONE)
+							message = unicode_string_list_get_string(
+								string_list_index,
+								0x65);
+						else
+							message = L"";
+						hud_print_message(
+							unit_get_local_player_index(unit_player->unit_index),
+							message);
+					}
 					return;
 				}
-
-				game_engine_teleport_message_ticks = 120;
-				{
-					long string_list_index =
-						tag_loaded('ustr', "ui\\multiplayer_game_text");
-					wchar_t const *message;
-
-					if (string_list_index != NONE)
-						message = unicode_string_list_get_string(
-							string_list_index,
-							0x65);
-					else
-						message = L"";
-					hud_print_message(
-						unit_get_local_player_index(unit_player->unit_index),
-						message);
-				}
-				return;
 			}
 		}
 
@@ -3865,7 +3868,7 @@ void game_engine_update(
 				}
 			}
 
-			code_0009bdf0(iterator.data.datum_index);
+			game_engine_update_teleporter(iterator.data.datum_index);
 
 			if (game_engine->player_update_each_tick)
 			{
