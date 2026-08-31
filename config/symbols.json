@@ -22437,7 +22437,7 @@
 { "file_offset": 4445580, "flags": 0, "name": "_bss_0043d58c" },
 { "file_offset": 4445584, "flags": 0, "name": "_bss_0043d590" },
 { "file_offset": 4446216, "flags": 0, "name": "_bss_0043d808" },
-{ "file_offset": 4449420, "flags": 0, "name": "_bss_0043e48c" },
+{ "file_offset": 4449420, "flags": 0, "name": "_game_globals" },
 { "file_offset": 4449424, "flags": 0, "name": "_bss_0043e490" },
 { "file_offset": 4449432, "flags": 0, "name": "_global_goal" },
 { "file_offset": 4450456, "flags": 0, "name": "_global_variant" },

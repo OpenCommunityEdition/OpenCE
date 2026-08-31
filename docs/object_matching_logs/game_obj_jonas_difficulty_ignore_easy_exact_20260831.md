@@ -31,7 +31,7 @@ semantic evidence.  January's split COFF is the byte authority.  Its body
 loads the owned runtime-global pointer, reads the signed 16-bit difficulty at
 `+0x0E`, clamps values at or below Normal (`1`) to Normal, and returns.  The
 single relocation at `+0x01` is the typed external runtime-global owner
-`_bss_0043e48c`; no address literal or invented data owner is introduced.
+`_game_globals`; no address literal or anonymous address owner is retained.
 
 The owner header already established a `short` difficulty contract.  That is
 also consistent with the field's existing offset assertions in `game.c` and
@@ -74,3 +74,11 @@ separate cross-translation-unit prototype.
   470 units, 5,001 functions evaluated, 4,890 accepted exact, and zero unit
   errors;
 - tool tests and `git diff --check`: recorded after the retained-source replay.
+
+## Canonical naming correction
+
+The integration review rejected the agent branch's direct use of
+`bss_0043e48c`. Existing assertions and the typed runtime prefix support the
+descriptive external pointer name `game_globals`. Canonical source and
+`config/symbols.json` now use that name directly, with no address alias macro;
+all five affected exact accessors were rebuilt after the rename.

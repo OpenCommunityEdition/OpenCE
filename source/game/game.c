@@ -111,7 +111,7 @@ symbols in this file:
 002DDDB0 0608:
 	_global_game_difficulty_level_names (0000)
 0043E48C 0004:
-	_bss_0043e48c (0000)
+	_game_globals (0000)
 */
 
 struct game_options;
@@ -128,8 +128,6 @@ struct game_options;
 /* ---------- constants */
 
 /* ---------- macros */
-
-#define game_globals bss_0043e48c
 
 /* ---------- structures */
 
@@ -346,7 +344,7 @@ void numeric_countdown_timer_update(
 
 /* ---------- globals */
 
-extern struct game_runtime_globals_prefix *bss_0043e48c;
+extern struct game_runtime_globals_prefix *game_globals;
 extern struct game_variant game_variant_global;
 extern struct data_array *player_data;
 extern short player_spawn_count;
@@ -379,7 +377,7 @@ void game_initial_pulse(
 void game_set_players_are_double_speed(
 	boolean players_are_double_speed)
 {
-	bss_0043e48c->players_are_double_speed = players_are_double_speed;
+	game_globals->players_are_double_speed = players_are_double_speed;
 
 	return;
 }
@@ -387,13 +385,13 @@ void game_set_players_are_double_speed(
 boolean game_players_are_double_speed(
 	void)
 {
-	return bss_0043e48c->players_are_double_speed;
+	return game_globals->players_are_double_speed;
 }
 
 void game_difficulty_level_set(
 	short difficulty)
 {
-	bss_0043e48c->options.difficulty = difficulty;
+	game_globals->options.difficulty = difficulty;
 
 	return;
 }
@@ -401,13 +399,13 @@ void game_difficulty_level_set(
 short game_difficulty_level_get(
 	void)
 {
-	return bss_0043e48c->options.difficulty;
+	return game_globals->options.difficulty;
 }
 
 short game_difficulty_level_get_ignore_easy(
 	void)
 {
-	short difficulty = bss_0043e48c->options.difficulty;
+	short difficulty = game_globals->options.difficulty;
 
 	return difficulty > _game_difficulty_level_normal ? difficulty : _game_difficulty_level_normal;
 }
