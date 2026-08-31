@@ -10,6 +10,7 @@ stock-XDK owner evidence exposed their address-placeholder premise as false.
 Three assembly implementations now remain parked: `stristr` and two Particles
 functions.
 
+
 ## The standing rule
 
 The campaign rule is *no asm, no volatile, no casts intended to alter codegen,
@@ -23,11 +24,13 @@ is not a defence here; only reading the source is.
 
 ## Historical inventory at discovery
 
-Seven functions contain whole-body or naked `__asm` and compare
+Nine functions contained inline, whole-body, or naked `__asm` and compared
 `EXACT` by `section_infos_equal`:
 
 | unit | function | asm blocks | kind |
 |---|---|---|---|
+| `ai/action_converse` | `action_converse_perform` | 3 | inline, inside C |
+| `camera/director` | `director_initialize_for_new_map` | 8 | inline, inside C |
 | `cseries/cseries` | `stristr` | 1 | whole body |
 | `effects/particles` | `code_0008fcd0` | 1 | whole body |
 | `effects/particles` | `code_0008ff30` | 1 | whole body |
@@ -58,7 +61,8 @@ function has no C body at all.
 
 The inline cases (`action_converse_perform`, `director_initialize_for_new_map`)
 were the subtler risk, because each function read as C at a glance while the
-assembly was buried mid-body. Both are now ordinary fuzzy C. The remaining
+assembly was buried mid-body. Both are now ordinary C: Action Converse remains
+an honest fuzzy park, while Director new-map is strict exact. The remaining
 inventory is visibly whole-body assembly.
 
 ## Initial resolution (owner chose: park them)
@@ -105,21 +109,24 @@ remaining 64-byte accessor, whose original name was unavailable, is named
 static helper.
 
 The former transcription was 208 padded bytes with 19 relocations and matched
-January by construction. The ordinary-C candidate is 128 padded bytes with ten
-relocations and an objdiff fuzzy score of 55.460316%. All 13 inherited sibling
-exact functions remain strict exact. In addition, `director_get` now gates its
-64 padded bytes and five relocations exact and inlines naturally into its
-callers. Thus the invalid assembly-backed exact owner was replaced in the count
-by a genuine ordinary-C exact helper. January also inlined the 80-byte
-`director_choose_camera` wrapper and propagated the private conventions of its
-callees, whose definitions are still missing from this translation unit. The
-source deliberately retains that natural wrapper call instead of manually
-reproducing its inline schedule.
+January by construction. The first ordinary-C checkpoint was an honest
+128-byte/ten-relocation residual because the private camera-selection callees
+were still absent. Defining the authenticated private helper cluster as
+ordinary `static` C restored the original translation-unit context naturally:
+`director_set_camera`, `director_initialize_variables`,
+`director_rotate_cameras`, `director_choose_game_perspective`,
+`director_choose_camera_game`, `director_choose_camera_editor`,
+`director_choose_camera_script_camera_record`, and `director_choose_camera`
+all compare strict exact. VC7 again inlines the 80-byte wrapper into the
+new-map loop without an inline directive, and
+`director_initialize_for_new_map` now reproduces the target's 208 padded bytes,
+19 relocations, and normalized SHA-256
+`70b72e43999f76618be8ead0ece3d3a9facba546b477b5245a1f0d2f88e9c6c6`.
 
-Accordingly, the function remains parked, but its class is now
-`tu-context-optimization`. Reopen it only when ordinary-C definitions for the
-named private helper cluster can restore the original VC7 translation-unit
-context naturally. Full measurements and provenance are recorded in
+The Director park is therefore removed. No assembly, raw emission, volatile or
+register forcing, optimizer directive, fabricated branch, direct structure
+offset, or byte patch was used, and the January inline schedule still emits no
+`point_from_line3d` COMDAT. Full measurements and provenance are recorded in
 `docs/object_matching_logs/director_obj_jonas_ordinary_c_credibility_recovery_20260830.md`.
 
 ## Ordinary-C recovery: object shadows

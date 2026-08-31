@@ -135,25 +135,6 @@
       }
     },
     {
-      "unit": "source/camera/director",
-      "function": "_director_initialize_for_new_map",
-      "class": "tu-context-optimization",
-      "evidence": "The 2026-08-30 source-credibility audit removed all eight hand-transcribed assembly blocks, including the raw '_emit 07ch / _emit 006h' branch bytes, register staging, direct structure offsets, helper-call setup, and pointer walk. The retained ordinary C is the coherent source-level routine corroborated independently by the January CFG/data offsets, HCEA, and the stianeklund/pastudan trees: choose game versus editor mode, clear initialize_camera, reset each player's camera-change/bored state, then call director_choose_camera(local_player_index, TRUE, FALSE) and director_initialize_variables(local_player_index). The typed static director_get accessor was recovered separately and now gates 64 padded bytes and five relocations exact while inlining naturally into the inherited exact callers. The camera-selection wrapper call is deliberately not manually inlined. January's 208-byte new-map function shows VC7 also inlined the 80-byte director_choose_camera wrapper and propagated the private conventions of its still-missing callees, so the honest form emits 128 padded bytes and ten relocations instead of reproducing that unavailable optimization context. No asm, raw emission, volatile/register forcing, undefined behavior, optimizer directive, synthetic branch, or byte patch remains. Reopen only with ordinary-C definitions for the remaining named director helper cluster so VC7 can recover the original private conventions and inlining naturally.",
-      "measurements": {
-        "target": {
-          "size": 208,
-          "relocation_count": 19,
-          "normalized_sha256": "70b72e43999f76618be8ead0ece3d3a9facba546b477b5245a1f0d2f88e9c6c6"
-        },
-        "base": {
-          "size": 128,
-          "relocation_count": 10,
-          "normalized_sha256": "5b1d60ea43cdd981bff2360af7d12b07702fc9dc2e763aa4b5648ff28ae5d459"
-        },
-        "objdiff_percent": 55.460316
-      }
-    },
-    {
       "unit": "source/cseries/cseries",
       "function": "_stristr",
       "class": "asm-implemented",
