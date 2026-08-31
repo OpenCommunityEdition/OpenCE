@@ -139,14 +139,48 @@ copying through a named pointer, that pointer scoped to an inner block,
 declaring `v2` before the integer locals, and both combined. Naming the
 packed value in a local regresses to 528 bytes.
 
+## `_uncompress_int32_to_real_vector3d`: 2 instructions, parked
+
+144/144 padded bytes, 9/9 relocations with identical destinations, 49/49
+instructions. One dependency-free transposition remains: January emits
+`fadd __real@3f800000` before `shl eax, 0x16`; ours emits them swapped,
+which also shifts that relocation's address by three bytes.
+
+The shape that fixed the frame was **a local `real_vector3d` copied out
+through `*result`**, not three scalar `real`s — `sub esp, 0xc` is the
+vector, and naming three scalars lets VC7 fold them away entirely (112
+bytes). Fields are 11/11/10 bits with `2^-20`/`2^-21` pre-scales and
+`1/2047`/`1/1023` scales, reached by *destructive* shifts (`compressed >>=
+11`) so the `shr` sequence matches rather than collapsing into masks.
+
+Measured inert: folding the second shift into the k expression, long-hand
+assignment, hoisting the shift ahead of j, a division form of the k scale.
+
+## Parked
+
+Three functions are parked as `instruction-scheduling` ties, each meeting
+the parking standard — exact padded size, exact relocation count and
+destinations, full instruction-count parity, one precisely classified
+divergence, and an exhausted control set recorded in the entry:
+
+| function | bytes | insns | divergence | fuzzy |
+| --- | ---: | ---: | --- | ---: |
+| `_uncompress_int32_to_real_vector3d` | 144/144 | 49/49 | one `fadd`/`shl` transposition | 95.0 |
+| `_compress_real_vector3d_to_int32` | 544/544 | 181/181 | round-trip copy grouped vs interleaved | 96.35 |
+| `_compress_real_vector3d_to_int32_clamp` | 512/512 | 164/164 | same as its twin | 94.8 |
+
+The build gates on parked evidence, so these fail closed if they drift.
+
 ## Remaining
 
-`_rasterizer_geometry_get_vertex_size` (enum, above),
-`_uncompress_int32_to_real_vector3d` (144),
-`_compress_real_vector3d_to_int32` (544),
-`_compress_real_vector3d_to_int32_clamp` (512),
-`_rasterizer_geometry_compress_vertices` (736),
-`_rasterizer_geometry_uncompress_vertices` (1088).
+Two functions are still unwritten:
+`_rasterizer_geometry_compress_vertices` (736) and
+`_rasterizer_geometry_uncompress_vertices` (1088). Both are the bulk
+converters that drive the compress/uncompress helpers now in place, so they
+should be attempted with those as fixed points.
+
+Object state: **14/19 strict exact, 3 parked, 2 unwritten** (from 9/19 at
+the start of the session).
 
 The two `compress_real_vector3d_to_int32` functions are the natural next
 targets: they are the vector form of the four landed here and will use the
