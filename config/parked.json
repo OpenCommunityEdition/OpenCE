@@ -446,6 +446,44 @@
       }
     },
     {
+      "unit": "libs/libcmt/stream",
+      "function": "__getstream",
+      "class": "unclassified",
+      "evidence": "The retained source is the coherent VC7 CRT stream-pool scan under the CRT's /O1 /Gy recipe. Target and base have the same 290-byte text and the same resolved SEH funclet destination, but the base carries 21 relocations while January carries 22: the local call is encoded directly instead of through a compiler-generated relocation against __getstream plus an addend. This is not semantically credited because a relocation entry is absent, even though masking relocation fields makes the bytes identical. Sixteen compiler-flag variants and three locally distinct VC7 suites reproduce the same compiler-internal SEH-label choice. No assembly, volatile access, fake dependency, dead branch, or compiler-control source shaping is retained. Reopen only for authentic CRT source/compiler provenance or a natural source lever that emits the missing relocation.",
+      "measurements": {
+        "target": {
+          "size": 290,
+          "relocation_count": 22,
+          "normalized_sha256": "0d80b800690d9a29528f639890684a4686fb466026ab9f3a09f7b15eaf8e1fb6"
+        },
+        "base": {
+          "size": 290,
+          "relocation_count": 21,
+          "normalized_sha256": "54fc2e036b80bd063638e338df7ee32d35e3822bfd05126fc3c966f367aefec9"
+        },
+        "objdiff_percent": 100.0
+      }
+    },
+    {
+      "unit": "libs/libcmt/woutput",
+      "function": "__woutput",
+      "class": "register-allocation",
+      "evidence": "The retained output.c is coherent VC7 CRT wide-printf source compiled through the authentic thin woutput.c wrapper. Five private helpers are strict exact under their conventional CRT names. The remaining __woutput residual has the target's 30 relocation entries and is 1928 versus 1932 bytes. Alignment isolates a stack-slot-colouring/register-residency fixed point: January shares radix with textlen while this compiler shares radix with text, with related zero/register materialization differences. Declaration, live-range, type, statement-order, and supported-flag experiments do not move the result naturally; three distinct local VC7 suites emit the same candidate. No volatile access, assembly, fake dependency, nonsensical branch, or artificial compiler steering is retained. Reopen only for authentic CRT source/local-lifetime evidence or a naturally semantic same-compiler donor.",
+      "measurements": {
+        "target": {
+          "size": 1932,
+          "relocation_count": 30,
+          "normalized_sha256": "c502f6356f6b521fad46d3e5ce24dbf72ffb973bd74e5037c4e196d9554bf618"
+        },
+        "base": {
+          "size": 1928,
+          "relocation_count": 30,
+          "normalized_sha256": "cd33ec1e195055aa1d208d36af2b16a1eb0906833ea06c483574bd52d6ebf716"
+        },
+        "objdiff_percent": 95.571915
+      }
+    },
+    {
       "unit": "source/math/matrix_math",
       "function": "_matrix4x3_multiply",
       "class": "asm-implemented",
