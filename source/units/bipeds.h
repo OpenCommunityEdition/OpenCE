@@ -88,6 +88,8 @@ void biped_reset(
 	long biped_index);
 boolean biped_flying_through_air(
 	long biped_index);
+void biped_export_function_values(
+	long biped_index);
 
 void biped_get_sight_position(
 	long biped_index,

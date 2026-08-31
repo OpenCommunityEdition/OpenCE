@@ -214,8 +214,6 @@ void biped_delete(
 	long object_index);
 boolean biped_update(
 	long object_index);
-void biped_export_function_values(
-	long object_index);
 void biped_preprocess_node_orientations(
 	long object_index,
 	struct real_orientation *node_orientations);

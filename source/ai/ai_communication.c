@@ -586,7 +586,6 @@ enum
 	_actor_mode_alert = 2,
 	_actor_mode_combat = 3,
 	_actor_combat_status_certain = 4,
-	_unit_speech_idle = 1,
 	_ai_information_none = 0,
 	_ai_information_look_unit = 1,
 	_ai_information_look_object = 2,

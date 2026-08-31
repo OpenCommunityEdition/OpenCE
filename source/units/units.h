@@ -19,6 +19,22 @@ enum
 	NUMBER_OF_UNIT_USER_ANIMATIONS = 2,
 };
 
+enum unit_speech_priority
+{
+	_unit_speech_none = 0,
+	_unit_speech_idle,
+	_unit_speech_pain,
+	_unit_speech_talk,
+	_unit_speech_communicate,
+	_unit_speech_shout,
+	_unit_speech_scripted,
+	_unit_speech_involuntary,
+	_unit_speech_exclamation,
+	_unit_speech_scream,
+	_unit_speech_death,
+	NUMBER_OF_UNIT_SPEECH_PRIORITIES,
+};
+
 enum unit_nearby_seat_result
 {
 	_unit_nearby_seat_none = 0,
@@ -588,7 +604,7 @@ void unit_destroy(
 void unit_died(long unit_index, boolean feigned);
 void unit_get_head_position(long unit_index, union real_point3d *head_position);
 char const *unit_get_speech_priority_name(
-	word priority);
+	short priority);
 char const *unit_describe_speech(
 	long unit_index,
 	boolean abbreviated,

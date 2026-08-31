@@ -88,12 +88,56 @@ symbols in this file:
 
 /* ---------- globals */
 
+char const *global_speech_priority_names[NUMBER_OF_UNIT_SPEECH_PRIORITIES] =
+{
+	"none",
+	"idle",
+	"pain",
+	"talk",
+	"communicate",
+	"shout",
+	"script",
+	"involuntary",
+	"exclaim",
+	"scream",
+	"death",
+};
+
 /* ---------- public code */
 
 boolean unit_is_speaking(
 	long unit_index)
 {
 	return unit_get(unit_index)->unit.speech.current.priority > 0;
+}
+
+char const *unit_get_speech_priority_name(
+	short priority)
+{
+	char const *name = "<error>";
+
+	if (priority >= _unit_speech_none && priority < NUMBER_OF_UNIT_SPEECH_PRIORITIES)
+		name = global_speech_priority_names[priority];
+
+	return name;
+}
+
+short unit_get_speech_priority_by_name(
+	char const *name)
+{
+	short result = _unit_speech_none;
+	short priority;
+
+	for (priority = _unit_speech_none; priority < NUMBER_OF_UNIT_SPEECH_PRIORITIES; priority++)
+	{
+		if (csstrcmp(global_speech_priority_names[priority], name) == 0)
+		{
+			result = priority;
+			break;
+		}
+	}
+
+	return result;
 }
 
 /* ---------- private code */

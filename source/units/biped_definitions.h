@@ -38,6 +38,12 @@ enum
 	NUMBER_OF_BIPED_DEFINITION_FLAGS,
 };
 
+enum
+{
+	_biped_function_none = 0,
+	_biped_function_flying_speed,
+};
+
 /* ---------- macros */
 
 #define biped_definition_get(index) ((struct biped_definition *)tag_get(BIPED_DEFINITION_TAG, (index)))

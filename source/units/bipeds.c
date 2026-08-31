@@ -366,6 +366,37 @@ boolean biped_flying_through_air(
 		TEST_FLAG(biped->object.damage_flags, _object_dead_bit));
 }
 
+void biped_export_function_values(
+	long biped_index)
+{
+	struct biped_datum *biped = biped_get(biped_index);
+	struct biped_definition *biped_definition = biped_definition_get(biped->definition_index);
+	real *function_values = biped->object.incoming_function_values;
+	short *function_modes = biped_definition->biped.function_modes;
+	long function_index;
+
+	for (function_index = NUMBER_OF_INCOMING_OBJECT_FUNCTIONS; function_index; --function_index, ++function_modes, ++function_values)
+	{
+		if (*function_modes != _biped_function_none)
+		{
+			real function_value = 0.0f;
+
+			switch (*function_modes)
+			{
+			case _biped_function_flying_speed:
+				function_value = magnitude3d(&biped->object.translational_velocity) /
+					(biped_definition->biped.flying_velocity / (real) TICKS_PER_SECOND);
+				function_value = PIN(function_value, 0.0f, 1.0f);
+				break;
+			}
+
+			*function_values = function_value;
+		}
+	}
+
+	return;
+}
+
 void biped_build_flying_axes(
 	real_vector3d const *forward_vector,
 	real_vector3d *left_vector,
