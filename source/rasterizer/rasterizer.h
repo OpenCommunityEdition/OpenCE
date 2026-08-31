@@ -582,6 +582,11 @@ void rasterizer_widget_submit_occlusion_test(
 long rasterizer_widget_get_occlusion_test_result(
 	long handle);
 
+/* ---------- prototypes/RASTERIZER_XBOX_ACTIVE_CAMOUFLAGE.C */
+
+void rasterizer_active_camouflage_set_visibility(
+	boolean visibility);
+
 /* ---------- prototypes/RASTERIZER_TEXT.C */
 
 void rasterizer_draw_string(union rectangle2d const *bounds, union rectangle2d const *clip, union point2d *cursor_reference, short height_adjust, char const *string);

@@ -1,22 +1,26 @@
 # Audit: functions credited byte-exact that are implemented in assembly
 
 Found incidentally 2026-08-16 while reading `source/camera/director.c` for an
-unrelated reconstruction. The audit is now resolved by parking the affected
-functions so assembly transcriptions are not credited as C reconstructions.
-`object_shadows.code_0012b870` was subsequently recovered in ordinary C and
-removed from the parked inventory on 2026-08-29.
+unrelated reconstruction. The initial audit parked the affected functions so
+assembly transcriptions were not credited as C reconstructions. Subsequent
+source-credibility work recovered `object_shadows.code_0012b870` and
+`action_converse_perform` in ordinary C. On 2026-08-30 the four Active
+Camouflage transcriptions were deleted after stock-XDK owner evidence exposed
+their address-placeholder premise as false. Four assembly implementations now
+remain parked: Director, `stristr`, and two Particles functions.
 
 ## The standing rule
 
 The campaign rule is *no asm, no volatile, no casts intended to alter codegen,
 no byte-forcing, readable code only* — and, separately, *never credit anything
-that is not byte-identical*. The second rule is being honoured. The first is
-not, in nine functions across five units, and the two interact badly: an assembly transcription will
-always be byte-identical, so the strict comparator cannot distinguish a genuine
-C reconstruction from a transcribed listing. The gate is not a defence here;
-only reading the source is.
+that is not byte-identical*. At discovery, the first rule was violated in nine
+functions across five units, and the two rules interacted badly: an assembly
+transcription will always be byte-identical, so the strict comparator cannot
+distinguish a genuine C recovery from a transcribed listing. Four such
+implementations remain, explicitly parked and excluded from credit. The gate
+is not a defence here; only reading the source is.
 
-## Inventory
+## Historical inventory at discovery
 
 Nine functions contain inline or naked `__asm` and compare
 `EXACT` by `section_infos_equal`:
@@ -51,17 +55,18 @@ in bx". That is a transcription of January's listing, not a reconstruction of
 January's source. It will never stop matching, and it teaches the project
 nothing about what the original C looked like.
 
-The `__declspec(naked)` cases are unambiguous by construction: a naked function
-has no C body at all.
+The former `__declspec(naked)` cases were unambiguous by construction: a naked
+function has no C body at all.
 
 The inline cases (`action_converse_perform`, `director_initialize_for_new_map`)
-are the subtler risk, because the function reads as C at a glance and the asm is
-buried mid-body.
+were the subtler risk, because the function reads as C at a glance and the asm
+is buried mid-body. Action Converse is now ordinary fuzzy C;
+`director_initialize_for_new_map` remains parked assembly.
 
-## Resolution (owner chose: park them)
+## Initial resolution (owner chose: park them)
 
-All nine remaining functions are parked in `config/parked.json` under a new class
-**`asm-implemented`**, so they no longer count as C reconstructions.
+All nine functions were initially parked in `config/parked.json` under a new
+class **`asm-implemented`**, so they no longer counted as C reconstructions.
 
 Parking these required a deliberate change to `tools/parked_functions.py`,
 because the manifest was built for the opposite case. Its validator rejects any
@@ -105,37 +110,36 @@ Unparking one means replacing its `__asm` with C that gates exact.
 
 ## Recovery attempt, 2026-08-16 (stristr + the four naked thunks)
 
-Attempted after parking. **Nothing was changed** — replacing a working asm body
-with non-matching C would trade a byte-exact function for a residual, which is
-not a recovery.
+At that point, **nothing was changed**: replacing a working asm body with
+non-matching C would have traded a byte-exact function for a residual. The
+Active Camouflage conclusion was later invalidated by the owner recovery below;
+those four bodies are now deleted rather than preserved as fake exact source.
 
-### The four `active_camouflage` thunks are provably not expressible in C
+### Correction, 2026-08-30: the four `active_camouflage` owners are stock XDK wrappers
 
-Their bodies are e.g. `push eax; push ecx; push edx; call
-D3DDevice_SetVertexShaderConstant@12; xor eax,eax; ret 4`. Two facts together
-rule out every C calling convention:
+The earlier calling-convention proof is withdrawn. It treated csplit's
+`_code_00148dd0` through `_code_00148e00` address placeholders as original
+symbol names. They were not. The target bodies, relocation destinations, and
+contiguous family match the stock XDK 3911 `D3DINLINE` owners exactly:
 
-* the argument registers are **live on entry** (`push eax` with no preceding
-  load), so the arguments arrive in registers, and
-* the symbol is **`_code_00148e00`** — plain leading-underscore, i.e. `__cdecl`
-  decoration — while the body does **`ret 4`**, i.e. callee cleanup.
-
-Measured: compiling the same body as `__stdcall` emits the symbol as
-`_code_00148e00@4`, so it no longer matches the target's name at all.
-
-| convention | symbol | cleanup |
+| Former placeholder | Correct owner | Callee |
 |---|---|---|
-| `__cdecl` | `_name` | caller (`ret`) |
-| `__stdcall` | `_name@4` | callee (`ret 4`) |
-| `__fastcall` | `@name@4` | callee (`ret 4`) |
-| **target** | **`_name`** | **callee (`ret 4`)** |
+| `_code_00148dd0` | `_IDirect3DDevice8_SetVertexShaderConstant@16` | `_D3DDevice_SetVertexShaderConstant@12` |
+| `_code_00148de0` | `_IDirect3DDevice8_SetVertexData2s@16` | `_D3DDevice_SetVertexData2s@12` |
+| `_code_00148df0` | `_IDirect3DDevice8_Begin@8` | `_D3DDevice_Begin@4` |
+| `_code_00148e00` | `_IDirect3DDevice8_End@4` | `_D3DDevice_End@0` |
 
-No standard convention produces the target's pair. The only C route is VC7's
-private convention for a `static` with in-TU call sites — and these four have
-**no references anywhere in the tree**, so an unreferenced static would simply be
-eliminated (measured earlier in
-`research/unwritten_frontier_recipe.md`). They stay parked, and the park is now
-backed by a proof rather than a judgement.
+Direct hardened comparison against the naturally emitted Motion Sensor donor
+proves exact padded bytes and relocation identity for all four. The corrected
+stdcall decorations also explain the target's `ret 4`; there is no impossible
+cdecl ABI. The adjacent 432-, 80-, 544-, and 96-byte sections independently
+match the XDK render-state and texture-stage-state wrapper family, confirming
+the source provenance and order.
+
+The naked handwritten copies and their four `asm-implemented` park entries
+were removed. Active Camouflage now leaves these target wrappers unwritten
+until the real typed Direct3D callers naturally instantiate them. No artificial
+emission anchor or stand-alone replacement is allowed.
 
 ### `stristr` is expressible in C but blocked on a spill preference
 
@@ -208,7 +212,7 @@ character and the loop character, `long`/`unsigned long`/`const long` for the
 length, assignment inside the `while` condition, comparing `*haystack` before
 incrementing, and computing the length before the guard.
 
-## Options considered (superseded by the above)
+## Historical options considered
 
 These are the same shape as the existing `matrix4x3_multiply` **vendored-asm
 park**, which the project already treats as *not* a real match. The consistent
@@ -224,8 +228,12 @@ options are:
    so the headline "N functions byte-exact" is not read as "N functions
    reconstructed in C".
 
-Option 1 is the chosen current state. Individual entries can move to option 2
-only after a C implementation passes the strict gate.
+Option 1 was the initial blanket decision. It remains the current state for
+Director, `stristr`, and the two Particles owners. Object Shadows moved to
+option 2 with strict-exact ordinary C; Action Converse moved to honest fuzzy C;
+and the Active Camouflage placeholders were exposed as misnamed stock-XDK
+owners, so their transcriptions and obsolete parks were deleted. Future moves
+must preserve this distinction between exact evidence and credible source.
 
 ## Not affected
 

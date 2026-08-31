@@ -5,23 +5,23 @@ symbols in this file:
 001488C0 0070:
 	_real_alpha_to_pixel32 (0000)
 00148930 01b0:
-	_code_00148930 (0000)
+	_D3DDevice_SetRenderState (0000)
 00148AE0 0050:
-	_code_00148ae0 (0000)
+	_D3DDevice_SetTextureStageState (0000)
 00148B30 0020:
 	_rasterizer_active_camouflage_set_visibility (0000)
 00148B50 0220:
-	_code_00148b50 (0000)
+	_IDirect3DDevice8_SetRenderState@12 (0000)
 00148D70 0060:
-	_code_00148d70 (0000)
+	_IDirect3DDevice8_SetTextureStageState@16 (0000)
 00148DD0 0010:
-	_code_00148dd0 (0000)
+	_IDirect3DDevice8_SetVertexShaderConstant@16 (0000)
 00148DE0 0010:
-	_code_00148de0 (0000)
+	_IDirect3DDevice8_SetVertexData2s@16 (0000)
 00148DF0 0010:
-	_code_00148df0 (0000)
+	_IDirect3DDevice8_Begin@8 (0000)
 00148E00 0010:
-	_code_00148e00 (0000)
+	_IDirect3DDevice8_End@4 (0000)
 00148E10 0340:
 	_rasterizer_active_camouflage_cache_primary_render_target (0000)
 00149150 07e0:
@@ -43,12 +43,15 @@ symbols in this file:
 0028DBE0 000e:
 	??_C@_0O@KHNLKNGC@group?9?$DOshader?$AA@ (0000)
 0045E8E0 0006:
-	_bss_0045e8e0 (0000)
+	_local_active_camouflage_visibility_flag (0000)
+	_local_active_camouflage_debug_cached_flag (0001)
+	_local_active_camouflage_debug_cache_count (0004)
 */
 
 /* ---------- headers */
 
 #include "cseries.h"
+#include "rasterizer/rasterizer.h"
 
 #include <xtl.h>
 
@@ -58,105 +61,28 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct rasterizer_active_camouflage_visibility_globals
-{
-	boolean visible_for_frame;
-	boolean visible_for_window;
-	word pad;
-	word state;
-};
-
-typedef char verify_rasterizer_active_camouflage_visibility_globals_size[
-	sizeof(struct rasterizer_active_camouflage_visibility_globals) == 6 ? 1 : -1];
-typedef char verify_rasterizer_active_camouflage_visible_for_frame_offset[
-	offsetof(
-		struct rasterizer_active_camouflage_visibility_globals,
-		visible_for_frame) == 0 ? 1 : -1];
-typedef char verify_rasterizer_active_camouflage_visible_for_window_offset[
-	offsetof(
-		struct rasterizer_active_camouflage_visibility_globals,
-		visible_for_window) == 1 ? 1 : -1];
-typedef char verify_rasterizer_active_camouflage_state_offset[
-	offsetof(
-		struct rasterizer_active_camouflage_visibility_globals,
-		state) == 4 ? 1 : -1];
-
 /* ---------- prototypes */
 
 /* ---------- globals */
 
-struct rasterizer_active_camouflage_visibility_globals bss_0045e8e0 = { 0 };
+boolean local_active_camouflage_visibility_flag = FALSE;
+boolean local_active_camouflage_debug_cached_flag = FALSE;
+short local_active_camouflage_debug_cache_count = 0;
 
 /* ---------- public code */
 
 void rasterizer_active_camouflage_set_visibility(
 	boolean visibility)
 {
-	bss_0045e8e0.visible_for_frame = visibility;
+	local_active_camouflage_visibility_flag = visibility;
 
 	if (!visibility)
 	{
-		bss_0045e8e0.state = 0;
-		bss_0045e8e0.visible_for_window = FALSE;
+		local_active_camouflage_debug_cache_count = 0;
+		local_active_camouflage_debug_cached_flag = FALSE;
 	}
 
 	return;
-}
-
-/*
-These are custom-ABI callback thunks. D3D arguments arrive in registers and a
-dispatcher-owned stack word is consumed by the return instruction.
-*/
-
-__declspec(naked) long code_00148dd0(
-	void)
-{
-	__asm
-	{
-		push eax
-		push ecx
-		push edx
-		call D3DDevice_SetVertexShaderConstant
-		xor eax, eax
-		ret 4
-	}
-}
-
-__declspec(naked) long code_00148de0(
-	void)
-{
-	__asm
-	{
-		push eax
-		push ecx
-		push edx
-		call D3DDevice_SetVertexData2s
-		xor eax, eax
-		ret 4
-	}
-}
-
-__declspec(naked) long code_00148df0(
-	void)
-{
-	__asm
-	{
-		push eax
-		call D3DDevice_Begin
-		xor eax, eax
-		ret 4
-	}
-}
-
-__declspec(naked) long code_00148e00(
-	void)
-{
-	__asm
-	{
-		call D3DDevice_End
-		xor eax, eax
-		ret 4
-	}
 }
 
 /* ---------- private code */

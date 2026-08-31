@@ -1,5 +1,11 @@
 # `rasterizer_xbox_active_camouflage.obj` visibility recovery
 
+> Superseded state note (2026-08-30): the visibility implementation remains
+> exact, but the four handwritten assembly wrappers described below were
+> removed and their stock-XDK identities recovered. The BSS placeholder was
+> also replaced by three authenticated global names. See
+> `rasterizer_xbox_active_camouflage_obj_jonas_credibility_recovery_20260830.md`.
+
 ## Result
 
 `_rasterizer_active_camouflage_set_visibility` is strict semantic-COFF exact,

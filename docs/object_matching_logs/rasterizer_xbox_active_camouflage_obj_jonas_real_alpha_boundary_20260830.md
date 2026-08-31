@@ -1,5 +1,10 @@
 # `rasterizer_xbox_active_camouflage.obj` real-alpha one-shot boundary (2026-08-30)
 
+> Superseded state note: the real-alpha disposition remains unchanged, but a
+> later 2026-08-30 credibility audit removed the four inherited naked-assembly
+> transcriptions. See
+> `rasterizer_xbox_active_camouflage_obj_jonas_credibility_recovery_20260830.md`.
+
 ## Result
 
 `_real_alpha_to_pixel32` remains unwritten.  The only production candidate
