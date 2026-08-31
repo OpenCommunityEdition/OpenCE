@@ -53,13 +53,6 @@ void ai_communication_event(
 void actor_pursuit_find_nearby_actors(
 	long actor_index,
 	boolean pursuit_is_coordinator);
-boolean actor_move_to_prop(
-	long actor_index,
-	long prop_index,
-	real distance);
-void actor_move_halt(
-	long actor_index);
-
 /* ---------- globals */
 
 /* ---------- public code */

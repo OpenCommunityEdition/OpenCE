@@ -90,9 +90,6 @@ boolean actor_nearby_firing_positions(
 real actor_destination_tolerance(
 	long actor_index);
 
-void actor_move_halt(
-	long actor_index);
-
 long actor_active_select_firing_position(
 	long actor_index,
 	struct firing_position_search_definition *search,

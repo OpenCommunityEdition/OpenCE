@@ -571,12 +571,6 @@ void encounter_actor_iterator_new(
 struct actor_datum *encounter_actor_iterator_next(
 	struct actions_encounter_actor_iterator *iterator);
 
-long prop_get_base_by_unit_index(
-	long actor_index,
-	long unit_index,
-	boolean create_if_missing,
-	boolean update_status);
-
 boolean actor_action_test_grenade(
 	long actor_index);
 
