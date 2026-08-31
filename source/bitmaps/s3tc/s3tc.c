@@ -70,6 +70,31 @@ symbols in this file:
 
 /* ---------- private code */
 
+void DecodeBlockAlpha4(
+	struct s3tc_block_alpha4 *source,
+	struct s3tc_color colors[S3TC_BLOCK_PIXELS])
+{
+	long row;
+	long column;
+	word alpha;
+
+	DecodeBlockRGB(&source->rgb, colors);
+
+	for (row = 0; row < 4; ++row)
+	{
+		alpha = source->alpha_bitmap[row];
+
+		for (column = 0; column < 4; ++column)
+		{
+			colors[4 * row + column].rgba[S3TC_ALPHA] =
+				((alpha & 0xF) << 4) | (alpha & 0xF);
+			alpha >>= 4;
+		}
+	}
+
+	return;
+}
+
 void DecodeBlockAlpha3(
 	struct s3tc_block_alpha3 *source,
 	struct s3tc_color colors[S3TC_BLOCK_PIXELS])

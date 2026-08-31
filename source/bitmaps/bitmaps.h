@@ -39,6 +39,9 @@ void bitmap_quantitize(
 
 /* ---------- prototypes/BITMAP_UTILITIES.C */
 
+void bitmap_vector_map(
+	struct bitmap_data *bitmap);
+
 real real_rgb_color_brightness(union real_rgb_color const *color);
 
 union real_rgb_color *rgb_colors_interpolate(

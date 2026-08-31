@@ -372,6 +372,28 @@
       }
     },
     {
+      "unit": "source/sound/ima_adpcm",
+      "function": "_decompress_ima_adpcm_audio_data",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked after the historical source census and the focused statement/declaration-order experiments recorded in the two IMA ADPCM ledgers. The retained ordinary C implements the coherent Bungie IMA decompressor with the exact 416-byte padded envelope and the same two table destinations. January stores decremented input_data_size before materializing sample_count * 2, while VC7 schedules the materialization first; the resulting packet shifts the step-size-table relocations from +178/+275 to +181/+277. Attempts to perturb this schedule either did not move it or regressed the surrounding loop. No volatile access, barrier, pragma, inline assembly, fake dependency, dead branch, or manual byte logic is retained. Reopen only for authoritative source/local ordering or a natural same-compiler donor.",
+      "measurements": {
+        "target": { "size": 416, "relocation_count": 2, "normalized_sha256": "c308b60091d47921aeb30f63188ec5317c64aa9fa52b9e53721774ecd34176f9" },
+        "base": { "size": 416, "relocation_count": 2, "normalized_sha256": "92f27a5e493fd0e401a7ee0c7c823e3040bddfdd6100cccb5b4f673be630d882" },
+        "objdiff_percent": 80.8125
+      }
+    },
+    {
+      "unit": "source/math/periodic_functions",
+      "function": "@periodic_function_build_variable_period_x_table@4",
+      "class": "instruction-scheduling",
+      "evidence": "The retained ordinary C is the authenticated HCEA/Fable waveform-table reconstruction, uses the January-atlas __fastcall name and the shared cseries fast_ftol policy, and has the exact 256-byte envelope and all 18 relocation destinations. After 21 bounded natural-source experiments, only a two-instruction EDX/ECX ordering tie remains around the first cosine constant; artificial volatile, barrier, pragma, dead-dependency, inline-assembly, and compiler-control forms are rejected. The integration ledger records the donor history and negative controls. Reopen only for original January source or new same-compiler scheduling evidence.",
+      "measurements": {
+        "target": { "size": 256, "relocation_count": 18, "normalized_sha256": "802ef4da9736bcaf8a616c56d03ba3e9322b229ad4b3814c60909462d7ebacf3" },
+        "base": { "size": 256, "relocation_count": 18, "normalized_sha256": "af8e65f5d773f0fb1e635264e54d3e63fccee99c69b65364a72be56cdca323b4" },
+        "objdiff_percent": 91.233765
+      }
+    },
+    {
       "unit": "source/bitmaps/s3tc/s3tc",
       "function": "_DecodeBlockAlpha3__single_pixel",
       "class": "unclassified",

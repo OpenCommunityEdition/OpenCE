@@ -9,11 +9,11 @@ symbols in this file:
 000F9F30 0120:
 	_transition_function_evaluate (0000)
 000FA050 0100:
-	_code_000fa050 (0000)
+	@periodic_function_build_variable_period_x_table@4 (0000)
 000FA150 0130:
-	_code_000fa150 (0000)
+	_transition_function_build_table (0000)
 000FA280 02b0:
-	_code_000fa280 (0000)
+	_periodic_function_build_table (0000)
 000FA530 00c0:
 	_periodic_functions_initialize (0000)
 0027AC7C 000a:
@@ -81,17 +81,18 @@ symbols in this file:
 0027AE28 001d:
 	??_C@_0BN@IGAJMLPO@?$CBfunction_tables_initialized?$AA@ (0000)
 0030791C 0060:
-	_data_0030791c (0000)
+	_global_periodic_functions_enum_strings (0000)
 	_global_periodic_functions_enum (0030)
 	_global_transition_functions_enum (0054)
 004561BC 004c:
-	_bss_004561bc (0000)
+	_periodic_functions_globals (0000)
 */
 
 /* ---------- headers */
 
 #include "cseries.h"
 #include "periodic_functions.h"
+#include "tag_files/tag_groups.h"
 
 /* ---------- constants */
 
@@ -118,16 +119,16 @@ enum
 	PERIODIC_FUNCTION_TABLE_MASK = PERIODIC_FUNCTION_TABLE_SIZE-1,
 };
 
+enum
+{
+	SLIDE_PERIODIC_FUNCTION_FLAGS =
+		FLAG(_periodic_function_slide) |
+		FLAG(_periodic_function_slide_variable_period),
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
-
-struct tag_enum_definition
-{
-	long count;
-	char **names;
-	void *unused;
-};
 
 struct periodic_functions_globals
 {
@@ -139,13 +140,12 @@ struct periodic_functions_globals
 
 /* ---------- prototypes */
 
-static void code_000fa050(real *values);
-static void code_000fa150(byte *table, short function_type);
-void code_000fa280(short function_type, byte *table);
+static void __fastcall periodic_function_build_variable_period_x_table(real *values);
+static void transition_function_build_table(short function_type, byte *table);
 
 /* ---------- globals */
 
-char *data_0030791c[NUMBER_OF_PERIODIC_FUNCTIONS] =
+static char *global_periodic_functions_enum_strings[NUMBER_OF_PERIODIC_FUNCTIONS] =
 {
 	"one",
 	"zero",
@@ -164,11 +164,11 @@ char *data_0030791c[NUMBER_OF_PERIODIC_FUNCTIONS] =
 struct tag_enum_definition global_periodic_functions_enum =
 {
 	NUMBER_OF_PERIODIC_FUNCTIONS,
-	data_0030791c,
+	global_periodic_functions_enum_strings,
 	NULL,
 };
 
-static char *transition_function_names[NUMBER_OF_TRANSITION_FUNCTIONS] =
+static char *global_transition_functions_enum_strings[NUMBER_OF_TRANSITION_FUNCTIONS] =
 {
 	"linear",
 	"early",
@@ -181,11 +181,11 @@ static char *transition_function_names[NUMBER_OF_TRANSITION_FUNCTIONS] =
 struct tag_enum_definition global_transition_functions_enum =
 {
 	NUMBER_OF_TRANSITION_FUNCTIONS,
-	transition_function_names,
+	global_transition_functions_enum_strings,
 	NULL,
 };
 
-struct periodic_functions_globals bss_004561bc = { 0 };
+static struct periodic_functions_globals periodic_functions_globals = { 0 };
 
 /* ---------- public code */
 
@@ -194,14 +194,14 @@ void periodic_functions_dispose(
 {
 	short function_index;
 
-	if (bss_004561bc.function_tables_initialized)
+	if (periodic_functions_globals.function_tables_initialized)
 	{
 		for (function_index = 0; function_index < NUMBER_OF_PERIODIC_FUNCTIONS; function_index++)
 		{
 			match_free(
 				"c:\\halo\\SOURCE\\math\\periodic_functions.c",
 				122,
-				bss_004561bc.periodic_function_tables[function_index]);
+				periodic_functions_globals.periodic_function_tables[function_index]);
 		}
 
 		for (function_index = 0; function_index < NUMBER_OF_TRANSITION_FUNCTIONS; function_index++)
@@ -209,10 +209,10 @@ void periodic_functions_dispose(
 			match_free(
 				"c:\\halo\\SOURCE\\math\\periodic_functions.c",
 				132,
-				bss_004561bc.transition_function_tables[function_index]);
+				periodic_functions_globals.transition_function_tables[function_index]);
 		}
 
-		bss_004561bc.function_tables_initialized = FALSE;
+		periodic_functions_globals.function_tables_initialized = FALSE;
 	}
 
 	return;
@@ -237,16 +237,18 @@ real periodic_function_evaluate(
 		157,
 		function_type>=0 && function_type<NUMBER_OF_PERIODIC_FUNCTIONS);
 
-	if (bss_004561bc.function_tables_initialized)
+	if (periodic_functions_globals.function_tables_initialized)
 	{
 		time *= 25.6f;
 		fraction = (real)fmod((double)time, 1.0);
-		index = (long)(time-fraction);
-		table = bss_004561bc.periodic_function_tables[function_type];
-		first_value = table[index&PERIODIC_FUNCTION_TABLE_MASK] * (1.0f/255.0f);
-		second_value = table[(index+1)&PERIODIC_FUNCTION_TABLE_MASK] * (1.0f/255.0f);
+		index = fast_ftol(time-fraction);
+		table = periodic_functions_globals.periodic_function_tables[function_type];
+		index &= PERIODIC_FUNCTION_TABLE_MASK;
+		first_value = table[index] * (1.0f/255.0f);
+		index = (index+1)&PERIODIC_FUNCTION_TABLE_MASK;
+		second_value = table[index] * (1.0f/255.0f);
 
-		if (((1 << function_type)&0xC0) != 0)
+		if (TEST_FLAG(SLIDE_PERIODIC_FUNCTION_FLAGS, function_type))
 		{
 			if (first_value > 0.75f && second_value < 0.25f)
 				second_value += 1.0f;
@@ -270,6 +272,7 @@ real transition_function_evaluate(
 {
 	long index;
 	byte *table;
+	real scaled;
 	real fraction;
 	real first_value;
 	real second_value;
@@ -287,12 +290,12 @@ real transition_function_evaluate(
 		216,
 		function_type>=0 && function_type<NUMBER_OF_TRANSITION_FUNCTIONS);
 
-	if (bss_004561bc.function_tables_initialized)
+	if (periodic_functions_globals.function_tables_initialized)
 	{
-		table = bss_004561bc.transition_function_tables[function_type];
-		value *= (real)(PERIODIC_FUNCTION_TABLE_SIZE-1);
-		fraction = (real)fmod((double)value, 1.0);
-		index = (long)(value-0.5f);
+		table = periodic_functions_globals.transition_function_tables[function_type];
+		scaled = value*(real)(PERIODIC_FUNCTION_TABLE_SIZE-1);
+		fraction = (real)fmod((double)scaled, 1.0);
+		index = fast_ftol(scaled-0.5f);
 		if ((short)index == PERIODIC_FUNCTION_TABLE_SIZE-1)
 			return table[PERIODIC_FUNCTION_TABLE_SIZE-1] * (1.0f/255.0f);
 
@@ -307,50 +310,65 @@ real transition_function_evaluate(
 
 /* ---------- private code */
 
-static void code_000fa050(
+static void __fastcall periodic_function_build_variable_period_x_table(
 	real *values)
 {
 	long index;
+	long count;
 	real sum = 0.0f;
-	real frequencies[3];
-	real amplitudes[3];
+	real x;
+	real value;
+	real amplitude0;
+	real amplitude1;
+	real amplitude2;
+	real cosine0;
+	real cosine1;
+	real cosine2;
+	real *destination;
 
-	for (index = 0; index < PERIODIC_FUNCTION_TABLE_SIZE; index++)
+	index = 0;
+	destination = values;
+	for (count = PERIODIC_FUNCTION_TABLE_SIZE; count; count--)
 	{
-		values[index] = sum;
-		amplitudes[0] = real_seed_random(get_global_random_seed_address());
-		amplitudes[1] = real_seed_random(get_global_random_seed_address());
-		amplitudes[2] = real_seed_random(get_global_random_seed_address());
-		frequencies[0] = (real)index;
-		frequencies[1] = real_seed_random(get_global_random_seed_address());
-		frequencies[1] = (frequencies[1]+1.0f)*0.25f;
-		frequencies[0] = (real)cos(frequencies[0]*0.044792242f);
-		frequencies[0] = (frequencies[0]+1.0f)*amplitudes[2] + frequencies[1];
-		frequencies[1] = (real)cos((real)index*0.03129321f);
-		frequencies[1] = (frequencies[1]+1.0f)*amplitudes[1] + frequencies[0];
-		frequencies[2] = (real)cos((real)index*0.025157286f);
-		frequencies[2] = (frequencies[2]+1.0f)*amplitudes[0] + frequencies[1];
-		sum += frequencies[2];
+		*destination = sum;
+		amplitude0 = real_seed_random(get_global_random_seed_address());
+		amplitude1 = real_seed_random(get_global_random_seed_address());
+		amplitude2 = real_seed_random(get_global_random_seed_address());
+		x = (real)index;
+		value = (real_seed_random(get_global_random_seed_address())+1.0f)*0.25f;
+		cosine0 = (real)cos(x*0.044792242f);
+		value = (cosine0+1.0f)*amplitude2 + value;
+		cosine1 = (real)cos(x*0.03129321f);
+		value = (cosine1+1.0f)*amplitude1 + value;
+		cosine2 = (real)cos(x*0.025157286f);
+		value = (cosine2+1.0f)*amplitude0 + value;
+		sum += value;
+		destination++;
+		index++;
 	}
 
+	destination = values;
 	for (index = 0; index < PERIODIC_FUNCTION_TABLE_SIZE; index++)
-		values[index] *= 1.0f/sum;
+		*destination++ *= 1.0f/sum;
 
 	return;
 }
 
-static void code_000fa150(
-	byte *table,
-	short function_type)
+static void transition_function_build_table(
+	short function_type,
+	byte *table)
 {
+	long transition_function = function_type;
 	long index;
+	long count;
 	real value;
 	real result;
 
-	for (index = 0; index < PERIODIC_FUNCTION_TABLE_SIZE; index++)
+	index = 0;
+	for (count = PERIODIC_FUNCTION_TABLE_SIZE; count; count--)
 	{
 		value = index * (1.0f/(PERIODIC_FUNCTION_TABLE_SIZE-1));
-		switch (function_type)
+		switch (transition_function)
 		{
 		case _transition_function_linear:
 			result = value;
@@ -373,21 +391,22 @@ static void code_000fa150(
 		default:
 			display_assert(NULL, "c:\\halo\\SOURCE\\math\\periodic_functions.c", 411, TRUE);
 			system_exit(-1);
-			result = 0.0f;
 			break;
 		}
 
 		table[index] = (byte)PIN((long)(result*255.0f), 0, 255);
+		index++;
 	}
 
 	return;
 }
 
-void code_000fa280(
+void periodic_function_build_table(
 	short function_type,
 	byte *table)
 {
 	long index;
+	long count;
 	real random_values[PERIODIC_FUNCTION_TABLE_SIZE];
 	real values[PERIODIC_FUNCTION_TABLE_SIZE];
 	real minimum = 3.402823466e+38f;
@@ -396,9 +415,12 @@ void code_000fa280(
 	real random_x;
 	real result;
 	real range;
+	real *value;
+	byte *destination;
 
-	code_000fa050(random_values);
-	for (index = 0; index < PERIODIC_FUNCTION_TABLE_SIZE; index++)
+	periodic_function_build_variable_period_x_table(random_values);
+	index = 0;
+	for (count = PERIODIC_FUNCTION_TABLE_SIZE; count; count--)
 	{
 		x = index*0.027343748f;
 		random_x = random_values[index]*28.0f;
@@ -416,30 +438,39 @@ void code_000fa280(
 		case _periodic_function_cosine_variable_period:
 			result = (real)cos(random_x*6.2831855f);
 			break;
+		case _periodic_function_slide:
+			result = (real)fmod((double)x, 1.0);
+			break;
+		case _periodic_function_slide_variable_period:
+			result = (real)fmod((double)random_x, 1.0);
+			break;
 		case _periodic_function_diagonal_wave:
 			result = (real)fmod((double)x, 1.0);
-		case _periodic_function_diagonal_wave_variable_period:
-			if (function_type == _periodic_function_diagonal_wave_variable_period)
-				result = (real)fmod((double)random_x, 1.0);
-			if (result <= 0.5f)
+			if (result < 0.5f)
 				result *= 2.0f;
 			else
 				result = 1.0f-(result-0.5f)*2.0f;
 			break;
-		case _periodic_function_slide:
-		case _periodic_function_slide_variable_period:
-			result = (real)fmod(
-				(double)(function_type == _periodic_function_slide ? x : random_x),
-				1.0);
+		case _periodic_function_diagonal_wave_variable_period:
+			result = (real)fmod((double)random_x, 1.0);
+			if (result < 0.5f)
+				result *= 2.0f;
+			else
+				result = 1.0f-(result-0.5f)*2.0f;
 			break;
 		case _periodic_function_noise:
 			result = real_seed_random(get_global_random_seed_address());
 			break;
 		case _periodic_function_jitter:
 		case _periodic_function_wander:
-			result = ((real)cos(x*0.89759791f)*(real)cos(x*25.132742f) +
-				(real)cos(x*43.9823f)*(real)sin(x*1.5707964f))*0.5f +
-				(real)sin(x*3.1415927f)*(real)cos(x*6.2831855f);
+			{
+				real cosine_fast = (real)cos(x*25.132742f);
+				real cosine_slow = (real)cos(x*0.89759791f);
+
+				result = (cosine_slow*cosine_fast +
+					(real)cos(x*43.9823f)*(real)sin(x*1.5707964f))*0.5f +
+					(real)sin(x*3.1415927f)*(real)cos(x*6.2831855f);
+			}
 			break;
 		case _periodic_function_spark:
 			result = (real)fmod((double)random_x, 1.0);
@@ -448,30 +479,37 @@ void code_000fa280(
 		default:
 			display_assert(NULL, "c:\\halo\\SOURCE\\math\\periodic_functions.c", 499, TRUE);
 			system_exit(-1);
-			result = 0.0f;
 			break;
 		}
 
-		minimum = MIN(minimum, result);
-		maximum = MAX(maximum, result);
+		if (result > maximum)
+			maximum = result;
+		if (result < minimum)
+			minimum = result;
 		values[index] = result;
+		index++;
 	}
 
-	range = ((1 << function_type)&0xC0) != 0
+	range = TEST_FLAG(SLIDE_PERIODIC_FUNCTION_FLAGS, function_type)
 		? 0.0f
 		: maximum-minimum;
-	for (index = 0; index < PERIODIC_FUNCTION_TABLE_SIZE; index++)
+	destination = table;
+	value = values;
+	for (count = PERIODIC_FUNCTION_TABLE_SIZE; count; count--)
 	{
-		result = values[index];
 		if (range != 0.0f)
-			result = (result-minimum)/range;
-		table[index] = (byte)PIN((long)(result*255.0f), 0, 255);
+			result = (*value-minimum)/range;
+		else
+			result = *value;
+		*destination = (byte)PIN((long)(result*255.0f), 0, 255);
+		value++;
+		destination++;
 	}
 
 	return;
 }
 
-#define function_tables_initialized bss_004561bc.function_tables_initialized
+#define function_tables_initialized periodic_functions_globals.function_tables_initialized
 
 void periodic_functions_initialize(
 	void)
@@ -487,15 +525,15 @@ void periodic_functions_initialize(
 
 	for (function_index = 0; function_index < NUMBER_OF_PERIODIC_FUNCTIONS; function_index++)
 	{
-		bss_004561bc.periodic_function_tables[function_index] = match_malloc(
+		periodic_functions_globals.periodic_function_tables[function_index] = match_malloc(
 			"c:\\halo\\SOURCE\\math\\periodic_functions.c",
 			78,
 			PERIODIC_FUNCTION_TABLE_SIZE);
-		if (bss_004561bc.periodic_function_tables[function_index])
+		if (periodic_functions_globals.periodic_function_tables[function_index])
 		{
-			code_000fa280(
+			periodic_function_build_table(
 				function_index,
-				bss_004561bc.periodic_function_tables[function_index]);
+				periodic_functions_globals.periodic_function_tables[function_index]);
 		}
 		else
 		{
@@ -505,15 +543,15 @@ void periodic_functions_initialize(
 
 	for (function_index = 0; function_index < NUMBER_OF_TRANSITION_FUNCTIONS; function_index++)
 	{
-		bss_004561bc.transition_function_tables[function_index] = match_malloc(
+		periodic_functions_globals.transition_function_tables[function_index] = match_malloc(
 			"c:\\halo\\SOURCE\\math\\periodic_functions.c",
 			96,
 			PERIODIC_FUNCTION_TABLE_SIZE);
-		if (bss_004561bc.transition_function_tables[function_index])
+		if (periodic_functions_globals.transition_function_tables[function_index])
 		{
-			code_000fa150(
-				bss_004561bc.transition_function_tables[function_index],
-				function_index);
+			transition_function_build_table(
+				function_index,
+				periodic_functions_globals.transition_function_tables[function_index]);
 		}
 		else
 		{

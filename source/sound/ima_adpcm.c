@@ -23,51 +23,40 @@ symbols in this file:
 
 #include "memory/byte_swapping.h"
 
+#include "ima_adpcm.h"
+
 /* ---------- constants */
+
+enum
+{
+	STEP_SIZE_TABLE_COUNT = 89,
+	STEP_SIZE_ADJUSTMENT_TABLE_COUNT = 16,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
-struct bungie_ima_adpcm_header
+struct bungie_ima_adpcm_header_byte_swap_data
 {
-	long sample_count;
-	short initial_sample;
-	short unused;
+	byte_swap_code codes[6];
+	struct byte_swap_definition definition;
 };
 
-struct bungie_ima_adpcm_state
-{
-	long sample_count;
-	long sample_index;
-	short sample;
-	short step_size_index;
-};
-
-struct bungie_ima_adpcm_byte_swap_globals
-{
-	byte_swap_code header_codes[6];
-	struct byte_swap_definition header_definition;
-};
-
-typedef char verify_bungie_ima_adpcm_header_size[
-	sizeof(struct bungie_ima_adpcm_header) == 0x8 ? 1 : -1];
-typedef char verify_bungie_ima_adpcm_state_size[
-	sizeof(struct bungie_ima_adpcm_state) == 0xC ? 1 : -1];
-typedef char verify_bungie_ima_adpcm_byte_swap_globals_size[
-	sizeof(struct bungie_ima_adpcm_byte_swap_globals) == 0x2C ? 1 : -1];
+typedef char verify_bungie_ima_adpcm_header_byte_swap_data_size[
+	sizeof(struct bungie_ima_adpcm_header_byte_swap_data) == 0x2C ? 1 : -1];
 
 /* ---------- prototypes */
 
 /* ---------- globals */
 
-long const step_size_adjustment_table[16] =
+long const step_size_adjustment_table[STEP_SIZE_ADJUSTMENT_TABLE_COUNT] =
 {
 	-1, -1, -1, -1, 2, 4, 6, 8,
 	-1, -1, -1, -1, 2, 4, 6, 8,
 };
 
-long const step_size_table[89] =
+long const step_size_table[STEP_SIZE_TABLE_COUNT] =
 {
 	7, 8, 9, 10, 11, 12, 13, 14, 16, 17,
 	19, 21, 23, 25, 28, 31, 34, 37, 41, 45,
@@ -80,7 +69,7 @@ long const step_size_table[89] =
 	15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767,
 };
 
-struct bungie_ima_adpcm_byte_swap_globals data_00316a7c =
+struct bungie_ima_adpcm_header_byte_swap_data bungie_ima_adpcm_header_bs =
 {
 	{
 		_begin_bs_array, 1,
@@ -90,7 +79,7 @@ struct bungie_ima_adpcm_byte_swap_globals data_00316a7c =
 	{
 		"bungie ima adpcm header",
 		sizeof(struct bungie_ima_adpcm_header),
-		data_00316a7c.header_codes,
+		bungie_ima_adpcm_header_bs.codes,
 		BYTE_SWAP_DEFINITION_SIGNATURE,
 		FALSE,
 	},
@@ -98,9 +87,6 @@ struct bungie_ima_adpcm_byte_swap_globals data_00316a7c =
 
 /* ---------- public code */
 
-/* NonMatching: target and candidate are both 0x160 bytes with both relocations
-   exact. The sole remaining divergence is a three-instruction independent-
-   assignment schedule when the second reconstruction pass is initialized. */
 long compress_ima_adpcm_audio_data(
 	short *input_samples,
 	long input_sample_count,
@@ -158,9 +144,8 @@ long compress_ima_adpcm_audio_data(
 			}
 			while (mask);
 
-			sample_difference = step_size;
-			sample_difference >>= 3;
-			temporary_step_size = step_size;
+			temporary_step_size = step_size_table[step_size_index];
+			sample_difference = temporary_step_size >> 3;
 			mask = 4;
 			do
 			{
@@ -178,12 +163,12 @@ long compress_ima_adpcm_audio_data(
 				sample_difference = -sample_difference;
 			}
 
-			sample = PIN(sample + sample_difference, -32768, 32767);
+			sample = PIN(sample + sample_difference, SHORT_MIN, SHORT_MAX);
 
 			step_size_index = (short)PIN(
 				step_size_index + step_size_adjustment_table[code],
 				0,
-				88);
+				STEP_SIZE_TABLE_COUNT - 1);
 
 			if (write_high_nibble)
 			{
@@ -212,10 +197,10 @@ long compress_ima_adpcm_audio_data(
 	return result;
 }
 
-/* NonMatching: target and candidate are both 0x1A0 bytes with two semantic
-   relocations; candidate offsets are +3 and +2. Recovering the original
-   sample-index shift removed the prior 0x10-byte structural excess. The
-   remainder is local-slot/register allocation around the persistent state. */
+/* NonMatching: the coherent decompressor preserves the 416-byte envelope and
+   both table relocations; January schedules the decremented input-size store
+   before materializing sample_count*2, shifting the remaining instruction
+   packet without changing the algorithm. */
 long decompress_ima_adpcm_audio_data(
 	struct bungie_ima_adpcm_header const *input_header,
 	long input_data_size,
@@ -289,12 +274,12 @@ long decompress_ima_adpcm_audio_data(
 				sample_difference = -sample_difference;
 			}
 
-			sample = PIN(sample + sample_difference, -32768, 32767);
+			sample = PIN(sample + sample_difference, SHORT_MIN, SHORT_MAX);
 
 			step_size_index = (short)PIN(
 				step_size_index + step_size_adjustment_table[code],
 				0,
-				88);
+				STEP_SIZE_TABLE_COUNT - 1);
 
 			*output_samples = (short)sample;
 			read_high_nibble = !read_high_nibble;
@@ -326,7 +311,7 @@ long decompress_ima_adpcm_audio_data(
 void byte_swap_bungie_ima_adpcm_header(
 	struct bungie_ima_adpcm_header *header)
 {
-	byte_swap_data(&data_00316a7c.header_definition, header, 1);
+	byte_swap_data(&bungie_ima_adpcm_header_bs.definition, header, 1);
 
 	return;
 }

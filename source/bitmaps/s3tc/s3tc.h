@@ -34,6 +34,12 @@ struct s3tc_block_rgb
 	unsigned long bitmap;
 };
 
+struct s3tc_block_alpha4
+{
+	word alpha_bitmap[4];
+	struct s3tc_block_rgb rgb;
+};
+
 struct s3tc_block_alpha3
 {
 	byte alpha0;
@@ -46,6 +52,10 @@ typedef char s3tc_color_size_assert[
 	sizeof(struct s3tc_color) == 0x4 ? 1 : -1];
 typedef char s3tc_block_rgb_size_assert[
 	sizeof(struct s3tc_block_rgb) == 0x8 ? 1 : -1];
+typedef char s3tc_block_alpha4_rgb_offset_assert[
+	offsetof(struct s3tc_block_alpha4, rgb) == 0x8 ? 1 : -1];
+typedef char s3tc_block_alpha4_size_assert[
+	sizeof(struct s3tc_block_alpha4) == 0x10 ? 1 : -1];
 typedef char s3tc_block_alpha3_rgb_offset_assert[
 	offsetof(struct s3tc_block_alpha3, rgb) == 0x8 ? 1 : -1];
 typedef char s3tc_block_alpha3_size_assert[
@@ -55,6 +65,9 @@ typedef char s3tc_block_alpha3_size_assert[
 
 void DecodeBlockRGB(
 	struct s3tc_block_rgb *source,
+	struct s3tc_color colors[S3TC_BLOCK_PIXELS]);
+void DecodeBlockAlpha4(
+	struct s3tc_block_alpha4 *source,
 	struct s3tc_color colors[S3TC_BLOCK_PIXELS]);
 void DecodeBlockAlpha3(
 	struct s3tc_block_alpha3 *source,

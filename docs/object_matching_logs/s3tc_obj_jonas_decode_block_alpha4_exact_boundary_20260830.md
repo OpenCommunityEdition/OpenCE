@@ -1,96 +1,121 @@
-# `s3tc.obj` `DecodeBlockAlpha4` exact ownership boundary (2026-08-30)
+# `s3tc.obj` `DecodeBlockAlpha4` exact recovery and ownership retest
 
 ## Result
 
-The first and only natural production candidate for
-`source/bitmaps/s3tc/s3tc.obj::_DecodeBlockAlpha4` was strict function-exact:
+`source/bitmaps/s3tc/s3tc.obj::_DecodeBlockAlpha4` is retained as strict
+semantic-COFF exact after a fresh ownership retest on the current integration
+base. The candidate is the ordinary Microsoft reference-rasterizer body in
+the authenticated source order, before `DecodeBlockAlpha3`:
 
-| Evidence | January target | First candidate |
+| Evidence | January target | Retained candidate |
 | --- | ---: | ---: |
-| Meaningful / padded code bytes | 131 / 144 | 131 / 144 |
-| Ordered relocations | 1 | 1 |
+| Meaningful / padded code bytes | `131 / 144` | `131 / 144` |
+| Ordered relocations | `1` | `1` |
 | Normalized SHA-256 | `f386c8c61c53347d44665a7f363d34f2099576f058d76ab3484b033b183026eb` | `f386c8c61c53347d44665a7f363d34f2099576f058d76ab3484b033b183026eb` |
 
-The relocation is `IMAGE_REL_I386_REL32` at owner offset `+0x12` and resolves
-to `_DecodeBlockRGB+0` in both objects. Direct hardened comparison reports
-`all_equal: true` for the new decoder and for the inherited exact
-`_DecodeBlockAlpha3` owner (606 / 608 bytes, one relocation, normalized
-SHA-256 `0dd23ce088e93017f7424049431b394d4d44e2730f3e8b0835aaee58e79a6a0d`).
+The sole relocation is `IMAGE_REL_I386_REL32` at owner offset `+0x12`,
+resolving to `_DecodeBlockRGB+0` in both objects. The emitted owner is an
+ordinary `.text` COMDAT with flags `0x60501020` and selection `1`, exactly
+matching January. No object-level `Matching` claim is made: the unit now has
+2/18 strict functions, one credible fuzzy residual, and fifteen unwritten
+owners.
 
-The candidate is nevertheless not retained. The fail-closed whole-TU
-regression manifest reports the intended `_DecodeBlockAlpha4` as
-`NEWLY_EXACT`, but also reports changed accepted-function evidence for
-`_DecodeBlockAlpha3`, changed `.debug$S` evidence, and changed symbol
-ownership. Adding the authentic Alpha4 body before Alpha3 changes the section
-and symbol inventory that owns the previously accepted Alpha3 COMDAT. Under
-the campaign's complete-ownership rule, direct function equality is necessary
-but not sufficient.
+This supersedes the 2026-08-30 retention conclusion in the original version
+of this ledger. That run correctly established the function match and donor
+provenance, but its complete-owner check reported changes around the inherited
+Alpha3 owner. The fresh current-base retest does not reproduce that blocker:
+both pre-existing emitted owners are byte-for-byte and ownership-view
+identical, all non-code evidence is unchanged, and the only semantic symbol
+delta is the intended new Alpha4 owner.
 
-Production source and header were inverse-restored. This ledger grants no
-function, byte, data, or object credit.
+## Authenticated source and types
 
-## Source provenance and sole candidate
+The controlling donor is Microsoft's preserved Direct3D reference rasterizer
+at commit `5c6fe3db626b63a384230a1aa6b92ac416b0765f`, file
+`multimedia/directx/dxg/ref8/common/dxtn.cpp`, blob
+`7a2508f7c313dc77aca8debc2936bf000a83edab`. Its source declares `row` and
+`col`, loads one 16-bit alpha row, traverses four rows and four columns, expands
+each low nibble with
 
-The integration base was
-`ff673c88c698326382a9d7ddcd1e0a8442f4c314`. All current S3TC ledgers,
-ref history, worktree source census, campaign methodology, comparator notes,
-and locally reachable Claude documentation were checked before the edit. No
-previous production attempt or ledger named `_DecodeBlockAlpha4`.
+```c
+((alpha & 0xF) << 4) | (alpha & 0xF)
+```
 
-Two independent source oracles agree on the same ordinary decoder:
+and shifts the row word right by four after each output pixel. It calls
+`DecodeBlockRGB` before alpha expansion. The retained typed C89 body preserves
+that statement topology and loop order; it adds no source unrolling or
+emission control.
 
-- Microsoft's preserved Direct3D reference rasterizer at commit
-  `5c6fe3db626b63a384230a1aa6b92ac416b0765f`, file
-  `multimedia/directx/dxg/ref8/common/dxtn.cpp`, blob
-  `7a2508f7c313dc77aca8debc2936bf000a83edab`;
-- HCEA reconstruction commit
-  `570c83fd9c365dad6f2a3e7041705d5b84c7847c`, file
-  `src/blam/bitmaps/DecodeBlockAlpha4.c`, blob
-  `3536bc2e6c1db0ab0237a0892ad5a22996a0e36c`, payload SHA-256
-  `e8089e67300f7a64e1dc34bc6a4bba8d64d7f87f5e47d26f8d5457e338bef510`.
+HCEA independently reconstructs the same operation at commit
+`570c83fd9c365dad6f2a3e7041705d5b84c7847c`, file
+`src/blam/bitmaps/DecodeBlockAlpha4.c`, blob
+`3536bc2e6c1db0ab0237a0892ad5a22996a0e36c`. HCEA is corroborating binary
+reconstruction evidence; Microsoft remains the source oracle.
 
-The Microsoft source is the controlling provenance. It defines a 16-byte
-Alpha4 block with four 16-bit alpha rows followed by the eight-byte RGB block,
-calls `DecodeBlockRGB`, then uses nested four-iteration row and column loops.
-Each low nibble is expanded with `((alpha & 0xF) << 4) | (alpha & 0xF)` before
-the row word shifts right by four. The candidate translated those exact types,
-statements, loop order, and source order into the repository's named C89
-structures. The header asserted both the RGB offset (`0x8`) and full block size
-(`0x10`).
+`source/bitmaps/s3tc/s3tc.h` owns the public structure and declaration. The
+named `s3tc_block_alpha4` has four `word` alpha rows followed by the existing
+`s3tc_block_rgb`; compile-time assertions prove the RGB offset is `0x8` and
+the complete block is `0x10`. The function prototype is in the same owner
+header and precedes the Alpha3 prototype, matching the donor and January
+function order.
 
-The candidate source/header Git blobs were respectively
-`8a7a5ecd607680fbfaea18b8f1c1b20e986f7979` and
-`48a2dab1d47c57e390a05ff561a2c184d201c0d6`. The first compiled object raw
-SHA-256 was
-`b6cdb153da94966ce23196b3dba817bb61b6b1c25a3bb7a5bf3f80fe2e46d0f3`.
+The retained source/header Git blob hashes are respectively
+`9e7481c487273e608cab14d916178871230b2802` and
+`566ad7172ac62baae861d74736f757969907aba9` before orchestration commit.
 
-The implementation was readable typed C89 with one parameter per line and an
-explicit terminal `return;`. It used no assembly, `volatile`, `register`,
-pragma, intrinsic, attribute, barrier, raw address or offset access, pointer or
-union pun, undefined behavior, compiler-option change, synthetic anchor, or
-byte/code-generation forcing.
+## Whole-TU and ownership proof
 
-## Retention boundary and restoration
+The production-path pre-edit object was frozen before the edit and compared
+with an XDK 3911 compile to the canonical production output path. This avoids
+mistaking the CodeView-recorded output filename for a compiler/debug change.
 
-The authentic Microsoft order places `DecodeBlockAlpha4` before
-`DecodeBlockAlpha3`; January's symbol inventory has the same order. Moving the
-new body after the inherited exact function might preserve the old candidate
-owner numbering, but it would be a second code-generation/ownership tuning
-shot and would contradict the authenticated source order. It was not tried.
-No section directive, duplicate declaration, synthetic caller, ownership
-adjudication, or comparator exception was considered.
+| Artifact | Raw SHA-256 |
+| --- | --- |
+| January split target | `95623e800d131322e6a079f07f78af41166864d8d3a29b7fe88ef788bc76a9dc` |
+| Pre-edit rebuilt TU | `400a813bca2be1e778c88b3f256e13c2096da900d817738b256a8b9107cd7e52` |
+| Retained rebuilt TU | `9d94cc769671114219298b67525ad46dc07e65b404f4058fe18d70831feac23f` |
 
-Both production edits were inverse-applied. The final source and header Git
-hashes equal the integration base exactly:
+The inherited owners remain unchanged:
 
-- `source/bitmaps/s3tc/s3tc.c`:
-  `5a7a2015ff994a1462a8a7a0767adb5ca51fb879`;
-- `source/bitmaps/s3tc/s3tc.h`:
-  `711c9a9342463681c4a314a1f9c436590399391f`.
+| Owner | Pre-edit versus retained |
+| --- | --- |
+| `_DecodeBlockAlpha3` | exact; 608 padded bytes, one relocation, normalized SHA-256 `0dd23ce088e93017f7424049431b394d4d44e2730f3e8b0835aaee58e79a6a0d` |
+| `_DecodeBlockAlpha3__single_pixel` | identical retained residual; 448 padded bytes, one relocation, normalized SHA-256 `db57324424c861cd2aa46b18de4452ba9f44e124138cbc496e7884d616d70c79` |
 
-After restoration, the unit returns to 1/18 strict functions with 17 unwritten
-owners. `_DecodeBlockAlpha3` remains direct-comparison exact at 608 padded
-bytes and one ordered relocation. Reopen Alpha4 only if the campaign adopts a
-reviewed ownership-preserving insertion mechanism that does not alter source
-topology or if the complete-TU ownership policy itself changes. Do not retry a
-post-Alpha3 reorder or any emission-control spelling under the current rules.
+The complete non-code fingerprints are identical before and after:
+
+- `.drectve`: 42 bytes, zero relocations, normalized SHA-256
+  `1bf8b9d961b573933e6b8f24821b55ae9c81a53e2c2e7fa81841fd557014cad8`;
+- `.debug$S`: 201 bytes, zero relocations, normalized SHA-256
+  `e5dc84d07404868a5dd4dee70fc60da071dd84db8a05261380d28702c2146cf6`.
+
+The pre-edit symbol inventory has ten semantic records and the retained object
+has twelve. The only additions are the `.text` section symbol and external
+function symbol for `.text|owners=_DecodeBlockAlpha4`; there are no removed,
+renamed, rehomed, or storage-class-changed symbols. Existing COMDAT section
+numbers shift by one, but section numbers are object-local and the hardened
+ownership view pairs them by owner identity. The generic regression gate's
+additive `SYMBOL_SET_CHANGED` finding is therefore the expected review lead
+for a newly written function, not an inherited ownership regression.
+
+## Policy and gates
+
+The implementation is readable, typed C89. It uses no assembly, `volatile`,
+`register`, pragma, intrinsic, attribute, optimizer barrier, pointer or union
+pun, raw address or byte offset, undefined behavior, synthetic caller, dead
+branch, duplicate declaration, or compiler-option change. It was not moved
+after Alpha3 and no post-donor reorder was tested.
+
+- Focused campaign gate: `_DecodeBlockAlpha4` exact at 144 padded bytes;
+  `_DecodeBlockAlpha3` remains exact at 608.
+- Full TU campaign gate: 2 exact, 1 residual, 15 unwritten of 18 target owners.
+- Hardened direct comparison: Alpha4 and inherited Alpha3 owners pass; the
+  known Alpha3 single-pixel residual is unchanged from the frozen pre-edit
+  object.
+- Runtime non-code, debug, COMDAT selection, owner identities, and relocation
+  destinations pass the current complete-owner retest.
+- `git diff --check` passes for the retained source and header.
+
+The orchestrator's consolidated build and global semantic, admission, park,
+fake-match, tooling-test, and protected-Units gates all pass. No `Matching`
+metadata or object-admission claim is part of this recovery.

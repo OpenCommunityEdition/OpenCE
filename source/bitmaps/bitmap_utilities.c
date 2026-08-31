@@ -224,9 +224,18 @@ symbols in this file:
 
 #include "cseries.h"
 
+#include "bitmaps/bitmaps.h"
 #include "bitmaps/bitmap_group.h"
+#include "cseries/errors.h"
 
 /* ---------- constants */
+
+enum
+{
+	_bitmap_type_2d = 0,
+	_bitmap_type_3d,
+	_bitmap_type_cube_map,
+};
 
 /* ---------- macros */
 
@@ -267,12 +276,46 @@ union real_hsv_color
 
 /* ---------- prototypes */
 
-void *bitmap_2d_address(
-	struct bitmap_data *bitmap,
-	short x,
-	short y,
-	short mipmap_index);
 long bitmap_get_pixel_count(
+	struct bitmap_data *bitmap);
+long bitmap_get_pixel_data_size(
+	struct bitmap_data *bitmap);
+void *bitmap_mipmap_address(
+	struct bitmap_data *bitmap,
+	short mipmap_index);
+struct bitmap_data *bitmap_2d_new(
+	short width,
+	short height,
+	short mipmap_count,
+	short format);
+void bitmap_3d_slice_extract(
+	struct bitmap_data *bitmap,
+	short mipmap_index,
+	short slice_index,
+	struct bitmap_data *slice_bitmap);
+void bitmap_3d_slice_insert(
+	struct bitmap_data *slice_bitmap,
+	struct bitmap_data *bitmap,
+	short mipmap_index,
+	short slice_index);
+void bitmap_cube_map_face_extract(
+	struct bitmap_data *bitmap,
+	short mipmap_index,
+	short face_index,
+	struct bitmap_data *face_bitmap);
+void bitmap_cube_map_face_insert(
+	struct bitmap_data *face_bitmap,
+	struct bitmap_data *bitmap,
+	short mipmap_index,
+	short face_index);
+void bitmap_delete(
+	struct bitmap_data *bitmap);
+
+static void bitmap_2d_vector_map(
+	struct bitmap_data *bitmap);
+static void bitmap_3d_vector_map(
+	struct bitmap_data *bitmap);
+static void bitmap_cm_vector_map(
 	struct bitmap_data *bitmap);
 
 /* ---------- globals */
@@ -718,4 +761,137 @@ union real_rgb_color *pixel32_to_real_rgb_color(
 	return result;
 }
 
+void bitmap_vector_map(
+	struct bitmap_data *bitmap)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x569, bitmap_verify(bitmap, TRUE));
+
+	switch (bitmap->type)
+	{
+		case _bitmap_type_2d:
+			bitmap_2d_vector_map(bitmap);
+			break;
+
+		case _bitmap_type_3d:
+			bitmap_3d_vector_map(bitmap);
+			break;
+
+		case _bitmap_type_cube_map:
+			bitmap_cm_vector_map(bitmap);
+			break;
+
+		default:
+			match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x577, FALSE, "### ERROR unsupported bitmap type");
+			break;
+	}
+
+	return;
+}
+
 /* ---------- private code */
+
+static void bitmap_2d_vector_map(
+	struct bitmap_data *bitmap)
+{
+	long pixel_data_size;
+	pixel32 *temporary_pixels;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x583, bitmap_verify(bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x584, bitmap->type==_bitmap_type_2d);
+
+	pixel_data_size= bitmap_get_pixel_data_size(bitmap);
+	temporary_pixels= match_malloc("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x587, pixel_data_size);
+	if (temporary_pixels)
+	{
+		short x, y;
+
+		for (y= 0; y<bitmap->height; y++)
+		{
+			for (x= 0; x<bitmap->width; x++)
+			{
+				pixel32 pixel= *(pixel32 *)bitmap_2d_address(bitmap, x, y, 0);
+				real_vector3d vector;
+
+				vector.i= ((pixel>>16)&0xFF)*(2.f/255.f) - 1.f;
+				vector.j= ((pixel>>8)&0xFF)*(2.f/255.f) - 1.f;
+				vector.k= (pixel&0xFF)*(2.f/255.f) - 1.f;
+				normalize3d(&vector);
+
+				temporary_pixels[y*bitmap->width + x]=
+					(pixel&0xFF000000) |
+					(fast_ftol((vector.i+1.f)*127.5f + 0.5f)<<16) |
+					(fast_ftol((vector.j+1.f)*127.5f + 0.5f)<<8) |
+					fast_ftol((vector.k+1.f)*127.5f + 0.5f);
+			}
+		}
+
+		csmemcpy(bitmap_mipmap_address(bitmap, 0), temporary_pixels, pixel_data_size);
+		match_free("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x5A8, temporary_pixels);
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate temporary buffer");
+	}
+
+	return;
+}
+
+static void bitmap_3d_vector_map(
+	struct bitmap_data *bitmap)
+{
+	struct bitmap_data *slice_bitmap;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x5B7, bitmap_verify(bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x5B8, bitmap->type==_bitmap_type_3d);
+
+	slice_bitmap= bitmap_2d_new(bitmap->width, bitmap->height, 0, bitmap->format);
+	if (slice_bitmap && slice_bitmap->base_address)
+	{
+		short slice_index;
+
+		for (slice_index= 0; slice_index<(short)bitmap->depth; slice_index++)
+		{
+			bitmap_3d_slice_extract(bitmap, 0, slice_index, slice_bitmap);
+			bitmap_2d_vector_map(slice_bitmap);
+			bitmap_3d_slice_insert(slice_bitmap, bitmap, 0, slice_index);
+		}
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+	}
+
+	bitmap_delete(slice_bitmap);
+
+	return;
+}
+
+static void bitmap_cm_vector_map(
+	struct bitmap_data *bitmap)
+{
+	struct bitmap_data *face_bitmap;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x5E5, bitmap_verify(bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x5E6, bitmap->type==_bitmap_type_cube_map);
+
+	face_bitmap= bitmap_2d_new(bitmap->width, bitmap->height, 0, bitmap->format);
+	if (face_bitmap && face_bitmap->base_address)
+	{
+		short face_index;
+
+		for (face_index= 0; face_index<NUMBER_OF_FACES_PER_CUBE; face_index++)
+		{
+			bitmap_cube_map_face_extract(bitmap, 0, face_index, face_bitmap);
+			bitmap_2d_vector_map(face_bitmap);
+			bitmap_cube_map_face_insert(face_bitmap, bitmap, 0, face_index);
+		}
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+	}
+
+	bitmap_delete(face_bitmap);
+
+	return;
+}
