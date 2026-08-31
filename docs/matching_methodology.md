@@ -37,6 +37,30 @@ addend, ABI, build, and regression evidence.
    assignment destination, member access, and read-back pattern before
    permuting commutative terms or adding artificial temporaries.
 
+## Source-credibility gate
+
+An exact object is necessary evidence, but exact bytes alone do not make a
+reconstruction admissible. Retained source must express coherent program logic
+and remain plausible for the original January 2002 codebase. Reject inert,
+contradictory, undefined, or artificial source whose only credible purpose is
+to steer VC7 into the target byte sequence. This includes unexplained empty
+branches, self-assignments, fixed conditions, volatile or aliasing tricks,
+synthetic lifetime anchors, raw instruction emission, and compiler-control
+directives. A target-proven original bug is the narrow exception and must meet
+the original-bug policy below.
+
+Review semantics across all reachable inputs, not only the path that resembles
+the disassembly. Corroborate unusual topology with January code/data/relocation
+evidence, authenticated names or type records, first-party source, or a
+credible contemporary analogue such as Marathon. When ordinary, meaningful C
+does not reach exactness after the bounded methodology, retain the best honest
+fuzzy reconstruction, record the residual, and park it.
+
+`python tools/fake_match_scan.py` provides conservative lexical review leads
+for several common smells. Its findings are neither proof of fake source nor a
+substitute for manual semantic and provenance review, and a clean scan is not
+proof of credibility.
+
 ## Blocker classes
 
 ### A. Recoverable source-shape mismatch

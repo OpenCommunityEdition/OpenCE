@@ -55,6 +55,10 @@ Each ledger must include:
 - Gate every function and owned data section with the hardened comparator.
 - Run the whole-translation-unit regression sweep before committing.
 - Revert failed source shapes immediately.
+- Treat exact bytes as necessary but not sufficient: reject semantically
+  nonsensical, historically implausible, or inert compiler-steering source,
+  even when it happens to match. Park the best honest fuzzy reconstruction
+  when a natural exact spelling is not available.
 - Do not use inline assembly, volatile byte forcing, undefined behavior,
   object-byte patches, or compiler-flag changes.
 - A parked residual must preserve enough evidence for another agent to
