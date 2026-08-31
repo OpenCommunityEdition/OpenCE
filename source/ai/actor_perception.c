@@ -270,13 +270,6 @@ symbols in this file:
 
 /* ---------- constants */
 
-enum
-{
-	_actor_danger_zone_suicide = 1,
-	_actor_danger_zone_projectile,
-	_actor_danger_zone_vehicle = 3
-};
-
 /* ---------- macros */
 
 /*

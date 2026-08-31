@@ -91,7 +91,7 @@ symbols in this file:
 0000C5B0 03c0:
 	_actor_action_handle_vehicle_entry (0000)
 0000C970 03a0:
-	_code_0000c970 (0000)
+	_actor_action_find_escape_from_danger (0000)
 0000CD10 01a0:
 	_actor_action_handle_active_cover_seeking (0000)
 0000CEB0 06f0:
@@ -233,6 +233,7 @@ symbols in this file:
 #include "actors.h"
 #include "actor_definitions.h"
 #include "actor_types.h"
+#include "ai.h"
 #include "ai_communication.h"
 #include "ai_debug.h"
 #include "encounters.h"
@@ -259,6 +260,7 @@ enum
 {
 	_actor_panic_none = 0,
 	_actor_panic_damage,
+	_actor_panic_unopposable_enemy = 5,
 	_actor_panic_surprise = 7,
 	_actor_panic_delayed_projectile_attached_to_us = 10,
 	_actor_panic_melee_attached_to_us = 11,
@@ -288,14 +290,6 @@ enum
 
 enum
 {
-	_actor_danger_zone_none = 0,
-	_actor_danger_zone_suicide,
-	_actor_danger_projectile = 2,
-	_actor_danger_zone_vehicle,
-};
-
-enum
-{
 	_actor_animation_surprise_front = 4,
 	_actor_animation_surprise_back,
 	_actor_animation_evade_left,
@@ -307,18 +301,6 @@ enum actor_evade_direction
 	_actor_evade_left = 0,
 	_actor_evade_right,
 	_actor_evade_random = 4,
-};
-
-enum
-{
-	_ai_communication_cover = 24,
-	_ai_communication_panic = 34,
-	_ai_communication_surprise = 41,
-};
-
-enum
-{
-	_action_class_passive = 1,
 };
 
 enum
@@ -723,15 +705,6 @@ boolean actor_move_try_evasion_vector(
 	real ledge_avoidance_distance,
 	boolean *is_ledge,
 	void *collision_result);
-
-void ai_communication_event(
-	short type,
-	long unit_index,
-	long prop_index,
-	long object_index,
-	long position_index,
-	long structure_index,
-	boolean allow_reply);
 
 void actor_combat_fire_wildly(
 	long actor_index,
@@ -2250,7 +2223,7 @@ boolean actor_action_handle_panic_transition(
 			if (communicate_failure && !force)
 			{
 				ai_communication_event(
-					_ai_communication_panic,
+					_ai_communication_attempted_flee,
 					actor->meta.unit_index,
 					NONE,
 					NONE,
@@ -2791,12 +2764,9 @@ boolean actor_action_handle_combat_selection(
 					 * this policy decision does not otherwise consume it. */
 					struct unit_datum *unit = unit_get(actor->meta.unit_index);
 					long current_time = game_time_get();
-					boolean berserking = actor->emotions.berserk;
-					boolean use_berserk_range = berserking;
+					boolean use_berserk_range = actor->emotions.berserk;
 					real charge_range;
 					boolean begin_charge = FALSE;
-					long last_attempt_time =
-						actor->emotions.last_melee_check_time;
 
 					(void)unit;
 
@@ -2808,7 +2778,7 @@ boolean actor_action_handle_combat_selection(
 						use_berserk_range = TRUE;
 					}
 
-					charge_delay = berserking ?
+					charge_delay = actor->emotions.berserk ?
 						0.0f : definition->berserk.melee_attack_delay_timer;
 					charge_delay = game_difficulty_get_value(
 						_game_difficulty_value_melee_delay_scale) * charge_delay +
@@ -2818,20 +2788,19 @@ boolean actor_action_handle_combat_selection(
 						variant_definition->ranged_combat.berserk_melee_range :
 						variant_definition->ranged_combat.melee_range;
 
-					if (last_attempt_time == NONE ||
-						last_attempt_time + 10 < current_time)
+					if (actor->emotions.last_melee_check_time == NONE ||
+						actor->emotions.last_melee_check_time + 10 <
+							current_time)
 					{
-						if (prop_distance <= charge_range)
+						if (!(prop_distance > charge_range))
 						{
 							boolean in_range = TRUE;
 
 							if (actor->external_orders.disable_charging)
 							{
-								real point_blank_range =
-									definition->berserk.melee_attack_range;
-
-								if (point_blank_range < 0.0f)
-									point_blank_range = 0.0f;
+								real point_blank_range = MAX(
+									0.0f,
+									definition->berserk.melee_attack_range);
 
 								if (prop_distance > point_blank_range + 0.8f)
 									in_range = FALSE;
@@ -2843,8 +2812,9 @@ boolean actor_action_handle_combat_selection(
 									actor->emotions.last_melee_attack_time;
 
 								if (last_charge_time == NONE ||
-									charge_delay * TICKS_PER_SECOND +
-										(real)last_charge_time < (real)current_time)
+									!(charge_delay * TICKS_PER_SECOND +
+										(real)last_charge_time >=
+											(real)current_time))
 								{
 									actor_has_ranged_weapon(actor_index);
 									begin_charge = TRUE;
@@ -2876,8 +2846,12 @@ boolean actor_action_handle_combat_selection(
 		if (actor->state.action != _actor_action_charge &&
 			!actor->external_orders.disable_charging &&
 			!action_changed &&
-			actor->input.vehicle_driver_type > 0)
+			actor->input.vehicle_driver_type > _actor_vehicle_driver_none)
 		{
+			struct unit_datum *vehicle =
+				vehicle_get(actor->input.vehicle_index);
+			struct vehicle_definition *vehicle_definition =
+				vehicle_specific_definition_get(vehicle->definition_index);
 			long last_charge_time = actor->emotions.last_vehicle_charge_time;
 			boolean repeat_elapsed = FALSE;
 
@@ -2885,26 +2859,19 @@ boolean actor_action_handle_combat_selection(
 			{
 				repeat_elapsed = TRUE;
 			}
-			else
+			else if (vehicle_definition->ai_charge_repeat_time *
+					TICKS_PER_SECOND + (real)last_charge_time <
+				(real)game_time_get())
 			{
-				struct unit_datum *vehicle =
-					unit_get(actor->input.vehicle_index);
-				struct vehicle_definition *vehicle_definition =
-					vehicle_specific_definition_get(vehicle->definition_index);
-
-				if (vehicle_definition->ai_charge_repeat_time *
-						TICKS_PER_SECOND + (real)last_charge_time <
-					(real)game_time_get())
-				{
-					repeat_elapsed = TRUE;
-				}
+				repeat_elapsed = TRUE;
 			}
 
 			if (repeat_elapsed)
 			{
 				boolean begin_charge = FALSE;
 
-				if (actor->input.vehicle_driver_type == 4 &&
+				if (actor->input.vehicle_driver_type ==
+						_actor_vehicle_driver_directional_flying &&
 					prop_distance > firing_variant->ranged_combat.melee_range &&
 					!prop->line_of_sight)
 				{
@@ -2931,7 +2898,6 @@ boolean actor_action_handle_combat_selection(
 		boolean desires_charge = actor->emotions.forced_to_charge &&
 			!actor->external_orders.disable_charging;
 		boolean restart_charge = FALSE;
-		short action = actor->state.action;
 
 		if (!actor->external_orders.disable_charging &&
 			!actor_has_ranged_weapon(actor_index) &&
@@ -2942,7 +2908,7 @@ boolean actor_action_handle_combat_selection(
 			desires_charge = TRUE;
 		}
 
-		if (action == _actor_action_charge)
+		if (actor->state.action == _actor_action_charge)
 		{
 			short goal = charge->goal;
 
@@ -2969,7 +2935,8 @@ boolean actor_action_handle_combat_selection(
 				goal == _charge_goal_vehicle_ramming)
 			{
 				if (charge->unable_to_advance ||
-					actor->input.vehicle_driver_type <= 1)
+					actor->input.vehicle_driver_type <=
+						_actor_vehicle_driver_unknown)
 				{
 					restart_charge = TRUE;
 				}
@@ -2979,36 +2946,32 @@ boolean actor_action_handle_combat_selection(
 
 					if (goal == _charge_goal_vehicle_strafing)
 					{
+						struct unit_datum *vehicle =
+							vehicle_get(actor->input.vehicle_index);
+						struct vehicle_definition *vehicle_definition =
+							vehicle_specific_definition_get(vehicle->definition_index);
+
 						if (actor->control.path.at_destination &&
-							actor->control.path.destination_orders.destination_type == 5 &&
+							actor->control.path.destination_orders.destination_type ==
+								_destination_prop &&
 							actor->control.path.destination_orders.prop.prop_index ==
 								actor->target.target_prop_index)
 						{
 							desires_charge = FALSE;
 						}
-						else
+						else if (prop_distance <
+							vehicle_definition->ai_strafing_stop_range)
 						{
-							struct unit_datum *vehicle =
-								unit_get(actor->input.vehicle_index);
-							struct vehicle_definition *vehicle_definition =
-								vehicle_specific_definition_get(vehicle->definition_index);
-							real stop_range =
-								vehicle_definition->ai_strafing_stop_range;
-
-							if (prop_distance >= stop_range)
-							{
-								if (prop_distance < stop_range * 2.0f &&
-									dot_product3d(
-										&actor->input.facing_vector,
-										&prop->actor_to_prop) < 0.5f)
-								{
-									desires_charge = FALSE;
-								}
-							}
-							else
-							{
-								desires_charge = FALSE;
-							}
+							desires_charge = FALSE;
+						}
+						else if (prop_distance <
+								vehicle_definition->
+									ai_strafing_stop_range * 2.0f &&
+							dot_product3d(
+								&actor->input.facing_vector,
+								&prop->actor_to_prop) < 0.5f)
+						{
+							desires_charge = FALSE;
 						}
 					}
 				}
@@ -3016,7 +2979,8 @@ boolean actor_action_handle_combat_selection(
 		}
 
 		if (desires_charge &&
-			(restart_charge || action != _actor_action_charge))
+			(restart_charge ||
+				actor->state.action != _actor_action_charge))
 		{
 			if (action_charge_setup(
 				actor_index,
@@ -3055,40 +3019,43 @@ boolean actor_action_handle_combat_selection(
 			action_changed = TRUE;
 		}
 
-		if (desires_charge)
+		else if (!action_changed)
 		{
-			match_assert(
-				"c:\\halo\\SOURCE\\ai\\actions.c",
-				2182,
-				actor->state.action == _actor_action_charge);
+			if (desires_charge)
+			{
+				match_assert(
+					"c:\\halo\\SOURCE\\ai\\actions.c",
+					2182,
+					actor->state.action == _actor_action_charge);
 
-			if (actor->state.action_data.charge.goal == _charge_goal_melee ||
-				actor->state.action_data.charge.goal == _charge_goal_melee_leaping)
-			{
-				match_assert(
-					"c:\\halo\\SOURCE\\ai\\actions.c",
-					2185,
-					!actor->state.action_data.charge.finished_melee_attack &&
-						!actor->state.action_data.charge.aborted_melee_attack &&
+				if (actor->state.action_data.charge.goal == _charge_goal_melee ||
+					actor->state.action_data.charge.goal == _charge_goal_melee_leaping)
+				{
+					match_assert(
+						"c:\\halo\\SOURCE\\ai\\actions.c",
+						2185,
+						!actor->state.action_data.charge.finished_melee_attack &&
+							!actor->state.action_data.charge.aborted_melee_attack &&
+							!actor->state.action_data.charge.unable_to_advance);
+				}
+				else if (actor->state.action_data.charge.goal ==
+						_charge_goal_vehicle_strafing ||
+					actor->state.action_data.charge.goal ==
+						_charge_goal_vehicle_ramming)
+				{
+					match_assert(
+						"c:\\halo\\SOURCE\\ai\\actions.c",
+						2189,
 						!actor->state.action_data.charge.unable_to_advance);
+				}
 			}
-			else if (actor->state.action_data.charge.goal ==
-					_charge_goal_vehicle_strafing ||
-				actor->state.action_data.charge.goal ==
-					_charge_goal_vehicle_ramming)
+			else
 			{
 				match_assert(
 					"c:\\halo\\SOURCE\\ai\\actions.c",
-					2189,
-					!actor->state.action_data.charge.unable_to_advance);
+					2194,
+					actor->state.action == _actor_action_fight);
 			}
-		}
-		else
-		{
-			match_assert(
-				"c:\\halo\\SOURCE\\ai\\actions.c",
-				2194,
-				actor->state.action == _actor_action_fight);
 		}
 	}
 
@@ -4492,7 +4459,7 @@ result_exit:
 	return result;
 }
 
-static boolean code_0000c970(
+static boolean actor_action_find_escape_from_danger(
 	long actor_index,
 	short *escape_direction_reference,
 	real *escape_distance_reference,
@@ -4575,16 +4542,15 @@ static boolean code_0000c970(
 		right_vector.j = -alignment_vector.i;
 		right_vector.k = 0.0f;
 
-		point_from_line3d(
-			body_position,
-			&left_vector,
-			evade_distance,
-			&left_position);
-		point_from_line3d(
-			&actor->input.position.body_position,
-			&right_vector,
-			evade_distance,
-			&right_position);
+		left_position.x = left_vector.i * evade_distance + body_position->x;
+		left_position.y = left_vector.j * evade_distance + body_position->y;
+		left_position.z = left_vector.k * evade_distance + body_position->z;
+		right_position.x = right_vector.i * evade_distance +
+			actor->input.position.body_position.x;
+		right_position.y = right_vector.j * evade_distance +
+			actor->input.position.body_position.y;
+		right_position.z = right_vector.k * evade_distance +
+			actor->input.position.body_position.z;
 
 		left_found = actor_move_try_evasion_vector(
 			actor_index,
@@ -4713,7 +4679,7 @@ boolean actor_action_handle_vehicle_exit(
 
 		if (actor->input.vehicle_passenger &&
 			(actor->input.delayed_attached_projectile_index != NONE ||
-				(actor->danger_zone.danger_type == _actor_danger_projectile &&
+				(actor->danger_zone.danger_type == _actor_danger_zone_projectile &&
 					actor->danger_zone.attached_to_us)))
 		{
 			want_exit = TRUE;
@@ -4763,7 +4729,8 @@ boolean actor_action_handle_evasion(
 			prop_get(actor->emotions.unopposable_retreat_prop_index);
 
 		if (prop->unopposable_enemy &&
-			(prop->line_of_sight == 0 || prop->line_of_sight == 1) &&
+			(prop->line_of_sight == _ai_line_of_sight_clear ||
+				prop->line_of_sight == _ai_line_of_sight_occluded) &&
 			(actor->emotions.last_defensive_cover_seeking_time == NONE ||
 				actor->emotions.last_defensive_cover_seeking_time + 30 <=
 					current_time))
@@ -4777,119 +4744,125 @@ boolean actor_action_handle_evasion(
 					FALSE,
 					TRUE))
 				{
-					return TRUE;
+					result = TRUE;
 				}
-				if (TEST_FLAG(
+				else if (TEST_FLAG(
 						definition->flags,
 						_actor_definition_panicked_by_unopposable_enemy_bit) &&
 					actor_action_try_to_panic(
 						actor_index,
-						5,
+						_actor_panic_unopposable_enemy,
 						actor->emotions.unopposable_retreat_prop_index,
 						FALSE))
 				{
 					result = TRUE;
-					return result;
 				}
 			}
 		}
 	}
 
-	if (!actor->emotions.currently_defending || actor->emotions.berserk)
-		dive_threshold =
-			definition->defensive.evasion_danger_threshold_attacking;
-	else
-		dive_threshold =
-			definition->defensive.evasion_danger_threshold_defending;
-
-	if (actor->external_orders.playfighting &&
-		definition->defensive.evasion_seek_cover_chance > 0.0f &&
-		dive_threshold > 1.1f)
+	if (!result)
 	{
-		dive_threshold = 1.1f;
-	}
-
-	/* Keep the original NaN behavior: an unordered danger comparison does
-	 * not start an evasion. */
-	if (!(actor->emotions.perceived_danger > dive_threshold))
-		return result;
-
-	if (!actor->control.moving)
-		real_seed_random(get_global_random_seed_address());
-
-	if (variant_definition->grenade_combat.stimulus_type ==
-			_actor_grenade_stimulus_seek_cover &&
-		actor_action_consider_grenade(actor_index))
-	{
-		actor->emotions.perceived_danger = 0.0f;
-		result = TRUE;
-	}
-
-	prop_dangerous = TRUE;
-	not_fleeing = TRUE;
-
-	if (actor->emotions.defensive_crouch &&
-		TEST_FLAG(
-			definition->flags,
-			_actor_definition_crouch_try_not_to_move_bit))
-	{
-		prop_dangerous = FALSE;
-
-		if (actor->target.target_prop_index != NONE)
+		if (!actor->emotions.currently_defending || actor->emotions.berserk)
 		{
-			struct prop_datum *prop = prop_get(actor->target.target_prop_index);
+			dive_threshold =
+				definition->defensive.evasion_danger_threshold_attacking;
+		}
+		else
+		{
+			dive_threshold =
+				definition->defensive.evasion_danger_threshold_defending;
+		}
 
-			if (prop->quantized_facing <= 2 &&
-				prop->quantized_distance <= 1)
+		if (actor->external_orders.playfighting &&
+			definition->defensive.evasion_seek_cover_chance > 0.0f &&
+			dive_threshold > 1.1f)
+		{
+			dive_threshold = 1.1f;
+		}
+
+		if (actor->emotions.perceived_danger > dive_threshold)
+		{
+			if (!actor->control.moving)
+				real_seed_random(get_global_random_seed_address());
+
+			if (variant_definition->grenade_combat.stimulus_type ==
+					_actor_grenade_stimulus_seek_cover &&
+				actor_action_consider_grenade(actor_index))
 			{
-				prop_dangerous = TRUE;
+				actor->emotions.perceived_danger = 0.0f;
+				result = TRUE;
+			}
+
+			prop_dangerous = TRUE;
+			not_fleeing = TRUE;
+
+			if (actor->emotions.defensive_crouch &&
+				TEST_FLAG(
+					definition->flags,
+					_actor_definition_crouch_try_not_to_move_bit))
+			{
+				prop_dangerous = FALSE;
+
+				if (actor->target.target_prop_index != NONE)
+				{
+					struct prop_datum *prop =
+						prop_get(actor->target.target_prop_index);
+
+					if (prop->quantized_facing <= 2 &&
+						prop->quantized_distance <= 1)
+					{
+						prop_dangerous = TRUE;
+					}
+				}
+			}
+
+			if (actor->state.action == _actor_action_charge &&
+				(actor->state.action_data.charge.goal == _charge_goal_melee ||
+					actor->state.action_data.charge.goal ==
+						_charge_goal_melee_leaping))
+			{
+				not_fleeing = FALSE;
+			}
+
+			if (!result &&
+				prop_dangerous &&
+				(actor->emotions.last_defensive_cover_seeking_time == NONE ||
+					actor->emotions.last_defensive_cover_seeking_time + 30 <=
+						current_time))
+			{
+				actor->emotions.last_defensive_cover_seeking_time = current_time;
+
+				if (actor_action_allow_cover_seeking(actor_index, FALSE) &&
+					real_seed_random(get_global_random_seed_address()) <
+						definition->defensive.evasion_seek_cover_chance &&
+					actor_action_try_to_seek_cover(actor_index, FALSE, TRUE))
+				{
+					ai_communication_event(
+						_ai_communication_cover,
+						actor->meta.unit_index,
+						actor_target_unit_index(actor_index),
+						NONE,
+						NONE,
+						NONE,
+						FALSE);
+					actor->emotions.perceived_danger = 0.0f;
+					result = TRUE;
+				}
+			}
+
+			if (!result &&
+				not_fleeing &&
+				!actor->emotions.evasion_delay_timer &&
+				actor_action_try_to_evade(actor_index))
+			{
+				actor->emotions.perceived_danger = 0.0f;
+				actor->emotions.evasion_delay_timer =
+					(short)(definition->defensive.evasion_delay_timer * 30.0f);
+				actor->firing_positions.moved_away_from_firing_position = TRUE;
+				result = TRUE;
 			}
 		}
-	}
-
-	if (actor->state.action == _actor_action_charge &&
-		(actor->state.action_data.charge.goal == _charge_goal_melee ||
-			actor->state.action_data.charge.goal == _charge_goal_melee_leaping))
-	{
-		not_fleeing = FALSE;
-	}
-
-	if (!result &&
-		prop_dangerous &&
-		(actor->emotions.last_defensive_cover_seeking_time == NONE ||
-			actor->emotions.last_defensive_cover_seeking_time + 30 <=
-				current_time))
-	{
-		actor->emotions.last_defensive_cover_seeking_time = current_time;
-
-		if (actor_action_allow_cover_seeking(actor_index, FALSE) &&
-			real_seed_random(get_global_random_seed_address()) <
-				definition->defensive.evasion_seek_cover_chance &&
-			actor_action_try_to_seek_cover(actor_index, FALSE, TRUE))
-		{
-			ai_communication_event(
-				_ai_communication_cover,
-				actor->meta.unit_index,
-				actor_target_unit_index(actor_index),
-				NONE,
-				NONE,
-				NONE,
-				FALSE);
-			actor->emotions.perceived_danger = 0.0f;
-			return TRUE;
-		}
-	}
-
-	if (!result &&
-		not_fleeing &&
-		!actor->emotions.evasion_delay_timer &&
-		actor_action_try_to_evade(actor_index))
-	{
-		actor->emotions.perceived_danger = 0.0f;
-		actor->emotions.evasion_delay_timer =
-			(short)(definition->defensive.evasion_delay_timer * 30.0f);
-		actor->firing_positions.moved_away_from_firing_position = TRUE;
-		return TRUE;
 	}
 
 	return result;
@@ -4935,25 +4908,25 @@ boolean actor_action_handle_danger_avoidance(
 	real_vector3d danger_line_delta;
 
 	debug_info->danger_avoidance_time = game_time_get();
-	debug_info->danger_decision = 0;
-	debug_info->dive_decision = 0;
+	debug_info->danger_decision = _danger_avoidance_none;
+	debug_info->dive_decision = _dive_not_attempted;
 	debug_info->danger_abandoned_path = FALSE;
 
 	if (!actor->danger_zone.danger_type)
 	{
-		debug_info->danger_decision = 0;
+		debug_info->danger_decision = _danger_avoidance_none;
 		goto try_avoid_action;
 	}
 
 	if (!actor->danger_zone.noticed_danger)
 	{
-		debug_info->danger_decision = 1;
+		debug_info->danger_decision = _danger_avoidance_unnoticed;
 		goto try_avoid_action;
 	}
 
 	if (actor->danger_zone.attached_to_us)
 	{
-		debug_info->danger_decision = 13;
+		debug_info->danger_decision = _danger_avoidance_attached_to_us;
 		goto try_avoid_action;
 	}
 
@@ -4977,7 +4950,7 @@ boolean actor_action_handle_danger_avoidance(
 			(reference_z * reference_z + reference_x * reference_x) >
 			reference_radius * reference_radius)
 		{
-			debug_info->danger_decision = 4;
+			debug_info->danger_decision = _danger_avoidance_far_away;
 			debug_info->danger_far_dist = distance3d(
 				body_position,
 				danger_reference);
@@ -4989,13 +4962,13 @@ boolean actor_action_handle_danger_avoidance(
 
 	if (actor_move_animation_busy(actor_index))
 	{
-		debug_info->danger_decision = 2;
+		debug_info->danger_decision = _danger_avoidance_animation_busy;
 		goto try_avoid_action;
 	}
 
 	if (actor->input.vehicle_passenger)
 	{
-		debug_info->danger_decision = 3;
+		debug_info->danger_decision = _danger_avoidance_vehicle;
 		goto try_avoid_action;
 	}
 
@@ -5082,7 +5055,7 @@ boolean actor_action_handle_danger_avoidance(
 
 		if (!body_within_danger)
 		{
-			debug_info->danger_decision = 5;
+			debug_info->danger_decision = _danger_avoidance_outside_zone;
 			debug_info->danger_zone_dist =
 				square_root(body_line_distance_squared);
 			debug_info->danger_zone_radius = actor->danger_zone.danger_radius;
@@ -5103,7 +5076,7 @@ boolean actor_action_handle_danger_avoidance(
 
 		switch (actor->danger_zone.danger_type)
 		{
-		case 1:
+		case _actor_danger_zone_suicide:
 			if (urgency == 0.0f &&
 				actor->danger_zone.suicide.time_until_death != NONE &&
 				actor->danger_zone.suicide.time_until_death < 30)
@@ -5112,7 +5085,7 @@ boolean actor_action_handle_danger_avoidance(
 			}
 			break;
 
-		case 2:
+		case _actor_danger_zone_projectile:
 			if (urgency == 0.0f &&
 				actor->danger_zone.projectile.time_until_explosion != NONE &&
 				actor->danger_zone.projectile.time_until_explosion < 20)
@@ -5121,33 +5094,41 @@ boolean actor_action_handle_danger_avoidance(
 			}
 			break;
 
-		case 3:
-			reaction_is_urgent = urgency < 30.0f;
+		case _actor_danger_zone_vehicle:
+			if (urgency < 30.0f)
+				reaction_is_urgent = TRUE;
 			break;
 		}
 
 		if ((!actor->danger_zone.hostility || reaction_is_urgent) &&
 			!actor->danger_zone.communicated)
 		{
-			short hostility = NONE;
+			long hostility = NONE;
 
 			switch (actor->danger_zone.hostility)
 			{
-			case 0: hostility = 3; break;
-			case 1: hostility = 2; break;
-			case 2: hostility = 1; break;
+			case _actor_danger_hostility_enemy:
+				hostility = _comm_hostility_enemy;
+				break;
+			case _actor_danger_hostility_friend:
+				hostility = _comm_hostility_friend;
+				break;
+			case _actor_danger_hostility_self:
+				hostility = _comm_hostility_self;
+				break;
 			}
 
-			if (actor->danger_zone.danger_type == 2)
+			if (actor->danger_zone.danger_type ==
+				_actor_danger_zone_projectile)
 			{
 				ai_communication_event(
-					12,
+					_ai_communication_grenade_danger,
 					actor->meta.unit_index,
 					NONE,
 					hostility,
 					NONE,
-				NONE,
-				FALSE);
+					NONE,
+					FALSE);
 			}
 
 			actor->danger_zone.communicated = TRUE;
@@ -5158,7 +5139,7 @@ boolean actor_action_handle_danger_avoidance(
 			boolean escape_found;
 			boolean escape_is_ledge;
 
-			escape_found = code_0000c970(
+			escape_found = actor_action_find_escape_from_danger(
 				actor_index,
 				&escape_direction,
 				&escape_distance,
@@ -5167,7 +5148,8 @@ boolean actor_action_handle_danger_avoidance(
 
 			if (escape_direction == NONE)
 			{
-				debug_info->danger_decision = 7;
+				debug_info->danger_decision =
+					_danger_avoidance_no_safe_direction;
 				goto try_avoid_action;
 			}
 
@@ -5178,36 +5160,41 @@ boolean actor_action_handle_danger_avoidance(
 
 				switch (actor->danger_zone.danger_type)
 				{
-				case 1:
+				case _actor_danger_zone_suicide:
 					if ((escape_found || escape_is_ledge) && urgency == 0.0f)
 					{
-						debug_info->danger_decision = 9;
+						debug_info->danger_decision =
+							_danger_avoidance_can_avoid;
 						should_dive = TRUE;
 					}
 					else if (reaction_is_urgent)
 					{
-						debug_info->danger_decision = 10;
+						debug_info->danger_decision =
+							_danger_avoidance_imminent_explosion;
 						should_dive = TRUE;
 					}
 					break;
 
-				case 2:
+				case _actor_danger_zone_projectile:
 					if ((escape_found || escape_is_ledge) && urgency < 7.0f)
 					{
-						debug_info->danger_decision = 9;
+						debug_info->danger_decision =
+							_danger_avoidance_can_avoid;
 						should_dive = TRUE;
 					}
 					else if (reaction_is_urgent)
 					{
-						debug_info->danger_decision = 10;
+						debug_info->danger_decision =
+							_danger_avoidance_imminent_explosion;
 						should_dive = TRUE;
 					}
 					break;
 
-				case 3:
+				case _actor_danger_zone_vehicle:
 					if (reaction_is_urgent)
 					{
-						debug_info->danger_decision = 11;
+						debug_info->danger_decision =
+							_danger_avoidance_imminent_impact;
 						should_dive = TRUE;
 					}
 					break;
@@ -5232,13 +5219,13 @@ boolean actor_action_handle_danger_avoidance(
 				}
 				else
 				{
-					debug_info->danger_decision = 8;
+					debug_info->danger_decision = _danger_avoidance_no_desire;
 					debug_info->danger_intersect_time = urgency;
 				}
 			}
 			else
 			{
-				debug_info->danger_decision = 6;
+				debug_info->danger_decision = _danger_avoidance_evasion_disallowed;
 			}
 		}
 	}
@@ -5252,7 +5239,8 @@ try_avoid_action:
 		struct action_state_data action_data;
 		short action_class = actor_action_class(actor_index);
 
-		if ((action_class == 1 || action_class == 3) &&
+		if ((action_class == _action_class_passive ||
+				action_class == _action_class_pursuit) &&
 			action_avoid_setup(actor_index, &action_data.avoid))
 		{
 			actor_action_change(actor_index, _actor_action_avoid, &action_data);

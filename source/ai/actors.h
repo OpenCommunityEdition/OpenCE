@@ -140,11 +140,42 @@ enum
 	NUMBER_OF_ACTOR_POSTCOMBAT_ACTIONS,
 };
 
-enum
+enum destination_type
 {
-	_actor_destination_none = 0,
-	_actor_destination_firing_position = 3,
-	_actor_destination_move_position = 4,
+	_destination_none = 0,
+	_destination_halt,
+	_destination_raw_location,
+	_destination_firing_position,
+	_destination_move_position,
+	_destination_prop,
+	NUMBER_OF_DESTINATION_TYPES,
+};
+
+enum actor_vehicle_driver_type
+{
+	_actor_vehicle_driver_none = 0,
+	_actor_vehicle_driver_unknown,
+	_actor_vehicle_driver_hovering_ground,
+	_actor_vehicle_driver_nondirectional_ground,
+	_actor_vehicle_driver_directional_flying,
+	NUMBER_OF_ACTOR_VEHICLE_DRIVER_TYPES,
+};
+
+enum actor_danger_zone_type
+{
+	_actor_danger_zone_none = 0,
+	_actor_danger_zone_suicide,
+	_actor_danger_zone_projectile,
+	_actor_danger_zone_vehicle,
+	number_of_actor_danger_zone_types,
+};
+
+enum actor_danger_zone_hostility
+{
+	_actor_danger_hostility_enemy = 0,
+	_actor_danger_hostility_friend,
+	_actor_danger_hostility_self,
+	NUMBER_OF_ACTOR_DANGER_ZONE_HOSTILITIES,
 };
 
 enum

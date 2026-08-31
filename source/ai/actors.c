@@ -298,7 +298,6 @@ enum
 	_actor_mode_alert = 2,
 	_actor_switch_props_fire_target_none = 0,
 	_actor_switch_props_fire_target_prop,
-	_actor_switch_props_destination_prop = 5,
 };
 
 /* ---------- macros */
@@ -696,12 +695,12 @@ void actor_switch_props(
 	}
 
 	if (actor->control.path.destination_orders.destination_type ==
-			_actor_switch_props_destination_prop &&
+			_destination_prop &&
 		actor->control.path.destination_orders.prop.prop_index == old_prop_index)
 	{
 		if (new_prop_index == NONE)
 		{
-			actor->control.path.destination_orders.destination_type = _actor_destination_none;
+			actor->control.path.destination_orders.destination_type = _destination_none;
 			actor->control.path.destination_orders.ignore_target_object_index = NONE;
 		}
 		else
@@ -757,10 +756,10 @@ void actor_flush_position_indices(
 
 	actor->firing_positions.current_position_index = NONE;
 
-	if (actor->control.path.destination_orders.destination_type == _actor_destination_firing_position ||
-		actor->control.path.destination_orders.destination_type == _actor_destination_move_position)
+	if (actor->control.path.destination_orders.destination_type == _destination_firing_position ||
+		actor->control.path.destination_orders.destination_type == _destination_move_position)
 	{
-		actor->control.path.destination_orders.destination_type = _actor_destination_none;
+		actor->control.path.destination_orders.destination_type = _destination_none;
 		actor->control.path.destination_orders.ignore_target_object_index = NONE;
 	}
 
