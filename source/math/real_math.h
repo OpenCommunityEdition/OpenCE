@@ -233,8 +233,6 @@ if (!valid_real_matrix4x3(matrix))															\
 
 /* ---------- structures */
 
-typedef float real;
-
 union real_euler_angles2d
 {
 	real n[2];

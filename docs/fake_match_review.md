@@ -36,6 +36,12 @@ target CFG/relocations, or a credible contemporary codebase supports it. Re-run
 the strict object and regression gates after any resulting edit. Exact bytes
 alone are not provenance.
 
+Semantic validity is an admission requirement even when every byte matches.
+Reject code whose behavior is nonsensical, whose conditions or data flow are
+meaningless, or whose source shape almost certainly would not have existed in
+the original program. A coincidental exact result must be reverted or replaced
+with the best honest fuzzy reconstruction and parked with its evidence.
+
 The rule set intentionally omits several noisy shortcuts. It does not condemn
 ordinary `volatile` declarations, generic representation casts, `!!value`, or
 `value != value`; those can express hardware synchronization, serialization,

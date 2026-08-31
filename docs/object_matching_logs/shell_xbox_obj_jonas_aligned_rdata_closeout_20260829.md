@@ -14,8 +14,9 @@ unchanged, with SHA-256
 `e2595f5b4deb0218eaa1c0333bc71d6174c181c00f35ebf8e937d5112de74f9f`.
 The split target object SHA-256 is
 `a031df3f8221220242213a247345bf724f97e88e3b5ede1edadada87556764ff`;
-the rebuilt base object SHA-256 is
-`ce9cc15f7195777449148593b9b5c85201696d505dd84ede933251e10cfa6c4c`.
+after the 2026-08-31 authenticated `cseries.h` declaration restoration, the
+rebuilt base object SHA-256 is
+`d96e025c99eab103119620b8660f15719c7409f60f4be208d15d2a98a85353cb`.
 
 ## Function proof
 
@@ -53,13 +54,20 @@ section independently:
 | --- | --- | ---: | ---: | ---: | --- |
 | `??_C@_06GAOAIMNN@xdemo?5?$AA@` | same | 7 / 8 | `1076891712` | 0 | `2d636beaf6ef18262eb352ea8a00f3b1b0ee3628666eb07e679892eca5f08b5e` |
 | `??_C@_06PFFNFMJI@XDEMOS?$AA@` | same | 7 / 8 | `1076891712` | 0 | `798ec2f79c908eed7153344688b0def452386891f2deae50826a2658182e9bd5` |
-| `_rdata_002a0a88` | `$T18261` | 12 / 16 | `1077940288` | 2 | `3414421b183188342209566fad4e0c0723070b4030630dde685ba70281e92725` |
+| `_rdata_002a0a88` | `$T18267` | 12 / 16 | `1077940288` | 2 | `3414421b183188342209566fad4e0c0723070b4030630dde685ba70281e92725` |
 
 The two scope-table relocations occur at table offsets `+4` and `+8`, with
 equal type and source-relative destinations `_main+81` and `_main+99`.
 Target and base deliberately retain their distinct producer owner snapshots:
 the target owner has storage class 2 and the compiler-local base owner has
 storage class 3. The existing 8-byte BSS span is already ordinary exact.
+
+The 2026-08-31 `cseries.h` restoration changed only the compiler-local scope
+table spelling from `$T18261` to `$T18267`. This is not inferred from the name:
+the current rebuilt section was re-identified by its unique 12-byte `.rdata`
+layout, flags, two relocations, and payload hash. Direct source-relative
+comparison still proves the same relocation addresses `+4`/`+8`, type 6, and
+destinations `_main+81`/`_main+99`. No data credit or exception was expanded.
 
 The grouped verifier is an evidence check, not an equality waiver. It requires
 a unique non-code owner at offset zero; equal normalized payload, relocation

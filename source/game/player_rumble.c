@@ -23,7 +23,7 @@ symbols in this file:
 000A9140 0060:
 	_rumble_dispose_from_old_map (0000)
 000A91A0 01a0:
-	_code_000a91a0 (0000)
+	_rumble_calculate (0000)
 000A9340 0130:
 	_rumble_update (0000)
 0025CE94 0007:
@@ -33,7 +33,7 @@ symbols in this file:
 0025CEB0 0024:
 	??_C@_0CE@KKOMCMLO@c?3?2halo?2SOURCE?2game?2player_rumbl@ (0000)
 00453404 0004:
-	_bss_00453404 (0000)
+	_rumble_globals (0000)
 */
 
 /* ---------- headers */
@@ -51,29 +51,12 @@ symbols in this file:
 enum
 {
 	MAXIMUM_RUMBLE_IMPULSES = 8,
-	NUMBER_OF_RUMBLE_MOTORS = 2,
 	MAXIMUM_RUMBLE_MOTOR_VALUE = 65535
 };
 
 /* ---------- macros */
 
 /* ---------- structures */
-
-struct rumble_motor
-{
-	real scale;
-	real duration;
-	short transition_function;
-	short pad;
-	real unused[2];
-};
-
-struct rumble_definition
-{
-	struct rumble_motor motors[NUMBER_OF_RUMBLE_MOTORS];
-	real scale_floor;
-	byte unused[16];
-};
 
 struct rumble_player
 {
@@ -99,42 +82,22 @@ struct rumble_motor_values
 
 /* ---------- prototypes */
 
-void rumble_initialize(
-	void);
-void rumble_initialize_for_new_map(
-	void);
-void rumble_dispose_from_old_map(
-	void);
-void rumble_player_set_scale(
-	real scale);
-void rumble_player_impulse(
-	short local_player_index,
-	struct rumble_definition *rumble_definition,
-	real scale,
-	real duration_scale);
-void rumble_player_continuous(
-	short local_player_index,
-	real left_motor,
-	real right_motor);
-void rumble_update(
-	void);
-
-static struct rumble_motor_values code_000a91a0(
+static struct rumble_motor_values rumble_calculate(
 	struct rumble_player *player);
 
 /* ---------- globals */
 
-static struct rumble_globals *bss_00453404;
+static struct rumble_globals *rumble_globals;
 
 /* ---------- public code */
 
 void rumble_initialize(
 	void)
 {
-	bss_00453404 = (struct rumble_globals *)game_state_malloc(
+	rumble_globals = (struct rumble_globals *)game_state_malloc(
 		"rumble",
 		NULL,
-		sizeof(*bss_00453404));
+		sizeof(*rumble_globals));
 
 	return;
 }
@@ -148,7 +111,7 @@ void rumble_dispose(
 void rumble_initialize_for_new_map(
 	void)
 {
-	csmemset(bss_00453404, 0, sizeof(*bss_00453404));
+	csmemset(rumble_globals, 0, sizeof(*rumble_globals));
 
 	return;
 }
@@ -157,8 +120,8 @@ void rumble_player_set_scripted_values(
 	real left_motor,
 	real right_motor)
 {
-	bss_00453404->scripted_left_motor = left_motor;
-	bss_00453404->scripted_right_motor = right_motor;
+	rumble_globals->scripted_left_motor = left_motor;
+	rumble_globals->scripted_right_motor = right_motor;
 
 	return;
 }
@@ -166,7 +129,7 @@ void rumble_player_set_scripted_values(
 void rumble_player_set_scale(
 	real scale)
 {
-	bss_00453404->scripted_scale = scale;
+	rumble_globals->scripted_scale = scale;
 
 	return;
 }
@@ -177,7 +140,7 @@ void rumble_player_impulse(
 	real scale,
 	real duration_scale)
 {
-	struct rumble_player *player = &bss_00453404->players[local_player_index];
+	struct rumble_player *player = &rumble_globals->players[local_player_index];
 	struct rumble_definition *impulse = player->impulses;
 	real longest = player->impulse_time[0];
 	real motor_scale;
@@ -241,7 +204,7 @@ void rumble_player_clear(
 	short local_player_index)
 {
 	csmemset(
-		&bss_00453404->players[local_player_index],
+		&rumble_globals->players[local_player_index],
 		0,
 		sizeof(struct rumble_player));
 
@@ -253,7 +216,7 @@ void rumble_clear_all_now(
 {
 	long gamepad_index;
 
-	csmemset(bss_00453404, 0, sizeof(*bss_00453404));
+	csmemset(rumble_globals, 0, sizeof(*rumble_globals));
 
 	for (gamepad_index = 0;
 		gamepad_index < MAXIMUM_LOCAL_PLAYERS;
@@ -276,7 +239,7 @@ void rumble_player_continuous(
 	real left_motor,
 	real right_motor)
 {
-	struct rumble_player *player = &bss_00453404->players[local_player_index];
+	struct rumble_player *player = &rumble_globals->players[local_player_index];
 
 	player->continuous_left = left_motor;
 	player->continuous_right = right_motor;
@@ -297,7 +260,7 @@ void rumble_dispose_from_old_map(
 		input_set_gamepad_rumbler_state(gamepad_index, 0, 0);
 	}
 
-	csmemset(bss_00453404, 0, sizeof(*bss_00453404));
+	csmemset(rumble_globals, 0, sizeof(*rumble_globals));
 
 	for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
 	{
@@ -321,8 +284,8 @@ void rumble_update(
 		local_player_index++)
 	{
 		struct rumble_player *player =
-			&bss_00453404->players[local_player_index];
-		struct rumble_motor_values motors = code_000a91a0(player);
+			&rumble_globals->players[local_player_index];
+		struct rumble_motor_values motors = rumble_calculate(player);
 		long player_index;
 
 		for (impulse_index = 0;
@@ -368,12 +331,7 @@ void rumble_update(
 
 /* ---------- private code */
 
-/* NonMatching: the readable mixer is required for January's private EAX
- * helper convention, which makes rumble_update strict-exact. The remaining
- * mixer difference is limited to VC7 float-to-integer lowering: the ordinary
- * build emits 19 relocations against January's 12. Do not replace the casts
- * with assembly, /QIfist, volatile forcing, or representation tricks. */
-static struct rumble_motor_values code_000a91a0(
+static struct rumble_motor_values rumble_calculate(
 	struct rumble_player *player)
 {
 	struct rumble_motor_values values;
@@ -409,25 +367,25 @@ static struct rumble_motor_values code_000a91a0(
 		}
 	}
 
-	if (bss_00453404->scripted_scale != 0.0f)
+	if (rumble_globals->scripted_scale != 0.0f)
 	{
-		motors[0] += bss_00453404->scripted_left_motor *
-			bss_00453404->scripted_scale;
-		motors[1] += bss_00453404->scripted_right_motor *
-			bss_00453404->scripted_scale;
+		motors[0] += rumble_globals->scripted_left_motor *
+			rumble_globals->scripted_scale;
+		motors[1] += rumble_globals->scripted_right_motor *
+			rumble_globals->scripted_scale;
 	}
 
 	value = PIN(
 		motors[0] * (real)MAXIMUM_RUMBLE_MOTOR_VALUE,
 		0.0f,
 		(real)MAXIMUM_RUMBLE_MOTOR_VALUE);
-	values.left = (word)(long)value;
+	values.left = (word)fast_ftol(value);
 
 	value = PIN(
 		motors[1] * (real)MAXIMUM_RUMBLE_MOTOR_VALUE,
 		0.0f,
 		(real)MAXIMUM_RUMBLE_MOTOR_VALUE);
-	values.right = (word)(long)value;
+	values.right = (word)fast_ftol(value);
 
 	return values;
 }

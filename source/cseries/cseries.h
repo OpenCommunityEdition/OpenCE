@@ -153,6 +153,7 @@ enum
 
 typedef unsigned char byte;
 typedef unsigned short word;
+typedef float real;
 
 typedef byte boolean;
 
@@ -295,5 +296,21 @@ extern const union real_rgb_color *global_real_rgb_aqua;
 extern const union real_rgb_color *global_real_rgb_darkgreen;
 extern const union real_rgb_color *global_real_rgb_salmon;
 extern const union real_rgb_color *global_real_rgb_violet;
+
+/* ---------- public code */
+
+__inline long fast_ftol(
+	real value)
+{
+	long result;
+
+	__asm
+	{
+		fld value
+		fistp result
+	}
+
+	return result;
+}
 
 #endif // __CSERIES_H
