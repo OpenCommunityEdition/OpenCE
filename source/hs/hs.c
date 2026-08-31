@@ -2779,6 +2779,7 @@ symbols in this file:
 #include "ai/ai_scenario_definitions.h"
 #include "cutscene/recorded_animation_definitions.h"
 #include "game/game.h"
+#include "interface/hud_messaging.h"
 #include "interface/interface.h"
 #include "tag_files/files.h"
 
@@ -3794,8 +3795,6 @@ short vehicle_scripting_unload(
 	char const *seat_name);
 boolean unit_solo_player_integrated_night_vision_is_active(
 	void);
-void scripted_hud_set_flashing_state(
-	boolean enabled);
 void hud_unit_deactivate_nav_point_with_flag(
 	long unit_index,
 	word flag_index);
@@ -3836,10 +3835,6 @@ void scripted_hud_set_timer_time(
 void scripted_hud_set_timer_warning_cutoff(
 	short minutes,
 	word seconds);
-void scripted_hud_set_timer_position(
-	word x,
-	word y,
-	word corner);
 void scripted_hud_show_timer(
 	boolean show);
 void scripted_hud_pause_timer(
@@ -4256,8 +4251,6 @@ void scripted_hud_restart_flashing(
 void terminal_clear(
 	void);
 void structure_lens_flares_place(
-	void);
-void scripted_hud_messages_clear(
 	void);
 void scripted_hud_time_code_reset(
 	void);

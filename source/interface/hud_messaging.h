@@ -20,7 +20,14 @@ void hud_messaging_dispose_from_old_map(
 	void);
 void hud_messaging_dispose(
 	void);
-void scripted_hud_messages_clear(void);
+void scripted_hud_set_flashing_state(
+	boolean flash);
+void scripted_hud_set_timer_position(
+	short x,
+	short y,
+	short corner);
+void scripted_hud_messages_clear(
+	void);
 void hud_print_message(
 	short local_player_index,
 	wchar_t const *message);

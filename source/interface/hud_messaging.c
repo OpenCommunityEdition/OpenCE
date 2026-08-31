@@ -3,9 +3,9 @@ HUD_MESSAGING.C
 
 symbols in this file:
 000C3810 0080:
-	_code_000c3810 (0000)
+	_render_state_text (0000)
 000C3890 0190:
-	_code_000c3890 (0000)
+	_render_state_bitmap (0000)
 000C3A20 0020:
 	_hud_messaging_initialize (0000)
 000C3A40 0030:
@@ -55,9 +55,9 @@ symbols in this file:
 000C4330 00c0:
 	_hud_messaging_get_objective (0000)
 000C43F0 0080:
-	_code_000c43f0 (0000)
+	_find_free_hud_message (0000)
 000C4470 0030:
-	_code_000c4470 (0000)
+	_compare_messages (0000)
 000C44A0 0040:
 	_scripted_hud_messages_clear (0000)
 000C44E0 0020:
@@ -105,11 +105,11 @@ symbols in this file:
 002700E0 0054:
 	??_C@_0FE@EGLPDJAB@hud_messaging_globals?9?$DOobjective@ (0000)
 002E4C4C 001c:
-	_data_002e4c4c (0000)
+	_button_mappings (0000)
 	_time_code_time (0010)
 	_time_code_stop_time (0014)
 00453AB8 0004:
-	_bss_00453ab8 (0000)
+	_hud_messaging_globals (0000)
 */
 
 /* ---------- headers */
@@ -308,7 +308,7 @@ typedef char hud_globals_messaging_offset_assert[
 
 /* ---------- globals */
 
-extern struct hud_messaging_globals_definition *bss_00453ab8;
+static struct hud_messaging_globals_definition *hud_messaging_globals;
 extern struct hud_globals_definition *hud_globals;
 extern struct hud_messaging_parameters_definition *hud_msg_def;
 extern struct hud_scripted_globals_definition *hud_scripted_globals;
@@ -320,10 +320,10 @@ extern long time_code_stop_time;
 void hud_messaging_initialize(
 	void)
 {
-	bss_00453ab8 = game_state_malloc(
+	hud_messaging_globals = game_state_malloc(
 		"hud messaging",
 		NULL,
-		sizeof(*bss_00453ab8));
+		sizeof(*hud_messaging_globals));
 	return;
 }
 
@@ -331,7 +331,7 @@ void hud_messaging_initialize_for_new_map(
 	void)
 {
 	hud_msg_def = &hud_globals->messaging;
-	csmemset(bss_00453ab8, 0, sizeof(*bss_00453ab8));
+	csmemset(hud_messaging_globals, 0, sizeof(*hud_messaging_globals));
 	return;
 }
 
@@ -358,7 +358,7 @@ void scripted_hud_set_state_message(
 		struct hud_message_text_definition *hud_messages = HUD_MESSAGE_TEXT_DEFINITION_GET(
 			scenario->hud_messages.index);
 
-		bss_00453ab8->help_message = TAG_BLOCK_GET_ELEMENT(
+		hud_messaging_globals->help_message = TAG_BLOCK_GET_ELEMENT(
 			&hud_messages->messages,
 			message_index,
 			struct hud_state_message_definition);
@@ -371,17 +371,15 @@ void scripted_hud_set_flashing_state(
 	boolean flash)
 {
 	long time;
-	struct hud_messaging_globals_definition *globals;
 
-	if (flash && !bss_00453ab8->use_flash)
+	if (flash && !hud_messaging_globals->use_flash)
 	{
 		time = game_time_get();
-		globals = bss_00453ab8;
-		globals->flash_start_time = time;
-		globals->use_flash = flash;
+		hud_messaging_globals->flash_start_time = time;
+		hud_messaging_globals->use_flash = flash;
 		return;
 	}
-	bss_00453ab8->use_flash = flash;
+	hud_messaging_globals->use_flash = flash;
 
 	return;
 }
@@ -389,8 +387,8 @@ void scripted_hud_set_flashing_state(
 void scripted_hud_restart_flashing(
 	void)
 {
-	if (bss_00453ab8->use_flash)
-		bss_00453ab8->flash_start_time = game_time_get();
+	if (hud_messaging_globals->use_flash)
+		hud_messaging_globals->flash_start_time = game_time_get();
 	else
 		error(
 			_error_silent,
@@ -403,7 +401,7 @@ void scripted_hud_set_timer_warning_cutoff(
 	short minutes,
 	word seconds)
 {
-	bss_00453ab8->timer.flash_cutoff = 30 * (60 * minutes + seconds);
+	hud_messaging_globals->timer.flash_cutoff = 30 * (60 * minutes + seconds);
 	return;
 }
 
@@ -412,14 +410,11 @@ void scripted_hud_set_timer_position(
 	short y,
 	short corner)
 {
-	struct hud_messaging_globals_definition *globals = bss_00453ab8;
+	struct hud_messaging_globals_definition *globals = hud_messaging_globals;
 
 	globals->timer.position[0] = x;
 	globals->timer.position[1] = y;
-	if (corner >= 0)
-		globals->timer.corner = corner > 4 ? 4 : corner;
-	else
-		globals->timer.corner = 0;
+	globals->timer.corner = PIN(corner, 0, 4);
 
 	return;
 }
@@ -427,14 +422,14 @@ void scripted_hud_set_timer_position(
 void scripted_hud_show_timer(
 	boolean show)
 {
-	bss_00453ab8->timer.enabled = show;
+	hud_messaging_globals->timer.enabled = show;
 	return;
 }
 
 void scripted_hud_pause_timer(
 	boolean paused)
 {
-	struct hud_timer_data_definition *timer = &bss_00453ab8->timer;
+	struct hud_timer_data_definition *timer = &hud_messaging_globals->timer;
 	short now;
 
 	timer->paused = paused;
@@ -501,7 +496,7 @@ hud_set_state_message_icon(
 	struct icon_hud_element_definition const *icon)
 {
 	struct hud_messaging_datum_definition *datum =
-		&bss_00453ab8->message_data[local_player_index];
+		&hud_messaging_globals->message_data[local_player_index];
 
 	if (datum->state_message.valid &&
 		!hud_scripted_globals->show_hud_help_text &&
@@ -522,7 +517,7 @@ hud_set_state_message_text(
 	boolean uses_scenario_names)
 {
 	struct hud_messaging_datum_definition *datum =
-		&bss_00453ab8->message_data[local_player_index];
+		&hud_messaging_globals->message_data[local_player_index];
 
 	if (datum->state_message.valid &&
 		!hud_scripted_globals->show_hud_help_text &&
@@ -542,7 +537,7 @@ hud_enable_custom_state_message(
 	boolean enabled)
 {
 	struct hud_messaging_datum_definition *datum =
-		&bss_00453ab8->message_data[local_player_index];
+		&hud_messaging_globals->message_data[local_player_index];
 
 	datum->leave_first_line_blank |= datum->state_message.valid != enabled;
 	datum->state_message.valid = enabled;
@@ -565,7 +560,7 @@ void hud_set_state_text(
 	wchar_t const *message)
 {
 	struct hud_messaging_datum_definition *datum =
-		&bss_00453ab8->message_data[local_player_index];
+		&hud_messaging_globals->message_data[local_player_index];
 
 	ustrncpy(
 		datum->state_message.message_buffer,
@@ -579,7 +574,7 @@ void hud_set_state_text(
 void scripted_hud_messages_clear(
 	void)
 {
-	struct hud_messaging_datum_definition *datum = bss_00453ab8->message_data;
+	struct hud_messaging_datum_definition *datum = hud_messaging_globals->message_data;
 	long datum_count = NUMBER_OF_HUD_MESSAGING_DATUMS;
 
 	do
@@ -624,7 +619,7 @@ real_argb_color *hud_get_text_color(
 void hud_messaging_globals_update(
 	void)
 {
-	bss_00453ab8->magic_number = 0;
+	hud_messaging_globals->magic_number = 0;
 	return;
 }
 
