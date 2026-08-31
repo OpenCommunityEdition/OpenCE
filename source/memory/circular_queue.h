@@ -24,11 +24,7 @@ struct circular_queue
 	byte *buffer;
 };
 
-/* ---------- prototypes/EXAMPLE.C */
-
-/* ---------- globals */
-
-/* ---------- public code */
+/* ---------- prototypes/CIRCULAR_QUEUE.C */
 
 void circular_queue_reset(
 	struct circular_queue *queue);
@@ -50,5 +46,9 @@ boolean circular_queue_dequeue_data(
 	void *data,
 	long data_size,
 	boolean advance);
+
+/* ---------- globals */
+
+/* ---------- public code */
 
 #endif // __CIRCULAR_QUEUE_H

@@ -20,7 +20,7 @@ Seven of eight functions are strict exact:
 | Function | Target/base size | Relocs | Normalized SHA-256 | Result |
 | --- | ---: | ---: | --- | --- |
 | `circular_queue_reset` | 16/16 | 0/0 | `43bd388fa461cee2...` | exact |
-| `circular_queue_validate` | 112/112 | 6/6 | `f6a98f7f32feb7df...` | exact |
+| `circular_queue_verify` | 112/112 | 6/6 | `f6a98f7f32feb7df...` | exact |
 | `circular_queue_new` | 96/96 | 4/4 | `89dac4b56b758d67...` | exact |
 | `circular_queue_delete` | 48/48 | 3/3 | `90fd5b668d0661b3...` | exact |
 | `circular_queue_size` | 32/32 | 1/1 | `691530e94ba7f3f2...` | exact |
@@ -34,7 +34,7 @@ code bytes. All five owned `.rdata` COMDATs are raw-byte exact:
 `.bss`.
 
 The residual begins at normalized offset `+0x4`; 222 normalized bytes differ.
-The first relocation has the correct `_circular_queue_validate` destination
+The first relocation has the correct `_circular_queue_verify` destination
 but is at target/base address 14/12. January keeps the queue in `EDI`, the
 input size in `ESI`, initializes `BL` to false, later reuses `EBX` for
 `read_offset`, and returns `BL` only on failure. Current VC7 instead keeps the
@@ -127,6 +127,14 @@ the current residual has unequal padded sizes, it is research-parked here but
 is deliberately **not** admitted to `config/parked.json` under the stricter
 equal-size/equal-relocation parking rule.
 
+### 2026-08-30 policy update
+
+The later house rule permits an honest fuzzy park once easy natural matching is
+exhausted. The 37-experiment result is therefore now recorded in
+`config/parked.json`; the source and measurements are unchanged. This is a
+work-queue disposition, not byte-match credit, and the object remains
+`NonMatching`.
+
 ## Do-not-repeat list
 
 - Do not retry declaration order/scope, `register`, local aliases, scalar
@@ -161,4 +169,4 @@ Reopen only if one of these appears:
 The safe source is restored and remains 7/8 strict exact with 251/251 owned
 data bytes exact. `circular_queue.obj` is **not Matching** and receives no
 object credit. The residual is evidence-exhausted under current provenance and
-parked at the research level pending one of the explicit reopen criteria.
+is now machine-readably parked pending one of the explicit reopen criteria.

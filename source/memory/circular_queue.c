@@ -5,7 +5,7 @@ symbols in this file:
 00108580 0010:
 	_circular_queue_reset (0000)
 00108590 0070:
-	_code_00108590 (0000)
+	_circular_queue_verify (0000)
 00108600 0060:
 	_circular_queue_new (0000)
 00108660 0030:
@@ -49,7 +49,7 @@ enum
 
 /* ---------- prototypes */
 
-static void circular_queue_validate(
+static void circular_queue_verify(
 	struct circular_queue *queue);
 
 /* ---------- globals */
@@ -77,7 +77,7 @@ struct circular_queue *circular_queue_new(
 		queue->signature = CIRCULAR_QUEUE_SIGNATURE;
 		queue->buffer_size = buffer_size + 1;
 		queue->buffer = (byte *)(queue + 1);
-		circular_queue_validate(queue);
+		circular_queue_verify(queue);
 	}
 
 	return queue;
@@ -86,7 +86,7 @@ struct circular_queue *circular_queue_new(
 void circular_queue_delete(
 	struct circular_queue *queue)
 {
-	circular_queue_validate(queue);
+	circular_queue_verify(queue);
 	match_free("c:\\halo\\SOURCE\\memory\\circular_queue.c", 72, queue);
 	return;
 }
@@ -96,7 +96,7 @@ long circular_queue_size(
 {
 	long size;
 
-	circular_queue_validate(queue);
+	circular_queue_verify(queue);
 	size = queue->write_offset - queue->read_offset;
 	if (size < 0)
 		size += queue->buffer_size;
@@ -109,7 +109,7 @@ long circular_queue_free_space(
 {
 	long size;
 
-	circular_queue_validate(queue);
+	circular_queue_verify(queue);
 	size = queue->write_offset - queue->read_offset;
 	if (size < 0)
 		size += queue->buffer_size;
@@ -126,9 +126,9 @@ boolean circular_queue_queue_data(
 	long size;
 	long contiguous_size;
 
-	circular_queue_validate(queue);
+	circular_queue_verify(queue);
 	match_assert("c:\\halo\\SOURCE\\memory\\circular_queue.c", 116, data && data_size>0 && data_size<queue->buffer_size);
-	circular_queue_validate(queue);
+	circular_queue_verify(queue);
 
 	write_offset = queue->write_offset;
 	size = write_offset - queue->read_offset;
@@ -173,10 +173,9 @@ boolean circular_queue_dequeue_data(
 	   docs/object_matching_logs/circular_queue_obj.md. */
 	long read_offset;
 	long contiguous_size;
-	boolean result;
+	boolean result = FALSE;
 
-	result = FALSE;
-	circular_queue_validate(queue);
+	circular_queue_verify(queue);
 	match_assert("c:\\halo\\SOURCE\\memory\\circular_queue.c", 153, data && data_size>0 && data_size<queue->buffer_size);
 
 	if (data_size <= circular_queue_size(queue))
@@ -208,7 +207,7 @@ boolean circular_queue_dequeue_data(
 
 /* ---------- private code */
 
-static void circular_queue_validate(
+static void circular_queue_verify(
 	struct circular_queue *queue)
 {
 	if (!queue ||

@@ -40,6 +40,25 @@
       }
     },
     {
+      "unit": "source/memory/circular_queue",
+      "function": "_circular_queue_dequeue_data",
+      "class": "tu-context-optimization",
+      "evidence": "Fuzzy-parked under the current house rule after 37 recorded legal-C experiments, both compatible local VC7 builds, January and October 2001 machine-topology comparison, donor scanning, and the later HCEA queue family were exhausted. The retained ordinary C preserves all 12 relocation identities, seven strict-exact sibling functions, and every owned rdata byte. January and October materialize FALSE in BL, then reuse EBX for read_offset and keep separate success/failure tails; the current compiler instead assigns the queue to EBX, read_offset to EDI, and folds failure directly into AL, producing 240 padded bytes versus 256. A natural single-iteration loop reaches the BL/EBX lifetime but also triggers a second validator inline, growing to 336 bytes and 17 relocations. Preventing that clone destroys the desired lifetime, while taking the validator address changes its private ABI and regresses exact siblings. Barriers, register hints, forced inlining/noinline, redundant predicates, union overlays, switches, and synthetic control flow are rejected rather than retained. The exact January symbol atlas recovers the private helper name circular_queue_verify. Reopen only for authoritative source/locals, a strict same-topology donor, or a general natural compiler control that prevents the nested clone without changing the helper ABI.",
+      "measurements": {
+        "target": {
+          "size": 256,
+          "relocation_count": 12,
+          "normalized_sha256": "2981341a22238a314c0f885d555149dc279257b6109242e674f38ccfb0ccd1f9"
+        },
+        "base": {
+          "size": 240,
+          "relocation_count": 12,
+          "normalized_sha256": "40adf3be1fa79c0b9aaf6b169e37da2e59aa4e306efef68a9573b7aa7ec8dede"
+        },
+        "objdiff_percent": 93.947365
+      }
+    },
+    {
       "unit": "source/game/game_statistics",
       "function": "_game_statistics_record_kill",
       "class": "register-allocation",
