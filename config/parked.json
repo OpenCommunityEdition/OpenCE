@@ -266,6 +266,25 @@
         },
         "objdiff_percent": 81.614815
       }
+    },
+    {
+      "unit": "source/bitmaps/bitmaps_quantitize",
+      "function": "_row_dither",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked after the full row-dither provenance packet, the later 1,571-worktree freshness census, all ten source identities, both obvious source statement orders, and the declaration/loop-tail/pointer/dependency families were exhausted. The retained natural Floyd-Steinberg C has the same 464-byte padded size, zero relocations, exact frame/control flow, and differs only in the order of three independent loop-maintenance operations: January emits inc EAX; add EBX,2; add ECX,2, while the retained compiler emits add EBX,2; inc EAX; add ECX,2. Reversing the two source statements puts ECX between EAX and EBX instead. Barriers, pragmas, artificial dependencies, volatile/register forcing, inline assembly, and byte patches are rejected. The January atlas and multiple cross-build maps recover row_dither; bitmap_quantitize_read_row and bits_per_channel_reversed are descriptive names because no original private names were found. Reopen only for original local/statement provenance, a same-compiler natural-C donor with this dependency context, or a genuinely new lawful scheduling control.",
+      "measurements": {
+        "target": {
+          "size": 464,
+          "relocation_count": 0,
+          "normalized_sha256": "a5feef0c98bc8565991a9cf9722e0258d2bd556e23fc0326891aa0ce0ebca5db"
+        },
+        "base": {
+          "size": 464,
+          "relocation_count": 0,
+          "normalized_sha256": "7afe02e297bf06dd682a9c44bfd00aacf39c2f7ea0c0f45acce838dc9b696da4"
+        },
+        "objdiff_percent": 98.809525
+      }
     }
   ]
 }

@@ -18,11 +18,23 @@ struct bitmap_data;
 
 /* ---------- prototypes/BITMAPS.C */
 
-/* ---------- prototypes/BITMAP_UTILITIES.C */
+boolean bitmap_verify(
+	struct bitmap_data *bitmap,
+	boolean repair);
+
+void *bitmap_2d_address(
+	struct bitmap_data *bitmap,
+	short x,
+	short y,
+	short mipmap_index);
+
+/* ---------- prototypes/BITMAPS_QUANTITIZE.C */
 
 void bitmap_quantitize(
 	struct bitmap_data *bitmap,
 	short const *bits_per_channel);
+
+/* ---------- prototypes/BITMAP_UTILITIES.C */
 
 real real_rgb_color_brightness(union real_rgb_color const *color);
 

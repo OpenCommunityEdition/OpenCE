@@ -3,9 +3,9 @@ BITMAPS_QUANTITIZE.C
 
 symbols in this file:
 0006D5D0 0020:
-	_code_0006d5d0 (0000)
+	_bitmap_quantitize_read_row (0000)
 0006D5F0 01d0:
-	_code_0006d5f0 (0000)
+	_row_dither (0000)
 0006D7C0 0250:
 	_bitmap_quantitize (0000)
 00255338 0054:
@@ -17,7 +17,7 @@ symbols in this file:
 	_bits_per_channel_a1r5g5b5 (0008)
 	_bits_per_channel_a4r4g4b4 (0010)
 0031C314 0008:
-	_bss_0031c314 (0000)
+	_bits_per_channel_reversed (0000)
 */
 
 /* ---------- headers */
@@ -25,6 +25,7 @@ symbols in this file:
 #include "cseries.h"
 
 #include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmaps.h"
 
 /* ---------- constants */
 
@@ -41,20 +42,11 @@ enum
 
 /* ---------- prototypes */
 
-boolean bitmap_verify(
-	struct bitmap_data *bitmap,
-	boolean repair);
-void *bitmap_2d_address(
-	struct bitmap_data *bitmap,
-	short x,
-	short y,
-	short mipmap_index);
-
-static void code_0006d5d0(
+static void bitmap_quantitize_read_row(
 	short *destination,
 	byte const *source,
 	short pixel_count);
-void code_0006d5f0(
+static void row_dither(
 	short const *bits_per_channel,
 	short const *minimum_error,
 	short pixel_count,
@@ -67,7 +59,7 @@ void code_0006d5f0(
 short bits_per_channel_r5g6b5[CHANNEL_COUNT] = { 0, 5, 6, 5 };
 short bits_per_channel_a1r5g5b5[CHANNEL_COUNT] = { 8, 5, 5, 5 };
 short bits_per_channel_a4r4g4b4[CHANNEL_COUNT] = { 4, 4, 4, 4 };
-short bss_0031c314[CHANNEL_COUNT] = { 0 };
+static short bits_per_channel_reversed[CHANNEL_COUNT] = { 0 };
 
 /* ---------- public code */
 
@@ -93,26 +85,26 @@ void bitmap_quantitize(
 			match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps_quantitize.c", 63, bits_per_channel[channel_index]>=0 && bits_per_channel[channel_index]<=CHANNEL_BITS);
 		}
 		for (channel_index = 0; channel_index < CHANNEL_COUNT; channel_index++)
-			bss_0031c314[CHANNEL_COUNT - 1 - channel_index] = bits_per_channel[channel_index];
+			bits_per_channel_reversed[CHANNEL_COUNT - 1 - channel_index] = bits_per_channel[channel_index];
 
 		for (channel_index = 0; channel_index < CHANNEL_COUNT; channel_index++)
-			minimum_error[channel_index] = (short)((1 << (CHANNEL_BITS - bss_0031c314[channel_index])) * 0.25f);
+			minimum_error[channel_index] = (short)((1 << (CHANNEL_BITS - bits_per_channel_reversed[channel_index])) * 0.25f);
 
 		/* Original behavior: if exactly one allocation fails, the successful
 		 * allocation is leaked. A corrected implementation would free either
 		 * non-NULL buffer before leaving this block. */
 		if (source && next_source)
 		{
-			code_0006d5d0(source, bitmap->base_address, bitmap->width);
+			bitmap_quantitize_read_row(source, bitmap->base_address, bitmap->width);
 
 			for (y = 0; y < bitmap->height - 1; y++)
 			{
-				code_0006d5d0(
+				bitmap_quantitize_read_row(
 					next_source,
 					bitmap_2d_address(bitmap, 0, (short)(y + 1), 0),
 					bitmap->width);
-				code_0006d5f0(
-					bss_0031c314,
+				row_dither(
+					bits_per_channel_reversed,
 					minimum_error,
 					bitmap->width,
 					source,
@@ -125,8 +117,8 @@ void bitmap_quantitize(
 				}
 			}
 
-			code_0006d5f0(
-				bss_0031c314,
+			row_dither(
+				bits_per_channel_reversed,
 				minimum_error,
 				bitmap->width,
 				source,
@@ -141,7 +133,7 @@ void bitmap_quantitize(
 
 /* ---------- private code */
 
-static void code_0006d5d0(
+static void bitmap_quantitize_read_row(
 	short *destination,
 	byte const *source,
 	short pixel_count)
@@ -153,7 +145,7 @@ static void code_0006d5d0(
 	return;
 }
 
-void code_0006d5f0(
+static void row_dither(
 	short const *bits_per_channel,
 	short const *minimum_error,
 	short pixel_count,
