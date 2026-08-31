@@ -375,10 +375,6 @@ void encounter_attach_actor(
 void code_00029e70(
 	long actor_index);
 
-void actor_set_dormant(
-	long actor_index,
-	boolean dormant);
-
 void actor_swarm_detach_from_unit(
 	long actor_index,
 	long unit_index);

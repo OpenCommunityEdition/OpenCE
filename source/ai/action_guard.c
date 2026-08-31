@@ -107,10 +107,6 @@ void ai_communication_event(
 	long structure_index,
 	boolean allow_reply);
 
-void actor_set_dormant(
-	long actor_index,
-	boolean dormant);
-
 long actor_target_unit_index(
 	long actor_index);
 

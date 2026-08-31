@@ -206,6 +206,7 @@ symbols in this file:
 
 #define arccosine arccosine_inline
 #include "cseries/cseries.h"
+#include "ai/actions.h"
 #include "ai/actors.h"
 #include "units/units.h"
 #undef arccosine
@@ -248,12 +249,109 @@ boolean actor_move_animation_busy(
 	return TRUE;
 }
 
+void actor_path_clear(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	actor->control.path.path.valid = FALSE;
+	actor->control.path.at_destination = TRUE;
+	actor->control.path.destination_original_distance = 0.0f;
+
+	return;
+}
+
 boolean actor_path_has_path(
 	long actor_index)
 {
 	struct actor_datum *actor = actor_get(actor_index);
 
 	return actor->control.path.path.valid;
+}
+
+boolean actor_path_at_destination(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	return !actor->control.path.path.valid || actor->control.path.at_destination;
+}
+
+short actor_path_get_destination_firing_position_index(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	short firing_position_index = NONE;
+
+	if (actor->control.path.destination_orders.destination_type == _destination_firing_position)
+		firing_position_index = actor->control.path.destination_orders.firing_position_index;
+
+	return firing_position_index;
+}
+
+boolean actor_move_animation_impulse(
+	long actor_index,
+	short impulse,
+	real_vector2d const *alignment_vector)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean result = FALSE;
+
+	actor_set_dormant(actor_index, FALSE);
+
+	if (!actor_move_animation_busy(actor_index))
+	{
+		actor->orders.move.animation.impulse = impulse;
+		actor->orders.move.animation.alignment_vector = *alignment_vector;
+		result = TRUE;
+	}
+
+	return result;
+}
+
+boolean actor_move_force_stop(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean result = FALSE;
+
+	if (!actor_move_animation_busy(actor_index) &&
+		!actor_action_deny_transition(actor_index))
+	{
+		actor->control.moving = FALSE;
+		actor->output.throttle = *global_zero_vector3d;
+		actor_unit_control_stop_animation_impulse(actor_index);
+		result = TRUE;
+	}
+
+	return result;
+}
+
+void actor_move_transform_avoidance_vector(
+	struct vector_avoidance_data *avoidance_data,
+	real_vector3d const *avoidance_vector,
+	real_vector3d *direction_vector)
+{
+	real component;
+
+	*direction_vector = *global_zero_vector3d;
+
+	component = avoidance_vector->i;
+	direction_vector->i += component * avoidance_data->forward.i;
+	direction_vector->j += component * avoidance_data->forward.j;
+	direction_vector->k += component * avoidance_data->forward.k;
+
+	component = avoidance_vector->j;
+	direction_vector->i += component * avoidance_data->left.i;
+	direction_vector->j += component * avoidance_data->left.j;
+	direction_vector->k += component * avoidance_data->left.k;
+
+	component = avoidance_vector->k;
+	direction_vector->i += component * avoidance_data->up.i;
+	direction_vector->j += component * avoidance_data->up.j;
+	direction_vector->k += component * avoidance_data->up.k;
+
+	return;
 }
 
 real arccosine(

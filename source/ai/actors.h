@@ -831,6 +831,9 @@ void actors_dispose_from_old_map(
 	void);
 real_argb_color const *actor_activation_debug_color(long actor_index);
 
+void actor_set_dormant(
+	long actor_index,
+	boolean dormant);
 boolean actor_get_running_blind_vector(long actor_index, real_vector3d *run_vector);
 boolean actor_has_unlimited_grenades(
 	long actor_index);
@@ -871,6 +874,10 @@ long actor_aim_grenade(long actor_index, real_point3d const *origin, real_vector
 /* ---------- prototypes/ACTOR_MOVING.C */
 
 boolean actor_move_animation_busy(long actor_index);
+boolean actor_move_animation_impulse(
+	long actor_index,
+	short impulse,
+	real_vector2d const *alignment_vector);
 boolean actor_move_to_prop(
 	long actor_index,
 	long prop_index,

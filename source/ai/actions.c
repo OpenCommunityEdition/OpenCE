@@ -684,11 +684,6 @@ real vector_to_line_distance_squared3d(
 	real_point3d const *base,
 	real_vector3d const *height);
 
-boolean actor_move_animation_impulse(
-	long actor_index,
-	short animation,
-	real_vector2d const *direction);
-
 boolean actor_move_try_evasion_direction(
 	long actor_index,
 	real_vector2d *alignment_vector,
