@@ -35,7 +35,7 @@ symbols in this file:
 0000B0A0 00a0:
 	_actor_action_deny_transition (0000)
 0000B140 0040:
-	_code_0000b140 (0000)
+	_actor_action_allowed_to_enter_vehicle (0000)
 0000B180 0150:
 	_actor_action_handle_vehicle_exit (0000)
 0000B2D0 00e0:
@@ -59,7 +59,7 @@ symbols in this file:
 0000BB00 0040:
 	_actor_get_pursuit_location (0000)
 0000BB40 0090:
-	_code_0000bb40 (0000)
+	_actor_pursuit_consider_nearby_actor (0000)
 0000BBD0 0030:
 	_actor_action_name (0000)
 0000BC00 0030:
@@ -897,7 +897,7 @@ void action_avoid_control(
 void action_avoid_end(
 	long actor_index);
 
-static boolean code_0000b140(
+static boolean actor_action_allowed_to_enter_vehicle(
 	long actor_index,
 	long vehicle_index);
 
@@ -2001,7 +2001,7 @@ boolean actor_action_can_stop_conversing(
 	return result;
 }
 
-static boolean code_0000bb40(
+static boolean actor_pursuit_consider_nearby_actor(
 	long actor_index,
 	boolean pursuit_controller,
 	long friend_actor_index)
@@ -2399,7 +2399,7 @@ long actor_pursuit_find_nearby_actors(
 				prop->actor_index != NONE &&
 				(!pursuit_controller ||
 					(prop->state >= 2 && prop->state <= 3)) &&
-				code_0000bb40(
+				actor_pursuit_consider_nearby_actor(
 					actor_index,
 					pursuit_controller,
 					prop->actor_index))
@@ -2427,7 +2427,7 @@ long actor_pursuit_find_nearby_actors(
 			friend_actor = encounter_actor_iterator_next(&actor_iterator))
 		{
 			if (friend_actor->meta.unit_index != NONE &&
-				code_0000bb40(
+				actor_pursuit_consider_nearby_actor(
 					actor_index,
 					pursuit_controller,
 					actor_iterator.actor_index))
@@ -4221,7 +4221,7 @@ boolean actor_action_try_to_enter_vehicle(
 	return FALSE;
 }
 
-static boolean code_0000b140(
+static boolean actor_action_allowed_to_enter_vehicle(
 	long actor_index,
 	long vehicle_index)
 {
@@ -4291,7 +4291,7 @@ boolean actor_action_handle_vehicle_entry(
 				prop->player &&
 				!prop->enemy &&
 				prop->vehicle_index != NONE &&
-				code_0000b140(actor_index, prop->vehicle_index))
+				actor_action_allowed_to_enter_vehicle(actor_index, prop->vehicle_index))
 			{
 				struct unit_datum *vehicle =
 					vehicle_try_and_get(prop->vehicle_index);
@@ -4346,7 +4346,7 @@ boolean actor_action_handle_vehicle_entry(
 			short actor_type_bitmask;
 
 			if (!vehicle_try_and_get(enterable->vehicle_index) ||
-				!code_0000b140(actor_index, enterable->vehicle_index))
+				!actor_action_allowed_to_enter_vehicle(actor_index, enterable->vehicle_index))
 			{
 				continue;
 			}
