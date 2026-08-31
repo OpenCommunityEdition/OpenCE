@@ -44,6 +44,9 @@ void bitmap_vector_map(
 
 real real_rgb_color_brightness(union real_rgb_color const *color);
 
+boolean valid_real_rgb_color(
+	union real_rgb_color const *color);
+
 union real_rgb_color *rgb_colors_interpolate(
 	union real_rgb_color *rgb_result,
 	unsigned long flags,

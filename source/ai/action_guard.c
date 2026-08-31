@@ -131,17 +131,6 @@ boolean actor_nearby_firing_positions(
 	long surface_index,
 	boolean allow_outside_range);
 
-void actor_move_to_point(
-	long actor_index,
-	real_point3d const *point,
-	long surface_index,
-	long ignore_object_index);
-
-boolean actor_move_to_firing_position(
-	long actor_index,
-	short firing_position_index,
-	boolean allow_pathfinding_failure);
-
 void actor_stimulus_suspicion(
 	long actor_index,
 	short suspicion_level,

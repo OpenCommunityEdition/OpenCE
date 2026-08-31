@@ -87,9 +87,6 @@ boolean actor_nearby_firing_positions(
 	long surface_index,
 	boolean allow_outside_range);
 
-real actor_destination_tolerance(
-	long actor_index);
-
 long actor_active_select_firing_position(
 	long actor_index,
 	struct firing_position_search_definition *search,

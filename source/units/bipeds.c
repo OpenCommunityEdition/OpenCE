@@ -235,6 +235,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "models/model_animation_definitions.h"
+#include "physics/physics.h"
 #include "units/biped_definitions.h"
 #include "units/bipeds.h"
 
@@ -297,6 +298,17 @@ void biped_delete(
 	return;
 }
 
+void biped_reset(
+	long biped_index)
+{
+	struct biped_datum *biped = biped_get(biped_index);
+	csmemset(&biped->biped, 0, sizeof(biped->biped));
+	biped->biped.ground_plane = depths_of_hell;
+	biped->biped.last_falling_communication_time = NONE;
+
+	return;
+}
+
 void biped_stop_melee_attack(
 	long biped_index)
 {
@@ -352,6 +364,40 @@ boolean biped_flying_through_air(
 	return biped->biped.airborne_ticks > 3 &&
 		(!TEST_FLAG(definition->biped.flags, _biped_flying_bit) ||
 		TEST_FLAG(biped->object.damage_flags, _object_dead_bit));
+}
+
+void biped_build_flying_axes(
+	real_vector3d const *forward_vector,
+	real_vector3d *left_vector,
+	real_vector3d *up_vector)
+{
+	match_assert("c:\\halo\\SOURCE\\units\\bipeds.c", 2993, forward_vector && left_vector && up_vector);
+
+	*up_vector = *global_up3d;
+	cross_product3d(up_vector, forward_vector, left_vector);
+	if (normalize3d(left_vector)==0.f)
+	{
+		*up_vector = *global_forward3d;
+		cross_product3d(up_vector, forward_vector, left_vector);
+		normalize3d(left_vector);
+	}
+
+	cross_product3d(forward_vector, left_vector, up_vector);
+	normalize3d(up_vector);
+
+	match_vassert("c:\\halo\\SOURCE\\units\\bipeds.c", 3008,
+		valid_real_vector3d_axes3(forward_vector, left_vector, up_vector),
+		csprintf(
+			temporary,
+			"%s, %s, %s: assert_valid_real_vector3d_axes3(%f, %f, %f / %f, %f, %f / %f, %f, %f)",
+			"forward_vector",
+			"left_vector",
+			"up_vector",
+			forward_vector->i, forward_vector->j, forward_vector->k,
+			up_vector->i, up_vector->j, up_vector->k,
+			left_vector->i, left_vector->j, left_vector->k));
+
+	return;
 }
 
 /* ---------- private code */

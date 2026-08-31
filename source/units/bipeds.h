@@ -84,6 +84,8 @@ void bipeds_dispose(
 	void);
 void biped_delete(
 	long biped_index);
+void biped_reset(
+	long biped_index);
 boolean biped_flying_through_air(
 	long biped_index);
 

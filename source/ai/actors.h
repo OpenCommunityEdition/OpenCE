@@ -834,6 +834,8 @@ real_argb_color const *actor_activation_debug_color(long actor_index);
 void actor_set_dormant(
 	long actor_index,
 	boolean dormant);
+real actor_destination_tolerance(
+	long actor_index);
 boolean actor_get_running_blind_vector(long actor_index, real_vector3d *run_vector);
 boolean actor_has_unlimited_grenades(
 	long actor_index);
@@ -878,6 +880,24 @@ boolean actor_move_animation_impulse(
 	long actor_index,
 	short impulse,
 	real_vector2d const *alignment_vector);
+boolean actor_test_destination(
+	long actor_index);
+boolean actor_path_refresh(
+	long actor_index,
+	boolean new_destination,
+	boolean temporary_firing_position);
+boolean actor_move_to_point(
+	long actor_index,
+	real_point3d const *destination,
+	long surface_index,
+	long ignore_target_object_index);
+boolean actor_move_to_move_position(
+	long actor_index,
+	short move_position_index);
+boolean actor_move_to_firing_position(
+	long actor_index,
+	short firing_position_index,
+	boolean temporary);
 boolean actor_move_to_prop(
 	long actor_index,
 	long prop_index,

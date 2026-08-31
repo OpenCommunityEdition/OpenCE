@@ -131,6 +131,7 @@ symbols in this file:
 #include "objects.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#include "units/bipeds.h"
 
 /* ---------- constants */
 
@@ -218,8 +219,6 @@ void biped_export_function_values(
 void biped_preprocess_node_orientations(
 	long object_index,
 	struct real_orientation *node_orientations);
-void biped_reset(
-	long object_index);
 void biped_disconnect_from_structure_bsp(
 	long object_index);
 void biped_render_debug(

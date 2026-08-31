@@ -239,6 +239,18 @@ enum
 
 /* ---------- macros */
 
+#define match_assert_valid_real_rgb_color(file, line, rgb) \
+match_vassert( \
+	file, \
+	line, \
+	valid_real_rgb_color(rgb), \
+	csprintf( \
+		temporary, \
+		"%s: assert_valid_real_rgb_color(%f, %f, %f)", \
+		#rgb, (*rgb).red, (*rgb).green, (*rgb).blue \
+	) \
+)
+
 /* ---------- structures */
 
 struct rgb_color
@@ -759,6 +771,61 @@ union real_rgb_color *pixel32_to_real_rgb_color(
 	result->green = green * (1.0f / 255.0f);
 	result->blue = blue * (1.0f / 255.0f);
 	return result;
+}
+
+boolean valid_real_rgb_color(
+	union real_rgb_color const *color)
+{
+	return
+		valid_real(color->red) &&
+		valid_real(color->green) &&
+		valid_real(color->blue) &&
+		color->red>=0.f && color->red<=1.f &&
+		color->green>=0.f && color->green<=1.f &&
+		color->blue>=0.f && color->blue<=1.f;
+}
+
+union real_rgb_color *rgb_colors_interpolate_and_scale(
+	union real_rgb_color *rgb_result,
+	unsigned long flags,
+	union real_argb_color const *argb_lower_bound,
+	union real_argb_color const *argb_upper_bound,
+	union real_rgb_color const *rgb_scale,
+	real u)
+{
+	rgb_colors_interpolate(
+		rgb_result,
+		flags,
+		&argb_lower_bound->rgb,
+		&argb_upper_bound->rgb,
+		u);
+
+	if (rgb_scale)
+	{
+		match_assert_valid_real_rgb_color("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x96E, rgb_scale);
+
+		if (argb_lower_bound->alpha>_real_epsilon ||
+			argb_upper_bound->alpha>_real_epsilon)
+		{
+			real alpha=
+				(1.f-u)*argb_lower_bound->alpha +
+				u*argb_upper_bound->alpha;
+
+			rgb_result->red= alpha*rgb_result->red + (1.f-alpha)*rgb_scale->red;
+			rgb_result->green= alpha*rgb_result->green + (1.f-alpha)*rgb_scale->green;
+			rgb_result->blue= alpha*rgb_result->blue + (1.f-alpha)*rgb_scale->blue;
+		}
+		else
+		{
+			rgb_result->red*= rgb_scale->red;
+			rgb_result->green*= rgb_scale->green;
+			rgb_result->blue*= rgb_scale->blue;
+		}
+	}
+
+	match_assert_valid_real_rgb_color("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x982, rgb_result);
+
+	return rgb_result;
 }
 
 void bitmap_vector_map(

@@ -479,6 +479,28 @@ void weapon_melee_attack(
 	return;
 }
 
+void weapon_set_total_rounds(
+	long weapon_index,
+	short *rounds_array)
+{
+	struct weapon_datum *weapon = weapon_get(weapon_index);
+	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
+	short magazine_index;
+
+	match_assert("c:\\halo\\SOURCE\\items\\weapons.c", 3082, rounds_array);
+
+	for (magazine_index = 0; magazine_index<weapon_definition->weapon.magazines.count; ++magazine_index)
+	{
+		struct weapon_magazine *magazine = weapon_magazine_get(weapon, magazine_index);
+		struct weapon_magazine_definition *magazine_definition = TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, magazine_index, struct weapon_magazine_definition);
+
+		magazine->rounds_total = MIN(magazine_definition->rounds_total_maximum, rounds_array[magazine_index]);
+		magazine->rounds_loaded = MIN(magazine->rounds_loaded, magazine->rounds_total);
+	}
+
+	return;
+}
+
 void weapon_delete(
 	long weapon_index)
 {

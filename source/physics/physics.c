@@ -117,7 +117,11 @@ real global_gravity = 0.0035651792f;
 real global_water_density = 1.0f;
 real global_air_density = 0.0011f;
 real global_physics_collision_depth = 0.2f;
-long depths_of_hell = 0;
+real_plane3d depths_of_hell =
+{
+	{ 0.0f, 0.0f, 1.0f },
+	-256.0f
+};
 
 /* ---------- public code */
 

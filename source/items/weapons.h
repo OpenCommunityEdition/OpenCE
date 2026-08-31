@@ -231,6 +231,8 @@ void weapon_set_integrated_light_power(long weapon_index, real light_power);
 
 void weapon_owner_update(long weapon_index, word control_flags, real primary_trigger);
 
+void weapon_set_total_rounds(long weapon_index, short *rounds_array);
+
 boolean weapon_can_be_fired(long weapon_index);
 
 short weapon_get_first_person_animation_time(long weapon_index, short mode, short animation_type, short shotgun_reload_type);

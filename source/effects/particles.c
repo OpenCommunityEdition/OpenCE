@@ -78,6 +78,7 @@ symbols in this file:
 #include "effects/particles.h"
 #undef valid_real_point3d
 
+#include "bitmaps/bitmaps.h"
 #include "cseries/errors.h"
 #include "interface/first_person_weapons.h"
 #include "memory/data.h"
@@ -100,8 +101,6 @@ enum particle_private_abi_offsets
 
 /* ---------- prototypes */
 
-boolean valid_real_rgb_color(
-	real_rgb_color const *color);
 // particle is passed in eax, group tag in ecx, and effect index in esi
 void code_0008fde0(
 	long parameter);

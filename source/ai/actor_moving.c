@@ -208,6 +208,7 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "ai/actions.h"
 #include "ai/actors.h"
+#include "ai/props.h"
 #include "units/units.h"
 #undef arccosine
 
@@ -361,3 +362,160 @@ real arccosine(
 }
 
 /* ---------- private code */
+
+boolean actor_test_destination(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->control.path.destination_orders.destination_type == _destination_none ||
+		actor->control.path.destination_orders.destination_type == _destination_halt)
+	{
+		actor->control.path.at_destination = TRUE;
+	}
+	else
+	{
+		real tolerance = actor_destination_tolerance(actor_index);
+
+		if (distance_squared3d(
+			&actor->input.position.body_position,
+			&actor->control.path.destination.point) < tolerance*tolerance)
+		{
+			actor->control.path.at_destination = TRUE;
+		}
+	}
+
+	return actor->control.path.at_destination;
+}
+
+boolean actor_move_to_point(
+	long actor_index,
+	real_point3d const *destination,
+	long surface_index,
+	long ignore_target_object_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean result = TRUE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\actor_moving.c",
+		951,
+		destination);
+
+	actor->firing_positions.current_position_index = NONE;
+	actor_set_dormant(actor_index, FALSE);
+
+	if (actor->control.path.destination_orders.destination_type != _destination_raw_location ||
+		actor->control.path.destination_orders.raw.surface_index != surface_index ||
+		distance_squared3d(destination, &actor->control.path.destination_orders.raw.point) > 0.1f*0.1f)
+	{
+		actor->orders.move.destination.destination_type = _destination_raw_location;
+		actor->orders.move.destination.keep_moving = FALSE;
+		actor->orders.move.destination.raw.point = *destination;
+		actor->orders.move.destination.raw.surface_index = surface_index;
+		actor->orders.move.destination.ignore_target_object_index = ignore_target_object_index;
+		actor->control.path.destination_orders = actor->orders.move.destination;
+
+		result = actor_path_refresh(actor_index, TRUE, FALSE);
+	}
+	else if (actor->meta.timeslice && !actor->control.path.refreshed_this_tick)
+	{
+		result = actor_path_refresh(actor_index, FALSE, FALSE);
+	}
+
+	return result;
+}
+
+boolean actor_move_to_move_position(
+	long actor_index,
+	short move_position_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean result = TRUE;
+
+	actor->firing_positions.current_position_index = NONE;
+	actor_set_dormant(actor_index, FALSE);
+
+	if (actor->control.path.destination_orders.destination_type != _destination_move_position ||
+		actor->control.path.destination_orders.move_position_index != move_position_index)
+	{
+		actor->orders.move.destination.destination_type = _destination_move_position;
+		actor->orders.move.destination.keep_moving = FALSE;
+		actor->orders.move.destination.move_position_index = move_position_index;
+		actor->orders.move.destination.ignore_target_object_index = NONE;
+		actor->control.path.destination_orders = actor->orders.move.destination;
+
+		result = actor_path_refresh(actor_index, TRUE, FALSE);
+	}
+	else if (actor->meta.timeslice && !actor->control.path.refreshed_this_tick)
+	{
+		result = actor_path_refresh(actor_index, FALSE, FALSE);
+	}
+
+	return result;
+}
+
+boolean actor_move_to_firing_position(
+	long actor_index,
+	short firing_position_index,
+	boolean temporary)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean result = TRUE;
+
+	actor_set_dormant(actor_index, FALSE);
+
+	if (actor->control.path.destination_orders.destination_type != _destination_firing_position ||
+		actor->control.path.destination_orders.firing_position_index != firing_position_index)
+	{
+		actor->orders.move.destination.destination_type = _destination_firing_position;
+		actor->orders.move.destination.keep_moving = FALSE;
+		actor->orders.move.destination.firing_position_index = firing_position_index;
+		actor->orders.move.destination.ignore_target_object_index = NONE;
+		actor->firing_positions.moved_away_from_firing_position = FALSE;
+		actor->control.path.destination_orders = actor->orders.move.destination;
+
+		result = actor_path_refresh(actor_index, TRUE, temporary);
+	}
+	else if (actor->meta.timeslice && !actor->control.path.refreshed_this_tick)
+	{
+		result = actor_path_refresh(actor_index, FALSE, temporary);
+	}
+
+	return result;
+}
+
+boolean actor_move_to_prop(
+	long actor_index,
+	long prop_index,
+	real accept_radius)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean result = TRUE;
+
+	actor->firing_positions.current_position_index = NONE;
+	actor_set_dormant(actor_index, FALSE);
+
+	if (actor->control.path.destination_orders.destination_type != _destination_prop ||
+		actor->control.path.destination_orders.prop.prop_index != prop_index ||
+		actor->control.path.destination_orders.prop.accept_radius != accept_radius)
+	{
+		struct prop_datum *prop = prop_get(prop_index);
+
+		actor->orders.move.destination.destination_type = _destination_prop;
+		actor->orders.move.destination.keep_moving = FALSE;
+		actor->orders.move.destination.prop.prop_index = prop_index;
+		actor->orders.move.destination.prop.accept_radius = accept_radius;
+		actor->orders.move.destination.ignore_target_object_index =
+			prop->vehicle_index == NONE ? prop->unit_index : prop->vehicle_index;
+		actor->control.path.destination_orders = actor->orders.move.destination;
+
+		result = actor_path_refresh(actor_index, TRUE, FALSE);
+	}
+	else if (actor->meta.timeslice && !actor->control.path.refreshed_this_tick)
+	{
+		result = actor_path_refresh(actor_index, FALSE, FALSE);
+	}
+
+	return result;
+}
