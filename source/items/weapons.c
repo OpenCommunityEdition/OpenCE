@@ -608,6 +608,59 @@ real weapon_get_field_of_view(
 	return result;
 }
 
+void weapon_set_current_amount(
+	long weapon_index,
+	real amount)
+{
+	struct weapon_datum *weapon = weapon_get(weapon_index);
+	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
+	boolean uses_age = FALSE;
+
+	if (weapon_definition->weapon.magazines.count==0)
+	{
+		uses_age = TRUE;
+	}
+	else
+	{
+		short trigger_index;
+
+		for (trigger_index = 0; trigger_index<weapon_definition->weapon.triggers.count; ++trigger_index)
+		{
+			struct weapon_trigger_definition *trigger_definition = TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
+
+			if (trigger_definition->age_generated_per_round>0.0f)
+			{
+				uses_age = TRUE;
+				break;
+			}
+		}
+	}
+
+	if (amount<0.0f)
+		amount = 0.0f;
+	else if (amount>1.0f)
+		amount = 1.0f;
+
+	if (uses_age)
+	{
+		weapon->weapon.age = 1.0f-amount;
+	}
+	else if (weapon_definition->weapon.magazines.count>0)
+	{
+		struct weapon_magazine_definition *magazine_definition = TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, 0, struct weapon_magazine_definition);
+		struct weapon_magazine *magazine = weapon_magazine_get(weapon, 0);
+		short rounds_loaded;
+
+		amount = magazine_definition->rounds_loaded_maximum*amount;
+		rounds_loaded = (short)fast_ftol(amount);
+
+		magazine->rounds_total += rounds_loaded-magazine->rounds_loaded;
+		magazine->rounds_loaded = rounds_loaded;
+	}
+
+	return;
+}
+
 real weapon_estimate_time_to_target(
 	long weapon_index,
 	short trigger_index,

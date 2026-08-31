@@ -425,6 +425,17 @@
     },
     {
       "unit": "source/effects/decals",
+      "function": "_decals_delete_permanent_from_cluster",
+      "class": "unclassified",
+      "evidence": "The retained ordinary-C implementation uses the recovered typed decal_datum and the five-layer linked-list traversal corroborated by January's assertion strings and line numbers and by the later HCEA reconstruction. Target and candidate have the same 0x190 padded envelope and all 29 relocation addresses, types, and destinations. Their only normalized-byte residual is an adjacent load-order difference at +0x13D/+0x140 after the decal loop: January reloads layer with `mov esi,[ebp-4]` before cluster_index with `mov ebx,[ebp+8]`, while the current VC7 build emits those two reads in the opposite order; every other normalized byte agrees. The fail-closed blocker classifier reports UNKNOWN because its generic rule does not prove independence between two memory operands, so this park deliberately claims no compiler recipe. An earlier wider scratch translation unit matched this function exactly, but it also retained the legacy `struct decal` representation and additional unrecovered neighboring bodies; preserving that obsolete context solely for its codegen side effect would be a function-only false positive. No volatile access, barrier, fake dependency, inline assembly, pragma, or compiler-control attribute is retained. Reopen for authoritative January source or local-lifetime evidence, or when naturally recovering the remaining same-TU functions restores the historical compiler context.",
+      "measurements": {
+        "target": { "size": 400, "relocation_count": 29, "normalized_sha256": "b3eeb427eeef1e02f793286b1011a5b89822e041f0b442759259255e1117220a" },
+        "base": { "size": 400, "relocation_count": 29, "normalized_sha256": "6fb830e33513eb040f0ff7cb46cc9167d30a96893dedb145370b416426025ffd" },
+        "objdiff_percent": 99.81035
+      }
+    },
+    {
+      "unit": "source/effects/decals",
       "function": "_decal_update",
       "class": "unclassified",
       "evidence": "The retained helper is coherent typed decal-aging source under the HCEA/PDB-authenticated private name `static void decal_update(long)`. It resets decal intensity, preserves permanent decals, fades finite-lifetime decals with cseries flag macros, releases locked-count ownership once, and deletes expired rasterizer vertices. Defining the helper in the same translation unit is required: VC7 rejects an undefined static prototype with C2129, and the complete private definition naturally gives the strict-exact public decals_update wrapper its January EDI live-in call convention without a fabricated ABI declaration. The remaining helper residual combines register/x87 scheduling with January's 32-bit inline FISTP conversion; ordinary C emits __ftol2, while /QIfist emits the wrong qword FISTP. No inline assembly, compiler flag, volatile access, register forcing, dead dependency, or fake control flow is retained. Reopen only for authoritative January source or a natural same-compiler helper/math spelling that emits the dword conversion and surrounding schedule.",

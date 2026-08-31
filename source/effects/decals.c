@@ -301,6 +301,9 @@ typedef char verify_decal_globals_locked_count_offset[
 
 /* ---------- prototypes */
 
+long decal_get_first_decal_index(
+	short cluster_index,
+	short layer);
 static void decal_update(
 	long decal_index);
 
@@ -389,6 +392,61 @@ void decals_update(
 		{
 			decal_update(iterator.datum_index);
 		}
+	}
+
+	return;
+}
+
+void decals_delete_permanent_from_cluster(
+	short cluster_index)
+{
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 887,
+		cluster_index>=0 && cluster_index<MAXIMUM_CLUSTERS_PER_STRUCTURE);
+
+	if (global_decal_data->valid)
+	{
+		short layer;
+
+		match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 893, decal_globals);
+
+		for (layer = 0; layer<NUMBER_OF_DECAL_LAYERS; layer++)
+		{
+			long decal_index;
+
+			if (cluster_index==NONE)
+			{
+				decal_index = (layer==0)
+					? decal_globals->first_disconnected_decal_index
+					: NONE;
+			}
+			else
+			{
+				decal_index = decal_get_first_decal_index(cluster_index, layer);
+			}
+
+			while (decal_index!=NONE)
+			{
+				struct decal_datum *decal = DECAL_GET(decal_index);
+				long next_decal_index = decal->next_decal_index;
+
+				match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 920, decal->cluster_index==cluster_index);
+
+				if (TEST_FLAG(decal->flags, _decal_permanent_bit))
+				{
+					SET_FLAG(decal->flags, _decal_permanent_bit, FALSE);
+					decal_globals->permanent_count -= 1;
+
+					match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 927,
+						!TEST_FLAG(decal->flags, _decal_locked_bit));
+
+					rasterizer_decal_vertices_delete(decal_index);
+				}
+
+				decal_index = next_decal_index;
+			}
+		}
+
+		match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 936, decal_globals->permanent_count>=0);
 	}
 
 	return;
