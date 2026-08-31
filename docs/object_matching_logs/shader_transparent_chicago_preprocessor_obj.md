@@ -18,9 +18,9 @@
 
 | Symbol | Target/base size | Target/base relocs | Strict result |
 |---|---:|---:|---|
-| `_code_0016b4e0` | `16/16` | `0/0` | exact |
+| `_shader_map_verify` | `16/16` | `0/0` | exact |
 | `_shader_transparent_chicago_create` | `432/416` | `17/17` | nonexact |
-| `_rdata_0029ce08` | `208/208` | `0/0` | exact |
+| `_shader_transparent_chicago_combiner_table` | `208/208` | `0/0` | exact |
 
 Residual baseline:
 
@@ -135,8 +135,8 @@ does not justify transferring a source shape into this function.
 
 ## Experiment matrix
 
-All failed production shapes were reverted. `_code_0016b4e0` and
-`_rdata_0029ce08` remained exact unless noted.
+All failed production shapes were reverted. `_shader_map_verify` and
+`_shader_transparent_chicago_combiner_table` remained exact unless noted.
 
 | ID | Source shape | Result | Decision |
 |---|---|---|---|
@@ -219,9 +219,9 @@ baseline and the object was rebuilt with XDK 3911 VC7 `13.00.9254.1`.
 
 | Symbol/data | Target/base size | Target/base relocs | Target/base normalized hash | Result |
 |---|---:|---:|---|---|
-| `_code_0016b4e0` | `16/16` | `0/0` | `1191f37e...` / `1191f37e...` | exact |
+| `_shader_map_verify` | `16/16` | `0/0` | `1191f37e...` / `1191f37e...` | exact |
 | `_shader_transparent_chicago_create` | `432/416` | `17/17` | `c465d59c...` / `c716cea5...` | nonexact |
-| `_rdata_0029ce08` | `208/208` | `0/0` | `444fe875...` / `444fe875...` | exact |
+| `_shader_transparent_chicago_combiner_table` | `208/208` | `0/0` | `444fe875...` / `444fe875...` | exact |
 
 The production source blob hash equals the committed blob hash
 `f165984ac91114fcdf3beacbc3c8998344798b16`; no experimental source shape
@@ -261,8 +261,38 @@ or statement-order sweep. Reopen only with:
 Any candidate must still keep the already-exact loop body, 17 relocation
 identities/order, helper, and owned data unchanged.
 
+## 2026-08-30 credibility closeout
+
+The later house rule explicitly permits an honest fuzzy park when easy natural
+byte matching is exhausted. That rule supersedes the earlier equal-size parking
+gate, but it does not weaken the source-credibility gate:
+
+- the September 25, 2001 linker map names the first function in this same
+  compiland `shader_map_verify`; this is recovered cross-build evidence, not an
+  address-derived invention;
+- `shader_transparent_chicago_combiner_table` is a descriptive name for the
+  measured 208-byte table and is not represented as a recovered original name;
+- `TEST_FLAG` replaces the manual shift/mask expression without changing the
+  compiled function;
+- the error category now uses `_error_silent`, and the result declaration is
+  initialized at declaration, both byte-neutral house-rule cleanups;
+- no `volatile`, `register`, barrier, pragma, inline assembly, inert expression,
+  false condition, or deliberately nonsensical source is present.
+
+The January executable contains no direct call or absolute pointer reference to
+the 16-byte `shader_map_verify` leaf. Its exact January linkage therefore cannot
+be inferred from executable xrefs alone; forcing `static` in this isolated TU
+causes VC7 to remove the unreferenced leaf, so the source retains ordinary
+external linkage rather than introducing a fake retention mechanism.
+
+`shader_transparent_chicago_create` remains the measured 432/416-byte,
+17/17-relocation register-allocation fixed point documented above and is now
+listed in `config/parked.json`. Reopen only with stronger source/compiler
+evidence; do not resume blind allocation steering.
+
 ## Disposition
 
-`NonMatching` / evidence-exhausted at 1/2 exact functions plus exact owned
-data. Do not mark the object complete, create parked credit, or grant credit
-from semantic plausibility. Reopen only under the evidence criteria above.
+Credible fuzzy park: 1/2 functions strictly exact, the remaining function
+parked at 96.15504%, and the complete owned data exact. Accepted as complete
+under the current house rule, without claiming byte identity for the parked
+function.

@@ -3,11 +3,11 @@ SHADER_TRANSPARENT_CHICAGO_PREPROCESSOR.C
 
 symbols in this file:
 0016B4E0 0010:
-	_code_0016b4e0 (0000)
+	_shader_map_verify (0000)
 0016B4F0 01b0:
 	_shader_transparent_chicago_create (0000)
 0029CE08 00d0:
-	_rdata_0029ce08 (0000)
+	_shader_transparent_chicago_combiner_table (0000)
 0029CED8 0025:
 	??_C@_0CF@ILPKPMME@?$CD?$CD?$CD?5ERROR?5chicago?5shader?5has?5no?5@ (0000)
 0029CF00 0049:
@@ -17,6 +17,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "shaders/shader_definitions.h"
 #include "tag_files/tag_groups.h"
 
@@ -98,7 +99,7 @@ struct shader_transparent_chicago_combiner_table
 
 /* ---------- prototypes */
 
-boolean code_0016b4e0(
+boolean shader_map_verify(
 	void);
 
 boolean shader_transparent_chicago_create(
@@ -107,7 +108,7 @@ boolean shader_transparent_chicago_create(
 
 /* ---------- globals */
 
-const struct shader_transparent_chicago_combiner_table rdata_0029ce08 =
+const struct shader_transparent_chicago_combiner_table shader_transparent_chicago_combiner_table =
 {
 	{
 		{
@@ -135,7 +136,7 @@ const struct shader_transparent_chicago_combiner_table rdata_0029ce08 =
 
 /* ---------- public code */
 
-boolean code_0016b4e0(
+boolean shader_map_verify(
 	void)
 {
 	return TRUE;
@@ -146,10 +147,8 @@ boolean shader_transparent_chicago_create(
 	struct pixel_shader_definition *pixel_shader)
 {
 	struct shader_transparent_chicago_definition *chicago;
-	boolean result;
+	boolean result = TRUE;
 	short map_index;
-
-	result = TRUE;
 
 #line 100 "c:\\halo\\SOURCE\\rasterizer\\xbox\\shader_transparent_chicago_preprocessor.c"
 	match_assert(__FILE__, __LINE__, shader);
@@ -178,11 +177,11 @@ boolean shader_transparent_chicago_create(
 			if (map_index != chicago->maps.count - 1)
 			{
 				pixel_shader->alpha_inputs[map_index + 1] =
-					rdata_0029ce08.stage_increments[map->alpha_function] * (map_index + 1) +
-					rdata_0029ce08.alpha_inputs[map->alpha_function];
+					shader_transparent_chicago_combiner_table.stage_increments[map->alpha_function] * (map_index + 1) +
+					shader_transparent_chicago_combiner_table.alpha_inputs[map->alpha_function];
 				pixel_shader->rgb_inputs[map_index + 1] =
-					rdata_0029ce08.stage_increments[map->color_function] * (map_index + 1) +
-					rdata_0029ce08.rgb_inputs[(map->flags >> _shader_transparent_chicago_map_flag_alpha_replicate_bit) & 1][map->color_function];
+					shader_transparent_chicago_combiner_table.stage_increments[map->color_function] * (map_index + 1) +
+					shader_transparent_chicago_combiner_table.rgb_inputs[TEST_FLAG(map->flags, _shader_transparent_chicago_map_flag_alpha_replicate_bit)][map->color_function];
 			}
 			else
 			{
@@ -196,7 +195,7 @@ boolean shader_transparent_chicago_create(
 	}
 	else
 	{
-		error(2, "### ERROR chicago shader has no maps");
+		error(_error_silent, "### ERROR chicago shader has no maps");
 		result = FALSE;
 	}
 

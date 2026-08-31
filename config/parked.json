@@ -21,6 +21,25 @@
       }
     },
     {
+      "unit": "source/rasterizer/xbox/shader_transparent_chicago_preprocessor",
+      "function": "_shader_transparent_chicago_create",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked under the current house rule after 28 recorded ordinary-C source-shape experiments, two compatible VC7 builds, the January donor census, and the later HCEA implementation were exhausted. The retained coherent C is byte-identical to January through the map loop and preserves all 17 relocation identities. The residual is the success-result/loop-index allocation at the tail: January keeps TRUE live in AL and increments the index in ECX, while both available VC7 builds home the result and reuse EAX for the increment, producing 416 padded bytes versus January's 432. Attempts to manufacture the AL lifetime were either optimized back to this fixed point or perturbed broader control flow. No volatile or register forcing, compiler barrier, inline assembly, undefined behavior, inert expression, or nonsensical branch is retained. The September 2001 linker map independently recovers shader_map_verify for the same compiland, the combiner-table name is explicitly descriptive, and the exact 16-byte leaf plus exact 208-byte owned table remain natural source. Reopen only for authoritative January source, a strict same-topology donor, or a compatible VC7/QFE that naturally emits the target allocation.",
+      "measurements": {
+        "target": {
+          "size": 432,
+          "relocation_count": 17,
+          "normalized_sha256": "c465d59ce6f43d7005db48b642ce3e8db33dafbba3f1a5aa84185c0c626e7aa7"
+        },
+        "base": {
+          "size": 416,
+          "relocation_count": 17,
+          "normalized_sha256": "c716cea5de50b243cc52ee306678f80207c76f7fd5b203e1049f69d86ea2a687"
+        },
+        "objdiff_percent": 96.15504
+      }
+    },
+    {
       "unit": "source/game/game_statistics",
       "function": "_game_statistics_record_kill",
       "class": "register-allocation",
