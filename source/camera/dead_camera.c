@@ -3,15 +3,15 @@ DEAD_CAMERA.C
 
 symbols in this file:
 000740B0 0070:
-	_code_000740b0 (0000)
+	_player_has_allies (0000)
 00074120 00b0:
-	_code_00074120 (0000)
+	_player_get_next_player_with_a_unit (0000)
 000741D0 0120:
 	_dead_camera_new (0000)
 000742F0 04e0:
 	_dead_camera_update (0000)
 00256AE8 000c:
-	_rdata_00256ae8 (0000)
+	_dead_camera_constants (0000)
 00256AF4 0024:
 	??_C@_0CE@LCNMEPOD@c?3?2halo?2SOURCE?2camera?2dead_camer@ (0000)
 */
@@ -67,23 +67,23 @@ typedef char dead_camera_command_size_assert[
 
 struct dead_camera_constants
 {
-	real timer;
+	real dead_timer;
 	real multiplayer_switch_timer;
-	real single_player_switch_timer;
+	real singleplayer_switch_timer;
 };
 
 /* ---------- prototypes */
 
-static boolean code_000740b0(
+static boolean player_has_allies(
 	long player_index);
-static long code_00074120(
+static long player_get_next_player_with_a_unit(
 	long player_index,
 	long old_player_index,
 	boolean match_team);
 
 /* ---------- globals */
 
-struct dead_camera_constants const rdata_00256ae8 =
+struct dead_camera_constants const dead_camera_constants =
 {
 	3.f,
 	15.f,
@@ -113,7 +113,7 @@ void dead_camera_new(
 	yaw = real_local_random_range(0.f, 2.f * _pi);
 	camera->facing.yaw = yaw;
 	pitch = real_local_random_range(0.47123894f, 1.0995574f);
-	camera->timer = rdata_00256ae8.timer;
+	camera->timer = dead_camera_constants.dead_timer;
 	camera->facing.pitch = -pitch;
 	if (unit_index != NONE)
 	{
@@ -122,8 +122,8 @@ void dead_camera_new(
 	else
 	{
 		switch_timer = game_engine_running()
-			? rdata_00256ae8.multiplayer_switch_timer
-			: rdata_00256ae8.single_player_switch_timer;
+			? dead_camera_constants.multiplayer_switch_timer
+			: dead_camera_constants.singleplayer_switch_timer;
 	}
 	camera->switch_timer = switch_timer;
 
@@ -173,7 +173,7 @@ void dead_camera_update(
 	result->position_timer = 0.f;
 	result->position_flags = 3;
 
-	if (camera->timer == rdata_00256ae8.timer)
+	if (camera->timer == dead_camera_constants.dead_timer)
 	{
 		result->depth = 0.5f;
 		result->distance_timer = 0.f;
@@ -191,8 +191,8 @@ void dead_camera_update(
 		long next_unit_index;
 		boolean match_team;
 
-		match_team = code_000740b0(camera->player_index);
-		next_player_index = code_00074120(
+		match_team = player_has_allies(camera->player_index);
+		next_player_index = player_get_next_player_with_a_unit(
 			camera->player_index,
 			camera->current_player_index,
 			match_team);
@@ -212,13 +212,13 @@ void dead_camera_update(
 
 		if (next_unit_index != camera->unit_index && next_unit_index != NONE)
 		{
-			camera->timer = rdata_00256ae8.timer;
+			camera->timer = dead_camera_constants.dead_timer;
 			camera->unit_index = next_unit_index;
 		}
 
 		camera->switch_timer = game_engine_running()
-			? rdata_00256ae8.multiplayer_switch_timer
-			: rdata_00256ae8.single_player_switch_timer;
+			? dead_camera_constants.multiplayer_switch_timer
+			: dead_camera_constants.singleplayer_switch_timer;
 	}
 
 	match_vassert(
@@ -264,7 +264,7 @@ void dead_camera_update(
 
 /* ---------- private code */
 
-static boolean code_000740b0(
+static boolean player_has_allies(
 	long player_index)
 {
 	struct data_iterator iterator;
@@ -287,7 +287,7 @@ static boolean code_000740b0(
 	return found;
 }
 
-static long code_00074120(
+static long player_get_next_player_with_a_unit(
 	long player_index,
 	long old_player_index,
 	boolean match_team)

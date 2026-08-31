@@ -77,6 +77,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "bungie_net/common/thread.h"
 #include "cseries/errors.h"
 
 /* ---------- constants */
@@ -89,8 +90,6 @@ enum
 /* ---------- macros */
 
 /* ---------- structures */
-
-struct thread_reference;
 
 struct playlist_profile_data_prefix
 {
@@ -129,10 +128,6 @@ typedef char verify_playlist_profile_globals_size[
 
 boolean delete_enumerated_saved_game_file(
 	long saved_game_file_index);
-boolean thread_has_exited(
-	struct thread_reference *thread_reference);
-void dispose_thread(
-	struct thread_reference *thread_reference);
 void code_001b1c10(
 	void);
 void saved_game_files_enumerate_available_to_local_player_index(

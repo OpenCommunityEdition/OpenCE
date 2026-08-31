@@ -433,6 +433,17 @@
         "base": { "size": 384, "relocation_count": 26, "normalized_sha256": "1ab3a89f52527a51460b6a1afa552e825fe26353faf14970500d56510166cf27" },
         "objdiff_percent": 94.21311
       }
+    },
+    {
+      "unit": "source/bungie_net/common/thread_win32",
+      "function": "_get_mutex_from_pool",
+      "class": "csplit-relocation-alias",
+      "evidence": "Not a code-generation difference. The natural loop bound is &thread_globals.mutex_references[MAXIMUM_MUTEX_REFERENCES].in_use, one past the static thread_globals object at image address 3262248 with size 1544, so the resolved address lies 36 bytes inside the following external transport_address_string object at 3263792. csplit attributes relocation 2 to _transport_address_string+36; VC7 correctly emits the same address as _thread_globals+1580. Both resolve to 3263828. Target and candidate otherwise have the same 64-byte section, normalized bytes, three type-6 relocations at offsets 5/27/40, and resolved destinations 3262548/3263828/3262512. No false cross-module mutex declaration, raw overlay, manual address, or compiler control is retained.",
+      "measurements": {
+        "target": { "size": 64, "relocation_count": 3, "normalized_sha256": "3b67f561243fc178ef970c0e26668272cdfd5b49b5f94800b85cbeeb4e051c6f" },
+        "base": { "size": 64, "relocation_count": 3, "normalized_sha256": "3b67f561243fc178ef970c0e26668272cdfd5b49b5f94800b85cbeeb4e051c6f" },
+        "objdiff_percent": 100.0
+      }
     }
   ]
 }

@@ -308,6 +308,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "bungie_net/common/thread.h"
 #include "saved games/saved_game_files.h"
 #include "tag_files/files.h"
 
@@ -316,8 +317,6 @@ symbols in this file:
 /* ---------- macros */
 
 /* ---------- structures */
-
-struct mutex_reference;
 
 struct saved_game_files_globals
 {
@@ -341,14 +340,10 @@ void code_001b4b00(
 	void);
 void code_001b31f0(
 	void);
-void dispose_mutex(
-	struct mutex_reference *mutex_reference);
 void player_profiles_dispose(
 	void);
 void playlist_profiles_dispose(
 	void);
-void release_mutex(
-	struct mutex_reference *mutex_reference);
 
 /* ---------- globals */
 

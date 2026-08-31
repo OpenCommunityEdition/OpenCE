@@ -109,6 +109,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "bungie_net/common/thread.h"
 #include "cseries/errors.h"
 #include "math/real_math.h"
 #include "saved games/player_profile.h"
@@ -126,8 +127,6 @@ enum
 /* ---------- macros */
 
 /* ---------- structures */
-
-struct thread_reference;
 
 struct player_profile_runtime_globals
 {
@@ -157,10 +156,6 @@ void saved_game_files_enumerate_available_to_local_player_index(
 	boolean include_default_profiles);
 boolean delete_enumerated_saved_game_file(
 	long saved_game_file_index);
-boolean thread_has_exited(
-	struct thread_reference *thread_reference);
-void dispose_thread(
-	struct thread_reference *thread_reference);
 void code_001b14d0(
 	void);
 

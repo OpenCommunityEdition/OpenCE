@@ -10,7 +10,14 @@ import argparse
 import json
 from pathlib import Path
 
-from .coff_compare import CoffError, load, section_info, section_infos_equal
+from .coff_compare import (
+    CoffError,
+    image_symbol_addresses,
+    load,
+    section_info,
+    section_info_resolved,
+    section_infos_equal,
+)
 
 
 ALLOWED_CLASSES = {
@@ -31,6 +38,12 @@ ALLOWED_CLASSES = {
     # reconstruction.  See ASM_IMPLEMENTED_CLASS below: entries in this class
     # are expected to compare exact, which is precisely why they are parked.
     "asm-implemented",
+    # The target split and rebuilt object spell one or more relocation targets
+    # differently even though independently recovered image addresses prove
+    # identical destinations.  See CSPLIT_RELOCATION_ALIAS_CLASS below: these
+    # entries must differ ordinarily and compare exact only after every
+    # relocation destination is resolved through unambiguous image evidence.
+    "csplit-relocation-alias",
 }
 
 # The ordinary manifest records functions we cannot yet match.  Membership is
@@ -40,6 +53,7 @@ ALLOWED_CLASSES = {
 # invalidate those entries, and non-exactness must, because a non-matching
 # asm body means the transcription has drifted from the target.
 ASM_IMPLEMENTED_CLASS = "asm-implemented"
+CSPLIT_RELOCATION_ALIAS_CLASS = "csplit-relocation-alias"
 
 
 class ParkedFunctionsError(RuntimeError):
@@ -64,6 +78,13 @@ def _differences(expected, current, prefix):
                 "current": current.get(key),
             })
     return differences
+
+
+def _has_unresolved_relocations(info):
+    return any(
+        relocation.get("target", [None])[0] != "address"
+        for relocation in info.get("relocations", [])
+    )
 
 
 def validate_parked_functions(project_root, report_path, config_path, manifest_path):
@@ -117,18 +138,68 @@ def validate_parked_functions(project_root, report_path, config_path, manifest_p
 
         config_unit = config_units[unit_name]
         try:
-            target_info = section_info(
-                load(project_root / config_unit["target_path"]), function_name
-            )
-            base_info = section_info(
-                load(project_root / config_unit["base_path"]), function_name
-            )
+            target_object = load(project_root / config_unit["target_path"])
+            base_object = load(project_root / config_unit["base_path"])
+            target_info = section_info(target_object, function_name)
+            base_info = section_info(base_object, function_name)
         except (CoffError, KeyError, OSError) as error:
             invalid.append({"key": key, "reason": f"cannot measure function: {error}"})
             continue
 
         is_exact = section_infos_equal(target_info, base_info)
-        if entry.get("class") == ASM_IMPLEMENTED_CLASS:
+        if entry.get("class") == CSPLIT_RELOCATION_ALIAS_CLASS:
+            if is_exact:
+                invalid.append({
+                    "key": key,
+                    "reason": (
+                        "csplit-relocation-alias function does not differ under "
+                        "ordinary comparison"
+                    ),
+                })
+                continue
+
+            try:
+                symbol_entries = json.loads(
+                    (project_root / "config" / "symbols.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                if not isinstance(symbol_entries, list):
+                    raise ValueError("symbol manifest must be a list")
+                symbol_addresses = image_symbol_addresses(symbol_entries)
+                target_resolved = section_info_resolved(
+                    target_object, function_name, symbol_addresses
+                )
+                base_resolved = section_info_resolved(
+                    base_object, function_name, symbol_addresses
+                )
+            except (CoffError, KeyError, OSError, TypeError, ValueError) as error:
+                invalid.append({
+                    "key": key,
+                    "reason": f"cannot resolve csplit relocation alias: {error}",
+                })
+                continue
+
+            if _has_unresolved_relocations(target_resolved) \
+                    or _has_unresolved_relocations(base_resolved):
+                invalid.append({
+                    "key": key,
+                    "reason": (
+                        "csplit-relocation-alias requires an unambiguous image "
+                        "address for every relocation destination"
+                    ),
+                })
+                continue
+            if not section_infos_equal(target_resolved, base_resolved):
+                invalid.append({
+                    "key": key,
+                    "reason": (
+                        "csplit-relocation-alias function is not exact after "
+                        "resolving image destinations"
+                    ),
+                })
+                continue
+        elif entry.get("class") == ASM_IMPLEMENTED_CLASS:
             # Inverted expectation: an asm body matches by construction, so
             # only a *non*-matching one is news (the transcription drifted).
             if not is_exact:

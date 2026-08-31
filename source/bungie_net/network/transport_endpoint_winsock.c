@@ -278,6 +278,8 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 
+#include "bungie_net/common/thread.h"
+
 #include "bungie_net/network/transport.h"
 
 /* ---------- constants */
@@ -305,9 +307,6 @@ struct transport_endpoint
 	char type;
 	short error;
 };
-
-struct thread_reference;
-struct mutex_reference;
 
 struct endpoint_thread_reference
 {
@@ -384,8 +383,6 @@ void delete_transport_endpoint(
 	struct transport_endpoint *endpoint);
 void disconnect_endpoint(
 	struct transport_endpoint *ep);
-void dispose_thread(
-	struct thread_reference *thread);
 long __stdcall listen(
 	long socket,
 	long backlog);
@@ -394,11 +391,6 @@ long __stdcall send(
 	void const *buffer,
 	long length,
 	long flags);
-boolean take_mutex(
-	struct mutex_reference *mutex_reference,
-	unsigned long timeout_ms);
-void release_mutex(
-	struct mutex_reference *mutex_reference);
 long __stdcall select(
 	long ignored,
 	struct winsock_fd_set *readable,

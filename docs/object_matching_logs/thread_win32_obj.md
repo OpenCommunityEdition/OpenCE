@@ -1,5 +1,15 @@
 # `thread_win32.obj` exact closeout
 
+> **Superseded on 2026-08-31.** The historical closeout below credited
+> `_get_mutex_from_pool` only by declaring the adjacent transport-address
+> character buffer as a `struct mutex_reference`. That declaration is false
+> and is no longer canonical. The corrected natural source, authenticated
+> names/linkage, owner-header propagation, and fail-closed resolved-address
+> disposition are recorded in
+> `thread_win32_obj_house_rule_correction_20260831.md`. Current status is eight
+> strict-exact functions plus one active `csplit-relocation-alias` park; no
+> false cross-module type remains.
+
 ## Result
 
 The January 2002 `thread_win32.obj` is complete under the XDK 3911 and

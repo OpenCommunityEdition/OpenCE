@@ -212,8 +212,8 @@
   },
   {
     "unit": "source/bungie_net/common/thread_win32",
-    "symbol": "_bss_0031c728",
-    "reason": "the complete rebuilt object owns the exact 1544-byte zero-initialized thread and mutex aggregate; csplit stores the zero payload physically while MSVC emits fileless BSS, but logical bytes, size, zero relocations, section flags and alignment, external owner spelling, storage class, and every section-relative code destination are exact",
+    "symbol": "_thread_globals",
+    "reason": "the complete rebuilt object owns the exact 1544-byte zero-initialized thread and mutex aggregate; csplit stores the zero payload physically while MSVC emits fileless BSS, but logical bytes, size, zero relocations, section flags and alignment, private owner spelling, static storage class, and every section-relative code destination are exact",
     "measurements": {
       "size": 1544,
       "relocation_count": 0,

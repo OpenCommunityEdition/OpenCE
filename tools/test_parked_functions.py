@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.coff_compare import build_coff, load, section_info
+from tools.coff_compare import build_coff, load, make_section_raw, section_info
 from tools.parked_functions import (
     ParkedFunctionsError,
     require_valid_parked_functions,
@@ -67,6 +67,38 @@ class ParkedFunctionsTests(unittest.TestCase):
         )
 
     @staticmethod
+    def _relocation_object(target_name, addend):
+        symbols = [{
+            "name": "_fn",
+            "value": 0,
+            "section": 1,
+            "type": 0x20,
+            "storage": 2,
+        }]
+        target_index = 0
+        if target_name != "_fn":
+            target_index = len(symbols)
+            symbols.append({
+                "name": target_name,
+                "value": 0,
+                "section": 0,
+                "type": 0,
+                "storage": 2,
+            })
+        raw, relocations = make_section_raw(
+            16, [(4, target_index, 6, addend)]
+        )
+        return build_coff(
+            sections=[{
+                "name": ".text",
+                "size": 16,
+                "raw_data": raw,
+                "reloc_data": relocations,
+            }],
+            symbols=symbols,
+        )
+
+    @staticmethod
     def _snapshot(info):
         return {
             "size": info["size"],
@@ -87,6 +119,35 @@ class ParkedFunctionsTests(unittest.TestCase):
         self.manifest_path.write_text(
             json.dumps({"version": 1, "entries": entries}), encoding="utf-8"
         )
+
+    def _install_csplit_alias_entry(self, symbol_entries=None):
+        self.target_path.write_bytes(
+            self._relocation_object("_previous", 6)
+        )
+        self.base_path.write_bytes(self._relocation_object("_fn", 0))
+        self.report["units"][0]["functions"][0]["fuzzy_match_percent"] = 100.0
+        entry = {
+            "unit": "unit",
+            "function": "_fn",
+            "class": "csplit-relocation-alias",
+            "evidence": (
+                "csplit spells the destination as _previous+6 while the "
+                "compiler spells the same image address as _fn+0."
+            ),
+            "measurements": self._measurements(),
+        }
+        entry["measurements"]["objdiff_percent"] = 100.0
+        symbols_path = self.root / "config" / "symbols.json"
+        symbols_path.parent.mkdir(parents=True)
+        symbols_path.write_text(
+            json.dumps(symbol_entries if symbol_entries is not None else [
+                {"name": "_previous", "file_offset": 0x1000},
+                {"name": "_fn", "file_offset": 0x1006},
+            ]),
+            encoding="utf-8",
+        )
+        self._write_inputs([entry])
+        return entry
 
     def _validate(self):
         return validate_parked_functions(
@@ -172,6 +233,70 @@ class ParkedFunctionsTests(unittest.TestCase):
         self.assertEqual(
             result["invalid"][0]["reason"],
             "asm-implemented function no longer matches the target",
+        )
+
+    def test_csplit_relocation_alias_is_active_when_resolved_exact(self):
+        self._install_csplit_alias_entry()
+        result = self._validate()
+        self.assertEqual(result["summary"], {"active": 1, "stale": 0, "invalid": 0})
+        self.assertEqual(result["active_keys"], ["unit:_fn"])
+
+    def test_csplit_relocation_alias_rejects_ordinary_exact_function(self):
+        entry = self._install_csplit_alias_entry()
+        self.base_path.write_bytes(self.target_path.read_bytes())
+        entry["measurements"] = self._measurements()
+        entry["measurements"]["objdiff_percent"] = 100.0
+        self._write_inputs([entry])
+        result = self._validate()
+        self.assertEqual(result["summary"]["invalid"], 1)
+        self.assertEqual(
+            result["invalid"][0]["reason"],
+            "csplit-relocation-alias function does not differ under ordinary comparison",
+        )
+
+    def test_csplit_relocation_alias_rejects_different_resolved_destination(self):
+        self._install_csplit_alias_entry([
+            {"name": "_previous", "file_offset": 0x2000},
+            {"name": "_fn", "file_offset": 0x1006},
+        ])
+        result = self._validate()
+        self.assertEqual(result["summary"]["invalid"], 1)
+        self.assertEqual(
+            result["invalid"][0]["reason"],
+            (
+                "csplit-relocation-alias function is not exact after resolving "
+                "image destinations"
+            ),
+        )
+
+    def test_csplit_relocation_alias_rejects_missing_image_address(self):
+        self._install_csplit_alias_entry([
+            {"name": "_fn", "file_offset": 0x1006},
+        ])
+        result = self._validate()
+        self.assertEqual(result["summary"]["invalid"], 1)
+        self.assertEqual(
+            result["invalid"][0]["reason"],
+            (
+                "csplit-relocation-alias requires an unambiguous image address "
+                "for every relocation destination"
+            ),
+        )
+
+    def test_csplit_relocation_alias_rejects_ambiguous_image_address(self):
+        self._install_csplit_alias_entry([
+            {"name": "_previous", "file_offset": 0x1000},
+            {"name": "_previous", "file_offset": 0x2000},
+            {"name": "_fn", "file_offset": 0x1006},
+        ])
+        result = self._validate()
+        self.assertEqual(result["summary"]["invalid"], 1)
+        self.assertEqual(
+            result["invalid"][0]["reason"],
+            (
+                "csplit-relocation-alias requires an unambiguous image address "
+                "for every relocation destination"
+            ),
         )
 
     def test_duplicate_key_is_invalid(self):
