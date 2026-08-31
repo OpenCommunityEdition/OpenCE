@@ -95,6 +95,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "math/real_math.h"
 #include "rasterizer_geometry.h"
 
@@ -103,6 +104,15 @@ symbols in this file:
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct environment_vertex_uncompressed
+{
+	real_point3d position;
+	real_vector3d normal;
+	real_vector3d binormal;
+	real_vector3d tangent;
+	real_point2d texcoord;
+};
 
 struct environment_vertex_compressed
 {
@@ -113,11 +123,39 @@ struct environment_vertex_compressed
 	real_point2d texcoord;
 };
 
+struct environment_lightmap_vertex_uncompressed
+{
+	real_vector3d incident_radiosity;
+	real_point2d texcoord;
+};
+
 struct environment_lightmap_vertex_compressed
 {
 	unsigned long incident_radiosity;
 	short lightmap_u;
 	short lightmap_v;
+};
+
+struct model_vertex_uncompressed
+{
+	real_point3d position;
+	real_vector3d normal;
+	real_vector3d binormal;
+	real_vector3d tangent;
+	real_point2d texcoord;
+	short nodes[2];
+	real node_weights[2];
+};
+
+struct model_vertex_compressed
+{
+	real_point3d position;
+	unsigned long normal;
+	unsigned long binormal;
+	unsigned long tangent;
+	point2d texcoord;
+	byte nodes[2];
+	short node0_weight;
 };
 
 /* ---------- prototypes */
@@ -167,6 +205,104 @@ void rasterizer_geometry_byte_swap_vertices(
 	void *vertices,
 	long buffer_size)
 {
+	return;
+}
+
+void rasterizer_geometry_uncompress_vertices(
+	short type,
+	long count,
+	void *uncompressed,
+	long uncompressed_size,
+	void *compressed,
+	long compressed_size)
+{
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 280, uncompressed);
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 281, compressed);
+
+	switch (type)
+	{
+		case _rasterizer_vertex_type_environment_compressed:
+		{
+			struct environment_vertex_uncompressed *dst= (struct environment_vertex_uncompressed *)uncompressed;
+			struct environment_vertex_compressed const *src= (struct environment_vertex_compressed const *)compressed;
+			real_vector3d normal, binormal, tangent;
+			long index;
+
+			match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 287, count*sizeof(struct environment_vertex_uncompressed)==uncompressed_size);
+			match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 288, count*sizeof(struct environment_vertex_compressed)==compressed_size);
+
+			for (index=0; index<count; index++, dst++, src++)
+			{
+				dst->position= src->position;
+				dst->normal= *uncompress_int32_to_real_vector3d(&normal, src->normal);
+				dst->binormal= *uncompress_int32_to_real_vector3d(&binormal, src->binormal);
+				dst->tangent= *uncompress_int32_to_real_vector3d(&tangent, src->tangent);
+				dst->texcoord= src->texcoord;
+			}
+
+			break;
+		}
+
+		case _rasterizer_vertex_type_environment_lightmap_compressed:
+		{
+			struct environment_lightmap_vertex_uncompressed *dst= (struct environment_lightmap_vertex_uncompressed *)uncompressed;
+			struct environment_lightmap_vertex_compressed const *src= (struct environment_lightmap_vertex_compressed const *)compressed;
+			real_vector3d incident_radiosity;
+			long index;
+
+			match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 307, count*sizeof(struct environment_lightmap_vertex_uncompressed)==uncompressed_size);
+			match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 308, count*sizeof(struct environment_lightmap_vertex_compressed)==compressed_size);
+
+			for (index=0; index<count; index++, dst++, src++)
+			{
+				dst->incident_radiosity= *uncompress_int32_to_real_vector3d(&incident_radiosity, src->incident_radiosity);
+				dst->texcoord.x= ((real)src->lightmap_u * 2.0f + 1.0f) * (1.0f / 65535.0f);
+				dst->texcoord.y= ((real)src->lightmap_v * 2.0f + 1.0f) * (1.0f / 65535.0f);
+			}
+
+			break;
+		}
+
+		case _rasterizer_vertex_type_model_compressed:
+		{
+			struct model_vertex_uncompressed *dst= (struct model_vertex_uncompressed *)uncompressed;
+			struct model_vertex_compressed const *src= (struct model_vertex_compressed const *)compressed;
+			real_vector3d normal, binormal, tangent;
+			long index;
+
+			match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 325, count*sizeof(struct model_vertex_uncompressed)==uncompressed_size);
+			match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 326, count*sizeof(struct model_vertex_compressed)==compressed_size);
+
+			for (index=0; index<count; index++, dst++, src++)
+			{
+				dst->position= src->position;
+				dst->normal= *uncompress_int32_to_real_vector3d(&normal, src->normal);
+				dst->binormal= *uncompress_int32_to_real_vector3d(&binormal, src->binormal);
+				dst->tangent= *uncompress_int32_to_real_vector3d(&tangent, src->tangent);
+				dst->texcoord.x= ((real)src->texcoord.x * 2.0f + 1.0f) * (1.0f / 65535.0f);
+				dst->texcoord.y= ((real)src->texcoord.y * 2.0f + 1.0f) * (1.0f / 65535.0f);
+				match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 341, src->nodes[0]%3==0);
+				match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 342, src->nodes[1]%3==0);
+				dst->nodes[0]= (short)(src->nodes[0]/3);
+				dst->nodes[1]= (short)(src->nodes[1]/3);
+				/* BUG (original, preserved for exact matching): the compress side stores
+				 * this weight with compress_real_to_int16_clamp, a full 16-bit value
+				 * (mov word ptr [edi+0xe], ax), but the uncompress side reads back only
+				 * its low byte (movzx edx, byte ptr [edi+0xe]) and rescales by 1/255, so
+				 * the round trip does not recover the stored weight. A corrected build
+				 * should read the full short and rescale by uncompress_int16_to_real. */
+				dst->node_weights[0]= (real)(byte)src->node0_weight * (1.0f / 255.0f);
+				dst->node_weights[1]= 1.0f - dst->node_weights[0];
+			}
+
+			break;
+		}
+
+		default:
+			error(_error_silent, "### ERROR can't uncompress this type of vertex buffer");
+			break;
+	}
+
 	return;
 }
 
@@ -320,6 +456,92 @@ unsigned long compress_real_vector3d_to_int32_clamp(
 	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 120, fabs(v2.k - v->k)<0.01f);
 
 	return ((k << 11) | j) << 11 | i;
+}
+
+void rasterizer_geometry_compress_vertices(
+	short type,
+	long count,
+	void *compressed,
+	long compressed_size,
+	void *uncompressed,
+	long uncompressed_size)
+{
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 194, uncompressed);
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 195, compressed);
+
+	switch (type)
+	{
+		case _rasterizer_vertex_type_environment_uncompressed:
+		{
+			struct environment_vertex_compressed *dst= (struct environment_vertex_compressed *)compressed;
+			struct environment_vertex_uncompressed const *src= (struct environment_vertex_uncompressed const *)uncompressed;
+			long index;
+
+			match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 201, count*sizeof(struct environment_vertex_uncompressed)==uncompressed_size);
+			match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 202, count*sizeof(struct environment_vertex_compressed)==compressed_size);
+
+			for (index=0; index<count; index++, src++, dst++)
+			{
+				dst->position= src->position;
+				dst->normal= compress_real_vector3d_to_int32_clamp(&src->normal);
+				dst->binormal= compress_real_vector3d_to_int32_clamp(&src->binormal);
+				dst->tangent= compress_real_vector3d_to_int32_clamp(&src->tangent);
+				dst->texcoord= src->texcoord;
+			}
+
+			break;
+		}
+
+		case _rasterizer_vertex_type_environment_lightmap_uncompressed:
+		{
+			struct environment_lightmap_vertex_compressed *dst= (struct environment_lightmap_vertex_compressed *)compressed;
+			struct environment_lightmap_vertex_uncompressed const *src= (struct environment_lightmap_vertex_uncompressed const *)uncompressed;
+			long index;
+
+			match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 221, count*sizeof(struct environment_lightmap_vertex_uncompressed)==uncompressed_size);
+			match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 222, count*sizeof(struct environment_lightmap_vertex_compressed)==compressed_size);
+
+			for (index=0; index<count; index++, src++, dst++)
+			{
+				dst->incident_radiosity= compress_real_vector3d_to_int32_clamp(&src->incident_radiosity);
+				dst->lightmap_u= compress_real_to_int16_clamp(src->texcoord.x);
+				dst->lightmap_v= compress_real_to_int16_clamp(src->texcoord.y);
+			}
+
+			break;
+		}
+
+		case _rasterizer_vertex_type_model_uncompressed:
+		{
+			struct model_vertex_compressed *dst= (struct model_vertex_compressed *)compressed;
+			struct model_vertex_uncompressed const *src= (struct model_vertex_uncompressed const *)uncompressed;
+			long index;
+
+			match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 239, count*sizeof(struct model_vertex_uncompressed)==uncompressed_size);
+			match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 240, count*sizeof(struct model_vertex_compressed)==compressed_size);
+
+			for (index=0; index<count; index++, src++, dst++)
+			{
+				dst->position= src->position;
+				dst->normal= compress_real_vector3d_to_int32_clamp(&src->normal);
+				dst->binormal= compress_real_vector3d_to_int32_clamp(&src->binormal);
+				dst->tangent= compress_real_vector3d_to_int32_clamp(&src->tangent);
+				dst->texcoord.x= compress_real_to_int16_clamp(src->texcoord.x);
+				dst->texcoord.y= compress_real_to_int16_clamp(src->texcoord.y);
+				dst->nodes[0]= (byte)(src->nodes[0]*3);
+				dst->nodes[1]= (byte)(src->nodes[1]*3);
+				dst->node0_weight= compress_real_to_int16_clamp(src->node_weights[0]);
+			}
+
+			break;
+		}
+
+		default:
+			error(_error_silent, "### ERROR can't compress this type of vertex buffer");
+			break;
+	}
+
+	return;
 }
 
 /* ---------- private code */
