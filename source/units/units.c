@@ -10092,12 +10092,10 @@ short unit_update_animation(
 					}
 				}
 
-	start_limp_body:
 				if (unit->object.type==_object_type_biped)
 				{
 					biped_start_limp_body_physics(unit_index);
 				}
-				goto finish_dying;
 
 	finish_dying:
 				SET_FLAG(
