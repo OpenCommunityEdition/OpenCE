@@ -42,6 +42,16 @@ enum
 	NUMBER_OF_CHARGE_GOALS,
 };
 
+enum action_class
+{
+	_action_class_noncombat = 0,
+	_action_class_passive,
+	_action_class_transitory,
+	_action_class_pursuit,
+	_action_class_active,
+	NUMBER_OF_ACTION_CLASSES,
+};
+
 
 #define ACTOR_MAXIMUM_AVOIDANCE_RAYS 9
 

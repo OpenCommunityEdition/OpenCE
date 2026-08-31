@@ -194,7 +194,7 @@
 { "file_offset": 50000, "flags": 32, "name": "_actor_action_handle_panic_transition" },
 { "file_offset": 50352, "flags": 32, "name": "_actor_action_handle_berserking_from_attached_projectiles" },
 { "file_offset": 50608, "flags": 32, "name": "_actor_action_handle_vehicle_entry" },
-{ "file_offset": 51568, "flags": 32, "name": "_code_0000c970" },
+{ "file_offset": 51568, "flags": 32, "name": "_actor_action_find_escape_from_danger", "static": true },
 { "file_offset": 52496, "flags": 32, "name": "_actor_action_handle_active_cover_seeking" },
 { "file_offset": 52912, "flags": 32, "name": "_actor_action_handle_combat_selection" },
 { "file_offset": 54688, "flags": 32, "name": "_actor_action_handle_lost_contact" },
