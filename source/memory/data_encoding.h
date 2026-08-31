@@ -52,7 +52,7 @@ boolean data_encode_structures(
 boolean data_encode_array(
 	struct data_encoding_state *state,
 	long element_size,
-	void const *volatile source_array,
+	void const *source_array,
 	long element_count,
 	struct byte_swap_definition *bs_definition);
 

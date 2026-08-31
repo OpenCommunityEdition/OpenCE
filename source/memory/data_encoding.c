@@ -110,8 +110,7 @@ boolean data_encode_memory(
 		43,
 		state && state->buffer && state->offset>=0 && state->offset<state->buffer_size);
 
-	/* Preserve the January VC7 stack reload at switch dispatch. */
-	switch (*(long volatile *)&element_size)
+	switch (element_size)
 	{
 	case 1:
 		memory_size = element_count;
@@ -126,9 +125,11 @@ boolean data_encode_memory(
 		memory_size = element_count<<3;
 		break;
 	default:
+		/* BUG (original): if system_exit returns, memory_size remains
+		 * uninitialized. All known callers use a valid element size.
+		 */
 		display_assert(NULL, "c:\\halo\\SOURCE\\memory\\data_encoding.c", 51, TRUE);
 		system_exit(-1);
-		memory_size = element_size;
 		break;
 	}
 
@@ -230,27 +231,23 @@ boolean data_encode_structures(
 	return !state->overflow;
 }
 
-/* volatile preserves the target's stack-backed source_array lifetime. */
 boolean data_encode_array(
 	struct data_encoding_state *state,
 	long element_size,
-	void const *volatile source_array,
+	void const *source_array,
 	long element_count,
 	struct byte_swap_definition *bs_definition)
 {
-	register long count;
-
 	match_assert(
 		"c:\\halo\\SOURCE\\memory\\data_encoding.c",
 		141,
 		state && state->buffer && state->offset>=0 && state->offset<state->buffer_size);
 	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 142, source_array);
 	match_assert("c:\\halo\\SOURCE\\memory\\data_encoding.c", 143, bs_definition);
-	count = element_count;
 	match_vassert(
 		"c:\\halo\\SOURCE\\memory\\data_encoding.c",
 		144,
-		count>=0,
+		element_count>=0,
 		"element_count>=0");
 
 	switch (element_size)
@@ -262,9 +259,9 @@ boolean data_encode_array(
 		match_vassert(
 			"c:\\halo\\SOURCE\\memory\\data_encoding.c",
 			150,
-			count<=UNSIGNED_CHAR_MAX,
+			element_count<=UNSIGNED_CHAR_MAX,
 			"element_count<=UNSIGNED_CHAR_MAX");
-		byte_count = (byte)count;
+		byte_count = (byte)element_count;
 		match_assert(
 			"c:\\halo\\SOURCE\\memory\\data_encoding.c",
 			43,
@@ -287,9 +284,9 @@ boolean data_encode_array(
 		match_vassert(
 			"c:\\halo\\SOURCE\\memory\\data_encoding.c",
 			154,
-			count<=UNSIGNED_SHORT_MAX,
+			element_count<=UNSIGNED_SHORT_MAX,
 			"element_count<=UNSIGNED_SHORT_MAX");
-		short_count = (short)count;
+		short_count = (short)element_count;
 		data_encode_memory(state, &short_count, 1, -sizeof(short_count));
 		break;
 	}
@@ -297,13 +294,13 @@ boolean data_encode_array(
 	{
 		long long_count;
 
-		long_count = count;
+		long_count = element_count;
 		data_encode_memory(state, &long_count, 1, -sizeof(long_count));
 		break;
 	}
 	case -8:
 	{
-		__int64 int64_count = count;
+		__int64 int64_count = element_count;
 
 		data_encode_memory(state, &int64_count, 1, -sizeof(int64_count));
 		break;
@@ -317,7 +314,7 @@ boolean data_encode_array(
 	data_encode_structures(
 		state,
 		source_array,
-		(short)count,
+		(short)element_count,
 		bs_definition);
 
 	return !state->overflow;

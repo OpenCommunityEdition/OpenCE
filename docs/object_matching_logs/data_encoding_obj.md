@@ -306,10 +306,17 @@ compiler reports VC7 13.00.9254.1 and uses unchanged
   are unchanged.
 - The consolidated build, semantic report, and progress gate pass with zero
   unit errors. The current tooling suite passes 173/173 tests.
-- The closing edit introduces no assembly, volatile use, force-inlining,
-  alignment directive, magic offset, raw tag/object access, compiler flag, or
-  comparison exception. Existing multi-return and volatile source shapes in
-  other already-exact functions were not changed because they are measured
-  code-generation requirements. The uninitialized `memory_size` path is the
-  original shipped defect proven above; the production `BUG (original)`
-  comment names the safe repair explicitly.
+- The closing edit introduces no assembly, force-inlining, alignment
+  directive, magic offset, raw tag/object access, compiler flag, or comparison
+  exception. The uninitialized `memory_size` path is the original shipped
+  defect proven above; the production `BUG (original)` comment names the safe
+  repair explicitly.
+
+## 2026-08-30 source-credibility revalidation
+
+The later credibility audit removed the encoder's volatile parameter type-pun,
+volatile array-pointer qualifier, `register` hint, redundant count alias, and
+invented fatal-edge fallback assignment. Ordinary direct C remains strict
+exact across all 16 functions and all owned data. The evidence, bounded
+experiment matrix, hashes, and validation are recorded in
+`data_encoding_obj_jonas_credibility_cleanup_20260830.md`.
