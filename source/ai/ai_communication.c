@@ -17,11 +17,11 @@ symbols in this file:
 00031330 0060:
 	_ai_communication_packet_new (0000)
 00031390 0070:
-	_code_00031390 (0000)
+	_reply_filter_close (0000)
 00031400 0070:
-	_code_00031400 (0000)
+	_reply_filter_not_close (0000)
 00031470 0050:
-	_code_00031470 (0000)
+	_reply_filter_searching (0000)
 000314C0 0090:
 	_code_000314c0 (0000)
 00031550 0020:
@@ -31,9 +31,9 @@ symbols in this file:
 000315B0 00b0:
 	_code_000315b0 (0000)
 00031660 0040:
-	_code_00031660 (0000)
+	_reply_filter_no_certain_target (0000)
 000316A0 0040:
-	_code_000316a0 (0000)
+	_reply_filter_flee_leader (0000)
 000316E0 01a0:
 	_code_000316e0 (0000)
 00031880 0040:
@@ -548,6 +548,7 @@ symbols in this file:
 #include "ai_debug.h"
 #include "actor_definitions.h"
 #include "actors.h"
+#include "actor_types.h"
 #include "game/game.h"
 #include "main/console.h"
 #include "memory/data.h"
@@ -583,6 +584,8 @@ enum
 	_ai_conversation_selection_radio = 6,
 	_ai_conversation_selection_radio_sargeant = 7,
 	_actor_mode_alert = 2,
+	_actor_mode_combat = 3,
+	_actor_combat_status_certain = 4,
 	_unit_speech_idle = 1,
 	_ai_information_none = 0,
 	_ai_information_look_unit = 1,
@@ -594,6 +597,8 @@ enum
 	_ai_sound_volume_loud = 2,
 	_ai_sound_volume_shout = 3,
 };
+
+#define COMMUNICATION_CLOSE_DISTANCE 5.0f
 
 /* ---------- macros */
 
@@ -850,15 +855,15 @@ typedef char ai_communication_actor_iterator_index_offset_assert[
 
 /* ---------- prototypes */
 
-boolean code_00031390(
+static boolean reply_filter_close(
 	long original_unit_index,
 	struct ai_information_packet *communication,
 	long reply_actor_index);
-boolean code_00031400(
+static boolean reply_filter_not_close(
 	long original_unit_index,
 	struct ai_information_packet *communication,
 	long reply_actor_index);
-boolean code_00031470(
+static boolean reply_filter_searching(
 	long original_unit_index,
 	struct ai_information_packet *communication,
 	long reply_actor_index);
@@ -878,11 +883,11 @@ boolean code_000315b0(
 	long original_unit_index,
 	struct ai_information_packet *communication,
 	long reply_actor_index);
-boolean code_00031660(
+static boolean reply_filter_no_certain_target(
 	long original_unit_index,
 	struct ai_information_packet *communication,
 	long reply_actor_index);
-boolean code_000316a0(
+static boolean reply_filter_flee_leader(
 	long original_unit_index,
 	struct ai_information_packet *communication,
 	long reply_actor_index);
@@ -1316,43 +1321,43 @@ struct dialogue_usage const global_dialogue_table[NUMBER_OF_DIALOGUE_USAGES] =
 struct reply_usage const global_reply_table[NUMBER_OF_REPLY_USAGES] =
 {
 	{ 76, -1, 2, 92, -1, 2, 0, 0.0f, 1.0f, 0.7f, 30.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 53, 2, 2, 81, -1, 2, 0, 0.0f, 0.5f, 0.7f, 60.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 53, 11, 2, 82, -1, 2, 0, 0.0f, 0.6f, 0.7f, 60.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 53, 10, 2, 83, -1, 2, 0, 0.0f, 0.6f, 0.7f, 60.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 53, 5, 2, 84, -1, 2, 0, 0.0f, 0.8f, 0.7f, 60.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 53, 3, 2, 85, -1, 2, 0, 0.5f, 0.9f, 0.7f, 60.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 53, 4, 2, 86, -1, 2, 0, 0.0f, 1.0f, 0.7f, 60.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 53, 6, 2, 87, -1, 2, 0, 0.0f, 1.0f, 0.7f, 60.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 53, 7, 2, 88, -1, 2, 0, 0.0f, 0.9f, 0.7f, 60.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 53, 12, 2, 89, -1, 2, 0, 0.0f, 0.6f, 0.7f, 60.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 53, 9, 2, 90, -1, 2, 0, 0.0f, 0.8f, 0.7f, 60.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 53, 8, 2, 91, -1, 2, 0, 0.0f, 1.0f, 0.7f, 60.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 55, -1, 2, 56, -1, 4, 1, 1.0f, 1.0f, 0.3f, 0.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 57, -1, 2, 58, -1, 2, 0, 0.8f, 0.6f, 0.5f, 30.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 59, -1, 2, 60, -1, 2, 0, 0.8f, 0.6f, 0.5f, 20.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 61, -1, 2, 62, -1, 2, 0, 0.8f, 0.6f, 0.5f, 20.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 63, -1, 2, 64, -1, 2, 0, 0.8f, 0.6f, 0.5f, 20.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 53, -1, 2, 54, -1, 2, 0, 0.6f, 0.4f, 0.5f, 30.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 53, -1, 2, 80, -1, 2, 0, 0.0f, 0.4f, 0.7f, 40.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 23, -1, 2, 24, -1, 1, 0, 0.8f, 0.0f, 0.7f, 20.0f,
 		NULL },
 	{ 32, -1, 4, 33, -1, 1, 0, 0.8f, 0.0f, 0.7f, 20.0f,
@@ -1360,31 +1365,31 @@ struct reply_usage const global_reply_table[NUMBER_OF_REPLY_USAGES] =
 	{ 32, -1, 2, 34, -1, 1, 0, 0.8f, 0.0f, 0.7f, 20.0f,
 		NULL },
 	{ 51, -1, 2, 52, -1, 4, 1, 1.0f, 0.0f, 0.3f, 0.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 49, -1, 2, 50, -1, 3, 0, 0.7f, 0.0f, 0.3f, 20.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 29, -1, 3, 30, -1, 2, 0, 0.7f, 0.4f, 0.5f, 20.0f,
 		NULL },
 	{ 108, -1, 2, 123, -1, 3, 0, 0.8f, 0.0f, 0.7f, 20.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 108, -1, 2, 124, -1, 3, 0, 0.8f, 0.0f, 0.7f, 20.0f,
-		code_00031400 },
+		reply_filter_not_close },
 	{ 109, -1, 2, 123, -1, 3, 0, 0.8f, 0.0f, 0.7f, 20.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 109, -1, 2, 124, -1, 3, 0, 0.8f, 0.0f, 0.7f, 20.0f,
-		code_00031400 },
+		reply_filter_not_close },
 	{ 110, -1, 2, 123, -1, 3, 0, 0.8f, 0.0f, 0.7f, 20.0f,
-		code_00031390 },
+		reply_filter_close },
 	{ 110, -1, 2, 124, -1, 3, 0, 0.8f, 0.0f, 0.7f, 20.0f,
-		code_00031400 },
+		reply_filter_not_close },
 	{ 125, -1, 3, 126, -1, 3, 0, 0.7f, 0.0f, 0.5f, 15.0f,
 		NULL },
 	{ 127, -1, 2, 128, -1, 3, 0, 0.7f, 0.0f, 0.5f, 30.0f,
-		code_00031660 },
+		reply_filter_no_certain_target },
 	{ 129, -1, 3, 130, -1, 3, 0, 0.5f, 0.0f, 0.5f, 20.0f,
 		NULL },
 	{ 132, -1, 2, 133, -1, 3, 0, 1.0f, 0.0f, 0.3f, 20.0f,
-		code_00031470 },
+		reply_filter_searching },
 	{ 137, -1, 2, 138, -1, 3, 0, 1.0f, 0.0f, 0.3f, 20.0f,
 		code_000315b0 },
 	{ 139, -1, 2, 140, -1, 4, 0, 0.7f, 0.0f, 0.7f, 20.0f,
@@ -1398,7 +1403,7 @@ struct reply_usage const global_reply_table[NUMBER_OF_REPLY_USAGES] =
 	{ 158, -1, 4, 154, -1, 3, 0, 0.5f, 0.0f, 0.7f, 30.0f,
 		code_00031550 },
 	{ 159, -1, 2, 160, -1, 3, 0, 0.5f, 0.0f, 0.7f, 20.0f,
-		code_000316a0 },
+		reply_filter_flee_leader },
 	{ 199, -1, 2, 200, -1, 3, 0, 0.8f, 0.0f, 0.5f, 0.0f,
 		NULL },
 	{ 201, -1, 2, 202, -1, 3, 0, 0.8f, 0.0f, 0.5f, 0.0f,
@@ -1688,6 +1693,98 @@ short ai_communication_get_type_by_name(
 	return communication_type;
 }
 
+static boolean reply_filter_close(
+	long original_unit_index,
+	struct ai_information_packet *communication,
+	long reply_actor_index)
+{
+	struct prop_datum *prop;
+	long prop_index;
+	boolean result;
+
+	result = FALSE;
+	if (reply_actor_index != NONE)
+	{
+		prop_index = prop_get_base_by_unit_index(
+			reply_actor_index,
+			original_unit_index,
+			TRUE,
+			TRUE);
+		if (prop_index != NONE)
+		{
+			prop = prop_get(prop_index);
+			if (prop->distance < COMMUNICATION_CLOSE_DISTANCE &&
+				(prop->line_of_sight == _ai_line_of_sight_clear ||
+				prop->line_of_sight == _ai_line_of_sight_occluded))
+			{
+				result = TRUE;
+			}
+		}
+	}
+
+	return result;
+}
+
+static boolean reply_filter_not_close(
+	long original_unit_index,
+	struct ai_information_packet *communication,
+	long reply_actor_index)
+{
+	struct prop_datum *prop;
+	long prop_index;
+	boolean result;
+
+	result = FALSE;
+	if (reply_actor_index != NONE)
+	{
+		prop_index = prop_get_base_by_unit_index(
+			reply_actor_index,
+			original_unit_index,
+			TRUE,
+			TRUE);
+		if (prop_index != NONE)
+		{
+			prop = prop_get(prop_index);
+			if (prop->distance > COMMUNICATION_CLOSE_DISTANCE ||
+				(prop->line_of_sight != _ai_line_of_sight_clear &&
+				prop->line_of_sight != _ai_line_of_sight_occluded))
+			{
+				result = TRUE;
+			}
+		}
+	}
+
+	return result;
+}
+
+static boolean reply_filter_searching(
+	long original_unit_index,
+	struct ai_information_packet *communication,
+	long reply_actor_index)
+{
+	struct actor_datum *reply_actor;
+	boolean result;
+
+	result = FALSE;
+	if (reply_actor_index != NONE)
+	{
+		reply_actor = actor_get(reply_actor_index);
+		switch (reply_actor->state.action)
+		{
+			case _actor_action_uncover:
+				result = (boolean)(reply_actor->state.action_data.uncover.pursuit_location.type ==
+					_pursuit_location_position);
+				break;
+
+			case _actor_action_search:
+				result = TRUE;
+				break;
+		}
+	}
+
+	return result;
+}
+
 boolean code_000314c0(
 	long original_unit_index,
 	struct ai_information_packet *communication,
@@ -1700,7 +1797,7 @@ boolean code_000314c0(
 	boolean result;
 
 	result = FALSE;
-	if (code_00031390(
+	if (reply_filter_close(
 		original_unit_index,
 		communication,
 		reply_actor_index))
@@ -1736,7 +1833,7 @@ boolean code_00031570(
 	boolean result;
 
 	result = FALSE;
-	if (code_00031390(
+	if (reply_filter_close(
 		original_unit_index,
 		communication,
 		reply_actor_index) &&
@@ -1762,7 +1859,7 @@ boolean code_000315b0(
 	boolean result;
 
 	result = FALSE;
-	if (code_00031390(
+	if (reply_filter_close(
 		original_unit_index,
 		communication,
 		reply_actor_index))
@@ -1780,6 +1877,49 @@ boolean code_000315b0(
 				reply_prop = prop_get(reply_actor->target.target_prop_index);
 				result = original_prop->unit_index == reply_prop->unit_index;
 			}
+		}
+	}
+
+	return result;
+}
+
+static boolean reply_filter_no_certain_target(
+	long original_unit_index,
+	struct ai_information_packet *communication,
+	long reply_actor_index)
+{
+	struct actor_datum *reply_actor;
+	boolean result;
+
+	result = FALSE;
+	if (reply_actor_index != NONE)
+	{
+		reply_actor = actor_get(reply_actor_index);
+		if (reply_actor->state.mode == _actor_mode_combat &&
+			reply_actor->state.combat_status < _actor_combat_status_certain)
+		{
+			result = TRUE;
+		}
+	}
+
+	return result;
+}
+
+static boolean reply_filter_flee_leader(
+	long original_unit_index,
+	struct ai_information_packet *communication,
+	long reply_actor_index)
+{
+	struct actor_datum *reply_actor;
+	boolean result;
+
+	result = FALSE;
+	if (actor_is_fighting(reply_actor_index))
+	{
+		reply_actor = actor_get(reply_actor_index);
+		if (reply_actor->meta.type == _actor_elite)
+		{
+			result = TRUE;
 		}
 	}
 
