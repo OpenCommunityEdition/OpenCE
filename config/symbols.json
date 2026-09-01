@@ -19855,7 +19855,7 @@
 { "file_offset": 2745052, "flags": 0, "name": "??_C@_0BL@IBKJHKIF@?$HMt?$CF?40f?$HMt?$CF?40f?$HMt?$CF?40f?$HMt?$CF?40f?$HMn?$AA@" },
 { "file_offset": 2745080, "flags": 0, "name": "??_C@_0CA@DPIIOMPF@?$HMt?$CF?40f?$HMt?$CF?40f?1?$CF?40f?$HMt?$CF?40f?$HMt?$CF?40f?$HMn?$AA@" },
 { "file_offset": 2745112, "flags": 0, "name": "??_C@_0CJ@FFAAFLA@?$HMn?$HMtframerate?$HMtaverage?5?$CIof?5?$CFd?$CJ?$HMt@" },
-{ "file_offset": 2745156, "flags": 0, "name": "_rdata_0029e344" },
+{ "file_offset": 2745156, "flags": 0, "name": "_rasterizer_vertex_type_sizes", "static": true },
 { "file_offset": 2745184, "flags": 0, "name": "__real@35000000" },
 { "file_offset": 2745188, "flags": 0, "name": "__real@3a001002" },
 { "file_offset": 2745192, "flags": 0, "name": "??_C@_0DA@GFMENBNG@c?3?2halo?2SOURCE?2rasterizer?2raster@" },

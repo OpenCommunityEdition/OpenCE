@@ -1,5 +1,10 @@
 # `rasterizer_geometry.obj` compress family (2026-08-30)
 
+> Historical experiment ledger. Its intermediate `fast_ftol` ownership and
+> `14/19` conclusion are superseded by
+> `rasterizer_geometry_obj_jonas_reconciled_closeout_20260901.md`. The measured
+> negative controls and three parked-function fingerprints remain applicable.
+
 ## Result
 
 Four previously unwritten functions are now strict exact, first compile:

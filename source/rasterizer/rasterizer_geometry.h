@@ -24,18 +24,14 @@ enum
 	_rasterizer_vertex_type_debug,
 	_rasterizer_vertex_type_decal,
 	_rasterizer_vertex_type_detail_object,
-	_rasterizer_vertex_type_environment_uncompressed_ff,
-	_rasterizer_vertex_type_environment_lightmap_uncompressed_ff,
-	_rasterizer_vertex_type_model_uncompressed_ff,
-	_rasterizer_vertex_type_model_processed,
-	_rasterizer_vertex_type_unlit_zsprite,
-	_rasterizer_vertex_type_widget,
 	NUMBER_OF_RASTERIZER_VERTEX_TYPES,
 };
 
 /* ---------- macros */
 
 /* ---------- structures */
+
+union real_vector3d;
 
 struct vertex_buffer
 {
@@ -63,7 +59,14 @@ struct triangle_buffer
 	void *hardware_format;
 };
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/RASTERIZER_GEOMETRY.C */
+
+union real_vector3d *uncompress_int32_to_real_vector3d(
+	union real_vector3d *result,
+	unsigned long compressed);
+
+long rasterizer_geometry_get_vertex_size(
+	short type);
 
 void rasterizer_geometry_uncompress_vertices(
 	short type,

@@ -483,9 +483,6 @@ void _rasterizer_decal_vertices_unlock(
 	void);
 void _rasterizer_widget_end(
 	void);
-real_vector3d *uncompress_int32_to_real_vector3d(
-	real_vector3d *result,
-	unsigned long compressed);
 
 void _rasterizer_decals_update_function_pointers(void);
 void _rasterizer_decals_initialize(

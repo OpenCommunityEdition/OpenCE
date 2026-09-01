@@ -155,35 +155,26 @@ struct model_vertex_compressed
 	unsigned long tangent;
 	point2d texcoord;
 	byte nodes[2];
-	short node0_weight;
+	short node_weight;
 };
 
-/* ---------- prototypes */
-
-real_vector3d *uncompress_int32_to_real_vector3d(
-	real_vector3d *result,
-	unsigned long compressed);
-
-/* Bungie's own real-to-long conversion helper, recovered verbatim from the
-   historical cseries.h.  January inlines it at every conversion below;
-   ordinary C conversions lower through a 64-bit fistp under this compiler
-   and cannot reproduce those chains.  Admitted by owner ruling 2026-08-30,
-   kept unit-local so a shared-header __inline cannot perturb other units. */
-static __inline long fast_ftol(
-	real d)
-{
-	long result;
-
-	__asm
-	{
-		fld d
-		fistp result
-	}
-
-	return result;
-}
-
 /* ---------- globals */
+
+static short const rasterizer_vertex_type_sizes[NUMBER_OF_RASTERIZER_VERTEX_TYPES]=
+{
+	56,
+	32,
+	20,
+	8,
+	68,
+	32,
+	24,
+	36,
+	20,
+	16,
+	16,
+	8,
+};
 
 /* ---------- public code */
 
@@ -197,6 +188,14 @@ real uncompress_int16_to_real(
 	short value)
 {
 	return ((real)value * 2.0f + 1.0f) * (1.0f / 65535.0f);
+}
+
+long rasterizer_geometry_get_vertex_size(
+	short type)
+{
+	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 170, type>=0 && type<NUMBER_OF_RASTERIZER_VERTEX_TYPES);
+
+	return rasterizer_vertex_type_sizes[type];
 }
 
 void rasterizer_geometry_byte_swap_vertices(
@@ -285,13 +284,7 @@ void rasterizer_geometry_uncompress_vertices(
 				match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 342, src->nodes[1]%3==0);
 				dst->nodes[0]= (short)(src->nodes[0]/3);
 				dst->nodes[1]= (short)(src->nodes[1]/3);
-				/* BUG (original, preserved for exact matching): the compress side stores
-				 * this weight with compress_real_to_int16_clamp, a full 16-bit value
-				 * (mov word ptr [edi+0xe], ax), but the uncompress side reads back only
-				 * its low byte (movzx edx, byte ptr [edi+0xe]) and rescales by 1/255, so
-				 * the round trip does not recover the stored weight. A corrected build
-				 * should read the full short and rescale by uncompress_int16_to_real. */
-				dst->node_weights[0]= (real)(byte)src->node0_weight * (1.0f / 255.0f);
+				dst->node_weights[0]= (real)(byte)src->node_weight * (1.0f / 255.0f);
 				dst->node_weights[1]= 1.0f - dst->node_weights[0];
 			}
 
@@ -530,7 +523,7 @@ void rasterizer_geometry_compress_vertices(
 				dst->texcoord.y= compress_real_to_int16_clamp(src->texcoord.y);
 				dst->nodes[0]= (byte)(src->nodes[0]*3);
 				dst->nodes[1]= (byte)(src->nodes[1]*3);
-				dst->node0_weight= compress_real_to_int16_clamp(src->node_weights[0]);
+				dst->node_weight= compress_real_to_int16_clamp(src->node_weights[0]);
 			}
 
 			break;
