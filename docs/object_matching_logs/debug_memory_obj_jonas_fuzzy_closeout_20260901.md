@@ -61,7 +61,9 @@ if (size & 1)
 
 This is defined, typed C with the same even-word fill and odd trailing-byte
 semantics as the prior reconstruction. It introduces no inert operation or
-compiler steering. It reproduces January's normalized SHA-256
+compiler steering. The integrated spelling uses the owning `cseries.h`
+`word` type rather than its raw `unsigned short` underlying type; this is
+code-byte neutral. It reproduces January's normalized SHA-256
 `b0a0af7697011f181c2a3b1aba0114ff1f5e3dccba9e5d3059106e73d8916300`
 and all eight ordered relocations exactly.
 
@@ -134,6 +136,7 @@ Focused verification:
 - fake-match scan of `source/cseries/debug_memory.c`: zero findings;
 - isolated parked-manifest validation: one active, zero stale, zero invalid;
 - focused fake-scan and parked-validator tests: 24/24 pass;
+- focused symbol-import and strict-comparator tests: 64/64 pass;
 - `git diff --check`: pass.
 
 The copied January split object still spells the target global

@@ -168,7 +168,7 @@ struct file_pointer_totals
 
 unsigned long *get_global_local_random_seed_address(
 	void);
-unsigned short seed_random(
+word seed_random(
 	unsigned long *seed);
 int compare_file_pointer_totals(
 	const void *a,
@@ -597,7 +597,7 @@ void *debug_realloc(
 
 /* ---------- private code */
 
-unsigned short local_random(
+word local_random(
 	void)
 {
 	return seed_random(get_global_local_random_seed_address());
@@ -731,9 +731,9 @@ static void debug_memory_fill_with_random(
 
 	for (current = pointer;
 		current < (byte *)pointer + size - 1;
-		current += sizeof(unsigned short))
+		current += sizeof(word))
 	{
-		*(unsigned short *)current = local_random();
+		*(word *)current = local_random();
 	}
 	if (size & 1)
 	{
