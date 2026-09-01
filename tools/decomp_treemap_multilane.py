@@ -44,8 +44,8 @@ from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Iterable
-from urllib.parse import urlparse
+from typing import Any, Callable, Iterable
+from urllib.parse import parse_qs, urlparse
 
 HTML = r'''<!doctype html>
 <html lang="en">
@@ -85,7 +85,7 @@ HTML = r'''<!doctype html>
   <span id="summary"></span>
 </header>
 <div id="status">Loading reports…</div>
-<div id="legend">Green = 100% after accepted COFF normalization where available. Blue intensity = selected match percentage. Diagonal lines = progress exists outside canonical. Double lines = parked report contributes.</div>
+<div id="legend">Green = proven exact. Blue intensity = fuzzy match percentage; a blue 100% is not yet hardened. Diagonal lines = progress exists outside canonical. Double lines = parked report contributes.</div>
 <div id="wrap"><canvas id="map"></canvas></div>
 <div id="tooltip"></div>
 <script>
@@ -113,6 +113,7 @@ let cssHeight = 1;
 
 function formatPercent(n) {
   if (!Number.isFinite(n)) return '0.00%';
+  if (n < 100 && n >= 99.995) return `${n.toFixed(4)}%`;
   return `${n.toFixed(2)}%`;
 }
 
@@ -128,6 +129,12 @@ function pctFor(item) {
   if (modeSelect.value === 'canonical') return item.canonicalPct;
   if (modeSelect.value === 'best') return item.bestPct;
   return item.unionPct;
+}
+
+function exactFor(item) {
+  if (modeSelect.value === 'canonical') return item.canonicalExact;
+  if (modeSelect.value === 'best') return item.bestExact;
+  return item.unionExact;
 }
 
 function linkedFor(item) {
@@ -200,8 +207,8 @@ function mix(c1, c2, t) {
   return c1.map((v, i) => Math.round(v + (c2[i] - v) * t));
 }
 function rgb(c) { return `rgb(${c[0]} ${c[1]} ${c[2]})`; }
-function colors(pct) {
-  if (pct >= 99.999) return [rgb(hslToRgb(120, 100, 39)), rgb(hslToRgb(120, 100, 17))];
+function colors(pct, exact) {
+  if (exact) return [rgb(hslToRgb(120, 100, 39)), rgb(hslToRgb(120, 100, 17))];
   const t = Math.max(0, Math.min(100, pct)) / 100;
   return [
     rgb(mix(hslToRgb(200, 0, 21), hslToRgb(200, 100, 35), t)),
@@ -250,8 +257,9 @@ function updateSummary() {
   const visible = displayed.filter(x => !x.filtered);
   const total = visible.reduce((s, x) => s + x.total, 0);
   const weighted = total ? visible.reduce((s, x) => s + x.total * pctFor(x), 0) / total : 0;
+  const exact = visible.filter(exactFor).length;
   const external = visible.filter(x => x.unionPct > x.canonicalPct + 0.0001).length;
-  summary.textContent = `${visible.length}/${displayed.length} shown • ${formatSize(total)} • ${formatPercent(weighted)} • ${external} external`;
+  summary.textContent = `${visible.length}/${displayed.length} shown • ${formatSize(total)} • ${formatPercent(weighted)} • ${exact} exact • ${external} external`;
 }
 
 function resize() {
@@ -298,7 +306,7 @@ function draw() {
   ctx.lineWidth = 1;
   ctx.strokeStyle = '#000';
   for (const item of displayed) {
-    const [inner, outer] = colors(pctFor(item));
+    const [inner, outer] = colors(pctFor(item), exactFor(item));
     const g = ctx.createRadialGradient(
       item.x + item.w * .4, item.y + item.h * .4, (item.w + item.h) * .1,
       item.x + item.w * .4, item.y + item.h * .4, (item.w + item.h) * .5
@@ -335,6 +343,7 @@ function showTooltip(item, clientX, clientY) {
   const lines = [
     `${item.name} • ${formatSize(item.total)}`,
     `canonical ${formatPercent(item.canonicalPct)} • best lane ${formatPercent(item.bestPct)} • union ${formatPercent(item.unionPct)}`,
+    `proven exact: canonical ${item.canonicalExact ? 'yes' : 'no'} • best ${item.bestExact ? 'yes' : 'no'} • union ${item.unionExact ? 'yes' : 'no'}`,
     `best source: ${item.bestSource || 'canonical'}`,
   ];
   if (item.contributors.length) lines.push(`external contributors: ${item.contributors.join(', ')}`);
@@ -377,7 +386,7 @@ new ResizeObserver(resize).observe(canvas);
 
 async function loadReport(force = false) {
   try {
-    const response = await fetch('/api/report', {cache:'no-store'});
+    const response = await fetch(force ? '/api/report?force=1' : '/api/report', {cache:'no-store'});
     if (!response.ok) throw new Error(await response.text());
     const next = await response.json();
     if (!force && reportStamp === next.stamp) return;
@@ -397,8 +406,8 @@ async function loadReport(force = false) {
   }
 }
 
-loadReport(true);
-setInterval(() => loadReport(false), 2000);
+loadReport(false);
+setInterval(() => loadReport(false), 30000);
 </script>
 </body>
 </html>
@@ -555,6 +564,18 @@ def load_json(path: Path) -> dict[str, Any]:
     return data
 
 
+def stat_signature(stat: Any) -> tuple[int, int, int]:
+    return (int(stat.st_mtime_ns), int(stat.st_ctime_ns), int(stat.st_size))
+
+
+def load_json_stable(path: Path, expected_signature: tuple[int, int, int]) -> dict[str, Any]:
+    """Read one report only if it stays unchanged for the whole read."""
+    data = load_json(path)
+    if stat_signature(path.stat()) != expected_signature:
+        raise OSError(f"Report changed while it was being read: {path}")
+    return data
+
+
 def function_key(function: dict[str, Any], index: int) -> str:
     address = value(function, 'address', 'address', None)
     size = int(function.get('size') or 0)
@@ -570,12 +591,12 @@ def semantic_acceptance_index(
     semantic_report: dict[str, Any] | None,
 ) -> dict[str, dict[str, dict[str, int]]]:
     """Index strict semantic-COFF evidence by unit, name, and measured size."""
-    accepted: dict[str, dict[str, dict[str, int]]] = {}
+    candidates: dict[tuple[str, str], list[dict[str, int]]] = {}
     if not semantic_report:
-        return accepted
+        return {}
     entries = semantic_report.get('accepted_ledger')
     if not isinstance(entries, list):
-        return accepted
+        return {}
     for entry in entries:
         if not isinstance(entry, dict):
             continue
@@ -596,10 +617,17 @@ def semantic_acceptance_index(
             continue
         if code_bytes <= 0 or padded_bytes < code_bytes:
             continue
-        accepted.setdefault(unit_name, {})[function_name] = {
+        candidates.setdefault((unit_name, function_name), []).append({
             'codeBytes': code_bytes,
             'paddedBytes': padded_bytes,
-        }
+        })
+
+    # A duplicated proof is ambiguous even when its values happen to agree.
+    # Fail closed instead of allowing JSON order to select the winning record.
+    accepted: dict[str, dict[str, dict[str, int]]] = {}
+    for (unit_name, function_name), records in candidates.items():
+        if len(records) == 1:
+            accepted.setdefault(unit_name, {})[function_name] = records[0]
     return accepted
 
 
@@ -607,14 +635,14 @@ def ordinary_rejection_index(
     semantic_report: dict[str, Any] | None,
 ) -> dict[str, dict[str, int]]:
     """Index raw objdiff 100% results rejected by the hardened comparator."""
-    rejected: dict[str, dict[str, int]] = {}
+    candidates: dict[tuple[str, str], list[int]] = {}
     if not semantic_report:
-        return rejected
+        return {}
     entries = semantic_report.get('ordinary_rejected')
     if isinstance(entries, dict):
         entries = [entries]
     if not isinstance(entries, list):
-        return rejected
+        return {}
     for entry in entries:
         if not isinstance(entry, dict):
             continue
@@ -625,7 +653,12 @@ def ordinary_rejection_index(
         except (KeyError, TypeError, ValueError):
             continue
         if isinstance(unit_name, str) and isinstance(function_name, str):
-            rejected.setdefault(unit_name, {})[function_name] = code_bytes
+            candidates.setdefault((unit_name, function_name), []).append(code_bytes)
+
+    rejected: dict[str, dict[str, int]] = {}
+    for (unit_name, function_name), sizes in candidates.items():
+        if len(sizes) == 1:
+            rejected.setdefault(unit_name, {})[function_name] = sizes[0]
     return rejected
 
 
@@ -660,7 +693,7 @@ def normalize_source(
         sections = raw_unit.get('sections') if isinstance(raw_unit.get('sections'), list) else []
         total = int(value(measures, 'total_code', 'totalCode', 0) or 0)
         raw_pct = float(value(measures, 'fuzzy_match_percent', 'fuzzyMatchPercent', 0) or 0)
-        linked = bool(value(metadata, 'complete', 'complete', False))
+        configured_linked = bool(value(metadata, 'complete', 'complete', False))
         accepted_records = semantic_index.get(name, {})
         rejected_names = rejection_index.get(name, {})
         raw_name_counts: dict[str, int] = {}
@@ -695,12 +728,16 @@ def normalize_source(
                 address = int(raw_fn.get('address'))
             except (TypeError, ValueError):
                 continue
-            if size != record['codeBytes'] or address < 0:
+            interval_end = address + record['paddedBytes']
+            if (
+                size != record['codeBytes']
+                or address < 0
+                or text_size <= 0
+                or interval_end > text_size
+            ):
                 continue
             semantic_accepted_indices.add(function_index)
-            semantic_intervals.append(
-                (address, address + record['paddedBytes'])
-            )
+            semantic_intervals.append((address, interval_end))
 
         semantic_complete = exact_intervals_cover_text(semantic_intervals, text_size)
         fn_out: dict[str, dict[str, Any]] = {}
@@ -736,11 +773,15 @@ def normalize_source(
             display_name = str(value(fn_meta, 'demangled_name', 'demangledName', '') or raw_fn.get('name') or f'function-{function_index}')
             raw_function_pct = float(value(raw_fn, 'fuzzy_match_percent', 'fuzzyMatchPercent', 0) or 0)
             semantic_accepted = function_index in semantic_accepted_indices
-            ordinary_rejected = rejected_names.get(raw_name) == size
+            ordinary_rejected = (
+                raw_name_counts.get(raw_name) == 1
+                and rejected_names.get(raw_name) == size
+            )
             has_ordinary_rejection = has_ordinary_rejection or ordinary_rejected
-            effective_pct = 100.0 if semantic_accepted else raw_function_pct
-            if ordinary_rejected and effective_pct >= 99.999:
-                effective_pct = 99.998
+            effective_pct = 100.0 if semantic_accepted else max(0.0, min(100.0, raw_function_pct))
+            function_exact = semantic_accepted or (
+                raw_function_pct >= 100.0 and not ordinary_rejected
+            )
             fn_out[key] = {
                 'key': key,
                 'name': display_name,
@@ -748,15 +789,39 @@ def normalize_source(
                 'total': size,
                 'pct': effective_pct,
                 'rawPct': raw_function_pct,
-                'linked': linked,
+                'linked': configured_linked,
                 'address': value(raw_fn, 'address', 'address', None),
                 'semanticAccepted': semantic_accepted,
                 'ordinaryRejected': ordinary_rejected,
+                'exact': function_exact,
             }
             fn_order.append(key)
-        effective_unit_pct = 100.0 if semantic_complete else raw_pct
-        if has_ordinary_rejection and effective_unit_pct >= 99.999:
-            effective_unit_pct = 99.998
+        function_total = sum(int(function['total']) for function in fn_out.values())
+        has_semantic_adjustment = bool(
+            semantic_accepted_indices
+            or local_continuation_bytes
+            or has_ordinary_rejection
+        )
+        if semantic_complete:
+            effective_unit_pct = 100.0
+        elif has_semantic_adjustment and function_total:
+            effective_unit_pct = sum(
+                int(function['total']) * float(function['pct'])
+                for function in fn_out.values()
+            ) / function_total
+        else:
+            effective_unit_pct = max(0.0, min(100.0, raw_pct))
+
+        unit_exact = semantic_complete or (
+            effective_unit_pct >= 100.0
+            and bool(fn_out)
+            and all(bool(function['exact']) for function in fn_out.values())
+        )
+        linked = configured_linked and (
+            not fn_out or all(bool(function['exact']) for function in fn_out.values())
+        )
+        for function in fn_out.values():
+            function['linked'] = linked
         units_out[name] = {
             'name': name,
             'total': (
@@ -765,12 +830,15 @@ def normalize_source(
                     for index in semantic_accepted_indices
                 )
                 if semantic_complete
-                else max(0, total - local_continuation_bytes)
+                else function_total if has_semantic_adjustment else max(0, total)
             ),
             'pct': effective_unit_pct,
             'rawPct': raw_pct,
             'linked': linked,
+            'configuredLinked': configured_linked,
+            'exact': unit_exact,
             'semanticComplete': semantic_complete,
+            'textSize': text_size,
             'functions': fn_out,
             'functionOrder': fn_order,
         }
@@ -802,6 +870,7 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
 
     canonical = next((x for x in loaded if x['spec'].kind == 'canonical'), loaded[0])
     canonical_units = canonical['units']
+    source_positions = {id(source): index for index, source in enumerate(loaded)}
 
     unit_order = list(canonical_units.keys())
     seen_units = set(unit_order)
@@ -812,7 +881,7 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
                 unit_order.append(name)
 
     merged_units: list[dict[str, Any]] = []
-    source_kind = {x['spec'].label: x['spec'].kind for x in loaded}
+    incompatible_by_source: dict[str, int] = {}
 
     for unit_name in unit_order:
         variants: list[tuple[dict[str, Any], dict[str, Any]]] = []
@@ -825,12 +894,103 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
 
         canonical_unit = canonical_units.get(unit_name)
         reference_unit = canonical_unit or max((u for _, u in variants), key=lambda u: u['total'])
+        reference_text_size = int(reference_unit.get('textSize') or 0)
+        if reference_text_size:
+            compatible_variants = []
+            for source, unit in variants:
+                if int(unit.get('textSize') or 0) == reference_text_size:
+                    compatible_variants.append((source, unit))
+                else:
+                    label = source['spec'].label
+                    incompatible_by_source[label] = incompatible_by_source.get(label, 0) + 1
+            variants = compatible_variants
+        if not variants:
+            continue
+
         total = int(reference_unit['total'] or max(u['total'] for _, u in variants))
-        canonical_pct = float(canonical_unit['pct']) if canonical_unit else 0.0
+        canonical_rejections = {
+            key for key, function in (canonical_unit or {}).get('functions', {}).items()
+            if function.get('ordinaryRejected')
+        }
+
+        def function_metrics(
+            source: dict[str, Any],
+            key: str,
+            function: dict[str, Any],
+        ) -> tuple[float, bool]:
+            pct = float(function['pct'])
+            exact = bool(function.get('exact'))
+            semantic_accepted = bool(function.get('semanticAccepted'))
+            if key in canonical_rejections and not semantic_accepted:
+                exact = False
+            # A stale or missing lane sidecar cannot turn an external raw 100%
+            # into a proven exact result.  It remains useful fuzzy evidence.
+            if source is not canonical and pct >= 100.0 and not semantic_accepted:
+                exact = False
+            return pct, exact
+
+        def unit_metrics(
+            source: dict[str, Any],
+            unit: dict[str, Any],
+        ) -> tuple[float, bool]:
+            if unit.get('semanticComplete'):
+                return 100.0, True
+            if not canonical_rejections:
+                pct = max(0.0, min(100.0, float(unit['pct'])))
+                exact = bool(unit.get('exact'))
+                if source is not canonical and pct >= 100.0:
+                    exact = False
+                return pct, exact
+
+            function_bytes = 0
+            matched_equivalent = 0.0
+            blocked_rejection = False
+            for key in unit['functionOrder']:
+                function = unit['functions'].get(key)
+                if function is None:
+                    continue
+                function_pct, _ = function_metrics(source, key, function)
+                size = max(0, int(function['total']))
+                function_bytes += size
+                matched_equivalent += size * function_pct / 100.0
+            for key in canonical_rejections:
+                function = unit['functions'].get(key)
+                if function is None or not function.get('semanticAccepted'):
+                    blocked_rejection = True
+
+            unit_total = max(0, int(unit['total']))
+            pct = float(unit['pct'])
+            if function_bytes:
+                residual = max(0, unit_total - function_bytes)
+                matched_equivalent += residual * pct / 100.0
+                denominator = max(unit_total, function_bytes)
+                pct = 100.0 * matched_equivalent / denominator if denominator else pct
+
+            exact = bool(unit.get('exact')) and not blocked_rejection
+            if source is not canonical and pct >= 100.0:
+                exact = False
+            return max(0.0, min(100.0, pct)), exact
+
+        variant_metrics = [
+            (source, unit, *unit_metrics(source, unit))
+            for source, unit in variants
+        ]
+        canonical_pct, canonical_exact = (
+            unit_metrics(canonical, canonical_unit)
+            if canonical_unit else (0.0, False)
+        )
         canonical_linked = bool(canonical_unit['linked']) if canonical_unit else False
 
-        best_source_obj, best_unit = max(variants, key=lambda pair: (pair[1]['pct'], pair[1]['linked'], pair[1]['total']))
-        best_pct = float(best_unit['pct'])
+        best_source_obj, best_unit, best_pct, best_exact = max(
+            variant_metrics,
+            key=lambda item: (
+                item[2],
+                bool(item[1].get('semanticComplete')),
+                item[3],
+                item[0] is canonical,
+                -source_positions[id(item[0])],
+            ),
+        )
         best_source = best_source_obj['spec'].label
         any_linked = any(bool(u['linked']) for _, u in variants)
 
@@ -862,20 +1022,43 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
             canonical_fn = canonical_unit['functions'].get(function_key_value) if canonical_unit else None
             reference_fn = canonical_fn or max((fn for _, fn in fn_variants), key=lambda fn: fn['total'])
             fn_total = int(reference_fn['total'])
-            fn_canonical_pct = float(canonical_fn['pct']) if canonical_fn else 0.0
-            fn_canonical_linked = bool(canonical_fn['linked']) if canonical_fn else False
-            best_fn_source_obj, best_fn = max(fn_variants, key=lambda pair: (pair[1]['pct'], pair[1]['linked'], pair[1]['total']))
-            fn_best_pct = float(best_fn['pct'])
+            fn_canonical_pct, fn_canonical_exact = (
+                function_metrics(canonical, function_key_value, canonical_fn)
+                if canonical_fn else (0.0, False)
+            )
+            fn_canonical_linked = canonical_linked and canonical_fn is not None
+            fn_variant_metrics = [
+                (source, function, *function_metrics(source, function_key_value, function))
+                for source, function in fn_variants
+            ]
+            best_fn_source_obj, best_fn, fn_best_pct, fn_best_exact = max(
+                fn_variant_metrics,
+                key=lambda item: (
+                    item[2],
+                    bool(item[1].get('semanticAccepted')),
+                    item[3],
+                    item[0] is canonical,
+                    -source_positions[id(item[0])],
+                ),
+            )
             fn_best_source = best_fn_source_obj['spec'].label
-            fn_any_linked = any(bool(fn['linked']) for _, fn in fn_variants)
+            fn_any_linked = any(
+                bool(unit['linked']) and function_key_value in unit['functions']
+                for _, unit in variants
+            )
 
             contributors = sorted({
                 source['spec'].label
-                for source, fn in fn_variants
-                if float(fn['pct']) > fn_canonical_pct + 0.0001
-                and abs(float(fn['pct']) - fn_best_pct) < 0.0001
+                for source, fn, pct, _ in fn_variant_metrics
+                if source is not canonical
+                and pct > fn_canonical_pct + 0.0001
+                and abs(pct - fn_best_pct) < 0.0001
             })
-            fn_parked = any(source_kind.get(label) == 'parked' for label in contributors)
+            fn_parked = any(
+                source['spec'].kind == 'parked'
+                and source['spec'].label in contributors
+                for source, _, _, _ in fn_variant_metrics
+            )
             unit_contributors.update(contributors)
             parked_contribution = parked_contribution or fn_parked
 
@@ -887,19 +1070,28 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
                 'canonicalPct': fn_canonical_pct,
                 'bestPct': fn_best_pct,
                 'unionPct': fn_best_pct,
+                'canonicalExact': fn_canonical_exact,
+                'bestExact': fn_best_exact,
+                'unionExact': fn_best_exact,
                 'bestSource': fn_best_source,
                 'contributors': contributors,
                 'parkedContribution': fn_parked,
-            'canonicalLinked': fn_canonical_linked,
-            'anyLinked': fn_any_linked,
-            'canonicalSemanticAccepted': bool(canonical_fn and canonical_fn.get('semanticAccepted')),
-            'anySemanticAccepted': any(bool(fn.get('semanticAccepted')) for _, fn in fn_variants),
-        })
+                'canonicalLinked': fn_canonical_linked,
+                'anyLinked': fn_any_linked,
+                'canonicalSemanticAccepted': bool(canonical_fn and canonical_fn.get('semanticAccepted')),
+                'anySemanticAccepted': any(bool(fn.get('semanticAccepted')) for _, fn in fn_variants),
+            })
 
         union_pct = weighted_union_pct(total, best_pct, merged_functions)
+        represented_bytes = sum(int(function['total']) for function in merged_functions)
+        union_exact = best_exact or bool(
+            merged_functions
+            and represented_bytes == total
+            and all(bool(function['unionExact']) for function in merged_functions)
+        )
         if best_pct > canonical_pct + 0.0001:
             unit_contributors.add(best_source)
-            if source_kind.get(best_source) == 'parked':
+            if best_source_obj['spec'].kind == 'parked':
                 parked_contribution = True
 
         merged_units.append({
@@ -909,6 +1101,9 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
             'canonicalPct': canonical_pct,
             'bestPct': best_pct,
             'unionPct': union_pct,
+            'canonicalExact': canonical_exact,
+            'bestExact': best_exact,
+            'unionExact': union_exact,
             'bestSource': best_source,
             'contributors': sorted(unit_contributors),
             'parkedContribution': parked_contribution,
@@ -918,6 +1113,11 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
             'anySemanticComplete': any(bool(u.get('semanticComplete')) for _, u in variants),
             'functions': merged_functions,
         })
+
+    for label, count in sorted(incompatible_by_source.items()):
+        warnings.append(
+            f"Ignored {count} target-layout-incompatible unit(s) from {label}"
+        )
 
     # Detect obvious wrong-version/wrong-baseline reports without rejecting them.
     canonical_total = sum(int(u['total']) for u in canonical_units.values())
@@ -954,20 +1154,53 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
 class ViewerServer(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, address: tuple[str, int], sources: list[SourceSpec], startup_warnings: list[str]):
+    def __init__(
+        self,
+        address: tuple[str, int],
+        sources: list[SourceSpec],
+        startup_warnings: list[str],
+        source_discovery: Callable[[], tuple[list[SourceSpec], list[str]]] | None = None,
+    ):
         self.sources = sources
         self.startup_warnings = startup_warnings
+        self.source_discovery = source_discovery
+        self._source_lock = threading.Lock()
+        self._build_lock = threading.Lock()
+        self._last_probe_at = 0.0
+        self.probe_interval_seconds = 30.0
         self._cache_stamp: str | None = None
         self._cache_body: bytes | None = None
         self._cache_lock = threading.Lock()
         super().__init__(address, ViewerHandler)
 
-    def build_envelope(self) -> bytes:
+    def build_envelope(self, force: bool = False) -> bytes:
+        with self._build_lock:
+            now = time.monotonic()
+            if (
+                not force
+                and self._cache_body is not None
+                and now - self._last_probe_at < self.probe_interval_seconds
+            ):
+                return self._cache_body
+            self._last_probe_at = now
+            return self._refresh_envelope()
+
+    def _refresh_envelope(self) -> bytes:
+        if self.source_discovery is not None:
+            with self._source_lock:
+                sources, discovery_warnings = self.source_discovery()
+                self.sources = sources
+        else:
+            sources = self.sources
+            discovery_warnings = self.startup_warnings
+
         readable_specs: list[SourceSpec] = []
         semantic_paths: dict[str, Path] = {}
+        report_signatures: dict[str, tuple[int, int, int]] = {}
+        semantic_signatures: dict[str, tuple[int, int, int]] = {}
         stamp_parts: list[str] = []
-        warnings = list(self.startup_warnings)
-        for spec in self.sources:
+        warnings = list(discovery_warnings)
+        for spec in sources:
             try:
                 stat = spec.path.stat()
             except FileNotFoundError:
@@ -976,7 +1209,9 @@ class ViewerServer(ThreadingHTTPServer):
                 warnings.append(f"Cannot stat {spec.label}: {exc}")
                 continue
             readable_specs.append(spec)
-            stamp_parts.append(f"{spec.id}:{stat.st_mtime_ns}:{stat.st_size}")
+            report_signature = stat_signature(stat)
+            report_signatures[spec.id] = report_signature
+            stamp_parts.append(f"{spec.id}:{report_signature}")
             semantic_path = spec.semantic_path
             if semantic_path is None:
                 continue
@@ -987,9 +1222,9 @@ class ViewerServer(ThreadingHTTPServer):
             except OSError as exc:
                 warnings.append(f"Cannot stat semantic report for {spec.label}: {exc}")
                 continue
-            stamp_parts.append(
-                f"{spec.id}:semantic:{semantic_stat.st_mtime_ns}:{semantic_stat.st_size}"
-            )
+            semantic_signature = stat_signature(semantic_stat)
+            semantic_signatures[spec.id] = semantic_signature
+            stamp_parts.append(f"{spec.id}:semantic:{semantic_signature}")
             if semantic_stat.st_mtime_ns < stat.st_mtime_ns:
                 warnings.append(
                     f"Semantic report older than objdiff report for {spec.label}; ignored"
@@ -1005,17 +1240,42 @@ class ViewerServer(ThreadingHTTPServer):
             loaded: list[dict[str, Any]] = []
             for spec in readable_specs:
                 try:
-                    report = load_json(spec.path)
+                    report = load_json_stable(spec.path, report_signatures[spec.id])
                 except (OSError, json.JSONDecodeError, ValueError) as exc:
+                    if spec.kind == 'canonical':
+                        raise OSError(f"Cannot load canonical report {spec.label}: {exc}") from exc
                     warnings.append(f"Cannot load {spec.label}: {exc}")
                     continue
                 semantic_report = None
                 semantic_path = semantic_paths.get(spec.id)
                 if semantic_path is not None:
                     try:
-                        semantic_report = load_json(semantic_path)
+                        semantic_report = load_json_stable(
+                            semantic_path, semantic_signatures[spec.id]
+                        )
                     except (OSError, json.JSONDecodeError, ValueError) as exc:
+                        if spec.kind == 'canonical':
+                            raise OSError(
+                                f"Cannot load canonical semantic report {spec.label}: {exc}"
+                            ) from exc
                         warnings.append(f"Cannot load semantic report for {spec.label}: {exc}")
+                if stat_signature(spec.path.stat()) != report_signatures[spec.id]:
+                    if spec.kind == 'canonical':
+                        raise OSError(f"Canonical report changed during paired read: {spec.path}")
+                    warnings.append(f"Report changed during paired read for {spec.label}; ignored")
+                    continue
+                if (
+                    semantic_path is not None
+                    and stat_signature(semantic_path.stat()) != semantic_signatures[spec.id]
+                ):
+                    if spec.kind == 'canonical':
+                        raise OSError(
+                            f"Canonical semantic report changed during paired read: {semantic_path}"
+                        )
+                    warnings.append(
+                        f"Semantic report changed during paired read for {spec.label}; ignored"
+                    )
+                    continue
                 loaded.append(normalize_source(spec, report, semantic_report))
 
             merged = merge_reports(loaded, warnings)
@@ -1043,13 +1303,18 @@ class ViewerHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self) -> None:
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
         if path in ('/', '/index.html'):
             self.send_bytes(HTML.encode('utf-8'), 'text/html; charset=utf-8')
             return
         if path == '/api/report':
             try:
-                self.send_bytes(self.server.build_envelope(), 'application/json; charset=utf-8')
+                force = parse_qs(parsed.query).get('force') == ['1']
+                self.send_bytes(
+                    self.server.build_envelope(force=force),
+                    'application/json; charset=utf-8',
+                )
             except (OSError, ValueError, json.JSONDecodeError) as exc:
                 self.send_bytes(str(exc).encode('utf-8'), 'text/plain; charset=utf-8', HTTPStatus.INTERNAL_SERVER_ERROR)
             return
@@ -1087,7 +1352,12 @@ def main() -> int:
     for warning in warnings:
         print(f"Warning: {warning}")
 
-    server = ViewerServer((args.host, args.port), sources, warnings)
+    server = ViewerServer(
+        (args.host, args.port),
+        sources,
+        warnings,
+        source_discovery=lambda: discover_sources(args),
+    )
     url = f'http://{args.host}:{args.port}/'
     print(f'Open: {url}')
     print('Press Ctrl+C to stop.')
