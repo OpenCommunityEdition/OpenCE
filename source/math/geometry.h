@@ -33,6 +33,10 @@ struct geosphere *geosphere_new(
 void geosphere_dispose(
 	struct geosphere *sphere);
 
+short convex_hull2d(
+	short point_count,
+	real_point2d const *points,
+	short *hull_indices);
 boolean convex_hull2d_verify(
 	short vertex_count,
 	real_point2d const *vertices,

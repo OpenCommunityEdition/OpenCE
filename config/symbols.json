@@ -6536,7 +6536,7 @@
 { "file_offset": 1586176, "flags": 32, "name": "_structure_detail_objects_initialize_for_new_map" },
 { "file_offset": 1586256, "flags": 32, "name": "_structure_render_detail_objects" },
 { "file_offset": 1587392, "flags": 32, "name": "_render_debug_detail_objects" },
-{ "file_offset": 1588144, "flags": 32, "name": "_compare_lens_flare_markers_by_cluster" },
+{ "file_offset": 1588144, "flags": 32, "name": "_compare_temp_markers" },
 { "file_offset": 1588176, "flags": 32, "name": "_cluster_index_from_point" },
 { "file_offset": 1588272, "flags": 32, "name": "_build_structure_lens_flares" },
 { "file_offset": 1592608, "flags": 32, "name": "_structure_lens_flares_place" },

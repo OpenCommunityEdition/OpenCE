@@ -2782,6 +2782,7 @@ symbols in this file:
 #include "interface/hud_messaging.h"
 #include "interface/interface.h"
 #include "rasterizer/rasterizer_cinematics.h"
+#include "structures/structure_lens_flares.h"
 #include "tag_files/files.h"
 
 /* ---------- constants */
@@ -4227,8 +4228,6 @@ void main_save_core(
 void scripted_hud_restart_flashing(
 	void);
 void terminal_clear(
-	void);
-void structure_lens_flares_place(
 	void);
 void scripted_hud_time_code_reset(
 	void);

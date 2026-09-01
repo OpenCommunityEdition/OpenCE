@@ -3,7 +3,7 @@ STRUCTURE_LENS_FLARES.C
 
 symbols in this file:
 00183BB0 0020:
-	_code_00183bb0 (0000)
+	_compare_temp_markers (0000)
 00183BD0 0060:
 	_cluster_index_from_point (0000)
 00183C30 10f0:
@@ -52,15 +52,22 @@ symbols in this file:
 #include "cseries/errors.h"
 
 #include "structure_bsp_definitions.h"
+#include "structures/structure_lens_flares.h"
+#include "cache/cache_files.h"
 #include "math/geometry.h"
+#include "memory/array.h"
 #include "physics/collision_bsp_definitions.h"
 #include "scenario/scenario.h"
 #include "shaders/shader_definitions.h"
+#include "tool/connected_geometry.h"
 
 /* ---------- constants */
 
 enum
 {
+	_shader_type_environment = 3,
+	_shader_type_transparent_generic = 5,
+	_shader_type_transparent_chicago = 6,
 	MAXIMUM_TRIANGLES_PER_CONNECTED_GEOMETRY_COPLANAR_GROUP = 20000,
 };
 
@@ -111,34 +118,6 @@ struct structure_environment_vertex
 	byte remaining[0x2C];
 };
 
-struct dynamic_array
-{
-	long element_size;
-	long count;
-	void *elements;
-};
-
-struct connected_geometry_edge
-{
-	byte reserved[0xC];
-	long point_indices[2];
-	byte trailing[0x8];
-};
-
-struct connected_geometry_triangle
-{
-	long edge_designators[3];
-	long coplanar_group_index;
-	long unused[2];
-};
-
-struct connected_geometry
-{
-	struct dynamic_array points;
-	struct dynamic_array edges;
-	struct dynamic_array triangles;
-};
-
 struct shader_lens_flare_fields_environment
 {
 	struct shader shader;
@@ -157,34 +136,9 @@ struct shader_lens_flare_fields_transparent
 
 /* ---------- prototypes */
 
-long compare_lens_flare_markers_by_cluster(
+long compare_temp_markers(
 	struct temporary_lens_flare_marker const *a,
 	struct temporary_lens_flare_marker const *b);
-boolean build_structure_lens_flares(
-	struct structure_bsp *structure_bsp);
-void structure_lens_flares_place(
-	void);
-
-boolean tag_block_resize(struct tag_block *block, long count);
-long tag_block_add_element(struct tag_block *block);
-void tag_reference_set(struct tag_reference *reference, unsigned long group_tag, const char *name);
-void connected_geometry_new(struct connected_geometry *geometry);
-void connected_geometry_delete(struct connected_geometry *geometry);
-long connected_geometry_add_triangle(
-	struct connected_geometry *geometry,
-	real_point3d const *point0,
-	real_point3d const *point1,
-	real_point3d const *point2,
-	boolean report_duplicates);
-long connected_geometry_group_coplanar(struct connected_geometry *geometry);
-void *dynamic_array_get_element(struct dynamic_array *array, long index, long element_size);
-short convex_hull2d(short point_count, real_point2d const *points, short *hull_indices);
-boolean convex_hull2d_test_point_indexed(
-	short count,
-	short const *indices,
-	real_point2d const *points,
-	real_point2d const *point,
-	real epsilon);
 
 /* ---------- globals */
 
@@ -287,28 +241,28 @@ boolean build_structure_lens_flares(
 			shader = tag_get('shdr', material->shader.index);
 			switch (shader->base.type)
 			{
-			case 3:
+			case _shader_type_environment:
 			{
 				struct shader_lens_flare_fields_environment *lens_flare_fields =
-					(struct shader_lens_flare_fields_environment *)shader_get_and_verify_type(shader, 3);
+					(struct shader_lens_flare_fields_environment *)shader_get_and_verify_type(shader, _shader_type_environment);
 				lens_flare_reference = &lens_flare_fields->lens_flare;
-				lens_flare_spacing = ((struct shader_lens_flare_fields_environment *)shader_get_and_verify_type(shader, 3))->lens_flare_spacing;
+				lens_flare_spacing = ((struct shader_lens_flare_fields_environment *)shader_get_and_verify_type(shader, _shader_type_environment))->lens_flare_spacing;
 				break;
 			}
-			case 5:
+			case _shader_type_transparent_generic:
 			{
 				struct shader_lens_flare_fields_transparent *lens_flare_fields =
-					(struct shader_lens_flare_fields_transparent *)shader_get_and_verify_type(shader, 5);
+					(struct shader_lens_flare_fields_transparent *)shader_get_and_verify_type(shader, _shader_type_transparent_generic);
 				lens_flare_reference = &lens_flare_fields->lens_flare;
-				lens_flare_spacing = ((struct shader_lens_flare_fields_transparent *)shader_get_and_verify_type(shader, 5))->lens_flare_spacing;
+				lens_flare_spacing = ((struct shader_lens_flare_fields_transparent *)shader_get_and_verify_type(shader, _shader_type_transparent_generic))->lens_flare_spacing;
 				break;
 			}
-			case 6:
+			case _shader_type_transparent_chicago:
 			{
 				struct shader_lens_flare_fields_transparent *lens_flare_fields =
-					(struct shader_lens_flare_fields_transparent *)shader_get_and_verify_type(shader, 6);
+					(struct shader_lens_flare_fields_transparent *)shader_get_and_verify_type(shader, _shader_type_transparent_chicago);
 				lens_flare_reference = &lens_flare_fields->lens_flare;
-				lens_flare_spacing = ((struct shader_lens_flare_fields_transparent *)shader_get_and_verify_type(shader, 6))->lens_flare_spacing;
+				lens_flare_spacing = ((struct shader_lens_flare_fields_transparent *)shader_get_and_verify_type(shader, _shader_type_transparent_chicago))->lens_flare_spacing;
 				break;
 			}
 			default:
@@ -318,14 +272,25 @@ boolean build_structure_lens_flares(
 			if (!lens_flare_reference || lens_flare_reference->index == NONE)
 				continue;
 
-			for (lens_flare_index = 0; lens_flare_index < structure_bsp->lens_flares.count; lens_flare_index++)
+			lens_flare_index = 0;
 			{
-				struct structure_lens_flare *lens_flare = TAG_BLOCK_GET_ELEMENT(
-					&structure_bsp->lens_flares,
-					lens_flare_index,
-					struct structure_lens_flare);
-				if (lens_flare->lens_flare.index == lens_flare_reference->index)
-					break;
+				long lens_flare_element_index = 0;
+
+				if (structure_bsp->lens_flares.count > 0)
+				{
+					do
+					{
+						struct structure_lens_flare *lens_flare = TAG_BLOCK_GET_ELEMENT(
+							&structure_bsp->lens_flares,
+							lens_flare_element_index,
+							struct structure_lens_flare);
+						if (lens_flare->lens_flare.index == lens_flare_reference->index)
+							break;
+						++lens_flare_index;
+						lens_flare_element_index = lens_flare_index;
+					}
+					while (lens_flare_element_index < structure_bsp->lens_flares.count);
+				}
 			}
 
 			if (structure_bsp->lens_flares.count == lens_flare_index)
@@ -475,8 +440,8 @@ boolean build_structure_lens_flares(
 				if (hull_count >= 3)
 				{
 					real_point3d origin = *global_origin3d;
-					real_vector3d s_axis;
-					real_vector3d t_axis;
+					real_plane3d s_plane;
+					real_plane3d t_plane;
 					real_rectangle2d bounds;
 					short hull_index;
 					rectangle2d grid_bounds;
@@ -489,28 +454,30 @@ boolean build_structure_lens_flares(
 						origin.y += points[hull_indices[hull_index]].y;
 						origin.z += points[hull_indices[hull_index]].z;
 					}
-					origin.x *= 1.f / (real)hull_count;
-					origin.y *= 1.f / (real)hull_count;
-					origin.z *= 1.f / (real)hull_count;
-
-					vector_from_points3d(&points[0], &points[1], &s_axis);
-					normalize3d(&s_axis);
-					cross_product3d(&plane.n, &s_axis, &t_axis);
+					origin.x = origin.x * (1.f / (real)hull_count);
+					origin.y = origin.y * (1.f / (real)hull_count);
+					origin.z = origin.z * (1.f / (real)hull_count);
 
 					{
-						real_point2d origin_projection;
-						real_point3d const *hull_point = &points[hull_indices[0]];
+						real_plane3d s_temp;
 
-						origin_projection.x = POINT_DOT_VECTOR3D(&origin, &s_axis);
-						origin_projection.y = POINT_DOT_VECTOR3D(&origin, &t_axis);
+						vector_from_points3d(&points[0], &points[1], &s_temp.n);
+						normalize3d(&s_temp.n);
+						cross_product3d(&plane.n, &s_temp.n, &t_plane.n);
+						plane3d_from_point_and_normal(&s_temp, &origin, &s_temp.n);
+						s_plane = s_temp;
+					}
 
-						bounds.x0 = bounds.x1 = POINT_DOT_VECTOR3D(hull_point, &s_axis) - origin_projection.x;
-						bounds.y0 = bounds.y1 = POINT_DOT_VECTOR3D(hull_point, &t_axis) - origin_projection.y;
+					{
+						plane3d_from_point_and_normal(&t_plane, &origin, &t_plane.n);
+
+						bounds.x0 = bounds.x1 = plane3d_distance_to_point(&s_plane, &points[hull_indices[0]]);
+						bounds.y0 = bounds.y1 = plane3d_distance_to_point(&t_plane, &points[hull_indices[0]]);
 						for (hull_index = 0; hull_index < hull_count; hull_index++)
 						{
-							real_point3d const *hull_point = &points[hull_indices[hull_index]];
-							real s = POINT_DOT_VECTOR3D(hull_point, &s_axis) - origin_projection.x;
-							real t_coordinate = POINT_DOT_VECTOR3D(hull_point, &t_axis) - origin_projection.y;
+							real_point3d const *point = &points[hull_indices[hull_index]];
+							real s = plane3d_distance_to_point(&s_plane, point);
+							real t_coordinate = plane3d_distance_to_point(&t_plane, point);
 
 							bounds.x0 = MIN(s, bounds.x0);
 							bounds.y0 = MIN(t_coordinate, bounds.y0);
@@ -521,10 +488,10 @@ boolean build_structure_lens_flares(
 
 					if (lens_flare_spacing != 0.f)
 					{
-						grid_bounds.x0 = (short)(real)ceil(PIN(bounds.x0 / lens_flare_spacing, -1000.f, 1000.f));
-						grid_bounds.y0 = (short)(real)ceil(PIN(bounds.y0 / lens_flare_spacing, -1000.f, 1000.f));
-						grid_bounds.x1 = (short)(real)floor(PIN(bounds.x1 / lens_flare_spacing, -1000.f, 1000.f));
-						grid_bounds.y1 = (short)(real)floor(PIN(bounds.y1 / lens_flare_spacing, -1000.f, 1000.f));
+						grid_bounds.x0 = (short)fast_ftol((real)ceil(PIN(bounds.x0 / lens_flare_spacing, -1000.f, 1000.f)));
+						grid_bounds.y0 = (short)fast_ftol((real)ceil(PIN(bounds.y0 / lens_flare_spacing, -1000.f, 1000.f)));
+						grid_bounds.x1 = (short)fast_ftol((real)floor(PIN(bounds.x1 / lens_flare_spacing, -1000.f, 1000.f)));
+						grid_bounds.y1 = (short)fast_ftol((real)floor(PIN(bounds.y1 / lens_flare_spacing, -1000.f, 1000.f)));
 					}
 					else
 					{
@@ -550,12 +517,16 @@ boolean build_structure_lens_flares(
 									long marker_index;
 									struct structure_lens_flare_marker *marker;
 
-									position.x = position.x + s_axis.i * s_distance;
-									position.y = position.y + s_axis.j * s_distance;
-									position.z = position.z + s_axis.k * s_distance;
-									position.x = t_axis.i * t_distance + position.x;
-									position.y = t_axis.j * t_distance + position.y;
-									position.z = t_axis.k * t_distance + position.z;
+									{
+										real ds_x = s_plane.n.i * s_distance;
+
+										position.x = position.x + ds_x;
+									}
+									position.y = position.y + s_plane.n.j * s_distance;
+									position.z = position.z + s_plane.n.k * s_distance;
+									position.x = t_plane.n.i * t_distance + position.x;
+									position.y = t_plane.n.j * t_distance + position.y;
+									position.z = t_plane.n.k * t_distance + position.z;
 									project_point3d(&position, projection_axis, projection_sign, &projected_position);
 									if (convex_hull2d_test_point_indexed(
 										hull_count,
@@ -572,9 +543,9 @@ boolean build_structure_lens_flares(
 												marker_index,
 												struct structure_lens_flare_marker);
 											marker->position = position;
-											marker->direction[0] = (char)(real)floor(plane.n.i * 127.5f);
-											marker->direction[1] = (char)(real)floor(plane.n.j * 127.5f);
-											marker->direction[2] = (char)(real)floor(plane.n.k * 127.5f);
+											marker->direction[0] = (char)fast_ftol((real)floor(plane.n.i * 127.5f));
+											marker->direction[1] = (char)fast_ftol((real)floor(plane.n.j * 127.5f));
+											marker->direction[2] = (char)fast_ftol((real)floor(plane.n.k * 127.5f));
 											marker->lens_flare_index = (byte)lens_flare_index;
 										}
 										else
@@ -624,17 +595,22 @@ boolean build_structure_lens_flares(
 				struct structure_lens_flare_marker);
 			real_vector3d direction;
 			real_point3d test_point = marker->position;
-			real offset = 1.f / 65536.f;
+			real offset;
 
 			direction.i = (real)marker->direction[0] * (1.f / 127.f);
 			direction.j = (real)marker->direction[1] * (1.f / 127.f);
 			direction.k = (real)marker->direction[2] * (1.f / 127.f);
+			offset = 1.f / 65536.f;
 			csmemcpy(&temp_markers[marker_index], marker, sizeof(*marker));
 
 			do
 			{
 				temp_markers[marker_index].cluster_index = cluster_index_from_point(structure_bsp, &test_point);
-				point_from_line3d(&test_point, &direction, offset, &test_point);
+				/* Preserve the January inline schedule without emitting a
+				 * point_from_line3d COMDAT. */
+				test_point.x = direction.i * offset + test_point.x;
+				test_point.y = direction.j * offset + test_point.y;
+				test_point.z = direction.k * offset + test_point.z;
 				offset += offset;
 			}
 			while (temp_markers[marker_index].cluster_index == NONE && offset < 1.f);
@@ -645,7 +621,7 @@ boolean build_structure_lens_flares(
 		temp_markers,
 		structure_bsp->lens_flare_markers.count,
 		sizeof(*temp_markers),
-		(int (__cdecl *)(const void *, const void *))compare_lens_flare_markers_by_cluster);
+		(int (__cdecl *)(const void *, const void *))compare_temp_markers);
 
 	{
 		for (marker_index = 0; marker_index < structure_bsp->lens_flare_markers.count; marker_index++)
@@ -731,7 +707,7 @@ boolean build_structure_lens_flares(
 
 /* ---------- private code */
 
-long compare_lens_flare_markers_by_cluster(
+long compare_temp_markers(
 	struct temporary_lens_flare_marker const *a,
 	struct temporary_lens_flare_marker const *b)
 {

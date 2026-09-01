@@ -969,6 +969,25 @@
         },
         "objdiff_percent": 93.333336
       }
+    },
+    {
+      "unit": "source/structures/structure_lens_flares",
+      "function": "_build_structure_lens_flares",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked under the current house rule after retaining the coherent Fable witness topology and authenticating the private name compare_temp_markers from the September 2001 cachebeta linker map in the local Halo symbol atlas. Target and candidate have the same 4336-byte padded envelope, 156 relocations, and 1327 decoded instructions; three sibling functions and all owned data are strict exact. The remaining differences are instruction scheduling and local/register lifetime choices in the recovered plane/grid packet, which also move several relocation positions while preserving the call and constant topology. The retained source uses project real/plane types, named shader enum constants, the witnessed scoped ds_x temporary, and the late offset assignment. It expands the three scalar point updates directly to preserve the January inline schedule without emitting a point_from_line3d COMDAT. The candidate-only 32-byte fast_ftol helper COMDAT is authenticated shared helper code but receives no object-completion credit. The closest shared structures header was rejected because the correct void prototype regressed protected units.obj from 189/189 to 188/189 through VC7 definition-position sensitivity; a dedicated natural owner header preserves both units.obj and hs.obj while removing the use-site prototype. No volatile access, compiler barrier, artificial alias, wrong fi4 cast, address-derived name, fake dependency, undefined behavior, assembly, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler scheduling donor.",
+      "measurements": {
+        "target": {
+          "size": 4336,
+          "relocation_count": 156,
+          "normalized_sha256": "40aa8e486e52fe258065ae9cc9bd892679b15fd7845008cc0ebe1651788cf33b"
+        },
+        "base": {
+          "size": 4336,
+          "relocation_count": 156,
+          "normalized_sha256": "57d6f033f379373528ec40ed132b8af7db73b6f1a087be9ddc3ad2f30d55fc46"
+        },
+        "objdiff_percent": 99.29274
+      }
     }
   ]
 }
