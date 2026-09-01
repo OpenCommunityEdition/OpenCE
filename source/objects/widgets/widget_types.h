@@ -22,7 +22,16 @@ enum
 	_widget_type_glow,
 	_widget_type_light_volume,
 	_widget_type_lightning,
-	NUMBER_OF_WIDGET_TYPES
+	NUMBER_OF_WIDGET_TYPES,
+
+	_widget_type_internal_sprite = NUMBER_OF_WIDGET_TYPES
+};
+
+enum
+{
+	_rasterizer_widget_z_enable_bit = 0,
+	_rasterizer_widget_z_write_enable_bit,
+	NUMBER_OF_RASTERIZER_WIDGET_FLAGS
 };
 
 /* ---------- macros */

@@ -22537,7 +22537,7 @@
 { "file_offset": 4548336, "flags": 0, "name": "_network_game_message_buffer", "static": true },
 { "file_offset": 4549876, "flags": 0, "name": "_network_game_server_memory_do_not_use_directly_in_use" },
 { "file_offset": 4549888, "flags": 0, "name": "_bss_00456d00" },
-{ "file_offset": 4550032, "flags": 0, "name": "_bss_00456d90" },
+{ "file_offset": 4550032, "flags": 0, "name": "_light_volume_globals" },
 { "file_offset": 4550212, "flags": 0, "name": "_lightning_globals" },
 { "file_offset": 4550216, "flags": 0, "name": "_bss_00456e48" },
 { "file_offset": 4550292, "flags": 0, "name": "_lights_game_globals" },

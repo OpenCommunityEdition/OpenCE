@@ -18,10 +18,17 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum
+{
+	_light_volume_color_interpolate_in_hsv_bit = 0,
+	_light_volume_color_interpolate_along_farthest_hue_path_bit,
+	NUMBER_OF_LIGHT_VOLUME_FLAGS
+};
+
 /* ---------- macros */
 
 #define light_volume_get(light_volume_index) \
-	((struct light_volume_datum *)datum_get(bss_00456d90.light_volumes, (light_volume_index)))
+	((struct light_volume_datum *)datum_get(light_volume_globals.light_volume_data, (light_volume_index)))
 #define light_volume_definition_get(definition_index) \
 	((struct light_volume_definition *)tag_get('mgs2', (definition_index)))
 
@@ -80,7 +87,7 @@ struct light_volume_definition
 struct light_volume_globals
 {
 	struct light_volume_frame frame_storage;
-	struct data_array *light_volumes;
+	struct data_array *light_volume_data;
 };
 
 typedef char light_volume_datum_size_assert[
@@ -93,8 +100,8 @@ typedef char light_volume_globals_size_assert[
 	sizeof(struct light_volume_globals) == 0xB4 ? 1 : -1];
 typedef char light_volume_datum_definition_index_offset_assert[
 	offsetof(struct light_volume_datum, definition_index) == 0x4 ? 1 : -1];
-typedef char light_volume_globals_light_volumes_offset_assert[
-	offsetof(struct light_volume_globals, light_volumes) == 0xB0 ? 1 : -1];
+typedef char light_volume_globals_light_volume_data_offset_assert[
+	offsetof(struct light_volume_globals, light_volume_data) == 0xB0 ? 1 : -1];
 typedef char light_volume_definition_attachment_marker_offset_assert[
 	offsetof(struct light_volume_definition, attachment_marker) == 0x0 ? 1 : -1];
 typedef char light_volume_definition_far_fade_distance_offset_assert[
@@ -125,6 +132,9 @@ long light_volume_new(
 
 void light_volume_delete(
 	long light_volume_index);
+void light_volume_render(
+	long object_index,
+	long light_volume_index);
 void light_volume_submit(
 	long object_index,
 	long light_volume_index,
@@ -133,7 +143,7 @@ void light_volume_submit(
 
 /* ---------- globals */
 
-extern struct light_volume_globals bss_00456d90;
+extern struct light_volume_globals light_volume_globals;
 
 /* ---------- public code */
 

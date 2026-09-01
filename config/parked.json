@@ -914,6 +914,25 @@
       }
     },
     {
+      "unit": "source/objects/widgets/light_volumes",
+      "function": "_light_volume_render",
+      "class": "tu-context-optimization",
+      "evidence": "Fuzzy-parked under the current house rule after the complete source-history and worktree census, the authenticated HCEA renderer/interpolator/type records at commit 570c83fd9c365dad6f2a3e7041705d5b84c7847c, the January disassembly, and the recorded bounded legal-C experiment families were rechecked from canonical ec4ae894a. The retained typed C implements the complete marker, view-angle, distance-fade, object-function, sprite-count, exponent, color-interpolation, and rasterizer path without fake steering. January emits a 912-byte function with a 0xA4 frame; VC7 emits 928 bytes with a 0xA8 frame. Both have 47 relocation types and destinations in the same semantic order. The remaining structural boundary is January's immediate 1.0f distance-fade store interleaved with the marker delta and its compact x87-valued inlined pow1 joins, while the available compiler materializes an earlier distance-fade local and memory phis for the later exponent results. Statement-position, scope, helper-edge, conditional-expression, direct-consumption, loop-count/divisor, HCEA-topology, compiler-version, and donor-branch families either reproduce this fixed point or lose the proven frame/relocation topology. No volatile access, register hint, barrier, assembly, raw offset, representation cast, undefined behavior, fake dependency, or nonsensical branch is retained. Reopen only for authoritative January source/local records, a natural same-compiler donor that distinguishes the x87 lifetime, or a genuinely distinct authentic VC7/QFE compiler.",
+      "measurements": {
+        "target": {
+          "size": 912,
+          "relocation_count": 47,
+          "normalized_sha256": "2e43dbc111ad125565ead94aff803117a92a3bb3215d18254e28281e204d0031"
+        },
+        "base": {
+          "size": 928,
+          "relocation_count": 47,
+          "normalized_sha256": "a4e273c7939882fcf1dadf774289b21742f1f88e718136216c33eaf04d55a94f"
+        },
+        "objdiff_percent": 75.711266
+      }
+    },
+    {
       "unit": "source/scenario/wind",
       "function": "_wind_variance_get",
       "class": "unclassified",

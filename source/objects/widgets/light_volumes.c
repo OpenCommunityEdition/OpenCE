@@ -15,9 +15,9 @@ symbols in this file:
 00124470 0020:
 	_light_volume_delete (0000)
 00124490 0210:
-	_code_00124490 (0000)
+	_light_volume_interpolate_frames (0000)
 001246A0 0030:
-	_code_001246a0 (0000)
+	_pow1 (0000)
 001246D0 0390:
 	_light_volume_render (0000)
 00124A60 0110:
@@ -29,7 +29,7 @@ symbols in this file:
 002891F8 000e:
 	??_C@_0O@BAADBFJE@light?5volumes?$AA@ (0000)
 00456D90 00b4:
-	_bss_00456d90 (0000)
+	_light_volume_globals (0000)
 */
 
 /* ---------- headers */
@@ -54,24 +54,21 @@ symbols in this file:
 static struct light_volume_frame *light_volume_interpolate_frames(
 	struct light_volume_definition *definition,
 	long object_index);
-real pow1(
+static real pow1(
 	real value,
 	real exponent);
-void light_volume_render(
-	long object_index,
-	long light_volume_index);
 
 /* ---------- globals */
 
-struct light_volume_globals bss_00456d90 = {0};
+struct light_volume_globals light_volume_globals = {0};
 
 /* ---------- public code */
 
 void light_volumes_initialize(
 	void)
 {
-	bss_00456d90.light_volumes = game_state_data_new("light volumes", 256, 8);
-	if (!bss_00456d90.light_volumes)
+	light_volume_globals.light_volume_data = game_state_data_new("light volumes", 256, 8);
+	if (!light_volume_globals.light_volume_data)
 	{
 		display_assert(
 			"light_volume_globals.light_volume_data",
@@ -93,8 +90,8 @@ void light_volumes_dispose(
 void light_volumes_initialize_for_new_map(
 	void)
 {
-	if (bss_00456d90.light_volumes)
-		data_make_valid(bss_00456d90.light_volumes);
+	if (light_volume_globals.light_volume_data)
+		data_make_valid(light_volume_globals.light_volume_data);
 
 	return;
 }
@@ -102,8 +99,8 @@ void light_volumes_initialize_for_new_map(
 void light_volumes_dispose_from_old_map(
 	void)
 {
-	if (bss_00456d90.light_volumes)
-		data_make_invalid(bss_00456d90.light_volumes);
+	if (light_volume_globals.light_volume_data)
+		data_make_invalid(light_volume_globals.light_volume_data);
 
 	return;
 }
@@ -111,7 +108,7 @@ void light_volumes_dispose_from_old_map(
 long light_volume_new(
 	long definition_index)
 {
-	long light_volume_index = datum_new(bss_00456d90.light_volumes);
+	long light_volume_index = datum_new(light_volume_globals.light_volume_data);
 
 	if (light_volume_index != NONE)
 		light_volume_get(light_volume_index)->definition_index = definition_index;
@@ -123,7 +120,7 @@ void light_volume_delete(
 	long light_volume_index)
 {
 	if (light_volume_index != NONE)
-		datum_delete(bss_00456d90.light_volumes, light_volume_index);
+		datum_delete(light_volume_globals.light_volume_data, light_volume_index);
 
 	return;
 }
@@ -167,40 +164,40 @@ static struct light_volume_frame *light_volume_interpolate_frames(
 			definition->frame_animation_source - 1,
 			&function_value))
 		{
-			result = &bss_00456d90.frame_storage;
+			result = &light_volume_globals.frame_storage;
 			inverse_function_value = 1.0f - function_value;
 
-			bss_00456d90.frame_storage.offset_from_marker =
+			light_volume_globals.frame_storage.offset_from_marker =
 				frame0->offset_from_marker * inverse_function_value + frame1->offset_from_marker * function_value;
-			bss_00456d90.frame_storage.offset_exponent =
+			light_volume_globals.frame_storage.offset_exponent =
 				frame0->offset_exponent * inverse_function_value + frame1->offset_exponent * function_value;
-			bss_00456d90.frame_storage.length =
+			light_volume_globals.frame_storage.length =
 				frame0->length * inverse_function_value + frame1->length * function_value;
-			bss_00456d90.frame_storage.radius_hither =
+			light_volume_globals.frame_storage.radius_hither =
 				frame0->radius_hither * inverse_function_value + frame1->radius_hither * function_value;
-			bss_00456d90.frame_storage.radius_yon =
+			light_volume_globals.frame_storage.radius_yon =
 				frame0->radius_yon * inverse_function_value + frame1->radius_yon * function_value;
-			bss_00456d90.frame_storage.radius_exponent =
+			light_volume_globals.frame_storage.radius_exponent =
 				frame0->radius_exponent * inverse_function_value + frame1->radius_exponent * function_value;
-			bss_00456d90.frame_storage.color_hither.alpha =
+			light_volume_globals.frame_storage.color_hither.alpha =
 				frame0->color_hither.alpha * inverse_function_value + frame1->color_hither.alpha * function_value;
-			bss_00456d90.frame_storage.color_hither.red =
+			light_volume_globals.frame_storage.color_hither.red =
 				frame0->color_hither.red * inverse_function_value + frame1->color_hither.red * function_value;
-			bss_00456d90.frame_storage.color_hither.green =
+			light_volume_globals.frame_storage.color_hither.green =
 				frame0->color_hither.green * inverse_function_value + frame1->color_hither.green * function_value;
-			bss_00456d90.frame_storage.color_hither.blue =
+			light_volume_globals.frame_storage.color_hither.blue =
 				frame0->color_hither.blue * inverse_function_value + frame1->color_hither.blue * function_value;
-			bss_00456d90.frame_storage.color_yon.alpha =
+			light_volume_globals.frame_storage.color_yon.alpha =
 				frame0->color_yon.alpha * inverse_function_value + frame1->color_yon.alpha * function_value;
-			bss_00456d90.frame_storage.color_yon.red =
+			light_volume_globals.frame_storage.color_yon.red =
 				frame0->color_yon.red * inverse_function_value + frame1->color_yon.red * function_value;
-			bss_00456d90.frame_storage.color_yon.green =
+			light_volume_globals.frame_storage.color_yon.green =
 				frame0->color_yon.green * inverse_function_value + frame1->color_yon.green * function_value;
-			bss_00456d90.frame_storage.color_yon.blue =
+			light_volume_globals.frame_storage.color_yon.blue =
 				frame0->color_yon.blue * inverse_function_value + frame1->color_yon.blue * function_value;
-			bss_00456d90.frame_storage.color_exponent =
+			light_volume_globals.frame_storage.color_exponent =
 				frame0->color_exponent * inverse_function_value + frame1->color_exponent * function_value;
-			bss_00456d90.frame_storage.brightness_exponent =
+			light_volume_globals.frame_storage.brightness_exponent =
 				frame0->brightness_exponent * inverse_function_value + frame1->brightness_exponent * function_value;
 		}
 	}
@@ -215,7 +212,7 @@ static struct light_volume_frame *light_volume_interpolate_frames(
 	return result;
 }
 
-real pow1(
+static real pow1(
 	real value,
 	real exponent)
 {
@@ -292,7 +289,9 @@ void light_volume_render(
 				short count;
 				long sprite_index;
 
-				rasterizer_widget_begin(5, 1);
+				rasterizer_widget_begin(
+					_widget_type_internal_sprite,
+					FLAG(_rasterizer_widget_z_enable_bit));
 				rasterizer_widget_set_texture(
 					0,
 					definition->map.index,
@@ -336,7 +335,9 @@ void light_volume_render(
 
 						rgb_colors_interpolate(
 							&color.rgb,
-							definition->flags & 3,
+							definition->flags &
+								(FLAG(_light_volume_color_interpolate_in_hsv_bit) |
+								 FLAG(_light_volume_color_interpolate_along_farthest_hue_path_bit)),
 							&frame->color_hither.rgb,
 							&frame->color_yon.rgb,
 							color_fraction);
