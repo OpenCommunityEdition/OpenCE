@@ -8,6 +8,10 @@ header included in hcex build.
 #define __CINEMATICS_H
 #pragma once
 
+/* ---------- headers */
+
+#include "math/real_math.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -22,8 +26,8 @@ struct cinematic_title
 
 struct cinematic_global_data
 {
-	long title_index;
-	long start_tick;
+	real letterbox_amount;
+	long letterbox_last_game_time;
 	boolean show_letterbox;
 	boolean in_progress;
 	boolean can_be_skipped;
@@ -63,6 +67,11 @@ void cinematic_suppress_bsp_object_creation(
 boolean cinematic_in_progress(
 	void);
 void cinematic_stop(
+	void);
+void cinematic_set_title_delayed(
+	short title_index,
+	real delay);
+void cinematic_render(
 	void);
 void cinematic_set_title(
 	unsigned short title_index);

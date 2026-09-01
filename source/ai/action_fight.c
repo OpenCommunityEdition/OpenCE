@@ -84,22 +84,6 @@ boolean actor_nearby_firing_positions(
 	long surface_index,
 	boolean allow_outside_range);
 
-long actor_active_select_firing_position(
-	long actor_index,
-	struct firing_position_search_definition *search,
-	struct firing_position_candidate *candidate,
-	long *previous_owner_actor_index,
-	struct firing_position_search_workspace *workspace,
-	long *position_flags);
-
-short actor_change_firing_position(
-	long actor_index,
-	long firing_position_index,
-	struct firing_position_candidate *candidate,
-	long previous_owner_actor_index,
-	struct firing_position_search_workspace *workspace,
-	long position_flags);
-
 void actor_perception_unreachable(
 	long actor_index,
 	long prop_index,
@@ -253,7 +237,7 @@ action_fight_perform(
 			}
 
 			{
-				long firing_position_index;
+				short firing_position_index;
 				long position_flags;
 				real combat_position_time_lower_bound;
 				long previous_owner_actor_index;

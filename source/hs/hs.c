@@ -2781,6 +2781,7 @@ symbols in this file:
 #include "game/game.h"
 #include "interface/hud_messaging.h"
 #include "interface/interface.h"
+#include "rasterizer/rasterizer_cinematics.h"
 #include "tag_files/files.h"
 
 /* ---------- constants */
@@ -3729,29 +3730,6 @@ void rasterizer_model_ambient_reflection_tint(
 	real red,
 	real green,
 	real blue);
-void rasterizer_script_screen_effect_set_value(
-	word effect_index,
-	real value);
-void rasterizer_screen_effect_set_convolution(
-	short convolution_type,
-	word source,
-	real value0,
-	real value1,
-	real value2);
-void rasterizer_screen_effect_set_filter(
-	real value0,
-	real value1,
-	real value2,
-	real value3,
-	boolean enabled,
-	real value4);
-void rasterizer_screen_effect_set_filter_desaturation_tint(
-	real red,
-	real green,
-	real blue);
-void rasterizer_screen_effect_set_video(
-	word video_index,
-	real value);
 short object_list_count(
 	long object_list_index);
 short numeric_countdown_timer_get(

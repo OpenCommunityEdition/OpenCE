@@ -638,6 +638,120 @@
         },
         "objdiff_percent": 94.18722
       }
+    },
+    {
+      "unit": "source/ai/action_uncover",
+      "function": "_action_uncover_perform",
+      "class": "instruction-scheduling",
+      "evidence": "The retained body is coherent typed C recovered from January disassembly and the established action-uncover donor, with HCEA commit 570c83fd9c365dad6f2a3e7041705d5b84c7847c corroborating the short selector/change ABI and high-level state transitions. January and candidate have the same 544-byte envelope, 164 instructions, and all 19 relocation addresses, types, destinations, and addends. Only 43 normalized byte positions differ in the contiguous +0xA2..+0xD3 pursuit-point copy: January loads all three point dwords before interleaving the independent flag/surface/cluster stores, while VC7 lowers the natural aggregate assignment as alternating loads and stores. The prior aggregate, scalar, alias, helper, field-order, scope, barrier, and 45 documented defined-C topology families are exhausted; forcing the target schedule would require prohibited gameplay assembly or artificial source. Reopen only for authenticated January source/local records, a strict same-compiler C donor, or a new natural lifetime fact that preserves the frame, relocations, compact source LEA, and downstream exact suffix.",
+      "measurements": {
+        "target": {
+          "size": 544,
+          "relocation_count": 19,
+          "normalized_sha256": "ddd3ed044dc0de47ecb6ba83ac683372ff87b3cb7d8fee318d20da5467c39ed8"
+        },
+        "base": {
+          "size": 544,
+          "relocation_count": 19,
+          "normalized_sha256": "f6c5eb3588f3efccd66611ba0c133b20dc3fb449fad4894f3022b8e9c6f04bd0"
+        },
+        "objdiff_percent": 98.77778
+      }
+    },
+    {
+      "unit": "source/rasterizer/rasterizer_cinematics",
+      "function": "_rasterizer_screen_effects_initialize_for_new_map",
+      "class": "instruction-scheduling",
+      "evidence": "The retained ordinary C is the authenticated HCEA/January map-reset logic: clear the 0x78-byte cinematic state and restore all four script values to 1.0f. Target and candidate share the 48-byte padded envelope, three relocation identities, and the same stores. The only residual is placement of the csmemset caller cleanup: January restores ESP after the first three constant stores, while VC7 restores it before all four. Separate assignments, chained assignments, and refreshed typed-pointer variants did not change that cleanup packet naturally. No volatile access, barrier, fake dependency, dead branch, assembly, or manual stack logic is retained. Reopen only for authoritative January source or a natural same-compiler declaration/statement-order donor.",
+      "measurements": {
+        "target": {
+          "size": 48,
+          "relocation_count": 3,
+          "normalized_sha256": "e53fee00ab5bd5eb887f92dd8dbe300dae55ac8ca59c1a5c9c1ab26e62441804"
+        },
+        "base": {
+          "size": 48,
+          "relocation_count": 3,
+          "normalized_sha256": "aefa986ca6e38326688e349fd4c7592575ef8ccb312f80881b6a17da2dae42e8"
+        },
+        "objdiff_percent": 59.933334
+      }
+    },
+    {
+      "unit": "source/rasterizer/rasterizer_cinematics",
+      "function": "_rasterizer_screen_effect_set_convolution",
+      "class": "instruction-scheduling",
+      "evidence": "The retained typed C implements the HCEA-corroborated convolution setter: disable video, store the signed-short pass/type controls and radius endpoints, then establish start/end times from game ticks using the canonical real type and TICKS_PER_SECOND. Target and candidate have the same four relocation identities. Their meaningful instruction streams are identical through the time calculation; January duplicates ST(0), pops one copy into convolution_time[0], then adds the duration, while VC7 uses FST for the first store and keeps the original value live, producing a 96-byte padded candidate versus January's 112-byte envelope. Direct helper calls, nested/chained assignments, and in-place time mutation all reproduce the retained compiler choice. No volatile access, fake lifetime carrier, barrier, assembly, or nonsensical logic is retained. Reopen only for authoritative January source or a natural same-compiler x87-lifetime donor.",
+      "measurements": {
+        "target": {
+          "size": 112,
+          "relocation_count": 4,
+          "normalized_sha256": "7beef58f5328b7768b506801a5528055389723414ad6c8ea1e4eead421e8aa48"
+        },
+        "base": {
+          "size": 96,
+          "relocation_count": 4,
+          "normalized_sha256": "643836a5bcf9eb11b33169e7e072dfdc1b76414c26549dc49c3b1ac33322fa9a"
+        },
+        "objdiff_percent": 95.15151
+      }
+    },
+    {
+      "unit": "source/rasterizer/rasterizer_cinematics",
+      "function": "_rasterizer_screen_effect_set_filter",
+      "class": "instruction-scheduling",
+      "evidence": "The retained typed C is the HCEA-corroborated filter setter: disable video, store both light-enhancement and desaturation interpolation bounds, compute the game-time interval, retain the additive flag, and clear both convolution-mask flags. Target and candidate share the 112-byte padded envelope and all four relocation identities. The residual is independent store and x87 scheduling: VC7 interleaves two endpoint stores with the video-clear packet, hoists the three byte flags around the time multiply, and uses FST for the first time endpoint; January keeps those packets in a different order. Bounded statement/declaration-order variants did not move all three choices together without artificial dependencies. No volatile access, barrier, assembly, pointer trick, or fake control flow is retained. Reopen only for authoritative January source or natural same-compiler scheduling evidence.",
+      "measurements": {
+        "target": {
+          "size": 112,
+          "relocation_count": 4,
+          "normalized_sha256": "de4709a02eba43f11818fd1edf0124d200de56a81157be6670dfa8fff0834794"
+        },
+        "base": {
+          "size": 112,
+          "relocation_count": 4,
+          "normalized_sha256": "41794657785400453f29a5dc48efb8f179b2cbf92a31ee9de493f4cc27dcf1a3"
+        },
+        "objdiff_percent": 81.53846
+      }
+    },
+    {
+      "unit": "source/rasterizer/rasterizer_cinematics",
+      "function": "_rasterizer_screen_effect_set_video",
+      "class": "instruction-scheduling",
+      "evidence": "The retained source implements the complete January/HCEA video-mode path with typed game-global bitmap references, the attested line-225 assertion, the named bitmap_group_get and TAG_BLOCK_GET_ELEMENT APIs, a full parameter/interpolation reset, and the original silent error. Target and candidate share the 288-byte padded envelope, twenty relocation identities, and 84 aligned instructions. Two independent caller-cleanup ties remain: January delays csmemset's ADD ESP,0xC until after the ten interpolation-zero stores and delays the first bitmap lookup's cleanup until after storing video_scanline_map; VC7 performs each cleanup immediately before those independent stores. Natural typed pointer locals recover the exact envelope from earlier 272/16 and 368/33 candidates but do not move the two cleanup instructions. No volatile access, barrier, assembly, raw tag arithmetic, fake dependency, or dead control flow is retained. Reopen only for authoritative January source or a natural same-compiler caller-cleanup donor.",
+      "measurements": {
+        "target": {
+          "size": 288,
+          "relocation_count": 20,
+          "normalized_sha256": "eb1b757f0f5e5dbfb23a66ea08ec4cd3b8eeb4ce6385ea9c8a0f3e4e5916c46a"
+        },
+        "base": {
+          "size": 288,
+          "relocation_count": 20,
+          "normalized_sha256": "c3a12c86831011cf9431a23afc3b9a196dbab9395404f46342d03b99f2281c03"
+        },
+        "objdiff_percent": 95.2381
+      }
+    },
+    {
+      "unit": "source/cutscene/cinematics",
+      "function": "_cinematic_render",
+      "class": "register-allocation",
+      "evidence": "The retained reconstruction is coherent Halo cinematic rendering source corroborated by the later HCEA control flow and the January instruction/relocation topology. It advances letterbox interpolation from game ticks, draws two 1/8-height black bars, validates and fades four queued chapter titles, sets the authored text bounds/colors/shadow, renders the localized string, and retires expired titles. The authenticated cseries fast_ftol helper supplies the original dword x87 conversions; there is no inline assembly in cinematic_render itself. Target and candidate share the 1280-byte envelope and all 57 relocation identities and addresses. The remaining 46 normalized byte differences are confined to VC7 stack-slot coloring for the elapsed/bar/helper temporaries and the shadow-color pack schedule. The preserved declaration, scope, expression, HCEA-layout, helper-call, subtraction, and shadow-pack matrices found no closer authentic source form; artificial barriers, volatile lifetimes, representation punning, forced register dependencies, direct gameplay assembly, and exact-only control flow were rejected. The translation unit also emits a candidate-only 32-byte zero-relocation _fast_ftol COMDAT from the authenticated external-inline helper, while January selects that owner from actor_combat.obj; this separate ownership surplus prevents whole-object completion even though delayed titles are strict exact. Reopen the function only for authoritative January source/local-variable records or a natural same-compiler donor that explains the remaining slot/pack schedule, and reopen whole-object admission only with a proven COMDAT ownership schedule that does not add a cinematics owner.",
+      "measurements": {
+        "target": {
+          "size": 1280,
+          "relocation_count": 57,
+          "normalized_sha256": "a89dcee38e6a239615cde9f2d1f3b2fc577ced717e620de08a6397f74a0e6288"
+        },
+        "base": {
+          "size": 1280,
+          "relocation_count": 57,
+          "normalized_sha256": "1eb7cfd27d9ce0693adee50153f2c344766443274dcf486917756d03eb2bf7ac"
+        },
+        "objdiff_percent": 99.32809
+      }
     }
   ]
 }

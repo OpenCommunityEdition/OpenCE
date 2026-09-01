@@ -8,6 +8,10 @@ header included in hcex build.
 #define __BITMAPS_H
 #pragma once
 
+/* ---------- headers */
+
+#include "math/integer_math.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -43,6 +47,9 @@ void bitmap_vector_map(
 	struct bitmap_data *bitmap);
 
 real real_rgb_color_brightness(union real_rgb_color const *color);
+union real_argb_color *pixel32_to_real_argb_color(
+	pixel32 color,
+	union real_argb_color *result);
 
 boolean valid_real_rgb_color(
 	union real_rgb_color const *color);

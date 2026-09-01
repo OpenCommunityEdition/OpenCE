@@ -311,7 +311,7 @@
   },
   {
     "unit": "source/ai/action_guard",
-    "function": "_code_000041b0",
+    "function": "_action_guard_speak_post_combat",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {

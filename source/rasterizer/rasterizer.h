@@ -637,6 +637,12 @@ void rasterizer_debug_end(
 
 void rasterizer_text_set_shadow_color(
 	pixel32 shadow_color);
+void rasterizer_draw_unicode_string(
+	rectangle2d const *bounds,
+	rectangle2d const *clip,
+	point2d *cursor_reference,
+	short height_adjust,
+	wchar_t const *string);
 void rasterizer_text_cache_flush(
 	void);
 void rasterizer_text_cache_dispose(

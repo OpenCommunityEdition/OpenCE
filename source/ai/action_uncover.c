@@ -20,6 +20,7 @@ symbols in this file:
 
 #include "actor_definitions.h"
 #include "actors.h"
+#include "ai.h"
 #include "ai_debug.h"
 #include "ai_scenario_definitions.h"
 #include "props.h"
@@ -30,6 +31,13 @@ symbols in this file:
 /* ---------- macros */
 
 #define ACTION_UNCOVER_DEBUG_PRINTING_ENABLED() (ai_debug.print_uncovering)
+
+/* ---------- constants */
+
+enum
+{
+	_firing_point_evaluation_mode_uncover = 3,
+};
 
 /* ---------- structures */
 
@@ -43,6 +51,34 @@ struct firing_position_definition
 	short cluster_index;
 	byte unresolved2[4];
 	long surface_index;
+};
+
+struct firing_position_search_definition
+{
+	long allowed_groups;
+	short evaluation_mode;
+	byte unresolved06[0x1A];
+	boolean specific_target_enable;
+	byte unresolved21[3];
+	real_point3d specific_target_point;
+	long specific_target_surface_index;
+	short specific_target_cluster_index;
+	byte unresolved36[0xB];
+	boolean use_last_visible_target_position;
+	byte unresolved42[0x62E];
+};
+
+struct firing_position_search_workspace
+{
+	byte unresolved[0x1408C];
+};
+
+struct firing_position_candidate
+{
+	byte unresolved00[6];
+	short line_of_sight;
+	real path_distance_from_actor;
+	byte unresolved0C[0x30];
 };
 
 /* ---------- prototypes */
@@ -61,9 +97,6 @@ void actor_discard_firing_position(
 	short firing_position_index,
 	boolean temporary);
 
-boolean action_uncover_perform(
-	long actor_index);
-
 /* ---------- public code */
 
 boolean action_uncover_setup_target(
@@ -78,7 +111,7 @@ boolean action_uncover_setup_target(
 	csmemset(state_data, 0, sizeof(*state_data));
 	if (!actor->input.vehicle_passenger && !actor->meta.swarm)
 	{
-		state_data->pursuit_location.type = 0;
+		state_data->pursuit_location.type = _pursuit_location_target;
 		state_data->able_to_search = able_to_search;
 		success = TRUE;
 	}
@@ -110,7 +143,7 @@ boolean action_uncover_setup_pursuit(
 			struct firing_position_definition);
 
 		state_data->pursuit_location.firing_position_index = firing_position_index;
-		state_data->pursuit_location.type = 1;
+		state_data->pursuit_location.type = _pursuit_location_position;
 		state_data->pursuit_location.position = firing_position->position;
 		state_data->pursuit_location.surface_index = firing_position->surface_index;
 		state_data->pursuit_location.cluster_index = firing_position->cluster_index;
@@ -120,6 +153,87 @@ boolean action_uncover_setup_pursuit(
 		success = TRUE;
 	}
 	return success;
+}
+
+boolean action_uncover_perform(
+	long actor_index)
+{
+	long position_flags;
+	long previous_owner_actor_index;
+	short selected_firing_position_index;
+	struct firing_position_candidate candidate;
+	char temporary[256];
+	struct firing_position_search_definition search;
+	struct firing_position_search_workspace workspace;
+	struct actor_datum *actor = actor_get(actor_index);
+	struct uncover_state_data *state_data = &actor->state.action_data.uncover;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\action_uncover.c", 132, !actor->meta.swarm);
+	if (actor->meta.timeslice &&
+		!actor->input.vehicle_passenger &&
+		!state_data->uncover_done)
+	{
+		csmemset(&search, 0, sizeof(search));
+		if (state_data->pursuit_location.type == _pursuit_location_position)
+		{
+			search.evaluation_mode = _firing_point_evaluation_mode_uncover;
+			search.specific_target_point = state_data->pursuit_location.position;
+			search.specific_target_surface_index = state_data->pursuit_location.surface_index;
+			search.specific_target_enable = TRUE;
+			search.specific_target_cluster_index = state_data->pursuit_location.cluster_index;
+		}
+		else
+		{
+			search.evaluation_mode = _firing_point_evaluation_mode_uncover;
+			search.use_last_visible_target_position = state_data->no_target_sight_available;
+		}
+
+		selected_firing_position_index = actor_active_select_firing_position(
+			actor_index,
+			&search,
+			&candidate,
+			&previous_owner_actor_index,
+			&workspace,
+			&position_flags);
+		if (selected_firing_position_index != NONE)
+		{
+			if (state_data->pursuit_location.type == _pursuit_location_target)
+			{
+				if (candidate.line_of_sight != _ai_line_of_sight_clear &&
+					candidate.line_of_sight != _ai_line_of_sight_occluded)
+				{
+					if (!state_data->no_target_sight_available && ACTION_UNCOVER_DEBUG_PRINTING_ENABLED())
+					{
+						ai_debug_describe_actor(actor_index, NONE, TRUE, temporary, NUMBEROF(temporary));
+						error(2, "%s: unable to see target's current location", temporary);
+					}
+					state_data->no_target_sight_available = TRUE;
+				}
+			}
+			else if (candidate.line_of_sight == _ai_line_of_sight_clear &&
+				actor_destination_tolerance(actor_index) > candidate.path_distance_from_actor)
+			{
+				if (!state_data->pursuit_location_inspected && ACTION_UNCOVER_DEBUG_PRINTING_ENABLED())
+				{
+					ai_debug_describe_actor(actor_index, NONE, TRUE, temporary, NUMBEROF(temporary));
+					error(2, "%s: inspected pursuit location", temporary);
+				}
+				state_data->pursuit_location_inspected = TRUE;
+			}
+		}
+
+		if (actor_change_firing_position(
+			actor_index,
+			selected_firing_position_index,
+			&candidate,
+			previous_owner_actor_index,
+			&workspace,
+			position_flags) == NONE)
+		{
+			state_data->uncover_exit_failure = TRUE;
+		}
+	}
+	return FALSE;
 }
 
 void action_uncover_control(
@@ -134,7 +248,7 @@ void action_uncover_control(
 		struct prop_datum *prop = prop_get(actor->target.target_prop_index);
 		boolean force_shoot = FALSE;
 
-		if (state_data->pursuit_location.type == 0)
+		if (state_data->pursuit_location.type == _pursuit_location_target)
 		{
 			if (actor->input.vehicle_gunner_bombardment)
 			{
@@ -153,7 +267,8 @@ void action_uncover_control(
 		}
 
 		if ((actor->orders.combat.shoot_at_target &&
-			(prop->line_of_sight == 0 || prop->line_of_sight == 1)) || force_shoot)
+			(prop->line_of_sight == _ai_line_of_sight_clear ||
+				prop->line_of_sight == _ai_line_of_sight_occluded)) || force_shoot)
 		{
 			actor->orders.look.primary_priority = 7;
 		}
@@ -161,7 +276,8 @@ void action_uncover_control(
 		{
 			actor->orders.look.primary_priority = 3;
 		}
-		else if (prop->line_of_sight != 2 && prop->line_of_sight != 4)
+		else if (prop->line_of_sight != _ai_line_of_sight_from_cover &&
+			prop->line_of_sight != _ai_line_of_sight_obstructed)
 		{
 			actor->orders.look.primary_priority = 5;
 		}
@@ -170,11 +286,11 @@ void action_uncover_control(
 			actor->orders.look.primary_priority = 2;
 		}
 
-		if (state_data->pursuit_location.type == 0)
+		if (state_data->pursuit_location.type == _pursuit_location_target)
 		{
 			actor->orders.look.primary_direction.type = 2;
 		}
-		else if (state_data->pursuit_location.type == 1)
+		else if (state_data->pursuit_location.type == _pursuit_location_position)
 		{
 			actor->orders.look.primary_direction.type = 3;
 			actor->orders.look.primary_direction.point = state_data->pursuit_location.position;
@@ -195,7 +311,7 @@ void action_uncover_flush_position_indices(
 {
 	struct uncover_state_data *state_data = &actor_get(actor_index)->state.action_data.uncover;
 
-	if (state_data->pursuit_location.type == 1)
+	if (state_data->pursuit_location.type == _pursuit_location_position)
 	{
 		state_data->pursuit_location.firing_position_index = NONE;
 		state_data->uncover_done = TRUE;
@@ -260,14 +376,14 @@ void action_uncover_begin(
 			2,
 			"%s: begin %s uncover for [%.1f-%.1f] = %.1f (%sable to search)",
 			temporary,
-			state_data->pursuit_location.type == 0 ? "target" : "pursuit",
+			state_data->pursuit_location.type == _pursuit_location_target ? "target" : "pursuit",
 			lower_bound,
 			upper_bound,
 			uncover_time,
 			state_data->able_to_search ? "" : "un");
 	}
 
-	if (state_data->pursuit_location.type == 0 &&
+	if (state_data->pursuit_location.type == _pursuit_location_target &&
 		actor->target.target_prop_index != NONE &&
 		actor->state.combat_status < 3)
 	{
@@ -304,7 +420,7 @@ void action_uncover_update(
 	done = TRUE;
 	target_visible = FALSE;
 	state_data->sneaking = FALSE;
-	if (state_data->pursuit_location.type == 0)
+	if (state_data->pursuit_location.type == _pursuit_location_target)
 	{
 		if (definition->defensive.defensive_crouch_type == 4)
 		{
@@ -317,7 +433,7 @@ void action_uncover_update(
 			state_data->sneaking = TRUE;
 		}
 	}
-	else if (state_data->pursuit_location.type == 1)
+	else if (state_data->pursuit_location.type == _pursuit_location_position)
 	{
 		if (definition->defensive.defensive_crouch_type == 4 ||
 			(TEST_FLAG(definition->flags, _actor_definition_sneak_uncovering_pursuit_position_bit) &&
@@ -336,7 +452,7 @@ void action_uncover_update(
 	else
 	{
 		state_data->current_position_hold_timer += 1;
-		if (state_data->pursuit_location.type == 0 &&
+		if (state_data->pursuit_location.type == _pursuit_location_target &&
 			state_data->current_position_hold_timer >= TICKS_PER_SECOND)
 		{
 			actor_discard_firing_position(
@@ -346,7 +462,7 @@ void action_uncover_update(
 		}
 	}
 
-	if (state_data->pursuit_location.type == 0)
+	if (state_data->pursuit_location.type == _pursuit_location_target)
 	{
 		if (actor->target.target_prop_index != NONE)
 		{
@@ -392,7 +508,7 @@ test_uncover_timers:
 	{
 		done = TRUE;
 	}
-	if (state_data->pursuit_location.type == 1 && state_data->pursuit_location_inspected)
+	if (state_data->pursuit_location.type == _pursuit_location_position && state_data->pursuit_location_inspected)
 	{
 		done = TRUE;
 	}
@@ -408,7 +524,7 @@ test_uncover_timers:
 		{
 			sprintf(reason, "persistent timer %d", state_data->uncover_exit_persistent_timer);
 		}
-		else if (state_data->pursuit_location.type == 1 && state_data->pursuit_location_inspected)
+		else if (state_data->pursuit_location.type == _pursuit_location_position && state_data->pursuit_location_inspected)
 		{
 			csstrcpy(reason, "location inspected");
 		}
@@ -420,7 +536,7 @@ test_uncover_timers:
 			2,
 			"%s: %s uncover done: %s",
 			actor_name,
-			state_data->pursuit_location.type == 0 ? "target" : "pursuit",
+			state_data->pursuit_location.type == _pursuit_location_target ? "target" : "pursuit",
 			reason);
 	}
 	state_data->uncover_done = done;

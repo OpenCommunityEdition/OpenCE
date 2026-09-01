@@ -3,7 +3,7 @@ RASTERIZER_CINEMATICS.C
 
 symbols in this file:
 0016D140 0020:
-	_code_0016d140 (0000)
+	_rasterizer_screen_effects_time (0000)
 0016D160 0040:
 	_rasterizer_screen_effects_initialize (0000)
 0016D1A0 0030:
@@ -45,21 +45,22 @@ symbols in this file:
 0029D900 008d:
 	??_C@_0IN@PCKCIAIJ@?$CD?$CD?$CD?5FATAL_ERROR?5screen?5effects?5c@ (0000)
 004662F4 0004:
-	_bss_004662f4 (0000)
+	_cinematic_screen_effect_globals (0000)
 */
 
 /* ---------- headers */
 
 #include "cseries.h"
+#include "bitmaps/bitmap_group.h"
+#include "cseries/errors.h"
 #include "game/game.h"
+#include "game/game_globals.h"
 #include "real_math.h"
+#include "rasterizer/common/rasterizer_common.h"
+#include "rasterizer/rasterizer_cinematics.h"
 #include "saved games/game_state.h"
 
 /* ---------- constants */
-
-/* ---------- macros */
-
-#define cinematic_screen_effect_globals bss_004662f4
 
 /* ---------- structures */
 
@@ -136,12 +137,12 @@ short main_get_window_count(
 
 /* ---------- globals */
 
-extern struct rasterizer_cinematic_screen_effect_state *bss_004662f4;
+struct rasterizer_cinematic_screen_effect_state *cinematic_screen_effect_globals = NULL;
 extern const struct rasterizer_global_defaults_prefix rasterizer_global_defaults;
 
 /* ---------- public code */
 
-real code_0016d140(
+static real rasterizer_screen_effects_time(
 	void)
 {
 	return (real)game_time_get() * (1.0f / TICKS_PER_SECOND);
@@ -158,6 +159,28 @@ void rasterizer_screen_effects_initialize(
 		"c:\\halo\\SOURCE\\rasterizer\\rasterizer_cinematics.c",
 		54,
 		cinematic_screen_effect_globals);
+
+	return;
+}
+
+void rasterizer_screen_effects_initialize_for_new_map(
+	void)
+{
+	struct rasterizer_cinematic_screen_effect_state *globals =
+		cinematic_screen_effect_globals;
+
+	if (globals)
+	{
+		csmemset(
+			globals,
+			0,
+			sizeof(*globals));
+		globals = cinematic_screen_effect_globals;
+		globals->script_values[0] = 1.0f;
+		globals->script_values[1] = 1.0f;
+		globals->script_values[2] = 1.0f;
+		globals->script_values[3] = 1.0f;
+	}
 
 	return;
 }
@@ -180,11 +203,11 @@ void rasterizer_script_screen_effect_set_value(
 {
 	short signed_effect_index = (short)effect_index;
 
-	if (bss_004662f4 &&
+	if (cinematic_screen_effect_globals &&
 		signed_effect_index >= 0 &&
 		signed_effect_index < 4)
 	{
-		bss_004662f4->script_values[signed_effect_index] = value;
+		cinematic_screen_effect_globals->script_values[signed_effect_index] = value;
 	}
 
 	return;
@@ -195,9 +218,9 @@ real rasterizer_script_screen_effect_get_value(
 {
 	real value = 0.0f;
 
-	if (bss_004662f4 && effect_index >= 0 && effect_index < 4)
+	if (cinematic_screen_effect_globals && effect_index >= 0 && effect_index < 4)
 	{
-		value = bss_004662f4->script_values[effect_index];
+		value = cinematic_screen_effect_globals->script_values[effect_index];
 	}
 
 	return value;
@@ -227,6 +250,85 @@ void rasterizer_screen_effect_start(
 	return;
 }
 
+void rasterizer_screen_effect_set_convolution(
+	short convolution_extra_passes,
+	short convolution_type,
+	real convolution_radius_lower_bound,
+	real convolution_radius_upper_bound,
+	real convolution_time)
+{
+	struct rasterizer_cinematic_screen_effect_state *globals =
+		cinematic_screen_effect_globals;
+
+	if (globals)
+	{
+		real time;
+
+		globals->parameters.video_on = FALSE;
+		globals->parameters.video_overbright_mode = 0;
+		globals->parameters.video_scanline_map = NULL;
+		globals->parameters.video_noise_intensity = 0.0f;
+		globals->parameters.video_noise_map_scale = 0.0f;
+		globals->parameters.video_noise_map = NULL;
+		globals->parameters.convolution_extra_passes = convolution_extra_passes;
+		globals->parameters.convolution_type = convolution_type;
+		globals->convolution_radius[0] = convolution_radius_lower_bound;
+		globals->convolution_radius[1] = convolution_radius_upper_bound;
+
+		time = (real)game_time_get() * (1.0f / TICKS_PER_SECOND);
+		globals = cinematic_screen_effect_globals;
+		globals->convolution_time[0] = time;
+		globals->convolution_time[1] = time + convolution_time;
+	}
+
+	return;
+}
+
+void rasterizer_screen_effect_set_filter(
+	real filter_light_enhancement_intensity_lower_bound,
+	real filter_light_enhancement_intensity_upper_bound,
+	real filter_desaturation_intensity_lower_bound,
+	real filter_desaturation_intensity_upper_bound,
+	boolean filter_desaturation_is_additive,
+	real filter_time)
+{
+	struct rasterizer_cinematic_screen_effect_state *globals =
+		cinematic_screen_effect_globals;
+
+	if (globals)
+	{
+		real time;
+
+		globals->parameters.video_on = FALSE;
+		globals->parameters.video_overbright_mode = 0;
+		globals->parameters.video_scanline_map = NULL;
+		globals->parameters.video_noise_intensity = 0.0f;
+		globals->parameters.video_noise_map_scale = 0.0f;
+		globals->parameters.video_noise_map = NULL;
+		globals->filter_light_enhancement_intensity[0] =
+			filter_light_enhancement_intensity_lower_bound;
+		globals->filter_light_enhancement_intensity[1] =
+			filter_light_enhancement_intensity_upper_bound;
+		globals->filter_desaturation_intensity[0] =
+			filter_desaturation_intensity_lower_bound;
+		globals->filter_desaturation_intensity[1] =
+			filter_desaturation_intensity_upper_bound;
+
+		time = (real)game_time_get() * (1.0f / TICKS_PER_SECOND);
+		globals = cinematic_screen_effect_globals;
+		globals->filter_time[0] = time;
+		globals->filter_time[1] = time + filter_time;
+		globals->parameters.filter_desaturation_is_additive =
+			filter_desaturation_is_additive;
+		globals->parameters.filter_light_enhancement_uses_convolution_mask =
+			FALSE;
+		globals->parameters.filter_desaturation_uses_convolution_mask =
+			FALSE;
+	}
+
+	return;
+}
+
 struct rasterizer_cinematic_screen_effect_state *rasterizer_screen_effect_get_cinematic_parameters(
 	struct rasterizer_cinematic_screen_effect_state *parameters)
 {
@@ -242,7 +344,7 @@ struct rasterizer_cinematic_screen_effect_state *rasterizer_screen_effect_get_ci
 			cinematic_screen_effect_globals->convolution_time[0])
 		{
 			convolution_fraction = PIN(
-				(code_0016d140() - cinematic_screen_effect_globals->convolution_time[0]) /
+				(rasterizer_screen_effects_time() - cinematic_screen_effect_globals->convolution_time[0]) /
 					(cinematic_screen_effect_globals->convolution_time[1] -
 						cinematic_screen_effect_globals->convolution_time[0]),
 				0.0f,
@@ -257,7 +359,7 @@ struct rasterizer_cinematic_screen_effect_state *rasterizer_screen_effect_get_ci
 			cinematic_screen_effect_globals->filter_time[0])
 		{
 			filter_fraction = PIN(
-				(code_0016d140() - cinematic_screen_effect_globals->filter_time[0]) /
+				(rasterizer_screen_effects_time() - cinematic_screen_effect_globals->filter_time[0]) /
 					(cinematic_screen_effect_globals->filter_time[1] -
 						cinematic_screen_effect_globals->filter_time[0]),
 				0.0f,
@@ -337,7 +439,8 @@ void rasterizer_screen_effect_set_filter_desaturation_tint(
 	real green,
 	real blue)
 {
-	struct rasterizer_cinematic_screen_effect_state *globals = bss_004662f4;
+	struct rasterizer_cinematic_screen_effect_state *globals =
+		cinematic_screen_effect_globals;
 
 	if (globals)
 	{
@@ -349,12 +452,76 @@ void rasterizer_screen_effect_set_filter_desaturation_tint(
 	return;
 }
 
+void rasterizer_screen_effect_set_video(
+	short video_overbright_mode,
+	real video_noise_intensity)
+{
+	struct rasterizer_cinematic_screen_effect_state *globals =
+		cinematic_screen_effect_globals;
+	struct bitmap_data *video_scanline_map;
+	struct bitmap_data *video_noise_map;
+
+	if (globals)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\rasterizer_cinematics.c",
+			225,
+			global_rasterizer_data);
+
+		if (global_rasterizer_data->screen_effect_video_scanline_map.index != NONE &&
+			global_rasterizer_data->screen_effect_video_noise_map.index != NONE)
+		{
+			csmemset(
+				&cinematic_screen_effect_globals->parameters,
+				0,
+				sizeof(globals->parameters));
+			globals = cinematic_screen_effect_globals;
+			globals->convolution_radius[0] = 0.0f;
+			globals->convolution_radius[1] = 0.0f;
+			globals->convolution_time[0] = 0.0f;
+			globals->convolution_time[1] = 0.0f;
+			globals->filter_light_enhancement_intensity[0] = 0.0f;
+			globals->filter_light_enhancement_intensity[1] = 0.0f;
+			globals->filter_desaturation_intensity[0] = 0.0f;
+			globals->filter_desaturation_intensity[1] = 0.0f;
+			globals->filter_time[0] = 0.0f;
+			globals->filter_time[1] = 0.0f;
+			globals->parameters.video_on = TRUE;
+			globals->parameters.video_overbright_mode = video_overbright_mode;
+			video_scanline_map = TAG_BLOCK_GET_ELEMENT(
+				&bitmap_group_get(
+					global_rasterizer_data->screen_effect_video_scanline_map.index)->bitmap_data,
+				0,
+				struct bitmap_data);
+			globals = cinematic_screen_effect_globals;
+			globals->parameters.video_scanline_map = video_scanline_map;
+			globals->parameters.video_noise_intensity = video_noise_intensity;
+			globals->parameters.video_noise_map_scale = 1.0f;
+			video_noise_map = TAG_BLOCK_GET_ELEMENT(
+				&bitmap_group_get(
+					global_rasterizer_data->screen_effect_video_noise_map.index)->bitmap_data,
+				0,
+				struct bitmap_data);
+			globals = cinematic_screen_effect_globals;
+			globals->parameters.video_noise_map = video_noise_map;
+		}
+		else
+		{
+			error(
+				_error_silent,
+				"### ERROR cinematics failed to set video mode; global bitmaps are not set");
+		}
+	}
+
+	return;
+}
+
 void rasterizer_screen_effect_stop(
 	void)
 {
-	if (bss_004662f4)
+	if (cinematic_screen_effect_globals)
 	{
-		bss_004662f4->has_control = FALSE;
+		cinematic_screen_effect_globals->has_control = FALSE;
 	}
 
 	return;
@@ -363,9 +530,9 @@ void rasterizer_screen_effect_stop(
 void rasterizer_set_near_clip_distance(
 	real near_clip_distance)
 {
-	if (bss_004662f4)
+	if (cinematic_screen_effect_globals)
 	{
-		bss_004662f4->near_clip_distance = near_clip_distance;
+		cinematic_screen_effect_globals->near_clip_distance = near_clip_distance;
 	}
 
 	return;
@@ -375,7 +542,8 @@ real rasterizer_get_near_clip_distance(
 	void)
 {
 	real near_clip_distance = rasterizer_global_defaults.near_clip_distance;
-	struct rasterizer_cinematic_screen_effect_state *globals = bss_004662f4;
+	struct rasterizer_cinematic_screen_effect_state *globals =
+		cinematic_screen_effect_globals;
 
 	if (globals && globals->near_clip_distance > 0.0f)
 	{

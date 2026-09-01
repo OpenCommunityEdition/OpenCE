@@ -261,6 +261,10 @@ enum
 
 /* ---------- structures */
 
+struct firing_position_search_definition;
+struct firing_position_search_workspace;
+struct firing_position_candidate;
+
 struct actor_meta_data
 {
 	short type;
@@ -868,6 +872,23 @@ void actor_unit_control_throw_grenade(
 	long actor_index);
 void actor_unit_control_stop_animation_impulse(
 	long actor_index);
+
+/* ---------- prototypes/ACTOR_FIRING_POSITION.C */
+
+short actor_active_select_firing_position(
+	long actor_index,
+	struct firing_position_search_definition *search,
+	struct firing_position_candidate *candidate,
+	long *previous_owner_actor_index,
+	struct firing_position_search_workspace *workspace,
+	long *position_flags);
+short actor_change_firing_position(
+	long actor_index,
+	short firing_position_index,
+	struct firing_position_candidate *candidate,
+	long previous_owner_actor_index,
+	struct firing_position_search_workspace *workspace,
+	long position_flags);
 
 /* ---------- prototypes/ACTOR_COMBAT.C */
 

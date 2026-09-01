@@ -63,22 +63,6 @@ struct firing_position_candidate
 
 /* ---------- prototypes */
 
-long actor_active_select_firing_position(
-	long actor_index,
-	struct firing_position_search_definition *search,
-	struct firing_position_candidate *candidate,
-	long *previous_owner_actor_index,
-	struct firing_position_search_workspace *workspace,
-	long *position_flags);
-
-short actor_change_firing_position(
-	long actor_index,
-	long firing_position_index,
-	struct firing_position_candidate *candidate,
-	long previous_owner_actor_index,
-	struct firing_position_search_workspace *workspace,
-	long position_flags);
-
 /* ---------- globals */
 
 /* ---------- public code */
@@ -109,7 +93,7 @@ boolean action_avoid_perform(
 {
 	long position_flags;
 	long previous_owner_actor_index;
-	long firing_position_index;
+	short firing_position_index;
 	struct firing_position_candidate candidate;
 	struct firing_position_search_definition search;
 	struct firing_position_search_workspace workspace;

@@ -13,7 +13,7 @@ symbols in this file:
 00004170 0040:
 	_action_guard_end (0000)
 000041B0 0140:
-	_code_000041b0 (0000)
+	_action_guard_speak_post_combat (0000)
 000042F0 01d0:
 	_action_guard_update (0000)
 000044C0 0080:
@@ -148,14 +148,6 @@ long actor_select_firing_position(
 	long *previous_owner_actor_index,
 	struct firing_position_search_workspace *workspace,
 	long *position_flags);
-
-short actor_change_firing_position(
-	long actor_index,
-	long firing_position_index,
-	struct firing_position_candidate *candidate,
-	long previous_owner_actor_index,
-	struct firing_position_search_workspace *workspace,
-	long position_flags);
 
 /* ---------- globals */
 
@@ -553,8 +545,8 @@ action_guard_replace_prop(
 
 /* ---------- private code */
 
-/* action_guard_post_combat */
-static boolean code_000041b0(
+/* action_guard_speak_post_combat */
+static boolean action_guard_speak_post_combat(
 	long actor_index)
 {
 	struct actor_datum *actor = actor_get(actor_index);
@@ -652,7 +644,7 @@ action_guard_update(
 		{
 			if (state_data->post_combat)
 			{
-				code_000041b0(actor_index);
+				action_guard_speak_post_combat(actor_index);
 				actor->external_orders.postcombat_type = _actor_postcombat_none;
 				actor->external_orders.postcombat_prop_index = NONE;
 				state_data->post_combat = FALSE;
@@ -955,7 +947,7 @@ action_guard_control(
 
 			if (state_data->post_combat)
 			{
-				code_000041b0(actor_index);
+				action_guard_speak_post_combat(actor_index);
 				if (actor->external_orders.postcombat_type == _actor_postcombat_shoot_corpse &&
 					state_data->guard_location_type == 2)
 				{
