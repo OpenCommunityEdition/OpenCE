@@ -51,13 +51,21 @@ def _spec():
     return SourceSpec("canonical", Path("build/report.json"), "canonical")
 
 
-def _normalized_at(tmp_path, label, report, semantic=None, kind="lane"):
+def _normalized_at(
+    tmp_path,
+    label,
+    report,
+    semantic=None,
+    kind="lane",
+    parked_policy=None,
+):
     report_path = tmp_path / f"{label}-report.json"
     report_path.write_text(json.dumps(report), encoding="utf-8")
     return normalize_source(
         SourceSpec(label, report_path, kind),
         report,
         semantic,
+        parked_policy,
     )
 
 
@@ -261,6 +269,129 @@ def test_semantic_accepted_lane_clears_canonical_rejection(tmp_path):
     assert merged_unit["functions"][0]["canonicalExact"] is False
     assert merged_unit["functions"][0]["bestExact"] is True
     assert merged_unit["functions"][0]["unionExact"] is True
+
+
+def test_canonical_park_vetoes_semantic_complete_external_lane(tmp_path):
+    canonical_dir = tmp_path / "canonical" / "build"
+    lane_dir = tmp_path / "lane" / "build"
+    config_dir = tmp_path / "canonical" / "config"
+    canonical_dir.mkdir(parents=True)
+    lane_dir.mkdir(parents=True)
+    config_dir.mkdir(parents=True)
+
+    report = _report(
+        [{"name": "_owner", "size": "40", "fuzzy_match_percent": 75.0, "address": "0"}],
+        fuzzy=75.0,
+    )
+    canonical_path = canonical_dir / "report.json"
+    lane_path = lane_dir / "report.json"
+    lane_semantic_path = lane_dir / "semantic_report.json"
+    parked_path = config_dir / "parked.json"
+    canonical_path.write_text(json.dumps(report), encoding="utf-8")
+    lane_path.write_text(json.dumps(report), encoding="utf-8")
+    lane_semantic_path.write_text(
+        json.dumps(_semantic(_owner=(40, 40))),
+        encoding="utf-8",
+    )
+    parked_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "entries": [
+                    {
+                        "unit": "source/units/example",
+                        "function": "_owner",
+                        "class": "instruction-scheduling",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    server = ViewerServer(
+        ("127.0.0.1", 0),
+        [
+            SourceSpec(
+                "canonical",
+                canonical_path,
+                "canonical",
+                parked_policy_path=parked_path,
+            ),
+            SourceSpec("lane", lane_path, "lane"),
+        ],
+        [],
+    )
+    try:
+        envelope = json.loads(server.build_envelope())
+    finally:
+        server.server_close()
+
+    unit = envelope["units"][0]
+    function = unit["functions"][0]
+    assert unit["canonicalPct"] == 75.0
+    assert unit["bestPct"] == 100.0
+    assert unit["unionPct"] == 100.0
+    assert unit["canonicalExact"] is False
+    assert unit["bestExact"] is False
+    assert unit["unionExact"] is False
+    assert unit["anySemanticComplete"] is False
+    assert function["bestPct"] == 100.0
+    assert function["canonicalExact"] is False
+    assert function["bestExact"] is False
+    assert function["unionExact"] is False
+    assert function["policyParked"] is True
+    assert function["anySemanticAccepted"] is True
+    assert envelope["sources"][0]["parkedPolicyPath"] == str(parked_path)
+
+
+def test_accepted_assembly_parks_do_not_veto_external_exactness(tmp_path):
+    report = _report(
+        [
+            {"name": "_asm", "size": "16", "fuzzy_match_percent": 25.0, "address": "0"},
+            {"name": "_vendor", "size": "24", "fuzzy_match_percent": 25.0, "address": "16"},
+        ],
+        fuzzy=25.0,
+    )
+    parked_policy = {
+        "version": 1,
+        "entries": [
+            {
+                "unit": "source/units/example",
+                "function": "_asm",
+                "class": "asm-implemented",
+            },
+            {
+                "unit": "source/units/example",
+                "function": "_vendor",
+                "class": "vendored-assembly",
+            },
+        ],
+    }
+    canonical = _normalized_at(
+        tmp_path,
+        "canonical",
+        report,
+        kind="canonical",
+        parked_policy=parked_policy,
+    )
+    accepted_lane = _normalized_at(
+        tmp_path,
+        "accepted-lane",
+        report,
+        _semantic(_asm=(16, 16), _vendor=(24, 24)),
+    )
+
+    merged_unit = merge_reports([canonical, accepted_lane], [])["units"][0]
+    assert merged_unit["bestExact"] is True
+    assert merged_unit["unionExact"] is True
+    assert merged_unit["anySemanticComplete"] is True
+    assert all(
+        function["policyParked"] is False
+        and function["bestExact"] is True
+        and function["unionExact"] is True
+        for function in merged_unit["functions"]
+    )
 
 
 def test_out_of_bounds_semantic_owner_fails_closed():

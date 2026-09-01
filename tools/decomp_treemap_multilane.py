@@ -420,10 +420,14 @@ class SourceSpec:
     path: Path
     kind: str  # canonical, lane, parked, extra
     branch: str | None = None
+    parked_policy_path: Path | None = None
 
     @property
     def id(self) -> str:
-        return f"{self.kind}:{self.label}:{self.path}"
+        return (
+            f"{self.kind}:{self.label}:{self.path}:"
+            f"parked-policy:{self.parked_policy_path or ''}"
+        )
 
     @property
     def semantic_path(self) -> Path | None:
@@ -505,7 +509,13 @@ def discover_sources(args: argparse.Namespace) -> tuple[list[SourceSpec], list[s
             break
 
     canonical_label = args.canonical_label or canonical_branch or 'canonical'
-    specs.append(SourceSpec(canonical_label, canonical_path, 'canonical', canonical_branch))
+    specs.append(SourceSpec(
+        canonical_label,
+        canonical_path,
+        'canonical',
+        canonical_branch,
+        (repo_root / 'config' / 'parked.json').resolve(),
+    ))
 
     if args.all_worktrees:
         for wt in worktrees:
@@ -662,6 +672,36 @@ def ordinary_rejection_index(
     return rejected
 
 
+def parked_exactness_veto_index(
+    parked_policy: dict[str, Any] | None,
+) -> dict[str, set[str]]:
+    """Index canonical fuzzy parks that must not receive external exact credit.
+
+    Authenticated assembly is tracked in ``parked.json`` for provenance, but
+    it is an accepted implementation policy rather than an unresolved C
+    reconstruction.  Every other parked class remains a fail-closed exactness
+    veto until canonical removes the park after review.
+    """
+    if not parked_policy:
+        return {}
+    entries = parked_policy.get('entries')
+    if not isinstance(entries, list):
+        return {}
+
+    accepted_assembly_classes = {'asm-implemented', 'vendored-assembly'}
+    vetoes: dict[str, set[str]] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get('class') in accepted_assembly_classes:
+            continue
+        unit_name = entry.get('unit')
+        function_name = entry.get('function')
+        if isinstance(unit_name, str) and isinstance(function_name, str):
+            vetoes.setdefault(unit_name, set()).add(function_name)
+    return vetoes
+
+
 def exact_intervals_cover_text(intervals: list[tuple[int, int]], text_size: int) -> bool:
     """Require exact owners to tile the complete target .text range."""
     if text_size <= 0 or not intervals:
@@ -678,10 +718,16 @@ def normalize_source(
     spec: SourceSpec,
     report: dict[str, Any],
     semantic_report: dict[str, Any] | None = None,
+    parked_policy: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     units_out: dict[str, dict[str, Any]] = {}
     semantic_index = semantic_acceptance_index(semantic_report)
     rejection_index = ordinary_rejection_index(semantic_report)
+    parked_veto_index = (
+        parked_exactness_veto_index(parked_policy)
+        if spec.kind == 'canonical'
+        else {}
+    )
     units = report.get('units') if isinstance(report.get('units'), list) else []
     for unit_index, raw_unit in enumerate(units):
         if not isinstance(raw_unit, dict):
@@ -696,6 +742,7 @@ def normalize_source(
         configured_linked = bool(value(metadata, 'complete', 'complete', False))
         accepted_records = semantic_index.get(name, {})
         rejected_names = rejection_index.get(name, {})
+        policy_parked_names = parked_veto_index.get(name, set())
         raw_name_counts: dict[str, int] = {}
         for raw_fn in functions:
             if not isinstance(raw_fn, dict):
@@ -777,10 +824,13 @@ def normalize_source(
                 raw_name_counts.get(raw_name) == 1
                 and rejected_names.get(raw_name) == size
             )
+            policy_parked = raw_name in policy_parked_names
             has_ordinary_rejection = has_ordinary_rejection or ordinary_rejected
             effective_pct = 100.0 if semantic_accepted else max(0.0, min(100.0, raw_function_pct))
-            function_exact = semantic_accepted or (
-                raw_function_pct >= 100.0 and not ordinary_rejected
+            function_exact = not policy_parked and (
+                semantic_accepted or (
+                    raw_function_pct >= 100.0 and not ordinary_rejected
+                )
             )
             fn_out[key] = {
                 'key': key,
@@ -793,6 +843,7 @@ def normalize_source(
                 'address': value(raw_fn, 'address', 'address', None),
                 'semanticAccepted': semantic_accepted,
                 'ordinaryRejected': ordinary_rejected,
+                'policyParked': policy_parked,
                 'exact': function_exact,
             }
             fn_order.append(key)
@@ -812,13 +863,19 @@ def normalize_source(
         else:
             effective_unit_pct = max(0.0, min(100.0, raw_pct))
 
-        unit_exact = semantic_complete or (
-            effective_unit_pct >= 100.0
-            and bool(fn_out)
-            and all(bool(function['exact']) for function in fn_out.values())
+        unit_exact = not policy_parked_names and (
+            semantic_complete or (
+                effective_unit_pct >= 100.0
+                and bool(fn_out)
+                and all(bool(function['exact']) for function in fn_out.values())
+            )
         )
         linked = configured_linked and (
-            not fn_out or all(bool(function['exact']) for function in fn_out.values())
+            not policy_parked_names
+            and (
+                not fn_out
+                or all(bool(function['exact']) for function in fn_out.values())
+            )
         )
         for function in fn_out.values():
             function['linked'] = linked
@@ -837,7 +894,9 @@ def normalize_source(
             'linked': linked,
             'configuredLinked': configured_linked,
             'exact': unit_exact,
-            'semanticComplete': semantic_complete,
+            'semanticComplete': semantic_complete and not policy_parked_names,
+            'semanticCoverageComplete': semantic_complete,
+            'policyParkedNames': sorted(policy_parked_names),
             'textSize': text_size,
             'functions': fn_out,
             'functionOrder': fn_order,
@@ -846,6 +905,9 @@ def normalize_source(
         'spec': spec,
         'version': report.get('version'),
         'semanticPath': str(spec.semantic_path) if semantic_report is not None else None,
+        'parkedPolicyPath': (
+            str(spec.parked_policy_path) if parked_policy is not None else None
+        ),
         'units': units_out,
     }
 
@@ -908,10 +970,16 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
             continue
 
         total = int(reference_unit['total'] or max(u['total'] for _, u in variants))
-        canonical_rejections = {
+        canonical_ordinary_rejections = {
             key for key, function in (canonical_unit or {}).get('functions', {}).items()
             if function.get('ordinaryRejected')
         }
+        canonical_policy_vetoes = set(
+            (canonical_unit or {}).get('policyParkedNames', [])
+        )
+
+        def policy_vetoes(function: dict[str, Any]) -> bool:
+            return str(function.get('rawName') or '') in canonical_policy_vetoes
 
         def function_metrics(
             source: dict[str, Any],
@@ -921,7 +989,9 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
             pct = float(function['pct'])
             exact = bool(function.get('exact'))
             semantic_accepted = bool(function.get('semanticAccepted'))
-            if key in canonical_rejections and not semantic_accepted:
+            if policy_vetoes(function):
+                exact = False
+            elif key in canonical_ordinary_rejections and not semantic_accepted:
                 exact = False
             # A stale or missing lane sidecar cannot turn an external raw 100%
             # into a proven exact result.  It remains useful fuzzy evidence.
@@ -934,8 +1004,8 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
             unit: dict[str, Any],
         ) -> tuple[float, bool]:
             if unit.get('semanticComplete'):
-                return 100.0, True
-            if not canonical_rejections:
+                return 100.0, not canonical_policy_vetoes
+            if not canonical_ordinary_rejections and not canonical_policy_vetoes:
                 pct = max(0.0, min(100.0, float(unit['pct'])))
                 exact = bool(unit.get('exact'))
                 if source is not canonical and pct >= 100.0:
@@ -944,7 +1014,7 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
 
             function_bytes = 0
             matched_equivalent = 0.0
-            blocked_rejection = False
+            blocked_rejection = bool(canonical_policy_vetoes)
             for key in unit['functionOrder']:
                 function = unit['functions'].get(key)
                 if function is None:
@@ -953,7 +1023,7 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
                 size = max(0, int(function['total']))
                 function_bytes += size
                 matched_equivalent += size * function_pct / 100.0
-            for key in canonical_rejections:
+            for key in canonical_ordinary_rejections:
                 function = unit['functions'].get(key)
                 if function is None or not function.get('semanticAccepted'):
                     blocked_rejection = True
@@ -979,26 +1049,38 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
             unit_metrics(canonical, canonical_unit)
             if canonical_unit else (0.0, False)
         )
-        canonical_linked = bool(canonical_unit['linked']) if canonical_unit else False
+        canonical_linked = bool(
+            canonical_unit
+            and canonical_unit['linked']
+            and not canonical_policy_vetoes
+        )
+
+        def effective_semantic_complete(unit: dict[str, Any]) -> bool:
+            return bool(unit.get('semanticComplete')) and not canonical_policy_vetoes
 
         best_source_obj, best_unit, best_pct, best_exact = max(
             variant_metrics,
             key=lambda item: (
                 item[2],
-                bool(item[1].get('semanticComplete')),
+                effective_semantic_complete(item[1]),
                 item[3],
                 item[0] is canonical,
                 -source_positions[id(item[0])],
             ),
         )
         best_source = best_source_obj['spec'].label
-        any_linked = any(bool(u['linked']) for _, u in variants)
+        any_linked = not canonical_policy_vetoes and any(
+            bool(u['linked']) for _, u in variants
+        )
 
         function_order = list(canonical_unit['functionOrder']) if canonical_unit else list(reference_unit['functionOrder'])
         # A fully covered canonical semantic census is authoritative. Raw lane
         # reports may still expose compiler-local $L continuations as extra
         # pseudo-functions; re-adding those would reopen an exact drill-down.
-        if not (canonical_unit and canonical_unit.get('semanticComplete')):
+        if not (
+            canonical_unit
+            and canonical_unit.get('semanticCoverageComplete')
+        ):
             seen_functions = set(function_order)
             for _, unit in variants:
                 for key in unit['functionOrder']:
@@ -1042,7 +1124,7 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
                 ),
             )
             fn_best_source = best_fn_source_obj['spec'].label
-            fn_any_linked = any(
+            fn_any_linked = not policy_vetoes(reference_fn) and any(
                 bool(unit['linked']) and function_key_value in unit['functions']
                 for _, unit in variants
             )
@@ -1078,16 +1160,19 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
                 'parkedContribution': fn_parked,
                 'canonicalLinked': fn_canonical_linked,
                 'anyLinked': fn_any_linked,
+                'policyParked': policy_vetoes(reference_fn),
                 'canonicalSemanticAccepted': bool(canonical_fn and canonical_fn.get('semanticAccepted')),
                 'anySemanticAccepted': any(bool(fn.get('semanticAccepted')) for _, fn in fn_variants),
             })
 
         union_pct = weighted_union_pct(total, best_pct, merged_functions)
         represented_bytes = sum(int(function['total']) for function in merged_functions)
-        union_exact = best_exact or bool(
-            merged_functions
-            and represented_bytes == total
-            and all(bool(function['unionExact']) for function in merged_functions)
+        union_exact = not canonical_policy_vetoes and (
+            best_exact or bool(
+                merged_functions
+                and represented_bytes == total
+                and all(bool(function['unionExact']) for function in merged_functions)
+            )
         )
         if best_pct > canonical_pct + 0.0001:
             unit_contributors.add(best_source)
@@ -1109,8 +1194,12 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
             'parkedContribution': parked_contribution,
             'canonicalLinked': canonical_linked,
             'anyLinked': any_linked,
-            'canonicalSemanticComplete': bool(canonical_unit and canonical_unit.get('semanticComplete')),
-            'anySemanticComplete': any(bool(u.get('semanticComplete')) for _, u in variants),
+            'canonicalSemanticComplete': bool(
+                canonical_unit and effective_semantic_complete(canonical_unit)
+            ),
+            'anySemanticComplete': any(
+                effective_semantic_complete(u) for _, u in variants
+            ),
             'functions': merged_functions,
         })
 
@@ -1142,6 +1231,7 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
             'mtime': stat.st_mtime,
             'version': source['version'],
             'semanticPath': source['semanticPath'],
+            'parkedPolicyPath': source['parkedPolicyPath'],
         })
 
     return {
@@ -1196,8 +1286,10 @@ class ViewerServer(ThreadingHTTPServer):
 
         readable_specs: list[SourceSpec] = []
         semantic_paths: dict[str, Path] = {}
+        parked_policy_paths: dict[str, Path] = {}
         report_signatures: dict[str, tuple[int, int, int]] = {}
         semantic_signatures: dict[str, tuple[int, int, int]] = {}
+        parked_policy_signatures: dict[str, tuple[int, int, int]] = {}
         stamp_parts: list[str] = []
         warnings = list(discovery_warnings)
         for spec in sources:
@@ -1212,6 +1304,25 @@ class ViewerServer(ThreadingHTTPServer):
             report_signature = stat_signature(stat)
             report_signatures[spec.id] = report_signature
             stamp_parts.append(f"{spec.id}:{report_signature}")
+            parked_policy_path = spec.parked_policy_path
+            if spec.kind == 'canonical' and parked_policy_path is not None:
+                try:
+                    parked_policy_stat = parked_policy_path.stat()
+                except FileNotFoundError as exc:
+                    raise OSError(
+                        f"Canonical parked policy not found: {parked_policy_path}"
+                    ) from exc
+                except OSError as exc:
+                    raise OSError(
+                        f"Cannot stat canonical parked policy {parked_policy_path}: {exc}"
+                    ) from exc
+                else:
+                    parked_policy_signature = stat_signature(parked_policy_stat)
+                    parked_policy_paths[spec.id] = parked_policy_path
+                    parked_policy_signatures[spec.id] = parked_policy_signature
+                    stamp_parts.append(
+                        f"{spec.id}:parked-policy:{parked_policy_signature}"
+                    )
             semantic_path = spec.semantic_path
             if semantic_path is None:
                 continue
@@ -1247,6 +1358,7 @@ class ViewerServer(ThreadingHTTPServer):
                     warnings.append(f"Cannot load {spec.label}: {exc}")
                     continue
                 semantic_report = None
+                parked_policy = None
                 semantic_path = semantic_paths.get(spec.id)
                 if semantic_path is not None:
                     try:
@@ -1259,6 +1371,17 @@ class ViewerServer(ThreadingHTTPServer):
                                 f"Cannot load canonical semantic report {spec.label}: {exc}"
                             ) from exc
                         warnings.append(f"Cannot load semantic report for {spec.label}: {exc}")
+                parked_policy_path = parked_policy_paths.get(spec.id)
+                if parked_policy_path is not None:
+                    try:
+                        parked_policy = load_json_stable(
+                            parked_policy_path,
+                            parked_policy_signatures[spec.id],
+                        )
+                    except (OSError, json.JSONDecodeError, ValueError) as exc:
+                        raise OSError(
+                            f"Cannot load canonical parked policy for {spec.label}: {exc}"
+                        ) from exc
                 if stat_signature(spec.path.stat()) != report_signatures[spec.id]:
                     if spec.kind == 'canonical':
                         raise OSError(f"Canonical report changed during paired read: {spec.path}")
@@ -1276,7 +1399,21 @@ class ViewerServer(ThreadingHTTPServer):
                         f"Semantic report changed during paired read for {spec.label}; ignored"
                     )
                     continue
-                loaded.append(normalize_source(spec, report, semantic_report))
+                if (
+                    parked_policy_path is not None
+                    and stat_signature(parked_policy_path.stat())
+                    != parked_policy_signatures[spec.id]
+                ):
+                    raise OSError(
+                        f"Canonical parked policy changed during paired read: "
+                        f"{parked_policy_path}"
+                    )
+                loaded.append(normalize_source(
+                    spec,
+                    report,
+                    semantic_report,
+                    parked_policy,
+                ))
 
             merged = merge_reports(loaded, warnings)
             merged['stamp'] = stamp
