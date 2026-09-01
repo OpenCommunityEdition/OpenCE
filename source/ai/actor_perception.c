@@ -1224,12 +1224,6 @@ void actor_perception_refresh_test_object(
 	struct actor_perception_refresh_list *friend_list,
 	struct actor_perception_refresh_list *enemy_list);
 
-struct actor_variant_definition *actor_combat_get_firing_variant_definition(
-	long actor_index);
-
-void *actor_get_weapon_definition(
-	long actor_index);
-
 void actor_input_sample_position(
 	long actor_index,
 	long unit_index,

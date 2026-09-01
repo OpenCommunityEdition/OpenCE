@@ -374,7 +374,7 @@ boolean game_engine_allow_pause(
 	void);
 
 boolean game_engine_allow_dynamic_lighting(
-	long object_index);
+	void);
 
 boolean game_engine_infinite_grenades(
 	long player_index);

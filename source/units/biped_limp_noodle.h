@@ -14,7 +14,10 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/BIPED_LIMP_NOODLE.C */
+
+long biped_limp_noodle_get_max_relaxation_iterations(
+	long biped_index);
 
 /* ---------- globals */
 

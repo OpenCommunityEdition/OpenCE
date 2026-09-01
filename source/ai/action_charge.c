@@ -138,9 +138,6 @@ enum
 
 /* ---------- prototypes */
 
-struct actor_variant_definition *actor_combat_get_firing_variant_definition(
-	long actor_index);
-
 void actor_move_keep_moving_past_destination(
 	long actor_index);
 

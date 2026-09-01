@@ -1848,10 +1848,10 @@ void game_engine_rasterize_in_game_score(
 	color.blue = 0.7f;
 	rasterize_in_game_score_draw_line(title_string, FALSE, &color, 0);
 
-	color.alpha = alpha;
 	color.red = 0.5f;
 	color.green = 0.5f;
 	color.blue = 0.5f;
+	color.alpha = alpha;
 
 	string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
 	if (string_list_index != NONE)
@@ -1884,7 +1884,7 @@ void game_engine_rasterize_in_game_score(
 			long place_index;
 			real_argb_color *row_color;
 
-			is_current_player = entry_player_index == player_index;
+			is_current_player = player_index == entry_player_index;
 			if (player)
 			{
 				color = *hud_get_text_color(&text_color);
@@ -5796,7 +5796,7 @@ boolean game_engine_allow_pause(
 }
 
 boolean game_engine_allow_dynamic_lighting(
-	long object_index)
+	void)
 {
 	boolean allow_dynamic_lighting = TRUE;
 

@@ -3,9 +3,9 @@ DECALS.C
 
 symbols in this file:
 00086FE0 0130:
-	_code_00086fe0 (0000)
+	_decal_verify_neighbors (0000)
 00087110 0080:
-	_code_00087110 (0000)
+	_decal_set_first_decal_index (0000)
 00087190 0180:
 	_code_00087190 (0000)
 00087310 00a0:
@@ -45,9 +45,9 @@ symbols in this file:
 00087CB0 0070:
 	_bsp3d_get_plane_from_designator (0000)
 00087D20 0190:
-	_code_00087d20 (0000)
+	_decal_update (0000)
 00087EB0 0070:
-	_code_00087eb0 (0000)
+	_decal_reinsert (0000)
 00087F20 02c0:
 	_code_00087f20 (0000)
 000881E0 01f0:
@@ -223,23 +223,37 @@ symbols in this file:
 #undef plane3d_distance_to_point
 
 #include "cseries/errors.h"
-#include "effects/decal_definitions.h"
 #include "game/game.h"
 #include "memory/data.h"
 #include "rasterizer/rasterizer.h"
 #include "structures/structures.h"
+#include "objects/objects.h"
+#include "scenario/scenario.h"
+#include "physics/collisions.h"
+#include "physics/collision_usage.h"
+#include "effects/decal_definitions.h"
 
 /* ---------- constants */
 
 enum
 {
 	NUMBER_OF_DECAL_LAYERS = 5,
+	MAXIMUM_DECALS_PER_MAP = 2048
 };
 
 enum
 {
 	_decal_locked_bit,
-	_decal_permanent_bit,
+	_decal_permanent_bit
+};
+
+enum
+{
+	_decal_definition_geometry_inherited_by_next_decal_bit,
+	_decal_definition_interpolate_color_in_hsv_bit,
+	_decal_definition_more_colors_bit,
+	_decal_definition_no_random_rotation_bit,
+	_decal_definition_water_effect_bit
 };
 
 /* ---------- macros */
@@ -248,14 +262,19 @@ enum
 
 /* ---------- structures */
 
-struct collision_result;
 struct decal_editor_geometry;
-union real_vector3d;
+
+/* Only the flags word is currently authenticated. Keep the partial tag
+   definition private until the complete layout is recovered. */
+struct decal_definition
+{
+	unsigned short flags;
+};
 
 struct decal_datum
 {
-	struct datum_header header;
-	word flags;
+	short identifier;
+	unsigned short flags;
 	short cluster_index;
 	short layer;
 	real_point3d position;
@@ -268,23 +287,15 @@ struct decal_datum
 	real decay_time;
 	pixel32 color;
 	byte intensity;
-	byte pad;
+	byte unused;
 	short quad_count;
 	long definition_index;
-	long prev_decal_index;
+	long previous_decal_index;
 	long next_decal_index;
 };
 
-typedef char verify_decal_datum_size[
+typedef char decal_size_check[
 	sizeof(struct decal_datum) == 0x38 ? 1 : -1];
-typedef char verify_decal_datum_flags_offset[
-	offsetof(struct decal_datum, flags) == 0x2 ? 1 : -1];
-typedef char verify_decal_datum_creation_time_offset[
-	offsetof(struct decal_datum, creation_time) == 0x14 ? 1 : -1];
-typedef char verify_decal_datum_intensity_offset[
-	offsetof(struct decal_datum, intensity) == 0x28 ? 1 : -1];
-typedef char verify_decal_datum_definition_index_offset[
-	offsetof(struct decal_datum, definition_index) == 0x2C ? 1 : -1];
 
 struct decal_globals
 {
@@ -294,24 +305,29 @@ struct decal_globals
 	long permanent_count;
 };
 
-typedef char verify_decal_globals_size[
-	sizeof(struct decal_globals) == 0x280C ? 1 : -1];
-typedef char verify_decal_globals_locked_count_offset[
-	offsetof(struct decal_globals, locked_count) == 0x2804 ? 1 : -1];
-
 /* ---------- prototypes */
 
-long decal_get_first_decal_index(
-	short cluster_index,
-	short layer);
+static void decal_verify_neighbors(
+	long decal_index,
+	boolean layer_check);
 static void decal_update(
 	long decal_index);
+static void decal_set_first_decal_index(
+	short cluster_index,
+	short layer,
+	long decal_index);
+static void decal_reinsert(
+	long decal_index,
+	short cluster_index,
+	short layer);
 
 /* ---------- globals */
 
 extern struct data_array *global_decal_data;
-static struct decal_globals *decal_globals;
+
+boolean decals_enabled= TRUE;
 static boolean decal_locked_count_reported;
+static struct decal_globals *decal_globals;
 
 /* ---------- public code */
 
@@ -335,11 +351,23 @@ void decals_dispose(
 	return;
 }
 
+long decal_get_first_decal_index(
+	short cluster_index,
+	short layer)
+{
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 1006,
+		cluster_index>=0 && cluster_index<MAXIMUM_CLUSTERS_PER_STRUCTURE);
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 1007,
+		layer>=0 && layer<NUMBER_OF_DECAL_LAYERS);
+
+	return decal_globals->first_decal_indices[layer][cluster_index];
+}
+
 void decal_new_from_media_collision(
 	long decal_definition_index,
 	struct collision_result const *collision,
-	union real_vector3d const *velocity,
-	float radius_modifier,
+	real_vector3d const *velocity,
+	real radius_modifier,
 	boolean permanent,
 	short forced_sequence_index,
 	struct decal_editor_geometry *editor_geometry)
@@ -452,6 +480,204 @@ void decals_delete_permanent_from_cluster(
 	return;
 }
 
+void decals_disconnect_from_structure_bsp(
+	void)
+{
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 713, global_decal_data);
+
+	if (global_decal_data->valid)
+	{
+		short cluster_index;
+
+		match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 719, decal_globals);
+
+		for (cluster_index= 0; cluster_index<MAXIMUM_CLUSTERS_PER_STRUCTURE; cluster_index++)
+		{
+			short layer;
+
+			for (layer= 0; layer<NUMBER_OF_DECAL_LAYERS; layer++)
+			{
+				long first_decal_index= decal_get_first_decal_index(cluster_index, layer);
+				long decal_index= first_decal_index;
+				long iteration_count= 0;
+
+				while (decal_index!=NONE)
+				{
+					struct decal_datum *decal= DECAL_GET(decal_index);
+					long next_decal_index= decal->next_decal_index;
+
+					if (iteration_count++>MAXIMUM_DECALS_PER_MAP)
+					{
+						error(_error_silent, "### ERROR decals: infinite loop -- tell Bernie!!");
+						break;
+					}
+
+					match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 746, decal->cluster_index==cluster_index);
+
+					decal->cluster_index= NONE;
+
+					if (decal->next_decal_index==NONE)
+					{
+						decal->next_decal_index= decal_globals->first_disconnected_decal_index;
+
+						if (decal_globals->first_disconnected_decal_index!=NONE)
+						{
+							DECAL_GET(decal_globals->first_disconnected_decal_index)->previous_decal_index= decal_index;
+						}
+
+						decal_globals->first_disconnected_decal_index= first_decal_index;
+
+						decal_set_first_decal_index(cluster_index, layer, NONE);
+					}
+
+					decal_index= next_decal_index;
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+void decals_reconnect_to_structure_bsp(
+	void)
+{
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 633, global_decal_data);
+
+	if (global_decal_data->valid)
+	{
+		long decal_index;
+		long iteration_count= 0;
+
+		match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 641, decal_globals);
+
+		decal_index= decal_globals->first_disconnected_decal_index;
+
+		while (decal_index!=NONE)
+		{
+			struct decal_datum *decal= DECAL_GET(decal_index);
+			long next_decal_index= decal->next_decal_index;
+			struct location location;
+
+			if (iteration_count++>MAXIMUM_DECALS_PER_MAP)
+			{
+				error(_error_silent, "### ERROR decals: infinite loop -- tell Bernie!!");
+				break;
+			}
+
+			match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 660, decal->cluster_index==NONE);
+			match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 661,
+				decal->layer>=0 && decal->layer<NUMBER_OF_DECAL_LAYERS);
+
+			decal_verify_neighbors(decal_index, FALSE);
+
+			scenario_location_from_point(&location, &decal->position);
+
+			if (location.cluster_index!=NONE)
+			{
+				if (decal->next_decal_index!=NONE)
+				{
+					DECAL_GET(decal->next_decal_index)->previous_decal_index= decal->previous_decal_index;
+				}
+
+				if (decal->previous_decal_index!=NONE)
+				{
+					DECAL_GET(decal->previous_decal_index)->next_decal_index= decal->next_decal_index;
+				}
+				else
+				{
+					match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 682,
+						decal_globals->first_disconnected_decal_index==decal_index);
+
+					decal_globals->first_disconnected_decal_index= decal->next_decal_index;
+				}
+
+				decal_reinsert(decal_index, location.cluster_index, decal->layer);
+			}
+
+			decal_verify_neighbors(decal_index, FALSE);
+
+			decal_index= next_decal_index;
+		}
+	}
+
+	return;
+}
+
+void decal_new(
+	long decal_definition_index,
+	real_point3d const *origin,
+	real_vector3d const *velocity,
+	real radius_modifier,
+	boolean permanent,
+	short forced_sequence_index,
+	struct decal_editor_geometry *editor_geometry)
+{
+	if (decals_enabled)
+	{
+		unsigned long *local_random_seed_address= get_global_local_random_seed_address();
+		unsigned long local_random_seed= 0;
+		struct collision_result collision;
+
+		if (permanent)
+		{
+			match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 1533, local_random_seed_address);
+			match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 1534, origin);
+
+			local_random_seed= *local_random_seed_address;
+			*local_random_seed_address= ((unsigned long const *)origin)[2]
+				^ ((unsigned long const *)origin)[1]
+				^ ((unsigned long const *)origin)[0]
+				^ 0xdeadc0de;
+		}
+
+		match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 1550,
+			global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
+		global_current_collision_users[global_current_collision_user_depth++] =
+			_collision_user_decals;
+
+		if (collision_test_vector(
+			FLAG(_collision_test_front_facing_surfaces_bit) |
+				FLAG(_collision_test_structure_bit) |
+				FLAG(_collision_test_media_bit) |
+				FLAG(_collision_test_try_to_keep_location_valid_bit),
+			origin,
+			velocity,
+			NONE,
+			&collision))
+		{
+			if (collision.type==_collision_result_media)
+			{
+				decal_new_from_media_collision(decal_definition_index, &collision, velocity,
+					radius_modifier, permanent, forced_sequence_index, editor_geometry);
+			}
+			else if (collision.type==_collision_result_structure)
+			{
+				struct decal_definition *definition= decal_definition_get(decal_definition_index);
+
+				if (!TEST_FLAG(definition->flags, _decal_definition_water_effect_bit))
+				{
+					decal_new_from_collision(decal_definition_index, &collision, velocity,
+						radius_modifier, permanent, forced_sequence_index, editor_geometry);
+				}
+			}
+		}
+
+		match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 1586,
+			global_current_collision_user_depth > 1);
+		--global_current_collision_user_depth;
+
+		if (permanent)
+		{
+			match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 1590, local_random_seed_address);
+
+			*local_random_seed_address= local_random_seed;
+		}
+	}
+
+	return;
+}
+
 /* ---------- private code */
 
 static void decal_update(
@@ -502,3 +728,71 @@ static void decal_update(
 
 	return;
 }
+static void decal_verify_neighbors(
+	long decal_index,
+	boolean layer_check)
+{
+	struct decal_datum *decal = DECAL_GET(decal_index);
+
+	if (decal->previous_decal_index!=NONE)
+	{
+		short cluster_index= DECAL_GET(decal->previous_decal_index)->cluster_index;
+		short layer= DECAL_GET(decal->previous_decal_index)->layer;
+
+		match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 194, cluster_index==decal->cluster_index);
+		match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 195, !layer_check || layer==decal->layer);
+	}
+
+	if (decal->next_decal_index!=NONE)
+	{
+		short cluster_index= DECAL_GET(decal->next_decal_index)->cluster_index;
+		short layer= DECAL_GET(decal->next_decal_index)->layer;
+
+		match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 203, cluster_index==decal->cluster_index);
+		match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 204, !layer_check || layer==decal->layer);
+	}
+
+	return;
+}
+
+static void decal_reinsert(
+	long decal_index,
+	short cluster_index,
+	short layer)
+{
+	long first_decal_index= decal_get_first_decal_index(cluster_index, layer);
+	struct decal_datum *decal = DECAL_GET(decal_index);
+
+	decal->previous_decal_index= NONE;
+	decal->next_decal_index= first_decal_index;
+	decal->cluster_index= cluster_index;
+	decal->layer= layer;
+
+	if (first_decal_index!=NONE)
+	{
+		DECAL_GET(first_decal_index)->previous_decal_index= decal_index;
+	}
+
+	decal_set_first_decal_index(cluster_index, layer, decal_index);
+
+	return;
+}
+
+
+
+static void decal_set_first_decal_index(
+	short cluster_index,
+	short layer,
+	long decal_index)
+{
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 216,
+		cluster_index>=0 && cluster_index<MAXIMUM_CLUSTERS_PER_STRUCTURE);
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 217,
+		layer>=0 && layer<NUMBER_OF_DECAL_LAYERS);
+
+	decal_globals->first_decal_indices[layer][cluster_index]= decal_index;
+
+	return;
+}
+
+/* ---------- end of file */

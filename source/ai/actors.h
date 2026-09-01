@@ -871,7 +871,39 @@ void actor_unit_control_stop_animation_impulse(
 
 /* ---------- prototypes/ACTOR_COMBAT.C */
 
-long actor_aim_grenade(long actor_index, real_point3d const *origin, real_vector3d *vector);
+struct weapon_definition;
+
+void actor_combat_fire_wildly(
+	long actor_index,
+	short fire_ticks);
+void actor_combat_disable_bursts(
+	long actor_index,
+	long disable_timer);
+struct weapon_definition *actor_get_weapon_definition(
+	long actor_index);
+struct actor_variant_definition *actor_combat_get_firing_variant_definition(
+	long actor_index);
+boolean actor_combat_find_grenade_target(
+	long actor_index,
+	real_point3d *grenade_target,
+	long *grenade_target_prop_index,
+	long *grenade_ignore_object_index);
+boolean actor_combat_check_collateral_damage(
+	long actor_index,
+	real enemy_radius,
+	real collateral_damage_radius,
+	real_point3d const *test_point,
+	short *threat_count);
+boolean actor_combat_plan_grenade_trajectory(
+	long actor_index,
+	short trajectory_type,
+	real_point3d const *grenade_target,
+	long grenade_target_prop_index,
+	long grenade_ignore_object_index);
+long actor_aim_grenade(
+	long actor_index,
+	real_point3d const *origin,
+	real_vector3d *vector);
 
 /* ---------- prototypes/ACTOR_MOVING.C */
 

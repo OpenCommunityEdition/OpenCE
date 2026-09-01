@@ -122,6 +122,13 @@ void encounters_dispose(
 	void);
 void encounters_dispose_from_old_map(
 	void);
+void encounter_actor_iterator_new(
+	struct encounter_actor_iterator *iterator,
+	long encounter_index);
+struct actor_datum *encounter_actor_iterator_next(
+	struct encounter_actor_iterator *iterator);
+struct actor_datum *encounter_actor_iterator_prev(
+	struct encounter_actor_iterator *iterator);
 void encounter_compute_activation_cluster_bit_vector(long encounter_index, boolean update_actor_dormancy, long bit_vector_size, unsigned long const *active_area, unsigned long *bit_vector);
 
 void encounter_build_firing_position_owner_actor_indices(

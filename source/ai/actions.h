@@ -128,7 +128,7 @@ struct fight_state_data
 	word pad;
 };
 
-struct __declspec(align(4)) guard_state_data
+struct guard_state_data
 {
 	short wait_ticks;
 	short look_ticks;
@@ -475,6 +475,11 @@ struct pursuit_location *actor_get_pursuit_location(
 
 real_argb_color *actor_action_debug_color(
 	long actor_index);
+
+/* ---------- prototypes/ACTION_CHARGE.C */
+
+real normalize2d(
+	real_vector2d *vector);
 
 /* ---------- prototypes/ACTION_OBEY.C */
 

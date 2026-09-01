@@ -79,6 +79,22 @@ real projectile_estimate_time_to_target(
 void projectile_set_target_object_index(
 	long projectile_index,
 	long target_object_index);
+real projectile_get_ballistic_acceleration(
+	struct projectile_definition const *definition);
+boolean projectile_aim(
+	struct projectile_definition const *definition,
+	real_point3d const *origin,
+	real_point3d const *target_point,
+	real const *override_velocity_max,
+	real *target_velocity_min,
+	real *target_ballistic_fraction_min,
+	real *forced_velocity,
+	boolean lob,
+	real_vector3d *result_aim_vector,
+	real *result_velocity,
+	real *result_ticks,
+	real *result_distance,
+	boolean *result_linear);
 void projectile_accelerate(long projectile_index, union real_vector3d const *acceleration);
 
 /* ---------- globals */

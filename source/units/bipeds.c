@@ -234,15 +234,25 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
+#include "game/game.h"
 #include "models/model_animation_definitions.h"
-#include "physics/physics.h"
+#include "units/biped_limp_noodle.h"
 #include "units/biped_definitions.h"
 #include "units/bipeds.h"
+#include "physics/breakable_surfaces.h"
+#include "physics/collision_bsp.h"
+#include "physics/collision_bsp_definitions.h"
+#include "physics/collisions.h"
+#include "physics/collision_usage.h"
+#include "physics/physics.h"
+#include "scenario/scenario.h"
 
 /* ---------- constants */
 
 enum
 {
+	_biped_airborne_bit = 0,
 	_biped_limp_body_physics_active_bit = 5,
 };
 
@@ -253,6 +263,11 @@ enum
 /* ---------- prototypes */
 
 /* ---------- globals */
+
+boolean debug_biped_physics;
+boolean debug_biped_skip_update;
+boolean debug_biped_skip_collision;
+boolean debug_biped_limp_body_disable;
 
 /* ---------- public code */
 
@@ -273,7 +288,6 @@ void bipeds_initialize(
 {
 	return;
 }
-
 void bipeds_initialize_for_new_map(
 	void)
 {
@@ -309,6 +323,19 @@ void biped_reset(
 	return;
 }
 
+void biped_disconnect_from_structure_bsp(
+	long biped_index)
+{
+	struct biped_datum *biped;
+
+	biped = biped_get(biped_index);
+	biped->biped.support_surface_index = NONE;
+	biped->biped.pathfinding_surface_index = NONE;
+	biped->biped.last_pathfinding_surface_index = NONE;
+
+	return;
+}
+
 void biped_stop_melee_attack(
 	long biped_index)
 {
@@ -321,15 +348,26 @@ void biped_stop_melee_attack(
 	return;
 }
 
-void biped_disconnect_from_structure_bsp(
+void biped_start_limp_body_physics(
 	long biped_index)
 {
-	struct biped_datum *biped;
+	struct biped_datum *biped = biped_get(biped_index);
+	boolean uses_limp_body_physics = TEST_FLAG(
+		biped_definition_get(biped->definition_index)->biped.flags,
+		_biped_uses_limp_body_physics_bit);
 
-	biped = biped_get(biped_index);
-	biped->biped.support_surface_index = NONE;
-	biped->biped.pathfinding_surface_index = NONE;
-	biped->biped.last_pathfinding_surface_index = NONE;
+	if (!debug_biped_limp_body_disable &&
+		uses_limp_body_physics &&
+		TEST_FLAG(biped->object.flags, _object_at_rest_bit) &&
+		!TEST_FLAG(biped->biped.flags, _biped_airborne_bit) &&
+		!TEST_FLAG(biped->biped.flags, _biped_limp_body_physics_active_bit))
+	{
+		biped->biped.limp_body_current_relaxation_iterations = 0;
+		biped->biped.limp_body_max_relaxation_iterations =
+			(byte)biped_limp_noodle_get_max_relaxation_iterations(biped_index);
+		SET_FLAG(biped->object.flags, _object_do_not_recompute_node_matrices_bit, TRUE);
+		SET_FLAG(biped->biped.flags, _biped_limp_body_physics_active_bit, TRUE);
+	}
 
 	return;
 }
@@ -361,7 +399,7 @@ boolean biped_flying_through_air(
 	biped = biped_get(biped_index);
 	definition = biped_definition_get(biped->definition_index);
 
-	return biped->biped.airborne_ticks > 3 &&
+	return biped->biped.airborne_ticks>3 &&
 		(!TEST_FLAG(definition->biped.flags, _biped_flying_bit) ||
 		TEST_FLAG(biped->object.damage_flags, _object_dead_bit));
 }
@@ -377,21 +415,47 @@ void biped_export_function_values(
 
 	for (function_index = NUMBER_OF_INCOMING_OBJECT_FUNCTIONS; function_index; --function_index, ++function_modes, ++function_values)
 	{
-		if (*function_modes != _biped_function_none)
+		if (*function_modes!=_biped_function_none)
 		{
 			real function_value = 0.0f;
 
 			switch (*function_modes)
 			{
 			case _biped_function_flying_speed:
-				function_value = magnitude3d(&biped->object.translational_velocity) /
-					(biped_definition->biped.flying_velocity / (real) TICKS_PER_SECOND);
+				function_value = magnitude3d(&biped->object.translational_velocity)/(biped_definition->biped.flying_velocity/(real)TICKS_PER_SECOND);
 				function_value = PIN(function_value, 0.0f, 1.0f);
 				break;
 			}
 
 			*function_values = function_value;
 		}
+	}
+
+	return;
+}
+
+void biped_exit_seat_end(
+	long biped_index,
+	long seat_object_index)
+{
+	struct biped_datum *biped = biped_get(biped_index);
+
+	biped_definition_get(biped->definition_index);
+
+	biped->object.forward.k = 0.f;
+	if (normalize3d(&biped->object.forward)==0.f)
+		biped->object.forward = *global_forward3d;
+	biped->object.up = *global_up3d;
+	SET_FLAG(biped->biped.flags, _biped_airborne_bit, TRUE);
+
+	if (!biped_fix_position(biped_index, seat_object_index, NULL, 0, 2.f, TRUE, FALSE, TRUE))
+	{
+		real_point3d center;
+		real radius;
+
+		object_get_bounding_sphere(seat_object_index, &center, &radius);
+		if (!biped_fix_position(biped_index, seat_object_index, &center, 0, radius, TRUE, FALSE, FALSE))
+			error(_error_silent, "couldn't teleport the biped out far enough from the vehicle...");
 	}
 
 	return;

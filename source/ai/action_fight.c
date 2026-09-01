@@ -75,9 +75,6 @@ void actor_discard_firing_position(
 	short firing_position_index,
 	boolean temporary);
 
-struct actor_variant_definition *actor_combat_get_firing_variant_definition(
-	long actor_index);
-
 void actor_find_pathfinding_location(
 	long actor_index);
 

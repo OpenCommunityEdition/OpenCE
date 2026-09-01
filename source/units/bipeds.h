@@ -90,6 +90,10 @@ boolean biped_flying_through_air(
 	long biped_index);
 void biped_export_function_values(
 	long biped_index);
+void biped_disconnect_from_structure_bsp(
+	long biped_index);
+void biped_stop_melee_attack(
+	long biped_index);
 
 void biped_get_sight_position(
 	long biped_index,
@@ -99,21 +103,31 @@ void biped_get_sight_position(
 	real_vector3d const *desired_gun_offset,
 	real_point3d *sight_position);
 void biped_get_physics_pill(long biped_index, real_point3d *base, real *height, real *width);
+void biped_get_autoaim_pill(
+	long biped_index,
+	real_point3d *base,
+	real_vector3d *height,
+	real *width);
 boolean biped_fix_position(
-	long unit_index,
-	long seat_index,
-	real_point3d *initial_position,
+	long biped_index,
+	long line_of_sight_object_index,
+	real_point3d const *new_position,
 	real_point3d *final_position,
-	real scale,
-	boolean keep_basis,
+	real maximum_radius_fudge_factor,
+	boolean fix_below_new_position,
 	boolean dont_teleport,
-	boolean scale_by_height);
+	boolean use_radius_as_multiplier);
 
 void biped_stop_limp_body_physics(long biped_index);
 void biped_start_limp_body_physics(
 	long biped_index);
 
 void biped_build_flying_axes(real_vector3d const *forward_vector, real_vector3d *left_vector, real_vector3d *up_vector);
+void biped_exit_seat_end(
+	long biped_index,
+	long seat_object_index);
+void biped_render_debug(
+	long biped_index);
 
 /* ---------- globals */
 

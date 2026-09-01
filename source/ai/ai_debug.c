@@ -246,14 +246,6 @@ void actor_iterator_new(
 	boolean active_only);
 struct actor_datum *actor_iterator_next(
 	struct actor_iterator *iterator);
-void encounter_actor_iterator_new(
-	struct encounter_actor_iterator *iterator,
-	long encounter_index);
-struct actor_datum *encounter_actor_iterator_next(
-	struct encounter_actor_iterator *iterator);
-struct actor_datum *encounter_actor_iterator_prev(
-	struct encounter_actor_iterator *iterator);
-
 /* ---------- globals */
 
 struct ai_debug_state ai_debug;

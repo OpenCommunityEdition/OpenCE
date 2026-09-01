@@ -200,6 +200,7 @@ symbols in this file:
 #include "cseries.h"
 
 #include "ai/actors.h"
+#include "ai/encounters.h"
 #include "ai/props.h"
 #include "units/units.h"
 
@@ -341,11 +342,6 @@ void actor_iterator_new(
 	boolean active_only);
 struct actor_datum *actor_iterator_next(
 	struct actor_iterator *iterator);
-void encounter_actor_iterator_new(
-	struct encounter_actor_iterator *iterator,
-	long encounter_index);
-struct actor_datum *encounter_actor_iterator_next(
-	struct encounter_actor_iterator *iterator);
 void actor_erase(
 	long actor_index,
 	boolean immediate);

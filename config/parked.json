@@ -446,6 +446,61 @@
       }
     },
     {
+      "unit": "source/objects/object_lights",
+      "function": "_light_mark",
+      "class": "unclassified",
+      "evidence": "The retained private helper is ordinary, coherent marker-state C and is emitted through the real lights_prepare_for_object_dynamic -> find_point_lights_for_object_in_cluster call topology; no anchor, duplicate helper, or standalone byte carrier remains. January and the candidate have the same 96-byte envelope and all eight relocation identities, but VC7 selects a different natural assertion/marker control-flow schedule. Source respellings that merely manufacture the target branch layout are rejected under the anti-fake-match rule. Reopen only for authoritative January source or independent same-compiler source/topology evidence that naturally explains the schedule; do not use volatile access, fake dependencies, assembly, or optimizer steering.",
+      "measurements": {
+        "target": { "size": 96, "relocation_count": 8, "normalized_sha256": "1175088cd02bd3341a0ff200c3356917ecd5b27958606b0c9d68ef92c07a5300" },
+        "base": { "size": 96, "relocation_count": 8, "normalized_sha256": "780f93f2adfaad0f187e7271a5e1516d6416d6881e7a7476969cf21eec2c887f" },
+        "objdiff_percent": 84.84849
+      }
+    },
+    {
+      "unit": "source/objects/object_lights",
+      "function": "_light_unmarked",
+      "class": "unclassified",
+      "evidence": "The retained private helper is the direct semantic predicate `lights_globals.marker != light->marker`, naturally called by find_point_lights_for_object_in_cluster. A previously discovered if/return/return spelling reaches the January 96-byte stream only by artificial source topology and is explicitly rejected; the honest one-expression function is 80 bytes with the same eight relocation identities. Reopen only for authoritative January source or independent evidence for a natural historical control-flow spelling. Do not admit the known byte-oriented respelling, volatile state, dead branches, assembly, or a fake caller.",
+      "measurements": {
+        "target": { "size": 96, "relocation_count": 8, "normalized_sha256": "6aa93207648f0793874a395bb091edda96bd71c50fd33a1eb3ef9d34ce6ff498" },
+        "base": { "size": 80, "relocation_count": 8, "normalized_sha256": "9ea9773df405cf2faefd56cf8476c76d416f5c00bbc2df13ea5f149b7b2c087f" },
+        "objdiff_percent": 77.40741
+      }
+    },
+    {
+      "unit": "source/objects/object_lights",
+      "function": "_light_reconnect_to_map",
+      "class": "unclassified",
+      "evidence": "The retained ordinary-C reconstruction reconnects a live light through the recovered cluster-partition flow and calls the real same-TU light_compute_bounding_sphere helper with its full semantic signature. It is a coherent owner function, not a wrapper or code-size carrier. The remaining gap is broad VC7 statement/register/x87 topology: 592 bytes and 24 relocations versus January's 640 bytes and 25 relocations. Reopen for authoritative January source, recovered light-datum fields, or a natural same-compiler donor that explains the missing relocation and schedule; reject representation-punning adapters, duplicate geometry helpers, artificial temporaries, volatile access, assembly, and fake control flow.",
+      "measurements": {
+        "target": { "size": 640, "relocation_count": 25, "normalized_sha256": "0bdb2e5147c6d190bb396e3c19d040bdfa2ec6a01efa1c6269b65283ffc7d488" },
+        "base": { "size": 592, "relocation_count": 24, "normalized_sha256": "8ceb97c81b99398fe7f92ff1bb956a41392c4bd0f8ca396932b17f3fc43c01bf" },
+        "objdiff_percent": 76.022026
+      }
+    },
+    {
+      "unit": "source/objects/object_lights",
+      "function": "_find_point_lights_for_object_in_cluster",
+      "class": "unclassified",
+      "evidence": "The authenticated private helper is naturally retained because lights_prepare_for_object_dynamic calls it; it traverses the real cluster light partition and uses light_unmarked/light_mark as one link-closed marker packet. January and the candidate have the same 31 relocations but differ in ordinary loop/register scheduling and padded size (560 versus 576 bytes). No uncalled duplicate, address-derived name, dummy carrier, or forced compiler construct is retained. Reopen only for authoritative January source or independent same-compiler evidence for the traversal/lifetime shape; do not use volatile access, fake dependencies, manual address logic, or assembly.",
+      "measurements": {
+        "target": { "size": 560, "relocation_count": 31, "normalized_sha256": "39d22fa1133941bdd6a0b52cfe5ff4e0df3e109e21e6318f46774740811f96be" },
+        "base": { "size": 576, "relocation_count": 31, "normalized_sha256": "e4f2b09bcfd6ce104ee90a2a6755d4ace911d2d61750e94792332857262ed1e2" },
+        "objdiff_percent": 97.430855
+      }
+    },
+    {
+      "unit": "source/objects/object_lights",
+      "function": "_light_compute_bounding_sphere",
+      "class": "unclassified",
+      "evidence": "The authenticated private helper is a real dependency of light_reconnect_to_map and computes the light's semantic radius/position from the typed light definition; it is not the distinct unwritten light_get_bounding_sphere function at the following January address. Target and candidate share a 240-byte envelope and five relocations, but differ in natural conditional/x87 scheduling and relocation identity. Reopen only for authoritative January source, recovered type/field evidence, or a natural same-compiler donor that explains both instruction and relocation choices; reject type-punning call adapters, duplicate math helpers, volatile access, fake branches, and assembly.",
+      "measurements": {
+        "target": { "size": 240, "relocation_count": 5, "normalized_sha256": "6daa7a1efe4519f3cc34c9fe6e40e087e21dc929be8f1f0b43ecaedee13ced3a" },
+        "base": { "size": 240, "relocation_count": 5, "normalized_sha256": "ac87c6b4c87e36b4bba6c3557c3c369a52480987b4627865ff0efb4d339ccb1a" },
+        "objdiff_percent": 63.494507
+      }
+    },
+    {
       "unit": "source/bungie_net/common/thread_win32",
       "function": "_get_mutex_from_pool",
       "class": "csplit-relocation-alias",
@@ -511,6 +566,39 @@
           "normalized_sha256": "0436d82fe1070f30523ce8798bcce3b7625099794f5d0ab3fbf9a9c33802314e"
         },
         "objdiff_percent": 100.0
+      }
+    },
+    {
+      "unit": "source/ai/actor_combat",
+      "function": "_actor_combat_find_nearby_target",
+      "class": "instruction-scheduling",
+      "evidence": "The retained source uses the HCEA-authenticated private signature, typed real_point3d/real_vector3d arithmetic, the January random-seed API, and the existing collision-vector API. Target and candidate have the same 352-byte envelope, twelve relocations, and identical relocation identities. The only meaningful residual is the final inline point expansion: January keeps height live on the x87 stack through direction.k and then pops it, while VC7 recognizes the last use and folds the memory operand. Natural typed-local, pointer-alias, and expression-shape variants did not reproduce January without fake lifetime steering. No synthetic helper, volatile access, inactive-union overlay, assembly, or point_from_line3d COMDAT is retained. Reopen only for authoritative source or a natural same-compiler lifetime/inlining donor.",
+      "measurements": {
+        "target": { "size": 352, "relocation_count": 12, "normalized_sha256": "d81707099ff33b584760980c0676308538c7bd08d3f6988d4aaec680fb9b26e6" },
+        "base": { "size": 352, "relocation_count": 12, "normalized_sha256": "ea9a37ad3b0e51df21b0011f3b93aa55152b23bbb72ddde606d46a33173afb96" },
+        "objdiff_percent": 97.28814
+      }
+    },
+    {
+      "unit": "source/ai/actor_combat",
+      "function": "_actor_combat_check_collateral_damage",
+      "class": "instruction-scheduling",
+      "evidence": "The retained source expresses each typed real_vector3d squared distance directly and coherently. Target and candidate are both 880 bytes with 21 identical relocation identities and 293 instructions; only six x87 stack-index opcode choices in the first inlined distance expression differ. Reordering terms can perturb the result but is not supported by source evidence and was rejected as fake matching. No duplicate math helper, volatile access, representation punning, assembly, or candidate-only helper COMDAT is retained. Reopen only for authoritative source or natural same-compiler expression/lifetime evidence.",
+      "measurements": {
+        "target": { "size": 880, "relocation_count": 21, "normalized_sha256": "eb4aee9d9f4765a5505126a61d5ef2bdabe4c40f9de3cba7d3cd7cc9771ee0d0" },
+        "base": { "size": 880, "relocation_count": 21, "normalized_sha256": "811617f77eb8c57aa71254cae2acdee20a270e90855aeb6976bbd25faca08ecc" },
+        "objdiff_percent": 99.89474
+      }
+    },
+    {
+      "unit": "source/ai/actor_combat",
+      "function": "_actor_combat_plan_grenade_trajectory",
+      "class": "register-allocation",
+      "evidence": "The retained function now uses the HCEA-authenticated build-trajectory argument order and typed grenade constants. Target and candidate have the same 288-byte envelope, five relocations, and identical relocation identities. January uses a 0x30-byte frame by reusing a dead incoming parameter home slot, while this VC7 source shape uses a 0x34-byte frame and a separate local slot. Natural declaration/lifetime and signature corrections do not reproduce the stack-slot colouring. No volatile access, raw overlay, fake dependency, assembly, or manual stack control is retained. Reopen only for authoritative source or a natural same-compiler stack-lifetime donor.",
+      "measurements": {
+        "target": { "size": 288, "relocation_count": 5, "normalized_sha256": "7edcb9d4e87b0a5fe7d095bf5ba048614e46a9708e7d858889cbeb627aa0a0de" },
+        "base": { "size": 288, "relocation_count": 5, "normalized_sha256": "ff9a7477deb2aa304240db075c9182d629f8b82c13cf4e4c48a51af1efc5170a" },
+        "objdiff_percent": 94.7
       }
     }
   ]

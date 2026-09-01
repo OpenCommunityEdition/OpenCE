@@ -9,7 +9,7 @@ symbols in this file:
 00128780 0040:
 	_code_00128780 (0000)
 001287C0 0060:
-	_code_001287c0 (0000)
+	_shade_vector3d (0000)
 00128820 0100:
 	_sample_lightmap (0000)
 00128920 00f0:
@@ -29,7 +29,7 @@ symbols in this file:
 00128B60 0040:
 	_light_delete (0000)
 00128BA0 0060:
-	_code_00128ba0 (0000)
+	_light_build_cluster_array (0000)
 00128C00 00d0:
 	_object_get_self_illumination (0000)
 00128CD0 0260:
@@ -41,31 +41,31 @@ symbols in this file:
 00129040 0020:
 	_light_attenuation (0000)
 00129060 00a0:
-	_code_00129060 (0000)
+	_brighten_real_rgb_color (0000)
 00129100 0020:
-	_code_00129100 (0000)
+	_cluster_get_first_light (0000)
 00129120 0020:
-	_code_00129120 (0000)
+	_cluster_get_next_light (0000)
 00129140 0040:
-	_code_00129140 (0000)
+	_light_marker_begin (0000)
 00129180 0060:
 	_light_unmarked (0000)
 001291E0 0060:
-	_code_001291e0 (0000)
+	_light_mark (0000)
 00129240 0040:
-	_code_00129240 (0000)
+	_light_marker_end (0000)
 00129280 0110:
 	_render_debug_light (0000)
 00129390 00e0:
 	_lights_queue_lens_flare (0000)
 00129470 0230:
-	_code_00129470 (0000)
+	_find_point_lights_for_object_in_cluster (0000)
 001296A0 0400:
-	_code_001296a0 (0000)
+	_build_distant_lights (0000)
 00129AA0 00f0:
-	_code_00129aa0 (0000)
+	_light_compute_bounding_sphere (0000)
 00129B90 00e0:
-	_code_00129b90 (0000)
+	_light_get_bounding_sphere (0000)
 00129C70 01d0:
 	_lights_render_diffuse (0000)
 00129E40 0150:
@@ -142,17 +142,34 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
+#include "cseries/profile.h"
+#include "math/real_math.h"
+#include "cache/texture_cache.h"
+#include "game/game.h"
+#include "game/game_engine.h"
+#include "memory/data.h"
+#include "objects/light_definitions.h"
+#include "objects/object_lights.h"
+#include "objects/objects.h"
 #include "render/render.h"
 #include "saved games/game_state.h"
-#include "math/real_math.h"
-#include "memory/data.h"
-#include "objects/object_lights.h"
+#include "scenario/scenario.h"
 #include "structures/cluster_partitions.h"
+#include "tag_files/tag_groups.h"
 
 /* ---------- constants */
 
 enum
 {
+	_light_definition_dynamic_bit = 0,
+	_light_definition_no_specular_bit,
+	_light_definition_dont_light_own_object_bit,
+	_light_definition_supersize_in_first_person_bit,
+};
+
+enum
+{
+	_point_light_dynamic_bit = 0,
 	_point_light_connects_to_map_bit = 1,
 	_point_light_connected_to_map_bit = 2,
 };
@@ -162,6 +179,9 @@ enum
 #define light_get(index) \
 	((struct light_datum *)datum_get(light_data, (index)))
 
+#define light_definition_get(index) \
+	((struct light_definition *)tag_get(LIGHT_DEFINITION_TAG, (index)))
+
 /* ---------- structures */
 
 struct lights_game_globals
@@ -170,10 +190,27 @@ struct lights_game_globals
 	byte reserved01[3];
 };
 
+struct light_definition
+{
+	long flags;
+	real radius;
+	real radius_modifier_lower_bound;
+	real radius_modifier_upper_bound;
+	real falloff_angle;
+	real cutoff_angle;
+	real lens_flare_radius;
+	real runtime_cosine_falloff_angle;
+	real runtime_cosine_cutoff_angle;
+	real specular_radius_multiplier;
+	real runtime_sine_cutoff_angle;
+	byte reserved2C[0x80];
+	struct tag_reference lens_flare;
+};
+
 struct light_datum
 {
 	struct datum_header header;
-	word flags;
+	unsigned short flags;
 	long definition_index;
 	long rasterizer_light_index;
 	long marker;
@@ -234,6 +271,8 @@ typedef char verify_light_datum_flags_offset[
 	offsetof(struct light_datum, flags) == 0x2 ? 1 : -1];
 typedef char verify_light_datum_cluster_reference_offset[
 	offsetof(struct light_datum, cluster_reference) == 0x10 ? 1 : -1];
+typedef char verify_light_definition_lens_flare_offset[
+	offsetof(struct light_definition, lens_flare) == 0xAC ? 1 : -1];
 typedef char verify_light_datum_size[
 	sizeof(struct light_datum) == 0x7C ? 1 : -1];
 typedef char verify_lights_globals_size[
@@ -241,16 +280,25 @@ typedef char verify_lights_globals_size[
 
 /* ---------- prototypes */
 
-struct bitmap_data;
-
-void profile_texture_start(
-	void);
-void profile_texture_end(
-	void);
-void *_texture_cache_bitmap_get_hardware_format(
-	struct bitmap_data *bitmap,
-	boolean block,
-	boolean load);
+static boolean light_unmarked(
+	long light_index);
+static void find_point_lights_for_object_in_cluster(
+	long object_index,
+	short cluster_index,
+	real_point3d const *center,
+	real radius,
+	long *light_indices,
+	real *light_intensities,
+	real *light_attenuations,
+	short *light_count,
+	short maximum_light_count);
+static void light_compute_bounding_sphere(
+	long light_index,
+	boolean maximum,
+	boolean specular,
+	boolean lens_flare_only,
+	real_point3d *position,
+	real *radius);
 
 /* ---------- globals */
 
@@ -341,6 +389,86 @@ boolean lights_enable(
 	lights_game_globals->render_lights = enable;
 
 	return enable;
+}
+
+long light_new(
+	long definition_index,
+	long object_index,
+	short object_attachment_index,
+	short object_function_index,
+	short object_change_color_index)
+{
+	struct light_definition *definition = light_definition_get(definition_index);
+	long light_index = NONE;
+
+	if (TEST_FLAG(definition->flags, _light_definition_dynamic_bit)
+		|| definition->lens_flare.index != NONE)
+	{
+		light_index = datum_new(light_data);
+		if (light_index != NONE)
+		{
+			struct light_datum *light = light_get(light_index);
+
+			light->definition_index = definition_index;
+			light->object_index = object_index;
+			light->attachment_marker_index = object_attachment_index;
+			light->function_index = object_function_index;
+			light->color_function_index = object_change_color_index;
+			light->flags = 0;
+			SET_FLAG(light->flags, _point_light_dynamic_bit,
+				TEST_FLAG(definition->flags, _light_definition_dynamic_bit));
+			SET_FLAG(light->flags, _point_light_connects_to_map_bit,
+				TEST_FLAG(light->flags, _point_light_dynamic_bit)
+				|| definition->lens_flare.index != NONE);
+			light->cluster_reference = NONE;
+			light->parent_light_index = NONE;
+			light_reconnect_to_map(light_index);
+			light->marker = lights_globals.marker - 1;
+		}
+	}
+
+	return light_index;
+}
+
+long light_new_unattached(
+	long definition_index,
+	long object_index,
+	short object_node_index,
+	real_point3d const *position,
+	real_vector3d const *direction,
+	real scale)
+{
+	long light_index = datum_new(light_data);
+
+	if (light_index != NONE)
+	{
+		struct light_datum *light = light_get(light_index);
+		struct light_definition *definition = light_definition_get(definition_index);
+
+		light->flags = 0;
+		light->parent_light_index = game_time_get();
+		light->definition_index = definition_index;
+		light->object_index = object_index;
+		light->intensity_scale = scale;
+		light->cluster_reference = NONE;
+		SET_FLAG(light->flags, _point_light_dynamic_bit, TRUE);
+		SET_FLAG(light->flags, _point_light_connects_to_map_bit, TRUE);
+		if (object_index == NONE)
+		{
+			light->position = *position;
+			light->forward = *direction;
+		}
+		else
+		{
+			light->attachment_marker_index = object_node_index;
+			light->node.relative_position = *position;
+			light->node.relative_forward = *direction;
+		}
+		light_reconnect_to_map(light_index);
+		light->marker = lights_globals.marker - 1;
+	}
+
+	return light_index;
 }
 
 void light_delete(
@@ -451,6 +579,19 @@ static boolean light_mark(
 	return FALSE;
 }
 
+static boolean light_unmarked(
+	long light_index)
+{
+	struct light_datum *light = light_get(light_index);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\object_lights.c",
+		0x66F,
+		lights_globals.marker_initialized);
+
+	return lights_globals.marker != light->marker;
+}
+
 static void light_marker_end(
 	void)
 {
@@ -472,7 +613,7 @@ real light_attenuation(
 	return 1.0f - (distance * distance) / (radius * radius);
 }
 
-long code_00129100(
+long cluster_get_first_light(
 	long *reference_index,
 	short cluster_index)
 {
@@ -482,10 +623,243 @@ long code_00129100(
 		cluster_index);
 }
 
-long code_00129120(
+long cluster_get_next_light(
 	long *reference_index)
 {
 	return cluster_partition_get_next_datum(
 		&light_cluster_partition,
 		reference_index);
+}
+
+static void light_compute_bounding_sphere(
+	long light_index,
+	boolean maximum,
+	boolean specular,
+	boolean lens_flare_only,
+	real_point3d *position,
+	real *radius)
+{
+	struct light_datum *light = light_get(light_index);
+	struct light_definition *definition = light_definition_get(light->definition_index);
+	real light_radius = maximum
+		? definition->radius_modifier_upper_bound * definition->radius
+		: light->radius;
+
+	if (!TEST_FLAG(definition->flags, _light_definition_no_specular_bit)
+		&& (specular || maximum))
+	{
+		light_radius *= definition->specular_radius_multiplier;
+	}
+
+	if (lens_flare_only && light_radius < definition->lens_flare_radius)
+	{
+		*position = light->position;
+		*radius = definition->lens_flare_radius;
+	}
+	else if (definition->cutoff_angle >= _pi / 2)
+	{
+		*position = light->position;
+		*radius = light_radius;
+	}
+	else if (definition->cutoff_angle >= _pi / 4)
+	{
+		*radius = light_radius * definition->runtime_sine_cutoff_angle;
+		light_radius *= definition->runtime_cosine_cutoff_angle;
+		position->x = light_radius * light->forward.i + light->position.x;
+		position->y = light_radius * light->forward.j + light->position.y;
+		position->z = light_radius * light->forward.k + light->position.z;
+	}
+	else
+	{
+		light_radius /= definition->runtime_cosine_cutoff_angle;
+		*radius = light_radius;
+		position->x = light_radius * light->forward.i + light->position.x;
+		position->y = light_radius * light->forward.j + light->position.y;
+		position->z = light_radius * light->forward.k + light->position.z;
+	}
+
+	return;
+}
+
+void light_reconnect_to_map(
+	long light_index)
+{
+	struct light_datum *light = light_get(light_index);
+	struct object_marker markers[1];
+	struct location location;
+	real_point3d position;
+	real radius;
+
+	if (light->parent_light_index == NONE)
+	{
+		object_get_marker_by_name(
+			light->object_index,
+			object_get_attachment_marker_name(light->object_index, light->attachment_marker_index),
+			markers,
+			1);
+		light->position = markers[0].matrix.position;
+		light->forward = markers[0].matrix.forward;
+		light->up = markers[0].matrix.up;
+	}
+	else if (object_try_and_get(light->object_index))
+	{
+		real_matrix4x3 *node_matrix = object_get_node_matrix(light->object_index, light->attachment_marker_index);
+
+		matrix4x3_transform_point(node_matrix, &light->node.relative_position, &light->position);
+		matrix4x3_transform_normal(node_matrix, &light->node.relative_forward, &light->forward);
+		perpendicular3d(&light->forward, &light->up);
+		normalize3d(&light->up);
+	}
+
+	if (TEST_FLAG(light->flags, _point_light_connects_to_map_bit))
+	{
+		light_compute_bounding_sphere(
+			light_index,
+			TRUE,
+			FALSE,
+			TRUE,
+			&position,
+			&radius);
+		match_assert(
+			"c:\\halo\\SOURCE\\objects\\object_lights.c",
+			0x4F9,
+			!TEST_FLAG(light->flags, _point_light_connected_to_map_bit));
+		if (light->object_index != NONE && object_try_and_get(light->object_index))
+		{
+			object_get_location(light->object_index, &location);
+		}
+		else
+		{
+			scenario_location_from_point(&location, &position);
+		}
+		cluster_partition_reconnect(
+			&light_cluster_partition,
+			light_index,
+			&light->cluster_reference,
+			&position,
+			radius,
+			&location);
+		SET_FLAG(light->flags, _point_light_connected_to_map_bit, TRUE);
+	}
+
+	return;
+}
+
+static void find_point_lights_for_object_in_cluster(
+	long object_index,
+	short cluster_index,
+	real_point3d const *center,
+	real radius,
+	long *light_indices,
+	real *light_intensities,
+	real *light_attenuations,
+	short *light_count,
+	short maximum_light_count)
+{
+	long light_index;
+	long reference_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\object_lights.c",
+		0x544,
+		lights_globals.marker_initialized);
+	for (light_index = cluster_partition_get_first_datum(&light_cluster_partition, &reference_index, cluster_index);
+		light_index != NONE;
+		light_index = cluster_partition_get_next_datum(&light_cluster_partition, &reference_index))
+	{
+		if (light_unmarked(light_index))
+		{
+			struct light_datum *light = light_get(light_index);
+
+			if (light->rasterizer_light_index != NONE
+				&& (light->object_index != object_index
+					|| !TEST_FLAG(light_definition_get(light->definition_index)->flags,
+						_light_definition_dont_light_own_object_bit)))
+			{
+				real_point3d const *light_position = &light->position;
+				real distance = distance3d(light_position, center);
+
+				if (distance < radius + light->radius)
+				{
+					real attenuation = light_attenuation(light->radius, distance);
+					real intensity = real_rgb_color_brightness(&light->current_color) * attenuation;
+					short index;
+
+					if (*light_count < maximum_light_count)
+					{
+						index = (*light_count)++;
+					}
+					else
+					{
+						real minimum_intensity = REAL_MAX;
+						short dimmest_index = NONE;
+
+						for (index = 0; index < *light_count; index++)
+						{
+							if (minimum_intensity > light_intensities[index])
+							{
+								minimum_intensity = light_intensities[index];
+								dimmest_index = index;
+							}
+						}
+
+						if (minimum_intensity < intensity)
+						{
+							index = dimmest_index;
+						}
+					}
+
+					if (index < maximum_light_count)
+					{
+						light_indices[index] = light_index;
+						light_intensities[index] = intensity;
+						light_attenuations[index] = attenuation;
+					}
+				}
+			}
+			light_mark(light_index);
+		}
+	}
+
+	return;
+}
+
+void lights_prepare_for_object_dynamic(
+	long object_index,
+	struct render_lighting *lighting)
+{
+	struct object_cluster_iterator iterator;
+	real_point3d center;
+	real radius;
+	real light_intensities[MAXIMUM_RENDERED_POINT_LIGHTS];
+	real light_attenuations[MAXIMUM_RENDERED_POINT_LIGHTS];
+	short cluster_index;
+	short light_index;
+
+	object_get_bounding_sphere(object_index, &center, &radius);
+	lighting->point_light_count = 0;
+	light_marker_begin();
+	for (cluster_index = object_get_first_cluster(&iterator, object_index);
+		cluster_index != NONE;
+		cluster_index = object_get_next_cluster(&iterator, object_index))
+	{
+		find_point_lights_for_object_in_cluster(
+			object_index,
+			cluster_index,
+			&center,
+			radius,
+			lighting->point_light_indices,
+			light_intensities,
+			light_attenuations,
+			&lighting->point_light_count,
+			MAXIMUM_RENDERED_POINT_LIGHTS);
+	}
+	light_marker_end();
+	for (light_index = 0; light_index < lighting->point_light_count; light_index++)
+	{
+		lighting->point_light_indices[light_index] =
+			light_get(lighting->point_light_indices[light_index])->rasterizer_light_index;
+	}
+
+	return;
 }

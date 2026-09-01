@@ -96,12 +96,26 @@ boolean ai_try_vehicle_eviction(
 	long actor_index,
 	long entering_unit_index,
 	boolean immediate);
+boolean ai_test_ballistic_line_of_fire(
+	long actor_index,
+	union real_point3d const *origin,
+	real ticks,
+	union real_vector3d const *velocity,
+	real gravity,
+	long ignore_object_index,
+	boolean in_vehicle);
 
 boolean ai_release_inactive_swarms(char *result_description, unsigned char *more_to_release, unsigned char *working_memory, short working_memory_size);
 void ai_find_inactive_encounters(unsigned char *working_memory, short working_memory_size);
 boolean ai_release_inactive_encounters(char *result_description, unsigned char *more_to_release, unsigned char *working_memory, short working_memory_size);
 
-void ai_handle_damage(long unit_index, long shooter_object_index, short damage_category, float fraction, union real_vector3d *damage_velocity, boolean delayed);
+void ai_handle_damage(
+	long unit_index,
+	long shooter_object_index,
+	short damage_category,
+	real fraction,
+	union real_vector3d *damage_velocity,
+	boolean delayed);
 void ai_handle_enter_vehicle(
 	long unit_index,
 	long vehicle_index);

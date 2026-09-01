@@ -358,10 +358,9 @@ struct ai_profile_action_data
 	short action_change_count;
 };
 
-/* Kept local while encounters.h is being recovered in another lane.  The
- * January iterator is exactly three datum indices; callers consume the
+/* The January iterator is exactly three datum indices; callers consume the
  * current actor index after encounter_actor_iterator_next advances it. */
-struct actions_encounter_actor_iterator
+struct encounter_actor_iterator
 {
 	long encounter_index;
 	long actor_index;
@@ -546,13 +545,6 @@ void actor_perception_abandoned_search(
 boolean actor_action_consider_grenade(
 	long actor_index);
 
-void encounter_actor_iterator_new(
-	struct actions_encounter_actor_iterator *iterator,
-	long encounter_index);
-
-struct actor_datum *encounter_actor_iterator_next(
-	struct actions_encounter_actor_iterator *iterator);
-
 boolean actor_action_test_grenade(
 	long actor_index);
 
@@ -701,43 +693,12 @@ boolean actor_move_try_evasion_vector(
 	boolean *is_ledge,
 	void *collision_result);
 
-void actor_combat_fire_wildly(
-	long actor_index,
-	long ticks);
-
-void actor_combat_disable_bursts(
-	long actor_index,
-	long ticks);
-
-boolean actor_combat_find_grenade_target(
-	long actor_index,
-	real_point3d *grenade_target,
-	long *grenade_target_prop_index,
-	long *grenade_ignore_object_index);
-
-boolean actor_combat_check_collateral_damage(
-	long actor_index,
-	real enemy_radius,
-	real collateral_damage_radius,
-	real_point3d const *test_point,
-	short *threat_count);
-
-boolean actor_combat_plan_grenade_trajectory(
-	long actor_index,
-	short trajectory_type,
-	real_point3d const *grenade_target,
-	long grenade_target_prop_index,
-	long grenade_ignore_object_index);
-
 void actor_stimulus_was_surprised(
 	long actor_index);
 
 boolean actor_situation_try_new_target(
 	long actor_index,
 	long prop_index);
-
-struct actor_variant_definition *actor_combat_get_firing_variant_definition(
-	long actor_index);
 
 void action_sleep_control(
 	long actor_index);
@@ -2416,7 +2377,7 @@ long actor_pursuit_find_nearby_actors(
 
 	if (actor_count < desired_actor_count && actor->meta.encounter_index != NONE)
 	{
-		struct actions_encounter_actor_iterator actor_iterator;
+		struct encounter_actor_iterator actor_iterator;
 		struct actor_datum *friend_actor;
 
 		encounter_actor_iterator_new(

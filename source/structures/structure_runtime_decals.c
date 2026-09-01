@@ -50,17 +50,6 @@ struct structure_decals_globals
 	byte pad[3];
 };
 
-/* ---------- prototypes */
-
-long decal_new(
-	long definition_index,
-	real_point3d const *position,
-	real_vector3d const *normal,
-	real scale,
-	short layer,
-	short cluster_index,
-	boolean permanent);
-
 /* ---------- globals */
 
 struct structure_decals_globals *structure_decals_globals = NULL;
