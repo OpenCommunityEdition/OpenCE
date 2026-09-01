@@ -126,13 +126,13 @@ real_vector3d *uncompress_int32_to_real_vector3d(
 	real_vector3d *result,
 	unsigned long compressed);
 
-/* Bungie's own float-to-long conversion helper, recovered verbatim from the
+/* Bungie's own real-to-long conversion helper, recovered verbatim from the
    historical cseries.h.  January inlines it at every conversion below;
    ordinary C conversions lower through a 64-bit fistp under this compiler
    and cannot reproduce those chains.  Admitted by owner ruling 2026-08-30,
    kept unit-local so a shared-header __inline cannot perturb other units. */
 static __inline long fast_ftol(
-	float d)
+	real d)
 {
 	long result;
 
@@ -149,16 +149,16 @@ static __inline long fast_ftol(
 
 /* ---------- public code */
 
-float uncompress_int8_to_real(
+real uncompress_int8_to_real(
 	byte value)
 {
-	return (float)value * (1.0f / 255.0f);
+	return (real)value * (1.0f / 255.0f);
 }
 
-float uncompress_int16_to_real(
+real uncompress_int16_to_real(
 	short value)
 {
-	return ((float)value * 2.0f + 1.0f) * (1.0f / 65535.0f);
+	return ((real)value * 2.0f + 1.0f) * (1.0f / 65535.0f);
 }
 
 void rasterizer_geometry_byte_swap_vertices(
@@ -236,8 +236,8 @@ void environment_lightmap_vertex_compressed_get_texcoord(
 	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 486, vertex);
 	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 487, texcoord);
 
-	texcoord->n[0] = ((float)vertex->lightmap_u * 2.0f + 1.0f) * (1.0f / 65535.0f);
-	texcoord->n[1] = ((float)vertex->lightmap_v * 2.0f + 1.0f) * (1.0f / 65535.0f);
+	texcoord->n[0] = ((real)vertex->lightmap_u * 2.0f + 1.0f) * (1.0f / 65535.0f);
+	texcoord->n[1] = ((real)vertex->lightmap_v * 2.0f + 1.0f) * (1.0f / 65535.0f);
 
 	return;
 }
