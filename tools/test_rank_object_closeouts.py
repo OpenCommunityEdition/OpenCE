@@ -1,6 +1,8 @@
+import tempfile
 import unittest
+from pathlib import Path
 
-from tools.rank_object_closeouts import build_rankings
+from tools.rank_object_closeouts import build_rankings, discover_ledger_units
 
 
 class RankObjectCloseoutsTests(unittest.TestCase):
@@ -108,6 +110,17 @@ class RankObjectCloseoutsTests(unittest.TestCase):
 		self.assertEqual("source/fresh", rankings[0]["unit"])
 		self.assertEqual("LEDGER_REVIEW", rankings[1]["class"])
 		self.assertTrue(rankings[1]["object_ledger_present"])
+
+	def test_discovers_suffixed_object_ledger_without_prefix_collision(self):
+		report = {"units": [
+			self._unit("source/game/player", [("_f", 16)]),
+			self._unit("source/game/player_rumble", [("_g", 16)]),
+		]}
+		with tempfile.TemporaryDirectory() as directory:
+			Path(directory, "player_rumble_obj_jonas_closeout.md").touch()
+			self.assertEqual(
+				{"source/game/player_rumble"},
+				discover_ledger_units(report, directory))
 
 
 if __name__ == "__main__":

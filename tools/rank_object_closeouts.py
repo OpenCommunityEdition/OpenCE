@@ -57,6 +57,26 @@ def _integer(measures, key):
 		return 0
 
 
+def discover_ledger_units(report, ledger_dir):
+	"""Return report unit names with a canonical or suffixed object ledger."""
+	if not os.path.isdir(ledger_dir):
+		return set()
+
+	filenames = set(os.listdir(ledger_dir))
+	ledger_units = set()
+	for unit in report.get("units", []):
+		name = unit["name"]
+		basename = name.rsplit("/", 1)[-1]
+		canonical = basename + "_obj.md"
+		prefix = basename + "_obj_"
+		if canonical in filenames or any(
+			filename.startswith(prefix) and filename.endswith(".md")
+			for filename in filenames
+		):
+			ledger_units.add(name)
+	return ledger_units
+
+
 def build_rankings(
 	report,
 	semantic_report,
@@ -199,21 +219,13 @@ def main(argv=None):
 	args = parser.parse_args(argv)
 
 	try:
-		ledger_units = set()
-		if os.path.isdir(args.ledger_dir):
-			for filename in os.listdir(args.ledger_dir):
-				if filename.endswith("_obj.md"):
-					ledger_units.add(filename[:-7])
+		report = _load_json(args.report)
 		rankings = build_rankings(
-			_load_json(args.report),
+			report,
 			_load_json(args.semantic_report),
 			_load_json(args.config),
 			_load_json(args.parked),
-			ledger_units={
-				unit["name"]
-				for unit in _load_json(args.report).get("units", [])
-				if unit["name"].rsplit("/", 1)[-1] in ledger_units
-			})
+			ledger_units=discover_ledger_units(report, args.ledger_dir))
 	except RankingError as error:
 		print(error, file=sys.stderr)
 		return 2
