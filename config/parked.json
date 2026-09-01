@@ -600,6 +600,44 @@
         "base": { "size": 288, "relocation_count": 5, "normalized_sha256": "ff9a7477deb2aa304240db075c9182d629f8b82c13cf4e4c48a51af1efc5170a" },
         "objdiff_percent": 94.7
       }
+    },
+    {
+      "unit": "source/memory/lruv_cache",
+      "function": "_lruv_block_new",
+      "class": "register-allocation",
+      "evidence": "The retained body is coherent typed C recovered in local donor commit 1ed2fd9efa4a322edd654d5fe9caf47ed2fe8e59 and independently corroborated at the control-flow and semantic level by Aerocatia/demon commit edb96c7614b80b4a80a3b0cee5c5fb7c7804a3c7. The public donor is used only as a semantic oracle: canonical helper names, types, assertions, and ring macros remain authoritative. Unlike the frozen historical candidate, this natural body needs no _ReadWriteBarrier, volatile access, fake dependency, raw address, or foreign local prototype; it initializes one new_block_index, scans holes with a typed best_hole, uses the named ring macro, and returns through one common path. Target and base now share the 1312-byte and 48-relocation envelope. The remaining divergence begins in the first callee-saved register cycle and is classified as register allocation. Reopen only for authenticated January source or a natural same-compiler lifetime fact that changes that cycle.",
+      "measurements": {
+        "target": {
+          "size": 1312,
+          "relocation_count": 48,
+          "normalized_sha256": "d008a8c97b45d969b3d824f6e3daa6caa018c04e9092b80c4ec64d84e3ab954b"
+        },
+        "base": {
+          "size": 1312,
+          "relocation_count": 48,
+          "normalized_sha256": "9420f4204689f729b2a0ad60ec74481598e2c207d13e312eccdf559f614e3b5b"
+        },
+        "objdiff_percent": 94.18722
+      }
+    },
+    {
+      "unit": "source/items/weapons",
+      "function": "_weapon_can_be_fired",
+      "class": "unclassified",
+      "evidence": "The retained typed-C reconstruction comes from local donor commit 1ed2fd9efa4a322edd654d5fe9caf47ed2fe8e59. Its behavior is independently corroborated by the readable Pastudan disassembly lift at src/halo/items/weapons.c: a weapon younger than one tick cannot fire, and a game-engine weapon with a finite magazine cannot fire only when both loaded and reserve rounds are empty. The owner prototype remains in source/items/weapons.h; no foreign local prototype, raw address, code_ADDRESS name, undefined behavior, fake dependency, or compiler steering was introduced. The candidate has the exact 144-byte and five-relocation envelope but only 25 percent fuzzy similarity, so the weapons zoom ledger correctly grants no exact credit. The residual is intentionally unclassified rather than inventing a register-allocation recipe. Reopen for authenticated source or a natural target-specific lifetime/control-flow donor.",
+      "measurements": {
+        "target": {
+          "size": 144,
+          "relocation_count": 5,
+          "normalized_sha256": "ba8b3806624808498c9815871e5b6e94428c0dac363ca1543591f6530687cedc"
+        },
+        "base": {
+          "size": 144,
+          "relocation_count": 5,
+          "normalized_sha256": "8d10523e3c79ff0b6fd2058db7ae29902a19777aa55504053a033e61f916f91e"
+        },
+        "objdiff_percent": 25.0
+      }
     }
   ]
 }

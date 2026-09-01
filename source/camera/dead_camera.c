@@ -130,9 +130,14 @@ void dead_camera_new(
 	player_index = local_player_get_player_index(local_player_index);
 	camera->player_index = player_index;
 
-	camera->unit_index = unit_index == NONE
-		? player_get(player_index)->dead_unit_index
-		: unit_index;
+	if (unit_index == NONE)
+	{
+		camera->unit_index = player_get(player_index)->dead_unit_index;
+	}
+	else
+	{
+		camera->unit_index = unit_index;
+	}
 	camera->current_player_index = camera->player_index;
 
 	return;
