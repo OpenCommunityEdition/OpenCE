@@ -415,6 +415,32 @@ char const *weapon_get_label(
 	return label;
 }
 
+boolean weapon_can_be_fired(
+	long weapon_index)
+{
+	struct weapon_datum *weapon = weapon_get(weapon_index);
+	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
+
+	if (weapon->weapon.age>=1.0f)
+		return FALSE;
+
+	if (game_engine_running() && weapon_definition->weapon.magazines.count>0)
+	{
+		struct weapon_magazine_definition *magazine_definition =
+			TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, 0,
+				struct weapon_magazine_definition);
+
+		if (magazine_definition->rounds_loaded_maximum>0 &&
+			weapon->weapon.magazines[0].rounds_loaded==0 &&
+			weapon->weapon.magazines[0].rounds_total==0)
+		{
+			return FALSE;
+		}
+	}
+
+	return TRUE;
+}
+
 boolean weapon_useful(
 	long weapon_index)
 {

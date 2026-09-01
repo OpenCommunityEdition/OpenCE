@@ -102,10 +102,14 @@ symbols in this file:
 
 enum
 {
-	LRUV_CACHE_SIGNATURE = 'weee'
+	LRUV_CACHE_SIGNATURE = 'weee',
+	MAXIMUM_LRUV_CACHE_HOLES = 256
 };
 
 /* ---------- macros */
+
+#define NEXT_HOLE_INDEX(index) \
+	((index)==MAXIMUM_LRUV_CACHE_HOLES-1 ? 0 : (index)+1)
 
 #define lruv_cache_block_get(cache, block_index) \
 	((struct lruv_cache_block *)datum_get((cache)->blocks, (block_index)))
@@ -526,16 +530,16 @@ long lruv_block_new(
 	struct lruv_cache *cache,
 	long size)
 {
-#define index datum_index
-	struct lruv_cache_hole holes[256];
+	struct lruv_cache_hole holes[MAXIMUM_LRUV_CACHE_HOLES];
+	struct lruv_cache_hole best_hole;
 	struct data_iterator iterator;
 	struct lruv_cache_block *block;
 	struct lruv_cache_block *next_block;
 	struct lruv_cache_block *new_block;
+	struct lruv_cache_hole *hole;
 	short hole_index;
 	short hole_read_index;
 	short hole_write_index;
-	short saved_hole_index;
 	long desired_page_count;
 	long page_index;
 	long block_index;
@@ -546,211 +550,202 @@ long lruv_block_new(
 	long oldest_unlocked_block_index;
 	unsigned long oldest_unlocked_tick;
 	boolean found_hole;
-	long found_block_index;
-	unsigned long found_last_used_tick;
-	long found_first_page_index;
-	long found_page_count;
 	long new_block_index;
+#define index datum_index
 
 	desired_page_count = lruv_cache_bytes_to_pages(cache, size);
 	found_hole = FALSE;
+	new_block_index = NONE;
 	oldest_unlocked_block_index = NONE;
 	match_assert(
 		"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
 		225,
 		desired_page_count>0);
 
-	page_index = 0;
-	hole_write_index = 0;
 	hole_read_index = 0;
+	hole_write_index = 0;
 	pending_block_index = NONE;
+	page_index = 0;
 	block_index = cache->first_block_index;
 
 	while (page_index < cache->page_count)
 	{
 		locked = FALSE;
-		hole_index = hole_write_index == 255 ? 0 : hole_write_index + 1;
-		if (hole_index != hole_read_index)
+
+		if (NEXT_HOLE_INDEX(hole_write_index) != hole_read_index)
 		{
-			holes[hole_write_index].block_index = pending_block_index;
-			holes[hole_write_index].last_used_tick = 0;
-			holes[hole_write_index].first_page_index = page_index;
-			holes[hole_write_index].page_count = 0;
-			hole_write_index = hole_write_index == 255 ? 0 : hole_write_index + 1;
+			hole = &holes[hole_write_index];
+			hole->block_index = pending_block_index;
+			hole->first_page_index = page_index;
+			hole->last_used_tick = 0;
+			hole->page_count = 0;
+			hole_write_index = NEXT_HOLE_INDEX(hole_write_index);
 		}
 
 		if (block_index == NONE)
 		{
-			page_count = cache->page_count - page_index;
 			last_used_tick = 0;
+			page_count = cache->page_count - page_index;
 			page_index = cache->page_count;
 		}
 		else
-			goto process_block;
-
-	accumulate_holes:
-		hole_index = hole_read_index;
-		while (hole_index != hole_write_index)
 		{
-			saved_hole_index = hole_index;
-			if (last_used_tick > holes[hole_index].last_used_tick)
-				holes[hole_index].last_used_tick = last_used_tick;
-			holes[hole_index].page_count += page_count;
-			if (holes[hole_index].page_count >= desired_page_count)
+			block = datum_get(cache->blocks, block_index);
+			if (page_index == block->first_page_index)
 			{
-				if (!found_hole ||
-					holes[hole_index].last_used_tick < found_last_used_tick ||
-					(holes[hole_index].last_used_tick == found_last_used_tick &&
-					 holes[hole_index].page_count < found_page_count))
+				last_used_tick = block->last_used_tick;
+				page_count = block->page_count;
+				locked = cache->locked_block_proc &&
+					cache->locked_block_proc(block_index);
+				if ((unsigned long)block->last_used_tick == (unsigned long)cache->tick)
+					locked = TRUE;
+				else if (!locked &&
+					(oldest_unlocked_block_index == NONE ||
+					(unsigned long)block->last_used_tick < oldest_unlocked_tick))
 				{
-					found_block_index = holes[hole_index].block_index;
-					found_last_used_tick = holes[hole_index].last_used_tick;
-					found_first_page_index = holes[hole_index].first_page_index;
-					found_page_count = holes[hole_index].page_count;
-					found_hole = TRUE;
+					oldest_unlocked_block_index = block_index;
+					oldest_unlocked_tick = block->last_used_tick;
 				}
 
+				page_index = block->first_page_index + block->page_count;
+				pending_block_index = block_index;
+				block_index = block->next_block_index;
+			}
+			else
+			{
+				last_used_tick = 0;
+				page_count = block->first_page_index - page_index;
 				match_assert(
 					"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
-					351,
-					hole_read_index==hole_index);
-				hole_read_index = hole_read_index == 255 ? 0 : hole_read_index + 1;
+					311,
+					page_count>0);
+				page_index = block->first_page_index;
 			}
-
-			hole_index = saved_hole_index == 255 ? 0 : saved_hole_index + 1;
 		}
-		goto loop_complete;
 
-	process_block:
-		block = datum_get(cache->blocks, block_index);
-		if (page_index == block->first_page_index)
-		{
-			last_used_tick = block->last_used_tick;
-			page_count = block->page_count;
-			if (cache->locked_block_proc && cache->locked_block_proc(block_index))
-				locked = TRUE;
-			if ((unsigned long)block->last_used_tick == (unsigned long)cache->tick)
-				locked = TRUE;
-			else if (!locked &&
-				(oldest_unlocked_block_index == NONE ||
-				(unsigned long)block->last_used_tick < oldest_unlocked_tick))
-			{
-				oldest_unlocked_block_index = block_index;
-				oldest_unlocked_tick = block->last_used_tick;
-			}
-
-			pending_block_index = block_index;
-			block_index = block->next_block_index;
-			page_index = block->first_page_index + block->page_count;
-			if (!locked)
-				goto accumulate_holes;
+		if (locked)
 			hole_read_index = hole_write_index;
-		}
 		else
 		{
-			page_count = block->first_page_index - page_index;
-			last_used_tick = 0;
-			match_assert(
-				"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
-				311,
-				page_count>0);
-			page_index = block->first_page_index;
-			goto accumulate_holes;
-		}
+			hole_index = hole_read_index;
+			while (hole_index != hole_write_index)
+			{
+				hole = &holes[hole_index];
+				if (last_used_tick > hole->last_used_tick)
+					hole->last_used_tick = last_used_tick;
+				hole->page_count += page_count;
+				if (hole->page_count >= desired_page_count)
+				{
+					if (!found_hole ||
+						hole->last_used_tick < best_hole.last_used_tick ||
+						(hole->last_used_tick == best_hole.last_used_tick &&
+						 hole->page_count < best_hole.page_count))
+					{
+						best_hole = *hole;
+						found_hole = TRUE;
+					}
 
-	loop_complete:
-		;
+					match_assert(
+						"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+						351,
+						hole_read_index==hole_index);
+					hole_read_index = NEXT_HOLE_INDEX(hole_read_index);
+				}
+
+				hole_index = NEXT_HOLE_INDEX(hole_index);
+			}
+		}
 	}
 
-	if (!found_hole)
-		return NONE;
-
-	data_iterator_new(&iterator, cache->blocks);
-	while ((block = data_iterator_next(&iterator)) != NULL)
+	if (found_hole)
 	{
-		if (block->first_page_index < found_first_page_index + desired_page_count &&
-			block->first_page_index + block->page_count > found_first_page_index)
+		data_iterator_new(&iterator, cache->blocks);
+		while ((block = data_iterator_next(&iterator)) != NULL)
 		{
-			match_assert(
-				"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
-				375,
-				!cache->locked_block_proc || !cache->locked_block_proc(iterator.index));
-			lruv_block_delete(cache, iterator.datum_index);
-		}
-	}
-
-	if (cache->blocks->actual_count == cache->blocks->maximum_count &&
-		oldest_unlocked_block_index != NONE)
-	{
-		if (found_block_index == oldest_unlocked_block_index)
-		{
-			block = datum_get(cache->blocks, oldest_unlocked_block_index);
-			found_block_index = block->previous_block_index;
-		}
-		match_assert(
-			"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
-			392,
-			lruv_cache_block_get(cache, oldest_unlocked_block_index));
-		match_assert(
-			"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
-			393,
-			!cache->locked_block_proc || !cache->locked_block_proc(oldest_unlocked_block_index));
-		lruv_block_delete(cache, oldest_unlocked_block_index);
-	}
-
-	new_block_index = datum_new(cache->blocks);
-	if (new_block_index != NONE)
-	{
-		new_block = datum_get(cache->blocks, new_block_index);
-		if (found_block_index == NONE)
-		{
-			if (cache->first_block_index == NONE)
+			if (block->first_page_index < best_hole.first_page_index + desired_page_count &&
+				block->first_page_index + block->page_count > best_hole.first_page_index)
 			{
 				match_assert(
 					"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
-					408,
-					cache->last_block_index==NONE);
-				new_block->previous_block_index = NONE;
-				cache->last_block_index = new_block_index;
-				new_block->next_block_index = cache->first_block_index;
-				cache->first_block_index = new_block_index;
+					375,
+					!cache->locked_block_proc || !cache->locked_block_proc(iterator.index));
+				lruv_block_delete(cache, iterator.datum_index);
 			}
-			else
-			{
-				next_block = datum_get(cache->blocks, cache->first_block_index);
-				match_assert(
-					"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
-					416,
-					next_block->previous_block_index==NONE);
-				new_block->previous_block_index = NONE;
-				next_block->previous_block_index = new_block_index;
-				new_block->next_block_index = cache->first_block_index;
-				cache->first_block_index = new_block_index;
-			}
-		}
-		else
-		{
-			block = datum_get(cache->blocks, found_block_index);
-			if (block->next_block_index != NONE)
-			{
-				next_block = datum_get(cache->blocks, block->next_block_index);
-				new_block->previous_block_index = next_block->previous_block_index;
-				next_block->previous_block_index = new_block_index;
-			}
-			else
-			{
-				new_block->previous_block_index = cache->last_block_index;
-				cache->last_block_index = new_block_index;
-			}
-			block = datum_get(cache->blocks, found_block_index);
-			new_block->next_block_index = block->next_block_index;
-			block->next_block_index = new_block_index;
 		}
 
-		new_block->first_page_index = found_first_page_index;
-		new_block->page_count = desired_page_count;
-		new_block->last_used_tick = cache->tick;
-		lruv_cache_verify(cache, TRUE);
+		if (cache->blocks->actual_count == cache->blocks->maximum_count &&
+			oldest_unlocked_block_index != NONE)
+		{
+			if (best_hole.block_index == oldest_unlocked_block_index)
+			{
+				block = datum_get(cache->blocks, oldest_unlocked_block_index);
+				best_hole.block_index = block->previous_block_index;
+			}
+			match_assert(
+				"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+				392,
+				lruv_cache_block_get(cache, oldest_unlocked_block_index));
+			match_assert(
+				"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+				393,
+				!cache->locked_block_proc || !cache->locked_block_proc(oldest_unlocked_block_index));
+			lruv_block_delete(cache, oldest_unlocked_block_index);
+		}
+
+		new_block_index = datum_new(cache->blocks);
+		if (new_block_index != NONE)
+		{
+			new_block = datum_get(cache->blocks, new_block_index);
+			if (best_hole.block_index == NONE)
+			{
+				if (cache->first_block_index == NONE)
+				{
+					match_assert(
+						"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+						408,
+						cache->last_block_index==NONE);
+					new_block->previous_block_index = NONE;
+					cache->last_block_index = new_block_index;
+					new_block->next_block_index = cache->first_block_index;
+					cache->first_block_index = new_block_index;
+				}
+				else
+				{
+					next_block = datum_get(cache->blocks, cache->first_block_index);
+					match_assert(
+						"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+						416,
+						next_block->previous_block_index==NONE);
+					new_block->previous_block_index = NONE;
+					next_block->previous_block_index = new_block_index;
+					new_block->next_block_index = cache->first_block_index;
+					cache->first_block_index = new_block_index;
+				}
+			}
+			else
+			{
+				block = datum_get(cache->blocks, best_hole.block_index);
+				if (block->next_block_index == NONE)
+				{
+					new_block->previous_block_index = cache->last_block_index;
+					cache->last_block_index = new_block_index;
+				}
+				else
+				{
+					next_block = datum_get(cache->blocks, block->next_block_index);
+					new_block->previous_block_index = next_block->previous_block_index;
+					next_block->previous_block_index = new_block_index;
+				}
+				block = datum_get(cache->blocks, best_hole.block_index);
+				new_block->next_block_index = block->next_block_index;
+				block->next_block_index = new_block_index;
+			}
+
+			new_block->first_page_index = best_hole.first_page_index;
+			new_block->page_count = desired_page_count;
+			new_block->last_used_tick = cache->tick;
+			lruv_cache_verify(cache, TRUE);
+		}
 	}
 
 	return new_block_index;
