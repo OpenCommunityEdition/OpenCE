@@ -45,8 +45,15 @@ struct shader_effect_definition
 	short framebuffer_blend_function;
 	byte reserved_before_bitmap[32];
 	struct tag_reference bitmap;
-	byte reserved_runtime[88];
+	byte reserved_before_secondary_map_radius[60];
+	real secondary_map_radius;
+	byte reserved_after_secondary_map_radius[24];
 };
+
+typedef char shader_effect_secondary_map_radius_offset_assert[
+	offsetof(struct shader_effect_definition, secondary_map_radius) == 0x98 ? 1 : -1];
+typedef char shader_effect_definition_size_assert[
+	sizeof(struct shader_effect_definition) == 0xB4 ? 1 : -1];
 
 /* ---------- prototypes/SHADER_DEFINITIONS.C */
 

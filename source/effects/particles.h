@@ -12,13 +12,21 @@ header included in hcex build.
 #include "math/real_math.h"
 #include "memory/data.h"
 #include "objects/objects.h"
+#include "shaders/shader_definitions.h"
 #include "tag_files/tag_groups.h"
 
 /* ---------- constants */
 
-enum particle_datum_flags
+enum particle_flags
 {
-	_particle_datum_attached_to_local_player_bit = 6
+	_particle_datum_animates_backwards_bit = 0,
+	_particle_datum_at_rest_bit,
+	_particle_datum_u_mirror_bit,
+	_particle_datum_v_mirror_bit,
+	_particle_datum_dont_draw_first_person_bit,
+	_particle_datum_dont_draw_third_person_bit,
+	_particle_datum_attached_to_local_player_bit,
+	NUMBER_OF_PARTICLE_FLAGS,
 };
 
 enum
@@ -56,26 +64,58 @@ struct particle_datum
 	long definition_index;
 	long object_index;
 	short node_index;
-	byte unknownE;
+	byte state;
 	byte local_player_index;
-	byte unknown10[4];
+	long last_rendered_frame_index;
 	real age;
 	real lifespan;
-	byte unknown1C[0x0C];
+	real frame_time;
+	real frame_span;
+	short sequence_index;
+	short frame_index;
 	struct location location;
 	real_point3d position;
-	byte unknown3C[0x20];
+	real_vector3d direction;
+	real_vector3d translational_velocity;
+	real rotation;
+	real angular_velocity;
 	real radius;
-	byte unknown60[0x10];
+	real_argb_color color;
 };
 
 struct particle_definition
 {
-	byte unknown0[0x58];
+	unsigned long flags;
+	struct tag_reference bitmap;
+	struct tag_reference physics;
+	struct tag_reference collision_material_effects;
+	long reserved34;
+	real life_span_lower_bound;
+	real life_span_upper_bound;
+	real fade_in_time;
+	real fade_out_time;
+	struct tag_reference collision_effect;
 	struct tag_reference effect;
-	byte unknown68[0x0C];
+	real minimum_pixels;
+	long reserved6C[2];
 	real radius_lower_bound;
 	real radius_upper_bound;
+	long reserved7C;
+	real frames_per_second_lower_bound;
+	real frames_per_second_upper_bound;
+	real frames_per_second_contact_deterioration;
+	real lod_falloff;
+	real lod_cutoff;
+	long reserved94;
+	short first_sequence_index;
+	short initial_sequence_count;
+	short looping_sequence_count;
+	short final_sequence_count;
+	long reservedA0[2];
+	real runtime_oo_width;
+	short sprite_orientation;
+	word padAE;
+	struct shader_effect_definition shader;
 };
 
 typedef char particle_datum_size_assert[
@@ -100,12 +140,18 @@ typedef char particle_datum_position_offset_assert[
 	offsetof(struct particle_datum, position) == 0x30 ? 1 : -1];
 typedef char particle_datum_radius_offset_assert[
 	offsetof(struct particle_datum, radius) == 0x5C ? 1 : -1];
+typedef char particle_datum_color_offset_assert[
+	offsetof(struct particle_datum, color) == 0x60 ? 1 : -1];
 typedef char particle_definition_radius_lower_bound_offset_assert[
 	offsetof(struct particle_definition, radius_lower_bound) == 0x74 ? 1 : -1];
 typedef char particle_definition_radius_upper_bound_offset_assert[
 	offsetof(struct particle_definition, radius_upper_bound) == 0x78 ? 1 : -1];
 typedef char particle_definition_effect_offset_assert[
 	offsetof(struct particle_definition, effect) == 0x58 ? 1 : -1];
+typedef char particle_definition_shader_offset_assert[
+	offsetof(struct particle_definition, shader) == 0xB0 ? 1 : -1];
+typedef char particle_definition_size_assert[
+	sizeof(struct particle_definition) == 0x164 ? 1 : -1];
 
 #define particle_get(index) ((struct particle_datum *)datum_get(particle_data, (index)))
 #define particle_definition_get(index) ((struct particle_definition *)tag_get(PARTICLE_TAG, (index)))

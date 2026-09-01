@@ -13,6 +13,23 @@ header included in hcex build.
 #include "math/real_math.h"
 #include "shaders/shader_definitions.h"
 
+/* ---------- constants */
+
+enum build_sprites_flags
+{
+	_build_sprites_screen_space_bit = 0,
+	_build_sprites_first_person_bit,
+	NUMBER_OF_BUILD_SPRITES_FLAGS,
+};
+
+enum build_sprite_flags
+{
+	_build_sprite_viewer_space_bit = 0,
+	_build_sprite_u_mirror_bit,
+	_build_sprite_v_mirror_bit,
+	NUMBER_OF_BUILD_SPRITE_FLAGS,
+};
+
 /* ---------- structures */
 
 struct build_sprite_data

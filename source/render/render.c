@@ -61,6 +61,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "render.h"
+#include "render_particles.h"
 #include "objects.h"
 #include "scenario.h"
 #include "structure_bsp_definitions.h"
@@ -187,8 +188,6 @@ void structure_render_transparent_geometry(
 void structure_render_fog(
 	void);
 void weather_particle_systems_render(
-	void);
-void render_particles(
 	void);
 void particle_systems_render(
 	void);
