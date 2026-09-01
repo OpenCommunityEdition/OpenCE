@@ -121,15 +121,24 @@ changed VC7 allocation in two unrelated exact functions:
 That content was fully reverted; `render.h` now hashes identically to its base
 blob.  A dedicated `render_particles.h` owns the function and global
 declarations, and `render.c` includes it instead of carrying a foreign local
-prototype.  The frustum helper stays in `render_cameras.h`, sprite flags stay
-in `render_sprite.h`, director perspective stays in `director.h`, and particle
+prototype.  The isolated lane initially placed the frustum helper in broad
+`render_cameras.h`.  The combined canonical build exposed another VC7
+definition-position interaction that the isolated sweep had missed:
+`unit_preprocess_node_orientations` fell from exact to residual solely while
+that prototype was visible through `render.h`.  The public header was restored
+byte-for-byte and the declaration moved to `render_cameras_internal.h`, a
+narrow cross-translation-unit interface owned by `render_cameras.c` and
+consumed only by `render_particles.c`.  This restored `units.obj` to 189/189
+without changing the particle candidate hash.  Sprite flags stay in
+`render_sprite.h`, director perspective stays in `director.h`, and particle
 and shader fields stay with their owning types.
 
 A fresh targeted compile sweep covered all direct and transitive consumers of
 the touched headers.  No previously exact function was lost.  This is the
 direct-includer blast radius before transitive expansion was: `director.h` 7
 translation units, `particles.h` 3, `render_particles.h` 2,
-`render_cameras.h` 2, `render_sprite.h` 3, and `shader_definitions.h` 7.
+`render_cameras_internal.h` 1, `render_sprite.h` 3, and
+`shader_definitions.h` 7.  The broad `render_cameras.h` is no longer changed.
 The integration checklist after expanding nested includes was:
 
 | affected unit | exact functions retained |
@@ -173,8 +182,9 @@ The transitive shader consumers `effects/decals`,
 `rasterizer/rasterizer_frame_statistics`, `rasterizer/rasterizer_debug`,
 `saved games/game_state`, `rasterizer/common/rasterizer_common`,
 `interface/terminal`, and `objects/objects` also lost zero exact functions.
-`effects/decals` incidentally moved from 14 to 15 exact functions; that is only
-a checkpoint observation until the orchestrator's full build confirms it.
+`effects/decals` moved from 14 to 15 exact functions.  The orchestrator's full
+build confirmed the gain, so the now-stale park for
+`decals_delete_permanent_from_cluster` was removed.
 
 ## Reopen rule and verification scope
 
@@ -183,7 +193,9 @@ authoritative January source/local-variable records or a natural same-compiler
 lifetime donor explains the remaining stack-coloring differences while
 preserving the authenticated one-pointer topology.
 
-This isolated closeout used fresh VC7 compiles, strict per-function normalized
+The isolated closeout used fresh VC7 compiles, strict per-function normalized
 hash/relocation comparison, the 43-unit exact-loss sweep, and `objdiff-cli`.
-It intentionally did not run `configure.py`, a full Ninja build, commit, or
-push; those remain orchestrator integration steps.
+Canonical integration then ran a full configure/Ninja build, a 571-object
+exact-function sweep with zero losses, parked-ledger validation, and the full
+test suite.  The combined sentinel was authoritative where it disagreed with
+the isolated header sweep.

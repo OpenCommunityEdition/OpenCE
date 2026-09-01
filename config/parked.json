@@ -425,17 +425,6 @@
     },
     {
       "unit": "source/effects/decals",
-      "function": "_decals_delete_permanent_from_cluster",
-      "class": "unclassified",
-      "evidence": "The retained ordinary-C implementation uses the recovered typed decal_datum and the five-layer linked-list traversal corroborated by January's assertion strings and line numbers and by the later HCEA reconstruction. Target and candidate have the same 0x190 padded envelope and all 29 relocation addresses, types, and destinations. Their only normalized-byte residual is an adjacent load-order difference at +0x13D/+0x140 after the decal loop: January reloads layer with `mov esi,[ebp-4]` before cluster_index with `mov ebx,[ebp+8]`, while the current VC7 build emits those two reads in the opposite order; every other normalized byte agrees. The fail-closed blocker classifier reports UNKNOWN because its generic rule does not prove independence between two memory operands, so this park deliberately claims no compiler recipe. An earlier wider scratch translation unit matched this function exactly, but it also retained the legacy `struct decal` representation and additional unrecovered neighboring bodies; preserving that obsolete context solely for its codegen side effect would be a function-only false positive. No volatile access, barrier, fake dependency, inline assembly, pragma, or compiler-control attribute is retained. Reopen for authoritative January source or local-lifetime evidence, or when naturally recovering the remaining same-TU functions restores the historical compiler context.",
-      "measurements": {
-        "target": { "size": 400, "relocation_count": 29, "normalized_sha256": "b3eeb427eeef1e02f793286b1011a5b89822e041f0b442759259255e1117220a" },
-        "base": { "size": 400, "relocation_count": 29, "normalized_sha256": "6fb830e33513eb040f0ff7cb46cc9167d30a96893dedb145370b416426025ffd" },
-        "objdiff_percent": 99.81035
-      }
-    },
-    {
-      "unit": "source/effects/decals",
       "function": "_decal_update",
       "class": "unclassified",
       "evidence": "The retained helper is coherent typed decal-aging source under the HCEA/PDB-authenticated private name `static void decal_update(long)`. It resets decal intensity, preserves permanent decals, fades finite-lifetime decals with cseries flag macros, releases locked-count ownership once, and deletes expired rasterizer vertices. Defining the helper in the same translation unit is required: VC7 rejects an undefined static prototype with C2129, and the complete private definition naturally gives the strict-exact public decals_update wrapper its January EDI live-in call convention without a fabricated ABI declaration. The remaining helper residual combines register/x87 scheduling with January's 32-bit inline FISTP conversion; ordinary C emits __ftol2, while /QIfist emits the wrong qword FISTP. No inline assembly, compiler flag, volatile access, register forcing, dead dependency, or fake control flow is retained. Reopen only for authoritative January source or a natural same-compiler helper/math spelling that emits the dword conversion and surrounding schedule.",
@@ -770,6 +759,158 @@
           "normalized_sha256": "47bcacd072921ce5ae46bb953f730061896e6db84e7a8e2a2c5fdfd82136f548"
         },
         "objdiff_percent": 84.69773
+      }
+    },
+    {
+      "unit": "source/rasterizer/rasterizer_transparent_geometry",
+      "function": "_rasterizer_transparent_geometry_initialize",
+      "class": "instruction-scheduling",
+      "evidence": "The retained ordinary C is the complete transparent-geometry lifecycle initializer: it allocates the primary 384-group pool, the 384-entry sorted-index array, and the secondary 32-group pool with the January source path and line numbers, clears both group counts, reports the attested silent allocation error, and initializes the Xbox auxiliary buffer. This topology is independently corroborated by the later HCEA implementation, the Stian lift, and the historical b6adf6705 donor. Target and candidate share the 160-byte padded envelope, 51-instruction count, and all 16 logical relocation destinations. The sole fixed point is block placement: January keeps the error block before the auxiliary-buffer call, while VC7 lays out the success call before the error block and uses SETNE for the successful return. Four documented natural result-lifetime/error-path families, public donors, and a 1,571-worktree census produced the same candidate hash or regressed it. No assembly, volatile access, barrier, fake dependency, dead branch, raw address, or optimizer-only carrier is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor that explains this block order.",
+      "measurements": {
+        "target": {
+          "size": 160,
+          "relocation_count": 16,
+          "normalized_sha256": "63251d0d8cc730b0de774a4c06b489f06bd0af5849fa8281705d46e40473e678"
+        },
+        "base": {
+          "size": 160,
+          "relocation_count": 16,
+          "normalized_sha256": "15f6dc8cbb204d551c2c25b60baf4e21ca760125fc43678f40cb24a48fcbdbe4"
+        },
+        "objdiff_percent": 76.0
+      }
+    },
+    {
+      "unit": "source/rasterizer/rasterizer_transparent_geometry",
+      "function": "_rasterizer_sort_external",
+      "class": "register-allocation",
+      "evidence": "The retained ordinary C is the cross-build HCEA rasterizer_sort_external topology: fill the short sorted-index array with identity order while invoking rasterizer_sort_internal, qsort it with group_sorted_indices_cmpfn, then stamp each group's resulting sorted_index. The semantic names replace the former address placeholders in both source and the symbol atlas. Target and candidate share the 176-byte padded envelope and 14 logical relocation destinations. The residual is VC7 lifetime allocation and scheduling: January forms the first-pass group through ECX from an EDX base and delays loading the qsort base, while the natural candidate uses EAX/ECX and loads that base earlier. Direct-expression, block-local-pointer, pre-test-index, Pastudan loop-local pointer, HCEA, declaration-order, and register-lifetime families are already exhausted; the best natural trial aligned the tail but not the first-pass allocation. No assembly, volatile/register forcing, barrier, fake dependency, raw offset, or synthetic control flow is retained. Reopen only for authoritative January local/statement provenance or a strict same-compiler C donor that naturally emits the target allocation.",
+      "measurements": {
+        "target": {
+          "size": 176,
+          "relocation_count": 14,
+          "normalized_sha256": "4f78b8476535a901325781b67d7ed04665e59478fb419ddd0c607c95220655d5"
+        },
+        "base": {
+          "size": 176,
+          "relocation_count": 14,
+          "normalized_sha256": "30cd227ef42506ffe5a4050491eff57faef6a200cbffc05301077bca69f40a50"
+        },
+        "objdiff_percent": 80.08772
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_utilities",
+      "function": "_bitmap_2d_shrink",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked under the current house rule after selectively reconciling the coherent typed donor body and corroborating its 2D shrink topology and semantic private name against HCEA commit 570c83fd9c365dad6f2a3e7041705d5b84c7847c. Target and candidate have the same 656-byte padded envelope and all 18 relocation identities. The candidate is 244 instructions versus January's 245; the remaining gap begins in the nested sample loop, where VC7 chooses the opposite accumulator operand, address-call setup, and channel-sum register schedule before reconverging. The retained source uses bitmap_data fields, cseries types and macros, named enum constants, and ordinary loops; no volatile access, barrier, artificial alias, undefined behavior, manual offset logic, assembly, or nonsensical exact-only control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler declaration/lifetime donor.",
+      "measurements": {
+        "target": {
+          "size": 656,
+          "relocation_count": 18,
+          "normalized_sha256": "e032c32d2cf00f0b14b44627abd321b829450ea9d964b379b1ad51969755c87c"
+        },
+        "base": {
+          "size": 656,
+          "relocation_count": 18,
+          "normalized_sha256": "bf78c45c893b86a2ac84467a577030719437cc0f2c6018219368533a0fbbec59"
+        },
+        "objdiff_percent": 95.15126
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_utilities",
+      "function": "_bitmap_3d_shrink",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked under the current house rule after selectively reconciling the coherent typed donor body and corroborating its 3D shrink topology and semantic private name against HCEA commit 570c83fd9c365dad6f2a3e7041705d5b84c7847c. Target and candidate share the 800-byte padded envelope and all 18 relocation identities. January emits 285 instructions while the retained source emits 290; VC7 assigns the scale, output dimensions, destination pointer, and nested voxel-loop indices to different callee-saved registers and stack slots, cascading through the averaging packet while preserving behavior and call topology. The 77.116196% residual is therefore recorded honestly rather than forced with source that exists only to steer the allocator. No volatile access, barrier, artificial alias, register hint, raw offset, assembly, undefined behavior, or fake control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler declaration/lifetime donor.",
+      "measurements": {
+        "target": {
+          "size": 800,
+          "relocation_count": 18,
+          "normalized_sha256": "5435cdf751f34b0fcdd56e703d1f8feb3d21dd3c4f95ac2a8bc65b06b9e9e8b4"
+        },
+        "base": {
+          "size": 800,
+          "relocation_count": 18,
+          "normalized_sha256": "c6a725afd52b660d466d6b1131ccca6d8335786d26aa8fae2fa0c56344f55fa1"
+        },
+        "objdiff_percent": 77.116196
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_utilities",
+      "function": "_bitmap_2d_alpha_bleed",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked under the current house rule after selectively reconciling the coherent typed donor body and authenticating bitmap_2d_alpha_bleed from HCEA commit 570c83fd9c365dad6f2a3e7041705d5b84c7847c. Target and candidate have the same 560-byte padded envelope, 196 aligned instructions, and all 24 relocation identities. The only normalized difference is the order of two independent stack reloads at +0x191/+0x194 after the neighborhood loop: January reloads ECX then EAX, while VC7 reloads EAX then ECX. The retained source uses the natural row/neighborhood loops and typed bitmap access. No volatile access, barrier, fake dependency, assembly, undefined behavior, manual byte forcing, or nonsensical source is retained. Reopen only for authoritative January source/local records or a natural same-compiler scheduling donor.",
+      "measurements": {
+        "target": {
+          "size": 560,
+          "relocation_count": 24,
+          "normalized_sha256": "cd45e448842f8046230b47dbafdb56d1c273af2d59757dde48c47f6c19208e94"
+        },
+        "base": {
+          "size": 560,
+          "relocation_count": 24,
+          "normalized_sha256": "6c6241f24b04a6ac891bc1c8f5eb5957c70ec09aa910ecc94ba41535b8bb264f"
+        },
+        "objdiff_percent": 99.934784
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_utilities",
+      "function": "_bitmap_2d_uncompress_from_mipmap",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked under the current house rule after retaining the correct DXT3 alpha4 block type and DecodeBlockAlpha4 owner-header prototype. HCEA commit 570c83fd9c365dad6f2a3e7041705d5b84c7847c corroborates the 2D decompression topology and semantic private name. Target and candidate have the same 880-byte padded envelope, 297 aligned instructions, and all 49 relocation identities. The only normalized difference is the order of two independent final-loop reloads at +0x33A/+0x33D: January reloads the cached height into EDI before source_mipmap_index into EBX, while VC7 emits the reverse order. A bounded diagnostic confirmed that the donor's erroneous DXT3 alpha3 cast/sizeof spelling does not control this tie; it was rejected in favor of the canonical alpha4 definition. No wrong type, volatile access, barrier, fake dependency, assembly, undefined behavior, or exact-only control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler scheduling donor.",
+      "measurements": {
+        "target": {
+          "size": 880,
+          "relocation_count": 49,
+          "normalized_sha256": "4f4b53aed0db63a496b4c239249e9adaaa70adee056f6e6bc6118dc30dc2b4ab"
+        },
+        "base": {
+          "size": 880,
+          "relocation_count": 49,
+          "normalized_sha256": "0d0264895ee68a288dde6eb4dcbd425500971c01ba59158e1fe21ea4f05b456c"
+        },
+        "objdiff_percent": 99.922264
+      }
+    },
+    {
+      "unit": "source/render/render_particles",
+      "function": "_render_particles",
+      "class": "register-allocation",
+      "evidence": "The retained ordinary-C reconstruction implements the complete January particle-render path with authenticated shared types and names: visibility and perspective filtering, the PDB-recorded single current_sprite_group pointer reused by the grouping and draw passes, sorted sprite batches, attached-object transforms, LOD/fade handling, named U/V mirror flags, and the original unguarded zero-by-zero secondary-map-radius division. Target and candidate share the 1168-byte padded envelope and all 39 relocation identities, addresses, types, destinations, and addends; objdiff reports 99.82228% for the function. The remaining 59 normalized positional differences are stack-slot/local-coloring choices. A two-shadow-pointer spelling reduced that count to 45, but contradicts the HCEA/PDB local record and is rejected as a less credible exactness-oriented source shape. The apparently idempotent detached-object sentinel write is retained because January directly stores -1 to particle_datum.object_index at function offset +0x2E3; removing it changes the function envelope and relocation positions. No volatile access, compiler barrier, forced inline/noinline, assembly, undefined behavior, fake dependency, inert branch, or nonsensical logic is retained. Both helper functions and the owned profile section remain strict exact. Reopen only for authoritative January source/local-variable records or a natural same-compiler lifetime donor that explains the remaining stack allocation while preserving the one-pointer topology.",
+      "measurements": {
+        "target": {
+          "size": 1168,
+          "relocation_count": 39,
+          "normalized_sha256": "97e541b16e87e1e09094430247df715ca41e4ecc679738f638d09e1bbfffcc4e"
+        },
+        "base": {
+          "size": 1168,
+          "relocation_count": 39,
+          "normalized_sha256": "8a7510241d251d090a30b22282d8569ad88fc8a4c0e94713687f2e0475db94f2"
+        },
+        "objdiff_percent": 99.82228
+      }
+    },
+    {
+      "unit": "source/scenario/wind",
+      "function": "_wind_variance_get",
+      "class": "unclassified",
+      "evidence": "The retained ordinary-C helper implements the HCEA-corroborated position/time wind-noise sampler with project real/vector types, the exact two-role three-axis countdown topology, and defined unsigned-character access to the low byte of the bias-added real's object representation. January and the candidate own the same eight relocation destinations and agree through the loop except for January's full-width AND 0x7FFFFFFF sign clear versus VC7's x87 FABS instruction; target/candidate are 224/208 padded bytes. A split fabs assignment emits the same x87 instruction. The only machine-wide exact artifact reads an inactive union member and remains prohibited. Marathon's authenticated cseries.h spells ABS as a conditional expression, not this integer sign clear, and has no direct wind donor. A one-instruction inline-assembly probe reproduced the AND but forced VC7 to spill the live magnitude, changed the frame from 0x0C to 0x10, and remained nonexact, so it was rejected rather than expanding assembly solely to steer x87 lifetime. All seven exact wind siblings remain exact and the already parked natural initializer is measurement-stable. No union punning, volatile access, assembly, fake dependency, address-derived name, or nonsensical branch is retained. Reopen only for authoritative January source or a defined same-compiler full-width sign-clear idiom with provenance.",
+      "measurements": {
+        "target": {
+          "size": 224,
+          "relocation_count": 8,
+          "normalized_sha256": "4df611f5e5a98c97ca86e2ea03d29c3057296fb1382b36fc687c31f0e58db1a6"
+        },
+        "base": {
+          "size": 208,
+          "relocation_count": 8,
+          "normalized_sha256": "951ffdb4c1b81a50bceb55a1b2ac7167c51c20a3bdb8542b61524c88e89c37d6"
+        },
+        "objdiff_percent": 93.333336
       }
     }
   ]

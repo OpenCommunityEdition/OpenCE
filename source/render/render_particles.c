@@ -23,6 +23,7 @@ symbols in this file:
 #include "game/players.h"
 #include "interface/first_person_weapons.h"
 #include "render.h"
+#include "render_cameras_internal.h"
 #include "render_particles.h"
 #include "render_sprite.h"
 #include "tag_files/tag_groups.h"

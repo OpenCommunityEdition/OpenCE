@@ -91,10 +91,6 @@ struct render_fog
 /* ---------- prototypes/RENDER_CAMERAS.C */
 
 void render_camera_build_frustum(const struct render_camera *camera, const real_rectangle2d *frustum_bounds, struct render_frustum *frustum, boolean build_projection);
-real render_frustum_sphere_diameter_in_pixels(
-	struct render_frustum const *frustum,
-	real_point3d const *point,
-	real radius);
 
 /* ---------- globals */
 

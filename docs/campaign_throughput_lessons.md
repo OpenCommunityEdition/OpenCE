@@ -197,7 +197,8 @@ in the `.c` that needs it - never in a shared header.
 
 ## 7. Reusable scratch tooling
 
-Left in `scratch/` by this run:
+Left in `scratch/` by this run (note that `scratch/` is per-worktree and is not
+committed, so these exist only in the worktree that produced them):
 
 | file | purpose |
 | --- | --- |
@@ -205,7 +206,10 @@ Left in `scratch/` by this run:
 | `build1.py` | compile one unit with the real build flags to a chosen `.obj` |
 | `cs_build.py`, `cs_gate.py`, `cs_blast2.py` | shadow-header-tree blast-radius harness |
 | `pn_score.py` | score source variants by byte divergence and first-diff offset |
-| `fakescan.py` | fake-match scanner |
+| `pn_try.py` | batch-apply source variants through `gate.py` and report |
+
+Use the committed `tools/fake_match_scan.py` for fake-match review; unlike the
+scratch helpers above, it is available in every checkout.
 
 A caution learned twice the hard way: **Python heredocs in this environment eat
 one level of backslashes.** Build Windows path separators with `chr(92)` rather
