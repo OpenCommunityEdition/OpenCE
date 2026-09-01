@@ -1175,9 +1175,6 @@ void actor_discard_firing_position(
 	short firing_position_index,
 	boolean temporary);
 
-boolean actor_type_flood_desire_shamble(
-	long actor_index);
-
 void actor_stimulus_noticed_danger_zone(
 	long actor_index,
 	short danger_type,

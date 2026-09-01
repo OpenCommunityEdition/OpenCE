@@ -752,6 +752,25 @@
         },
         "objdiff_percent": 99.32809
       }
+    },
+    {
+      "unit": "source/ai/actor_type_flood",
+      "function": "_actor_type_flood_desire_shamble",
+      "class": "unclassified",
+      "evidence": "The retained body is coherent typed C reconstructed from the January function and corroborated semantically by HCEA commit 570c83fd9c365dad6f2a3e7041705d5b84c7847c. It uses the canonical actor_variant_definition fields, named charge, movement-switching, combat-status, prop-state, unit-state, and damage-flag constants, the owner-header prototypes, and the existing typed actor/unit/prop accessors. The one deliberate topology difference from HCEA follows the January binary: movement-switching type 2 with no target or a target outside combat_range_upper_bound continues into the update body. Target and candidate have the same 44 relocation destination identities in the same order, all target-owned non-code remains exact, and the exact flood_decide_action sibling is preserved. VC7 emits 1312 padded bytes versus January's 1296 because it tail-sinks the false epilogue; the resulting five near branches and live-range changes account for the downstream drift. The retained source contains no volatile/register steering, optimizer barrier, raw offset access, speculative structure, inline assembly, fake dependency, or dead control flow. Reopen only for authenticated January source/local records or a natural same-compiler source fact that places the false epilogue inside the early decision region.",
+      "measurements": {
+        "target": {
+          "size": 1296,
+          "relocation_count": 44,
+          "normalized_sha256": "067d3d1a80f86aaa9906529ad2cfe9f187bb77f1168c60c0208ddc98a69f14bc"
+        },
+        "base": {
+          "size": 1312,
+          "relocation_count": 44,
+          "normalized_sha256": "47bcacd072921ce5ae46bb953f730061896e6db84e7a8e2a2c5fdfd82136f548"
+        },
+        "objdiff_percent": 84.69773
+      }
     }
   ]
 }

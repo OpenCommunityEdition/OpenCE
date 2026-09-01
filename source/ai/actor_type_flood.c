@@ -30,8 +30,32 @@ symbols in this file:
 #include "actor_types.h"
 #include "actors.h"
 #include "actions.h"
+#include "props.h"
+#include "units/units.h"
 
 /* ---------- constants */
+
+enum
+{
+	_actor_mode_combat = 3,
+};
+
+enum
+{
+	_actor_combat_status_clear_los = 5,
+};
+
+enum
+{
+	_actor_movement_switching_always_run = 0,
+	_actor_movement_switching_always_crouch,
+	_actor_movement_switching_switch_types,
+};
+
+enum
+{
+	_actor_variant_definition_movement_switching_try_to_stay_with_friends_bit = 3,
+};
 
 /* ---------- macros */
 
@@ -136,4 +160,220 @@ void flood_decide_action(
 	}
 
 	return;
+}
+
+boolean actor_type_flood_desire_shamble(
+	long actor_index)
+{
+	boolean new_value;
+	real crouch_chance;
+	struct actor_datum *actor = actor_get(actor_index);
+	struct unit_datum *unit;
+	struct prop_datum *target_prop;
+	struct actor_variant_definition const *variant =
+		actor_variant_definition_get(actor->meta.variant_definition_index);
+	struct actor_variant_definition const *firing_variant =
+		actor_combat_get_firing_variant_definition(actor_index);
+
+	if ((!unit_is_busy(actor->meta.unit_index) && !actor_path_has_path(actor_index)) ||
+		actor->state.mode < _actor_mode_combat)
+		goto desire_shamble;
+
+	if (actor->state.combat_status < _actor_combat_status_clear_los)
+		goto do_not_shamble;
+
+	unit = unit_get(actor->meta.unit_index);
+	target_prop = actor->target.target_prop_index == NONE
+		? NULL
+		: prop_get(actor->target.target_prop_index);
+
+	if (unit->unit.animation.state == _unit_state_hard_ping && !actor->emotions.berserk)
+		goto desire_shamble;
+	if (target_prop &&
+		target_prop->distance > firing_variant->ranged_combat.maximum_firing_range)
+		goto do_not_shamble;
+	if (actor->emotions.berserk && target_prop &&
+		target_prop->distance > firing_variant->ranged_combat.berserk_firing_range_upper_bound)
+		goto do_not_shamble;
+	if (TEST_FLAG(unit->object.damage_flags, _object_melee_attack_inhibited_bit))
+		goto desire_shamble;
+
+	if (actor->emotions.berserk)
+		goto do_not_shamble;
+	if ((actor->state.action == _actor_action_charge &&
+			(actor->state.action_data.charge.goal == _charge_goal_melee ||
+				actor->state.action_data.charge.goal == _charge_goal_melee_leaping)) ||
+		!actor_has_ranged_weapon(actor_index) || actor->input.underwater)
+		goto do_not_shamble;
+
+	if (variant->movement_switching.movement_type != _actor_movement_switching_always_run)
+	{
+		if (variant->movement_switching.movement_type == _actor_movement_switching_always_crouch)
+			goto desire_shamble;
+		if (!target_prop ||
+			!(target_prop->distance < firing_variant->ranged_combat.combat_range_upper_bound))
+			goto update_shamble;
+
+desire_shamble:
+		actor->emotions.crouch_switching_active = FALSE;
+		return TRUE;
+	}
+
+do_not_shamble:
+	actor->emotions.crouch_switching_active = FALSE;
+	return FALSE;
+
+update_shamble:
+	if (actor->emotions.crouch_switching_active)
+	{
+		if (actor->emotions.crouch_switching_stay_timer > 0)
+		{
+			actor->emotions.crouch_switching_stay_timer--;
+		}
+		else if (TEST_FLAG(
+			variant->flags,
+			_actor_variant_definition_movement_switching_try_to_stay_with_friends_bit) &&
+			actor->situation.close_friends > 0)
+		{
+			short forward_count = 0;
+			short middle_count = 0;
+			short backward_count = 0;
+			struct prop_iterator iterator;
+			struct prop_datum *prop;
+
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\actor_type_flood.c",
+				201,
+				actor->target.target_prop_index != NONE);
+			target_prop = prop_get(actor->target.target_prop_index);
+			prop_iterator_new(&iterator, actor_index);
+			while ((prop = prop_iterator_next(&iterator)) != NULL)
+			{
+				if (prop->state >= _prop_state_becoming_unacknowledged &&
+					prop->state <= _prop_state_acknowledged &&
+					!prop->enemy && !prop->dead && prop->distance <= 15.0f &&
+					prop->actor_index != NONE)
+				{
+					struct actor_datum *friend_actor = actor_get(prop->actor_index);
+
+					if (friend_actor->emotions.crouch_switching_active)
+					{
+						real_vector3d direction;
+						real projection;
+
+						vector_from_points3d(
+							&actor->input.position.body_position,
+							&friend_actor->input.position.body_position,
+							&direction);
+						projection = dot_product3d(&direction, &target_prop->actor_to_prop);
+						if (projection > 1.4f)
+							forward_count++;
+						else if (projection < -1.4f)
+							backward_count++;
+						else
+							middle_count++;
+					}
+				}
+			}
+
+			if (actor->emotions.crouch_switching_current_value)
+			{
+				if (backward_count == 0 && forward_count > middle_count)
+				{
+					new_value = !actor->emotions.crouch_switching_current_value;
+					goto changed;
+				}
+			}
+			else if (forward_count == 0 && backward_count > middle_count)
+			{
+				goto change_crouch;
+			}
+		}
+
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\actor_type_flood.c",
+			256,
+			actor->emotions.crouch_switching_change_timer > 0);
+		actor->emotions.crouch_switching_change_timer--;
+		if (actor->emotions.crouch_switching_change_timer != 0)
+			goto return_current;
+
+change_crouch:
+		new_value = !actor->emotions.crouch_switching_current_value;
+	}
+	else
+	{
+		crouch_chance = variant->movement_switching.initial_crouch_chance;
+
+		if (actor->situation.area_friends > 0)
+		{
+			short standing_count = 0;
+			short crouching_count = 0;
+			struct prop_iterator iterator;
+			struct prop_datum *prop;
+
+			prop_iterator_new(&iterator, actor_index);
+			while ((prop = prop_iterator_next(&iterator)) != NULL)
+			{
+				if (prop->state >= _prop_state_becoming_unacknowledged &&
+					prop->state <= _prop_state_acknowledged &&
+					!prop->enemy && !prop->dead && prop->actor_index != NONE)
+				{
+					struct actor_datum *friend_actor = actor_get(prop->actor_index);
+
+					if (friend_actor->meta.type == actor->meta.type &&
+						friend_actor->state.combat_status >= _actor_combat_status_clear_los)
+					{
+						if (friend_actor->emotions.defensive_crouch)
+							crouching_count++;
+						else
+							standing_count++;
+					}
+				}
+			}
+
+			{
+				real negative_crouch_chance = -crouch_chance;
+
+				crouch_chance -=
+					(negative_crouch_chance * standing_count +
+						(1.0f - crouch_chance) * crouching_count) * 0.5f;
+			}
+		}
+
+		{
+			real random_value = real_seed_random(get_global_random_seed_address());
+
+			actor->emotions.crouch_switching_active = TRUE;
+			new_value = random_value < crouch_chance;
+		}
+	}
+
+changed:
+	{
+		real lower_bound;
+		real upper_bound;
+		real change_time;
+
+		actor->emotions.crouch_switching_current_value = new_value;
+		if (new_value)
+		{
+			upper_bound = variant->movement_switching.crouch_time_upper_bound;
+			lower_bound = variant->movement_switching.crouch_time_lower_bound;
+		}
+		else
+		{
+			upper_bound = variant->movement_switching.run_time_upper_bound;
+			lower_bound = variant->movement_switching.run_time_lower_bound;
+		}
+		change_time = real_seed_random_range(
+			get_global_random_seed_address(),
+			lower_bound,
+			upper_bound) * 30.0f;
+		actor->emotions.crouch_switching_change_timer = (short)MAX(change_time, 31.0f);
+		actor->emotions.crouch_switching_stay_timer = 30;
+
+return_current:
+		return actor->emotions.crouch_switching_current_value;
+	}
 }

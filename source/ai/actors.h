@@ -855,6 +855,8 @@ long actor_get_weapon(
 	long actor_index);
 boolean actor_has_ranged_weapon(
 	long actor_index);
+boolean actor_type_flood_desire_shamble(
+	long actor_index);
 long actor_target_unit_index(
 	long actor_index);
 void actor_derive_target_information(
