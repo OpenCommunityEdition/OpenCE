@@ -92,7 +92,7 @@ RULES = (
 	Rule(
 		"fixed-boolean-condition",
 		"high",
-		"a simple value and its negation make this condition fixed if the read is stable",
+		"the condition is a boolean literal or a value combined with its negation; verify that it is not dead codegen scaffolding",
 	),
 	Rule(
 		"self-order-comparison",
@@ -389,6 +389,15 @@ def _top_level_operator(values: Sequence[str], operators: frozenset[str]) -> tup
 
 def _fixed_boolean_condition(values: Sequence[str]) -> bool:
 	values = _strip_outer_parentheses(values)
+	if tuple(values) in {
+		("0",),
+		("1",),
+		("FALSE",),
+		("TRUE",),
+		("false",),
+		("true",),
+	}:
+		return True
 	operator = _top_level_operator(values, frozenset(("&&", "||")))
 	if operator is None:
 		return False

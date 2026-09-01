@@ -66,12 +66,18 @@ class FakeMatchScanTests(unittest.TestCase):
 
 	def test_simple_fixed_conditions_are_review_leads(self):
 		findings = scan_text(
+			"if (FALSE) { retain_helper(); }\n"
+			"if (true) { debug_only(); }\n"
+			"if ((0)) { unreachable(); }\n"
 			"if (ready && !ready) { work(); }\n"
 			"if (state.value > state.value) { work(); }\n"
 			"if (number != number) { handle_nan(); }\n",
 			"conditions.c",
 		)
 		self.assertEqual([item.rule for item in findings], [
+			"fixed-boolean-condition",
+			"fixed-boolean-condition",
+			"fixed-boolean-condition",
 			"fixed-boolean-condition",
 			"self-order-comparison",
 		])

@@ -31,6 +31,7 @@ python tools/campaign/board.py | grep -E 'remaining +[0-9]+ B / [123] fn'
 python tools/campaign/gate.py source/units/units                       # whole unit
 python tools/campaign/gate.py source/units/units --fn _unit_place      # one function
 python tools/campaign/gate.py source/units/units --edits e.json --fn _unit_place --disas _unit_place
+python tools/campaign/gate.py source/units/units --cflag /Ob1 --all    # diagnostic flag override
 ```
 
 `--edits` takes a JSON list of `[find, replace, tag]` triples applied to the real
@@ -38,6 +39,9 @@ source in memory (the file on disk is never touched), so you can sweep spellings
 without dirtying the tree. `--disas` prints a side-by-side target/ours
 disassembly with relocation annotations. Reads per-unit cflags out of
 `build.ninja`, and always prepends `/nologo /c` (libcmt units omit them).
+`--cflag` appends one diagnostic compiler option after those unit flags and may
+be repeated. It is an audit aid only: a flag improvement is not source-match
+evidence and must not be admitted without independent build provenance.
 
 ## apply_edits.py — land an edits JSON on the real file
 
