@@ -621,6 +621,12 @@ void rasterizer_frame_statistics_dispose(
 
 /* ---------- prototypes/RASTERIZER_TRANSPARENT_GEOMETRY.C */
 
+boolean rasterizer_transparent_geometry_initialize(
+	void);
+boolean rasterizer_transparent_geometry_initialize_aux_buffer(
+	void);
+void rasterizer_transparent_geometry_dispose_aux_buffer(
+	void);
 void rasterizer_transparent_geometry_begin(
 	void);
 void rasterizer_transparent_geometry_end(
