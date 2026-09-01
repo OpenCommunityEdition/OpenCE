@@ -611,6 +611,25 @@
     },
     {
       "unit": "source/memory/lruv_cache",
+      "function": "_lruv_debug_to_file",
+      "class": "register-allocation",
+      "evidence": "The retained body is coherent typed C and follows the HaloCEA-authenticated cache->name, unsigned age, and lruv_cache_bytes_to_pages topology while preserving January's measured control-flow envelope. Target and candidate are both 464 bytes with 20 relocations. Their symbolic relocation-target multisets match 20/20; the three raw-owner differences are only csplit's external-versus-local representation of the shared empty, space, and newline string literals. The remaining divergence begins in the callee-saved register cycle and continues as ordinary VC7 stack colouring and instruction scheduling. Fifty-five documented natural-C experiments, the Demon-oracle pair, the unsigned-age one-shot, and a twelve-blob branch sweep found no strict source-level closure. No barrier, volatile access, register hint, fake dependency, raw overlay, assembly, manual byte control, or nonsensical type pun is retained. Reopen only for authenticated January source/local records or a natural same-compiler lifetime/topology donor that changes the initial register cycle.",
+      "measurements": {
+        "target": {
+          "size": 464,
+          "relocation_count": 20,
+          "normalized_sha256": "fb7c7a22cacb060e9e3fa2e5a57942daa52e259dccc6b7796bf744bf28d291bb"
+        },
+        "base": {
+          "size": 464,
+          "relocation_count": 20,
+          "normalized_sha256": "8b2776c4666f22765aba53a34d4bff1f09d4223456d38fb1ee53b3ae69b355aa"
+        },
+        "objdiff_percent": 91.38323
+      }
+    },
+    {
+      "unit": "source/memory/lruv_cache",
       "function": "_lruv_block_new",
       "class": "register-allocation",
       "evidence": "The retained body is coherent typed C recovered in local donor commit 1ed2fd9efa4a322edd654d5fe9caf47ed2fe8e59 and independently corroborated at the control-flow and semantic level by Aerocatia/demon commit edb96c7614b80b4a80a3b0cee5c5fb7c7804a3c7. The public donor is used only as a semantic oracle: canonical helper names, types, assertions, and ring macros remain authoritative. Unlike the frozen historical candidate, this natural body needs no _ReadWriteBarrier, volatile access, fake dependency, raw address, or foreign local prototype; it initializes one new_block_index, scans holes with a typed best_hole, uses the named ring macro, and returns through one common path. Target and base now share the 1312-byte and 48-relocation envelope. The remaining divergence begins in the first callee-saved register cycle and is classified as register allocation. Reopen only for authenticated January source or a natural same-compiler lifetime fact that changes that cycle.",
