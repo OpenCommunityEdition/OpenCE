@@ -21987,7 +21987,7 @@
 { "file_offset": 3001600, "flags": 0, "name": "_global_real_rgb_darkgreen" },
 { "file_offset": 3001604, "flags": 0, "name": "_global_real_rgb_salmon" },
 { "file_offset": 3001608, "flags": 0, "name": "_global_real_rgb_violet" },
-{ "file_offset": 3001612, "flags": 0, "name": "_data_002dcd0c" },
+{ "file_offset": 3001612, "flags": 0, "name": "_debug_memory_globals" },
 { "file_offset": 3001644, "flags": 0, "name": "_data_002dcd2c" },
 { "file_offset": 3001648, "flags": 0, "name": "_header_strings" },
 { "file_offset": 3001656, "flags": 0, "name": "_format_strings" },

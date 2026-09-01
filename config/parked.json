@@ -2,6 +2,25 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/cseries/debug_memory",
+      "function": "_debug_realloc",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked under the current house rule after the credible loop recovered in unmerged campaign commit c8ff585ee made debug_memory_fill_with_random byte-exact and changed the caller ABI enough for the target-proven result != NULL || size == 0 accounting predicate to reach January's 416-byte padded envelope and 25-relocation count. The retained typed C has the correct realloc bookkeeping: successful allocations update the heap total, zero-size frees subtract the old allocation, and failed nonzero reallocations leave accounting unchanged. January keeps the original pointer in ESI, requested size in EDI, and allocation file in EBX from entry; VC7 instead keeps the reconstructed allocation_file/allocation_line locals in a different register/stack schedule. With the now-exact private helper as genuinely new evidence, one bounded single-header parameter-reuse retest still shrank the caller to 400 bytes and a 12-byte frame, so it was reverted. Earlier documented predicate-only, separate-header donor, single-header lifetime, formal-order, end-pointer, and lexical-scope families are exhausted. No register hint, volatile access, barrier, pragma, inline assembly, undefined behavior, fake dependency, inert expression, or nonsensical control flow is retained. Reopen only for authoritative January/cache-beta source, authenticated local/debug information, or a natural same-compiler donor that explains the ESI/EDI/EBX entry lifetimes while retaining the 16-byte frame.",
+      "measurements": {
+        "target": {
+          "size": 416,
+          "relocation_count": 25,
+          "normalized_sha256": "d812408198d3b0ffe7e64a41f32db28bceb17093d3b341f8c2c7d75e0f47f1d1"
+        },
+        "base": {
+          "size": 416,
+          "relocation_count": 25,
+          "normalized_sha256": "697e6e5109aee7ca97b938ee02877b832ecfb48ed0456393977b12be2688bebb"
+        },
+        "objdiff_percent": 81.89706
+      }
+    },
+    {
       "unit": "source/game/game_statistics",
       "function": "_game_statistics_record_kill",
       "class": "instruction-scheduling",
