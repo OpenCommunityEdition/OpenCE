@@ -550,6 +550,25 @@
       }
     },
     {
+      "unit": "source/scenario/wind",
+      "function": "_wind_variance_initialize",
+      "class": "tu-context-optimization",
+      "evidence": "The retained ordinary-C reconstruction implements the HCEA-corroborated cyclic variance table directly: seed eight keyframes for each of three axes, then fill seven intermediate samples with uniform_cubic_spline_vector3d using the four wrapped neighbouring keyframes. January and the candidate share the seed-loop instruction/relocation topology apart from stack-home offsets, the same nine relocation destinations as a multiset, and the external wind_variance_initialize storage class. January emits a 0x38 frame and recomputes three wrapped-keyframe addresses inside the axis loop; VC7 hoists those typed array addresses and uses a 0x40 frame, producing 400 padded bytes versus January's 384. Unsigned word neighbour indices are retained because January's movzx sequence directly proves unsigned 16-bit values; the smaller signed-short candidate emits movsx and is structurally wrong. A pointer-induction refinement grew to 432 bytes and 10 relocations, while the earlier phase-union lifetime carrier was rejected as fake matching. The per-TU spline rename schedule follows the existing glow.c include precedent and leaves the canonical spline call unresolved, preventing the header's two target-absent inline COMDAT owners. The complete text-owner census is 10 versus 10 with no missing, surplus, or storage-class mismatch; all seven inherited exact wind functions and units.obj 189/189 remain strict exact. No union punning, volatile access, assembly, fake dependency, address-derived name, or nonsensical branch is retained. Reopen only for authoritative January source, a same-compiler donor with the target lifetime topology, or a natural loop/local spelling that prevents address hoisting without changing ownership.",
+      "measurements": {
+        "target": {
+          "size": 384,
+          "relocation_count": 9,
+          "normalized_sha256": "1d5cd879825797c62a8f525b3f47ac10ee86b61f82da861f5ae6e6db4afa41ff"
+        },
+        "base": {
+          "size": 400,
+          "relocation_count": 9,
+          "normalized_sha256": "75c381860540e026071ff2e96633e80efbc09849bb0dc828d3cc04dc2c522146"
+        },
+        "objdiff_percent": 60.99206
+      }
+    },
+    {
       "unit": "source/math/matrix_math",
       "function": "_matrix4x3_multiply",
       "class": "asm-implemented",

@@ -5,13 +5,13 @@ symbols in this file:
 0017F740 0010:
 	_wind_dispose_from_old_map (0000)
 0017F750 00e0:
-	_code_0017f750 (0000)
+	_wind_variance_get (0000)
 0017F830 0260:
 	_wind_update (0000)
 0017FA90 0140:
 	_scenario_get_current_from_weather_palette (0000)
 0017FBD0 0180:
-	_code_0017fbd0 (0000)
+	_wind_variance_initialize (0000)
 0017FD50 0050:
 	_wind_initialize_for_new_map (0000)
 0017FDA0 0120:
@@ -36,7 +36,11 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define uniform_cubic_spline wind_uniform_cubic_spline_inline
+#define uniform_cubic_spline_vector3d wind_uniform_cubic_spline_vector3d_inline
 #include "scenario/wind.h"
+#undef uniform_cubic_spline_vector3d
+#undef uniform_cubic_spline
 
 #include "cseries/cseries.h"
 #include "objects/objects.h"
@@ -112,6 +116,15 @@ static void wind_variance_get(
 	real maximum_magnitude);
 void wind_variance_initialize(
 	void);
+void uniform_cubic_spline_vector3d(
+	real_vector3d *result,
+	real_vector3d const *f0,
+	real_vector3d const *f1,
+	real_vector3d const *f2,
+	real_vector3d const *f3,
+	real t0,
+	real h,
+	real t);
 
 /* ---------- globals */
 
@@ -424,3 +437,49 @@ void scenario_get_water_current(
 }
 
 /* ---------- private code */
+
+void wind_variance_initialize(
+	void)
+{
+	short control_point_index;
+	short sample_index;
+	short axis_index;
+
+	for (control_point_index = 0; control_point_index < 8; control_point_index++)
+	{
+		for (axis_index = 0; axis_index < 3; axis_index++)
+		{
+			seed_random_direction3d(
+				get_global_random_seed_address(),
+				&wind_globals.variance[axis_index][control_point_index * 8]);
+		}
+	}
+
+	for (control_point_index = 0; control_point_index < 8; control_point_index++)
+	{
+		word previous_control_point =
+			(word)((control_point_index - 1) & 7);
+		word next_control_point =
+			(word)((control_point_index + 1) & 7);
+		word following_control_point =
+			(word)((control_point_index + 2) & 7);
+
+		for (sample_index = 1; sample_index < 8; sample_index++)
+		{
+			for (axis_index = 0; axis_index < 3; axis_index++)
+			{
+				uniform_cubic_spline_vector3d(
+					&wind_globals.variance[axis_index][control_point_index * 8 + sample_index],
+					&wind_globals.variance[axis_index][previous_control_point * 8],
+					&wind_globals.variance[axis_index][control_point_index * 8],
+					&wind_globals.variance[axis_index][next_control_point * 8],
+					&wind_globals.variance[axis_index][following_control_point * 8],
+					(real)(control_point_index - 1),
+					1.f,
+					(real)sample_index * 0.125f + (real)control_point_index);
+			}
+		}
+	}
+
+	return;
+}
