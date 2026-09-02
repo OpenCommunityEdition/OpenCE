@@ -557,10 +557,6 @@ boolean actor_action_try_to_throw_grenade(
 	long actor_index,
 	boolean known_trajectory);
 
-void encounter_squad_timer_expire(
-	long encounter_index,
-	short squad_index);
-
 boolean action_vehicle_setup_impromptu(
 	long actor_index,
 	long vehicle_index,
@@ -576,16 +572,6 @@ boolean action_charge_setup(
 boolean action_fight_setup(
 	long actor_index,
 	struct fight_state_data *state_data);
-
-void encounter_modify_pursuit_desires(
-	long encounter_index,
-	short squad_index,
-	boolean *pursue_tenacious,
-	short *group_pursuit_restriction,
-	boolean *group_pursuit_controller,
-	short *desire_target_search,
-	short *desire_pursuit,
-	short *desire_pursuit_search);
 
 void encounter_determine_pursuit_availability(
 	long encounter_index,
@@ -644,12 +630,6 @@ short actor_select_firing_position(
 	long *previous_owner_actor_index,
 	struct actions_firing_position_search_workspace *workspace,
 	boolean *position_flags);
-
-boolean encounter_mark_examined_pursuit_position(
-	long encounter_index,
-	long actor_index,
-	short firing_position_index,
-	long time);
 
 void actor_clear_discarded_firing_positions(
 	long actor_index,

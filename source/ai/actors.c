@@ -284,7 +284,9 @@ symbols in this file:
 #include "actors.h"
 #include "actor_definitions.h"
 #include "actor_iterators.h"
+#include "actor_placement.h"
 #include "actor_types.h"
+#include "encounters.h"
 #include "props.h"
 
 #include "saved games/game_state.h"
@@ -355,22 +357,6 @@ void actor_action_replace_prop(
 	long actor_index,
 	long invalid_prop_index,
 	long replacement_prop_index);
-
-void encounter_detach_actor(
-	long actor_index,
-	boolean died);
-
-void encounterless_attach_actor(
-	long actor_index);
-
-void encounterless_detach_actor(
-	long actor_index);
-
-void encounter_attach_actor(
-	long actor_index,
-	long encounter_index,
-	short squad_index,
-	boolean has_previous_team);
 
 void code_00029e70(
 	long actor_index);

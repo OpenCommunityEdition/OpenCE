@@ -122,6 +122,22 @@ void encounters_dispose(
 	void);
 void encounters_dispose_from_old_map(
 	void);
+void encounters_initialize_for_new_map(
+	void);
+void encounters_create_for_new_map(
+	void);
+void encounters_update(
+	void);
+void encounter_update_status(
+	long encounter_index);
+void encounter_create(
+	long encounter_index,
+	short desired_platoon_index,
+	short desired_squad_index);
+short encounter_get_actor_starting_location(
+	long encounter_index,
+	short squad_index,
+	boolean spawning);
 void encounter_actor_iterator_new(
 	struct encounter_actor_iterator *iterator,
 	long encounter_index);
@@ -129,11 +145,67 @@ struct actor_datum *encounter_actor_iterator_next(
 	struct encounter_actor_iterator *iterator);
 struct actor_datum *encounter_actor_iterator_prev(
 	struct encounter_actor_iterator *iterator);
-void encounter_compute_activation_cluster_bit_vector(long encounter_index, boolean update_actor_dormancy, long bit_vector_size, unsigned long const *active_area, unsigned long *bit_vector);
+void encounter_compute_activation_cluster_bit_vector(
+	long encounter_index,
+	boolean update_actor_dormancy,
+	long bit_vector_size,
+	unsigned long const *active_area,
+	unsigned long *bit_vector);
+
+long encounter_get_by_name(
+	char const *encounter_name);
+void encounter_modify_pursuit_desires(
+	long encounter_index,
+	short squad_index,
+	boolean *pursue_tenacious,
+	short *group_pursuit_restriction,
+	boolean *group_pursuit_controller,
+	short *desired_target_search,
+	short *desired_pursuit,
+	short *desired_pursuit_search);
+boolean encounter_link_activation(
+	long encounter_index,
+	short link_encounter_index);
+void encounter_attach_actor(
+	long actor_index,
+	long encounter_index,
+	short squad_index,
+	boolean has_previous_team);
+void encounter_detach_actor(
+	long actor_index,
+	boolean died);
+void encounterless_attach_actor(
+	long actor_index);
+void encounterless_detach_actor(
+	long actor_index);
+void encounter_attach_unit(
+	long encounter_index,
+	long unit_index);
+void encounter_force_activate(
+	long encounter_index);
+void encounter_force_deactivate(
+	long encounter_index);
+void encounter_squad_timer_expire(
+	long encounter_index,
+	short squad_index);
+boolean encounter_spawn_actor(
+	long encounter_index,
+	short squad_index);
+void encounter_stand_down(
+	long encounter_index);
+void encounters_unit_died(
+	long unit_index);
 
 void encounter_build_firing_position_owner_actor_indices(
 	long encounter_index,
 	long *owner_actor_indices);
+void encounter_verify_firing_position_owner_actor_indices(
+	long encounter_index);
+boolean encounter_mark_examined_pursuit_position(
+	long encounter_index,
+	long actor_index,
+	short firing_position_index,
+	long history_start_time);
 boolean encounter_pursuit_position_already_examined(
 	long encounter_index,
 	long actor_index,

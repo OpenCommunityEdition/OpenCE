@@ -833,7 +833,13 @@ void actors_initialize_for_new_map(
 	void);
 void actors_dispose_from_old_map(
 	void);
-real_argb_color const *actor_activation_debug_color(long actor_index);
+real_argb_color const *actor_activation_debug_color(
+	long actor_index);
+void actor_verify_activation(
+	long actor_index);
+void actor_set_team(
+	long actor_index,
+	short team_index);
 
 void actor_set_dormant(
 	long actor_index,

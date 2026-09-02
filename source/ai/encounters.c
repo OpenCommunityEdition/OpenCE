@@ -286,13 +286,18 @@ symbols in this file:
 
 #include "actors.h"
 #include "actor_definitions.h"
+#include "actor_iterators.h"
+#include "actor_placement.h"
 #include "actor_types.h"
+#include "ai.h"
 #include "ai_debug.h"
+#include "ai_script.h"
 #include "ai_scenario_definitions.h"
 #include "props.h"
 #include "cseries/errors.h"
 #include "editor/editor_stubs.h"
 #include "game/game.h"
+#include "game/game_allegiance.h"
 #include "game/game_engine.h"
 #include "game/players.h"
 #include "math/integer_math.h"
@@ -476,45 +481,7 @@ typedef char pursuit_datum_size_assert[
 
 /* ---------- prototypes */
 
-void encounter_update_status(
-	long encounter_index);
-void encounter_create(
-	long encounter_index,
-	short desired_platoon_index,
-	short desired_squad_index);
-short encounter_get_actor_starting_location(
-	long encounter_index,
-	short squad_index,
-	boolean spawning);
-void actor_verify_activation(
-	long actor_index);
-void actor_set_team(
-	long actor_index,
-	short team_index);
-long actor_place(
-	long actor_variant_definition_index,
-	long encounter_index,
-	short squad_index,
-	struct actor_starting_location *starting_location,
-	boolean upgrade_major,
-	short initial_variant);
-void ai_update_team_status(
-	void);
-boolean game_team_is_enemy(
-	short team_index0,
-	short team_index1);
-void ai_get_major_upgrade_chance(
-	short major_upgrade,
-	boolean *upgrade_major,
-	boolean *random,
-	real *chance);
-boolean ai_consider_major_upgrade(
-	long encounter_index,
-	short squad_index,
-	real chance);
-void ai_scripting_magically_see_players(
-	long ai_reference);
-void encounter_update_squads(
+static void encounter_update_squads(
 	long encounter_index);
 void encounter_update_respawn(
 	long encounter_index);
@@ -547,7 +514,7 @@ static void encounter_deactivate(
 	long encounter_index);
 static void encounter_update_timers(
 	long encounter_index);
-short squad_get_actor_type(
+static short squad_get_actor_type(
 	struct squad_definition *squad_definition);
 
 /* ---------- globals */
@@ -838,7 +805,7 @@ void encounter_modify_pursuit_desires(
 	short *desired_pursuit_search)
 {
 	struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
-		&global_scenario_get()->ai_encounters, encounter_index&0xffff, struct encounter_definition);
+		&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
 	struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
 		&encounter_definition->squads, squad_index, struct squad_definition);
 	short searching = encounter_definition->searching;
@@ -999,7 +966,9 @@ void encounter_squad_timer_expire(
 	if (TEST_FLAG(squad_definition->flags, _squad_magic_sight_after_timer_bit))
 	{
 		ai_scripting_magically_see_players(
-			DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index) | ((short)(FLAG(_ai_reference_squad_bit) | (squad_index&0xff)) << SHORT_BITS));
+			DATUM_INDEX_NEW(
+				DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index),
+				FLAG(_ai_reference_squad_bit) | (squad_index & UNSIGNED_CHAR_MAX)));
 	}
 
 	if (ai_debug.print_rules)
@@ -1108,8 +1077,8 @@ boolean encounter_spawn_actor(
 		squad->respawn_delay_ticks = real_random_range(squad_definition->respawn_time_lower_bound, squad_definition->respawn_time_upper_bound) * TICKS_PER_SECOND;
 	}
 
-	/* BUG (preserved for exact matching): January returns FALSE on every path, the spawn result is
-	 * never reported. A corrected build should return TRUE after a successful placement. */
+	/* Original January and HCEA behavior: the successful placement is not reported to the caller;
+	 * this routine returns FALSE on every path. */
 	return FALSE;
 }
 
@@ -1619,7 +1588,7 @@ static boolean encounter_activate(
 {
 	struct encounter_datum *encounter = encounter_get(encounter_index);
 	struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
-		&global_scenario_get()->ai_encounters, encounter_index&0xffff, struct encounter_definition);
+		&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
 
 	if (encounter_definition->runtime_structure_bsp_reference_index == NONE ||
 		encounter_definition->runtime_structure_bsp_reference_index == global_structure_bsp_index)
@@ -1660,7 +1629,7 @@ static void encounter_deactivate(
 	return;
 }
 
-short squad_get_actor_type(
+static short squad_get_actor_type(
 	struct squad_definition *squad_definition)
 {
 	struct scenario *scenario = global_scenario_get();
@@ -1684,7 +1653,7 @@ short squad_get_actor_type(
 	return actor_type;
 }
 
-boolean encounter_post_combat_add_possibility(
+static boolean encounter_post_combat_add_possibility(
 	struct post_combat_possibility *possibility_array,
 	long actor_index,
 	real weight,
@@ -1791,7 +1760,7 @@ static void encounter_update_timers(
 	return;
 }
 
-void encounter_update_squads(
+static void encounter_update_squads(
 	long encounter_index)
 {
 	struct encounter_datum *encounter = encounter_get(encounter_index);

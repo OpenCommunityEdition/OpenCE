@@ -89,6 +89,17 @@ struct ai_information_packet
 
 void ai_globals_dialogue_triggers_enabled(
 	boolean enabled);
+void ai_update_team_status(
+	void);
+void ai_get_major_upgrade_chance(
+	short major_upgrade,
+	boolean *upgrade_major,
+	boolean *random,
+	real *chance);
+boolean ai_consider_major_upgrade(
+	long encounter_index,
+	short squad_index,
+	real chance);
 
 boolean ai_enemies_attacking_player(
 	void);

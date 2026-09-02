@@ -311,8 +311,6 @@ void ai_script_dispose_from_old_map(
 
 void encounters_dispose(
 	void);
-void encounters_create_for_new_map(
-	void);
 void encounters_dispose_from_old_map(
 	void);
 void props_dispose_from_old_map(

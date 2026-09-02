@@ -71,6 +71,8 @@ void ai_scripting_attach_unit(
 void ai_scripting_magically_see_unit(
 	long ai_reference,
 	long unit_index);
+void ai_scripting_magically_see_players(
+	long ai_reference);
 void ai_index_actor_iterator_new(
 	long ai_reference,
 	struct ai_script_actor_reference_iterator *iterator);

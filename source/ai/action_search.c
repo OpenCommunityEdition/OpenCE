@@ -38,6 +38,7 @@ symbols in this file:
 #include "actor_definitions.h"
 #include "actors.h"
 #include "ai_scenario_definitions.h"
+#include "encounters.h"
 #include "props.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
@@ -76,12 +77,6 @@ long actor_target_unit_index(
 boolean actors_searching_same_position(
 	long actor_index,
 	long other_actor_index);
-
-void encounter_mark_examined_pursuit_position(
-	long encounter_index,
-	long actor_index,
-	word firing_position_index,
-	long time);
 
 short ai_test_line_of_sight(
 	real_point3d const *origin,

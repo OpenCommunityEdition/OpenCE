@@ -6,6 +6,9 @@ void game_allegiance_dispose(
 	void);
 void game_allegiance_dispose_from_old_map(
 	void);
+boolean game_team_is_enemy(
+	short team_index0,
+	short team_index1);
 boolean game_allegiance_remove(
 	short team1_index,
 	short team2_index);
