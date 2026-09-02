@@ -542,6 +542,7 @@ symbols in this file:
 #include "aim_assist.h"
 #include "game_engine.h"
 #include "game_engine_place.h"
+#include "game_engine_runtime.h"
 
 #include "bitmaps/bitmap_group.h"
 #include "game_globals.h"

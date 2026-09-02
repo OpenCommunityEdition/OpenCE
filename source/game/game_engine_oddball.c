@@ -3,81 +3,81 @@ GAME_ENGINE_ODDBALL.C
 
 symbols in this file:
 000A1630 0010:
-	_code_000a1630 (0000)
+	_oddball_engine_dispose (0000)
 000A1640 0010:
-	_code_000a1640 (0000)
+	_oddball_engine_dispose_from_old_map (0000)
 000A1650 0020:
-	_code_000a1650 (0000)
+	_oddball_engine_player_added (0000)
 000A1670 0010:
-	_code_000a1670 (0000)
+	_oddball_engine_game_ending (0000)
 000A1680 0010:
-	_code_000a1680 (0000)
+	_oddball_engine_game_starting (0000)
 000A1690 0010:
-	_code_000a1690 (0000)
+	_oddball_engine_statistics_append (0000)
 000A16A0 0010:
-	_code_000a16a0 (0000)
+	_oddball_engine_handle_client_message (0000)
 000A16B0 0010:
-	_code_000a16b0 (0000)
+	_oddball_engine_handle_server_message (0000)
 000A16C0 0010:
-	_code_000a16c0 (0000)
+	_oddball_engine_pregame_post_rasterize (0000)
 000A16D0 0010:
-	_code_000a16d0 (0000)
+	_oddball_engine_post_rasterize (0000)
 000A16E0 00d0:
-	_code_000a16e0 (0000)
+	_oddball_add_score (0000)
 000A17B0 0040:
-	_code_000a17b0 (0000)
+	_oddball_add_time_with_ball (0000)
 000A17F0 0030:
-	_code_000a17f0 (0000)
+	_player_ball_count (0000)
 000A1820 0010:
-	_code_000a1820 (0000)
+	_oddball_engine_player_damaged_player (0000)
 000A1830 0030:
 	_player_has_ball (0000)
 000A1860 0040:
 	_ball_available (0000)
 000A18A0 02e0:
-	_code_000a18a0 (0000)
+	_oddball_engine_display_score (0000)
 000A1B80 0010:
-	_code_000a1b80 (0000)
+	_oddball_engine_prespawn_player_update (0000)
 000A1B90 0040:
-	_code_000a1b90 (0000)
+	_oddball_weapon_drop (0000)
 000A1BD0 0040:
-	_code_000a1bd0 (0000)
+	_oddball_get_score (0000)
 000A1C10 0020:
-	_code_000a1c10 (0000)
+	_oddball_ball_transfer_by_killing (0000)
 000A1C30 0020:
-	_code_000a1c30 (0000)
+	_accumulate_score_by_time (0000)
 000A1C50 0020:
-	_code_000a1c50 (0000)
+	_terminator_scoring_rules (0000)
 000A1C70 0020:
-	_code_000a1c70 (0000)
+	_oddball_test_flag (0000)
 000A1C90 0050:
-	_code_000a1c90 (0000)
+	_oddball_test_trait (0000)
 000A1CE0 0050:
-	_code_000a1ce0 (0000)
+	_oddball_get_score_string (0000)
 000A1D30 0070:
-	_code_000a1d30 (0000)
+	_oddball_get_score_header_string (0000)
 000A1DA0 0050:
-	_code_000a1da0 (0000)
+	_oddball_get_team_score_string (0000)
 000A1DF0 0140:
-	_code_000a1df0 (0000)
+	_find_position_for_ball (0000)
 000A1F30 0090:
-	_code_000a1f30 (0000)
+	_create_the_ball (0000)
 000A1FC0 0120:
-	_code_000a1fc0 (0000)
+	_oddball_engine_initialize_for_new_map (0000)
 000A20E0 0070:
-	_code_000a20e0 (0000)
+	_reset_ball (0000)
 000A2150 0090:
-	_code_000a2150 (0000)
+	_update_ball_ownership (0000)
 000A21E0 01c0:
-	_code_000a21e0 (0000)
+	_oddball_engine_player_update (0000)
 000A23A0 00c0:
-	_code_000a23a0 (0000)
+	_oddball_engine_weapon_update (0000)
 000A2460 00d0:
-	_code_000a2460 (0000)
+	_oddball_engine_update (0000)
 000A2530 01c0:
-	_code_000a2530 (0000)
+	_oddball_engine_player_killed_player (0000)
 000A26F0 00b0:
-	_code_000a26f0 (0000)
+	_oddball_weapon_pickup (0000)
 0025BE74 002a:
 	??_C@_0CK@LKLFFONL@c?3?2halo?2SOURCE?2game?2game_engine_@ (0000)
 0025BEA0 0034:
@@ -99,14 +99,15 @@ symbols in this file:
 002DE560 0088:
 	_oddball_engine (0000)
 0043EBA8 0104:
-	_bss_0043eba8 (0000)
+	_oddball_globals (0000)
 */
 
 /* ---------- headers */
 
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
-#include "game_engine.h"
+#include "game/game_engine_place.h"
+#include "game/game_engine_runtime.h"
 #include "game.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
@@ -132,38 +133,40 @@ enum
 	ODDBALL_MAXIMUM_BALLS_FOR_RESET_SOUND = 2,
 };
 
-enum
+enum oddball_weapon_flags
 {
 	_oddball_weapon_touched_bit = 6,
 };
 
 /* game_engine_test_flag() queries */
-enum
+enum oddball_game_engine_test_flags
 {
-	_game_engine_flag_kill_messages_show_score = 1,
+	_game_engine_test_flag_rasterize_score = 1,
 };
 
-enum
+enum oddball_ball_type
 {
 	_oddball_normal = 0,
 	_oddball_magic,
 	_oddball_terminator,
 };
 
-enum
+enum oddball_speed
 {
 	_oddball_speed_slow = 0,
 	_oddball_speed_normal,
 	_oddball_speed_faster,
 };
 
-enum
+enum game_engine_trait
 {
-	_oddball_trait_none = 0,
-	_oddball_trait_invisible,
+	_game_trait_none = 0,
+	_game_trait_invisible,
+	_game_trait_extra_damage,
+	_game_trait_damage_resistant,
 };
 
-enum
+enum oddball_message
 {
 	_oddball_message_you_have_the_ball = 30,
 	_oddball_message_ally_has_the_ball,
@@ -177,7 +180,7 @@ enum
 	_oddball_message_you_have_the_ball_tick,
 };
 
-enum
+enum multiplayer_information_sound
 {
 	_multiplayer_sound_play_ball = 0,
 	_multiplayer_sound_one_minute_to_win = 2,
@@ -193,7 +196,7 @@ enum
 };
 
 /* ui\multiplayer_game_text string indices */
-enum
+enum multiplayer_game_text
 {
 	_multiplayer_game_text_score = 0x9A,
 	_multiplayer_game_text_place_score = 0x9B,
@@ -209,6 +212,14 @@ enum
 };
 
 /* ---------- macros */
+
+#define oddball_variant_random_start unknown4C.byte0
+#define oddball_variant_score_to_win unknown40
+#define oddball_variant_speed_with_ball unknown50
+#define oddball_variant_trait_with_ball unknown54
+#define oddball_variant_trait_without_ball unknown58
+#define oddball_variant_ball_type unknown5C
+#define oddball_variant_ball_spawn_count unknown60
 
 /* ---------- structures */
 
@@ -240,31 +251,7 @@ struct scenario_netgame_flag
 typedef char verify_scenario_netgame_flag_size[
 	sizeof(struct scenario_netgame_flag) == 0x94 ? 1 : -1];
 
-struct game_engine_place
-{
-	short flags;
-	short place;
-};
-
 /* ---------- prototypes */
-
-struct game_engine_place game_engine_get_place(
-	long player_index,
-	enum get_score_type score_type);
-
-wchar_t *get_place_name(
-	struct game_engine_place place);
-
-void game_show_score_you_ally_enemy(
-	long player_index,
-	long you_score,
-	long ally_score,
-	long enemy_score,
-	long other_player_index);
-
-void game_engine_flag_reset(
-	long weapon_index,
-	real_point3d const *position);
 
 /* ---------- globals */
 
@@ -272,73 +259,75 @@ static struct oddball_globals oddball_globals = { 0 };
 
 /* ---------- public code */
 
-void code_000a1630(
+static void oddball_engine_dispose(
 	void)
 {
 	return;
 }
 
-void code_000a1640(
+static void oddball_engine_dispose_from_old_map(
 	void)
 {
 	return;
 }
 
-void code_000a1670(
+static void oddball_engine_game_ending(
 	void)
 {
 	return;
 }
 
-void code_000a1680(
+static void oddball_engine_game_starting(
 	void)
 {
 	return;
 }
 
-void code_000a1690(
+static void oddball_engine_statistics_append(
+	long statistic)
+{
+	return;
+}
+
+static void oddball_engine_handle_client_message(
+	void *message)
+{
+	return;
+}
+
+static void oddball_engine_handle_server_message(
+	void *message)
+{
+	return;
+}
+
+static void oddball_engine_pregame_post_rasterize(
 	void)
 {
 	return;
 }
 
-void code_000a16a0(
+static void oddball_engine_post_rasterize(
 	void)
 {
 	return;
 }
 
-void code_000a16b0(
-	void)
+static void oddball_engine_player_damaged_player(
+	long damaging_player_index,
+	long dead_player_index,
+	boolean damage_type)
 {
 	return;
 }
 
-void code_000a16c0(
-	void)
+static void oddball_engine_prespawn_player_update(
+	long player_index)
 {
 	return;
 }
 
-void code_000a16d0(
-	void)
-{
-	return;
-}
-
-void code_000a1820(
-	void)
-{
-	return;
-}
-
-void code_000a1b80(
-	void)
-{
-	return;
-}
-
-void code_000a1650(
+static void oddball_engine_player_added(
 	long player_index)
 {
 	player_get(player_index);
@@ -346,7 +335,7 @@ void code_000a1650(
 	return;
 }
 
-void code_000a1b90(
+static void oddball_weapon_drop(
 	long weapon_index)
 {
 	match_assert(
@@ -360,7 +349,7 @@ void code_000a1b90(
 static boolean oddball_ball_transfer_by_killing(
 	void)
 {
-	long ball_type = game_engine_get_variant()->unknown5C;
+	enum oddball_ball_type ball_type = game_engine_get_variant()->oddball_variant_ball_type;
 
 	if (ball_type > _oddball_normal && ball_type <= _oddball_terminator)
 		return TRUE;
@@ -371,7 +360,7 @@ static boolean oddball_ball_transfer_by_killing(
 static boolean accumulate_score_by_time(
 	void)
 {
-	switch (game_engine_get_variant()->unknown5C)
+	switch (game_engine_get_variant()->oddball_variant_ball_type)
 	{
 	case _oddball_terminator:
 		return FALSE;
@@ -383,7 +372,7 @@ static boolean accumulate_score_by_time(
 static boolean terminator_scoring_rules(
 	void)
 {
-	switch (game_engine_get_variant()->unknown5C)
+	switch (game_engine_get_variant()->oddball_variant_ball_type)
 	{
 	case _oddball_terminator:
 		return TRUE;
@@ -395,7 +384,7 @@ static boolean terminator_scoring_rules(
 boolean player_has_ball(
 	long player_index)
 {
-	long ball_spawn_count = game_engine_get_variant()->unknown60;
+	long ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
 	boolean has_ball = FALSE;
 	long ball_index;
 
@@ -414,7 +403,7 @@ boolean player_has_ball(
 boolean ball_available(
 	void)
 {
-	long ball_spawn_count = game_engine_get_variant()->unknown60;
+	long ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
 	boolean available = FALSE;
 	long ball_index;
 
@@ -437,7 +426,7 @@ static long player_ball_count(
 	long player_index)
 {
 	long ball_count = 0;
-	long ball_spawn_count = game_engine_get_variant()->unknown60;
+	long ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
 	long ball_index;
 
 	for (ball_index = 0; ball_index < ball_spawn_count; ball_index++)
@@ -500,7 +489,7 @@ static void oddball_add_time_with_ball(
 {
 	struct player_datum *player = player_get(player_index);
 
-	if (game_engine_get_variant()->unknown5C == _oddball_normal)
+	if (game_engine_get_variant()->oddball_variant_ball_type == _oddball_normal)
 	{
 		game_engine_state_message(
 			player_index,
@@ -519,9 +508,12 @@ static real_point3d find_position_for_ball(
 {
 	struct scenario *scenario = global_scenario_get();
 	long flag_index = NONE;
+	/* BUG (original): after the fatal missing-spawn assertion, January returns
+	 * the untouched value. A corrected build should report failure explicitly.
+	 */
 	real_point3d position;
 
-	if (!game_engine_get_variant()->unknown4C.byte0)
+	if (!game_engine_get_variant()->oddball_variant_random_start)
 	{
 		flag_index = find_netgame_flag(
 			NULL,
@@ -630,7 +622,7 @@ static void reset_ball(
 	struct weapon_datum *weapon = weapon_get(weapon_index);
 	real_point3d position = find_position_for_ball(weapon->object.owner_team_index);
 
-	if (game_engine_get_variant()->unknown60 <= ODDBALL_MAXIMUM_BALLS_FOR_RESET_SOUND)
+	if (game_engine_get_variant()->oddball_variant_ball_spawn_count <= ODDBALL_MAXIMUM_BALLS_FOR_RESET_SOUND)
 		game_engine_play_multiplayer_sound(_multiplayer_sound_hill_move);
 
 	game_engine_flag_reset(weapon_index, &position);
@@ -677,15 +669,18 @@ static void update_ball_ownership(
 
 /* ---------- public code (game engine callbacks) */
 
-boolean oddball_engine_initialize_for_new_map(
+static boolean oddball_engine_initialize_for_new_map(
 	void)
 {
 	long ball_index;
 
+	/* January performs this scenario touch even though the returned pointer is
+	 * not consumed here; its call and relocation are present in the target.
+	 */
 	global_scenario_get();
 	csmemset(&oddball_globals, 0, sizeof(oddball_globals));
 
-	oddball_globals.score_to_win = game_engine_get_variant()->unknown40;
+	oddball_globals.score_to_win = game_engine_get_variant()->oddball_variant_score_to_win;
 	if (accumulate_score_by_time())
 		oddball_globals.score_to_win *= ODDBALL_SCORE_TICKS_PER_UNIT;
 
@@ -699,7 +694,7 @@ boolean oddball_engine_initialize_for_new_map(
 
 	if (!oddball_ball_transfer_by_killing())
 	{
-		long ball_spawn_count = game_engine_get_variant()->unknown60;
+		long ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
 		long spawn_delay = 0;
 
 		for (ball_index = 0; ball_index < ball_spawn_count; ball_index++)
@@ -710,7 +705,7 @@ boolean oddball_engine_initialize_for_new_map(
 	}
 	else
 	{
-		long ball_spawn_count = game_engine_get_variant()->unknown60;
+		long ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
 
 		for (ball_index = 0; ball_index < ball_spawn_count; ball_index++)
 		{
@@ -722,7 +717,7 @@ boolean oddball_engine_initialize_for_new_map(
 	return TRUE;
 }
 
-void oddball_engine_player_update(
+static void oddball_engine_player_update(
 	long player_index)
 {
 	struct player_datum *player = player_get(player_index);
@@ -735,10 +730,10 @@ void oddball_engine_player_update(
 	player->speed_multiplier = 1.0f;
 	if (ball_count > 0)
 	{
-		if (game_engine_get_variant()->unknown54 != _oddball_trait_invisible)
+		if (game_engine_get_variant()->oddball_variant_trait_with_ball != _game_trait_invisible)
 			game_engine_player_depower_active_camo(player_index);
 
-		switch (game_engine_get_variant()->unknown50)
+		switch (game_engine_get_variant()->oddball_variant_speed_with_ball)
 		{
 		case _oddball_speed_normal:
 			player->speed_multiplier = 1.0f;
@@ -797,7 +792,7 @@ void oddball_engine_player_update(
 	return;
 }
 
-void oddball_engine_weapon_update(
+static void oddball_engine_weapon_update(
 	long weapon_index,
 	struct weapon_datum *weapon)
 {
@@ -835,7 +830,7 @@ void oddball_engine_weapon_update(
 	return;
 }
 
-boolean oddball_weapon_pickup(
+static boolean oddball_weapon_pickup(
 	long weapon_index,
 	long player_index)
 {
@@ -871,7 +866,7 @@ boolean oddball_weapon_pickup(
 	return allow_pick_up;
 }
 
-void oddball_engine_update(
+static void oddball_engine_update(
 	void)
 {
 	long ball_spawn_count;
@@ -885,7 +880,7 @@ void oddball_engine_update(
 				_multiplayer_sound_oddball);
 	}
 
-	ball_spawn_count = game_engine_get_variant()->unknown60;
+	ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
 	for (ball_index = 0; ball_index < ball_spawn_count; ball_index++)
 	{
 		if (oddball_globals.ball_spawn_timer[ball_index] > 0)
@@ -932,7 +927,7 @@ void oddball_engine_update(
 	return;
 }
 
-long oddball_get_score(
+static long oddball_get_score(
 	long player_index,
 	enum get_score_type score_type)
 {
@@ -947,7 +942,7 @@ long oddball_get_score(
 	return score;
 }
 
-wchar_t *oddball_get_score_string(
+static wchar_t *oddball_get_score_string(
 	long player_index,
 	wchar_t *buffer)
 {
@@ -961,7 +956,7 @@ wchar_t *oddball_get_score_string(
 	return buffer;
 }
 
-wchar_t *oddball_get_score_header_string(
+static wchar_t *oddball_get_score_header_string(
 	wchar_t *buffer)
 {
 	short string_index;
@@ -982,7 +977,7 @@ wchar_t *oddball_get_score_header_string(
 	return buffer;
 }
 
-wchar_t *oddball_get_team_score_string(
+static wchar_t *oddball_get_team_score_string(
 	long team_index,
 	wchar_t *buffer)
 {
@@ -996,7 +991,7 @@ wchar_t *oddball_get_team_score_string(
 	return buffer;
 }
 
-void oddball_engine_player_killed_player(
+static void oddball_engine_player_killed_player(
 	long killing_player_index,
 	long killing_object_index,
 	long dead_player_index,
@@ -1004,7 +999,7 @@ void oddball_engine_player_killed_player(
 {
 	if (oddball_ball_transfer_by_killing())
 	{
-		long ball_spawn_count = game_engine_get_variant()->unknown60;
+		long ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
 		long capture_index = NONE;
 		long ball_index;
 
@@ -1059,6 +1054,9 @@ void oddball_engine_player_killed_player(
 
 				if (capture_index != NONE)
 				{
+					/* January and HCEA both retain this mode re-query inside
+					 * the already transfer-only arm.
+					 */
 					game_show_score_you_ally_enemy(
 						killing_player_index,
 						oddball_ball_transfer_by_killing() ? NONE : _oddball_message_you_are_it,
@@ -1080,14 +1078,14 @@ void oddball_engine_player_killed_player(
 	return;
 }
 
-boolean oddball_test_flag(
+static boolean oddball_test_flag(
 	long flag)
 {
 	boolean result = FALSE;
 
 	switch (flag)
 	{
-	case _game_engine_flag_kill_messages_show_score:
+	case _game_engine_test_flag_rasterize_score:
 		result = terminator_scoring_rules();
 		break;
 	}
@@ -1095,24 +1093,24 @@ boolean oddball_test_flag(
 	return result;
 }
 
-boolean oddball_test_trait(
+static boolean oddball_test_trait(
 	long player_index,
 	long trait)
 {
 	boolean result = FALSE;
 
-	if (trait != _oddball_trait_none)
+	if (trait != _game_trait_none)
 	{
 		if (player_has_ball(player_index))
-			result = trait == game_engine_get_variant()->unknown54;
+			result = trait == game_engine_get_variant()->oddball_variant_trait_with_ball;
 		else
-			result = trait == game_engine_get_variant()->unknown58;
+			result = trait == game_engine_get_variant()->oddball_variant_trait_without_ball;
 	}
 
 	return result;
 }
 
-boolean oddball_engine_display_score(
+static boolean oddball_engine_display_score(
 	long player_index,
 	long message,
 	long message_player_index,
@@ -1271,3 +1269,43 @@ boolean oddball_engine_display_score(
 
 	return result;
 }
+
+/* ---------- engine table */
+
+struct game_engine oddball_engine =
+{
+	"oddball",
+	game_engine_oddball,
+	oddball_engine_dispose,
+	oddball_engine_initialize_for_new_map,
+	oddball_engine_dispose_from_old_map,
+	oddball_engine_player_added,
+	oddball_engine_game_ending,
+	oddball_engine_game_starting,
+	oddball_engine_statistics_append,
+	oddball_engine_handle_client_message,
+	oddball_engine_handle_server_message,
+	oddball_engine_pregame_post_rasterize,
+	oddball_engine_post_rasterize,
+	oddball_engine_player_update,
+	oddball_engine_weapon_update,
+	oddball_weapon_pickup,
+	oddball_weapon_drop,
+	oddball_engine_update,
+	oddball_get_score,
+	oddball_get_score_string,
+	oddball_get_score_header_string,
+	oddball_get_team_score_string,
+	NULL,
+	oddball_engine_player_damaged_player,
+	oddball_engine_player_killed_player,
+	oddball_engine_display_score,
+	NULL,
+	oddball_engine_prespawn_player_update,
+	NULL,
+	NULL,
+	NULL,
+	oddball_test_flag,
+	oddball_test_trait,
+	NULL,
+};
