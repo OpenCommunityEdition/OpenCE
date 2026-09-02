@@ -192,9 +192,11 @@ symbols in this file:
 #include "game/player_control_runtime.h"
 #include "players.h"
 
+#include "game/game_globals.h"
 #include "items/weapons.h"
 #include "objects/objects.h"
 #include "saved games/game_state.h"
+#include "scenario/scenario.h"
 #include "units/unit_definitions.h"
 #include "units/units.h"
 #include "units/vehicle_definitions.h"
@@ -223,9 +225,25 @@ void player_aiming_vector_from_facing(
 	real_vector3d *facing_direction,
 	real_euler_angles2d const *facing_angles);
 
+static void player_control_modify_desired_angles(
+	short local_player_index,
+	real delta_yaw,
+	real delta_pitch);
+
 /* ---------- globals */
 
+boolean player_autoaim_flag = TRUE;
+boolean player_magnetism_flag = TRUE;
+boolean controls_swapped = TRUE;
+real player_look_zoomed_scale = 0.5f;
+
 struct player_control_globals_data *bss_0043ee30;
+short debug_input_target;
+real player_look_yaw_rate[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+real player_look_pitch_rate[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+boolean controls_enable_crouch;
+boolean controls_enable_doubled_spin;
+boolean controls_swap_doubled_spin_state;
 
 /* ---------- public code */
 
@@ -787,4 +805,209 @@ boolean player_control_action_test_look_relative_all_directions(
 		_player_control_look_relative_all_directions_flags);
 }
 
+void player_control_initialize_for_new_map(
+	void)
+{
+	struct player_control_globals_data *globals = player_control_globals;
+	short local_player_index;
+
+	globals->action_flags = 0;
+	globals->action_test_flags = 0;
+	globals->suppressed_action_flags = 0;
+	globals->flags = 0;
+
+	for (local_player_index = 0;
+		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
+		local_player_index++)
+	{
+		struct game_globals_player_control *constants = TAG_BLOCK_GET_ELEMENT(
+			&scenario_get_game_globals()->player_control,
+			0,
+			struct game_globals_player_control);
+
+		player_control_new_unit(local_player_index, NONE);
+		if (player_look_pitch_rate[local_player_index] == 0.f)
+		{
+			player_look_pitch_rate[local_player_index] =
+				constants->look_default_pitch_rate;
+		}
+		if (player_look_yaw_rate[local_player_index] == 0.f)
+		{
+			player_look_yaw_rate[local_player_index] =
+				constants->look_default_yaw_rate;
+		}
+	}
+	return;
+}
+
+void player_control_permanent_impulse(
+	short local_player_index,
+	real_euler_angles2d const *delta)
+{
+	match_assert("c:\\halo\\SOURCE\\game\\player_control.c", 0x467, delta);
+	player_control_modify_desired_angles(
+		local_player_index,
+		delta->yaw,
+		delta->pitch);
+	return;
+}
+
 /* ---------- private code */
+
+static void player_control_modify_desired_angles(
+	short local_player_index,
+	real delta_yaw,
+	real delta_pitch)
+{
+	struct player_control *player = player_control_get(local_player_index);
+	struct game_globals_player_control *constants = TAG_BLOCK_GET_ELEMENT(
+		&scenario_get_game_globals()->player_control,
+		0,
+		struct game_globals_player_control);
+	struct player_control_unit_camera_info camera_info;
+	real pitch_minimum = -DEGREES_TO_RADIANS(85.5f);
+	real pitch_maximum = DEGREES_TO_RADIANS(85.5f);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\player_control.c",
+		0x494,
+		valid_euler_angles2d(&player->desired_angles));
+	player_control_get_unit_camera_info(local_player_index, &camera_info);
+
+	player->desired_angles.yaw += delta_yaw;
+	if (camera_info.seat_index != NONE)
+	{
+		struct unit_datum *unit = unit_get(camera_info.unit_index);
+		struct unit_definition *definition = unit_definition_get(unit->definition_index);
+		struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+			&definition->unit.seats,
+			camera_info.seat_index,
+			struct unit_seat);
+
+		if (seat->yaw_minimum != 0.f || seat->yaw_maximum != 0.f)
+		{
+			struct object_marker marker;
+			real_euler_angles2d marker_angles;
+			real yaw_minimum;
+			real yaw_maximum;
+			real arc;
+			real to_maximum;
+			real to_minimum;
+
+			object_get_marker_by_name(
+				camera_info.unit_index,
+				seat->marker_name,
+				&marker,
+				1);
+			euler_angles2d_from_vector3d(&marker_angles, &marker.matrix.forward);
+			yaw_minimum = marker_angles.yaw + seat->yaw_minimum;
+			yaw_maximum = marker_angles.yaw + seat->yaw_maximum;
+			arc = signed_angular_difference(yaw_minimum, yaw_maximum);
+			to_maximum = signed_angular_difference(player->desired_angles.yaw, yaw_maximum);
+			to_minimum = signed_angular_difference(yaw_minimum, player->desired_angles.yaw);
+			if (arc < 0.f)
+			{
+				arc += _pi * 2.f;
+			}
+
+			if (!(to_maximum >= 0.f && to_maximum < arc) &&
+				!(to_minimum >= 0.f && to_minimum < arc))
+			{
+				if (fabs(to_minimum) < fabs(to_maximum))
+				{
+					player->desired_angles.yaw = yaw_minimum;
+				}
+				else
+				{
+					player->desired_angles.yaw = yaw_maximum;
+				}
+			}
+		}
+	}
+
+	while (player->desired_angles.yaw < 0.f)
+	{
+		player->desired_angles.yaw += _pi * 2.f;
+	}
+	while (player->desired_angles.yaw > _pi * 2.f)
+	{
+		player->desired_angles.yaw -= _pi * 2.f;
+	}
+
+	if (camera_info.camera)
+	{
+		struct unit_datum *unit = unit_get(camera_info.unit_index);
+		real pitch_autolevel = camera_info.camera->pitch_autolevel;
+
+		if (camera_info.camera->pitch_maximum != 0.f ||
+			camera_info.camera->pitch_minimum != 0.f)
+		{
+			pitch_minimum = camera_info.camera->pitch_minimum;
+			pitch_maximum = camera_info.camera->pitch_maximum;
+
+			if (camera_info.seat_index != NONE && unit->object.up.k > 0.2f)
+			{
+				real_euler_angles2d look_angles;
+				real_vector3d look_vector;
+				real tilt;
+
+				look_angles.yaw = player->desired_angles.yaw;
+				look_angles.pitch = 0.f;
+				vector3d_from_euler_angles2d(&look_vector, &look_angles);
+				tilt = _pi / 2.f - angle_between_vectors3d(&look_vector, &unit->object.up);
+				pitch_minimum -= tilt;
+				pitch_maximum -= tilt;
+				pitch_autolevel -= tilt;
+			}
+
+			pitch_minimum = PIN(
+				pitch_minimum,
+				-DEGREES_TO_RADIANS(85.5f),
+				DEGREES_TO_RADIANS(85.5f));
+			pitch_maximum = PIN(
+				pitch_maximum,
+				-DEGREES_TO_RADIANS(85.5f),
+				DEGREES_TO_RADIANS(85.5f));
+		}
+
+		if (pitch_autolevel != 0.f || player->unknown26)
+		{
+			real error = fabs(player->desired_angles.pitch - pitch_autolevel) * (2.f / _pi);
+
+			match_assert_valid_real(
+				"c:\\halo\\SOURCE\\game\\player_control.c",
+				0x4F2,
+				player->desired_angles.pitch);
+			if (pitch_autolevel != 0.f)
+			{
+				interpolate_scalar(
+					&player->desired_angles.pitch,
+					pitch_autolevel,
+					magnitude3d(&unit->object.translational_velocity) * error * 0.08f);
+			}
+			else
+			{
+				interpolate_scalar(
+					&player->desired_angles.pitch,
+					pitch_autolevel,
+					magnitude3d(&unit->object.translational_velocity) *
+						constants->look_autolevel_scale * error);
+			}
+			match_assert_valid_real(
+				"c:\\halo\\SOURCE\\game\\player_control.c",
+				0x4FD,
+				player->desired_angles.pitch);
+		}
+	}
+
+	interpolate_scalar(&player->pitch_minimum, pitch_minimum, _pi / 256.f);
+	interpolate_scalar(&player->pitch_maximum, pitch_maximum, _pi / 256.f);
+
+	player->desired_angles.pitch += delta_pitch;
+	player->desired_angles.pitch = PIN(
+		player->desired_angles.pitch,
+		player->pitch_minimum,
+		player->pitch_maximum);
+
+	return;
+}
