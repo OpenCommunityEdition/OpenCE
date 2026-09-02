@@ -503,5 +503,10 @@
     "unit": "source/camera/camera_scripting",
     "function": "_scripted_camera_update",
     "reason": "hardened COFF comparison proves all 1664 padded bytes and all 82 semantic relocations exact (SHA-256 cb504e5b44213920854f97d593ab2361bda073fcb0ffef531347b0c4b8565e06); objdiff reports a switch-table/local-label encoding false negative"
+  },
+  {
+    "unit": "source/game/game_engine_ctf",
+    "function": "_ctf_engine_display_score",
+    "reason": "hardened COFF comparison proves all 928 padded bytes and all 78 semantic relocations exact (SHA-256 df4518d31867315a05039fdcf8679ba2476011eeb70122ac00c6b6efef13f148); objdiff reports a switch-table/local-label ownership false negative"
   }
 ]

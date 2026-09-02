@@ -1,5 +1,10 @@
 # `game_engine_ctf.obj` small-families wave (2026-09-01)
 
+> This is the preserved worker ledger from the interrupted Fable session.
+> Final naming, ownership, data, accounting, park, and verification evidence is
+> recorded in
+> `game_engine_ctf_obj_fable_salvage_reconciliation_20260902.md`.
+
 ## Scope and provenance
 
 - Translation unit: `source/game/game_engine_ctf.c` (only file edited besides

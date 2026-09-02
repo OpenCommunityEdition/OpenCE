@@ -348,5 +348,16 @@
         }
       }
     ]
+  },
+  {
+    "unit": "source/game/game_engine_ctf",
+    "symbol": "_ctf_engine",
+    "allow_incomplete_unit": true,
+    "reason": "the source-complete but fuzzy-parked CTF object owns the exact callback table; csplit names the ctf string relocation as an undefined image symbol while MSVC emits the identically named select-any string COMDAT locally, and the hardened comparator proves all normalized bytes plus every relocation address, type, destination, and addend",
+    "measurements": {
+      "size": 136,
+      "relocation_count": 28,
+      "normalized_sha256": "45c41730d038fd3f985f7ccfd8a7e04aa02e2db549ac941386e7cd04c1e1d8c1"
+    }
   }
 ]

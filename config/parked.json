@@ -1982,6 +1982,25 @@
         },
         "objdiff_percent": 84.45783
       }
+    },
+    {
+      "unit": "source/game/game_engine_ctf",
+      "function": "_ctf_engine_weapon_update",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete CTF objective-weapon tick in ordinary typed C from January disassembly and assertions, the January engine-table role, and the independent HaloCEA implementation. The retained body handles single-flag swapping, unattended connected-flag return, warning and score messaging, carrier discovery, and both world/carrier goal markers through named cseries flags and typed weapon access. January and the candidate both occupy 576 padded bytes and contain the same 40-relocation behavior set; objdiff reports 77.044945 percent similarity. Their remaining differences are broad but coherent compiler choices: January preserves the weapon index in EDI while VC7 selects EBX, lowers the connected-map TEST_FLAG through shr/test instead of test ah, computes the opposite team before the handled-flag branch, and places the carrier/no-carrier goal blocks in the opposite fallthrough order. The fail-closed blocker classifier returns UNKNOWN, so this is honestly unclassified rather than assigned an invented recipe. Fable's bounded W3/W4 block-local team-index, W5 connected-flag local, W6 goal-polarity, Vw2 manual-bitshift, and combined variants did not close the residual and were rejected. No forced inline/noinline, barrier, volatile/register forcing, pragma, assembly, manual replacement for the retained cseries flag macros, raw address, fake dependency, representation pun, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the whole register/control-flow schedule.",
+      "measurements": {
+        "target": {
+          "size": 576,
+          "relocation_count": 40,
+          "normalized_sha256": "0c8e2649895a583167f4b4c8d53d9d29c7e4c0edbad2488e717d4517ce66d20b"
+        },
+        "base": {
+          "size": 576,
+          "relocation_count": 40,
+          "normalized_sha256": "ca4f3e8d94db6ebd18708ad5263816b8e2542424d9fcbbe35cbd33701e1f2a56"
+        },
+        "objdiff_percent": 77.044945
+      }
     }
   ]
 }

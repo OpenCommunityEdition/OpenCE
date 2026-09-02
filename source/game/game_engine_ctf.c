@@ -3,83 +3,83 @@ GAME_ENGINE_CTF.C
 
 symbols in this file:
 0009EB60 0060:
-	_code_0009eb60 (0000)
+	_ctf_create_flag_object (0000)
 0009EBC0 0010:
-	_code_0009ebc0 (0000)
+	_ctf_engine_dispose (0000)
 0009EBD0 0060:
-	_code_0009ebd0 (0000)
+	_create_the_flag (0000)
 0009EC30 0040:
-	_code_0009ec30 (0000)
+	_ctf_single_flag_what_is_up_message (0000)
 0009EC70 0010:
-	_code_0009ec70 (0000)
+	_ctf_engine_dispose_from_old_map (0000)
 0009EC80 0020:
-	_code_0009ec80 (0000)
+	_ctf_engine_player_added (0000)
 0009ECA0 0010:
-	_code_0009eca0 (0000)
+	_ctf_engine_game_ending (0000)
 0009ECB0 0010:
-	_code_0009ecb0 (0000)
+	_ctf_engine_game_starting (0000)
 0009ECC0 0010:
-	_code_0009ecc0 (0000)
+	_ctf_engine_statistics_append (0000)
 0009ECD0 0010:
-	_code_0009ecd0 (0000)
+	_ctf_engine_handle_client_message (0000)
 0009ECE0 0010:
-	_code_0009ece0 (0000)
+	_ctf_engine_handle_server_message (0000)
 0009ECF0 0010:
-	_code_0009ecf0 (0000)
+	_ctf_engine_pregame_post_rasterize (0000)
 0009ED00 0010:
-	_code_0009ed00 (0000)
+	_ctf_engine_post_rasterize (0000)
 0009ED10 00c0:
-	_code_0009ed10 (0000)
+	_ctf_award_capture (0000)
 0009EDD0 0040:
-	_code_0009edd0 (0000)
+	_ctf_flag_failure_sound (0000)
 0009EE10 0070:
-	_code_0009ee10 (0000)
+	_ctf_find_flag_carrier (0000)
 0009EE80 0080:
-	_code_0009ee80 (0000)
+	_ctf_engine_allow_pick_up (0000)
 0009EF00 0010:
-	_code_0009ef00 (0000)
+	_ctf_engine_player_damaged_player (0000)
 0009EF10 0010:
-	_code_0009ef10 (0000)
+	_ctf_engine_player_killed_player (0000)
 0009EF20 03a0:
-	_code_0009ef20 (0000)
+	_ctf_engine_display_score (0000)
 0009F2C0 0010:
-	_code_0009f2c0 (0000)
+	_ctf_engine_prespawn_player_update (0000)
 0009F2D0 0010:
-	_code_0009f2d0 (0000)
+	_ctf_state_message_update_warning (0000)
 0009F2E0 0040:
-	_code_0009f2e0 (0000)
+	_ctf_sound_update_warning (0000)
 0009F320 0020:
-	_code_0009f320 (0000)
+	_ctf_set_flag_warning (0000)
 0009F340 0040:
-	_code_0009f340 (0000)
+	_ctf_weapon_drop (0000)
 0009F380 0040:
-	_code_0009f380 (0000)
+	_ctf_get_score (0000)
 0009F3C0 0010:
-	_code_0009f3c0 (0000)
+	_ctf_test_flag (0000)
 0009F3D0 0040:
-	_code_0009f3d0 (0000)
+	_ctf_get_score_string (0000)
 0009F410 0060:
-	_code_0009f410 (0000)
+	_ctf_get_score_header_string (0000)
 0009F470 0030:
-	_code_0009f470 (0000)
+	_ctf_get_team_score_string (0000)
 0009F4A0 03d0:
-	_code_0009f4a0 (0000)
+	_ctf_engine_initialize_for_new_map (0000)
 0009F870 0050:
-	_code_0009f870 (0000)
+	_ctf_reset_flag (0000)
 0009F8C0 0090:
-	_code_0009f8c0 (0000)
+	_ctf_player_drop_flag (0000)
 0009F950 0050:
-	_code_0009f950 (0000)
+	_ctf_position_near_flag (0000)
 0009F9A0 0150:
-	_code_0009f9a0 (0000)
+	_ctf_engine_player_update (0000)
 0009FAF0 0240:
-	_code_0009faf0 (0000)
+	_ctf_engine_weapon_update (0000)
 0009FD30 0080:
-	_code_0009fd30 (0000)
+	_ctf_engine_update (0000)
 0009FDB0 0160:
-	_code_0009fdb0 (0000)
+	_ctf_weapon_pickup (0000)
 0009FF10 0120:
-	_code_0009ff10 (0000)
+	_ctf_engine_starting_location_rating (0000)
 0025BBC4 000f:
 	??_C@_0P@HPMPGFLN@created?5a?5flag?$AA@ (0000)
 0025BBD4 001a:
@@ -113,7 +113,7 @@ symbols in this file:
 002DE400 0088:
 	_ctf_engine (0000)
 0043E914 0030:
-	_bss_0043e914 (0000)
+	_ctf_globals (0000)
 */
 
 /* ---------- headers */
@@ -122,7 +122,9 @@ symbols in this file:
 #include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
 #include "game_engine.h"
+#include "game_engine_runtime.h"
 #include "players.h"
+#include "players_runtime.h"
 #include "items/weapons.h"
 #include "objects/objects.h"
 #include "scenario/scenario.h"
@@ -237,31 +239,6 @@ typedef char verify_ctf_globals_scores_offset[
 typedef char verify_ctf_globals_size[
 	sizeof(struct ctf_globals) == 0x30 ? 1 : -1];
 
-/* ---------- prototypes/GAME_ENGINE.C */
-
-void game_show_score_team(
-	long team_index,
-	long score);
-
-void game_show_score_you_ally_enemy(
-	long player_index,
-	long you_score,
-	long ally_score,
-	long enemy_score,
-	long other_player_index);
-
-void game_engine_flag_reset(
-	long weapon_index,
-	real_point3d const *position);
-
-/* ---------- prototypes/PLAYERS.C */
-
-short player_get_starting_location_count(
-	void);
-
-struct player_starting_location *player_get_starting_location(
-	short starting_location_index);
-
 /* ---------- prototypes */
 
 static long ctf_create_flag_object(
@@ -304,84 +281,89 @@ static boolean ctf_position_near_flag(
 
 /* ---------- globals */
 
-extern struct ctf_globals ctf_globals;
+static struct ctf_globals ctf_globals = { 0 };
 extern long timeout_for_endgame_sound;
 
-/* ---------- public code */
+/* ---------- code */
 
-void code_0009ebc0(
+static void ctf_engine_dispose(
 	void)
 {
 	return;
 }
 
-void code_0009ec70(
+static void ctf_engine_dispose_from_old_map(
 	void)
 {
 	return;
 }
 
-void code_0009eca0(
+static void ctf_engine_game_ending(
 	void)
 {
 	return;
 }
 
-void code_0009ecc0(
+static void ctf_engine_statistics_append(
+	long statistic)
+{
+	return;
+}
+
+static void ctf_engine_handle_client_message(
+	void *message)
+{
+	return;
+}
+
+static void ctf_engine_handle_server_message(
+	void *message)
+{
+	return;
+}
+
+static void ctf_engine_pregame_post_rasterize(
 	void)
 {
 	return;
 }
 
-void code_0009ecd0(
+static void ctf_engine_post_rasterize(
 	void)
 {
 	return;
 }
 
-void code_0009ece0(
-	void)
+static void ctf_engine_player_damaged_player(
+	long damaging_player_index,
+	long dead_player_index,
+	boolean damage_type)
 {
 	return;
 }
 
-void code_0009ecf0(
-	void)
+static void ctf_engine_player_killed_player(
+	long killing_player_index,
+	long killing_object_index,
+	long dead_player_index,
+	boolean friendly_fire)
 {
 	return;
 }
 
-void code_0009ed00(
-	void)
+static void ctf_engine_prespawn_player_update(
+	long player_index)
 {
 	return;
 }
 
-void code_0009ef00(
-	void)
+void ctf_state_message_update_warning(
+	long team_index)
 {
 	return;
 }
 
-void code_0009ef10(
-	void)
-{
-	return;
-}
-
-void code_0009f2c0(
-	void)
-{
-	return;
-}
-
-void code_0009f2d0(
-	void)
-{
-	return;
-}
-
-void code_0009ec80(
+static void ctf_engine_player_added(
 	long player_index)
 {
 	player_get(player_index);
@@ -389,7 +371,7 @@ void code_0009ec80(
 	return;
 }
 
-void code_0009ecb0(
+static void ctf_engine_game_starting(
 	void)
 {
 	game_engine_play_multiplayer_sound(
@@ -398,7 +380,7 @@ void code_0009ecb0(
 	return;
 }
 
-boolean code_0009ee80(
+static boolean ctf_engine_allow_pick_up(
 	long unit_index,
 	long weapon_index)
 {
@@ -422,7 +404,7 @@ boolean code_0009ee80(
 	return allow_pick_up;
 }
 
-wchar_t *code_0009f3d0(
+static wchar_t *ctf_get_score_string(
 	long player_index,
 	wchar_t *buffer)
 {
@@ -436,7 +418,7 @@ wchar_t *code_0009f3d0(
 	return buffer;
 }
 
-wchar_t *code_0009f470(
+static wchar_t *ctf_get_team_score_string(
 	long team_index,
 	wchar_t *buffer)
 {
@@ -448,7 +430,7 @@ wchar_t *code_0009f470(
 	return buffer;
 }
 
-boolean ctf_engine_initialize_for_new_map(
+static boolean ctf_engine_initialize_for_new_map(
 	void)
 {
 	struct scenario *scenario;
@@ -566,7 +548,7 @@ boolean ctf_engine_initialize_for_new_map(
 	return TRUE;
 }
 
-void ctf_engine_player_update(
+static void ctf_engine_player_update(
 	long player_index)
 {
 	struct player_datum *player = player_get(player_index);
@@ -631,7 +613,7 @@ void ctf_engine_player_update(
 	return;
 }
 
-void ctf_engine_weapon_update(
+static void ctf_engine_weapon_update(
 	long weapon_index,
 	struct weapon_datum *weapon)
 {
@@ -725,7 +707,7 @@ void ctf_engine_weapon_update(
 	return;
 }
 
-boolean ctf_weapon_pickup(
+static boolean ctf_weapon_pickup(
 	long weapon_index,
 	long player_index)
 {
@@ -797,7 +779,7 @@ boolean ctf_weapon_pickup(
 	return result;
 }
 
-void ctf_weapon_drop(
+static void ctf_weapon_drop(
 	long weapon_index)
 {
 	match_assert(
@@ -808,7 +790,7 @@ void ctf_weapon_drop(
 	return;
 }
 
-void ctf_engine_update(
+static void ctf_engine_update(
 	void)
 {
 	boolean game_over = FALSE;
@@ -829,7 +811,7 @@ void ctf_engine_update(
 	return;
 }
 
-long ctf_get_score(
+static long ctf_get_score(
 	long player_index,
 	enum get_score_type score_type)
 {
@@ -841,10 +823,10 @@ long ctf_get_score(
 	return ctf_globals.scores[player->team_index];
 }
 
-wchar_t *ctf_get_score_header_string(
+static wchar_t *ctf_get_score_header_string(
 	wchar_t *buffer)
 {
-	long string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+	long string_list_index = tag_loaded(UNICODE_STRING_LIST_TAG, "ui\\multiplayer_game_text");
 
 	wchar_t *string;
 
@@ -858,7 +840,7 @@ wchar_t *ctf_get_score_header_string(
 	return buffer;
 }
 
-boolean ctf_engine_display_score(
+static boolean ctf_engine_display_score(
 	long player_index,
 	long message,
 	long parameter2,
@@ -875,7 +857,7 @@ boolean ctf_engine_display_score(
 	switch (message)
 	{
 	case _ctf_message_score:
-		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+		string_list_index = tag_loaded(UNICODE_STRING_LIST_TAG, "ui\\multiplayer_game_text");
 		if (string_list_index != NONE)
 		{
 			string = unicode_string_list_get_string(
@@ -893,7 +875,7 @@ boolean ctf_engine_display_score(
 		break;
 
 	case _ctf_message_you_scored:
-		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+		string_list_index = tag_loaded(UNICODE_STRING_LIST_TAG, "ui\\multiplayer_game_text");
 		if (string_list_index != NONE)
 		{
 			string = unicode_string_list_get_string(
@@ -911,7 +893,7 @@ boolean ctf_engine_display_score(
 		break;
 
 	case _ctf_message_enemy_scored:
-		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+		string_list_index = tag_loaded(UNICODE_STRING_LIST_TAG, "ui\\multiplayer_game_text");
 		if (string_list_index != NONE)
 		{
 			string = unicode_string_list_get_string(
@@ -929,7 +911,7 @@ boolean ctf_engine_display_score(
 		break;
 
 	case _ctf_message_good_guys_scored:
-		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+		string_list_index = tag_loaded(UNICODE_STRING_LIST_TAG, "ui\\multiplayer_game_text");
 		if (string_list_index != NONE)
 		{
 			string = unicode_string_list_get_string(
@@ -951,7 +933,7 @@ boolean ctf_engine_display_score(
 		break;
 
 	case _ctf_message_you_returned_the_flag:
-		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+		string_list_index = tag_loaded(UNICODE_STRING_LIST_TAG, "ui\\multiplayer_game_text");
 		if (string_list_index != NONE)
 		{
 			string = unicode_string_list_get_string(
@@ -965,7 +947,7 @@ boolean ctf_engine_display_score(
 
 	case _ctf_message_enemy_has_the_flag:
 	case _ctf_message_enemy_has_the_flag_tick:
-		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+		string_list_index = tag_loaded(UNICODE_STRING_LIST_TAG, "ui\\multiplayer_game_text");
 		if (string_list_index != NONE)
 		{
 			string = unicode_string_list_get_string(
@@ -978,7 +960,7 @@ boolean ctf_engine_display_score(
 		break;
 
 	case _ctf_message_enemy_returned_the_flag:
-		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+		string_list_index = tag_loaded(UNICODE_STRING_LIST_TAG, "ui\\multiplayer_game_text");
 		if (string_list_index != NONE)
 		{
 			string = unicode_string_list_get_string(
@@ -991,7 +973,7 @@ boolean ctf_engine_display_score(
 		break;
 
 	case _ctf_message_good_guys_have_the_flag:
-		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+		string_list_index = tag_loaded(UNICODE_STRING_LIST_TAG, "ui\\multiplayer_game_text");
 		if (string_list_index != NONE)
 		{
 			string = unicode_string_list_get_string(
@@ -1004,7 +986,7 @@ boolean ctf_engine_display_score(
 		break;
 
 	case _ctf_message_good_guys_returned_the_flag:
-		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+		string_list_index = tag_loaded(UNICODE_STRING_LIST_TAG, "ui\\multiplayer_game_text");
 		if (string_list_index != NONE)
 		{
 			string = unicode_string_list_get_string(
@@ -1017,7 +999,7 @@ boolean ctf_engine_display_score(
 		break;
 
 	case _ctf_message_your_flag_was_returned:
-		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+		string_list_index = tag_loaded(UNICODE_STRING_LIST_TAG, "ui\\multiplayer_game_text");
 		if (string_list_index != NONE)
 		{
 			string = unicode_string_list_get_string(
@@ -1030,7 +1012,7 @@ boolean ctf_engine_display_score(
 		break;
 
 	case _ctf_message_enemy_flag_was_returned:
-		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+		string_list_index = tag_loaded(UNICODE_STRING_LIST_TAG, "ui\\multiplayer_game_text");
 		if (string_list_index != NONE)
 		{
 			string = unicode_string_list_get_string(
@@ -1043,7 +1025,7 @@ boolean ctf_engine_display_score(
 		break;
 
 	case _ctf_message_time_expired:
-		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+		string_list_index = tag_loaded(UNICODE_STRING_LIST_TAG, "ui\\multiplayer_game_text");
 		if (string_list_index != NONE)
 		{
 			string = unicode_string_list_get_string(
@@ -1056,7 +1038,7 @@ boolean ctf_engine_display_score(
 		break;
 
 	case _ctf_message_you_are_on_attack:
-		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+		string_list_index = tag_loaded(UNICODE_STRING_LIST_TAG, "ui\\multiplayer_game_text");
 		if (string_list_index != NONE)
 		{
 			string = unicode_string_list_get_string(
@@ -1069,7 +1051,7 @@ boolean ctf_engine_display_score(
 		break;
 
 	case _ctf_message_you_are_on_defense:
-		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+		string_list_index = tag_loaded(UNICODE_STRING_LIST_TAG, "ui\\multiplayer_game_text");
 		if (string_list_index != NONE)
 		{
 			string = unicode_string_list_get_string(
@@ -1089,7 +1071,7 @@ boolean ctf_engine_display_score(
 	return result;
 }
 
-real ctf_engine_starting_location_rating(
+static real ctf_engine_starting_location_rating(
 	long player_index,
 	struct player_starting_location const *starting_location)
 {
@@ -1122,7 +1104,7 @@ real ctf_engine_starting_location_rating(
 	return rating;
 }
 
-boolean ctf_test_flag(
+static boolean ctf_test_flag(
 	long flag)
 {
 	boolean result = FALSE;
@@ -1356,3 +1338,43 @@ static boolean ctf_position_near_flag(
 
 	return result;
 }
+
+/* ---------- engine table */
+
+struct game_engine ctf_engine =
+{
+	"ctf",
+	game_engine_ctf,
+	ctf_engine_dispose,
+	ctf_engine_initialize_for_new_map,
+	ctf_engine_dispose_from_old_map,
+	ctf_engine_player_added,
+	ctf_engine_game_ending,
+	ctf_engine_game_starting,
+	ctf_engine_statistics_append,
+	ctf_engine_handle_client_message,
+	ctf_engine_handle_server_message,
+	ctf_engine_pregame_post_rasterize,
+	ctf_engine_post_rasterize,
+	ctf_engine_player_update,
+	ctf_engine_weapon_update,
+	ctf_weapon_pickup,
+	ctf_weapon_drop,
+	ctf_engine_update,
+	ctf_get_score,
+	ctf_get_score_string,
+	ctf_get_score_header_string,
+	ctf_get_team_score_string,
+	ctf_engine_allow_pick_up,
+	ctf_engine_player_damaged_player,
+	ctf_engine_player_killed_player,
+	ctf_engine_display_score,
+	ctf_engine_starting_location_rating,
+	ctf_engine_prespawn_player_update,
+	NULL,
+	NULL,
+	NULL,
+	ctf_test_flag,
+	NULL,
+	NULL,
+};
