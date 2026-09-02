@@ -206,8 +206,8 @@ static void stack_memory_pool_unlock_block(
 	struct stack_memory_pool *pool,
 	struct stack_memory_pool_block *block);
 static struct stack_memory_pool_block *stack_memory_pool_allocate(
-	long allocation_size,
 	struct stack_memory_pool *pool,
+	unsigned long size,
 	char const *file,
 	unsigned long line);
 static struct stack_memory_pool_block *stack_memory_pool_new_block(
@@ -222,8 +222,8 @@ static struct stack_memory_pool_block *stack_memory_pool_new_block_clear(
 	unsigned long line);
 static struct stack_memory_pool_block *stack_memory_pool_resize_block(
 	struct stack_memory_pool *pool,
-	unsigned long allocation_size,
-	struct stack_memory_pool_block *block,
+	struct stack_memory_pool_block *reference,
+	unsigned long new_size,
 	char const *file,
 	unsigned long line);
 
@@ -285,10 +285,10 @@ void stack_memory_pool_reset(
 		stack_memory_pool_dispose_block(block, pool);
 		stack_memory_pool_lock_block(block, pool);
 		stack_memory_pool_unlock_block(pool, block);
-		stack_memory_pool_allocate(sizeof(*block), pool, __FILE__, __LINE__);
+		stack_memory_pool_allocate(pool, sizeof(*block), __FILE__, __LINE__);
 		stack_memory_pool_new_block(sizeof(*block), pool, __FILE__, __LINE__);
 		stack_memory_pool_new_block_clear(sizeof(*block), pool, __FILE__, __LINE__);
-		stack_memory_pool_resize_block(pool, sizeof(*block), block, __FILE__, __LINE__);
+		stack_memory_pool_resize_block(pool, block, sizeof(*block), __FILE__, __LINE__);
 	}
 
 	return;
@@ -421,7 +421,7 @@ struct stack_memory_pool_block *pool_new_handle(
 {
 	struct stack_memory_pool_block *block;
 
-	block = stack_memory_pool_allocate(allocation_size, pool, file, line);
+	block = stack_memory_pool_allocate(pool, allocation_size, file, line);
 	if (block)
 	{
 		pool->bytes_used += block->size_and_flags&0x7FFFFFFF;
@@ -447,7 +447,7 @@ struct stack_memory_pool_block *pool_new_handle_clear(
 {
 	struct stack_memory_pool_block *block;
 
-	block = stack_memory_pool_allocate(allocation_size, pool, file, line);
+	block = stack_memory_pool_allocate(pool, allocation_size, file, line);
 	if (block)
 	{
 		match_vassert(
@@ -498,7 +498,7 @@ boolean pool_resize_handle(
 	{
 		match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x22F, block);
 		old_block_size = block->size_and_flags&0x7FFFFFFF;
-		new_block = stack_memory_pool_resize_block(pool, allocation_size, block, file, line);
+		new_block = stack_memory_pool_resize_block(pool, block, allocation_size, file, line);
 		if (new_block)
 		{
 			*h = new_block;
@@ -529,7 +529,7 @@ void *pool_new_pointer(
 	struct stack_memory_pool_block *block;
 	void *pointer = NULL;
 
-	block = stack_memory_pool_allocate(allocation_size, pool, file, line);
+	block = stack_memory_pool_allocate(pool, allocation_size, file, line);
 	if (block)
 	{
 		stack_memory_pool_lock_block(block, pool);
@@ -561,7 +561,7 @@ void *pool_new_pointer_clear(
 	struct stack_memory_pool_block *block;
 	void *pointer = NULL;
 
-	block = stack_memory_pool_allocate(allocation_size, pool, file, line);
+	block = stack_memory_pool_allocate(pool, allocation_size, file, line);
 	if (block)
 	{
 		match_vassert(
@@ -614,7 +614,7 @@ void *pool_resize_pointer(
 		old_block_size = block->size_and_flags&0x7FFFFFFF;
 	}
 
-	new_block = stack_memory_pool_resize_block(pool, allocation_size, block, file, line);
+	new_block = stack_memory_pool_resize_block(pool, block, allocation_size, file, line);
 	if (new_block)
 	{
 		match_vassert(
@@ -1054,8 +1054,8 @@ unlock_block:
 }
 
 static struct stack_memory_pool_block *stack_memory_pool_allocate(
-	long allocation_size,
 	struct stack_memory_pool *pool,
+	unsigned long size,
 	char const *file,
 	unsigned long line)
 {
@@ -1069,9 +1069,9 @@ static struct stack_memory_pool_block *stack_memory_pool_allocate(
 		0x342,
 		pool && pool->base_address);
 	if (
-		(unsigned long)allocation_size <= 0 ||
-		(unsigned long)allocation_size > 0x7FFFFFFF ||
-		(unsigned long)allocation_size >= (unsigned long)pool->size)
+		size <= 0 ||
+		size > 0x7FFFFFFF ||
+		size >= (unsigned long)pool->size)
 	{
 		display_assert(
 			"invalid size",
@@ -1081,7 +1081,7 @@ static struct stack_memory_pool_block *stack_memory_pool_allocate(
 		return NULL;
 	}
 
-	aligned_block_size = allocation_size+sizeof(*block);
+	aligned_block_size = size+sizeof(*block);
 	free_space_in_pool_previous = NULL;
 	free_space = NULL;
 	while (aligned_block_size&3)
@@ -1204,7 +1204,7 @@ static struct stack_memory_pool_block *stack_memory_pool_new_block(
 	char const *file,
 	unsigned long line)
 {
-	return stack_memory_pool_allocate(allocation_size, pool, file, line);
+	return stack_memory_pool_allocate(pool, allocation_size, file, line);
 }
 
 static struct stack_memory_pool_block *stack_memory_pool_new_block_clear(
@@ -1215,7 +1215,7 @@ static struct stack_memory_pool_block *stack_memory_pool_new_block_clear(
 {
 	struct stack_memory_pool_block *block;
 
-	block = stack_memory_pool_allocate(allocation_size, pool, file, line);
+	block = stack_memory_pool_allocate(pool, allocation_size, file, line);
 	if (block)
 	{
 		match_vassert(
@@ -1230,40 +1230,40 @@ static struct stack_memory_pool_block *stack_memory_pool_new_block_clear(
 
 static struct stack_memory_pool_block *stack_memory_pool_resize_block(
 	struct stack_memory_pool *pool,
-	unsigned long allocation_size,
-	struct stack_memory_pool_block *block,
+	struct stack_memory_pool_block *reference,
+	unsigned long new_size,
 	char const *file,
 	unsigned long line)
 {
 	struct stack_memory_pool_block *new_block = NULL;
 
-	if (allocation_size > 0)
+	if (new_size > 0)
 	{
-		if (!block)
+		if (!reference)
 		{
-			new_block = stack_memory_pool_allocate(allocation_size, pool, file, line);
+			new_block = stack_memory_pool_allocate(pool, new_size, file, line);
 		}
 		else
 		{
 			match_vassert(
 				"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
 				0x2B4,
-				stack_memory_pool_valid_block(pool, block),
+				stack_memory_pool_valid_block(pool, reference),
 				"stack_memory_pool_valid_block(pool, reference)");
-			if (memory_block_get_user_size(block) >= allocation_size)
+			if (memory_block_get_user_size(reference) >= new_size)
 			{
-				new_block = block;
+				new_block = reference;
 			}
 			else
 			{
-				new_block = stack_memory_pool_allocate(allocation_size, pool, file, line);
+				new_block = stack_memory_pool_allocate(pool, new_size, file, line);
 				if (new_block)
 				{
 					csmemcpy(
 						memory_block_get_user_address(new_block),
-						memory_block_get_user_address(block),
-						memory_block_get_user_size(block));
-					stack_memory_pool_dispose_block(block, pool);
+						memory_block_get_user_address(reference),
+						memory_block_get_user_size(reference));
+					stack_memory_pool_dispose_block(reference, pool);
 				}
 			}
 		}
