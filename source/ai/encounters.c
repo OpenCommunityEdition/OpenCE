@@ -285,8 +285,23 @@ symbols in this file:
 #include "encounters.h"
 
 #include "actors.h"
+#include "actor_definitions.h"
+#include "actor_types.h"
+#include "ai_debug.h"
+#include "ai_scenario_definitions.h"
+#include "props.h"
+#include "cseries/errors.h"
+#include "editor/editor_stubs.h"
+#include "game/game.h"
+#include "game/game_engine.h"
+#include "game/players.h"
+#include "math/integer_math.h"
 #include "memory/data.h"
 #include "saved games/game_state.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
+#include "structures/structure_bsp_definitions.h"
+#include "units/units.h"
 
 #include <stddef.h>
 
@@ -295,13 +310,85 @@ symbols in this file:
 enum
 {
 	MAXIMUM_ENCOUNTERS = 128,
-	MAXIMUM_PURSUITS = 256,
-	PURSUIT_DATUM_SIZE = 0x28,
+	MAXIMUM_EXAMINED_PURSUIT_POSITIONS_PER_MAP = 256,
+	NUMBER_OF_ACTOR_INDICES_PER_EXAMINED_PURSUIT_POSITION = 6,
+};
+
+enum
+{
+	MAXIMUM_LINK_ENCOUNTERS_PER_ENCOUNTER = 3,
+	MAXIMUM_FIRING_POSITIONS_PER_ENCOUNTER = 512,
+	NUMBER_OF_POST_COMBAT_POSSIBILITIES = 2,
+	ENCOUNTER_REMAIN_ACTIVE_TIME = 150,
+	ENCOUNTER_UPDATE_INTERVAL = TICKS_PER_SECOND/2,
+};
+
+// encounter_definition.searching
+enum
+{
+	_encounter_searching_normal = 0,
+	_encounter_searching_never,
+	_encounter_searching_forever,
+	NUMBER_OF_ENCOUNTER_SEARCHING_TYPES,
+};
+
+// actor_type_definition.when_to_search_at_target/when_to_pursue/when_to_search_pursuit
+enum
+{
+	_actor_pursuit_always = 0,
+	_actor_pursuit_not_when_group,
+	_actor_pursuit_never,
+};
+
+// encounter_definition.flags (TU-local until ai_scenario_definitions.h names them)
+enum
+{
+	_encounter_not_initially_created_bit = 0,
+	_encounter_respawn_enabled_bit,
+	_encounter_blind_bit,
+	_encounter_deaf_bit,
+};
+
+// squad_definition.unique_leader_type (TU-local until ai_scenario_definitions.h names them)
+enum
+{
+	_unique_leader_type_normal = 0,
+	_unique_leader_type_none,
+	_unique_leader_type_random,
+	_unique_leader_type_sergeant_johnson,
+	_unique_leader_type_sergeant_lehto,
+	NUMBER_OF_UNIQUE_LEADER_TYPES,
+};
+
+enum
+{
+	_ai_reference_squad_bit = 15,
 };
 
 /* ---------- macros */
 
+#define pursuit_get(index) ((struct pursuit_datum *)datum_get(pursuit_data, (index)))
+
 /* ---------- structures */
+
+struct pursuit_datum
+{
+	short identifier;
+	short firing_position_index;
+	long last_examined_time;
+	short actor_count;
+	short next_actor_index_index;
+	long actor_indices[NUMBER_OF_ACTOR_INDICES_PER_EXAMINED_PURSUIT_POSITION];
+	long next_pursuit_index;
+};
+
+struct post_combat_possibility
+{
+	long actor_index;
+	real weight;
+	long prop_index;
+	long unit_index;
+};
 
 struct encounter_iterator
 {
@@ -325,6 +412,14 @@ struct actor_iterator
 	byte pad[2];
 	long index;
 	long next_index;
+};
+
+/* `ai_profile` is owned by ai_profile.c.  Encounters only owns the January
+ * encounter-update counter at +0x94, so keep the rest opaque here. */
+struct ai_profile_encounter_data
+{
+	byte __unknown0[0x94];
+	short encounter_update_count;
 };
 
 struct encounter_ai_globals_prefix
@@ -376,15 +471,89 @@ typedef char encounter_datum_deaf_offset_assert[
 	offsetof(struct encounter_datum, deaf) == 0x41 ? 1 : -1];
 typedef char actor_datum_next_actor_index_offset_assert[
 	offsetof(struct actor_datum, meta.next_actor_index) == 0x2C ? 1 : -1];
+typedef char pursuit_datum_size_assert[
+	sizeof(struct pursuit_datum) == 0x28 ? 1 : -1];
 
 /* ---------- prototypes */
 
 void encounter_update_status(
 	long encounter_index);
+void encounter_create(
+	long encounter_index,
+	short desired_platoon_index,
+	short desired_squad_index);
+short encounter_get_actor_starting_location(
+	long encounter_index,
+	short squad_index,
+	boolean spawning);
+void actor_verify_activation(
+	long actor_index);
+void actor_set_team(
+	long actor_index,
+	short team_index);
+long actor_place(
+	long actor_variant_definition_index,
+	long encounter_index,
+	short squad_index,
+	struct actor_starting_location *starting_location,
+	boolean upgrade_major,
+	short initial_variant);
+void ai_update_team_status(
+	void);
+boolean game_team_is_enemy(
+	short team_index0,
+	short team_index1);
+void ai_get_major_upgrade_chance(
+	short major_upgrade,
+	boolean *upgrade_major,
+	boolean *random,
+	real *chance);
+boolean ai_consider_major_upgrade(
+	long encounter_index,
+	short squad_index,
+	real chance);
+void ai_scripting_magically_see_players(
+	long ai_reference);
+void encounter_update_squads(
+	long encounter_index);
+void encounter_update_respawn(
+	long encounter_index);
+void encounter_update_platoons(
+	long encounter_index);
+void encounter_update_follow(
+	long encounter_index);
+void encounter_control_actors(
+	long encounter_index);
+
+static void encounter_clear_pursuit(
+	long encounter_index);
+static boolean encounter_place_actor(
+	long encounter_index,
+	short squad_index,
+	short initial_variant,
+	boolean spawning);
+static void encounterless_deactivate(
+	long actor_index);
+static void encounters_test_activation(
+	void);
+static long encounter_find_pursuit(
+	long encounter_index,
+	short firing_position_index,
+	long history_start_time,
+	boolean force_create);
+static boolean encounter_activate(
+	long encounter_index);
+static void encounter_deactivate(
+	long encounter_index);
+static void encounter_update_timers(
+	long encounter_index);
+short squad_get_actor_type(
+	struct squad_definition *squad_definition);
 
 /* ---------- globals */
 
 extern struct encounter_ai_globals_prefix *ai_globals;
+extern struct ai_profile_encounter_data ai_profile;
 
 struct data_array *encounter_data;
 struct platoon_datum *platoon_array;
@@ -405,7 +574,7 @@ void encounters_initialize(
 	platoon_array = (struct platoon_datum *)game_state_malloc("platoon", "platoon", MAXIMUM_PLATOONS_PER_MAP * sizeof(struct platoon_datum));
 	match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 116, platoon_array);
 
-	pursuit_data = game_state_data_new("ai pursuit", MAXIMUM_PURSUITS, PURSUIT_DATUM_SIZE);
+	pursuit_data = game_state_data_new("ai pursuit", MAXIMUM_EXAMINED_PURSUIT_POSITIONS_PER_MAP, sizeof(struct pursuit_datum));
 	match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 119, pursuit_data);
 
 	return;
@@ -560,4 +729,1244 @@ void encounters_update_dirty_status(
 	return;
 }
 
+long encounter_get_by_name(
+	char const *encounter_name)
+{
+	long encounter_index = NONE;
+	struct scenario *scenario = global_scenario_get();
+
+	if (scenario)
+	{
+		long i;
+
+		for (i = 0; i < scenario->ai_encounters.count; ++i)
+		{
+			struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+				&scenario->ai_encounters, i, struct encounter_definition);
+
+			if (csstrncmp(encounter_definition->name, encounter_name, TAG_STRING_LENGTH+1) == 0)
+			{
+				encounter_index = i;
+				break;
+			}
+		}
+	}
+
+	return encounter_index;
+}
+
+struct actor_datum *encounter_actor_iterator_prev(
+	struct encounter_actor_iterator *iterator)
+{
+	struct actor_datum *result = NULL;
+
+	if (ai_globals->ai_initialized_for_map)
+	{
+		long actor_index = encounter_get(iterator->encounter_index)->first_actor_index;
+		long previous_index = NONE;
+
+		while (actor_index != iterator->index && actor_index != NONE)
+		{
+			previous_index = actor_index;
+			result = actor_get(actor_index);
+			actor_index = result->meta.next_actor_index;
+		}
+
+		if (actor_index != iterator->index)
+			return NULL;
+
+		iterator->next_index = actor_index;
+		iterator->index = previous_index;
+	}
+
+	return result;
+}
+
+struct actor_datum *actor_iterator_next(
+	struct actor_iterator *iterator)
+{
+	struct actor_datum *result = NULL;
+
+	if (ai_globals->ai_initialized_for_map)
+	{
+		if (iterator->next_index == NONE)
+		{
+			struct encounter_datum *encounter;
+
+			do
+			{
+				encounter = (struct encounter_datum *)data_iterator_next(&iterator->encounter_iterator);
+				if (!encounter)
+					break;
+				if (!iterator->active_only || encounter->active)
+					iterator->next_index = encounter->first_actor_index;
+			} while (iterator->next_index == NONE);
+
+			if (!encounter && !iterator->iterated_encounterless_list)
+			{
+				iterator->next_index = ai_globals->first_encounterless_actor_index;
+				iterator->iterated_encounterless_list = TRUE;
+			}
+		}
+
+		do
+		{
+			long next_index = iterator->next_index;
+
+			iterator->index = next_index;
+			if (next_index == NONE)
+				break;
+
+			result = actor_get(next_index);
+			iterator->next_index = result->meta.next_actor_index;
+			if (iterator->active_only && !result->meta.active)
+				result = NULL;
+		} while (!result);
+	}
+
+	return result;
+}
+
+void encounter_modify_pursuit_desires(
+	long encounter_index,
+	short squad_index,
+	boolean *pursue_tenacious,
+	short *group_pursuit_restriction,
+	boolean *group_pursuit_controller,
+	short *desired_target_search,
+	short *desired_pursuit,
+	short *desired_pursuit_search)
+{
+	struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_encounters, encounter_index&0xffff, struct encounter_definition);
+	struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+		&encounter_definition->squads, squad_index, struct squad_definition);
+	short searching = encounter_definition->searching;
+
+	if (TEST_FLAG(squad_definition->flags, _squad_never_search_bit))
+		searching = _encounter_searching_never;
+
+	switch (searching)
+	{
+	case _encounter_searching_never:
+		*group_pursuit_restriction = 1;
+		*desired_pursuit = _actor_pursuit_never;
+		*desired_pursuit_search = _actor_pursuit_never;
+		break;
+
+	case _encounter_searching_forever:
+		*pursue_tenacious = TRUE;
+		*desired_target_search = _actor_pursuit_always;
+		*desired_pursuit = _actor_pursuit_always;
+		*desired_pursuit_search = _actor_pursuit_always;
+		*group_pursuit_controller = FALSE;
+		break;
+	}
+
+	return;
+}
+
+boolean encounter_link_activation(
+	long encounter_index,
+	short link_encounter_index)
+{
+	struct encounter_datum *encounter = encounter_get(encounter_index);
+	boolean result = FALSE;
+	short i;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 1916, (link_encounter_index >= 0) && (link_encounter_index < global_scenario_get()->ai_encounters.count));
+
+	for (i = 0; i < encounter->link_encounter_count; ++i)
+	{
+		if (encounter->link_encounter_indices[i] == link_encounter_index)
+		{
+			result = TRUE;
+			break;
+		}
+	}
+
+	if (!result && encounter->link_encounter_count < MAXIMUM_LINK_ENCOUNTERS_PER_ENCOUNTER)
+	{
+		encounter->link_encounter_indices[encounter->link_encounter_count] = link_encounter_index;
+		encounter->link_encounter_count++;
+		result = TRUE;
+	}
+
+	return result;
+}
+
+void encounterless_attach_actor(
+	long actor_index)
+{
+	if (ai_globals->ai_initialized_for_map)
+	{
+		struct actor_datum *actor = actor_get(actor_index);
+
+		match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 758, actor->meta.encounter_index==NONE);
+		match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 759, !actor->meta.encounterless);
+
+		actor->meta.next_actor_index = ai_globals->first_encounterless_actor_index;
+		ai_globals->first_encounterless_actor_index = actor_index;
+		actor->meta.encounterless = TRUE;
+		actor->meta.encounterless_active_timer = actor->meta.active ? 90 : 0;
+		actor_flush_position_indices(actor_index);
+	}
+
+	return;
+}
+
+boolean encounter_mark_examined_pursuit_position(
+	long encounter_index,
+	long actor_index,
+	short firing_position_index,
+	long history_start_time)
+{
+	boolean marked = FALSE;
+	long pursuit_index = encounter_find_pursuit(encounter_index, firing_position_index, history_start_time, TRUE);
+
+	if (pursuit_index != NONE)
+	{
+		struct pursuit_datum *pursuit = pursuit_get(pursuit_index);
+		short i;
+
+		match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 1031, pursuit->firing_position_index == firing_position_index);
+
+		for (i = 0; i < NUMBER_OF_ACTOR_INDICES_PER_EXAMINED_PURSUIT_POSITION; ++i)
+		{
+			if (pursuit->actor_indices[i] == actor_index)
+				break;
+		}
+
+		if (i >= NUMBER_OF_ACTOR_INDICES_PER_EXAMINED_PURSUIT_POSITION)
+		{
+			match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 1044, (pursuit->next_actor_index_index >= 0) && (pursuit->next_actor_index_index < NUMBER_OF_ACTOR_INDICES_PER_EXAMINED_PURSUIT_POSITION));
+			pursuit->actor_indices[pursuit->next_actor_index_index] = actor_index;
+			pursuit->next_actor_index_index = (pursuit->next_actor_index_index+1) % NUMBER_OF_ACTOR_INDICES_PER_EXAMINED_PURSUIT_POSITION;
+			pursuit->actor_count++;
+			marked = TRUE;
+		}
+
+		pursuit->last_examined_time = game_time_get();
+	}
+
+	return marked;
+}
+
+void encounter_force_activate(
+	long encounter_index)
+{
+	encounter_get(encounter_index)->remain_active_timer = ENCOUNTER_REMAIN_ACTIVE_TIME;
+	encounter_activate(encounter_index);
+
+	return;
+}
+
+void encounter_force_deactivate(
+	long encounter_index)
+{
+	encounter_get(encounter_index)->remain_active_timer = 0;
+	encounter_deactivate(encounter_index);
+
+	return;
+}
+
+void encounter_set_respawn(
+	long encounter_index,
+	boolean respawn)
+{
+	if (ai_globals->ai_initialized_for_map)
+	{
+		encounter_get(encounter_index)->respawn_enabled = respawn;
+		encounter_force_activate(encounter_index);
+	}
+
+	return;
+}
+
+void encounter_squad_timer_expire(
+	long encounter_index,
+	short squad_index)
+{
+	struct encounter_datum *encounter = encounter_get(encounter_index);
+	struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
+	struct squad_datum *squad = encounter_get_squad(encounter, squad_index);
+	struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+		&encounter_definition->squads, squad_index, struct squad_definition);
+
+	squad->delay_timer = 0;
+
+	if (TEST_FLAG(squad_definition->flags, _squad_magic_sight_after_timer_bit))
+	{
+		ai_scripting_magically_see_players(
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index) | ((short)(FLAG(_ai_reference_squad_bit) | (squad_index&0xff)) << SHORT_BITS));
+	}
+
+	if (ai_debug.print_rules)
+		console_printf(FALSE, "%s/%s: delay timer finished", encounter_definition->name, squad_definition->name);
+
+	return;
+}
+
+void encounters_create_for_new_map(
+	void)
+{
+	struct scenario *scenario = global_scenario_get();
+	struct encounter_iterator iterator;
+	struct encounter_datum *encounter;
+
+	encounter_iterator_new(&iterator, FALSE);
+	while ((encounter = encounter_iterator_next(&iterator)) != NULL)
+	{
+		struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+			&scenario->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.index), struct encounter_definition);
+		boolean create = !TEST_FLAG(encounter_definition->flags, _encounter_not_initially_created_bit);
+
+		if (DATUM_INDEX_TO_ABSOLUTE_INDEX(ai_debug.selected_squad_index) == DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.index) || create)
+		{
+			encounter_create(iterator.index, NONE, NONE);
+		}
+	}
+
+	return;
+}
+
+void encounters_unit_died(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	if (unit->object.owner_team_index != NONE)
+	{
+		struct encounter_iterator iterator;
+		struct encounter_datum *encounter;
+
+		encounter_iterator_new(&iterator, TRUE);
+		while ((encounter = encounter_iterator_next(&iterator)) != NULL)
+		{
+			if (game_team_is_enemy(encounter->team_index, unit->object.owner_team_index) &&
+				encounter->enemy_target && !encounter->stand_down && !encounter->post_combat)
+			{
+				encounter->enemies_defeated++;
+			}
+		}
+	}
+
+	return;
+}
+
+void encounter_attach_unit(
+	long encounter_index,
+	long unit_index)
+{
+	struct encounter_datum *encounter = encounter_get(encounter_index);
+	struct unit_datum *unit = unit_get(unit_index);
+
+	if (unit->unit.swarm_actor_index != NONE)
+	{
+		struct actor_datum *actor = actor_get(unit->unit.swarm_actor_index);
+
+		match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 603, actor->meta.encounter_index == encounter_index);
+	}
+	else
+	{
+		struct actor_datum *actor = actor_get(unit->unit.actor_index);
+
+		match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 609, actor->meta.encounter_index == encounter_index);
+		match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 610, actor->meta.unit_index == unit_index);
+	}
+
+	if (!game_engine_running() && encounter->team_index == 0)
+	{
+		encounter->team_index = unit->object.owner_team_index;
+		if (encounter->first_actor_index != NONE)
+			ai_update_team_status();
+	}
+
+	return;
+}
+
+boolean encounter_spawn_actor(
+	long encounter_index,
+	short squad_index)
+{
+	if (ai_globals->ai_initialized_for_map && encounter_place_actor(encounter_index, squad_index, 0, TRUE))
+	{
+		struct encounter_datum *encounter = encounter_get(encounter_index);
+		struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
+		struct squad_datum *squad = encounter_get_squad(encounter, squad_index);
+		struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+			&encounter_definition->squads, squad_index, struct squad_definition);
+
+		encounter->current_count++;
+		squad->current_count++;
+		if (squad_definition->respawn_total_count > 0)
+			squad->respawn_actors_left--;
+
+		encounter->respawn_delay_ticks = real_random_range(encounter_definition->respawn_time_lower_bound, encounter_definition->respawn_time_upper_bound) * TICKS_PER_SECOND;
+		squad->respawn_delay_ticks = real_random_range(squad_definition->respawn_time_lower_bound, squad_definition->respawn_time_upper_bound) * TICKS_PER_SECOND;
+	}
+
+	/* BUG (preserved for exact matching): January returns FALSE on every path, the spawn result is
+	 * never reported. A corrected build should return TRUE after a successful placement. */
+	return FALSE;
+}
+
+void encounter_verify_firing_position_owner_actor_indices(
+	long encounter_index)
+{
+	struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
+	long owner_actor_indices[MAXIMUM_FIRING_POSITIONS_PER_ENCOUNTER];
+	struct encounter_actor_iterator iterator;
+	struct actor_datum *actor;
+
+	csmemset(owner_actor_indices, NONE, encounter_definition->firing_positions.count*sizeof(long));
+
+	encounter_actor_iterator_new(&iterator, encounter_index);
+	while ((actor = encounter_actor_iterator_next(&iterator)) != NULL)
+	{
+		if (actor->firing_positions.current_position_index != NONE)
+		{
+			match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 302, actor->firing_positions.current_position_index>=0 && actor->firing_positions.current_position_index < encounter_definition->firing_positions.count);
+			match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 303, owner_actor_indices[actor->firing_positions.current_position_index]==NONE);
+			owner_actor_indices[actor->firing_positions.current_position_index] = iterator.index;
+		}
+	}
+
+	return;
+}
+
+void encounter_build_firing_position_owner_actor_indices(
+	long encounter_index,
+	long *firing_position_owner_actor_indices)
+{
+	struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
+	struct encounter_actor_iterator iterator;
+	struct actor_datum *actor;
+
+	csmemset(firing_position_owner_actor_indices, NONE, encounter_definition->firing_positions.count*sizeof(long));
+
+	encounter_actor_iterator_new(&iterator, encounter_index);
+	while ((actor = encounter_actor_iterator_next(&iterator)) != NULL)
+	{
+		if (actor->firing_positions.current_position_index != NONE)
+		{
+			match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 332, actor->firing_positions.current_position_index>=0 && actor->firing_positions.current_position_index < encounter_definition->firing_positions.count);
+			match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 333, firing_position_owner_actor_indices[actor->firing_positions.current_position_index]==NONE);
+			firing_position_owner_actor_indices[actor->firing_positions.current_position_index] = iterator.index;
+		}
+	}
+
+	return;
+}
+
+void encounterless_detach_actor(
+	long actor_index)
+{
+	if (ai_globals->ai_initialized_for_map)
+	{
+		struct actor_datum *actor = actor_get(actor_index);
+		long *actor_index_reference;
+
+		match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 782, actor->meta.encounterless);
+		match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 783, actor->meta.encounter_index == NONE);
+		match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 784, actor->meta.squad_index == NONE);
+		match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 785, actor->meta.platoon_index == NONE);
+
+		for (actor_index_reference = &ai_globals->first_encounterless_actor_index;
+			*actor_index_reference != actor_index;
+			actor_index_reference = &actor_get(*actor_index_reference)->meta.next_actor_index)
+		{
+			match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 796, *actor_index_reference!=NONE);
+		}
+
+		*actor_index_reference = actor->meta.next_actor_index;
+		actor->meta.encounterless = FALSE;
+		actor->meta.next_actor_index = NONE;
+		actor->meta.force_active = FALSE;
+	}
+
+	return;
+}
+
+void encounter_detach_actor(
+	long actor_index,
+	boolean died)
+{
+	if (ai_globals->ai_initialized_for_map)
+	{
+		struct actor_datum *actor = actor_get(actor_index);
+
+		if (actor->meta.encounter_index != NONE)
+		{
+			struct encounter_datum *encounter = encounter_get(actor->meta.encounter_index);
+			long *actor_index_reference;
+
+			for (actor_index_reference = &encounter->first_actor_index;
+				*actor_index_reference != actor_index;
+				actor_index_reference = &actor_get(*actor_index_reference)->meta.next_actor_index)
+			{
+				match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 544, *actor_index_reference!=NONE);
+			}
+			*actor_index_reference = actor->meta.next_actor_index;
+
+			if (!died)
+			{
+				struct squad_datum *squad = encounter_get_squad(encounter, actor->meta.squad_index);
+
+				match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 556, encounter->original_count > 0);
+				encounter->original_count--;
+
+				if (actor->meta.unique_leader)
+				{
+					match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 561, encounter->unique_leader_count > 0);
+					encounter->unique_leader_count--;
+				}
+
+				match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 565, squad->original_count > 0);
+				squad->original_count--;
+
+				if (actor->meta.platoon_index != NONE)
+				{
+					struct platoon_datum *platoon = encounter_get_platoon(encounter, actor->meta.platoon_index);
+
+					match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 573, platoon->original_count > 0);
+					platoon->original_count--;
+				}
+			}
+
+			actor->meta.next_actor_index = NONE;
+			actor->meta.encounter_index = NONE;
+			actor->meta.platoon_index = NONE;
+			actor->meta.squad_index = NONE;
+			encounter->status_dirty = TRUE;
+		}
+	}
+
+	return;
+}
+
+void encounter_stand_down(
+	long encounter_index)
+{
+	struct encounter_datum *encounter = encounter_get(encounter_index);
+	struct encounter_actor_iterator iterator;
+	struct actor_datum *actor;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 2431, !encounter->enemy_visible);
+
+	encounter->stand_down = TRUE;
+	encounter->enemies_defeated = 0;
+	encounter_clear_pursuit(encounter_index);
+
+	encounter_actor_iterator_new(&iterator, encounter_index);
+	while ((actor = encounter_actor_iterator_next(&iterator)) != NULL)
+	{
+		struct prop_iterator prop_iterator;
+		struct prop_datum *prop;
+
+		prop_iterator_new(&prop_iterator, iterator.index);
+		while ((prop = prop_iterator_next(&prop_iterator)) != NULL)
+		{
+			if (prop->state >= _prop_state_uninspected_orphan && prop->state <= _prop_state_inspected_orphan &&
+				prop->enemy && prop_iterator.index != actor->target.target_prop_index)
+			{
+				struct prop_datum *parent_prop;
+
+				match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 2458, prop->parent_prop_index != NONE);
+				parent_prop = prop_get(prop->parent_prop_index);
+				match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 2463, parent_prop->orphan_prop_index == prop_iterator.index);
+				parent_prop->orphan_prop_index = NONE;
+
+				actor_switch_props(iterator.index, prop_iterator.index, NONE);
+				prop_delete(iterator.index, prop_iterator.index);
+			}
+		}
+	}
+
+	return;
+}
+
+void encounter_attach_actor(
+	long actor_index,
+	long encounter_index,
+	short squad_index,
+	boolean has_previous_team)
+{
+	if (ai_globals->ai_initialized_for_map)
+	{
+		struct actor_datum *actor = actor_get(actor_index);
+		struct actor_definition *actor_definition = actor_definition_get(actor->meta.definition_index); // January fetches the definition but never reads it
+		struct encounter_datum *encounter = encounter_get(encounter_index);
+		struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
+		struct squad_datum *squad = encounter_get_squad(encounter, squad_index);
+		struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+			&encounter_definition->squads, squad_index, struct squad_definition);
+		short platoon_index = squad_definition->platoon_index;
+		boolean activated = FALSE;
+
+		match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 650, actor->meta.encounter_index==NONE);
+
+		actor->meta.disconnected_encounter_index = NONE;
+		actor->meta.disconnected_squad_index = NONE;
+		actor->meta.next_actor_index = encounter->first_actor_index;
+		encounter->first_actor_index = actor_index;
+
+		if (platoon_index < 0 || platoon_index >= encounter_definition->platoons.count)
+			platoon_index = NONE;
+
+		actor->meta.encounter_index = encounter_index;
+		actor->meta.squad_index = squad_index;
+		actor->meta.platoon_index = platoon_index;
+
+		if (actor->meta.active && !actor->meta.dormant)
+		{
+			encounter_get(encounter_index)->remain_active_timer = ENCOUNTER_REMAIN_ACTIVE_TIME;
+			activated = encounter_activate(encounter_index);
+		}
+
+		if (!activated)
+		{
+			actor_set_active(actor_index, encounter->active);
+			if (encounter->active)
+				actor_set_dormant(actor_index, FALSE);
+		}
+
+		if (actor->meta.unit_index != NONE)
+			encounter_attach_unit(encounter_index, actor->meta.unit_index);
+
+		if (actor->meta.team_index != encounter->team_index)
+		{
+			if (has_previous_team)
+			{
+				if (encounter->current_count == 0)
+				{
+					encounter->team_index = actor->meta.team_index;
+					ai_update_team_status();
+				}
+				else
+				{
+					error(_error_silent, "WARNING: actor changing to encounter %s/%s is being forced to change teams", encounter_definition->name, squad_definition->name);
+					actor_set_team(actor_index, encounter->team_index);
+				}
+			}
+			else
+			{
+				actor_set_team(actor_index, encounter->team_index);
+			}
+		}
+
+		encounter->original_count++;
+		squad->original_count++;
+		if (actor->meta.unique_leader)
+			encounter->unique_leader_count++;
+
+		if (platoon_index != NONE)
+		{
+			struct platoon_datum *platoon = encounter_get_platoon(encounter, platoon_index);
+
+			actor->external_orders.defending = platoon->defending;
+			actor->emotions.currently_defending = platoon->defending;
+			platoon->original_count++;
+		}
+
+		encounter->status_dirty = TRUE;
+	}
+
+	return;
+}
+
+void encounter_create(
+	long encounter_index,
+	short desired_platoon_index,
+	short desired_squad_index)
+{
+	if (ai_globals->ai_initialized_for_map)
+	{
+		struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
+		boolean all_squads = desired_platoon_index == NONE && desired_squad_index == NONE;
+		short squad_index;
+
+		if (ai_debug.print_placement)
+		{
+			if (desired_platoon_index != NONE)
+			{
+				console_printf(FALSE, "ai_place %s/%s", encounter_definition->name,
+					TAG_BLOCK_GET_ELEMENT(&encounter_definition->platoons, desired_platoon_index, struct platoon_definition)->name);
+			}
+			else if (desired_squad_index != NONE)
+			{
+				console_printf(FALSE, "ai_place %s/%s", encounter_definition->name,
+					TAG_BLOCK_GET_ELEMENT(&encounter_definition->squads, desired_squad_index, struct squad_definition)->name);
+			}
+			else
+			{
+				console_printf(FALSE, "ai_place %s", encounter_definition->name);
+			}
+		}
+
+		for (squad_index = 0; squad_index < encounter_definition->squads.count; ++squad_index)
+		{
+			struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+				&encounter_definition->squads, squad_index, struct squad_definition);
+			short initial_variant = 0;
+			short actor_count;
+			short actor_type;
+			short i;
+
+			if (!all_squads && squad_index != desired_squad_index)
+			{
+				if (squad_definition->platoon_index == NONE || squad_definition->platoon_index != desired_platoon_index)
+					continue;
+			}
+
+			switch (game_difficulty_level_get())
+			{
+			case _game_difficulty_level_easy:
+			case _game_difficulty_level_normal:
+				actor_count = squad_definition->min_count;
+				break;
+			case _game_difficulty_level_hard:
+				actor_count = (squad_definition->max_count + squad_definition->min_count) / 2;
+				break;
+			case _game_difficulty_level_impossible:
+				actor_count = squad_definition->max_count;
+				break;
+			default:
+				match_vassert("c:\\halo\\SOURCE\\ai\\encounters.c", 1730, FALSE, NULL);
+			}
+
+			actor_type = squad_get_actor_type(squad_definition);
+
+			switch (squad_definition->unique_leader_type)
+			{
+			case _unique_leader_type_normal:
+				{
+					struct encounter_datum *encounter = encounter_get(encounter_index);
+					boolean create_leader = FALSE;
+
+					if (actor_type == _actor_marine)
+					{
+						if (encounter->unique_leader_count == 0)
+							create_leader = encounter->original_count + actor_count >= 4;
+						else if (encounter->unique_leader_count == 1)
+							create_leader = encounter->original_count + actor_count >= 10;
+					}
+
+					if (ai_debug.print_placement)
+					{
+						console_printf(FALSE, "%s/%s: %d current %d leaders, create %d -> %s",
+							encounter_definition->name, squad_definition->name,
+							encounter->original_count, encounter->unique_leader_count, actor_count,
+							create_leader ? "new leader" : "no leader");
+					}
+
+					if (!create_leader)
+						break;
+				}
+				// fall through
+			case _unique_leader_type_random:
+				if (actor_type == _actor_marine)
+					initial_variant = 100 + random_range(0, 2);
+				break;
+			case _unique_leader_type_sergeant_johnson:
+				if (actor_type == _actor_marine)
+					initial_variant = 100;
+				break;
+			case _unique_leader_type_sergeant_lehto:
+				if (actor_type == _actor_marine)
+					initial_variant = 101;
+				break;
+			case _unique_leader_type_none:
+				break;
+			}
+
+			for (i = 0; i < actor_count; ++i)
+			{
+				encounter_place_actor(encounter_index, squad_index, initial_variant, FALSE);
+				initial_variant = 0;
+			}
+		}
+
+		encounter_update_status(encounter_index);
+		encounters_test_activation();
+	}
+
+	return;
+}
+
+void encounters_update(
+	void)
+{
+	long time = game_time_get();
+	short phase;
+	struct encounter_iterator iterator;
+	struct encounter_datum *encounter;
+
+	if (time % TICKS_PER_SECOND == 0)
+	{
+		encounters_update_dirty_status();
+		encounters_test_activation();
+	}
+	phase = time % ENCOUNTER_UPDATE_INTERVAL;
+
+	encounter_iterator_new(&iterator, TRUE);
+	while ((encounter = encounter_iterator_next(&iterator)) != NULL)
+	{
+		long encounter_index = iterator.index;
+
+		ai_profile.encounter_update_count++;
+		if (DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index) % ENCOUNTER_UPDATE_INTERVAL == phase)
+		{
+			encounter_update_status(encounter_index);
+			encounter_update_timers(encounter_index);
+			encounter_update_respawn(encounter_index);
+			encounter_update_squads(encounter_index);
+			encounter_update_platoons(encounter_index);
+			encounter_update_follow(encounter_index);
+			encounter_control_actors(encounter_index);
+		}
+	}
+
+	return;
+}
+
 /* ---------- private code */
+
+static void encounter_clear_pursuit(
+	long encounter_index)
+{
+	struct encounter_datum *encounter = encounter_get(encounter_index);
+	long pursuit_index;
+
+	for (pursuit_index = encounter->first_pursuit_index; pursuit_index != NONE; pursuit_index = encounter->first_pursuit_index)
+	{
+		encounter->first_pursuit_index = pursuit_get(pursuit_index)->next_pursuit_index;
+		datum_delete(pursuit_data, pursuit_index);
+	}
+
+	return;
+}
+
+static long encounter_find_pursuit(
+	long encounter_index,
+	short firing_position_index,
+	long history_start_time,
+	boolean force_create)
+{
+	struct encounter_datum *encounter = encounter_get(encounter_index);
+	long pursuit_index = encounter->first_pursuit_index;
+	boolean reset = FALSE;
+
+	while (pursuit_index != NONE)
+	{
+		struct pursuit_datum *pursuit = pursuit_get(pursuit_index);
+
+		if (pursuit->firing_position_index == firing_position_index)
+		{
+			if (pursuit->last_examined_time < history_start_time)
+				reset = TRUE;
+			break;
+		}
+
+		pursuit_index = pursuit->next_pursuit_index;
+	}
+
+	if (pursuit_index == NONE)
+	{
+		if (force_create)
+		{
+			pursuit_index = datum_new(pursuit_data);
+			if (pursuit_index != NONE)
+			{
+				struct pursuit_datum *pursuit = pursuit_get(pursuit_index);
+
+				pursuit->firing_position_index = firing_position_index;
+				pursuit->next_pursuit_index = encounter->first_pursuit_index;
+				encounter->first_pursuit_index = pursuit_index;
+				reset = TRUE;
+			}
+			else
+			{
+				error(_error_silent, "WARNING: too many actors searching, exceeded MAXIMUM_EXAMINED_PURSUIT_POSITIONS_PER_MAP (%d)", MAXIMUM_EXAMINED_PURSUIT_POSITIONS_PER_MAP);
+			}
+		}
+	}
+
+	if (reset)
+	{
+		struct pursuit_datum *pursuit = pursuit_get(pursuit_index);
+
+		pursuit->last_examined_time = NONE;
+		pursuit->actor_count = 0;
+		pursuit->next_actor_index_index = 0;
+		csmemset(pursuit->actor_indices, NONE, sizeof(pursuit->actor_indices));
+
+		if (!force_create)
+			return NONE;
+	}
+
+	return pursuit_index;
+}
+
+static boolean encounter_activate(
+	long encounter_index)
+{
+	struct encounter_datum *encounter = encounter_get(encounter_index);
+	struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_encounters, encounter_index&0xffff, struct encounter_definition);
+
+	if (encounter_definition->runtime_structure_bsp_reference_index == NONE ||
+		encounter_definition->runtime_structure_bsp_reference_index == global_structure_bsp_index)
+	{
+		if (!encounter->active)
+		{
+			struct encounter_actor_iterator iterator;
+
+			encounter_actor_iterator_new(&iterator, encounter_index);
+			while (encounter_actor_iterator_next(&iterator))
+				actor_set_active(iterator.index, TRUE);
+		}
+
+		encounter->last_active_time = game_time_get();
+		encounter->active = TRUE;
+	}
+
+	return encounter->active;
+}
+
+static void encounter_deactivate(
+	long encounter_index)
+{
+	struct encounter_actor_iterator iterator;
+	struct actor_datum *actor;
+
+	encounter_get(encounter_index)->active = FALSE;
+	encounter_clear_pursuit(encounter_index);
+
+	encounter_actor_iterator_new(&iterator, encounter_index);
+	while ((actor = encounter_actor_iterator_next(&iterator)) != NULL)
+	{
+		if (actor->meta.active)
+			actor_set_active(iterator.index, FALSE);
+		actor_verify_activation(iterator.index);
+	}
+
+	return;
+}
+
+short squad_get_actor_type(
+	struct squad_definition *squad_definition)
+{
+	struct scenario *scenario = global_scenario_get();
+	short actor_palette_index = squad_definition->actor_palette_index;
+	short actor_type = _actor_none;
+
+	if (actor_palette_index >= 0 && actor_palette_index < scenario->ai_actor_palette.count)
+	{
+		long actor_variant_definition_index = TAG_BLOCK_GET_ELEMENT(
+			&scenario->ai_actor_palette, actor_palette_index, struct tag_reference)->index;
+
+		if (actor_variant_definition_index != NONE)
+		{
+			long actor_definition_index = actor_variant_definition_get(actor_variant_definition_index)->actor_reference.index;
+
+			if (actor_definition_index != NONE)
+				actor_type = actor_definition_get(actor_definition_index)->type;
+		}
+	}
+
+	return actor_type;
+}
+
+boolean encounter_post_combat_add_possibility(
+	struct post_combat_possibility *possibility_array,
+	long actor_index,
+	real weight,
+	long prop_index,
+	long unit_index)
+{
+	boolean added = FALSE;
+	short i, j;
+
+	for (i = 0; i < NUMBER_OF_POST_COMBAT_POSSIBILITIES; ++i)
+	{
+		if (weight > possibility_array[i].weight)
+		{
+			for (j = NUMBER_OF_POST_COMBAT_POSSIBILITIES-1; j > i; --j)
+				possibility_array[j] = possibility_array[j-1];
+
+			possibility_array[i].weight = weight;
+			possibility_array[i].actor_index = actor_index;
+			possibility_array[i].prop_index = prop_index;
+			possibility_array[i].unit_index = unit_index;
+			added = TRUE;
+		}
+	}
+
+	return added;
+}
+
+static boolean encounter_place_actor(
+	long encounter_index,
+	short squad_index,
+	short initial_variant,
+	boolean spawning)
+{
+	struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
+	struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+		&encounter_definition->squads, squad_index, struct squad_definition);
+	short starting_location_index = encounter_get_actor_starting_location(encounter_index, squad_index, spawning);
+
+	if (starting_location_index != NONE)
+	{
+		struct actor_starting_location *starting_location = TAG_BLOCK_GET_ELEMENT(
+			&squad_definition->starting_locations, starting_location_index, struct actor_starting_location);
+		short actor_palette_index = squad_definition->actor_palette_index;
+
+		if (starting_location->actor_variant_index != NONE)
+			actor_palette_index = starting_location->actor_variant_index;
+
+		if (actor_palette_index >= 0 && actor_palette_index < global_scenario_get()->ai_actor_palette.count)
+		{
+			struct tag_reference *actor_palette_entry = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->ai_actor_palette, actor_palette_index, struct tag_reference);
+
+			if (actor_palette_entry->index != NONE)
+			{
+				struct actor_variant_definition *actor_variant_definition = actor_variant_definition_get(actor_palette_entry->index);
+				boolean upgrade_major = FALSE;
+
+				if (actor_variant_definition->major_upgrade_reference.index != NONE)
+				{
+					boolean random = FALSE;
+					real chance = 0.f;
+
+					ai_get_major_upgrade_chance(squad_definition->major_upgrade, &upgrade_major, &random, &chance);
+					if (random)
+						upgrade_major = ai_consider_major_upgrade(encounter_index, squad_index, chance);
+				}
+
+				return actor_place(actor_palette_entry->index, encounter_index, squad_index, starting_location, upgrade_major, initial_variant) != NONE;
+			}
+		}
+		else
+		{
+			error(_error_silent, "WARNING: cannot spawn actors in %s/%s because the actor variant specified for this squad is NONE or invalid", encounter_definition->name, squad_definition->name);
+		}
+	}
+
+	return FALSE;
+}
+
+static void encounter_update_timers(
+	long encounter_index)
+{
+	struct encounter_datum *encounter = encounter_get(encounter_index);
+
+	if (encounter->enemy_visible)
+		encounter->enemy_visible_timer = 0;
+	else if (encounter->enemy_visible_timer != NONE)
+		encounter->enemy_visible_timer += ENCOUNTER_UPDATE_INTERVAL;
+
+	if (encounter->enemy_alive)
+		encounter->enemy_alive_timer = 0;
+	else if (encounter->enemy_alive_timer != NONE)
+		encounter->enemy_alive_timer += ENCOUNTER_UPDATE_INTERVAL;
+
+	if (encounter->post_combat && encounter->post_combat_delay)
+	{
+		if (encounter->post_combat_delay_timer > ENCOUNTER_UPDATE_INTERVAL)
+			encounter->post_combat_delay_timer -= ENCOUNTER_UPDATE_INTERVAL;
+		else
+			encounter->post_combat_delay_timer = 0;
+	}
+
+	return;
+}
+
+void encounter_update_squads(
+	long encounter_index)
+{
+	struct encounter_datum *encounter = encounter_get(encounter_index);
+	struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
+	short squad_index;
+
+	for (squad_index = 0; squad_index < encounter->squad_count; ++squad_index)
+	{
+		struct squad_datum *squad = encounter_get_squad(encounter, squad_index);
+		struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+			&encounter_definition->squads, squad_index, struct squad_definition);
+
+		if (squad->delay_timer > 0 && !TEST_FLAG(squad_definition->flags, _squad_delay_forever_bit))
+		{
+			if (squad->delay_timer_started)
+			{
+				if (squad->delay_timer > ENCOUNTER_UPDATE_INTERVAL)
+					squad->delay_timer -= ENCOUNTER_UPDATE_INTERVAL;
+				else
+					encounter_squad_timer_expire(encounter_index, squad_index);
+			}
+			else
+			{
+				squad->delay_timer_started = TEST_FLAG(squad_definition->flags, _squad_timer_starts_immediately_bit) ||
+					encounter->current_in_combat_count > 0;
+				if (squad->delay_timer_started && ai_debug.print_rules)
+				{
+					console_printf(FALSE, "%s/%s: delay timer started (%.1f sec)",
+						encounter_definition->name, squad_definition->name, squad_definition->squad_delay_timer);
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+static void encounterless_deactivate(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 1838, actor->meta.encounterless);
+	actor->meta.encounterless_active_timer = 0;
+	actor_set_active(actor_index, FALSE);
+
+	return;
+}
+
+static void encounters_test_activation(
+	void)
+{
+	struct structure_bsp *structure_bsp = global_structure_bsp_get();
+	unsigned long const *combined_pvs = players_get_combined_pvs();
+	unsigned long activation_cluster_bit_vector[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_CLUSTERS_PER_STRUCTURE)];
+	struct data_iterator iterator;
+	struct encounter_datum *encounter;
+	struct actor_datum *actor;
+	long actor_index;
+
+	for (actor_index = ai_globals->first_encounterless_actor_index; actor_index != NONE; actor_index = actor->meta.next_actor_index)
+	{
+		actor = actor_get(actor_index);
+		match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 2234, actor->meta.encounterless);
+
+		if (actor->meta.swarm)
+		{
+			actor->meta.dormant_desire = TRUE;
+
+			if (actor->meta.swarm_cache_index == NONE)
+			{
+				long unit_index = actor->meta.swarm_unit_index;
+
+				while (unit_index != NONE)
+				{
+					struct unit_datum *unit = unit_get(unit_index);
+					short cluster_index = object_get(object_get_ultimate_parent(unit_index))->object.location.cluster_index;
+
+					if (cluster_index != NONE && BIT_VECTOR_TEST_FLAG(combined_pvs, cluster_index))
+					{
+						actor->meta.dormant_desire = FALSE;
+						break;
+					}
+
+					unit_index = unit->unit.swarm_next_unit_index;
+				}
+			}
+			else
+			{
+				struct swarm_datum *swarm = swarm_get(actor->meta.swarm_cache_index);
+				short i;
+
+				for (i = 0; i < swarm->unit_count; ++i)
+				{
+					short cluster_index = object_get(object_get_ultimate_parent(swarm->unit_indices[i]))->object.location.cluster_index;
+
+					if (cluster_index != NONE && BIT_VECTOR_TEST_FLAG(combined_pvs, cluster_index))
+					{
+						actor->meta.dormant_desire = FALSE;
+						break;
+					}
+				}
+			}
+		}
+		else
+		{
+			short cluster_index = object_get(object_get_ultimate_parent(actor->meta.unit_index))->object.location.cluster_index;
+
+			if (cluster_index == NONE)
+				actor->meta.dormant_desire = TRUE;
+			else
+				actor->meta.dormant_desire = !BIT_VECTOR_TEST_FLAG(combined_pvs, cluster_index);
+		}
+
+		if (!actor->meta.dormant_desire || actor->meta.force_active || game_in_editor() || ai_debug.force_all_active)
+		{
+			encounterless_activate(actor_index);
+		}
+		else if (actor->meta.encounterless_active_timer > TICKS_PER_SECOND)
+		{
+			actor->meta.encounterless_active_timer -= TICKS_PER_SECOND;
+		}
+		else
+		{
+			actor->meta.encounterless_active_timer = 0;
+			encounterless_deactivate(actor_index);
+		}
+
+		actor_verify_activation(actor_index);
+	}
+
+	data_iterator_new(&iterator, encounter_data);
+	while ((encounter = (struct encounter_datum *)data_iterator_next(&iterator)) != NULL)
+	{
+		long encounter_index = iterator.datum_index;
+		struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
+		boolean force_active = encounter->force_active || game_in_editor() || encounter->respawn_delay_ticks > 0 || ai_debug.force_all_active;
+		boolean active = FALSE;
+
+		if (encounter_definition->runtime_structure_bsp_reference_index == NONE ||
+			encounter_definition->runtime_structure_bsp_reference_index == global_structure_bsp_index)
+		{
+			encounter_compute_activation_cluster_bit_vector(encounter_index, TRUE, MAXIMUM_CLUSTERS_PER_STRUCTURE, combined_pvs, activation_cluster_bit_vector);
+			active = bit_vector_and(structure_bsp->clusters.count, combined_pvs, activation_cluster_bit_vector, NULL) || force_active;
+		}
+
+		if (active)
+		{
+			encounter->remain_active_timer = ENCOUNTER_REMAIN_ACTIVE_TIME;
+			encounter_activate(encounter_index);
+		}
+		else if (encounter->active && encounter->remain_active_timer > TICKS_PER_SECOND)
+		{
+			encounter->remain_active_timer -= TICKS_PER_SECOND;
+		}
+		else
+		{
+			boolean link_active = FALSE;
+			short i;
+
+			for (i = 0; i < encounter->link_encounter_count; ++i)
+			{
+				if (encounter_get(encounter->link_encounter_indices[i])->remain_active_timer > 0)
+					link_active = TRUE;
+			}
+
+			encounter->remain_active_timer = 0;
+			if (link_active)
+				encounter_activate(encounter_index);
+			else
+				encounter_deactivate(encounter_index);
+		}
+	}
+
+	return;
+}
