@@ -809,16 +809,6 @@ struct stack_memory_pool
 	struct stack_memory_pool_block *blocks[1];
 };
 
-struct game_input_preferences
-{
-	real yaw_rate;
-	real pitch_rate;
-	byte game_control_to_xbox_buttons[12];
-	short joystick_controls;
-	boolean invert_look;
-	boolean invert_look_aircraft_control;
-};
-
 struct ui_widget_deferred_error
 {
 	short error_code;

@@ -52,7 +52,7 @@
 ## House-rule reconciliation
 
 - Removed cross-module prototype copies from `ui_widget.c`; declarations now live in their owner or closest associated headers.
-- Kept TU-sensitive recovered structure definitions local rather than perturbing broad shared headers.
+- Kept UI-private recovered structure definitions local rather than perturbing broad shared headers. The cross-subsystem 24-byte `game_input_preferences` type now lives in its narrow `input_abstraction.h` owner after the authenticated `player_ui` caller recovery required it; the combined full-tree rebuild preserved all 53 UI exact functions.
 - Added the narrow Xbox shell owner header `shell_xbox.h`; putting the declaration in broad `shell.h` changed an unrelated target data owner under the C2 declaration-position oracle.
 - Corrected profile enumeration counts to the owner-defined `word` type and retained `real` rather than raw `float`.
 - Kept private functions semantic and target-authenticated; no `code_<address>` names remain.
