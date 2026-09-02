@@ -23,7 +23,7 @@ symbols in this file:
 000962A0 0060:
 	_game_allegiance_notify_change (0000)
 00096300 01a0:
-	_code_00096300 (0000)
+	_game_allegiance_broken (0000)
 000964A0 0080:
 	_game_allegiance_update (0000)
 00096520 00e0:
@@ -45,13 +45,14 @@ symbols in this file:
 002DE3B8 0028:
 	_global_game_team_names (0000)
 0043E490 0004:
-	_bss_0043e490 (0000)
+	_game_allegiance_globals (0000)
 */
 
 /* ---------- headers */
 
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
+#include "ai/ai_runtime.h"
 #include "game/game_allegiance.h"
 #include "saved games/game_state.h"
 
@@ -60,6 +61,14 @@ symbols in this file:
 enum
 {
 	NUMBER_OF_GAME_TEAMS = 10
+};
+
+enum allegiance_incident_type
+{
+	_allegiance_incident_accident = 0,
+	_allegiance_incident_betrayal,
+	_allegiance_incident_forgive,
+	NUMBER_OF_ALLEGIANCE_INCIDENT_TYPES
 };
 
 /* ---------- macros */
@@ -97,14 +106,6 @@ typedef char game_allegiance_globals_size_assert[
 	sizeof(struct game_allegiance_globals) == 0xB4 ? 1 : -1];
 typedef struct game_allegiance_globals game_allegiance_globals_type;
 
-/* ---------- prototypes */
-
-extern void ai_handle_allegiance_status_changed(
-	short team1_index,
-	short team2_index,
-	boolean currently_broken,
-	boolean permanently_broken);
-
 /* ---------- globals */
 
 char const *global_game_team_names[NUMBER_OF_GAME_TEAMS] =
@@ -121,9 +122,7 @@ char const *global_game_team_names[NUMBER_OF_GAME_TEAMS] =
 	"unused9"
 };
 
-struct game_allegiance_globals *bss_0043e490 = NULL;
-
-#define game_allegiance_globals bss_0043e490
+struct game_allegiance_globals *game_allegiance_globals = NULL;
 
 /* ---------- public code */
 
@@ -360,7 +359,7 @@ void game_allegiance_notify_change(
 
 /* ---------- private code */
 
-static void code_00096300(
+static void game_allegiance_broken(
 	struct game_allegiance_record *allegiance,
 	boolean currently_broken,
 	boolean permanently_broken)
@@ -433,7 +432,7 @@ void game_allegiance_update(
 					allegiance->current_incidents--;
 					if (allegiance->current_incidents == 0)
 					{
-						code_00096300(allegiance, FALSE, FALSE);
+						game_allegiance_broken(allegiance, FALSE, FALSE);
 					}
 					else
 					{
@@ -526,7 +525,7 @@ void game_allegiance_create(
 		target->current_incident_decay_time = 0;
 		target->requires_communication = requires_communication;
 		target->currently_broken = TRUE;
-		code_00096300(target, FALSE, FALSE);
+		game_allegiance_broken(target, FALSE, FALSE);
 		target->status_changed = FALSE;
 	}
 
@@ -554,7 +553,7 @@ boolean game_allegiance_remove(
 			(allegiance->team2_index == team1_index &&
 				allegiance->team1_index == team2_index))
 		{
-			code_00096300(allegiance, TRUE, TRUE);
+			game_allegiance_broken(allegiance, TRUE, TRUE);
 			globals = game_allegiance_globals;
 			globals->allegiance_count--;
 			if (globals->allegiance_count > allegiance_index)
@@ -599,13 +598,13 @@ boolean game_allegiance_incident(
 			increment = 0;
 			switch (incident_type)
 			{
-			case 0:
+			case _allegiance_incident_accident:
 				increment = 1;
 				break;
-			case 1:
+			case _allegiance_incident_betrayal:
 				increment = 3;
 				break;
-			case 2:
+			case _allegiance_incident_forgive:
 				increment = -1;
 				break;
 			}
@@ -620,7 +619,7 @@ boolean game_allegiance_incident(
 			if (allegiance->incident_threshold != NONE &&
 				allegiance->current_incidents >= allegiance->incident_threshold)
 			{
-				code_00096300(allegiance, TRUE, FALSE);
+				game_allegiance_broken(allegiance, TRUE, FALSE);
 				result = TRUE;
 				if (notify_immediately)
 				{

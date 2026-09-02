@@ -1140,6 +1140,44 @@
         },
         "objdiff_percent": 99.87578
       }
+    },
+    {
+      "unit": "source/game/game_allegiance",
+      "function": "_game_allegiance_broken",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked under the current house rule with the HCEA/Pastudan-authenticated allegiance state transition retained as ordinary typed C. The January cachebeta symbol atlas itself recovers `_game_allegiance_broken` at 0x496300, and multiple Gearbox CE maps plus later HCEA PDBs independently preserve the same private name and static `(game_allegiance *, boolean, boolean)` role; the old address-derived label was removed. Target and candidate have the same 416-byte padded envelope, both relocation identities, all 142 decoded instructions, and the same bit-matrix/state/AI-notification control flow. The remaining allocation cycle is January keeping `permanently_broken` in DL and the bounded team words in CX/SI while VC7 keeps the boolean in CL and the team words in SI/DI, extending one ESI save through the tail. The prior bounded source-shape packet exhausted semantic team aliases, declaration/scope order, bit-index locals, global/local access, and predicate spellings, and a new census of all 1,646 registered worktrees found only ten source blobs with this retained source as the unique complete frontier. No register hint, volatile access, compiler barrier, pragma, assembly, fake dependency, undefined behavior, or nonsensical control flow is retained. Reopen only for authoritative January local-variable records, original source, or a natural same-compiler donor that explains the boolean/team-word allocation.",
+      "measurements": {
+        "target": {
+          "size": 416,
+          "relocation_count": 2,
+          "normalized_sha256": "3eba7c13f76df6f625c5abf7165fe4e320ba92642bad6390de317f45dfcd0f9e"
+        },
+        "base": {
+          "size": 416,
+          "relocation_count": 2,
+          "normalized_sha256": "abbb6b20b7bb98348e048ae1252104ab55585fc1da07cdc14e12e699d681ef34"
+        },
+        "objdiff_percent": 94.296875
+      }
+    },
+    {
+      "unit": "source/game/game_allegiance",
+      "function": "_game_allegiance_create",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked under the current house rule with the coherent HCEA/Pastudan-authenticated create-or-replace flow, bounded eight-record table, January-owned overflow error, typed record stores, and private `game_allegiance_broken` transition retained. Target and candidate have the same 224-byte padded envelope, all five relocation identities in order, and the same 82 decoded instructions. The residual is a closed callee-saved allocation cycle: January keeps the globals base in EDI and the hot team field in DX, while VC7 keeps globals in EDX and shrink-wraps EDI around the search field. The earlier bounded packet exhausted index widths, predicate and declaration order, alias scopes, pointer versus indexed traversal, global reloads, store order, and helper spelling without finding a lawful source lever, and the new 1,646-worktree/ten-blob census found no later frontier. No volatile/register forcing, compiler barrier, pragma, assembly, inert carrier, fake dependency, undefined behavior, or nonsensical exactness control is retained. Reopen only for authoritative January locals/source or a natural same-compiler donor that explains the EDI/DX lifetime assignment.",
+      "measurements": {
+        "target": {
+          "size": 224,
+          "relocation_count": 5,
+          "normalized_sha256": "47961c6c1d4c59a901156d907b22388d0b0a39a06f367b8403cd9e97ada8ed1f"
+        },
+        "base": {
+          "size": 224,
+          "relocation_count": 5,
+          "normalized_sha256": "be3a5bd445aa935a156513c29538f662a0d940b83315fab36696cf7603821b0d"
+        },
+        "objdiff_percent": 83.69334
+      }
     }
   ]
 }

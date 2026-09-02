@@ -199,6 +199,8 @@ symbols in this file:
 
 #include "cseries.h"
 
+#include "ai/ai_runtime.h"
+
 #include "ai/actors.h"
 #include "ai/encounters.h"
 #include "ai/props.h"
