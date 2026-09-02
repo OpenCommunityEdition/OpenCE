@@ -21,6 +21,12 @@ void bitmap_fade(
 	struct bitmap_data *bitmap,
 	pixel32 fade_color,
 	real fade_amount);
+void bitmap_smooth(
+	struct bitmap_data *bitmap,
+	real filter_size);
+void bitmap_sharpen(
+	struct bitmap_data *bitmap,
+	real sharpen_amount);
 struct bitmap_data *bitmap_shrink(
 	struct bitmap_data *source_bitmap,
 	short scale,

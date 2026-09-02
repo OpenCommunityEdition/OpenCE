@@ -1716,6 +1716,82 @@
         },
         "objdiff_percent": 94.97959
       }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_utilities",
+      "function": "_bitmap_2d_smooth",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete in-place separable 2D smoothing algorithm in ordinary typed C from January disassembly, relocation and diagnostic evidence, cross-checked against the later HaloCEA implementation. The retained body verifies the 2D bitmap and filter, rejects an oversized filter with the target-proven warning and unused newline vararg, allocates the full pixel-data scratch buffer with the January source line, performs horizontal and vertical toroidal convolution over all four channels with the evidenced binomial normalization, reports allocation failure, and frees the scratch buffer at the target line. January is 1,136 padded bytes and the candidate is 1,120; both have 27 relocations and the report records 79.08777 percent similarity. The fail-closed classifier returns UNKNOWN; the remaining difference is broad C2 frame/register/address scheduling, not missing logic. No forced inline/noinline, barrier, volatile or register forcing, pragma, assembly, fake dependency, undefined behavior, invented helper, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the remaining schedule.",
+      "measurements": {
+        "target": {
+          "size": 1136,
+          "relocation_count": 27,
+          "normalized_sha256": "90b742207acc12d7ffc61ded1c7a346f26f7076d550c0011ad2e78990182b4a1"
+        },
+        "base": {
+          "size": 1120,
+          "relocation_count": 27,
+          "normalized_sha256": "50140a12ed87f6078950e90a3752af637be8fd1a6de063538023c3cac5447871"
+        },
+        "objdiff_percent": 79.08777
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_utilities",
+      "function": "_bitmap_3d_smooth",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete 3D separable smoothing algorithm in ordinary typed C from January disassembly, relocation and diagnostic evidence, cross-checked against the later HaloCEA implementation. The retained body verifies the 3D bitmap and filter, preserves the target's oversized-filter warning and unused newline vararg, allocates the full pixel-data scratch buffer, performs toroidally wrapped X, Y, and Z convolution passes over every channel, copies the full scratch buffer back as January does, reports allocation failure, and frees at source line 0x33E. January is 1,824 padded bytes and the candidate is 1,792; both have 28 relocations and the report records 78.04 percent similarity. The fail-closed classifier returns UNKNOWN; the remaining difference is broad C2 frame/register/address scheduling, not missing logic. No forced inline/noinline, barrier, volatile or register forcing, pragma, assembly, fake dependency, undefined behavior, invented helper, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the remaining schedule.",
+      "measurements": {
+        "target": {
+          "size": 1824,
+          "relocation_count": 28,
+          "normalized_sha256": "747a45c66bf64a1173294daa196597534368e72d120f3715e324e42c4fbd717a"
+        },
+        "base": {
+          "size": 1792,
+          "relocation_count": 28,
+          "normalized_sha256": "dbdbd0bafa0bb62473ea8f137a0d3075e194123bf8705d26834b8f27fea5a5e0"
+        },
+        "objdiff_percent": 78.04
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_utilities",
+      "function": "_bitmap_2d_sharpen",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete toroidally wrapped 3x3 2D sharpen filter in ordinary typed C from January disassembly and table relocations, cross-checked against the later HaloCEA algorithm while retaining January's x86 parameter order. The retained body verifies the bitmap and signed positive/negative lookup tables, skips images smaller than 3x3, allocates a full scratch bitmap, processes each ARGB byte with the positive center term and eight negative neighbor terms using the cseries PIN macro, copies the result back, reports allocation failure, and frees at source line 0x3D1. January is 1,152 padded bytes and the candidate is 1,184; both have 29 relocations and the report records 60.921833 percent similarity. The fail-closed classifier returns UNKNOWN; the remaining difference is broad C2 frame/register/pointer scheduling, not missing logic. The PPC HaloCEA float-last ABI was deliberately not transplanted. No forced inline/noinline, barrier, volatile or register forcing, pragma, assembly, fake dependency, undefined behavior, raw offset, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the remaining schedule.",
+      "measurements": {
+        "target": {
+          "size": 1152,
+          "relocation_count": 29,
+          "normalized_sha256": "38d28fa8cc7ad1141ae0e3eeee9cefd225f50d30675345ae64f826e6aa5cf042"
+        },
+        "base": {
+          "size": 1184,
+          "relocation_count": 29,
+          "normalized_sha256": "8a988645f8b5734c6607564d032d20a39c294dde3a2ba0b5107c766da700dcc2"
+        },
+        "objdiff_percent": 60.921833
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_utilities",
+      "function": "_bitmap_sharpen",
+      "class": "csplit-relocation-alias",
+      "evidence": "The natural typed dispatcher and lookup-table builder is byte-identical to January after correcting the semantic BSS ownership proved by table construction and use: bitmap_sharpen_negative_table begins at 3260160 and bitmap_sharpen_positive_table at 3260672. Ordinary COFF comparison differs only at two strength-reduced loop relocations because csplit anchors positive_table-2 as negative_table+510 and negative_table-2 as the preceding _bss_0031bed4+42. The fail-closed resolved-address scan proves both pairs resolve respectively to 3260670 and 3260158; all other bytes and all 23 relocations agree. The source retains direct semantic array indexing and MAX/PIN cseries macros rather than introducing an out-of-bounds alias or raw address merely to copy csplit's spelling.",
+      "measurements": {
+        "target": {
+          "size": 352,
+          "relocation_count": 23,
+          "normalized_sha256": "999f3191aca8d9e3ec7721de890a470569586b58b32cd1b8432b2be68fa1f750"
+        },
+        "base": {
+          "size": 352,
+          "relocation_count": 23,
+          "normalized_sha256": "999f3191aca8d9e3ec7721de890a470569586b58b32cd1b8432b2be68fa1f750"
+        },
+        "objdiff_percent": 100.0
+      }
     }
   ]
 }

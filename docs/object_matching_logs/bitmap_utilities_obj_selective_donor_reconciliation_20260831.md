@@ -34,16 +34,16 @@ shown by the recovered topology.  The previously established
 names and their exact bodies were preserved.
 
 The 0x414-byte target BSS owner was also split semantically instead of leaving
-`_bss_0031bf00`.  January relocations prove two 0x200-byte lookup tables at
+`_bss_0031bf00`. January relocations prove two 0x200-byte lookup tables at
 offsets `+0x000` and `+0x200`, used by `bitmap_sharpen`, followed by a
-ten-word (`0x14` byte) filter at `+0x400`, used by `bitmap_smooth`.  HaloCEA's
-applied types independently identify `positive_table[256]` and
-`bitmap_sharpen_negative_table[256]`; January assertion strings identify the
-`positive_table`, `negative_table`, and `filter_coefficients` roles.  The
-restrained Xbox manifest names are therefore:
+ten-word (`0x14` byte) filter at `+0x400`, used by `bitmap_smooth`. Subsequent
+completion of the sharpen family established the two table roles more strongly
+than this lane could: January builds the neighbor-subtraction values at the
+base address and the center-positive values at `+0x200`, then uses them in
+exactly those roles in `bitmap_2d_sharpen`. The corrected restrained names are:
 
-- `bitmap_sharpen_positive_table[256]` at `0031BF00`;
-- `bitmap_sharpen_negative_table[256]` at `0031C100`;
+- `bitmap_sharpen_negative_table[256]` at `0031BF00`;
+- `bitmap_sharpen_positive_table[256]` at `0031C100`;
 - `bitmap_smooth_filter_coefficients[10]` at `0031C300`.
 
 The arrays are named in the target manifest but are not emitted speculatively

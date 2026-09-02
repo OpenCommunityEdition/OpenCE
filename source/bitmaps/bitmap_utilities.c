@@ -217,9 +217,9 @@ symbols in this file:
 00254488 0041:
 	??_C@_0EB@GJHMFKH@?$CD?$CD?$CD?5WARNING?5importing?5special?9ef@ (0000)
 0031BF00 0200:
-	_bitmap_sharpen_positive_table (0000)
-0031C100 0200:
 	_bitmap_sharpen_negative_table (0000)
+0031C100 0200:
+	_bitmap_sharpen_positive_table (0000)
 0031C300 0014:
 	_bitmap_smooth_filter_coefficients (0000)
 */
@@ -254,6 +254,11 @@ enum
 enum
 {
 	_bitmap_compressed_bit = 1,
+};
+
+enum
+{
+	MAXIMUM_FILTER_SIZE = 10,
 };
 
 enum
@@ -328,6 +333,33 @@ static struct bitmap_data *bitmap_cm_shrink(
 	short scale,
 	short alpha_bias,
 	boolean ignore_transparent_pixels);
+static void bitmap_2d_smooth(
+	struct bitmap_data *bitmap,
+	short filter_size,
+	short const *filter_coefficients);
+static void bitmap_3d_smooth(
+	struct bitmap_data *bitmap,
+	short filter_size,
+	short const *filter_coefficients);
+static void bitmap_cm_smooth(
+	struct bitmap_data *bitmap,
+	short filter_size,
+	short const *filter_coefficients);
+static void bitmap_2d_sharpen(
+	struct bitmap_data *bitmap,
+	real sharpen_amount,
+	short const *positive_table,
+	short const *negative_table);
+static void bitmap_3d_sharpen(
+	struct bitmap_data *bitmap,
+	real sharpen_amount,
+	short const *positive_table,
+	short const *negative_table);
+static void bitmap_cm_sharpen(
+	struct bitmap_data *bitmap,
+	real sharpen_amount,
+	short const *positive_table,
+	short const *negative_table);
 static void bitmap_2d_alpha_bleed(
 	struct bitmap_data *bitmap,
 	short passes);
@@ -384,6 +416,9 @@ static void bitmap_cm_vector_map(
 /* ---------- globals */
 
 real const oo_unsigned_short_max = 1.0f / UNSIGNED_SHORT_MAX;
+short bitmap_sharpen_negative_table[256];
+short bitmap_sharpen_positive_table[256];
+short bitmap_smooth_filter_coefficients[MAXIMUM_FILTER_SIZE];
 
 /* ---------- public code */
 
@@ -1086,6 +1121,143 @@ struct bitmap_data *bitmap_shrink(
 	return destination_bitmap;
 }
 
+void bitmap_smooth(
+	struct bitmap_data *bitmap,
+	real filter_size)
+{
+	short integral_filter_size = (short)floor(filter_size);
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x21E,
+		bitmap_verify(bitmap, TRUE));
+	match_vassert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+		0x21F,
+		filter_size <= (real)MAXIMUM_FILTER_SIZE,
+		"filter_size<=(float)MAXIMUM_FILTER_SIZE");
+
+	if (integral_filter_size > 0.f)
+	{
+		short pass;
+
+		csmemset(
+			bitmap_smooth_filter_coefficients,
+			0,
+			sizeof(bitmap_smooth_filter_coefficients));
+
+		for (pass = 2 * integral_filter_size; pass >= 0; pass--)
+		{
+			short coefficient_index;
+
+			for (coefficient_index = MAXIMUM_FILTER_SIZE - 1;
+				coefficient_index > 0;
+				coefficient_index--)
+			{
+				bitmap_smooth_filter_coefficients[coefficient_index] +=
+					bitmap_smooth_filter_coefficients[coefficient_index - 1];
+			}
+
+			bitmap_smooth_filter_coefficients[0] = 1;
+		}
+
+		switch (bitmap->type)
+		{
+		case _bitmap_type_2d:
+			bitmap_2d_smooth(
+				bitmap,
+				integral_filter_size,
+				bitmap_smooth_filter_coefficients);
+			break;
+
+		case _bitmap_type_3d:
+			bitmap_3d_smooth(
+				bitmap,
+				integral_filter_size,
+				bitmap_smooth_filter_coefficients);
+			break;
+
+		case _bitmap_type_cube_map:
+			bitmap_cm_smooth(
+				bitmap,
+				integral_filter_size,
+				bitmap_smooth_filter_coefficients);
+			break;
+
+		default:
+			match_vassert(
+				"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+				0x244,
+				FALSE,
+				"### ERROR unsupported bitmap type");
+			break;
+		}
+	}
+
+	return;
+}
+
+void bitmap_sharpen(
+	struct bitmap_data *bitmap,
+	real sharpen_amount)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x361,
+		bitmap_verify(bitmap, TRUE));
+
+	if (sharpen_amount > 0.f)
+	{
+		short sharpen_value = (short)(sharpen_amount * 100.f);
+		short falloff;
+		short value;
+
+		sharpen_value = PIN(sharpen_value, 0, 100);
+		falloff = MAX(1, 100 - sharpen_value);
+
+		for (value = 0; value < NUMBEROF(bitmap_sharpen_positive_table); value++)
+		{
+			bitmap_sharpen_positive_table[value] =
+				(short)(100 * value / falloff);
+			bitmap_sharpen_negative_table[value] =
+				(short)(value * sharpen_value / 8 / falloff);
+		}
+
+		switch (bitmap->type)
+		{
+		case _bitmap_type_2d:
+			bitmap_2d_sharpen(
+				bitmap,
+				sharpen_amount,
+				bitmap_sharpen_positive_table,
+				bitmap_sharpen_negative_table);
+			break;
+
+		case _bitmap_type_3d:
+			bitmap_3d_sharpen(
+				bitmap,
+				sharpen_amount,
+				bitmap_sharpen_positive_table,
+				bitmap_sharpen_negative_table);
+			break;
+
+		case _bitmap_type_cube_map:
+			bitmap_cm_sharpen(
+				bitmap,
+				sharpen_amount,
+				bitmap_sharpen_positive_table,
+				bitmap_sharpen_negative_table);
+			break;
+
+		default:
+			match_vassert(
+				"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+				0x37F,
+				FALSE,
+				"### ERROR unsupported bitmap type");
+			break;
+		}
+	}
+
+	return;
+}
+
 void bitmap_alpha_bleed(
 	struct bitmap_data *bitmap,
 	short passes)
@@ -1270,6 +1442,487 @@ void bitmap_vector_map(
 }
 
 /* ---------- private code */
+
+static void bitmap_2d_smooth(
+	struct bitmap_data *bitmap,
+	short filter_size,
+	short const *filter_coefficients)
+{
+	long pixel_data_size;
+	pixel32 *source_pixels;
+	pixel32 *temporary_pixels;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x250, bitmap_verify(bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x251, bitmap->type==_bitmap_type_2d);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x252, filter_coefficients);
+
+	if (bitmap->width >= filter_size && bitmap->height >= filter_size)
+	{
+		short y;
+
+		pixel_data_size = bitmap_get_pixel_data_size(bitmap);
+		source_pixels = bitmap_mipmap_address(bitmap, 0);
+		temporary_pixels = match_malloc(
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x25D,
+			pixel_data_size);
+		if (temporary_pixels)
+		{
+			for (y = 0; y < bitmap->height; y++)
+			{
+				short x;
+
+				for (x = 0; x < bitmap->width; x++)
+				{
+					long alpha = 0;
+					long red = 0;
+					long green = 0;
+					long blue = 0;
+					short filter_index;
+
+					for (filter_index = -filter_size;
+						filter_index <= filter_size;
+						filter_index++)
+					{
+						short source_x =
+							(short)((bitmap->width + filter_index + x) % bitmap->width);
+						short coefficient = filter_coefficients[filter_index + filter_size];
+						pixel32 pixel = source_pixels[y * bitmap->width + source_x];
+
+						alpha += (pixel >> 24) * coefficient;
+						red += ((pixel >> 16) & 0xFF) * coefficient;
+						green += ((pixel >> 8) & 0xFF) * coefficient;
+						blue += (pixel & 0xFF) * coefficient;
+					}
+
+					{
+						long rounding = 1 << (2 * filter_size - 1);
+						short shift = 2 * filter_size;
+
+						temporary_pixels[y * bitmap->width + x] =
+							((((rounding + alpha) >> shift) << 24) |
+							(((rounding + red) >> shift) << 16) |
+							(((rounding + green) >> shift) << 8) |
+							((rounding + blue) >> shift));
+					}
+				}
+			}
+
+			for (y = 0; y < bitmap->height; y++)
+			{
+				short x;
+
+				for (x = 0; x < bitmap->width; x++)
+				{
+					long alpha = 0;
+					long red = 0;
+					long green = 0;
+					long blue = 0;
+					short filter_index;
+
+					for (filter_index = -filter_size;
+						filter_index <= filter_size;
+						filter_index++)
+					{
+						short source_y =
+							(short)((bitmap->height + filter_index + y) % bitmap->height);
+						short coefficient = filter_coefficients[filter_index + filter_size];
+						pixel32 pixel = temporary_pixels[source_y * bitmap->width + x];
+
+						alpha += (pixel >> 24) * coefficient;
+						red += ((pixel >> 16) & 0xFF) * coefficient;
+						green += ((pixel >> 8) & 0xFF) * coefficient;
+						blue += (pixel & 0xFF) * coefficient;
+					}
+
+					{
+						long rounding = 1 << (2 * filter_size - 1);
+						short shift = 2 * filter_size;
+
+						source_pixels[y * bitmap->width + x] =
+							((((rounding + alpha) >> shift) << 24) |
+							(((rounding + red) >> shift) << 16) |
+							(((rounding + green) >> shift) << 8) |
+							((rounding + blue) >> shift));
+					}
+				}
+			}
+
+			match_free(
+				"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+				0x2A5,
+				temporary_pixels);
+		}
+		else
+		{
+			error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+		}
+	}
+	else
+	{
+		/* BUG (preserved): January supplies an unused newline vararg. */
+		fprintf(
+			stdout,
+			"### WARNING tried to smooth a bitmap with a filter which is too large",
+			"\r\n");
+		fflush(stdout);
+	}
+
+	return;
+}
+
+static void bitmap_3d_smooth(
+	struct bitmap_data *bitmap,
+	short filter_size,
+	short const *filter_coefficients)
+{
+	long pixel_data_size;
+	pixel32 *source_pixels;
+	pixel32 *temporary_pixels;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x2BA, bitmap_verify(bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x2BB, bitmap->type==_bitmap_type_3d);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x2BC, filter_coefficients);
+
+	if (bitmap->width >= filter_size &&
+		bitmap->height >= filter_size &&
+		(short)bitmap->depth >= filter_size)
+	{
+		short z;
+
+		pixel_data_size = bitmap_get_pixel_data_size(bitmap);
+		source_pixels = bitmap_mipmap_address(bitmap, 0);
+		temporary_pixels = match_malloc(
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x2C7,
+			pixel_data_size);
+		if (temporary_pixels)
+		{
+			for (z = 0; z < (short)bitmap->depth; z++)
+			{
+				short y;
+
+				for (y = 0; y < bitmap->height; y++)
+				{
+					short x;
+
+					for (x = 0; x < bitmap->width; x++)
+					{
+						long alpha = 0;
+						long red = 0;
+						long green = 0;
+						long blue = 0;
+						short filter_index;
+
+						for (filter_index = -filter_size;
+							filter_index <= filter_size;
+							filter_index++)
+						{
+							short source_x =
+								(short)((bitmap->width + filter_index + x) % bitmap->width);
+							short coefficient = filter_coefficients[filter_index + filter_size];
+							pixel32 pixel = source_pixels[
+								(bitmap->height * z + y) * bitmap->width + source_x];
+
+							alpha += (pixel >> 24) * coefficient;
+							red += ((pixel >> 16) & 0xFF) * coefficient;
+							green += ((pixel >> 8) & 0xFF) * coefficient;
+							blue += (pixel & 0xFF) * coefficient;
+						}
+
+						{
+							long rounding = 1 << (2 * filter_size - 1);
+							short shift = 2 * filter_size;
+
+							temporary_pixels[(bitmap->height * z + y) * bitmap->width + x] =
+								((((rounding + alpha) >> shift) << 24) |
+								(((rounding + red) >> shift) << 16) |
+								(((rounding + green) >> shift) << 8) |
+								((rounding + blue) >> shift));
+						}
+					}
+				}
+			}
+
+			for (z = 0; z < (short)bitmap->depth; z++)
+			{
+				short y;
+
+				for (y = 0; y < bitmap->height; y++)
+				{
+					short x;
+
+					for (x = 0; x < bitmap->width; x++)
+					{
+						long alpha = 0;
+						long red = 0;
+						long green = 0;
+						long blue = 0;
+						short filter_index;
+
+						for (filter_index = -filter_size;
+							filter_index <= filter_size;
+							filter_index++)
+						{
+							short source_y =
+								(short)((bitmap->height + filter_index + y) % bitmap->height);
+							short coefficient = filter_coefficients[filter_index + filter_size];
+							pixel32 pixel = temporary_pixels[
+								(bitmap->height * z + source_y) * bitmap->width + x];
+
+							alpha += (pixel >> 24) * coefficient;
+							red += ((pixel >> 16) & 0xFF) * coefficient;
+							green += ((pixel >> 8) & 0xFF) * coefficient;
+							blue += (pixel & 0xFF) * coefficient;
+						}
+
+						{
+							long rounding = 1 << (2 * filter_size - 1);
+							short shift = 2 * filter_size;
+
+							source_pixels[(bitmap->height * z + y) * bitmap->width + x] =
+								((((rounding + alpha) >> shift) << 24) |
+								(((rounding + red) >> shift) << 16) |
+								(((rounding + green) >> shift) << 8) |
+								((rounding + blue) >> shift));
+						}
+					}
+				}
+			}
+
+			for (z = 0; z < (short)bitmap->depth; z++)
+			{
+				short y;
+
+				for (y = 0; y < bitmap->height; y++)
+				{
+					short x;
+
+					for (x = 0; x < bitmap->width; x++)
+					{
+						long alpha = 0;
+						long red = 0;
+						long green = 0;
+						long blue = 0;
+						short filter_index;
+
+						for (filter_index = -filter_size;
+							filter_index <= filter_size;
+							filter_index++)
+						{
+							short source_z =
+								(short)(((short)bitmap->depth + filter_index + z) % (short)bitmap->depth);
+							short coefficient = filter_coefficients[filter_index + filter_size];
+							pixel32 pixel = source_pixels[
+								(bitmap->height * source_z + y) * bitmap->width + x];
+
+							alpha += (pixel >> 24) * coefficient;
+							red += ((pixel >> 16) & 0xFF) * coefficient;
+							green += ((pixel >> 8) & 0xFF) * coefficient;
+							blue += (pixel & 0xFF) * coefficient;
+						}
+
+						{
+							long rounding = 1 << (2 * filter_size - 1);
+							short shift = 2 * filter_size;
+
+							temporary_pixels[(bitmap->height * z + y) * bitmap->width + x] =
+								((((rounding + alpha) >> shift) << 24) |
+								(((rounding + red) >> shift) << 16) |
+								(((rounding + green) >> shift) << 8) |
+								((rounding + blue) >> shift));
+						}
+					}
+				}
+			}
+
+			csmemcpy(source_pixels, temporary_pixels, pixel_data_size);
+			match_free(
+				"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+				0x33E,
+				temporary_pixels);
+		}
+		else
+		{
+			error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+		}
+	}
+	else
+	{
+		/* BUG (preserved): January supplies an unused newline vararg. */
+		fprintf(
+			stdout,
+			"### WARNING tried to smooth a bitmap with a filter which is too large",
+			"\r\n");
+		fflush(stdout);
+	}
+
+	return;
+}
+
+static void bitmap_cm_smooth(
+	struct bitmap_data *bitmap,
+	short filter_size,
+	short const *filter_coefficients)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x353, bitmap_verify(bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x354, bitmap->type==_bitmap_type_cube_map);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x355, filter_coefficients);
+
+	/* BUG (preserved for exact matching): January passes a newline as an
+	 * unused vararg even though the format has no conversion. A corrected
+	 * build should append the newline to the format string instead.
+	 */
+	fprintf(stdout, "### WARNING tried to smooth a cube map", "\r\n");
+	fflush(stdout);
+
+	return;
+}
+
+static void bitmap_2d_sharpen(
+	struct bitmap_data *bitmap,
+	real sharpen_amount,
+	short const *positive_table,
+	short const *negative_table)
+{
+	long pixel_data_size;
+	byte *temporary_pixels;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x38C, bitmap_verify(bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x38D, bitmap->type==_bitmap_type_2d);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x38E, positive_table);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x38F, negative_table);
+
+	if (bitmap->width >= 3 && bitmap->height >= 3)
+	{
+		short y;
+
+		pixel_data_size = bitmap_get_pixel_data_size(bitmap);
+		temporary_pixels = match_malloc(
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x398,
+			pixel_data_size);
+		if (temporary_pixels)
+		{
+			for (y = 0; y < bitmap->height; y++)
+			{
+				short previous_y = y > 0 ? y - 1 : bitmap->height - 1;
+				short next_y = y < bitmap->height - 1 ? y + 1 : 0;
+				byte *previous_row = bitmap_2d_address(bitmap, 0, previous_y, 0);
+				byte *current_row = bitmap_2d_address(bitmap, 0, y, 0);
+				byte *next_row = bitmap_2d_address(bitmap, 0, next_y, 0);
+				byte *destination_row = temporary_pixels + 4 * bitmap->width * y;
+				short row_size = 4 * bitmap->width;
+				short byte_index = 0;
+
+				do
+				{
+					short wrapped_left = row_size + byte_index;
+					long value =
+						positive_table[current_row[byte_index]] -
+						negative_table[next_row[wrapped_left - 4]] -
+						negative_table[current_row[wrapped_left - 4]] -
+						negative_table[previous_row[wrapped_left - 4]] -
+						negative_table[previous_row[byte_index + 4]] -
+						negative_table[next_row[byte_index + 4]] -
+						negative_table[current_row[byte_index + 4]] -
+						negative_table[previous_row[byte_index]] -
+						negative_table[next_row[byte_index]];
+
+					destination_row[byte_index] = (byte)PIN(value, 0, 255);
+					byte_index++;
+				}
+				while (byte_index < 4);
+
+				while (byte_index < row_size - 4)
+				{
+					long value =
+						positive_table[current_row[byte_index]] -
+						negative_table[previous_row[byte_index - 4]] -
+						negative_table[previous_row[byte_index + 4]] -
+						negative_table[next_row[byte_index - 4]] -
+						negative_table[next_row[byte_index + 4]] -
+						negative_table[current_row[byte_index - 4]] -
+						negative_table[current_row[byte_index + 4]] -
+						negative_table[previous_row[byte_index]] -
+						negative_table[next_row[byte_index]];
+
+					destination_row[byte_index] = (byte)PIN(value, 0, 255);
+					byte_index++;
+				}
+
+				while (byte_index < row_size)
+				{
+					short wrapped_right = byte_index - row_size;
+					long value =
+						positive_table[current_row[byte_index]] -
+						negative_table[next_row[wrapped_right + 4]] -
+						negative_table[current_row[wrapped_right + 4]] -
+						negative_table[previous_row[wrapped_right + 4]] -
+						negative_table[previous_row[byte_index - 4]] -
+						negative_table[next_row[byte_index - 4]] -
+						negative_table[current_row[byte_index - 4]] -
+						negative_table[previous_row[byte_index]] -
+						negative_table[next_row[byte_index]];
+
+					destination_row[byte_index] = (byte)PIN(value, 0, 255);
+					byte_index++;
+				}
+			}
+
+			csmemcpy(
+				bitmap_mipmap_address(bitmap, 0),
+				temporary_pixels,
+				pixel_data_size);
+			match_free(
+				"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+				0x3D1,
+				temporary_pixels);
+		}
+		else
+		{
+			error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+		}
+	}
+
+	return;
+}
+
+static void bitmap_3d_sharpen(
+	struct bitmap_data *bitmap,
+	real sharpen_amount,
+	short const *positive_table,
+	short const *negative_table)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x3E2, bitmap_verify(bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x3E3, bitmap->type==_bitmap_type_3d);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x3E4, positive_table);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x3E5, negative_table);
+
+	/* BUG (preserved for exact matching): see bitmap_cm_smooth. */
+	fprintf(stdout, "### WARNING tried to sharpen a 3d bitmap", "\r\n");
+	fflush(stdout);
+
+	return;
+}
+
+static void bitmap_cm_sharpen(
+	struct bitmap_data *bitmap,
+	real sharpen_amount,
+	short const *positive_table,
+	short const *negative_table)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x3F3, bitmap_verify(bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x3F4, bitmap->type==_bitmap_type_cube_map);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x3F5, positive_table);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x3F6, negative_table);
+
+	/* BUG (preserved for exact matching): see bitmap_cm_smooth. */
+	fprintf(stdout, "### WARNING tried to sharpen a cube map", "\r\n");
+	fflush(stdout);
+
+	return;
+}
 
 static void bitmap_2d_uncompress_from_mipmap(
 	struct bitmap_data *source_bitmap,
