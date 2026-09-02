@@ -74,9 +74,9 @@ symbols in this file:
 
 enum
 {
-	MAXIMUM_FLAG_WIDTH= 40,
-	MAXIMUM_FLAG_VERTICES= 225,
-	MAXIMUM_FLAG_CELLS= 196
+	MAXIMUM_FLAG_WIDTH = 40,
+	MAXIMUM_FLAG_VERTICES = 225,
+	MAXIMUM_FLAG_CELLS = 196,
 };
 
 enum trailing_edge_shape
@@ -105,6 +105,13 @@ enum tesselate
 };
 
 /* ---------- macros */
+
+#define FLAG_TAG 'flag'
+
+#define flag_get(index) \
+	((struct flag_datum_prefix *)datum_get(flag_data, (index)))
+#define flag_definition_get(index) \
+	((struct flag_definition *)tag_get(FLAG_TAG, (index)))
 
 /* ---------- structures */
 
@@ -250,8 +257,9 @@ void flags_update(
 		flag_index != NONE;
 		flag_index = data_next_index(flag_data, flag_index))
 	{
-		struct flag_datum_prefix *flag = datum_get(flag_data, flag_index);
-		struct flag_definition *definition = tag_get('flag', flag->definition_index);
+		struct flag_datum_prefix *flag = flag_get(flag_index);
+		struct flag_definition *definition =
+			flag_definition_get(flag->definition_index);
 
 		flag->updates_since_last_render++;
 		if (flag->object_index != NONE &&
@@ -275,8 +283,8 @@ void flag_render(
 	struct flag_definition *definition;
 
 	object_get(object_index);
-	flag = datum_get(flag_data, flag_index);
-	definition = tag_get('flag', flag->definition_index);
+	flag = flag_get(flag_index);
+	definition = flag_definition_get(flag->definition_index);
 	flag->object_index = object_index;
 
 	if (flag->updates_since_last_render > 5 || !flag->initialized)
@@ -302,12 +310,12 @@ long flag_new(
 	flag_index = NONE;
 	if (definition_index != NONE)
 	{
-		struct flag_definition *definition = tag_get('flag', definition_index);
+		struct flag_definition *definition = flag_definition_get(definition_index);
 
 		flag_index = datum_new(flag_data);
 		if (flag_index != NONE)
 		{
-			struct flag_datum_prefix *flag = datum_get(flag_data, flag_index);
+			struct flag_datum_prefix *flag = flag_get(flag_index);
 
 			if (definition->height * definition->width >= MAXIMUM_FLAG_VERTICES ||
 				definition->width >= MAXIMUM_FLAG_WIDTH ||
