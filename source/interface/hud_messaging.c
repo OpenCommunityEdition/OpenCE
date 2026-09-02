@@ -118,6 +118,7 @@ symbols in this file:
 
 #include "cseries/errors.h"
 #include "game/game.h"
+#include "game/game_engine.h"
 #include "game/players.h"
 #include "interface/hud_messaging.h"
 #include "saved games/game_state.h"
@@ -305,6 +306,11 @@ typedef char hud_globals_messaging_offset_assert[
 	offsetof(struct hud_globals_definition, messaging) == 0 ? 1 : -1];
 
 /* ---------- prototypes */
+
+static struct hud_message_definition *find_free_hud_message(
+	struct hud_messaging_datum_definition *datum,
+	long item_definition_index,
+	char message_offset);
 
 /* ---------- globals */
 
@@ -623,4 +629,139 @@ void hud_messaging_globals_update(
 	return;
 }
 
+void hud_print_message(
+	short local_player_index,
+	wchar_t const *message_text)
+{
+	if (local_player_index != NONE)
+	{
+		struct hud_messaging_datum_definition *datum =
+			&hud_messaging_globals->message_data[local_player_index];
+		struct hud_message_definition *message = find_free_hud_message(
+			datum,
+			NONE,
+			0);
+
+		ustrncpy(message->text, message_text, NUMBEROF(message->text));
+		message->item_definition_index = NONE;
+		message->time = game_time_get();
+		message->valid = TRUE;
+		message->magic_number = hud_messaging_globals->magic_number++;
+		datum->leave_first_line_blank = FALSE;
+	}
+
+	return;
+}
+
+void hud_add_item_message(
+	short local_player_index,
+	long item_definition_index,
+	short quantity,
+	char message_offset)
+{
+	if (local_player_index != NONE)
+	{
+		struct hud_messaging_datum_definition *datum =
+			&hud_messaging_globals->message_data[local_player_index];
+		struct hud_message_definition *message = find_free_hud_message(
+			datum,
+			item_definition_index,
+			message_offset);
+
+		if (!message->valid)
+			message->quantity = 0;
+		message->quantity += quantity;
+		message->item_definition_index = item_definition_index;
+		message->message_offset = message_offset;
+		message->time = game_time_get();
+		message->valid = TRUE;
+		message->magic_number = hud_messaging_globals->magic_number++;
+		datum->leave_first_line_blank = FALSE;
+	}
+
+	return;
+}
+
+void hud_broadcast_team_message(
+	long victim_player_index,
+	wchar_t const *message)
+{
+	if (game_engine_running())
+	{
+		short local_player_index;
+
+		for (local_player_index = 0;
+			local_player_index < MAXIMUM_LOCAL_PLAYERS;
+			local_player_index++)
+		{
+			long player_index = local_player_get_player_index(local_player_index);
+
+			if (player_index != NONE &&
+				player_get(player_index)->team_index == player_get(victim_player_index)->team_index)
+			{
+				hud_print_message(local_player_index, message);
+			}
+		}
+	}
+
+	return;
+}
+
 /* ---------- private code */
+
+static struct hud_message_definition *find_free_hud_message(
+	struct hud_messaging_datum_definition *datum,
+	long item_definition_index,
+	char message_offset)
+{
+	struct hud_message_definition *result = NULL;
+	long oldest_time = LONG_MAX;
+	short oldest_message_index = 0;
+	short message_index = 0;
+
+	do
+	{
+		struct hud_message_definition *message = &datum->messages[message_index];
+
+		if ((item_definition_index != NONE &&
+			item_definition_index == message->item_definition_index &&
+			message_offset == message->message_offset) || !message->valid)
+		{
+			result = message;
+			if (item_definition_index == NONE ||
+				item_definition_index == message->item_definition_index)
+			{
+				break;
+			}
+		}
+		else if (oldest_time > message->time)
+		{
+			oldest_time = message->time;
+			oldest_message_index = message_index;
+		}
+
+		message_index++;
+	}
+	while ((word)message_index < NUMBER_OF_HUD_MESSAGES_PER_DATUM);
+
+	if (!result)
+		result = &datum->messages[oldest_message_index];
+
+	return result;
+}
+
+static long compare_messages(
+	struct hud_message_definition const *message_a,
+	struct hud_message_definition const *message_b)
+{
+	long difference = message_b->time - message_a->time;
+
+	if (!difference)
+	{
+		difference = message_b->item_definition_index - message_a->item_definition_index;
+		if (!difference)
+			difference = message_b->magic_number - message_a->magic_number;
+	}
+
+	return difference;
+}

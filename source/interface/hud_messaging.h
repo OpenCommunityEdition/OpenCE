@@ -44,6 +44,9 @@ void hud_add_item_message(
 	long item_definition_index,
 	short quantity,
 	char message_offset);
+void hud_broadcast_team_message(
+	long victim_player_index,
+	wchar_t const *message);
 void hud_messaging_update(
 	short local_player_index);
 void hud_set_state_message(
