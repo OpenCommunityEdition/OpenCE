@@ -81,32 +81,238 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h"
 #include "game_engine.h"
 #include "players.h"
+#include "main/console.h"
+#include "math/geometry.h"
+#include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_geometry.h"
+#include "render/render.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
+#include "shaders/shader_definitions.h"
+#include "shaders/shaders.h"
+#include "tag_files/tag_groups.h"
+#include "text/text_group.h"
+#include "text/unicode.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
 enum
 {
 	MAXIMUM_KING_SCORE_SLOTS = 16,
+	MAXIMUM_HILL_POINTS = 12,
+	MAXIMUM_HILLS = 64,
+	NUMBER_OF_DEFAULT_ANIMATION_VALUES = 4,
+
+	HILL_MOVE_TIME = TICKS_PER_MINUTE,
+	HILL_CONTROL_TIME = 10*TICKS_PER_SECOND,
+	HILL_SCORE_SOUND_INTERVAL = 5*TICKS_PER_SECOND,
+	HILL_30_SECOND_WARNING = 30*TICKS_PER_SECOND,
+	HILL_60_SECOND_WARNING = TICKS_PER_MINUTE,
+};
+
+enum
+{
+	_multiplayer_sound_60_seconds = 0x2,
+	_multiplayer_sound_30_seconds,
+	_multiplayer_sound_red_60_seconds,
+	_multiplayer_sound_red_30_seconds,
+	_multiplayer_sound_blue_60_seconds,
+	_multiplayer_sound_blue_30_seconds,
+	_multiplayer_sound_hill_move = 0x1E,
 	_multiplayer_sound_team_king_of_the_hill = 0x20,
 	_multiplayer_sound_king_of_the_hill = 0x24,
+	_multiplayer_sound_hill_contested = 0x27,
+	_multiplayer_sound_hill_controlled,
+	_multiplayer_sound_countdown_timer_end = 0x2A,
+};
+
+enum
+{
+	_king_message_enemy_on_the_hill = 0x1E,
+	_king_message_ally_on_the_hill,
+	_king_message_you_are_on_the_hill,
+};
+
+enum
+{
+	_multiplayer_game_text_you_are_on_the_hill = 0x9B,
+	_multiplayer_game_text_ally_on_the_hill,
+	_multiplayer_game_text_enemy_on_the_hill,
+	_multiplayer_game_text_king_score_header,
+};
+
+enum
+{
+	_king_hill_state_uncontrolled = 0,
+	_king_hill_state_controlled,
+	_king_hill_state_controlled_red,
+	_king_hill_state_controlled_blue,
+	_king_hill_state_contested,
+};
+
+enum
+{
+	_rasterizer_lock_none = 0,
+	_rasterizer_lock_dynamic_quad = 9,
 };
 
 /* ---------- macros */
 
 /* ---------- structures */
 
-struct king_globals_prefix
+/* rasterizer_geometry.c private; declared here until they are homed in rasterizer_geometry.h */
+struct model_vertex_uncompressed
 {
-	long scores[MAXIMUM_KING_SCORE_SLOTS];
+	real_point3d position;
+	real_vector3d normal;
+	real_vector3d binormal;
+	real_vector3d tangent;
+	real_point2d texcoord;
+	short nodes[2];
+	real node_weights[2];
 };
+
+struct model_vertex_compressed
+{
+	real_point3d position;
+	unsigned long normal;
+	unsigned long binormal;
+	unsigned long tangent;
+	point2d texcoord;
+	byte nodes[2];
+	short node_weight;
+};
+
+typedef char verify_model_vertex_uncompressed_size[
+	sizeof(struct model_vertex_uncompressed) == 0x44 ? 1 : -1];
+typedef char verify_model_vertex_compressed_size[
+	sizeof(struct model_vertex_compressed) == 0x20 ? 1 : -1];
+
+/* models.c private; declared here until they are homed in rasterizer.h */
+struct rasterizer_model_skinning
+{
+	real_matrix4x3 const *node_matrices;
+	short node_matrix_count;
+	word pad;
+};
+
+struct render_model_effect
+{
+	short type;
+	word pad;
+	real intensity;
+	byte reserved[0x20];
+};
+
+struct rasterizer_model_begin_parameters
+{
+	unsigned long geometry_flags;
+	long unique_identifier;
+	struct rasterizer_model_skinning skinning;
+	struct render_lighting lighting;
+	struct render_animation animation;
+	struct render_model_effect effect;
+	real_point3d centroid;
+	real radius;
+	real_vector2d base_map_scale;
+};
+
+typedef char verify_rasterizer_model_begin_parameters_size[
+	sizeof(struct rasterizer_model_begin_parameters) == 0xCC ? 1 : -1];
+
+/* game_engine.c private; declared here until it is homed in game_engine.h */
+struct game_engine_place
+{
+	short flags;
+	short place;
+};
+
+/* game_engine.c private; declared here until it is homed in scenario_definitions.h */
+struct scenario_netgame_flag
+{
+	real_point3d position;
+	real facing;
+	short type;
+	short team_index;
+	byte unused[0x80];
+};
+
+typedef char verify_scenario_netgame_flag_size[
+	sizeof(struct scenario_netgame_flag) == 0x94 ? 1 : -1];
+typedef char verify_scenario_netgame_flags_offset[
+	offsetof(struct scenario, netgame_flags) == 0x378 ? 1 : -1];
+
+struct king_globals
+{
+	long score[MAXIMUM_KING_SCORE_SLOTS];
+	long score_tick[MAXIMUM_KING_SCORE_SLOTS];
+	boolean on_the_hill[MAXIMUM_KING_SCORE_SLOTS];
+	long hill_point_count;
+	real_point3d hill_points[MAXIMUM_HILL_POINTS];
+	real_point2d convex_hull[MAXIMUM_HILL_POINTS];
+	real_point3d hill_center;
+	long hill_state;
+	long hill_controlled_count;
+	long hill_previous_controller;
+	real hill_top;
+	real hill_bottom;
+	long hill_id;
+	long hill_timer;
+};
+
+typedef char verify_king_globals_size[
+	sizeof(struct king_globals) == 0x1AC ? 1 : -1];
+typedef char verify_king_globals_on_the_hill_offset[
+	offsetof(struct king_globals, on_the_hill) == 0x80 ? 1 : -1];
+typedef char verify_king_globals_convex_hull_offset[
+	offsetof(struct king_globals, convex_hull) == 0x124 ? 1 : -1];
+typedef char verify_king_globals_hill_id_offset[
+	offsetof(struct king_globals, hill_id) == 0x1A4 ? 1 : -1];
 
 /* ---------- prototypes */
 
+/* game_engine.c; declared here until they are homed in game_engine.h */
+struct game_engine_place game_engine_get_place(
+	long player_index,
+	enum get_score_type score_type);
+wchar_t *get_place_name(
+	struct game_engine_place place);
+
+static void hill_points_to_2d(
+	real_point3d const *points,
+	real_point2d *points2d,
+	long point_count);
+static void find_hill(
+	void);
+static long find_next_hill(
+	long hill_id);
+static boolean player_inside_hill(
+	long player_index);
+static void king_calculate_hill_state(
+	void);
+void render_dynamic_quad_initialize(
+	void);
+void render_dynamic_quad(
+	struct model_vertex_uncompressed *verts,
+	long shader_index,
+	struct render_lighting const *lighting,
+	struct render_animation const *animation,
+	real u_scale,
+	real v_scale);
+
 /* ---------- globals */
 
-extern struct king_globals_prefix bss_0043e948;
+/* owned elsewhere; declared here until they are homed in the render header */
+extern real_rgb_color global_default_animation_colors[4];
+extern real global_default_animation_values[4];
+
+struct king_globals king_globals = { 0 };
+static short king_engine_hill_count = 0;
+static short king_engine_hills[MAXIMUM_HILLS] = { 0 };
 
 /* ---------- public code */
 
@@ -208,11 +414,681 @@ wchar_t *code_000a0de0(
 	wchar_t *buffer)
 {
 	ticks_to_unicode_time_string(
-		bss_0043e948.scores[team_index],
+		king_globals.score[team_index],
 		256,
 		buffer);
 
 	return buffer;
 }
 
+boolean king_engine_initialize_for_new_map(
+	void)
+{
+	struct scenario *scenario = global_scenario_get();
+	short flag_index;
+
+	csmemset(&king_globals, 0, sizeof(king_globals));
+	king_engine_hill_count = 0;
+	for (flag_index = 0; flag_index < scenario->netgame_flags.count; flag_index++)
+	{
+		struct scenario_netgame_flag *flag = TAG_BLOCK_GET_ELEMENT(
+			&scenario->netgame_flags,
+			flag_index,
+			struct scenario_netgame_flag);
+
+		if (flag->type == _netgame_flag_hill)
+		{
+			boolean found = FALSE;
+			short hill_index;
+
+			for (hill_index = 0; hill_index < king_engine_hill_count; hill_index++)
+			{
+				if (king_engine_hills[hill_index] == flag->team_index)
+				{
+					found = TRUE;
+					break;
+				}
+			}
+			if (!found)
+				king_engine_hills[king_engine_hill_count++] = flag->team_index;
+		}
+	}
+
+	king_globals.hill_id = 0;
+	king_globals.hill_timer = HILL_MOVE_TIME;
+	king_globals.hill_previous_controller = NONE;
+	king_globals.hill_state = _king_hill_state_uncontrolled;
+	find_hill();
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\game_engine_king.c",
+		0x154,
+		king_globals.hill_point_count != 0);
+
+	render_dynamic_quad_initialize();
+
+	return TRUE;
+}
+
+void king_engine_player_update(
+	long player_index)
+{
+	struct player_datum *player = player_get(player_index);
+
+	game_engine_state_message(player_index, NONE, NONE);
+	king_globals.on_the_hill[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index)] = FALSE;
+	if (player->unit_index != NONE)
+	{
+		unit_get(player->unit_index);
+		if (game_engine_can_score() && player_inside_hill(player_index))
+		{
+			king_globals.on_the_hill[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index)] = TRUE;
+			player->statistics.multiplayer_statistics.king_statistics.time_on_hill++;
+			if (king_globals.score_tick[player->team_index] < game_time_get())
+			{
+				long score_to_win;
+				long score;
+
+				king_globals.score[player->team_index]++;
+				king_globals.score_tick[player->team_index] = game_time_get();
+				score_to_win = game_engine_get_variant()->unknown40*TICKS_PER_MINUTE;
+				score = king_globals.score[player->team_index];
+				if (score_to_win - score == HILL_30_SECOND_WARNING)
+				{
+					if (game_engine_has_teams())
+					{
+						game_engine_play_multiplayer_sound(
+							player->team_index ?
+								_multiplayer_sound_blue_30_seconds :
+								_multiplayer_sound_red_30_seconds);
+					}
+					else
+					{
+						game_engine_play_multiplayer_sound(_multiplayer_sound_30_seconds);
+					}
+				}
+				if (score_to_win - score == HILL_60_SECOND_WARNING)
+				{
+					if (game_engine_has_teams())
+					{
+						game_engine_play_multiplayer_sound(
+							player->team_index ?
+								_multiplayer_sound_blue_60_seconds :
+								_multiplayer_sound_red_60_seconds);
+					}
+					else
+					{
+						game_engine_play_multiplayer_sound(_multiplayer_sound_60_seconds);
+					}
+				}
+				if (king_globals.score[player->team_index] > 0 &&
+					king_globals.score[player->team_index] % HILL_SCORE_SOUND_INTERVAL == 0 &&
+					king_globals.score[player->team_index] < score_to_win)
+				{
+					game_engine_play_multiplayer_sound(_multiplayer_sound_countdown_timer_end);
+				}
+				if (score >= score_to_win)
+					game_engine_end_game();
+			}
+			game_engine_state_message(player_index, _king_message_you_are_on_the_hill, player_index);
+		}
+	}
+
+	return;
+}
+
+boolean king_engine_display_score(
+	long player_index,
+	long message,
+	long message_player_index,
+	wchar_t *buffer,
+	long buffer_size)
+{
+	struct player_datum *player = player_get(player_index);
+	boolean result = TRUE;
+	long string_list_index;
+	wchar_t *string;
+
+	switch (message)
+	{
+	case _king_message_enemy_on_the_hill:
+	case _king_message_ally_on_the_hill:
+	case _king_message_you_are_on_the_hill:
+		{
+			struct player_datum *other_player = player_get(message_player_index);
+			long score = king_globals.score[other_player->team_index]/TICKS_PER_SECOND;
+
+			if (message == _king_message_you_are_on_the_hill)
+			{
+				wchar_t *place_name = get_place_name(
+					game_engine_get_place(player_index, _get_score_team));
+
+				string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+				if (string_list_index != NONE)
+				{
+					string = unicode_string_list_get_string(
+						string_list_index,
+						_multiplayer_game_text_you_are_on_the_hill);
+				}
+				else
+					string = L"";
+				usnprintf(buffer, buffer_size, string, place_name, score);
+			}
+			else if (message == _king_message_ally_on_the_hill)
+			{
+				string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+				if (string_list_index != NONE)
+				{
+					string = unicode_string_list_get_string(
+						string_list_index,
+						_multiplayer_game_text_ally_on_the_hill);
+				}
+				else
+					string = L"";
+				usnprintf(buffer, buffer_size, string, other_player->name, score);
+			}
+			else if (message == _king_message_enemy_on_the_hill)
+			{
+				string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+				if (string_list_index != NONE)
+				{
+					string = unicode_string_list_get_string(
+						string_list_index,
+						_multiplayer_game_text_enemy_on_the_hill);
+				}
+				else
+					string = L"";
+				usnprintf(buffer, buffer_size, string, other_player->name, score);
+			}
+			else
+			{
+				match_assert(
+					"c:\\halo\\SOURCE\\game\\game_engine_king.c",
+					0x3A2,
+					!"unreachable");
+			}
+		}
+		break;
+
+	default:
+		result = FALSE;
+		break;
+	}
+
+	return result;
+}
+
+long king_get_score(
+	long player_index,
+	enum get_score_type score_type)
+{
+	struct player_datum *player = player_get(player_index);
+
+	if (score_type == _get_score_individual)
+		return player->statistics.multiplayer_statistics.king_statistics.time_on_hill;
+
+	return king_globals.score[player->team_index];
+}
+
+void render_dynamic_quad_initialize(
+	void)
+{
+	short i;
+
+	global_default_animation_colors[0] = *global_real_rgb_white;
+	global_default_animation_colors[1] = *global_real_rgb_white;
+	global_default_animation_colors[2] = *global_real_rgb_white;
+	global_default_animation_colors[3] = *global_real_rgb_white;
+	for (i = 0; i < NUMBER_OF_DEFAULT_ANIMATION_VALUES; i++)
+		global_default_animation_values[i] = 0.0f;
+
+	return;
+}
+
+void render_dynamic_quad(
+	struct model_vertex_uncompressed *verts,
+	long shader_index,
+	struct render_lighting const *lighting,
+	struct render_animation const *animation,
+	real u_scale,
+	real v_scale)
+{
+	long triangle_buffer_index;
+	long vertex_buffer_index;
+
+	rasterizer_globals.current_lock_operation = _rasterizer_lock_dynamic_quad;
+	triangle_buffer_index = rasterizer_dynamic_triangles_new(2);
+	vertex_buffer_index = rasterizer_dynamic_vertices_new(_rasterizer_vertex_type_model_compressed, 4);
+	if (triangle_buffer_index != NONE && vertex_buffer_index != NONE)
+	{
+		void *vertices = rasterizer_dynamic_vertices_lock(vertex_buffer_index);
+		short *triangles = rasterizer_dynamic_triangles_lock(triangle_buffer_index);
+		struct rasterizer_model_begin_parameters parameters;
+		real_point3d centroid;
+		struct shader *shader;
+
+		rasterizer_geometry_compress_vertices(
+			_rasterizer_vertex_type_model_uncompressed,
+			4,
+			vertices,
+			4*sizeof(struct model_vertex_compressed),
+			verts,
+			4*sizeof(struct model_vertex_uncompressed));
+		triangles[0] = 0;
+		triangles[1] = 1;
+		triangles[2] = 2;
+		triangles[3] = 2;
+		triangles[4] = 3;
+		triangles[5] = 0;
+		rasterizer_dynamic_triangles_unlock(triangle_buffer_index);
+		rasterizer_dynamic_vertices_unlock(vertex_buffer_index);
+
+		shader = tag_get('shdr', shader_index);
+		centroid.x = (verts[0].position.x + verts[1].position.x + verts[2].position.x + verts[3].position.x)*0.25f;
+		centroid.y = (verts[0].position.y + verts[1].position.y + verts[2].position.y + verts[3].position.y)*0.25f;
+		centroid.z = (verts[0].position.z + verts[1].position.z + verts[2].position.z + verts[3].position.z)*0.25f;
+
+		csmemset(&parameters, 0, sizeof(parameters));
+		parameters.unique_identifier = 1;
+		parameters.skinning.node_matrices = global_identity4x3;
+		parameters.skinning.node_matrix_count = 1;
+		if (lighting)
+		{
+			parameters.lighting = *lighting;
+		}
+		else
+		{
+			parameters.lighting.ambient_color = *global_real_rgb_white;
+			parameters.lighting.distant_light_count = 0;
+			parameters.lighting.point_light_count = 0;
+			parameters.lighting.reflection_tint_color = *global_real_argb_white;
+			parameters.lighting.shadow_vector.i = 0.0f;
+			parameters.lighting.shadow_vector.j = 1.0f;
+			parameters.lighting.shadow_vector.k = 0.0f;
+			parameters.lighting.shadow_color = *global_real_rgb_black;
+		}
+		if (animation)
+		{
+			parameters.animation = *animation;
+		}
+		else
+		{
+			parameters.animation.colors = global_default_animation_colors;
+			parameters.animation.values = global_default_animation_values;
+		}
+		parameters.centroid = centroid;
+		parameters.base_map_scale.i = u_scale;
+		parameters.base_map_scale.j = v_scale;
+
+		rasterizer_profile_enable(FALSE);
+		rasterizer_models_begin(FALSE);
+		rasterizer_model_begin(&parameters, TRUE);
+		if (shader_type_is_transparent(shader->base.type))
+		{
+			rasterizer_model_transparent_geometry_submit(
+				shader,
+				0,
+				NULL,
+				triangle_buffer_index,
+				2,
+				NULL,
+				vertex_buffer_index,
+				&centroid,
+				NULL);
+		}
+		else
+		{
+			rasterizer_model_draw(
+				shader,
+				0,
+				NULL,
+				triangle_buffer_index,
+				2,
+				NULL,
+				vertex_buffer_index);
+		}
+		rasterizer_model_end();
+		rasterizer_models_end();
+		rasterizer_profile_enable(TRUE);
+		rasterizer_dynamic_triangles_delete(triangle_buffer_index);
+		rasterizer_dynamic_vertices_delete(vertex_buffer_index);
+	}
+	rasterizer_globals.current_lock_operation = _rasterizer_lock_none;
+
+	return;
+}
+
+wchar_t *king_get_score_header_string(
+	wchar_t *buffer)
+{
+	long string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+	wchar_t const *string;
+
+	if (string_list_index != NONE)
+	{
+		string = unicode_string_list_get_string(
+			string_list_index,
+			_multiplayer_game_text_king_score_header);
+	}
+	else
+	{
+		string = L"";
+	}
+	ustrcpy(buffer, string);
+
+	return buffer;
+}
+
+boolean king_engine_goal_matches_player(
+	long player_index,
+	long goal_index)
+{
+	boolean matches = !king_globals.on_the_hill[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index)];
+
+	return matches;
+}
+
+void king_engine_update(
+	void)
+{
+	if (game_engine_can_score() &&
+		game_engine_get_variant()->unknown4C.byte0 &&
+		--king_globals.hill_timer == 0)
+	{
+		king_globals.hill_timer = HILL_MOVE_TIME;
+		king_globals.hill_id = find_next_hill(king_globals.hill_id);
+		find_hill();
+		game_engine_play_multiplayer_sound(_multiplayer_sound_hill_move);
+		while (king_globals.hill_point_count == 0)
+		{
+			error(2, "failed to find hill #%d most likely bad point placement", king_globals.hill_id);
+			if (king_globals.hill_id == 0)
+				break;
+
+			king_globals.hill_id = find_next_hill(king_globals.hill_id);
+			find_hill();
+			game_engine_play_multiplayer_sound(_multiplayer_sound_hill_move);
+		}
+	}
+
+	if (king_globals.hill_point_count > 0)
+	{
+		real_point3d position = king_globals.hill_center;
+
+		game_engine_set_goal_position(0, &position, 0.0f, "crown_blue", NONE, NONE, NONE);
+	}
+	else
+	{
+		console_printf(FALSE, "FAILED TO FIND HILL");
+	}
+	king_calculate_hill_state();
+
+	return;
+}
+
 /* ---------- private code */
+
+static void hill_points_to_2d(
+	real_point3d const *points,
+	real_point2d *points2d,
+	long point_count)
+{
+	long i;
+
+	for (i = 0; i < point_count; i++)
+	{
+		points2d[i].x = points[i].x;
+		points2d[i].y = points[i].y;
+	}
+
+	return;
+}
+
+static void find_hill(
+	void)
+{
+	struct scenario *scenario = global_scenario_get();
+	long flag_indices[MAXIMUM_HILL_POINTS];
+	real_point3d points[MAXIMUM_HILL_POINTS];
+	real_point2d points2d[MAXIMUM_HILL_POINTS];
+	short hull_indices[MAXIMUM_HILL_POINTS];
+	real_point3d minimum, maximum;
+	long point_count;
+	short hull_point_count;
+	long i;
+
+	point_count = find_netgame_flags(
+		NULL,
+		0.0f,
+		0.0f,
+		_netgame_flag_hill,
+		(short)king_globals.hill_id,
+		MAXIMUM_HILL_POINTS,
+		flag_indices);
+	king_globals.hill_point_count = point_count;
+	if (point_count)
+	{
+		for (i = 0; i < point_count; i++)
+		{
+			struct scenario_netgame_flag *flag = TAG_BLOCK_GET_ELEMENT(
+				&scenario->netgame_flags,
+				flag_indices[i],
+				struct scenario_netgame_flag);
+
+			match_assert(
+				"c:\\halo\\SOURCE\\game\\game_engine_king.c",
+				0xDE,
+				NULL != flag);
+			points[i] = flag->position;
+		}
+		if (point_count == 1)
+		{
+			points[1] = points[0];
+			points[2] = points[0];
+			points[3] = points[0];
+			points[0].x -= 1.0f;
+			points[0].y -= 1.0f;
+			points[1].x += 1.0f;
+			points[1].y -= 1.0f;
+			points[2].x -= 1.0f;
+			points[2].y += 1.0f;
+			points[3].x += 1.0f;
+			points[3].y += 1.0f;
+			point_count = 4;
+		}
+		hill_points_to_2d(points, points2d, point_count);
+		hull_point_count = convex_hull2d(point_count, points2d, hull_indices);
+		for (i = 0; i < hull_point_count; i++)
+		{
+			king_globals.hill_points[i] = points[hull_indices[i]];
+			king_globals.convex_hull[i] = points2d[hull_indices[i]];
+		}
+		king_globals.hill_point_count = hull_point_count;
+
+		minimum = king_globals.hill_points[0];
+		maximum = king_globals.hill_points[0];
+		for (i = 0; i < hull_point_count; i++)
+		{
+			real_point3d *point = &king_globals.hill_points[i];
+
+			minimum.x = MIN(minimum.x, point->x);
+			minimum.y = MIN(minimum.y, point->y);
+			minimum.z = MIN(minimum.z, point->z);
+			maximum.x = MAX(maximum.x, point->x);
+			maximum.y = MAX(maximum.y, point->y);
+			maximum.z = MAX(maximum.z, point->z);
+		}
+		king_globals.hill_bottom = minimum.z - 0.1f;
+		king_globals.hill_top = maximum.z + 0.8f;
+		king_globals.hill_center.x = (maximum.x + minimum.x)*0.5f;
+		king_globals.hill_center.y = (maximum.y + minimum.y)*0.5f;
+		king_globals.hill_center.z = (maximum.z + minimum.z)*0.5f;
+	}
+
+	return;
+}
+
+static boolean player_inside_hill(
+	long player_index)
+{
+	boolean inside = FALSE;
+
+	if (player_index != NONE)
+	{
+		struct player_datum *player = player_get(player_index);
+
+		if (player->unit_index != NONE)
+		{
+			struct unit_datum *unit = unit_get(player->unit_index);
+			real_point3d const *position = &unit->object.bounding_sphere_center;
+
+			if (position->z >= king_globals.hill_bottom && position->z <= king_globals.hill_top)
+			{
+				real_point2d point;
+
+				point.x = position->x;
+				point.y = position->y;
+				inside = convex_hull2d_test_point(
+					king_globals.hill_point_count,
+					king_globals.convex_hull,
+					&point,
+					0.0f);
+			}
+		}
+	}
+
+	return inside;
+}
+
+static void king_calculate_hill_state(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	long player_count = 0;
+
+	if (game_engine_has_teams())
+	{
+		long enemy_count = 0;
+
+		data_iterator_new(&iterator, player_data);
+		player = (struct player_datum *)data_iterator_next(&iterator);
+		while (player)
+		{
+			if (king_globals.on_the_hill[DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index)])
+			{
+				if (player->team_index)
+					enemy_count++;
+				else
+					player_count++;
+			}
+			player = (struct player_datum *)data_iterator_next(&iterator);
+		}
+
+		if (enemy_count)
+		{
+			if (player_count)
+			{
+				king_globals.hill_state = _king_hill_state_contested;
+				if (king_globals.hill_controlled_count > HILL_CONTROL_TIME)
+					game_engine_play_multiplayer_sound(_multiplayer_sound_hill_contested);
+				king_globals.hill_controlled_count = 0;
+			}
+			else
+			{
+				if (king_globals.hill_state == _king_hill_state_controlled_blue)
+					king_globals.hill_controlled_count++;
+				else
+					king_globals.hill_controlled_count = 0;
+				king_globals.hill_state = _king_hill_state_controlled_blue;
+				if (king_globals.hill_controlled_count == HILL_CONTROL_TIME)
+					game_engine_play_multiplayer_sound(_multiplayer_sound_hill_controlled);
+			}
+		}
+		else if (player_count)
+		{
+			if (king_globals.hill_state == _king_hill_state_controlled_red)
+				king_globals.hill_controlled_count++;
+			else
+				king_globals.hill_controlled_count = 0;
+			king_globals.hill_state = _king_hill_state_controlled_red;
+			if (king_globals.hill_controlled_count == HILL_CONTROL_TIME)
+				game_engine_play_multiplayer_sound(_multiplayer_sound_hill_controlled);
+		}
+		else
+		{
+			king_globals.hill_state = _king_hill_state_uncontrolled;
+			king_globals.hill_controlled_count = 0;
+		}
+	}
+	else
+	{
+		long controller;
+
+		data_iterator_new(&iterator, player_data);
+		player = (struct player_datum *)data_iterator_next(&iterator);
+		while (player)
+		{
+			if (king_globals.on_the_hill[DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index)])
+			{
+				controller = iterator.datum_index;
+				player_count++;
+			}
+			player = (struct player_datum *)data_iterator_next(&iterator);
+		}
+
+		if (player_count > 1)
+		{
+			king_globals.hill_state = _king_hill_state_contested;
+			if (king_globals.hill_controlled_count > HILL_CONTROL_TIME)
+				game_engine_play_multiplayer_sound(_multiplayer_sound_hill_contested);
+			king_globals.hill_controlled_count = 0;
+			king_globals.hill_previous_controller = NONE;
+		}
+		else if (player_count)
+		{
+			if (king_globals.hill_state == _king_hill_state_controlled &&
+				controller == king_globals.hill_previous_controller)
+			{
+				king_globals.hill_controlled_count++;
+			}
+			else
+			{
+				king_globals.hill_controlled_count = 0;
+				king_globals.hill_previous_controller = controller;
+			}
+			king_globals.hill_state = _king_hill_state_controlled;
+			if (king_globals.hill_controlled_count == HILL_CONTROL_TIME)
+				game_engine_play_multiplayer_sound(_multiplayer_sound_hill_controlled);
+		}
+		else
+		{
+			king_globals.hill_state = _king_hill_state_uncontrolled;
+			king_globals.hill_controlled_count = 0;
+			king_globals.hill_previous_controller = NONE;
+		}
+	}
+
+	return;
+}
+
+static long find_next_hill(
+	long hill_id)
+{
+	long next_hill_id;
+	short start_index = random_range(0, king_engine_hill_count);
+	short i;
+
+	for (i = 0; i < king_engine_hill_count; i++)
+	{
+		short hill_index = (start_index + i)%king_engine_hill_count;
+
+		if (hill_id != king_engine_hills[hill_index])
+			return king_engine_hills[hill_index];
+	}
+
+	/* BUG (preserved for exact matching): next_hill_id is never assigned, so
+	 * when every hill equals hill_id (or there are no hills) the caller
+	 * receives an uninitialized value. A corrected build should return
+	 * hill_id here. */
+	return next_hill_id;
+}
