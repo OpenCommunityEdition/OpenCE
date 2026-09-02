@@ -12,9 +12,12 @@ ap.add_argument('unit')
 ap.add_argument('--source')
 ap.add_argument('--edits')
 ap.add_argument('--cflag', action='append', default=[])
+ap.add_argument('--alias', action='append', default=[],
+                help='OURS=TARGET: rename C identifier OURS to TARGET in memory before compiling (word-boundary)')
 ap.add_argument('--fn', action='append', default=[])
 ap.add_argument('--disas')
 ap.add_argument('--all', action='store_true')
+ap.add_argument('--out', help='copy the compiled object to this path for later inspection')
 a = ap.parse_args()
 
 unit = a.unit.replace('\\', '/')
@@ -39,12 +42,19 @@ if a.edits:
         find, repl = entry[0], entry[1]
         assert find in code, 'EDIT NOT FOUND: %r' % find[:80]
         code = code.replace(find, repl)
+for entry in a.alias:
+    ours_name, target_name = entry.split('=', 1)
+    pat = re.compile(r'(?<![A-Za-z0-9_])' + re.escape(ours_name) + r'(?![A-Za-z0-9_])')
+    assert pat.search(code), 'ALIAS NOT FOUND: %r' % ours_name
+    code = pat.sub(target_name, code)
 scratch_src = f'scratch/_gate_{os.getpid()}.c'
 open(scratch_src, 'w', encoding='latin-1', newline='\n').write(code)
 obj = f'scratch/_gate_{os.getpid()}.obj'
 if os.path.exists(obj):
     os.remove(obj)
-cl = r'C:\halo-worktrees\claude-finish-hs-20260816\xbox\bin\vc7\CL.Exe'
+cl = os.environ.get('HALO_CL') or os.path.abspath(os.path.join('xbox', 'bin', 'vc7', 'CL.Exe'))
+if not os.path.exists(cl):
+    cl = r'C:\halo-worktrees\claude-finish-hs-20260816\xbox\bin\vc7\CL.Exe'
 incdir = os.path.dirname(unit_src)
 cmd = [cl, '/nologo', '/c'] + toks + a.cflag + ['/I' + incdir, '/Fo' + obj, scratch_src]
 r = subprocess.run(cmd, capture_output=True, text=True)
@@ -54,6 +64,9 @@ if not os.path.exists(obj) or r.returncode != 0:
     print(r.stderr[-2000:])
     sys.exit(1)
 
+if a.out:
+    import shutil
+    shutil.copyfile(obj, a.out)
 target = cc.load(open('build/split/' + unit + '.obj', 'rb').read())
 ours = cc.load(open(obj, 'rb').read())
 
@@ -85,7 +98,7 @@ for name in want:
     oi = cc.section_info(ours, name)
     if cc.section_infos_equal(ti, oi):
         nexact += 1
-        if a.fn:
+        if a.fn or a.all:
             print(f'EXACT     {ti["size"]:5d}  {name}')
     else:
         nres += 1
