@@ -369,5 +369,16 @@
       "relocation_count": 27,
       "normalized_sha256": "ffe1ef0aa827017276299f3a497655019d91f94374129c31634061500e5ae4b9"
     }
+  },
+  {
+    "unit": "source/game/game_engine_race",
+    "symbol": "_race_engine",
+    "allow_incomplete_unit": true,
+    "reason": "the incomplete Race object owns the exact callback table; csplit names the race string relocation as an undefined image symbol while MSVC emits the identically named select-any string COMDAT locally, and the hardened comparator proves all normalized bytes plus every relocation address, type, destination, and addend",
+    "measurements": {
+      "size": 136,
+      "relocation_count": 25,
+      "normalized_sha256": "97a4c632a978acafd20933da4504d8ec3fdf3c5afd2f78934bced57dc8f746f4"
+    }
   }
 ]
