@@ -387,7 +387,27 @@ struct action_state_data
 
 /* ---------- prototypes/ACTIONS.C */
 
+boolean actor_action_perform(
+	long actor_index);
+void actor_action_update(
+	long actor_index);
+void actor_action_control(
+	long actor_index);
+void actor_action_replace_prop(
+	long actor_index,
+	long invalid_prop_index,
+	long replacement_prop_index);
 void actor_action_flush_position_indices(
+	long actor_index);
+void actor_action_flush_structure_indices(
+	long actor_index);
+void actor_action_change(
+	long actor_index,
+	long action,
+	struct action_state_data *action_data);
+char const *actor_action_name(
+	short action);
+short actor_action_class(
 	long actor_index);
 
 boolean actor_action_handle_initial_action(
@@ -515,6 +535,11 @@ void action_obey_describe_command(
 void action_fight_begin(
 	long actor_index);
 void action_fight_end(
+	long actor_index);
+
+/* ---------- prototypes/ACTION_CONVERSE.C */
+
+void actor_conversation_control(
 	long actor_index);
 
 /* ---------- globals */

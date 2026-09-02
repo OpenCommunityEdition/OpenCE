@@ -151,7 +151,6 @@ void encounter_compute_activation_cluster_bit_vector(
 	long bit_vector_size,
 	unsigned long const *active_area,
 	unsigned long *bit_vector);
-
 long encounter_get_by_name(
 	char const *encounter_name);
 void encounter_modify_pursuit_desires(

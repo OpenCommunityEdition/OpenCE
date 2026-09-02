@@ -290,6 +290,8 @@ symbols in this file:
 #include "props.h"
 
 #include "ai.h"
+#include "actor_looking.h"
+#include "ai_communication.h"
 #include "ai_debug.h"
 #include "ai_scenario_definitions.h"
 #include "encounters.h"
@@ -315,6 +317,7 @@ enum
 {
 	_actor_mode_braindead = 0,
 	_actor_mode_alert = 2,
+	_actor_mode_combat,
 	_actor_fire_target_none = 0,
 	_actor_fire_target_prop,
 };
@@ -520,161 +523,11 @@ typedef char ai_profile_meter_globals_units_active_offset_assert[
 
 /* ---------- prototypes */
 
-void actor_action_replace_prop(
-	long actor_index,
-	long invalid_prop_index,
-	long replacement_prop_index);
-
-void encounter_detach_actor(
-	long actor_index,
-	boolean died);
-
-void encounterless_attach_actor(
-	long actor_index);
-
-void encounterless_detach_actor(
-	long actor_index);
-
-void encounter_attach_actor(
-	long actor_index,
-	long encounter_index,
-	short squad_index,
-	boolean has_previous_team);
-
-void actor_action_flush_structure_indices(
-	long actor_index);
-
-long biped_find_pathfinding_surface_index(
-	long biped_index,
-	real_point3d *position);
-
-short actor_action_class(
-	long actor_index);
-
-void ai_conversation_actor_deleted(
-	long actor_index);
-
-void actor_perception_find_sense_position(
-	long actor_index,
-	real_point3d const *position,
-	long prop_index,
-	struct actor_position_data *sense_position);
-
-short actor_audibility_at_point(
-	long actor_index,
-	struct actor_position_data *sense_position,
-	real_point3d const *position,
-	struct location const *location,
-	short volume,
-	real perception_factor,
-	short line_of_sight);
-
-void actor_stimulus_environmental_noise(
-	long actor_index,
-	long object_index,
-	real_point3d const *position,
-	short count);
-
-void actor_stimulus_weapon_impact(
-	long actor_index,
-	long object_index,
-	real_point3d const *position,
-	short count);
-
-void actor_stimulus_weapon_detonation(
-	long actor_index,
-	long object_index,
-	real_point3d const *position,
-	short count);
-
-void encounter_attach_unit(
-	long encounter_index,
-	long unit_index);
-
+/* January keeps this function private to ACTORS.C. Its body remains one of
+ * this object's explicitly unwritten functions, so the forward declaration
+ * stays TU-local until the static definition is reconstructed. */
 void actor_input_update(
 	long actor_index);
-
-void actor_stimulus_damage(
-	long actor_index,
-	long prop_index,
-	real damage_fraction,
-	real_vector3d *damage_velocity);
-
-void actor_stimulus_enter_combat_friend_in_combat(
-	long actor_index,
-	long prop_index);
-
-void actor_stimulus_prop_fleeing(
-	long actor_index,
-	long prop_index);
-
-void actor_died(
-	long actor_index);
-
-void actor_perception_update(
-	long actor_index);
-
-void actor_situation_update(
-	long actor_index);
-
-void actor_emotion_update(
-	long actor_index);
-
-void actor_action_update(
-	long actor_index);
-
-void actor_action_control(
-	long actor_index);
-
-void actor_communication_update(
-	long actor_index);
-
-void actor_conversation_control(
-	long actor_index);
-
-void actor_destination_update(
-	long actor_index);
-
-void actor_look_affect_movement(
-	long actor_index);
-
-void actor_move_update(
-	long actor_index);
-
-void actor_look_update(
-	long actor_index);
-
-void actor_combat_update(
-	long actor_index);
-
-void actor_stimulus_clear(
-	long actor_index);
-
-boolean actor_action_perform(
-	long actor_index);
-
-void actor_action_change(
-	long actor_index,
-	short action,
-	struct action_state_data *action_data);
-
-char const *actor_action_name(
-	short action);
-
-boolean valid_real_normal2d(
-	real_vector2d const *normal);
-
-void actor_stimulus_bumped(
-	long actor_index,
-	long prop_index);
-
-void actor_stimulus_heard_shooting(
-	long actor_index,
-	long prop_index);
-
-void actor_stimulus_prop_just_killed(
-	long actor_index,
-	long prop_index);
 
 /* ---------- globals */
 
@@ -1012,7 +865,7 @@ void actor_swarm_cache_delete(
 	return;
 }
 
-void actor_swarm_component_refresh(
+static void actor_swarm_component_refresh(
 	long unit_index,
 	long component_index)
 {
@@ -1040,7 +893,7 @@ boolean actor_has_unlimited_grenades(
 boolean actor_is_noncombat(
 	long actor_index)
 {
-	boolean result = actor_get(actor_index)->state.mode < 3;
+	boolean result = actor_get(actor_index)->state.mode < _actor_mode_combat;
 
 	return result;
 }
@@ -1050,7 +903,8 @@ boolean actor_in_combat(
 {
 	struct actor_datum *actor = actor_get(actor_index);
 
-	if (actor->state.mode == 3 && actor->state.combat_status > actor->state.artificial_combat_status)
+	if (actor->state.mode == _actor_mode_combat &&
+		actor->state.combat_status > actor->state.artificial_combat_status)
 	{
 		return TRUE;
 	}
@@ -1062,7 +916,7 @@ boolean actor_is_fighting(
 	long actor_index)
 {
 	struct actor_datum *actor = actor_get(actor_index);
-	boolean result = actor->state.combat_status >= 7;
+	boolean result = actor->state.combat_status >= _actor_combat_status_visible;
 
 	if (result &&
 		actor->state.action == _actor_action_flee &&
@@ -1107,7 +961,7 @@ boolean actor_is_leaping(
 	struct actor_datum *actor = actor_get(actor_index);
 	boolean result = FALSE;
 
-	if (actor->state.action == 10)
+	if (actor->state.action == _actor_action_charge)
 	{
 		result = action_charge_is_leaping(actor_index);
 	}
@@ -1438,7 +1292,7 @@ static void actor_freeze_unit(
 	return;
 }
 
-void actor_freeze(
+static void actor_freeze(
 	long actor_index)
 {
 	struct actor_datum *actor = actor_get(actor_index);
@@ -1510,7 +1364,7 @@ static void actor_update_begin(
 	return;
 }
 
-void code_0002a150(
+static void actor_update_end(
 	void)
 {
 	global_updating_actor_index = NONE;
@@ -2963,7 +2817,7 @@ static void actor_update(
 			}
 		}
 	}
-	code_0002a150();
+	actor_update_end();
 
 	return;
 }

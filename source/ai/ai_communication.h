@@ -119,6 +119,12 @@ void ai_communication_dispose_from_old_map(
 	void);
 void ai_communication_packet_new(
 	struct ai_information_packet *information);
+void actor_communication_update(
+	long actor_index);
+void actor_handle_communication(
+	long actor_index,
+	long prop_index,
+	struct ai_information_packet *information);
 short actor_communication_team(
 	long actor_index);
 short ai_conversation_status(
@@ -136,6 +142,8 @@ void ai_conversation_finish(
 	boolean force);
 void ai_conversation_stop(
 	short scenario_conversation_index);
+void ai_conversation_actor_deleted(
+	long actor_index);
 real ai_communication_get_player_rating(
 	long unit_index,
 	boolean test_line_of_sight,

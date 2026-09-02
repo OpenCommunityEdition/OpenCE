@@ -840,7 +840,13 @@ void actor_verify_activation(
 void actor_set_team(
 	long actor_index,
 	short team_index);
-
+void actor_detach_from_unit(
+	long actor_index);
+void actor_swarm_detach_from_unit(
+	long actor_index,
+	long unit_index);
+void actor_swarm_cache_delete(
+	long actor_index);
 void actor_set_dormant(
 	long actor_index,
 	boolean dormant);
@@ -848,7 +854,13 @@ void actor_find_pathfinding_location(
 	long actor_index);
 real actor_destination_tolerance(
 	long actor_index);
-boolean actor_get_running_blind_vector(long actor_index, real_vector3d *run_vector);
+void actor_input_sample_position(
+	long actor_index,
+	long unit_index,
+	struct actor_position_data *position);
+boolean actor_get_running_blind_vector(
+	long actor_index,
+	real_vector3d *run_vector);
 boolean actor_has_unlimited_grenades(
 	long actor_index);
 boolean actor_is_noncombat(
@@ -857,6 +869,9 @@ boolean actor_in_combat(
 	long actor_index);
 boolean actor_is_fighting(
 	long actor_index);
+boolean actor_attacking_target(
+	long actor_index,
+	real_vector3d *attack_vector);
 boolean actor_is_leaping(
 	long actor_index);
 long actor_get_weapon(
@@ -876,12 +891,81 @@ void actor_switch_props(
 	long new_prop_index);
 void actor_flush_position_indices(
 	long actor_index);
+void actor_flush_structure_indices(
+	long actor_index);
+void actor_handle_damage(
+	long actor_index,
+	long aggressor_unit_index,
+	real damage_fraction,
+	real_vector3d *damage_velocity);
+void actor_change_encounter(
+	long actor_index,
+	long encounter_index,
+	short squad_index);
+void actors_handle_spatial_effect(
+	long object_index,
+	short effect_type,
+	real_point3d const *position,
+	short volume,
+	short count);
+void actor_unit_control_crouch(
+	long actor_index,
+	boolean crouch);
 void actor_unit_control_jump(
 	long actor_index);
+void actor_unit_control_primary_trigger(
+	long actor_index,
+	boolean firing,
+	real analog_primary_trigger);
+void actor_unit_control_secondary_trigger(
+	long actor_index,
+	boolean firing);
 void actor_unit_control_throw_grenade(
 	long actor_index);
+void actor_unit_control_exact_facing(
+	long actor_index,
+	boolean exact_facing);
 void actor_unit_control_stop_animation_impulse(
 	long actor_index);
+void actor_died(
+	long actor_index);
+void actor_delete_props(
+	long actor_index);
+void actor_delete(
+	long actor_index,
+	boolean died);
+long actor_swarm_cache_new(
+	long actor_index);
+void actor_kill(
+	long actor_index,
+	boolean silent,
+	boolean delayed);
+void actor_swarm_unit_died(
+	long actor_index,
+	long unit_index);
+void actor_braindead(
+	long actor_index,
+	boolean braindead);
+void actor_handle_unit_effect(
+	long actor_index,
+	long prop_index,
+	short effect_type);
+void actors_freeze(
+	void);
+void actors_move_randomly(
+	void);
+void actor_attach_unit(
+	long actor_index,
+	long unit_index);
+void actor_erase(
+	long actor_index,
+	boolean immediate);
+void actors_handle_unit_effect(
+	long unit_index,
+	short effect_type,
+	short volume);
+void actors_update(
+	void);
 
 /* ---------- prototypes/ACTOR_FIRING_POSITION.C */
 
@@ -940,6 +1024,8 @@ long actor_aim_projectile(
 	real_point3d const *origin,
 	real_vector3d *vector,
 	real *error_reference);
+void actor_combat_update(
+	long actor_index);
 
 /* ---------- prototypes/ACTOR_MOVING.C */
 
@@ -1002,6 +1088,10 @@ boolean actor_path_has_path(
 	long actor_index);
 boolean actor_path_at_destination(
 	long actor_index);
+void actor_destination_update(
+	long actor_index);
+void actor_move_update(
+	long actor_index);
 
 /* ---------- prototypes/ACTOR_PERCEPTION.C */
 
@@ -1029,6 +1119,25 @@ long actor_perception_find_killer_prop_index(
 void actor_perception_find_prop_pathfinding_location(
 	long actor_index,
 	long prop_index);
+void actor_perception_find_sense_position(
+	long actor_index,
+	real_point3d const *position,
+	long prop_index,
+	struct actor_position_data *sense_position);
+short actor_audibility_at_point(
+	long actor_index,
+	struct actor_position_data const *sense_position,
+	real_point3d const *position,
+	struct location const *location,
+	short volume,
+	real perception_factor,
+	short line_of_sight);
+void actor_perception_update(
+	long actor_index);
+void actor_situation_update(
+	long actor_index);
+void actor_emotion_update(
+	long actor_index);
 boolean actor_emotion_flee_with_friends(
 	long actor_index,
 	real *desire_to_flee);
@@ -1049,6 +1158,19 @@ void actor_stimulus_enter_combat_perceived_enemy(
 void actor_stimulus_enter_combat_friend_in_combat(
 	long actor_index,
 	long prop_index);
+void actor_stimulus_clear(
+	long actor_index);
+void actor_stimulus_bumped(
+	long actor_index,
+	long prop_index);
+void actor_stimulus_environmental_noise(
+	long actor_index,
+	long object_index,
+	real_point3d const *position,
+	short count);
+void actor_stimulus_heard_shooting(
+	long actor_index,
+	long prop_index);
 void actor_stimulus_noticed_danger_zone(
 	long actor_index,
 	short danger_type,
@@ -1060,12 +1182,20 @@ void actor_stimulus_weapon_impact(
 	long object_index,
 	real_point3d const *position,
 	short count);
+void actor_stimulus_weapon_detonation(
+	long actor_index,
+	long object_index,
+	real_point3d const *position,
+	short count);
 void actor_stimulus_damage(
 	long actor_index,
 	long prop_index,
 	real damage_fraction,
 	real_vector3d const *damage_velocity);
 void actor_stimulus_prop_just_killed(
+	long actor_index,
+	long prop_index);
+void actor_stimulus_prop_fleeing(
 	long actor_index,
 	long prop_index);
 void actor_stimulus_abandon_stationary_facing(
@@ -1083,13 +1213,23 @@ void actor_looking_test_validity(
 	boolean *aiming_valid,
 	boolean *looking_valid);
 
-void actor_get_vision_distances(long actor_index, real maximum_vision_distance, real perception_factor, real horizontal_angle, real *full_distance_reference, real *partial_distance_reference);
+void actor_get_vision_distances(
+	long actor_index,
+	real maximum_vision_distance,
+	real perception_factor,
+	real horizontal_angle,
+	real *full_distance_reference,
+	real *partial_distance_reference);
 
 void actor_berserk(
 	long actor_index,
 	boolean berserk);
 
-short actor_perception_aiming_vector_test_blockage(real_point3d const *source_position, real_vector3d const *source_vector, real_point3d const *friend_position, real_vector3d *friend_direction_to_aiming_vector);
+short actor_perception_aiming_vector_test_blockage(
+	real_point3d const *source_position,
+	real_vector3d const *source_vector,
+	real_point3d const *friend_position,
+	real_vector3d *friend_direction_to_aiming_vector);
 
 /* ---------- globals */
 
