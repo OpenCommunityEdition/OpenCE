@@ -296,12 +296,10 @@ void player_ui_initialize(
 void player_ui_clear_multiplayer_joins(
 	void)
 {
-	long local_player_index;
+	long local_player_index = 0;
 	struct player_profile *profile;
-	boolean *joined;
+	boolean *joined = &player_ui_globals.local_players[0].prejoined_multiplayer;
 
-	local_player_index = 0;
-	joined = &player_ui_globals.local_players[0].prejoined_multiplayer;
 	do
 	{
 		profile = &player_ui_globals.local_players[(short)local_player_index].profile;
