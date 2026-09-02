@@ -13,9 +13,11 @@ header included in hcex build.
 #include "real_math.h"
 #include "tag_groups.h"
 
-/* ---------- constants */
-
 /* ---------- macros */
+
+#define SHADER_DEFINITION_TAG 'shdr'
+#define shader_definition_get(index) \
+	((struct shader *)tag_get(SHADER_DEFINITION_TAG, (index)))
 
 /* ---------- structures */
 

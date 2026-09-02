@@ -3,63 +3,63 @@ GAME_ENGINE_KING.C
 
 symbols in this file:
 000A0030 0010:
-	_code_000a0030 (0000)
+	_king_engine_dispose (0000)
 000A0040 0020:
-	_code_000a0040 (0000)
+	_hill_points_to_2d (0000)
 000A0060 0350:
-	_code_000a0060 (0000)
+	_find_hill (0000)
 000A03B0 0010:
-	_code_000a03b0 (0000)
+	_king_engine_dispose_from_old_map (0000)
 000A03C0 0020:
-	_code_000a03c0 (0000)
+	_king_engine_player_added (0000)
 000A03E0 0010:
-	_code_000a03e0 (0000)
+	_king_engine_game_ending (0000)
 000A03F0 0020:
-	_code_000a03f0 (0000)
+	_king_engine_game_starting (0000)
 000A0410 0010:
-	_code_000a0410 (0000)
+	_king_engine_statistics_append (0000)
 000A0420 0010:
-	_code_000a0420 (0000)
+	_king_engine_handle_client_message (0000)
 000A0430 0010:
-	_code_000a0430 (0000)
+	_king_engine_handle_server_message (0000)
 000A0440 0010:
-	_code_000a0440 (0000)
+	_king_engine_pregame_post_rasterize (0000)
 000A0450 0090:
-	_code_000a0450 (0000)
+	_player_inside_hill (0000)
 000A04E0 0160:
-	_code_000a04e0 (0000)
+	_king_engine_player_update (0000)
 000A0640 01c0:
-	_code_000a0640 (0000)
+	_king_calculate_hill_state (0000)
 000A0800 0010:
-	_code_000a0800 (0000)
+	_king_engine_player_damaged_player (0000)
 000A0810 0010:
-	_code_000a0810 (0000)
+	_king_engine_player_killed_player (0000)
 000A0820 0190:
-	_code_000a0820 (0000)
+	_king_engine_display_score (0000)
 000A09B0 0010:
-	_code_000a09b0 (0000)
+	_king_engine_prespawn_player_update (0000)
 000A09C0 0040:
-	_code_000a09c0 (0000)
+	_king_get_score (0000)
 000A0A00 0090:
 	_render_dynamic_quad_initialize (0000)
 000A0A90 02b0:
 	_render_dynamic_quad (0000)
 000A0D40 0040:
-	_code_000a0d40 (0000)
+	_king_get_score_string (0000)
 000A0D80 0060:
-	_code_000a0d80 (0000)
+	_king_get_score_header_string (0000)
 000A0DE0 0030:
-	_code_000a0de0 (0000)
+	_king_get_team_score_string (0000)
 000A0E10 0020:
-	_code_000a0e10 (0000)
+	_king_engine_goal_matches_player (0000)
 000A0E30 0070:
-	_code_000a0e30 (0000)
+	_find_next_hill (0000)
 000A0EA0 0110:
-	_code_000a0ea0 (0000)
+	_king_engine_initialize_for_new_map (0000)
 000A0FB0 03a0:
-	_code_000a0fb0 (0000)
+	_king_engine_post_rasterize (0000)
 000A1350 0110:
-	_code_000a1350 (0000)
+	_king_engine_update (0000)
 0025BDC0 000d:
 	??_C@_0N@DGPCNCJC@NULL?5?$CB?$DN?5flag?$AA@ (0000)
 0025BDD0 0027:
@@ -75,15 +75,16 @@ symbols in this file:
 002DE488 0088:
 	_king_engine (0000)
 0043E948 0230:
-	_bss_0043e948 (0000)
+	_king_globals (0000)
 */
 
 /* ---------- headers */
 
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
-#include "game_engine.h"
-#include "players.h"
+#include "game/game_engine_king.h"
+#include "game/game_engine_place.h"
+#include "game/players.h"
 #include "main/console.h"
 #include "math/geometry.h"
 #include "rasterizer/rasterizer.h"
@@ -123,8 +124,8 @@ enum
 	_multiplayer_sound_blue_60_seconds,
 	_multiplayer_sound_blue_30_seconds,
 	_multiplayer_sound_hill_move = 0x1E,
-	_multiplayer_sound_team_king_of_the_hill = 0x20,
-	_multiplayer_sound_king_of_the_hill = 0x24,
+	_multiplayer_sound_team_king = 0x20,
+	_multiplayer_sound_king = 0x24,
 	_multiplayer_sound_hill_contested = 0x27,
 	_multiplayer_sound_hill_controlled,
 	_multiplayer_sound_countdown_timer_end = 0x2A,
@@ -132,31 +133,10 @@ enum
 
 enum
 {
-	_king_message_enemy_on_the_hill = 0x1E,
-	_king_message_ally_on_the_hill,
-	_king_message_you_are_on_the_hill,
-};
-
-enum
-{
-	_multiplayer_game_text_you_are_on_the_hill = 0x9B,
-	_multiplayer_game_text_ally_on_the_hill,
-	_multiplayer_game_text_enemy_on_the_hill,
-	_multiplayer_game_text_king_score_header,
-};
-
-enum
-{
-	_king_hill_state_uncontrolled = 0,
-	_king_hill_state_controlled,
-	_king_hill_state_controlled_red,
-	_king_hill_state_controlled_blue,
-	_king_hill_state_contested,
-};
-
-enum
-{
-	_rasterizer_lock_none = 0,
+	_string_place_score_seconds = 0x9B,
+	_string_ally_name_is_on_the_hill_score_seconds,
+	_string_enemy_name_is_on_the_hill_score_seconds,
+	_string_time,
 	_rasterizer_lock_dynamic_quad = 9,
 };
 
@@ -164,7 +144,7 @@ enum
 
 /* ---------- structures */
 
-/* rasterizer_geometry.c private; declared here until they are homed in rasterizer_geometry.h */
+/* Target-proven vertex layouts used by this translation unit's quad helper. */
 struct model_vertex_uncompressed
 {
 	real_point3d position;
@@ -192,7 +172,7 @@ typedef char verify_model_vertex_uncompressed_size[
 typedef char verify_model_vertex_compressed_size[
 	sizeof(struct model_vertex_compressed) == 0x20 ? 1 : -1];
 
-/* models.c private; declared here until they are homed in rasterizer.h */
+/* January-local render packet layouts used by render_dynamic_quad. */
 struct rasterizer_model_skinning
 {
 	real_matrix4x3 const *node_matrices;
@@ -224,14 +204,7 @@ struct rasterizer_model_begin_parameters
 typedef char verify_rasterizer_model_begin_parameters_size[
 	sizeof(struct rasterizer_model_begin_parameters) == 0xCC ? 1 : -1];
 
-/* game_engine.c private; declared here until it is homed in game_engine.h */
-struct game_engine_place
-{
-	short flags;
-	short place;
-};
-
-/* game_engine.c private; declared here until it is homed in scenario_definitions.h */
+/* January scenario flag layout consumed by the King map scan. */
 struct scenario_netgame_flag
 {
 	real_point3d position;
@@ -246,41 +219,7 @@ typedef char verify_scenario_netgame_flag_size[
 typedef char verify_scenario_netgame_flags_offset[
 	offsetof(struct scenario, netgame_flags) == 0x378 ? 1 : -1];
 
-struct king_globals
-{
-	long score[MAXIMUM_KING_SCORE_SLOTS];
-	long score_tick[MAXIMUM_KING_SCORE_SLOTS];
-	boolean on_the_hill[MAXIMUM_KING_SCORE_SLOTS];
-	long hill_point_count;
-	real_point3d hill_points[MAXIMUM_HILL_POINTS];
-	real_point2d convex_hull[MAXIMUM_HILL_POINTS];
-	real_point3d hill_center;
-	long hill_state;
-	long hill_controlled_count;
-	long hill_previous_controller;
-	real hill_top;
-	real hill_bottom;
-	long hill_id;
-	long hill_timer;
-};
-
-typedef char verify_king_globals_size[
-	sizeof(struct king_globals) == 0x1AC ? 1 : -1];
-typedef char verify_king_globals_on_the_hill_offset[
-	offsetof(struct king_globals, on_the_hill) == 0x80 ? 1 : -1];
-typedef char verify_king_globals_convex_hull_offset[
-	offsetof(struct king_globals, convex_hull) == 0x124 ? 1 : -1];
-typedef char verify_king_globals_hill_id_offset[
-	offsetof(struct king_globals, hill_id) == 0x1A4 ? 1 : -1];
-
 /* ---------- prototypes */
-
-/* game_engine.c; declared here until they are homed in game_engine.h */
-struct game_engine_place game_engine_get_place(
-	long player_index,
-	enum get_score_type score_type);
-wchar_t *get_place_name(
-	struct game_engine_place place);
 
 static void hill_points_to_2d(
 	real_point3d const *points,
@@ -294,19 +233,10 @@ static boolean player_inside_hill(
 	long player_index);
 static void king_calculate_hill_state(
 	void);
-void render_dynamic_quad_initialize(
-	void);
-void render_dynamic_quad(
-	struct model_vertex_uncompressed *verts,
-	long shader_index,
-	struct render_lighting const *lighting,
-	struct render_animation const *animation,
-	real u_scale,
-	real v_scale);
 
 /* ---------- globals */
 
-/* owned elsewhere; declared here until they are homed in the render header */
+/* Shared rasterizer defaults, named by the January image. */
 extern real_rgb_color global_default_animation_colors[4];
 extern real global_default_animation_values[4];
 
@@ -316,67 +246,72 @@ static short king_engine_hills[MAXIMUM_HILLS] = { 0 };
 
 /* ---------- public code */
 
-void code_000a0030(
+void king_engine_dispose(
 	void)
 {
 	return;
 }
 
-void code_000a03b0(
+void king_engine_dispose_from_old_map(
 	void)
 {
 	return;
 }
 
-void code_000a03e0(
+void king_engine_game_ending(
 	void)
 {
 	return;
 }
 
-void code_000a0410(
+void king_engine_statistics_append(
+	long statistic)
+{
+	return;
+}
+
+void king_engine_handle_client_message(
+	void *message)
+{
+	return;
+}
+
+void king_engine_handle_server_message(
+	void *message)
+{
+	return;
+}
+
+void king_engine_pregame_post_rasterize(
 	void)
 {
 	return;
 }
 
-void code_000a0420(
-	void)
+void king_engine_player_damaged_player(
+	long damaging_player_index,
+	long dead_player_index,
+	boolean damage_type)
 {
 	return;
 }
 
-void code_000a0430(
-	void)
+void king_engine_player_killed_player(
+	long killing_player_index,
+	long killing_object_index,
+	long dead_player_index,
+	boolean friendly_fire)
 {
 	return;
 }
 
-void code_000a0440(
-	void)
+void king_engine_prespawn_player_update(
+	long player_index)
 {
 	return;
 }
 
-void code_000a0800(
-	void)
-{
-	return;
-}
-
-void code_000a0810(
-	void)
-{
-	return;
-}
-
-void code_000a09b0(
-	void)
-{
-	return;
-}
-
-void code_000a03c0(
+void king_engine_player_added(
 	long player_index)
 {
 	player_get(player_index);
@@ -384,18 +319,18 @@ void code_000a03c0(
 	return;
 }
 
-void code_000a03f0(
+void king_engine_game_starting(
 	void)
 {
 	game_engine_play_multiplayer_sound(
 		game_engine_has_teams() ?
-			_multiplayer_sound_team_king_of_the_hill :
-			_multiplayer_sound_king_of_the_hill);
+			_multiplayer_sound_team_king :
+			_multiplayer_sound_king);
 
 	return;
 }
 
-wchar_t *code_000a0d40(
+wchar_t *king_get_score_string(
 	long player_index,
 	wchar_t *buffer)
 {
@@ -409,7 +344,7 @@ wchar_t *code_000a0d40(
 	return buffer;
 }
 
-wchar_t *code_000a0de0(
+wchar_t *king_get_team_score_string(
 	long team_index,
 	wchar_t *buffer)
 {
@@ -457,7 +392,7 @@ boolean king_engine_initialize_for_new_map(
 	king_globals.hill_id = 0;
 	king_globals.hill_timer = HILL_MOVE_TIME;
 	king_globals.hill_previous_controller = NONE;
-	king_globals.hill_state = _king_hill_state_uncontrolled;
+	king_globals.hill_state = king_hill_uncontrolled;
 	find_hill();
 	match_assert(
 		"c:\\halo\\SOURCE\\game\\game_engine_king.c",
@@ -478,7 +413,8 @@ void king_engine_player_update(
 	king_globals.on_the_hill[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index)] = FALSE;
 	if (player->unit_index != NONE)
 	{
-		unit_get(player->unit_index);
+		struct unit_datum *unit = unit_get(player->unit_index);
+
 		if (game_engine_can_score() && player_inside_hill(player_index))
 		{
 			king_globals.on_the_hill[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index)] = TRUE;
@@ -529,7 +465,7 @@ void king_engine_player_update(
 				if (score >= score_to_win)
 					game_engine_end_game();
 			}
-			game_engine_state_message(player_index, _king_message_you_are_on_the_hill, player_index);
+			game_engine_state_message(player_index, king_message_you_are_on_the_hill, player_index);
 		}
 	}
 
@@ -550,14 +486,14 @@ boolean king_engine_display_score(
 
 	switch (message)
 	{
-	case _king_message_enemy_on_the_hill:
-	case _king_message_ally_on_the_hill:
-	case _king_message_you_are_on_the_hill:
+	case king_message_enemy_on_the_hill:
+	case king_message_ally_on_the_hill:
+	case king_message_you_are_on_the_hill:
 		{
 			struct player_datum *other_player = player_get(message_player_index);
 			long score = king_globals.score[other_player->team_index]/TICKS_PER_SECOND;
 
-			if (message == _king_message_you_are_on_the_hill)
+			if (message == king_message_you_are_on_the_hill)
 			{
 				wchar_t *place_name = get_place_name(
 					game_engine_get_place(player_index, _get_score_team));
@@ -567,33 +503,33 @@ boolean king_engine_display_score(
 				{
 					string = unicode_string_list_get_string(
 						string_list_index,
-						_multiplayer_game_text_you_are_on_the_hill);
+						_string_place_score_seconds);
 				}
 				else
 					string = L"";
 				usnprintf(buffer, buffer_size, string, place_name, score);
 			}
-			else if (message == _king_message_ally_on_the_hill)
+			else if (message == king_message_ally_on_the_hill)
 			{
 				string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
 				if (string_list_index != NONE)
 				{
 					string = unicode_string_list_get_string(
 						string_list_index,
-						_multiplayer_game_text_ally_on_the_hill);
+						_string_ally_name_is_on_the_hill_score_seconds);
 				}
 				else
 					string = L"";
 				usnprintf(buffer, buffer_size, string, other_player->name, score);
 			}
-			else if (message == _king_message_enemy_on_the_hill)
+			else if (message == king_message_enemy_on_the_hill)
 			{
 				string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
 				if (string_list_index != NONE)
 				{
 					string = unicode_string_list_get_string(
 						string_list_index,
-						_multiplayer_game_text_enemy_on_the_hill);
+						_string_enemy_name_is_on_the_hill_score_seconds);
 				}
 				else
 					string = L"";
@@ -682,7 +618,7 @@ void render_dynamic_quad(
 		rasterizer_dynamic_triangles_unlock(triangle_buffer_index);
 		rasterizer_dynamic_vertices_unlock(vertex_buffer_index);
 
-		shader = tag_get('shdr', shader_index);
+		shader = shader_definition_get(shader_index);
 		centroid.x = (verts[0].position.x + verts[1].position.x + verts[2].position.x + verts[3].position.x)*0.25f;
 		centroid.y = (verts[0].position.y + verts[1].position.y + verts[2].position.y + verts[3].position.y)*0.25f;
 		centroid.z = (verts[0].position.z + verts[1].position.z + verts[2].position.z + verts[3].position.z)*0.25f;
@@ -752,7 +688,7 @@ void render_dynamic_quad(
 		rasterizer_dynamic_triangles_delete(triangle_buffer_index);
 		rasterizer_dynamic_vertices_delete(vertex_buffer_index);
 	}
-	rasterizer_globals.current_lock_operation = _rasterizer_lock_none;
+	rasterizer_globals.current_lock_operation = _rasterizer_lock_unlocked;
 
 	return;
 }
@@ -767,7 +703,7 @@ wchar_t *king_get_score_header_string(
 	{
 		string = unicode_string_list_get_string(
 			string_list_index,
-			_multiplayer_game_text_king_score_header);
+			_string_time);
 	}
 	else
 	{
@@ -988,35 +924,35 @@ static void king_calculate_hill_state(
 		{
 			if (player_count)
 			{
-				king_globals.hill_state = _king_hill_state_contested;
+				king_globals.hill_state = king_hill_contested;
 				if (king_globals.hill_controlled_count > HILL_CONTROL_TIME)
 					game_engine_play_multiplayer_sound(_multiplayer_sound_hill_contested);
 				king_globals.hill_controlled_count = 0;
 			}
 			else
 			{
-				if (king_globals.hill_state == _king_hill_state_controlled_blue)
+				if (king_globals.hill_state == king_hill_controlled_blue)
 					king_globals.hill_controlled_count++;
 				else
 					king_globals.hill_controlled_count = 0;
-				king_globals.hill_state = _king_hill_state_controlled_blue;
+				king_globals.hill_state = king_hill_controlled_blue;
 				if (king_globals.hill_controlled_count == HILL_CONTROL_TIME)
 					game_engine_play_multiplayer_sound(_multiplayer_sound_hill_controlled);
 			}
 		}
 		else if (player_count)
 		{
-			if (king_globals.hill_state == _king_hill_state_controlled_red)
+			if (king_globals.hill_state == king_hill_controlled_red)
 				king_globals.hill_controlled_count++;
 			else
 				king_globals.hill_controlled_count = 0;
-			king_globals.hill_state = _king_hill_state_controlled_red;
+			king_globals.hill_state = king_hill_controlled_red;
 			if (king_globals.hill_controlled_count == HILL_CONTROL_TIME)
 				game_engine_play_multiplayer_sound(_multiplayer_sound_hill_controlled);
 		}
 		else
 		{
-			king_globals.hill_state = _king_hill_state_uncontrolled;
+			king_globals.hill_state = king_hill_uncontrolled;
 			king_globals.hill_controlled_count = 0;
 		}
 	}
@@ -1038,7 +974,7 @@ static void king_calculate_hill_state(
 
 		if (player_count > 1)
 		{
-			king_globals.hill_state = _king_hill_state_contested;
+			king_globals.hill_state = king_hill_contested;
 			if (king_globals.hill_controlled_count > HILL_CONTROL_TIME)
 				game_engine_play_multiplayer_sound(_multiplayer_sound_hill_contested);
 			king_globals.hill_controlled_count = 0;
@@ -1046,7 +982,7 @@ static void king_calculate_hill_state(
 		}
 		else if (player_count)
 		{
-			if (king_globals.hill_state == _king_hill_state_controlled &&
+			if (king_globals.hill_state == king_hill_controlled &&
 				controller == king_globals.hill_previous_controller)
 			{
 				king_globals.hill_controlled_count++;
@@ -1056,13 +992,13 @@ static void king_calculate_hill_state(
 				king_globals.hill_controlled_count = 0;
 				king_globals.hill_previous_controller = controller;
 			}
-			king_globals.hill_state = _king_hill_state_controlled;
+			king_globals.hill_state = king_hill_controlled;
 			if (king_globals.hill_controlled_count == HILL_CONTROL_TIME)
 				game_engine_play_multiplayer_sound(_multiplayer_sound_hill_controlled);
 		}
 		else
 		{
-			king_globals.hill_state = _king_hill_state_uncontrolled;
+			king_globals.hill_state = king_hill_uncontrolled;
 			king_globals.hill_controlled_count = 0;
 			king_globals.hill_previous_controller = NONE;
 		}
@@ -1086,9 +1022,7 @@ static long find_next_hill(
 			return king_engine_hills[hill_index];
 	}
 
-	/* BUG (preserved for exact matching): next_hill_id is never assigned, so
-	 * when every hill equals hill_id (or there are no hills) the caller
-	 * receives an uninitialized value. A corrected build should return
-	 * hill_id here. */
+	/* January and the later Xbox build both leave the no-candidate result
+	 * undefined. The caller expects maps to provide at least two hill ids. */
 	return next_hill_id;
 }

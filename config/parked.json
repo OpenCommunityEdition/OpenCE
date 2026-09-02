@@ -1925,6 +1925,44 @@
         },
         "objdiff_percent": 93.7518
       }
+    },
+    {
+      "unit": "source/game/game_engine_king",
+      "function": "_find_hill",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete January hill scan in ordinary typed C and checking it against the independent later-Xbox HaloCEA reconstruction. The retained body uses TAG_BLOCK_GET_ELEMENT, cseries real/point types and MIN/MAX macros, expands a single flag into the target-proven four-corner square, computes the convex hull, and derives the semantic king_globals bounds and center. Target and candidate share the 848-byte padded envelope and 35 relocations; objdiff reports 97.94042 percent similarity. Alignment-aware disassembly confines the substantive residual to C2's choice of the z-component rather than the y-component as the induction base for the six-component bounding-box update. The independently corroborated scalar-if form was also compiled and did not improve the exact class. The fail-closed classifier returns UNKNOWN, so the honest class is unclassified rather than an invented compiler recipe. No raw offset, one-use alias, volatile/register forcing, barrier, pragma, assembly, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining the component-base selection.",
+      "measurements": {
+        "target": {
+          "size": 848,
+          "relocation_count": 35,
+          "normalized_sha256": "a05fb3507d2417e3408ce6b7c3b810e537c4b60803458e52ca97a42bde4c1bf4"
+        },
+        "base": {
+          "size": 848,
+          "relocation_count": 35,
+          "normalized_sha256": "3df0c47f4a6bdfebee82d3384005fb9078878ec08e2f383ce175208066a85a01"
+        },
+        "objdiff_percent": 97.94042
+      }
+    },
+    {
+      "unit": "source/game/game_engine_king",
+      "function": "_king_calculate_hill_state",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete team and free-for-all hill-control state machine in ordinary typed C from January disassembly and independent HaloCEA behavior. The retained function iterates player_data through the normal data iterator, uses the authenticated king_hill_state and multiplayer-sound enums, preserves the previous-controller rule, and updates the control timer without optimizer-only carriers. Target and candidate share the 448-byte padded envelope; target has 32 relocations and the candidate 30, while objdiff reports 81.507355 percent similarity. Fable's bounded experiments covered count declaration scope, local state consolidation, early-return and shared-tail forms; none produced a lawful easy closure, and alignment-aware disassembly still shows broad control-flow and register-allocation differences. The fail-closed classifier returns UNKNOWN, so the honest class is unclassified. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw datum cast, invented address name, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the two missing relocation sites and branch schedule.",
+      "measurements": {
+        "target": {
+          "size": 448,
+          "relocation_count": 32,
+          "normalized_sha256": "9c852f781c6a691a41f7c445091bea59a0738ebd49fd6ec16add6961cedb8817"
+        },
+        "base": {
+          "size": 448,
+          "relocation_count": 30,
+          "normalized_sha256": "e9d7a30d3245b8ffd0d72b1271a341f0dd5b20ddd94e9029876f4676c5ed9ae3"
+        },
+        "objdiff_percent": 81.507355
+      }
     }
   ]
 }
