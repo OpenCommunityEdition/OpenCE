@@ -106,7 +106,14 @@ is byte-neutral rather than trading readability for credit.
 - Candidate/source scan for `point_from_line3d`, `__asm`, `_code_` and `_bss_`:
   no findings.
 - `tools/fake_match_scan.py`: zero review leads.
-- Full repository build, semantic/progress report, tool tests, parked registry
-  validation and object-admission audit are required again after canonical
-  integration; their results are not pre-claimed by this isolated ledger.
+- Canonical `ninja all_source progress semantic_progress`: pass, 5,221
+  accepted semantic-exact functions, zero unit errors, and 688,799 / 2,198,102
+  exact code bytes overall.  The wave contributes four functions and 1,521
+  report-accounted code bytes relative to canonical `9083d83ce`.
+- `python -m pytest tools -q -p no:cacheprovider`: 258 passed.
+- Parked validation: 108 active, zero stale, zero invalid.
+- Object-admission audit: zero candidates and zero contradictions; the single
+  inherited `player_rumble` rejection is unchanged.
+- Canonical `flags.obj` contains no `point_from_line3d` symbol or COMDAT.
+- `git diff --check`: clean.
 
