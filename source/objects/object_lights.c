@@ -143,6 +143,8 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "cseries/profile.h"
+#include "bitmaps/bitmaps.h"
+#include "effects/decals.h"
 #include "math/real_math.h"
 #include "cache/texture_cache.h"
 #include "game/game.h"
@@ -152,6 +154,7 @@ symbols in this file:
 #include "objects/object_lights.h"
 #include "objects/objects.h"
 #include "render/render.h"
+#include "rasterizer/rasterizer_geometry.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 #include "structures/cluster_partitions.h"
@@ -174,6 +177,11 @@ enum
 	_point_light_connected_to_map_bit = 2,
 };
 
+enum
+{
+	LENS_FLARE_DEFINITION_TAG = 'lens',
+};
+
 /* ---------- macros */
 
 #define light_get(index) \
@@ -181,6 +189,9 @@ enum
 
 #define light_definition_get(index) \
 	((struct light_definition *)tag_get(LIGHT_DEFINITION_TAG, (index)))
+
+#define lens_flare_definition_get(index) \
+	((struct lens_flare_definition *)tag_get(LENS_FLARE_DEFINITION_TAG, (index)))
 
 /* ---------- structures */
 
@@ -481,6 +492,71 @@ void light_delete(
 		light_index,
 		&light->cluster_reference);
 	datum_delete(light_data, light_index);
+
+	return;
+}
+
+real object_get_self_illumination(
+	long object_index)
+{
+	struct object_datum *object = object_get(object_index);
+	struct object_definition *definition = object_definition_get(object->definition_index);
+	short attachment_index = 0;
+	real illumination = 0.0f;
+
+	if (definition->object.attachments.count > 0)
+	{
+		do
+		{
+			if (object->object.attachment_types[attachment_index] == _object_attachment_type_light
+				&& object->object.attachment_indices[attachment_index] != NONE)
+			{
+				struct light_datum *light = light_get(object->object.attachment_indices[attachment_index]);
+				illumination += real_rgb_color_brightness(&light->current_color);
+			}
+			attachment_index++;
+		}
+		while (attachment_index < definition->object.attachments.count);
+	}
+
+	if (object->object.first_child_object_index != NONE)
+	{
+		illumination += object_get_self_illumination(object->object.first_child_object_index);
+	}
+	if (object->object.next_object_index != NONE)
+	{
+		illumination += object_get_self_illumination(object->object.next_object_index);
+	}
+
+	return illumination;
+}
+
+void lights_queue_lens_flare(
+	long lens_flare_definition_index,
+	real_point3d const *position,
+	real_vector3d const *direction,
+	real_vector3d const *up,
+	real_rgb_color const *color,
+	real scale)
+{
+	if (lights_globals.queued_lens_flare_count < MAXIMUM_QUEUED_LENS_FLARES
+		&& (color->red != 0.0f || color->green != 0.0f || color->blue != 0.0f))
+	{
+		struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters =
+			&lights_globals.queued_lens_flares[lights_globals.queued_lens_flare_count];
+
+		lens_flare_parameters->compressed_light_color = real_a_rgb_color_to_pixel32(1.0f, color);
+		lens_flare_parameters->compressed_light_scale = compress_real_to_int8(scale);
+		lens_flare_parameters->definition = lens_flare_definition_get(lens_flare_definition_index);
+		lens_flare_parameters->position = *position;
+		lens_flare_parameters->compressed_direction = compress_real_vector3d_to_int32_clamp(direction);
+		lens_flare_parameters->compressed_up = compress_real_vector3d_to_int32_clamp(up);
+		lens_flare_parameters->compressed_window_index = (byte)render.window_index;
+		lens_flare_parameters->light_index = NONE;
+		lens_flare_parameters->light_identifier = NONE;
+		lens_flare_parameters->lens_flare_index = lights_globals.queued_lens_flare_count;
+		lights_globals.queued_lens_flare_count++;
+	}
 
 	return;
 }

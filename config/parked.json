@@ -508,12 +508,23 @@
     {
       "unit": "source/objects/object_lights",
       "function": "_find_point_lights_for_object_in_cluster",
-      "class": "unclassified",
-      "evidence": "The authenticated private helper is naturally retained because lights_prepare_for_object_dynamic calls it; it traverses the real cluster light partition and uses light_unmarked/light_mark as one link-closed marker packet. January and the candidate have the same 31 relocations but differ in ordinary loop/register scheduling and padded size (560 versus 576 bytes). No uncalled duplicate, address-derived name, dummy carrier, or forced compiler construct is retained. Reopen only for authoritative January source or independent same-compiler evidence for the traversal/lifetime shape; do not use volatile access, fake dependencies, manual address logic, or assembly.",
+      "class": "instruction-scheduling",
+      "evidence": "The authenticated private helper is naturally retained because lights_prepare_for_object_dynamic calls it; it traverses the real cluster light partition and uses light_unmarked/light_mark as one link-closed marker packet. Restoring the real earlier object_get_self_illumination owner function changed the lawful same-TU optimizer context and naturally improved this helper from 576 to January's exact 560-byte padded envelope while preserving all 31 relocation identities. The remaining difference is a small ordinary instruction-scheduling residual recorded at 99.3617 percent. No uncalled duplicate, address-derived name, dummy carrier, forced inline, or compiler construct is retained. Reopen only for authoritative January source or independent same-compiler evidence for the traversal/lifetime shape; do not use volatile access, fake dependencies, manual address logic, or assembly.",
       "measurements": {
         "target": { "size": 560, "relocation_count": 31, "normalized_sha256": "39d22fa1133941bdd6a0b52cfe5ff4e0df3e109e21e6318f46774740811f96be" },
-        "base": { "size": 576, "relocation_count": 31, "normalized_sha256": "e4f2b09bcfd6ce104ee90a2a6755d4ace911d2d61750e94792332857262ed1e2" },
-        "objdiff_percent": 97.430855
+        "base": { "size": 560, "relocation_count": 31, "normalized_sha256": "3c814b365210b7757eb6ba5dee596c15ec8fefe476a335ad299af138e89876a2" },
+        "objdiff_percent": 99.3617
+      }
+    },
+    {
+      "unit": "source/objects/object_lights",
+      "function": "_object_get_self_illumination",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked under the current house rule after restoring the complete ordinary-C implementation from January disassembly and relocation evidence and corroborating its object/attachment recursion against the later HCEA source. The retained function uses the typed object_definition_get, object_get, and light_get accessors, iterates the semantic _object_attachment_type_light slots, accumulates real_rgb_color_brightness, and recursively visits the first child and next sibling. January and the candidate have the same 208-byte padded envelope, all seven relocation identities, and the same 84-instruction semantic sequence; the generated report records 96.35135 percent similarity. The residual is confined to the placement of stack cleanup and two independent zero initializations before the attachment loop. Three natural declaration/scope arrangements either produced this fixed point or a broader prologue split, so the source is parked rather than adding an optimizer-only carrier. No forced inline/noinline, volatile or register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the initialization schedule.",
+      "measurements": {
+        "target": { "size": 208, "relocation_count": 7, "normalized_sha256": "f104fb248006b06b69810ac8eb1b9460fba97be1e28353017b9867084897a681" },
+        "base": { "size": 208, "relocation_count": 7, "normalized_sha256": "cfef1bd48ce36ee1ba93ff9b23618e5ea288f0810e834eb9b0e27c8e161bd302" },
+        "objdiff_percent": 96.35135
       }
     },
     {

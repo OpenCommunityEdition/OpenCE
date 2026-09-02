@@ -65,6 +65,12 @@ union real_vector3d *uncompress_int32_to_real_vector3d(
 	union real_vector3d *result,
 	unsigned long compressed);
 
+byte compress_real_to_int8(
+	real value);
+
+unsigned long compress_real_vector3d_to_int32_clamp(
+	union real_vector3d const *vector);
+
 long rasterizer_geometry_get_vertex_size(
 	short type);
 
