@@ -194,3 +194,27 @@ beside the implementation; its `players.obj` and `player_rumble.obj` consumers
 remain unchanged at 54/70 and 12/12 exact respectively. The focused fake-match
 scan reports zero review leads, `git diff --check` passes, and the tool test
 suite passes 255/255.
+
+## Fast network-server setup follow-up (2026-09-02)
+
+`_player_ui_fast_setup_network_server` is now reconstructed from its January
+call graph and the independent Xbox lift. The typed implementation closes the
+current UI, tears down stale network endpoints, resets the game connection and
+map/variant state, loads the connected-pregame screen, starts both network
+endpoints, and returns to the main menu on either failure path. Connection
+states use the owning `_game_connection_local` and
+`_game_connection_network_server` constants, and every external declaration
+comes from its owning `game`, `game_engine`, `ui_widget`, network, or `main`
+header.
+
+The function is strict exact at 174 meaningful / 176 padded bytes with 24
+relocations and normalized SHA-256
+`685b98dd8b527d1f1fda24bd823243417cc636c430251b5495ec7a54d5d7147e`.
+Target and candidate agree instruction-for-instruction and on every relocation
+address, type, destination, and addend. The object frontier is therefore 34
+exact / 0 residual / 8 unwritten, with 2,640 strict padded code bytes. All 33
+previous exact functions remain exact. The `player_ui.h` declaration is owned
+beside the implementation; `players.obj` and `player_rumble.obj` remain
+unchanged at 54/70 and 12/12 exact respectively. The focused fake-match scan
+reports zero review leads, `git diff --check` passes, and the tool test suite
+passes 255/255.

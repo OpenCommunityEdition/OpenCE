@@ -142,10 +142,14 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
+#include "game/game.h"
+#include "game/game_engine.h"
 #include "text/unicode.h"
 #include "input/input.h"
 #include "networking/network_game_globals.h"
+#include "interface/ui_widget.h"
 #include "interface/virtual_keyboard.h"
+#include "main/main.h"
 #include "player_ui.h"
 
 /* ---------- constants */
@@ -230,12 +234,6 @@ typedef char player_ui_edit_profile_size_assert[
 
 /* ---------- prototypes */
 
-void game_connection_set(
-	short connection);
-void game_engine_dispose(
-	void);
-void game_set_game_variant(
-	struct game_variant *variant);
 word saved_game_file_get_type(
 	long profile_index);
 boolean player_profile_get_enclosing_directory_path(
@@ -571,6 +569,48 @@ long player_ui_get_player1_last_used_profile_index(
 			player_ui_globals.player1_last_used_profile_directory, 0);
 	}
 	return data_002fd5a4;
+}
+
+void player_ui_fast_setup_network_server(
+	void)
+{
+	ui_widgets_close_all();
+	dispose_global_network_game_server();
+	dispose_global_network_game_client();
+	game_connection_set(_game_connection_local);
+	main_set_multiplayer_map_name("");
+	player_ui_globals.multiplayer_variant_specified = FALSE;
+	if (ui_widget_load_by_name_or_tag(
+		"ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen",
+		NONE,
+		NULL,
+		NONE,
+		NONE,
+		NONE,
+		NONE))
+	{
+		game_engine_playlist_initialize();
+		network_game_accept_remote_connections(TRUE);
+		if (create_global_network_game_server() && create_global_network_game_client())
+		{
+			game_engine_playlist_begin();
+			game_connection_set(_game_connection_network_server);
+			return;
+		}
+
+		dispose_global_network_game_server();
+		dispose_global_network_game_client();
+		network_game_accept_remote_connections(FALSE);
+		error(_error_silent, "failed to initiate a multiplayer game server");
+		main_goto_main_menu();
+		return;
+	}
+
+	error(
+		_error_silent,
+		"failed to load network pregame screen... maybe you ran this from some place other than the game shell UI?");
+	main_goto_main_menu();
+	return;
 }
 
 boolean player_ui_edit_profile_is_default_profile(
