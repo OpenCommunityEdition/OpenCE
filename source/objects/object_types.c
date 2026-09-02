@@ -128,6 +128,7 @@ symbols in this file:
 #include "cache/cache_files.h"
 #include "cutscene/cinematics.h"
 #include "editor/editor_stubs.h"
+#include "items/weapons.h"
 #include "objects.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
@@ -248,16 +249,12 @@ void item_delete(
 boolean item_update(
 	long object_index);
 
-boolean weapon_new(
-	long object_index);
 void weapon_place(
 	long object_index,
 	struct scenario_object_datum *scenario_object);
 void weapon_delete(
 	long object_index);
 boolean weapon_update(
-	long object_index);
-void weapon_export_function_values(
 	long object_index);
 void weapon_preprocess_node_orientations(
 	long object_index,

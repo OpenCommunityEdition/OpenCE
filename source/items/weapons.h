@@ -93,6 +93,31 @@ enum
 	NUMBER_OF_FIRST_PERSON_WEAPON_MESSAGES,
 };
 
+enum weapon_type
+{
+	_weapon_type_undefined = 0,
+	_weapon_type_shotgun,
+	_weapon_type_needler,
+	_weapon_type_plasma_pistol,
+	_weapon_type_plasma_rifle,
+	NUMBER_OF_WEAPON_TYPES,
+};
+
+enum shotgun_reload_type
+{
+	_shotgun_reload_type_first_round = 0,
+	_shotgun_reload_type_last_round,
+	_shotgun_reload_type_first_and_last_round,
+	NUMBER_OF_SHOTGUN_RELOAD_TYPES,
+};
+
+enum weapon_first_person_animation_time_mode
+{
+	_weapon_first_person_animation_time_frame_count = 0,
+	_weapon_first_person_animation_time_private_key_frame,
+	NUMBER_OF_WEAPON_FIRST_PERSON_ANIMATION_TIME_MODES,
+};
+
 enum
 {
 	_first_person_weapon_animation_idle = 0,
@@ -231,7 +256,14 @@ void weapon_set_integrated_light_power(long weapon_index, real light_power);
 
 void weapon_owner_update(long weapon_index, word control_flags, real primary_trigger);
 
+struct weapon_interface_state;
+
+boolean weapon_new(long weapon_index);
+void weapon_export_function_values(long weapon_index);
+
 void weapon_set_total_rounds(long weapon_index, short *rounds_array);
+
+void weapon_build_weapon_interface_state(long weapon_index, struct weapon_interface_state *state);
 
 boolean weapon_can_be_fired(long weapon_index);
 

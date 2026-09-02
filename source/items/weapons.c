@@ -224,6 +224,38 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct weapon_interface_magazine_state
+{
+	boolean reloading;
+	boolean can_fire;
+	short rounds_loaded;
+	short rounds_loaded_maximum;
+	short rounds_remaining;
+	short rounds_remaining_maximum;
+};
+
+struct weapon_interface_state
+{
+	real heat;
+	real age;
+	boolean overheated;
+	byte _pad09;
+	short magazine_count;
+	struct weapon_interface_magazine_state magazines[2];
+};
+
+struct animation_graph_weapon_animations
+{
+	long unused1[4];
+	struct tag_block animations;
+};
+
+struct animation_graph_first_person_weapon_animations
+{
+	long unused1[4];
+	struct tag_block animations;
+};
+
 /* ---------- prototypes */
 
 boolean game_engine_running(
@@ -479,6 +511,38 @@ void weapon_melee_attack(
 	return;
 }
 
+boolean weapon_new(
+	long weapon_index)
+{
+	struct weapon_datum *weapon = weapon_get(weapon_index);
+	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
+	short magazine_index;
+	short trigger_index;
+
+	weapon->weapon.state = _weapon_state_idle;
+	weapon->weapon.overheated_effect_index = NONE;
+
+	for (magazine_index = 0; magazine_index<weapon_definition->weapon.magazines.count; ++magazine_index)
+	{
+		struct weapon_magazine *magazine = weapon_magazine_get(weapon, magazine_index);
+		struct weapon_magazine_definition *magazine_definition = TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, magazine_index, struct weapon_magazine_definition);
+
+		magazine->rounds_loaded = MIN(magazine_definition->rounds_total_initial, magazine_definition->rounds_loaded_maximum);
+		magazine->rounds_total = magazine_definition->rounds_total_initial-magazine->rounds_loaded;
+	}
+
+	for (trigger_index = 0; trigger_index<weapon_definition->weapon.triggers.count; ++trigger_index)
+	{
+		struct weapon_trigger *trigger = weapon_trigger_get(weapon, trigger_index);
+
+		(void)TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
+		trigger->charging_effect_index = NONE;
+		trigger->idle_ticks = 127;
+	}
+
+	return TRUE;
+}
+
 void weapon_set_total_rounds(
 	long weapon_index,
 	short *rounds_array)
@@ -608,6 +672,36 @@ real weapon_get_field_of_view(
 	return result;
 }
 
+void weapon_build_weapon_interface_state(
+	long weapon_index,
+	struct weapon_interface_state *state)
+{
+	struct weapon_datum *weapon = weapon_get(weapon_index);
+	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
+	short magazine_index;
+
+	state->heat = weapon->weapon.heat;
+	state->age = weapon->weapon.age;
+	state->overheated = TEST_FLAG(weapon->weapon.flags, 0);
+	state->magazine_count = (short)weapon_definition->weapon.magazines.count;
+
+	for (magazine_index = 0; magazine_index<weapon_definition->weapon.magazines.count; ++magazine_index)
+	{
+		struct weapon_magazine *magazine = weapon_magazine_get(weapon, magazine_index);
+		struct weapon_magazine_definition *magazine_definition = TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, magazine_index, struct weapon_magazine_definition);
+		long reloading = magazine->state==_magazine_reloading || magazine->state==_magazine_chambering;
+
+		state->magazines[magazine_index].reloading = reloading;
+		state->magazines[magazine_index].can_fire = magazine->state==_magazine_idle;
+		state->magazines[magazine_index].rounds_loaded = magazine->rounds_loaded;
+		state->magazines[magazine_index].rounds_loaded_maximum = magazine_definition->rounds_loaded_maximum;
+		state->magazines[magazine_index].rounds_remaining = magazine->rounds_total;
+		state->magazines[magazine_index].rounds_remaining_maximum = magazine_definition->rounds_total_maximum;
+	}
+
+	return;
+}
+
 void weapon_set_current_amount(
 	long weapon_index,
 	real amount)
@@ -659,6 +753,75 @@ void weapon_set_current_amount(
 	}
 
 	return;
+}
+
+short weapon_get_first_person_animation_time(
+	long weapon_index,
+	short mode,
+	short animation_type,
+	short shotgun_reload_type)
+{
+	struct weapon_datum *weapon = weapon_get(weapon_index);
+	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
+	short time = 0;
+
+	if (weapon_definition->weapon.interface_definition.first_person_animations.index!=NONE)
+	{
+		struct animation_graph *animation_graph = animation_graph_definition_get(weapon_definition->weapon.interface_definition.first_person_animations.index);
+
+		if (animation_graph->first_person_weapon_animations.count)
+		{
+			struct animation_graph_first_person_weapon_animations *weapon_animations = TAG_BLOCK_GET_ELEMENT(&animation_graph->first_person_weapon_animations, 0, struct animation_graph_first_person_weapon_animations);
+
+			if (weapon_animations && animation_type>=0 && animation_type<weapon_animations->animations.count)
+			{
+				short animation_index = animation_graph_animation_index_get(&weapon_animations->animations)[animation_type].animation_index;
+
+				if (animation_index!=NONE)
+				{
+					struct animation *animation = TAG_BLOCK_GET_ELEMENT(&animation_graph->animations, animation_index, struct animation);
+
+					switch (mode)
+					{
+					case _weapon_first_person_animation_time_frame_count:
+						time = animation->frame_count;
+						break;
+
+					case _weapon_first_person_animation_time_private_key_frame:
+						time = animation->private_key_frame_index;
+						break;
+
+					default:
+						match_vassert("c:\\halo\\SOURCE\\items\\weapons.c", 1588, FALSE, NULL);
+						break;
+					}
+
+					if (mode==_weapon_first_person_animation_time_frame_count && weapon_definition->weapon.weapon_type==_weapon_type_shotgun)
+					{
+						struct animation *shotgun_enter = TAG_BLOCK_GET_ELEMENT(&animation_graph->animations, _first_person_weapon_animation_shotgun_enter<weapon_animations->animations.count ? animation_graph_animation_index_get(&weapon_animations->animations)[_first_person_weapon_animation_shotgun_enter].animation_index : NONE, struct animation);
+						struct animation *shotgun_exit_empty = TAG_BLOCK_GET_ELEMENT(&animation_graph->animations, _first_person_weapon_animation_shotgun_exit_empty<weapon_animations->animations.count ? animation_graph_animation_index_get(&weapon_animations->animations)[_first_person_weapon_animation_shotgun_exit_empty].animation_index : NONE, struct animation);
+						struct animation *shotgun_exit_full = TAG_BLOCK_GET_ELEMENT(&animation_graph->animations, _first_person_weapon_animation_shotgun_exit_full<weapon_animations->animations.count ? animation_graph_animation_index_get(&weapon_animations->animations)[_first_person_weapon_animation_shotgun_exit_full].animation_index : NONE, struct animation);
+
+						/* January resolves all three reload variants, but both handled phases use the enter animation. */
+						(void)shotgun_exit_empty;
+						(void)shotgun_exit_full;
+						switch (shotgun_reload_type)
+						{
+						case _shotgun_reload_type_first_round:
+							time = shotgun_enter->frame_count;
+							break;
+
+						case _shotgun_reload_type_first_and_last_round:
+							time = shotgun_enter->frame_count;
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return time;
 }
 
 real weapon_estimate_time_to_target(
@@ -984,12 +1147,6 @@ static boolean weapon_state_interruptable(
 	return interruptable;
 }
 
-struct animation_graph_weapon_animation
-{
-	long unused[4];
-	struct tag_block animations;
-};
-
 void weapon_preprocess_node_orientations(
 	long weapon_index)
 {
@@ -998,7 +1155,7 @@ void weapon_preprocess_node_orientations(
 	struct animation_graph *animation_graph = animation_graph_definition_get(weapon_definition->object.animation_graph.index);
 
 	if (animation_graph->weapon_animations.count)
-		TAG_BLOCK_GET_ELEMENT(&animation_graph->weapon_animations, 0, struct animation_graph_weapon_animation);
+		TAG_BLOCK_GET_ELEMENT(&animation_graph->weapon_animations, 0, struct animation_graph_weapon_animations);
 
 	return;
 }
@@ -1022,7 +1179,7 @@ static boolean weapon_set_state(
 
 			if (animation_graph->weapon_animations.count)
 			{
-				struct animation_graph_weapon_animation *weapon_animation = TAG_BLOCK_GET_ELEMENT(&animation_graph->weapon_animations, 0, struct animation_graph_weapon_animation);
+				struct animation_graph_weapon_animations *weapon_animation = TAG_BLOCK_GET_ELEMENT(&animation_graph->weapon_animations, 0, struct animation_graph_weapon_animations);
 
 				if (weapon_animation)
 				{
