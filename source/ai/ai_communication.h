@@ -119,6 +119,11 @@ void ai_communication_dispose_from_old_map(
 	void);
 void ai_communication_packet_new(
 	struct ai_information_packet *information);
+void ai_communication_started(
+	long unit_index,
+	short priority,
+	short vocalization_type,
+	struct ai_information_packet *information);
 void actor_communication_update(
 	long actor_index);
 void actor_handle_communication(
