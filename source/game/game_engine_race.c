@@ -103,18 +103,150 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h"
+#include "game_engine.h"
+#include "game_globals.h"
 #include "players.h"
+#include "objects/objects.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
+#include "tag_files/tag_groups.h"
+#include "text/text_group.h"
 #include "text/unicode.h"
+#include "units/units.h"
 
 /* ---------- constants */
+
+enum
+{
+	MAXIMUM_RACE_FLAGS = 32,
+	MAXIMUM_RACE_VEHICLES = 8,
+	MAXIMUM_RACE_VEHICLES_TO_DELETE = 32,
+	MULTIPLAYER_MAXIMUM_PLAYERS = 16,
+};
+
+enum race_type
+{
+	_race_type_normal = 0,
+	_race_type_any_order,
+	_race_type_flag_rally,
+	NUMBER_OF_RACE_TYPES
+};
+
+enum race_team_scoring
+{
+	_race_team_scoring_minimum = 0,
+	_race_team_scoring_maximum,
+	_race_team_scoring_sum,
+	NUMBER_OF_RACE_TEAM_SCORING_TYPES
+};
+
+enum
+{
+	_game_engine_vehicles_default = 0,
+	_game_engine_vehicles_none,
+	_game_engine_vehicles_warthog,
+	_game_engine_vehicles_ghost,
+	_game_engine_vehicles_tank,
+};
+
+enum
+{
+	_multiplayer_vehicle_warthog = 0,
+	_multiplayer_vehicle_ghost,
+	_multiplayer_vehicle_scorpion,
+};
+
+enum
+{
+	_multiplayer_sound_race = 0x14,
+	_multiplayer_sound_warthog = 0x17,
+	_multiplayer_sound_ghost = 0x18,
+	_multiplayer_sound_scorpion = 0x19,
+	_multiplayer_sound_countdown_timer = 0x1A,
+	_multiplayer_sound_team_race = 0x22,
+	_multiplayer_sound_countdown_timer_end = 0x2A,
+};
+
+enum
+{
+	_race_message_show_score = 0x16,
+	_race_message_you_completed_a_lap = 0x1E,
+	_race_message_ally_completed_a_lap,
+	_race_message_enemy_completed_a_lap,
+	_race_message_you_touched_a_flag_rally,
+	_race_message_ally_touched_a_flag_rally,
+	_race_message_enemy_touched_a_flag_rally,
+	_race_message_new_best_lap_time,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct scenario_netgame_flag
+{
+	real_point3d position;
+	real facing;
+	short type;
+	short team_index;
+	byte unused[0x80];
+};
+
+typedef char verify_scenario_netgame_flag_size[
+	sizeof(struct scenario_netgame_flag) == 0x94 ? 1 : -1];
+
+struct race_globals
+{
+	unsigned long lap_completed_value;
+	long first_flag[MULTIPLAYER_MAXIMUM_PLAYERS];
+	long lap_bit_vector[MULTIPLAYER_MAXIMUM_PLAYERS];
+	long rally_flag;
+	long team_laps[MULTIPLAYER_MAXIMUM_PLAYERS];
+	long unknownC8;
+	boolean vehicles_have_been_added;
+	byte padCD[3];
+};
+
+typedef char verify_race_globals_size[
+	sizeof(struct race_globals) == 0xD0 ? 1 : -1];
+typedef char verify_race_globals_vehicles_have_been_added_offset[
+	offsetof(struct race_globals, vehicles_have_been_added) == 0xCC ? 1 : -1];
+
 /* ---------- prototypes */
 
+static void delete_race_vehicles(
+	void);
+static long race_get_vehicle_to_spawn(
+	long vehicle_number);
+static void race_complete_lap(
+	long player_index);
+static boolean can_touch_team(
+	long player_index,
+	long team_index);
+static long new_rally_flag(
+	long old_flag);
+static void race_touch_flag(
+	long player_index,
+	long netgame_flag_index);
+static boolean race_team_can_win_game(
+	long team_index);
+static void build_player_speeds(
+	void);
+static long count_bits(
+	unsigned long flags);
+static long find_closest_vehicle(
+	real_point3d const *point,
+	long *ignore_these,
+	long ignore_these_count);
+static void spawn_race_vehicles(
+	void);
+
 /* ---------- globals */
+
+extern long timeout_for_endgame_sound;
+
+static struct race_globals race_globals = { 0 };
 
 /* ---------- public code */
 
@@ -124,9 +256,132 @@ void code_000a27a0(
 	return;
 }
 
+static void delete_race_vehicles(
+	void)
+{
+	struct object_iterator iterator;
+	long vehicle_indices[MAXIMUM_RACE_VEHICLES_TO_DELETE];
+	long vehicle_count = 0;
+	long itr;
+
+	object_iterator_new(&iterator, _object_mask_vehicle, 0);
+	while (object_iterator_next(&iterator))
+	{
+		if (vehicle_count < MAXIMUM_RACE_VEHICLES_TO_DELETE)
+			vehicle_indices[vehicle_count++] = iterator.index;
+	}
+
+	for (itr = 0; itr < vehicle_count; itr++)
+		object_delete(vehicle_indices[itr]);
+
+	return;
+}
+
+static long race_get_vehicle_to_spawn(
+	long vehicle_number)
+{
+	struct scenario *scenario = global_scenario_get();
+	struct game_globals *game_globals = scenario_get_game_globals();
+	struct game_globals_multiplayer_information *multiplayer_information =
+		TAG_BLOCK_GET_ELEMENT(
+			&game_globals->multiplayer_information,
+			0,
+			struct game_globals_multiplayer_information);
+	struct game_globals_vehicle *warthog = TAG_BLOCK_GET_ELEMENT(
+		&multiplayer_information->vehicles,
+		_multiplayer_vehicle_warthog,
+		struct game_globals_vehicle);
+	struct game_globals_vehicle *ghost = TAG_BLOCK_GET_ELEMENT(
+		&multiplayer_information->vehicles,
+		_multiplayer_vehicle_ghost,
+		struct game_globals_vehicle);
+	struct game_globals_vehicle *scorpion = TAG_BLOCK_GET_ELEMENT(
+		&multiplayer_information->vehicles,
+		_multiplayer_vehicle_scorpion,
+		struct game_globals_vehicle);
+	long vehicle_definition_index = NONE;
+
+	switch (game_engine_get_variant()->unknown48)
+	{
+	case _game_engine_vehicles_default:
+		if (vehicle_number == 0)
+			vehicle_definition_index = warthog->vehicle.index;
+		else if (vehicle_number == 1)
+			vehicle_definition_index = scorpion->vehicle.index;
+		else if (vehicle_number < 6)
+			vehicle_definition_index = ghost->vehicle.index;
+		break;
+	case _game_engine_vehicles_none:
+		break;
+	case _game_engine_vehicles_warthog:
+		vehicle_definition_index = vehicle_number < 4 ? warthog->vehicle.index : NONE;
+		break;
+	case _game_engine_vehicles_ghost:
+		vehicle_definition_index = vehicle_number < 8 ? ghost->vehicle.index : NONE;
+		break;
+	case _game_engine_vehicles_tank:
+		vehicle_definition_index = vehicle_number < 4 ? scorpion->vehicle.index : NONE;
+		break;
+	}
+
+	return vehicle_definition_index;
+}
+
+void race_flags_make_unique(
+	void)
+{
+	struct scenario *scenario = global_scenario_get();
+	unsigned long used_flags = 0;
+	short itr;
+
+	for (itr = 0; itr < scenario->netgame_flags.count; itr++)
+	{
+		struct scenario_netgame_flag *flag = TAG_BLOCK_GET_ELEMENT(
+			&scenario->netgame_flags,
+			itr,
+			struct scenario_netgame_flag);
+
+		if (flag->type == _netgame_flag_race_track &&
+			flag->team_index >= 0 &&
+			flag->team_index < MAXIMUM_RACE_FLAGS)
+		{
+			if (TEST_FLAG(used_flags, flag->team_index))
+			{
+				long free_index;
+
+				for (free_index = 0; free_index < MAXIMUM_RACE_FLAGS; free_index++)
+				{
+					if (!TEST_FLAG(used_flags, free_index))
+					{
+						/* BUG (original): the flag that was already in use is
+						   marked again rather than the newly assigned index. */
+						SET_FLAG(used_flags, flag->team_index, TRUE);
+						break;
+					}
+				}
+				flag->team_index = (short)free_index;
+			}
+			else
+			{
+				SET_FLAG(used_flags, flag->team_index, TRUE);
+			}
+		}
+	}
+
+	return;
+}
+
 void code_000a29b0(
 	void)
 {
+	return;
+}
+
+void code_000a29c0(
+	long player_index)
+{
+	player_get(player_index)->multiplayer_special = 0;
+
 	return;
 }
 
@@ -138,26 +393,6 @@ void code_000a29f0(
 
 void code_000a2a00(
 	void)
-{
-	return;
-}
-
-void code_000a2a50(
-	void)
-{
-	return;
-}
-
-void code_000a2e90(
-	long player_index,
-	long damage_owner_player_index,
-	boolean damage_was_melee)
-{
-	return;
-}
-
-void code_000a3330(
-	long player_index)
 {
 	return;
 }
@@ -186,8 +421,332 @@ void code_000a2a40(
 	return;
 }
 
+void code_000a2a50(
+	void)
+{
+	return;
+}
+
+static void race_complete_lap(
+	long player_index)
+{
+	struct player_datum *player = player_get(player_index);
+	long lap_time = game_time_get() - player->unknown88;
+	struct data_iterator iterator;
+	struct player_datum *team_player;
+	long team_score;
+
+	race_globals.lap_bit_vector[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index)] = 0;
+	game_engine_play_multiplayer_sound(_multiplayer_sound_countdown_timer_end);
+	player->statistics.multiplayer_statistics.race_statistics.last_lap_time = (short)lap_time;
+
+	if (game_engine_get_variant()->unknown4C.value == _race_type_flag_rally)
+	{
+		game_show_score_you_ally_enemy(
+			player_index,
+			_race_message_you_touched_a_flag_rally,
+			_race_message_ally_touched_a_flag_rally,
+			_race_message_enemy_completed_a_lap,
+			player_index);
+	}
+	else
+	{
+		game_show_score_you_ally_enemy(
+			player_index,
+			_race_message_you_completed_a_lap,
+			_race_message_ally_completed_a_lap,
+			_race_message_enemy_completed_a_lap,
+			player_index);
+	}
+
+	if (player->statistics.multiplayer_statistics.race_statistics.laps == 0)
+	{
+		player->statistics.multiplayer_statistics.race_statistics.best_lap_time = (short)lap_time;
+	}
+	else if (lap_time < player->statistics.multiplayer_statistics.race_statistics.best_lap_time)
+	{
+		player->statistics.multiplayer_statistics.race_statistics.best_lap_time = (short)lap_time;
+		if (game_engine_get_variant()->unknown4C.value != _race_type_flag_rally)
+		{
+			game_show_score_extended(
+				player_index,
+				_race_message_new_best_lap_time,
+				player_index);
+		}
+	}
+
+	player->statistics.multiplayer_statistics.race_statistics.laps++;
+	player->unknown88 = game_time_get();
+
+	team_score = player->statistics.multiplayer_statistics.race_statistics.laps;
+	data_iterator_new(&iterator, player_data);
+	if (game_engine_get_variant()->unknown50 == _race_team_scoring_sum)
+		team_score = 0;
+	while ((team_player = data_iterator_next(&iterator)))
+	{
+		if (player->team_index == team_player->team_index)
+		{
+			long laps = team_player->statistics.multiplayer_statistics.race_statistics.laps;
+
+			switch (game_engine_get_variant()->unknown50)
+			{
+			case _race_team_scoring_minimum:
+				team_score = MIN(team_score, laps);
+				break;
+			case _race_team_scoring_maximum:
+				team_score = MAX(team_score, laps);
+				break;
+			case _race_team_scoring_sum:
+				team_score += laps;
+				break;
+			default:
+				match_assert(
+					"c:\\halo\\SOURCE\\game\\game_engine_race.c",
+					0x248,
+					!"unreachable");
+				break;
+			}
+		}
+	}
+
+	if (team_score > race_globals.team_laps[player->team_index])
+		race_globals.team_laps[player->team_index] = team_score;
+	if (race_globals.team_laps[player->team_index] >= game_engine_get_variant()->unknown40)
+		game_engine_end_game();
+
+	return;
+}
+
+static boolean can_touch_team(
+	long player_index,
+	long team_index)
+{
+	struct player_datum *player = player_get(player_index);
+	long absolute_player_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+	unsigned long untouched_flags = race_globals.lap_completed_value &
+		~race_globals.lap_bit_vector[absolute_player_index];
+	boolean can_touch = TRUE;
+
+	if (team_index >= MAXIMUM_RACE_FLAGS)
+	{
+		can_touch = FALSE;
+	}
+	else if (player->statistics.multiplayer_statistics.race_statistics.laps >=
+		game_engine_get_variant()->unknown40)
+	{
+		can_touch = FALSE;
+	}
+	else if (game_engine_get_variant()->unknown4C.value == _race_type_flag_rally)
+	{
+		can_touch = race_globals.rally_flag == team_index;
+	}
+	else if (race_globals.lap_bit_vector[absolute_player_index] == race_globals.lap_completed_value)
+	{
+		can_touch = team_index == race_globals.first_flag[absolute_player_index];
+	}
+	else if (!TEST_FLAG(untouched_flags, team_index))
+	{
+		can_touch = FALSE;
+	}
+	else if (game_engine_get_variant()->unknown4C.value == _race_type_normal)
+	{
+		long itr;
+
+		for (itr = 0; itr < MAXIMUM_RACE_FLAGS; itr++)
+		{
+			if (itr == team_index)
+			{
+				can_touch = TRUE;
+				break;
+			}
+			if (TEST_FLAG(untouched_flags, itr))
+			{
+				can_touch = FALSE;
+				break;
+			}
+		}
+		match_assert(
+			"c:\\halo\\SOURCE\\game\\game_engine_race.c",
+			0x28A,
+			itr < MAXIMUM_RACE_FLAGS);
+	}
+	else
+	{
+		can_touch = TRUE;
+	}
+
+	return can_touch;
+}
+
+static long new_rally_flag(
+	long old_flag)
+{
+	long new_flag = NONE;
+	struct scenario *scenario = global_scenario_get();
+	long count = count_bits(race_globals.lap_completed_value);
+	long random_index;
+	long itr;
+
+	if (old_flag != NONE)
+		count--;
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\game_engine_race.c",
+		0x2A8,
+		count > 0);
+	random_index = random_range(0, count);
+
+	for (itr = 0; itr < scenario->netgame_flags.count; itr++)
+	{
+		struct scenario_netgame_flag *flag = TAG_BLOCK_GET_ELEMENT(
+			&scenario->netgame_flags,
+			itr,
+			struct scenario_netgame_flag);
+
+		if (flag->type == _netgame_flag_race_track && flag->team_index != old_flag)
+		{
+			if (random_index == 0)
+			{
+				new_flag = flag->team_index;
+				break;
+			}
+			random_index--;
+		}
+	}
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\game_engine_race.c",
+		0x2BD,
+		new_flag != NONE);
+
+	return new_flag;
+}
+
+static void race_touch_flag(
+	long player_index,
+	long netgame_flag_index)
+{
+	struct scenario *scenario = global_scenario_get();
+	struct scenario_netgame_flag *flag = TAG_BLOCK_GET_ELEMENT(
+		&scenario->netgame_flags,
+		netgame_flag_index,
+		struct scenario_netgame_flag);
+	long team_index = flag->team_index;
+
+	if (can_touch_team(player_index, team_index))
+	{
+		long absolute_player_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+		long *lap_bit_vector = &race_globals.lap_bit_vector[absolute_player_index];
+
+		game_engine_play_multiplayer_sound(_multiplayer_sound_countdown_timer);
+
+		if (race_globals.first_flag[absolute_player_index] == NONE)
+		{
+			match_vassert(
+				"c:\\halo\\SOURCE\\game\\game_engine_race.c",
+				0x2D4,
+				_race_type_normal != game_engine_get_variant()->unknown4C.value,
+				"_race_type_normal != game_engine_get_variant()->game_engine_variant.race.race_type");
+			race_globals.first_flag[absolute_player_index] = flag->team_index;
+		}
+
+		if (game_engine_get_variant()->unknown4C.value == _race_type_flag_rally)
+		{
+			race_complete_lap(player_index);
+			race_globals.rally_flag = new_rally_flag(race_globals.rally_flag);
+		}
+		else if (*lap_bit_vector == race_globals.lap_completed_value)
+		{
+			race_complete_lap(player_index);
+		}
+		else
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\game\\game_engine_race.c",
+				0x2EA,
+				!TEST_FLAG(*lap_bit_vector, team_index));
+			SET_FLAG(*lap_bit_vector, team_index, TRUE);
+			match_assert(
+				"c:\\halo\\SOURCE\\game\\game_engine_race.c",
+				0x2EE,
+				!(*lap_bit_vector & ~race_globals.lap_completed_value));
+		}
+	}
+
+	return;
+}
+
 void code_000a2d10(
 	void)
+{
+	return;
+}
+
+static boolean race_team_can_win_game(
+	long team_index)
+{
+	boolean can_win = TRUE;
+
+	if (game_engine_get_variant()->unknown50 == _race_team_scoring_minimum)
+	{
+		struct data_iterator iterator;
+		struct player_datum *player;
+
+		data_iterator_new(&iterator, player_data);
+		while ((player = data_iterator_next(&iterator)))
+		{
+			if (player->team_index == team_index &&
+				player->statistics.multiplayer_statistics.race_statistics.laps <
+					game_engine_get_variant()->unknown40 &&
+				(game_engine_player_is_out_of_lives(iterator.datum_index) ||
+					player->unknown_d1))
+			{
+				can_win = FALSE;
+			}
+		}
+	}
+
+	return can_win;
+}
+
+static void build_player_speeds(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	long maximum_laps = 0;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)))
+	{
+		maximum_laps = MAX(
+			maximum_laps,
+			player->statistics.multiplayer_statistics.race_statistics.laps);
+	}
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)))
+	{
+		real speed_multiplier = 1.0f;
+		long laps_behind = maximum_laps -
+			player->statistics.multiplayer_statistics.race_statistics.laps;
+
+		if (game_engine_get_variant()->unknown4C.value == _race_type_flag_rally)
+			laps_behind /= 3;
+
+		if (laps_behind >= 2)
+			speed_multiplier = 1.2f;
+		else if (laps_behind >= 1)
+			speed_multiplier = 1.1f;
+
+		player->speed_multiplier = speed_multiplier;
+	}
+
+	return;
+}
+
+void code_000a2e90(
+	long player_index,
+	long damage_owner_player_index,
+	boolean damage_was_melee)
 {
 	return;
 }
@@ -198,12 +757,64 @@ void code_000a2ea0(
 	return;
 }
 
-void code_000a29c0(
+void code_000a3330(
 	long player_index)
 {
-	player_get(player_index)->multiplayer_special = 0;
-
 	return;
+}
+
+boolean race_goal_matches_player(
+	long player_index,
+	long goal_index)
+{
+	struct player_datum *player = player_get(player_index);
+	boolean result = FALSE;
+
+	if (!TEST_FLAG(race_globals.lap_completed_value, goal_index))
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\game\\game_engine_race.c",
+			0x43E,
+			!"race goal matches player called on an invalid goal");
+	}
+	else
+	{
+		result = can_touch_team(player_index, goal_index);
+	}
+
+	return result;
+}
+
+static long count_bits(
+	unsigned long flags)
+{
+	long count = 0;
+	long bit;
+
+	for (bit = 0; bit < LONG_BITS; bit++)
+	{
+		if (TEST_FLAG(flags, bit))
+			count++;
+	}
+
+	return count;
+}
+
+long race_engine_get_score(
+	long player_index,
+	enum get_score_type score_type)
+{
+	struct player_datum *player = player_get(player_index);
+	long laps;
+	long flags_touched;
+
+	if (score_type == _get_score_team)
+		return race_globals.team_laps[player->team_index];
+
+	laps = player->statistics.multiplayer_statistics.race_statistics.laps;
+	flags_touched = count_bits(race_globals.lap_bit_vector[player->team_index]);
+
+	return laps * (MAXIMUM_RACE_FLAGS + 1) + flags_touched;
 }
 
 wchar_t *code_000a34a0(
@@ -219,6 +830,336 @@ wchar_t *code_000a34a0(
 		player->statistics.multiplayer_statistics.race_statistics.laps);
 
 	return string;
+}
+
+wchar_t *race_get_score_header_string(
+	wchar_t *string)
+{
+	short string_index =
+		game_engine_get_variant()->unknown4C.value == _race_type_flag_rally ?
+			178 : 25;
+	long string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+	wchar_t *header_string;
+
+	if (string_list_index != NONE)
+		header_string = unicode_string_list_get_string(string_list_index, string_index);
+	else
+		header_string = L"";
+
+	ustrcpy(string, header_string);
+
+	return string;
+}
+
+wchar_t *race_get_team_score_string(
+	long team_index,
+	wchar_t *string)
+{
+	usprintf(string, L"%d", race_globals.team_laps[team_index]);
+
+	return string;
+}
+
+long race_engine_did_player_win(
+	long player_index)
+{
+	if (game_engine_has_teams())
+	{
+		struct player_datum *player = player_get(player_index);
+		boolean can_team_win[2];
+
+		can_team_win[0] = race_team_can_win_game(0);
+		can_team_win[1] = race_team_can_win_game(1);
+
+		if (can_team_win[0] != can_team_win[1])
+			return can_team_win[player->team_index] != FALSE;
+
+		if (!can_team_win[0])
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\game\\game_engine_race.c",
+				0x4AC,
+				!can_team_win[1]);
+
+			return NONE;
+		}
+
+		return game_engine_did_player_win_default(player_index);
+	}
+
+	return game_engine_did_player_win_default(player_index);
+}
+
+static long find_closest_vehicle(
+	real_point3d const *point,
+	long *ignore_these,
+	long ignore_these_count)
+{
+	real closest_distance = 1000000.0f;
+	long closest_flag_index = NONE;
+	struct scenario *scenario = global_scenario_get();
+	struct game_globals *game_globals = scenario_get_game_globals();
+	struct game_globals_multiplayer_information *multiplayer_information =
+		TAG_BLOCK_GET_ELEMENT(
+			&game_globals->multiplayer_information,
+			0,
+			struct game_globals_multiplayer_information);
+	long flag_index;
+
+	for (flag_index = 0; flag_index < scenario->netgame_flags.count; flag_index++)
+	{
+		struct scenario_netgame_flag *flag = TAG_BLOCK_GET_ELEMENT(
+			&scenario->netgame_flags,
+			flag_index,
+			struct scenario_netgame_flag);
+
+		if (flag->type == _netgame_flag_race_vehicle)
+		{
+			boolean ignored = FALSE;
+			long itr;
+
+			for (itr = 0; itr < ignore_these_count; itr++)
+			{
+				if (flag_index == ignore_these[itr])
+				{
+					ignored = TRUE;
+					break;
+				}
+			}
+
+			if (!ignored)
+			{
+				real distance;
+
+				if (!point)
+					return flag_index;
+
+				distance = distance_squared3d(point, &flag->position);
+				if (distance < closest_distance)
+				{
+					closest_distance = distance;
+					closest_flag_index = flag_index;
+				}
+			}
+		}
+	}
+
+	return closest_flag_index;
+}
+
+static void spawn_race_vehicles(
+	void)
+{
+	struct scenario *scenario = global_scenario_get();
+	long flag_indices[MAXIMUM_RACE_VEHICLES] = { NONE };
+	long vehicle_count = 0;
+	struct data_iterator iterator;
+	struct player_datum *player;
+	struct object_placement_data placement_data;
+	long itr;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)))
+	{
+		struct unit_datum *unit =
+			player->unit_index != NONE ? unit_get(player->unit_index) : NULL;
+		long flag_index;
+
+		if (vehicle_count == MAXIMUM_RACE_VEHICLES)
+			break;
+
+		if (unit)
+		{
+			flag_index = find_closest_vehicle(
+				&unit->object.position,
+				flag_indices,
+				vehicle_count);
+		}
+		else
+		{
+			flag_index = find_closest_vehicle(
+				NULL,
+				flag_indices,
+				vehicle_count);
+		}
+		if (flag_index == NONE)
+			break;
+
+		flag_indices[vehicle_count++] = flag_index;
+	}
+
+	for (itr = 0; itr < vehicle_count; itr++)
+	{
+		struct scenario_netgame_flag *flag = TAG_BLOCK_GET_ELEMENT(
+			&scenario->netgame_flags,
+			flag_indices[itr],
+			struct scenario_netgame_flag);
+		long vehicle_definition_index = race_get_vehicle_to_spawn(itr);
+
+		if (vehicle_definition_index != NONE)
+		{
+			object_placement_data_new(&placement_data, vehicle_definition_index, NONE);
+			placement_data.position = flag->position;
+			vector3d_from_angle(&placement_data.forward, flag->facing);
+			object_new(&placement_data);
+			race_globals.vehicles_have_been_added = TRUE;
+		}
+	}
+
+	return;
+}
+
+void race_engine_player_update(
+	long player_index)
+{
+	struct player_datum *player = player_get(player_index);
+
+	game_engine_state_message(
+		player_index,
+		_race_message_show_score,
+		player_index);
+
+	if (player->unit_index != NONE && game_engine_can_score())
+	{
+		struct unit_datum *unit = unit_get(player->unit_index);
+		long netgame_flag_index;
+
+		if (unit->object.parent_object_index != NONE)
+		{
+			struct unit_datum *vehicle = unit_get(unit->object.parent_object_index);
+
+			netgame_flag_index = find_netgame_flag(
+				&vehicle->object.bounding_sphere_center,
+				2.5f,
+				0.0f,
+				_netgame_flag_race_track,
+				NONE);
+		}
+		else
+		{
+			netgame_flag_index = find_netgame_flag(
+				&unit->object.bounding_sphere_center,
+				1.5f,
+				0.6f,
+				_netgame_flag_race_track,
+				NONE);
+		}
+
+		if (netgame_flag_index != NONE)
+			race_touch_flag(player_index, netgame_flag_index);
+	}
+
+	return;
+}
+
+void race_engine_update(
+	void)
+{
+	if (game_time_get() == 2)
+	{
+		delete_race_vehicles();
+		spawn_race_vehicles();
+		game_engine_play_multiplayer_sound(
+			game_engine_has_teams() ?
+				_multiplayer_sound_team_race :
+				_multiplayer_sound_race);
+
+		if (race_globals.vehicles_have_been_added)
+		{
+			switch (game_engine_get_variant()->unknown48)
+			{
+			case _game_engine_vehicles_default:
+				game_engine_play_multiplayer_sound(_multiplayer_sound_warthog);
+				game_engine_play_multiplayer_sound(_multiplayer_sound_ghost);
+				game_engine_play_multiplayer_sound(_multiplayer_sound_scorpion);
+				break;
+			case _game_engine_vehicles_warthog:
+				game_engine_play_multiplayer_sound(_multiplayer_sound_warthog);
+				break;
+			case _game_engine_vehicles_ghost:
+				game_engine_play_multiplayer_sound(_multiplayer_sound_ghost);
+				break;
+			case _game_engine_vehicles_tank:
+				game_engine_play_multiplayer_sound(_multiplayer_sound_scorpion);
+				break;
+			}
+		}
+	}
+
+	if (game_engine_has_teams())
+	{
+		if (!race_team_can_win_game(0))
+			game_engine_end_game();
+		if (!race_team_can_win_game(1))
+			game_engine_end_game();
+	}
+
+	build_player_speeds();
+
+	return;
+}
+
+boolean race_engine_initialize_for_new_map(
+	void)
+{
+	long lowest_flag_index = MAXIMUM_RACE_FLAGS;
+	struct scenario *scenario = global_scenario_get();
+	long itr;
+
+	race_flags_make_unique();
+
+	race_globals.vehicles_have_been_added = FALSE;
+	csmemset(&race_globals, 0, sizeof(race_globals));
+	timeout_for_endgame_sound = 30;
+
+	for (itr = 0; itr < scenario->netgame_flags.count; itr++)
+	{
+		struct scenario_netgame_flag *flag = TAG_BLOCK_GET_ELEMENT(
+			&scenario->netgame_flags,
+			itr,
+			struct scenario_netgame_flag);
+
+		if (flag->type == _netgame_flag_race_track)
+		{
+			if (flag->team_index >= MAXIMUM_RACE_FLAGS)
+			{
+				error(
+					_error_silent,
+					"one of the netgameflags that defines the track was out of the legal range 0..%d",
+					MAXIMUM_RACE_FLAGS);
+			}
+			else
+			{
+				lowest_flag_index = MIN(lowest_flag_index, flag->team_index);
+				SET_FLAG(race_globals.lap_completed_value, flag->team_index, TRUE);
+				game_engine_set_goal_position(
+					flag->team_index,
+					&flag->position,
+					0.0f,
+					"flag_blue",
+					NONE,
+					NONE,
+					NONE);
+			}
+		}
+	}
+
+	if (game_engine_get_variant()->unknown4C.value == _race_type_flag_rally)
+	{
+		race_globals.rally_flag = new_rally_flag(NONE);
+	}
+	else if (game_engine_get_variant()->unknown4C.value == _race_type_normal)
+	{
+		for (itr = 0; itr < MULTIPLAYER_MAXIMUM_PLAYERS; itr++)
+			race_globals.first_flag[itr] = lowest_flag_index;
+	}
+	else
+	{
+		for (itr = 0; itr < MULTIPLAYER_MAXIMUM_PLAYERS; itr++)
+			race_globals.first_flag[itr] = NONE;
+	}
+
+	return TRUE;
 }
 
 /* ---------- private code */
