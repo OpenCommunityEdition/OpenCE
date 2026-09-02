@@ -635,14 +635,25 @@ struct widget_instance;
 #include "event_manager.h"
 #include "game/players.h"
 #include "input/input.h"
+#include "input/input_abstraction.h"
 #include "interface/attract_mode.h"
 #include "interface/player_ui.h"
 #include "interface/ui_widget_definitions.h"
+#include "interface/ui_widget_event_handler_functions.h"
 #include "interface/virtual_keyboard.h"
 #include "main/main.h"
+#include "main/main_runtime.h"
+#include "memory/stack_memory_pool.h"
 #include "networking/network_connection.h"
 #include "networking/network_game_globals.h"
+#include "networking/network_server_manager.h"
+#include "saved games/player_profile.h"
+#include "saved games/playlist_profile.h"
+#include "saved games/saved_game_files.h"
+#include "shell/shell_xbox.h"
+#include "sound/game_sound.h"
 #include "sound/sound_definitions.h"
+#include "sound/sound_manager.h"
 #include "ui_widget.h"
 
 /* ---------- constants */
@@ -796,16 +807,6 @@ struct stack_memory_pool
 	struct stack_memory_pool_block *first_block;
 	struct stack_memory_pool_block *last_block;
 	struct stack_memory_pool_block *blocks[1];
-};
-
-struct game_input_preferences
-{
-	real yaw_rate;
-	real pitch_rate;
-	byte game_control_to_xbox_buttons[12];
-	short joystick_controls;
-	boolean invert_look;
-	boolean invert_look_aircraft_control;
 };
 
 struct ui_widget_deferred_error
@@ -1001,66 +1002,13 @@ static unsigned long __stdcall filesystem_initialization_thread_proc(
 static void perform_filesystem_initialization(
 	void);
 
-const char *shell_get_command_line(
-	void);
-void input_abstraction_reset_controller_detection_timer(
-	void);
-void input_abstraction_get_local_player_preferences(
-	short local_player_index,
-	struct game_input_preferences *preferences);
-short saved_game_perform_file_system_checks(
-	void);
-void playlist_profiles_enumerate_available_to_local_player_index(
-	short local_player_index,
-	long *number_of_profiles,
-	long *playlist_profile_indices);
-void player_profiles_enumerate_available_to_local_player_index(
-	short local_player_index,
-	long *number_of_profiles,
-	long *player_profile_indices,
-	boolean include_default_profiles);
-void reset_last_player1_profile_index(
-	void);
-void network_game_server_pause_countdown(
-	struct network_game_server *server,
-	boolean pause_countdown);
-void main_loop_of_death(
-	void);
-void sound_pause(
-	boolean paused);
-long unspatialized_impulse_sound_new(
-	long definition_index,
-	real scale);
-void scripted_looping_sound_start(
-	long sound_index,
-	long source_object_index,
-	real gain);
-void scripted_looping_sound_stop(
-	long sound_index);
-void stack_memory_pool_reset(
-	struct stack_memory_pool *pool);
-void *pool_new_pointer(
-	struct stack_memory_pool *pool,
-	long allocation_size,
-	char const *file,
-	unsigned long line);
-void dispose_pointer(
-	struct stack_memory_pool *pool,
-	void *pointer);
-void *pool_resize_pointer(
-	struct stack_memory_pool *pool,
-	void *pointer,
-	long allocation_size,
-	char const *file,
-	unsigned long line);
-
 /* ---------- globals */
 
 extern struct stack_memory_pool *widget_memory_pool;
-extern struct ui_widget_bss_prefix bss_00454240;
+extern struct ui_widget_bss_prefix ui_widget_globals_storage;
 
-#define widget_globals bss_00454240.widget_globals
-#define we_are_at_the_main_menu bss_00454240.we_are_at_the_main_menu
+#define widget_globals ui_widget_globals_storage.widget_globals
+#define we_are_at_the_main_menu ui_widget_globals_storage.we_are_at_the_main_menu
 extern real_argb_color ui_plasma_effect_color;
 extern real global_ui_white_red;
 extern real global_ui_white_green;
@@ -1989,7 +1937,7 @@ static unsigned long __stdcall filesystem_initialization_thread_proc(
 	widget_globals.filesystem_check_result = saved_game_perform_file_system_checks();
 	if (!widget_globals.filesystem_check_result)
 	{
-		long number_of_profiles = 1;
+		word number_of_profiles = 1;
 		long profile_index;
 
 		playlist_profiles_enumerate_available_to_local_player_index(NONE, &number_of_profiles, &profile_index);
