@@ -149,7 +149,7 @@ typedef char verify_rasterizer_dynamic_screen_geometry_parameters_size[
 
 struct rasterizer_globals_reserved04
 {
-	byte __unknown04[8];
+	rectangle2d screen_bounds;
 	rectangle2d frame_bounds;
 	byte __unknown14[4];
 };

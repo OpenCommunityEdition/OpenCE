@@ -343,6 +343,7 @@ symbols in this file:
 #include "game/player_control_runtime.h"
 #include "game/players.h"
 #include "integer_math.h"
+#include "main/main_runtime.h"
 #include "input.h"
 #include "shell.h"
 #include "event_manager.h"
@@ -655,6 +656,35 @@ real main_get_seconds_elapsed(
 	return main_globals.seconds_elapsed;
 }
 
+boolean gamepad_button_is_down(
+	short button_index)
+{
+	short gamepad_index;
+	boolean result = FALSE;
+
+	match_assert("c:\\halo\\SOURCE\\main\\main.c", 245,
+		button_index>=0 && button_index<NUMBER_OF_GAMEPAD_BUTTONS);
+	gamepad_index = 0;
+
+	do
+	{
+		if (input_has_gamepad(gamepad_index))
+			break;
+
+		gamepad_index++;
+	}
+	while (gamepad_index < MAXIMUM_GAMEPADS);
+
+	if (gamepad_index < MAXIMUM_GAMEPADS)
+	{
+		struct gamepad_state const *gamepad = input_get_gamepad_state(gamepad_index);
+
+		result = gamepad->buttons[button_index] > 0;
+	}
+
+	return result;
+}
+
 void game_connection_set(
 	short connection)
 {
@@ -931,12 +961,22 @@ void main_menu_load(
 	return;
 }
 
+static void screenshot_record(
+	struct bitmap_data *screen,
+	struct file_reference *file)
+{
+	char const *error_message = tiff_export(file, screen);
+
+	if (error_message)
+		error(_error_silent, error_message);
+	return;
+}
+
 void main_present_frame(
 	void)
 {
 	struct file_reference reference;
 	char path[512];
-	char const *error_message;
 
 	render_frame_present(NULL, main_globals.movie);
 	if (global_screenshot_count <= 0 && main_globals.movie)
@@ -947,9 +987,7 @@ void main_present_frame(
 			"movie\\frame%06d.tga",
 			main_globals.recording_frame_index++);
 		file_reference_create_from_path(&reference, path, FALSE);
-		error_message = tiff_export(&reference, main_globals.movie);
-		if (error_message)
-			error(_error_silent, error_message);
+		screenshot_record(main_globals.movie, &reference);
 	}
 
 	return;
@@ -1008,6 +1046,122 @@ void main_run_demos(
 	void)
 {
 	main_globals.run_xdemos = TRUE;
+	return;
+}
+
+static void compute_subframe_counts(
+	long num_players,
+	long *horizontal_count,
+	long *vertical_count)
+{
+	long horizontal = 1;
+	long vertical = 1;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\main\\main.c",
+		1308,
+		num_players>0);
+	if (num_players>1)
+	{
+		do
+		{
+			if (horizontal<vertical)
+				horizontal++;
+			else
+			{
+				horizontal = 1;
+				vertical++;
+			}
+		}
+		while (vertical*horizontal<num_players);
+	}
+
+	*horizontal_count = horizontal;
+	*vertical_count = vertical;
+	return;
+}
+
+void compute_window_bounds(
+	long player_index,
+	long num_players,
+	rectangle2d *pixel_bounds,
+	rectangle2d *safe_frame_bounds)
+{
+	long vertical_count;
+	long horizontal_count;
+	long horizontal_index;
+	long vertical_index;
+	long subframe_width;
+	long subframe_height;
+	long safe_frame_inset;
+	boolean first_player_spans_two_columns;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\main\\main.c",
+		1359,
+		player_index<num_players);
+	safe_frame_inset = num_players>1 ? 4 : 0;
+	first_player_spans_two_columns = FALSE;
+	compute_subframe_counts(
+		num_players,
+		&horizontal_count,
+		&vertical_count);
+
+	if (horizontal_count*vertical_count>num_players)
+	{
+		if (!player_index)
+			first_player_spans_two_columns = TRUE;
+		else
+			player_index++;
+	}
+
+	vertical_index = player_index/horizontal_count;
+	horizontal_index = player_index-vertical_index*horizontal_count;
+	match_assert(
+		"c:\\halo\\SOURCE\\main\\main.c",
+		1390,
+		vertical_index>=0 && vertical_index<vertical_count);
+	match_assert(
+		"c:\\halo\\SOURCE\\main\\main.c",
+		1391,
+		horizontal_index>=0 && horizontal_index<horizontal_count);
+
+	subframe_height =
+		(rasterizer_globals.reserved04.frame_bounds.y1-
+			rasterizer_globals.reserved04.frame_bounds.y0)/vertical_count;
+	subframe_width =
+		(rasterizer_globals.reserved04.frame_bounds.x1-
+			rasterizer_globals.reserved04.frame_bounds.x0)/horizontal_count;
+	subframe_width *= first_player_spans_two_columns ? 2 : 1;
+
+	safe_frame_bounds->x0 =
+		subframe_width*horizontal_index+
+		rasterizer_globals.reserved04.frame_bounds.x0;
+	safe_frame_bounds->x1 =
+		subframe_width*(horizontal_index+1)+
+		rasterizer_globals.reserved04.frame_bounds.x0;
+	safe_frame_bounds->y0 =
+		subframe_height*vertical_index+
+		rasterizer_globals.reserved04.frame_bounds.y0;
+	safe_frame_bounds->y1 =
+		subframe_height*(vertical_index+1)+
+		rasterizer_globals.reserved04.frame_bounds.y0;
+	*pixel_bounds = *safe_frame_bounds;
+
+	safe_frame_bounds->x0 += horizontal_index*safe_frame_inset;
+	safe_frame_bounds->x1 -= (horizontal_index==0)*safe_frame_inset;
+	safe_frame_bounds->y0 += vertical_index*safe_frame_inset;
+	safe_frame_bounds->y1 -= (vertical_index==0)*safe_frame_inset;
+
+	if (!horizontal_index)
+		pixel_bounds->x0 = rasterizer_globals.reserved04.screen_bounds.x0;
+	if ((first_player_spans_two_columns!=FALSE)+horizontal_index+1==horizontal_count)
+		pixel_bounds->x1 = rasterizer_globals.reserved04.screen_bounds.x1;
+	if (!vertical_index)
+		pixel_bounds->y0 = rasterizer_globals.reserved04.screen_bounds.y0;
+	if (vertical_index+1==vertical_count)
+		pixel_bounds->y1 = rasterizer_globals.reserved04.screen_bounds.y1;
+
 	return;
 }
 

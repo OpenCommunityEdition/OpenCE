@@ -1102,6 +1102,44 @@
         },
         "objdiff_percent": 98.98104
       }
+    },
+    {
+      "unit": "source/main/main",
+      "function": "_compute_subframe_counts",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after restoring the HCEA-authenticated subframe-count algorithm together with its authentic compute_window_bounds caller and January's line-1308 num_players>0 assertion. The real caller makes VC7 retain the helper naturally and recover January's private convention: num_players arrives in EBX and only the two result pointers are stack arguments. Target and candidate have the same 112-byte padded envelope and all four relocation identities at the same addresses. The residual is confined to one loop-termination spelling: January materializes vertical*horizontal<num_players with setl/test/je, while the direct ordinary-C predicate emits cmp/jge. Bounded boolean-temporary, predicate-polarity, while/do-while, and product-local spellings did not recover that instruction choice without degrading the otherwise exact body. No public prototype, forced linkage, volatile access, compiler barrier, assembly, fake dependency, inert expression, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the materialized boolean.",
+      "measurements": {
+        "target": {
+          "size": 112,
+          "relocation_count": 4,
+          "normalized_sha256": "d5b5047a8d0a783c6ec4e08a1f96d2df2346801a8a8e8364f8faa50ab6e139de"
+        },
+        "base": {
+          "size": 112,
+          "relocation_count": 4,
+          "normalized_sha256": "edd705dfff90e3b299dca140e8b7558db363d700e2a276ef89b21011be641136"
+        },
+        "objdiff_percent": 94.347824
+      }
+    },
+    {
+      "unit": "source/main/main",
+      "function": "_compute_window_bounds",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked under the current house rule after restoring the complete HCEA-authenticated window-geometry routine with January's three exact assertions, semantic rectangle2d types, and named rasterizer screen_bounds/frame_bounds fields. Target and candidate have the same 496-byte padded envelope, all 25 relocation identities at the same addresses, and the same 176 decoded instructions. The only two differences are commutative integer products: January copies horizontal_index or first_player_spans_two_columns into EDX and multiplies by horizontal_count, while VC7 copies horizontal_count into EDX and multiplies by the other operand. Ordinary declaration-order, product-local, operand-order, and expression-grouping corrections either compile to this fixed point or perturb more code, so the natural donor topology is retained. No carrier variable, volatile access, barrier, assembly, fake dependency, raw-address field, or nonsensical control flow is present. The public prototype is isolated in main_runtime.h because adding the rectangle type to broad main.h changed an unrelated shell_xbox rdata COMDAT owner under C2; the narrow owner header preserves every consumer. Reopen only for authoritative January source/local records or a natural same-compiler register-lifetime donor.",
+      "measurements": {
+        "target": {
+          "size": 496,
+          "relocation_count": 25,
+          "normalized_sha256": "9e74a78d008dcdaa4ecd0e8290296cab0e4bc43a5ea1222200a9867d80677e76"
+        },
+        "base": {
+          "size": 496,
+          "relocation_count": 25,
+          "normalized_sha256": "102856c3048a4eca32fbcb6e11ad419f5f9d1d581ee12f6832cf90a2f73e99bf"
+        },
+        "objdiff_percent": 99.87578
+      }
     }
   ]
 }
