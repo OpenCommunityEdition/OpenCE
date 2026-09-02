@@ -358,6 +358,7 @@ enum
 /* ---------- structures */
 
 struct unit_control_data;
+struct scenario_unit_datum;
 
 struct unit_animation
 {
@@ -528,6 +529,9 @@ struct unit_control_data;
 void unit_control(
 	long unit_index,
 	struct unit_control_data const *control_data);
+void unit_place(
+	long unit_index,
+	struct scenario_unit_datum const *scenario_unit);
 
 void units_initialize(
 	void);

@@ -27,6 +27,9 @@ enum
 /* ---------- structures */
 
 struct animation;
+struct object_placement_data;
+struct real_orientation;
+struct scenario_object_datum;
 
 struct _biped_datum
 {
@@ -82,12 +85,18 @@ void bipeds_dispose_from_old_map(
 	void);
 void bipeds_dispose(
 	void);
+void biped_place(
+	long biped_index,
+	struct scenario_object_datum *scenario_object);
 void biped_delete(
 	long biped_index);
 void biped_reset(
 	long biped_index);
 boolean biped_flying_through_air(
 	long biped_index);
+void biped_adjust_placement(
+	long biped_index,
+	struct object_placement_data *data);
 void biped_export_function_values(
 	long biped_index);
 void biped_disconnect_from_structure_bsp(
@@ -102,7 +111,11 @@ void biped_get_sight_position(
 	real_vector3d *desired_facing,
 	real_vector3d const *desired_gun_offset,
 	real_point3d *sight_position);
-void biped_get_physics_pill(long biped_index, real_point3d *base, real *height, real *width);
+void biped_get_physics_pill(
+	long biped_index,
+	real_point3d *base,
+	real *height,
+	real *width);
 void biped_get_autoaim_pill(
 	long biped_index,
 	real_point3d *base,
@@ -118,16 +131,33 @@ boolean biped_fix_position(
 	boolean dont_teleport,
 	boolean use_radius_as_multiplier);
 
-void biped_stop_limp_body_physics(long biped_index);
+void biped_stop_limp_body_physics(
+	long biped_index);
 void biped_start_limp_body_physics(
 	long biped_index);
 
-void biped_build_flying_axes(real_vector3d const *forward_vector, real_vector3d *left_vector, real_vector3d *up_vector);
+void biped_build_flying_axes(
+	real_vector3d const *forward_vector,
+	real_vector3d *left_vector,
+	real_vector3d *up_vector);
 void biped_exit_seat_end(
 	long biped_index,
 	long seat_object_index);
 void biped_render_debug(
 	long biped_index);
+short biped_approximate_surface_index(
+	long biped_index,
+	real_point3d *point);
+long biped_find_pathfinding_surface_index(
+	long biped_index,
+	real_point3d *pathfinding_point);
+boolean biped_new(
+	long biped_index);
+boolean biped_update(
+	long biped_index);
+void biped_preprocess_node_orientations(
+	long biped_index,
+	struct real_orientation *node_orientations);
 
 /* ---------- globals */
 

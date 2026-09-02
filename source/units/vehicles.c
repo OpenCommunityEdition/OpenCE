@@ -345,9 +345,6 @@ struct scenario_vehicle
 
 /* ---------- prototypes */
 
-void unit_place(
-	long unit_index,
-	void *unit);
 void aiming_screen_apply(
 	struct animation const *animation,
 	struct vehicle_animation const *vehicle_animation,
@@ -409,7 +406,7 @@ void vehicle_place(
 	long vehicle_index,
 	struct scenario_vehicle *vehicle)
 {
-	unit_place(vehicle_index, vehicle->unit);
+	unit_place(vehicle_index, (struct scenario_unit_datum const *)vehicle->unit);
 	object_add_scenario_permutation(vehicle_index, (struct scenario_object_permutation *)vehicle->permutation);
 
 	return;

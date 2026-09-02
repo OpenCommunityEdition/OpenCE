@@ -348,6 +348,8 @@ struct object_placement_data
 
 /* ---------- prototypes/OBJECTS.C */
 
+struct scenario_object_permutation;
+
 long cluster_get_first_noncollideable_object(long *reference_index, short cluster_index);
 long cluster_get_next_noncollideable_object(long *reference_index);
 long cluster_get_first_collideable_object(long *reference_index, short cluster_index);

@@ -1679,7 +1679,7 @@ boolean player_teleport_internal(
 			}
 
 			collision_height = biped_definition_get(
-				pointers.biped->definition_index)->biped.collision_height_standing;
+				pointers.biped->definition_index)->biped.collision_radius;
 			scale = collision_height * 3.f +
 				pointers.source_root_object->object.bounding_sphere_radius;
 		match_assert(
@@ -1953,7 +1953,7 @@ void players_debug_render(
 							&pill_height,
 							&pill_width);
 						fixed_position.z +=
-							biped_definition->biped.collision_height_standing;
+							biped_definition->biped.collision_radius;
 						scale_vector3d(global_up3d, pill_height, &pill_vector);
 						if (collision_test_pill(
 							_collision_test_for_player_teleport_flags,

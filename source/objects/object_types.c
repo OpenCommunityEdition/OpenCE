@@ -204,26 +204,6 @@ void unit_notify_impulse_sound(
 void unit_render_debug(
 	long object_index);
 
-void biped_adjust_placement(
-	long object_index,
-	struct object_placement_data *data);
-boolean biped_new(
-	long object_index);
-void biped_place(
-	long object_index,
-	struct scenario_object_datum *scenario_object);
-void biped_delete(
-	long object_index);
-boolean biped_update(
-	long object_index);
-void biped_preprocess_node_orientations(
-	long object_index,
-	struct real_orientation *node_orientations);
-void biped_disconnect_from_structure_bsp(
-	long object_index);
-void biped_render_debug(
-	long object_index);
-
 boolean vehicle_new(
 	long object_index);
 void vehicle_place(

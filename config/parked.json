@@ -1539,6 +1539,25 @@
         },
         "objdiff_percent": 96.4574
       }
+    },
+    {
+      "unit": "source/units/bipeds",
+      "function": "_biped_find_nearby_support_surface",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after restoring the complete typed support-surface search from January disassembly and relocation topology, the later HCEA semantic implementation, and the earlier e02971dfd campaign reconstruction. The same-build Halo CE symbol atlas independently recovers the private name biped_find_nearby_support_surface. The retained ordinary C obtains the biped physics pill, brackets the collision query with the semantic collision-user stack, tests the structure BSP with the breakable-surface flags, corrects back-facing planes through named fields and LONG_MAX, selects the closest support plane, and updates the biped's support surface, ground plane, and up vector. Target and candidate have the same 544-byte padded envelope, all 23 relocation identities, and 175 decoded instructions; the report records 99.976746 percent similarity. Their sole machine-code difference is the order of the first two independent x87 multiply/add terms inside the inlined plane3d_distance_to_point expression. The source-authentic project helper is retained rather than expanding and reordering its dot-product terms solely to steer code generation. The fail-closed classifier returns UNKNOWN. No forced inline/noinline, barrier, volatile access, pragma, assembly, fake dependency, raw offset, undefined behavior, manual bitwise plane mask, or nonsensical branch is retained. Reopen only for authoritative January source/local records, a proven January inline-schedule correction, or a natural compatible-compiler donor that explains the x87 evaluation order.",
+      "measurements": {
+        "target": {
+          "size": 544,
+          "relocation_count": 23,
+          "normalized_sha256": "d2fe0224f5db1253a04cdd2a4749291078f65eb5c0b9a9f21e7de2b2b31e6b4b"
+        },
+        "base": {
+          "size": 544,
+          "relocation_count": 23,
+          "normalized_sha256": "7264f6ba522f1b4dab0f59e9a1e725bfed9363c869e1727e0b69f94b1e1212b0"
+        },
+        "objdiff_percent": 99.976746
+      }
     }
   ]
 }
