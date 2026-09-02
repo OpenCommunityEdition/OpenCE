@@ -156,7 +156,11 @@ struct game_engine
 		long damaging_player_index,
 		long dead_player_index,
 		boolean damage_type);
-	void (*unknown60)(void);
+	void (*player_killed_player)(
+		long killing_player_index,
+		long killing_object_index,
+		long dead_player_index,
+		boolean friendly_fire);
 	boolean (*format_message)(
 		long player_index,
 		long parameter1,
@@ -493,7 +497,7 @@ boolean game_engine_allow_integrated_lights(
 
 void game_engine_player_killed(
 	long killing_player_index,
-	long damage_type,
+	long killing_object_index,
 	long dead_player_index,
 	boolean friendly_fire);
 

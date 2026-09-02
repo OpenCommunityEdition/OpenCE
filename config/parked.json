@@ -1811,6 +1811,63 @@
         },
         "objdiff_percent": 100.0
       }
+    },
+    {
+      "unit": "source/game/game_engine",
+      "function": "_find_closest_player_index",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete closest-player target search in ordinary typed C from January disassembly and independent HaloCEA source. The retained body iterates the target-proven object sweep, resolves each candidate through unit_get, applies the active-camouflage/requesting-player exception, calls the typed autoaim_compute_target interface owned by aim_assist.h, and retains each qualifying sweep result exactly as January does. The consecutive comparisons of the same squared-distance local against 400.0f and 900.0f are mathematically redundant but evidence-backed rather than a match trick: January emits both loads/comparisons and the independent reconstruction records the same pair. January and the candidate are both 448 padded bytes with 18 relocations, and the report records 94.2638 percent similarity. Their instruction streams remain identical through the final selection tail; January keeps the successful candidate in EAX and schedules the failure assignment separately, while C2's natural source lowering merges the terminal conversions and chooses a different temporary register. Declaration order, initialization placement, and natural equivalent control-flow forms did not alter that tail. No forced inline/noinline, barrier, volatile or register forcing, pragma, assembly, fake dependency, raw object cast, invented address name, or unsupported nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the remaining tail schedule.",
+      "measurements": {
+        "target": {
+          "size": 448,
+          "relocation_count": 18,
+          "normalized_sha256": "4c90ec184c403112ccdd4b254be7841546362efefda25464c37fe8c16c767639"
+        },
+        "base": {
+          "size": 448,
+          "relocation_count": 18,
+          "normalized_sha256": "542e7ea46ce27458a815781758141536442e685e6172e9bab9c41d0dd26e4e9a"
+        },
+        "objdiff_percent": 94.2638
+      }
+    },
+    {
+      "unit": "source/game/game_engine",
+      "function": "_game_engine_should_spawn_player",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete multiplayer spawn eligibility decision in ordinary typed C from January disassembly and independent HaloCEA source. The retained body blocks spawning while the game is in a terminal postgame state, asks the active engine whether the player may spawn, applies the target-proven respawn-timer decrement and final countdown sound selection, and reports the remaining delay through the out parameter using semantic game-engine and multiplayer-sound enum constants. January and the candidate are both 256 padded bytes with 9 relocations, and the report records 99.71265 percent similarity. The residual is the target's register choice: January pins integer one in EBX and later compares EAX against EBX, whereas C2's natural lowering uses an immediate/byte form and a different countdown temporary. Equivalent declarations and source-level branch forms did not recover that allocation. No forced inline/noinline, barrier, volatile or register forcing, pragma, assembly, fake dependency, raw numeric enum, invented address name, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the register allocation.",
+      "measurements": {
+        "target": {
+          "size": 256,
+          "relocation_count": 9,
+          "normalized_sha256": "8259180402f726ea65aa4d62461f38a4138acc21fc1d8fe1c19e9d246b5ff0ef"
+        },
+        "base": {
+          "size": 256,
+          "relocation_count": 9,
+          "normalized_sha256": "031050d5b5fa8b5697cbd4a43d34c01f3d0d3f7b6cc40ab3856f55f8d6b86142"
+        },
+        "objdiff_percent": 99.71265
+      }
+    },
+    {
+      "unit": "source/game/game_engine",
+      "function": "_game_engine_get_place",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete place/rank calculation in ordinary typed C from January disassembly, the game-engine callback ABI, and independent HaloCEA source. The retained body queries the active engine with the semantic _get_score_team enum, compares the requested score against every opposing team, tracks tied and all-tied state as booleans, and returns the semantic place flags with the correct rank. January and the candidate are both 368 padded bytes with 12 relocations, and the report records 94.49254 percent similarity. The residual is confined to C2's byte-local allocation and boolean combine: January assigns the two byte locals to the opposite stack slots and emits an early AND through DL/CL, while natural declarations emit TEST or swap those registers; explicitly materializing the same operation grows the function by 16 bytes. The retained boolean bitwise AND is meaningful for normalized boolean values and preserves January's size and relocation shape. No forced inline/noinline, barrier, volatile or register forcing, pragma, assembly, fake dependency, raw numeric score/flag constant, invented address name, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the byte-register allocation.",
+      "measurements": {
+        "target": {
+          "size": 368,
+          "relocation_count": 12,
+          "normalized_sha256": "91161c382c55b5a853880db9762c078496b19779acec4a23fb5ae6837afd3323"
+        },
+        "base": {
+          "size": 368,
+          "relocation_count": 12,
+          "normalized_sha256": "bcf2be6ca02eb7a0bbb9ddfbc12fffef603d6e539e68d79ec02aecdaf172f185"
+        },
+        "objdiff_percent": 94.49254
+      }
     }
   ]
 }

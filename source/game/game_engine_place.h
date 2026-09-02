@@ -12,6 +12,14 @@ GAME_ENGINE_PLACE.H
 
 /* ---------- structures */
 
+enum game_engine_place_flags
+{
+	_place_tied = 0,
+	_place_all_tied,
+	_place_two_groups,
+	_place_team,
+};
+
 struct game_engine_place
 {
 	short flags;

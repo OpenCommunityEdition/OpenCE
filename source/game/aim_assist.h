@@ -8,6 +8,10 @@ header included in hcex build.
 #define __AIM_ASSIST_H
 #pragma once
 
+/* ---------- headers */
+
+#include "math/real_math.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -24,7 +28,17 @@ struct aim_assist_parameters
 	real unused;
 };
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/AIM_ASSIST.C */
+
+boolean autoaim_compute_target(
+	long object_index,
+	real_point3d const *position,
+	real_vector3d const *direction,
+	long unit_index,
+	real_point3d *target_position,
+	real_vector3d *target_direction,
+	real *target_distance,
+	real *target_angle);
 
 /* ---------- globals */
 

@@ -539,6 +539,7 @@ symbols in this file:
 #include "cseries.h"
 #include "cseries_windows.h"
 #include "errors.h"
+#include "aim_assist.h"
 #include "game_engine.h"
 #include "game_engine_place.h"
 
@@ -578,6 +579,57 @@ symbols in this file:
 enum
 {
 	MULTIPLAYER_MAXIMUM_PLAYERS = 16,
+};
+
+enum game_engine_message
+{
+	_game_engine_message_welcome = 0,
+	_game_engine_message_killed_by_unknown,
+	_game_engine_message_killed_by_biped,
+	_game_engine_message_killed_by_vehicle,
+	_game_engine_message_killed_by_player,
+	_game_engine_message_killed_by_friendly_fire,
+	_game_engine_message_killed_by_self,
+	_game_engine_message_double_kill,
+	_game_engine_message_killed_enemy,
+	_game_engine_message_triple_kill,
+	_game_engine_message_multi_kill,
+	_game_engine_message_five_kills_in_row,
+	_game_engine_message_ten_kills_in_a_row,
+	_game_engine_message_killed_friendly,
+	_game_engine_message_multi_kill_with_score,
+	_game_engine_message_triple_kill_with_score,
+	_game_engine_message_double_kill_with_score,
+	_game_engine_message_ten_kills_in_a_row_with_score,
+	_game_engine_message_five_kills_in_row_with_score,
+	_game_engine_message_killed_enemy_with_score,
+	_game_engine_message_winner,
+	_game_engine_message_team_winner,
+	_game_engine_message_show_score,
+	_game_engine_message_odd_man_out,
+	_game_engine_message_out_of_lives,
+	_game_engine_message_respawn_timer,
+	_game_engine_message_waiting_for_space_to_clear,
+	_game_engine_message_player_quit_self,
+	_game_engine_message_quit,
+	_game_engine_message_press_back_for_score,
+	_game_engine_message_time_left,
+	NUMBER_OF_GAME_ENGINE_MESSAGES,
+};
+
+enum game_engine_postgame_state
+{
+	_game_engine_postgame_state_active = 0,
+	_game_engine_postgame_state_delay,
+	_game_engine_postgame_state_rasterize_delay,
+	_game_engine_postgame_state_rasterize,
+};
+
+enum
+{
+	_multiplayer_sound_countdown_for_respawn = 0x1D,
+	_multiplayer_sound_respawn = 0x1F,
+	_equipment_created_at_rest_bit = 0,
 };
 
 /* ---------- macros */
@@ -940,16 +992,6 @@ long populate_statistic_buffer(
 	struct postgame_statistic_entry *entries,
 	long parameter1,
 	long parameter2);
-
-boolean autoaim_compute_target(
-	long object_index,
-	real_point3d const *position,
-	real_vector3d const *direction,
-	long unit_index,
-	void *output0,
-	void *output1,
-	void *output2,
-	real *angle);
 
 boolean find_closest_player_callback(
 	long object_index,
@@ -2296,6 +2338,93 @@ void game_engine_post_rasterize_post_game(
 	}
 
 	return;
+}
+
+long find_closest_player_index(
+	long player_index)
+{
+	struct player_datum *player;
+	long best_object_index;
+	long object_index;
+	long candidate_object_index;
+	struct unit_datum *candidate;
+	long candidate_player_index;
+	real x;
+	real y;
+	real z;
+	long object_indices[32];
+	real_point3d target_position;
+	real_vector3d target_direction;
+	real_vector3d facing_direction;
+	real target_distance;
+	real_point3d camera_position;
+	long object_count;
+	real target_angle;
+	real distance_squared;
+
+	player = player_get(player_index);
+	best_object_index = NONE;
+	if (player->local_player_index != NONE &&
+		player_control_get_autoaim_level(player->local_player_index) > 0.0f)
+	{
+		best_object_index =
+			player_control_get_target_object_index(player->local_player_index);
+	}
+
+	if (best_object_index == NONE)
+	{
+		unit_get_camera_position(player->unit_index, &camera_position);
+		player_control_get_facing_direction(
+			player->local_player_index,
+			&facing_direction);
+		object_count = find_objects_from_point_vector(
+			&camera_position,
+			&facing_direction,
+			(boolean (*)(long, void *))find_closest_player_callback,
+			&player_index,
+			NUMBEROF(object_indices),
+			object_indices);
+
+		object_index = 0;
+		for (; object_index < object_count; object_index++)
+		{
+			candidate_object_index = object_indices[object_index];
+			candidate = unit_get(candidate_object_index);
+			x = candidate->object.position.x - camera_position.x;
+			y = candidate->object.position.y - camera_position.y;
+			z = candidate->object.position.z - camera_position.z;
+			distance_squared = y * y + (x * x + z * z);
+
+			if ((candidate->unit.active_camouflage < 1.0f ||
+				(candidate_player_index =
+					player_index_from_unit_index(candidate_object_index),
+					player->unknown7c == candidate_player_index)) &&
+				autoaim_compute_target(
+					candidate_object_index,
+					&camera_position,
+					&facing_direction,
+					player->unit_index,
+					&target_position,
+					&target_direction,
+					&target_distance,
+					&target_angle) &&
+				fabs(target_angle) < 0.13083334267139435 &&
+				distance_squared < 400.0f &&
+				distance_squared < 900.0f)
+			{
+				best_object_index = object_indices[object_index];
+			}
+		}
+
+		if (best_object_index != NONE)
+			return player_index_from_unit_index(best_object_index);
+	}
+	else
+	{
+		return player_index_from_unit_index(best_object_index);
+	}
+
+	return best_object_index;
 }
 
 long game_engine_remap_equipment(
@@ -3939,6 +4068,173 @@ void game_engine_update(
 	return;
 }
 
+
+void game_engine_player_killed(
+	long killing_player_index,
+	long killing_object_index,
+	long dead_player_index,
+	boolean friendly_fire)
+{
+	struct player_datum *dead_player = player_get(dead_player_index);
+	boolean player_kill;
+	boolean same_player;
+	boolean valid_players;
+	long message = NONE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\game_engine.c",
+		0xA31,
+		dead_player_index != NONE);
+
+	if (!game_engine)
+		return;
+
+	dead_player->death_time = game_time_get();
+	if (game_engine->player_killed_player)
+	{
+		game_engine->player_killed_player(
+			killing_player_index,
+			killing_object_index,
+			dead_player_index,
+			friendly_fire);
+	}
+
+	same_player = killing_player_index == dead_player_index;
+	if (killing_player_index != NONE && dead_player_index != NONE)
+		valid_players = TRUE;
+	else
+		valid_players = FALSE;
+	player_kill = !friendly_fire && valid_players && !same_player;
+
+	dead_player->respawn_timer =
+		dead_player->respawn_penalty + global_variant.unknown30;
+	if (global_variant.unknown2C > 0)
+	{
+		dead_player->respawn_penalty += global_variant.unknown2C;
+		dead_player->respawn_penalty =
+			MIN(
+				dead_player->respawn_penalty,
+				global_variant.unknown2C * 5);
+		if (player_kill && killing_player_index != NONE)
+		{
+			struct player_datum *killing_player =
+				player_get(killing_player_index);
+			killing_player->respawn_penalty -= global_variant.unknown2C;
+			killing_player->respawn_penalty =
+				MAX(killing_player->respawn_penalty, 0);
+		}
+	}
+
+	if (!player_kill)
+		dead_player->respawn_timer += global_variant.unknown34;
+
+	dead_player->respawn_timer = MAX(dead_player->respawn_timer, 90);
+	dead_player = player_get(dead_player_index);
+
+	if (!dead_player->quit_out_of_game)
+	{
+		if (killing_player_index == NONE)
+		{
+			if (killing_object_index == NONE)
+				message = _game_engine_message_killed_by_unknown;
+			else
+			{
+				struct object_datum *object = object_get(killing_object_index);
+
+				unit_try_and_get(killing_object_index);
+				switch (object->object.type)
+				{
+				case _object_type_biped:
+					message = _game_engine_message_killed_by_biped;
+					break;
+				case _object_type_vehicle:
+					message = _game_engine_message_killed_by_vehicle;
+					break;
+				default:
+					message = _game_engine_message_killed_by_unknown;
+					break;
+				}
+			}
+		}
+		else if (killing_player_index == dead_player_index)
+			message = _game_engine_message_killed_by_self;
+		else
+			message =
+				_game_engine_message_killed_by_player + (friendly_fire != FALSE);
+
+		game_show_score_extended(
+			dead_player_index,
+			message,
+			killing_player_index);
+	}
+	else
+	{
+		struct data_iterator iterator;
+
+		data_iterator_new(&iterator, player_data);
+		while (data_iterator_next(&iterator))
+		{
+			multiplayer_message(
+				iterator.datum_index,
+				_game_engine_message_quit,
+				dead_player_index);
+		}
+	}
+
+	if (message == _game_engine_message_killed_by_friendly_fire)
+	{
+		if (killing_player_index != NONE)
+		{
+			multiplayer_message(
+				killing_player_index,
+				_game_engine_message_killed_friendly,
+				dead_player_index);
+		}
+		else
+		{
+			struct data_iterator iterator;
+
+			data_iterator_new(&iterator, player_data);
+			while (data_iterator_next(&iterator))
+			{
+				multiplayer_message(
+					iterator.datum_index,
+					_game_engine_message_killed_friendly,
+					dead_player_index);
+			}
+		}
+	}
+	else if (message == _game_engine_message_killed_by_player)
+	{
+		struct player_datum *killing_player =
+			player_get(killing_player_index);
+
+		if (killing_player->statistics.multiple_kills >=
+			_game_engine_message_killed_by_player)
+		{
+			message = _game_engine_message_multi_kill;
+		}
+		else if (killing_player->statistics.multiple_kills == 3)
+			message = _game_engine_message_triple_kill;
+		else if (killing_player->statistics.multiple_kills == 2)
+			message = _game_engine_message_double_kill;
+		else if (killing_player->statistics.kills_in_a_row == 5)
+			message = _game_engine_message_five_kills_in_row;
+		else
+		{
+			message = (killing_player->statistics.kills_in_a_row % 5)
+				? _game_engine_message_killed_enemy
+				: _game_engine_message_ten_kills_in_a_row;
+		}
+
+		game_show_score_extended(
+			killing_player_index,
+			message,
+			dead_player_index);
+	}
+
+	return;
+}
 
 void game_engine_update_non_deterministic(
 	real delta_seconds)
@@ -7177,6 +7473,86 @@ static long random_item(
 }
 
 
+void game_engine_update_item_spawn(
+	void)
+{
+	struct scenario *scenario = global_scenario_get();
+	short equipment_index;
+
+	for (equipment_index = 0;
+		equipment_index < scenario->netgame_equipment.count;
+		equipment_index++)
+	{
+		struct scenario_netgame_equipment *equipment =
+			TAG_BLOCK_GET_ELEMENT(
+				&scenario->netgame_equipment,
+				equipment_index,
+				struct scenario_netgame_equipment);
+		long game_type = NONE;
+
+		if (game_engine)
+			game_type = game_engine->type;
+
+		if (match_game_type(
+			game_type,
+			NUMBEROF(equipment->game_types),
+			equipment->game_types))
+		{
+			long respawn_period = 30 * TICKS_PER_SECOND;
+			short respawn_time = equipment->respawn_time;
+
+			if (respawn_time == 0)
+			{
+				if (equipment->item_collection_index != NONE)
+				{
+					struct item_collection_definition *item_collection =
+						item_collection_definition_get(
+							equipment->item_collection_index);
+
+					respawn_time = item_collection->respawn_time;
+					if (respawn_time != 0)
+						respawn_period = respawn_time * TICKS_PER_SECOND;
+				}
+			}
+			else
+			{
+				respawn_period = respawn_time * TICKS_PER_SECOND;
+			}
+
+			if (game_time_get() % respawn_period == 0)
+			{
+				long definition_index =
+					random_item(equipment->item_collection_index);
+				struct object_placement_data placement_data;
+				long object_index;
+
+				object_placement_data_new(
+					&placement_data,
+					definition_index,
+					NONE);
+				placement_data.position = equipment->position;
+				object_index = object_new(&placement_data);
+				if (object_index != NONE)
+				{
+					struct item_datum *item = item_get(object_index);
+
+					object_set_garbage(object_index, FALSE);
+					if (TEST_FLAG(
+						equipment->flags,
+						_equipment_created_at_rest_bit))
+					{
+						SET_FLAG(item->object.flags, _object_at_rest_bit, TRUE);
+					}
+					item->item.last_owned_time +=
+						respawn_period - 30 * TICKS_PER_SECOND;
+				}
+			}
+		}
+	}
+
+	return;
+}
+
 static void handle_custom_starting_equipment(
 	long unit_index,
 	long *fragmentation_grenade_count,
@@ -7393,6 +7769,260 @@ void game_engine_postspawn_player_update(
 
 
 
+
+boolean game_engine_get_state_message(
+	long player_index,
+	wchar_t *message,
+	long message_character_count)
+{
+	struct player_datum *player;
+	long state_message_parameter;
+	long state_message;
+	long respawn_timer;
+	boolean result = FALSE;
+
+	if (game_engine)
+	{
+		player = player_get(player_index);
+
+		if (player->state_message >= _game_engine_message_odd_man_out &&
+			player->state_message <=
+				_game_engine_message_waiting_for_space_to_clear)
+		{
+			player->state_message = NONE;
+		}
+
+		if (player->unit_index == NONE)
+		{
+			state_message_parameter = 0;
+			if (player->quit_out_of_game == TRUE)
+				state_message = _game_engine_message_player_quit_self;
+			else if (game_engine_player_is_out_of_lives(player_index))
+				state_message = _game_engine_message_out_of_lives;
+			else if (game_engine_player_is_odd_man_out(player_index))
+				state_message = _game_engine_message_odd_man_out;
+			else
+			{
+				respawn_timer = player->respawn_timer;
+				if (respawn_timer > 0)
+				{
+					state_message = _game_engine_message_respawn_timer;
+					state_message_parameter = respawn_timer / TICKS_PER_SECOND;
+				}
+				else
+					state_message =
+						_game_engine_message_waiting_for_space_to_clear;
+			}
+
+			result = multiplayer_message_internal(
+				player_index,
+				state_message,
+				state_message_parameter,
+				message,
+				message_character_count);
+		}
+		else if (game_time_get() < 15 * TICKS_PER_SECOND)
+		{
+			result = multiplayer_message_internal(
+				player_index,
+				_game_engine_message_press_back_for_score,
+				NONE,
+				message,
+				message_character_count);
+		}
+		else if (player->state_message != NONE)
+		{
+			result = multiplayer_message_internal(
+				player_index,
+				player->state_message,
+				player->state_message_player_index,
+				message,
+				message_character_count);
+		}
+	}
+
+	return result;
+}
+
+boolean game_engine_should_spawn_player(
+	long player_index)
+{
+	boolean should_spawn = FALSE;
+
+	if (game_engine)
+	{
+		struct player_datum *player = player_get(player_index);
+
+		should_spawn = TRUE;
+		if (player->quit_out_of_game == TRUE)
+		{
+			should_spawn = FALSE;
+		}
+		else if (player->statistics.deaths == 0)
+		{
+			if (game_time_get() > 3 &&
+				game_time_get() % 32 !=
+					DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index) % 32)
+			{
+				should_spawn = FALSE;
+			}
+		}
+		else if (game_engine_player_is_out_of_lives(player_index))
+		{
+			should_spawn = FALSE;
+		}
+		else if (game_engine_player_is_odd_man_out(player_index))
+		{
+			should_spawn = FALSE;
+		}
+		else if (game_engine_globals.postgame_state ==
+				_game_engine_postgame_state_rasterize ||
+			game_engine_globals.postgame_state ==
+				_game_engine_postgame_state_rasterize_delay)
+		{
+			should_spawn = FALSE;
+		}
+		else
+		{
+			long respawn_timer = player->respawn_timer;
+
+			if (respawn_timer > 0)
+			{
+				if (player->local_player_index != NONE)
+				{
+					if (respawn_timer == 90)
+					{
+						game_engine_play_multiplayer_sound(
+							_multiplayer_sound_countdown_for_respawn);
+					}
+					else if (respawn_timer == 60)
+					{
+						game_engine_play_multiplayer_sound(
+							_multiplayer_sound_countdown_for_respawn);
+					}
+					else if (respawn_timer == 30)
+					{
+						game_engine_play_multiplayer_sound(
+							_multiplayer_sound_countdown_for_respawn);
+					}
+					else if (respawn_timer == 1)
+					{
+						game_engine_play_multiplayer_sound(
+							_multiplayer_sound_respawn);
+					}
+				}
+
+				player->respawn_timer--;
+				should_spawn = player->respawn_timer == 0;
+			}
+
+			if (should_spawn &&
+				game_time_get() > 3 &&
+				game_time_get() % 32 !=
+					DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index) % 32)
+			{
+				should_spawn = FALSE;
+			}
+		}
+	}
+
+	return should_spawn;
+}
+
+struct game_engine_place game_engine_get_place(
+	long player_index,
+	enum get_score_type score_type)
+{
+	struct player_datum *player;
+	struct data_iterator iterator;
+	struct player_datum *other_player;
+	long score;
+	long group_count;
+	unsigned long team_mask;
+	boolean tied;
+	boolean all_tied;
+	struct game_engine_place result;
+
+	player = player_get(player_index);
+	all_tied = TRUE;
+	tied = FALSE;
+	group_count = 1;
+	result.place = 0;
+
+	if (game_engine->get_player_score)
+	{
+		team_mask = 0;
+		score = game_engine->get_player_score(player_index, score_type);
+		data_iterator_new(&iterator, player_data);
+		other_player = (struct player_datum *)data_iterator_next(&iterator);
+		while (other_player)
+		{
+			boolean different_player;
+
+			if (score_type == _get_score_team)
+			{
+				different_player =
+					other_player->team_index != player->team_index;
+			}
+			else
+				different_player = iterator.datum_index != player_index;
+
+			if (different_player)
+			{
+				if (score_type == _get_score_team)
+				{
+					unsigned long team_bit =
+						FLAG(other_player->team_index);
+
+					if (team_mask & team_bit)
+						goto next_player;
+
+					team_mask |= team_bit;
+				}
+
+				{
+					long other_score = game_engine->get_player_score(
+						iterator.datum_index,
+						score_type);
+
+					group_count++;
+					if (other_score != score)
+						all_tied = FALSE;
+
+					if (other_score > score)
+						result.place++;
+					else if (other_score == score)
+						tied = TRUE;
+				}
+			}
+
+next_player:
+			other_player =
+				(struct player_datum *)data_iterator_next(&iterator);
+		}
+
+		match_vassert(
+			"c:\\halo\\SOURCE\\game\\game_engine.c",
+			0x1377,
+			!all_tied || tied || group_count == 1,
+			"(!all_tied || (tied)) || (1 == group_count)");
+	}
+
+	result.flags = score_type != _get_score_team
+		? 0
+		: FLAG(_place_team);
+	SET_FLAG(result.flags, _place_tied, tied);
+	SET_FLAG(
+		result.flags,
+		_place_all_tied,
+		all_tied & tied);
+	SET_FLAG(
+		result.flags,
+		_place_two_groups,
+		group_count == 2);
+
+	return result;
+}
 
 static void netgame_verify_spawn_points(
 	short game_type,
