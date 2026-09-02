@@ -10,8 +10,8 @@ header included in hcex build.
 
 /* ---------- headers */
 
-#include "math/real_math.h"
 #include "memory/array.h"
+#include "math/real_math.h"
 
 /* ---------- constants */
 

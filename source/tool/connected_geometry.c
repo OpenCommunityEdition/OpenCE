@@ -32,47 +32,13 @@ symbols in this file:
 
 /* ---------- headers */
 
-#include "memory/array.h"
+#include "tool/connected_geometry.h"
 
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
-
-struct connected_geometry_point
-{
-	float x;
-	float y;
-	float z;
-};
-
-struct connected_geometry_plane
-{
-	struct connected_geometry_point normal;
-	float distance;
-};
-
-struct connected_geometry_edge
-{
-	struct dynamic_array triangle_indices;
-	long point_indices[2];
-	long unused[2];
-};
-
-struct connected_geometry_triangle
-{
-	long edge_designators[3];
-	long coplanar_group_index;
-	long unused[2];
-};
-
-struct connected_geometry
-{
-	struct dynamic_array points;
-	struct dynamic_array edges;
-	struct dynamic_array triangles;
-};
 
 struct intermediate_geometry_triangle
 {
@@ -84,7 +50,7 @@ struct intermediate_geometry_triangle
 struct intermediate_geometry_vertex
 {
 	long unused_before_point[2];
-	struct connected_geometry_point point;
+	real_point3d point;
 	long unused_after_point[15];
 };
 
@@ -104,9 +70,9 @@ typedef boolean (*connected_geometry_group_predicate)(
 typedef char connected_geometry_dynamic_array_size_assert[
 	sizeof(struct dynamic_array) == 0xC ? 1 : -1];
 typedef char connected_geometry_point_size_assert[
-	sizeof(struct connected_geometry_point) == 0xC ? 1 : -1];
+	sizeof(real_point3d) == 0xC ? 1 : -1];
 typedef char connected_geometry_plane_size_assert[
-	sizeof(struct connected_geometry_plane) == 0x10 ? 1 : -1];
+	sizeof(real_plane3d) == 0x10 ? 1 : -1];
 typedef char connected_geometry_edge_size_assert[
 	sizeof(struct connected_geometry_edge) == 0x1C ? 1 : -1];
 typedef char connected_geometry_edge_point_indices_offset_assert[
@@ -134,23 +100,6 @@ typedef char intermediate_geometry_vertices_offset_assert[
 
 /* ---------- prototypes */
 
-long connected_geometry_add_triangle(
-	struct connected_geometry *geometry,
-	struct connected_geometry_point const *point0,
-	struct connected_geometry_point const *point1,
-	struct connected_geometry_point const *point2,
-	boolean report_duplicates);
-struct connected_geometry_plane *plane3d_from_points(
-	struct connected_geometry_plane *plane,
-	struct connected_geometry_point const *point0,
-	struct connected_geometry_point const *point1,
-	struct connected_geometry_point const *point2);
-boolean triangle_coplanar(
-	void *predicate_data,
-	struct connected_geometry *geometry,
-	struct connected_geometry_triangle *triangle,
-	long group_index);
-
 /* ---------- globals */
 
 /* ---------- public code */
@@ -158,7 +107,7 @@ boolean triangle_coplanar(
 void connected_geometry_new(
 	struct connected_geometry *geometry)
 {
-	dynamic_array_new(&geometry->points, sizeof(struct connected_geometry_point));
+	dynamic_array_new(&geometry->points, sizeof(real_point3d));
 	dynamic_array_new(&geometry->edges, sizeof(struct connected_geometry_edge));
 	dynamic_array_new(&geometry->triangles, sizeof(struct connected_geometry_triangle));
 
@@ -251,6 +200,73 @@ void connected_geometry_group_recursive(
 	return;
 }
 
+static boolean triangle_coplanar(
+	void *predicate_data,
+	struct connected_geometry *geometry,
+	struct connected_geometry_triangle *triangle,
+	long group_index)
+{
+	real_plane3d *plane = predicate_data;
+	real_point3d *point0 = dynamic_array_get_element(
+		&geometry->points,
+		((struct connected_geometry_edge *)dynamic_array_get_element(
+			&geometry->edges,
+			triangle->edge_designators[0] & LONG_MAX,
+			sizeof(struct connected_geometry_edge)))->point_indices[
+				(triangle->edge_designators[0] & LONG_MIN) != 0],
+		sizeof(real_point3d));
+	real_point3d *point1 = dynamic_array_get_element(
+		&geometry->points,
+		((struct connected_geometry_edge *)dynamic_array_get_element(
+			&geometry->edges,
+			triangle->edge_designators[1] & LONG_MAX,
+			sizeof(struct connected_geometry_edge)))->point_indices[
+				(triangle->edge_designators[1] & LONG_MIN) != 0],
+		sizeof(real_point3d));
+	real_point3d *point2 = dynamic_array_get_element(
+		&geometry->points,
+		((struct connected_geometry_edge *)dynamic_array_get_element(
+			&geometry->edges,
+			triangle->edge_designators[2] & LONG_MAX,
+			sizeof(struct connected_geometry_edge)))->point_indices[
+				(triangle->edge_designators[2] & LONG_MIN) != 0],
+		 sizeof(real_point3d));
+	real_plane3d triangle_plane;
+	real point_distance;
+	real point_product;
+	real facing;
+
+	if (fabs(
+		point0->y*plane->n.j +
+		point0->z*plane->n.k +
+		point0->x*plane->n.i -
+		plane->d) < 0.01f &&
+		fabs(
+			point1->y*plane->n.j +
+			point1->z*plane->n.k +
+			point1->x*plane->n.i -
+			plane->d) < 0.01f)
+	{
+		point_distance = point2->y*plane->n.j;
+		point_distance += point2->z*plane->n.k;
+		point_product = point2->x*plane->n.i;
+		point_distance += point_product;
+		if (fabs(point_distance - plane->d) < 0.01f &&
+			plane3d_from_points(&triangle_plane, point0, point2, point1) != NULL)
+		{
+			facing = triangle_plane.n.i*plane->n.i;
+			facing += triangle_plane.n.k*plane->n.k;
+			facing += triangle_plane.n.j*plane->n.j;
+			if (facing > 0.0f)
+			{
+				return TRUE;
+			}
+		}
+	}
+
+	return FALSE;
+}
+
 void connected_geometry_add_intermediate_triangle(
 	struct connected_geometry *geometry,
 	struct intermediate_geometry *intermediate_geometry,
@@ -289,7 +305,7 @@ long connected_geometry_group_coplanar(
 	struct connected_geometry_triangle *triangle;
 	long group_count;
 	long triangle_index;
-	struct connected_geometry_plane plane;
+	real_plane3d plane;
 
 	group_count = 0;
 	triangle_index = 0;
@@ -311,7 +327,7 @@ long connected_geometry_group_coplanar(
 						triangle->edge_designators[0] & LONG_MAX,
 						sizeof(struct connected_geometry_edge)))->point_indices[
 							(triangle->edge_designators[0] & LONG_MIN) != 0],
-					sizeof(struct connected_geometry_point)),
+					sizeof(real_point3d)),
 				dynamic_array_get_element(
 					&geometry->points,
 					((struct connected_geometry_edge *)dynamic_array_get_element(
@@ -319,7 +335,7 @@ long connected_geometry_group_coplanar(
 						triangle->edge_designators[2] & LONG_MAX,
 						sizeof(struct connected_geometry_edge)))->point_indices[
 							(triangle->edge_designators[2] & LONG_MIN) != 0],
-					sizeof(struct connected_geometry_point)),
+					sizeof(real_point3d)),
 				dynamic_array_get_element(
 					&geometry->points,
 					((struct connected_geometry_edge *)dynamic_array_get_element(
@@ -327,7 +343,7 @@ long connected_geometry_group_coplanar(
 						triangle->edge_designators[1] & LONG_MAX,
 						sizeof(struct connected_geometry_edge)))->point_indices[
 							(triangle->edge_designators[1] & LONG_MIN) != 0],
-					sizeof(struct connected_geometry_point)));
+					sizeof(real_point3d)));
 			if (triangle->coplanar_group_index == NONE)
 			{
 				connected_geometry_group_recursive(

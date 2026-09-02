@@ -990,6 +990,25 @@
       }
     },
     {
+      "unit": "source/tool/connected_geometry",
+      "function": "_triangle_coplanar",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked under the current house rule after recovering the natural typed C predicate from the independently corroborating Stian reconstruction and HCEA geometry types, then preserving January's authenticated y+z+x dot-product topology. Target and candidate have the same 384-byte padded envelope, 11 relocation destinations and addresses, and 151 decoded instructions. The sole remaining difference is one dependency-free x87 operand choice at target offsets +0x11D/+0x11F: January loads point2.x and multiplies by plane.n.i, while VC7 loads plane.n.i and multiplies by point2.x. Sequential accumulation closes the later dot-product schedule exactly. Measured inert or inferior: reversing the point2.x expression operands, reversing the final product operands, explicit final grouping, k+i+j grouping, sequential point2 accumulation, and a named point-product temporary. The retained source uses real_point3d/real_plane3d, typed dynamic-array records, authenticated private symbol and enum-independent bit tests; it contains no assembly, volatile access, fake dependency, raw address name, undefined offset access, or nonsensical control flow. Reopen only for authoritative January source/local records or a natural same-compiler x87 scheduling donor.",
+      "measurements": {
+        "target": {
+          "size": 384,
+          "relocation_count": 11,
+          "normalized_sha256": "02acd868e062aee29df8e260c3fbd62221e3f2ced5e5f43573a1a288e6129d54"
+        },
+        "base": {
+          "size": 384,
+          "relocation_count": 11,
+          "normalized_sha256": "4a01cf6dc779006e22869160f05e1640de65f3f9559f720f03f2ab716e7eff99"
+        },
+        "objdiff_percent": 99.87755
+      }
+    },
+    {
       "unit": "source/rasterizer/rasterizer_geometry",
       "function": "_uncompress_int32_to_real_vector3d",
       "class": "instruction-scheduling",

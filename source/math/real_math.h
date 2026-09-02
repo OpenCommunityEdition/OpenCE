@@ -1238,24 +1238,22 @@ __inline real_plane3d *plane3d_from_points(
 	real_point3d const *point1,
 	real_point3d const *point2)
 {
-	real_vector3d v0;
-	real_vector3d v1;
+	real_vector3d vector0;
+	real_vector3d vector1;
 
-	vector_from_points3d(point0, point1, &v0);
-	vector_from_points3d(point0, point2, &v1);
+	vector_from_points3d(point0, point1, &vector0);
+	vector_from_points3d(point0, point2, &vector1);
+	cross_product3d(&vector0, &vector1, &plane->n);
 
-	cross_product3d(&v0, &v1, &plane->n);
-
-	if (normalize3d(&plane->n) == 0.0f)
-	{
-		plane->d = 0.0f;
-	}
-	else
+	if (normalize3d(&plane->n) != 0.0f)
 	{
 		plane->d = dot_product3d((real_vector3d *)point0, &plane->n);
+		return plane;
 	}
 
-	return plane;
+	plane->d = 0.0f;
+
+	return NULL;
 }
 
 __inline real_plane3d *plane3d_negate(
