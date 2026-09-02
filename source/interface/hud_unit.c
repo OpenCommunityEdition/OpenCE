@@ -11,7 +11,7 @@ symbols in this file:
 000C65C0 0040:
 	_code_000c65c0 (0000)
 000C6600 0070:
-	_code_000c6600 (0000)
+	_get_hud_state (0000)
 000C6670 0040:
 	_hud_initialize_unit_interface (0000)
 000C66B0 00f0:
@@ -37,7 +37,7 @@ symbols in this file:
 000C6B00 0080:
 	_hud_fix_unit_data (0000)
 000C6B80 0220:
-	_code_000c6b80 (0000)
+	_hud_update_unit_local_player (0000)
 000C6DA0 02b0:
 	_hud_render_damage_indicators (0000)
 000C7050 0040:
@@ -67,6 +67,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "game/players.h"
 #include "interface/hud_unit.h"
 #include "saved games/game_state.h"
 
@@ -132,6 +133,9 @@ typedef char unit_hud_globals_size_assert[
 
 /* ---------- prototypes */
 
+static struct unit_hud_state *get_hud_state(
+	short local_player_index);
+
 /* ---------- globals */
 
 extern struct unit_hud_globals *bss_00453ac0;
@@ -155,6 +159,26 @@ void unit_hud_shield_meter_mapper_init(
 {
 	return;
 }
+
+/* ---------- private code */
+
+static struct unit_hud_state *get_hud_state(
+	short local_player_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\hud_unit.c",
+		0x106,
+		local_player_index>=0 &&
+			local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\hud_unit.c",
+		0x107,
+		unit_hud_globals);
+
+	return &unit_hud_globals->hud_states[local_player_index];
+}
+
+/* ---------- public code */
 
 void hud_initialize_unit_interface(
 	void)
@@ -296,6 +320,18 @@ void scripted_hud_blink_motion_sensor(
 		UNIT_HUD_GLOBALS->script_flags,
 		_hud_panel_motion_sensor_blink_bit,
 		blink);
+
+	return;
+}
+
+void hud_tick_shield(
+	long player_index,
+	real amount)
+{
+	short local_player_index = player_get(player_index)->local_player_index;
+
+	if (local_player_index != NONE)
+		get_hud_state(local_player_index)->last_shield_vitality -= amount;
 
 	return;
 }

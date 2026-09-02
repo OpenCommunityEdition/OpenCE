@@ -27,5 +27,8 @@ void hud_render_damage_indicators(
 void hud_play_unit_sounds(
 	struct player_datum const *player,
 	boolean show_hud);
+void hud_tick_shield(
+	long player_index,
+	real amount);
 
 #endif // __HUD_UNIT_H
