@@ -143,3 +143,32 @@ only object delta is compiler type information in `.debug$S`, expected from
 replacing the generic buffer description with the recovered union; it receives
 no runtime matching credit. The 1,366/2,004 strict target-owned data-byte result
 is unchanged.
+
+## Typed initialization follow-up (2026-09-02)
+
+The January `_player_ui_initialize` body is now reconstructed from three
+independent evidence layers: its 52-instruction target section, the October
+2276 Xbox `player_ui_initialize` lift, and the CEA/PDB player-profile member
+names. The retained source clears the `0x230`-byte runtime prefix, initializes
+four `0x38`-byte local-player records, preserves the target's `profile`
+assertion at source line `0x369`, seeds the profile/controller sentinels, and
+marks the UI globals initialized. It uses the recovered profile and controller
+member names rather than raw byte offsets.
+
+The function is strict exact at 152 meaningful / 160 padded bytes with 12
+relocations and normalized SHA-256
+`2134ac102d60728a290f2e3e4809764fb49912cfaad568ec4f71ea417f4f692b`.
+Target and candidate agree instruction-for-instruction and on every relocation
+address, type, destination, and addend. The object frontier therefore moves
+from 31 exact / 0 residual / 11 unwritten to 32 exact / 0 residual / 10
+unwritten, and from 2,144 to 2,304 strict padded code bytes.
+
+The same evidence authenticates the compact profile prefix (`name`, primary
+color, profile flags, ten solo-level flags, last solo level, and the eight
+controller-setting bytes) and the post-edit `initialized` byte. Refactoring
+the TU-private layout to those semantic members preserves all 31 previously
+exact functions. `player_ui.h` now owns the public initialization prototype;
+its only two current consumers were separately gated and remain unchanged at
+54/70 exact (`players.obj`) and 12/12 exact (`player_rumble.obj`). The focused
+fake-match scan reports zero review leads, `git diff --check` passes, and the
+tool test suite passes 255/255.

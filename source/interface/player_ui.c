@@ -163,28 +163,29 @@ enum
 
 /* ---------- structures */
 
-struct player_ui_local_player
-{
-	byte unknown0[0x1c];
-	byte solo_levels[10];
-	short last_single_player_level;
-	byte unknown28;
-	byte joystick_set;
-	byte unknown2A;
-	boolean look_pitch_inverted;
-	boolean rumble_disabled;
-	byte unknown2D;
-	boolean autolevel;
-	byte unknown2F;
-	long active_profile_index;
-	boolean autojoin_next_multiplayer_game;
-	byte unknown35[3];
-};
-
 struct player_profile
 {
 	wchar_t name[12];
-	byte unknown18[0x18];
+	short primary_color_index;
+	word flags;
+	byte solo_levels[10];
+	short last_single_player_level;
+	byte button_preset;
+	byte joystick_preset;
+	byte look_sensitivity;
+	boolean invert_look;
+	boolean vibration_disabled;
+	boolean flight_stick_aircraft_controls;
+	boolean autocenter;
+	boolean ingame_help_disabled;
+};
+
+struct player_ui_local_player
+{
+	struct player_profile profile;
+	long active_profile_index;
+	boolean prejoined_multiplayer;
+	byte unknown35[3];
 };
 
 struct playlist_profile
@@ -203,7 +204,6 @@ struct player_ui_edit_profile
 {
 	union player_ui_edit_profile_data current;
 	union player_ui_edit_profile_data original;
-	byte unknownD0[4];
 };
 
 struct player_ui_globals
@@ -216,6 +216,8 @@ struct player_ui_globals
 	byte unknown155[3];
 	long edit_profile_index;
 	struct player_ui_edit_profile edit_profile;
+	boolean initialized;
+	byte unknown22D[3];
 	char player1_last_used_profile_directory[0x100];
 };
 
@@ -224,7 +226,7 @@ typedef char player_profile_size_assert[
 typedef char playlist_profile_size_assert[
 	sizeof(struct playlist_profile) == 0x68 ? 1 : -1];
 typedef char player_ui_edit_profile_size_assert[
-	sizeof(struct player_ui_edit_profile) == 0xD4 ? 1 : -1];
+	sizeof(struct player_ui_edit_profile) == 0xD0 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -270,6 +272,29 @@ void player_ui_dispose(
 	return;
 }
 
+void player_ui_initialize(
+	void)
+{
+	long local_player_index;
+	struct player_profile *profile;
+
+	csmemset(&player_ui_globals, 0, PLAYER_UI_DISPOSE_SIZE);
+	for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
+	{
+		profile = &player_ui_globals.local_players[(short)local_player_index].profile;
+		match_vassert("c:\\halo\\SOURCE\\interface\\player_ui.c", 0x369, profile, "profile");
+		csmemset(profile, 0, sizeof(*profile));
+		profile->primary_color_index = NONE;
+		profile->button_preset = 0;
+		profile->joystick_preset = 0;
+		player_ui_globals.local_players[(short)local_player_index].active_profile_index = NONE;
+		player_ui_globals.single_player_controller[(short)local_player_index] = NONE;
+	}
+	player_ui_globals.edit_profile_index = NONE;
+	player_ui_globals.initialized = TRUE;
+	return;
+}
+
 void player_ui_reset_single_player_local_player_controllers(
 	void)
 {
@@ -301,10 +326,10 @@ short player_ui_get_single_player_local_player_from_controller(
 void player_ui_autojoin_players_to_next_multiplayer_game(
 	void)
 {
-	player_ui_globals.local_players[0].autojoin_next_multiplayer_game = player_ui_globals.multiplayer_autojoin[0];
-	player_ui_globals.local_players[1].autojoin_next_multiplayer_game = player_ui_globals.multiplayer_autojoin[1];
-	player_ui_globals.local_players[2].autojoin_next_multiplayer_game = player_ui_globals.multiplayer_autojoin[2];
-	player_ui_globals.local_players[3].autojoin_next_multiplayer_game = player_ui_globals.multiplayer_autojoin[3];
+	player_ui_globals.local_players[0].prejoined_multiplayer = player_ui_globals.multiplayer_autojoin[0];
+	player_ui_globals.local_players[1].prejoined_multiplayer = player_ui_globals.multiplayer_autojoin[1];
+	player_ui_globals.local_players[2].prejoined_multiplayer = player_ui_globals.multiplayer_autojoin[2];
+	player_ui_globals.local_players[3].prejoined_multiplayer = player_ui_globals.multiplayer_autojoin[3];
 	return;
 }
 
@@ -357,14 +382,14 @@ struct playlist_profile *player_ui_get_edit_playlist_profile(
 boolean player0_look_pitch_is_inverted(
 	void)
 {
-	return player_ui_globals.local_players[0].look_pitch_inverted;
+	return player_ui_globals.local_players[0].profile.invert_look;
 }
 
 boolean player0_joystick_set_is_normal(
 	void)
 {
-	return player_ui_globals.local_players[0].joystick_set == 0 ||
-		player_ui_globals.local_players[0].joystick_set == 1;
+	return player_ui_globals.local_players[0].profile.joystick_preset == 0 ||
+		player_ui_globals.local_players[0].profile.joystick_preset == 1;
 }
 
 void player_ui_end_editing_profile(
@@ -379,7 +404,7 @@ boolean player_ui_local_player_wants_to_play_multiplayer(
 {
 	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 167, (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
 
-	return player_ui_globals.local_players[local_player_index].autojoin_next_multiplayer_game;
+	return player_ui_globals.local_players[local_player_index].prejoined_multiplayer;
 }
 
 void player_ui_clear_multiplayer_autojoin_for_local_player(
@@ -387,7 +412,7 @@ void player_ui_clear_multiplayer_autojoin_for_local_player(
 {
 	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 175, (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
 
-	player_ui_globals.local_players[local_player_index].autojoin_next_multiplayer_game = FALSE;
+	player_ui_globals.local_players[local_player_index].prejoined_multiplayer = FALSE;
 	return;
 }
 
@@ -396,7 +421,7 @@ short player_ui_get_last_single_player_level_played(
 {
 	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 265, (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
 
-	return player_ui_globals.local_players[local_player_index].last_single_player_level;
+	return player_ui_globals.local_players[local_player_index].profile.last_single_player_level;
 }
 
 short player_ui_get_single_player_local_player_controller(
@@ -414,7 +439,7 @@ void player_ui_local_player_joined_multiplayer_game(
 {
 	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 157, (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
 
-	player_ui_globals.local_players[local_player_index].autojoin_next_multiplayer_game = TRUE;
+	player_ui_globals.local_players[local_player_index].prejoined_multiplayer = TRUE;
 	player_ui_globals.multiplayer_autojoin[local_player_index] = TRUE;
 	return;
 }
@@ -427,7 +452,7 @@ boolean player_ui_rumble_disabled(
 
 	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 305, (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
 
-	return player_ui_globals.local_players[local_player_index].rumble_disabled;
+	return player_ui_globals.local_players[local_player_index].profile.vibration_disabled;
 }
 
 boolean player_ui_get_path_to_local_player_profile_directory(
@@ -447,7 +472,7 @@ void player_ui_get_active_player_profile(
 {
 	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 238, (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS) && (profile != NULL));
 
-	csmemcpy(profile, &player_ui_globals.local_players[local_player_index], 0x30);
+	csmemcpy(profile, &player_ui_globals.local_players[local_player_index].profile, 0x30);
 	return;
 }
 
@@ -459,14 +484,14 @@ void player_ui_activate_all_solo_levels(
 	level_index = 0;
 	do
 	{
-		player_ui_globals.local_players[0].solo_levels[level_index] |= 0xf;
+		player_ui_globals.local_players[0].profile.solo_levels[level_index] |= 0xf;
 	}
 	while (++level_index < 10);
 
 	if (player_ui_globals.local_players[0].active_profile_index != NONE)
 		player_profile_save(
 			player_ui_globals.local_players[0].active_profile_index,
-			&player_ui_globals.local_players[0]);
+			&player_ui_globals.local_players[0].profile);
 	return;
 }
 
@@ -630,7 +655,7 @@ boolean player_ui_autolevel_enabled(
 
 	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 340, (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
 
-	return player_ui_globals.local_players[local_player_index].autolevel;
+	return player_ui_globals.local_players[local_player_index].profile.autocenter;
 }
 
 boolean player_ui_edit_profile_name_is_dirty(
