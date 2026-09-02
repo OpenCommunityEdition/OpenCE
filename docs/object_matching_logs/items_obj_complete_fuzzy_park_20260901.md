@@ -15,7 +15,8 @@ the exact target size, stack frame, and relocation inventory.
 - Retained candidate: 2,352 padded bytes, 110 ordered relocations, normalized
   SHA-256
   `3daa5a96ffd38c2e133967126ca722610b145121e9690eb92a76f5a026b736f5`.
-- Objdiff score: 95.414246%.
+- External objdiff score: 95.414246%; the campaign report's validator metric
+  is 86.30959%.
 - Strict gain: zero functions and zero padded bytes.
 - Parked scope: one complete function and 2,352 padded bytes. The strict
   progress reporter correctly reserves matched-byte and matched-object credit,
