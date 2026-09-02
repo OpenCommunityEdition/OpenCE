@@ -493,8 +493,6 @@ void players_initialize(
 		sizeof(players_globals->local_players));
 	players_globals->unknown0 = NONE;
 	players_globals->local_player_count = 0;
-	players_globals->local_player_triggered_switch =
-		_local_player_triggered_switch_none;
 
 	player_control_initialize();
 
@@ -522,8 +520,6 @@ void players_initialize_for_new_map(
 	players_globals->double_speed_ticks = 0;
 	players_globals->all_dead = FALSE;
 	players_globals->pending_teleport_starting_location_index = NONE;
-	players_globals->local_player_triggered_switch =
-		_local_player_triggered_switch_none;
 	players_globals->respawn_failure = 0;
 	data_make_valid(player_data);
 	data_make_valid(team_data);
