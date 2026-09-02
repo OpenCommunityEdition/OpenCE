@@ -253,3 +253,24 @@ exact / 3 residual, `player_ui.obj` is 34 exact / 0 residual / 8 unwritten,
 `player_rumble.obj` is 12/12 exact. The focused Ninja build and all 255 tool
 tests pass. Existing partial-layout pointer warnings in the UI consumer are
 unchanged and do not affect its exact object output.
+
+## Private edit-reset name evidence and emission blocker (2026-09-02)
+
+Cross-build map and PDB evidence authenticates January `000D0800` as
+`clear_profile_edit_data`. September 2001 map builds place that private helper
+immediately after `set_local_player_controls_from_player_profile`, and its body
+matches the January leaf exactly: it sets `edit_profile_index` to `NONE` and
+returns. HCEX PDB metadata additionally records the function as private
+(`static`) and `WasInlined=true`.
+
+The semantic rename is intentionally not admitted yet. In the current partial
+translation unit, declaring the helper `static` makes the January VC7 compiler
+omit its otherwise-unreferenced out-of-line body, reducing the object from 34
+to 33 exact functions. Retaining external linkage, adding a synthetic address
+anchor, or inventing a call would preserve bytes for the wrong reason and is
+forbidden by the campaign's source-admission rules. The inherited exact
+`code_000d0800` spelling therefore remains temporarily in source and symbol
+configuration. Rename it only when an authenticated live caller has been
+reconstructed and naturally causes the private out-of-line copy to be emitted.
+The restored object remains 34 exact / 0 residual / 8 unwritten, including the
+16-byte leaf itself.
