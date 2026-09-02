@@ -1165,10 +1165,6 @@ boolean network_game_client_add_player(
 void network_event(
 	char *format,
 	...);
-boolean player_ui_edit_profile_is_dirty(
-	void);
-boolean player_ui_save_profile(
-	void);
 void ui_widget_delete(
 	struct widget_instance *widget);
 void player_profiles_enumerate_available_to_local_player_index(
@@ -1216,10 +1212,6 @@ void *ui_widget_realloc(
 long player_profile_number_of_available_primary_colors(
 	void);
 boolean player_profile_get(
-	long profile_index,
-	void *profile);
-void player_ui_set_active_player_profile(
-	short controller_index,
 	long profile_index,
 	void *profile);
 

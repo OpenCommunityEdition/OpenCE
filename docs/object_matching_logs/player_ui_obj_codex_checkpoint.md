@@ -234,3 +234,22 @@ The repair preserves `ui_widget_event_handler_functions.obj` at 100/100 exact,
 `hs.obj` at 445 exact / 3 residual, `player_ui.obj` at 34 exact / 0 residual /
 8 unwritten, `players.obj` at 54 exact / 15 residual / 1 unwritten, and
 `player_rumble.obj` at 12/12 exact.
+
+The remaining three event-handler declarations are now owned by
+`player_ui.h` as well. January disassembly and the independent Xbox lift both
+identify `player_ui_edit_profile_is_dirty` and `player_ui_save_profile` as
+no-argument boolean functions. They also agree that
+`player_ui_set_active_player_profile` takes a signed 16-bit local-player
+index, a 32-bit profile index, and a typed `struct player_profile *`; the
+header already owned the corresponding semantic forward declaration. The
+consumer's stale `void *` spelling and its other two local declarations were
+removed. A repository survey finds no remaining consumer-local declarations
+of these functions.
+
+The affected-header blast-radius gates remain unchanged:
+`ui_widget_event_handler_functions.obj` is 100/100 exact, `hs.obj` is 445
+exact / 3 residual, `player_ui.obj` is 34 exact / 0 residual / 8 unwritten,
+`players.obj` is 54 exact / 15 residual / 1 unwritten, and
+`player_rumble.obj` is 12/12 exact. The focused Ninja build and all 255 tool
+tests pass. Existing partial-layout pointer warnings in the UI consumer are
+unchanged and do not affect its exact object output.

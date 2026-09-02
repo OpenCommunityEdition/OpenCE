@@ -46,6 +46,10 @@ struct player_profile *player_ui_get_edit_player_profile(
 	void);
 struct playlist_profile *player_ui_get_edit_playlist_profile(
 	void);
+boolean player_ui_edit_profile_is_dirty(
+	void);
+boolean player_ui_save_profile(
+	void);
 boolean player0_look_pitch_is_inverted(
 	void);
 boolean player0_joystick_set_is_normal(
@@ -89,6 +93,10 @@ void player_ui_remember_player1_profile(
 	boolean save);
 void player_ui_begin_editing_profile(
 	long profile_index);
+void player_ui_set_active_player_profile(
+	short local_player_index,
+	long profile_index,
+	struct player_profile *profile);
 boolean player_ui_autolevel_enabled(
 	short controller_index);
 boolean player_ui_edit_profile_name_is_dirty(
