@@ -3,77 +3,77 @@ GAME_ENGINE_RACE.C
 
 symbols in this file:
 000A27A0 0010:
-	_code_000a27a0 (0000)
+	_race_engine_dispose (0000)
 000A27B0 0080:
-	_code_000a27b0 (0000)
+	_delete_race_vehicles (0000)
 000A2830 00f0:
-	_code_000a2830 (0000)
+	_race_get_vehicle_to_spawn (0000)
 000A2920 0090:
 	_race_flags_make_unique (0000)
 000A29B0 0010:
-	_code_000a29b0 (0000)
+	_race_engine_dispose_from_old_map (0000)
 000A29C0 0030:
-	_code_000a29c0 (0000)
+	_race_engine_player_added (0000)
 000A29F0 0010:
-	_code_000a29f0 (0000)
+	_race_engine_game_ending (0000)
 000A2A00 0010:
-	_code_000a2a00 (0000)
+	_race_engine_game_starting (0000)
 000A2A10 0010:
-	_code_000a2a10 (0000)
+	_race_engine_statistics_append (0000)
 000A2A20 0010:
-	_code_000a2a20 (0000)
+	_race_engine_handle_client_message (0000)
 000A2A30 0010:
-	_code_000a2a30 (0000)
+	_race_engine_handle_server_message (0000)
 000A2A40 0010:
-	_code_000a2a40 (0000)
+	_race_engine_pregame_post_rasterize (0000)
 000A2A50 0010:
-	_code_000a2a50 (0000)
+	_race_engine_post_rasterize (0000)
 000A2A60 0190:
-	_code_000a2a60 (0000)
+	_race_complete_lap (0000)
 000A2BF0 0120:
-	_code_000a2bf0 (0000)
+	_can_touch_team (0000)
 000A2D10 0010:
-	_code_000a2d10 (0000)
+	_race_engine_weapon_update (0000)
 000A2D20 0090:
-	_code_000a2d20 (0000)
+	_race_team_can_win_game (0000)
 000A2DB0 00e0:
-	_code_000a2db0 (0000)
+	_build_player_speeds (0000)
 000A2E90 0010:
-	_code_000a2e90 (0000)
+	_race_engine_player_damaged_player (0000)
 000A2EA0 0010:
-	_code_000a2ea0 (0000)
+	_race_engine_player_killed_player (0000)
 000A2EB0 0480:
-	_code_000a2eb0 (0000)
+	_race_engine_display_score (0000)
 000A3330 0010:
-	_code_000a3330 (0000)
+	_race_engine_prespawn_player_update (0000)
 000A3340 0060:
-	_code_000a3340 (0000)
+	_race_goal_matches_player (0000)
 000A33A0 0020:
-	_code_000a33a0 (0000)
+	_count_bits_32 (0000)
 000A33C0 00e0:
-	_code_000a33c0 (0000)
+	_race_engine_get_score (0000)
 000A34A0 0040:
-	_code_000a34a0 (0000)
+	_race_get_score_string (0000)
 000A34E0 0070:
-	_code_000a34e0 (0000)
+	_race_get_score_header_string (0000)
 000A3550 0030:
-	_code_000a3550 (0000)
+	_race_get_team_score_string (0000)
 000A3580 00b0:
-	_code_000a3580 (0000)
+	_race_engine_did_player_win (0000)
 000A3630 00e0:
-	_code_000a3630 (0000)
+	_find_closest_vehicle (0000)
 000A3710 0130:
-	_code_000a3710 (0000)
+	_spawn_race_vehicles (0000)
 000A3840 00f0:
-	_code_000a3840 (0000)
+	_new_rally_flag (0000)
 000A3930 0150:
-	_code_000a3930 (0000)
+	_race_touch_flag (0000)
 000A3A80 00a0:
-	_code_000a3a80 (0000)
+	_race_engine_player_update (0000)
 000A3B20 00c0:
-	_code_000a3b20 (0000)
+	_race_engine_update (0000)
 000A3BE0 0110:
-	_code_000a3be0 (0000)
+	_race_engine_initialize_for_new_map (0000)
 0025BFD4 0027:
 	??_C@_0CH@MLHAJCND@c?3?2halo?2SOURCE?2game?2game_engine_@ (0000)
 0025BFFC 0019:
@@ -97,14 +97,14 @@ symbols in this file:
 002DE5E8 0088:
 	_race_engine (0000)
 0043ECB0 00d0:
-	_bss_0043ecb0 (0000)
+	_race_globals (0000)
 */
 
 /* ---------- headers */
 
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
-#include "game_engine.h"
+#include "game_engine_race.h"
 #include "game_globals.h"
 #include "players.h"
 #include "objects/objects.h"
@@ -182,6 +182,11 @@ enum
 
 /* ---------- macros */
 
+#define race_variant_laps_to_win unknown40
+#define race_variant_vehicles unknown48
+#define race_variant_race_type unknown4C.value
+#define race_variant_team_scoring unknown50
+
 /* ---------- structures */
 
 struct scenario_netgame_flag
@@ -203,7 +208,7 @@ struct race_globals
 	long lap_bit_vector[MULTIPLAYER_MAXIMUM_PLAYERS];
 	long rally_flag;
 	long team_laps[MULTIPLAYER_MAXIMUM_PLAYERS];
-	long unknownC8;
+	long persistent_team_score;
 	boolean vehicles_have_been_added;
 	byte padCD[3];
 };
@@ -233,7 +238,7 @@ static boolean race_team_can_win_game(
 	long team_index);
 static void build_player_speeds(
 	void);
-static long count_bits(
+static long count_bits_32(
 	unsigned long flags);
 static long find_closest_vehicle(
 	real_point3d const *point,
@@ -246,11 +251,11 @@ static void spawn_race_vehicles(
 
 extern long timeout_for_endgame_sound;
 
-static struct race_globals race_globals = { 0 };
+struct race_globals race_globals = { 0 };
 
 /* ---------- public code */
 
-void code_000a27a0(
+void race_engine_dispose(
 	void)
 {
 	return;
@@ -301,7 +306,7 @@ static long race_get_vehicle_to_spawn(
 		struct game_globals_vehicle);
 	long vehicle_definition_index = NONE;
 
-	switch (game_engine_get_variant()->unknown48)
+	switch (game_engine_get_variant()->race_variant_vehicles)
 	{
 	case _game_engine_vehicles_default:
 		if (vehicle_number == 0)
@@ -371,13 +376,13 @@ void race_flags_make_unique(
 	return;
 }
 
-void code_000a29b0(
+void race_engine_dispose_from_old_map(
 	void)
 {
 	return;
 }
 
-void code_000a29c0(
+void race_engine_player_added(
 	long player_index)
 {
 	player_get(player_index)->multiplayer_special = 0;
@@ -385,43 +390,43 @@ void code_000a29c0(
 	return;
 }
 
-void code_000a29f0(
+void race_engine_game_ending(
 	void)
 {
 	return;
 }
 
-void code_000a2a00(
+void race_engine_game_starting(
 	void)
 {
 	return;
 }
 
-void code_000a2a10(
+void race_engine_statistics_append(
+	long statistic)
+{
+	return;
+}
+
+void race_engine_handle_client_message(
+	void *message)
+{
+	return;
+}
+
+void race_engine_handle_server_message(
+	void *message)
+{
+	return;
+}
+
+void race_engine_pregame_post_rasterize(
 	void)
 {
 	return;
 }
 
-void code_000a2a20(
-	void)
-{
-	return;
-}
-
-void code_000a2a30(
-	void)
-{
-	return;
-}
-
-void code_000a2a40(
-	void)
-{
-	return;
-}
-
-void code_000a2a50(
+void race_engine_post_rasterize(
 	void)
 {
 	return;
@@ -431,7 +436,7 @@ static void race_complete_lap(
 	long player_index)
 {
 	struct player_datum *player = player_get(player_index);
-	long lap_time = game_time_get() - player->unknown88;
+	long lap_time = game_time_get() - player->multiplayer_special;
 	struct data_iterator iterator;
 	struct player_datum *team_player;
 	long team_score;
@@ -440,7 +445,7 @@ static void race_complete_lap(
 	game_engine_play_multiplayer_sound(_multiplayer_sound_countdown_timer_end);
 	player->statistics.multiplayer_statistics.race_statistics.last_lap_time = (short)lap_time;
 
-	if (game_engine_get_variant()->unknown4C.value == _race_type_flag_rally)
+	if (game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally)
 	{
 		game_show_score_you_ally_enemy(
 			player_index,
@@ -466,7 +471,7 @@ static void race_complete_lap(
 	else if (lap_time < player->statistics.multiplayer_statistics.race_statistics.best_lap_time)
 	{
 		player->statistics.multiplayer_statistics.race_statistics.best_lap_time = (short)lap_time;
-		if (game_engine_get_variant()->unknown4C.value != _race_type_flag_rally)
+		if (game_engine_get_variant()->race_variant_race_type != _race_type_flag_rally)
 		{
 			game_show_score_extended(
 				player_index,
@@ -476,11 +481,11 @@ static void race_complete_lap(
 	}
 
 	player->statistics.multiplayer_statistics.race_statistics.laps++;
-	player->unknown88 = game_time_get();
+	player->multiplayer_special = game_time_get();
 
 	team_score = player->statistics.multiplayer_statistics.race_statistics.laps;
 	data_iterator_new(&iterator, player_data);
-	if (game_engine_get_variant()->unknown50 == _race_team_scoring_sum)
+	if (game_engine_get_variant()->race_variant_team_scoring == _race_team_scoring_sum)
 		team_score = 0;
 	while ((team_player = data_iterator_next(&iterator)))
 	{
@@ -488,7 +493,7 @@ static void race_complete_lap(
 		{
 			long laps = team_player->statistics.multiplayer_statistics.race_statistics.laps;
 
-			switch (game_engine_get_variant()->unknown50)
+			switch (game_engine_get_variant()->race_variant_team_scoring)
 			{
 			case _race_team_scoring_minimum:
 				team_score = MIN(team_score, laps);
@@ -511,7 +516,7 @@ static void race_complete_lap(
 
 	if (team_score > race_globals.team_laps[player->team_index])
 		race_globals.team_laps[player->team_index] = team_score;
-	if (race_globals.team_laps[player->team_index] >= game_engine_get_variant()->unknown40)
+	if (race_globals.team_laps[player->team_index] >= game_engine_get_variant()->race_variant_laps_to_win)
 		game_engine_end_game();
 
 	return;
@@ -532,11 +537,11 @@ static boolean can_touch_team(
 		can_touch = FALSE;
 	}
 	else if (player->statistics.multiplayer_statistics.race_statistics.laps >=
-		game_engine_get_variant()->unknown40)
+		game_engine_get_variant()->race_variant_laps_to_win)
 	{
 		can_touch = FALSE;
 	}
-	else if (game_engine_get_variant()->unknown4C.value == _race_type_flag_rally)
+	else if (game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally)
 	{
 		can_touch = race_globals.rally_flag == team_index;
 	}
@@ -548,7 +553,7 @@ static boolean can_touch_team(
 	{
 		can_touch = FALSE;
 	}
-	else if (game_engine_get_variant()->unknown4C.value == _race_type_normal)
+	else if (game_engine_get_variant()->race_variant_race_type == _race_type_normal)
 	{
 		long itr;
 
@@ -583,7 +588,7 @@ static long new_rally_flag(
 {
 	long new_flag = NONE;
 	struct scenario *scenario = global_scenario_get();
-	long count = count_bits(race_globals.lap_completed_value);
+	long count = count_bits_32(race_globals.lap_completed_value);
 	long random_index;
 	long itr;
 
@@ -643,12 +648,12 @@ static void race_touch_flag(
 			match_vassert(
 				"c:\\halo\\SOURCE\\game\\game_engine_race.c",
 				0x2D4,
-				_race_type_normal != game_engine_get_variant()->unknown4C.value,
+				_race_type_normal != game_engine_get_variant()->race_variant_race_type,
 				"_race_type_normal != game_engine_get_variant()->game_engine_variant.race.race_type");
 			race_globals.first_flag[absolute_player_index] = flag->team_index;
 		}
 
-		if (game_engine_get_variant()->unknown4C.value == _race_type_flag_rally)
+		if (game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally)
 		{
 			race_complete_lap(player_index);
 			race_globals.rally_flag = new_rally_flag(race_globals.rally_flag);
@@ -674,8 +679,9 @@ static void race_touch_flag(
 	return;
 }
 
-void code_000a2d10(
-	void)
+void race_engine_weapon_update(
+	long item_index,
+	struct weapon_datum *weapon)
 {
 	return;
 }
@@ -685,7 +691,7 @@ static boolean race_team_can_win_game(
 {
 	boolean can_win = TRUE;
 
-	if (game_engine_get_variant()->unknown50 == _race_team_scoring_minimum)
+	if (game_engine_get_variant()->race_variant_team_scoring == _race_team_scoring_minimum)
 	{
 		struct data_iterator iterator;
 		struct player_datum *player;
@@ -695,9 +701,9 @@ static boolean race_team_can_win_game(
 		{
 			if (player->team_index == team_index &&
 				player->statistics.multiplayer_statistics.race_statistics.laps <
-					game_engine_get_variant()->unknown40 &&
+					game_engine_get_variant()->race_variant_laps_to_win &&
 				(game_engine_player_is_out_of_lives(iterator.datum_index) ||
-					player->unknown_d1))
+					player->quit_out_of_game))
 			{
 				can_win = FALSE;
 			}
@@ -729,7 +735,7 @@ static void build_player_speeds(
 		long laps_behind = maximum_laps -
 			player->statistics.multiplayer_statistics.race_statistics.laps;
 
-		if (game_engine_get_variant()->unknown4C.value == _race_type_flag_rally)
+		if (game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally)
 			laps_behind /= 3;
 
 		if (laps_behind >= 2)
@@ -743,21 +749,24 @@ static void build_player_speeds(
 	return;
 }
 
-void code_000a2e90(
-	long player_index,
-	long damage_owner_player_index,
-	boolean damage_was_melee)
+void race_engine_player_damaged_player(
+	long killing_player_index,
+	long dead_player_index,
+	boolean friendly_fire)
 {
 	return;
 }
 
-void code_000a2ea0(
-	void)
+void race_engine_player_killed_player(
+	long killing_player_index,
+	long killing_object_index,
+	long dead_player_index,
+	boolean friendly_fire)
 {
 	return;
 }
 
-void code_000a3330(
+void race_engine_prespawn_player_update(
 	long player_index)
 {
 	return;
@@ -785,7 +794,7 @@ boolean race_goal_matches_player(
 	return result;
 }
 
-static long count_bits(
+static long count_bits_32(
 	unsigned long flags)
 {
 	long count = 0;
@@ -812,12 +821,12 @@ long race_engine_get_score(
 		return race_globals.team_laps[player->team_index];
 
 	laps = player->statistics.multiplayer_statistics.race_statistics.laps;
-	flags_touched = count_bits(race_globals.lap_bit_vector[player->team_index]);
+	flags_touched = count_bits_32(race_globals.lap_bit_vector[player->team_index]);
 
 	return laps * (MAXIMUM_RACE_FLAGS + 1) + flags_touched;
 }
 
-wchar_t *code_000a34a0(
+wchar_t *race_get_score_string(
 	long player_index,
 	wchar_t *string)
 {
@@ -836,7 +845,7 @@ wchar_t *race_get_score_header_string(
 	wchar_t *string)
 {
 	short string_index =
-		game_engine_get_variant()->unknown4C.value == _race_type_flag_rally ?
+		game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally ?
 			178 : 25;
 	long string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
 	wchar_t *header_string;
@@ -1066,7 +1075,7 @@ void race_engine_update(
 
 		if (race_globals.vehicles_have_been_added)
 		{
-			switch (game_engine_get_variant()->unknown48)
+			switch (game_engine_get_variant()->race_variant_vehicles)
 			{
 			case _game_engine_vehicles_default:
 				game_engine_play_multiplayer_sound(_multiplayer_sound_warthog);
@@ -1144,11 +1153,11 @@ boolean race_engine_initialize_for_new_map(
 		}
 	}
 
-	if (game_engine_get_variant()->unknown4C.value == _race_type_flag_rally)
+	if (game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally)
 	{
 		race_globals.rally_flag = new_rally_flag(NONE);
 	}
-	else if (game_engine_get_variant()->unknown4C.value == _race_type_normal)
+	else if (game_engine_get_variant()->race_variant_race_type == _race_type_normal)
 	{
 		for (itr = 0; itr < MULTIPLAYER_MAXIMUM_PLAYERS; itr++)
 			race_globals.first_flag[itr] = lowest_flag_index;
@@ -1161,5 +1170,45 @@ boolean race_engine_initialize_for_new_map(
 
 	return TRUE;
 }
+
+/* ---------- engine table */
+
+struct game_engine race_engine =
+{
+	"race",
+	game_engine_race,
+	race_engine_dispose,
+	race_engine_initialize_for_new_map,
+	race_engine_dispose_from_old_map,
+	race_engine_player_added,
+	race_engine_game_ending,
+	race_engine_game_starting,
+	race_engine_statistics_append,
+	race_engine_handle_client_message,
+	race_engine_handle_server_message,
+	race_engine_pregame_post_rasterize,
+	race_engine_post_rasterize,
+	race_engine_player_update,
+	race_engine_weapon_update,
+	NULL,
+	NULL,
+	race_engine_update,
+	race_engine_get_score,
+	race_get_score_string,
+	race_get_score_header_string,
+	race_get_team_score_string,
+	NULL,
+	race_engine_player_damaged_player,
+	race_engine_player_killed_player,
+	race_engine_display_score,
+	NULL,
+	race_engine_prespawn_player_update,
+	NULL,
+	NULL,
+	race_goal_matches_player,
+	NULL,
+	NULL,
+	race_engine_did_player_win,
+};
 
 /* ---------- private code */
