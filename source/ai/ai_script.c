@@ -446,19 +446,26 @@ symbols in this file:
 
 #include "cseries.h"
 #include "ai/actions.h"
+#include "ai/actor_definitions.h"
 #include "ai/actor_iterators.h"
 #include "ai/actor_looking.h"
 #include "ai/ai_communication.h"
 #include "ai/ai_debug.h"
+#include "ai/ai_scenario_definitions.h"
 #include "ai/encounters.h"
 #include "ai/ai_script.h"
+#include "ai/props.h"
 #include "cseries/errors.h"
+#include "game/game.h"
 #include "game/game_allegiance.h"
+#include "game/players.h"
 #include "hs/hs.h"
 #include "hs/object_lists.h"
 #include "memory/data.h"
+#include "objects/objects.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#include "tag_files/tag_files.h"
 #include "units/units.h"
 #include "units/vehicle_scripting.h"
 
@@ -472,6 +479,59 @@ enum
 	NUMBER_OF_AI_COUNT_TYPES,
 };
 
+/* encounter_datum.follow_target_type (encounters.h does not yet declare these) */
+enum
+{
+	_follow_target_none = 0,
+	_follow_target_players,
+	_follow_target_unit,
+	_follow_target_ai,
+	NUMBER_OF_FOLLOW_TARGET_TYPES,
+};
+
+/* actor_external_orders.desired_target_type (actors.h does not yet declare these) */
+enum
+{
+	_desired_target_none = 0,
+	_desired_target_ai,
+	_desired_target_player,
+	NUMBER_OF_DESIRED_TARGET_TYPES,
+};
+
+/* ai unit effect types (ai.h does not yet declare these; actors.c carries the same list) */
+enum
+{
+	_ai_unit_effect_bump = 0,
+	_ai_unit_effect_shooting,
+	_ai_unit_effect_death_scream,
+	_ai_unit_effect_magic_sight,
+	NUMBER_OF_AI_UNIT_EFFECTS,
+};
+
+/* actor default states, in the order of global_ai_default_state_names (actions.c only
+declares the count) */
+enum
+{
+	_actor_default_state_none = 0,
+	_actor_default_state_sleep,
+	_actor_default_state_alert,
+	_actor_default_state_move_repeat,
+	_actor_default_state_move_loop,
+	_actor_default_state_move_loop_back_and_forth,
+	_actor_default_state_move_loop_random,
+	_actor_default_state_move_random,
+	_actor_default_state_guard,
+	_actor_default_state_guard_at_position,
+	_actor_default_state_search,
+	_actor_default_state_flee,
+	NUMBER_OF_ACTOR_DEFAULT_STATES,
+};
+
+enum
+{
+	MAXIMUM_ACTIVATION_LINK_INDICES_PER_ENCOUNTER = 3,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -481,6 +541,45 @@ struct ai_script_globals_prefix
 	boolean ai_active;
 	boolean ai_initialized_for_map;
 };
+
+/* private to encounters.c in this tree; ai_script.c embeds one at the tail of its
+actor reference iterator (ai_script.h flattens it into three longs) */
+struct encounter_actor_iterator
+{
+	long encounter_index;
+	long actor_index;
+	long next_actor_index;
+};
+
+struct ai_script_squad_iterator
+{
+	long encounter_index;
+	long platoon_index;
+	long squad_index;
+	long current_squad_index;
+	long last_squad_index;
+};
+
+/* element of squad_definition.starting_locations; ai_scenario_definitions.h leaves the
+first 0x18 bytes unnamed.  position at 0 and facing at 0xc are proven by the teleport
+helper (object_set_position / vector3d_from_angle call sites). */
+struct ai_script_actor_starting_location
+{
+	real_point3d position;
+	real facing;
+	short cluster_index;
+	char sequence_id;
+	byte flags;
+	short default_state;
+	short initial_state;
+	short actor_variant_index;
+	short command_list_index;
+};
+
+typedef char ai_script_actor_starting_location_size_assert[
+	sizeof(struct ai_script_actor_starting_location) == 0x1C ? 1 : -1];
+typedef char ai_script_squad_iterator_size_assert[
+	sizeof(struct ai_script_squad_iterator) == 0x14 ? 1 : -1];
 
 struct actor_iterator
 {
@@ -546,6 +645,110 @@ void actor_kill(
 	long actor_index,
 	boolean silent,
 	boolean delayed);
+void ai_erase(
+	long encounter_index,
+	long platoon_index,
+	long squad_index,
+	boolean immediate);
+void encounter_create(
+	long encounter_index,
+	short platoon_index,
+	short squad_index);
+boolean encounter_spawn_actor(
+	long encounter_index,
+	short squad_index);
+boolean game_team_is_ally(
+	short our_team_index,
+	short other_team_index);
+boolean game_team_is_enemy(
+	short our_team_index,
+	short other_team_index);
+void game_allegiance_create(
+	short team1_index,
+	boolean team1_suspicious,
+	short team2_index,
+	boolean team2_suspicious,
+	short incident_threshold,
+	short incident_decay_time,
+	boolean requires_communication);
+void actor_braindead(
+	long actor_index,
+	boolean braindead);
+void actor_set_team(
+	long actor_index,
+	short team_index);
+void ai_update_team_status(
+	void);
+void encounter_squad_timer_expire(
+	long encounter_index,
+	short squad_index);
+void action_obey_advance_command_list(
+	long actor_index);
+boolean action_obey_command_list_setup(
+	long actor_index,
+	short command_list_index,
+	struct obey_state_data *state_data);
+void actor_action_change(
+	long actor_index,
+	long new_action_type,
+	struct action_state_data *new_action_data);
+boolean actor_action_set_default_state(
+	long actor_index,
+	short override_state);
+short actor_action_class(
+	long actor_index);
+void encounter_detach_actor(
+	long actor_index,
+	boolean died);
+void encounterless_attach_actor(
+	long actor_index);
+void encounters_update_dirty_status(
+	void);
+boolean encounter_link_activation(
+	long encounter_index,
+	short link_encounter_index);
+void encounter_force_activate(
+	long encounter_index);
+void actor_handle_unit_effect(
+	long actor_index,
+	long prop_index,
+	short effect_type);
+short encounter_get_actor_starting_location(
+	long encounter_index,
+	long squad_index,
+	boolean spawn);
+long biped_approximate_surface_index(
+	long biped_index,
+	real_point3d *surface_point);
+long actor_create_for_unit(
+	boolean swarm,
+	long unit_index,
+	long actor_variant_definition_index,
+	long encounter_index,
+	short squad_index,
+	boolean allow_addition_to_other_squads,
+	long disallow_actor_index,
+	boolean initially_braindead,
+	short initial_state,
+	short default_state,
+	short initial_command_list_index,
+	char noncombat_sequence_id);
+unsigned long *get_global_random_seed_address(
+	void);
+short seed_random_range(
+	unsigned long *seed,
+	short lower_bound,
+	short upper_bound);
+void ai_index_squad_iterator_new(
+	long ai_reference,
+	struct ai_script_squad_iterator *iterator);
+struct squad_datum *ai_index_squad_iterator_next(
+	struct ai_script_squad_iterator *iterator);
+static short ai_scripting_assess_status(
+	long actor_index);
+static void ai_scripting_teleport_starting_location_private(
+	long ai_reference,
+	boolean only_if_unsupported);
 static void code_000432b0(
 	long ai_reference,
 	boolean silent);
