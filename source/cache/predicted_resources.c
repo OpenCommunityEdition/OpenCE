@@ -12,6 +12,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cache/predicted_resources.h"
+#include "cache/sound_cache.h"
 #include "bitmaps/bitmap_group.h"
 #include "sound/sound_definitions.h"
 #include "tag_files/tag_groups.h"
@@ -23,12 +24,6 @@ symbols in this file:
 /* ---------- structures */
 
 /* ---------- prototypes */
-
-void _sound_cache_sound_request(
-	struct sound_permutation *sound,
-	boolean load,
-	boolean reference,
-	boolean block);
 
 void *_texture_cache_bitmap_get_hardware_format(
 	struct bitmap_data *bitmap,

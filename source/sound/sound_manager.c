@@ -220,6 +220,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "data.h"
+#include "cache/sound_cache.h"
 #include "sound_environment_definitions.h"
 
 /* ---------- constants */
@@ -321,8 +322,6 @@ typedef char verify_sound_manager_dialog_time_offset[
 /* ---------- prototypes */
 
 long game_time_get(
-	void);
-void sound_cache_delete(
 	void);
 unsigned long system_milliseconds(
 	void);

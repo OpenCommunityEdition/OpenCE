@@ -2770,6 +2770,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cache/sound_cache.h"
 #include "hs.h"
 #include "object_lists.h"
 #include "hs_scenario_definitions.h"
@@ -4182,8 +4183,6 @@ void main_print_version(
 void main_set_game_connection_to_film_playback(
 	void);
 void texture_cache_flush(
-	void);
-void sound_cache_flush(
 	void);
 void debug_dump_memory(
 	void);

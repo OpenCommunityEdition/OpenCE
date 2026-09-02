@@ -19,13 +19,13 @@ symbols in this file:
 001ADC30 0030:
 	_sound_cache_sound_hardware_unlock (0000)
 001ADC60 0040:
-	_code_001adc60 (0000)
+	_sound_cache_locked_block_proc (0000)
 001ADCA0 00c0:
-	_code_001adca0 (0000)
+	_sound_cache_delete_block_proc (0000)
 001ADD60 0040:
-	_code_001add60 (0000)
+	_sound_cache_debug_block_name (0000)
 001ADDA0 0130:
-	_code_001adda0 (0000)
+	_sound_cache_start_loading_sound (0000)
 001ADED0 00b0:
 	_sound_cache_new (0000)
 001ADF80 0060:
@@ -35,7 +35,7 @@ symbols in this file:
 001AE040 0160:
 	__sound_cache_sound_request (0000)
 001AE1A0 0100:
-	_code_001ae1a0 (0000)
+	_render_inverse_transform_screen_point (0000)
 001AE2A0 0170:
 	_sound_cache_debug_render (0000)
 002A7818 0028:
@@ -87,7 +87,7 @@ symbols in this file:
 002A7BBC 000f:
 	??_C@_0P@FHHOOBEP@load?5?$HM?$HM?5?$CBblock?$AA@ (0000)
 004D1088 0110:
-	_bss_004d1088 (0000)
+	_xbox_sound_cache_globals (0000)
 */
 
 /* ---------- headers */
@@ -95,6 +95,7 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "cache/physical_memory_map.h"
+#include "cache/sound_cache.h"
 #include "interface/terminal.h"
 #include "memory/data.h"
 #include "memory/lruv_cache.h"
@@ -111,6 +112,7 @@ symbols in this file:
 #define cache_block_index unknown0
 #define cache_base_address unknown1
 #define cache_tag_index unknown2
+#define runtime_tag_index unknown3
 
 /* ---------- structures */
 
@@ -178,11 +180,9 @@ typedef char verify_xbox_sound_cache_globals_size[
 
 /* ---------- prototypes */
 
-void sound_cache_sound_delete(
-	struct sound_permutation *sound);
-long code_001adc60(
+long sound_cache_locked_block_proc(
 	long block_index);
-void code_001adca0(
+void sound_cache_delete_block_proc(
 	long block_index);
 
 /* ---------- globals */
@@ -190,16 +190,16 @@ void code_001adca0(
 extern short assertion_count;
 extern boolean debug_sound_cache;
 extern boolean debug_sound_reference_counts;
-extern struct xbox_sound_cache_globals bss_004d1088;
+extern struct xbox_sound_cache_globals xbox_sound_cache_globals;
 
 /* ---------- public code */
 
 void sound_cache_delete(
 	void)
 {
-	data_dispose(bss_004d1088.cache_sounds);
-	lruv_delete(bss_004d1088.cache);
-	bss_004d1088.base_address = NULL;
+	data_dispose(xbox_sound_cache_globals.cache_sounds);
+	lruv_delete(xbox_sound_cache_globals.cache);
+	xbox_sound_cache_globals.base_address = NULL;
 
 	return;
 }
@@ -207,7 +207,7 @@ void sound_cache_delete(
 void sound_cache_open(
 	void)
 {
-	data_make_valid(bss_004d1088.cache_sounds);
+	data_make_valid(xbox_sound_cache_globals.cache_sounds);
 
 	return;
 }
@@ -215,7 +215,7 @@ void sound_cache_open(
 void sound_cache_idle(
 	void)
 {
-	lruv_idle(bss_004d1088.cache);
+	lruv_idle(xbox_sound_cache_globals.cache);
 	match_vassert(
 		"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
 		148,
@@ -232,11 +232,11 @@ void sound_cache_sound_new(
 	match_vassert(
 		"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
 		158,
-		sound->unknown1 == 0,
+		sound->cache_base_address == 0,
 		"sound->cache_base_address==NULL");
-	sound->unknown0 = NONE;
-	sound->unknown1 = 0;
-	sound->unknown2 = cache_tag_index;
+	sound->cache_block_index = NONE;
+	sound->cache_base_address = 0;
+	sound->cache_tag_index = cache_tag_index;
 
 	return;
 }
@@ -244,43 +244,45 @@ void sound_cache_sound_new(
 void sound_cache_sound_delete(
 	struct sound_permutation *sound)
 {
-	if (sound->unknown0 != NONE)
+	if (sound->cache_block_index != NONE)
 	{
 		match_vassert(
 			"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
 			173,
 			((struct xbox_cache_sound_datum *)datum_get(
-				bss_004d1088.cache_sounds,
-				sound->unknown0))->software_reference_count == 0,
+				xbox_sound_cache_globals.cache_sounds,
+				sound->cache_block_index))->software_reference_count == 0,
 			csprintf(
 				temporary,
 				"tried to delete sound %s(%s) from the cache while it was playing (soft).",
 				tag_get_name(((struct xbox_cache_sound_datum *)datum_get(
-					bss_004d1088.cache_sounds,
-					sound->unknown0))->sound->unknown3),
+					xbox_sound_cache_globals.cache_sounds,
+					sound->cache_block_index))->sound->runtime_tag_index),
 				((struct xbox_cache_sound_datum *)datum_get(
-					bss_004d1088.cache_sounds,
-					sound->unknown0))->sound));
+					xbox_sound_cache_globals.cache_sounds,
+					sound->cache_block_index))->sound));
 		match_vassert(
 			"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
 			174,
 			((struct xbox_cache_sound_datum *)datum_get(
-				bss_004d1088.cache_sounds,
-				sound->unknown0))->hardware_reference_count == 0,
+				xbox_sound_cache_globals.cache_sounds,
+				sound->cache_block_index))->hardware_reference_count == 0,
 			csprintf(
 				temporary,
 				"tried to delete sound %s(%s) from the cache while it was playing (hard).",
 				tag_get_name(((struct xbox_cache_sound_datum *)datum_get(
-					bss_004d1088.cache_sounds,
-					sound->unknown0))->sound->unknown3),
+					xbox_sound_cache_globals.cache_sounds,
+					sound->cache_block_index))->sound->runtime_tag_index),
 				((struct xbox_cache_sound_datum *)datum_get(
-					bss_004d1088.cache_sounds,
-					sound->unknown0))->sound));
-		lruv_block_delete(bss_004d1088.cache, sound->unknown0);
+					xbox_sound_cache_globals.cache_sounds,
+					sound->cache_block_index))->sound));
+		lruv_block_delete(
+			xbox_sound_cache_globals.cache,
+			sound->cache_block_index);
 	}
 
-	sound->unknown0 = NONE;
-	sound->unknown1 = 0;
+	sound->cache_block_index = NONE;
+	sound->cache_base_address = 0;
 
 	return;
 }
@@ -290,7 +292,9 @@ void sound_cache_sound_finished(
 {
 	struct xbox_cache_sound_datum *cache_sound;
 
-	cache_sound = datum_get(bss_004d1088.cache_sounds, sound->unknown0);
+	cache_sound = datum_get(
+		xbox_sound_cache_globals.cache_sounds,
+		sound->cache_block_index);
 	if (debug_sound_reference_counts)
 	{
 		error(
@@ -313,8 +317,9 @@ void sound_cache_sound_hardware_lock(
 {
 	struct xbox_cache_sound_datum *cache_sound;
 
-	/* January Xbox and HCEA both identify unknown0 as cache_block_index. */
-	cache_sound = datum_get(bss_004d1088.cache_sounds, sound->unknown0);
+	cache_sound = datum_get(
+		xbox_sound_cache_globals.cache_sounds,
+		sound->cache_block_index);
 	if (cache_sound->hardware_reference_count < UNSIGNED_CHAR_MAX)
 	{
 		cache_sound->hardware_reference_count++;
@@ -327,35 +332,55 @@ void sound_cache_sound_hardware_lock(
 	return;
 }
 
+void sound_cache_sound_hardware_unlock(
+	struct sound_permutation *sound)
+{
+	struct xbox_cache_sound_datum *cache_sound = datum_get(
+		xbox_sound_cache_globals.cache_sounds,
+		sound->cache_block_index);
+
+	if (cache_sound->hardware_reference_count)
+	{
+		cache_sound->hardware_reference_count--;
+	}
+	else
+	{
+		assertion_count++;
+	}
+
+	return;
+}
+
 void sound_cache_new(
 	void)
 {
-	bss_004d1088.cache_sounds = data_new(
+	xbox_sound_cache_globals.cache_sounds = data_new(
 		"xbox sound",
 		512,
 		sizeof(struct xbox_cache_sound_datum));
 	match_vassert(
 		"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
 		69,
-		bss_004d1088.cache_sounds != NULL,
+		xbox_sound_cache_globals.cache_sounds != NULL,
 		"xbox_sound_cache_globals.cache_sounds");
-	bss_004d1088.cache = lruv_new(
+	xbox_sound_cache_globals.cache = lruv_new(
 		"xbox sound cache",
 		1024,
 		12,
 		512,
-		code_001adca0,
-		(lruv_locked_block_proc)code_001adc60);
+		sound_cache_delete_block_proc,
+		(lruv_locked_block_proc)sound_cache_locked_block_proc);
 	match_vassert(
 		"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
 		73,
-		bss_004d1088.cache != NULL,
+		xbox_sound_cache_globals.cache != NULL,
 		"xbox_sound_cache_globals.cache");
-	bss_004d1088.base_address = physical_memory_get_sound_cache_base_address();
+	xbox_sound_cache_globals.base_address =
+		physical_memory_get_sound_cache_base_address();
 	match_vassert(
 		"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
 		76,
-		bss_004d1088.base_address != NULL,
+		xbox_sound_cache_globals.base_address != NULL,
 		"xbox_sound_cache_globals.base_address");
 
 	return;
@@ -367,7 +392,7 @@ void sound_cache_flush(
 	struct data_iterator iterator;
 	struct xbox_cache_sound_datum *cache_sound;
 
-	data_iterator_new(&iterator, bss_004d1088.cache_sounds);
+	data_iterator_new(&iterator, xbox_sound_cache_globals.cache_sounds);
 	while ((cache_sound = data_iterator_next(&iterator)) != NULL)
 	{
 		if (cache_sound->software_reference_count == 0 &&
@@ -386,24 +411,24 @@ void sound_cache_close(
 	struct data_iterator iterator;
 	struct xbox_cache_sound_datum *cache_sound;
 
-	data_iterator_new(&iterator, bss_004d1088.cache_sounds);
+	data_iterator_new(&iterator, xbox_sound_cache_globals.cache_sounds);
 	while ((cache_sound = data_iterator_next(&iterator)) != NULL)
 	{
 		sound_cache_sound_delete(cache_sound->sound);
 	}
-	data_make_invalid(bss_004d1088.cache_sounds);
+	data_make_invalid(xbox_sound_cache_globals.cache_sounds);
 
 	return;
 }
 
 /* ---------- private code */
 
-long code_001adc60(
+long sound_cache_locked_block_proc(
 	long block_index)
 {
 	struct xbox_cache_sound_datum *cache_sound;
 
-	cache_sound = datum_get(bss_004d1088.cache_sounds, block_index);
+	cache_sound = datum_get(xbox_sound_cache_globals.cache_sounds, block_index);
 	if (cache_sound->loaded &&
 		cache_sound->software_reference_count == 0 &&
 		cache_sound->hardware_reference_count == 0)
@@ -414,12 +439,12 @@ long code_001adc60(
 	return TRUE;
 }
 
-void code_001adca0(
+void sound_cache_delete_block_proc(
 	long block_index)
 {
 	struct xbox_cache_sound_datum *cache_sound;
 
-	cache_sound = datum_get(bss_004d1088.cache_sounds, block_index);
+	cache_sound = datum_get(xbox_sound_cache_globals.cache_sounds, block_index);
 	match_vassert(
 		"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
 		0x141,
@@ -428,41 +453,41 @@ void code_001adca0(
 		csprintf(
 			temporary,
 			"tried to delete sound %s(%s) from the cache while it was playing.",
-			tag_get_name(cache_sound->sound->unknown3),
+			tag_get_name(cache_sound->sound->runtime_tag_index),
 			cache_sound->sound));
 	match_assert(
 		"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
 		0x144,
 		cache_sound->sound->cache_block_index==block_index);
 	cache_sound->sound->cache_block_index = NONE;
-	cache_sound->sound->unknown1 = 0;
-	datum_delete(bss_004d1088.cache_sounds, block_index);
+	cache_sound->sound->cache_base_address = 0;
+	datum_delete(xbox_sound_cache_globals.cache_sounds, block_index);
 
 	return;
 }
 
-const char *code_001add60(
+const char *sound_cache_debug_block_name(
 	long block_index)
 {
 	struct xbox_cache_sound_datum *cache_sound;
 
-	cache_sound = datum_get(bss_004d1088.cache_sounds, block_index);
+	cache_sound = datum_get(xbox_sound_cache_globals.cache_sounds, block_index);
 	sprintf(
-		bss_004d1088.debug_block_name,
+		xbox_sound_cache_globals.debug_block_name,
 		"%s (%s)",
-		tag_get_name(cache_sound->sound->unknown3),
+		tag_get_name(cache_sound->sound->runtime_tag_index),
 		cache_sound->sound);
 
-	return bss_004d1088.debug_block_name;
+	return xbox_sound_cache_globals.debug_block_name;
 }
 
-static void code_001adda0(
+static void sound_cache_start_loading_sound(
 	struct sound_permutation *sound)
 {
 	long cache_block_index;
 
 	cache_block_index = lruv_block_new(
-		bss_004d1088.cache,
+		xbox_sound_cache_globals.cache,
 		sound->samples.size);
 	if (cache_block_index != NONE)
 	{
@@ -470,15 +495,15 @@ static void code_001adda0(
 		long new_cache_sound_index;
 		struct xbox_cache_sound_datum *cache_sound;
 
-		cache_address = bss_004d1088.base_address +
+		cache_address = xbox_sound_cache_globals.base_address +
 			(unsigned long)lruv_block_get_address(
-				bss_004d1088.cache,
+				xbox_sound_cache_globals.cache,
 				cache_block_index);
 		new_cache_sound_index = datum_new_at_index(
-			bss_004d1088.cache_sounds,
+			xbox_sound_cache_globals.cache_sounds,
 			cache_block_index);
 		cache_sound = datum_get(
-			bss_004d1088.cache_sounds,
+			xbox_sound_cache_globals.cache_sounds,
 			cache_block_index);
 		match_assert(
 			"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
@@ -497,7 +522,7 @@ static void code_001adda0(
 	}
 	else if (
 		system_milliseconds() -
-			bss_004d1088.last_allocation_failure_time > 10000)
+			xbox_sound_cache_globals.last_allocation_failure_time > 10000)
 	{
 		terminal_printf(
 			global_real_argb_purple,
@@ -512,10 +537,11 @@ static void code_001adda0(
 			"d:\\stabbed.txt",
 			sound->name,
 			sound->samples.size,
-			bss_004d1088.cache,
+			xbox_sound_cache_globals.cache,
 			scenario_debug_to_file,
-			code_001add60);
-		bss_004d1088.last_allocation_failure_time = system_milliseconds();
+			sound_cache_debug_block_name);
+		xbox_sound_cache_globals.last_allocation_failure_time =
+			system_milliseconds();
 	}
 
 	return;
@@ -547,17 +573,17 @@ boolean _sound_cache_sound_request(
 		sound->cache_tag_index!=0);
 
 	if (sound->cache_block_index == NONE && load)
-		code_001adda0(sound);
+		sound_cache_start_loading_sound(sound);
 
 	if (sound->cache_block_index != NONE)
 	{
 		lruv_block_touch(
-			bss_004d1088.cache,
+			xbox_sound_cache_globals.cache,
 			sound->cache_block_index);
 		for (;;)
 		{
 			cache_sound = datum_get(
-				bss_004d1088.cache_sounds,
+				xbox_sound_cache_globals.cache_sounds,
 				sound->cache_block_index);
 			if (cache_sound->loaded)
 				break;
@@ -597,10 +623,10 @@ boolean _sound_cache_sound_request(
 	return result;
 }
 
-static void code_001ae1a0(
-	real *world_position,
-	real *world_vector,
-	real const *screen_position)
+static void render_inverse_transform_screen_point(
+	real_point2d const *screen_position,
+	real_point3d *world_position,
+	real_vector3d *world_vector)
 {
 	real const *origin;
 	real screen_x;
@@ -609,14 +635,14 @@ static void code_001ae1a0(
 	real_vector3d delta1;
 	real_point3d point;
 
-	screen_x = screen_position[0] * (1.0f / 640.0f);
-	screen_y = 1.0f - screen_position[1] * (1.0f / 480.0f);
+	screen_x = screen_position->x * (1.0f / 640.0f);
+	screen_y = 1.0f - screen_position->y * (1.0f / 480.0f);
 	origin = global_zero_vector3d->n;
-	world_position[0] =
+	world_position->x =
 		render.frustum.world_vertices[4].n[0] + origin[0];
-	world_position[1] =
+	world_position->y =
 		render.frustum.world_vertices[4].n[1] + origin[1];
-	world_position[2] =
+	world_position->z =
 		render.frustum.world_vertices[4].n[2] + origin[2];
 
 	delta0.i = render.frustum.world_vertices[1].n[0] -
@@ -639,9 +665,9 @@ static void code_001ae1a0(
 	point.y = delta1.j * screen_y + point.y;
 	point.z = delta1.k * screen_y + point.z;
 
-	world_vector[0] = point.x - world_position[0];
-	world_vector[1] = point.y - world_position[1];
-	world_vector[2] = point.z - world_position[2];
+	world_vector->i = point.x - world_position->x;
+	world_vector->j = point.y - world_position->y;
+	world_vector->k = point.z - world_position->z;
 
 	return;
 }
@@ -652,20 +678,19 @@ void sound_cache_debug_render(
 	byte page_usage[1024];
 	real_point3d world_positions[2];
 	real_point2d screen_positions[2];
-	real_argb_color const *colors[4] =
-	{
-		global_real_argb_red,
-		global_real_argb_green,
-		global_real_argb_blue,
-		global_real_argb_yellow
-	};
+	real_argb_color const *colors[4];
 	real_vector3d world_vector;
 	long page_index;
 	long state_index;
 
 	if (debug_sound_cache)
 	{
-		lruv_cache_get_page_usage(bss_004d1088.cache, page_usage);
+		colors[0] = global_real_argb_red;
+		colors[1] = global_real_argb_green;
+		colors[2] = global_real_argb_blue;
+		colors[3] = global_real_argb_yellow;
+
+		lruv_cache_get_page_usage(xbox_sound_cache_globals.cache, page_usage);
 
 		for (page_index = 0; page_index < 640; page_index++)
 		{
@@ -687,10 +712,10 @@ void sound_cache_debug_render(
 
 					for (point_index = 0; point_index < 2; point_index++)
 					{
-						code_001ae1a0(
-							world_positions[point_index].n,
-							world_vector.n,
-							screen_positions[point_index].n);
+						render_inverse_transform_screen_point(
+							&screen_positions[point_index],
+							&world_positions[point_index],
+							&world_vector);
 						scale = distance /
 							dot_product3d(&render.camera.forward, &world_vector);
 						world_positions[point_index].x += world_vector.i * scale;

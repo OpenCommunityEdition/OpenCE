@@ -129,6 +129,7 @@ symbols in this file:
 #include "tag_files/files.h"
 #include "cache_files.h"
 #include "physical_memory_map.h"
+#include "sound_cache.h"
 #include "scenario/scenario_definitions.h"
 #include "sound/sound_manager.h"
 
@@ -222,8 +223,6 @@ void cache_files_dispose(
 	void);
 void cache_files_initialize(
 	void);
-void sound_cache_close(
-	void);
 void texture_cache_close(
 	void);
 void cache_file_close(
@@ -241,8 +240,6 @@ void cache_files_precache_set_priority(
 void display_error_damaged_media(
 	void);
 void texture_cache_open(
-	void);
-void sound_cache_open(
 	void);
 void sound_idle(
 	void);
