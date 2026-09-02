@@ -138,6 +138,7 @@ symbols in this file:
 #include "cseries/cseries_windows.h"
 #include "errors.h"
 #include "rasterizer.h"
+#include "rasterizer_geometry.h"
 
 /* ---------- constants */
 
@@ -178,6 +179,15 @@ typedef char verify_rasterizer_frame_statistics_accumulation_frame_index_offset[
 		fps_accumulation_frame_index) == 0x750 ? 1 : -1];
 
 /* ---------- prototypes */
+
+static boolean eat_my_shorts(
+	word first,
+	word second);
+
+void qsort_2byte(
+	word *elements,
+	unsigned long element_count,
+	boolean (*compare)(word, word));
 
 /* ---------- globals */
 
@@ -227,6 +237,100 @@ void rasterizer_fps_accumulate(
 		rasterizer_globals.fps_accumulation_frame_index;
 
 	return;
+}
+
+static boolean eat_my_shorts(
+	word first,
+	word second)
+{
+	boolean result = FALSE;
+
+	if (first > second)
+	{
+		result = TRUE;
+	}
+
+	return result;
+}
+
+long rasterizer_frame_statistics_count_static_vertices(
+	struct triangle_buffer const *triangle_buffer,
+	struct vertex_buffer const *vertex_buffer)
+{
+	long vertex_count = 0;
+
+	if (triangle_buffer && vertex_buffer)
+	{
+		if (triangle_buffer->type == _triangle_buffer_type_precompiled_strip)
+		{
+			vertex_count = triangle_buffer->count + 2;
+		}
+		else if (triangle_buffer->type == _triangle_buffer_type_triangles)
+		{
+			vertex_count = vertex_buffer->count;
+		}
+	}
+
+	return vertex_count;
+}
+
+long rasterizer_frame_statistics_count_dynamic_vertices(
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count)
+{
+	long vertex_count = 0;
+
+	if (dynamic_triangle_buffer_index >= 0)
+	{
+		short *triangles = rasterizer_dynamic_triangles_lock(dynamic_triangle_buffer_index);
+
+		if (triangles)
+		{
+			long index_count = triangle_count*NUMBER_OF_VERTICES_PER_TRIANGLE;
+			word last_vertex_index = (word)NONE;
+			long index;
+
+			match_assert(
+				"c:\\halo\\SOURCE\\rasterizer\\rasterizer_frame_statistics.c",
+				217,
+				triangle_count<RASTERIZER_MAXIMUM_TRIANGLES_PER_TRIANGLE_BUFFER);
+			match_assert(
+				"c:\\halo\\SOURCE\\rasterizer\\rasterizer_frame_statistics.c",
+				218,
+				rasterizer_frame_statistics_temp_buffer);
+			memcpy(
+				rasterizer_frame_statistics_temp_buffer,
+				triangles + first_triangle_index*NUMBER_OF_VERTICES_PER_TRIANGLE,
+				sizeof(word)*triangle_count*NUMBER_OF_VERTICES_PER_TRIANGLE);
+			qsort_2byte(rasterizer_frame_statistics_temp_buffer, index_count, eat_my_shorts);
+			for (index = 0; index < index_count; index++)
+			{
+				if (last_vertex_index != rasterizer_frame_statistics_temp_buffer[index])
+				{
+					last_vertex_index = rasterizer_frame_statistics_temp_buffer[index];
+					vertex_count++;
+				}
+			}
+			rasterizer_dynamic_triangles_unlock(dynamic_triangle_buffer_index);
+		}
+	}
+	else
+	{
+		short vertices_per_primitive = (short)-dynamic_triangle_buffer_index;
+
+		if (vertices_per_primitive == NUMBER_OF_VERTICES_PER_TRIANGLE ||
+			vertices_per_primitive == NUMBER_OF_VERTICES_PER_QUADRILATERAL)
+		{
+			vertex_count = triangle_count/(vertices_per_primitive - 2);
+		}
+		else
+		{
+			vertex_count = vertices_per_primitive;
+		}
+	}
+
+	return vertex_count;
 }
 
 void rasterizer_frame_statistics_end(
