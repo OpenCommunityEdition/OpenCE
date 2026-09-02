@@ -82,6 +82,8 @@ symbols in this file:
 #include "cutscene/cinematics.h"
 #include "devices/device_controls.h"
 #include "game/game_engine.h"
+#include "game/game_globals.h"
+#include "game/player_control.h"
 #include "game/players.h"
 #include "interface/hud.h"
 #include "interface/hud_messaging.h"
@@ -98,7 +100,10 @@ symbols in this file:
 #include "render/render.h"
 #include "render/render_camera_projection.h"
 #include "saved games/game_state.h"
+#include "scenario/scenario.h"
 #include "sound/game_sound.h"
+#include "tag_files/tag_files.h"
+#include "text/draw_string.h"
 #include "text/text_group.h"
 #include "units/unit_definitions.h"
 #include "units/units.h"
@@ -996,6 +1001,136 @@ void hud_draw_players(
 		{
 			hud_draw_friendly_indicator(teammate_indices[teammate_index]);
 		}
+	}
+
+	return;
+}
+
+void temporary_hud_draw(
+	void)
+{
+	long player_index = local_player_get_player_index(render.local_player_index);
+	struct player_datum *player;
+	struct unit_datum *unit;
+	long weapon_index;
+	long equipment_index;
+
+	if (player_index == NONE)
+		return;
+
+	player = player_get(player_index);
+	if (player->unit_index == NONE)
+		return;
+
+	unit = unit_get(player->unit_index);
+	(void)unit_definition_get(unit->definition_index);
+	weapon_index = unit_inventory_get_weapon(
+		player->unit_index,
+		unit_get(player->unit_index)->unit.current_weapon_index);
+	equipment_index = unit_get_current_equipment(player->unit_index);
+	if (equipment_index != NONE)
+	{
+		struct object_datum *equipment = object_get(equipment_index);
+		sprintf(
+			temporary,
+			"%s (press WHITE to use)|n",
+			strrchr(tag_get_name(equipment->definition_index), '\\') + 1);
+	}
+	else
+	{
+		sprintf(temporary, "|n");
+	}
+
+	if (unit->unit.current_grenade_index != NONE)
+	{
+		struct game_globals_grenade *grenade = TAG_BLOCK_GET_ELEMENT(
+			&scenario_get_game_globals()->grenades,
+			unit->unit.current_grenade_index,
+			struct game_globals_grenade);
+		sprintf(
+			temporary + csstrlen(temporary),
+			"%d %s|n",
+			unit->unit.grenade_counts[unit->unit.current_grenade_index],
+			tag_name_strip_path(tag_get_name(grenade->projectile.index)));
+	}
+
+	if (weapon_index != NONE)
+	{
+		struct weapon_datum *weapon = weapon_get(weapon_index);
+		struct weapon_definition *weapon_definition = weapon_definition_get(
+			weapon->definition_index);
+
+		if (weapon_definition->weapon.magazines.count > 0)
+		{
+			struct weapon_magazine_definition *magazine_definition =
+				TAG_BLOCK_GET_ELEMENT(
+					&weapon_definition->weapon.magazines,
+					0,
+					struct weapon_magazine_definition);
+			sprintf(
+				temporary + csstrlen(temporary),
+				"%s|ntotal %d/%d|nloaded %d/%d|nheat %3.2f|nage %3.2f|n",
+				strrchr(tag_get_name(weapon->definition_index), '\\') + 1,
+				weapon->weapon.magazines[0].rounds_total,
+				magazine_definition->rounds_total_maximum,
+				weapon->weapon.magazines[0].rounds_loaded,
+				magazine_definition->rounds_loaded_maximum,
+				weapon->weapon.heat,
+				weapon->weapon.age);
+		}
+		else
+		{
+			sprintf(
+				temporary + csstrlen(temporary),
+				"%s|n",
+				strrchr(tag_get_name(weapon->definition_index), '\\') + 1);
+		}
+
+		sprintf(
+			temporary + csstrlen(temporary),
+			"%s%s",
+			(real)player->powerup_durations[_player_powerup_active_camouflage] > 0.0f
+				? "ACTIVE-CAMOUFLAGE "
+				: "",
+			(real)player->powerup_durations[_player_powerup_full_spectrum_vision] > 0.0f
+				? "FULL-SPECTRUM VISION "
+				: "");
+
+		temporary_hud_draw_reticle(
+			weapon_definition->weapon.aim_assist_parameters.autoaim_angle /
+				weapon_get_zoom_magnification(
+					weapon_index,
+					player_control_get_zoom_level(render.local_player_index)),
+			player_control_get_autoaim_level(render.local_player_index) < 1.0f
+				? global_real_argb_blue
+				: global_real_argb_red);
+
+		{
+			struct weapon_trigger_definition *trigger_definition =
+				TAG_BLOCK_GET_ELEMENT(
+					&weapon_definition->weapon.triggers,
+					0,
+					struct weapon_trigger_definition);
+			real error = TEST_FLAG(
+				trigger_definition->flags,
+				_weapon_trigger_analog_rate_of_fire_bit)
+				? weapon->weapon.primary_trigger
+				: weapon->weapon.triggers[0].error;
+
+			temporary_hud_draw_reticle(
+				(1.0f - error) *
+					trigger_definition->projectile_error_angle_lower_bound +
+					error * trigger_definition->projectile_error_angle_upper_bound,
+				global_real_argb_yellow);
+		}
+	}
+
+	{
+		rectangle2d bounds = render.camera.window_bounds;
+		bounds.x0 += 100;
+		draw_string_set_format(NONE, 0, 0);
+		draw_string_set_color(global_real_argb_white);
+		rasterizer_draw_string(&bounds, NULL, NULL, 0, temporary);
 	}
 
 	return;

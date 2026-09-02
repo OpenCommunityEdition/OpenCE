@@ -171,7 +171,7 @@ struct weapon_trigger
 	real rate_of_fire;
 	real ejection_port_position;
 	real illumination;
-	real __noop;
+	real error;
 	long charging_effect_index;
 };
 

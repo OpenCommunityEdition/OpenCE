@@ -3,18 +3,18 @@
 ## Outcome
 
 This isolated pass advances `source/interface/hud.obj` from 16 exact / zero
-residual / six unwritten functions to 18 exact / three credible residual / one
-unwritten. The two new strict closures add 79 meaningful and 96 padded code
-bytes. Three complete evidence-backed functions replace another 2,256 padded
-bytes of unwritten scope and are parked honestly at their measured compiler
-boundaries. The only function still unwritten is the 880-byte
-`temporary_hud_draw`.
+residual / six unwritten functions to 19 exact / three credible residual /
+zero unwritten. The three new strict closures add 949 meaningful and 976
+padded code bytes. Three complete evidence-backed functions replace another
+2,256 padded bytes of unwritten scope and are parked honestly at their measured
+compiler boundaries. All 22 January HUD functions now have source.
 
 | Newly exact function | Meaningful bytes | Padded bytes | Relocations | Normalized SHA-256 |
 | --- | ---: | ---: | ---: | --- |
 | `_weapon_state_is_depleted` | 39 | 48 | 0 | `5d58458dd78a3f82e3c97ba62d170a9fdd6b92deac467c8c2592d7d9f3fcdbd7` |
 | `_get_object_icon_text_index` | 40 | 48 | 2 | `0e91acf71443ef0fe8c2908a770549be45b9e9409f39079f267fac5828739299` |
-| **Total** | **79** | **96** | **2** | |
+| `_temporary_hud_draw` | 870 | 880 | 75 | `cf69900b9db1dc2f5a083033c67629507b18c0a8102f20e25f004279a1fa7aae` |
+| **Total** | **949** | **976** | **77** | |
 
 Every one of the 16 inherited HUD exact functions remains strict exact.
 
@@ -24,19 +24,23 @@ Every one of the 16 inherited HUD exact functions remains strict exact.
 - January target `hud.obj` SHA-256:
   `fb839de981b5e363e3f3ff72c14a209253dd40f5e1b88c99c720faae8753f3ca`.
 - Rebuilt candidate `hud.obj` SHA-256:
-  `469729a2e3026d721fcddd05e07fd86c3aac22d75c83f6b09b5a86a6d21a4b5c`.
+  `7b3df7713debecc092c5f6f75b55b29ec4fda8b6a308f3092531498e29129d8d`.
 - Compiler: pinned Microsoft VC7/XDK 3911 through the normal Ninja edge and
   PID-isolated `tools/campaign/gate.py` checks.
 - Primary semantic donor: HCEA commit
   `570c83fd9c365dad6f2a3e7041705d5b84c7847c`, especially
   `weapon_state_is_depleted.c`, `get_object_icon_text_index.c`,
   `hud_show_action_response.c`, `hud_draw_screen.c`, and the authenticated
-  HUD/player/unit/weapon enum and structure records.
+  HUD/player/unit/weapon enum and structure records. The database-backed
+  `game_globals_grenade`, `weapon_trigger_definition_flags`, and runtime weapon
+  layouts independently verify the three fields that close the temporary HUD.
 - Independent corroboration: Pastudan Halo commit
   `918af885935ec470a31256ecce9a977b12b01f80` and Stian Halo commit
   `fc11d861865735877d5b8b4c408b1a0c06dde3cf` were searched for the HUD
-  family and checked against January control flow. Neither carries a more
-  complete January source candidate.
+  family and checked against January control flow. Stian's complete raw-offset
+  temporary-HUD lift corroborates the functional blocks but not the final
+  field identities; those are resolved from typed records plus January's exact
+  relocation and offset topology.
 - Marathon commit `ce4fdc63f20f6fa39616a86e717118f4d8bdf25c`
   was checked for contemporary C-series style and type precedent. It has no
   direct Halo action-response or temporary-HUD donor.
@@ -57,9 +61,24 @@ accessors. The `NONE` guard and chained definition/icon lookup naturally
 reproduce the private EAX convention, both relocation identities, and all 48
 padded bytes.
 
+`temporary_hud_draw` reconstructs the complete development HUD from January's
+COFF and the later source-family evidence. It obtains the local player's typed
+unit, equipment, current grenade, and weapon; builds the equipment, grenade,
+magazine, heat, age, active-camouflage, and full-spectrum diagnostic strings;
+draws the zoom-scaled autoaim reticle and trigger-error cone; and emits the
+final text within the render window. The trigger flag names are independently
+authenticated by the HCEA enum database. The target topology proves that the
+grenade label names the projectile reference, that the first reticle uses the
+weapon aim-assist autoaim angle, and that the runtime trigger field is the
+non-analog error interpolant; the retained typed source reflects those
+semantics instead of donor raw offsets. Ordinary VC7 lowering reproduces all
+279 instructions, 75 relocation identities, 870 meaningful bytes, and the
+complete 880-byte padded COMDAT without a compiler-control construct.
+
 The semantic names come from the HCEA source/PDB atlas rather than January
-address placeholders. Both functions are correctly recorded as private static
-symbols in `config/symbols.json`.
+address placeholders. The two private helpers are correctly recorded as
+private static symbols in `config/symbols.json`; `temporary_hud_draw` is
+declared in its owning HUD header.
 
 ## Complete fuzzy reconstructions
 
@@ -139,10 +158,13 @@ typed object/tag subsystem access, semantic private/global names, declaration
 plus initialization where natural, multiline signatures, and explicit
 returns. Public cross-TU declarations are in their owning or closest associated
 headers (`game_engine.h`, `units.h`, the HUD subsystem headers, and
-`rasterizer.h`) rather than duplicated at the use site. The provisional
-weapon-interface layouts remain TU-private: a previous measured campaign pass
-proved that moving those structure definitions into a widely included weapon
-header perturbs the already-exact `units.obj` allocator schedule.
+`rasterizer.h`) rather than duplicated at the use site. The authenticated
+weapon-trigger definition flag enum now lives with its owning definition, and
+the runtime trigger interpolant is named `error` rather than an address or
+placeholder. The provisional weapon-interface layouts remain TU-private: a
+previous measured campaign pass proved that moving those structure definitions
+into a widely included weapon header perturbs the already-exact `units.obj`
+allocator schedule.
 
 There is no forced inline/noinline, `volatile` steering, barrier, pragma,
 optimizer-only alias, raw address field, fake dependency, undefined behavior,
@@ -152,17 +174,20 @@ inline schedule and ownership boundary.
 
 ## Validation
 
-- Focused gate: 18 exact / three residual / one unwritten.
+- Focused gate: 19 exact / three residual / zero unwritten.
 - Full `halobetacache_build` and `libcmt_build`: pass.
-- Strict semantic report: 473 units scanned, 5,214 functions evaluated,
-  5,069 semantic exact, 134 hidden exact, zero unit errors.
+- Strict semantic report: 473 units scanned, 5,215 functions evaluated,
+  5,070 semantic exact, 134 hidden exact, zero unit errors.
 - Park validator: 94 active / zero stale / zero invalid.
 - Protected `units.obj`: 189/189 strict exact.
-- Address-keyed whole-tree regression verdict: two HUD gains and zero losses.
+- Address-keyed whole-tree regression verdict: three HUD gains and zero losses
+  across 7,731 common address keys.
 - Object-admission audit: zero HUD contradictions or revocations.
 - Focused fake-match scan: zero findings.
 - Tooling suite: 255 passed.
 - `git diff --check`: pass.
 
-The validation figures above describe the committed candidate. No whole-object
-completion is claimed while `temporary_hud_draw` remains unwritten.
+The final strict HUD accounting is 2,312 / 4,558 meaningful code bytes and
+2,464 / 4,736 padded COMDAT bytes. Its complete 280-byte `.rdata` section is
+also exact. No whole-object completion is claimed while the three documented
+compiler-boundary residuals remain.
