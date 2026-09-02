@@ -75,6 +75,19 @@ section our base object already emits under a real name. Rename the
 regenerates the split), and the pair gates EXACT. Closed two whole objects this
 session. **Skip candidates that match multiple our-names** — ambiguous.
 
+## stable_verdicts.py — rename-stable whole-tree regression snapshots
+
+```
+python -m tools.campaign.stable_verdicts snapshot scratch/before.json
+python -m tools.campaign.stable_verdicts snapshot scratch/after.json
+python -m tools.campaign.stable_verdicts diff scratch/before.json scratch/after.json
+```
+
+Keys each function by unit plus January target section index, so a reviewed
+semantic symbol rename does not appear as one lost function and one new
+function. The diff exits nonzero for every exact-to-residual/unwritten loss and
+reports the padded bytes gained.
+
 ## units_hunt_all.py — cross-branch splice hunter
 
 ```
