@@ -488,12 +488,6 @@ boolean action_guard_setup_postcombat(
 	long actor_index,
 	struct guard_state_data *state_data);
 
-boolean action_alert_setup(
-	long actor_index,
-	short move_position_order,
-	long target_prop_index,
-	struct alert_state_data *state_data);
-
 void actor_action_change(
 	long actor_index,
 	long new_action_type,
@@ -701,19 +695,6 @@ boolean actor_situation_try_new_target(
 	long prop_index);
 
 void action_sleep_control(
-	long actor_index);
-
-void action_alert_begin(
-	long actor_index);
-boolean action_alert_perform(
-	long actor_index);
-void action_alert_update(
-	long actor_index);
-void action_alert_control(
-	long actor_index);
-void action_alert_flush_position_indices(
-	long actor_index);
-void action_alert_flush_structure_indices(
 	long actor_index);
 
 void action_fight_begin(

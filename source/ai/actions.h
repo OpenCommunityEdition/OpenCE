@@ -52,6 +52,17 @@ enum action_class
 	NUMBER_OF_ACTION_CLASSES,
 };
 
+enum move_position_order
+{
+	_move_position_order_none = 0,
+	_move_position_order_repeat,
+	_move_position_order_loop,
+	_move_position_order_loop_back_and_forth,
+	_move_position_order_loop_randomly,
+	_move_position_order_random,
+	NUMBER_OF_MOVE_POSITION_ORDERS,
+};
+
 
 #define ACTOR_MAXIMUM_AVOIDANCE_RAYS 9
 
@@ -474,6 +485,26 @@ struct pursuit_location *actor_get_pursuit_location(
 	long actor_index);
 
 real_argb_color *actor_action_debug_color(
+	long actor_index);
+
+/* ---------- prototypes/ACTION_ALERT.C */
+
+boolean action_alert_setup(
+	long actor_index,
+	long move_position_order,
+	short initial_move_position_index,
+	struct alert_state_data *state_data);
+void action_alert_begin(
+	long actor_index);
+boolean action_alert_perform(
+	long actor_index);
+void action_alert_update(
+	long actor_index);
+void action_alert_control(
+	long actor_index);
+void action_alert_flush_position_indices(
+	long actor_index);
+void action_alert_flush_structure_indices(
 	long actor_index);
 
 /* ---------- prototypes/ACTION_CHARGE.C */

@@ -9,7 +9,7 @@
 { "file_offset": 1952, "flags": 32, "name": "_distance_squared3d" },
 { "file_offset": 2016, "flags": 32, "name": "_real_random_range" },
 { "file_offset": 2048, "flags": 32, "name": "_action_alert_update" },
-{ "file_offset": 2384, "flags": 32, "name": "_code_00000950" },
+{ "file_offset": 2384, "flags": 32, "name": "_action_alert_next_position", "static": true },
 { "file_offset": 3168, "flags": 32, "name": "_action_alert_perform" },
 { "file_offset": 3776, "flags": 32, "name": "_action_avoid_setup" },
 { "file_offset": 3840, "flags": 32, "name": "_action_avoid_begin" },

@@ -1463,6 +1463,25 @@
         },
         "objdiff_percent": 78.78802
       }
+    },
+    {
+      "unit": "source/ai/action_alert",
+      "function": "_action_alert_next_position",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete alert-position traversal from January disassembly and relocation evidence, the later HCEA semantic implementation, and the matching AI data definitions. The retained ordinary C rejects disabled actors, resolves the actor's encounter and squad through typed accessors, filters every move position by current position, actor distance, noncombat sequence, and nearby props, records unavailable positions with the cseries bit-vector macro, performs weighted-random selection, and implements forward, ping-pong, and per-tick-random traversal with semantic enum constants. It also recovers the private name action_alert_next_position and preserves all eleven exact siblings. Target and candidate carry the same 18 relocation identities in order; January is 784 padded bytes, the candidate is 768, and the freshly generated campaign report records 99.46479 percent similarity. Aligned instruction comparison shows the complete geometry, iterator, bit-vector, random-selection, and traversal body is byte-identical; the residual is limited to January preloading the NONE result in EAX, consequent AL/CL and EAX/ECX register choices in the entry guard, two equivalent full-EAX versus AX sentinel returns, and target-envelope padding. Bounded ordinary-C experiments covered combined, separate, and enclosing entry guards; short and long default-result lifetimes; declaration order; direct versus assigned random returns; natural for/while traversal; and switch/default shapes. They either returned to this fixed point or disturbed exact body code; no volatile or register forcing, compiler barrier, pragma, inline assembly, fake dependency, raw offset, undefined behavior, forced inline, or nonsensical control flow is retained. Reopen only for authoritative January source/local-variable records or a natural compatible-compiler donor explaining the default-result register lifetime.",
+      "measurements": {
+        "target": {
+          "size": 784,
+          "relocation_count": 18,
+          "normalized_sha256": "677fd6cc1a9e66de32123c4614de5a0cc1188501baee69ea20fd5bf74eac3fe4"
+        },
+        "base": {
+          "size": 768,
+          "relocation_count": 18,
+          "normalized_sha256": "4e16c85b544ded3352df48ee7baa0e19b5a34a45e421a975cf11cd771184f371"
+        },
+        "objdiff_percent": 99.46479
+      }
     }
   ]
 }
