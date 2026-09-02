@@ -79,7 +79,10 @@ symbols in this file:
 #include "cseries.h"
 
 #include "ai/actors.h"
+#include "ai/actor_definitions.h"
 #include "ai/props.h"
+
+#include "game/game.h"
 
 #include "memory/data.h"
 
@@ -307,6 +310,37 @@ void actor_stimulus_maneuvering(
 	{
 		actor->stimuli.panic_type = _actor_panic_platoon_retreating;
 		actor->stimuli.panic_prop_index = NONE;
+	}
+
+	return;
+}
+
+void actor_stimulus_abandon_stationary_facing(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition =
+		actor_definition_get(actor->meta.definition_index);
+
+	if (actor->emotions.defensive_crouch)
+	{
+		if (definition->defensive.change_facing_stand_time > 0.0f)
+		{
+			actor->emotions.defensive_crouch = FALSE;
+			actor->emotions.defensive_crouch_timer =
+				(short)(definition->defensive.change_facing_stand_time *
+					TICKS_PER_SECOND);
+			{
+				long prop_index = actor->target.target_prop_index;
+
+				if (prop_index != NONE && prop_get(prop_index)->distance < 4.0f)
+				{
+					actor->emotions.perceived_danger = MAX(
+						actor->emotions.perceived_danger,
+						1.8f);
+				}
+			}
+		}
 	}
 
 	return;

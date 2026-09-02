@@ -1014,6 +1014,8 @@ boolean actor_perception_create_orphan_from_friend(
 
 /* ---------- prototypes/ACTOR_STIMULUS.C */
 
+void actor_stimulus_abandon_stationary_facing(
+	long actor_index);
 void actor_stimulus_prop_acknowledged(
 	long actor_index,
 	long prop_index,
