@@ -1,5 +1,8 @@
 # `lightning.obj` credible fuzzy completion (2026-09-02)
 
+> Historical baseline ledger. The current retained source and measurements are
+> superseded by `lightning_obj_fable_salvage_reconciliation_20260902.md`.
+
 ## Result
 
 This lane reconstructed the last two unwritten owners in

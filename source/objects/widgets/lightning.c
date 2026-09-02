@@ -47,9 +47,11 @@ symbols in this file:
 #include "bitmaps/bitmap_group.h"
 #include "cache/texture_cache.h"
 #include "cseries/cseries.h"
+#include "interface/hud_draw.h"
 #include "math/real_math.h"
 #include "objects/objects.h"
 #include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_geometry.h"
 #include "render/render.h"
 #include "saved games/game_state.h"
 #include "shaders/shader_definitions.h"
@@ -60,30 +62,25 @@ symbols in this file:
 
 enum
 {
-	MAXIMUM_INTERMEDIATE_LIGHTNING_POINTS = 4096
+	LIGHTNING_TAG = 'elec',
+	MAXIMUM_LIGHTNING_POINTS = 4097,
 };
 
 enum
 {
 	_lightning_marker_not_connected_to_next_marker_bit = 0,
-	NUMBER_OF_LIGHTNING_MARKER_FLAGS
 };
 
 enum
 {
 	_rasterizer_lock_none = 0,
-	_rasterizer_lock_lightning = 12
-};
-
-enum
-{
-	_rasterizer_vertex_type_dynamic_unlit = 6
+	_rasterizer_lock_lightning = 12,
 };
 
 /* ---------- macros */
 
 #define lightning_definition_get(definition_index) \
-	((struct lightning_definition *)tag_get('elec', (definition_index)))
+	((struct lightning_definition *)tag_get(LIGHTNING_TAG, (definition_index)))
 
 /* ---------- structures */
 
@@ -91,34 +88,34 @@ struct lightning_marker_definition
 {
 	char attachment_marker[32];
 	word flags;
-	word pad22;
-	word octaves_to_next_marker;
+	short type;
+	short octaves_to_next_marker;
 	word pad26;
-	long unknown28[19];
+	byte reserved28[0x4C];
 	real_vector3d random_position_bounds;
 	real random_jitter_offset;
 	real thickness;
 	real_argb_color tint;
-	long unknown98[19];
+	byte reserved98[0x4C];
 };
 
 struct lightning_definition
 {
 	word flags;
 	short count;
-	long unknown4[4];
+	byte reserved04[0x10];
 	real near_fade_distance;
 	real far_fade_distance;
-	long unknown1C[4];
+	byte reserved1C[0x10];
 	short jitter_scale_source;
 	short thickness_scale_source;
 	short tint_modulation_source;
 	short brightness_scale_source;
 	struct tag_reference map;
-	long unknown44[21];
+	byte reserved44[0x54];
 	struct tag_block markers;
 	struct tag_block shaders;
-	long unknownB0[22];
+	byte reservedB0[0x58];
 };
 
 struct intermediate_lightning_point
@@ -127,6 +124,7 @@ struct intermediate_lightning_point
 	real width;
 	real_argb_color color;
 	boolean valid;
+	byte pad21[3];
 };
 
 struct lightning_vertex
@@ -161,12 +159,14 @@ typedef char intermediate_lightning_point_valid_offset_assert[
 
 /* ---------- prototypes */
 
-unsigned long real_argb_color_to_pixel32(
-	real_argb_color const *color);
+static void lightning_offset_marker_position(
+	real_point3d *position,
+	real_matrix4x3 const *matrix,
+	real_vector3d const *random_position_bounds);
 
 /* ---------- globals */
 
-struct lightning_globals lightning_globals;
+struct lightning_globals lightning_globals = {0};
 
 /* ---------- public code */
 
@@ -245,9 +245,9 @@ static void lightning_offset_marker_position(
 	match_assert("c:\\halo\\SOURCE\\objects\\widgets\\lightning.c", 117, matrix);
 	match_assert("c:\\halo\\SOURCE\\objects\\widgets\\lightning.c", 118, random_position_bounds);
 
-	random_z = real_local_random();
-	random_y = real_local_random();
-	random_x = real_local_random();
+	random_z = real_seed_random(get_global_local_random_seed_address());
+	random_y = real_seed_random(get_global_local_random_seed_address());
+	random_x = real_seed_random(get_global_local_random_seed_address());
 
 	offset.i = (2.f*random_x - 1.f)*random_position_bounds->i;
 	offset.j = (2.f*random_y - 1.f)*random_position_bounds->j;
@@ -290,7 +290,7 @@ void lightning_submit(
 
 			if (_texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
 			{
-				struct intermediate_lightning_point points[MAXIMUM_INTERMEDIATE_LIGHTNING_POINTS + 1];
+				struct intermediate_lightning_point points[MAXIMUM_LIGHTNING_POINTS];
 				short instance_index;
 
 				for (instance_index = 0; instance_index < definition->count; instance_index++)
@@ -349,13 +349,13 @@ void lightning_submit(
 								{
 									struct lightning_vertex *vertices = rasterizer_dynamic_vertices_lock(vertex_buffer_index);
 									real one_over_point_count = 1.f/point_count;
-									real u_offset = real_local_random();
+									real u_offset = real_seed_random(get_global_local_random_seed_address());
 									real thickness_scale = 1.f;
 									real_rgb_color const *tint = global_real_rgb_white;
 									real brightness_scale = 1.f;
 									real_rectangle3d bounds;
 									real_point3d centroid;
-									struct shader *shader;
+									struct shader const *shader;
 									short vertex_index;
 
 									match_assert("c:\\halo\\SOURCE\\objects\\widgets\\lightning.c", 239, vertices);
@@ -494,7 +494,11 @@ void lightning_submit(
 								&up);
 							cross_product3d(&up, &render.camera.forward, &up);
 							if (normalize3d(&up) == 0.f)
-								up = *(real_vector3d const *)global_z_axis3d;
+							{
+								up.i = global_z_axis3d->x;
+								up.j = global_z_axis3d->y;
+								up.k = global_z_axis3d->z;
+							}
 
 							for (octave_index = 1; octave_index <= octaves; octave_index++)
 							{
@@ -523,7 +527,10 @@ void lightning_submit(
 
 									match_assert("c:\\halo\\SOURCE\\objects\\widgets\\lightning.c", 426, !points[point_count+segment_point_index].valid);
 
-									jitter = real_local_random_range(-1.f, 1.f)*jitter_offset;
+									jitter = real_seed_random_range(
+										get_global_local_random_seed_address(),
+										-1.f,
+										1.f)*jitter_offset;
 									scale_vector3d(&up, jitter, &offset);
 									set_real_point3d(
 										&point->position,

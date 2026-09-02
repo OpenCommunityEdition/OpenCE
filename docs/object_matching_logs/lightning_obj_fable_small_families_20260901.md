@@ -111,3 +111,12 @@ January assert text (`point_count`, `segment_point_count`,
 ## Disposition
 
 In progress - see the end of the file for the final state.
+
+## Salvage disposition (2026-09-02)
+
+This preserved worker snapshot was imported atomically as commit `606c3b44b`
+and then reconciled against the newer canonical Lightning source and current
+house rules. The admitted source, frozen-base comparison, current measurements,
+and final verification are recorded in
+`lightning_obj_fable_salvage_reconciliation_20260902.md`. This section does not
+retroactively turn the worker's parked residuals into exact matches.
