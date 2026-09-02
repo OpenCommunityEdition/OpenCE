@@ -1963,6 +1963,25 @@
         },
         "objdiff_percent": 81.507355
       }
+    },
+    {
+      "unit": "source/game/game_engine_race",
+      "function": "_race_engine_get_score",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed Race score getter from January disassembly and the independent later-Xbox HaloCEA implementation. The retained ordinary C returns the semantic team score for _get_score_team and otherwise combines the player's completed laps with the exact count_bits_32 population count of touched flags. January and the candidate are both 224 padded bytes with four relocations and objdiff reports 84.46 percent similarity. January keeps the lap bit vector in EDX, the lap count in EDI, and the inlined population count in ESI; VC7 selects an equivalent register permutation. Natural assignment-order and direct-expression probes reproduce the permutation, while a scoped bit-vector local prevents the target's helper unroll and shrinks the function to 96 bytes. The fail-closed classifier returns UNKNOWN, so no compiler recipe is claimed. No forced inline/noinline, volatile/register forcing, barrier, pragma, assembly, fake dependency, raw address, undefined behavior, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the inlined-helper register allocation.",
+      "measurements": {
+        "target": {
+          "size": 224,
+          "relocation_count": 4,
+          "normalized_sha256": "d4de45e4555836b0b784b385c6fe1a16eb949a3b107f3a16331d2c300d667db1"
+        },
+        "base": {
+          "size": 224,
+          "relocation_count": 4,
+          "normalized_sha256": "4f2137667212ade01aa3926e67a3ad0b3d726bec432a345a596e2e03a5948ce8"
+        },
+        "objdiff_percent": 84.45783
+      }
     }
   ]
 }
