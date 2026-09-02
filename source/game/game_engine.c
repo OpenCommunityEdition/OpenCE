@@ -545,6 +545,7 @@ symbols in this file:
 #include "bitmaps/bitmap_group.h"
 #include "game_globals.h"
 #include "interface/interface.h"
+#include "interface/hud_messaging.h"
 #include "interface/terminal.h"
 #include "interface/ui_widget.h"
 #include "input/input.h"
@@ -851,10 +852,6 @@ void rasterizer_draw_unicode_string(
 	short parameter2,
 	short parameter3,
 	wchar_t const *string);
-
-void hud_print_message(
-	word local_player_index,
-	wchar_t const *message);
 
 struct bitmap_data *bitmap_group_try_and_get_bitmap(
 	long bitmap_group_index,
