@@ -1555,7 +1555,7 @@ static void bitmap_2d_smooth(
 		}
 		else
 		{
-			error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+			error(_error_silent, "### ERROR failed to allocate temporary buffer");
 		}
 	}
 	else
@@ -1744,7 +1744,7 @@ static void bitmap_3d_smooth(
 		}
 		else
 		{
-			error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+			error(_error_silent, "### ERROR failed to allocate temporary buffer");
 		}
 	}
 	else
@@ -1881,7 +1881,7 @@ static void bitmap_2d_sharpen(
 		}
 		else
 		{
-			error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+			error(_error_silent, "### ERROR failed to allocate temporary buffer");
 		}
 	}
 

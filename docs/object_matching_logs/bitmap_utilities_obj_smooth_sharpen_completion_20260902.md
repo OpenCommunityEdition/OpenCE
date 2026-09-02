@@ -35,7 +35,7 @@ direct analogue for this family.
 
 HaloCEA was used as semantic evidence rather than copied blindly. January adds
 the validation assertions HaloCEA omits, calls
-`error(_error_silent, "### ERROR failed to allocate temporary bitmap")` when a
+`error(_error_silent, "### ERROR failed to allocate temporary buffer")` when a
 scratch allocation fails, and passes `"\r\n"` as an unused `fprintf` vararg in
 the warning paths. Those shipped behaviors are preserved. HaloCEA's PPC
 `bitmap_2d_sharpen` float-last ABI note was rejected: January x86 proves the
