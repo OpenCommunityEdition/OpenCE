@@ -60,7 +60,7 @@ enum weapon_trigger_definition_flags
 	_weapon_trigger_projectiles_cannot_be_aimed_bit,
 	_weapon_trigger_projectiles_have_identical_error_bit,
 	_weapon_trigger_client_side_only_bit,
-	NUMBER_OF_WEAPON_TRIGGER_DEFINITION_FLAGS,
+	NUMBER_OF_WEAPON_TRIGGER_FLAGS,
 };
 
 /* ---------- macros */
