@@ -361,6 +361,7 @@
 					"source/text/text_group.h",
 					"source/text/unicode.h",
 					"source/tool/connected_geometry.h",
+					"source/tool/error_geometry.h",
 					"source/tool/intermediate_geometry.h",
 					"source/units/biped_definitions.h",
 					"source/units/biped_limp_noodle.h",

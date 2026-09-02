@@ -1054,6 +1054,25 @@
     },
     {
       "unit": "source/tool/connected_geometry",
+      "function": "_connected_geometry_find_or_add_vertex",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after replacing the Fable compact loop with the independently reconstructed Stian topology while keeping canonical real_point3d and dynamic-array types. Target and candidate have the same 192-byte padded envelope, all eight relocation types, destinations, and addresses, and 80 decoded instructions. The remaining divergence is confined to two equivalent coordinate-difference evaluations and the final three scalar copies: January keeps point.y and point.z on x87 across each getter, while VC7 uses an integer bit-copy into the same four-byte local before reloading it; the final stores use an interchangeable ECX/EDX allocation. The direct Fable conjunction and reversed inline absolute-difference forms both collapsed to 176 bytes, while the donor-shaped named pending coordinate recovered January's frame, size, relocation packet, and instruction count. The retained code is coherent typed C with no volatile access, alias trick, compiler directive, inline assembly, raw offset, or inert dependency. Reopen only for authoritative January local/source records or a natural same-compiler source donor that establishes the remaining x87 lifetime and copy-register choices.",
+      "measurements": {
+        "target": {
+          "size": 192,
+          "relocation_count": 8,
+          "normalized_sha256": "c21c80fafbc4175df12584cdd83cf153b979272feeab86c9354405901df8253a"
+        },
+        "base": {
+          "size": 192,
+          "relocation_count": 8,
+          "normalized_sha256": "e42aac4dc8c567a7fd1f8072038969e00f4fce226c654ca16451e47d20c9afc0"
+        },
+        "objdiff_percent": 91.02597
+      }
+    },
+    {
+      "unit": "source/tool/connected_geometry",
       "function": "_triangle_coplanar",
       "class": "instruction-scheduling",
       "evidence": "Fuzzy-parked under the current house rule after recovering the natural typed C predicate from the independently corroborating Stian reconstruction and HCEA geometry types, then preserving January's authenticated y+z+x dot-product topology. Target and candidate have the same 384-byte padded envelope, 11 relocation destinations and addresses, and 151 decoded instructions. The sole remaining difference is one dependency-free x87 operand choice at target offsets +0x11D/+0x11F: January loads point2.x and multiplies by plane.n.i, while VC7 loads plane.n.i and multiplies by point2.x. Sequential accumulation closes the later dot-product schedule exactly. Measured inert or inferior: reversing the point2.x expression operands, reversing the final product operands, explicit final grouping, k+i+j grouping, sequential point2 accumulation, and a named point-product temporary. The retained source uses real_point3d/real_plane3d, typed dynamic-array records, authenticated private symbol and enum-independent bit tests; it contains no assembly, volatile access, fake dependency, raw address name, undefined offset access, or nonsensical control flow. Reopen only for authoritative January source/local records or a natural same-compiler x87 scheduling donor.",
