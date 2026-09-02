@@ -72,17 +72,30 @@ struct breakable_surface_particle_effect
 
 /* ---------- prototypes/BREAKABLE_SURFACES.C */
 
-struct breakable_surface_datum *breakable_surface_get(short breakable_surface_index);
-void breakable_surfaces_initialize(void);
-void breakable_surfaces_dispose(void);
-void breakable_surfaces_initialize_for_new_map(void);
-void breakable_surfaces_dispose_from_old_map(void);
-void breakable_surfaces_enable(boolean state);
-void breakable_surfaces_reset(void);
-byte *breakable_surface_flags_get(void);
-boolean breakable_surface_extant(short breakable_surface_index);
-void breakable_surface_damage(short breakable_surface_index, struct damage_data *damage_data, long seed_surface_index);
-void breakable_surface_damage_area_of_effect(const struct damage_data *damage_data);
+struct breakable_surface_datum *breakable_surface_get(
+	short breakable_surface_index);
+void breakable_surfaces_initialize(
+	void);
+void breakable_surfaces_dispose(
+	void);
+void breakable_surfaces_initialize_for_new_map(
+	void);
+void breakable_surfaces_dispose_from_old_map(
+	void);
+void breakable_surfaces_enable(
+	boolean state);
+void breakable_surfaces_reset(
+	void);
+byte *breakable_surface_flags_get(
+	void);
+boolean breakable_surface_extant(
+	short breakable_surface_index);
+void breakable_surface_damage(
+	short breakable_surface_index,
+	struct damage_data *damage_data,
+	long seed_surface_index);
+void breakable_surface_damage_area_of_effect(
+	const struct damage_data *damage_data);
 
 /* ---------- globals */
 

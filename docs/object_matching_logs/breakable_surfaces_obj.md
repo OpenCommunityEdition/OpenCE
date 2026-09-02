@@ -8,7 +8,8 @@
 - Compiler: XDK 3911 Microsoft C/C++ 13.00.9254.1
 - Flags: `/O2 /Oy- /Ow /QIfist /DDEBUG /Dxbox`
 - Comparator: hardened COFF function and section comparison
-- Status: active closeout lane; no matching credit has been granted
+- Status: rigorously fuzzy-parked at the current natural-source frontier; no
+  strict matching credit has been granted
 
 The rough October source at
 `C:\Users\isabe\Downloads\halo-main (1)\halo-main\src\halo\physics\breakable_surfaces.c`
@@ -21,18 +22,24 @@ remain authoritative.
 - Only residual: `_breakable_surface_effect`.
 - Target/current padded size: `0xFC0/0xFC0` (`4032/4032`).
 - Target/current relocations: `117/117`, with the same semantic destinations.
-- Target/current frame: `0x1240/0x1230`.
+- Target/current frame: `0x1240/0x1240`.
 - Target normalized SHA-256:
   `510486a7d0a1f2fc1dfb8f0c47990c57f83ce1030ef5e4db8dfc42943dc56bfa`
 - Current normalized SHA-256:
-  `fcf66a3ce196b5295b412824a98f874123effcdf9f3043e6a1cd9bb98bfcaef2`
+  `678a8125d160643a9f1226240128c662bcbb85e7f968f8fd3ed0f0b411f77797`
 - All 11 protected sibling functions remain strict exact.
 
-The current source is the E09 traversal/audio scratch union plus the E18
-`rectangle2d grid_bounds` shape. It was rebuilt from source under the
-canonical flags after all later analysis-only experiments were reverted.
+The current source is the 2026-08-31 Claude reconstruction reconciled against
+the current shared headers and September house rules. It supersedes the E09
+traversal/audio scratch union checkpoint described below. The older experiment
+ledger remains here because it is still useful negative evidence.
 
-## Accepted controls retained in source
+## Historical checkpoint controls (superseded)
+
+E09 and E18 were legitimate intermediate evidence, but they are no longer the
+production source shape. The final reconciliation recovered the later natural
+block lifetimes and the same `rectangle2d` field meanings without retaining the
+scratch union.
 
 ### E09: traversal/audio scratch union
 
@@ -266,9 +273,80 @@ Reopen only with evidence for one of:
 
 ## Disposition
 
-`NonMatching` / rigorously parked at 11/12 exact functions. The retained E09
-and E18 changes are an evidence-backed improvement checkpoint, not an object
-completion. Do not mark the object complete or grant credit from equal size
-or semantic plausibility. Reopen only if an authentic source blob, a
-distinct compatible VC7/XDK compiler or QFE, or a strict reconstructed-C
-donor becomes available.
+`NonMatching` / rigorously parked at 11/12 exact functions. E09 and E18 were
+evidence-backed improvement checkpoints, not object completion. The newer
+reconciliation below is authoritative. Do not mark the object complete or
+grant credit from equal size or semantic plausibility.
+
+## 2026-09-01 Claude-frontier and house-rule reconciliation
+
+### Corpus audit
+
+The closeout reviewed all 1,648 registered worktrees and reduced their
+`breakable_surfaces.c` files to twelve distinct source variants. The unique
+complete frontier was the history on `claude/breakable-surfaces-20260830`, in
+particular commits `7fbe2a94d`, `a324c519b`, `39207d9ec`, `a5af3125d`,
+`ba1109b49`, and `230dc0af0`. It was checked against the separate
+`exact-breakable-surfaces-closeout` lane, the canonical/object log history,
+`research/breakable_surfaces_closeout/`, the January target, the HCEX PDB and
+PowerPC implementation, the HCEA donor, the October reconstruction, and the
+local same-compiler donor census. No worktree contained a later credible
+frontier.
+
+The retained source recovers the complete surface traversal and projection,
+particle-grid generation, outward/forward impulse shaping, particle tint and
+alpha evaluation, and optional break sound. It also retains the evidence-backed
+natural block scopes, `rectangle2d` grid bounds, `real_point3d` vertex lvalues,
+semantic private helper names, grouped j/k plane-distance association, and the
+target alpha multiplication order. The old duplicate TU-local conversion
+helper was removed: all four conversions now use the authenticated shared
+`fast_ftol` in `source/cseries/cseries.h`. That two-instruction x87 helper is
+independently corroborated by the HCEX PDB and January's
+`actor_combat.obj`, and is within the house rule allowing sparse assembly in a
+math/helper primitive.
+
+### Inline ownership
+
+Calling the shared header `point_from_line3d` directly leaves a candidate-only
+COMDAT even though January owns none in this object. The production source
+therefore uses a transparent, coordinate-for-coordinate scalar expansion of
+that header body. Its semantic local bindings model the inline function's
+parameters, preserve the exact `0x1240` frame and `0xFC0` padded envelope, and
+emit no `_point_from_line3d` symbol or COMDAT. Plain direct statements also
+remove the COMDAT, but make VC7 collapse the function to `0xFB0`; that less
+faithful schedule was rejected. No forced-inline/noinline attribute, pragma,
+volatile access, barrier, assembly in the effect routine, or fake dependency
+is retained.
+
+### Final measurements and residual
+
+- Strict gate: `11 exact / 1 residual / 0 unwritten`.
+- `_breakable_surface_effect`: target/current padded size `4032/4032`.
+- Frame: target/current `0x1240/0x1240`.
+- Relocations: `117/117`; relocation types and symbolic destinations occur in
+  the same sequence.
+- Objdiff fuzzy similarity: `99.8042%`.
+- Target normalized SHA-256:
+  `510486a7d0a1f2fc1dfb8f0c47990c57f83ce1030ef5e4db8dfc42943dc56bfa`.
+- Candidate normalized SHA-256:
+  `678a8125d160643a9f1226240128c662bcbb85e7f968f8fd3ed0f0b411f77797`.
+- All eleven sibling functions and the object's owned data remain strict exact.
+
+The aligned 1,156-target/1,155-candidate instruction diff reduces the genuine
+code differences to two small x87 regions: commutative operand-role selection
+in one `cross_product3d` expansion around target offsets `0x37B`-`0x392`, and
+an equivalent `fxch`/load/pop stack schedule in the first scalar-expanded grid
+offset around `0x97D`-`0x9B1`. More than seventy ordinary-C declaration, scope,
+association, helper, operand-order, and compiler-shape probes either returned
+to this fixed point or degraded broader code. Relocation-name differences shown
+by the historical aligned-diff utility are annotation artifacts; the hardened
+COFF comparison resolves their symbolic destinations.
+
+### Final disposition
+
+This is the most complete authentic, house-rule-compliant source currently
+available, but it is not byte exact and earns no strict completion credit. It
+is evidence-parked as `instruction-scheduling`. Reopen only for authoritative
+January source/local records, an authenticated compatible compiler/QFE, or a
+natural same-compiler donor that explains the remaining x87 operand and stack
+choices.
