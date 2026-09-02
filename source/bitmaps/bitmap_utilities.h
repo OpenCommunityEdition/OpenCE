@@ -41,5 +41,8 @@ void bitmap_uncompress_from_mipmap(
 	struct bitmap_data *source_bitmap,
 	struct bitmap_data *destination_bitmap,
 	short source_mipmap_index);
+union real_rgb_color *pixel32_to_real_rgb_color(
+	pixel32 color,
+	union real_rgb_color *result);
 
 #endif /* __BITMAP_UTILITIES_H */

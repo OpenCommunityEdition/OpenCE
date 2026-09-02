@@ -84,6 +84,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "math/real_math.h"
+#include "interface/hud_draw.h"
 
 /* ---------- constants */
 

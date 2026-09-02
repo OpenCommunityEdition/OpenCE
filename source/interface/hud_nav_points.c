@@ -107,12 +107,19 @@ symbols in this file:
 #include "physics/collision_usage.h"
 #include "math/integer_math.h"
 #include "math/real_math.h"
+#include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmap_utilities.h"
+#include "cache/texture_cache.h"
 #include "tag_files/tag_groups.h"
 #include "interface/hud.h"
 #include "interface/hud_definitions.h"
+#include "interface/hud_draw.h"
 #include "objects/object_types.h"
+#include "render/render.h"
+#include "render/render_cameras_internal.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
@@ -126,6 +133,28 @@ enum
 	_hud_nav_point_type_flag,
 	_hud_nav_point_type_object,
 	_hud_nav_point_type_game_engine_flag
+};
+
+enum waypoint_type
+{
+	_waypoint_on_screen,
+	_waypoint_off_screen,
+	_waypoint_occluded,
+	NUMBER_OF_WAYPOINT_TYPES
+};
+
+enum hud_waypoint_arrow_flags
+{
+	_hud_waypoint_dont_rotate_offscreen_bit,
+	NUMBER_OF_HUD_WAYPOINT_ARROW_FLAGS
+};
+
+enum hud_number_show_flags
+{
+	_hud_number_show_all_leading_zeros_bit,
+	_hud_number_show_only_when_zoomed_bit,
+	_hud_number_show_trailing_m_bit,
+	NUMBER_OF_HUD_NUMBER_SHOW_FLAGS
 };
 
 /* ---------- structures */
@@ -157,6 +186,17 @@ struct hud_color_definition
 	real flash_length;
 	unsigned long disabled_color;
 	unsigned long custom;
+};
+
+struct number_hud_element_definition
+{
+	struct hud_placement_definition placement;
+	struct hud_color_definition colors;
+	byte digits;
+	byte number_flags;
+	byte fractional_digits;
+	byte pad;
+	long unused[3];
 };
 
 struct hud_messaging_parameters_definition
@@ -729,6 +769,257 @@ short hud_get_nav_point_render_type(
 	--global_current_collision_user_depth;
 
 	return render_type;
+}
+
+void custom_render_nav_point(
+	short local_player_index,
+	real_point3d const *position,
+	short nav_index,
+	short waypoint_type)
+{
+	long return_eip = get_return_eip();
+	long stack_buffer[0x80];
+	struct hud_waypoint_arrow *arrow;
+	real_point3d view_point;
+	real distance;
+	real arrow_scale;
+	real_point2d screen_point;
+	real horizontal_radius;
+	real vertical_radius;
+	real vertical_component;
+	real horizontal_component;
+	real radius_product;
+	real theta;
+
+	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+
+	arrow = TAG_BLOCK_GET_ELEMENT(
+		&hud_globals->waypoint.arrows,
+		nav_index,
+		struct hud_waypoint_arrow);
+	view_point = *position;
+
+	{
+		long unit_index = local_player_get_player_index(local_player_index)==NONE ?
+			NONE :
+			player_get(local_player_get_player_index(local_player_index))->unit_index;
+		real_point3d camera_position;
+		real delta_x;
+		real delta_y;
+		real delta_z;
+
+		unit_get_camera_position(unit_index, &camera_position);
+
+		delta_x = position->x-camera_position.x;
+		delta_y = position->y-camera_position.y;
+		delta_z = position->z-camera_position.z;
+		distance = square_root(
+			delta_x*delta_x + (delta_y*delta_y + delta_z*delta_z));
+	}
+
+	if (distance>15.0f)
+	{
+		arrow_scale = 0.5f;
+	}
+	else
+	{
+		arrow_scale = (real)pow(
+			1.0f-distance*(1.0f/15.0f),
+			0.7) + 0.5f;
+	}
+
+	matrix4x3_transform_point(
+		&render.frustum.world_to_view,
+		&view_point,
+		&view_point);
+
+	if (waypoint_type==_waypoint_off_screen ||
+		!render_camera_view_to_screen(
+			&render.camera,
+			&render.frustum,
+			&view_point,
+			&screen_point))
+	{
+		screen_point.x = view_point.x;
+		screen_point.y = -view_point.y;
+		waypoint_type = _waypoint_off_screen;
+	}
+	else
+	{
+		screen_point.x -= (real)(
+			((render.camera.viewport_bounds.x1-render.camera.viewport_bounds.x0)/2) +
+			render.camera.viewport_bounds.x0);
+		screen_point.y -= (real)(
+			((render.camera.viewport_bounds.y1-render.camera.viewport_bounds.y0)/2) +
+			render.camera.viewport_bounds.y0);
+	}
+
+	horizontal_radius =
+		((real)(render.camera.window_bounds.x1-render.camera.window_bounds.x0) -
+		(hud_globals->waypoint.right_offset+hud_globals->waypoint.left_offset))*0.5f;
+	vertical_radius =
+		((real)(render.camera.window_bounds.y1-render.camera.window_bounds.y0) -
+		(hud_globals->waypoint.bottom_offset+hud_globals->waypoint.top_offset))*0.5f;
+	radius_product = vertical_radius*horizontal_radius;
+	vertical_component = vertical_radius*screen_point.x;
+	horizontal_component = horizontal_radius*screen_point.y;
+	theta = 0.0f;
+
+	if (waypoint_type==_waypoint_off_screen ||
+		radius_product*radius_product <=
+		vertical_component*vertical_component + horizontal_component*horizontal_component)
+	{
+		real scale = square_root(
+			(radius_product*radius_product) /
+			(vertical_component*vertical_component + horizontal_component*horizontal_component));
+
+		waypoint_type = _waypoint_off_screen;
+		screen_point.x *= scale;
+		screen_point.y *= scale;
+
+		if (!TEST_FLAG(arrow->flags, _hud_waypoint_dont_rotate_offscreen_bit))
+		{
+			theta = -arctangent(screen_point.x, screen_point.y);
+		}
+	}
+
+	screen_point.x += (real)(
+		(render.camera.viewport_bounds.x1-render.camera.viewport_bounds.x0)/2);
+	screen_point.y += (real)(
+		(render.camera.viewport_bounds.y1-render.camera.viewport_bounds.y0)/2);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\hud_nav_points.c",
+		615,
+		waypoint_type!=NONE);
+
+	{
+		long bitmap_group_index = hud_globals->waypoint.arrow_bitmap.index;
+		struct bitmap_data *bitmap = NULL;
+		real_rectangle2d const *clip = NULL;
+
+		hud_retrieve_bitmap_and_bounding_rect(
+			bitmap_group_index,
+			arrow->sequence_indices[waypoint_type],
+			0,
+			&bitmap,
+			&clip);
+
+		if (bitmap && _texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
+		{
+			point2d point;
+			real_rgb_color color;
+			byte alpha;
+			real fade;
+
+			point.x = (short)(long)screen_point.x;
+			point.y = (short)(long)screen_point.y;
+			alpha = (byte)PIN(fast_ftol_C(arrow->opacity)*255, 0, 255);
+			pixel32_to_real_rgb_color(arrow->color, &color);
+			fade = 1.0f-arrow->fade;
+			color.red *= PIN(fade, 0.0f, 1.0f);
+			color.green *= PIN(fade, 0.0f, 1.0f);
+			color.blue *= PIN(fade, 0.0f, 1.0f);
+
+			hud_draw_bitmap_direct(
+				bitmap,
+				_hud_anchor_center,
+				&point,
+				clip,
+				arrow_scale,
+				theta,
+				((pixel32)alpha<<24) | real_rgb_color_to_pixel32(&color),
+				FALSE);
+
+			if (waypoint_type!=_waypoint_off_screen)
+			{
+				struct number_hud_element_definition numbers;
+				struct hud_absolute_placement_definition placement;
+				real decimal_modulus;
+				real bitmap_extent;
+
+				distance *= 3.0480001f;
+				csmemset(&placement, 0, sizeof(placement));
+				csmemset(&numbers, 0, sizeof(numbers));
+
+				placement.corner = _hud_anchor_top_left;
+				numbers.colors.color =
+					((pixel32)alpha<<24) | real_rgb_color_to_pixel32(&color);
+				numbers.colors.flash_color =
+					((pixel32)alpha<<24) | real_rgb_color_to_pixel32(&color);
+				numbers.digits = 3;
+				numbers.fractional_digits = 1;
+				numbers.number_flags =
+					FLAG(_hud_number_show_all_leading_zeros_bit) |
+					FLAG(_hud_number_show_trailing_m_bit);
+
+				bitmap_extent =
+					((clip->x1-clip->x0)*(real)bitmap->width)*0.5f;
+				numbers.placement.offset.x = (short)(long)(
+					bitmap_extent*arrow_scale*0.33000001f + (real)point.x);
+				bitmap_extent =
+					((clip->y1-clip->y0)*(real)bitmap->height)*0.5f;
+				numbers.placement.offset.y = (short)(long)(
+					bitmap_extent*arrow_scale*0.66000003f + (real)point.y);
+				numbers.placement.offset.x -= render.camera.window_bounds.x0;
+				numbers.placement.offset.x += render.camera.viewport_bounds.x0;
+				numbers.placement.offset.y -= render.camera.window_bounds.y0;
+				numbers.placement.offset.y += render.camera.viewport_bounds.y0;
+
+				decimal_modulus = (real)pow(10.0, 4.0);
+				{
+					short decimal_value = (short)fast_ftol(
+						(real)fmod(
+							fabs(decimal_modulus*distance),
+							decimal_modulus));
+
+					hud_draw_numbers(
+						local_player_index,
+						&placement,
+						&numbers,
+						(short)fast_ftol_C(distance),
+						decimal_value,
+						0,
+						0,
+						0.0f);
+				}
+			}
+		}
+	}
+
+	{
+		short corrupt_index;
+		short buffer_index;
+
+		for (buffer_index = 0x7F; buffer_index>=0; buffer_index--)
+		{
+			if (stack_buffer[buffer_index]!=0x62626262)
+			{
+				goto corrupt_stack_found_custom_render_nav_point;
+			}
+		}
+
+		corrupt_index = NONE;
+		goto stack_buffer_checked_custom_render_nav_point;
+
+corrupt_stack_found_custom_render_nav_point:
+		corrupt_index = buffer_index;
+
+stack_buffer_checked_custom_render_nav_point:
+
+		match_vassert(
+			"c:\\halo\\SOURCE\\interface\\hud_nav_points.c",
+			675,
+			return_eip==get_return_eip(),
+			"corrupt return address!");
+		match_vassert(
+			"c:\\halo\\SOURCE\\interface\\hud_nav_points.c",
+			675,
+			corrupt_index==NONE,
+			csprintf(temporary, "corrupt stack at %d!", corrupt_index));
+	}
+
+	return;
 }
 
 void hud_render_nav_points(

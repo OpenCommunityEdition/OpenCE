@@ -1330,6 +1330,44 @@
         },
         "objdiff_percent": 86.30959
       }
+    },
+    {
+      "unit": "source/interface/hud_nav_points",
+      "function": "_custom_render_nav_point",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete January four-argument waypoint renderer from the January target and the later HCEA semantic donor. The retained ordinary C implements camera-distance scaling, view projection, ellipse clamping and optional rotation, typed waypoint bitmap retrieval, opacity/fade color packing, the on-screen meter readout, and January's full stack guard. Target and candidate have the same 1632-byte padded envelope, all 95 relocation identities at the same addresses, and the same instruction boundaries throughout. Only eight normalized bytes remain at +0x58A: January pushes the zero override-scale argument before loading decimal_value and distance, while VC7 hoists those two independent loads before that push. Direct and block-local decimal expressions, explicit and implicit short conversion, and literal/local zero spellings reproduce the same schedule. The complete Git/worktree/COFF census, HCEA commit 570c83fd9c365dad6f2a3e7041705d5b84c7847c, and Marathon commit ce4fdc63f20f6fa39616a86e717118f4d8bdf25c provide no closer source. No volatile access, compiler barrier, artificial alias, forced inlining, pragma, fake dependency, assembly, undefined behavior, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining that final argument-load schedule.",
+      "measurements": {
+        "target": {
+          "size": 1632,
+          "relocation_count": 95,
+          "normalized_sha256": "287a20cd338648964303d1f60b46e9cdf94753f43718b48f8c648a0dd9e60306"
+        },
+        "base": {
+          "size": 1632,
+          "relocation_count": 95,
+          "normalized_sha256": "ad77c226edfd32a6644d9d531123945d71c2341f7b2aaa929edef572045157ca"
+        },
+        "objdiff_percent": 99.579155
+      }
+    },
+    {
+      "unit": "source/interface/hud_nav_points",
+      "function": "_hud_render_nav_points",
+      "class": "tu-context-optimization",
+      "evidence": "Fuzzy-parked under the current house rule with the complete typed four-waypoint traversal retained. The routine validates the local player and arrow bitmap, resolves flag/object/game-engine destinations with typed tag and object access, applies the vertical offset, and calls the reconstructed renderer with the named screen type. All 17 relocation identities remain in the same semantic order. January biases its ESI loop cursor to reference_index at datum+8 and addresses the other fields negatively, producing 400 padded bytes; the direct typed pointer loop anchors ESI at the datum base and produces 416. Natural indexed-for, short/long index, and count-derived array forms do recover the +8 cursor but spill the count and perturb the frame/register allocation, giving a structurally worse 416-byte family; the direct pointer form remains the best lawful source. No raw byte cursor, containing-record alias, volatile access, compiler barrier, forced inlining, pragma, assembly, fake dependency, undefined behavior, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler typed traversal that explains the biased cursor without spilling the count.",
+      "measurements": {
+        "target": {
+          "size": 400,
+          "relocation_count": 17,
+          "normalized_sha256": "f2bb689a08030b4b54e28e13307de141eab53b71b0acc334bc2bec2f1dd78391"
+        },
+        "base": {
+          "size": 416,
+          "relocation_count": 17,
+          "normalized_sha256": "0df4703281637b185fa8bd6f44392a688be3a3e4e2b11e6bc6314ae756823274"
+        },
+        "objdiff_percent": 95.26667
+      }
     }
   ]
 }
