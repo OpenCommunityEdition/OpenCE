@@ -340,6 +340,7 @@ symbols in this file:
 #include "game_engine.h"
 #include "game/cheats.h"
 #include "game/player_control.h"
+#include "game/player_control_runtime.h"
 #include "game/players.h"
 #include "integer_math.h"
 #include "input.h"

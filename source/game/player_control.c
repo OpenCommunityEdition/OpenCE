@@ -189,6 +189,7 @@ symbols in this file:
 #undef limit2d
 #undef signed_angular_difference
 #include "game/player_control.h"
+#include "game/player_control_runtime.h"
 #include "players.h"
 
 #include "items/weapons.h"
