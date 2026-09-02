@@ -110,6 +110,13 @@ enum
 #define slayer_variant_flag_must_reset unknown4C.byte2
 #define slayer_variant_score_to_win unknown40
 
+#define GET_MULTIPLAYER_GAME_TEXT(index) \
+	(((string_list_index = tag_loaded( \
+		UNICODE_STRING_LIST_TAG, \
+		"ui\\multiplayer_game_text")) != NONE) \
+		? unicode_string_list_get_string(string_list_index, (index)) \
+		: L"")
+
 /* ---------- structures */
 
 struct slayer_globals
@@ -290,29 +297,11 @@ wchar_t *slayer_get_score_string(
 wchar_t *slayer_get_score_header_string(
 	wchar_t *buffer)
 {
-	long string_list_index = tag_loaded(
-		UNICODE_STRING_LIST_TAG,
-		"ui\\multiplayer_game_text");
+	long string_list_index;
 
-	if (string_list_index != NONE)
-	{
-		wchar_t *string = unicode_string_list_get_string(
-			string_list_index,
-			_string_score);
-		wchar_t *result = buffer;
+	ustrcpy(buffer, GET_MULTIPLAYER_GAME_TEXT(_string_score));
 
-		ustrcpy(result, string);
-
-		return result;
-	}
-	else
-	{
-		wchar_t *result = buffer;
-
-		ustrcpy(result, L"");
-
-		return result;
-	}
+	return buffer;
 }
 
 wchar_t *slayer_get_team_score_string(
@@ -506,69 +495,58 @@ boolean slayer_engine_display_score(
 	long message,
 	long message_data,
 	wchar_t *buffer,
-	long buffer_size)
+	long buffer_character_count)
 {
-	wchar_t score[128];
-	struct player_datum *player;
-
-	player_get(player_index);
-	player = NULL;
+	struct player_datum *player = player_get(player_index);
+	struct player_datum *target_player = NULL;
+	wchar_t string[128];
+	long string_list_index;
+	boolean result = TRUE;
 
 	if (message == _slayer_message_new_target)
 	{
 		if (game_engine_get_variant()->has_teams)
 		{
-			long string_list_index = tag_loaded(
-				UNICODE_STRING_LIST_TAG,
-				"ui\\multiplayer_game_text");
-			wchar_t *format = string_list_index != NONE
-				? unicode_string_list_get_string(
-					string_list_index,
-					_string_n_team_n)
-				: L"";
-
 			usnprintf(
-				score,
-				NUMBEROF(score),
-				format,
+				string,
+				NUMBEROF(string),
+				GET_MULTIPLAYER_GAME_TEXT(_string_n_team_n),
 				slayer_get_score(player_index, _get_score_individual),
 				slayer_get_score(player_index, _get_score_team));
 		}
 		else
 		{
 			usnprintf(
-				score,
-				NUMBEROF(score),
+				string,
+				NUMBEROF(string),
 				L"%d",
 				slayer_get_score(player_index, _get_score_individual));
 		}
 
-		player = player_get(message_data);
+		target_player = player_get(message_data);
 	}
 
 	switch (message)
 	{
+	case _slayer_message_new_target:
+		usnprintf(
+			buffer,
+			buffer_character_count,
+			GET_MULTIPLAYER_GAME_TEXT(_string_new_target_name),
+			target_player->name);
+		break;
+
 	case _game_engine_message_show_score:
 		if (game_engine_get_variant()->has_teams)
 		{
-			struct game_engine_place place = game_engine_get_place(
-				player_index,
-				_get_score_team);
-			wchar_t *place_name = get_place_name(place);
-			long string_list_index = tag_loaded(
-				UNICODE_STRING_LIST_TAG,
-				"ui\\multiplayer_game_text");
-
-			wchar_t *format = string_list_index != NONE
-				? unicode_string_list_get_string(
-					string_list_index,
-					_string_name_kills_score_n_team_score_of_max)
-				: L"";
+			wchar_t *place_name = get_place_name(
+				game_engine_get_place(player_index, _get_score_team));
 
 			usnprintf(
 				buffer,
-				buffer_size,
-				format,
+				buffer_character_count,
+				GET_MULTIPLAYER_GAME_TEXT(
+					_string_name_kills_score_n_team_score_of_max),
 				place_name,
 				slayer_get_score(player_index, _get_score_individual),
 				slayer_get_score(player_index, _get_score_team),
@@ -576,54 +554,26 @@ boolean slayer_engine_display_score(
 		}
 		else
 		{
-			struct game_engine_place place = game_engine_get_place(
-				player_index,
-				_get_score_team);
-			wchar_t *place_name = get_place_name(place);
-			long string_list_index = tag_loaded(
-				UNICODE_STRING_LIST_TAG,
-				"ui\\multiplayer_game_text");
-
-			wchar_t *format = string_list_index != NONE
-				? unicode_string_list_get_string(
-					string_list_index,
-					_string_name_kills_score_of_max)
-				: L"";
+			wchar_t *place_name = get_place_name(
+				game_engine_get_place(player_index, _get_score_team));
 
 			usnprintf(
 				buffer,
-				buffer_size,
-				format,
+				buffer_character_count,
+				GET_MULTIPLAYER_GAME_TEXT(
+					_string_name_kills_score_of_max),
 				place_name,
 				slayer_get_score(player_index, _get_score_team),
 				game_engine_get_variant()->slayer_variant_score_to_win);
 		}
-
-		return TRUE;
-
-	case _slayer_message_new_target:
-	{
-		long string_list_index = tag_loaded(
-			UNICODE_STRING_LIST_TAG,
-			"ui\\multiplayer_game_text");
-		wchar_t *format = string_list_index != NONE
-			? unicode_string_list_get_string(
-				string_list_index,
-				_string_new_target_name)
-			: L"";
-
-		usnprintf(
-			buffer,
-			buffer_size,
-			format,
-			player->name);
-
-		return TRUE;
-	}
+		break;
 
 	default:
-		return FALSE;
+		result = FALSE;
+		break;
 	}
+
+	return result;
 }
 
 void slayer_player_update(
