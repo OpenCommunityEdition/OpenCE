@@ -908,6 +908,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "interface/player_ui.h"
 #include "interface/ui_widget_definitions.h"
 
 /* ---------- constants */
@@ -1043,8 +1044,6 @@ void dispose_global_network_game_client(
 	void);
 void dispose_global_network_game_server(
 	void);
-void player_ui_clear_multiplayer_joins(
-	void);
 void game_engine_playlist_initialize(
 	void);
 void game_engine_playlist_next(
@@ -1057,8 +1056,6 @@ void game_connection_set(
 	long);
 void main_menu_switch_to_single_player(
 	void);
-void player_ui_remember_player1_profile(
-	long);
 void network_game_server_open_game(
 	void *server);
 void network_game_server_pause_countdown(
@@ -1070,12 +1067,6 @@ boolean xbox_demos_available(
 	void);
 void ui_stop_main_menu_music(
 	void);
-void player_ui_reset_single_player_local_player_controllers(
-	void);
-void player_ui_clear_multiplayer_variant(
-	void);
-void player_ui_end_editing_profile(
-	void);
 void ui_widgets_pop_stack(
 	short local_player_index);
 boolean ui_main_menu_music_active(
@@ -1086,15 +1077,10 @@ void main_set_map_name(
 	char *map_name);
 void main_defer_map_map_change(
 	void);
-void player_ui_get_active_player_profile(
-	short local_player_index,
-	void *profile);
 void player_profile_get_highest_completed_solo_level(
 	void *profile,
 	short *level,
 	short *difficulty);
-short player_ui_get_last_single_player_level_played(
-	short local_player_index);
 void *widget_free(
 	void *pointer);
 boolean create_global_network_game_client(
@@ -1115,8 +1101,6 @@ void playlist_profile_delete(
 	long profile_index);
 void player_profile_delete(
 	long profile_index);
-void player_ui_local_player_joined_multiplayer_game(
-	word local_player_index);
 void ui_play_audio_feedback_sound(
 	short feedback);
 void display_error_deferred(
@@ -1124,24 +1108,15 @@ void display_error_deferred(
 	short local_player_index,
 	boolean modal,
 	boolean pause_game_time);
-void player_ui_begin_editing_profile(
-	long profile_index);
 long player_profile_new(
 	short controller_index,
 	wchar_t *name);
-wchar_t *player_ui_get_edit_playlist_profile(
-	void);
-void *player_ui_get_edit_player_profile(
-	void);
 boolean virtual_keyboard_launch(
 	void *text,
 	long maximum_length,
 	long keyboard_type);
 void network_game_client_local_player_quit(
 	word controller_index);
-void player_ui_set_single_player_local_player_controller(
-	short local_player_index,
-	short controller_index);
 struct widget_instance *widget_instance_get_topmost_parent(
 	struct widget_instance *widget);
 struct widget_instance *widget_instance_get_nth_child(
@@ -1154,8 +1129,6 @@ void display_error(
 	short local_player_index,
 	boolean modal,
 	boolean pause_game_time);
-short player_ui_get_single_player_local_player_controller(
-	short local_player_index);
 char *main_get_map_name(
 	void);
 void *global_network_game_client_get(
@@ -1172,10 +1145,6 @@ boolean network_game_client_request_start_time_change(
 boolean network_game_client_request_remove_player(
 	void *client,
 	void *player);
-void player_ui_clear_multiplayer_autojoin_for_local_player(
-	short controller_index);
-void player_ui_autojoin_players_to_next_multiplayer_game(
-	void);
 boolean network_game_should_accept_remote_connections(
 	void);
 boolean network_game_client_initiate_join_game(
@@ -1197,12 +1166,6 @@ void network_event(
 	char *format,
 	...);
 boolean player_ui_edit_profile_is_dirty(
-	void);
-boolean player_ui_edit_profile_is_default_profile(
-	void);
-boolean player_ui_edit_profile_name_is_dirty(
-	void);
-boolean player_ui_prompt_user_to_rename_edit_profile(
 	void);
 boolean player_ui_save_profile(
 	void);
@@ -1260,10 +1223,6 @@ void player_ui_set_active_player_profile(
 	long profile_index,
 	void *profile);
 
-long player_ui_get_player1_last_used_profile_index(
-	void);
-short player_ui_get_single_player_local_player_from_controller(
-	short controller_index);
 extern byte cached_player_profile[0x9C];
 
 long playlist_profile_new(

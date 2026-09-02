@@ -2782,6 +2782,7 @@ symbols in this file:
 #include "game/game.h"
 #include "interface/hud_messaging.h"
 #include "interface/interface.h"
+#include "interface/player_ui.h"
 #include "rasterizer/rasterizer_cinematics.h"
 #include "structures/structure_lens_flares.h"
 #include "tag_files/files.h"
@@ -4238,10 +4239,6 @@ void rasterizer_screen_effect_stop(
 void enumerate_memory_units_test(
 	void);
 void saved_game_files_delete_all_custom_profiles(
-	void);
-void player_ui_fast_setup_network_server(
-	void);
-void player_ui_activate_all_solo_levels(
 	void);
 void network_game_client_request_immediate_start(
 	void);

@@ -218,3 +218,19 @@ beside the implementation; `players.obj` and `player_rumble.obj` remain
 unchanged at 54/70 and 12/12 exact respectively. The focused fake-match scan
 reports zero review leads, `git diff --check` passes, and the tool test suite
 passes 255/255.
+
+## Consumer prototype-ownership repair (2026-09-02)
+
+The new public declarations exposed two stale consumer-local prototypes:
+`ui_widget_event_handler_functions.c` redeclared
+`player_ui_clear_multiplayer_joins`, and `hs.c` redeclared
+`player_ui_fast_setup_network_server`. Both consumers now include
+`interface/player_ui.h`; all redundant player-UI declarations already covered
+by that owner were removed from the event-handler TU, including several stale
+type spellings. The remaining local player-UI declarations correspond only to
+frontier functions not yet present in the owning header.
+
+The repair preserves `ui_widget_event_handler_functions.obj` at 100/100 exact,
+`hs.obj` at 445 exact / 3 residual, `player_ui.obj` at 34 exact / 0 residual /
+8 unwritten, `players.obj` at 54 exact / 15 residual / 1 unwritten, and
+`player_rumble.obj` at 12/12 exact.
