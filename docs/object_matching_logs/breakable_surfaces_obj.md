@@ -325,8 +325,7 @@ is retained.
 - Frame: target/current `0x1240/0x1240`.
 - Relocations: `117/117`; relocation types and symbolic destinations occur in
   the same sequence.
-- External objdiff fuzzy similarity: `99.8042%`; the campaign report's
-  validator metric is `91.437065%`.
+- Freshly regenerated campaign-report fuzzy similarity: `99.8042%`.
 - Target normalized SHA-256:
   `510486a7d0a1f2fc1dfb8f0c47990c57f83ce1030ef5e4db8dfc42943dc56bfa`.
 - Candidate normalized SHA-256:
