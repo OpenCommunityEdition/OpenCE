@@ -499,6 +499,8 @@ void action_alert_flush_structure_indices(
 
 real normalize2d(
 	real_vector2d *vector);
+real normalize3d(
+	real_vector3d *vector);
 
 /* ---------- prototypes/ACTION_OBEY.C */
 

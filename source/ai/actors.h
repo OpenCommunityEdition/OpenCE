@@ -929,6 +929,11 @@ long actor_aim_grenade(
 	long actor_index,
 	real_point3d const *origin,
 	real_vector3d *vector);
+long actor_aim_projectile(
+	long actor_index,
+	real_point3d const *origin,
+	real_vector3d *vector,
+	real *error_reference);
 
 /* ---------- prototypes/ACTOR_MOVING.C */
 

@@ -15,7 +15,7 @@ symbols in this file:
 0000F700 0040:
 	_actor_get_weapon_definition (0000)
 0000F740 00c0:
-	_code_0000f740 (0000)
+	_actor_get_weapon_vector (0000)
 0000F800 0080:
 	_actor_combat_get_firing_variant_definition (0000)
 0000F880 00a0:
@@ -130,6 +130,8 @@ symbols in this file:
 #define sine sine_inline
 #define tangent tangent_inline
 #define cross_product2d cross_product2d_inline
+#define normalize2d normalize2d_inline
+#define normalize3d normalize3d_inline
 #define add_vectors3d add_vectors3d_inline
 #define point_from_line3d actor_combat_point_from_line3d_inline
 #define vector_from_points3d actor_combat_vector_from_points3d_inline
@@ -140,6 +142,7 @@ symbols in this file:
 #include "cseries.h"
 
 #include "ai.h"
+#include "ai_debug.h"
 #include "actor_definitions.h"
 #include "actors.h"
 #include "encounters.h"
@@ -149,8 +152,11 @@ symbols in this file:
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
 #include "game/game_globals.h"
+#include "game/game.h"
 #include "physics/collisions.h"
 #include "scenario/scenario.h"
+#include "units/vehicle_definitions.h"
+#include "units/vehicles.h"
 #undef collision_test_line
 #undef real_random_range
 #undef distance_squared3d
@@ -158,6 +164,8 @@ symbols in this file:
 #undef vector_from_points3d
 #undef point_from_line3d
 #undef add_vectors3d
+#undef normalize3d
+#undef normalize2d
 #undef cross_product2d
 #undef cosine
 #undef sine
@@ -168,11 +176,19 @@ symbols in this file:
 enum
 {
 	_actor_fire_target_none = 0,
+	_actor_fire_target_prop,
+
+	_vehicle_ai_weapon_cannot_rotate_bit = 8,
 
 	MAXIMUM_COLLATERAL_DAMAGE_ACTORS = 32,
 };
 
 /* ---------- macros */
+
+#define GRENADE_AIMING_ANGLE_COSINE 0.8660254f
+#define GRENADE_AIMING_ANGLE_SINE 0.5f
+#define actor_combat_vehicle_definition_get(index) \
+	((struct actor_combat_vehicle_definition_view *)vehicle_specific_definition_get(index))
 
 /* ---------- structures */
 
@@ -183,11 +199,29 @@ struct encounter_actor_iterator
 	long next_index;
 };
 
+struct actor_combat_vehicle_definition_view
+{
+	byte __unknown0[0x2F0];
+	unsigned long flags;
+};
+
+typedef char actor_combat_vehicle_definition_flags_offset_assert[
+	offsetof(struct actor_combat_vehicle_definition_view, flags) == 0x2F0 ? 1 : -1];
+
 /* ---------- prototypes */
 
 static void actor_combat_find_nearby_target(
 	real_point3d *target_point,
 	real miss_distance);
+static void actor_get_weapon_vector(
+	long actor_index,
+	real_vector3d *weapon_vector);
+/* The owner declarations in actions.h are macro-renamed while importing the
+ * January inline set; restore the external names after that schedule ends. */
+real normalize2d(
+	real_vector2d *vector);
+real normalize3d(
+	real_vector3d *vector);
 static boolean actor_combat_build_grenade_trajectory(
 	short grenade_type_index,
 	real_point3d const *grenade_origin,
@@ -200,6 +234,12 @@ static boolean actor_combat_build_grenade_trajectory(
 	real *aim_ticks,
 	real_vector3d *aim_velocity,
 	real *aim_gravity);
+static boolean actor_combat_reaim_grenade(
+	long actor_index,
+	real_point3d const *grenade_origin);
+static boolean actor_combat_retarget_grenade(
+	long actor_index,
+	real_point3d const *desired_grenade_target);
 
 /* ---------- globals */
 
@@ -264,6 +304,45 @@ struct weapon_definition *actor_get_weapon_definition(
 	}
 
 	return result;
+}
+
+static void actor_get_weapon_vector(
+	long actor_index,
+	real_vector3d *weapon_vector)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	long unit_index = actor->meta.unit_index;
+	boolean have_vector = FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\actor_combat.c",
+		1166,
+		weapon_vector);
+
+	if (actor->input.vehicle_gunner)
+	{
+		struct unit_datum *vehicle = vehicle_get(actor->input.vehicle_index);
+		struct actor_combat_vehicle_definition_view *vehicle_definition =
+			actor_combat_vehicle_definition_get(vehicle->definition_index);
+
+		unit_index = actor->input.vehicle_index;
+		if (TEST_FLAG(
+			vehicle_definition->flags,
+			_vehicle_ai_weapon_cannot_rotate_bit))
+		{
+			*weapon_vector = vehicle->object.forward;
+			have_vector = TRUE;
+		}
+	}
+
+	if (!have_vector)
+	{
+		unit_get(unit_index);
+		unit_get_aiming_vector(unit_index, weapon_vector);
+		unit_clip_to_aiming_bounds(unit_index, weapon_vector, TRUE);
+	}
+
+	return;
 }
 
 struct actor_variant_definition *actor_combat_get_firing_variant_definition(
@@ -394,6 +473,90 @@ static void actor_combat_find_nearby_target(
 	*target_point = target;
 
 	return;
+}
+
+static boolean actor_combat_reaim_grenade(
+	long actor_index,
+	real_point3d const *grenade_origin)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_variant_definition *variant_definition =
+		actor_variant_definition_get(actor->meta.variant_definition_index);
+	short grenade_type_index = variant_definition->grenade_combat.grenade_type;
+	struct game_globals_grenade *grenade = TAG_BLOCK_GET_ELEMENT(
+		&scenario_get_game_globals()->grenades,
+		grenade_type_index,
+		struct game_globals_grenade);
+	struct projectile_definition *projectile_definition = NULL;
+	real aim_gravity;
+	real_vector2d aim_vector2d;
+	real_vector3d aim_vector;
+	real aim_speed;
+	real aim_ticks;
+	boolean linear;
+	boolean result = FALSE;
+
+	if (grenade && grenade->projectile.index != NONE)
+	{
+		projectile_definition =
+			projectile_definition_get(grenade->projectile.index);
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\actor_combat.c",
+		1731,
+		projectile_definition);
+
+	if (projectile_aim(
+		projectile_definition,
+		grenade_origin,
+		&actor->control.grenade_current_target,
+		NULL,
+		NULL,
+		NULL,
+		&actor->control.grenade_current_aim_speed,
+		actor->control.grenade_current_lob,
+		&aim_vector,
+		&aim_speed,
+		&aim_ticks,
+		NULL,
+		&linear))
+	{
+		aim_vector2d.i = aim_vector.i;
+		aim_vector2d.j = aim_vector.j;
+
+		if (normalize2d(&aim_vector2d) > 0.0f &&
+			aim_vector2d.i*actor->input.facing_vector.i +
+				aim_vector2d.j*actor->input.facing_vector.j >
+					GRENADE_AIMING_ANGLE_COSINE)
+		{
+			real_vector3d aim_velocity;
+
+			aim_velocity.i = aim_vector.i*aim_speed;
+			aim_velocity.j = aim_vector.j*aim_speed;
+			aim_velocity.k = aim_vector.k*aim_speed;
+
+			aim_gravity = linear ?
+				0.0f :
+				projectile_get_ballistic_acceleration(projectile_definition);
+
+			if (ai_test_ballistic_line_of_fire(
+				actor_index,
+				grenade_origin,
+				aim_ticks,
+				&aim_velocity,
+				aim_gravity,
+				actor->control.grenade_current_ignore_object_index,
+				actor->input.vehicle_index != NONE))
+			{
+				actor->control.grenade_current_aim_vector = aim_vector;
+				actor->control.grenade_current_aim_speed = aim_speed;
+				result = TRUE;
+			}
+		}
+	}
+
+	return result;
 }
 
 static boolean actor_combat_build_grenade_trajectory(
@@ -750,6 +913,211 @@ boolean actor_combat_plan_grenade_trajectory(
 	}
 
 	return result;
+}
+
+long actor_aim_projectile(
+	long actor_index,
+	real_point3d const *origin,
+	real_vector3d *vector,
+	real *error_reference)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	long target_unit_index = NONE;
+
+	if (actor->control.fire_state == _actor_fire_state_bursting)
+	{
+		struct actor_debug_info *actor_debug_info =
+			&actor_debug_array[DATUM_INDEX_TO_ABSOLUTE_INDEX(actor_index)];
+		real_vector3d weapon_vector;
+		real alignment;
+
+		actor_debug_info->last_projectile_aiming_time = game_time_get();
+
+		if (actor->control.current_fire_target_type == _actor_fire_target_prop &&
+			actor->control.current_fire_target_prop_index != NONE)
+		{
+			struct prop_datum *prop =
+				prop_get(actor->control.current_fire_target_prop_index);
+
+			if (prop->state >= _prop_state_becoming_unacknowledged &&
+				prop->state <= _prop_state_acknowledged)
+			{
+				target_unit_index = prop->unit_index;
+			}
+		}
+
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\actor_combat.c",
+			1071,
+			vector);
+
+		actor_debug_info->field_60 = actor->control.burst_aim_by_vector;
+		actor_debug_info->field_64 = *origin;
+
+		if (actor->control.burst_aim_by_vector)
+		{
+			*vector = actor->control.burst_aim_vector;
+		}
+		else
+		{
+			real_point3d const *burst_target = &actor->control.burst_target;
+
+			actor_debug_info->field_7C = *burst_target;
+			vector->i = burst_target->x - origin->x;
+			vector->j = burst_target->y - origin->y;
+			vector->k = burst_target->z - origin->z;
+			normalize3d(vector);
+		}
+
+		match_assert_valid_real_normal3d(
+			"c:\\halo\\SOURCE\\ai\\actor_combat.c",
+			1090,
+			vector);
+		actor_debug_info->field_70 = *vector;
+
+		actor_get_weapon_vector(actor_index, &weapon_vector);
+		alignment = dot_product3d(&weapon_vector, vector);
+		if (alignment < GRENADE_AIMING_ANGLE_COSINE)
+		{
+			real_vector3d rotation_axis;
+			boolean aiming_success = TRUE;
+
+			cross_product3d(&weapon_vector, vector, &rotation_axis);
+			if (normalize3d(&rotation_axis) == 0.0f)
+			{
+				perpendicular3d(&weapon_vector, &rotation_axis);
+				if (normalize3d(&rotation_axis) == 0.0f)
+				{
+					aiming_success = FALSE;
+				}
+			}
+
+			*vector = weapon_vector;
+			if (aiming_success)
+			{
+				rotate_vector_about_axis(
+					vector,
+					&rotation_axis,
+					GRENADE_AIMING_ANGLE_SINE,
+					GRENADE_AIMING_ANGLE_COSINE);
+			}
+
+			actor_debug_info->field_98 = weapon_vector;
+			actor_debug_info->field_88 = TRUE;
+			actor_debug_info->field_8C = *vector;
+		}
+		else
+		{
+			actor_debug_info->field_88 = FALSE;
+		}
+
+		*error_reference = actor->control.burst_error;
+	}
+
+	return target_unit_index;
+}
+
+static boolean actor_combat_retarget_grenade(
+	long actor_index,
+	real_point3d const *desired_grenade_target)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_variant_definition *variant_definition =
+		actor_variant_definition_get(actor->meta.variant_definition_index);
+	boolean result = FALSE;
+
+	if (actor_combat_check_collateral_damage(
+		actor_index,
+		variant_definition->grenade_combat.enemy_radius,
+		variant_definition->grenade_combat.collateral_damage_radius,
+		desired_grenade_target,
+		NULL))
+	{
+		actor->control.grenade_current_target = *desired_grenade_target;
+		result = TRUE;
+	}
+
+	return result;
+}
+
+long actor_aim_grenade(
+	long actor_index,
+	real_point3d const *origin,
+	real_vector3d *vector)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	real_vector3d aim_vector;
+	long target_unit_index = NONE;
+
+	if (actor->control.grenade_current_prop_index != NONE)
+	{
+		struct prop_datum *prop = prop_get(actor->control.grenade_current_prop_index);
+
+		if (prop->state >= _prop_state_becoming_unacknowledged &&
+			prop->state <= _prop_state_acknowledged)
+		{
+			target_unit_index = prop->unit_index;
+		}
+
+		if (prop->state < _prop_state_unacknowledged ||
+			prop->state > _prop_state_becoming_acknowledged)
+		{
+			aim_vector.n[0] = prop->body_position.x;
+			aim_vector.n[1] = prop->body_position.y;
+			aim_vector.n[2] = prop->body_position.z + 0.2f;
+			actor_combat_retarget_grenade(
+				actor_index,
+				(real_point3d const *)&aim_vector);
+		}
+	}
+
+	actor_combat_reaim_grenade(actor_index, origin);
+
+	if (actor->input.vehicle_index == NONE)
+	{
+		real_vector2d aim_vector2d;
+
+		aim_vector = actor->control.grenade_current_aim_vector;
+		aim_vector2d.i = aim_vector.i;
+		aim_vector2d.j = aim_vector.j;
+
+		if (normalize2d(&aim_vector2d) > 0.0f &&
+			aim_vector2d.i*actor->input.facing_vector.i +
+				aim_vector2d.j*actor->input.facing_vector.j <
+					GRENADE_AIMING_ANGLE_COSINE)
+		{
+			boolean counterclockwise =
+				aim_vector2d.j*actor->input.facing_vector.i -
+					aim_vector2d.i*actor->input.facing_vector.j > 0.0f;
+			real_vector3d new_aim_vector = actor->input.facing_vector;
+			real magnitude;
+
+			rotate_vector_about_axis(
+				&new_aim_vector,
+				global_up3d,
+				(counterclockwise ? 1 : -1)*GRENADE_AIMING_ANGLE_SINE,
+				GRENADE_AIMING_ANGLE_COSINE);
+
+			magnitude = square_root(
+				aim_vector.i*aim_vector.i + aim_vector.j*aim_vector.j);
+			new_aim_vector.i *= magnitude;
+			new_aim_vector.j *= magnitude;
+			new_aim_vector.k = aim_vector.k;
+
+			match_assert_valid_real_normal3d(
+				"c:\\halo\\SOURCE\\ai\\actor_combat.c",
+				1865,
+				&new_aim_vector);
+
+			aim_vector = new_aim_vector;
+		}
+	}
+
+	vector->i = aim_vector.i*actor->control.grenade_current_aim_speed;
+	vector->j = aim_vector.j*actor->control.grenade_current_aim_speed;
+	vector->k = aim_vector.k*actor->control.grenade_current_aim_speed;
+
+	return target_unit_index;
 }
 
 /* ---------- private code */

@@ -659,6 +659,39 @@
       }
     },
     {
+      "unit": "source/ai/actor_combat",
+      "function": "_actor_combat_reaim_grenade",
+      "class": "register-allocation",
+      "evidence": "The retained typed C follows the HCEA-corroborated grenade-projectile lookup, projectile_aim outputs, normalized planar-facing test, ballistic line-of-fire test, and successful aim latch. Target and candidate both contain 448 padded bytes, 16 relocations, and 162 instructions. Moving the velocity calculation ahead of gravity selection, as both HCEA and January require, raises the natural reconstruction to 98.509674%. The remaining code differences are a four-byte frame/stack-slot coloring shift plus one independent post-tag_get move/stack-cleanup schedule; the calls, branches, arithmetic, and stores otherwise retain January's topology. Natural declaration-order and early-return forms either preserve the slot coloring or worsen the branch polarity. No forced register directive, volatile lifetime, barrier, fake dependency, assembly, or nonsensical control flow is retained. Reopen only for authoritative January local-variable/source evidence or a natural same-compiler stack-allocation donor.",
+      "measurements": {
+        "target": { "size": 448, "relocation_count": 16, "normalized_sha256": "8d2e09aa4f73bc982c4cf17d6e4f9a963ffd7db0b486ff7f037d19966ef52772" },
+        "base": { "size": 448, "relocation_count": 16, "normalized_sha256": "b2a1aa5cad19d1cfaa1f0cf99729c8edd10f30854f973029e38af9b104e2c54c" },
+        "objdiff_percent": 98.509674
+      }
+    },
+    {
+      "unit": "source/ai/actor_combat",
+      "function": "_actor_aim_projectile",
+      "class": "instruction-scheduling",
+      "evidence": "The retained ordinary C reconstructs the firing-state gate, acknowledged-prop target recovery, authenticated actor-debug snapshots, cached-point/vector selection, out-of-line normalize3d ownership, weapon-vector cone clamp, and burst-error output. The parameter name vector is proved by both January assertion literals and the actors.h owner declaration. Target and candidate both contain 720 padded bytes, 27 relocations, and 237 instructions. The meaningful code is identical except for the ordering of independent loads and stores while copying weapon_vector into the debug record at +0x274; all following offsets reconverge. Natural debug-field statement orders were tested, and the alternatives either move the boolean store earlier or enlarge the function. No alias carrier, volatile access, barrier, fake dependency, forced inline/noinline, assembly, or invented control flow is retained. Reopen only for authoritative January source/local ordering or a natural same-compiler aggregate-copy scheduling donor.",
+      "measurements": {
+        "target": { "size": 720, "relocation_count": 27, "normalized_sha256": "22aacf2cc27693354c5025ab0df43e759489116f19e4e3600ad74e4f1e8973ac" },
+        "base": { "size": 720, "relocation_count": 27, "normalized_sha256": "44113369d29436c6449ac416cc0a68340f752929938a3f099acd6fd10ab6101c" },
+        "objdiff_percent": 98.017395
+      }
+    },
+    {
+      "unit": "source/ai/actor_combat",
+      "function": "_actor_aim_grenade",
+      "class": "unclassified",
+      "evidence": "The retained reconstruction follows the HCEA-corroborated prop-state bands, semantic target retest, grenade re-aim, vehicle/non-vehicle direction selection, 30-degree facing clamp, and final speed scaling. January's vehicle path demonstrably reuses the working three-real storage that previously held the prop body point; the C expresses that representation-safe point/vector reuse explicitly rather than retaining the older coincidental uninitialized-local candidate. January has a 544-byte/22-relocation function while the current natural C has 576 bytes and the same relocation count. The residual is a broader VC7 frame-coloring and x87-expression schedule, so no narrower blocker is claimed. No volatile access, barrier, fake dependency, forced register or inline control, assembly, or semantically invalid carrier is retained. Parked at the requested fuzzy threshold pending authoritative January source/local records or a natural same-compiler control-flow donor.",
+      "measurements": {
+        "target": { "size": 544, "relocation_count": 22, "normalized_sha256": "e0f88f129bff43bffd1418d177c79d4849c02f0e71e1acf1cf188c16030193fb" },
+        "base": { "size": 576, "relocation_count": 22, "normalized_sha256": "e38739d6afd1c17b9b91505748fdddcf9ec66a7a3b41e586e4b2b88eb1bb6398" },
+        "objdiff_percent": 79.125
+      }
+    },
+    {
       "unit": "source/memory/lruv_cache",
       "function": "_lruv_debug_to_file",
       "class": "register-allocation",

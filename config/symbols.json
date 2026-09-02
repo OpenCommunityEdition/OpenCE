@@ -219,7 +219,7 @@
 { "file_offset": 63120, "flags": 32, "name": "_actor_firing_blindly" },
 { "file_offset": 63168, "flags": 32, "name": "_actor_combat_currently_firing_burst" },
 { "file_offset": 63232, "flags": 32, "name": "_actor_get_weapon_definition" },
-{ "file_offset": 63296, "flags": 32, "name": "_code_0000f740" },
+{ "file_offset": 63296, "flags": 32, "name": "_actor_get_weapon_vector", "static": true },
 { "file_offset": 63488, "flags": 32, "name": "_actor_combat_get_firing_variant_definition" },
 { "file_offset": 63616, "flags": 32, "name": "_code_0000f880" },
 { "file_offset": 63776, "flags": 32, "name": "_code_0000f920" },

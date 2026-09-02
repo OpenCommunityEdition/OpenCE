@@ -248,8 +248,8 @@ typedef char actor_moving_vehicle_pathfinding_radius_offset_assert[
 
 /* ---------- prototypes */
 
-/* `real_math.h` currently carries the inline definition, while January's
- * actor-moving compiland calls the out-of-line COMDAT owner. */
+/* The owner declaration in actions.h is macro-renamed while importing the
+ * January inline set; restore the external name after that schedule ends. */
 real normalize3d(
 	real_vector3d *vector);
 
