@@ -26,7 +26,7 @@ void virtual_keyboard_dispose(
 	void);
 boolean virtual_keyboard_launch(
 	wchar_t *text_buffer,
-	unsigned short buffer_size,
+	word buffer_size,
 	short caption_index);
 boolean virtual_keyboard_active(
 	void);

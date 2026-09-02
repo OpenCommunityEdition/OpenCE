@@ -13,37 +13,37 @@ symbols in this file:
 000E4E00 0010:
 	_virtual_keyboard_last_exit_saved_text (0000)
 000E4E10 0050:
-	_code_000e4e10 (0000)
+	_virtual_keyboard_tab_left (0000)
 000E4E60 0050:
-	_code_000e4e60 (0000)
+	_virtual_keyboard_tab_right (0000)
 000E4EB0 0050:
-	_code_000e4eb0 (0000)
+	_virtual_keyboard_tab_up (0000)
 000E4F00 0050:
-	_code_000e4f00 (0000)
+	_virtual_keyboard_tab_down (0000)
 000E4F50 0060:
-	_code_000e4f50 (0000)
+	_virtual_keyboard_cancel (0000)
 000E4FB0 00d0:
-	_code_000e4fb0 (0000)
+	_virtual_keyboard_get_character (0000)
 000E5080 0030:
-	_code_000e5080 (0000)
+	_virtual_keyboard_get_current_character (0000)
 000E50B0 0650:
-	_code_000e50b0 (0000)
+	_virtual_keyboard_render_internal (0000)
 000E5700 0020:
-	_code_000e5700 (0000)
+	_virtual_keyboard_free_space_in_text_buffer (0000)
 000E5720 0060:
-	_code_000e5720 (0000)
+	_virtual_keyboard_backspace (0000)
 000E5780 0010:
 	_virtual_keyboard_close (0000)
 000E5790 0010:
 	_virtual_keyboard_render (0000)
 000E57A0 0440:
-	_code_000e57a0 (0000)
+	_virtual_keyboard_select (0000)
 000E5BE0 0350:
-	_code_000e5be0 (0000)
+	_virtual_keyboard_process_internal (0000)
 000E5F30 0010:
 	_virtual_keyboard_process (0000)
 00278CC0 0037:
-	_rdata_00278cc0 (0000)
+	_virtual_keyboard_key_layout (0000)
 00278CF8 0032:
 	??_C@_0DC@DOACNNNI@failed?5to?5load?5virtual?5keyboard?5@ (0000)
 00278D2C 0032:
@@ -71,9 +71,11 @@ symbols in this file:
 00278F88 0027:
 	??_C@_0CH@KEKEOCJD@virtual_keyboard_globals?4buffer_@ (0000)
 00306338 0160:
-	_data_00306338 (0000)
-00454D10 006c:
-	_bss_00454d10 (0000)
+	_keyboard_rect (0000)
+00454D10 0068:
+	_virtual_keyboard_globals (0000)
+00454D78 0004:
+	?time_of_last_tab@?1??virtual_keyboard_process_internal@@9@9 (0000)
 */
 
 /* ---------- headers */
@@ -81,10 +83,14 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
+#include "bitmaps/bitmap_group.h"
 #include "interface/event_manager.h"
+#include "interface/ui_widget.h"
 #include "interface/virtual_keyboard.h"
 #include "input/input.h"
+#include "saved games/saved_game_files.h"
 #include "tag_files/tag_groups.h"
+#include "text/unicode.h"
 
 /* ---------- constants */
 
@@ -92,7 +98,6 @@ enum
 {
 	VIRTUAL_KEYBOARD_ROW_COUNT = 5,
 	VIRTUAL_KEYBOARD_COLUMN_COUNT = 11,
-	NUMBER_OF_CONFIGURABLE_VIRTUAL_KEYS = 0x24,
 	FIRST_VIRTUAL_KEYBOARD_CAPTION_STRING_INDEX = 8,
 	NUMBER_OF_VIRTUAL_KEYBOARD_STRINGS = 11,
 	MAXIMUM_VIRTUAL_KEYBOARD_BUFFER_SIZE = 0x40,
@@ -102,17 +107,54 @@ enum
 	NUMBER_OF_VIRTUAL_KEYBOARD_FORTUNES = 10,
 };
 
-enum
+enum virtual_key_code
 {
-	_virtual_key_done= NUMBER_OF_CONFIGURABLE_VIRTUAL_KEYS,
-	_virtual_key_shift,
-	_virtual_key_caps_lock,
-	_virtual_key_symbols,
-	_virtual_key_backspace,
-	_virtual_key_cursor_left,
-	_virtual_key_cursor_right,
-	_virtual_key_space,
-	NUMBER_OF_VIRTUAL_KEYS
+	_vkey_1,
+	_vkey_2,
+	_vkey_3,
+	_vkey_4,
+	_vkey_5,
+	_vkey_6,
+	_vkey_7,
+	_vkey_8,
+	_vkey_9,
+	_vkey_0,
+	_vkey_a,
+	_vkey_b,
+	_vkey_c,
+	_vkey_d,
+	_vkey_e,
+	_vkey_f,
+	_vkey_g,
+	_vkey_h,
+	_vkey_i,
+	_vkey_j,
+	_vkey_k,
+	_vkey_l,
+	_vkey_m,
+	_vkey_n,
+	_vkey_o,
+	_vkey_p,
+	_vkey_q,
+	_vkey_r,
+	_vkey_s,
+	_vkey_t,
+	_vkey_u,
+	_vkey_v,
+	_vkey_w,
+	_vkey_x,
+	_vkey_y,
+	_vkey_z,
+	NUMBER_OF_CONFIGURABLE_VIRTUAL_KEYS,
+	_vkey_done = NUMBER_OF_CONFIGURABLE_VIRTUAL_KEYS,
+	_vkey_shift,
+	_vkey_caps,
+	_vkey_symbols,
+	_vkey_backspace,
+	_vkey_left,
+	_vkey_right,
+	_vkey_space,
+	NUMBER_OF_VIRTUAL_KEYS,
 };
 
 enum
@@ -123,7 +165,7 @@ enum
 	_event_tab_down,
 	_event_key_select,
 	_event_cancel,
-	NUMBER_OF_VIRTUAL_KEYBOARD_EVENTS
+	NUMBER_OF_VIRTUAL_KEYBOARD_EVENTS,
 };
 
 /* event_manager.c keeps these private; see header request in the ledger */
@@ -132,10 +174,34 @@ enum
 	_event_type_null,
 	_event_type_left_stick,
 	_event_type_right_stick,
-	_event_type_button
+	_event_type_button,
+};
+
+/* ui_widget.c owns the same private enum. */
+enum ui_audio_feedback_sound
+{
+	_ui_audio_feedback_none,
+	_ui_audio_feedback_cursor,
+	_ui_audio_feedback_forward,
+	_ui_audio_feedback_back,
+	_ui_audio_feedback_flag_failure,
+};
+
+/* ui_widget.c owns the full error enum. */
+enum virtual_keyboard_error
+{
+	_error_already_a_saved_game_file_with_that_name = 27,
+	_error_cannot_create_saved_game_file_with_empty_name = 29,
 };
 
 /* ---------- macros */
+
+#define VIRTUAL_KEYBOARD_TAG 'vcky'
+
+#define virtual_keyboard_definition_get(index) \
+	((struct virtual_keyboard_definition *)tag_get(VIRTUAL_KEYBOARD_TAG, (index)))
+#define virtual_keyboard_key_get(definition, index) \
+	((struct virtual_keyboard_key *)(definition)->keys.address + (index))
 
 /* ---------- structures */
 
@@ -167,7 +233,7 @@ struct virtual_keyboard_globals
 	struct virtual_keyboard_definition *keyboard;
 	short row;
 	short column;
-	unsigned short buffer_size;
+	word buffer_size;
 	short last_event;
 	short last_key;
 	short number_of_event_repeats;
@@ -188,49 +254,28 @@ typedef char verify_virtual_keyboard_key_size[
 
 /* ---------- prototypes */
 
-boolean code_000e4f50(
+static boolean virtual_keyboard_cancel(
 	void);
-static wchar_t code_000e4fb0(
-	unsigned short keycode);
-wchar_t code_000e5080(
+static wchar_t virtual_keyboard_get_character(
+	word keycode);
+wchar_t virtual_keyboard_get_current_character(
 	void);
-void code_000e50b0(
+void virtual_keyboard_render_internal(
 	void);
 static boolean virtual_keyboard_select(
 	void);
 static void virtual_keyboard_process_internal(
 	void);
-unsigned long ustrlen(
-	wchar_t const *string);
-wchar_t *ustrncpy(
-	wchar_t *destination,
-	wchar_t const *source,
-	unsigned long count);
-void ui_play_audio_feedback_sound(
-	short audio_feedback);
-void display_error(
-	short error_code,
-	short local_player_index,
-	boolean modal,
-	boolean pause_game_time);
-long ustrcmp(
-	wchar_t const *string1,
-	wchar_t const *string2);
-wchar_t *ustrcpy(
-	wchar_t *dest,
-	wchar_t const *src);
-boolean saved_game_file_name_unique(
-	wchar_t const *name);
 
 /* ---------- globals */
 
 char const virtual_keyboard_key_layout[VIRTUAL_KEYBOARD_ROW_COUNT][VIRTUAL_KEYBOARD_COLUMN_COUNT] =
 {
-	{ 0x24, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09 },
-	{ 0x25, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13 },
-	{ 0x26, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D },
-	{ 0x27, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x28, 0x28, 0x28, 0x28 },
-	{ 0x2B, 0x2B, 0x2B, 0x2B, 0x2B, 0x2B, 0x2B, 0x29, 0x29, 0x2A, 0x2A },
+	{ _vkey_done, _vkey_1, _vkey_2, _vkey_3, _vkey_4, _vkey_5, _vkey_6, _vkey_7, _vkey_8, _vkey_9, _vkey_0 },
+	{ _vkey_shift, _vkey_a, _vkey_b, _vkey_c, _vkey_d, _vkey_e, _vkey_f, _vkey_g, _vkey_h, _vkey_i, _vkey_j },
+	{ _vkey_caps, _vkey_k, _vkey_l, _vkey_m, _vkey_n, _vkey_o, _vkey_p, _vkey_q, _vkey_r, _vkey_s, _vkey_t },
+	{ _vkey_symbols, _vkey_u, _vkey_v, _vkey_w, _vkey_x, _vkey_y, _vkey_z, _vkey_backspace, _vkey_backspace, _vkey_backspace, _vkey_backspace },
+	{ _vkey_space, _vkey_space, _vkey_space, _vkey_space, _vkey_space, _vkey_space, _vkey_space, _vkey_left, _vkey_left, _vkey_right, _vkey_right },
 };
 
 struct virtual_keyboard_globals virtual_keyboard_globals;
@@ -242,37 +287,37 @@ boolean virtual_keyboard_initialize(
 {
 	long keyboard_index;
 
-	virtual_keyboard_globals.active= FALSE;
-	virtual_keyboard_globals.shift_active= FALSE;
-	virtual_keyboard_globals.caps_active= FALSE;
-	virtual_keyboard_globals.symbols_active= FALSE;
+	virtual_keyboard_globals.active = FALSE;
+	virtual_keyboard_globals.shift_active = FALSE;
+	virtual_keyboard_globals.caps_active = FALSE;
+	virtual_keyboard_globals.symbols_active = FALSE;
 
-	keyboard_index= tag_loaded('vcky', "ui\\english");
+	keyboard_index = tag_loaded(VIRTUAL_KEYBOARD_TAG, "ui\\english");
 	if (keyboard_index != NONE)
 	{
-		virtual_keyboard_globals.keyboard= tag_get('vcky', keyboard_index);
+		virtual_keyboard_globals.keyboard = virtual_keyboard_definition_get(keyboard_index);
 		match_assert(
 			"c:\\halo\\SOURCE\\interface\\virtual_keyboard.c",
 			364,
 			virtual_keyboard_globals.keyboard);
 
-		virtual_keyboard_globals.row= 0;
-		virtual_keyboard_globals.column= 0;
-		virtual_keyboard_globals.buffer_size= 0;
-		virtual_keyboard_globals.last_event= NONE;
-		virtual_keyboard_globals.last_key= NONE;
-		virtual_keyboard_globals.number_of_event_repeats= 0;
-		virtual_keyboard_globals.text_buffer= NULL;
-		virtual_keyboard_globals.cursor= NULL;
-		virtual_keyboard_globals.time_of_last_event= 0;
+		virtual_keyboard_globals.row = 0;
+		virtual_keyboard_globals.column = 0;
+		virtual_keyboard_globals.buffer_size = 0;
+		virtual_keyboard_globals.last_event = NONE;
+		virtual_keyboard_globals.last_key = NONE;
+		virtual_keyboard_globals.number_of_event_repeats = 0;
+		virtual_keyboard_globals.text_buffer = NULL;
+		virtual_keyboard_globals.cursor = NULL;
+		virtual_keyboard_globals.time_of_last_event = 0;
 	}
 	else
 	{
 		error(2, "failed to load virtual keyboard for '%s' language", "<unknown>");
 	}
 
-	virtual_keyboard_globals.caret_bitmap_index=
-		tag_loaded('bitm', "ui\\shell\\bitmaps\\white");
+	virtual_keyboard_globals.caret_bitmap_index =
+		tag_loaded(BITMAP_GROUP_TAG, "ui\\shell\\bitmaps\\white");
 	if (virtual_keyboard_globals.caret_bitmap_index == NONE)
 	{
 		error(
@@ -287,20 +332,20 @@ boolean virtual_keyboard_initialize(
 void virtual_keyboard_dispose(
 	void)
 {
-	virtual_keyboard_globals.active= FALSE;
-	virtual_keyboard_globals.shift_active= FALSE;
-	virtual_keyboard_globals.caps_active= FALSE;
-	virtual_keyboard_globals.symbols_active= FALSE;
-	virtual_keyboard_globals.keyboard= NULL;
-	virtual_keyboard_globals.row= 0;
-	virtual_keyboard_globals.column= 0;
-	virtual_keyboard_globals.buffer_size= 0;
-	virtual_keyboard_globals.last_event= NONE;
-	virtual_keyboard_globals.last_key= NONE;
-	virtual_keyboard_globals.number_of_event_repeats= 0;
-	virtual_keyboard_globals.text_buffer= NULL;
-	virtual_keyboard_globals.cursor= NULL;
-	virtual_keyboard_globals.time_of_last_event= 0;
+	virtual_keyboard_globals.active = FALSE;
+	virtual_keyboard_globals.shift_active = FALSE;
+	virtual_keyboard_globals.caps_active = FALSE;
+	virtual_keyboard_globals.symbols_active = FALSE;
+	virtual_keyboard_globals.keyboard = NULL;
+	virtual_keyboard_globals.row = 0;
+	virtual_keyboard_globals.column = 0;
+	virtual_keyboard_globals.buffer_size = 0;
+	virtual_keyboard_globals.last_event = NONE;
+	virtual_keyboard_globals.last_key = NONE;
+	virtual_keyboard_globals.number_of_event_repeats = 0;
+	virtual_keyboard_globals.text_buffer = NULL;
+	virtual_keyboard_globals.cursor = NULL;
+	virtual_keyboard_globals.time_of_last_event = 0;
 
 	event_manager_flush();
 
@@ -309,10 +354,10 @@ void virtual_keyboard_dispose(
 
 boolean virtual_keyboard_launch(
 	wchar_t *text_buffer,
-	unsigned short buffer_size,
+	word buffer_size,
 	short caption_index)
 {
-	boolean result= FALSE;
+	boolean result = FALSE;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\interface\\virtual_keyboard.c",
@@ -326,29 +371,29 @@ boolean virtual_keyboard_launch(
 	if (!virtual_keyboard_globals.active && virtual_keyboard_globals.keyboard)
 	{
 		event_manager_flush();
-		virtual_keyboard_globals.row= 0;
-		virtual_keyboard_globals.column= 0;
-		virtual_keyboard_globals.active= TRUE;
-		virtual_keyboard_globals.text_buffer= text_buffer;
-		virtual_keyboard_globals.cursor= text_buffer + ustrlen(text_buffer);
-		virtual_keyboard_globals.buffer_size= buffer_size;
+		virtual_keyboard_globals.row = 0;
+		virtual_keyboard_globals.column = 0;
+		virtual_keyboard_globals.active = TRUE;
+		virtual_keyboard_globals.text_buffer = text_buffer;
+		virtual_keyboard_globals.cursor = text_buffer + ustrlen(text_buffer);
+		virtual_keyboard_globals.buffer_size = buffer_size;
 		if (virtual_keyboard_globals.buffer_size >= MAXIMUM_VIRTUAL_KEYBOARD_BUFFER_SIZE)
-			virtual_keyboard_globals.buffer_size= MAXIMUM_VIRTUAL_KEYBOARD_BUFFER_SIZE;
-		virtual_keyboard_globals.last_event= NONE;
-		virtual_keyboard_globals.time_of_last_event= system_milliseconds();
-		virtual_keyboard_globals.caption_index= caption_index;
-		virtual_keyboard_globals.shift_active= FALSE;
-		virtual_keyboard_globals.caps_active= FALSE;
-		virtual_keyboard_globals.symbols_active= FALSE;
-		virtual_keyboard_globals.first_key_replaces_buffer= TRUE;
+			virtual_keyboard_globals.buffer_size = MAXIMUM_VIRTUAL_KEYBOARD_BUFFER_SIZE;
+		virtual_keyboard_globals.last_event = NONE;
+		virtual_keyboard_globals.time_of_last_event = system_milliseconds();
+		virtual_keyboard_globals.caption_index = caption_index;
+		virtual_keyboard_globals.shift_active = FALSE;
+		virtual_keyboard_globals.caps_active = FALSE;
+		virtual_keyboard_globals.symbols_active = FALSE;
+		virtual_keyboard_globals.first_key_replaces_buffer = TRUE;
 		ustrncpy(
 			virtual_keyboard_globals.saved_text,
 			text_buffer,
 			MAXIMUM_VIRTUAL_KEYBOARD_SAVED_TEXT_LENGTH);
-		virtual_keyboard_globals.saved_text[MAXIMUM_VIRTUAL_KEYBOARD_SAVED_TEXT_LENGTH - 1]= L'\0';
-		virtual_keyboard_globals.last_exit_saved_text= FALSE;
-		ui_play_audio_feedback_sound(2);
-		result= TRUE;
+		virtual_keyboard_globals.saved_text[MAXIMUM_VIRTUAL_KEYBOARD_SAVED_TEXT_LENGTH - 1] = L'\0';
+		virtual_keyboard_globals.last_exit_saved_text = FALSE;
+		ui_play_audio_feedback_sound(_ui_audio_feedback_forward);
+		result = TRUE;
 	}
 
 	return result;
@@ -366,7 +411,7 @@ boolean virtual_keyboard_last_exit_saved_text(
 	return virtual_keyboard_globals.last_exit_saved_text;
 }
 
-boolean code_000e4e10(
+static boolean virtual_keyboard_tab_left(
 	void)
 {
 	char keycode = virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column];
@@ -379,12 +424,12 @@ boolean code_000e4e10(
 	}
 	while (virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column] == keycode);
 
-	ui_play_audio_feedback_sound(1);
+	ui_play_audio_feedback_sound(_ui_audio_feedback_cursor);
 
 	return TRUE;
 }
 
-boolean code_000e4e60(
+static boolean virtual_keyboard_tab_right(
 	void)
 {
 	char keycode = virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column];
@@ -397,12 +442,12 @@ boolean code_000e4e60(
 	}
 	while (virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column] == keycode);
 
-	ui_play_audio_feedback_sound(1);
+	ui_play_audio_feedback_sound(_ui_audio_feedback_cursor);
 
 	return TRUE;
 }
 
-boolean code_000e4eb0(
+static boolean virtual_keyboard_tab_up(
 	void)
 {
 	char keycode = virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column];
@@ -415,12 +460,12 @@ boolean code_000e4eb0(
 	}
 	while (virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column] == keycode);
 
-	ui_play_audio_feedback_sound(1);
+	ui_play_audio_feedback_sound(_ui_audio_feedback_cursor);
 
 	return TRUE;
 }
 
-boolean code_000e4f00(
+static boolean virtual_keyboard_tab_down(
 	void)
 {
 	char keycode = virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column];
@@ -433,15 +478,15 @@ boolean code_000e4f00(
 	}
 	while (virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column] == keycode);
 
-	ui_play_audio_feedback_sound(1);
+	ui_play_audio_feedback_sound(_ui_audio_feedback_cursor);
 
 	return TRUE;
 }
 
-boolean code_000e4f50(
+static boolean virtual_keyboard_cancel(
 	void)
 {
-	virtual_keyboard_globals.active= FALSE;
+	virtual_keyboard_globals.active = FALSE;
 	if (virtual_keyboard_globals.text_buffer)
 	{
 		ustrncpy(
@@ -449,19 +494,19 @@ boolean code_000e4f50(
 			virtual_keyboard_globals.saved_text,
 			virtual_keyboard_globals.buffer_size / sizeof(wchar_t));
 		virtual_keyboard_globals.text_buffer[
-			virtual_keyboard_globals.buffer_size / sizeof(wchar_t) - 1]= L'\0';
+			virtual_keyboard_globals.buffer_size / sizeof(wchar_t) - 1] = L'\0';
 	}
 
-	virtual_keyboard_globals.text_buffer= NULL;
-	virtual_keyboard_globals.saved_text[0]= L'\0';
-	virtual_keyboard_globals.last_exit_saved_text= FALSE;
-	ui_play_audio_feedback_sound(3);
+	virtual_keyboard_globals.text_buffer = NULL;
+	virtual_keyboard_globals.saved_text[0] = L'\0';
+	virtual_keyboard_globals.last_exit_saved_text = FALSE;
+	ui_play_audio_feedback_sound(_ui_audio_feedback_back);
 
 	return TRUE;
 }
 
-static wchar_t code_000e4fb0(
-	unsigned short keycode)
+static wchar_t virtual_keyboard_get_character(
+	word keycode)
 {
 	struct virtual_keyboard_key *key;
 	wchar_t character;
@@ -475,71 +520,71 @@ static wchar_t code_000e4fb0(
 		988,
 		keycode < NUMBER_OF_CONFIGURABLE_VIRTUAL_KEYS);
 
-	key= (struct virtual_keyboard_key *)virtual_keyboard_globals.keyboard->keys.address + keycode;
+	key = virtual_keyboard_key_get(virtual_keyboard_globals.keyboard, keycode);
 	if (virtual_keyboard_globals.shift_active)
 	{
 		if (virtual_keyboard_globals.caps_active)
-			character= key->shift_caps_character;
+			character = key->shift_caps_character;
 		else if (virtual_keyboard_globals.symbols_active)
-			character= key->shift_symbols_character;
+			character = key->shift_symbols_character;
 		else
-			character= key->shift_character;
+			character = key->shift_character;
 	}
 	else
 	{
 		if (virtual_keyboard_globals.caps_active)
 		{
 			if (virtual_keyboard_globals.symbols_active)
-				character= key->caps_symbols_character;
+				character = key->caps_symbols_character;
 			else
-				character= key->caps_character;
+				character = key->caps_character;
 		}
 		else if (virtual_keyboard_globals.symbols_active)
-			character= key->symbols_character;
+			character = key->symbols_character;
 		else
-			character= key->character;
+			character = key->character;
 	}
 
 	if (!character)
-		character= 0x7F;
+		character = 0x7F;
 
 	return character;
 }
 
-wchar_t code_000e5080(
+wchar_t virtual_keyboard_get_current_character(
 	void)
 {
-	return code_000e4fb0(virtual_keyboard_key_layout[
+	return virtual_keyboard_get_character(virtual_keyboard_key_layout[
 		virtual_keyboard_globals.row][virtual_keyboard_globals.column]);
 }
 
-long code_000e5700(
+long virtual_keyboard_free_space_in_text_buffer(
 	void)
 {
 	return virtual_keyboard_globals.buffer_size -
 		2 * (ustrlen(virtual_keyboard_globals.text_buffer) + 1);
 }
 
-void code_000e5720(
+static void virtual_keyboard_backspace(
 	void)
 {
 	if (virtual_keyboard_globals.cursor > virtual_keyboard_globals.text_buffer)
 	{
-		long remaining_size= virtual_keyboard_globals.buffer_size -
+		long remaining_size = virtual_keyboard_globals.buffer_size -
 			((byte *)virtual_keyboard_globals.cursor - (byte *)virtual_keyboard_globals.text_buffer);
 
-		if (remaining_size>=0)
+		if (remaining_size >= 0)
 		{
 			csmemmove(
 				virtual_keyboard_globals.cursor - 1,
 				virtual_keyboard_globals.cursor,
 				remaining_size);
-			virtual_keyboard_globals.text_buffer[virtual_keyboard_globals.buffer_size / 2 - 1]= L'\0';
+			virtual_keyboard_globals.text_buffer[virtual_keyboard_globals.buffer_size / 2 - 1] = L'\0';
 			virtual_keyboard_globals.cursor--;
 		}
 	}
 
-	ui_play_audio_feedback_sound(1);
+	ui_play_audio_feedback_sound(_ui_audio_feedback_cursor);
 
 	return;
 }
@@ -547,7 +592,7 @@ void code_000e5720(
 void virtual_keyboard_close(
 	void)
 {
-	code_000e4f50();
+	virtual_keyboard_cancel();
 
 	return;
 }
@@ -556,7 +601,7 @@ void virtual_keyboard_render(
 	void)
 {
 	if (virtual_keyboard_globals.active)
-		code_000e50b0();
+		virtual_keyboard_render_internal();
 
 	return;
 }
@@ -575,57 +620,57 @@ void virtual_keyboard_process(
 static boolean virtual_keyboard_select(
 	void)
 {
-	short keycode= virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column];
+	short keycode = virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column];
 
 	switch (keycode)
 	{
-	case _virtual_key_done:
-		if (ustrcmp(virtual_keyboard_globals.saved_text, virtual_keyboard_globals.text_buffer)!=0)
+	case _vkey_done:
+		if (ustrcmp(virtual_keyboard_globals.saved_text, virtual_keyboard_globals.text_buffer) != 0)
 		{
 			if (virtual_keyboard_globals.text_buffer[0])
 			{
 				if (saved_game_file_name_unique(virtual_keyboard_globals.text_buffer))
 				{
-					virtual_keyboard_globals.last_exit_saved_text= TRUE;
+					virtual_keyboard_globals.last_exit_saved_text = TRUE;
 				}
 				else
 				{
-					display_error(27, NONE, TRUE, FALSE); /* already a saved game file with that name */
-					code_000e4f50();
+					display_error(_error_already_a_saved_game_file_with_that_name, NONE, TRUE, FALSE);
+					virtual_keyboard_cancel();
 				}
 			}
 			else
 			{
-				display_error(29, NONE, TRUE, FALSE); /* cannot create a saved game file with an empty name */
-				code_000e4f50();
+				display_error(_error_cannot_create_saved_game_file_with_empty_name, NONE, TRUE, FALSE);
+				virtual_keyboard_cancel();
 			}
 		}
 		else
 		{
-			virtual_keyboard_globals.last_exit_saved_text= TRUE;
+			virtual_keyboard_globals.last_exit_saved_text = TRUE;
 		}
-		ui_play_audio_feedback_sound(3);
-		virtual_keyboard_globals.active= FALSE;
+		ui_play_audio_feedback_sound(_ui_audio_feedback_back);
+		virtual_keyboard_globals.active = FALSE;
 		event_manager_flush();
 		break;
 
-	case _virtual_key_shift:
-		ui_play_audio_feedback_sound(1);
-		virtual_keyboard_globals.shift_active= !virtual_keyboard_globals.shift_active;
+	case _vkey_shift:
+		ui_play_audio_feedback_sound(_ui_audio_feedback_cursor);
+		virtual_keyboard_globals.shift_active = !virtual_keyboard_globals.shift_active;
 		break;
 
-	case _virtual_key_caps_lock:
-		ui_play_audio_feedback_sound(1);
-		virtual_keyboard_globals.caps_active= !virtual_keyboard_globals.caps_active;
+	case _vkey_caps:
+		ui_play_audio_feedback_sound(_ui_audio_feedback_cursor);
+		virtual_keyboard_globals.caps_active = !virtual_keyboard_globals.caps_active;
 		break;
 
-	case _virtual_key_symbols:
-		ui_play_audio_feedback_sound(1);
-		virtual_keyboard_globals.symbols_active= !virtual_keyboard_globals.symbols_active;
+	case _vkey_symbols:
+		ui_play_audio_feedback_sound(_ui_audio_feedback_cursor);
+		virtual_keyboard_globals.symbols_active = !virtual_keyboard_globals.symbols_active;
 		break;
 
-	case _virtual_key_backspace:
-		if (virtual_keyboard_globals.first_key_replaces_buffer==TRUE)
+	case _vkey_backspace:
+		if (virtual_keyboard_globals.first_key_replaces_buffer == TRUE)
 		{
 			match_assert(
 				"c:\\halo\\SOURCE\\interface\\virtual_keyboard.c",
@@ -635,31 +680,31 @@ static boolean virtual_keyboard_select(
 				virtual_keyboard_globals.text_buffer,
 				0,
 				virtual_keyboard_globals.buffer_size);
-			virtual_keyboard_globals.cursor= virtual_keyboard_globals.text_buffer;
-			virtual_keyboard_globals.first_key_replaces_buffer= FALSE;
+			virtual_keyboard_globals.cursor = virtual_keyboard_globals.text_buffer;
+			virtual_keyboard_globals.first_key_replaces_buffer = FALSE;
 		}
 		else
 		{
-			code_000e5720();
+			virtual_keyboard_backspace();
 		}
 		break;
 
-	case _virtual_key_cursor_left:
-		if (virtual_keyboard_globals.cursor>virtual_keyboard_globals.text_buffer)
+	case _vkey_left:
+		if (virtual_keyboard_globals.cursor > virtual_keyboard_globals.text_buffer)
 			virtual_keyboard_globals.cursor--;
-		virtual_keyboard_globals.first_key_replaces_buffer= FALSE;
-		ui_play_audio_feedback_sound(1);
+		virtual_keyboard_globals.first_key_replaces_buffer = FALSE;
+		ui_play_audio_feedback_sound(_ui_audio_feedback_cursor);
 		break;
 
-	case _virtual_key_cursor_right:
+	case _vkey_right:
 		if (*virtual_keyboard_globals.cursor)
 			virtual_keyboard_globals.cursor++;
-		virtual_keyboard_globals.first_key_replaces_buffer= FALSE;
-		ui_play_audio_feedback_sound(1);
+		virtual_keyboard_globals.first_key_replaces_buffer = FALSE;
+		ui_play_audio_feedback_sound(_ui_audio_feedback_cursor);
 		break;
 
-	case _virtual_key_space:
-		if (virtual_keyboard_globals.first_key_replaces_buffer==TRUE)
+	case _vkey_space:
+		if (virtual_keyboard_globals.first_key_replaces_buffer == TRUE)
 		{
 			match_assert(
 				"c:\\halo\\SOURCE\\interface\\virtual_keyboard.c",
@@ -669,26 +714,26 @@ static boolean virtual_keyboard_select(
 				virtual_keyboard_globals.text_buffer,
 				0,
 				virtual_keyboard_globals.buffer_size);
-			virtual_keyboard_globals.cursor= virtual_keyboard_globals.text_buffer;
-			virtual_keyboard_globals.first_key_replaces_buffer= FALSE;
+			virtual_keyboard_globals.cursor = virtual_keyboard_globals.text_buffer;
+			virtual_keyboard_globals.first_key_replaces_buffer = FALSE;
 		}
-		if (code_000e5700()>=2)
+		if (virtual_keyboard_free_space_in_text_buffer() >= 2)
 		{
 			csmemmove(
-				virtual_keyboard_globals.cursor+1,
+				virtual_keyboard_globals.cursor + 1,
 				virtual_keyboard_globals.cursor,
-				virtual_keyboard_globals.buffer_size-((byte *)virtual_keyboard_globals.cursor-(byte *)virtual_keyboard_globals.text_buffer)-sizeof(wchar_t));
-			*virtual_keyboard_globals.cursor++= L' ';
-			ui_play_audio_feedback_sound(2);
+				virtual_keyboard_globals.buffer_size - ((byte *)virtual_keyboard_globals.cursor - (byte *)virtual_keyboard_globals.text_buffer) - sizeof(wchar_t));
+			*virtual_keyboard_globals.cursor++ = L' ';
+			ui_play_audio_feedback_sound(_ui_audio_feedback_forward);
 		}
 		else
 		{
-			ui_play_audio_feedback_sound(4);
+			ui_play_audio_feedback_sound(_ui_audio_feedback_flag_failure);
 		}
 		break;
 
 	default:
-		if (virtual_keyboard_globals.first_key_replaces_buffer==TRUE)
+		if (virtual_keyboard_globals.first_key_replaces_buffer == TRUE)
 		{
 			match_assert(
 				"c:\\halo\\SOURCE\\interface\\virtual_keyboard.c",
@@ -698,31 +743,31 @@ static boolean virtual_keyboard_select(
 				virtual_keyboard_globals.text_buffer,
 				0,
 				virtual_keyboard_globals.buffer_size);
-			virtual_keyboard_globals.cursor= virtual_keyboard_globals.text_buffer;
-			virtual_keyboard_globals.first_key_replaces_buffer= FALSE;
+			virtual_keyboard_globals.cursor = virtual_keyboard_globals.text_buffer;
+			virtual_keyboard_globals.first_key_replaces_buffer = FALSE;
 		}
 		{
-			long buffer_size= virtual_keyboard_globals.buffer_size;
-			long free_space= buffer_size-2*(ustrlen(virtual_keyboard_globals.text_buffer)+1);
+			long buffer_size = virtual_keyboard_globals.buffer_size;
+			long free_space = buffer_size - 2 * (ustrlen(virtual_keyboard_globals.text_buffer) + 1);
 
-			if (free_space>=2)
+			if (free_space >= 2)
 			{
 				csmemmove(
-					virtual_keyboard_globals.cursor+1,
+					virtual_keyboard_globals.cursor + 1,
 					virtual_keyboard_globals.cursor,
-					buffer_size-((byte *)virtual_keyboard_globals.cursor-(byte *)virtual_keyboard_globals.text_buffer)-sizeof(wchar_t));
-				*virtual_keyboard_globals.cursor++= code_000e4fb0(
+					buffer_size - ((byte *)virtual_keyboard_globals.cursor - (byte *)virtual_keyboard_globals.text_buffer) - sizeof(wchar_t));
+				*virtual_keyboard_globals.cursor++ = virtual_keyboard_get_character(
 					virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column]);
-				if (ustrcmp(virtual_keyboard_globals.text_buffer, L".fortune")==0)
+				if (ustrcmp(virtual_keyboard_globals.text_buffer, L".fortune") == 0)
 				{
-					unsigned long fortune_index= system_milliseconds()%NUMBER_OF_VIRTUAL_KEYBOARD_FORTUNES;
-					fortune_index= MIN(fortune_index, NUMBER_OF_VIRTUAL_KEYBOARD_FORTUNES-1);
-					virtual_keyboard_globals.caption_index= FIRST_VIRTUAL_KEYBOARD_FORTUNE_STRING_INDEX+
+					unsigned long fortune_index = system_milliseconds() % NUMBER_OF_VIRTUAL_KEYBOARD_FORTUNES;
+					fortune_index = MIN(fortune_index, NUMBER_OF_VIRTUAL_KEYBOARD_FORTUNES - 1);
+					virtual_keyboard_globals.caption_index = FIRST_VIRTUAL_KEYBOARD_FORTUNE_STRING_INDEX +
 						fortune_index;
 					if (virtual_keyboard_globals.saved_text[0])
 					{
 						ustrcpy(virtual_keyboard_globals.text_buffer, virtual_keyboard_globals.saved_text);
-						virtual_keyboard_globals.cursor= virtual_keyboard_globals.text_buffer+
+						virtual_keyboard_globals.cursor = virtual_keyboard_globals.text_buffer +
 							ustrlen(virtual_keyboard_globals.text_buffer);
 					}
 					else
@@ -731,21 +776,21 @@ static boolean virtual_keyboard_select(
 							virtual_keyboard_globals.text_buffer,
 							0,
 							virtual_keyboard_globals.buffer_size);
-						virtual_keyboard_globals.cursor= virtual_keyboard_globals.text_buffer;
+						virtual_keyboard_globals.cursor = virtual_keyboard_globals.text_buffer;
 					}
 				}
-				ui_play_audio_feedback_sound(2);
+				ui_play_audio_feedback_sound(_ui_audio_feedback_forward);
 			}
 			else
 			{
-				ui_play_audio_feedback_sound(4);
+				ui_play_audio_feedback_sound(_ui_audio_feedback_flag_failure);
 			}
 		}
 		break;
 	}
 
-	if (virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column]!=_virtual_key_shift)
-		virtual_keyboard_globals.shift_active= FALSE;
+	if (virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column] != _vkey_shift)
+		virtual_keyboard_globals.shift_active = FALSE;
 
 	return TRUE;
 }
@@ -754,93 +799,93 @@ static void virtual_keyboard_process_internal(
 	void)
 {
 	static unsigned long time_of_last_tab;
-	unsigned long time= system_milliseconds();
+	unsigned long time = system_milliseconds();
 	struct event_record event;
-	long action= NONE;
-	boolean handled= FALSE;
+	long action = NONE;
+	boolean handled = FALSE;
 
 	while (get_next_event(&event, NONE))
 	{
 		switch (event.type)
 		{
 		case _event_type_left_stick:
-			if (event.data.stick.y==SHORT_MAX)
-				action= _event_tab_up;
-			else if (event.data.stick.y==SHORT_MIN)
-				action= _event_tab_down;
-			else if (event.data.stick.x==SHORT_MIN)
-				action= _event_tab_left;
-			else if (event.data.stick.x==SHORT_MAX)
-				action= _event_tab_right;
+			if (event.data.stick.y == SHORT_MAX)
+				action = _event_tab_up;
+			else if (event.data.stick.y == SHORT_MIN)
+				action = _event_tab_down;
+			else if (event.data.stick.x == SHORT_MIN)
+				action = _event_tab_left;
+			else if (event.data.stick.x == SHORT_MAX)
+				action = _event_tab_right;
 			break;
 
 		case _event_type_button:
 			switch (event.data.button.index)
 			{
 			case _gamepad_analog_button_a:
-				if (event.data.button.value==1)
-					action= _event_key_select;
+				if (event.data.button.value == 1)
+					action = _event_key_select;
 				break;
 
 			case _gamepad_analog_button_b:
 			case _gamepad_binary_button_back:
-				if (event.data.button.value==1)
-					action= _event_cancel;
+				if (event.data.button.value == 1)
+					action = _event_cancel;
 				break;
 
 			case _gamepad_binary_button_dpad_up:
-				if (virtual_keyboard_globals.last_event!=_event_tab_up ||
-					time-time_of_last_tab>=VIRTUAL_KEYBOARD_TAB_REPEAT_MILLISECONDS ||
-					event.data.button.value==1)
+				if (virtual_keyboard_globals.last_event != _event_tab_up ||
+					time - time_of_last_tab >= VIRTUAL_KEYBOARD_TAB_REPEAT_MILLISECONDS ||
+					event.data.button.value == 1)
 				{
-					action= _event_tab_up;
-					time_of_last_tab= time;
+					action = _event_tab_up;
+					time_of_last_tab = time;
 				}
 				break;
 
 			case _gamepad_binary_button_dpad_left:
-				if (virtual_keyboard_globals.last_event!=_event_tab_left ||
-					time-time_of_last_tab>=VIRTUAL_KEYBOARD_TAB_REPEAT_MILLISECONDS ||
-					event.data.button.value==1)
+				if (virtual_keyboard_globals.last_event != _event_tab_left ||
+					time - time_of_last_tab >= VIRTUAL_KEYBOARD_TAB_REPEAT_MILLISECONDS ||
+					event.data.button.value == 1)
 				{
-					action= _event_tab_left;
-					time_of_last_tab= time;
+					action = _event_tab_left;
+					time_of_last_tab = time;
 				}
 				break;
 
 			case _gamepad_binary_button_dpad_down:
-				if (virtual_keyboard_globals.last_event!=_event_tab_down ||
-					time-time_of_last_tab>=VIRTUAL_KEYBOARD_TAB_REPEAT_MILLISECONDS ||
-					event.data.button.value==1)
+				if (virtual_keyboard_globals.last_event != _event_tab_down ||
+					time - time_of_last_tab >= VIRTUAL_KEYBOARD_TAB_REPEAT_MILLISECONDS ||
+					event.data.button.value == 1)
 				{
-					action= _event_tab_down;
-					time_of_last_tab= time;
+					action = _event_tab_down;
+					time_of_last_tab = time;
 				}
 				break;
 
 			case _gamepad_binary_button_dpad_right:
-				if (virtual_keyboard_globals.last_event!=_event_tab_right ||
-					time-time_of_last_tab>=VIRTUAL_KEYBOARD_TAB_REPEAT_MILLISECONDS ||
-					event.data.button.value==1)
+				if (virtual_keyboard_globals.last_event != _event_tab_right ||
+					time - time_of_last_tab >= VIRTUAL_KEYBOARD_TAB_REPEAT_MILLISECONDS ||
+					event.data.button.value == 1)
 				{
-					action= _event_tab_right;
-					time_of_last_tab= time;
+					action = _event_tab_right;
+					time_of_last_tab = time;
 				}
 				break;
 
 			case _gamepad_binary_button_start:
-				if (event.data.button.value==1)
+				if (event.data.button.value == 1)
 				{
-					virtual_keyboard_globals.row= 0;
-					virtual_keyboard_globals.column= 0;
-					action= _event_key_select;
+					virtual_keyboard_globals.row = 0;
+					virtual_keyboard_globals.column = 0;
+					action = _event_key_select;
 				}
 				break;
 
 			case _gamepad_analog_button_x:
-				if (event.data.button.value==1)
+				if (event.data.button.value == 1)
 				{
-					if (virtual_keyboard_globals.first_key_replaces_buffer==TRUE)
+					if (virtual_keyboard_globals.first_key_replaces_buffer == TRUE)
 					{
 						match_assert(
 							"c:\\halo\\SOURCE\\interface\\virtual_keyboard.c",
@@ -850,37 +895,37 @@ static void virtual_keyboard_process_internal(
 							virtual_keyboard_globals.text_buffer,
 							0,
 							virtual_keyboard_globals.buffer_size);
-						virtual_keyboard_globals.cursor= virtual_keyboard_globals.text_buffer;
-						virtual_keyboard_globals.first_key_replaces_buffer= FALSE;
-						ui_play_audio_feedback_sound(1);
+						virtual_keyboard_globals.cursor = virtual_keyboard_globals.text_buffer;
+						virtual_keyboard_globals.first_key_replaces_buffer = FALSE;
+						ui_play_audio_feedback_sound(_ui_audio_feedback_cursor);
 					}
 					else
 					{
-						code_000e5720();
+						virtual_keyboard_backspace();
 					}
-					handled= TRUE;
+					handled = TRUE;
 				}
 				break;
 
 			case _gamepad_analog_button_left_trigger:
-				if (event.data.button.value==1)
+				if (event.data.button.value == 1)
 				{
-					virtual_keyboard_globals.first_key_replaces_buffer= FALSE;
-					if (virtual_keyboard_globals.cursor>virtual_keyboard_globals.text_buffer)
+					virtual_keyboard_globals.first_key_replaces_buffer = FALSE;
+					if (virtual_keyboard_globals.cursor > virtual_keyboard_globals.text_buffer)
 						virtual_keyboard_globals.cursor--;
-					ui_play_audio_feedback_sound(1);
-					handled= TRUE;
+					ui_play_audio_feedback_sound(_ui_audio_feedback_cursor);
+					handled = TRUE;
 				}
 				break;
 
 			case _gamepad_analog_button_right_trigger:
-				if (event.data.button.value==1)
+				if (event.data.button.value == 1)
 				{
-					virtual_keyboard_globals.first_key_replaces_buffer= FALSE;
+					virtual_keyboard_globals.first_key_replaces_buffer = FALSE;
 					if (*virtual_keyboard_globals.cursor)
 						virtual_keyboard_globals.cursor++;
-					ui_play_audio_feedback_sound(1);
-					handled= TRUE;
+					ui_play_audio_feedback_sound(_ui_audio_feedback_cursor);
+					handled = TRUE;
 				}
 				break;
 			}
@@ -888,24 +933,36 @@ static void virtual_keyboard_process_internal(
 		}
 	}
 
-	if (action!=NONE)
+	if (action != NONE)
 	{
-		virtual_keyboard_globals.last_key= virtual_keyboard_key_layout[
+		virtual_keyboard_globals.last_key = virtual_keyboard_key_layout[
 			virtual_keyboard_globals.row][virtual_keyboard_globals.column];
 		switch (action)
 		{
-		case _event_tab_left: handled= code_000e4e10(); break;
-		case _event_tab_right: handled= code_000e4e60(); break;
-		case _event_tab_up: handled= code_000e4eb0(); break;
-		case _event_tab_down: handled= code_000e4f00(); break;
-		case _event_key_select: handled= virtual_keyboard_select(); break;
-		case _event_cancel: handled= code_000e4f50(); break;
+		case _event_tab_left:
+			handled = virtual_keyboard_tab_left();
+			break;
+		case _event_tab_right:
+			handled = virtual_keyboard_tab_right();
+			break;
+		case _event_tab_up:
+			handled = virtual_keyboard_tab_up();
+			break;
+		case _event_tab_down:
+			handled = virtual_keyboard_tab_down();
+			break;
+		case _event_key_select:
+			handled = virtual_keyboard_select();
+			break;
+		case _event_cancel:
+			handled = virtual_keyboard_cancel();
+			break;
 		}
 
-		if (handled==TRUE)
+		if (handled == TRUE)
 		{
-			virtual_keyboard_globals.time_of_last_event= time;
-			virtual_keyboard_globals.last_event= action;
+			virtual_keyboard_globals.time_of_last_event = time;
+			virtual_keyboard_globals.last_event = action;
 		}
 	}
 

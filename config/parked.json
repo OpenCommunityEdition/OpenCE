@@ -1906,6 +1906,25 @@
         },
         "objdiff_percent": 99.59677
       }
+    },
+    {
+      "unit": "source/interface/virtual_keyboard",
+      "function": "_virtual_keyboard_select",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete virtual-key selection dispatcher in ordinary typed C from January disassembly and the independent HaloCEA implementation. The retained body handles done/save validation, shift/caps/symbol modes, backspace, cursor motion, space insertion, configurable character insertion, the .fortune easter egg, feedback sounds, and one-shot shift reset through semantic enums and owner-header prototypes. January and the candidate are both 1,088 padded bytes with 123 relocations, and objdiff reports 93.7518 percent similarity. The fail-closed blocker classifier returns UNKNOWN: the remaining differences are distributed source-order, branch-layout, and register-scheduling choices rather than missing behavior, and prior natural HaloCEA adaptation had a worse 1,120-byte envelope. No forced inline/noinline, barrier, volatile/register forcing, pragma, assembly, raw address, invented dependency, fake branch, or nonsensical matching construct is retained. Reopen only for authenticated January source/local records or a natural compatible-compiler donor that explains the residual schedule.",
+      "measurements": {
+        "target": {
+          "size": 1088,
+          "relocation_count": 123,
+          "normalized_sha256": "28fa08bf4fb555466006d076f32c672ca72ddd07a165e4c51e1cb54f02a0e141"
+        },
+        "base": {
+          "size": 1088,
+          "relocation_count": 123,
+          "normalized_sha256": "025bd53f5f2169bb649702adf79e4603dd2a13ac0b5967aca9297e7e983565d9"
+        },
+        "objdiff_percent": 93.7518
+      }
     }
   ]
 }
