@@ -289,8 +289,25 @@ symbols in this file:
 #include "encounters.h"
 #include "props.h"
 
+#include "ai.h"
+#include "ai_debug.h"
+#include "ai_scenario_definitions.h"
+#include "encounters.h"
+#include "cseries/errors.h"
+#include "game/game.h"
+#include "game/players.h"
 #include "saved games/game_state.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
+#include "structures/structures.h"
+#include "structures/structure_bsp_definitions.h"
+#include "tag_files/tag_groups.h"
+#include "units/bipeds.h"
+#include "units/unit_control_data.h"
+#include "units/unit_definitions.h"
 #include "units/units.h"
+#include "units/vehicle_definitions.h"
+#include "units/vehicles.h"
 
 /* ---------- constants */
 
@@ -298,15 +315,111 @@ enum
 {
 	_actor_mode_braindead = 0,
 	_actor_mode_alert = 2,
-	_actor_switch_props_fire_target_none = 0,
-	_actor_switch_props_fire_target_prop,
+	_actor_fire_target_none = 0,
+	_actor_fire_target_prop,
+};
+
+/* January names these limits in its assert and error strings; the shared
+header spells them MAXIMUM_SWARMS and MAXIMUM_UNIT_INDICES_PER_SWARM. */
+enum
+{
+	MAXIMUM_NUMBER_OF_ACTIVE_SWARMS = MAXIMUM_SWARMS,
+	MAXIMUM_NUMBER_OF_UNITS_PER_SWARM = MAXIMUM_UNIT_INDICES_PER_SWARM,
+};
+
+/* decision loop bounds; the history length and iteration cap come from the
+ * January error path (five remembered actions, ten passes) */
+enum
+{
+	MAXIMUM_DECISION_LOOP_ITERATIONS = 10,
+	NUMBER_OF_DECISION_LOOP_HISTORY_ENTRIES = 5,
+};
+
+/* actor state.combat_status levels (actors.h does not yet declare these) */
+enum
+{
+	_actor_combat_status_none = 0,
+	_actor_combat_status_wary,
+	_actor_combat_status_investigate,
+	_actor_combat_status_definite,
+	_actor_combat_status_certain,
+	_actor_combat_status_clear_los,
+	_actor_combat_status_dangerous,
+	_actor_combat_status_visible,
+	NUMBER_OF_ACTOR_COMBAT_STATUS_LEVELS,
+};
+
+/* ai sound volumes (ai.h does not yet declare these) */
+enum
+{
+	_ai_sound_volume_silent = 0,
+	_ai_sound_volume_medium,
+	_ai_sound_volume_loud,
+	_ai_sound_volume_shout,
+	_ai_sound_volume_quiet,
+	NUMBER_OF_AI_SOUND_VOLUMES,
+};
+
+/* ai spatial effect types (ai.h does not yet declare these) */
+enum
+{
+	_ai_spatial_effect_environmental_noise = 0,
+	_ai_spatial_effect_weapon_impact,
+	_ai_spatial_effect_weapon_detonation,
+	NUMBER_OF_AI_SPATIAL_EFFECTS,
+};
+
+/* ai unit effect types (ai.h does not yet declare these) */
+enum
+{
+	_ai_unit_effect_bump = 0,
+	_ai_unit_effect_shooting,
+	_ai_unit_effect_death_scream,
+	_ai_unit_effect_magic_sight,
+	NUMBER_OF_AI_UNIT_EFFECTS,
+};
+
+/* encounter follow-target types (encounters.h does not yet declare these) */
+enum
+{
+	_follow_target_none = 0,
+	_follow_target_players,
+	_follow_target_unit,
+	_follow_target_ai,
+	NUMBER_OF_FOLLOW_TARGET_TYPES,
+};
+
+/* ai profile meters touched by the actor update (ai_profile.h does not yet
+ * declare the meter table; ai_profile.c owns NUMBER_OF_AI_METERS == 28) */
+enum
+{
+	_ai_meter_actors_updated = 3,
+	_ai_meter_actors_active,
+	_ai_meter_units_updated = 6,
+	_ai_meter_units_active,
+	NUMBER_OF_AI_METERS = 28,
+};
+
+/* ai_information_packet.information_type (ai.h does not yet declare these) */
+enum
+{
+	_ai_information_none = 0,
+	_ai_information_allegiance,
+	_ai_information_combat_stimulus,
+	_ai_information_target_knowledge,
+	_ai_information_flee,
+	NUMBER_OF_AI_INFORMATION_TYPES,
 };
 
 /* ---------- macros */
 
-#define actor_switch_props_swarm_component_get(index) \
-	((struct actor_switch_props_swarm_component_datum *)datum_get( \
+#define swarm_component_get(index) \
+	((struct swarm_component_datum *)datum_get( \
 		swarm_component_data, (index)))
+
+#define prop_orphaned(prop) \
+	((prop)->state >= _prop_state_uninspected_orphan && \
+		(prop)->state <= _prop_state_inspected_orphan)
 
 /* ---------- structures */
 
@@ -325,7 +438,7 @@ typedef char actor_iterator_size_assert[
 typedef char actor_iterator_index_offset_assert[
 	offsetof(struct actor_iterator, index) == 0x14 ? 1 : -1];
 
-struct actor_switch_props_swarm_component_datum
+struct swarm_component_datum
 {
 	short identifier;
 	word flags;
@@ -335,10 +448,10 @@ struct actor_switch_props_swarm_component_datum
 	byte unknown_tail[SWARM_COMPONENT_DATUM_SIZE - 0x18];
 };
 
-typedef char actor_switch_props_swarm_component_datum_size_assert[
-	sizeof(struct actor_switch_props_swarm_component_datum) == SWARM_COMPONENT_DATUM_SIZE ? 1 : -1];
-typedef char actor_switch_props_swarm_component_target_prop_offset_assert[
-	offsetof(struct actor_switch_props_swarm_component_datum, combat_target_prop_index) == 0x14 ? 1 : -1];
+typedef char swarm_component_datum_size_assert[
+	sizeof(struct swarm_component_datum) == SWARM_COMPONENT_DATUM_SIZE ? 1 : -1];
+typedef char swarm_component_datum_combat_target_prop_offset_assert[
+	offsetof(struct swarm_component_datum, combat_target_prop_index) == 0x14 ? 1 : -1];
 
 typedef char actor_datum_output_control_flags_offset_assert[
 	offsetof(struct actor_datum, output.control_flags) == 0x6D0 ? 1 : -1];
@@ -351,6 +464,60 @@ typedef char actor_datum_meta_encounter_index_offset_assert[
 typedef char actor_datum_meta_first_prop_index_offset_assert[
 	offsetof(struct actor_datum, meta.first_prop_index) == 0x50 ? 1 : -1];
 
+/* The shared vehicle tag layout is still opaque past the common unit
+ * definition (vehicle_definitions.h only forward-declares it).  Actors reads
+ * the January-authenticated AI destination radius at 0x384 only, so keep that
+ * ownership local to this TU. */
+struct vehicle_definition
+{
+	struct unit_definition unit;
+	byte __unknown2F0[0x94];
+	real ai_destination_radius;
+};
+
+typedef char vehicle_definition_ai_destination_radius_offset_assert[
+	offsetof(struct vehicle_definition, ai_destination_radius) == 0x384 ? 1 : -1];
+
+/* ai.h does not yet declare the ai globals; actors touches only the
+ * January-authenticated service-timer prefix, so model that view locally
+ * (the leading flags follow the ai.c prefix). */
+struct ai_globals_service_data
+{
+	boolean ai_active;
+	boolean ai_initialized_for_map;
+	byte reserved002;
+	boolean time_given_this_frame;
+	short last_highest_service_timer;
+	short current_highest_service_timer;
+};
+
+typedef char ai_globals_service_data_time_given_offset_assert[
+	offsetof(struct ai_globals_service_data, time_given_this_frame) == 0x3 ? 1 : -1];
+typedef char ai_globals_service_data_current_highest_offset_assert[
+	offsetof(struct ai_globals_service_data, current_highest_service_timer) == 0x6 ? 1 : -1];
+
+/* ai_profile.c owns the profile globals; actors bumps only the January
+ * authenticated per-tick meters, so model the 0x88-byte meter records that
+ * follow the profile header locally. */
+struct ai_profile_meter
+{
+	short current;
+	byte __unknown2[0x86];
+};
+
+struct ai_profile_meter_globals
+{
+	byte __unknown0[0xC];
+	struct ai_profile_meter meters[NUMBER_OF_AI_METERS];
+};
+
+typedef char ai_profile_meter_size_assert[
+	sizeof(struct ai_profile_meter) == 0x88 ? 1 : -1];
+typedef char ai_profile_meter_globals_actors_updated_offset_assert[
+	offsetof(struct ai_profile_meter_globals, meters) + _ai_meter_actors_updated * sizeof(struct ai_profile_meter) == 0x1A4 ? 1 : -1];
+typedef char ai_profile_meter_globals_units_active_offset_assert[
+	offsetof(struct ai_profile_meter_globals, meters) + _ai_meter_units_active * sizeof(struct ai_profile_meter) == 0x3C4 ? 1 : -1];
+
 /* ---------- prototypes */
 
 void actor_action_replace_prop(
@@ -358,19 +525,156 @@ void actor_action_replace_prop(
 	long invalid_prop_index,
 	long replacement_prop_index);
 
-void code_00029e70(
-	long actor_index);
-
-void actor_swarm_detach_from_unit(
-	long actor_index,
-	long unit_index);
-
-void actor_delete(
+void encounter_detach_actor(
 	long actor_index,
 	boolean died);
 
+void encounterless_attach_actor(
+	long actor_index);
+
+void encounterless_detach_actor(
+	long actor_index);
+
+void encounter_attach_actor(
+	long actor_index,
+	long encounter_index,
+	short squad_index,
+	boolean has_previous_team);
+
+void actor_action_flush_structure_indices(
+	long actor_index);
+
+long biped_find_pathfinding_surface_index(
+	long biped_index,
+	real_point3d *position);
+
+short actor_action_class(
+	long actor_index);
+
+void ai_conversation_actor_deleted(
+	long actor_index);
+
+void actor_perception_find_sense_position(
+	long actor_index,
+	real_point3d const *position,
+	long prop_index,
+	struct actor_position_data *sense_position);
+
+short actor_audibility_at_point(
+	long actor_index,
+	struct actor_position_data *sense_position,
+	real_point3d const *position,
+	struct location const *location,
+	short volume,
+	real perception_factor,
+	short line_of_sight);
+
+void actor_stimulus_environmental_noise(
+	long actor_index,
+	long object_index,
+	real_point3d const *position,
+	short count);
+
+void actor_stimulus_weapon_impact(
+	long actor_index,
+	long object_index,
+	real_point3d const *position,
+	short count);
+
+void actor_stimulus_weapon_detonation(
+	long actor_index,
+	long object_index,
+	real_point3d const *position,
+	short count);
+
+void encounter_attach_unit(
+	long encounter_index,
+	long unit_index);
+
+void actor_input_update(
+	long actor_index);
+
+void actor_stimulus_damage(
+	long actor_index,
+	long prop_index,
+	real damage_fraction,
+	real_vector3d *damage_velocity);
+
+void actor_stimulus_enter_combat_friend_in_combat(
+	long actor_index,
+	long prop_index);
+
+void actor_stimulus_prop_fleeing(
+	long actor_index,
+	long prop_index);
+
 void actor_died(
 	long actor_index);
+
+void actor_perception_update(
+	long actor_index);
+
+void actor_situation_update(
+	long actor_index);
+
+void actor_emotion_update(
+	long actor_index);
+
+void actor_action_update(
+	long actor_index);
+
+void actor_action_control(
+	long actor_index);
+
+void actor_communication_update(
+	long actor_index);
+
+void actor_conversation_control(
+	long actor_index);
+
+void actor_destination_update(
+	long actor_index);
+
+void actor_look_affect_movement(
+	long actor_index);
+
+void actor_move_update(
+	long actor_index);
+
+void actor_look_update(
+	long actor_index);
+
+void actor_combat_update(
+	long actor_index);
+
+void actor_stimulus_clear(
+	long actor_index);
+
+boolean actor_action_perform(
+	long actor_index);
+
+void actor_action_change(
+	long actor_index,
+	short action,
+	struct action_state_data *action_data);
+
+char const *actor_action_name(
+	short action);
+
+boolean valid_real_normal2d(
+	real_vector2d const *normal);
+
+void actor_stimulus_bumped(
+	long actor_index,
+	long prop_index);
+
+void actor_stimulus_heard_shooting(
+	long actor_index,
+	long prop_index);
+
+void actor_stimulus_prop_just_killed(
+	long actor_index,
+	long prop_index);
 
 /* ---------- globals */
 
@@ -378,6 +682,18 @@ struct data_array *swarm_data = NULL;
 struct data_array *swarm_component_data = NULL;
 struct data_array *actor_data = NULL;
 long global_updating_actor_index = NONE;
+
+short const global_movement_animation_states[NUMBER_OF_ACTOR_MOVEMENT_TYPES] =
+{
+	_unit_animation_state_alert,
+	_unit_animation_state_asleep,
+	_unit_animation_state_in_combat,
+	_unit_animation_state_flee,
+	_unit_animation_state_flaming,
+};
+
+extern struct ai_globals_service_data *ai_globals;
+extern struct ai_profile_meter_globals ai_profile;
 
 /* ---------- public code */
 
@@ -465,6 +781,256 @@ void actor_set_team(
 	return;
 }
 
+real_argb_color const *actor_activation_debug_color(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->meta.active)
+	{
+		if (actor->meta.dormant)
+		{
+			return global_real_argb_blue;
+		}
+
+		if (actor->meta.dormant_desire)
+		{
+			if (actor->meta.become_dormant_timer > 0)
+			{
+				return global_real_argb_green;
+			}
+
+			return global_real_argb_yellow;
+		}
+
+		return global_real_argb_white;
+	}
+
+	if (actor->meta.encounter_index != NONE)
+	{
+		struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->ai_encounters,
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->meta.encounter_index),
+			struct encounter_definition);
+
+		if (encounter_definition->runtime_structure_bsp_reference_index != NONE &&
+			encounter_definition->runtime_structure_bsp_reference_index != global_structure_bsp_index)
+		{
+			return global_real_argb_red;
+		}
+	}
+
+	return global_real_argb_purple;
+}
+
+static void actor_verify_unit_activation(
+	long actor_index,
+	long unit_index,
+	char const *name)
+{
+	struct object_header_datum *object_header = object_header_get(unit_index);
+	struct unit_datum *unit = unit_get(unit_index);
+	struct actor_datum *actor = actor_get(actor_index);
+
+	/* BUG (preserved for exact matching): January tests
+	 * unit->unit.last_vehicle_index + 30 < game_time_get() here; the exact
+	 * unit_exit_seat_end proves last_vehicle_index at 0x2DC with the exit time in
+	 * the following long.  A corrected build should compare
+	 * unit->unit.game_time_at_last_vehicle_exit. */
+	if (unit->object.parent_object_index == NONE &&
+		unit->unit.last_vehicle_index + 30 < game_time_get())
+	{
+		if (actor->meta.dormant != !TEST_FLAG(object_header->flags, _object_header_active_bit))
+		{
+			error(_error_silent, "%s unit activation logic error", name);
+		}
+	}
+
+	return;
+}
+
+void actor_verify_activation(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (!actor->meta.active && !actor->meta.dormant)
+	{
+		error(_error_silent, "actor dormancy logic error");
+	}
+
+	if (actor->meta.swarm)
+	{
+		if (actor->meta.swarm_cache_index != NONE)
+		{
+			struct swarm_datum *swarm = swarm_get(actor->meta.swarm_cache_index);
+			short unit_index;
+
+			for (unit_index = 0; unit_index < swarm->unit_count; unit_index++)
+			{
+				actor_verify_unit_activation(actor_index, swarm->unit_indices[unit_index], "active swarm");
+			}
+		}
+		else
+		{
+			long unit_index = actor->meta.swarm_unit_index;
+
+			while (unit_index != NONE)
+			{
+				struct unit_datum *unit = unit_get(unit_index);
+
+				actor_verify_unit_activation(actor_index, unit_index, "inactive swarm");
+				unit_index = unit->unit.swarm_next_unit_index;
+			}
+		}
+	}
+	else if (actor->meta.unit_index != NONE)
+	{
+		actor_verify_unit_activation(actor_index, actor->meta.unit_index, "individual");
+	}
+
+	return;
+}
+
+void actor_detach_from_unit(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->meta.unit_index != NONE)
+	{
+		struct unit_datum *unit = unit_get(actor->meta.unit_index);
+
+		object_set_automatic_deactivation(actor->meta.unit_index, TRUE);
+		unit_set_actively_controlled(actor->meta.unit_index, FALSE);
+		match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1374, unit->unit.actor_index == actor_index);
+		unit->unit.actor_index = NONE;
+
+		if (actor->meta.unique_leader && actor->meta.encounter_index != NONE)
+		{
+			struct encounter_datum *encounter = encounter_get(actor->meta.encounter_index);
+
+			match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1381, encounter->unique_leader_count > 0);
+			encounter->unique_leader_count--;
+		}
+
+		actor->meta.unit_index = NONE;
+		actor->meta.unique_leader = FALSE;
+	}
+
+	return;
+}
+
+void actor_swarm_detach_from_unit(
+	long actor_index,
+	long unit_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct unit_datum *unit = unit_get(unit_index);
+
+	if (unit->unit.swarm_actor_index == actor_index)
+	{
+		match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1401, actor->meta.swarm_unit_count > 0);
+		object_set_automatic_deactivation(unit_index, TRUE);
+		unit_set_actively_controlled(unit_index, FALSE);
+
+		if (actor->meta.swarm_cache_index != NONE)
+		{
+			struct swarm_datum *swarm = swarm_get(actor->meta.swarm_cache_index);
+			boolean found = FALSE;
+			short unit_slot;
+
+			match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1413, swarm->actor_index == actor_index);
+			match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1414, swarm->unit_count == actor->meta.swarm_unit_count);
+
+			for (unit_slot = 0; unit_slot < swarm->unit_count; unit_slot++)
+			{
+				if (swarm->unit_indices[unit_slot] == unit_index)
+				{
+					long component_index = swarm->component_indices[unit_slot];
+
+					swarm->unit_count--;
+					if (unit_slot < swarm->unit_count)
+					{
+						swarm->unit_indices[unit_slot] = swarm->unit_indices[swarm->unit_count];
+						swarm->component_indices[unit_slot] = swarm->component_indices[swarm->unit_count];
+					}
+
+					datum_delete(swarm_component_data, component_index);
+					found = TRUE;
+					break;
+				}
+			}
+
+			match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1436, found);
+		}
+
+		if (unit->unit.swarm_prev_unit_index != NONE)
+		{
+			unit_get(unit->unit.swarm_prev_unit_index)->unit.swarm_next_unit_index =
+				unit->unit.swarm_next_unit_index;
+		}
+		else
+		{
+			actor->meta.swarm_unit_index = unit->unit.swarm_next_unit_index;
+		}
+
+		if (unit->unit.swarm_next_unit_index != NONE)
+		{
+			unit_get(unit->unit.swarm_next_unit_index)->unit.swarm_prev_unit_index =
+				unit->unit.swarm_prev_unit_index;
+		}
+
+		unit->unit.swarm_actor_index = NONE;
+		actor->meta.swarm_unit_count--;
+	}
+
+	return;
+}
+
+void actor_swarm_cache_delete(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->meta.swarm_cache_index != NONE)
+	{
+		struct swarm_datum *swarm = swarm_get(actor->meta.swarm_cache_index);
+		short component_index;
+
+		for (component_index = 0;
+			component_index < swarm->unit_count;
+			component_index++)
+		{
+			datum_delete(swarm_component_data, swarm->component_indices[component_index]);
+		}
+
+		datum_delete(swarm_data, actor->meta.swarm_cache_index);
+		actor->meta.swarm_cache_index = NONE;
+	}
+
+	return;
+}
+
+void actor_swarm_component_refresh(
+	long unit_index,
+	long component_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct swarm_component_datum *component = swarm_component_get(component_index);
+	long surface_index = NONE;
+
+	if (unit->object.type == _object_type_biped)
+	{
+		surface_index = ((struct biped_datum *)unit)->biped.support_surface_index;
+	}
+
+	object_get_origin(unit_index, &component->position);
+	component->surface_index = surface_index;
+
+	return;
+}
+
 boolean actor_has_unlimited_grenades(
 	long actor_index)
 {
@@ -506,6 +1072,33 @@ boolean actor_is_fighting(
 	}
 
 	return result;
+}
+
+boolean actor_attacking_target(
+	long actor_index,
+	real_vector3d *attack_vector)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1688, attack_vector);
+
+	if (actor->target.target_type > _actor_target_clear_line_of_sight_enemy &&
+		actor_action_class(actor_index) == _action_class_active)
+	{
+		if (actor->control.grenade_trying_to_throw)
+		{
+			*attack_vector = actor->input.aiming_vector;
+			return TRUE;
+		}
+
+		if (actor->control.current_fire_target_type > _actor_fire_target_none)
+		{
+			*attack_vector = actor->control.current_fire_target_aim_vector;
+			return TRUE;
+		}
+	}
+
+	return FALSE;
 }
 
 boolean actor_is_leaping(
@@ -627,13 +1220,13 @@ void actor_switch_props(
 			actor->target.target_type = _actor_target_none;
 	}
 
-	if (actor->control.current_fire_target_type == _actor_switch_props_fire_target_prop &&
+	if (actor->control.current_fire_target_type == _actor_fire_target_prop &&
 		actor->control.current_fire_target_prop_index == old_prop_index)
 	{
 		actor->control.current_fire_target_prop_index = new_prop_index;
 
 		if (new_prop_index == NONE)
-			actor->control.current_fire_target_type = _actor_switch_props_fire_target_none;
+			actor->control.current_fire_target_type = _actor_fire_target_none;
 	}
 
 	if (actor->control.grenade_current_prop_index == old_prop_index)
@@ -708,8 +1301,8 @@ void actor_switch_props(
 			component_index < swarm->unit_count;
 			component_index++)
 		{
-			struct actor_switch_props_swarm_component_datum *component =
-				actor_switch_props_swarm_component_get(
+			struct swarm_component_datum *component =
+				swarm_component_get(
 					swarm->component_indices[component_index]);
 
 			if (component->combat_target_prop_index == old_prop_index)
@@ -737,6 +1330,138 @@ void actor_flush_position_indices(
 	}
 
 	actor_action_flush_position_indices(actor_index);
+
+	return;
+}
+
+void actor_flush_structure_indices(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	actor->input.position.body_location.cluster_index = NONE;
+	actor->input.position.body_location.leaf_index = NONE;
+	actor->input.pathfinding_surface_index = NONE;
+	actor->stimuli.combat_transition_guard_point_surface_index = NONE;
+
+	if (actor->orders.move.destination.destination_type == _destination_raw_location)
+	{
+		actor->orders.move.destination.raw.surface_index = NONE;
+	}
+
+	if (actor->control.path.destination_orders.destination_type == _destination_raw_location)
+	{
+		actor->control.path.destination_orders.raw.surface_index = NONE;
+	}
+
+	actor->control.path.destination.surface_index = NONE;
+
+	if (actor->meta.swarm && actor->meta.swarm_cache_index != NONE)
+	{
+		struct swarm_datum *swarm = swarm_get(actor->meta.swarm_cache_index);
+		short component_index;
+
+		for (component_index = 0;
+			component_index < swarm->unit_count;
+			component_index++)
+		{
+			swarm_component_get(swarm->component_indices[component_index])->surface_index = NONE;
+		}
+	}
+
+	actor_action_flush_structure_indices(actor_index);
+
+	return;
+}
+
+void actor_handle_damage(
+	long actor_index,
+	long aggressor_unit_index,
+	real damage_fraction,
+	real_vector3d *damage_velocity)
+{
+	if (aggressor_unit_index != NONE)
+	{
+		long prop_index = prop_get_base_by_unit_index(actor_index, aggressor_unit_index, TRUE, TRUE);
+
+		if (prop_index != NONE)
+		{
+			struct prop_datum *prop = prop_get(prop_index);
+
+			prop->damage_inflicted_on_me += damage_fraction;
+			prop->ticks_since_damage = 0;
+			prop->currently_damaging_me = TRUE;
+			match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 2038, !prop_orphaned(prop));
+
+			if (prop->parent_prop_index != NONE)
+			{
+				struct prop_datum *parent_prop = prop_get(prop->parent_prop_index);
+
+				parent_prop->damage_inflicted_on_me += damage_fraction;
+				parent_prop->ticks_since_damage = 0;
+				parent_prop->currently_damaging_me = TRUE;
+			}
+
+			if (prop->state < _prop_state_becoming_unacknowledged ||
+				prop->state > _prop_state_acknowledged)
+			{
+				prop_index = NONE;
+			}
+		}
+
+		actor_stimulus_damage(actor_index, prop_index, damage_fraction, damage_velocity);
+	}
+
+	return;
+}
+
+static void actor_freeze_unit(
+	long actor_index,
+	long unit_index)
+{
+	struct unit_control_data control_data;
+
+	csmemset(&control_data, 0, sizeof(control_data));
+	control_data.animation_state = _unit_animation_state_alert;
+	control_data.control_flags = 0;
+	control_data.throttle = *global_zero_vector3d;
+	control_data.aiming_speed = 1;
+	control_data.weapon_index = NONE;
+	control_data.grenade_index = NONE;
+	control_data.zoom_level = NONE;
+	unit_get_facing_vector(unit_index, &control_data.facing_vector);
+	unit_get_aiming_vector(unit_index, &control_data.aiming_vector);
+	unit_get_looking_vector(unit_index, &control_data.looking_vector);
+	unit_control(unit_index, &control_data);
+	unit_set_actively_controlled(unit_index, FALSE);
+
+	return;
+}
+
+void actor_freeze(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->meta.swarm)
+	{
+		if (actor->meta.swarm_cache_index != NONE)
+		{
+			struct swarm_datum *swarm = swarm_get(actor->meta.swarm_cache_index);
+			short unit_index;
+
+			for (unit_index = 0; unit_index < swarm->unit_count; unit_index++)
+			{
+				actor_freeze_unit(actor_index, swarm->unit_indices[unit_index]);
+			}
+		}
+	}
+	else
+	{
+		actor_freeze_unit(actor_index, actor->meta.unit_index);
+	}
+
+	actor->meta.frozen = TRUE;
 
 	return;
 }
@@ -771,10 +1496,357 @@ void actor_change_encounter(
 	return;
 }
 
+static void actor_update_begin(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	global_updating_actor_index = actor_index;
+	if (ai_debug.enter_debugger && ai_debug.selected_actor_index == actor_index)
+	{
+		ai_debug.enter_debugger = FALSE;
+	}
+
+	return;
+}
+
 void code_0002a150(
 	void)
 {
 	global_updating_actor_index = NONE;
+
+	return;
+}
+
+static boolean actor_get_timeslice(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean result = FALSE;
+	boolean jumping = FALSE;
+
+	if (actor->state.action == _actor_action_charge)
+	{
+		short goal = actor->state.action_data.charge.goal;
+
+		if (goal == _charge_goal_melee ||
+			goal == _charge_goal_melee_leaping ||
+			goal == _charge_goal_vehicle_strafing ||
+			goal == _charge_goal_vehicle_ramming)
+		{
+			jumping = TRUE;
+		}
+	}
+
+	actor->meta.service_timer += jumping ? 3 : 1;
+
+	if (!ai_globals->time_given_this_frame &&
+		actor->meta.service_timer > ai_globals->last_highest_service_timer &&
+		actor->meta.service_timer > 15)
+	{
+		actor->meta.service_timer = 0;
+		ai_globals->time_given_this_frame = TRUE;
+		result = TRUE;
+	}
+	else if (actor->meta.service_timer > ai_globals->current_highest_service_timer)
+	{
+		ai_globals->current_highest_service_timer = actor->meta.service_timer;
+	}
+
+	actor->meta.timeslice = result;
+
+	return result;
+}
+
+static void actor_clear_output(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	actor->output.facing_vector = actor->input.facing_vector;
+	actor->output.aiming_vector = actor->input.aiming_vector;
+	actor->output.looking_vector = actor->input.looking_vector;
+	actor->output.control_flags = 0;
+	actor->output.analog_primary_trigger = 0.f;
+	actor->output.throttle = *global_zero_vector3d;
+	actor->output.animation.impulse = NONE;
+
+	return;
+}
+
+void actor_find_pathfinding_location(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *actor_definition = actor_definition_get(actor->meta.definition_index);
+
+	if (actor->input.pathfinding_surface_index == NONE)
+	{
+		actor->input.pathfinding_point = actor->input.position.body_position;
+
+		if (!actor->state.flying)
+		{
+			if (actor->input.vehicle_index != NONE)
+			{
+				enum actor_vehicle_driver_type vehicle_driver_type = actor->input.vehicle_driver_type;
+
+				if (vehicle_driver_type >= _actor_vehicle_driver_hovering_ground &&
+					vehicle_driver_type <= _actor_vehicle_driver_nondirectional_ground)
+				{
+					actor->input.pathfinding_surface_index = vehicle_find_pathfinding_surface_index(
+						actor->input.vehicle_index,
+						&actor->input.pathfinding_point);
+				}
+			}
+			else if (biped_try_and_get(actor->meta.unit_index))
+			{
+				actor->input.pathfinding_surface_index = biped_find_pathfinding_surface_index(
+					actor->meta.unit_index,
+					&actor->input.pathfinding_point);
+			}
+		}
+	}
+
+	return;
+}
+
+real actor_destination_tolerance(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	real tolerance = 0.5f;
+
+	if (actor->input.vehicle_index != NONE)
+	{
+		struct unit_datum *vehicle = vehicle_get(actor->input.vehicle_index);
+		struct vehicle_definition *vehicle_definition =
+			vehicle_specific_definition_get(vehicle->definition_index);
+
+		tolerance = vehicle_definition->ai_destination_radius;
+	}
+
+	if (actor->state.action == _actor_action_obey &&
+		actor->state.action_data.obey.complex_control.destination_radius_valid)
+	{
+		tolerance = actor->state.action_data.obey.complex_control.destination_radius;
+	}
+
+	if (actor->state.action == _actor_action_vehicle)
+	{
+		return 0.7f;
+	}
+
+	return MAX(tolerance, 0.2f);
+}
+
+void actor_input_sample_position(
+	long actor_index,
+	long unit_index,
+	struct actor_position_data *position)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	long ultimate_parent_index;
+
+	object_get_origin(unit_index, &position->body_position);
+	position->body_facing = unit->object.forward;
+	unit_get_head_position(unit_index, &position->head_position);
+	object_get_velocities(unit_index, &position->velocity, NULL);
+	ultimate_parent_index = object_get_ultimate_parent(unit_index);
+	position->body_location = object_get(ultimate_parent_index)->object.location;
+
+	return;
+}
+
+static void actor_clear_orders(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	csmemset(&actor->orders, 0, sizeof(actor->orders));
+	actor->orders.move.animation.impulse = NONE;
+	actor->orders.move.override_movement_type = NONE;
+	actor->orders.move.override_movement_facing = NONE;
+
+	return;
+}
+
+static void actor_decision_loop(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	char message[1024];
+	char encounter_name[256];
+	short action_history[NUMBER_OF_DECISION_LOOP_HISTORY_ENTRIES];
+	long iteration = 0;
+	long history_index = 0;
+	boolean action_performed = FALSE;
+
+	csmemset(action_history, NONE, sizeof(action_history));
+
+	for (;;)
+	{
+		action_history[history_index] = actor->state.action;
+		iteration++;
+		history_index = (history_index + 1) % NUMBER_OF_DECISION_LOOP_HISTORY_ENTRIES;
+		actor->state.action_changed = FALSE;
+		actor_type_decide_action(actor_index);
+		actor_stimulus_clear(actor_index);
+
+		if ((action_performed && !actor->state.action_changed) ||
+			iteration >= MAXIMUM_DECISION_LOOP_ITERATIONS)
+		{
+			break;
+		}
+
+		action_performed = actor_action_perform(actor_index);
+		if (!action_performed && !actor->state.action_changed)
+		{
+			return;
+		}
+	}
+
+	if (actor->meta.encounter_index == NONE)
+	{
+		csstrcpy(encounter_name, "<no encounter>");
+	}
+	else
+	{
+		struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->ai_encounters,
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->meta.encounter_index),
+			struct encounter_definition);
+		struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+			&encounter_definition->squads,
+			actor->meta.squad_index,
+			struct squad_definition);
+
+		sprintf(encounter_name, "%s/%s", encounter_definition->name, squad_definition->name);
+	}
+
+	if (iteration >= MAXIMUM_DECISION_LOOP_ITERATIONS)
+	{
+		long entry_index = history_index;
+
+		sprintf(message, "actor-type %s ", actor_type_get_name(actor->meta.type));
+		do
+		{
+			if (action_history[entry_index] != NONE)
+			{
+				csstrcat(message, actor_action_name(action_history[entry_index]));
+				csstrcat(message, "/");
+			}
+			entry_index = (entry_index + 1) % NUMBER_OF_DECISION_LOOP_HISTORY_ENTRIES;
+		}
+		while (entry_index != history_index);
+		sprintf(temporary, " infinite decision loop (%s)", encounter_name);
+		csstrcat(message, temporary);
+	}
+	else
+	{
+		sprintf(
+			message,
+			"actor-type %s %s internal logic error (%s)",
+			actor_type_get_name(actor->meta.type),
+			actor_action_name(actor->state.action),
+			encounter_name);
+	}
+
+	match_vwarn("c:\\halo\\SOURCE\\ai\\actors.c", 3436, FALSE, message);
+	error(_error_silent, "AI error condition detected, attempting to recover (please tell butcher)...");
+	actor_action_change(actor_index, _actor_action_none, NULL);
+
+	return;
+}
+
+void actors_handle_spatial_effect(
+	long object_index,
+	short effect_type,
+	real_point3d const *position,
+	short volume,
+	short count)
+{
+	struct location location;
+	struct actor_iterator iterator;
+	struct actor_datum *actor;
+
+	scenario_location_from_point(&location, position);
+
+	actor_iterator_new(&iterator, TRUE);
+	while ((actor = actor_iterator_next(&iterator)) != NULL)
+	{
+		if (actor->state.combat_status < _actor_combat_status_visible)
+		{
+			struct actor_position_data sense_position;
+
+			actor_perception_find_sense_position(iterator.index, position, NONE, &sense_position);
+			if (actor_audibility_at_point(iterator.index, &sense_position, position, &location, volume, 1.f, 0) >=
+				_ai_sound_volume_loud)
+			{
+				switch (effect_type)
+				{
+				case _ai_spatial_effect_environmental_noise:
+					actor_stimulus_environmental_noise(iterator.index, object_index, position, count);
+					break;
+
+				case _ai_spatial_effect_weapon_impact:
+					actor_stimulus_weapon_impact(iterator.index, object_index, position, count);
+					break;
+
+				case _ai_spatial_effect_weapon_detonation:
+					actor_stimulus_weapon_detonation(iterator.index, object_index, position, count);
+					break;
+
+				default:
+					display_assert(NULL, "c:\\halo\\SOURCE\\ai\\actors.c", 3498, TRUE);
+					system_exit(-1);
+					break;
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+void actor_handle_communication(
+	long actor_index,
+	long prop_index,
+	struct ai_information_packet *information)
+{
+	if (information)
+	{
+		switch (information->information_type)
+		{
+		case _ai_information_combat_stimulus:
+			actor_stimulus_enter_combat_friend_in_combat(actor_index, prop_index);
+			break;
+
+		case _ai_information_target_knowledge:
+			{
+				struct prop_datum *prop = prop_get(prop_index);
+
+				if (prop->actor_index != NONE)
+				{
+					struct prop_datum *friend_prop = prop_try_and_get(
+						information->information_data.target_knowledge.prop_index);
+
+					if (friend_prop)
+					{
+						actor_perception_create_orphan_from_friend(
+							actor_index,
+							friend_prop->unit_index,
+							prop->actor_index,
+							information->information_data.target_knowledge.prop_index);
+					}
+				}
+			}
+			break;
+
+		case _ai_information_flee:
+			actor_stimulus_prop_fleeing(actor_index, prop_index);
+			break;
+		}
+	}
 
 	return;
 }
@@ -867,6 +1939,96 @@ void actor_unit_control_stop_animation_impulse(
 	return;
 }
 
+void actor_set_dormant(
+	long actor_index,
+	boolean dormant)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->meta.active && actor->meta.dormant != dormant)
+	{
+		if (actor->meta.swarm)
+		{
+			if (actor->meta.swarm_cache_index != NONE)
+			{
+				struct swarm_datum *swarm = swarm_get(actor->meta.swarm_cache_index);
+				short unit_index;
+
+				for (unit_index = 0; unit_index < swarm->unit_count; unit_index++)
+				{
+					if (dormant)
+					{
+						object_deactivate(swarm->unit_indices[unit_index]);
+					}
+					else
+					{
+						object_activate(swarm->unit_indices[unit_index]);
+					}
+				}
+			}
+			else
+			{
+				long unit_index = actor->meta.swarm_unit_index;
+
+				while (unit_index != NONE)
+				{
+					struct unit_datum *unit = unit_get(unit_index);
+
+					if (dormant)
+					{
+						object_deactivate(unit_index);
+					}
+					else
+					{
+						object_activate(unit_index);
+					}
+
+					unit_index = unit->unit.swarm_next_unit_index;
+				}
+			}
+		}
+		else if (actor->meta.unit_index != NONE)
+		{
+			if (dormant)
+			{
+				object_deactivate(actor->meta.unit_index);
+			}
+			else
+			{
+				object_activate(actor->meta.unit_index);
+			}
+		}
+
+		actor->meta.dormant = dormant;
+		if (!dormant)
+		{
+			actor->meta.become_dormant_timer = 0;
+		}
+	}
+
+	actor_verify_activation(actor_index);
+
+	return;
+}
+
+static void actor_swarm_component_setup(
+	long swarm_index,
+	long unit_index,
+	long component_index)
+{
+	struct swarm_datum *swarm = swarm_get(swarm_index);
+	struct swarm_component_datum *component = swarm_component_get(component_index);
+
+	component->combat_target_prop_index = NONE;
+	match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1244, swarm->unit_count < MAXIMUM_NUMBER_OF_UNITS_PER_SWARM);
+	swarm->unit_indices[swarm->unit_count] = unit_index;
+	swarm->component_indices[swarm->unit_count] = component_index;
+	swarm->unit_count++;
+	actor_swarm_component_refresh(unit_index, component_index);
+
+	return;
+}
+
 void actor_delete_props(
 	long actor_index)
 {
@@ -876,6 +2038,230 @@ void actor_delete_props(
 	{
 		actor_switch_props(actor_index, actor->meta.first_prop_index, NONE);
 		prop_delete(actor_index, actor->meta.first_prop_index);
+	}
+
+	return;
+}
+
+void actor_delete(
+	long actor_index,
+	boolean died)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct data_iterator iterator;
+	struct prop_datum *prop;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1488, actor_index != global_updating_actor_index);
+
+	if (ai_debug.selected_actor_index == actor_index)
+	{
+		ai_debug.selected_actor_index = NONE;
+	}
+
+	if (ai_debug.field_859F4 == actor_index)
+	{
+		ai_debug.field_859F4 = NONE;
+	}
+
+	if (actor->meta.encounterless)
+	{
+		encounterless_detach_actor(actor_index);
+	}
+	else
+	{
+		encounter_detach_actor(actor_index, died);
+	}
+
+	if (actor->meta.swarm)
+	{
+		actor_swarm_cache_delete(actor_index);
+		while (actor->meta.swarm_unit_index != NONE)
+		{
+			actor_swarm_detach_from_unit(actor_index, actor->meta.swarm_unit_index);
+		}
+	}
+	else
+	{
+		actor_detach_from_unit(actor_index);
+	}
+
+	actor_delete_props(actor_index);
+
+	data_iterator_new(&iterator, prop_data);
+	while ((prop = data_iterator_next(&iterator)) != NULL)
+	{
+		if (prop->actor_index == actor_index)
+		{
+			prop->actor_index = NONE;
+		}
+	}
+
+	ai_debug_actor_deleted(actor_index);
+	ai_conversation_actor_deleted(actor_index);
+	datum_delete(actor_data, actor_index);
+
+	return;
+}
+
+long actor_swarm_cache_new(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->meta.swarm_cache_index == NONE)
+	{
+		long swarm_index = datum_new(swarm_data);
+
+		actor->meta.swarm_cache_index = swarm_index;
+		if (swarm_index == NONE)
+		{
+			error(_error_silent, "exceeded MAXIMUM_NUMBER_OF_ACTIVE_SWARMS (%d)", MAXIMUM_NUMBER_OF_ACTIVE_SWARMS);
+		}
+		else
+		{
+			struct swarm_datum *swarm = swarm_get(swarm_index);
+			long unit_index = actor->meta.swarm_unit_index;
+
+			match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1570, actor->meta.swarm_unit_count <= MAXIMUM_NUMBER_OF_UNITS_PER_SWARM);
+			swarm->actor_index = actor_index;
+			swarm->unit_count = 0;
+
+			while (unit_index != NONE)
+			{
+				struct unit_datum *unit = unit_get(unit_index);
+				long component_index = datum_new(swarm_component_data);
+
+				if (component_index == NONE)
+				{
+					error(_error_silent, "unable to create any more swarm components (max %d)", MAXIMUM_SWARM_COMPONENTS);
+					break;
+				}
+
+				actor_swarm_component_setup(actor->meta.swarm_cache_index, unit_index, component_index);
+				unit_index = unit->unit.swarm_next_unit_index;
+			}
+		}
+	}
+
+	return actor->meta.swarm_cache_index;
+}
+
+boolean actor_get_running_blind_vector(
+	long actor_index,
+	real_vector3d *run_vector)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean have_vector = FALSE;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1966, run_vector);
+
+	if (!actor->meta.swarm)
+	{
+		if (actor->control.moving)
+		{
+			*run_vector = actor->control.moving_towards_vector;
+			have_vector = TRUE;
+		}
+		else if (actor->control.path.path.valid)
+		{
+			run_vector->i = actor->control.path.destination.point.x - actor->input.position.body_position.x;
+			run_vector->j = actor->control.path.destination.point.y - actor->input.position.body_position.y;
+			run_vector->k = actor->control.path.destination.point.z - actor->input.position.body_position.z;
+			have_vector = TRUE;
+		}
+	}
+
+	if (have_vector && normalize3d(run_vector) == 0.f)
+	{
+		return FALSE;
+	}
+
+	return have_vector;
+}
+
+void actor_kill(
+	long actor_index,
+	boolean silent,
+	boolean delayed)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	long encounter_index = actor->meta.encounter_index;
+
+	if (actor->meta.swarm)
+	{
+		long unit_index = actor->meta.swarm_unit_index;
+
+		while (unit_index != NONE)
+		{
+			struct unit_datum *unit = unit_get(unit_index);
+
+			if (silent)
+			{
+				unit->object.damage_flags |= FLAG(_object_die_act_of_god_silent_bit);
+			}
+			else
+			{
+				unit->object.damage_flags |= FLAG(_object_die_act_of_god_bit);
+			}
+
+			if (!delayed)
+			{
+				actor_swarm_detach_from_unit(actor_index, unit_index);
+			}
+
+			unit_index = unit->unit.swarm_next_unit_index;
+		}
+	}
+	else
+	{
+		struct unit_datum *unit = unit_get(actor->meta.unit_index);
+
+		if (silent)
+		{
+			unit->object.damage_flags |= FLAG(_object_die_act_of_god_silent_bit);
+		}
+		else
+		{
+			unit->object.damage_flags |= FLAG(_object_die_act_of_god_bit);
+		}
+
+		if (!delayed)
+		{
+			actor_detach_from_unit(actor_index);
+		}
+	}
+
+	if (!delayed)
+	{
+		actor_delete(actor_index, TRUE);
+		if (encounter_index != NONE)
+		{
+			encounter_update_status(encounter_index);
+		}
+	}
+
+	return;
+}
+
+void actor_swarm_unit_died(
+	long actor_index,
+	long unit_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 2272, actor->meta.swarm);
+	actor_swarm_detach_from_unit(actor_index, unit_index);
+
+	if (actor->meta.swarm_unit_count == 0)
+	{
+		long encounter_index = actor->meta.encounter_index;
+
+		match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 2279, actor->meta.swarm_unit_index == NONE);
+		actor_delete(actor_index, TRUE);
+		if (encounter_index != NONE)
+		{
+			encounter_update_status(encounter_index);
+		}
 	}
 
 	return;
@@ -892,7 +2278,7 @@ void actor_braindead(
 		actor->state.mode = _actor_mode_braindead;
 		actor->state.action = _actor_action_none;
 		actor_delete_props(actor_index);
-		code_00029e70(actor_index);
+		actor_freeze(actor_index);
 		actor_set_dormant(actor_index, FALSE);
 	}
 	else if (actor->state.mode == _actor_mode_braindead)
@@ -903,6 +2289,149 @@ void actor_braindead(
 	return;
 }
 
+void actor_handle_unit_effect(
+	long actor_index,
+	long prop_index,
+	short effect_type)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct prop_datum *prop = prop_get(prop_index);
+	boolean deaf;
+
+	if (actor->meta.encounter_index != NONE)
+	{
+		deaf = encounter_get(actor->meta.encounter_index)->deaf;
+	}
+	else
+	{
+		deaf = FALSE;
+	}
+
+	if (game_connection() == _game_connection_local && ai_debug.deaf)
+	{
+		deaf = TRUE;
+	}
+
+	if (prop->unit_effect == NONE || prop->unit_effect <= effect_type)
+	{
+		prop->unit_effect = effect_type;
+		prop->unit_effect_decay_ticks = effect_type == _ai_unit_effect_magic_sight ? 150 : 30;
+	}
+
+	switch (effect_type)
+	{
+	case _ai_unit_effect_shooting:
+		if (!deaf && !prop->ignore)
+		{
+			prop->shooting = TRUE;
+			prop->audibility = _ai_sound_volume_shout;
+			prop->perception = _actor_perception_unmistakable;
+			prop->refresh_stimuli = TRUE;
+			if (prop->player)
+			{
+				actor_set_dormant(actor_index, FALSE);
+			}
+			actor_stimulus_heard_shooting(actor_index, prop_index);
+		}
+		break;
+
+	case _ai_unit_effect_death_scream:
+		if (!deaf && !prop->ignore)
+		{
+			prop->dead = TRUE;
+			prop->audibility = _ai_sound_volume_shout;
+			prop->perception = _actor_perception_unmistakable;
+			prop->refresh_stimuli = TRUE;
+			actor_set_dormant(actor_index, FALSE);
+			actor_stimulus_prop_just_killed(actor_index, prop_index);
+		}
+		break;
+
+	case _ai_unit_effect_bump:
+		if (!prop->ignore)
+		{
+			prop->ineffability = _actor_perception_unmistakable;
+			prop->perception = _actor_perception_unmistakable;
+			prop->refresh_stimuli = TRUE;
+			actor_stimulus_bumped(actor_index, prop_index);
+		}
+		break;
+
+	case _ai_unit_effect_magic_sight:
+		if (!prop->ignore)
+		{
+			prop->ineffability = _actor_perception_unmistakable;
+			prop->perception = _actor_perception_unmistakable;
+			prop->refresh_stimuli = TRUE;
+			if (prop->player)
+			{
+				actor_set_dormant(actor_index, FALSE);
+			}
+			actor_perception_become_acknowledged(actor_index, prop_index, NULL);
+		}
+		break;
+	}
+
+	return;
+}
+
+boolean actor_set_active(
+	long actor_index,
+	boolean active)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean result = TRUE;
+
+	actor_verify_activation(actor_index);
+
+	if (actor->meta.active != active)
+	{
+		if (active)
+		{
+			if (actor->meta.swarm)
+			{
+				actor_swarm_cache_new(actor_index);
+				if (actor->meta.swarm_cache_index == NONE)
+				{
+					error(
+						_error_silent,
+						"swarm tried to become active but couldn't, erasing %d units",
+						actor->meta.swarm_unit_count);
+					actor->meta.erase_next_tick = TRUE;
+					result = FALSE;
+				}
+			}
+		}
+		else
+		{
+			actor_delete_props(actor_index);
+			actor_swarm_cache_delete(actor_index);
+		}
+
+		if (result)
+		{
+			if (active)
+			{
+				actor->meta.active = TRUE;
+				if (actor->state.mode == _actor_mode_braindead)
+				{
+					actor_set_dormant(actor_index, FALSE);
+				}
+			}
+			else
+			{
+				actor_set_dormant(actor_index, TRUE);
+				actor->meta.active = FALSE;
+				actor->meta.last_active_time = game_time_get();
+			}
+		}
+	}
+
+	actor_verify_activation(actor_index);
+
+	return result;
+}
+
 void actors_freeze(
 	void)
 {
@@ -911,8 +2440,141 @@ void actors_freeze(
 	actor_iterator_new(&iterator, TRUE);
 	while (actor_iterator_next(&iterator))
 	{
-		code_00029e70(iterator.index);
+		actor_freeze(iterator.index);
 	}
+
+	return;
+}
+
+static void actor_randomly_control_unit(
+	long actor_index,
+	long unit_index)
+{
+	struct unit_control_data control_data;
+
+	csmemset(&control_data, 0, sizeof(control_data));
+	control_data.animation_state = _unit_animation_state_in_combat;
+	control_data.control_flags = 0;
+	control_data.throttle = *global_forward3d;
+	control_data.aiming_speed = 1;
+	control_data.weapon_index = NONE;
+	control_data.grenade_index = NONE;
+	control_data.zoom_level = NONE;
+	unit_get_facing_vector(unit_index, &control_data.facing_vector);
+	rotate_vector_about_axis(&control_data.facing_vector, global_up3d, 0.5f, 0.8660254f);
+	control_data.aiming_vector = control_data.facing_vector;
+	control_data.looking_vector = control_data.facing_vector;
+
+	if ((game_time_get() + unit_index) % 5 == 0)
+	{
+		control_data.control_flags |= FLAG(_unit_control_weapon_primary_trigger_bit);
+		control_data.primary_trigger = 1.0f;
+	}
+
+	unit_control(unit_index, &control_data);
+	unit_set_actively_controlled(unit_index, FALSE);
+
+	return;
+}
+
+void actors_move_randomly(
+	void)
+{
+	struct actor_iterator iterator;
+	struct actor_datum *actor;
+
+	actor_iterator_new(&iterator, TRUE);
+	while ((actor = actor_iterator_next(&iterator)) != NULL)
+	{
+		if (actor->meta.swarm)
+		{
+			if (actor->meta.swarm_cache_index != NONE)
+			{
+				struct swarm_datum *swarm = swarm_get(actor->meta.swarm_cache_index);
+				short unit_index;
+
+				for (unit_index = 0; unit_index < swarm->unit_count; unit_index++)
+				{
+					actor_randomly_control_unit(iterator.index, swarm->unit_indices[unit_index]);
+				}
+			}
+		}
+		else
+		{
+			actor_randomly_control_unit(iterator.index, actor->meta.unit_index);
+		}
+	}
+
+	return;
+}
+
+void actor_attach_unit(
+	long actor_index,
+	long unit_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct unit_datum *unit = unit_get(unit_index);
+
+	if (unit->unit.actor_index != actor_index)
+	{
+		if (unit->unit.swarm_actor_index != NONE)
+		{
+			actor_swarm_detach_from_unit(unit->unit.swarm_actor_index, unit_index);
+		}
+
+		if (unit->unit.actor_index != NONE)
+		{
+			actor_delete(unit->unit.actor_index, FALSE);
+		}
+
+		if (actor->meta.unit_index != NONE)
+		{
+			actor_detach_from_unit(actor_index);
+		}
+
+		match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 868, !actor->meta.swarm);
+		match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 869, actor->meta.unit_index == NONE);
+		match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 870, unit->unit.actor_index == NONE);
+		match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 871, unit->unit.swarm_actor_index == NONE);
+
+		actor->meta.unit_index = unit_index;
+		unit->unit.actor_index = actor_index;
+
+		if (actor->meta.encounter_index != NONE)
+		{
+			struct encounter_datum *encounter = encounter_get(actor->meta.encounter_index);
+
+			encounter_attach_unit(actor->meta.encounter_index, unit_index);
+			unit->object.owner_team_index = encounter->team_index;
+		}
+
+		actor->meta.team_index = unit->object.owner_team_index;
+
+		if (unit->object.variant_number >= 100)
+		{
+			actor->meta.unique_leader = TRUE;
+			if (actor->meta.encounter_index != NONE)
+			{
+				struct encounter_datum *encounter = encounter_get(actor->meta.encounter_index);
+
+				encounter->unique_leader_count++;
+			}
+		}
+
+		actor_input_update(actor_index);
+		object_set_automatic_deactivation(unit_index, FALSE);
+		if (actor->meta.dormant)
+		{
+			object_deactivate(unit_index);
+		}
+		else
+		{
+			object_activate(unit_index);
+		}
+		unit_set_actively_controlled(unit_index, TRUE);
+	}
+
+	actor_verify_activation(actor_index);
 
 	return;
 }
@@ -956,6 +2618,376 @@ void actor_erase(
 		else
 		{
 			object_delete(unit_index);
+		}
+	}
+
+	return;
+}
+
+static boolean actor_general_update(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean result = TRUE;
+
+	ai_profile.meters[_ai_meter_actors_updated].current++;
+	if (!actor->meta.dormant)
+	{
+		ai_profile.meters[_ai_meter_actors_active].current++;
+	}
+
+	if (actor->meta.swarm)
+	{
+		ai_profile.meters[_ai_meter_units_updated].current += actor->meta.swarm_unit_count;
+		if (!actor->meta.dormant)
+		{
+			ai_profile.meters[_ai_meter_units_active].current += actor->meta.swarm_unit_count;
+		}
+	}
+	else
+	{
+		ai_profile.meters[_ai_meter_units_updated].current++;
+		if (!actor->meta.dormant)
+		{
+			ai_profile.meters[_ai_meter_units_active].current++;
+		}
+	}
+
+	if (actor->meta.swarm && actor->meta.swarm_cache_index == NONE)
+	{
+		match_vwarn(
+			"c:\\halo\\SOURCE\\ai\\actors.c",
+			2733,
+			FALSE,
+			csprintf(
+				temporary,
+				"tried to update a swarm actor without a swarm cache, erasing %d units",
+				actor->meta.swarm_unit_count));
+		actor_erase(actor_index, FALSE);
+		result = FALSE;
+	}
+
+	if (result)
+	{
+		struct encounter_datum *encounter;
+		boolean force_active;
+
+		actor->control.path.refreshed_this_tick = FALSE;
+
+		if (actor->state.suspicion_timer > 0)
+		{
+			actor->state.suspicion_timer--;
+			if (actor->state.suspicion_timer == 0)
+			{
+				actor->state.suspicion_combat_status = _actor_combat_status_none;
+			}
+		}
+
+		if (actor->state.command_list_delay_timer > 0)
+		{
+			actor->state.command_list_delay_timer--;
+		}
+
+		if (actor->meta.encounter_index != NONE)
+		{
+			encounter = encounter_get(actor->meta.encounter_index);
+		}
+		else
+		{
+			encounter = NULL;
+		}
+
+		force_active = actor->meta.force_active;
+		if (encounter)
+		{
+			force_active |= encounter->force_active;
+		}
+
+		if (!actor->meta.dormant_desire || force_active)
+		{
+			actor_set_dormant(actor_index, FALSE);
+		}
+		else if (!actor->meta.dormant)
+		{
+			short action_class = actor_action_class(actor_index);
+			boolean can_become_dormant = TRUE;
+
+			if (action_class == _action_class_transitory)
+			{
+				can_become_dormant = FALSE;
+			}
+			else if (actor->target.target_prop_index != NONE)
+			{
+				struct prop_datum *prop = prop_get(actor->target.target_prop_index);
+
+				if (prop->player && prop->enemy && !prop->dead)
+				{
+					if ((prop->state >= _prop_state_becoming_unacknowledged &&
+							prop->state <= _prop_state_acknowledged) ||
+						(prop_orphaned(prop) && action_class == _action_class_pursuit))
+					{
+						can_become_dormant = FALSE;
+					}
+				}
+			}
+
+			if (can_become_dormant && actor_path_has_path(actor_index))
+			{
+				switch (actor->control.path.destination_orders.destination_type)
+				{
+				case _destination_firing_position:
+					if (actor->state.action == _actor_action_guard &&
+						encounter->follow_target_type == _follow_target_players)
+					{
+						can_become_dormant = FALSE;
+					}
+					break;
+
+				case _destination_prop:
+					if (prop_get(actor->control.path.destination_orders.prop.prop_index)->player)
+					{
+						can_become_dormant = FALSE;
+					}
+					break;
+				}
+			}
+
+			if (can_become_dormant)
+			{
+				actor->meta.become_dormant_timer++;
+				if (actor->meta.become_dormant_timer >= 60)
+				{
+					actor_set_dormant(actor_index, TRUE);
+				}
+			}
+		}
+	}
+
+	return result;
+}
+
+void actors_handle_unit_effect(
+	long unit_index,
+	short effect_type,
+	short volume)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct location const *location = &unit->object.location;
+	struct structure_bsp *structure_bsp;
+	struct actor_iterator iterator;
+	struct actor_datum *actor;
+	unsigned long audible_clusters[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_CLUSTERS_PER_STRUCTURE)];
+	real_point3d origin;
+	long owner_actor_index;
+
+	if (unit->unit.swarm_actor_index != NONE)
+	{
+		owner_actor_index = unit->unit.swarm_actor_index;
+	}
+	else
+	{
+		owner_actor_index = unit->unit.actor_index;
+	}
+
+	if (unit->object.parent_object_index != NONE)
+	{
+		long ultimate_parent_index = object_get_ultimate_parent(unit_index);
+
+		location = &object_get(ultimate_parent_index)->object.location;
+	}
+
+	structure_bsp = global_structure_bsp_get();
+	csmemset(audible_clusters, 0, BIT_VECTOR_SIZE_IN_BYTES(structure_bsp->clusters.count));
+
+	if (location->cluster_index != NONE)
+	{
+		short cluster_index;
+
+		for (cluster_index = 0; cluster_index < structure_bsp->clusters.count; cluster_index++)
+		{
+			byte encoded_sound_distance = structure_bsp_get_cluster_encoded_sound_distance(
+				structure_bsp,
+				location->cluster_index,
+				cluster_index);
+
+			if (!(encoded_sound_distance & FLAG(7)) &&
+				(encoded_sound_distance & ~FLAG(7)) * 2.015748f < 40.f)
+			{
+				BIT_VECTOR_SET_FLAG(audible_clusters, cluster_index, TRUE);
+			}
+		}
+	}
+
+	object_get_origin(unit_index, &origin);
+
+	actor_iterator_new(&iterator, TRUE);
+	while ((actor = actor_iterator_next(&iterator)) != NULL)
+	{
+		if (iterator.index != owner_actor_index &&
+			actor->input.position.body_location.cluster_index != NONE &&
+			BIT_VECTOR_TEST_FLAG(audible_clusters, actor->input.position.body_location.cluster_index))
+		{
+			struct actor_position_data sense_position;
+
+			actor_perception_find_sense_position(iterator.index, &origin, NONE, &sense_position);
+			if (actor_audibility_at_point(iterator.index, &sense_position, &origin, location, volume, 1.f, 0) >=
+				_ai_sound_volume_loud)
+			{
+				long prop_index = prop_get_base_by_unit_index(iterator.index, unit_index, TRUE, TRUE);
+
+				if (prop_index != NONE)
+				{
+					struct prop_datum *prop = prop_get(prop_index);
+
+					if (actor_audibility_at_point(
+						iterator.index,
+						&sense_position,
+						&prop->body_position,
+						&prop->body_location,
+						volume,
+						1.f,
+						prop->line_of_sight) >= _ai_sound_volume_loud)
+					{
+						actor_handle_unit_effect(iterator.index, prop_index, effect_type);
+					}
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+static void actor_unit_control(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct unit_datum *unit = unit_get(actor->meta.unit_index);
+	struct unit_control_data control_data;
+
+	control_data.animation_state = global_movement_animation_states[actor->output.movement_type];
+	control_data.control_flags = actor->output.control_flags;
+	control_data.primary_trigger = actor->output.analog_primary_trigger;
+	control_data.throttle = actor->output.throttle;
+	control_data.aiming_speed = actor->output.aiming_speed;
+	control_data.facing_vector = actor->output.facing_vector;
+	control_data.aiming_vector = actor->output.aiming_vector;
+	control_data.looking_vector = actor->output.looking_vector;
+	control_data.weapon_index = NONE;
+	control_data.grenade_index = NONE;
+	control_data.zoom_level = NONE;
+
+	if (!actor->state.flying)
+	{
+		match_vassert(
+			"c:\\halo\\SOURCE\\ai\\actors.c",
+			3846,
+			valid_real_normal2d((real_vector2d *) &control_data.facing_vector),
+			csprintf(
+				temporary,
+				"%s: assert_valid_real_normal2d(%f, %f)",
+				"(real_vector2d *) &control_data.facing_vector",
+				control_data.facing_vector.i,
+				control_data.facing_vector.j));
+	}
+	match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\ai\\actors.c", 3848, &control_data.facing_vector);
+	match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\ai\\actors.c", 3849, &control_data.aiming_vector);
+	match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\ai\\actors.c", 3850, &control_data.looking_vector);
+	match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 3851, (fabs(control_data.throttle.i) <= 1.0f) && (fabs(control_data.throttle.j) <= 1.0f) && (fabs(control_data.throttle.k) <= 1.0f));
+
+	if (unit->unit.player_index == NONE || !player_input_enabled())
+	{
+		if (actor->meta.frozen)
+		{
+			unit_set_actively_controlled(actor->meta.unit_index, TRUE);
+			actor->meta.frozen = FALSE;
+		}
+
+		unit_control(actor->meta.unit_index, &control_data);
+
+		if (actor->output.animation.impulse != NONE)
+		{
+			unit_start_animation_impulse(
+				actor->meta.unit_index,
+				actor->output.animation.impulse,
+				&actor->output.animation.alignment_vector);
+		}
+
+		if (actor->output.persistent_control_ticks > 0)
+		{
+			unit_persistent_control(
+				actor->meta.unit_index,
+				actor->output.persistent_control_ticks,
+				actor->output.persistent_control_flags);
+		}
+	}
+
+	return;
+}
+
+static void actor_update(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	actor_update_begin(actor_index);
+	if (actor_general_update(actor_index))
+	{
+		actor_get_timeslice(actor_index);
+		actor_input_update(actor_index);
+		actor_perception_update(actor_index);
+		actor_situation_update(actor_index);
+		actor_emotion_update(actor_index);
+		actor_clear_orders(actor_index);
+		actor_decision_loop(actor_index);
+		actor_action_update(actor_index);
+
+		if (!actor->meta.dormant)
+		{
+			if (actor->meta.swarm)
+			{
+				actor_type_swarm_control(actor_index);
+			}
+			else
+			{
+				actor_clear_output(actor_index);
+				actor_action_control(actor_index);
+				actor_communication_update(actor_index);
+				actor_conversation_control(actor_index);
+				actor_destination_update(actor_index);
+				actor_look_affect_movement(actor_index);
+				actor_move_update(actor_index);
+				actor_look_update(actor_index);
+				actor_combat_update(actor_index);
+				actor_unit_control(actor_index);
+			}
+		}
+	}
+	code_0002a150();
+
+	return;
+}
+
+void actors_update(
+	void)
+{
+	struct actor_iterator iterator;
+	struct actor_datum *actor;
+
+	ai_globals->last_highest_service_timer = ai_globals->current_highest_service_timer;
+	ai_globals->current_highest_service_timer = 0;
+	ai_globals->time_given_this_frame = FALSE;
+
+	actor_iterator_new(&iterator, TRUE);
+	while ((actor = actor_iterator_next(&iterator)) != NULL)
+	{
+		if (actor->meta.erase_next_tick)
+		{
+			actor_erase(iterator.index, FALSE);
+		}
+		else if (actor->state.mode > _actor_mode_braindead)
+		{
+			actor_update(iterator.index);
 		}
 	}
 
