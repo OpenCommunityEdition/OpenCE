@@ -581,57 +581,6 @@ enum
 	MULTIPLAYER_MAXIMUM_PLAYERS = 16,
 };
 
-enum game_engine_message
-{
-	_game_engine_message_welcome = 0,
-	_game_engine_message_killed_by_unknown,
-	_game_engine_message_killed_by_biped,
-	_game_engine_message_killed_by_vehicle,
-	_game_engine_message_killed_by_player,
-	_game_engine_message_killed_by_friendly_fire,
-	_game_engine_message_killed_by_self,
-	_game_engine_message_double_kill,
-	_game_engine_message_killed_enemy,
-	_game_engine_message_triple_kill,
-	_game_engine_message_multi_kill,
-	_game_engine_message_five_kills_in_row,
-	_game_engine_message_ten_kills_in_a_row,
-	_game_engine_message_killed_friendly,
-	_game_engine_message_multi_kill_with_score,
-	_game_engine_message_triple_kill_with_score,
-	_game_engine_message_double_kill_with_score,
-	_game_engine_message_ten_kills_in_a_row_with_score,
-	_game_engine_message_five_kills_in_row_with_score,
-	_game_engine_message_killed_enemy_with_score,
-	_game_engine_message_winner,
-	_game_engine_message_team_winner,
-	_game_engine_message_show_score,
-	_game_engine_message_odd_man_out,
-	_game_engine_message_out_of_lives,
-	_game_engine_message_respawn_timer,
-	_game_engine_message_waiting_for_space_to_clear,
-	_game_engine_message_player_quit_self,
-	_game_engine_message_quit,
-	_game_engine_message_press_back_for_score,
-	_game_engine_message_time_left,
-	NUMBER_OF_GAME_ENGINE_MESSAGES,
-};
-
-enum game_engine_postgame_state
-{
-	_game_engine_postgame_state_active = 0,
-	_game_engine_postgame_state_delay,
-	_game_engine_postgame_state_rasterize_delay,
-	_game_engine_postgame_state_rasterize,
-};
-
-enum
-{
-	_multiplayer_sound_countdown_for_respawn = 0x1D,
-	_multiplayer_sound_respawn = 0x1F,
-	_equipment_created_at_rest_bit = 0,
-};
-
 /* ---------- macros */
 
 #define game_engine_postgame_hud_definition_get(index) \
@@ -4068,6 +4017,57 @@ void game_engine_update(
 	return;
 }
 
+
+enum game_engine_message
+{
+	_game_engine_message_welcome = 0,
+	_game_engine_message_killed_by_unknown,
+	_game_engine_message_killed_by_biped,
+	_game_engine_message_killed_by_vehicle,
+	_game_engine_message_killed_by_player,
+	_game_engine_message_killed_by_friendly_fire,
+	_game_engine_message_killed_by_self,
+	_game_engine_message_double_kill,
+	_game_engine_message_killed_enemy,
+	_game_engine_message_triple_kill,
+	_game_engine_message_multi_kill,
+	_game_engine_message_five_kills_in_row,
+	_game_engine_message_ten_kills_in_a_row,
+	_game_engine_message_killed_friendly,
+	_game_engine_message_multi_kill_with_score,
+	_game_engine_message_triple_kill_with_score,
+	_game_engine_message_double_kill_with_score,
+	_game_engine_message_ten_kills_in_a_row_with_score,
+	_game_engine_message_five_kills_in_row_with_score,
+	_game_engine_message_killed_enemy_with_score,
+	_game_engine_message_winner,
+	_game_engine_message_team_winner,
+	_game_engine_message_show_score,
+	_game_engine_message_odd_man_out,
+	_game_engine_message_out_of_lives,
+	_game_engine_message_respawn_timer,
+	_game_engine_message_waiting_for_space_to_clear,
+	_game_engine_message_player_quit_self,
+	_game_engine_message_quit,
+	_game_engine_message_press_back_for_score,
+	_game_engine_message_time_left,
+	NUMBER_OF_GAME_ENGINE_MESSAGES,
+};
+
+enum game_engine_postgame_state
+{
+	_game_engine_postgame_state_active = 0,
+	_game_engine_postgame_state_delay,
+	_game_engine_postgame_state_rasterize_delay,
+	_game_engine_postgame_state_rasterize,
+};
+
+enum
+{
+	_multiplayer_sound_countdown_for_respawn = 0x1D,
+	_multiplayer_sound_respawn = 0x1F,
+	_equipment_created_at_rest_bit = 0,
+};
 
 void game_engine_player_killed(
 	long killing_player_index,

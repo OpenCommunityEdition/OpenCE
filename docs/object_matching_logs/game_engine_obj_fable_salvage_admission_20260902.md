@@ -114,6 +114,17 @@ and `game_engine.c` plus `game_engine_slayer.c` directly include
 572-object strict exact-set sweep cover the compiler's header-position
 sensitivity rather than assuming ABI-compatible declarations are harmless.
 
+During integration onto the newer canonical encounters wave, the combination
+of its authenticated actor declarations and these TU-private enum definitions
+changed C2's definition-position state and reopened the otherwise untouched
+`populate_statistic_buffer`.  Keeping the enums private but placing them beside
+their first consumer, `game_engine_player_killed`, restores that pre-existing
+560-byte exact function while all three new closures remain exact.  This is a
+normal source organization for implementation-only constants, does not alter
+their values or scope, and avoids exporting private engine-message constants
+through a shared header.  The combined gate is therefore 169 exact, 11
+residual, and zero unwritten rather than accepting the interaction regression.
+
 ## Honest fuzzy parks
 
 These complete bodies are useful semantic progress but are not presented as
