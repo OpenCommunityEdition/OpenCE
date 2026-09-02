@@ -3809,9 +3809,6 @@ void scripted_hud_set_state_message(
 	word message_index);
 void scripted_hud_set_objective(
 	word message_index);
-void scripted_hud_set_timer_time(
-	short minutes,
-	word seconds);
 void scripted_hud_set_timer_warning_cutoff(
 	short minutes,
 	word seconds);

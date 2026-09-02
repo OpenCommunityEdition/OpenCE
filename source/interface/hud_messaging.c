@@ -160,7 +160,18 @@ struct hud_message_definition
 
 struct hud_state_message_definition
 {
-	byte reserved[0x40];
+	char name[32];
+	word text_start_index;
+	word element_start_index;
+	byte element_count;
+	byte pad25[3];
+	long unused28[6];
+};
+
+struct hud_state_message_element_definition
+{
+	byte type;
+	byte data;
 };
 
 struct icon_hud_element_definition;
@@ -200,8 +211,10 @@ struct hud_messaging_datum_definition
 
 struct hud_message_text_definition
 {
-	byte reserved000[0x20];
+	struct tag_data text_data;
+	struct tag_block elements;
 	struct tag_block messages;
+	long unused2C[21];
 };
 
 struct hud_scripted_globals_definition
@@ -222,6 +235,13 @@ struct hud_timer_data_definition
 	boolean enabled;
 };
 
+struct hud_objective_runtime_definition
+{
+	struct hud_state_message_definition *message;
+	short uptime;
+	short pad6;
+};
+
 struct hud_messaging_globals_definition
 {
 	struct hud_messaging_datum_definition message_data[NUMBER_OF_HUD_MESSAGING_DATUMS];
@@ -230,8 +250,29 @@ struct hud_messaging_globals_definition
 	byte magic_number;
 	byte reserved1186[6];
 	struct hud_state_message_definition *help_message;
-	byte reserved1190[8];
+	struct hud_objective_runtime_definition objective;
 	struct hud_timer_data_definition timer;
+};
+
+struct hud_color_definition
+{
+	unsigned long color;
+	unsigned long flash_color;
+	real flash_period;
+	real flash_delay;
+	short number_of_flashes;
+	word flash_flags;
+	real flash_length;
+	unsigned long disabled_color;
+	union
+	{
+		long unused;
+		struct
+		{
+			short up_ticks;
+			short fade_ticks;
+		} objective;
+	} custom;
 };
 
 struct hud_messaging_parameters_definition
@@ -242,7 +283,15 @@ struct hud_messaging_parameters_definition
 	real up_time;
 	real fade_time;
 	real_argb_color state_color;
-	byte reserved080[0xA0];
+	real_argb_color text_color;
+	real spacing;
+	struct tag_reference hud_item_messages;
+	struct tag_reference messaging_icons;
+	struct tag_reference alternate_icon_text;
+	struct tag_block button_icons;
+	struct hud_color_definition color;
+	struct tag_reference hud_messages;
+	struct hud_color_definition objective_color;
 };
 
 struct hud_globals_definition
@@ -403,6 +452,25 @@ void scripted_hud_restart_flashing(
 	return;
 }
 
+void scripted_hud_set_timer_time(
+	short minutes,
+	word seconds)
+{
+	struct hud_timer_data_definition *timer;
+	long time;
+
+	hud_messaging_globals->timer.ticks = 30 * (60 * minutes + seconds);
+	timer = &hud_messaging_globals->timer;
+	timer->paused = FALSE;
+	timer->enabled = TRUE;
+	time = game_time_get();
+	timer = &hud_messaging_globals->timer;
+	timer->reference_time = time;
+	timer->corner = PIN(timer->corner, 0, 4);
+
+	return;
+}
+
 void scripted_hud_set_timer_warning_cutoff(
 	short minutes,
 	word seconds)
@@ -491,6 +559,46 @@ void scripted_hud_time_code_reset(
 	time_code_time = time;
 	if (time_code_stop_time != NONE)
 		time_code_stop_time = time;
+
+	return;
+}
+
+void hud_set_state_message(
+	short local_player_index,
+	short message_index)
+{
+	if (!hud_scripted_globals->show_hud_help_text)
+	{
+		long hud_messages_index = hud_globals->messaging.hud_messages.index;
+
+		if (hud_messages_index != NONE)
+		{
+			struct hud_messaging_globals_definition *globals = hud_messaging_globals;
+			struct hud_messaging_datum_definition *datum =
+				&globals->message_data[local_player_index];
+
+			if (message_index != NONE)
+			{
+				struct hud_message_text_definition *hud_messages =
+					HUD_MESSAGE_TEXT_DEFINITION_GET(hud_messages_index);
+
+				if (message_index < hud_messages->messages.count)
+				{
+					datum->state_message.state_message = TAG_BLOCK_GET_ELEMENT(
+						&hud_messages->messages,
+						message_index,
+						struct hud_state_message_definition);
+					datum->state_message.is_text_flags = 0;
+				}
+				else
+				{
+					message_index = NONE;
+				}
+			}
+
+			datum->state_message.valid = message_index != NONE;
+		}
+	}
 
 	return;
 }

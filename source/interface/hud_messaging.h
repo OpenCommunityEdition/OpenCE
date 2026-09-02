@@ -34,6 +34,9 @@ void scripted_hud_set_timer_position(
 	short x,
 	short y,
 	short corner);
+void scripted_hud_set_timer_time(
+	short minutes,
+	word seconds);
 void scripted_hud_messages_clear(
 	void);
 void hud_print_message(
