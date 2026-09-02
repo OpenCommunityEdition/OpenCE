@@ -43,6 +43,8 @@ short scripted_hud_get_timer_ticks(
 	void);
 void scripted_hud_messages_clear(
 	void);
+void hud_render_timer(
+	void);
 void hud_print_message(
 	short local_player_index,
 	wchar_t const *message);

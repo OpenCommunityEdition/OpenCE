@@ -71,6 +71,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "interface/interface.h"
+#include "interface/hud_messaging.h"
 #include "math/real_math.h"
 #include "text/draw_string.h"
 
@@ -116,8 +117,6 @@ void first_person_weapons_dispose(
 void cinematic_render(
 	void);
 void code_000cf2f0(
-	void);
-void hud_render_timer(
 	void);
 void terminal_draw(
 	void);

@@ -120,7 +120,11 @@ symbols in this file:
 #include "game/game.h"
 #include "game/game_engine.h"
 #include "game/players.h"
+#include "interface/hud_draw.h"
 #include "interface/hud_messaging.h"
+#include "interface/interface.h"
+#include "render/render.h"
+#include "render/render_debug.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
@@ -134,15 +138,36 @@ symbols in this file:
 enum
 {
 	hud_message_text_group_tag = 'hmt ',
+	hud_number_group_tag = 'hud#',
 	NUMBER_OF_HUD_MESSAGING_DATUMS = 4,
 	NUMBER_OF_HUD_MESSAGES_PER_DATUM = 4,
 	MAXIMUM_HUD_STATE_MESSAGE_TEXT_LENGTH = 256
+};
+
+enum hud_corner
+{
+	_hud_corner_top_left,
+	_hud_corner_top_right,
+	_hud_corner_bottom_left,
+	_hud_corner_bottom_right,
+	_hud_corner_center,
+	NUMBER_OF_HUD_CORNERS
+};
+
+enum hud_number_show_flags
+{
+	_hud_number_show_all_leading_zeros_bit,
+	_hud_number_show_only_when_zoomed_bit,
+	_hud_number_show_trailing_m_bit,
+	NUMBER_OF_HUD_NUMBER_SHOW_FLAGS
 };
 
 /* ---------- macros */
 
 #define HUD_MESSAGE_TEXT_DEFINITION_GET(index) \
 	((struct hud_message_text_definition *)tag_get(hud_message_text_group_tag, (index)))
+#define HUD_NUMBER_DEFINITION_GET(index) \
+	((struct hud_number_definition *)tag_get(hud_number_group_tag, (index)))
 
 /* ---------- structures */
 
@@ -236,10 +261,26 @@ struct hud_timer_data_definition
 	long reference_time;
 	short ticks;
 	short flash_cutoff;
-	short position[2];
+	point2d position;
 	short corner;
 	boolean paused;
 	boolean enabled;
+};
+
+struct hud_absolute_placement_definition
+{
+	short corner;
+	short pad;
+	long unused[8];
+};
+
+struct hud_placement_definition
+{
+	point2d offset;
+	real_vector2d scale;
+	short multiplayer_scaling_flags;
+	short pad;
+	long unused[5];
 };
 
 struct hud_objective_runtime_definition
@@ -282,6 +323,37 @@ struct hud_color_definition
 	} custom;
 };
 
+struct number_hud_element_definition
+{
+	struct hud_placement_definition placement;
+	struct hud_color_definition colors;
+	char digits;
+	byte number_flags;
+	char fractional_digits;
+	byte pad;
+	long unused[3];
+};
+
+struct hud_number_definition
+{
+	struct tag_reference number_bitmap;
+	char character_width;
+	char screen_width;
+	char x_offset;
+	char y_offset;
+	char decimal_point_width;
+	char colon_width;
+	short pad;
+	long unused[19];
+};
+
+struct hud_timer_definition
+{
+	struct hud_color_definition color;
+	struct hud_color_definition time_up_color;
+	long unused[10];
+};
+
 struct hud_messaging_parameters_definition
 {
 	byte reserved000[0x48];
@@ -304,6 +376,8 @@ struct hud_messaging_parameters_definition
 struct hud_globals_definition
 {
 	struct hud_messaging_parameters_definition messaging;
+	byte reserved120[0x240];
+	struct hud_timer_definition timer_definition;
 };
 
 typedef char hud_timer_data_size_assert[
@@ -360,6 +434,16 @@ typedef char hud_messaging_state_color_offset_assert[
 	offsetof(struct hud_messaging_parameters_definition, state_color) == 0x70 ? 1 : -1];
 typedef char hud_globals_messaging_offset_assert[
 	offsetof(struct hud_globals_definition, messaging) == 0 ? 1 : -1];
+typedef char hud_absolute_placement_size_assert[
+	sizeof(struct hud_absolute_placement_definition) == 0x24 ? 1 : -1];
+typedef char hud_placement_size_assert[
+	sizeof(struct hud_placement_definition) == 0x24 ? 1 : -1];
+typedef char number_hud_element_size_assert[
+	sizeof(struct number_hud_element_definition) == 0x54 ? 1 : -1];
+typedef char hud_number_size_assert[
+	sizeof(struct hud_number_definition) == 0x64 ? 1 : -1];
+typedef char hud_globals_timer_definition_offset_assert[
+	offsetof(struct hud_globals_definition, timer_definition) == 0x360 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -534,8 +618,8 @@ void scripted_hud_set_timer_position(
 {
 	struct hud_messaging_globals_definition *globals = hud_messaging_globals;
 
-	globals->timer.position[0] = x;
-	globals->timer.position[1] = y;
+	globals->timer.position.n[0] = x;
+	globals->timer.position.n[1] = y;
 	globals->timer.corner = PIN(corner, 0, 4);
 
 	return;
@@ -631,6 +715,145 @@ void scripted_hud_time_code_reset(
 	time_code_time = time;
 	if (time_code_stop_time != NONE)
 		time_code_stop_time = time;
+
+	return;
+}
+
+void hud_render_timer(
+	void)
+{
+	struct hud_timer_data_definition *timer = &hud_messaging_globals->timer;
+
+	if (timer->enabled)
+	{
+		struct hud_absolute_placement_definition placement = { timer->corner };
+		struct number_hud_element_definition numbers;
+		long current_time = game_time_get();
+		short flash = FALSE;
+		short digit_advance = 0;
+		short timer_ticks = scripted_hud_get_timer_ticks();
+		long hud_number_index;
+
+		numbers.digits = 2;
+		numbers.fractional_digits = 4;
+		numbers.number_flags = FLAG(_hud_number_show_all_leading_zeros_bit);
+		numbers.placement.offset = timer->position;
+		numbers.placement.scale.i = 1.0f;
+		numbers.placement.scale.j = 1.0f;
+
+		hud_number_index = interface_get_tag_index(_interface_hud_digits);
+		if (hud_number_index != NONE)
+		{
+			struct hud_number_definition *hud_number =
+				HUD_NUMBER_DEFINITION_GET(hud_number_index);
+
+			digit_advance = (short)(long)((real)hud_number->screen_width * 2.0f);
+		}
+
+		switch (timer->corner)
+		{
+		case _hud_corner_top_left:
+		case _hud_corner_bottom_left:
+			break;
+
+		case _hud_corner_top_right:
+		case _hud_corner_bottom_right:
+			numbers.placement.offset.x += 5 * digit_advance;
+			digit_advance = -digit_advance;
+			break;
+
+		case _hud_corner_center:
+			numbers.placement.offset.x -= 3 * digit_advance;
+			break;
+
+		default:
+			match_assert(
+				"c:\\halo\\SOURCE\\interface\\hud_messaging.c",
+				0x1F8,
+				!"unreachable");
+			break;
+		}
+
+		if (timer_ticks > 0)
+		{
+			numbers.colors = hud_globals->timer_definition.color;
+			{
+				short flash_cutoff = timer->flash_cutoff;
+
+				if (timer_ticks <= flash_cutoff)
+				{
+					flash = TRUE;
+					if (timer->ticks > flash_cutoff)
+					{
+						timer->ticks = flash_cutoff;
+						timer->reference_time =
+							flash_cutoff - timer_ticks + current_time;
+					}
+				}
+			}
+		}
+		else
+		{
+			long reference_time = timer->reference_time;
+
+			timer->ticks = NONE;
+			numbers.colors = hud_globals->timer_definition.time_up_color;
+			flash = TRUE;
+			if (reference_time == NONE)
+				timer->reference_time = game_time_get();
+		}
+
+		{
+			short clamped_ticks = MAX(timer_ticks, 0);
+			short total_seconds = clamped_ticks / TICKS_PER_SECOND;
+			double offset_advance;
+
+			hud_draw_numbers(
+				render.local_player_index,
+				&placement,
+				&numbers,
+				total_seconds / SECONDS_PER_MINUTE,
+				NONE,
+				flash,
+				timer->reference_time,
+				2.0f);
+
+			offset_advance = (double)digit_advance * 2.5;
+			numbers.placement.offset.x = (short)(long)(
+				(double)numbers.placement.offset.x + offset_advance);
+			hud_draw_numbers(
+				render.local_player_index,
+				&placement,
+				&numbers,
+				total_seconds % SECONDS_PER_MINUTE,
+				NONE,
+				flash,
+				timer->reference_time,
+				2.0f);
+
+			numbers.placement.offset.x = (short)(long)(
+				(double)numbers.placement.offset.x + offset_advance);
+			hud_draw_numbers(
+				render.local_player_index,
+				&placement,
+				&numbers,
+				100 * (clamped_ticks % TICKS_PER_SECOND) / TICKS_PER_SECOND,
+				NONE,
+				flash,
+				timer->reference_time,
+				2.0f);
+		}
+	}
+
+	if (time_code_time != NONE)
+	{
+		long stop_time = time_code_stop_time;
+
+		if (stop_time == NONE)
+			stop_time = game_time_get();
+		sprintf(temporary, "%d", stop_time - time_code_time);
+		render_debug_string(TRUE, temporary);
+	}
 
 	return;
 }
