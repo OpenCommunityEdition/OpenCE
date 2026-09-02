@@ -15,6 +15,7 @@ import copy
 import json
 from pathlib import Path
 
+from tools.object_admission_policy import load_rejection_index
 from tools.semantic_progress import (
     apply_semantic_data_matches,
     apply_semantic_matches,
@@ -36,11 +37,13 @@ def _normalize_measures(report):
             measures[key] = _integer(value)
 
 
-def classify_units(raw_report, strict_report):
+def classify_units(raw_report, strict_report, admission_rejections=None):
     """Return fail-closed completion candidates and contradicted labels."""
+    admission_rejections = admission_rejections or {}
     raw_units = {unit["name"]: unit for unit in raw_report.get("units", [])}
     candidates = []
     contradicted = []
+    rejected = []
 
     for unit in strict_report.get("units", []):
         measures = unit.get("measures", {})
@@ -55,6 +58,7 @@ def classify_units(raw_report, strict_report):
         raw_complete = bool(
             raw_units.get(unit["name"], {}).get("metadata", {}).get("complete", False)
         )
+        unit_rejections = admission_rejections.get(unit["name"], [])
 
         item = {
             "unit": unit["name"],
@@ -64,15 +68,27 @@ def classify_units(raw_report, strict_report):
             "data_gap": data_gap,
         }
         if fully_reported and has_reported_content and not raw_complete:
-            item["decision"] = "audit-coff-ownership-before-admission"
-            candidates.append(item)
-        elif raw_complete and not fully_reported:
+            if unit_rejections:
+                item["decision"] = "object-admission-rejected"
+                item["rejections"] = unit_rejections
+                rejected.append(item)
+            else:
+                item["decision"] = "audit-coff-ownership-before-admission"
+                candidates.append(item)
+        elif raw_complete and (not fully_reported or unit_rejections):
             item["decision"] = "completion-label-contradicted"
+            if unit_rejections:
+                item["rejections"] = unit_rejections
             contradicted.append(item)
 
     candidates.sort(key=lambda item: (item["data_gap"], item["function_gap"], item["unit"]))
     contradicted.sort(key=lambda item: item["unit"])
-    return {"candidates": candidates, "contradicted": contradicted}
+    rejected.sort(key=lambda item: item["unit"])
+    return {
+        "candidates": candidates,
+        "contradicted": contradicted,
+        "rejected": rejected,
+    }
 
 
 def audit(
@@ -83,6 +99,7 @@ def audit(
     semantic_matches_path,
     semantic_data_matches_path,
     symbol_manifest_path,
+    admission_rejections_path,
 ):
     raw_report = json.loads(report_path.read_text(encoding="utf-8"))
     strict_report = copy.deepcopy(raw_report)
@@ -103,10 +120,15 @@ def audit(
         symbol_manifest_path,
     )
     revoked = revoke_incomplete_units(strict_report)
-    result = classify_units(raw_report, strict_report)
+    admission_rejections = load_rejection_index(
+        admission_rejections_path,
+        {unit["name"] for unit in strict_report.get("units", [])},
+    )
+    result = classify_units(raw_report, strict_report, admission_rejections)
     result["summary"] = {
         "candidate_count": len(result["candidates"]),
         "contradicted_count": len(result["contradicted"]),
+        "rejected_count": len(result["rejected"]),
         "revoked_count": len(revoked),
     }
     result["revoked"] = revoked
@@ -132,6 +154,11 @@ def main(argv=None):
         default=Path("config/semantic_data_matches.json"),
     )
     parser.add_argument("--symbols", type=Path, default=Path("config/symbols.json"))
+    parser.add_argument(
+        "--admission-rejections",
+        type=Path,
+        default=Path("config/object_admission_rejections.json"),
+    )
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
 
@@ -148,6 +175,7 @@ def main(argv=None):
         resolve(args.semantic_matches),
         resolve(args.semantic_data_matches),
         resolve(args.symbols),
+        resolve(args.admission_rejections),
     )
     rendered = json.dumps(result, indent=2) + "\n"
     if args.output:

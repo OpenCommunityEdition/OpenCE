@@ -29,6 +29,7 @@ class ObjectAdmissionAuditTests(unittest.TestCase):
             "audit-coff-ownership-before-admission",
         )
         self.assertEqual(result["contradicted"], [])
+        self.assertEqual(result["rejected"], [])
 
     def test_lists_complete_label_with_strict_gap_as_contradicted(self):
         raw = {"units": [_unit("source/b", True, 3, 3, 12, 12)]}
@@ -40,6 +41,7 @@ class ObjectAdmissionAuditTests(unittest.TestCase):
         self.assertEqual(
             [item["unit"] for item in result["contradicted"]], ["source/b"]
         )
+        self.assertEqual(result["rejected"], [])
 
     def test_does_not_list_incomplete_or_already_complete_units(self):
         units = [
@@ -49,14 +51,50 @@ class ObjectAdmissionAuditTests(unittest.TestCase):
 
         result = classify_units({"units": units}, {"units": units})
 
-        self.assertEqual(result, {"candidates": [], "contradicted": []})
+        self.assertEqual(
+            result,
+            {"candidates": [], "contradicted": [], "rejected": []},
+        )
 
     def test_does_not_list_zero_content_placeholder_as_candidate(self):
         unit = _unit("libs/empty", False, 0, 0, 0, 0)
 
         result = classify_units({"units": [unit]}, {"units": [unit]})
 
-        self.assertEqual(result, {"candidates": [], "contradicted": []})
+        self.assertEqual(
+            result,
+            {"candidates": [], "contradicted": [], "rejected": []},
+        )
+
+    def test_reviewed_ownership_failure_is_not_an_admission_candidate(self):
+        unit = _unit("source/game/player_rumble", False, 12, 12, 68, 68)
+        rejection = {
+            "source/game/player_rumble": [
+                {
+                    "unit": "source/game/player_rumble",
+                    "class": "candidate-only-comdat-owner",
+                    "symbol": "_fast_ftol",
+                    "reason": "candidate-only owner",
+                    "evidence": "docs/evidence.md",
+                    "reopen": "prove compatible owner",
+                }
+            ]
+        }
+
+        result = classify_units(
+            {"units": [unit]},
+            {"units": [unit]},
+            rejection,
+        )
+
+        self.assertEqual(result["candidates"], [])
+        self.assertEqual(result["contradicted"], [])
+        self.assertEqual(
+            result["rejected"][0]["decision"], "object-admission-rejected"
+        )
+        self.assertEqual(
+            result["rejected"][0]["rejections"][0]["symbol"], "_fast_ftol"
+        )
 
 
 if __name__ == "__main__":

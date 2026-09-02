@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "unit": "source/game/player_rumble",
+      "class": "candidate-only-comdat-owner",
+      "symbol": "_fast_ftol",
+      "reason": "The rebuilt translation unit emits a select-any _fast_ftol COMDAT absent from the player_rumble target, while January's selected actor_combat owner is no-duplicates and currently has no compatible rebuilt owner.",
+      "evidence": "docs/object_matching_logs/player_rumble_obj_jonas_object_accounting_audit_20260831.md#exact-blocker-_fast_ftol-ownership",
+      "reopen": "Remove this rejection only after an ordinary base/base link proves a compatible authenticated canonical owner can discard the player_rumble copy, or authentic source topology prevents the copy from being emitted."
+    }
+  ]
+}

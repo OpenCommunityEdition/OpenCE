@@ -58,6 +58,7 @@ def _normalized_at(
     semantic=None,
     kind="lane",
     parked_policy=None,
+    admission_policy=None,
 ):
     report_path = tmp_path / f"{label}-report.json"
     report_path.write_text(json.dumps(report), encoding="utf-8")
@@ -66,6 +67,7 @@ def _normalized_at(
         report,
         semantic,
         parked_policy,
+        admission_policy,
     )
 
 
@@ -392,6 +394,61 @@ def test_accepted_assembly_parks_do_not_veto_external_exactness(tmp_path):
         and function["unionExact"] is True
         for function in merged_unit["functions"]
     )
+
+
+def test_object_admission_rejection_vetoes_complete_unit_not_functions(tmp_path):
+    report = _report(
+        [{"name": "_owner", "size": "40", "fuzzy_match_percent": 100.0, "address": "0"}],
+        fuzzy=100.0,
+    )
+    policy = {
+        "version": 1,
+        "entries": [
+            {
+                "unit": "source/units/example",
+                "class": "candidate-only-comdat-owner",
+                "symbol": "_fast_ftol",
+                "reason": "candidate-only COMDAT",
+                "evidence": "docs/evidence.md",
+                "reopen": "prove compatible owner",
+            }
+        ],
+    }
+    canonical = _normalized_at(
+        tmp_path,
+        "canonical",
+        report,
+        _semantic(_owner=(40, 40)),
+        kind="canonical",
+        admission_policy=policy,
+    )
+    lane = _normalized_at(
+        tmp_path,
+        "accepted-lane",
+        report,
+        _semantic(_owner=(40, 40)),
+    )
+
+    normalized = canonical["units"]["source/units/example"]
+    assert normalized["pct"] == 100.0
+    assert normalized["exact"] is False
+    assert normalized["semanticCoverageComplete"] is True
+    assert normalized["semanticComplete"] is False
+    assert normalized["admissionRejected"] is True
+    assert next(iter(normalized["functions"].values()))["exact"] is True
+
+    merged = merge_reports([canonical, lane], [])["units"][0]
+    assert merged["canonicalPct"] == 100.0
+    assert merged["bestPct"] == 100.0
+    assert merged["unionPct"] == 100.0
+    assert merged["canonicalExact"] is False
+    assert merged["bestExact"] is False
+    assert merged["unionExact"] is False
+    assert merged["canonicalSemanticComplete"] is False
+    assert merged["anySemanticComplete"] is False
+    assert merged["canonicalAdmissionRejected"] is True
+    assert merged["canonicalAdmissionRejections"][0]["symbol"] == "_fast_ftol"
+    assert merged["functions"][0]["canonicalExact"] is True
 
 
 def test_out_of_bounds_semantic_owner_fails_closed():

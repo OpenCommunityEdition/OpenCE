@@ -47,6 +47,15 @@ from pathlib import Path
 from typing import Any, Callable, Iterable
 from urllib.parse import parse_qs, urlparse
 
+try:
+    from tools.object_admission_policy import (
+        rejection_index as object_admission_rejection_index,
+    )
+except ModuleNotFoundError:  # Support ``python tools/decomp_treemap_multilane.py``.
+    from object_admission_policy import (  # type: ignore[no-redef]
+        rejection_index as object_admission_rejection_index,
+    )
+
 HTML = r'''<!doctype html>
 <html lang="en">
 <head>
@@ -346,6 +355,12 @@ function showTooltip(item, clientX, clientY) {
     `proven exact: canonical ${item.canonicalExact ? 'yes' : 'no'} • best ${item.bestExact ? 'yes' : 'no'} • union ${item.unionExact ? 'yes' : 'no'}`,
     `best source: ${item.bestSource || 'canonical'}`,
   ];
+  if (item.canonicalAdmissionRejected) {
+    const blockers = item.canonicalAdmissionRejections
+      .map(entry => `${entry.symbol}: ${entry.reason}`)
+      .join('; ');
+    lines.push(`object admission rejected: ${blockers}`);
+  }
   if (item.contributors.length) lines.push(`external contributors: ${item.contributors.join(', ')}`);
   if (item.anyLinked) lines.push(`linked somewhere${item.canonicalLinked ? ' (including canonical)' : ''}`);
   tooltip.textContent = lines.join('\n');
@@ -421,12 +436,14 @@ class SourceSpec:
     kind: str  # canonical, lane, parked, extra
     branch: str | None = None
     parked_policy_path: Path | None = None
+    admission_policy_path: Path | None = None
 
     @property
     def id(self) -> str:
         return (
             f"{self.kind}:{self.label}:{self.path}:"
-            f"parked-policy:{self.parked_policy_path or ''}"
+            f"parked-policy:{self.parked_policy_path or ''}:"
+            f"admission-policy:{self.admission_policy_path or ''}"
         )
 
     @property
@@ -515,6 +532,7 @@ def discover_sources(args: argparse.Namespace) -> tuple[list[SourceSpec], list[s
         'canonical',
         canonical_branch,
         (repo_root / 'config' / 'parked.json').resolve(),
+        (repo_root / 'config' / 'object_admission_rejections.json').resolve(),
     ))
 
     if args.all_worktrees:
@@ -719,6 +737,7 @@ def normalize_source(
     report: dict[str, Any],
     semantic_report: dict[str, Any] | None = None,
     parked_policy: dict[str, Any] | None = None,
+    admission_policy: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     units_out: dict[str, dict[str, Any]] = {}
     semantic_index = semantic_acceptance_index(semantic_report)
@@ -729,6 +748,18 @@ def normalize_source(
         else {}
     )
     units = report.get('units') if isinstance(report.get('units'), list) else []
+    admission_rejection_index = (
+        object_admission_rejection_index(
+            admission_policy,
+            {
+                str(unit.get('name'))
+                for unit in units
+                if isinstance(unit, dict) and unit.get('name')
+            },
+        )
+        if spec.kind == 'canonical'
+        else {}
+    )
     for unit_index, raw_unit in enumerate(units):
         if not isinstance(raw_unit, dict):
             continue
@@ -743,6 +774,8 @@ def normalize_source(
         accepted_records = semantic_index.get(name, {})
         rejected_names = rejection_index.get(name, {})
         policy_parked_names = parked_veto_index.get(name, set())
+        admission_rejections = admission_rejection_index.get(name, [])
+        admission_rejected = bool(admission_rejections)
         raw_name_counts: dict[str, int] = {}
         for raw_fn in functions:
             if not isinstance(raw_fn, dict):
@@ -863,7 +896,7 @@ def normalize_source(
         else:
             effective_unit_pct = max(0.0, min(100.0, raw_pct))
 
-        unit_exact = not policy_parked_names and (
+        unit_exact = not policy_parked_names and not admission_rejected and (
             semantic_complete or (
                 effective_unit_pct >= 100.0
                 and bool(fn_out)
@@ -872,6 +905,7 @@ def normalize_source(
         )
         linked = configured_linked and (
             not policy_parked_names
+            and not admission_rejected
             and (
                 not fn_out
                 or all(bool(function['exact']) for function in fn_out.values())
@@ -894,9 +928,15 @@ def normalize_source(
             'linked': linked,
             'configuredLinked': configured_linked,
             'exact': unit_exact,
-            'semanticComplete': semantic_complete and not policy_parked_names,
+            'semanticComplete': (
+                semantic_complete
+                and not policy_parked_names
+                and not admission_rejected
+            ),
             'semanticCoverageComplete': semantic_complete,
             'policyParkedNames': sorted(policy_parked_names),
+            'admissionRejected': admission_rejected,
+            'admissionRejections': admission_rejections,
             'textSize': text_size,
             'functions': fn_out,
             'functionOrder': fn_order,
@@ -907,6 +947,11 @@ def normalize_source(
         'semanticPath': str(spec.semantic_path) if semantic_report is not None else None,
         'parkedPolicyPath': (
             str(spec.parked_policy_path) if parked_policy is not None else None
+        ),
+        'admissionPolicyPath': (
+            str(spec.admission_policy_path)
+            if admission_policy is not None
+            else None
         ),
         'units': units_out,
     }
@@ -977,6 +1022,10 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
         canonical_policy_vetoes = set(
             (canonical_unit or {}).get('policyParkedNames', [])
         )
+        canonical_admission_rejections = list(
+            (canonical_unit or {}).get('admissionRejections', [])
+        )
+        canonical_admission_rejected = bool(canonical_admission_rejections)
 
         def policy_vetoes(function: dict[str, Any]) -> bool:
             return str(function.get('rawName') or '') in canonical_policy_vetoes
@@ -1004,8 +1053,15 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
             unit: dict[str, Any],
         ) -> tuple[float, bool]:
             if unit.get('semanticComplete'):
-                return 100.0, not canonical_policy_vetoes
-            if not canonical_ordinary_rejections and not canonical_policy_vetoes:
+                return 100.0, (
+                    not canonical_policy_vetoes
+                    and not canonical_admission_rejected
+                )
+            if (
+                not canonical_ordinary_rejections
+                and not canonical_policy_vetoes
+                and not canonical_admission_rejected
+            ):
                 pct = max(0.0, min(100.0, float(unit['pct'])))
                 exact = bool(unit.get('exact'))
                 if source is not canonical and pct >= 100.0:
@@ -1014,7 +1070,9 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
 
             function_bytes = 0
             matched_equivalent = 0.0
-            blocked_rejection = bool(canonical_policy_vetoes)
+            blocked_rejection = bool(
+                canonical_policy_vetoes or canonical_admission_rejected
+            )
             for key in unit['functionOrder']:
                 function = unit['functions'].get(key)
                 if function is None:
@@ -1053,10 +1111,15 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
             canonical_unit
             and canonical_unit['linked']
             and not canonical_policy_vetoes
+            and not canonical_admission_rejected
         )
 
         def effective_semantic_complete(unit: dict[str, Any]) -> bool:
-            return bool(unit.get('semanticComplete')) and not canonical_policy_vetoes
+            return (
+                bool(unit.get('semanticComplete'))
+                and not canonical_policy_vetoes
+                and not canonical_admission_rejected
+            )
 
         best_source_obj, best_unit, best_pct, best_exact = max(
             variant_metrics,
@@ -1069,8 +1132,12 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
             ),
         )
         best_source = best_source_obj['spec'].label
-        any_linked = not canonical_policy_vetoes and any(
-            bool(u['linked']) for _, u in variants
+        any_linked = (
+            not canonical_policy_vetoes
+            and not canonical_admission_rejected
+            and any(
+                bool(u['linked']) for _, u in variants
+            )
         )
 
         function_order = list(canonical_unit['functionOrder']) if canonical_unit else list(reference_unit['functionOrder'])
@@ -1124,9 +1191,13 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
                 ),
             )
             fn_best_source = best_fn_source_obj['spec'].label
-            fn_any_linked = not policy_vetoes(reference_fn) and any(
-                bool(unit['linked']) and function_key_value in unit['functions']
-                for _, unit in variants
+            fn_any_linked = (
+                not canonical_admission_rejected
+                and not policy_vetoes(reference_fn)
+                and any(
+                    bool(unit['linked']) and function_key_value in unit['functions']
+                    for _, unit in variants
+                )
             )
 
             contributors = sorted({
@@ -1167,11 +1238,15 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
 
         union_pct = weighted_union_pct(total, best_pct, merged_functions)
         represented_bytes = sum(int(function['total']) for function in merged_functions)
-        union_exact = not canonical_policy_vetoes and (
-            best_exact or bool(
-                merged_functions
-                and represented_bytes == total
-                and all(bool(function['unionExact']) for function in merged_functions)
+        union_exact = (
+            not canonical_policy_vetoes
+            and not canonical_admission_rejected
+            and (
+                best_exact or bool(
+                    merged_functions
+                    and represented_bytes == total
+                    and all(bool(function['unionExact']) for function in merged_functions)
+                )
             )
         )
         if best_pct > canonical_pct + 0.0001:
@@ -1200,6 +1275,8 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
             'anySemanticComplete': any(
                 effective_semantic_complete(u) for _, u in variants
             ),
+            'canonicalAdmissionRejected': canonical_admission_rejected,
+            'canonicalAdmissionRejections': canonical_admission_rejections,
             'functions': merged_functions,
         })
 
@@ -1232,6 +1309,7 @@ def merge_reports(loaded: list[dict[str, Any]], warnings: list[str]) -> dict[str
             'version': source['version'],
             'semanticPath': source['semanticPath'],
             'parkedPolicyPath': source['parkedPolicyPath'],
+            'admissionPolicyPath': source['admissionPolicyPath'],
         })
 
     return {
@@ -1287,9 +1365,11 @@ class ViewerServer(ThreadingHTTPServer):
         readable_specs: list[SourceSpec] = []
         semantic_paths: dict[str, Path] = {}
         parked_policy_paths: dict[str, Path] = {}
+        admission_policy_paths: dict[str, Path] = {}
         report_signatures: dict[str, tuple[int, int, int]] = {}
         semantic_signatures: dict[str, tuple[int, int, int]] = {}
         parked_policy_signatures: dict[str, tuple[int, int, int]] = {}
+        admission_policy_signatures: dict[str, tuple[int, int, int]] = {}
         stamp_parts: list[str] = []
         warnings = list(discovery_warnings)
         for spec in sources:
@@ -1322,6 +1402,25 @@ class ViewerServer(ThreadingHTTPServer):
                     parked_policy_signatures[spec.id] = parked_policy_signature
                     stamp_parts.append(
                         f"{spec.id}:parked-policy:{parked_policy_signature}"
+                    )
+            admission_policy_path = spec.admission_policy_path
+            if spec.kind == 'canonical' and admission_policy_path is not None:
+                try:
+                    admission_policy_stat = admission_policy_path.stat()
+                except FileNotFoundError as exc:
+                    raise OSError(
+                        f"Canonical admission policy not found: {admission_policy_path}"
+                    ) from exc
+                except OSError as exc:
+                    raise OSError(
+                        f"Cannot stat canonical admission policy {admission_policy_path}: {exc}"
+                    ) from exc
+                else:
+                    admission_policy_signature = stat_signature(admission_policy_stat)
+                    admission_policy_paths[spec.id] = admission_policy_path
+                    admission_policy_signatures[spec.id] = admission_policy_signature
+                    stamp_parts.append(
+                        f"{spec.id}:admission-policy:{admission_policy_signature}"
                     )
             semantic_path = spec.semantic_path
             if semantic_path is None:
@@ -1359,6 +1458,7 @@ class ViewerServer(ThreadingHTTPServer):
                     continue
                 semantic_report = None
                 parked_policy = None
+                admission_policy = None
                 semantic_path = semantic_paths.get(spec.id)
                 if semantic_path is not None:
                     try:
@@ -1381,6 +1481,17 @@ class ViewerServer(ThreadingHTTPServer):
                     except (OSError, json.JSONDecodeError, ValueError) as exc:
                         raise OSError(
                             f"Cannot load canonical parked policy for {spec.label}: {exc}"
+                        ) from exc
+                admission_policy_path = admission_policy_paths.get(spec.id)
+                if admission_policy_path is not None:
+                    try:
+                        admission_policy = load_json_stable(
+                            admission_policy_path,
+                            admission_policy_signatures[spec.id],
+                        )
+                    except (OSError, json.JSONDecodeError, ValueError) as exc:
+                        raise OSError(
+                            f"Cannot load canonical admission policy for {spec.label}: {exc}"
                         ) from exc
                 if stat_signature(spec.path.stat()) != report_signatures[spec.id]:
                     if spec.kind == 'canonical':
@@ -1408,11 +1519,21 @@ class ViewerServer(ThreadingHTTPServer):
                         f"Canonical parked policy changed during paired read: "
                         f"{parked_policy_path}"
                     )
+                if (
+                    admission_policy_path is not None
+                    and stat_signature(admission_policy_path.stat())
+                    != admission_policy_signatures[spec.id]
+                ):
+                    raise OSError(
+                        f"Canonical admission policy changed during paired read: "
+                        f"{admission_policy_path}"
+                    )
                 loaded.append(normalize_source(
                     spec,
                     report,
                     semantic_report,
                     parked_policy,
+                    admission_policy,
                 ))
 
             merged = merge_reports(loaded, warnings)
