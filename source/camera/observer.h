@@ -76,6 +76,8 @@ void observer_initialize_for_new_map(
 	void);
 void observer_reconnect_to_structure_bsp(
 	void);
+void observer_update(
+	real time_delta_sec);
 
 struct observer_result const *observer_get_camera(
 	short local_player_index);

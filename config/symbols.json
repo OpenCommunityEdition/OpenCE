@@ -4159,7 +4159,7 @@
 { "file_offset": 985952, "flags": 32, "name": "_main_exit" },
 { "file_offset": 986032, "flags": 32, "name": "_main_reset_time" },
 { "file_offset": 986080, "flags": 32, "name": "_code_000f0be0" },
-{ "file_offset": 986096, "flags": 32, "name": "_code_000f0bf0" },
+{ "file_offset": 986096, "flags": 32, "name": "_main_update_time" },
 { "file_offset": 987536, "flags": 32, "name": "_main_rasterizer_throttle" },
 { "file_offset": 988064, "flags": 32, "name": "_screenshot_record" },
 { "file_offset": 988096, "flags": 32, "name": "_main_taking_screenshot" },

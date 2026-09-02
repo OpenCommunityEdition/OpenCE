@@ -185,6 +185,8 @@ boolean player_control_action_test_move_relative_all_directions(
 	void);
 boolean player_control_action_test_look_relative_all_directions(
 	void);
+void player_control_update(
+	real time_delta_sec);
 
 /* ---------- globals */
 

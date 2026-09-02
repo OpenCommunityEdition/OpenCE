@@ -14,7 +14,10 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/COLLISION_USAGE.C */
+
+void collision_log_continue_period(
+	short time_period);
 
 /* ---------- globals */
 

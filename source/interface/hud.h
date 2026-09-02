@@ -18,6 +18,8 @@ header included in hcex build.
 
 void hud_load(
 	boolean load);
+void hud_autosave(
+	boolean active);
 
 void hud_picked_up_powerup(
 	short local_player_index,

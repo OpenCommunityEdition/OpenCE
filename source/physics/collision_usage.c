@@ -113,6 +113,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "collision_debug.h"
 #include "collision_usage.h"
 #include "editor/editor_stubs.h"
 #include "game/game.h"

@@ -158,6 +158,8 @@ void director_script_camera(
 	boolean scripted);
 void director_initialize_for_saved_game(
 	void);
+void director_update(
+	real time_delta_sec);
 
 /* ---------- globals */
 

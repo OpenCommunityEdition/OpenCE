@@ -53,6 +53,10 @@ boolean create_global_network_game_client(
 	void);
 void dispose_global_network_game_client(
 	void);
+boolean network_game_client_start_frame(
+	void);
+boolean network_game_client_end_frame(
+	void);
 short network_game_client_get_local_machine_index(
 	void);
 void network_game_client_local_player_quit(
