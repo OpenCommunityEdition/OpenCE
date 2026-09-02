@@ -15,6 +15,8 @@ struct bitmap_data;
 struct hud_absolute_placement_definition;
 struct number_hud_element_definition;
 
+long get_return_eip(
+	void);
 void hud_retrieve_bitmap_and_bounding_rect(
 	long bitmap_group_index,
 	short sequence_index,

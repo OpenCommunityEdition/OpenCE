@@ -311,9 +311,6 @@ void custom_render_nav_point(
 void game_engine_render_nav_points(
 	short local_player_index);
 
-long get_return_eip(
-	void);
-
 void unit_get_head_position(
 	long unit_index,
 	real_point3d *head_position);

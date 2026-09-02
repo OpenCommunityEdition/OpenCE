@@ -67,9 +67,13 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cutscene/cinematics.h"
+#include "game/game.h"
 #include "game/players.h"
+#include "interface/hud_draw.h"
 #include "interface/hud_unit.h"
 #include "saved games/game_state.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
@@ -86,6 +90,12 @@ enum
 enum
 {
 	MAXIMUM_NUMBER_OF_LOCAL_PLAYERS = 4,
+};
+
+enum
+{
+	STACK_BUFFER_LENGTH = 0x80,
+	STACK_BUFFER_FILL = 0x62626262,
 };
 
 /* ---------- macros */
@@ -118,6 +128,13 @@ struct unit_hud_globals
 	long script_flags;
 };
 
+struct hud_scripted_globals
+{
+	boolean show_hud;
+	boolean show_hud_help_text;
+	byte reserved2[2];
+};
+
 typedef char unit_hud_state_auxilary_flash_time_offset_assert[
 	offsetof(struct unit_hud_state, auxilary_flash_time) == 0x22 ? 1 : -1];
 typedef char unit_hud_state_sound_flags_offset_assert[
@@ -130,15 +147,20 @@ typedef char unit_hud_globals_script_flags_offset_assert[
 	offsetof(struct unit_hud_globals, script_flags) == 0x160 ? 1 : -1];
 typedef char unit_hud_globals_size_assert[
 	sizeof(struct unit_hud_globals) == 0x164 ? 1 : -1];
+typedef char hud_scripted_globals_size_assert[
+	sizeof(struct hud_scripted_globals) == 0x4 ? 1 : -1];
 
 /* ---------- prototypes */
 
 static struct unit_hud_state *get_hud_state(
 	short local_player_index);
+static void hud_update_unit_local_player(
+	short local_player_index);
 
 /* ---------- globals */
 
 extern struct unit_hud_globals *bss_00453ac0;
+extern struct hud_scripted_globals *hud_scripted_globals;
 
 /* ---------- public code */
 
@@ -324,6 +346,117 @@ void scripted_hud_blink_motion_sensor(
 	return;
 }
 
+/* ---------- private code */
+
+static void hud_update_unit_local_player(
+	short local_player_index)
+{
+	long return_eip = get_return_eip();
+	long stack_buffer[STACK_BUFFER_LENGTH];
+
+	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+
+	if (local_player_get_player_index(local_player_index) != NONE)
+	{
+		long unit_index = player_get(
+			local_player_get_player_index(local_player_index))->unit_index;
+
+		if (unit_index != NONE)
+		{
+			struct unit_datum *unit = unit_get(unit_index);
+			struct unit_hud_state *hud_state = get_hud_state(local_player_index);
+
+			if (hud_state->last_body_vitality == -1.0f)
+				hud_state->last_body_vitality = unit->object.body_vitality;
+			if (hud_state->last_shield_vitality == -1.0f)
+				hud_state->last_shield_vitality = unit->object.shield_vitality;
+
+			if (hud_state->last_shield_vitality > unit->object.shield_vitality)
+			{
+				if (hud_state->fade_time < 0.0f || hud_state->fade_time > 1.0f)
+					hud_state->last_shield_hit_time = game_time_get();
+
+				if (game_time_get() - hud_state->last_shield_hit_time < 15)
+				{
+					hud_state->fade_time = 0.0f;
+					goto update_finished;
+				}
+
+				hud_state->last_shield_vitality = unit->object.shield_vitality;
+				hud_state->fade_time +=
+					(real)(game_time_get() - hud_state->last_shield_hit_time) *
+					(1.0f / TICKS_PER_SECOND);
+			}
+			else
+			{
+				if (hud_state->last_shield_vitality < unit->object.shield_vitality)
+				{
+					hud_state->last_shield_vitality = unit->object.shield_vitality;
+					hud_state->fade_time = -1.0f;
+				}
+				else
+				{
+					hud_state->last_shield_vitality = unit->object.shield_vitality;
+					if (hud_state->fade_time > 0.0f)
+					{
+						hud_state->fade_time +=
+							(real)(game_time_get() - hud_state->last_shield_hit_time) *
+							(1.0f / TICKS_PER_SECOND);
+					}
+				}
+			}
+
+			hud_state->last_shield_hit_time = game_time_get();
+		}
+	}
+
+update_finished:
+	if (cinematic_in_progress())
+	{
+		long player_index = local_player_get_player_index(local_player_index);
+
+		if (player_index != NONE)
+		{
+			hud_play_unit_sounds(
+				player_get(player_index),
+				hud_scripted_globals->show_hud);
+		}
+	}
+
+	{
+		short corrupt_index;
+		short buffer_index;
+
+		for (buffer_index = STACK_BUFFER_LENGTH - 1; buffer_index >= 0; buffer_index--)
+		{
+			if (stack_buffer[buffer_index] != STACK_BUFFER_FILL)
+				goto corrupt_stack_found;
+		}
+
+		corrupt_index = NONE;
+		goto stack_buffer_checked;
+
+corrupt_stack_found:
+		corrupt_index = buffer_index;
+
+stack_buffer_checked:
+		match_vassert(
+			"c:\\halo\\SOURCE\\interface\\hud_unit.c",
+			0x201,
+			return_eip == get_return_eip(),
+			"corrupt return address!");
+		match_vassert(
+			"c:\\halo\\SOURCE\\interface\\hud_unit.c",
+			0x201,
+			corrupt_index == NONE,
+			csprintf(temporary, "corrupt stack at %d!", corrupt_index));
+	}
+
+	return;
+}
+
+/* ---------- public code */
+
 void hud_tick_shield(
 	long player_index,
 	real amount)
@@ -332,6 +465,20 @@ void hud_tick_shield(
 
 	if (local_player_index != NONE)
 		get_hud_state(local_player_index)->last_shield_vitality -= amount;
+
+	return;
+}
+
+void hud_update_unit(
+	void)
+{
+	short local_player_index = local_player_get_next(NONE);
+
+	while (local_player_index != NONE)
+	{
+		hud_update_unit_local_player(local_player_index);
+		local_player_index = local_player_get_next(local_player_index);
+	}
 
 	return;
 }
