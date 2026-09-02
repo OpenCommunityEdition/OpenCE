@@ -1906,6 +1906,44 @@
         },
         "objdiff_percent": 87.8
       }
+    },
+    {
+      "unit": "source/game/player_control",
+      "function": "_player_control_initialize_for_new_map",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete map-reset body in ordinary typed C from January disassembly and the independent HaloCEA implementation. The retained body clears the four semantic player-control flag fields, iterates MAXIMUM_NUMBER_OF_LOCAL_PLAYERS, obtains the typed player-control constants through TAG_BLOCK_GET_ELEMENT, resets each local unit through player_control_new_unit, and initializes only zero pitch/yaw rates from the tag defaults. January and the candidate are both 144 padded bytes with the same 10 relocation identities; objdiff reports 92.888885 percent similarity. Their instruction streams are exact from +0x0F through the epilogue. The sole residual is the opening schedule: January stores action_test_flags and action_flags before saving EDI, while VC7 hoists the EDI save before those stores and reverses the two independent stores. Ordinary declaration, initialization, nested-scope, direct-member, chained-zero, and reordered natural-C spellings were measured without recovering that schedule. The fail-closed classifier returns UNKNOWN, so no compiler recipe is claimed. No forced inline/noinline, barrier, volatile or register forcing, pragma, assembly, fake dependency, raw offset, invented address name, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the prologue schedule.",
+      "measurements": {
+        "target": {
+          "size": 144,
+          "relocation_count": 10,
+          "normalized_sha256": "adb32edd759e2bbcf07d7c5b87f8a11099d2f03e8e93e465605bcbc3512994e7"
+        },
+        "base": {
+          "size": 144,
+          "relocation_count": 10,
+          "normalized_sha256": "782be32752d680a0aa319f1f3fe2eec2e01fed6eee342801b2fb2b66e01d9ebd"
+        },
+        "objdiff_percent": 92.888885
+      }
+    },
+    {
+      "unit": "source/game/player_control",
+      "function": "_player_control_modify_desired_angles",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete desired-look update in ordinary typed C from January disassembly, PDB-authenticated private ownership, and the independent HaloCEA implementation. The retained body uses player_control_get, unit_get, unit_definition_get, and TAG_BLOCK_GET_ELEMENT; applies the seat-marker yaw arc, wraps yaw, derives and clamps camera pitch limits, autolevels against typed translational velocity, eases the persistent limits, and applies the requested pitch delta. The source uses real values and cseries PIN/angle helpers; the target-proven 2/pi scalar is expressed as the natural real literal 0.63661975f, eliminating the donor's wrong full-precision relocation. January and the candidate are both 1,584 padded bytes with the same 83 relocation identities; objdiff reports 99.59677 percent similarity. The fail-closed classifier proves independent-instruction-scheduling: the residual is one dependency-free else-arm schedule in which January materializes constants and the frame pointer between a velocity load and its x87 multiply while VC7 emits the multiply first. Six natural declaration/expression shapes were measured without changing that tie. No forced inline/noinline, barrier, volatile or register forcing, pragma, assembly, fake dependency, raw object/tag cast, invented address name, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the remaining schedule.",
+      "measurements": {
+        "target": {
+          "size": 1584,
+          "relocation_count": 83,
+          "normalized_sha256": "6e468bddb00f141c0c0018648fc4965e97ac383f6e688247adeab58281c6d4fb"
+        },
+        "base": {
+          "size": 1584,
+          "relocation_count": 83,
+          "normalized_sha256": "c61e9a2f2f5674737556d0890676ed566e69473ec0fe9f051738a4e9c1560afc"
+        },
+        "objdiff_percent": 99.59677
+      }
     }
   ]
 }

@@ -55,7 +55,7 @@ struct player_control
 	boolean unknown26;
 	byte unknown27;
 	long target_object_index;
-	float autoaim_level;
+	real autoaim_level;
 	byte unknown30[8];
 	real pitch_minimum;
 	real pitch_maximum;
@@ -115,6 +115,8 @@ void player_control_dispose(
 	void);
 void player_control_dispose_from_old_map(
 	void);
+boolean player_control_camera_control_is_active(
+	void);
 struct player_control *player_control_get(
 	short local_player_index);
 void player_control_inhibit_buttons(
@@ -135,7 +137,7 @@ long player_control_get_desired_weapon(
 	long unit_index);
 short player_control_get_zoom_level(
 	short local_player_index);
-float player_control_get_autoaim_level(
+real player_control_get_autoaim_level(
 	short local_player_index);
 void players_unzoom_all(
 	void);
@@ -155,6 +157,11 @@ void player_control_set_facing(
 void player_control_new_unit(
 	short local_player_index,
 	long unit_index);
+void player_control_initialize_for_new_map(
+	void);
+void player_control_permanent_impulse(
+	short local_player_index,
+	real_euler_angles2d const *delta);
 boolean scripted_player_control_set_camera_control(
 	boolean camera_control);
 void player_control_action_test_reset(
@@ -188,8 +195,6 @@ boolean player_control_action_test_look_relative_all_directions(
 
 /* ---------- globals */
 
-extern struct player_control_globals_data *bss_0043ee30;
-
-#define player_control_globals bss_0043ee30
+extern struct player_control_globals_data *player_control_globals;
 
 #endif // __PLAYER_CONTROL_H

@@ -11,7 +11,7 @@ symbols in this file:
 000A5770 0010:
 	_player_control_dispose_from_old_map (0000)
 000A5780 0020:
-	_code_000a5780 (0000)
+	_player_control_camera_control_is_active (0000)
 000A57A0 0030:
 	_scripted_player_control_set_camera_control (0000)
 000A57D0 0060:
@@ -19,7 +19,7 @@ symbols in this file:
 000A5830 00f0:
 	_evaluate_piecewise_linear_function (0000)
 000A5920 0010:
-	_code_000a5920 (0000)
+	_player_action_clear (0000)
 000A5930 0060:
 	_player_control_get_aiming_unit_index (0000)
 000A5990 0070:
@@ -71,7 +71,7 @@ symbols in this file:
 000A5F30 0010:
 	_player_control_action_test_look_relative_down (0000)
 000A5F40 0200:
-	_code_000a5f40 (0000)
+	_player_control_action_test_check_reset_input_blob (0000)
 000A6140 0040:
 	_signed_angular_difference (0000)
 000A6180 0050:
@@ -83,7 +83,7 @@ symbols in this file:
 000A6330 00f0:
 	_player_control_new_unit (0000)
 000A6420 0d80:
-	_code_000a6420 (0000)
+	_get_local_player_input_blob (0000)
 000A71A0 00e0:
 	_player_control_get_facing_angles (0000)
 000A7280 0030:
@@ -91,11 +91,11 @@ symbols in this file:
 000A72B0 0050:
 	_player_control_set_desired_weapon (0000)
 000A7300 0630:
-	_code_000a7300 (0000)
+	_player_control_modify_desired_angles (0000)
 000A7930 0090:
 	_player_control_initialize_for_new_map (0000)
 000A79C0 0620:
-	_code_000a79c0 (0000)
+	_handle_one_player_input (0000)
 000A7FE0 0080:
 	_player_control_update (0000)
 000A8060 0040:
@@ -169,7 +169,7 @@ symbols in this file:
 	_controls_swapped (0002)
 	_player_look_zoomed_scale (0004)
 0043EE30 002b:
-	_bss_0043ee30 (0000)
+	_player_control_globals (0000)
 	_debug_input_target (0004)
 	_player_look_yaw_rate (0008)
 	_player_look_pitch_rate (0018)
@@ -193,6 +193,7 @@ symbols in this file:
 #include "players.h"
 
 #include "game/game_globals.h"
+#include "cseries/profile.h"
 #include "items/weapons.h"
 #include "objects/objects.h"
 #include "saved games/game_state.h"
@@ -237,7 +238,9 @@ boolean player_magnetism_flag = TRUE;
 boolean controls_swapped = TRUE;
 real player_look_zoomed_scale = 0.5f;
 
-struct player_control_globals_data *bss_0043ee30;
+static struct profile_section player_control_update_section = {"player_control_update", NONE, TRUE};
+
+struct player_control_globals_data *player_control_globals;
 short debug_input_target;
 real player_look_yaw_rate[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
 real player_look_pitch_rate[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
@@ -289,7 +292,7 @@ void player_control_dispose_from_old_map(
 	return;
 }
 
-boolean code_000a5780(
+boolean player_control_camera_control_is_active(
 	void)
 {
 	return (boolean)(!TEST_FLAG(
@@ -467,7 +470,7 @@ short player_control_get_zoom_level(
 	return zoom_level;
 }
 
-float player_control_get_autoaim_level(
+real player_control_get_autoaim_level(
 	short local_player_index)
 {
 	match_assert("c:\\halo\\SOURCE\\game\\player_control.c", 0xB1,
@@ -972,7 +975,7 @@ static void player_control_modify_desired_angles(
 
 		if (pitch_autolevel != 0.f || player->unknown26)
 		{
-			real error = fabs(player->desired_angles.pitch - pitch_autolevel) * (2.f / _pi);
+			real error = fabs(player->desired_angles.pitch - pitch_autolevel) * 0.63661975f;
 
 			match_assert_valid_real(
 				"c:\\halo\\SOURCE\\game\\player_control.c",
