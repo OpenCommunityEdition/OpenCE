@@ -128,6 +128,7 @@ symbols in this file:
 #include "cache/cache_files.h"
 #include "cutscene/cinematics.h"
 #include "editor/editor_stubs.h"
+#include "items/items.h"
 #include "items/weapons.h"
 #include "objects.h"
 #include "scenario/scenario.h"
@@ -240,13 +241,6 @@ void vehicle_preprocess_node_orientations(
 void vehicle_reset(
 	long object_index);
 void vehicle_render_debug(
-	long object_index);
-
-boolean item_new(
-	long object_index);
-void item_delete(
-	long object_index);
-boolean item_update(
 	long object_index);
 
 void weapon_place(

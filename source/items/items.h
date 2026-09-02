@@ -70,6 +70,8 @@ void item_delete(
 	long item_index);
 boolean item_new(
 	long item_index);
+boolean item_update(
+	long item_index);
 boolean dangerous_items_near_player(
 	void);
 void item_in_unit_inventory(

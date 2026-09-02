@@ -17,7 +17,7 @@ symbols in this file:
 000E6140 0010:
 	_item_delete (0000)
 000E6150 0010:
-	_code_000e6150 (0000)
+	_verify_item_location (0000)
 000E6160 0050:
 	_dangerous_items_near_player (0000)
 000E61B0 00a0:
@@ -27,7 +27,7 @@ symbols in this file:
 000E62E0 0090:
 	_item_detonate (0000)
 000E6370 00c0:
-	_code_000e6370 (0000)
+	_item_adjust_for_angular_velocity_change (0000)
 000E6430 00c0:
 	_valid_real_vector3d_axes3 (0000)
 000E64F0 0060:
@@ -35,11 +35,11 @@ symbols in this file:
 000E6550 03b0:
 	_item_accelerate (0000)
 000E6900 0230:
-	_code_000e6900 (0000)
+	_item_align_to_normal_and_point (0000)
 000E6B30 0930:
 	_item_update (0000)
 00278FB0 0004:
-	_rdata_00278fb0 (0000)
+	_item_maximum_impact_velocity (0000)
 00278FB4 000c:
 	??_C@_0M@HIOGOKBN@item_update?$AA@ (0000)
 00278FC0 000d:
@@ -53,7 +53,7 @@ symbols in this file:
 00279024 0004:
 	__real@3f350481 (0000)
 00306498 05f8:
-	_data_00306498 (0000)
+	_item_update_section (0000)
 */
 
 /* ---------- headers */
@@ -142,15 +142,6 @@ struct item_update_storage
 
 typedef char item_update_storage_size_assert[
 	sizeof(struct item_update_storage) == 0xA0 ? 1 : -1];
-
-struct item_update_vectors
-{
-	real_vector3d velocity;
-	real_point3d candidate;
-};
-
-typedef char item_update_vectors_size_assert[
-	sizeof(struct item_update_vectors) == 0x18 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -624,7 +615,8 @@ boolean item_update(
 	struct item_datum *item;
 	struct item_definition *definition;
 	struct item_update_storage storage;
-	struct item_update_vectors vectors;
+	real_vector3d velocity;
+	real_point3d candidate;
 
 	item = item_get(item_index);
 	definition = item_definition_get(item->definition_index);
@@ -649,9 +641,9 @@ boolean item_update(
 			cross_product3d(
 				&item->object.up,
 				&item->object.forward,
-				&vectors.velocity);
+				(real_vector3d *)&candidate);
 			cross_product3d(
-				&vectors.velocity,
+				(real_vector3d const *)&candidate,
 				&item->object.up,
 				&item->object.forward);
 			if (normalize3d(&item->object.forward) == 0.f)
@@ -662,45 +654,43 @@ boolean item_update(
 
 		if (!TEST_FLAG(item->object.flags, _object_at_rest_bit))
 		{
-			vectors.velocity = item->object.translational_velocity;
+			velocity = item->object.translational_velocity;
 			if (!TEST_FLAG(
 					definition->item.flags,
 					_item_definition_antigravity_bit))
 			{
-				vectors.velocity.k -= global_gravity;
+				velocity.k -= global_gravity;
 			}
 
-			vectors.candidate.x = item->object.position.x + vectors.velocity.i;
-			vectors.candidate.y = item->object.position.y + vectors.velocity.j;
-			vectors.candidate.z = item->object.position.z + vectors.velocity.k;
+			candidate.x = item->object.position.x + velocity.i;
+			candidate.y = item->object.position.y + velocity.j;
+			candidate.z = item->object.position.z + velocity.k;
 
 			if (collision_test_line(
 					ITEM_UPDATE_COLLISION_TEST_FLAGS,
 					&item->object.position,
-					&vectors.candidate,
+					&candidate,
 					item->item.ignore_object_index,
 					&storage.scratch.collision.result))
 			{
 				struct collision_result *collision;
+				long impulse_sound_index;
 				real impact_scale;
 
 				collision = &storage.scratch.collision.result;
-				vectors.candidate.x += collision->plane.n.i * 0.05f;
-				vectors.candidate.y += collision->plane.n.j * 0.05f;
-				vectors.candidate.z += collision->plane.n.k * 0.05f;
+				candidate.x += collision->plane.n.i * 0.05f;
+				candidate.y += collision->plane.n.j * 0.05f;
+				candidate.z += collision->plane.n.k * 0.05f;
 
-				impact_scale = magnitude3d(&vectors.velocity);
+				impact_scale = magnitude3d(&velocity);
 				impact_scale /= item_maximum_impact_velocity;
-				if (impact_scale >= 0.f)
-				{
-					if (impact_scale > 1.f)
-					{
-						impact_scale = 1.f;
-					}
-				}
-				else
+				if (impact_scale < 0.f)
 				{
 					impact_scale = 0.f;
+				}
+				else if (impact_scale > 1.f)
+				{
+					impact_scale = 1.f;
 				}
 
 				if (definition->item.material_effects.index != NONE &&
@@ -716,15 +706,16 @@ boolean item_update(
 						impact_scale);
 				}
 
-				if (definition->item.collision_sound.index != NONE)
+				impulse_sound_index = definition->item.collision_sound.index;
+				if (impulse_sound_index != NONE)
 				{
-					storage.work.sound.location.position = vectors.candidate;
+					storage.work.sound.location.position = candidate;
 					storage.work.sound.location.forward = collision->plane.n;
 					storage.work.sound.location.translational_velocity =
 						*global_zero_vector3d;
 					storage.work.sound.location.game_location = item->object.location;
 					unattached_impulse_sound_new(
-						definition->item.collision_sound.index,
+						impulse_sound_index,
 						&storage.work.sound.location,
 						impact_scale);
 				}
@@ -735,21 +726,19 @@ boolean item_update(
 							_object_mask_scenery | _object_mask_device,
 							object_get_type(collision->object_index)))) &&
 					collision->plane.n.k > 0.7071f &&
-					-(collision->plane.n.k * vectors.velocity.k +
-						(collision->plane.n.j * vectors.velocity.j +
-							collision->plane.n.i * vectors.velocity.i)) < 0.05f)
+					-(collision->plane.n.k * velocity.k +
+						(collision->plane.n.j * velocity.j +
+							collision->plane.n.i * velocity.i)) < 0.05f)
 				{
 					real angular_dot;
 
-					vectors.candidate = collision->point;
+					candidate = collision->point;
 					item_align_to_normal_and_point(
 						item_index,
 						&collision->plane.n,
 						&collision->point,
-						&vectors.candidate);
-					vectors.velocity.i = 0.f;
-					vectors.velocity.j = 0.f;
-					vectors.velocity.k = 0.f;
+						&candidate);
+					velocity.i = velocity.j = velocity.k = 0.f;
 					angular_dot =
 						item->object.angular_velocity.i * collision->plane.n.i +
 						(collision->plane.n.j * item->object.angular_velocity.j +
@@ -765,11 +754,11 @@ boolean item_update(
 						object_set_garbage(item_index, TRUE);
 					}
 
-					item->object.flags |= FLAG(_object_at_rest_bit);
+					SET_FLAG(item->object.flags, _object_at_rest_bit, TRUE);
 					switch (collision->type)
 					{
 					case _collision_result_structure:
-						item->item.flags |= FLAG(_item_on_structure_bit);
+						SET_FLAG(item->item.flags, _item_on_structure_bit, TRUE);
 						item->item.rested_surface_index =
 							(short)collision->surface_index;
 						item->item.bsp_index =
@@ -780,12 +769,12 @@ boolean item_update(
 					{
 						real_matrix4x3 const *support_matrix;
 
-						item->item.flags |= FLAG(_item_on_object_bit);
-						item->item.item_on_rest_object_index =
-							collision->object_index;
+						SET_FLAG(item->item.flags, _item_on_object_bit, TRUE);
 						support_matrix = object_get_node_matrix(
 							collision->object_index,
 							0);
+						item->item.item_on_rest_object_index =
+							collision->object_index;
 						matrix4x3_inverse_transform_point(
 							support_matrix,
 							&collision->point,
@@ -809,41 +798,42 @@ boolean item_update(
 				{
 					real reflection;
 
-					reflection = -(
-						collision->plane.n.k * vectors.velocity.k * 1.4f -
-						(collision->plane.n.i * vectors.velocity.i * -1.4f -
-							collision->plane.n.j * vectors.velocity.j * 1.4f));
-					if (collision->type != _collision_result_structure &&
-						reflection >= 1.5f)
+					reflection =
+						collision->plane.n.i * velocity.i * -1.4f -
+						collision->plane.n.j * velocity.j * 1.4f -
+						collision->plane.n.k * velocity.k * 1.4f;
+					if (collision->type != _collision_result_structure)
 					{
-						reflection = 1.5f;
+						reflection = MIN(1.5f, reflection);
 					}
-					vectors.velocity.i += collision->plane.n.i * reflection;
-					vectors.velocity.j += collision->plane.n.j * reflection;
-					vectors.velocity.k += collision->plane.n.k * reflection;
-					vectors.candidate = collision->point;
+					candidate.x = collision->point.x;
+					velocity.i = collision->plane.n.i * reflection + velocity.i;
+					candidate.y = collision->point.y;
+					candidate.z = collision->point.z;
+					velocity.j = collision->plane.n.j * reflection + velocity.j;
+					velocity.k = reflection * collision->plane.n.k + velocity.k;
 					if (collision_test_point(
 							ITEM_UPDATE_COLLISION_TEST_FLAGS,
-							&vectors.candidate,
+							&candidate,
 							item_index))
 					{
 						point_from_line3d(
 							&collision->point,
 							&collision->plane.n,
 							0.05f,
-							&vectors.candidate);
+							&candidate);
 					}
 					collision_test_point(
 						ITEM_UPDATE_COLLISION_TEST_FLAGS,
-						&vectors.candidate,
+						&candidate,
 						item_index);
 				}
 			}
 
-			item->object.translational_velocity = vectors.velocity;
+			item->object.translational_velocity = velocity;
 			object_translate(
 				item_index,
-				&vectors.candidate,
+				&candidate,
 				&storage.scratch.collision.result.location);
 		}
 		else if (!TEST_FLAG(
@@ -857,7 +847,7 @@ boolean item_update(
 				1);
 
 			if (TEST_FLAG(item->item.flags, _item_on_structure_bit) &&
-				(word)item->item.rested_surface_index != (word)NONE &&
+				item->item.rested_surface_index != NONE &&
 				item->item.bsp_index == global_structure_bsp_index_get())
 			{
 				struct collision_bsp *collision_bsp;
@@ -875,25 +865,18 @@ boolean item_update(
 					scale_vector3d(
 						global_down3d,
 						global_gravity,
-						(real_vector3d *)&vectors.candidate);
-					item->item.flags &= ~FLAG(_item_on_structure_bit);
+						(real_vector3d *)&candidate);
+					SET_FLAG(item->item.flags, _item_on_structure_bit, FALSE);
 					item->item.rested_surface_index = NONE;
-					goto accelerate;
+					item_accelerate(
+						item_index,
+						(real_vector3d const *)&candidate,
+						FALSE);
 				}
-				goto damp_angular;
 			}
 			else if (TEST_FLAG(item->item.flags, _item_on_object_bit))
 			{
-				if (!object_try_and_get(item->item.item_on_rest_object_index))
-				{
-					scale_vector3d(
-						global_down3d,
-						global_gravity,
-						(real_vector3d *)&vectors.candidate);
-					item->item.flags &= ~FLAG(_item_on_object_bit);
-					goto accelerate;
-				}
-				else
+				if (object_try_and_get(item->item.item_on_rest_object_index))
 				{
 					real_matrix4x3 const *support_matrix;
 
@@ -903,23 +886,27 @@ boolean item_update(
 					matrix4x3_transform_point(
 						support_matrix,
 						&item->item.item_rest_object_offset,
-						(real_point3d *)&vectors.velocity);
+						&candidate);
 					item_align_to_normal_and_point(
 						item_index,
 						&item->item.rotation_axis,
-						(real_point3d const *)&vectors.velocity,
+						&candidate,
 						NULL);
+				}
+				else
+				{
+					scale_vector3d(
+						global_down3d,
+						global_gravity,
+						(real_vector3d *)&candidate);
+					SET_FLAG(item->item.flags, _item_on_object_bit, FALSE);
+					item_accelerate(
+						item_index,
+						(real_vector3d const *)&candidate,
+						FALSE);
 				}
 			}
 
-			goto damp_angular;
-		accelerate:
-			item_accelerate(
-				item_index,
-				(real_vector3d const *)&vectors.candidate,
-				FALSE);
-
-		damp_angular:
 			item->object.angular_velocity.i *= 0.9f;
 			item->object.angular_velocity.j *= 0.9f;
 			item->object.angular_velocity.k *= 0.9f;
@@ -982,9 +969,9 @@ boolean item_update(
 			cross_product3d(
 				&item->object.up,
 				&item->object.forward,
-				&vectors.velocity);
+				(real_vector3d *)&candidate);
 			cross_product3d(
-				&vectors.velocity,
+				(real_vector3d const *)&candidate,
 				&item->object.up,
 				&item->object.forward);
 			normalize3d(&item->object.forward);
