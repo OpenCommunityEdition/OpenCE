@@ -1868,6 +1868,44 @@
         },
         "objdiff_percent": 94.49254
       }
+    },
+    {
+      "unit": "source/rasterizer/rasterizer_frame_statistics",
+      "function": "_eat_my_shorts",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after retaining the ordinary unsigned-word comparator required by the exact dynamic-vertex counter. The semantic private name eat_my_shorts is authenticated by the imported January/Halo CE symbol evidence, and January's jbe branch proves the strict first > second predicate used by qsort_2byte. The source preserves that early-return structure directly: return TRUE when first is greater, otherwise return FALSE. VC7 collapses the natural source to seta and one return in 16 padded bytes, while January preserves two explicit returns in 32 padded bytes; the fail-closed classifier identifies only its R5 control-flow-return-shape signature and grants no match credit. A same-size result-variable spelling was rejected because it changes the source topology solely to steer code generation. No volatile/register forcing, barrier, pragma, assembly, undefined behavior, fake dependency, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler context that preserves both source-authentic early exits.",
+      "measurements": {
+        "target": {
+          "size": 32,
+          "relocation_count": 0,
+          "normalized_sha256": "272173574597a002350643c155ed196ad630c283059b477e0743dbf755f77f6e"
+        },
+        "base": {
+          "size": 16,
+          "relocation_count": 0,
+          "normalized_sha256": "824636ceaea1b9fd752c3bd2d2e627269d300d2dbc33b596caea74e2aeaa9d0c"
+        },
+        "objdiff_percent": 58.18182
+      }
+    },
+    {
+      "unit": "source/rasterizer/rasterizer_frame_statistics",
+      "function": "_rasterizer_frame_statistics_count_static_vertices",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after restoring the complete ordinary typed static-vertex counter from January's instruction stream and the target-authenticated triangle_buffer and vertex_buffer layouts. It returns zero for either null buffer or an unsupported type, triangle_buffer->count + 2 for _triangle_buffer_type_precompiled_strip, and vertex_buffer->count for _triangle_buffer_type_triangles. January and the candidate share the 64-byte padded envelope, zero relocations, and the complete semantic branch/value topology; objdiff reports 87.8 percent similarity. The residual is a VC7 callee-save/epilogue schedule: January delays push esi until after the first null test and places an alignment nop between pop esi and pop ebp, while the natural typed source saves ESI before that branch. Combined and nested null guards compile to the same fixed point, and the fail-closed classifier returns UNKNOWN. No forced inline/noinline, volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, undefined behavior, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler context that explains the delayed ESI save.",
+      "measurements": {
+        "target": {
+          "size": 64,
+          "relocation_count": 0,
+          "normalized_sha256": "abb0cdbbf190c800ba8155c28e0a784c40db9fd088fd6ff879704b736ecce18c"
+        },
+        "base": {
+          "size": 64,
+          "relocation_count": 0,
+          "normalized_sha256": "df987f2500b4f059b29f638e8a3c6bc588dbbaf1410573fbac13cff295c3a60d"
+        },
+        "objdiff_percent": 87.8
+      }
     }
   ]
 }

@@ -15,6 +15,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "sort.h"
 
 /* ---------- constants */
 
@@ -37,15 +38,6 @@ static void shortsort_2byte(
 static void shortsort_4byte(
 	long *hi,
 	long *lo,
-	boolean (*compare)(long, long));
-
-void qsort_2byte(
-	word *elements,
-	unsigned long element_count,
-	boolean (*compare)(word, word));
-void qsort_4byte(
-	long *elements,
-	unsigned long element_count,
 	boolean (*compare)(long, long));
 
 /* ---------- globals */

@@ -11,7 +11,7 @@ symbols in this file:
 0016E580 0040:
 	_rasterizer_fps_accumulate (0000)
 0016E5C0 0020:
-	_code_0016e5c0 (0000)
+	_eat_my_shorts (0000)
 0016E5E0 0040:
 	_rasterizer_frame_statistics_count_static_vertices (0000)
 0016E620 0130:
@@ -135,6 +135,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/sort.h"
 #include "cseries/cseries_windows.h"
 #include "errors.h"
 #include "rasterizer.h"
@@ -183,11 +184,6 @@ typedef char verify_rasterizer_frame_statistics_accumulation_frame_index_offset[
 static boolean eat_my_shorts(
 	word first,
 	word second);
-
-void qsort_2byte(
-	word *elements,
-	unsigned long element_count,
-	boolean (*compare)(word, word));
 
 /* ---------- globals */
 
@@ -243,14 +239,12 @@ static boolean eat_my_shorts(
 	word first,
 	word second)
 {
-	boolean result = FALSE;
-
 	if (first > second)
 	{
-		result = TRUE;
+		return TRUE;
 	}
 
-	return result;
+	return FALSE;
 }
 
 long rasterizer_frame_statistics_count_static_vertices(
@@ -287,7 +281,7 @@ long rasterizer_frame_statistics_count_dynamic_vertices(
 
 		if (triangles)
 		{
-			long index_count = triangle_count*NUMBER_OF_VERTICES_PER_TRIANGLE;
+			long index_count = triangle_count * NUMBER_OF_VERTICES_PER_TRIANGLE;
 			word last_vertex_index = (word)NONE;
 			long index;
 
@@ -301,8 +295,8 @@ long rasterizer_frame_statistics_count_dynamic_vertices(
 				rasterizer_frame_statistics_temp_buffer);
 			memcpy(
 				rasterizer_frame_statistics_temp_buffer,
-				triangles + first_triangle_index*NUMBER_OF_VERTICES_PER_TRIANGLE,
-				sizeof(word)*triangle_count*NUMBER_OF_VERTICES_PER_TRIANGLE);
+				triangles + first_triangle_index * NUMBER_OF_VERTICES_PER_TRIANGLE,
+				sizeof(word) * triangle_count * NUMBER_OF_VERTICES_PER_TRIANGLE);
 			qsort_2byte(rasterizer_frame_statistics_temp_buffer, index_count, eat_my_shorts);
 			for (index = 0; index < index_count; index++)
 			{
@@ -322,7 +316,7 @@ long rasterizer_frame_statistics_count_dynamic_vertices(
 		if (vertices_per_primitive == NUMBER_OF_VERTICES_PER_TRIANGLE ||
 			vertices_per_primitive == NUMBER_OF_VERTICES_PER_QUADRILATERAL)
 		{
-			vertex_count = triangle_count/(vertices_per_primitive - 2);
+			vertex_count = triangle_count / (vertices_per_primitive - 2);
 		}
 		else
 		{
