@@ -67,9 +67,17 @@ symbols in this file:
 #include "memory/data.h"
 #include "objects/objects.h"
 #include "saved games/game_state.h"
+#include "scenario/scenario.h"
 #include "tag_files/tag_groups.h"
 
 /* ---------- constants */
+
+enum
+{
+	MAXIMUM_FLAG_WIDTH= 40,
+	MAXIMUM_FLAG_VERTICES= 225,
+	MAXIMUM_FLAG_CELLS= 196
+};
 
 enum trailing_edge_shape
 {
@@ -80,10 +88,20 @@ enum trailing_edge_shape
 	_trailing_edge_shape_trapezoid_short_bottom
 };
 
+enum attached_edge_shape
+{
+	_attached_edge_shape_flat,
+	_attached_edge_shape_triangular_notch
+};
+
 enum tesselate
 {
-	_tesselate_top_left = 2,
-	_tesselate_bottom_left = 3
+	_tesselate_both,
+	_tesselate_none,
+	_tesselate_top_left,
+	_tesselate_bottom_left,
+	_tesselate_top_right,
+	_tesselate_bottom_right
 };
 
 /* ---------- macros */
@@ -105,11 +123,19 @@ struct flag_datum_prefix
 	{
 		real_point3d position;
 		real_vector3d velocity;
-	} vertices[225];
+	} vertices[MAXIMUM_FLAG_VERTICES];
 	struct flag_cell_datum
 	{
 		short tesselation;
-	} cells[196];
+	} cells[MAXIMUM_FLAG_CELLS];
+};
+
+struct flag_attachment_point
+{
+	short height_to_next_attachment;
+	short pad2;
+	long unused[4];
+	char marker_name[32];
 };
 
 struct flag_definition
@@ -121,6 +147,14 @@ struct flag_definition
 	short padA;
 	short width;
 	short height;
+	real cell_width_scale;
+	real cell_height_scale;
+	struct tag_reference shader_red;
+	struct tag_reference physics;
+	real wind_noise;
+	long unused3C[2];
+	struct tag_reference shader_blue;
+	struct tag_block attachment_points;
 };
 
 /* ---------- prototypes */
@@ -151,6 +185,12 @@ void flag_tesselate_region(
 	short y,
 	short size,
 	short tesselation);
+void flag_set_attachment_shape(
+	struct flag_definition *definition,
+	struct flag_datum_prefix *flag);
+void flag_set_trailing_shape(
+	struct flag_definition *definition,
+	struct flag_datum_prefix *flag);
 
 /* ---------- globals */
 
@@ -252,6 +292,166 @@ void flag_render(
 	return;
 }
 
+long flag_new(
+	long definition_index)
+{
+	long flag_index;
+
+	global_scenario_get();
+
+	flag_index = NONE;
+	if (definition_index != NONE)
+	{
+		struct flag_definition *definition = tag_get('flag', definition_index);
+
+		flag_index = datum_new(flag_data);
+		if (flag_index != NONE)
+		{
+			struct flag_datum_prefix *flag = datum_get(flag_data, flag_index);
+
+			if (definition->height * definition->width >= MAXIMUM_FLAG_VERTICES ||
+				definition->width >= MAXIMUM_FLAG_WIDTH ||
+				definition->shader_blue.index == NONE)
+			{
+				flag->noop = TRUE;
+			}
+			else
+			{
+				short x;
+				short y;
+
+				flag->noop = FALSE;
+				flag->initialized = FALSE;
+				flag->object_index = NONE;
+				flag->definition_index = definition_index;
+				flag->first_attachment.x = flag->first_attachment.y = flag->first_attachment.z = 0.0f;
+
+				for (x = 0; x < definition->width; x++)
+				{
+					for (y = 0; y < definition->height; y++)
+					{
+						struct flag_vertex_datum *vertex = flag_datum_get_vertex(flag, definition, x, y);
+
+						vertex->position = *global_origin3d;
+						vertex->velocity = *global_zero_vector3d;
+						if (x < definition->width - 1 && y < definition->height - 1)
+							flag_datum_get_cell(flag, definition, x, y)->tesselation = _tesselate_both;
+					}
+				}
+
+				flag_set_attachment_shape(definition, flag);
+				flag_set_trailing_shape(definition, flag);
+			}
+		}
+	}
+
+	return flag_index;
+}
+
+void flag_update_attachment(
+	struct flag_datum_prefix *flag,
+	struct flag_definition *definition,
+	struct location *location,
+	real_point3d *attachment_points,
+	real_point3d *attachment_force_points,
+	short *attachment_y,
+	short *y_attachments)
+{
+	struct object_marker marker;
+	real_vector3d delta;
+	short i;
+	short y;
+
+	for (i = 0; i < definition->attachment_points.count; i++)
+	{
+		struct flag_attachment_point *point = TAG_BLOCK_GET_ELEMENT(
+			&definition->attachment_points,
+			i,
+			struct flag_attachment_point);
+
+		object_get_marker_by_name(flag->object_index, point->marker_name, &marker, 1);
+		attachment_points[i] = marker.matrix.position;
+	}
+
+	scenario_location_from_point(location, attachment_points);
+
+	if (flag->noop)
+		return;
+
+	for (y = 0; y < definition->height; y++)
+		y_attachments[y] = NONE;
+
+	y = 0;
+	for (i = 0; i < definition->attachment_points.count; i++)
+	{
+		struct flag_attachment_point *point;
+		short span;
+		short y_end;
+		short row_start;
+
+		if (y >= definition->height)
+			break;
+
+		point = TAG_BLOCK_GET_ELEMENT(
+			&definition->attachment_points,
+			i,
+			struct flag_attachment_point);
+		span = PIN(point->height_to_next_attachment, 0, definition->height - y) & ~1;
+		y_end = y + span;
+
+		attachment_y[i] = y;
+		y_attachments[y] = i;
+		row_start = y;
+
+		for (; y <= y_end; y++)
+		{
+			real t = ((real)y - row_start) / ((real)y_end - row_start);
+			real_point3d *from = &attachment_points[i];
+			real_point3d *to = &attachment_points[i + 1];
+			real_point3d *force_point = &attachment_force_points[y];
+
+			force_point->x = from->x * (1.0f - t) + to->x * t;
+			force_point->y = from->y * (1.0f - t) + to->y * t;
+			force_point->z = from->z * (1.0f - t) + to->z * t;
+		}
+
+		y--;
+	}
+
+	delta.i = attachment_points->x - flag->first_attachment.x;
+	delta.j = attachment_points->y - flag->first_attachment.y;
+	delta.k = attachment_points->z - flag->first_attachment.z;
+
+	/*
+	 * BUG (original): integer truncation makes this an effective two-unit
+	 * threshold, as in antenna_update_attachment. A non-matching correctness
+	 * fix would compare fabs(delta.i), fabs(delta.j), and fabs(delta.k)
+	 * directly against 1.0f.
+	 */
+	if ((real)abs((long)delta.i) > 1.0f ||
+		(real)abs((long)delta.j) > 1.0f ||
+		(real)abs((long)delta.k) > 1.0f)
+	{
+		short x;
+
+		for (x = 0; x < definition->width; x++)
+		{
+			for (y = 0; y < definition->height; y++)
+			{
+				struct flag_vertex_datum *vertex = flag_datum_get_vertex(flag, definition, x, y);
+
+				vertex->position.x += delta.i;
+				vertex->position.y += delta.j;
+				vertex->position.z += delta.k;
+			}
+		}
+	}
+
+	flag->first_attachment = *attachment_points;
+
+	return;
+}
+
 /* ---------- private code */
 
 struct flag_vertex_datum *flag_datum_get_vertex(
@@ -296,6 +496,87 @@ struct flag_cell_datum *flag_datum_get_cell(
 		y>=0 && y<definition->height-1);
 
 	return &flag->cells[x * (definition->height - 1) + y];
+}
+
+void flag_tesselate_region(
+	struct flag_definition *definition,
+	struct flag_datum_prefix *flag,
+	short x,
+	short y,
+	short size,
+	short tesselation)
+{
+	short i;
+	short j;
+
+	for (i = x; i < x + size; i++)
+	{
+		for (j = y; j < y + size; j++)
+		{
+			struct flag_cell_datum *cell;
+			short horizontal;
+			short vertical;
+
+			if (i < 0 || j < 0 ||
+				i >= definition->width - 1 ||
+				j >= definition->height - 1)
+			{
+				continue;
+			}
+
+			horizontal = (tesselation == _tesselate_top_right || tesselation == _tesselate_bottom_right) ?
+				i - x : size - i + x - 1;
+			vertical = (tesselation == _tesselate_top_right || tesselation == _tesselate_top_left) ?
+				j - y : size - j + y - 1;
+
+			cell = flag_datum_get_cell(flag, definition, i, j);
+			if (horizontal == vertical)
+				cell->tesselation = tesselation;
+			else
+				cell->tesselation = horizontal <= vertical ? _tesselate_none : _tesselate_both;
+		}
+	}
+
+	return;
+}
+
+void flag_set_attachment_shape(
+	struct flag_definition *definition,
+	struct flag_datum_prefix *flag)
+{
+	short point_index;
+	short y = 0;
+
+	if (definition->attached_edge_shape == _attached_edge_shape_flat)
+		return;
+
+	for (point_index = 0;
+		point_index < definition->attachment_points.count;
+		point_index++)
+	{
+		struct flag_attachment_point *point;
+		short span;
+		short half_span;
+
+		if (y >= definition->height)
+			break;
+
+		point = TAG_BLOCK_GET_ELEMENT(
+			&definition->attachment_points,
+			point_index,
+			struct flag_attachment_point);
+		span = PIN(point->height_to_next_attachment, 0, definition->height - y) & ~1;
+		half_span = span >> 1;
+
+		flag_tesselate_region(
+			definition, flag, 0, y, half_span, _tesselate_top_right);
+		flag_tesselate_region(
+			definition, flag, 0, y + half_span, half_span, _tesselate_bottom_right);
+
+		y += span;
+	}
+
+	return;
 }
 
 void flag_set_trailing_shape(
