@@ -41,7 +41,7 @@ symbols in this file:
 00043220 0090:
 	_ai_scripting_place (0000)
 000432B0 0060:
-	_code_000432b0 (0000)
+	_ai_scripting_kill_internal (0000)
 00043310 0060:
 	_ai_scripting_kill (0000)
 00043370 0060:
@@ -71,7 +71,7 @@ symbols in this file:
 00043920 00a0:
 	_ai_scripting_timer_expire (0000)
 000439C0 02d0:
-	_code_000439c0 (0000)
+	_ai_scripting_count_internal (0000)
 00043C90 0020:
 	_ai_scripting_swarm_count (0000)
 00043CB0 0020:
@@ -111,7 +111,7 @@ symbols in this file:
 00044E50 0050:
 	_ai_scripting_allegiance_broken (0000)
 00044EA0 0050:
-	_code_00044ea0 (0000)
+	_ai_scripting_vehicle_candidate_qsort (0000)
 00044EF0 0060:
 	_ai_scripting_going_to_vehicle (0000)
 00044F50 00a0:
@@ -227,7 +227,7 @@ symbols in this file:
 00047150 0010:
 	_ai_scripting_retreat (0000)
 00047160 0150:
-	_code_00047160 (0000)
+	_ai_scripting_go_to_vehicle_internal (0000)
 000472B0 0080:
 	_ai_scripting_go_to_vehicle (0000)
 00047330 0080:
@@ -446,26 +446,21 @@ symbols in this file:
 
 #include "cseries.h"
 #include "ai/actions.h"
-#include "ai/actor_definitions.h"
 #include "ai/actor_iterators.h"
 #include "ai/actor_looking.h"
+#include "ai/actors.h"
 #include "ai/ai_communication.h"
 #include "ai/ai_debug.h"
 #include "ai/ai_scenario_definitions.h"
 #include "ai/encounters.h"
 #include "ai/ai_script.h"
-#include "ai/props.h"
 #include "cseries/errors.h"
-#include "game/game.h"
 #include "game/game_allegiance.h"
-#include "game/players.h"
 #include "hs/hs.h"
 #include "hs/object_lists.h"
 #include "memory/data.h"
-#include "objects/objects.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
-#include "tag_files/tag_files.h"
 #include "units/units.h"
 #include "units/vehicle_scripting.h"
 
@@ -479,6 +474,14 @@ enum
 	NUMBER_OF_AI_COUNT_TYPES,
 };
 
+enum ai_reference_type
+{
+	_ai_reference_type_encounter = 0,
+	_ai_reference_type_platoon,
+	_ai_reference_type_squad,
+	NUMBER_OF_AI_REFERENCE_TYPES,
+};
+
 /* encounter_datum.follow_target_type (encounters.h does not yet declare these) */
 enum
 {
@@ -487,49 +490,6 @@ enum
 	_follow_target_unit,
 	_follow_target_ai,
 	NUMBER_OF_FOLLOW_TARGET_TYPES,
-};
-
-/* actor_external_orders.desired_target_type (actors.h does not yet declare these) */
-enum
-{
-	_desired_target_none = 0,
-	_desired_target_ai,
-	_desired_target_player,
-	NUMBER_OF_DESIRED_TARGET_TYPES,
-};
-
-/* ai unit effect types (ai.h does not yet declare these; actors.c carries the same list) */
-enum
-{
-	_ai_unit_effect_bump = 0,
-	_ai_unit_effect_shooting,
-	_ai_unit_effect_death_scream,
-	_ai_unit_effect_magic_sight,
-	NUMBER_OF_AI_UNIT_EFFECTS,
-};
-
-/* actor default states, in the order of global_ai_default_state_names (actions.c only
-declares the count) */
-enum
-{
-	_actor_default_state_none = 0,
-	_actor_default_state_sleep,
-	_actor_default_state_alert,
-	_actor_default_state_move_repeat,
-	_actor_default_state_move_loop,
-	_actor_default_state_move_loop_back_and_forth,
-	_actor_default_state_move_loop_random,
-	_actor_default_state_move_random,
-	_actor_default_state_guard,
-	_actor_default_state_guard_at_position,
-	_actor_default_state_search,
-	_actor_default_state_flee,
-	NUMBER_OF_ACTOR_DEFAULT_STATES,
-};
-
-enum
-{
-	MAXIMUM_ACTIVATION_LINK_INDICES_PER_ENCOUNTER = 3,
 };
 
 /* ---------- macros */
@@ -542,42 +502,6 @@ struct ai_script_globals_prefix
 	boolean ai_initialized_for_map;
 };
 
-/* private to encounters.c in this tree; ai_script.c embeds one at the tail of its
-actor reference iterator (ai_script.h flattens it into three longs) */
-struct encounter_actor_iterator
-{
-	long encounter_index;
-	long actor_index;
-	long next_actor_index;
-};
-
-struct ai_script_squad_iterator
-{
-	long encounter_index;
-	long platoon_index;
-	long squad_index;
-	long current_squad_index;
-	long last_squad_index;
-};
-
-/* element of squad_definition.starting_locations; ai_scenario_definitions.h leaves the
-first 0x18 bytes unnamed.  position at 0 and facing at 0xc are proven by the teleport
-helper (object_set_position / vector3d_from_angle call sites). */
-struct ai_script_actor_starting_location
-{
-	real_point3d position;
-	real facing;
-	short cluster_index;
-	char sequence_id;
-	byte flags;
-	short default_state;
-	short initial_state;
-	short actor_variant_index;
-	short command_list_index;
-};
-
-typedef char ai_script_actor_starting_location_size_assert[
-	sizeof(struct ai_script_actor_starting_location) == 0x1C ? 1 : -1];
 typedef char ai_script_squad_iterator_size_assert[
 	sizeof(struct ai_script_squad_iterator) == 0x14 ? 1 : -1];
 
@@ -633,8 +557,6 @@ typedef char ai_script_vehicle_candidate_state_offset_assert[
 void ai_debug_select_actor(
 	long encounter_index,
 	long actor_index);
-void ai_scripting_maneuver(
-	long ai_index);
 boolean ai_conversation(
 	short conversation_index,
 	boolean scripted);
@@ -645,122 +567,18 @@ void actor_kill(
 	long actor_index,
 	boolean silent,
 	boolean delayed);
-void ai_erase(
-	long encounter_index,
-	long platoon_index,
-	long squad_index,
-	boolean immediate);
-void encounter_create(
-	long encounter_index,
-	short platoon_index,
-	short squad_index);
-boolean encounter_spawn_actor(
-	long encounter_index,
-	short squad_index);
-boolean game_team_is_ally(
-	short our_team_index,
-	short other_team_index);
-boolean game_team_is_enemy(
-	short our_team_index,
-	short other_team_index);
-void game_allegiance_create(
-	short team1_index,
-	boolean team1_suspicious,
-	short team2_index,
-	boolean team2_suspicious,
-	short incident_threshold,
-	short incident_decay_time,
-	boolean requires_communication);
-void actor_braindead(
-	long actor_index,
-	boolean braindead);
-void actor_set_team(
-	long actor_index,
-	short team_index);
-void ai_update_team_status(
-	void);
-void encounter_squad_timer_expire(
-	long encounter_index,
-	short squad_index);
-void action_obey_advance_command_list(
-	long actor_index);
-boolean action_obey_command_list_setup(
-	long actor_index,
-	short command_list_index,
-	struct obey_state_data *state_data);
-void actor_action_change(
-	long actor_index,
-	long new_action_type,
-	struct action_state_data *new_action_data);
-boolean actor_action_set_default_state(
-	long actor_index,
-	short override_state);
-short actor_action_class(
-	long actor_index);
-void encounter_detach_actor(
-	long actor_index,
-	boolean died);
-void encounterless_attach_actor(
-	long actor_index);
-void encounters_update_dirty_status(
-	void);
-boolean encounter_link_activation(
-	long encounter_index,
-	short link_encounter_index);
-void encounter_force_activate(
-	long encounter_index);
-void actor_handle_unit_effect(
-	long actor_index,
-	long prop_index,
-	short effect_type);
-short encounter_get_actor_starting_location(
-	long encounter_index,
-	long squad_index,
-	boolean spawn);
-long biped_approximate_surface_index(
-	long biped_index,
-	real_point3d *surface_point);
-long actor_create_for_unit(
-	boolean swarm,
-	long unit_index,
-	long actor_variant_definition_index,
-	long encounter_index,
-	short squad_index,
-	boolean allow_addition_to_other_squads,
-	long disallow_actor_index,
-	boolean initially_braindead,
-	short initial_state,
-	short default_state,
-	short initial_command_list_index,
-	char noncombat_sequence_id);
-unsigned long *get_global_random_seed_address(
-	void);
-short seed_random_range(
-	unsigned long *seed,
-	short lower_bound,
-	short upper_bound);
-void ai_index_squad_iterator_new(
-	long ai_reference,
-	struct ai_script_squad_iterator *iterator);
-struct squad_datum *ai_index_squad_iterator_next(
-	struct ai_script_squad_iterator *iterator);
-static short ai_scripting_assess_status(
-	long actor_index);
-static void ai_scripting_teleport_starting_location_private(
-	long ai_reference,
-	boolean only_if_unsupported);
-static void code_000432b0(
+static void ai_scripting_kill_internal(
 	long ai_reference,
 	boolean silent);
-static long code_000439c0(
+static long ai_scripting_count_internal(
 	long ai_reference,
 	short count_type,
 	long *original_count_reference,
 	real *strength_reference);
-static int code_00044ea0(
+static int ai_scripting_vehicle_candidate_qsort(
 	void const *candidate0,
 	void const *candidate1);
-static void code_00047160(
+static void ai_scripting_go_to_vehicle_internal(
 	long ai_reference,
 	long unit_index,
 	char const *seat_substring_name,
@@ -796,6 +614,281 @@ void ai_script_dispose_from_old_map(
 	return;
 }
 
+void ai_index_to_string(
+	long ai_reference,
+	struct scenario *scenario,
+	char *buffer,
+	long buffer_size)
+{
+	if (ai_reference == NONE)
+	{
+		csstrncpy(buffer, "none", buffer_size);
+	}
+	else
+	{
+		struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+			&scenario->ai_encounters,
+			ai_reference & UNSIGNED_SHORT_MAX,
+			struct encounter_definition);
+
+		switch ((unsigned long)ai_reference >> 30)
+		{
+		case _ai_reference_type_encounter:
+			_snprintf(buffer, buffer_size, "%s", encounter_definition->name);
+			break;
+		case _ai_reference_type_platoon:
+			_snprintf(
+				buffer,
+				buffer_size,
+				"%s/%s",
+				encounter_definition->name,
+				TAG_BLOCK_GET_ELEMENT(
+					&encounter_definition->platoons,
+					(ai_reference >> 16) & UNSIGNED_CHAR_MAX,
+					struct platoon_definition)->name);
+			break;
+		case _ai_reference_type_squad:
+			_snprintf(
+				buffer,
+				buffer_size,
+				"%s/%s",
+				encounter_definition->name,
+				TAG_BLOCK_GET_ELEMENT(
+					&encounter_definition->squads,
+					(ai_reference >> 16) & UNSIGNED_CHAR_MAX,
+					struct squad_definition)->name);
+			break;
+		default:
+			csstrncpy(buffer, "<error>", buffer_size);
+			break;
+		}
+	}
+
+	return;
+}
+
+void ai_index_squad_iterator_new(
+	long ai_reference,
+	struct ai_script_squad_iterator *iterator)
+{
+	struct scenario *scenario = global_scenario_try_and_get();
+
+	match_assert("c:\\halo\\SOURCE\\ai\\ai_script.c", 282, iterator);
+
+	iterator->encounter_index = ai_reference & UNSIGNED_SHORT_MAX;
+
+	if (scenario &&
+		ai_globals->ai_initialized_for_map &&
+		VALID_INDEX(iterator->encounter_index, scenario->ai_encounters.count))
+	{
+		struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->ai_encounters,
+			iterator->encounter_index & UNSIGNED_SHORT_MAX,
+			struct encounter_definition);
+
+		switch ((unsigned long)ai_reference >> 30)
+		{
+		case _ai_reference_type_encounter:
+		case _ai_reference_type_platoon:
+			iterator->squad_index = NONE;
+			iterator->next_squad_index = 0;
+			iterator->last_squad_index = encounter_definition->squads.count - 1;
+			if (((unsigned long)ai_reference >> 30) == _ai_reference_type_encounter)
+				iterator->required_platoon_index = NONE;
+			else
+				iterator->required_platoon_index = (ai_reference >> 16) & UNSIGNED_CHAR_MAX;
+			break;
+		case _ai_reference_type_squad:
+		{
+			short squad_index = (ai_reference >> 16) & UNSIGNED_CHAR_MAX;
+
+			if (VALID_INDEX(squad_index, encounter_definition->squads.count))
+			{
+				iterator->squad_index = NONE;
+				iterator->last_squad_index = squad_index;
+				iterator->next_squad_index = squad_index;
+				iterator->required_platoon_index = NONE;
+			}
+			else
+			{
+				iterator->encounter_index = NONE;
+			}
+			break;
+		}
+		default:
+			iterator->encounter_index = NONE;
+			break;
+		}
+	}
+	else
+	{
+		iterator->encounter_index = NONE;
+	}
+
+	return;
+}
+
+struct squad_datum *ai_index_squad_iterator_next(
+	struct ai_script_squad_iterator *iterator)
+{
+	struct squad_datum *squad = NULL;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\ai_script.c", 351, iterator);
+
+	if (iterator->encounter_index != NONE)
+	{
+		struct encounter_datum *encounter = encounter_get(iterator->encounter_index);
+		struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->ai_encounters,
+			iterator->encounter_index & UNSIGNED_SHORT_MAX,
+			struct encounter_definition);
+
+		while (iterator->next_squad_index <= iterator->last_squad_index)
+		{
+			struct squad_definition *squad_definition;
+
+			iterator->squad_index = iterator->next_squad_index;
+			iterator->next_squad_index++;
+			squad_definition = TAG_BLOCK_GET_ELEMENT(
+				&encounter_definition->squads,
+				iterator->squad_index,
+				struct squad_definition);
+
+			if (iterator->required_platoon_index == NONE ||
+				squad_definition->platoon_index == iterator->required_platoon_index)
+			{
+				squad = encounter_get_squad(encounter, iterator->squad_index);
+				break;
+			}
+		}
+	}
+
+	return squad;
+}
+
+void ai_index_platoon_iterator_new(
+	long ai_reference,
+	struct ai_script_platoon_iterator *iterator)
+{
+	struct scenario *scenario = global_scenario_try_and_get();
+
+	match_assert("c:\\halo\\SOURCE\\ai\\ai_script.c", 191, iterator);
+
+	iterator->encounter_index = ai_reference & UNSIGNED_SHORT_MAX;
+
+	if (scenario &&
+		ai_globals->ai_initialized_for_map &&
+		VALID_INDEX(iterator->encounter_index, scenario->ai_encounters.count))
+	{
+		struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->ai_encounters,
+			iterator->encounter_index & UNSIGNED_SHORT_MAX,
+			struct encounter_definition);
+
+		switch ((unsigned long)ai_reference >> 30)
+		{
+		case _ai_reference_type_encounter:
+			iterator->platoon_index = 0;
+			iterator->last_platoon_index = encounter_definition->platoons.count - 1;
+			break;
+		case _ai_reference_type_platoon:
+		case _ai_reference_type_squad:
+			if (((unsigned long)ai_reference >> 30) == _ai_reference_type_squad)
+			{
+				long squad_index = (ai_reference >> 16) & UNSIGNED_CHAR_MAX;
+
+				if (VALID_INDEX(squad_index, encounter_definition->squads.count))
+				{
+					iterator->platoon_index = TAG_BLOCK_GET_ELEMENT(
+						&encounter_definition->squads,
+						squad_index,
+						struct squad_definition)->platoon_index;
+				}
+				else
+				{
+					iterator->platoon_index = NONE;
+				}
+			}
+			else
+			{
+				iterator->platoon_index = (ai_reference >> 16) & UNSIGNED_CHAR_MAX;
+			}
+
+			if (VALID_INDEX(iterator->platoon_index, encounter_definition->platoons.count))
+				iterator->last_platoon_index = iterator->platoon_index;
+			else
+				iterator->encounter_index = NONE;
+			break;
+		default:
+			iterator->encounter_index = NONE;
+			break;
+		}
+	}
+	else
+	{
+		iterator->encounter_index = NONE;
+	}
+
+	return;
+}
+
+struct platoon_datum *ai_index_platoon_iterator_next(
+	struct ai_script_platoon_iterator *iterator)
+{
+	struct platoon_datum *platoon = NULL;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\ai_script.c", 265, iterator);
+
+	if (iterator->encounter_index != NONE &&
+		iterator->platoon_index <= iterator->last_platoon_index)
+	{
+		platoon = encounter_get_platoon(
+			encounter_get(iterator->encounter_index),
+			iterator->platoon_index);
+		iterator->platoon_index++;
+	}
+
+	return platoon;
+}
+
+long object_list_from_ai_reference(
+	long ai_reference)
+{
+	long object_list_index = NONE;
+
+	if (ai_reference != NONE)
+	{
+		object_list_index = object_list_new();
+		if (object_list_index != NONE)
+		{
+			struct ai_script_actor_reference_iterator iterator;
+			struct actor_datum *actor;
+
+			ai_index_actor_iterator_new(ai_reference, &iterator);
+			for (actor = ai_index_actor_iterator_next(&iterator);
+				actor;
+				actor = ai_index_actor_iterator_next(&iterator))
+			{
+				long swarm_unit_index;
+
+				if (actor->meta.unit_index != NONE)
+					object_list_add(object_list_index, actor->meta.unit_index);
+
+				for (swarm_unit_index = actor->meta.swarm_unit_index;
+					swarm_unit_index != NONE;)
+				{
+					struct unit_datum *unit = unit_get(swarm_unit_index);
+
+					object_list_add(object_list_index, swarm_unit_index);
+					swarm_unit_index = unit->unit.swarm_next_unit_index;
+				}
+			}
+		}
+	}
+
+	return object_list_index;
+}
+
 void ai_scripting_reconnect(
 	void)
 {
@@ -818,6 +911,438 @@ void ai_scripting_retreat(
 	long ai_reference)
 {
 	ai_scripting_maneuver(ai_reference);
+
+	return;
+}
+
+void ai_scripting_maneuver(
+	long ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_maneuver %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	if (ai_reference != NONE)
+	{
+		struct ai_script_platoon_iterator iterator;
+		struct platoon_datum *platoon;
+
+		ai_index_platoon_iterator_new(ai_reference, &iterator);
+		for (platoon = ai_index_platoon_iterator_next(&iterator);
+			platoon;
+			platoon = ai_index_platoon_iterator_next(&iterator))
+		{
+			platoon->maneuvering = TRUE;
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_attack(
+	long ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_attack %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	if (ai_reference != NONE)
+	{
+		struct ai_script_platoon_iterator iterator;
+		struct platoon_datum *platoon;
+
+		ai_index_platoon_iterator_new(ai_reference, &iterator);
+		for (platoon = ai_index_platoon_iterator_next(&iterator);
+			platoon;
+			platoon = ai_index_platoon_iterator_next(&iterator))
+		{
+			platoon->defending = FALSE;
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_defend(
+	long ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_defend %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	if (ai_reference != NONE)
+	{
+		struct ai_script_platoon_iterator iterator;
+		struct platoon_datum *platoon;
+
+		ai_index_platoon_iterator_new(ai_reference, &iterator);
+		for (platoon = ai_index_platoon_iterator_next(&iterator);
+			platoon;
+			platoon = ai_index_platoon_iterator_next(&iterator))
+		{
+			platoon->defending = TRUE;
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_maneuver_enable(
+	long ai_reference,
+	boolean enable)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_maneuver_enable %s %s", hs_runtime_get_executing_thread_name(), ai_name, enable ? "on" : "off");
+	}
+
+	if (ai_reference != NONE)
+	{
+		struct ai_script_platoon_iterator iterator;
+		struct platoon_datum *platoon;
+
+		ai_index_platoon_iterator_new(ai_reference, &iterator);
+		for (platoon = ai_index_platoon_iterator_next(&iterator);
+			platoon;
+			platoon = ai_index_platoon_iterator_next(&iterator))
+		{
+			platoon->maneuver_disable = !enable;
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_berserk(
+	long ai_reference,
+	boolean berserk)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_berserk %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	if (ai_reference != NONE)
+	{
+		struct ai_script_actor_reference_iterator iterator;
+		struct actor_datum *actor;
+
+		ai_index_actor_iterator_new(ai_reference, &iterator);
+		for (actor = ai_index_actor_iterator_next(&iterator);
+			actor;
+			actor = ai_index_actor_iterator_next(&iterator))
+		{
+			actor_berserk(iterator.actor_index, berserk);
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_playfight(
+	long ai_reference,
+	boolean playfight)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[512];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_playfight %s %s", hs_runtime_get_executing_thread_name(), ai_name, playfight ? "on" : "off");
+	}
+
+	if (ai_reference != NONE)
+		encounter_get(ai_reference & UNSIGNED_SHORT_MAX)->playfighting = playfight;
+
+	return;
+}
+
+void ai_scripting_braindead(
+	long ai_reference,
+	boolean braindead)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_braindead %s %s", hs_runtime_get_executing_thread_name(), ai_name, braindead ? "on" : "off");
+	}
+
+	if (ai_reference != NONE)
+	{
+		struct ai_script_actor_reference_iterator iterator;
+		struct actor_datum *actor;
+
+		ai_index_actor_iterator_new(ai_reference, &iterator);
+		for (actor = ai_index_actor_iterator_next(&iterator);
+			actor;
+			actor = ai_index_actor_iterator_next(&iterator))
+		{
+			actor_braindead(iterator.actor_index, braindead);
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_allow_charge(
+	long ai_reference,
+	boolean allow)
+{
+	struct ai_script_actor_reference_iterator iterator;
+	struct actor_datum *actor;
+
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_allow_charge %s %s", hs_runtime_get_executing_thread_name(), ai_name, allow ? "true" : "false");
+	}
+
+	ai_index_actor_iterator_new(ai_reference, &iterator);
+	for (actor = ai_index_actor_iterator_next(&iterator);
+		actor;
+		actor = ai_index_actor_iterator_next(&iterator))
+	{
+		actor->external_orders.disable_charging = !allow;
+	}
+
+	return;
+}
+
+void ai_scripting_allow_dormant(
+	long ai_reference,
+	boolean allow)
+{
+	struct ai_script_squad_iterator iterator;
+	struct squad_datum *squad;
+
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_allow_dormant %s %s", hs_runtime_get_executing_thread_name(), ai_name, allow ? "true" : "false");
+	}
+
+	ai_index_squad_iterator_new(ai_reference, &iterator);
+	for (squad = ai_index_squad_iterator_next(&iterator);
+		squad;
+		squad = ai_index_squad_iterator_next(&iterator))
+	{
+		squad->disable_dormant = !allow;
+	}
+
+	return;
+}
+
+void ai_scripting_timer_start(
+	long ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_timer_start %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	if (ai_reference != NONE)
+	{
+		struct ai_script_squad_iterator iterator;
+		struct squad_datum *squad;
+
+		ai_index_squad_iterator_new(ai_reference, &iterator);
+		for (squad = ai_index_squad_iterator_next(&iterator);
+			squad;
+			squad = ai_index_squad_iterator_next(&iterator))
+		{
+			squad->delay_timer_started = TRUE;
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_timer_expire(
+	long ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_timer_expire %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	if (ai_reference != NONE)
+	{
+		struct ai_script_squad_iterator iterator;
+		struct squad_datum *squad;
+
+		ai_index_squad_iterator_new(ai_reference, &iterator);
+		for (squad = ai_index_squad_iterator_next(&iterator);
+			squad;
+			squad = ai_index_squad_iterator_next(&iterator))
+		{
+			encounter_squad_timer_expire(iterator.encounter_index, iterator.squad_index);
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_follow_target_disable(
+	long ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[512];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_follow_target_disable %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	if (ai_reference != NONE)
+		encounter_get(ai_reference & UNSIGNED_SHORT_MAX)->follow_target_type = _follow_target_none;
+
+	return;
+}
+
+void ai_scripting_automatic_migration_target(
+	long ai_reference,
+	boolean automatic)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[512];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_automatic_migration_target %s %s", hs_runtime_get_executing_thread_name(), ai_name, automatic ? "on" : "off");
+	}
+
+	if (ai_reference != NONE)
+	{
+		struct ai_script_squad_iterator iterator;
+		struct squad_datum *squad;
+
+		ai_index_squad_iterator_new(ai_reference, &iterator);
+		for (squad = ai_index_squad_iterator_next(&iterator);
+			squad;
+			squad = ai_index_squad_iterator_next(&iterator))
+		{
+			squad->automatic_migration_target = automatic;
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_follow_target_players(
+	long ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[512];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_follow_target_players %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	if (ai_reference != NONE)
+		encounter_get(ai_reference & UNSIGNED_SHORT_MAX)->follow_target_type = _follow_target_players;
+
+	return;
+}
+
+void ai_scripting_follow_distance(
+	long ai_reference,
+	real distance)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[512];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_follow_distance %s %.1f", hs_runtime_get_executing_thread_name(), ai_name, distance);
+	}
+
+	if (ai_reference != NONE)
+		encounter_get(ai_reference & UNSIGNED_SHORT_MAX)->follow_target_distance = distance;
+
+	return;
+}
+
+void ai_scripting_follow_target_unit(
+	long ai_reference,
+	long unit_index)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[512];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_follow_target_unit %s <some unit>", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	if (ai_reference != NONE)
+	{
+		struct encounter_datum *encounter = encounter_get(ai_reference & UNSIGNED_SHORT_MAX);
+
+		if (unit_index == NONE)
+		{
+			encounter->follow_target_type = _follow_target_none;
+		}
+		else
+		{
+			encounter->follow_target_type = _follow_target_unit;
+			encounter->follow_target_unit_index = unit_index;
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_force_active(
+	long ai_reference,
+	boolean force)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[512];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_force_active %s %s", hs_runtime_get_executing_thread_name(), ai_name, force ? "true" : "false");
+	}
+
+	if (ai_globals->ai_initialized_for_map && ai_reference != NONE)
+	{
+		long encounter_index = ai_reference & UNSIGNED_SHORT_MAX;
+		struct scenario *scenario = global_scenario_get();
+
+		if (VALID_INDEX(encounter_index, scenario->ai_encounters.count))
+			encounter_get(encounter_index)->force_active = force;
+	}
 
 	return;
 }
@@ -1058,7 +1583,7 @@ void ai_scripting_kill(
 			ai_name);
 	}
 
-	code_000432b0(ai_reference, FALSE);
+	ai_scripting_kill_internal(ai_reference, FALSE);
 
 	return;
 }
@@ -1081,7 +1606,7 @@ void ai_scripting_kill_silent(
 			ai_name);
 	}
 
-	code_000432b0(ai_reference, TRUE);
+	ai_scripting_kill_internal(ai_reference, TRUE);
 
 	return;
 }
@@ -1089,19 +1614,19 @@ void ai_scripting_kill_silent(
 short ai_scripting_swarm_count(
 	long ai_reference)
 {
-	return code_000439c0(ai_reference, _ai_count_swarm, NULL, NULL);
+	return ai_scripting_count_internal(ai_reference, _ai_count_swarm, NULL, NULL);
 }
 
 short ai_scripting_nonswarm_count(
 	long ai_reference)
 {
-	return code_000439c0(ai_reference, _ai_count_nonswarm, NULL, NULL);
+	return ai_scripting_count_internal(ai_reference, _ai_count_nonswarm, NULL, NULL);
 }
 
 short ai_scripting_living_count(
 	long ai_reference)
 {
-	return code_000439c0(ai_reference, _ai_count_living, NULL, NULL);
+	return ai_scripting_count_internal(ai_reference, _ai_count_living, NULL, NULL);
 }
 
 real ai_scripting_living_fraction(
@@ -1109,7 +1634,7 @@ real ai_scripting_living_fraction(
 {
 	real result = 0.0f;
 	long original_count;
-	long count = code_000439c0(
+	long count = ai_scripting_count_internal(
 		ai_reference,
 		_ai_count_living,
 		&original_count,
@@ -1125,7 +1650,7 @@ real ai_scripting_strength(
 	long ai_reference)
 {
 	real strength = 0.0f;
-	code_000439c0(ai_reference, _ai_count_living, NULL, &strength);
+	ai_scripting_count_internal(ai_reference, _ai_count_living, NULL, &strength);
 	return strength;
 }
 
@@ -1336,7 +1861,7 @@ void ai_scripting_go_to_vehicle(
 			seat_substring_name);
 	}
 
-	code_00047160(ai_reference, unit_index, seat_substring_name, FALSE);
+	ai_scripting_go_to_vehicle_internal(ai_reference, unit_index, seat_substring_name, FALSE);
 
 	return;
 }
@@ -1363,14 +1888,14 @@ void ai_scripting_go_to_vehicle_override(
 			seat_substring_name);
 	}
 
-	code_00047160(ai_reference, unit_index, seat_substring_name, TRUE);
+	ai_scripting_go_to_vehicle_internal(ai_reference, unit_index, seat_substring_name, TRUE);
 
 	return;
 }
 
 /* ---------- private code */
 
-static int code_00044ea0(
+static int ai_scripting_vehicle_candidate_qsort(
 	void const *candidate0,
 	void const *candidate1)
 {
@@ -1389,7 +1914,7 @@ static int code_00044ea0(
 	return 0;
 }
 
-static void code_00047160(
+static void ai_scripting_go_to_vehicle_internal(
 	long ai_reference,
 	long unit_index,
 	char const *seat_substring_name,
@@ -1445,7 +1970,7 @@ static void code_00047160(
 		actor = ai_index_actor_iterator_next(&iterator);
 	}
 
-	qsort(candidates, candidate_count, sizeof(candidates[0]), code_00044ea0);
+	qsort(candidates, candidate_count, sizeof(candidates[0]), ai_scripting_vehicle_candidate_qsort);
 
 	for (candidate_index = 0; candidate_index < candidate_count; candidate_index++)
 	{
@@ -1467,7 +1992,7 @@ static void code_00047160(
 	return;
 }
 
-static void code_000432b0(
+static void ai_scripting_kill_internal(
 	long ai_reference,
 	boolean silent)
 {
@@ -1483,7 +2008,7 @@ static void code_000432b0(
 	return;
 }
 
-static long code_000439c0(
+static long ai_scripting_count_internal(
 	long ai_reference,
 	short count_type,
 	long *original_count_reference,

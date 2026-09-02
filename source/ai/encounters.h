@@ -254,7 +254,7 @@ __inline struct platoon_datum *encounter_get_platoon(
 	match_assert("c:\\halo\\source\\ai\\encounters.h", 234, platoon_index>=0 && platoon_index<MAXIMUM_PLATOONS_PER_ENCOUNTER && platoon_index<encounter->platoon_count);
 
 	platoon_absolute_index = platoon_index + encounter->platoon_base;
-	match_assert("c:\\halo\\source\\ai\\encounters.h", 237, platoon_absolute_index>=0 && platoon_absolute_index<MAXIMUM_SQUADS_PER_MAP);
+	match_assert("c:\\halo\\source\\ai\\encounters.h", 237, platoon_absolute_index>=0 && platoon_absolute_index<MAXIMUM_PLATOONS_PER_MAP);
 
 	return &platoon_array[platoon_absolute_index];
 }
