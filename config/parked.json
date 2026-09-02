@@ -914,25 +914,6 @@
       }
     },
     {
-      "unit": "source/bitmaps/bitmap_utilities",
-      "function": "_bitmap_2d_uncompress_from_mipmap",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked under the current house rule after retaining the correct DXT3 alpha4 block type and DecodeBlockAlpha4 owner-header prototype. HCEA commit 570c83fd9c365dad6f2a3e7041705d5b84c7847c corroborates the 2D decompression topology and semantic private name. Target and candidate have the same 880-byte padded envelope, 297 aligned instructions, and all 49 relocation identities. The only normalized difference is the order of two independent final-loop reloads at +0x33A/+0x33D: January reloads the cached height into EDI before source_mipmap_index into EBX, while VC7 emits the reverse order. A bounded diagnostic confirmed that the donor's erroneous DXT3 alpha3 cast/sizeof spelling does not control this tie; it was rejected in favor of the canonical alpha4 definition. No wrong type, volatile access, barrier, fake dependency, assembly, undefined behavior, or exact-only control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler scheduling donor.",
-      "measurements": {
-        "target": {
-          "size": 880,
-          "relocation_count": 49,
-          "normalized_sha256": "4f4b53aed0db63a496b4c239249e9adaaa70adee056f6e6bc6118dc30dc2b4ab"
-        },
-        "base": {
-          "size": 880,
-          "relocation_count": 49,
-          "normalized_sha256": "0d0264895ee68a288dde6eb4dcbd425500971c01ba59158e1fe21ea4f05b456c"
-        },
-        "objdiff_percent": 99.922264
-      }
-    },
-    {
       "unit": "source/render/render_particles",
       "function": "_render_particles",
       "class": "register-allocation",

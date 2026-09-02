@@ -16,9 +16,15 @@ header included in hcex build.
 
 /* ---------- prototypes/HUD_MESSAGING.C */
 
+void hud_messaging_initialize(
+	void);
+void hud_messaging_initialize_for_new_map(
+	void);
 void hud_messaging_dispose_from_old_map(
 	void);
 void hud_messaging_dispose(
+	void);
+void hud_messaging_globals_update(
 	void);
 void scripted_hud_set_flashing_state(
 	boolean flash);
@@ -31,6 +37,11 @@ void scripted_hud_messages_clear(
 void hud_print_message(
 	short local_player_index,
 	wchar_t const *message);
+void hud_add_item_message(
+	short local_player_index,
+	long item_definition_index,
+	short quantity,
+	char message_offset);
 
 /* ---------- globals */
 

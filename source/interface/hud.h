@@ -16,10 +16,28 @@ header included in hcex build.
 
 /* ---------- prototypes/HUD.C */
 
+void hud_initialize_for_new_map(
+	void);
+void hud_initialize_nav_points(
+	void);
+void hud_initialize_nav_points_for_new_map(
+	void);
+void hud_dispose_nav_points_from_old_map(
+	void);
+void hud_dispose_nav_points(
+	void);
+void hud_update_nav_points(
+	void);
+
+wchar_t const *hud_get_item_string(
+	long string_index);
+
 void hud_load(
 	boolean load);
 void hud_autosave(
 	boolean active);
+void hud_draw_players(
+	void);
 
 void hud_picked_up_powerup(
 	short local_player_index,

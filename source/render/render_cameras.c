@@ -130,20 +130,13 @@ symbols in this file:
 
 #include "cseries.h"
 #include "render/render_cameras.h"
+#include "render/render_camera_projection.h"
 
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
-
-/* ---------- prototypes */
-
-boolean render_camera_view_to_screen(
-	const struct render_camera *camera,
-	const struct render_frustum *frustum,
-	const real_point3d *view_point,
-	real_point2d *screen_point);
 
 /* ---------- globals */
 

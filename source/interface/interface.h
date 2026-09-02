@@ -35,9 +35,20 @@ enum
 
 /* ---------- structures */
 
+struct bitmap_data;
+union point2d;
+union real_rectangle2d;
+
 /* ---------- prototypes/INTERFACE.C */
 
 long interface_get_tag_index(short interface_tag_index);
+void interface_draw_bitmap(
+	struct bitmap_data const *bitmap,
+	union point2d const *point,
+	union real_rectangle2d const *clip,
+	real scale,
+	real theta,
+	real fade);
 
 /* ---------- globals */
 
