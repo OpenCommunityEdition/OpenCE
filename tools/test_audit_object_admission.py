@@ -1,3 +1,6 @@
+from pathlib import Path
+import subprocess
+import sys
 import unittest
 
 from tools.audit_object_admission import classify_units
@@ -17,6 +20,22 @@ def _unit(name, complete, total_functions, matched_functions, total_data, matche
 
 
 class ObjectAdmissionAuditTests(unittest.TestCase):
+    def test_direct_script_entrypoint_imports_repository_tools(self):
+        repository_root = Path(__file__).resolve().parents[1]
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(repository_root / "tools" / "audit_object_admission.py"),
+                "--help",
+            ],
+            cwd=repository_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_lists_unmarked_zero_gap_unit_without_admitting_it(self):
         raw = {"units": [_unit("source/a", False, 2, 1, 8, 8)]}
         strict = {"units": [_unit("source/a", False, 2, 2, 8, 8)]}

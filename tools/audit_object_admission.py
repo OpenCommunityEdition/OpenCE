@@ -13,7 +13,11 @@ proved before changing config.json.
 import argparse
 import copy
 import json
+import sys
 from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tools.object_admission_policy import load_rejection_index
 from tools.semantic_progress import (
