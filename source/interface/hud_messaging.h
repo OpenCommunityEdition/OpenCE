@@ -30,6 +30,8 @@ void hud_messaging_globals_update(
 	void);
 void scripted_hud_set_flashing_state(
 	boolean flash);
+void scripted_hud_set_objective(
+	short message_index);
 void scripted_hud_set_timer_position(
 	short x,
 	short y,

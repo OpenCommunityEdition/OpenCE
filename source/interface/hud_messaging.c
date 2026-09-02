@@ -168,7 +168,14 @@ struct hud_state_message_definition
 	long unused28[6];
 };
 
-struct hud_state_message_element_definition
+enum
+{
+	_hud_message_type_text,
+	_hud_message_type_icon,
+	NUMBER_OF_HUD_MESSAGE_TYPES
+};
+
+struct hud_state_message_element
 {
 	byte type;
 	byte data;
@@ -448,6 +455,47 @@ void scripted_hud_restart_flashing(
 		error(
 			_error_silent,
 			"trying to restart help text flashing when flashing is disabled");
+
+	return;
+}
+
+void scripted_hud_set_objective(
+	short message_index)
+{
+	struct scenario *scenario = global_scenario_get();
+
+	if (scenario->hud_messages.index != NONE)
+	{
+		struct hud_message_text_definition *hud_messages =
+			HUD_MESSAGE_TEXT_DEFINITION_GET(scenario->hud_messages.index);
+		struct hud_state_message_definition *message = TAG_BLOCK_GET_ELEMENT(
+			&hud_messages->messages,
+			message_index,
+			struct hud_state_message_definition);
+		struct hud_state_message_element *element = TAG_BLOCK_GET_ELEMENT(
+			&hud_messages->elements,
+			message->element_start_index,
+			struct hud_state_message_element);
+
+		if (message->element_count == 1 && element->type == _hud_message_type_text)
+		{
+			struct hud_globals_definition *hud = hud_globals;
+			struct hud_messaging_globals_definition *globals = hud_messaging_globals;
+			short up_ticks;
+			short fade_ticks;
+
+			globals->objective.message = message;
+			up_ticks = hud->messaging.objective_color.custom.objective.up_ticks;
+			fade_ticks = hud->messaging.objective_color.custom.objective.fade_ticks;
+			globals->objective.uptime = fade_ticks + up_ticks;
+		}
+		else
+		{
+			error(
+				_error_silent,
+				"objective text MUST only be text, no icons");
+		}
+	}
 
 	return;
 }

@@ -2,6 +2,25 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/interface/hud_messaging",
+      "function": "_scripted_hud_set_objective",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the ordinary typed setter from the January instruction/relocation topology, the independent HCEA Xbox behavior, the Stian PC lift, and Aerocatia/demon's named HUD-message definitions. The retained function resolves the scenario HUD-message tag through HUD_MESSAGE_TEXT_DEFINITION_GET, obtains both records through TAG_BLOCK_GET_ELEMENT, requires exactly one _hud_message_type_text element, installs the objective, sums the authenticated up_ticks/fade_ticks scalar locals, and emits January's silent error for an invalid icon-bearing objective. Target and candidate share the 160-byte padded envelope and all eight relocation identities; objdiff reports 96.8 percent similarity. The only residual is address materialization for the adjacent timing fields: January loads fade_ticks through [hud_globals+0x11e], then advances the same base by 0x100 before adding up_ticks at +0x1c, while VC7 lowers the natural typed scalar source as two full-displacement reads at +0x11e/+0x11c. A coherent objective_color subobject pointer moved the base adjustment before the objective store and shrank the function to 144 padded bytes, so it was rejected. The fail-closed classifier returns UNKNOWN, hence the honest unclassified label rather than an invented compiler recipe. No one-use mixed alias, raw offset, volatile/register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the asymmetric subobject-base lifetime.",
+      "measurements": {
+        "target": {
+          "size": 160,
+          "relocation_count": 8,
+          "normalized_sha256": "a83e487b78b95cb689279b7de9dfe2a3078ce9e67c5809282fdd7a6b3ebc6a54"
+        },
+        "base": {
+          "size": 160,
+          "relocation_count": 8,
+          "normalized_sha256": "c3e1fe857ff8074266e9c69b797a29e79f3bc99d6a09fdee025d4d8bd20d9d6e"
+        },
+        "objdiff_percent": 96.8
+      }
+    },
+    {
       "unit": "source/cseries/debug_memory",
       "function": "_debug_realloc",
       "class": "register-allocation",
