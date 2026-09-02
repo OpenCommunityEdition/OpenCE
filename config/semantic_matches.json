@@ -508,5 +508,10 @@
     "unit": "source/game/game_engine_ctf",
     "function": "_ctf_engine_display_score",
     "reason": "hardened COFF comparison proves all 928 padded bytes and all 78 semantic relocations exact (SHA-256 df4518d31867315a05039fdcf8679ba2476011eeb70122ac00c6b6efef13f148); objdiff reports a switch-table/local-label ownership false negative"
+  },
+  {
+    "unit": "source/game/game_engine_oddball",
+    "function": "_oddball_engine_display_score",
+    "reason": "hardened COFF comparison proves all 736 padded bytes and all 56 semantic relocations exact (SHA-256 6ad4051ea66ca25449fb855b7cb0076efef3e056e80fa1a6566d7dc5fc2a2e38); objdiff reports pooled-string COMDAT ownership as a false negative"
   }
 ]

@@ -359,5 +359,15 @@
       "relocation_count": 28,
       "normalized_sha256": "45c41730d038fd3f985f7ccfd8a7e04aa02e2db549ac941386e7cd04c1e1d8c1"
     }
+  },
+  {
+    "unit": "source/game/game_engine_oddball",
+    "symbol": "_oddball_engine",
+    "reason": "the complete rebuilt object owns the exact Oddball callback table; csplit names the oddball string relocation as an undefined image symbol while MSVC emits the identically named select-any string COMDAT locally, and the hardened comparator proves all normalized bytes plus every relocation address, type, destination, and addend",
+    "measurements": {
+      "size": 136,
+      "relocation_count": 27,
+      "normalized_sha256": "ffe1ef0aa827017276299f3a497655019d91f94374129c31634061500e5ae4b9"
+    }
   }
 ]
