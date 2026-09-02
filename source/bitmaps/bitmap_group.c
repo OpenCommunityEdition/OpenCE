@@ -573,11 +573,15 @@ short bitmap_group_add_bitmap(
 				match_assert(
 					"c:\\halo\\SOURCE\\bitmaps\\bitmap_group.c",
 					0x352,
-					(byte*)bitmap->base_address>=(byte*)group->pixel_data.address);
+					(byte *)bitmap->base_address >=
+						(byte *)group->pixel_data.address);
 				match_assert(
 					"c:\\halo\\SOURCE\\bitmaps\\bitmap_group.c",
 					0x354,
-					(byte*)bitmap->base_address + bitmap_get_pixel_data_size(bitmap) <= (byte*)group->pixel_data.address + group->pixel_data.size);
+					(byte *)bitmap->base_address +
+						bitmap_get_pixel_data_size(bitmap) <=
+						(byte *)group->pixel_data.address +
+						group->pixel_data.size);
 
 				if (previous_bitmap)
 				{
@@ -587,7 +591,7 @@ short bitmap_group_add_bitmap(
 					match_assert(
 						"c:\\halo\\SOURCE\\bitmaps\\bitmap_group.c",
 						0x35B,
-						space_between>=0);
+						space_between >= 0);
 					if (space_between != 0)
 					{
 						error(
