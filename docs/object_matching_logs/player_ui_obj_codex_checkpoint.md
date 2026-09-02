@@ -274,3 +274,61 @@ configuration. Rename it only when an authenticated live caller has been
 reconstructed and naturally causes the private out-of-line copy to be emitted.
 The restored object remains 34 exact / 0 residual / 8 unwritten, including the
 16-byte leaf itself.
+
+## Player-zero control-profile live cluster (2026-09-02)
+
+This follow-up reconstructs the complete January live-call cluster rooted at
+`player0_look_invert_pitch`. The January symbol atlas authenticates
+`000D0530` as `hud_message_to_all` and `000D05F0` as
+`set_local_player_controls_from_player_profile`; the accompanying type and
+linkage evidence records both helpers as translation-unit private. The CEA
+sources independently corroborate their behavior, the controller-settings
+layout, the ten-entry pitch/yaw tables, all five button presets, and the
+controller-to-local-player fallback. January disassembly, relocations, and
+the existing public consumers remain the authority for the Xbox source shape.
+
+The target relocation census is decisive for the private call graph.
+`hud_message_to_all` is called by `player0_look_invert_pitch` at `+0x41`.
+`set_local_player_controls_from_player_profile` has exactly two public callers:
+`player_ui_set_active_player_profile` at `+0x5C` and
+`player0_look_invert_pitch` at `+0x5E`. There is no call from the adjacent
+`000D0810` frontier function. Reconstructing both real callers lets VC7 derive
+January's private `DI` argument convention naturally; no ABI annotation,
+external-linkage escape, synthetic anchor, forced inline, assembly, or
+compiler-control construct is present.
+
+All four recovered functions are strict exact:
+
+| Function | Meaningful / padded | Relocations | Normalized SHA-256 |
+| --- | ---: | ---: | --- |
+| `_hud_message_to_all` | 77 / 80 | 5 | `fa4e53147db1e478326d486725a987d2dff309df28c1f2fd26e43cb06fb38693` |
+| `_set_local_player_controls_from_player_profile` | 528 / 528 | 14 | `ff47c65c6eda0c31b625817bb914f77ad790244d2be44109e484d10664685ee5` |
+| `_player_ui_set_active_player_profile` | 100 / 112 | 8 | `7f67d7f26f397dec8e062f653e63f086ddc638f4aa61cd443fb46b5e2637aec1` |
+| `_player0_look_invert_pitch` | 101 / 112 | 11 | `8ab5c9eadcf9771057b2868e873b8b4c50125c73bb1dc9fb544b8c6f9ae47621` |
+
+The strict gain is four functions, 806 meaningful bytes, 832 padded bytes,
+and 38 relocations. The object moves from 34 exact / 0 residual / 8 unwritten
+to 38 exact / 0 residual / 4 unwritten; all 34 baseline exact functions remain
+exact. The recovered helper uses semantic `real`, profile-controller members,
+input button constants, and authenticated preset enums. Its negative-first
+look-sensitivity saturation tree reproduces January exactly and remains
+ordinary, sensible C across the full input range. An alignment-aware Capstone
+diff was used while the helper was residual; the retained build has no
+remaining residual instruction region.
+
+`input_abstraction.h` now owns the 24-byte `game_input_preferences` structure
+and both public preference API declarations, while `input_abstraction.c`
+retains the same definition only through that owner. Its only two current
+consumers gate clean: `input_abstraction.obj` remains 6 exact / 0 residual / 4
+unwritten and `player_ui.obj` has the result above. The public
+`player0_look_invert_pitch` declaration is now owned by `player_ui.h`, and the
+stale private declaration was removed from `hs.c`. The exact 64-byte
+`player0_look_invert_pitch_evaluate` consumer is unchanged instruction for
+instruction.
+
+The complete header blast-radius remains stable:
+`ui_widget_event_handler_functions.obj` is 100/100 exact, `player_rumble.obj`
+is 12/12 exact, `players.obj` remains 54 exact / 15 residual / 1 unwritten,
+and `hs.obj` remains 445 exact / 3 residual. `ninja all_source` compiles the
+complete source graph, the focused fake-match scan reports zero review leads,
+`git diff --check` passes, and the tool suite passes 258/258 tests.

@@ -103,6 +103,8 @@ boolean player_ui_edit_profile_name_is_dirty(
 	void);
 boolean player_ui_prompt_user_to_rename_edit_profile(
 	void);
+void player0_look_invert_pitch(
+	boolean invert);
 
 /* ---------- globals */
 

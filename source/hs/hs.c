@@ -3821,8 +3821,6 @@ void rasterizer_screen_effect_start(
 	boolean clear);
 void rasterizer_set_near_clip_distance(
 	real distance);
-void player0_look_invert_pitch(
-	boolean invert);
 void ui_widget_debug_show_path(
 	boolean show);
 void display_scenario_help(

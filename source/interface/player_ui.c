@@ -144,12 +144,18 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "game/game.h"
 #include "game/game_engine.h"
+#include "game/players.h"
 #include "text/unicode.h"
+#include "text/text_group.h"
 #include "input/input.h"
+#include "input/input_abstraction.h"
+#include "interface/hud_messaging.h"
+#include "memory/data.h"
 #include "networking/network_game_globals.h"
 #include "interface/ui_widget.h"
 #include "interface/virtual_keyboard.h"
 #include "main/main.h"
+#include "tag_files/tag_groups.h"
 #include "player_ui.h"
 
 /* ---------- constants */
@@ -160,20 +166,30 @@ enum
 	PLAYER_UI_DISPOSE_SIZE = 0x230,
 	SAVED_GAME_FILE_TYPE_PLAYER_PROFILE = 0,
 	SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE = 1,
-	NUMBER_OF_SAVED_GAME_FILE_TYPES = 2
+	NUMBER_OF_SAVED_GAME_FILE_TYPES = 2,
+
+	_button_preset_standard = 0,
+	_button_preset_southpaw,
+	_button_preset_jumpy,
+	_button_preset_bumperjumper,
+	_button_preset_boxer,
+	NUMBER_OF_BUTTON_PRESETS,
+
+	_joystick_preset_standard = 0,
+	_joystick_preset_south_paw,
+	_joystick_preset_legacy,
+	_joystick_preset_legacy_south_paw,
+	NUMBER_OF_JOYSTICK_PRESETS,
+
+	NUMBER_OF_LOOK_SENSITIVITY_SETTINGS = 10
 };
 
 /* ---------- macros */
 
 /* ---------- structures */
 
-struct player_profile
+struct player_profile_controller_settings
 {
-	wchar_t name[12];
-	short primary_color_index;
-	word flags;
-	byte solo_levels[10];
-	short last_single_player_level;
 	byte button_preset;
 	byte joystick_preset;
 	byte look_sensitivity;
@@ -182,6 +198,16 @@ struct player_profile
 	boolean flight_stick_aircraft_controls;
 	boolean autocenter;
 	boolean ingame_help_disabled;
+};
+
+struct player_profile
+{
+	wchar_t name[12];
+	short primary_color_index;
+	word flags;
+	byte solo_levels[10];
+	short last_single_player_level;
+	struct player_profile_controller_settings controller_settings;
 };
 
 struct player_ui_local_player
@@ -283,8 +309,8 @@ void player_ui_initialize(
 		match_vassert("c:\\halo\\SOURCE\\interface\\player_ui.c", 0x369, profile, "profile");
 		csmemset(profile, 0, sizeof(*profile));
 		profile->primary_color_index = NONE;
-		profile->button_preset = 0;
-		profile->joystick_preset = 0;
+		profile->controller_settings.button_preset = _button_preset_standard;
+		profile->controller_settings.joystick_preset = _joystick_preset_standard;
 		player_ui_globals.local_players[(short)local_player_index].active_profile_index = NONE;
 		player_ui_globals.single_player_controller[(short)local_player_index] = NONE;
 	}
@@ -306,8 +332,8 @@ void player_ui_clear_multiplayer_joins(
 		match_vassert("c:\\halo\\SOURCE\\interface\\player_ui.c", 0x369, profile, "profile");
 		csmemset(profile, 0, sizeof(*profile));
 		profile->primary_color_index = NONE;
-		profile->button_preset = 0;
-		profile->joystick_preset = 0;
+		profile->controller_settings.button_preset = _button_preset_standard;
+		profile->controller_settings.joystick_preset = _joystick_preset_standard;
 		player_ui_globals.single_player_controller[(short)local_player_index] = NONE;
 		player_ui_globals.local_players[(short)local_player_index].active_profile_index = NONE;
 		*joined = FALSE;
@@ -408,14 +434,14 @@ struct playlist_profile *player_ui_get_edit_playlist_profile(
 boolean player0_look_pitch_is_inverted(
 	void)
 {
-	return player_ui_globals.local_players[0].profile.invert_look;
+	return player_ui_globals.local_players[0].profile.controller_settings.invert_look;
 }
 
 boolean player0_joystick_set_is_normal(
 	void)
 {
-	return player_ui_globals.local_players[0].profile.joystick_preset == 0 ||
-		player_ui_globals.local_players[0].profile.joystick_preset == 1;
+	return player_ui_globals.local_players[0].profile.controller_settings.joystick_preset == _joystick_preset_standard ||
+		player_ui_globals.local_players[0].profile.controller_settings.joystick_preset == _joystick_preset_south_paw;
 }
 
 void player_ui_end_editing_profile(
@@ -478,7 +504,7 @@ boolean player_ui_rumble_disabled(
 
 	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 305, (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
 
-	return player_ui_globals.local_players[local_player_index].profile.vibration_disabled;
+	return player_ui_globals.local_players[local_player_index].profile.controller_settings.vibration_disabled;
 }
 
 boolean player_ui_get_path_to_local_player_profile_directory(
@@ -723,7 +749,7 @@ boolean player_ui_autolevel_enabled(
 
 	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 340, (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
 
-	return player_ui_globals.local_players[local_player_index].profile.autocenter;
+	return player_ui_globals.local_players[local_player_index].profile.controller_settings.autocenter;
 }
 
 boolean player_ui_edit_profile_name_is_dirty(
@@ -811,6 +837,223 @@ boolean player_ui_prompt_user_to_rename_edit_profile(
 }
 
 /* ---------- private code */
+
+static void hud_message_to_all(
+	wchar_t const *message)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+	{
+		short local_player_index = player->local_player_index;
+
+		if (local_player_index != NONE)
+			hud_print_message(local_player_index, message);
+	}
+
+	return;
+}
+
+static void set_local_player_controls_from_player_profile(
+	short local_player_index)
+{
+	struct game_input_preferences preferences = { 0 };
+	real pitch_rate_table[NUMBER_OF_LOOK_SENSITIVITY_SETTINGS] =
+	{
+		40.0f, 50.0f, 60.0f, 70.0f, 80.0f,
+		90.0f, 100.0f, 110.0f, 120.0f, 130.0f
+	};
+	real yaw_rate_table[NUMBER_OF_LOOK_SENSITIVITY_SETTINGS] =
+	{
+		80.0f, 100.0f, 120.0f, 140.0f, 160.0f,
+		180.0f, 200.0f, 220.0f, 240.0f, 260.0f
+	};
+	struct player_profile_controller_settings *controls;
+	long look_sensitivity;
+	long yaw_index;
+	short pitch_index;
+	short controller_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\player_ui.c",
+		0x396,
+		(local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
+
+	controls = &player_ui_globals.local_players[local_player_index].profile.controller_settings;
+	look_sensitivity = controls->look_sensitivity;
+	yaw_index = look_sensitivity - 1;
+	if (look_sensitivity - 1 < 0)
+	{
+		pitch_index = 0;
+	}
+	else
+	{
+		if (yaw_index > NUMBER_OF_LOOK_SENSITIVITY_SETTINGS - 1)
+			pitch_index = NUMBER_OF_LOOK_SENSITIVITY_SETTINGS - 1;
+		else
+			pitch_index = (short)yaw_index;
+	}
+
+	if (yaw_index < 0)
+	{
+		yaw_index = 0;
+	}
+	else
+	{
+		if (yaw_index > NUMBER_OF_LOOK_SENSITIVITY_SETTINGS - 1)
+			yaw_index = NUMBER_OF_LOOK_SENSITIVITY_SETTINGS - 1;
+	}
+
+	preferences.pitch_rate = pitch_rate_table[pitch_index];
+	preferences.yaw_rate = yaw_rate_table[(short)yaw_index];
+	preferences.joystick_controls = controls->joystick_preset > _joystick_preset_legacy_south_paw ?
+		_joystick_preset_legacy_south_paw : controls->joystick_preset;
+
+	switch (controls->button_preset)
+	{
+		case _button_preset_standard:
+			preferences.game_control_to_xbox_buttons[0] = _gamepad_analog_button_a;
+			preferences.game_control_to_xbox_buttons[1] = _gamepad_analog_button_black;
+			preferences.game_control_to_xbox_buttons[2] = _gamepad_analog_button_x;
+			preferences.game_control_to_xbox_buttons[3] = _gamepad_analog_button_y;
+			preferences.game_control_to_xbox_buttons[4] = _gamepad_analog_button_b;
+			preferences.game_control_to_xbox_buttons[5] = _gamepad_analog_button_white;
+			preferences.game_control_to_xbox_buttons[6] = _gamepad_analog_button_left_trigger;
+			preferences.game_control_to_xbox_buttons[7] = _gamepad_analog_button_right_trigger;
+			preferences.game_control_to_xbox_buttons[8] = _gamepad_binary_button_start;
+			preferences.game_control_to_xbox_buttons[9] = _gamepad_binary_button_back;
+			preferences.game_control_to_xbox_buttons[10] = _gamepad_binary_button_left_thumb;
+			preferences.game_control_to_xbox_buttons[11] = _gamepad_binary_button_right_thumb;
+			break;
+
+		case _button_preset_southpaw:
+			preferences.game_control_to_xbox_buttons[0] = _gamepad_analog_button_a;
+			preferences.game_control_to_xbox_buttons[1] = _gamepad_analog_button_black;
+			preferences.game_control_to_xbox_buttons[2] = _gamepad_analog_button_x;
+			preferences.game_control_to_xbox_buttons[3] = _gamepad_analog_button_y;
+			preferences.game_control_to_xbox_buttons[4] = _gamepad_analog_button_b;
+			preferences.game_control_to_xbox_buttons[5] = _gamepad_analog_button_white;
+			preferences.game_control_to_xbox_buttons[6] = _gamepad_analog_button_right_trigger;
+			preferences.game_control_to_xbox_buttons[7] = _gamepad_analog_button_left_trigger;
+			preferences.game_control_to_xbox_buttons[8] = _gamepad_binary_button_start;
+			preferences.game_control_to_xbox_buttons[9] = _gamepad_binary_button_back;
+			preferences.game_control_to_xbox_buttons[10] = _gamepad_binary_button_left_thumb;
+			preferences.game_control_to_xbox_buttons[11] = _gamepad_binary_button_right_thumb;
+			break;
+
+		case _button_preset_jumpy:
+			preferences.game_control_to_xbox_buttons[0] = _gamepad_analog_button_left_trigger;
+			preferences.game_control_to_xbox_buttons[1] = _gamepad_analog_button_black;
+			preferences.game_control_to_xbox_buttons[2] = _gamepad_analog_button_x;
+			preferences.game_control_to_xbox_buttons[3] = _gamepad_analog_button_y;
+			preferences.game_control_to_xbox_buttons[4] = _gamepad_analog_button_b;
+			preferences.game_control_to_xbox_buttons[5] = _gamepad_analog_button_white;
+			preferences.game_control_to_xbox_buttons[6] = _gamepad_analog_button_a;
+			preferences.game_control_to_xbox_buttons[7] = _gamepad_analog_button_right_trigger;
+			preferences.game_control_to_xbox_buttons[8] = _gamepad_binary_button_start;
+			preferences.game_control_to_xbox_buttons[9] = _gamepad_binary_button_back;
+			preferences.game_control_to_xbox_buttons[10] = _gamepad_binary_button_left_thumb;
+			preferences.game_control_to_xbox_buttons[11] = _gamepad_binary_button_right_thumb;
+			break;
+
+		case _button_preset_bumperjumper:
+			preferences.game_control_to_xbox_buttons[0] = _gamepad_analog_button_a;
+			preferences.game_control_to_xbox_buttons[1] = _gamepad_analog_button_black;
+			preferences.game_control_to_xbox_buttons[2] = _gamepad_analog_button_x;
+			preferences.game_control_to_xbox_buttons[3] = _gamepad_analog_button_y;
+			preferences.game_control_to_xbox_buttons[4] = _gamepad_analog_button_left_trigger;
+			preferences.game_control_to_xbox_buttons[5] = _gamepad_analog_button_white;
+			preferences.game_control_to_xbox_buttons[6] = _gamepad_analog_button_b;
+			preferences.game_control_to_xbox_buttons[7] = _gamepad_analog_button_right_trigger;
+			preferences.game_control_to_xbox_buttons[8] = _gamepad_binary_button_start;
+			preferences.game_control_to_xbox_buttons[9] = _gamepad_binary_button_back;
+			preferences.game_control_to_xbox_buttons[10] = _gamepad_binary_button_left_thumb;
+			preferences.game_control_to_xbox_buttons[11] = _gamepad_binary_button_right_thumb;
+			break;
+
+		case _button_preset_boxer:
+			preferences.game_control_to_xbox_buttons[0] = _gamepad_analog_button_a;
+			preferences.game_control_to_xbox_buttons[1] = _gamepad_analog_button_black;
+			preferences.game_control_to_xbox_buttons[2] = _gamepad_analog_button_x;
+			preferences.game_control_to_xbox_buttons[3] = _gamepad_analog_button_y;
+			preferences.game_control_to_xbox_buttons[4] = _gamepad_binary_button_right_thumb;
+			preferences.game_control_to_xbox_buttons[5] = _gamepad_analog_button_white;
+			preferences.game_control_to_xbox_buttons[6] = _gamepad_analog_button_left_trigger;
+			preferences.game_control_to_xbox_buttons[7] = _gamepad_analog_button_right_trigger;
+			preferences.game_control_to_xbox_buttons[8] = _gamepad_binary_button_start;
+			preferences.game_control_to_xbox_buttons[9] = _gamepad_binary_button_back;
+			preferences.game_control_to_xbox_buttons[10] = _gamepad_binary_button_left_thumb;
+			preferences.game_control_to_xbox_buttons[11] = _gamepad_analog_button_b;
+			break;
+	}
+
+	preferences.invert_look = controls->invert_look;
+	preferences.invert_look_aircraft_control = controls->flight_stick_aircraft_controls;
+	controller_index = player_ui_globals.single_player_controller[local_player_index];
+	if (controller_index != NONE)
+	{
+		input_abstraction_update_local_player_preferences(
+			controller_index,
+			&preferences);
+	}
+	else
+	{
+		input_abstraction_update_local_player_preferences(
+			local_player_index,
+			&preferences);
+	}
+
+	return;
+}
+
+void player_ui_set_active_player_profile(
+	short local_player_index,
+	long profile_index,
+	struct player_profile *profile)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\player_ui.c",
+		0xE2,
+		(local_player_index>=0) &&
+		(local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS) &&
+		(profile != NULL));
+
+	player_ui_globals.local_players[local_player_index].active_profile_index = profile_index;
+	csmemcpy(
+		&player_ui_globals.local_players[local_player_index].profile,
+		profile,
+		sizeof(*profile));
+	set_local_player_controls_from_player_profile(local_player_index);
+	return;
+}
+
+void player0_look_invert_pitch(
+	boolean invert)
+{
+	long string_list_index;
+	wchar_t const *message;
+
+	player_ui_globals.local_players[0].profile.controller_settings.invert_look = invert;
+	if (player_ui_globals.local_players[0].active_profile_index != NONE)
+	{
+		string_list_index = tag_loaded(
+			UNICODE_STRING_LIST_TAG,
+			"ui\\shell\\strings\\temp_strings");
+		if (string_list_index != NONE)
+			message = unicode_string_list_get_string(string_list_index, 1);
+		else
+			message = L"";
+		hud_message_to_all(message);
+		player_profile_save(
+			player_ui_globals.local_players[0].active_profile_index,
+			&player_ui_globals.local_players[0].profile);
+	}
+
+	set_local_player_controls_from_player_profile(0);
+	return;
+}
 
 void code_000d0800(
 	void)

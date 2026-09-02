@@ -56,6 +56,7 @@ symbols in this file:
 #include "bink/bink_playback.h"
 #include "cseries/errors.h"
 #include "input/input.h"
+#include "input/input_abstraction.h"
 #include "math/real_math.h"
 
 /* ---------- constants */
@@ -63,16 +64,6 @@ symbols in this file:
 /* ---------- macros */
 
 /* ---------- structures */
-
-struct game_input_preferences
-{
-	real yaw_rate;
-	real pitch_rate;
-	byte game_control_to_xbox_buttons[12];
-	short joystick_controls;
-	boolean invert_look;
-	boolean invert_look_aircraft_control;
-};
 
 struct game_input_state
 {
@@ -93,8 +84,6 @@ struct input_abstraction_runtime_globals
 	unsigned long time_of_first_device_insertion;
 };
 
-typedef char verify_game_input_preferences_size[
-	sizeof(struct game_input_preferences) == 0x18 ? 1 : -1];
 typedef char verify_game_input_state_size[
 	sizeof(struct game_input_state) == 0x1C ? 1 : -1];
 typedef char verify_input_abstraction_input_states_offset[
