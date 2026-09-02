@@ -28,7 +28,7 @@ enum
 
 struct bitmap_data
 {
-	unsigned long bitmap_class;
+	unsigned long signature;
 	short width;
 	short height;
 	unsigned short depth;
@@ -39,7 +39,7 @@ struct bitmap_data
 	short registration_point_y;
 	unsigned short mipmap_count;
 	unsigned short pixel_data;
-	unsigned long pixel_data_offset;
+	unsigned long pixels_offset;
 	unsigned long pixel_data_size;
 	unsigned long bitmap_tag_index;
 	void *bitmap_data_pointer;
@@ -61,7 +61,7 @@ struct bitmap_group
 	unsigned short color_plate_width;
 	unsigned short color_plate_height;
 	struct tag_data compressed_color_plate_data;
-	struct tag_data processed_pixel_data;
+	struct tag_data pixel_data;
 	real blur_filter_size;
 	real alpha_bias;
 	unsigned short mipmap_count;

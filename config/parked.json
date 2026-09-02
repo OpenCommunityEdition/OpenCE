@@ -1602,6 +1602,25 @@
         },
         "objdiff_percent": 99.976746
       }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_group",
+      "function": "_bitmap_group_add_bitmap",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after restoring the complete typed bitmap insertion routine from January disassembly, relocation topology, assertion and diagnostic strings, the later HCEA semantic implementation, and the independent PC machine-code lift. The retained ordinary C builds the 48-byte bitmap descriptor through semantic fields, validates interface, power-of-two, cube-map, compressed, and palettized cases, grows the bitmap block and pixel blob, repoints every existing bitmap through TAG_BLOCK_GET_ELEMENT, verifies the relocated ranges, preserves the original tight-packing warning, copies the new descriptor, and zero-fills its pixels. Its five sibling functions remain strict exact. January is 995 meaningful bytes in a 1008-byte padded envelope; the candidate is 989 meaningful bytes in a 992-byte envelope, preserves the 0x34 frame and all 59 semantically corresponding relocations, and reports 60.99099 percent similarity. The first divergence is VC7's allocation of the 16-bit type/depth/group-type lifetimes, followed by a different but equivalent diagnostic-block layout; the fail-closed classifier returns UNKNOWN. The earlier object ledger exhausted explicit-clear, flags-local, entry-live-range, return-type, declaration-order, signature-store, predicate, and branch-layout families, including a historical 1008/59 candidate that was still nonexact and whose source artifact was not retained. A fresh dangling-blob and worktree audit recovered only the later HCEA reconstruction, not that disposable source. Adding the public owner-header prototype was also rejected after a full verdict bisect proved that its header-position sensitivity regressed the exact bitmap_2d_uncompress_from_mipmap; the function definition remains its authoritative declaration until a consumer requires an owner-header API. No barrier, volatile or register forcing, pragma, assembly, fake dependency, raw offset, undefined behavior, codegen carrier, or nonsensical branch is retained. Reopen only for authoritative January source or local-variable records, recovery of the historical readable candidate, a strict same-topology donor, or a compatible VC7/QFE that naturally explains the register and cold-block schedule.",
+      "measurements": {
+        "target": {
+          "size": 1008,
+          "relocation_count": 59,
+          "normalized_sha256": "b5fee4632a47ed183bb1aec903552bd1b140a591e64d42625900c8b7bf8a7e69"
+        },
+        "base": {
+          "size": 992,
+          "relocation_count": 59,
+          "normalized_sha256": "2e0bbd84c45f240758cc76a2d4df8c78be689cfe9bc21af6a52e017f218e7ca0"
+        },
+        "objdiff_percent": 60.99099
+      }
     }
   ]
 }
