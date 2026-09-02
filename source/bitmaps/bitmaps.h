@@ -22,6 +22,9 @@ struct bitmap_data;
 
 /* ---------- prototypes/BITMAPS.C */
 
+void bitmap_delete(
+	struct bitmap_data *bitmap);
+
 boolean bitmap_verify(
 	struct bitmap_data *bitmap,
 	boolean repair);

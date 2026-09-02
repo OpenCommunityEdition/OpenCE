@@ -21,6 +21,7 @@ header included in hcex build.
 struct tag_block;
 struct tag_data;
 struct tag_reference;
+struct bitmap_data;
 
 struct tag_iterator
 {
@@ -96,6 +97,12 @@ boolean cache_files_precache_map_begin(
 	boolean copy_map);
 
 unsigned long tag_get_group_tag(long tag_index);
+
+/* ---------- prototypes/XBOX_TEXTURE_CACHE.C */
+
+void texture_cache_bitmap_new(
+	long bitmap_group_index,
+	struct bitmap_data *bitmap);
 
 /* ---------- globals */
 
