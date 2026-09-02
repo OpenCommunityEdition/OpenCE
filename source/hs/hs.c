@@ -3765,8 +3765,6 @@ short scripted_camera_time(
 	void);
 short global_structure_bsp_index_get(
 	void);
-short scripted_hud_get_timer_ticks(
-	void);
 short vehicle_scripting_load_magic(
 	long vehicle_index,
 	char const *seat_name,

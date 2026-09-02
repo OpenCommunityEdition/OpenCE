@@ -571,6 +571,30 @@ void scripted_hud_pause_timer(
 	return;
 }
 
+short scripted_hud_get_timer_ticks(
+	void)
+{
+	struct hud_timer_data_definition *timer = &hud_messaging_globals->timer;
+	boolean enabled = timer->enabled;
+	short result = 0;
+
+	if (enabled)
+	{
+		if (timer->ticks == NONE)
+			return NONE;
+		result = timer->ticks;
+
+		if (!timer->paused)
+		{
+			return (short)(
+				(word)(timer->ticks + (word)timer->reference_time) -
+				game_time_get());
+		}
+	}
+
+	return result;
+}
+
 void scripted_hud_time_code_show(
 	boolean show)
 {

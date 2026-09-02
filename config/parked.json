@@ -21,6 +21,25 @@
       }
     },
     {
+      "unit": "source/interface/hud_messaging",
+      "function": "_scripted_hud_get_timer_ticks",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the ordinary typed timer query from the January control-flow and relocation topology, HCEA's independent Xbox behavior, and the Stian January-PC lift. The retained function returns zero while the timer is hidden, NONE for the sentinel duration, the stored ticks while paused, and the 16-bit remaining-tick result while running. It uses the semantic hud_timer_data_definition owner and cseries word/short types; its owner declaration lives in interface/hud_messaging.h. Target and candidate share the 80-byte padded envelope, two relocation identities, and 97.5 percent objdiff similarity. Their meaningful streams differ only at the NONE return: January reloads the known sentinel as five-byte mov eax,-1, while VC7 naturally preserves the already-loaded short with three-byte or ax,ax. That two-byte materialization delta shifts the game_time_get relocation from +0x32 to +0x30; every subsequent meaningful instruction, including January's narrow sum and 32-bit subtraction schedule, is identical. Several bounded, source-authentic expression and local-total forms either reproduced this fixed point or worsened register allocation. The fail-closed classifier returns UNKNOWN, hence unclassified rather than an inferred recipe. No volatile/register forcing, barrier, pragma, assembly, raw offset, representation pun, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the full-width sentinel rematerialization.",
+      "measurements": {
+        "target": {
+          "size": 80,
+          "relocation_count": 2,
+          "normalized_sha256": "c28cd50e0150845564921ef4ab5bb445c5a9cb58ac319a84461460fa53686468"
+        },
+        "base": {
+          "size": 80,
+          "relocation_count": 2,
+          "normalized_sha256": "aaa93f528312a9d8cffdd2e9fed2f8b143dc031d73500550964b8eaeacd95350"
+        },
+        "objdiff_percent": 97.5
+      }
+    },
+    {
       "unit": "source/cseries/debug_memory",
       "function": "_debug_realloc",
       "class": "register-allocation",
