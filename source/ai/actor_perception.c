@@ -1175,17 +1175,6 @@ void actor_discard_firing_position(
 	short firing_position_index,
 	boolean temporary);
 
-void actor_stimulus_noticed_danger_zone(
-	long actor_index,
-	short danger_type,
-	short hostility,
-	long object_index,
-	real_point3d const *position);
-
-void actor_stimulus_prop_just_killed(
-	long actor_index,
-	long prop_index);
-
 void actor_stimulus_prop_sighted(
 	long actor_index,
 	long prop_index,

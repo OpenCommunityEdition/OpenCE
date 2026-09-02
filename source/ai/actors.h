@@ -1016,12 +1016,24 @@ boolean actor_perception_create_orphan_from_friend(
 	long unit_index,
 	long friend_actor_index,
 	long friend_prop_index);
+long actor_perception_find_killer_prop_index(
+	long actor_index,
+	long prop_index,
+	boolean enemies_only);
 void actor_perception_find_prop_pathfinding_location(
 	long actor_index,
 	long prop_index);
+boolean actor_emotion_flee_with_friends(
+	long actor_index,
+	real *desire_to_flee);
 
 /* ---------- prototypes/ACTOR_STIMULUS.C */
 
+void actor_stimulus_surprise(
+	long actor_index,
+	short surprise_level,
+	long prop_index,
+	real_vector3d const *surprise_vector);
 void actor_stimulus_enter_combat_found_body(
 	long actor_index,
 	long prop_index);
@@ -1029,6 +1041,25 @@ void actor_stimulus_enter_combat_perceived_enemy(
 	long actor_index,
 	long prop_index);
 void actor_stimulus_enter_combat_friend_in_combat(
+	long actor_index,
+	long prop_index);
+void actor_stimulus_noticed_danger_zone(
+	long actor_index,
+	short danger_type,
+	short danger_hostility,
+	long danger_object_index,
+	real_point3d const *position);
+void actor_stimulus_weapon_impact(
+	long actor_index,
+	long object_index,
+	real_point3d const *position,
+	short count);
+void actor_stimulus_damage(
+	long actor_index,
+	long prop_index,
+	real damage_fraction,
+	real_vector3d const *damage_velocity);
+void actor_stimulus_prop_just_killed(
 	long actor_index,
 	long prop_index);
 void actor_stimulus_abandon_stationary_facing(

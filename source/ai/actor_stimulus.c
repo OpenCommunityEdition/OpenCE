@@ -100,27 +100,58 @@ enum
 {
 	_actor_stimulus_combat_friend = 1,
 	_actor_stimulus_combat_body = 2,
+	_actor_stimulus_combat_impact = 3,
+	_actor_stimulus_combat_danger = 4,
+	_actor_stimulus_combat_damage = 5,
+	_actor_stimulus_combat_enemy = 6,
 };
 
 enum
 {
+	_actor_surprise_unprepared_weapon_impact_close = 2,
+	_actor_surprise_unprepared_grenade = 4,
+	_actor_surprise_unprepared_damage = 5,
+};
+
+enum
+{
+	_actor_panic_friend_same_type_killed = 3,
 	_actor_panic_platoon_retreating = 6,
+	_actor_panic_friend_leader_type_killed = 8,
+};
+
+enum
+{
+	_actor_definition_panic_in_groups_bit = 5,
+};
+
+enum
+{
+	_prop_facing_central = 2,
 };
 
 enum
 {
 	_ai_communication_sighted_enemy = 4,
 	_ai_communication_found_enemy = 5,
+	_ai_communication_grenade_startle = 10,
+	_ai_communication_grenade_sighted = 11,
 	_ai_communication_advance = 22,
 	_ai_communication_retreat = 23,
 };
 
 enum
 {
+	_communication_hostility_self = 1,
+	_communication_hostility_friend = 2,
 	_communication_hostility_enemy = 3,
 };
 
 /* ---------- macros */
+
+#define prop_acknowledged(prop) \
+	((prop)->state >= _prop_state_becoming_unacknowledged && \
+		(prop)->state <= _prop_state_acknowledged)
 
 /* ---------- structures */
 
@@ -237,6 +268,31 @@ static void actor_stimulus_combat(
 	return;
 }
 
+void actor_stimulus_surprise(
+	long actor_index,
+	short surprise_level,
+	long prop_index,
+	real_vector3d const *surprise_vector)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (surprise_level > actor->stimuli.surprise_level)
+	{
+		actor->stimuli.surprise_level = surprise_level;
+		actor->stimuli.surprise_prop_index = prop_index;
+		if (!surprise_vector)
+		{
+			actor->stimuli.surprise_has_vector = FALSE;
+			return;
+		}
+
+		actor->stimuli.surprise_has_vector = TRUE;
+		actor->stimuli.surprise_vector = *surprise_vector;
+	}
+
+	return;
+}
+
 void actor_stimulus_suspicion(
 	long actor_index,
 	short suspicion_combat_status,
@@ -284,6 +340,27 @@ void actor_stimulus_enter_combat_found_body(
 	return;
 }
 
+void actor_stimulus_enter_combat_perceived_enemy(
+	long actor_index,
+	long prop_index)
+{
+	struct prop_datum *prop = prop_get(prop_index);
+
+	actor_stimulus_combat(
+		actor_index,
+		_actor_stimulus_combat_enemy,
+		NULL,
+		NONE,
+		0.0f,
+		90,
+		&prop->actor_to_prop,
+		prop_index,
+		150,
+		FALSE);
+
+	return;
+}
+
 void actor_stimulus_enter_combat_friend_in_combat(
 	long actor_index,
 	long prop_index)
@@ -312,6 +389,313 @@ void actor_stimulus_enter_combat_friend_in_combat(
 				actor_index,
 				friend_actor->state.suspicion_combat_status,
 				450);
+		}
+	}
+
+	return;
+}
+
+void actor_stimulus_noticed_danger_zone(
+	long actor_index,
+	short danger_type,
+	short danger_hostility,
+	long danger_object_index,
+	real_point3d const *position)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition =
+		actor_definition_get(actor->meta.definition_index);
+	long unit_index = actor->meta.unit_index;
+	real_vector3d vector;
+	real distance;
+
+	if (unit_index == NONE)
+	{
+		return;
+	}
+
+	if (danger_type == _actor_danger_zone_projectile)
+	{
+		long communication_hostility = NONE;
+
+		switch (danger_hostility)
+		{
+		case _actor_danger_hostility_enemy:
+			communication_hostility = _communication_hostility_enemy;
+			break;
+		case _actor_danger_hostility_friend:
+			communication_hostility = _communication_hostility_friend;
+			break;
+		case _actor_danger_hostility_self:
+			communication_hostility = _communication_hostility_self;
+			break;
+		}
+
+		ai_communication_event(
+			_ai_communication_grenade_sighted,
+			unit_index,
+			NONE,
+			communication_hostility,
+			NONE,
+			NONE,
+			NULL);
+	}
+
+	distance = normalize3d(vector_from_points3d(
+		&actor->input.position.head_position,
+		position,
+		&vector));
+	if (actor->state.mode < _actor_mode_combat &&
+		distance < definition->panic.surprise_distance &&
+		danger_type == _actor_danger_zone_projectile)
+	{
+		actor_stimulus_surprise(
+			actor_index,
+			_actor_surprise_unprepared_grenade,
+			NONE,
+			&vector);
+	}
+
+	actor_stimulus_combat(
+		actor_index,
+		_actor_stimulus_combat_danger,
+		NULL,
+		NONE,
+		0.0f,
+		0,
+		&vector,
+		NONE,
+		0,
+		FALSE);
+
+	return;
+}
+
+void actor_stimulus_weapon_impact(
+	long actor_index,
+	long object_index,
+	real_point3d const *position,
+	short count)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition =
+		actor_definition_get(actor->meta.definition_index);
+
+	if (actor->danger_zone.danger_type > _actor_danger_zone_none &&
+		actor->danger_zone.object_index == object_index &&
+		actor->danger_zone.acknowledgement_timer > 0)
+	{
+		ai_communication_event(
+			_ai_communication_grenade_startle,
+			actor->meta.unit_index,
+			NONE,
+			NONE,
+			NONE,
+			NONE,
+			NULL);
+	}
+	else
+	{
+		real_vector3d surprise_vector;
+		real distance = normalize3d(vector_from_points3d(
+			&actor->input.position.head_position,
+			position,
+			&surprise_vector));
+
+		if (fabs(distance) < _real_epsilon)
+		{
+			surprise_vector = actor->input.facing_vector;
+		}
+
+		if (actor->state.mode < _actor_mode_combat &&
+			distance < definition->panic.surprise_distance)
+		{
+			actor_stimulus_surprise(
+				actor_index,
+				_actor_surprise_unprepared_weapon_impact_close,
+				NONE,
+				&surprise_vector);
+		}
+
+		actor_stimulus_combat(
+			actor_index,
+			_actor_stimulus_combat_impact,
+			NULL,
+			NONE,
+			0.0f,
+			90,
+			&surprise_vector,
+			NONE,
+			0,
+			FALSE);
+	}
+
+	{
+		struct direction_specification direction;
+
+		direction.type = _direction_specification_point;
+		direction.point = *position;
+		actor_look_secondary(
+			actor_index,
+			_secondary_look_weapon_impact,
+			_secondary_look_priority_default,
+			&direction);
+	}
+
+	return;
+}
+
+void actor_stimulus_damage(
+	long actor_index,
+	long prop_index,
+	real damage_fraction,
+	real_vector3d const *damage_velocity)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct prop_datum *prop = NULL;
+	real_vector3d const *surprise_vector = NULL;
+	boolean have_recoil_direction = FALSE;
+	real_vector3d recoil_direction;
+	struct direction_specification direction;
+
+	if (prop_index != NONE)
+	{
+		prop = prop_get(prop_index);
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\actor_stimulus.c",
+			0x154,
+			prop_acknowledged(prop));
+		surprise_vector = &prop->actor_to_prop;
+	}
+	else if (damage_velocity)
+	{
+		real magnitude_squared = magnitude_squared3d(damage_velocity);
+
+		if (magnitude_squared > 0.25f)
+		{
+			scale_vector3d(
+				damage_velocity,
+				-1.0f / square_root(magnitude_squared),
+				&recoil_direction);
+			surprise_vector = &recoil_direction;
+			have_recoil_direction = TRUE;
+		}
+	}
+
+	actor->stimuli.was_damaged = TRUE;
+	if ((!prop || prop->enemy) && actor->state.mode < _actor_mode_combat)
+	{
+		actor_stimulus_surprise(
+			actor_index,
+			_actor_surprise_unprepared_damage,
+			prop_index,
+			surprise_vector);
+		actor_stimulus_combat(
+			actor_index,
+			_actor_stimulus_combat_damage,
+			NULL,
+			NONE,
+			0.0f,
+			90,
+			surprise_vector,
+			prop_index,
+			150,
+			FALSE);
+	}
+
+	if (prop_index != NONE)
+	{
+		direction.type = _direction_specification_prop;
+		direction.prop_index = prop_index;
+	}
+	else if (have_recoil_direction)
+	{
+		direction.type = _direction_specification_vector;
+		direction.vector = recoil_direction;
+	}
+	else
+	{
+		return;
+	}
+
+	actor_look_secondary(
+		actor_index,
+		_secondary_look_damage,
+		_secondary_look_priority_default,
+		&direction);
+
+	return;
+}
+
+void actor_stimulus_prop_just_killed(
+	long actor_index,
+	long prop_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct prop_datum *prop = prop_get(prop_index);
+
+	actor->state.been_in_combat = TRUE;
+	if (!prop->enemy)
+	{
+		struct actor_definition *definition;
+		long killer_prop_index;
+
+		actor = actor_get(actor_index);
+		definition = actor_definition_get(actor->meta.definition_index);
+		killer_prop_index = actor_perception_find_killer_prop_index(
+			actor_index,
+			prop_index,
+			TRUE);
+
+		if (prop->type == definition->panic.panic_leader_type &&
+			actor->stimuli.panic_type < _actor_panic_friend_leader_type_killed &&
+			real_seed_random(get_global_random_seed_address()) <
+				definition->panic.panic_chance_leader_type_killed)
+		{
+			actor->stimuli.panic_type = _actor_panic_friend_leader_type_killed;
+			actor->stimuli.panic_prop_index = killer_prop_index;
+		}
+
+		if (prop->distance < 8.0f && killer_prop_index != NONE)
+		{
+			struct prop_datum *killer_prop = prop_get(killer_prop_index);
+
+			if (killer_prop->enemy)
+			{
+				if (killer_prop->visibility > 0 &&
+					killer_prop->quantized_facing <= _prop_facing_central)
+				{
+					real flee_chance =
+						definition->panic.panic_chance_friend_killed;
+
+					if ((TEST_FLAG(
+							definition->flags2,
+							_actor_definition_panic_in_groups_bit) &&
+						game_time_get() >
+							actor->emotions.flee_with_friends_disable_time &&
+						actor_emotion_flee_with_friends(
+							actor_index,
+							&flee_chance)) ||
+						real_seed_random(get_global_random_seed_address()) <
+							flee_chance)
+					{
+						if (actor->stimuli.panic_type <
+							_actor_panic_friend_same_type_killed)
+						{
+							actor->stimuli.panic_type =
+								_actor_panic_friend_same_type_killed;
+							actor->stimuli.panic_prop_index =
+								killer_prop_index;
+						}
+					}
+				}
+
+				if (killer_prop->unopposable_enemy)
+				{
+					killer_prop->unopposable_casualties_inflicted++;
+					killer_prop->unopposable_casualty_decay_timer = 750;
+				}
+			}
 		}
 	}
 
