@@ -17,7 +17,7 @@ struct transport_endpoint;
 
 /* ---------- prototypes/KEY_AGREEMENT.C */
 
-boolean is_message_encryption_key_message(
+long is_message_encryption_key_message(
 	word const *msgptr,
 	word message_size,
 	byte *packet_type);

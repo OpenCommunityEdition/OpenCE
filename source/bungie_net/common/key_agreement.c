@@ -177,26 +177,28 @@ static byte key_agreement_message_buffer[KEY_AGREEMENT_MESSAGE_BUFFER_SIZE];
 
 /* ---------- public code */
 
-boolean is_message_encryption_key_message(
+long is_message_encryption_key_message(
 	word const *msgptr,
 	word message_size,
 	byte *packet_type)
 {
-	byte type;
-	long message_flags;
+	word message_flags;
 	byte message_type;
 
 	match_assert(KEY_AGREEMENT_FILE, 0xC4, msgptr && packet_type);
 
-	type = ((byte const *)msgptr)[message_size - 1];
-	message_flags = GET_MESSAGE_FLAGS(*(byte const *)msgptr);
-	*packet_type = type;
+	message_flags = GET_MESSAGE_FLAGS(*msgptr);
+	*packet_type = ((byte const *)msgptr)[message_size - 1];
 	message_type = GET_MESSAGE_TYPE(*msgptr);
-
-	return TEST_FLAG(message_flags, 1) &&
+	if (TEST_FLAG(message_flags, 1) &&
 		message_type == _message_type_packet &&
-		(type == _key_agreement_packet_type_initiate ||
-			type == _key_agreement_packet_type_finalize);
+		(*packet_type == _key_agreement_packet_type_initiate ||
+		*packet_type == _key_agreement_packet_type_finalize))
+	{
+		return TRUE;
+	}
+
+	return FALSE;
 }
 
 boolean initiate_key_exchange(
