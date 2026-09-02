@@ -1368,6 +1368,63 @@
         },
         "objdiff_percent": 95.26667
       }
+    },
+    {
+      "unit": "source/cache/xbox_sound_cache",
+      "function": "__sound_cache_sound_request",
+      "class": "tu-context-optimization",
+      "evidence": "Fuzzy-parked under the current house rule with the complete sound-cache request policy retained in ordinary typed C: lazy allocation, LRU touch, optional blocking load, software reference accounting, and coherent success/failure returns. January homes the result boolean and preserves separate false-return tails, while the available VC7 build folds those paths and emits 368 padded bytes and 27 relocations against January's 352 and 25. The complete repository and donor census found one strict candidate that depends on a volatile result solely to control code generation; it is rejected. Natural declaration, predicate, return, scope, and parameter-order probes return to this fixed point or disturb broader semantics. No volatile/register forcing, barrier, pragma, forced inline, assembly, fake dependency, undefined behavior, or nonsensical control flow is retained. Reopen only for authoritative January source/local records, an authenticated compiler/QFE difference, or a natural same-compiler donor that explains the result lifetime and return topology.",
+      "measurements": {
+        "target": {
+          "size": 352,
+          "relocation_count": 25,
+          "normalized_sha256": "92c886403f8cde61d3d896b9ed86e8834df085c15e28f3db224e2e28628e968a"
+        },
+        "base": {
+          "size": 368,
+          "relocation_count": 27,
+          "normalized_sha256": "8949af89c5592c066f29a1ea7dd9514f23d783eb55548ce806a9c5fe91ba055f"
+        },
+        "objdiff_percent": 83.92623
+      }
+    },
+    {
+      "unit": "source/cache/xbox_sound_cache",
+      "function": "_render_inverse_transform_screen_point",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked under the current house rule after restoring the HCEA-authenticated private name, typed point/vector signature, and parameter order. Target and candidate share the 256-byte padded envelope and all 22 relocation identities in semantic order. Their normalized instruction streams have the same length and behavior; the residual is the equivalent ECX/EDX assignment of the two output pointers. Ordinary declaration, type, expression, and parameter-order probes converge on this compiler allocation. No volatile/register forcing, barrier, pragma, forced inline, assembly, fake dependency, undefined behavior, or nonsensical control flow is retained. Reopen only for authoritative January locals/source, an authenticated compiler/QFE difference, or a natural same-compiler register-allocation donor.",
+      "measurements": {
+        "target": {
+          "size": 256,
+          "relocation_count": 22,
+          "normalized_sha256": "c39690660070bc740fc89bc34ed735ce9c30406d8f26cfe5f853c9d2e5261bee"
+        },
+        "base": {
+          "size": 256,
+          "relocation_count": 22,
+          "normalized_sha256": "d434a17b8d90be4fa31d5651b27f45be31c5a6c6e5d0c21b366fc2d174e23acc"
+        },
+        "objdiff_percent": 99.347824
+      }
+    },
+    {
+      "unit": "source/cache/xbox_sound_cache",
+      "function": "_sound_cache_debug_render",
+      "class": "tu-context-optimization",
+      "evidence": "Fuzzy-parked under the current house rule with the complete debug page-usage renderer retained in ordinary typed C. Target and candidate share the 368-byte padded envelope and all 14 relocation identities in semantic order. Moving the four debug colors under the debug predicate naturally recovered January's flag/color prefix; the remaining packet is the nested-loop local/register schedule and the equivalent private render helper ECX/EDX allocation. Declaration and scope permutations either reproduce this fixed point or worsen the broader stream. No volatile/register forcing, barrier, pragma, forced inline, assembly, fake dependency, undefined behavior, or nonsensical control flow is retained. Reopen only for authoritative January source/local records, an authenticated compiler/QFE difference, or a natural same-compiler donor that explains the private-helper ABI and nested-loop lifetimes together.",
+      "measurements": {
+        "target": {
+          "size": 368,
+          "relocation_count": 14,
+          "normalized_sha256": "4c8eb53f6c7feaadf4c4b83d4b2587f923802d0cfa271d08fb642c35e0cb225e"
+        },
+        "base": {
+          "size": 368,
+          "relocation_count": 14,
+          "normalized_sha256": "10efee1b75e2372c741dc9d5bd93615fec17157ad0d52456f032c5d758df8dc3"
+        },
+        "objdiff_percent": 86.17647
+      }
     }
   ]
 }
