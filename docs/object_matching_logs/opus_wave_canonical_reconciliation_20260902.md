@@ -55,8 +55,8 @@ The speech-timer helper itself is an honest residual: target and candidate are
 both 672 padded bytes with 43 relocations, with target normalized SHA-256
 `91999fda75815c6638478824f3efa53ee6717572f365530362cbec00e78a50ac`
 and candidate SHA-256
-`885fdb81966284acf5ba7138a4bbbd2221e7c61c89114fdd6f53b96ba89b81a0`.
-Objdiff reports 97.68 percent similarity. The remaining differences are the
+`7db4861a5adf519e0457a0ffe785ff4d47e878fda47cc0a06206a529776ac91c`.
+Objdiff reports 97.76382 percent similarity. The remaining differences are the
 previously documented natural register/lifetime schedule; no register hint,
 volatile access, barrier, pragma, assembly, false alias, or inert dependency is
 introduced. The typed implementation is retained and fuzzy-parked.
