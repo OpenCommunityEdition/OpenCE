@@ -733,6 +733,43 @@ void hud_set_state_text(
 	return;
 }
 
+wchar_t *hud_messaging_get_objective(
+	void)
+{
+	wchar_t *result = NULL;
+
+	if (hud_messaging_globals->objective.message)
+	{
+		struct scenario *scenario = global_scenario_get();
+		struct hud_message_text_definition *hud_messages =
+			HUD_MESSAGE_TEXT_DEFINITION_GET(scenario->hud_messages.index);
+		struct hud_state_message_definition *message =
+			hud_messaging_globals->objective.message;
+		struct hud_state_message_element *element = TAG_BLOCK_GET_ELEMENT(
+			&hud_messages->elements,
+			message->element_start_index,
+			struct hud_state_message_element);
+
+		match_vassert(
+			"c:\\halo\\SOURCE\\interface\\hud_messaging.c",
+			0x2A2,
+			message->element_count == 1,
+			"message->element_count==1");
+		match_vassert(
+			"c:\\halo\\SOURCE\\interface\\hud_messaging.c",
+			0x2A3,
+			element->type == _hud_message_type_text,
+			"element->type==_hud_message_type_text");
+
+		result = tag_data_get_pointer(
+			&hud_messages->text_data,
+			message->text_start_index * sizeof(wchar_t),
+			element->data * sizeof(wchar_t));
+	}
+
+	return result;
+}
+
 void scripted_hud_messages_clear(
 	void)
 {

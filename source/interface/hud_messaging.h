@@ -72,6 +72,8 @@ void hud_enable_custom_state_message(
 void hud_set_state_text(
 	short local_player_index,
 	wchar_t const *message);
+wchar_t *hud_messaging_get_objective(
+	void);
 
 /* ---------- globals */
 
