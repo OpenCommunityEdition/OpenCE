@@ -54,6 +54,15 @@ is now declared beside `unit_place` in `units.h`, and its stale use-site
 declaration was removed from `object_types.c`. This restores Units to 189/189
 without changing the function body or adding any compiler-control construct.
 
+The first combined canonical build also exposed a surplus
+`point_from_line3d` COMDAT in `bipeds.obj`. January references the shared
+helper but does not own it in this object. The two uses inside
+`biped_find_ground_surface` now spell out the transparent coordinate
+assignments with semantic local bindings. This preserves that function's
+exact instruction schedule and all nine gains while removing the surplus
+symbol; no pragma, forced-inline annotation, assembly, or fake dependency is
+needed.
+
 ## Parked residual
 
 `biped_find_nearby_support_surface` is retained as natural fuzzy C and parked.
@@ -75,5 +84,6 @@ so the park is unclassified and grants no exact credit.
 - `python -m pytest -q`: 255 passed;
 - fake-match scan of the touched Biped/Players source: zero review leads;
 - parked ledger: 89 active, zero stale, zero invalid;
+- final candidate COFF: no `point_from_line3d` symbol or COMDAT;
 - no inline assembly, forced inline/noinline, volatile steering, barriers,
   raw offsets, or address-derived identifiers are retained.

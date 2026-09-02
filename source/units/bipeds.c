@@ -632,7 +632,10 @@ static long biped_find_ground_surface(
 	global_current_collision_users[global_current_collision_user_depth++] = _collision_user_bipeds;
 
 	object_get_origin(object_index, &origin);
-	point_from_line3d(&origin, global_up3d, 0.4f, &origin);
+	/* Preserve January's inline schedule without owning point_from_line3d here. */
+	origin.x = global_up3d->i*0.4f + origin.x;
+	origin.y = global_up3d->j*0.4f + origin.y;
+	origin.z = global_up3d->k*0.4f + origin.z;
 	scale_vector3d(direction, distance, &vector);
 
 	if (collision_bsp_test_vector(
@@ -647,7 +650,15 @@ static long biped_find_ground_surface(
 	{
 		surface_index = result.surface_index;
 		if (point)
-			point_from_line3d(&origin, &vector, result.t, point);
+		{
+			real_point3d const *line_point = &origin;
+			real_vector3d const *line_vector = &vector;
+			real line_t = result.t;
+
+			point->x = line_vector->i*line_t + line_point->x;
+			point->y = line_vector->j*line_t + line_point->y;
+			point->z = line_vector->k*line_t + line_point->z;
+		}
 		if (normal)
 			*normal = result.plane->n;
 	}
