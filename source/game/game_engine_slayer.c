@@ -76,6 +76,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 
+#include "game/game_engine_place.h"
 #include "game/game_engine_slayer.h"
 #include "game/players.h"
 #include "memory/data.h"
@@ -92,7 +93,12 @@ enum
 	_multiplayer_sound_slayer = 0x15,
 	_multiplayer_sound_team_slayer = 0x23,
 	_slayer_message_new_target = 0x1E,
+	_game_engine_message_show_score = 0x16,
 	_string_score = 0x9A,
+	_string_n_team_n = 0xB3,
+	_string_new_target_name = 0xB4,
+	_string_name_kills_score_n_team_score_of_max = 0xB5,
+	_string_name_kills_score_of_max = 0xB6,
 	_game_engine_test_flag_rasterize_score = 1,
 	_slayer_maximum_players = 16,
 };
@@ -493,6 +499,131 @@ void slayer_engine_player_killed_player(
 	}
 
 	return;
+}
+
+boolean slayer_engine_display_score(
+	long player_index,
+	long message,
+	long message_data,
+	wchar_t *buffer,
+	long buffer_size)
+{
+	wchar_t score[128];
+	struct player_datum *player;
+
+	player_get(player_index);
+	player = NULL;
+
+	if (message == _slayer_message_new_target)
+	{
+		if (game_engine_get_variant()->has_teams)
+		{
+			long string_list_index = tag_loaded(
+				UNICODE_STRING_LIST_TAG,
+				"ui\\multiplayer_game_text");
+			wchar_t *format = string_list_index != NONE
+				? unicode_string_list_get_string(
+					string_list_index,
+					_string_n_team_n)
+				: L"";
+
+			usnprintf(
+				score,
+				NUMBEROF(score),
+				format,
+				slayer_get_score(player_index, _get_score_individual),
+				slayer_get_score(player_index, _get_score_team));
+		}
+		else
+		{
+			usnprintf(
+				score,
+				NUMBEROF(score),
+				L"%d",
+				slayer_get_score(player_index, _get_score_individual));
+		}
+
+		player = player_get(message_data);
+	}
+
+	switch (message)
+	{
+	case _game_engine_message_show_score:
+		if (game_engine_get_variant()->has_teams)
+		{
+			struct game_engine_place place = game_engine_get_place(
+				player_index,
+				_get_score_team);
+			wchar_t *place_name = get_place_name(place);
+			long string_list_index = tag_loaded(
+				UNICODE_STRING_LIST_TAG,
+				"ui\\multiplayer_game_text");
+
+			wchar_t *format = string_list_index != NONE
+				? unicode_string_list_get_string(
+					string_list_index,
+					_string_name_kills_score_n_team_score_of_max)
+				: L"";
+
+			usnprintf(
+				buffer,
+				buffer_size,
+				format,
+				place_name,
+				slayer_get_score(player_index, _get_score_individual),
+				slayer_get_score(player_index, _get_score_team),
+				game_engine_get_variant()->slayer_variant_score_to_win);
+		}
+		else
+		{
+			struct game_engine_place place = game_engine_get_place(
+				player_index,
+				_get_score_team);
+			wchar_t *place_name = get_place_name(place);
+			long string_list_index = tag_loaded(
+				UNICODE_STRING_LIST_TAG,
+				"ui\\multiplayer_game_text");
+
+			wchar_t *format = string_list_index != NONE
+				? unicode_string_list_get_string(
+					string_list_index,
+					_string_name_kills_score_of_max)
+				: L"";
+
+			usnprintf(
+				buffer,
+				buffer_size,
+				format,
+				place_name,
+				slayer_get_score(player_index, _get_score_team),
+				game_engine_get_variant()->slayer_variant_score_to_win);
+		}
+
+		return TRUE;
+
+	case _slayer_message_new_target:
+	{
+		long string_list_index = tag_loaded(
+			UNICODE_STRING_LIST_TAG,
+			"ui\\multiplayer_game_text");
+		wchar_t *format = string_list_index != NONE
+			? unicode_string_list_get_string(
+				string_list_index,
+				_string_new_target_name)
+			: L"";
+
+		usnprintf(
+			buffer,
+			buffer_size,
+			format,
+			player->name);
+
+		return TRUE;
+	}
+
+	default:
+		return FALSE;
+	}
 }
 
 void slayer_player_update(

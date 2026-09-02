@@ -88,6 +88,13 @@ void slayer_engine_player_killed_player(
 	long dead_player_index,
 	boolean friendly_fire);
 
+boolean slayer_engine_display_score(
+	long player_index,
+	long message,
+	long message_data,
+	wchar_t *buffer,
+	long buffer_size);
+
 void slayer_player_update(
 	long player_index);
 

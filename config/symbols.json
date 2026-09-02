@@ -2433,7 +2433,7 @@
 { "file_offset": 671920, "flags": 32, "name": "_slayer_get_team_score_string" },
 { "file_offset": 671968, "flags": 32, "name": "_find_next_target", "static": true },
 { "file_offset": 672368, "flags": 32, "name": "_slayer_engine_player_killed_player" },
-{ "file_offset": 672512, "flags": 32, "name": "_code_000a4300" },
+{ "file_offset": 672512, "flags": 32, "name": "_slayer_engine_display_score" },
 { "file_offset": 673152, "flags": 32, "name": "_slayer_player_update" },
 { "file_offset": 673552, "flags": 32, "name": "_code_000a4710" },
 { "file_offset": 673568, "flags": 32, "name": "_code_000a4720" },

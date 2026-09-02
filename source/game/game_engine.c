@@ -540,6 +540,7 @@ symbols in this file:
 #include "cseries_windows.h"
 #include "errors.h"
 #include "game_engine.h"
+#include "game_engine_place.h"
 
 #include "bitmaps/bitmap_group.h"
 #include "game_globals.h"
@@ -4139,12 +4140,6 @@ void game_engine_weapon_fired(
 
 	return;
 }
-
-struct game_engine_place
-{
-	short flags;
-	short place;
-};
 
 wchar_t *get_place_name(
 	struct game_engine_place place)
