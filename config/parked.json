@@ -1197,6 +1197,101 @@
         },
         "objdiff_percent": 83.69334
       }
+    },
+    {
+      "unit": "source/ai/actions",
+      "function": "_actor_action_handle_vehicle_entry",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked after replaying every distinct Actions source blob visible to the campaign and retaining the complete ordinary-C vehicle-entry policy reconstructed from January control flow and the later HCEA implementation. Target and candidate have the same 960-byte padded envelope, all 22 relocation identities at the same addresses, and 96.54422% objdiff similarity; normalized comparison leaves 39 differing instruction positions in otherwise aligned streams. The best natural source differs in false-result tail topology and register assignment. An enclosing negative-guard rewrite increased the difference count from 39 to 240 and was reverted. No volatile/register forcing, barrier, pragma, assembly, fake dependency, inert carrier, or nonsensical branch is retained. Reopen only for authoritative January locals/source or a natural same-compiler donor that explains the remaining result/register lifetime.",
+      "measurements": {
+        "target": {
+          "size": 960,
+          "relocation_count": 22,
+          "normalized_sha256": "df9b95a1daf88c72ac92d1bf7a1877f8cc3acfab8916e7ffc18c640ec793630f"
+        },
+        "base": {
+          "size": 960,
+          "relocation_count": 22,
+          "normalized_sha256": "80e7bf257e70635f1a9a668d895ab372d01671ab05db2a55b2db8afbb8866ac3"
+        },
+        "objdiff_percent": 96.54422
+      }
+    },
+    {
+      "unit": "source/ai/actions",
+      "function": "_actor_action_handle_lost_contact",
+      "class": "tu-context-optimization",
+      "evidence": "Fuzzy-parked after the complete lost-contact state machine was reconstructed from January's relocation/control-flow graph and cross-checked against the later HCEA behavior, then replayed against all distinct Actions donors. Target and candidate share the 1,872-byte padded envelope and all 55 relocation destinations in semantic order. The remaining broad packet difference is the compiler's private-helper convention, frame coloring, and x87/register scheduling rather than missing behavior. A declaration-order and CodeView-oriented lifetime experiment worsened the result and was reverted. No artificial local, volatile access, barrier, pragma, assembly, fake dependency, or nonsensical control flow is retained. Reopen only for authoritative January local-variable records/source, a compatible original C2/QFE, or a natural same-compiler donor that recovers the private calling/lifetime schedule.",
+      "measurements": {
+        "target": {
+          "size": 1872,
+          "relocation_count": 55,
+          "normalized_sha256": "1b2dca7a160e365844a4f791b96e850838684053047eede1d2efc59a260c9834"
+        },
+        "base": {
+          "size": 1872,
+          "relocation_count": 55,
+          "normalized_sha256": "0e96d40ea2f3812285e7d27ea025aef17c91be73dad2c67b35f68a8ea670c422"
+        },
+        "objdiff_percent": 95.328384
+      }
+    },
+    {
+      "unit": "source/ai/actions",
+      "function": "_actor_action_handle_danger_avoidance",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked with the coherent negative danger predicate and complete typed avoidance policy retained after the historical donor replay. Target is 1,520 padded bytes and the natural candidate is 1,504, while both carry the same 34 relocation destinations in semantic order. The only discovered strict-exact form replaces `if (!body_within_danger)` with an empty positive arm and moves all real work into `else`; independent Fable review identified that shape as score-only fake matching, so it is explicitly rejected. Source keeps the natural condition and semantic private helper name instead. No volatile/register forcing, barrier, pragma, assembly, artificial carrier, undefined behavior, or nonsensical exactness control is retained. Reopen only for authoritative January source/locals or a natural donor that explains the 16-byte control-flow/codegen gap.",
+      "measurements": {
+        "target": {
+          "size": 1520,
+          "relocation_count": 34,
+          "normalized_sha256": "50e4161c4fc3e7ba8a3a310dc7254db5ccb8c9731b76038f7a53114d511a8807"
+        },
+        "base": {
+          "size": 1504,
+          "relocation_count": 34,
+          "normalized_sha256": "b1d5ecaf33b392f8b6071a515b226a8c41e112097105096e0216f9554e3b328f"
+        },
+        "objdiff_percent": 90.41458
+      }
+    },
+    {
+      "unit": "source/ai/actions",
+      "function": "_actor_action_try_to_dive",
+      "class": "tu-context-optimization",
+      "evidence": "Fuzzy-parked after reconstructing the complete January dive eligibility, target selection, debug bookkeeping, and animation/action transition in ordinary typed C and exhausting the recorded declaration, aggregate-vector, scope, and linkage variants. The candidate retains all 29 semantic relocation destinations but is 704 padded bytes against January's 720. Static-linkage and aggregate/lifetime experiments could recover isolated allocation features only while perturbing broader code and were reverted. No forced inlining, volatile access, barrier, pragma, assembly, fake dependency, or nonsensical control flow is retained. Reopen only for authoritative January locals/source, the original translation-unit context, or a natural same-compiler donor that explains the remaining frame/allocation schedule.",
+      "measurements": {
+        "target": {
+          "size": 720,
+          "relocation_count": 29,
+          "normalized_sha256": "2548ce8b22f46d482056a0e7fce5078dfa8f2d4d5e064a9e1943c90b8147d990"
+        },
+        "base": {
+          "size": 704,
+          "relocation_count": 29,
+          "normalized_sha256": "1489a21aa830ee0316bfe8fea3886993bee7ad2372e4c0173669cbf618ca2c9e"
+        },
+        "objdiff_percent": 85.18107
+      }
+    },
+    {
+      "unit": "source/ai/actions",
+      "function": "_actors_searching_same_position",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked after retaining the complete bounded actor-search predicate in ordinary typed C and replaying all distinct historical Actions bodies. Target and candidate share the 320-byte padded envelope and all 14 relocation destinations in semantic order. The remaining packet is a closed register/lifetime allocation difference; prior predicate, declaration, iterator, and local-scope variants either compiled to this fixed point or disturbed more of the function. No volatile/register forcing, barrier, pragma, inline assembly, artificial dependency, inert expression, or nonsensical control flow is retained. Reopen only for authoritative January locals/source or a natural same-compiler register-allocation donor.",
+      "measurements": {
+        "target": {
+          "size": 320,
+          "relocation_count": 14,
+          "normalized_sha256": "0f8d4038344e6058a388fc236ba1a32a119bb69d13fa1b6c9f7b806c25071fb1"
+        },
+        "base": {
+          "size": 320,
+          "relocation_count": 14,
+          "normalized_sha256": "844a679f805ae87f3195ebaddccc8fe5fe9c8b5e507a5d09e895dfbba1baac62"
+        },
+        "objdiff_percent": 87.87611
+      }
     }
   ]
 }
