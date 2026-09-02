@@ -640,8 +640,6 @@ void rasterizer_debug_end(
 
 /* ---------- prototypes/RASTERIZER_TEXT.C */
 
-pixel32 real_argb_color_to_pixel32(
-	real_argb_color const *color);
 void rasterizer_text_set_shadow_color(
 	pixel32 shadow_color);
 void rasterizer_draw_unicode_string(

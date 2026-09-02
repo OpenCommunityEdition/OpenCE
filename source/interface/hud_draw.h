@@ -23,6 +23,8 @@ void hud_retrieve_bitmap_and_bounding_rect(
 	real_rectangle2d const **clip);
 long fast_ftol_C(
 	real value);
+pixel32 real_argb_color_to_pixel32(
+	real_argb_color const *color);
 pixel32 real_rgb_color_to_pixel32(
 	real_rgb_color const *color);
 void hud_draw_bitmap_direct(

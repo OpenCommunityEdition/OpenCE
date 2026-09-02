@@ -88,7 +88,8 @@ the target's private register ABI without source-level register forcing.
 - animation value/color modulation and packed vertex color emission;
 - dynamic-vertex allocation, bounds construction, shader selection, drawing,
   and cleanup;
-- January assertion expressions and line identities.
+- January assertion expressions and line identities, without emitting a
+  `point_from_line3d` helper or COMDAT.
 
 Typed tag lookup goes through a subsystem macro. Object marker access uses the
 existing typed object access surface. Source uses `real`, named constants,
@@ -102,9 +103,11 @@ The four-byte target BSS owner is emitted by defining
 VC7 emit a COMMON symbol instead of the January-owned `.bss`; the explicit
 zero initializer is normal source and reproduces the target's real ownership.
 
-`real_argb_color_to_pixel32` is now declared in its rasterizer owner header.
-The obsolete duplicate declaration in `render_contrails.c` was removed. No
-prototype was introduced in an unrelated consumer.
+`real_argb_color_to_pixel32` is defined by `hud_draw.c`, so its declaration is
+now in the corresponding narrow owner header, `interface/hud_draw.h`.
+`lightning.c` and `render_contrails.c` include that owner header, and the
+obsolete use-site declaration in `render_contrails.c` was removed. No
+prototype remains in an unrelated consumer or subsystem header.
 
 ## Residual classification
 

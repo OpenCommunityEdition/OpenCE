@@ -47,6 +47,7 @@ symbols in this file:
 #include "bitmaps/bitmap_group.h"
 #include "cache/texture_cache.h"
 #include "cseries/cseries.h"
+#include "interface/hud_draw.h"
 #include "math/real_math.h"
 #include "objects/objects.h"
 #include "rasterizer/rasterizer.h"
