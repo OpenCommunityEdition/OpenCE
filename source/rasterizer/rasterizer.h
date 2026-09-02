@@ -90,8 +90,7 @@ enum rasterizer_lock_operation
 /* ---------- structures */
 
 struct rasterizer_model_begin_parameters;
-struct detail_object_global_runtime_data;
-struct detail_object_render_data;
+struct detail_object_view_data;
 struct bitmap_data;
 struct render_animation;
 struct shader;
@@ -310,9 +309,9 @@ void rasterizer_decals_update_function_pointers(void);
 void rasterizer_detail_objects_begin(
 	void);
 void rasterizer_detail_objects_rebuild_vertices(
-	struct detail_object_global_runtime_data *runtime_data);
+	struct detail_object_view_data *view_data);
 void rasterizer_detail_objects_draw(
-	struct detail_object_render_data *render_data);
+	struct detail_object_view_data *view_data);
 void rasterizer_detail_objects_end(
 	void);
 void rasterizer_screen_effect(

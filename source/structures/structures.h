@@ -72,6 +72,12 @@ void structure_detail_objects_dispose(
 	void);
 void structure_detail_objects_flush(
 	void);
+void detail_object_offset(
+	real offset);
+void structure_render_detail_objects(
+	void);
+void render_debug_detail_objects(
+	void);
 
 /* ---------- prototypes/STRUCTURE_LENS_FLARES.C */
 

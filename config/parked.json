@@ -1406,6 +1406,63 @@
         },
         "objdiff_percent": 86.17647
       }
+    },
+    {
+      "unit": "source/structures/structure_detail_objects",
+      "function": "_structure_detail_objects_initialize",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked after restoring the HCEA-authenticated allocation and default normal initialization in ordinary typed C and preserving the three exact relocation destinations. Target and candidate share the 80-byte padded envelope and differ only in the schedule of the independent stack cleanup and global runtime-data store: January restores the three game_state_malloc arguments before publishing the allocation, while VC7 publishes the allocation first and then adjusts ESP. The direct-global, declaration-order, assignment-order, aggregate-initializer, and temporary-pointer source families either return to this fixed point or enlarge the function and relocation set; the direct-global spelling specifically grows to 96 bytes and six relocations. No barrier, volatile access, pragma, assembly, fake dependency, inert expression, or nonsensical branch is retained. Reopen only for authoritative January locals/source or a natural same-compiler scheduling donor.",
+      "measurements": {
+        "target": {
+          "size": 80,
+          "relocation_count": 3,
+          "normalized_sha256": "99e687328f033302450f35257d1339d168279f9876fcd14b9180ddaa52f618d5"
+        },
+        "base": {
+          "size": 80,
+          "relocation_count": 3,
+          "normalized_sha256": "46c693d13661a9d71dd5516590b0c9d7c29e22dc1cc38eea6ff94d60c88ddd82"
+        },
+        "objdiff_percent": 76.36364
+      }
+    },
+    {
+      "unit": "source/structures/structure_detail_objects",
+      "function": "_structure_render_detail_objects",
+      "class": "tu-context-optimization",
+      "evidence": "Fuzzy-parked after reconstructing the complete January visible-cell rebuild and render path from the target disassembly and relocations, the first-party HCEA function, and the independent Pastudan PC lift. The retained ordinary C has the exact 1,136-byte padded envelope and 31 relocations; it uses named cell/layer/view structures, typed tag-block accessors, the authenticated fast_ftol helper, January's intrinsic memset/abs lowering, the exact lower/upper-bound helpers, and the original lower_bound_cell<=upper_bound_cell assertion. The residual spans VC7 frame coloring, local/register allocation, one reciprocal/count-access scheduling swap, and x87 lifetimes. Natural runtime/view aliases, declaration and scope order, loop spelling, direct-global fallback, and reciprocal placement were boundedly tested; variants either returned to this fixed point, disturbed the exact helper family, or added unsupported alias-only source. No forced inline/noinline, barrier, volatile access, pragma, assembly in this routine, fake dependency, undefined behavior, or nonsensical control flow is retained. Reopen only for authoritative January source/local records, the original translation-unit context, or a natural same-compiler donor that explains the allocation and x87 schedule.",
+      "measurements": {
+        "target": {
+          "size": 1136,
+          "relocation_count": 31,
+          "normalized_sha256": "dbf237f0819e54a61d67102c174e6f79789603a62a8adbac4e97c21e01394658"
+        },
+        "base": {
+          "size": 1136,
+          "relocation_count": 31,
+          "normalized_sha256": "eb6883e150ad20816c89d64a99075684ab290ad767736f7942e56317ac3d4fb1"
+        },
+        "objdiff_percent": 76.39528
+      }
+    },
+    {
+      "unit": "source/structures/structure_detail_objects",
+      "function": "_render_debug_detail_objects",
+      "class": "tu-context-optimization",
+      "evidence": "Fuzzy-parked after restoring the complete debug traversal from January disassembly and relocations, cross-checking its control/traversal/reset subset against the later HCEA renderer, and using the independent Pastudan PC lift for the target-specific packed decode and drawing path. The retained ordinary C performs the target-backed duplicate enable check, visible layer/cell traversal, optional reference-plane offset, packed detail-object decode, clipping test, point draw, cell bounds draw, clipped overlay, and one-shot debug-state reset using semantic project types and named structures. It preserves all 33 relocation destinations in semantic sequence and compiles to 736 padded bytes versus January's 752; the residual is x87 stack/frame and pointer-lifetime scheduling. A credible dot_product4d spelling recovered the 752-byte envelope but introduced a 34th unsupported multiply-by-one relocation and was reverted; direct-vector, declaration/scope, bounds-arithmetic, comparison-order, view-data access, and loop-shape variants either return to this fixed point or regress relocation topology. No forced inline/noinline, barrier, volatile access, pragma, assembly in this routine, fake dependency, undefined behavior, or nonsensical branch is retained. Reopen only for authoritative January source/local records, the original translation-unit context, or a natural same-compiler donor that explains the remaining x87 and frame schedule.",
+      "measurements": {
+        "target": {
+          "size": 752,
+          "relocation_count": 33,
+          "normalized_sha256": "3e4c30c13847d08060c08d64bd9114a3c6592eb827ba69d422c93f046d70a6a7"
+        },
+        "base": {
+          "size": 736,
+          "relocation_count": 33,
+          "normalized_sha256": "4457d66b4b59e307e3671bba697b89ab0c51f05f4c7b48284ef89a92b068a822"
+        },
+        "objdiff_percent": 78.78802
+      }
     }
   ]
 }

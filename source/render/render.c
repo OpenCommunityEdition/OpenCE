@@ -193,8 +193,6 @@ void particle_systems_render(
 	void);
 void rasterizer_transparent_geometry_draw(
 	boolean water);
-void structure_render_detail_objects(
-	void);
 void rasterizer_transparent_geometry_stop(
 	void);
 void structure_render_fog_screen(

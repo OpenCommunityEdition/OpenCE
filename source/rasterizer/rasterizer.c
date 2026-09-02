@@ -504,9 +504,9 @@ void _rasterizer_decals_flush(
 void _rasterizer_detail_objects_begin(
 	void);
 void _rasterizer_detail_objects_rebuild_vertices(
-	struct detail_object_global_runtime_data *runtime_data);
+	struct detail_object_view_data *view_data);
 void _rasterizer_detail_objects_draw(
-	struct detail_object_render_data *render_data);
+	struct detail_object_view_data *view_data);
 void _rasterizer_detail_objects_end(
 	void);
 void _rasterizer_screen_effect(
@@ -1151,16 +1151,16 @@ void rasterizer_detail_objects_begin(
 }
 
 void rasterizer_detail_objects_rebuild_vertices(
-	struct detail_object_global_runtime_data *runtime_data)
+	struct detail_object_view_data *view_data)
 {
-	_rasterizer_detail_objects_rebuild_vertices(runtime_data);
+	_rasterizer_detail_objects_rebuild_vertices(view_data);
 	return;
 }
 
 void rasterizer_detail_objects_draw(
-	struct detail_object_render_data *render_data)
+	struct detail_object_view_data *view_data)
 {
-	_rasterizer_detail_objects_draw(render_data);
+	_rasterizer_detail_objects_draw(view_data);
 	return;
 }
 
