@@ -37,6 +37,12 @@ COMDATs as well as its four target relocation identities.
 
 ## Public predicate closeout (2026-09-01)
 
+> Superseded on 2026-09-02 by
+> `key_agreement_obj_fable_small_families_20260901.md`: January's full-width
+> return establishes a `long` owner-header ABI, and that natural declaration
+> makes the predicate strict exact. The text below remains as the audit trail
+> for the earlier `boolean` frontier rather than the current disposition.
+
 The January target and the concordant Stian/Pastudan semantic donors establish
 the full behavior: assert `msgptr && packet_type` at source line `0xC4`, copy
 the final encoded message byte to `packet_type`, require message flag bit one

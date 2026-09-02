@@ -345,25 +345,6 @@
     },
     {
       "unit": "source/bungie_net/common/key_agreement",
-      "function": "_is_message_encryption_key_message",
-      "class": "register-allocation",
-      "evidence": "Fuzzy-parked at the natural ordinary-C compiler boundary after reconstructing the complete public predicate from the January packet and concordant Stian/Pastudan semantic donors. The retained owner-header API asserts `msgptr && packet_type` at the authentic January line 0xC4, reads the final encoded byte into the output, requires message flag bit one and `_message_type_packet`, and accepts exactly the named initiate/finalize packet types. Its 109 meaningful bytes occupy the exact 112-byte padded envelope, preserve all four relocation identities and offsets, and match every target instruction except one ephemeral size-index register: January uses ECX for `message_size` and then overwrites CL with the packet byte, while VC7 selects EAX for the index and CL for the byte. This changes only the ModR/M byte at +0x35 and SIB byte at +0x39; the remaining normalized packet is identical, producing 99.77778%. The low-byte header view and long-width flags value are independent representation evidence, not score-only controls: both donor lifts declare a byte-message pointer and cache the first byte before testing its fields, while January itself emits `xor eax; mov al,[esi]; and eax,3`, proving a zero-extended byte read and full-width mask. The owner API remains word-header based so `GET_MESSAGE_TYPE` retains January's shift/mask topology. No volatile/register forcing, pragma, barrier, inline assembly, fake dependency, source-order trick, or nonsensical coincidental match is present. Reopen only with authenticated January source or new natural same-compiler allocation evidence.",
-      "measurements": {
-        "target": {
-          "size": 112,
-          "relocation_count": 4,
-          "normalized_sha256": "18904e84b6ada1ed80b32160f9aece6ac3e2907f6fb403dfc53f9f214fd03db8"
-        },
-        "base": {
-          "size": 112,
-          "relocation_count": 4,
-          "normalized_sha256": "a89786bb20eb26d7833f5f38df1e6de55e61d969f9bacac37dc499a84b2ca154"
-        },
-        "objdiff_percent": 99.77778
-      }
-    },
-    {
-      "unit": "source/bungie_net/common/key_agreement",
       "function": "_initiate_key_exchange",
       "class": "register-allocation",
       "evidence": "Fuzzy-parked with the simplest coherent Diffie-Hellman initiation flow: generate parameters and public key, build into the same-TU 0x200-byte buffer, byte-swap the header, write the complete message, and return the write result. Target and retained source have equal 128-byte padded size and the same six relocation identities. January preserves a preinitialized byte-sized TRUE result and a larger local frame; retaining `boolean result = TRUE; return result;` solely to influence code generation lacked independent source provenance and was rejected under the source-credibility rule. Direct `return TRUE`/`FALSE` is retained even though it scores lower. No exact candidate was found or rejected, and no compiler-steering construct is present.",

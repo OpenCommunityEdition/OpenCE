@@ -175,3 +175,22 @@ other work is required. Parked siblings: see the probe table above.
   `_is_message_encryption_key_message` is strict EXACT (112 padded bytes, 4 relocations). The three
   residuals are the previously PARKED functions, untouched.
 - Disposition updated: **newly exact +1 function / +112 strict padded bytes**.
+
+## Canonical reconciliation audit (2026-09-02)
+
+- Replayed the isolated Fable commit onto canonical `778961b89`; its only
+  source conflict was the older `boolean` fuzzy implementation documented
+  above. The evidence-backed five-parameter body and `long` owner-header ABI
+  were retained.
+- Removed the now-stale `_is_message_encryption_key_message` entry from
+  `config/parked.json`. The other three key-agreement residuals remain parked
+  and unchanged.
+- Focused gate: `exact 7 / residual 3 / unwritten 0`, up from canonical
+  `exact 6 / residual 4 / unwritten 0`.
+- Full `ninja all_source` succeeded. A per-function comparison across all 619
+  January split objects found exactly one gain and zero losses:
+  `_is_message_encryption_key_message` (+112 padded bytes).
+- `tools/fake_match_scan.py --fail-on-findings` reported zero review leads;
+  `python -m pytest -q -p no:cacheprovider` passed 258 tests;
+  `tools.parked_functions` reported 105 active, zero stale, zero invalid; and
+  `tools.audit_object_admission` reported zero candidates or contradictions.
