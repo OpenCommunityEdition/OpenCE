@@ -62,6 +62,12 @@ use-site declarations for `actor_stimulus_noticed_danger_zone` and
 dependent rebuild proves the declaration relocation is neutral to every
 previously accepted function.
 
+The independent admission review also removed the translation-unit-local
+shadow of `ai_communication_event` and its enums. `actor_stimulus.c` now takes
+the prototype, communication types, and `_comm_hostility_*` constants from
+their owning `ai/ai_communication.h` header; the rebuilt object remains strict
+exact.
+
 The retained source uses project `real`, `boolean`, point, and vector types;
 typed `actor_get`, `prop_get`, and `actor_definition_get` accessors; semantic
 enum constants; `TEST_FLAG`; established math/vector helpers; one parameter
@@ -102,11 +108,11 @@ game-team subsystem outside this lane. The two other remaining functions are
 - target split object SHA-256:
   `df66a3343163344d9cd0be4395c5e87f56e28b81e61b14560850ccf27c71cdef`;
 - candidate object SHA-256:
-  `e0858dc0adee7d26f73be2d37bff57e033950a1db5ee258af931ab8e64dfa9e4`;
+  `899ea5fca2c19348c22ec8a8c6bb588d7e5ada9ffab0d42aedffcb5099cf90c5`;
 - `build/report.json` SHA-256:
   `dfeba59c43ec377e6d7f710eb8b35e9b941674ac6c86b201c464bee0a6fbbb98`;
 - `build/semantic_report.json` SHA-256:
   `3e208e8607a56826b5bb53990491ef5453c52a24c8f48ce3e72de765cdf7daf8`;
 - final `actor_stimulus.c` payload SHA-256:
-  `d11fcffdc15809138ffc53db1de0386ca914dc508506d313d92c4eb0d2e545fc`;
+  `6a162f1dae3f4dbbdb7100d1112e31b502465d443e1a170f5ae05857ff6064b8`;
 - `git diff --check`: clean.

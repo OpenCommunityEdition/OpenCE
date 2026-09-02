@@ -78,6 +78,7 @@ symbols in this file:
 
 #include "cseries.h"
 
+#include "ai/ai_communication.h"
 #include "ai/actors.h"
 #include "ai/actor_definitions.h"
 #include "ai/props.h"
@@ -122,29 +123,12 @@ enum
 
 enum
 {
-	_actor_definition_panic_in_groups_bit = 5,
+	_actor_definition_flags2_panic_in_groups_bit = 5,
 };
 
 enum
 {
 	_prop_facing_central = 2,
-};
-
-enum
-{
-	_ai_communication_sighted_enemy = 4,
-	_ai_communication_found_enemy = 5,
-	_ai_communication_grenade_startle = 10,
-	_ai_communication_grenade_sighted = 11,
-	_ai_communication_advance = 22,
-	_ai_communication_retreat = 23,
-};
-
-enum
-{
-	_communication_hostility_self = 1,
-	_communication_hostility_friend = 2,
-	_communication_hostility_enemy = 3,
 };
 
 /* ---------- macros */
@@ -187,17 +171,6 @@ typedef char actor_stimulus_prop_enemy_offset_assert[
 	offsetof(struct prop_datum, enemy) == 0x60 ? 1 : -1];
 typedef char actor_stimulus_prop_dead_offset_assert[
 	offsetof(struct prop_datum, dead) == 0x127 ? 1 : -1];
-
-/* ---------- prototypes */
-
-void ai_communication_event(
-	short type,
-	long unit_index,
-	long prop_index,
-	long object_index,
-	long position_index,
-	long structure_index,
-	void const *context);
 
 /* ---------- globals */
 
@@ -421,13 +394,13 @@ void actor_stimulus_noticed_danger_zone(
 		switch (danger_hostility)
 		{
 		case _actor_danger_hostility_enemy:
-			communication_hostility = _communication_hostility_enemy;
+			communication_hostility = _comm_hostility_enemy;
 			break;
 		case _actor_danger_hostility_friend:
-			communication_hostility = _communication_hostility_friend;
+			communication_hostility = _comm_hostility_friend;
 			break;
 		case _actor_danger_hostility_self:
-			communication_hostility = _communication_hostility_self;
+			communication_hostility = _comm_hostility_self;
 			break;
 		}
 
@@ -438,7 +411,7 @@ void actor_stimulus_noticed_danger_zone(
 			communication_hostility,
 			NONE,
 			NONE,
-			NULL);
+			FALSE);
 	}
 
 	distance = normalize3d(vector_from_points3d(
@@ -492,7 +465,7 @@ void actor_stimulus_weapon_impact(
 			NONE,
 			NONE,
 			NONE,
-			NULL);
+			FALSE);
 	}
 	else
 	{
@@ -670,7 +643,7 @@ void actor_stimulus_prop_just_killed(
 
 					if ((TEST_FLAG(
 							definition->flags2,
-							_actor_definition_panic_in_groups_bit) &&
+							_actor_definition_flags2_panic_in_groups_bit) &&
 						game_time_get() >
 							actor->emotions.flee_with_friends_disable_time &&
 						actor_emotion_flee_with_friends(
@@ -780,10 +753,10 @@ void actor_stimulus_prop_sighted(
 				_ai_communication_found_enemy,
 			actor->meta.unit_index,
 			prop->unit_index,
-			_communication_hostility_enemy,
+			_comm_hostility_enemy,
 			NONE,
 			NONE,
-			NULL);
+			FALSE);
 	}
 
 	return;
@@ -807,7 +780,7 @@ void actor_stimulus_maneuvering(
 			NONE,
 			NONE,
 			NONE,
-			NULL);
+			FALSE);
 	}
 
 	if (flee &&
