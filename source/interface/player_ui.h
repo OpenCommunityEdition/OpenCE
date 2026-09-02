@@ -28,6 +28,8 @@ void player_ui_dispose(
 	void);
 void player_ui_initialize(
 	void);
+void player_ui_clear_multiplayer_joins(
+	void);
 void player_ui_reset_single_player_local_player_controllers(
 	void);
 short player_ui_get_single_player_local_player_controller(

@@ -172,3 +172,25 @@ its only two current consumers were separately gated and remain unchanged at
 54/70 exact (`players.obj`) and 12/12 exact (`player_rumble.obj`). The focused
 fake-match scan reports zero review leads, `git diff --check` passes, and the
 tool test suite passes 255/255.
+
+## Typed multiplayer-join reset follow-up (2026-09-02)
+
+`_player_ui_clear_multiplayer_joins` is now reconstructed as typed C from its
+58-instruction January section and the independent Xbox lift. It resets each
+local player's profile defaults, active-profile and controller sentinels,
+prejoin flag, and multiplayer-autojoin flag. The loop walks the recovered
+`prejoined_multiplayer` member at the natural `sizeof(struct
+player_ui_local_player)` stride; all profile and global stores use semantic
+members rather than address-derived offsets.
+
+The function is strict exact at 149 meaningful / 160 padded bytes with 11
+relocations and normalized SHA-256
+`8692898b2486742b7d43788cde199edc6c6bec4a1ee1758fc5d83824b9e03a11`.
+Target and candidate agree instruction-for-instruction and on every relocation
+address, type, destination, and addend. The object frontier is therefore 33
+exact / 0 residual / 9 unwritten, with 2,464 strict padded code bytes. All 32
+previous exact functions remain exact. The `player_ui.h` declaration is owned
+beside the implementation; its `players.obj` and `player_rumble.obj` consumers
+remain unchanged at 54/70 and 12/12 exact respectively. The focused fake-match
+scan reports zero review leads, `git diff --check` passes, and the tool test
+suite passes 255/255.

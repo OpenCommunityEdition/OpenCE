@@ -295,6 +295,36 @@ void player_ui_initialize(
 	return;
 }
 
+void player_ui_clear_multiplayer_joins(
+	void)
+{
+	long local_player_index;
+	struct player_profile *profile;
+	boolean *joined;
+
+	local_player_index = 0;
+	joined = &player_ui_globals.local_players[0].prejoined_multiplayer;
+	do
+	{
+		profile = &player_ui_globals.local_players[(short)local_player_index].profile;
+		match_vassert("c:\\halo\\SOURCE\\interface\\player_ui.c", 0x369, profile, "profile");
+		csmemset(profile, 0, sizeof(*profile));
+		profile->primary_color_index = NONE;
+		profile->button_preset = 0;
+		profile->joystick_preset = 0;
+		player_ui_globals.single_player_controller[(short)local_player_index] = NONE;
+		player_ui_globals.local_players[(short)local_player_index].active_profile_index = NONE;
+		*joined = FALSE;
+		player_ui_globals.multiplayer_autojoin[local_player_index] = FALSE;
+		local_player_index++;
+		joined += sizeof(struct player_ui_local_player);
+	}
+	while ((long)joined < (long)(
+		&player_ui_globals.local_players[0].prejoined_multiplayer +
+		sizeof(player_ui_globals.local_players)));
+	return;
+}
+
 void player_ui_reset_single_player_local_player_controllers(
 	void)
 {
