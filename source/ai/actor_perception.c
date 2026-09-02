@@ -1191,14 +1191,6 @@ void actor_stimulus_prop_sighted(
 	long prop_index,
 	boolean initial_acknowledgement);
 
-void actor_stimulus_enter_combat_found_body(
-	long actor_index,
-	long prop_index);
-
-void actor_stimulus_enter_combat_perceived_enemy(
-	long actor_index,
-	long prop_index);
-
 static long actor_perception_unit_from_swarm(
 	long swarm_actor_index,
 	long actor_index,

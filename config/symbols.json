@@ -371,7 +371,7 @@
 { "file_offset": 144016, "flags": 32, "name": "_actor_perception_refresh" },
 { "file_offset": 146432, "flags": 32, "name": "_actor_perception_update" },
 { "file_offset": 151152, "flags": 32, "name": "_actor_stimulus_clear" },
-{ "file_offset": 151200, "flags": 32, "name": "_code_00024ea0" },
+{ "file_offset": 151200, "flags": 32, "name": "_actor_stimulus_combat", "static": true },
 { "file_offset": 151408, "flags": 32, "name": "_actor_stimulus_surprise" },
 { "file_offset": 151504, "flags": 32, "name": "_actor_stimulus_suspicion" },
 { "file_offset": 151600, "flags": 32, "name": "_actor_stimulus_prop_sighted" },

@@ -93,6 +93,13 @@ symbols in this file:
 enum
 {
 	_actor_mode_asleep = 1,
+	_actor_mode_combat = 3,
+};
+
+enum
+{
+	_actor_stimulus_combat_friend = 1,
+	_actor_stimulus_combat_body = 2,
 };
 
 enum
@@ -174,6 +181,62 @@ void actor_stimulus_clear(
 	return;
 }
 
+static void actor_stimulus_combat(
+	long actor_index,
+	short transition_type,
+	real_point3d const *guard_point,
+	long guard_point_surface_index,
+	real guard_distance,
+	long guard_timer,
+	real_vector3d const *transition_vector,
+	long prop_index,
+	long prop_look_timer,
+	boolean prop_look_while_moving)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->state.mode >= _actor_mode_combat)
+	{
+		return;
+	}
+	if (transition_type < actor->stimuli.combat_transition)
+	{
+		return;
+	}
+
+	actor->stimuli.combat_transition = transition_type;
+	if (!guard_point)
+	{
+		actor->stimuli.combat_transition_guard_at_point = FALSE;
+	}
+	else
+	{
+		actor->stimuli.combat_transition_guard_at_point = TRUE;
+		actor->stimuli.combat_transition_guard_point = *guard_point;
+		actor->stimuli.combat_transition_guard_point_surface_index =
+			guard_point_surface_index;
+		actor->stimuli.combat_transition_guard_point_distance = guard_distance;
+	}
+
+	if (!transition_vector)
+	{
+		actor->stimuli.combat_transition_has_vector = FALSE;
+	}
+	else
+	{
+		actor->stimuli.combat_transition_has_vector = TRUE;
+		actor->stimuli.combat_transition_vector = *transition_vector;
+	}
+
+	actor->stimuli.combat_transition_prop_index = prop_index;
+	actor->stimuli.combat_transition_prop_look_timer = prop_look_timer;
+	actor->stimuli.combat_transition_prop_look_while_moving =
+		prop_look_while_moving;
+	actor->stimuli.combat_transition_guard_timer = guard_timer;
+
+	return;
+}
+
 void actor_stimulus_suspicion(
 	long actor_index,
 	short suspicion_combat_status,
@@ -192,6 +255,64 @@ void actor_stimulus_suspicion(
 		actor->stimuli.suspicion_timer = MAX(
 			actor->stimuli.suspicion_timer,
 			suspicion_timer);
+	}
+
+	return;
+}
+
+void actor_stimulus_enter_combat_found_body(
+	long actor_index,
+	long prop_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct prop_datum *prop = prop_get(prop_index);
+
+	actor->emotions.corpse_ignore_time = game_time_get();
+	actor_perception_find_prop_pathfinding_location(actor_index, prop_index);
+	actor_stimulus_combat(
+		actor_index,
+		_actor_stimulus_combat_body,
+		&prop->pathfinding_point,
+		prop->pathfinding_surface_index,
+		1.5f,
+		90,
+		NULL,
+		prop_index,
+		90,
+		TRUE);
+
+	return;
+}
+
+void actor_stimulus_enter_combat_friend_in_combat(
+	long actor_index,
+	long prop_index)
+{
+	struct prop_datum *prop = prop_get(prop_index);
+
+	actor_stimulus_combat(
+		actor_index,
+		_actor_stimulus_combat_friend,
+		NULL,
+		NONE,
+		0.0f,
+		90,
+		&prop->actor_to_prop,
+		prop_index,
+		150,
+		FALSE);
+
+	if (prop->actor_index != NONE)
+	{
+		struct actor_datum *friend_actor = actor_get(prop->actor_index);
+
+		if (friend_actor->state.suspicion_combat_status > 0)
+		{
+			actor_stimulus_suspicion(
+				actor_index,
+				friend_actor->state.suspicion_combat_status,
+				450);
+		}
 	}
 
 	return;

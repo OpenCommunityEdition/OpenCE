@@ -121,10 +121,6 @@ void actor_perception_forget_recent_damage(
 void actor_perception_retreat_successful(
 	long actor_index);
 
-void actor_perception_find_prop_pathfinding_location(
-	long actor_index,
-	long prop_index);
-
 boolean actor_nearby_firing_positions(
 	long actor_index,
 	real_point3d const *point,

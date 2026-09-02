@@ -1016,9 +1016,21 @@ boolean actor_perception_create_orphan_from_friend(
 	long unit_index,
 	long friend_actor_index,
 	long friend_prop_index);
+void actor_perception_find_prop_pathfinding_location(
+	long actor_index,
+	long prop_index);
 
 /* ---------- prototypes/ACTOR_STIMULUS.C */
 
+void actor_stimulus_enter_combat_found_body(
+	long actor_index,
+	long prop_index);
+void actor_stimulus_enter_combat_perceived_enemy(
+	long actor_index,
+	long prop_index);
+void actor_stimulus_enter_combat_friend_in_combat(
+	long actor_index,
+	long prop_index);
 void actor_stimulus_abandon_stationary_facing(
 	long actor_index);
 void actor_stimulus_prop_acknowledged(
