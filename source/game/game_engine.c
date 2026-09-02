@@ -1914,7 +1914,7 @@ void game_engine_rasterize_in_game_score(
 					else
 						status_string = L"";
 				}
-				else if (player->unknown_d1)
+				else if (player->quit_out_of_game)
 				{
 					string_list_index =
 						tag_loaded('ustr', "ui\\multiplayer_game_text");
@@ -5503,7 +5503,7 @@ boolean multiple_teams_alive(
 		player = (struct player_datum *)data_iterator_next(&iterator);
 		while (player)
 		{
-			if (!player->unknown_d1 &&
+			if (!player->quit_out_of_game &&
 				(player->unit_index != NONE ||
 					(!game_engine_player_is_odd_man_out(iterator.datum_index) &&
 						!game_engine_player_is_out_of_lives(
@@ -5552,7 +5552,7 @@ boolean team_has_players(
 		player = (struct player_datum *)data_iterator_next(&iterator);
 		while (player)
 		{
-			if (!player->unknown_d1 &&
+			if (!player->quit_out_of_game &&
 				(player->unit_index != NONE ||
 					(!game_engine_player_is_odd_man_out(iterator.datum_index) &&
 						!game_engine_player_is_out_of_lives(
@@ -5728,7 +5728,7 @@ boolean game_engine_man_out(
 {
 	struct player_datum *player = player_get(player_index);
 
-	if (player->unknown_d1)
+	if (player->quit_out_of_game)
 		goto man_out;
 
 	if (global_variant.maximum_lives>0)
@@ -7129,7 +7129,7 @@ static long adjust_score_for_ranking(
 	{
 		result = 0x40000000;
 	}
-	if (!player->unknown_d1)
+	if (!player->quit_out_of_game)
 		result |= 0x20000000;
 
 	return result | score;

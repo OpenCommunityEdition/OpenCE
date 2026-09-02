@@ -110,12 +110,12 @@ struct player_datum
 		long target_hold_time;
 	};
 	long death_time;
-	long unknown88;
+	long multiplayer_special;
 	struct game_statistics statistics;
 	long telefrag_timeout;
 	long unknown_cc;
 	boolean is_blocking_teleporter;
-	boolean unknown_d1;
+	boolean quit_out_of_game;
 	byte pad_d2[2];
 };
 
@@ -171,8 +171,8 @@ typedef char player_datum_unknown_cc_offset_assert[
 	offsetof(struct player_datum, unknown_cc) == 0xCC ? 1 : -1];
 typedef char player_datum_is_blocking_teleporter_offset_assert[
 	offsetof(struct player_datum, is_blocking_teleporter) == 0xD0 ? 1 : -1];
-typedef char player_datum_unknown_d1_offset_assert[
-	offsetof(struct player_datum, unknown_d1) == 0xD1 ? 1 : -1];
+typedef char player_datum_quit_out_of_game_offset_assert[
+	offsetof(struct player_datum, quit_out_of_game) == 0xD1 ? 1 : -1];
 typedef char player_datum_size_assert[
 	sizeof(struct player_datum) == 0xD4 ? 1 : -1];
 

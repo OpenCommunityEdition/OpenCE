@@ -201,7 +201,7 @@ void code_000a2ea0(
 void code_000a29c0(
 	long player_index)
 {
-	player_get(player_index)->unknown88 = 0;
+	player_get(player_index)->multiplayer_special = 0;
 
 	return;
 }

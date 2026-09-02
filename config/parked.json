@@ -1064,6 +1064,25 @@
         },
         "objdiff_percent": 94.8
       }
+    },
+    {
+      "unit": "source/game/game_engine_slayer",
+      "function": "_slayer_get_score_header_string",
+      "class": "tu-context-optimization",
+      "evidence": "Fuzzy-parked under the current house rule after retaining the HCEA-authenticated score-header routine with the natural tag lookup, unicode string-list access, and ustrcpy branches. Target and candidate preserve all six relocation identities and both semantic outcomes. January shrink-wraps ESI independently inside the success and failure branches and emits two branch-local return tails, producing 96 padded bytes; the available VC7 compile hoists one ESI save and merges the common buffer return, producing 80 padded bytes. Ordinary early-return, branch-local result, and branch-local string scopes were measured and did not recover the January topology. No volatile access, compiler barrier, artificial carrier, pragma, inline assembly, undefined behavior, fake dependency, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor that explains the branch-local ESI schedule.",
+      "measurements": {
+        "target": {
+          "size": 96,
+          "relocation_count": 6,
+          "normalized_sha256": "5634f4fc63ca196bd01bfedc309a0b89d402b324ab777ee1adbe7fcb8e37a19a"
+        },
+        "base": {
+          "size": 80,
+          "relocation_count": 6,
+          "normalized_sha256": "6642902d005f708954a7343d1efc251e6de94381ab033888f13bce26059ca79e"
+        },
+        "objdiff_percent": 82.545456
+      }
     }
   ]
 }

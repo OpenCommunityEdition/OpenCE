@@ -1143,7 +1143,7 @@ long player_new(
 		player2->action_result = _player_action_result_reload;
 		player2->action_object_index = NONE;
 		player->unknown_cc = NONE;
-		player->unknown_d1 = FALSE;
+		player->quit_out_of_game = FALSE;
 
 		if (network_player)
 			csmemcpy(&player->network_player_data, network_player, sizeof(struct network_player));
