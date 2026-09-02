@@ -1659,6 +1659,63 @@
         },
         "objdiff_percent": 70.72703
       }
+    },
+    {
+      "unit": "source/interface/hud",
+      "function": "_hud_show_action_response",
+      "class": "private-register-convention",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete action-response dispatcher as ordinary typed C from January disassembly and relocation topology plus the later HCEA semantic recovery at commit 570c83fd9c365dad6f2a3e7041705d5b84c7847c. The retained function handles all named respawn failures and player action-result enums, typed object/unit/control/weapon access, weapon-HUD messaging icons, custom game-engine text, driver/gunner suppression, and the target-attested odd inventory loop. Its 1024-wide-character state buffer recovers January's 0x82c frame, and its instruction count is 626 against January's 631. The remaining boundary is January's private EAX argument convention and common-tail selection: the public C spelling compiles with a stack argument and one extra relocation, while an explicit __fastcall experiment used the stack plus ret 4 and materially worsened the function. Register hints, duplicated fallbacks, declaration/order variants, and alternate icon/seat access shapes did not close the residual. No forced convention shim, naked wrapper, assembly, volatile access, optimizer carrier, raw offset, fake dependency, undefined behavior, or nonsensical branch is retained. Reopen only for authoritative January source/local records or natural same-compiler evidence explaining the private EAX convention and fallback tail sharing.",
+      "measurements": {
+        "target": {
+          "size": 1744,
+          "relocation_count": 120,
+          "normalized_sha256": "bfe1022d2e8f59dc3220b33c497fed91681596b485f4cb2b9339454fe27ec317"
+        },
+        "base": {
+          "size": 1728,
+          "relocation_count": 121,
+          "normalized_sha256": "853cffc36136054ae6e51f2bb4012315c6f5b991c2950c0783d7b0f4fc9cafa9"
+        },
+        "objdiff_percent": 71.032104
+      }
+    },
+    {
+      "unit": "source/interface/hud",
+      "function": "_temporary_hud_draw_reticle",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked under the current house rule with a complete ordinary-C reticle renderer recovered from January disassembly: it constructs sixteen typed world-space points from sine/cosine and the render view transform, then closes the ring through rasterizer_debug_line. January and the retained candidate have the same six relocation identities. The residual is limited to two compiler choices: January schedules the pi/8 x87 add before call-stack cleanup, and retains the generic signed remainder-by-16 sequence, whereas VC7 proves the reconstructed index nonnegative and emits an and 0xf. Natural for-loop, increment-placement, signed long-index, pointer-loop, and declaration-order variants were tested; they either return to this fixed point or perturb more code. No volatile or register forcing, artificial signedness carrier, inline assembly, barrier, raw offset, fake dependency, undefined behavior, or nonsensical control flow is retained. Reopen only for authoritative January source/local-lifetime evidence or a natural same-compiler donor explaining both the x87 and remainder schedules.",
+      "measurements": {
+        "target": {
+          "size": 208,
+          "relocation_count": 6,
+          "normalized_sha256": "34a33fe789d2858840e360558ebc1d2674a329e6a14d59572a3dfb9c1bc2255c"
+        },
+        "base": {
+          "size": 192,
+          "relocation_count": 6,
+          "normalized_sha256": "676b43cbdb66de19263a32f71a6c895b867d638c75f5fcd404e031b808e47afa"
+        },
+        "objdiff_percent": 90.676926
+      }
+    },
+    {
+      "unit": "source/interface/hud",
+      "function": "_hud_draw_screen",
+      "class": "private-register-convention",
+      "evidence": "Fuzzy-parked with the complete top-level HUD draw dispatcher retained in ordinary typed C and corroborated by HCEA commit 570c83fd9c365dad6f2a3e7041705d5b84c7847c. Target and candidate have all 33 relocation identities and the same semantic call sequence: rasterizer HUD bracketing, teammate indicators, primary-local-player motion-sensor tick, perspective and unit gating, weapon/action/sound/unit/nav/damage rendering, messaging, and the temporary HUD tail. The 16-byte envelope gap and downstream register/cleanup schedule are consequences of the adjacent private hud_show_action_response call: January passes its player index in EAX, while the honest source-level candidate pushes a normal stack argument. All unrelated calls remain cdecl and the streams realign at the rasterizer end/temporary-HUD tail. Explicit __fastcall on the private callee was rejected because this compiler emitted a stack argument plus ret 4 and worsened both functions. No ABI shim, naked wrapper, forced convention, assembly, volatile access, optimizer carrier, fake dependency, or nonsensical control flow is retained. Reopen with authoritative January declaration/context evidence or a natural same-compiler mechanism for the private EAX call.",
+      "measurements": {
+        "target": {
+          "size": 320,
+          "relocation_count": 33,
+          "normalized_sha256": "4c1bd54b1e9c6c99e27b86fe5281fca35482e7f2b16be9a9d808a4110b77dffb"
+        },
+        "base": {
+          "size": 304,
+          "relocation_count": 33,
+          "normalized_sha256": "b1b1215ac7f29cbcd63a6070eb063e95473ffdde8caf4a744719cf62850343f7"
+        },
+        "objdiff_percent": 94.97959
+      }
     }
   ]
 }

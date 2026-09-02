@@ -259,6 +259,11 @@ void get_postgame_hilite_colors(
 boolean game_engine_running(
 	void);
 
+boolean game_engine_get_state_message(
+	long player_index,
+	wchar_t *message,
+	long maximum_length);
+
 boolean game_engine_force_single_screen(
 	void);
 

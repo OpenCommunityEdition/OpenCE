@@ -20,6 +20,10 @@ void hud_fix_unit_data(
 
 void hud_update_unit(
 	void);
+void hud_render_unit_interface(
+	struct player_datum *player);
+void hud_render_damage_indicators(
+	short local_player_index);
 void hud_play_unit_sounds(
 	struct player_datum const *player,
 	boolean show_hud);

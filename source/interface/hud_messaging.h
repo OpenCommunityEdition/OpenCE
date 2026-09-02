@@ -14,6 +14,8 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct icon_hud_element_definition;
+
 /* ---------- prototypes/HUD_MESSAGING.C */
 
 void hud_messaging_initialize(
@@ -42,6 +44,26 @@ void hud_add_item_message(
 	long item_definition_index,
 	short quantity,
 	char message_offset);
+void hud_messaging_update(
+	short local_player_index);
+void hud_set_state_message(
+	short local_player_index,
+	short message_index);
+void hud_set_state_message_text(
+	short local_player_index,
+	short custom_icon_index,
+	short icon_string_index,
+	boolean uses_scenario_names);
+void hud_set_state_message_icon(
+	short local_player_index,
+	short custom_icon_index,
+	struct icon_hud_element_definition const *icon);
+void hud_enable_custom_state_message(
+	short local_player_index,
+	boolean enabled);
+void hud_set_state_text(
+	short local_player_index,
+	wchar_t const *message);
 
 /* ---------- globals */
 

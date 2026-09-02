@@ -20,6 +20,8 @@ void motion_sensor_initialize(void);
 void motion_sensor_initialize_for_new_map(void);
 void motion_sensor_dispose_from_old_map(void);
 void motion_sensor_dispose(void);
+void motion_sensor_tick(
+	void);
 
 /* ---------- globals */
 

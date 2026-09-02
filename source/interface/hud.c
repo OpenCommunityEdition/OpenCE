@@ -77,7 +77,10 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "bitmaps/bitmap_group.h"
+#include "camera/director.h"
 #include "cache/texture_cache.h"
+#include "cutscene/cinematics.h"
+#include "devices/device_controls.h"
 #include "game/game_engine.h"
 #include "game/players.h"
 #include "interface/hud.h"
@@ -86,21 +89,56 @@ symbols in this file:
 #include "interface/hud_weapon.h"
 #include "interface/interface.h"
 #include "interface/motion_sensor.h"
+#include "items/weapon_definitions.h"
+#include "items/weapons.h"
 #include "memory/data.h"
+#include "objects/object_definitions.h"
 #include "objects/objects.h"
+#include "rasterizer/rasterizer.h"
 #include "render/render.h"
 #include "render/render_camera_projection.h"
 #include "saved games/game_state.h"
 #include "sound/game_sound.h"
 #include "text/text_group.h"
+#include "units/unit_definitions.h"
 #include "units/units.h"
 
 /* ---------- constants */
+
+enum player_respawn_failure
+{
+	_player_respawn_failure_none = 0,
+	_player_respawn_failure_combat,
+	_player_respawn_failure_enemies,
+	_player_respawn_failure_moving,
+	_player_respawn_failure_vehicle,
+	NUMBER_OF_PLAYER_RESPAWN_FAILURES,
+};
+
+enum hud_state_message_type
+{
+	_hud_message_pickup = 0,
+	_hud_message_swap_powerup,
+	_hud_message_touch_device,
+	_hud_message_custom_device,
+	_hud_message_swap_weapon,
+	_hud_message_remind_to_switch_weapons,
+	_hud_message_enter_vehicle,
+	_hud_message_exit_vehicle,
+	_hud_message_flip_vehicle,
+	_hud_message_respawn_failed_moving,
+	_hud_message_respawn_failed_unsafe,
+	_hud_message_respawn_failed_combat,
+	_hud_message_respawn_failed_vehicle,
+	NUMBER_OF_HUD_STATE_MESSAGE_TYPES,
+};
 
 /* ---------- macros */
 
 #define hud_globals_definition_get(index) \
 	((struct hud_globals_definition *)tag_get('hudg', (index)))
+#define weapon_hud_interface_definition_get(index) \
+	((struct weapon_hud_interface_definition *)tag_get('wphi', (index)))
 
 /* ---------- structures */
 
@@ -109,6 +147,44 @@ struct hud_scripted_globals
 	boolean show_hud;
 	boolean show_hud_help_text;
 	byte reserved2[2];
+};
+
+struct icon_hud_element_definition
+{
+	short sequence_index;
+	short width_offset;
+	point2d offset;
+	unsigned long color;
+	char frame_rate;
+	byte flags;
+	short text_index;
+};
+
+struct weapon_hud_interface_definition
+{
+	byte reserved000[0x13C];
+	struct icon_hud_element_definition messaging_icon;
+	byte reserved14C[0x30];
+};
+
+struct weapon_interface_magazine_state
+{
+	boolean reloading;
+	boolean can_fire;
+	short rounds_loaded;
+	short rounds_loaded_maximum;
+	short rounds_remaining;
+	short rounds_remaining_maximum;
+};
+
+struct weapon_interface_state
+{
+	real heat;
+	real age;
+	boolean overheated;
+	byte pad09;
+	short magazine_count;
+	struct weapon_interface_magazine_state magazines[2];
 };
 
 struct hud_globals_definition
@@ -133,6 +209,12 @@ typedef char hud_globals_loading_begin_index_offset_assert[
 	offsetof(struct hud_globals_definition, loading_begin_index) == 0x3D8 ? 1 : -1];
 typedef char hud_globals_checkpoint_sound_index_offset_assert[
 	offsetof(struct hud_globals_definition, checkpoint_sound.index) == 0x3EC ? 1 : -1];
+typedef char icon_hud_element_definition_size_assert[
+	sizeof(struct icon_hud_element_definition) == 0x10 ? 1 : -1];
+typedef char weapon_hud_interface_definition_messaging_icon_offset_assert[
+	offsetof(struct weapon_hud_interface_definition, messaging_icon) == 0x13C ? 1 : -1];
+typedef char weapon_interface_state_size_assert[
+	sizeof(struct weapon_interface_state) == 0x20 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -140,10 +222,20 @@ typedef char hud_globals_checkpoint_sound_index_offset_assert[
 
 extern struct hud_globals_definition *hud_globals;
 extern struct hud_scripted_globals *hud_scripted_globals;
+extern boolean temporary_hud;
 
 wchar_t const *default_string = L"";
 
 /* ---------- public code */
+
+static long weapon_state_is_depleted(
+	struct weapon_interface_state const *state)
+{
+	return (state->magazines[0].rounds_loaded_maximum &&
+		!state->magazines[0].rounds_loaded &&
+		!state->magazines[0].rounds_remaining) ||
+		state->age == 1.0f;
+}
 
 void hud_initialize(
 	void)
@@ -247,6 +339,395 @@ void hud_update(
 	return;
 }
 
+static long get_object_icon_text_index(
+	long object_index)
+{
+	if (object_index == NONE)
+		return NONE;
+
+	return object_definition_get(
+		object_get(object_index)->definition_index)->object.icon_text_index;
+}
+
+static void hud_show_action_response(
+	long player_index)
+{
+	struct player_datum *player = player_get(player_index);
+	short respawn_failure = players_get_respawn_failure();
+	long action_object_index;
+	short item_name_index;
+
+	if (respawn_failure != _player_respawn_failure_none &&
+		player->unit_index == NONE)
+	{
+		switch (respawn_failure)
+		{
+		case _player_respawn_failure_combat:
+			hud_set_state_message(
+				render.local_player_index,
+				_hud_message_respawn_failed_combat);
+			break;
+
+		case _player_respawn_failure_enemies:
+			hud_set_state_message(
+				render.local_player_index,
+				_hud_message_respawn_failed_unsafe);
+			break;
+
+		case _player_respawn_failure_moving:
+			hud_set_state_message(
+				render.local_player_index,
+				_hud_message_respawn_failed_moving);
+			break;
+
+		case _player_respawn_failure_vehicle:
+			hud_set_state_message(
+				render.local_player_index,
+				_hud_message_respawn_failed_vehicle);
+			break;
+
+		default:
+			match_assert(
+				"c:\\halo\\SOURCE\\interface\\hud.c",
+				424,
+				!"unreachable");
+			break;
+		}
+
+		return;
+	}
+
+	action_object_index = player->action_object_index;
+	if (action_object_index == NONE)
+	{
+		item_name_index = NONE;
+	}
+	else
+	{
+		item_name_index = object_definition_get(
+			object_get(action_object_index)->definition_index)->object.icon_text_index;
+	}
+
+	switch (player->action_result)
+	{
+	case _player_action_result_pickup_powerup:
+	case _player_action_result_pickup_weapon:
+		hud_set_state_message(
+			render.local_player_index,
+			_hud_message_pickup);
+		hud_set_state_message_text(
+			render.local_player_index,
+			0,
+			item_name_index,
+			FALSE);
+		return;
+
+	case _player_action_result_exit_vehicle:
+	{
+		struct unit_datum *unit = unit_get(player->unit_index);
+
+		hud_set_state_message(
+			render.local_player_index,
+			_hud_message_exit_vehicle);
+		hud_set_state_message_text(
+			render.local_player_index,
+			0,
+			(short)get_object_icon_text_index(unit->object.parent_object_index),
+			FALSE);
+		return;
+	}
+
+	case _player_action_result_swap_for_powerup:
+		hud_set_state_message(
+			render.local_player_index,
+			_hud_message_swap_powerup);
+		hud_set_state_message_text(
+			render.local_player_index,
+			0,
+			(short)get_object_icon_text_index(
+				unit_get_current_equipment(player->unit_index)),
+			FALSE);
+		hud_set_state_message_text(
+			render.local_player_index,
+			1,
+			item_name_index,
+			FALSE);
+		return;
+
+	case _player_action_result_swap_for_weapon:
+	{
+		struct weapon_datum *weapon = weapon_try_and_get(action_object_index);
+
+		if (weapon != NULL)
+		{
+			struct icon_hud_element_definition const *icon = NULL;
+			long hud_interface_index = weapon_definition_get(
+				weapon->definition_index)->weapon.interface_definition.hud_interface.index;
+
+			if (hud_interface_index != NONE)
+			{
+				icon = &weapon_hud_interface_definition_get(
+					hud_interface_index)->messaging_icon;
+				if (icon->sequence_index == NONE)
+					icon = NULL;
+			}
+
+			hud_set_state_message(
+				render.local_player_index,
+				_hud_message_swap_weapon);
+			if (icon != NULL)
+			{
+				hud_set_state_message_icon(
+					render.local_player_index,
+					0,
+					icon);
+			}
+			else
+			{
+				hud_set_state_message_text(
+					render.local_player_index,
+					0,
+					item_name_index,
+					FALSE);
+			}
+		}
+
+		return;
+	}
+
+	case _player_action_result_add_weapon_to_inventory:
+	{
+		struct weapon_datum *weapon = weapon_try_and_get(action_object_index);
+
+		if (weapon != NULL)
+		{
+			struct icon_hud_element_definition const *icon = NULL;
+			long hud_interface_index = weapon_definition_get(
+				weapon->definition_index)->weapon.interface_definition.hud_interface.index;
+
+			if (hud_interface_index != NONE)
+			{
+				icon = &weapon_hud_interface_definition_get(
+					hud_interface_index)->messaging_icon;
+				if (icon->sequence_index == NONE)
+					icon = NULL;
+			}
+
+			hud_set_state_message(
+				render.local_player_index,
+				_hud_message_pickup);
+			if (icon != NULL)
+			{
+				hud_set_state_message_icon(
+					render.local_player_index,
+					0,
+					icon);
+			}
+			else
+			{
+				hud_set_state_message_text(
+					render.local_player_index,
+					0,
+					item_name_index,
+					FALSE);
+			}
+		}
+
+		return;
+	}
+
+	case _player_action_result_enter_vehicle:
+	case _player_action_result_evict_from_vehicle:
+	{
+		hud_set_state_message(
+			render.local_player_index,
+			_hud_message_enter_vehicle);
+		hud_set_state_message_text(
+			render.local_player_index,
+			0,
+			TAG_BLOCK_GET_ELEMENT(
+				&unit_definition_get(
+					unit_get(action_object_index)->definition_index)->unit.seats,
+				player->action_seat_index,
+				struct unit_seat)->icon_text_index,
+			FALSE);
+		hud_set_state_message_text(
+			render.local_player_index,
+			1,
+			item_name_index,
+			FALSE);
+		return;
+	}
+
+	case _player_action_result_touch_device:
+	{
+		struct control_datum *control = control_get(action_object_index);
+
+		if (control->control.custom_name_index == NONE)
+		{
+			hud_set_state_message(
+				render.local_player_index,
+				_hud_message_touch_device);
+			hud_set_state_message_text(
+				render.local_player_index,
+				0,
+				item_name_index,
+				FALSE);
+		}
+		else
+		{
+			hud_set_state_message(
+				render.local_player_index,
+				_hud_message_custom_device);
+			hud_set_state_message_text(
+				render.local_player_index,
+				0,
+				control->control.custom_name_index,
+				TRUE);
+		}
+
+		return;
+	}
+
+	case _player_action_result_flip_vehicle:
+		hud_set_state_message(
+			render.local_player_index,
+			_hud_message_flip_vehicle);
+		hud_set_state_message_text(
+			render.local_player_index,
+			0,
+			(short)get_object_icon_text_index(action_object_index),
+			FALSE);
+		return;
+
+	default:
+	{
+		wchar_t state_message[1024];
+
+		if (game_engine_get_state_message(
+			player_index,
+			state_message,
+			1024))
+		{
+			hud_enable_custom_state_message(render.local_player_index, TRUE);
+			hud_set_state_text(render.local_player_index, state_message);
+			return;
+		}
+
+		if (player->unit_index == NONE)
+		{
+			hud_enable_custom_state_message(render.local_player_index, FALSE);
+			return;
+		}
+
+		{
+			long unit_index = player->unit_index;
+			long weapon_index = unit_inventory_get_weapon(
+				unit_index,
+				unit_get(unit_index)->unit.current_weapon_index);
+			struct unit_datum *unit = unit_get(unit_index);
+			boolean allow_swap_prompt = TRUE;
+
+			if (unit->object.parent_object_index != NONE &&
+				unit->unit.parent_seat_index != NONE)
+			{
+				struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+					&unit_definition_get(
+						unit_get(unit->object.parent_object_index)->definition_index)->unit.seats,
+					unit->unit.parent_seat_index,
+					struct unit_seat);
+
+				allow_swap_prompt =
+					!TEST_FLAG(seat->flags, _unit_seat_driver_bit) &&
+					!TEST_FLAG(seat->flags, _unit_seat_gunner_bit);
+			}
+
+			if (weapon_index != NONE && allow_swap_prompt)
+			{
+				struct weapon_interface_state weapon_state;
+
+				weapon_build_weapon_interface_state(weapon_index, &weapon_state);
+				if (weapon_state_is_depleted(&weapon_state))
+				{
+					short weapon_slot = unit->unit.current_weapon_index;
+					short weapon_count = unit_get_weapon_count(unit_index);
+					long candidate_weapon_index;
+
+					do
+					{
+						weapon_slot = unit_inventory_next_weapon(
+							unit_index,
+							weapon_slot,
+							1);
+						candidate_weapon_index = unit_inventory_get_weapon(
+							unit_index,
+							weapon_slot);
+						weapon_build_weapon_interface_state(
+							candidate_weapon_index,
+							&weapon_state);
+						if (!weapon_state_is_depleted(&weapon_state) ||
+							candidate_weapon_index == weapon_index)
+						{
+							break;
+						}
+					}
+					while (!--weapon_count);
+
+					if (!weapon_state_is_depleted(&weapon_state) &&
+						candidate_weapon_index != weapon_index)
+					{
+						struct weapon_datum *candidate_weapon;
+
+						hud_set_state_message(
+							render.local_player_index,
+							_hud_message_remind_to_switch_weapons);
+						candidate_weapon = weapon_try_and_get(
+							candidate_weapon_index);
+						if (candidate_weapon != NULL)
+						{
+							long hud_interface_index = weapon_definition_get(
+								candidate_weapon->definition_index)->weapon.interface_definition.hud_interface.index;
+							struct icon_hud_element_definition const *icon = NULL;
+
+							if (hud_interface_index != NONE)
+							{
+								icon = &weapon_hud_interface_definition_get(
+									hud_interface_index)->messaging_icon;
+								if (icon->sequence_index == NONE)
+									icon = NULL;
+							}
+
+							if (icon != NULL)
+							{
+								hud_set_state_message_icon(
+									render.local_player_index,
+									0,
+									icon);
+							}
+							else
+							{
+								hud_set_state_message_text(
+									render.local_player_index,
+									0,
+									item_name_index,
+									FALSE);
+							}
+
+							return;
+						}
+					}
+				}
+			}
+		}
+
+		hud_enable_custom_state_message(render.local_player_index, FALSE);
+		return;
+	}
+	}
+
+	return;
+}
+
 wchar_t const *hud_get_item_string(
 	long string_index)
 {
@@ -329,6 +810,47 @@ void hud_picked_up_powerup(
 			0,
 			0);
 	}
+
+	return;
+}
+
+void temporary_hud_draw_reticle(
+	real angle,
+	real_argb_color const *color)
+{
+	real_point3d points[16];
+	real radius = tangent(angle * 0.5f) * 0.0625f;
+	long point_index;
+	long next_point_index;
+	long line_count;
+	real_point3d *point;
+
+	angle = 0.0f;
+	for (point_index = 0; point_index < NUMBEROF(points); point_index++)
+	{
+		points[point_index].x = cosine(angle) * radius;
+		points[point_index].y = sine(angle) * radius;
+		points[point_index].z = -0.0625f;
+		matrix4x3_transform_point(
+			&render.frustum.view_to_world,
+			&points[point_index],
+			&points[point_index]);
+		angle += _pi / 8.0f;
+	}
+
+	next_point_index = 1;
+	line_count = NUMBEROF(points);
+	point = points;
+	do
+	{
+		rasterizer_debug_line(
+			point,
+			&points[next_point_index % NUMBEROF(points)],
+			color);
+		next_point_index++;
+		point++;
+	}
+	while (--line_count);
 
 	return;
 }
@@ -474,6 +996,63 @@ void hud_draw_players(
 		{
 			hud_draw_friendly_indicator(teammate_indices[teammate_index]);
 		}
+	}
+
+	return;
+}
+
+void hud_draw_screen(
+	void)
+{
+	long player_index = local_player_get_player_index(render.local_player_index);
+	director_perspective perspective = director_get_perspective(render.local_player_index);
+
+	rasterizer_hud_begin();
+	if (player_index != NONE)
+	{
+		struct player_datum *player = player_get(player_index);
+
+		if ((!game_engine_running() || game_engine_display_team_indicators()) &&
+			!cinematic_in_progress())
+		{
+			hud_draw_players();
+		}
+
+		if (!game_time_get_paused() &&
+			render.local_player_index == local_player_get_next(NONE))
+		{
+			motion_sensor_tick();
+		}
+
+		if (hud_scripted_globals->show_hud &&
+			perspective != _director_perspective_neutral &&
+			perspective != _director_perspective_scripted &&
+			player->unit_index != NONE)
+		{
+			hud_render_weapon_interface(player);
+			hud_show_action_response(player_index);
+			hud_play_unit_sounds(player, hud_scripted_globals->show_hud);
+			hud_render_unit_interface(player);
+			hud_render_nav_points(render.local_player_index);
+			hud_render_damage_indicators(render.local_player_index);
+		}
+		else
+		{
+			if (hud_scripted_globals->show_hud)
+			{
+				hud_show_action_response(player_index);
+			}
+
+			hud_play_unit_sounds(player, hud_scripted_globals->show_hud);
+		}
+
+		hud_messaging_update(render.local_player_index);
+	}
+
+	rasterizer_hud_end();
+	if (temporary_hud)
+	{
+		temporary_hud_draw();
 	}
 
 	return;

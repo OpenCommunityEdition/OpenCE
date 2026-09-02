@@ -52,6 +52,15 @@ void hud_picked_up_ammunition(
 void hud_picked_up_weapon(
 	short local_player_index,
 	long weapon_definition_index);
+void hud_render_nav_points(
+	short local_player_index);
+void temporary_hud_draw_reticle(
+	real angle,
+	real_argb_color const *color);
+void temporary_hud_draw(
+	void);
+void hud_draw_screen(
+	void);
 
 /* ---------- globals */
 

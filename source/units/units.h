@@ -703,6 +703,10 @@ void unit_scripting_exit_vehicle(
 	long unit_index);
 boolean unit_clip_to_aiming_bounds(long unit_index, real_vector3d *vector, boolean use_aiming_screen);
 long unit_inventory_get_weapon(long unit_index, short index);
+short unit_inventory_next_weapon(
+	long unit_index,
+	short current_index,
+	short delta);
 short unit_inventory_next_grenade(long unit_index, short current_index, short delta);
 short unit_inventory_get_must_be_readied_weapon(
 	long unit_index);

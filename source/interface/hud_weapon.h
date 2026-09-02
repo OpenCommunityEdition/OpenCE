@@ -2,6 +2,8 @@
 #define __HUD_WEAPON_H
 #pragma once
 
+struct player_datum;
+
 void hud_initialize_weapon_interface(
 	void);
 void hud_initialize_weapon_interface_for_new_map(
@@ -18,5 +20,7 @@ void hud_fix_weapon_data(
 
 void hud_update_weapon(
 	void);
+void hud_render_weapon_interface(
+	struct player_datum *player);
 
 #endif // __HUD_WEAPON_H
