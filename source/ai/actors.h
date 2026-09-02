@@ -838,6 +838,8 @@ real_argb_color const *actor_activation_debug_color(long actor_index);
 void actor_set_dormant(
 	long actor_index,
 	boolean dormant);
+void actor_find_pathfinding_location(
+	long actor_index);
 real actor_destination_tolerance(
 	long actor_index);
 boolean actor_get_running_blind_vector(long actor_index, real_vector3d *run_vector);
@@ -930,11 +932,19 @@ long actor_aim_grenade(
 
 /* ---------- prototypes/ACTOR_MOVING.C */
 
-boolean actor_move_animation_busy(long actor_index);
+boolean actor_move_animation_busy(
+	long actor_index);
 boolean actor_move_animation_impulse(
 	long actor_index,
 	short impulse,
 	real_vector2d const *alignment_vector);
+void actor_path_input_new(
+	long actor_index,
+	struct path_input *input);
+boolean actor_path_3d_available(
+	long actor_index,
+	real_point3d const *destination,
+	real *avoidance_distance_reference);
 boolean actor_test_destination(
 	long actor_index);
 boolean actor_path_refresh(
@@ -959,6 +969,8 @@ boolean actor_move_to_prop(
 	real distance);
 boolean actor_move_halt(
 	long actor_index);
+boolean actor_move_halt_at_firing_position(
+	long actor_index);
 
 void actor_look_secondary(
 	long actor_index,
@@ -966,11 +978,19 @@ void actor_look_secondary(
 	short priority,
 	struct direction_specification const *direction);
 
-void actor_move_transform_avoidance_vector(struct vector_avoidance_data *avoidance_data, real_vector3d const *avoidance_vector, real_vector3d *direction_vector);
-void actor_move_get_avoidance_direction(struct vector_avoidance_data *avoidance_data, real direction, real_vector3d *direction_vector);
+void actor_move_transform_avoidance_vector(
+	struct vector_avoidance_data *avoidance_data,
+	real_vector3d const *avoidance_vector,
+	real_vector3d *direction_vector);
+void actor_move_get_avoidance_direction(
+	struct vector_avoidance_data *avoidance_data,
+	real direction,
+	real_vector3d *direction_vector);
 
-boolean actor_path_has_path(long actor_index);
-boolean actor_path_at_destination(long actor_index);
+boolean actor_path_has_path(
+	long actor_index);
+boolean actor_path_at_destination(
+	long actor_index);
 
 /* ---------- prototypes/ACTOR_PERCEPTION.C */
 

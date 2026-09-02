@@ -75,9 +75,6 @@ void actor_discard_firing_position(
 	short firing_position_index,
 	boolean temporary);
 
-void actor_find_pathfinding_location(
-	long actor_index);
-
 boolean actor_nearby_firing_positions(
 	long actor_index,
 	real_point3d const *position,

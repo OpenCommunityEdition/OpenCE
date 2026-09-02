@@ -205,22 +205,67 @@ symbols in this file:
 /* ---------- headers */
 
 #define arccosine arccosine_inline
+#define normalize3d normalize3d_inline
 #include "cseries/cseries.h"
+#include "cseries/errors.h"
 #include "ai/actions.h"
+#include "ai/actor_definitions.h"
 #include "ai/actors.h"
 #include "ai/props.h"
 #include "units/units.h"
+#include "units/vehicle_definitions.h"
+#include "units/vehicles.h"
 #undef arccosine
+#undef normalize3d
 
 /* ---------- constants */
 
+enum
+{
+	NUMBER_OF_VECTOR_AVOIDANCE_DIRECTIONS = 8,
+};
+
 /* ---------- macros */
+
+#define _full_circle (2.f*_pi)
 
 /* ---------- structures */
 
+/* The shared vehicle tag layout remains opaque in the public header. Actor
+ * movement reads only these two January-authenticated AI pathing fields, so
+ * keep that layout fragment local to this translation unit. */
+struct vehicle_definition
+{
+	byte __unknown0[0x388];
+	real ai_avoidance_distance;
+	real ai_pathfinding_radius;
+};
+
+typedef char actor_moving_vehicle_avoidance_distance_offset_assert[
+	offsetof(struct vehicle_definition, ai_avoidance_distance) == 0x388 ? 1 : -1];
+typedef char actor_moving_vehicle_pathfinding_radius_offset_assert[
+	offsetof(struct vehicle_definition, ai_pathfinding_radius) == 0x38C ? 1 : -1];
+
 /* ---------- prototypes */
 
+/* `real_math.h` currently carries the inline definition, while January's
+ * actor-moving compiland calls the out-of-line COMDAT owner. */
+real normalize3d(
+	real_vector3d *vector);
+
 /* ---------- globals */
+
+real const avoidance_ray_angles[NUMBER_OF_VECTOR_AVOIDANCE_DIRECTIONS] =
+{
+	0.f,
+	_pi/4,
+	_pi/2,
+	3*_pi/4,
+	_pi,
+	3.9269909f,
+	_pi + _pi/2,
+	5.4977875f,
+};
 
 /* ---------- public code */
 
@@ -290,6 +335,41 @@ short actor_path_get_destination_firing_position_index(
 	return firing_position_index;
 }
 
+void actor_path_input_new(
+	long actor_index,
+	struct path_input *input)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition =
+		actor_definition_get(actor->meta.definition_index);
+	real pathfinding_radius = definition->moving.pathfinding_radius;
+	long ignore_source_object_index = actor->meta.unit_index;
+
+	if (actor->input.vehicle_driver_type > _actor_vehicle_driver_none)
+	{
+		struct unit_datum *vehicle = vehicle_get(actor->input.vehicle_index);
+		struct vehicle_definition *vehicle_definition =
+			vehicle_specific_definition_get(vehicle->definition_index);
+
+		ignore_source_object_index = actor->input.vehicle_index;
+		if (vehicle_definition->ai_pathfinding_radius > 0.f)
+			pathfinding_radius = vehicle_definition->ai_pathfinding_radius;
+	}
+
+	actor_find_pathfinding_location(actor_index);
+	path_input_new(
+		input,
+		pathfinding_radius,
+		actor->emotions.ignorant_of_broken_surfaces,
+		ignore_source_object_index);
+	path_input_set_start(
+		input,
+		&actor->input.pathfinding_point,
+		actor->input.pathfinding_surface_index);
+
+	return;
+}
+
 boolean actor_move_animation_impulse(
 	long actor_index,
 	short impulse,
@@ -353,6 +433,99 @@ void actor_move_transform_avoidance_vector(
 	direction_vector->k += component * avoidance_data->up.k;
 
 	return;
+}
+
+void actor_move_get_avoidance_direction(
+	struct vector_avoidance_data *avoidance_data,
+	real direction,
+	real_vector3d *direction_vector)
+{
+	real_vector3d avoidance_vector;
+	real angle = REAL_MAX;
+	short direction_index;
+
+	if (direction < 0.f || direction >= (real)NUMBER_OF_VECTOR_AVOIDANCE_DIRECTIONS)
+		direction = 0.f;
+
+	for (direction_index = 0;
+		direction_index < NUMBER_OF_VECTOR_AVOIDANCE_DIRECTIONS;
+		direction_index++)
+	{
+		if ((real)direction_index + 1.f > direction)
+		{
+			real fraction = direction - (real)direction_index;
+			real angle0 = avoidance_ray_angles[direction_index];
+			real angle1 =
+				direction_index == NUMBER_OF_VECTOR_AVOIDANCE_DIRECTIONS - 1
+					? avoidance_ray_angles[0]
+					: avoidance_ray_angles[direction_index + 1];
+
+			angle = angle0*(1.f - fraction) + angle1*fraction;
+			break;
+		}
+	}
+
+	if (angle == REAL_MAX)
+	{
+		angle = 0.f;
+		error(
+			_error_silent,
+			"warning: actor_move_get_avoidance_vector couldn't find out-of-bounds direction %.4f",
+			direction);
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\actor_moving.c",
+		2743,
+		(angle >= 0.0f) && (angle < _full_circle));
+
+	avoidance_vector.i = 0.f;
+	avoidance_vector.j = cosine(angle);
+	avoidance_vector.k = sine(angle);
+	actor_move_transform_avoidance_vector(
+		avoidance_data,
+		&avoidance_vector,
+		direction_vector);
+
+	return;
+}
+
+boolean actor_path_3d_available(
+	long actor_index,
+	real_point3d const *destination,
+	real *avoidance_distance_reference)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	real avoidance_distance = 0.f;
+	boolean available = TRUE;
+
+	if (actor->input.vehicle_driver_type == _actor_vehicle_driver_directional_flying)
+	{
+		struct unit_datum *vehicle = vehicle_get(actor->input.vehicle_index);
+		struct vehicle_definition *vehicle_definition =
+			vehicle_specific_definition_get(vehicle->definition_index);
+
+		avoidance_distance = vehicle_definition->ai_avoidance_distance;
+		if (avoidance_distance > 0.f &&
+			actor->control.vector_avoidance_rotation_emergency_instantaneous > 0.9f)
+		{
+			real_vector3d direction;
+
+			if (normalize3d(vector_from_points3d(
+					&actor->input.position.body_position,
+					destination,
+					&direction)) > 0.f &&
+				dot_product3d(&direction, &actor->input.facing_vector) > 0.984f)
+			{
+				available = FALSE;
+			}
+		}
+	}
+
+	if (avoidance_distance_reference)
+		*avoidance_distance_reference = avoidance_distance;
+
+	return available;
 }
 
 real arccosine(
@@ -518,4 +691,56 @@ boolean actor_move_to_prop(
 	}
 
 	return result;
+}
+
+boolean actor_move_halt(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->input.vehicle_driver_type == _actor_vehicle_driver_directional_flying &&
+		actor->control.moving)
+	{
+		return actor_move_to_point(
+			actor_index,
+			&actor->input.position.body_position,
+			actor->input.pathfinding_surface_index,
+			NONE);
+	}
+
+	actor->firing_positions.current_position_index = NONE;
+	if (actor->control.path.destination_orders.destination_type != _destination_halt)
+	{
+		actor->orders.move.destination.destination_type = _destination_halt;
+		actor->control.path.destination_orders = actor->orders.move.destination;
+	}
+
+	return actor_path_refresh(actor_index, TRUE, FALSE);
+}
+
+boolean actor_move_halt_at_firing_position(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->input.vehicle_driver_type == _actor_vehicle_driver_directional_flying)
+	{
+		short firing_position_index = actor->firing_positions.current_position_index;
+
+		if (firing_position_index == NONE)
+			return actor_move_halt(actor_index);
+
+		return actor_move_to_firing_position(
+			actor_index,
+			firing_position_index,
+			FALSE);
+	}
+
+	if (actor->control.path.destination_orders.destination_type != _destination_halt)
+	{
+		actor->orders.move.destination.destination_type = _destination_halt;
+		actor->control.path.destination_orders = actor->orders.move.destination;
+	}
+
+	return actor_path_refresh(actor_index, TRUE, FALSE);
 }
