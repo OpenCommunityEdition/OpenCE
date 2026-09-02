@@ -1,7 +1,7 @@
 """Gate harness: compile a unit (optionally with find/replace edits) and report per-function status.
 
-usage: python scratch/gate.py <unit-path-no-ext> [--edits edits.json] [--fn NAME ...] [--disas NAME]
-Example: python scratch/gate.py source/hs/hs --fn _hs_find_script_by_name --disas _hs_find_script_by_name
+usage: python tools/campaign/gate.py <unit-path-no-ext> [--edits edits.json] [--fn NAME ...] [--disas NAME]
+Example: python tools/campaign/gate.py source/hs/hs --fn _hs_find_script_by_name --disas _hs_find_script_by_name
 """
 import sys, json, os, re, subprocess, argparse
 sys.path.insert(0, 'tools')

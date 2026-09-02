@@ -4,11 +4,13 @@ Five small tools that carried the 2026-08-16 session. All are run from the
 worktree root and assume `ninja` has produced `build/base/**` and
 `build/split/**`.
 
-**Hard-coded path warning:** `gate.py`, `units_hunt_all.py` and
-`tools/c2dbg32/*.py` embed the absolute path
+**Hard-coded path warning:** `units_hunt_all.py` and `tools/c2dbg32/*.py`
+embed the absolute path
 `C:\halo-worktrees\claude-finish-hs-20260816\xbox\bin\vc7\CL.Exe`.
-If you work in a different worktree, edit the `CL` constant in each (or export
-your own copy). Everything else is path-relative.
+If you work in a different worktree, edit the `CL` constant in each. `gate.py`
+uses `HALO_CL` when set, then the current worktree's `xbox/bin/vc7/CL.Exe`,
+and retains the old absolute path only as a compatibility fallback. Everything
+else is path-relative.
 
 ## board.py — the scoreboard
 
@@ -32,6 +34,8 @@ python tools/campaign/gate.py source/units/units                       # whole u
 python tools/campaign/gate.py source/units/units --fn _unit_place      # one function
 python tools/campaign/gate.py source/units/units --edits e.json --fn _unit_place --disas _unit_place
 python tools/campaign/gate.py source/units/units --cflag /Ob1 --all    # diagnostic flag override
+python tools/campaign/gate.py source/ai/encounters --alias old_name=new_name --all
+python tools/campaign/gate.py source/ai/encounters --out scratch/encounters-probe.obj
 ```
 
 `--edits` takes a JSON list of `[find, replace, tag]` triples applied to the real
@@ -42,6 +46,11 @@ disassembly with relocation annotations. Reads per-unit cflags out of
 `--cflag` appends one diagnostic compiler option after those unit flags and may
 be repeated. It is an audit aid only: a flag improvement is not source-match
 evidence and must not be admitted without independent build provenance.
+`--alias` applies a whole-identifier source rename in memory for symbol-mapping
+probes; like `--edits`, it never changes the source file and is not admission
+evidence by itself. `--out` preserves the PID-isolated probe object at the
+specified path for independent COFF or disassembly inspection. `--all` prints
+exact functions as well as residual and unwritten functions.
 
 ## apply_edits.py — land an edits JSON on the real file
 
