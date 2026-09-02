@@ -1621,6 +1621,44 @@
         },
         "objdiff_percent": 60.99099
       }
+    },
+    {
+      "unit": "source/objects/widgets/lightning",
+      "function": "_lightning_offset_marker_position",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete private marker-offset helper in ordinary typed C from January disassembly and assertion/relocation evidence, then corroborating its semantic name and algorithm against the later HCEA implementation and the independent Stian/Pastudan lifts. The helper is a same-TU static owner naturally emitted by the complete lightning_submit caller and receives position, matrix, and random_position_bounds in January's ESI/EBX/EDI private register convention. Target and candidate share the 240-byte padded envelope and all 22 relocation identities; the fail-closed classifier returns a PROVEN independent-instruction-scheduling STOP. After relocation normalization, the sole instruction difference is an adjacent transposition of the post-transform stack cleanup and first independent x87 addition. The retained source performs all three authenticated assertions, three local random draws, component remapping, in-place matrix transform, and position accumulation. No register hint, volatile access, barrier, pragma, assembly, fake dependency, undefined behavior, forced inline/noinline, or nonsensical control flow is present. Reopen only for authoritative January source/local records or a natural compatible-compiler context that explains that independent schedule.",
+      "measurements": {
+        "target": {
+          "size": 240,
+          "relocation_count": 22,
+          "normalized_sha256": "2fe97798519acba821968a88f76c5a3ac64a62c86a9919327b6ed89c8599f17d"
+        },
+        "base": {
+          "size": 240,
+          "relocation_count": 22,
+          "normalized_sha256": "18303a5b66698933663dbbd26cebba03fb0487eb8154f80ec6a8bfadd6d7c7f3"
+        },
+        "objdiff_percent": 97.402596
+      }
+    },
+    {
+      "unit": "source/objects/widgets/lightning",
+      "function": "_lightning_submit",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after restoring the complete lightning widget renderer in ordinary typed C from January control flow, frame, calls, relocation topology, and owned assertions, with its marker/subdivision/render semantics independently corroborated by the later HCEA source and the Stian/Pastudan lifts. The retained function uses lightning_definition_get, lightning_get, bitmap_group_get, and TAG_BLOCK_GET_ELEMENT typed access; semantic enums and cseries flag/index macros; TU-private target-proven tag and vertex layouts; and the correctly owned rasterizer color-packing prototype. It reproduces January's 0x24144 stack frame and 0x24024-byte clear for 4,097 typed 0x24-byte points, resolves object markers, applies endpoint and midpoint jitter, preserves point-valid assertions and the January math inline schedule, billboards the path into typed dynamic-unlit vertices, computes its bounds centroid, selects the semantic shader, submits, and releases the buffer. January is 2,576 padded bytes with 80 relocations; VC7 emits 2,480 bytes with 77 relocations, and the fresh report records 70.72703 percent. The fail-closed classifier returns UNKNOWN for the broad remaining register/control scheduling gap, so no specific compiler recipe or strict credit is claimed. No register hint, volatile access, barrier, pragma, assembly, fake dependency, raw address, undefined behavior, forced inline/noinline, manual color packing, or nonsensical exact-only branch is present. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the remaining allocation and scheduling packet.",
+      "measurements": {
+        "target": {
+          "size": 2576,
+          "relocation_count": 80,
+          "normalized_sha256": "fb46c25559e11027286d7f9192b0cbceef54b7e56aece731f83c6d0c298c5377"
+        },
+        "base": {
+          "size": 2480,
+          "relocation_count": 77,
+          "normalized_sha256": "8c2a94c7c5b19af4e3fae15c90c1c3fcfdde8606db804a924a2ac554604b3ab4"
+        },
+        "objdiff_percent": 70.72703
+      }
     }
   ]
 }

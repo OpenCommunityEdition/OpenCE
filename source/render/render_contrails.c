@@ -87,8 +87,6 @@ void *_texture_cache_bitmap_get_hardware_format(
 	struct bitmap_data *bitmap,
 	boolean block,
 	boolean load);
-pixel32 real_argb_color_to_pixel32(
-	real_argb_color const *color);
 
 real contrail_fade(
 	struct contrail_definition *definition,
