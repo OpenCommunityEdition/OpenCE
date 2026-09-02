@@ -52,18 +52,6 @@ enum action_class
 	NUMBER_OF_ACTION_CLASSES,
 };
 
-enum move_position_order
-{
-	_move_position_order_none = 0,
-	_move_position_order_repeat,
-	_move_position_order_loop,
-	_move_position_order_loop_back_and_forth,
-	_move_position_order_loop_randomly,
-	_move_position_order_random,
-	NUMBER_OF_MOVE_POSITION_ORDERS,
-};
-
-
 #define ACTOR_MAXIMUM_AVOIDANCE_RAYS 9
 
 /* ---------- macros */
