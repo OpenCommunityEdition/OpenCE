@@ -3,7 +3,7 @@ MODELS.C
 
 symbols in this file:
 00112DB0 0430:
-	_code_00112db0 (0000)
+	_render_model_parts (0000)
 001131E0 0110:
 	_model_interpolate_node_orientations (0000)
 001132F0 0090:
@@ -19,7 +19,7 @@ symbols in this file:
 001136A0 0070:
 	_model_find_node (0000)
 00113710 0010:
-	_code_00113710 (0000)
+	_model_geometry_part_build_tangent_matrices (0000)
 00113720 0860:
 	_render_model (0000)
 00113F80 01d0:
@@ -53,9 +53,12 @@ symbols in this file:
 0027FC4C 000e:
 	??_C@_0O@BKFGBDDJ@node_matrices?$AA@ (0000)
 0030A390 05f8:
-	_data_0030a390 (0000)
+	_render_model_section (0000)
 00456650 0088:
-	_bss_00456650 (0000)
+	_default_function_values (0000)
+	_default_render_model_change_colors (0000)
+	_default_render_model_effect (0000)
+	_default_render_model_region_permutation_indices (0000)
 */
 
 /* ---------- headers */
@@ -257,42 +260,7 @@ typedef char verify_rasterizer_debug_options_size[sizeof(struct rasterizer_debug
 
 /* ---------- prototypes */
 
-void rasterizer_model_begin(
-	struct rasterizer_model_begin_parameters const *parameters,
-	boolean is_dynamic);
-void rasterizer_model_end(
-	void);
-void rasterizer_environment_shadow_model_begin(
-	struct rasterizer_model_begin_parameters const *parameters);
-void rasterizer_environment_shadow_model_end(
-	void);
-void rasterizer_model_draw(
-	struct shader const *shader,
-	short shader_permutation_index,
-	struct triangle_buffer const *triangle_buffer,
-	long dynamic_triangle_buffer_index,
-	long triangle_count,
-	struct vertex_buffer const *vertex_buffer,
-	long dynamic_vertex_buffer_index);
-void rasterizer_model_transparent_geometry_submit(
-	struct shader const *shader,
-	short shader_permutation_index,
-	struct triangle_buffer const *triangle_buffer,
-	long dynamic_triangle_buffer_index,
-	long triangle_count,
-	struct vertex_buffer const *vertex_buffer,
-	long dynamic_vertex_buffer_index,
-	real_point3d const *centroid,
-	struct render_sort_filth *sort_filth);
-void rasterizer_environment_shadow_model_draw(
-	struct shader const *shader,
-	short shader_permutation_index,
-	struct triangle_buffer const *triangle_buffer,
-	struct vertex_buffer const *vertex_buffer);
-void rasterizer_debug_model_vertices(
-	long object_index,
-	struct rasterizer_model_skinning const *skinning,
-	struct model_geometry_part const *part);
+#include "rasterizer/rasterizer_models.h"
 
 static void render_model_parts(
 	struct model const *model,
@@ -314,9 +282,10 @@ extern boolean render_model_vertex_counts;
 extern boolean render_model_index_counts;
 extern boolean render_model_no_geometry;
 
-static char default_render_model_region_permutation_indices[MAXIMUM_REGIONS_PER_MODEL];
-static struct render_model_effect default_render_model_effect;
+static real default_function_values[MAXIMUM_FUNCTION_VALUES_PER_MODEL];
 static real_rgb_color default_render_model_change_colors[MAXIMUM_CHANGE_COLORS_PER_MODEL];
+static struct render_model_effect default_render_model_effect;
+static char default_render_model_region_permutation_indices[MAXIMUM_REGIONS_PER_MODEL];
 
 struct profile_section render_model_section = { "render_model", NONE, TRUE };
 
@@ -368,7 +337,7 @@ static void render_model_parts(
 							&model->shaders,
 							part->shader_index,
 							struct model_shader_reference);
-						struct shader *shader = tag_get('shdr', shader_reference->shader.index);
+						struct shader *shader = shader_definition_get(shader_reference->shader.index);
 
 						if (shader_type_is_valid_for_model(shader->base.type) &&
 							!TEST_FLAG(part->flags, _model_geometry_part_stripped_bit))
@@ -781,8 +750,8 @@ void model_build_tangent_matrices(
 	return;
 }
 
-void code_00113710(
-	void)
+void model_geometry_part_build_tangent_matrices(
+	struct model_geometry_part *part)
 {
 	return;
 }
@@ -802,7 +771,6 @@ void render_model(
 	short forced_shader_permutation_index,
 	unsigned long flags)
 {
-	static real default_function_values[MAXIMUM_FUNCTION_VALUES_PER_MODEL];
 	struct model *model = model_definition_get(model_index);
 
 	profile_enter(render_model_section);

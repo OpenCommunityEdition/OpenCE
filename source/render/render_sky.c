@@ -65,27 +65,14 @@ struct sky_light
 	byte pad70[4];
 };
 
-struct sky_render_model_record
-{
-	real_rgb_color color;
-	byte unusedC[0x68];
-};
-
 typedef char verify_sky_animations_offset[offsetof(struct sky, animations) == 0xB8 ? 1 : -1];
 typedef char verify_sky_lights_offset[offsetof(struct sky, lights) == 0xC4 ? 1 : -1];
 typedef char verify_sky_animation_size[sizeof(struct sky_animation) == 0x24 ? 1 : -1];
 typedef char verify_sky_light_size[sizeof(struct sky_light) == 0x74 ? 1 : -1];
-typedef char verify_sky_render_model_record_size[sizeof(struct sky_render_model_record) == 0x74 ? 1 : -1];
+typedef char verify_sky_render_lighting_size[sizeof(struct render_lighting) == 0x74 ? 1 : -1];
 
 /* ---------- prototypes */
 
-void model_node_matrices_from_orientations(
-	struct model const *model,
-	real_matrix4x3 *node_matrices,
-	struct real_orientation const *node_orientations,
-	real_point3d const *position,
-	real_vector3d const *forward,
-	real_vector3d const *up);
 void lights_queue_lens_flare(
 	long lens_flare_index,
 	real_point3d const *position,
@@ -97,21 +84,6 @@ void rasterizer_models_begin(
 	boolean sky_mode);
 void rasterizer_models_end(
 	void);
-void render_model(
-	long model_index,
-	real scale,
-	real_matrix4x3 const *node_matrices,
-	long arg3,
-	long arg4,
-	real const *region_scales,
-	struct sky_render_model_record const *record,
-	real_point3d const *camera_position,
-	long arg8,
-	long arg9,
-	long arg10,
-	long arg11,
-	boolean arg12);
-
 /* ---------- globals */
 
 real render_sky_globals[MAXIMUM_SKIES_PER_SCENARIO] = {0.f};
@@ -123,7 +95,7 @@ void render_sky(
 {
 	real_matrix4x3 node_matrices[MAXIMUM_NODES_PER_ANIMATION];
 	struct real_orientation node_orientations[MAXIMUM_NODES_PER_ANIMATION];
-	struct sky_render_model_record render_model_record;
+	struct render_lighting render_model_lighting;
 	real region_scales[MAXIMUM_SKIES_PER_SCENARIO];
 	real_matrix4x3 view_matrix;
 	struct object_marker light_marker;
@@ -276,8 +248,8 @@ void render_sky(
 			}
 
 			rasterizer_models_begin(TRUE);
-			csmemset(&render_model_record, 0, sizeof(render_model_record));
-			render_model_record.color = *global_real_rgb_white;
+			csmemset(&render_model_lighting, 0, sizeof(render_model_lighting));
+			render_model_lighting.ambient_color = *global_real_rgb_white;
 			render_model(
 				sky->model.index,
 				0.f,
@@ -285,7 +257,7 @@ void render_sky(
 				0,
 				0,
 				region_scales,
-				&render_model_record,
+				&render_model_lighting,
 				&render.camera.position,
 				0,
 				0,
