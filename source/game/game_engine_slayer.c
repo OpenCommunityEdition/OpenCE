@@ -53,7 +53,7 @@ symbols in this file:
 000A4270 0090:
 	_slayer_engine_player_killed_player (0000)
 000A4300 0280:
-	_code_000a4300 (0000)
+	_slayer_engine_display_score (0000)
 000A4580 0190:
 	_slayer_player_update (0000)
 0025C190 0014:
@@ -146,15 +146,15 @@ static void find_next_target(
 
 struct slayer_globals slayer_globals = { 0 };
 
-/* ---------- public code */
+/* ---------- code */
 
-void slayer_engine_dispose(
+static void slayer_engine_dispose(
 	void)
 {
 	return;
 }
 
-boolean slayer_engine_initialize_for_new_map(
+static boolean slayer_engine_initialize_for_new_map(
 	void)
 {
 	csmemset(slayer_globals.team_score, 0, sizeof(slayer_globals.team_score));
@@ -163,25 +163,25 @@ boolean slayer_engine_initialize_for_new_map(
 	return TRUE;
 }
 
-void slayer_engine_dispose_from_old_map(
+static void slayer_engine_dispose_from_old_map(
 	void)
 {
 	return;
 }
 
-void slayer_engine_game_ending(
+static void slayer_engine_game_ending(
 	void)
 {
 	return;
 }
 
-void slayer_engine_post_rasterize(
+static void slayer_engine_post_rasterize(
 	void)
 {
 	return;
 }
 
-void slayer_engine_player_damaged_player(
+static void slayer_engine_player_damaged_player(
 	long damaging_player_index,
 	long dead_player_index,
 	boolean damage_type)
@@ -189,43 +189,43 @@ void slayer_engine_player_damaged_player(
 	return;
 }
 
-void slayer_engine_prespawn_player_update(
+static void slayer_engine_prespawn_player_update(
 	long player_index)
 {
 	return;
 }
 
-void slayer_engine_statistics_append(
+static void slayer_engine_statistics_append(
 	long statistic)
 {
 	return;
 }
 
-void slayer_engine_handle_client_message(
+static void slayer_engine_handle_client_message(
 	void *message)
 {
 	return;
 }
 
-void slayer_engine_handle_server_message(
+static void slayer_engine_handle_server_message(
 	void *message)
 {
 	return;
 }
 
-void slayer_engine_pregame_post_rasterize(
+static void slayer_engine_pregame_post_rasterize(
 	void)
 {
 	return;
 }
 
-void slayer_engine_update(
+static void slayer_engine_update(
 	void)
 {
 	return;
 }
 
-void slayer_engine_player_added(
+static void slayer_engine_player_added(
 	long player_index)
 {
 	struct player_datum *player = player_get(player_index);
@@ -235,7 +235,7 @@ void slayer_engine_player_added(
 	return;
 }
 
-void slayer_engine_game_starting(
+static void slayer_engine_game_starting(
 	void)
 {
 	game_engine_play_multiplayer_sound(
@@ -246,14 +246,14 @@ void slayer_engine_game_starting(
 	return;
 }
 
-boolean slayer_engine_allow_pick_up(
+static boolean slayer_engine_allow_pick_up(
 	long unit_index,
 	long weapon_index)
 {
 	return TRUE;
 }
 
-long slayer_get_score(
+static long slayer_get_score(
 	long player_index,
 	enum get_score_type score_type)
 {
@@ -266,7 +266,7 @@ long slayer_get_score(
 		DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index)];
 }
 
-boolean slayer_test_flag(
+static boolean slayer_test_flag(
 	long flag)
 {
 	boolean result = FALSE;
@@ -281,7 +281,7 @@ boolean slayer_test_flag(
 	return result;
 }
 
-wchar_t *slayer_get_score_string(
+static wchar_t *slayer_get_score_string(
 	long player_index,
 	wchar_t *buffer)
 {
@@ -294,7 +294,7 @@ wchar_t *slayer_get_score_string(
 	return buffer;
 }
 
-wchar_t *slayer_get_score_header_string(
+static wchar_t *slayer_get_score_header_string(
 	wchar_t *buffer)
 {
 	long string_list_index;
@@ -304,7 +304,7 @@ wchar_t *slayer_get_score_header_string(
 	return buffer;
 }
 
-wchar_t *slayer_get_team_score_string(
+static wchar_t *slayer_get_team_score_string(
 	long team_index,
 	wchar_t *buffer)
 {
@@ -456,7 +456,7 @@ static void find_next_target(
 	return;
 }
 
-void slayer_engine_player_killed_player(
+static void slayer_engine_player_killed_player(
 	long killing_player_index,
 	long killing_object_index,
 	long dead_player_index,
@@ -490,18 +490,20 @@ void slayer_engine_player_killed_player(
 	return;
 }
 
-boolean slayer_engine_display_score(
+static boolean slayer_engine_display_score(
 	long player_index,
 	long message,
 	long message_data,
 	wchar_t *buffer,
 	long buffer_character_count)
 {
-	struct player_datum *player = player_get(player_index);
-	struct player_datum *target_player = NULL;
-	wchar_t string[128];
 	long string_list_index;
+	struct player_datum *target_player;
+	wchar_t string[128];
 	boolean result = TRUE;
+
+	player_get(player_index);
+	target_player = NULL;
 
 	if (message == _slayer_message_new_target)
 	{
@@ -576,7 +578,7 @@ boolean slayer_engine_display_score(
 	return result;
 }
 
-void slayer_player_update(
+static void slayer_player_update(
 	long index)
 {
 	struct player_datum *player = player_get(index);
@@ -651,3 +653,43 @@ void slayer_player_update(
 
 	return;
 }
+
+/* ---------- engine table */
+
+struct game_engine slayer_engine =
+{
+	"slayer",
+	game_engine_slayer,
+	slayer_engine_dispose,
+	slayer_engine_initialize_for_new_map,
+	slayer_engine_dispose_from_old_map,
+	slayer_engine_player_added,
+	slayer_engine_game_ending,
+	slayer_engine_game_starting,
+	slayer_engine_statistics_append,
+	slayer_engine_handle_client_message,
+	slayer_engine_handle_server_message,
+	slayer_engine_pregame_post_rasterize,
+	slayer_engine_post_rasterize,
+	slayer_player_update,
+	NULL,
+	NULL,
+	NULL,
+	slayer_engine_update,
+	slayer_get_score,
+	slayer_get_score_string,
+	slayer_get_score_header_string,
+	slayer_get_team_score_string,
+	slayer_engine_allow_pick_up,
+	slayer_engine_player_damaged_player,
+	slayer_engine_player_killed_player,
+	slayer_engine_display_score,
+	NULL,
+	slayer_engine_prespawn_player_update,
+	NULL,
+	NULL,
+	NULL,
+	slayer_test_flag,
+	NULL,
+	NULL,
+};

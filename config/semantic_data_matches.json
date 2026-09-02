@@ -262,6 +262,16 @@
     }
   },
   {
+    "unit": "source/game/game_engine_slayer",
+    "symbol": "_slayer_engine",
+    "reason": "the complete rebuilt object owns the exact Slayer callback table; csplit names the slayer string relocation as an undefined image symbol while MSVC emits the identically named select-any string COMDAT locally, and the hardened comparator proves all normalized bytes plus every relocation address, type, destination, and addend",
+    "measurements": {
+      "size": 136,
+      "relocation_count": 24,
+      "normalized_sha256": "cd47b29508fea4e4c11451792c17f629a9ad240b3c3df5c889c0d416c378bc78"
+    }
+  },
+  {
     "unit": "source/shell/shell_xbox",
     "group": "aligned-rdata",
     "reason": "the complete rebuilt object owns the exact two string COMDATs and compiler-generated SEH scope table; the grouped verifier proves each payload, alignment-derived padded extent, flags, owner snapshot, relocation address/type, and source-relative handler destination while objdiff merges the aligned sections and attributes the private scope-table labels differently",

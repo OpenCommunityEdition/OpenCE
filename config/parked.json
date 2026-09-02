@@ -1129,44 +1129,6 @@
       }
     },
     {
-      "unit": "source/game/game_engine_slayer",
-      "function": "_slayer_get_score_header_string",
-      "class": "tu-context-optimization",
-      "evidence": "Fuzzy-parked under the current house rule after retaining the HCEA-authenticated score-header routine with the natural tag lookup, unicode string-list access, and ustrcpy branches. Target and candidate preserve all six relocation identities and both semantic outcomes. January shrink-wraps ESI independently inside the success and failure branches and emits two branch-local return tails, producing 96 padded bytes; the available VC7 compile hoists one ESI save and merges the common buffer return, producing 80 padded bytes. Ordinary early-return, branch-local result, and branch-local string scopes were measured and did not recover the January topology. No volatile access, compiler barrier, artificial carrier, pragma, inline assembly, undefined behavior, fake dependency, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor that explains the branch-local ESI schedule.",
-      "measurements": {
-        "target": {
-          "size": 96,
-          "relocation_count": 6,
-          "normalized_sha256": "5634f4fc63ca196bd01bfedc309a0b89d402b324ab777ee1adbe7fcb8e37a19a"
-        },
-        "base": {
-          "size": 80,
-          "relocation_count": 6,
-          "normalized_sha256": "6642902d005f708954a7343d1efc251e6de94381ab033888f13bce26059ca79e"
-        },
-        "objdiff_percent": 82.545456
-      }
-    },
-    {
-      "unit": "source/game/game_engine_slayer",
-      "function": "_slayer_engine_display_score",
-      "class": "register-allocation",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete January PC formatter from the target control flow and relocation graph, with the HCEA routine and string enum supplying the authenticated public name, callback signature, and B3-B6 string meanings. The retained ordinary C preserves January's unconditional typed player_get validation, independent legacy new-target score[128] block, named message/string constants, natural compiler inlining of slayer_get_score, packed game_engine_place return, and both show-score branches including the surprising nonteam team-score read. Target and candidate have the same 640-byte padded envelope and all 52 relocation identities in the same semantic order; the normalized prefix is exact through +0x161. Manual aligned review finds only two branch-local pointer allocation choices: January spills place_name to the dead message parameter slot and keeps format in EBX in the team branch, then uses EBX/EDI for place_name/format in the nonteam branch, while VC7 chooses the opposite legal registers. The fail-closed codegen blocker classifier reports UNKNOWN/unclassified because its atlas has no pointer register/spill-swap rule; it is recorded as diagnostic, not proof. A declaration-order variant was inert and a shared default-format lifetime worsened size/relocations, so no volatile access, artificial carrier, assembly, pragma, fake dependency, alias trick, undefined behavior, or nonsensical exactness control is retained. Reopen only for authoritative January local-variable records or a natural same-compiler register-allocation donor.",
-      "measurements": {
-        "target": {
-          "size": 640,
-          "relocation_count": 52,
-          "normalized_sha256": "0c232f29dab93c8f31dcea0fae6d71a6024bef79360a36634aedbeb8c8e97b08"
-        },
-        "base": {
-          "size": 640,
-          "relocation_count": 52,
-          "normalized_sha256": "6b7e2cc293e7f6700db5239c71458697c54c918a5a62aad8f0615e2e92e6f0fb"
-        },
-        "objdiff_percent": 98.98104
-      }
-    },
-    {
       "unit": "source/main/main",
       "function": "_compute_subframe_counts",
       "class": "unclassified",

@@ -669,7 +669,7 @@
 				{ "name": "source/game/game_globals.c", "index": 295, "status": "Matching" },
 				{ "name": "source/game/game_engine_terminator.c", "index": 296, "status": "Matching" },
 				{ "name": "source/game/game_engine_stub.c", "index": 297, "status": "Matching" },
-				{ "name": "source/game/game_engine_slayer.c", "index": 298, "status": "NonMatching" },
+				{ "name": "source/game/game_engine_slayer.c", "index": 298, "status": "Matching" },
 				{ "name": "source/game/game_engine_race.c", "index": 299, "status": "NonMatching" },
 				{ "name": "source/game/game_engine_oddball.c", "index": 300, "status": "NonMatching" },
 				{ "name": "source/game/game_engine_multiplayer_sounds.c", "index": 301, "status": "Matching" },
