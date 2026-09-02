@@ -8,6 +8,14 @@
       "reason": "The rebuilt translation unit emits a select-any _fast_ftol COMDAT absent from the player_rumble target, while January's selected actor_combat owner is no-duplicates and currently has no compatible rebuilt owner.",
       "evidence": "docs/object_matching_logs/player_rumble_obj_jonas_object_accounting_audit_20260831.md#exact-blocker-_fast_ftol-ownership",
       "reopen": "Remove this rejection only after an ordinary base/base link proves a compatible authenticated canonical owner can discard the player_rumble copy, or authentic source topology prevents the copy from being emitted."
+    },
+    {
+      "unit": "source/models/models",
+      "class": "bss-symbol-layout-mismatch",
+      "symbol": ".bss",
+      "reason": "The target and rebuilt objects both contain 136 zero-filled BSS bytes, but the four semantic default_render_model symbols have different section-relative offsets; byte-only data accounting therefore cannot prove equivalent ownership or final linked addresses.",
+      "evidence": "docs/object_matching_logs/models_obj_fable_salvage_20260902.md#bss-ownership-boundary",
+      "reopen": "Remove this rejection only after authoritative January ownership evidence or natural source makes all four BSS symbol offsets and linkage agree without aggregate facades, hash-steering names, custom sections, or other matching-only constructs."
     }
   ]
 }

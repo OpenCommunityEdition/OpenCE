@@ -11,7 +11,10 @@ from typing import Any
 import json
 
 
-ALLOWED_CLASSES = {"candidate-only-comdat-owner"}
+ALLOWED_CLASSES = {
+    "bss-symbol-layout-mismatch",
+    "candidate-only-comdat-owner",
+}
 
 
 class ObjectAdmissionPolicyError(RuntimeError):
