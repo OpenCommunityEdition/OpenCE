@@ -191,9 +191,6 @@ void unit_handle_region_destroyed(
 	long object_index,
 	short region_index,
 	unsigned long damage_flags);
-void unit_preprocess_node_orientations(
-	long object_index,
-	struct real_orientation *node_orientations);
 void unit_postprocess_node_matrices(
 	long object_index,
 	struct real_matrix4x3 *node_matrices);

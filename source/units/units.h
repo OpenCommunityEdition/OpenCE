@@ -529,10 +529,6 @@ struct unit_control_data;
 void unit_control(
 	long unit_index,
 	struct unit_control_data const *control_data);
-void unit_place(
-	long unit_index,
-	struct scenario_unit_datum const *scenario_unit);
-
 void units_initialize(
 	void);
 void units_initialize_for_new_map(
@@ -829,6 +825,13 @@ boolean unit_custom_animation_at_frame(
 boolean unit_drop_current_weapon(long unit_index, boolean immediate);
 
 boolean unit_throw_grenade_begin(long unit_index, real_vector2d const *alignment_vector);
+
+void unit_place(
+	long unit_index,
+	struct scenario_unit_datum const *scenario_unit);
+void unit_preprocess_node_orientations(
+	long unit_index,
+	struct real_orientation *node_orientations);
 
 
 /* ---------- prototypes/UNIT_DIALOGUE.C */

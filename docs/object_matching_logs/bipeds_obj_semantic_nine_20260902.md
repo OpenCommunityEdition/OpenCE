@@ -46,6 +46,14 @@ removed from `object_types.c`; `object_types.obj` remains 31/31 exact. The
 existing Vehicle caller was updated with a type-only cast to the owner
 prototype and remains 34 exact / 5 pre-existing residual.
 
+During canonical reconciliation, the later Actor Moving header additions made
+the otherwise-correct `unit_place` declaration expose a two-instruction C2
+scheduling tie in `unit_preprocess_node_orientations`. Completing the same
+owner-header cleanup fixed it naturally: `unit_preprocess_node_orientations`
+is now declared beside `unit_place` in `units.h`, and its stale use-site
+declaration was removed from `object_types.c`. This restores Units to 189/189
+without changing the function body or adding any compiler-control construct.
+
 ## Parked residual
 
 `biped_find_nearby_support_surface` is retained as natural fuzzy C and parked.
