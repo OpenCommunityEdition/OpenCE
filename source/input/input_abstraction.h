@@ -14,7 +14,15 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+struct game_input_preferences;
+
+/* ---------- prototypes/INPUT_ABSTRACTION.C */
+
+void input_abstraction_reset_controller_detection_timer(
+	void);
+void input_abstraction_get_local_player_preferences(
+	short local_player_index,
+	struct game_input_preferences *preferences);
 
 /* ---------- globals */
 

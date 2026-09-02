@@ -14,7 +14,10 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/UI_WIDGET_EVENT_HANDLER_FUNCTIONS.C */
+
+void reset_last_player1_profile_index(
+	void);
 
 /* ---------- globals */
 

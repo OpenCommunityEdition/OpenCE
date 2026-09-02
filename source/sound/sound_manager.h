@@ -27,6 +27,8 @@ long sound_render_time(
 
 void sound_stop_all(void);
 void sound_stop_impulse(long sound_index);
+void sound_pause(
+	boolean paused);
 
 /* ---------- globals */
 

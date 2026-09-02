@@ -20,5 +20,7 @@ void compute_window_bounds(
 	long num_players,
 	rectangle2d *pixel_bounds,
 	rectangle2d *safe_frame_bounds);
+void main_loop_of_death(
+	void);
 
 #endif // __MAIN_RUNTIME_H

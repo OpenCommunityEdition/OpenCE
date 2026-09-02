@@ -35,6 +35,11 @@ real_rgb_color *player_profile_get_rgb_color(
 	long color_index);
 void player_profile_save_level_completed(
 	short local_player_index);
+void player_profiles_enumerate_available_to_local_player_index(
+	short local_player_index,
+	word *number_of_profiles,
+	long *player_profile_indices,
+	boolean include_default_profiles);
 
 /* ---------- globals */
 
