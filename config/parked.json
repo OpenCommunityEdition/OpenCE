@@ -1520,6 +1520,25 @@
         },
         "objdiff_percent": 99.14286
       }
+    },
+    {
+      "unit": "libs/libcmt/x10fout",
+      "function": "_$I10_OUTPUT",
+      "class": "tu-context-optimization",
+      "evidence": "Fuzzy-parked with the complete first-party Microsoft CRT implementation retained in ordinary C. XDK 3911 CodeView names d:\\xbox-finalfre\\private\\sdktools\\crt\\fpw32\\conv\\x10fout.c, and the matching Microsoft source in xerohour/xbox_leak_may_2020 commit fd00b4b3b2abb1ea6ef9ac64b755419741a3af00 blob 7e9106227dc9543ac5bca9a216e0fdf1b0b486cc explicitly defines STRCPY as strcpy and uses it for all four special-value outputs. Under the unchanged /O1 /Gy policy, VC7 leaves two shared tail calls out of line, producing 638 bytes and 14 relocations instead of January's 631 bytes and 12. A previously reported strict-exact form replaced those calls with invented fixed-size aggregate types and assignments solely to steer code generation; it is rejected under the anti-fake rule because authoritative source proves those constructs were absent. /Oi, optimizer pragmas, forced inline, aggregate copy substitutes, assembly, volatile/register forcing, undefined behavior, fake dependencies, and nonsensical control flow are not retained. Reopen only with authenticated evidence for January's CRT intrinsic configuration or original compiler/header context that naturally lowers the four strcpy calls to the target copies.",
+      "measurements": {
+        "target": {
+          "size": 631,
+          "relocation_count": 12,
+          "normalized_sha256": "680a37145127a3fc46fe86768557819c28826e310a95b69f9b5133f108d03a6d"
+        },
+        "base": {
+          "size": 638,
+          "relocation_count": 14,
+          "normalized_sha256": "b290f40fcd9212e3550eaf60c6943489f6564c4e73756d0d2450ff79ca920c12"
+        },
+        "objdiff_percent": 96.4574
+      }
     }
   ]
 }
