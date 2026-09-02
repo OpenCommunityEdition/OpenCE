@@ -1482,6 +1482,44 @@
         },
         "objdiff_percent": 99.46479
       }
+    },
+    {
+      "unit": "source/physics/collision_usage",
+      "function": "_collision_log_render",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete collision-usage renderer in ordinary typed C from the January disassembly and relocation topology, the historical Punpckhdq scope skeleton, and the independent Stian PC semantic donor. HCEA independently corroborates the exported debug controls; the open Marathon corpus was searched but has no direct collision-profiler analogue. The retained function scans all eight collision functions and three periods, aggregates and sorts all 22 semantic collision users, formats totals or the six busiest users, selects the terminal draw mode, renders each line, and advances the cursor. Its private formatter is independently strict exact and naturally follows January's inline schedule. January is 1,584 padded bytes with 79 relocations; the candidate is 1,536 bytes with 76 and the fresh campaign report records 82.027954 percent. The remaining boundary is broad VC7 frame/register scheduling: January reads only rasterizer_globals+16 while the candidate's typed rectangle copy also reads +12, and January's aggregation directly materializes collision_usage_buffer+24/+32/+36 while the candidate keeps a typed usage pointer. Earlier documented declaration, scope, direct-expression, frame-bound, source-pointer, and assertion-spelling families either returned to this fixed point or disturbed wider control flow. No forced inline/noinline, volatile or register forcing, barrier, pragma, assembly, fake dependency, raw offset, undefined behavior, or nonsensical exactness branch is retained. The fail-closed classifier returns UNKNOWN. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the frame and aggregation lifetimes together.",
+      "measurements": {
+        "target": {
+          "size": 1584,
+          "relocation_count": 79,
+          "normalized_sha256": "dc4c9ded347bbcf3f6a5577d375e9611458a2c6b06039e89a01b7b47ceb1a213"
+        },
+        "base": {
+          "size": 1536,
+          "relocation_count": 76,
+          "normalized_sha256": "f586255e6af97eacfd630c01c08aaa2ff43060eea09eaf9fe4257f2d00ecb94b"
+        },
+        "objdiff_percent": 82.027954
+      }
+    },
+    {
+      "unit": "source/physics/collision_usage",
+      "function": "_collision_log_get_current_user",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule with the complete private user-selection helper retained in ordinary typed C and its semantic name recovered from historical Xbox donor source. The retained stack-top access is global_current_collision_users[global_current_collision_user_depth - 1], as independently proved by January's collision_usage_current+2974 relocation resolving two bytes before global_current_collision_users. Target and candidate share the 256-byte padded envelope and 23 relocations. After resolving that csplit alias, their instruction streams align for every instruction except the final successful return: January emits mov ax,si while VC7 emits movsx eax,si. Restoring the target assertion punctuation recovered the authentic owned strings. The independent PC machine-code lifts infer a short return, but neither has source or PDB type provenance; compiling that signature collapses January's separate NONE exits and shrinks the function to 240 bytes, so the Xbox donor's natural long-return topology is retained. Prior declaration, local-result, and return-shape experiments are documented as exhausted. No barrier, volatile or register forcing, pragma, assembly, fake dependency, undefined behavior, or nonsensical branch is retained. The fail-closed classifier returns UNKNOWN. Reopen only for authoritative January prototype/local-lifetime evidence or a natural same-compiler donor that explains the narrow AX return without changing the rest of the function.",
+      "measurements": {
+        "target": {
+          "size": 256,
+          "relocation_count": 23,
+          "normalized_sha256": "fc370d7e130011908802a1d09d62cadaccb97dac976f7c5705341b7eb44d1cb3"
+        },
+        "base": {
+          "size": 256,
+          "relocation_count": 23,
+          "normalized_sha256": "0f1289b9c2652df52cbd35e38ba0778b3d2ada82a9dd87a9528fb5928c017bf3"
+        },
+        "objdiff_percent": 99.14286
+      }
     }
   ]
 }
