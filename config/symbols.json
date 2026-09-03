@@ -21944,6 +21944,7 @@
 { "file_offset": 2995788, "flags": 0, "name": "_data_002db64c" },
 { "file_offset": 2995832, "flags": 0, "name": "_bitmap_copy_translation_table_data" },
 { "file_offset": 2995848, "flags": 0, "name": "_translation_table" },
+{ "file_offset": 2998440, "flags": 0, "name": "_bitmap_bevel_translation_flags", "static": true },
 { "file_offset": 2998480, "flags": 0, "name": "_global_bitmap_reference" },
 { "file_offset": 2998492, "flags": 0, "name": "_global_bitmap_reference_optional" },
 { "file_offset": 2999340, "flags": 0, "name": "_bitmap_pixel_data" },

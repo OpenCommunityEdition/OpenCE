@@ -103,7 +103,9 @@ representation pun, or nonsensical branch in the retained source.
 ## Validation
 
 - focused default gate: CTF **38 exact / 1 residual / 0 unwritten**;
-- focused `/W3 /WX` gate: CTF **38 / 1 / 0**;
+- focused `/W3 /WX` is not a passing aggregate gate because baseline-existing
+  C4146 and C4244 warnings are promoted to errors; before/after diagnostics are
+  identical, so the CTF change introduces no new warning class or count;
 - candidate: 576 padded bytes, 566 meaningful bytes, 188 instructions, and 40
   ordered relocations;
 - fail-closed classifier: `UNKNOWN`, no match credit;

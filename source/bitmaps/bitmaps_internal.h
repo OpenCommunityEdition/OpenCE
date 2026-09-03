@@ -10,6 +10,8 @@ Narrow cross-translation-unit interface owned by BITMAPS.C.
 
 #include "bitmaps/bitmaps.h"
 
+char const *bitmap_format_get_string(
+	short format);
 void bitmap_delete(
 	struct bitmap_data *bitmap);
 void *bitmap_3d_address(

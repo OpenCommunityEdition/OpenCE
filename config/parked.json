@@ -2970,6 +2970,25 @@
         },
         "objdiff_percent": 91.316414
       }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_drawing",
+      "function": "_bitmap_copy",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the complete bitmap copy path from January's disassembly, exact assertions and data, plus an independent Halo Editing Kit Sapien implementation. The retained typed C performs clipping and coordinate adjustment, selects the exact 18-by-18-by-4 translation entry, and implements all thirteen 16-bit and 32-bit conversion, modulation, and alpha-blend cases. Target is 2,784 padded bytes and candidate 2,832; both have 69 relocations, and objdiff reports 78.528175 percent. The remaining gap is a VC7 register/spill tie concentrated in blend cases: January keeps both cursors in registers while the natural candidate spills them. A 2,816-byte declaration-order variant was explicitly rejected because it merges cursor induction variables into sub edi, esi plus indexed loads that January does not contain. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No implicit prototype, volatile/register forcing, pragma, assembly, raw address, fake dependency, forced inline, invented data prefix, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the allocation schedule.",
+      "measurements": {
+        "target": {
+          "size": 2784,
+          "relocation_count": 69,
+          "normalized_sha256": "d8154826cc75922608a282d952b0f3c6e517e4074599f218e01160c4f18033b6"
+        },
+        "base": {
+          "size": 2832,
+          "relocation_count": 69,
+          "normalized_sha256": "7a67b27bb76f74be0c497b87fc57389334cb3362913dbd9a12d4564af47921ef"
+        },
+        "objdiff_percent": 78.528175
+      }
     }
   ]
 }
