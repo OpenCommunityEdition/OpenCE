@@ -46,7 +46,9 @@ the retained scratch candidate has SHA-256
 `54A504FD9986CB81302816396D3475220CA2102156C7ADD049C32AADA3D028C2`.
 The object contributes no newly exact data section; the data work is semantic
 naming of the 2-byte specular permutation index and the 0xB5-byte environment
-global block.
+global block. Canonical admission confirmed that the latter is owned privately
+by this translation unit, so both its symbol metadata and C definition are
+`static` rather than an unresolved cross-TU declaration.
 
 ## Honest fuzzy parks and remaining work
 

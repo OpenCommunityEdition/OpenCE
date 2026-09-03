@@ -507,7 +507,7 @@ static void rasterizer_environment_specular_spot_light_begin(
 
 extern struct rasterizer_environment_debug_options rasterizer_debug_options;
 extern struct rasterizer_environment_rasterizer_globals rasterizer_globals;
-extern struct rasterizer_environment_globals rasterizer_environment_globals;
+static struct rasterizer_environment_globals rasterizer_environment_globals;
 extern struct pixel_shader_definition pixel_shader;
 extern struct rasterizer_lights_globals rasterizer_lights;
 extern struct rasterizer_environment_frame_parameters global_frame_parameters;

@@ -74,13 +74,6 @@ struct bitmap_group
 
 /* ---------- prototypes/BITMAP_GROUP.C */
 
-boolean bitmaps_extract(
-	struct bitmap_group *group,
-	long build_debug_plate);
-boolean bitmaps_extract_from_plate(
-	struct bitmap_data *plate,
-	struct bitmap_group *group,
-	long build_debug_plate);
 struct bitmap_data *bitmap_group_get_bitmap_from_sequence(
 	long bitmap_group_index,
 	short sequence_index,

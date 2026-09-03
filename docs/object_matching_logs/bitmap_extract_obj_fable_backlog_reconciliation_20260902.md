@@ -84,8 +84,11 @@ is not an accidental or invented match.
 - The DXT1 alpha carrier is `unsigned long`, matching the target's 32-bit shift
   and comparisons.  General scalar types use CSeries definitions (`boolean`,
   `real`, `word`, `pixel32`, `rectangle2d`) rather than substitute primitives.
-- Public extraction prototypes live in the closest owning header,
-  `source/bitmaps/bitmap_group.h`; private prototypes remain in the owner C file.
+- The closest associated header is `source/bitmaps/bitmap_group.h`, but the two
+  extraction entry points currently have no outside C caller.  Their initially
+  added declarations were removed during canonical admission because VC7's
+  declaration-position sensitivity regressed an unrelated exact bitmap utility
+  function.  Private prototypes remain in the owner C file.
 - `data_decompress` now exposes its target-proven destination-capacity argument.
   Its three-function object remains 3/3 exact.
 
@@ -98,8 +101,8 @@ exact 6, residual 3, unwritten 12 (21 target functions)
 ```
 
 The scoped fake-match scan reports zero review leads.  `git diff --check` is
-clean.  A full build is intentionally deferred to the canonical worktree,
-whose Xbox compiler payload is available; this isolated worktree does not carry
-the ignored `xbox/bin/vc7/CL.Exe` payload.  Canonical admission still requires a
-fresh configure, full `ninja all_source`, strict before/after sweep, pytest, and
-park-manifest measurements from the regenerated report.
+clean.  The isolated worktree did not carry the ignored Xbox compiler payload,
+so the full build was performed during canonical admission.  That sweep also
+identified and removed the otherwise-correct but unused public declarations
+described above; final strict verdict and test results are recorded in the
+canonical admission commit.
