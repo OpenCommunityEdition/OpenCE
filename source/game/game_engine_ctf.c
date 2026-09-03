@@ -619,6 +619,7 @@ static void ctf_engine_weapon_update(
 {
 	long carrier_player_index;
 	long team_index;
+	long ticks;
 	long other_team_index;
 	real_point3d position;
 
@@ -654,24 +655,31 @@ static void ctf_engine_weapon_update(
 		}
 	}
 
-	if ((unsigned long)(game_time_get() - weapon->item.last_owned_time) > CTF_FLAG_RETURN_TIME &&
-		weapon_is_flag(weapon_index) &&
-		TEST_FLAG(weapon->object.flags, _object_connected_to_map_bit) &&
-		weapon->object.parent_object_index == NONE)
+	ticks = game_time_get();
+	if ((unsigned long)(ticks - weapon->item.last_owned_time) > CTF_FLAG_RETURN_TIME &&
+		weapon_is_flag(weapon_index))
 	{
-		team_index = weapon->object.owner_team_index;
-		other_team_index = (team_index + 1) % 2;
-		if (TEST_FLAG(weapon->weapon.flags, _ctf_weapon_handled_bit))
+		boolean connected_to_map = TEST_FLAG(
+			weapon->object.flags,
+			_object_connected_to_map_bit);
+
+		if (connected_to_map && weapon->object.parent_object_index == NONE)
 		{
-			game_engine_play_multiplayer_sound(
-				team_index == _team_red ?
-					_multiplayer_sound_red_team_flag_returned :
-					_multiplayer_sound_blue_team_flag_returned);
-			ctf_set_flag_warning(weapon->object.owner_team_index, FALSE);
-			game_show_score_team(team_index, _ctf_message_your_flag_was_returned);
-			game_show_score_team(other_team_index, _ctf_message_enemy_flag_was_returned);
+			short return_team_index = weapon->object.owner_team_index;
+			long return_other_team_index = (return_team_index + 1) % 2;
+
+			if (TEST_FLAG(weapon->weapon.flags, _ctf_weapon_handled_bit))
+			{
+				game_engine_play_multiplayer_sound(
+					return_team_index == _team_red ?
+						_multiplayer_sound_red_team_flag_returned :
+						_multiplayer_sound_blue_team_flag_returned);
+				ctf_set_flag_warning(weapon->object.owner_team_index, FALSE);
+				game_show_score_team(return_team_index, _ctf_message_your_flag_was_returned);
+				game_show_score_team(return_other_team_index, _ctf_message_enemy_flag_was_returned);
+			}
+			ctf_reset_flag(weapon_index);
 		}
-		ctf_reset_flag(weapon_index);
 	}
 
 	carrier_player_index = ctf_find_flag_carrier(weapon_index);
@@ -686,11 +694,7 @@ static void ctf_engine_weapon_update(
 		NONE,
 		other_team_index,
 		carrier_player_index);
-	if (carrier_player_index == NONE)
-	{
-		game_engine_clear_goal_position(team_index + 2);
-	}
-	else
+	if (carrier_player_index != NONE)
 	{
 		position = ctf_globals.flags[other_team_index]->position;
 		position.y += 0.5f;
@@ -702,6 +706,10 @@ static void ctf_engine_weapon_update(
 			carrier_player_index,
 			NONE,
 			NONE);
+	}
+	else
+	{
+		game_engine_clear_goal_position(team_index + 2);
 	}
 
 	return;
