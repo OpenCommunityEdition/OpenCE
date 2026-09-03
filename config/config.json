@@ -473,7 +473,7 @@
 				{ "name": "source/rasterizer/rasterizer_debug.c", "index": 98, "status": "NonMatching" },
 				{ "name": "source/rasterizer/rasterizer_cinematics.c", "index": 99, "status": "NonMatching" },
 				{ "name": "source/rasterizer/rasterizer.c", "index": 100, "status": "Matching" },
-				{ "name": "source/rasterizer/xbox/shader_transparent_generic_preprocessor.c", "index": 101, "status": "NonMatching" },
+				{ "name": "source/rasterizer/xbox/shader_transparent_generic_preprocessor.c", "index": 101, "status": "Matching" },
 				{ "name": "source/rasterizer/xbox/shader_transparent_chicago_preprocessor.c", "index": 102, "status": "NonMatching" },
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_widgets.c", "index": 103, "status": "NonMatching" },
 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_water.c", "index": 104, "status": "NonMatching" },

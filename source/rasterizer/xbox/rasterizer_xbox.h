@@ -16,6 +16,7 @@ RASTERIZER_XBOX.H
 
 struct bitmap_data;
 struct pixel_shader_definition;
+struct shader;
 struct vertex_buffer;
 
 /* ---------- prototypes/RASTERIZER_XBOX.C */
@@ -69,6 +70,12 @@ void rasterizer_draw_dynamic_triangles_static_vertices2(
 	struct vertex_buffer const *vertex_buffer1);
 void rasterizer_water_set_visibility_for_window(
 	boolean visibility);
+
+/* ---------- prototypes/SHADER_TRANSPARENT_GENERIC_PREPROCESSOR.C */
+
+boolean shader_transparent_generic_create(
+	struct shader *shader,
+	struct pixel_shader_definition *pixel_shader);
 
 /* ---------- globals */
 
