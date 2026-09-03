@@ -1037,8 +1037,6 @@ boolean ai_handle_killing_spree(
 	short killing_spree_count);
 void ai_create_mounted_weapons_for_unit(
 	long unit_index);
-void unit_dialogue_determine_variant(
-	long unit_index);
 void player_died(
 	long player_index);
 void actor_died(

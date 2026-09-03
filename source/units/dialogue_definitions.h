@@ -16,17 +16,26 @@ header included in hcex build.
 
 enum
 {
+	DIALOGUE_DEFINITION_TAG = 'udlg',
 	NUMBER_OF_DIALOGUE_VOCALIZATION_TYPES = 209,
 };
 
 /* ---------- macros */
 
+#define dialogue_definition_get(index) \
+	((struct dialogue_definition *)tag_get(DIALOGUE_DEFINITION_TAG, (index)))
+
 /* ---------- structures */
+
+struct dialogue_definition;
 
 /* ---------- prototypes/DIALOGUE_DEFINITIONS.C */
 
-char const *dialogue_get_vocalization_name(short vocalization_type, boolean abbreviated);
-short dialogue_get_vocalization_type_by_name(char const *name);
+char const *dialogue_get_vocalization_name(
+	short vocalization_type,
+	boolean abbreviated);
+short dialogue_get_vocalization_type_by_name(
+	char const *name);
 
 /* ---------- globals */
 

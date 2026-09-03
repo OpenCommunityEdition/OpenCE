@@ -1987,7 +1987,7 @@
       "unit": "source/ai/ai_communication",
       "function": "_ai_communication_update_speech_timers",
       "class": "register-allocation",
-      "evidence": "Fuzzy-parked under the current house rule after restoring the complete typed speech-timer update through its genuine ai_communication_started caller. Independent HCEA source authenticates the semantic ai_communication_update_speech_timers and actor_reset_idle_vocalization_timer names; the retained implementation uses unit_get and actor_get, named speech-priority constants, the typed AI communication globals, and the established dialogue/reply table structures. Target and candidate are both 672 padded bytes with all 43 relocation identities, and objdiff reports 97.76382 percent similarity. The remaining gap is the previously documented C2 register/lifetime schedule: January retains the unit in EDI and time in ESI while the natural candidate selects the inverse allocation, with a small associated two-load ordering tie. Prior bounded declaration, initialization, and expression-order probes did not close it naturally. No register hint, volatile access, barrier, pragma, assembly, fake dependency, false alias, raw offset, forced inline/noinline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the register lifetimes.",
+      "evidence": "Fuzzy-parked under the current house rule after restoring the complete typed speech-timer update through its genuine ai_communication_started caller. Independent HCEA source authenticates the semantic ai_communication_update_speech_timers and actor_reset_idle_vocalization_timer names; the retained implementation uses unit_get and actor_get, named speech-priority constants, the typed AI communication globals, and the established dialogue/reply table structures. Target and candidate are both 672 padded bytes with all 43 relocation identities, and objdiff reports 97.67839 percent similarity after ai_communication_notify and ai_communication_finished were placed in their proper owner header for unit-dialogue callers. That declaration-only owner-header change perturbs this already-residual function's normalized stream without changing its size, relocation topology, semantics, or the exact/non-exact identity of any function in all eight dependent translation units. The remaining gap is the previously documented C2 register/lifetime schedule: January retains the unit in EDI and time in ESI while the natural candidate selects the inverse allocation, with a small associated load-order tie. Prior bounded declaration, initialization, and expression-order probes did not close it naturally. No register hint, volatile access, barrier, pragma, assembly, fake dependency, false alias, raw offset, forced inline/noinline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the register lifetimes.",
       "measurements": {
         "target": {
           "size": 672,
@@ -1997,9 +1997,9 @@
         "base": {
           "size": 672,
           "relocation_count": 43,
-          "normalized_sha256": "7db4861a5adf519e0457a0ffe785ff4d47e878fda47cc0a06206a529776ac91c"
+          "normalized_sha256": "885fdb81966284acf5ba7138a4bbbd2221e7c61c89114fdd6f53b96ba89b81a0"
         },
-        "objdiff_percent": 97.76382
+        "objdiff_percent": 97.67839
       }
     },
     {
@@ -3081,6 +3081,44 @@
           "relocation_count": 45,
           "normalized_sha256": "2d2cc82fb3a6cc531b4549653fe802ff8a8cfd904d108612cb06375df6fd37be"
         }
+      }
+    },
+    {
+      "unit": "source/units/unit_dialogue",
+      "function": "_unit_dialogue_determine_variant",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed January behavior from target disassembly and the independent HaloCEA applied-type lift: collect at most sixteen dialogue variants below 100, report the authenticated silent overflow error, select sequentially through the PDB-authenticated sequential_counter global, and store the selected variant only when the unit has no variant. Target and candidate both occupy 176 padded bytes with all seven relocation identities, and objdiff reports 88.95522 percent. The residual is confined to VC7's final independent load/increment/store register schedule; bounded natural local and direct-assignment spellings did not close it. No volatile/register forcing, barrier, pragma, assembly, raw offset, fake dependency, forced inline, or nonsensical branch is retained.",
+      "measurements": {
+        "target": {
+          "size": 176,
+          "relocation_count": 7,
+          "normalized_sha256": "5331055b840b29dd2d20476dd69850abee818a531a6da9e8373d5f98e8b90ef1"
+        },
+        "base": {
+          "size": 176,
+          "relocation_count": 7,
+          "normalized_sha256": "b54dcf839bc4a04064e8b70f84bcf63f2da833933260f74fee0df91102b2ee88"
+        },
+        "objdiff_percent": 88.95522
+      }
+    },
+    {
+      "unit": "source/units/unit_dialogue",
+      "function": "_unit_dialogue_update",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked with the complete typed dialogue lifecycle recovered from January target disassembly and the independent HaloCEA Xbox lift. The retained function performs setup, damage-speech timer decay, head-marker sound placement, AI communication start/notify/finish transitions, delay expiration, speech completion, and queued-speech dequeue using the authenticated enum constant. It preserves January's independently corroborated double decrement of damage_minor_timer rather than silently repairing the original behavior. Target and candidate both occupy 768 padded bytes with all fifteen relocation identities; objdiff reports 98.4058 percent. Remaining differences are local branch and instruction scheduling, not missing behavior. No volatile/register forcing, barrier, pragma, assembly, raw offset, fake dependency, forced inline, or invented control flow is retained.",
+      "measurements": {
+        "target": {
+          "size": 768,
+          "relocation_count": 15,
+          "normalized_sha256": "0bc104489dda51afb9471523058e2f12e6b20bd55ce54ddf6b49eab0b441ba8f"
+        },
+        "base": {
+          "size": 768,
+          "relocation_count": 15,
+          "normalized_sha256": "def7aab44a446dd38126ecfa09ffe755328450d1b55e840b75a6114e46ef1266"
+        },
+        "objdiff_percent": 98.4058
       }
     }
   ]

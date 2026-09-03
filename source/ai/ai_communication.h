@@ -124,6 +124,18 @@ void ai_communication_started(
 	short priority,
 	short vocalization_type,
 	struct ai_information_packet *information);
+void ai_communication_notify(
+	long unit_index,
+	short priority,
+	short vocalization_type,
+	struct ai_information_packet *information);
+void ai_communication_finished(
+	long unit_index,
+	short priority,
+	short vocalization_type,
+	boolean reply_to_player,
+	long preselected_reply_actor_index,
+	struct ai_information_packet *information);
 void actor_communication_update(
 	long actor_index);
 void actor_handle_communication(
