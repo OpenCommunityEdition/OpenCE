@@ -451,27 +451,6 @@ void _rasterizer_dynamic_vertices_unlock(
 	long dynamic_vertex_buffer_index);
 void _rasterizer_dynamic_vertices_delete(
 	long dynamic_vertex_buffer_index);
-void _rasterizer_debug_immediate_line(
-	real_point3d const *p0,
-	real_point3d const *p1,
-	real_rgb_color const *color0,
-	real_rgb_color const *color1);
-void _rasterizer_debug_immediate_triangle(
-	real_point3d const *p0,
-	real_point3d const *p1,
-	real_point3d const *p2,
-	real_rgb_color const *color0,
-	real_rgb_color const *color1,
-	real_rgb_color const *color2);
-void _rasterizer_debug_immediate_line_screenspace(
-	point2d const *p0,
-	point2d const *p1,
-	real_rgb_color const *color0,
-	real_rgb_color const *color1);
-void _rasterizer_debug_immediate_linestrip_screenspace(
-	point2d const *points,
-	short point_count,
-	real_rgb_color const *color);
 void *_rasterizer_decal_vertices_lock(
 	short cache_index,
 	unsigned long cache_size);
@@ -511,14 +490,6 @@ void _rasterizer_detail_objects_end(
 	void);
 void _rasterizer_screen_effect(
 	struct render_screen_effect const *effect);
-void _rasterizer_debug_immediate_begin(
-	void);
-void _rasterizer_debug_immediate_end(
-	void);
-void _rasterizer_debug_immediate_begin_screenspace(
-	void);
-void _rasterizer_debug_immediate_end_screenspace(
-	void);
 void _rasterizer_hud_begin(
 	void);
 void _rasterizer_hud_end(

@@ -28,6 +28,13 @@ void rasterizer_spin_begin(
 void rasterizer_spin_end(
 	void);
 
+/* ---------- prototypes/RASTERIZER_XBOX_ERRORS.C */
+
+void rasterizer_error(
+	long error_result,
+	char const *format,
+	...);
+
 
 /* ---------- prototypes/RASTERIZER_XBOX_PROFILE.C */
 
@@ -80,6 +87,7 @@ boolean shader_transparent_generic_create(
 /* ---------- globals */
 
 extern D3DDevice *global_d3d_device;
+extern struct pixel_shader_definition pixel_shader;
 
 /* ---------- public code */
 
