@@ -5,13 +5,13 @@ symbols in this file:
 0018ED80 0010:
 	_biped_limp_noodle_get_max_relaxation_iterations (0000)
 0018ED90 04e0:
-	_code_0018ed90 (0000)
+	_biped_limp_noodle_valid_joint_rotation (0000)
 0018F270 07b0:
-	_code_0018f270 (0000)
+	_biped_limp_noodle_move_relax_and_constrain_positions (0000)
 0018FA20 01f0:
 	_validate_real_vector3d_axes3 (0000)
 0018FC10 02c0:
-	_code_0018fc10 (0000)
+	_biped_limp_noodle_adjust_orientations (0000)
 0018FED0 0100:
 	_biped_limp_noodle_relax_nodes_onto_environment (0000)
 002A3030 0045:
@@ -25,7 +25,7 @@ symbols in this file:
 002A30AC 0004:
 	__real@bd036d41 (0000)
 004C1C08 af08:
-	_bss_004c1c08 (0000)
+	_biped_limp_noodle_globals (0000)
 */
 
 /* ---------- headers */
@@ -49,7 +49,7 @@ enum
 	_joint_type_ball_and_socket = 0,
 	_joint_type_hinge,
 	_joint_type_no_movement,
-	NUMBER_OF_JOINT_TYPES,
+	NUMBER_OF_NODE_BLOCK_FLAGS,
 };
 
 /* ---------- macros */

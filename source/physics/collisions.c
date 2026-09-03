@@ -388,8 +388,8 @@ short collision_move_sphere(
 	long ignore_object_index,
 	real_point3d *clipped_position,
 	real_vector3d *clipped_velocity,
-	struct collision_result *collisions,
-	short *collision_count)
+	short maximum_collision_count,
+	struct collision_plane *collisions)
 {
 	return collision_move_pill(
 		flags,
@@ -400,8 +400,8 @@ short collision_move_sphere(
 		ignore_object_index,
 		clipped_position,
 		clipped_velocity,
-		collisions,
-		collision_count);
+		maximum_collision_count,
+		collisions);
 }
 
 short collision_move_pill(
@@ -413,8 +413,8 @@ short collision_move_pill(
 	long ignore_object_index,
 	real_point3d *clipped_position,
 	real_vector3d *clipped_velocity,
-	struct collision_result *collisions,
-	short *collision_count)
+	short maximum_collision_count,
+	struct collision_plane *collisions)
 {
 	short result = FALSE;
 	struct collision_feature_list features;
@@ -442,8 +442,8 @@ short collision_move_pill(
 			&features,
 			clipped_position,
 			clipped_velocity,
-			collisions,
-			collision_count);
+			maximum_collision_count,
+			collisions);
 	}
 	else
 	{

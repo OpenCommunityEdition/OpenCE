@@ -150,8 +150,8 @@ short collision_move_pill(
 	long ignore_object_index,
 	real_point3d *clipped_position,
 	real_vector3d *clipped_velocity,
-	struct collision_result *collisions,
-	short *collision_count);
+	short maximum_collision_count,
+	struct collision_plane *collisions);
 short collision_move_sphere(
 	unsigned long flags,
 	real_point3d const *position,
@@ -160,8 +160,8 @@ short collision_move_sphere(
 	long ignore_object_index,
 	real_point3d *clipped_position,
 	real_vector3d *clipped_velocity,
-	struct collision_result *collisions,
-	short *collision_count);
+	short maximum_collision_count,
+	struct collision_plane *collisions);
 /* ---------- globals */
 
 /* ---------- public code */

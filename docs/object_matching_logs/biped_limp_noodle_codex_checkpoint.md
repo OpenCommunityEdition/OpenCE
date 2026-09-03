@@ -48,6 +48,15 @@ feature-list and collision-plane types they consume. The ad-hoc declarations
 were removed from `biped_limp_noodle.c`, `game_engine.c`, and
 `collisions.c`; every biped sphere query now passes `biped_index`.
 
+The pre-existing `collision_move_pill` and `collision_move_sphere` declaration
+tails were also corrected from an incompatible collision-result/count pair to
+the January-confirmed maximum-plane-count and `collision_plane` array. Their
+declarations remain in their original slots in `collisions.h`; moving those
+slots changes C2 scheduling in an otherwise unrelated exact Decals function.
+The feature-list APIs remain in the associated `collision_features.h` owner
+section. A direct C2 compile of `collisions.c` is warning-free with these
+interfaces.
+
 This placement is also C2 schedule-safe. All four direct
 `collision_features.h` consumers and all fourteen direct `collisions.h`
 consumers were compiled and gated. No exact function changed: Units remains
@@ -68,6 +77,8 @@ which HCEA and January agree. This prevents emission of a
 - `units.obj`: 189 exact, zero residual, zero unwritten.
 - `bipeds.obj`: unchanged at 25 exact, one inherited residual, 25 unwritten.
 - `collisions.obj`: unchanged at eight exact, zero residual, 12 unwritten.
+- `_collision_move_pill`, `_collision_move_sphere`, and
+  `_collision_test_sphere` remain exact after the signature reconciliation.
 - `biped_limp_noodle.obj`: three exact, three residual, zero unwritten;
   corrected-interface candidates are 1,216, 1,888, and 240 padded bytes.
 - All four `collision_features.h` and fourteen `collisions.h` direct
@@ -77,7 +88,7 @@ which HCEA and January agree. This prevents emission of a
 - Candidate symbol audit: no `point_from_line3d` definition or COMDAT.
 
 Source SHA-256:
-`5ec46accb5e871eeacd358af27577e3ff78e5a8638da037900fe447fcf85ee82`.
+`75dd79b1a99b59bea13bc6da390db6037828f4b4d4ec57ea722e3a1b3ba623db`.
 January target object SHA-256:
 `113dfab879513774d369627a6bd7a7607baf9bb7bcf82c87ee1bc28b6aa32b69`.
 
