@@ -192,12 +192,21 @@ symbols in this file:
 #include "game/player_control_runtime.h"
 #include "players.h"
 
+#include "game/aim_assist.h"
 #include "game/game_globals.h"
+#include "camera/director.h"
 #include "cseries/profile.h"
+#include "cutscene/cinematics.h"
+#include "input/input.h"
+#include "input/input_abstraction.h"
+#include "interface/player_ui.h"
 #include "items/weapons.h"
+#include "main/main.h"
 #include "objects/objects.h"
+#include "physics/collision_usage.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
+#include "units/bipeds.h"
 #include "units/unit_definitions.h"
 #include "units/units.h"
 #include "units/vehicle_definitions.h"
@@ -206,6 +215,39 @@ symbols in this file:
 #include "real_math.h"
 
 /* ---------- constants */
+
+enum control_button
+{
+	_button_jump = 0,
+	_button_switch_grenade,
+	_button_action_reload,
+	_button_switch_weapon,
+	_button_melee_attack,
+	_button_flashlight,
+	_button_throw_grenade,
+	_button_fire,
+	_button_start,
+	_button_back,
+	_button_crouch,
+	_button_scope_zoom,
+	NUMBER_OF_ACTION_CONTROL_BUTTONS,
+};
+
+enum
+{
+	_biped_airborne_bit = 0,
+};
+
+enum mouse_button
+{
+	_mouse_button_left = 0,
+	_mouse_button_middle,
+	_mouse_button_right,
+	NUMBER_OF_MOUSE_BUTTONS = 4,
+};
+
+real const MOUSE_YAW_SCALE = 0.0031415927f;
+real const MOUSE_PITCH_SCALE = 0.0031415927f;
 
 /* ---------- macros */
 
@@ -219,6 +261,44 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct input_blob
+{
+	real_vector2d throttle;
+	real primary_trigger;
+	real_euler_angles2d facing_delta;
+	boolean accept;
+	boolean back;
+	byte pad16[2];
+	unsigned long unit_control_flags;
+	unsigned long player_control_flags;
+};
+
+struct game_input_state
+{
+	byte buttons[12];
+	real forward_movement;
+	real strafe;
+	real yaw;
+	real pitch;
+};
+
+struct mouse_state
+{
+	long x;
+	long y;
+	long wheel;
+	byte buttons[NUMBER_OF_MOUSE_BUTTONS];
+};
+
+typedef char input_blob_size_assert[
+	sizeof(struct input_blob) == sizeof(struct player_action) ? 1 : -1];
+typedef char game_input_state_size_assert[
+	sizeof(struct game_input_state) == 0x1C ? 1 : -1];
+typedef char mouse_state_size_assert[
+	sizeof(struct mouse_state) == 0x10 ? 1 : -1];
+typedef char mouse_state_buttons_offset_assert[
+	offsetof(struct mouse_state, buttons) == 0xC ? 1 : -1];
+
 /* ---------- prototypes */
 
 void player_aiming_vector_from_facing(
@@ -230,6 +310,17 @@ static void player_control_modify_desired_angles(
 	short local_player_index,
 	real delta_yaw,
 	real delta_pitch);
+static void player_action_clear(
+	struct input_blob *input);
+static void player_control_action_test_check_reset_input_blob(
+	struct input_blob *input);
+static void get_local_player_input_blob(
+	short local_player_index,
+	real time_delta_sec,
+	struct input_blob *input);
+static void handle_one_player_input(
+	short local_player_index,
+	real time_delta_sec);
 
 /* ---------- globals */
 
@@ -318,10 +409,10 @@ void player_control_inhibit_buttons(
 {
 	struct player_control *control = player_control_get(local_player_index);
 
-	control->inhibited_action_flags |= action_flags;
+	control->inhibited_button_bit_vector |= action_flags;
 	if (persistent)
 	{
-		control->persistent_inhibited_action_flags |= action_flags;
+		control->reset_button_when_released_bit_vector |= action_flags;
 	}
 	return;
 }
@@ -440,6 +531,244 @@ real evaluate_piecewise_linear_function(
 		result = -result;
 	}
 	return result;
+}
+
+static void player_action_clear(
+	struct input_blob *input)
+{
+	csmemset(
+		input,
+		0,
+		sizeof(*input));
+
+	return;
+}
+
+static void handle_one_player_input(
+	short local_player_index,
+	real time_delta_sec)
+{
+	struct player_control *player = player_control_get(local_player_index);
+	struct game_globals_player_control *constants = TAG_BLOCK_GET_ELEMENT(
+		&scenario_get_game_globals()->player_control,
+		0,
+		struct game_globals_player_control);
+	struct input_blob input;
+	struct player_action action;
+	long current_weapon_index;
+
+	csmemset(
+		&input,
+		0xFA,
+		sizeof(input));
+	get_local_player_input_blob(
+		local_player_index,
+		time_delta_sec,
+		&input);
+	if (local_player_get_player_index(local_player_index) != NONE)
+	{
+		match_assert_valid_real(
+			"c:\\halo\\SOURCE\\game\\player_control.c",
+			0x2CE,
+			player->desired_angles.pitch);
+		match_assert_valid_real(
+			"c:\\halo\\SOURCE\\game\\player_control.c",
+			0x2CF,
+			player->desired_angles.yaw);
+	}
+
+	if (director_inhibited_input(local_player_index))
+	{
+		csmemset(&input, 0, sizeof(input));
+	}
+
+	if (game_connection() == _game_connection_local)
+	{
+		if (TEST_FLAG(input.player_control_flags, _player_control_debug_rotate_units_bit) ||
+			TEST_FLAG(input.player_control_flags, _player_control_debug_rotate_all_units_bit))
+		{
+			long unit_index = TEST_FLAG(
+				input.player_control_flags,
+				_player_control_debug_rotate_all_units_bit)
+				? units_debug_get_next_unit(player->unit_index)
+				: units_debug_get_closest_unit(player->unit_index);
+
+			if (unit_index != NONE)
+			{
+				players_set_local_player_unit(local_player_index, unit_index);
+			}
+		}
+		if (TEST_FLAG(input.player_control_flags, _player_control_debug_ninja_rope_bit) &&
+			player->unit_index != NONE)
+		{
+			unit_debug_ninja_rope(player->unit_index);
+		}
+	}
+
+	if (player->unit_index != NONE)
+	{
+		struct unit_datum *unit = unit_get(player->unit_index);
+		short must_be_readied_weapon;
+
+		unit_definition_get(unit->definition_index);
+		current_weapon_index = unit_inventory_get_weapon(
+			player->unit_index,
+			unit->unit.current_weapon_index);
+		if (player->desired_weapon_index == NONE ||
+			unit_inventory_get_weapon(
+				player->unit_index,
+				player->desired_weapon_index) == NONE)
+		{
+			player->desired_weapon_index = unit->unit.desired_weapon_index;
+		}
+
+		if (TEST_FLAG(input.player_control_flags, _player_control_rotate_weapons_bit) ||
+			unit_inventory_get_weapon(
+				player->unit_index,
+				player->desired_weapon_index) == NONE ||
+			player->desired_weapon_index == NONE)
+		{
+			player->desired_weapon_index = unit_inventory_next_weapon(
+				player->unit_index,
+				player->desired_weapon_index,
+				TEST_FLAG(input.player_control_flags, _player_control_rotate_weapons_bit));
+			player->zoom_level = NONE;
+		}
+
+		must_be_readied_weapon = unit_inventory_get_must_be_readied_weapon(
+			player->unit_index);
+		if (must_be_readied_weapon != NONE &&
+			player->desired_weapon_index != must_be_readied_weapon)
+		{
+			player->desired_weapon_index = must_be_readied_weapon;
+			player->zoom_level = NONE;
+		}
+
+		if (player->desired_grenade_index == NONE ||
+			!unit_get_grenade_count(
+				player->unit_index,
+				player->desired_grenade_index))
+		{
+			player->desired_grenade_index = unit->unit.desired_grenade_index;
+		}
+		if (TEST_FLAG(input.player_control_flags, _player_control_rotate_grenades_bit) ||
+			!unit_get_grenade_count(
+				player->unit_index,
+				player->desired_grenade_index) ||
+			player->desired_grenade_index == NONE)
+		{
+			player->desired_grenade_index = unit_inventory_next_grenade(
+				player->unit_index,
+				player->desired_grenade_index,
+				1);
+		}
+
+		if (TEST_FLAG(input.player_control_flags, _player_control_input_zoom_bit) &&
+			player_control_camera_control_is_active() &&
+			current_weapon_index != NONE &&
+			!cinematic_in_progress())
+		{
+			player->zoom_level = weapon_rotate_zoom_level(
+				current_weapon_index,
+				player->zoom_level);
+		}
+
+		if (!director_inhibited_facing(local_player_index))
+		{
+			player_control_modify_desired_angles(
+				local_player_index,
+				input.facing_delta.yaw,
+				input.facing_delta.pitch);
+		}
+
+		if (unit->object.parent_object_index == NONE)
+		{
+			if (player_ui_autolevel_enabled(local_player_index) &&
+				fabs(player->throttle.i) > 0.5 &&
+				input.facing_delta.pitch < 0.0001f &&
+				player->magnetism_level < 0.0001f)
+			{
+				player->autolevel_ticks = (char)PIN(
+					player->autolevel_ticks + 1,
+					0,
+					127);
+				player->use_autolevel =
+					player->autolevel_ticks > constants->minimum_autolevel_enabled_ticks;
+			}
+			else
+			{
+				player->autolevel_ticks = 0;
+				player->use_autolevel = FALSE;
+			}
+		}
+		else
+		{
+			player->use_autolevel = FALSE;
+		}
+	}
+
+	player->control_flags = input.unit_control_flags;
+	player->throttle = input.throttle;
+	player->primary_trigger = input.primary_trigger;
+	match_assert_valid_real(
+		"c:\\halo\\SOURCE\\game\\player_control.c",
+		0x351,
+		player->primary_trigger);
+
+	if (local_player_get_player_index(local_player_index) != NONE)
+	{
+		match_assert_valid_real(
+			"c:\\halo\\SOURCE\\game\\player_control.c",
+			0x35D,
+			player->desired_angles.pitch);
+		match_assert_valid_real(
+			"c:\\halo\\SOURCE\\game\\player_control.c",
+			0x35E,
+			player->desired_angles.yaw);
+		match_assert_valid_real(
+			"c:\\halo\\SOURCE\\game\\player_control.c",
+			0x35F,
+			player->primary_trigger);
+
+		action.control_flags = player->control_flags;
+		action.desired_facing = player->desired_angles;
+		action.throttle = player->throttle;
+		action.primary_trigger = player->primary_trigger;
+		action.desired_weapon_index = player->desired_weapon_index;
+		action.desired_grenade_index = player->desired_grenade_index;
+		action.desired_zoom_level = player->zoom_level;
+		match_assert_valid_real(
+			"c:\\halo\\SOURCE\\game\\player_control.c",
+			0x369,
+			action.desired_facing.pitch);
+		match_assert_valid_real(
+			"c:\\halo\\SOURCE\\game\\player_control.c",
+			0x36A,
+			action.desired_facing.yaw);
+		update_client_queue(&action);
+	}
+
+	return;
+}
+
+boolean player_control_update(
+	real time_delta_sec)
+{
+	short local_player_index;
+
+	profile_enter(player_control_update_section);
+	collision_log_begin_period(2);
+	update_client_queue_push();
+	for (local_player_index = 0;
+		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
+		local_player_index++)
+	{
+		handle_one_player_input(local_player_index, time_delta_sec);
+	}
+	collision_log_end_period();
+	profile_exit(player_control_update_section);
+
+	return FALSE;
 }
 
 long player_control_get_aiming_unit_index(
@@ -659,12 +988,12 @@ void player_control_new_unit(
 	control->desired_weapon_index = NONE;
 	control->desired_grenade_index = NONE;
 	control->zoom_level = NONE;
-	control->unknown26 = FALSE;
+	control->use_autolevel = FALSE;
 	control->target_object_index = NONE;
 	control->pitch_maximum = DEGREES_TO_RADIANS(85.5f);
 	control->pitch_minimum = -DEGREES_TO_RADIANS(85.5f);
-	control->inhibited_action_flags = 0;
-	control->persistent_inhibited_action_flags = 0;
+	control->inhibited_button_bit_vector = 0;
+	control->reset_button_when_released_bit_vector = 0;
 
 	if (unit_index != NONE)
 	{
@@ -681,6 +1010,462 @@ void player_control_new_unit(
 		control->desired_grenade_index = unit->unit.desired_grenade_index;
 		control->zoom_level = unit->unit.desired_zoom_level;
 	}
+	return;
+}
+
+static void get_local_player_input_blob(
+	short local_player_index,
+	real time_delta_sec,
+	struct input_blob *input)
+{
+	long player_index = local_player_get_player_index(local_player_index);
+
+	player_action_clear(input);
+	if (player_index != NONE)
+	{
+		struct player_control *control = player_control_get(local_player_index);
+		struct player_datum *player = player_get(player_index);
+		short gamepad_index = player->local_player_index;
+		boolean is_primary_player = gamepad_index == debug_input_target;
+
+		if (gamepad_index != NONE && input_has_gamepad(gamepad_index))
+		{
+			struct game_globals_player_control *constants = TAG_BLOCK_GET_ELEMENT(
+				&scenario_get_game_globals()->player_control,
+				0,
+				struct game_globals_player_control);
+			struct gamepad_state const *gamepad = input_get_gamepad_state(gamepad_index);
+			struct game_input_state *input_state = input_abstraction_get_input_state(gamepad_index);
+			real look_yaw_rate = 0.f;
+			real look_pitch_rate = 0.f;
+
+			if (player->unit_index != NONE)
+			{
+				struct unit_datum *unit = unit_get(player->unit_index);
+
+				look_yaw_rate = DEGREES_TO_RADIANS(
+					player_look_yaw_rate[local_player_index]) *
+					(1.f / TICKS_PER_SECOND);
+				look_pitch_rate = DEGREES_TO_RADIANS(
+					player_look_pitch_rate[local_player_index]) *
+					(1.f / TICKS_PER_SECOND);
+				if (unit->object.parent_object_index != NONE &&
+					unit->unit.parent_seat_index != NONE)
+				{
+					struct unit_datum *parent_unit = unit_get(
+						unit->object.parent_object_index);
+					struct unit_definition *parent_definition = unit_definition_get(
+						parent_unit->definition_index);
+					struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+						&parent_definition->unit.seats,
+						unit->unit.parent_seat_index,
+						struct unit_seat);
+
+					if (seat->yaw_rate > 0.f)
+					{
+						look_yaw_rate = DEGREES_TO_RADIANS(seat->yaw_rate) *
+							(1.f / TICKS_PER_SECOND);
+					}
+					if (seat->pitch_rate > 0.f)
+					{
+						look_pitch_rate = DEGREES_TO_RADIANS(seat->pitch_rate) *
+							(1.f / TICKS_PER_SECOND);
+					}
+				}
+			}
+
+			input->throttle.i = input_state->forward_movement;
+			input->throttle.j = input_state->strafe;
+			{
+				real absolute_pitch = fabs(input_state->pitch);
+				real absolute_yaw = fabs(input_state->yaw);
+				real look_scale = 1.f;
+				real clamped_yaw;
+				real clamped_pitch;
+
+				if (absolute_pitch > 0.1f && absolute_yaw > 0.1f)
+				{
+					if (absolute_pitch > absolute_yaw)
+					{
+						absolute_yaw /= absolute_pitch;
+						absolute_pitch = 1.f;
+					}
+					else
+					{
+						absolute_pitch /= absolute_yaw;
+						absolute_yaw = 1.f;
+					}
+					look_scale = square_root(
+						absolute_pitch * absolute_pitch +
+						absolute_yaw * absolute_yaw);
+				}
+				clamped_yaw = PIN(input_state->yaw * look_scale, -1.f, 1.f);
+				clamped_pitch = PIN(input_state->pitch * look_scale, -1.f, 1.f);
+
+				if (player_control_camera_control_is_active())
+				{
+					long doubled_spin;
+					real yaw_spin_scale;
+					real pitch_spin_scale;
+					real yaw_delta;
+					real pitch_delta;
+					real_euler_angles2d target_angular_position;
+					real_euler_angles2d target_angular_velocity;
+
+					if (input_state->buttons[_button_scope_zoom] &&
+						controls_enable_doubled_spin)
+					{
+						doubled_spin = !controls_swap_doubled_spin_state;
+					}
+					else
+					{
+						doubled_spin = controls_swap_doubled_spin_state;
+					}
+					pitch_spin_scale = (real)(doubled_spin + 1);
+					if (!input_state->buttons[_button_scope_zoom] ||
+						!controls_enable_doubled_spin)
+					{
+						doubled_spin = controls_swap_doubled_spin_state;
+					}
+					else
+					{
+						doubled_spin = !controls_swap_doubled_spin_state;
+					}
+					yaw_spin_scale = (real)(doubled_spin + 1);
+					match_assert(
+						"c:\\halo\\SOURCE\\game\\player_control.c",
+						0x1C8,
+						constants->look_function.count>1);
+					yaw_delta = evaluate_piecewise_linear_function(
+						constants->look_function.count,
+						constants->look_function.address,
+						clamped_yaw) * yaw_spin_scale * look_yaw_rate;
+					pitch_delta = evaluate_piecewise_linear_function(
+						constants->look_function.count,
+						constants->look_function.address,
+						clamped_pitch) * pitch_spin_scale * look_pitch_rate;
+
+					if (player->unit_index != NONE && control->zoom_level != NONE)
+					{
+						real inverse_zoom = 1.f / unit_get_zoom_magnification(
+							player->unit_index,
+							control->zoom_level);
+
+						yaw_delta *= inverse_zoom;
+						pitch_delta *= inverse_zoom;
+					}
+					if (player->unit_index != NONE)
+					{
+						struct game_globals_player_information *player_information =
+							TAG_BLOCK_GET_ELEMENT(
+								&scenario_get_game_globals()->player_information,
+								0,
+								struct game_globals_player_information);
+						struct unit_datum *unit = unit_get(player->unit_index);
+						real stun_scale = 1.f - unit->unit.body_stun *
+							player_information->stun_turning_penalty;
+
+						yaw_delta *= stun_scale;
+						pitch_delta *= stun_scale;
+					}
+
+					match_assert(
+						"c:\\halo\\SOURCE\\game\\player_control.c",
+						0x1E3,
+						constants->look_acceleration_time>0.0f);
+					if (fabs(clamped_yaw) < constants->look_pegging_threshold)
+					{
+						control->look_acceleration_time = 0.f;
+					}
+					else
+					{
+						real acceleration = PIN(
+							control->look_acceleration_time /
+								constants->look_acceleration_time,
+							0.f,
+							1.f);
+
+						yaw_delta *= (constants->look_acceleration_scale - 1.f) *
+							acceleration + 1.f;
+						control->look_acceleration_time += time_delta_sec;
+					}
+
+					control->target_object_index = local_player_aim_assist(
+						local_player_index,
+						&control->autoaim_level,
+						&control->magnetism_level,
+						&target_angular_position,
+						&target_angular_velocity);
+					if (player_magnetism_flag && control->magnetism_level > 0.f &&
+						(fabs(clamped_yaw) > _real_epsilon ||
+						fabs(clamped_pitch) > _real_epsilon ||
+						fabs(input->throttle.i) > _real_epsilon ||
+						fabs(input->throttle.j) > _real_epsilon))
+					{
+						real game_speed = game_time_get_speed();
+						real input_scale = 1.f - control->magnetism_level *
+							PIN(constants->magnetism_friction, 0.f, 1.f);
+						real magnetism_scale = control->magnetism_level *
+							PIN(constants->magnetism_adhesion, 0.f, 1.f);
+
+						if (game_players_are_double_speed())
+						{
+							game_speed *= 0.5f;
+						}
+						target_angular_velocity.yaw = PIN(
+							target_angular_velocity.yaw * game_speed,
+							-DEGREES_TO_RADIANS(6.f),
+							DEGREES_TO_RADIANS(6.f));
+						target_angular_velocity.pitch = PIN(
+							target_angular_velocity.pitch * game_speed,
+							-DEGREES_TO_RADIANS(3.f),
+							DEGREES_TO_RADIANS(3.f));
+						yaw_delta = target_angular_velocity.yaw * magnetism_scale +
+							yaw_delta * input_scale;
+						pitch_delta = target_angular_velocity.pitch * magnetism_scale +
+							pitch_delta * input_scale;
+					}
+
+					{
+						real facing_scale = time_delta_sec * TICKS_PER_SECOND;
+
+						input->facing_delta.yaw = facing_scale * yaw_delta;
+						input->facing_delta.pitch = facing_scale * pitch_delta;
+					}
+				}
+				else
+				{
+					input->facing_delta.yaw = 0.f;
+					input->facing_delta.pitch = 0.f;
+				}
+			}
+
+			{
+				byte effective_buttons[NUMBER_OF_ACTION_CONTROL_BUTTONS] = {0};
+				word buttons_to_reset =
+					control->inhibited_button_bit_vector &
+					control->reset_button_when_released_bit_vector;
+				long button_index;
+
+				if (buttons_to_reset)
+				{
+					for (button_index = 0;
+						button_index < NUMBER_OF_ACTION_CONTROL_BUTTONS;
+						button_index++)
+					{
+						if (TEST_FLAG(buttons_to_reset, button_index) &&
+							!input_state->buttons[button_index])
+						{
+							SET_FLAG(
+								control->inhibited_button_bit_vector,
+								button_index,
+								FALSE);
+							SET_FLAG(
+								control->reset_button_when_released_bit_vector,
+								button_index,
+								FALSE);
+						}
+					}
+				}
+				for (button_index = 0;
+					button_index < NUMBER_OF_ACTION_CONTROL_BUTTONS;
+					button_index++)
+				{
+					if (!TEST_FLAG(
+						control->inhibited_button_bit_vector,
+						button_index))
+					{
+						effective_buttons[button_index] =
+							input_state->buttons[button_index];
+					}
+				}
+
+				if (player->unit_index != NONE)
+				{
+					struct biped_datum *biped = biped_try_and_get(player->unit_index);
+
+					if (biped &&
+						(controls_enable_crouch ||
+						TEST_FLAG(biped->biped.flags, _biped_airborne_bit) ||
+						magnitude_squared2d(&input->throttle) < 0.98f * 0.98f))
+					{
+						SET_FLAG(
+							input->unit_control_flags,
+							_unit_control_crouch_modifier_bit,
+							effective_buttons[_button_crouch]);
+					}
+				}
+
+				input->primary_trigger =
+					(real)input_state->buttons[_button_fire] * 0.0039215689f;
+				SET_FLAG(
+					input->unit_control_flags,
+					_unit_control_weapon_primary_trigger_bit,
+					effective_buttons[_button_fire]);
+				SET_FLAG(
+					input->unit_control_flags,
+					_unit_control_throw_grenade_bit,
+					effective_buttons[_button_throw_grenade]);
+				SET_FLAG(
+					input->unit_control_flags,
+					_unit_control_weapon_secondary_trigger_bit,
+					effective_buttons[_button_throw_grenade]);
+				SET_FLAG(
+					input->player_control_flags,
+					_player_control_input_zoom_bit,
+					effective_buttons[_button_scope_zoom] == TRUE);
+				SET_FLAG(
+					input->unit_control_flags,
+					_unit_control_action_bit,
+					effective_buttons[_button_action_reload]);
+				SET_FLAG(
+					input->unit_control_flags,
+					_unit_control_swap_weapons_bit,
+					effective_buttons[_button_action_reload] >=
+						constants->minimum_weapon_swap_ticks);
+				SET_FLAG(
+					input->unit_control_flags,
+					_unit_control_integrated_light_bit,
+					effective_buttons[_button_flashlight]);
+				SET_FLAG(
+					input->unit_control_flags,
+					_unit_control_jump_bit,
+					effective_buttons[_button_jump]);
+				SET_FLAG(
+					input->unit_control_flags,
+					_unit_control_use_equipment_bit,
+					effective_buttons[_button_melee_attack]);
+				SET_FLAG(
+					input->player_control_flags,
+					_player_control_rotate_weapons_bit,
+					effective_buttons[_button_switch_weapon] == TRUE);
+				SET_FLAG(
+					input->player_control_flags,
+					_player_control_rotate_grenades_bit,
+					effective_buttons[_button_switch_grenade] == TRUE);
+
+				if (!TEST_FLAG(
+					control->inhibited_button_bit_vector,
+					_button_back))
+				{
+					input->back = gamepad->buttons[_gamepad_analog_button_b];
+				}
+				if (!TEST_FLAG(
+					control->inhibited_button_bit_vector,
+					_button_action_reload))
+				{
+					input->accept = gamepad->buttons[_gamepad_analog_button_a];
+				}
+			}
+		}
+		else
+		{
+			struct mouse_state const *mouse = input_get_mouse_state();
+
+			if (mouse && is_primary_player)
+			{
+				mouse = input_get_mouse_state();
+				input->throttle.i =
+					(real)(!!input_key_is_down(_key_w) - !!input_key_is_down(_key_s));
+				input->throttle.j =
+					(real)(!!input_key_is_down(_key_a) - !!input_key_is_down(_key_d));
+				if (player_control_camera_control_is_active())
+				{
+					input->facing_delta.yaw = -(real)mouse->x * MOUSE_YAW_SCALE;
+					input->facing_delta.pitch = -(real)mouse->y * MOUSE_PITCH_SCALE;
+				}
+				else
+				{
+					input->facing_delta.yaw = 0.f;
+					input->facing_delta.pitch = 0.f;
+				}
+
+				SET_FLAG(
+					input->unit_control_flags,
+					_unit_control_look_dont_turn_bit,
+					input_key_is_down(_key_shift));
+				SET_FLAG(
+					input->unit_control_flags,
+					_unit_control_force_alert_bit,
+					input_key_is_down(_key_alt));
+				SET_FLAG(
+					input->unit_control_flags,
+					_unit_control_crouch_modifier_bit,
+					input_key_is_down(_key_control));
+				SET_FLAG(
+					input->unit_control_flags,
+					_unit_control_jump_bit,
+					input_key_is_down(_key_space));
+				SET_FLAG(
+					input->unit_control_flags,
+					_unit_control_action_bit,
+					input_key_is_down(_key_q));
+				SET_FLAG(
+					input->unit_control_flags,
+					_unit_control_integrated_light_bit,
+					input_key_is_down(_key_x));
+				SET_FLAG(
+					input->unit_control_flags,
+					_unit_control_weapon_reload_bit,
+					input_key_is_down(_key_r));
+				SET_FLAG(
+					input->unit_control_flags,
+					_unit_control_weapon_primary_trigger_bit,
+					mouse->buttons[_mouse_button_left]);
+				SET_FLAG(
+					input->unit_control_flags,
+					_unit_control_throw_grenade_bit,
+					mouse->buttons[_mouse_button_right]);
+				SET_FLAG(
+					input->player_control_flags,
+					_player_control_input_zoom_bit,
+					input_key_is_down(_key_z) == TRUE);
+				SET_FLAG(
+					input->player_control_flags,
+					_player_control_rotate_weapons_bit,
+					input_key_is_down(_key_e) == TRUE);
+				input->primary_trigger = TEST_FLAG(
+					input->unit_control_flags,
+					_unit_control_weapon_primary_trigger_bit) ? 1.f : 0.f;
+			}
+		}
+
+		SET_FLAG(
+			input->player_control_flags,
+			_player_control_debug_rotate_units_bit,
+			input_key_is_down(_key_backslash) == TRUE);
+		SET_FLAG(
+			input->player_control_flags,
+			_player_control_debug_rotate_all_units_bit,
+			input_key_is_down(_key_right_bracket) == TRUE);
+		SET_FLAG(
+			input->player_control_flags,
+			_player_control_debug_ninja_rope_bit,
+			input_key_is_down(_key_left_bracket) == TRUE);
+		SET_FLAG(
+			input->unit_control_flags,
+			_unit_control_user_animation1_bit,
+			input_key_is_down(_key_1) == TRUE);
+		SET_FLAG(
+			input->unit_control_flags,
+			_unit_control_user_animation2_bit,
+			input_key_is_down(_key_2) == TRUE);
+
+		if (magnitude_squared2d(&input->throttle) > 1.f)
+		{
+			real scale = 1.f / square_root(magnitude_squared2d(&input->throttle));
+
+			input->throttle.i *= scale;
+			input->throttle.j *= scale;
+		}
+	}
+
+	player_control_action_test_check_reset_input_blob(input);
+	match_assert_valid_real(
+		"c:\\halo\\SOURCE\\game\\player_control.c",
+		0x2B6,
+		input->primary_trigger);
+
 	return;
 }
 
@@ -806,6 +1591,155 @@ boolean player_control_action_test_look_relative_all_directions(
 {
 	return !(~player_control_globals->action_flags &
 		_player_control_look_relative_all_directions_flags);
+}
+
+static void player_control_action_test_check_reset_input_blob(
+	struct input_blob *input)
+{
+	struct player_control_globals_data *globals;
+
+	if (input->accept && cinematic_can_be_skipped())
+	{
+		main_skip_cinematic();
+	}
+
+	globals = player_control_globals;
+	if (TEST_FLAG(input->unit_control_flags, _unit_control_action_bit))
+	{
+		globals->action_flags |= FLAG(_player_control_action_bit);
+	}
+	if (TEST_FLAG(input->unit_control_flags, _unit_control_jump_bit))
+	{
+		globals->action_flags |= FLAG(_player_control_jump_bit);
+	}
+	if (input->accept)
+	{
+		globals->action_flags |= FLAG(_player_control_accept_bit);
+	}
+	if (input->back)
+	{
+		globals->action_flags |= FLAG(_player_control_back_bit);
+	}
+	if (input->primary_trigger > 0.f)
+	{
+		globals->action_flags |= FLAG(_player_control_primary_trigger_bit);
+	}
+	if (TEST_FLAG(input->unit_control_flags, _unit_control_throw_grenade_bit))
+	{
+		globals->action_flags |= FLAG(_player_control_grenade_trigger_bit);
+	}
+	if (TEST_FLAG(input->player_control_flags, _player_control_input_zoom_bit))
+	{
+		globals->action_flags |= FLAG(_player_control_zoom_bit);
+	}
+
+	if (input->facing_delta.pitch > 0.f)
+	{
+		globals->action_flags |= FLAG(_player_control_look_relative_up_bit);
+	}
+	else if (input->facing_delta.pitch < 0.f)
+	{
+		globals->action_flags |= FLAG(_player_control_look_relative_down_bit);
+	}
+	if (input->facing_delta.yaw > 0.f)
+	{
+		globals->action_flags |= FLAG(_player_control_look_relative_left_bit);
+	}
+	else if (input->facing_delta.yaw < 0.f)
+	{
+		globals->action_flags |= FLAG(_player_control_look_relative_right_bit);
+	}
+	if (input->throttle.i > 0.f)
+	{
+		globals->action_flags |= FLAG(_player_control_move_relative_forward_bit);
+	}
+	else if (input->throttle.i < 0.f)
+	{
+		globals->action_flags |= FLAG(_player_control_move_relative_backward_bit);
+	}
+	if (input->throttle.j > 0.f)
+	{
+		globals->action_flags |= FLAG(_player_control_move_relative_right_bit);
+	}
+	else if (input->throttle.j < 0.f)
+	{
+		globals->action_flags |= FLAG(_player_control_move_relative_left_bit);
+	}
+
+	if (!TEST_FLAG(globals->action_test_flags, _player_control_action_bit))
+	{
+		if (!TEST_FLAG(globals->suppressed_action_flags, _player_control_action_bit))
+		{
+			goto check_accept;
+		}
+		SET_FLAG(
+			globals->suppressed_action_flags,
+			_player_control_action_bit,
+			TEST_FLAG(input->unit_control_flags, _unit_control_action_bit));
+	}
+	SET_FLAG(input->unit_control_flags, _unit_control_action_bit, FALSE);
+
+check_accept:
+	if (!controls_swapped)
+	{
+		if (!TEST_FLAG(globals->action_test_flags, _player_control_accept_bit))
+		{
+			if (!TEST_FLAG(globals->suppressed_action_flags, _player_control_accept_bit))
+			{
+				goto check_back_unswapped;
+			}
+			SET_FLAG(
+				globals->suppressed_action_flags,
+				_player_control_accept_bit,
+				TEST_FLAG(input->unit_control_flags, _unit_control_action_bit));
+		}
+		SET_FLAG(input->unit_control_flags, _unit_control_action_bit, FALSE);
+
+	check_back_unswapped:
+		if (!TEST_FLAG(globals->action_test_flags, _player_control_back_bit))
+		{
+			if (!TEST_FLAG(globals->suppressed_action_flags, _player_control_back_bit))
+			{
+				return;
+			}
+			SET_FLAG(
+				globals->suppressed_action_flags,
+				_player_control_back_bit,
+				TEST_FLAG(input->player_control_flags, _player_control_rotate_weapons_bit));
+		}
+		SET_FLAG(input->player_control_flags, _player_control_rotate_weapons_bit, FALSE);
+	}
+	else
+	{
+		if (!TEST_FLAG(globals->action_test_flags, _player_control_accept_bit))
+		{
+			if (!TEST_FLAG(globals->suppressed_action_flags, _player_control_accept_bit))
+			{
+				goto check_back_swapped;
+			}
+			SET_FLAG(
+				globals->suppressed_action_flags,
+				_player_control_accept_bit,
+				TEST_FLAG(input->unit_control_flags, _unit_control_jump_bit));
+		}
+		SET_FLAG(input->unit_control_flags, _unit_control_jump_bit, FALSE);
+
+	check_back_swapped:
+		if (!TEST_FLAG(globals->action_test_flags, _player_control_back_bit))
+		{
+			if (!TEST_FLAG(globals->suppressed_action_flags, _player_control_accept_bit))
+			{
+				return;
+			}
+			SET_FLAG(
+				globals->suppressed_action_flags,
+				_player_control_accept_bit,
+				TEST_FLAG(input->player_control_flags, _player_control_rotate_grenades_bit));
+		}
+		SET_FLAG(input->player_control_flags, _player_control_rotate_grenades_bit, FALSE);
+	}
+
+	return;
 }
 
 void player_control_initialize_for_new_map(
@@ -973,7 +1907,7 @@ static void player_control_modify_desired_angles(
 				DEGREES_TO_RADIANS(85.5f));
 		}
 
-		if (pitch_autolevel != 0.f || player->unknown26)
+		if (pitch_autolevel != 0.f || player->use_autolevel)
 		{
 			real error = fabs(player->desired_angles.pitch - pitch_autolevel) * 0.63661975f;
 

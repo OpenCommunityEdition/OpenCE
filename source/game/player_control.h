@@ -19,6 +19,10 @@ enum
 	_player_control_look_relative_down_bit,
 	_player_control_look_relative_left_bit,
 	_player_control_look_relative_right_bit,
+	_player_control_move_relative_forward_bit,
+	_player_control_move_relative_backward_bit,
+	_player_control_move_relative_right_bit,
+	_player_control_move_relative_left_bit,
 };
 
 enum
@@ -26,6 +30,16 @@ enum
 	_player_control_camera_control_disabled_bit,
 	_player_control_look_relative_all_directions_flags = 0x780,
 	_player_control_move_relative_all_directions_flags = 0x7800,
+};
+
+enum
+{
+	_player_control_rotate_weapons_bit,
+	_player_control_rotate_grenades_bit,
+	_player_control_input_zoom_bit,
+	_player_control_debug_rotate_units_bit,
+	_player_control_debug_rotate_all_units_bit,
+	_player_control_debug_ninja_rope_bit,
 };
 
 /* ---------- structures */
@@ -44,19 +58,21 @@ struct player_control_unit_camera_info
 struct player_control
 {
 	long unit_index;
-	long unknown04;
-	short inhibited_action_flags;
-	short persistent_inhibited_action_flags;
+	unsigned long control_flags;
+	word inhibited_button_bit_vector;
+	word reset_button_when_released_bit_vector;
 	real_euler_angles2d desired_angles;
-	byte unknown14[0xC];
+	real_vector2d throttle;
+	real primary_trigger;
 	short desired_weapon_index;
 	short desired_grenade_index;
 	short zoom_level;
-	boolean unknown26;
-	byte unknown27;
+	boolean use_autolevel;
+	char autolevel_ticks;
 	long target_object_index;
 	real autoaim_level;
-	byte unknown30[8];
+	real magnetism_level;
+	real look_acceleration_time;
 	real pitch_minimum;
 	real pitch_maximum;
 };
@@ -75,7 +91,7 @@ typedef char player_control_size_assert[
 typedef char player_control_unit_index_offset_assert[
 	offsetof(struct player_control, unit_index) == 0x0 ? 1 : -1];
 typedef char player_control_inhibited_action_flags_offset_assert[
-	offsetof(struct player_control, inhibited_action_flags) == 0x8 ? 1 : -1];
+	offsetof(struct player_control, inhibited_button_bit_vector) == 0x8 ? 1 : -1];
 typedef char player_control_desired_yaw_offset_assert[
 	offsetof(struct player_control, desired_angles.yaw) == 0xC ? 1 : -1];
 typedef char player_control_desired_pitch_offset_assert[
@@ -90,6 +106,10 @@ typedef char player_control_target_object_index_offset_assert[
 	offsetof(struct player_control, target_object_index) == 0x28 ? 1 : -1];
 typedef char player_control_autoaim_level_offset_assert[
 	offsetof(struct player_control, autoaim_level) == 0x2C ? 1 : -1];
+typedef char player_control_magnetism_level_offset_assert[
+	offsetof(struct player_control, magnetism_level) == 0x30 ? 1 : -1];
+typedef char player_control_look_acceleration_time_offset_assert[
+	offsetof(struct player_control, look_acceleration_time) == 0x34 ? 1 : -1];
 typedef char player_control_pitch_minimum_offset_assert[
 	offsetof(struct player_control, pitch_minimum) == 0x38 ? 1 : -1];
 typedef char player_control_pitch_maximum_offset_assert[

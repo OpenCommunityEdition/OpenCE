@@ -211,8 +211,7 @@ void update_client_add_player(
 }
 
 void update_client_queue(
-	struct player_action const *action,
-	long ticks_to_apply_action_to)
+	struct player_action const *action)
 {
 	update_client_globals.saved_action_collection.actions[
 		update_client_globals.current_local_player] = *action;
@@ -222,7 +221,7 @@ void update_client_queue(
 }
 
 void update_client_queue_push(
-	long ticks_to_apply_nothingness_to)
+	void)
 {
 	update_client_globals.current_local_player = 0;
 	csmemset(

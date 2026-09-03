@@ -1889,6 +1889,44 @@
       }
     },
     {
+      "unit": "source/game/player_control",
+      "function": "_get_local_player_input_blob",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete January local-input digestion path as ordinary typed C. January disassembly, relocations, assertions, and the independently reconstructed HaloCEA behavior establish the player/control look-rate and seat overrides, circular stick normalization, doubled-spin curves, zoom and body-stun scaling, look acceleration, aim-assist magnetism, button inhibition and release latches, crouch gating, gamepad mappings, keyboard/mouse fallback, debug controls, throttle normalization, and unconditional action-test pass. Raw January offsets were translated to player_get, player_control_get, unit_get, biped_try_and_get, unit_definition_get, TAG_BLOCK_GET_ELEMENT, named enums, and cseries real/flag helpers; TU-local January input and mouse layouts have explicit size/offset guards. Target and candidate are both 3,456 padded bytes with 130 relocations, and objdiff reports 98.305176 percent similarity. Alignment-aware comparison shows the same broad instruction topology; the residual is local/x87 scheduling, one equivalent floating comparison branch form, stack-slot selection, and compiler-local literal ownership rather than missing behavior. The fail-closed classifier returns UNKNOWN, so the honest class is unclassified. No raw-offset access, address-derived symbol, volatile/register forcing, barrier, pragma, assembly, forced inline, fake dependency, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the remaining local and x87 schedule.",
+      "measurements": {
+        "target": {
+          "size": 3456,
+          "relocation_count": 130,
+          "normalized_sha256": "4b4ad9ae985a33b5447df49d1037b7ec716d220c7a6a1544720c49a2b52c1b9a"
+        },
+        "base": {
+          "size": 3456,
+          "relocation_count": 130,
+          "normalized_sha256": "515cbede397cc244de9ae8f89c3cbf13e33dfa86ecdda7941bae3eda7f31c9d1"
+        },
+        "objdiff_percent": 98.305176
+      }
+    },
+    {
+      "unit": "source/game/player_control",
+      "function": "_handle_one_player_input",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete January per-player input consumer as ordinary typed C from the target disassembly and assertions, the January-specific raw donor, and the independent HaloCEA behavior. The retained body fills and validates the input blob, honors director inhibition, handles local debug possession, reconciles desired weapons and grenades through typed unit/inventory APIs, rotates zoom, updates desired facing, applies the on-foot autolevel state machine, commits the semantic player-control fields, validates them, and submits a fully typed player_action through the queue owner API. Target and candidate are both 1,568 padded bytes with the same 95 relocation identities, and objdiff reports 99.010185 percent similarity. The remaining differences are local/register and independent-instruction scheduling choices; the fail-closed classifier returns UNKNOWN and therefore supplies no narrower compiler recipe. No raw offset, representation pun, address-derived symbol, volatile/register forcing, barrier, pragma, assembly, forced inline, fake dependency, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the residual allocation schedule.",
+      "measurements": {
+        "target": {
+          "size": 1568,
+          "relocation_count": 95,
+          "normalized_sha256": "490eb357b2d76f34ef5d2e72a92c21a3e625e230e3c4a0a586f9502f0d4cc845"
+        },
+        "base": {
+          "size": 1568,
+          "relocation_count": 95,
+          "normalized_sha256": "12698d608adb71728f639496fa6698158cdd3a2401325413160697a5d76d7f24"
+        },
+        "objdiff_percent": 99.010185
+      }
+    },
+    {
       "unit": "source/interface/virtual_keyboard",
       "function": "_virtual_keyboard_select",
       "class": "unclassified",

@@ -12,7 +12,7 @@ PLAYER_CONTROL_RUNTIME.H
 
 /* ---------- prototypes/PLAYER_CONTROL.C */
 
-void player_control_update(
+boolean player_control_update(
 	real time_delta_sec);
 
 #endif // __PLAYER_CONTROL_RUNTIME_H

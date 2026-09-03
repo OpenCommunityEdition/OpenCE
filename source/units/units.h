@@ -538,6 +538,12 @@ void unit_control(
 	struct unit_control_data const *control_data);
 void units_initialize(
 	void);
+long units_debug_get_next_unit(
+	long unit_index);
+long units_debug_get_closest_unit(
+	long unit_index);
+void unit_debug_ninja_rope(
+	long unit_index);
 void units_initialize_for_new_map(
 	void);
 void units_dispose_from_old_map(

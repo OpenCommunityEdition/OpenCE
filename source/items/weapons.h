@@ -220,6 +220,10 @@ struct weapon_datum
 
 /* ---------- prototypes/WEAPONS.C */
 
+short weapon_rotate_zoom_level(
+	long weapon_index,
+	short zoom_level);
+
 void weapons_initialize(
 	void);
 void weapons_initialize_for_new_map(

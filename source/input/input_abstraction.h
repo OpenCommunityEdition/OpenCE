@@ -28,6 +28,8 @@ struct game_input_preferences
 	boolean invert_look_aircraft_control;
 };
 
+struct game_input_state;
+
 typedef char verify_game_input_preferences_size[
 	sizeof(struct game_input_preferences) == 0x18 ? 1 : -1];
 
@@ -41,6 +43,8 @@ void input_abstraction_get_local_player_preferences(
 void input_abstraction_update_local_player_preferences(
 	short controller_index,
 	struct game_input_preferences const *preferences);
+struct game_input_state *input_abstraction_get_input_state(
+	short local_player_index);
 
 /* ---------- globals */
 

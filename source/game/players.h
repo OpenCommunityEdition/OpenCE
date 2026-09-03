@@ -201,6 +201,9 @@ boolean local_player_exists(
 	long local_player_index);
 long local_player_get_player_index(
 	short local_player_index);
+void players_set_local_player_unit(
+	short local_player_index,
+	long unit_index);
 
 short local_player_get_next(
 	short local_player_index);
@@ -258,6 +261,10 @@ void player_handle_powerup_equipment(
 
 /* ---------- prototypes/PLAYER_QUEUES_NEW.C */
 
+void update_client_queue(
+	struct player_action const *action);
+void update_client_queue_push(
+	void);
 void update_queues_reset_and_fill_with_lies(void);
 boolean update_client_dequeue(
 	struct player_action *actions);

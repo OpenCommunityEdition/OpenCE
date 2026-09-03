@@ -39,6 +39,12 @@ boolean autoaim_compute_target(
 	real_vector3d *target_direction,
 	real *target_distance,
 	real *target_angle);
+long local_player_aim_assist(
+	short local_player_index,
+	real *autoaim_level,
+	real *magnetism_level,
+	real_euler_angles2d *target_angular_position,
+	real_euler_angles2d *target_angular_velocity);
 
 /* ---------- globals */
 
