@@ -7,7 +7,7 @@ symbols in this file:
 00163CF0 0050:
 	_code_00163cf0 (0000)
 00163D40 0020:
-	_code_00163d40 (0000)
+	_IDirect3DDevice8_CreateVertexBuffer@24 (0000)
 00163D60 0180:
 	_rasterizer_transparent_geometry_group_draw__internal (0000)
 00163EE0 0220:
@@ -19,19 +19,19 @@ symbols in this file:
 00164170 0010:
 	_code_00164170 (0000)
 00164180 0010:
-	_code_00164180 (0000)
+	_IDirect3DDevice8_BeginVisibilityTest@4 (0000)
 00164190 0010:
-	_code_00164190 (0000)
+	_IDirect3DDevice8_EndVisibilityTest@8 (0000)
 001641A0 0010:
-	_code_001641a0 (0000)
+	_IDirect3DDevice8_GetVisibilityTestResult@16 (0000)
 001641B0 0010:
-	_code_001641b0 (0000)
+	_D3DVertexBuffer_Unlock@4 (0000)
 001641C0 0010:
-	_code_001641c0 (0000)
+	_IDirect3DVertexBuffer8_Release@4 (0000)
 001641D0 0020:
-	_code_001641d0 (0000)
+	_IDirect3DVertexBuffer8_Lock@20 (0000)
 001641F0 0010:
-	_code_001641f0 (0000)
+	_IDirect3DVertexBuffer8_Unlock@4 (0000)
 00164200 01b0:
 	_rasterizer_transparent_geometry_groups_end (0000)
 001643B0 0030:
@@ -125,41 +125,161 @@ symbols in this file:
 00293810 0040:
 	??_C@_0EA@EGBNPDLH@vertex_type?$DO?$DN0?5?$CG?$CG?5vertex_type?$DMNU@ (0000)
 004662D8 0010:
-	_bss_004662d8 (0000)
+	_rasterizer_xbox_transparent_geometry_globals (0000)
 */
 
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "real_math.h"
+#include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_transparent_geometry.h"
+
+/* January retains the stock XDK D3DINLINE out-of-line wrappers emitted by
+ * the real device calls below. Keep the stock definitions intact. */
+#include <xtl.h>
+#include "rasterizer/xbox/rasterizer_xbox.h"
 
 /* ---------- constants */
+
+enum
+{
+	RASTERIZER_TRANSPARENT_GEOMETRY_TEXCOORD_STREAM_SIZE = 8192,
+	RASTERIZER_STATIC_BUFFER_USAGE = D3DUSAGE_WRITEONLY,
+	RASTERIZER_STATIC_BUFFER_POOL = D3DPOOL_MANAGED,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct rasterizer_transparent_geometry_debug_options_prefix
+{
+	byte reserved00[0x88];
+	boolean transparent_pixel_counter_active;
+	boolean transparent_pixel_counter;
+	byte reserved8A[2];
+};
+
 struct rasterizer_xbox_transparent_geometry_globals
 {
-	long unknown0;
-	void *auxiliary_buffer;
-	boolean unknown8;
-	byte unknown9[7];
+	long last_source_object_index;
+	D3DVertexBuffer *texcoord_stream;
+	boolean test_no_more_active_camo;
+	byte reserved09[3];
+	unsigned long transparent_pixel_count;
 };
 
 typedef char rasterizer_xbox_transparent_geometry_globals_size_assert[
 	sizeof(struct rasterizer_xbox_transparent_geometry_globals) == 16 ? 1 : -1];
 
-/* ---------- prototypes */
-
-unsigned long __stdcall D3DResource_Release(
-	void *resource);
-
 /* ---------- globals */
 
-struct rasterizer_xbox_transparent_geometry_globals bss_004662d8 = { 0 };
+static struct rasterizer_xbox_transparent_geometry_globals
+	rasterizer_xbox_transparent_geometry_globals = { 0 };
 
+extern struct rasterizer_transparent_geometry_debug_options_prefix
+	rasterizer_debug_options;
 /* ---------- public code */
+
+boolean rasterizer_transparent_geometry_initialize_aux_buffer(
+	void)
+{
+	byte *vertices = NULL;
+	boolean success;
+	long result = IDirect3DDevice8_CreateVertexBuffer(
+		global_d3d_device,
+		RASTERIZER_TRANSPARENT_GEOMETRY_TEXCOORD_STREAM_SIZE*(2*sizeof(byte)),
+		RASTERIZER_STATIC_BUFFER_USAGE,
+		0,
+		RASTERIZER_STATIC_BUFFER_POOL,
+		&rasterizer_xbox_transparent_geometry_globals.texcoord_stream);
+
+	if (result >= 0)
+	{
+		success = TRUE;
+	}
+	else
+	{
+		success = FALSE;
+		rasterizer_error(
+			result,
+			"IDirect3DDevice8_CreateVertexBuffer(global_d3d_device, RASTERIZER_TRANSPARENT_GEOMETRY_TEXCOORD_STREAM_SIZE*(2*sizeof(byte)), RASTERIZER_STATIC_BUFFER_USAGE, 0, RASTERIZER_STATIC_BUFFER_POOL, &rasterizer_xbox_transparent_geometry_texcoord_stream)");
+	}
+
+	rasterizer_globals.current_lock_operation = 2;
+	if (IDirect3DVertexBuffer8_Lock(
+		rasterizer_xbox_transparent_geometry_globals.texcoord_stream,
+		0,
+		RASTERIZER_TRANSPARENT_GEOMETRY_TEXCOORD_STREAM_SIZE*(2*sizeof(byte)),
+		&vertices,
+		0) >= 0 && success)
+	{
+		success = TRUE;
+	}
+	else
+	{
+		success = FALSE;
+		rasterizer_error(
+			0,
+			"IDirect3DVertexBuffer8_Lock(rasterizer_xbox_transparent_geometry_texcoord_stream, 0, RASTERIZER_TRANSPARENT_GEOMETRY_TEXCOORD_STREAM_SIZE*(2*sizeof(byte)), (unsigned char**)&vertices, 0)");
+	}
+	rasterizer_globals.current_lock_operation = 0;
+
+	if (success && vertices)
+	{
+		char quad_texcoords[8] = { 0, 0, 0, -1, -1, -1, -1, 0 };
+		long quad_index;
+
+		for (quad_index = 0;
+			quad_index < RASTERIZER_TRANSPARENT_GEOMETRY_TEXCOORD_STREAM_SIZE/8;
+			quad_index++)
+		{
+			csmemcpy(vertices, quad_texcoords, sizeof(quad_texcoords));
+			vertices += sizeof(quad_texcoords);
+		}
+		IDirect3DVertexBuffer8_Unlock(
+			rasterizer_xbox_transparent_geometry_globals.texcoord_stream);
+
+		success = TRUE;
+	}
+	else
+	{
+		success = FALSE;
+		error(_error_silent, "### ERROR failed to allocate texcoord stream");
+	}
+
+	return success;
+}
+
+void rasterizer_transparent_geometry_groups_begin(
+	void)
+{
+	rasterizer_xbox_transparent_geometry_globals.last_source_object_index = 0;
+	rasterizer_xbox_transparent_geometry_globals.test_no_more_active_camo = FALSE;
+	if (rasterizer_debug_options.transparent_pixel_counter_active &&
+		rasterizer_debug_options.transparent_pixel_counter &&
+		global_window_parameters.window_index != NONE)
+	{
+		IDirect3DDevice8_BeginVisibilityTest(global_d3d_device);
+	}
+
+	return;
+}
+
+void rasterizer_transparent_geometry_dispose_aux_buffer(
+	void)
+{
+	if (rasterizer_xbox_transparent_geometry_globals.texcoord_stream)
+	{
+		IDirect3DVertexBuffer8_Release(
+			rasterizer_xbox_transparent_geometry_globals.texcoord_stream);
+		rasterizer_xbox_transparent_geometry_globals.texcoord_stream = NULL;
+	}
+
+	return;
+}
 
 /* ---------- private code */
 
@@ -188,16 +308,4 @@ real_vector4d *offset_vector4d(
 	result->l = vector->l*scale + base->l;
 
 	return result;
-}
-
-void rasterizer_transparent_geometry_dispose_aux_buffer(
-	void)
-{
-	if (bss_004662d8.auxiliary_buffer)
-	{
-		D3DResource_Release(bss_004662d8.auxiliary_buffer);
-		bss_004662d8.auxiliary_buffer = NULL;
-	}
-
-	return;
 }

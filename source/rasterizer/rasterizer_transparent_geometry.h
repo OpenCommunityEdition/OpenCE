@@ -12,6 +12,10 @@ Narrow cross-translation-unit interface owned by RASTERIZER_TRANSPARENT_GEOMETRY
 
 struct transparent_geometry_group;
 
+boolean rasterizer_transparent_geometry_initialize_aux_buffer(
+	void);
+void rasterizer_transparent_geometry_dispose_aux_buffer(
+	void);
 void rasterizer_transparent_geometry_groups_begin(
 	void);
 void rasterizer_transparent_geometry_groups_end(
