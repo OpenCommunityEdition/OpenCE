@@ -29,7 +29,7 @@ void validate_real_vector3d_axes3(
 	real_vector3d *left,
 	real_vector3d *up);
 
-void biped_limp_noodle_relax_nodes_onto_environment(
+boolean biped_limp_noodle_relax_nodes_onto_environment(
 	long biped_index);
 
 /* ---------- globals */
