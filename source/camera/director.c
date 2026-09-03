@@ -131,6 +131,7 @@ symbols in this file:
 #include "editor/editor_stubs.h"
 #include "game/player_control.h"
 #include "game/players.h"
+#include "input/input.h"
 #include "main/console.h"
 #include "saved games/game_state.h"
 
@@ -142,6 +143,51 @@ symbols in this file:
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct camera_control
+{
+	short local_player_index;
+	boolean active;
+	byte pad3;
+	real seconds_elapsed;
+	real_euler_angles3d facing_delta;
+	real_vector3d position_delta;
+	real wheel_delta;
+};
+
+struct mouse_state
+{
+	long x;
+	long y;
+	long wheel_delta;
+	byte buttons[2];
+};
+
+enum camera_control_flags
+{
+	_camera_control_forward_bit = 0,
+	_camera_control_reverse_bit,
+	_camera_control_left_bit,
+	_camera_control_right_bit,
+	_camera_control_up_bit,
+	_camera_control_down_bit,
+	_camera_control_roll_left_bit,
+	_camera_control_roll_right_bit
+};
+
+enum observer_time_flags
+{
+	_observer_time_valid_bit = 0,
+	_observer_time_force_bit
+};
+
+static void director_process_variables(
+	short local_player_index,
+	unsigned long control_flags,
+	real speed_delta);
+static boolean director_update_controls(
+	short local_player_index,
+	struct camera_control *controls);
 
 /* ---------- globals */
 
@@ -436,6 +482,69 @@ static void director_initialize_variables(
 	return;
 }
 
+static void director_process_variables(
+	short local_player_index,
+	unsigned long control_flags,
+	real speed_delta)
+{
+	short variable_index;
+	struct director *director = director_get(local_player_index);
+
+	director->debug_input_scale *= power(1.3f, speed_delta);
+	director->debug_input_scale =
+		PIN(director->debug_input_scale, 0.01f, 50.f);
+
+	for (variable_index = 0;
+		variable_index < NUMBER_OF_DIRECTOR_VARIABLES;
+		variable_index++)
+	{
+		struct director_variable_definition const *definition =
+			&variables[variable_index];
+		struct director_variable_instance *instance =
+			&director->debug_variables[variable_index];
+		/* BUG (original): January tests the height definition for every
+		 * variable. A corrected build should test definition->has_hyper_scale.
+		 */
+		real hyper_scale = variables[_variable_height].has_hyper_scale
+			? director->debug_input_scale
+			: 1.f;
+		real velocity_scale =
+			1.f - PIN(director_globals.dtime * friction, 0.f, 1.f);
+		boolean negative = definition->negative_bit != NONE &&
+			TEST_FLAG(control_flags, definition->negative_bit);
+		boolean positive = definition->positive_bit != NONE &&
+			TEST_FLAG(control_flags, definition->positive_bit);
+		boolean reset = definition->reset_bit != NONE &&
+			TEST_FLAG(control_flags, definition->reset_bit);
+
+		instance->velocity *= velocity_scale;
+		if (negative && !positive)
+		{
+			instance->velocity -=
+				definition->scale * director_globals.dtime * hyper_scale * 25.f;
+		}
+		else if (positive && !negative)
+		{
+			instance->velocity +=
+				definition->scale * director_globals.dtime * hyper_scale * 25.f;
+		}
+		else if (game_in_editor())
+		{
+			instance->velocity = 0.f;
+		}
+
+		instance->delta = director_globals.dtime * instance->velocity;
+		if (reset)
+			instance->value = definition->initial_value;
+		else
+			instance->value += instance->delta;
+		instance->value =
+			PIN(instance->value, definition->minimum, definition->maximum);
+	}
+
+	return;
+}
+
 static void director_rotate_cameras(
 	short local_player_index,
 	short const *camera_modes,
@@ -668,6 +777,139 @@ static void director_choose_camera_script_camera_record(
 	return;
 }
 
+static boolean director_update_controls(
+	short local_player_index,
+	struct camera_control *controls)
+{
+	boolean switch_camera;
+	long player_index;
+	struct director *director = director_get(local_player_index);
+
+	csmemset(controls, 0, sizeof(*controls));
+	controls->local_player_index = local_player_index;
+	controls->seconds_elapsed = director_globals.dtime;
+	player_index = player_get(
+		local_player_get_player_index(local_player_index))->local_player_index;
+	if (player_index != NONE && input_has_gamepad((short)player_index))
+	{
+		unsigned long control_flags;
+		struct gamepad_state const *gamepad =
+			input_get_gamepad_state((short)player_index);
+
+		if (director_camera_switch_fast)
+		{
+			switch_camera =
+				gamepad->buttons[_gamepad_analog_button_black] == 1;
+		}
+		else
+		{
+			byte ticks = gamepad->buttons[_gamepad_analog_button_black];
+			switch_camera = ticks > 0 && ticks % TICKS_PER_SECOND == 0;
+		}
+
+		if (director->camera_proc ==
+				(director_camera_update_proc)first_person_camera_update ||
+			director->camera_proc ==
+				(director_camera_update_proc)following_camera_update)
+		{
+			return switch_camera;
+		}
+
+		if (gamepad->buttons[_gamepad_binary_button_right_thumb] == 1)
+			director->debug_controls = !director->debug_controls;
+		if (!director->debug_controls)
+			return switch_camera;
+
+		control_flags = 0;
+		SET_FLAG(
+			control_flags,
+			_camera_control_down_bit,
+			gamepad->buttons[_gamepad_analog_button_left_trigger] != 0);
+		SET_FLAG(
+			control_flags,
+			_camera_control_up_bit,
+			gamepad->buttons[_gamepad_analog_button_right_trigger] != 0);
+		controls->wheel_delta =
+			(real)((gamepad->buttons[_gamepad_binary_button_dpad_up] > 1) -
+				(gamepad->buttons[_gamepad_binary_button_dpad_down] > 1)) * 0.4f;
+		director_process_variables(
+			local_player_index,
+			control_flags,
+			controls->wheel_delta);
+		controls->facing_delta.yaw =
+			(real)gamepad->sticks[_gamepad_stick_right].x *
+				director_globals.dtime * -0.0000392699076f;
+		controls->facing_delta.pitch =
+			(real)gamepad->sticks[_gamepad_stick_right].y *
+				director_globals.dtime * 0.0000196349538f;
+		controls->position_delta.i =
+			(real)gamepad->sticks[_gamepad_stick_left].y *
+				director->debug_input_scale * director_globals.dtime * 0.00005f;
+		controls->position_delta.j =
+			(real)gamepad->sticks[_gamepad_stick_left].x *
+				director->debug_input_scale * director_globals.dtime * -0.00005f;
+		controls->position_delta.k +=
+			director->debug_variables[_variable_height].delta;
+		controls->active = TRUE;
+		director_inhibit_input(local_player_index);
+		director_inhibit_facing(local_player_index);
+	}
+	else if (input_get_mouse_state())
+	{
+		unsigned long control_flags = 0;
+		struct mouse_state const *mouse = input_get_mouse_state();
+
+		switch_camera = input_key_is_down(_key_backspace) == TRUE;
+		if ((director->camera_proc !=
+				(director_camera_update_proc)first_person_camera_update &&
+			mouse->buttons[1]) || input_key_is_down(_key_tab))
+		{
+			SET_FLAG(control_flags, _camera_control_forward_bit,
+				input_key_is_down(_key_w));
+			SET_FLAG(control_flags, _camera_control_reverse_bit,
+				input_key_is_down(_key_s));
+			SET_FLAG(control_flags, _camera_control_left_bit,
+				input_key_is_down(_key_a));
+			SET_FLAG(control_flags, _camera_control_right_bit,
+				input_key_is_down(_key_d));
+			SET_FLAG(control_flags, _camera_control_up_bit,
+				input_key_is_down(_key_r));
+			SET_FLAG(control_flags, _camera_control_down_bit,
+				input_key_is_down(_key_f));
+			SET_FLAG(control_flags, _camera_control_roll_left_bit,
+				input_key_is_down(_key_t));
+			SET_FLAG(control_flags, _camera_control_roll_right_bit,
+				input_key_is_down(_key_g));
+			director_process_variables(
+				local_player_index,
+				control_flags,
+				(real)mouse->wheel_delta);
+			controls->facing_delta.yaw =
+				(real)mouse->x * -0.0031415927f;
+			controls->facing_delta.pitch =
+				(real)mouse->y * -0.0031415927f;
+			controls->facing_delta.roll +=
+				director->debug_variables[_variable_roll].delta;
+			controls->wheel_delta = (real)mouse->wheel_delta;
+			controls->position_delta.i +=
+				director->debug_variables[_variable_forward].delta;
+			controls->position_delta.j +=
+				director->debug_variables[_variable_right].delta;
+			controls->position_delta.k +=
+				director->debug_variables[_variable_height].delta;
+			controls->active = TRUE;
+			director_inhibit_input(local_player_index);
+			director_inhibit_facing(local_player_index);
+		}
+	}
+	else
+	{
+		switch_camera = FALSE;
+	}
+
+	return switch_camera;
+}
+
 static void director_choose_camera(
 	short local_player_index,
 	boolean initialize,
@@ -710,6 +952,92 @@ void director_initialize_for_new_map(
 		director->camera_change_pause = 0.f;
 		director_choose_camera(local_player_index, TRUE, FALSE);
 		director_initialize_variables(local_player_index);
+	}
+
+	return;
+}
+
+void director_update(
+	real time_delta_sec)
+{
+	short local_player_index;
+
+	director_globals.dtime = time_delta_sec;
+	for (local_player_index = 0;
+		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
+		local_player_index++)
+	{
+		if (local_player_get_player_index(local_player_index) != NONE)
+		{
+			boolean switch_camera;
+			struct camera_control controls;
+			struct observer_command command;
+			struct director *director = director_get(local_player_index);
+
+			director->inhibited_facing = FALSE;
+			director->inhibited_input = FALSE;
+			switch_camera =
+				director_update_controls(local_player_index, &controls);
+			director_choose_camera(
+				local_player_index,
+				director_globals.initialize_camera,
+				switch_camera);
+			director_globals.initialize_camera = FALSE;
+			csmemset(&command, 0, sizeof(command));
+
+			if (director->camera_proc &&
+				(director->camera_proc !=
+					(director_camera_update_proc)scripted_camera_update ||
+				local_player_index == local_player_get_next(NONE)))
+			{
+				director->camera_proc(
+					director->camera_data,
+					&controls,
+					&command);
+			}
+
+			if (TEST_FLAG(command.flags, _observer_command_valid_bit))
+			{
+				if (director->camera_change_pause != 0.f)
+				{
+					if (director->camera_change_pause < 0.2f &&
+						director->camera_proc ==
+							(director_camera_update_proc)first_person_camera_update)
+					{
+						director->camera_change_pause = 0.f;
+						command.parameter_timers[0] = 0.f;
+						command.parameter_flags[0] =
+							FLAG(_observer_time_valid_bit) |
+							FLAG(_observer_time_force_bit);
+						command.parameter_timers[2] = 0.f;
+						command.parameter_flags[2] =
+							FLAG(_observer_time_valid_bit) |
+							FLAG(_observer_time_force_bit);
+					}
+					else
+					{
+						command.timer = MAX(
+							command.timer,
+							director->camera_change_pause);
+					}
+
+					director->camera_change_pause = MAX(
+						0.f,
+						director->camera_change_pause - time_delta_sec);
+				}
+
+				director->command = command;
+			}
+			else
+			{
+				SET_FLAG(
+					director->command.flags,
+					_observer_command_valid_bit,
+					FALSE);
+			}
+
+			observer_set_camera(local_player_index, &director->command);
+		}
 	}
 
 	return;

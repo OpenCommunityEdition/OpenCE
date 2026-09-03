@@ -3046,6 +3046,42 @@
         },
         "objdiff_percent": 96.43883
       }
+    },
+    {
+      "unit": "source/camera/director",
+      "function": "_director_process_variables",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed four-variable Director integrator from January disassembly and relocation evidence, corroborated by the later HaloCEA donor at research-cache/halocea-full-blobs-20260830/src/blam/camera/director_process_variables.c. The retained body scales and clamps debug input, applies frame-time friction, decodes the authenticated control-bit definitions, accelerates or damps each variable, resets requested values, integrates deltas, and clamps the result. The January-proven use of variables[_variable_height].has_hyper_scale for every element is retained and documented as an original bug. Target and candidate are both 544 padded bytes with all 27 relocation identities; the residual consists of the 1.3 constant load width and an x87 multiplication-order difference. No assembly, volatile/register forcing, barrier, pragma, fake dependency, raw offset, address-derived name, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining those two x87 choices.",
+      "measurements": {
+        "target": {
+          "size": 544,
+          "relocation_count": 27,
+          "normalized_sha256": "bef5cd3d13acbdff614b49be03828e844198e6cb56bcd27e13e13909d0e9f42c"
+        },
+        "base": {
+          "size": 544,
+          "relocation_count": 27,
+          "normalized_sha256": "c757e7d92cc71ea6051675f46f2c899e94f15d174392ed6322e92a66acbd839d"
+        }
+      }
+    },
+    {
+      "unit": "source/camera/director",
+      "function": "_director_update_controls",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed Xbox gamepad and dormant mouse/keyboard Director input paths from January's instruction and relocation topology, with HaloCEA types and donor semantics used only where corroborated. The retained body initializes camera_control, resolves the typed player datum, implements the black-button switch cadence and debug-control toggle, maps authenticated gamepad/key enums into named camera-control bits, integrates Director variables, applies the January float constants, and inhibits normal input/facing while debug control is active. Target and candidate are both 960 padded bytes with all 45 relocation identities; remaining differences are instruction/register/x87 scheduling within otherwise aligned paths. No HCEA-only speed override or forced switch global, assembly, volatile/register forcing, barrier, pragma, fake dependency, raw offset, address-derived name, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the remaining schedule.",
+      "measurements": {
+        "target": {
+          "size": 960,
+          "relocation_count": 45,
+          "normalized_sha256": "7b4bef8961ac5919acc38751bc1ef3ecc03b5779ab4601e5fa5e9cbd4e296584"
+        },
+        "base": {
+          "size": 960,
+          "relocation_count": 45,
+          "normalized_sha256": "2d2cc82fb3a6cc531b4549653fe802ff8a8cfd904d108612cb06375df6fd37be"
+        }
+      }
     }
   ]
 }
