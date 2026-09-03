@@ -16,12 +16,12 @@ source reconstruction has not exhausted natural declaration/lifetime shapes.
 
 | Function | Target | Candidate | Relocations | Objdiff |
 | --- | ---: | ---: | ---: | ---: |
-| `_extract_3d_textures` | 464 padded bytes | 480 padded bytes | 22 / 22 | 70.99% |
+| `_extract_3d_textures` | 464 padded bytes | 448 padded bytes | 22 / 22 | 85.67% |
 
 - Target normalized SHA-256:
   `db5cb3236cbae82c1dbb9a526754dc136bf8741c9f1608c2b80c43982b33edfd`
 - Candidate normalized SHA-256:
-  `271296d2ce3589a33dfdd46cba30cafffde50f6365253a8f0e5bc020647469cb`
+  `9bd8a780aafffb87c4f18c5534b26380b5cdca57e180027ab246991a300cc130`
 - Final object gate: 6 exact / 4 residual / 11 unwritten. The inherited six
   exact functions are unchanged.
 
@@ -58,9 +58,13 @@ should remove that cleanup naturally.
   The retained source reproduces that authenticated topology. Safety relies on
   the extraction-phase invariant that temporary entries are emitted in
   sequence runs and the next entry terminates the run; this packet does not
-  silently add a defensive bound that January lacks. The missing terminal
-  bound is recorded as a target-visible original precondition and should be
-  rechecked when `extract_sequence` is reconstructed.
+  silently add a defensive bound that January lacks. This is an original
+  1024-entry edge hazard: a final run that fills the temporary array can read
+  one entry beyond it. The retained condition tests `incompatible_dimensions`
+  first, matching January's immediate post-increment flag test and preventing
+  an additional sequence read after a dimension mismatch. The missing terminal
+  bound is recorded as target-visible original behavior and should be rechecked
+  when `extract_sequence` is reconstructed.
 - There is no inline assembly, volatile/register steering, optimizer pragma,
   raw offset, representation pun, forced inline, fake dependency, invented
   address name, or nonsensical control flow.

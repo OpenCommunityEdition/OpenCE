@@ -997,8 +997,8 @@ static boolean extract_3d_textures(
 		boolean incompatible_dimensions = FALSE;
 		short bitmap_count = 0;
 
-		while (extract_data.bitmaps[first_bitmap_index + bitmap_count].sequence_index == sequence_index &&
-			!incompatible_dimensions)
+		while (!incompatible_dimensions &&
+			extract_data.bitmaps[first_bitmap_index + bitmap_count].sequence_index == sequence_index)
 		{
 			struct bitmap_data *bitmap =
 				extract_data.bitmaps[first_bitmap_index + bitmap_count].bitmap;
