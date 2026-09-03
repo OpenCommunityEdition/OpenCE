@@ -2248,6 +2248,63 @@
         },
         "objdiff_percent": 94.84425
       }
+    },
+    {
+      "unit": "source/units/biped_limp_noodle",
+      "function": "_biped_limp_noodle_valid_joint_rotation",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed joint-constraint path from January disassembly, relocation/assert topology, and the independent HCEA implementation. The retained ordinary C resolves the biped and animation graph through subsystem accessors, validates the authored collision radius, implements hinge and conical constraints, tests January's three-argument collision sphere interface, updates the moved-node bit vector, and follows the parent when required. Target is 1248 padded bytes and the candidate 1216, with the same ordered 34-entry relocation target/type sequence although some relocation addresses drift; objdiff reports 81.18033 percent. The first measured divergence is the stack frame at +0x03 (January 0xE4, candidate 0xCC), followed by broad local/register allocation differences. The authenticated node-block flag names and ten-plane Xbox collision topology are retained. No register hint, volatile access, barrier, pragma, assembly, raw offset, representation punning, fake dependency, forced inline, or nonsensical branch is present. Reopen only for authoritative January source/local records, a natural same-compiler donor explaining the frame and lifetimes, or a source-authentic semantic correction.",
+      "measurements": {
+        "target": {
+          "size": 1248,
+          "relocation_count": 34,
+          "normalized_sha256": "699263a33b8b8131dfa843828894caa194dff415596b92545c5e5f96cd666a14"
+        },
+        "base": {
+          "size": 1216,
+          "relocation_count": 34,
+          "normalized_sha256": "8306eb3e4e81348ff9a5a2f823d70735cfdd1984ebd813dfea954dca5434949b"
+        },
+        "objdiff_percent": 81.18033
+      }
+    },
+    {
+      "unit": "source/units/biped_limp_noodle",
+      "function": "_biped_limp_noodle_move_relax_and_constrain_positions",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the complete limp-body relaxation solver from January disassembly and the independent HCEA control flow, corrected for January's ten-plane scratch array and Xbox collision interfaces. The retained ordinary C installs the collision user, gathers sphere features, performs four breadth-first relaxation passes, applies gravity and point movement, resolves embedded endpoints, restores authored bone lengths, and unwinds the collision-user stack. Target is 1968 padded bytes and the candidate 1888, with the same ordered 66-entry relocation target/type sequence although some relocation addresses drift; objdiff reports 87.124596 percent. The prologue and setup are instruction-identical through +0xE0; the first measured divergence is January homing the integer conversion temporary at [ebp-0x20] while the candidate selects [ebp-0x1C], after which local-slot and instruction schedules differ. Correcting the third collision_test_sphere argument naturally improved the candidate by 16 bytes. No volatile/register forcing, barrier, pragma, gameplay assembly, raw offset, representation punning, fake dependency, forced inline, or invented branch is retained. Reopen only for authoritative January source/local records, a natural same-compiler lifetime donor, or a source-authentic semantic correction.",
+      "measurements": {
+        "target": {
+          "size": 1968,
+          "relocation_count": 66,
+          "normalized_sha256": "5964980a1f042d1c452e559fcba37592d608e1798ae0b7b5cef8deb9e40961d8"
+        },
+        "base": {
+          "size": 1888,
+          "relocation_count": 66,
+          "normalized_sha256": "34b872cd2ae1a72136400424c983c399b7a2f8fbc7a3f342d9ed968e90dd19b3"
+        },
+        "objdiff_percent": 87.124596
+      }
+    },
+    {
+      "unit": "source/units/biped_limp_noodle",
+      "function": "_biped_limp_noodle_relax_nodes_onto_environment",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the typed public relaxation wrapper from January disassembly and independent HCEA behavior. The retained ordinary C obtains the biped node-matrix block through the object-header API, snapshots every animation node position, invokes the reconstructed solver and exact orientation pass, saturates the iteration byte at CHAR_MAX, and returns whether relaxation was already complete. Target is 256 padded bytes and the candidate 240, with the same ordered nine-entry relocation target/type sequence although some relocation addresses drift; objdiff reports 89.82417 percent. At +0x1E January calls tag_get immediately, while VC7 first spills the biped pointer to [ebp-0x10], changing later register and loop allocation without changing the call topology. No register hint, volatile access, barrier, pragma, assembly, raw offset, false alias, fake dependency, forced inline, or nonsensical control flow is retained. Reopen only for authoritative January source/local records, a natural same-compiler donor explaining the pointer lifetime, or a source-authentic semantic correction.",
+      "measurements": {
+        "target": {
+          "size": 256,
+          "relocation_count": 9,
+          "normalized_sha256": "19128c623c5575500437c95cdfd0363c69fcbfdbf57f7972bbdcf1d2dffaf84f"
+        },
+        "base": {
+          "size": 240,
+          "relocation_count": 9,
+          "normalized_sha256": "d1b5db56b26dff8d5d6bafeeae5e1c0e202e19464ab0bf3dec48bea5e1e7ce18"
+        },
+        "objdiff_percent": 89.82417
+      }
     }
   ]
 }
