@@ -219,44 +219,14 @@ typedef char verify_cache_file_header_size[
 
 static struct cache_file_tag_instance *cache_get_tag_instance(
 	long tag_index);
-void cache_files_dispose(
-	void);
-void cache_files_initialize(
-	void);
 void texture_cache_close(
 	void);
-void cache_file_close(
-	void);
-void tags_header_deregister_vertex_and_index_buffers(
-	struct cache_file_tag_header *header);
-void structure_bsp_header_deregister_vertex_buffers(
-	struct cache_file_structure_bsp_header *header);
-boolean cache_files_precache_map_loaded(
-	char const *map_name);
-boolean cache_files_precache_is_copying_map(
-	char const *map_name);
-void cache_files_precache_set_priority(
-	boolean blocking);
 void display_error_damaged_media(
 	void);
 void texture_cache_open(
 	void);
 void sound_idle(
 	void);
-boolean cache_file_open(
-	char const *scenario_name,
-	struct cache_file_header *header);
-void cache_file_read(
-	long request_index,
-	long offset,
-	long size,
-	void *buffer,
-	boolean *completion_flag,
-	boolean block);
-void tags_header_register_vertex_and_index_buffers(
-	struct cache_file_tag_header *header);
-void structure_bsp_header_register_vertex_buffers(
-	struct cache_file_structure_bsp_header *header);
 
 /* ---------- globals */
 

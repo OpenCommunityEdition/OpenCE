@@ -16,6 +16,9 @@ header included in hcex build.
 
 /* ---------- prototypes/EXAMPLE.C */
 
+wchar_t const *network_game_get_random_player_name(
+	void);
+
 /* ---------- globals */
 
 /* ---------- public code */

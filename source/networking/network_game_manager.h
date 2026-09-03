@@ -24,10 +24,14 @@ void network_game_invalidate_player(
 	struct network_player *player);
 void network_game_end_and_load_ui(
 	struct network_game *game);
-void code_0011a4c0(
-	void);
+void network_game_dump(
+	struct network_game *game,
+	char const *prefix);
 boolean network_player_is_valid(
 	struct network_player *player);
+boolean network_game_add_machine(
+	struct network_game *game,
+	struct network_machine *machine);
 boolean network_game_update_machine(
 	struct network_game *game,
 	struct network_machine *machine);
@@ -42,7 +46,26 @@ boolean network_game_player_is_valid(
 	struct network_game *game);
 void network_game_reset_for_next_round(
 	struct network_game *game,
-	boolean load_ui);
+	boolean unload_game_objects);
+boolean network_game_add_player(
+	struct network_game *game,
+	struct network_player *player);
+void network_game_invalidate_machine(
+	struct network_game *game,
+	word machine_index);
+void network_game_invalidate(
+	struct network_game *game);
+boolean network_game_update_player(
+	struct network_game *game,
+	struct network_player *player);
+boolean network_game_remove_player(
+	struct network_game *game,
+	struct network_player *player);
+boolean network_game_remove_machine(
+	struct network_game *game,
+	struct network_machine *machine);
+boolean network_game_create_game_objects(
+	struct network_game *game);
 
 /* ---------- globals */
 

@@ -82,6 +82,9 @@ char const *transport_address_to_string(
 	struct transport_address const *addr);
 char const *transport_error_to_string(
 	short error);
+boolean transport_is_nonce(
+	void const *nonce,
+	long nonce_length);
 
 /* ---------- globals */
 

@@ -82,6 +82,7 @@ enum rasterizer_lock_operation
 {
 	_rasterizer_lock_unlocked = 0,
 	_rasterizer_lock_cinematics = 8,
+	_rasterizer_lock_structure_bsp_vertex_buffers = 17,
 };
 
 
@@ -704,7 +705,7 @@ extern real_argb_color *global_rasterizer_model_ambient_reflection_tint;
 extern struct rasterizer_globals_definition rasterizer_globals;
 
 /* comm. not sure where this should be */
-struct rasterizer_frame_begin_parameters global_frame_parameters;
+extern struct rasterizer_frame_begin_parameters global_frame_parameters;
 
 /* ---------- public code */
 

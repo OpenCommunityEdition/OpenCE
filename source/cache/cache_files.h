@@ -22,6 +22,9 @@ struct tag_block;
 struct tag_data;
 struct tag_reference;
 struct bitmap_data;
+struct cache_file_header;
+struct cache_file_tag_header;
+struct cache_file_structure_bsp_header;
 
 struct tag_iterator
 {
@@ -36,7 +39,13 @@ struct tag_iterator
 const char *cache_files_map_directory(
 	void);
 
-unsigned long cache_files_get_checksum(void);
+boolean cache_file_header_verify(
+	struct cache_file_header *header,
+	char const *scenario_name,
+	boolean fatal);
+
+unsigned long cache_files_get_checksum(
+	void);
 void cache_files_enable_writes(
 	void);
 void cache_files_disable_writes(
@@ -86,15 +95,57 @@ long tag_iterator_next(
 
 /* ---------- prototypes/CACHE_FILES_WINDOWS.C */
 
-boolean cache_files_precache_in_progress(void);
+void tags_header_register_vertex_and_index_buffers(
+	struct cache_file_tag_header *header);
+void tags_header_deregister_vertex_and_index_buffers(
+	struct cache_file_tag_header *header);
+void structure_bsp_header_register_vertex_buffers(
+	struct cache_file_structure_bsp_header *header);
+void structure_bsp_header_deregister_vertex_buffers(
+	struct cache_file_structure_bsp_header *header);
+void cache_files_initialize(
+	void);
+void cache_files_dispose(
+	void);
+void cache_files_precache_set_priority(
+	boolean blocking);
 
-short cache_files_precache_map_status(real *progress);
+boolean cache_files_precache_in_progress(
+	void);
 
-void cache_files_precache_map_end(void);
+boolean cache_files_precache_is_copying_map(
+	char const *map_name);
+boolean cache_files_precache_map_loaded(
+	char const *map_name);
+
+short cache_files_precache_map_status(
+	real *progress);
+
+void cache_files_precache_map_end(
+	void);
+void cache_files_precache_map_queue_end(
+	void);
 
 boolean cache_files_precache_map_begin(
 	char const *map_name,
 	boolean copy_map);
+
+void cache_file_promote_read(
+	short request_index);
+void cache_file_block_until_not_busy(
+	void);
+void cache_file_close(
+	void);
+boolean cache_file_open(
+	char const *scenario_name,
+	struct cache_file_header *header);
+short cache_file_read(
+	long tag_index,
+	long offset,
+	long size,
+	void *buffer,
+	boolean *completion_flag_reference,
+	boolean blocking);
 
 unsigned long tag_get_group_tag(long tag_index);
 

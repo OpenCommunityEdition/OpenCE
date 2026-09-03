@@ -10,11 +10,42 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum cache_copy_status
+{
+	_cache_copy_bad_file_failure,
+	_cache_copy_read_failure,
+	_cache_copy_write_failure,
+	_cache_copy_in_progress,
+	_cache_copy_finished,
+	NUMBER_OF_CACHE_COPY_STATES,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/CACHE_FILES_DECOMPRESS_WINDOWS.C */
+
+long cache_copy_buffer_size(
+	boolean copy_map);
+void cache_copy_set_priority(
+	boolean blocking);
+boolean cache_copy_compressed_file_complete(
+	void);
+void cache_copy_begin(
+	void *buffer,
+	long buffer_size,
+	void *file,
+	long size,
+	char const *source_path);
+void cache_copy_queue_end(
+	void);
+short cache_copy_get_status(
+	real *progress);
+void cache_copy_end(
+	void);
+void cache_copy_initialize(
+	void);
 
 /* ---------- globals */
 
