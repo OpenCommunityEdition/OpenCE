@@ -82,6 +82,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
+#include "game/game_globals.h"
 #include "game/game_engine_king.h"
 #include "game/game_engine_place.h"
 #include "game/players.h"
@@ -285,6 +286,122 @@ void king_engine_handle_server_message(
 void king_engine_pregame_post_rasterize(
 	void)
 {
+	return;
+}
+
+void king_engine_post_rasterize(
+	void)
+{
+	struct game_globals *game_globals;
+	struct game_globals_multiplayer_information *multiplayer_information;
+	real accumulated_distance;
+	real hill_perimeter;
+	real inverse_segment_count;
+	real texels_per_unit;
+	real previous_u;
+	long hill_point_count;
+	long shader_index;
+	long next_point_index;
+	long remaining_point_count;
+	real_point3d const *current_point;
+
+	global_scenario_get();
+	game_globals = scenario_get_game_globals();
+	multiplayer_information = TAG_BLOCK_GET_ELEMENT(
+		&game_globals->multiplayer_information,
+		0,
+		struct game_globals_multiplayer_information);
+	hill_point_count = king_globals.hill_point_count;
+	hill_perimeter = 0.0f;
+	shader_index = multiplayer_information->hill_shader.index;
+
+	if (hill_point_count > 0)
+	{
+		next_point_index = 1;
+		remaining_point_count = hill_point_count;
+		current_point = king_globals.hill_points;
+
+		do
+		{
+			hill_perimeter += distance3d(
+				current_point,
+				&king_globals.hill_points[
+					next_point_index == hill_point_count ? 0 : next_point_index]);
+			current_point++;
+			next_point_index++;
+			remaining_point_count--;
+		}
+		while (remaining_point_count != 0);
+	}
+
+	inverse_segment_count = (real)(1.0/floor(hill_perimeter + 0.5f));
+	texels_per_unit = 1.0f/(inverse_segment_count*hill_perimeter);
+	previous_u = 0.0f;
+	accumulated_distance = 0.0f;
+
+	if (hill_point_count > 0)
+	{
+		next_point_index = 1;
+		remaining_point_count = hill_point_count;
+		current_point = king_globals.hill_points;
+
+		do
+		{
+			struct model_vertex_uncompressed vertices[NUMBER_OF_VERTICES_PER_QUADRILATERAL];
+			real_vector3d side0;
+			real_vector3d side1;
+			real_vector3d normal;
+			real edge_length = distance3d(
+				current_point,
+				&king_globals.hill_points[
+					next_point_index == hill_point_count ? 0 : next_point_index]);
+			real edge_end_u = (edge_length + accumulated_distance)*texels_per_unit;
+
+			accumulated_distance = edge_length + accumulated_distance;
+			csmemset(vertices, 0, sizeof(vertices));
+			vertices[1].position = *current_point;
+			vertices[1].position.z += 0.8f;
+			vertices[0].position = *current_point;
+			vertices[3].position = king_globals.hill_points[
+				next_point_index == hill_point_count ? 0 : next_point_index];
+			vertices[2].position = king_globals.hill_points[
+				next_point_index == hill_point_count ? 0 : next_point_index];
+			vertices[2].position.z += 0.8f;
+
+			vector_from_points3d(&vertices[0].position, &vertices[1].position, &side0);
+			vector_from_points3d(&vertices[1].position, &vertices[2].position, &side1);
+			cross_product3d(&side0, &side1, &normal);
+			normalize3d(&normal);
+			vertices[0].normal = normal;
+			vertices[1].normal = normal;
+			vertices[2].normal = normal;
+			vertices[3].normal = normal;
+
+			vertices[0].texcoord.x = previous_u*inverse_segment_count;
+			vertices[0].texcoord.y = 1.0f;
+			vertices[1].texcoord.x = previous_u*inverse_segment_count;
+			vertices[1].texcoord.y = 0.2f;
+			vertices[2].texcoord.x = edge_end_u*inverse_segment_count;
+			vertices[2].texcoord.y = 0.2f;
+			vertices[3].texcoord.x = edge_end_u*inverse_segment_count;
+			vertices[3].texcoord.y = 1.0f;
+			previous_u = edge_end_u;
+
+			render_dynamic_quad(
+				vertices,
+				shader_index,
+				NULL,
+				NULL,
+				1.0f/inverse_segment_count,
+				1.0f);
+
+			current_point++;
+			next_point_index++;
+			remaining_point_count--;
+		}
+		while (remaining_point_count != 0);
+	}
+
 	return;
 }
 

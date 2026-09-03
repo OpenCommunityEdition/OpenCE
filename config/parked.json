@@ -2989,6 +2989,25 @@
         },
         "objdiff_percent": 78.528175
       }
+    },
+    {
+      "unit": "source/game/game_engine_king",
+      "function": "_king_engine_post_rasterize",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete January hill-boundary renderer in ordinary typed C from the target disassembly and an independently reconstructed later-Xbox HaloCEA donor pinned at commit 570c83fd9c365dad6f2a3e7041705d5b84c7847c, path src/blam/game/king_engine_post_rasterize.c, blob 5ee668b4803d3665b097cac021628e63092c97b2. The retained two-pass body computes the closed hill perimeter, derives the target-proven texture repeat scale, builds one 0.8-world-unit-high dynamic quad per edge, computes its face normal with the standard math helpers, maps the running perimeter into the horizontal texture coordinate, and renders through render_dynamic_quad. Scenario multiplayer data is accessed with TAG_BLOCK_GET_ELEMENT and all geometry and scalar values use cseries types. January is 928 padded bytes with 23 relocations; the candidate is 896 padded bytes with 22 relocations and objdiff reports 88.0717 percent similarity. Alignment-aware disassembly shows broad but semantic-equivalent register and x87 scheduling differences: January keeps the point count in EBX, current point in ESI, and next index in EDI and recomputes the next point after csmemset, while C2 naturally spills the count and preserves the next point across that call, accounting for the missing global relocation. Bounded natural tests covered pointer and indexed loops, scoped and shared locals, declaration orders, direct and temporary next-point expressions, vertex assignment order, and equivalent accumulated-distance expressions; none closed the residual. HaloCEA's decompiler-shaped zero-difference algebra was rejected rather than copied. The fail-closed classifier returns UNKNOWN, so the honest class is unclassified. No forced inline/noinline, barrier, volatile or register forcing, pragma, assembly, fake dependency, raw offset, invented address name, or nonsensical logic is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the register and x87 schedule.",
+      "measurements": {
+        "target": {
+          "size": 928,
+          "relocation_count": 23,
+          "normalized_sha256": "a08e67ac8eb6f17666d65a2fcc7add06e4cf523448a667875e0f5beffcfc1b71"
+        },
+        "base": {
+          "size": 896,
+          "relocation_count": 22,
+          "normalized_sha256": "9f13a4c24615b66a6ac337d302424c38c17f0f73e9623e172a81da359c4b6bd5"
+        },
+        "objdiff_percent": 88.0717
+      }
     }
   ]
 }
