@@ -78,6 +78,10 @@ void contrails_dispose(
 	void);
 void contrails_disconnect_from_structure_bsp(
 	void);
+void contrails_reconnect_to_structure_bsp(
+	void);
+void contrail_delete(
+	long contrail_index);
 long contrail_new(
 	long definition_index,
 	long object_index,
@@ -85,6 +89,8 @@ long contrail_new(
 void contrail_owner_collision(
 	long contrail_index,
 	unsigned char object_dying,
+	real dt);
+void contrails_update(
 	real dt);
 
 /* ---------- globals */

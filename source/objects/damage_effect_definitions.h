@@ -35,6 +35,7 @@ enum
 /* ---------- macros */
 
 #define damage_effect_definition_get(index) ((struct damage_effect_definition *)tag_get(DAMAGE_EFFECT_DEFINITION_TAG, index))
+#define continuous_damage_effect_definition_get(index) ((struct continuous_damage_effect_definition *)tag_get(CONTINUOUS_DAMAGE_EFFECT_DEFINITION_TAG, (index)))
 
 /* ---------- structures */
 

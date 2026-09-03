@@ -39,6 +39,11 @@ void lights_queue_lens_flare(
 	real_vector3d const *up,
 	real_rgb_color const *color,
 	real scale);
+void light_particle(
+	real_point3d const *position,
+	real_rgb_color *light,
+	real_rgb_color *diffuse,
+	boolean block);
 
 real object_get_self_illumination(long object_index);
 void lights_illumination_at_point(union real_point3d const *point, struct location const *location, union real_rgb_color *color);

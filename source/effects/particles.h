@@ -178,7 +178,10 @@ void particles_disconnect_from_structure_bsp(
 	void);
 void particles_reconnect_to_structure_bsp(
 	void);
-void particle_new(struct new_particle_data const *data);
+void particle_new(
+	struct new_particle_data const *data);
+void particles_update(
+	real dt);
 
 /* ---------- globals */
 
