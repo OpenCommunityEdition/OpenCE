@@ -2875,6 +2875,101 @@
         },
         "objdiff_percent": 83.333336
       }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_decals",
+      "function": "__rasterizer_decals_draw",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed decal draw path from January disassembly, assertion strings, XDK 3911 interfaces, and HaloCEA naming/semantic evidence. The retained C validates the decal, resolves its shader, maintains the semantic bitmap cache, configures the texture and framebuffer blend mode, computes the LRUV vertex offset, draws the triangle fan, and updates frame statistics. Target and candidate share the 848-byte padded envelope and all 77 ordered relocation identities; objdiff reports 94.63415 percent. The first meaningful gap is a VC7 instruction-order choice around the cached bitmap group/index stores near +0x20A; the retained group-then-index source order agrees with independent HaloCEA evidence. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No reordered semantic writes, volatile/register forcing, barrier, pragma, assembly, raw offset, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining this schedule.",
+      "measurements": {
+        "target": {
+          "size": 848,
+          "relocation_count": 77,
+          "normalized_sha256": "99a8c7dd1568c82d25de2211ce0c77f6b595223e55cead8d10d22b2906bfc9e6"
+        },
+        "base": {
+          "size": 848,
+          "relocation_count": 77,
+          "normalized_sha256": "90faf57d723b6455d1a0cdc0e5cadfe23f9acab7619890f2f2c56596e4e93206"
+        },
+        "objdiff_percent": 94.63415
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_decals",
+      "function": "__rasterizer_decals_initialize",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after retaining the natural typed initialization sequence: assert the D3D device, allocate and initialize the D3DVertexBuffer descriptor, allocate its GPU storage, register it, create the decal LRUV cache, and assert both allocations. January is 272 padded bytes with 31 relocations; the candidate is 288 with 33 and objdiff reports 90.710526 percent. The first meaningful divergence is at +0x64: January preserves the address of the Data member in ESI across game_state_gpu_malloc, while VC7 recompilation reloads the semantic local_d3d_vertex_buffer global. An explicit inner-block pointer-lvalue probe did not close the function and was rejected as needless compiler steering. HaloCEA independently authenticates the local_d3d_vertex_buffer and local_vertex_cache global names. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, assembly, raw offset, fake dependency, forced inline, or invented control flow is retained. Reopen only for authoritative January source/local records, the exact original SDK declaration context, or a natural same-compiler donor explaining the lvalue lifetime.",
+      "measurements": {
+        "target": {
+          "size": 272,
+          "relocation_count": 31,
+          "normalized_sha256": "87bdf054c7cc834eb2ed4baa6be508efc6476dca660b1c3d50a89e8cb5940b1a"
+        },
+        "base": {
+          "size": 288,
+          "relocation_count": 33,
+          "normalized_sha256": "fe276f982fbaab2c6a9049e415f1d1013882ab7bc6eb9296b87cac4bda0bec1c"
+        },
+        "objdiff_percent": 90.710526
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_lights",
+      "function": "_rasterizer_sun_glow_draw",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule with the complete typed sun-glow renderer retained. January disassembly and strings establish the view-vector normalization, angular visibility falloff, billboard projection and clipping, two-stage downsample/convolution render-target work, Xbox render-state setup, and final immediate-mode quad. Target and candidate share the 2,352-byte padded envelope and 174 relocations; objdiff reports 95.815155 percent. The first meaningful divergence is the 0x98 versus 0xA4 local frame and the x87 dot/falloff schedule beginning near +0x69, followed by shifted but semantically equivalent local lifetimes throughout the billboard path. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, handwritten assembly, raw offset, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler sun-glow donor explaining the local/x87 schedule.",
+      "measurements": {
+        "target": {
+          "size": 2352,
+          "relocation_count": 174,
+          "normalized_sha256": "35e009239abac9901e5910082bb0796fa29837b33d15918820000490facfd996"
+        },
+        "base": {
+          "size": 2352,
+          "relocation_count": 174,
+          "normalized_sha256": "dafe3a30c86a8480f266462aab566bcc259752c9b225fcb48a1efdc914209a2d"
+        },
+        "objdiff_percent": 95.815155
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_water",
+      "function": "_rasterizer_water_build_bumpmap",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the full four-ripple bumpmap builder as ordinary typed C. The retained function copies or defaults all ripple descriptors, normalizes contribution pairs, binds four ripple maps, constructs all four texture transforms, programs the Xbox pixel combiner, renders every requested mip level as an immediate-mode fan, restores the window target/stencil state, and reports failure. January is 2,080 padded bytes with 138 relocations; the candidate is 1,744 with 118 and objdiff reports 81.09785 percent. Both sides agree closely through setup and transform construction; the broad divergence begins in VC7's mip-loop local/register allocation and compaction of the repeated immediate-mode success/error blocks. The unusual mysterious_horizontal_offset identifier is authenticated by January's own assertion strings. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, handwritten assembly, raw offsets, fake dependencies, forced inline, or deleted error behavior is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the repeated block topology.",
+      "measurements": {
+        "target": {
+          "size": 2080,
+          "relocation_count": 138,
+          "normalized_sha256": "c21d75775db9deb6dc9d0f332494745ae27b6b4c80fe523c7712f61adfe630cb"
+        },
+        "base": {
+          "size": 1744,
+          "relocation_count": 118,
+          "normalized_sha256": "53fd687558dc97c81999070019c86587a507b832ec74ac72a2d179313c32399a"
+        },
+        "objdiff_percent": 81.09785
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_water",
+      "function": "_rasterizer_water_draw",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked with the complete typed water draw pipeline retained: optional pre-fog opacity depth, bumpmap refresh, base-map alpha and color modulation passes, bump/reflection texture setup, atmospheric-fog and reflection combiner constants, mip bias, vertex constants, raster state, and transparent-group draw. January is 2,240 padded bytes with 171 relocations; the candidate is 2,320 with 173 and objdiff reports 91.316414 percent. The remaining differences are broad local/register and x87 scheduling rather than an identified missing pass. The retained mipmap bias conversion uses csmemcpy into an unsigned-long bit container; an earlier donor pointer-pun was rejected as undefined representation aliasing even though it produced a slightly smaller 2,304-byte candidate. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No pointer punning, volatile/register forcing, barrier, pragma, handwritten assembly, raw offset, fake dependency, forced inline, or semantically false path is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the lifetime schedule.",
+      "measurements": {
+        "target": {
+          "size": 2240,
+          "relocation_count": 171,
+          "normalized_sha256": "bc1ccd223540f3d77f9b8d9c55c4e2bc88cf1e6471309c6e6c7f69ae02c61a13"
+        },
+        "base": {
+          "size": 2320,
+          "relocation_count": 173,
+          "normalized_sha256": "4900130dbc9adc4caad687f4bc9322674065b58bb049ededf912ced502d54ae6"
+        },
+        "objdiff_percent": 91.316414
+      }
     }
   ]
 }

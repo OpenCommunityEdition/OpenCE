@@ -24,6 +24,10 @@ struct decal_editor_geometry;
 
 /* ---------- prototypes/DECALS.C */
 
+void decals_unlock(
+	boolean permanent);
+void decal_delete(
+	long decal_index);
 long decal_get_first_decal_index(
 	short cluster_index,
 	short layer);

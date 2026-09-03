@@ -7,6 +7,7 @@ RASTERIZER_XBOX.H
 #pragma once
 
 #include "cseries.h"
+#include "math/integer_math.h"
 
 /* ---------- constants */
 
@@ -67,6 +68,19 @@ void rasterizer_profile_dispose(
 
 void rasterizer_set_framebuffer_blend_function(
 	short framebuffer_blend_function);
+void rasterizer_set_target(
+	short target,
+	short mipmap_index,
+	pixel32 background_color,
+	boolean clear,
+	boolean use_zbuffer);
+void rasterizer_set_target_as_texture(
+	short stage,
+	short target,
+	short maximum_mipmap_level);
+void SetRenderStateSmart(
+	D3DRENDERSTATETYPE state,
+	unsigned long value);
 void rasterizer_set_stencil_mode(
 	long stencil_mode);
 void rasterizer_set_texture_bitmap_data(
