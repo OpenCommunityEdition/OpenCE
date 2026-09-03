@@ -117,7 +117,7 @@ symbols in this file:
 0030CEFA 0001:
 	_data_0030cefa (0000)
 00465AD0 0295:
-	_bss_00465ad0 (0000)
+	_rasterizer_environment_fog_screen_globals (0000)
 */
 
 /* ---------- headers */
@@ -289,9 +289,7 @@ typedef char rasterizer_environment_fog_pixel_shader_size_assert[
 
 /* ---------- globals */
 
-struct rasterizer_environment_fog_screen_globals bss_00465ad0 = { 0 };
-
-#define rasterizer_environment_fog_screen_globals bss_00465ad0
+static struct rasterizer_environment_fog_screen_globals rasterizer_environment_fog_screen_globals = { 0 };
 
 extern struct rasterizer_environment_fog_debug_options rasterizer_debug_options;
 extern struct rasterizer_environment_fog_frame_statistics rasterizer_frame_statistics;

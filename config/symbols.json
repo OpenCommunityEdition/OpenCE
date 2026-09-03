@@ -22602,7 +22602,7 @@
 { "file_offset": 4581640, "flags": 0, "name": "_dynamic_vertices" },
 { "file_offset": 4610582, "flags": 0, "name": "_reported_too_many_transparent_geometry_groups" },
 { "file_offset": 4610584, "flags": 0, "name": "_rasterizer_environment_globals", "static": true },
-{ "file_offset": 4610768, "flags": 0, "name": "_bss_00465ad0" },
+{ "file_offset": 4610768, "flags": 0, "name": "_rasterizer_environment_fog_screen_globals", "static": true },
 { "file_offset": 4611432, "flags": 0, "name": "_bss_00465d68" },
 { "file_offset": 4611623, "flags": 0, "name": "_bss_00465e27" },
 { "file_offset": 4611624, "flags": 0, "name": "_rasterizer_profile_callback_elapsed_times", "static": true },

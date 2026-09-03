@@ -113,21 +113,33 @@ and globals but contains no local-variable or line record that would justify
 richer private names. Marathon and the searched Claude worktrees provide no
 competing January implementation.
 
-## Existing BSS owner boundary
+## BSS owner naming and boundary
 
-This packet does not add an address-named global, raw address, raw-offset
-access, or pointer reconstruction. The base already defined the zero-filled
-fog-screen BSS owner and its semantic source alias. That existing owner is
-retained unchanged; the admitted code accesses named typed fields only.
+The prior source defined the real fog-screen owner under an address-derived C
+identifier and hid it behind a macro alias. This packet removes that workaround:
+the actual production identifier and the csplit symbol-map entry are now
+`rasterizer_environment_fog_screen_globals`. The variable is file-private.
+Every January reference to the 661-byte range belongs to this translation
+unit, the PDB has no exported/public name for the owner, no other source module
+declares or references it, and the adjacent Xbox environment and profile
+global aggregates follow the same `static ..._globals` ownership convention.
+The symbol-map entry is therefore marked `static: true`, making csplit retain
+the same file-private COFF storage class as the source. A scan of every
+regenerated split object finds this symbol only in
+`rasterizer_xbox_environment_fog.obj`; both the split target and rebuilt
+candidate encode it with COFF storage class 3 (`STATIC`).
 
-January relocation identity proves that this is the real owner rather than an
-invented storage object. The wind function targets owner addend 332, which is
-`windows` at 0x120 plus the selected 0x4C-byte window record and its wind field
-at 0x2C. Fog begin targets the warning counter at owner addend 0x280. Earlier
-object ledgers independently prove the same owner's fields at 592, 596, and
-644. The modeled prefix remains 648 bytes although January's BSS contribution
-is 661 bytes; the unknown 13-byte tail is not guessed and receives no matching
-credit.
+January relocation identity proves that this is the real storage owner rather
+than an invented replacement. The wind function targets owner addend 332,
+which is `windows` at 0x120 plus the selected 0x4C-byte window record and its
+wind field at 0x2C. Fog begin targets the warning counter at owner addend
+0x280. Earlier object ledgers independently prove the same owner's fields at
+592, 596, and 644. The admitted code accesses named typed fields only; it does
+not use a raw address, raw offset, macro alias, or pointer reconstruction.
+
+The modeled prefix remains 648 bytes although January's BSS contribution is
+661 bytes. The unknown 13-byte tail is not guessed, fake-packed, or awarded
+data-matching credit.
 
 ## Verification
 
@@ -166,4 +178,3 @@ uses named XDK constants; the fog flag uses its authenticated enum constant.
 The code does not add inline assembly, forced inlining, `register`, `volatile`,
 pragmas, intrinsics, raw addresses, manual pointer arithmetic, type punning,
 synthetic anchors, undefined behavior, or nonsensical byte-matching forms.
-
