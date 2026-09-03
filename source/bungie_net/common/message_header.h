@@ -38,6 +38,8 @@ enum message_type
 
 /* ---------- structures */
 
+typedef word message_header;
+
 /* ---------- prototypes/MESSAGE_HEADER.C */
 
 void build_message_header(word *msg, word length, byte type, byte flags);

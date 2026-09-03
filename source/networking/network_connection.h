@@ -20,11 +20,37 @@ enum
 /* ---------- structures */
 
 struct network_connection;
+struct transport_address;
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/NETWORK_CONNECTION.C */
 
 void network_connection_initialize(
 	void);
+long network_connection_connected(
+	struct network_connection *connection);
+void network_connection_get_address(
+	struct network_connection *connection,
+	struct transport_address *reliable_address,
+	struct transport_address *unreliable_address);
+boolean network_connection_connect(
+	struct network_connection *connection,
+	struct transport_address const *remote_address,
+	void *process_reference);
+struct network_connection *network_connection_new(
+	unsigned long flags,
+	word well_known_port);
+boolean network_connection_read(
+	struct network_connection *connection,
+	void *buffer,
+	word *buffer_size,
+	struct transport_address *source_address);
+boolean network_connection_disconnect(
+	struct network_connection *connection);
+boolean network_server_close_client_connection(
+	struct network_connection *server_connection,
+	struct network_connection *client_connection);
+void network_connection_delete(
+	struct network_connection *connection);
 void network_connection_set_connection_rejection_procedure(
 	struct network_connection *connection,
 	void *connection_rejection_procedure);
@@ -34,6 +60,9 @@ boolean network_connection_going_stale(
 	struct network_connection *connection);
 void network_connection_keep_alive(
 	struct network_connection *connection);
+boolean network_connection_server_accept_client_connection(
+	struct network_connection *server_connection,
+	struct network_connection *client_connection);
 void network_server_allow_client_connections(
 	struct network_connection *server_connection,
 	boolean allow_client_connections);
