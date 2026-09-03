@@ -86,6 +86,8 @@ struct hs_enum_definition
 	char const **values;
 };
 
+struct hs_function_definition;
+
 /* ---------- prototypes/HS.C */
 
 void hs_dispose(
@@ -118,6 +120,10 @@ short hs_tokens_enumerate(char const *substring, long type_flags, char const **r
 boolean hs_can_cast(
 	short actual_type,
 	short desired_type);
+struct hs_function_definition *hs_function_get(
+	short function_index);
+short hs_find_function_by_name(
+	char const *name);
 short hs_find_script_by_name(
 	char const *name);
 short hs_find_global_by_name(
@@ -126,6 +132,14 @@ short hs_global_get_type(
 	short global_index);
 char const *hs_global_get_name(
 	short global_index);
+boolean hs_parse(
+	long expression_index,
+	short expected_type);
+void hs_compile(
+	long source_size,
+	char const *source,
+	char const **error_message,
+	char const **error_source);
 
 /* ---------- globals */
 
@@ -133,6 +147,7 @@ extern word hs_object_type_masks[NUMBER_OF_HS_OBJECT_TYPES];
 extern tag hs_tag_reference_type_group_tags[];
 extern struct hs_enum_definition hs_enum_table[NUMBER_OF_HS_TYPES];
 extern char const *hs_type_names[NUMBER_OF_HS_TYPES];
+extern char const *hs_script_type_names[];
 
 /* ---------- public code */
 

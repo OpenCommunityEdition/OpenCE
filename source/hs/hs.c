@@ -4501,11 +4501,6 @@ void hs_compile_initialize(
 	boolean compiling_scenario);
 void hs_compile_dispose(
 	void);
-long hs_compile(
-	long source_size,
-	char const *source,
-	char const **error_source,
-	char const **error_message);
 long alphabetize_file_references(
 	struct file_reference const *left,
 	struct file_reference const *right);
