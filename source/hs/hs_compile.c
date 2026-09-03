@@ -789,6 +789,37 @@ boolean hs_verify_source_offset(
 
 /* ---------- private code */
 
+boolean hs_parse_sleep(
+	short function_index,
+	long expression_index)
+{
+	boolean result = FALSE;
+	long ticks_expression_index = hs_syntax_get(
+		hs_syntax_get(expression_index)->data)->next_node_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x20E,
+		function_index == _hs_function_sleep);
+	if (ticks_expression_index != NONE)
+	{
+		if (hs_parse(ticks_expression_index, _hs_type_short_integer))
+		{
+			long script_expression_index = hs_syntax_get(ticks_expression_index)->next_node_index;
+
+			if (script_expression_index == NONE || hs_parse(script_expression_index, _hs_type_script))
+				result = TRUE;
+		}
+	}
+	else
+	{
+		hs_compile_globals.error = "the sleep call requires a time and, optionally, a script name.";
+		hs_compile_globals.error_offset = hs_syntax_get(expression_index)->source_offset;
+	}
+
+	return result;
+}
+
 static long hs_find_string_constant(
 	char const *string)
 {
