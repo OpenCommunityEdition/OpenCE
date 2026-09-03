@@ -50,19 +50,19 @@ struct bitmap_data
 struct bitmap_group
 {
 	short type;
-	short encoding_format;
+	short format;
 	short usage;
 	unsigned short flags;
-	real detail_fade_factor;
+	real detail_fade;
 	real sharpen_amount;
 	real bump_height;
 	short sprite_budget_size;
 	unsigned short sprite_budget_count;
-	unsigned short color_plate_width;
-	unsigned short color_plate_height;
-	struct tag_data compressed_color_plate_data;
+	short import_width;
+	short import_height;
+	struct tag_data import_bitmap;
 	struct tag_data pixel_data;
-	real blur_filter_size;
+	real smoothing_filter_size;
 	real alpha_bias;
 	unsigned short mipmap_count;
 	short sprite_usage;
@@ -74,6 +74,13 @@ struct bitmap_group
 
 /* ---------- prototypes/BITMAP_GROUP.C */
 
+boolean bitmaps_extract(
+	struct bitmap_group *group,
+	long build_debug_plate);
+boolean bitmaps_extract_from_plate(
+	struct bitmap_data *plate,
+	struct bitmap_group *group,
+	long build_debug_plate);
 struct bitmap_data *bitmap_group_get_bitmap_from_sequence(
 	long bitmap_group_index,
 	short sequence_index,

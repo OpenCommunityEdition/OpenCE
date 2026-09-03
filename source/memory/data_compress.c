@@ -80,9 +80,11 @@ boolean data_decompress(
 	void const *compressed_data,
 	unsigned long compressed_size,
 	void *destination,
-	unsigned long *destination_size)
+	unsigned long *destination_size,
+	unsigned long destination_capacity)
 {
 	boolean result = FALSE;
+	(void)destination_capacity;
 
 	*destination_size = data_decompressed_size(compressed_data, compressed_size);
 	if (uncompress(

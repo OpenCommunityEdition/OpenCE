@@ -32,6 +32,7 @@ boolean data_decompress(
 	void const *compressed_data,
 	unsigned long compressed_size,
 	void *destination,
-	unsigned long *destination_size);
+	unsigned long *destination_size,
+	unsigned long destination_capacity);
 
 #endif // __DATA_COMPRESS_H
