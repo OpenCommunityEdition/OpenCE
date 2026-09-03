@@ -17,7 +17,7 @@ symbols in this file:
 0011A410 00b0:
 	_network_game_reset_for_next_round (0000)
 0011A4C0 0010:
-	_code_0011a4c0 (0000)
+	_network_game_dump (0000)
 0011A4D0 0030:
 	_network_player_is_valid (0000)
 0011A500 00b0:
@@ -25,7 +25,7 @@ symbols in this file:
 0011A5B0 01a0:
 	_network_game_add_player (0000)
 0011A750 0140:
-	_code_0011a750 (0000)
+	_compare_network_players (0000)
 0011A890 0080:
 	_network_game_spawn_player (0000)
 0011A910 0090:
@@ -77,12 +77,17 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h"
 #include "game/game.h"
+#include "game/game_engine.h"
 #include "game/players.h"
 #include "main/main.h"
 #include "network_game_globals.h"
 #include "network_game_manager.h"
+#include "network_game_ui.h"
 #include "text/unicode.h"
+
+#include <xtl.h>
 
 /* ---------- constants */
 
@@ -98,6 +103,15 @@ enum
 
 /* ---------- structures */
 
+struct game_options
+{
+	unsigned long flags;
+	short code_version;
+	short difficulty;
+	unsigned long random_seed;
+	char map_name[256];
+};
+
 struct network_machine
 {
 	wchar_t name[32];
@@ -105,46 +119,73 @@ struct network_machine
 	byte __padding41[3];
 };
 
+struct network_game_map
+{
+	long __unknown0;
+	char name[0x80];
+};
+
+struct network_game_local_data
+{
+	boolean game_objects_loaded;
+	byte __padding431[3];
+};
+
 struct network_game
 {
 	wchar_t name[16];
-	byte map[0x84];
-	byte __unknownA4[0x69];
+	struct network_game_map map;
+	struct game_variant variant;
+	byte __padding10C;
 	byte game_mode;
-	byte maximum_player_count;
+	char maximum_player_count;
 	byte __padding10F;
 	short difficulty;
 	short machine_count;
 	struct network_machine machines[4];
 	short player_count;
 	struct network_player players[16];
-	byte __unknown426[0xA];
-	boolean load_ui;
-	byte __padding431[3];
+	short __unknown426;
+	unsigned long random_seed;
+	byte __unknown42C[4];
+	struct network_game_local_data local_data;
 };
 
 /* ---------- prototypes */
 
-void main_load_ui_scenario(
-	boolean load_ui);
-long __stdcall XFindFirstNicknameW(
-	long this_title_only,
-	wchar_t *nickname,
-	unsigned long size);
-long __stdcall XFindClose(
-	long handle);
-long __stdcall XSetNicknameW(
-	wchar_t const *nickname,
-	long preserve_case);
-wchar_t const *network_game_get_random_player_name(
-	void);
-void network_game_invalidate_machine(
-	struct network_game *game,
-	word machine_index);
+static long compare_network_players(
+	struct network_player *p1,
+	struct network_player *p2);
 
 /* ---------- globals */
 
 /* ---------- public code */
+
+boolean network_game_add_machine(
+	struct network_game *game,
+	struct network_machine *machine)
+{
+	long machine_index;
+	boolean result = FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_game_manager.c",
+		0x6A,
+		game && machine && network_machine_is_valid(machine));
+
+	for (machine_index = 0; machine_index < 4; machine_index++)
+	{
+		if (!network_machine_is_valid(&game->machines[machine_index]))
+		{
+			csmemcpy(&game->machines[machine_index], machine, sizeof(*machine));
+			game->machine_count++;
+			result = TRUE;
+			break;
+		}
+	}
+
+	return result;
+}
 
 boolean network_game_update_machine(
 	struct network_game *game,
@@ -197,9 +238,9 @@ void network_game_generate_local_machine_name(
 	wchar_t *machine_name)
 {
 	char ascii_machine_name[32];
-	long find_handle = XFindFirstNicknameW(FALSE, machine_name, 32);
+	HANDLE find_handle = XFindFirstNicknameW(FALSE, machine_name, 32);
 
-	if (find_handle == NONE)
+	if (find_handle == INVALID_HANDLE_VALUE)
 	{
 		ustrncpy(machine_name, network_game_get_random_player_name(), 32);
 		machine_name[31] = 0;
@@ -237,18 +278,77 @@ void network_game_invalidate_player(
 void network_game_end_and_load_ui(
 	struct network_game *game)
 {
-	if (game->load_ui)
+	if (game->local_data.game_objects_loaded)
 		main_load_ui_scenario(TRUE);
 
-	csmemset(&game->load_ui, 0, sizeof(long));
+	csmemset(&game->local_data, 0, sizeof(game->local_data));
 
 	return;
 }
 
-void code_0011a4c0(
-	void)
+void network_game_dump(
+	struct network_game *game,
+	char const *prefix)
 {
 	return;
+}
+
+boolean network_game_add_player(
+	struct network_game *game,
+	struct network_player *player)
+{
+	long player_index;
+	long new_player_index;
+	boolean result = FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_game_manager.c",
+		0xBB,
+		game && player);
+
+	if (game->player_count < game->maximum_player_count)
+	{
+		if (VALID_INDEX(player->machine_index, MAXIMUM_NETWORK_MACHINE_COUNT) &&
+			VALID_INDEX(player->controller_index, MAXIMUM_LOCAL_PLAYERS))
+		{
+			for (player_index = 0; player_index < 16; player_index++)
+			{
+				if (game->players[player_index].machine_index == player->machine_index &&
+					game->players[player_index].controller_index == player->controller_index)
+				{
+					break;
+				}
+			}
+
+			if (player_index == 16 && network_player_is_valid(player))
+			{
+				new_player_index = NONE;
+				for (player_index = 0; player_index < 16; player_index++)
+				{
+					if (game->players[player_index].player_list_index == NONE)
+					{
+						new_player_index = player_index;
+						break;
+					}
+				}
+
+				if ((player->player_list_index == NONE || new_player_index == player->player_list_index) &&
+					new_player_index != NONE)
+				{
+					player->player_list_index = (char)new_player_index;
+					csmemcpy(&game->players[new_player_index], player, sizeof(struct network_player));
+					game->player_count++;
+					result = TRUE;
+				}
+			}
+		}
+	}
+	else
+	{
+		error(2, "game is already at maximum players; can't add new player");
+	}
+
+	return result;
 }
 
 boolean network_player_is_valid(
@@ -343,17 +443,17 @@ boolean network_game_player_is_valid(
 
 void network_game_reset_for_next_round(
 	struct network_game *game,
-	boolean load_ui)
+	boolean unload_game_objects)
 {
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_game_manager.c",
 		0x22D,
 		game);
 
-	if (load_ui && game->load_ui)
+	if (unload_game_objects && game->local_data.game_objects_loaded)
 	{
 		main_load_ui_scenario(TRUE);
-		csmemset(&game->load_ui, 0, sizeof(long));
+		csmemset(&game->local_data, 0, sizeof(game->local_data));
 		if (global_network_game_server_get())
 			game_connection_set(2);
 		else if (global_network_game_client_get())
@@ -361,7 +461,7 @@ void network_game_reset_for_next_round(
 	}
 	else
 	{
-		csmemset(&game->load_ui, 0, sizeof(long));
+		csmemset(&game->local_data, 0, sizeof(game->local_data));
 	}
 
 	game_time_end();
@@ -379,7 +479,7 @@ void network_game_invalidate(
 		game);
 
 	csmemset(game, 0, sizeof(*game));
-	csmemset(game->map, 0, sizeof(game->map));
+	csmemset(&game->map, 0, sizeof(game->map));
 	game->machine_count = 0;
 	game->player_count = 0;
 
@@ -389,7 +489,7 @@ void network_game_invalidate(
 	csmemset(game->players, NONE, sizeof(game->players));
 	game->game_mode = 2;
 	game->maximum_player_count = 16;
-	game->load_ui = FALSE;
+	game->local_data.game_objects_loaded = FALSE;
 
 	return;
 }
@@ -423,4 +523,191 @@ boolean network_game_update_player(
 	return result;
 }
 
+boolean network_game_remove_player(
+	struct network_game *game,
+	struct network_player *player)
+{
+	long player_index;
+	boolean result = FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_game_manager.c",
+		0x120,
+		game && player);
+
+	if (network_game_player_is_valid(player, game))
+	{
+		for (player_index = 0; player_index < 16; player_index++)
+		{
+			if (network_player_is_valid(&game->players[player_index]) &&
+				game->players[player_index].machine_index == player->machine_index &&
+				game->players[player_index].controller_index == player->controller_index)
+			{
+				network_game_invalidate_player(&game->players[player_index]);
+				game->player_count--;
+				result = TRUE;
+				break;
+			}
+		}
+	}
+	else
+	{
+		error(2, "tried to remove a player with indvalid data");
+	}
+
+	return result;
+}
+
+boolean network_game_remove_machine(
+	struct network_game *game,
+	struct network_machine *machine)
+{
+	long machine_index;
+	long player_index;
+	boolean result = FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_game_manager.c",
+		0x97,
+		game && machine);
+
+	if (network_machine_is_valid(machine))
+	{
+		for (machine_index = 0; machine_index < 4; machine_index++)
+		{
+			if (game->machines[machine_index].machine_index == machine->machine_index)
+			{
+				for (player_index = 0; player_index < 16; player_index++)
+				{
+					if (network_player_is_valid(&game->players[player_index]) &&
+						game->players[player_index].machine_index == machine->machine_index)
+					{
+						if (!network_game_remove_player(game, &game->players[player_index]))
+							error(2, "failed to remove a machine's player");
+					}
+				}
+
+				network_game_invalidate_machine(game, machine->machine_index);
+				game->machine_count--;
+				result = TRUE;
+				break;
+			}
+		}
+	}
+
+	return result;
+}
+
+boolean network_game_create_game_objects(
+	struct network_game *game)
+{
+	long player_index;
+	struct game_options options;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_game_manager.c",
+		0x170,
+		game);
+
+	game_options_new(&options);
+	csstrncpy(options.map_name, game->map.name, sizeof(game->map.name) - 1);
+	options.difficulty = game->difficulty;
+
+	switch (game_connection())
+	{
+		case _game_connection_network_client:
+		case _game_connection_network_server:
+			options.random_seed = network_game_get_random_seed();
+			break;
+
+		case _game_connection_film_playback:
+			options.random_seed = game->random_seed;
+			break;
+
+		default:
+			match_assert(
+				"c:\\halo\\SOURCE\\networking\\network_game_manager.c",
+				0x17F,
+				!"bad game connection");
+			break;
+	}
+
+	game_precache_new_map(options.map_name, TRUE);
+	main_menu_unload();
+
+	if (game_in_progress())
+	{
+		game_dispose_from_old_map();
+		game_unload();
+	}
+
+	if (game->variant.engine_type)
+		game_set_game_variant(&game->variant);
+
+	if (game_load(&options))
+	{
+		game->local_data.game_objects_loaded = TRUE;
+		game_initialize_for_new_map();
+
+		qsort(
+			game->players,
+			16,
+			sizeof(struct network_player),
+			(int(__cdecl *)(const void *, const void *))compare_network_players);
+
+		for (player_index = 0; player_index < 16; player_index++)
+		{
+			if (!network_player_is_valid(&game->players[player_index]))
+				break;
+
+			if (!network_game_spawn_player(&game->players[player_index]))
+			{
+				game->local_data.game_objects_loaded = FALSE;
+				break;
+			}
+		}
+	}
+	else
+	{
+		error(0, "game_load() failed.");
+	}
+
+	return game->local_data.game_objects_loaded;
+}
+
 /* ---------- private code */
+
+static long compare_network_players(
+	struct network_player *p1,
+	struct network_player *p2)
+{
+	long result = 0;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_game_manager.c",
+		0x142,
+		p1 && p2);
+
+	if (!network_player_is_valid(p1) && !network_player_is_valid(p2))
+		result = 0;
+	else if (!network_player_is_valid(p1) && network_player_is_valid(p2))
+		result = 1;
+	else if (network_player_is_valid(p1) && !network_player_is_valid(p2))
+		result = -1;
+	else if (p1->machine_index > p2->machine_index)
+		result = 1;
+	else if (p1->machine_index < p2->machine_index)
+		result = -1;
+	else if (p1->controller_index > p2->controller_index)
+		result = 1;
+	else if (p1->controller_index < p2->controller_index)
+		result = -1;
+	else
+		match_vassert(
+			"c:\\halo\\SOURCE\\networking\\network_game_manager.c",
+			0x165,
+			FALSE,
+			"multiple players on the same machine cannot have the same controller index");
+
+	return result;
+}
