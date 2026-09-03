@@ -348,7 +348,7 @@ boolean extract_plateless_cube_map(
 	struct bitmap_data *bitmap);
 short extract_add_bitmap(
 	struct bitmap_data *bitmap);
-boolean extract_3d_textures(
+static boolean extract_3d_textures(
 	void);
 boolean extract_cube_maps(
 	void);
@@ -977,6 +977,100 @@ static boolean extract_bitmap(
 	{
 		fprintf(stdout, "### WARNING skipped a bitmap which contained no data\r\n");
 		fflush(stdout);
+	}
+
+	return result;
+}
+
+static boolean extract_3d_textures(
+	void)
+{
+	boolean result = TRUE;
+	long first_bitmap_index = 0;
+
+	while (result && first_bitmap_index < extract_data.bitmap_count)
+	{
+		struct bitmap_extract_entry *first_entry = &extract_data.bitmaps[first_bitmap_index];
+		short sequence_index = first_entry->sequence_index;
+		short width = first_entry->bitmap->width;
+		short height = first_entry->bitmap->height;
+		boolean incompatible_dimensions = FALSE;
+		short bitmap_count = 0;
+
+		while (extract_data.bitmaps[first_bitmap_index + bitmap_count].sequence_index == sequence_index &&
+			!incompatible_dimensions)
+		{
+			struct bitmap_data *bitmap =
+				extract_data.bitmaps[first_bitmap_index + bitmap_count].bitmap;
+
+			if (bitmap->width != width || bitmap->height != height)
+				incompatible_dimensions = TRUE;
+
+			bitmap_count++;
+		}
+
+		if (incompatible_dimensions)
+		{
+			fprintf(stdout, "skipping 3D texture with incompatible slices\r\n");
+			fflush(stdout);
+		}
+		else if (bitmap_count & (bitmap_count - 1))
+		{
+			fprintf(stdout, "skipping 3D texture with non power-of-two slice count\r\n");
+			fflush(stdout);
+		}
+		else
+		{
+			struct bitmap_data *bitmap =
+				bitmap_3d_new(width, height, bitmap_count, 0, _bitmap_format_a8r8g8b8);
+
+			if (bitmap && bitmap->base_address)
+			{
+				short slice_index;
+
+				for (slice_index = 0; slice_index < bitmap_count; slice_index++)
+				{
+					bitmap_3d_slice_insert(
+						extract_data.bitmaps[first_bitmap_index + slice_index].bitmap,
+						bitmap,
+						0,
+						slice_index);
+				}
+
+				extract_data.sequence_index = sequence_index;
+				{
+					short bitmap_index = extract_add_bitmap(bitmap);
+
+					if (bitmap_index != NONE)
+					{
+						struct bitmap_group_sequence *sequence =
+							TAG_BLOCK_GET_ELEMENT(
+								&extract_data.group->sequences,
+								sequence_index,
+								struct bitmap_group_sequence);
+
+						if (sequence->first_bitmap_index == NONE)
+						{
+							sequence->first_bitmap_index = bitmap_index;
+							sequence->bitmap_count = 1;
+						}
+						else
+						{
+							sequence->bitmap_count++;
+						}
+					}
+				}
+			}
+			else
+			{
+				error(_error_silent, "### ERROR extract: failed to allocate temporary bitmap");
+				result = FALSE;
+			}
+
+			bitmap_delete(bitmap);
+		}
+
+		first_bitmap_index += bitmap_count;
 	}
 
 	return result;
