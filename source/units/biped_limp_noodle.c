@@ -94,23 +94,6 @@ static void biped_limp_noodle_adjust_orientations(
 	real_matrix4x3 *node_matrices,
 	long node_count,
 	real_point3d const *last_positions);
-boolean collision_get_features_in_sphere(
-	unsigned long flags,
-	real_point3d const *center,
-	real enclosing_radius,
-	real height,
-	real radius,
-	long ignore_object_index,
-	struct collision_feature_list *features);
-short collision_move_point(
-	real_point3d const *position,
-	real_vector3d const *velocity,
-	struct collision_feature_list const *features,
-	real_point3d *clipped_position,
-	real_vector3d *clipped_velocity,
-	short maximum_collision_count,
-	struct collision_plane *collisions);
-
 /* ---------- globals */
 
 static struct biped_limp_noodle_globals biped_limp_noodle_globals;
@@ -249,7 +232,8 @@ static boolean biped_limp_noodle_valid_joint_rotation(
 				if (current_world_position->z >= rotate_to_position.z &&
 					!collision_test_sphere(
 						&rotate_to_position,
-						collision_radius))
+						collision_radius,
+						biped_index))
 				{
 					*current_world_position = rotate_to_position;
 				}
@@ -382,7 +366,10 @@ static void biped_limp_noodle_move_relax_and_constrain_positions(
 				vector_from_points3d(parent_position, position, &segment);
 
 				if (!iteration &&
-					!collision_test_sphere(position, collision_radius))
+					!collision_test_sphere(
+						position,
+						collision_radius,
+						biped_index))
 				{
 					real_point3d moved_position;
 					real_vector3d moved_velocity;
@@ -432,10 +419,12 @@ static void biped_limp_noodle_move_relax_and_constrain_positions(
 
 						embedded[0] = collision_test_sphere(
 							position,
-							0.03f);
+							0.03f,
+							biped_index);
 						embedded[1] = collision_test_sphere(
 							parent_position,
-							0.03f);
+							0.03f,
+							biped_index);
 
 						if (embedded[0] || embedded[1])
 						{
@@ -557,7 +546,8 @@ static void biped_limp_noodle_move_relax_and_constrain_positions(
 							scale_vector3d(&segment, correction, &velocity);
 							if (collision_test_sphere(
 								position,
-								collision_radius))
+								collision_radius,
+								biped_index))
 							{
 								goto next_node;
 							}

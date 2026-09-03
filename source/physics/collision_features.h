@@ -258,6 +258,29 @@ void render_debug_collision_prism(
 void render_debug_collision_features(
 	struct collision_feature_list const *features);
 
+/* ---------- prototypes/COLLISIONS.C */
+
+boolean collision_test_sphere(
+	real_point3d const *center,
+	real radius,
+	long ignore_object_index);
+boolean collision_get_features_in_sphere(
+	unsigned long flags,
+	real_point3d const *center,
+	real enclosing_radius,
+	real height,
+	real radius,
+	long ignore_object_index,
+	struct collision_feature_list *features);
+short collision_move_point(
+	real_point3d const *position,
+	real_vector3d const *velocity,
+	struct collision_feature_list const *features,
+	real_point3d *clipped_position,
+	real_vector3d *clipped_velocity,
+	short maximum_collision_count,
+	struct collision_plane *collisions);
+
 /* ---------- globals */
 
 /* ---------- public code */

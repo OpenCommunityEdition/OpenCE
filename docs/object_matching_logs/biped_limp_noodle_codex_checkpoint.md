@@ -18,8 +18,8 @@ are retained as reviewable fuzzy reconstructions after one natural exact pass.
 | Function | Target meaningful | Target padded | Candidate padded | Verdict |
 | --- | ---: | ---: | ---: | --- |
 | `_biped_limp_noodle_get_max_relaxation_iterations` | 6 | 16 | 16 | exact |
-| `_biped_limp_noodle_valid_joint_rotation` | 1,244 | 1,248 | 1,200 | fuzzy |
-| `_biped_limp_noodle_move_relax_and_constrain_positions` | 1,955 | 1,968 | 1,872 | fuzzy |
+| `_biped_limp_noodle_valid_joint_rotation` | 1,244 | 1,248 | 1,216 | fuzzy |
+| `_biped_limp_noodle_move_relax_and_constrain_positions` | 1,955 | 1,968 | 1,888 | fuzzy |
 | `_validate_real_vector3d_axes3` | 492 | 496 | 496 | exact |
 | `_biped_limp_noodle_adjust_orientations` | 695 | 704 | 704 | exact |
 | `_biped_limp_noodle_relax_nodes_onto_environment` | 244 | 256 | 240 | fuzzy |
@@ -37,22 +37,24 @@ constraints, rebuild node orientations, and iterate until stable. It uses the
 January-confirmed ten-plane collision scratch array rather than the twelve
 planes present in the PPC-oriented HCEA reconstruction.
 
-## Deliberate collision-interface disposition
+## Collision-interface ownership reconciliation
 
 January proves that calls to `collision_test_sphere` pass a third
-`ignore_object_index` argument, and also proves that this particular x86
-callee never reads it. Correcting that declaration in `collisions.h` caused a
-real C2 definition-position regression in the otherwise exact
-`decals::_decals_delete_permanent_from_cluster` (400 padded bytes). Adding the
-two missing movement declarations to that header caused the same regression.
+`ignore_object_index` argument, even though this particular x86 callee does
+not read it. It also proves the seven-argument
+`collision_get_features_in_sphere` and `collision_move_point` interfaces.
+Those collision-feature APIs now live in `collision_features.h`, beside the
+feature-list and collision-plane types they consume. The ad-hoc declarations
+were removed from `biped_limp_noodle.c`, `game_engine.c`, and
+`collisions.c`; every biped sphere query now passes `biped_index`.
 
-The public collision header and `collisions.c` were therefore restored byte
-for byte to the canonical baseline. This TU keeps local declarations for the
-two previously undeclared collision owners and uses the established two-arg
-sphere declaration. That is a deliberate, semantics-preserving fuzzy
-compromise; no exact function was sacrificed to improve a residual. The three
-residual functions should be revisited when the collision header can be
-reconstructed as a complete January scheduling unit.
+This placement is also C2 schedule-safe. All four direct
+`collision_features.h` consumers and all fourteen direct `collisions.h`
+consumers were compiled and gated. No exact function changed: Units remains
+189/189, Decals retains its exact
+`_decals_delete_permanent_from_cluster`, and the Collisions, Game Engine,
+Collision Features, and Biped exact sets are preserved. The corrected third
+argument improves the two large fuzzy candidates by 16 padded bytes each.
 
 Direct component arithmetic is used at the three line/point constructions for
 which HCEA and January agree. This prevents emission of a
@@ -66,14 +68,16 @@ which HCEA and January agree. This prevents emission of a
 - `units.obj`: 189 exact, zero residual, zero unwritten.
 - `bipeds.obj`: unchanged at 25 exact, one inherited residual, 25 unwritten.
 - `collisions.obj`: unchanged at eight exact, zero residual, 12 unwritten.
-- `biped_limp_noodle.obj`: three exact, three residual, zero unwritten.
-- All 17 `collisions.h` consumers were rebuilt during the blast-radius check.
+- `biped_limp_noodle.obj`: three exact, three residual, zero unwritten;
+  corrected-interface candidates are 1,216, 1,888, and 240 padded bytes.
+- All four `collision_features.h` and fourteen `collisions.h` direct
+  consumers were compiled and gated during the final blast-radius check.
 - Tool suite: 261/261 tests passed.
 - `git diff --check`: passed.
 - Candidate symbol audit: no `point_from_line3d` definition or COMDAT.
 
 Source SHA-256:
-`b4540bb45a95408315ab24391dad0dbf12f4c1b00d5f2f7fd5375bd2f592792a`.
+`5ec46accb5e871eeacd358af27577e3ff78e5a8638da037900fe447fcf85ee82`.
 January target object SHA-256:
 `113dfab879513774d369627a6bd7a7607baf9bb7bcf82c87ee1bc28b6aa32b69`.
 

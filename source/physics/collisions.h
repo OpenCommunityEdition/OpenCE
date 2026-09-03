@@ -117,9 +117,6 @@ typedef char collision_result_material_type_offset_assert[
 long collision_model_get_material_type(
 	struct collision_model const *model,
 	short material_index);
-boolean collision_test_sphere(
-	real_point3d const *center,
-	real radius);
 boolean collision_test_point(
 	unsigned long flags,
 	real_point3d const *point,
@@ -165,7 +162,6 @@ short collision_move_sphere(
 	real_vector3d *clipped_velocity,
 	struct collision_result *collisions,
 	short *collision_count);
-
 /* ---------- globals */
 
 /* ---------- public code */

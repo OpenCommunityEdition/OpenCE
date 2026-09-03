@@ -895,15 +895,6 @@ void sound_class_set_gain(
 void network_game_server_switch_to_postgame(
 	struct network_game_server *server);
 
-boolean collision_get_features_in_sphere(
-	unsigned long flags,
-	real_point3d const *center,
-	real enclosing_radius,
-	real height,
-	real radius,
-	long ignore_object_index,
-	struct collision_feature_list *features);
-
 void player_effect_screen_flash(
 	long player_index,
 	struct screen_flash_definition const *screen_flash,

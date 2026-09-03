@@ -137,23 +137,6 @@ boolean code_0013d360(
 	unsigned long flags,
 	real_point3d const *point,
 	long ignore_object_index);
-boolean collision_get_features_in_sphere(
-	unsigned long flags,
-	real_point3d const *center,
-	real enclosing_radius,
-	real height,
-	real radius,
-	long ignore_object_index,
-	struct collision_feature_list *features);
-short collision_move_point(
-	real_point3d const *position,
-	real_vector3d const *velocity,
-	struct collision_feature_list const *features,
-	real_point3d *clipped_position,
-	real_vector3d *clipped_velocity,
-	struct collision_result *collisions,
-	short *collision_count);
-
 /* ---------- globals */
 
 extern boolean debug_collision_skip_objects;
@@ -183,7 +166,8 @@ long collision_model_get_material_type(
 
 boolean collision_test_sphere(
 	real_point3d const *center,
-	real radius)
+	real radius,
+	long ignore_object_index)
 {
 	boolean result;
 	struct collision_bsp_test_sphere_result sphere_result;
