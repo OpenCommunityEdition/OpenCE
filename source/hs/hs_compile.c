@@ -889,10 +889,8 @@ static void hs_parse_call_predicate(
 static boolean hs_parse_boolean(
 	long expression_index)
 {
-	boolean result = TRUE;
 	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
 	char const *string = hs_compile_globals.compiled_source + expression->source_offset;
-	boolean value;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
@@ -907,23 +905,20 @@ static boolean hs_parse_boolean(
 		csstrcmp(string, "off") == 0 ||
 		csstrcmp(string, "0") == 0)
 	{
-		value = FALSE;
+		expression->boolean_value = FALSE;
+		return TRUE;
 	}
-	else if (csstrcmp(string, "true") == 0 ||
+	if (csstrcmp(string, "true") == 0 ||
 		csstrcmp(string, "on") == 0 ||
 		csstrcmp(string, "1") == 0)
 	{
-		value = TRUE;
+		expression->boolean_value = TRUE;
+		return TRUE;
 	}
-	else
-	{
-		hs_compile_globals.error = "i expected \"true\" or \"false\".";
-		hs_compile_globals.error_offset = expression->source_offset;
-		result = FALSE;
-	}
-	expression->boolean_value = value;
 
-	return result;
+	hs_compile_globals.error = "i expected \"true\" or \"false\".";
+	hs_compile_globals.error_offset = expression->source_offset;
+	return FALSE;
 }
 
 static boolean hs_parse_real(

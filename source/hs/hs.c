@@ -4776,6 +4776,10 @@ boolean hs_compile_source(
 			source_files,
 			source_file_index,
 			struct hs_source_file);
+		/*
+		 * BUG (original): January and HCEA pass these outputs in reverse.
+		 * A corrected build should pass &error_message, &error_source.
+		 */
 		hs_compile(
 			source_file->source.size,
 			tag_data_get_pointer(
