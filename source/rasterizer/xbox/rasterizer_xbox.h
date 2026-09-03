@@ -17,11 +17,13 @@ RASTERIZER_XBOX.H
 
 struct bitmap_data;
 struct pixel_shader_definition;
+struct real_matrix4x3;
 struct rasterizer_model_begin_parameters;
 struct rasterizer_model_skinning_parameters;
 struct shader;
 struct triangle_buffer;
 struct vertex_buffer;
+union real_rgb_color;
 
 /* ---------- prototypes/RASTERIZER_XBOX.C */
 
@@ -116,8 +118,8 @@ void _rasterizer_environment_shadows_begin(
 	void);
 boolean _rasterizer_environment_shadow_begin(
 	long object_index,
-	real_matrix4x3 const *shadow_matrix,
-	real_rgb_color const *shadow_color,
+	struct real_matrix4x3 const *shadow_matrix,
+	union real_rgb_color const *shadow_color,
 	real object_bounding_radius,
 	real *shadow_volume_bounding_radius);
 void _rasterizer_environment_shadow_model_begin(

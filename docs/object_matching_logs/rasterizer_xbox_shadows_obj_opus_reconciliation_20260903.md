@@ -57,7 +57,7 @@ reopening conditions are recorded in `config/parked.json`.
 | --- | ---: | ---: | ---: | --- |
 | `__rasterizer_environment_shadow_begin` | 944 / 944 | 73 / 73 | 98.32% | independent constant-row stores and commutative x87 dot-product scheduling |
 | `__rasterizer_environment_shadow_model_draw` | 688 / 688 | 48 / 48 | 97.95% | two dependency-independent instruction transpositions |
-| `__rasterizer_environment_shadow_draw` | 1,472 / 1,472 | 146 / 146 | 95.33% | equivalent x87 operand/term order in three commutative dot products |
+| `__rasterizer_environment_shadow_draw` | 1,472 / 1,472 | 146 / 146 | 95.55% | equivalent x87 operand/term order in three commutative dot products |
 
 The donor's bounded probes covered six ordinary-C sum spellings plus natural
 declaration, initialization, constant-store, and include-order variants.  They

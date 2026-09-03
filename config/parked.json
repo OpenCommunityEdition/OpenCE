@@ -3177,7 +3177,7 @@
           "relocation_count": 73,
           "normalized_sha256": "709c6800cb61db4110660fda4c3622669f7a0d60293514e8ca292ea4e90cab99"
         },
-        "objdiff_percent": 98.32
+        "objdiff_percent": 98.32258
       }
     },
     {
@@ -3196,14 +3196,14 @@
           "relocation_count": 48,
           "normalized_sha256": "c81ae7e554a892d0f30600ed846a2585dbd904d74b628c472219ed77a5fb6489"
         },
-        "objdiff_percent": 97.95
+        "objdiff_percent": 97.948715
       }
     },
     {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_shadows",
       "function": "__rasterizer_environment_shadow_draw",
       "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked after reconstructing the complete typed January environment-shadow projection and draw path from the target instruction/relocation topology, stock XDK render-state interfaces, January's own global and statistics evidence, and the later HaloCEA shadow pipeline. The retained routine performs the optional exact convolution pass, configures all three textures and fixed-function states, constructs the target pixel shader, derives and uploads the five projection constants, restores the primary target exactly once, draws the requested dynamic triangles under the reject stencil mode, and updates shadow statistics. Target and candidate both occupy 1472 padded bytes with all 146 relocation types and destinations, and objdiff reports 95.33 percent similarity. The residual is confined to equivalent x87 term/operand ordering in the three commutative dot products; six source-order spellings and the bounded declaration/include variants compiled back to the same schedule. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining the x87 scheduler choice.",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed January environment-shadow projection and draw path from the target instruction/relocation topology, stock XDK render-state interfaces, January's own global and statistics evidence, and the later HaloCEA shadow pipeline. The retained routine performs the optional exact convolution pass, configures all three textures and fixed-function states, constructs the target pixel shader, derives and uploads the five projection constants, restores the primary target exactly once, draws the requested dynamic triangles under the reject stencil mode, and updates shadow statistics. Target and candidate both occupy 1472 padded bytes with all 146 relocation types and destinations, and objdiff reports 95.55 percent similarity. The residual is confined to equivalent x87 term/operand ordering in the three commutative dot products; six source-order spellings and the bounded declaration/include variants compiled back to the same schedule. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining the x87 scheduler choice.",
       "measurements": {
         "target": {
           "size": 1472,
@@ -3215,7 +3215,7 @@
           "relocation_count": 146,
           "normalized_sha256": "e24df5bd0c0b9df9ff9fd77aafa3f2ec51274c6e8e7151d95b3cbbbb3850e3c3"
         },
-        "objdiff_percent": 95.33
+        "objdiff_percent": 95.546745
       }
     }
   ]
