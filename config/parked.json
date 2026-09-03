@@ -2305,6 +2305,177 @@
         },
         "objdiff_percent": 89.82417
       }
+    },
+    {
+      "unit": "source/networking/network_connection",
+      "function": "_network_connection_connect",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed synchronous/asynchronous endpoint connection path from January assertions, calls, diagnostics, and the independent HCEA implementation. The retained ordinary C validates both inputs, connects the unreliable endpoint synchronously, permits the authenticated asynchronous-in-progress result for the reliable endpoint, reports transport errors, and returns a truthful boolean. Target/candidate meaningful sizes are 281/261 bytes and padded sizes are 288/272, with the same ordered 20 relocation identities. The first normalized divergence at +0x5D is January's direct failure epilogue and BL success carrier versus VC7's branch into the later endpoint path; later differences are equivalent early-return scheduling. No register hint, volatile access, barrier, pragma, assembly, raw offset, fake dependency, or nonsensical branch is retained. Reopen for authoritative January source or a natural same-compiler control-flow donor.",
+      "measurements": {
+        "target": {
+          "size": 288,
+          "relocation_count": 20,
+          "normalized_sha256": "ba5d0690bff0b71e8ebeec87c2e268ac6f5c6093d2323c275ae0ad48c5a4d7eb"
+        },
+        "base": {
+          "size": 272,
+          "relocation_count": 20,
+          "normalized_sha256": "ea92b8ec1f0cba653087aed130e5f50f6072042402c748eacd9bc25c7c1b33e9"
+        },
+        "objdiff_percent": 65.47899
+      }
+    },
+    {
+      "unit": "source/networking/network_connection",
+      "function": "_network_connection_connected",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked after retaining the complete typed connection predicate supported by January and independent HCEA behavior. Target and candidate both have 81 meaningful bytes, 96 padded bytes, and the same five relocation identities. Their only normalized difference begins at +0x31: January reuses ESI for the reliable endpoint while VC7 retains the connection in ESI and uses EAX for the endpoint. A natural direct-member formulation produces the same candidate, so coercive register steering was rejected. No volatile/register forcing, barrier, pragma, assembly, fake dependency, or semantic distortion is present. Reopen only for authoritative January source or a natural same-compiler allocation donor.",
+      "measurements": {
+        "target": {
+          "size": 96,
+          "relocation_count": 5,
+          "normalized_sha256": "50677dce5bbee398989d36573afcb4be3ca3025c446a6e7bb0c005c2cd4fe3f8"
+        },
+        "base": {
+          "size": 96,
+          "relocation_count": 5,
+          "normalized_sha256": "2d3b407a0afef3ca4f721a1dd65d6e75ff6d7277377b7200372ccefcd1eade92"
+        },
+        "objdiff_percent": 99.375
+      }
+    },
+    {
+      "unit": "source/networking/network_connection",
+      "function": "_network_connection_disconnect",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked after reconstructing the complete client disconnect and UDP rebind path from January's seven-call relocation topology and independent HCEA semantics. The retained code drains the reliable endpoint, disconnects it, recreates and rebinds the datagram endpoint when a well-known port exists, and reports success honestly. Target/candidate meaningful sizes are 165/159 bytes and padded sizes are 176/160, with all seven relocation identities preserved. The first substantive divergence at +0x95 is January's ESI/EBX cleanup and direct false epilogue versus the candidate's BL result carrier; the endpoint call order is unchanged. No register forcing, volatile access, barrier, pragma, assembly, raw offset, or fake control flow is retained. Reopen for authoritative January source or a natural same-compiler lifetime donor.",
+      "measurements": {
+        "target": {
+          "size": 176,
+          "relocation_count": 7,
+          "normalized_sha256": "302d9e70140896b6321ce92306d66c783f987e0ab790072bb30d6370bb050537"
+        },
+        "base": {
+          "size": 160,
+          "relocation_count": 7,
+          "normalized_sha256": "e8a2e1507f52e0e66029898ce6c2dade668576dd6e322fdcd89ee3d0ce9c5238"
+        },
+        "objdiff_percent": 92.05882
+      }
+    },
+    {
+      "unit": "source/networking/network_connection",
+      "function": "_network_connection_get_address",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked after reconstructing the two typed endpoint-address outputs from January's assertions, field offsets, memset topology, and independent HCEA semantics. Target/candidate meaningful sizes are 146/143 bytes and padded sizes are 160/144, with the same eight relocation identities. The first divergence is the prologue: January keeps the connection in EBX and the IPv4 address-length constant in DI, while VC7 keeps the connection in EDI and materializes 4 at each store. The retained source uses transport_address fields rather than raw offsets. No volatile/register forcing, barrier, pragma, assembly, fake dependency, or representation trick is present. Reopen for authoritative January source or a natural same-compiler allocation donor.",
+      "measurements": {
+        "target": {
+          "size": 160,
+          "relocation_count": 8,
+          "normalized_sha256": "76f557523934d9604438564e053c6fdb5ad8971ff9f70bad52f406bd3082295f"
+        },
+        "base": {
+          "size": 144,
+          "relocation_count": 8,
+          "normalized_sha256": "3aa67cae8a9d870e7139605e14962a137758ad8afa9bc9adc740422b0d7cc8f5"
+        },
+        "objdiff_percent": 88.44827
+      }
+    },
+    {
+      "unit": "source/networking/network_connection",
+      "function": "_network_connection_new",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked fail-closed after reconstructing the full typed server/client allocation path from January's 29-relocation call topology, assertions, queue labels, role flags, and independent HCEA behavior. It allocates the correct 0x50/0x38 layouts through named structs, creates and configures TCP/UDP endpoints, creates role-sized queues, records the well-known port, opens traffic accounting, and tears down every failure through network_connection_delete. Target/candidate meaningful sizes are 569/542 bytes and padded sizes are 576/544, with every relocation identity preserved. The first divergence is the 0x20 versus 0x1C stack frame at +0x03, followed by broad but semantically equivalent local lifetime and branch scheduling differences. No more specific compiler mechanism is proven, so the class remains unclassified. No raw layout arithmetic, volatile/register steering, pragma, assembly, fake dependency, or undefined behavior is retained. Reopen for authoritative January source or a natural same-compiler implementation.",
+      "measurements": {
+        "target": {
+          "size": 576,
+          "relocation_count": 29,
+          "normalized_sha256": "a58c7f31b2b5f8ceb0d2d13e2f9b7f00f9ba754b4089c1a527849e5d876f9f37"
+        },
+        "base": {
+          "size": 544,
+          "relocation_count": 29,
+          "normalized_sha256": "ecbcea4b217116826bd7210f33461f2008dc64b1150eebaf55519ad25dd76e9f"
+        },
+        "objdiff_percent": 64.01031
+      }
+    },
+    {
+      "unit": "source/networking/network_connection",
+      "function": "_network_connection_read",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked after reconstructing the typed reliable/unreliable dispatch from January role flags and independent HCEA behavior. Target/candidate meaningful sizes are 129/124 bytes and padded sizes are 144/128, with the same seven relocation identities and call order. The first divergence at +0x49 is argument retention: January loads buffer_size and buffer into EAX/ECX and preserves source_address in EBX, while VC7 chooses a different equivalent carrier order. The server path, reliable-first client path, and client-only unreliable fallback are retained. No register forcing, volatile access, barrier, pragma, assembly, fake dependency, or nonsensical branch is present. Reopen for authoritative January source or a natural same-compiler allocation donor.",
+      "measurements": {
+        "target": {
+          "size": 144,
+          "relocation_count": 7,
+          "normalized_sha256": "fd00e2e86571d2dc266206d9ec9c6574b0043096121845113ff18c8326dff0a0"
+        },
+        "base": {
+          "size": 128,
+          "relocation_count": 7,
+          "normalized_sha256": "cee8163549c9a2895713138df0a1c3b3fb155c4e53724848b63d90456cefe3cc"
+        },
+        "objdiff_percent": 91.781815
+      }
+    },
+    {
+      "unit": "source/networking/network_connection",
+      "function": "_network_connection_read_reliable",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked after reconstructing the complete framed reliable-queue reader from January's assertions, message-header macros, diagnostics, queue operations, and independent HCEA semantics. Target/candidate meaningful sizes are 468/456 bytes and padded sizes are 480/464, with all 32 relocation identities preserved. The first divergence at +0x04 is the connection carrier (EDI in January, ESI in the candidate); a later empty-queue epilogue and word-sized message carrier follow that allocation choice. The retained code validates sizes, resets corrupt queues, restores the header, resolves the optional source address, and increments the stream-message counter. No register/volatile steering, barrier, pragma, assembly, raw offset, fake dependency, or undefined behavior is present. Reopen for authoritative January source or a natural same-compiler allocation donor.",
+      "measurements": {
+        "target": {
+          "size": 480,
+          "relocation_count": 32,
+          "normalized_sha256": "67b3b81b040b726314e395318076a99747822c0989e5c755115733fbcf0de7d3"
+        },
+        "base": {
+          "size": 464,
+          "relocation_count": 32,
+          "normalized_sha256": "8fa52ac304d4df19249917c7579f8cdcf097f4d3ca5f6dea963ba34d5e4e769b"
+        },
+        "objdiff_percent": 91.24551
+      }
+    },
+    {
+      "unit": "source/networking/network_connection",
+      "function": "_network_connection_read_unreliable",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked after reconstructing the complete datagram-queue reader from January's 33-relocation topology, assertions, exact diagnostic strings, message-header macros, and independent HCEA behavior. Target/candidate meaningful sizes are 501/498 bytes and both occupy 512 padded bytes with every relocation identity preserved. The first normalized divergence at +0xF6 is only the EDX versus ECX carrier around circular_queue_size; later differences are equivalent argument and temporary allocation. The retained typed body validates and swaps the header, checks the datagram limit, dequeues the payload and IPv4 source atomically, restores the header, and resets partial/corrupt queues. Two malformed percent-format literals found during integration were corrected to the January strings before parking. No register/volatile forcing, barrier, pragma, assembly, raw offset, fake dependency, or semantic distortion is retained. Reopen for authoritative January source or a natural same-compiler allocation donor.",
+      "measurements": {
+        "target": {
+          "size": 512,
+          "relocation_count": 33,
+          "normalized_sha256": "7f61cf188ca1eac6f1ad3fbbb55574aa9f9330cabf6d4edf5f333569ef53f898"
+        },
+        "base": {
+          "size": 512,
+          "relocation_count": 33,
+          "normalized_sha256": "09471328a0f8a2f47582797a7f5a09b3573a58ea2c4dc1830d538e2a74586b51"
+        },
+        "objdiff_percent": 98.889534
+      }
+    },
+    {
+      "unit": "source/networking/network_connection",
+      "function": "_network_server_close_client_connection",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under an explicit semantic veto after reconstructing the complete typed server-client removal path. Target and candidate both have 307 meaningful bytes, 320 padded bytes, and all 24 relocation identities; their only normalized instruction difference is January's loop comparison against 5 versus the candidate's comparison against the authenticated four-entry client_list. The fifth pointer-sized slot at offset 0x4C is the adjacent allow_client_connections field in the proven 0x50 server layout. Emitting a five-element C array or deliberate out-of-bounds read solely to reproduce that instruction would be nonsensical and violate the anti-fake rule. The retained implementation searches the valid client slots, removes the endpoint, deletes the connection, clears the slot, and reports success honestly. The class remains fail-closed as unclassified rather than inventing a compiler explanation. Reopen only if authoritative January source or structure-layout evidence proves a different valid bound.",
+      "measurements": {
+        "target": {
+          "size": 320,
+          "relocation_count": 24,
+          "normalized_sha256": "6de0fa9b448df7051f3d496de301265cf4603d435351b9522489b1b9d6a75450"
+        },
+        "base": {
+          "size": 320,
+          "relocation_count": 24,
+          "normalized_sha256": "8d1fbe0cbb44890e403dc3d2a07b6377204b4a9eff25fc9eb331bd8a71724277"
+        },
+        "objdiff_percent": 99.99029
+      }
     }
   ]
 }

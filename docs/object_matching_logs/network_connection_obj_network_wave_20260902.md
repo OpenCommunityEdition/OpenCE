@@ -24,11 +24,11 @@ The pre-existing January split object has SHA-256
 
 | State | Pristine | This wave | Target padded bytes now represented |
 |---|---:|---:|---:|
-| strict exact | 6 | 9 | 1,184 / 7,456 |
-| credible residual | 0 | 10 | 3,840 / 7,456 |
+| strict exact | 6 | 10 | 2,272 / 7,456 |
+| credible residual | 0 | 9 | 2,752 / 7,456 |
 | unwritten target section | 17 | 4 | 2,432 / 7,456 |
 
-This is a strict gain of three functions and 848 padded bytes, with no exact
+This is a strict gain of four functions and 1,936 padded bytes, with no exact
 function lost.  Nineteen of the 23 target functions now emit complete source
 definitions; 5,024 target padded bytes are represented by exact or credible
 residual sections.  A twentieth complete definition,
@@ -36,13 +36,14 @@ residual sections.  A twentieth complete definition,
 source but is currently eliminated by VC7 because its only future caller is
 one of the still-unwritten idle paths.
 
-The three newly strict functions are:
+The four newly strict functions are:
 
 - `network_connection_server_accept_client_connection` (160 bytes);
 - `network_connection_delete` (208 bytes);
-- private `network_connection_idle_client_reliable_endpoint` (480 bytes).
+- private `network_connection_idle_client_reliable_endpoint` (480 bytes);
+- private `network_connection_notify_traffic_event` (1,088 bytes).
 
-The current complete gate is 9 exact, 10 residual, and 4 unwritten.  The
+The current complete gate is 10 exact, 9 residual, and 4 unwritten.  The
 remaining target sections are public `network_connection_write` (816 bytes),
 public `network_connection_idle` (784 bytes), private
 `network_connection_idle_server_reliable_endpoint` (704 bytes), and the
@@ -84,12 +85,45 @@ access would be nonsensical original source under the campaign's anti-fake
 rule.  The safe complete C implementation is retained as a same-padded-size
 fuzzy residual rather than manufacturing a strict match.
 
-`network_connection_notify_traffic_event` emits the full 1,088-byte January
-instruction body and internal switch layout.  Strict comparison remains
-`reloc-identity` only because the candidate owns two non-code COMDAT constants
-that January records as external identities (the `"w"` mode string and the
-1000.0 double).  No source distortion was accepted merely to manipulate COFF
-ownership.
+`network_connection_notify_traffic_event` now emits the exact 1,088-byte
+January section.  Integration review found that the initial reconstruction had
+paired the stream/datagram labels with the opposite header constants.  January
+prints datagram overhead with 0x1C, then stream overhead with 0x28.  Correcting
+that real semantic error also restored the January first-use/COMDAT ownership
+schedule, making the normalized body and all 81 relocation identities strict.
+This exact gain came from fixing behavior, not from manipulating COFF metadata.
+
+## Canonical integration audit and parked residuals
+
+The canonical integrator independently rebuilt the TU, compared normalized
+Capstone sequences with a sequence alignment diff, and validated every parked
+measurement against the current `build/base` object.  Two malformed diagnostic
+literals (`#d`) were corrected to January's `#%d` before admission.  All nine
+retained residuals have complete, ordinary, typed behavior and exactly preserve
+the target's ordered relocation identities.
+
+| Function | Meaningful T/B | Padded T/B | Relocs T/B | First measured divergence | Fail-closed class |
+|---|---:|---:|---:|---|---|
+| `network_connection_connected` | 81/81 | 96/96 | 5/5 | +0x31, ESI versus EAX endpoint carrier | register-allocation |
+| `network_connection_get_address` | 146/143 | 160/144 | 8/8 | prologue, EBX+DI versus EDI+immediate 4 | register-allocation |
+| `network_connection_connect` | 281/261 | 288/272 | 20/20 | +0x5D, direct failure epilogue/BL carrier | instruction-scheduling |
+| `network_connection_read_unreliable` | 501/498 | 512/512 | 33/33 | +0xF6, EDX versus ECX queue carrier | register-allocation |
+| `network_server_close_client_connection` | 307/307 | 320/320 | 24/24 | loop bound 5 versus authenticated safe bound 4 | unclassified semantic veto |
+| `network_connection_read_reliable` | 468/456 | 480/464 | 32/32 | +0x04, EDI versus ESI connection carrier | register-allocation |
+| `network_connection_new` | 569/542 | 576/544 | 29/29 | +0x03, 0x20 versus 0x1C stack frame | unclassified |
+| `network_connection_read` | 129/124 | 144/128 | 7/7 | +0x49, argument/register retention order | register-allocation |
+| `network_connection_disconnect` | 165/159 | 176/160 | 7/7 | +0x95, result carrier and false epilogue | register-allocation |
+
+The corresponding `config/parked.json` entries record both normalized hashes,
+the exact unrounded objdiff percentages, provenance, and reopen conditions.
+Validation reports 140 active parks, zero stale, and zero invalid.
+
+Do not repeat without new evidence: volatile/register steering; fake barriers;
+five-element `client_list` or deliberate access to the adjacent admission byte;
+raw-offset rewrites of the typed transport structures; swapping the two traffic
+overhead labels; or removing `%` from the size diagnostics.  The remaining
+natural direct-member form of `network_connection_connected` was also tested
+and reproduces the same register-allocation fixed point.
 
 ## Header ownership and blast audit
 
@@ -134,18 +168,21 @@ functions.  No header-induced exact regression was admitted.
 
 ## Validation
 
-The focused base object and complete campaign build pass.  Final strict totals
-after `ninja halobetacache_build libcmt_build progress semantic_progress` are
-733,721 / 2,198,102 code bytes, 5,362 / 11,060 functions, and 386 / 833
-objects.  The halobetacache subset is 720,651 / 1,770,166 code bytes,
-5,190 / 7,574 functions, and 284 / 468 objects.  Semantic reporting evaluates
-5,654 functions across 473 units with 5,401 semantic exact, 148 hidden, and
-zero unit errors.
+The focused base object and complete campaign build pass.  Canonical strict
+section accounting is 802,003 / 1,922,413 padded code bytes and 5,391 / 8,245
+functions; a stable-verdict diff against the post-Biped snapshot reports only
+the four gains above, totaling 1,936 bytes, with zero regressions.  After
+`ninja halobetacache_build libcmt_build progress semantic_progress`, the linked
+build reports 734,416 / 2,198,102 meaningful code bytes and 5,363 / 11,060
+functions.  The halobetacache subset is 721,346 / 1,770,166 code bytes and
+5,191 / 7,574 functions.  Semantic reporting evaluates 5,658 functions across
+473 units with 5,404 semantic exact, 150 hidden, 5,420 accepted exact, and zero
+unit errors.
 
 `python -m pytest -q` passes 261 tests.  The focused fake-match scan reports
 zero findings.  Object admission reports zero new candidates, contradictions,
 or revocations (apart from two unrelated pre-existing rejected records).
-Parked-function validation reports 128 active, zero stale, and zero invalid.
+Parked-function validation reports 140 active, zero stale, and zero invalid.
 `git diff --check` passes, and the protected Units object remains 189/189
 strict exact.
 
@@ -154,6 +191,6 @@ strict exact.
 Continue with `network_connection_idle_server_reliable_endpoint`, then public
 `network_connection_idle`, which will also materialize the already-written
 server-side-client constructor.  Attack `network_connection_write` afterward.
-For the ten complete residuals, revisit only with new declaration, ABI, or
+For the nine complete residuals, revisit only with new declaration, ABI, or
 authenticated January-source evidence; they are credible fuzzy source and are
 lower leverage than the four remaining sections.

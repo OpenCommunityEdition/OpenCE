@@ -315,8 +315,8 @@ long network_connection_connected(
 
 	if (connection->flags & (FLAG(_connection_create_clientside_client_bit) | FLAG(_connection_create_serverside_client_bit)))
 	{
-		struct transport_endpoint *reliable_endpoint = connection->reliable_endpoint;
-		if (reliable_endpoint && (boolean)endpoint_connected(reliable_endpoint))
+		if (connection->reliable_endpoint &&
+			(boolean)endpoint_connected(connection->reliable_endpoint))
 		{
 			return TRUE;
 		}
@@ -393,8 +393,8 @@ static void network_connection_notify_traffic_event(
 		fprintf(connection->traffic_log, "datagrams received\t%ld\n", connection->datagrams_received);
 		fprintf(connection->traffic_log, "stream messages sent\t%ld\n", connection->stream_messages_sent);
 		fprintf(connection->traffic_log, "stream messages received\t%ld\n", connection->stream_messages_received);
-		fprintf(connection->traffic_log, "stream overhead (headers)\t%ld\tbytes per chunk\n", 0x1C);
-		fprintf(connection->traffic_log, "datagram overhead (headers)\t%ld\tbytes per packet\n", 0x28);
+		fprintf(connection->traffic_log, "datagram overhead (headers)\t%ld\tbytes per packet\n", 0x1C);
+		fprintf(connection->traffic_log, "stream overhead (headers)\t%ld\tbytes per chunk\n", 0x28);
 		fprintf(connection->traffic_log, "NOTE: header overhead is not included in the above traffic graph\n");
 		fprintf(
 			connection->traffic_log,
@@ -654,7 +654,7 @@ static boolean network_connection_read_unreliable(
 		{
 			error(
 				_error_silent,
-				"got an unusually large datagram (#d bytes); resetting unreliable incoming queue",
+				"got an unusually large datagram (#%d bytes); resetting unreliable incoming queue",
 				message_size);
 			circular_queue_reset(connection->unreliable_incoming_queue);
 			return FALSE;
@@ -1074,7 +1074,7 @@ static boolean network_connection_read_reliable(
 	{
 		error(
 			_error_silent,
-			"got an unusually large message (#d bytes); resetting reliable incoming queue",
+			"got an unusually large message (#%d bytes); resetting reliable incoming queue",
 			message_size);
 		circular_queue_reset(local_connection->reliable_incoming_queue);
 		return FALSE;
