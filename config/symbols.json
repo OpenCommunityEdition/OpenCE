@@ -3142,7 +3142,7 @@
 { "file_offset": 754400, "flags": 32, "name": "_hs_parse_debug_string" },
 { "file_offset": 754672, "flags": 32, "name": "_hs_compile_expression" },
 { "file_offset": 755280, "flags": 32, "name": "_hs_compile" },
-{ "file_offset": 755600, "flags": 32, "name": "_code_000b8790" },
+{ "file_offset": 755600, "flags": 32, "name": "_hs_compile_finish" },
 { "file_offset": 755856, "flags": 32, "name": "_hs_compile_dispose" },
 { "file_offset": 756064, "flags": 32, "name": "_hs_not" },
 { "file_offset": 756080, "flags": 32, "name": "_hs_print" },

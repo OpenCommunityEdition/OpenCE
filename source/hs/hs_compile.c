@@ -127,7 +127,7 @@ symbols in this file:
 000B8650 0140:
 	_hs_compile (0000)
 000B8790 0100:
-	_code_000b8790 (0000)
+	_hs_compile_finish (0000)
 000B8890 00d0:
 	_hs_compile_dispose (0000)
 00269F98 00cc:
@@ -1542,11 +1542,11 @@ static long hs_concatenate_string_constant(
 
 		if (string_size < hs_compile_globals.string_constant_buffer_size)
 		{
-			result = hs_compile_globals.string_constant_buffer_offset;
 			memcpy(
-				hs_compile_globals.string_constant_buffer + result,
+				hs_compile_globals.string_constant_buffer + hs_compile_globals.string_constant_buffer_offset,
 				string,
 				string_size);
+			result = hs_compile_globals.string_constant_buffer_offset;
 			hs_compile_globals.string_constant_buffer_offset += string_size;
 			hs_compile_globals.string_constant_buffer_size -= string_size;
 		}
@@ -1573,15 +1573,15 @@ static void hs_concatenate_expression(
 	{
 		if (expression->type == _hs_function_name)
 		{
-			if (expression->source_offset == NONE)
+			if (expression->source_offset != NONE)
 			{
 				expression->source_offset = hs_concatenate_string_constant(
-					hs_function_get(expression->function_index)->name);
+					hs_compile_globals.compiled_source + expression->source_offset);
 			}
 			else
 			{
 				expression->source_offset = hs_concatenate_string_constant(
-					hs_compile_globals.compiled_source + expression->source_offset);
+					hs_function_get(expression->function_index)->name);
 			}
 		}
 		else if (TEST_FLAG(expression->flags, _hs_syntax_node_variable_bit) || expression->type >= _hs_type_string)
@@ -2337,6 +2337,57 @@ void hs_compile(
 	{
 		*error_message = "couldn't allocate memory for compiled source.";
 	}
+
+	return;
+}
+
+void hs_compile_finish(
+	void)
+{
+	struct scenario *scenario = global_scenario_get();
+	boolean success = tag_data_resize(
+		&scenario->hs_string_constants,
+		hs_compile_globals.compiled_source_size);
+	short global_index;
+	short script_index;
+
+	if (success)
+	{
+		hs_compile_globals.string_constant_buffer = scenario->hs_string_constants.address;
+		hs_compile_globals.string_constant_buffer_offset = 0;
+		hs_compile_globals.string_constant_buffer_size = hs_compile_globals.compiled_source_size;
+
+		for (global_index = 0; global_index < scenario->hs_globals.count; global_index++)
+		{
+			struct hs_global *global = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->hs_globals,
+				global_index,
+				struct hs_global);
+
+			hs_concatenate_expression(global->initialization_expression_index);
+		}
+
+		for (script_index = 0; script_index < scenario->hs_scripts.count; script_index++)
+		{
+			struct hs_script *script = TAG_BLOCK_GET_ELEMENT(
+				&scenario->hs_scripts,
+				script_index,
+				struct hs_script);
+
+			hs_concatenate_expression(script->root_expression_index);
+		}
+
+		hs_node_gc();
+		success = tag_data_resize(
+			&scenario->hs_string_constants,
+			hs_compile_globals.string_constant_buffer_offset + 0x400);
+	}
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x16D,
+		success,
+		"increase MAXIMUM_HS_STRING_DATA_PER_SCENARIO");
 
 	return;
 }
