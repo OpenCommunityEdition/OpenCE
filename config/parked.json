@@ -2210,6 +2210,44 @@
         },
         "objdiff_percent": 54.82266
       }
+    },
+    {
+      "unit": "source/ai/actors",
+      "function": "_actor_place",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed actor-placement path from January disassembly and independent HCEA behavior. The retained ordinary C validates and optionally upgrades the actor variant, builds the unit placement, reports January's exact unit/actor creation diagnostics, reads squad starting state, customizes and creates the actor, cleans up on failure, and verifies activation. Target is 800 padded bytes and the candidate 816, with all 41 relocation identities preserved; objdiff reports 90.887215 percent similarity. The common prefix and call topology are close, while the residual begins with VC7's choice of callee-saved registers and a four-byte frame-size difference. Bounded natural declaration-lifetime, branch, and local-placement forms did not close that allocation tie. No register hint, volatile access, barrier, pragma, forced inline, assembly, raw offset, fake dependency, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the remaining allocation.",
+      "measurements": {
+        "target": {
+          "size": 800,
+          "relocation_count": 41,
+          "normalized_sha256": "a4258acc637a3ae90493b151b147e75fea1243d941bcc699f9ec7463542ec5fb"
+        },
+        "base": {
+          "size": 816,
+          "relocation_count": 41,
+          "normalized_sha256": "ff120b98736b6eb6c41f5c41c8c5e33f6a4e15a5179d42a938b8c320f1ec6a2f"
+        },
+        "objdiff_percent": 90.887215
+      }
+    },
+    {
+      "unit": "source/ai/actors",
+      "function": "_actor_input_update",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the full typed actor-input refresh from January disassembly, January relocation/assert/string topology, independent HCEA behavior, and the recovered Claude draft as secondary evidence. The retained ordinary C updates swarm centers and members, samples individual or parent-vehicle state, handles vehicle roles and encounter migration, diagnoses flying/3D-position mismatches, scans attached melee/projectile threats, refreshes biped path state and orientation vectors, validates every resulting normal, and records vitality. Target is 2384 padded bytes and the candidate 2400, with all 89 relocation identities preserved; objdiff reports 94.84425 percent similarity. The residual spans several VC7 allocation and instruction-scheduling choices rather than one isolated source construct, so it remains fail-closed as unclassified. Bounded natural condition, declaration-lifetime, encounter-migration, and vector-expression forms did not close it; an earlier equal-size form was rejected because it expressed January's behavior less faithfully. No register hint, volatile access, barrier, pragma, forced inline, assembly, raw offset, fake dependency, or nonsensical control flow is retained. Reopen for authoritative January source/local records or a natural same-compiler donor.",
+      "measurements": {
+        "target": {
+          "size": 2384,
+          "relocation_count": 89,
+          "normalized_sha256": "bf2e87448623ee925aa42e94ee93f1e1ebc439fd58971dba93e1a2b993c0d9b8"
+        },
+        "base": {
+          "size": 2400,
+          "relocation_count": 89,
+          "normalized_sha256": "7820324643af007011e488b773988db634efcf67378be6c4a78ff5ee20a1bb54"
+        },
+        "objdiff_percent": 94.84425
+      }
     }
   ]
 }

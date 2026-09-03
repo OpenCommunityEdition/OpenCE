@@ -514,7 +514,7 @@ struct actor_debug_info
 	real vision_last_maximum_distance;
 	real vision_last_perception_factor;
 	short num_debug_evaluations;
-	short evaluation_mode;
+	short firing_position_type_mismatch_ticks;
 };
 
 /* ---------- prototypes/AI_DEBUG.C */

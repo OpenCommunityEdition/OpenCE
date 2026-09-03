@@ -631,10 +631,6 @@ short actor_select_firing_position(
 	struct actions_firing_position_search_workspace *workspace,
 	boolean *position_flags);
 
-void actor_clear_discarded_firing_positions(
-	long actor_index,
-	boolean temporary_only);
-
 void actor_discard_firing_position(
 	long actor_index,
 	short firing_position_index,

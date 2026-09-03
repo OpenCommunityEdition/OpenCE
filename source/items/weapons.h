@@ -262,6 +262,9 @@ boolean weapon_new(long weapon_index);
 void weapon_export_function_values(long weapon_index);
 
 void weapon_set_total_rounds(long weapon_index, short *rounds_array);
+void weapon_set_current_amount(
+	long weapon_index,
+	real current_amount);
 
 void weapon_build_weapon_interface_state(long weapon_index, struct weapon_interface_state *state);
 

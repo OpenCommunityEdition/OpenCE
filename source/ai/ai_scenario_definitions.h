@@ -18,7 +18,7 @@ header included in hcex build.
 
 enum
 {
-	// only the two bits ai_debug.c reads are named; the rest are unidentified
+	_encounter_braindead_bit = 4,
 	_encounter_3d_firing_positions_bit = 5,
 	_encounter_manual_structure_bsp_index_bit = 6,
 };
@@ -150,15 +150,32 @@ struct encounter_definition
 	struct tag_block player_starting_locations;
 };
 
-// element of squad_definition.starting_locations; the 0x1C size comes from the
-// call site and the field at 0x18 from the string "reset the actor variant in
-// all %d starting locations"
+// element of squad_definition.starting_locations
 struct actor_starting_location
 {
-	unsigned char __unknown00[0x18];
+	real_point3d position;
+	real facing;
+	short cluster_index;
+	signed char noncombat_sequence_id;
+	byte flags;
+	short default_state;
+	short initial_state;
 	short actor_variant_index;
-	word pad;
+	short command_list_index;
 };
+
+typedef char actor_starting_location_size_assert[
+	sizeof(struct actor_starting_location) == 0x1C ? 1 : -1];
+typedef char actor_starting_location_noncombat_sequence_id_offset_assert[
+	offsetof(struct actor_starting_location, noncombat_sequence_id) == 0x12 ? 1 : -1];
+typedef char actor_starting_location_default_state_offset_assert[
+	offsetof(struct actor_starting_location, default_state) == 0x14 ? 1 : -1];
+typedef char actor_starting_location_initial_state_offset_assert[
+	offsetof(struct actor_starting_location, initial_state) == 0x16 ? 1 : -1];
+typedef char actor_starting_location_actor_variant_index_offset_assert[
+	offsetof(struct actor_starting_location, actor_variant_index) == 0x18 ? 1 : -1];
+typedef char actor_starting_location_command_list_index_offset_assert[
+	offsetof(struct actor_starting_location, command_list_index) == 0x1A ? 1 : -1];
 
 struct platoon_definition
 {

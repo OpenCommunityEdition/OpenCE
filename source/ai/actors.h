@@ -865,6 +865,10 @@ long actor_create_for_unit(
 	short default_state,
 	short initial_command_list_index,
 	char noncombat_sequence_id);
+
+void actor_clear_discarded_firing_positions(
+	long actor_index,
+	boolean clear_temporary_only);
 short actors_spawn_from_unit(
 	long unit_index,
 	long actor_variant_definition_index,
