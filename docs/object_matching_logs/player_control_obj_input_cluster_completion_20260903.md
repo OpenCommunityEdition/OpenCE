@@ -14,6 +14,12 @@ This work was performed on `agent/player-control-unwritten-20260903` from
 `4c4ba569d19678992f9fa95180142a1a1d5d7916`.  It was committed only in the
 isolated worktree; canonical was not modified and nothing was pushed.
 
+Canonical integration at `58618a790` rebuilt the complete transitive header
+surface.  The added Unit debug declarations changed only the compiler schedule
+of the already-parked `ai_communication_update_speech_timers`: it remains
+672/672 bytes with all 43 relocation identities and improves to 97.76382%
+objdiff.  Its refreshed measurement is recorded in `config/parked.json`.
+
 ## Authorities and provenance
 
 - January's split `source/game/player_control.obj` is the byte authority.

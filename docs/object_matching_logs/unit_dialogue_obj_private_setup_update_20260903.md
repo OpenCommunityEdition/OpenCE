@@ -45,7 +45,8 @@ repair. Both functions are recorded in `config/parked.json`.
   eight dependent translation units: every exact/non-exact function identity
   is preserved. They alter only the normalized stream of the already-parked
   `ai_communication_update_speech_timers`, which remains 672/672 bytes with
-  43/43 relocations and is re-attested at 97.67839% objdiff.
+  43/43 relocations. The later Player Control interface changes return it to
+  the earlier 97.76382% register schedule without changing its behavior.
 - Putting `unit_dialogue_determine_variant` in broad `units.h` reopened the
   otherwise-exact 560-byte `_populate_statistic_buffer` through C2's
   declaration-environment sensitivity. Moving the same declaration to the
