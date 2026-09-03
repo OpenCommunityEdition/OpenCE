@@ -103,12 +103,15 @@ January's split producer cannot recover those local names from the linked
 aggregate, but every relocation from the 36 exact functions resolves to the
 same anchored BSS destination and addend.
 
-Including stock `xtl.h` also instantiates three XDK `D3DCONST` tables as
-`extern const __declspec(selectany)` COMDATs. Two are unreferenced and
-discardable. `D3DPRIMITIVETOVERTEXCOUNT` is referenced by genuine exact XDK
-wrapper code and is selected against the program-wide owner by the linker.
-These are compiler/XDK artifacts, not January-owned data reconstructed with
-dummy emission; no source workaround was added to hide them.
+The candidate has six additional discardable `.rdata` COMDATs. Three are XDK
+`D3DCONST` tables instantiated by stock `xtl.h` as
+`extern const __declspec(selectany)` owners. Two are unreferenced;
+`D3DPRIMITIVETOVERTEXCOUNT` is referenced by genuine exact XDK wrapper code
+and is selected against the program-wide owner by the linker. The other three
+are the natural string-literal owners for the genuine `global_d3d_device`,
+`count>=0`, and `group` assertions. These are compiler/XDK artifacts, not
+January-owned data reconstructed with dummy emission; no source workaround was
+added to hide them.
 
 ## Legacy objdiff boundary
 
