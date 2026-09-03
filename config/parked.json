@@ -2685,6 +2685,196 @@
         },
         "objdiff_percent": 84.6474
       }
+    },
+    {
+      "unit": "source/text/draw_string",
+      "function": "_bitmap_draw_character",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed software glyph blender from the January target and the independent HCEA implementation. The retained ordinary C clips each glyph row and column, decodes the supported A8/Y8/AY8/R5G6B5/A8R8G8B8 formats, applies the source alpha and draw color, and uses the semantic aggregate draw_string_globals rather than anonymous BSS symbols. Direct bitmap-field access restores January's 25-relocation topology; target and candidate are 944 and 912 padded bytes respectively and objdiff reports 70.833885 percent. Bounded experiments covered destination pixel width, row/column widths, source-format switches, MIN/MAX macros, and direct-versus-cached global loads; the retained form was the closest source-authentic result. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, assembly, raw address, representation punning, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor that explains the remaining allocation and schedule gap.",
+      "measurements": {
+        "target": {
+          "size": 944,
+          "relocation_count": 25,
+          "normalized_sha256": "1fbab7db0314ed562e1e6908a77d5570fd513dbc8a3e27e261710ed051f3682a"
+        },
+        "base": {
+          "size": 912,
+          "relocation_count": 25,
+          "normalized_sha256": "a779c56eb5f9c0f580bd13d928b5298c28f868bdfd35cef40c26fdf2884faed9"
+        },
+        "objdiff_percent": 70.833885
+      }
+    },
+    {
+      "unit": "source/text/draw_string",
+      "function": "_bitmap_draw_string",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked with an explicit safety boundary. The retained typed wrapper validates the bitmap format, installs the software target, derives a full-bitmap rectangle when bounds is NULL, clips an optional clip rectangle to the bitmap, and calls draw_string through its owner declaration. HCEA and January prove the surrounding call topology, but the target's NULL-bounds path reads an absolute VA-zero rectangle; reproducing that dead or corrupted behavior would require fake source and is rejected. Target is 304 padded bytes, the safe candidate 240, both have nine relocations, and objdiff reports 51.18261 percent. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No null dereference, raw absolute address, volatile/register forcing, barrier, pragma, assembly, fake dependency, forced inline, or invented control flow is retained. Reopen only if authoritative source proves a safe original expression that naturally produces January's code.",
+      "measurements": {
+        "target": {
+          "size": 304,
+          "relocation_count": 9,
+          "normalized_sha256": "4e8747543c903cdbcfac7e2ebca7b5ed667af293165012efd03b1262c00fe2aa"
+        },
+        "base": {
+          "size": 240,
+          "relocation_count": 9,
+          "normalized_sha256": "ad3d0d63e2c82c1ee6789c401e3062340c96831eb3dbb7e9f63845da47aafe8b"
+        },
+        "objdiff_percent": 51.18261
+      }
+    },
+    {
+      "unit": "source/text/draw_string",
+      "function": "_draw_string",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the complete narrow-string layout loop from January disassembly and the independent HCEA control flow. The retained typed C performs parsing, font-style selection, width measurement, wrapping, justification, vertical clipping, highlighting, glyph callbacks, and column termination; it uses TEST_FLAG rather than an undeclared bit helper and public enum constants rather than numeric switch cases. Target is 912 padded bytes with 46 relocations; candidate is 976 with 45 and objdiff reports 48.085617 percent. Natural lifetime and line-top variants were measured and either reproduced this result or worsened the frame and schedule. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, gameplay assembly, raw offset, representation punning, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler layout-loop donor.",
+      "measurements": {
+        "target": {
+          "size": 912,
+          "relocation_count": 46,
+          "normalized_sha256": "8a16ea28aab4bb4839d80221e1c7b793a2180e9a3ec7c50a0b6d2c6a008c48d3"
+        },
+        "base": {
+          "size": 976,
+          "relocation_count": 45,
+          "normalized_sha256": "defd236dd149bb2f6dad4155af658002a18de798674390a943fadb8491dcae5a"
+        },
+        "objdiff_percent": 48.085617
+      }
+    },
+    {
+      "unit": "source/text/draw_string",
+      "function": "_draw_string_partial",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing HCEA's complete typed narrow-glyph partial renderer: it resolves the styled font, clips the requested range, advances over non-drawn glyphs, handles tabs and line breaks, computes character bounds, invokes the callback, and returns the final x coordinate. Target is 528 padded bytes, candidate 544; both have the same ordered nine relocation identities and objdiff reports 63.23656 percent. The remaining delta is broad local/register and branch scheduling rather than a missing semantic call. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, assembly, raw offset, fake dependency, forced inline, or invented branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the lifetime schedule.",
+      "measurements": {
+        "target": {
+          "size": 528,
+          "relocation_count": 9,
+          "normalized_sha256": "e55f2a4aa9ebcd849324eb7c083e8a2f03fee150ddddf12284fa28d2c5e11c5a"
+        },
+        "base": {
+          "size": 544,
+          "relocation_count": 9,
+          "normalized_sha256": "55ba88e7380296d8a8ab54b8d34ed2ae47866ec806fcc008a923dafad4d707eb"
+        },
+        "objdiff_percent": 63.23656
+      }
+    },
+    {
+      "unit": "source/text/draw_string",
+      "function": "_draw_string_set_tab_stops",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after retaining the natural typed setter with January's range assertions and bounded short-array copy. Target and candidate share the 112-byte padded envelope and objdiff reports 94.0 percent; January carries eight relocations while the candidate carries seven because the target duplicates a draw_string_globals count store/load that VC7 folds in the ordinary parameter form. Count-local and parameter-mutation variants were measured without an authentic improvement. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, assembly, raw offset, fake store, dependency trick, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the duplicated global access.",
+      "measurements": {
+        "target": {
+          "size": 112,
+          "relocation_count": 8,
+          "normalized_sha256": "093c317d014b2d059db64033de044e6fc0853997564a94f6fa3458b3500e30e6"
+        },
+        "base": {
+          "size": 112,
+          "relocation_count": 7,
+          "normalized_sha256": "d266e60a74db46ccbe29a4ecf8b2e67fd7aade5e2fc0fa5bf0f43ecafb1e2ddd"
+        },
+        "objdiff_percent": 94.0
+      }
+    },
+    {
+      "unit": "source/text/draw_string",
+      "function": "_draw_unicode_string",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the complete wide-string layout loop from January disassembly and HCEA. The retained typed C performs Unicode parsing, styled-font selection, measurement, wrapping, justification, clipping, highlighting, callbacks, and column termination; it uses TEST_FLAG and the corrected January assertion line provenance. Target is 912 padded bytes with 46 relocations; candidate is 960 with 45 and objdiff reports 53.439026 percent. Natural lifetime and line-top variants did not close the broad frame/register schedule. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, gameplay assembly, raw offset, representation punning, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler layout-loop donor.",
+      "measurements": {
+        "target": {
+          "size": 912,
+          "relocation_count": 46,
+          "normalized_sha256": "a9959a0469b03fcbff5ec70bf6749e20a761755c4e6e192fec80f5dca8e28e70"
+        },
+        "base": {
+          "size": 960,
+          "relocation_count": 45,
+          "normalized_sha256": "a127308710f207cf389d4e0a860d77a2b15544585c43fdcbd2cd000d703a8ee3"
+        },
+        "objdiff_percent": 53.439026
+      }
+    },
+    {
+      "unit": "source/text/draw_string",
+      "function": "_draw_unicode_string_partial",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing HCEA's complete typed Unicode partial renderer: it resolves the styled font, clips the range, advances over non-drawn characters, handles tabs and line breaks, computes bounds, invokes the callback, and returns the final x coordinate. Target is 528 padded bytes, candidate 544; both have the same ordered nine relocation identities and objdiff reports 62.967567 percent. The residual is broad local/register and branch scheduling rather than a missing semantic operation. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, assembly, raw offset, fake dependency, forced inline, or invented branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the lifetime schedule.",
+      "measurements": {
+        "target": {
+          "size": 528,
+          "relocation_count": 9,
+          "normalized_sha256": "a5bfb710d5d9d7d0231206c83cfd1f931e2aab1bd0188203fde7c9c0e0ecce07"
+        },
+        "base": {
+          "size": 544,
+          "relocation_count": 9,
+          "normalized_sha256": "f1c15fb2d0ccfe5b17a4c2cd45afc64571fe14a095813f6e7ad9a678ae756bcf"
+        },
+        "objdiff_percent": 62.967567
+      }
+    },
+    {
+      "unit": "source/text/draw_string",
+      "function": "_parse_string",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the full HCEA narrow-string parser with January's typed result codes, control escapes, style/color/justification updates, word-boundary handling, localization lookup, and assertion topology. Target and candidate share the 624-byte padded envelope; January has 30 relocations, candidate 29, and objdiff reports 27.615385 percent. Short result comparisons, continue-based escape handling, and alternate style-switch forms were measured; the retained form best preserves the independent-source semantics while the remaining gap is a whole-function CFG/allocation choice. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, assembly, raw offset, representation punning, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler parser donor.",
+      "measurements": {
+        "target": {
+          "size": 624,
+          "relocation_count": 30,
+          "normalized_sha256": "f80225b7f49eeafe4a68d6094b4ec238747e5af312947588c11ab8529dfcb304"
+        },
+        "base": {
+          "size": 624,
+          "relocation_count": 29,
+          "normalized_sha256": "ff1ae435b34e440a09b9187fe056612713013289e773f78dafe5e0a1da1c3221"
+        },
+        "objdiff_percent": 27.615385
+      }
+    },
+    {
+      "unit": "source/text/draw_string",
+      "function": "_styled_font_get",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after retaining the natural HCEA typed lookup: plain style uses the requested font, non-plain style validates the style index and reads the associated styled font, NONE falls back to the requested font, and the result goes through font_definition_get. Target and candidate share the 112-byte padded envelope, all six relocation identities, and objdiff reports 86.6129 percent. Their residual is branch/index/register scheduling; bounded expression and branch-order variants did not improve authentically. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, assembly, raw offset, fake dependency, forced inline, or invented branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the schedule.",
+      "measurements": {
+        "target": {
+          "size": 112,
+          "relocation_count": 6,
+          "normalized_sha256": "85f0a63276b854d6854915b2099aacdcd0ba5741d1366b55f4e7cf2c2fa9fc81"
+        },
+        "base": {
+          "size": 112,
+          "relocation_count": 6,
+          "normalized_sha256": "bc72edd715836e32dca4d4f7d1c86d6c2178b00f802be1eb364e6ffee73fd5aa"
+        },
+        "objdiff_percent": 86.6129
+      }
+    },
+    {
+      "unit": "source/text/draw_string",
+      "function": "_text_pick_draw_character",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed text-pick callback from January and HCEA. It checks the requested string index, computes horizontal and vertical distance from the pick point to the character rectangle, selects the nearest character, and updates the semantic draw_string_globals pick fields. Target and candidate share the 224-byte padded envelope, all eleven relocation identities, and objdiff reports 80.10256 percent. The meaningful gap is register and conditional scheduling, not missing behavior. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, assembly, raw offset, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the register schedule.",
+      "measurements": {
+        "target": {
+          "size": 224,
+          "relocation_count": 11,
+          "normalized_sha256": "a0b5c3c509e22da9390fc71d49e8296440382e1d4b706b5762c320a7a779a7c8"
+        },
+        "base": {
+          "size": 224,
+          "relocation_count": 11,
+          "normalized_sha256": "12157843c4789aaaff70d49b2e4327ccfd350f1f20177a5865d177a66a4b61d5"
+        },
+        "objdiff_percent": 80.10256
+      }
     }
   ]
 }

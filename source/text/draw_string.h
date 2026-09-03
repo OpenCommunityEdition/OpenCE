@@ -8,11 +8,47 @@ header included in hcex build.
 #define __DRAW_STRING_H
 #pragma once
 
+/* ---------- headers */
+
+#include "math/integer_math.h"
+#include "math/real_math.h"
+
 /* ---------- constants */
+
+enum
+{
+	_text_justification_left = 0,
+	_text_justification_right,
+	_text_justification_center,
+	NUMBER_OF_TEXT_JUSTIFICATIONS,
+};
+
+enum
+{
+	_draw_text_wrap_horizontally_bit = 0,
+	_draw_text_wrap_vertically_bit,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct bitmap_data;
+struct font_character;
+struct font_header;
+struct parse_string_state;
+
+typedef void (*draw_character_proc)(
+	struct parse_string_state *state,
+	struct font_header *font,
+	struct font_character *character,
+	pixel32 color,
+	short x0,
+	short y0,
+	short x,
+	short y,
+	short dx,
+	short dy);
 
 /* ---------- prototypes/DRAW_STRING.C */
 
@@ -52,6 +88,39 @@ void draw_string_set_draw_mode(
 void draw_string_set_highlight(
 	short start,
 	short end);
+void draw_string(
+	draw_character_proc draw_character,
+	rectangle2d const *bounds,
+	point2d *cursor_reference,
+	rectangle2d const *clip,
+	short height_adjust,
+	char const *string);
+void draw_unicode_string(
+	draw_character_proc draw_character,
+	rectangle2d const *bounds,
+	point2d *cursor_reference,
+	rectangle2d const *clip,
+	short height_adjust,
+	wchar_t const *string);
+void draw_string_compute_bounds(
+	rectangle2d const *bounds,
+	char const *string,
+	rectangle2d *text_bounds,
+	rectangle2d *cursor_bounds);
+void draw_unicode_string_compute_bounds(
+	rectangle2d const *bounds,
+	wchar_t const *string,
+	rectangle2d *text_bounds,
+	rectangle2d *cursor_bounds);
+short draw_string_pick(
+	rectangle2d const *bounds,
+	char const *string,
+	point2d const *point);
+void bitmap_draw_string(
+	struct bitmap_data *bitmap,
+	rectangle2d const *bounds,
+	rectangle2d const *clip,
+	char const *string);
 
 /* ---------- globals */
 
