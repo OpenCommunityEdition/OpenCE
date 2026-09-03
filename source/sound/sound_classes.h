@@ -17,7 +17,15 @@ file has inline function assertions.
 
 /* ---------- structures */
 
+struct sound_class_definition;
+
 /* ---------- prototypes/SOUND_CLASSES.C */
+
+struct sound_class_definition *sound_class_get(
+	short class_index);
+
+real sound_class_get_gain(
+	short class_index);
 
 void sound_classes_dispose_from_old_map(
 	void);

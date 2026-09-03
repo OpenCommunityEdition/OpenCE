@@ -14,9 +14,13 @@ file has inline function assertions.
 
 /* ---------- structures */
 
+struct sound_platform_definition;
+
 /* ---------- prototypes/EXAMPLE.C */
 
 /* ---------- globals */
+
+extern struct sound_platform_definition platform_sound_dsound;
 
 /* ---------- public code */
 
