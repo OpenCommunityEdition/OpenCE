@@ -500,12 +500,17 @@ void rasterizer_environment_transparent_geometry_begin(
 	void);
 void rasterizer_environment_transparent_geometry_submit(
 	struct shader const *shader,
-	short bitmap_index,
-	struct bitmap_data const *bitmap,
+	short shader_permutation_index,
+	struct bitmap_data const *lightmap,
 	long dynamic_triangle_buffer_index,
 	long first_triangle_index,
 	long triangle_count,
-	struct vertex_buffer const *vertex_buffer);
+	struct vertex_buffer const *vertex_buffers,
+	real_point3d const *centroid,
+	real_plane3d const *plane,
+	real_vector3d const *offset,
+	void const *lighting,
+	unsigned long geometry_flags);
 void rasterizer_environment_transparent_geometry_end(
 	void);
 void rasterizer_dynamic_screen_geometry_draw(

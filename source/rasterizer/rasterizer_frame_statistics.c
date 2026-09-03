@@ -139,6 +139,7 @@ symbols in this file:
 #include "cseries/cseries_windows.h"
 #include "errors.h"
 #include "rasterizer.h"
+#include "rasterizer_frame_statistics.h"
 #include "rasterizer_geometry.h"
 
 /* ---------- constants */

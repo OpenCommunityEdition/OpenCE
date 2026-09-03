@@ -383,6 +383,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries.h"
+
 #include <xtl.h>
 
 #include "rasterizer_xbox.h"

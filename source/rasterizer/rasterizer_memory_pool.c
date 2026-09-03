@@ -8,6 +8,7 @@ RASTERIZER_MEMORY_POOL.C
 #include "errors.h"
 #include "real_math.h"
 #include "rasterizer.h"
+#include "rasterizer_memory_pool.h"
 
 /* ---------- globals */
 

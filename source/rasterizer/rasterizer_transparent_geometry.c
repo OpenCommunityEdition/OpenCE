@@ -86,6 +86,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "rasterizer.h"
 #include "rasterizer_geometry.h"
+#include "rasterizer_transparent_geometry.h"
 #include "shaders/shader_definitions.h"
 #include "shaders/shaders.h"
 
@@ -173,13 +174,6 @@ void rasterizer_profile_begin(
 	short profile);
 void rasterizer_profile_end(
 	short profile);
-void rasterizer_transparent_geometry_groups_begin(
-	void);
-void rasterizer_transparent_geometry_groups_end(
-	void);
-void rasterizer_transparent_geometry_group_draw(
-	struct transparent_geometry_group *group,
-	boolean dirty);
 void rasterizer_set_frustum_z(
 	real z_near,
 	real z_far);
