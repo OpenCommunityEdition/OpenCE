@@ -1434,7 +1434,7 @@ void multiplayer_game_set_text_box_for_teams_noteams(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0xAAA,
 		widget->type == _ui_widget_type_text_box,
-		"expected 'teams on/off' textbox");
+		"expected text box widget for mp game settings text");
 
 	game = network_game_get_game();
 	if (game)
@@ -1456,7 +1456,7 @@ void multiplayer_game_set_text_box_for_score_limit(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0xAC3,
 		widget->type == _ui_widget_type_text_box,
-		"expected 'score limit' textbox");
+		"expected text box widget for mp game settings text");
 
 	game = network_game_get_game();
 	if (game)
@@ -1662,7 +1662,7 @@ void multiplayer_game_set_text_box_for_number_of_players(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0xB4E,
 		widget->type == _ui_widget_type_text_box,
-		"expected text box widget for mp game directions");
+		"expected text box widget for mp game settings text");
 
 	game = network_game_get_game();
 	if (game)
@@ -1835,7 +1835,7 @@ void teams_no_teams_mp_game_bitmap_update(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0xBFC,
 		widget->type == _ui_widget_type_bitmap,
-		"expected container bitmap for teams/no teams mp game bitmap");
+		"expected a container bitmap for mp pregame header widget");
 
 	if (game)
 		widget->animation.current_frame_index = game->variant.has_teams != TRUE;
@@ -1880,7 +1880,7 @@ void dim_if_no_system_link_cable(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0xC3C,
 		widget->type == _ui_widget_type_text_box,
-		"expected text box widget for mp game directions");
+		"expected a text box widget for system link menu text item");
 
 	widget->alpha_modifier = transport_network_available() ? 1.0f : 0.333f;
 	return;

@@ -4,7 +4,7 @@
 
 Admit this isolated source reconstruction as a zero-regression candidate based on canonical commit `88d0bd31eb25f74c9f7064c4e5fcb941ee8f52c1`.  The wave replaces address-derived function and data labels with independently attested semantic names, reconstructs all of the small callbacks that closed naturally, retains coherent ordinary-C implementations for the honest residuals, and leaves the three large network callbacks unwritten.  It does not claim the residual or merely semantic data bytes as exact.
 
-The final address-normalized gate moves the translation unit from **1 exact / 0 residual / 45 unwritten** to **21 exact / 22 residual / 3 unwritten**.  The inherited 16-byte null callback remains exact.  The strict new code gain is **20 functions / 4,400 padded bytes**, with no inherited exact-address regression.
+The isolated address-normalized gate moved the translation unit from **1 exact / 0 residual / 45 unwritten** to **21 exact / 22 residual / 3 unwritten**.  Canonical target-metadata regeneration made `set_textbox_to_build_number` exact, and restoring five January-authenticated assertion diagnostics closed the other relocation-only callbacks.  The admitted canonical result is therefore **27 exact / 16 residual / 3 unwritten**.  The inherited 16-byte null callback remains exact.  The strict new code gain is **26 functions / 5,120 padded bytes**, with no inherited exact-address regression.
 
 ## Provenance and naming
 
@@ -36,7 +36,13 @@ All labels in this object's configured address range now have semantic names.  T
 | `player_profile_color_picker_update` | 400 |
 | `mp_level_select_list_update_displayed_items` | 432 |
 | `ui_widget_game_data_function_invoke` | 96 |
-| **Total** | **4,400** |
+| `set_textbox_to_build_number` | 144 |
+| `multiplayer_game_set_text_box_for_teams_noteams` | 112 |
+| `multiplayer_game_set_text_box_for_score_limit` | 144 |
+| `multiplayer_game_set_text_box_for_number_of_players` | 160 |
+| `teams_no_teams_mp_game_bitmap_update` | 80 |
+| `dim_if_no_system_link_cable` | 80 |
+| **Total** | **5,120** |
 
 ## Data reconstruction
 
@@ -46,7 +52,12 @@ The build-version buffer restores another 128 bytes of coherent semantic BSS.  T
 
 ## Honest residual frontier
 
-Six callbacks (720 padded bytes total) are instruction-identical and differ only by relocation names pending semantic target regeneration: `set_textbox_to_build_number`, `multiplayer_game_set_text_box_for_teams_noteams`, `multiplayer_game_set_text_box_for_score_limit`, `multiplayer_game_set_text_box_for_number_of_players`, `teams_no_teams_mp_game_bitmap_update`, and `dim_if_no_system_link_cable`.  They are deliberately reported as residual, not exact.
+Six callbacks that were instruction-identical during isolated work are exact in
+canonical. Regenerating the semantic target metadata closed
+`set_textbox_to_build_number`; the other five referenced shorter donor
+diagnostics rather than January's assertion text. Restoring the strings exposed
+by the target object closed all five without changing executable behavior or
+introducing compiler steering.
 
 The strongest nontrivial candidates are:
 
@@ -83,8 +94,8 @@ Every non-owning translation unit that includes a changed broad header was gated
 
 ## Verification
 
-- Final alias-aware `gate.py`: **21 exact / 22 residual / 3 unwritten**.
-- Frozen-base exact set: the sole inherited exact callback is retained; strict delta **+20 functions / +4,400 padded code bytes**.
+- Final canonical `gate.py`: **27 exact / 16 residual / 3 unwritten**.
+- Frozen-base exact set: the sole inherited exact callback is retained; strict delta **+26 functions / +5,120 padded code bytes**.
 - Callback-table COFF comparison: 164 bytes, 41 relocations, identical normalized bytes and identities under semantic aliases.
 - Header-blast gate sweep: no exact-set change in the four affected non-owning units listed above.
 - `python -m pytest -q -p no:cacheprovider`: **258 passed**.
@@ -107,7 +118,9 @@ F4565330AEE69A14AF39C5A8729C89C390B8B780A5AA3BE89E5556B3ECEC7005  source/saved g
 
 ## Integration caveats
 
-1. Regenerate semantic target metadata before promoting the six relocation-only callbacks or the split BSS to strict exact credit.
+1. The semantic target metadata has been regenerated. The six formerly
+   relocation-only callbacks are strict exact; the split BSS remains semantic
+   reconstruction and is not credited as strict data.
 2. Run the canonical full build and per-function exact-set sweep after cherry-pick; the isolated header blast sweep is strong but does not replace link-wide validation.
 3. Keep the three large network callbacks as the next frontier.  Completing `server_list_menu_update` should naturally cause the 40-byte `displayed_servers` array to be emitted.
 4. `player_profile_number_of_available_primary_colors` currently has an owner definition returning `short`, while an older interface-local declaration elsewhere says `long`.  This wave preserves the actual owner signature and does not expand scope to repair that pre-existing declaration mismatch.

@@ -2039,6 +2039,101 @@
         },
         "objdiff_percent": 97.76382
       }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_extract",
+      "function": "_bitmaps_extract",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the complete public bitmap extraction entry point in ordinary typed C from January's instruction, relocation, assertion, and cleanup topology, cross-checked against independent later Halo sources. The retained body validates the group, allocates and decompresses the imported plate, dispatches sequence and group-type extraction, reports January's target-proven double error on allocation failure, and releases temporary state. The 720-byte candidate versus 736-byte target and 66 versus 68 relocations reflect cold cleanup layout and still-unwritten private callees; bounded natural control-flow variants did not expose a semantic defect. No register forcing, volatile carrier, pragma, assembly, fake dependency, invented branch, or undefined behavior is retained. Reopen for authoritative January source/local records or when the remaining private extraction callees are reconstructed naturally.",
+      "measurements": {
+        "target": {
+          "size": 736,
+          "relocation_count": 68,
+          "normalized_sha256": "537d98f8a8adf6da9a4651ec215d5cf13225263ecefe5cb3562c8e932eb718ed"
+        },
+        "base": {
+          "size": 720,
+          "relocation_count": 66,
+          "normalized_sha256": "51cadcd34bfde4712f54de3e6857f3ca096f6b623352a90454c4ae53c260e337"
+        },
+        "objdiff_percent": 76.950676
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_extract",
+      "function": "_extract_warn_about_horizontal_border",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked after recovering the target-proven horizontal-border warning loop in natural typed C. Target and candidate share the 128-byte envelope and all nine relocation identities; objdiff reports 99.48718 percent similarity. Four normalized bytes differ only because VC7 selects different temporary registers for two vararg integer extensions. Natural declaration and expression shapes did not reveal missing behavior. No register hint, volatile access, barrier, pragma, inline assembly, fake dependency, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the temporary-register choice.",
+      "measurements": {
+        "target": {
+          "size": 128,
+          "relocation_count": 9,
+          "normalized_sha256": "12713fbd52519b45853b962d44c886bc14bc020e2b80b044cfe0bc174fdeb8db"
+        },
+        "base": {
+          "size": 128,
+          "relocation_count": 9,
+          "normalized_sha256": "17f7087e59c4a476db19d9896873393f95f891dd2997971eb2d4946439c3f6bc"
+        },
+        "objdiff_percent": 99.48718
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_extract",
+      "function": "_extract_bitmap",
+      "class": "private-register-convention",
+      "evidence": "Fuzzy-parked after reconstructing the complete private bitmap extractor from January's control-flow, relocations, assertions, marker rules, and independent later-source semantics. The retained typed body covers bounds, registration points, marker filtering, alpha and DXT1 color-key warnings, interface-format validation, pending entries, sprites, plateless cubes, and direct bitmaps. Candidate and target have all 66 relocations; the candidate is 1,152 padded bytes versus 1,168. The remaining gap is C2 register/cold-block allocation and the unresolved private extract_add_bitmap call: January uses a TU-private EAX convention that cannot arise from an undefined ordinary declaration. No calling-convention lie, register forcing, volatile carrier, pragma, fake wrapper, assembly, or undefined behavior is retained. Reopen when extract_add_bitmap is naturally reconstructed in this TU or authoritative January source/local records appear.",
+      "measurements": {
+        "target": {
+          "size": 1168,
+          "relocation_count": 66,
+          "normalized_sha256": "051e1fae474dc6acd83587572aebfa8a0a9b8ab20dfafed770583e6ad046469c"
+        },
+        "base": {
+          "size": 1152,
+          "relocation_count": 66,
+          "normalized_sha256": "feaf057bd40ae57be6e00fd6b992917f505b252e13ee90219ae693a6be9a26ed"
+        },
+        "objdiff_percent": 80.3984
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_environment",
+      "function": "__rasterizer_environment_diffuse_light_begin",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked after reconstructing the full diffuse-light setup in ordinary typed C from January disassembly and Halo/Xbox renderer evidence. Target and candidate both occupy 928 padded bytes with all 58 relocation identities; objdiff reports 99.89695 percent similarity. The remaining normalized difference is C2's assignment of three coherent local basis vectors to different stack slots. Bounded declaration-scope and vector-shape probes did not produce a natural closure. No volatile or register steering, barrier, pragma, assembly, raw offset, fake dependency, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining those stack lifetimes.",
+      "measurements": {
+        "target": {
+          "size": 928,
+          "relocation_count": 58,
+          "normalized_sha256": "96f42a578f493250f9fb27beb69c6e4bbd03472de63c1e81e039ec7723dbfcf7"
+        },
+        "base": {
+          "size": 928,
+          "relocation_count": 58,
+          "normalized_sha256": "6b3b2693e14dabc8837d8ae5f0c01d349f16ed4f347f60a7be6d226baee60252"
+        },
+        "objdiff_percent": 99.89695
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_environment",
+      "function": "_rasterizer_environment_specular_spot_light_begin",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked after retaining the complete HCEA-backed spot-light vector and cross-product implementation in ordinary C. January is 960 padded bytes and the candidate 944, with all 64 relocations shared and objdiff at 82.64557 percent. The remaining difference is compiler vector/local allocation and scheduling, not absent renderer behavior; bounded helper and declaration-shape probes did not close it. The source uses project real/vector types and existing math helpers and preserves the January inline schedule without emitting point_from_line3d. No forced inline/noinline, volatile steering, barrier, pragma, assembly, fake arithmetic, raw address, or undefined behavior is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor that explains the vector lifetime schedule.",
+      "measurements": {
+        "target": {
+          "size": 960,
+          "relocation_count": 64,
+          "normalized_sha256": "e0331f6b94a74f9c4b4cc2fbed6d8a0cf3d0e3b8d65c487daeac0b7a0e4ab7af"
+        },
+        "base": {
+          "size": 944,
+          "relocation_count": 64,
+          "normalized_sha256": "2a707c5cccc4f0c2d87cf05ca1a6b07fcb1f9bae48ee0271f2043aa4ae01f5a9"
+        },
+        "objdiff_percent": 82.64557
+      }
     }
   ]
 }

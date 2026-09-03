@@ -20,15 +20,19 @@ functions represented 20,480 padded bytes.
 
 ## Retained exact recovery
 
-The final gate is 32 exact, 3 residual, and 9 unwritten functions. It adds 13
-strict functions, 8,304 padded code bytes, 8,193 meaningful code bytes, and
-649 exact relocations. Every inherited exact function remains exact.
+The isolated final gate was 32 exact, 3 residual, and 9 unwritten functions.
+Canonical admission corrected the 0xB5 environment block from an unresolved
+extern to its target-proven TU-private definition; that naturally closed
+`_rasterizer_environment_lightmap_begin`. The admitted result is **33 exact,
+2 residual, and 9 unwritten**, adding **14 strict functions and 8,704 padded
+code bytes**. Every inherited exact function remains exact.
 
 | January address | Function | Padded | Meaningful | Relocations |
 | --- | --- | ---: | ---: | ---: |
 | `0x14FCC0` | `D3DDevice_SetRenderState` | 432 | 422 | 32 |
 | `0x150200` | `_rasterizer_environment_reflection_lightmap_mask_draw` | 512 | 504 | 34 |
 | `0x150480` | `_rasterizer_environment_lightmaps_begin` | 400 | 388 | 29 |
+| `0x150610` | `_rasterizer_environment_lightmap_begin` | 400 | — | 30 |
 | `0x151750` | `_rasterizer_environment_diffuse_lights_begin` | 704 | 704 | 63 |
 | `0x151DB0` | `_rasterizer_environment_diffuse_light_draw` | 560 | 545 | 39 |
 | `0x151FE0` | `_rasterizer_environment_diffuse_textures_begin` | 400 | 394 | 32 |
@@ -52,12 +56,9 @@ by this translation unit, so both its symbol metadata and C definition are
 
 ## Honest fuzzy parks and remaining work
 
-Three coherent, evidence-backed bodies are retained as fuzzy residuals and are
+Two coherent, evidence-backed bodies are retained as fuzzy residuals and are
 not credited as exact:
 
-- `0x150610`, `_rasterizer_environment_lightmap_begin`: target/candidate are
-  400 padded bytes with 30 relocations; the remaining difference is the C2
-  choice between x87 and integer moves for a chained RGB assignment.
 - `0x151A10`, `_rasterizer_environment_diffuse_light_begin`: both are 928
   padded / 914 meaningful bytes with 58 relocations and equivalent control
   flow; C2 assigns three local basis vectors to different stack slots.
