@@ -12,7 +12,9 @@ Two independent source lines reject that interpretation:
 - the HCEA Xbox reconstruction at repository commit
   `570c83fd9c365dad6f2a3e7041705d5b84c7847c`, locally cached as
   `work/research-cache-halocea/src/blam/hs/hs_parse_boolean.c`;
-- the later PC implementation used during the local cross-build review.
+- the later PC implementation at
+  `work/halo/src/halo/hs/hs_compile.c` in local reference commit
+  `afc14e5b1d016560ac5808a7da5aa9f2adb2b885`.
 
 Both write the node only for a recognized false or true spelling and return
 immediately.  The retained implementation follows that corroborated behavior.
