@@ -19,6 +19,13 @@ enum
 	NUMBER_OF_UNIT_USER_ANIMATIONS = 2,
 };
 
+enum unit_add_weapon_mode
+{
+	_unit_add_weapon_normal = 0,
+	_unit_add_weapon_starting,
+	_unit_add_weapon_replace,
+};
+
 enum unit_speech_priority
 {
 	_unit_speech_none = 0,

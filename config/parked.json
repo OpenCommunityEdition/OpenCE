@@ -2134,6 +2134,82 @@
         },
         "objdiff_percent": 82.64557
       }
+    },
+    {
+      "unit": "source/ai/actors",
+      "function": "_actor_swarm_attach_unit",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed swarm attachment path from January's instruction, relocation, assertion, and error topology. The retained ordinary C creates the optional swarm component, detaches prior actor ownership, links the unit into the doubly-linked swarm list, initializes the component cache, inherits encounter/team ownership, controls activation, and marks the unit actively controlled. Target and candidate share the 656-byte padded envelope and all 43 relocation identities; objdiff reports 94.25247 percent similarity. Bounded declaration and branch forms leave a VC7 register/scheduling tie. No register hint, volatile access, barrier, pragma, forced inline, assembly, raw offset, fake dependency, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the remaining allocation.",
+      "measurements": {
+        "target": {
+          "size": 656,
+          "relocation_count": 43,
+          "normalized_sha256": "d3153578bbc9c66ae43435a4b417c54675d0925fdffaa3501f03c90011b171e9"
+        },
+        "base": {
+          "size": 656,
+          "relocation_count": 43,
+          "normalized_sha256": "6eeef871c34cb94714939d7af4e52d1d8c91b7a74ddc5830a84e4b3b6fbefdc6"
+        },
+        "objdiff_percent": 94.25247
+      }
+    },
+    {
+      "unit": "source/ai/actors",
+      "function": "_actor_customize_unit",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed actor-variant customization path from January disassembly and independent HCEA behavior. The retained ordinary C applies vitality overrides, forced shader permutations, tag-block change colors, default weapon replacement, grenade inventory, validated powerup equipment, and active/super camouflage. It uses semantic actor-variant flags, typed tag/object accessors, and January's exact equipment diagnostic. Target is 640 padded bytes and the candidate 672, with all 26 relocation identities preserved; objdiff reports 65.71359 percent. Straightforward condition, declaration, and lifetime forms did not isolate a missing behavior, so the fail-closed class remains unclassified. No false field, register or volatile steering, barrier, pragma, assembly, forced inline, fake dependency, or undefined behavior is retained. Reopen for authoritative January source/local records or a natural same-compiler donor.",
+      "measurements": {
+        "target": {
+          "size": 640,
+          "relocation_count": 26,
+          "normalized_sha256": "940083a9f9c438a46008f10ccd707110659c75bfabdc759f04b3ac94dde73f6d"
+        },
+        "base": {
+          "size": 672,
+          "relocation_count": 26,
+          "normalized_sha256": "0a9c42b8a04f30f959817cd50c482b9c1b88524b16e36dd8cff695ce3202d759"
+        },
+        "objdiff_percent": 65.71359
+      }
+    },
+    {
+      "unit": "source/ai/actors",
+      "function": "_actor_create_for_unit",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked after reconstructing actor creation and attachment in complete typed ordinary C. The function validates individual bipeds, reuses a compatible swarm actor, allocates and attaches new actors to encounters or the encounterless pool, initializes brain/default/command-list state, validates swarm type compatibility with January's exact diagnostic, attaches the unit, and verifies activation. Target and candidate share the 624-byte padded envelope and all 29 relocation identities; objdiff reports 93.40611 percent. Nearly the entire body is instruction-identical after the prologue; the residual is VC7 callee-saved register allocation and shrink wrapping around the early exits. Plausible declaration, comparison, and outer-block forms did not close it naturally. No register hint, volatile access, barrier, pragma, assembly, forced inline, fake dependency, or false alias is retained. Reopen only for authoritative January source/local records or a natural same-compiler allocation donor.",
+      "measurements": {
+        "target": {
+          "size": 624,
+          "relocation_count": 29,
+          "normalized_sha256": "c57ee9f93e814f9fea670c9d0dbecc8f169bca56e8927152831246b0937c49f4"
+        },
+        "base": {
+          "size": 624,
+          "relocation_count": 29,
+          "normalized_sha256": "2671b840674c236181fee91624f136dfc81e1798a2789e58af203aee9e0cd7e6"
+        },
+        "objdiff_percent": 93.40611
+      }
+    },
+    {
+      "unit": "source/ai/actors",
+      "function": "_actors_spawn_from_unit",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked after reconstructing the full typed spawn loop from January disassembly and independent HCEA semantics. The retained ordinary C inherits encounter/squad ownership, resolves actor tags through subsystem macros, creates each unit at the source origin with randomized facing and offset, settles bipeds, customizes and creates actors, emits January's exact failure warning and cleanup, verifies activation, and applies the randomized outward launch. Target and candidate share the 672-byte padded envelope and all 29 relocation identities. Objdiff reports 54.82266 percent because an early register-allocation shift makes its index-aligned score pessimistic; the major call, constant, placement, cleanup, activation, launch, and loop topology remains aligned. Bounded early-return, single-exit, loop, declaration, and vector-expression forms only traded VC7 callee-save/register and x87-stack schedules. No register hint, volatile access, barrier, pragma, forced inline, assembly, raw offset, fake dependency, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining those schedules.",
+      "measurements": {
+        "target": {
+          "size": 672,
+          "relocation_count": 29,
+          "normalized_sha256": "38d0b2f1fcd5109d57fab7a261e7d8abe3bf5d4b8c1d44e26feccf0941ded7e1"
+        },
+        "base": {
+          "size": 672,
+          "relocation_count": 29,
+          "normalized_sha256": "8c163f7b091727361868c65de3aaf62f4e8b4ac9d495435b3e00f45adeb68eba"
+        },
+        "objdiff_percent": 54.82266
+      }
     }
   ]
 }

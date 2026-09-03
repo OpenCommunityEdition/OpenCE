@@ -130,6 +130,9 @@ boolean biped_fix_position(
 	boolean fix_below_new_position,
 	boolean dont_teleport,
 	boolean use_radius_as_multiplier);
+void biped_accelerate(
+	long biped_index,
+	real_vector3d *acceleration);
 
 void biped_stop_limp_body_physics(
 	long biped_index);

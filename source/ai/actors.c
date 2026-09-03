@@ -294,10 +294,13 @@ symbols in this file:
 #include "ai_communication.h"
 #include "ai_debug.h"
 #include "ai_scenario_definitions.h"
+#include "bitmaps/bitmaps.h"
 #include "encounters.h"
 #include "cseries/errors.h"
 #include "game/game.h"
 #include "game/players.h"
+#include "items/equipment_definitions.h"
+#include "objects/damage.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
@@ -320,6 +323,28 @@ enum
 	_actor_mode_combat,
 	_actor_fire_target_none = 0,
 	_actor_fire_target_prop,
+};
+
+enum actor_default_state
+{
+	actor_default_state_none = 0,
+	actor_default_state_asleep,
+	actor_default_state_alert,
+	actor_default_state_moving_repeat_position,
+	actor_default_state_moving_loop,
+	actor_default_state_moving_loop_back_and_forth,
+	actor_default_state_moving_loop_randomly,
+	actor_default_state_moving_randomly,
+	actor_default_state_guarding,
+	actor_default_state_guarding_at_guard_point,
+	actor_default_state_searching,
+	actor_default_state_fleeing,
+	number_of_actor_default_states,
+};
+
+enum
+{
+	_rgb_color_interpolation_hsv_bit = 0,
 };
 
 /* January names these limits in its assert and error strings; the shared
@@ -436,6 +461,18 @@ struct actor_iterator
 	long next_index;
 };
 
+struct encounter_actor_iterator
+{
+	long encounter_index;
+	long index;
+	long next_index;
+};
+
+typedef char encounter_actor_iterator_size_assert[
+	sizeof(struct encounter_actor_iterator) == 0xC ? 1 : -1];
+typedef char encounter_actor_iterator_index_offset_assert[
+	offsetof(struct encounter_actor_iterator, index) == 0x4 ? 1 : -1];
+
 typedef char actor_iterator_size_assert[
 	sizeof(struct actor_iterator) == 0x1C ? 1 : -1];
 typedef char actor_iterator_index_offset_assert[
@@ -450,6 +487,16 @@ struct swarm_component_datum
 	long combat_target_prop_index;
 	byte unknown_tail[SWARM_COMPONENT_DATUM_SIZE - 0x18];
 };
+
+struct actor_variant_change_colors
+{
+	real_rgb_color color_lower_bound;
+	real_rgb_color color_upper_bound;
+	unsigned long unused[2];
+};
+
+typedef char actor_variant_change_colors_size_assert[
+	sizeof(struct actor_variant_change_colors) == 0x20 ? 1 : -1];
 
 typedef char swarm_component_datum_size_assert[
 	sizeof(struct swarm_component_datum) == SWARM_COMPONENT_DATUM_SIZE ? 1 : -1];
@@ -1793,6 +1840,421 @@ void actor_unit_control_stop_animation_impulse(
 	return;
 }
 
+void actor_customize_unit(
+	long actor_variant_definition_index,
+	long unit_index)
+{
+	struct actor_variant_definition *actor_variant_definition =
+		actor_variant_definition_get(actor_variant_definition_index);
+	struct actor_definition *actor_definition =
+		actor_definition_get(actor_variant_definition->actor_reference.index);
+	struct unit_datum *unit = unit_get(unit_index);
+	struct object_placement_data placement_data;
+	short change_color_index;
+
+	if (actor_variant_definition->unit.maximum_body_vitality > 0.f ||
+		actor_variant_definition->unit.maximum_shield_vitality > 0.f)
+	{
+		object_initialize_vitality(
+			unit_index,
+			&actor_variant_definition->unit.maximum_body_vitality,
+			&actor_variant_definition->unit.maximum_shield_vitality);
+	}
+
+	if (actor_variant_definition->unit.forced_shader_permutation_index)
+	{
+		unit->object.forced_shader_permutation_index =
+			actor_variant_definition->unit.forced_shader_permutation_index;
+	}
+
+	for (change_color_index = 0;
+		change_color_index < actor_variant_definition->change_colors.count;
+		change_color_index++)
+	{
+		struct actor_variant_change_colors *change_colors = TAG_BLOCK_GET_ELEMENT(
+			&actor_variant_definition->change_colors,
+			change_color_index,
+			struct actor_variant_change_colors);
+
+		if (change_color_index < NUMBER_OF_OBJECT_CHANGE_COLORS)
+		{
+			rgb_colors_interpolate(
+				&unit->object.base_change_colors[change_color_index],
+				FLAG(_rgb_color_interpolation_hsv_bit),
+				&change_colors->color_lower_bound,
+				&change_colors->color_upper_bound,
+				real_seed_random(get_global_random_seed_address()));
+			unit->object.outgoing_change_colors[change_color_index] =
+				unit->object.base_change_colors[change_color_index];
+		}
+	}
+
+	if (actor_variant_definition->ranged_combat.reference.index != NONE)
+	{
+		long weapon_index;
+
+		object_placement_data_new(
+			&placement_data,
+			actor_variant_definition->ranged_combat.reference.index,
+			unit_index);
+		weapon_index = object_new(&placement_data);
+		if (weapon_index != NONE &&
+			!unit_add_weapon_to_inventory(
+				unit_index,
+				weapon_index,
+				_unit_add_weapon_replace))
+		{
+			object_delete(weapon_index);
+		}
+	}
+
+	if (actor_variant_definition->grenade_combat.grenade_type != NONE)
+	{
+		short grenade_count = seed_random_range(
+			get_global_random_seed_address(),
+			actor_variant_definition->items.grenades_lower_bound,
+			actor_variant_definition->items.grenades_upper_bound + 1);
+
+		unit_add_grenade_type_to_inventory(
+			unit_index,
+			actor_variant_definition->grenade_combat.grenade_type,
+			grenade_count);
+	}
+
+	if (actor_variant_definition->items.equipment_reference.index != NONE)
+	{
+		struct equipment_definition *equipment_definition = equipment_definition_get(
+			actor_variant_definition->items.equipment_reference.index);
+
+		if (equipment_definition->equipment.powerup_type == _equipment_powerup_none ||
+			equipment_definition->equipment.powerup_type == _equipment_powerup_grenade)
+		{
+			error(
+				_error_silent,
+				"cannot add grenades or non-powerups to an actor's inventory as equipment... try using the 'grenade' fields maybe?");
+		}
+		else
+		{
+			long equipment_index;
+
+			object_placement_data_new(
+				&placement_data,
+				actor_variant_definition->items.equipment_reference.index,
+				unit_index);
+			equipment_index = object_new(&placement_data);
+			if (equipment_index != NONE &&
+				!unit_add_equipment_to_inventory(
+					unit_index,
+					equipment_index,
+					TRUE))
+			{
+				object_delete(equipment_index);
+			}
+		}
+	}
+
+	if ((actor_variant_definition->flags &
+		(FLAG(_actor_variant_definition_active_camouflage_bit) |
+			FLAG(_actor_variant_definition_super_active_camouflage_bit))) != 0)
+	{
+		if (TEST_FLAG(
+			actor_variant_definition->flags,
+			_actor_variant_definition_super_active_camouflage_bit))
+		{
+			SET_FLAG(unit->unit.flags, _unit_super_camouflaged_bit, TRUE);
+		}
+		SET_FLAG(unit->unit.flags, _unit_active_camouflaged_bit, TRUE);
+		unit->unit.active_camouflage = 1.f;
+		unit->unit.active_camouflage_super_amount = TEST_FLAG(
+			actor_definition->flags,
+			_actor_definition_crouch_try_not_to_move_bit) ? 1.f : 0.f;
+	}
+
+	return;
+}
+
+long actor_create_for_unit(
+	boolean swarm,
+	long unit_index,
+	long actor_variant_definition_index,
+	long encounter_index,
+	short squad_index,
+	boolean allow_addition_to_other_squads,
+	long disallow_actor_index,
+	boolean initially_braindead,
+	short initial_state,
+	short default_state,
+	short initial_command_list_index,
+	char noncombat_sequence_id)
+{
+	long actor_index = NONE;
+	struct actor_datum *actor;
+
+	if (unit_index == NONE || actor_variant_definition_index == NONE)
+	{
+		return actor_index;
+	}
+
+	if (swarm)
+	{
+		struct encounter_actor_iterator iterator;
+
+		encounter_actor_iterator_new(&iterator, encounter_index);
+		while ((actor = encounter_actor_iterator_next(&iterator)) != NULL)
+		{
+			if (actor->meta.swarm &&
+				iterator.index != disallow_actor_index &&
+				actor->meta.swarm_unit_count < MAXIMUM_NUMBER_OF_UNITS_PER_SWARM &&
+				actor->meta.variant_definition_index == actor_variant_definition_index &&
+				(allow_addition_to_other_squads || actor->meta.squad_index == squad_index))
+			{
+				actor_index = iterator.index;
+				break;
+			}
+		}
+	}
+	else
+	{
+		struct biped_datum *biped = biped_try_and_get(unit_index);
+
+		if (!biped || TEST_FLAG(biped->object.damage_flags, _object_dead_bit))
+		{
+			return actor_index;
+		}
+	}
+
+	if (actor_index == NONE)
+	{
+		boolean actor_is_swarm;
+
+		actor_index = actor_new(actor_variant_definition_index);
+		if (actor_index == NONE)
+		{
+			return actor_index;
+		}
+
+		actor = actor_get(actor_index);
+		if (encounter_index == NONE)
+		{
+			encounterless_attach_actor(actor_index);
+		}
+		else
+		{
+			struct encounter_datum *encounter = encounter_get(encounter_index);
+
+			if ((encounter_index & 0xFFFF0000) == 0)
+			{
+				encounter_index = DATUM_INDEX_NEW(
+					DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index),
+					encounter->identifier);
+			}
+			encounter_attach_actor(
+				actor_index,
+				encounter_index,
+				squad_index,
+				FALSE);
+		}
+
+		if (initially_braindead)
+		{
+			boolean active = actor->meta.active;
+
+			actor->state.mode = _actor_mode_braindead;
+			if (active)
+			{
+				actor_set_dormant(actor_index, FALSE);
+			}
+		}
+		else
+		{
+			actor->state.mode = _actor_mode_alert;
+		}
+
+		actor->state.initial_state = initial_state;
+		actor->state.default_state = default_state;
+		if (default_state == NONE || default_state == 0)
+		{
+			actor->state.default_state = actor_action_get_default_state(initial_state);
+		}
+		actor->state.command_list_immediate = FALSE;
+		actor->state.command_list_delay_timer = 2;
+		actor->state.command_list_index = initial_command_list_index;
+		actor->state.noncombat_sequence_id = noncombat_sequence_id;
+
+		actor_is_swarm = actor->meta.swarm;
+		if (actor_is_swarm != actor_type_get_swarm(actor->meta.type))
+		{
+			char const *actor_description = actor_is_swarm ? "swarm" : "individual";
+
+			error(
+				_error_silent,
+				"%s actor variant %s cannot have type %s (swarm flag does not match)",
+				actor_description,
+				tag_name_strip_path(tag_get_name(actor_variant_definition_index)),
+				actor_type_get_name(actor->meta.type));
+			actor_delete(actor_index, FALSE);
+
+			return NONE;
+		}
+	}
+
+	if (swarm)
+	{
+		if (!actor_swarm_attach_unit(actor_index, unit_index))
+		{
+			actor = actor_get(actor_index);
+			if (actor->meta.swarm_unit_count == 0)
+			{
+				actor_delete(actor_index, FALSE);
+			}
+			actor_index = NONE;
+		}
+	}
+	else
+	{
+		actor_attach_unit(actor_index, unit_index);
+	}
+
+	actor_verify_activation(actor_index);
+
+	return actor_index;
+}
+
+short actors_spawn_from_unit(
+	long unit_index,
+	long actor_variant_definition_index,
+	short actor_count,
+	real throw_velocity)
+{
+	long spawned_actor_count = 0;
+	struct unit_datum *source_unit;
+	short encounter_index;
+	short squad_index;
+	struct actor_variant_definition *actor_variant_definition;
+	struct actor_definition *actor_definition;
+
+	if (actor_variant_definition_index == NONE || actor_count <= 0)
+	{
+		return 0;
+	}
+
+	source_unit = unit_get(unit_index);
+	if (source_unit->unit.swarm_actor_index != NONE ||
+		source_unit->unit.actor_index != NONE)
+	{
+		struct actor_datum *source_actor = actor_get(source_unit->unit.actor_index);
+
+		encounter_index = source_actor->meta.encounter_index;
+		squad_index = source_actor->meta.squad_index;
+	}
+	else
+	{
+		encounter_index = source_unit->unit.fake_encounter_index;
+		squad_index = source_unit->unit.fake_squad_index;
+	}
+
+	if (encounter_index == NONE || squad_index == NONE)
+	{
+		return 0;
+	}
+
+	actor_variant_definition = actor_variant_definition_get(actor_variant_definition_index);
+	actor_definition = actor_definition_get(actor_variant_definition->actor_reference.index);
+	while (actor_count-- > 0)
+	{
+		real angle = real_seed_random_range(
+			get_global_random_seed_address(),
+			0.f,
+			2.f * _pi);
+		struct object_placement_data placement_data;
+		long spawned_unit_index;
+
+		object_placement_data_new(
+			&placement_data,
+			actor_variant_definition->unit_reference.index,
+			NONE);
+		vector3d_from_angle(&placement_data.forward, angle);
+		object_get_origin(unit_index, &placement_data.position);
+		placement_data.position.x =
+			placement_data.forward.i * 0.3f + placement_data.position.x;
+		placement_data.position.y =
+			placement_data.forward.j * 0.3f + placement_data.position.y;
+		placement_data.position.z =
+			placement_data.forward.k * 0.3f + (placement_data.position.z + 0.3f);
+
+		spawned_unit_index = object_new(&placement_data);
+		if (spawned_unit_index != NONE)
+		{
+			struct unit_datum *spawned_unit = unit_get(spawned_unit_index);
+			long actor_index;
+
+			if (spawned_unit->object.type == _object_type_biped)
+			{
+				biped_fix_position(
+					spawned_unit_index,
+					NONE,
+					&placement_data.position,
+					NULL,
+					1.f,
+					TRUE,
+					FALSE,
+					FALSE);
+			}
+
+			actor_customize_unit(actor_variant_definition_index, spawned_unit_index);
+			actor_index = actor_create_for_unit(
+				TEST_FLAG(actor_definition->flags, _actor_definition_swarm_actor_bit),
+				spawned_unit_index,
+				actor_variant_definition_index,
+				encounter_index,
+				squad_index,
+				FALSE,
+				NONE,
+				FALSE,
+				actor_default_state_alert,
+				actor_default_state_none,
+				NONE,
+				0);
+			if (actor_index == NONE)
+			{
+				error(
+					_error_silent,
+					"WARNING: cannot create actor to be spawned from unit");
+				object_delete(spawned_unit_index);
+			}
+			else
+			{
+				actor_verify_activation(actor_index);
+				if (throw_velocity > 0.f)
+				{
+					real speed_factor = real_seed_random_range(
+						get_global_random_seed_address(),
+						0.5f,
+						1.f);
+					real vertical_factor = real_seed_random_range(
+						get_global_random_seed_address(),
+						0.8f,
+						1.5f);
+					real_vector3d acceleration;
+
+					acceleration.i =
+						placement_data.forward.i * speed_factor * throw_velocity;
+					acceleration.j =
+						placement_data.forward.j * speed_factor * throw_velocity;
+					acceleration.k = vertical_factor * throw_velocity;
+					if (spawned_unit->object.type == _object_type_biped)
+					{
+						biped_accelerate(spawned_unit_index, &acceleration);
+					}
+				}
+				spawned_actor_count++;
+			}
+		}
+	}
+
+	return spawned_actor_count;
+}
+
 void actor_set_dormant(
 	long actor_index,
 	boolean dormant)
@@ -2284,6 +2746,102 @@ boolean actor_set_active(
 	actor_verify_activation(actor_index);
 
 	return result;
+}
+
+boolean actor_swarm_attach_unit(
+	long actor_index,
+	long unit_index)
+{
+	struct actor_datum *actor;
+	struct unit_datum *unit;
+	boolean succeeded;
+	long component_index = NONE;
+
+	actor = actor_get(actor_index);
+	unit = unit_get(unit_index);
+	succeeded = TRUE;
+	if (unit->unit.swarm_actor_index != actor_index)
+	{
+		if (actor->meta.swarm_cache_index != NONE)
+		{
+			component_index = datum_new(swarm_component_data);
+			succeeded = component_index != NONE;
+			if (!succeeded)
+			{
+				error(
+					_error_silent,
+					"unable to create any more swarm components (max %d)",
+					MAXIMUM_SWARM_COMPONENTS);
+
+				return succeeded;
+			}
+		}
+
+		if (unit->unit.swarm_actor_index != NONE)
+		{
+			actor_swarm_detach_from_unit(unit->unit.swarm_actor_index, unit_index);
+		}
+
+		if (unit->unit.actor_index != NONE)
+		{
+			actor_delete(unit->unit.actor_index, FALSE);
+		}
+
+		if (actor->meta.unit_index != NONE)
+		{
+			actor_detach_from_unit(actor_index);
+		}
+
+		match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1299, actor->meta.swarm);
+		match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1300, actor->meta.unit_index == NONE);
+		match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1301, unit->unit.actor_index == NONE);
+		match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1302, unit->unit.swarm_actor_index == NONE);
+		match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1305, actor->meta.swarm_unit_count < MAXIMUM_NUMBER_OF_UNITS_PER_SWARM);
+
+		unit->unit.swarm_actor_index = actor_index;
+		unit->unit.swarm_next_unit_index = actor->meta.swarm_unit_index;
+		unit->unit.swarm_prev_unit_index = NONE;
+		if (actor->meta.swarm_unit_index != NONE)
+		{
+			struct unit_datum *swarm_first_unit = unit_get(actor->meta.swarm_unit_index);
+
+			match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1316, swarm_first_unit->unit.swarm_prev_unit_index == NONE);
+			swarm_first_unit->unit.swarm_prev_unit_index = unit_index;
+		}
+		actor->meta.swarm_unit_index = unit_index;
+
+		if (actor->meta.swarm_cache_index != NONE)
+		{
+			actor_swarm_component_setup(
+				actor->meta.swarm_cache_index,
+				unit_index,
+				component_index);
+		}
+
+		actor->meta.swarm_unit_count++;
+		actor->meta.swarm_original_unit_count++;
+		if (actor->meta.encounter_index != NONE)
+		{
+			struct encounter_datum *encounter = encounter_get(actor->meta.encounter_index);
+
+			encounter_attach_unit(actor->meta.encounter_index, unit_index);
+			unit->object.owner_team_index = encounter->team_index;
+		}
+
+		actor->meta.team_index = unit->object.owner_team_index;
+		object_set_automatic_deactivation(unit_index, FALSE);
+		if (actor->meta.dormant)
+		{
+			object_deactivate(unit_index);
+		}
+		else
+		{
+			object_activate(unit_index);
+		}
+		unit_set_actively_controlled(unit_index, TRUE);
+	}
+
+	return succeeded;
 }
 
 void actors_freeze(

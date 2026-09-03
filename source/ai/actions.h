@@ -409,6 +409,8 @@ char const *actor_action_name(
 	short action);
 short actor_action_class(
 	long actor_index);
+short actor_action_get_default_state(
+	short initial_state);
 
 boolean actor_action_handle_initial_action(
 	long actor_index);

@@ -847,6 +847,29 @@ void actor_swarm_detach_from_unit(
 	long unit_index);
 void actor_swarm_cache_delete(
 	long actor_index);
+long actor_new(
+	long actor_variant_definition_index);
+void actor_customize_unit(
+	long actor_variant_definition_index,
+	long unit_index);
+long actor_create_for_unit(
+	boolean swarm,
+	long unit_index,
+	long actor_variant_definition_index,
+	long encounter_index,
+	short squad_index,
+	boolean allow_addition_to_other_squads,
+	long disallow_actor_index,
+	boolean initially_braindead,
+	short initial_state,
+	short default_state,
+	short initial_command_list_index,
+	char noncombat_sequence_id);
+short actors_spawn_from_unit(
+	long unit_index,
+	long actor_variant_definition_index,
+	short actor_count,
+	real throw_velocity);
 void actor_set_dormant(
 	long actor_index,
 	boolean dormant);
@@ -950,6 +973,9 @@ void actor_handle_unit_effect(
 	long actor_index,
 	long prop_index,
 	short effect_type);
+boolean actor_swarm_attach_unit(
+	long actor_index,
+	long unit_index);
 void actors_freeze(
 	void);
 void actors_move_randomly(

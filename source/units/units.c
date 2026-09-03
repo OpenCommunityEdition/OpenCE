@@ -694,13 +694,6 @@ enum
 
 enum
 {
-	_unit_add_weapon_normal = 0,
-	_unit_add_weapon_starting,
-	_unit_add_weapon_replace,
-};
-
-enum
-{
 	_unit_weapon_overlay_primary_recoil = 1,
 	_unit_weapon_overlay_secondary_recoil,
 	_unit_weapon_overlay_primary_charged,
@@ -1077,11 +1070,6 @@ boolean unit_make_damage_sound(
 void biped_exit_seat_end(
 	long biped_index,
 	long parent_unit_index);
-short actors_spawn_from_unit(
-	long unit_index,
-	long actor_variant_definition_index,
-	short actor_count,
-	real throw_velocity);
 short animation_choose_random_permutation(
 	long animation_graph_index,
 	short animation_index);

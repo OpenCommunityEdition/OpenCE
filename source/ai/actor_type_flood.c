@@ -52,11 +52,6 @@ enum
 	_actor_movement_switching_switch_types,
 };
 
-enum
-{
-	_actor_variant_definition_movement_switching_try_to_stay_with_friends_bit = 3,
-};
-
 /* ---------- macros */
 
 /* ---------- structures */
