@@ -24,6 +24,58 @@ No experiment used inline assembly, `_emit`, volatile byte forcing, undefined
 behavior, object-byte patching, comparator weakening, gratuitous alignment
 pragmas, or compiler-flag changes.
 
+## Canonical-base re-audit (2026-09-03)
+
+The claimed complete object was re-audited from canonical base
+`332a39a56a5d3c5410bcf6743446492006c3de66`.  The audit censused all 1,743
+registered local worktrees (19 raw on-disk source hashes, including line-ending
+variants), every commit touching `source/game/game_statistics.c`, the named
+Claude/Opus/Fable campaign trees, and the surviving dedicated
+`game-statistics-*` experiment trees.  Every substantive historical family was
+then compiled against the same January target with
+`tools/campaign/gate.py source/game/game_statistics --all`.
+
+Only the Fable source at `79275995c` (later admitted by `3b81021d4`) closes all
+four functions.  Its sole closing construct is the one-use block-local
+`short *kills` alias already rejected below: replacing `kills[0]++` with the
+direct typed member immediately restores the one target/candidate transpose at
+`+0x1AE`.  The independently reconstructed HaloCEA Xbox implementation also
+updates `killer->statistics.kills[...]` directly.  Marathon contains no
+analogous Halo statistics routine.  No original-source, PDB-local, or natural
+same-compiler evidence supports the alias, so the exact donor remains rejected
+under the anti-fake-match rule.
+
+The admitted source-quality reconciliation makes no instruction change:
+
+- `game_team_is_enemy` is declared only by its owner,
+  `source/game/game_allegiance.h`, instead of being redeclared in this `.c`;
+- the third public parameter is correctly named `killing_object_index` in both
+  the definition and the closest associated owner header, `source/game/game.h`;
+- `game_statistics_start` uses the semantic `TRUE` constant; and
+- the direct typed `statistics.kills[0]` access remains intact.
+
+Strict before/after state is therefore deliberately unchanged: **3 exact / 1
+residual / 0 unwritten**, or **176 / 848 accepted padded code bytes**.  The
+remaining function is 672/672 bytes with 22/22 relocation identities; target
+SHA-256 is
+`faed51b584f65f1a0f97f4416a0f599800dceeb2352a80dcf565d92d37724a69`,
+candidate SHA-256 is
+`c83a7c0613ccce274d91ca76f8f2315496ee2b9eefa91862c84160ff35ce5c0b`,
+and the only instruction difference is:
+
+```text
+target +0x1AE: inc [esi+0x98]; movsx ecx,[esi+0x96]
+base   +0x1AE: movsx ecx,[esi+0x96]; inc [esi+0x98]
+```
+
+The 42 direct `game.h` consumers plus the protected `units.obj` sentinel were
+force-compiled after the owner-header edit.  A stable-section comparison over
+their 1,983 target functions preserved all 1,732 previously exact functions
+with zero gains or regressions; `units.obj` remained 189/189.  The focused
+Ninja build, `git diff --check`, and `python -m pytest tools/ -q` (261 passed)
+also succeeded.  The existing instruction-scheduling park and `NonMatching`
+classification remain correct.
+
 ## Policy correction and current disposition (2026-08-31)
 
 The exact admission described in the historical section below is revoked under
@@ -163,13 +215,14 @@ baseline:  movsx ecx,[esi+0x96]; inc [esi+0x98]
 Both windows reconverged immediately. The frame remained `0x28`, and every
 branch, relocation, and instruction outside those windows agreed.
 
-## Retained improvement and final object state
+## Historical barrier checkpoint (superseded)
 
-A Microsoft compiler intrinsic barrier immediately after
-`credited_player->statistics.kills[0]++` is retained. It emits no machine
-instruction. It only prevents XDK 3911 from moving the independent
-last-kill-time load ahead of the January kill-count store. This restores the
-entire `+0x1AE` window:
+At this historical checkpoint, a Microsoft compiler intrinsic barrier
+immediately after `credited_player->statistics.kills[0]++` was retained.  It
+emitted no machine instruction and prevented XDK 3911 from moving the
+independent last-kill-time load ahead of the January kill-count store.  Current
+house rules forbid compiler barriers, so this source is no longer retained.
+The experiment restored the entire `+0x1AE` window:
 
 ```text
 target/current +0x1AE:
@@ -177,7 +230,7 @@ target/current +0x1AE:
 0f bf 8e 96 00 00 00    movsx ecx,word ptr [esi+0x96]
 ```
 
-The final strict state is:
+The historical barrier-checkpoint state was:
 
 | Function / datum | Padded size T/B | Relocs T/B | Base normalized SHA-256 | Result |
 |---|---:|---:|---|---|
@@ -205,16 +258,17 @@ control flow, all 22 relocations, and every other normalized byte agree.
 Objdiff reports 99.904305% for the function and 99.92113% for the unit, but
 those percentages are navigation aids and do not grant match credit.
 
-## Accepted controls
+## Historical experiment controls (superseded)
 
 - `best_attacker_index` remains a `short`.
 - The explicit attacker-pointer initialization, independent loop-index zero,
   saved `attackers` pointer, comparison operand order, and direct indexed
   attacker-field loads are retained because they are the strongest measured
   topology.
-- The no-code `_ReadWriteBarrier` is retained because it is the only tested
-  defined-C/compiler control that restores the independently corroborated
-  January credited-kill schedule without changing size or relocations.
+- The no-code `_ReadWriteBarrier` was retained only at this historical
+  checkpoint because it restored the independently corroborated January
+  credited-kill schedule without changing size or relocations.  It is rejected
+  by the current house rules.
 - The three exact function siblings and `_game_statistics_active` are frozen
   controls. Every experiment compiled the complete translation unit and
   checked all of them.
@@ -225,9 +279,11 @@ those percentages are navigation aids and do not grant match credit.
 
 ## Experiment matrix
 
-All experiments used the exact XDK 3911 command line. Unless marked retained,
-each source change was reverted immediately after measurement. Every row
-preserved all three exact function siblings and `_game_statistics_active`.
+All experiments used the exact XDK 3911 command line. Unless marked retained at
+that historical checkpoint, each source change was reverted immediately after
+measurement.  Current policy supersedes the historical retain decisions.
+Every row preserved all three exact function siblings and
+`_game_statistics_active`.
 
 Hash keys:
 
@@ -262,7 +318,7 @@ X40 f46d7452246a313589da1b1f7303e4ce1d5569291f37e910cb1fda744a90c4a3
 | E09 | Swap attacker and attackers declaration order | `0x2A0/0x2A0` | `22/22` | B | no lifetime/allocation effect | reverted |
 | E10 | Value-forward second reset from `kills_in_a_row` | `0x2A0/0x2A0` | `22/22` | B | no zero-register effect | reverted |
 | E11 | `register short statistic_reset` | `0x2A0/0x2A0` | `22/22` | B | register hint ignored | reverted |
-| E12 | No-code `_ReadWriteBarrier` after credited kill increment | `0x2A0/0x2A0` | `22/22` | R | `+0x67` only; `+0x1AE` becomes exact | retained |
+| E12 | No-code `_ReadWriteBarrier` after credited kill increment | `0x2A0/0x2A0` | `22/22` | R | `+0x67` only; `+0x1AE` becomes exact | historically retained; now rejected |
 | E13 | Additional early barrier after deaths increment, on top of E12 | `0x2A0/0x2A0` | `22/22` | R | no effect beyond E12 | extra barrier reverted |
 | E14 | Early-declared typed statistic-reset local, on top of E12 | `0x2A0/0x2A0` | `22/22` | R | no zero-register effect | reverted |
 | E15 | Split friendly-fire computation through a boolean | `0x2A0/0x2A0` | `22/22` | X15 | `+0x67`; introduced setcc/neg branch-shape differences | reverted |
@@ -372,21 +428,16 @@ datum, or TU invariant regressed.
 
 ## Residual classification
 
-The scheduling component is solved and retained. The only residual is
-methodology class C: a private register-allocation tie.
+The Fable attacker-loop initialization-order correction naturally resolves the
+former `+0x67` register-allocation window.  In the current direct-member source,
+the sole residual is methodology class D: an independent instruction-scheduling
+transpose at `+0x1AE`.  A compiler barrier closes it but violates current policy;
+the one-use pointer alias closes it by hiding field disjointness but has no
+independent semantic provenance.  Natural scalar, subobject-pointer, local-copy,
+branch, expression, and declaration-order forms are covered by the experiment
+matrix and either reproduce this fixed point or perturb already exact code.
 
-At `+0x67`, the earlier player-index ESI live range has ended and XDK may use
-either ESI or EDX as the shared zero. EDX is overwritten by the next argument
-load at `+0x85`, so both choices are semantically interchangeable. The tested
-defined-C lifetime controls either canonicalize to EDX or damage independently
-exact code. The continuation batches E22-E46 additionally cover compound reuse
-of the ending ESI source variable, C89 scope/initialization changes, no-code
-reset-boundary barriers, existing later-zero lifetimes, legal field aliases,
-storage qualifiers, commutative predicate spellings, and branch-edge zero
-merges. No remaining evidence-backed source-level dependency or lifetime
-control selects ESI.
-
-This is therefore a rigorous park, not a match.
+This is therefore a rigorous fuzzy park, not a match.
 
 ## Verification gates
 
