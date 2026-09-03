@@ -152,6 +152,9 @@ symbols in this file:
 #include "interface/hud_messaging.h"
 #include "memory/data.h"
 #include "networking/network_game_globals.h"
+#include "saved games/player_profile.h"
+#include "saved games/playlist_profile.h"
+#include "saved games/saved_game_files.h"
 #include "interface/ui_widget.h"
 #include "interface/virtual_keyboard.h"
 #include "main/main.h"
@@ -167,6 +170,8 @@ enum
 	SAVED_GAME_FILE_TYPE_PLAYER_PROFILE = 0,
 	SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE = 1,
 	NUMBER_OF_SAVED_GAME_FILE_TYPES = 2,
+	_saved_game_file_default_profile_bit = 30,
+	_playlist_profile_system_default_bit = 0,
 
 	_button_preset_standard = 0,
 	_button_preset_southpaw,
@@ -221,7 +226,11 @@ struct player_ui_local_player
 struct playlist_profile
 {
 	wchar_t name[12];
-	byte unknown18[0x50];
+	enum game_engine_type engine_type;
+	boolean teams;
+	byte unused1D[0x47];
+	word flags;
+	byte unused66[2];
 };
 
 union player_ui_edit_profile_data
@@ -260,27 +269,12 @@ typedef char player_ui_edit_profile_size_assert[
 
 /* ---------- prototypes */
 
-word saved_game_file_get_type(
-	long profile_index);
-boolean player_profile_get_enclosing_directory_path(
-	long profile,
-	char *full_path);
-void player_profile_save(
-	long profile,
-	void *data);
-boolean saved_game_file_retrieve_player1_last_used_profile_directory(
-	char *directory);
-long saved_game_file_find_profile_index_for_directory_path(
-	char *directory,
-	long file_type);
-void saved_game_file_remember_player1_last_used_profile_directory(
-	char *directory);
-boolean player_profile_get(
-	long profile_index,
+static void generate_default_player_profile(
 	struct player_profile *profile);
-boolean playlist_profile_get(
-	long profile_index,
-	struct playlist_profile *profile);
+static void reset_local_player_profile(
+	short local_player_index);
+static void clear_profile_edit_data(
+	void);
 
 /* ---------- globals */
 
@@ -288,6 +282,28 @@ long data_002fd5a4 = NONE;
 struct player_ui_globals player_ui_globals = { 0 };
 
 /* ---------- public code */
+
+static void generate_default_player_profile(
+	struct player_profile *profile)
+{
+	match_vassert("c:\\halo\\SOURCE\\interface\\player_ui.c", 0x369, profile, "profile");
+	csmemset(profile, 0, sizeof(*profile));
+	profile->primary_color_index = NONE;
+	profile->controller_settings.button_preset = _button_preset_standard;
+	profile->controller_settings.joystick_preset = _joystick_preset_standard;
+
+	return;
+}
+
+static void reset_local_player_profile(
+	short local_player_index)
+{
+	generate_default_player_profile(&player_ui_globals.local_players[local_player_index].profile);
+	player_ui_globals.local_players[local_player_index].active_profile_index = NONE;
+	player_ui_globals.single_player_controller[local_player_index] = NONE;
+
+	return;
+}
 
 void player_ui_dispose(
 	void)
@@ -300,19 +316,11 @@ void player_ui_initialize(
 	void)
 {
 	long local_player_index;
-	struct player_profile *profile;
 
 	csmemset(&player_ui_globals, 0, PLAYER_UI_DISPOSE_SIZE);
 	for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
 	{
-		profile = &player_ui_globals.local_players[(short)local_player_index].profile;
-		match_vassert("c:\\halo\\SOURCE\\interface\\player_ui.c", 0x369, profile, "profile");
-		csmemset(profile, 0, sizeof(*profile));
-		profile->primary_color_index = NONE;
-		profile->controller_settings.button_preset = _button_preset_standard;
-		profile->controller_settings.joystick_preset = _joystick_preset_standard;
-		player_ui_globals.local_players[(short)local_player_index].active_profile_index = NONE;
-		player_ui_globals.single_player_controller[(short)local_player_index] = NONE;
+		reset_local_player_profile((short)local_player_index);
 	}
 	player_ui_globals.edit_profile_index = NONE;
 	player_ui_globals.initialized = TRUE;
@@ -323,19 +331,11 @@ void player_ui_clear_multiplayer_joins(
 	void)
 {
 	long local_player_index = 0;
-	struct player_profile *profile;
 	boolean *joined = &player_ui_globals.local_players[0].prejoined_multiplayer;
 
 	do
 	{
-		profile = &player_ui_globals.local_players[(short)local_player_index].profile;
-		match_vassert("c:\\halo\\SOURCE\\interface\\player_ui.c", 0x369, profile, "profile");
-		csmemset(profile, 0, sizeof(*profile));
-		profile->primary_color_index = NONE;
-		profile->controller_settings.button_preset = _button_preset_standard;
-		profile->controller_settings.joystick_preset = _joystick_preset_standard;
-		player_ui_globals.single_player_controller[(short)local_player_index] = NONE;
-		player_ui_globals.local_players[(short)local_player_index].active_profile_index = NONE;
+		reset_local_player_profile((short)local_player_index);
 		*joined = FALSE;
 		player_ui_globals.multiplayer_autojoin[local_player_index] = FALSE;
 		local_player_index++;
@@ -431,6 +431,65 @@ struct playlist_profile *player_ui_get_edit_playlist_profile(
 	return result;
 }
 
+boolean player_ui_edit_profile_is_dirty(
+	void)
+{
+	boolean result;
+	word original_flags, current_flags;
+
+	result = FALSE;
+
+	if (player_ui_globals.edit_profile_index != NONE)
+	{
+		switch (saved_game_file_get_type(player_ui_globals.edit_profile_index))
+		{
+			case SAVED_GAME_FILE_TYPE_PLAYER_PROFILE:
+			{
+				original_flags = player_ui_globals.edit_profile.original.player.flags;
+				current_flags = player_ui_globals.edit_profile.current.player.flags;
+
+				player_ui_globals.edit_profile.original.player.flags = 0;
+				player_ui_globals.edit_profile.current.player.flags = 0;
+				if (csmemcmp(
+					&player_ui_globals.edit_profile.original.player,
+					&player_ui_globals.edit_profile.current.player,
+					sizeof(struct player_profile)))
+				{
+					result = TRUE;
+				}
+				player_ui_globals.edit_profile.current.player.flags = current_flags;
+				player_ui_globals.edit_profile.original.player.flags = original_flags;
+				break;
+			}
+
+			case SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE:
+			{
+				original_flags = player_ui_globals.edit_profile.original.playlist.flags;
+				current_flags = player_ui_globals.edit_profile.current.playlist.flags;
+
+				player_ui_globals.edit_profile.original.playlist.flags = 0;
+				player_ui_globals.edit_profile.current.playlist.flags = 0;
+				if (csmemcmp(
+					&player_ui_globals.edit_profile.original.playlist,
+					&player_ui_globals.edit_profile.current.playlist,
+					sizeof(struct playlist_profile)))
+				{
+					result = TRUE;
+				}
+				player_ui_globals.edit_profile.original.playlist.flags = original_flags;
+				player_ui_globals.edit_profile.current.playlist.flags = current_flags;
+				break;
+			}
+
+			default:
+				error(_error_silent, "unknown profile type being edited");
+				break;
+		}
+	}
+
+	return result;
+}
+
 boolean player0_look_pitch_is_inverted(
 	void)
 {
@@ -447,7 +506,8 @@ boolean player0_joystick_set_is_normal(
 void player_ui_end_editing_profile(
 	void)
 {
-	player_ui_globals.edit_profile_index = NONE;
+	clear_profile_edit_data();
+
 	return;
 }
 
@@ -730,6 +790,110 @@ void player_ui_begin_editing_profile(
 
 	player_ui_globals.edit_profile_index = profile_index;
 	return;
+}
+
+boolean player_ui_save_profile(
+	void)
+{
+	boolean result = FALSE;
+	char directory_path[256];
+
+	switch (saved_game_file_get_type(player_ui_globals.edit_profile_index))
+	{
+		case SAVED_GAME_FILE_TYPE_PLAYER_PROFILE:
+			if (TEST_FLAG(
+				player_ui_globals.edit_profile_index,
+				_saved_game_file_default_profile_bit))
+			{
+				error(_error_silent, "### WARNING: saving over a default player profile");
+			}
+
+			if (!player_ui_edit_profile_is_dirty())
+			{
+				error(_error_silent, "### WARNING: saving player profile even though it hasn't been changed");
+			}
+
+			player_profile_save(
+				player_ui_globals.edit_profile_index,
+				&player_ui_globals.edit_profile.current.player);
+			result = TRUE;
+			break;
+
+		case SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE:
+			if (!player_ui_edit_profile_is_dirty())
+			{
+				error(_error_silent, "### WARNING: saving player profile even though it hasn't been changed");
+			}
+
+			if (TEST_FLAG(
+				player_ui_globals.edit_profile_index,
+				_saved_game_file_default_profile_bit))
+			{
+				if (ustrncmp(
+					player_ui_globals.edit_profile.current.playlist.name,
+					player_ui_globals.edit_profile.original.playlist.name,
+					NUMBEROF(player_ui_globals.edit_profile.current.playlist.name)))
+				{
+					long new_profile_index;
+
+					SET_FLAG(
+						player_ui_globals.edit_profile.current.playlist.flags,
+						_playlist_profile_system_default_bit,
+						FALSE);
+					new_profile_index = playlist_profile_new(
+						0,
+						player_ui_globals.edit_profile.current.playlist.name);
+					if (new_profile_index != NONE)
+					{
+						playlist_profile_save(
+							new_profile_index,
+							&player_ui_globals.edit_profile.current.playlist);
+						player_ui_globals.edit_profile_index = new_profile_index;
+						if (saved_game_file_get_path_to_enclosing_directory(
+							new_profile_index,
+							directory_path))
+						{
+							saved_game_file_remember_last_used_multiplayer_variant_directory(
+								directory_path);
+						}
+						result = TRUE;
+					}
+					else
+					{
+						error(_error_silent, "failed to save renamed profile to disk");
+					}
+				}
+				else
+				{
+					error(
+						_error_silent,
+						"cannot save over default profiles; must rename and save-as a new profile");
+				}
+			}
+			else
+			{
+				playlist_profile_save(
+					player_ui_globals.edit_profile_index,
+					&player_ui_globals.edit_profile.current.playlist);
+				if (saved_game_file_get_path_to_enclosing_directory(
+					player_ui_globals.edit_profile_index,
+					directory_path))
+				{
+					saved_game_file_remember_last_used_multiplayer_variant_directory(
+						directory_path);
+				}
+				result = TRUE;
+			}
+			break;
+
+		default:
+			error(_error_silent, "failed to save profile because we are not editing one");
+			break;
+	}
+
+	clear_profile_edit_data();
+
+	return result;
 }
 
 boolean player_ui_autolevel_enabled(
@@ -1055,7 +1219,7 @@ void player0_look_invert_pitch(
 	return;
 }
 
-void code_000d0800(
+static void clear_profile_edit_data(
 	void)
 {
 	player_ui_globals.edit_profile_index = NONE;

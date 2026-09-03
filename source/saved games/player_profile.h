@@ -33,6 +33,9 @@ boolean player_profile_get_enclosing_directory_path(
 boolean player_profile_get(
 	long player_profile_index,
 	struct player_profile *profile);
+void player_profile_save(
+	long player_profile_index,
+	struct player_profile *profile);
 void player_profile_get_highest_completed_solo_level(
 	struct player_profile *profile,
 	short *level,

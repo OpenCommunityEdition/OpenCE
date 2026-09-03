@@ -18,6 +18,20 @@ header included in hcex build.
 
 /* ---------- prototypes/SAVED_GAME_FILES.C */
 
+long saved_game_file_find_profile_index_for_directory_path(
+	char *directory_path,
+	long file_type);
+boolean saved_game_file_get_path_to_enclosing_directory(
+	long profile_index,
+	char *directory_path);
+word saved_game_file_get_type(
+	long profile_index);
+void saved_game_file_remember_last_used_multiplayer_variant_directory(
+	char *directory_path);
+void saved_game_file_remember_player1_last_used_profile_directory(
+	char *directory_path);
+boolean saved_game_file_retrieve_player1_last_used_profile_directory(
+	char *directory_path);
 boolean saved_game_files_take_mutex(
 	void);
 void saved_game_files_release_mutex(
