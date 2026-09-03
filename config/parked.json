@@ -211,44 +211,6 @@
       }
     },
     {
-      "unit": "source/effects/particles",
-      "function": "_code_0008fcd0",
-      "class": "asm-implemented",
-      "evidence": "Parked under asm-implemented: our source implements this function with MSVC inline assembly, so it is byte-identical to January by construction rather than by reconstruction. This violates the campaign's standing 'no asm' rule, and the two rules interact badly - an assembly transcription always compares exact, so section_infos_equal cannot distinguish it from a genuine C recovery; only reading the source can. Parked rather than deleted so the exact tally stops counting it as a C reconstruction while the bytes remain reproducible. Same treatment as the pre-existing vendored-assembly park for matrix4x3_multiply. To unpark, replace the __asm with C that gates exact. Audit and full inventory: research/asm_credited_functions_audit.md. Whole body is a single __asm block; no C remains.",
-      "measurements": {
-        "target": {
-          "size": 16,
-          "relocation_count": 1,
-          "normalized_sha256": "41eed58c9a0765d9d594f1473bc1c296a81493ee3d057b5d8313a81cc9f1b470"
-        },
-        "base": {
-          "size": 16,
-          "relocation_count": 1,
-          "normalized_sha256": "41eed58c9a0765d9d594f1473bc1c296a81493ee3d057b5d8313a81cc9f1b470"
-        },
-        "objdiff_percent": 100
-      }
-    },
-    {
-      "unit": "source/effects/particles",
-      "function": "_code_0008ff30",
-      "class": "asm-implemented",
-      "evidence": "Parked under asm-implemented: our source implements this function with MSVC inline assembly, so it is byte-identical to January by construction rather than by reconstruction. This violates the campaign's standing 'no asm' rule, and the two rules interact badly - an assembly transcription always compares exact, so section_infos_equal cannot distinguish it from a genuine C recovery; only reading the source can. Parked rather than deleted so the exact tally stops counting it as a C reconstruction while the bytes remain reproducible. Same treatment as the pre-existing vendored-assembly park for matrix4x3_multiply. To unpark, replace the __asm with C that gates exact. Audit and full inventory: research/asm_credited_functions_audit.md. Whole body is a single __asm block; no C remains.",
-      "measurements": {
-        "target": {
-          "size": 80,
-          "relocation_count": 6,
-          "normalized_sha256": "959a33a1ae57de3e7dd04e07b55a619b337b744570172bfc142f692253108258"
-        },
-        "base": {
-          "size": 80,
-          "relocation_count": 6,
-          "normalized_sha256": "959a33a1ae57de3e7dd04e07b55a619b337b744570172bfc142f692253108258"
-        },
-        "objdiff_percent": 100
-      }
-    },
-    {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_hardware_bitmaps",
       "function": "_rasterizer_bitmap_new",
       "class": "instruction-scheduling",
