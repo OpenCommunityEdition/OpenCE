@@ -66,6 +66,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "memory/data.h"
 #include "objects/objects.h"
+#include "physics/point_physics.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 #include "tag_files/tag_groups.h"
@@ -77,6 +78,9 @@ enum
 	MAXIMUM_FLAG_WIDTH = 40,
 	MAXIMUM_FLAG_VERTICES = 225,
 	MAXIMUM_FLAG_CELLS = 196,
+	MAXIMUM_FLAG_HEIGHT = 40,
+	MAXIMUM_FLAG_ATTACHMENT_POINTS = 5,
+	NUMBER_OF_FLAG_NEIGHBORS = 3,
 };
 
 enum trailing_edge_shape
@@ -456,6 +460,165 @@ void flag_update_attachment(
 	}
 
 	flag->first_attachment = *attachment_points;
+
+	return;
+}
+
+void flag_update(
+	struct flag_datum_prefix *flag,
+	struct flag_definition *definition,
+	real delta)
+{
+	short weather_palette_index;
+	real_point3d attachment_points[MAXIMUM_FLAG_ATTACHMENT_POINTS];
+	short attachment_y[MAXIMUM_FLAG_ATTACHMENT_POINTS];
+	struct location attachment_location;
+	real_point3d attachment_force_points[MAXIMUM_FLAG_HEIGHT];
+	short y_attachments[MAXIMUM_FLAG_HEIGHT];
+	boolean underwater;
+	short sweep_forward = !flag->update_state;
+
+	object_get(flag->object_index);
+	flag_update_attachment(
+		flag,
+		definition,
+		&attachment_location,
+		attachment_points,
+		attachment_force_points,
+		attachment_y,
+		y_attachments);
+	underwater = scenario_location_underwater(
+		&attachment_location,
+		&attachment_points[definition->attachment_points.count - 1],
+		&weather_palette_index);
+
+	if (!flag->noop)
+	{
+		real parent_distances[NUMBER_OF_FLAG_NEIGHBORS];
+		point2d const parent_deltas[NUMBER_OF_FLAG_NEIGHBORS] = {{-1, 0}, {0, 1}, {0, -1}};
+		short column;
+		short i;
+
+		for (i = 0; i < NUMBER_OF_FLAG_NEIGHBORS; i++)
+		{
+			real dx = parent_deltas[i].x * definition->cell_width_scale;
+			real dy = parent_deltas[i].y * definition->cell_height_scale;
+
+			parent_distances[i] = square_root(dy*dy + dx*dx);
+		}
+
+		for (column = 0; column < definition->width; column++)
+		{
+			short row_step = sweep_forward ? 1 : -1;
+			short row;
+
+			for (row = sweep_forward ? 0 : definition->height - 1;
+				sweep_forward ? row < definition->height : row > 0;
+				row += row_step)
+			{
+				struct flag_vertex_datum *vertex = flag_datum_get_vertex(flag, definition, column, row);
+				short neighbor_count = 0;
+				unsigned long physics_flags = FLAG(_point_physics_ignore_position_bit);
+				real_point3d new_position;
+				struct location new_location;
+				real_vector3d turbulence;
+				real wind_scale;
+				short attachment_index_for_row;
+
+				if (!underwater)
+				{
+					wind_scale = point_physics_definition_get(definition->physics.index)->air_friction *
+						definition->wind_noise * 0.0004f;
+				}
+				else
+				{
+					wind_scale = point_physics_definition_get(definition->physics.index)->water_friction *
+						definition->wind_noise * 0.00016f;
+					SET_FLAG(physics_flags, _point_physics_ignore_position_under_water_bit, TRUE);
+				}
+
+				local_random_direction3d(&turbulence);
+				scale_vector3d(&turbulence, wind_scale, &turbulence);
+
+				new_position = vertex->position;
+				new_location = attachment_location;
+				point_physics_update(
+					physics_flags,
+					point_physics_definition_get(definition->physics.index),
+					&new_location,
+					weather_palette_index,
+					&new_position,
+					&vertex->velocity,
+					&turbulence,
+					NULL,
+					NULL,
+					0.02f,
+					delta);
+
+				if (column != 0 || (attachment_index_for_row = y_attachments[row]) == NONE)
+				{
+					real_point3d estimated_positions[NUMBER_OF_FLAG_NEIGHBORS];
+					real_vector3d weighted_position;
+					real weight_sum;
+					real inverse_weight;
+
+					for (i = 0; i < NUMBER_OF_FLAG_NEIGHBORS; i++)
+					{
+						short neighbor_column = column + parent_deltas[i].x;
+						short neighbor_row = row + parent_deltas[i].y;
+
+						if (neighbor_column >= 0 && neighbor_column < definition->width &&
+							neighbor_row >= 0 && neighbor_row < definition->height)
+						{
+							struct flag_vertex_datum *neighbor = flag_datum_get_vertex(flag, definition, neighbor_column, neighbor_row);
+							real_vector3d direction;
+
+							vector_from_points3d(&neighbor->position, &new_position, &direction);
+							normalize3d(&direction);
+							estimated_positions[neighbor_count].x = neighbor->position.x + direction.i * parent_distances[i];
+							estimated_positions[neighbor_count].y = neighbor->position.y + direction.j * parent_distances[i];
+							estimated_positions[neighbor_count].z = neighbor->position.z + direction.k * parent_distances[i];
+							neighbor_count++;
+						}
+					}
+
+					weight_sum = 0.0f;
+					weighted_position.i = weighted_position.j = weighted_position.k = 0.0f;
+					for (i = 0; i < neighbor_count; i++)
+					{
+						real weight = (column != 0 && i == 0) ? 4.0f : 1.0f;
+
+						weighted_position.i += estimated_positions[i].x * weight;
+						weighted_position.j += estimated_positions[i].y * weight;
+						weighted_position.k += estimated_positions[i].z * weight;
+						weight_sum += weight;
+					}
+
+					if (column == 0)
+					{
+						weighted_position.i += attachment_force_points[row].x * 4.0f;
+						weighted_position.j += attachment_force_points[row].y * 4.0f;
+						weighted_position.k += attachment_force_points[row].z * 4.0f;
+						weight_sum += 4.0f;
+					}
+
+					inverse_weight = 1.0f / weight_sum;
+					new_position.x = inverse_weight * weighted_position.i;
+					new_position.y = inverse_weight * weighted_position.j;
+					new_position.z = inverse_weight * weighted_position.k;
+				}
+				else
+				{
+					new_position = attachment_points[attachment_index_for_row];
+				}
+
+				vertex->velocity.i = (new_position.x - vertex->position.x) * (1.0f / delta);
+				vertex->velocity.j = (new_position.y - vertex->position.y) * (1.0f / delta);
+				vertex->velocity.k = (new_position.z - vertex->position.z) * (1.0f / delta);
+				vertex->position = new_position;
+			}
+		}
+	}
 
 	return;
 }

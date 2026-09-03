@@ -3027,6 +3027,25 @@
         },
         "objdiff_percent": 86.36364
       }
+    },
+    {
+      "unit": "source/objects/widgets/flags",
+      "function": "_flag_update",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed cloth-simulation update from January's instruction and relocation topology, the independent later HaloCEA implementation, and authenticated HCEX PDB local names and types. The retained ordinary C updates marker attachments, queries underwater state, computes the three parent rest distances, alternates the row sweep, applies air/water point physics and turbulence, snaps attached vertices, relaxes every other vertex against valid neighbors and attachment force points with the target's 4:1 weights, and derives velocity from the position delta. Target and candidate share the 1,184-byte padded envelope and all 26 ordered relocation identities; objdiff reports 96.43883 percent similarity. The remaining gap is a VC7 scalar stack-home/register-allocation fixed point: January assigns row/neighbor-count/wind/column/weight to -4/-8/-0xC/-0x10/-0x14, while the natural candidate chooses -8/-0xC/-4/-0x14/-0x10 and carries row in EDX through part of the relaxation path. Fable's declaration-order, scope, arm-order, weight, helper, and loop variants plus a focused PDB-guided pass over declaration order, attachment-index lifetime, row initialization, while/for shape, and physics-flag construction did not improve the strict result without changing correct code generation. The fail-closed classifier returns UNKNOWN, hence unclassified rather than an invented compiler recipe. No point_from_line3d COMDAT, volatile/register forcing, barrier, pragma, assembly, raw offset, fake dependency, forced inline, undefined behavior, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining this scalar-home permutation.",
+      "measurements": {
+        "target": {
+          "size": 1184,
+          "relocation_count": 26,
+          "normalized_sha256": "a8c30b7df9882ad4e154767a3ce63294ebae7d9b8bc5aa1671acc8e034efca6d"
+        },
+        "base": {
+          "size": 1184,
+          "relocation_count": 26,
+          "normalized_sha256": "776ba88304402bf2ae995d27de02026f8a9a6655fe565c6385712bbf55c8d2ee"
+        },
+        "objdiff_percent": 96.43883
+      }
     }
   ]
 }
