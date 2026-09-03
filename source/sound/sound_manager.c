@@ -219,6 +219,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "errors.h"
 #include "data.h"
 #include "cache/sound_cache.h"
 #include "math/real_math.h"
@@ -243,6 +244,7 @@ enum
 {
 	MAXIMUM_SOUND_CHANNELS = 256,
 	MAXIMUM_NUMBER_OF_LOCAL_PLAYERS = 4,
+	MAXIMUM_SOUND_CALLBACK_DATA = 0x30,
 };
 
 enum sound_promotion_result
@@ -286,11 +288,29 @@ enum sound_fade_mode
 	_sound_fade_mode_crossfade,
 };
 
+enum sound_encoding
+{
+	_sound_encoding_mono = 0,
+	_sound_encoding_stereo = 1,
+	NUMBER_OF_SOUND_ENCODINGS = 2,
+};
+
+enum sound_compression
+{
+	_sound_compression_none = 0,
+	_sound_compression_xbox_adpcm = 1,
+	_sound_compression_ima_adpcm = 2,
+	_sound_compression_ogg = 3,
+	NUMBER_OF_SOUND_COMPRESSION_TYPES = 4,
+};
+
 enum sound_datum_flags
 {
-	_sound_datum_delayed_bit,
-	_sound_datum_cached_bit,
-	_sound_datum_inaudible_bit,
+	_sound_delayed_bit,
+	_sound_cached_bit,
+	_sound_inaudible_bit,
+	_sound_waiting_for_cache_bit,
+	NUMBER_OF_SOUND_FLAGS,
 };
 
 enum sound_channel_flags
@@ -562,6 +582,9 @@ static real sound_scale_random_value(
 	real lower_bound_modifier,
 	real upper_bound_modifier,
 	real scale);
+static real source_distance(
+	short listener_index,
+	struct sound_source *source);
 static real source_distance_squared(
 	short listener_index,
 	struct sound_source *source);
@@ -587,6 +610,7 @@ static void sound_stop(
 extern struct data_array *looping_sound_data;
 extern struct data_array *sound_data;
 extern struct sound_channel_datum sound_channels[MAXIMUM_SOUND_CHANNELS];
+extern boolean loud_dialog_hack;
 
 static real const sound_pitch_range_fade_time = 0.5f;
 static real const sound_inaudible_fade_out_time = 2.f;
@@ -926,24 +950,22 @@ static boolean sound_definition_is_playable(
 	long definition_index)
 {
 	struct sound_definition *definition = sound_definition_get(definition_index);
-	struct sound_pitch_range *pitch_range;
 
-	if (!definition->pitch_ranges.count)
+	if (definition->pitch_ranges.count)
 	{
-		return FALSE;
+		struct sound_pitch_range *pitch_range = TAG_BLOCK_GET_ELEMENT(
+			&definition->pitch_ranges,
+			0,
+			struct sound_pitch_range);
+
+		if (pitch_range->permutations.count &&
+			!sound_class_get(definition->sound_class)->disabled)
+		{
+			return TRUE;
+		}
 	}
 
-	pitch_range = TAG_BLOCK_GET_ELEMENT(
-		&definition->pitch_ranges,
-		0,
-		struct sound_pitch_range);
-
-	if (!pitch_range->permutations.count)
-	{
-		return FALSE;
-	}
-
-	return !sound_class_get(definition->sound_class)->disabled;
+	return FALSE;
 }
 
 static struct sound_channel_datum *channel_get(
@@ -988,11 +1010,7 @@ static short sound_definition_promote(
 		definition->promotion_counter;
 	definition->promotion_counter = promotion_counter;
 
-	if (promotion_counter < 0)
-	{
-		promotion_counter = 0;
-	}
-
+	promotion_counter = MAX(promotion_counter, 0);
 	definition->promotion_counter = promotion_counter;
 	definition->promotion_time = sound_manager_globals.render_time;
 	definition->promotion_counter = longest_permutation_length + promotion_counter;
@@ -1056,7 +1074,7 @@ static boolean refresh_sound(
 		sound->playing_channel_index==NONE ||
 			channel_get(sound->playing_channel_index)->sound_index==sound_index);
 
-	if (TEST_FLAG(sound->flags, _sound_datum_delayed_bit) ||
+	if (TEST_FLAG(sound->flags, _sound_delayed_bit) ||
 		!sound->track_proc ||
 		sound->start_time >= sound_manager_globals.render_time ||
 		sound->track_proc(
@@ -1394,7 +1412,7 @@ static void sound_stop(
 		channel_stop(sound->playing_channel_index);
 		sound->playing_channel_index = NONE;
 	}
-	else if (TEST_FLAG(sound->flags, _sound_datum_cached_bit))
+	else if (TEST_FLAG(sound->flags, _sound_cached_bit))
 	{
 		struct sound_permutation *permutation = sound_permutation_get(
 			sound->definition_index,
@@ -1429,6 +1447,53 @@ static void sound_stop(
 	sound_delete(sound_index);
 
 	return;
+}
+
+static real source_distance(
+	short listener_index,
+	struct sound_source *source)
+{
+	real distance;
+
+	switch (source->spatialization_mode)
+	{
+	case _sound_spatialization_mode_none:
+		distance = 0.f;
+		break;
+
+	case _sound_spatialization_mode_absolute:
+		{
+			real_point3d const *listener_position =
+				&listener_get(listener_index)->matrix.position;
+			real x = listener_position->x - source->location.position.x;
+			real y = listener_position->y - source->location.position.y;
+			real z = listener_position->z - source->location.position.z;
+
+			distance = square_root(y * y + (x * x + z * z));
+		}
+		match_assert(
+			"c:\\halo\\SOURCE\\sound\\sound_manager.c",
+			0x58D,
+			listener_get(listener_index)->valid);
+		break;
+
+	case _sound_spatialization_mode_relative:
+		distance = square_root(
+			source->location.position.x * source->location.position.x +
+			source->location.position.y * source->location.position.y +
+			source->location.position.z * source->location.position.z);
+		break;
+
+	default:
+		match_vassert(
+			"c:\\halo\\SOURCE\\sound\\sound_manager.c",
+			0x593,
+			FALSE,
+			NULL);
+		break;
+	}
+
+	return distance;
 }
 
 static real source_distance_squared(
@@ -1492,6 +1557,199 @@ void sound_stop_all(
 	sound_manager_globals.game_time_when_no_scripted_dialog_will_be_playing = 0;
 
 	return;
+}
+
+long sound_new_impulse(
+	long definition_index,
+	struct sound_source *source,
+	long source_identifier,
+	boolean (*track_proc)(
+		long source_identifier,
+		void const *track_data,
+		struct sound_source *source),
+	void const *track_data,
+	short track_data_size,
+	boolean is_local_player)
+{
+	struct sound_definition *definition = sound_definition_get(definition_index);
+	real scale = source->scale;
+	long result = NONE;
+	short listener_index;
+	short promotion_result;
+	long sound_index;
+	struct sound_datum *sound;
+	long travel_milliseconds;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\sound_manager.c",
+		0x240,
+		track_data_size<=MAXIMUM_SOUND_CALLBACK_DATA);
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\sound_manager.c",
+		0x242,
+		source->spatialization_mode==_sound_spatialization_mode_none ||
+			valid_real_normal3d(&source->location.forward));
+
+	if (definition->sound_class == _sound_class_scripted_dialog_to_player ||
+		definition->sound_class == _sound_class_scripted_dialog_to_other ||
+		definition->sound_class ==
+			_sound_class_scripted_dialog_force_unspatialized)
+	{
+		long game_time = game_time_get();
+		long dialog_stop_time = game_time +
+			30 * definition->longest_permutation_length / 1000 + 10;
+
+		if (dialog_stop_time >
+			sound_manager_globals.game_time_when_no_scripted_dialog_will_be_playing)
+		{
+			sound_manager_globals.game_time_when_no_scripted_dialog_will_be_playing =
+				dialog_stop_time;
+		}
+
+		if (loud_dialog_hack)
+		{
+			source->spatialization_mode = _sound_spatialization_mode_none;
+		}
+	}
+
+	if (definition->sound_class ==
+		_sound_class_scripted_dialog_force_unspatialized)
+	{
+		source->spatialization_mode = _sound_spatialization_mode_none;
+	}
+
+	if (!sound_manager_globals.initialized || !sound_manager_globals.enabled)
+	{
+		return result;
+	}
+
+	if (definition->compression != _sound_compression_xbox_adpcm ||
+		(definition->encoding != _sound_encoding_stereo &&
+			(definition->encoding != _sound_encoding_mono ||
+				definition->sample_rate != 0)))
+	{
+		error(
+			_error_silent,
+			"attempt to play a sound that was not a mono 22k compressed sound or a stereo 22k or 44k compressed sound.");
+		return result;
+	}
+
+	if (source->scale == 0.f && definition->zero_gain_modifier == 0.f)
+	{
+		return result;
+	}
+
+	if (real_seed_random(get_global_local_random_seed_address()) <=
+		sound_scale_value(
+			definition->skip_fraction,
+			definition->zero_skip_fraction_modifier,
+			definition->one_skip_fraction_modifier,
+			scale))
+	{
+		return result;
+	}
+
+	{
+		real maximum_distance =
+			sound_definition_get_maximum_distance(definition_index);
+
+		if (!sound_definition_is_playable(definition_index))
+		{
+			return result;
+		}
+
+		listener_index = source_audible(source, maximum_distance);
+	}
+
+	if (listener_index == NONE)
+	{
+		return result;
+	}
+
+	promotion_result = sound_definition_promote(definition_index);
+	if (promotion_result != _sound_promotion_dont)
+	{
+		if (promotion_result == _sound_promotion_do)
+		{
+			return sound_new_impulse(
+				definition->promotion_sound.index,
+				source,
+				source_identifier,
+				track_proc,
+				track_data,
+				track_data_size,
+				is_local_player);
+		}
+
+		return result;
+	}
+
+	sound_index = datum_new(sound_data);
+	if (sound_index == NONE)
+	{
+		return result;
+	}
+
+	result = sound_index;
+	sound = sound_get(sound_index);
+	travel_milliseconds = sound_travel_milliseconds(
+		source_distance(listener_index, source));
+
+	sound->definition_index = definition_index;
+	sound->playing_channel_index = NONE;
+	sound->listener_index = listener_index;
+	sound->type = _sound_impulse;
+	sound->source_identifier = source_identifier;
+	sound->flags = 0;
+	sound->pitch = sound_scale_random_value(
+		definition->random_pitch_bounds.lower,
+		definition->random_pitch_bounds.upper,
+		definition->zero_pitch_modifier,
+		definition->one_pitch_modifier,
+		source->scale);
+	sound->source = *source;
+	sound->track_proc = track_proc;
+
+	if (track_proc)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\sound\\sound_manager.c",
+			0x28E,
+			sound->track_data);
+		csmemcpy(sound->track_data, track_data, track_data_size);
+	}
+
+	sound->pitch_range_index = sound_definition_find_pitch_range_by_pitch(
+		definition,
+		sound->pitch,
+		NONE);
+	sound->permutation_index = sound_definition_next_permutation(
+		definition,
+		sound->pitch_range_index,
+		NONE);
+	sound->loop_track_index = NONE;
+	sound->fade_stop_time = 0;
+	sound->fade_start_time = 0;
+	_sound_cache_sound_request(
+		sound_permutation_get(
+			sound->definition_index,
+			sound->pitch_range_index,
+			sound->permutation_index),
+		FALSE,
+		TRUE,
+		FALSE);
+
+	if (travel_milliseconds > speed_of_sound_threshold)
+	{
+		sound->start_time = sound_manager_globals.render_time + travel_milliseconds;
+		SET_FLAG(sound->flags, _sound_delayed_bit, TRUE);
+	}
+	else
+	{
+		sound->start_time = sound_manager_globals.render_time;
+	}
+
+	return result;
 }
 
 void sound_dispose_from_old_map(
@@ -1652,27 +1910,27 @@ static void refresh_sounds(
 
 			if (listener_index == NONE)
 			{
-				if (!TEST_FLAG(sound->flags, _sound_datum_inaudible_bit))
+				if (!TEST_FLAG(sound->flags, _sound_inaudible_bit))
 				{
 					sound_start_fade(
 						_sound_fade_mode_linear,
 						sound_inaudible_fade_out_time,
 						NONE,
 						sound_index);
-					SET_FLAG(sound->flags, _sound_datum_inaudible_bit, TRUE);
+					SET_FLAG(sound->flags, _sound_inaudible_bit, TRUE);
 				}
 			}
 			else
 			{
 				sound->listener_index = listener_index;
-				if (TEST_FLAG(sound->flags, _sound_datum_inaudible_bit))
+				if (TEST_FLAG(sound->flags, _sound_inaudible_bit))
 				{
 					sound_start_fade(
 						_sound_fade_mode_linear,
 						sound_inaudible_fade_back_in_time,
 						sound_index,
 						NONE);
-					SET_FLAG(sound->flags, _sound_datum_inaudible_bit, FALSE);
+					SET_FLAG(sound->flags, _sound_inaudible_bit, FALSE);
 				}
 			}
 

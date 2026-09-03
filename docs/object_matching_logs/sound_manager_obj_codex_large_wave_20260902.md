@@ -113,3 +113,44 @@ The HCEA PDB enumerates the complete sound lifecycle as `_sound_impulse = 0`,
 `_sound_looping` label. The PDB signature for `source_distance_squared` is
 `static float source_distance_squared(short, struct sound_source *)`, so its
 source parameter is intentionally non-const.
+
+## Impulse-construction wave
+
+After rebasing onto canonical integration commit `9b0d6fc3e`, the next
+production-emitted cluster was reconstructed through the public
+`sound_new_impulse` root. January target control flow and field offsets are the
+authority; the HCEA PDB supplies the public signature and semantic names. This
+wave moves the production gate from 22 exact, 1 residual, 42 unwritten to 27
+exact, 6 residual, 32 unwritten.
+
+New exact functions and padded bytes are:
+
+- `_source_distance` (208);
+- `_source_distance_squared` (192), previously proven only under diagnostic
+  refresh-cluster exposure;
+- `_listener_get` (64);
+- `_sound_scale_random_value` (48);
+- `_sound_scale_value` (32).
+
+The exact gain is five functions and 544 padded bytes. The 976-byte
+`_sound_new_impulse` root is an honest 960-byte fuzzy reconstruction with the
+target relocation count. It naturally emits four further evidence-backed
+residuals: `_sound_definition_is_playable` (matching envelope),
+`_sound_definition_promote` (144 versus 160), `_sound_travel_milliseconds`
+(exact instructions, semantic-constant relocation identity only), and the
+previously documented `_source_audible` residual. Each received one natural
+source-level closure attempt and is parked without register, pragma, volatile,
+dummy, or aggregate steering.
+
+The PDB-authenticated sound flag names (`_sound_delayed_bit`,
+`_sound_cached_bit`, `_sound_inaudible_bit`, and
+`_sound_waiting_for_cache_bit`) replace provisional datum-prefixed labels.
+The tempting 112-byte `_sound_idle` leaf was not forced: its real private
+dependency is the still-unwritten 864-byte `_update_channels`, so no fake
+external linkage or placeholder body was retained.
+
+Final verification rebuilt all 94 affected translation units with `ninja` and
+reported zero semantic unit errors. `units.obj` remains 189 exact with no
+residual or unwritten functions; `sound_classes.obj` remains 12/0/0 and
+`sound_definitions.obj` remains 7/0/0. The fake-match scan reports zero review
+leads, `git diff --check` is clean, and all 261 Python tests pass.

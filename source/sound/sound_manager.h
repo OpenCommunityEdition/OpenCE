@@ -14,6 +14,8 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct sound_source;
+
 /* ---------- prototypes/SOUND_MANAGER.C */
 
 boolean sound_valid_for_channel(
@@ -45,6 +47,17 @@ void sound_stop_impulse(
 void sound_stop_impulse_by_source_and_definition(
 	long source_identifier,
 	long definition_index);
+long sound_new_impulse(
+	long definition_index,
+	struct sound_source *source,
+	long source_identifier,
+	boolean (*track_proc)(
+		long source_identifier,
+		void const *track_data,
+		struct sound_source *source),
+	void const *track_data,
+	short track_data_size,
+	boolean is_local_player);
 void sound_pause(
 	boolean paused);
 void sound_idle(
