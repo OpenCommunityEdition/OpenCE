@@ -2476,6 +2476,215 @@
         },
         "objdiff_percent": 99.99029
       }
+    },
+    {
+      "unit": "source/structures/structure_visibility",
+      "function": "_structure_visibility_traverse_subclusters",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed subcluster visibility traversal from January's instruction, relocation, assertion-string, and profile-section topology, with HaloCEA's named Xbox implementation as independent semantic evidence. The retained function clears the environment surface flags, walks every rendered cluster and its visible subclusters, tests each subcluster frustum cube, marks environment surfaces, and records the cluster-local visible range. Target and candidate share the 416-byte padded envelope and all 24 relocations; objdiff reports 98.42519 percent. The remaining normalized-byte difference is ordinary VC7 expression/register scheduling, but no narrower fail-closed compiler mechanism is proved, so the entry remains unclassified. No volatile/register forcing, pragma, assembly, raw overlay, fake dependency, forced inline, or nonsensical branch is retained. Reopen for authoritative January source/local records or a natural same-compiler topology donor.",
+      "measurements": {
+        "target": {
+          "size": 416,
+          "relocation_count": 24,
+          "normalized_sha256": "2d0107d50065a36b23c64015836d3765e3ee36a5878a238b689f3c7d2a8e6ca3"
+        },
+        "base": {
+          "size": 416,
+          "relocation_count": 24,
+          "normalized_sha256": "49dc2e10af3b59701ca5001e862dc2fc844843a19cb1559d7e61950b87271977"
+        },
+        "objdiff_percent": 98.42519
+      }
+    },
+    {
+      "unit": "source/structures/structure_visibility",
+      "function": "_structure_visibility_traverse_surface_lists",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the complete fallback visibility path used by old BSPs without subclusters. January's code, relocations, exact diagnostic string, and profile ownership establish the loop shape; HaloCEA independently supplies the named behavior. The retained typed C emits the one-time reimport warning in the caller, clears surface flags, walks every rendered cluster surface list, marks surfaces, and records each rendered cluster's surface span. Target and candidate share the 528-byte padded envelope and all 27 relocations; objdiff reports 71.402435 percent. The residual is distributed VC7 loop/register scheduling rather than a proved source defect, so it is honestly unclassified. No barriers, volatile/register forcing, pragma, assembly, raw offset logic, fake dependency, forced inline, or semantic distortion is retained. Reopen for authoritative January source/local records or a natural same-compiler donor.",
+      "measurements": {
+        "target": {
+          "size": 528,
+          "relocation_count": 27,
+          "normalized_sha256": "2a6617213b8569bb3d60a0106335609d210a6abb8a1d87a43c061f6413abf2b2"
+        },
+        "base": {
+          "size": 528,
+          "relocation_count": 27,
+          "normalized_sha256": "9aeaac4160f423a5cbe83cf89b2247549e2e255f31b77ad393bfe9218bf30db5"
+        },
+        "objdiff_percent": 71.402435
+      }
+    },
+    {
+      "unit": "source/structures/structure_visibility",
+      "function": "_planes_intersect_rectangle",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked with the complete geometric classifier retained in ordinary typed C. January proves the three-state out/spanning/in result, plane loop, positive/negative support-corner construction, and assertion topology; HaloCEA's named implementation corroborates those semantics. The function uses real_rectangle3d and real_plane3d rather than raw overlays and returns immediately when a plane excludes the box. Target is 384 padded bytes and the candidate 368, with all eight relocation identities preserved; objdiff reports 91.68148 percent. The remaining 16-byte envelope gap is a VC7 aggregate-copy/lifetime choice for the support points, but available evidence does not prove a unique compiler recipe, so the entry remains unclassified. No assembly, volatile/register forcing, pragma, fake dependency, forced inline, or nonsensical geometry is retained. Reopen for January source/local records or a natural same-compiler aggregate donor.",
+      "measurements": {
+        "target": {
+          "size": 384,
+          "relocation_count": 8,
+          "normalized_sha256": "31b090b9939bf64edf6131c83ca8454f4baf80674c81d7a75982c5d4524b6c90"
+        },
+        "base": {
+          "size": 368,
+          "relocation_count": 8,
+          "normalized_sha256": "f226643f238a408f869bea7c357da7c08f3aaa5bedd522644560f92d8f4be194"
+        },
+        "objdiff_percent": 91.68148
+      }
+    },
+    {
+      "unit": "source/structures/structure_visibility",
+      "function": "_structure_visibility_build_surfaces_traverse_clusters",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the complete cluster/subcluster surface collector from January's control flow, relocations, and assertions, with HaloCEA's named Xbox routine as independent semantic evidence. The retained function validates cluster indices, culls subclusters against the requested bounds and planes, de-duplicates environment surfaces with cseries bit-vector macros, respects maximum_count, and returns the collected count. Target and candidate share the 352-byte padded envelope and all seven relocations; objdiff reports 77.694916 percent. The remaining difference is ordinary loop/register scheduling and no unique fail-closed compiler mechanism is established, so it is unclassified. No raw bit arithmetic, volatile/register forcing, pragma, assembly, fake dependency, forced inline, or semantic shortcut is retained. Reopen for authoritative January source/local records or a natural same-compiler donor.",
+      "measurements": {
+        "target": {
+          "size": 352,
+          "relocation_count": 7,
+          "normalized_sha256": "cb3e624783365b287cb7bfae736a0f2a0571c7855a0f99fc706349e98c54ed35"
+        },
+        "base": {
+          "size": 352,
+          "relocation_count": 7,
+          "normalized_sha256": "b7e4c3b369bcc5b759d721a6e5a36c0814bfe98ec24e43e227c05489c2ef55c4"
+        },
+        "objdiff_percent": 77.694916
+      }
+    },
+    {
+      "unit": "source/structures/structure_visibility",
+      "function": "_structure_visibility_build_surfaces_traverse_leaf",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked with the full recursive BSP-leaf surface collector reconstructed from January's instruction, relocation, bounds-dequantization, and assertion topology and cross-checked against HaloCEA's named implementation. The retained typed C dequantizes the leaf bounds, combines box/plane intersection states, walks the leaf surface references, filters against rendered environment surfaces, de-duplicates with bit-vector macros, and respects maximum_count. Target and candidate share the 480-byte padded envelope and all 27 relocations; objdiff reports 91.46154 percent. The residual is ordinary VC7 local/register scheduling without a uniquely proved source mechanism, hence unclassified. No inline-schedule workaround, raw overlay, volatile/register forcing, pragma, assembly, fake dependency, or nonsensical branch is retained. Reopen for authoritative January source/local records or a natural same-compiler donor.",
+      "measurements": {
+        "target": {
+          "size": 480,
+          "relocation_count": 27,
+          "normalized_sha256": "89ca9208599f6ce411ed2f8c1f4979a14ce42172b6ff9e0f3d62f4a68263cc1a"
+        },
+        "base": {
+          "size": 480,
+          "relocation_count": 27,
+          "normalized_sha256": "55702e72a3c51ba39787b11868194982262464dd5ecee1d9e9cd35a25df5cc93"
+        },
+        "objdiff_percent": 91.46154
+      }
+    },
+    {
+      "unit": "source/structures/structure_visibility",
+      "function": "_portal_hull_from_points",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the complete portal projection helper from January's projection calls, assertion strings, loop shape, and return topology, with HaloCEA providing the authenticated private name and behavior. The retained typed C projects each real_point3d through the current camera/frustum, rejects a hull only when every point is behind the screen plane, computes the 2D convex hull, and returns January's three-state result. Target is 480 padded bytes and the candidate 464, with all 16 relocation identities preserved; objdiff reports 85.31645 percent. The remaining 16-byte gap spans VC7 local/register and floating-point scheduling, with no unique source recipe proved, so the entry is unclassified. No representation pun, volatile/register forcing, pragma, assembly, fake dependency, forced inline, or geometric distortion is retained. Reopen for authoritative January source/local records or a natural same-compiler donor.",
+      "measurements": {
+        "target": {
+          "size": 480,
+          "relocation_count": 16,
+          "normalized_sha256": "5d359f8240cd82db678d5851249806a2530dddb8ab29ef0aba1edf1beaa5b633"
+        },
+        "base": {
+          "size": 464,
+          "relocation_count": 16,
+          "normalized_sha256": "004a86dfae5e2df2c0c60a4d98e0f845725354a5dfc8d133f14a03833571924d"
+        },
+        "objdiff_percent": 85.31645
+      }
+    },
+    {
+      "unit": "source/structures/structure_visibility",
+      "function": "_structure_visibility_find_mirror",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked with the complete mirror-selection path retained in typed C. January's instructions, relocations, assertion/error strings, portal-plane tests, shader lookup, and render-camera call graph establish the implementation; HaloCEA independently corroborates the named routine. The function walks visible clusters and mirrors, rejects back-facing/off-frustum polygons, transforms the mirror plane into camera space, resolves the environment shader through a typed tag macro, and reports conflicting visible mirrors. Target is 704 padded bytes and candidate 688, with all 18 relocation identities preserved; objdiff reports 88.52941 percent. The residual spans VC7 aggregate/register/floating-point scheduling rather than a proved semantic difference, so it remains unclassified. No raw tag_get cast, volatile/register forcing, pragma, assembly, fake dependency, forced inline, or false mirror branch is retained. Reopen for authoritative January source/local records or a natural same-compiler donor.",
+      "measurements": {
+        "target": {
+          "size": 704,
+          "relocation_count": 18,
+          "normalized_sha256": "a73ca94621d5523246b92ee34dcf234be6e2f91541132472ba99facd1d8afbad"
+        },
+        "base": {
+          "size": 688,
+          "relocation_count": 18,
+          "normalized_sha256": "83b7511460ef807c971256bcbc8dd69b3d6ba18a781978b69fa70fac9c458c8e"
+        },
+        "objdiff_percent": 88.52941
+      }
+    },
+    {
+      "unit": "source/structures/structure_visibility",
+      "function": "_structure_visibility_build_surfaces_traverse_node",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the complete recursive BSP-node collector from January's disassembly, relocation identities, dequantization calls, and assertions, with HaloCEA's named Xbox implementation as independent semantic evidence. The retained typed C dequantizes node bounds, propagates the three-state box/plane intersection, culls child sides by the sphere/plane distance, and recursively dispatches to node or leaf helpers while respecting the output capacity. Target is 608 padded bytes and candidate 624, with all 26 relocation identities preserved; objdiff reports 74.99083 percent. The 16-byte difference is distributed VC7 recursion/register/lifetime scheduling and no unique compiler mechanism is proved, so it remains unclassified. No raw BSP overlay, volatile/register forcing, pragma, assembly, fake dependency, forced inline, or branch distortion is retained. Reopen for authoritative January source/local records or a natural same-compiler donor.",
+      "measurements": {
+        "target": {
+          "size": 608,
+          "relocation_count": 26,
+          "normalized_sha256": "4724859cbb5d84ee92fc37ec79de6188c26811c92a47e3d92bbac615fad48925"
+        },
+        "base": {
+          "size": 624,
+          "relocation_count": 26,
+          "normalized_sha256": "26c73014d2655b888f7f90d137969c278387aff8d196656e63a6108c38325999"
+        },
+        "objdiff_percent": 74.99083
+      }
+    },
+    {
+      "unit": "source/structures/structure_visibility",
+      "function": "_structure_visibility_traverse_cluster",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked with the full recursive portal-cluster traversal reconstructed from January's code, 53-relocation call graph, assertions, error strings, PVS bit operations, and profile context, and independently checked against HaloCEA's named behavior. The retained typed C guards recursion with the visited bit vector, creates or grows rendered clusters, optionally draws the visible hull, projects and intersects neighboring portal hulls, handles degenerate/intersection-failure cases, applies far-plane distance gating, and clears the visit bit on return. Target is 912 padded bytes with 53 relocations; candidate is 896 with 51, and objdiff reports 88.952896 percent. The residual spans VC7 recursion, aggregate, and call scheduling and is not attributable to a uniquely proved compiler recipe, so it remains unclassified. No raw addresses, volatile/register forcing, pragma, assembly, fake dependency, forced inline, or semantically false path is retained. Reopen for authoritative January source/local records or a natural same-compiler donor.",
+      "measurements": {
+        "target": {
+          "size": 912,
+          "relocation_count": 53,
+          "normalized_sha256": "c1053f49f6c23c306099d9cd9d3e63e55b53de53558e4bb4f9b79c89814e6c6d"
+        },
+        "base": {
+          "size": 896,
+          "relocation_count": 51,
+          "normalized_sha256": "9a6ca252add3cc9dbe256e5d219904c01212820293084cfea43713752005a6b8"
+        },
+        "objdiff_percent": 88.952896
+      }
+    },
+    {
+      "unit": "source/structures/structure_visibility",
+      "function": "_structure_visibility_build_surfaces",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the full public surface-query dispatcher from January's stack layout, assertions, threshold/data relocations, sphere-bounds construction, location lookup, and helper calls, with HaloCEA's public implementation as independent semantic evidence. The retained typed C clears the surface bit vector, derives bounds when absent, chooses BSP traversal for large or unclustered queries, honors caller-supplied clusters, and otherwise discovers clusters in the sphere before collecting surfaces. Target and candidate share the 480-byte padded envelope and all 18 relocations; objdiff reports 83.905266 percent. The remaining normalized-byte difference is ordinary VC7 local/register scheduling without a unique proved source mechanism, hence unclassified. No raw offsets, volatile/register forcing, pragma, assembly, fake dependency, forced inline, or false dispatch is retained. Reopen for authoritative January source/local records or a natural same-compiler donor.",
+      "measurements": {
+        "target": {
+          "size": 480,
+          "relocation_count": 18,
+          "normalized_sha256": "be4b07f707ac21bc863b60cb158f25d47e81dfae8c7f660d21c247eb42b8004f"
+        },
+        "base": {
+          "size": 480,
+          "relocation_count": 18,
+          "normalized_sha256": "377dd1f9dd936c22df84a6ebf609edce112650d9e3802c4823537d8481b63d53"
+        },
+        "objdiff_percent": 83.905266
+      }
+    },
+    {
+      "unit": "source/structures/structure_visibility",
+      "function": "_structure_visibility_compute",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked with the complete public visibility-frame orchestrator reconstructed from January's code, exact warning string, profile-static relocations, PVS branch, surface-path dispatch, and render-global mutations, with HaloCEA's public Xbox behavior as independent evidence. The retained typed C initializes visible clusters and environment surfaces, runs portal traversal, supports the debug PVS override, constructs rendered-cluster frusta, chooses subcluster or legacy surface-list traversal, and emits the one-time old-BSP warning. Target is 576 padded bytes with 48 relocations; candidate is 544 with 47, and objdiff reports 84.6474 percent. The residual spans VC7 loop/register/profile-call scheduling rather than a uniquely proved semantic defect, so it remains unclassified. No macro-hiding, volatile/register forcing, pragma, assembly, fake dependency, forced inline, or nonsensical control flow is retained. Reopen for authoritative January source/local records or a natural same-compiler donor.",
+      "measurements": {
+        "target": {
+          "size": 576,
+          "relocation_count": 48,
+          "normalized_sha256": "0c3960161dffa598a275c6fcb9a7c9635008250354665a1aef8f16e8e48e6ca3"
+        },
+        "base": {
+          "size": 544,
+          "relocation_count": 47,
+          "normalized_sha256": "38d0eea43858053c29745880088ed69ae5d22c9e01b53323387e09f7eb9c8946"
+        },
+        "objdiff_percent": 84.6474
+      }
     }
   ]
 }
