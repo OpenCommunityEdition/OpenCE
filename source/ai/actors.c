@@ -1710,15 +1710,15 @@ static void actor_input_update(
 						actor->input.vehicle_driver_type =
 							_actor_vehicle_driver_directional_flying;
 					}
-				else if (TEST_FLAG(
+					else if (TEST_FLAG(
 						vehicle_flags,
 						_vehicle_ai_driver_nondirectional_bit))
-				{
-					actor->input.vehicle_driver_type =
-						TEST_FLAG(vehicle_flags, _vehicle_ai_driver_hovering_bit)
-							? _actor_vehicle_driver_hovering_ground
-							: _actor_vehicle_driver_nondirectional_ground;
-				}
+					{
+						actor->input.vehicle_driver_type =
+							TEST_FLAG(vehicle_flags, _vehicle_ai_driver_hovering_bit)
+								? _actor_vehicle_driver_hovering_ground
+								: _actor_vehicle_driver_nondirectional_ground;
+					}
 				}
 			}
 

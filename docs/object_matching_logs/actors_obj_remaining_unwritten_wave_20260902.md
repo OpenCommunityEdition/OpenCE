@@ -40,10 +40,10 @@ control flow were retained.
 lookups, object placement, exact failure diagnostics, squad/start-state
 selection, customization, actor creation, cleanup, and activation check. Its
 target/candidate section sizes are 800/816 with identical ordered relocation
-destinations. The close common prefix diverges when VC7 chooses its callee-save
-allocation and a four-byte-larger local frame. Natural declaration-lifetime,
-branch, and local-placement trials did not close the residual, so it is parked
-as `register-allocation`.
+destinations. The close common prefix diverges across several VC7 allocation,
+lifetime, and scheduling choices, including a four-byte-larger local frame.
+Natural declaration-lifetime, branch, and local-placement trials did not close
+the residual, so it remains fail-closed as `unclassified`.
 
 `actor_input_update` retains the complete January call and diagnostic topology:
 swarm center/member sampling, individual and parent-vehicle sampling, AI driver
