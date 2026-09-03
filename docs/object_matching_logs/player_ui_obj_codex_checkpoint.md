@@ -332,3 +332,45 @@ is 12/12 exact, `players.obj` remains 54 exact / 15 residual / 1 unwritten,
 and `hs.obj` remains 445 exact / 3 residual. `ninja all_source` compiles the
 complete source graph, the focused fake-match scan reports zero review leads,
 `git diff --check` passes, and the tool suite passes 258/258 tests.
+
+## Full January closeout (2026-09-03)
+
+The four remaining January functions are now reconstructed as ordinary,
+readable C, and `player_ui.obj` is strict-exact at 42/42 functions and
+4,320/4,320 padded code bytes. This is a net gain of four functions and 848
+bytes over the 38/42 checkpoint. No residual or unwritten function remains.
+
+| Recovered function | Padded bytes | Relocations | Normalized SHA-256 |
+| --- | ---: | ---: | --- |
+| `_generate_default_player_profile` | 64 | 5 | `3a6b0e46083cc5eb3e2bf1cd83e0872248f4cb1d851f74bc17bcc90542379a1e` |
+| `_reset_local_player_profile` | 112 | 8 | `cabfb147e57d5801b63abe7ce0f6fee6ce0a95047326f7296ee2fb2b8895f38e` |
+| `_player_ui_edit_profile_is_dirty` | 240 | 22 | `b6322a19752323a48f6cedf53d16361ed1587cde6b5fd652c7c6bd7cebbb27c2` |
+| `_player_ui_save_profile` | 432 | 40 | `083905a7eeb715ea7ffc8a566571237b4f12a9fa83610b9e8498e613cb869a10` |
+
+The adjacent 16-byte `clear_profile_edit_data` body was already byte-present
+under an address placeholder. Its authenticated private name is now used in
+both the source and symbol map. Reconstructing its real callers lets VC7 emit
+the private out-of-line body naturally; no anchor, linkage escape, forced
+inline, assembly, or code-generation directive is involved.
+
+January disassembly and relocation identity remain authoritative. The CEA
+lift independently corroborates the dirty/save behavior, while the existing
+Xbox UI structures establish the 0x30-byte player profile, 0x68-byte playlist
+profile, flag offsets, 12-wide-character name comparison, and save-as flow.
+The save path uses a semantic default-profile index bit and
+`SET_FLAG`; both profile kinds temporarily clear their typed flag members
+around `csmemcmp`, then restore them. The implementation contains no raw
+offset access, pointer representation cast, fake alias carrier, volatile
+schedule control, or nonsensical byte-matching construct.
+
+Public saved-game and profile declarations now live in
+`saved_game_files.h`, `player_profile.h`, and `playlist_profile.h`.
+The player UI TU no longer owns consumer-local copies. Direct header consumers
+retain their prior gate totals: `main` 73 exact,
+`game_engine` 169 exact, `ui_widget` 54 exact,
+`ui_widget_game_data_input_functions` 27 exact,
+`virtual_keyboard` 18 exact, and `player_ui` 42 exact.
+`units.obj` remains 189/189, the focused fake-match scan reports zero review
+leads, and `git diff --check` passes. The two saved-game units whose paths
+contain spaces remain subject to the known one-TU gate path parser limitation
+and are covered by the aggregate Ninja and stable-verdict admission sweep.
