@@ -45,6 +45,32 @@ dependency, optimizer pragma, raw-byte emission, undefined behavior, invented
 address name, or nonsensical branch was admitted. The rasterizer work preserves
 the January inline schedule and emits no `point_from_line3d` COMDAT.
 
+## Preserved dirty-worktree closure audit
+
+The intentionally preserved dirty donor at
+`C:\halo-worktrees\fable-small-families-20260901` was re-audited after the
+canonical admission rather than treated as an implicit backlog. Its 18 changed
+production translation units were compiled in place with the PID-local gate and
+compared with the same 18 canonical units:
+
+| View | Exact | Residual | Unwritten | Total |
+| --- | ---: | ---: | ---: | ---: |
+| preserved Fable donor | 515 | 53 | 272 | 840 |
+| canonical at `9b0d6fc3e` | 664 | 46 | 130 | 840 |
+
+Canonical is equal or ahead by whole-unit gate on every donor-touched object:
+**149 more exact functions, seven fewer residuals, and 142 fewer unwritten
+functions** in aggregate. No function that is written only in the donor remains
+unwritten under its canonical identity. Apparent name-only differences in the
+older split (`code_<address>`) are the same January functions after canonical
+PDB/HCEA-backed naming, and therefore are not regressions or omitted donor
+credit. The donor's `gate.py` additions are also present canonically; canonical
+additionally corrects its stale `scratch/gate.py` usage text.
+
+This establishes that the dirty worktree is a historical donor archive, not an
+unreviewed implementation queue. It remains untouched so its experiments and
+scratch evidence can still be inspected.
+
 ## Verification
 
 - Fresh `configure.py`, regenerated target split, and full `ninja all_source`:
