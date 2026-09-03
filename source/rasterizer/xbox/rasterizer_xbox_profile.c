@@ -126,7 +126,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cseries/errors.h"
-#include "cseries/profile.h"
+#include "cseries/profile_rasterizer.h"
 #include "rasterizer/rasterizer.h"
 
 #include <xtl.h>

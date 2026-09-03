@@ -87,9 +87,6 @@ typedef char profile_section_field_5F0_offset_assert[
 /* ---------- prototypes/PROFILE.C */
 
 void profile_initialize(void);
-void profile_rasterizer_stats(
-	real gpu_time,
-	__int64 pushbuffer_size);
 
 void profile_enter_private(struct profile_section *objects_update_section);
 void profile_exit_private(struct profile_section *objects_update_section);
