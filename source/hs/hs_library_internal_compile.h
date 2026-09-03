@@ -16,6 +16,13 @@ file has inline function assertions.
 
 /* ---------- prototypes/EXAMPLE.C */
 
+boolean hs_compile_postprocess(
+	char const **error_message,
+	char const **error_source);
+boolean hs_parse_sleep(
+	short function_index,
+	long expression_index);
+
 /* ---------- globals */
 
 /* ---------- public code */

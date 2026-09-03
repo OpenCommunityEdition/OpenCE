@@ -412,6 +412,7 @@ symbols in this file:
 #include "cache/cache_files.h"
 #include "ai/ai_script.h"
 #include "hs/hs.h"
+#include "hs/hs_library_internal_compile.h"
 #include "hs/hs_scenario_definitions.h"
 #include "interface/interface.h"
 #include "memory/data.h"
@@ -651,7 +652,7 @@ static boolean hs_parse_primitive(
 	long expression_index);
 static boolean hs_parse_nonprimitive(
 	long expression_index);
-void hs_concatenate_expression(
+static void hs_concatenate_expression(
 	long expression_index);
 static long hs_tokenize(
 	struct hs_tokenizer *tokenizer);
@@ -798,9 +799,9 @@ boolean hs_parse_sleep(
 		hs_syntax_get(expression_index)->data)->next_node_index;
 
 	match_assert(
-		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		"c:\\halo\\source\\hs\\hs_library_internal_compile.h",
 		0x20E,
-		function_index == _hs_function_sleep);
+		function_index==_hs_function_sleep);
 	if (ticks_expression_index != NONE)
 	{
 		if (hs_parse(ticks_expression_index, _hs_type_short_integer))
@@ -1562,7 +1563,7 @@ static long hs_concatenate_string_constant(
 	return result;
 }
 
-void hs_concatenate_expression(
+static void hs_concatenate_expression(
 	long expression_index)
 {
 	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);

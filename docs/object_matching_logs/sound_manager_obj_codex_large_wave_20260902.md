@@ -139,8 +139,9 @@ residuals: `_sound_definition_is_playable` (matching envelope),
 `_sound_definition_promote` (144 versus 160), `_sound_travel_milliseconds`
 (exact instructions, semantic-constant relocation identity only), and the
 previously documented `_source_audible` residual. Each received one natural
-source-level closure attempt and is parked without register, pragma, volatile,
-dummy, or aggregate steering.
+source-level closure attempt and remains a measured residual without register,
+pragma, volatile, dummy, or aggregate steering. No park-manifest credit is
+claimed for this group.
 
 The PDB-authenticated sound flag names (`_sound_delayed_bit`,
 `_sound_cached_bit`, `_sound_inaudible_bit`, and

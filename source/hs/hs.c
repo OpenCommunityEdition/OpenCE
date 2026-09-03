@@ -2772,6 +2772,7 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "cache/sound_cache.h"
 #include "hs.h"
+#include "hs_library_internal_compile.h"
 #include "object_lists.h"
 #include "hs_scenario_definitions.h"
 #include "math/real_math.h"
@@ -4517,9 +4518,6 @@ long hs_compile_expression(
 	char const *source,
 	char const **error_source,
 	char const **error_message);
-boolean hs_compile_postprocess(
-	char const **error_message,
-	char const **error_source);
 int isspace(
 	int character);
 boolean hs_scenario_merge(
