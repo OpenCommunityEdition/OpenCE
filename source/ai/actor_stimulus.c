@@ -84,8 +84,12 @@ symbols in this file:
 #include "ai/props.h"
 
 #include "game/game.h"
+#include "game/game_allegiance.h"
+#include "game/players.h"
 
 #include "memory/data.h"
+
+#include "units/units.h"
 
 #include <stddef.h>
 
@@ -95,6 +99,11 @@ enum
 {
 	_actor_mode_asleep = 1,
 	_actor_mode_combat = 3,
+};
+
+enum
+{
+	_actor_combat_status_certain = 4,
 };
 
 enum
@@ -731,6 +740,70 @@ void actor_stimulus_environmental_noise(
 		_secondary_look_environmental_noise,
 		_secondary_look_priority_default,
 		&direction);
+
+	return;
+}
+
+void actor_stimulus_heard_shooting(
+	long actor_index,
+	long prop_index)
+{
+	struct prop_datum *prop = prop_get(prop_index);
+
+	if (prop->enemy)
+	{
+		actor_stimulus_enter_combat_perceived_enemy(actor_index, prop_index);
+	}
+	else
+	{
+		struct unit_datum *unit = unit_get(prop->unit_index);
+		long player_index;
+
+		actor_stimulus_enter_combat_friend_in_combat(actor_index, prop_index);
+		player_index = unit->unit.player_index;
+		if (player_index != NONE)
+		{
+			struct player_datum *player = player_get(player_index);
+
+			if (player->aim_assist_unit_index != NONE &&
+				player->aim_assist_timestamp + 90 >= game_time_get())
+			{
+				struct actor_datum *actor = actor_get(actor_index);
+
+				if (game_team_is_enemy(
+					(word)actor->meta.team_index,
+					(word)unit_get(player->aim_assist_unit_index)->object.owner_team_index))
+				{
+					actor_perception_create_orphan_from_friend(
+						actor_index,
+						player->aim_assist_unit_index,
+						NONE,
+						NONE);
+				}
+			}
+		}
+		else
+		{
+			if (unit->unit.actor_index != NONE &&
+				actor_get(unit->unit.actor_index)->state.combat_status >=
+					_actor_combat_status_certain)
+			{
+				actor_derive_target_information(actor_index, unit->unit.actor_index);
+			}
+		}
+	}
+
+	{
+		struct direction_specification direction;
+
+		direction.type = _direction_specification_prop;
+		direction.prop_index = prop_index;
+		actor_look_secondary(
+			actor_index,
+			_secondary_look_shooting_prop,
+			_secondary_look_priority_default,
+			&direction);
+	}
 
 	return;
 }
