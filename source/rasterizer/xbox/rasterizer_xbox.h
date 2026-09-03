@@ -102,17 +102,6 @@ void rasterizer_set_vertex_shader_permutation(
 	short vertex_shader_index,
 	short vertex_type,
 	short permutation_index);
-void rasterizer_draw_dynamic_triangles_static_vertices(
-	long dynamic_triangle_buffer_index,
-	long first_triangle_index,
-	long triangle_count,
-	struct vertex_buffer const *vertex_buffer);
-void rasterizer_draw_dynamic_triangles_static_vertices2(
-	long dynamic_triangle_buffer_index,
-	long first_triangle_index,
-	long triangle_count,
-	struct vertex_buffer const *vertex_buffer0,
-	struct vertex_buffer const *vertex_buffer1);
 void rasterizer_water_set_visibility_for_window(
 	boolean visibility);
 
