@@ -304,6 +304,8 @@ symbols in this file:
 #include "real_math.h"
 #include "rasterizer.h"
 #include "rasterizer_geometry.h"
+#include <xtl.h>
+#include "rasterizer/xbox/rasterizer_xbox.h"
 #include "rasterizer/xbox/rasterizer_xbox_dynavobgeom.h"
 #include "render/render.h"
 #include "render/render_debug.h"
@@ -557,34 +559,6 @@ void _rasterizer_environment_diffuse_light_draw(
 	long first_triangle_index,
 	long triangle_count,
 	struct vertex_buffer const *vertex_buffer);
-void _rasterizer_environment_shadows_begin(
-	void);
-void _rasterizer_environment_shadow_begin(
-	long object_index,
-	real_matrix4x3 const *shadow_matrix,
-	real_point3d const *object_position,
-	real object_bounding_radius,
-	real_rgb_color const *shadow_color);
-void _rasterizer_environment_shadow_model_begin(
-	struct rasterizer_model_begin_parameters const *parameters);
-void _rasterizer_environment_shadow_model_draw(
-	struct shader const *shader,
-	short bitmap_index,
-	void const *geometry,
-	real_rgb_color const *change_colors);
-void _rasterizer_environment_shadow_model_end(
-	void);
-void _rasterizer_environment_shadow_end(
-	void);
-void _rasterizer_environment_shadow_draw(
-	struct shader const *shader,
-	short bitmap_index,
-	long dynamic_triangle_buffer_index,
-	long first_triangle_index,
-	long triangle_count,
-	struct vertex_buffer const *vertex_buffer);
-void _rasterizer_environment_shadows_end(
-	void);
 void _rasterizer_environment_diffuse_textures_end(
 	void);
 void _rasterizer_environment_diffuse_textures_begin(
@@ -1333,15 +1307,19 @@ void rasterizer_environment_shadows_begin(
 	return;
 }
 
-void rasterizer_environment_shadow_begin(
+boolean rasterizer_environment_shadow_begin(
 	long object_index,
 	real_matrix4x3 const *shadow_matrix,
-	real_point3d const *object_position,
+	real_rgb_color const *shadow_color,
 	real object_bounding_radius,
-	real_rgb_color const *shadow_color)
+	real *shadow_volume_bounding_radius)
 {
-	_rasterizer_environment_shadow_begin(object_index, shadow_matrix, object_position, object_bounding_radius, shadow_color);
-	return;
+	return _rasterizer_environment_shadow_begin(
+		object_index,
+		shadow_matrix,
+		shadow_color,
+		object_bounding_radius,
+		shadow_volume_bounding_radius);
 }
 
 void rasterizer_environment_shadow_model_begin(
@@ -1354,10 +1332,14 @@ void rasterizer_environment_shadow_model_begin(
 void rasterizer_environment_shadow_model_draw(
 	struct shader const *shader,
 	short bitmap_index,
-	void const *geometry,
-	real_rgb_color const *change_colors)
+	struct triangle_buffer const *triangle_buffer,
+	struct vertex_buffer const *vertex_buffer)
 {
-	_rasterizer_environment_shadow_model_draw(shader, bitmap_index, geometry, change_colors);
+	_rasterizer_environment_shadow_model_draw(
+		shader,
+		bitmap_index,
+		triangle_buffer,
+		vertex_buffer);
 	return;
 }
 

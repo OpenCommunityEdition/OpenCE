@@ -3160,6 +3160,63 @@
         },
         "objdiff_percent": 98.4058
       }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_shadows",
+      "function": "__rasterizer_environment_shadow_begin",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed January Xbox shadow-target setup from the target instruction and relocation topology, January's own assertion strings and debug-global bindings, and the independently named HaloCEA shadow state. The retained routine validates the matrix, color, and radius; installs the shadow render state and pixel shader; derives the two projected matrix rows and constant rows; selects the shadow target; initializes the typed shadow state; and accounts statistics. Target and candidate both occupy 944 padded bytes with all 73 relocation types and destinations, and objdiff reports 98.32 percent similarity. The first residual is January sinking five independent constant-row stores around the x87 projection block while VC7 sinks three, followed by an equivalent commutative dot-product schedule. Six ordinary-C sum spellings, declaration orders, constant-row placements, initialization forms, and include-set variants all returned to this fixed point or degraded it. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining the backend store and x87 schedule.",
+      "measurements": {
+        "target": {
+          "size": 944,
+          "relocation_count": 73,
+          "normalized_sha256": "b6c4674070a5973fe1a47b27603e72d5688973dc6c5ca209fedb3fcf0e489df9"
+        },
+        "base": {
+          "size": 944,
+          "relocation_count": 73,
+          "normalized_sha256": "709c6800cb61db4110660fda4c3622669f7a0d60293514e8ca292ea4e90cab99"
+        },
+        "objdiff_percent": 98.32
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_shadows",
+      "function": "__rasterizer_environment_shadow_model_draw",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked with the complete typed January model-shadow draw path reconstructed from target disassembly and relocations, January's shader/debug/statistics fields, and the independently corresponding HaloCEA shader-model behavior. The retained routine verifies model shaders and geometry, chooses culling and alpha-test texture state from named flags, evaluates the texture animation with the cached model parameters, uploads the three vertex constants, draws the complete static triangle buffer, and updates model-shadow statistics. Target and candidate both occupy 688 padded bytes with all 48 relocation types and destinations, and objdiff reports 97.95 percent similarity. The remaining difference is two dependency-independent scheduling transpositions around one fld/fmul pair and the neighboring constant-buffer address materialization; no behavior or call is absent. Bounded natural declaration, initialization, and include-set probes did not change that scheduler fixed point. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining those two independent instruction placements.",
+      "measurements": {
+        "target": {
+          "size": 688,
+          "relocation_count": 48,
+          "normalized_sha256": "366f4471c47176709d6d1469a6ef998e1b248296a375b8cb8e8192c734341c9c"
+        },
+        "base": {
+          "size": 688,
+          "relocation_count": 48,
+          "normalized_sha256": "c81ae7e554a892d0f30600ed846a2585dbd904d74b628c472219ed77a5fb6489"
+        },
+        "objdiff_percent": 97.95
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_shadows",
+      "function": "__rasterizer_environment_shadow_draw",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed January environment-shadow projection and draw path from the target instruction/relocation topology, stock XDK render-state interfaces, January's own global and statistics evidence, and the later HaloCEA shadow pipeline. The retained routine performs the optional exact convolution pass, configures all three textures and fixed-function states, constructs the target pixel shader, derives and uploads the five projection constants, restores the primary target exactly once, draws the requested dynamic triangles under the reject stencil mode, and updates shadow statistics. Target and candidate both occupy 1472 padded bytes with all 146 relocation types and destinations, and objdiff reports 95.33 percent similarity. The residual is confined to equivalent x87 term/operand ordering in the three commutative dot products; six source-order spellings and the bounded declaration/include variants compiled back to the same schedule. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining the x87 scheduler choice.",
+      "measurements": {
+        "target": {
+          "size": 1472,
+          "relocation_count": 146,
+          "normalized_sha256": "ddc0ede010a6293c32aa9a30e712b9cde81eaf12e9e5b8124119d13ff9cc16cb"
+        },
+        "base": {
+          "size": 1472,
+          "relocation_count": 146,
+          "normalized_sha256": "e24df5bd0c0b9df9ff9fd77aafa3f2ec51274c6e8e7151d95b3cbbbb3850e3c3"
+        },
+        "objdiff_percent": 95.33
+      }
     }
   ]
 }

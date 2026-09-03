@@ -95,6 +95,7 @@ struct detail_object_view_data;
 struct bitmap_data;
 struct render_animation;
 struct shader;
+struct triangle_buffer;
 struct vertex_buffer;
 struct rasterizer_dynamic_screen_geometry_parameters;
 struct rasterizer_model_geometry_part;
@@ -401,19 +402,19 @@ void rasterizer_environment_diffuse_light_draw(
 	struct vertex_buffer const *vertex_buffer);
 void rasterizer_environment_shadows_begin(
 	void);
-void rasterizer_environment_shadow_begin(
+boolean rasterizer_environment_shadow_begin(
 	long object_index,
 	real_matrix4x3 const *shadow_matrix,
-	real_point3d const *object_position,
+	real_rgb_color const *shadow_color,
 	real object_bounding_radius,
-	real_rgb_color const *shadow_color);
+	real *shadow_volume_bounding_radius);
 void rasterizer_environment_shadow_model_begin(
 	struct rasterizer_model_begin_parameters const *parameters);
 void rasterizer_environment_shadow_model_draw(
 	struct shader const *shader,
 	short bitmap_index,
-	void const *geometry,
-	real_rgb_color const *change_colors);
+	struct triangle_buffer const *triangle_buffer,
+	struct vertex_buffer const *vertex_buffer);
 void rasterizer_environment_shadow_model_end(
 	void);
 void rasterizer_environment_shadow_end(

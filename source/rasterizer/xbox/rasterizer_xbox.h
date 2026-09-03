@@ -17,7 +17,10 @@ RASTERIZER_XBOX.H
 
 struct bitmap_data;
 struct pixel_shader_definition;
+struct rasterizer_model_begin_parameters;
+struct rasterizer_model_skinning_parameters;
 struct shader;
+struct triangle_buffer;
 struct vertex_buffer;
 
 /* ---------- prototypes/RASTERIZER_XBOX.C */
@@ -92,6 +95,8 @@ long rasterizer_set_texture_direct(
 	short bitmap_index);
 void rasterizer_set_pixel_shader(
 	struct pixel_shader_definition const *definition);
+void rasterizer_set_model_skinning(
+	struct rasterizer_model_skinning_parameters const *skinning);
 void rasterizer_set_texture(
 	short stage,
 	short bitmap_type,
@@ -104,6 +109,37 @@ void rasterizer_set_vertex_shader_permutation(
 	short permutation_index);
 void rasterizer_water_set_visibility_for_window(
 	boolean visibility);
+
+/* ---------- prototypes/RASTERIZER_XBOX_SHADOWS.C */
+
+void _rasterizer_environment_shadows_begin(
+	void);
+boolean _rasterizer_environment_shadow_begin(
+	long object_index,
+	real_matrix4x3 const *shadow_matrix,
+	real_rgb_color const *shadow_color,
+	real object_bounding_radius,
+	real *shadow_volume_bounding_radius);
+void _rasterizer_environment_shadow_model_begin(
+	struct rasterizer_model_begin_parameters const *parameters);
+void _rasterizer_environment_shadow_model_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	struct triangle_buffer const *triangle_buffer,
+	struct vertex_buffer const *vertex_buffer);
+void _rasterizer_environment_shadow_model_end(
+	void);
+void _rasterizer_environment_shadow_end(
+	void);
+void _rasterizer_environment_shadow_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
+void _rasterizer_environment_shadows_end(
+	void);
 
 /* ---------- prototypes/SHADER_TRANSPARENT_GENERIC_PREPROCESSOR.C */
 
