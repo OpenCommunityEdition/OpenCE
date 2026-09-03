@@ -38,11 +38,35 @@ void rasterizer_error(
 
 /* ---------- prototypes/RASTERIZER_XBOX_PROFILE.C */
 
+boolean rasterizer_profile_initialize(
+	void);
+void rasterizer_profile_frame_begin(
+	void);
+void rasterizer_profile_window_begin(
+	void);
+void _rasterizer_profile_enable(
+	boolean enable);
 void rasterizer_profile_begin(
 	short profile);
 void rasterizer_profile_end(
 	short profile);
+const char *rasterizer_profile_get_string(
+	short profile);
+real rasterizer_profile_query(
+	short profile);
+long rasterizer_profile_query_pushbuffer(
+	short profile);
+void rasterizer_profile_frame_end(
+	void);
+void rasterizer_profile_window_end(
+	void);
+void rasterizer_profile_dispose(
+	void);
 
+/* ---------- prototypes/RASTERIZER_XBOX.C */
+
+void rasterizer_set_framebuffer_blend_function(
+	short framebuffer_blend_function);
 void rasterizer_set_stencil_mode(
 	long stencil_mode);
 void rasterizer_set_texture_bitmap_data(
