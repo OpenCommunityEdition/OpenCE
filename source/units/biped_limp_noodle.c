@@ -32,6 +32,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "math/real_math.h"
+#include "units/biped_limp_noodle.h"
 
 /* ---------- constants */
 
@@ -46,7 +47,7 @@ symbols in this file:
 /* ---------- public code */
 
 long biped_limp_noodle_get_max_relaxation_iterations(
-	void)
+	long biped_index)
 {
 	return 20;
 }
