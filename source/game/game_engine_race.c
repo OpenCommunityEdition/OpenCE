@@ -104,6 +104,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
+#include "game_engine_place.h"
 #include "game_engine_race.h"
 #include "game_globals.h"
 #include "players.h"
@@ -178,6 +179,22 @@ enum
 	_race_message_ally_touched_a_flag_rally,
 	_race_message_enemy_touched_a_flag_rally,
 	_race_message_new_best_lap_time,
+};
+
+/* ui\multiplayer_game_text string indices */
+enum multiplayer_game_text
+{
+	_multiplayer_game_text_you_scored_a_flag = 0xA7,
+	_multiplayer_game_text_ally_name_scored_a_flag,
+	_multiplayer_game_text_enemy_name_scored_a_flag,
+	_multiplayer_game_text_you_completed_lap_n_in_x_seconds,
+	_multiplayer_game_text_ally_name_completed_a_lap_n,
+	_multiplayer_game_text_enemy_name_completed_a_lap,
+	_multiplayer_game_text_new_best_lap_time_x,
+	_multiplayer_game_text_name_1_flag,
+	_multiplayer_game_text_name_n_flags,
+	_multiplayer_game_text_name_all_laps_complete,
+	_multiplayer_game_text_name_lap_n_of_total,
 };
 
 /* ---------- macros */
@@ -764,6 +781,244 @@ void race_engine_player_killed_player(
 	boolean friendly_fire)
 {
 	return;
+}
+
+boolean race_engine_display_score(
+	long player_index,
+	long message,
+	long message_player_index,
+	wchar_t *buffer,
+	long buffer_size)
+{
+	boolean result = TRUE;
+	struct player_datum *other_player = NULL;
+	long string_list_index;
+	wchar_t *string;
+
+	switch (message)
+	{
+	case _race_message_show_score:
+	case _race_message_you_completed_a_lap:
+	case _race_message_ally_completed_a_lap:
+	case _race_message_enemy_completed_a_lap:
+	case _race_message_ally_touched_a_flag_rally:
+	case _race_message_enemy_touched_a_flag_rally:
+	case _race_message_new_best_lap_time:
+		other_player = player_get(message_player_index);
+		break;
+
+	default:
+		break;
+	}
+
+	switch (message)
+	{
+	case _race_message_you_touched_a_flag_rally:
+		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+		if (string_list_index != NONE)
+		{
+			string = unicode_string_list_get_string(
+				string_list_index,
+				_multiplayer_game_text_you_scored_a_flag);
+		}
+		else
+			string = L"";
+		ustrncpy(buffer, string, buffer_size);
+		break;
+
+	case _race_message_ally_touched_a_flag_rally:
+		{
+			string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+			if (string_list_index != NONE)
+			{
+				string = unicode_string_list_get_string(
+					string_list_index,
+					_multiplayer_game_text_ally_name_scored_a_flag);
+			}
+			else
+				string = L"";
+			usnprintf(buffer, buffer_size, string, other_player->name);
+		}
+		break;
+
+	case _race_message_enemy_touched_a_flag_rally:
+		{
+			string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+			if (string_list_index != NONE)
+			{
+				string = unicode_string_list_get_string(
+					string_list_index,
+					_multiplayer_game_text_enemy_name_scored_a_flag);
+			}
+			else
+				string = L"";
+			usnprintf(buffer, buffer_size, string, other_player->name);
+		}
+		break;
+
+	case _race_message_you_completed_a_lap:
+		{
+			real lap_time =
+				(real)player_get(message_player_index)->statistics.multiplayer_statistics.race_statistics.last_lap_time /
+				TICKS_PER_SECOND;
+
+			string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+			if (string_list_index != NONE)
+			{
+				string = unicode_string_list_get_string(
+					string_list_index,
+					_multiplayer_game_text_you_completed_lap_n_in_x_seconds);
+			}
+			else
+				string = L"";
+			usnprintf(
+				buffer,
+				buffer_size,
+				string,
+				other_player->statistics.multiplayer_statistics.race_statistics.laps + 1,
+				lap_time);
+		}
+		break;
+
+	case _race_message_ally_completed_a_lap:
+		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+		if (string_list_index != NONE)
+		{
+			string = unicode_string_list_get_string(
+				string_list_index,
+				_multiplayer_game_text_ally_name_completed_a_lap_n);
+		}
+		else
+			string = L"";
+		usnprintf(
+			buffer,
+			buffer_size,
+			string,
+			other_player->name,
+			other_player->statistics.multiplayer_statistics.race_statistics.laps + 1);
+		break;
+
+	case _race_message_enemy_completed_a_lap:
+		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+		if (string_list_index != NONE)
+		{
+			string = unicode_string_list_get_string(
+				string_list_index,
+				_multiplayer_game_text_enemy_name_completed_a_lap);
+		}
+		else
+			string = L"";
+		usnprintf(
+			buffer,
+			buffer_size,
+			string,
+			other_player->name,
+			other_player->statistics.multiplayer_statistics.race_statistics.laps);
+		break;
+
+	case _race_message_new_best_lap_time:
+		{
+			real best_lap_time =
+				(real)player_get(message_player_index)->statistics.multiplayer_statistics.race_statistics.best_lap_time /
+				TICKS_PER_SECOND;
+
+			string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+			if (string_list_index != NONE)
+			{
+				string = unicode_string_list_get_string(
+					string_list_index,
+					_multiplayer_game_text_new_best_lap_time_x);
+			}
+			else
+				string = L"";
+			usnprintf(buffer, buffer_size, string, best_lap_time);
+		}
+		break;
+
+	case _race_message_show_score:
+		if (game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally)
+		{
+			if (other_player->statistics.multiplayer_statistics.race_statistics.laps == 1)
+			{
+				string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+				if (string_list_index != NONE)
+				{
+					string = unicode_string_list_get_string(
+						string_list_index,
+						_multiplayer_game_text_name_1_flag);
+				}
+				else
+					string = L"";
+				usnprintf(
+					buffer,
+					buffer_size,
+					string,
+					get_place_name(game_engine_get_place(player_index, _get_score_team)));
+			}
+			else
+			{
+				string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+				if (string_list_index != NONE)
+				{
+					string = unicode_string_list_get_string(
+						string_list_index,
+						_multiplayer_game_text_name_n_flags);
+				}
+				else
+					string = L"";
+				usnprintf(
+					buffer,
+					buffer_size,
+					string,
+					get_place_name(game_engine_get_place(player_index, _get_score_team)),
+					other_player->statistics.multiplayer_statistics.race_statistics.laps);
+			}
+		}
+		else if (other_player->statistics.multiplayer_statistics.race_statistics.laps + 1 >
+			game_engine_get_variant()->race_variant_laps_to_win)
+		{
+			string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+			if (string_list_index != NONE)
+			{
+				string = unicode_string_list_get_string(
+					string_list_index,
+					_multiplayer_game_text_name_all_laps_complete);
+			}
+			else
+				string = L"";
+			usnprintf(
+				buffer,
+				buffer_size,
+				string,
+				get_place_name(game_engine_get_place(player_index, _get_score_team)));
+		}
+		else
+		{
+			string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+			if (string_list_index != NONE)
+			{
+				string = unicode_string_list_get_string(
+					string_list_index,
+					_multiplayer_game_text_name_lap_n_of_total);
+			}
+			else
+				string = L"";
+			usnprintf(
+				buffer,
+				buffer_size,
+				string,
+				get_place_name(game_engine_get_place(player_index, _get_score_team)),
+				other_player->statistics.multiplayer_statistics.race_statistics.laps + 1,
+				game_engine_get_variant()->race_variant_laps_to_win);
+		}
+		break;
+
+	default:
+		result = FALSE;
+		break;
+	}
+
+	return result;
 }
 
 void race_engine_prespawn_player_update(
