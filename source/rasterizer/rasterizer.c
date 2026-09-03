@@ -304,6 +304,7 @@ symbols in this file:
 #include "real_math.h"
 #include "rasterizer.h"
 #include "rasterizer_geometry.h"
+#include "rasterizer/xbox/rasterizer_xbox_dynavobgeom.h"
 #include "render/render.h"
 #include "render/render_debug.h"
 #include "saved games/game_state.h"
@@ -490,10 +491,6 @@ void _rasterizer_detail_objects_end(
 	void);
 void _rasterizer_screen_effect(
 	struct render_screen_effect const *effect);
-void _rasterizer_hud_begin(
-	void);
-void _rasterizer_hud_end(
-	void);
 void _rasterizer_hud_motion_sensor_blip_begin(
 	void);
 void _rasterizer_hud_motion_sensor_blip_draw(
@@ -709,29 +706,6 @@ void _rasterizer_environment_fog_screen_draw(
 	long first_triangle_index,
 	long triangle_count,
 	struct vertex_buffer const *vertex_buffer);
-void _rasterizer_dynamic_screen_geometry_draw(
-	long primitive_type,
-	long vertex_type,
-	long dynamic_vertex_buffer_index,
-	long vertex_count);
-void _rasterizer_dynamic_screen_geometry_add_multitexture_params_to_base(
-	struct rasterizer_dynamic_screen_geometry_parameters *base,
-	struct rasterizer_dynamic_screen_geometry_parameters const *multitex_params);
-void _rasterizer_dynamic_unlit_geometry_draw(
-	struct shader const *shader,
-	struct bitmap_data const *bitmap,
-	struct render_animation const *animation,
-	long dynamic_triangle_buffer_index,
-	long dynamic_vertex_buffer_index,
-	long vertex_count,
-	real_point3d const *centroid,
-	unsigned long geometry_flags);
-void _rasterizer_dynamic_lit_geometry_draw(
-	void const *vertices,
-	void const *parameters);
-void _rasterizer_psuedo_dynamic_screen_quad_draw(
-	struct rasterizer_dynamic_screen_geometry_parameters *parameters,
-	struct dynamic_screen_vertex *vertices);
 void _rasterizer_widget_submit(
 	long object_index,
 	long widget_index,

@@ -598,7 +598,12 @@ void rasterizer_active_camouflage_set_visibility(
 
 /* ---------- prototypes/RASTERIZER_TEXT.C */
 
-void rasterizer_draw_string(union rectangle2d const *bounds, union rectangle2d const *clip, union point2d *cursor_reference, short height_adjust, char const *string);
+void rasterizer_draw_string(
+	rectangle2d const *bounds,
+	rectangle2d const *clip,
+	point2d *cursor_reference,
+	short height_adjust,
+	char const *string);
 
 /* ---------- prototypes/RASTERIZER_MEMORY_POOL.C */
 
@@ -611,7 +616,8 @@ void rasterizer_memory_pool_dispose(void);
 
 /* ---------- prototypes/RASTERIZER_LIGHTS.C */
 
-void rasterizer_lights_reset_for_new_map(void);
+void rasterizer_lights_reset_for_new_map(
+	void);
 void rasterizer_lights_begin(
 	void);
 void rasterizer_lights_end(

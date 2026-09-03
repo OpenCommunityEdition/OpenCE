@@ -84,6 +84,7 @@ symbols in this file:
 #include <xtl.h>
 
 #include "rasterizer_xbox.h"
+#include "rasterizer_xbox_dynavobgeom.h"
 
 /* ---------- constants */
 

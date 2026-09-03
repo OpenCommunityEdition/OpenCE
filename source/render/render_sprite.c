@@ -76,15 +76,90 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "bitmaps/bitmap_group.h"
+#include "cseries/errors.h"
+#include "interface/hud_draw.h"
 #include "math/real_math.h"
+#include "rasterizer/rasterizer.h"
 #include "render/render.h"
 #include "render/render_debug.h"
+#include "render/render_sprite.h"
+#include "tag_files/tag_files.h"
+#include "tag_files/tag_groups.h"
 
 /* ---------- constants */
+
+enum build_sprites_internal_flags
+{
+	_build_sprites_valid_bit = NUMBER_OF_BUILD_SPRITES_FLAGS,
+};
+
+enum
+{
+	MAXIMUM_BUILD_SPRITE_GROUPS = 8,
+};
+
+enum
+{
+	_rasterizer_lock_sprite = 16,
+};
+
+enum
+{
+	_shader_effect_uses_nonlinear_tint_bit = 1,
+};
+
+enum
+{
+	_rasterizer_geometry_no_sort_bit = 0,
+	_rasterizer_geometry_no_queue_bit,
+	_rasterizer_geometry_no_fog_bit,
+	_rasterizer_geometry_no_zbuffer_bit,
+	_rasterizer_geometry_sky_bit,
+	_rasterizer_geometry_viewspace_bit,
+	_rasterizer_geometry_atmospheric_fog_but_no_planar_fog_bit,
+	_rasterizer_geometry_first_person_bit,
+	_rasterizer_geometry_parts_define_local_nodes_bit,
+	NUMBER_OF_RASTERIZER_GEOMETRY_FLAGS
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct build_sprite_vertex
+{
+	real_point3d point;
+	real_point2d texture_coordinates;
+	pixel32 color;
+};
+
+typedef char build_sprite_vertex_size_assert[
+	sizeof(struct build_sprite_vertex) == 0x18 ? 1 : -1];
+
+struct bitmap_group_sprite
+{
+	short bitmap_index;
+	word pad02;
+	long unused04;
+	real_rectangle2d bounds;
+	real_point2d registration_point;
+};
+
+typedef char bitmap_group_sprite_size_assert[
+	sizeof(struct bitmap_group_sprite) == 0x20 ? 1 : -1];
+
+struct bitmap_group_sequence
+{
+	char name[32];
+	short first_bitmap_index;
+	short bitmap_count;
+	byte unused24[16];
+	struct tag_block sprites;
+};
+
+typedef char bitmap_group_sequence_size_assert[
+	sizeof(struct bitmap_group_sequence) == 0x40 ? 1 : -1];
 
 struct build_sprite_globals_data
 {
@@ -104,12 +179,140 @@ typedef char build_sprite_globals_data_size_assert[
 
 /* ---------- prototypes */
 
+void *_texture_cache_bitmap_get_hardware_format(
+	struct bitmap_data *bitmap,
+	boolean block,
+	boolean load);
+real render_frustum_cube_view_fraction(
+	struct render_frustum const *frustum,
+	real_rectangle3d const *bounds);
+void render_camera_screen_to_view(
+	struct render_camera const *camera,
+	struct render_frustum const *frustum,
+	real_point2d const *screen_point,
+	real_vector3d *view_vector);
+
+static void build_sprite_transform_origin_and_direction(
+	struct build_sprite_data const *data,
+	unsigned long flags,
+	real_point3d const *untransformed_origin,
+	real_vector3d const *untransformed_direction,
+	real_point3d *transformed_origin,
+	real_vector3d *transformed_direction);
+static void build_sprite_compute_scale(
+	struct build_sprite_data const *data,
+	short mode,
+	unsigned long flags,
+	real_point3d const *origin,
+	struct bitmap_data const *bitmap,
+	real *scale);
+static short build_sprite_get_group(
+	struct build_sprite_data *data,
+	struct bitmap_data *bitmap);
+static void build_sprite_compute_basis(
+	struct build_sprite_data const *data,
+	short mode,
+	unsigned long flags,
+	real_point3d const *origin,
+	real_vector3d const *transformed_direction,
+	real_matrix4x3 *basis);
+
 /* ---------- globals */
 
 extern boolean debug_sprites;
 extern struct build_sprite_globals_data build_sprite_globals;
 
+static real const one_over_full_circle = 1.f / (2.f*_pi);
+
+static boolean build_sprite_vertex_allocation_failure_reported;
+
 /* ---------- public code */
+
+void build_sprites_begin(
+	struct build_sprite_data *data,
+	short maximum_sprite_count,
+	long bitmap_group_index,
+	struct shader_effect_definition const *shader,
+	unsigned long flags)
+{
+	match_assert("c:\\halo\\SOURCE\\render\\render_sprite.c", 335, shader);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_sprite.c",
+		336,
+		!TEST_FLAG(flags, _build_sprites_valid_bit));
+
+	data->bitmap_group_index = bitmap_group_index;
+	data->flags = flags;
+	data->shader = shader;
+	data->group_count = 0;
+	data->sprite_count = 0;
+	data->maximum_sprite_count = maximum_sprite_count;
+	data->centroid = *global_origin3d;
+	SET_FLAG(data->flags, _build_sprites_valid_bit, TRUE);
+	return;
+}
+
+void build_sprites_end(
+	struct build_sprite_data *data)
+{
+	real one_over_sprite_count = 1.f / data->sprite_count;
+	short group_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_sprite.c",
+		358,
+		TEST_FLAG(data->flags, _build_sprites_valid_bit));
+
+	data->centroid.x *= one_over_sprite_count;
+	data->centroid.y *= one_over_sprite_count;
+	data->centroid.z *= one_over_sprite_count;
+	matrix4x3_transform_point(&render.frustum.view_to_world, &data->centroid, &data->centroid);
+
+	for (group_index = 0; group_index < data->group_count; group_index++)
+	{
+		struct build_sprite_group *group = &data->groups[group_index];
+
+		if (group->sprite_count)
+		{
+			rasterizer_dynamic_vertices_unlock(group->vertex_buffer_index);
+			if (TEST_FLAG(data->flags, _build_sprites_screen_space_bit))
+			{
+				match_vassert(
+					"c:\\halo\\SOURCE\\render\\render_sprite.c",
+					377,
+					FALSE,
+					"### ERROR sprites rendered with screen geometry -- tell Bernie!!");
+				rasterizer_dynamic_screen_geometry_draw(
+					0,
+					-NUMBER_OF_VERTICES_PER_QUADRILATERAL,
+					group->vertex_buffer_index,
+					2 * group->sprite_count);
+			}
+			else
+			{
+				unsigned long geometry_flags = FLAG(_rasterizer_geometry_viewspace_bit);
+
+				SET_FLAG(
+					geometry_flags,
+					_rasterizer_geometry_first_person_bit,
+					TEST_FLAG(data->flags, _build_sprites_first_person_bit));
+				rasterizer_dynamic_unlit_geometry_draw(
+					(struct shader const *)data->shader,
+					group->bitmap,
+					NULL,
+					-NUMBER_OF_VERTICES_PER_QUADRILATERAL,
+					group->vertex_buffer_index,
+					2 * group->sprite_count,
+					&data->centroid,
+					geometry_flags);
+			}
+			rasterizer_dynamic_vertices_delete(group->vertex_buffer_index);
+		}
+	}
+
+	SET_FLAG(data->flags, _build_sprites_valid_bit, FALSE);
+	return;
+}
 
 void build_sprite_prepare_for_window(void)
 {
@@ -138,4 +341,578 @@ void build_sprite_prepare_for_window(void)
 	return;
 }
 
+real build_sprite_compute_vertex_fade(
+	short fade_mode,
+	real_point3d const *viewer_space_point,
+	real_vector3d const *viewer_space_normal)
+{
+	real fade = 1.f;
+
+	if (fade_mode)
+	{
+		fade = fabs(dot_product3d(viewer_space_normal, (real_vector3d const *)viewer_space_point) /
+			magnitude3d((real_vector3d const *)viewer_space_point));
+
+		if (fade_mode == 2)
+			fade = 1.f - fade;
+	}
+
+	return fade;
+}
+
+void build_sprite(
+	struct build_sprite_data *data,
+	short mode,
+	short sequence_index,
+	short sprite_index,
+	real_point3d const *untransformed_origin,
+	real_vector3d const *untransformed_direction,
+	real rotation,
+	real scale,
+	real_argb_color const *color,
+	real fade,
+	unsigned long flags)
+{
+	struct bitmap_group *bitmap_group = bitmap_group_get(data->bitmap_group_index);
+
+	match_assert("c:\\halo\\SOURCE\\render\\render_sprite.c", 418, untransformed_origin);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_sprite.c",
+		419,
+		mode==_build_sprite_normal ||
+			(untransformed_direction && magnitude_squared3d(untransformed_direction)));
+
+	if (!color)
+		color = global_real_argb_white;
+
+	if (data->sprite_count<data->maximum_sprite_count)
+	{
+		if (sequence_index>=0 && sequence_index<bitmap_group->sequences.count)
+		{
+		struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
+			&bitmap_group->sequences,
+			sequence_index,
+			struct bitmap_group_sequence);
+
+		if (sequence->first_bitmap_index!=NONE &&
+			sprite_index>=0 && sprite_index<sequence->sprites.count)
+		{
+			struct bitmap_group_sprite *sprite = TAG_BLOCK_GET_ELEMENT(
+				&sequence->sprites,
+				sprite_index,
+				struct bitmap_group_sprite);
+			struct bitmap_data *bitmap;
+			short group_index;
+
+			match_vassert(
+				"c:\\halo\\SOURCE\\render\\render_sprite.c",
+				435,
+				sprite->bitmap_index!=NONE,
+				csprintf(
+					temporary,
+					"the bitmap group %s sequence %d sprite %d references bitmap -1 (tell matt).",
+					tag_get_name(data->bitmap_group_index),
+					sequence_index,
+					sprite_index));
+
+			bitmap = TAG_BLOCK_GET_ELEMENT(
+				&bitmap_group->bitmap_data,
+				sprite->bitmap_index,
+				struct bitmap_data);
+			group_index = build_sprite_get_group(data, bitmap);
+			if (group_index!=NONE)
+			{
+				struct build_sprite_group *group = &data->groups[group_index];
+
+				if (group->sprite_count<data->maximum_sprite_count)
+				{
+					short vertex_index = NUMBER_OF_VERTICES_PER_QUADRILATERAL*group->sprite_count;
+					real rotation_sine = 0.f;
+					real rotation_cosine = 1.f;
+					real_rectangle3d bounds = *global_null_rectangle3d;
+					real_point3d transformed_origin;
+					real_vector3d transformed_direction;
+					real_matrix4x3 basis;
+					pixel32 pixel;
+					real alpha;
+					short vertex;
+
+					if (rotation!=0.f)
+					{
+						rotation_sine = sine(rotation);
+						rotation_cosine = cosine(rotation);
+					}
+
+					build_sprite_transform_origin_and_direction(
+						data,
+						flags,
+						untransformed_origin,
+						untransformed_direction,
+						&transformed_origin,
+						&transformed_direction);
+					build_sprite_compute_basis(
+						data,
+						mode,
+						flags,
+						&transformed_origin,
+						&transformed_direction,
+						&basis);
+					build_sprite_compute_scale(data, mode, flags, &transformed_origin, bitmap, &scale);
+
+					if (data->shader &&
+						data->shader->framebuffer_fade_mode &&
+						mode!=_build_sprite_normal)
+					{
+						cross_product3d(&basis.forward, &basis.left, &basis.up);
+						fade *= build_sprite_compute_vertex_fade(
+							data->shader->framebuffer_fade_mode,
+							&transformed_origin,
+							&basis.up);
+					}
+
+					pixel = real_argb_color_to_pixel32(color);
+					if (data->shader &&
+						data->shader->framebuffer_blend_function &&
+						!TEST_FLAG(
+							data->shader->flags,
+							_shader_effect_uses_nonlinear_tint_bit))
+					{
+						alpha = fade*255.f;
+					}
+					else
+					{
+						alpha = (real)(pixel>>24)*fade;
+					}
+					pixel = (pixel & 0x00ffffff) | ((unsigned long)(byte)alpha<<24);
+
+					for (vertex = 0; vertex<NUMBER_OF_VERTICES_PER_QUADRILATERAL; vertex++)
+					{
+						real u = (((vertex>>1)^vertex)&1)
+							? sprite->bounds.x1
+							: sprite->bounds.x0;
+						real v = (vertex&2) ? sprite->bounds.y0 : sprite->bounds.y1;
+						real offset_x = u - (sprite->bounds.x0 + sprite->registration_point.x);
+						real offset_y = (sprite->registration_point.y + sprite->bounds.y0) - v;
+						real x = offset_x*rotation_cosine - offset_y*rotation_sine;
+						real y = offset_y*rotation_cosine + offset_x*rotation_sine;
+
+						if (TEST_FLAG(flags, _build_sprite_u_mirror_bit))
+							x = -x;
+						if (TEST_FLAG(flags, _build_sprite_v_mirror_bit))
+							y = -y;
+
+						if (TEST_FLAG(data->flags, _build_sprites_screen_space_bit))
+						{
+							struct dynamic_screen_vertex *screen_vertex =
+								&((struct dynamic_screen_vertex *)group->vertices)[vertex_index];
+
+							screen_vertex->position.x = x*scale + transformed_origin.x;
+							screen_vertex->position.y = y*scale + transformed_origin.y;
+							screen_vertex->texture_coordinates.x = u;
+							screen_vertex->texture_coordinates.y = v;
+							screen_vertex->color = pixel;
+						}
+						else
+						{
+							struct build_sprite_vertex *sprite_vertex =
+								&((struct build_sprite_vertex *)group->vertices)[vertex_index];
+							real_point3d point;
+
+							point.x = (basis.forward.i*x + basis.left.i*y)*scale +
+								transformed_origin.x;
+							point.y = (basis.forward.j*x + basis.left.j*y)*scale +
+								transformed_origin.y;
+							point.z = (basis.forward.k*x + basis.left.k*y)*scale +
+								transformed_origin.z;
+							if (point.x<bounds.x0)
+								bounds.x0 = point.x;
+							if (point.x>bounds.x1)
+								bounds.x1 = point.x;
+							if (point.y<bounds.y0)
+								bounds.y0 = point.y;
+							if (point.y>bounds.y1)
+								bounds.y1 = point.y;
+							if (point.z<bounds.z0)
+								bounds.z0 = point.z;
+							if (point.z>bounds.z1)
+								bounds.z1 = point.z;
+							sprite_vertex->point = point;
+							sprite_vertex->texture_coordinates.x = u;
+							sprite_vertex->texture_coordinates.y = v;
+							sprite_vertex->color = pixel;
+						}
+						vertex_index++;
+					}
+
+					data->centroid.x += transformed_origin.x;
+					data->centroid.y += transformed_origin.y;
+					data->centroid.z += transformed_origin.z;
+					group->sprite_count++;
+					data->sprite_count++;
+
+					if (!TEST_FLAG(data->flags, _build_sprites_screen_space_bit))
+					{
+						real coverage = render_frustum_cube_view_fraction(&render.frustum, &bounds);
+
+						build_sprite_globals.screen_coverage += coverage;
+						if (coverage>0.5f && build_sprite_globals.big_sprite_count++>10)
+						{
+							group->sprite_count--;
+							data->sprite_count--;
+						}
+
+						if (debug_sprites)
+						{
+							struct build_sprite_vertex *vertices =
+								(struct build_sprite_vertex *)group->vertices;
+							real_point3d point0;
+							real_point3d point1;
+							real_point3d point2;
+							real_point3d point3;
+
+							matrix4x3_transform_point(
+								&render.frustum.view_to_world,
+								&vertices[vertex_index - 4].point,
+								&point0);
+							matrix4x3_transform_point(
+								&render.frustum.view_to_world,
+								&vertices[vertex_index - 3].point,
+								&point1);
+							matrix4x3_transform_point(
+								&render.frustum.view_to_world,
+								&vertices[vertex_index - 2].point,
+								&point2);
+							matrix4x3_transform_point(
+								&render.frustum.view_to_world,
+								&vertices[vertex_index - 1].point,
+								&point3);
+							rasterizer_debug_line(&point0, &point1, global_real_argb_white);
+							rasterizer_debug_line(&point0, &point2, global_real_argb_white);
+							rasterizer_debug_line(&point2, &point3, global_real_argb_white);
+							rasterizer_debug_line(&point3, &point1, global_real_argb_white);
+						}
+					}
+				}
+			}
+		}
+		}
+	}
+	else
+	{
+		error(_error_silent, "build_sprite sprite count exceeded.");
+	}
+	return;
+}
+
+void build_sprite_rotational(
+	struct build_sprite_data *data,
+	unsigned long flags,
+	short sequence_index,
+	short sprite_index,
+	real_point3d const *untransformed_origin,
+	real_vector3d const *untransformed_axis_of_rotation,
+	real rotation,
+	real scale,
+	real_argb_color const *color,
+	real fade)
+{
+	real_point3d transformed_origin;
+	real_vector3d transformed_axis_of_rotation;
+	real fraction;
+	real angle;
+	real sprite_rotation;
+
+	match_assert("c:\\halo\\SOURCE\\render\\render_sprite.c", 646, data);
+	match_assert("c:\\halo\\SOURCE\\render\\render_sprite.c", 647, untransformed_origin);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_sprite.c",
+		648,
+		untransformed_axis_of_rotation);
+
+	if (!color)
+		color = global_real_argb_white;
+
+	build_sprite_transform_origin_and_direction(
+		data,
+		flags & FLAG(_build_sprite_rotational_viewer_space_bit),
+		untransformed_origin,
+		untransformed_axis_of_rotation,
+		&transformed_origin,
+		&transformed_axis_of_rotation);
+
+	angle = angle_between_vectors3d(
+		(real_vector3d const *)&transformed_origin,
+		&transformed_axis_of_rotation) - _pi/2;
+	fraction = angle*angle/((_pi/2)*(_pi/2));
+	fraction = PIN(fraction, 0.f, 1.f);
+
+	if (fraction>0.05f)
+	{
+		struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
+			&bitmap_group_get(data->bitmap_group_index)->sequences,
+			sequence_index+1,
+			struct bitmap_group_sequence);
+		short sprite_count = (short)sequence->sprites.count;
+		unsigned long edge_flags = FLAG(_build_sprite_viewer_space_bit);
+		short edge_sprite_index;
+
+		if (TEST_FLAG(flags, _build_sprite_rotational_sideways_rotation_animates_bit))
+		{
+			edge_sprite_index = (short)(fmod(
+				sprite_count*one_over_full_circle*rotation + 0.5f,
+				(real)sprite_count) + sprite_index);
+			sprite_rotation = 0.f;
+			if (angle<0.f)
+				edge_sprite_index = sprite_count-sprite_index;
+		}
+		else
+		{
+			edge_sprite_index = sprite_index;
+			sprite_rotation = rotation;
+			if (angle<0.f)
+				SET_FLAG(edge_flags, _build_sprite_u_mirror_bit, TRUE);
+		}
+
+		build_sprite(
+			data,
+			_build_sprite_normal,
+			sequence_index+1,
+			edge_sprite_index,
+			&transformed_origin,
+			NULL,
+			sprite_rotation,
+			scale,
+			color,
+			fraction*fade,
+			edge_flags);
+	}
+
+	fraction = 1.f-fraction;
+	if (fraction>0.05f)
+	{
+		struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
+			&bitmap_group_get(data->bitmap_group_index)->sequences,
+			sequence_index,
+			struct bitmap_group_sequence);
+		short sprite_count = (short)sequence->sprites.count;
+
+		build_sprite(
+			data,
+			_build_sprite_normal,
+			sequence_index,
+			(short)fmod(
+				sprite_count*one_over_full_circle*rotation + 0.5f,
+				(real)sprite_count),
+			&transformed_origin,
+			NULL,
+			arctangent(
+				transformed_axis_of_rotation.j,
+				transformed_axis_of_rotation.i),
+			scale,
+			color,
+			fraction*fade,
+			FLAG(_build_sprite_viewer_space_bit));
+	}
+	return;
+}
+
 /* ---------- private code */
+
+static void build_sprite_transform_origin_and_direction(
+	struct build_sprite_data const *data,
+	unsigned long flags,
+	real_point3d const *untransformed_origin,
+	real_vector3d const *untransformed_direction,
+	real_point3d *transformed_origin,
+	real_vector3d *transformed_direction)
+{
+	match_assert("c:\\halo\\SOURCE\\render\\render_sprite.c", 74, data);
+	match_assert("c:\\halo\\SOURCE\\render\\render_sprite.c", 75, untransformed_origin);
+	match_assert("c:\\halo\\SOURCE\\render\\render_sprite.c", 76, transformed_origin);
+	match_assert("c:\\halo\\SOURCE\\render\\render_sprite.c", 77, transformed_direction);
+
+	if (TEST_FLAG(data->flags, _build_sprites_screen_space_bit))
+	{
+		real_vector3d unused_view_vector;
+
+		render_camera_screen_to_view(
+			&render.camera,
+			&render.frustum,
+			(real_point2d const *)untransformed_origin,
+			&unused_view_vector);
+		match_assert("c:\\halo\\SOURCE\\render\\render_sprite.c", 84, !untransformed_direction);
+	}
+	else if (TEST_FLAG(flags, _build_sprite_viewer_space_bit))
+	{
+		*transformed_origin = *untransformed_origin;
+		if (untransformed_direction)
+			*transformed_direction = *untransformed_direction;
+	}
+	else
+	{
+		matrix4x3_transform_point(
+			&render.frustum.world_to_view,
+			untransformed_origin,
+			transformed_origin);
+		if (untransformed_direction)
+			matrix4x3_transform_normal(
+				&render.frustum.world_to_view,
+				untransformed_direction,
+				transformed_direction);
+	}
+	return;
+}
+
+static void build_sprite_compute_scale(
+	struct build_sprite_data const *data,
+	short mode,
+	unsigned long flags,
+	real_point3d const *origin,
+	struct bitmap_data const *bitmap,
+	real *scale)
+{
+	if (TEST_FLAG(data->flags, _build_sprites_screen_space_bit))
+	{
+		if (*scale == 0.f)
+			*scale = 1.f;
+	}
+	else if (mode == _build_sprite_normal && *scale == 0.f)
+	{
+		*scale = -(origin->z / render.frustum.projection_world_to_screen.i);
+	}
+
+	*scale = bitmap->width * *scale;
+	return;
+}
+
+static short build_sprite_get_group(
+	struct build_sprite_data *data,
+	struct bitmap_data *bitmap)
+{
+	short group_index;
+
+	for (group_index = 0; group_index < data->group_count; group_index++)
+	{
+		if (data->groups[group_index].bitmap == bitmap)
+			break;
+	}
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\render\\render_sprite.c",
+		275,
+		group_index < data->group_count ||
+			data->group_count < MAXIMUM_BUILD_SPRITE_GROUPS,
+		csprintf(
+			temporary,
+			"a build_sprites_begin call can accomodate at most %d bitmaps",
+			MAXIMUM_BUILD_SPRITE_GROUPS));
+
+	if (group_index >= data->group_count &&
+		data->group_count >= MAXIMUM_BUILD_SPRITE_GROUPS)
+	{
+		return NONE;
+	}
+
+	if (group_index >= data->group_count)
+	{
+		struct build_sprite_group *group = &data->groups[group_index];
+
+		data->group_count++;
+		group->bitmap = bitmap;
+		if (_texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
+		{
+			rasterizer_globals.current_lock_operation = _rasterizer_lock_sprite;
+			group->vertex_buffer_index = rasterizer_dynamic_vertices_new(
+				TEST_FLAG(data->flags, _build_sprites_screen_space_bit) ? 8 : 6,
+				NUMBER_OF_VERTICES_PER_QUADRILATERAL*data->maximum_sprite_count);
+			if (group->vertex_buffer_index != NONE)
+			{
+				group->vertices = rasterizer_dynamic_vertices_lock(
+					group->vertex_buffer_index);
+				match_assert(
+					"c:\\halo\\SOURCE\\render\\render_sprite.c",
+					294,
+					group->vertices);
+			}
+			else
+			{
+				if (!build_sprite_vertex_allocation_failure_reported)
+				{
+					error(
+						_error_silent,
+						"build_sprite failed to allocate dynamic vertices");
+					build_sprite_vertex_allocation_failure_reported = TRUE;
+				}
+				group->vertices = NULL;
+			}
+			rasterizer_globals.current_lock_operation = _rasterizer_lock_unlocked;
+		}
+		else
+		{
+			group->vertices = NULL;
+		}
+		group->sprite_count = 0;
+	}
+
+	return (group_index == NONE || data->groups[group_index].vertices)
+		? group_index
+		: (short)NONE;
+}
+
+static void build_sprite_compute_basis(
+	struct build_sprite_data const *data,
+	short mode,
+	unsigned long flags,
+	real_point3d const *origin,
+	real_vector3d const *transformed_direction,
+	real_matrix4x3 *basis)
+{
+	match_assert("c:\\halo\\SOURCE\\render\\render_sprite.c", 116, data);
+	match_assert("c:\\halo\\SOURCE\\render\\render_sprite.c", 117, origin);
+	match_assert("c:\\halo\\SOURCE\\render\\render_sprite.c", 118, basis);
+
+	if (TEST_FLAG(data->flags, _build_sprites_screen_space_bit))
+	{
+		match_vassert(
+			"c:\\halo\\SOURCE\\render\\render_sprite.c",
+			122,
+			mode == _build_sprite_normal,
+			"build_sprite only supports normal sprites in screen space.");
+	}
+	else if (mode == _build_sprite_normal)
+	{
+		basis->forward.i = 1.f;
+		basis->forward.j = 0.f;
+		basis->forward.k = 0.f;
+		basis->left.i = 0.f;
+		basis->left.j = 1.f;
+		basis->left.k = 0.f;
+	}
+	else if (mode == _build_sprite_parallel)
+	{
+		basis->forward = *transformed_direction;
+		normalize3d(&basis->forward);
+		cross_product3d((real_vector3d const *)origin, &basis->forward, &basis->left);
+		normalize3d(&basis->left);
+	}
+	else if (mode == _build_sprite_perpendicular)
+	{
+		real_vector3d const *reference = &build_sprite_globals.viewer_space_world_up;
+		real dot = dot_product3d(transformed_direction, reference);
+
+		if (dot*dot > magnitude_squared3d(transformed_direction)*0.99f)
+			reference = &build_sprite_globals.viewer_space_world_forward;
+
+		cross_product3d(transformed_direction, reference, &basis->forward);
+		normalize3d(&basis->forward);
+		basis->left = basis->forward;
+		basis->up = *transformed_direction;
+		normalize3d(&basis->up);
+		rotate_vector_about_axis(&basis->left, &basis->up, -1.f, 0.f);
+	}
+	else
+	{
+		match_vassert("c:\\halo\\SOURCE\\render\\render_sprite.c", 172, FALSE, NULL);
+	}
+	return;
+}

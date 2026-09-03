@@ -45,8 +45,9 @@ struct shader_effect_definition global_shader_effect_additive =
 		}
 	},
 	0,
-	0,
 	3,
+	0,
+	0,
 	{ 0 },
 	{ 'bitm', "", 0, NONE },
 	{ 0 }
@@ -67,6 +68,7 @@ struct shader_effect_definition global_shader_effect_alpha_blended =
 			0
 		}
 	},
+	0,
 	0,
 	0,
 	0,
