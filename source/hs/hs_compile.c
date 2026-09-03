@@ -651,7 +651,7 @@ static boolean hs_parse_primitive(
 	long expression_index);
 static boolean hs_parse_nonprimitive(
 	long expression_index);
-static void hs_concatenate_expression(
+void hs_concatenate_expression(
 	long expression_index);
 static long hs_tokenize(
 	struct hs_tokenizer *tokenizer);
@@ -1529,6 +1529,48 @@ static long hs_concatenate_string_constant(
 	}
 
 	return result;
+}
+
+void hs_concatenate_expression(
+	long expression_index)
+{
+	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+
+	SET_FLAG(expression->flags, _hs_syntax_node_permanent_bit, TRUE);
+	if (TEST_FLAG(hs_syntax_get(expression_index)->flags, _hs_syntax_node_primitive_bit))
+	{
+		if (expression->type == _hs_function_name)
+		{
+			if (expression->source_offset == NONE)
+			{
+				expression->source_offset = hs_concatenate_string_constant(
+					hs_function_get(expression->function_index)->name);
+			}
+			else
+			{
+				expression->source_offset = hs_concatenate_string_constant(
+					hs_compile_globals.compiled_source + expression->source_offset);
+			}
+		}
+		else if (TEST_FLAG(expression->flags, _hs_syntax_node_variable_bit) || expression->type >= _hs_type_string)
+		{
+			expression->source_offset = hs_concatenate_string_constant(
+				hs_compile_globals.compiled_source + expression->source_offset);
+		}
+	}
+	else
+	{
+		long child_expression_index;
+
+		for (child_expression_index = expression->data;
+			child_expression_index != NONE;
+			child_expression_index = hs_syntax_get(child_expression_index)->next_node_index)
+		{
+			hs_concatenate_expression(child_expression_index);
+		}
+	}
+
+	return;
 }
 
 static boolean hs_add_global(
