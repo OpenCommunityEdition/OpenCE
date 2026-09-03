@@ -12,8 +12,8 @@ plus the pre-existing scripted-camera residual.
 
 | Function | Target | Candidate | Relocations | Result |
 | --- | ---: | ---: | ---: | --- |
-| `_director_process_variables` | 544 | 544 | 27 / 27 | credible fuzzy |
-| `_director_update_controls` | 960 | 960 | 45 / 45 | credible fuzzy |
+| `_director_process_variables` | 544 | 544 | 27 / 27 | credible fuzzy, 98.56725% |
+| `_director_update_controls` | 960 | 960 | 45 / 45 | credible fuzzy, 97.700325% |
 | `_director_update` | 496 | 496 | 31 / 31 | strict exact |
 
 The exact `_director_update` normalized SHA-256 is

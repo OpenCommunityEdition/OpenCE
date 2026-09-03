@@ -37,6 +37,11 @@ char const *dialogue_get_vocalization_name(
 short dialogue_get_vocalization_type_by_name(
 	char const *name);
 
+/* ---------- prototypes/UNIT_DIALOGUE.C */
+
+void unit_dialogue_determine_variant(
+	long unit_index);
+
 /* ---------- globals */
 
 /* ---------- public code */

@@ -23,8 +23,8 @@ names `unit_find_dialogue_variant` and `unit_dialogue_setup`, plus the global
 `code_...` and `bss_...` placeholders. The dialogue tag is obtained through the
 typed `dialogue_definition_get` macro, unit/object access remains typed, and
 the public determine-variant declaration is owned by the existing closest
-associated header, `units.h`, rather than a foreign C file or a new one-use
-header.
+dialogue-associated header, `dialogue_definitions.h`, rather than a foreign C
+file or a new one-use header.
 
 ## Honest fuzzy work
 
@@ -46,6 +46,12 @@ repair. Both functions are recorded in `config/parked.json`.
   is preserved. They alter only the normalized stream of the already-parked
   `ai_communication_update_speech_timers`, which remains 672/672 bytes with
   43/43 relocations and is re-attested at 97.67839% objdiff.
+- Putting `unit_dialogue_determine_variant` in broad `units.h` reopened the
+  otherwise-exact 560-byte `_populate_statistic_buffer` through C2's
+  declaration-environment sensitivity. Moving the same declaration to the
+  existing narrow `dialogue_definitions.h` owner, which `units.c` now includes,
+  restores Game Engine to 169 exact functions while preserving `units.obj` at
+  189/189 and all exact functions in the five dialogue-header dependents.
 - Exact helpers retain matching size, relocation identity, and normalized hash.
 - No inline assembly, barriers, volatile/register forcing, raw offsets, fake
   dependencies, forced inlining, or nonsensical match-only logic was admitted.

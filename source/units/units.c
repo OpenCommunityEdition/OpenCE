@@ -648,6 +648,7 @@ symbols in this file:
 
 #include "bipeds.h"
 #include "biped_definitions.h"
+#include "dialogue_definitions.h"
 #include "unit_definitions.h"
 
 #include "ai/actors.h"

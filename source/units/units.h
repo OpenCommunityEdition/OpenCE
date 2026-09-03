@@ -864,8 +864,6 @@ short unit_get_speech_priority_by_name(
 boolean unit_scream(long unit_index, short scream_type);
 void unit_dialogue_update(
 	long unit_index);
-void unit_dialogue_determine_variant(
-	long unit_index);
 
 
 /* ---------- globals */
