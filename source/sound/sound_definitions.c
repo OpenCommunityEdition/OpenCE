@@ -33,6 +33,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "errors.h"
+#include "sound_classes.h"
 #include "sound_definitions.h"
 
 /* ---------- constants */
@@ -41,17 +42,7 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct sound_class_definition
-{
-	byte unused[0x18];
-	real minimum_distance;
-	real maximum_distance;
-};
-
 /* ---------- prototypes */
-
-struct sound_class_definition *sound_class_get(
-	short sound_class);
 
 /* ---------- globals */
 

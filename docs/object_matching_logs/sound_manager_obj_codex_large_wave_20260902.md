@@ -94,3 +94,22 @@ remaining differing loop rotation follows from `_sound_idle` remaining
 unwritten in this TU. Close it with the real `_sound_idle`/`_update_channels`
 caller cluster rather than with control-flow steering. Production gate at this
 checkpoint is therefore 22 exact, 1 residual, and 42 unwritten.
+
+## Cross-TU type audit
+
+An independent integration audit found that `sound_manager.c` had recovered
+the PDB-authenticated byte-sized `speech` member at offset 8, while the
+`sound_classes.c` owner still described those two bytes as a `short flags`.
+The complete 0x2C `sound_class_definition` now has one authoritative definition
+in `sound_classes.h`; `sound_classes.c`, `sound_manager.c`, and
+`sound_definitions.c` all consume that definition. The class-table initializer
+names the fourth value `speech` and explicitly initializes its padding byte, so
+the data bytes and all three object gates remain unchanged.
+
+The HCEA PDB enumerates the complete sound lifecycle as `_sound_impulse = 0`,
+`_sound_start_track = 1`, `_sound_loop_track = 2`,
+`_sound_stopping_track = 3`, `_sound_stop_track = 4`, and
+`NUMBER_OF_SOUND_TYPES = 5`. Those exact names replace the provisional
+`_sound_looping` label. The PDB signature for `source_distance_squared` is
+`static float source_distance_squared(short, struct sound_source *)`, so its
+source parameter is intentionally non-const.

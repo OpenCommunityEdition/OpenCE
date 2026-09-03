@@ -122,8 +122,8 @@ enum
 
 /* ---------- macros */
 
-#define SOUND_CLASS_DEFINITION(maximum_per_definition, maximum_per_object, preemption_time, flags, priority, cache_miss_mode, wet_gain, minimum_distance, maximum_distance, unknown_gain, unknown_scale, disabled) \
-	{ maximum_per_definition, maximum_per_object, preemption_time, flags, priority, cache_miss_mode, 0, wet_gain, 0.f, minimum_distance, maximum_distance, unknown_gain, unknown_scale, disabled, { 0, 0, 0 } }
+#define SOUND_CLASS_DEFINITION(maximum_per_definition, maximum_per_object, preemption_time, speech, priority, cache_miss_mode, wet_gain, minimum_distance, maximum_distance, unknown_gain, unknown_scale, disabled) \
+	{ maximum_per_definition, maximum_per_object, preemption_time, speech, 0, priority, cache_miss_mode, 0, wet_gain, 0.f, minimum_distance, maximum_distance, unknown_gain, unknown_scale, disabled, { 0, 0, 0 } }
 
 /* ---------- structures */
 
@@ -133,25 +133,6 @@ struct sound_class_runtime
 	real current_gain;
 	short interpolation_ticks;
 	short pad;
-};
-
-struct sound_class_definition
-{
-	short maximum_number_per_definition;
-	short maximum_number_per_object;
-	long preemption_time;
-	short flags;
-	short priority;
-	short cache_miss_mode;
-	short pad_E;
-	real wet_gain;
-	real pad_14;
-	real minimum_distance;
-	real maximum_distance;
-	real unknown_gain;
-	real unknown_scale;
-	boolean disabled;
-	byte pad_29[3];
 };
 
 typedef char verify_sound_class_definition_size[

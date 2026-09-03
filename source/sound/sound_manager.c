@@ -272,10 +272,12 @@ enum sound_spatialization_mode
 
 enum sound_type
 {
-	_sound_impulse,
-	_sound_looping,
-	_sound_loop_track,
-	_sound_stopping_track,
+	_sound_impulse = 0,
+	_sound_start_track = 1,
+	_sound_loop_track = 2,
+	_sound_stopping_track = 3,
+	_sound_stop_track = 4,
+	NUMBER_OF_SOUND_TYPES = 5,
 };
 
 enum sound_fade_mode
@@ -318,26 +320,6 @@ struct platform_sound_listener_properties;
 struct sound_location;
 struct sound_permutation;
 struct sound_preferences;
-
-struct sound_class_definition
-{
-	short maximum_number_per_definition;
-	short maximum_number_per_object;
-	long preemption_time;
-	boolean speech;
-	byte pad_9;
-	short priority;
-	short cache_miss_mode;
-	short pad_E;
-	real wet_gain;
-	real pad_14;
-	real minimum_distance;
-	real maximum_distance;
-	real unknown_gain;
-	real unknown_scale;
-	boolean disabled;
-	byte pad_29[3];
-};
 
 struct sound_source
 {
@@ -582,7 +564,7 @@ static real sound_scale_random_value(
 	real scale);
 static real source_distance_squared(
 	short listener_index,
-	struct sound_source const *source);
+	struct sound_source *source);
 static short source_audible(
 	struct sound_source *source,
 	real maximum_distance);
@@ -1451,7 +1433,7 @@ static void sound_stop(
 
 static real source_distance_squared(
 	short listener_index,
-	struct sound_source const *source)
+	struct sound_source *source)
 {
 	real distance_squared;
 

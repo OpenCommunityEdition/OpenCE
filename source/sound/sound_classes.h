@@ -17,7 +17,25 @@ file has inline function assertions.
 
 /* ---------- structures */
 
-struct sound_class_definition;
+struct sound_class_definition
+{
+	short maximum_number_per_definition;
+	short maximum_number_per_object;
+	long preemption_time;
+	boolean speech;
+	byte pad_9;
+	short priority;
+	short cache_miss_mode;
+	short pad_E;
+	real wet_gain;
+	real pad_14;
+	real minimum_distance;
+	real maximum_distance;
+	real unknown_gain;
+	real unknown_scale;
+	boolean disabled;
+	byte pad_29[3];
+};
 
 /* ---------- prototypes/SOUND_CLASSES.C */
 
