@@ -19,7 +19,9 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+struct player_profile;
+
+/* ---------- prototypes/PLAYER_PROFILE.C */
 
 long player_profile_get_random_color(
 	void);
@@ -28,6 +30,13 @@ long player_profile_get_random_good_color(
 boolean player_profile_get_enclosing_directory_path(
 	long profile,
 	char *full_path);
+boolean player_profile_get(
+	long player_profile_index,
+	struct player_profile *profile);
+void player_profile_get_highest_completed_solo_level(
+	struct player_profile *profile,
+	short *level,
+	short *difficulty);
 short player_profile_number_of_available_primary_colors(
 	void);
 real_rgb_color *player_profile_get_rgb_color(
