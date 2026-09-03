@@ -1485,6 +1485,9 @@ static real source_distance(
 		break;
 
 	default:
+		/* BUG (original): January returns the uninitialized distance after
+		 * reporting an invalid spatialization mode. The HCEA binary preserves
+		 * the same invalid-mode stack read; valid enum values never take it. */
 		match_vassert(
 			"c:\\halo\\SOURCE\\sound\\sound_manager.c",
 			0x593,
