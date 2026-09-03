@@ -71,6 +71,23 @@ boolean convex_hull2d_test_vector(
 boolean convex_polygon2d_verify(
 	short count,
 	real *vertices);
+short convex_polygon3d_clip_to_plane(
+	short vertex_count,
+	real_point3d const *vertices,
+	real_plane3d const *plane,
+	short maximum_vertex_count,
+	real_point3d *clipped_vertices,
+	short *vertex_indices,
+	real epsilon,
+	boolean keep_degenerate);
+short convex_hull2d_intersect(
+	short p_count,
+	real_point2d const *p,
+	long q_count,
+	real_point2d const *q,
+	short maximum_count,
+	real_point2d *result,
+	real epsilon);
 
 /* ---------- globals */
 

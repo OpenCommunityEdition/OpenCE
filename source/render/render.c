@@ -61,10 +61,12 @@ symbols in this file:
 
 #include "cseries.h"
 #include "render.h"
+#include "render_cameras_internal.h"
 #include "render_particles.h"
 #include "objects.h"
 #include "scenario.h"
 #include "structure_bsp_definitions.h"
+#include "structures/structure_visibility.h"
 #include "rasterizer.h"
 #include "profile.h"
 #include "progress_bar.h"
@@ -104,15 +106,6 @@ enum
 
 /* ---------- structures */
 
-struct render_mirror
-{
-	real_plane3d plane;
-	real index_of_refraction;
-	real depth;
-	short cluster_index;
-	word pad;
-};
-
 /* ---------- prototypes */
 
 static void code_00174410(
@@ -130,24 +123,9 @@ static void code_00174ae0(
 	struct render_window *window,
 	const point2d *screenshot_combined_index);
 
-void structure_visibility_find_camera(
-	const struct render_camera *camera);
-boolean structure_visibility_find_mirror(
-	const struct render_camera *camera,
-	const struct render_frustum *frustum,
-	struct render_mirror *mirror);
-void structure_visibility_compute(
-	void);
 void structure_get_planar_fog(
 	short cluster_index,
 	struct render_fog *fog);
-void render_camera_build_frustum_bounds(
-	const struct render_camera *camera,
-	real_rectangle2d *frustum_bounds);
-void render_camera_mirror(
-	const struct render_camera *camera,
-	const struct render_mirror *mirror,
-	struct render_camera *result);
 void player_effect_get_screen_flash(
 	short local_player_index,
 	struct render_screen_flash *screen_flash);

@@ -2786,6 +2786,7 @@ symbols in this file:
 #include "interface/player_ui.h"
 #include "rasterizer/rasterizer_cinematics.h"
 #include "structures/structure_lens_flares.h"
+#include "structures/structure_visibility.h"
 #include "tag_files/files.h"
 
 /* ---------- constants */
@@ -4427,8 +4428,6 @@ void profile_sections_deactivate(
 	char const *section_name);
 void profile_graph_toggle(
 	char const *graph_name);
-void debug_pvs(
-	boolean enable);
 void ai_debug_vocalize(
 	long ai_index,
 	char const *vocalization);
