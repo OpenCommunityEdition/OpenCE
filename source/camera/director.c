@@ -119,6 +119,7 @@ symbols in this file:
 
 #include "director.h"
 
+#include "camera_scripting.h"
 #include "dead_camera.h"
 #include "editor_flying_camera.h"
 #include "first_person_camera.h"
@@ -141,13 +142,6 @@ symbols in this file:
 /* ---------- macros */
 
 /* ---------- structures */
-
-/* ---------- prototypes */
-
-void scripted_camera_update(
-	void *camera,
-	void *command,
-	void *result);
 
 /* ---------- globals */
 
@@ -271,7 +265,7 @@ director_perspective director_get_perspective(
 	{
 		camera->perspective = 1;
 	}
-	else if (camera->camera_proc == scripted_camera_update)
+	else if (camera->camera_proc == (director_camera_update_proc)scripted_camera_update)
 	{
 		camera->perspective = 2;
 	}
@@ -380,6 +374,46 @@ static void director_set_camera(
 	director->debug_controls = FALSE;
 	if (interpolate)
 		director->camera_change_pause = 1.f;
+
+	return;
+}
+
+void director_load_camera(
+	void)
+{
+	FILE *file = fopen("d:\\camera.txt", "r");
+
+	if (file)
+	{
+		real_point3d position;
+		real_vector3d forward;
+		real_vector3d derived_up;
+		real_vector3d stored_up;
+		real_vector3d cross_product;
+		real field_of_view;
+		struct director *director = director_get(0);
+		struct flying_camera *camera =
+			(struct flying_camera *)director->camera_data;
+
+		fscanf(file, "%f %f %f\n", &position.x, &position.y, &position.z);
+		fscanf(file, "%f %f %f\n", &forward.i, &forward.j, &forward.k);
+		fscanf(file, "%f %f %f\n", &stored_up.i, &stored_up.j, &stored_up.k);
+		fscanf(file, "%f\n", &field_of_view);
+		fclose(file);
+
+		flying_camera_new_from_point_and_vector(camera, &position, &forward);
+		observer_up_from_forward(&forward, &derived_up);
+		camera->facing.roll = angle_between_vectors3d(&stored_up, &derived_up);
+		cross_product3d(&stored_up, &derived_up, &cross_product);
+		if (dot_product3d(&cross_product, &forward) > 0.f)
+			camera->facing.roll = -camera->facing.roll;
+		camera->field_of_view = field_of_view;
+		director_set_camera(
+			0,
+			(director_camera_update_proc)flying_camera_update,
+			FALSE);
+		director->camera_mode_index = _camera_flying;
+	}
 
 	return;
 }
@@ -502,6 +536,36 @@ static void director_choose_game_perspective(
 		}
 
 		director->seat_state = perspective;
+	}
+
+	return;
+}
+
+void director_script_camera(
+	boolean scripted)
+{
+	short local_player_index;
+
+	director_camera_scripted->camera_scripted = scripted;
+	for (local_player_index = 0;
+		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
+		local_player_index++)
+	{
+		struct director *director = director_get(local_player_index);
+
+		if (scripted)
+		{
+			director->camera_proc =
+				(director_camera_update_proc)scripted_camera_update;
+			director->debug_input_scale = 1.f;
+			director->debug_controls = FALSE;
+		}
+		else
+		{
+			director_choose_game_perspective(local_player_index, TRUE);
+		}
+
+		scripted_camera_enable(scripted);
 	}
 
 	return;

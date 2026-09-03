@@ -3008,6 +3008,25 @@
         },
         "objdiff_percent": 88.0717
       }
+    },
+    {
+      "unit": "source/camera/director",
+      "function": "_director_script_camera",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete scripted-camera mode switch in ordinary typed C from January's target disassembly and the independently reconstructed HaloCEA donor at _research_cache/halocea/src/blam/camera/director_script_camera.c. The retained body updates the authenticated camera_scripted state, resolves each local player's typed Director state through director_get, selects the scripted update procedure or restores game perspective, resets the two authenticated debug-control fields, and enables or disables scripted camera state. January is 304 padded bytes with 23 relocations; the candidate is 256 padded bytes with 19 relocations and objdiff reports 86.36 percent similarity. January performs a second bounds-checked director_get assertion in each branch after already resolving the same state; ordinary C with one necessary typed accessor per path does not reproduce those redundant assertion sequences. A director_set_camera variant also remained 256 bytes with 19 relocations and diverged earlier. Adding an unused duplicate accessor, fake dependency, or nonsensical branch solely to imitate the extra assertions would violate the no-fake-matching rule, so it is not retained. The fail-closed classifier therefore remains UNKNOWN with class unclassified. No raw offset, address-derived name, forced inline/noinline, volatile or register forcing, optimizer barrier, pragma, assembly, fabricated control flow, or duplicate assertion call is present. Reopen only for authoritative January source/local records or a natural same-compiler donor that explains the repeated accessor checks.",
+      "measurements": {
+        "target": {
+          "size": 304,
+          "relocation_count": 23,
+          "normalized_sha256": "dfba772232540bf6926d16fb6554f65c256948c84e827cf14e52db1252c203ed"
+        },
+        "base": {
+          "size": 256,
+          "relocation_count": 19,
+          "normalized_sha256": "fd2c8c5b220ad335bf62943e3e4e0d5065913b93d202bf8e15fff8f140dc8faa"
+        },
+        "objdiff_percent": 86.36364
+      }
     }
   ]
 }

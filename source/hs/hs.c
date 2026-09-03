@@ -2770,6 +2770,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "camera/director.h"
 #include "cache/sound_cache.h"
 #include "hs.h"
 #include "hs_library_internal_compile.h"
@@ -4162,10 +4163,6 @@ void ai_scripting_deselect(
 	void);
 void ai_scripting_reconnect(
 	void);
-void director_save_camera(
-	void);
-void director_load_camera(
-	void);
 void players_unzoom_all(
 	void);
 void player_control_action_test_reset(
@@ -4437,8 +4434,6 @@ void ai_debug_speak(
 	char const *vocalization);
 void ai_debug_speak_list(
 	char const *list_name);
-void director_script_camera(
-	boolean scripted);
 void scripted_camera_set_absolute(
 	short camera_point_index,
 	word transition_time);

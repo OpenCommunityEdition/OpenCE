@@ -38,6 +38,9 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "camera_scripting.h"
+#include "director.h"
+
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "game/game.h"
@@ -141,8 +144,6 @@ void scripted_camera_set_camera_point_relative(
 	real field_of_view,
 	word transition_time,
 	long relative_object_index);
-void director_update(
-	real dt);
 void observer_update(
 	real dt);
 void first_person_camera_fake(
