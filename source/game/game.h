@@ -117,13 +117,15 @@ struct game_statistics
 };
 
 
-/* ---------- prototypes/GAME.C */
+/* ---------- prototypes/GAME_STATISTICS.C */
 
 void game_statistics_record_kill(
 	long dead_unit_index,
 	long killing_player_index,
-	long damage_type,
+	long killing_object_index,
 	short killing_team_index);
+
+/* ---------- prototypes/GAME.C */
 
 void game_initialize(void);
 void game_dispose(void);

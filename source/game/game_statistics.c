@@ -32,10 +32,6 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-boolean game_team_is_enemy(
-	short team_index0,
-	short team_index1);
-
 /* ---------- globals */
 
 boolean game_statistics_active = FALSE;
@@ -45,7 +41,7 @@ boolean game_statistics_active = FALSE;
 void game_statistics_start(
 	void)
 {
-	game_statistics_active = 1;
+	game_statistics_active = TRUE;
 
 	return;
 }
@@ -86,10 +82,13 @@ void game_statistics_record_damage(
 	return;
 }
 
+/* NonMatching: the natural direct-member source preserves the complete target
+   topology. The only residual is one independent load/store transpose in the
+   credited-kill statistics update. */
 void game_statistics_record_kill(
 	long dead_unit_index,
 	long killing_player_index,
-	long damage_type,
+	long killing_object_index,
 	short killing_team_index)
 {
 	if (game_statistics_active)
@@ -211,7 +210,7 @@ void game_statistics_record_kill(
 
 			game_engine_player_killed(
 				credited_player_index,
-				damage_type,
+				killing_object_index,
 				dead_player_index,
 				credited_friendly_fire);
 		}
