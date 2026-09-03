@@ -42,8 +42,12 @@ and closes `_sound_delete`, `_sound_stop`, and `_sound_stop_all` naturally.
   reports 22 exact, 0 residual, 43 unwritten.
 - `sound_classes.obj` remains 12 exact, 0 residual, 0 unwritten after its owner
   declarations were added.
-- House-rule fake-match scan and `git diff --check` are required at the commit
-  boundary.
+- A full 576-step `ninja` rebuild and the final incremental rebuild completed
+  with zero semantic-report unit errors; this includes `units.obj` and every
+  sound includer affected by the owner-header declarations.
+- `python -m pytest -q --basetemp scratch/pytest-final` passes 261 tests.
+- The house-rule fake-match scan reports zero review leads, and
+  `git diff --check` is clean.
 
 ## Remaining frontier
 
@@ -54,3 +58,39 @@ Larger update, looping-sound, prioritization, and channel-selection clusters
 remain unwritten. Natural HCEA-derived leaf bodies that currently lack a real
 January caller are intentionally left un-emitted rather than forced into the
 object.
+
+## Refresh/audibility reconstruction checkpoint
+
+The complete natural `_refresh_sounds` dependency cluster was reconstructed
+after the stable exact checkpoint. Because `_refresh_sounds` is correctly
+TU-private and its real caller (`_sound_render`) is still unwritten, VC7 does
+not emit this cluster in the production gate yet. A diagnostic build that only
+changes `_refresh_sounds` linkage in scratch memory (never in production
+source) proves the following status:
+
+- exact: `_channel_get_state` (240), `_refresh_sound` (240), `_listener_get`
+  (64), `_render_debug_sound` (192), `_source_distance_squared` (192);
+- `_refresh_sounds` has the exact 544-byte instruction stream and 32
+  relocation sites; the only fail-closed gate difference is that January's
+  split object anchors three PDB-named file-static constants through the
+  anonymous `_rdata_002af830` section owner, while the compiler names the
+  semantic constants directly;
+- `_source_audible` has the exact 240-byte envelope and all eight relocation
+  identities. Its remaining difference is the C2 local/register lifetime for
+  the nearest-listener result; no semantic or structural behavior is missing.
+
+The file-static constants are named from the HCEA release PDB:
+`sound_pitch_range_fade_time`, `sound_inaudible_fade_out_time`,
+`sound_inaudible_fade_back_in_time`, `sound_player_fade_out_time`,
+`oo_speed_of_sound`, `speed_of_sound_threshold`, and
+`sound_priority_epsilon`. They remain separate semantic variables, matching
+the PDB evidence; they were not collapsed into an invented byte-matching
+aggregate merely to satisfy split-object relocation naming.
+
+`_sound_dispose_from_old_map` is retained as an honest fuzzy reconstruction.
+It is 272 bytes with 23 relocations against January's 240 bytes and 21
+relocations. The target-proven immediate `0.3f` fade duration is preserved; the
+remaining differing loop rotation follows from `_sound_idle` remaining
+unwritten in this TU. Close it with the real `_sound_idle`/`_update_channels`
+caller cluster rather than with control-flow steering. Production gate at this
+checkpoint is therefore 22 exact, 1 residual, and 42 unwritten.

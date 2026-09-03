@@ -18,6 +18,8 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct sound_source;
+
 struct sound_location
 {
 	real_point3d position;
@@ -62,6 +64,10 @@ void scripted_looping_sound_stop(
 	long sound_index);
 void scripted_looping_sound_set_scale(long sound_index, real scale);
 void scripted_looping_sound_set_alternate(long sound_index, boolean alternate);
+void compute_sound_obstruction(
+	short local_player_index,
+	struct sound_source *source,
+	real distance);
 
 /* ---------- globals */
 

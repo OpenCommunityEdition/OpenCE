@@ -135,6 +135,11 @@ typedef char looping_sound_definition_scripting_sound_index_offset_assert[
 
 /* ---------- public code */
 
+real sound_definition_get_maximum_distance(
+	long sound_index);
+real sound_definition_get_minimum_distance(
+	long sound_index);
+
 short sound_definition_find_pitch_range_by_pitch(
 	struct sound_definition *definition,
 	real pitch,

@@ -30,6 +30,8 @@ void sound_initialize(
 	void);
 void sound_initialize_for_new_map(
 	void);
+void sound_dispose_from_old_map(
+	void);
 void sound_reconnect_to_structure_bsp(
 	void);
 
@@ -49,6 +51,8 @@ void sound_idle(
 	void);
 
 /* ---------- globals */
+
+extern boolean debug_sound;
 
 /* ---------- public code */
 
