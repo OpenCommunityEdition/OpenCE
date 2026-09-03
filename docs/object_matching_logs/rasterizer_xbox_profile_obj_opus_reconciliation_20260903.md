@@ -8,7 +8,7 @@
   `source/rasterizer/xbox/rasterizer_xbox_profile.c`.
 - Cross-unit ABI repair:
   `source/cseries/profile.c` and its owner header
-  `source/cseries/profile.h`.
+  `source/cseries/profile_rasterizer.h`.
 - Public Xbox rasterizer declarations were placed in their owner header,
   `source/rasterizer/xbox/rasterizer_xbox.h`.
 
@@ -166,7 +166,8 @@ call sites, not permission to add inert arguments elsewhere.
 - A packed aggregate for the 132-byte initialized state was rejected in favor
   of the naturally aligned `LARGE_INTEGER` plus profile-state objects.
 - A consumer-local declaration of `profile_rasterizer_stats` was rejected;
-  the ABI is owned by `profile.h` and gated at both caller and callee.
+  the ABI is owned by the narrow `profile_rasterizer.h` interface and gated
+  at both caller and callee.
 - The single-call conditional-format cleanup was rejected by the exact target
   shape described above.
 
@@ -186,3 +187,15 @@ call sites, not permission to add inert arguments elsewhere.
 - Scoped fake-match scan: 4 files scanned, 0 findings.
 - Tool tests: 261 passed.
 - `git diff --check`: clean.
+
+## Canonical aggregate reconciliation
+
+The initial canonical admission exposed a VC7 definition-position regression
+that the isolated lane could not see: placing the rasterizer-only ABI in the
+broad `profile.h` include path changed `units.obj` from 189/189 to 188/189,
+even though `units.c` does not call the function. The declaration was moved to
+the narrow owner interface `source/cseries/profile_rasterizer.h`, included only
+by `profile.c` and `rasterizer_xbox_profile.c`. After a full rebuild and a fresh
+target split, `units.obj` returned to 189/189 while
+`rasterizer_xbox_profile.obj` remained 16/16. This is the canonical form of the
+ABI and supersedes the broad-header wording in the isolated-lane record.
