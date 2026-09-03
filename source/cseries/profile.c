@@ -316,8 +316,8 @@ struct profile_frame
 	long lapsed_msec;
 	boolean lapsed_msec_valid;
 	char lapsed_reason[0x203];
-	long rasterizer_triangle_count;
-	long rasterizer_vertex_count;
+	real rasterizer_gpu_time;
+	unsigned long rasterizer_pushbuffer_size;
 	long stall_count;
 	short stall_index;
 	byte __unknown111E[2];
@@ -551,11 +551,11 @@ void profile_lapsed_msec(
 }
 
 void profile_rasterizer_stats(
-	long triangle_count,
-	long vertex_count)
+	real gpu_time,
+	__int64 pushbuffer_size)
 {
-	profile_globals.current_frame.rasterizer_triangle_count = triangle_count;
-	profile_globals.current_frame.rasterizer_vertex_count = vertex_count;
+	profile_globals.current_frame.rasterizer_gpu_time = gpu_time;
+	profile_globals.current_frame.rasterizer_pushbuffer_size = (unsigned long)pushbuffer_size;
 
 	return;
 }
