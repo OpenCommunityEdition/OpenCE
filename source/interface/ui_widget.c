@@ -629,14 +629,17 @@ struct widget_instance;
 
 #include "cseries.h"
 #include "errors.h"
+#include "bitmaps/bitmap_group.h"
 #include "bink/bink_playback.h"
 #include "bungie_net/common/thread.h"
+#include "cseries/cseries_windows.h"
 #include "cutscene/cinematics.h"
 #include "event_manager.h"
 #include "game/players.h"
 #include "input/input.h"
 #include "input/input_abstraction.h"
 #include "interface/attract_mode.h"
+#include "interface/interface.h"
 #include "interface/player_ui.h"
 #include "interface/ui_widget_definitions.h"
 #include "interface/ui_widget_event_handler_functions.h"
@@ -647,6 +650,7 @@ struct widget_instance;
 #include "networking/network_connection.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_server_manager.h"
+#include "rasterizer/rasterizer.h"
 #include "saved games/player_profile.h"
 #include "saved games/playlist_profile.h"
 #include "saved games/saved_game_files.h"
@@ -993,6 +997,9 @@ typedef char verify_widget_instance_text_box_string_list_index_offset[
 
 static boolean transition_to_game_in_progress(
 	void);
+static __inline real compute_offset_coordinate(
+	long time,
+	real delta_per_second);
 static short get_icon_type(
 	wchar_t const *string);
 static boolean should_flip_sticks_for_local_player(
@@ -1106,6 +1113,184 @@ void ui_widgets_inhibit_processing(
 		1174,
 		widget_globals.initialized);
 	widget_globals.processing_inhibited = inhibit;
+
+	return;
+}
+
+static __inline real compute_offset_coordinate(
+	long time,
+	real delta_per_second)
+{
+	real scaled_delta = delta_per_second * 0.001f;
+
+	return (real)fmod(
+		scaled_delta * time,
+		1.0);
+}
+
+void draw_bitmap_in_rect(
+	struct bitmap_data *bitmap,
+	rectangle2d *rect,
+	rectangle2d *bitmap_rect,
+	rectangle2d *clip_rect,
+	pixel32 argb,
+	struct rasterizer_dynamic_screen_geometry_parameters *multitexture_params,
+	boolean no_plasma)
+{
+	if (bitmap && rect)
+	{
+		real_argb_color plasma_fade = ui_plasma_effect_color;
+		real_rgb_color map_tint = { 0.9f, 0.9f, 0.9f };
+		real map_fade = 0.9f;
+		rectangle2d default_bitmap_rect;
+		real_point2d positions[NUMBER_OF_POINTS_PER_RECTANGLE];
+		struct dynamic_screen_vertex vertices[NUMBER_OF_POINTS_PER_RECTANGLE];
+		struct rasterizer_dynamic_screen_geometry_parameters parameters;
+		real bitmap_width;
+		real bitmap_height;
+		real texture_width;
+		real texture_height;
+		real_point2d map_offsets[2];
+		short rectangle_x0;
+		short rectangle_y0;
+		short rectangle_width;
+		short rectangle_height;
+		short source_width;
+		short source_height;
+		short vertex_index;
+
+		if (!bitmap_rect)
+		{
+			default_bitmap_rect.y0 = 0;
+			default_bitmap_rect.x0 = 0;
+			default_bitmap_rect.y1 = bitmap->height;
+			default_bitmap_rect.x1 = bitmap->width;
+			bitmap_rect = &default_bitmap_rect;
+		}
+
+		rectangle_x0 = rect->x0;
+		rectangle_y0 = rect->y0;
+		rectangle_width = rect->x1 - rect->x0;
+		rectangle_height = rect->y1 - rect->y0;
+		source_width = bitmap_rect->x1 - bitmap_rect->x0;
+		source_height = bitmap_rect->y1 - bitmap_rect->y0;
+		positions[0].x = (real)rectangle_x0;
+		positions[0].y = (real)rectangle_y0;
+		positions[1].x = (real)(rectangle_x0 + rectangle_width);
+		positions[1].y = (real)rectangle_y0;
+		positions[2].x = (real)(rectangle_x0 + rectangle_width);
+		positions[2].y = (real)(rectangle_y0 + rectangle_height);
+		positions[3].x = (real)rectangle_x0;
+		positions[3].y = (real)(rectangle_y0 + rectangle_height);
+
+		if (clip_rect)
+		{
+			if (clip_rect->x0 > rect->x0)
+			{
+				positions[0].x = (real)clip_rect->x0;
+				positions[3].x = (real)clip_rect->x0;
+			}
+			if (clip_rect->x1 < rect->x1)
+			{
+				positions[1].x = (real)clip_rect->x1;
+				positions[2].x = (real)clip_rect->x1;
+			}
+			if (clip_rect->y0 > rect->y0)
+			{
+				positions[0].y = (real)clip_rect->y0;
+				positions[1].y = (real)clip_rect->y0;
+			}
+			if (clip_rect->y1 < rect->y1)
+			{
+				positions[2].y = (real)clip_rect->y1;
+				positions[3].y = (real)clip_rect->y1;
+			}
+		}
+
+		bitmap_width = MAX(1.0f, (real)bitmap->width);
+		texture_width = MIN(
+			(real)source_width / bitmap_width,
+			1.0f);
+		bitmap_height = MAX(1.0f, (real)bitmap->height);
+		texture_height = MIN(
+			(real)source_height / bitmap_height,
+			1.0f);
+
+		for (vertex_index = 0;
+			vertex_index < NUMBER_OF_POINTS_PER_RECTANGLE;
+			vertex_index++)
+		{
+			vertices[vertex_index].position = positions[vertex_index];
+			vertices[vertex_index].texture_coordinates.x =
+				(vertex_index % 3) ? texture_width : 0.0f;
+			vertices[vertex_index].texture_coordinates.y =
+				(vertex_index > 1) ? texture_height : 0.0f;
+			vertices[vertex_index].color = argb;
+		}
+
+		csmemset(&parameters, 0, sizeof(parameters));
+		if (no_plasma)
+		{
+			parameters.map[0] = bitmap;
+			parameters.map_scale[0].i = 1.0f;
+			parameters.map_scale[0].j = 1.0f;
+			parameters.map_texture_scale[0].i = 1.0f;
+			parameters.map_texture_scale[0].j = 1.0f;
+		}
+		else
+		{
+			struct bitmap_data *plasma_bitmap = TAG_BLOCK_GET_ELEMENT(
+				&bitmap_group_get(
+					interface_get_tag_index(_interface_bitmap_iface_map3))->bitmap_data,
+				0,
+				struct bitmap_data);
+			long time = system_milliseconds();
+
+			map_offsets[0].x =
+				compute_offset_coordinate(time, 0.03215434f) * 311.0f;
+			map_offsets[0].y =
+				compute_offset_coordinate(time, 0.026795285f) * 311.0f;
+			map_offsets[1].x =
+				-compute_offset_coordinate(time, 0.035536603f);
+			map_offsets[1].x *= 201.0f;
+			map_offsets[1].y =
+				-compute_offset_coordinate(time, 0.031094525f);
+			map_offsets[1].y *= 201.0f;
+
+			parameters.map[0] = plasma_bitmap;
+			parameters.map[1] = plasma_bitmap;
+			parameters.map[2] = bitmap;
+			parameters.map_anchor_screen[0] = TRUE;
+			parameters.map_anchor_screen[1] = TRUE;
+			parameters.map_wrapped[0] = TRUE;
+			parameters.map_wrapped[1] = TRUE;
+			parameters.map_offset[0] = &map_offsets[0];
+			parameters.map_offset[1] = &map_offsets[1];
+			parameters.map_scale[0].i = 1.0f;
+			parameters.map_scale[0].j = 1.0f;
+			parameters.map_scale[1].i = 1.0f;
+			parameters.map_scale[1].j = 1.0f;
+			parameters.map_scale[2].i = 1.0f;
+			parameters.map_scale[2].j = 1.0f;
+			parameters.map_texture_scale[0].i = 1.0f / 311.0f;
+			parameters.map_texture_scale[0].j = 1.0f / 311.0f;
+			parameters.map_texture_scale[1].i = 1.0f / 201.0f;
+			parameters.map_texture_scale[1].j = 1.0f / 201.0f;
+			parameters.map_texture_scale[2].i = 1.0f;
+			parameters.map_texture_scale[2].j = 1.0f;
+			parameters.map_tint[0] = &map_tint;
+			parameters.map_tint[1] = &map_tint;
+			parameters.plasma_fade = plasma_fade;
+			parameters.doing_plasma_effect = TRUE;
+			parameters.map_fade[0] = &map_fade;
+			parameters.map_fade[1] = &map_fade;
+			parameters.map0_to_1_blend_function = 5;
+		}
+
+		parameters.framebuffer_blend_function = 0;
+		parameters.point_sampled = FALSE;
+		rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
+	}
 
 	return;
 }
