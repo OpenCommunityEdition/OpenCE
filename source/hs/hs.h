@@ -72,6 +72,7 @@ enum
 /* ---------- macros */
 
 #define hs_type_valid(type) ((type)>=_hs_type_void && (type)<NUMBER_OF_HS_TYPES)
+#define HS_TYPE_IS_TAG_REFERENCE(type) ((type)>=_hs_type_sound && (type)<=_hs_type_object_definition)
 #define HS_TYPE_IS_ENUM(type) ((type)>=_hs_type_enum_game_difficulty && (type)<=_hs_type_enum_hud_corner)
 #define HS_TYPE_IS_OBJECT_NAME(type) ((type)>=_hs_type_object_name && (type)<=_hs_type_scenery_name)
 #define HS_TYPE_IS_OBJECT(type) ((type)>=_hs_type_object && (type)<=_hs_type_scenery)
@@ -117,11 +118,21 @@ short hs_tokens_enumerate(char const *substring, long type_flags, char const **r
 boolean hs_can_cast(
 	short actual_type,
 	short desired_type);
+short hs_find_script_by_name(
+	char const *name);
+short hs_find_global_by_name(
+	char const *name);
+short hs_global_get_type(
+	short global_index);
+char const *hs_global_get_name(
+	short global_index);
 
 /* ---------- globals */
 
 extern word hs_object_type_masks[NUMBER_OF_HS_OBJECT_TYPES];
+extern tag hs_tag_reference_type_group_tags[];
 extern struct hs_enum_definition hs_enum_table[NUMBER_OF_HS_TYPES];
+extern char const *hs_type_names[NUMBER_OF_HS_TYPES];
 
 /* ---------- public code */
 

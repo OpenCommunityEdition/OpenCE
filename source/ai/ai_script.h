@@ -75,6 +75,10 @@ void ai_index_to_string(
 	struct scenario *scenario,
 	char *buffer,
 	long buffer_size);
+boolean ai_index_from_string(
+	struct scenario *scenario,
+	char const *ai_string,
+	long *ai_reference);
 void ai_index_squad_iterator_new(
 	long ai_reference,
 	struct ai_script_squad_iterator *iterator);

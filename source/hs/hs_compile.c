@@ -410,53 +410,246 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "cache/cache_files.h"
+#include "ai/ai_script.h"
+#include "hs/hs.h"
+#include "hs/hs_scenario_definitions.h"
+#include "interface/interface.h"
 #include "memory/data.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 
 /* ---------- constants */
 
+enum
+{
+	first_hs_object_type = _hs_type_object_name,
+	first_hs_object_name_type = _hs_type_object,
+	scenario_cutscene_flag_size = 0x5C,
+	scenario_cutscene_title_size = 0x60,
+	scenario_recorded_animation_size = 0x40,
+	scenario_device_group_size = 0x34,
+	scenario_ai_command_list_size = 0x60,
+	scenario_conversation_size = 0x74,
+	hud_globals_group_tag = 'hudg',
+	hud_message_text_group_tag = 'hmt ',
+	hud_waypoint_arrow_size = 0x68,
+	hud_message_definition_size = 0x40,
+};
+
+enum hs_syntax_node_flag_bits
+{
+	_hs_syntax_node_primitive_bit = 0,
+	_hs_syntax_node_script_bit,
+	_hs_syntax_node_variable_bit,
+	_hs_syntax_node_checked_bit,
+};
+
 /* ---------- macros */
+
+#define hs_syntax_get(expression_index) ((struct hs_compile_syntax_node *)datum_get(hs_syntax_data, (expression_index)))
+#define hud_globals_definition_get(index) ((struct hud_globals_definition *)tag_get(hud_globals_group_tag, (index)))
+#define hud_message_text_definition_get(index) ((struct hud_message_text_definition *)tag_get(hud_message_text_group_tag, (index)))
+#undef HS_TYPE_IS_OBJECT
+#undef HS_TYPE_IS_OBJECT_NAME
+#define HS_TYPE_IS_OBJECT(type) ((type)>=first_hs_object_type && (type)<=first_hs_object_type+NUMBER_OF_HS_OBJECT_TYPES-1)
+#define HS_TYPE_IS_OBJECT_NAME(type) ((type)>=first_hs_object_name_type && (type)<=first_hs_object_name_type+NUMBER_OF_HS_OBJECT_TYPES-1)
 
 /* ---------- structures */
 
-struct hs_compile_globals_prefix
+struct hs_compile_globals
 {
 	boolean initialized;
-	byte reserved0001[3];
-	long source_size;
+	byte pad001[3];
+	long compiled_source_size;
 	char *compiled_source;
-	byte reserved000C[0x0C];
-	boolean error_occurred;
-	byte reserved0019[3];
+	char *string_constant_buffer;
+	long string_constant_buffer_offset;
+	long string_constant_buffer_size;
+	boolean error_since_initialize;
+	byte pad019[3];
 	char const *error;
-	byte reserved0020[0x105];
+	long error_offset;
+	char error_buffer[256];
+	boolean malloced;
 	boolean compiling_scenario;
+	boolean disallow_blocks;
+	boolean disallow_sets;
+	boolean variables_predetermined;
+	byte pad129[3];
 };
 
+struct hs_compile_syntax_node
+{
+	short datum_header;
+	union
+	{
+		short index;
+		short constant_type;
+		short function_index;
+		short script_index;
+	};
+	short type;
+	word flags;
+	long next_node_index;
+	long source_offset;
+	union
+	{
+		long data;
+		boolean boolean_value;
+		real real_value;
+		short short_value;
+	};
+};
+
+typedef char verify_hs_compile_syntax_node_size[
+	sizeof(struct hs_compile_syntax_node) == sizeof(struct hs_syntax_node) ? 1 : -1];
+
+struct hud_globals_definition
+{
+	byte reserved000[0x160];
+	struct tag_block waypoint_arrows;
+};
+
+struct hud_message_text_definition
+{
+	byte reserved000[0x20];
+	struct tag_block messages;
+};
+
+typedef boolean (*hs_primitive_parser)(
+	long expression_index);
+
 typedef char verify_hs_compile_initialized_offset[
-	offsetof(struct hs_compile_globals_prefix, initialized) == 0x00 ? 1 : -1];
-typedef char verify_hs_compile_source_size_offset[
-	offsetof(struct hs_compile_globals_prefix, source_size) == 0x04 ? 1 : -1];
+	offsetof(struct hs_compile_globals, initialized) == 0x00 ? 1 : -1];
+typedef char verify_hs_compile_compiled_source_size_offset[
+	offsetof(struct hs_compile_globals, compiled_source_size) == 0x04 ? 1 : -1];
 typedef char verify_hs_compile_compiled_source_offset[
-	offsetof(struct hs_compile_globals_prefix, compiled_source) == 0x08 ? 1 : -1];
-typedef char verify_hs_compile_error_occurred_offset[
-	offsetof(struct hs_compile_globals_prefix, error_occurred) == 0x18 ? 1 : -1];
+	offsetof(struct hs_compile_globals, compiled_source) == 0x08 ? 1 : -1];
+typedef char verify_hs_compile_string_constant_buffer_offset[
+	offsetof(struct hs_compile_globals, string_constant_buffer) == 0x0C ? 1 : -1];
+typedef char verify_hs_compile_error_since_initialize_offset[
+	offsetof(struct hs_compile_globals, error_since_initialize) == 0x18 ? 1 : -1];
 typedef char verify_hs_compile_error_offset[
-	offsetof(struct hs_compile_globals_prefix, error) == 0x1C ? 1 : -1];
+	offsetof(struct hs_compile_globals, error) == 0x1C ? 1 : -1];
 typedef char verify_hs_compile_compiling_scenario_offset[
-	offsetof(struct hs_compile_globals_prefix, compiling_scenario) == 0x125 ? 1 : -1];
+	offsetof(struct hs_compile_globals, compiling_scenario) == 0x125 ? 1 : -1];
+typedef char verify_hs_compile_globals_size[
+	sizeof(struct hs_compile_globals) == 0x12C ? 1 : -1];
 
 /* ---------- prototypes */
 
+static boolean hs_parse_scenario_datum(
+	long expression_index,
+	short offset,
+	struct tag_block *block,
+	long element_size);
+static boolean hs_parse_trigger_volume(
+	long expression_index);
+static boolean hs_parse_cutscene_flag(
+	long expression_index);
+static boolean hs_parse_cutscene_camera_point(
+	long expression_index);
+static boolean hs_parse_cutscene_title(
+	long expression_index);
+static boolean hs_parse_cutscene_recording(
+	long expression_index);
+static boolean hs_parse_device_group(
+	long expression_index);
+static boolean hs_parse_ai_command_list(
+	long expression_index);
+static boolean hs_parse_starting_profile(
+	long expression_index);
+static boolean hs_parse_conversation(
+	long expression_index);
+static boolean hs_parse_boolean(
+	long expression_index);
+static boolean hs_parse_real(
+	long expression_index);
+static boolean hs_parse_integer(
+	long expression_index);
+static boolean hs_parse_string(
+	long expression_index);
+static boolean hs_parse_script(
+	long expression_index);
+static boolean hs_parse_tag_reference(
+	long expression_index);
+static boolean hs_parse_enum(
+	long expression_index);
+static boolean hs_parse_ai(
+	long expression_index);
+static boolean hs_parse_object_name(
+	long expression_index);
+static boolean hs_parse_object(
+	long expression_index);
+static boolean hs_parse_navpoint(
+	long expression_index);
+static boolean hs_parse_hud_message(
+	long expression_index);
+static boolean hs_parse_object_list(
+	long expression_index);
+
 /* ---------- globals */
 
-extern struct hs_compile_globals_prefix bss_00453480;
 extern struct data_array *hs_syntax_data;
 
-/* ---------- public code */
+static struct hs_compile_globals hs_compile_globals;
 
-#define hs_compile_globals bss_00453480
+static char const whitespace_characters[2] = { ' ', '\t' };
+static char const eol_characters[2] = { '\n', '\r' };
+static hs_primitive_parser const hs_type_primitive_parsers[NUMBER_OF_HS_TYPES] =
+{
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	hs_parse_boolean,
+	hs_parse_real,
+	hs_parse_integer,
+	hs_parse_integer,
+	hs_parse_string,
+	hs_parse_script,
+	hs_parse_trigger_volume,
+	hs_parse_cutscene_flag,
+	hs_parse_cutscene_camera_point,
+	hs_parse_cutscene_title,
+	hs_parse_cutscene_recording,
+	hs_parse_device_group,
+	hs_parse_ai,
+	hs_parse_ai_command_list,
+	hs_parse_starting_profile,
+	hs_parse_conversation,
+	hs_parse_navpoint,
+	hs_parse_hud_message,
+	hs_parse_object_list,
+	hs_parse_tag_reference,
+	hs_parse_tag_reference,
+	hs_parse_tag_reference,
+	hs_parse_tag_reference,
+	hs_parse_tag_reference,
+	hs_parse_tag_reference,
+	hs_parse_tag_reference,
+	hs_parse_tag_reference,
+	hs_parse_enum,
+	hs_parse_enum,
+	hs_parse_enum,
+	hs_parse_enum,
+	hs_parse_enum,
+	hs_parse_object_name,
+	hs_parse_object_name,
+	hs_parse_object_name,
+	hs_parse_object_name,
+	hs_parse_object_name,
+	hs_parse_object_name,
+	hs_parse_object,
+	hs_parse_object,
+	hs_parse_object,
+	hs_parse_object,
+	hs_parse_object,
+	hs_parse_object,
+};
+
+/* ---------- public code */
 
 void hs_compile_initialize(
 	boolean compiling_scenario)
@@ -469,9 +662,9 @@ void hs_compile_initialize(
 		!hs_compile_globals.initialized);
 	hs_compile_globals.initialized = TRUE;
 	hs_compile_globals.compiled_source = NULL;
-	hs_compile_globals.source_size = 0;
+	hs_compile_globals.compiled_source_size = 0;
 	hs_compile_globals.compiling_scenario = compiling_scenario;
-	hs_compile_globals.error_occurred = FALSE;
+	hs_compile_globals.error_since_initialize = FALSE;
 	hs_compile_globals.error = NULL;
 	if (compiling_scenario)
 	{
@@ -486,20 +679,636 @@ void hs_compile_initialize(
 	return;
 }
 
-#undef hs_compile_globals
-
 boolean hs_verify_source_offset(
 	long source_offset)
 {
 	boolean valid;
 
 	valid = TRUE;
-	if (source_offset < 0 || source_offset >= bss_00453480.source_size)
+	if (source_offset < 0 || source_offset >= hs_compile_globals.compiled_source_size)
 	{
-		bss_00453480.error = "bad source offset (you need to recompile.)";
+		hs_compile_globals.error = "bad source offset (you need to recompile.)";
 		valid = FALSE;
 	}
 	return valid;
 }
 
 /* ---------- private code */
+
+static boolean hs_parse_boolean(
+	long expression_index)
+{
+	boolean result = TRUE;
+	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	char const *string = hs_compile_globals.compiled_source + expression->source_offset;
+	boolean value;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x5B3,
+		expression->type==_hs_type_boolean);
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x5B4,
+		expression->constant_type==expression->type);
+
+	if (csstrcmp(string, "false") == 0 ||
+		csstrcmp(string, "off") == 0 ||
+		csstrcmp(string, "0") == 0)
+	{
+		value = FALSE;
+	}
+	else if (csstrcmp(string, "true") == 0 ||
+		csstrcmp(string, "on") == 0 ||
+		csstrcmp(string, "1") == 0)
+	{
+		value = TRUE;
+	}
+	else
+	{
+		hs_compile_globals.error = "i expected \"true\" or \"false\".";
+		hs_compile_globals.error_offset = expression->source_offset;
+		result = FALSE;
+	}
+	expression->boolean_value = value;
+
+	return result;
+}
+
+static boolean hs_parse_real(
+	long expression_index)
+{
+	boolean result = TRUE;
+	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	char const *string = hs_compile_globals.compiled_source + expression->source_offset;
+	boolean decimal = FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x5D6,
+		expression->type==_hs_type_real);
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x5D7,
+		expression->constant_type==expression->type);
+
+	if (*string == '-')
+		string++;
+	while (*string)
+	{
+		if (!isdigit(*string))
+		{
+			if (decimal || *string != '.')
+			{
+				hs_compile_globals.error = "this is not a valid real number.";
+				hs_compile_globals.error_offset = expression->source_offset;
+				result = FALSE;
+				break;
+			}
+			decimal = TRUE;
+		}
+		string++;
+	}
+	expression->real_value = (real)atof(
+		hs_compile_globals.compiled_source + expression->source_offset);
+
+	return result;
+}
+
+static boolean hs_parse_integer(
+	long expression_index)
+{
+	boolean result = TRUE;
+	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	char const *string = hs_compile_globals.compiled_source + expression->source_offset;
+	long value;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x5F7,
+		expression->type==_hs_type_short_integer || expression->type==_hs_type_long_integer);
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x5F8,
+		expression->constant_type==expression->type);
+
+	if (*string == '-')
+		string++;
+	while (*string)
+	{
+		if (!isdigit(*string))
+		{
+			hs_compile_globals.error = "this is not a valid integer.";
+			hs_compile_globals.error_offset = expression->source_offset;
+			result = FALSE;
+			break;
+		}
+		string++;
+	}
+
+	value = atoi(hs_compile_globals.compiled_source + expression->source_offset);
+	if (result &&
+		expression->type != _hs_type_long_integer &&
+		(value > SHORT_MAX || value < SHORT_MIN))
+	{
+		hs_compile_globals.error = "shorts must be in the range [-32767, 32768].";
+		hs_compile_globals.error_offset = expression->source_offset;
+		result = FALSE;
+	}
+	if (expression->type == _hs_type_long_integer)
+		expression->data = value;
+	else
+		expression->short_value = (short)value;
+
+	return result;
+}
+
+static boolean hs_parse_string(
+	long expression_index)
+{
+	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x61E,
+		expression->type==_hs_type_string);
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x61F,
+		expression->constant_type==expression->type);
+
+	expression->data = (long)(hs_compile_globals.compiled_source + expression->source_offset);
+
+	return TRUE;
+}
+
+static boolean hs_parse_script(
+	long expression_index)
+{
+	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	short script_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x62D,
+		expression->type==_hs_type_script);
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x62E,
+		expression->constant_type==expression->type);
+
+	script_index = hs_find_script_by_name(
+		hs_compile_globals.compiled_source + expression->source_offset);
+	if (script_index != NONE)
+	{
+		expression->short_value = script_index;
+		return TRUE;
+	}
+
+	hs_compile_globals.error = "this is not a valid script name.";
+	hs_compile_globals.error_offset = expression->source_offset;
+
+	return FALSE;
+}
+
+static boolean hs_parse_tag_reference(
+	long expression_index)
+{
+	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct scenario *scenario = global_scenario_get();
+	tag group_tag;
+	short reference_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x69E,
+		HS_TYPE_IS_TAG_REFERENCE(expression->type));
+
+	group_tag = hs_tag_reference_type_group_tags[expression->type - _hs_type_sound];
+	for (reference_index = 0;
+		reference_index < scenario->hs_references.count;
+		reference_index++)
+	{
+		struct hs_reference *reference = TAG_BLOCK_GET_ELEMENT(
+			&scenario->hs_references,
+			reference_index,
+			struct hs_reference);
+		if (csstrcmp(
+			reference->reference.name,
+			hs_compile_globals.compiled_source + expression->source_offset) == 0 &&
+			reference->reference.group_tag == group_tag)
+		{
+			expression->data = reference->reference.index;
+			break;
+		}
+	}
+
+	return TRUE;
+}
+
+static boolean hs_parse_enum(
+	long expression_index)
+{
+	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_enum_definition *enum_definition = &hs_enum_table[expression->type];
+	short value_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x6BC,
+		HS_TYPE_IS_ENUM(expression->type));
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x6BD,
+		expression->constant_type==expression->type);
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x6BE,
+		enum_definition->count);
+
+	for (value_index = 0; value_index < enum_definition->count; value_index++)
+	{
+		if (_stricmp(
+			hs_compile_globals.compiled_source + expression->source_offset,
+			enum_definition->values[value_index]) == 0)
+		{
+			break;
+		}
+	}
+
+	if (value_index != enum_definition->count)
+	{
+		expression->short_value = value_index;
+		return TRUE;
+	}
+
+	sprintf(
+		hs_compile_globals.error_buffer,
+		"%s must be ",
+		hs_type_names[expression->type]);
+	for (value_index = 0; value_index < enum_definition->count - 1; value_index++)
+	{
+		csstrcat(hs_compile_globals.error_buffer, "\"");
+		csstrcat(hs_compile_globals.error_buffer, enum_definition->values[value_index]);
+		csstrcat(hs_compile_globals.error_buffer, "\", ");
+	}
+	if (enum_definition->count > 1)
+		csstrcat(hs_compile_globals.error_buffer, "or ");
+	csstrcat(hs_compile_globals.error_buffer, "\"");
+	csstrcat(hs_compile_globals.error_buffer, enum_definition->values[value_index]);
+	csstrcat(hs_compile_globals.error_buffer, "\".");
+	hs_compile_globals.error = hs_compile_globals.error_buffer;
+	hs_compile_globals.error_offset = expression->source_offset;
+	expression->short_value = value_index;
+
+	return FALSE;
+}
+
+static boolean hs_parse_scenario_datum(
+	long expression_index,
+	short offset,
+	struct tag_block *block,
+	long element_size)
+{
+	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	short element_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x6F1,
+		element_size<=SHORT_MAX);
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x6F2,
+		offset+TAG_STRING_LENGTH<element_size);
+	for (element_index = 0; element_index < block->count; element_index++)
+	{
+		char const *element = tag_block_get_element_with_size(
+			block,
+			element_index,
+			element_size);
+		if (stricmp(
+			element + offset,
+			hs_compile_globals.compiled_source + expression->source_offset) == 0)
+		{
+			expression->data = element_index;
+			return TRUE;
+		}
+	}
+
+	sprintf(
+		hs_compile_globals.error_buffer,
+		"this is not a valid %s name",
+		hs_type_names[expression->type]);
+	hs_compile_globals.error = hs_compile_globals.error_buffer;
+	hs_compile_globals.error_offset = expression->source_offset;
+
+	return FALSE;
+}
+
+static boolean hs_parse_trigger_volume(
+	long expression_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x711,
+		hs_syntax_get(expression_index)->type==_hs_type_trigger_volume);
+
+	return hs_parse_scenario_datum(
+		expression_index,
+		offsetof(struct scenario_trigger_volume, name),
+		&global_scenario_get()->trigger_volumes,
+		sizeof(struct scenario_trigger_volume));
+}
+
+static boolean hs_parse_cutscene_flag(
+	long expression_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x719,
+		hs_syntax_get(expression_index)->type==_hs_type_cutscene_flag);
+
+	return hs_parse_scenario_datum(
+		expression_index,
+		4,
+		&global_scenario_get()->cutscene_flags,
+		scenario_cutscene_flag_size);
+}
+
+static boolean hs_parse_cutscene_camera_point(
+	long expression_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x721,
+		hs_syntax_get(expression_index)->type==_hs_type_cutscene_camera_point);
+
+	return hs_parse_scenario_datum(
+		expression_index,
+		offsetof(struct scenario_cutscene_camera_point, name),
+		&global_scenario_get()->cutscene_camera_points,
+		sizeof(struct scenario_cutscene_camera_point));
+}
+
+static boolean hs_parse_cutscene_title(
+	long expression_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x729,
+		hs_syntax_get(expression_index)->type==_hs_type_cutscene_title);
+
+	return hs_parse_scenario_datum(
+		expression_index,
+		4,
+		&global_scenario_get()->cutscene_chapter_titles,
+		scenario_cutscene_title_size);
+}
+
+static boolean hs_parse_cutscene_recording(
+	long expression_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x731,
+		hs_syntax_get(expression_index)->type==_hs_type_cutscene_recording);
+
+	return hs_parse_scenario_datum(
+		expression_index,
+		0,
+		&global_scenario_get()->recorded_animations,
+		scenario_recorded_animation_size);
+}
+
+static boolean hs_parse_device_group(
+	long expression_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x739,
+		hs_syntax_get(expression_index)->type==_hs_type_device_group);
+
+	return hs_parse_scenario_datum(
+		expression_index,
+		0,
+		&global_scenario_get()->device_groups,
+		scenario_device_group_size);
+}
+
+static boolean hs_parse_ai(
+	long expression_index)
+{
+	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	boolean result;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x744,
+		hs_syntax_get(expression_index)->type==_hs_type_ai);
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x745,
+		expression->constant_type==expression->type);
+
+	result = ai_index_from_string(
+		global_scenario_get(),
+		hs_compile_globals.compiled_source + expression->source_offset,
+		&expression->data);
+	if (!result)
+	{
+		hs_compile_globals.error = "this is not a valid ai encounter or squad.";
+		hs_compile_globals.error_offset = expression->source_offset;
+	}
+
+	return result;
+}
+
+static boolean hs_parse_ai_command_list(
+	long expression_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x755,
+		hs_syntax_get(expression_index)->type==_hs_type_ai_command_list);
+
+	return hs_parse_scenario_datum(
+		expression_index,
+		0,
+		&global_scenario_get()->ai_command_lists,
+		scenario_ai_command_list_size);
+}
+
+static boolean hs_parse_starting_profile(
+	long expression_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x75D,
+		hs_syntax_get(expression_index)->type==_hs_type_starting_profile);
+
+	return hs_parse_scenario_datum(
+		expression_index,
+		0,
+		&global_scenario_get()->starting_profiles,
+		sizeof(struct scenario_starting_profile));
+}
+
+static boolean hs_parse_conversation(
+	long expression_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x765,
+		hs_syntax_get(expression_index)->type==_hs_type_conversation);
+
+	return hs_parse_scenario_datum(
+		expression_index,
+		0,
+		&global_scenario_get()->ai_conversations,
+		scenario_conversation_size);
+}
+
+static boolean hs_parse_object_name(
+	long expression_index)
+{
+	boolean result = FALSE;
+	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	short object_name_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x771,
+		HS_TYPE_IS_OBJECT_NAME(expression->type));
+
+	object_name_index = scenario_object_name_index_from_string(
+		global_scenario_get(),
+		hs_compile_globals.compiled_source + expression->source_offset);
+	if (object_name_index != NONE)
+	{
+		struct scenario_object_name *object_name = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->object_names,
+			object_name_index,
+			struct scenario_object_name);
+
+		match_assert(
+			"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+			0x77A,
+			object_name->runtime_object_type!=NONE);
+		if (TEST_FLAG(
+			(short)hs_object_type_masks[expression->type - first_hs_object_name_type],
+			object_name->runtime_object_type))
+		{
+			expression->short_value = object_name_index;
+			result = TRUE;
+		}
+		else
+		{
+			sprintf(
+				hs_compile_globals.error_buffer,
+				"this is not an object of type %s.",
+				hs_type_names[expression->type]);
+			hs_compile_globals.error = hs_compile_globals.error_buffer;
+			hs_compile_globals.error_offset = expression->source_offset;
+		}
+	}
+	else
+	{
+		hs_compile_globals.error = "this is not a valid object name.";
+		hs_compile_globals.error_offset = expression->source_offset;
+	}
+
+	return result;
+}
+
+static boolean hs_parse_object(
+	long expression_index)
+{
+	boolean result = TRUE;
+	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x79A,
+		HS_TYPE_IS_OBJECT(expression->type));
+
+	if (csstrcmp(
+		hs_compile_globals.compiled_source + expression->source_offset,
+		"none") == 0)
+	{
+		expression->data = NONE;
+	}
+	else
+	{
+		expression->type += NUMBER_OF_HS_OBJECT_TYPES;
+		expression->constant_type = expression->type;
+		result = hs_parse_object_name(expression_index);
+		expression->type -= NUMBER_OF_HS_OBJECT_TYPES;
+	}
+
+	return result;
+}
+
+static boolean hs_parse_navpoint(
+	long expression_index)
+{
+	long hud_globals_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x7B1,
+		hs_syntax_get(expression_index)->type==_hs_type_navpoint);
+
+	hud_globals_index = interface_get_tag_index(_interface_hud_globals);
+	if (hud_globals_index == NONE)
+		return FALSE;
+
+	return hs_parse_scenario_datum(
+		expression_index,
+		0,
+		&hud_globals_definition_get(
+			interface_get_tag_index(_interface_hud_globals))->waypoint_arrows,
+		hud_waypoint_arrow_size);
+}
+
+static boolean hs_parse_hud_message(
+	long expression_index)
+{
+	boolean result = FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x7BF,
+		hs_syntax_get(expression_index)->type==_hs_type_hud_message);
+
+	if (global_scenario_get()->hud_messages.index != NONE)
+	{
+		result = hs_parse_scenario_datum(
+			expression_index,
+			0,
+			&hud_message_text_definition_get(
+				global_scenario_get()->hud_messages.index)->messages,
+			hud_message_definition_size);
+	}
+
+	return result;
+}
+
+static boolean hs_parse_object_list(
+	long expression_index)
+{
+	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	boolean result;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x7CF,
+		expression->type==_hs_type_object_list);
+
+	expression->constant_type = first_hs_object_name_type;
+	expression->type = first_hs_object_name_type;
+	result = hs_parse_object_name(expression_index);
+	expression->type = _hs_type_object_list;
+
+	return result;
+}
