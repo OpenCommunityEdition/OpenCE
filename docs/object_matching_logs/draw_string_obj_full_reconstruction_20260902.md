@@ -87,11 +87,12 @@ their proven offsets; the unused two-byte gap and trailing 0x8C-byte
 multitexture parameter region remain non-owning fields in the same aggregate.
 No storage was split, duplicated, or moved.
 
-The public formatting enums, callback type, and declarations for the narrow,
-Unicode, bounds, pick, and bitmap entry points now live in
-`source/text/draw_string.h`. Private helper definitions and prototypes remain
-in `draw_string.c`. `bitmap_format_get_bits_per_pixel` is obtained from its
-owner `bitmaps/bitmaps.h`, and `tolower` from the CRT `ctype.h`; there are no
+The public callback type and declarations for the narrow, Unicode, bounds,
+pick, and bitmap entry points now live in `source/text/draw_string.h`. The
+justification and wrapping enums are used only by this compiland and therefore
+remain private in `draw_string.c`, together with private helper definitions
+and prototypes. `bitmap_format_get_bits_per_pixel` is obtained from its owner
+`bitmaps/bitmaps.h`, and `tolower` from the CRT `ctype.h`; there are no
 consumer-local external prototypes.
 
 ## Source-authentic implementation decisions
@@ -145,6 +146,15 @@ header change. Their verdict counts are unchanged; the final counts are:
 | `source/interface/interface` | 6 | 0 | 12 |
 | `source/game/game_engine` | 169 | 11 | 0 |
 | `source/physics/collision_usage` | 12 | 2 | 0 |
+| `source/interface/terminal` | 13 | 0 | 0 |
+
+Canonical admission exposed a definition-position interaction that the older
+isolated base did not: putting the two TU-private enums in the shared header
+changed VC7's schedule for exact `game_engine::_populate_statistic_buffer`.
+Moving those private enums back to `draw_string.c` restored that 560-byte
+function exactly while leaving all 18 draw-string exact owners unchanged.
+This preserves both declaration ownership and the January inline/definition
+schedule; no compiler steering is involved.
 
 The required Units sentinel remains 189 exact, zero residual, zero unwritten.
 The following final checks pass:

@@ -8,26 +8,7 @@ header included in hcex build.
 #define __DRAW_STRING_H
 #pragma once
 
-/* ---------- headers */
-
-#include "math/integer_math.h"
-#include "math/real_math.h"
-
 /* ---------- constants */
-
-enum
-{
-	_text_justification_left = 0,
-	_text_justification_right,
-	_text_justification_center,
-	NUMBER_OF_TEXT_JUSTIFICATIONS,
-};
-
-enum
-{
-	_draw_text_wrap_horizontally_bit = 0,
-	_draw_text_wrap_vertically_bit,
-};
 
 /* ---------- macros */
 
