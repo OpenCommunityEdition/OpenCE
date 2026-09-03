@@ -997,6 +997,7 @@ static boolean extract_3d_textures(
 		boolean incompatible_dimensions = FALSE;
 		short bitmap_count = 0;
 
+		// BUG (preserved): January does not bound the final run before reading its next sequence index.
 		while (!incompatible_dimensions &&
 			extract_data.bitmaps[first_bitmap_index + bitmap_count].sequence_index == sequence_index)
 		{
