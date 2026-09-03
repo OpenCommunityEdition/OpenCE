@@ -2875,6 +2875,44 @@
         },
         "objdiff_percent": 80.10256
       }
+    },
+    {
+      "unit": "source/cache/cache_files_windows",
+      "function": "_cached_map_file_read_header",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed asynchronous header-read path from January's instructions, assertion/error strings, exact relocation topology, and the independently named HaloCEA Xbox implementation. The retained C obtains the semantic cached-map record, records its FILETIME, issues the 2048-byte overlapped read, waits alertably on a volatile completion flag, verifies the header, clears invalid header/time data, and invalidates the handle on failed completion. Target and candidate share the 400-byte padded envelope and all 26 relocation identities; objdiff reports 98.70079 percent similarity. The residual is confined to VC7 register selection around the asynchronous request and a redundant volatile completion reload/control-flow schedule; changing the local away from volatile worsened the authentic initialization schedule and was rejected. No raw offsets, fake alias, inert read, barrier, pragma, assembly, forced inline, or semantically false path is retained. Reopen for authoritative January source/local records or a natural same-compiler donor explaining the redundant completion reload.",
+      "measurements": {
+        "target": {
+          "size": 400,
+          "relocation_count": 26,
+          "normalized_sha256": "1a3412aeb8f52881b0a0317f1671f1bef803f138ec9d594be08e349072fe034a"
+        },
+        "base": {
+          "size": 400,
+          "relocation_count": 26,
+          "normalized_sha256": "5abb084355a19b12c72870099def7db0523ce8f3e2ff464cb2f75c69e2ce7bfe"
+        },
+        "objdiff_percent": 98.70079
+      }
+    },
+    {
+      "unit": "source/cache/cache_files_windows",
+      "function": "_cache_files_open_cache_files",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule with the full cache-file startup loop retained as ordinary typed C. January's 47-relocation call graph, file/API constants, assertions, diagnostic strings, cache-file layout, and the surrounding HaloCEA cache subsystem establish the behavior: delete the sentinel slot, open each cache file, preserve correctly sized existing files, rewrite stale files asynchronously, truncate them to the configured size, install the handle, validate cached headers against the DVD checksum/build, and clear invalid slots. Target and candidate share the 752-byte padded envelope and all 47 relocation identities; objdiff reports 83.333336 percent similarity. The residual is broad VC7 basic-block and register scheduling, especially cold CreateFile/setup-failure placement and the post-open validation path, without evidence for a unique source rewrite. No goto reshaping, raw offsets, volatile/register forcing beyond the real asynchronous completion flag, barrier, pragma, assembly, fake dependency, forced inline, or nonsensical success path is retained. Reopen for authoritative January source/local records or a natural same-compiler donor that explains the cold-block layout.",
+      "measurements": {
+        "target": {
+          "size": 752,
+          "relocation_count": 47,
+          "normalized_sha256": "f1c88310c585856cc88840f5dfa06dfa579231bca2e1f57c06cf7d00803c7a3f"
+        },
+        "base": {
+          "size": 752,
+          "relocation_count": 47,
+          "normalized_sha256": "5ac13a55c15d04794a7e301ed502b8962f97c1466484b36d13aacec0ff3648bc"
+        },
+        "objdiff_percent": 83.333336
+      }
     }
   ]
 }
