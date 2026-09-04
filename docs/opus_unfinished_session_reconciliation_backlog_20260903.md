@@ -89,3 +89,16 @@ ledger.  A completed-looking donor report is never sufficient by itself: each
 packet still needs current-canonical compilation, stable whole-tree comparison,
 semantic and ownership audits, park validation, fake-match review, tooling
 tests, the `units.obj` sentinel, and the January COMDAT check.
+
+### Additional interrupted Opus intake reported 2026-09-04
+
+The user reports that the newest Opus prompt was nearly finished when its
+token budget expired. Keep that run on the reconciliation queue even though it
+did not produce a final handoff. At this checkpoint there is no newer local
+`opus/*` branch or commit than `opus/small-families-30k-20260902` at
+`eeedd72e5`; its preserved dirty state is still the only discoverable
+unfinished Opus worktree. If the newest run used that worktree, its changes are
+covered by the object-by-object queue above. If it wrote elsewhere, identify
+and freeze that path before changing it, then add its dirty files, scratch
+reports, and last stable snapshot as a distinct donor instead of silently
+folding its claimed progress into the existing totals.
