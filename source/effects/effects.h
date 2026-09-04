@@ -20,6 +20,11 @@ void effects_disconnect_from_structure_bsp(
 	void);
 void effects_reconnect_to_structure_bsp(
 	void);
+void effects_start_on_first_person_weapon(
+	short local_player_index,
+	long weapon_index);
+void effects_stop_on_first_person_weapon(
+	short local_player_index);
 boolean dangerous_effects_near_player(
 	void);
 long effect_new_looping(

@@ -148,7 +148,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
-#include "model_animation_definitions.h"
+#include "models/model_animations.h"
 
 /* ---------- constants */
 

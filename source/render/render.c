@@ -74,6 +74,7 @@ symbols in this file:
 #include "bink_playback.h"
 #include "game.h"
 #include "game_engine.h"
+#include "interface/first_person_weapons.h"
 #include "editor_stubs.h"
 #include "render_debug.h"
 #include "objects/object_lights_rendering.h"
@@ -133,8 +134,6 @@ void player_effect_get_screen_flash(
 void build_sprite_prepare_for_window(
 	void);
 void render_sky(
-	void);
-void first_person_weapon_render_update(
 	void);
 void render_objects(
 	void);

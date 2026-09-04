@@ -3548,6 +3548,82 @@
         },
         "objdiff_percent": 99.14717
       }
+    },
+    {
+      "unit": "source/interface/first_person_weapons",
+      "function": "_first_person_weapon_message",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked after restoring the complete externally linked message dispatcher in ordinary typed C from the HCEA first-person-weapon sources and January's switch, shotgun-reload, call, string, and relocation topology. Target and candidate both occupy 544 padded bytes and carry the same 20 relocation destinations. January materializes a four-byte message local that shifts the early body by one byte and later compares the shotgun reload type at full width; VC7 lowers the direct typed short parameter and field comparisons without that local. An invented long copy and a long reload-type carrier were rejected because neither closed the function and neither has source provenance. The retained switch uses the recovered enum constants and case order, retains the coherent reload state machine, and keeps the owner external because both January wrappers use its cdecl stack boundary. No raw offset, volatile/register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, forced inline, or nonsensical branch is retained. Reopen only for authoritative January local records or a natural same-compiler donor explaining both width/lifetime choices.",
+      "measurements": {
+        "target": {
+          "size": 544,
+          "relocation_count": 20,
+          "normalized_sha256": "cd9c8aedea8b749e4062c3d33d11467628ea4338df7558fa7fa17223441d5338"
+        },
+        "base": {
+          "size": 544,
+          "relocation_count": 20,
+          "normalized_sha256": "e98a3d38ed723ccb195a9fd10b3cfa625b66e3d7fe1728bff62775b97c06c809"
+        },
+        "objdiff_percent": 79.60345
+      }
+    },
+    {
+      "unit": "source/interface/first_person_weapons",
+      "function": "_first_person_weapon_render_update",
+      "class": "private-register-convention",
+      "evidence": "Fuzzy-parked with the complete typed render-update wrapper reconstructed from HCEA behavior and January's assertions, render-global reads, perspective/zoom tests, and 14 relocation destinations. January is 176 padded bytes and the candidate is 192 because the private first_person_weapon_set_visibility call expects visible in BL in January but VC7 passes the honest boolean on the stack for the recovered short/boolean signature. The function is otherwise structurally aligned through the visibility update and exact node-matrix builder call. Changing the local-player parameter to long can force the callee's register shape, but contradicts the January caller loads and was rejected as an allocator coincidence. No false ABI, raw offset, volatile/register forcing, barrier, pragma, assembly, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January type/local records or a natural same-compiler donor explaining the private two-register call boundary.",
+      "measurements": {
+        "target": {
+          "size": 176,
+          "relocation_count": 14,
+          "normalized_sha256": "1eae8155ba3c823b726bfb78add927d2367ab4c1fa1ddc568c2c1f48be4c63e3"
+        },
+        "base": {
+          "size": 192,
+          "relocation_count": 14,
+          "normalized_sha256": "b97ded8cf2c5d190d3fe9aa5d96d6084da3d18b7347a642a5cf62dbb60641672"
+        },
+        "objdiff_percent": 92.2807
+      }
+    },
+    {
+      "unit": "source/interface/first_person_weapons",
+      "function": "_first_person_weapon_set_visibility",
+      "class": "private-register-convention",
+      "evidence": "Fuzzy-parked after reconstructing the complete visibility transition helper in ordinary typed C. January and the candidate own the same 12 relocation destinations and the same semantic effects-start/effects-stop/particles-stop state transition, but January's 160-byte private helper receives the short local-player index in DI and boolean visibility in BL while VC7 gives the honest short/boolean spelling a stack boolean and emits 176 bytes. Extensive natural type/order/caller experiments converged on that stack boundary; only a false long local-player parameter matched, and January's caller loads disprove it. The recovered global is the source-static first_person_weapons pointer authenticated verbatim by January's assertion text. No false signature, raw offset, volatile/register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, forced inline, or nonsensical branch is retained. Reopen only for authoritative January signature/local records or a natural same-compiler private-ABI donor.",
+      "measurements": {
+        "target": {
+          "size": 160,
+          "relocation_count": 12,
+          "normalized_sha256": "d4692680178268eae30468170feb07dbfc0f220c1252109a17b4bbcf89630473"
+        },
+        "base": {
+          "size": 176,
+          "relocation_count": 12,
+          "normalized_sha256": "8f4cf998c0f8feec5e5cac0e617de4c5676be86be2baa97acb4eb805a297c5bf"
+        },
+        "objdiff_percent": 75.729164
+      }
+    },
+    {
+      "unit": "source/interface/first_person_weapons",
+      "function": "_first_person_weapon_switch_weapons",
+      "class": "tu-context-optimization",
+      "evidence": "Fuzzy-parked with the complete typed weapon-switch transaction reconstructed from the HCEA source family and January's object/tag calls, remapping-table setup, ten-field commit block, prediction tail, and relocation topology. January occupies 608 padded bytes with 26 relocations; the candidate occupies 544 with 20. The first real divergence is January inlining the 160-byte private first_person_weapon_set_visibility helper at the hidden/visible transitions, while the honest 176-byte short/boolean candidate is outside VC7's inline decision and remains a call; downstream slot/index materialization differs as a consequence. A long-index visibility signature induced the inline but is contradicted by January's caller loads and was rejected. No force-inline annotation, false ABI, raw offset, volatile/register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, or nonsensical branch is retained. Reopen only when the visibility private-ABI blocker is solved from authoritative evidence or a natural same-compiler TU context.",
+      "measurements": {
+        "target": {
+          "size": 608,
+          "relocation_count": 26,
+          "normalized_sha256": "7d83d24b330d5e74a0a680e21d4e2d42a659c01cd00ffbca6cbd64b821aba62b"
+        },
+        "base": {
+          "size": 544,
+          "relocation_count": 20,
+          "normalized_sha256": "b10569c0c59756cb7b87d442d6fe1c628584fa2186fa9942b3760b10ad4f036c"
+        },
+        "objdiff_percent": 76.96774
+      }
     }
   ]
 }

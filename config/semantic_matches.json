@@ -513,5 +513,20 @@
     "unit": "source/game/game_engine_oddball",
     "function": "_oddball_engine_display_score",
     "reason": "hardened COFF comparison proves all 736 padded bytes and all 56 semantic relocations exact (SHA-256 6ad4051ea66ca25449fb855b7cb0076efef3e056e80fa1a6566d7dc5fc2a2e38); objdiff reports pooled-string COMDAT ownership as a false negative"
+  },
+  {
+    "unit": "source/interface/first_person_weapons",
+    "function": "_first_person_weapon_state_from_weapon_message",
+    "reason": "hardened COFF comparison proves all 192 padded bytes and all 19 semantic relocations exact (SHA-256 f551efe027b59b504571439a15088c0065c23383298acbcdb85aeb04f10d3947); objdiff reports a private switch-table/local-label ownership false negative"
+  },
+  {
+    "unit": "source/interface/first_person_weapons",
+    "function": "_first_person_animation_type_from_weapon_state",
+    "reason": "hardened COFF comparison proves all 272 padded bytes and all 25 semantic relocations exact (SHA-256 ea1838b37d9d2a3d39b80a5118d966f264e0daecbff3a47c9f41a6968006b499); objdiff reports a private switch-table/local-label ownership false negative"
+  },
+  {
+    "unit": "source/interface/first_person_weapons",
+    "function": "_first_person_weapon_set_state",
+    "reason": "hardened COFF comparison proves all 688 padded bytes and all 26 semantic relocations exact (SHA-256 965964af9115913e36fa06e152828b2e857e7ac59e2cc0e6fdcff29ddebcb91f); objdiff reports a private switch-table/local-label ownership false negative"
   }
 ]

@@ -103,6 +103,7 @@ symbols in this file:
 #include "shaders/shader_definitions.h"
 #include "shaders/shaders.h"
 #include "game/players.h"
+#include "interface/first_person_weapons.h"
 #include "camera/director.h"
 #include "cutscene/cinematics.h"
 #include "tag_files/tag_files.h"
@@ -268,8 +269,6 @@ short structure_visibility_find_objects(
 	void (*get_bounding_sphere_function)(long object_index, real_point3d *center, real *radius),
 	boolean (*unmarked_function)(long object_index),
 	boolean (*mark_function)(long object_index));
-void first_person_weapon_draw(
-	void);
 void rasterizer_models_begin(
 	boolean sky);
 void rasterizer_models_end(

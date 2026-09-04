@@ -70,6 +70,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "interface/first_person_weapons.h"
 #include "interface/interface.h"
 #include "interface/hud_messaging.h"
 #include "math/real_math.h"
@@ -98,21 +99,15 @@ void hud_initialize(
 	void);
 void draw_string_initialize(
 	void);
-void first_person_weapons_initialize(
-	void);
 void draw_string_dispose_from_old_map(
 	void);
 void hud_dispose_from_old_map(
-	void);
-void first_person_weapons_dispose_from_old_map(
 	void);
 void draw_string_dispose(
 	void);
 void terminal_dispose(
 	void);
 void hud_dispose(
-	void);
-void first_person_weapons_dispose(
 	void);
 void cinematic_render(
 	void);
