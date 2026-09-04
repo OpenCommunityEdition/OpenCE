@@ -3757,6 +3757,101 @@
         },
         "objdiff_percent": 96.15385
       }
+    },
+    {
+      "unit": "source/saved games/saved_game_files",
+      "function": "_create_enumerated_saved_game_file",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed save-game creation transaction from January's assertions, switch topology, XDK calls, exact callee tree, strings, field widths, and all 50 ordered relocation destinations. The retained ordinary C validates the file type/player/display name, refreshes dirty memory-unit state, performs disk-space/count checks, creates XDK metadata and a typed 512-byte save block, generates the signature at the type-specific payload boundary, appends the mapfile record, and deletes ghost metadata on failure. January occupies 912 padded bytes and the candidate 896 at 97.72535 percent objdiff similarity. The meaningful residual is a shallow local-lifetime/register-allocation choice: January materializes the NONE fallback in EDI before the assertion and returns that live value on the outer failure paths, while VC7 constant-folds those candidate returns and rotates the saved file-type/count registers; the remaining envelope delta is trailing alignment padding. No false type, raw fixed offset, pointer-representation pun, volatile/register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, forced inline, or nonsensical branch is retained; the XDK checksum output points at the typed signature bytes within the save block. Reopen only for authoritative January local records or a natural same-compiler source form explaining the fallback lifetime.",
+      "measurements": {
+        "target": {
+          "size": 912,
+          "relocation_count": 50,
+          "normalized_sha256": "5ba23a0ddf9fedb641685924e65af6d1db53f30c92f71f8aab8bd769fb2ea3bb"
+        },
+        "base": {
+          "size": 896,
+          "relocation_count": 50,
+          "normalized_sha256": "7d8a1e3770825f9eae9413fb168186bcee21cc3e7594097f5875b041f428e008"
+        },
+        "objdiff_percent": 97.72535
+      }
+    },
+    {
+      "unit": "source/saved games/saved_game_files",
+      "function": "_saved_game_file_find_profile_index_for_directory_path",
+      "class": "tu-context-optimization",
+      "evidence": "Fuzzy-parked with the complete typed directory-prefix lookup recovered from January's assertion, packed-index fields, mutex/mapfile protocol, exact private callees, and string comparison topology. January occupies 352 padded bytes with 25 relocations; the candidate occupies 432 with 33 at 72.14286 percent objdiff similarity. The sole structural delta is VC7 inlining the independently byte-exact close_mapfile_after_reading helper, whereas January emits its private call; every caller instruction outside that expansion follows the recovered scan and cleanup behavior. Definition order and natural counter-width forms were measured without suppressing the inline, and the current house rule forbids noinline directives, barriers, and false linkage. No raw offset, volatile/register forcing, pragma, assembly, fake dependency, undefined behavior, or nonsensical branch is retained. Reopen only when additional authentic TU content naturally changes the C2 inline budget or authoritative January source/local records become available.",
+      "measurements": {
+        "target": {
+          "size": 352,
+          "relocation_count": 25,
+          "normalized_sha256": "65498fbf5bb67233cfc916f0e5b2c57ef5445185fde7d1518bdf9c4bc0d4d028"
+        },
+        "base": {
+          "size": 432,
+          "relocation_count": 33,
+          "normalized_sha256": "f03bb88e750d57441d061e930a24935679c5a5fa199a81d64dc0742a60cfc602"
+        },
+        "objdiff_percent": 72.14286
+      }
+    },
+    {
+      "unit": "source/saved games/saved_game_files",
+      "function": "_saved_game_files_delete_all_custom_profiles",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed custom-profile deletion and default-profile re-enumeration flow from January's XDK calls, exact mapfile helpers, path tables, string diagnostics, counter widths, and all 14 relocation destinations. Target and candidate both occupy 224 padded bytes and objdiff reports 96.51316 percent similarity. Their meaningful instructions are byte-identical; January inserts one loop-alignment nop before the XDeleteSaveGame loop, shifting the later branch displacements by one byte, while the current VC7 context omits it. Natural for/while conditions and equivalent unsigned one-element loop spellings converge on the retained result. No inert padding source, raw byte emission, volatile/register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, forced inline, or nonsensical branch is retained. Reopen only for a natural same-compiler TU context that reproduces January's loop alignment or authoritative January source records.",
+      "measurements": {
+        "target": {
+          "size": 224,
+          "relocation_count": 14,
+          "normalized_sha256": "c70f61b8dccdada264209b5c197c0156c1af640a29db8d1829cb6a9822f68239"
+        },
+        "base": {
+          "size": 224,
+          "relocation_count": 14,
+          "normalized_sha256": "9829c1454b61f159c6888ad09efcfc9448030a6a85a93520f5f24dce7371c2a9"
+        },
+        "objdiff_percent": 96.51316
+      }
+    },
+    {
+      "unit": "source/saved games/saved_game_files",
+      "function": "_saved_game_files_enumerate_available_to_local_player_index",
+      "class": "tu-context-optimization",
+      "evidence": "Fuzzy-parked with the complete typed available-profile enumerator recovered from January's assertion, general/mapfile mutex protocol, packed-index builder, default-profile filter, exact private callees, and output-count behavior. January occupies 368 padded bytes with 23 relocations; the candidate occupies 432 with 31 at 74.090164 percent objdiff similarity. The retained result count is initialized before the mutex so every failure path deterministically reports zero; January appears to reload the dead player-index slot on the outer mutex-failure path, and reproducing that artifact would require an uninitialized local, so it is rejected under the anti-UB and meaningful-source rules. The larger structural delta is VC7 inlining the independently byte-exact close_mapfile_after_reading helper where January retains its private call. Natural private-definition order and long/word counter variants were measured; the recovered long available-count local is retained because it matches January's indexing and comparison widths. No noinline directive, false linkage, raw offset, volatile/register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, or nonsensical branch is retained. Reopen only when added authentic TU content naturally changes the C2 inline budget or authoritative January source/local records provide a defined failure-result formulation.",
+      "measurements": {
+        "target": {
+          "size": 368,
+          "relocation_count": 23,
+          "normalized_sha256": "fe3dc1b00a07ea0397a545bacff6b37837b4b43f38dda93b289d9cb41ebbcd8d"
+        },
+        "base": {
+          "size": 432,
+          "relocation_count": 31,
+          "normalized_sha256": "5c155e5b3faa50e45749b66b259d3b6d855be96e1a33d0d0b8fb1bc8aa070f4b"
+        },
+        "objdiff_percent": 74.090164
+      }
+    },
+    {
+      "unit": "source/saved games/saved_game_files",
+      "function": "_saved_game_perform_file_system_checks",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed disk-capacity and XDK saved-game-count check from January's 64-bit comparison, XGAME_FIND_DATA frame, enum return values, API calls, and all ten relocation destinations. Target and candidate both occupy 208 padded bytes at 85.783134 percent objdiff similarity. The only semantic-stream difference is an equivalent loop rotation: January keeps the unsigned count bound at the top and branches back on the byte-sized XFindNextSaveGame result, while VC7 duplicates the bound at the bottom after the same increment/break logic. Plain while/for forms, byte-result casts, unsigned counter widths, and hoisted locals converged on this closest ordinary-C result. No raw offset, volatile/register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, forced inline, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler loop form that selects the target rotation.",
+      "measurements": {
+        "target": {
+          "size": 208,
+          "relocation_count": 10,
+          "normalized_sha256": "41b22a32e3885a75d4899107422e02e6181a0610baa8330ac22aaf56ee5afde7"
+        },
+        "base": {
+          "size": 208,
+          "relocation_count": 10,
+          "normalized_sha256": "bdc444dbf13905e8b28259d32a6f1836b7a70634caacd2b5ee8ce4d61d7cd596"
+        },
+        "objdiff_percent": 85.783134
+      }
     }
   ]
 }

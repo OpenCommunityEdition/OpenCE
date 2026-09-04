@@ -23,6 +23,10 @@ struct player_profile;
 
 /* ---------- prototypes/PLAYER_PROFILE.C */
 
+void player_profiles_initialize(
+	void);
+void player_profiles_dispose(
+	void);
 long player_profile_get_random_color(
 	void);
 long player_profile_get_random_good_color(

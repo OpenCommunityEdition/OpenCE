@@ -190,7 +190,9 @@ boolean file_write_to_position(
 	unsigned long count,
 	void const *buffer);
 // file_get_last_modification_date
-// file_get_size
+boolean file_get_size(
+	struct file_reference const *file,
+	unsigned long *size);
 boolean find_files_next(struct file_reference *file, struct file_last_modification_date *date);
 
 /* ---------- globals */

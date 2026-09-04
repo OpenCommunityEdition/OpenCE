@@ -16,29 +16,80 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct file_reference;
+struct _XCALCSIG_SIGNATURE;
+
 /* ---------- prototypes/SAVED_GAME_FILES.C */
 
-long saved_game_file_find_profile_index_for_directory_path(
-	char *directory_path,
-	long file_type);
-boolean saved_game_file_get_path_to_enclosing_directory(
-	long profile_index,
-	char *directory_path);
-word saved_game_file_get_type(
+void saved_game_files_initialize(
+	void);
+void saved_game_files_dispose(
+	void);
+boolean saved_game_file_close(
+	struct file_reference *saved_game_file,
 	long profile_index);
-void saved_game_file_remember_last_used_multiplayer_variant_directory(
-	char *directory_path);
-void saved_game_file_remember_player1_last_used_profile_directory(
-	char *directory_path);
-boolean saved_game_file_retrieve_player1_last_used_profile_directory(
-	char *directory_path);
+void saved_game_files_notify_memory_units_changed(
+	void);
 boolean saved_game_files_take_mutex(
 	void);
 void saved_game_files_release_mutex(
 	void);
+short saved_game_perform_file_system_checks(
+	void);
 boolean saved_game_file_name_unique(
 	wchar_t const *name);
-short saved_game_perform_file_system_checks(
+void saved_game_file_remember_player1_last_used_profile_directory(
+	char const *directory_path);
+boolean saved_game_file_retrieve_player1_last_used_profile_directory(
+	char *directory_path);
+void saved_game_file_remember_last_used_multiplayer_variant_directory(
+	char const *directory_path);
+boolean saved_game_file_retrieve_last_used_multiplayer_variant_directory(
+	char *directory_path);
+void saved_game_file_remember_last_used_multiplayer_map(
+	char const *map_name);
+boolean saved_game_file_retrieve_last_used_multiplayer_map(
+	char *map_name);
+void saved_game_file_generate_checksum(
+	void const *buffer,
+	word buffer_size,
+	struct _XCALCSIG_SIGNATURE *checksum);
+boolean saved_game_files_take_mapfile_mutex(
+	void);
+void saved_game_files_release_mapfile_mutex(
+	void);
+wchar_t *saved_game_file_get_display_name(
+	long profile_index);
+boolean saved_game_file_open(
+	struct file_reference *saved_game_file,
+	long profile_index);
+boolean saved_game_file_get_path_to_enclosing_directory(
+	long profile_index,
+	char *directory_path);
+short saved_game_files_enumerate_default_files(
+	void);
+long create_enumerated_saved_game_file(
+	word saved_game_file_type,
+	short local_player_index,
+	wchar_t *display_name);
+boolean delete_enumerated_saved_game_file(
+	long profile_index);
+void saved_game_file_get_useable_untitled_profile_name(
+	wchar_t *display_name);
+void saved_game_files_enumerate_available_to_local_player_index(
+	short player_index,
+	word saved_game_file_type,
+	word *number_of_profiles,
+	long *player_profile_indices,
+	boolean include_default_profiles);
+long saved_game_file_find_profile_index_for_directory_path(
+	char const *directory_path,
+	short type);
+void saved_game_files_delete_all_custom_profiles(
+	void);
+word saved_game_file_get_type(
+	long profile_index);
+void enumerate_memory_units(
 	void);
 void enumerate_memory_units_test(
 	void);

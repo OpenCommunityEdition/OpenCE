@@ -22,6 +22,12 @@ struct playlist_profile;
 
 /* ---------- prototypes/PLAYLIST_PROFILE.C */
 
+void playlist_profiles_initialize(
+	void);
+void playlist_profiles_dispose(
+	void);
+word playlist_profile_number_of_default_profiles_on_disk(
+	void);
 boolean playlist_profile_get(
 	long playlist_profile_index,
 	struct playlist_profile *profile);
