@@ -358,7 +358,10 @@ static boolean new_particle_is_visible(
 	real_point3d const *position,
 	real radius)
 {
-	return scenario_location_potentially_visible_local(location);
+	if (scenario_location_potentially_visible_local(location))
+		return TRUE;
+
+	return FALSE;
 }
 
 real particle_get_radius(

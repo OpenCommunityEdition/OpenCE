@@ -4099,6 +4099,25 @@
         },
         "objdiff_percent": 99.52381
       }
+    },
+    {
+      "unit": "source/effects/particles",
+      "function": "_particle_next_frame",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked after retaining the complete typed ordinary-C particle animation step corroborated by January control flow and relocations and by the later HCEA reconstruction. Target and candidate both occupy 208 padded bytes, contain 88 instructions, and carry the same eight relocation identities; objdiff reports 95.71429 percent. The first true divergence is an interchangeable EAX/ECX lifetime choice: January keeps the TRUE result in AL, loads the backwards flag into CL, and tests AL against CL, while VC7 naturally loads the flag into AL, tests bit 0 directly, uses EAX rather than ECX for the frame index, and rematerializes TRUE on the early return. Nine earlier evidence-backed source shapes plus cached-flag, short-frame-index, and promoted-frame-index variants either reproduced this allocation or worsened the stream. No register/volatile forcing, barrier, pragma, assembly, raw offset, representation pun, fake dependency, undefined behavior, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or natural same-compiler TU-context evidence resolving the register lifetime tie.",
+      "measurements": {
+        "target": {
+          "size": 208,
+          "relocation_count": 8,
+          "normalized_sha256": "5b20757045cb3e9b1402dc94c9f4b8c115fb6c394bd0fec214a3b5e8795c46a0"
+        },
+        "base": {
+          "size": 208,
+          "relocation_count": 8,
+          "normalized_sha256": "0c83d99b1fa0e00c0b58c38e14e0ce8dfed68104029e3ab76b49493e7f9c8bae"
+        },
+        "objdiff_percent": 95.71429
+      }
     }
   ]
 }
