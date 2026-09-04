@@ -317,6 +317,7 @@ enum
 	MAXIMUM_ENCOUNTERS = 128,
 	MAXIMUM_EXAMINED_PURSUIT_POSITIONS_PER_MAP = 256,
 	NUMBER_OF_ACTOR_INDICES_PER_EXAMINED_PURSUIT_POSITION = 6,
+	MAXIMUM_STARTING_LOCATIONS_PER_SQUAD = 64,
 };
 
 enum
@@ -917,6 +918,174 @@ boolean encounter_mark_examined_pursuit_position(
 	}
 
 	return marked;
+}
+
+boolean encounter_pursuit_position_already_examined(
+	long encounter_index,
+	long actor_index,
+	short firing_position_index,
+	long start_time,
+	short *examined_count,
+	long *last_examined_time_out)
+{
+	long pursuit_index = encounter_find_pursuit(encounter_index, firing_position_index, start_time, FALSE);
+	long last_examined_time = NONE;
+	boolean already_examined = FALSE;
+	short actor_count = 0;
+
+	if (pursuit_index != NONE)
+	{
+		struct pursuit_datum *pursuit = pursuit_get(pursuit_index);
+		short i;
+
+		match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 1076, pursuit->firing_position_index == firing_position_index);
+
+		actor_count = pursuit->actor_count;
+		last_examined_time = pursuit->last_examined_time;
+
+		if (actor_count >= NUMBER_OF_ACTOR_INDICES_PER_EXAMINED_PURSUIT_POSITION+1)
+		{
+			already_examined = TRUE;
+		}
+		else
+		{
+			for (i = 0; i < NUMBER_OF_ACTOR_INDICES_PER_EXAMINED_PURSUIT_POSITION; i++)
+			{
+				if (pursuit->actor_indices[i] == actor_index)
+				{
+					already_examined = TRUE;
+					break;
+				}
+			}
+		}
+	}
+
+	if (examined_count)
+		*examined_count = actor_count;
+	if (last_examined_time_out)
+		*last_examined_time_out = last_examined_time;
+
+	return already_examined;
+}
+
+short encounter_get_actor_starting_location(
+	long encounter_index,
+	long squad_index,
+	boolean spawning)
+{
+	struct encounter_datum *encounter = encounter_get(encounter_index);
+	struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
+	struct squad_datum *squad = encounter_get_squad(encounter, squad_index);
+	struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+		&encounter_definition->squads, squad_index, struct squad_definition);
+	unsigned long assigned_locations[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_STARTING_LOCATIONS_PER_SQUAD)];
+	short found_index = NONE;
+	short index;
+
+	csmemset(assigned_locations, 0, sizeof(assigned_locations));
+
+	{
+		short required_count = 0;
+
+		for (index = 0; index < squad_definition->starting_locations.count; index++)
+		{
+			if (BIT_VECTOR_TEST_FLAG(squad->required_locations, index) &&
+				!BIT_VECTOR_TEST_FLAG(assigned_locations, index))
+			{
+				required_count++;
+			}
+		}
+
+		if (required_count > 0)
+		{
+			short random_index = seed_random_range(get_global_random_seed_address(), 0, required_count);
+
+			for (index = 0; index < squad_definition->starting_locations.count; index++)
+			{
+				if (BIT_VECTOR_TEST_FLAG(squad->required_locations, index) &&
+					!BIT_VECTOR_TEST_FLAG(assigned_locations, index))
+				{
+					if (!random_index)
+					{
+						BIT_VECTOR_SET_FLAG(squad->required_locations, index, FALSE);
+						match_assert(
+							"c:\\halo\\SOURCE\\ai\\encounters.c",
+							1557,
+							BIT_VECTOR_TEST_FLAG(squad->unused_locations, index));
+						BIT_VECTOR_SET_FLAG(squad->unused_locations, index, FALSE);
+						found_index = index;
+						break;
+					}
+					random_index--;
+				}
+			}
+
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\encounters.c",
+				1571,
+				found_index != NONE);
+		}
+	}
+
+	if (found_index == NONE)
+	{
+		short unused_count;
+		boolean reset_unused;
+
+		do
+		{
+			boolean unused_locations_available = FALSE;
+
+			reset_unused = FALSE;
+			unused_count = 0;
+			for (index = 0; index < squad_definition->starting_locations.count; index++)
+			{
+				if (!BIT_VECTOR_TEST_FLAG(assigned_locations, index))
+				{
+					if (BIT_VECTOR_TEST_FLAG(squad->unused_locations, index))
+						unused_count++;
+					else
+						unused_locations_available = TRUE;
+				}
+			}
+
+			if (unused_locations_available && !unused_count)
+			{
+				csmemset(squad->unused_locations, NONE,
+					BIT_VECTOR_SIZE_IN_BYTES(squad_definition->starting_locations.count));
+				reset_unused = TRUE;
+			}
+		}
+		while (reset_unused);
+
+		if (unused_count > 0)
+		{
+			short random_index = seed_random_range(get_global_random_seed_address(), 0, unused_count);
+
+			for (index = 0; index < squad_definition->starting_locations.count; index++)
+			{
+				if (BIT_VECTOR_TEST_FLAG(squad->unused_locations, index) &&
+					!BIT_VECTOR_TEST_FLAG(assigned_locations, index))
+				{
+					if (!random_index)
+					{
+						BIT_VECTOR_SET_FLAG(squad->unused_locations, index, FALSE);
+						found_index = index;
+						break;
+					}
+					random_index--;
+				}
+			}
+
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\encounters.c",
+				1637,
+				found_index != NONE);
+		}
+	}
+
+	return found_index;
 }
 
 void encounter_force_activate(

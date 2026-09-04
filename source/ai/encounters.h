@@ -136,7 +136,7 @@ void encounter_create(
 	short desired_squad_index);
 short encounter_get_actor_starting_location(
 	long encounter_index,
-	short squad_index,
+	long squad_index,
 	boolean spawning);
 void encounter_actor_iterator_new(
 	struct encounter_actor_iterator *iterator,
@@ -211,7 +211,7 @@ boolean encounter_pursuit_position_already_examined(
 	short firing_position_index,
 	long start_time,
 	short *examined_count,
-	boolean flag);
+	long *last_examined_time);
 void encounter_set_respawn(
 	long encounter_index,
 	boolean respawn);
