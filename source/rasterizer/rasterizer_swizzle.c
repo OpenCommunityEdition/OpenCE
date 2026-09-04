@@ -67,9 +67,9 @@ static const short face_mapping_inverse_table[NUMBER_OF_FACES_PER_CUBE]=
 	0, 2, 1, 3, 4, 5
 };
 
-static unsigned long global_swizzle_z_mask;
-static unsigned long global_swizzle_y_mask;
-static unsigned long global_swizzle_x_mask;
+static unsigned long rasterizer_swizzle_z_mask;
+static unsigned long rasterizer_swizzle_y_mask;
+static unsigned long rasterizer_swizzle_x_mask;
 
 /* ---------- public code */
 
@@ -209,10 +209,10 @@ void rasterizer_xbox_bitmap_swizzle2d_byte(
 		{
 			((byte *)dst)[y_swizzle | x_swizzle] = ((byte const *)src)[source_index];
 			source_index++;
-			x_swizzle = (x_swizzle - global_swizzle_x_mask) & global_swizzle_x_mask;
+			x_swizzle = (x_swizzle - rasterizer_swizzle_x_mask) & rasterizer_swizzle_x_mask;
 		}
 
-		y_swizzle = (y_swizzle - global_swizzle_y_mask) & global_swizzle_y_mask;
+		y_swizzle = (y_swizzle - rasterizer_swizzle_y_mask) & rasterizer_swizzle_y_mask;
 	}
 
 	return;
@@ -240,10 +240,10 @@ void rasterizer_xbox_bitmap_swizzle2d_word(
 		{
 			((word *)dst)[y_swizzle | x_swizzle] = ((word const *)src)[source_index];
 			source_index++;
-			x_swizzle = (x_swizzle - global_swizzle_x_mask) & global_swizzle_x_mask;
+			x_swizzle = (x_swizzle - rasterizer_swizzle_x_mask) & rasterizer_swizzle_x_mask;
 		}
 
-		y_swizzle = (y_swizzle - global_swizzle_y_mask) & global_swizzle_y_mask;
+		y_swizzle = (y_swizzle - rasterizer_swizzle_y_mask) & rasterizer_swizzle_y_mask;
 	}
 
 	return;
@@ -271,10 +271,10 @@ void rasterizer_xbox_bitmap_swizzle2d_long(
 		{
 			((long *)dst)[y_swizzle | x_swizzle] = ((long const *)src)[source_index];
 			source_index++;
-			x_swizzle = (x_swizzle - global_swizzle_x_mask) & global_swizzle_x_mask;
+			x_swizzle = (x_swizzle - rasterizer_swizzle_x_mask) & rasterizer_swizzle_x_mask;
 		}
 
-		y_swizzle = (y_swizzle - global_swizzle_y_mask) & global_swizzle_y_mask;
+		y_swizzle = (y_swizzle - rasterizer_swizzle_y_mask) & rasterizer_swizzle_y_mask;
 	}
 
 	return;
@@ -306,13 +306,13 @@ void rasterizer_xbox_bitmap_swizzle3d_byte(
 			{
 				((byte *)dst)[z_swizzle | y_swizzle | x_swizzle] = ((byte const *)src)[source_index];
 				source_index++;
-				x_swizzle = (x_swizzle - global_swizzle_x_mask) & global_swizzle_x_mask;
+				x_swizzle = (x_swizzle - rasterizer_swizzle_x_mask) & rasterizer_swizzle_x_mask;
 			}
 
-			y_swizzle = (y_swizzle - global_swizzle_y_mask) & global_swizzle_y_mask;
+			y_swizzle = (y_swizzle - rasterizer_swizzle_y_mask) & rasterizer_swizzle_y_mask;
 		}
 
-		z_swizzle = (z_swizzle - global_swizzle_z_mask) & global_swizzle_z_mask;
+		z_swizzle = (z_swizzle - rasterizer_swizzle_z_mask) & rasterizer_swizzle_z_mask;
 	}
 
 	return;
@@ -344,13 +344,13 @@ void rasterizer_xbox_bitmap_swizzle3d_word(
 			{
 				((word *)dst)[z_swizzle | y_swizzle | x_swizzle] = ((word const *)src)[source_index];
 				source_index++;
-				x_swizzle = (x_swizzle - global_swizzle_x_mask) & global_swizzle_x_mask;
+				x_swizzle = (x_swizzle - rasterizer_swizzle_x_mask) & rasterizer_swizzle_x_mask;
 			}
 
-			y_swizzle = (y_swizzle - global_swizzle_y_mask) & global_swizzle_y_mask;
+			y_swizzle = (y_swizzle - rasterizer_swizzle_y_mask) & rasterizer_swizzle_y_mask;
 		}
 
-		z_swizzle = (z_swizzle - global_swizzle_z_mask) & global_swizzle_z_mask;
+		z_swizzle = (z_swizzle - rasterizer_swizzle_z_mask) & rasterizer_swizzle_z_mask;
 	}
 
 	return;
@@ -382,13 +382,13 @@ void rasterizer_xbox_bitmap_swizzle3d_long(
 			{
 				((long *)dst)[z_swizzle | y_swizzle | x_swizzle] = ((long const *)src)[source_index];
 				source_index++;
-				x_swizzle = (x_swizzle - global_swizzle_x_mask) & global_swizzle_x_mask;
+				x_swizzle = (x_swizzle - rasterizer_swizzle_x_mask) & rasterizer_swizzle_x_mask;
 			}
 
-			y_swizzle = (y_swizzle - global_swizzle_y_mask) & global_swizzle_y_mask;
+			y_swizzle = (y_swizzle - rasterizer_swizzle_y_mask) & rasterizer_swizzle_y_mask;
 		}
 
-		z_swizzle = (z_swizzle - global_swizzle_z_mask) & global_swizzle_z_mask;
+		z_swizzle = (z_swizzle - rasterizer_swizzle_z_mask) & rasterizer_swizzle_z_mask;
 	}
 
 	return;
@@ -658,9 +658,9 @@ static void compute_swizzle_masks(
 	unsigned long bit = 1;
 	unsigned long advanced;
 
-	global_swizzle_z_mask = 0;
-	global_swizzle_y_mask = 0;
-	global_swizzle_x_mask = 0;
+	rasterizer_swizzle_z_mask = 0;
+	rasterizer_swizzle_y_mask = 0;
+	rasterizer_swizzle_x_mask = 0;
 
 	do
 	{
@@ -668,21 +668,21 @@ static void compute_swizzle_masks(
 
 		if (size < width)
 		{
-			global_swizzle_x_mask |= bit;
+			rasterizer_swizzle_x_mask |= bit;
 			bit <<= 1;
 			advanced = bit;
 		}
 
 		if (size < height)
 		{
-			global_swizzle_y_mask |= bit;
+			rasterizer_swizzle_y_mask |= bit;
 			bit <<= 1;
 			advanced = bit;
 		}
 
 		if (size < depth)
 		{
-			global_swizzle_z_mask |= bit;
+			rasterizer_swizzle_z_mask |= bit;
 			bit <<= 1;
 			advanced = bit;
 		}
