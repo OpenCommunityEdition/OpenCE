@@ -101,3 +101,17 @@ branch, volatile/register forcing, pragma, forced inline/noinline, undefined
 behavior, representation pun, or inline assembly is introduced. Parameters
 remain one per line, no-argument functions use `void` on its own line, and
 every function retains an explicit terminal return.
+
+## Canonical admission
+
+Integrated as `b8afb0515` after the isolated full build and stable sweep.
+The canonical full build, including every changed-header consumer, passes.
+The rename-stable comparison against `59b7660a8` records exactly three gains,
+448 padded bytes, and zero regressions. Canonical now contains 889,854
+meaningful matched code bytes and 6,100 credited functions; the semantic
+report records 6,157 semantic exact and 6,173 accepted exact functions, with
+zero unit errors. `units.obj` remains 189/189 exact. All 235 parks validate,
+the admission audit has no contradictions or revocations, and 284 tooling
+tests pass. Both rebuilt sound objects pass the new complete-symbol
+`--forbid-emitted-symbol _point_from_line3d` guard. The protected bitmap file
+hashes remain unchanged.
