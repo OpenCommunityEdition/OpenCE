@@ -5,9 +5,9 @@ symbols in this file:
 00128730 0030:
 	_texture_cache_bitmap_load (0000)
 00128760 0020:
-	_code_00128760 (0000)
+	_shade_scalar (0000)
 00128780 0040:
-	_code_00128780 (0000)
+	_shade_vector2d (0000)
 001287C0 0060:
 	_shade_vector3d (0000)
 00128820 0100:
@@ -15,7 +15,7 @@ symbols in this file:
 00128920 00f0:
 	_sample_diffuse_texture (0000)
 00128A10 0020:
-	_code_00128a10 (0000)
+	_should_render_lights (0000)
 00128A30 00c0:
 	_lights_initialize (0000)
 00128AF0 0010:
@@ -144,6 +144,10 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "cseries/profile.h"
 #include "bitmaps/bitmaps.h"
+#include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmap_group_lookup.h"
+#include "bitmaps/bitmaps_sampling.h"
+#include "bitmaps/bitmap_utilities.h"
 #include "effects/decals.h"
 #include "math/real_math.h"
 #include "cache/texture_cache.h"
@@ -152,12 +156,23 @@ symbols in this file:
 #include "memory/data.h"
 #include "objects/light_definitions.h"
 #include "objects/object_lights.h"
+#include "objects/object_lights_rendering.h"
 #include "objects/objects.h"
 #include "render/render.h"
+#include "render/render_debug.h"
+#include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_environment.h"
 #include "rasterizer/rasterizer_geometry.h"
+#include "rasterizer/rasterizer_geometry_environment.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
+#include "shaders/shader_definitions.h"
 #include "structures/cluster_partitions.h"
+#include "structures/structure_bsp_definitions.h"
+#include "structures/structure_render.h"
+#include "structures/structure_render_lights.h"
+#include "structures/structures.h"
+#include "structures/structure_vector_tests.h"
 #include "tag_files/tag_groups.h"
 
 /* ---------- constants */
@@ -175,11 +190,34 @@ enum
 	_point_light_dynamic_bit = 0,
 	_point_light_connects_to_map_bit = 1,
 	_point_light_connected_to_map_bit = 2,
+	_point_light_attached_to_first_person_weapon_bit = 3,
+};
+
+enum
+{
+	MAXIMUM_CLUSTERS_PER_LIGHT = 512,
+};
+
+enum
+{
+	_distant_lighting_raycast_sideways_bit = 0,
+	_distant_lighting_block_on_textures_bit,
+	_distant_lighting_brighten_bit,
+};
+
+enum
+{
+	NUMBER_OF_LIGHTMAP_SAMPLE_SIDEWAYS_RAYCASTS = 4,
 };
 
 enum
 {
 	LENS_FLARE_DEFINITION_TAG = 'lens',
+};
+
+enum
+{
+	_shader_type_environment = 3,
 };
 
 /* ---------- macros */
@@ -193,7 +231,45 @@ enum
 #define lens_flare_definition_get(index) \
 	((struct lens_flare_definition *)tag_get(LENS_FLARE_DEFINITION_TAG, (index)))
 
+#define shader_environment_definition_get(shader) \
+	((struct shader_environment_definition *)shader_get_and_verify_type( \
+		(shader), \
+		_shader_type_environment))
+
+#define structure_material_get_vertex(material, vertex_index) \
+	((struct environment_vertex_compressed const *)(material)->compressed_vertex_data.address \
+		+ (vertex_index))
+
+#define structure_material_get_lightmap_vertex(material, vertex_index) \
+	((struct environment_lightmap_vertex_compressed const *) \
+		((struct environment_vertex_compressed const *)(material)->compressed_vertex_data.address \
+			+ (material)->vertices.count) \
+		+ (vertex_index))
+
 /* ---------- structures */
+
+struct environment_vertex_compressed
+{
+	real_point3d position;
+	unsigned long normal;
+	unsigned long binormal;
+	unsigned long tangent;
+	real_point2d texcoord;
+};
+
+struct environment_lightmap_vertex_compressed
+{
+	unsigned long incident_radiosity;
+	short lightmap_u;
+	short lightmap_v;
+};
+
+struct shader_environment_definition
+{
+	struct shader shader;
+	byte reserved28[0x60];
+	struct tag_reference base_map;
+};
 
 struct lights_game_globals
 {
@@ -221,7 +297,7 @@ struct light_definition
 struct light_datum
 {
 	struct datum_header header;
-	unsigned short flags;
+	word flags;
 	long definition_index;
 	long rasterizer_light_index;
 	long marker;
@@ -303,6 +379,28 @@ static void find_point_lights_for_object_in_cluster(
 	real *light_attenuations,
 	short *light_count,
 	short maximum_light_count);
+static void shade_vector3d(
+	real_vector3d const *vertex0,
+	real_vector3d const *vertex1,
+	real_vector3d const *vertex2,
+	real b,
+	real c,
+	real_vector3d *result);
+static void brighten_real_rgb_color(
+	real_rgb_color *color,
+	real fraction);
+static void build_distant_lights(
+	long flags,
+	real_vector3d const *surface_normal,
+	real_rgb_color const *diffuse_color,
+	real_vector3d const *radiosity_normal,
+	real radiosity_accuracy,
+	real_rgb_color const *lightmap_color,
+	struct render_lighting *lighting);
+static short light_build_cluster_array(
+	long light_index,
+	short maximum_count,
+	short *cluster_indices);
 static void light_compute_bounding_sphere(
 	long light_index,
 	boolean maximum,
@@ -310,9 +408,48 @@ static void light_compute_bounding_sphere(
 	boolean lens_flare_only,
 	real_point3d *position,
 	real *radius);
+static void render_debug_light(
+	long light_index);
+static void light_get_bounding_sphere(
+	long light_index,
+	real_point3d *position,
+	real *radius);
 
 /* ---------- globals */
 
+struct render_lighting const default_object_lighting =
+{
+	{ 0.2f, 0.2f, 0.2f },
+	2,
+	0,
+	{
+		{ { 1.0f, 1.0f, 1.0f }, { -0.577f, -0.577f, -0.577f } },
+		{ { 0.4f, 0.4f, 0.5f }, { 0.0f, 0.0f, 1.0f } },
+	},
+	0,
+	0,
+	{ 0, 0 },
+	{ 0.5f, 1.0f, 1.0f, 1.0f },
+	{ 0.0f, 0.0f, -1.0f },
+	{ 0.0f, 0.0f, 0.0f },
+};
+
+static real_vector3d const lightmap_sample_raycast_down = { 0.0f, 0.0f, -10.0f };
+static real_vector3d const lightmap_sample_raycast_sideways[NUMBER_OF_LIGHTMAP_SAMPLE_SIDEWAYS_RAYCASTS] =
+{
+	{ -10.0f, 0.0f, 0.0f },
+	{ 10.0f, 0.0f, 0.0f },
+	{ 0.0f, -10.0f, 0.0f },
+	{ 0.0f, 10.0f, 0.0f },
+};
+
+real object_light_ambient_base = 0.03f;
+real object_light_ambient_scale = 0.4f;
+real object_light_secondary_scale = 1.0f;
+boolean object_light_interpolate = TRUE;
+
+extern boolean debug_lights;
+extern boolean debug_object_lights;
 extern struct data_array *light_data;
 extern struct cluster_partition light_cluster_partition;
 extern struct lights_game_globals *lights_game_globals;
@@ -333,6 +470,132 @@ void *texture_cache_bitmap_load(
 	profile_texture_end();
 
 	return hardware_format;
+}
+
+static real shade_scalar(
+	real scalar0,
+	real scalar1,
+	real scalar2,
+	real b,
+	real c)
+{
+	return (scalar1 - scalar0) * b + (scalar2 - scalar0) * c + scalar0;
+}
+
+static void shade_vector2d(
+	real_point2d const *vertex0,
+	real_point2d const *vertex1,
+	real_point2d const *vertex2,
+	real b,
+	real c,
+	real_point2d *result)
+{
+	result->x = shade_scalar(vertex0->x, vertex1->x, vertex2->x, b, c);
+	result->y = shade_scalar(vertex0->y, vertex1->y, vertex2->y, b, c);
+
+	return;
+}
+
+static void shade_vector3d(
+	real_vector3d const *vertex0,
+	real_vector3d const *vertex1,
+	real_vector3d const *vertex2,
+	real b,
+	real c,
+	real_vector3d *result)
+{
+	result->i = shade_scalar(vertex0->i, vertex1->i, vertex2->i, b, c);
+	result->j = shade_scalar(vertex0->j, vertex1->j, vertex2->j, b, c);
+	result->k = shade_scalar(vertex0->k, vertex1->k, vertex2->k, b, c);
+
+	return;
+}
+
+void sample_lightmap(
+	struct structure_material *material,
+	struct bitmap_data *bitmap,
+	struct structure_surface const *surface,
+	real s,
+	real t,
+	real_rgb_color *color)
+{
+	real_point2d texcoords[3];
+	real_point2d texcoord;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\object_lights.c",
+		143,
+		material->lightmap_vertices.type==_rasterizer_vertex_type_environment_lightmap_uncompressed || material->lightmap_vertices.type==_rasterizer_vertex_type_environment_lightmap_compressed);
+	environment_lightmap_vertex_compressed_get_texcoord(
+		structure_material_get_lightmap_vertex(material, surface->vertex_indices[0]),
+		&texcoords[0]);
+	environment_lightmap_vertex_compressed_get_texcoord(
+		structure_material_get_lightmap_vertex(material, surface->vertex_indices[1]),
+		&texcoords[1]);
+	environment_lightmap_vertex_compressed_get_texcoord(
+		structure_material_get_lightmap_vertex(material, surface->vertex_indices[2]),
+		&texcoords[2]);
+	shade_vector2d(
+		&texcoords[0],
+		&texcoords[1],
+		&texcoords[2],
+		s,
+		t,
+		&texcoord);
+	pixel32_to_real_rgb_color(
+		bitmap_2d_get_pixel(bitmap, &texcoord, 1.0f),
+		color);
+
+	return;
+}
+
+void sample_diffuse_texture(
+	struct structure_material *material,
+	struct bitmap_data *bitmap,
+	struct structure_surface const *surface,
+	real s,
+	real t,
+	real_rgb_color *color)
+{
+	real_point2d texcoords[3];
+	real_point2d texcoord;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\object_lights.c",
+		167,
+		material->vertices.type==_rasterizer_vertex_type_environment_uncompressed || material->vertices.type==_rasterizer_vertex_type_environment_compressed);
+	environment_vertex_compressed_get_texcoord(
+		structure_material_get_vertex(material, surface->vertex_indices[0]),
+		&texcoords[0]);
+	environment_vertex_compressed_get_texcoord(
+		structure_material_get_vertex(material, surface->vertex_indices[1]),
+		&texcoords[1]);
+	environment_vertex_compressed_get_texcoord(
+		structure_material_get_vertex(material, surface->vertex_indices[2]),
+		&texcoords[2]);
+	shade_vector2d(
+		&texcoords[0],
+		&texcoords[1],
+		&texcoords[2],
+		s,
+		t,
+		&texcoord);
+	pixel32_to_real_rgb_color(
+		bitmap_2d_get_pixel(bitmap, &texcoord, 0.3f),
+		color);
+
+	return;
+}
+
+boolean should_render_lights(
+	void)
+{
+	if (lights_game_globals->render_lights && game_engine_allow_dynamic_lighting())
+	{
+		return TRUE;
+	}
+
+	return FALSE;
 }
 
 void lights_initialize(
@@ -485,7 +748,7 @@ long light_new_unattached(
 void light_delete(
 	long light_index)
 {
-	struct light_datum *light = datum_get(light_data, light_index);
+	struct light_datum *light = light_get(light_index);
 
 	cluster_partition_disconnect(
 		&light_cluster_partition,
@@ -501,8 +764,8 @@ real object_get_self_illumination(
 {
 	struct object_datum *object = object_get(object_index);
 	struct object_definition *definition = object_definition_get(object->definition_index);
-	short attachment_index = 0;
 	real illumination = 0.0f;
+	short attachment_index = 0;
 
 	if (definition->object.attachments.count > 0)
 	{
@@ -561,10 +824,98 @@ void lights_queue_lens_flare(
 	return;
 }
 
+void light_particle(
+	real_point3d const *position,
+	real_rgb_color *light,
+	real_rgb_color *diffuse,
+	boolean block)
+{
+	short lightmap_index;
+	short material_index;
+	long surface_index;
+	real s;
+	real t;
+	real_point3d collision_point;
+
+	*light = *global_real_rgb_grey;
+	*diffuse = *global_real_rgb_grey;
+	if (structure_test_vector(
+		position,
+		&lightmap_sample_raycast_down,
+		&collision_point,
+		&lightmap_index,
+		&material_index,
+		&surface_index,
+		&s,
+		&t))
+	{
+		struct structure_bsp *structure = global_structure_bsp_get();
+		struct structure_lightmap *lightmap = TAG_BLOCK_GET_ELEMENT(
+			&structure->lightmaps,
+			lightmap_index,
+			struct structure_lightmap);
+		struct structure_material *material = TAG_BLOCK_GET_ELEMENT(
+			&lightmap->materials,
+			material_index,
+			struct structure_material);
+		struct shader *shader = shader_definition_get(material->shader.index);
+
+		if (shader->base.type == _shader_type_environment)
+		{
+			struct shader_environment_definition *shader_environment =
+				shader_environment_definition_get(shader);
+
+			if (structure->lightmap_group.index != NONE
+				&& shader_environment->base_map.index != NONE
+				&& lightmap->bitmap_index != NONE)
+			{
+				struct bitmap_data *lightmap_bitmap = bitmap_group_try_and_get_bitmap(
+					structure->lightmap_group.index,
+					lightmap->bitmap_index);
+				struct bitmap_data *diffuse_bitmap = bitmap_group_try_and_get_bitmap(
+					shader_environment->base_map.index,
+					(short)(material->permutation_index
+						% bitmap_group_get(shader_environment->base_map.index)->bitmap_data.count));
+				struct structure_surface const *surface = NULL;
+
+				if (lightmap_bitmap
+					&& ((block && texture_cache_bitmap_load(lightmap_bitmap))
+						|| _texture_cache_bitmap_get_hardware_format(lightmap_bitmap, FALSE, FALSE)))
+				{
+					surface = TAG_BLOCK_GET_ELEMENT(
+						&structure->surfaces,
+						surface_index,
+						struct structure_surface);
+					sample_lightmap(material, lightmap_bitmap, surface, s, t, light);
+					light->red = MIN(light->red + 0.1f, 1.0f);
+					light->green = MIN(light->green + 0.1f, 1.0f);
+					light->blue = MIN(light->blue + 0.1f, 1.0f);
+				}
+
+				if (diffuse_bitmap
+					&& ((block && texture_cache_bitmap_load(diffuse_bitmap))
+						|| _texture_cache_bitmap_get_hardware_format(diffuse_bitmap, FALSE, FALSE)))
+				{
+					if (!surface)
+					{
+						surface = TAG_BLOCK_GET_ELEMENT(
+							&structure->surfaces,
+							surface_index,
+							struct structure_surface);
+					}
+					sample_diffuse_texture(material, diffuse_bitmap, surface, s, t, diffuse);
+				}
+			}
+		}
+	}
+
+	return;
+}
+
 void light_disconnect_from_map(
 	long light_index)
 {
-	struct light_datum *light = datum_get(light_data, light_index);
+	struct light_datum *light = light_get(light_index);
 
 	if (TEST_FLAG(light->flags, _point_light_connects_to_map_bit))
 	{
@@ -591,7 +942,7 @@ void lights_disconnect_from_structure_bsp(
 		light_index != NONE;
 		light_index = data_next_index(light_data, light_index))
 	{
-		struct light_datum *light = datum_get(light_data, light_index);
+		struct light_datum *light = light_get(light_index);
 
 		if (TEST_FLAG(light->flags, _point_light_connected_to_map_bit))
 		{
@@ -612,7 +963,7 @@ void lights_reconnect_to_structure_bsp(
 		light_index != NONE;
 		light_index = data_next_index(light_data, light_index))
 	{
-		struct light_datum *light = datum_get(light_data, light_index);
+		struct light_datum *light = light_get(light_index);
 
 		if (TEST_FLAG(light->flags, _point_light_connected_to_map_bit))
 		{
@@ -680,6 +1031,51 @@ static void light_marker_end(
 	return;
 }
 
+static void render_debug_light(
+	long light_index)
+{
+	if (debug_lights)
+	{
+		struct light_datum *light = light_get(light_index);
+		struct light_definition *definition = light_definition_get(light->definition_index);
+		real radius = definition->radius_modifier_upper_bound * definition->radius;
+		real_argb_color color = *global_real_argb_orange;
+
+		render_debug_sphere(
+			TRUE,
+			&light->position,
+			definition->lens_flare_radius,
+			global_real_argb_white);
+		render_debug_sphere(
+			TRUE,
+			&light->position,
+			light->radius,
+			&color);
+		color.red *= 0.8f;
+		color.green *= 0.8f;
+		color.blue *= 0.8f;
+		if (!TEST_FLAG(definition->flags, _light_definition_no_specular_bit))
+		{
+			radius *= definition->specular_radius_multiplier;
+			render_debug_sphere(
+				TRUE,
+				&light->position,
+				definition->specular_radius_multiplier * light->radius,
+				&color);
+		}
+		color.red *= 0.8f;
+		color.green *= 0.8f;
+		color.blue *= 0.8f;
+		render_debug_sphere(
+			TRUE,
+			&light->position,
+			radius,
+			&color);
+	}
+
+	return;
+}
+
 /* ---------- private code */
 
 real light_attenuation(
@@ -687,6 +1083,30 @@ real light_attenuation(
 	real distance)
 {
 	return 1.0f - (distance * distance) / (radius * radius);
+}
+
+static void brighten_real_rgb_color(
+	real_rgb_color *color,
+	real fraction)
+{
+	real maximum = MAX(color->red, MAX(color->green, color->blue));
+	real scale = fraction + 1.0f;
+	real scaled_maximum = scale * maximum;
+
+	if (scaled_maximum > 1.0f)
+	{
+		scale = 1.0f / maximum;
+	}
+	else if (scaled_maximum < fraction)
+	{
+		scale = fraction / maximum;
+	}
+
+	color->red *= scale;
+	color->green *= scale;
+	color->blue *= scale;
+
+	return;
 }
 
 long cluster_get_first_light(
@@ -732,27 +1152,186 @@ static void light_compute_bounding_sphere(
 		*position = light->position;
 		*radius = definition->lens_flare_radius;
 	}
-	else if (definition->cutoff_angle >= _pi / 2)
+	else if (definition->cutoff_angle < _pi / 2)
+	{
+		if (definition->cutoff_angle < _pi / 4)
+		{
+			light_radius = *radius = light_radius / definition->runtime_cosine_cutoff_angle;
+			position->x = light_radius * light->forward.i + light->position.x;
+			position->y = light_radius * light->forward.j + light->position.y;
+			position->z = light_radius * light->forward.k + light->position.z;
+		}
+		else
+		{
+			*radius = light_radius * definition->runtime_sine_cutoff_angle;
+			light_radius *= definition->runtime_cosine_cutoff_angle;
+			position->x = light_radius * light->forward.i + light->position.x;
+			position->y = light_radius * light->forward.j + light->position.y;
+			position->z = light_radius * light->forward.k + light->position.z;
+		}
+	}
+	else
 	{
 		*position = light->position;
 		*radius = light_radius;
 	}
-	else if (definition->cutoff_angle >= _pi / 4)
+
+	return;
+}
+
+static short light_build_cluster_array(
+	long light_index,
+	short maximum_count,
+	short *cluster_indices)
+{
+	struct light_datum *light = light_get(light_index);
+	short cluster_count = 0;
+	short cluster_index;
+	long reference_index;
+
+	for (cluster_index = (short)cluster_partition_get_first_cluster(
+			&light_cluster_partition,
+			&reference_index,
+			light->cluster_reference);
+		cluster_count < maximum_count;
+		cluster_index = (short)cluster_partition_get_next_cluster(
+			&light_cluster_partition,
+			&reference_index))
 	{
-		*radius = light_radius * definition->runtime_sine_cutoff_angle;
-		light_radius *= definition->runtime_cosine_cutoff_angle;
-		position->x = light_radius * light->forward.i + light->position.x;
-		position->y = light_radius * light->forward.j + light->position.y;
-		position->z = light_radius * light->forward.k + light->position.z;
+		if (cluster_index == NONE)
+		{
+			break;
+		}
+		cluster_indices[cluster_count++] = cluster_index;
 	}
-	else
+
+	return cluster_count;
+}
+
+static void light_get_bounding_sphere(
+	long light_index,
+	real_point3d *position,
+	real *radius)
+{
+	light_compute_bounding_sphere(
+		light_index,
+		TRUE,
+		FALSE,
+		TRUE,
+		position,
+		radius);
+
+	return;
+}
+
+void lights_render_diffuse(
+	void)
+{
+	short cluster_indices[MAXIMUM_CLUSTERS_PER_LIGHT];
+	short light_index;
+
+	rasterizer_environment_diffuse_lights_begin();
+	if (lights_game_globals->render_lights && game_engine_allow_dynamic_lighting())
 	{
-		light_radius /= definition->runtime_cosine_cutoff_angle;
-		*radius = light_radius;
-		position->x = light_radius * light->forward.i + light->position.x;
-		position->y = light_radius * light->forward.j + light->position.y;
-		position->z = light_radius * light->forward.k + light->position.z;
+		for (light_index = 0;
+			light_index < lights_globals.scene_point_light_count;
+			light_index++)
+		{
+			struct light_datum *light = light_get(
+				lights_globals.scene_point_lights[light_index]);
+
+			if (TEST_FLAG(light->flags, _point_light_dynamic_bit)
+				&& light->rasterizer_light_index != NONE)
+			{
+				boolean skip_clusters = TEST_FLAG(light->flags,
+						_point_light_attached_to_first_person_weapon_bit)
+					&& TEST_FLAG(light_definition_get(light->definition_index)->flags,
+						_light_definition_supersize_in_first_person_bit);
+				short cluster_count = 0;
+				real_point3d center;
+				real radius;
+
+				if (!skip_clusters)
+				{
+					cluster_count = light_build_cluster_array(
+						lights_globals.scene_point_lights[light_index],
+						MAXIMUM_CLUSTERS_PER_LIGHT,
+						cluster_indices);
+				}
+				light_compute_bounding_sphere(
+					lights_globals.scene_point_lights[light_index],
+					FALSE,
+					FALSE,
+					FALSE,
+					&center,
+					&radius);
+				structure_render_diffuse_light(
+					light->rasterizer_light_index,
+					&center,
+					radius,
+					cluster_count,
+					skip_clusters ? NULL : cluster_indices);
+			}
+		}
 	}
+	rasterizer_environment_diffuse_lights_end();
+
+	return;
+}
+
+void lights_render_specular(
+	void)
+{
+	short cluster_indices[MAXIMUM_CLUSTERS_PER_LIGHT];
+	short light_index;
+
+	rasterizer_environment_specular_lights_begin();
+	if (lights_game_globals->render_lights && game_engine_allow_dynamic_lighting())
+	{
+		for (light_index = 0;
+			light_index < lights_globals.scene_point_light_count;
+			light_index++)
+		{
+			struct light_datum *light = light_get(
+				lights_globals.scene_point_lights[light_index]);
+
+			if (TEST_FLAG(light->flags, _point_light_dynamic_bit)
+				&& light->rasterizer_light_index != NONE
+				&& !TEST_FLAG(light_definition_get(light->definition_index)->flags,
+					_light_definition_no_specular_bit))
+			{
+				boolean skip_clusters = TEST_FLAG(light->flags,
+						_point_light_attached_to_first_person_weapon_bit)
+					&& TEST_FLAG(light_definition_get(light->definition_index)->flags,
+						_light_definition_supersize_in_first_person_bit);
+				short cluster_count = 0;
+				real_point3d center;
+				real radius;
+
+				if (!skip_clusters)
+				{
+					cluster_count = light_build_cluster_array(
+						lights_globals.scene_point_lights[light_index],
+						MAXIMUM_CLUSTERS_PER_LIGHT,
+						cluster_indices);
+				}
+				light_compute_bounding_sphere(
+					lights_globals.scene_point_lights[light_index],
+					FALSE,
+					TRUE,
+					FALSE,
+					&center,
+					&radius);
+				structure_render_specular_light(
+					light->rasterizer_light_index,
+					&center,
+					radius,
+					cluster_count,
+					skip_clusters ? NULL : cluster_indices);
+			}
+		}
+	}
+	rasterizer_environment_specular_lights_end();
 
 	return;
 }
@@ -761,6 +1340,7 @@ void light_reconnect_to_map(
 	long light_index)
 {
 	struct light_datum *light = light_get(light_index);
+	struct light_definition *definition = light_definition_get(light->definition_index);
 	struct object_marker markers[1];
 	struct location location;
 	real_point3d position;
@@ -900,6 +1480,103 @@ static void find_point_lights_for_object_in_cluster(
 	return;
 }
 
+void lights_illumination_at_point(
+	real_point3d const *point,
+	struct location const *location,
+	real_rgb_color *color)
+{
+	*color = *global_real_rgb_black;
+	{
+		short lightmap_index;
+		short material_index;
+		long surface_index;
+		real s;
+		real t;
+		real_point3d collision_point;
+
+		if (structure_test_vector(
+			point,
+			&lightmap_sample_raycast_down,
+			&collision_point,
+			&lightmap_index,
+			&material_index,
+			&surface_index,
+			&s,
+			&t))
+		{
+			struct structure_bsp *structure = global_structure_bsp_get();
+			struct structure_lightmap *lightmap = TAG_BLOCK_GET_ELEMENT(
+				&structure->lightmaps,
+				lightmap_index,
+				struct structure_lightmap);
+			struct structure_material *material = TAG_BLOCK_GET_ELEMENT(
+				&lightmap->materials,
+				material_index,
+				struct structure_material);
+
+			if (structure->lightmap_group.index != NONE
+				&& lightmap->bitmap_index != NONE)
+			{
+				struct bitmap_data *bitmap = bitmap_group_try_and_get_bitmap(
+					structure->lightmap_group.index,
+					lightmap->bitmap_index);
+				struct structure_surface const *surface = TAG_BLOCK_GET_ELEMENT(
+					&structure->surfaces,
+					surface_index,
+					struct structure_surface);
+
+				match_assert(
+					"c:\\halo\\SOURCE\\objects\\object_lights.c",
+					854,
+					material->lightmap_vertices.type==_rasterizer_vertex_type_environment_lightmap_uncompressed || material->lightmap_vertices.type==_rasterizer_vertex_type_environment_lightmap_compressed);
+				if (_texture_cache_bitmap_get_hardware_format(bitmap, FALSE, FALSE))
+				{
+					sample_lightmap(material, bitmap, surface, s, t, color);
+				}
+			}
+		}
+	}
+
+	if (location->cluster_index != NONE)
+	{
+		long light_indices[MAXIMUM_RENDERED_POINT_LIGHTS];
+		real light_intensities[MAXIMUM_RENDERED_POINT_LIGHTS];
+		real light_attenuations[MAXIMUM_RENDERED_POINT_LIGHTS];
+		short light_count = 0;
+		short light_index;
+
+		light_marker_begin();
+		find_point_lights_for_object_in_cluster(
+			NONE,
+			location->cluster_index,
+			point,
+			0.0f,
+			light_indices,
+			light_intensities,
+			light_attenuations,
+			&light_count,
+			MAXIMUM_RENDERED_POINT_LIGHTS);
+		light_marker_end();
+		for (light_index = 0; light_index < light_count; light_index++)
+		{
+			struct light_datum *light = light_get(light_indices[light_index]);
+
+			if (TEST_FLAG(light->flags, _point_light_dynamic_bit))
+			{
+				color->red += light->current_color.red * light_attenuations[light_index];
+				color->green += light->current_color.green * light_attenuations[light_index];
+				color->blue += light->current_color.blue * light_attenuations[light_index];
+			}
+		}
+	}
+
+	color->red = PIN(color->red, 0.0f, 1.0f);
+	color->green = PIN(color->green, 0.0f, 1.0f);
+	color->blue = PIN(color->blue, 0.0f, 1.0f);
+
+	return;
+}
+
 void lights_prepare_for_object_dynamic(
 	long object_index,
 	struct render_lighting *lighting)
@@ -935,6 +1612,377 @@ void lights_prepare_for_object_dynamic(
 	{
 		lighting->point_light_indices[light_index] =
 			light_get(lighting->point_light_indices[light_index])->rasterizer_light_index;
+	}
+
+	return;
+}
+
+static void build_distant_lights(
+	long flags,
+	real_vector3d const *surface_normal,
+	real_rgb_color const *diffuse_color,
+	real_vector3d const *radiosity_normal,
+	real radiosity_accuracy,
+	real_rgb_color const *lightmap_color,
+	struct render_lighting *lighting)
+{
+	real brightness = real_rgb_color_brightness(lightmap_color);
+	real accuracy, horizontal_length, ambient;
+
+	lighting->ambient_color.red = lightmap_color->red * object_light_ambient_scale + object_light_ambient_base;
+	lighting->ambient_color.green = lightmap_color->green * object_light_ambient_scale + object_light_ambient_base;
+	lighting->ambient_color.blue = lightmap_color->blue * object_light_ambient_scale + object_light_ambient_base;
+	lighting->distant_light_count = 2;
+	lighting->distant_lights[0].color = *lightmap_color;
+	lighting->distant_lights[0].direction.i = -radiosity_normal->i;
+	lighting->distant_lights[0].direction.j = -radiosity_normal->j;
+	lighting->distant_lights[0].direction.k = -radiosity_normal->k;
+	lighting->distant_lights[1].color.red = diffuse_color->red * object_light_secondary_scale * brightness;
+	lighting->distant_lights[1].color.green = diffuse_color->green * object_light_secondary_scale * brightness;
+	lighting->distant_lights[1].color.blue = diffuse_color->blue * object_light_secondary_scale * brightness;
+	lighting->distant_lights[1].direction = *surface_normal;
+	lighting->reflection_tint_color.alpha = PIN(brightness * 1.5f + 0.25f, 0.0f, 1.0f);
+	lighting->reflection_tint_color.red = PIN(diffuse_color->red * 3.0f + 0.5f, 0.0f, 1.0f);
+	lighting->reflection_tint_color.green = PIN(diffuse_color->green * 3.0f + 0.5f, 0.0f, 1.0f);
+	lighting->reflection_tint_color.blue = PIN(diffuse_color->blue * 3.0f + 0.5f, 0.0f, 1.0f);
+	lighting->reflection_tint_color.red *= PIN(lightmap_color->red * 2.0f + 0.25f, 0.0f, 1.0f);
+	lighting->reflection_tint_color.green *= PIN(lightmap_color->green * 2.0f + 0.25f, 0.0f, 1.0f);
+	lighting->reflection_tint_color.blue *= PIN(lightmap_color->blue * 2.0f + 0.25f, 0.0f, 1.0f);
+	accuracy = power(radiosity_accuracy, 0.25f);
+	lighting->shadow_vector.i = lighting->distant_lights[0].direction.i * accuracy;
+	lighting->shadow_vector.j = lighting->distant_lights[0].direction.j * accuracy;
+	horizontal_length = square_root(lighting->shadow_vector.i * lighting->shadow_vector.i
+		+ lighting->shadow_vector.j * lighting->shadow_vector.j);
+	if (horizontal_length < 0.707f)
+	{
+		lighting->shadow_vector.k = -square_root(1.0f - horizontal_length * horizontal_length);
+	}
+	else
+	{
+		lighting->shadow_vector.k = -0.707f;
+		lighting->shadow_vector.i *= 0.707f / horizontal_length;
+		lighting->shadow_vector.j *= 0.707f / horizontal_length;
+	}
+	ambient = (1.0f - radiosity_accuracy) * 0.5f;
+	lighting->shadow_color.red = PIN(1.0f - lighting->distant_lights[0].color.red * 1.3f + ambient,
+		object_light_ambient_base, 1.0f);
+	lighting->shadow_color.green = PIN(1.0f - lighting->distant_lights[0].color.green * 1.3f + ambient,
+		object_light_ambient_base, 1.0f);
+	lighting->shadow_color.blue = PIN(1.0f - lighting->distant_lights[0].color.blue * 1.3f + ambient,
+		object_light_ambient_base, 1.0f);
+	if (TEST_FLAG(flags, _distant_lighting_brighten_bit))
+	{
+		brighten_real_rgb_color(&lighting->ambient_color, 0.2f);
+		brighten_real_rgb_color(&lighting->distant_lights[0].color, 0.3f);
+		brighten_real_rgb_color(&lighting->distant_lights[1].color, 0.2f);
+		brighten_real_rgb_color(&lighting->reflection_tint_color.rgb, 0.5f);
+		lighting->reflection_tint_color.alpha = 1.0f;
+	}
+
+	return;
+}
+
+boolean lights_distant_lighting_at_point(
+	long flags,
+	real_point3d const *position,
+	struct render_lighting *lighting)
+{
+	boolean result = FALSE;
+	real s;
+	real t;
+	short lightmap_index;
+	short material_index;
+	real lengths[3];
+	long surface_index;
+	real_rgb_color lightmap_color;
+	real_vector3d normals[3];
+	real_vector3d radiosity_normal;
+	real_vector3d surface_normal;
+	real_rgb_color diffuse_color;
+	real_point3d collision_point;
+	struct structure_bsp *structure_bsp = global_structure_bsp_get();
+	real_vector3d const *raycasts;
+	short raycast_count;
+	short raycast_index;
+
+	if (structure_bsp->default_lighting.ambient_color.red != 0.0f)
+	{
+		*lighting = structure_bsp->default_lighting;
+		lighting->distant_light_count = 2;
+	}
+	else
+	{
+		*lighting = default_object_lighting;
+	}
+	if (TEST_FLAG(flags, _distant_lighting_raycast_sideways_bit))
+	{
+		raycasts = lightmap_sample_raycast_sideways;
+		raycast_count = NUMBER_OF_LIGHTMAP_SAMPLE_SIDEWAYS_RAYCASTS;
+	}
+	else
+	{
+		raycasts = &lightmap_sample_raycast_down;
+		raycast_count = 1;
+	}
+	for (raycast_index = 0; raycast_index < raycast_count; raycast_index++)
+	{
+		if (structure_test_vector(
+			position,
+			&raycasts[raycast_index],
+			&collision_point,
+			&lightmap_index,
+			&material_index,
+			&surface_index,
+			&s,
+			&t))
+		{
+			struct structure_lightmap *lightmap;
+			struct structure_material *material;
+			struct shader *shader;
+
+			structure_bsp = global_structure_bsp_get();
+			lightmap = TAG_BLOCK_GET_ELEMENT(
+				&structure_bsp->lightmaps,
+				lightmap_index,
+				struct structure_lightmap);
+			material = TAG_BLOCK_GET_ELEMENT(
+				&lightmap->materials,
+				material_index,
+				struct structure_material);
+			shader = shader_definition_get(material->shader.index);
+			if (shader->base.type == _shader_type_environment)
+			{
+				struct shader_environment_definition *shader_environment =
+					shader_environment_definition_get(shader);
+
+				if (structure_bsp->lightmap_group.index != NONE
+					&& lightmap->bitmap_index != NONE
+					&& shader_environment->base_map.index != NONE)
+				{
+					struct structure_surface const *surface = TAG_BLOCK_GET_ELEMENT(
+						&structure_bsp->surfaces,
+						surface_index,
+						struct structure_surface);
+					struct bitmap_data *lightmap_bitmap = bitmap_group_try_and_get_bitmap(
+						structure_bsp->lightmap_group.index,
+						lightmap->bitmap_index);
+					struct bitmap_data *diffuse_bitmap = bitmap_group_try_and_get_bitmap(
+						shader_environment->base_map.index,
+						(short)(material->permutation_index
+							% bitmap_group_get(shader_environment->base_map.index)->bitmap_data.count));
+
+					if (lightmap_bitmap != NULL
+						&& diffuse_bitmap != NULL
+						&& texture_cache_bitmap_load(lightmap_bitmap) != NULL
+						&& texture_cache_bitmap_load(diffuse_bitmap) != NULL)
+					{
+						real radiosity_accuracy;
+
+						sample_diffuse_texture(
+							material,
+							diffuse_bitmap,
+							surface,
+							s,
+							t,
+							&diffuse_color);
+						sample_lightmap(
+							material,
+							lightmap_bitmap,
+							surface,
+							s,
+							t,
+							&lightmap_color);
+						environment_vertex_compressed_get_normal(
+							structure_material_get_vertex(material, surface->vertex_indices[0]),
+							&normals[0]);
+						environment_vertex_compressed_get_normal(
+							structure_material_get_vertex(material, surface->vertex_indices[1]),
+							&normals[1]);
+						environment_vertex_compressed_get_normal(
+							structure_material_get_vertex(material, surface->vertex_indices[2]),
+							&normals[2]);
+						shade_vector3d(
+							&normals[0],
+							&normals[1],
+							&normals[2],
+							s,
+							t,
+							&surface_normal);
+						normalize3d(&surface_normal);
+						environment_lightmap_vertex_compressed_get_incident_radiosity(
+							structure_material_get_lightmap_vertex(material, surface->vertex_indices[0]),
+							&normals[0]);
+						environment_lightmap_vertex_compressed_get_incident_radiosity(
+							structure_material_get_lightmap_vertex(material, surface->vertex_indices[1]),
+							&normals[1]);
+						environment_lightmap_vertex_compressed_get_incident_radiosity(
+							structure_material_get_lightmap_vertex(material, surface->vertex_indices[2]),
+							&normals[2]);
+						lengths[0] = normalize3d(&normals[0]);
+						lengths[1] = normalize3d(&normals[1]);
+						lengths[2] = normalize3d(&normals[2]);
+						shade_vector3d(
+							&normals[0],
+							&normals[1],
+							&normals[2],
+							s,
+							t,
+							&radiosity_normal);
+						radiosity_accuracy = shade_scalar(lengths[0], lengths[1], lengths[2], s, t);
+						normalize3d(&radiosity_normal);
+						if (debug_object_lights)
+						{
+							real_argb_color color;
+
+							color.rgb = lightmap_color;
+							color.alpha = 1.0f;
+							render_debug_point(
+								TRUE,
+								position,
+								0.5f,
+								&color);
+							render_debug_vector(
+								TRUE,
+								position,
+								&radiosity_normal,
+								radiosity_accuracy,
+								&color);
+						}
+						build_distant_lights(
+							flags,
+							&surface_normal,
+							&diffuse_color,
+							&radiosity_normal,
+							radiosity_accuracy,
+							&lightmap_color,
+							lighting);
+						result = TRUE;
+					}
+				}
+			}
+
+			break;
+		}
+	}
+
+	return result;
+}
+
+void lights_prepare_for_object_static(
+	long object_index,
+	struct render_lighting *lighting)
+{
+	struct object_datum *object = object_get(object_index);
+	long flags = 0;
+	real_point3d point;
+	struct render_lighting sample;
+	short sample_count;
+	short corner_index;
+	boolean sampled;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\object_lights.c",
+		970,
+		lighting);
+	if (TEST_FLAG(object->object.flags, _object_static_lighting_raycast_sideways_bit))
+	{
+		SET_FLAG(flags, _distant_lighting_raycast_sideways_bit, TRUE);
+	}
+	if (TEST_FLAG(object_definition_get(object->definition_index)->object.flags,
+		_object_artificially_bright_bit))
+	{
+		SET_FLAG(flags, _distant_lighting_brighten_bit, TRUE);
+	}
+	sampled = lights_distant_lighting_at_point(
+		flags,
+		&object->object.bounding_sphere_center,
+		lighting);
+	if (TEST_FLAG(object->object.flags, _object_static_lighting_recompute_bit))
+	{
+		return;
+	}
+	if (sampled)
+	{
+		sample_count = 1;
+	}
+	else
+	{
+		sample_count = 0;
+		csmemset(lighting, 0, sizeof(struct render_lighting));
+		lighting->distant_light_count = 2;
+	}
+	for (corner_index = 0; corner_index < 4; corner_index++)
+	{
+		point.x = (TEST_FLAG(corner_index, 0) ? 0.70710678f : -0.70710678f)
+			* object->object.bounding_sphere_radius
+			+ object->object.bounding_sphere_center.x;
+		point.y = (TEST_FLAG(corner_index, 1) ? 0.70710678f : -0.70710678f)
+			* object->object.bounding_sphere_radius
+			+ object->object.bounding_sphere_center.y;
+		point.z = object->object.bounding_sphere_center.z;
+		if (lights_distant_lighting_at_point(
+			flags,
+			&point,
+			&sample))
+		{
+			sample_count++;
+			lighting->ambient_color.red += sample.ambient_color.red;
+			lighting->ambient_color.green += sample.ambient_color.green;
+			lighting->ambient_color.blue += sample.ambient_color.blue;
+			lighting->reflection_tint_color.alpha += sample.reflection_tint_color.alpha;
+			lighting->reflection_tint_color.red += sample.reflection_tint_color.red;
+			lighting->reflection_tint_color.green += sample.reflection_tint_color.green;
+			lighting->reflection_tint_color.blue += sample.reflection_tint_color.blue;
+			lighting->distant_lights[0].color.red += sample.distant_lights[0].color.red;
+			lighting->distant_lights[0].color.green += sample.distant_lights[0].color.green;
+			lighting->distant_lights[0].color.blue += sample.distant_lights[0].color.blue;
+			lighting->distant_lights[0].direction.i += sample.distant_lights[0].direction.i;
+			lighting->distant_lights[0].direction.j += sample.distant_lights[0].direction.j;
+			lighting->distant_lights[0].direction.k += sample.distant_lights[0].direction.k;
+			lighting->distant_lights[1].color.red += sample.distant_lights[1].color.red;
+			lighting->distant_lights[1].color.green += sample.distant_lights[1].color.green;
+			lighting->distant_lights[1].color.blue += sample.distant_lights[1].color.blue;
+			lighting->distant_lights[1].direction.i += sample.distant_lights[1].direction.i;
+			lighting->distant_lights[1].direction.j += sample.distant_lights[1].direction.j;
+			lighting->distant_lights[1].direction.k += sample.distant_lights[1].direction.k;
+			lighting->shadow_color.red += sample.shadow_color.red;
+			lighting->shadow_color.green += sample.shadow_color.green;
+			lighting->shadow_color.blue += sample.shadow_color.blue;
+			lighting->shadow_vector.i += sample.shadow_vector.i;
+			lighting->shadow_vector.j += sample.shadow_vector.j;
+			lighting->shadow_vector.k += sample.shadow_vector.k;
+		}
+	}
+	if (sample_count > 1)
+	{
+		real scale = 1.0f / sample_count;
+
+		lighting->ambient_color.red *= scale;
+		lighting->ambient_color.green *= scale;
+		lighting->ambient_color.blue *= scale;
+		lighting->reflection_tint_color.alpha *= scale;
+		lighting->reflection_tint_color.red *= scale;
+		lighting->reflection_tint_color.green *= scale;
+		lighting->reflection_tint_color.blue *= scale;
+		lighting->distant_lights[0].color.red *= scale;
+		lighting->distant_lights[0].color.green *= scale;
+		lighting->distant_lights[0].color.blue *= scale;
+		scale_vector3d(&lighting->distant_lights[0].direction, scale, &lighting->distant_lights[0].direction);
+		normalize3d(&lighting->distant_lights[0].direction);
+		lighting->distant_lights[1].color.red *= scale;
+		lighting->distant_lights[1].color.green *= scale;
+		lighting->distant_lights[1].color.blue *= scale;
+		scale_vector3d(&lighting->distant_lights[1].direction, scale, &lighting->distant_lights[1].direction);
+		normalize3d(&lighting->distant_lights[1].direction);
+		lighting->shadow_color.red *= scale;
+		lighting->shadow_color.green *= scale;
+		lighting->shadow_color.blue *= scale;
+		scale_vector3d(&lighting->shadow_vector, scale, &lighting->shadow_vector);
+		normalize3d(&lighting->shadow_vector);
+	}
+	else if (sample_count == 0)
+	{
+		*lighting = sample;
 	}
 
 	return;

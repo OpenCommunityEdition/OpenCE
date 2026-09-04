@@ -477,20 +477,9 @@
     },
     {
       "unit": "source/objects/object_lights",
-      "function": "_light_reconnect_to_map",
-      "class": "unclassified",
-      "evidence": "The retained ordinary-C reconstruction reconnects a live light through the recovered cluster-partition flow and calls the real same-TU light_compute_bounding_sphere helper with its full semantic signature. It is a coherent owner function, not a wrapper or code-size carrier. The remaining gap is broad VC7 statement/register/x87 topology: 592 bytes and 24 relocations versus January's 640 bytes and 25 relocations. Reopen for authoritative January source, recovered light-datum fields, or a natural same-compiler donor that explains the missing relocation and schedule; reject representation-punning adapters, duplicate geometry helpers, artificial temporaries, volatile access, assembly, and fake control flow.",
-      "measurements": {
-        "target": { "size": 640, "relocation_count": 25, "normalized_sha256": "0bdb2e5147c6d190bb396e3c19d040bdfa2ec6a01efa1c6269b65283ffc7d488" },
-        "base": { "size": 592, "relocation_count": 24, "normalized_sha256": "8ceb97c81b99398fe7f92ff1bb956a41392c4bd0f8ca396932b17f3fc43c01bf" },
-        "objdiff_percent": 76.022026
-      }
-    },
-    {
-      "unit": "source/objects/object_lights",
       "function": "_find_point_lights_for_object_in_cluster",
       "class": "instruction-scheduling",
-      "evidence": "The authenticated private helper is naturally retained because lights_prepare_for_object_dynamic calls it; it traverses the real cluster light partition and uses light_unmarked/light_mark as one link-closed marker packet. Restoring the real earlier object_get_self_illumination owner function changed the lawful same-TU optimizer context and naturally improved this helper from 576 to January's exact 560-byte padded envelope while preserving all 31 relocation identities. The remaining difference is a small ordinary instruction-scheduling residual recorded at 99.3617 percent. No uncalled duplicate, address-derived name, dummy carrier, forced inline, or compiler construct is retained. Reopen only for authoritative January source or independent same-compiler evidence for the traversal/lifetime shape; do not use volatile access, fake dependencies, manual address logic, or assembly.",
+      "evidence": "The authenticated private helper is naturally retained because lights_prepare_for_object_dynamic calls it; it traverses the real cluster light partition and uses light_unmarked/light_mark as one link-closed marker packet. The complete typed body is corroborated by January disassembly and the later HCEA reconstruction. Target and candidate have the same 560-byte padded envelope and all 31 relocation identities; the generated report records 99.3617 percent similarity, with the residual confined to ordinary instruction scheduling. No uncalled duplicate, address-derived name, dummy carrier, forced inline, volatile access, fake dependency, manual address logic, or assembly is retained. Reopen only for authoritative January source or independent same-compiler evidence for the traversal/lifetime schedule.",
       "measurements": {
         "target": { "size": 560, "relocation_count": 31, "normalized_sha256": "39d22fa1133941bdd6a0b52cfe5ff4e0df3e109e21e6318f46774740811f96be" },
         "base": { "size": 560, "relocation_count": 31, "normalized_sha256": "3c814b365210b7757eb6ba5dee596c15ec8fefe476a335ad299af138e89876a2" },
@@ -499,24 +488,24 @@
     },
     {
       "unit": "source/objects/object_lights",
-      "function": "_object_get_self_illumination",
+      "function": "_build_distant_lights",
       "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked under the current house rule after restoring the complete ordinary-C implementation from January disassembly and relocation evidence and corroborating its object/attachment recursion against the later HCEA source. The retained function uses the typed object_definition_get, object_get, and light_get accessors, iterates the semantic _object_attachment_type_light slots, accumulates real_rgb_color_brightness, and recursively visits the first child and next sibling. January and the candidate have the same 208-byte padded envelope, all seven relocation identities, and the same 84-instruction semantic sequence; the generated report records 96.35135 percent similarity. The residual is confined to the placement of stack cleanup and two independent zero initializations before the attachment loop. Three natural declaration/scope arrangements either produced this fixed point or a broader prologue split, so the source is parked rather than adding an optimizer-only carrier. No forced inline/noinline, volatile or register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the initialization schedule.",
+      "evidence": "The retained private helper is complete typed lighting source corroborated by the later HCEA reconstruction and January's control flow, data references, and 78 relocation identities. The candidate has the same semantic stages and every target relocation but differs in a narrow x87 schedule around construction of the horizontal shadow vector, producing a 1008-byte section versus January's 1024-byte envelope. The generated report records 96.383835 percent similarity. No behavior is missing, and no volatile access, artificial dependency, register forcing, inline assembly, optimizer pragma, or target-shaped control flow is retained. Reopen only for authoritative January source or natural same-compiler source-shape evidence that explains the x87 store/reload schedule.",
       "measurements": {
-        "target": { "size": 208, "relocation_count": 7, "normalized_sha256": "f104fb248006b06b69810ac8eb1b9460fba97be1e28353017b9867084897a681" },
-        "base": { "size": 208, "relocation_count": 7, "normalized_sha256": "cfef1bd48ce36ee1ba93ff9b23618e5ea288f0810e834eb9b0e27c8e161bd302" },
-        "objdiff_percent": 96.35135
+        "target": { "size": 1024, "relocation_count": 78, "normalized_sha256": "9040b294b2196ad5856ae91dc985071fc099c4df2afc3095ea8b2c49bf62529c" },
+        "base": { "size": 1008, "relocation_count": 78, "normalized_sha256": "1b4925a4b1ee51c16c1e16898040c719aae5cd39a2431a3adeb7a37802da1891" },
+        "objdiff_percent": 96.383835
       }
     },
     {
       "unit": "source/objects/object_lights",
-      "function": "_light_compute_bounding_sphere",
-      "class": "unclassified",
-      "evidence": "The authenticated private helper is a real dependency of light_reconnect_to_map and computes the light's semantic radius/position from the typed light definition; it is not the distinct unwritten light_get_bounding_sphere function at the following January address. Target and candidate share a 240-byte envelope and five relocations, but differ in natural conditional/x87 scheduling and relocation identity. Reopen only for authoritative January source, recovered type/field evidence, or a natural same-compiler donor that explains both instruction and relocation choices; reject type-punning call adapters, duplicate math helpers, volatile access, fake branches, and assembly.",
+      "function": "_lights_prepare_for_object_static",
+      "class": "instruction-scheduling",
+      "evidence": "The retained public function is complete typed static-object lighting source corroborated by the later HCEA reconstruction and January's calls, constants, and all 17 relocation identities. Target and candidate have the same 832-byte envelope; the generated report records 97.64286 percent similarity, with the residual confined to a short point.z load/store interleaving and ordinary x87 instruction scheduling. The implementation preserves the January scale_vector3d inline schedule and does not emit point_from_line3d. No volatile access, artificial dependency, register forcing, inline assembly, optimizer pragma, or target-shaped branch is retained. Reopen only for authoritative January source or natural same-compiler evidence for the local declaration/evaluation schedule.",
       "measurements": {
-        "target": { "size": 240, "relocation_count": 5, "normalized_sha256": "6daa7a1efe4519f3cc34c9fe6e40e087e21dc929be8f1f0b43ecaedee13ced3a" },
-        "base": { "size": 240, "relocation_count": 5, "normalized_sha256": "ac87c6b4c87e36b4bba6c3557c3c369a52480987b4627865ff0efb4d339ccb1a" },
-        "objdiff_percent": 63.494507
+        "target": { "size": 832, "relocation_count": 17, "normalized_sha256": "99209b5ebb1bce3e750c483032987911774acc613c74965847b808a3d7fc5068" },
+        "base": { "size": 832, "relocation_count": 17, "normalized_sha256": "b4b295c47c7202130f3af582bbe93e05d6acfb9d0846eade9a78ad29b8cf04b1" },
+        "objdiff_percent": 97.64286
       }
     },
     {

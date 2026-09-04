@@ -1,5 +1,7 @@
 /*
 RASTERIZER_ENVIRONMENT.H
+
+Narrow cross-translation-unit environment interface owned by RASTERIZER.C.
 */
 
 #ifndef __RASTERIZER_ENVIRONMENT_H
@@ -28,6 +30,10 @@ void rasterizer_environment_diffuse_textures_begin(
 void rasterizer_environment_specular_lightmaps_begin(
 	void);
 void rasterizer_environment_reflection_lightmap_masks_begin(
+	void);
+void rasterizer_environment_diffuse_lights_begin(
+	void);
+void rasterizer_environment_specular_lights_begin(
 	void);
 void rasterizer_environment_fog_begin(
 	void);

@@ -76,6 +76,7 @@ symbols in this file:
 #include "game_engine.h"
 #include "editor_stubs.h"
 #include "render_debug.h"
+#include "objects/object_lights_rendering.h"
 
 /* ---------- constants */
 
@@ -135,17 +136,11 @@ void render_sky(
 	void);
 void first_person_weapon_render_update(
 	void);
-void lights_preprocess_scene(
-	void);
 void render_objects(
 	void);
 void rasterizer_lens_flares_submit_occlusion_tests(
 	void);
 void render_object_shadows(
-	void);
-void lights_render_diffuse(
-	void);
-void lights_render_specular(
 	void);
 void weather_particle_systems_render(
 	void);

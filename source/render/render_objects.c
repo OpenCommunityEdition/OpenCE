@@ -96,6 +96,7 @@ symbols in this file:
 #include "objects/objects.h"
 #include "objects/object_definitions.h"
 #include "objects/object_lights.h"
+#include "objects/object_lights_rendering.h"
 #include "objects/widgets/widgets.h"
 #include "units/units.h"
 #include "models/models.h"
@@ -267,9 +268,6 @@ short structure_visibility_find_objects(
 	void (*get_bounding_sphere_function)(long object_index, real_point3d *center, real *radius),
 	boolean (*unmarked_function)(long object_index),
 	boolean (*mark_function)(long object_index));
-void lights_prepare_for_object_static(
-	long object_index,
-	struct render_lighting *lighting);
 void first_person_weapon_draw(
 	void);
 void rasterizer_models_begin(
@@ -293,7 +291,6 @@ boolean editor_preprocess_rendered_object(
 	struct render_lighting const *lighting);
 
 extern struct rasterizer_debug_options rasterizer_debug_options;
-extern boolean object_light_interpolate;
 extern boolean debug_objects;
 extern short debug_rasterizer_light_count;
 
