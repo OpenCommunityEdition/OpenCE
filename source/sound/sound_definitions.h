@@ -123,11 +123,11 @@ struct looping_sound_definition
 {
 	unsigned long flags;
 	byte unused04[0x18];
-	long scripting_sound_index;
+	long runtime_scripting_sound_index;
 };
 
-typedef char looping_sound_definition_scripting_sound_index_offset_assert[
-	offsetof(struct looping_sound_definition, scripting_sound_index) == 0x1C ? 1 : -1];
+typedef char looping_sound_definition_runtime_scripting_sound_index_offset_assert[
+	offsetof(struct looping_sound_definition, runtime_scripting_sound_index) == 0x1C ? 1 : -1];
 
 /* ---------- prototypes/EXAMPLE.C */
 

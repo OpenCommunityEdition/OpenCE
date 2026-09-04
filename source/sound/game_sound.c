@@ -97,6 +97,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cache/cache_files.h"
 #include "game/game.h"
 #include "memory/data.h"
 #include "objects/objects.h"
@@ -111,25 +112,37 @@ symbols in this file:
 enum
 {
 	MAXIMUM_GAME_LOOPING_SOUNDS = 1024,
+	_looping_sound_fake_impulse_sound_bit = 1,
 	_game_looping_sound_unattached_stop_bit = 1,
 	_game_looping_sound_unattached_stop_fixed_fadeout_bit = 2,
 	_game_looping_sound_alternate_bit = 3,
 	_game_looping_sound_scripted_bit = 4,
 };
 
+enum game_looping_sound_state
+{
+	_game_looping_sound_active,
+	_game_looping_sound_deactivating,
+	_game_looping_sound_inactive,
+	NUMBER_OF_GAME_LOOPING_SOUND_STATES,
+};
+
 /* ---------- macros */
+
+#define game_looping_sound_get(index) \
+	((struct game_looping_sound_datum *)datum_get(game_looping_sound_data, (index)))
 
 /* ---------- structures */
 
 struct game_looping_sound_datum
 {
 	struct datum_header header;
-	short unknown2;
+	short state;
 	unsigned long flags;
 	real scale;
 	long definition_index;
 	long object_index;
-	long sound_index;
+	long last_audible_frame_index;
 	short function_index;
 	short node_index;
 	real_point3d position;
@@ -199,6 +212,140 @@ void game_sound_initialize_for_new_map(
 	return;
 }
 
+void game_sound_clear(
+	void)
+{
+	long looping_sound_index;
+
+	for (looping_sound_index = data_next_index(game_looping_sound_data, NONE);
+		looping_sound_index != NONE;
+		looping_sound_index = data_next_index(game_looping_sound_data, looping_sound_index))
+	{
+		struct game_looping_sound_datum *sound =
+			game_looping_sound_get(looping_sound_index);
+		struct looping_sound_definition *definition =
+			looping_sound_definition_get(sound->definition_index);
+
+		if (definition->runtime_scripting_sound_index == looping_sound_index)
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\sound\\game_sound.c",
+				176,
+				TEST_FLAG(sound->flags, _game_looping_sound_scripted_bit));
+			definition->runtime_scripting_sound_index = NONE;
+		}
+		else if (definition->runtime_scripting_sound_index != NONE)
+		{
+			game_looping_sound_get(definition->runtime_scripting_sound_index);
+		}
+	}
+
+	return;
+}
+
+void game_sound_restore(
+	void)
+{
+	long looping_sound_index;
+	struct tag_iterator iterator;
+	long sound_definition_index;
+
+	for (looping_sound_index = data_next_index(game_looping_sound_data, NONE);
+		looping_sound_index != NONE;
+		looping_sound_index = data_next_index(game_looping_sound_data, looping_sound_index))
+	{
+		struct game_looping_sound_datum *sound =
+			game_looping_sound_get(looping_sound_index);
+
+		if (TEST_FLAG(sound->flags, _game_looping_sound_scripted_bit))
+		{
+			struct looping_sound_definition *definition =
+				looping_sound_definition_get(sound->definition_index);
+
+			if (!TEST_FLAG(definition->flags, _looping_sound_fake_impulse_sound_bit))
+			{
+				definition->runtime_scripting_sound_index = looping_sound_index;
+			}
+			else
+			{
+				datum_delete(game_looping_sound_data, looping_sound_index);
+			}
+		}
+	}
+
+	tag_iterator_new(&iterator, SOUND_DEFINITION_TAG);
+	for (sound_definition_index = tag_iterator_next(&iterator);
+		sound_definition_index != NONE;
+		sound_definition_index = tag_iterator_next(&iterator))
+	{
+		sound_definition_get(sound_definition_index)->scripting_time = NONE;
+	}
+
+	return;
+}
+
+long game_looping_sound_new(
+	long object_index,
+	long definition_index,
+	char const *marker_name,
+	short function_index)
+{
+	struct object_marker marker;
+	long looping_sound_index = NONE;
+	struct game_looping_sound_datum *sound;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\game_sound.c",
+		240,
+		marker_name);
+
+	if (definition_index != NONE
+		&& (object_index == NONE
+			|| object_get_marker_by_name(object_index, marker_name, &marker, 1)))
+	{
+		looping_sound_index = datum_new(game_looping_sound_data);
+		if (looping_sound_index != NONE)
+		{
+			sound = game_looping_sound_get(looping_sound_index);
+			sound->object_index = object_index;
+			sound->definition_index = definition_index;
+			sound->state = _game_looping_sound_inactive;
+			sound->flags = 0;
+			sound->function_index = function_index;
+			sound->last_audible_frame_index = NONE;
+			if (object_index != NONE)
+			{
+				sound->node_index = marker.node_index;
+				sound->position = marker.node_matrix.position;
+				sound->forward = marker.node_matrix.forward;
+			}
+		}
+	}
+
+	return looping_sound_index;
+}
+
+void game_looping_sound_delete(
+	long looping_sound_index)
+{
+	struct game_looping_sound_datum *sound =
+		game_looping_sound_get(looping_sound_index);
+	struct looping_sound_definition *definition =
+		looping_sound_definition_get(sound->definition_index);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\game_sound.c",
+		281,
+		definition->runtime_scripting_sound_index!=looping_sound_index);
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\game_sound.c",
+		282,
+		definition->runtime_scripting_sound_index==NONE || game_looping_sound_get(definition->runtime_scripting_sound_index));
+	datum_delete(game_looping_sound_data, looping_sound_index);
+
+	return;
+}
+
 void game_sound_dispose_from_old_map(
 	void)
 {
@@ -260,11 +407,11 @@ void scripted_looping_sound_set_scale(
 	if (sound_index != NONE)
 	{
 		definition = looping_sound_definition_get(sound_index);
-		if (definition->scripting_sound_index != NONE)
+		if (definition->runtime_scripting_sound_index != NONE)
 		{
 			looping_sound = datum_get(
 				game_looping_sound_data,
-				definition->scripting_sound_index);
+				definition->runtime_scripting_sound_index);
 			looping_sound->scale = PIN(scale, 0.0f, 1.0f);
 		}
 	}
@@ -282,11 +429,11 @@ void scripted_looping_sound_set_alternate(
 	if (sound_index != NONE)
 	{
 		definition = looping_sound_definition_get(sound_index);
-		if (definition->scripting_sound_index != NONE)
+		if (definition->runtime_scripting_sound_index != NONE)
 		{
 			looping_sound = datum_get(
 				game_looping_sound_data,
-				definition->scripting_sound_index);
+				definition->runtime_scripting_sound_index);
 			SET_FLAG(looping_sound->flags, _game_looping_sound_alternate_bit, alternate);
 		}
 	}
@@ -316,14 +463,14 @@ static void scripted_looping_sound_stop_internal(
 	if (sound_index != NONE)
 	{
 		definition = looping_sound_definition_get(sound_index);
-		if (definition->scripting_sound_index != NONE)
+		if (definition->runtime_scripting_sound_index != NONE)
 		{
 			looping_sound = datum_get(
 				game_looping_sound_data,
-				definition->scripting_sound_index);
+				definition->runtime_scripting_sound_index);
 			SET_FLAG(looping_sound->flags, _game_looping_sound_scripted_bit, FALSE);
-			unattached_looping_sound_stop(definition->scripting_sound_index);
-			definition->scripting_sound_index = NONE;
+			unattached_looping_sound_stop(definition->runtime_scripting_sound_index);
+			definition->runtime_scripting_sound_index = NONE;
 			if (fixed_fadeout)
 			{
 				SET_FLAG(
