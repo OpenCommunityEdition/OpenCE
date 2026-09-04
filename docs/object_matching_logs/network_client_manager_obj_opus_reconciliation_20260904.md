@@ -160,9 +160,10 @@ bytes** and from 5,955 to **5,975 / 11,060 functions**.  That net
 **+4,938-byte / +20-function** movement is smaller than the strict gain because
 three strict COFF gains remain conservative objdiff false negatives and are
 not allowlisted for headline credit (`add_player`, 489 bytes;
-`request_remove_player`, 493; and `idle`, 301), while the already
-semantic-exact `initiate_join_game` boundary changes from uncredited fuzzy to
-objdiff 100% and adds 246 bytes plus one ordinary structural credit.  Thus
+`request_remove_player`, 493; and `idle`, 301), while the newly implemented
+`initiate_join_game` lies outside the strict-gain set because its assertion
+literal relocation differs, but its identical code reaches objdiff 100% and
+adds 246 bytes plus one ordinary structural credit.  Thus
 `22 - 3 + 1 = 20` functions and `5,975 - 1,283 + 246 = 4,938` bytes.  No
 semantic proof or code was lost; the difference is conservative proof-channel
 classification.
