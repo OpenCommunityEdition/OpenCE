@@ -1062,12 +1062,12 @@ long actor_aim_grenade(
 		if (prop->state < _prop_state_unacknowledged ||
 			prop->state > _prop_state_becoming_acknowledged)
 		{
-			aim_vector.n[0] = prop->body_position.x;
-			aim_vector.n[1] = prop->body_position.y;
-			aim_vector.n[2] = prop->body_position.z + 0.2f;
+			real_point3d desired_grenade_target = prop->body_position;
+
+			desired_grenade_target.z += 0.2f;
 			actor_combat_retarget_grenade(
 				actor_index,
-				(real_point3d const *)&aim_vector);
+				&desired_grenade_target);
 		}
 	}
 
