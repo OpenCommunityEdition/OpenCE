@@ -6,6 +6,7 @@ Example: python tools/campaign/gate.py source/hs/hs --fn _hs_find_script_by_name
 import sys, json, os, re, subprocess, argparse
 sys.path.insert(0, 'tools')
 import coff_compare as cc
+from campaign.emitted_symbols import forbidden_emitted_symbols
 
 ap = argparse.ArgumentParser()
 ap.add_argument('unit')
@@ -18,6 +19,8 @@ ap.add_argument('--fn', action='append', default=[])
 ap.add_argument('--disas')
 ap.add_argument('--all', action='store_true')
 ap.add_argument('--out', help='copy the compiled object to this path for later inspection')
+ap.add_argument('--forbid-emitted-symbol', action='append', default=[], metavar='NAME',
+                help='fail if any candidate code definition has this exact COFF name; repeatable')
 a = ap.parse_args()
 
 unit = a.unit.replace('\\', '/')
@@ -69,6 +72,23 @@ if a.out:
     shutil.copyfile(obj, a.out)
 target = cc.load(open('build/split/' + unit + '.obj', 'rb').read())
 ours = cc.load(open(obj, 'rb').read())
+
+if a.forbid_emitted_symbol:
+    forbidden = forbidden_emitted_symbols(ours, a.forbid_emitted_symbol)
+    for finding in forbidden:
+        print(
+            f'FORBIDDEN-EMITTED-SYMBOL {finding["name"]} '
+            f'object={obj} symbol-index={finding["symbol_index"]} '
+            f'section={finding["section_number"]}:{finding["section_name"]} '
+            f'offset=0x{finding["offset"]:x} section-size={finding["section_size"]}'
+        )
+    if forbidden:
+        print('Emitted-symbol guard failed: inspect the reported code definitions and '
+              'their inline schedule. Candidate-only symbols are checked even when '
+              'absent from the target or --fn selection.')
+        sys.exit(1)
+    print(f'== emitted-symbol guard passed '
+          f'({len(set(a.forbid_emitted_symbol))} forbidden names checked)')
 
 
 def fn_syms(o):

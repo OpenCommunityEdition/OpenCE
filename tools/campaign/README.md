@@ -37,6 +37,7 @@ python tools/campaign/gate.py source/units/units --edits e.json --fn _unit_place
 python tools/campaign/gate.py source/units/units --cflag /Ob1 --all    # diagnostic flag override
 python tools/campaign/gate.py source/ai/encounters --alias old_name=new_name --all
 python tools/campaign/gate.py source/ai/encounters --out scratch/encounters-probe.obj
+python tools/campaign/gate.py source/physics/collision_bsp --forbid-emitted-symbol _point_from_line3d --all
 ```
 
 `--edits` takes a JSON list of `[find, replace, tag]` triples applied to the real
@@ -52,6 +53,18 @@ probes; like `--edits`, it never changes the source file and is not admission
 evidence by itself. `--out` preserves the PID-isolated probe object at the
 specified path for independent COFF or disassembly inspection. `--all` prints
 exact functions as well as residual and unwritten functions.
+
+`--forbid-emitted-symbol NAME` checks the complete candidate COFF symbol table
+for a code definition with that exact decorated name and exits nonzero if one
+is present. Repeat the option to forbid additional names. The check includes
+candidate-only functions absent from the target, regardless of `--fn`, as well
+as static definitions, named code subsections, and nonzero symbol offsets.
+Undefined references, COMMON symbols, and data definitions do not fail this
+code-emission check. Failures identify the object, symbol-table index, section,
+offset, and section size for inspection. A clean check prints an explicit pass;
+without this option the existing gate output and exit behavior are unchanged.
+Use this guard to verify the January `point_from_line3d` inline schedule: the
+ordinary target-function listing cannot detect an extra candidate-only helper.
 
 ## apply_edits.py — land an edits JSON on the real file
 
