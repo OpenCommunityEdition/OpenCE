@@ -2787,6 +2787,7 @@ symbols in this file:
 #include "interface/interface.h"
 #include "interface/player_ui.h"
 #include "rasterizer/rasterizer_cinematics.h"
+#include "sound/game_sound.h"
 #include "structures/structure_lens_flares.h"
 #include "structures/structure_visibility.h"
 #include "tag_files/files.h"
@@ -3661,17 +3662,6 @@ void player_effect_screen_fade_out(
 void cinematic_set_title_delayed(
 	short title_index,
 	real delay);
-void scripted_sound_new(
-	long sound_index,
-	long source_object_index,
-	real gain);
-void scripted_looping_sound_start(
-	long sound_index,
-	long source_object_index,
-	real gain);
-void scripted_looping_sound_set_scale(
-	long sound_index,
-	real scale);
 void debug_sound_classes_set_distances(
 	char const *name,
 	real minimum_distance,
@@ -3899,8 +3889,6 @@ long unit_scripting_unit_gunner(
 	long unit_index);
 long object_list_from_ai_reference(
 	long ai_reference);
-long scripted_sound_time(
-	long sound_index);
 long hs_object_list_get_element(
 	long object_list_index,
 	unsigned short element_index);
@@ -4435,15 +4423,6 @@ void main_save_core_name(
 	char const *core_name);
 void main_skip(
 	unsigned short skip_type);
-void scripted_sound_stop(
-	long sound_index);
-void scripted_foley_predict(
-	long object_index);
-void scripted_looping_sound_stop(
-	long sound_index);
-void scripted_looping_sound_set_alternate(
-	long sound_index,
-	boolean alternate);
 void debug_sound_classes_enable(
 	long sound_class,
 	boolean enable);

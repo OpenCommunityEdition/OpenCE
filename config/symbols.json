@@ -7432,7 +7432,7 @@
 { "file_offset": 1799664, "flags": 32, "name": "_game_sound_set_mouth_aperture" },
 { "file_offset": 1799728, "flags": 32, "name": "_code_001b7630" },
 { "file_offset": 1799968, "flags": 32, "name": "_code_001b7720" },
-{ "file_offset": 1800080, "flags": 32, "name": "_code_001b7790" },
+{ "file_offset": 1800080, "flags": 32, "name": "_scripted_looping_sound_stop_internal", "static": true },
 { "file_offset": 1800192, "flags": 32, "name": "_code_001b7800" },
 { "file_offset": 1800288, "flags": 32, "name": "_code_001b7860" },
 { "file_offset": 1800496, "flags": 32, "name": "_game_sound_dispose_from_old_map" },

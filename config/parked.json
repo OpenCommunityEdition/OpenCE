@@ -2014,7 +2014,7 @@
       "unit": "source/ai/ai_communication",
       "function": "_ai_communication_update_speech_timers",
       "class": "register-allocation",
-      "evidence": "Fuzzy-parked under the current house rule after restoring the complete typed speech-timer update through its genuine ai_communication_started caller. Independent HCEA source authenticates the semantic ai_communication_update_speech_timers and actor_reset_idle_vocalization_timer names; the retained implementation uses unit_get and actor_get, named speech-priority constants, the typed AI communication globals, and the established dialogue/reply table structures. Target and candidate are both 672 padded bytes with all 43 relocation identities, and objdiff reports 97.76382 percent similarity after the completed Player Control call graph added its genuine Unit debug declarations to the Unit owner header. That declaration-only interface change returns this already-residual function to the earlier measured register schedule without changing its size, relocation topology, semantics, or any inherited strict-exact function in the 80-TU transitive header audit. The remaining gap is the previously documented C2 register/lifetime schedule: January retains the unit in EDI and time in ESI while the natural candidate selects the inverse allocation, with a small associated load-order tie. Prior bounded declaration, initialization, and expression-order probes did not close it naturally. No register hint, volatile access, barrier, pragma, assembly, fake dependency, false alias, raw offset, forced inline/noinline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the register lifetimes.",
+      "evidence": "Fuzzy-parked under the current house rule after restoring the complete typed speech-timer update through its genuine ai_communication_started caller. Independent HCEA source authenticates the semantic ai_communication_update_speech_timers and actor_reset_idle_vocalization_timer names; the retained implementation uses unit_get and actor_get, named speech-priority constants, the typed AI communication globals, and the established dialogue/reply table structures. Target and candidate are both 672 padded bytes with all 43 relocation identities, and objdiff reports 97.67839 percent similarity after replacing caller-local game-sound declarations with the owning game_sound.h interface. That declaration-only ownership cleanup changes a minor C2 register schedule without changing size, relocation topology, semantics, or any inherited strict-exact function in the full transitive rebuild. The remaining gap is the previously documented C2 register/lifetime schedule: January retains the unit in EDI and time in ESI while the natural candidate selects the inverse allocation, with a small associated load-order tie. Prior bounded declaration, initialization, and expression-order probes did not close it naturally. No register hint, volatile access, barrier, pragma, assembly, fake dependency, false alias, raw offset, forced inline/noinline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the register lifetimes.",
       "measurements": {
         "target": {
           "size": 672,
@@ -2024,9 +2024,9 @@
         "base": {
           "size": 672,
           "relocation_count": 43,
-          "normalized_sha256": "7db4861a5adf519e0457a0ffe785ff4d47e878fda47cc0a06206a529776ac91c"
+          "normalized_sha256": "885fdb81966284acf5ba7138a4bbbd2221e7c61c89114fdd6f53b96ba89b81a0"
         },
-        "objdiff_percent": 97.76382
+        "objdiff_percent": 97.67839
       }
     },
     {

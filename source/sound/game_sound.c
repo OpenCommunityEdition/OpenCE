@@ -97,6 +97,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "game/game.h"
 #include "memory/data.h"
 #include "objects/objects.h"
 #include "saved games/game_state.h"
@@ -111,7 +112,9 @@ enum
 {
 	MAXIMUM_GAME_LOOPING_SOUNDS = 1024,
 	_game_looping_sound_unattached_stop_bit = 1,
+	_game_looping_sound_unattached_stop_fixed_fadeout_bit = 2,
 	_game_looping_sound_alternate_bit = 3,
+	_game_looping_sound_scripted_bit = 4,
 };
 
 /* ---------- macros */
@@ -145,6 +148,10 @@ typedef char game_sound_globals_size_assert[
 	sizeof(struct game_sound_globals) == 0x8 ? 1 : -1];
 
 /* ---------- prototypes */
+
+static void scripted_looping_sound_stop_internal(
+	long sound_index,
+	boolean fixed_fadeout);
 
 /* ---------- globals */
 
@@ -202,6 +209,26 @@ void game_sound_dispose_from_old_map(
 	}
 
 	return;
+}
+
+long scripted_sound_time(
+	long sound_index)
+{
+	struct sound_definition *definition;
+	long time = 0;
+
+	if (sound_index != NONE)
+	{
+		definition = sound_definition_get(sound_index);
+		if (definition->scripting_time != NONE)
+		{
+			long remaining = definition->scripting_time - game_time_get();
+
+			time = MAX(remaining, 0);
+		}
+	}
+
+	return time;
 }
 
 void scripted_sound_stop(
@@ -275,6 +302,45 @@ void unattached_looping_sound_stop(
 		looping_sound_index);
 
 	SET_FLAG(looping_sound->flags, _game_looping_sound_unattached_stop_bit, TRUE);
+
+	return;
+}
+
+static void scripted_looping_sound_stop_internal(
+	long sound_index,
+	boolean fixed_fadeout)
+{
+	struct looping_sound_definition *definition;
+	struct game_looping_sound_datum *looping_sound;
+
+	if (sound_index != NONE)
+	{
+		definition = looping_sound_definition_get(sound_index);
+		if (definition->scripting_sound_index != NONE)
+		{
+			looping_sound = datum_get(
+				game_looping_sound_data,
+				definition->scripting_sound_index);
+			SET_FLAG(looping_sound->flags, _game_looping_sound_scripted_bit, FALSE);
+			unattached_looping_sound_stop(definition->scripting_sound_index);
+			definition->scripting_sound_index = NONE;
+			if (fixed_fadeout)
+			{
+				SET_FLAG(
+					looping_sound->flags,
+					_game_looping_sound_unattached_stop_fixed_fadeout_bit,
+					TRUE);
+			}
+		}
+	}
+
+	return;
+}
+
+void scripted_looping_sound_stop(
+	long sound_index)
+{
+	scripted_looping_sound_stop_internal(sound_index, FALSE);
 
 	return;
 }

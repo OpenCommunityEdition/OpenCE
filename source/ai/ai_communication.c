@@ -557,6 +557,7 @@ symbols in this file:
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#include "sound/game_sound.h"
 #include "tag_files/tag_files.h"
 #include "units/dialogue_definitions.h"
 #include "units/units.h"
@@ -940,12 +941,6 @@ void unit_speak(
 	struct unit_speech_item const *speech_item);
 boolean sound_scripted_dialog_is_playing(
 	void);
-void scripted_sound_new(
-	long definition_index,
-	long source_object_index,
-	real scale);
-long scripted_sound_time(
-	long definition_index);
 void ai_handle_allegiance_broken_notification(
 	short team1_index,
 	short team2_index,
