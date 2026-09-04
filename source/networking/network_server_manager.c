@@ -458,7 +458,7 @@ symbols in this file:
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
 #include "networking/network_messages.h"
-#include "networking/network_server_manager.h"
+#include "networking/network_server_manager_internal.h"
 #include "text/unicode.h"
 
 /* ---------- constants */
@@ -494,17 +494,15 @@ struct countdown_timer
 	unsigned long last_update_time;
 };
 
-struct network_game_client_machine
+struct network_machine
 {
-	byte opaque00[0xE];
-	byte flags;
-	byte opaque0F[0x31];
+	wchar_t name[32];
 	char machine_index;
-	byte opaque41[3];
+	byte padding41[3];
 };
 
-typedef char network_game_client_machine_size_assert[
-	sizeof(struct network_game_client_machine) == 0x44 ? 1 : -1];
+typedef char network_machine_size_assert[
+	sizeof(struct network_machine) == 0x44 ? 1 : -1];
 
 struct network_game
 {
@@ -517,7 +515,7 @@ struct network_game
 	byte padding10F;
 	short difficulty;
 	short machine_count;
-	struct network_game_client_machine machines[MAXIMUM_NETWORK_MACHINE_COUNT];
+	struct network_machine machines[MAXIMUM_NETWORK_MACHINE_COUNT];
 	short player_count;
 	struct network_player players[MAXIMUM_NETWORK_PLAYER_COUNT];
 	byte opaque426[2];
@@ -627,10 +625,10 @@ long countdown_timer_get_time_remaining(
 }
 
 struct network_connection *network_game_server_get_client_connection(
-	struct network_game_server *server)
+	struct network_game_server_client_machine *client_machine)
 {
-	if (server)
-		return server->connection;
+	if (client_machine)
+		return client_machine->connection;
 
 	return NULL;
 }
@@ -700,7 +698,7 @@ void countdown_timer_set_time_remaining(
 
 void network_game_server_client_machine_is_precached(
 	struct network_game_server *server,
-	struct network_game_client_machine *client_machine,
+	struct network_game_server_client_machine *client_machine,
 	char const *map_name)
 {
 	char const *multiplayer_map_name = main_get_multiplayer_map_name();
@@ -743,7 +741,7 @@ boolean network_game_server_game_is_valid(
 
 boolean network_game_server_client_machine_is_joined_to_game(
 	struct network_game_server *server,
-	struct network_game_client_machine *machine)
+	struct network_game_server_client_machine *machine)
 {
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x3CD, server);
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x3CE, machine);
@@ -903,7 +901,7 @@ boolean server_ok_to_countdown(
 }
 
 void network_game_server_invalidate_network_machine(
-	struct network_game_client_machine *machine)
+	struct network_machine *machine)
 {
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x6C9, machine);
 
@@ -913,12 +911,12 @@ void network_game_server_invalidate_network_machine(
 	return;
 }
 
-struct network_game_client_machine *network_game_server_get_client_machine(
+struct network_machine *network_game_server_get_client_machine(
 	struct network_game_server *server,
 	struct network_game_server_client_machine *client_machine,
 	long *machine_index)
 {
-	struct network_game_client_machine *machine;
+	struct network_machine *machine;
 
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x701, server && client_machine);
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x702,
@@ -936,7 +934,7 @@ struct network_game_client_machine *network_game_server_get_client_machine(
 
 struct network_connection *network_game_server_get_machine_connection(
 	struct network_game_server *server,
-	struct network_game_client_machine *machine)
+	struct network_machine *machine)
 {
 	struct network_connection *connection = NULL;
 	long index;

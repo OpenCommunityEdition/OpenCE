@@ -8,13 +8,47 @@ header included in hcex build.
 #define __NETWORK_SERVER_MESSAGE_HANDLER_H
 #pragma once
 
+/* ---------- headers */
+
+#include "cseries.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+struct network_machine;
+struct network_game_server;
+struct network_game_server_client_machine;
+struct network_message;
+struct network_player;
+struct transport_address;
+
+/* ---------- prototypes/NETWORK_SERVER_MESSAGE_HANDLER.C */
+
+boolean network_game_server_send_message_to_machine(
+	struct network_game_server *server,
+	struct network_machine *machine,
+	struct network_message *message);
+boolean network_game_server_send_message_to_all_machines(
+	struct network_game_server *server,
+	struct network_message *message);
+boolean network_game_server_send_player_joined_info_ingame(
+	struct network_game_server *server,
+	struct network_player *player);
+boolean network_game_server_send_game_data_pregame(
+	struct network_game_server *server);
+boolean network_game_server_handle_client_message(
+	struct network_game_server *server,
+	struct network_game_server_client_machine *machine,
+	word *message,
+	short message_buffer_size);
+boolean network_game_server_handle_datagram(
+	struct network_game_server *server,
+	word *message,
+	short datagram_size,
+	struct transport_address *source_address);
 
 /* ---------- globals */
 

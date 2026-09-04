@@ -2,6 +2,44 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/networking/network_server_message_handler",
+      "function": "_network_game_server_handle_message_client_ping",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed ping reply from January's instruction and relocation topology. Target and candidate both occupy 192 padded bytes with all 11 relocation identities; objdiff reports 79.17333 percent similarity. January receives the private server and message arguments in ECX and EAX, preserves them in EBX and ESI, and reads the transport address from the stack, while VC7 gives the natural static C helper a different private register/stack convention. Ten bounded, ordinary source shapes covering parameter order, local lifetime, reply construction, and connection lookup all returned to this fixed point or worsened it. No public-linkage fiction, register or volatile forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, undefined behavior, or nonsensical branch is retained. Reopen only for authoritative January source or local/debug records, or a natural same-compiler donor that explains the two-register private entry convention.",
+      "measurements": {
+        "target": {
+          "size": 192,
+          "relocation_count": 11,
+          "normalized_sha256": "96c721475f9cc12f4132e7b05d91aa3d576f804e99d6ffc134e39df030820831"
+        },
+        "base": {
+          "size": 192,
+          "relocation_count": 11,
+          "normalized_sha256": "4ac6454d882e733bbbb663871ea567e3dc945ffa42ec5a3b98ddc64b9e17d8f5"
+        },
+        "objdiff_percent": 79.17333
+      }
+    },
+    {
+      "unit": "source/networking/network_server_message_handler",
+      "function": "_network_game_server_handle_datagram",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked with the complete typed datagram decoder and dispatch path reconstructed from January's instruction/relocation topology and authenticated message definitions. Target and candidate both occupy 784 padded bytes with all 47 relocation identities; objdiff reports 98.851616 percent similarity. The remaining bytes are confined to the call and stack cleanup for network_game_server_handle_message_client_ping and follow from that private helper's unresolved two-register entry convention; the surrounding header validation, client lookup, message dispatch, error reply, and logging paths agree. Resolving the callee through artificial linkage, an ABI shim, or an emission anchor would violate the source and house rules, so none is retained. No register or volatile forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, undefined behavior, or nonsensical control flow is used. Reopen together with the ping helper when authoritative January source/local records or a natural same-compiler donor explains its private ABI.",
+      "measurements": {
+        "target": {
+          "size": 784,
+          "relocation_count": 47,
+          "normalized_sha256": "f32e88d94387bb9f05b146c7f2410d457f7c64e104167a6c4c42c665bebaae54"
+        },
+        "base": {
+          "size": 784,
+          "relocation_count": 47,
+          "normalized_sha256": "88dde40002615b6a6602eb63b3aa0a7d21f18eab3ecd19137faa658446dbbad8"
+        },
+        "objdiff_percent": 98.851616
+      }
+    },
+    {
       "unit": "source/interface/hud_messaging",
       "function": "_scripted_hud_set_objective",
       "class": "unclassified",

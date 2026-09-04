@@ -103,8 +103,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
-
-#include <xtl.h>
+#include "bungie_net/network/transport_endpoint_winsock.h"
 
 /* ---------- constants */
 

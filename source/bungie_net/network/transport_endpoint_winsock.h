@@ -8,6 +8,10 @@ header included in hcex build.
 #define __TRANSPORT_ENDPOINT_WINSOCK_H
 #pragma once
 
+/* ---------- headers */
+
+#include <xtl.h>
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -88,6 +92,15 @@ void delete_endpoint_set(
 	struct transport_endpoint_set *set);
 void delete_transport_endpoint(
 	struct transport_endpoint *endpoint);
+void transport_get_nonce(
+	void *nonce,
+	long nonce_length);
+XNADDR *transport_get_xnaddr(
+	XNADDR *address);
+XNKID transport_get_key_id(
+	void);
+XNKEY transport_get_key(
+	void);
 
 /* ---------- globals */
 
