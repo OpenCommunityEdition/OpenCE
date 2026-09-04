@@ -121,3 +121,27 @@ bodies were not expanded or rewritten around that uncertainty.
   5,816 / 11,060 functions, and 391 / 833 linked objects. Semantic validation
   reported 5,868 semantic exact, 5,885 accepted, 162 hidden exact, and zero
   unit errors. The parked ledger validated 190 entries.
+
+## Canonical integration replay
+
+The isolated commit was subsequently cherry-picked onto canonical commit
+`44e897053`, after the intervening render, sound, path, game, networking, and
+devices packets. A fresh configure, full Ninja build, and rename-stable sweep
+reproduced the same 25-function / 6,688-padded-byte gain with zero regressions
+across all 8,245 target functions. The current object remains 55 exact, 3
+parked residual, and 8 unwritten functions.
+
+The rebased progress report records 843,442 / 2,198,102 matched code bytes,
+5,877 / 11,060 matched functions, and 2,001,721 matched data bytes. Relative to
+the immediately preceding canonical snapshot, the packet contributes 6,159
+meaningful code bytes and eight data bytes. Semantic validation reports 5,929
+semantic exact, 5,946 accepted exact, and zero unit errors. The current park
+manifest validates at 188 active, 0 stale, and 0 invalid entries; object
+admission remains 0 candidates, 0 contradictions, and 0 revocations. The fake
+scan remains clean, all rebuilt HS objects emit no `point_from_line3d` symbol,
+and the complete tool suite again passes 261/261 tests.
+
+Stable snapshots:
+
+- before: `scratch/after-devices-touch-group-delete-20260904.json` (5,895 exact)
+- after: `scratch/after-hs-runtime-opus-integration-20260904.json` (5,920 exact)
