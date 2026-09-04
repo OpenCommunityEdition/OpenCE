@@ -7,7 +7,7 @@ symbols in this file:
 00136C60 00e0:
 	_collision_surface_polygon (0000)
 00136D40 0030:
-	_code_00136d40 (0000)
+	_add_feature (0000)
 00136D70 0050:
 	_render_debug_collision_vertex (0000)
 00136DC0 0080:
@@ -31,7 +31,7 @@ symbols in this file:
 00137560 01c0:
 	_collision_surface_test_line2d (0000)
 00137720 0370:
-	_code_00137720 (0000)
+	_collision_surface_test_sphere (0000)
 00137A90 0130:
 	_code_00137a90 (0000)
 00137BC0 00d0:
@@ -39,7 +39,7 @@ symbols in this file:
 00137C90 02a0:
 	_code_00137c90 (0000)
 00137F30 00a0:
-	_code_00137f30 (0000)
+	_bsp2d_test_sphere_recursive (0000)
 00137FD0 0190:
 	_code_00137fd0 (0000)
 00138160 0210:
@@ -47,7 +47,7 @@ symbols in this file:
 00138370 0070:
 	_collision_bsp_test_pill_new (0000)
 001383E0 0320:
-	_code_001383e0 (0000)
+	_bsp3d_test_sphere_recursive (0000)
 00138700 0320:
 	_code_00138700 (0000)
 00138A20 01e0:
@@ -71,7 +71,7 @@ symbols in this file:
 0028B094 0004:
 	__real@39000000 (0000)
 00456EB0 0010:
-	_bss_00456eb0 (0000)
+	_collision_bsp_usage_times (0000)
 */
 
 /* ---------- headers */
@@ -85,6 +85,19 @@ symbols in this file:
 #include "tag_files/tag_groups.h"
 
 /* ---------- constants */
+
+enum
+{
+	MAXIMUM_BSP3D_DEPTH = 128,
+};
+
+enum collision_surface_flags
+{
+	_collision_surface_two_sided_bit,
+	_collision_surface_invisible_bit,
+	_collision_surface_climbable_bit,
+	_collision_surface_breakable_bit,
+};
 
 /* ---------- macros */
 
@@ -134,11 +147,39 @@ struct collision_bsp_test_sphere_context
 	real radius;
 	struct collision_bsp_test_sphere_result *result;
 	long stack_depth;
-	long traversal_stack[131];
+	long plane_stack[MAXIMUM_BSP3D_DEPTH];
+	short projection_axis;
+	boolean projection_sign;
+	byte pad2;
+	real_point2d center2d;
 };
 
 typedef char collision_bsp_test_sphere_context_size_assert[
 	sizeof(struct collision_bsp_test_sphere_context) == 0x228 ? 1 : -1];
+typedef char collision_bsp_test_sphere_context_plane_stack_offset_assert[
+	offsetof(struct collision_bsp_test_sphere_context, plane_stack) == 0x1C ? 1 : -1];
+typedef char collision_bsp_test_sphere_context_projection_axis_offset_assert[
+	offsetof(struct collision_bsp_test_sphere_context, projection_axis) == 0x21C ? 1 : -1];
+typedef char collision_bsp_test_sphere_context_center2d_offset_assert[
+	offsetof(struct collision_bsp_test_sphere_context, center2d) == 0x220 ? 1 : -1];
+
+struct collision_leaf
+{
+	word flags;
+	short bsp2d_reference_count;
+	long first_bsp2d_reference_index;
+};
+
+struct bsp2d_reference
+{
+	long plane_designator;
+	long root_index;
+};
+
+typedef char collision_leaf_size_assert[
+	sizeof(struct collision_leaf) == 0x08 ? 1 : -1];
+typedef char bsp2d_reference_size_assert[
+	sizeof(struct bsp2d_reference) == 0x08 ? 1 : -1];
 
 struct collision_bsp_test_vector_context
 {
@@ -175,8 +216,18 @@ boolean code_00137c90(
 boolean code_00138ed0(
 	struct collision_bsp_test_pill_context *context,
 	long node_index);
-void code_001383e0(
-	struct collision_bsp_test_sphere_context *context,
+static void add_feature(
+	long *count,
+	long *indices,
+	long index);
+static void collision_surface_test_sphere(
+	struct collision_bsp_test_sphere_context *data,
+	long surface_index);
+static void bsp2d_test_sphere_recursive(
+	struct collision_bsp_test_sphere_context *data,
+	long child_index);
+static void bsp3d_test_sphere_recursive(
+	struct collision_bsp_test_sphere_context *data,
 	long node_index);
 boolean code_00138700(
 	struct collision_bsp_test_vector_context *context,
@@ -191,7 +242,7 @@ void render_debug_collision_edge(
 
 /* ---------- globals */
 
-struct collision_bsp_usage_times bss_00456eb0 = { 0 };
+struct collision_bsp_usage_times collision_bsp_usage_times = { 0 };
 
 /* ---------- public code */
 
@@ -872,7 +923,7 @@ boolean collision_bsp_test_sphere(
 	short collision_function = 6 + (bsp == global_collision_bsp);
 
 	collision_log_usage(collision_function);
-	collision_log_start_time(&bss_00456eb0.sphere);
+	collision_log_start_time(&collision_bsp_usage_times.sphere);
 
 	context.bsp = bsp;
 	context.breakable_surface_count = breakable_surface_count;
@@ -886,8 +937,10 @@ boolean collision_bsp_test_sphere(
 	result->edge_count = 0;
 	result->vertex_count = 0;
 
-	code_001383e0(&context, 0);
-	collision_log_end_time(collision_function, bss_00456eb0.sphere.QuadPart);
+	bsp3d_test_sphere_recursive(&context, 0);
+	collision_log_end_time(
+		collision_function,
+		collision_bsp_usage_times.sphere.QuadPart);
 
 	return result->surface_count > 0 || result->edge_count > 0;
 }
@@ -908,7 +961,7 @@ boolean collision_bsp_test_vector(
 	real t;
 
 	collision_log_usage(collision_function);
-	collision_log_start_time(&bss_00456eb0.vector);
+	collision_log_start_time(&collision_bsp_usage_times.vector);
 
 	context.flags = flags;
 	context.bsp = bsp;
@@ -925,9 +978,340 @@ boolean collision_bsp_test_vector(
 
 	t = PIN(maximum_t, 0.f, 1.f);
 	return_value = code_00138700(&context, 0, 0, t);
-	collision_log_end_time(collision_function, bss_00456eb0.vector.QuadPart);
+	collision_log_end_time(
+		collision_function,
+		collision_bsp_usage_times.vector.QuadPart);
 
 	return return_value;
 }
 
 /* ---------- private code */
+
+static void add_feature(
+	long *count,
+	long *indices,
+	long index)
+{
+	short feature_index;
+
+	for (feature_index = 0; feature_index < *count; feature_index++)
+	{
+		if (indices[feature_index] == index)
+			return;
+	}
+
+	if (*count < 256)
+	{
+		indices[*count] = index;
+		(*count)++;
+	}
+
+	return;
+}
+
+static void collision_surface_test_sphere(
+	struct collision_bsp_test_sphere_context *data,
+	long surface_index)
+{
+	struct collision_surface const *surface = TAG_BLOCK_GET_ELEMENT(
+		&data->bsp->surfaces,
+		surface_index,
+		struct collision_surface);
+	byte breakable_surface_index;
+	long edge_index;
+	real radius_squared;
+	boolean hit_feature = FALSE;
+
+	if (TEST_FLAG(surface->flags, _collision_surface_breakable_bit))
+	{
+		breakable_surface_index = surface->breakable_surface_index;
+		if (breakable_surface_index < data->breakable_surface_count &&
+			!BIT_VECTOR_TEST_FLAG(
+				(long const *)data->breakable_surface_flags,
+				breakable_surface_index))
+		{
+			return;
+		}
+	}
+
+	radius_squared = data->radius * data->radius;
+	edge_index = surface->first_edge_index;
+	do
+	{
+		struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(
+			&data->bsp->edges,
+			edge_index,
+			struct collision_edge);
+		boolean reverse = edge->surface_indices[1] == surface_index;
+		long vertex_index = edge->vertex_indices[reverse];
+		struct collision_vertex const *vertex = TAG_BLOCK_GET_ELEMENT(
+			&data->bsp->vertices,
+			vertex_index,
+			struct collision_vertex);
+		real delta_x = vertex->point.x - data->center->x;
+		real delta_y = vertex->point.y - data->center->y;
+		real delta_z = vertex->point.z - data->center->z;
+		real distance_squared =
+			delta_x * delta_x +
+			delta_y * delta_y +
+			delta_z * delta_z;
+
+		if (distance_squared <= radius_squared)
+		{
+			add_feature(
+				&data->result->vertex_count,
+				data->result->vertex_indices,
+				vertex_index);
+			hit_feature = TRUE;
+		}
+
+		edge_index = edge->edge_indices[reverse];
+	}
+	while (edge_index != surface->first_edge_index);
+
+	edge_index = surface->first_edge_index;
+	do
+	{
+		struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(
+			&data->bsp->edges,
+			edge_index,
+			struct collision_edge);
+		boolean reverse = edge->surface_indices[1] == surface_index;
+		struct collision_vertex const *vertex0 = TAG_BLOCK_GET_ELEMENT(
+			&data->bsp->vertices,
+			edge->vertex_indices[reverse],
+			struct collision_vertex);
+		struct collision_vertex const *vertex1 = TAG_BLOCK_GET_ELEMENT(
+			&data->bsp->vertices,
+			edge->vertex_indices[!reverse],
+			struct collision_vertex);
+		real_vector3d edge_vector;
+
+		vector_from_points3d(&vertex0->point, &vertex1->point, &edge_vector);
+		if (fast_vector_intersects_sphere(
+			&vertex0->point,
+			&edge_vector,
+			data->center,
+			data->radius))
+		{
+			add_feature(
+				&data->result->edge_count,
+				data->result->edge_indices,
+				edge_index);
+			hit_feature = TRUE;
+		}
+
+		edge_index = edge->edge_indices[reverse];
+	}
+	while (edge_index != surface->first_edge_index);
+
+	if (!hit_feature)
+	{
+		edge_index = surface->first_edge_index;
+		do
+		{
+			struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(
+				&data->bsp->edges,
+				edge_index,
+				struct collision_edge);
+			boolean reverse = edge->surface_indices[1] == surface_index;
+			struct collision_vertex const *vertex0 = TAG_BLOCK_GET_ELEMENT(
+				&data->bsp->vertices,
+				edge->vertex_indices[reverse],
+				struct collision_vertex);
+			struct collision_vertex const *vertex1 = TAG_BLOCK_GET_ELEMENT(
+				&data->bsp->vertices,
+				edge->vertex_indices[!reverse],
+				struct collision_vertex);
+			real_point2d point0;
+			real_point2d point1;
+			real_vector2d vector0;
+			real_vector2d vector1;
+
+			project_point3d(
+				&vertex0->point,
+				data->projection_axis,
+				data->projection_sign,
+				&point0);
+			project_point3d(
+				&vertex1->point,
+				data->projection_axis,
+				data->projection_sign,
+				&point1);
+			vector_from_points2d(&data->center2d, &point0, &vector0);
+			vector_from_points2d(&data->center2d, &point1, &vector1);
+			if (cross_product2d(&vector0, &vector1) < 0.f)
+				return;
+
+			edge_index = edge->edge_indices[reverse];
+		}
+		while (edge_index != surface->first_edge_index);
+	}
+
+	add_feature(
+		&data->result->surface_count,
+		data->result->surface_indices,
+		surface_index);
+
+	return;
+}
+
+static void bsp2d_test_sphere_recursive(
+	struct collision_bsp_test_sphere_context *data,
+	long child_index)
+{
+	real_point2d const *center2d = &data->center2d;
+
+	while (!(child_index & LONG_MIN))
+	{
+		struct bsp2d_node const *node = TAG_BLOCK_GET_ELEMENT(
+			&data->bsp->bsp2d.nodes,
+			child_index,
+			struct bsp2d_node);
+		real distance =
+			node->plane.n.j * center2d->y +
+			center2d->x * node->plane.n.i -
+			node->plane.d;
+		boolean reaches_first_child = distance <= data->radius;
+		boolean reaches_second_child = distance >= -data->radius;
+
+		if (reaches_first_child)
+			bsp2d_test_sphere_recursive(data, node->child_indices[0]);
+		if (!reaches_second_child)
+			return;
+
+		child_index = node->child_indices[1];
+	}
+
+	collision_surface_test_sphere(data, child_index & LONG_MAX);
+
+	return;
+}
+
+static void bsp3d_test_sphere_recursive(
+	struct collision_bsp_test_sphere_context *data,
+	long node_index)
+{
+	while (!(node_index & LONG_MIN))
+	{
+		struct bsp3d_node const *node = TAG_BLOCK_GET_ELEMENT(
+			&data->bsp->bsp3d.nodes,
+			node_index,
+			struct bsp3d_node);
+		real_plane3d const *plane = TAG_BLOCK_GET_ELEMENT(
+			&data->bsp->bsp3d.planes,
+			node->plane_designator,
+			real_plane3d);
+		real distance = plane3d_distance_to_point(plane, data->center);
+		boolean reaches_second_child = distance < data->radius;
+		boolean child_index = distance > -data->radius;
+
+		if (child_index && reaches_second_child)
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\physics\\collision_bsp.c",
+				0x206,
+				data->stack_depth>=0 && data->stack_depth<MAXIMUM_BSP3D_DEPTH);
+			data->plane_stack[data->stack_depth++] =
+				node->plane_designator | LONG_MIN;
+			bsp3d_test_sphere_recursive(data, node->children[0]);
+
+			data->stack_depth--;
+			match_assert(
+				"c:\\halo\\SOURCE\\physics\\collision_bsp.c",
+				0x210,
+				data->stack_depth>=0 && data->stack_depth<MAXIMUM_BSP3D_DEPTH);
+			data->plane_stack[data->stack_depth++] =
+				node->plane_designator & LONG_MAX;
+			bsp3d_test_sphere_recursive(data, node->children[1]);
+			data->stack_depth--;
+
+			return;
+		}
+
+		node_index = node->children[child_index];
+	}
+
+	if (node_index != NONE)
+	{
+		long leaf_index = node_index & LONG_MAX;
+		struct collision_leaf const *leaf = TAG_BLOCK_GET_ELEMENT(
+			&data->bsp->leaves,
+			leaf_index,
+			struct collision_leaf);
+		long reference_index;
+
+		if (data->result->leaf_count < 256)
+		{
+			data->result->leaf_indices[data->result->leaf_count] = leaf_index;
+			data->result->leaf_count++;
+		}
+
+		for (
+			reference_index = leaf->first_bsp2d_reference_index;
+			reference_index <
+				leaf->first_bsp2d_reference_index + leaf->bsp2d_reference_count;
+			reference_index++)
+		{
+			struct bsp2d_reference const *reference = TAG_BLOCK_GET_ELEMENT(
+				&data->bsp->bsp2d_references,
+				reference_index,
+				struct bsp2d_reference);
+			short stack_index;
+
+			for (stack_index = 0; stack_index < data->stack_depth; stack_index++)
+			{
+				if (data->plane_stack[stack_index] == reference->plane_designator)
+				{
+					real_plane3d const *plane = TAG_BLOCK_GET_ELEMENT(
+						&data->bsp->bsp3d.planes,
+						reference->plane_designator & LONG_MAX,
+						real_plane3d);
+					real plane_distance = -(
+						plane->n.i * data->center->x +
+						(
+							data->center->z * plane->n.k +
+							data->center->y * plane->n.j) -
+						plane->d);
+					real_point3d projected_center;
+					real absolute_i;
+					real absolute_j;
+					real absolute_k;
+					short projection;
+					boolean projection_sign;
+
+					projected_center.x =
+						plane->n.i * plane_distance + data->center->x;
+					projected_center.y =
+						plane->n.j * plane_distance + data->center->y;
+					projected_center.z =
+						plane->n.k * plane_distance + data->center->z;
+					absolute_i = fabs(plane->n.i);
+					absolute_j = fabs(plane->n.j);
+					absolute_k = fabs(plane->n.k);
+					if (absolute_k >= absolute_j && absolute_k >= absolute_i)
+						projection = _z;
+					else
+						projection = absolute_j >= absolute_i ? _y : _x;
+					data->projection_axis = projection;
+					match_assert(
+						"..\\math\\real_math.h",
+						848,
+						projection>=_x && projection<=_z);
+					projection_sign = plane->n.n[projection] > 0.f;
+					data->projection_sign = projection_sign !=
+						(reference->plane_designator & LONG_MIN ? TRUE : FALSE);
+					project_point3d(
+						&projected_center,
+						data->projection_axis,
+						data->projection_sign,
+						&data->center2d);
+					bsp2d_test_sphere_recursive(data, reference->root_index);
+					break;
+				}
+			}
+		}
+	}
+
+	return;
+}

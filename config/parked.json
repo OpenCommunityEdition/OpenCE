@@ -4289,6 +4289,63 @@
         },
         "objdiff_percent": 88.5429
       }
+    },
+    {
+      "unit": "source/physics/collision_bsp",
+      "function": "_collision_surface_test_sphere",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed private sphere-versus-surface walker and recovering its semantic name from independent HCEA and Stian evidence. January COFF remains the sole byte authority. The retained C lazily rejects destroyed breakable surfaces through the correct bit-3 enum and repository bit-vector macro, walks the oriented edge ring to collect overlapping vertices and edges, tests the projected center against the polygon only when no boundary feature hit, and invokes the naturally inlined exact add_feature helper for duplicate suppression. This audited revision types the local breakable index as byte, matching the owning collision_surface field: its unsigned 0..255 domain is preserved while ordinary integral promotion reproduces January's signed range comparison and logical right shift. It also preserves surface->first_edge_index as the ring sentinel instead of introducing a cached first_edge_index local, and uses ordinary delta_x/delta_y/delta_z locals for the independently corroborated squared-distance calculation so the object does not acquire a non-target _distance_squared3d COMDAT. The target is 880 padded bytes with 13 relocations; the natural candidate is 848 padded bytes with the same 13 ordered relocation identities and 86.4106 percent objdiff similarity. January's vertex-distance reduction uses packed SSE while the retained natural expression emits scalar x87; that structural difference changes the frame and downstream register/lifetime schedule. The bit-vector macro's long-pointer view is the established boundary for the public byte-packed breakable-surface buffer and is also used by its owning subsystem. No speculative SSE transcription, shared-header alteration, optimizer control, assembly, fake dependency, undefined behavior, or nonsensical branch is retained. Reopen for authenticated January Xbox source or a natural same-compiler context that explains the packed reduction without collateral regressions.",
+      "measurements": {
+        "target": {
+          "size": 880,
+          "relocation_count": 13,
+          "normalized_sha256": "d8ecf6e6e8e9fdc80c42b6c515fbb1b84a20be1adeb2938ded8793f43495079d"
+        },
+        "base": {
+          "size": 848,
+          "relocation_count": 13,
+          "normalized_sha256": "b8b40ff369f5c4845872f78a79bf92531f06a252973eacbb4e122b3ac3a439fb"
+        },
+        "objdiff_percent": 86.4106
+      }
+    },
+    {
+      "unit": "source/physics/collision_bsp",
+      "function": "_bsp2d_test_sphere_recursive",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed private 2D BSP sphere traversal and recovering its semantic name from independent HCEA and Stian evidence. January COFF remains the sole byte authority. Target and candidate both occupy 160 padded bytes, contain 77 instructions, and carry the same three ordered relocation identities at the same addresses; objdiff reports 98.064514 percent similarity. The aligned residual is exactly one commutative multiply operand load: January loads center2d->x then multiplies by plane->n.i, while the retained natural direct expression loads plane->n.i then multiplies by center2d->x. Calling the shared plane2d_distance_to_point inline helper makes this function strict exact but also emits a 32-byte _plane2d_distance_to_point COMDAT absent from the January object, so that candidate is rejected. The retained direct expression follows the independent HCEA lift and avoids the extra helper without an optimizer control, forced inline, fake dependency, or unnatural arithmetic. Reopen only for authoritative January source or a natural shared-helper linkage context that preserves the one-function schedule without adding a non-target COMDAT.",
+      "measurements": {
+        "target": {
+          "size": 160,
+          "relocation_count": 3,
+          "normalized_sha256": "3d3e2ebc2475a44e6fc46a61a195af74e7bfe2b9123b724beb96f1fb3dc9c8f1"
+        },
+        "base": {
+          "size": 160,
+          "relocation_count": 3,
+          "normalized_sha256": "bbd48caaee511fea2e988c180bd90ee0e2b3ea970e1b12ca9e147a10ddeb5e15"
+        },
+        "objdiff_percent": 98.064514
+      }
+    },
+    {
+      "unit": "source/physics/collision_bsp",
+      "function": "_bsp3d_test_sphere_recursive",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed recursive 3D BSP sphere traversal and recovering its semantic private name from independent HCEA and Stian evidence. January COFF remains the sole byte authority. The retained function descends single-sided nodes, recursively visits both sides while maintaining the authenticated 128-entry signed plane stack, records overlapping leaves, resolves matching 2D references, projects the sphere center, and invokes the reconstructed 2D walker. Audit retracted the earlier claim that the residual was three equivalent unordered-value branch encodings: the shared projection_from_vector3d body actually selected the wrong axis for x- or y-dominant vectors, and different x87 unordered branches are not generally equivalent for NaNs. The retained named-axis conditional implements the HCEA semantics and matches January's dominant-axis comparisons instruction-for-instruction, including their unordered/NaN behavior, while direct projected-point and sign expressions avoid non-target _point_from_line3d, _projection_from_vector3d, and _projection_sign_from_vector3d COMDATs. January's embedded real_math.h assertion string and line prove that projection-sign logic was expanded in this caller even though no helper section exists in the target. Target and candidate both occupy 800 padded bytes and carry the same 22 ordered relocation identities; the candidate has 290 instructions versus January's 287 and objdiff reports 99.08602 percent similarity. The remaining aligned differences are a commutative y/z plane-distance evaluation order and the natural byte boolean's mov al/xor al sequence versus January's 32-bit mov eax/xor eax sequence; the latter shifts the final two call relocations three bytes earlier and leaves three bytes of alignment padding. The conservative unclassified label reflects that this is not instruction scheduling alone. No forced inline, shared-header edit, optimizer control, representation cast, assembly, fake dependency, undefined behavior, or nonsensical branch is retained. Reopen for authoritative January source or a natural type/helper context that accounts for the 32-bit boolean materialization without reintroducing non-target COMDATs or changing the protected January inline schedule.",
+      "measurements": {
+        "target": {
+          "size": 800,
+          "relocation_count": 22,
+          "normalized_sha256": "35304d9cd3dbf061092fc383fa53e18c78003d1c12cb9cddce7cf9b6e69381ed"
+        },
+        "base": {
+          "size": 800,
+          "relocation_count": 22,
+          "normalized_sha256": "f0b2e6723519920dcc3ca4060725b75b2b3fc3cd032e52595af3a6a9669ea008"
+        },
+        "objdiff_percent": 99.08602
+      }
     }
   ]
 }
