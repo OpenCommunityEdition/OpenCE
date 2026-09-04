@@ -99,11 +99,6 @@ struct structure_lens_flare_marker
 	byte lens_flare_index;
 };
 
-struct structure_surface
-{
-	word vertex_indices[3];
-};
-
 struct structure_cluster_lens_flare_data
 {
 	byte reserved[0x40];

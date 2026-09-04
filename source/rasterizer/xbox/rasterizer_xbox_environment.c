@@ -146,6 +146,8 @@ symbols in this file:
 #include "bitmaps/bitmaps_inlines.h"
 #include "math/periodic_functions.h"
 #include "math/real_math.h"
+#include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_environment.h"
 #include "rasterizer/common/rasterizer_common.h"
 #include "rasterizer/rasterizer_frame_statistics.h"
 #include "rasterizer/rasterizer_geometry.h"
@@ -178,15 +180,6 @@ enum
 
 enum
 {
-	_rasterizer_lightmap_mode_normal = 0,
-	_rasterizer_lightmap_mode_no_lightmap,
-	_rasterizer_lightmap_mode_fullbright,
-	_rasterizer_lightmap_mode_lightmap_bitmap,
-	_rasterizer_lightmap_mode_fullbright_without_bump,
-};
-
-enum
-{
 	_shader_environment_alpha_tested_bit = 0,
 	_shader_environment_bump_map_is_specular_mask_bit,
 	_shader_environment_true_atmospheric_fog_bit,
@@ -204,19 +197,6 @@ enum
 	_shader_type_environment = 3,
 	_shader_type_transparent_water = 7,
 	_rasterizer_statistics_mode_enabled = 2,
-};
-
-enum
-{
-	_rasterizer_profile_environment_lightmaps = 3,
-	_rasterizer_profile_environment_diffuse_lights = 5,
-	_rasterizer_profile_environment_textures = 8,
-	_rasterizer_profile_environment_specular_lights = 11,
-	_rasterizer_profile_environment_specular_lightmaps = 12,
-	_rasterizer_profile_environment_reflection_lightmap_masks = 13,
-	_rasterizer_profile_environment_reflection_mirrors = 14,
-	_rasterizer_profile_environment_reflections = 15,
-	_rasterizer_profile_environment_transparents = 16,
 };
 
 enum
@@ -270,12 +250,6 @@ struct rasterizer_environment_debug_options
 	boolean lightmap_filtering;
 	byte reserved36[0x7];
 	boolean environment_specular_mask_enabled;
-};
-
-struct rasterizer_environment_rasterizer_globals
-{
-	byte reserved0[0x60];
-	short lightmap_mode;
 };
 
 struct transparent_geometry_group
@@ -403,12 +377,6 @@ struct rasterizer_lights_globals
 	struct rasterizer_light_submit_parameters lights[128];
 };
 
-struct rasterizer_environment_frame_parameters
-{
-	real game_time_sec;
-	real dt;
-};
-
 struct shader_environment_diffuse_properties
 {
 	byte reserved00[0xA0];
@@ -508,11 +476,9 @@ static void rasterizer_environment_specular_spot_light_begin(
 /* ---------- globals */
 
 extern struct rasterizer_environment_debug_options rasterizer_debug_options;
-extern struct rasterizer_environment_rasterizer_globals rasterizer_globals;
 static struct rasterizer_environment_globals rasterizer_environment_globals;
 extern struct pixel_shader_definition pixel_shader;
 extern struct rasterizer_lights_globals rasterizer_lights;
-extern struct rasterizer_environment_frame_parameters global_frame_parameters;
 extern struct rasterizer_environment_frame_statistics rasterizer_frame_statistics;
 extern struct rasterizer_environment_window_parameters global_window_parameters;
 extern short specular_light_vertex_shader_permutation_index;

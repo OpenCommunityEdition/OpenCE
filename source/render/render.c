@@ -139,31 +139,13 @@ void lights_preprocess_scene(
 	void);
 void render_objects(
 	void);
-void structure_render_preprocess(
-	void);
-void structure_render_lightmaps(
-	void);
 void rasterizer_lens_flares_submit_occlusion_tests(
 	void);
 void render_object_shadows(
 	void);
 void lights_render_diffuse(
 	void);
-void structure_render_diffuse_texture(
-	void);
 void lights_render_specular(
-	void);
-void structure_render_specular_lightmaps(
-	void);
-void structure_render_reflection_lightmap_masks(
-	void);
-void structure_render_reflection_mirrors(
-	void);
-void structure_render_reflections(
-	void);
-void structure_render_transparent_geometry(
-	void);
-void structure_render_fog(
 	void);
 void weather_particle_systems_render(
 	void);
@@ -172,8 +154,6 @@ void particle_systems_render(
 void rasterizer_transparent_geometry_draw(
 	boolean water);
 void rasterizer_transparent_geometry_stop(
-	void);
-void structure_render_fog_screen(
 	void);
 void rasterizer_lens_flares_draw(
 	void);

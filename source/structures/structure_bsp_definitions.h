@@ -39,6 +39,14 @@ struct structure_leaf
 	long first_surface_reference_index;
 };
 
+struct structure_surface
+{
+	word vertex_indices[NUMBER_OF_VERTICES_PER_TRIANGLE];
+};
+
+typedef char structure_surface_size_assert[
+	sizeof(struct structure_surface) == 0x6 ? 1 : -1];
+
 struct structure_material
 {
 	struct tag_reference shader;

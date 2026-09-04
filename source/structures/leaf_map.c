@@ -157,19 +157,10 @@ struct map_leaf
 	struct tag_block portal_designators;		// long
 };
 
-struct leaf_portal
-{
-	long plane_index;
-	long leaf_indices[2];
-	struct tag_block vertices;			// real_point3d
-};
-
 typedef char map_leaf_face_size_assert[
 	sizeof(struct map_leaf_face) == 0x10 ? 1 : -1];
 typedef char map_leaf_size_assert[
 	sizeof(struct map_leaf) == 0x18 ? 1 : -1];
-typedef char leaf_portal_size_assert[
-	sizeof(struct leaf_portal) == 0x18 ? 1 : -1];
 
 /* ---------- prototypes */
 

@@ -288,12 +288,6 @@ boolean rasterizer_environment_shadow_begin(
 	real *shadow_bounding_radius);
 void rasterizer_environment_shadow_end(
 	void);
-void structure_render_shadow(
-	real_point3d const *center,
-	real radius,
-	real_rectangle3d const *bounding_box,
-	short bounding_plane_count,
-	real_plane3d const *bounding_planes);
 boolean editor_preprocess_rendered_object(
 	long object_index,
 	struct render_lighting const *lighting);
