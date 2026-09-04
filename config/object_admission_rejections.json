@@ -16,6 +16,22 @@
       "reason": "The target and rebuilt objects both contain 136 zero-filled BSS bytes, but the four semantic default_render_model symbols have different section-relative offsets; byte-only data accounting therefore cannot prove equivalent ownership or final linked addresses.",
       "evidence": "docs/object_matching_logs/models_obj_fable_salvage_20260902.md#bss-ownership-boundary",
       "reopen": "Remove this rejection only after authoritative January ownership evidence or natural source makes all four BSS symbol offsets and linkage agree without aggregate facades, hash-steering names, custom sections, or other matching-only constructs."
+    },
+    {
+      "unit": "source/units/units",
+      "class": "candidate-only-comdat-owner",
+      "symbol": "_point_from_line3d",
+      "reason": "The rebuilt translation unit emits a 48-byte select-any _point_from_line3d COMDAT absent from the January units split, while January's selected action_charge owner is no-duplicates. All 189 January units functions remain strict exact, including the two authentic external calls from _unit_cause_continuous_melee_damage; the surplus owner is a separate whole-object admission failure under the explicit no-emission house rule.",
+      "evidence": "docs/object_matching_logs/shared_inline_helper_admission_audit_20260904.md#units-point_from_line3d-owner",
+      "reopen": "Remove only after source-authentic header/declaration topology preserves all 189 exact target functions and the two January external calls while preventing units.obj from emitting _point_from_line3d. Linker discard alone does not waive the explicit no-emission house rule; do not expand the two external calls or use forced inline/noinline, pragmas, assembly, or byte-shaping."
+    },
+    {
+      "unit": "source/physics/collision_features",
+      "class": "candidate-only-comdat-owner",
+      "symbol": "_projection_from_vector3d",
+      "reason": "All 20 target-owned functions compare strict exact, but the rebuilt translation unit also emits an 80-byte _projection_from_vector3d COMDAT absent from its January split. That surplus body reverses the x/y dominant-axis choice and differs from January's selected decals owner; exact external callers do not establish correct helper code or ownership.",
+      "evidence": "docs/object_matching_logs/shared_inline_helper_admission_audit_20260904.md#collision-features-projection-owner",
+      "reopen": "Correct the shared helper from January evidence, preserve inherited target-function matches across all header consumers, and establish authentic compatible ownership through ordinary source topology and link verification. Do not invent a helper owner, force emission, or credit the decals-owned 80 bytes from a candidate-only copy."
     }
   ]
 }

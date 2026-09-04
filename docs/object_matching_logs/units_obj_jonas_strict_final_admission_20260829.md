@@ -2,8 +2,10 @@
 
 ## Result
 
-The integrated `source/units/units.c` reconstruction is complete under the
-campaign's hardened COFF comparator:
+All target-owned functions and runtime-data owners in the integrated
+`source/units/units.c` reconstruction are exact under the hardened COFF
+comparator. Whole-object admission is rejected after the later complete-symbol
+audit identified a candidate-only helper; this does not debit the census below.
 
 | Census | Exact | Nonexact | Absent | Bytes | Relocations |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -56,8 +58,19 @@ strict-equal after relocation normalization. Temporarily changing the unit to
 `Matching` makes the repository admission audit correctly fail closed and
 report that contradiction. Therefore `config/config.json` remains
 `NonMatching`; no raw-comparator exception is introduced merely to force a
-completion label. The hardened 189/129 census above is the acceptance
-authority for this integrated reconstruction.
+completion label. The hardened 189/129 census above proves target-owner
+accounting, not the absence of surplus candidate sections.
+
+## Candidate-only helper correction (2026-09-04)
+
+The original closeout omitted candidate-only code inventory. Rebuilt Units
+also emits a 48-byte `_point_from_line3d` COMDAT absent from its January split.
+January genuinely calls that shared helper twice, and the copy is identical
+to the selected `action_charge` body; the calls must not be replaced merely
+to suppress the copy. Nevertheless, this violates the user's explicit
+no-emitted-COMDAT rule and is now recorded as a whole-object admission veto.
+This is an inherited accounting defect, not a newly lost function or byte.
+See [the complete ownership audit](shared_inline_helper_admission_audit_20260904.md#units-point_from_line3d-owner).
 
 ## Repository validation
 

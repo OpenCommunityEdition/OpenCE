@@ -128,3 +128,90 @@ summary. On discovery, freeze and inspect the donor read-only, inventory every
 touched object and tool, recover any uncommitted scratch evidence, and
 reconcile only net-new functions against the then-current canonical tree. Do
 not credit or discard the run based on the interrupted status alone.
+
+### Published checkpoint after scripted music (`fe1da9234`)
+
+Canonical and both `bnunu/halo` publication branches contain 889,854 / 2,198,102
+meaningful matched code bytes and 6,100 / 11,060 credited functions. These are
+current admitted totals, not the donor union. Earlier byte counts and candidate
+pools in this document are historical checkpoints; they must not be subtracted
+from this total to estimate a current unreconciled backlog.
+
+The sound lifecycle and impulse/foley packets, followed by the three scripted
+music functions, are now admitted. `game_sound.obj` is 26 exact / 0 residual /
+5 unwritten. The canonical full build and rename-stable sweep report zero
+regressions; `units.obj` remains 189/189 exact; all 235 parks validate; all 284
+tool tests pass. Both protected bitmap hashes are unchanged.
+
+The next PAS helpers cannot be credited independently: VC7 discards their
+unreferenced static definitions until the genuine game-sound update caller is
+reconstructed. That caller cluster requires owning API corrections, including
+the January frame argument and the sound-environment pointer output. It is
+being reconciled in isolation, not forced into emission with fake references
+or changed linkage. The collision-sphere packet likewise remains outside
+canonical while its unintended helper definitions and residual-source quality
+are corrected and independently reviewed. Neither packet is included in the
+published total above.
+
+The separately reported newer interrupted Opus run is still pending intake;
+no new worktree/ref was found in the latest read-only census. Preserve the
+existing frozen donor and do not count its already-adjudicated twelve dirty
+translation units a second time.
+
+### Collision admission and preserved PAS blocker (`119868d4b`)
+
+The corrected collision-sphere reconstruction is now canonical: one strict
+function / 44 meaningful bytes, plus three honest fuzzy bodies. Its complete
+emitted-symbol audit removes all five packet-induced non-target helpers.
+Canonical reaches 889,898 meaningful matched code bytes and 6,101 credited
+functions with zero exact regressions; all 238 parks and 284 tests pass.
+
+The PAS caller cluster is preserved only in the isolated sound lane as
+`9d60117aa`. Its correct owner-header declaration of `game_sound_update(real
+dt)` changes `units::_unit_preprocess_node_orientations` from exact to residual;
+the draft's 112 padded candidate bytes are therefore not admitted. Keep its
+complete source and evidence rather than suppressing the prototype, inventing
+references, or overwriting canonical Units to collect a nominal gain.
+
+The new complete-symbol guard also found an inherited Units ownership issue:
+its 189 target functions remain strict exact, but it emits a 48-byte
+`point_from_line3d` COMDAT absent from the split Units target. January does
+genuinely call that shared helper twice, and the candidate copy matches the
+selected `action_charge` implementation. Do not replace those authentic calls
+with arithmetic or silently waive the user's no-COMDAT rule. Whole-object
+approval is being audited separately from the valid target-function bytes.
+
+### Publication-ready shared-helper accounting checkpoint
+
+Canonical remains at 889,898 / 2,198,102 meaningful matched code bytes and
+6,101 / 11,060 credited functions. The full build passes; the stable sweep
+against the published scripted-music checkpoint shows one collision gain
+(48 padded / 44 meaningful bytes) and zero exact regressions. All 238 parks
+validate, all 284 tool tests pass, and the protected bitmap hashes are unchanged.
+
+Units retains all 189 exact target functions but now has an explicit
+candidate-only helper ownership veto. Collision Features likewise retains all
+20 exact target functions but is changed from `Matching` to `NonMatching`
+because its surplus projection helper has incorrect dominant-axis behavior.
+This corrects the linked-object count from 391 to 390 without deleting any
+source or subtracting valid function bytes. The canonical treemap preserves
+both 100% function-byte readings while withholding whole-object approval.
+The detailed evidence is in
+`docs/object_matching_logs/shared_inline_helper_admission_audit_20260904.md`.
+
+The natural shared-header projection correction is also preserved outside
+canonical as local-only commit `9633a0b4c` in the
+`agent/collision-bsp-sphere-cluster-20260904` lane. Focused
+gates preserved Units and closed the 176-padded-byte Leaf Map function, but
+the full dependent-unit build regressed
+`decals::_decals_delete_permanent_from_cluster` and
+`game_engine::_populate_statistic_buffer` and invalidated the active
+`bitmap_group::_bitmap_group_add_bitmap` park. Do not import that header or
+refresh the affected park to conceal the failure. Its complete source and
+before/after evidence remain available for a source-authentic reconciliation.
+
+The PAS draft remains locally committed as `9d60117aa`, with authenticated
+Units shared-helper evidence recorded in `e1eb62f05`. Neither draft contributes
+to the published byte total, and neither is lost. The separately reported
+newer interrupted Opus run still needs a worktree path, branch, commit, patch,
+or handoff before its distinct unreconciled bytes can be measured.
