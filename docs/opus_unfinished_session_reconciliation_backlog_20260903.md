@@ -58,3 +58,34 @@ Do not re-open the already adjudicated widget, transparent-geometry, screen-effe
 ## Fable disposition
 
 The prior Fable backlog is fully audited. `fable/small-families-20260901` is already canonical ancestry. The 25 functions present only on `fable/exact-finish-20260829` (10,272 padded bytes) are all previously documented semantic rejects or honest residuals; there is no forgotten Fable bulk packet to import.
+
+## Canonical reconciliation checkpoint (2026-09-04)
+
+The interrupted Opus state remains frozen and read-only at the path and tip
+above.  The following object packets have now been selectively replayed,
+house-rule audited, rebuilt, swept against rename-stable whole-tree snapshots,
+and committed to canonical with zero strict regressions:
+
+- cache decompression worker: `933b9df1d`;
+- render-debug geometry: `87fbeb758`;
+- profile timers/render texture: `43bc9e074`;
+- first-person weapons: `6d351b357`;
+- network client: `7d74519b1`, with accounting corrections `c2a08e0e9`
+  and `99a8e4735`;
+- network server message handler: `10e330359`;
+- saved-game files: `1c834b12f`.
+
+The current admitted tree contains 871,741 / 2,198,102 meaningful matched code
+bytes, 6,021 / 11,060 credited functions, 2,015,906 matched data bytes, and
+391 / 833 linked objects.  The remaining interrupted-session work is still a
+candidate pool rather than presumed progress.
+
+Active isolated reconciliations are `effects.obj`, the dirty
+`network_server_manager.obj` packet, and the dirty `encounters.obj` leaf.  Once
+those finish, continue the object-by-object queue in the order above, skipping
+anything already admitted and preserving every remaining dirty donor file and
+scratch artifact until its owning object has an explicit admit/park/reject
+ledger.  A completed-looking donor report is never sufficient by itself: each
+packet still needs current-canonical compilation, stable whole-tree comparison,
+semantic and ownership audits, park validation, fake-match review, tooling
+tests, the `units.obj` sentinel, and the January COMDAT check.
