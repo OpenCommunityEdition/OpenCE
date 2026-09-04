@@ -27,7 +27,7 @@ symbols in this file:
 0011B9B0 0060:
 	_network_game_server_game_is_valid (0000)
 0011BA10 00d0:
-	_code_0011ba10 (0000)
+	_network_game_server_send_player_quit_messages_ingame (0000)
 0011BAE0 00e0:
 	_network_game_server_start_network_game (0000)
 0011BBC0 00a0:
@@ -117,7 +117,7 @@ symbols in this file:
 0011D470 00d0:
 	_code_0011d470 (0000)
 0011D540 0030:
-	_code_0011d540 (0000)
+	_network_game_server_get_client_machine_count (0000)
 0011D570 0100:
 	_code_0011d570 (0000)
 0011D670 0130:
@@ -453,6 +453,7 @@ symbols in this file:
 #include "cseries.h"
 #include "bungie_net/network/transport.h"
 #include "cseries/cseries_windows.h"
+#include "game/game.h"
 #include "game/game_engine_runtime.h"
 #include "game/player_queues_new.h"
 #include "game/players.h"
@@ -483,6 +484,7 @@ enum
 	NETWORK_PLAYER_NAME_LENGTH = 12,
 	MAXIMUM_MACHINE_NAME_LENGTH = 32,
 	NUMBER_OF_MULTIPLAYER_TEAMS = 2,
+	NETWORK_GAME_PLAYER_QUIT_DELAY = 33,
 	NETWORK_GAME_CLIENT_STALL_TIMEOUT = 2000,
 	MAXIMUM_PLAYERS_PER_MACHINE = MAXIMUM_LOCAL_PLAYERS,
 	PLAYER_UPDATE_SIZE = 0x20,
@@ -540,6 +542,17 @@ struct countdown_timer
 struct message_server_game_over
 {
 	long unused;
+};
+
+struct message_server_begin_game
+{
+	long unused;
+};
+
+struct message_server_remove_player_ingame
+{
+	struct network_player player;
+	long reason;
 };
 
 struct message_server_graceful_game_exit_pregame
@@ -646,7 +659,8 @@ struct network_game_server
 	struct network_game_server_countdown_state countdown_state;
 	struct network_player queued_player;
 	boolean queued_player_valid;
-	byte padding4B9[3];
+	boolean network_game_started;
+	byte padding4BA[2];
 };
 
 typedef char network_game_players_offset_assert[
@@ -843,6 +857,87 @@ void network_game_server_close_game(
 	SET_FLAG(server->flags, _network_game_server_game_open_bit, FALSE);
 	network_server_allow_client_connections(server->connection, FALSE);
 	network_event("closing game");
+
+	return;
+}
+
+boolean network_game_server_start_network_game(
+	struct network_game_server *server)
+{
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x2DE, server);
+
+	if (!server->network_game_started)
+	{
+		struct network_game game_settings;
+		struct message_server_begin_game begin_game = { 0 };
+		void *message;
+
+		csmemcpy(&game_settings, &server->game, sizeof(game_settings));
+		message = create_network_game_message(
+			_message_server_game_settings_update,
+			&game_settings,
+			sizeof(game_settings));
+		if (message && network_game_server_send_message_to_all_machines(server, message))
+		{
+			message = create_network_game_message(
+				_message_server_begin_game,
+				&begin_game,
+				sizeof(begin_game));
+			if (message && network_game_server_send_message_to_all_machines(server, message))
+			{
+				network_event("signalling client machines to begin loading for network game");
+				server->next_update_number = 0;
+				server->network_game_started = TRUE;
+				return TRUE;
+			}
+		}
+
+		network_event("failed to signal client machines to begin loading for network game");
+	}
+
+	server->next_update_number = 0;
+
+	return TRUE;
+}
+
+void network_game_server_send_player_quit_messages_ingame(
+	struct network_game_server *server,
+	struct network_game_server_client_machine *machine)
+{
+	long player_index;
+
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x267,
+		_network_game_server_state_ingame == server->state);
+
+	for (player_index = 0;
+		player_index < MAXIMUM_NETWORK_PLAYER_COUNT;
+		player_index++)
+	{
+		struct network_player *player = &server->game.players[player_index];
+
+		if (network_player_is_valid(player) &&
+			player->machine_index == machine->machine_index)
+		{
+			struct message_server_remove_player_ingame remove_player;
+			void *message;
+
+			remove_player.player = *player;
+			remove_player.reason = game_time_get() + NETWORK_GAME_PLAYER_QUIT_DELAY;
+
+			error(2, "sending quit out of game, time = %x", remove_player.reason);
+
+			message = create_network_game_message(
+				_message_server_remove_player_ingame,
+				&remove_player,
+				sizeof(remove_player));
+			if (message &&
+				!network_game_server_send_message_to_all_machines(server, message))
+			{
+				network_event(
+					"network_game_server_send_message_to_all_machines() failed in network_game_server_handle_message_client_remove_player_request_ingame()");
+			}
+		}
+	}
 
 	return;
 }

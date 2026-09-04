@@ -4083,6 +4083,25 @@
     },
     {
       "unit": "source/networking/network_server_manager",
+      "function": "_network_game_server_start_network_game",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed game-start message sequence from January's instruction and relocation topology and corroborating it against the frozen Opus donor and the independent Stian PC lift. The retained function validates the server, skips an already-started game, copies the typed network game into the settings payload, broadcasts the settings and begin-game messages in order, records the start state, resets the update number on every exit path, and preserves January's intentionally TRUE result. January occupies 224 padded bytes with 13 relocations; the natural VC7 candidate occupies 240 with the same 13 relocation identities and scores 87.44 percent in objdiff. The residual is a compiler allocation fixed point: January keeps a shared zero in EBX, reuses the dead incoming-parameter slot for the four-byte begin-game payload, and orders the adjacent final stores differently, while ordinary block-scope and initialization-lifetime spellings retain the same coherent 240-byte form or worsen it. No false linkage or prototype, forced inline/noinline, volatile/register forcing, barrier, pragma, assembly, raw offset, fake dependency, undefined behavior, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler context explaining the saved-zero allocation.",
+      "measurements": {
+        "target": {
+          "size": 224,
+          "relocation_count": 13,
+          "normalized_sha256": "b5b6ecc62e0eff77aeab7b5ca8f40326d7cd7486a5d2ca7ca092e9e9d6967f39"
+        },
+        "base": {
+          "size": 240,
+          "relocation_count": 13,
+          "normalized_sha256": "4fdad9f5a67f8ddb8839f712a0173d6df2fc175a957e7b907e3ce620c5816c48"
+        },
+        "objdiff_percent": 87.44
+      }
+    },
+    {
+      "unit": "source/networking/network_server_manager",
       "function": "_network_game_server_update_countdown",
       "class": "unclassified",
       "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed countdown state machine from January's message events, server state, millisecond timing, game-start status, client-loading gates, transition calls, and all ordinary branches. January occupies 480 padded bytes with 21 relocations; the closest natural VC7 candidate occupies 496 with 20 at 72.8 percent objdiff similarity. The residual is a compiler register/allocation and call-scheduling choice: January retains one additional system_milliseconds call/relocation and pins the zero/event temporaries in different saved registers, while natural short/long parameter spellings and helper placement either select the retained 496-byte form or a worse out-of-line-helper form. The classifier found no defensible known mechanism. No forced inline or noinline, false linkage/type/prototype, raw offset, volatile/register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, or nonsensical branch is retained. Reopen for authoritative January source/local records or a natural same-compiler TU context that explains the extra timing call and register schedule.",
