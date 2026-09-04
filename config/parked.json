@@ -4251,6 +4251,25 @@
         },
         "objdiff_percent": 95.47282
       }
+    },
+    {
+      "unit": "source/physics/collision_bsp",
+      "function": "_collision_surface_find_closest_point2d",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked under the current house rule after reopening the documented first-shot rejection on the January-authenticated opposite dot-product predicate. The retained ordinary typed C follows the independent HCEA circular oriented-edge walk while January's COFF fixes the tag-block lookup topology, three project_point3d calls, dot < 0.0f branch orientation, zero constants, and wrap-corner flow. It also corrects the public prototype from a point pointer to boolean, consistent with the function's inside/outside result and its caller. Target and candidate both occupy 560 padded bytes, have 555 meaningful bytes, and carry the same 11 ordered relocation identities; objdiff reports 98.81739 percent similarity. The remaining differences are confined to commutative x87 operand scheduling in the projection math and a destructive multiply/store choice in point_from_line2d's naturally inlined second coordinate, which shifts the final three relocation addresses four bytes earlier without changing their identities. Bounded natural variants covering initial flag lifetime, nested control flow, point/edge-vector assignment order, dot-product operand order, manual equivalent expressions, and length-squared scope either worsened the envelope or returned to this fixed point. No raw offset, false type or prototype, representation pun, volatile/register forcing, barrier, pragma, assembly, fake dependency, forced inline, undefined behavior, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler helper/TU context that resolves the x87 scheduling tie without altering the authenticated January inline schedule.",
+      "measurements": {
+        "target": {
+          "size": 560,
+          "relocation_count": 11,
+          "normalized_sha256": "c61b255f98ff4e2265d41eed79757db722c37a9d62db50b20142d839be363d6a"
+        },
+        "base": {
+          "size": 560,
+          "relocation_count": 11,
+          "normalized_sha256": "044384f284562918f8e9709fa15d8ce1b435047fac8d46ddb75bfc2779d2ab43"
+        },
+        "objdiff_percent": 98.81739
+      }
     }
   ]
 }

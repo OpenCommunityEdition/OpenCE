@@ -110,7 +110,7 @@ real_point3d *collision_surface_project_point2d(
 	boolean sign,
 	real_point2d const *point,
 	real_point3d *result);
-real_point2d *collision_surface_find_closest_point2d(
+boolean collision_surface_find_closest_point2d(
 	struct collision_bsp const *bsp,
 	long surface_index,
 	short projection,

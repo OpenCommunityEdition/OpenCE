@@ -604,6 +604,126 @@ boolean collision_surface_test_point2d(
 	return TRUE;
 }
 
+boolean collision_surface_find_closest_point2d(
+	struct collision_bsp const *bsp,
+	long surface_index,
+	short projection,
+	boolean sign,
+	real_point2d const *point,
+	real_point2d *result)
+{
+	struct collision_surface const *surface = TAG_BLOCK_GET_ELEMENT(
+		&bsp->surfaces,
+		surface_index,
+		struct collision_surface);
+	long first_edge_index = surface->first_edge_index;
+	long edge_index = first_edge_index;
+	boolean previous_before;
+	boolean previous_after;
+	boolean first_before;
+	boolean first_after;
+	boolean before;
+	boolean after;
+
+	do
+	{
+		struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(
+			&bsp->edges,
+			edge_index,
+			struct collision_edge);
+		boolean reverse = edge->surface_indices[1] == surface_index;
+		struct collision_vertex const *origin = TAG_BLOCK_GET_ELEMENT(
+			&bsp->vertices,
+			edge->vertex_indices[reverse],
+			struct collision_vertex);
+		struct collision_vertex const *target = TAG_BLOCK_GET_ELEMENT(
+			&bsp->vertices,
+			edge->vertex_indices[!reverse],
+			struct collision_vertex);
+		real_point2d origin2d;
+		real_point2d target2d;
+		real_vector2d edge_vector;
+		real_vector2d point_vector;
+		real dot;
+
+		before = FALSE;
+		after = FALSE;
+		project_point3d(&origin->point, projection, sign, &origin2d);
+		project_point3d(&target->point, projection, sign, &target2d);
+		point_vector.i = point->x-origin2d.x;
+		point_vector.j = point->y-origin2d.y;
+		edge_vector.i = target2d.x-origin2d.x;
+		edge_vector.j = target2d.y-origin2d.y;
+
+		if (edge_vector.j*point_vector.i-edge_vector.i*point_vector.j > 0.f)
+		{
+			dot = dot_product2d(&point_vector, &edge_vector);
+			if (dot < 0.f)
+			{
+				before = TRUE;
+			}
+			else
+			{
+				real length_squared = magnitude_squared2d(&edge_vector);
+
+				if (dot > length_squared)
+				{
+					after = TRUE;
+				}
+				else
+				{
+					point_from_line2d(
+						&origin2d,
+						&edge_vector,
+						dot/length_squared,
+						result);
+					return FALSE;
+				}
+			}
+		}
+
+		if (edge_index != first_edge_index)
+		{
+			if ((previous_after && (before || !after)) ||
+				(before && (previous_after || !previous_before)))
+			{
+				*result = origin2d;
+				return FALSE;
+			}
+		}
+		else
+		{
+			first_before = before;
+			first_after = after;
+		}
+
+		previous_before = before;
+		previous_after = after;
+		edge_index = edge->edge_indices[reverse];
+	}
+	while (edge_index != first_edge_index);
+
+	if ((after && (first_before || !first_after)) ||
+		(first_before && (after || !before)))
+	{
+		struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(
+			&bsp->edges,
+			edge_index,
+			struct collision_edge);
+		boolean reverse = edge->surface_indices[1] == surface_index;
+		struct collision_vertex const *origin = TAG_BLOCK_GET_ELEMENT(
+			&bsp->vertices,
+			edge->vertex_indices[reverse],
+			struct collision_vertex);
+
+		project_point3d(&origin->point, projection, sign, result);
+		return FALSE;
+	}
+
+	*result = *point;
+	return TRUE;
+}
+
 boolean collision_surface_test_line2d(
 	struct collision_bsp const *bsp,
 	long surface_index,
