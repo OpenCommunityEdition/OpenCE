@@ -117,3 +117,14 @@ This does not close the user's newly reported interrupted run. Keep it as a
 pending intake item until its exact worktree path, branch/ref, or commit hash
 appears. Freeze that location before any build or edit, compare it against
 canonical by function-section identity, and admit only verified net-new gains.
+
+#### Latest Opus continuation still awaiting handoff
+
+The user reconfirmed on 2026-09-04 that a newer Opus prompt made substantial
+progress but exhausted its token budget just before completion. Preserve this
+as an open intake item, separate from the already-audited historical donor,
+until Opus supplies a branch, commit, worktree path, patch, or final session
+summary. On discovery, freeze and inspect the donor read-only, inventory every
+touched object and tool, recover any uncommitted scratch evidence, and
+reconcile only net-new functions against the then-current canonical tree. Do
+not credit or discard the run based on the interrupted status alone.
