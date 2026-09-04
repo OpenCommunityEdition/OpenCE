@@ -131,6 +131,7 @@ symbols in this file:
 #include "cseries.h"
 #include "render/render_cameras.h"
 #include "render/render_camera_projection.h"
+#include "render/render_cameras_internal.h"
 
 /* ---------- constants */
 
@@ -226,6 +227,22 @@ boolean render_camera_world_to_screen(
 		frustum,
 		&view_point,
 		screen_point);
+}
+
+real render_frustum_sphere_diameter_in_pixels(
+	const struct render_frustum *frustum,
+	const real_point3d *point,
+	real radius)
+{
+	real depth =
+		frustum->world_to_view.up.k * point->z +
+		frustum->world_to_view.left.k * point->y +
+		frustum->world_to_view.forward.k * point->x +
+		frustum->world_to_view.position.z;
+	real absolute_depth = ABS(depth);
+	real clamped_depth = MAX(absolute_depth, 0.1f);
+
+	return (frustum->projection_world_to_screen.j / clamped_depth) * radius * 2.0f;
 }
 
 /* ---------- private code */
