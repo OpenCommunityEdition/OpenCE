@@ -101,7 +101,17 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#ifndef _X86_
+#define _X86_
+#endif
+#include <excpt.h>
+#include <windef.h>
+#include <winbase.h>
+#include <xbox.h>
+
+#include "input/HaloAutoTest.h"
 #include "input.h"
+#include "interface/player_ui.h"
 
 /* ---------- constants */
 
@@ -119,12 +129,16 @@ struct input_globals
 	unsigned char reserved0[0x138];
 	boolean suppressed;
 	unsigned char reserved1[3];
-	void *gamepad_handles[MAXIMUM_GAMEPADS];
+	HANDLE gamepad_handles[MAXIMUM_GAMEPADS];
 	struct gamepad_state gamepad_states[MAXIMUM_GAMEPADS];
 	struct gamepad_state suppressed_gamepad_state;
-	unsigned char reserved2[0x19];
+	struct vibrate_data gamepad_rumbler_states[MAXIMUM_GAMEPADS];
+	unsigned char reserved2[4];
+	HANDLE update_event_handle;
+	boolean update_event_pending;
 	boolean frame_active;
-	unsigned char reserved3[0xA];
+	unsigned char reserved3[6];
+	HANDLE keyboard_handle;
 	byte key_ticks[NUMBER_OF_KEYS];
 	byte key_latches[NUMBER_OF_KEYS];
 	short buffered_key_read_index;
@@ -140,8 +154,16 @@ typedef char verify_input_gamepad_states_offset[
 	offsetof(struct input_globals, gamepad_states) == 0x14C ? 1 : -1];
 typedef char verify_input_suppressed_gamepad_state_offset[
 	offsetof(struct input_globals, suppressed_gamepad_state) == 0x1EC ? 1 : -1];
+typedef char verify_input_gamepad_rumbler_states_offset[
+	offsetof(struct input_globals, gamepad_rumbler_states) == 0x214 ? 1 : -1];
+typedef char verify_input_update_event_handle_offset[
+	offsetof(struct input_globals, update_event_handle) == 0x228 ? 1 : -1];
+typedef char verify_input_update_event_pending_offset[
+	offsetof(struct input_globals, update_event_pending) == 0x22C ? 1 : -1];
 typedef char verify_input_frame_active_offset[
 	offsetof(struct input_globals, frame_active) == 0x22D ? 1 : -1];
+typedef char verify_input_keyboard_handle_offset[
+	offsetof(struct input_globals, keyboard_handle) == 0x234 ? 1 : -1];
 typedef char verify_input_key_ticks_offset[
 	offsetof(struct input_globals, key_ticks) == 0x238 ? 1 : -1];
 typedef char verify_input_key_latches_offset[
@@ -238,6 +260,30 @@ void input_deactivate(
 	return;
 }
 
+void input_dispose(
+	void)
+{
+	short gamepad_index;
+
+	HATCleanup();
+	if (input_globals.keyboard_handle != NULL)
+	{
+		XInputClose(input_globals.keyboard_handle);
+		input_globals.keyboard_handle = NULL;
+	}
+
+	for (gamepad_index = 0; gamepad_index < MAXIMUM_GAMEPADS; gamepad_index++)
+	{
+		if (input_globals.gamepad_handles[gamepad_index] != NULL)
+		{
+			XInputClose(input_globals.gamepad_handles[gamepad_index]);
+			input_globals.gamepad_handles[gamepad_index] = NULL;
+		}
+	}
+
+	return;
+}
+
 void input_flush(
 	void)
 {
@@ -304,6 +350,38 @@ const struct gamepad_state *input_get_gamepad_state(
 	}
 
 	return result;
+}
+
+void input_set_gamepad_rumbler_state(
+	short gamepad_index,
+	word left_speed,
+	word right_speed)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\input\\input_xbox.c",
+		0x198,
+		gamepad_index>=0 && gamepad_index<MAXIMUM_GAMEPADS);
+
+	if (!player_ui_rumble_disabled(gamepad_index))
+	{
+		input_globals.gamepad_rumbler_states[gamepad_index].left_frequency = left_speed;
+		input_globals.gamepad_rumbler_states[gamepad_index].right_frequency = right_speed;
+	}
+
+	return;
+}
+
+void input_vertical_blank_interrupt(
+	void)
+{
+	if (input_globals.update_event_pending)
+	{
+		SetEvent(input_globals.update_event_handle);
+	}
+
+	input_globals.update_event_pending = !input_globals.update_event_pending;
+
+	return;
 }
 
 void input_frame_end(

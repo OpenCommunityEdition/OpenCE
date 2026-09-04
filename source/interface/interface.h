@@ -41,6 +41,10 @@ union real_rectangle2d;
 
 /* ---------- prototypes/INTERFACE.C */
 
+void interface_initialize(
+	void);
+void interface_initialize_for_new_map(
+	void);
 long interface_get_tag_index(short interface_tag_index);
 void interface_set_bitmap_text_draw_mode(
 	short interface_font_index,

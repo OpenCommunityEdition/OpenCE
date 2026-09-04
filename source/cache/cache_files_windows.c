@@ -208,14 +208,6 @@ enum
 	MULTIPLAYER_CACHE_FILE_MAXIMUM_SIZE = 0x02F00000,
 };
 
-enum cached_map_file_precache_state
-{
-	_cached_map_file_in_progress,
-	_cached_map_file_success,
-	_cached_map_file_failed,
-	NUMBER_OF_CACHED_MAP_FILE_PRECACHE_STATES,
-};
-
 /* ---------- macros */
 
 #define CACHE_FILE_BUILD_STRING "01.01.14.2342"

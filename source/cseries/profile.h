@@ -86,7 +86,12 @@ typedef char profile_section_field_5F0_offset_assert[
 
 /* ---------- prototypes/PROFILE.C */
 
-void profile_initialize(void);
+void profile_initialize(
+	void);
+void profile_tick_start(
+	void);
+void profile_tick_end(
+	void);
 
 void profile_enter_private(struct profile_section *objects_update_section);
 void profile_exit_private(struct profile_section *objects_update_section);

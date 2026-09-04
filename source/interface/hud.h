@@ -16,6 +16,8 @@ header included in hcex build.
 
 /* ---------- prototypes/HUD.C */
 
+void hud_update(
+	void);
 void hud_initialize_for_new_map(
 	void);
 void hud_initialize_nav_points(

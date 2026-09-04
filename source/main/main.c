@@ -342,6 +342,7 @@ symbols in this file:
 #include "game/player_control.h"
 #include "game/player_control_runtime.h"
 #include "game/players.h"
+#include "game/player_queues_new.h"
 #include "integer_math.h"
 #include "main/main_runtime.h"
 #include "input.h"
@@ -929,8 +930,6 @@ void main_menu_unload(
 }
 
 extern void update_server_delete(
-	void);
-extern void update_server_new(
 	void);
 extern void update_server_start(
 	void);

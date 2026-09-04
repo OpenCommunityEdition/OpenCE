@@ -190,6 +190,8 @@ void player_control_unzoom(long unit_index);
 
 void players_initialize(
 	void);
+void players_initialize_for_new_map(
+	void);
 
 long player_new(
 	long machine_index,

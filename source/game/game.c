@@ -123,18 +123,62 @@ struct game_options;
 #include "game/game.h"
 #undef set_random_seed
 #include "ai/ai.h"
+#include "bink/bink_playback.h"
+#include "bungie_net/network/transport.h"
 #include "cache/cache_files.h"
+#include "camera/director.h"
+#include "camera/observer.h"
 #include "cseries/errors.h"
+#include "cseries/profile.h"
+#include "cutscene/cinematics.h"
+#include "cutscene/recorded_animations.h"
+#include "editor/editor_stubs.h"
+#include "effects/contrails.h"
+#include "effects/decals.h"
 #include "effects/effects.h"
+#include "effects/particle_systems.h"
+#include "effects/particles.h"
+#include "effects/player_effects.h"
+#include "effects/weather_particle_systems.h"
+#include "game/cheats.h"
+#include "game/game_allegiance.h"
 #include "game/game_engine.h"
+#include "game/game_engine_runtime.h"
+#include "game/player_control.h"
+#include "game/player_queues_new.h"
+#include "game/player_rumble.h"
 #include "game/players.h"
+#include "hs/hs.h"
+#include "input/input_abstraction.h"
+#include "interface/event_manager.h"
+#include "interface/first_person_weapons.h"
+#include "interface/hud.h"
+#include "interface/interface.h"
+#include "interface/player_ui.h"
+#include "interface/progress_bar.h"
 #include "interface/ui_widget.h"
 #include "items/items.h"
 #include "items/projectiles.h"
 #include "main/main.h"
+#include "main/console.h"
 #include "math/random_math.h"
+#include "math/real_math.h"
 #include "memory/data.h"
+#include "networking/network_messages.h"
+#include "networking/telnet_console.h"
+#include "objects/objects.h"
+#include "physics/breakable_surfaces.h"
+#include "physics/collision_usage.h"
+#include "physics/point_physics.h"
+#include "rasterizer/rasterizer.h"
+#include "render/render.h"
+#include "saved games/game_state.h"
+#include "saved games/saved_game_files.h"
 #include "scenario/scenario.h"
+#include "sound/game_sound.h"
+#include "sound/sound_classes.h"
+#include "sound/sound_manager.h"
+#include "structures/structures.h"
 #include "units/units.h"
 
 /* ---------- constants */
@@ -207,8 +251,6 @@ void rumble_dispose(
 void game_sound_dispose(
 	void);
 void sound_classes_dispose(
-	void);
-void game_engine_dispose(
 	void);
 void particle_systems_dispose(
 	void);
@@ -317,10 +359,6 @@ void game_engine_dispose_from_old_map(
 	void);
 void scenario_dispose_from_old_map(
 	void);
-void collision_log_begin_period(
-	short period);
-void collision_log_end_period(
-	void);
 void particles_update(
 	real dt);
 void contrails_update(
@@ -340,12 +378,67 @@ void numeric_countdown_timer_update(
 
 /* ---------- globals */
 
-extern struct game_runtime_globals_prefix *game_globals;
+struct game_runtime_globals_prefix *game_globals = NULL;
 extern struct game_variant game_variant_global;
 extern struct data_array *player_data;
 extern short player_spawn_count;
 
+char const *global_game_difficulty_level_names[NUMBER_OF_GAME_DIFFICULTY_LEVELS] =
+{
+	"easy",
+	"normal",
+	"hard",
+	"impossible"
+};
+
+static struct profile_section game_update_section = {"game_update", NONE, TRUE};
+
 /* ---------- public code */
+
+void game_tick(
+	void)
+{
+	real seconds_per_tick;
+
+	profile_tick_start();
+	collision_log_begin_period(0);
+	real_math_reset_precision();
+	profile_enter(game_update_section);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\game.c",
+		0x28D,
+		game_globals->active);
+
+	remove_quitting_players_from_game();
+	game_allegiance_update();
+	units_update();
+	ai_update();
+	players_update_before_game();
+
+	seconds_per_tick = game_globals->players_are_double_speed
+		? 1.0f / (2 * TICKS_PER_SECOND)
+		: 1.0f / TICKS_PER_SECOND;
+	effects_update(seconds_per_tick);
+	lock_global_random_seed();
+	rumble_update();
+	first_person_weapons_update();
+	unlock_global_random_seed();
+	game_engine_update();
+	editor_update();
+	hs_update();
+	recorded_animations_update();
+	objects_update();
+	players_update_after_game();
+	hud_update();
+	player_effect_update();
+
+	profile_exit(game_update_section);
+	collision_log_end_period();
+	profile_tick_end();
+
+	return;
+}
 
 void game_options_new(
 	struct game_options *options)
@@ -595,6 +688,101 @@ void game_dispose(
 	transport_dispose();
 	bink_playback_dispose();
 	progress_bar_dispose();
+
+	return;
+}
+
+void game_precache_new_map(
+	char *map_name,
+	boolean blocking)
+{
+	long map_status;
+
+	if (!cache_files_precache_map_loaded(map_name))
+	{
+		if (cache_files_precache_in_progress() &&
+			!cache_files_precache_is_copying_map(map_name))
+		{
+			if (blocking)
+			{
+				cache_files_precache_map_end();
+			}
+			else
+			{
+				cache_files_precache_map_queue_end();
+				main_queue_map_name(map_name);
+			}
+		}
+
+		if (!cache_files_precache_in_progress() &&
+			!cache_files_precache_map_begin(map_name, blocking))
+		{
+			error(
+				_error_silent,
+				"shouldn't be here... map '%s' doesn't exist",
+				map_name);
+			if (blocking)
+			{
+				match_vassert(
+					"c:\\halo\\SOURCE\\game\\game.c",
+					0xF9,
+					FALSE,
+					"read the last error message for which map failed to load");
+			}
+		}
+
+		cache_files_precache_set_priority(blocking);
+		if (blocking)
+		{
+			struct game_runtime_globals_prefix *globals = game_globals;
+
+			globals->map_load_in_progress = TRUE;
+			globals->loading_progress = 0.0f;
+			match_assert(
+				"c:\\halo\\SOURCE\\game\\game.c",
+				0x105,
+				cache_files_precache_in_progress() &&
+					cache_files_precache_is_copying_map(map_name));
+			ui_widget_load_progress_widget();
+			progress_bar_begin(global_scenario_index != NONE);
+			do
+			{
+				map_status = cache_files_precache_map_status(
+					&game_globals->loading_progress);
+				main_pregame_render();
+				main_rasterizer_throttle();
+				main_present_frame();
+			}
+			while (!map_status);
+
+			progress_bar_end();
+			ui_widgets_close_all();
+			if (map_status == _cached_map_file_failed)
+				display_error_damaged_media();
+			cache_files_precache_map_end();
+			match_assert(
+				"c:\\halo\\SOURCE\\game\\game.c",
+				0x11A,
+				cache_files_precache_map_loaded(map_name));
+			globals = game_globals;
+			globals->map_load_in_progress = FALSE;
+			globals->loading_progress = 1.0f;
+		}
+	}
+
+	if (blocking)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\game\\game.c",
+			0x123,
+			cache_files_precache_map_loaded(map_name));
+		main_save_current_solo_map(map_name);
+		main_queue_map_name(NULL);
+		if (cache_files_precache_in_progress())
+			cache_files_precache_map_end();
+		if (player_spawn_count == 1)
+			player_ui_remember_player1_profile(TRUE);
+	}
 
 	return;
 }

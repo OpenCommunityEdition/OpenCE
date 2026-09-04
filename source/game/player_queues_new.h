@@ -28,6 +28,8 @@ void update_server_handle_client_update(
 	struct player_action *actions);
 void update_server_next_update(
 	void);
+boolean update_server_new(
+	void);
 void update_server_build_server_update(
 	long machine_index,
 	struct server_update *update,

@@ -30,6 +30,10 @@ struct cheat_globals
 
 /* ---------- prototypes/CHEATS.C */
 
+void cheats_initialize(
+	void);
+void cheats_initialize_for_new_map(
+	void);
 void cheats_dispose(
 	void);
 void cheats_dispose_from_old_map(

@@ -16,7 +16,14 @@ header included in hcex build.
 
 /* ---------- prototypes/RECORDED_ANIMATIONS.C */
 
-void recorded_animations_clear_debug_storage(void);
+void recorded_animations_initialize(
+	void);
+void recorded_animations_initialize_for_new_map(
+	void);
+void recorded_animations_update(
+	void);
+void recorded_animations_clear_debug_storage(
+	void);
 
 boolean recorded_animation_controlling_unit(
 	long unit_index);

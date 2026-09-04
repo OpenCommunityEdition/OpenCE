@@ -61,7 +61,7 @@ symbols in this file:
 002E4C68 0004:
 	_data_002e4c68 (0000)
 00453AC0 0004:
-	_bss_00453ac0 (0000)
+	_unit_hud_globals (0000)
 */
 
 /* ---------- headers */
@@ -100,16 +100,13 @@ enum
 
 /* ---------- macros */
 
-#define UNIT_HUD_GLOBALS bss_00453ac0
-#define unit_hud_globals bss_00453ac0
-
 /* ---------- structures */
 
 struct unit_hud_state
 {
-	float last_shield_vitality;
-	float last_body_vitality;
-	float fade_time;
+	real last_shield_vitality;
+	real last_body_vitality;
+	real fade_time;
 	long last_shield_hit_time;
 	long last_shield_flash_time;
 	long last_health_flash_time;
@@ -159,7 +156,7 @@ static void hud_update_unit_local_player(
 
 /* ---------- globals */
 
-extern struct unit_hud_globals *bss_00453ac0;
+static struct unit_hud_globals *unit_hud_globals = NULL;
 extern struct hud_scripted_globals *hud_scripted_globals;
 
 /* ---------- public code */
@@ -280,11 +277,33 @@ void hud_dispose_unit_interface(
 	return;
 }
 
+void hud_fix_unit_data(
+	short old_local_player_index,
+	short new_local_player_index)
+{
+	struct unit_hud_state *old_hud_state;
+	struct unit_hud_state *new_hud_state;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\hud_unit.c",
+		0x1AB,
+		old_local_player_index!=NONE);
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\hud_unit.c",
+		0x1AC,
+		new_local_player_index!=NONE);
+	old_hud_state = get_hud_state(old_local_player_index);
+	new_hud_state = get_hud_state(new_local_player_index);
+	*new_hud_state = *old_hud_state;
+
+	return;
+}
+
 void scripted_hud_show_health(
 	boolean show)
 {
 	SET_FLAG(
-		UNIT_HUD_GLOBALS->script_flags,
+		unit_hud_globals->script_flags,
 		_hud_panel_health_dont_show_bit,
 		!show);
 
@@ -295,7 +314,7 @@ void scripted_hud_blink_health(
 	boolean blink)
 {
 	SET_FLAG(
-		UNIT_HUD_GLOBALS->script_flags,
+		unit_hud_globals->script_flags,
 		_hud_panel_health_blink_bit,
 		blink);
 
@@ -306,7 +325,7 @@ void scripted_hud_show_shield(
 	boolean show)
 {
 	SET_FLAG(
-		UNIT_HUD_GLOBALS->script_flags,
+		unit_hud_globals->script_flags,
 		_hud_panel_shield_dont_show_bit,
 		!show);
 
@@ -317,7 +336,7 @@ void scripted_hud_blink_shield(
 	boolean blink)
 {
 	SET_FLAG(
-		UNIT_HUD_GLOBALS->script_flags,
+		unit_hud_globals->script_flags,
 		_hud_panel_shield_blink_bit,
 		blink);
 
@@ -328,7 +347,7 @@ void scripted_hud_show_motion_sensor(
 	boolean show)
 {
 	SET_FLAG(
-		UNIT_HUD_GLOBALS->script_flags,
+		unit_hud_globals->script_flags,
 		_hud_panel_motion_sensor_dont_show_bit,
 		!show);
 
@@ -339,7 +358,7 @@ void scripted_hud_blink_motion_sensor(
 	boolean blink)
 {
 	SET_FLAG(
-		UNIT_HUD_GLOBALS->script_flags,
+		unit_hud_globals->script_flags,
 		_hud_panel_motion_sensor_blink_bit,
 		blink);
 

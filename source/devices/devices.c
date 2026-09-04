@@ -37,11 +37,11 @@ symbols in this file:
 00084E10 00b0:
 	_device_effect_new (0000)
 00084EC0 0070:
-	_code_00084ec0 (0000)
+	_device_group_new (0000)
 00084F30 0040:
 	_device_group_delete (0000)
 00084F70 00e0:
-	_code_00084f70 (0000)
+	_create_initial_device_groups (0000)
 00085050 0020:
 	_devices_initialize_for_new_map (0000)
 00085070 0090:
@@ -89,15 +89,20 @@ symbols in this file:
 #include "device_machines.h"
 #include "memory/data.h"
 #include "saved games/game_state.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
 
 /* ---------- constants */
 
 enum
 {
+	_device_position_reversed_bit = 0,
+	_device_not_usable_bit = 1,
 	_device_position_changed_bit = 2,
 	_device_group_can_change_only_once_bit = 0,
 	_device_group_changed_once_bit = 1,
 	_device_group_runtime_bit = 2,
+	_scenario_device_group_can_change_only_once_bit = 0,
 };
 
 /* ---------- macros */
@@ -111,17 +116,36 @@ struct device_group_datum
 	real actual_value;
 };
 
+struct scenario_device_group
+{
+	char name[32];
+	real initial_value;
+	unsigned long flags;
+	long unused[3];
+};
+
 typedef char device_group_datum_size_assert[
 	sizeof(struct device_group_datum) == 0x8 ? 1 : -1];
 typedef char device_group_datum_actual_value_offset_assert[
 	offsetof(struct device_group_datum, actual_value) == 0x4 ? 1 : -1];
+typedef char scenario_device_group_size_assert[
+	sizeof(struct scenario_device_group) == 0x34 ? 1 : -1];
+typedef char scenario_device_group_initial_value_offset_assert[
+	offsetof(struct scenario_device_group, initial_value) == 0x20 ? 1 : -1];
+typedef char scenario_device_group_flags_offset_assert[
+	offsetof(struct scenario_device_group, flags) == 0x24 ? 1 : -1];
+typedef char scenario_device_groups_offset_assert[
+	offsetof(struct scenario, device_groups) == 0x288 ? 1 : -1];
 
 /* ---------- prototypes */
 
 void device_group_set_actual_value(
 	short group_index,
 	real actual_value);
-void code_00084f70(
+static short device_group_new(
+	real initial_value,
+	word flags);
+static void create_initial_device_groups(
 	void);
 static void device_group_delete(
 	short group_index);
@@ -149,7 +173,7 @@ void devices_initialize_for_new_map(
 	void)
 {
 	data_make_valid(device_groups_data);
-	code_00084f70();
+	create_initial_device_groups();
 
 	return;
 }
@@ -427,7 +451,106 @@ void device_set_power(
 	return;
 }
 
+void device_add_scenario_information(
+	long device_index,
+	struct scenario_device_datum *scenario_device)
+{
+	struct device_datum *device = device_get(device_index);
+
+	device_definition_get(device->definition_index);
+	device->device.power_group_index = scenario_device->power_group_index != NONE
+		? scenario_device->power_group_index
+		: device_group_new(
+			TEST_FLAG(scenario_device->flags, _scenario_device_initially_off_bit) ? 0.0f : 1.0f,
+			FLAG(_device_group_runtime_bit));
+	device->device.position_group_index = scenario_device->position_group_index != NONE
+		? scenario_device->position_group_index
+		: device_group_new(
+			TEST_FLAG(scenario_device->flags, _scenario_device_initially_open_bit) ? 1.0f : 0.0f,
+			FLAG(_device_group_runtime_bit) |
+			(TEST_FLAG(scenario_device->flags, _scenario_device_changes_only_once_bit)
+				? FLAG(_device_group_can_change_only_once_bit) : 0));
+
+	{
+		struct device_group_datum *group = datum_get(
+			device_groups_data,
+			device->device.power_group_index);
+
+		device->device.power = group->actual_value;
+	}
+	{
+		struct device_group_datum *group = datum_get(
+			device_groups_data,
+			device->device.position_group_index);
+
+		device->device.position = group->actual_value;
+	}
+
+	/* January revalidates both assigned groups after copying their values. */
+	datum_get(device_groups_data, device->device.power_group_index);
+	datum_get(device_groups_data, device->device.position_group_index);
+
+	if (TEST_FLAG(scenario_device->flags, _scenario_device_position_reversed_bit))
+		device->device.flags |= FLAG(_device_position_reversed_bit);
+	if (TEST_FLAG(scenario_device->flags, _scenario_device_not_usable_bit))
+		device->device.flags |= FLAG(_device_not_usable_bit);
+
+	return;
+}
+
 /* ---------- private code */
+
+static short device_group_new(
+	real initial_value,
+	word flags)
+{
+	short group_index = datum_new(device_groups_data);
+
+	if (group_index != NONE)
+	{
+		struct device_group_datum *group = datum_get(device_groups_data, group_index);
+
+		group->actual_value = initial_value;
+		group->flags = flags;
+	}
+	else
+	{
+		match_vassert(
+			"c:\\halo\\SOURCE\\devices\\devices.c",
+			0x311,
+			FALSE,
+			"no more free device groups");
+	}
+
+	return group_index;
+}
+
+static void create_initial_device_groups(
+	void)
+{
+	struct tag_block *groups = &global_scenario_get()->device_groups;
+	short group_index;
+
+	for (group_index = 0; group_index < groups->count; group_index++)
+	{
+		struct scenario_device_group *definition = TAG_BLOCK_GET_ELEMENT(
+			groups,
+			group_index,
+			struct scenario_device_group);
+		word flags = 0;
+		short new_group_index;
+
+		if (TEST_FLAG(definition->flags, _scenario_device_group_can_change_only_once_bit))
+			flags |= FLAG(_device_group_can_change_only_once_bit);
+		new_group_index = device_group_new(definition->initial_value, flags);
+		match_assert(
+			"c:\\halo\\SOURCE\\devices\\devices.c",
+			0x339,
+			new_group_index==group_index);
+	}
+
+	return;
+}
 
 static void device_group_delete(
 	short group_index)

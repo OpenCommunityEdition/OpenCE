@@ -69,6 +69,8 @@ struct transport_address
 
 /* ---------- prototypes/EXAMPLE.C */
 
+short transport_initialize(
+	void);
 struct transport_address *create_transport_address(
 	struct transport_address_data const *address,
 	word address_length,

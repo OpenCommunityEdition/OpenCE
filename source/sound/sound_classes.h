@@ -49,6 +49,10 @@ struct sound_class_definition
 
 /* ---------- prototypes/SOUND_CLASSES.C */
 
+void sound_classes_initialize(
+	void);
+void sound_classes_initialize_for_new_map(
+	void);
 struct sound_class_definition *sound_class_get(
 	short class_index);
 

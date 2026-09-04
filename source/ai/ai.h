@@ -87,6 +87,14 @@ struct ai_information_packet
 
 /* ---------- prototypes/AI.C */
 
+void ai_initialize(
+	void);
+void ai_initialize_for_new_map(
+	void);
+void ai_place(
+	void);
+void ai_update(
+	void);
 void ai_globals_dialogue_triggers_enabled(
 	boolean enabled);
 void ai_update_team_status(

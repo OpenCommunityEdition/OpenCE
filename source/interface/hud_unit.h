@@ -31,4 +31,17 @@ void hud_tick_shield(
 	long player_index,
 	real amount);
 
+void scripted_hud_show_health(
+	boolean show);
+void scripted_hud_blink_health(
+	boolean blink);
+void scripted_hud_show_shield(
+	boolean show);
+void scripted_hud_blink_shield(
+	boolean blink);
+void scripted_hud_show_motion_sensor(
+	boolean show);
+void scripted_hud_blink_motion_sensor(
+	boolean blink);
+
 #endif // __HUD_UNIT_H

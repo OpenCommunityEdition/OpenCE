@@ -2,6 +2,44 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/devices/devices",
+      "function": "_create_initial_device_groups",
+      "class": "unclassified",
+      "evidence": "Authentic typed scenario-group initialization preserves all inherited exact siblings; first subobject-base and zero-initialization lowering adds ten meaningful bytes and shifts otherwise identical loop/epilogue. No declaration-order, compiler, fake-lifetime or inline forcing. Reopen for authentic source or new type/ABI evidence. See docs/object_matching_logs/devices_obj_group_creation_wave_20260904.md.",
+      "measurements": {
+        "target": {
+          "size": 224,
+          "relocation_count": 14,
+          "normalized_sha256": "3599a03ce7c3c87fe5261d8f67e0865ee14eda302453f947ee3682499be3bb95"
+        },
+        "base": {
+          "size": 240,
+          "relocation_count": 14,
+          "normalized_sha256": "28358cf0131d290b01174a2e2d24ae4efa49a825a7885389699ea41460081cc0"
+        },
+        "objdiff_percent": 78.333336
+      }
+    },
+    {
+      "unit": "source/devices/devices",
+      "function": "_device_add_scenario_information",
+      "class": "unclassified",
+      "evidence": "Authentic typed scenario-device group assignment; target and candidate are 288 bytes with all 12 ordered relocations identical. Only the equivalent nine-byte changes-once/runtime flag lowering differs at +0x7C. Retain natural FLAG/TEST_FLAG source rather than an unusual shifted mask for codegen. See docs/object_matching_logs/devices_obj_group_creation_wave_20260904.md.",
+      "measurements": {
+        "target": {
+          "size": 288,
+          "relocation_count": 12,
+          "normalized_sha256": "6a508ab57f807278d3115da228ff0f772290ec852b455d8ef8595112af1ce6da"
+        },
+        "base": {
+          "size": 288,
+          "relocation_count": 12,
+          "normalized_sha256": "44aeccc35c9004fb6a37926da5f38083cc0b7c6bfdee96d06e7edca02f5c06b8"
+        },
+        "objdiff_percent": 97.56626
+      }
+    },
+    {
       "unit": "source/input/input_abstraction",
       "function": "_input_abstraction_update",
       "class": "unclassified",
@@ -1710,7 +1748,7 @@
       "unit": "source/bitmaps/bitmap_group",
       "function": "_bitmap_group_add_bitmap",
       "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after restoring the complete typed bitmap insertion routine from January disassembly, relocation topology, assertion and diagnostic strings, the later HCEA semantic implementation, and the independent PC machine-code lift. The retained ordinary C builds the 48-byte bitmap descriptor through semantic fields, validates interface, power-of-two, cube-map, compressed, and palettized cases, grows the bitmap block and pixel blob, repoints every existing bitmap through TAG_BLOCK_GET_ELEMENT, verifies the relocated ranges, preserves the original tight-packing warning, copies the new descriptor, and zero-fills its pixels. Its five sibling functions remain strict exact. January is 995 meaningful bytes in a 1008-byte padded envelope; the candidate is 989 meaningful bytes in a 992-byte envelope, preserves the 0x34 frame and all 59 semantically corresponding relocations, and reports 60.99099 percent similarity. The first divergence is VC7's allocation of the 16-bit type/depth/group-type lifetimes, followed by a different but equivalent diagnostic-block layout; the fail-closed classifier returns UNKNOWN. The earlier object ledger exhausted explicit-clear, flags-local, entry-live-range, return-type, declaration-order, signature-store, predicate, and branch-layout families, including a historical 1008/59 candidate that was still nonexact and whose source artifact was not retained. A fresh dangling-blob and worktree audit recovered only the later HCEA reconstruction, not that disposable source. Adding the public owner-header prototype was also rejected after a full verdict bisect proved that its header-position sensitivity regressed the exact bitmap_2d_uncompress_from_mipmap; the function definition remains its authoritative declaration until a consumer requires an owner-header API. No barrier, volatile or register forcing, pragma, assembly, fake dependency, raw offset, undefined behavior, codegen carrier, or nonsensical branch is retained. Reopen only for authoritative January source or local-variable records, recovery of the historical readable candidate, a strict same-topology donor, or a compatible VC7/QFE that naturally explains the register and cold-block schedule.",
+      "evidence": "Fuzzy-parked under the current house rule after restoring the complete typed bitmap insertion routine from January disassembly, relocation topology, assertion and diagnostic strings, the later HCEA semantic implementation, and the independent PC machine-code lift. The retained ordinary C builds the 48-byte bitmap descriptor through semantic fields, validates interface, power-of-two, cube-map, compressed, and palettized cases, grows the bitmap block and pixel blob, repoints every existing bitmap through TAG_BLOCK_GET_ELEMENT, verifies the relocated ranges, preserves the original tight-packing warning, copies the new descriptor, and zero-fills its pixels. Its five sibling functions remain strict exact. January is 995 meaningful bytes in a 1008-byte padded envelope; the candidate is 989 meaningful bytes in a 992-byte envelope, preserves the 0x34 frame and all 59 semantically corresponding relocations, and reports 60.99099 percent similarity. The first divergence is VC7's allocation of the 16-bit type/depth/group-type lifetimes, followed by a different but equivalent diagnostic-block layout; the fail-closed classifier returns UNKNOWN. The earlier object ledger exhausted explicit-clear, flags-local, entry-live-range, return-type, declaration-order, signature-store, predicate, and branch-layout families, including a historical 1008/59 candidate that was still nonexact and whose source artifact was not retained. A fresh dangling-blob and worktree audit recovered only the later HCEA reconstruction, not that disposable source. Adding the public owner-header prototype was also rejected after a full verdict bisect proved that its header-position sensitivity regressed the exact bitmap_2d_uncompress_from_mipmap; the function definition remains its authoritative declaration until a consumer requires an owner-header API. No barrier, volatile or register forcing, pragma, assembly, fake dependency, raw offset, undefined behavior, codegen carrier, or nonsensical branch is retained. Reopen only for authoritative January source or local-variable records, recovery of the historical readable candidate, a strict same-topology donor, or a compatible VC7/QFE that naturally explains the register and cold-block schedule. Re-audited 2026-09-04 after moving the authentic cache-status enum to its public owner: pristine/current-header compiles prove only two independent stack loads exchange order in [0xFF,0x106); all other bytes and all 59 ordered relocations are identical. Five exact siblings, frame, sizes and 60.99099 percent similarity are unchanged. This reviewed fingerprint update grants no exact credit. See docs/object_matching_logs/bitmap_group_obj_cache_enum_reaudit_20260904.md.",
       "measurements": {
         "target": {
           "size": 1008,
@@ -1720,7 +1758,7 @@
         "base": {
           "size": 992,
           "relocation_count": 59,
-          "normalized_sha256": "2e0bbd84c45f240758cc76a2d4df8c78be689cfe9bc21af6a52e017f218e7ca0"
+          "normalized_sha256": "0bd88e42b1b36f4e9df5a8bed007887a18a1443d6f895f15ea9d275f2f6526c4"
         },
         "objdiff_percent": 60.99099
       }

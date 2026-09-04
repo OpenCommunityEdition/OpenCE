@@ -91,6 +91,12 @@ struct hs_external_global_definition;
 
 /* ---------- prototypes/HS.C */
 
+void hs_initialize(
+	void);
+void hs_initialize_for_new_map(
+	void);
+void hs_update(
+	void);
 void hs_dispose(
 	void);
 
