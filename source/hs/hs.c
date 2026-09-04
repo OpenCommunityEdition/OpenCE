@@ -2780,6 +2780,7 @@ symbols in this file:
 #include "memory/data.h"
 #include "scenario/scenario_definitions.h"
 #include "ai/ai_scenario_definitions.h"
+#include "ai/ai_profile.h"
 #include "cutscene/recorded_animation_definitions.h"
 #include "devices/devices.h"
 #include "game/game.h"
@@ -4134,8 +4135,6 @@ void debug_dump_memory(
 void debug_dump_memory_by_file(
 	void);
 void profile_initialize(
-	void);
-short ai_profile_change_render_spray(
 	void);
 void ai_debug_sound_point_set(
 	void);

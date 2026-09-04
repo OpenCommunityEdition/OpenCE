@@ -17,7 +17,7 @@ header included in hcex build.
 struct network_game_client;
 struct transport_address;
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/NETWORK_CLIENT_MESSAGE_HANDLER.C */
 
 boolean network_game_client_handle_message(
 	struct network_game_client *client,

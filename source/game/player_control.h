@@ -216,5 +216,7 @@ boolean player_control_action_test_look_relative_all_directions(
 /* ---------- globals */
 
 extern struct player_control_globals_data *player_control_globals;
+extern real player_look_yaw_rate[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+extern real player_look_pitch_rate[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
 
 #endif // __PLAYER_CONTROL_H

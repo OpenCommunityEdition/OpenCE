@@ -193,6 +193,8 @@ symbols in this file:
 #include "cseries.h"
 #include "bungie_net/common/message_header.h"
 #include "bungie_net/network/transport.h"
+#include "bungie_net/network/transport_endpoint_winsock.h"
+#include "game/game_engine.h"
 #include "game/players.h"
 #include "networking/network_client_manager.h"
 #include "networking/network_client_message_handler.h"
@@ -207,9 +209,10 @@ enum
 	NETWORK_GAME_MESSAGE_VERSION = 1,
 	TRANSPORT_NONCE_LENGTH = 8,
 	TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH = 0x80,
-	NETWORK_GAME_ADVERTISEMENT_SIZE = 0x114,
-	NETWORK_GAME_SETTINGS_SIZE = 0x434,
-	NETWORK_GAME_UPDATE_SIZE = 0x210,
+	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
+	NETWORK_GAME_NAME_LENGTH = 16,
+	MAXIMUM_NUMBER_OF_PLAYERS = 16,
+	JOIN_GAME_TOKEN_LENGTH = 16,
 };
 
 #define MINIMUM_TRANSPORT_ERROR_MESSAGE_SIZE (sizeof(word) + TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH + sizeof(byte))
@@ -244,9 +247,65 @@ enum network_game_packet_class
 
 struct network_game_client;
 
+struct network_machine
+{
+	wchar_t name[32];
+	char machine_index;
+	byte padding41[3];
+};
+
+struct network_game_map
+{
+	long unknown;
+	char name[0x80];
+};
+
+struct network_game_local_data
+{
+	boolean game_objects_loaded;
+	byte padding431[3];
+};
+
+struct network_game
+{
+	wchar_t name[NETWORK_GAME_NAME_LENGTH];
+	struct network_game_map map;
+	struct game_variant variant;
+	byte unknown10C;
+	char minimum_player_count;
+	char maximum_player_count;
+	byte team_count;
+	short difficulty;
+	short machine_count;
+	struct network_machine machines[MAXIMUM_NETWORK_MACHINE_COUNT];
+	short player_count;
+	struct network_player players[MAXIMUM_NUMBER_OF_PLAYERS];
+	word reserved_after_players;
+	unsigned long random_seed;
+	long number_of_games_played;
+	struct network_game_local_data local_data;
+};
+
 struct message_server_game_advertise
 {
-	byte opaque[NETWORK_GAME_ADVERTISEMENT_SIZE];
+	byte client_nonce[TRANSPORT_NONCE_LENGTH];
+	byte nonce[TRANSPORT_NONCE_LENGTH];
+	XNKID key_id;
+	XNKEY key;
+	XNADDR xnaddr;
+	word port;
+	word version;
+	word platform;
+	wchar_t game_name[NETWORK_GAME_NAME_LENGTH];
+	byte reserved[0x1A];
+	struct network_game_map map;
+	short engine_type;
+	short machine_count;
+	short player_count;
+	short maximum_player_count;
+	short variant_setting;
+	word flags;
+	byte join_game_token[JOIN_GAME_TOKEN_LENGTH];
 };
 
 struct message_server_pong
@@ -256,47 +315,49 @@ struct message_server_pong
 
 struct message_server_machine_accepted
 {
-	byte opaque[8];
+	long random_seed;
+	short machine_index;
+	byte padding6[2];
 };
 
 struct message_server_machine_rejected
 {
-	long reason;
-};
-
-struct network_game
-{
-	byte opaque[NETWORK_GAME_SETTINGS_SIZE];
+	short reason;
 };
 
 struct message_server_pregame_countdown
 {
-	long seconds_remaining;
+	short seconds_remaining;
 };
 
 struct message_server_pregame_keep_alive
 {
-	byte opaque[2];
+	short unused;
 };
 
 struct message_server_postgame_keep_alive
 {
-	byte opaque[2];
+	short unused;
 };
 
 struct message_server_begin_game
 {
-	byte opaque[4];
+	long unused;
 };
 
 struct message_server_graceful_game_exit_pregame
 {
-	byte opaque[4];
+	long unused;
 };
 
 struct message_server_game_update
 {
-	byte opaque[NETWORK_GAME_UPDATE_SIZE];
+	unsigned long update_number;
+	long random_seed;
+	long game_time;
+	byte padding0C[2];
+	short local_player_count;
+	struct player_action player_actions[MAXIMUM_NUMBER_OF_PLAYERS];
 };
 
 struct message_server_remove_player_ingame
@@ -307,17 +368,17 @@ struct message_server_remove_player_ingame
 
 struct message_server_game_over
 {
-	byte opaque[4];
+	long unused;
 };
 
 struct message_server_switch_to_pregame
 {
-	byte opaque[4];
+	long unused;
 };
 
 struct message_server_graceful_game_exit_postgame
 {
-	byte opaque[4];
+	long unused;
 };
 
 /* ---------- prototypes */

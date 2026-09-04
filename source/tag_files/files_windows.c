@@ -124,6 +124,11 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	MAXIMUM_SEARCH_DEPTH = 8
+};
+
 /* ---------- macros */
 
 /*
@@ -137,13 +142,42 @@ symbols in this file:
 
 /* ---------- structures */
 
+struct find_files_state
+{
+	unsigned long flags;
+	short depth;
+	short location;
+	char path[MAXIMUM_FILENAME_LENGTH+1];
+	void *handles[MAXIMUM_SEARCH_DEPTH];
+	WIN32_FIND_DATAA data;
+};
+
 /* ---------- prototypes */
 
-static void code_00189ca0(
+static void file_error(
 	struct file_reference const *file,
 	const char *function_name);
 
 /* ---------- globals */
+
+static struct find_files_state find_files_globals =
+{
+	0,
+	NONE,
+	0,
+	"",
+	{
+		INVALID_HANDLE_VALUE,
+		INVALID_HANDLE_VALUE,
+		INVALID_HANDLE_VALUE,
+		INVALID_HANDLE_VALUE,
+		INVALID_HANDLE_VALUE,
+		INVALID_HANDLE_VALUE,
+		INVALID_HANDLE_VALUE,
+		INVALID_HANDLE_VALUE
+	},
+	{ 0 }
+};
 
 /* ---------- public code */
 
@@ -158,6 +192,45 @@ long file_compare_last_modification_dates(
 	struct file_last_modification_date const *date1)
 {
 	return csmemcmp(date0, date1, sizeof(*date0));
+}
+
+void find_files_start(
+	unsigned long flags,
+	struct file_reference const *directory)
+{
+	struct file_reference_info const *info;
+	short depth;
+
+	info = file_reference_get_const_info(directory);
+	depth = find_files_globals.depth;
+	match_assert(
+		"c:\\halo\\SOURCE\\tag_files\\files_windows.c",
+		548,
+		VALID_FLAGS(flags, NUMBER_OF_FIND_FILES_FLAGS));
+	match_assert(
+		"c:\\halo\\SOURCE\\tag_files\\files_windows.c",
+		549,
+		!TEST_FLAG(info->flags, has_filename_bit));
+
+	while (depth >= 0)
+	{
+		void *handle = find_files_globals.handles[depth];
+
+		if (handle != INVALID_HANDLE_VALUE)
+		{
+			CloseHandle(handle);
+			find_files_globals.handles[depth] = INVALID_HANDLE_VALUE;
+		}
+
+		depth--;
+	}
+
+	find_files_globals.flags = flags;
+	find_files_globals.depth = 0;
+	find_files_globals.location = info->location;
+	csstrcpy(find_files_globals.path, info->path);
+
+	return;
 }
 
 void file_path_add_name(
@@ -230,6 +303,60 @@ void file_path_remove_name(
 	return;
 }
 
+void file_path_split(
+	char *path,
+	char **directory,
+	char **parent_directory,
+	char **filename,
+	char **extension,
+	boolean has_filename)
+{
+	short index = (short)csstrlen(path);
+	char *end = path + index;
+
+	*directory = end;
+	*parent_directory = end;
+	*filename = end;
+	*extension = end;
+
+	while (index)
+	{
+		word character = get_previous_character((byte *)path, &index);
+
+		if (character == '.')
+		{
+			if (has_filename && !**filename && !**extension)
+			{
+				path[index] = 0;
+				*extension = path + index + 1;
+			}
+		}
+		else if (character == '\\')
+		{
+			if (has_filename && !**filename)
+			{
+				path[index] = 0;
+				*filename = path + index + 1;
+			}
+			else if (!**parent_directory)
+			{
+				*parent_directory = path + index + 1;
+			}
+		}
+	}
+
+	if (has_filename && !**filename)
+	{
+		*filename = path;
+		return;
+	}
+
+	if (*filename != path)
+		*directory = path;
+
+	return;
+}
+
 void file_location_get_full_path(
 	short location,
 	const char *path,
@@ -256,7 +383,7 @@ boolean file_create(
 
 	file_location_get_full_path(info->location, info->path, full_path);
 
-	if (TEST_FLAG(info->flags, _has_filename_bit))
+	if (TEST_FLAG(info->flags, has_filename_bit))
 	{
 		void *file_handle = CreateFileA(full_path, GENERIC_WRITE, 0, NULL,
 			CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -292,7 +419,7 @@ boolean file_delete(
 
 	file_location_get_full_path(info->location, info->path, full_path);
 
-	if (TEST_FLAG(info->flags, _has_filename_bit))
+	if (TEST_FLAG(info->flags, has_filename_bit))
 	{
 		if (SetFileAttributesA(full_path, FILE_ATTRIBUTE_NORMAL) &&
 			DeleteFileA(full_path))
@@ -341,6 +468,60 @@ boolean file_rename(
 	return result;
 }
 
+boolean file_open(
+	struct file_reference *file,
+	unsigned long flags)
+{
+	struct file_reference_info *info = file_reference_get_info(file);
+	char full_path[MAXIMUM_FILENAME_LENGTH+1] = "";
+	unsigned long desired_access = 0;
+	void *file_handle;
+	boolean result;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\tag_files\\files_windows.c",
+		308,
+		VALID_FLAGS(flags, NUMBER_OF_PERMISSION_FLAGS));
+	match_assert(
+		"c:\\halo\\SOURCE\\tag_files\\files_windows.c",
+		309,
+		flags & (FLAG(_permission_read_bit)|FLAG(_permission_write_bit)));
+	match_assert(
+		"c:\\halo\\SOURCE\\tag_files\\files_windows.c",
+		310,
+		TEST_FLAG(flags, _permission_write_bit) ||
+			!TEST_FLAG(flags, _permission_append_bit));
+
+	file_location_get_full_path(info->location, info->path, full_path);
+	if (TEST_FLAG(flags, _permission_read_bit))
+		desired_access = GENERIC_READ;
+	if (TEST_FLAG(flags, _permission_write_bit))
+		desired_access |= GENERIC_WRITE;
+
+	file_handle = CreateFileA(full_path, desired_access, 0, NULL,
+		OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	result = file_handle != INVALID_HANDLE_VALUE;
+	if (result)
+	{
+		info->file_handle = file_handle;
+		if (TEST_FLAG(flags, _permission_append_bit))
+		{
+			result = SetFilePointer(file_handle, 0, NULL, FILE_END) !=
+				(unsigned long)NONE;
+			if (!result)
+			{
+				CloseHandle(info->file_handle);
+				info->file_handle = NULL;
+			}
+		}
+	}
+
+	if (!result)
+		file_error(file, "file_open");
+
+	return result;
+}
+
 boolean file_get_last_modification_date(
 	struct file_reference *file,
 	struct file_last_modification_date *date)
@@ -368,6 +549,145 @@ boolean file_get_last_modification_date(
 	return TRUE;
 }
 
+boolean file_get_size(
+	struct file_reference const *file,
+	unsigned long *size)
+{
+	struct file_reference_info const *info;
+	char full_path[MAXIMUM_FILENAME_LENGTH+1] = "";
+	WIN32_FILE_ATTRIBUTE_DATA attribute_data;
+
+	info = file_reference_get_const_info(file);
+	match_assert(
+		"c:\\halo\\SOURCE\\tag_files\\files_windows.c",
+		524,
+		size);
+	file_location_get_full_path(info->location, info->path, full_path);
+
+	if (GetFileAttributesExA(full_path, GetFileExInfoStandard, &attribute_data))
+	{
+		*size = attribute_data.nFileSizeLow;
+		return TRUE;
+	}
+
+	file_error(file, "file_get_size");
+
+	return FALSE;
+}
+
+boolean find_files_next(
+	struct file_reference *file,
+	struct file_last_modification_date *date)
+{
+	short depth = find_files_globals.depth;
+	char full_path[MAXIMUM_FILENAME_LENGTH+1] = "";
+	boolean result = FALSE;
+
+	while (depth >= 0)
+	{
+		void *handle = find_files_globals.handles[depth];
+
+		if (handle == INVALID_HANDLE_VALUE)
+		{
+			file_location_get_full_path(
+				find_files_globals.location,
+				find_files_globals.path,
+				full_path);
+			file_path_add_name(full_path, "*.*");
+			handle = FindFirstFileA(full_path, &find_files_globals.data);
+			find_files_globals.handles[depth] = handle;
+			if (handle == INVALID_HANDLE_VALUE)
+			{
+				file_path_remove_name(find_files_globals.path);
+				depth--;
+				goto resume;
+			}
+		}
+		else if (!FindNextFileA(handle, &find_files_globals.data))
+		{
+			CloseHandle(find_files_globals.handles[depth]);
+			find_files_globals.handles[depth] = INVALID_HANDLE_VALUE;
+			file_path_remove_name(find_files_globals.path);
+			depth--;
+			goto resume;
+		}
+
+		if ((find_files_globals.data.dwFileAttributes &
+			FILE_ATTRIBUTE_DIRECTORY) != 0)
+		{
+			if (csstrcmp(find_files_globals.data.cFileName, ".") &&
+				csstrcmp(find_files_globals.data.cFileName, ".."))
+			{
+				unsigned long flags = find_files_globals.flags;
+
+				if (TEST_FLAG(flags, _find_files_enumerate_directories_bit))
+				{
+					file_reference_create(file, find_files_globals.location);
+					file_reference_add_directory(
+						file,
+						find_files_globals.path);
+					file_reference_add_directory(
+						file,
+						find_files_globals.data.cFileName);
+					flags = find_files_globals.flags;
+				}
+
+				if (TEST_FLAG(flags, _find_files_recursive_bit))
+				{
+					if (!TEST_FLAG(
+						flags,
+						_find_files_enumerate_directories_bit))
+					{
+						file_path_add_name(
+							find_files_globals.path,
+							find_files_globals.data.cFileName);
+						flags = find_files_globals.flags;
+					}
+
+					depth++;
+				}
+
+				if (TEST_FLAG(
+					flags,
+					_find_files_enumerate_directories_bit))
+				{
+					goto found;
+				}
+			}
+		}
+		else if (!TEST_FLAG(
+			find_files_globals.flags,
+			_find_files_enumerate_directories_bit))
+		{
+			file_reference_create(file, find_files_globals.location);
+			file_reference_add_directory(file, find_files_globals.path);
+			file_reference_set_name(
+				file,
+				find_files_globals.data.cFileName);
+			goto found;
+		}
+
+resume:
+		;
+	}
+
+	goto finished;
+
+found:
+	if (date)
+	{
+		csmemcpy(
+			date,
+			&find_files_globals.data.ftLastWriteTime,
+			sizeof(*date));
+	}
+	result = TRUE;
+
+finished:
+	find_files_globals.depth = depth;
+	return result;
+}
+
 boolean file_exists(
 	const struct file_reference *file)
 {
@@ -383,7 +703,7 @@ boolean file_exists(
 	}
 	else if (GetLastError()!=ERROR_FILE_NOT_FOUND && GetLastError()!=ERROR_PATH_NOT_FOUND)
 	{
-		code_00189ca0(file, "file_exists");
+		file_error(file, "file_exists");
 	}
 
 	return result;
@@ -516,6 +836,58 @@ boolean file_set_eof(
 	return result;
 }
 
+boolean file_read(
+	struct file_reference const *file,
+	unsigned long count,
+	void *buffer)
+{
+	struct file_reference_info const *info;
+	unsigned long bytes_read;
+
+	info = file_reference_get_const_info(file);
+	match_assert(
+		"c:\\halo\\SOURCE\\tag_files\\files_windows.c",
+		423,
+		buffer);
+
+	if (ReadFile(info->file_handle, buffer, count, &bytes_read, NULL))
+	{
+		if (bytes_read == count)
+			return TRUE;
+
+		SetLastError(ERROR_HANDLE_EOF);
+	}
+
+	file_error(file, "file_read");
+
+	return FALSE;
+}
+
+boolean file_write(
+	struct file_reference const *file,
+	unsigned long count,
+	void const *buffer)
+{
+	struct file_reference_info const *info;
+	unsigned long bytes_written;
+
+	info = file_reference_get_const_info(file);
+	match_assert(
+		"c:\\halo\\SOURCE\\tag_files\\files_windows.c",
+		451,
+		buffer);
+
+	if (WriteFile(info->file_handle, buffer, count, &bytes_written, NULL) &&
+		bytes_written == count)
+	{
+		return TRUE;
+	}
+
+	file_error(file, "file_write");
+
+	return FALSE;
+}
+
 boolean file_read_from_position(
 	struct file_reference const *file,
 	unsigned long position,
@@ -536,7 +908,7 @@ boolean file_write_to_position(
 
 /* ---------- private code */
 
-static void code_00189ca0(
+static void file_error(
 	struct file_reference const *file,
 	const char *function_name)
 {

@@ -1,5 +1,10 @@
 [
   {
+    "unit": "source/networking/network_client_message_handler",
+    "function": "_network_game_client_handle_message",
+    "reason": "Audited January dispatcher is strict exact: 1088 padded/logical bytes, 84 ordered relocations, normalized SHA-256 32ca599a7f9f3eb44546bcd119ce77eb705e9fc745f9d852c16295cbe1f3850f. Objdiff differs only on compiler-local switch labels; no byte or target exception. See docs/object_matching_logs/network_client_message_handler_obj_admission_review_20260904.md."
+  },
+  {
     "unit": "source/cache/cache_files",
     "function": "_cache_files_map_directory",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"

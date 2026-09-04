@@ -1,5 +1,15 @@
 [
   {
+    "unit": "source/ai/ai_profile",
+    "symbol": "_global_ai_meter_definitions",
+    "reason": "Natural separate 224-byte meter array and private 12-byte spray-name table share the exact 236-byte data section; both owner offsets/linkage, all bytes and all ten resolved relocations agree. Objdiff differs on string ownership. No aggregate facade or new target bytes; see docs/object_matching_logs/ai_profile_obj_complete_reconstruction_review_20260904.md.",
+    "measurements": {
+      "size": 236,
+      "relocation_count": 10,
+      "normalized_sha256": "3a69a8b8a83037c3277fa86c09c7aa4e9b9da8b480e3facb87275548ee4c88b8"
+    }
+  },
+  {
     "unit": "source/physics/collision_bsp_definitions",
     "symbol": "_global_collision_bsp_definition_data",
     "reason": "csplit represents 22 internal pointers through the preceding external image symbol; resolved image destinations, normalized bytes, relocation addresses, and relocation types are exact",

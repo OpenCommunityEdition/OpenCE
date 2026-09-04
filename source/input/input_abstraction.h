@@ -35,6 +35,10 @@ typedef char verify_game_input_preferences_size[
 
 /* ---------- prototypes/INPUT_ABSTRACTION.C */
 
+void input_abstraction_initialize(
+	void);
+void input_abstraction_update(
+	void);
 void input_abstraction_reset_controller_detection_timer(
 	void);
 void input_abstraction_get_local_player_preferences(

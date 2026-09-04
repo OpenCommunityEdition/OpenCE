@@ -42,9 +42,17 @@ enum
 
 enum
 {
-	_has_filename_bit = 0,
+	has_filename_bit = 0,
+	_has_filename_bit = has_filename_bit,
 
 	NUMBER_OF_REFERENCE_INFO_FLAGS
+};
+
+enum
+{
+	_find_files_recursive_bit = 0,
+	_find_files_enumerate_directories_bit,
+	NUMBER_OF_FIND_FILES_FLAGS
 };
 
 enum
@@ -65,12 +73,6 @@ struct datastore
 	struct datastore_entry entry[NUMBER_OF_DATASTORE_ENTRIES];
 };
 
-//enum
-//{
-//    _find_files_recursive_bit = 0,
-//    _find_files_enumerate_directories_bit,
-//    NUMBER_OF_FIND_FILES_FLAGS,
-//};
 //windows version of the header below?
 //enum
 //{
@@ -81,12 +83,6 @@ struct datastore
 //    EXTENSION_SEPARATOR = 46, // 0x002E '.'
 //    BAD_FILE = -1, // 0xFF
 //    MAXIMUM_SEARCH_DEPTH = 8, // 0x0008
-//};
-//
-//enum
-//{
-//    has_filename_bit = 0,
-//    NUMBER_OF_REFERENCE_INFO_FLAGS,
 //};
 //
 //struct find_files_state

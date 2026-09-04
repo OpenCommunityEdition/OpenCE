@@ -55,11 +55,68 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "bink/bink_playback.h"
 #include "cseries/errors.h"
+#include "cseries/cseries_windows.h"
+#include "game/game_globals.h"
+#include "game/player_control.h"
+#include "game/players.h"
 #include "input/input.h"
 #include "input/input_abstraction.h"
+#include "interface/player_ui.h"
+#include "interface/ui_widget.h"
+#include "interface/virtual_keyboard.h"
 #include "math/real_math.h"
+#include "networking/network_game_globals.h"
+#include "scenario/scenario.h"
+#include "units/vehicle_definitions.h"
+#include "units/vehicles.h"
 
 /* ---------- constants */
+
+enum
+{
+	_game_control_jump,
+	_game_control_switch_grenades,
+	_game_control_action,
+	_game_control_switch_weapons,
+	_game_control_melee,
+	_game_control_flashlight,
+	_game_control_grenade,
+	_game_control_primary_trigger,
+	_game_control_start,
+	_game_control_back,
+	_game_control_crouch,
+	_game_control_zoom,
+	NUMBER_OF_GAME_CONTROLS,
+};
+
+enum
+{
+	_joystick_controls_default,
+	_joystick_controls_southpaw,
+	_joystick_controls_legacy,
+	_joystick_controls_legacy_southpaw,
+	NUMBER_OF_JOYSTICK_CONTROLS,
+};
+
+enum
+{
+	_vehicle_type_human_plane = 3,
+	_vehicle_type_alien_fighter = 5,
+};
+
+enum
+{
+	_error_controller_unplugged_start_to_continue = 12,
+	_error_controller_unplugged = 13,
+};
+
+/* January promotes the rounded 45- and 10-degree single-precision constants
+ * before subtracting them; the 35-degree window and its reciprocal are double. */
+#define STICK_DIAGONAL_ANGLE 0.7853981852531433f
+#define STICK_SECOND_QUADRANT_DIAGONAL_ANGLE 2.356194496154785f
+#define RIGHT_STICK_DIAGONAL_SNAP_ANGLE ((double)0.1745329201221466f)
+#define LEFT_STICK_DIAGONAL_SNAP_ANGLE ((double)STICK_DIAGONAL_ANGLE - RIGHT_STICK_DIAGONAL_SNAP_ANGLE)
+#define STICK_DIAGONAL_BLEND_SCALE (1.0 / LEFT_STICK_DIAGONAL_SNAP_ANGLE)
 
 /* ---------- macros */
 
@@ -67,12 +124,24 @@ symbols in this file:
 
 struct game_input_state
 {
-	byte buttons[12];
+	byte buttons[NUMBER_OF_GAME_CONTROLS];
 	real forward_movement;
 	real strafe;
 	real yaw;
 	real pitch;
 };
+
+/* Vehicle tags remain opaque in the shared header. This authenticated prefix
+ * is sufficient for the aircraft-type check; it is not a complete tag layout. */
+struct vehicle_definition
+{
+	struct unit_definition unit;
+	unsigned long flags;
+	short vehicle_type;
+};
+
+typedef char verify_input_vehicle_type_offset[
+	offsetof(struct vehicle_definition, vehicle_type) == 0x2F4 ? 1 : -1];
 
 struct input_abstraction_runtime_globals
 {
@@ -101,14 +170,45 @@ typedef char verify_input_abstraction_runtime_globals_size[
 
 /* ---------- prototypes */
 
-unsigned long system_milliseconds(
-	void);
+static void set_default_game_input_preferences(
+	struct game_input_preferences *preferences);
+static boolean local_player_is_piloting_aircraft(
+	short controller_index);
 
 /* ---------- globals */
 
-extern struct input_abstraction_runtime_globals input_abstraction_globals;
+struct input_abstraction_runtime_globals input_abstraction_globals = {0};
+static real const stick_direction_angles[] =
+{
+	STICK_DIAGONAL_ANGLE,
+	STICK_SECOND_QUADRANT_DIAGONAL_ANGLE,
+	-STICK_DIAGONAL_ANGLE,
+	-STICK_SECOND_QUADRANT_DIAGONAL_ANGLE,
+};
 
 /* ---------- public code */
+
+void input_abstraction_initialize(
+	void)
+{
+	long controller_index;
+
+	csmemset(
+		&input_abstraction_globals,
+		0,
+		offsetof(struct input_abstraction_runtime_globals, time_of_first_device_insertion));
+	for (controller_index = 0; controller_index < MAXIMUM_GAMEPADS; controller_index++)
+	{
+		set_default_game_input_preferences(
+			&input_abstraction_globals.player_control_preferences[controller_index]);
+		input_abstraction_globals.controller_available[controller_index] =
+			input_has_gamepad((short)controller_index);
+	}
+	input_abstraction_reset_controller_detection_timer();
+	input_abstraction_globals.initialized = TRUE;
+
+	return;
+}
 
 void input_abstraction_dispose(
 	void)
@@ -214,4 +314,298 @@ void input_abstraction_update_device_changes(
 	return;
 }
 
+void input_abstraction_update(
+	void)
+{
+	long controller_index;
+
+	TAG_BLOCK_GET_ELEMENT(
+		&scenario_get_game_globals()->player_control,
+		0,
+		struct game_globals_player_control);
+	for (controller_index = 0; controller_index < MAXIMUM_GAMEPADS; controller_index++)
+	{
+		struct gamepad_state const *gamepad = input_get_gamepad_state((short)controller_index);
+
+		if (gamepad)
+		{
+			struct game_input_preferences const *preferences =
+				&input_abstraction_globals.player_control_preferences[controller_index];
+			struct game_input_state *state = &input_abstraction_globals.input_states[controller_index];
+			real left_angle;
+			real right_angle;
+			real left_x;
+			real left_y;
+			real right_x;
+			real right_y;
+			real left_scale;
+			real right_scale;
+			long control_index;
+			boolean invert_look;
+
+			player_look_yaw_rate[controller_index] = preferences->yaw_rate;
+			player_look_pitch_rate[controller_index] = preferences->pitch_rate;
+			left_angle = (real)atan2(
+				(real)gamepad->sticks[_gamepad_stick_left].y,
+				(real)gamepad->sticks[_gamepad_stick_left].x);
+			left_scale = (real)(1.0 / MAX(fabs((real)sin(left_angle)), fabs((real)cos(left_angle))));
+			left_x = PIN((real)gamepad->sticks[_gamepad_stick_left].x * (1.f / SHORT_MAX) * left_scale, -1.f, 1.f);
+			left_y = PIN((real)gamepad->sticks[_gamepad_stick_left].y * (1.f / SHORT_MAX) * left_scale, -1.f, 1.f);
+			right_angle = (real)atan2(
+				(real)gamepad->sticks[_gamepad_stick_right].y,
+				(real)gamepad->sticks[_gamepad_stick_right].x);
+			right_scale = (real)(1.0 / MAX(fabs((real)sin(right_angle)), fabs((real)cos(right_angle))));
+			right_x = PIN((real)gamepad->sticks[_gamepad_stick_right].x * (1.f / SHORT_MAX) * right_scale, -1.f, 1.f);
+			right_y = PIN((real)gamepad->sticks[_gamepad_stick_right].y * (1.f / SHORT_MAX) * right_scale, -1.f, 1.f);
+			for (control_index = 0; control_index < NUMBER_OF_GAME_CONTROLS; control_index++)
+			{
+				state->buttons[control_index] =
+					gamepad->buttons[preferences->game_control_to_xbox_buttons[control_index]];
+			}
+
+			if (preferences->joystick_controls == _joystick_controls_legacy ||
+				preferences->joystick_controls == _joystick_controls_legacy_southpaw)
+			{
+				short left_quadrant = (left_x < 0.f ? 1 : 0) + (left_y < 0.f ? 2 : 0);
+				short right_quadrant = (right_x < 0.f ? 1 : 0) + (right_y < 0.f ? 2 : 0);
+				real left_magnitude = (real)sqrt(left_x * left_x + left_y * left_y);
+				real right_magnitude = (real)sqrt(right_x * right_x + right_y * right_y);
+				real left_diagonal_distance = (real)fabs(left_angle - stick_direction_angles[left_quadrant]);
+				real right_diagonal_distance;
+
+				if (left_diagonal_distance >= LEFT_STICK_DIAGONAL_SNAP_ANGLE)
+				{
+					if (fabs(left_x) > fabs(left_y))
+					{
+						left_y = 0.f;
+						left_x = (left_x < 0.f ? -1 : 1) * left_magnitude;
+					}
+					else
+					{
+						left_x = 0.f;
+						left_y = (left_y < 0.f ? -1 : 1) * left_magnitude;
+					}
+				}
+				else if (fabs(left_angle) < STICK_DIAGONAL_ANGLE ||
+					fabs(left_angle) > STICK_SECOND_QUADRANT_DIAGONAL_ANGLE)
+				{
+					left_x = (left_x < 0.f ? -1 : 1) * left_magnitude;
+					left_y = (left_y < 0.f ? -1 : 1) * left_magnitude *
+						(1.0 - left_diagonal_distance * STICK_DIAGONAL_BLEND_SCALE);
+				}
+				else
+				{
+					left_y = (left_y < 0.f ? -1 : 1) * left_magnitude;
+					left_x = (left_x < 0.f ? -1 : 1) * left_magnitude *
+						(1.0 - left_diagonal_distance * STICK_DIAGONAL_BLEND_SCALE);
+				}
+
+				right_diagonal_distance = (real)fabs(right_angle - stick_direction_angles[right_quadrant]);
+				if (right_diagonal_distance >= RIGHT_STICK_DIAGONAL_SNAP_ANGLE)
+				{
+					if (fabs(right_x) > fabs(right_y))
+					{
+						right_y = 0.f;
+						right_x = (right_x < 0.f ? -1 : 1) * right_magnitude;
+					}
+					else
+					{
+						right_x = 0.f;
+						right_y = (right_y < 0.f ? -1 : 1) * right_magnitude;
+					}
+				}
+				else if (fabs(right_angle) < STICK_DIAGONAL_ANGLE ||
+					fabs(right_angle) > STICK_SECOND_QUADRANT_DIAGONAL_ANGLE)
+				{
+					right_x = (right_x < 0.f ? -1 : 1) * right_magnitude;
+					right_y = (right_y < 0.f ? -1 : 1) * right_magnitude *
+						(1.0 - right_diagonal_distance * STICK_DIAGONAL_BLEND_SCALE);
+				}
+				else
+				{
+					right_y = (right_y < 0.f ? -1 : 1) * right_magnitude;
+					right_x = (right_x < 0.f ? -1 : 1) * right_magnitude *
+						(1.0 - right_diagonal_distance * STICK_DIAGONAL_BLEND_SCALE);
+				}
+			}
+
+			invert_look = preferences->invert_look;
+			if (!invert_look && preferences->invert_look_aircraft_control)
+			{
+				invert_look = local_player_is_piloting_aircraft((short)controller_index);
+			}
+			switch (preferences->joystick_controls)
+			{
+				case _joystick_controls_default:
+					state->strafe = gamepad->buttons[_gamepad_binary_button_dpad_left] ? 1.f :
+						gamepad->buttons[_gamepad_binary_button_dpad_right] ? -1.f : -left_x;
+					state->forward_movement = gamepad->buttons[_gamepad_binary_button_dpad_up] ? 1.f :
+						gamepad->buttons[_gamepad_binary_button_dpad_down] ? -1.f : left_y;
+					state->yaw = -right_x;
+					state->pitch = (invert_look ? -1.f : 1.f) * right_y;
+					break;
+				case _joystick_controls_southpaw:
+					state->yaw = gamepad->buttons[_gamepad_binary_button_dpad_left] ? 1.f :
+						gamepad->buttons[_gamepad_binary_button_dpad_right] ? -1.f : -left_x;
+					state->pitch = (invert_look ? -1.f : 1.f) *
+						(gamepad->buttons[_gamepad_binary_button_dpad_up] ? 1.f :
+						gamepad->buttons[_gamepad_binary_button_dpad_down] ? -1.f : left_y);
+					state->forward_movement = right_y;
+					state->strafe = -right_x;
+					break;
+				case _joystick_controls_legacy:
+					state->yaw = gamepad->buttons[_gamepad_binary_button_dpad_left] ? 1.f :
+						gamepad->buttons[_gamepad_binary_button_dpad_right] ? -1.f : -left_x;
+					state->forward_movement = gamepad->buttons[_gamepad_binary_button_dpad_up] ? 1.f :
+						gamepad->buttons[_gamepad_binary_button_dpad_down] ? -1.f : left_y;
+					state->strafe = -right_x;
+					state->pitch = (invert_look ? -1.f : 1.f) * right_y;
+					break;
+				case _joystick_controls_legacy_southpaw:
+					state->strafe = gamepad->buttons[_gamepad_binary_button_dpad_left] ? 1.f :
+						gamepad->buttons[_gamepad_binary_button_dpad_right] ? -1.f : -left_x;
+					state->pitch = (invert_look ? -1.f : 1.f) *
+						(gamepad->buttons[_gamepad_binary_button_dpad_up] ? 1.f :
+						gamepad->buttons[_gamepad_binary_button_dpad_down] ? -1.f : left_y);
+					state->forward_movement = right_y;
+					state->yaw = -right_x;
+					break;
+				default:
+					error(_error_silent, "unknown joystick preset");
+					break;
+			}
+			input_abstraction_globals.controller_available[controller_index] = TRUE;
+		}
+		else
+		{
+			if (input_abstraction_globals.controller_available[controller_index])
+			{
+				short error_controller = (short)controller_index;
+				short error_code;
+				boolean pause_game;
+				boolean show_error = TRUE;
+
+				if (main_menu_is_active())
+				{
+					long available_controllers = 0;
+					long index;
+
+					for (index = 0; index < MAXIMUM_GAMEPADS; index++)
+					{
+						if (input_abstraction_globals.controller_available[index])
+						{
+							available_controllers++;
+						}
+					}
+					pause_game = FALSE;
+					error_code = _error_controller_unplugged;
+					if (available_controllers >= 2)
+					{
+						show_error =
+							player_ui_get_single_player_local_player_controller(0) == controller_index ||
+							player_ui_get_single_player_local_player_controller(1) == controller_index ||
+							player_ui_get_single_player_local_player_controller(2) == controller_index ||
+							player_ui_get_single_player_local_player_controller(3) == controller_index ||
+							player_ui_local_player_wants_to_play_multiplayer((short)controller_index);
+					}
+					else if (player_ui_get_single_player_local_player_controller(0) != controller_index &&
+						player_ui_get_single_player_local_player_controller(1) != controller_index &&
+						player_ui_get_single_player_local_player_controller(2) != controller_index &&
+						player_ui_get_single_player_local_player_controller(3) != controller_index &&
+						!player_ui_local_player_wants_to_play_multiplayer((short)controller_index))
+					{
+						error_controller = NONE;
+					}
+				}
+				else
+				{
+					pause_game = global_network_game_client_get() == NULL;
+					error_code = pause_game ? _error_controller_unplugged_start_to_continue :
+						_error_controller_unplugged;
+					show_error = local_player_exists((short)controller_index) == TRUE;
+				}
+				if (show_error)
+				{
+					if (virtual_keyboard_active())
+					{
+						virtual_keyboard_close();
+					}
+					display_error_deferred(error_code, error_controller, pause_game, pause_game);
+				}
+			}
+			input_abstraction_globals.controller_available[controller_index] = FALSE;
+		}
+	}
+
+	return;
+}
+
 /* ---------- private code */
+
+static boolean local_player_is_piloting_aircraft(
+	short controller_index)
+{
+	boolean piloting_aircraft = FALSE;
+	long player_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\input\\input_abstraction.c",
+		569,
+		(controller_index>=0) && (controller_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
+	player_index = local_player_get_player_index(controller_index);
+	if (player_index != NONE)
+	{
+		struct player_datum *player = player_try_and_get(player_index);
+
+		if (player)
+		{
+			struct unit_datum *unit = unit_try_and_get(player->unit_index);
+
+			if (unit && unit->object.parent_object_index != NONE && unit->unit.parent_seat_index != NONE)
+			{
+				struct unit_datum *vehicle = vehicle_get(unit->object.parent_object_index);
+				struct vehicle_definition *definition = vehicle_specific_definition_get(vehicle->definition_index);
+
+				if (definition->vehicle_type == _vehicle_type_human_plane ||
+					definition->vehicle_type == _vehicle_type_alien_fighter)
+				{
+					struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+						&definition->unit.unit.seats,
+						unit->unit.parent_seat_index,
+						struct unit_seat);
+
+					if (TEST_FLAG(seat->flags, _unit_seat_driver_bit))
+					{
+						piloting_aircraft = TRUE;
+					}
+				}
+			}
+		}
+	}
+
+	return piloting_aircraft;
+}
+
+static void set_default_game_input_preferences(
+	struct game_input_preferences *preferences)
+{
+	preferences->pitch_rate = 60.f;
+	preferences->yaw_rate = 120.f;
+	preferences->game_control_to_xbox_buttons[_game_control_jump] = _gamepad_analog_button_a;
+	preferences->game_control_to_xbox_buttons[_game_control_switch_grenades] = _gamepad_analog_button_black;
+	preferences->game_control_to_xbox_buttons[_game_control_action] = _gamepad_analog_button_x;
+	preferences->game_control_to_xbox_buttons[_game_control_switch_weapons] = _gamepad_analog_button_y;
+	preferences->game_control_to_xbox_buttons[_game_control_melee] = _gamepad_analog_button_b;
+	preferences->game_control_to_xbox_buttons[_game_control_flashlight] = _gamepad_analog_button_white;
+	preferences->game_control_to_xbox_buttons[_game_control_grenade] = _gamepad_analog_button_left_trigger;
+	preferences->game_control_to_xbox_buttons[_game_control_primary_trigger] = _gamepad_analog_button_right_trigger;
+	preferences->game_control_to_xbox_buttons[_game_control_start] = _gamepad_binary_button_start;
+	preferences->game_control_to_xbox_buttons[_game_control_back] = _gamepad_binary_button_back;
+	preferences->game_control_to_xbox_buttons[_game_control_crouch] = _gamepad_binary_button_left_thumb;
+	preferences->game_control_to_xbox_buttons[_game_control_zoom] = _gamepad_binary_button_right_thumb;
+	preferences->joystick_controls = _joystick_controls_default;
+	preferences->invert_look = FALSE;
+	preferences->invert_look_aircraft_control = FALSE;
+
+	return;
+}

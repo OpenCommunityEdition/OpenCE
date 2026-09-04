@@ -1,5 +1,13 @@
 # AI Profile `_ai_profile_change_render_spray` strict first shot (2026-08-30)
 
+> Superseded ownership claim (2026-09-04): the 236-byte csplit span below
+> establishes adjacency, not a single original C aggregate. The current
+> reconstruction uses the natural 224-byte meter-definition array and a
+> separate private 12-byte spray-name table. A target symbol at the independently
+> referenced +224 boundary names the latter. The earlier wrapper and its
+> purported unknown short (ordinary alignment padding) are removed; the original
+> measurements below are retained as historical evidence, not ownership proof.
+
 ## Outcome
 
 `source/ai/ai_profile.obj::_ai_profile_change_render_spray` is recovered in

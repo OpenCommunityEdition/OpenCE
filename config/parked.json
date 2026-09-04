@@ -2,6 +2,101 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/input/input_abstraction",
+      "function": "_input_abstraction_update",
+      "class": "unclassified",
+      "evidence": "Reconstructed ordinary typed January controller update covering normalization, legacy diagonal snapping, all four presets, aircraft inversion and disconnect handling. Two natural formulations; instruction, frame and relocation differences remain, not a proven narrow compiler tie. Isolated execution passed 240 sampled input cases and 16 disconnect scenarios; bounded evidence only. Nine strict exact siblings remain preserved. No raw offsets, type punning, compiler controls, fake dependencies, assembly or forced inline. Reopen for authoritative source or new precision/ownership evidence. See docs/object_matching_logs/input_abstraction_obj_small_family_wave_20260904.md.",
+      "measurements": {
+        "target": {
+          "size": 2384,
+          "relocation_count": 103,
+          "normalized_sha256": "7630e7c9cb2c1abfcce11af3bdf04a7e26ae5bf9a96b1286576b9444cd3c9cbe"
+        },
+        "base": {
+          "size": 2416,
+          "relocation_count": 114,
+          "normalized_sha256": "b313e9082f5a59d752fdaf147b03bb96b8e011b5caf7cfb1129256ea9f44f7c0"
+        },
+        "objdiff_percent": 67.32703
+      }
+    },
+    {
+      "unit": "source/tag_files/files_windows",
+      "function": "_file_open",
+      "class": "unclassified",
+      "evidence": "Typed January open/append/error flow reconstructed; candidate is 16 padded bytes shorter with return/control-topology differences. Natural file_error calls auto-inline to the same packets without source-level forcing. Previously rejected early-return donor not repeated. No fake dependencies, raw offsets, punning, assembly or compiler controls. Reopen for authentic source or family-level type/API evidence. See docs/object_matching_logs/files_windows_obj_small_family_wave_20260904.md.",
+      "measurements": {
+        "target": {
+          "size": 400,
+          "relocation_count": 23,
+          "normalized_sha256": "b91ff127948eb458e70ae51cf1efc5158a353749d27b2e29a03ad3abcb7b930b"
+        },
+        "base": {
+          "size": 384,
+          "relocation_count": 23,
+          "normalized_sha256": "7a5172a1a82ec4c9d83a0577970c4a341bdd52ab76907b0d330a5f537f3ef0eb"
+        },
+        "objdiff_percent": 84.65151
+      }
+    },
+    {
+      "unit": "source/tag_files/files_windows",
+      "function": "_file_read",
+      "class": "unclassified",
+      "evidence": "Complete typed read, exact-count check, EOF error and natural file_error call preserve January behavior. Same padded size and relocation count; register selection and reload placement remain different. No proven compiler recipe, allocation search, fake operations, raw offsets, assembly or forced inline. Reopen on authentic source or family API evidence. See docs/object_matching_logs/files_windows_obj_small_family_wave_20260904.md.",
+      "measurements": {
+        "target": {
+          "size": 176,
+          "relocation_count": 13,
+          "normalized_sha256": "8442e02641914ce558f9947431dc6e60171d38dd9ba1c9882defba9f2e39773a"
+        },
+        "base": {
+          "size": 176,
+          "relocation_count": 13,
+          "normalized_sha256": "51d43b44745309d3e8c9033422b29f4444fc8f19b492702bf0936aeae50a4a06"
+        },
+        "objdiff_percent": 93.43284
+      }
+    },
+    {
+      "unit": "source/tag_files/files_windows",
+      "function": "_file_write",
+      "class": "unclassified",
+      "evidence": "Complete typed write/count/error behavior with natural file_error call. Same padded size and relocation count; register selection and reload placement remain different. No proven compiler recipe, allocation search, fake operations, raw offsets, assembly or forced inline. Reopen on authentic source or family API evidence. See docs/object_matching_logs/files_windows_obj_small_family_wave_20260904.md.",
+      "measurements": {
+        "target": {
+          "size": 176,
+          "relocation_count": 12,
+          "normalized_sha256": "f1fb6f5c8738ecea224c025c70e077c7175200d705df410ce5773d166733e101"
+        },
+        "base": {
+          "size": 176,
+          "relocation_count": 12,
+          "normalized_sha256": "44d258415364d089b03af100e28a101e14bda1aace15f786f95f0f764ad0b7a3"
+        },
+        "objdiff_percent": 93.23077
+      }
+    },
+    {
+      "unit": "source/tag_files/files_windows",
+      "function": "_file_get_size",
+      "class": "unclassified",
+      "evidence": "Complete typed path/attribute lookup, low-size return and natural file_error call. Same padded size and relocation count; info-pointer lifetime/register differences remain. No proven narrow compiler recipe, allocation search, fake operations, raw offsets, assembly or forced inline. Reopen on authentic source or family API evidence. See docs/object_matching_logs/files_windows_obj_small_family_wave_20260904.md.",
+      "measurements": {
+        "target": {
+          "size": 224,
+          "relocation_count": 13,
+          "normalized_sha256": "3e237cfe3e76e06d034d1b64effb416e37dfb3694bfa56ca1d16cd16cfba958f"
+        },
+        "base": {
+          "size": 224,
+          "relocation_count": 13,
+          "normalized_sha256": "d26fde60720be6198f891f7f8e4688b9a5617339aa8b8f4d1d314522ece62a27"
+        },
+        "objdiff_percent": 85.75325
+      }
+    },
+    {
       "unit": "source/effects/player_effects",
       "function": "_player_effect_get_camera_effect_matrix",
       "class": "unclassified",
