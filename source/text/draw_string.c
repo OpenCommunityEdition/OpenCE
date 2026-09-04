@@ -378,21 +378,13 @@ void draw_string_set_tab_stops(
 	short const *tab_stops,
 	short count)
 {
-	match_assert(
-		"c:\\halo\\SOURCE\\text\\draw_string.c",
-		350,
-		count>=0 && count<MAXIMUM_NUMBER_OF_TAB_STOPS);
+	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 350, count>=0 && count<MAXIMUM_NUMBER_OF_TAB_STOPS);
 
-	if (count > MAXIMUM_NUMBER_OF_TAB_STOPS)
-		count = MAXIMUM_NUMBER_OF_TAB_STOPS;
+	draw_string_globals.tab_stop_count = MIN(count, MAXIMUM_NUMBER_OF_TAB_STOPS);
 
-	draw_string_globals.tab_stop_count = count;
-	if (count > 0)
+	if (draw_string_globals.tab_stop_count > 0)
 	{
-		csmemcpy(
-			draw_string_globals.tab_stops,
-			tab_stops,
-			sizeof(*tab_stops) * count);
+		csmemcpy(draw_string_globals.tab_stops, tab_stops, draw_string_globals.tab_stop_count * sizeof(short));
 	}
 
 	return;

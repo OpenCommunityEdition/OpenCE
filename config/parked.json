@@ -2753,25 +2753,6 @@
     },
     {
       "unit": "source/text/draw_string",
-      "function": "_draw_string_set_tab_stops",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after retaining the natural typed setter with January's range assertions and bounded short-array copy. Target and candidate share the 112-byte padded envelope and objdiff reports 94.0 percent; January carries eight relocations while the candidate carries seven because the target duplicates a draw_string_globals count store/load that VC7 folds in the ordinary parameter form. Count-local and parameter-mutation variants were measured without an authentic improvement. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, assembly, raw offset, fake store, dependency trick, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the duplicated global access.",
-      "measurements": {
-        "target": {
-          "size": 112,
-          "relocation_count": 8,
-          "normalized_sha256": "093c317d014b2d059db64033de044e6fc0853997564a94f6fa3458b3500e30e6"
-        },
-        "base": {
-          "size": 112,
-          "relocation_count": 7,
-          "normalized_sha256": "d266e60a74db46ccbe29a4ecf8b2e67fd7aade5e2fc0fa5bf0f43ecafb1e2ddd"
-        },
-        "objdiff_percent": 94.0
-      }
-    },
-    {
-      "unit": "source/text/draw_string",
       "function": "_draw_unicode_string",
       "class": "unclassified",
       "evidence": "Fuzzy-parked after reconstructing the complete wide-string layout loop from January disassembly and HCEA. The retained typed C performs Unicode parsing, styled-font selection, measurement, wrapping, justification, clipping, highlighting, callbacks, and column termination; it uses TEST_FLAG and the corrected January assertion line provenance. Target is 912 padded bytes with 46 relocations; candidate is 960 with 45 and objdiff reports 53.439026 percent. Natural lifetime and line-top variants did not close the broad frame/register schedule. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, gameplay assembly, raw offset, representation punning, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler layout-loop donor.",
