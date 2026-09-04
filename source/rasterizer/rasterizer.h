@@ -194,9 +194,6 @@ typedef char verify_rasterizer_globals_framerate_throttle_offset[
 	offsetof(struct rasterizer_globals_definition, framerate_throttle) == 0x3D ? 1 : -1];
 typedef char verify_rasterizer_globals_near_clip_distance_offset[
 	offsetof(struct rasterizer_globals_definition, near_clip_distance) == 0x44 ? 1 : -1];
-typedef char verify_rasterizer_globals_lightmap_mode_offset[
-	offsetof(struct rasterizer_globals_definition, lightmap_mode) == 0x60 ? 1 : -1];
-
 struct rasterizer_window_begin_parameters
 {
 	short rasterizer_target;

@@ -109,8 +109,8 @@ large shared `rasterizer.h` changed one exact draw-primitives function, while
 inserting the enum there changed one exact decals function. Likewise, adding
 the bitmap lookup to broad `bitmap_group.h` changed the retained measurement
 of its parked large function. Moving only those declarations into subsystem-
-owned narrow headers restored both exact functions and the parked evidence;
-the real rasterizer field itself is safe in its true owner structure. This is
+owned narrow headers restored both exact functions and the parked evidence.
+The real rasterizer field remains in its true owner structure. This is
 declaration-position isolation, not a code-generation carrier.
 
 `rasterizer_xbox_environment.c` now consumes the owner definitions and drops
@@ -155,6 +155,24 @@ is not counted as target-owned data and does not block `Matching` admission.
 - Changed-source fake-match scan: zero review leads.
 - Tool suite: 261 tests passed.
 - `git diff --check`: clean.
+
+### Combined-canonical integration check
+
+The isolated sweep above preceded the larger Xbox rasterizer-core admission.
+When both packets were combined, the extra compile-only
+`verify_rasterizer_globals_lightmap_mode_offset` typedef changed C2's
+declaration context and transposed two independent loads in the otherwise
+exact `_decals_delete_permanent_from_cluster`. The semantic `lightmap_mode`
+field itself was retained; only that non-runtime verification typedef was
+removed. Its offset remains proved by the enclosing 0x68-byte structure,
+known preceding fields, January relocations to `_rasterizer_globals+0x60`,
+and the script-global entry at the same address.
+
+The final combined-canonical stable sweep again reports all 19
+`structure_render` functions exact, the 18-function / 3,424-byte gain, and
+zero regressions across all 8,245 tracked functions. The decals function is
+strict exact again. This removes a reconstruction-only declaration rather
+than retaining a source-shape device to influence generated code.
 
 Reproducibility SHA-256 values:
 
