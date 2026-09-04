@@ -103,6 +103,7 @@ enum
 
 enum
 {
+	_actor_combat_status_investigate = 2,
 	_actor_combat_status_certain = 4,
 };
 
@@ -520,6 +521,77 @@ void actor_stimulus_weapon_impact(
 		actor_look_secondary(
 			actor_index,
 			_secondary_look_weapon_impact,
+			_secondary_look_priority_default,
+			&direction);
+	}
+
+	return;
+}
+
+void actor_stimulus_weapon_detonation(
+	long actor_index,
+	long object_index,
+	real_point3d const *position,
+	short count)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition =
+		actor_definition_get(actor->meta.definition_index);
+
+	{
+		real_vector3d surprise_vector;
+		real distance = normalize3d(vector_from_points3d(
+			&actor->input.position.head_position,
+			position,
+			&surprise_vector));
+
+		if (fabs(distance) < _real_epsilon)
+		{
+			surprise_vector = actor->input.facing_vector;
+		}
+
+		if (actor->state.mode < _actor_mode_combat &&
+			distance < definition->panic.surprise_distance)
+		{
+			actor_stimulus_surprise(
+				actor_index,
+				_actor_surprise_unprepared_grenade,
+				NONE,
+				&surprise_vector);
+		}
+
+		actor_stimulus_combat(
+			actor_index,
+			_actor_stimulus_combat_impact,
+			NULL,
+			NONE,
+			0.0f,
+			90,
+			&surprise_vector,
+			NONE,
+			0,
+			FALSE);
+	}
+
+	if (object_index != NONE &&
+		game_team_is_enemy(
+			(word)actor->meta.team_index,
+			object_get(object_index)->object.owner_team_index))
+	{
+		actor_stimulus_suspicion(
+			actor_index,
+			_actor_combat_status_investigate,
+			900);
+	}
+
+	{
+		struct direction_specification direction;
+
+		direction.type = _direction_specification_point;
+		direction.point = *position;
+		actor_look_secondary(
+			actor_index,
+			_secondary_look_detonation,
 			_secondary_look_priority_default,
 			&direction);
 	}
