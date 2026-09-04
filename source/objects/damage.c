@@ -27,7 +27,7 @@ symbols in this file:
 00126090 0050:
 	_code_00126090 (0000)
 001260E0 0050:
-	_code_001260e0 (0000)
+	_get_player_index_from_object_or_parents (0000)
 00126130 0050:
 	_object_can_take_damage (0000)
 00126180 0050:
@@ -37,7 +37,7 @@ symbols in this file:
 00126200 0030:
 	_object_set_melee_attack_inhibited (0000)
 00126230 0020:
-	_code_00126230 (0000)
+	_damage_effect_new_on_object (0000)
 00126250 0080:
 	_object_permutation_shield_regions (0000)
 001262D0 0060:
@@ -175,9 +175,16 @@ typedef char object_destroy_effect_offset_assert[
 void render_debug_object_damage(
 	void);
 
+static long get_player_index_from_object_or_parents(
+	long object_index);
+
 static void object_permutation_shield_regions(
 	long object_index,
 	boolean active);
+
+static void damage_effect_new_on_object(
+	long effect_definition_index,
+	long object_index);
 
 /* ---------- globals */
 
@@ -371,15 +378,9 @@ void object_deplete_body(
 			struct collision_model *collision_model;
 
 			collision_model = collision_model_definition_get(collision_model_index);
-			effect_new_from_object(
+			damage_effect_new_on_object(
 				collision_model->resistance.body_depleted_effect.index,
-				object_index,
-				object_index,
-				NONE,
-				0.f,
-				0.f,
-				NULL,
-				NULL);
+				object_index);
 		}
 
 		if (object->object.type == _object_type_vehicle)
@@ -446,15 +447,9 @@ void object_destroy(
 		struct collision_model *collision_model;
 
 		collision_model = collision_model_definition_get(collision_model_index);
-		effect_new_from_object(
+		damage_effect_new_on_object(
 			collision_model->resistance.body_destroyed_effect.index,
-			object_index,
-			object_index,
-			NONE,
-			0.f,
-			0.f,
-			NULL,
-			NULL);
+			object_index);
 	}
 
 	code_00126090(object_index);
@@ -478,15 +473,9 @@ void object_deplete_shield(
 			struct collision_model *collision_model =
 				collision_model_definition_get(collision_model_index);
 
-			effect_new_from_object(
+			damage_effect_new_on_object(
 				collision_model->resistance.shield_depleted_effect.index,
-				object_index,
-				object_index,
-				NONE,
-				0.f,
-				0.f,
-				NULL,
-				NULL);
+				object_index);
 		}
 
 		object->object.current_shield_damage = 0.f;
@@ -634,6 +623,41 @@ void object_set_melee_attack_inhibited(
 }
 
 /* ---------- private code */
+
+static long get_player_index_from_object_or_parents(
+	long object_index)
+{
+	long player_index = NONE;
+
+	while (object_index != NONE)
+	{
+		if (unit_try_and_get(object_index))
+		{
+			player_index = player_index_from_unit_index(object_index);
+			break;
+		}
+
+		object_index = object_get(object_index)->object.parent_object_index;
+	}
+
+	return player_index;
+}
+
+static void damage_effect_new_on_object(
+	long effect_definition_index,
+	long object_index)
+{
+	effect_new_from_object(
+		effect_definition_index,
+		object_index,
+		object_index,
+		NONE,
+		0.f,
+		0.f,
+		NULL,
+		NULL);
+	return;
+}
 
 static void object_permutation_shield_regions(
 	long object_index,
