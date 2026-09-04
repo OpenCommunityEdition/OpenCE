@@ -14,6 +14,8 @@ MAIN_RUNTIME.H
 
 boolean gamepad_button_is_down(
 	short button_index);
+short main_get_window_count(
+	void);
 
 void compute_window_bounds(
 	long player_index,

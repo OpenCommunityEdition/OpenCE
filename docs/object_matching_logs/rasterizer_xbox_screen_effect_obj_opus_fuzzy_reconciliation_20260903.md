@@ -22,7 +22,9 @@ The two TU-private source helpers have descriptive semantic names and ordinary d
 ## Reconciliation work
 
 - Removed donor-local declarations with false signatures and used owning declarations from `rasterizer_xbox.h`, `hud_draw.h`, and related subsystem headers.
-- Added `main_get_window_count` to its owner, `main/main.h`, rather than declaring it at its call site.
+- Added `main_get_window_count` to the narrow owner interface,
+  `main/main_runtime.h`, rather than declaring it at its call site or perturbing
+  the broad `main.h` include surface.
 - Replaced the donor's provisional flat window structure with canonical `rasterizer_window_begin_parameters` access and replaced the incomplete cinematic state with layout-checked TU-private definitions matching the owner.
 - Replaced magic render, vertex, cull, convolution, and flash values with semantic constants and authenticated enums; retained project `real` and geometry types.
 - Kept natural C89 source, explicit returns, one parameter per line, and declarations near initialization. No raw address names, inline assembly, volatile/register steering, barriers, pragmas, representation punning, fake dependencies, undefined behavior, or nonsensical source forms remain.
@@ -35,6 +37,12 @@ Both functions are honest high-similarity residuals. The screen-effect residual 
 
 The focused gate reports `0 exact / 2 residual / 11 unwritten`. `ninja all_source` and report generation pass, and the semantic report scans 473 units with 6,062 functions evaluated, 5,735 semantic exact, 158 hidden exact (95,170 bytes), 5,752 accepted exact, and zero unit errors. The stable snapshot remains `8245` functions / `5726` exact; its diff reports `0` gained and `0` regressions. The parked audit reports `181 active / 0 stale / 0 invalid`, the fake-match scan reports zero review leads, `git diff --check` passes, and pytest reports `261 passed`.
 
-The combined `ninja all_source progress semantic_progress` invocation completed the object build and semantic report but the `progress` subcommand stopped on the pre-existing semantic-data record `source/shell/shell_xbox:_rdata_002a0a88` because its configured owner `$T18267` was absent. The admission audit reaches the same unrelated fail-closed check. This packet does not alter `shell_xbox`, semantic-data configuration, or that owner; the stable per-function sweep above is the applicable regression gate.
+The first current-head integration attempt placed `main_get_window_count` in
+the broad `main.h`; as documented by the earlier Main packet, that shifted
+VC7 type allocation in `shell_xbox.obj` and removed semantic-data owner
+`$T18267`. Moving the declaration to the established narrow
+`main/main_runtime.h` owner interface restored that data owner. The final
+combined `ninja all_source progress semantic_progress` and admission checks
+therefore pass without weakening the non-code gate.
 
 Exact-code progress therefore remains unchanged; this packet converts two previously unwritten functions into reviewed fuzzy reconstructions without weakening any inherited exact function.
