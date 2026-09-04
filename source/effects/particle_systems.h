@@ -79,7 +79,16 @@ void particle_systems_dispose(
 	void);
 void particle_systems_disconnect_from_structure_bsp(
 	void);
-long particle_system_new_attached(long definition_index, long object_index, short attachment_index);
+long particle_system_new_attached(
+	long definition_index,
+	long object_index,
+	short attachment_index);
+long particle_system_new_unattached(
+	long definition_index,
+	real_point3d const *position,
+	real_vector3d const *velocity,
+	real_argb_color const *color,
+	real scale);
 
 void particle_system_orphan(
 	long system_index);

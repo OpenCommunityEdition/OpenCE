@@ -416,14 +416,14 @@ static void particle_effect_new(
 			NONE,
 			&velocity,
 			NUMBER_OF_PARTICLE_EFFECT_MARKERS,
-			(long)particle_effect_marker_names,
+			particle_effect_marker_names,
 			marker_points,
 			marker_forwards,
 			scale,
 			0.0f,
 			NULL,
 			NULL,
-			0);
+			FALSE);
 	}
 	else if (group_tag == SOUND_DEFINITION_TAG)
 	{

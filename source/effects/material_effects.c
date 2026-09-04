@@ -114,14 +114,14 @@ void material_effect_new(
 					NONE,
 					NULL,
 					1,
-					0,
+					NULL,
 					&effect_position,
 					normal,
 					scale,
 					0.f,
 					NULL,
 					NULL,
-					0);
+					FALSE);
 			}
 
 			if (material->sound.index != NONE)

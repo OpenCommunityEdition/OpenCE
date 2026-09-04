@@ -177,19 +177,6 @@ void terminal_printf(
 void area_of_effect_cause_damage(
 	struct damage_data *damage,
 	long unlucky_object_index);
-long effect_new_attached_from_markers(
-	long definition_index,
-	long owner_object_index,
-	long object_index,
-	short node_index,
-	short marker_count,
-	char const **marker_names,
-	real_point3d const *marker_points,
-	real_vector3d const *marker_forwards,
-	real scale_a,
-	real scale_b,
-	real_rgb_color const *color,
-	struct effect_vector_field const *impulse_field);
 boolean player_teleport(
 	long player_index,
 	long source_unit_index,

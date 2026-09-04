@@ -215,8 +215,6 @@ void particle_systems_dispose(
 	void);
 void weather_particle_systems_dispose(
 	void);
-void effects_dispose(
-	void);
 void particles_dispose(
 	void);
 void contrails_dispose(
@@ -305,8 +303,6 @@ void players_dispose_from_old_map(
 void contrails_dispose_from_old_map(
 	void);
 void particles_dispose_from_old_map(
-	void);
-void effects_dispose_from_old_map(
 	void);
 void game_sound_dispose_from_old_map(
 	void);

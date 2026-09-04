@@ -1353,8 +1353,8 @@ static void create_ghost_effect(
 					reflect_vector3d(&direction, &collision.plane.n, &marker_forwards[3]);
 
 					effect_new_unattached_from_markers(definition->effect.index, NONE, NULL, 4,
-						(long)marker_names, marker_points, marker_forwards, scale, scale,
-						NULL, NULL, 1);
+						marker_names, marker_points, marker_forwards, scale, scale,
+						NULL, NULL, TRUE);
 				}
 			}
 		}
@@ -1423,8 +1423,8 @@ static void create_pelican_effect(
 				scale = 1.0f-collision.t;
 
 				effect_new_unattached_from_markers(definition->effect.index, NONE, NULL, 3,
-					(long)marker_names, marker_points, marker_forwards, scale, scale,
-					NULL, NULL, 1);
+					marker_names, marker_points, marker_forwards, scale, scale,
+					NULL, NULL, TRUE);
 			}
 		}
 	}

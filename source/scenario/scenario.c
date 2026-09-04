@@ -167,6 +167,7 @@ symbols in this file:
 #include "bink/bink_playback.h"
 #include "cache/cache_files.h"
 #include "cseries/errors.h"
+#include "effects/effects.h"
 #include "effects/material_effect_definitions.h"
 #include "game/game_globals.h"
 #include "game/players.h"
@@ -220,8 +221,6 @@ void lights_reconnect_to_structure_bsp(
 	void);
 void ai_reconnect_to_structure_bsp(
 	void);
-void effects_reconnect_to_structure_bsp(
-	void);
 void particles_reconnect_to_structure_bsp(
 	void);
 void particle_systems_reconnect_to_structure_bsp(
@@ -246,8 +245,6 @@ void objects_disconnect_from_structure_bsp(
 void lights_disconnect_from_structure_bsp(
 	void);
 void ai_disconnect_from_structure_bsp(
-	void);
-void effects_disconnect_from_structure_bsp(
 	void);
 void particles_disconnect_from_structure_bsp(
 	void);

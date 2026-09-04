@@ -3852,6 +3852,196 @@
         },
         "objdiff_percent": 85.783134
       }
+    },
+    {
+      "unit": "source/effects/effects",
+      "function": "_effect_allowed_by_environment",
+      "class": "unclassified",
+      "evidence": "The retained ordinary-C environment switch implements the complete January air, water, vacuum, and anywhere behavior with named enum constants and typed location/point arguments, and the later HCEA reconstruction independently corroborates those four arms. January's invalid-enum arm calls the fatal assertion path and then reloads an uninitialized result byte if system_exit unexpectedly returns. The Opus donor reproduced that indeterminate fallthrough and was exact, but it is rejected under the no-undefined-behavior rule. The closest safe natural source initializes the result from the meaningful anywhere predicate before overriding the air/water arms; invalid and vacuum values therefore remain FALSE. It compiles to 112 padded bytes and ten relocations versus January's 128, with 55.909092 percent objdiff, while preserving the donor's better 1,616-byte and 592-byte shapes in both real callers. Simple FALSE initialization and assignment-after-assert forms also produced 112 bytes but caused both callers to inline the assertion body and regress broadly. The fail-closed classifier returns UNKNOWN. No uninitialized read, false noreturn declaration, volatile/register forcing, barrier, pragma, assembly, fake dependency, or nonsensical branch is retained. Reopen only for authoritative January source proving a safe result lifetime or a truthful shared noreturn contract that naturally reproduces the target.",
+      "measurements": {
+        "target": {
+          "size": 128,
+          "relocation_count": 10,
+          "normalized_sha256": "a005be4ac405246678b6c4e9a4bf65deb16b96b5208fad9454b45df70e8fa7cd"
+        },
+        "base": {
+          "size": 112,
+          "relocation_count": 10,
+          "normalized_sha256": "19760ee664c88645139c9ce8c61958c388596d76ccd0eae8bba88f5c865632df"
+        },
+        "objdiff_percent": 55.909092
+      }
+    },
+    {
+      "unit": "source/effects/effects",
+      "function": "_effect_evaluate_function_integral",
+      "class": "unclassified",
+      "evidence": "The retained ordinary-C switch implements every January distribution function with the recovered enum constants and the target's -1, 0, 1, 2, and 3 floating constants. January and the candidate both occupy 176 padded bytes, but VC7 tail-merges the early fraction == -1 zero return with the end-mode zero return, leaving 16 relocations against January's 17 and an 82.694916 percent objdiff score. The conditional-expression spelling tested by Opus regressed the block topology rather than restoring January's selective merge. The later HCEA source independently corroborates the formulas, and the fail-closed classifier returns UNKNOWN. No duplicated fake branch, volatile/register forcing, barrier, pragma, assembly, or undefined behavior is retained. Reopen only for authoritative January source/local records or a natural same-compiler source shape that explains the selective zero-tail separation.",
+      "measurements": {
+        "target": {
+          "size": 176,
+          "relocation_count": 17,
+          "normalized_sha256": "d68c4243e967a0ca2728e4396cd92595dfbfdb5253489e32bbfb08c9b9d3ed29"
+        },
+        "base": {
+          "size": 176,
+          "relocation_count": 16,
+          "normalized_sha256": "d9cf43e51902938bb440df7323ee852a858ce3ce33f109cd8924174ebb443c82"
+        },
+        "objdiff_percent": 82.694916
+      }
+    },
+    {
+      "unit": "source/effects/effects",
+      "function": "_effect_generate_part",
+      "class": "unclassified",
+      "evidence": "The retained typed ordinary-C part dispatcher covers the target's particle-system, sound, object, decal, damage, and light tag cases, uses subsystem accessors and engine real/color types, and is independently corroborated by the later HCEA reconstruction. Its safe unknown-tag assertion formats into the real global temporary buffer. January's target instead proves a malformed three-argument csprintf call with no destination buffer; the Opus donor reproduced that call, which would write through the format-string literal before the fatal assertion, so it is rejected as unsafe and nonsensical source. The safe candidate is 976 padded bytes with 28 relocations versus January's 992 bytes and 27 relocations, at 85.99458 percent objdiff; the remaining frame delta is also consistent with one unrecovered four-byte local. The fail-closed classifier returns UNKNOWN. No malformed variadic call, raw offset, representation pun, volatile/register forcing, barrier, pragma, forced inline, or assembly is retained. Reopen only for authoritative January source that supplies a safe formatting contract and the missing natural local lifetime.",
+      "measurements": {
+        "target": {
+          "size": 992,
+          "relocation_count": 27,
+          "normalized_sha256": "eb3a1fe032ad59202ce0a3fc407f282644a5ffb8e7af42b974f68761622ca9d3"
+        },
+        "base": {
+          "size": 976,
+          "relocation_count": 28,
+          "normalized_sha256": "a1ef8676e8952af52dbecfeaf78c8273d0b0a959bd48fa00a580c132b4c92128"
+        },
+        "objdiff_percent": 85.99458
+      }
+    },
+    {
+      "unit": "source/effects/effects",
+      "function": "_effect_generate_particles",
+      "class": "unclassified",
+      "evidence": "The retained ordinary-C implementation completes the event-particle traversal, distribution, marker transforms, environment/disposition filtering, velocity/orientation, tint, split-screen limits, and particle creation using named enums, typed structures, cseries flags, and engine real types. January disassembly and relocations establish the same behavior, and the later HCEA reconstruction corroborates the algorithm. The candidate is 1,616 padded bytes with the same 46 relocation count versus January's 1,888 bytes, at 68.30481 percent objdiff. January inlines effect_real_random_range at three sites, whereas VC7 keeps natural calls in this context; forcing inline would violate the house rule and disturb the exact out-of-line/helper schedule. The fail-closed classifier returns UNKNOWN. No forced inline, duplicated helper body, volatile/register forcing, barrier, pragma, assembly, raw offset, or fake control flow is retained. Reopen only for authoritative January source or natural compatible-compiler evidence for the three helper-inline decisions.",
+      "measurements": {
+        "target": {
+          "size": 1888,
+          "relocation_count": 46,
+          "normalized_sha256": "d196a029c22bfe043323cd0def8c1f0365590b559f3fbb65f23c9ef5b4065ef5"
+        },
+        "base": {
+          "size": 1616,
+          "relocation_count": 46,
+          "normalized_sha256": "54d1ff54d1dc06f03c9e8729f779cc63c3afc13901dad56d027f98534dca5d43"
+        },
+        "objdiff_percent": 68.30481
+      }
+    },
+    {
+      "unit": "source/effects/effects",
+      "function": "_effect_generate_parts",
+      "class": "unclassified",
+      "evidence": "The retained ordinary-C implementation walks the current event's typed part block, validates semantic locations and references, applies disposition and environment enums, resolves world marker transforms, honors the world-down flag, computes the effect scale, and dispatches each part. January disassembly/relocations and the independent HCEA reconstruction corroborate the complete behavior. Target and candidate share the same 592-byte padded envelope and all 15 relocation identities; objdiff reports 91.225 percent, with the remaining difference confined to register allocation and one alignment jump. The fail-closed classifier returns UNKNOWN. No representation punning from HCEA, manual offsets, forced inline, volatile/register forcing, barrier, pragma, assembly, or fake branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor that explains the local/register schedule.",
+      "measurements": {
+        "target": {
+          "size": 592,
+          "relocation_count": 15,
+          "normalized_sha256": "57b1eb3518c25cd821a330e2cb80201e5196bcd98d140bce265503797999db71"
+        },
+        "base": {
+          "size": 592,
+          "relocation_count": 15,
+          "normalized_sha256": "4d2196b5982f1a6ba4dc7d6db5a070f641d7d02339a5710e692ab01f7d77d221"
+        },
+        "objdiff_percent": 91.225
+      }
+    },
+    {
+      "unit": "source/effects/effects",
+      "function": "_effect_get_node_matrix",
+      "class": "unclassified",
+      "evidence": "The retained ordinary-C helper resolves NONE to the object's origin matrix, first-person node designators through the first-person-weapon accessor, and ordinary node designators through the object accessor, using the recovered named first-person bit. January and the candidate share the same 80-byte padded envelope and three relocation identities; objdiff reports 92.88461 percent. Their two out-of-line return arms are ordered oppositely, while the natural if/else-if/else spelling tested by Opus shrinks the helper to 64 bytes. The later HCEA reconstruction corroborates the semantics and the fail-closed classifier returns UNKNOWN. No forced branch carrier, volatile/register forcing, barrier, pragma, assembly, or raw mask offset is retained. Reopen only for authoritative January source/local records or a natural same-compiler source shape that controls the arm order.",
+      "measurements": {
+        "target": {
+          "size": 80,
+          "relocation_count": 3,
+          "normalized_sha256": "0d95929225eaea99b2246cf8cfcbd8207e89afd5eed6b827464b612b9d9daf1f"
+        },
+        "base": {
+          "size": 80,
+          "relocation_count": 3,
+          "normalized_sha256": "89e9defe2b034898c4530c79fdbcc71a6a801d52792da5c22087f9024297e958"
+        },
+        "objdiff_percent": 92.88461
+      }
+    },
+    {
+      "unit": "source/effects/effects",
+      "function": "_effect_part_allowed_by_disposition",
+      "class": "unclassified",
+      "evidence": "The retained one-expression helper implements the complete named-enum rule: nonviolent effects reject violent parts and other effects reject nonviolent parts. Target and candidate share 32 padded bytes, have no relocations, and implement the same comparisons; objdiff reports 79.166664 percent because January computes through CL/DL and copies to AL while natural VC7 C computes directly in AL with the disposition in CX. Parameter-order probes did not change the allocation, and the independent HCEA reconstruction corroborates the rule. The fail-closed classifier returns UNKNOWN. No register forcing, volatile access, barrier, pragma, assembly, fake temporary, or nonsensical branch is retained. Reopen only for authoritative January prototype/local records or a natural same-compiler donor explaining the private register convention.",
+      "measurements": {
+        "target": {
+          "size": 32,
+          "relocation_count": 0,
+          "normalized_sha256": "e878f1da4c5677d4e788b43988e2655d11524f10570cd45b8d60ffaf745e54df"
+        },
+        "base": {
+          "size": 32,
+          "relocation_count": 0,
+          "normalized_sha256": "4077be2bfbc9b1bafede8b74df69c9be8f3588608edcf86799f21e8b31a06466"
+        },
+        "objdiff_percent": 79.166664
+      }
+    },
+    {
+      "unit": "source/effects/effects",
+      "function": "_effect_scale",
+      "class": "unclassified",
+      "evidence": "The retained ordinary-C helper scales an engine real by the effect's scale_a and scale_b values under the corresponding cseries flag masks, exactly matching January's recovered five-parameter semantics and the independent HCEA reconstruction. Target and candidate share 48 padded bytes and have no relocations; objdiff reports 87.5 percent. The retained value-mutation spelling leaves only January's x87 pop/reload pair different and keeps the 128-byte effect_real_random_range caller exact. A separate scaled_value local makes this out-of-line helper exact but regresses that larger exact caller, proving a genuine same-source inline/out-of-line codegen fork. The fail-closed classifier returns UNKNOWN. No duplicate helper, forced inline, volatile/register forcing, barrier, pragma, assembly, or fake dependency is retained. Reopen only for authoritative January source or natural TU-context evidence that satisfies both emitted forms.",
+      "measurements": {
+        "target": {
+          "size": 48,
+          "relocation_count": 0,
+          "normalized_sha256": "fa6e87903a77e69479c8093e30c27f512a543da7c828aa0888a7feb02efcca1d"
+        },
+        "base": {
+          "size": 48,
+          "relocation_count": 0,
+          "normalized_sha256": "3f58193a9072d61aebec6170661e12471f6ef41f2d928084da6a9969f857f122"
+        },
+        "objdiff_percent": 87.5
+      }
+    },
+    {
+      "unit": "source/effects/effects",
+      "function": "_effect_update",
+      "class": "unclassified",
+      "evidence": "The retained typed ordinary-C owner implements the complete effect lifecycle: object/parent location tracking, looping driver updates, stop/delete transitions, color validation, event timing, location updates, particle and part generation, event advance, and terminal cleanup. January control flow and all 48 relocation identities plus the independent HCEA reconstruction corroborate the behavior. The candidate is 1,312 padded bytes versus January's 1,328 and objdiff reports 94.71298 percent. The remaining three-instruction/private-register delta is coupled to January's three inlined effect_real_random_range sites in effect_generate_particles; natural VC7 retains those helper calls and does not establish January's EDI/EBX convention. The fail-closed classifier returns UNKNOWN. No forced inline, register forcing, volatile access, barrier, pragma, assembly, raw offset, representation pun, or fake path is retained. Reopen only for authoritative January source or natural TU-context evidence resolving the downstream helper-inline schedule.",
+      "measurements": {
+        "target": {
+          "size": 1328,
+          "relocation_count": 48,
+          "normalized_sha256": "0e9307dd99a9d220aebf4f39b9c10df08687d3796376148bce23387fe54c6fd3"
+        },
+        "base": {
+          "size": 1312,
+          "relocation_count": 48,
+          "normalized_sha256": "bbafc4b8132a06ed0bc7dc9e1407a77173e4539f8859fb44a7529ce86dd0d172"
+        },
+        "objdiff_percent": 94.71298
+      }
+    },
+    {
+      "unit": "source/effects/effects",
+      "function": "_effects_object_is_corpse",
+      "class": "unclassified",
+      "evidence": "The retained ordinary-C predicate uses the typed biped accessor, named dead flag, recovered CORPSE_SETTLING_TIME constant, unit time_of_death field, and game_time_get to implement the complete January corpse test. The later HCEA reconstruction corroborates the semantics. Candidate and target have the same two relocation identities, but VC7 tail-merges the three FALSE exits into 64 padded bytes while January keeps three distinct exits in 80 bytes; objdiff reports 67.870964 percent. The classifier identifies the return-shape signature, but no source-authentic spelling found by Opus prevents the merge. No duplicated fake condition, volatile/register forcing, barrier, pragma, assembly, or undefined behavior is retained. Reopen only for authoritative January source/local records or a natural same-compiler spelling that preserves the separate exits.",
+      "measurements": {
+        "target": {
+          "size": 80,
+          "relocation_count": 2,
+          "normalized_sha256": "258911960813c6bc362d9c018f048c2a6aac9ed52fb28febb5bca828cddd2e4c"
+        },
+        "base": {
+          "size": 64,
+          "relocation_count": 2,
+          "normalized_sha256": "95450f4504f5450759bdc547245cb0d7ef6407ab93326408f6400caee80c2f16"
+        },
+        "objdiff_percent": 67.870964
+      }
     }
   ]
 }
