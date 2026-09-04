@@ -16,5 +16,13 @@ void render_debug_triangle(
 	real_point3d const *point1,
 	real_point3d const *point2,
 	real_argb_color const *color);
+void render_debug_polygon(
+	real_point3d const *points,
+	short point_count,
+	real_argb_color const *color);
+void render_debug_polygon_edges(
+	real_point3d const *points,
+	short point_count,
+	real_argb_color const *color);
 
 #endif // __RENDER_DEBUG_GEOMETRY_H

@@ -134,7 +134,9 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "math/real_math.h"
+#include "rasterizer/rasterizer_debug.h"
 #include "render/render_debug.h"
+#include "render/render_debug_geometry.h"
 
 /* ---------- constants */
 
@@ -148,16 +150,222 @@ symbols in this file:
 
 /* ---------- public code */
 
-void render_debug_quaternion(
+void render_debug_triangle(
 	boolean immediate,
-	const real_point3d *point,
-	const real_quaternion *quaternion,
+	real_point3d const *point0,
+	real_point3d const *point1,
+	real_point3d const *point2,
+	real_argb_color const *color)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		480,
+		immediate);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		481,
+		point0);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		482,
+		point1);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		483,
+		point2);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		484,
+		color);
+
+	rasterizer_debug_triangle(
+		point0,
+		point1,
+		point2,
+		color);
+
+	return;
+}
+
+void render_debug_polygon(
+	real_point3d const *points,
+	short point_count,
+	real_argb_color const *color)
+{
+	short index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		855,
+		points);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		856,
+		color);
+
+	for (index = 1; index<point_count-1; index++)
+	{
+		render_debug_triangle(
+			TRUE,
+			points,
+			&points[index],
+			&points[index+1],
+			color);
+	}
+
+	return;
+}
+
+void render_debug_vector(
+	boolean immediate,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real size,
+	real_argb_color const *color)
+{
+	real_point3d end_point;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		388,
+		point);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		389,
+		vector);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		390,
+		color);
+
+	end_point.x = point->x + size*vector->i;
+	end_point.y = point->y + size*vector->j;
+	end_point.z = point->z + size*vector->k;
+
+	render_debug_line(
+		immediate,
+		point,
+		&end_point,
+		color);
+
+	return;
+}
+
+void render_debug_tick(
+	boolean immediate,
+	real_point3d const *point,
+	real_vector3d const *tick_vector,
+	real tick_size,
+	real_argb_color const *color)
+{
+	real_point3d point0;
+	real_point3d point1;
+	real negative_tick_size;
+
+	point0.x = point->x + tick_size*tick_vector->i;
+	point0.y = point->y + tick_size*tick_vector->j;
+	point0.z = point->z + tick_size*tick_vector->k;
+	negative_tick_size = -tick_size;
+	point1.x = point->x + negative_tick_size*tick_vector->i;
+	point1.y = point->y + negative_tick_size*tick_vector->j;
+	point1.z = point->z + negative_tick_size*tick_vector->k;
+
+	render_debug_line(
+		immediate,
+		&point0,
+		&point1,
+		color);
+
+	return;
+}
+
+void render_debug_line_offset(
+	boolean immediate,
+	real_point3d const *p0,
+	real_point3d const *p1,
+	real_argb_color const *color,
+	real offset)
+{
+	real_point3d point0;
+	real_point3d point1;
+
+	point0.x = p0->x + offset*global_up3d->i;
+	point0.y = p0->y + offset*global_up3d->j;
+	point0.z = p0->z + offset*global_up3d->k;
+	point1.x = p1->x + offset*global_up3d->i;
+	point1.y = p1->y + offset*global_up3d->j;
+	point1.z = p1->z + offset*global_up3d->k;
+
+	render_debug_line(
+		immediate,
+		&point0,
+		&point1,
+		color);
+
+	return;
+}
+
+void render_debug_matrix(
+	boolean immediate,
+	struct real_matrix4x3 const *matrix,
 	real size)
 {
-	real_matrix4x3 matrix;
+	render_debug_vector(
+		immediate,
+		&matrix->position,
+		&matrix->forward,
+		size*matrix->scale,
+		global_real_argb_red);
+	render_debug_vector(
+		immediate,
+		&matrix->position,
+		&matrix->left,
+		size*matrix->scale,
+		global_real_argb_green);
+	render_debug_vector(
+		immediate,
+		&matrix->position,
+		&matrix->up,
+		size*matrix->scale,
+		global_real_argb_blue);
 
-	matrix4x3_from_point_and_quaternion(&matrix, point, quaternion);
-	render_debug_matrix(immediate, &matrix, size);
+	return;
+}
+
+void render_debug_polygon_edges(
+	real_point3d const *points,
+	short point_count,
+	real_argb_color const *color)
+{
+	short index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		873,
+		points);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		874,
+		color);
+
+	if (point_count>2)
+	{
+		render_debug_line(
+			TRUE,
+			&points[point_count-1],
+			points,
+			color);
+
+		for (index = 1; index<point_count; index++)
+		{
+			render_debug_line(
+				TRUE,
+				&points[index-1],
+				&points[index],
+				color);
+		}
+	}
+
 	return;
 }
 
@@ -171,6 +379,19 @@ void render_debug_vectors(
 	real_matrix4x3 matrix;
 
 	matrix4x3_from_point_and_vectors(&matrix, point, forward, up);
+	render_debug_matrix(immediate, &matrix, size);
+	return;
+}
+
+void render_debug_quaternion(
+	boolean immediate,
+	const real_point3d *point,
+	const real_quaternion *quaternion,
+	real size)
+{
+	real_matrix4x3 matrix;
+
+	matrix4x3_from_point_and_quaternion(&matrix, point, quaternion);
 	render_debug_matrix(immediate, &matrix, size);
 	return;
 }

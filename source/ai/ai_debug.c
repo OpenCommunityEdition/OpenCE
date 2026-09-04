@@ -30,6 +30,7 @@ AI_DEBUG.C
 #include "physics/collisions.h"
 #include "rasterizer/rasterizer.h"
 #include "render/render_debug.h"
+#include "render/render_debug_geometry.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "structures/structure_bsp_definitions.h"

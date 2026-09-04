@@ -8,6 +8,18 @@
 - Last stable donor snapshot: `scratch/opus-30k-after-hdr2.json`
 - Donor policy: read-only. Reconcile selectively onto current canonical; do not bulk cherry-pick.
 
+### 2026-09-04 token-exhaustion checkpoint
+
+The user reported that the follow-up Opus prompt nearly completed but exhausted
+its token budget before producing a final handoff.  A fresh read-only check
+confirmed that the donor still points at `eeedd72e5ba0fc1761519f68cad241fe606320e7`
+and retains the twelve modified translation units and `scratch/` evidence listed
+below.  Treat that live working-tree state, including its per-object reports and
+scratch candidates, as an unfinished reconciliation source.  Do not infer
+completion from the interrupted run, discard its dirty state, or replace it
+with the committed tip; audit and incorporate it object by object under the
+normal canonical gates when the current admitted queue is clear.
+
 Against canonical `c700b911f`, the committed donor retains 414 donor-only strict exact functions totaling 84,384 padded bytes. Most of the earlier Opus wave is already canonical: 306 of 337 functions and 67,184 of 72,720 padded bytes from `bb0d690a3` have been incorporated. The genuine committed review backlog is concentrated in `8aed00b49`, `608c66380`, and `02d350bbe`.
 
 ## Interrupted dirty session
