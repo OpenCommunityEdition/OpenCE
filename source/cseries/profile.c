@@ -284,6 +284,17 @@ enum
 
 /* ---------- macros */
 
+#define QUERY_TIMEBASE(timebase) \
+{ \
+	__asm push eax \
+	__asm push edx \
+	__asm rdtsc \
+	__asm mov dword ptr timebase, eax \
+	__asm mov dword ptr timebase+4, edx \
+	__asm pop edx \
+	__asm pop eax \
+}
+
 /* ---------- structures */
 
 struct profile_timer
@@ -581,6 +592,88 @@ void profile_initialize(
 	profile_globals.current_frame_history_index = 0;
 	profile_globals.lost_frame_count = 999;
 	profile_globals.framedump_file = NULL;
+
+	return;
+}
+
+void profile_render_start(
+	void)
+{
+	__int64 timebase;
+
+	profile_globals.current_frame.window_count = 0;
+	QUERY_TIMEBASE(timebase);
+	profile_globals.current_frame.render.start = timebase;
+
+	return;
+}
+
+void profile_render_end(
+	void)
+{
+	__int64 timebase;
+	real msec;
+
+	QUERY_TIMEBASE(timebase);
+	profile_globals.current_frame.render.end = timebase;
+	msec = (real)((timebase-profile_globals.current_frame.render.start)*1000.0f/
+		profile_globals.timebase_frequency);
+	profile_globals.current_frame.render.total += msec;
+	profile_globals.current_frame.render.frame_total += msec;
+
+	return;
+}
+
+void profile_texture_start(
+	void)
+{
+	__int64 timebase;
+
+	QUERY_TIMEBASE(timebase);
+	profile_globals.current_frame.texture.start = timebase;
+
+	return;
+}
+
+void profile_texture_end(
+	void)
+{
+	__int64 timebase;
+	real msec;
+
+	QUERY_TIMEBASE(timebase);
+	profile_globals.current_frame.texture.end = timebase;
+	msec = (real)((timebase-profile_globals.current_frame.texture.start)*1000.0f/
+		profile_globals.timebase_frequency);
+	profile_globals.current_frame.texture.total += msec;
+	profile_globals.current_frame.texture.frame_total += msec;
+
+	return;
+}
+
+void profile_idle_start(
+	void)
+{
+	__int64 timebase;
+
+	QUERY_TIMEBASE(timebase);
+	profile_globals.current_frame.idle.start = timebase;
+
+	return;
+}
+
+void profile_idle_end(
+	void)
+{
+	__int64 timebase;
+	real msec;
+
+	QUERY_TIMEBASE(timebase);
+	profile_globals.current_frame.idle.end = timebase;
+	msec = (real)((timebase-profile_globals.current_frame.idle.start)*1000.0f/
+		profile_globals.timebase_frequency);
+	profile_globals.current_frame.idle.total += msec;
+	profile_globals.current_frame.idle.frame_total += msec;
 
 	return;
 }
