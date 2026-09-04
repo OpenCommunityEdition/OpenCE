@@ -100,3 +100,16 @@ parameters, explicit returns, and ordinary direct control flow. No raw offset,
 false type, representation pun, assembly, volatile/register forcing, optimizer
 barrier, pragma, fake dependency, forced inline/noinline, undefined behavior,
 or nonsensical branch is introduced. The January inline schedule is preserved.
+
+## Canonical admission
+
+Integrated as `c673081e2` after the independent source review, including
+authenticated structure/member names and source/attachment layout assertions.
+The canonical full build and every changed-header consumer pass. The stable
+sweep against `cda32ef8b` confirms six gains / 1,344 padded bytes / zero
+regressions. Current canonical metrics are 889,424 meaningful matched code
+bytes, 6,097 credited functions, 6,154 semantic exact functions, and 6,170
+accepted exact functions, with zero semantic errors. Units remains 189/189;
+all 235 parks validate; the admission audit has zero contradictions or
+revocations; all 272 tool tests pass. Neither sound object emits
+`point_from_line3d`, and both protected bitmap file hashes are unchanged.
