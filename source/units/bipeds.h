@@ -133,6 +133,8 @@ boolean biped_fix_position(
 void biped_accelerate(
 	long biped_index,
 	real_vector3d *acceleration);
+void biped_snap_facing(
+	long biped_index);
 
 void biped_stop_limp_body_physics(
 	long biped_index);

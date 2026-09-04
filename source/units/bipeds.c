@@ -259,6 +259,8 @@ enum
 
 /* ---------- macros */
 
+#define BIPED_CLIMBING_SNAP_ANGLE ((real)(10.0*M_PI/180.0))
+
 /* ---------- structures */
 
 struct scenario_object_datum
@@ -293,11 +295,6 @@ struct scenario_biped_datum
 	struct scenario_object_permutation permutation;
 	struct scenario_unit_datum unit;
 };
-
-/* ---------- prototypes */
-
-void biped_snap_facing(
-	long biped_index);
 
 /* ---------- globals */
 
@@ -868,6 +865,146 @@ static void biped_find_nearby_support_surface(
 
 	match_assert("c:\\halo\\SOURCE\\units\\bipeds.c", 4034, global_current_collision_user_depth > 1);
 	--global_current_collision_user_depth;
+
+	return;
+}
+
+void biped_snap_facing(
+	long biped_index)
+{
+	struct biped_datum *biped = biped_get(biped_index);
+	struct biped_definition *definition = biped_definition_get(biped->definition_index);
+
+	if (TEST_FLAG(definition->biped.flags, _biped_flying_bit) &&
+		!TEST_FLAG(biped->object.damage_flags, _object_dead_bit))
+	{
+		real_vector3d left;
+		real_vector3d up;
+		real sine;
+		real cosine;
+
+		match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\units\\bipeds.c", 4051, &biped->object.forward);
+
+		cross_product3d(&biped->object.forward, global_up3d, &left);
+		cross_product3d(&left, &biped->object.forward, &up);
+		if (normalize3d(&up)==0.f)
+		{
+			up = *global_forward3d;
+			left = *global_left3d;
+		}
+
+		cosine = (real)cos(biped->biped.bank);
+		sine = (real)sin(biped->biped.bank);
+		up.i *= cosine;
+		up.j *= cosine;
+		up.k *= cosine;
+		normalize3d(&left);
+		biped->object.up.i = left.i*sine + up.i;
+		biped->object.up.j = left.j*sine + up.j;
+		biped->object.up.k = left.k*sine + up.k;
+
+		biped_verify_object_vectors(biped_index, "post-bank-snapfacing");
+	}
+	else if (TEST_FLAG(definition->biped.flags, _biped_climbs_anything_bit) &&
+		!TEST_FLAG(biped->object.damage_flags, _object_dead_bit))
+	{
+		real_vector3d normal;
+		real_vector3d vector;
+		real_vector3d axis;
+		real_vector3d forward;
+
+		if (biped->biped.support_surface_index==NONE)
+		{
+			normal = biped->object.up;
+		}
+		else
+		{
+			boolean tilt_toward_surface = TRUE;
+
+			normal = biped->biped.ground_plane.n;
+			cross_product3d(&biped->object.up, &normal, &axis);
+			if (normalize3d(&axis)==0.f)
+			{
+				if (dot_product3d(&normal, &biped->object.up)>0.f)
+					tilt_toward_surface = FALSE;
+				else
+					axis = biped->object.forward;
+			}
+
+			if (tilt_toward_surface)
+			{
+				real_vector3d tilted_up = biped->object.up;
+
+				rotate_vector_about_axis(
+					&tilted_up,
+					&axis,
+					(real)sin(BIPED_CLIMBING_SNAP_ANGLE),
+					(real)cos(BIPED_CLIMBING_SNAP_ANGLE));
+				cross_product3d(&tilted_up, &normal, &vector);
+				if (dot_product3d(&axis, &vector)>0.f)
+					normal = tilted_up;
+			}
+		}
+
+		cross_product3d(&biped->object.forward, &normal, &vector);
+		cross_product3d(&normal, &vector, &forward);
+		if (normalize3d(&forward)==0.f)
+		{
+			cross_product3d(&normal, &biped->object.up, &vector);
+			cross_product3d(&normal, &vector, &forward);
+			if (normalize3d(&forward)==0.f)
+			{
+				normal = *global_up3d;
+				forward = *global_forward3d;
+			}
+		}
+
+		biped->object.forward = forward;
+		biped->object.up = normal;
+
+		biped_verify_object_vectors(biped_index, "post-climb-snapfacing");
+	}
+	else if (TEST_FLAG(biped->object.damage_flags, _object_dead_bit) &&
+		!TEST_FLAG(biped->biped.flags, _biped_airborne_bit))
+	{
+		real cosine_of_angle;
+
+		biped_verify_object_vectors(biped_index, "pre-deadplane-snapfacing");
+
+		cosine_of_angle = dot_product3d(&biped->object.up, &biped->biped.ground_plane.n);
+		if (!(fabs(cosine_of_angle - 1.f)<_real_epsilon))
+		{
+			real angle = (real)acos(cosine_of_angle);
+
+			if (angle!=0.f)
+			{
+				real_vector3d axis;
+
+				cross_product3d(&biped->object.up, &biped->biped.ground_plane.n, &axis);
+				if (normalize3d(&axis)!=0.f)
+				{
+					real cosine = (real)cos(angle);
+					real sine = (real)sin(angle);
+
+					rotate_vector_about_axis(&biped->object.up, &axis, sine, cosine);
+					rotate_vector_about_axis(&biped->object.forward, &axis, sine, cosine);
+					normalize3d(&biped->object.up);
+					normalize3d(&biped->object.forward);
+				}
+			}
+		}
+
+		biped_verify_object_vectors(biped_index, "post-deadplane-snapfacing");
+	}
+	else
+	{
+		biped->object.forward.k = 0.f;
+		if (normalize3d(&biped->object.forward)==0.f)
+			biped->object.forward = *global_forward3d;
+		biped->object.up = *global_up3d;
+
+		biped_verify_object_vectors(biped_index, "post-normal-snapfacing");
+	}
 
 	return;
 }

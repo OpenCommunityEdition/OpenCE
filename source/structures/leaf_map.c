@@ -593,12 +593,9 @@ static void leaf_map_family_mark(
 		struct leaf_portal *portal = TAG_BLOCK_GET_ELEMENT(&leaf_map->portals,
 			*TAG_BLOCK_GET_ELEMENT(&leaf->portal_designators, portal_designator_index, long) & LONG_MAX,
 			struct leaf_portal);
-		long neighbor_leaf_index = portal->leaf_indices[0];
-
-		if (neighbor_leaf_index == leaf_index)
-		{
-			neighbor_leaf_index = portal->leaf_indices[1];
-		}
+		long neighbor_leaf_index = (portal->leaf_indices[0] != leaf_index)
+			? portal->leaf_indices[0]
+			: portal->leaf_indices[1];
 
 		if (!BIT_VECTOR_TEST_FLAG(marked_leaves, neighbor_leaf_index))
 		{
