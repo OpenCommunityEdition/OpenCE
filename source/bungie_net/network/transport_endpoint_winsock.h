@@ -17,6 +17,7 @@ header included in hcex build.
 struct transport_endpoint;
 struct transport_endpoint_set;
 struct transport_address;
+struct connect_process_input;
 
 /* ---------- prototypes/TRANSPORT_ENDPOINT_WINSOCK.C */
 
@@ -52,6 +53,8 @@ short connect_endpoint_async(
 	struct transport_endpoint *endpoint,
 	struct transport_address const *address,
 	void *process_reference);
+void cancel_connect_process(
+	struct connect_process_input *input);
 short set_endpoint_blocking(
 	struct transport_endpoint *endpoint,
 	boolean blocking);

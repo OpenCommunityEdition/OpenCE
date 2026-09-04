@@ -222,11 +222,12 @@ enum
 
 enum network_game_client_state
 {
-	_network_game_client_state_searching = 0,
+	_network_game_client_state_searching,
 	_network_game_client_state_joining,
 	_network_game_client_state_pregame,
 	_network_game_client_state_ingame,
 	_network_game_client_state_postgame,
+	NUMBER_OF_NETWORK_GAME_CLIENT_STATES,
 };
 
 enum network_game_packet_class
@@ -263,7 +264,7 @@ struct message_server_machine_rejected
 	long reason;
 };
 
-struct message_server_game_settings_update
+struct network_game
 {
 	byte opaque[NETWORK_GAME_SETTINGS_SIZE];
 };
@@ -837,7 +838,7 @@ static boolean network_game_client_handle_message_server_game_settings_update(
 	{
 		if (network_game_client_get_state(client, NULL) == _network_game_client_state_pregame)
 		{
-			struct message_server_game_settings_update game_settings;
+			struct network_game game_settings;
 			short packet_type = _message_server_game_settings_update;
 			short packet_version = NETWORK_GAME_MESSAGE_VERSION;
 

@@ -335,6 +335,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "bungie_net/network/transport.h"
 #include "interface/ui_widget.h"
 #include "interface/ui_widget_definitions.h"
 #include "interface/ui_widget_game_data_input_functions.h"

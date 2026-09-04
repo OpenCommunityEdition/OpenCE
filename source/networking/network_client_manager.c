@@ -366,16 +366,115 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "bungie_net/common/message_header.h"
+#include "bungie_net/network/transport.h"
+#include "bungie_net/network/transport_endpoint_winsock.h"
+#include "cache/cache_file_precaching.h"
+#include "cache/cache_files.h"
+#include "cseries/cseries_windows.h"
+#include "cseries/errors.h"
+#include "game/game_engine.h"
+#include "game/local_players.h"
+#include "game/player_queues_new.h"
+#include "game/players.h"
+#include "interface/player_ui.h"
+#include "interface/ui_widget.h"
+#include "main/main.h"
+#include "memory/data.h"
+#include "networking/network_client_manager.h"
+#include "networking/network_client_message_handler.h"
+#include "networking/network_connection.h"
+#include "networking/network_game_globals.h"
+#include "networking/network_game_manager.h"
+#include "networking/network_messages.h"
+#include "networking/network_server_manager.h"
+#include "text/unicode.h"
 
 /* ---------- constants */
 
 enum
 {
 	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
-	_error_silent = 2
+	MAXIMUM_NETWORK_ADVERTISED_GAMES = 9,
+	MAXIMUM_NUMBER_OF_PLAYERS = 16,
+	MAXIMUM_MACHINE_NAME_LENGTH = 32,
+	NETWORK_GAME_NAME_LENGTH = 16,
+	TRANSPORT_NONCE_LENGTH = 8,
+	NETWORK_PLAYER_NAME_LENGTH = 12,
+	NETWORK_GAME_MAP_NAME_LENGTH = 0x100,
+	MAXIMUM_NETWORK_MESSAGE_SIZE = 0x800,
+};
+
+enum network_game_client_state
+{
+	_network_game_client_state_searching,
+	_network_game_client_state_joining,
+	_network_game_client_state_pregame,
+	_network_game_client_state_ingame,
+	_network_game_client_state_postgame,
+	NUMBER_OF_NETWORK_GAME_CLIENT_STATES,
+};
+
+enum
+{
+	_network_game_client_error_none = 0,
+	_network_game_client_error_unknown = 1,
+	_network_game_client_error_server_shutdown = 8,
+	NUMBER_OF_NETWORK_GAME_CLIENT_ERRORS = 9
+};
+
+enum
+{
+	_rejection_code_version_too_old = 0,
+	_rejection_code_version_too_new,
+	_rejection_code_bad_join_token,
+	_rejection_code_bad_password,
+	_rejection_code_game_is_full,
+	_rejection_code_game_is_closed,
+	_rejection_code_blacklisted_machine,
+};
+
+enum
+{
+	_network_game_client_connection_established_bit,
+	_network_game_client_join_request_sent_bit
+};
+
+enum
+{
+	NUMBER_OF_GAME_START_REQUESTS = 4
+};
+
+enum
+{
+	_game_advertisement_open_bit = 1,
+	_game_advertisement_has_teams_bit,
+	_game_advertisement_oddball_variant_bit
+};
+
+enum network_game_platform
+{
+	_network_game_platform_xbox,
+	_network_game_platform_pc,
+	NUMBER_OF_NETWORK_GAME_PLATFORMS
+};
+
+enum
+{
+	_network_connection_type_client = 2,
+	NETWORK_GAME_SERVER_PORT = 0x141E,
+	NETWORK_GAME_CLIENT_PORT = 0x141F
+};
+
+enum
+{
+	LOCAL_HOST_IPV4_ADDRESS = 0x7F000001,
+	BROADCAST_IPV4_ADDRESS = 0xFFFFFFFF
 };
 
 /* ---------- macros */
+
+#define network_game_get_local_platform() _network_game_platform_xbox
 
 #define network_machine_is_valid(machine) \
 	((machine) && (machine)->machine_index >= 0 && \
@@ -390,79 +489,324 @@ struct network_machine
 	byte __padding41[3];
 };
 
+struct network_game_map
+{
+	long __unknown0;
+	char name[0x80];
+};
+
+struct network_game_local_data
+{
+	boolean game_objects_loaded;
+	byte __padding431[3];
+};
+
 struct network_game
 {
-	byte __unknown0[0x114];
+	wchar_t name[16];
+	struct network_game_map map;
+	struct game_variant variant;
+	byte __padding10C;
+	byte game_mode;
+	char maximum_player_count;
+	byte __padding10F;
+	short difficulty;
+	short machine_count;
 	struct network_machine machines[MAXIMUM_NETWORK_MACHINE_COUNT];
-	byte __unknown224[0x210];
+	short player_count;
+	struct network_player players[MAXIMUM_NUMBER_OF_PLAYERS];
+	short __unknown426;
+	unsigned long random_seed;
+	byte __unknown42C[4];
+	struct network_game_local_data local_data;
+};
+
+struct transport_key_id
+{
+	byte data[8];
+};
+
+struct transport_key
+{
+	byte data[16];
+};
+
+struct transport_xnaddr
+{
+	byte data[12];
 };
 
 struct network_advertised_game
 {
-	byte __unknown0[0x2C];
+	struct transport_key_id key_id;
+	struct transport_key key;
+	struct transport_xnaddr xnaddr;
+	byte nonce[TRANSPORT_NONCE_LENGTH];
 	unsigned long update_time;
-	byte __unknown30[0xB1];
+	wchar_t game_name[NETWORK_GAME_NAME_LENGTH];
+	struct network_game_map map;
+	short engine_type;
+	short machine_count;
+	short player_count;
+	short maximum_player_count;
+	short unknown100;
+	short platform;
+	boolean open;
 	boolean valid;
+	boolean has_teams;
+	boolean oddball_variant;
 };
 
-struct data_array;
-
-struct data_iterator
+struct message_server_game_advertise
 {
-	struct data_array *data;
-	short absolute_index;
-	short pad;
-	long datum_index;
-	unsigned long signature;
+	byte client_nonce[TRANSPORT_NONCE_LENGTH];
+	byte nonce[TRANSPORT_NONCE_LENGTH];
+	struct transport_key_id key_id;
+	struct transport_key key;
+	struct transport_xnaddr xnaddr;
+	word port;
+	word version;
+	word platform;
+	wchar_t game_name[NETWORK_GAME_NAME_LENGTH];
+	byte __unknown5A[0x1A];
+	struct network_game_map map;
+	short engine_type;
+	short machine_count;
+	short player_count;
+	short maximum_player_count;
+	short unknown100;
+	word flags;
+	byte join_game_token[0x10];
+};
+
+struct network_join_parameters
+{
+	word __unknown0;
+	word __unknown2;
+	byte __unknown4[0xE];
+	byte join_token[0x10];
+};
+
+struct network_connection;
+struct connect_process_input;
+
+struct message_client_game_start_request
+{
+	short request_type;
+};
+
+struct player_profile_controller_settings
+{
+	byte button_preset;
+	byte joystick_preset;
+	byte look_sensitivity;
+	boolean invert_look;
+	boolean vibration_disabled;
+	boolean flight_stick_aircraft_controls;
+	boolean autocenter;
+	boolean ingame_help_disabled;
+};
+
+struct player_profile
+{
+	wchar_t name[12];
+	short primary_color_index;
+	word flags;
+	byte solo_levels[10];
+	short last_single_player_level;
+	struct player_profile_controller_settings controller_settings;
+};
+
+struct message_client_add_player_request
+{
+	struct network_player player;
+};
+
+struct message_client_remove_player_request
+{
+	struct network_player player;
+};
+
+struct message_server_game_update
+{
+	unsigned long update_number;
+	long random_seed;
+	long game_time;
+	byte __unknown0C[2];
+	short local_player_count;
+	struct player_action player_actions[MAXIMUM_NUMBER_OF_PLAYERS];
+};
+
+struct server_update
+{
+	word local_player_count;
+	byte __padding2[2];
+	struct player_action player_actions[MAXIMUM_NUMBER_OF_PLAYERS];
+};
+
+struct message_client_graceful_game_exit_pregame
+{
+	long opaque;
+};
+
+struct message_client_graceful_game_exit_postgame
+{
+	long opaque;
+};
+
+struct message_client_loaded
+{
+	long opaque;
+};
+
+struct message_client_broadcast_game_search
+{
+	word port;
+	word __unknown2;
+	byte nonce[8];
+};
+
+struct message_client_ping
+{
+	long timestamp;
+	word port;
+	byte __padding6[2];
+};
+
+struct message_client_join_game_request
+{
+	wchar_t machine_name[MAXIMUM_MACHINE_NAME_LENGTH];
+	byte join_token[0x10];
+};
+
+struct message_client_map_is_precached_pregame
+{
+	char map_name[NETWORK_GAME_MAP_NAME_LENGTH];
+};
+
+struct message_server_machine_accepted
+{
+	long random_seed;
+	short machine_index;
+	byte __padding6[2];
+};
+
+struct message_client_settings_request
+{
+	wchar_t machine_name[MAXIMUM_MACHINE_NAME_LENGTH];
+	char machine_index;
+	byte __padding41[3];
 };
 
 struct network_game_client
 {
-	unsigned short machine_index;
+	word machine_index;
 	byte __padding2[2];
-	byte available_games[0x828];
-	void *connection;
-	byte __padding830[4];
+	struct network_advertised_game available_games[MAXIMUM_NETWORK_ADVERTISED_GAMES];
+	struct transport_address ping_address;
+	unsigned long last_ping_time;
+	byte __padding824[2];
+	word ping_sample_count;
+	word average_ping;
+	boolean pinging;
+	byte __padding82B;
+	struct network_connection *connection;
+	struct connect_process_input *connect_process;
 	unsigned long connection_attempt_time;
-	byte __padding838[0x24];
+	struct network_join_parameters join_parameters;
+	byte __padding85A[2];
 	struct network_game game;
 	unsigned long join_in_progress;
-	byte __paddingC94[4];
+	unsigned long last_broadcast_search_time;
 	unsigned long next_update_number;
-	unsigned long __unknownC9C;
-	byte __paddingCA0[4];
+	unsigned long last_update_time;
+	long last_precache_time;
 	short seconds_to_game_start;
-	short state;
+	word state;
 	short error;
-	byte __paddingCAA[2];
+	word flags;
 	boolean out_of_sync;
 	boolean connection_silent;
 };
 
 typedef char network_machine_size_assert[
 	sizeof(struct network_machine) == 0x44 ? 1 : -1];
+typedef char player_profile_size_assert[
+	sizeof(struct player_profile) == 0x30 ? 1 : -1];
+typedef char message_server_game_update_size_assert[
+	sizeof(struct message_server_game_update) == 0x210 ? 1 : -1];
+typedef char server_update_size_assert[
+	sizeof(struct server_update) == 0x204 ? 1 : -1];
+typedef char message_server_machine_accepted_size_assert[
+	sizeof(struct message_server_machine_accepted) == 8 ? 1 : -1];
+typedef char message_client_settings_request_size_assert[
+	sizeof(struct message_client_settings_request) == 0x44 ? 1 : -1];
 typedef char network_game_size_assert[
 	sizeof(struct network_game) == 0x434 ? 1 : -1];
+typedef char network_game_map_name_offset_assert[
+	offsetof(struct network_game, map.name) == 0x24 ? 1 : -1];
+typedef char network_game_machine_count_offset_assert[
+	offsetof(struct network_game, machine_count) == 0x112 ? 1 : -1];
+typedef char network_game_local_data_offset_assert[
+	offsetof(struct network_game, local_data) == 0x430 ? 1 : -1];
+typedef char network_game_player_count_offset_assert[
+	offsetof(struct network_game, player_count) == 0x224 ? 1 : -1];
+typedef char network_game_players_offset_assert[
+	offsetof(struct network_game, players) == 0x226 ? 1 : -1];
 typedef char network_advertised_game_update_time_offset_assert[
 	offsetof(struct network_advertised_game, update_time) == 0x2C ? 1 : -1];
+typedef char network_advertised_game_size_assert2[
+	sizeof(struct message_server_game_advertise) == 0x114 ? 1 : -1];
+typedef char network_advertised_game_game_name_offset_assert[
+	offsetof(struct network_advertised_game, game_name) == 0x30 ? 1 : -1];
+typedef char network_advertised_game_engine_type_offset_assert[
+	offsetof(struct network_advertised_game, engine_type) == 0xD4 ? 1 : -1];
+typedef char network_advertised_game_platform_offset_assert[
+	offsetof(struct network_advertised_game, platform) == 0xDE ? 1 : -1];
+typedef char network_advertised_game_open_offset_assert[
+	offsetof(struct network_advertised_game, open) == 0xE0 ? 1 : -1];
 typedef char network_advertised_game_valid_offset_assert[
 	offsetof(struct network_advertised_game, valid) == 0xE1 ? 1 : -1];
-typedef char data_iterator_size_assert[
-	sizeof(struct data_iterator) == 0x10 ? 1 : -1];
+typedef char network_join_parameters_size_assert[
+	sizeof(struct network_join_parameters) == 0x22 ? 1 : -1];
 typedef char data_iterator_datum_index_offset_assert[
 	offsetof(struct data_iterator, datum_index) == 8 ? 1 : -1];
+typedef char network_advertised_game_size_assert[
+	sizeof(struct network_advertised_game) == 0xE4 ? 1 : -1];
+typedef char network_game_client_ping_address_offset_assert[
+	offsetof(struct network_game_client, ping_address) == 0x808 ? 1 : -1];
+typedef char network_game_client_ping_sample_count_offset_assert[
+	offsetof(struct network_game_client, ping_sample_count) == 0x826 ? 1 : -1];
+typedef char network_game_client_pinging_offset_assert[
+	offsetof(struct network_game_client, pinging) == 0x82A ? 1 : -1];
 typedef char network_game_client_connection_offset_assert[
 	offsetof(struct network_game_client, connection) == 0x82C ? 1 : -1];
+typedef char network_game_client_connect_process_offset_assert[
+	offsetof(struct network_game_client, connect_process) == 0x830 ? 1 : -1];
 typedef char network_game_client_connection_attempt_time_offset_assert[
 	offsetof(struct network_game_client, connection_attempt_time) == 0x834 ? 1 : -1];
+typedef char network_game_client_join_parameters_offset_assert[
+	offsetof(struct network_game_client, join_parameters) == 0x838 ? 1 : -1];
 typedef char network_game_client_game_offset_assert[
 	offsetof(struct network_game_client, game) == 0x85C ? 1 : -1];
 typedef char network_game_client_join_in_progress_offset_assert[
 	offsetof(struct network_game_client, join_in_progress) == 0xC90 ? 1 : -1];
 typedef char network_game_client_next_update_number_offset_assert[
 	offsetof(struct network_game_client, next_update_number) == 0xC98 ? 1 : -1];
-typedef char network_game_client_unknownC9C_offset_assert[
-	offsetof(struct network_game_client, __unknownC9C) == 0xC9C ? 1 : -1];
+typedef char network_game_client_last_broadcast_search_time_offset_assert[
+	offsetof(struct network_game_client, last_broadcast_search_time) == 0xC94 ? 1 : -1];
+typedef char network_game_client_last_update_time_offset_assert[
+	offsetof(struct network_game_client, last_update_time) == 0xC9C ? 1 : -1];
+typedef char network_game_client_flags_offset_assert[
+	offsetof(struct network_game_client, flags) == 0xCAA ? 1 : -1];
+typedef char network_game_client_last_precache_time_offset_assert[
+	offsetof(struct network_game_client, last_precache_time) == 0xCA0 ? 1 : -1];
+typedef char message_client_broadcast_game_search_size_assert[
+	sizeof(struct message_client_broadcast_game_search) == 0xC ? 1 : -1];
+typedef char message_client_ping_size_assert[
+	sizeof(struct message_client_ping) == 8 ? 1 : -1];
+typedef char message_client_join_game_request_size_assert[
+	sizeof(struct message_client_join_game_request) == 0x50 ? 1 : -1];
 typedef char network_game_client_seconds_to_game_start_offset_assert[
 	offsetof(struct network_game_client, seconds_to_game_start) == 0xCA4 ? 1 : -1];
 typedef char network_game_client_error_offset_assert[
@@ -474,134 +818,37 @@ typedef char network_game_client_connection_silent_offset_assert[
 
 /* ---------- prototypes */
 
-boolean network_connection_write(
-	void *connection,
-	void *message,
-	unsigned short message_size,
-	void *address,
-	long flags);
-void network_connection_keep_alive(
-	void *connection);
-void network_connection_get_address(
-	void *connection,
-	void *address,
-	boolean include_port);
-void network_connection_delete(
-	void *connection);
-unsigned long system_milliseconds(
+static boolean network_game_client_network_available(
 	void);
-void game_engine_switch_to_postgame(
-	void);
-void network_event(
-	char *format,
-	...);
-boolean network_game_is_splitscreen_local(
-	void);
-boolean transport_network_available(
-	void);
-void error(
-	short priority,
-	const char *format,
-	...);
-void display_error_when_main_menu_loaded(
-	short error_code);
-void network_game_reset_for_next_round(
-	struct network_game *game,
-	boolean load_ui);
-void network_game_reset_to_pregame_ui(
-	void);
-void network_game_client_all_local_players_have_quit(
-	void);
-short local_player_get_next(
-	short local_player_index);
-void display_error(
-	short error_code,
-	short local_player_index,
-	boolean modal,
-	boolean pause_game_time);
-void data_iterator_new(
-	struct data_iterator *iterator,
-	struct data_array *data);
-void *data_iterator_next(
-	struct data_iterator *iterator);
-
-boolean network_game_client_write(
-	void *connection,
-	void *message,
-	unsigned short message_size,
-	void *address,
-	long flags);
-
-boolean code_001141c0(
-	void);
-void network_game_client_dispose(
-	struct network_game_client *client);
-void network_game_client_game_out_of_sync(
-	struct network_game_client *client);
-long unstrip_player_index(
-	long player_index);
-
-short network_game_client_get_state(
+static void network_game_client_set_error(
 	struct network_game_client *client,
-	short *state_data);
-boolean network_game_client_set_machine(
-	struct network_game_client *client,
-	struct network_machine *machine);
-void network_game_client_switch_to_postgame(
+	word error);
+static boolean network_game_client_add_advertised_game(
+	struct network_advertised_game *available_games,
+	struct message_server_game_advertise *advertisement);
+static boolean network_game_client_process_incoming_messages(
 	struct network_game_client *client);
-boolean network_game_client_switch_to_pregame(
+static void network_game_client_precache_map(
 	struct network_game_client *client);
-void network_game_client_countdown_timer_update(
-	struct network_game_client *client,
-	short seconds_to_game_start);
-boolean network_game_client_advertised_game_is_valid(
-	struct network_advertised_game *advertised_game);
-void network_game_client_game_shutdown(
+static boolean network_game_client_idle_searching(
 	struct network_game_client *client);
-void network_game_client_reset(
-	struct network_game_client *client,
-	boolean leave_connection_open);
-void network_game_client_rejected_by_game(
-	struct network_game_client *client,
-	void *source_address,
-	unsigned short rejection_code);
-
-struct network_machine *network_game_client_get_machine(
+static boolean network_game_client_idle_joining(
 	struct network_game_client *client);
-short network_game_client_get_machine_index(
+static boolean network_game_client_idle_pregame(
 	struct network_game_client *client);
-void *network_game_client_get_available_games(
+static boolean network_game_client_idle_ingame(
 	struct network_game_client *client);
-short network_game_client_get_error(
-	struct network_game_client *client);
-short network_game_client_get_seconds_to_game_start(
-	struct network_game_client *client);
-void network_game_client_keep_alive(
-	struct network_game_client *client);
-void *network_game_client_get_connection(
-	struct network_game_client *client);
-void network_game_client_get_remote_server_address(
-	struct network_game_client *client,
-	void *address);
-struct network_game *network_game_client_get_game(
-	struct network_game_client *client);
-boolean network_game_client_server_has_started_game(
-	struct network_game_client *client);
-long network_game_client_get_next_update_number(
-	struct network_game_client *client);
-boolean network_client_get_oos(
+static boolean network_game_client_idle_postgame(
 	struct network_game_client *client);
 
 /* ---------- globals */
-
-extern struct data_array *player_data;
 
 boolean allow_out_of_sync = FALSE;
 boolean network_game_client_dont_use_directly_in_use = FALSE;
 
 /* ---------- public code */
 
-boolean code_001141c0(
+static boolean network_game_client_network_available(
 	void)
 {
 	boolean connected = TRUE;
@@ -676,7 +923,8 @@ long unstrip_player_index(
 
 	while (data_iterator_next(&iterator))
 	{
-		if ((iterator.datum_index & 0xFFFF) == (player_index & 0xFFFF))
+		if (DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index) ==
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index))
 		{
 			result = iterator.datum_index;
 			break;
@@ -701,7 +949,7 @@ short network_game_client_get_state(
 	{
 		*state_data = 0;
 
-		if (client->state == 1)
+		if (client->state == _network_game_client_state_joining)
 		{
 			elapsed_time = system_milliseconds() * 100 -
 				client->connection_attempt_time * 100;
@@ -738,7 +986,7 @@ void network_game_client_switch_to_postgame(
 		client);
 
 	game_engine_switch_to_postgame();
-	client->state = 4;
+	client->state = _network_game_client_state_postgame;
 	network_event("switching to postgame");
 
 	return;
@@ -752,15 +1000,15 @@ boolean network_game_client_switch_to_pregame(
 		0x499,
 		client);
 
-	if (client->state != 2)
+	if (client->state != _network_game_client_state_pregame)
 	{
 		network_game_reset_for_next_round(&client->game, TRUE);
 		network_connection_keep_alive(client->connection);
 		client->next_update_number = 0;
 		client->join_in_progress = TRUE;
-		client->__unknownC9C = 0;
+		client->last_update_time = 0;
 		client->connection_silent = FALSE;
-		client->state = 2;
+		client->state = _network_game_client_state_pregame;
 		client->out_of_sync = FALSE;
 		network_event("switching to pregame");
 		network_game_reset_to_pregame_ui();
@@ -805,13 +1053,10 @@ void network_game_client_game_shutdown(
 		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
 		0x3FC,
 		client);
-	match_assert(
-		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
-		0x662,
-		client);
 
-	if (client->error == 0)
-		client->error = 8;
+	network_game_client_set_error(
+		client,
+		_network_game_client_error_server_shutdown);
 
 	network_event("the game host is shutting down");
 	network_game_client_all_local_players_have_quit();
@@ -839,7 +1084,7 @@ short network_game_client_get_machine_index(
 	return client->machine_index;
 }
 
-void *network_game_client_get_available_games(
+struct network_advertised_game *network_game_client_get_available_games(
 	struct network_game_client *client)
 {
 	match_assert(
@@ -880,7 +1125,7 @@ void network_game_client_keep_alive(
 	return;
 }
 
-void *network_game_client_get_connection(
+struct network_connection *network_game_client_get_connection(
 	struct network_game_client *client)
 {
 	match_assert(
@@ -893,14 +1138,14 @@ void *network_game_client_get_connection(
 
 void network_game_client_get_remote_server_address(
 	struct network_game_client *client,
-	void *address)
+	struct transport_address *address)
 {
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
 		0x4BC,
 		client);
 
-	network_connection_get_address(client->connection, address, FALSE);
+	network_connection_get_address(client->connection, address, NULL);
 
 	return;
 }
@@ -950,10 +1195,10 @@ boolean network_client_get_oos(
 }
 
 boolean network_game_client_write(
-	void *connection,
-	void *message,
-	unsigned short message_size,
-	void *address,
+	struct network_connection *connection,
+	message_header *message,
+	word message_size,
+	struct transport_address *address,
 	long flags)
 {
 	return network_connection_write(
@@ -964,10 +1209,1099 @@ boolean network_game_client_write(
 		flags);
 }
 
+boolean network_game_client_idle(
+	struct network_game_client *client)
+{
+	boolean success = FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0xC6,
+		client);
+
+	switch (client->state)
+	{
+	case _network_game_client_state_searching:
+		if (!(success = network_game_client_idle_searching(client)))
+			network_event("network_game_client_idle_searching() failed");
+		break;
+
+	case _network_game_client_state_joining:
+		if (!(success = network_game_client_idle_joining(client)))
+			network_event("network_game_client_idle_joining() failed");
+		break;
+
+	case _network_game_client_state_pregame:
+		if (!(success = network_game_client_idle_pregame(client)))
+			network_event("network_game_client_idle_pregame() failed");
+		break;
+
+	case _network_game_client_state_ingame:
+		if (!(success = network_game_client_idle_ingame(client)))
+			network_event("network_game_client_idle_ingame() failed");
+		break;
+
+	case _network_game_client_state_postgame:
+		if (!(success = network_game_client_idle_postgame(client)))
+			network_event("network_game_client_idle_postgame() failed");
+		break;
+
+	default:
+		match_assert(
+			"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+			0xEE,
+			!"unknown client state");
+		break;
+	}
+
+	return success;
+}
+
+boolean network_game_client_game_settings_updated(
+	struct network_game_client *client,
+	struct network_game *message_packet)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x375,
+		client && message_packet);
+
+	if (message_packet->machine_count >= 0 &&
+		message_packet->machine_count <= MAXIMUM_NETWORK_MACHINE_COUNT &&
+		message_packet->player_count >= 0 &&
+		message_packet->player_count <= MAXIMUM_NUMBER_OF_PLAYERS)
+	{
+		struct network_game previous_game;
+
+		if (csstrcmp(message_packet->map.name, client->game.map.name))
+		{
+			network_event("precaching map '%s'...", message_packet->map.name);
+			main_set_multiplayer_map_name(message_packet->map.name);
+		}
+
+		csmemcpy(&previous_game, &client->game, sizeof(client->game));
+		csmemcpy(&client->game, message_packet, sizeof(client->game));
+		csmemcpy(
+			&client->game.local_data,
+			&previous_game.local_data,
+			sizeof(client->game.local_data));
+
+		network_event(
+			"received updated game settings from the server; there are %d players on %d machines in the game",
+			message_packet->player_count,
+			message_packet->machine_count);
+		network_event(
+			"player count %d machine count %d",
+			message_packet->player_count,
+			message_packet->machine_count);
+
+		return TRUE;
+	}
+
+	network_event(
+		"invalid message_server_game_settings_update message received player count %d machine count %d",
+		message_packet->player_count,
+		message_packet->machine_count);
+
+	return FALSE;
+}
+
+void network_game_client_new_advertised_game(
+	struct network_game_client *client,
+	struct message_server_game_advertise *message_packet)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x2FC,
+		client && message_packet);
+
+	network_game_client_add_advertised_game(client->available_games, message_packet);
+
+	return;
+}
+
+boolean network_game_client_leave_game(
+	struct network_game_client *client)
+{
+	boolean success = TRUE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x179,
+		client && client->connection);
+
+	network_event("leaving network game");
+
+	switch (client->state)
+	{
+	case _network_game_client_state_searching:
+		match_assert(
+			"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+			0x180,
+			!(boolean)network_connection_connected(client->connection));
+		break;
+
+	case _network_game_client_state_joining:
+		if (client->connect_process)
+		{
+			cancel_connect_process(client->connect_process);
+			client->connect_process = 0;
+		}
+
+		if ((boolean)network_connection_connected(client->connection))
+		{
+			if (!(success = network_connection_disconnect(client->connection)))
+			{
+				network_event("network_connection_disconnect() failed _network_game_client_state_joining");
+			}
+		}
+		break;
+
+	case _network_game_client_state_pregame:
+	{
+		struct message_client_graceful_game_exit_pregame graceful_game_exit = {0};
+		message_header *message;
+
+		if ((boolean)network_connection_connected(client->connection))
+		{
+			message = create_network_game_message(
+				_message_client_graceful_game_exit_pregame,
+				&graceful_game_exit,
+				sizeof(graceful_game_exit));
+
+			if (message)
+			{
+				if (!network_game_client_write(
+					client->connection,
+					message,
+					GET_MESSAGE_SIZE(*message),
+					NULL,
+					1))
+				{
+					network_event("network_game_client_write() failed while sending a message_client_graceful_game_exit_pregame message");
+				}
+			}
+			else
+			{
+				network_event("failed to create a message_client_graceful_game_exit_pregame message");
+			}
+
+			if (!(success = network_connection_disconnect(client->connection)))
+			{
+				network_event("network_connection_disconnect() failed _network_game_client_state_pregame");
+			}
+		}
+	}
+	break;
+
+	case _network_game_client_state_ingame:
+		if ((boolean)network_connection_connected(client->connection))
+		{
+			if (!(success = network_connection_disconnect(client->connection)))
+			{
+				network_event("network_connection_disconnect() failed _network_game_client_state_ingame");
+			}
+		}
+		break;
+
+	case _network_game_client_state_postgame:
+	{
+		struct message_client_graceful_game_exit_postgame graceful_game_exit = {0};
+		message_header *message;
+
+		if ((boolean)network_connection_connected(client->connection))
+		{
+			message = create_network_game_message(
+				_message_client_graceful_game_exit_postgame,
+				&graceful_game_exit,
+				sizeof(graceful_game_exit));
+
+			if (message)
+			{
+				if (!network_game_client_write(
+					client->connection,
+					message,
+					GET_MESSAGE_SIZE(*message),
+					NULL,
+					1))
+				{
+					network_event("network_game_client_write() failed while sending a message_client_graceful_game_exit_postgame message");
+				}
+			}
+
+			if (!(success = network_connection_disconnect(client->connection)))
+			{
+				network_event("network_connection_disconnect() failed _network_game_client_state_postgame");
+			}
+		}
+	}
+	break;
+
+	default:
+		network_event("client is in an unknown state");
+		break;
+	}
+
+	network_game_invalidate(&client->game);
+	client->state = _network_game_client_state_searching;
+
+	return success;
+}
+
+boolean network_game_client_request_remove_player(
+	struct network_game_client *client,
+	struct network_player *player)
+{
+	boolean success = TRUE;
+	struct message_client_remove_player_request remove_player_request;
+	message_header *message;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x208,
+		client && network_player_is_valid(player));
+	match_vassert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x209,
+		client->game.machines[client->machine_index].machine_index ==
+			player->machine_index,
+		"client's can only remove players from their own machines");
+
+	network_event(
+		"requesting a player removal (controller index #%d)",
+		player->controller_index);
+
+	switch (client->state)
+	{
+	case _network_game_client_state_searching:
+	case _network_game_client_state_joining:
+		network_event("can't remove players from a game until after a game is joined");
+		success = FALSE;
+		break;
+
+	case _network_game_client_state_pregame:
+		csmemcpy(&remove_player_request, player, sizeof(remove_player_request));
+
+		message = create_network_game_message(
+			_message_client_remove_player_request_pregame,
+			&remove_player_request,
+			sizeof(remove_player_request));
+		if (message)
+		{
+			success = network_game_client_write(
+				client->connection,
+				message,
+				GET_MESSAGE_SIZE(*message),
+				NULL,
+				1);
+		}
+		else
+		{
+			network_event("failed to create a message_client_remove_player_request_pregame mesage");
+			success = FALSE;
+		}
+		break;
+
+	case _network_game_client_state_ingame:
+		csmemcpy(&remove_player_request, player, sizeof(remove_player_request));
+
+		message = create_network_game_message(
+			_message_client_remove_player_request_ingame,
+			&remove_player_request,
+			sizeof(remove_player_request));
+		if (message)
+		{
+			success = network_game_client_write(
+				client->connection,
+				message,
+				GET_MESSAGE_SIZE(*message),
+				NULL,
+				1);
+		}
+		else
+		{
+			network_event("failed to create a message_client_remove_player_request_ingame message");
+			success = FALSE;
+		}
+		break;
+
+	case _network_game_client_state_postgame:
+		csmemcpy(&remove_player_request, player, sizeof(remove_player_request));
+
+		message = create_network_game_message(
+			_message_client_remove_player_request_postgame,
+			&remove_player_request,
+			sizeof(remove_player_request));
+		if (message)
+		{
+			if (!(success = network_game_client_write(
+				client->connection,
+				message,
+				GET_MESSAGE_SIZE(*message),
+				NULL,
+				1)))
+			{
+				network_event("network_game_client_write() failed while sending a message_client_remove_player_request_postgame message");
+			}
+		}
+		else
+		{
+			network_event("failed to create a message_client_remove_player_request_postgame message");
+			success = FALSE;
+		}
+		break;
+
+	default:
+		network_event("client is in an unknown state");
+		break;
+	}
+
+	return success;
+}
+
+boolean network_game_client_add_player(
+	struct network_game_client *client,
+	short local_player_index)
+{
+	boolean success = TRUE;
+	struct network_player player;
+	struct message_client_add_player_request add_player_request;
+	struct player_profile profile;
+	message_header *message;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x530,
+		client && (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
+
+	player_ui_get_active_player_profile(local_player_index, &profile);
+
+	player.controller_index = (char)local_player_index;
+	player.machine_index = (char)client->machine_index;
+	ustrncpy(player.name, profile.name, NETWORK_PLAYER_NAME_LENGTH - 1);
+	player.name[NETWORK_PLAYER_NAME_LENGTH - 1] = 0;
+	player.primary_color_index = profile.primary_color_index;
+	player.icon_index = NONE;
+	player.team_index = NONE;
+	player.player_list_index = NONE;
+
+	network_event(
+		"requesting a player addition (controller index #%d)",
+		player.controller_index);
+
+	switch (client->state)
+	{
+	case _network_game_client_state_searching:
+	case _network_game_client_state_joining:
+		network_event("can't add players to a game until after a game is joined");
+		success = FALSE;
+		break;
+
+	case _network_game_client_state_pregame:
+		csmemcpy(&add_player_request, &player, sizeof(add_player_request));
+
+		message = create_network_game_message(
+			_message_client_add_player_request_pregame,
+			&add_player_request,
+			sizeof(add_player_request));
+		if (message)
+		{
+			if (!(success = network_game_client_write(
+				client->connection,
+				message,
+				GET_MESSAGE_SIZE(*message),
+				NULL,
+				1)))
+			{
+				network_event("network_game_client_write() failed while sending a message_client_add_player_request_pregame message");
+			}
+		}
+		else
+		{
+			network_event("failed to create a message_client_add_player_request_pregame message");
+		}
+		break;
+
+	case _network_game_client_state_ingame:
+		csmemcpy(&add_player_request, &player, sizeof(add_player_request));
+
+		message = create_network_game_message(
+			_message_client_add_player_request_ingame,
+			&add_player_request,
+			sizeof(add_player_request));
+		if (message)
+		{
+			if (!(success = network_game_client_write(
+				client->connection,
+				message,
+				GET_MESSAGE_SIZE(*message),
+				NULL,
+				1)))
+			{
+				network_event("network_game_client_write() failed while sending a message_client_add_player_request_ingame message");
+			}
+		}
+		else
+		{
+			network_event("failed to create a message_client_add_player_request_ingame message");
+		}
+		break;
+
+	case _network_game_client_state_postgame:
+		network_event("client tried to add a new player in post-game");
+		success = FALSE;
+		break;
+
+	default:
+		network_event("client is in an unknown state");
+		break;
+	}
+
+	return success;
+}
+
+boolean network_game_client_handle_game_update(
+	struct network_game_client *client,
+	struct message_server_game_update *message_packet)
+{
+	struct server_update update;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x40D,
+		client && message_packet);
+
+	if (message_packet->local_player_count < client->game.player_count)
+	{
+		csmemset(
+			&message_packet->player_actions[message_packet->local_player_count],
+			0,
+			(client->game.player_count - message_packet->local_player_count) *
+				sizeof(struct player_action));
+		message_packet->local_player_count = client->game.player_count;
+	}
+
+	if (message_packet->update_number != client->next_update_number)
+	{
+		network_event(
+			"out of sync: missed a server update (expected #%ld, got #%ld)",
+			client->next_update_number,
+			message_packet->update_number);
+		network_game_client_game_out_of_sync(client);
+	}
+	else if (!global_network_game_server_get())
+	{
+		if (game_time_get() == message_packet->update_number &&
+			message_packet->game_time != game_time_get())
+		{
+			network_event(
+				"not a bug, but update %d time %d our time %d",
+				message_packet->update_number,
+				message_packet->game_time,
+				game_time_get());
+		}
+
+		if (game_time_get() == message_packet->game_time)
+		{
+			if (message_packet->random_seed != get_random_seed())
+			{
+				network_event(
+					"out of sync: client/server random seed mismatch, update= #%ld, game time= #%ld (%ld) (#%lx/#%lx)",
+					message_packet->update_number,
+					game_time_get(),
+					message_packet->game_time,
+					get_random_seed(),
+					message_packet->random_seed);
+				network_game_client_game_out_of_sync(client);
+			}
+		}
+
+		if (message_packet->update_number % 30 == 0)
+		{
+			network_event(
+				"client is lagging behind the server by #%d game ticks",
+				message_packet->update_number - game_time_get());
+		}
+	}
+
+	update.local_player_count = message_packet->local_player_count;
+
+	csmemcpy(
+		update.player_actions,
+		message_packet->player_actions,
+		update.local_player_count * sizeof(struct player_action));
+
+	update_client_handle_server_update(&update, message_packet->update_number);
+
+	client->next_update_number++;
+	client->last_update_time = system_milliseconds();
+
+	return TRUE;
+}
+
+boolean network_game_client_game_has_started(
+	struct network_game_client *client)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x3B0,
+		client && (client->state == _network_game_client_state_pregame));
+
+	client->seconds_to_game_start = NONE;
+	network_connection_keep_alive(client->connection);
+
+	if (network_game_create_game_objects(&client->game))
+	{
+		long network_player_index;
+
+		for (network_player_index = 0;
+			network_player_index < MAXIMUM_NUMBER_OF_PLAYERS;
+			network_player_index++)
+		{
+			if (client->game.players[network_player_index].machine_index == client->machine_index)
+			{
+				for (;
+					client->game.players[network_player_index].machine_index == client->machine_index &&
+					network_player_is_valid(&client->game.players[network_player_index]);
+					network_player_index++)
+				{
+					local_player_set_player_index(
+						client->game.players[network_player_index].controller_index,
+						unstrip_player_index(
+							client->game.players[network_player_index].player_list_index));
+				}
+
+				break;
+			}
+		}
+
+		network_connection_keep_alive(client->connection);
+
+		{
+			struct message_client_loaded loaded = {0};
+			message_header *message = create_network_game_message(
+				_message_client_loaded,
+				&loaded,
+				sizeof(loaded));
+
+			if (message)
+			{
+				if (network_game_client_write(
+					client->connection,
+					message,
+					GET_MESSAGE_SIZE(*message),
+					NULL,
+					1))
+				{
+					network_event("local machine is loaded & ready to play");
+
+					client->state = _network_game_client_state_ingame;
+					client->next_update_number = 0;
+					client->last_update_time = 0;
+					client->connection_silent = FALSE;
+
+					ui_widgets_close_all();
+					game_time_start();
+					game_initial_pulse();
+				}
+				else
+				{
+					network_event("network_game_client_write() failed while sending a message_client_loaded message");
+				}
+			}
+			else
+			{
+				network_event("failed to create a message_client_loaded message");
+			}
+		}
+	}
+	else
+	{
+		network_event("failed to load the necessary game data");
+	}
+
+	return client->state == _network_game_client_state_ingame;
+}
+
+boolean network_game_client_remove_player(
+	struct network_game_client *client,
+	struct network_player *player,
+	long reason)
+{
+	long network_player_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x273,
+		client && player);
+
+	for (network_player_index = 0;
+		network_player_index < MAXIMUM_NUMBER_OF_PLAYERS;
+		network_player_index++)
+	{
+		if (network_player_is_valid(&client->game.players[network_player_index]) &&
+			client->game.players[network_player_index].machine_index == player->machine_index &&
+			client->game.players[network_player_index].controller_index == player->controller_index)
+		{
+			long player_index = unstrip_player_index(
+				client->game.players[network_player_index].player_list_index);
+			boolean success = network_game_remove_player(&client->game, player);
+
+			if (success && client->game.local_data.game_objects_loaded)
+			{
+				struct player_datum *player_datum;
+
+				if (!player_index || player_index == NONE)
+				{
+					error(
+						_error_silent,
+						"network game tried to delete a player with a phony player index (#0x%08lX)",
+						player_index);
+
+					return FALSE;
+				}
+
+				player_datum = player_get(player_index);
+
+				if (reason != NONE)
+				{
+					error(
+						_error_silent,
+						"%x quit of of game at tick %d (now %d)",
+						player_index,
+						reason,
+						game_time_get());
+					player_datum->unknown_cc = reason;
+				}
+
+				for (network_player_index = 0;
+					network_player_index < MAXIMUM_NUMBER_OF_PLAYERS;
+					network_player_index++)
+				{
+					if (network_player_is_valid(&client->game.players[network_player_index]) &&
+						client->game.players[network_player_index].machine_index == client->machine_index)
+					{
+						break;
+					}
+				}
+
+				if (network_player_index == MAXIMUM_NUMBER_OF_PLAYERS)
+				{
+					network_game_client_all_local_players_have_quit();
+					network_event("no local players remain in the game, exiting the game now");
+				}
+			}
+
+			return success;
+		}
+	}
+
+	return FALSE;
+}
+
+void network_game_client_accepted_into_game(
+	struct network_game_client *client,
+	struct transport_address *source_address,
+	struct message_server_machine_accepted *message_packet)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x327,
+		client && source_address && message_packet && (client->state == _network_game_client_state_joining));
+
+	if (message_packet->machine_index >= 0 &&
+		message_packet->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT)
+	{
+		struct message_client_settings_request settings_request;
+		message_header *message;
+
+		client->machine_index = message_packet->machine_index;
+		client->game.machines[message_packet->machine_index].machine_index =
+			(char)message_packet->machine_index;
+		client->state = _network_game_client_state_pregame;
+
+		network_game_set_random_seed(message_packet->random_seed);
+		network_event(
+			"successfully joined a net game; our machine is #%d",
+			message_packet->machine_index);
+
+		network_game_generate_local_machine_name(settings_request.machine_name);
+		settings_request.machine_index = (char)message_packet->machine_index;
+
+		message = create_network_game_message(
+			_message_client_settings_request,
+			&settings_request,
+			sizeof(settings_request));
+		if (message)
+		{
+			if (!network_game_client_write(
+				client->connection,
+				message,
+				GET_MESSAGE_SIZE(*message),
+				NULL,
+				1))
+			{
+				network_event("network_game_client_write() failed while sending a message_client_settings_request message");
+			}
+		}
+		else
+		{
+			network_event("failed to create a message_client_settings_request message");
+		}
+	}
+	else
+	{
+		network_event("received a message_server_machine_accepted message with a bad machine_index");
+	}
+
+	return;
+}
+
+boolean network_game_client_update_local_player_data(
+	struct network_game_client *client,
+	struct network_player *player)
+{
+	boolean success = FALSE;
+	struct network_player player_settings;
+	message_header *message;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x587,
+		client && player);
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x588,
+		player->machine_index==client->machine_index);
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x589,
+		network_player_is_valid(player));
+
+	csmemcpy(&player_settings, player, sizeof(player_settings));
+
+	if (player_settings.team_index == NONE)
+		player_settings.team_index = 0;
+
+	message = create_network_game_message(
+		_message_client_player_settings_request,
+		&player_settings,
+		sizeof(player_settings));
+	if (message)
+	{
+		if (network_game_client_write(
+			client->connection,
+			message,
+			GET_MESSAGE_SIZE(*message),
+			NULL,
+			1))
+		{
+			success = TRUE;
+		}
+		else
+		{
+			network_event("network_game_client_update_local_player_data() failed while sending a message_client_player_settings_request message");
+		}
+	}
+
+	return success;
+}
+
+boolean network_game_client_add_player_to_game(
+	struct network_game_client *client,
+	struct network_player *player)
+{
+	boolean success = FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x462,
+		client && player);
+
+	if (network_player_is_valid(player))
+	{
+		success = network_game_add_player(&client->game, player);
+
+		if (success)
+		{
+			if (client->state == _network_game_client_state_ingame)
+			{
+				player = &client->game.players[client->game.player_count - 1];
+
+				success = network_game_spawn_player(player);
+
+				if (success)
+				{
+					long player_index = unstrip_player_index(player->player_list_index);
+
+					if (player->machine_index == client->machine_index)
+					{
+						local_player_set_player_index(
+							player->controller_index,
+							player_index);
+					}
+
+					update_client_add_player(player_index);
+
+					if (global_network_game_server_get())
+						update_server_add_player(player_index);
+				}
+			}
+
+			if (success)
+			{
+				network_event(
+					"added new player to the game (machine #%d / controller #%d)",
+					player->machine_index,
+					player->controller_index);
+			}
+		}
+	}
+
+	return success;
+}
+
+boolean network_game_client_initiate_join_game(
+	struct network_game_client *client,
+	struct network_advertised_game *game,
+	struct network_join_parameters *join_parameters,
+	struct transport_address *address)
+{
+	boolean success;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x157,
+		client && (client->state == _network_game_client_state_searching) && game && join_parameters && client->connection && !(boolean)network_connection_connected(client->connection) && (game->platform == network_game_get_local_platform()));
+
+	client->join_in_progress = TRUE;
+	client->connect_process = 0;
+	client->connection_attempt_time = system_milliseconds();
+
+	csmemcpy(
+		&client->join_parameters,
+		join_parameters,
+		sizeof(*join_parameters));
+
+	success = network_connection_connect(client->connection, address, 0);
+
+	if (success == TRUE)
+	{
+		client->state = _network_game_client_state_joining;
+		network_event(
+			"attempting to connect to game @ %s",
+			transport_address_to_string(address));
+	}
+	else
+	{
+		display_error_when_main_menu_loaded(7);
+		network_event(
+			"failed attempt to initiate a connection to game @ %s",
+			transport_address_to_string(address));
+	}
+
+	return success;
+}
+
+void network_game_client_ponged(
+	struct network_game_client *client,
+	struct transport_address *source_address,
+	long timestamp)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x307,
+		client && source_address);
+
+	if (client->pinging &&
+		client->ping_address.address.long_words[0] ==
+		source_address->address.long_words[0])
+	{
+		unsigned long now = system_milliseconds();
+
+		if (timestamp <= now)
+		{
+			client->average_ping = (word)((client->average_ping *
+				client->ping_sample_count + now - timestamp) /
+				(client->ping_sample_count + 1));
+			client->ping_sample_count += 1;
+		}
+		else
+		{
+			network_event("received a pong from the future");
+		}
+	}
+	else
+	{
+		network_event("received a pong from a system we aren't interested in");
+	}
+
+	return;
+}
+
+boolean network_game_client_address_matches_server(
+	struct network_game_client *client,
+	struct transport_address *address)
+{
+	struct transport_address server_address;
+	boolean address_matches;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x2D2,
+		client != NULL);
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x2D3,
+		client->connection);
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x2D4,
+		address != NULL);
+	match_vassert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x2D5,
+		address->address.long_words[0],
+		"address->address.ipv4_address");
+
+	network_connection_get_address(client->connection, &server_address, NULL);
+
+	address_matches = server_address.address.long_words[0] == address->address.long_words[0];
+
+	return address_matches;
+}
+
+boolean network_game_client_request_start_time_change(
+	struct network_game_client *client,
+	short request_type)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x5A5,
+		client);
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x5A6,
+		(request_type>=0) && (request_type<NUMBER_OF_GAME_START_REQUESTS));
+
+	if (client->state == _network_game_client_state_pregame)
+	{
+		struct message_client_game_start_request game_start_request;
+		message_header *message;
+
+		game_start_request.request_type = request_type;
+
+		message = create_network_game_message(
+			_message_client_game_start_request,
+			&game_start_request,
+			sizeof(game_start_request));
+		if (message)
+		{
+			if (!network_game_client_write(
+				client->connection,
+				message,
+				GET_MESSAGE_SIZE(*message),
+				NULL,
+				1))
+			{
+				network_event("network_game_client_request_start_time_change() failed to send a message_client_game_start_request message");
+			}
+		}
+	}
+	else
+	{
+		network_event("failed to send a message_client_game_start_request because we are not in the pregame state");
+	}
+
+	return TRUE;
+}
+
+void network_game_client_reset(
+	struct network_game_client *client,
+	boolean leave_connection_open)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x4EE,
+		client);
+
+	network_game_invalidate(&client->game);
+
+	client->machine_index = NONE;
+	client->state = _network_game_client_state_searching;
+
+	if (leave_connection_open && client->connection &&
+		(boolean)network_connection_connected(client->connection))
+	{
+		client->join_in_progress = TRUE;
+
+		if (network_connection_disconnect(client->connection))
+		{
+			SET_FLAG(
+				client->flags,
+				_network_game_client_connection_established_bit,
+				FALSE);
+		}
+		else
+		{
+			network_game_client_set_error(
+				client,
+				_network_game_client_error_unknown);
+			network_event("failed to reinitialize network game client");
+		}
+	}
+
+	SET_FLAG(client->flags, _network_game_client_join_request_sent_bit, FALSE);
+	client->error = _network_game_client_error_none;
+	client->last_broadcast_search_time = 0;
+	client->next_update_number = 0;
+	client->last_update_time = 0;
+	client->connection_silent = FALSE;
+	client->out_of_sync = FALSE;
+	client->seconds_to_game_start = NONE;
+
+	return;
+}
+
+struct network_game_client *network_game_client_create(
+	void)
+{
+	struct network_game_client *client = &network_game_client_dont_use_directly;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x94,
+		!network_game_client_dont_use_directly_in_use);
+
+	network_game_client_dont_use_directly_in_use = TRUE;
+
+	csmemset(
+		&network_game_client_dont_use_directly,
+		0,
+		sizeof(network_game_client_dont_use_directly));
+
+	network_game_client_dont_use_directly.connection = network_connection_new(
+		_network_connection_type_client,
+		NETWORK_GAME_CLIENT_PORT);
+
+	if (network_game_client_dont_use_directly.connection)
+	{
+		network_game_client_reset(&network_game_client_dont_use_directly, FALSE);
+	}
+	else
+	{
+		network_event("network_game_create_client() failed; could not create network connection");
+		network_game_client_dispose(&network_game_client_dont_use_directly);
+		client = NULL;
+	}
+
+	return client;
+}
+
 void network_game_client_rejected_by_game(
 	struct network_game_client *client,
-	void *source_address,
-	unsigned short rejection_code)
+	struct transport_address *source_address,
+	word rejection_code)
 {
 	const char *reason = "<unknown>";
 
@@ -976,35 +2310,35 @@ void network_game_client_rejected_by_game(
 		0x35A,
 		client && source_address);
 
-	client->state = 0;
+	client->state = _network_game_client_state_searching;
 
 	switch (rejection_code)
 	{
-	case 0:
+	case _rejection_code_version_too_old:
 		reason = "_rejection_code_version_too_old";
 		break;
 
-	case 1:
+	case _rejection_code_version_too_new:
 		reason = "_rejection_code_version_too_new";
 		break;
 
-	case 2:
+	case _rejection_code_bad_join_token:
 		reason = "_rejection_code_bad_join_token";
 		break;
 
-	case 3:
+	case _rejection_code_bad_password:
 		reason = "_rejection_code_bad_password";
 		break;
 
-	case 4:
+	case _rejection_code_game_is_full:
 		reason = "_rejection_code_game_is_full";
 		break;
 
-	case 5:
+	case _rejection_code_game_is_closed:
 		reason = "_rejection_code_game_is_closed";
 		break;
 
-	case 6:
+	case _rejection_code_blacklisted_machine:
 		reason = "_rejection_code_blacklisted_machine";
 		break;
 	}
@@ -1019,3 +2353,603 @@ void network_game_client_rejected_by_game(
 }
 
 /* ---------- private code */
+
+static boolean network_game_client_add_advertised_game(
+	struct network_advertised_game *available_games,
+	struct message_server_game_advertise *advertisement)
+{
+	boolean open = TEST_FLAG(advertisement->flags, _game_advertisement_open_bit) &&
+		advertisement->machine_count < MAXIMUM_NETWORK_MACHINE_COUNT;
+	struct network_advertised_game *advertised_game = NULL;
+	struct network_advertised_game *game;
+	char const *open_name;
+	char const *platform_name;
+	long game_index;
+
+	for (game_index = 0; game_index < MAXIMUM_NETWORK_ADVERTISED_GAMES; game_index++)
+	{
+		if (!network_game_client_advertised_game_is_valid(&available_games[game_index]))
+		{
+			csmemset(
+				&available_games[game_index],
+				0,
+				sizeof(available_games[game_index]));
+		}
+	}
+
+	for (game_index = 0, game = available_games;
+		game_index < MAXIMUM_NETWORK_ADVERTISED_GAMES;
+		game_index++, game++)
+	{
+		if (transport_nonce_is_equal(game->nonce, advertisement->nonce))
+		{
+			advertised_game = game;
+			break;
+		}
+	}
+
+	if (!advertised_game)
+	{
+		for (game_index = 0, game = available_games;
+			game_index < MAXIMUM_NETWORK_ADVERTISED_GAMES;
+			game_index++, game++)
+		{
+			if (!game->valid)
+			{
+				advertised_game = game;
+				break;
+			}
+		}
+	}
+
+	if (!advertised_game)
+	{
+		if (open)
+		{
+			struct network_advertised_game *current;
+
+			for (game_index = 0; game_index < MAXIMUM_NETWORK_ADVERTISED_GAMES; game_index++)
+			{
+				current = &available_games[game_index];
+
+				match_assert(
+					"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+					0x61F,
+					current->valid);
+
+				if (!current->open)
+				{
+					advertised_game = current;
+					csmemset(advertised_game, 0, sizeof(*advertised_game));
+					break;
+				}
+			}
+		}
+
+		if (!advertised_game)
+		{
+			error(
+				_error_silent,
+				"not fatal, but we have to many active network games cannot add more to the list");
+
+			return FALSE;
+		}
+	}
+
+	advertised_game->valid = TRUE;
+	advertised_game->key = advertisement->key;
+	advertised_game->key_id = advertisement->key_id;
+	advertised_game->xnaddr = advertisement->xnaddr;
+
+	csmemcpy(
+		advertised_game->nonce,
+		advertisement->nonce,
+		sizeof(advertised_game->nonce));
+
+	advertised_game->update_time = system_milliseconds();
+	advertised_game->platform = advertisement->platform;
+
+	if (advertisement->game_name[0])
+	{
+		ustrncpy(
+			advertised_game->game_name,
+			advertisement->game_name,
+			NETWORK_GAME_NAME_LENGTH - 1);
+	}
+	else
+	{
+		ustrncpy(
+			advertised_game->game_name,
+			L"???",
+			NETWORK_GAME_NAME_LENGTH - 1);
+	}
+	advertised_game->game_name[NETWORK_GAME_NAME_LENGTH - 1] = 0;
+
+	csmemcpy(
+		&advertised_game->map,
+		&advertisement->map,
+		sizeof(advertised_game->map));
+
+	advertised_game->engine_type = advertisement->engine_type;
+	advertised_game->machine_count = advertisement->machine_count;
+	advertised_game->player_count = advertisement->player_count;
+	advertised_game->maximum_player_count = advertisement->maximum_player_count;
+	advertised_game->unknown100 = advertisement->unknown100;
+	advertised_game->open = open;
+	advertised_game->has_teams = TEST_FLAG(
+		advertisement->flags,
+		_game_advertisement_has_teams_bit);
+	advertised_game->oddball_variant =
+		advertised_game->engine_type == game_engine_oddball &&
+		TEST_FLAG(advertisement->flags, _game_advertisement_oddball_variant_bit);
+
+	switch (advertised_game->platform)
+	{
+	case _network_game_platform_xbox:
+		platform_name = "XBox";
+		break;
+
+	case _network_game_platform_pc:
+		platform_name = "PC";
+		break;
+
+	default:
+		platform_name = "<unknown platform>";
+		break;
+	}
+
+	open_name = open ? "an open" : "a closed";
+
+	network_event(
+		"there is %s %s net game with %d players and %d machines",
+		open_name,
+		platform_name,
+		advertised_game->player_count,
+		advertised_game->machine_count);
+
+	return TRUE;
+}
+
+static boolean network_game_client_process_incoming_messages(
+	struct network_game_client *client)
+{
+	boolean success = TRUE;
+	word message_packet_size;
+	struct transport_address source_address;
+	word message_packet[MAXIMUM_NETWORK_MESSAGE_SIZE / sizeof(word)];
+
+	message_packet_size = sizeof(message_packet);
+
+	while (success && network_connection_read(
+		client->connection,
+		message_packet,
+		&message_packet_size,
+		&source_address))
+	{
+		if (!(success = network_game_client_handle_message(
+			client,
+			message_packet,
+			message_packet_size,
+			&source_address)))
+		{
+			network_event("network_game_client_handle_message() failed in network_game_client_process_incoming_messages()");
+		}
+
+		message_packet_size = sizeof(message_packet);
+	}
+
+	return success;
+}
+
+static void network_game_client_precache_map(
+	struct network_game_client *client)
+{
+	long now = system_milliseconds();
+
+	if (now > client->last_precache_time + 1000)
+	{
+		char *map_name = main_get_multiplayer_map_name();
+
+		client->last_precache_time = now;
+
+		if (cache_files_give_time_to_precache(map_name))
+		{
+			struct message_client_map_is_precached_pregame map_is_precached = {0};
+			message_header *message;
+
+			csstrncpy(
+				map_is_precached.map_name,
+				map_name,
+				sizeof(map_is_precached.map_name));
+
+			message = create_network_game_message(
+				_message_client_map_is_precached_pregame,
+				&map_is_precached,
+				sizeof(map_is_precached));
+			if (message)
+			{
+				if (!network_game_client_write(
+					client->connection,
+					message,
+					GET_MESSAGE_SIZE(*message),
+					NULL,
+					1))
+				{
+					network_event("network_game_client_write() failed while sending a message_client_graceful_game_exit_pregame message");
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+static boolean network_game_client_idle_searching(
+	struct network_game_client *client)
+{
+	unsigned long now = system_milliseconds();
+	boolean success;
+
+	network_connection_keep_alive(client->connection);
+
+	success = network_game_client_network_available();
+
+	if (success == TRUE)
+	{
+		if (global_network_game_server_get())
+		{
+			struct network_advertised_game local_game = {0};
+			struct network_join_parameters join_parameters;
+			struct transport_address server_address;
+
+			server_address.address.long_words[0] = LOCAL_HOST_IPV4_ADDRESS;
+			server_address.port = NETWORK_GAME_SERVER_PORT;
+			server_address.address_length = IPV4_ADDRESS_LENGTH;
+			local_game.platform = network_game_get_local_platform();
+
+			transport_get_nonce(local_game.nonce, sizeof(local_game.nonce));
+
+			join_parameters.__unknown2 = 0;
+			network_game_generate_join_game_token(join_parameters.join_token);
+
+			if (!network_game_client_initiate_join_game(
+				client,
+				&local_game,
+				&join_parameters,
+				&server_address))
+			{
+				success = FALSE;
+				display_error_when_main_menu_loaded(7);
+				network_event("network_game_client_initiate_join_game() failed");
+			}
+		}
+		else if (!(success = network_connection_idle(client->connection, 5000, FALSE)))
+		{
+			display_error_when_main_menu_loaded(7);
+			network_event("network_connection_idle() failed in network_game_client_idle_searching()");
+		}
+		else if (!(success = network_game_client_process_incoming_messages(client)))
+		{
+			network_event("network_game_client_process_incoming_messages() failed in network_game_client_idle_searching()");
+		}
+		else if (now - client->last_broadcast_search_time > 2000)
+		{
+			if (!global_network_game_server_get())
+			{
+				struct message_client_broadcast_game_search broadcast_game_search;
+				struct transport_address broadcast_address;
+				message_header *message;
+
+				broadcast_game_search.port = NETWORK_GAME_CLIENT_PORT;
+				broadcast_game_search.__unknown2 = 1;
+				transport_get_nonce(
+					broadcast_game_search.nonce,
+					sizeof(broadcast_game_search.nonce));
+				broadcast_address.address_length = IPV4_ADDRESS_LENGTH;
+				broadcast_address.address.long_words[0] = BROADCAST_IPV4_ADDRESS;
+				broadcast_address.port = NETWORK_GAME_SERVER_PORT;
+
+				message = create_network_game_message(
+					_message_client_broadcast_game_search,
+					&broadcast_game_search,
+					sizeof(broadcast_game_search));
+				if (message)
+				{
+					success = network_game_client_write(
+						client->connection,
+						message,
+						GET_MESSAGE_SIZE(*message),
+						&broadcast_address,
+						0);
+					if (success == TRUE)
+					{
+						network_event("sent out a broadcast game search packet");
+						client->last_broadcast_search_time = now;
+					}
+					else
+					{
+						network_event("network_game_client_write() failed while sending a message_client_broadcast_game_search message");
+					}
+				}
+				else
+				{
+					network_event("failed to create a message_client_broadcast_game_search message");
+				}
+			}
+		}
+		else if (client->pinging == TRUE && now - client->last_ping_time > 1000)
+		{
+			struct message_client_ping ping;
+			message_header *message;
+
+			ping.timestamp = now;
+			ping.port = NETWORK_GAME_CLIENT_PORT;
+
+			message = create_network_game_message(
+				_message_client_ping,
+				&ping,
+				sizeof(ping));
+			if (message)
+			{
+				if (network_game_client_write(
+					client->connection,
+					message,
+					GET_MESSAGE_SIZE(*message),
+					&client->ping_address,
+					0))
+				{
+					client->last_ping_time = now;
+				}
+				else
+				{
+					network_event("network_game_client_write() failed while sending a message_client_ping message");
+				}
+			}
+			else
+			{
+				network_event("failed to create a message_client_ping message");
+			}
+		}
+	}
+
+	return success;
+}
+
+static boolean network_game_client_idle_joining(
+	struct network_game_client *client)
+{
+	boolean success = network_game_client_network_available();
+
+	if (success == TRUE)
+	{
+		if ((boolean)network_connection_connected(client->connection))
+		{
+			if (!TEST_FLAG(client->flags, _network_game_client_join_request_sent_bit))
+			{
+				struct message_client_join_game_request join_game_request;
+				message_header *message;
+
+				csmemset(&join_game_request, 0, sizeof(join_game_request));
+				network_game_generate_local_machine_name(join_game_request.machine_name);
+				csmemcpy(
+					join_game_request.join_token,
+					client->join_parameters.join_token,
+					sizeof(join_game_request.join_token));
+
+				message = create_network_game_message(
+					_message_client_join_game_request,
+					&join_game_request,
+					sizeof(join_game_request));
+				if (message)
+				{
+					if (network_game_client_write(
+						client->connection,
+						message,
+						GET_MESSAGE_SIZE(*message),
+						NULL,
+						1))
+					{
+						SET_FLAG(
+							client->flags,
+							_network_game_client_join_request_sent_bit,
+							TRUE);
+					}
+					else
+					{
+						network_event("network_game_client_write() failed to send a message_client_join_game_request message");
+					}
+				}
+				else
+				{
+					network_event("failed to create a message_client_join_game_request message");
+				}
+			}
+
+			client->connect_process = 0;
+		}
+		else if (client->connect_process &&
+			system_milliseconds() - client->connection_attempt_time > 120000)
+		{
+			network_event("client connection process has timed out; aborting connection attempt");
+			cancel_connect_process(client->connect_process);
+			client->connect_process = 0;
+
+			return FALSE;
+		}
+
+		success = network_connection_idle(client->connection, 5000, FALSE);
+
+		if (success)
+		{
+			if (!(success = network_game_client_process_incoming_messages(client)))
+			{
+				network_event("network_game_client_process_incoming_messages() failed in network_game_client_idle_joining()");
+			}
+		}
+		else
+		{
+			network_event("network_connection_idle() failed in network_game_client_idle_joining()");
+		}
+	}
+
+	return success;
+}
+
+static boolean network_game_client_idle_pregame(
+	struct network_game_client *client)
+{
+	boolean success = network_game_client_network_available();
+
+	if (success)
+	{
+		if (network_connection_active(client->connection) &&
+			(boolean)network_connection_connected(client->connection))
+		{
+			network_game_client_precache_map(client);
+
+			if (!(success = network_connection_idle(client->connection, 15000, FALSE)))
+			{
+				network_event("network_connection_idle() failed in network_game_client_idle_pregame()");
+			}
+			else if (!(success = network_game_client_process_incoming_messages(client)))
+			{
+				network_event("network_game_client_process_incoming_messages() failed in network_game_client_idle_pregame()");
+			}
+		}
+		else
+		{
+			success = FALSE;
+		}
+	}
+
+	if (!success)
+	{
+		if (!network_connection_active(client->connection))
+		{
+			display_error_when_main_menu_loaded(4);
+
+			return FALSE;
+		}
+	}
+
+	return success;
+}
+
+static boolean network_game_client_idle_ingame(
+	struct network_game_client *client)
+{
+	boolean success = TRUE;
+
+	if (network_connection_active(client->connection) &&
+		(boolean)network_connection_connected(client->connection))
+	{
+		if (!network_game_is_splitscreen_local())
+		{
+			boolean connection_silent = network_connection_going_stale(client->connection);
+
+			if (!transport_network_available())
+			{
+				display_error_when_main_menu_loaded(6);
+				network_event("network connection went down (idle in game)!");
+				success = FALSE;
+			}
+			else if (connection_silent && !client->connection_silent)
+			{
+				short local_player_index;
+
+				for (local_player_index = local_player_get_next(NONE);
+					local_player_index != NONE;
+					local_player_index = local_player_get_next(local_player_index))
+				{
+					display_error(9, local_player_index, FALSE, FALSE);
+				}
+
+				network_event("network client connection has been silent for a dangerously long amount of time");
+			}
+
+			client->connection_silent = connection_silent;
+		}
+
+		if (success == TRUE)
+		{
+			success = network_connection_idle(client->connection, 15000, FALSE);
+
+			if (success)
+			{
+				if (!(success = network_game_client_process_incoming_messages(client)))
+				{
+					network_event("network_game_client_process_incoming_messages() failed in network_game_client_idle_ingame()");
+				}
+			}
+			else
+			{
+				if (!network_connection_active(client->connection) ||
+					!(boolean)network_connection_connected(client->connection))
+				{
+					error(_error_silent, "new2 idle in game abort hit");
+					display_error_when_main_menu_loaded(4);
+					success = FALSE;
+				}
+
+				network_event("network_connection_idle() failed in network_game_client_idle_ingame()");
+			}
+		}
+	}
+	else
+	{
+		error(_error_silent, "new idle in game abort hit");
+		display_error_when_main_menu_loaded(4);
+		success = FALSE;
+	}
+
+	return success;
+}
+
+static boolean network_game_client_idle_postgame(
+	struct network_game_client *client)
+{
+	boolean success = network_game_client_network_available();
+
+	if (success)
+	{
+		if (!(success = network_connection_idle(client->connection, 15000, FALSE)))
+		{
+			network_event("network_connection_idle() failed in network_game_client_idle_postgame()");
+		}
+		else if (!(success = network_game_client_process_incoming_messages(client)))
+		{
+			network_event("network_game_client_process_incoming_messages() failed in network_game_client_idle_postgame()");
+		}
+	}
+
+	if (!success)
+	{
+		if (!network_connection_active(client->connection))
+		{
+			display_error_when_main_menu_loaded(4);
+
+			return FALSE;
+		}
+	}
+
+	return success;
+}
+
+
+static void network_game_client_set_error(
+	struct network_game_client *client,
+	word error)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+		0x662,
+		client);
+
+	if (error >= NUMBER_OF_NETWORK_GAME_CLIENT_ERRORS)
+		error = _network_game_client_error_unknown;
+
+	if (client->error == _network_game_client_error_none)
+		client->error = error;
+
+	return;
+}

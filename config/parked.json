@@ -3624,6 +3624,101 @@
         },
         "objdiff_percent": 76.96774
       }
+    },
+    {
+      "unit": "source/networking/network_client_manager",
+      "function": "_network_game_client_add_advertised_game",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after selectively reconciling the interrupted Opus reconstruction as ordinary typed C and checking it against January's complete instruction and relocation topology. The retained helper expires stale advertisements, reuses a nonce match or empty/closed slot, copies the authenticated advertisement fields, applies named advertisement flag macros and platform enum constants, and emits the observed diagnostics. Target and candidate both occupy 720 padded bytes with 22 relocations; objdiff reports 82.70755 percent similarity. The aligned streams agree through both initial table walks, then differ in a compiler-sensitive spill/branch schedule for the closed-slot replacement and in later independent aggregate-copy/load ordering and two-case platform selection. The fail-closed classifier reports UNKNOWN, so no recipe is inferred. No raw offsets, volatile/register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, forced inline, or nonsensical coincidental match is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the remaining frame, branch, and aggregate-copy schedule.",
+      "measurements": {
+        "target": {
+          "size": 720,
+          "relocation_count": 22,
+          "normalized_sha256": "7584796d30a9a06f6c3a1b12feaca8607256f9330324c750f0794af6b307bd1c"
+        },
+        "base": {
+          "size": 720,
+          "relocation_count": 22,
+          "normalized_sha256": "730d6ba279a033af67b58c31b0dbed4c19a53837deaf895920e65311fa1a7d2b"
+        },
+        "objdiff_percent": 82.70755
+      }
+    },
+    {
+      "unit": "source/networking/network_client_manager",
+      "function": "_network_game_client_idle_ingame",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after retaining Opus's complete ordinary-C in-game idle state machine with the truthful owner declaration for network_connection_connected. The body checks connection liveness, reports transport loss and newly silent connections, services the connection, processes incoming messages, and preserves the two distinct abort diagnostics. Target and candidate both occupy 400 padded bytes with 27 relocations; objdiff reports 76.03846 percent similarity. January keeps the success and silent-state bytes in a different register/stack lifetime and orders the two post-idle connection checks and diagnostic blocks differently; the retained source expresses the same short-circuit behavior without compiler steering. The fail-closed classifier reports UNKNOWN, so no register or scheduling recipe is asserted. No false prototype, raw offset, volatile/register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor that explains the private value lifetimes and failure-block placement.",
+      "measurements": {
+        "target": {
+          "size": 400,
+          "relocation_count": 27,
+          "normalized_sha256": "b8d85f18191d91a25dc95c9f4a4aa11d3fb04b2cb9d05cf41360550932dfcad8"
+        },
+        "base": {
+          "size": 400,
+          "relocation_count": 27,
+          "normalized_sha256": "5a2c1ae0e065f5b1f47062cdb79bbb04bf0641cb3ece81f9a30a669c53a645e3"
+        },
+        "objdiff_percent": 76.03846
+      }
+    },
+    {
+      "unit": "source/networking/network_client_manager",
+      "function": "_network_game_client_remove_player",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after retaining the complete typed player-removal path from Opus and verifying it against January. The function locates the matching network player, removes it from the embedded game, updates the real player datum through the existing player-data owner, detects the last local player, and emits the observed failure diagnostics. Target and candidate both occupy 368 padded bytes with all 18 relocation identities; objdiff reports 98.06201 percent similarity. The residual consists of equivalent byte-register choices for the game-active test and an independent load order/extension choice in the final local-machine comparison. The fail-closed classifier reports UNKNOWN, so the honest class remains unclassified. No raw offset, one-use alias, volatile/register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, forced inline, or nonsensical logic is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining those two narrow instruction-selection choices.",
+      "measurements": {
+        "target": {
+          "size": 368,
+          "relocation_count": 18,
+          "normalized_sha256": "dc8b3cc79a45ade5c1867e72dca21cc20d4512358c82a52cfa4ba47a50a21e3a"
+        },
+        "base": {
+          "size": 368,
+          "relocation_count": 18,
+          "normalized_sha256": "d4cc7f9d2314f34438970668b3bf27328b326dfa823cb0466cd79ccd72a0850c"
+        },
+        "objdiff_percent": 98.06201
+      }
+    },
+    {
+      "unit": "source/networking/network_client_manager",
+      "function": "_network_game_client_initiate_join_game",
+      "class": "unclassified",
+      "evidence": "Parked at a source-authentic relocation-only boundary. Target and candidate have identical 256-byte padded code, 15 relocations, normalized instruction bytes, and a 100.0 percent objdiff score. Their sole strict difference is the assertion-expression string: January spells !network_connection_connected(client->connection), while the retained source must spell !(boolean)network_connection_connected(client->connection) because the January owner body and repository owner declaration truthfully return long. Opus obtained the January string only through a contradictory TU-local boolean prototype. Removing the cast would make C evaluation depend on nonzero upper result bytes; hard-coding or otherwise faking the string is forbidden. No false prototype, fake string, raw offset, volatile/register forcing, barrier, pragma, assembly, or undefined behavior is retained. Reopen only if authoritative January source proves a different shared owner contract that also preserves the owner translation unit.",
+      "measurements": {
+        "target": {
+          "size": 256,
+          "relocation_count": 15,
+          "normalized_sha256": "faa6e6c953ee2541df879bd31303e2fe8c028f3ee10d7a4938d841824467795c"
+        },
+        "base": {
+          "size": 256,
+          "relocation_count": 15,
+          "normalized_sha256": "faa6e6c953ee2541df879bd31303e2fe8c028f3ee10d7a4938d841824467795c"
+        },
+        "objdiff_percent": 100.0
+      }
+    },
+    {
+      "unit": "source/networking/network_client_manager",
+      "function": "_network_game_client_leave_game",
+      "class": "unclassified",
+      "evidence": "Parked at the same truthful owner-contract boundary as network_game_client_initiate_join_game. Target and candidate have identical 608-byte padded code, identical normalized instruction bytes, and 42 relocations; objdiff reports 96.15385 percent because one assertion-owned data relocation differs. January's assertion string spells !network_connection_connected(client->connection), while the retained source's normal narrowing cast stringizes as !(boolean)network_connection_connected(client->connection). The cast is required by the long-returning owner declaration and January's full-EAX owner code; Opus's exact form depended on a false TU-local boolean prototype. All five switch arms, the jump table, message sends, disconnects, diagnostics, and invalidation tail otherwise compare identically. No false prototype, fake assertion text, raw offset, volatile/register forcing, barrier, pragma, assembly, or undefined behavior is retained. Reopen only if authoritative January source proves a different shared owner contract that also preserves the owner translation unit.",
+      "measurements": {
+        "target": {
+          "size": 608,
+          "relocation_count": 42,
+          "normalized_sha256": "c987a13c402904abf05ce28daff5016f5d5b50ec351b6cc671e1a9d37184ef43"
+        },
+        "base": {
+          "size": 608,
+          "relocation_count": 42,
+          "normalized_sha256": "c987a13c402904abf05ce28daff5016f5d5b50ec351b6cc671e1a9d37184ef43"
+        },
+        "objdiff_percent": 96.15385
+      }
     }
   ]
 }

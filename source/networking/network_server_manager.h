@@ -23,6 +23,8 @@ void network_game_server_reset_to_pregame(
 void network_game_server_pause_countdown(
 	struct network_game_server *server,
 	boolean pause_countdown);
+void network_game_generate_join_game_token(
+	byte *join_game_token);
 
 /* ---------- globals */
 

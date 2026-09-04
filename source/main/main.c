@@ -1163,9 +1163,6 @@ void compute_window_bounds(
 	return;
 }
 
-extern void cache_files_give_time_to_precache(
-	char const *map_name);
-
 void main_set_multiplayer_map_name(
 	char const *map_name)
 {

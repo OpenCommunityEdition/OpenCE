@@ -85,6 +85,14 @@ char const *transport_error_to_string(
 boolean transport_is_nonce(
 	void const *nonce,
 	long nonce_length);
+void transport_get_nonce(
+	void *nonce,
+	long nonce_length);
+boolean transport_nonce_is_equal(
+	void const *a,
+	void const *b);
+boolean transport_network_available(
+	void);
 
 /* ---------- globals */
 

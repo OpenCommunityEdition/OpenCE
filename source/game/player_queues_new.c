@@ -103,6 +103,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "game/player_queues_new.h"
 #include "game/players.h"
 #include "memory/data.h"
 

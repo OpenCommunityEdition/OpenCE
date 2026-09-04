@@ -44,6 +44,16 @@ boolean network_connection_read(
 	void *buffer,
 	word *buffer_size,
 	struct transport_address *source_address);
+boolean network_connection_write(
+	struct network_connection *connection,
+	void *message,
+	word message_size,
+	struct transport_address *address,
+	long flags);
+boolean network_connection_idle(
+	struct network_connection *connection,
+	long timeout,
+	boolean flush);
 boolean network_connection_disconnect(
 	struct network_connection *connection);
 boolean network_server_close_client_connection(

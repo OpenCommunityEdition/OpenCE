@@ -100,14 +100,28 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
+#include "bungie_net/common/message_header.h"
+#include "bungie_net/network/transport.h"
+#include "game/player_queues_new.h"
 #include "game/players.h"
 #include "main/main.h"
 #include "memory/data_packet_groups.h"
+#include "network_client_manager.h"
 #include "network_messages.h"
 #include "network_game_manager.h"
 #include "network_game_globals.h"
 
 /* ---------- constants */
+
+enum network_game_client_state
+{
+	_network_game_client_state_searching,
+	_network_game_client_state_joining,
+	_network_game_client_state_pregame,
+	_network_game_client_state_ingame,
+	_network_game_client_state_postgame,
+	NUMBER_OF_NETWORK_GAME_CLIENT_STATES,
+};
 
 /* ---------- macros */
 
@@ -214,47 +228,6 @@ boolean network_game_server_idle(
 	struct network_game_server *server);
 struct network_game_server *network_game_server_create(
 	void);
-
-struct network_game *network_game_client_get_game(
-	struct network_game_client *client);
-struct network_machine *network_game_client_get_machine(
-	struct network_game_client *client);
-struct network_game_client *network_game_client_create(
-	void);
-void network_game_client_dispose(
-	struct network_game_client *client);
-boolean network_game_client_request_remove_player(
-	struct network_game_client *client,
-	struct network_player *player);
-boolean network_game_client_request_start_time_change(
-	struct network_game_client *client,
-	long start_time);
-boolean network_game_client_idle(
-	struct network_game_client *client);
-short network_game_client_get_error(
-	struct network_game_client *client);
-short network_game_client_get_state(
-	struct network_game_client *client,
-	long *state_data);
-boolean network_game_client_server_has_started_game(
-	struct network_game_client *client);
-long network_game_client_get_next_update_number(
-	struct network_game_client *client);
-boolean network_client_get_oos(
-	struct network_game_client *client);
-void network_game_client_get_remote_server_address(
-	struct network_game_client *client,
-	void *address);
-void *network_game_client_get_connection(
-	struct network_game_client *client);
-boolean network_game_client_write(
-	void *connection,
-	void *message,
-	unsigned short message_size,
-	void *address,
-	long flags);
-void update_client_build_client_update(
-	struct player_action_collection *action_collection);
 
 unsigned long *get_global_local_random_seed_address(
 	void);
@@ -499,7 +472,7 @@ boolean network_game_client_start_frame(
 	void)
 {
 	short state;
-	long state_data;
+	short state_data;
 	boolean result;
 	struct network_game *game;
 
@@ -541,23 +514,23 @@ boolean network_game_client_start_frame(
 				state = network_game_client_get_state(global_network_game_client, &state_data);
 				switch ((unsigned short)state)
 				{
-				case 0:
+				case _network_game_client_state_searching:
 					if (player_action_collection_definition.previous_client_state != state)
 						network_event("searching for a network game ...");
 					break;
-				case 1:
+				case _network_game_client_state_joining:
 					if (player_action_collection_definition.previous_client_state != state)
 						network_event("joining a network game ...");
 					break;
-				case 2:
+				case _network_game_client_state_pregame:
 					if (player_action_collection_definition.previous_client_state != state)
 						network_event("waiting for game to start ...");
 					break;
-				case 3:
+				case _network_game_client_state_ingame:
 					if (player_action_collection_definition.previous_client_state != state)
 						network_event("client signalled to begin loading for network game");
 					break;
-				case 4:
+				case _network_game_client_state_postgame:
 					if (player_action_collection_definition.previous_client_state != state)
 						network_event("waiting for game to restart ...");
 					break;
@@ -593,9 +566,9 @@ boolean network_game_client_end_frame(
 {
 	struct player_action_collection update;
 	struct client_game_update_message message;
-	byte remote_server_address[0x18];
+	struct transport_address remote_server_address;
 	unsigned long now;
-	void *encoded_message;
+	message_header *encoded_message;
 	boolean result;
 
 	result = TRUE;
@@ -604,7 +577,7 @@ boolean network_game_client_end_frame(
 		game_connection_set(0);
 		main_menu_ensure_player_queues_exist();
 	}
-	else if (network_game_client_get_state(global_network_game_client, NULL) == 3)
+	else if (network_game_client_get_state(global_network_game_client, NULL) == _network_game_client_state_ingame)
 	{
 		now = system_milliseconds();
 		if (now-bss_004566dc.last_client_update_time >= 0x10 &&
@@ -635,12 +608,12 @@ boolean network_game_client_end_frame(
 			{
 				network_game_client_get_remote_server_address(
 					global_network_game_client,
-					remote_server_address);
+					&remote_server_address);
 				result = network_game_client_write(
 					network_game_client_get_connection(global_network_game_client),
 					encoded_message,
-					*(unsigned short *)encoded_message>>4,
-					remote_server_address,
+					GET_MESSAGE_SIZE(*encoded_message),
+					&remote_server_address,
 					0);
 				if (!result)
 					network_event("failed to send a game update to the server");
