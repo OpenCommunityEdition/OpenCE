@@ -113,6 +113,8 @@ char const *hs_runtime_get_executing_thread_name(
 	void);
 boolean hs_wake_by_name(
 	char const *name);
+void render_debug_scripting(
+	void);
 void hs_evaluate_wake(
 	short function_index,
 	long thread_index,

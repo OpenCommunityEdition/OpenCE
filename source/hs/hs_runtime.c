@@ -270,9 +270,11 @@ symbols in this file:
 #include "memory/data.h"
 #include "objects/objects.h"
 #include "objects/object_types.h"
+#include "render/render_debug.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "saved games/game_state.h"
+#include "text/draw_string.h"
 #include "cseries/errors.h"
 #include "main/console.h"
 #include "game/game.h"
@@ -577,6 +579,7 @@ extern struct data_array *hs_thread_data;
 extern struct data_array *hs_syntax_data;
 extern short hs_external_global_count;
 extern short hs_type_sizes[NUMBER_OF_HS_TYPES];
+extern boolean debug_scripting;
 static hs_inspection_procedure hs_type_inspectors[NUMBER_OF_HS_TYPES] =
 {
 	NULL,
@@ -730,6 +733,37 @@ void hs_runtime_dispose_from_old_map(
 	return;
 }
 
+static char const *expression_get_function_name(
+	long thread_index,
+	long expression_index)
+{
+	long next_expression_index;
+	struct hs_syntax_node *syntax_node = hs_syntax_get(expression_index);
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+
+	while (!TEST_FLAG(syntax_node->flags, _hs_syntax_node_script_bit))
+	{
+		if (syntax_node->index != 0 ||
+			expression_index != thread->stack->expression_index)
+		{
+			return hs_function_get((word)syntax_node->index)->name;
+		}
+
+		next_expression_index = *(long *)thread->stack->data;
+		if (next_expression_index == NONE)
+			return "(end of script)";
+
+		expression_index = next_expression_index;
+		syntax_node = hs_syntax_get(expression_index);
+		thread = hs_thread_get(thread_index);
+	}
+
+	return TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->hs_scripts,
+		syntax_node->index,
+		struct hs_script)->name;
+}
+
 char const *hs_runtime_get_executing_thread_name(
 	void)
 {
@@ -759,6 +793,61 @@ boolean hs_wake_by_name(
 	}
 
 	return result;
+}
+
+void render_debug_scripting(
+	void)
+{
+	char string[0x2800];
+	short tab_stops[2];
+
+	if (debug_scripting)
+	{
+		long thread_index;
+
+		tab_stops[0] = 200;
+		tab_stops[1] = 300;
+		sprintf(string, "|n|n|nscript name|tsleep time|tfunction");
+
+		for (thread_index = data_next_index(hs_thread_data, NONE);
+			hs_runtime_globals.initialized && thread_index != NONE;
+			thread_index = data_next_index(hs_thread_data, thread_index))
+		{
+			struct hs_thread_datum *thread = hs_thread_get(thread_index);
+
+			if (thread->sleep_until >= 0)
+			{
+				sprintf(
+					string + csstrlen(string),
+					"|n%s|t",
+					hs_thread_format(thread_index));
+				sprintf(
+					string + csstrlen(string),
+					"%d",
+					thread->sleep_until
+						? thread->sleep_until - game_time_get()
+						: 0);
+				csstrcat(string, "|t");
+
+				if (thread->stack != (struct hs_stack_frame *)thread->stack_data &&
+					thread->sleep_until != -2)
+				{
+					csstrcat(
+						string,
+						expression_get_function_name(
+							thread_index,
+							thread->stack->expression_index));
+				}
+			}
+		}
+
+		string[0x400] = 0;
+		draw_string_set_tab_stops(tab_stops, NUMBEROF(tab_stops));
+		render_debug_string(TRUE, string);
+		draw_string_set_tab_stops(tab_stops, 0);
+	}
+
+	return;
 }
 
 void hs_runtime_update(

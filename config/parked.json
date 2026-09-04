@@ -4080,6 +4080,25 @@
         },
         "objdiff_percent": 72.8
       }
+    },
+    {
+      "unit": "source/hs/hs_runtime",
+      "function": "_expression_get_function_name",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete private helper in ordinary typed C from January's instruction and relocation topology, with the independent later HCEA implementation corroborating its script-stack semantics and original-style name. The retained static helper walks outward through the active thread stack, returns the current function name, preserves the authenticated end-of-script string, and resolves script names through the typed TAG_BLOCK_GET_ELEMENT path. Target and candidate both occupy 176 padded bytes, have the same 70 decoded instructions, and share all 12 relocation identities at identical offsets; objdiff reports 99.52381 percent similarity. The only byte differences are two independent ECX/EDX scratch-register selections in the terminal script-index and function-index paths. Bounded declaration, next-expression staging, assignment-order, scalar-width, and loop/return forms either converge on this fixed point or disturb otherwise exact control flow. The fail-closed classifier returns UNKNOWN, so the entry remains unclassified rather than inferring a compiler recipe. No register or volatile forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, undefined behavior, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the two scratch-register choices.",
+      "measurements": {
+        "target": {
+          "size": 176,
+          "relocation_count": 12,
+          "normalized_sha256": "50c82a2814e4ab854e325a08464b0ae9985f2c032445bb2c9e16bb26754ea821"
+        },
+        "base": {
+          "size": 176,
+          "relocation_count": 12,
+          "normalized_sha256": "bf099693458aa0c86c0297f4536c0d37f8d73bda1332a1448d4ee921f4ba51cf"
+        },
+        "objdiff_percent": 99.52381
+      }
     }
   ]
 }
