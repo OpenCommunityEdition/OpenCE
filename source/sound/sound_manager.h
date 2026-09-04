@@ -56,8 +56,7 @@ long sound_new_impulse(
 		void const *track_data,
 		struct sound_source *source),
 	void const *track_data,
-	short track_data_size,
-	boolean is_local_player);
+	short track_data_size);
 void sound_pause(
 	boolean paused);
 void sound_idle(

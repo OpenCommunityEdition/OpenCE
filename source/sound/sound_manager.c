@@ -1571,8 +1571,7 @@ long sound_new_impulse(
 		void const *track_data,
 		struct sound_source *source),
 	void const *track_data,
-	short track_data_size,
-	boolean is_local_player)
+	short track_data_size)
 {
 	struct sound_definition *definition = sound_definition_get(definition_index);
 	real scale = source->scale;
@@ -1680,8 +1679,7 @@ long sound_new_impulse(
 				source_identifier,
 				track_proc,
 				track_data,
-				track_data_size,
-				is_local_player);
+				track_data_size);
 		}
 
 		return result;

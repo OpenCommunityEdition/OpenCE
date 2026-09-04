@@ -98,13 +98,20 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cache/cache_files.h"
+#include "cache/sound_cache.h"
+#include "camera/observer.h"
 #include "game/game.h"
+#include "game/players.h"
 #include "memory/data.h"
 #include "objects/objects.h"
+#include "physics/collisions.h"
+#include "physics/collision_usage.h"
 #include "saved games/game_state.h"
+#include "scenario/scenario.h"
 #include "sound/game_sound.h"
 #include "sound/sound_definitions.h"
 #include "sound/sound_manager.h"
+#include "structures/structure_bsp_definitions.h"
 #include "units/units.h"
 
 /* ---------- constants */
@@ -112,7 +119,6 @@ symbols in this file:
 enum
 {
 	MAXIMUM_GAME_LOOPING_SOUNDS = 1024,
-	_looping_sound_fake_impulse_sound_bit = 1,
 	_game_looping_sound_unattached_stop_bit = 1,
 	_game_looping_sound_unattached_stop_fixed_fadeout_bit = 2,
 	_game_looping_sound_alternate_bit = 3,
@@ -127,12 +133,39 @@ enum game_looping_sound_state
 	NUMBER_OF_GAME_LOOPING_SOUND_STATES,
 };
 
+enum sound_spatialization_mode
+{
+	_sound_spatialization_mode_none,
+	_sound_spatialization_mode_absolute,
+	_sound_spatialization_mode_relative,
+	NUMBER_OF_SOUND_SPATIALIZATION_MODES,
+};
+
 /* ---------- macros */
 
 #define game_looping_sound_get(index) \
 	((struct game_looping_sound_datum *)datum_get(game_looping_sound_data, (index)))
 
 /* ---------- structures */
+
+struct sound_source
+{
+	short spatialization_mode;
+	short pad_2;
+	real scale;
+	real gain;
+	struct sound_location location;
+	real obstruction;
+	real occlusion;
+};
+
+struct sound_attachment_data
+{
+	short function_index;
+	short node_index;
+	real_point3d position;
+	real_vector3d forward;
+};
 
 struct game_looping_sound_datum
 {
@@ -159,12 +192,22 @@ typedef char game_looping_sound_datum_size_assert[
 	sizeof(struct game_looping_sound_datum) == 0x34 ? 1 : -1];
 typedef char game_sound_globals_size_assert[
 	sizeof(struct game_sound_globals) == 0x8 ? 1 : -1];
+typedef char sound_source_size_assert[
+	sizeof(struct sound_source) == 0x40 ? 1 : -1];
+typedef char sound_attachment_data_size_assert[
+	sizeof(struct sound_attachment_data) == 0x1C ? 1 : -1];
+typedef char sound_attachment_data_node_index_offset_assert[
+	offsetof(struct sound_attachment_data, node_index) == 2 ? 1 : -1];
 
 /* ---------- prototypes */
 
 static void scripted_looping_sound_stop_internal(
 	long sound_index,
 	boolean fixed_fadeout);
+static boolean track_object_impulse_sound(
+	long object_index,
+	void const *attachment_data,
+	struct sound_source *source);
 
 /* ---------- globals */
 
@@ -207,6 +250,18 @@ void game_sound_initialize_for_new_map(
 		data_make_valid(game_looping_sound_data);
 		game_sound_globals->music_looping_sound_index = NONE;
 		game_sound_globals->update_index = 0;
+	}
+
+	return;
+}
+
+void game_sound_dispose_from_old_map(
+	void)
+{
+	if (game_looping_sound_data && game_looping_sound_data->valid)
+	{
+		game_sound_clear();
+		data_make_invalid(game_looping_sound_data);
 	}
 
 	return;
@@ -346,13 +401,156 @@ void game_looping_sound_delete(
 	return;
 }
 
-void game_sound_dispose_from_old_map(
-	void)
+long object_impulse_sound_new(
+	long object_index,
+	long definition_index,
+	short node_index,
+	real_point3d const *position,
+	real_vector3d const *forward,
+	real scale)
 {
-	if (game_looping_sound_data && game_looping_sound_data->valid)
+	struct sound_attachment_data attachment_data;
+	struct sound_source source;
+	long sound_index = NONE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\game_sound.c",
+		301,
+		position && forward);
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\game_sound.c",
+		302,
+		scale>=0.f && scale<=1.f);
+
+	attachment_data.position = *position;
+	attachment_data.forward = *forward;
+	source.spatialization_mode = _sound_spatialization_mode_absolute;
+	source.gain = 1.f;
+	attachment_data.node_index = node_index;
+	source.location.game_location.cluster_index = NONE;
+	if (track_object_impulse_sound(object_index, &attachment_data, &source))
 	{
-		game_sound_clear();
-		data_make_invalid(game_looping_sound_data);
+		source.scale = scale;
+		sound_index = sound_new_impulse(
+			definition_index,
+			&source,
+			object_index,
+			track_object_impulse_sound,
+			&attachment_data,
+			sizeof(attachment_data));
+	}
+
+	return sound_index;
+}
+
+long unattached_impulse_sound_new(
+	long definition_index,
+	struct sound_location const *location,
+	real scale)
+{
+	struct sound_source source;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\game_sound.c",
+		329,
+		location);
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\game_sound.c",
+		330,
+		scale>=0.f && scale<=1.f);
+
+	source.location = *location;
+	source.scale = scale;
+	source.spatialization_mode = _sound_spatialization_mode_absolute;
+	source.gain = 1.f;
+
+	return sound_new_impulse(
+		definition_index,
+		&source,
+		NONE,
+		NULL,
+		NULL,
+		0);
+}
+
+long unspatialized_impulse_sound_new(
+	long definition_index,
+	real scale)
+{
+	struct sound_source source;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\game_sound.c",
+		346,
+		scale>=0.f && scale<=1.f);
+
+	source.spatialization_mode = _sound_spatialization_mode_none;
+	source.scale = scale;
+	source.gain = 1.f;
+
+	return sound_new_impulse(
+		definition_index,
+		&source,
+		NONE,
+		NULL,
+		NULL,
+		0);
+}
+
+void scripted_sound_new(
+	long definition_index,
+	long source_object_index,
+	real scale)
+{
+	struct sound_definition *definition;
+	struct object_marker marker;
+	real_vector3d forward;
+	real_point3d position;
+	long impulse_sound_index;
+
+	if (definition_index != NONE)
+	{
+		definition = sound_definition_get(definition_index);
+		sound_stop_impulse(definition->scripting_sound_index);
+		definition->scripting_time = game_time_get()
+			+ (long)definition->longest_permutation_length * TICKS_PER_SECOND / 1000;
+		scale = PIN(scale, 0.f, 1.f);
+		if (source_object_index != NONE)
+		{
+			short node_index;
+
+			if (object_get_marker_by_name(source_object_index, "head", &marker, 1))
+			{
+				node_index = marker.node_index;
+				position = marker.node_matrix.position;
+				forward = marker.node_matrix.forward;
+			}
+			else
+			{
+				node_index = 0;
+				position = *global_origin3d;
+				forward = *global_forward3d;
+			}
+			impulse_sound_index = object_impulse_sound_new(
+				source_object_index,
+				definition_index,
+				node_index,
+				&position,
+				&forward,
+				scale);
+			if (impulse_sound_index != NONE)
+			{
+				object_type_notify_impulse_sound(
+					source_object_index,
+					definition_index,
+					impulse_sound_index);
+			}
+		}
+		else
+		{
+			impulse_sound_index = unspatialized_impulse_sound_new(definition_index, scale);
+		}
+		definition->scripting_sound_index = impulse_sound_index;
 	}
 
 	return;
@@ -391,6 +589,50 @@ void scripted_sound_stop(
 			sound_stop_impulse(definition->scripting_sound_index);
 			definition->scripting_sound_index = NONE;
 			definition->scripting_time = NONE;
+		}
+	}
+
+	return;
+}
+
+void scripted_foley_predict(
+	long definition_index)
+{
+	struct looping_sound_definition *definition;
+	short track_index;
+
+	if (definition_index != NONE)
+	{
+		definition = looping_sound_definition_get(definition_index);
+		for (track_index = 0; track_index < definition->tracks.count; track_index++)
+		{
+			struct looping_sound_track *track = TAG_BLOCK_GET_ELEMENT(
+				&definition->tracks,
+				track_index,
+				struct looping_sound_track);
+
+			if (track->loop_sound.index != NONE)
+			{
+				struct sound_definition *sound = sound_definition_get(track->loop_sound.index);
+
+				if (sound->pitch_ranges.count == 1)
+				{
+					struct sound_pitch_range *pitch_range = TAG_BLOCK_GET_ELEMENT(
+						&sound->pitch_ranges,
+						0,
+						struct sound_pitch_range);
+
+					if (pitch_range->permutations.count)
+					{
+						struct sound_permutation *permutation = TAG_BLOCK_GET_ELEMENT(
+							&pitch_range->permutations,
+							0,
+							struct sound_permutation);
+
+						_sound_cache_sound_request(permutation, FALSE, TRUE, FALSE);
+					}
+				}
+			}
 		}
 	}
 
@@ -534,3 +776,51 @@ void game_sound_set_mouth_aperture(
 }
 
 /* ---------- private code */
+
+static boolean track_object_impulse_sound(
+	long object_index,
+	void const *attachment_data,
+	struct sound_source *source)
+{
+	struct object_datum *object = object_try_and_get(object_index);
+	struct sound_attachment_data const *attachment = attachment_data;
+	struct location location;
+	real_matrix4x3 const *node_matrix;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\game_sound.c",
+		794,
+		attachment_data);
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\game_sound.c",
+		795,
+		source);
+
+	if (object)
+	{
+		object_get_location(object_index, &location);
+		if (location.cluster_index != NONE)
+		{
+			node_matrix = object_get_node_matrix(
+				object_index,
+				attachment->node_index == NONE ? 0 : attachment->node_index);
+			source->location.game_location = location;
+			matrix4x3_transform_point(
+				node_matrix,
+				&attachment->position,
+				&source->location.position);
+			matrix4x3_transform_normal(
+				node_matrix,
+				&attachment->forward,
+				&source->location.forward);
+			object_get_velocities(
+				object_index,
+				&source->location.translational_velocity,
+				NULL);
+
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}

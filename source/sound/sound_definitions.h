@@ -39,6 +39,14 @@ enum
 	MAXIMUM_DETAIL_SOUNDS_PER_LOOPING_SOUND = 32,
 };
 
+enum looping_sound_definition_flags
+{
+	_looping_sound_deafening_bit,
+	_looping_sound_fake_impulse_sound_bit,
+	_looping_sound_stops_music_bit,
+	NUMBER_OF_LOOPING_SOUND_FLAGS,
+};
+
 /* ---------- macros */
 
 #define sound_definition_get(index) ((struct sound_definition *)tag_get(SOUND_DEFINITION_TAG, (index)))
@@ -119,15 +127,62 @@ struct sound_definition
 	struct tag_block pitch_ranges;
 };
 
+struct looping_sound_scale_modifiers
+{
+	real detail_period;
+	long unused0[2];
+};
+
+struct looping_sound_track
+{
+	unsigned long flags;
+	real gain;
+	real fade_in_duration;
+	real fade_out_duration;
+	long unused[8];
+	struct tag_reference start_sound;
+	struct tag_reference loop_sound;
+	struct tag_reference stop_sound;
+	long unused2[8];
+	struct tag_reference alternate_loop_sound;
+	struct tag_reference alternate_stop_sound;
+};
+
+struct looping_sound_detail
+{
+	struct tag_reference sound;
+	struct real_bounds period_bounds;
+	real gain;
+	unsigned long flags;
+	long unused0[12];
+	struct real_bounds theta_bounds;
+	struct real_bounds phi_bounds;
+	struct real_bounds distance_bounds;
+};
+
 struct looping_sound_definition
 {
 	unsigned long flags;
-	byte unused04[0x18];
+	struct looping_sound_scale_modifiers scale_lower_bound;
+	struct looping_sound_scale_modifiers scale_upper_bound;
 	long runtime_scripting_sound_index;
+	real runtime_maximum_distance;
+	long unused[2];
+	struct tag_reference continuous_damage_effect;
+	struct tag_block tracks;
+	struct tag_block details;
 };
 
 typedef char looping_sound_definition_runtime_scripting_sound_index_offset_assert[
 	offsetof(struct looping_sound_definition, runtime_scripting_sound_index) == 0x1C ? 1 : -1];
+typedef char looping_sound_definition_tracks_offset_assert[
+	offsetof(struct looping_sound_definition, tracks) == 0x3C ? 1 : -1];
+typedef char looping_sound_definition_size_assert[
+	sizeof(struct looping_sound_definition) == 0x54 ? 1 : -1];
+typedef char looping_sound_track_size_assert[
+	sizeof(struct looping_sound_track) == 0xA0 ? 1 : -1];
+typedef char looping_sound_detail_size_assert[
+	sizeof(struct looping_sound_detail) == 0x68 ? 1 : -1];
 
 /* ---------- prototypes/EXAMPLE.C */
 

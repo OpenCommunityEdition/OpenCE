@@ -78,7 +78,7 @@ void scripted_sound_stop(
 long scripted_sound_time(
 	long sound_index);
 void scripted_foley_predict(
-	long object_index);
+	long definition_index);
 void scripted_looping_sound_start(
 	long sound_index,
 	long source_object_index,
