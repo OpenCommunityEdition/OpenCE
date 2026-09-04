@@ -105,10 +105,17 @@ symbols in this file:
 #include "effects/effects.h"
 #include "game/cheats.h"
 #include "game/game_globals.h"
+#include "game/players.h"
 #include "hs/object_lists.h"
+#include "input/input.h"
 #include "object_definitions.h"
 #include "object_types.h"
 #include "physics/collision_model_definitions.h"
+#include "physics/collisions.h"
+#include "rasterizer/rasterizer.h"
+#include "render/render.h"
+#include "tag_files/tag_files.h"
+#include "text/draw_string.h"
 #include "units/units.h"
 
 /* ---------- constants */
@@ -165,11 +172,16 @@ typedef char object_destroy_effect_offset_assert[
 
 /* ---------- prototypes */
 
+void render_debug_object_damage(
+	void);
+
 static void object_permutation_shield_regions(
 	long object_index,
 	boolean active);
 
 /* ---------- globals */
+
+extern boolean debug_damage;
 
 struct damage_globals damage_globals;
 
@@ -480,6 +492,84 @@ void object_deplete_shield(
 		object->object.current_shield_damage = 0.f;
 		SET_FLAG(object->object.damage_flags, _object_shield_depleted_bit, TRUE);
 		object_permutation_shield_regions(object_index, FALSE);
+	}
+
+	return;
+}
+
+void render_debug_object_damage(
+	void)
+{
+	if (debug_damage)
+	{
+		char buffer[2048];
+		struct collision_result collision;
+		real_vector3d direction;
+		rectangle2d bounds = render.camera.window_bounds;
+
+		bounds.x0 += 320;
+		if (damage_globals.debug_object_index == NONE)
+		{
+			_snprintf(
+				buffer,
+				sizeof(buffer),
+				"no object to debug|n(point and press space)");
+		}
+		else
+		{
+			struct object_datum *object =
+				object_try_and_get(damage_globals.debug_object_index);
+
+			if (object)
+			{
+				_snprintf(
+					buffer,
+					sizeof(buffer),
+					"%s|nbody %0.3f|n  current %0.3f|n  recent %0.3f|nshield %0.3f|n  current %0.3f|n  recent %0.3f|n",
+					strrchr(tag_get_name(object->definition_index), '\\'),
+					(double)object->object.body_vitality,
+					(double)object->object.current_body_damage,
+					(double)object->object.recent_body_damage,
+					(double)object->object.shield_vitality,
+					(double)object->object.current_shield_damage,
+					(double)object->object.recent_shield_damage);
+			}
+			else
+			{
+				damage_globals.debug_object_index = NONE;
+			}
+		}
+
+		draw_string_set_format(NONE, 0, 0);
+		draw_string_set_color(global_real_argb_white);
+		rasterizer_draw_string(&bounds, NULL, NULL, 0, buffer);
+
+		if (input_key_is_down(_key_space))
+		{
+			long unit_index = NONE;
+
+			if (render.local_player_index != NONE)
+			{
+				unit_index = player_get(
+					local_player_get_player_index(render.local_player_index))->unit_index;
+			}
+
+			scale_vector3d(&render.camera.forward, 50.f, &direction);
+			if (collision_test_vector(
+				FLAG(_collision_test_front_facing_surfaces_bit) |
+					FLAG(_collision_test_objects_bit),
+				&render.camera.position,
+				&direction,
+				unit_index,
+				&collision))
+			{
+				match_assert(
+					"c:\\halo\\SOURCE\\objects\\damage.c",
+					0x794,
+					collision.type==_collision_result_object);
+				damage_globals.debug_object_index = collision.object_index;
+			}
+		}
 	}
 
 	return;
