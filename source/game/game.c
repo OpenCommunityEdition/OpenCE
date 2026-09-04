@@ -361,6 +361,15 @@ void game_options_new(
 	return;
 }
 
+boolean game_options_verify(
+	struct game_options *options)
+{
+	if (!VALID_INDEX(options->difficulty, NUMBER_OF_GAME_DIFFICULTY_LEVELS))
+		return FALSE;
+
+	return TRUE;
+}
+
 void game_initial_pulse(
 	void)
 {
@@ -448,6 +457,17 @@ void set_random_seed(
 	*get_global_random_seed_address() = seed;
 
 	return;
+}
+
+boolean game_map_loading_in_progress(
+	real *progress)
+{
+	struct game_runtime_globals_prefix *globals = game_globals;
+
+	if (progress)
+		*progress = globals->loading_progress;
+
+	return globals->map_load_in_progress;
 }
 
 void game_dispose(
