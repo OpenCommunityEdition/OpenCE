@@ -822,6 +822,44 @@ boolean server_needs_more_teams(
 	return needs_more_teams;
 }
 
+boolean server_has_a_player_on_each_machine(
+	struct network_game_server *server)
+{
+	long client_machine_index;
+
+	for (client_machine_index = 0;
+		client_machine_index < MAXIMUM_NETWORK_MACHINE_COUNT;
+		client_machine_index++)
+	{
+		struct network_game_server_client_machine *client_machine =
+			&server->client_machines[client_machine_index];
+
+		if (client_machine->machine_index >= 0 &&
+			client_machine->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT)
+		{
+			boolean has_a_player = FALSE;
+			long player_index;
+
+			for (player_index = 0;
+				player_index < MAXIMUM_NETWORK_PLAYER_COUNT;
+				player_index++)
+			{
+				if (network_player_is_valid(&server->game.players[player_index]) &&
+					server->game.players[player_index].machine_index ==
+						client_machine->machine_index)
+				{
+					has_a_player = TRUE;
+				}
+			}
+
+			if (!has_a_player)
+				return FALSE;
+		}
+	}
+
+	return TRUE;
+}
+
 boolean server_has_enough_machines(
 	struct network_game_server *server)
 {
@@ -848,6 +886,20 @@ boolean server_has_enough_machines(
 	has_enough_machines = machine_count >= minimum_machine_count;
 
 	return has_enough_machines;
+}
+
+boolean server_ok_to_countdown(
+	struct network_game_server *server)
+{
+	if (server_has_enough_machines(server) &&
+		server_has_a_player_on_each_machine(server) &&
+		!server_needs_more_teams(server) &&
+		server->game.player_count >= server->game.minimum_player_count)
+	{
+		return TRUE;
+	}
+
+	return FALSE;
 }
 
 void network_game_server_invalidate_network_machine(
