@@ -79,13 +79,18 @@ symbols in this file:
 #include "cseries.h"
 
 #include "ai/ai_communication.h"
+#include "ai/ai_debug.h"
 #include "ai/actors.h"
 #include "ai/actor_definitions.h"
+#include "ai/actor_types.h"
 #include "ai/props.h"
 
+#include "game/cheats.h"
 #include "game/game.h"
 #include "game/game_allegiance.h"
 #include "game/players.h"
+
+#include "main/console.h"
 
 #include "memory/data.h"
 
@@ -104,7 +109,9 @@ enum
 enum
 {
 	_actor_combat_status_investigate = 2,
+	_actor_combat_status_definite = 3,
 	_actor_combat_status_certain = 4,
+	_actor_combat_status_clear_los = 5,
 };
 
 enum
@@ -119,9 +126,15 @@ enum
 
 enum
 {
+	_actor_surprise_none = 0,
+	_actor_surprise_unprepared_enemy_shooting = 1,
 	_actor_surprise_unprepared_weapon_impact_close = 2,
+	_actor_surprise_unprepared_enemy_close = 3,
 	_actor_surprise_unprepared_grenade = 4,
 	_actor_surprise_unprepared_damage = 5,
+	_actor_surprise_unexpected_enemy_close_shooting = 6,
+	_actor_surprise_unexpected_enemy_close_flanked_shooting = 7,
+	NUMBER_OF_ACTOR_SURPRISE_TYPES,
 };
 
 enum
@@ -751,6 +764,156 @@ void actor_stimulus_prop_just_killed(
 				}
 			}
 		}
+	}
+
+	return;
+}
+
+void actor_stimulus_prop_acknowledged(
+	long actor_index,
+	long prop_index,
+	boolean reappearance,
+	boolean expected_acknowledgement)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition =
+		actor_definition_get(actor->meta.definition_index);
+	struct prop_datum *prop = prop_get(prop_index);
+
+	if (!prop->dead)
+	{
+		{
+			struct direction_specification direction;
+
+			direction.type = _direction_specification_prop;
+			direction.prop_index = prop_index;
+			actor_look_secondary(
+				actor_index,
+				_secondary_look_newly_acknowledged_prop,
+				_secondary_look_priority_default,
+				&direction);
+		}
+
+		if (prop->enemy)
+		{
+			short surprise_level = _actor_surprise_none;
+			boolean flanked = dot_product3d(
+				&prop->actor_to_prop,
+				&actor->input.facing_vector) < 0.5f;
+			short combat_status = actor->state.combat_status;
+
+			if (!combat_status)
+			{
+				expected_acknowledgement = FALSE;
+				if (actor->state.mode < _actor_mode_combat)
+				{
+					if (prop->shooting)
+					{
+						surprise_level =
+							_actor_surprise_unprepared_enemy_shooting;
+					}
+					if (prop->distance < definition->panic.surprise_distance)
+					{
+						if (surprise_level <=
+							_actor_surprise_unprepared_enemy_close)
+						{
+							surprise_level =
+								_actor_surprise_unprepared_enemy_close;
+						}
+					}
+				}
+			}
+			else if (combat_status >= _actor_combat_status_clear_los && !flanked)
+			{
+				expected_acknowledgement = TRUE;
+			}
+
+			if (!expected_acknowledgement &&
+				prop->shooting &&
+				prop->distance < definition->panic.surprise_distance)
+			{
+				if (flanked)
+				{
+					if (surprise_level <=
+						_actor_surprise_unexpected_enemy_close_flanked_shooting)
+					{
+						surprise_level =
+							_actor_surprise_unexpected_enemy_close_flanked_shooting;
+					}
+				}
+				else if (surprise_level <=
+					_actor_surprise_unexpected_enemy_close_shooting)
+				{
+					surprise_level =
+						_actor_surprise_unexpected_enemy_close_shooting;
+				}
+			}
+
+			if (ai_debug.print_surprise && prop->player)
+			{
+				char const *surprise_names[NUMBER_OF_ACTOR_SURPRISE_TYPES] =
+				{
+					"none",
+					"enemy-shoot",
+					"impact",
+					"enemy-close",
+					"grenade",
+					"damage",
+					"unexp-close-shoot",
+					"unexp-behind-shoot",
+				};
+
+				console_printf(
+					FALSE,
+					"%s %d: surprise %s: %s %sexp %s %sshoot %s (%.1f%c%.1f)",
+					actor_type_get_name((word)actor->meta.type),
+					(word)actor_index,
+					surprise_names[surprise_level],
+					combat_status ? "combat" : "noncom",
+					expected_acknowledgement ? "" : "un",
+					flanked ? "flank" : "front",
+					prop->shooting ? "" : "not",
+					prop->distance < definition->panic.surprise_distance ?
+						"close" : "far",
+					prop->distance,
+					prop->distance < definition->panic.surprise_distance ?
+						'<' : '>',
+					definition->panic.surprise_distance);
+			}
+
+			if (surprise_level > _actor_surprise_none)
+			{
+				actor_stimulus_surprise(
+					actor_index,
+					surprise_level,
+					prop_index,
+					&prop->actor_to_prop);
+			}
+
+			if (actor->state.combat_status < _actor_combat_status_definite &&
+				!expected_acknowledgement &&
+				prop->visibility < 2 &&
+				actor->meta.unit_index != NONE)
+			{
+				ai_communication_event(
+					_ai_communication_unexpected_enemy,
+					actor->meta.unit_index,
+					prop->unit_index,
+					_comm_hostility_enemy,
+					NONE,
+					NONE,
+					FALSE);
+			}
+		}
+	}
+
+	if (prop->player &&
+		prop->enemy &&
+		!prop->dead &&
+		actor->meta.type != _actor_mounted_weapon &&
+		cheat.medusa)
+	{
+		actor_kill(actor_index, FALSE, TRUE);
 	}
 
 	return;

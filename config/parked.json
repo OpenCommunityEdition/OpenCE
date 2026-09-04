@@ -4042,6 +4042,25 @@
         },
         "objdiff_percent": 67.870964
       }
+    },
+    {
+      "unit": "source/ai/actor_stimulus",
+      "function": "_actor_stimulus_prop_acknowledged",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed prop-acknowledgement response from January's control flow, fields, constants, strings, and all 32 relocation identities, with the independent later HCEA lift corroborating the gameplay semantics. The retained ordinary C directs the actor's look, computes front/flank surprise levels from combat status, shooting, and distance, emits the authenticated surprise diagnostic, posts the unexpected-enemy communication, and applies the named medusa cheat behavior. Target and candidate both occupy 800 padded bytes with 32 relocations and objdiff reports 94.97531 percent similarity. The residual is a coherent whole-function allocation tie: January keeps the actor in EBX then spills it, keeps surprise_level in EDI, and homes combat_status; VC7 instead keeps the actor in EDI, uses EBX for surprise_level with three homes, and rematerializes combat status. Reversing the dot-product operands and using explicit named surprise branches recovered January's x87 order, branch topology, and exact padded extent. Bounded declaration-order and signed/unsigned status-width variants did not change the allocation or worsened the instruction stream. No register/volatile forcing, barrier, pragma, assembly, raw offset, representation pun, fake dependency, undefined behavior, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the EBX/EDI lifetime choice.",
+      "measurements": {
+        "target": {
+          "size": 800,
+          "relocation_count": 32,
+          "normalized_sha256": "b66ac2399346e00349948c7ff4ac539414f83869a38ed7ba62d5f4aafa21524d"
+        },
+        "base": {
+          "size": 800,
+          "relocation_count": 32,
+          "normalized_sha256": "0f62d6950730557f884ae53b66518852751bf8414fe24bb8eb3011fe333e54fe"
+        },
+        "objdiff_percent": 94.97531
+      }
     }
   ]
 }
