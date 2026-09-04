@@ -266,6 +266,17 @@ static void player_effect_update_camera_shake(
 	real scale,
 	real time_scale);
 
+static real effect_scale_value(
+	short transition_function,
+	real zero_scale_factor,
+	real elapsed,
+	real duration);
+
+static void get_shake_matrix(
+	real translation,
+	real rotation,
+	real_matrix4x3 *matrix);
+
 /* ---------- globals */
 
 static struct player_effect_globals_definition *player_effect_globals;
@@ -731,6 +742,277 @@ void player_telefrag_effect_start(
 		rumble_player_continuous((short)local_player_index, intensity, intensity);
 		player_effect_update_screen_flash((short)local_player_index, effect, &screen_flash, intensity, 1.0f);
 		player_effect_update_camera_shake((short)local_player_index, effect, &camera_shake, intensity, 1.0f);
+	}
+
+	return;
+}
+
+static real effect_scale_value(
+	short transition_function,
+	real zero_scale_factor,
+	real elapsed,
+	real duration)
+{
+	return transition_function_evaluate(
+		transition_function,
+		1.0f - elapsed / duration) * zero_scale_factor;
+}
+
+static void get_shake_matrix(
+	real translation,
+	real rotation,
+	real_matrix4x3 *matrix)
+{
+	real_vector3d direction;
+
+	if (rotation != 0.0f)
+	{
+		seed_random_direction3d(
+			get_global_local_random_seed_address(),
+			&direction);
+		matrix4x3_rotation_from_axis_and_angle(
+			matrix,
+			&direction,
+			sine(rotation),
+			cosine(rotation));
+	}
+
+	if (translation != 0.0f)
+	{
+		seed_random_direction3d(
+			get_global_local_random_seed_address(),
+			&direction);
+		matrix->position.x = direction.i * translation;
+		matrix->position.y = direction.j * translation;
+		matrix->position.z = direction.k * translation;
+	}
+
+	return;
+}
+
+void player_effect_get_camera_effect_matrix(
+	short local_player_index,
+	real_matrix4x3 *matrix)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\effects\\player_effects.c",
+		601,
+		matrix);
+
+	if (local_player_index != NONE)
+	{
+		game_time_get();
+
+		if (TEST_FLAG(player_effect_globals->global_flags, _scripted_player_effect_active_bit))
+		{
+			struct scripted_player_effect_definition *scripted_effect =
+				&player_effect_globals->scripted_effect;
+			real intensity = scripted_effect->max_intensity;
+
+			*matrix = *global_identity4x3;
+
+			if (scripted_effect->timer > 0)
+			{
+				if (TEST_FLAG(player_effect_globals->global_flags, _scripted_player_effect_stopping_bit))
+					intensity = ((real)scripted_effect->timer / scripted_effect->total_time) * intensity;
+				else
+					intensity = (1.0f - (real)scripted_effect->timer / scripted_effect->total_time) * intensity;
+
+				scripted_effect->timer -= game_time_get_elapsed();
+			}
+			else if (TEST_FLAG(player_effect_globals->global_flags, _scripted_player_effect_stopping_bit))
+			{
+				SET_FLAG(
+					player_effect_globals->global_flags,
+					_scripted_player_effect_active_bit,
+					FALSE);
+				rumble_player_set_scale(0.0f);
+			}
+
+			if (TEST_FLAG(player_effect_globals->global_flags, _scripted_player_effect_active_bit))
+			{
+				real random_roll;
+				real random_pitch;
+				real random_yaw;
+				real random_depth;
+				real random_horizontal;
+				real random_vertical;
+
+				intensity = PIN(intensity, 0.0f, 1.0f);
+				rumble_player_set_scale(intensity);
+
+				random_roll = real_seed_random_range(
+					get_global_local_random_seed_address(),
+					-1.0f,
+					1.0f);
+				random_pitch = real_seed_random_range(
+					get_global_local_random_seed_address(),
+					-1.0f,
+					1.0f);
+				random_yaw = real_seed_random_range(
+					get_global_local_random_seed_address(),
+					-1.0f,
+					1.0f);
+
+				matrix4x3_rotation_from_angles(
+					matrix,
+					scripted_effect->max_rotation.yaw * random_yaw * intensity,
+					scripted_effect->max_rotation.pitch * random_pitch * intensity,
+					scripted_effect->max_rotation.roll * random_roll * intensity);
+
+				random_depth = real_seed_random_range(
+					get_global_local_random_seed_address(),
+					-1.0f,
+					1.0f);
+				random_horizontal = real_seed_random_range(
+					get_global_local_random_seed_address(),
+					-1.0f,
+					1.0f);
+				random_vertical = real_seed_random_range(
+					get_global_local_random_seed_address(),
+					-1.0f,
+					1.0f);
+
+				matrix->position.z = scripted_effect->max_translation.k * random_depth * intensity;
+				matrix->position.y = scripted_effect->max_translation.i * random_horizontal * intensity;
+				matrix->position.x = scripted_effect->max_translation.j * random_vertical * intensity;
+			}
+		}
+		else
+		{
+			struct player_effect_datum *effect = player_effect_get(local_player_index);
+			real_matrix4x3 effect_matrix;
+			real_matrix4x3 const *source;
+			short camera_shake_ticks;
+
+			if (effect->camera_impulse_time_left > 0 ||
+				TEST_FLAG(effect->flags, _player_effect_camera_impulse_just_started_bit))
+			{
+				real_vector3d axis;
+				real scale;
+				real rotation;
+				real translation;
+
+				if (TEST_FLAG(effect->flags, _player_effect_camera_impulse_just_started_bit))
+				{
+					scale = 1.0f;
+				}
+				else
+				{
+					real duration = effect->camera_impulse.temporary_duration;
+
+					scale = effect_scale_value(
+						effect->camera_impulse.temporary_transition,
+						effect->camera_impulse.temporary_zero_scale_factor,
+						duration - effect->camera_impulse_time_left,
+						duration);
+				}
+
+				SET_FLAG(
+					effect->flags,
+					_player_effect_camera_impulse_just_started_bit,
+					FALSE);
+
+				cross_product3d(global_up3d, &effect->direction, &axis);
+
+				rotation = scale * effect->camera_impulse.temporary_rotation;
+				matrix4x3_rotation_from_axis_and_angle(
+					&effect_matrix,
+					&axis,
+					sine(rotation),
+					cosine(rotation));
+
+				translation = scale * effect->camera_impulse.temporary_translation;
+				effect_matrix.position.x = effect->direction.i * translation + effect->jitter.i * scale;
+				effect_matrix.position.y = effect->direction.j * translation + effect->jitter.j * scale;
+				effect_matrix.position.z = effect->direction.k * translation + effect->jitter.k * scale;
+
+				effect->camera_impulse_time_left -= game_time_get_elapsed();
+				source = &effect_matrix;
+			}
+			else
+			{
+				source = global_identity4x3;
+			}
+
+			*matrix = *source;
+
+			camera_shake_ticks = effect->camera_shake_time_left;
+
+			if (camera_shake_ticks > 0 ||
+				TEST_FLAG(effect->flags, _player_effect_camera_shake_just_started_bit))
+			{
+				struct continuous_player_effect_datum *continuous =
+					&effect->continuous_effect;
+				real scale;
+				real magnitude;
+				real random_translation_magnitude;
+				real random_rotation_magnitude;
+
+				effect_matrix = *global_identity4x3;
+
+				if (TEST_FLAG(effect->flags, _player_effect_camera_shake_just_started_bit))
+				{
+					scale = 1.0f;
+				}
+				else
+				{
+					real duration = effect->camera_shake.duration;
+
+					scale = effect_scale_value(
+						effect->camera_shake.falloff_transition_function,
+						effect->camera_shake.zero_scale_factor,
+						duration - camera_shake_ticks,
+						duration);
+				}
+
+				magnitude = (periodic_function_evaluate(
+					effect->camera_shake.periodic_function,
+					(effect->camera_shake.duration - effect->camera_shake_time_left) /
+						effect->camera_shake.periodic_period) *
+						effect->camera_shake.periodic_weight +
+						(1.0f - effect->camera_shake.periodic_weight)) * scale;
+
+				random_translation_magnitude = MAX(
+					magnitude * effect->camera_shake.random_translation_magnitude,
+					0.0f);
+				random_rotation_magnitude = MAX(
+					magnitude * effect->camera_shake.random_rotation_magnitude,
+					0.0f);
+
+				SET_FLAG(
+					effect->flags,
+					_player_effect_camera_shake_just_started_bit,
+					FALSE);
+
+				get_shake_matrix(
+					random_translation_magnitude + continuous->translational_shake,
+					random_rotation_magnitude + continuous->rotational_shake,
+					&effect_matrix);
+
+				rumble_player_continuous(
+					local_player_index,
+					continuous->vibrate_frequencies[0],
+					continuous->vibrate_frequencies[1]);
+
+				effect->continuous_effect_timer += game_time_get_elapsed();
+
+				if (effect->continuous_effect_timer > 0)
+				{
+					effect->continuous_effect_timer = 0;
+					csmemset(continuous, 0, sizeof(*continuous));
+				}
+
+				get_shake_matrix(
+					random_translation_magnitude,
+					random_rotation_magnitude,
+					&effect_matrix);
+
+				effect->camera_shake_time_left -= game_time_get_elapsed();
+
+				matrix4x3_multiply(matrix, &effect_matrix, matrix);
+			}
+		}
 	}
 
 	return;

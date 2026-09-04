@@ -2,6 +2,25 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/effects/player_effects",
+      "function": "_player_effect_get_camera_effect_matrix",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconciling the interrupted Opus reconstruction with canonical's typed January-PC player-effect layouts and the target's complete instruction, assertion, call, and relocation topology. The retained ordinary C implements the scripted rumble/rotation/translation path, camera-impulse falloff and transform, periodic camera shake, continuous rumble accumulation/reset, and final matrix composition; its two natural same-TU helpers become strict exact, including the target's private EAX convention for effect_scale_value. Target and candidate carry the same ordered 49 relocation identities and the same 0x48-byte frame, while objdiff reports 91.115486 percent similarity; the candidate is 1280 padded bytes against January's 1312. The first substantive differences are x87 temporary storage/order in the scripted translation block and later shake-magnitude expression scheduling. The fail-closed classifier returns UNKNOWN, so no compiler recipe is inferred. The Opus donor's raw tag access, numeric enum table, misplaced random-math prototypes, and incompatible renamed aggregate were not retained. Independent HCEA source corroborates the helper bodies, global_up3d cross-product order, axis/value mapping, and deliberate overwritten first shake call but is not treated as January byte authority. No assembly, volatile/register forcing, barrier, pragma, raw offset, representation pun, fake dependency, forced inline, undefined behavior, or nonsensical branch is present. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the remaining x87 temporary lifetimes and expression schedule.",
+      "measurements": {
+        "target": {
+          "size": 1312,
+          "relocation_count": 49,
+          "normalized_sha256": "34ba1689676f40ae08fd01a8f705c1ab0e81fba92ad6c4eac74e6565e02c324a"
+        },
+        "base": {
+          "size": 1280,
+          "relocation_count": 49,
+          "normalized_sha256": "36cc5e8fb04363d6e87bd5c48a971b5b17f6b318fcc37bdc8255024718cded67"
+        },
+        "objdiff_percent": 91.115486
+      }
+    },
+    {
       "unit": "source/networking/network_server_message_handler",
       "function": "_network_game_server_handle_message_client_ping",
       "class": "register-allocation",

@@ -63,6 +63,9 @@ void player_effect_clear_damage_indicators(
 void player_effect_get_screen_flash(
 	short local_player_index,
 	struct render_screen_flash *screen_flash);
+void player_effect_get_camera_effect_matrix(
+	short local_player_index,
+	real_matrix4x3 *matrix);
 void scripted_player_effect_set_translation(
 	real horizontal,
 	real vertical,
