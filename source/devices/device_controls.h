@@ -90,7 +90,8 @@ void control_place(
 	long control_index,
 	struct scenario_control_datum *scenario_control);
 void control_touched(
-	long control_index);
+	long control_index,
+	long unit_index);
 void control_destroyed(
 	long control_index);
 

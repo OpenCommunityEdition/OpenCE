@@ -135,7 +135,8 @@ void control_place(
 }
 
 void control_touched(
-	long control_index)
+	long control_index,
+	long unit_index)
 {
 	struct control_datum *control= control_get(control_index);
 	struct control_definition *definition= control_definition_get(control->definition_index);

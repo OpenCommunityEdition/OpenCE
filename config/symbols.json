@@ -1792,7 +1792,7 @@
 { "file_offset": 544144, "flags": 32, "name": "_device_can_change_position" },
 { "file_offset": 544272, "flags": 32, "name": "_device_effect_new" },
 { "file_offset": 544448, "flags": 32, "name": "_code_00084ec0" },
-{ "file_offset": 544560, "flags": 32, "name": "_code_00084f30" },
+{ "file_offset": 544560, "flags": 32, "name": "_device_group_delete", "static": true },
 { "file_offset": 544624, "flags": 32, "name": "_code_00084f70" },
 { "file_offset": 544848, "flags": 32, "name": "_devices_initialize_for_new_map" },
 { "file_offset": 544880, "flags": 32, "name": "_device_delete" },

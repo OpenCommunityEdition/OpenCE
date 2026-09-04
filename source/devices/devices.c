@@ -39,7 +39,7 @@ symbols in this file:
 00084EC0 0070:
 	_code_00084ec0 (0000)
 00084F30 0040:
-	_code_00084f30 (0000)
+	_device_group_delete (0000)
 00084F70 00e0:
 	_code_00084f70 (0000)
 00085050 0020:
@@ -84,6 +84,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "devices.h"
+#include "device_controls.h"
 #include "device_definitions.h"
 #include "device_machines.h"
 #include "memory/data.h"
@@ -122,6 +123,8 @@ void device_group_set_actual_value(
 	real actual_value);
 void code_00084f70(
 	void);
+static void device_group_delete(
+	short group_index);
 
 /* ---------- globals */
 
@@ -155,25 +158,10 @@ void device_delete(
 	long device_index)
 {
 	struct device_datum *device;
-	struct device_group_datum *group;
-	short group_index;
 
 	device = device_get(device_index);
-	group_index = device->device.power_group_index;
-	if (group_index != NONE)
-	{
-		group = datum_get(device_groups_data, group_index);
-		if (TEST_FLAG(group->flags, _device_group_runtime_bit))
-			datum_delete(device_groups_data, group_index);
-	}
-
-	group_index = device->device.position_group_index;
-	if (group_index != NONE)
-	{
-		group = datum_get(device_groups_data, group_index);
-		if (TEST_FLAG(group->flags, _device_group_runtime_bit))
-			datum_delete(device_groups_data, group_index);
-	}
+	device_group_delete(device->device.power_group_index);
+	device_group_delete(device->device.position_group_index);
 
 	return;
 }
@@ -322,6 +310,26 @@ void device_group_change_only_once_more_set(
 	return;
 }
 
+void device_touched(
+	long device_index,
+	long unit_index)
+{
+	struct device_datum *device = device_get(device_index);
+
+	switch (device->object.type)
+	{
+		case _object_type_machine:
+			machine_bumped(device_index, unit_index);
+			break;
+
+		case _object_type_control:
+			control_touched(device_index, unit_index);
+			break;
+	}
+
+	return;
+}
+
 void device_set_actual_position(
 	long device_index,
 	real position)
@@ -377,3 +385,18 @@ void device_set_power(
 }
 
 /* ---------- private code */
+
+static void device_group_delete(
+	short group_index)
+{
+	if (group_index != NONE)
+	{
+		struct device_group_datum *group;
+
+		group = datum_get(device_groups_data, group_index);
+		if (TEST_FLAG(group->flags, _device_group_runtime_bit))
+			datum_delete(device_groups_data, group_index);
+	}
+
+	return;
+}
