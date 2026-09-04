@@ -664,7 +664,8 @@ struct widget_instance;
 
 enum
 {
-	WIDGET_MEMORY_POOL_SIZE = 0x4000
+	WIDGET_MEMORY_POOL_SIZE = 0x4000,
+	MAXIMUM_WIDGET_MEMORY_POOL_BLOCKS = 4096
 };
 
 enum
@@ -811,6 +812,12 @@ struct stack_memory_pool
 	struct stack_memory_pool_block *first_block;
 	struct stack_memory_pool_block *last_block;
 	struct stack_memory_pool_block *blocks[1];
+};
+
+struct stack_memory_pool_medium
+{
+	struct stack_memory_pool pool;
+	struct stack_memory_pool_block *blocks[MAXIMUM_WIDGET_MEMORY_POOL_BLOCKS - 1];
 };
 
 struct ui_widget_deferred_error
@@ -1011,7 +1018,6 @@ static void perform_filesystem_initialization(
 
 /* ---------- globals */
 
-extern struct stack_memory_pool *widget_memory_pool;
 extern struct ui_widget_bss_prefix ui_widget_globals_storage;
 
 #define widget_globals ui_widget_globals_storage.widget_globals
@@ -1021,9 +1027,21 @@ extern real global_ui_white_red;
 extern real global_ui_white_green;
 extern real global_ui_white_blue;
 
-short dashboard_abort_error = NONE;
+static struct stack_memory_pool_medium __medium_widget_memory_pool =
+{
+	{
+		"widget_memory_pool",
+		NULL,
+		0,
+		MAXIMUM_WIDGET_MEMORY_POOL_BLOCKS
+	}
+};
+
+struct stack_memory_pool *widget_memory_pool = &__medium_widget_memory_pool.pool;
 
 static boolean main_screen_shell_first_load = TRUE;
+
+short dashboard_abort_error = NONE;
 
 static wchar_t const *icon_names[NUMBER_OF_ICON_TYPES] =
 {
@@ -1945,6 +1963,192 @@ boolean ui_widgets_active_for_local_player(
 	return result;
 }
 
+void display_error(
+	short error_code,
+	short local_player_index,
+	boolean modal,
+	boolean pause_game_time)
+{
+	if (cinematic_in_progress())
+	{
+		if (local_player_index == NONE)
+		{
+			local_player_index = 0;
+		}
+		else
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+				2077,
+				local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+		}
+		if (widget_globals.deferred_cinematic_errors[local_player_index].error_code == NONE)
+		{
+			widget_globals.deferred_cinematic_errors[local_player_index].error_code = error_code;
+			widget_globals.deferred_cinematic_errors[local_player_index].modal = modal;
+			widget_globals.deferred_cinematic_errors[local_player_index].pause_game_time = pause_game_time;
+		}
+		else
+		{
+			error(_error_silent, "there is already a deferred-for-cinematic error queued for player #%d; ignoring this one", local_player_index);
+		}
+	}
+	else
+	{
+		char const *widget_name;
+		short error_local_player_index = NONE;
+		short local_player_count = 0;
+		short widget_stack;
+		boolean first_local_player = TRUE;
+		struct widget_instance *top_widget;
+		struct widget_instance *widget;
+
+		if (local_player_index != NONE)
+		{
+			short index;
+
+			for (index = local_player_get_next(NONE); index != NONE; index = local_player_get_next(index))
+			{
+				if (index == local_player_index)
+				{
+					error_local_player_index = local_player_index;
+					if (local_player_count > 0)
+						first_local_player = FALSE;
+				}
+				local_player_count++;
+			}
+		}
+		if (error_local_player_index == NONE && !we_are_at_the_main_menu)
+			local_player_index = NONE;
+		switch (local_player_count)
+		{
+		case 0:
+		case 1:
+			widget_name = modal
+				? "ui\\shell\\error\\error_modal_fullscreen"
+				: "ui\\shell\\error\\error_nonmodal_fullscreen";
+			break;
+		case 2:
+			widget_name = modal
+				? "ui\\shell\\error\\error_modal_halfscreen"
+				: "ui\\shell\\error\\error_nonmodal_halfscreen";
+			break;
+		case 3:
+			if (first_local_player == TRUE)
+			{
+				widget_name = modal
+					? "ui\\shell\\error\\error_modal_halfscreen"
+					: "ui\\shell\\error\\error_nonmodal_halfscreen";
+
+				break;
+			}
+		case 4:
+			widget_name = modal
+				? "ui\\shell\\error\\error_modal_qtrscreen"
+				: "ui\\shell\\error\\error_nonmodal_qtrscreen";
+			break;
+		default:
+			match_vassert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+				2161,
+				FALSE,
+				"invalid local player count");
+
+			return;
+		}
+		if (local_player_index == NONE)
+		{
+			widget_stack = 0;
+		}
+		else
+		{
+			widget_stack = local_player_index;
+			match_assert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+				2168,
+				(widget_stack>=0) && (widget_stack<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
+		}
+		if (transition_to_game_in_progress())
+		{
+			error(_error_silent, "aborting to the main menu root, for safety's sake");
+			main_screen_shell_load();
+			main_defer_map_map_change();
+			widget_globals.fade_to_black = -1.0f;
+		}
+		top_widget = widget_globals.active_widgets[widget_stack];
+		if (top_widget && top_widget->widget_is_error_dialog == TRUE)
+		{
+			error(_error_silent, "there is already an error message displayed for this local player index");
+		}
+		else
+		{
+			widget = ui_widget_load_by_name_or_tag(
+				widget_name,
+				NONE,
+				NULL,
+				local_player_index,
+				top_widget ? top_widget->definition_tag_index : NONE,
+				NONE,
+				NONE);
+			if (widget)
+			{
+				struct widget_instance *text_box;
+
+				match_vassert(
+					"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+					2206,
+					widget->child && widget->child->child,
+					"error screen widget tag not layed out as expected");
+				text_box = widget->child->child;
+				match_vassert(
+					"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+					2208,
+					text_box->type == _ui_widget_type_text_box,
+					"expected a text box widget in the error widget");
+				text_box->parameters.text_box.string_list_index = MIN(MAX(0, error_code), NUMBER_OF_ERROR_CODES - 1);
+				widget->widget_is_error_dialog = TRUE;
+				if (!widget->pause_game_time)
+				{
+					widget->pause_game_time = pause_game_time;
+					if (pause_game_time == TRUE)
+					{
+						match_vassert(
+							"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+							2217,
+							widget_globals.pause_game_time_count>=0,
+							"widget pause counter is out of whack");
+						widget_globals.pause_game_time_count++;
+						if (!game_time_get_paused())
+							game_time_set_paused(TRUE);
+						if (!widget_globals.sound_paused && !we_are_at_the_main_menu)
+						{
+							sound_pause(TRUE);
+							widget_globals.sound_paused = TRUE;
+						}
+					}
+				}
+				switch (error_code)
+				{
+				case _error_controller_unplugged:
+					widget->close_if_local_player_controller_present = TRUE;
+				case _error_controller_unplugged_start_to_continue:
+					widget->milliseconds_to_auto_close = 0;
+					widget->auto_close_fade_time = 0;
+					break;
+				default:
+					widget->close_if_local_player_controller_present = FALSE;
+					break;
+				}
+
+				return;
+			}
+		}
+		error(_error_silent, "failed to display error message");
+	}
+
+	return;
+}
+
 void display_error_abort_to_dashboard(
 	short error_code,
 	boolean optional)
@@ -2042,9 +2246,15 @@ void network_game_reset_to_pregame_ui(
 static boolean transition_to_game_in_progress(
 	void)
 {
-	return we_are_at_the_main_menu &&
+	if (
+		we_are_at_the_main_menu &&
 		widget_globals.fade_to_black <= 1.0f &&
-		widget_globals.fade_to_black >= 0.0f;
+		widget_globals.fade_to_black >= 0.0f)
+	{
+		return TRUE;
+	}
+
+	return FALSE;
 }
 
 static short get_icon_type(
