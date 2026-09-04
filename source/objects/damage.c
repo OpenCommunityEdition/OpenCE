@@ -39,7 +39,7 @@ symbols in this file:
 00126230 0020:
 	_code_00126230 (0000)
 00126250 0080:
-	_code_00126250 (0000)
+	_object_permutation_shield_regions (0000)
 001262D0 0060:
 	_object_get_actual_body_vitality (0000)
 00126330 0060:
@@ -95,7 +95,7 @@ symbols in this file:
 002896BC 0004:
 	__real@3a422e45 (0000)
 00456E48 004c:
-	_bss_00456e48 (0000)
+	_damage_globals (0000)
 */
 
 /* ---------- headers */
@@ -113,6 +113,11 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	_object_region_missing_when_shield_is_zero_bit = 4,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -122,6 +127,20 @@ struct damage_globals
 	byte unknown[0x48];
 	long debug_object_index;
 };
+
+struct damage_region
+{
+	char name[TAG_STRING_LENGTH+1];
+	unsigned long flags;
+	long unused0;
+	real damage_threshold;
+	long unused1[3];
+	struct tag_reference destroyed_effect;
+	struct tag_block permutations;
+};
+
+typedef char damage_region_size_assert[
+	sizeof(struct damage_region) == 0x54 ? 1 : -1];
 
 typedef char object_deplete_body_definition_index_offset_assert[
 	offsetof(struct object_datum, definition_index) == 0x00 ? 1 : -1];
@@ -146,9 +165,13 @@ typedef char object_destroy_effect_offset_assert[
 
 /* ---------- prototypes */
 
+static void object_permutation_shield_regions(
+	long object_index,
+	boolean active);
+
 /* ---------- globals */
 
-struct damage_globals bss_00456e48;
+struct damage_globals damage_globals;
 
 /* ---------- public code */
 
@@ -164,7 +187,7 @@ void damage_dispose(void)
 
 void damage_initialize_for_new_map(void)
 {
-	bss_00456e48.debug_object_index = NONE;
+	damage_globals.debug_object_index = NONE;
 	return;
 }
 
@@ -295,6 +318,24 @@ boolean object_restore_body(
 	return restored;
 }
 
+boolean object_double_charge_shield(
+	long object_index)
+{
+	struct object_datum *object = object_get(object_index);
+	boolean charged = object->object.shield_vitality <= 1.f;
+
+	if (charged)
+	{
+		SET_FLAG(object->object.damage_flags, _object_shield_over_charging_bit, TRUE);
+		if (object->object.shield_vitality == 0.f)
+			object->object.shield_vitality = 0.01f;
+
+		object->object.shield_stun_ticks = 0;
+	}
+
+	return charged;
+}
+
 void object_deplete_body(
 	long object_index)
 {
@@ -410,6 +451,40 @@ void object_destroy(
 	return;
 }
 
+void object_deplete_shield(
+	long object_index)
+{
+	struct object_datum *object = object_get(object_index);
+
+	if (!TEST_FLAG(object->object.damage_flags, _object_shield_depleted_bit))
+	{
+		struct object_definition *definition = object_definition_get(object->definition_index);
+		long collision_model_index = definition->object.collision_model.index;
+
+		if (collision_model_index != NONE)
+		{
+			struct collision_model *collision_model =
+				collision_model_definition_get(collision_model_index);
+
+			effect_new_from_object(
+				collision_model->resistance.shield_depleted_effect.index,
+				object_index,
+				object_index,
+				NONE,
+				0.f,
+				0.f,
+				NULL,
+				NULL);
+		}
+
+		object->object.current_shield_damage = 0.f;
+		SET_FLAG(object->object.damage_flags, _object_shield_depleted_bit, TRUE);
+		object_permutation_shield_regions(object_index, FALSE);
+	}
+
+	return;
+}
+
 void object_can_take_damage(
 	long object_list_index)
 {
@@ -469,3 +544,32 @@ void object_set_melee_attack_inhibited(
 }
 
 /* ---------- private code */
+
+static void object_permutation_shield_regions(
+	long object_index,
+	boolean active)
+{
+	struct object_datum *object = object_get(object_index);
+	struct object_definition *definition = object_definition_get(object->definition_index);
+	struct collision_model *collision_model =
+		collision_model_definition_get(definition->object.collision_model.index);
+	short region_index;
+
+	for (region_index = 0;
+		region_index < collision_model->resistance.regions.count;
+		region_index++)
+	{
+		struct damage_region *region = TAG_BLOCK_GET_ELEMENT(
+			&collision_model->resistance.regions,
+			region_index,
+			struct damage_region);
+
+		if (TEST_FLAG(region->flags, _object_region_missing_when_shield_is_zero_bit) &&
+			region->permutations.count > 1)
+		{
+			object->object.region_permutations[region_index] = !active;
+		}
+	}
+
+	return;
+}

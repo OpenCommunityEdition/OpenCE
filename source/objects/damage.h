@@ -86,6 +86,9 @@ void damage_data_new(struct damage_data *damage_data, long definition_index);
 boolean object_restore_body(long object_index);
 boolean object_double_charge_shield(long object_index);
 
+void object_deplete_shield(
+	long object_index);
+
 void object_deplete_body(
 	long object_index);
 void area_of_effect_cause_damage(

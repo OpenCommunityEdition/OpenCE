@@ -4562,9 +4562,6 @@ struct scenario_unit_datum
 typedef char scenario_unit_datum_size_check[
 	sizeof(struct scenario_unit_datum) == 0x08 ? 1 : -1];
 
-void object_deplete_shield(
-	long object_index);
-
 void unit_place(
 	long unit_index,
 	struct scenario_unit_datum const *scenario_unit)
