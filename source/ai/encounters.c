@@ -991,7 +991,10 @@ void encounters_create_for_new_map(
 			&scenario->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.index), struct encounter_definition);
 		boolean create = !TEST_FLAG(encounter_definition->flags, _encounter_not_initially_created_bit);
 
-		if (DATUM_INDEX_TO_ABSOLUTE_INDEX(ai_debug.selected_squad_index) == DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.index) || create)
+		if (DATUM_INDEX_TO_ABSOLUTE_INDEX(ai_debug.selected_squad_index) == DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.index))
+			create = TRUE;
+
+		if (create)
 		{
 			encounter_create(iterator.index, NONE, NONE);
 		}
@@ -1487,18 +1490,18 @@ void encounters_update(
 	encounter_iterator_new(&iterator, TRUE);
 	while ((encounter = encounter_iterator_next(&iterator)) != NULL)
 	{
-		long encounter_index = iterator.index;
+		short encounter_phase = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.index) % ENCOUNTER_UPDATE_INTERVAL;
 
 		ai_profile.encounter_update_count++;
-		if (DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index) % ENCOUNTER_UPDATE_INTERVAL == phase)
+		if (encounter_phase == phase)
 		{
-			encounter_update_status(encounter_index);
-			encounter_update_timers(encounter_index);
-			encounter_update_respawn(encounter_index);
-			encounter_update_squads(encounter_index);
-			encounter_update_platoons(encounter_index);
-			encounter_update_follow(encounter_index);
-			encounter_control_actors(encounter_index);
+			encounter_update_status(iterator.index);
+			encounter_update_timers(iterator.index);
+			encounter_update_respawn(iterator.index);
+			encounter_update_squads(iterator.index);
+			encounter_update_platoons(iterator.index);
+			encounter_update_follow(iterator.index);
+			encounter_control_actors(iterator.index);
 		}
 	}
 
