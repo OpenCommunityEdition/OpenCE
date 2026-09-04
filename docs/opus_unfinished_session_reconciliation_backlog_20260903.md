@@ -102,3 +102,18 @@ covered by the object-by-object queue above. If it wrote elsewhere, identify
 and freeze that path before changing it, then add its dirty files, scratch
 reports, and last stable snapshot as a distinct donor instead of silently
 folding its claimed progress into the existing totals.
+
+#### Post-`c787f81ec` read-only intake check
+
+No distinct newer Opus/Fable/Claude ref or linked-worktree HEAD is currently
+discoverable. The only visible interrupted Opus state remains
+`C:\\halo-worktrees\\opus-small-families-30k-20260902` at `eeedd72e5`; its dirty
+files predate the current checkpoint. All twelve touched translation units and
+both post-`608c66380` commits now have later canonical object-by-object
+reconciliation/adjudication commits, so that historical dirty tree must not be
+counted again as a new packet.
+
+This does not close the user's newly reported interrupted run. Keep it as a
+pending intake item until its exact worktree path, branch/ref, or commit hash
+appears. Freeze that location before any build or edit, compare it against
+canonical by function-section identity, and admit only verified net-new gains.
