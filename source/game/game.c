@@ -123,12 +123,18 @@ struct game_options;
 #include "game/game.h"
 #undef set_random_seed
 #include "ai/ai.h"
+#include "cache/cache_files.h"
+#include "cseries/errors.h"
 #include "effects/effects.h"
 #include "game/game_engine.h"
 #include "game/players.h"
+#include "interface/ui_widget.h"
 #include "items/items.h"
 #include "items/projectiles.h"
+#include "main/main.h"
+#include "math/random_math.h"
 #include "memory/data.h"
+#include "scenario/scenario.h"
 #include "units/units.h"
 
 /* ---------- constants */
@@ -146,13 +152,6 @@ struct game_options
 	char map_name[256];
 };
 
-struct game_options_prefix
-{
-	unsigned long flags;
-	short code_version;
-	short difficulty;
-};
-
 struct game_runtime_globals_prefix
 {
 	boolean map_loaded;
@@ -160,7 +159,7 @@ struct game_runtime_globals_prefix
 	boolean players_are_double_speed;
 	boolean map_load_in_progress;
 	real loading_progress;
-	struct game_options_prefix options;
+	struct game_options options;
 };
 
 typedef char verify_game_options_size[
@@ -177,7 +176,7 @@ typedef char verify_game_runtime_globals_players_are_double_speed_offset[
 	offsetof(struct game_runtime_globals_prefix, players_are_double_speed) == 0x2 ? 1 : -1];
 typedef char verify_game_runtime_globals_difficulty_offset[
 	offsetof(struct game_runtime_globals_prefix, options) +
-		offsetof(struct game_options_prefix, difficulty) == 0xE ? 1 : -1];
+		offsetof(struct game_options, difficulty) == 0xE ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -318,11 +317,6 @@ void game_engine_dispose_from_old_map(
 	void);
 void scenario_dispose_from_old_map(
 	void);
-void ui_widgets_close_all(
-	void);
-void ui_widgets_safe_to_load(
-	boolean safe);
-
 void collision_log_begin_period(
 	short period);
 void collision_log_end_period(
@@ -488,6 +482,35 @@ void set_random_seed(
 	return;
 }
 
+boolean game_load(
+	struct game_options *options)
+{
+	struct game_runtime_globals_prefix *globals;
+	boolean loaded;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\game.c",
+		0x192,
+		!game_globals->active);
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\game.c",
+		0x193,
+		!game_globals->map_loaded);
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\game.c",
+		0x194,
+		game_options_verify(options));
+
+	random_seed_debug_log(TRUE);
+	csmemcpy(&game_globals->options, options, sizeof(*options));
+	loaded = scenario_load(options->map_name);
+	globals = game_globals;
+	if (loaded)
+		globals->map_loaded = TRUE;
+
+	return globals->map_loaded;
+}
+
 boolean game_map_loading_in_progress(
 	real *progress)
 {
@@ -497,6 +520,40 @@ boolean game_map_loading_in_progress(
 		*progress = globals->loading_progress;
 
 	return globals->map_load_in_progress;
+}
+
+void game_unload(
+	void)
+{
+	if (cache_files_precache_in_progress())
+	{
+		long map_status;
+
+		game_globals->map_load_in_progress = TRUE;
+		ui_widget_load_progress_widget();
+		do
+		{
+			map_status = cache_files_precache_map_status(&game_globals->loading_progress);
+			main_pregame_render();
+			main_rasterizer_throttle();
+			main_present_frame();
+		}
+		while (!map_status);
+
+		ui_widgets_close_all();
+		if (map_status == 2)
+			display_error_damaged_media();
+		cache_files_precache_map_end();
+	}
+
+	if (game_globals->map_loaded)
+	{
+		scenario_unload();
+		random_seed_debug_log(FALSE);
+		game_globals->map_loaded = FALSE;
+	}
+
+	return;
 }
 
 void game_dispose(
@@ -610,6 +667,62 @@ void game_frame(
 	rasterizer_frame_update(frame_dt);
 	numeric_countdown_timer_update();
 	collision_log_end_period();
+
+	return;
+}
+
+void remove_quitting_players_from_game(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	long current_time;
+
+	if (!game_engine_running())
+		return;
+
+	current_time = game_time_get();
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+	{
+		long quit_time = player->quit_out_of_game_time;
+
+		if (quit_time != NONE && !player->quit_out_of_game)
+		{
+			if (current_time == quit_time)
+			{
+				long unit_index = player->unit_index;
+
+				player->quit_out_of_game = TRUE;
+				if (unit_index != NONE)
+				{
+					unit_get(unit_index);
+					unit_kill_no_statistics(player->unit_index);
+				}
+			}
+			else if (current_time > quit_time)
+			{
+				error(
+					_error_silent,
+					"player %x failed to quit, wanted %d is %d",
+					iterator.datum_index,
+					quit_time,
+					current_time);
+			}
+		}
+	}
+
+	return;
+}
+
+void game_set_game_variant_from_name(
+	const char *name)
+{
+	struct game_variant variant;
+	struct game_variant temporary_variant;
+
+	variant = *game_engine_get_variant_by_name(&temporary_variant, name);
+	game_set_game_variant(&variant);
 
 	return;
 }

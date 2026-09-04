@@ -611,10 +611,6 @@ extern char const *tiff_export(
 	struct bitmap_data *bitmap);
 extern short global_screenshot_count;
 
-extern void main_rasterizer_throttle(void);
-extern void main_pregame_render(void);
-extern void main_present_frame(void);
-
 /* ---------- globals */
 
 short global_difficulty_level = 1;

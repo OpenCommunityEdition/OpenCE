@@ -4156,6 +4156,44 @@
         },
         "objdiff_percent": 95.71429
       }
+    },
+    {
+      "unit": "source/game/game",
+      "function": "_game_load",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule with the complete January-authenticated loading path retained as ordinary typed C. The function asserts the inactive and unloaded preconditions at January lines 0x192 and 0x193, lets the already-exact game_options_verify owner inline at line 0x194, enables the random-seed log, copies the complete typed 0x10C game_options value into the runtime globals, loads the named scenario, conditionally records map_loaded, and returns that flag. The Stian January-PC lift independently corroborates this exact source shape; HCEA's later game_precache_new_map call is excluded because January has no such relocation. Target and candidate share the 208-byte padded envelope, all 19 relocation identities, and 96.5 percent objdiff similarity. The residual is confined to the tail after scenario_load: January cleans the argument stack, tests AL, then loads game_globals into EAX, while VC7 schedules the independent load before cleanup into ECX. Bounded declaration-order, cached-pointer, nested-scope, and direct-global variants either reproduced this fixed point or worsened it to 224 bytes with duplicated global loads. The fail-closed classifier returns UNKNOWN. No false prototype, raw offset, representation pun, volatile/register forcing, barrier, pragma, assembly, fake dependency, forced inline, or nonsensical control flow is retained. Reopen only for authoritative January local/source records or a natural same-compiler TU context that explains the final pointer-load schedule.",
+      "measurements": {
+        "target": {
+          "size": 208,
+          "relocation_count": 19,
+          "normalized_sha256": "a80cab9a8ed85380cdfb09ec10d06eb1c215c83c1a2a80105f45bda76e9f82f5"
+        },
+        "base": {
+          "size": 208,
+          "relocation_count": 19,
+          "normalized_sha256": "23af1db0ec128baef3d56cc61289d9c22ca22bd6b378c149b3b67c3aca9babf2"
+        },
+        "objdiff_percent": 96.5
+      }
+    },
+    {
+      "unit": "source/game/game",
+      "function": "_game_set_game_variant_from_name",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule with the high-confidence historical two-local source retained: copy the result of game_engine_get_variant_by_name into a semantic game_variant local, then pass that local to the already-exact game_set_game_variant owner. January independently proves two 0x68 stack locals, the returned-structure copy, and the inlined setter including its unreachable null branch; the historical exact-repository commit 8aed00b49 and the independent HCEA behavior corroborate this source while HCEA's later network-server refresh is excluded. Current VC7 folds the intermediate local and known-nonnull inlined branch into one 48-byte global copy, versus January's 96-byte owner, for 54.0 percent objdiff similarity. Both January source-order placement at the end of the owner and historical placement beside the setter were tested, along with bounded current-header and historical prototype-context probes, without changing that optimizer fixed point. The fail-closed classifier returns UNKNOWN. Reconstructing the missing dead branch explicitly or using an emission anchor would be fake source, so neither is retained. No volatile/register forcing, barrier, pragma, assembly, raw offset, representation pun, dummy dependency, forced inline, or nonsensical branch is used. Reopen only for authoritative January source/local records or a natural same-compiler TU context that preserves the two-local inlined-setter schedule.",
+      "measurements": {
+        "target": {
+          "size": 96,
+          "relocation_count": 4,
+          "normalized_sha256": "62ca68eeccbbb9122495598ffdfbf01a8c8b83e0a039845872f0aa264774d341"
+        },
+        "base": {
+          "size": 48,
+          "relocation_count": 2,
+          "normalized_sha256": "c64370c9f30af66fc89c88544734f6c485e91b368468e22b8a3aa4301e3a3382"
+        },
+        "objdiff_percent": 54.0
+      }
     }
   ]
 }

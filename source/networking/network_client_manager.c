@@ -1871,7 +1871,7 @@ boolean network_game_client_remove_player(
 						player_index,
 						reason,
 						game_time_get());
-					player_datum->unknown_cc = reason;
+					player_datum->quit_out_of_game_time = reason;
 				}
 
 				for (network_player_index = 0;

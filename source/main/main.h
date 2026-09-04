@@ -152,6 +152,12 @@ void main_menu_load(
 void main_present_frame(
 	void);
 
+void main_pregame_render(
+	void);
+
+void main_rasterizer_throttle(
+	void);
+
 void main_print_version(
 	void);
 

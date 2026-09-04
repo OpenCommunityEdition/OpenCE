@@ -131,10 +131,12 @@ void game_initialize(void);
 void game_dispose(void);
 void game_precache_new_map(char *map_name, boolean blocking);
 boolean game_map_loading_in_progress(real *progress);
-void game_unload(void);
+void game_unload(
+	void);
 void game_dispose_from_old_map(void);
 void game_frame(real dt);
-void remove_quitting_players_from_game(void);
+void remove_quitting_players_from_game(
+	void);
 void game_tick(void);
 void game_options_new(struct game_options *options);
 boolean game_options_verify(struct game_options *options);
@@ -152,9 +154,11 @@ boolean game_safe_to_save(void);
 boolean game_safe_to_speak(
 	void);
 boolean game_is_cooperative(void);
-boolean game_load(struct game_options *options);
+boolean game_load(
+	struct game_options *options);
 void game_initialize_for_new_map(void);
-void game_set_game_variant_from_name(const char *name);
+void game_set_game_variant_from_name(
+	const char *name);
 
 /* ---------- prototypes/GAME_TIME.C */
 

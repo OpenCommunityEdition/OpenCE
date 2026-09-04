@@ -11,4 +11,7 @@ RANDOM_MATH.H
 unsigned long get_random_seed(
 	void);
 
+void random_seed_debug_log(
+	boolean log);
+
 #endif /* __RANDOM_MATH_H */

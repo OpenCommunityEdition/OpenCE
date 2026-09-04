@@ -113,7 +113,7 @@ struct player_datum
 	long multiplayer_special;
 	struct game_statistics statistics;
 	long telefrag_timeout;
-	long unknown_cc;
+	long quit_out_of_game_time;
 	boolean is_blocking_teleporter;
 	boolean quit_out_of_game;
 	byte pad_d2[2];
@@ -167,8 +167,8 @@ typedef char player_datum_statistics_offset_assert[
 	offsetof(struct player_datum, statistics) == 0x8C ? 1 : -1];
 typedef char player_datum_telefrag_timeout_offset_assert[
 	offsetof(struct player_datum, telefrag_timeout) == 0xC8 ? 1 : -1];
-typedef char player_datum_unknown_cc_offset_assert[
-	offsetof(struct player_datum, unknown_cc) == 0xCC ? 1 : -1];
+typedef char player_datum_quit_out_of_game_time_offset_assert[
+	offsetof(struct player_datum, quit_out_of_game_time) == 0xCC ? 1 : -1];
 typedef char player_datum_is_blocking_teleporter_offset_assert[
 	offsetof(struct player_datum, is_blocking_teleporter) == 0xD0 ? 1 : -1];
 typedef char player_datum_quit_out_of_game_offset_assert[

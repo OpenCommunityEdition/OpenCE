@@ -144,6 +144,7 @@ void
 random_seed_debug_log(
 	boolean log)
 {
+	return;
 }
 
 unsigned long get_number_suitable_for_initializing_random_seed(void)
