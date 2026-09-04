@@ -26,7 +26,7 @@ src = a.source or unit_src
 bn = open('build.ninja').read()
 # the "build <obj>: cl <src>" line may be wrapped with a $ continuation, so match
 # on the object path alone rather than requiring the leading "build " on that line
-key = 'build\\base\\' + unit.replace('/', '\\') + '.obj:'
+key = 'build\\base\\' + unit.replace('/', '\\').replace(' ', '$ ') + '.obj:'
 i = bn.index(key)
 j = bn.index('cflags = ', i)
 k = bn.index('\nbuild ', j)
