@@ -88,6 +88,7 @@ symbols in this file:
 #include "device_definitions.h"
 #include "device_machines.h"
 #include "memory/data.h"
+#include "models/model_animation_definitions.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
@@ -103,6 +104,13 @@ enum
 	_device_group_changed_once_bit = 1,
 	_device_group_runtime_bit = 2,
 	_scenario_device_group_can_change_only_once_bit = 0,
+};
+
+enum
+{
+	_device_animation_position = 0,
+	_device_animation_power,
+	NUMBER_OF_DEVICE_ANIMATIONS,
 };
 
 /* ---------- macros */
@@ -124,6 +132,12 @@ struct scenario_device_group
 	long unused[3];
 };
 
+struct animation_graph_device_animations
+{
+	long unused[21];
+	struct tag_block animations;
+};
+
 typedef char device_group_datum_size_assert[
 	sizeof(struct device_group_datum) == 0x8 ? 1 : -1];
 typedef char device_group_datum_actual_value_offset_assert[
@@ -136,6 +150,18 @@ typedef char scenario_device_group_flags_offset_assert[
 	offsetof(struct scenario_device_group, flags) == 0x24 ? 1 : -1];
 typedef char scenario_device_groups_offset_assert[
 	offsetof(struct scenario, device_groups) == 0x288 ? 1 : -1];
+typedef char animation_graph_device_animations_size_assert[
+	sizeof(struct animation_graph_device_animations) == 0x60 ? 1 : -1];
+typedef char animation_graph_device_animations_indices_offset_assert[
+	offsetof(struct animation_graph_device_animations, animations) == 0x54 ? 1 : -1];
+typedef char animation_graph_device_animations_offset_assert[
+	offsetof(struct animation_graph, device_animations) == 0x30 ? 1 : -1];
+typedef char animation_graph_animations_offset_assert[
+	offsetof(struct animation_graph, animations) == 0x74 ? 1 : -1];
+typedef char device_animation_size_assert[
+	sizeof(struct animation) == 0xB4 ? 1 : -1];
+typedef char device_animation_frame_count_offset_assert[
+	offsetof(struct animation, frame_count) == 0x22 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -216,6 +242,193 @@ boolean device_new(
 	device->object.flags |= FLAG(_object_shadowless_bit);
 
 	return TRUE;
+}
+
+void device_preprocess_node_orientations(
+	long device_index,
+	struct real_orientation *node_orientations)
+{
+	struct device_datum *device = device_get(device_index);
+	struct device_definition *definition = device_definition_get(device->definition_index);
+	struct animation_graph *graph = animation_graph_definition_get(
+		definition->object.animation_graph.index);
+
+	if (graph->device_animations.count != 0)
+	{
+		struct animation_graph_device_animations *device_animations = TAG_BLOCK_GET_ELEMENT(
+			&graph->device_animations,
+			0,
+			struct animation_graph_device_animations);
+
+		if (device_animations != NULL)
+		{
+			if (device_animations->animations.count > _device_animation_position)
+			{
+				short animation_index = animation_graph_animation_index_get(
+					&device_animations->animations)[_device_animation_position].animation_index;
+
+				if (animation_index != NONE)
+				{
+					struct animation *animation = TAG_BLOCK_GET_ELEMENT(
+						&graph->animations,
+						animation_index,
+						struct animation);
+					real position = TEST_FLAG(device->device.flags, _device_position_reversed_bit)
+						? 1.0f - device->device.position
+						: device->device.position;
+					real frame_index = position *
+						(TEST_FLAG(definition->device.flags, _device_position_loops_bit)
+							? (real)animation->frame_count
+							: (real)(animation->frame_count - 1));
+
+					if (TEST_FLAG(definition->device.flags, _device_position_animation_not_interpolated_bit))
+					{
+						overlay_animation_apply(animation, (short)frame_index, node_orientations);
+					}
+					else
+					{
+						overlay_animation_apply_continuous(animation, frame_index, node_orientations);
+					}
+				}
+			}
+
+			if (device_animations->animations.count > _device_animation_power)
+			{
+				short animation_index = animation_graph_animation_index_get(
+					&device_animations->animations)[_device_animation_power].animation_index;
+
+				if (animation_index != NONE)
+				{
+					struct animation *animation = TAG_BLOCK_GET_ELEMENT(
+						&graph->animations,
+						animation_index,
+						struct animation);
+
+					overlay_animation_apply_continuous(
+						animation,
+						animation->frame_count * device->device.power,
+						node_orientations);
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+boolean device_update(
+	long device_index)
+{
+	struct device_datum *device = device_get(device_index);
+	struct device_definition *definition = device_definition_get(device->definition_index);
+	boolean changed = FALSE;
+
+	if (device->device.power_group_index != NONE)
+	{
+		struct device_group_datum *group = datum_get(
+			device_groups_data,
+			device->device.power_group_index);
+
+		if (group->actual_value != device->device.power ||
+			device->device.power_velocity != 0.0f)
+		{
+			real old_power = device->device.power;
+
+			if (!accelerate_to_position(
+				&device->device.power,
+				&device->device.power_velocity,
+				group->actual_value,
+				definition->device.runtime_maximum_power_acceleration,
+				definition->device.runtime_maximum_power_velocity,
+				0.0f,
+				1.0f,
+				FALSE))
+			{
+				changed = TRUE;
+			}
+
+			if (old_power != device->device.power)
+				device->device.flags |= FLAG(_device_position_changed_bit);
+		}
+	}
+
+	if (device->device.position_group_index != NONE)
+	{
+		struct device_group_datum *group = datum_get(
+			device_groups_data,
+			device->device.position_group_index);
+
+		if (group->actual_value != device->device.position ||
+			device->device.position_velocity != 0.0f)
+		{
+			real maximum_acceleration =
+				(1.0f - device->device.power) * definition->device.runtime_maximum_depowered_position_acceleration +
+				device->device.power * definition->device.runtime_maximum_powered_position_acceleration;
+			real maximum_velocity =
+				(1.0f - device->device.power) * definition->device.runtime_maximum_depowered_position_velocity +
+				device->device.power * definition->device.runtime_maximum_powered_position_velocity;
+			boolean moving_forward = device->device.position_velocity > 0.0f;
+
+			if (!(device->device.delay_ticks >= definition->device.runtime_delay_ticks) &&
+				device->device.position == 0.0f &&
+				!(group->actual_value < device->device.position))
+			{
+				if (++device->device.delay_ticks == 1)
+				{
+					device_effect_new(device_index, definition->device.delay_effect.index);
+				}
+			}
+			else
+			{
+				real old_velocity = device->device.position_velocity;
+				real old_position = device->device.position;
+
+				if (fabs(device->device.position_velocity) > maximum_velocity)
+				{
+					device->device.position_velocity = moving_forward
+						? maximum_velocity : -maximum_velocity;
+				}
+
+				if (accelerate_to_position(
+					&device->device.position,
+					&device->device.position_velocity,
+					group->actual_value,
+					maximum_acceleration,
+					maximum_velocity,
+					0.0f,
+					1.0f,
+					TEST_FLAG(definition->device.flags, _device_position_loops_bit)))
+				{
+					if (moving_forward)
+						device_effect_new(device_index, definition->device.positive_stop_effect.index);
+					else
+						device_effect_new(device_index, definition->device.negative_stop_effect.index);
+				}
+				else
+				{
+					if (device->device.position_velocity != 0.0f &&
+						old_velocity * device->device.position_velocity <= 0.0f)
+					{
+						long effect_index = device->device.position_velocity > old_velocity
+							? definition->device.positive_start_effect.index
+							: definition->device.negative_start_effect.index;
+
+						device_effect_new(device_index, effect_index);
+					}
+					changed = TRUE;
+				}
+
+				if (old_position != device->device.position)
+					device->device.flags |= FLAG(_device_position_changed_bit);
+			}
+		}
+		else
+		{
+			device->device.delay_ticks = 0;
+		}
+	}
+
+	return changed;
 }
 
 real device_get_position(
@@ -303,6 +516,53 @@ void device_group_set_actual_value(
 	}
 
 	return;
+}
+
+boolean device_group_set_desired_value(
+	short group_index,
+	real desired_value)
+{
+	boolean changed = FALSE;
+
+	if (desired_value < 0.0f)
+		desired_value = 0.0f;
+	else if (desired_value > 1.0f)
+		desired_value = 1.0f;
+
+	if (group_index != NONE)
+	{
+		struct device_group_datum *group = datum_get(device_groups_data, group_index);
+
+		if (group->actual_value != desired_value &&
+			(!TEST_FLAG(group->flags, _device_group_can_change_only_once_bit) ||
+				!TEST_FLAG(group->flags, _device_group_changed_once_bit)))
+		{
+			struct object_iterator iterator;
+			struct device_datum *device;
+
+			group->actual_value = desired_value;
+			group->flags |= FLAG(_device_group_changed_once_bit);
+			changed = TRUE;
+
+			object_iterator_new(&iterator, _object_mask_device, 0);
+			while ((device = object_iterator_next(&iterator)) != NULL)
+			{
+				struct device_definition *definition =
+					device_definition_get(device->definition_index);
+
+				if (device->device.power_group_index == group_index)
+				{
+					long effect_index = desired_value > 0.0f
+						? definition->device.repowered_effect.index
+						: definition->device.depowered_effect.index;
+
+					device_effect_new(iterator.index, effect_index);
+				}
+			}
+		}
+	}
+
+	return changed;
 }
 
 void device_one_sided_set(

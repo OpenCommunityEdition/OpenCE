@@ -1,5 +1,10 @@
 [
   {
+    "unit": "source/interface/hud_unit",
+    "function": "_hud_render_damage_indicators",
+    "reason": "Independent root/worker COFF gates prove all 688 padded bytes and 39 ordered relocations exact, normalized SHA-256 cf7cb8af78f4f4f9fb2a11c7bb67c2e5fb0e31cedcbe8b062ef7aa7fad4cacd0. Objdiff reports 95.85253 percent because compiler-local switch labels are represented differently; no byte or target exception. The independently PDB/type/ABI-reviewed source and complete emitted-owner audit are documented in docs/object_matching_logs/hud_unit_obj_damage_indicators_exact_20260904.md."
+  },
+  {
     "unit": "source/networking/network_client_message_handler",
     "function": "_network_game_client_handle_message",
     "reason": "Audited January dispatcher is strict exact: 1088 padded/logical bytes, 84 ordered relocations, normalized SHA-256 32ca599a7f9f3eb44546bcd119ce77eb705e9fc745f9d852c16295cbe1f3850f. Objdiff differs only on compiler-local switch labels; no byte or target exception. See docs/object_matching_logs/network_client_message_handler_obj_admission_review_20260904.md."

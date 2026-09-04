@@ -39,6 +39,8 @@ void input_abstraction_initialize(
 	void);
 void input_abstraction_update(
 	void);
+void input_abstraction_update_device_changes(
+	unsigned long device_change_flags);
 void input_abstraction_reset_controller_detection_timer(
 	void);
 void input_abstraction_get_local_player_preferences(

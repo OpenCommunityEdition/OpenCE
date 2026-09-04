@@ -123,6 +123,11 @@ void device_touched(
 void device_effect_new(
 	long device_index,
 	long effect_index);
+void device_preprocess_node_orientations(
+	long device_index,
+	struct real_orientation *node_orientations);
+boolean device_update(
+	long device_index);
 
 extern struct data_array *device_groups_data;
 

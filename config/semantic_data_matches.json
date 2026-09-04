@@ -1,5 +1,16 @@
 [
   {
+    "unit": "source/interface/hud",
+    "symbol": "_default_string",
+    "allow_incomplete_unit": true,
+    "reason": "The rebuilt object owns the exact default empty-wide-string pointer; January and candidate resolve the same single relocation destination. The separately restored public BSS is ordinarily matched, leaving this four-byte pointer as the complete reported data gap. See docs/object_matching_logs/hud_owner_devices_update_independent_audit_20260904.md.",
+    "measurements": {
+      "size": 4,
+      "relocation_count": 1,
+      "normalized_sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+    }
+  },
+  {
     "unit": "source/ai/ai_profile",
     "symbol": "_global_ai_meter_definitions",
     "reason": "Natural separate 224-byte meter array and private 12-byte spray-name table share the exact 236-byte data section; both owner offsets/linkage, all bytes and all ten resolved relocations agree. Objdiff differs on string ownership. No aggregate facade or new target bytes; see docs/object_matching_logs/ai_profile_obj_complete_reconstruction_review_20260904.md.",

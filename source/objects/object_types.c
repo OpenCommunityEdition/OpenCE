@@ -127,6 +127,7 @@ symbols in this file:
 
 #include "cache/cache_files.h"
 #include "cutscene/cinematics.h"
+#include "devices/devices.h"
 #include "editor/editor_stubs.h"
 #include "items/items.h"
 #include "items/weapons.h"
@@ -272,13 +273,8 @@ boolean device_new(
 	long object_index);
 void device_delete(
 	long object_index);
-boolean device_update(
-	long object_index);
 void device_export_function_values(
 	long object_index);
-void device_preprocess_node_orientations(
-	long object_index,
-	struct real_orientation *node_orientations);
 void device_render_debug(
 	long object_index);
 

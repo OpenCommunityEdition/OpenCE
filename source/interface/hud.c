@@ -225,8 +225,8 @@ typedef char weapon_interface_state_size_assert[
 
 /* ---------- globals */
 
-extern struct hud_globals_definition *hud_globals;
-extern struct hud_scripted_globals *hud_scripted_globals;
+struct hud_globals_definition *hud_globals = NULL;
+struct hud_scripted_globals *hud_scripted_globals = NULL;
 extern boolean temporary_hud;
 
 wchar_t const *default_string = L"";

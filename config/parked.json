@@ -2,6 +2,82 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/input/input_xbox",
+      "function": "_input_update_analog_button_state",
+      "class": "unclassified",
+      "evidence": "Genuine January standalone private analog-button hysteresis helper at file offset 780288, with an ordinary static source definition and authentic auto-inlining into the device poller. Target and candidate are 48 padded bytes with no relocations; only sub al,32 versus compiler-canonical add al,-32 differs. Retain the natural threshold subtraction, not assembly, optimizer steering or an invented helper. All 16 inherited exact owners are preserved and no extra code owner or point_from_line3d is emitted. Reopen only for new authentic compiler/source evidence. See docs/object_matching_logs/input_xbox_obj_device_keyboard_pollers_wave_20260904.md. This park grants no exact credit.",
+      "measurements": {
+        "target": {
+          "size": 48,
+          "relocation_count": 0,
+          "normalized_sha256": "5850a17e99380c5499a719ba1667ef91f992a37284afe5049ba6e7f04e79c826"
+        },
+        "base": {
+          "size": 48,
+          "relocation_count": 0,
+          "normalized_sha256": "78f85bb297cc663f10c1fcea301827288980a1f2dc6cf99b0012b4fe641a1bb9"
+        },
+        "objdiff_percent": 97.0
+      }
+    },
+    {
+      "unit": "source/input/input_xbox",
+      "function": "_input_get_device_states",
+      "class": "unclassified",
+      "evidence": "Typed January Xbox gamepad/memory-unit hotplug and state poller reconstructed with genuine XDK 3911 API/layout declarations, semantic private owners, named device flags and exact natural lookup-table ownership. First natural pointer/count implementation retains frame, register, table-hoisting and scheduling differences: 1280 versus 1232 padded bytes and 32 versus 28 relocations. This is not a proven narrow compiler tie or a byte-exact claim. All inherited exact functions remain exact; the two public callers now close with real private callees. No synthetic lifetime, raw offset, representation pun, forced inline, assembly or declaration-order search. Reopen for new authentic ABI/type/control-flow evidence, not equivalent-expression trials. See docs/object_matching_logs/input_xbox_obj_device_keyboard_pollers_wave_20260904.md.",
+      "measurements": {
+        "target": {
+          "size": 1232,
+          "relocation_count": 28,
+          "normalized_sha256": "56316233dc2ab683b304fa910b38ac5a82e29e8a13850a48cf31af300c81d580"
+        },
+        "base": {
+          "size": 1280,
+          "relocation_count": 32,
+          "normalized_sha256": "b7cded6529564446f880d89597e525942284f3f273aea62da3e10b259c0acdde"
+        },
+        "objdiff_percent": 89.23637
+      }
+    },
+    {
+      "unit": "source/input/input_xbox",
+      "function": "_input_update_keyboard_devices",
+      "class": "unclassified",
+      "evidence": "Typed January debug-keyboard hotplug, key-tick aging and SDK keystroke queue/ring handling using the genuine XDK keystroke type, semantic modifier/key constants and exact private ASCII/virtual-key tables. Natural source reaches the 640-byte target extent but retains scheduling and relocation differences (51 versus 49); no exact or general equivalence claim. All inherited exact owners remain preserved. No fake helper, raw-offset access, representation cast, assembly, forced inline, compiler control or source-order hunt. Reopen only for new authentic source or ABI/control-flow evidence. See docs/object_matching_logs/input_xbox_obj_device_keyboard_pollers_wave_20260904.md.",
+      "measurements": {
+        "target": {
+          "size": 640,
+          "relocation_count": 49,
+          "normalized_sha256": "80bcd2f76c52c728ac2196960ec81c6f2364ab006debe2291d6405a3c7372d89"
+        },
+        "base": {
+          "size": 640,
+          "relocation_count": 51,
+          "normalized_sha256": "3e938f14594007d55c8c4582e070f1912ce6788c9ebbb76d7eae75d5bd2923dc"
+        },
+        "objdiff_percent": 93.70744
+      }
+    },
+    {
+      "unit": "source/devices/devices",
+      "function": "_device_update",
+      "class": "unclassified",
+      "evidence": "Complete typed January device power/position/delay/effect update, independently reviewed against January COFF and pinned HCEA semantic corroboration. Target and candidate have 736 padded bytes, 735 meaningful bytes, 242 instructions including one padding NOP, a 0x18 frame, and all 19 ordered relocations identical. The retained negated delay-limit and group-position comparisons preserve January's unordered/NaN behavior; the initial plain comparisons did not. Exactly six normalized bytes differ at 0x249, 0x24F, 0x251, 0x252, 0x25E and 0x266, solely argument registers for the two stop-effect calls, with identical argument values, stack order and call destinations. The classifier remains UNKNOWN, so this conservative park invents no tuning recipe. All 22 pre-update exact owners and both existing parks remain unchanged; no extra code owner or point_from_line3d COMDAT is emitted. No artificial lifetime, fake helper, raw offset, representation pun, assembly, optimizer control, declaration-order hunt or nonsensical logic is retained. Reopen only for fresh authentic source/compiler-context evidence explaining those argument-register choices. See docs/object_matching_logs/hud_owner_devices_update_independent_audit_20260904.md. This park grants no exact code credit.",
+      "measurements": {
+        "target": {
+          "size": 736,
+          "relocation_count": 19,
+          "normalized_sha256": "a288da977cb9066045f8d9461c85e24bc86a39b0f7557faf6addb2fa36c8fd49"
+        },
+        "base": {
+          "size": 736,
+          "relocation_count": 19,
+          "normalized_sha256": "3791e2d1409f16da2b48f8ad5d4672299df7526bc763f516a7f125e112c49139"
+        },
+        "objdiff_percent": 99.87552
+      }
+    },
+    {
       "unit": "source/devices/devices",
       "function": "_create_initial_device_groups",
       "class": "unclassified",
