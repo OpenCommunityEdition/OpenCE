@@ -87,6 +87,19 @@ void devices_dispose(
 void device_add_scenario_information(
 	long object_index,
 	struct scenario_device_datum *scenario_device);
+real device_get_position(
+	long device_index);
+real device_get_power(
+	long device_index);
+void device_set_never_appears_locked(
+	long device_index,
+	boolean never_locked);
+void device_one_sided_set(
+	long device_index,
+	boolean one_sided);
+void device_operates_automatically_set(
+	long device_index,
+	boolean automatic);
 void device_set_actual_position(
 	long device_index,
 	real position);
@@ -99,6 +112,11 @@ boolean device_frontfacing(
 	long device_index,
 	real_point3d const *position,
 	real_vector3d const *facing);
+void device_group_change_only_once_more_set(
+	long device_group_index,
+	boolean change_only_once_more);
+real device_group_get_value(
+	short device_group_index);
 void device_touched(
 	long device_index,
 	long unit_index);

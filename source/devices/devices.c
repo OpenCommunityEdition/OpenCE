@@ -194,6 +194,32 @@ boolean device_new(
 	return TRUE;
 }
 
+real device_get_position(
+	long device_index)
+{
+	if (device_index != NONE)
+	{
+		struct device_datum *device = device_get(device_index);
+
+		return device->device.position;
+	}
+
+	return 0.0f;
+}
+
+real device_get_power(
+	long device_index)
+{
+	if (device_index != NONE)
+	{
+		struct device_datum *device = device_get(device_index);
+
+		return device->device.power;
+	}
+
+	return 0.0f;
+}
+
 void device_set_never_appears_locked(
 	long device_index,
 	boolean never_appears_locked)
@@ -305,6 +331,23 @@ void device_group_change_only_once_more_set(
 		}
 
 		group->flags &= ~FLAG(_device_group_changed_once_bit);
+	}
+
+	return;
+}
+
+void device_operates_automatically_set(
+	long device_index,
+	boolean operates_automatically)
+{
+	struct machine_datum *machine = machine_try_and_get(device_index);
+
+	if (machine != NULL)
+	{
+		SET_FLAG(
+			machine->machine.flags,
+			_machine_does_not_operate_automatically_bit,
+			!operates_automatically);
 	}
 
 	return;

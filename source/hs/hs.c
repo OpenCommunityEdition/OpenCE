@@ -2781,6 +2781,7 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "ai/ai_scenario_definitions.h"
 #include "cutscene/recorded_animation_definitions.h"
+#include "devices/devices.h"
 #include "game/game.h"
 #include "interface/hud_messaging.h"
 #include "interface/interface.h"
@@ -4023,15 +4024,6 @@ void units_set_desired_flashlight_state(
 void unit_set_desired_flashlight_state(
 	long unit_index,
 	boolean desired_state);
-void device_set_never_appears_locked(
-	long device_index,
-	boolean never_locked);
-void device_one_sided_set(
-	long device_index,
-	boolean one_sided);
-void device_operates_automatically_set(
-	long device_index,
-	boolean automatic);
 void ai_scripting_set_respawn(
 	long ai_reference,
 	boolean respawn);
@@ -4086,9 +4078,6 @@ void unit_scripting_set_emotion_animation(
 void unit_scripting_set_seat(
 	long unit_index,
 	char const *seat_name);
-void device_group_change_only_once_more_set(
-	long device_group_index,
-	boolean change_only_once_more);
 void unit_set_emotion(
 	long unit_index,
 	word emotion_index);
@@ -4102,12 +4091,6 @@ real unit_scripting_get_health(
 	long unit_index);
 real unit_scripting_get_shield(
 	long unit_index);
-real device_get_power(
-	long device_index);
-real device_get_position(
-	long device_index);
-real device_group_get_value(
-	short device_group_index);
 real ai_scripting_living_fraction(
 	long ai_reference);
 real ai_scripting_strength(
