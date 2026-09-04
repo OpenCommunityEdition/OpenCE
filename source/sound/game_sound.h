@@ -65,7 +65,7 @@ long unspatialized_impulse_sound_new(
 	real scale);
 long unattached_looping_sound_start(
 	long definition_index,
-	long period,
+	long source_object_index,
 	real scale);
 void unattached_looping_sound_stop(
 	long looping_sound_index);

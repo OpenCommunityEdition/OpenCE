@@ -254,16 +254,6 @@ enum sound_promotion_result
 	_sound_promotion_dont_play,
 };
 
-enum sound_class
-{
-	_sound_class_unit_dialog = 19,
-	_sound_class_music = 32,
-	_sound_class_scripted_dialog_to_player = 44,
-	_sound_class_scripted_other = 45,
-	_sound_class_scripted_dialog_to_other = 46,
-	_sound_class_scripted_dialog_force_unspatialized = 47,
-};
-
 enum sound_spatialization_mode
 {
 	_sound_spatialization_mode_none,

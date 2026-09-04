@@ -109,6 +109,7 @@ symbols in this file:
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 #include "sound/game_sound.h"
+#include "sound/sound_classes.h"
 #include "sound/sound_definitions.h"
 #include "sound/sound_manager.h"
 #include "structures/structure_bsp_definitions.h"
@@ -119,6 +120,7 @@ symbols in this file:
 enum
 {
 	MAXIMUM_GAME_LOOPING_SOUNDS = 1024,
+	_game_looping_sound_unattached_bit = 0,
 	_game_looping_sound_unattached_stop_bit = 1,
 	_game_looping_sound_unattached_stop_fixed_fadeout_bit = 2,
 	_game_looping_sound_alternate_bit = 3,
@@ -201,6 +203,10 @@ typedef char sound_attachment_data_node_index_offset_assert[
 
 /* ---------- prototypes */
 
+static boolean looping_sound_definition_is_music(
+	long definition_index);
+static void scripted_music_stop_all(
+	void);
 static void scripted_looping_sound_stop_internal(
 	long sound_index,
 	boolean fixed_fadeout);
@@ -734,9 +740,47 @@ void scripted_looping_sound_stop(
 	return;
 }
 
+void scripted_looping_sound_start(
+	long sound_index,
+	long source_object_index,
+	real gain)
+{
+	struct looping_sound_definition *definition;
+	long looping_sound_index;
+	struct game_looping_sound_datum *looping_sound;
+
+	if (sound_index != NONE)
+	{
+		definition = looping_sound_definition_get(sound_index);
+		scripted_looping_sound_stop(sound_index);
+		match_assert(
+			"c:\\halo\\SOURCE\\sound\\game_sound.c",
+			495,
+			definition->runtime_scripting_sound_index==NONE);
+		if (TEST_FLAG(definition->flags, _looping_sound_stops_music_bit))
+		{
+			scripted_music_stop_all();
+		}
+		looping_sound_index = unattached_looping_sound_start(
+			sound_index,
+			source_object_index,
+			gain);
+		definition->runtime_scripting_sound_index = looping_sound_index;
+		if (looping_sound_index != NONE)
+		{
+			looping_sound = datum_get(
+				game_looping_sound_data,
+				looping_sound_index);
+			SET_FLAG(looping_sound->flags, _game_looping_sound_scripted_bit, TRUE);
+		}
+	}
+
+	return;
+}
+
 long unattached_looping_sound_start(
 	long definition_index,
-	long period,
+	long source_object_index,
 	real scale)
 {
 	long looping_sound_index;
@@ -744,7 +788,7 @@ long unattached_looping_sound_start(
 
 	looping_sound_definition_get(definition_index);
 	looping_sound_index = game_looping_sound_new(
-		period,
+		source_object_index,
 		definition_index,
 		"",
 		NONE);
@@ -753,7 +797,7 @@ long unattached_looping_sound_start(
 		looping_sound = datum_get(
 			game_looping_sound_data,
 			looping_sound_index);
-		SET_FLAG(looping_sound->flags, 0, TRUE);
+		SET_FLAG(looping_sound->flags, _game_looping_sound_unattached_bit, TRUE);
 		looping_sound->scale = scale;
 	}
 
@@ -776,6 +820,30 @@ void game_sound_set_mouth_aperture(
 }
 
 /* ---------- private code */
+
+static boolean looping_sound_definition_is_music(
+	long definition_index)
+{
+	struct looping_sound_definition *definition =
+		looping_sound_definition_get(definition_index);
+	short track_index;
+
+	for (track_index = 0; track_index < definition->tracks.count; track_index++)
+	{
+		struct looping_sound_track *track = TAG_BLOCK_GET_ELEMENT(
+			&definition->tracks,
+			track_index,
+			struct looping_sound_track);
+
+		if (track->loop_sound.index != NONE
+			&& sound_definition_get(track->loop_sound.index)->sound_class == _sound_class_music)
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
 
 static boolean track_object_impulse_sound(
 	long object_index,
@@ -823,4 +891,27 @@ static boolean track_object_impulse_sound(
 	}
 
 	return FALSE;
+}
+
+static void scripted_music_stop_all(
+	void)
+{
+	long looping_sound_index;
+
+	for (looping_sound_index = data_next_index(game_looping_sound_data, NONE);
+		looping_sound_index != NONE;
+		looping_sound_index = data_next_index(game_looping_sound_data, looping_sound_index))
+	{
+		struct game_looping_sound_datum *looping_sound = datum_get(
+			game_looping_sound_data,
+			looping_sound_index);
+
+		if (looping_sound->object_index == NONE
+			&& looping_sound_definition_is_music(looping_sound->definition_index))
+		{
+			scripted_looping_sound_stop_internal(looping_sound->definition_index, TRUE);
+		}
+	}
+
+	return;
 }
