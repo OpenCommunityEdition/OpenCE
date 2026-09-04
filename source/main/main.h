@@ -16,6 +16,8 @@ MAIN.H
 
 float main_get_seconds_elapsed(
 	void);
+short main_get_window_count(
+	void);
 
 void game_connection_set(
 	short connection);

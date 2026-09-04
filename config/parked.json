@@ -3217,6 +3217,44 @@
         },
         "objdiff_percent": 95.546745
       }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_screen_effect",
+      "function": "__rasterizer_screen_effect",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconciling the complete ordinary-C Xbox cinematic screen-effect path from January's instruction, relocation, assertion-string, and global-offset topology. The retained function validates video/convolution combinations, alternates the primary and screen-effect targets, binds the correct convolution/video textures, configures the January pixel-combiner programs, uploads texture transforms, draws every triangle-fan pass with checked XDK calls, restores the window target, and closes the screen-effect profile. The independent HaloCEA DX9 reconstruction corroborates the parameter layout, pass count, ping-pong topology, mask/scanline/noise selection, convolution/warp transforms, video overbright handling, and final target restoration while remaining build-divergent evidence. Target and candidate preserve all 290 relocation identities; objdiff reports 93.197845 percent similarity, with a 3888-byte target and 3872-byte candidate. The residual is broad instruction/register/x87 scheduling and one 16-byte padded-size slot rather than a missing call or branch, so no compiler-tie grind was attempted. Donor-local false prototypes and the provisional flat window layout were removed in favor of owning headers, the canonical rasterizer window type, a layout-checked complete cinematic state plus parameter prefix, real/enum types, and named XDK constants. No volatile/register forcing, barrier, pragma, assembly, raw address, representation pun, fake dependency, forced inline, undefined behavior, or nonsensical matching form is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the remaining allocation and schedule.",
+      "measurements": {
+        "target": {
+          "size": 3888,
+          "relocation_count": 290,
+          "normalized_sha256": "d67a06f0c52e684686aae8a5a8e3a7e5e2bcf6c84e854bd525b54660cc66d7f8"
+        },
+        "base": {
+          "size": 3872,
+          "relocation_count": 290,
+          "normalized_sha256": "fe3e214e0e283e629854f4b448c161f0adc9254aaf2088c339c235ff9b1bca87"
+        },
+        "objdiff_percent": 93.197845
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_screen_effect",
+      "function": "__rasterizer_screen_flash",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconciling the complete typed Xbox full-screen flash path from January's instruction, relocation, switch-table, assertion-string, and global-offset topology. The retained function applies the authenticated render-screen-flash enum, computes straight and inverse ARGB colors, configures lighten/darken/max/min/invert/tint blend modes with named XDK constants, uploads the viewport transform and pixel combiner, draws the four-vertex fan, and balances the screen-flash profile. The independent HaloCEA DX9 reconstruction corroborates the six techniques, color math, viewport transform, full-screen quad, and blend-state choices while its shader API remains build-divergent. Target and candidate share the exact 1344-byte padded envelope and all 118 relocation identities; objdiff reports 93.82736 percent similarity. The residual is distributed instruction/register/x87 and switch scheduling rather than missing behavior, so it is parked without compiler steering. Donor-local false prototypes and magic render/vertex constants were replaced with owning headers and semantic enums; the canonical rasterizer window layout is used with compile-time offset checks. No volatile/register forcing, barrier, pragma, assembly, raw address, representation pun, fake dependency, forced inline, undefined behavior, or nonsensical matching form is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining the remaining allocation and schedule.",
+      "measurements": {
+        "target": {
+          "size": 1344,
+          "relocation_count": 118,
+          "normalized_sha256": "f1d3e84eebfa355c8aecd1b784f3128fdd6fab0714ccc51b8feafdd988c9f7af"
+        },
+        "base": {
+          "size": 1344,
+          "relocation_count": 118,
+          "normalized_sha256": "74b68c67df01d6b9be5ac42d98f9a6a94025e977476bdb250bf198eeb071fa16"
+        },
+        "objdiff_percent": 93.82736
+      }
     }
   ]
 }
