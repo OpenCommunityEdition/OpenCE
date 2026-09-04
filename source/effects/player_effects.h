@@ -15,6 +15,7 @@ header included in hcex build.
 
 struct screen_flash_definition;
 struct render_screen_flash;
+struct damage_data;
 
 /* ---------- constants */
 
@@ -66,6 +67,12 @@ void player_effect_get_screen_flash(
 void player_effect_get_camera_effect_matrix(
 	short local_player_index,
 	real_matrix4x3 *matrix);
+void player_effect_start(
+	long player_index,
+	struct damage_data const *damage,
+	real_vector3d const *direction,
+	real scale,
+	real total_damage);
 void scripted_player_effect_set_translation(
 	real horizontal,
 	real vertical,

@@ -4194,6 +4194,44 @@
         },
         "objdiff_percent": 54.0
       }
+    },
+    {
+      "unit": "source/effects/player_effects",
+      "function": "_player_effect_update_camera_impulse",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed camera-impulse path from January's ABI, control flow, constants, fields, calls, and relocation topology, with the preserved Opus donor at 608c66380 and independent HCEA code at 570c83fd corroborating the source-level behavior. Target and candidate both occupy 752 padded bytes, contain 267 instructions, and carry the same 24 ordered relocation identities; objdiff reports 96.454544 percent similarity. The retained source performs the temporary impulse acceptance test, flattens and validates the hit/facing vectors, installs the scaled definition, generates and rotates jitter under the global random seed, and applies the permanent facing impulse. The remaining differences are confined to commutative x87 operand-load/evaluation order inside naturally inlined cross-product and dot-product helpers; changing shared helper definitions would risk the authenticated January inline schedule in unrelated objects, while spelling per-call manual arithmetic would violate the source-quality rule. No raw offset, false type or prototype, representation pun, volatile/register forcing, barrier, pragma, assembly, fake dependency, forced inline, undefined behavior, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler helper definition/context that explains the operand schedule without collateral regressions.",
+      "measurements": {
+        "target": {
+          "size": 752,
+          "relocation_count": 24,
+          "normalized_sha256": "c3d56bbfe28c780c2c47aad44ac2078c456d952cb5e1427d630e3b05d4ec0ba4"
+        },
+        "base": {
+          "size": 752,
+          "relocation_count": 24,
+          "normalized_sha256": "71ee3ca41d2b6a3073ce8e9ed25236dbb24aa4e6e8e086e08889e608ffe9d9fa"
+        },
+        "objdiff_percent": 96.454544
+      }
+    },
+    {
+      "unit": "source/effects/player_effects",
+      "function": "_player_effect_start",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed public damage-feedback entry point from January's ABI, assert, random-seed lock lifetime, definition fields, calls, branch topology, and indicator math, with the preserved Opus donor at 608c66380 and independent HCEA code at 570c83fd corroborating the behavior and semantic name. Target and candidate both occupy 736 padded bytes, contain 247 instructions, and carry the same 35 ordered relocation identities; objdiff reports 99.99187 percent similarity. The only instruction-byte difference is the interchangeable load side of one commutative multiplication in the inlined camera-left dot product. The source retains typed player, unit, object, tag, observer, sound, rumble, and math access; uses the authenticated bit-8 damage-indicator enum name; and keeps owner prototypes in player_effects.h and random_math.h. A shared owner-header enum insertion was rejected because a full rebuild reopened the protected units.obj node-orientation sentinel; the named constant is therefore TU-private. No raw offset, false type or prototype, representation pun, volatile/register forcing, barrier, pragma, assembly, fake dependency, forced inline, undefined behavior, or nonsensical branch is retained. Reopen only for authoritative January source/local records or natural same-compiler evidence for the final commutative operand order.",
+      "measurements": {
+        "target": {
+          "size": 736,
+          "relocation_count": 35,
+          "normalized_sha256": "33e471ae9bb2e73c5aaabb039c2c574847ed5f611ef728aefd5af9394e526b08"
+        },
+        "base": {
+          "size": 736,
+          "relocation_count": 35,
+          "normalized_sha256": "997d1f3474a758ef05783af0fb2927e46cf5e3e1505e340540f171b47ad13b21"
+        },
+        "objdiff_percent": 99.99187
+      }
     }
   ]
 }

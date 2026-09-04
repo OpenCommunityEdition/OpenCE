@@ -88,11 +88,14 @@ symbols in this file:
 
 #include "effects/player_effects.h"
 
+#include "camera/observer.h"
 #include "game/game.h"
 #include "game/game_globals.h"
+#include "game/player_control.h"
 #include "game/player_rumble.h"
 #include "game/players.h"
 #include "math/periodic_functions.h"
+#include "math/random_math.h"
 #include "main/console.h"
 #include "networking/network_connection.h"
 #include "objects/damage.h"
@@ -100,7 +103,9 @@ symbols in this file:
 #include "objects/objects.h"
 #include "render/render_cameras.h"
 #include "saved games/game_state.h"
+#include "sound/game_sound.h"
 #include "tag_files/tag_groups.h"
+#include "units/units.h"
 
 #include <stddef.h>
 
@@ -161,6 +166,11 @@ enum
 	_player_effect_camera_shake_just_started_bit,
 
 	NUMBER_OF_PLAYER_EFFECT_FLAGS
+};
+
+enum
+{
+	_damage_draw_indicators_down_bit = 8
 };
 
 /* ---------- macros */
@@ -263,6 +273,14 @@ static void player_effect_update_camera_shake(
 	short local_player_index,
 	struct player_effect_datum *effect,
 	struct camera_shake_definition const *camera_shake,
+	real scale,
+	real time_scale);
+
+static void player_effect_update_camera_impulse(
+	short local_player_index,
+	struct player_effect_datum *effect,
+	struct camera_impulse_definition const *camera_impulse,
+	real_vector3d const *direction,
 	real scale,
 	real time_scale);
 
@@ -1014,6 +1032,242 @@ void player_effect_get_camera_effect_matrix(
 			}
 		}
 	}
+
+	return;
+}
+
+static void player_effect_update_camera_impulse(
+	short local_player_index,
+	struct player_effect_datum *effect,
+	struct camera_impulse_definition const *camera_impulse,
+	real_vector3d const *direction,
+	real scale,
+	real time_scale)
+{
+	real time_factor;
+	real intensity;
+
+	game_time_get();
+
+	time_factor = time_scale * TICKS_PER_SECOND;
+	intensity = effect_scale_factor(
+		camera_impulse->temporary_zero_scale_factor,
+		scale);
+
+	if (effect->camera_impulse.temporary_duration > effect->camera_impulse_time_left ||
+		intensity > effect->camera_impulse.temporary_zero_scale_factor ||
+		(intensity >= effect->camera_impulse.temporary_zero_scale_factor &&
+			effect->camera_impulse_time_left < time_factor * camera_impulse->temporary_duration))
+	{
+		real_vector3d flattened_direction = *direction;
+		real_vector3d facing;
+		real_euler_angles2d facing_angles;
+
+		flattened_direction.k = 0.0f;
+		normalize3d(&flattened_direction);
+
+		facing_angles = *player_control_get_facing_angles(local_player_index);
+		vector3d_from_euler_angles2d(&facing, &facing_angles);
+		facing.k = 0.0f;
+		normalize3d(&facing);
+
+		if (fabs(magnitude_squared3d(&flattened_direction) - 1.0f) < _real_epsilon &&
+			fabs(magnitude_squared3d(&facing) - 1.0f) < _real_epsilon)
+		{
+			real angle = signed_angle_between_vectors2d(
+				(real_vector2d const *)&facing,
+				(real_vector2d const *)&flattened_direction);
+			real jitter_lower_bound;
+			real jitter_upper_bound;
+			real jitter_magnitude;
+			real jitter_angle;
+
+			effect->camera_impulse = *camera_impulse;
+			effect->camera_impulse.temporary_zero_scale_factor = intensity;
+			effect->camera_impulse.temporary_duration =
+				time_factor * effect->camera_impulse.temporary_duration;
+			effect->camera_impulse_time_left =
+				(short)effect->camera_impulse.temporary_duration;
+
+			effect->direction.i = cosine(angle);
+			effect->direction.j = sine(angle);
+			effect->direction.k = 0.0f;
+
+			jitter_upper_bound = effect->camera_impulse.temporary_jitter_upper_bound;
+			jitter_lower_bound = effect->camera_impulse.temporary_jitter_lower_bound;
+			jitter_magnitude = real_seed_random_range(
+				get_global_local_random_seed_address(),
+				jitter_lower_bound,
+				jitter_upper_bound);
+			jitter_angle = real_seed_random_range(
+				get_global_local_random_seed_address(),
+				0.0f,
+				2 * _pi);
+
+			cross_product3d(&effect->direction, global_up3d, &effect->jitter);
+			normalize3d(&effect->jitter);
+			rotate_vector_about_axis(
+				&effect->jitter,
+				&effect->direction,
+				sine(jitter_angle),
+				cosine(jitter_angle));
+			scale_vector3d(&effect->jitter, jitter_magnitude, &effect->jitter);
+
+			SET_FLAG(
+				effect->flags,
+				_player_effect_camera_impulse_just_started_bit,
+				TRUE);
+		}
+	}
+
+	{
+		real permanent_intensity = effect_scale_factor(
+			camera_impulse->permanent_zero_scale_factor,
+			scale);
+		real_vector3d facing;
+		real_vector3d left;
+		real_euler_angles2d delta;
+
+		player_control_get_facing_direction(local_player_index, &facing);
+		cross_product3d(global_up3d, &facing, &left);
+
+		delta.yaw = dot_product3d(&left, direction) *
+			camera_impulse->permanent_angle * permanent_intensity;
+		delta.pitch = dot_product3d(&facing, direction) *
+			camera_impulse->permanent_angle * permanent_intensity;
+
+		player_control_permanent_impulse(local_player_index, &delta);
+	}
+
+	return;
+}
+
+void player_effect_start(
+	long player_index,
+	struct damage_data const *damage,
+	real_vector3d const *direction,
+	real scale,
+	real total_damage)
+{
+	short local_player_index = player_get(player_index)->local_player_index;
+
+	match_assert("c:\\halo\\SOURCE\\effects\\player_effects.c", 342, direction);
+
+	lock_global_random_seed();
+
+	if (local_player_index != NONE)
+	{
+		struct damage_effect_definition *definition =
+			damage_effect_definition_get(damage->definition_index);
+		struct player_effect_datum *effect = player_effect_get(local_player_index);
+
+		player_effect_update_screen_flash(
+			local_player_index,
+			effect,
+			&definition->screen_flash,
+			scale,
+			1.0f);
+		player_effect_update_camera_impulse(
+			local_player_index,
+			effect,
+			&definition->camera_impulse,
+			direction,
+			scale,
+			1.0f);
+		player_effect_update_camera_shake(
+			local_player_index,
+			effect,
+			&definition->camera_shake,
+			scale,
+			1.0f);
+		rumble_player_impulse(
+			local_player_index,
+			(struct rumble_definition *)&definition->vibrate,
+			scale,
+			1.0f);
+
+		if (definition->sound.index != NONE)
+			unspatialized_impulse_sound_new(definition->sound.index, 1.0f);
+
+		if (total_damage > 0.0f && damage->owner_object_index != NONE)
+		{
+			if (TEST_FLAG(definition->damage.flags, _damage_draw_indicators_down_bit))
+			{
+				effect->damage_indicator_ticks[2] = 1;
+			}
+			else
+			{
+				long unit_index;
+				struct unit_datum *unit;
+				struct object_datum *attacker;
+
+				if (local_player_get_player_index(local_player_index) == NONE)
+					unit_index = NONE;
+				else
+					unit_index = player_get(
+						local_player_get_player_index(local_player_index))->unit_index;
+
+				unit = unit_try_and_get(unit_index);
+				attacker = object_try_and_get(damage->owner_object_index);
+
+				if (unit && attacker)
+				{
+					struct observer_result const *camera =
+						observer_get_camera(local_player_index);
+
+					if (camera)
+					{
+						real_point3d head_position;
+						real_point3d attacker_position;
+						real_vector3d delta;
+						real_vector3d left;
+						real_vector3d relative;
+
+						unit_get_head_position(unit_index, &head_position);
+						object_get_origin(
+							damage->owner_object_index,
+							&attacker_position);
+						vector_from_points3d(
+							&head_position,
+							&attacker_position,
+							&delta);
+						cross_product3d(&camera->forward, &camera->up, &left);
+
+						relative.i = dot_product3d(&left, &delta);
+						relative.j = dot_product3d(&delta, &camera->forward);
+						relative.k = dot_product3d(&delta, &camera->up);
+
+						if (normalize3d(&relative) != 0.0f)
+						{
+							real angle;
+							real absolute_angle;
+
+							if (fabs(relative.k) > 0.5)
+							{
+								if (relative.k > 0.0f)
+									effect->damage_indicator_ticks[0] = 1;
+								else
+									effect->damage_indicator_ticks[2] = 1;
+							}
+
+							angle = arctangent(relative.j, relative.i);
+							absolute_angle = (real)fabs(angle);
+
+							if (angle < _pi / 4 || angle > 3 * _pi / 4)
+							{
+								if (absolute_angle > _pi / 2)
+									effect->damage_indicator_ticks[1] = 1;
+								else
+									effect->damage_indicator_ticks[3] = 1;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	unlock_global_random_seed();
 
 	return;
 }
