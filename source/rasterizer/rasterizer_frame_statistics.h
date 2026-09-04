@@ -10,6 +10,12 @@ Narrow cross-translation-unit interface owned by RASTERIZER_FRAME_STATISTICS.C.
 
 struct triangle_buffer;
 struct vertex_buffer;
+struct rasterizer_frame_statistics_globals;
+
+void rasterizer_frame_statistics_get_fps(
+	struct rasterizer_frame_statistics_globals *frame_statistics);
+void rasterizer_frame_statistics_draw(
+	void);
 
 long rasterizer_frame_statistics_count_static_vertices(
 	struct triangle_buffer const *triangle_buffer,

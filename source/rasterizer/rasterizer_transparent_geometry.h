@@ -16,6 +16,8 @@ boolean rasterizer_transparent_geometry_initialize_aux_buffer(
 	void);
 void rasterizer_transparent_geometry_dispose_aux_buffer(
 	void);
+void rasterizer_transparent_geometry_dispose(
+	void);
 void rasterizer_transparent_geometry_groups_begin(
 	void);
 void rasterizer_transparent_geometry_groups_end(

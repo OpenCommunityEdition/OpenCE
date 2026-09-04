@@ -307,6 +307,7 @@ symbols in this file:
 #include "rasterizer_geometry.h"
 #include <xtl.h>
 #include "rasterizer/xbox/rasterizer_xbox.h"
+#include "rasterizer/xbox/rasterizer_xbox_internal.h"
 #include "rasterizer/xbox/rasterizer_xbox_dynavobgeom.h"
 #include "render/render.h"
 #include "render/render_debug.h"
@@ -421,21 +422,6 @@ struct rasterizer_debug_model_vertex
 
 /* ---------- prototypes */
 
-void _rasterizer_reset_state(
-	void);
-boolean _rasterizer_initialize(
-	void);
-void _rasterizer_frame_begin(
-	struct rasterizer_frame_begin_parameters const *parameters);
-void _rasterizer_present(
-	struct bitmap_data *screenshot_bitmap,
-	point2d const *screenshot_index);
-void _rasterizer_window_get_fog(
-	struct render_fog *fog);
-void _rasterizer_window_set_fog(
-	struct render_fog const *fog);
-void _rasterizer_set_vblank_callback(
-	void (*callback)(unsigned long));
 long _rasterizer_dynamic_triangles_new(
 	long triangle_count);
 short *_rasterizer_dynamic_triangles_lock(
@@ -685,14 +671,6 @@ void _rasterizer_profile_enable(
 	boolean enable);
 void _rasterizer_screen_flash(
 	void);
-void _rasterizer_dispose(void);
-void _rasterizer_frame_end(void);
-void _rasterizer_window_begin(
-	struct rasterizer_window_begin_parameters const *parameters);
-void _rasterizer_window_end(
-	void);
-boolean _rasterizer_windows_begin(void);
-void _rasterizer_windows_end(void);
 void _rasterizer_models_begin(
 	boolean skip_obscurer_test);
 
@@ -1837,9 +1815,12 @@ void rasterizer_window_end(
 	return;
 }
 
-boolean rasterizer_windows_begin(void)
+void rasterizer_windows_begin(
+	void)
 {
-	return _rasterizer_windows_begin();
+	_rasterizer_windows_begin();
+
+	return;
 }
 
 void rasterizer_windows_end(void)

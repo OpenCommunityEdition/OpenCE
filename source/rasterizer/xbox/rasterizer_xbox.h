@@ -27,7 +27,7 @@ union real_rgb_color;
 
 /* ---------- prototypes/RASTERIZER_XBOX.C */
 
-void rasterizer_preinitialize__fill_you_up_with_the_devils_cock(
+boolean rasterizer_preinitialize__fill_you_up_with_the_devils_cock(
 	void);
 void rasterizer_spin_begin(
 	short profile);
@@ -98,10 +98,10 @@ void SetRenderStateSmart(
 	unsigned long value);
 void rasterizer_set_stencil_mode(
 	long stencil_mode);
-void rasterizer_set_texture_bitmap_data(
+boolean rasterizer_set_texture_bitmap_data(
 	short stage,
 	struct bitmap_data const *bitmap);
-long rasterizer_set_texture_direct(
+boolean rasterizer_set_texture_direct(
 	short stage,
 	long bitmap_group_index,
 	short bitmap_index);
@@ -109,7 +109,7 @@ void rasterizer_set_pixel_shader(
 	struct pixel_shader_definition const *definition);
 void rasterizer_set_model_skinning(
 	struct rasterizer_model_skinning_parameters const *skinning);
-void rasterizer_set_texture(
+union point2d *rasterizer_set_texture(
 	short stage,
 	short bitmap_type,
 	short bitmap_usage,

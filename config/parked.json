@@ -3255,6 +3255,120 @@
         },
         "objdiff_percent": 97.91958
       }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox",
+      "function": "_SetupSmartStates",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the complete January smart-state reset from the target instruction and relocation topology and the stock XDK 3911 state-shadow declarations. The retained routine copies all D3DRS_MAX render states, walks all D3DTSS_MAX texture states for the four Xbox stages, and clears the four texture bindings. Target and candidate both occupy 128 padded bytes. The only structural gap is that January emits the initial 0x90-dword copy as an inline rep movsd with fourteen total relocations, while the ordinary csmemcpy spelling has fifteen because cseries.h deliberately routes memcpy to the project function. An exact spelling requires a one-use representation cast to an invented aggregate type for two XDK arrays, which is rejected under the anti-fake-match rule. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, or nonsensical control flow is retained. Reopen for an authoritative owner type or January source evidence for the aggregate assignment.",
+      "measurements": {
+        "target": {
+          "size": 128,
+          "relocation_count": 14,
+          "normalized_sha256": "cfe9f19764073025697fc58befd435e453f1af4aba3fff8b58d89737ad8ef4ba"
+        },
+        "base": {
+          "size": 128,
+          "relocation_count": 15,
+          "normalized_sha256": "5af5c50b6097a2d81f5aaa9f10d49fd60ccd6c6178cdac368f6e5ea4152ed33d"
+        },
+        "objdiff_percent": 75.89286
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox",
+      "function": "__rasterizer_window_begin",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked after reconstructing the full typed January window-begin lifecycle from the target disassembly, assertion strings, ordered subsystem calls, named fog/window structures, and XDK state setter. Target and candidate both occupy 416 padded bytes with all 39 relocations and objdiff reports 99.03226 percent similarity. The sole residual is a dependency-independent transposition: January loads parameters->window_index before storing suppress_window_begin_end, while VC7 schedules the byte store first. Expression-assignment and explicit if/else spellings reproduce the same fixed point. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, or nonsensical branch is retained.",
+      "measurements": {
+        "target": {
+          "size": 416,
+          "relocation_count": 39,
+          "normalized_sha256": "fecabaa8a9edb25e6db2dc22654b55310d362082bac2a8c2254eba73f2b41223"
+        },
+        "base": {
+          "size": 416,
+          "relocation_count": 39,
+          "normalized_sha256": "4dfccf310cdb9f7d271d4a81cb536b225a7443be6be49a915069bc9163379b8f"
+        },
+        "objdiff_percent": 99.03226
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox",
+      "function": "_rasterizer_set_frustum_z",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked with the complete typed frustum update and eight-register vertex-constant construction recovered from January's instruction/relocation topology and the existing render-camera owner types. Target and candidate both occupy 320 padded bytes with all 22 relocations and objdiff reports 96.521736 percent similarity. The residual is confined to equivalent x87 ordering in a commutative projection sum; four natural term-order and temporary-expression spellings converged to this fixed point or degraded it. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, or nonsensical logic is retained.",
+      "measurements": {
+        "target": {
+          "size": 320,
+          "relocation_count": 22,
+          "normalized_sha256": "984bc304482a6a7983d946e2b254c7d41987cf7657680eb98dd71c98392396b9"
+        },
+        "base": {
+          "size": 320,
+          "relocation_count": 22,
+          "normalized_sha256": "690abd0fa2736042fbb1d964ce85ff0470e2e7bd6210db37f4cb4bd0aa53c0ef"
+        },
+        "objdiff_percent": 96.521736
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox",
+      "function": "_rasterizer_set_model_skinning",
+      "class": "private-register-convention",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed 44-node skinning constant upload from January's assertions, instruction/relocation topology, and the independently used model-skinning parameter layout. Target and candidate both occupy 320 padded bytes with all 18 relocations and objdiff reports 95.92233 percent similarity. Their instruction streams implement the same transposed, scale-folded matrices and differ only by an EAX/ECX register exchange. Five natural declaration orders and direct-index forms either returned to this fixed point or worsened code generation. No register keyword, volatile access, barrier, pragma, assembly, fake dependency, raw offset, forced inline, or nonsensical logic is retained.",
+      "measurements": {
+        "target": {
+          "size": 320,
+          "relocation_count": 18,
+          "normalized_sha256": "ba181c535da3f3a4b566208d3ce013b4a00c7e9f8c077c30d23b0cadd4b535be"
+        },
+        "base": {
+          "size": 320,
+          "relocation_count": 18,
+          "normalized_sha256": "3b0471f353677f94ad13f447678034d81d82e2fc8126b598c699f499f98d3258"
+        },
+        "objdiff_percent": 95.92233
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox",
+      "function": "_rasterizer_set_stencil_mode",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked with the complete six-mode stencil state machine reconstructed from January's switch topology, XDK render-state constants, debug gate, and cached-state update. Target and candidate both occupy 784 padded bytes with all 78 relocations and objdiff reports 95.382774 percent similarity. The residual is confined to the initial stencil-debug gate's equivalent load/if-conversion schedule; seven ordinary typed switch and local-mode spellings converged to this fixed point. Correct enum constants and semantic state-cache fields are retained. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, or nonsensical branch is present.",
+      "measurements": {
+        "target": {
+          "size": 784,
+          "relocation_count": 78,
+          "normalized_sha256": "903201d61d15f0c4dcad96fd81acb8049e8bfc201883061924dc95f3eaea8852"
+        },
+        "base": {
+          "size": 784,
+          "relocation_count": 78,
+          "normalized_sha256": "ad5062d43fbc0e799eee361920653fde67f4315ae91ccb29024b002382000b08"
+        },
+        "objdiff_percent": 95.382774
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox",
+      "function": "_rasterizer_set_texture",
+      "class": "tu-context-optimization",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed blocking texture-selection path from January's assertions and relocations, the exact non-blocking sibling, bitmap owner APIs, and the target's pointer-return sequence. The retained routine validates stage/type/usage, resolves and type-checks the requested bitmap, falls back to the typed default texture, binds it, records dimensions, emits the authenticated failure diagnostics, and returns the dimensions pointer only on success. January occupies 496 padded bytes with 35 relocations; the candidate is 432 bytes with 31 relocations and objdiff reports 86.17284 percent. Every call, relocation destination, assertion line, fallback edge, failure edge, and both return sequences agree. January uniquely compiler-clones the successful tail in one predecessor while leaving an unforwarded success-byte store in the shared copy; six natural CFG spellings all compile to the same smaller shared-tail form. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, or invented behavior is retained. Reopen for authoritative January source or compatible TU-context evidence explaining the compiler's tail duplication.",
+      "measurements": {
+        "target": {
+          "size": 496,
+          "relocation_count": 35,
+          "normalized_sha256": "dc5b1cd08b24f3dd90c859db380212cd047b32fe695713ef5020c92cf0332b6d"
+        },
+        "base": {
+          "size": 432,
+          "relocation_count": 31,
+          "normalized_sha256": "d132f4db59dd3fbbfe3cc1535056de9ae4cebd2600eb7a2fba7127555e7df1b8"
+        },
+        "objdiff_percent": 86.17284
+      }
     }
   ]
 }

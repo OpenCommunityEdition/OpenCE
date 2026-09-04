@@ -216,7 +216,8 @@ void rasterizer_widget_end(
 boolean rasterizer_initialize(void);
 
 void rasterizer_frame_begin(const struct rasterizer_frame_begin_parameters *parameters);
-boolean rasterizer_windows_begin(void);
+void rasterizer_windows_begin(
+	void);
 void rasterizer_window_begin(
 	struct rasterizer_window_begin_parameters const *parameters);
 void rasterizer_window_end(

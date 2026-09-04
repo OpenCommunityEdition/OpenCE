@@ -24,6 +24,12 @@ void *_texture_cache_bitmap_get_hardware_format(
 	boolean load);
 void *texture_cache_bitmap_load(
 	struct bitmap_data *bitmap);
+void texture_cache_new(
+	void);
+void texture_cache_delete(
+	void);
+void texture_cache_idle(
+	void);
 void texture_cache_return_memory(
 	void);
 void *texture_cache_steal_memory(
