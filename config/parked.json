@@ -3396,6 +3396,158 @@
         },
         "objdiff_percent": 92.30703
       }
+    },
+    {
+      "unit": "source/cache/cache_files_decompress_windows",
+      "function": "_acquire_read_request",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked with the complete typed request-acquisition loop reconstructed from January's instruction and relocation topology and the independently corroborating HCEA cache-copy implementation. Target and candidate both occupy 112 padded bytes with one relocation and objdiff reports 84.82927 percent similarity. They perform the same free-slot scan, physical-buffer protection, request initialization, and return; the residual is a register-role and scheduling tie around the request-address LEA and XPhysicalProtect call. Function-scope request and buffer locals, plus an earlier natural request computation, either returned to this fixed point or worsened it. No register keyword, volatile access, barrier, pragma, assembly, fake dependency, raw offset, forced inline, undefined behavior, or nonsensical logic is retained.",
+      "measurements": {
+        "target": {
+          "size": 112,
+          "relocation_count": 1,
+          "normalized_sha256": "e02ac996c6a8e2aba3cb61d7188815f082442aca055f7710066c81546a45badb"
+        },
+        "base": {
+          "size": 112,
+          "relocation_count": 1,
+          "normalized_sha256": "d2dc62f3b7b1b8c8bad1b7781ac3da5ed19a591ed6ca7540e8f22050bd9dbf6c"
+        },
+        "objdiff_percent": 84.82927
+      }
+    },
+    {
+      "unit": "source/cache/cache_files_decompress_windows",
+      "function": "_cache_copy_FileIOCompletionRoutine@12",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed asynchronous-I/O completion path from January's assertions, inclusive read/write range checks, timer bookkeeping, progress event, and failure flags, with behavior independently corroborated by HCEA. The evidence-backed dirty Opus continuation adds function-scope pointers for the two bit vectors and restores January's inclusive range forms, improving the candidate to 480 padded bytes, all 24 relocations, and 93.868965 percent objdiff similarity against January's 496 bytes. The remaining gap is a stack-slot/scheduling decision for completed_flags and the timer temporary plus the same RMW-fold peephole isolated in cache_copy_set_flag. Direct member-bit macros, pointer locals, half-open and inclusive ranges, and natural flag-expression orders were measured; the retained form is the closest honest source. No register/volatile forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, undefined behavior, or nonsensical branch is retained.",
+      "measurements": {
+        "target": {
+          "size": 496,
+          "relocation_count": 24,
+          "normalized_sha256": "319636f87325bb6800f85ad4a3fc25cca604a0df2e78a859c8cada14ce81390f"
+        },
+        "base": {
+          "size": 480,
+          "relocation_count": 24,
+          "normalized_sha256": "a693a54573c6b18882bc51a8fa0c7bc3aad14645a497b1baf2e18873aaf2a876"
+        },
+        "objdiff_percent": 93.868965
+      }
+    },
+    {
+      "unit": "source/cache/cache_files_decompress_windows",
+      "function": "_cache_copy_get_status",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked with the complete typed status/progress query recovered from January's control flow, assertion strings, flag order, wait result, and floating-point clamp. Target and candidate both occupy 400 padded bytes with all 20 relocations and objdiff reports 99.963234 percent similarity. The sole meaningful difference is January's five-byte mov eax,3 for one short enum return versus VC7's natural four-byte mov ax,3; all subsequent differences are the one-byte shift and padding. Eight ordinary return, local-width, enum, and assignment spellings converged to this fixed point or disturbed otherwise exact returns. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, undefined behavior, or nonsensical logic is retained.",
+      "measurements": {
+        "target": {
+          "size": 400,
+          "relocation_count": 20,
+          "normalized_sha256": "3a3d93f1205a4dcc032b3f6bed85f2a553cf884942b7ff770dc03fb79865eba0"
+        },
+        "base": {
+          "size": 400,
+          "relocation_count": 20,
+          "normalized_sha256": "eca3e16ff5a5c9880e2a559604f580766ffb41b33d5a7c8e764f674e11dbcf17"
+        },
+        "objdiff_percent": 99.963234
+      }
+    },
+    {
+      "unit": "source/cache/cache_files_decompress_windows",
+      "function": "_cache_copy_issue_read",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked with the complete typed asynchronous read issuer reconstructed from January's assertion, OVERLAPPED setup, retry/error handling, failure flag, and timer accounting. Target and candidate both occupy 320 padded bytes with all 21 relocations and objdiff reports 99.462364 percent similarity. The first 0x10e bytes are identical; only the trailing inlined, independently exact decompressor_timer_stop chooses an EDX/ECX/EAX register rotation rather than the candidate's ECX/EDX/EAX rotation. Three natural elapsed-time expression shapes did not move the tie. No register keyword, volatile access, barrier, pragma, assembly, fake dependency, raw offset, forced inline, undefined behavior, or nonsensical logic is retained.",
+      "measurements": {
+        "target": {
+          "size": 320,
+          "relocation_count": 21,
+          "normalized_sha256": "82ab59307459d188e9fc66d440cdfcef412bd1ad7a0e30b55d69903874259fd2"
+        },
+        "base": {
+          "size": 320,
+          "relocation_count": 21,
+          "normalized_sha256": "da1834c4b9e0f3f8276c749ac1ddef6be1a51d0a16a1c60d039d999cca2b750a"
+        },
+        "objdiff_percent": 99.462364
+      }
+    },
+    {
+      "unit": "source/cache/cache_files_decompress_windows",
+      "function": "_cache_copy_issue_write",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked with the complete typed asynchronous write issuer reconstructed from January's assertion, OVERLAPPED setup, retry/error handling, failure flag, and timer accounting. Target and candidate both occupy 320 padded bytes with all 21 relocations and objdiff reports 99.46809 percent similarity. The first 0x10e bytes are identical; only the trailing inlined, independently exact decompressor_timer_stop chooses an EDX/ECX/EAX register rotation rather than the candidate's ECX/EDX/EAX rotation. Three natural elapsed-time expression shapes did not move the tie. No register keyword, volatile access, barrier, pragma, assembly, fake dependency, raw offset, forced inline, undefined behavior, or nonsensical logic is retained.",
+      "measurements": {
+        "target": {
+          "size": 320,
+          "relocation_count": 21,
+          "normalized_sha256": "b539e11396fe030b46aeb1f7a6f3f231d923dabb23f31449bd10c8fc24624e31"
+        },
+        "base": {
+          "size": 320,
+          "relocation_count": 21,
+          "normalized_sha256": "fbee508d8baa41f0c178580aeeed25cdabcd94b77f7ebd1aa3476c33d3323a58"
+        },
+        "objdiff_percent": 99.46809
+      }
+    },
+    {
+      "unit": "source/cache/cache_files_decompress_windows",
+      "function": "_cache_copy_set_flag",
+      "class": "private-register-convention",
+      "evidence": "Fuzzy-parked with the natural private typed flag setter used throughout the reconstructed cache-copy worker. January occupies 48 padded bytes with one relocation; the retained candidate occupies 32 bytes with one relocation and objdiff reports 40 percent. A public byte-parameter form reproduces January's stack frame and first 0x12 bytes, proving the parameter width, but would invent external linkage for a helper with no public owner and still leaves January's load/or/store versus VC7's RMW-or peephole unmatched. Static __cdecl and six natural SET_FLAG, temporary, operand-order, and getter forms all preserve the private register ABI or the RMW fold. The honest static helper and cseries bit-vector macro are retained; no false public prototype, register/volatile forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, undefined behavior, or nonsensical logic is used.",
+      "measurements": {
+        "target": {
+          "size": 48,
+          "relocation_count": 1,
+          "normalized_sha256": "7550a1e6b978f5c5a14f4ab8f9eb968b8ecc030a91bf37867e6bc6e130a84632"
+        },
+        "base": {
+          "size": 32,
+          "relocation_count": 1,
+          "normalized_sha256": "7d6d7761738324b18a21d67b0b64de805d65b6351e0b113c930fb1dc87eb72bd"
+        },
+        "objdiff_percent": 40.0
+      }
+    },
+    {
+      "unit": "source/cache/cache_files_decompress_windows",
+      "function": "_cache_copy_update_write_buffers",
+      "class": "tu-context-optimization",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed write-buffer completion, pending-count, offset, sequencing, and next-write scheduling path from January's control flow and assertions. January occupies 496 padded bytes and the candidate 512, both with all 18 relocation destinations, at 89.87288 percent objdiff similarity. January kills cached completed-flags and pending-count values across the semantic write-sequence store; VC7 naturally keeps them live, adding six meaningful bytes and downstream loop-alignment padding. Four ordinary statement, decrement, index, and current-request spellings either returned to this fixed point or traded it for worse addressing. No alias-obscuring one-use carrier, register/volatile forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, undefined behavior, or nonsensical logic is retained.",
+      "measurements": {
+        "target": {
+          "size": 496,
+          "relocation_count": 18,
+          "normalized_sha256": "415c4305c972ccc70e19adbf482a423884bcf555f02d33a9a6fd9955b5cbddcf"
+        },
+        "base": {
+          "size": 512,
+          "relocation_count": 18,
+          "normalized_sha256": "a9da2cafadf47384e60f49b27c6d3afdfd4dc664cbfb57107ba4ab07a530e258"
+        },
+        "objdiff_percent": 89.87288
+      }
+    },
+    {
+      "unit": "source/cache/cache_files_decompress_windows",
+      "function": "_simple_cache_copy_thread@4",
+      "class": "register-allocation",
+      "evidence": "Fuzzy-parked with the complete typed cache-copy worker state machine reconstructed from January's instruction/relocation topology, assertion strings, exact callee tree, and the independently corroborating HCEA implementation. Target and candidate both occupy 992 padded bytes with all 73 relocations and objdiff reports 99.14717 percent similarity. Both have 279 instructions with identical mnemonics, operand roles, calls, and branches; the residual is 42 bytes in five shallow register-name/load-order clusters, including inlined cache_copy_set_flag's known RMW/register tie. The relevant helper bodies and natural local/expression orders were measured without finding a source-authentic lever. No register keyword, volatile access, barrier, pragma, assembly, fake dependency, raw offset, forced inline, undefined behavior, or nonsensical branch is retained.",
+      "measurements": {
+        "target": {
+          "size": 992,
+          "relocation_count": 73,
+          "normalized_sha256": "6bb679d927ee902bcbe66d6a7a825123bb56cfea48d5c3759ce9de8717fea14f"
+        },
+        "base": {
+          "size": 992,
+          "relocation_count": 73,
+          "normalized_sha256": "9272438fae80290e2f4e23d0f9d5ee8e04187d90894b4d74701599c2b3bd26f9"
+        },
+        "objdiff_percent": 99.14717
+      }
     }
   ]
 }

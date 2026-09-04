@@ -24,6 +24,9 @@ enum cache_copy_status
 
 /* ---------- structures */
 
+struct cache_copy_read_request;
+struct simple_decompressor_definition;
+
 /* ---------- prototypes/CACHE_FILES_DECOMPRESS_WINDOWS.C */
 
 long cache_copy_buffer_size(
@@ -46,6 +49,9 @@ void cache_copy_end(
 	void);
 void cache_copy_initialize(
 	void);
+struct cache_copy_read_request *acquire_read_request(
+	struct simple_decompressor_definition *self,
+	short read_sequence_index);
 
 /* ---------- globals */
 
