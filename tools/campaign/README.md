@@ -1,7 +1,8 @@
 # tools/campaign — the working harnesses
 
-Five small tools that carried the 2026-08-16 session. All are run from the
-worktree root and assume `ninja` has produced `build/base/**` and
+The original five small tools carried the 2026-08-16 session; the directory now
+also contains later campaign diagnostics. Unless a tool says otherwise, run it
+from the worktree root after `ninja` has produced `build/base/**` and
 `build/split/**`.
 
 **Hard-coded path warning:** `units_hunt_all.py` and `tools/c2dbg32/*.py`
@@ -87,6 +88,48 @@ Keys each function by unit plus January target section index, so a reviewed
 semantic symbol rename does not appear as one lost function and one new
 function. The diff exits nonzero for every exact-to-residual/unwritten loss and
 reports the padded bytes gained.
+
+## alndiff.py — aligned normalized disassembly differences
+
+```
+python tools/campaign/alndiff.py source/objects/damage _object_damage_update
+python tools/campaign/alndiff.py source/ai/actors _code_00123456 --ours-function _actor_helper
+```
+
+Disassembles exactly one target and candidate function section with Capstone,
+masks relocated dwords, preserves relocation identities as annotations, and
+aligns the normalized instruction streams with `difflib.SequenceMatcher`.
+Unlike an index-aligned zip, an inserted block does not make the rest of the
+function look different. `--target-object` and `--ours-object` inspect explicit
+objects; relative overrides are resolved from `--root`.
+
+## tinfo.py — bounded read-only COFF inspection
+
+```
+python tools/campaign/tinfo.py source/objects/damage
+python tools/campaign/tinfo.py source/objects/damage --fn _object_damage_update
+python tools/campaign/tinfo.py source/objects/damage --data --preview-bytes 128
+python tools/campaign/tinfo.py --object scratch/probe.obj --json
+```
+
+Lists function section sizes, normalized hashes, and relocation identities, or
+prints bounded previews of non-code sections. It opens objects read-only and
+never materializes uninitialized/BSS contents. The default object is the
+January split target; pass `--base` for the built candidate.
+
+## namegap.py — proposal-only symbol-name gaps
+
+```
+python tools/campaign/namegap.py source/objects/damage
+python tools/campaign/namegap.py --json
+```
+
+Finds unmatched target/candidate function sections that are strictly equal
+under `coff_compare.section_infos_equal` and uniquely paired in both
+directions. Results are **non-authoritative proposals**, not original-name
+proof. The tool never edits source or config, rejects ambiguous pairings, and
+requires independent January/PDB/source provenance review before a human makes
+any rename.
 
 ## units_hunt_all.py — cross-branch splice hunter
 
