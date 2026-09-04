@@ -40,6 +40,7 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "math/real_math.h"
 #include "objects/objects.h"
+#include "rasterizer/rasterizer_widgets.h"
 #include "rasterizer/rasterizer.h"
 #include "render/render.h"
 #include "saved games/game_state.h"

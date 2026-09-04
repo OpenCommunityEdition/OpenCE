@@ -80,6 +80,9 @@ symbols in this file:
 #include "rasterizer/rasterizer_transparent_geometry.h"
 
 #include <xtl.h>
+#include "rasterizer/xbox/rasterizer_xbox.h"
+#include "rasterizer/rasterizer_widgets.h"
+#include "rasterizer/rasterizer.h"
 
 /* ---------- constants */
 
@@ -201,45 +204,11 @@ struct pixel_shader_definition
 
 /* ---------- prototypes */
 
-void rasterizer_error(
-	long error_result,
-	char const *format,
-	...);
-
-void rasterizer_widget_set_tint_factor(
-	real tint_factor);
-
-void rasterizer_set_vertex_shader_permutation(
-	short vertex_type,
-	short permutation,
-	boolean one_node);
-
-void rasterizer_set_pixel_shader(
-	struct pixel_shader_definition const *pixel_shader_definition);
-
-void rasterizer_spin_begin(
-	short profile);
-
-void rasterizer_spin_end(
-	void);
-
 static boolean rasterizer_widget_project_billboard(
 	real_point3d const *point,
 	real radius,
 	real_point3d *projected_center,
 	real_vector2d *projected_axes);
-
-boolean rasterizer_set_texture_non_blocking(
-	short stage,
-	short bitmap_type,
-	short bitmap_usage,
-	long bitmap_definition_index,
-	short bitmap_sequence_index);
-
-boolean rasterizer_set_texture_direct_non_blocking(
-	short stage,
-	long bitmap_group_index,
-	short bitmap_index);
 
 /* ---------- globals */
 
@@ -276,10 +245,7 @@ long _rasterizer_widget_get_occlusion_test_result(
 			&timestamp);
 		if (result == D3DERR_TESTINCOMPLETE)
 		{
-			/* the spin/profile slot for the occlusion-query read-back; the
-			 * reconstructed _rasterizer_profile_* enum does not name slot 26
-			 * credibly, so the index is spelled out here. */
-			rasterizer_spin_begin(26);
+			rasterizer_spin_begin(_rasterizer_profile_screen_effect);
 			do
 			{
 				result = IDirect3DDevice8_GetVisibilityTestResult(
@@ -309,7 +275,9 @@ long _rasterizer_widget_get_occlusion_test_result(
 			574,
 			(occlusion_test_result&0x80000000)==0);
 		if (!success)
-			error(2, "### ERROR rasterizer_widget_get_occlusion_test_result failed");
+			error(
+				_error_silent,
+				"### ERROR rasterizer_widget_get_occlusion_test_result failed");
 	}
 	else
 	{
@@ -609,46 +577,51 @@ static boolean rasterizer_widget_project_billboard(
 
 	if (radius > 0.0f)
 	{
-	viewport_width = global_window_parameters.viewport_bounds.x1 -
-		global_window_parameters.viewport_bounds.x0;
-	viewport_height = global_window_parameters.viewport_bounds.y1 -
-		global_window_parameters.viewport_bounds.y0;
-	matrix4x3_transform_point(
-		&global_window_parameters.world_to_view,
-		point,
-		&view_point);
+		viewport_width = global_window_parameters.viewport_bounds.x1 -
+			global_window_parameters.viewport_bounds.x0;
+		viewport_height = global_window_parameters.viewport_bounds.y1 -
+			global_window_parameters.viewport_bounds.y0;
+		matrix4x3_transform_point(
+			&global_window_parameters.world_to_view,
+			point,
+			&view_point);
 
-	clip_y =
-		global_window_parameters.projection_matrix[0][1] * view_point.x +
-		global_window_parameters.projection_matrix[1][1] * view_point.y +
-		global_window_parameters.projection_matrix[2][1] * view_point.z +
-		global_window_parameters.projection_matrix[3][1];
-	clip_z =
-		global_window_parameters.projection_matrix[0][2] * view_point.x +
-		global_window_parameters.projection_matrix[1][2] * view_point.y +
-		global_window_parameters.projection_matrix[2][2] * view_point.z +
-		global_window_parameters.projection_matrix[3][2];
-	projected_radius_x = global_window_parameters.projection_matrix[0][0] * radius;
-	projected_radius_y = global_window_parameters.projection_matrix[1][1] * radius;
-	if (clip_z > 0.0f)
-	{
-	inverse_w = 1.0f / (
-		global_window_parameters.projection_matrix[0][3] * view_point.x +
-		global_window_parameters.projection_matrix[1][3] * view_point.y +
-		global_window_parameters.projection_matrix[2][3] * view_point.z +
-		global_window_parameters.projection_matrix[3][3]);
-	projected_center->x = (((
-		global_window_parameters.projection_matrix[0][0] * view_point.x +
-		global_window_parameters.projection_matrix[1][0] * view_point.y +
-		global_window_parameters.projection_matrix[2][0] * view_point.z +
-		global_window_parameters.projection_matrix[3][0]) * inverse_w + 1.0f) *
-		viewport_width - 1.0f) * 0.5f;
-	projected_center->y = ((1.0f - clip_y * inverse_w) * viewport_height - 1.0f) * 0.5f;
-	projected_center->z = MIN(1.0f, clip_z * inverse_w);
-	projected_axes->i = viewport_width * inverse_w * projected_radius_x * 0.5f;
-	projected_axes->j = viewport_height * inverse_w * projected_radius_y * 0.5f;
-	projected = TRUE;
-	}
+		clip_y =
+			global_window_parameters.projection_matrix[0][1] * view_point.x +
+			global_window_parameters.projection_matrix[1][1] * view_point.y +
+			global_window_parameters.projection_matrix[2][1] * view_point.z +
+			global_window_parameters.projection_matrix[3][1];
+		clip_z =
+			global_window_parameters.projection_matrix[0][2] * view_point.x +
+			global_window_parameters.projection_matrix[1][2] * view_point.y +
+			global_window_parameters.projection_matrix[2][2] * view_point.z +
+			global_window_parameters.projection_matrix[3][2];
+		projected_radius_x =
+			global_window_parameters.projection_matrix[0][0] * radius;
+		projected_radius_y =
+			global_window_parameters.projection_matrix[1][1] * radius;
+		if (clip_z > 0.0f)
+		{
+			inverse_w = 1.0f / (
+				global_window_parameters.projection_matrix[0][3] * view_point.x +
+				global_window_parameters.projection_matrix[1][3] * view_point.y +
+				global_window_parameters.projection_matrix[2][3] * view_point.z +
+				global_window_parameters.projection_matrix[3][3]);
+			projected_center->x = (((
+				global_window_parameters.projection_matrix[0][0] * view_point.x +
+				global_window_parameters.projection_matrix[1][0] * view_point.y +
+				global_window_parameters.projection_matrix[2][0] * view_point.z +
+				global_window_parameters.projection_matrix[3][0]) *
+				inverse_w + 1.0f) * viewport_width - 1.0f) * 0.5f;
+			projected_center->y =
+				((1.0f - clip_y * inverse_w) * viewport_height - 1.0f) * 0.5f;
+			projected_center->z = MIN(1.0f, clip_z * inverse_w);
+			projected_axes->i =
+				viewport_width * inverse_w * projected_radius_x * 0.5f;
+			projected_axes->j =
+				viewport_height * inverse_w * projected_radius_y * 0.5f;
+			projected = TRUE;
+		}
 	}
 
 	return projected;

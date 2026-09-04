@@ -302,6 +302,7 @@ symbols in this file:
 #include "physics/collisions.h"
 #include "physics/collision_usage.h"
 #include "real_math.h"
+#include "rasterizer_widgets.h"
 #include "rasterizer.h"
 #include "rasterizer_geometry.h"
 #include <xtl.h>
@@ -680,39 +681,10 @@ void _rasterizer_environment_fog_screen_draw(
 	long first_triangle_index,
 	long triangle_count,
 	struct vertex_buffer const *vertex_buffer);
-void _rasterizer_widget_submit(
-	long object_index,
-	long widget_index,
-	real_point3d const *centroid,
-	rasterizer_widget_render_proc render_proc);
-void _rasterizer_widget_begin(
-	short type,
-	word flags);
 void _rasterizer_profile_enable(
 	boolean enable);
 void _rasterizer_screen_flash(
 	void);
-boolean _rasterizer_widget_set_texture(
-	short stage_index,
-	long bitmap_group_index,
-	short sequence_index);
-void _rasterizer_widget_set_tint_factor(
-	long handle);
-long _rasterizer_widget_set_zbuffer_enable(
-	long handle,
-	long enable);
-short _rasterizer_widget_draw_sprite2d(
-	long dynamic_vertex_buffer_index);
-void _rasterizer_widget_draw_sprite3d(
-	real_point3d const *point,
-	real radius,
-	real_vector2d const *scale,
-	real rotation,
-	unsigned long color);
-void _rasterizer_widget_submit_occlusion_test(
-	long handle);
-long _rasterizer_widget_get_occlusion_test_result(
-	long handle);
 void _rasterizer_dispose(void);
 void _rasterizer_frame_end(void);
 void _rasterizer_window_begin(
@@ -1744,23 +1716,35 @@ boolean rasterizer_widget_set_texture(
 }
 
 void rasterizer_widget_set_tint_factor(
-	long handle)
+	real tint_factor)
 {
-	_rasterizer_widget_set_tint_factor(handle);
+	_rasterizer_widget_set_tint_factor(tint_factor);
 	return;
 }
 
-long rasterizer_widget_set_zbuffer_enable(
-	long handle,
-	long enable)
+void rasterizer_widget_set_zbuffer_enable(
+	boolean zbuffer_enable)
 {
-	return _rasterizer_widget_set_zbuffer_enable(handle, enable);
+	_rasterizer_widget_set_zbuffer_enable(zbuffer_enable);
+	return;
 }
 
-short rasterizer_widget_draw_sprite2d(
-	long dynamic_vertex_buffer_index)
+void rasterizer_widget_draw_sprite2d(
+	real_point2d const *point,
+	real radius,
+	real_vector2d const *scale,
+	real_vector2d const *texture_scale,
+	real rotation,
+	unsigned long color)
 {
-	return _rasterizer_widget_draw_sprite2d(dynamic_vertex_buffer_index);
+	_rasterizer_widget_draw_sprite2d(
+		point,
+		radius,
+		scale,
+		texture_scale,
+		rotation,
+		color);
+	return;
 }
 
 void rasterizer_widget_draw_sprite3d(
@@ -1779,17 +1763,21 @@ void rasterizer_widget_draw_sprite3d(
 	return;
 }
 
-void rasterizer_widget_submit_occlusion_test(
-	long handle)
+long rasterizer_widget_submit_occlusion_test(
+	real_point3d const *point,
+	real radius,
+	long index)
 {
-	_rasterizer_widget_submit_occlusion_test(handle);
-	return;
+	return _rasterizer_widget_submit_occlusion_test(
+		point,
+		radius,
+		index);
 }
 
 long rasterizer_widget_get_occlusion_test_result(
-	long handle)
+	long index)
 {
-	return _rasterizer_widget_get_occlusion_test_result(handle);
+	return _rasterizer_widget_get_occlusion_test_result(index);
 }
 
 void rasterizer_environment_fog_begin(

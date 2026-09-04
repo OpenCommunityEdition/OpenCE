@@ -85,6 +85,7 @@ symbols in this file:
 #include "render.h"
 #include "scenario/scenario.h"
 #include "tag_files/tag_groups.h"
+#include "rasterizer_widgets.h"
 #include "rasterizer.h"
 #include "rasterizer_lights.h"
 #include "rasterizer_geometry.h"

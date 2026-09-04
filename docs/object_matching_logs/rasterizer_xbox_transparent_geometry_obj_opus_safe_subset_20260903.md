@@ -9,3 +9,15 @@ The 15,120-byte group-draw body remains unwritten. Its 384-byte internal dispatc
 The translation-unit global now has a semantic subsystem name and a typed 16-byte layout. No raw offsets, representation punning, address-derived C identifiers, inline assembly, forced inlining, or `point_from_line3d` COMDAT are present.
 
 Validation: focused gate 11 exact / 0 residual / 11 unwritten; full Ninja build passed; stable-verdict diff gained 8 functions / 416 padded bytes with zero regressions; parked audit 179 active / 0 stale / 0 invalid; fake-match scan found zero leads; and the tools suite passed 261 tests using a workspace-local basetemp.
+# Current-HEAD integration note
+
+The combined widget/transparent integration required the complete narrow
+window-parameter prefix and its typed `global_window_parameters` declaration
+in this translation unit. The prefix exposes only January-proven
+`rasterizer_target` and `window_index` fields and replaces an accidental
+implicit declaration from the isolated donor packet. This compatibility fix is
+ordinary typed source, introduces no new function or matching credit, and is
+included in the combined full-build and stable-regression validation.
+
+Final current-HEAD validation of the combined packet gains 23 functions /
+2,608 padded text bytes with zero stable-verdict regressions.

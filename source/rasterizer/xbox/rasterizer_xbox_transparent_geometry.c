@@ -162,6 +162,12 @@ struct rasterizer_transparent_geometry_debug_options_prefix
 	byte reserved8A[2];
 };
 
+struct rasterizer_transparent_geometry_window_parameters_prefix
+{
+	short rasterizer_target;
+	short window_index;
+};
+
 struct rasterizer_xbox_transparent_geometry_globals
 {
 	long last_source_object_index;
@@ -181,6 +187,9 @@ static struct rasterizer_xbox_transparent_geometry_globals
 
 extern struct rasterizer_transparent_geometry_debug_options_prefix
 	rasterizer_debug_options;
+extern struct rasterizer_transparent_geometry_window_parameters_prefix
+	global_window_parameters;
+
 /* ---------- public code */
 
 boolean rasterizer_transparent_geometry_initialize_aux_buffer(

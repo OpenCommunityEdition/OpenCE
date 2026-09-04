@@ -101,9 +101,11 @@ struct rasterizer_dynamic_screen_geometry_parameters;
 struct rasterizer_model_geometry_part;
 struct rasterizer_model_skinning;
 
+#ifndef RASTERIZER_WIDGET_SIGNATURES_OWNED
 typedef void (*rasterizer_widget_render_proc)(
 	long object_index,
 	long widget_index);
+#endif
 
 struct rasterizer_frame_begin_parameters
 {
@@ -538,6 +540,7 @@ void rasterizer_dynamic_lit_geometry_draw(
 void rasterizer_psuedo_dynamic_screen_quad_draw(
 	struct rasterizer_dynamic_screen_geometry_parameters *parameters,
 	struct dynamic_screen_vertex *vertices);
+#ifndef RASTERIZER_WIDGET_SIGNATURES_OWNED
 void rasterizer_widget_submit(
 	long object_index,
 	long widget_index,
@@ -546,6 +549,7 @@ void rasterizer_widget_submit(
 void rasterizer_widget_begin(
 	short type,
 	word flags);
+#endif
 void rasterizer_profile_enable(
 	boolean enable);
 void rasterizer_screen_flash(
@@ -570,6 +574,7 @@ void rasterizer_environment_fog_screen_draw(
 	long first_triangle_index,
 	long triangle_count,
 	struct vertex_buffer const *vertex_buffer);
+#ifndef RASTERIZER_WIDGET_SIGNATURES_OWNED
 boolean rasterizer_widget_set_texture(
 	short stage_index,
 	long bitmap_group_index,
@@ -591,6 +596,7 @@ void rasterizer_widget_submit_occlusion_test(
 	long handle);
 long rasterizer_widget_get_occlusion_test_result(
 	long handle);
+#endif
 
 /* ---------- prototypes/RASTERIZER_XBOX_ACTIVE_CAMOUFLAGE.C */
 

@@ -77,3 +77,29 @@ semantic parks.
 - `config/parked.json` is unchanged and contains no widgets entry, so the
   packet neither stales nor bypasses a parked verdict;
 - JSON parse and `git diff --check`: pass.
+
+## Current-HEAD integration cleanup
+
+The combined integration branch also carries the reviewed transparent-geometry
+subset. Backend widget declarations now live in the closest associated
+`rasterizer_widgets.h`; `rasterizer.c` and the Xbox implementation include
+that owner instead of maintaining consumer-local declarations. Public wrapper
+and backend signatures now agree with the Xbox implementation and HCEA
+evidence: tint is `real`, z-buffer enable is one `boolean`, sprite2d owns its
+full typed argument list, and occlusion submission returns `long` from
+point/radius/index arguments. The wrapper tail thunks remain exact.
+
+`rasterizer_spin_begin(short profile)` and both nonblocking texture helpers
+are owned by `rasterizer_xbox.h`. Slot 26 is spelled with
+`_rasterizer_profile_screen_effect`, and the failure path uses
+`_error_silent`. The high-bit assertion retains its original expression
+because `match_assert` stringifies it: changing it to `TEST_FLAG` preserves
+instructions but changes January's assertion-string relocation and therefore
+is not exact. The private projection helper received indentation-only cleanup.
+
+The owner header is included before the broad legacy `rasterizer.h` in the
+three widget consumers. A compatibility guard leaves the legacy declarations'
+preprocessed token stream unchanged for unrelated consumers; this is required
+because VC7 allocation in `decals.obj` is definition-position sensitive. The
+final combined stable diff gains 23 functions / 2,608 padded text bytes with
+zero regressions.

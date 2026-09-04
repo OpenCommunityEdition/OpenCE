@@ -30,9 +30,19 @@ union real_rgb_color;
 void rasterizer_preinitialize__fill_you_up_with_the_devils_cock(
 	void);
 void rasterizer_spin_begin(
-	void);
+	short profile);
 void rasterizer_spin_end(
 	void);
+boolean rasterizer_set_texture_non_blocking(
+	short stage,
+	short bitmap_type,
+	short bitmap_usage,
+	long bitmap_definition_index,
+	short bitmap_sequence_index);
+boolean rasterizer_set_texture_direct_non_blocking(
+	short stage,
+	long bitmap_group_index,
+	short bitmap_index);
 
 /* ---------- prototypes/RASTERIZER_XBOX_ERRORS.C */
 

@@ -408,7 +408,7 @@ void _rasterizer_reset_state(
 }
 
 void rasterizer_spin_begin(
-	void)
+	short profile)
 {
 	return;
 }
