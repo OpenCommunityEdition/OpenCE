@@ -3,19 +3,19 @@ HS_RUNTIME.C
 
 symbols in this file:
 000B9850 0030:
-	_code_000b9850 (0000)
+	_hs_syntax_nth (0000)
 000B9880 0050:
-	_code_000b9880 (0000)
+	_hs_inspect_boolean (0000)
 000B98D0 0050:
-	_code_000b98d0 (0000)
+	_hs_inspect_real (0000)
 000B9920 0050:
-	_code_000b9920 (0000)
+	_hs_inspect_short_integer (0000)
 000B9970 0050:
-	_code_000b9970 (0000)
+	_hs_inspect_long_integer (0000)
 000B99C0 0050:
-	_code_000b99c0 (0000)
+	_hs_inspect_string (0000)
 000B9A10 0090:
-	_code_000b9a10 (0000)
+	_hs_inspect_enum (0000)
 000B9AA0 0100:
 	_hs_runtime_initialize (0000)
 000B9BA0 0080:
@@ -23,61 +23,61 @@ symbols in this file:
 000B9C20 0010:
 	_hs_runtime_dispose (0000)
 000B9C30 00b0:
-	_code_000b9c30 (0000)
+	_expression_get_function_name (0000)
 000B9CE0 00f0:
-	_code_000b9ce0 (0000)
+	_hs_thread_new (0000)
 000B9DD0 0050:
-	_code_000b9dd0 (0000)
+	_hs_thread_delete (0000)
 000B9E20 0080:
-	_code_000b9e20 (0000)
+	_hs_thread_format (0000)
 000B9EA0 0080:
-	_code_000b9ea0 (0000)
+	_hs_stack_push (0000)
 000B9F20 0020:
-	_code_000b9f20 (0000)
+	_hs_stack_pop (0000)
 000B9F40 0150:
-	_code_000b9f40 (0000)
+	_hs_stack_allocate (0000)
 000BA090 00b0:
-	_code_000ba090 (0000)
+	_hs_wake (0000)
 000BA140 0060:
-	_code_000ba140 (0000)
+	_hs_find_thread_by_script (0000)
 000BA1A0 0080:
-	_code_000ba1a0 (0000)
+	_hs_find_thread_by_name (0000)
 000BA220 0020:
-	_code_000ba220 (0000)
+	_hs_long_to_boolean (0000)
 000BA240 0020:
-	_code_000ba240 (0000)
+	_hs_short_to_boolean (0000)
 000BA260 0020:
-	_code_000ba260 (0000)
+	_hs_string_to_boolean (0000)
 000BA280 0010:
-	_code_000ba280 (0000)
+	_hs_data_to_void (0000)
 000BA290 0020:
-	_code_000ba290 (0000)
+	_hs_short_to_real (0000)
 000BA2B0 0010:
-	_code_000ba2b0 (0000)
+	_hs_long_to_real (0000)
 000BA2C0 0020:
-	_code_000ba2c0 (0000)
+	_hs_enum_to_real (0000)
 000BA2E0 0020:
-	_code_000ba2e0 (0000)
+	_hs_real_to_short (0000)
 000BA300 0010:
-	_code_000ba300 (0000)
+	_hs_real_to_long (0000)
 000BA310 0010:
-	_code_000ba310 (0000)
+	_hs_long_to_short (0000)
 000BA320 0040:
-	_code_000ba320 (0000)
+	_hs_object_name_to_object_list (0000)
 000BA360 0030:
-	_code_000ba360 (0000)
+	_hs_object_to_object_list (0000)
 000BA390 0080:
-	_code_000ba390 (0000)
+	_hs_object_type_can_cast (0000)
 000BA410 0100:
 	_hs_can_cast (0000)
 000BA510 00c0:
 	_hs_cast (0000)
 000BA5D0 0580:
-	_code_000ba5d0 (0000)
+	_hs_global_reconcile_read (0000)
 000BAB50 0190:
-	_code_000bab50 (0000)
+	_hs_global_reconcile_write (0000)
 000BACE0 0040:
-	_code_000bace0 (0000)
+	_hs_runtime_recompile_error (0000)
 000BAD20 0020:
 	_hs_runtime_get_executing_thread_name (0000)
 000BAD40 0020:
@@ -89,15 +89,15 @@ symbols in this file:
 000BB320 0120:
 	_hs_return (0000)
 000BB440 0040:
-	_code_000bb440 (0000)
+	_hs_global_evaluate (0000)
 000BB480 00f0:
 	_hs_evaluate_wake (0000)
 000BB570 0170:
-	_code_000bb570 (0000)
+	_hs_evaluate (0000)
 000BB6E0 0060:
-	_code_000bb6e0 (0000)
+	_hs_script_evaluate (0000)
 000BB740 01c0:
-	_code_000bb740 (0000)
+	_hs_arguments_evaluate (0000)
 000BB900 0030:
 	_hs_macro_function_evaluate (0000)
 000BB930 00d0:
@@ -127,7 +127,7 @@ symbols in this file:
 000BCA60 0180:
 	_hs_evaluate_debug_string (0000)
 000BCBE0 02f0:
-	_code_000bcbe0 (0000)
+	_hs_thread_main (0000)
 000BCED0 02d0:
 	_hs_runtime_initialize_for_new_map (0000)
 000BD1A0 00b0:
@@ -253,25 +253,29 @@ symbols in this file:
 0026F098 0036:
 	??_C@_0DG@NJPPFAFA@there?5are?5not?5enough?5threads?5to?5@ (0000)
 002E2370 264c:
-	_data_002e2370 (0000)
+	_hs_type_inspectors (0000)
 	_typecasting_procedures (00c8)
 004535AC 0008:
-	_bss_004535ac (0000)
+	_hs_runtime_globals (0000)
 */
 
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "ai/ai_debug_scripting.h"
 #include "hs/hs.h"
 #include "hs/object_lists.h"
 #include "hs/hs_scenario_definitions.h"
 #include "math/real_math.h"
 #include "memory/data.h"
 #include "objects/objects.h"
+#include "objects/object_types.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "saved games/game_state.h"
 #include "cseries/errors.h"
+#include "main/console.h"
+#include "game/game.h"
 
 /* ---------- constants */
 
@@ -286,14 +290,99 @@ enum
 enum
 {
 	_hs_syntax_node_primitive_bit = 0,
-	_hs_function_wake = 0x15,
+	_hs_syntax_node_script_bit,
+	_hs_syntax_node_global_bit,
+};
+
+enum hs_function_index
+{
+	_hs_function_begin = 0,
+	_hs_function_begin_random,
+	_hs_function_if,
+	_hs_function_cond,
+	_hs_function_set,
+	_hs_function_and,
+	_hs_function_or,
+	_hs_function_plus,
+	_hs_function_minus,
+	_hs_function_times,
+	_hs_function_divide,
+	_hs_function_min,
+	_hs_function_max,
+	_hs_function_equal,
+	_hs_function_not_equal,
+	_hs_function_greater_than,
+	_hs_function_less_than,
+	_hs_function_greater_than_or_equal,
+	_hs_function_less_than_or_equal,
+	_hs_function_sleep,
+	_hs_function_sleep_until,
+	_hs_function_wake,
+	_hs_function_inspect,
+	_hs_function_object_to_unit,
+	_hs_function_debug_string__first,
+	_hs_function_debug_string__ai_debug_communication_suppress =
+		_hs_function_debug_string__first,
+	_hs_function_debug_string__ai_debug_communication_ignore,
+	_hs_function_debug_string__ai_debug_communication_focus,
+	_hs_function_debug_string__last =
+		_hs_function_debug_string__ai_debug_communication_focus,
+};
+
+enum
+{
+	MAXIMUM_HS_DEBUG_STRING_ARGUMENTS = 32
+};
+
+enum
+{
+	HS_THREAD_STACK_SIZE = 0x200
+};
+
+enum
+{
+	_hs_script_startup = 0,
+	_hs_script_dormant,
+	_hs_script_continuous,
+	_hs_script_static,
+	_hs_script_stub,
+};
+
+enum
+{
+	_hs_thread_in_function_call_bit = 0,
+	_hs_thread_sleeping_bit,
+	_hs_global_external_bit = 15,
 };
 
 /* ---------- macros */
 
-typedef long (*hs_typecasting_procedure)(long value);
+#define hs_thread_get(thread_index) \
+	((struct hs_thread_datum *)datum_get(hs_thread_data, (thread_index)))
 
-/* ---------- structures */
+#define hs_syntax_get(expression_index) \
+	((struct hs_syntax_node *)datum_get(hs_syntax_data, (expression_index)))
+
+/* a thread is valid when it lies inside the thread data array and its stack pointer and
+   the fill mark of its topmost frame lie inside its own inline stack buffer */
+#define valid_thread(thread) \
+	((byte *)(thread)>=(byte *)hs_thread_data->data && \
+	(byte *)(thread)<(byte *)hs_thread_data->data+hs_thread_data->count*hs_thread_data->size && \
+	(byte *)(thread)->stack>=(thread)->stack_data && \
+	(byte *)(thread)->stack<(thread)->stack_data+HS_THREAD_STACK_SIZE && \
+	(thread)->stack->data+(thread)->stack->size<=(thread)->stack_data+HS_THREAD_STACK_SIZE)
+
+#define HS_GLOBAL_DESIGNATOR_IS_EXTERNAL(designator) \
+	TEST_FLAG((designator), _hs_global_external_bit)
+
+#define HS_GLOBAL_DESIGNATOR_TO_INDEX(designator) \
+	((designator)&0x7fff)
+
+/* every runtime failure is reported through the executing script's name */
+#define match_hs_assert(file, line, thread_index, expr, reason) \
+	match_vassert(file, line, expr, csprintf(temporary, \
+		"a problem occurred while executing the script %s: %s (%s)", \
+		hs_thread_format(thread_index), reason, #expr))
 
 union hs_conversion_result
 {
@@ -302,6 +391,37 @@ union hs_conversion_result
 	long long_integer;
 	real real;
 	char const *string;
+};
+
+typedef long (*hs_typecasting_procedure)(long value);
+
+typedef void (*hs_debug_string_procedure)(
+	long name_count,
+	char const **names);
+
+typedef void (*hs_evaluate_procedure)(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+
+typedef void (*hs_inspection_procedure)(
+	short type,
+	union hs_conversion_result value,
+	char *result);
+
+/* ---------- structures */
+
+struct hs_function_definition
+{
+	short return_type;
+	short flags;
+	char const *name;
+	void *parse;
+	void *evaluate;
+	char const *help;
+	char const *usage;
+	short parameter_count;
+	short parameter_types[1];
 };
 
 struct hs_runtime_globals
@@ -321,6 +441,21 @@ struct hs_stack_frame
 	byte data[2];
 };
 
+struct hs_global_datum
+{
+	short identifier;
+	short unused;
+	union hs_conversion_result value;
+};
+
+struct hs_external_global_definition
+{
+	char const *name;
+	short type;
+	short unused;
+	void *address;
+};
+
 struct hs_thread_datum
 {
 	short identifier;
@@ -328,9 +463,9 @@ struct hs_thread_datum
 	byte flags;
 	long script_index;
 	long sleep_until;
-	long unknown0c;
+	long previous_sleep_until;
 	struct hs_stack_frame *stack;
-	long unknown14;
+	long result;
 	byte stack_data[0x200];
 };
 
@@ -339,67 +474,100 @@ typedef char hs_thread_datum_size_assert[
 
 /* ---------- prototypes */
 
-void code_000b9880(
+static void hs_inspect_boolean(
 	short type,
 	union hs_conversion_result value,
 	char *result);
-void code_000b98d0(
+static void hs_inspect_real(
 	short type,
 	union hs_conversion_result value,
 	char *result);
-void code_000b9920(
+static void hs_inspect_short_integer(
 	short type,
 	union hs_conversion_result value,
 	char *result);
-void code_000b9970(
+static void hs_inspect_long_integer(
 	short type,
 	union hs_conversion_result value,
 	char *result);
-void code_000b99c0(
+static void hs_inspect_string(
 	short type,
 	union hs_conversion_result value,
 	char *result);
-void code_000b9a10(
+static void hs_inspect_enum(
 	short type,
-	long enum_value,
+	union hs_conversion_result value,
 	char *result);
-union hs_conversion_result code_000ba220(
+union hs_conversion_result hs_long_to_boolean(
 	union hs_conversion_result value);
-union hs_conversion_result code_000ba240(
+union hs_conversion_result hs_short_to_boolean(
 	union hs_conversion_result value);
-union hs_conversion_result code_000ba260(
+union hs_conversion_result hs_string_to_boolean(
 	union hs_conversion_result value);
-union hs_conversion_result code_000ba280(
+union hs_conversion_result hs_data_to_void(
 	union hs_conversion_result value);
-union hs_conversion_result code_000ba290(
+union hs_conversion_result hs_short_to_real(
 	union hs_conversion_result value);
-union hs_conversion_result code_000ba2b0(
+union hs_conversion_result hs_long_to_real(
 	union hs_conversion_result value);
-union hs_conversion_result code_000ba2c0(
+union hs_conversion_result hs_enum_to_real(
 	union hs_conversion_result value);
-union hs_conversion_result code_000ba2e0(
+union hs_conversion_result hs_real_to_short(
 	union hs_conversion_result value);
-long code_000ba300(
+long hs_real_to_long(
 	union hs_conversion_result value);
-long code_000ba310(
+long hs_long_to_short(
 	union hs_conversion_result value);
-long code_000ba320(
+long hs_object_name_to_object_list(
 	short object_name_index);
-long code_000ba360(
+long hs_object_to_object_list(
 	long object_index);
-static boolean code_000ba390(
+static boolean hs_object_type_can_cast(
 	short actual_type,
 	short desired_type);
-static char const *code_000b9e20(
+static char const *hs_thread_format(
 	long thread_index);
-static void code_000b9f20(
+static void hs_stack_pop(
 	long thread_index);
-static void code_000ba090(
+static void hs_wake(
 	long thread_index);
-static long code_000ba140(
+static long hs_find_thread_by_script(
 	short script_index);
-static long code_000ba1a0(
+static long hs_find_thread_by_name(
 	char const *name);
+static long hs_syntax_nth(
+	long expression_index,
+	short n);
+static void hs_thread_delete(
+	long thread_index);
+static void hs_stack_push(
+	long thread_index);
+static void *hs_stack_allocate(
+	long thread_index,
+	long size);
+static void hs_evaluate(
+	long thread_index,
+	long expression_index,
+	long *destination);
+static long hs_global_evaluate(
+	word global_designator);
+static long *hs_arguments_evaluate(
+	long thread_index,
+	short formal_parameter_count,
+	short const *formal_parameters,
+	boolean initialize);
+static boolean hs_runtime_recompile_error(
+	long thread_index,
+	char const *reason,
+	char const *expression);
+static void hs_script_evaluate(
+	short script_index,
+	long thread_index,
+	boolean initialize);
+static void hs_thread_main(
+	long thread_index);
+static void hs_global_reconcile_read(
+	word global_designator);
 
 /* ---------- globals */
 
@@ -408,7 +576,101 @@ extern struct data_array *hs_global_data;
 extern struct data_array *hs_thread_data;
 extern struct data_array *hs_syntax_data;
 extern short hs_external_global_count;
-extern struct hs_runtime_globals bss_004535ac;
+extern short hs_type_sizes[NUMBER_OF_HS_TYPES];
+static hs_inspection_procedure hs_type_inspectors[NUMBER_OF_HS_TYPES] =
+{
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	hs_inspect_boolean,
+	hs_inspect_real,
+	hs_inspect_short_integer,
+	hs_inspect_long_integer,
+	hs_inspect_string,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	hs_inspect_enum,
+	hs_inspect_enum,
+	hs_inspect_enum,
+	hs_inspect_enum,
+	hs_inspect_enum,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+};
+static struct hs_runtime_globals hs_runtime_globals;
+
+/* per-type fallbacks used when an external global has no backing address */
+extern boolean _hs_type_boolean_default;
+extern real _hs_type_real_default;
+extern short _hs_type_short_integer_default;
+extern long _hs_type_long_integer_default;
+extern char const *_hs_type_string_default;
+extern short _hs_type_script_default;
+extern short _hs_type_trigger_volume_default;
+extern short _hs_type_cutscene_flag_default;
+extern short _hs_type_cutscene_camera_point_default;
+extern short _hs_type_cutscene_title_default;
+extern short _hs_type_cutscene_recording_default;
+extern short _hs_type_device_group_default;
+extern long _hs_type_ai_default;
+extern short _hs_type_ai_command_list_default;
+extern short _hs_type_starting_profile_default;
+extern short _hs_type_conversation_default;
+extern short _hs_type_navpoint_default;
+extern short _hs_type_hud_message_default;
+extern long _hs_type_object_list_default;
+extern long _hs_type_sound_default;
+extern long _hs_type_effect_default;
+extern long _hs_type_damage_default;
+extern long _hs_type_looping_sound_default;
+extern long _hs_type_animation_graph_default;
+extern long _hs_type_actor_variant_default;
+extern long _hs_type_damage_effect_default;
+extern long _hs_type_object_definition_default;
+extern short _hs_type_enum_game_difficulty_default;
+extern short _hs_type_enum_team_default;
+extern short _hs_type_enum_ai_default_state_default;
+extern short _hs_type_enum_actor_type_default;
+extern short _hs_type_enum_hud_corner_default;
+extern long _hs_type_object_default;
+extern long _hs_type_unit_default;
+extern long _hs_type_vehicle_default;
+extern long _hs_type_weapon_default;
+extern long _hs_type_device_default;
+extern long _hs_type_scenery_default;
+extern short _hs_type_object_name_default;
 
 /* ---------- public code */
 
@@ -463,7 +725,7 @@ void hs_runtime_dispose_from_old_map(
 		if (datum_try_and_get(hs_global_data, global_index))
 			datum_delete(hs_global_data, global_index);
 	}
-	bss_004535ac.initialized = FALSE;
+	hs_runtime_globals.initialized = FALSE;
 
 	return;
 }
@@ -474,8 +736,8 @@ char const *hs_runtime_get_executing_thread_name(
 	char const *name;
 
 	name = NULL;
-	if (bss_004535ac.executing_thread_index != NONE)
-		name = code_000b9e20(bss_004535ac.executing_thread_index);
+	if (hs_runtime_globals.executing_thread_index != NONE)
+		name = hs_thread_format(hs_runtime_globals.executing_thread_index);
 	if (!name)
 		name = "[unknown]";
 
@@ -488,12 +750,81 @@ boolean hs_wake_by_name(
 	long thread_index;
 	boolean result;
 
-	thread_index = code_000ba1a0(name);
+	thread_index = hs_find_thread_by_name(name);
 	result = FALSE;
 	if (thread_index != NONE)
 	{
-		code_000ba090(thread_index);
+		hs_wake(thread_index);
 		result = TRUE;
+	}
+
+	return result;
+}
+
+void hs_runtime_update(
+	void)
+{
+	if (hs_runtime_globals.initialized)
+	{
+		long time = game_time_get();
+		boolean console_command_running = FALSE;
+		long thread_index;
+
+		for (thread_index = data_next_index(hs_thread_data, NONE);
+			hs_runtime_globals.initialized && thread_index!=NONE;
+			thread_index = data_next_index(hs_thread_data, thread_index))
+		{
+			struct hs_thread_datum *thread = hs_thread_get(thread_index);
+
+			if (thread->type==_hs_thread_type_console_command)
+				console_command_running = TRUE;
+			if (thread->sleep_until>=0 && thread->sleep_until<=time)
+				hs_thread_main(thread_index);
+		}
+
+		object_list_gc();
+		if (!console_command_running && game_time_get()%16==0)
+			hs_node_gc();
+	}
+
+	return;
+}
+
+long hs_runtime_evaluate(
+	long expression_index)
+{
+	long result = NONE;
+
+	if (hs_runtime_globals.initialized && expression_index!=NONE)
+	{
+		long thread_index = datum_new(hs_thread_data);
+
+		if (thread_index!=NONE)
+		{
+			struct hs_thread_datum *thread = hs_thread_get(thread_index);
+
+			thread->stack = (struct hs_stack_frame *)thread->stack_data;
+			thread->stack->previous = NULL;
+			thread->stack->size = 0;
+			thread->stack->expression_index = NONE;
+			thread->type = _hs_thread_type_console_command;
+			thread->script_index = NONE;
+			thread->flags = 0;
+			thread->sleep_until = 0;
+
+			thread = hs_thread_get(thread_index);
+			hs_evaluate(thread_index, expression_index, &thread->result);
+			if (TEST_FLAG(thread->flags, _hs_thread_in_function_call_bit))
+			{
+				hs_thread_main(thread_index);
+
+				return NONE;
+			}
+
+			return thread->result;
+		}
+
+		error(_error_silent, "there are not enough threads to execute that command.");
 	}
 
 	return result;
@@ -524,9 +855,9 @@ void hs_evaluate_wake(
 	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x22e,
 		script_name_node->type==_hs_type_script);
 
-	wake_thread_index = code_000ba140((short)script_name_node->data);
+	wake_thread_index = hs_find_thread_by_script((short)script_name_node->data);
 	if (wake_thread_index != NONE)
-		code_000ba090(wake_thread_index);
+		hs_wake(wake_thread_index);
 	hs_return(thread_index, 0);
 
 	return;
@@ -534,7 +865,48 @@ void hs_evaluate_wake(
 
 /* ---------- private code */
 
-static char const *code_000b9e20(
+static long hs_syntax_nth(
+	long expression_index,
+	short n)
+{
+	short index;
+
+	for (index = 0; index<n; index++)
+		expression_index = hs_syntax_get(expression_index)->next_node_index;
+
+	return expression_index;
+}
+
+static void hs_thread_delete(
+	long thread_index)
+{
+	match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x290,
+		hs_thread_get(thread_index)->type!=_hs_thread_type_script);
+
+	datum_delete(hs_thread_data, thread_index);
+
+	return;
+}
+
+static void hs_stack_push(
+	long thread_index)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+	struct hs_stack_frame *new_frame = (struct hs_stack_frame *)
+		((byte *)thread->stack+thread->stack->size+sizeof(struct hs_stack_frame));
+
+	match_hs_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x35e, thread_index,
+		(byte *) (new_frame+1)<thread->stack_data+HS_THREAD_STACK_SIZE,
+		"stack overflow.");
+
+	new_frame->previous = thread->stack;
+	thread->stack = new_frame;
+	new_frame->size = 0;
+
+	return;
+}
+
+static char const *hs_thread_format(
 	long thread_index)
 {
 	struct hs_thread_datum *thread;
@@ -567,7 +939,7 @@ static char const *code_000b9e20(
 	return name;
 }
 
-static void code_000b9f20(
+static void hs_stack_pop(
 	long thread_index)
 {
 	struct hs_thread_datum *thread;
@@ -578,7 +950,7 @@ static void code_000b9f20(
 	return;
 }
 
-static void code_000ba090(
+static void hs_wake(
 	long thread_index)
 {
 	struct hs_thread_datum *thread;
@@ -589,7 +961,7 @@ static void code_000ba090(
 		thread->sleep_until = 0;
 		if (TEST_FLAG(thread->flags, 1))
 		{
-			thread->sleep_until = thread->unknown0c;
+			thread->sleep_until = thread->previous_sleep_until;
 			SET_FLAG(thread->flags, 1, FALSE);
 		}
 		else
@@ -598,7 +970,7 @@ static void code_000ba090(
 			{
 				if (((struct hs_syntax_node *)datum_get(hs_syntax_data, thread->stack->expression_index))->index == 0x14)
 				{
-					code_000b9f20(thread_index);
+					hs_stack_pop(thread_index);
 					return;
 				}
 			}
@@ -610,8 +982,8 @@ static void code_000ba090(
 					hs_syntax_data,
 					thread->stack->previous->expression_index))->index == 0x14)
 				{
-					code_000b9f20(thread_index);
-					code_000b9f20(thread_index);
+					hs_stack_pop(thread_index);
+					hs_stack_pop(thread_index);
 					SET_FLAG(thread->flags, 0, FALSE);
 				}
 			}
@@ -621,7 +993,7 @@ static void code_000ba090(
 	return;
 }
 
-static long code_000ba1a0(
+static long hs_find_thread_by_name(
 	char const *name)
 {
 	long thread_index;
@@ -649,7 +1021,7 @@ static long code_000ba1a0(
 	return NONE;
 }
 
-static long code_000ba140(
+static long hs_find_thread_by_script(
 	short script_index)
 {
 	long thread_index;
@@ -668,7 +1040,7 @@ static long code_000ba140(
 	return NONE;
 }
 
-void code_000b9880(
+static void hs_inspect_boolean(
 	short type,
 	union hs_conversion_result value,
 	char *result)
@@ -681,7 +1053,7 @@ void code_000b9880(
 	return;
 }
 
-void code_000b98d0(
+static void hs_inspect_real(
 	short type,
 	union hs_conversion_result value,
 	char *result)
@@ -694,7 +1066,7 @@ void code_000b98d0(
 	return;
 }
 
-void code_000b9920(
+static void hs_inspect_short_integer(
 	short type,
 	union hs_conversion_result value,
 	char *result)
@@ -707,7 +1079,7 @@ void code_000b9920(
 	return;
 }
 
-void code_000b9970(
+static void hs_inspect_long_integer(
 	short type,
 	union hs_conversion_result value,
 	char *result)
@@ -720,7 +1092,7 @@ void code_000b9970(
 	return;
 }
 
-void code_000b99c0(
+static void hs_inspect_string(
 	short type,
 	union hs_conversion_result value,
 	char *result)
@@ -733,9 +1105,9 @@ void code_000b99c0(
 	return;
 }
 
-void code_000b9a10(
+static void hs_inspect_enum(
 	short type,
-	long enum_value,
+	union hs_conversion_result value,
 	char *result)
 {
 	struct hs_enum_definition *enum_definition;
@@ -744,15 +1116,15 @@ void code_000b9a10(
 	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x27b,
 		HS_TYPE_IS_ENUM(type));
 	match_vassert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x27c,
-		(short)enum_value>=0 && (short)enum_value<enum_definition->count,
+		value.short_integer>=0 && value.short_integer<enum_definition->count,
 		"enum_value>=0 && enum_value<enum_definition->count");
 
-	sprintf(result, "%s", enum_definition->values[(short)enum_value]);
+	sprintf(result, "%s", enum_definition->values[value.short_integer]);
 
 	return;
 }
 
-union hs_conversion_result code_000ba220(
+union hs_conversion_result hs_long_to_boolean(
 	union hs_conversion_result value)
 {
 	value.boolean = value.long_integer==0;
@@ -760,7 +1132,7 @@ union hs_conversion_result code_000ba220(
 	return value;
 }
 
-union hs_conversion_result code_000ba240(
+union hs_conversion_result hs_short_to_boolean(
 	union hs_conversion_result value)
 {
 	value.boolean = value.short_integer==0;
@@ -768,7 +1140,7 @@ union hs_conversion_result code_000ba240(
 	return value;
 }
 
-union hs_conversion_result code_000ba260(
+union hs_conversion_result hs_string_to_boolean(
 	union hs_conversion_result value)
 {
 	union hs_conversion_result result;
@@ -778,7 +1150,7 @@ union hs_conversion_result code_000ba260(
 	return result;
 }
 
-union hs_conversion_result code_000ba280(
+union hs_conversion_result hs_data_to_void(
 	union hs_conversion_result value)
 {
 	union hs_conversion_result result;
@@ -788,7 +1160,7 @@ union hs_conversion_result code_000ba280(
 	return result;
 }
 
-union hs_conversion_result code_000ba290(
+union hs_conversion_result hs_short_to_real(
 	union hs_conversion_result value)
 {
 	union hs_conversion_result result;
@@ -799,7 +1171,7 @@ union hs_conversion_result code_000ba290(
 	return result;
 }
 
-union hs_conversion_result code_000ba2b0(
+union hs_conversion_result hs_long_to_real(
 	union hs_conversion_result value)
 {
 	value.real = value.long_integer;
@@ -807,7 +1179,7 @@ union hs_conversion_result code_000ba2b0(
 	return value;
 }
 
-union hs_conversion_result code_000ba2c0(
+union hs_conversion_result hs_enum_to_real(
 	union hs_conversion_result value)
 {
 	union hs_conversion_result result;
@@ -818,7 +1190,7 @@ union hs_conversion_result code_000ba2c0(
 	return result;
 }
 
-union hs_conversion_result code_000ba2e0(
+union hs_conversion_result hs_real_to_short(
 	union hs_conversion_result value)
 {
 	value.short_integer = (short)value.real;
@@ -826,13 +1198,13 @@ union hs_conversion_result code_000ba2e0(
 	return value;
 }
 
-long code_000ba300(
+long hs_real_to_long(
 	union hs_conversion_result value)
 {
 	return (long)value.real;
 }
 
-long code_000ba310(
+long hs_long_to_short(
 	union hs_conversion_result value)
 {
 	union hs_conversion_result result;
@@ -842,7 +1214,7 @@ long code_000ba310(
 	return result.long_integer;
 }
 
-long code_000ba320(
+long hs_object_name_to_object_list(
 	short object_name_index)
 {
 	long object_index;
@@ -858,7 +1230,7 @@ long code_000ba320(
 	return object_list_index;
 }
 
-long code_000ba360(
+long hs_object_to_object_list(
 	long object_index)
 {
 	long object_list_index = NONE;
@@ -872,7 +1244,7 @@ long code_000ba360(
 	return object_list_index;
 }
 
-static boolean code_000ba390(
+static boolean hs_object_type_can_cast(
 	short actual_type,
 	short desired_type)
 {
@@ -906,38 +1278,1155 @@ boolean hs_can_cast(
 		return TRUE;
 	}
 
-	if (HS_TYPE_IS_OBJECT_NAME(desired_type))
+	if (HS_TYPE_IS_OBJECT(desired_type))
 	{
-		object_type = desired_type - _hs_type_object_name;
-		if (HS_TYPE_IS_OBJECT_NAME(actual_type))
+		object_type = desired_type - _hs_type_object;
+		if (HS_TYPE_IS_OBJECT(actual_type))
 		{
-			return code_000ba390(
-				actual_type-_hs_type_object_name,
+			return hs_object_type_can_cast(
+				actual_type-_hs_type_object,
 				object_type);
 		}
-		else if (!HS_TYPE_IS_OBJECT(actual_type))
+		else if (!HS_TYPE_IS_OBJECT_NAME(actual_type))
 		{
 			return FALSE;
 		}
 
 		goto cast_object_type;
 	}
-	else if (HS_TYPE_IS_OBJECT(desired_type))
+	else if (HS_TYPE_IS_OBJECT_NAME(desired_type))
 	{
-		if (!HS_TYPE_IS_OBJECT(actual_type))
+		if (!HS_TYPE_IS_OBJECT_NAME(actual_type))
 		{
 			return FALSE;
 		}
 
-		object_type = desired_type - _hs_type_object;
+		object_type = desired_type - _hs_type_object_name;
 
 cast_object_type:
-		return code_000ba390(
-			actual_type-_hs_type_object,
+		return hs_object_type_can_cast(
+			actual_type-_hs_type_object_name,
 			object_type);
 	}
 	else
 	{
 		return typecasting_procedures[desired_type][actual_type] != NULL;
 	}
+}
+
+long hs_cast(
+	long thread_index,
+	short actual_type,
+	short desired_type,
+	long value)
+{
+	match_hs_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x5d8, thread_index,
+		hs_can_cast(actual_type, desired_type), "bad typecast.");
+
+	if (actual_type!=desired_type &&
+		actual_type!=_hs_passthrough &&
+		!HS_TYPE_IS_OBJECT_NAME(desired_type))
+	{
+		if (!HS_TYPE_IS_OBJECT(desired_type))
+			return typecasting_procedures[desired_type][actual_type](value);
+		else if (HS_TYPE_IS_OBJECT_NAME(actual_type))
+			return object_index_from_name_index((short)value);
+	}
+
+	return value;
+}
+
+void hs_return(
+	long thread_index,
+	long value)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+	struct hs_syntax_node *expression = hs_syntax_get(thread->stack->expression_index);
+	short return_type;
+
+	match_hs_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x325, thread_index,
+		valid_thread(thread), "corrupted stack.");
+
+	if (!TEST_FLAG(expression->flags, _hs_syntax_node_script_bit))
+	{
+		return_type = hs_function_get(expression->index)->return_type;
+	}
+	else
+	{
+		return_type = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->hs_scripts,
+			expression->index,
+			struct hs_script)->return_type;
+	}
+
+	*(long *)thread->stack->previous->result = hs_cast(
+		thread_index,
+		return_type,
+		expression->type,
+		value);
+
+	thread = hs_thread_get(thread_index);
+	thread->stack = thread->stack->previous;
+
+	return;
+}
+
+long *hs_macro_function_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_function_definition *function = hs_function_get(function_index);
+
+	return hs_arguments_evaluate(
+		thread_index,
+		function->parameter_count,
+		function->parameter_types,
+		initialize);
+}
+
+void hs_evaluate_begin(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+	long *expression_index = hs_stack_allocate(thread_index, sizeof(long));
+	long *result = hs_stack_allocate(thread_index, sizeof(long));
+
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x15,
+		function_index==_hs_function_begin);
+
+	if (initialize)
+	{
+		*expression_index = hs_syntax_get(hs_syntax_get(
+			thread->stack->expression_index)->data)->next_node_index;
+		*result = 0;
+	}
+
+	if (*expression_index!=NONE)
+	{
+		hs_evaluate(thread_index, *expression_index, result);
+		*expression_index = hs_syntax_get(*expression_index)->next_node_index;
+	}
+	else
+	{
+		hs_return(thread_index, *result);
+	}
+
+	return;
+}
+
+
+void hs_evaluate_equality(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	short parameter_types[2];
+	long *arguments;
+	union hs_conversion_result result;
+	short type;
+
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x131,
+		function_index==_hs_function_equal || function_index==_hs_function_not_equal);
+
+	type = hs_syntax_get(hs_syntax_get(hs_syntax_get(
+		hs_thread_get(thread_index)->stack->expression_index)->data)->next_node_index)->type;
+	parameter_types[0] = parameter_types[1] = type;
+
+	arguments = hs_arguments_evaluate(thread_index, 2, parameter_types, initialize);
+	if (arguments)
+	{
+		boolean equal = csmemcmp(arguments, arguments+1, hs_type_sizes[type])==0;
+
+		if (function_index==_hs_function_not_equal)
+			equal = !equal;
+
+		result.boolean = equal;
+		hs_return(thread_index, result.long_integer);
+	}
+
+	return;
+}
+
+void hs_evaluate_logical(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+	long *expression_index = hs_stack_allocate(thread_index, sizeof(long));
+	boolean *value = hs_stack_allocate(thread_index, sizeof(long));
+	boolean *result = hs_stack_allocate(thread_index, sizeof(boolean));
+	boolean and = function_index==_hs_function_and;
+	union hs_conversion_result value_out;
+
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0xcf,
+		function_index==_hs_function_and || function_index==_hs_function_or);
+
+	if (initialize)
+	{
+		*expression_index = hs_syntax_get(hs_syntax_get(
+			thread->stack->expression_index)->data)->next_node_index;
+		*result = and;
+	}
+	else
+	{
+		boolean argument = *value;
+
+		if (and)
+			*result = *result && argument;
+		else
+			*result = *result || argument;
+	}
+
+	if (*expression_index!=NONE && *result==and)
+	{
+		hs_evaluate(thread_index, *expression_index, (long *)value);
+		*expression_index = hs_syntax_get(*expression_index)->next_node_index;
+	}
+	else
+	{
+		value_out.boolean = *result;
+
+		hs_return(thread_index, value_out.long_integer);
+	}
+
+	return;
+}
+
+void hs_evaluate_if(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+	union hs_conversion_result *condition = hs_stack_allocate(thread_index, sizeof(long));
+	long *expression_index = hs_stack_allocate(thread_index, sizeof(long));
+	long *result = hs_stack_allocate(thread_index, sizeof(long));
+
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x77,
+		function_index==_hs_function_if);
+
+	if (initialize)
+	{
+		condition->long_integer = 0;
+		*expression_index = NONE;
+		hs_evaluate(thread_index, hs_syntax_get(hs_syntax_get(
+			thread->stack->expression_index)->data)->next_node_index,
+			&condition->long_integer);
+	}
+	else if (*expression_index==NONE)
+	{
+		if (condition->boolean)
+		{
+			*expression_index = hs_syntax_get(hs_syntax_get(hs_syntax_get(
+				thread->stack->expression_index)->data)->next_node_index)->next_node_index;
+		}
+		else
+		{
+			*expression_index = hs_syntax_get(hs_syntax_get(hs_syntax_get(hs_syntax_get(
+				thread->stack->expression_index)->data)->next_node_index)->
+				next_node_index)->next_node_index;
+			if (*expression_index==NONE)
+			{
+				hs_return(thread_index, 0);
+
+				return;
+			}
+		}
+
+		hs_evaluate(thread_index, *expression_index, result);
+	}
+	else
+	{
+		hs_return(thread_index, *result);
+	}
+
+	return;
+}
+
+void hs_evaluate_inspect(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	char string[1024];
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+	union hs_conversion_result *value = hs_stack_allocate(thread_index, sizeof(long));
+
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x2bc,
+		function_index==_hs_function_inspect);
+
+	if (initialize)
+	{
+		hs_evaluate(thread_index, hs_syntax_get(hs_syntax_get(
+			thread->stack->expression_index)->data)->next_node_index,
+			&value->long_integer);
+	}
+	else
+	{
+		struct hs_syntax_node *expression = hs_syntax_get(hs_syntax_get(hs_syntax_get(
+			thread->stack->expression_index)->data)->next_node_index);
+
+		if (hs_type_inspectors[expression->type])
+		{
+			hs_type_inspectors[expression->type](expression->type, *value, string);
+			console_printf(FALSE, string);
+		}
+
+		hs_return(thread_index, 0);
+	}
+
+	return;
+}
+
+void hs_evaluate_arithmetic(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+	short *argument_index = hs_stack_allocate(thread_index, sizeof(short));
+	long *expression_index = hs_stack_allocate(thread_index, sizeof(long));
+	real *value = hs_stack_allocate(thread_index, sizeof(real));
+	real *result = hs_stack_allocate(thread_index, sizeof(real));
+	union hs_conversion_result value_out;
+
+	if (initialize)
+	{
+		*argument_index = 0;
+		*expression_index = hs_syntax_get(hs_syntax_get(
+			thread->stack->expression_index)->data)->next_node_index;
+	}
+	else
+	{
+		real argument = *value;
+
+		if (*argument_index==0)
+		{
+			*result = argument;
+		}
+		else
+		{
+			switch (function_index)
+			{
+			case _hs_function_plus:
+				*result = *result+argument;
+				break;
+			case _hs_function_minus:
+				*result = *result-argument;
+				break;
+			case _hs_function_times:
+				*result = *result*argument;
+				break;
+			case _hs_function_divide:
+				*result = *result/argument;
+				break;
+			case _hs_function_min:
+				*result = MIN(*result, argument);
+				break;
+			case _hs_function_max:
+				*result = MAX(*result, argument);
+				break;
+			default:
+				display_assert(NULL, "c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x111, TRUE);
+				system_exit(-1);
+				break;
+			}
+		}
+
+		*argument_index += 1;
+	}
+
+	if (*expression_index!=NONE)
+	{
+		hs_evaluate(thread_index, *expression_index, (long *)value);
+		*expression_index = hs_syntax_get(*expression_index)->next_node_index;
+	}
+	else
+	{
+		value_out.real = *result;
+
+		hs_return(thread_index, value_out.long_integer);
+	}
+
+	return;
+}
+
+void hs_evaluate_object_cast_up(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+	long *object_index = hs_stack_allocate(thread_index, sizeof(long));
+
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x2dc,
+		function_index>=_hs_function_object_to_unit &&
+		function_index<=_hs_function_object_to_unit);
+
+	if (initialize)
+	{
+		hs_evaluate(thread_index, hs_syntax_get(hs_syntax_get(
+			thread->stack->expression_index)->data)->next_node_index, object_index);
+	}
+	else if (*object_index!=NONE)
+	{
+		struct object_datum *object = object_get(*object_index);
+		short object_type = function_index-_hs_function_inspect;
+
+		if (TEST_FLAG((short)hs_object_type_masks[object_type], object->object.type))
+		{
+			hs_return(thread_index, *object_index);
+		}
+		else
+		{
+			error(_error_silent, "attempt to convert object %s to type %s",
+				tag_get_name(object->definition_index),
+				hs_type_names[object_type+_hs_type_object]);
+			hs_return(thread_index, NONE);
+		}
+	}
+	else
+	{
+		hs_return(thread_index, NONE);
+	}
+
+	return;
+}
+
+void hs_evaluate_begin_random(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+	short *argument_count = hs_stack_allocate(thread_index, sizeof(short));
+	long *evaluated = hs_stack_allocate(thread_index, sizeof(long));
+	long *result = hs_stack_allocate(thread_index, sizeof(long));
+	short random;
+	short index;
+
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x45,
+		function_index==_hs_function_begin_random);
+
+	if (initialize)
+	{
+		long expression_index = hs_syntax_get(hs_syntax_get(
+			thread->stack->expression_index)->data)->next_node_index;
+
+		*argument_count = 0;
+		while (expression_index!=NONE)
+		{
+			expression_index = hs_syntax_get(expression_index)->next_node_index;
+			*argument_count += 1;
+		}
+
+		match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x50,
+			*argument_count<LONG_BITS);
+
+		csmemset(evaluated, 0, BIT_VECTOR_SIZE_IN_BYTES(*argument_count));
+	}
+
+	random = seed_random_range(get_global_random_seed_address(), 0, *argument_count);
+	for (index = 0; index<*argument_count; index++)
+	{
+		short choice = (short)((random+index)%*argument_count);
+
+		if (!BIT_VECTOR_TEST_FLAG(evaluated, choice))
+		{
+			hs_evaluate(thread_index, hs_syntax_nth(hs_syntax_get(hs_syntax_get(
+				thread->stack->expression_index)->data)->next_node_index, choice), result);
+			BIT_VECTOR_SET_FLAG(evaluated, choice, TRUE);
+
+			break;
+		}
+	}
+
+	if (index==*argument_count)
+		hs_return(thread_index, *result);
+
+	return;
+}
+
+void hs_evaluate_debug_string(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+	long *expression_index = hs_stack_allocate(thread_index, sizeof(long));
+	long *argument_count = hs_stack_allocate(thread_index, sizeof(long));
+	char const **arguments = hs_stack_allocate(thread_index,
+		MAXIMUM_HS_DEBUG_STRING_ARGUMENTS*sizeof(char const *));
+
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x304,
+		(function_index>=_hs_function_debug_string__first) &&
+		(function_index<=_hs_function_debug_string__last));
+
+	if (initialize)
+	{
+		*expression_index = hs_syntax_get(hs_syntax_get(
+			thread->stack->expression_index)->data)->next_node_index;
+		*argument_count = 0;
+		csmemset((void *)arguments, 0,
+			MAXIMUM_HS_DEBUG_STRING_ARGUMENTS*sizeof(char const *));
+	}
+
+	if (*expression_index!=NONE && *argument_count<MAXIMUM_HS_DEBUG_STRING_ARGUMENTS)
+	{
+		long argument;
+
+		hs_evaluate(thread_index, *expression_index, &argument);
+		*expression_index = hs_syntax_get(*expression_index)->next_node_index;
+		arguments[*argument_count] = (char const *)argument;
+		*argument_count += 1;
+	}
+	else
+	{
+		hs_debug_string_procedure procedure;
+
+		switch (function_index)
+		{
+		case _hs_function_debug_string__ai_debug_communication_suppress:
+			procedure = ai_debug_communication_suppress;
+			break;
+		case _hs_function_debug_string__ai_debug_communication_ignore:
+			procedure = ai_debug_communication_ignore;
+			break;
+		case _hs_function_debug_string__ai_debug_communication_focus:
+			procedure = ai_debug_communication_focus;
+			break;
+		default:
+			display_assert(NULL, "c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x330, TRUE);
+			system_exit(-1);
+			procedure = NULL;
+			break;
+		}
+
+		if (procedure)
+			procedure(*argument_count, arguments);
+
+		hs_return(thread_index, NONE);
+	}
+
+	return;
+}
+
+void hs_evaluate_sleep_until(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+	union hs_conversion_result *condition = hs_stack_allocate(thread_index, sizeof(long));
+	union hs_conversion_result *ticks = hs_stack_allocate(thread_index, sizeof(long));
+	long *timeout = hs_stack_allocate(thread_index, sizeof(long));
+	long *start_time = hs_stack_allocate(thread_index, sizeof(long));
+	short *argument_index = hs_stack_allocate(thread_index, sizeof(short));
+	long expression_index = hs_syntax_get(hs_syntax_get(hs_syntax_get(
+		thread->stack->expression_index)->data)->next_node_index)->next_node_index;
+
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x1e5,
+		function_index==_hs_function_sleep_until);
+
+	if (initialize)
+	{
+		condition->boolean = FALSE;
+		*start_time = game_time_get();
+		*argument_index = 0;
+		ticks->short_integer = 30;
+		*timeout = NONE;
+
+		if (expression_index!=NONE)
+		{
+			hs_evaluate(thread_index, expression_index, &ticks->long_integer);
+
+			return;
+		}
+	}
+
+	if (*argument_index==0)
+	{
+		*argument_index = 1;
+		if (expression_index!=NONE)
+		{
+			long timeout_expression_index =
+				hs_syntax_get(expression_index)->next_node_index;
+
+			if (timeout_expression_index!=NONE)
+			{
+				hs_evaluate(thread_index, timeout_expression_index, timeout);
+
+				return;
+			}
+		}
+	}
+
+	if (*argument_index==1)
+	{
+		if (condition->boolean ||
+			(*timeout!=NONE && game_time_get()>=*timeout+*start_time))
+		{
+			hs_return(thread_index, 0);
+		}
+		else
+		{
+			hs_evaluate(thread_index, hs_syntax_get(hs_syntax_get(
+				thread->stack->expression_index)->data)->next_node_index,
+				&condition->long_integer);
+
+			thread->sleep_until = game_time_get()+MAX(1, ticks->short_integer);
+			if (*timeout!=NONE)
+			{
+				thread->sleep_until = MIN(*timeout+*start_time, thread->sleep_until);
+			}
+		}
+	}
+
+	return;
+}
+
+void hs_evaluate_sleep(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+	long *ticks = hs_stack_allocate(thread_index, sizeof(long));
+	long *script_index = hs_stack_allocate(thread_index, sizeof(long));
+	short *argument_index = hs_stack_allocate(thread_index, sizeof(short));
+	long sleep_thread_index = thread_index;
+
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x189,
+		function_index==_hs_function_sleep);
+
+	if (initialize)
+	{
+		hs_evaluate(thread_index, hs_syntax_get(hs_syntax_get(
+			thread->stack->expression_index)->data)->next_node_index, ticks);
+		*argument_index = 0;
+	}
+	else
+	{
+		if (*argument_index==0)
+		{
+			long expression_index = hs_syntax_get(hs_syntax_get(hs_syntax_get(
+				thread->stack->expression_index)->data)->next_node_index)->next_node_index;
+
+			*argument_index += 1;
+			if (expression_index!=NONE)
+			{
+				hs_evaluate(thread_index, expression_index, script_index);
+
+				return;
+			}
+
+			*script_index = NONE;
+		}
+
+		if (*argument_index!=0)
+		{
+			short sleep_ticks = (short)*ticks;
+
+			if (sleep_ticks!=0)
+			{
+				if ((short)*script_index!=NONE)
+					sleep_thread_index = hs_find_thread_by_script((short)*script_index);
+
+				if (sleep_thread_index!=NONE)
+				{
+					struct hs_thread_datum *sleep_thread = hs_thread_get(sleep_thread_index);
+					long sleep_until;
+
+					if (sleep_ticks<0)
+						sleep_until = NONE-1;
+					else
+						sleep_until = game_time_get()+sleep_ticks;
+
+					if (sleep_thread->sleep_until!=NONE)
+					{
+						if (sleep_thread_index!=thread_index &&
+							!TEST_FLAG(sleep_thread->flags, _hs_thread_sleeping_bit))
+						{
+							SET_FLAG(sleep_thread->flags, _hs_thread_sleeping_bit, TRUE);
+							sleep_thread->previous_sleep_until = sleep_thread->sleep_until;
+						}
+
+						hs_thread_get(sleep_thread_index)->sleep_until = sleep_until;
+					}
+				}
+			}
+
+			hs_return(thread_index, 0);
+		}
+	}
+
+	return;
+}
+
+static void hs_thread_main(
+	long thread_index)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+	struct hs_script *script = NULL;
+
+	hs_runtime_globals.executing_thread_index = (short)thread_index;
+	if (thread->type==_hs_thread_type_script)
+	{
+		script = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->hs_scripts,
+			thread->script_index,
+			struct hs_script);
+		match_hs_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x2ba, thread_index,
+			script->script_type!=_hs_script_static &&
+			script->script_type!=_hs_script_stub,
+			"found a static script at toplevel.");
+	}
+
+	match_hs_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x2bd, thread_index,
+		valid_thread(thread), "corrupted stack.");
+
+	thread->sleep_until = 0;
+	if (thread->stack==(struct hs_stack_frame *)thread->stack_data)
+	{
+		match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x2c3, script);
+
+		thread->stack->size = 0;
+		hs_evaluate(thread_index, script->root_expression_index,
+			hs_stack_allocate(thread_index, sizeof(long)));
+	}
+
+	while (thread->stack!=(struct hs_stack_frame *)thread->stack_data &&
+		thread->sleep_until>=0 &&
+		(!game_in_progress() || thread->sleep_until<=game_time_get()) &&
+		hs_runtime_globals.initialized)
+	{
+		struct hs_syntax_node *expression = hs_syntax_get(thread->stack->expression_index);
+		boolean initialize = TEST_FLAG(thread->flags, _hs_thread_in_function_call_bit);
+
+		thread->stack->size = 0;
+		SET_FLAG(thread->flags, _hs_thread_in_function_call_bit, FALSE);
+
+		if (!TEST_FLAG(expression->flags, _hs_syntax_node_script_bit))
+		{
+			struct hs_function_definition *function = hs_function_get(expression->index);
+
+			match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x2d8, function->evaluate);
+
+			((hs_evaluate_procedure)function->evaluate)(
+				expression->index,
+				thread_index,
+				initialize);
+		}
+		else
+		{
+			hs_script_evaluate(expression->index, thread_index, initialize);
+		}
+	}
+
+	if (thread->stack==(struct hs_stack_frame *)thread->stack_data)
+	{
+		if (thread->type==_hs_thread_type_script)
+		{
+			if (script->script_type==_hs_script_startup ||
+				script->script_type==_hs_script_dormant)
+			{
+				thread->sleep_until = NONE;
+			}
+		}
+		else if (thread->type==_hs_thread_type_console_command)
+		{
+			hs_thread_delete(thread_index);
+		}
+	}
+
+	hs_runtime_globals.executing_thread_index = NONE;
+
+	return;
+}
+
+static void hs_script_evaluate(
+	short script_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_script *script = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->hs_scripts,
+		script_index,
+		struct hs_script);
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+	long *result = hs_stack_allocate(thread_index, sizeof(long));
+
+	if (initialize)
+		hs_evaluate(thread_index, script->root_expression_index, result);
+	else
+		hs_return(thread_index, *result);
+
+	return;
+}
+
+static void *hs_stack_allocate(
+	long thread_index,
+	long size)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+	struct hs_stack_frame *frame = thread->stack;
+	void *result;
+
+	match_hs_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x37d, thread_index,
+		valid_thread(thread), "corrupted stack.");
+	match_hs_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x37e, thread_index,
+		size, "attempt to allocate zero space from the stack.");
+	match_hs_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x37f, thread_index,
+		frame->data+frame->size+size<=thread->stack_data+HS_THREAD_STACK_SIZE,
+		"stack overflow.");
+
+	result = frame->data+frame->size;
+	frame->size += (short)size;
+
+	return result;
+}
+
+static void hs_evaluate(
+	long thread_index,
+	long expression_index,
+	long *destination)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
+
+	match_hs_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x2ff, thread_index,
+		valid_thread(thread), "corrupted stack.");
+	match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x300, destination);
+
+	if (TEST_FLAG(hs_syntax_get(expression_index)->flags, _hs_syntax_node_primitive_bit))
+	{
+		if (TEST_FLAG(expression->flags, _hs_syntax_node_global_bit))
+		{
+			*destination = hs_cast(
+				thread_index,
+				hs_global_get_type((short)expression->data),
+				expression->type,
+				hs_global_evaluate((short)expression->data));
+		}
+		else
+		{
+			*destination = hs_cast(
+				thread_index,
+				expression->index,
+				expression->type,
+				expression->data);
+		}
+	}
+	else
+	{
+		thread->stack->result = destination;
+		hs_stack_push(thread_index);
+		SET_FLAG(thread->flags, _hs_thread_in_function_call_bit, TRUE);
+		thread->stack->expression_index = expression_index;
+	}
+
+	return;
+}
+
+static void hs_global_reconcile_read(
+	word global_designator)
+{
+	struct hs_global_datum *global;
+	struct hs_external_global_definition *external;
+
+	if (HS_GLOBAL_DESIGNATOR_IS_EXTERNAL(global_designator))
+	{
+		global = datum_get(hs_global_data,
+			HS_GLOBAL_DESIGNATOR_TO_INDEX(global_designator));
+		external = hs_global_external_get(
+			HS_GLOBAL_DESIGNATOR_TO_INDEX(global_designator));
+
+		switch (hs_global_get_type(global_designator))
+		{
+		case _hs_type_boolean:
+			global->value.boolean = external->address
+				? *(boolean *)external->address
+				: _hs_type_boolean_default;
+			break;
+		case _hs_type_real:
+			global->value.real = external->address
+				? *(real *)external->address
+				: _hs_type_real_default;
+			break;
+		case _hs_type_short_integer:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_short_integer_default;
+			break;
+		case _hs_type_long_integer:
+			global->value.long_integer = external->address
+				? *(long *)external->address
+				: _hs_type_long_integer_default;
+			break;
+		case _hs_type_string:
+			global->value.string = external->address
+				? *(char const * *)external->address
+				: _hs_type_string_default;
+			break;
+		case _hs_type_script:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_script_default;
+			break;
+		case _hs_type_trigger_volume:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_trigger_volume_default;
+			break;
+		case _hs_type_cutscene_flag:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_cutscene_flag_default;
+			break;
+		case _hs_type_cutscene_camera_point:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_cutscene_camera_point_default;
+			break;
+		case _hs_type_cutscene_title:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_cutscene_title_default;
+			break;
+		case _hs_type_cutscene_recording:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_cutscene_recording_default;
+			break;
+		case _hs_type_device_group:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_device_group_default;
+			break;
+		case _hs_type_ai:
+			global->value.long_integer = external->address
+				? *(long *)external->address
+				: _hs_type_ai_default;
+			break;
+		case _hs_type_ai_command_list:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_ai_command_list_default;
+			break;
+		case _hs_type_starting_profile:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_starting_profile_default;
+			break;
+		case _hs_type_conversation:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_conversation_default;
+			break;
+		case _hs_type_navpoint:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_navpoint_default;
+			break;
+		case _hs_type_hud_message:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_hud_message_default;
+			break;
+		case _hs_type_object_list:
+			global->value.long_integer = external->address
+				? *(long *)external->address
+				: _hs_type_object_list_default;
+			break;
+		case _hs_type_sound:
+			global->value.long_integer = external->address
+				? *(long *)external->address
+				: _hs_type_sound_default;
+			break;
+		case _hs_type_looping_sound:
+			global->value.long_integer = external->address
+				? *(long *)external->address
+				: _hs_type_looping_sound_default;
+			break;
+		case _hs_type_effect:
+			global->value.long_integer = external->address
+				? *(long *)external->address
+				: _hs_type_effect_default;
+			break;
+		case _hs_type_damage:
+			global->value.long_integer = external->address
+				? *(long *)external->address
+				: _hs_type_damage_default;
+			break;
+		case _hs_type_animation_graph:
+			global->value.long_integer = external->address
+				? *(long *)external->address
+				: _hs_type_animation_graph_default;
+			break;
+		case _hs_type_actor_variant:
+			global->value.long_integer = external->address
+				? *(long *)external->address
+				: _hs_type_actor_variant_default;
+			break;
+		case _hs_type_damage_effect:
+			global->value.long_integer = external->address
+				? *(long *)external->address
+				: _hs_type_damage_effect_default;
+			break;
+		case _hs_type_object_definition:
+			global->value.long_integer = external->address
+				? *(long *)external->address
+				: _hs_type_object_definition_default;
+			break;
+		case _hs_type_enum_game_difficulty:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_enum_game_difficulty_default;
+			break;
+		case _hs_type_enum_team:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_enum_team_default;
+			break;
+		case _hs_type_enum_ai_default_state:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_enum_ai_default_state_default;
+			break;
+		case _hs_type_enum_actor_type:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_enum_actor_type_default;
+			break;
+		case _hs_type_enum_hud_corner:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_enum_hud_corner_default;
+			break;
+		case _hs_type_object:
+			global->value.long_integer = external->address
+				? *(long *)external->address
+				: _hs_type_object_default;
+			break;
+		case _hs_type_unit:
+			global->value.long_integer = external->address
+				? *(long *)external->address
+				: _hs_type_unit_default;
+			break;
+		case _hs_type_vehicle:
+			global->value.long_integer = external->address
+				? *(long *)external->address
+				: _hs_type_vehicle_default;
+			break;
+		case _hs_type_weapon:
+			global->value.long_integer = external->address
+				? *(long *)external->address
+				: _hs_type_weapon_default;
+			break;
+		case _hs_type_device:
+			global->value.long_integer = external->address
+				? *(long *)external->address
+				: _hs_type_device_default;
+			break;
+		case _hs_type_scenery:
+			global->value.long_integer = external->address
+				? *(long *)external->address
+				: _hs_type_scenery_default;
+			break;
+		case _hs_type_object_name:
+			global->value.short_integer = external->address
+				? *(short *)external->address
+				: _hs_type_object_name_default;
+			break;
+		default:
+			display_assert(NULL, "c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x638, TRUE);
+			system_exit(-1);
+			break;
+		}
+	}
+
+	return;
+}
+
+static long hs_global_evaluate(
+	word global_designator)
+{
+	long global_index;
+
+	hs_global_reconcile_read(global_designator);
+	if (HS_GLOBAL_DESIGNATOR_IS_EXTERNAL(global_designator))
+	{
+		global_index = HS_GLOBAL_DESIGNATOR_TO_INDEX(global_designator);
+	}
+	else
+	{
+		global_index = HS_GLOBAL_DESIGNATOR_TO_INDEX(global_designator)+
+			hs_external_global_count;
+	}
+
+	return ((struct hs_global_datum *)datum_get(hs_global_data, global_index))->
+		value.long_integer;
+}
+
+static long *hs_arguments_evaluate(
+	long thread_index,
+	short formal_parameter_count,
+	short const *formal_parameters,
+	boolean initialize)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+	long *values = hs_stack_allocate(thread_index, formal_parameter_count*sizeof(long));
+	short *argument_index = hs_stack_allocate(thread_index, sizeof(short));
+	long *expression_index = hs_stack_allocate(thread_index, sizeof(long));
+
+	if (initialize)
+	{
+		*argument_index = 0;
+		*expression_index = hs_syntax_get(hs_syntax_get(
+			thread->stack->expression_index)->data)->next_node_index;
+	}
+
+	if (*argument_index<formal_parameter_count)
+	{
+		match_hs_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x3c4, thread_index,
+			*expression_index!=NONE, "corrupted syntax tree.");
+
+		if (hs_syntax_get(*expression_index)->type!=formal_parameters[*argument_index])
+		{
+			hs_runtime_recompile_error(thread_index, "unexpected actual parameters.",
+				"hs_syntax_get(*expression_index)->type==formal_parameters[*argument_index]");
+
+			return values;
+		}
+
+		hs_evaluate(thread_index, *expression_index, &values[*argument_index]);
+		*expression_index = hs_syntax_get(*expression_index)->next_node_index;
+		*argument_index += 1;
+
+		return NULL;
+	}
+
+	match_hs_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x3d1, thread_index,
+		*expression_index==NONE, "corrupted syntax tree.");
+
+	return values;
+}
+
+static boolean hs_runtime_recompile_error(
+	long thread_index,
+	char const *reason,
+	char const *expression)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+
+	error(_error_silent, "script %s needs to be recompiled. (%s: %s)",
+		hs_thread_format(thread_index),
+		reason ? reason : "no reason given.",
+		expression);
+
+	return FALSE;
 }

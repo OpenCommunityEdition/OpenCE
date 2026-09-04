@@ -37,9 +37,9 @@ enum hs_type
 	_hs_type_hud_message,
 	_hs_type_object_list,
 	_hs_type_sound,
-	_hs_type_looping_sound,
 	_hs_type_effect,
 	_hs_type_damage,
+	_hs_type_looping_sound,
 	_hs_type_animation_graph,
 	_hs_type_actor_variant,
 	_hs_type_damage_effect,
@@ -49,18 +49,18 @@ enum hs_type
 	_hs_type_enum_ai_default_state,
 	_hs_type_enum_actor_type,
 	_hs_type_enum_hud_corner,
-	_hs_type_object_name,
-	_hs_type_unit_name,
-	_hs_type_vehicle_name,
-	_hs_type_weapon_name,
-	_hs_type_device_name,
-	_hs_type_scenery_name,
 	_hs_type_object,
 	_hs_type_unit,
 	_hs_type_vehicle,
 	_hs_type_weapon,
 	_hs_type_device,
 	_hs_type_scenery,
+	_hs_type_object_name,
+	_hs_type_unit_name,
+	_hs_type_vehicle_name,
+	_hs_type_weapon_name,
+	_hs_type_device_name,
+	_hs_type_scenery_name,
 	NUMBER_OF_HS_TYPES
 };
 
@@ -87,17 +87,28 @@ struct hs_enum_definition
 };
 
 struct hs_function_definition;
+struct hs_external_global_definition;
 
 /* ---------- prototypes/HS.C */
 
 void hs_dispose(
 	void);
 
+/* ---------- prototypes/HS_RUNTIME.C */
+
 void hs_runtime_dispose(
 	void);
 
 void hs_runtime_dispose_from_old_map(
 	void);
+void hs_runtime_initialize(
+	void);
+void hs_runtime_initialize_for_new_map(
+	void);
+void hs_runtime_update(
+	void);
+long hs_runtime_evaluate(
+	long expression_index);
 char const *hs_runtime_get_executing_thread_name(
 	void);
 boolean hs_wake_by_name(
@@ -109,6 +120,12 @@ void hs_evaluate_wake(
 void hs_return(
 	long thread_index,
 	long value);
+long *hs_macro_function_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+
+/* ---------- prototypes/HS.C */
 
 void hs_recompile(
 	void);
@@ -122,6 +139,8 @@ boolean hs_can_cast(
 	short desired_type);
 struct hs_function_definition *hs_function_get(
 	short function_index);
+struct hs_external_global_definition *hs_global_external_get(
+	short global_index);
 short hs_find_function_by_name(
 	char const *name);
 short hs_find_script_by_name(

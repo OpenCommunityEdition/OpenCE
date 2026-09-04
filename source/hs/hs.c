@@ -2889,7 +2889,7 @@ void evaluator( \
 	union hs_evaluation_argument *arguments; \
 	union hs_short_result result; \
 	result.value = 0; \
-	arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	arguments = (union hs_evaluation_argument *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
 		result.short_value = function(arguments[0].unsigned_short_value); \
@@ -2950,7 +2950,7 @@ void evaluator( \
 	long thread_index, \
 	boolean initialize) \
 { \
-	unsigned short *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	unsigned short *arguments = (unsigned short *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
 		union hs_real_value result; \
@@ -2981,7 +2981,7 @@ void evaluator( \
 	long thread_index, \
 	boolean initialize) \
 { \
-	union hs_evaluation_argument *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	union hs_evaluation_argument *arguments = (union hs_evaluation_argument *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
 		function(arguments[0].boolean_value); \
@@ -2996,7 +2996,7 @@ void evaluator( \
 	long thread_index, \
 	boolean initialize) \
 { \
-	union hs_evaluation_argument *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	union hs_evaluation_argument *arguments = (union hs_evaluation_argument *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
 		function(arguments[0].unsigned_short_value); \
@@ -3011,7 +3011,7 @@ void evaluator( \
 	long thread_index, \
 	boolean initialize) \
 { \
-	union hs_evaluation_argument *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	union hs_evaluation_argument *arguments = (union hs_evaluation_argument *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
 		function(arguments[0].long_value, arguments[1].boolean_value); \
@@ -3056,7 +3056,7 @@ void evaluator( \
 	long thread_index, \
 	boolean initialize) \
 { \
-	union hs_evaluation_argument *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	union hs_evaluation_argument *arguments = (union hs_evaluation_argument *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
 		function(arguments[0].short_value, arguments[1].unsigned_short_value); \
@@ -3071,7 +3071,7 @@ void evaluator( \
 	long thread_index, \
 	boolean initialize) \
 { \
-	union hs_evaluation_argument *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	union hs_evaluation_argument *arguments = (union hs_evaluation_argument *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
 		function(arguments[0].long_value, arguments[1].unsigned_short_value); \
@@ -3086,7 +3086,7 @@ void evaluator( \
 	long thread_index, \
 	boolean initialize) \
 { \
-	union hs_evaluation_argument *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	union hs_evaluation_argument *arguments = (union hs_evaluation_argument *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
 		function(arguments[0].unsigned_short_value); \
@@ -3101,7 +3101,7 @@ void evaluator( \
 	long thread_index, \
 	boolean initialize) \
 { \
-	union hs_evaluation_argument *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	union hs_evaluation_argument *arguments = (union hs_evaluation_argument *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
 		function(arguments[0].boolean_value); \
@@ -3116,7 +3116,7 @@ void evaluator( \
 	long thread_index, \
 	boolean initialize) \
 { \
-	struct hs_arguments_string *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	struct hs_arguments_string *arguments = (struct hs_arguments_string *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
 		function(arguments->value); \
@@ -3131,7 +3131,7 @@ void evaluator( \
 	long thread_index, \
 	boolean initialize) \
 { \
-	struct hs_arguments_long_string *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	struct hs_arguments_long_string *arguments = (struct hs_arguments_long_string *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
 		function(arguments->value0, arguments->value1); \
@@ -3146,7 +3146,7 @@ void evaluator( \
 	long thread_index, \
 	boolean initialize) \
 { \
-	struct hs_arguments_long_long_string *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	struct hs_arguments_long_long_string *arguments = (struct hs_arguments_long_long_string *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
 		function(arguments->value0, arguments->value1, arguments->value2); \
@@ -3161,7 +3161,7 @@ void evaluator( \
 	long thread_index, \
 	boolean initialize) \
 { \
-	union hs_evaluation_argument *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	union hs_evaluation_argument *arguments = (union hs_evaluation_argument *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
 		function(arguments[0].short_value, arguments[1].boolean_value); \
@@ -3551,19 +3551,6 @@ union hs_boolean_result
 
 /* ---------- prototypes */
 
-void hs_return(
-	long thread_index,
-	long value);
-void *hs_macro_function_evaluate(
-	short function_index,
-	long thread_index,
-	boolean initialize);
-void hs_runtime_evaluate(
-	long expression_index);
-void hs_runtime_update(
-	void);
-void hs_runtime_initialize(
-	void);
 void profile_enter_private(
 	struct hs_profile_section *section);
 void profile_exit_private(
@@ -3577,8 +3564,6 @@ long alphabetize(
 	char const **right);
 struct scenario *global_scenario_get(
 	void);
-struct hs_external_global_definition *hs_global_external_get(
-	short global_index);
 void hs_teleport_players_not_in_trigger_volume(
 	short trigger_volume_index,
 	word cutscene_flag_index);
@@ -3924,8 +3909,6 @@ void hs_object_create(
 	word object_name_index);
 void hs_object_create_anew(
 	word object_name_index);
-void object_pvs_set_camera_point(
-	word camera_point_index);
 void cheat_active_camouflage_local_player(
 	word player_index);
 void breakable_surfaces_enable(
@@ -4486,10 +4469,6 @@ void sound_enable(
 void vehicle_hover(
 	long vehicle_index,
 	boolean hover);
-void hs_runtime_dispose_from_old_map(
-	void);
-void hs_runtime_initialize_for_new_map(
-	void);
 void hs_dispose_from_old_map(
 	void);
 void hs_compile_initialize(
@@ -6297,7 +6276,8 @@ void hs_object_list_get_element_evaluate(
 {
 	struct hs_object_list_get_element_arguments *arguments;
 
-	arguments = hs_macro_function_evaluate(function_index, thread_index, initialize);
+	arguments = (struct hs_object_list_get_element_arguments *)hs_macro_function_evaluate(
+		function_index, thread_index, initialize);
 	if (arguments)
 	{
 		hs_return(

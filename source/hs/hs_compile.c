@@ -423,8 +423,8 @@ symbols in this file:
 
 enum
 {
-	first_hs_object_type = _hs_type_object_name,
-	first_hs_object_name_type = _hs_type_object,
+	first_hs_object_type = _hs_type_object,
+	first_hs_object_name_type = _hs_type_object_name,
 	_hs_script_startup = 0,
 	_hs_script_dormant,
 	_hs_script_continuous,

@@ -3339,6 +3339,63 @@
         },
         "objdiff_percent": 86.17284
       }
+    },
+    {
+      "unit": "source/hs/hs_runtime",
+      "function": "_hs_inspect_enum",
+      "class": "csplit-relocation-alias",
+      "evidence": "January and the retained ordinary typed inspector have the same 144-byte padded extent, 11 relocations, normalized instruction hash, and 100.0 percent objdiff score. The sole ordinary-comparison difference is csplit attribution of the same data address: January names the relocation as __hs_type_scenery_default+12912, while the rebuild names hs_enum_table-256. Whole-image address resolution proves those destinations identical, and the enum table access, range checks, assertions, and string formatting are otherwise byte-identical. The function and its exact 49-entry hs_type_inspectors owner table are source-static as supported by HCEX PDB evidence. No raw address, pointer pun, compiler steering, fake dependency, or nonsensical logic is retained.",
+      "measurements": {
+        "target": {
+          "size": 144,
+          "relocation_count": 11,
+          "normalized_sha256": "a941037b633bbe666daf47a9644bdb3da452a7227109aa86c013312570f01454"
+        },
+        "base": {
+          "size": 144,
+          "relocation_count": 11,
+          "normalized_sha256": "a941037b633bbe666daf47a9644bdb3da452a7227109aa86c013312570f01454"
+        },
+        "objdiff_percent": 100.0
+      }
+    },
+    {
+      "unit": "source/hs/hs_runtime",
+      "function": "_hs_evaluate_begin_random",
+      "class": "private-register-convention",
+      "evidence": "Fuzzy-parked after reconstructing the complete begin-random evaluator in ordinary typed C from January's instruction and relocation topology. Target and candidate share the 528-byte padded envelope and all 30 relocation identities; objdiff reports 99.89011 percent similarity. The residual is only four ModRM register-selection bytes in the random-child selection loop, with identical operations and control flow. Donor and reconciliation experiments exhausted natural declaration, initialization, and statement-order forms without moving this tie independently. No register or volatile forcing, barrier, pragma, assembly, raw offset, fake dependency, undefined behavior, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the private register assignment.",
+      "measurements": {
+        "target": {
+          "size": 528,
+          "relocation_count": 30,
+          "normalized_sha256": "fce47f8f054751af9bd8b16e2e3e11e5c3a2afbe506383b41aff2a61a6f3b573"
+        },
+        "base": {
+          "size": 528,
+          "relocation_count": 30,
+          "normalized_sha256": "c10e869c67180ba3040bc35040e0e9a4329b841c05599c61583c5114a84b5cf1"
+        },
+        "objdiff_percent": 99.89011
+      }
+    },
+    {
+      "unit": "source/hs/hs_runtime",
+      "function": "_hs_global_reconcile_read",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked after restoring the complete external-global reconciliation switch in ordinary typed C, using the corrected January hs_type enum order and the matching named default globals. Target and candidate both occupy 1408 padded bytes and carry the same 86 relocation identities; objdiff reports 92.30703 percent similarity. The residual begins with an equivalent prologue scheduling choice: January preserves the designator and pushes the masked index before loading hs_global_data, while VC7 loads that independent global first; the case logic and fallback destinations remain aligned. Bounded natural local-order and control-flow variants did not close the schedule. No shifted enum compensation, raw address, volatile or register forcing, barrier, pragma, assembly, fake dependency, forced inline, or nonsensical logic is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the prologue lifetime schedule.",
+      "measurements": {
+        "target": {
+          "size": 1408,
+          "relocation_count": 86,
+          "normalized_sha256": "c65c8235c5484ea157c046421679547b0fbfe63831fc6f07e43030cfc0f453ee"
+        },
+        "base": {
+          "size": 1408,
+          "relocation_count": 86,
+          "normalized_sha256": "6de0dd79e98a7bc9b653af1fc9ec3991f4b5bffc4f7de2ef5a71ac610301ec25"
+        },
+        "objdiff_percent": 92.30703
+      }
     }
   ]
 }

@@ -610,8 +610,6 @@ extern char const *tiff_export(
 	struct file_reference *file,
 	struct bitmap_data *bitmap);
 extern short global_screenshot_count;
-extern void hs_runtime_initialize_for_new_map(
-	void);
 
 extern void main_rasterizer_throttle(void);
 extern void main_pregame_render(void);
