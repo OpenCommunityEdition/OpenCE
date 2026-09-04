@@ -507,4 +507,8 @@ extern struct game_engine *game_engine;
 
 /* ---------- public code */
 
+real game_engine_get_damage_multiplier(
+	long damaging_player_index,
+	long damaged_player_index);
+
 #endif // __GAME_ENGINE_H

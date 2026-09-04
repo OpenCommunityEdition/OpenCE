@@ -146,4 +146,11 @@ void ai_index_to_string(
 
 /* ---------- public code */
 
+struct damage_data;
+
+void ai_adjust_damage(
+	long actor_index,
+	struct damage_data const *damage,
+	real *total_damage);
+
 #endif // __AI_H

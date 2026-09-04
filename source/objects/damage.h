@@ -96,7 +96,13 @@ void area_of_effect_cause_damage(
 	struct damage_data *damage,
 	long unused_object_index);
 
-void object_cause_damage(struct damage_data *damage_data, long object_index, short node_index, short region_index, short material_index, real_vector3d const *object_normal);
+void object_cause_damage(
+	struct damage_data *damage,
+	long object_index,
+	short node_index,
+	short region_index,
+	short material_index,
+	real_vector3d const *object_normal);
 
 /* ---------- globals */
 

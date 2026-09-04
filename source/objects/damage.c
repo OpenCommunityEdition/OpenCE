@@ -47,9 +47,9 @@ symbols in this file:
 00126390 0080:
 	_object_deplete_shield (0000)
 00126410 0380:
-	_code_00126410 (0000)
+	_object_damage_shield (0000)
 00126790 0230:
-	_code_00126790 (0000)
+	_object_damage_aftermath (0000)
 001269C0 0200:
 	_code_001269c0 (0000)
 00126BC0 01d0:
@@ -61,7 +61,7 @@ symbols in this file:
 00126EE0 0140:
 	_code_00126ee0 (0000)
 00127020 0550:
-	_code_00127020 (0000)
+	_object_damage_body (0000)
 00127570 07c0:
 	_object_cause_damage (0000)
 00127D30 0420:
@@ -102,8 +102,11 @@ symbols in this file:
 
 #include "cseries.h"
 #include "damage.h"
+#include "ai/ai.h"
 #include "effects/effects.h"
+#include "effects/player_effects.h"
 #include "game/cheats.h"
+#include "game/game.h"
 #include "game/game_allegiance.h"
 #include "game/game_engine.h"
 #include "game/game_globals.h"
@@ -111,10 +114,12 @@ symbols in this file:
 #include "hs/object_lists.h"
 #include "input/input.h"
 #include "interface/hud_unit.h"
+#include "main/console.h"
 #include "damage_effect_definitions.h"
 #include "object_definitions.h"
 #include "object_types.h"
 #include "physics/breakable_surfaces.h"
+#include "physics/collision_bsp_definitions.h"
 #include "physics/collision_model_definitions.h"
 #include "physics/collisions.h"
 #include "physics/collision_usage.h"
@@ -141,14 +146,34 @@ enum
 enum
 {
 	_damage_does_not_hurt_owner_bit = 0,
+	_damage_can_cause_headshots_bit,
+	_damage_pings_resistant_units_bit,
 	_damage_does_not_hurt_friends_bit = 3,
+	_damage_does_not_ping_units_bit,
+	_damage_detonates_explosives_bit,
+	_damage_only_hurts_shields_bit,
+	_damage_causes_flaming_death_bit,
+	_damage_draw_indicators_down_bit,
+	_damage_skips_shields_bit,
 	_damage_does_not_hurt_infection_forms_bit = 10,
+	_damage_can_cause_multiplayer_headshots_bit,
 	_damage_infection_form_pop_bit = 12,
 };
 
 enum
 {
+	_damage_resistance_takes_shield_damage_for_children_bit = 0,
+	_damage_resistance_takes_body_damage_for_children_bit,
+	_damage_resistance_always_shields_friendly_damage_bit,
 	_damage_resistance_children_take_area_damage_bit = 3,
+	_damage_resistance_parent_never_takes_body_damage_for_us_bit,
+	_damage_resistance_only_hurt_by_explosives_bit,
+	_damage_resistance_only_hurt_while_occupied_bit,
+};
+
+enum
+{
+	_damage_side_effect_lethal_to_the_unsuspecting = 2,
 };
 
 enum
@@ -167,7 +192,7 @@ enum
 
 struct damage_globals
 {
-	byte unknown[0x48];
+	struct damage_resistance_material default_damage_material;
 	long debug_object_index;
 };
 
@@ -237,6 +262,43 @@ void render_debug_object_damage(
 
 static long get_player_index_from_object_or_parents(
 	long object_index);
+
+void object_damage_shield(
+	long object_index,
+	struct damage_resistance const *damage_resistance,
+	struct damage_resistance_material const *damage_material,
+	struct damage_definition const *damage_definition,
+	struct damage_data *damage,
+	unsigned long *being_damaged_flags,
+	real *shield_damage,
+	real *total_damage);
+
+void object_damage_body(
+	long object_index,
+	short region_index,
+	short node_index,
+	real_vector3d const *object_normal,
+	struct damage_resistance const *damage_resistance,
+	struct damage_resistance_material const *damage_material,
+	struct damage_definition const *damage_definition,
+	struct damage_data *damage,
+	unsigned long *being_damaged_flags,
+	real *body_damage,
+	real *body_damage_multiplier,
+	real total_damage);
+
+void object_damage_aftermath(
+	long object_index,
+	struct damage_data *damage,
+	unsigned long being_damaged_flags,
+	real shield_damage,
+	real body_damage,
+	real body_damage_multiplier,
+	short body_part);
+
+boolean unit_unsuspecting(
+	long unit_index,
+	real_point3d const *point);
 
 static void object_permutation_shield_regions(
 	long object_index,
@@ -681,6 +743,462 @@ void object_set_melee_attack_inhibited(
 	{
 		struct object_datum *object = object_get(object_index);
 		SET_FLAG(object->object.damage_flags, _object_melee_attack_inhibited_bit, inhibited);
+	}
+
+	return;
+}
+
+void object_cause_damage(
+	struct damage_data *damage,
+	long object_index,
+	short node_index,
+	short region_index,
+	short material_index,
+	real_vector3d const *object_normal)
+{
+	struct damage_effect_definition *damage_effect;
+	struct damage_definition const *damage_definition;
+	boolean damage_was_modified;
+	boolean parent_takes_body_damage;
+	boolean material_effect_recorded;
+	short damaged_object_count;
+	real total_damage;
+	struct object_datum *current_object;
+	struct collision_model const *collision_model;
+	struct damage_resistance_material const *damage_material;
+	long current_object_index;
+	unsigned long being_damaged_flags;
+	real shield_damage;
+	real body_damage;
+	real body_damage_multiplier;
+	short body_part;
+	long damaged_object_indices[16];
+
+	damage_effect = damage_effect_definition_get(damage->definition_index);
+	damage_definition = &damage_effect->damage;
+	damage_was_modified = FALSE;
+	parent_takes_body_damage = TRUE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\objects\\damage.c",
+		0x338,
+		region_index==NONE ||
+			(region_index>=0 && region_index<MAXIMUM_REGIONS_PER_OBJECT));
+
+	if (damage->owner_player_index != NONE)
+		damage_globals.debug_object_index = object_index;
+
+	{
+		real damage_lower_bound = damage_definition->damage_lower_bound;
+		real damage_upper_bound = damage_definition->damage_upper_bound;
+		real random_damage = real_seed_random_range(
+			get_global_random_seed_address(),
+			damage_lower_bound,
+			damage_upper_bound);
+
+		total_damage =
+			((1.f - damage->scale) * damage_definition->damage_minimum +
+				random_damage * damage->scale) *
+			damage->multiplier;
+	}
+
+	if (damage->owner_object_index != NONE)
+	{
+		struct unit_datum *attacker =
+			unit_try_and_get(damage->owner_object_index);
+
+		if (attacker)
+		{
+			long actor_index;
+
+			if (attacker->unit.gunner_object_index != NONE)
+			{
+				attacker = unit_get(attacker->unit.gunner_object_index);
+			}
+
+			actor_index = attacker->unit.swarm_actor_index;
+			if (actor_index == NONE)
+				actor_index = attacker->unit.actor_index;
+
+			if (actor_index != NONE)
+				ai_adjust_damage(actor_index, damage, &total_damage);
+		}
+	}
+
+	if (game_engine_running())
+	{
+		total_damage *= game_engine_get_damage_multiplier(
+			get_player_index_from_object_or_parents(damage->owner_object_index),
+			get_player_index_from_object_or_parents(object_index));
+	}
+	else if (damage->owner_team_index != NONE &&
+		game_team_is_enemy(damage->owner_team_index, _game_team_player))
+	{
+		total_damage *= game_difficulty_get_value(_game_difficulty_value_enemy_damage);
+		damage_was_modified = TRUE;
+	}
+
+	damaged_object_count = 0;
+	material_effect_recorded = FALSE;
+	if (TEST_FLAG(damage->flags, _damage_area_of_effect_bit) ||
+		TEST_FLAG(damage->flags, _damage_kill_instantly_bit))
+	{
+		damaged_object_count = 1;
+		damaged_object_indices[0] = object_index;
+	}
+	else
+	{
+		long damaged_object_index = object_index;
+
+		while (damaged_object_index != NONE)
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\objects\\damage.c",
+				0x37E,
+				damaged_object_count<sizeof(damaged_object_indices)/sizeof(long));
+			damaged_object_indices[damaged_object_count] = damaged_object_index;
+			damaged_object_count++;
+			damaged_object_index =
+				object_get(damaged_object_index)->object.parent_object_index;
+		}
+	}
+
+	{
+		struct object_datum *object = object_get(object_index);
+		struct object_definition const *object_definition =
+			object_definition_get(object->definition_index);
+
+		if (object_definition->object.collision_model.index != NONE)
+		{
+			struct collision_model const *collision_model =
+				collision_model_definition_get(
+					object_definition->object.collision_model.index);
+
+			parent_takes_body_damage = !TEST_FLAG(
+				collision_model->resistance.flags,
+				_damage_resistance_parent_never_takes_body_damage_for_us_bit);
+		}
+
+		if (object->object.umbrella_shield_object_index != NONE)
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\objects\\damage.c",
+				0x397,
+				damaged_object_count<sizeof(damaged_object_indices)/sizeof(long));
+			damaged_object_indices[damaged_object_count] =
+				object->object.umbrella_shield_object_index;
+			damaged_object_count++;
+		}
+
+		if (!TEST_FLAG(damage->flags, _damage_area_of_effect_bit) &&
+			object->object.type == _object_type_vehicle)
+		{
+			struct unit_datum *vehicle = unit_get(object_index);
+			struct unit_definition const *vehicle_definition =
+				unit_definition_get(vehicle->definition_index);
+			long child_object_index;
+
+			damage->multiplier =
+				(1.f - damage_definition->vehicle_passthrough_penalty) *
+				vehicle_definition->unit.child_damage_fraction;
+			child_object_index = vehicle->object.first_child_object_index;
+			while (child_object_index != NONE)
+			{
+				struct object_datum *child_object = object_get(child_object_index);
+
+				match_assert(
+					"c:\\halo\\SOURCE\\objects\\damage.c",
+					0x3AB,
+					damaged_object_count<sizeof(damaged_object_indices)/sizeof(long));
+				if (child_object->object.type == _object_type_biped)
+				{
+					struct unit_datum *child_unit = unit_get(child_object_index);
+
+					if (child_unit->unit.player_index != NONE ||
+						child_object_index == vehicle->unit.gunner_object_index)
+					{
+						SET_FLAG(
+							damage->flags,
+							_damage_bypasses_shields_bit,
+							child_unit->unit.player_index == NONE);
+						object_cause_damage(
+							damage,
+							child_object_index,
+							NONE,
+							NONE,
+							NONE,
+							NULL);
+						SET_FLAG(
+							damage->flags,
+							_damage_bypasses_shields_bit,
+							FALSE);
+					}
+				}
+
+				child_object_index = child_object->object.next_object_index;
+			}
+
+			damage->multiplier = 1.f;
+		}
+	}
+
+	if (damaged_object_count > 0)
+	{
+		long *damaged_object_index = damaged_object_indices;
+		short remaining_object_count = damaged_object_count;
+
+		do
+		{
+			struct unit_datum *unit = unit_try_and_get(*damaged_object_index);
+
+			if (unit)
+			{
+				long player_index = unit->unit.player_index;
+
+				if (player_index != NONE)
+				{
+					player_effect_start(
+						player_index,
+						damage,
+						&damage->direction,
+						damage->scale,
+						total_damage);
+				}
+				else if (cheat.reflexive_damage_effects)
+				{
+					player_effect_start(
+						local_player_get_player_index(0),
+						damage,
+						&damage->direction,
+						damage->scale,
+						total_damage);
+				}
+			}
+
+			damaged_object_index++;
+			remaining_object_count--;
+		}
+		while (remaining_object_count > 0);
+	}
+
+	if (total_damage > 0.f)
+	{
+		do
+		{
+			struct object_definition const *current_definition;
+			long collision_model_index;
+
+			if (damaged_object_count-- <= 0)
+				return;
+
+			current_object_index = damaged_object_indices[damaged_object_count];
+			current_object = object_get(current_object_index);
+			current_definition = object_definition_get(current_object->definition_index);
+			collision_model_index = current_definition->object.collision_model.index;
+			shield_damage = 0.f;
+			body_damage = 0.f;
+			body_damage_multiplier = 0.f;
+			being_damaged_flags = 0;
+			body_part = NONE;
+
+			if (collision_model_index != NONE)
+			{
+				boolean force_kill = TEST_FLAG(
+					damage->flags,
+					_damage_kill_instantly_bit);
+
+				collision_model = collision_model_definition_get(
+					collision_model_index);
+
+				if (node_index >= 0 && node_index < collision_model->nodes.count)
+				{
+					struct collision_node const *collision_node =
+						TAG_BLOCK_GET_ELEMENT(
+							&collision_model->nodes,
+							node_index,
+							struct collision_node);
+
+					body_part = collision_node->runtime_damage_part;
+				}
+
+				if (damage_was_modified)
+				{
+					SET_FLAG(
+						being_damaged_flags,
+						_object_being_damaged_multiplied_by_difficulty_bit,
+						TRUE);
+				}
+
+				if (damage->owner_team_index != NONE &&
+					!game_team_is_enemy(
+						current_object->object.owner_team_index,
+						damage->owner_team_index))
+				{
+					SET_FLAG(
+						being_damaged_flags,
+						_object_being_damaged_by_friendly_bit,
+						TRUE);
+				}
+
+				if (damaged_object_count == 0 &&
+					material_index >= 0 &&
+					material_index < collision_model->resistance.materials.count)
+				{
+					damage_material = TAG_BLOCK_GET_ELEMENT(
+						&collision_model->resistance.materials,
+						material_index,
+						struct damage_resistance_material);
+				}
+				else if (collision_model->resistance.indirect_damage_material_index >= 0 &&
+					collision_model->resistance.indirect_damage_material_index <
+						collision_model->resistance.materials.count)
+				{
+					damage_material = TAG_BLOCK_GET_ELEMENT(
+						&collision_model->resistance.materials,
+						collision_model->resistance.indirect_damage_material_index,
+						struct damage_resistance_material);
+				}
+				else
+				{
+					damage_material = &damage_globals.default_damage_material;
+				}
+
+				damage->material_type = damage_material->material_type;
+
+				if (cheat.omnipotent && damage->owner_player_index != NONE)
+					force_kill = TRUE;
+
+				if (damage_definition->side_effect ==
+						_damage_side_effect_lethal_to_the_unsuspecting &&
+					unit_unsuspecting(current_object_index, &damage->epicenter) &&
+					!TEST_FLAG(
+						current_object->object.damage_flags,
+						_object_cannot_take_damage_bit))
+				{
+					force_kill = TRUE;
+				}
+
+				if (force_kill &&
+					!TEST_FLAG(current_object->object.damage_flags, _object_dead_bit))
+				{
+					current_object->object.body_vitality = 0.f;
+					object_deplete_body(current_object_index);
+					SET_FLAG(
+						being_damaged_flags,
+						_object_being_damaged_body_depleted_bit,
+						TRUE);
+					SET_FLAG(
+						being_damaged_flags,
+						_object_being_damaged_killed_instantly_bit,
+						TRUE);
+				}
+
+				if (!TEST_FLAG(damage->flags, _damage_bypasses_shields_bit) &&
+					!TEST_FLAG(damage_definition->flags, _damage_skips_shields_bit) &&
+					current_object->object.maximum_shield_vitality > 0.f &&
+					(damaged_object_count == 0 ||
+						TEST_FLAG(
+							collision_model->resistance.flags,
+							_damage_resistance_takes_shield_damage_for_children_bit)))
+				{
+					object_damage_shield(
+						current_object_index,
+						&collision_model->resistance,
+						damage_material,
+						damage_definition,
+						damage,
+						&being_damaged_flags,
+						&shield_damage,
+						&total_damage);
+				}
+
+				if ((damaged_object_count == 0 ||
+						(parent_takes_body_damage &&
+							TEST_FLAG(
+								collision_model->resistance.flags,
+								_damage_resistance_takes_body_damage_for_children_bit))) &&
+					!TEST_FLAG(
+						damage_definition->flags,
+						_damage_only_hurts_shields_bit))
+				{
+					if (TEST_FLAG(
+							collision_model->resistance.flags,
+							_damage_resistance_only_hurt_by_explosives_bit) &&
+						!TEST_FLAG(
+							damage_definition->flags,
+							_damage_detonates_explosives_bit))
+					{
+						total_damage = 0.f;
+					}
+
+					object_damage_body(
+						current_object_index,
+						damaged_object_count == 0 ? region_index : NONE,
+						damaged_object_count == 0 ? node_index : NONE,
+						damaged_object_count == 0 ? object_normal : NULL,
+						&collision_model->resistance,
+						damage_material,
+						damage_definition,
+						damage,
+						&being_damaged_flags,
+						&body_damage,
+						&body_damage_multiplier,
+						total_damage);
+					damaged_object_count = 0;
+				}
+
+				if (!material_effect_recorded &&
+					(shield_damage > _real_epsilon || body_damage > _real_epsilon))
+				{
+					if (shield_damage > body_damage)
+					{
+						damage->material_type =
+							collision_model->resistance.shield_material_type;
+						damage->material_effect_scale =
+							current_object->object.shield_vitality;
+					}
+					else
+					{
+						damage->material_effect_scale = PIN(
+							current_object->object.body_vitality,
+							0.f,
+							1.f);
+					}
+
+					if (debug_damage &&
+						current_object_index == damage_globals.debug_object_index)
+					{
+						console_printf(
+							FALSE,
+							"%s: \"%s\" \"%s\" k=%0.2f S[%3.2f] B[%3.2f]",
+							strrchr(tag_get_name(damage->definition_index), '\\') + 1,
+							material_get_name(damage_material->material_type),
+							damage_material->name,
+							(double)damage->scale,
+							(double)shield_damage,
+							(double)body_damage);
+					}
+
+					material_effect_recorded = TRUE;
+				}
+			}
+
+			object_damage_aftermath(
+				current_object_index,
+				damage,
+				being_damaged_flags,
+				shield_damage,
+				body_damage,
+				body_damage_multiplier,
+				body_part);
+			if (TEST_FLAG(
+				being_damaged_flags,
+				_object_being_damaged_body_destroyed_bit))
+			{
+				object_delete(current_object_index);
+			}
+		}
+		while (total_damage > 0.f);
 	}
 
 	return;
