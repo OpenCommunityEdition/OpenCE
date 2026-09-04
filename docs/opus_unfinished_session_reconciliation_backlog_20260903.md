@@ -193,7 +193,7 @@ Units retains all 189 exact target functions but now has an explicit
 candidate-only helper ownership veto. Collision Features likewise retains all
 20 exact target functions but is changed from `Matching` to `NonMatching`
 because its surplus projection helper has incorrect dominant-axis behavior.
-This corrects the linked-object count from 391 to 390 without deleting any
+This corrects the configured `Matching`-object count from 391 to 390 without deleting any
 source or subtracting valid function bytes. The canonical treemap preserves
 both 100% function-byte readings while withholding whole-object approval.
 The detailed evidence is in

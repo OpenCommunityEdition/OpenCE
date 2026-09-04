@@ -89,7 +89,7 @@ whole-object policy correction.
 
 The full canonical `ninja` build succeeds with 889,898 / 2,198,102 meaningful
 matched code bytes, 6,101 / 11,060 credited functions, and 2,018,514 matched
-data bytes. The linked-object count changes from 391 to 390 because Collision
+data bytes. The configured `Matching`-object count changes from 391 to 390 because Collision
 Features is no longer mislabeled `Matching`; no reconstructed source or valid
 function bytes were removed. All 238 active parks validate, all 284 tool
 tests pass, and the rename-stable snapshot comparison before and after this
