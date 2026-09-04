@@ -21,7 +21,6 @@ January compiler is sensitive to declaration position even in unrelated code.
 /* ---------- structures */
 
 struct message_client_game_update;
-struct message_client_settings_request;
 struct network_connection;
 struct network_game;
 struct network_game_server;
@@ -31,7 +30,7 @@ struct network_player;
 
 /* ---------- prototypes/NETWORK_SERVER_MANAGER.C */
 
-short network_game_server_get_state(
+word network_game_server_get_state(
 	struct network_game_server *server,
 	short *substate);
 boolean network_game_server_game_is_open(
@@ -53,7 +52,7 @@ boolean network_game_server_remove_player_from_game(
 boolean network_game_server_adjust_machine_settings(
 	struct network_game_server *server,
 	struct network_game_server_client_machine *client_machine,
-	struct message_client_settings_request *machine_settings);
+	struct network_machine *machine_settings);
 void network_game_server_client_machine_game_loading_complete(
 	struct network_game_server *server,
 	struct network_game_server_client_machine *client_machine);
@@ -100,7 +99,7 @@ boolean network_game_server_remove_machine_from_game(
 	struct network_machine *machine);
 void network_game_server_update_countdown(
 	struct network_game_server *server,
-	long countdown_time);
+	short countdown_event);
 void network_game_generate_join_game_token(
 	byte *join_game_token);
 

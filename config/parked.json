@@ -4061,6 +4061,25 @@
         },
         "objdiff_percent": 94.97531
       }
+    },
+    {
+      "unit": "source/networking/network_server_manager",
+      "function": "_network_game_server_update_countdown",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed countdown state machine from January's message events, server state, millisecond timing, game-start status, client-loading gates, transition calls, and all ordinary branches. January occupies 480 padded bytes with 21 relocations; the closest natural VC7 candidate occupies 496 with 20 at 72.8 percent objdiff similarity. The residual is a compiler register/allocation and call-scheduling choice: January retains one additional system_milliseconds call/relocation and pins the zero/event temporaries in different saved registers, while natural short/long parameter spellings and helper placement either select the retained 496-byte form or a worse out-of-line-helper form. The classifier found no defensible known mechanism. No forced inline or noinline, false linkage/type/prototype, raw offset, volatile/register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, or nonsensical branch is retained. Reopen for authoritative January source/local records or a natural same-compiler TU context that explains the extra timing call and register schedule.",
+      "measurements": {
+        "target": {
+          "size": 480,
+          "relocation_count": 21,
+          "normalized_sha256": "4e64f4f9ca4b1c3e6971dca2af566fbe87b5abd43272ed45535a12592f23ac51"
+        },
+        "base": {
+          "size": 496,
+          "relocation_count": 20,
+          "normalized_sha256": "19afd9e555269508c01d42c537ee32f4df08d3088646b9b1db15fe1e094ff997"
+        },
+        "objdiff_percent": 72.8
+      }
     }
   ]
 }

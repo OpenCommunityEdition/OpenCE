@@ -57,6 +57,7 @@ symbols in this file:
 #include "cseries.h"
 #include "cseries_windows.h"
 #include "real_math.h"
+#include "random_math.h"
 #include "game_engine.h"
 
 /* ---------- constants */

@@ -18,6 +18,9 @@ union real_point3d;
 
 /* ---------- prototypes/GAME_ENGINE.C */
 
+void game_engine_update(
+	void);
+
 void game_show_score_team(
 	long team_index,
 	long score);

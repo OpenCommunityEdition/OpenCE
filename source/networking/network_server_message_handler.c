@@ -1688,7 +1688,7 @@ static boolean network_game_server_handle_message_client_settings_request(
 {
 	if (network_game_server_get_state(server, NULL) == _network_game_server_state_pregame)
 	{
-		struct message_client_settings_request machine_settings;
+		struct network_machine machine_settings;
 		short packet_type = _message_client_settings_request;
 		short packet_version = NETWORK_GAME_MESSAGE_VERSION;
 
@@ -1707,9 +1707,9 @@ static boolean network_game_server_handle_message_client_settings_request(
 					"server received machine settings for machine #%d/'%s'",
 					machine_settings.machine_index,
 					wide_to_ascii(
-						machine_settings.machine_name,
-						(char *)machine_settings.machine_name,
-						sizeof(machine_settings.machine_name)));
+						machine_settings.name,
+						(char *)machine_settings.name,
+						sizeof(machine_settings.name)));
 				if (!network_game_server_send_game_data_pregame(server))
 				{
 					network_event(

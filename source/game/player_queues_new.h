@@ -9,6 +9,7 @@ PLAYER_QUEUES_NEW.H
 /* ---------- structures */
 
 struct player_action_collection;
+struct player_action;
 struct server_update;
 
 /* ---------- public code */
@@ -22,5 +23,14 @@ void update_client_build_client_update(
 void update_client_handle_server_update(
 	struct server_update *update,
 	unsigned long update_number);
+void update_server_handle_client_update(
+	long machine_index,
+	struct player_action *actions);
+void update_server_next_update(
+	void);
+void update_server_build_server_update(
+	long machine_index,
+	struct server_update *update,
+	long *update_number);
 
 #endif /* __PLAYER_QUEUES_NEW_H */
