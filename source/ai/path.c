@@ -257,6 +257,30 @@ void path_input_set_start(
 	return;
 }
 
+void path_input_set_attractor(
+	struct path_input *input,
+	real_point3d const *attractor_point,
+	real attractor_radius,
+	long attractor_object_index,
+	real attractor_weight)
+{
+	input->attractor_valid = TRUE;
+	input->attractor_point = *attractor_point;
+	input->attractor_radius = attractor_radius;
+	input->attractor_object_index = attractor_object_index;
+	input->attractor_weight = attractor_weight;
+	return;
+}
+
+void path_input_set_search_bounds(
+	struct path_input *input,
+	real search_maximum_distance)
+{
+	input->search_bounded = TRUE;
+	input->search_maximum_distance = search_maximum_distance;
+	return;
+}
+
 void path_state_new(
 	struct path_input const *input,
 	struct path_state *state,
@@ -282,6 +306,22 @@ void path_state_destination(
 	state->destination.target_radius = destination_accept_radius;
 
 	return;
+}
+
+struct path_node *path_get_node(
+	struct path_state *state,
+	short node_index)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\path.c",
+		1553,
+		node_index != NONE);
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\path.c",
+		1554,
+		(node_index >= 0) && (node_index < state->node_count));
+
+	return &state->node_list[node_index];
 }
 
 short path_node_from_hash_table(
