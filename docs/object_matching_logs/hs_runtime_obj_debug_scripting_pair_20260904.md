@@ -109,3 +109,23 @@ Stable snapshot:
 The comparison baseline is canonical's
 `scratch/post-network-server-replay-20260904.json`, captured at the same
 starting commit.
+
+## Canonical integration replay
+
+The isolated packet was cherry-picked as `fbda87ac2` on top of the separately
+validated rasterizer-swizzle ownership audit, rasterizer-Xbox audit, and
+Leaf/Biped exact pair.  A fresh configure and full Ninja rebuild recompiled all
+HS-header consumers and reproduced the packet's **+1 exact function / +384
+padded bytes / +376 meaningful bytes** with zero losses across all 8,245
+target functions.  Canonical now reports **884,582 / 2,198,102** meaningful
+code bytes, **6,072 / 11,060** credited functions, 2,018,310 matched data
+bytes, and 391/833 linked objects.  The semantic audit reports 6,145 accepted
+exact proofs and zero unit errors; the park manifest validates 225 active / 0
+stale / 0 invalid entries, object admission remains clean, Units remains
+189/189, the focused fake-match scan remains empty, and the scoped tooling
+suite passes 261/261.
+
+Canonical stable snapshots:
+
+- before: `scratch/after-leaf-bipeds-canonical-20260904.json`
+- after: `scratch/after-hs-debug-canonical-20260904.json`
