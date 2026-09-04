@@ -27,8 +27,6 @@ long fast_ftol_C(
 	real value);
 pixel32 real_argb_color_to_pixel32(
 	real_argb_color const *color);
-pixel32 real_alpha_to_pixel32(
-	real alpha);
 pixel32 real_alpha_intensity_to_pixel32(
 	real alpha,
 	real intensity);

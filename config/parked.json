@@ -2973,25 +2973,6 @@
     },
     {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_water",
-      "function": "_rasterizer_water_build_bumpmap",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after reconstructing the full four-ripple bumpmap builder as ordinary typed C. The retained function copies or defaults all ripple descriptors, normalizes contribution pairs, binds four ripple maps, constructs all four texture transforms, programs the Xbox pixel combiner, renders every requested mip level as an immediate-mode fan, restores the window target/stencil state, and reports failure. January is 2,080 padded bytes with 138 relocations; the candidate is 1,744 with 118 and objdiff reports 81.09785 percent. Both sides agree closely through setup and transform construction; the broad divergence begins in VC7's mip-loop local/register allocation and compaction of the repeated immediate-mode success/error blocks. The unusual mysterious_horizontal_offset identifier is authenticated by January's own assertion strings. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, handwritten assembly, raw offsets, fake dependencies, forced inline, or deleted error behavior is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the repeated block topology.",
-      "measurements": {
-        "target": {
-          "size": 2080,
-          "relocation_count": 138,
-          "normalized_sha256": "c21d75775db9deb6dc9d0f332494745ae27b6b4c80fe523c7712f61adfe630cb"
-        },
-        "base": {
-          "size": 1744,
-          "relocation_count": 118,
-          "normalized_sha256": "53fd687558dc97c81999070019c86587a507b832ec74ac72a2d179313c32399a"
-        },
-        "objdiff_percent": 81.09785
-      }
-    },
-    {
-      "unit": "source/rasterizer/xbox/rasterizer_xbox_water",
       "function": "_rasterizer_water_draw",
       "class": "unclassified",
       "evidence": "Fuzzy-parked with the complete typed water draw pipeline retained: optional pre-fog opacity depth, bumpmap refresh, base-map alpha and color modulation passes, bump/reflection texture setup, atmospheric-fog and reflection combiner constants, mip bias, vertex constants, raster state, and transparent-group draw. January is 2,240 padded bytes with 171 relocations; the candidate is 2,320 with 173 and objdiff reports 91.316414 percent. The remaining differences are broad local/register and x87 scheduling rather than an identified missing pass. The retained mipmap bias conversion uses csmemcpy into an unsigned-long bit container; an earlier donor pointer-pun was rejected as undefined representation aliasing even though it produced a slightly smaller 2,304-byte candidate. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No pointer punning, volatile/register forcing, barrier, pragma, handwritten assembly, raw offset, fake dependency, forced inline, or semantically false path is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the lifetime schedule.",

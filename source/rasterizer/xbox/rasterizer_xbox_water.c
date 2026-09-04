@@ -51,6 +51,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "game/game_globals.h"
 #include "interface/hud_draw.h"
+#include "bitmaps/bitmaps_inlines.h"
 #include "math/real_math.h"
 #include "rasterizer/common/rasterizer_common.h"
 #include "rasterizer/rasterizer.h"

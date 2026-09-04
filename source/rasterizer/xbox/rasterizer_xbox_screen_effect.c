@@ -96,6 +96,7 @@ symbols in this file:
 #include "bitmaps/bitmap_group.h"
 #include "cseries/errors.h"
 #include "interface/hud_draw.h"
+#include "bitmaps/bitmaps_inlines.h"
 #include "main/main_runtime.h"
 #include "math/integer_math.h"
 #include "math/real_math.h"

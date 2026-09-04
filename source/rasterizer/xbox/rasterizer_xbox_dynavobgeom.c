@@ -72,6 +72,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "math/real_math.h"
 #include "interface/hud_draw.h"
+#include "bitmaps/bitmaps_inlines.h"
 #include "rasterizer.h"
 #include "rasterizer/rasterizer_frame_statistics.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
