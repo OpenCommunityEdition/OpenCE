@@ -146,9 +146,11 @@ short game_difficulty_level_get(void);
 short game_difficulty_level_get_ignore_easy(void);
 void game_set_game_variant(struct game_variant *variant);
 void game_set_game_engine_index(short index);
-boolean game_all_quiet(void);
+boolean game_all_quiet(
+	void);
 boolean game_safe_to_save(void);
-boolean game_safe_to_speak(void);
+boolean game_safe_to_speak(
+	void);
 boolean game_is_cooperative(void);
 boolean game_load(struct game_options *options);
 void game_initialize_for_new_map(void);

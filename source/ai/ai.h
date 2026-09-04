@@ -103,6 +103,8 @@ boolean ai_consider_major_upgrade(
 
 boolean ai_enemies_attacking_player(
 	void);
+boolean ai_enemies_can_see_player(
+	void);
 boolean ai_try_vehicle_eviction(
 	long actor_index,
 	long entering_unit_index,

@@ -20,6 +20,8 @@ void effects_disconnect_from_structure_bsp(
 	void);
 void effects_reconnect_to_structure_bsp(
 	void);
+boolean dangerous_effects_near_player(
+	void);
 long effect_new_looping(
 	long definition_index,
 	long object_index,

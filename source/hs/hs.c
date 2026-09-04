@@ -4489,14 +4489,6 @@ boolean hs_scenario_postprocess(
 	boolean restore_syntax_data);
 void object_lists_dispose(
 	void);
-boolean game_safe_to_save(
-	void);
-boolean game_all_quiet(
-	void);
-boolean game_safe_to_speak(
-	void);
-boolean game_is_cooperative(
-	void);
 boolean main_saving_map(
 	void);
 boolean game_state_reverted(

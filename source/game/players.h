@@ -219,6 +219,8 @@ boolean players_respawn_coop(
 
 boolean players_are_all_dead(
 	void);
+boolean any_player_is_dead(
+	void);
 
 long player_index_from_unit_index(long unit_index);
 

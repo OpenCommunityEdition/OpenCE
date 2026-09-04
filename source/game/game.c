@@ -122,8 +122,14 @@ struct game_options;
 #define set_random_seed set_random_seed_inline
 #include "game/game.h"
 #undef set_random_seed
+#include "ai/ai.h"
+#include "effects/effects.h"
 #include "game/game_engine.h"
+#include "game/players.h"
+#include "items/items.h"
+#include "items/projectiles.h"
 #include "memory/data.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
@@ -443,6 +449,33 @@ void game_set_game_engine_index(
 		!"this is broken and should get updated for the variants, ask michael");
 
 	return;
+}
+
+boolean game_all_quiet(
+	void)
+{
+	if (dangerous_projectiles_near_player() ||
+		dangerous_items_near_player() ||
+		dangerous_effects_near_player() ||
+		any_unit_is_dangerous() ||
+		ai_enemies_can_see_player())
+	{
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+boolean game_safe_to_speak(
+	void)
+{
+	if (dangerous_projectiles_near_player() ||
+		any_player_is_dead())
+	{
+		return FALSE;
+	}
+
+	return TRUE;
 }
 
 boolean game_is_cooperative(
