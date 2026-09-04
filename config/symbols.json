@@ -5126,7 +5126,7 @@
 { "file_offset": 1208352, "flags": 32, "name": "_code_00127020" },
 { "file_offset": 1209712, "flags": 32, "name": "_object_cause_damage" },
 { "file_offset": 1211696, "flags": 32, "name": "_object_damage_update" },
-{ "file_offset": 1212752, "flags": 32, "name": "_code_00128150" },
+{ "file_offset": 1212752, "flags": 32, "name": "_area_of_effect_cause_damage_to_object" },
 { "file_offset": 1214080, "flags": 32, "name": "_area_of_effect_cause_damage" },
 { "file_offset": 1214208, "flags": 32, "name": "_object_deleted_procs_call" },
 { "file_offset": 1214256, "flags": 32, "name": "_texture_cache_bitmap_load" },

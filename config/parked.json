@@ -4232,6 +4232,25 @@
         },
         "objdiff_percent": 99.99187
       }
+    },
+    {
+      "unit": "source/objects/damage",
+      "function": "_area_of_effect_cause_damage_to_object",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete January area-damage helper in ordinary typed C and recovering its semantic external name from independent HCEA evidence. January COFF remains the sole byte, ABI, and relocation authority: the retained helper performs collision-user stack accounting, the four-ray unit/core-radius obstruction test, the direct obstruction path, owner/friend and infection-form filtering, distance falloff, object damage, child propagation, damaged-one-object bookkeeping, and optional sibling traversal. The paired public wrapper is strict exact at 128 padded bytes and retains January's long object_indices[64], with no later HCEA double-radius cheat and no later unlucky-object parameter semantics. The target is 1328 padded bytes with 51 relocations; the natural candidate is 1312 padded bytes with 52 relocations and 95.47282 percent objdiff similarity. Bounded natural variants of the recursive sibling tail, parameter assignment, loop form, clamp expression, declaration lifetime, and vector temporary schedule either converged on this fixed point or worsened allocation and size. The remaining structural differences are January's optimized sibling-recursion backedge and its x87 clamp schedule; VC7 retains a recursive call and lowers the natural PIN expression with a different stack-pop sequence. The fail-closed classifier returns UNKNOWN, so the entry remains unclassified rather than inferring a recipe. No assembly, goto-shaped codegen steering, raw offset, address-derived identifier, representation pun, volatile/register forcing, barrier, pragma, forced inline/noinline, fake dependency, undefined behavior, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the tail-recursion and x87 scheduling choices.",
+      "measurements": {
+        "target": {
+          "size": 1328,
+          "relocation_count": 51,
+          "normalized_sha256": "d3f929d4ce73b3cd08de3cd85da26284c7ad3b7e3574a856192f9fa0b40221a1"
+        },
+        "base": {
+          "size": 1312,
+          "relocation_count": 52,
+          "normalized_sha256": "46952a116c873e6f604b0e33c5b3e8b8e2a581b7c8afbd46364621b05d361abf"
+        },
+        "objdiff_percent": 95.47282
+      }
     }
   ]
 }

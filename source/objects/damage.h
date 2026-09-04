@@ -93,7 +93,7 @@ void object_deplete_body(
 	long object_index);
 void area_of_effect_cause_damage(
 	struct damage_data *damage,
-	long unlucky_object_index);
+	long unused_object_index);
 
 void object_cause_damage(struct damage_data *damage_data, long object_index, short node_index, short region_index, short material_index, real_vector3d const *object_normal);
 
