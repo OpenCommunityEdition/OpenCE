@@ -74,7 +74,9 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "bitmaps/bitmaps.h"
 #include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmaps_mipmap.h"
 #include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_swizzle.h"
 #include <xtl.h>
 
 /* ---------- constants */
@@ -97,67 +99,10 @@ enum
 
 void texture_cache_bitmap_delete(
 	struct bitmap_data *bitmap);
-short rasterizer_xbox_bitmap_get_max_mipmap_count(
-	struct bitmap_data *bitmap);
 void rasterizer_error(
 	long error_result,
 	char const *format,
 	...);
-void *bitmap_mipmap_address(
-	struct bitmap_data *bitmap,
-	short mipmap_index);
-void *bitmap_cube_map_address(
-	struct bitmap_data *bitmap,
-	short x,
-	short y,
-	short face_index,
-	short mipmap_index);
-short bitmap_mipmap_get_width(
-	struct bitmap_data *bitmap,
-	short mipmap_index);
-short bitmap_mipmap_get_height(
-	struct bitmap_data *bitmap,
-	short mipmap_index);
-short bitmap_mipmap_get_depth(
-	struct bitmap_data *bitmap,
-	short mipmap_index);
-long bitmap_mipmap_get_pixel_data_size(
-	struct bitmap_data *bitmap,
-	short mipmap_index);
-void rasterizer_xbox_bitmap_swizzle2d_byte(
-	void *destination,
-	void const *source,
-	short width,
-	short height);
-void rasterizer_xbox_bitmap_swizzle2d_word(
-	void *destination,
-	void const *source,
-	short width,
-	short height);
-void rasterizer_xbox_bitmap_swizzle2d_long(
-	void *destination,
-	void const *source,
-	short width,
-	short height);
-void rasterizer_xbox_bitmap_swizzle3d_byte(
-	void *destination,
-	void const *source,
-	short width,
-	short height,
-	short depth);
-void rasterizer_xbox_bitmap_swizzle3d_word(
-	void *destination,
-	void const *source,
-	short width,
-	short height,
-	short depth);
-void rasterizer_xbox_bitmap_swizzle3d_long(
-	void *destination,
-	void const *source,
-	short width,
-	short height,
-	short depth);
-
 static void rasterizer_bitmap_2d_changed(
 	struct bitmap_data *bitmap);
 static void rasterizer_bitmap_3d_changed(

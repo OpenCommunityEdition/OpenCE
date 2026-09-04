@@ -3255,6 +3255,25 @@
         },
         "objdiff_percent": 93.82736
       }
+    },
+    {
+      "unit": "source/rasterizer/rasterizer_swizzle",
+      "function": "_rasterizer_xbox_bitmap_swizzle",
+      "class": "instruction-scheduling",
+      "evidence": "Fuzzy-parked after reconstructing the complete typed January Xbox bitmap-swizzle path from the target instruction, relocation, assertion-string, and switch topology, with the independently recovered HaloCEA implementation corroborating the mipmap traversal, temporary-buffer flow, 2D/3D/cube dispatch, error paths, copy-back, free, and swizzled-flag update. Target and candidate both occupy 800 padded bytes with all 47 relocation identities, and objdiff reports 97.91958 percent similarity. The residual is confined to eight instruction slots in the cube-map prologue: January spills the widened bytes-per-pixel value before the divide-by-six sequence while VC7 keeps the same value live in a different register and homes it afterward. Natural declaration-order, initialization, constant-spelling, and call-order probes either reproduced this fixed point or degraded it; all behavior, calls, frame size, and relocations are present. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, undefined behavior, or nonsensical matching form is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining this backend schedule.",
+      "measurements": {
+        "target": {
+          "size": 800,
+          "relocation_count": 47,
+          "normalized_sha256": "4e705de69eb0ee60da8a23b66cf9de1258831b8d1ac4493078af7e0479b0168f"
+        },
+        "base": {
+          "size": 800,
+          "relocation_count": 47,
+          "normalized_sha256": "1155ecd5529a0f2c7c1942020eaf6da423f0ff5b783510feed709e61151e66bd"
+        },
+        "objdiff_percent": 97.91958
+      }
     }
   ]
 }
