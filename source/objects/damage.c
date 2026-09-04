@@ -105,10 +105,12 @@ symbols in this file:
 #include "effects/effects.h"
 #include "game/cheats.h"
 #include "game/game_allegiance.h"
+#include "game/game_engine.h"
 #include "game/game_globals.h"
 #include "game/players.h"
 #include "hs/object_lists.h"
 #include "input/input.h"
+#include "interface/hud_unit.h"
 #include "damage_effect_definitions.h"
 #include "object_definitions.h"
 #include "object_types.h"
@@ -118,6 +120,7 @@ symbols in this file:
 #include "physics/collision_usage.h"
 #include "rasterizer/rasterizer.h"
 #include "render/render.h"
+#include "scenario/scenario.h"
 #include "tag_files/tag_files.h"
 #include "text/draw_string.h"
 #include "units/unit_definitions.h"
@@ -179,8 +182,32 @@ struct damage_region
 	struct tag_block permutations;
 };
 
+struct game_globals_falling_damage
+{
+	long unused0[2];
+	real falling_distance_lower_bound;
+	real falling_distance_upper_bound;
+	struct tag_reference falling_damage;
+	long terminal_velocity_unused[2];
+	real maximum_distance;
+	struct tag_reference maximum_distance_damage;
+	struct tag_reference vehicle_hit_environment_damage_effect;
+	struct tag_reference vehicle_killed_unit_damage_effect;
+	struct tag_reference vehicle_collision_damage;
+	struct tag_reference flaming_death_damage;
+	long unused7c[4];
+	real runtime_maximum_falling_velocity;
+	real runtime_minimum_damage_velocity;
+	real runtime_maximum_damage_velocity;
+};
+
 typedef char damage_region_size_assert[
 	sizeof(struct damage_region) == 0x54 ? 1 : -1];
+typedef char game_globals_falling_damage_size_assert[
+	sizeof(struct game_globals_falling_damage) == 0x98 ? 1 : -1];
+typedef char game_globals_falling_damage_effect_offset_assert[
+	offsetof(struct game_globals_falling_damage, falling_damage) +
+		offsetof(struct tag_reference, index) == 0x1C ? 1 : -1];
 
 typedef char object_deplete_body_definition_index_offset_assert[
 	offsetof(struct object_datum, definition_index) == 0x00 ? 1 : -1];
@@ -690,6 +717,209 @@ void area_of_effect_cause_damage(
 	}
 
 	breakable_surface_damage_area_of_effect(damage);
+	return;
+}
+
+void object_damage_update(
+	long object_index)
+{
+	struct object_datum *object = object_get(object_index);
+	struct object_definition *object_definition =
+		object_definition_get(object->definition_index);
+	long collision_model_index = object_definition->object.collision_model.index;
+	struct collision_model *collision_model;
+	word damage_flags;
+
+	if (collision_model_index == NONE)
+		return;
+
+	collision_model = collision_model_definition_get(collision_model_index);
+	if (!collision_model)
+		return;
+
+	damage_flags = object->object.damage_flags;
+	if (TEST_FLAG(damage_flags, _object_die_act_of_god_no_statistics_bit) ||
+		(damage_flags &
+			(FLAG(_object_die_act_of_god_bit) |
+				FLAG(_object_die_act_of_god_silent_bit))) != 0)
+	{
+		if (!TEST_FLAG(damage_flags, _object_dead_bit))
+		{
+			struct game_globals_falling_damage *falling_damage =
+				TAG_BLOCK_GET_ELEMENT(
+					&scenario_get_game_globals()->falling_damage,
+					0,
+					struct game_globals_falling_damage);
+			long damage_effect_index = falling_damage->falling_damage.index;
+
+			if (damage_effect_index != NONE)
+			{
+				struct damage_data damage;
+
+				damage_data_new(&damage, damage_effect_index);
+				damage.scale = 1.f;
+				SET_FLAG(damage.flags, _damage_kill_instantly_bit, TRUE);
+				if (TEST_FLAG(
+					object->object.damage_flags,
+					_object_die_act_of_god_silent_bit))
+				{
+					SET_FLAG(damage.flags, _damage_silent_bit, TRUE);
+				}
+
+				if (TEST_FLAG(
+					object->object.damage_flags,
+					_object_die_act_of_god_no_statistics_bit))
+				{
+					SET_FLAG(damage.flags, _damage_no_statistics_bit, TRUE);
+				}
+
+				object_cause_damage(
+					&damage,
+					object_index,
+					NONE,
+					NONE,
+					NONE,
+					NULL);
+			}
+		}
+
+		object->object.damage_flags &=
+			~(FLAG(_object_die_act_of_god_bit) |
+				FLAG(_object_die_act_of_god_silent_bit) |
+				FLAG(_object_die_act_of_god_no_statistics_bit));
+	}
+
+	SET_FLAG(object->object.damage_flags, _object_shield_charging_bit, FALSE);
+	damage_flags = object->object.damage_flags;
+	if (object->object.maximum_shield_vitality > 0.f &&
+		!TEST_FLAG(damage_flags, _object_dead_bit))
+	{
+		if (TEST_FLAG(damage_flags, _object_shield_over_charging_bit))
+		{
+			real shield_vitality = object->object.shield_vitality + 0.033333335f;
+
+			object->object.shield_vitality = shield_vitality;
+			if (shield_vitality >= 3.f)
+			{
+				object->object.shield_vitality = 3.f;
+				SET_FLAG(
+					object->object.damage_flags,
+					_object_shield_over_charging_bit,
+					FALSE);
+			}
+			else
+			{
+				SET_FLAG(
+					object->object.damage_flags,
+					_object_shield_charging_bit,
+					TRUE);
+			}
+		}
+		else if (object->object.shield_vitality > 1.f && game_engine_running())
+		{
+			long player_index = player_index_from_unit_index(object_index);
+			real overcharge = object->object.shield_vitality - 1.f;
+
+			if (0.00074074074f > overcharge)
+			{
+				object->object.shield_vitality = 1.f;
+				hud_tick_shield(player_index, overcharge);
+			}
+			else
+			{
+				object->object.shield_vitality -= 0.00074074074f;
+				hud_tick_shield(player_index, 0.00074074074f);
+			}
+		}
+		else if (object->object.shield_vitality < 1.f)
+		{
+			if (object->object.shield_stun_ticks == 0)
+			{
+				real shield_recharge =
+					collision_model->resistance.runtime_shield_recharge_velocity;
+
+				shield_recharge *= game_difficulty_get_team_value(
+						_game_difficulty_value_enemy_recharge,
+						object->object.owner_team_index);
+
+				if (TEST_FLAG(
+					object->object.damage_flags,
+					_object_shield_depleted_bit))
+				{
+					damage_effect_new_on_object(
+						collision_model->resistance.shield_recharging_effect.index,
+						object_index);
+					SET_FLAG(
+						object->object.damage_flags,
+						_object_shield_depleted_bit,
+						FALSE);
+					object_permutation_shield_regions(object_index, TRUE);
+				}
+
+				SET_FLAG(
+					object->object.damage_flags,
+					_object_shield_charging_bit,
+					TRUE);
+				shield_recharge += object->object.shield_vitality;
+				damage_flags = object->object.damage_flags;
+				object->object.shield_vitality = shield_recharge;
+				if (shield_recharge > 1.f)
+				{
+					SET_FLAG(
+						damage_flags,
+						_object_shield_charging_bit,
+						FALSE);
+					object->object.shield_vitality = 1.f;
+					object->object.damage_flags = damage_flags;
+				}
+			}
+			else
+			{
+				object->object.shield_stun_ticks--;
+			}
+		}
+	}
+
+	if (object->object.body_damage_decay_timer != NONE)
+	{
+		long decay_timer = ++object->object.body_damage_decay_timer;
+
+		if (decay_timer >= 0)
+			object->object.current_body_damage -= 0.016666668f;
+		if (decay_timer >= TICKS_PER_SECOND * 2)
+			object->object.recent_body_damage -= 0.016666668f;
+
+		object->object.current_body_damage =
+			MAX(0.f, object->object.current_body_damage);
+		object->object.recent_body_damage =
+			MAX(0.f, object->object.recent_body_damage);
+		if (object->object.current_body_damage == 0.f &&
+			object->object.recent_body_damage == 0.f)
+		{
+			object->object.body_damage_decay_timer = NONE;
+		}
+	}
+
+	if (object->object.shield_damage_decay_timer != NONE)
+	{
+		long decay_timer = ++object->object.shield_damage_decay_timer;
+
+		if (decay_timer >= 0)
+			object->object.current_shield_damage -= 0.016666668f;
+		if (decay_timer >= TICKS_PER_SECOND * 2)
+			object->object.recent_shield_damage -= 0.016666668f;
+
+		object->object.current_shield_damage =
+			MAX(0.f, object->object.current_shield_damage);
+		object->object.recent_shield_damage =
+			MAX(0.f, object->object.recent_shield_damage);
+		if (object->object.current_shield_damage == 0.f &&
+			object->object.recent_shield_damage == 0.f)
+		{
+			object->object.shield_damage_decay_timer = NONE;
+		}
+	}
+
 	return;
 }
 

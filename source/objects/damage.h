@@ -79,7 +79,8 @@ real object_get_actual_shield_vitality(long object_index, boolean ignore_difficu
 real object_get_maximum_body_vitality(long object_index, boolean ignore_difficulty);
 real object_get_maximum_shield_vitality(long object_index, boolean ignore_difficulty);
 
-void object_damage_update(long object_index);
+void object_damage_update(
+	long object_index);
 void object_destroy(
 	long object_index);
 void damage_data_new(struct damage_data *damage_data, long definition_index);
