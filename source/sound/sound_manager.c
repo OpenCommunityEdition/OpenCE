@@ -850,7 +850,7 @@ void sound_initialize(
 		short index;
 
 		sound_manager_globals.channel_count +=
-			preferences->channel_counts[channel_type];
+			preferences->virtual_channel_counts[channel_type];
 		match_assert(
 			"c:\\halo\\SOURCE\\sound\\sound_manager.c",
 			0x168,
@@ -858,7 +858,7 @@ void sound_initialize(
 
 		for (
 			index = 0;
-			index < preferences->channel_counts[channel_type];
+			index < preferences->virtual_channel_counts[channel_type];
 			index++)
 		{
 			struct sound_channel_datum *channel = channel_get(channel_index++);

@@ -17,15 +17,17 @@ header included in hcex build.
 struct sound_preferences
 {
 	short platform;
-	short unknown_platform_values[4];
-	short channel_counts[4];
+	short actual_channel_counts[4];
+	short virtual_channel_counts[4];
 	short unused;
 };
 
 /* ---------- prototypes/SOUND_PREFERENCES.C */
 
-void read_sound_preferences(struct sound_preferences **preferences);
-void write_sound_preferences(void);
+void read_sound_preferences(
+	struct sound_preferences **preferences);
+void write_sound_preferences(
+	void);
 
 /* ---------- globals */
 
