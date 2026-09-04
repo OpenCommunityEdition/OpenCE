@@ -158,12 +158,14 @@ zero regressions** across all 8,245 target function sections.  Aggregate
 semantic progress moves from 855,687 to **860,625 / 2,198,102 meaningful code
 bytes** and from 5,955 to **5,975 / 11,060 functions**.  That net
 **+4,938-byte / +20-function** movement is smaller than the strict gain because
-three newly named strict functions were already credited through the
-name-independent semantic COFF overlay (`add_player`, 489 bytes;
-`request_remove_player`, 493; and `idle`, 301), while the instruction-exact
-`initiate_join_game` assertion-relocation boundary adds 246 bytes and one
-ordinary structural credit.  In other words, the accounting difference is
-deduplication, not lost code.
+three strict COFF gains remain conservative objdiff false negatives and are
+not allowlisted for headline credit (`add_player`, 489 bytes;
+`request_remove_player`, 493; and `idle`, 301), while the already
+semantic-exact `initiate_join_game` boundary changes from uncredited fuzzy to
+objdiff 100% and adds 246 bytes plus one ordinary structural credit.  Thus
+`22 - 3 + 1 = 20` functions and `5,975 - 1,283 + 246 = 4,938` bytes.  No
+semantic proof or code was lost; the difference is conservative proof-channel
+classification.
 
 Matched data remains **2,007,670 bytes** and linked objects remain **391/833**.
 The combined semantic report contains 6,047 accepted exact functions and zero
