@@ -271,12 +271,13 @@ symbols in this file:
 0025698C 002a:
 	??_C@_0CK@OGLHOBHI@ep?5?$CG?$CG?5buffer?5?$CG?$CG?5?$CIlength?5?$DO?50?$CJ?5?$CG?$CG?5@ (0000)
 0031CE38 020c:
-	_bss_0031ce38 (0000)
+	_transport_endpoint_globals (0000)
 */
 
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h"
 
 #include "bungie_net/common/thread.h"
 #include "memory/byte_swapping.h"
@@ -320,7 +321,7 @@ struct connect_process_input
 
 struct transport_endpoint_winsock_globals
 {
-	void *unknown0;
+	char const *error_string;
 	long unknown4;
 	struct endpoint_thread_reference endpoint_threads[MAXIMUM_ENDPOINT_THREADS];
 	long last_error;
@@ -338,7 +339,7 @@ void code_000713a0(
 
 /* ---------- globals */
 
-struct transport_endpoint_winsock_globals bss_0031ce38 = {0};
+struct transport_endpoint_winsock_globals transport_endpoint_globals = {0};
 
 /* ---------- public code */
 
@@ -350,7 +351,7 @@ void code_000713a0(
 	do
 	{
 		struct endpoint_thread_reference *endpoint_thread =
-			&bss_0031ce38.endpoint_threads[endpoint_thread_index];
+			&transport_endpoint_globals.endpoint_threads[endpoint_thread_index];
 
 		if (endpoint_thread->thread && endpoint_thread->dispose)
 		{
@@ -575,6 +576,367 @@ short get_endpoint_error(
 	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x43E, ep);
 
 	return ep->error;
+}
+
+char const *winsock_error_to_string(
+	long error_code)
+{
+	char const *error_string;
+
+	/* The January table names the Win32 WSA aliases. Use their underlying
+	 * system constants where the XDK's WIN16 fallback has different values.
+	 */
+	switch (error_code)
+	{
+	case (long)WSA_WAIT_FAILED:
+		error_string = "WSA_WAIT_FAILED";
+		break;
+
+	case (long)WSA_INVALID_EVENT:
+		error_string = "WSA_INVALID_EVENT";
+		break;
+
+	case ERROR_INVALID_HANDLE:
+		error_string = "WSA_INVALID_HANDLE";
+		break;
+
+	case ERROR_NOT_ENOUGH_MEMORY:
+		error_string = "WSA_NOT_ENOUGH_MEMORY";
+		break;
+
+	case WSA_MAXIMUM_WAIT_EVENTS:
+		error_string = "WSA_MAXIMUM_WAIT_EVENTS";
+		break;
+
+	case ERROR_INVALID_PARAMETER:
+		error_string = "WSA_INVALID_PARAMETER";
+		break;
+
+	case WAIT_IO_COMPLETION:
+		error_string = "WSA_WAIT_IO_COMPLETION";
+		break;
+
+	case WSA_WAIT_TIMEOUT:
+		error_string = "WSA_WAIT_TIMEOUT";
+		break;
+
+	case ERROR_OPERATION_ABORTED:
+		error_string = "WSA_OPERATION_ABORTED";
+		break;
+
+	case ERROR_IO_INCOMPLETE:
+		error_string = "WSA_IO_INCOMPLETE";
+		break;
+
+	case ERROR_IO_PENDING:
+		error_string = "WSA_IO_PENDING";
+		break;
+
+	case WSAEINTR:
+		error_string = "WSAEINTR";
+		break;
+
+	case WSAEBADF:
+		error_string = "WSAEBADF";
+		break;
+
+	case WSAEACCES:
+		error_string = "WSAEACCES";
+		break;
+
+	case WSAEFAULT:
+		error_string = "WSAEFAULT";
+		break;
+
+	case WSAEINVAL:
+		error_string = "WSAEINVAL";
+		break;
+
+	case WSAEMFILE:
+		error_string = "WSAEMFILE";
+		break;
+
+	case WSAEWOULDBLOCK:
+		error_string = "WSAEWOULDBLOCK";
+		break;
+
+	case WSAEINPROGRESS:
+		error_string = "WSAEINPROGRESS";
+		break;
+
+	case WSAEALREADY:
+		error_string = "WSAEALREADY";
+		break;
+
+	case WSAENOTSOCK:
+		error_string = "WSAENOTSOCK";
+		break;
+
+	case WSAEDESTADDRREQ:
+		error_string = "WSAEDESTADDRREQ";
+		break;
+
+	case WSAEMSGSIZE:
+		error_string = "WSAEMSGSIZE";
+		break;
+
+	case WSAEPROTOTYPE:
+		error_string = "WSAEPROTOTYPE";
+		break;
+
+	case WSAENOPROTOOPT:
+		error_string = "WSAENOPROTOOPT";
+		break;
+
+	case WSAEPROTONOSUPPORT:
+		error_string = "WSAEPROTONOSUPPORT";
+		break;
+
+	case WSAESOCKTNOSUPPORT:
+		error_string = "WSAESOCKTNOSUPPORT";
+		break;
+
+	case WSAEOPNOTSUPP:
+		error_string = "WSAEOPNOTSUPP";
+		break;
+
+	case WSAEPFNOSUPPORT:
+		error_string = "WSAEPFNOSUPPORT";
+		break;
+
+	case WSAEAFNOSUPPORT:
+		error_string = "WSAEAFNOSUPPORT";
+		break;
+
+	case WSAEADDRINUSE:
+		error_string = "WSAEADDRINUSE";
+		break;
+
+	case WSAEADDRNOTAVAIL:
+		error_string = "WSAEADDRNOTAVAIL";
+		break;
+
+	case WSAENETDOWN:
+		error_string = "WSAENETDOWN";
+		break;
+
+	case WSAENETUNREACH:
+		error_string = "WSAENETUNREACH";
+		break;
+
+	case WSAENETRESET:
+		error_string = "WSAENETRESET";
+		break;
+
+	case WSAECONNABORTED:
+		error_string = "WSAECONNABORTED";
+		break;
+
+	case WSAECONNRESET:
+		error_string = "WSAECONNRESET";
+		break;
+
+	case WSAENOBUFS:
+		error_string = "WSAENOBUFS";
+		break;
+
+	case WSAEISCONN:
+		error_string = "WSAEISCONN";
+		break;
+
+	case WSAENOTCONN:
+		error_string = "WSAENOTCONN";
+		break;
+
+	case WSAESHUTDOWN:
+		error_string = "WSAESHUTDOWN";
+		break;
+
+	case WSAETOOMANYREFS:
+		error_string = "WSAETOOMANYREFS";
+		break;
+
+	case WSAETIMEDOUT:
+		error_string = "WSAETIMEDOUT";
+		break;
+
+	case WSAECONNREFUSED:
+		error_string = "WSAECONNREFUSED";
+		break;
+
+	case WSAELOOP:
+		error_string = "WSAELOOP";
+		break;
+
+	case WSAENAMETOOLONG:
+		error_string = "WSAENAMETOOLONG";
+		break;
+
+	case WSAEHOSTDOWN:
+		error_string = "WSAEHOSTDOWN";
+		break;
+
+	case WSAEHOSTUNREACH:
+		error_string = "WSAEHOSTUNREACH";
+		break;
+
+	case WSAENOTEMPTY:
+		error_string = "WSAENOTEMPTY";
+		break;
+
+	case WSAEPROCLIM:
+		error_string = "WSAEPROCLIM";
+		break;
+
+	case WSAEUSERS:
+		error_string = "WSAEUSERS";
+		break;
+
+	case WSAEDQUOT:
+		error_string = "WSAEDQUOT";
+		break;
+
+	case WSAESTALE:
+		error_string = "WSAESTALE";
+		break;
+
+	case WSAEREMOTE:
+		error_string = "WSAEREMOTE";
+		break;
+
+	case WSASYSNOTREADY:
+		error_string = "WSASYSNOTREADY";
+		break;
+
+	case WSAVERNOTSUPPORTED:
+		error_string = "WSAVERNOTSUPPORTED";
+		break;
+
+	case WSANOTINITIALISED:
+		error_string = "WSANOTINITIALISED";
+		break;
+
+	case WSAEDISCON:
+		error_string = "WSAEDISCON";
+		break;
+
+	case WSAENOMORE:
+		error_string = "WSAENOMORE";
+		break;
+
+	case WSAECANCELLED:
+		error_string = "WSAECANCELLED";
+		break;
+
+	case WSAEINVALIDPROCTABLE:
+		error_string = "WSAEINVALIDPROCTABLE";
+		break;
+
+	case WSAEINVALIDPROVIDER:
+		error_string = "WSAEINVALIDPROVIDER";
+		break;
+
+	case WSAEPROVIDERFAILEDINIT:
+		error_string = "WSAEPROVIDERFAILEDINIT";
+		break;
+
+	case WSASYSCALLFAILURE:
+		error_string = "WSASYSCALLFAILURE";
+		break;
+
+	case WSASERVICE_NOT_FOUND:
+		error_string = "WSASERVICE_NOT_FOUND";
+		break;
+
+	case WSATYPE_NOT_FOUND:
+		error_string = "WSATYPE_NOT_FOUND";
+		break;
+
+	case WSA_E_NO_MORE:
+		error_string = "WSA_E_NO_MORE";
+		break;
+
+	case WSA_E_CANCELLED:
+		error_string = "WSA_E_CANCELLED";
+		break;
+
+	case WSAEREFUSED:
+		error_string = "WSAEREFUSED";
+		break;
+
+	case WSAHOST_NOT_FOUND:
+		error_string = "WSAHOST_NOT_FOUND";
+		break;
+
+	case WSATRY_AGAIN:
+		error_string = "WSATRY_AGAIN";
+		break;
+
+	case WSANO_RECOVERY:
+		error_string = "WSANO_RECOVERY";
+		break;
+
+	case WSANO_DATA:
+		error_string = "WSANO_DATA";
+		break;
+
+	case WSA_QOS_RECEIVERS:
+		error_string = "WSA_QOS_RECEIVERS";
+		break;
+
+	case WSA_QOS_SENDERS:
+		error_string = "WSA_QOS_SENDERS";
+		break;
+
+	case WSA_QOS_NO_SENDERS:
+		error_string = "WSA_QOS_NO_SENDERS";
+		break;
+
+	case WSA_QOS_NO_RECEIVERS:
+		error_string = "WSA_QOS_NO_RECEIVERS";
+		break;
+
+	case WSA_QOS_REQUEST_CONFIRMED:
+		error_string = "WSA_QOS_REQUEST_CONFIRMED";
+		break;
+
+	case WSA_QOS_ADMISSION_FAILURE:
+		error_string = "WSA_QOS_ADMISSION_FAILURE";
+		break;
+
+	case WSA_QOS_POLICY_FAILURE:
+		error_string = "WSA_QOS_POLICY_FAILURE";
+		break;
+
+	case WSA_QOS_BAD_STYLE:
+		error_string = "WSA_QOS_BAD_STYLE";
+		break;
+
+	case WSA_QOS_BAD_OBJECT:
+		error_string = "WSA_QOS_BAD_OBJECT";
+		break;
+
+	case WSA_QOS_TRAFFIC_CTRL_ERROR:
+		error_string = "WSA_QOS_TRAFFIC_CTRL_ERROR";
+		break;
+
+	case WSA_QOS_GENERIC_ERROR:
+		error_string = "WSA_QOS_GENERIC_ERROR";
+		break;
+
+	default:
+		error_string = "<unknown error>";
+		break;
+	}
+
+	transport_endpoint_globals.error_string = error_string;
+	if (error_code != transport_endpoint_globals.last_error)
+	{
+		error(_error_log, "winsock error #%d: %s", error_code, error_string);
+		transport_endpoint_globals.last_error = error_code;
+	}
+
+	return transport_endpoint_globals.error_string;
 }
 
 long endpoint_equivalent(

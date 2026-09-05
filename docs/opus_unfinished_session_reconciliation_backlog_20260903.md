@@ -1,5 +1,45 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
+## Current published checkpoint (2026-09-05)
+
+Verified published code checkpoint `760ea3bde` on canonical and both
+`bnunu/halo` publication branches:
+**906,391 meaningful matched code bytes**, **6,171 credited functions**,
+**2,030,868 matched data bytes**, and **391/833 Matching objects**.
+The full stable-owner sweep has **6,217 strict owners**; **277 fuzzy parks**
+validate. The latest batches reconcile the older Opus Profile getters and
+retain the natural Transport receive pair. All288 tests plus26 subtests pass.
+
+The donor byte pools and earlier "current" totals below are historical
+checkpoints, not a live unreconciled-byte count. Do not subtract or sum them
+against today's canonical total. Previously adjudicated or admitted donor
+functions must not be counted again. Unresolved ownership/API packets remain
+withheld with their evidence; an interrupted newer Opus run without a distinct
+path/ref remains pending intake, not zero progress or an approved import.
+
+The new active `fable/50k-small-families-20260904` lane and all its reserved
+implementations remain excluded from this campaign until the user reports its
+completion or token exhaustion. Read only the frozen older donor trees.
+
+### Follow-up adjudication
+
+The natural Winsock error-string body now passes canonical verification at
+49.78903% ordinary match:1,568 meaningful target bytes reconstructed as fuzzy,
+zero exact-code/data credit. Its address-derived global name is reconciled to
+`transport_endpoint_globals` without changing storage/linkage. All22 inherited
+code and20 data owners survive;86 authentic target literals are recovered.
+The stable sweep remains6,217 strict owners;278 parks validate and all288
+tests plus26 subtests pass. See
+`docs/object_matching_logs/transport_endpoint_winsock_obj_error_string_natural_boundary_20260905.md`.
+
+The older-Opus `ai_get_responsible_unit` leaf is **withheld**, not imported.
+Although119 meaningful bytes are strict in isolation, the mandatory owning
+`ai.h` declaration regresses two Race owners (496 padded bytes) and changes an
+existing AI Communication park across63 consumers. The entire four-file trial
+was restored; zero admitted delta. See
+`docs/object_matching_logs/ai_obj_responsible_unit_header_boundary_20260905.md`.
+Do not repeat header-position or source-shape searches to evade this boundary.
+
 ## Frozen donor
 
 - Worktree: `C:\halo-worktrees\opus-small-families-30k-20260902`

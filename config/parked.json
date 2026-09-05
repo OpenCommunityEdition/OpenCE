@@ -3,6 +3,25 @@
   "entries": [
     {
       "unit": "source/bungie_net/network/transport_endpoint_winsock",
+      "function": "_winsock_error_to_string",
+      "class": "unclassified",
+      "evidence": "One complete natural84-case named SDK switch with exact January strings, real error API, existing global semantic ownership and target-proven post-log field return. Target/candidate1568B/177relocs and normalized bytes agree but10 relocation destinations differ: first five string bodies and compensating jump-table destinations are physically permuted. This is not strict exact and no semantic exception applies. Existing22 code and20 data owners/property records unchanged;86 new target literals1363B all strict/property-exact. Two frozen objects pass33069 stubbed logger behavior cases each, including stored-string mutation, all codes/gaps and ABI checks. No variants, new helper/global/COMMON or point_from_line3d. See docs/object_matching_logs/transport_endpoint_winsock_obj_error_string_natural_boundary_20260905.md.",
+      "measurements": {
+        "target": {
+          "size": 1568,
+          "relocation_count": 177,
+          "normalized_sha256": "35e5bf685b7053c6bf425c6f771467a3359cebda61937162f15f708d9b21ae60"
+        },
+        "base": {
+          "size": 1568,
+          "relocation_count": 177,
+          "normalized_sha256": "35e5bf685b7053c6bf425c6f771467a3359cebda61937162f15f708d9b21ae60"
+        },
+        "objdiff_percent": 49.78903
+      }
+    },
+    {
+      "unit": "source/bungie_net/network/transport_endpoint_winsock",
       "function": "_read_endpoint",
       "class": "unclassified",
       "evidence": "Complete one-shot natural January stream read through the existing real SDK recv owner, public long endpoint/void-buffer/long-length API, target assertions, WSA error constants, and cseries flag macros. Target and candidate are256 padded bytes/16 relocations. The documented old residual remains: January's default error arm loads flags into CL, masks/stores them and writes the short error; VC7 uses the equivalent in-memory byte AND, shortening this arm by5 bytes and shifting the tail/tables. No E38–E42 variant was repeated. WSAEWOULDBLOCK sets error-4 and leaves flags; connection errors clear connected/readable and set error-3; other failures clear readable and set error-2. Positive reads return their count. EOF returns-3 without updating endpoint fields, preserving January. All20 inherited emitted code owners (17 exact/3 parked) and17 runtime-data owners remain byte/relocation-identical with unchanged real-owner offset/storage/type/flags/alignment/COMDAT selection. Exactly one new public code owner, no new data/COMMON/helpers/point_from_line3d. Reopen only with authentic source/type/compiler context, not scheduling variants. See docs/object_matching_logs/transport_endpoint_winsock_obj_read_natural_boundary_20260905.md.",
