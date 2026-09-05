@@ -16,13 +16,28 @@ else is path-relative.
 ## board.py — the scoreboard
 
 ```
-python tools/campaign/board.py                 # totals + every partially-done object
+python tools/campaign/board.py                 # totals + selected small partial objects
 python tools/campaign/board.py source/hs/hs    # one unit, listing its non-exact functions
 ```
 
-Walks `objdiff.json`, gates every `_`-prefixed `.text` function-start symbol with
-`coff_compare.section_infos_equal`, counts `config/parked.json` as done. This is
-the only number that counts. Objects within N functions of complete:
+Walks `objdiff.json` and gates the eligible `_`-prefixed `.text` function-start
+owners with `coff_compare.section_infos_equal`. Only `EXACT` rows contribute to
+its done totals. Ordinary fuzzy `PARKED` rows do not count; `asm-implemented`
+and `vendored-assembly` rows are displayed separately as `ASM` and do not count
+in this C-reconstruction board even when their bytes are equal.
+
+Board byte sizes include target section padding. Its selected function-owner
+population and function-only "fully exact" objects are not the canonical
+meaningful-byte or whole-object completion totals. Use the semantic-adjusted
+production progress report for meaningful credited bytes, and require the
+data/BSS/linkage/extra-owner and source-authenticity admission checks before
+marking an object `Matching`.
+
+The default per-object listing is filtered to partial objects with some exact
+work and at most 8,000 remaining padded bytes. It is not an exhaustive census
+and must not be diffed as a regression proof; use `stable_verdicts.py` for the
+complete built-owner set. To inspect objects within N functions of completing
+their listed function set:
 
 ```
 python tools/campaign/board.py | grep -E 'remaining +[0-9]+ B / [123] fn'
@@ -43,7 +58,11 @@ python tools/campaign/gate.py source/physics/collision_bsp --forbid-emitted-symb
 `--edits` takes a JSON list of `[find, replace, tag]` triples applied to the real
 source in memory (the file on disk is never touched), so you can sweep spellings
 without dirtying the tree. `--disas` prints a side-by-side target/ours
-disassembly with relocation annotations. Reads per-unit cflags out of
+disassembly with relocation annotations, but pairs instructions by index rather
+than aligning insertions/deletions. Use `alndiff.py` for actual instruction
+alignment. Spelling sweeps are not source-authenticity evidence and are not
+authorized by the current house rules merely because the tool supports them.
+Reads per-unit cflags out of
 `build.ninja`, and always prepends `/nologo /c` (libcmt units omit them).
 `--cflag` appends one diagnostic compiler option after those unit flags and may
 be repeated. It is an audit aid only: a flag improvement is not source-match

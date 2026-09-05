@@ -2,6 +2,25 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/interface/hud_unit",
+      "function": "_hud_render_unit_interface",
+      "class": "unclassified",
+      "evidence": "Fresh ordinary typed reconstruction of January unit-HUD layering, shield overcharge/fade, health colors, motion sensor, team-color overlays, auxiliary meters and real stack-corruption guards. January and independent HCEX PDB evidence authenticate the 18-entry index arrays, one auxiliary value, five colors, genuine local meter copies and static-local overcharge_count=4. Proper owner-header APIs, tag/object macros, named draw flags and explicit return are retained. Evidence-driven corrections preserve ordered auxiliary cutoff equality, the health unordered branch, MAX operand selection, the six genuine fast_ftol_C health calls, and the exact January assertion text. Target is3493 meaningful/3504 padded bytes; candidate3460/3472, both102 relocations, but instruction/register/x87 scheduling remains nonexact. All20 inherited HUD Unit exact functions are preserved and the real renderer caller naturally retains the newly exact private initializer51 meaningful/64 padded bytes. Complete owner census finds no point_from_line3d or COMMON. The authentic existing fast_ftol helper also emits a candidate-only32-byte COMDAT; it receives no HUD Unit exact credit and its selected-owner/coalescing boundary still blocks whole-object admission. No forced inline, manual helper expansion, new renderer assembly, compiler flag change, volatile/register steering, fake lifetime, raw-offset view or nonsensical exactness control was used. Reopen only for new authentic January source/type/compiler-context evidence, not spelling or allocation searches. See docs/object_matching_logs/hud_unit_obj_renderer_independent_review_20260904.md and hud_unit_obj_renderer_integration_20260904.md. This park grants no exact renderer or whole-object completion credit.",
+      "measurements": {
+        "target": {
+          "size": 3504,
+          "relocation_count": 102,
+          "normalized_sha256": "b82d575e1154cad1dd27cee874e9af5cc4b86dc302ea41685b56181ba32d93bc"
+        },
+        "base": {
+          "size": 3472,
+          "relocation_count": 102,
+          "normalized_sha256": "4071a4f0c7b1f808423bd5673e822e7f3c6a036e9a3a2db0fe7bd14b413b1817"
+        },
+        "objdiff_percent": 78.98858
+      }
+    },
+    {
       "unit": "source/interface/hud_sounds",
       "function": "_hud_play_sound",
       "class": "unclassified",

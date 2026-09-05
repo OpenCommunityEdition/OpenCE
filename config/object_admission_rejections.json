@@ -2,6 +2,14 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/interface/hud_unit",
+      "class": "candidate-only-comdat-owner",
+      "symbol": "_fast_ftol",
+      "reason": "The new source-authentic renderer naturally emits an unreferenced select-any32-byte fast_ftol copy absent from January HUD Unit. Its body equals January's selected Actor Combat helper, but that selected owner is no-duplicates and the prior ordinary XDK link test rejects the duplicate. Genuine initializer/data credit and the honest renderer park remain valid; identical helper bytes do not prove whole-object ownership.",
+      "evidence": "docs/object_matching_logs/hud_unit_obj_renderer_integration_20260904.md#honest-residual-and-complete-owner-boundary",
+      "reopen": "Remove only after authentic source topology preserves the January helper schedule without extra emission, or an ordinary base/base link proves a compatible authenticated canonical selected owner can coalesce the copy. Do not force inline, manually expand the helper, alter comparator/selection metadata, invent a discard pass, or count another object's selected bytes. The renderer must independently become strict and all other source/data/linkage checks must pass before Matching admission."
+    },
+    {
       "unit": "source/interface/player_ui",
       "class": "source-layout-incomplete",
       "symbol": "struct playlist_profile",

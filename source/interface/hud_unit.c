@@ -76,6 +76,7 @@ symbols in this file:
 #include "interface/hud_definitions.h"
 #include "interface/hud_draw.h"
 #include "interface/hud.h"
+#include "interface/motion_sensor.h"
 #include "interface/hud_unit.h"
 #include "interface/unit_hud_interface_definition.h"
 #include "render/render.h"
@@ -285,6 +286,23 @@ void unit_hud_shield_meter_mapper_init(
 }
 
 /* ---------- private code */
+
+static void initialize_hud_state(
+	struct unit_hud_state *hud_state)
+{
+	csmemset(
+		hud_state->auxilary_flash_time,
+		NONE,
+		sizeof(hud_state->auxilary_flash_time));
+	hud_state->last_body_vitality = -1.0f;
+	hud_state->last_shield_vitality = -1.0f;
+	hud_state->last_health_flash_time = NONE;
+	hud_state->last_motion_sensor_flash_time = NONE;
+	hud_state->fade_time = -1.0f;
+	hud_state->last_unit_index = NONE;
+
+	return;
+}
 
 static struct unit_hud_state *get_hud_state(
 	short local_player_index)
@@ -856,4 +874,594 @@ void hud_update_unit(
 	return;
 }
 
-/* ---------- private code */
+/* ---------- public code */
+
+void hud_render_unit_interface(
+	struct player_datum *player)
+{
+	static long overcharge_count = 4;
+	long return_eip = get_return_eip();
+	long stack_buffer[STACK_BUFFER_LENGTH];
+
+	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\hud_unit.c",
+		0x209,
+		player->local_player_index==render.local_player_index);
+
+	if (player->local_player_index == render.local_player_index &&
+		player->unit_index != NONE)
+	{
+		short local_player_index = player->local_player_index;
+		struct unit_datum *unit = unit_get(player->unit_index);
+		struct unit_definition const *unit_definition =
+			unit_definition_get(unit->definition_index);
+		long player_index = local_player_get_player_index(local_player_index);
+		struct unit_hud_state *hud_state = get_hud_state(local_player_index);
+		long unit_indices[18] = { player->unit_index };
+		long unit_hud_indices[18] =
+		{
+			unit_definition_get_active_hud_index(
+				unit_definition,
+				local_player_count() > 1)
+		};
+		long unit_count = 1;
+		unsigned long auxilary_flags;
+		unsigned long aux_activated_when_disabled_flags;
+		real auxilary_values[1];
+
+		if (hud_state->last_unit_index == NONE)
+			initialize_hud_state(get_hud_state(local_player_index));
+		hud_state->last_unit_index = player->unit_index;
+
+		if (unit->object.parent_object_index != NONE &&
+			unit->unit.parent_seat_index != NONE)
+		{
+			long parent_unit_index = unit->object.parent_object_index;
+			struct unit_datum *parent_unit = unit_get(parent_unit_index);
+			struct unit_definition const *parent_unit_definition =
+				unit_definition_get(parent_unit->definition_index);
+			struct unit_seat const *seat = TAG_BLOCK_GET_ELEMENT(
+				&parent_unit_definition->unit.seats,
+				unit->unit.parent_seat_index,
+				struct unit_seat);
+			long parent_hud_index;
+
+			get_hud_state(local_player_index);
+			parent_hud_index = unit_definition_get_active_hud_index(
+				parent_unit_definition,
+				local_player_count() > 1);
+
+			if (TEST_FLAG(seat->flags, _unit_seat_driver_bit))
+			{
+				long child_unit_index;
+
+				if (parent_hud_index != NONE)
+				{
+					unit_indices[1] = parent_unit_index;
+					unit_hud_indices[1] = parent_hud_index;
+					unit_count = 2;
+				}
+
+				child_unit_index = parent_unit->object.first_child_object_index;
+				while (child_unit_index != NONE && unit_count < NUMBEROF(unit_indices))
+				{
+					struct object_datum *child_object = object_get(child_unit_index);
+					struct unit_datum *child_unit = unit_try_and_get(child_unit_index);
+
+					if (child_unit &&
+						child_unit->object.parent_object_index == parent_unit_index &&
+						child_unit->unit.parent_seat_index != NONE)
+					{
+						unit_indices[unit_count] = child_unit_index;
+						unit_hud_indices[unit_count] =
+							unit_definition_get_seat_active_hud_index(
+								parent_unit_definition,
+								child_unit->unit.parent_seat_index,
+								local_player_count() > 1);
+						unit_count++;
+					}
+
+					child_unit_index = child_object->object.next_object_index;
+				}
+			}
+		}
+
+		auxilary_flags = unit->unit.integrated_light_power == 1.0f;
+		aux_activated_when_disabled_flags =
+			!TEST_FLAG(unit->unit.flags, _unit_integrated_light_on_bit) &&
+			unit->unit.integrated_light_battery < 0.2f &&
+			TEST_FLAG(unit->unit.control_flags, _unit_control_integrated_light_bit);
+		auxilary_values[0] = unit->unit.integrated_light_battery;
+
+		while (unit_count)
+		{
+			struct unit_datum *hud_unit;
+			long unit_hud_index;
+
+			unit_count--;
+			hud_unit = unit_try_and_get(unit_indices[unit_count]);
+			unit_hud_index = unit_hud_indices[unit_count];
+
+			if (hud_unit && unit_hud_index != NONE)
+			{
+				struct unit_hud_interface_definition *hud_definition =
+					unit_hud_interface_definition_get(unit_hud_index);
+
+				if (hud_definition->background.interface_bitmap.index != NONE)
+				{
+					short draw_flags = TEST_FLAG(
+						hud_unit->object.damage_flags,
+						_object_dead_bit) ? FLAG(_hud_draw_disabled_bit) : 0;
+
+					SET_FLAG(
+						draw_flags,
+						_hud_draw_in_multiplayer_bit,
+						local_player_count() > 1);
+					hud_draw_static_element(
+						local_player_index,
+						&hud_definition->absolute_placement,
+						&hud_definition->background,
+						draw_flags,
+						NONE);
+				}
+
+				if (game_engine_has_shield(player_index) &&
+					!TEST_FLAG(
+						unit_hud_globals->script_flags,
+						_hud_panel_shield_dont_show_bit))
+				{
+					short draw_flags =
+						hud_unit->object.shield_vitality < 0.25f ||
+						TEST_FLAG(
+							unit_hud_globals->script_flags,
+							_hud_panel_shield_blink_bit);
+
+					SET_FLAG(
+						draw_flags,
+						_hud_draw_disabled_bit,
+						TEST_FLAG(hud_unit->object.damage_flags, _object_dead_bit));
+					SET_FLAG(
+						draw_flags,
+						_hud_draw_in_multiplayer_bit,
+						local_player_count() > 1);
+
+					if (unit_count == 0)
+					{
+						if (TEST_FLAG(draw_flags, _hud_draw_flashing_bit))
+						{
+							if (hud_state->last_shield_flash_time == NONE)
+								hud_state->last_shield_flash_time = game_time_get();
+						}
+						else
+						{
+							hud_state->last_shield_flash_time = NONE;
+						}
+					}
+
+					if (hud_definition->shield_meter.meter.meter_bitmap.index != NONE)
+					{
+						real reference_shield_vitality;
+						short value_scale = hud_definition->shield_meter.meter.value_scale;
+						struct meter_hud_element_definition overcharge_meter =
+							hud_definition->shield_meter.meter;
+						pixel32 color[5] =
+						{
+							0,
+							0x00FF0000,
+							0x0000FF00,
+							0x00FFFF00,
+							0x007F00FF,
+						};
+						long overcharge_index;
+
+						game_engine_running();
+						if (unit_count == 0)
+							reference_shield_vitality = hud_state->last_shield_vitality;
+						else
+							reference_shield_vitality = hud_unit->object.shield_vitality;
+						if (value_scale == 0)
+							value_scale = UNSIGNED_CHAR_MAX;
+
+						for (overcharge_index = 0;
+							overcharge_index <= overcharge_count;
+							overcharge_index++)
+						{
+							real shield_vitality = PIN(
+								hud_unit->object.shield_vitality - (real)overcharge_index,
+								0.0f,
+								1.0f);
+							real last_shield_vitality = PIN(
+								reference_shield_vitality - (real)overcharge_index,
+								0.0f,
+								1.0f);
+							real maximum_shield_vitality = MAX(
+								last_shield_vitality,
+								shield_vitality);
+							real reference_time =
+								last_shield_vitality > shield_vitality ?
+									hud_state->fade_time : -1.0f;
+							struct meter_hud_element_definition const *meter;
+
+							if (shield_vitality <= 0.0f &&
+								maximum_shield_vitality <= 0.0f)
+							{
+								break;
+							}
+
+							overcharge_meter.min_color = color[overcharge_index];
+							overcharge_meter.max_color = color[overcharge_index];
+							meter = overcharge_index == 0 ?
+								&hud_definition->shield_meter.meter :
+								&overcharge_meter;
+							hud_draw_meter(
+								local_player_index,
+								&hud_definition->absolute_placement,
+								meter,
+								(byte)PIN(
+									fast_ftol((real)value_scale * shield_vitality),
+									0,
+									UNSIGNED_CHAR_MAX),
+								(byte)PIN(
+									fast_ftol((real)value_scale * maximum_shield_vitality),
+									0,
+									UNSIGNED_CHAR_MAX),
+								draw_flags,
+								reference_time,
+								shield_vitality);
+						}
+					}
+
+					if (hud_definition->shield_meter.background.interface_bitmap.index != NONE)
+					{
+						hud_draw_static_element(
+							local_player_index,
+							&hud_definition->absolute_placement,
+							&hud_definition->shield_meter.background,
+							draw_flags,
+							hud_state->last_shield_flash_time);
+					}
+				}
+
+				if (!TEST_FLAG(
+					unit_hud_globals->script_flags,
+					_hud_panel_health_dont_show_bit))
+				{
+					short draw_flags =
+						TEST_FLAG(
+							hud_unit->object.damage_flags,
+							_object_shield_depleted_bit) ||
+						TEST_FLAG(
+							unit_hud_globals->script_flags,
+							_hud_panel_health_blink_bit);
+
+					SET_FLAG(
+						draw_flags,
+						_hud_draw_disabled_bit,
+						TEST_FLAG(hud_unit->object.damage_flags, _object_dead_bit));
+					SET_FLAG(
+						draw_flags,
+						_hud_draw_in_multiplayer_bit,
+						local_player_count() > 1);
+
+					if (unit_count == 0)
+					{
+						if (TEST_FLAG(draw_flags, _hud_draw_flashing_bit))
+						{
+							if (hud_state->last_health_flash_time == NONE)
+								hud_state->last_health_flash_time = game_time_get();
+						}
+						else
+						{
+							hud_state->last_health_flash_time = NONE;
+						}
+					}
+
+					if (hud_definition->health_meter.meter.meter_bitmap.index != NONE)
+					{
+						short value_scale = hud_definition->health_meter.meter.value_scale;
+						struct meter_hud_element_definition health_meter =
+							hud_definition->health_meter.meter;
+
+						if (value_scale == 0)
+							value_scale = 8;
+						if (!(hud_unit->object.body_vitality >=
+							hud_definition->health_meter.health_extras.max_cutoff))
+						{
+							if (hud_unit->object.body_vitality <=
+								hud_definition->health_meter.health_extras.min_cutoff)
+							{
+								health_meter.max_color = health_meter.min_color;
+							}
+							else
+							{
+								health_meter.max_color =
+									hud_definition->health_meter.health_extras.mid_color;
+							}
+						}
+						health_meter.min_color = health_meter.max_color;
+
+						hud_draw_meter(
+							local_player_index,
+							&hud_definition->absolute_placement,
+							&health_meter,
+							(byte)PIN(
+								fast_ftol_C(
+									(real)value_scale * hud_unit->object.body_vitality),
+								0,
+								UNSIGNED_CHAR_MAX),
+							(byte)PIN(
+								fast_ftol_C(
+									(real)value_scale * hud_unit->object.body_vitality),
+								0,
+								UNSIGNED_CHAR_MAX),
+							draw_flags,
+							-1.0f,
+							hud_unit->object.body_vitality);
+					}
+
+					if (hud_definition->health_meter.background.interface_bitmap.index != NONE)
+					{
+						hud_draw_static_element(
+							local_player_index,
+							&hud_definition->absolute_placement,
+							&hud_definition->health_meter.background,
+							draw_flags,
+							hud_state->last_health_flash_time);
+					}
+
+					hud_state->last_body_vitality = hud_unit->object.body_vitality;
+				}
+
+				if (unit_count == 0 &&
+					!TEST_FLAG(
+						unit_hud_globals->script_flags,
+						_hud_panel_motion_sensor_dont_show_bit) &&
+					game_engine_hud_draw_motion_sensor(player_index))
+				{
+					struct hud_absolute_placement_definition absolute_placement;
+					short draw_flags = 0;
+					point2d corner;
+
+					absolute_placement.corner = _hud_anchor_bottom_left;
+					SET_FLAG(
+						draw_flags,
+						_hud_draw_in_multiplayer_bit,
+						local_player_count() > 1);
+					SET_FLAG(
+						draw_flags,
+						_hud_draw_flashing_bit,
+						TEST_FLAG(
+							unit_hud_globals->script_flags,
+							_hud_panel_motion_sensor_blink_bit));
+
+					if (TEST_FLAG(draw_flags, _hud_draw_flashing_bit))
+					{
+						if (hud_state->last_motion_sensor_flash_time == NONE)
+							hud_state->last_motion_sensor_flash_time = game_time_get();
+					}
+					else
+					{
+						hud_state->last_motion_sensor_flash_time = NONE;
+					}
+
+					if (hud_definition->motion_sensor.background.interface_bitmap.index != NONE)
+					{
+						hud_draw_static_element(
+							local_player_index,
+							&absolute_placement,
+							&hud_definition->motion_sensor.background,
+							draw_flags,
+							NONE);
+					}
+					if (hud_definition->motion_sensor.foreground.interface_bitmap.index != NONE)
+					{
+						hud_draw_static_element(
+							local_player_index,
+							&absolute_placement,
+							&hud_definition->motion_sensor.foreground,
+							draw_flags,
+							NONE);
+					}
+
+					hud_calculate_point(
+						local_player_index,
+						&absolute_placement,
+						&hud_definition->blip_placement,
+						NULL,
+						local_player_count() > 1,
+						0.0f,
+						&corner);
+					motion_sensor_draw_screen(
+						local_player_index,
+						local_player_count() > 1,
+						&corner);
+				}
+
+				{
+					unsigned long overlay_type_flags = game_engine_has_teams() != FALSE;
+					short draw_flags = 0;
+					short overlay_index;
+
+					SET_FLAG(
+						draw_flags,
+						_hud_draw_in_multiplayer_bit,
+						local_player_count() > 1);
+					for (overlay_index = 0;
+						overlay_index < hud_definition->auxilary_panel.auxilary_overlays.count;
+						overlay_index++)
+					{
+						struct auxilary_overlay_definition *overlay = TAG_BLOCK_GET_ELEMENT(
+							&hud_definition->auxilary_panel.auxilary_overlays,
+							overlay_index,
+							struct auxilary_overlay_definition);
+
+						if (TEST_FLAG(overlay_type_flags, overlay->type))
+						{
+							if (TEST_FLAG(
+								overlay->flags,
+								_auxilary_overlay_use_team_color_bit))
+							{
+								overlay->static_element.colors.color =
+									real_rgb_color_to_pixel32(
+										&hud_unit->object.base_change_colors[0]) |
+									0xFF000000;
+							}
+
+							hud_draw_static_element(
+								local_player_index,
+								&hud_definition->auxilary_panel.absolute_placement,
+								&overlay->static_element,
+								draw_flags,
+								NONE);
+						}
+					}
+				}
+
+				{
+					short meter_index;
+
+					for (meter_index = 0;
+						meter_index < hud_definition->auxilary_meters.count;
+						meter_index++)
+					{
+						struct auxilary_meter_definition *meter = TAG_BLOCK_GET_ELEMENT(
+							&hud_definition->auxilary_meters,
+							meter_index,
+							struct auxilary_meter_definition);
+
+						if (TEST_FLAG(
+								hud_state->auxilary_active_type_flags,
+								meter->type) &&
+							!TEST_FLAG(auxilary_flags, meter->type))
+						{
+							hud_state->auxilary_flash_time[meter->type] = NONE;
+						}
+
+						if (TEST_FLAG(auxilary_flags, meter->type))
+						{
+							long background_bitmap_index = verify_tag_reference(
+								&meter->panel.background.interface_bitmap);
+							long meter_bitmap_index = verify_tag_reference(
+								&meter->panel.meter.meter_bitmap);
+							short draw_flags = 0;
+							short *flash_time =
+								&hud_state->auxilary_flash_time[meter->type];
+
+							SET_FLAG(
+								draw_flags,
+								_hud_draw_in_multiplayer_bit,
+								local_player_count() > 1);
+							SET_FLAG(
+								draw_flags,
+								_hud_draw_flashing_bit,
+								auxilary_values[meter->type] <=
+									meter->panel.aux_extras.min_cutoff);
+							*flash_time += game_time_get_elapsed();
+							*flash_time %= 2 * get_flash_duration(
+								&meter->panel.background.colors);
+
+							if (background_bitmap_index != NONE)
+							{
+								hud_draw_static_element(
+									local_player_index,
+									&hud_definition->absolute_placement,
+									&meter->panel.background,
+									draw_flags,
+									game_time_get() - *flash_time);
+							}
+
+							if (meter_bitmap_index != NONE)
+							{
+								real value = auxilary_values[meter->type];
+								real value_scale = (real)meter->panel.meter.value_scale;
+
+								hud_draw_meter(
+									local_player_index,
+									&hud_definition->absolute_placement,
+									&meter->panel.meter,
+									(byte)PIN(
+										fast_ftol(value_scale * value),
+										0,
+										UNSIGNED_CHAR_MAX),
+									(byte)PIN(
+										fast_ftol(value_scale * value),
+										0,
+										UNSIGNED_CHAR_MAX),
+									draw_flags,
+									-1.0f,
+									value);
+							}
+						}
+						else if (TEST_FLAG(
+							aux_activated_when_disabled_flags,
+							meter->type) ||
+							(hud_state->auxilary_flash_time[meter->type] != NONE &&
+								hud_state->auxilary_flash_time[meter->type] <
+									get_flash_duration(&meter->panel.background.colors)))
+						{
+							long background_bitmap_index = verify_tag_reference(
+								&meter->panel.background.interface_bitmap);
+							short draw_flags = FLAG(_hud_draw_flashing_bit);
+							short *flash_time =
+								&hud_state->auxilary_flash_time[meter->type];
+
+							SET_FLAG(
+								draw_flags,
+								_hud_draw_in_multiplayer_bit,
+								local_player_count() > 1);
+							*flash_time += game_time_get_elapsed();
+
+							if (background_bitmap_index != NONE)
+							{
+								hud_draw_static_element(
+									local_player_index,
+									&hud_definition->absolute_placement,
+									&meter->panel.background,
+									draw_flags,
+									game_time_get() - *flash_time);
+							}
+						}
+						else
+						{
+							hud_state->auxilary_flash_time[meter->type] = NONE;
+						}
+					}
+				}
+
+				hud_state->auxilary_active_type_flags = (word)auxilary_flags;
+			}
+		}
+	}
+
+	{
+		short corrupt_index;
+		short buffer_index;
+
+		for (buffer_index = STACK_BUFFER_LENGTH - 1; buffer_index >= 0; buffer_index--)
+		{
+			if (stack_buffer[buffer_index] != STACK_BUFFER_FILL)
+				goto corrupt_stack_found;
+		}
+
+		corrupt_index = NONE;
+		goto stack_buffer_checked;
+
+corrupt_stack_found:
+		corrupt_index = buffer_index;
+
+stack_buffer_checked:
+		match_vassert(
+			"c:\\halo\\SOURCE\\interface\\hud_unit.c",
+			0x3C9,
+			return_eip == get_return_eip(),
+			"corrupt return address!");
+		match_vassert(
+			"c:\\halo\\SOURCE\\interface\\hud_unit.c",
+			0x3C9,
+			corrupt_index == NONE,
+			csprintf(temporary, "corrupt stack at %d!", corrupt_index));
+	}
+
+	return;
+}
