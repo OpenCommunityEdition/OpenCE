@@ -67,7 +67,7 @@ struct transport_address
 	long address_type;
 };
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes */
 
 short transport_initialize(
 	void);

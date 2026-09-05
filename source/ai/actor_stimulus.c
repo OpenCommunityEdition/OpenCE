@@ -5,7 +5,7 @@ symbols in this file:
 00024E70 0030:
 	_actor_stimulus_clear (0000)
 00024EA0 00d0:
-	_code_00024ea0 (0000)
+	_actor_stimulus_combat (0000)
 00024F70 0060:
 	_actor_stimulus_surprise (0000)
 00024FD0 0060:
@@ -139,6 +139,7 @@ enum
 
 enum
 {
+	_actor_panic_friend_fleeing = 2,
 	_actor_panic_friend_same_type_killed = 3,
 	_actor_panic_platoon_retreating = 6,
 	_actor_panic_friend_leader_type_killed = 8,
@@ -1124,6 +1125,50 @@ void actor_stimulus_abandon_stationary_facing(
 					actor->emotions.perceived_danger = MAX(
 						actor->emotions.perceived_danger,
 						1.8f);
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+void actor_stimulus_prop_fleeing(
+	long actor_index,
+	long prop_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition =
+		actor_definition_get(actor->meta.definition_index);
+	struct prop_datum *prop = prop_get(prop_index);
+
+	if (!prop->enemy &&
+		TEST_FLAG(definition->flags2,
+			_actor_definition_flags2_panic_in_groups_bit) &&
+		game_time_get() > actor->emotions.flee_with_friends_disable_time)
+	{
+		real desire_to_flee = definition->panic.panic_chance_friend_killed;
+
+		if (actor_emotion_flee_with_friends(actor_index, &desire_to_flee) ||
+			real_seed_random(get_global_random_seed_address()) < desire_to_flee)
+		{
+			if (actor->stimuli.panic_type < _actor_panic_friend_same_type_killed)
+			{
+				long flee_prop_index = actor->target.target_prop_index;
+
+				if (prop->actor_index != NONE)
+				{
+					struct actor_datum *fleeing_actor = actor_get(prop->actor_index);
+
+					if (fleeing_actor->state.action == _actor_action_flee &&
+						fleeing_actor->state.action_data.flee.flee_prop_index != NONE)
+					{
+						flee_prop_index = prop_get_active_by_unit_index(
+							actor_index,
+							prop_get(fleeing_actor->state.action_data.flee.flee_prop_index)->unit_index);
+					}
+					actor->stimuli.panic_type = _actor_panic_friend_fleeing;
+					actor->stimuli.panic_prop_index = flee_prop_index;
 				}
 			}
 		}

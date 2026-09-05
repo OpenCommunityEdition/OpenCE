@@ -21,6 +21,8 @@ header included in hcex build.
 
 /* ---------- prototypes/TRANSPORT_ENDPOINT_SET_WINSOCK.C */
 
+void transport_client_stop(
+	void);
 XNADDR *transport_get_xnaddr(
 	XNADDR *address);
 XNKID transport_get_key_id(

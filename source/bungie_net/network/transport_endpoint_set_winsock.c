@@ -154,7 +154,9 @@ static int __cdecl transport_endpoint_set_compare_entries(
 
 /* ---------- globals */
 
-extern long global_key_depth;
+boolean transport_initialized = FALSE;
+boolean global_client_active = FALSE;
+long global_key_depth = 0;
 extern XNADDR global_address;
 extern XNKID global_key_id;
 extern XNKEY global_key;
@@ -239,6 +241,23 @@ void transport_pop_key(
 		XNetUnregisterKey(&global_key_id);
 	}
 	return;
+}
+
+void transport_client_stop(
+	void)
+{
+	if (global_client_active)
+	{
+		transport_pop_key();
+		global_client_active = FALSE;
+	}
+	return;
+}
+
+boolean transport_network_available(
+	void)
+{
+	return (XNetGetEthernetLinkStatus() & XNET_ETHERNET_LINK_ACTIVE) != 0;
 }
 
 struct transport_endpoint_set *create_endpoint_set(

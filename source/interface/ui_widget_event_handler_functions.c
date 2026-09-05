@@ -908,6 +908,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "bungie_net/network/transport.h"
 #include "interface/player_ui.h"
 #include "interface/ui_widget_definitions.h"
 
@@ -976,24 +977,6 @@ struct network_game_join_descriptor
 	short unknown02;
 	byte unknown04[0x0E];
 	byte token[0x12];
-};
-
-struct transport_address_data
-{
-	union
-	{
-		unsigned long long_words[4];
-		word words[8];
-		byte bytes[16];
-	};
-};
-
-struct transport_address
-{
-	struct transport_address_data address;
-	word address_length;
-	word port;
-	long address_type;
 };
 
 struct game_variant_data
@@ -1122,8 +1105,6 @@ struct widget_instance *widget_instance_get_topmost_parent(
 struct widget_instance *widget_instance_get_nth_child(
 	struct widget_instance *widget,
 	long n);
-boolean transport_network_available(
-	void);
 void display_error(
 	short error_code,
 	short local_player_index,

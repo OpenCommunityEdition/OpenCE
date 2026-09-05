@@ -3,6 +3,17 @@
   "entries": [
     {
       "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
+      "function": "_transport_network_available",
+      "class": "unclassified",
+      "evidence": "Restore the natural boolean XDK Ethernet-link query under current fuzzy-park policy. January and candidate both16padded/1reloc, calling the real XNetGetEthernetLinkStatus API and testing its named XNET_ETHERNET_LINK_ACTIVE mask. January masks AL, natural C masks EAX; no cast, flag, declaration-order or register search is repeated from the August26 exact-only rejection. Existing transport.h owns the boolean(void) API; UI event handler consumes that owner instead of a local prototype and duplicate transport-address layouts. All14 current strict target functions and5 inherited parks remain unchanged; no new code/COMMON/point_from_line3d is introduced. Unknown source/compiler mechanism, no exact credit. Reopen only for authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_set_winsock_obj_client_stop_bss_lifecycle_leaves_20260904.md and the admitting batch checkpoint.",
+      "measurements": {
+        "target": {"size": 16, "relocation_count": 1, "normalized_sha256": "73954fa0da7600bd1a60ddb3387eafabb788779227be715ec886a2fb1bdfe783"},
+        "base": {"size": 16, "relocation_count": 1, "normalized_sha256": "eef4bf49c6b243bcaae881c7f8494b0d0f6d9e65505d6dbe7d8138d1f2b12b2b"},
+        "objdiff_percent": 98.333336
+      }
+    },
+    {
+      "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
       "function": "_transport_endpoint_set_compare_entries",
       "class": "unclassified",
       "evidence": "Natural typed qsort callback reconstructed with its real poll caller. Both entries are loaded, non-NULL entries precede NULL entries, and the callback returns the January -1/0/1 relation. Private semantic name is inferred and mapped to the original target owner at 0x70B10 without an alias or linkage change. Both48B/0relocs; only EAX/ECX assignment differs. No register/declaration-order search or ABI steering. All12 inherited exact owners and the nonce park are unchanged; no candidate-only code or point_from_line3d is emitted. Reopen only for authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_set_winsock_obj_set_operations_cluster_20260904.md.",
