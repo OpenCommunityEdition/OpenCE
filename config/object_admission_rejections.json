@@ -2,6 +2,14 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/interface/hud_draw",
+      "class": "candidate-only-comdat-owner",
+      "symbol": "_fast_ftol",
+      "reason": "The exact flash-duration leaf uses the authentic shared conversion helper and naturally emits an additional unreferenced select-any32-byte fast_ftol copy absent from January HUD Draw. January's identical selected Actor Combat copy is no-duplicates; its ordinary XDK duplicate-owner failure is already documented. The two newly exact drawing helpers receive valid target-function credit, but no whole-object or linked-coalescing claim follows.",
+      "evidence": "docs/object_matching_logs/hud_draw_obj_two_exact_leaves_integration_20260904.md#complete-owner-boundary",
+      "reopen": "Require authentic source topology or an ordinary base/base link with an authenticated compatible canonical selected helper before clearing this veto. Do not force inline, manually expand math, alter target/COMDAT metadata, invent a discard pass, or credit candidate-only helper bytes. All remaining HUD Draw functions/data/linkage/source checks must independently pass before whole-object Matching."
+    },
+    {
       "unit": "source/interface/hud_unit",
       "class": "candidate-only-comdat-owner",
       "symbol": "_fast_ftol",

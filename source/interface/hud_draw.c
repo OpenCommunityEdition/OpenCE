@@ -85,6 +85,7 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "math/real_math.h"
 #include "interface/hud_draw.h"
+#include "interface/unit_hud_interface_definition.h"
 
 /* ---------- constants */
 
@@ -122,6 +123,35 @@ real hud_globals_get_scale(
 	boolean in_multiplayer)
 {
 	return 1.0f;
+}
+
+pixel32 real_alpha_intensity_to_pixel32(
+	real alpha,
+	real intensity)
+{
+	real_argb_color color;
+
+	match_assert(
+		"..\\bitmaps\\bitmaps_inlines.h",
+		0x13F,
+		alpha>=0.0f && alpha<=1.0f);
+	match_assert(
+		"..\\bitmaps\\bitmaps_inlines.h",
+		0x140,
+		intensity>=0.0f && intensity<=1.0f);
+
+	color.alpha = alpha;
+	color.red = intensity;
+	color.green = intensity;
+	color.blue = intensity;
+
+	return real_argb_color_to_pixel32(&color);
+}
+
+long get_flash_duration(
+	struct hud_color_definition const *hud_color)
+{
+	return fast_ftol(hud_color->flash_period * 30.0f);
 }
 
 /* ---------- private code */
