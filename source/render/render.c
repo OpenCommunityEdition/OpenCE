@@ -219,7 +219,7 @@ static void code_00174410(
 {
 	struct rasterizer_window_begin_parameters parameters;
 
-	profile_render_window_start(NULL);
+	profile_render_window_start(FALSE);
 	memset(&parameters, 0, sizeof(parameters));
 
 	render.camera = window->render_camera;
@@ -265,7 +265,7 @@ void render_frame_pregame(
 
 	rasterizer_frame_begin(&parameters);
 	rasterizer_windows_begin();
-	profile_render_window_start(NULL);
+	profile_render_window_start(FALSE);
 
 	memset(&rasterizer_parameters, 0, sizeof(rasterizer_parameters));
 
@@ -328,7 +328,7 @@ static void code_001746f0(
 	struct rasterizer_window_begin_parameters parameters;
 	short rendered_cluster_index;
 
-	profile_render_window_start((void *)TRUE);
+	profile_render_window_start(TRUE);
 	render.scene_index++;
 	memset(&parameters, 0, sizeof(parameters));
 

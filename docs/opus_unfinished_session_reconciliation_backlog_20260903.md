@@ -424,3 +424,19 @@ functions**, **2,028,747 data bytes**, **391/833 Matching objects**, and
 **267 valid parks**. All 288 tests plus 26 subtests pass. Active Fable remains
 untouched; older withheld dependencies and the pending separate Opus intake
 remain open rather than being counted as integrated.
+
+### Profile window boolean API: 902,009 bytes (2026-09-04)
+
+`profile_render_window_start` adds **133 meaningful / 144 padded exact code
+bytes**, accompanied by the correct owning boolean declaration and all three
+Render caller repairs. The full 25-consumer header blast preserves every
+inherited strict owner. Profile is **31E/0R/13U**; Render remains 13 exact,
+Units 189 exact, and the full sweep reaches **6,208 strict owners**.
+See `object_matching_logs/profile_obj_window_start_boolean_api_20260904.md`.
+
+Verified working totals are **902,009 meaningful code bytes**, **6,162 credited
+functions**, **2,028,747 data bytes**, **391/833 Matching objects**, and **267
+valid parks**. The general campaign next examines genuine Network Connection
+server-idle caller/helper topology and a Texture Cache source-owner repair.
+Neither scratch proposal is credited before full integration. Fable's active
+Network Server Manager and all other assigned files remain excluded.

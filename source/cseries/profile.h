@@ -98,7 +98,8 @@ void profile_enter_private(
 void profile_exit_private(
 	struct profile_section *section);
 
-void profile_render_window_start(void *arg0);
+void profile_render_window_start(
+	boolean player_window);
 void profile_render_window_end(void);
 void profile_render_start(
 	void);

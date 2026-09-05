@@ -668,6 +668,30 @@ void profile_tick_end(
 	return;
 }
 
+void profile_render_window_start(
+	boolean player_window)
+{
+	__int64 timebase;
+	struct profile_timer *timer;
+
+	if (profile_globals.current_frame.window_count<MAXIMUM_WINDOWS)
+	{
+		profile_globals.current_frame.window_count++;
+		profile_globals.current_frame.window_ids[profile_globals.current_frame.window_count-1] = player_window;
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\cseries\\profile.c",
+		353,
+		(profile_globals.current_frame.window_count > 0) && (profile_globals.current_frame.window_count <= MAXIMUM_WINDOWS));
+
+	timer = &profile_globals.current_frame.windows[profile_globals.current_frame.window_count-1];
+	QUERY_TIMEBASE(timebase);
+	timer->start = timebase;
+
+	return;
+}
+
 void profile_render_window_end(
 	void)
 {
