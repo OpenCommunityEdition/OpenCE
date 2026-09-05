@@ -135,6 +135,7 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "math/real_math.h"
 #include "rasterizer/rasterizer_debug.h"
+#include "render/render.h"
 #include "render/render_debug.h"
 #include "render/render_debug_geometry.h"
 
@@ -182,6 +183,55 @@ void render_debug_triangle(
 		point0,
 		point1,
 		point2,
+		color);
+
+	return;
+}
+
+void render_debug_quadrilateral(
+	boolean immediate,
+	real_point3d const *point0,
+	real_point3d const *point1,
+	real_point3d const *point2,
+	real_point3d const *point3,
+	real_argb_color const *color)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		499,
+		immediate);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		500,
+		point0);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		501,
+		point1);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		502,
+		point2);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		503,
+		point3);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		504,
+		color);
+
+	render_debug_triangle(
+		immediate,
+		point0,
+		point1,
+		point2,
+		color);
+	render_debug_triangle(
+		immediate,
+		point0,
+		point2,
+		point3,
 		color);
 
 	return;
@@ -393,6 +443,71 @@ void render_debug_quaternion(
 
 	matrix4x3_from_point_and_quaternion(&matrix, point, quaternion);
 	render_debug_matrix(immediate, &matrix, size);
+	return;
+}
+
+void render_debug_box2d_outline(
+	boolean immediate,
+	real_rectangle2d const *bounds,
+	real_argb_color const *color)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		745,
+		bounds);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		746,
+		color);
+
+	if (immediate)
+	{
+		real_point3d points[4];
+
+		points[0].x = bounds->x0;
+		points[0].y = bounds->y0;
+		points[0].z = -1.0f;
+		points[1].x = bounds->x1;
+		points[1].y = bounds->y0;
+		points[1].z = -1.0f;
+		points[2].x = bounds->x1;
+		points[2].y = bounds->y1;
+		points[2].z = -1.0f;
+		points[3].x = bounds->x0;
+		points[3].y = bounds->y1;
+		points[3].z = -1.0f;
+
+		matrix4x3_transform_point(
+			&render.frustum.view_to_world,
+			&points[0],
+			&points[0]);
+		matrix4x3_transform_point(
+			&render.frustum.view_to_world,
+			&points[1],
+			&points[1]);
+		matrix4x3_transform_point(
+			&render.frustum.view_to_world,
+			&points[2],
+			&points[2]);
+		matrix4x3_transform_point(
+			&render.frustum.view_to_world,
+			&points[3],
+			&points[3]);
+
+		render_debug_polygon_edges(
+			points,
+			NUMBEROF(points),
+			color);
+	}
+	else
+	{
+		match_vassert(
+			"c:\\halo\\SOURCE\\render\\render_debug.c",
+			765,
+			FALSE,
+			"can't add box2d to debug cache");
+	}
+
 	return;
 }
 

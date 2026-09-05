@@ -326,3 +326,52 @@ rules; one local-random helper also differs from the selected implementation.
 The source is not lost or counted as completed. Do not solve this by false
 exports, suppressing authentic calls, declaration-order steering, or forcing
 an inline schedule. The new Fable lane remains untouched until user handoff.
+
+### Published boundary refresh: 900,486 bytes (2026-09-04)
+
+Subsequent verified publications are `416c57f21` (Saved Game enumeration and
+endpoint ownership), `a5c2c50ab` (endpoint-set operations and Telnet ownership),
+`6132b8d0e` (Actor Stimulus fleeing and transport client lifecycle), and
+`47c947b37` (the older Opus AI race mapper with its correct public declaration).
+Both authorized GitHub refs are verified at the last commit. Canonical and
+GitHub now contain **900,486 meaningful credited code bytes**, **6,153 credited
+functions**, **2,028,615 credited data bytes**, and **391/833 Matching objects**.
+All **6,199 inherited/current stable exact owners** survive the latest sweep;
+266 parks validate with no stale or invalid measurements.
+
+The mapper was not absent from all earlier investigations: the August 21
+vehicle-event ledger called it already attempted. Frozen Opus source now
+provides a successful, independently audited selective replay (+74 meaningful
+bytes), not an unreviewed donor total. See
+`object_matching_logs/ai_obj_opus_race_mapper_reconciliation_20260904.md`.
+
+These publications do not mean every Claude lane is fully reconciled. The
+new active Fable lane and all assigned implementations remain excluded until
+the user hands them back. Leaf Map's shared projection boundary, the First
+Person Weapons helper-linkage conflict, and the separately pending newer Opus
+intake remain open. Other earlier object-level decisions may still contain
+separable public leaves worth reviewing; Render Debug and Profile are the
+next bounded checks. Historical raw candidate pools are not current
+admissible-byte estimates and must not be added to canonical progress.
+
+### Four further public Opus leaves: 901,368 bytes (2026-09-04)
+
+The next bounded replay admits Render Debug's quadrilateral/2D-outline pair
+and Profile's tick/window timer endings: **+882 meaningful / 912 padded
+bytes**, four functions, no strict regressions, and no new code/helper owner.
+The proper narrow geometry header passes its full blast; Profile uses its
+existing owner declarations and audited timestamp primitive. Totals are now
+**901,368 meaningful code bytes**, **6,157 credited functions**, **6,203 stable
+strict owners**, **391/833 Matching objects**, and **266 valid parks**.
+See `object_matching_logs/render_debug_profile_end_opus_reconciliation_20260904.md`.
+
+The Render Debug private input/structure lead is withheld because its sole
+real caller remains unwritten; the donor's external linkage is not admissible.
+The independently reconstructed StackWalk loader/comparator is also withheld
+because even its minimal correct common-header declaration regresses four
+unrelated exact functions and fails a data-owner identity check. The complete
+credible source and evidence are preserved in
+`object_matching_logs/stack_walk_windows_obj_loader_cluster_withheld_20260904.md`.
+All attempted header changes were restored, with a whole-tree zero-regression
+rebuild before the public-leaf admission. Neither withheld packet contributes
+to the totals above. Active Fable ownership remains excluded.

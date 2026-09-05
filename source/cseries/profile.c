@@ -271,6 +271,7 @@ symbols in this file:
 #include "profile.h"
 
 #include "math/real_math.h"
+#include "rasterizer/rasterizer.h"
 
 /* ---------- constants */
 
@@ -592,6 +593,46 @@ void profile_initialize(
 	profile_globals.current_frame_history_index = 0;
 	profile_globals.lost_frame_count = 999;
 	profile_globals.framedump_file = NULL;
+
+	return;
+}
+
+void profile_tick_end(
+	void)
+{
+	__int64 timebase;
+	struct profile_timer *timer;
+	real msec;
+
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 320,
+		(profile_globals.current_frame.game_tick_count > 0) && (profile_globals.current_frame.game_tick_count <= MAXIMUM_GAME_TICKS_PER_FRAME));
+
+	timer = &profile_globals.current_frame.game_ticks[profile_globals.current_frame.game_tick_count-1];
+	QUERY_TIMEBASE(timebase);
+	timer->end = timebase;
+	msec = (real)((timer->end-timer->start)*1000.0f/profile_globals.timebase_frequency);
+	timer->total += msec;
+	timer->frame_total += msec;
+
+	return;
+}
+
+void profile_render_window_end(
+	void)
+{
+	__int64 timebase;
+	struct profile_timer *timer;
+	real msec;
+
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 362,
+		(profile_globals.current_frame.window_count > 0) && (profile_globals.current_frame.window_count <= MAXIMUM_WINDOWS));
+
+	timer = &profile_globals.current_frame.windows[profile_globals.current_frame.window_count-1];
+	QUERY_TIMEBASE(timebase);
+	timer->end = timebase;
+	msec = (real)((timer->end-timer->start)*1000.0f/profile_globals.timebase_frequency);
+	timer->total += msec;
+	timer->frame_total += msec;
 
 	return;
 }

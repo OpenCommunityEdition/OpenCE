@@ -16,6 +16,17 @@ void render_debug_triangle(
 	real_point3d const *point1,
 	real_point3d const *point2,
 	real_argb_color const *color);
+void render_debug_quadrilateral(
+	boolean immediate,
+	real_point3d const *point0,
+	real_point3d const *point1,
+	real_point3d const *point2,
+	real_point3d const *point3,
+	real_argb_color const *color);
+void render_debug_box2d_outline(
+	boolean immediate,
+	real_rectangle2d const *bounds,
+	real_argb_color const *color);
 void render_debug_polygon(
 	real_point3d const *points,
 	short point_count,
