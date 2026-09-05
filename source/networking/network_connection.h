@@ -21,6 +21,10 @@ enum
 
 struct network_connection;
 struct transport_address;
+struct transport_endpoint;
+
+typedef void (*network_connection_rejection_procedure)(
+	struct transport_endpoint *endpoint);
 
 /* ---------- prototypes/NETWORK_CONNECTION.C */
 
@@ -53,7 +57,7 @@ boolean network_connection_write(
 boolean network_connection_idle(
 	struct network_connection *connection,
 	long timeout,
-	boolean flush);
+	struct network_connection **new_client_connection);
 boolean network_connection_disconnect(
 	struct network_connection *connection);
 boolean network_server_close_client_connection(
@@ -63,7 +67,7 @@ void network_connection_delete(
 	struct network_connection *connection);
 void network_connection_set_connection_rejection_procedure(
 	struct network_connection *connection,
-	void *connection_rejection_procedure);
+	network_connection_rejection_procedure connection_rejection_procedure);
 boolean network_connection_active(
 	struct network_connection *connection);
 boolean network_connection_going_stale(
@@ -78,6 +82,8 @@ void network_server_allow_client_connections(
 	boolean allow_client_connections);
 
 /* ---------- globals */
+
+extern boolean global_connection_dont_timeout;
 
 /* ---------- public code */
 

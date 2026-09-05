@@ -4852,6 +4852,44 @@
         },
         "objdiff_percent": 96.95652
       }
+    },
+    {
+      "unit": "source/networking/network_connection",
+      "function": "_network_connection_idle_server_reliable_endpoint",
+      "class": "unclassified",
+      "evidence": "Complete natural server-side reliable-endpoint idle path reconstructed with the authenticated endpoint-set and connection layouts, real callback type, and January-observable short-circuit order. The target invokes get_next_endpoint_from_set before testing the retained transport result on the loop backedge; the source preserves that order. The target also contains a redundant, unreachable duplicate capacity diagnostic after a safe four-slot store. The candidate deliberately does not manufacture that unreachable block. Target 704 bytes / 44 relocations versus candidate 672 bytes / 42, objdiff 84.9819 percent. The strict 128-byte private server-side constructor now materializes naturally, all 19 inherited emitted code owners are unchanged, no candidate-only code/COMMON/point_from_line3d is emitted, and the one-byte timeout global is strict. No register, declaration-order, fake-branch, ABI or compiler-control search was used. Reopen only for authentic source/debug/type/compiler-context evidence. See docs/object_matching_logs/network_connection_obj_server_idle_natural_boundary_20260904.md and scratch/network_connection_server_idle_final_report_20260904.json.",
+      "measurements": {
+        "target": {
+          "size": 704,
+          "relocation_count": 44,
+          "normalized_sha256": "f6b8e5e3395ee155cdac58d340554ca74a3f3cfa4b39defd48eb96d563c3cbf0"
+        },
+        "base": {
+          "size": 672,
+          "relocation_count": 42,
+          "normalized_sha256": "3c31501a1b919d340eaf248df5d3a5461a5d27229842307db87de592d3136ccd"
+        },
+        "objdiff_percent": 84.9819
+      }
+    },
+    {
+      "unit": "source/networking/network_connection",
+      "function": "_network_connection_idle",
+      "class": "unclassified",
+      "evidence": "Complete natural public connection-idle dispatcher reconstructed with its corrected third parameter struct network_connection **, genuine server/client reliable dispatch, named timeout global, endpoint reads, source-address append and 404-byte queue-safe buffer. January has five NULL client-manager callers and two output-pointer server-manager callers. Target/candidate are both 784 bytes / 46 relocations; objdiff 99.26966 percent. The first material difference follows the naturally fuzzy private helper call convention; remaining differences are ordinary result-carrier instruction selection. All 19 inherited emitted functions are byte/relocation-identical, the strict 128-byte constructor and strict one-byte BSS owner are separate admitted gains, and there are no extra code owners, COMMONs, forbidden point helper, fake export, representation pun or ABI lie. Reopen only for authentic source/debug/type/compiler-context evidence, not equivalent spelling or register searches. See docs/object_matching_logs/network_connection_obj_server_idle_natural_boundary_20260904.md and scratch/network_connection_server_idle_final_report_20260904.json.",
+      "measurements": {
+        "target": {
+          "size": 784,
+          "relocation_count": 46,
+          "normalized_sha256": "e1129c78e3cfd2d0cb1c05eaefb4f33994d07d3badb52769c5051203d212e59e"
+        },
+        "base": {
+          "size": 784,
+          "relocation_count": 46,
+          "normalized_sha256": "7375c170512a3bc064aa26fb33fa91c19781422eccc7087d4f5b6e7b41ec620c"
+        },
+        "objdiff_percent": 99.26966
+      }
     }
   ]
 }

@@ -895,6 +895,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "hs.h"
+#include "networking/network_connection.h"
 
 /* ---------- constants */
 
@@ -1047,7 +1048,6 @@ extern byte display_precache_progress[];
 extern byte display_vblank_deltas[];
 extern byte effects_corpse_nonviolent[];
 extern byte find_all_fucked_up_shit[];
-extern byte global_connection_dont_timeout[];
 extern byte global_frame_rate_throttle[];
 extern byte global_screenshot_count[];
 extern byte global_screenshot_size[];
@@ -1538,7 +1538,7 @@ struct hs_external_global_definition hs_external_global_definitions[442] =
 	{ "debug_player_color", _hs_type_short_integer, 0, debug_player_color },
 	{ "find_all_fucked_up_shit", _hs_type_boolean, 0, find_all_fucked_up_shit },
 	{ "allow_out_of_sync", _hs_type_boolean, 0, allow_out_of_sync },
-	{ "global_connection_dont_timeout", _hs_type_boolean, 0, global_connection_dont_timeout },
+	{ "global_connection_dont_timeout", _hs_type_boolean, 0, &global_connection_dont_timeout },
 	{ "run_game_scripts", _hs_type_boolean, 0, NULL },
 };
 

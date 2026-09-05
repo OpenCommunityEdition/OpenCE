@@ -463,3 +463,27 @@ subtests pass; 268 valid parks. Totals remain 902,009 meaningful code bytes,
 6,162 credited functions, 2,028,747 data bytes and 391/833 Matching objects.
 Network Connection is still a separately audited scratch proposal. Fable's
 active lane and every reserved implementation remain untouched.
+
+### Network Connection genuine idle cluster: 902,137 bytes (2026-09-04)
+
+The complete server/public idle cluster is now integrated through the real
+Network Connection header: pointer-to-pointer client output, typed rejection
+callback, all five existing client calls, and the HS scalar-global consumer.
+The private server-side constructor materializes naturally as 128 meaningful
+exact bytes, and its named timeout flag adds one strictly verified BSS byte.
+The two full idle functions are honest fuzzy parks: 84.9819% and 99.26966%.
+No unreachable duplicate diagnostic was fabricated to match the target.
+
+Full dependency Ninja and stable sweep pass: 6,209 strict owners, one gain,
+zero regressions. All 288 tests plus 26 subtests pass; 270 parks validate;
+admission remains unchanged at 0 candidates / 0 contradictions / 5 rejections
+/ 0 revocations. Verified totals are 902,137 meaningful code bytes, 6,163
+credited functions, 2,028,748 data bytes and 391/833 Matching objects.
+See `object_matching_logs/network_connection_obj_server_idle_natural_boundary_20260904.md`.
+
+The reserved canonical Server Manager currently has no reconstructed setter
+or idle caller to migrate; its future Fable code must consume this real API.
+No active Fable tree or reserved implementation was edited. Network write
+remains unwritten in this publication and is being separately researched;
+its proposed API corrections and source are not yet credited. Older Opus
+Profile frame-dump reconciliation also remains a separate unfinished packet.

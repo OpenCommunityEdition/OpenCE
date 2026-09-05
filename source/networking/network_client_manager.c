@@ -2623,7 +2623,7 @@ static boolean network_game_client_idle_searching(
 				network_event("network_game_client_initiate_join_game() failed");
 			}
 		}
-		else if (!(success = network_connection_idle(client->connection, 5000, FALSE)))
+		else if (!(success = network_connection_idle(client->connection, 5000, NULL)))
 		{
 			display_error_when_main_menu_loaded(7);
 			network_event("network_connection_idle() failed in network_game_client_idle_searching()");
@@ -2777,7 +2777,7 @@ static boolean network_game_client_idle_joining(
 			return FALSE;
 		}
 
-		success = network_connection_idle(client->connection, 5000, FALSE);
+		success = network_connection_idle(client->connection, 5000, NULL);
 
 		if (success)
 		{
@@ -2807,7 +2807,7 @@ static boolean network_game_client_idle_pregame(
 		{
 			network_game_client_precache_map(client);
 
-			if (!(success = network_connection_idle(client->connection, 15000, FALSE)))
+			if (!(success = network_connection_idle(client->connection, 15000, NULL)))
 			{
 				network_event("network_connection_idle() failed in network_game_client_idle_pregame()");
 			}
@@ -2872,7 +2872,7 @@ static boolean network_game_client_idle_ingame(
 
 		if (success == TRUE)
 		{
-			success = network_connection_idle(client->connection, 15000, FALSE);
+			success = network_connection_idle(client->connection, 15000, NULL);
 
 			if (success)
 			{
@@ -2912,7 +2912,7 @@ static boolean network_game_client_idle_postgame(
 
 	if (success)
 	{
-		if (!(success = network_connection_idle(client->connection, 15000, FALSE)))
+		if (!(success = network_connection_idle(client->connection, 15000, NULL)))
 		{
 			network_event("network_connection_idle() failed in network_game_client_idle_postgame()");
 		}
