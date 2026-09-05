@@ -273,3 +273,34 @@ The fresh provider census is recorded separately in
 absence of a new provider ref is not a claim that all old source leads were
 exhausted. The new Fable lane and its assigned Network Server Manager scope
 remain untouched until the user's handoff.
+
+### Older-lane boundary refresh and independent endpoint-set progress (2026-09-04)
+
+The original Opus dirty-twelve census is now recorded in
+`object_matching_logs/opus_original_30k_dirty12_unreconciled_inventory_20260904.md`.
+After the grenade-helper admission, its raw target-fingerprint screen leaves
+25 candidates / 5,936 padded bytes: Leaf Map 2,880 and Fable-reserved Network
+Server Manager 3,056. These are screening leads, not an admissible-byte total;
+the historical 100,016-byte delta must not be recounted. The Leaf Map donor
+does contain the genuine missing caller family, but it cannot be imported
+wholesale with its incorrect shared projection dependency and extra helper.
+
+A fresh replay of the preserved projection correction in current canonical
+resolves the old Game Engine collateral mismatch, preserves Units 189, and
+again closes Leaf Map's 176-byte vertex helper. The Decals 400-byte exact
+still regresses. The header is restored, the full remaining blast radius is
+not certified, and the admitted delta is zero. See
+`object_matching_logs/real_math_projection_current_context_recheck_20260904.md`.
+Do not retry equivalent spellings or count the scratch Leaf Map gain.
+
+Meanwhile, independent small-object work outside Fable's scope reconstructs
+four endpoint-set lifecycle/iteration functions on their first natural
+compile, adds **610 meaningful / 640 padded exact bytes**, and preserves all
+6,188 inherited stable exact owners. Canonical's verified working total is
+**899,348 meaningful code bytes**, **6,146 credited functions**, **391/833
+Matching objects**, and **256 valid parks**. The proper owner-header signature
+corrections, full-build proof, complete owner census, and 288-test result are
+recorded in
+`object_matching_logs/transport_endpoint_set_winsock_obj_lifecycle_packet_20260904.md`.
+First Person Weapons and Saved Game Files genuine private caller clusters
+continue independently in scratch; no incomplete cluster is yet credited.

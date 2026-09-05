@@ -103,6 +103,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_endpoint_winsock.h"
 
 /* ---------- constants */
@@ -143,7 +144,6 @@ typedef char transport_endpoint_set_size_assert[
 /* ---------- globals */
 
 extern long global_key_depth;
-extern boolean transport_initialized;
 extern XNADDR global_address;
 extern XNKID global_key_id;
 extern XNKEY global_key;
@@ -167,6 +167,7 @@ void transport_push_key(
 			0 == error);
 	}
 	global_key_depth++;
+	return;
 }
 
 XNADDR *transport_get_xnaddr(
@@ -208,6 +209,119 @@ void transport_pop_key(
 	{
 		XNetUnregisterKey(&global_key_id);
 	}
+	return;
+}
+
+struct transport_endpoint_set *create_endpoint_set(
+	short max_endpoints)
+{
+	struct transport_endpoint_set *set;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x196,
+		transport_initialized);
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x197,
+		max_endpoints > 0);
+	set = match_malloc(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x199,
+		sizeof(*set));
+	if (set)
+	{
+		if (max_endpoints <= FD_SETSIZE)
+		{
+			set->needs_compaction = FALSE;
+			FD_ZERO(&set->sockets);
+			set->ep_array = debug_malloc(
+				max_endpoints * sizeof(*set->ep_array),
+				TRUE,
+				"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+				0x1A2);
+			if (set->ep_array)
+			{
+				set->max_endpoints = max_endpoints;
+				set->last_endpoint_index = NONE;
+				set->current_endpoint_index = 0;
+			}
+			else
+			{
+				match_free(
+					"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+					0x1AA,
+					set);
+				set = NULL;
+			}
+		}
+		else
+		{
+			match_free(
+				"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+				0x1B0,
+				set);
+			set = NULL;
+		}
+	}
+	return set;
+}
+
+short delete_endpoint_set(
+	struct transport_endpoint_set *set)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x1BB,
+		set && set->ep_array);
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x1BC,
+		transport_initialized);
+	match_free(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x1BE,
+		set->ep_array);
+	match_free(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x1BF,
+		set);
+	return _transport_error_none;
+}
+
+void rewind_endpoint_set(
+	struct transport_endpoint_set *set)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x26D,
+		set);
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x26E,
+		transport_initialized);
+	set->current_endpoint_index = 0;
+	return;
+}
+
+struct transport_endpoint *get_next_endpoint_from_set(
+	struct transport_endpoint_set *set)
+{
+	struct transport_endpoint *endpoint = NULL;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x27A,
+		set);
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x27B,
+		transport_initialized);
+	if (set->current_endpoint_index <= set->last_endpoint_index)
+	{
+		endpoint = set->ep_array[set->current_endpoint_index++];
+	}
+	return endpoint;
 }
 
 long count_endpoints_in_set(

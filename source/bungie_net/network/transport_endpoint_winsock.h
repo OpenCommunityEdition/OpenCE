@@ -28,7 +28,7 @@ struct connect_process_input;
 struct transport_endpoint *create_transport_endpoint(
 	long type);
 struct transport_endpoint_set *create_endpoint_set(
-	long maximum_endpoints);
+	short maximum_endpoints);
 long read_endpoint(
 	struct transport_endpoint *endpoint,
 	void *buffer,
@@ -88,7 +88,7 @@ short add_endpoint_to_set(
 short remove_endpoint_from_set(
 	struct transport_endpoint *endpoint,
 	struct transport_endpoint_set *set);
-void delete_endpoint_set(
+short delete_endpoint_set(
 	struct transport_endpoint_set *set);
 void delete_transport_endpoint(
 	struct transport_endpoint *endpoint);
