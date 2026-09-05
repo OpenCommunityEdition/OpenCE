@@ -1,5 +1,16 @@
 [
   {
+    "unit": "source/rasterizer/xbox/rasterizer_xbox_profile",
+    "symbol": "_rasterizer_profile_performance_counter_frequency",
+    "allow_incomplete_unit": true,
+    "reason": "The two natural static initialized owners occupy the exact complete 132-byte data section at offsets 0 and 8. Bytes, flags, linkage and all 29 resolved relocations agree; only the report's internal string-relocation attribution differs. This credits already-reconstructed data, not the candidate-only SDK tables or whole-object completion. See docs/object_matching_logs/rasterizer_xbox_profile_obj_data_accounting_audit_20260904.md.",
+    "measurements": {
+      "size": 132,
+      "relocation_count": 29,
+      "normalized_sha256": "b577924a924477a95be3c0a539812cce4cae4eaf93489d580a909a02169d0cf9"
+    }
+  },
+  {
     "unit": "source/interface/hud",
     "symbol": "_default_string",
     "allow_incomplete_unit": true,

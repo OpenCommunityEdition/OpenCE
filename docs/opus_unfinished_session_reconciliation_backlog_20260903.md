@@ -404,3 +404,23 @@ form was retained without tuning. The final combined whole-tree snapshot is
 `scratch/profile-biped-final-20260904.json`, still 6,205 strict owners with
 zero regressions, and **267 parks** now validate. See
 `object_matching_logs/bipeds_obj_adjust_placement_fuzzy_20260904.md`.
+
+### Profile starters and Xbox Profile data: 901,876 bytes (2026-09-04)
+
+Two more genuine older-Opus public leaves, `profile_frame_start` and
+`profile_tick_start`, add **245 meaningful / 272 padded exact code bytes**.
+Their existing history updater now has an honest semantic private name,
+`profile_sections_update`, supported by the complete January caller census.
+Profile is **30E/0R/14U** without new helper/data owners. The full canonical
+sweep has **6,207 strict owners and zero regressions**; Units keeps all 189.
+See `object_matching_logs/profile_obj_frame_tick_start_reconciliation_20260904.md`.
+
+An independent accounting audit also recovers **132 already-exact initialized
+data bytes** in Xbox Profile. It grants no code or whole-object credit and
+records the existing surplus SDK tables/source-layout boundary explicitly.
+See `object_matching_logs/rasterizer_xbox_profile_obj_data_accounting_audit_20260904.md`.
+Verified totals are **901,876 meaningful code bytes**, **6,161 credited
+functions**, **2,028,747 data bytes**, **391/833 Matching objects**, and
+**267 valid parks**. All 288 tests plus 26 subtests pass. Active Fable remains
+untouched; older withheld dependencies and the pending separate Opus intake
+remain open rather than being counted as integrated.

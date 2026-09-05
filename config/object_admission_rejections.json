@@ -2,6 +2,14 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_profile",
+      "class": "candidate-only-comdat-owner",
+      "symbol": "_D3DSIMPLERENDERSTATEENCODE",
+      "reason": "All 16 target functions and all 2234 target data bytes are exact, including the independently verified 132-byte initialized section. The candidate also emits three stock SDK select-any tables absent from January's split: D3DTEXTUREDIRECTENCODE (16 bytes), D3DSIMPLERENDERSTATEENCODE (328), and D3DPRIMITIVETOVERTEXCOUNT (88). No ordinary final-link ownership proof is claimed. The inherited caller-local debug-options view also remains a source-layout boundary. Exact target-data accounting does not waive these separate whole-object checks.",
+      "evidence": "docs/object_matching_logs/rasterizer_xbox_profile_obj_data_accounting_audit_20260904.md#whole-object-veto",
+      "reopen": "Recover authentic shared diagnostic-state ownership and prove the complete SDK table ownership with source-authentic topology or an ordinary compatible canonical link. Do not use partial-header facades, forced inline, altered selection metadata, fake references, or an invented discard pass. Preserve all target-function and data matches before claiming Matching."
+    },
+    {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_dynavobgeom",
       "class": "source-layout-incomplete",
       "symbol": "struct rasterizer_dynamic_geometry_debug_options",

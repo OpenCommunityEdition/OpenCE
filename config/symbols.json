@@ -1615,7 +1615,7 @@
 { "file_offset": 515184, "flags": 32, "name": "_errors_handle" },
 { "file_offset": 515216, "flags": 32, "name": "_errors_clear" },
 { "file_offset": 515232, "flags": 32, "name": "_profile_initialize" },
-{ "file_offset": 515360, "flags": 32, "name": "_code_0007dd20" },
+{ "file_offset": 515360, "flags": 32, "name": "_profile_sections_update", "static": true },
 { "file_offset": 515712, "flags": 32, "name": "_profile_rasterizer_stats" },
 { "file_offset": 515744, "flags": 32, "name": "_code_0007dea0" },
 { "file_offset": 515808, "flags": 32, "name": "_profile_seconds_elapsed" },

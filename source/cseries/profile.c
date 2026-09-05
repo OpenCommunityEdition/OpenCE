@@ -5,7 +5,7 @@ symbols in this file:
 0007DCA0 0080:
 	_profile_initialize (0000)
 0007DD20 0160:
-	_code_0007dd20 (0000)
+	_profile_sections_update (0000)
 0007DE80 0020:
 	_profile_rasterizer_stats (0000)
 0007DEA0 0040:
@@ -272,6 +272,7 @@ symbols in this file:
 
 #include "math/real_math.h"
 #include "rasterizer/rasterizer.h"
+#include "render/render.h"
 
 /* ---------- constants */
 
@@ -369,7 +370,7 @@ struct profile_globals
 
 /* ---------- prototypes */
 
-void code_0007dd20(
+static void profile_sections_update(
 	void);
 void find_profile_section(
 	struct profile_section *section);
@@ -597,6 +598,56 @@ void profile_initialize(
 	return;
 }
 
+void profile_frame_start(
+	void)
+{
+	__int64 timebase;
+
+	if (!profile_timebase_ticks)
+	{
+		profile_sections_update();
+	}
+
+	csmemset(&profile_globals.current_frame, 0, sizeof(profile_globals.current_frame));
+
+	profile_globals.current_frame.frame_index = render.frame_index;
+	profile_globals.current_frame.rasterizer_frame_index = rasterizer_globals.frame_index;
+	profile_globals.current_frame.vertical_blank_index = rasterizer_globals.vertical_blank_index;
+	profile_globals.current_frame.game_tick_count = 0;
+	QUERY_TIMEBASE(timebase);
+	profile_globals.current_frame.frame.start = timebase;
+
+	return;
+}
+
+void profile_tick_start(
+	void)
+{
+	__int64 timebase;
+	struct profile_timer *timer;
+
+	if (profile_timebase_ticks)
+	{
+		profile_sections_update();
+	}
+
+	if (profile_globals.current_frame.game_tick_count<MAXIMUM_GAME_TICKS_PER_FRAME)
+	{
+		profile_globals.current_frame.game_tick_count++;
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\cseries\\profile.c",
+		311,
+		(profile_globals.current_frame.game_tick_count > 0) && (profile_globals.current_frame.game_tick_count <= MAXIMUM_GAME_TICKS_PER_FRAME));
+
+	timer = &profile_globals.current_frame.game_ticks[profile_globals.current_frame.game_tick_count-1];
+	QUERY_TIMEBASE(timebase);
+	timer->start = timebase;
+
+	return;
+}
+
 void profile_tick_end(
 	void)
 {
@@ -769,7 +820,7 @@ void profile_exit_private(
 
 /* ---------- private code */
 
-void code_0007dd20(
+static void profile_sections_update(
 	void)
 {
 	if (profile_global_enable)
