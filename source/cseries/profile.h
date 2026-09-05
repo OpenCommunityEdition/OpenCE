@@ -13,6 +13,23 @@ enum
 	MAXIMUM_PROFILE_HISTORY = 120,
 };
 
+enum profile_sort_mode
+{
+	_profile_sort_mode_name,
+	_profile_sort_mode_average_time,
+	_profile_sort_mode_total_time,
+
+	NUMBER_OF_PROFILE_SORT_MODES
+};
+
+enum profile_dump_format_mode
+{
+	_profile_dump_format_mode_file,
+	_profile_dump_format_mode_screen,
+
+	NUMBER_OF_PROFILE_DUMP_FORMAT_MODES
+};
+
 /* ---------- macros */
 
 #define profile_enter(section)							\
@@ -37,52 +54,52 @@ struct profile_section
 	short stack_depth;
 	long field_C;
 	unsigned __int64 entry_timebase;
-	long field_18;
+	long recent_call_count;
 	byte reserved1C[4];
-	__int64 field_20;
-	long field_28[MAXIMUM_PROFILE_HISTORY];
-	__int64 field_208[MAXIMUM_PROFILE_HISTORY];
-	long field_5C8;
+	__int64 recent_elapsed_timebase;
+	long frame_call_count_history[MAXIMUM_PROFILE_HISTORY];
+	__int64 frame_elapsed_timebase_history[MAXIMUM_PROFILE_HISTORY];
+	long sample_count;
 	long frame_call_count;
 	__int64 frame_elapsed_timebase;
-	long field_5D8;
+	long total_call_count;
 	byte reserved5DC[4];
-	__int64 field_5E0;
-	long field_5E8;
+	__int64 total_elapsed_timebase;
+	long peak_call_count;
 	byte reserved5EC[4];
-	__int64 field_5F0;
+	__int64 peak_elapsed_timebase;
 };
 
 typedef char profile_section_size_assert[
 	sizeof(struct profile_section) == 0x5F8 ? 1 : -1];
-typedef char profile_section_field_18_offset_assert[
-	offsetof(struct profile_section, field_18) == 0x18 ? 1 : -1];
+typedef char profile_section_recent_call_count_offset_assert[
+	offsetof(struct profile_section, recent_call_count) == 0x18 ? 1 : -1];
 typedef char profile_section_reserved1C_offset_assert[
 	offsetof(struct profile_section, reserved1C) == 0x1C ? 1 : -1];
-typedef char profile_section_field_20_offset_assert[
-	offsetof(struct profile_section, field_20) == 0x20 ? 1 : -1];
-typedef char profile_section_field_28_offset_assert[
-	offsetof(struct profile_section, field_28) == 0x28 ? 1 : -1];
-typedef char profile_section_field_208_offset_assert[
-	offsetof(struct profile_section, field_208) == 0x208 ? 1 : -1];
-typedef char profile_section_field_5C8_offset_assert[
-	offsetof(struct profile_section, field_5C8) == 0x5C8 ? 1 : -1];
+typedef char profile_section_recent_elapsed_timebase_offset_assert[
+	offsetof(struct profile_section, recent_elapsed_timebase) == 0x20 ? 1 : -1];
+typedef char profile_section_frame_call_count_history_offset_assert[
+	offsetof(struct profile_section, frame_call_count_history) == 0x28 ? 1 : -1];
+typedef char profile_section_frame_elapsed_timebase_history_offset_assert[
+	offsetof(struct profile_section, frame_elapsed_timebase_history) == 0x208 ? 1 : -1];
+typedef char profile_section_sample_count_offset_assert[
+	offsetof(struct profile_section, sample_count) == 0x5C8 ? 1 : -1];
 typedef char profile_section_frame_call_count_offset_assert[
 	offsetof(struct profile_section, frame_call_count) == 0x5CC ? 1 : -1];
 typedef char profile_section_frame_elapsed_timebase_offset_assert[
 	offsetof(struct profile_section, frame_elapsed_timebase) == 0x5D0 ? 1 : -1];
-typedef char profile_section_field_5D8_offset_assert[
-	offsetof(struct profile_section, field_5D8) == 0x5D8 ? 1 : -1];
+typedef char profile_section_total_call_count_offset_assert[
+	offsetof(struct profile_section, total_call_count) == 0x5D8 ? 1 : -1];
 typedef char profile_section_reserved5DC_offset_assert[
 	offsetof(struct profile_section, reserved5DC) == 0x5DC ? 1 : -1];
-typedef char profile_section_field_5E0_offset_assert[
-	offsetof(struct profile_section, field_5E0) == 0x5E0 ? 1 : -1];
-typedef char profile_section_field_5E8_offset_assert[
-	offsetof(struct profile_section, field_5E8) == 0x5E8 ? 1 : -1];
+typedef char profile_section_total_elapsed_timebase_offset_assert[
+	offsetof(struct profile_section, total_elapsed_timebase) == 0x5E0 ? 1 : -1];
+typedef char profile_section_peak_call_count_offset_assert[
+	offsetof(struct profile_section, peak_call_count) == 0x5E8 ? 1 : -1];
 typedef char profile_section_reserved5EC_offset_assert[
 	offsetof(struct profile_section, reserved5EC) == 0x5EC ? 1 : -1];
-typedef char profile_section_field_5F0_offset_assert[
-	offsetof(struct profile_section, field_5F0) == 0x5F0 ? 1 : -1];
+typedef char profile_section_peak_elapsed_timebase_offset_assert[
+	offsetof(struct profile_section, peak_elapsed_timebase) == 0x5F0 ? 1 : -1];
 
 /* ---------- prototypes/PROFILE.C */
 
@@ -113,6 +130,14 @@ void profile_texture_start(
 	void);
 void profile_texture_end(
 	void);
+void profile_dump(
+	const char *name,
+	short sort_mode,
+	short format_mode,
+	short maximum_section_count,
+	char *buffer);
+void profile_dump_to_file(
+	const char *name);
 
 /* ---------- globals */
 

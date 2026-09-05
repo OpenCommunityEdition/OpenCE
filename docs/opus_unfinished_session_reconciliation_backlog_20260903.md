@@ -548,3 +548,25 @@ bytes**, **6,169 credited functions**, **2,028,748 data bytes**, and **391/833
 Matching objects**. Older Profile dump/comparator reconciliation is still a
 separate scratch proposal pending genuine header/consumer verification.
 The active Fable lane and every reserved implementation remain excluded.
+
+### Older Opus Profile dump reconciled as natural fuzzy source (2026-09-05)
+
+The complete dump/comparator cluster now uses its true public owner header,
+short mode/count API, public enums, semantic section fields and private format
+tables. The older donor's uninitialized comparator return was rejected;
+defined natural C is retained instead. Profile reaches **35 exact / 2 residual
+/ 7 unwritten**, with dump parked at **99.147285%** and the comparator at
+**21.59292%**. No artificial private helper emissions or exact-code credit
+are claimed. The two real tables add **16 matched data bytes**.
+See `object_matching_logs/profile_obj_dump_comparator_natural_boundary_20260905.md`.
+
+The genuine 25-consumer header build and full stable sweep preserve all
+**6,215 strict owners**, with zero regressions. All 288 tests plus 26 subtests
+pass; **273 parks** validate and admission is unchanged. A scratch census
+indentation defect was caught and corrected before publication: all four new
+literal pools have compatible selected target/canonical owners, so they are
+not an unresolved ownership veto. Totals are **905,027 meaningful code bytes**,
+**6,169 credited functions**, **2,028,764 data bytes**, and **391/833 Matching
+objects**. The remaining genuine Profile getters and separate Transport write
+caller/helper cluster are uncredited research, not completed reconciliation.
+All Fable reservations remain in force.

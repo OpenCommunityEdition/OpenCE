@@ -388,14 +388,23 @@ static void profile_framedump_flush(
 static void code_0007ee30(
 	const char *name,
 	boolean active);
-void profile_dump(
-	const char *name,
-	long use_name,
-	long format_mode,
-	long maximum_section_count,
-	char *buffer);
+static int compare_profile_sections(
+	void const *section0,
+	void const *section1);
 
 /* ---------- globals */
+
+static const char *header_strings[NUMBER_OF_PROFILE_DUMP_FORMAT_MODES] =
+{
+	"section\t                                     total calls / time           av. calls / time      peak calls / time\r\n",
+	"|t|rthis frame|taverage|tpeak|n"
+};
+
+static const char *format_strings[NUMBER_OF_PROFILE_DUMP_FORMAT_MODES] =
+{
+	"%-50s%6ld / %7.3f            %5.2f / %7.3f            %ld / %7.3f\r\n",
+	"|l%s|t|r% 3.2f/% 4ld|t% 3.2f/% 4ld|t% 3.2f/% 4ld|n"
+};
 
 static struct profile_globals profile_globals = {0};
 boolean profile_timebase_ticks = FALSE;
@@ -421,6 +430,133 @@ void profile_dump_to_file(
 		fprintf(file, "%s\r\n", buffer);
 	}
 	fclose(file);
+
+	return;
+}
+
+void profile_dump(
+	const char *name,
+	short sort_mode,
+	short format_mode,
+	short maximum_section_count,
+	char *buffer)
+{
+	struct profile_section *sections[MAXIMUM_PROFILE_SECTIONS];
+	short displayed_count = 0;
+	short section_index;
+
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 879,
+		sort_mode>=0 && sort_mode<NUMBER_OF_PROFILE_SORT_MODES);
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 880,
+		format_mode>=0 && format_mode<NUMBER_OF_PROFILE_DUMP_FORMAT_MODES);
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 881,
+		maximum_section_count>0);
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 882,
+		buffer);
+
+	profile_globals.compare_type = sort_mode;
+
+	csmemcpy(
+		sections,
+		profile_globals.sections,
+		profile_globals.section_count*sizeof(struct profile_section *));
+	qsort(
+		sections,
+		profile_globals.section_count,
+		sizeof(struct profile_section *),
+		compare_profile_sections);
+
+	if (profile_globals.section_count && sections[0]->active)
+	{
+		sprintf(buffer, header_strings[format_mode]);
+
+		for (section_index = 0; section_index<profile_globals.section_count; section_index++)
+		{
+			struct profile_section *section;
+			long total_calls;
+			real total_time;
+			real average_calls;
+			real average_msec;
+			long peak_calls;
+			real peak_msec;
+			long frame_calls;
+			real frame_msec;
+
+			if (displayed_count>=maximum_section_count)
+				break;
+
+			section = sections[section_index];
+			total_calls = 0;
+			total_time = 0.0f;
+			average_calls = 0.0f;
+			average_msec = 0.0f;
+			peak_calls = 0;
+			peak_msec = 0.0f;
+			frame_calls = 0;
+			frame_msec = 0.0f;
+
+			if (section->active && (!name || strstr(section->name, name)))
+			{
+				do
+				{
+					total_calls += sections[section_index]->total_call_count;
+					total_time += (real)(sections[section_index]->total_elapsed_timebase/
+						(double)profile_globals.timebase_frequency);
+					average_calls += (real)sections[section_index]->total_call_count/
+						sections[section_index]->sample_count;
+					average_msec += (real)((sections[section_index]->sample_count==0 ?
+						0.0 :
+						(double)sections[section_index]->total_elapsed_timebase/
+							sections[section_index]->sample_count)*1000.0/
+						profile_globals.timebase_frequency);
+					peak_calls += sections[section_index]->peak_call_count;
+					peak_msec += (real)(sections[section_index]->peak_elapsed_timebase*1000.0/
+						profile_globals.timebase_frequency);
+					frame_calls += sections[section_index]->frame_call_count;
+					frame_msec += (real)(sections[section_index]->frame_elapsed_timebase*1000.0/
+						profile_globals.timebase_frequency);
+
+					section_index++;
+				}
+				while (section_index<profile_globals.section_count &&
+					csstrcmp(sections[section_index]->name, section->name)==0);
+
+				switch (format_mode)
+				{
+					case _profile_dump_format_mode_file:
+						sprintf(
+							buffer+csstrlen(buffer),
+							format_strings[format_mode],
+							section->name,
+							total_calls,
+							total_time,
+							average_calls,
+							average_msec,
+							peak_calls,
+							peak_msec);
+						break;
+
+					case _profile_dump_format_mode_screen:
+						sprintf(
+							buffer+csstrlen(buffer),
+							format_strings[format_mode],
+							section->name,
+							frame_msec,
+							frame_calls,
+							average_msec,
+							(long)(average_calls+0.5f),
+							peak_msec,
+							peak_calls,
+							total_time,
+							total_calls);
+						break;
+				}
+
+				section_index--;
+				displayed_count++;
+			}
+		}
+	}
 
 	return;
 }
@@ -1105,6 +1241,62 @@ void profile_frame_end(
 
 /* ---------- private code */
 
+static int compare_profile_sections(
+	void const *section0,
+	void const *section1)
+{
+	struct profile_section *const *first = (struct profile_section *const *)section0;
+	struct profile_section *const *second = (struct profile_section *const *)section1;
+	int result = 0;
+
+	if ((*first)->active && !(*second)->active)
+	{
+		result = -1;
+	}
+	else if ((*second)->active && !(*first)->active)
+	{
+		result = 1;
+	}
+	else
+	{
+		switch (profile_globals.compare_type)
+		{
+			case _profile_sort_mode_name:
+				result = csstrcmp((*first)->name, (*second)->name);
+				break;
+
+			case _profile_sort_mode_average_time:
+			{
+				double first_average = (*first)->sample_count==0 ?
+					0.0 :
+					(double)(*first)->total_elapsed_timebase/(*first)->sample_count;
+				double second_average = (*second)->sample_count==0 ?
+					0.0 :
+					(double)(*second)->total_elapsed_timebase/(*second)->sample_count;
+
+				if (first_average>second_average)
+					result = -1;
+				else if (first_average<second_average)
+					result = 1;
+				break;
+			}
+
+			case _profile_sort_mode_total_time:
+				if ((*first)->recent_elapsed_timebase>(*second)->recent_elapsed_timebase)
+					result = -1;
+				else if ((*first)->recent_elapsed_timebase<(*second)->recent_elapsed_timebase)
+					result = 1;
+				break;
+
+			default:
+				match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 844, !"unreachable");
+				break;
+		}
+	}
+
+	return result;
+}
+
 static void profile_sections_update(
 	void)
 {
@@ -1118,23 +1310,23 @@ static void profile_sections_update(
 
 			if (section->active)
 			{
-				section->field_20 -= section->field_208[profile_globals.history_index];
-				section->field_18 -= section->field_28[profile_globals.history_index];
-				section->field_208[profile_globals.history_index] = section->frame_elapsed_timebase;
-				section->field_28[profile_globals.history_index] = section->frame_call_count;
-				section->field_20 += section->frame_elapsed_timebase;
-				section->field_18 += section->frame_call_count;
+				section->recent_elapsed_timebase -= section->frame_elapsed_timebase_history[profile_globals.history_index];
+				section->recent_call_count -= section->frame_call_count_history[profile_globals.history_index];
+				section->frame_elapsed_timebase_history[profile_globals.history_index] = section->frame_elapsed_timebase;
+				section->frame_call_count_history[profile_globals.history_index] = section->frame_call_count;
+				section->recent_elapsed_timebase += section->frame_elapsed_timebase;
+				section->recent_call_count += section->frame_call_count;
 
-				if (section->frame_elapsed_timebase>section->field_5F0)
-					section->field_5F0 = section->frame_elapsed_timebase;
-				if (section->frame_call_count>section->field_5E8)
-					section->field_5E8 = section->frame_call_count;
+				if (section->frame_elapsed_timebase>section->peak_elapsed_timebase)
+					section->peak_elapsed_timebase = section->frame_elapsed_timebase;
+				if (section->frame_call_count>section->peak_call_count)
+					section->peak_call_count = section->frame_call_count;
 
-				section->field_5E0 += section->frame_elapsed_timebase;
-				section->field_5D8 += section->frame_call_count;
+				section->total_elapsed_timebase += section->frame_elapsed_timebase;
+				section->total_call_count += section->frame_call_count;
 				section->frame_elapsed_timebase = 0;
 				section->frame_call_count = 0;
-				section->field_5C8++;
+				section->sample_count++;
 			}
 		}
 	}
@@ -1167,19 +1359,19 @@ void find_profile_section(
 		profile_globals.section_count++;
 		profile_globals.sections[section->section_index] = section;
 
-		csmemset(section->field_208, 0, sizeof(section->field_208));
-		csmemset(section->field_28, 0, sizeof(section->field_28));
+		csmemset(section->frame_elapsed_timebase_history, 0, sizeof(section->frame_elapsed_timebase_history));
+		csmemset(section->frame_call_count_history, 0, sizeof(section->frame_call_count_history));
 
-		section->field_18 = 0;
-		section->field_20 = 0;
+		section->recent_call_count = 0;
+		section->recent_elapsed_timebase = 0;
 		section->stack_depth = NONE;
-		section->field_5C8 = 0;
+		section->sample_count = 0;
 		section->frame_elapsed_timebase = 0;
 		section->frame_call_count = 0;
-		section->field_5E0 = 0;
-		section->field_5D8 = 0;
-		section->field_5F0 = 0;
-		section->field_5E8 = 0;
+		section->total_elapsed_timebase = 0;
+		section->total_call_count = 0;
+		section->peak_elapsed_timebase = 0;
+		section->peak_call_count = 0;
 	}
 
 	return;

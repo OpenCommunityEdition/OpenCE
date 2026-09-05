@@ -4343,8 +4343,6 @@ void main_crash(
 	char const *reason);
 void debug_dump_memory_for_file(
 	char const *file_name);
-void profile_dump_to_file(
-	char const *file_name);
 void profile_sections_activate(
 	char const *section_name);
 void profile_sections_deactivate(

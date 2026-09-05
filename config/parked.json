@@ -2,6 +2,44 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/cseries/profile",
+      "function": "_profile_dump",
+      "class": "unclassified",
+      "evidence": "Complete natural January Profile dump reconstructed with its real typed qsort callback, public short mode/count ABI, two private two-entry format tables, semantic profile_section fields, target-backed assertions, name grouping/filtering, cumulative/per-sample/peak/current-frame aggregation, and correct file/screen enum cases. The existing profile_dump_to_file caller remains strict128B/9 relocs after moving the API to profile.h and removing caller-local prototypes. January and candidate are both864B/44 relocs; aligned streams first differ in an x87 divide/pop schedule leaving subsequent instruction addresses two bytes apart until final padding. No spelling, declaration-order, x87-stack, compiler-flag, inline-control, fake-source or unsafe-return search was performed. All35 inherited strict Profile owners remain exact; no point_from_line3d/profile_timebase/profile_timer_end owner is emitted. Reopen only for authentic original-source/type/compiler-context evidence. See docs/object_matching_logs/profile_obj_dump_comparator_natural_boundary_20260905.md.",
+      "measurements": {
+        "target": {
+          "size": 864,
+          "relocation_count": 44,
+          "normalized_sha256": "1b5a353ac0e64397890fa73f4fd0970229b5a2d22c2af46c3b4e4a8fb5f056e6"
+        },
+        "base": {
+          "size": 864,
+          "relocation_count": 44,
+          "normalized_sha256": "807e99111f0772c729f6569ea1731f148e3eeaab1e1b2f754df3c2789c2e42af"
+        },
+        "objdiff_percent": 99.147285
+      }
+    },
+    {
+      "unit": "source/cseries/profile",
+      "function": "_compare_profile_sections",
+      "class": "unclassified",
+      "evidence": "Natural private qsort callback reconstructed as the sole real profile_dump dependency. It orders active sections first, then implements target-backed name ascending, average elapsed time descending with zero-sample handling, and signed64 rolling-total descending modes using correct public enums and semantic fields. The invalid-mode path preserves the January !\"unreachable\" assertion but returns a defined zero result if fatal system_exit unexpectedly returns. The older Opus donor's exact288B body used an uninitialized return whose accidental value reproduced January after the fatal call; that fake/undefined source is explicitly rejected. Candidate304B/8 relocs versus target288B/8. No return-recipe/register/control-flow search was performed after the defined natural pass. Private linkage is a source-ownership inference supported by the sole incoming relocation from profile_dump, not recovered PDB linkage proof; all35 inherited strict owners remain exact and no forbidden helper is emitted. Reopen only for authentic original-source/type/compiler-context evidence. See docs/object_matching_logs/profile_obj_dump_comparator_natural_boundary_20260905.md.",
+      "measurements": {
+        "target": {
+          "size": 288,
+          "relocation_count": 8,
+          "normalized_sha256": "d94ba79bf813177b3186d21957777d58068c95b63f28ea1131ff8ff68ee039a1"
+        },
+        "base": {
+          "size": 304,
+          "relocation_count": 8,
+          "normalized_sha256": "aebbef78d074d93227bcb077dadf533651dc5c60c2d7b75b63f127a7cbd93072"
+        },
+        "objdiff_percent": 21.59292
+      }
+    },
+    {
       "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
       "function": "_transport_network_available",
       "class": "unclassified",
