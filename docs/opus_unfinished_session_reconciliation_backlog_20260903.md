@@ -487,3 +487,26 @@ No active Fable tree or reserved implementation was edited. Network write
 remains unwritten in this publication and is being separately researched;
 its proposed API corrections and source are not yet credited. Older Opus
 Profile frame-dump reconciliation also remains a separate unfinished packet.
+
+### Profile frame-end cluster: 904,719 bytes (2026-09-04)
+
+The older-Opus frame-end, formatter, dump and timer-subtraction cluster is
+now reconciled as **2,582 meaningful / 2,624 padded exact code bytes**, four
+functions. Profile reaches **35E/0R/9U**. Its helpers have honest private
+names/linkage and its Main throttle flag uses the existing genuine internal
+owner header. The confirmed original formatter-buffer defect is explicitly
+documented, not silently fixed or mistaken for credible safe behavior.
+See `object_matching_logs/profile_obj_frame_end_owner_reconciliation_20260904.md`.
+
+The broad-header trial's UI/Units regressions and Shell data-identity failure
+were not admitted. With the existing narrow Main interface and the unrelated
+Profile seconds-elapsed API repair deferred, full Ninja and the stable sweep
+pass: **6,213 strict owners**, four gains and zero regressions. Units remains
+189 exact. The seconds-elapsed real-type evidence is preserved in the ledger
+as an open dependency, not lost source or credited progress.
+
+All 288 tests plus 26 subtests pass, 270 parks validate, and object admission
+remains unchanged. Verified totals are **904,719 meaningful code bytes**,
+**6,167 credited functions**, **2,028,748 data bytes**, and **391/833 Matching
+objects**. Network write is still separate scratch research. Fable's active
+lane and every reserved implementation remain excluded pending user handoff.

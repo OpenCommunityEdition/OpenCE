@@ -11,4 +11,7 @@ Narrow cross-translation-unit interface owned by MAIN.C.
 short main_get_window_count(
 	void);
 
+/* Engine-internal frame pacing control; defined by MAIN.C. */
+extern boolean global_frame_rate_throttle;
+
 #endif /* __MAIN_INTERNAL_H */

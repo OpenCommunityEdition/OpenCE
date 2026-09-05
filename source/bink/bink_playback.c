@@ -116,6 +116,8 @@ symbols in this file:
 
 #include "cseries.h"
 #include "bink_playback.h"
+#include "main/main.h"
+#include "main/main_internal.h"
 
 /* ---------- constants */
 
@@ -179,8 +181,6 @@ void code_001b5e30(
 	void);
 void event_manager_suppress(
 	boolean suppress);
-void main_menu_load(
-	void);
 void attract_mode_reset_timer(
 	void);
 void __stdcall BinkClose(
@@ -190,7 +190,6 @@ void __stdcall BinkClose(
 
 extern struct bink_playback_globals bink_globals;
 extern struct bink_playback_saved_state data_0031693c;
-extern boolean global_frame_rate_throttle;
 
 /* ---------- public code */
 

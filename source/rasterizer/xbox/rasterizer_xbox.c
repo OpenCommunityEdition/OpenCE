@@ -918,9 +918,6 @@ extern struct rasterizer_debug_options rasterizer_debug_options;
 extern struct rasterizer_lights_globals_prefix rasterizer_lights;
 extern struct rasterizer_frame_statistics_globals rasterizer_frame_statistics;
 
-/* owned by source/main/main.c; the same global bink_playback.c reads */
-extern boolean global_frame_rate_throttle;
-
 /* owned by source/bitmaps/bitmaps.c */
 extern pixel32 global_vector_palette[NUMBER_OF_ENTRIES_IN_PALETTE];
 

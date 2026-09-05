@@ -895,6 +895,8 @@ symbols in this file:
 
 #include "cseries.h"
 #include "hs.h"
+#include "main/main.h"
+#include "main/main_internal.h"
 #include "networking/network_connection.h"
 
 /* ---------- constants */
@@ -1048,7 +1050,6 @@ extern byte display_precache_progress[];
 extern byte display_vblank_deltas[];
 extern byte effects_corpse_nonviolent[];
 extern byte find_all_fucked_up_shit[];
-extern byte global_frame_rate_throttle[];
 extern byte global_screenshot_count[];
 extern byte global_screenshot_size[];
 extern byte hs_model_animation_bullshit[];
@@ -1067,7 +1068,6 @@ extern byte player_autoaim_flag[];
 extern byte player_look_pitch_rate[];
 extern byte player_look_yaw_rate[];
 extern byte player_magnetism_flag[];
-extern byte player_spawn_count[];
 extern byte profile_display[];
 extern byte profile_dump_frames[];
 extern byte profile_dump_lost_frames[];
@@ -1100,8 +1100,8 @@ struct hs_external_global_definition hs_external_global_definitions[442] =
 {
 	{ "screenshot_size", _hs_type_short_integer, 0, global_screenshot_size },
 	{ "screenshot_count", _hs_type_short_integer, 0, global_screenshot_count },
-	{ "player_spawn_count", _hs_type_short_integer, 0, player_spawn_count },
-	{ "framerate_throttle", _hs_type_boolean, 0, global_frame_rate_throttle },
+	{ "player_spawn_count", _hs_type_short_integer, 0, &player_spawn_count },
+	{ "framerate_throttle", _hs_type_boolean, 0, &global_frame_rate_throttle },
 	{ "framerate_lock", _hs_type_boolean, 0, debug_force_frame_rate_update },
 	{ "debug_framerate", _hs_type_boolean, 0, debug_frame_rate },
 	{ "display_framerate", _hs_type_boolean, 0, display_framerate },

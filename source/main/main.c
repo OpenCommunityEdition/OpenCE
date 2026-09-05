@@ -613,7 +613,7 @@ extern short global_screenshot_count;
 
 short global_difficulty_level = 1;
 short player_spawn_count = 1;
-byte global_frame_rate_throttle = 1;
+boolean global_frame_rate_throttle = TRUE;
 short global_screenshot_size = 1;
 
 static char const *scenario_paths[10] =

@@ -9,7 +9,7 @@ symbols in this file:
 0007DE80 0020:
 	_profile_rasterizer_stats (0000)
 0007DEA0 0040:
-	_code_0007dea0 (0000)
+	_profile_timesection_subtract (0000)
 0007DEE0 0010:
 	_profile_seconds_elapsed (0000)
 0007DEF0 0040:
@@ -23,7 +23,7 @@ symbols in this file:
 0007E130 00a0:
 	_profile_exit_private (0000)
 0007E1D0 0610:
-	_code_0007e1d0 (0000)
+	_profile_frame_build_string (0000)
 0007E7E0 0010:
 	_code_0007e7e0 (0000)
 0007E7F0 0050:
@@ -35,9 +35,9 @@ symbols in this file:
 0007ECC0 0080:
 	_profile_dump_to_file (0000)
 0007ED40 0080:
-	_code_0007ed40 (0000)
+	_profile_frame_dump (0000)
 0007EDC0 0040:
-	_code_0007edc0 (0000)
+	_profile_framedump_flush (0000)
 0007EE00 0030:
 	_code_0007ee00 (0000)
 0007EE30 00a0:
@@ -273,6 +273,8 @@ symbols in this file:
 #include "math/real_math.h"
 #include "rasterizer/rasterizer.h"
 #include "render/render.h"
+#include "main/main_internal.h"
+#include "game/players.h"
 
 /* ---------- constants */
 
@@ -309,7 +311,7 @@ struct profile_timer
 
 struct profile_frame
 {
-	byte __unknown0000[4];
+	boolean dumped;
 	long frame_index;
 	__int64 vertical_blank_index;
 	short game_tick_count;
@@ -359,7 +361,7 @@ struct profile_globals
 	FILE* framedump_file;
 	short compare_type;
 	long lost_frame_count;
-	boolean unk;
+	boolean framedump_flush_pending;
 	short current_frame_history_count;
 	short current_frame_history_index;
 	struct profile_frame frames[MAXIMUM_PROFILE_FRAMES];
@@ -368,11 +370,20 @@ struct profile_globals
 
 /* ---------- prototypes */
 
+static void profile_timesection_subtract(
+	struct profile_timer *parent_timesection,
+	struct profile_timer *child_timesection);
+static void profile_frame_build_string(
+	struct profile_frame *frame,
+	char *string,
+	short maximum_length);
+static void profile_frame_dump(
+	struct profile_frame *frame);
 static void profile_sections_update(
 	void);
 void find_profile_section(
 	struct profile_section *section);
-void code_0007edc0(
+static void profile_framedump_flush(
 	void);
 static void code_0007ee30(
 	const char *name,
@@ -838,6 +849,260 @@ void profile_exit_private(
 	return;
 }
 
+static void profile_timesection_subtract(
+	struct profile_timer *parent_timesection,
+	struct profile_timer *child_timesection)
+{
+	match_vassert("c:\\halo\\SOURCE\\cseries\\profile.c", 434,
+		parent_timesection->frame_total>=child_timesection->total,
+		"parent_timesection->self_msec >= child_timesection->elapsed_msec");
+
+	parent_timesection->frame_total -= child_timesection->total;
+
+	return;
+}
+
+static void profile_frame_build_string(
+	struct profile_frame *frame,
+	char *string,
+	short maximum_length)
+{
+	short game_tick_display_count;
+	short window_display_count;
+	short game_tick_index;
+	short window_index;
+
+	/* BUG (preserved for exact matching): January repeatedly appends with
+	 * maximum_length-strlen without handling CRT truncation or exhaustion.
+	 * A 512-byte dump buffer can be exhausted by the legal 150-tick record.
+	 * A corrected build should bound appends and guarantee NUL termination.
+	 */
+	csstrcpy(string, "");
+
+	_snprintf(string+csstrlen(string), maximum_length-csstrlen(string),
+		"frame %5d vbl %5I64d tot%6.2f",
+		frame->frame_index,
+		frame->vertical_blank_index,
+		frame->frame.total);
+
+	if (frame->lapsed_frames>0)
+	{
+		if (global_frame_rate_throttle)
+		{
+			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "(lost%3d)", frame->lapsed_frames);
+		}
+		else
+		{
+			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "(free%3d)", frame->lapsed_frames);
+		}
+	}
+	else if (frame->lapsed_msec>0)
+	{
+		if (global_frame_rate_throttle)
+		{
+			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "(l.%3dms)", frame->lapsed_msec);
+		}
+		else
+		{
+			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "(f.%3dms)", frame->lapsed_msec);
+		}
+	}
+	else
+	{
+		if (frame->lapsed_msec_valid)
+		{
+			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "(slowed) ");
+		}
+		else
+		{
+			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "(synced) ");
+		}
+	}
+
+	if (frame->idle.frame_total>0.0f)
+	{
+		_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "idle%6.2f ", frame->idle.frame_total);
+	}
+	else
+	{
+		_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "           ", frame->idle.frame_total);
+	}
+
+	game_tick_display_count = MAX(frame->game_tick_count, 8);
+
+	_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "game%2d ", frame->game_tick_count);
+
+	_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), " (");
+
+	for (game_tick_index = 0; game_tick_index<game_tick_display_count; game_tick_index++)
+	{
+		if (game_tick_index<frame->game_tick_count)
+		{
+			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "%6.2f%s",
+				frame->game_ticks[game_tick_index].frame_total,
+				game_tick_index<game_tick_display_count-1 ? " " : "");
+		}
+		else
+		{
+			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "      %s",
+				game_tick_index<game_tick_display_count-1 ? " " : "");
+		}
+	}
+
+	_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), ")");
+
+	window_display_count = MAX(frame->window_count, local_player_count()+1);
+
+	_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), " render%6.2f", frame->render.total);
+
+	_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), " (");
+
+	for (window_index = 0; window_index<window_display_count; window_index++)
+	{
+		if (window_index<frame->window_count)
+		{
+			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "%s%6.2f%s",
+				frame->window_ids[window_index] ? "p" : "n",
+				frame->windows[window_index].frame_total,
+				window_index<window_display_count-1 ? " " : "");
+		}
+		else
+		{
+			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "       %s",
+				window_index<window_display_count-1 ? " " : "");
+		}
+	}
+
+	_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), ")");
+
+	if (frame->stall.frame_total>0.0f)
+	{
+		_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "stall%6.2f ", frame->stall.frame_total);
+	}
+	else
+	{
+		_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "            ", frame->stall.frame_total);
+	}
+
+	if (frame->texture.frame_total>0.0f)
+	{
+		_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "tex%6.2f ", frame->texture.frame_total);
+	}
+	else
+	{
+		_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "          ", frame->texture.frame_total);
+	}
+
+	_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "r-misc %6.2f ", frame->render.frame_total);
+
+	_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "f-misc %6.2f ", frame->frame.frame_total);
+
+	csstrncat(string+csstrlen(string), frame->lapsed_reason, maximum_length-csstrlen(string));
+
+	return;
+}
+
+static void profile_frame_dump(
+	struct profile_frame *frame)
+{
+	char buffer[0x200];
+
+	if (!profile_globals.framedump_file)
+	{
+		profile_globals.framedump_file = fopen("d:\\framedump.txt", "wb");
+	}
+
+	if (profile_globals.framedump_file && !frame->dumped)
+	{
+		frame->dumped = TRUE;
+
+		profile_frame_build_string(frame, buffer, sizeof(buffer));
+
+		fprintf(profile_globals.framedump_file, "%s\r\n", buffer);
+
+		frame->dumped = TRUE;
+	}
+
+	profile_globals.framedump_flush_pending = TRUE;
+
+	return;
+}
+
+void profile_frame_end(
+	void)
+{
+	__int64 timebase;
+	real msec;
+	short game_tick_index;
+	short window_index;
+	short frame_index;
+
+	QUERY_TIMEBASE(timebase);
+	profile_globals.current_frame.frame.end = timebase;
+	msec = (real)((timebase-profile_globals.current_frame.frame.start)*1000.0f/
+		profile_globals.timebase_frequency);
+	profile_globals.current_frame.frame.total += msec;
+	profile_globals.current_frame.frame.frame_total += msec;
+
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 448,
+		(profile_globals.current_frame.game_tick_count >= 0) && (profile_globals.current_frame.game_tick_count <= MAXIMUM_GAME_TICKS_PER_FRAME));
+
+	for (game_tick_index = 0; game_tick_index<profile_globals.current_frame.game_tick_count; game_tick_index++)
+	{
+		profile_timesection_subtract(&profile_globals.current_frame.frame, &profile_globals.current_frame.game_ticks[game_tick_index]);
+	}
+
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 454,
+		(profile_globals.current_frame.window_count >= 0) && (profile_globals.current_frame.window_count <= MAXIMUM_WINDOWS));
+
+	profile_timesection_subtract(&profile_globals.current_frame.frame, &profile_globals.current_frame.render);
+
+	for (window_index = 0; window_index<profile_globals.current_frame.window_count; window_index++)
+	{
+		profile_timesection_subtract(&profile_globals.current_frame.render, &profile_globals.current_frame.windows[window_index]);
+	}
+
+	profile_timesection_subtract(&profile_globals.current_frame.frame, &profile_globals.current_frame.idle);
+
+	profile_globals.frames[profile_globals.current_frame_history_index] = profile_globals.current_frame;
+
+	profile_globals.current_frame_history_count = MAX(profile_globals.current_frame_history_count, profile_globals.current_frame_history_index+1);
+	profile_globals.current_frame_history_index = (profile_globals.current_frame_history_index+1)%MAXIMUM_PROFILE_FRAMES;
+
+	if (profile_globals.current_frame.lapsed_msec_valid)
+	{
+		profile_globals.lost_frame_count = 0;
+	}
+	else
+	{
+		profile_globals.lost_frame_count++;
+
+		if (profile_dump_lost_frames && !profile_dump_frames && profile_globals.lost_frame_count>3)
+		{
+			profile_framedump_flush();
+		}
+	}
+
+	if (profile_dump_frames || (profile_dump_lost_frames && profile_globals.lost_frame_count<=3))
+	{
+		frame_index = (profile_globals.current_frame_history_index+MAXIMUM_PROFILE_FRAMES-3)%MAXIMUM_PROFILE_FRAMES;
+
+		do
+		{
+			if (frame_index<profile_globals.current_frame_history_count)
+			{
+				profile_frame_dump(&profile_globals.frames[frame_index]);
+			}
+
+			frame_index = (frame_index+1)%MAXIMUM_PROFILE_FRAMES;
+		}
+		while (frame_index!=profile_globals.current_frame_history_index);
+	}
+
+	return;
+}
+
+
 /* ---------- private code */
 
 static void profile_sections_update(
@@ -920,10 +1185,10 @@ void find_profile_section(
 	return;
 }
 
-void code_0007edc0(
+static void profile_framedump_flush(
 	void)
 {
-	if (profile_globals.unk)
+	if (profile_globals.framedump_flush_pending)
 	{
 		if (profile_globals.framedump_file)
 		{
@@ -931,7 +1196,7 @@ void code_0007edc0(
 			fflush(profile_globals.framedump_file);
 		}
 
-		profile_globals.unk = FALSE;
+		profile_globals.framedump_flush_pending = FALSE;
 	}
 
 	return;
