@@ -200,11 +200,13 @@ symbols in this file:
 #include "cseries.h"
 
 #include "ai/ai_runtime.h"
+#include "ai/actor_types.h"
 
 #include "ai/actors.h"
 #include "ai/encounters.h"
 #include "ai/props.h"
 #include "units/units.h"
+#include "game/game.h"
 
 #include "memory/data.h"
 
@@ -618,6 +620,25 @@ boolean ai_enemies_attacking_player(
 	void)
 {
 	return code_000309a0(TRUE);
+}
+
+long ai_get_race_from_team_index(
+	short team_index)
+{
+	long race = _race_none;
+
+	if (team_index == _game_team_player)
+		race = _race_player;
+	else if (team_index == _game_team_human)
+		race = _race_human;
+	else if (team_index == _game_team_covenant)
+		race = _race_covenant;
+	else if (team_index == _game_team_flood)
+		race = _race_flood;
+	else if (team_index == _game_team_sentinel)
+		race = _race_sentinel;
+
+	return race;
 }
 
 /* ---------- private code */

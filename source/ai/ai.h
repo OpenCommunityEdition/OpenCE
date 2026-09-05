@@ -99,6 +99,8 @@ void ai_globals_dialogue_triggers_enabled(
 	boolean enabled);
 void ai_update_team_status(
 	void);
+long ai_get_race_from_team_index(
+	short team_index);
 void ai_get_major_upgrade_chance(
 	short major_upgrade,
 	boolean *upgrade_major,
