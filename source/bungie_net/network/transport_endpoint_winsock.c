@@ -279,9 +279,10 @@ symbols in this file:
 #include "cseries/cseries.h"
 
 #include "bungie_net/common/thread.h"
+#include "memory/byte_swapping.h"
 
 #include "bungie_net/network/transport.h"
-#include "bungie_net/network/transport_endpoint.h"
+#include "bungie_net/network/transport_endpoint_winsock.h"
 
 /* ---------- constants */
 
@@ -290,14 +291,13 @@ enum
 	_transport_type_udp = 0x11,
 	_transport_type_tcp,
 	MAXIMUM_PENDING_CONNECTIONS = 32,
-	MAXIMUM_SOCKETS_PER_SET = 64,
 	MAXIMUM_ENDPOINT_THREADS = 64,
+	MINIMUM_ENDPOINT_SOCKET_BUFFER_SIZE = 16 * 1024,
 };
 
 /* ---------- macros */
 
 #define TRANSPORT_ENDPOINT_WINSOCK_FILE "c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_winsock.c"
-#define INVALID_SOCKET ((long)-1)
 
 /* ---------- structures */
 
@@ -326,69 +326,15 @@ struct transport_endpoint_winsock_globals
 	long last_error;
 };
 
-struct winsock_fd_set
-{
-	unsigned long count;
-	long sockets[MAXIMUM_SOCKETS_PER_SET];
-};
-
-struct winsock_timeval
-{
-	long seconds;
-	long microseconds;
-};
-
-struct winsock_sockaddr
-{
-	word family;
-	byte data[14];
-};
-
-struct winsock_sockaddr_in
-{
-	word family;
-	word port;
-	unsigned long address;
-	byte zero[8];
-};
-
 /* ---------- prototypes */
 
-long __stdcall accept(
-	long socket,
-	struct winsock_sockaddr *address,
-	long *address_length);
-long __stdcall closesocket(
-	long socket);
-long __stdcall getpeername(
-	long socket,
-	struct winsock_sockaddr_in *address,
-	long *address_length);
-long __stdcall getsockname(
-	long socket,
-	struct winsock_sockaddr_in *address,
-	long *address_length);
+static SOCKET create_endpoint_socket(
+	int address_family,
+	int socket_type,
+	int protocol);
+
 void code_000713a0(
 	void);
-long __stdcall listen(
-	long socket,
-	long backlog);
-long __stdcall send(
-	long socket,
-	void const *buffer,
-	long length,
-	long flags);
-long __stdcall select(
-	long ignored,
-	struct winsock_fd_set *readable,
-	struct winsock_fd_set *writeable,
-	struct winsock_fd_set *exceptions,
-	struct winsock_timeval *timeout);
-long __stdcall WSAGetLastError(
-	void);
-long __stdcall __WSAFDIsSet(
-	long socket,
-	struct winsock_fd_set *set);
 
 /* ---------- globals */
 
@@ -520,18 +466,18 @@ boolean endpoint_readable(
 
 	if (ep->socket != INVALID_SOCKET)
 	{
-		struct winsock_fd_set readable;
-		struct winsock_timeval timeval;
+		fd_set readable;
+		struct timeval timeval;
 
 		if (TEST_FLAG(ep->flags, _transport_endpoint_in_set_bit))
 		{
 			return TEST_FLAG(ep->flags, _transport_endpoint_readable_bit);
 		}
 
-		readable.sockets[0] = ep->socket;
-		timeval.seconds = 0;
-		timeval.microseconds = timeout * MILLISECONDS_PER_SECOND;
-		readable.count = 1;
+		readable.fd_array[0] = ep->socket;
+		timeval.tv_sec = 0;
+		timeval.tv_usec = timeout * MILLISECONDS_PER_SECOND;
+		readable.fd_count = 1;
 
 		if (select(1, &readable, NULL, NULL, &timeval) > 0 &&
 			__WSAFDIsSet(ep->socket, &readable))
@@ -547,18 +493,18 @@ boolean endpoint_writeable(
 	struct transport_endpoint *ep,
 	word timeout)
 {
-	struct winsock_fd_set writeable;
-	struct winsock_timeval timeval;
+	fd_set writeable;
+	struct timeval timeval;
 
 	match_assert(
 		TRANSPORT_ENDPOINT_WINSOCK_FILE,
 		0x417,
 		ep && (ep->socket != INVALID_SOCKET));
 
-	timeval.seconds = 0;
-	timeval.microseconds = timeout * MILLISECONDS_PER_SECOND;
-	writeable.sockets[0] = ep->socket;
-	writeable.count = 1;
+	timeval.tv_sec = 0;
+	timeval.tv_usec = timeout * MILLISECONDS_PER_SECOND;
+	writeable.fd_array[0] = ep->socket;
+	writeable.fd_count = 1;
 
 	if (select(1, NULL, &writeable, NULL, &timeval) > 0 &&
 		__WSAFDIsSet(ep->socket, &writeable))
@@ -601,8 +547,8 @@ short get_endpoint_address(
 	struct transport_address *address)
 {
 	long error = _transport_error_none;
-	long address_length = sizeof(struct winsock_sockaddr_in);
-	struct winsock_sockaddr_in socket_address;
+	int address_length = sizeof(struct sockaddr_in);
+	struct sockaddr_in socket_address;
 	unsigned long network_address;
 	word network_port;
 
@@ -611,12 +557,12 @@ short get_endpoint_address(
 
 	if (ep->socket != INVALID_SOCKET)
 	{
-		if (getpeername(ep->socket, &socket_address, &address_length) == 0)
+		if (getpeername(ep->socket, (struct sockaddr *)&socket_address, &address_length) == 0)
 		{
-			if (socket_address.family == 2)
+			if (socket_address.sin_family == 2)
 			{
-				network_address = socket_address.address;
-				network_port = socket_address.port;
+				network_address = socket_address.sin_addr.s_addr;
+				network_port = socket_address.sin_port;
 				address->address.long_words[0] =
 					(((network_address & 0xFF0000) | (network_address >> 16)) >> 8) |
 					(((network_address & 0xFF00) | (network_address << 16)) << 8);
@@ -629,11 +575,11 @@ short get_endpoint_address(
 				error = _transport_error_address_unknown;
 			}
 		}
-		else if (getsockname(ep->socket, &socket_address, &address_length) == 0 &&
-			socket_address.family == 2)
+		else if (getsockname(ep->socket, (struct sockaddr *)&socket_address, &address_length) == 0 &&
+			socket_address.sin_family == 2)
 		{
-			network_address = socket_address.address;
-			network_port = socket_address.port;
+			network_address = socket_address.sin_addr.s_addr;
+			network_port = socket_address.sin_port;
 			address->address.long_words[0] =
 				(((network_address & 0xFF0000) | (network_address >> 16)) >> 8) |
 				(((network_address & 0xFF00) | (network_address << 16)) << 8);
@@ -730,9 +676,9 @@ struct transport_endpoint *accept_endpoint(
 	struct transport_endpoint *listening_endpoint)
 {
 	struct transport_endpoint *ep = NULL;
-	long address_length = sizeof(struct winsock_sockaddr);
-	struct winsock_sockaddr address;
-	long socket;
+	int address_length = sizeof(struct sockaddr);
+	struct sockaddr address;
+	SOCKET socket;
 
 	match_vassert(
 		TRANSPORT_ENDPOINT_WINSOCK_FILE,
@@ -765,6 +711,73 @@ struct transport_endpoint *accept_endpoint(
 	return ep;
 }
 
+long write_to_endpoint(
+	struct transport_endpoint *ep,
+	void const *buffer,
+	long length,
+	struct transport_address const *dest_addr)
+{
+	struct sockaddr_in socket_address;
+
+	match_assert(
+		TRANSPORT_ENDPOINT_WINSOCK_FILE,
+		0x3BD,
+		ep && buffer && (length > 0) && dest_addr);
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x3BE, transport_initialized);
+
+	socket_address.sin_addr.s_addr = SWAP4(dest_addr->address.long_words[0]);
+	socket_address.sin_port = (word)SWAP2(dest_addr->port);
+	socket_address.sin_family = AF_INET;
+
+	if (ep->socket == INVALID_SOCKET)
+	{
+		match_assert(
+			TRANSPORT_ENDPOINT_WINSOCK_FILE,
+			0x3C6,
+			ep->type == _transport_type_udp);
+
+		ep->socket = create_endpoint_socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
+		if (ep->socket == INVALID_SOCKET)
+		{
+			ep->error = _transport_error_unknown;
+		}
+	}
+
+	if (ep->socket != INVALID_SOCKET)
+	{
+		long result = sendto(
+			ep->socket,
+			buffer,
+			length,
+			0,
+			(struct sockaddr const *)&socket_address,
+			sizeof(socket_address));
+
+		if (result != SOCKET_ERROR)
+		{
+			return result;
+		}
+	}
+
+	switch (WSAGetLastError())
+	{
+	case WSAEWOULDBLOCK:
+		return _transport_result_operation_would_block;
+
+	case WSAENETRESET:
+	case WSAECONNABORTED:
+	case WSAECONNRESET:
+	case WSAENOTCONN:
+	case WSAESHUTDOWN:
+	case WSAETIMEDOUT:
+		SET_FLAG(ep->flags, _transport_endpoint_connected_bit, FALSE);
+		return _transport_error_connection_lost;
+
+	default:
+		return _transport_error_endpoint_io;
+	}
+}
+
 void delete_transport_endpoint(
 	struct transport_endpoint *ep)
 {
@@ -789,3 +802,78 @@ short reject_endpoint(
 }
 
 /* ---------- private code */
+
+static SOCKET create_endpoint_socket(
+	int address_family,
+	int socket_type,
+	int protocol)
+{
+	SOCKET endpoint_socket = socket(address_family, socket_type, protocol);
+
+	if (endpoint_socket != INVALID_SOCKET)
+	{
+		int option;
+		int option_length;
+
+		if (socket_type == SOCK_DGRAM)
+		{
+			option = -1;
+			if (setsockopt(endpoint_socket, SOL_SOCKET, SO_BROADCAST,
+				(char const *)&option, sizeof(option)) != 0)
+			{
+				winsock_error_to_string(WSAGetLastError());
+			}
+		}
+
+		option = TRUE;
+		if (setsockopt(endpoint_socket, SOL_SOCKET, SO_REUSEADDR,
+			(char const *)&option, sizeof(option)) != 0)
+		{
+			winsock_error_to_string(WSAGetLastError());
+		}
+
+		option_length = sizeof(option);
+		if (getsockopt(endpoint_socket, SOL_SOCKET, SO_SNDBUF,
+			(char *)&option, &option_length) == 0)
+		{
+			if (option < MINIMUM_ENDPOINT_SOCKET_BUFFER_SIZE)
+			{
+				option = MINIMUM_ENDPOINT_SOCKET_BUFFER_SIZE;
+				if (setsockopt(endpoint_socket, SOL_SOCKET, SO_SNDBUF,
+					(char const *)&option, sizeof(option)) != 0)
+				{
+					winsock_error_to_string(WSAGetLastError());
+				}
+			}
+		}
+		else
+		{
+			winsock_error_to_string(WSAGetLastError());
+		}
+
+		option_length = sizeof(option);
+		if (getsockopt(endpoint_socket, SOL_SOCKET, SO_RCVBUF,
+			(char *)&option, &option_length) == 0)
+		{
+			if (option < MINIMUM_ENDPOINT_SOCKET_BUFFER_SIZE)
+			{
+				option = MINIMUM_ENDPOINT_SOCKET_BUFFER_SIZE;
+				if (setsockopt(endpoint_socket, SOL_SOCKET, SO_RCVBUF,
+					(char const *)&option, sizeof(option)) != 0)
+				{
+					winsock_error_to_string(WSAGetLastError());
+				}
+			}
+		}
+		else
+		{
+			winsock_error_to_string(WSAGetLastError());
+		}
+	}
+	else
+	{
+		winsock_error_to_string(WSAGetLastError());
+	}
+
+	return endpoint_socket;
+}

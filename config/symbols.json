@@ -1406,7 +1406,7 @@
 { "file_offset": 465104, "flags": 32, "name": "_get_endpoint_error" },
 { "file_offset": 465168, "flags": 32, "name": "_endpoint_equivalent" },
 { "file_offset": 465280, "flags": 32, "name": "_winsock_error_to_string" },
-{ "file_offset": 466848, "flags": 32, "name": "_code_00071fa0" },
+{ "file_offset": 466848, "flags": 32, "name": "_create_endpoint_socket", "static": true },
 { "file_offset": 467152, "flags": 32, "name": "_get_endpoint_address" },
 { "file_offset": 467520, "flags": 32, "name": "_set_endpoint_blocking" },
 { "file_offset": 467792, "flags": 32, "name": "_bind_endpoint" },

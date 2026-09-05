@@ -570,3 +570,28 @@ not an unresolved ownership veto. Totals are **905,027 meaningful code bytes**,
 objects**. The remaining genuine Profile getters and separate Transport write
 caller/helper cluster are uncredited research, not completed reconciliation.
 All Fable reservations remain in force.
+
+### Genuine Transport datagram caller/socket helper: 905,328 bytes (2026-09-05)
+
+The general campaign retains the full natural datagram writer with its real
+private socket-construction dependency, gaining **301 meaningful /304 padded
+exact code bytes**. The helper has a semantic static name; the caller is a
+**75.76159%** fuzzy park. Nine copied WinSock declarations and four duplicate
+SDK layouts are removed in favor of the existing actual owner header. The
+unit reaches **17E/3R/10U**. See
+`object_matching_logs/transport_endpoint_winsock_obj_write_socket_cluster_20260905.md`.
+
+Independent source review, canonical no-alias gate, full Ninja and stable
+sweep pass: **6,216 strict owners**, one gain, zero regressions. All288 tests
+plus26 subtests pass; **274 parks** validate; admission is unchanged. Three
+new stock SDK tables pass duplicate-symbol processing with real canonical
+base copies, but diagnostics end on unrelated unresolveds, not a successful
+whole link. They receive no data credit; no whole-object admission is claimed.
+The split selection1 values are explicit reconstruction JSON, not evidence
+authorizing target metadata changes or fabricated SDK include shims.
+
+Verified totals are **905,328 meaningful code bytes**, **6,170 credited
+functions**, **2,028,764 data bytes**, and **391/833 Matching objects**.
+Older Profile getter reconstruction remains a separate uncredited scratch
+packet with its real public API/seconds-elapsed field dependency. All Fable
+reservations remain excluded.

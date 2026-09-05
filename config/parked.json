@@ -2,6 +2,25 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/bungie_net/network/transport_endpoint_winsock",
+      "function": "_write_to_endpoint",
+      "class": "unclassified",
+      "evidence": "First complete natural January datagram write reconstruction with the genuine static create_endpoint_socket dependency, correct public long return/const destination API, stock SDK socket types and APIs, SWAP4/SWAP2 address conversion, target-backed assertions, and WSA enum cases. Target and candidate are384 padded bytes/21 relocations. First instruction drift is the failed socket-creation block: VC7 places the error store before sendto and uses known AX=-1, while January places an immediate -1 store after switch dispatch; downstream addresses differ. The caller retains the immediately strict301 meaningful/304 padded byte helper through its only implemented genuine call; no synthetic anchors or calling-convention controls. All18 inherited emitted functions and12 inherited named runtime-data owners retain strict sections and real-owner storage/offset/type/flags/COMDAT selection. The genuine owner header's stock xtl.h dependency adds three SDK select-any tables totaling432B, with compatible canonical base copies. Ordinary unmodified candidate/base tests pass duplicate-symbol processing in both orders but fail on24 unrelated unresolveds; no successful whole-link proof or data credit is claimed. Split selection1 values are explicit config/contribs.json reconstruction metadata of unknown historical origin, not rewritten to match. No variants or bind/connect residual tuning. Reopen only for authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_winsock_obj_write_socket_cluster_20260905.md.",
+      "measurements": {
+        "target": {
+          "size": 384,
+          "relocation_count": 21,
+          "normalized_sha256": "d14d251cab0a59331c2f126a13526012abea159035e313ad7796100d90e3eb90"
+        },
+        "base": {
+          "size": 384,
+          "relocation_count": 21,
+          "normalized_sha256": "96450414f58083badd95f037fae797d4c6ff99f19d75e9ca748cc9e0b412f86b"
+        },
+        "objdiff_percent": 75.76159
+      }
+    },
+    {
       "unit": "source/cseries/profile",
       "function": "_profile_dump",
       "class": "unclassified",
