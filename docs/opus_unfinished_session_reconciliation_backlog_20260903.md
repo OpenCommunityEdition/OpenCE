@@ -619,3 +619,31 @@ show that section rising89.350914%->100%; no unrelated gain is needed.
 Verified totals are **906,391 meaningful code bytes**, **6,171 credited
 functions**, **2,030,868 matched data bytes**, and **391/833 Matching objects**.
 No whole-Profile completion is claimed. Fable reservations remain excluded.
+
+### Transport receive pair: two natural source gaps filled (2026-09-05)
+
+The general campaign retains complete TCP and UDP receive paths through their
+existing genuine API/type owners. The combined Transport Endpoint Winsock gate
+is **17E/5R/8U**. Stream read is parked at **67.14286%**; datagram read is
+parked at **46.441624%**. These reconstruct **799 meaningful target bytes**
+but receive **zero exact-code credit**. All17 prior exact functions and all
+prior parked functions remain unchanged. See the `transport_endpoint_winsock_obj_read_natural_boundary_20260905.md`
+and `transport_endpoint_winsock_obj_read_from_natural_boundary_20260905.md`
+object logs.
+
+Independent semantic/ABI reviews verify January's deliberately different TCP
+EOF and zero-length UDP behavior. The combined actual canonical ownership
+audits preserve all20 old code/17 old data owners and add only the two functions
+and three target-backed assertion literals94B. No new helper, COMMON, fake
+API/header, compiler control or reserved Fable implementation is involved.
+
+Full Ninja and the stable8,245-owner sweep preserve **6,217 strict owners**
+with zero regressions. All288 tests plus26 subtests pass;277 parks validate;
+admission is unchanged. Credited totals remain **906,391 code bytes**,
+**6,171 functions**, **2,030,868 data bytes**, and **391/833 Matching objects**.
+The real bind implementation and other residual/ownership debts remain
+explicitly uncompleted. All Fable exclusions remain in force.
+
+The same publication also includes the supplemental Profile header-consumer
+and data-credit audit at
+`object_matching_logs/profile_obj_getters_header_consumer_and_data_audit_20260905.md`.

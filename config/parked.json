@@ -2,6 +2,44 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/bungie_net/network/transport_endpoint_winsock",
+      "function": "_read_endpoint",
+      "class": "unclassified",
+      "evidence": "Complete one-shot natural January stream read through the existing real SDK recv owner, public long endpoint/void-buffer/long-length API, target assertions, WSA error constants, and cseries flag macros. Target and candidate are256 padded bytes/16 relocations. The documented old residual remains: January's default error arm loads flags into CL, masks/stores them and writes the short error; VC7 uses the equivalent in-memory byte AND, shortening this arm by5 bytes and shifting the tail/tables. No E38–E42 variant was repeated. WSAEWOULDBLOCK sets error-4 and leaves flags; connection errors clear connected/readable and set error-3; other failures clear readable and set error-2. Positive reads return their count. EOF returns-3 without updating endpoint fields, preserving January. All20 inherited emitted code owners (17 exact/3 parked) and17 runtime-data owners remain byte/relocation-identical with unchanged real-owner offset/storage/type/flags/alignment/COMDAT selection. Exactly one new public code owner, no new data/COMMON/helpers/point_from_line3d. Reopen only with authentic source/type/compiler context, not scheduling variants. See docs/object_matching_logs/transport_endpoint_winsock_obj_read_natural_boundary_20260905.md.",
+      "measurements": {
+        "target": {
+          "size": 256,
+          "relocation_count": 16,
+          "normalized_sha256": "1ccff970f392034644ae9ef3f46732fbcaaa6c60076defca35cafe662dd99e0e"
+        },
+        "base": {
+          "size": 256,
+          "relocation_count": 16,
+          "normalized_sha256": "61b84f3b48ae319f309c469afd1bc3ded1721e6a319844f1a7d8d1355a57101f"
+        },
+        "objdiff_percent": 67.14286
+      }
+    },
+    {
+      "unit": "source/bungie_net/network/transport_endpoint_winsock",
+      "function": "_read_from_endpoint",
+      "class": "unclassified",
+      "evidence": "First complete natural January datagram receive using the existing exact static create_endpoint_socket, real public short-return bind_endpoint, naturally inlined endpoint_connected predicate, and stock recvfrom/WSA API. No bind body, helper, shared header or SDK feature was changed. Target/candidate544 padded bytes/30 relocations; target543 meaningful bytes. Natural VC7 keeps length in EBX and saves/restores it whereas January reloads the stack parameter; it uses a different zero-initialization store schedule, places the address-copy success block before errors, and chooses equivalent flag-update instructions. Same44B stack frame, all target cases and call identities present; no variants were tried. Zero datagrams return0 and populate IPv4/port; unused source-address fields stay untouched. All20 inherited code owners (17 exact,3 parked) and17 inherited runtime-data owners retain bytes/relocations and real-owner properties. Exactly one new code owner and three authentic assertion literals94B (all strict to target), no new candidate-only owner/COMMON/point_from_line3d. Park credible fuzzy; reopen only from authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_winsock_obj_read_from_natural_boundary_20260905.md.",
+      "measurements": {
+        "target": {
+          "size": 544,
+          "relocation_count": 30,
+          "normalized_sha256": "436b29a8a3fead8a698af2e95e38faae6e8e1336c2566954e28b7382a1890a9b"
+        },
+        "base": {
+          "size": 544,
+          "relocation_count": 30,
+          "normalized_sha256": "dad0a6d1bcae2082669d34fb51928ab05bc0f7a1b54e23e9a7dea80de81e9441"
+        },
+        "objdiff_percent": 46.441624
+      }
+    },
+    {
       "unit": "source/cseries/profile",
       "function": "_profile_frame_get_value",
       "class": "unclassified",
