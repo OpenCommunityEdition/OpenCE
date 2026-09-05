@@ -312,6 +312,7 @@ symbols in this file:
 #include "bungie_net/common/thread.h"
 #include "saved games/saved_game_files.h"
 #include "input/input.h"
+#include "memory/crc.h"
 #include "tag_files/files.h"
 #include "text/unicode.h"
 #include "interface/ui_widget.h"
@@ -1812,6 +1813,166 @@ void saved_game_files_delete_all_custom_profiles(
 		memory_unit_index++;
 	}
 
+	return;
+}
+
+void enumerate_memory_units(
+	void)
+{
+	wchar_t message[MAXIMUM_FILENAME_LENGTH+1];
+	XGAME_FIND_DATA find_data;
+	byte block[SAVED_GAME_FILE_BLOCK_SIZE];
+	struct file_reference saved_game_file;
+	XCALCSIG_SIGNATURE checksum;
+	HANDLE find_handle;
+	unsigned long old_style_crc;
+	unsigned long memory_unit_index = _memory_unit_hard_drive;
+	long number_of_enumerated_files = 0;
+
+	while (memory_unit_index < NUMBER_OF_SUPPORTED_MEMORY_UNITS)
+	{
+		if (take_mutex(saved_game_files_globals.general_mutex, SAVED_GAME_FILES_MUTEX_TIMEOUT))
+		{
+			if (enumerate_mapfile_begin(memory_unit_index))
+			{
+				if (memory_unit_index == _memory_unit_hard_drive)
+				{
+					char root_path[MEMORY_UNIT_ROOT_PATH_SIZE] = {0};
+					find_handle = XFindFirstSaveGame(
+						wide_to_ascii(memory_unit_root_path[memory_unit_index], root_path, sizeof(root_path)),
+						&find_data);
+
+					if (find_handle != INVALID_HANDLE_VALUE)
+					{
+						while (number_of_enumerated_files < MAXIMUM_ENUMERATED_SAVED_GAME_FILES_ANY_TYPE_PER_MEMORY_UNIT)
+						{
+							struct enumerated_saved_game_file file = {0};
+							word checksum_data_size;
+							if (_snprintf(
+									file.path,
+									MAXIMUM_FILENAME_LENGTH,
+									"%s%s",
+									find_data.szSaveGameDirectory,
+									"blam.sav") > 0 &&
+								file_reference_create_from_path(&saved_game_file, file.path, FALSE) &&
+								file_exists(&saved_game_file))
+							{
+								file.type = _saved_game_file_type_player_profile;
+								checksum_data_size = PLAYER_PROFILE_CHECKSUM_DATA_SIZE;
+							}
+							else if (_snprintf(
+									file.path,
+									MAXIMUM_FILENAME_LENGTH,
+									"%s%s",
+									find_data.szSaveGameDirectory,
+									"blam.lst") > 0 &&
+								file_reference_create_from_path(&saved_game_file, file.path, FALSE) &&
+								file_exists(&saved_game_file))
+							{
+								file.type = _saved_game_file_type_game_variant;
+								checksum_data_size = PLAYLIST_PROFILE_CHECKSUM_DATA_SIZE;
+							}
+							else
+							{
+								usnprintf(
+									message,
+									MAXIMUM_FILENAME_LENGTH,
+									L"random crap found by XFindNextSaveGame(): display name= '%s' path= '%hs'",
+									find_data.szSaveGameName,
+									find_data.wfd.cFileName);
+								message[MAXIMUM_FILENAME_LENGTH] = 0;
+								error(
+									_error_silent,
+									wide_to_ascii(message, (char *)message, sizeof(message)));
+								file.type = NONE;
+							}
+
+							if (file.type != NONE)
+							{
+								ustrncpy(file.display_name, find_data.szSaveGameName, MAX_GAMENAME-1);
+								file.display_name[MAX_GAMENAME-1] = 0;
+
+								if (file_open(
+										&saved_game_file,
+										FLAG(_permission_read_bit)|FLAG(_permission_write_bit)))
+								{
+									if (file_read(&saved_game_file, sizeof(block), block))
+									{
+										saved_game_file_generate_checksum(block, checksum_data_size, &checksum);
+										if (!csmemcmp(&checksum, block+checksum_data_size, sizeof(checksum)))
+										{
+											file.valid = TRUE;
+										}
+										else
+										{
+											error(_error_silent, "checksum validation failed for '%s'", file.path);
+											crc_new(&old_style_crc);
+											crc_checksum_buffer(&old_style_crc, block, checksum_data_size);
+											if (!csmemcmp(&old_style_crc, block+checksum_data_size, sizeof(old_style_crc)))
+											{
+												error(_error_silent, "checksum validation matched old-style crc; updating saved game file '%s'", file.path);
+												csmemcpy(block+checksum_data_size, &checksum, sizeof(checksum));
+												if (file_set_position(&saved_game_file, 0) &&
+													file_write(&saved_game_file, sizeof(block), block))
+												{
+													file.valid = TRUE;
+												}
+											}
+										}
+									}
+									else
+									{
+										error(_error_silent, "failed to read saved game file to verify checksum");
+									}
+
+									if (!file_close(&saved_game_file))
+									{
+										error(_error_silent, "failed to close saved game file after verifying checksum");
+									}
+								}
+								else
+								{
+									error(_error_silent, "failed to open saved game file to verify checksum");
+								}
+
+								if (!append_entry_to_mapfile(&file))
+								{
+									break;
+								}
+								number_of_enumerated_files++;
+							}
+
+							if (!(boolean)XFindNextSaveGame(find_handle, &find_data))
+							{
+								break;
+							}
+						}
+
+						if (!XFindClose(find_handle))
+						{
+							error(_error_silent, "XFindClose() failed");
+						}
+					}
+
+					{
+						short number_of_playlist_files = enumerate_default_playlist_profile_files();
+						short number_of_player_profile_files = enumerate_default_player_profile_files();
+						short number_of_default_files = number_of_playlist_files+number_of_player_profile_files;
+
+						number_of_enumerated_files += number_of_default_files;
+					}
+				}
+
+				enumerate_mapfile_end(memory_unit_index);
+			}
+
+			release_mutex(saved_game_files_globals.general_mutex);
+		}
+
+		memory_unit_index++;
+	}
+
+	saved_game_files_globals.memory_units_dirty = FALSE;
 	return;
 }
 

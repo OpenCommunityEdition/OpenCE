@@ -2,6 +2,14 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_dynavobgeom",
+      "class": "source-layout-incomplete",
+      "symbol": "struct rasterizer_dynamic_geometry_debug_options",
+      "reason": "All 17 target functions remain strict exact and the diagnostic flag now has its authentic one-byte BSS owner instead of COMMON storage. Whole-object completion still fails source ownership: debug-options and frame-statistics globals use caller-local incomplete views with opaque spans, and the window global uses a separate partial type. The candidate also retains an extra real_alpha_to_pixel32 code owner and stock SDK data copies absent from this January split; no ordinary final-link ownership proof is claimed.",
+      "evidence": "docs/object_matching_logs/rasterizer_xbox_dynavobgeom_obj_bss_owner_audit_20260904.md#remaining-completion-boundary",
+      "reopen": "Recover the authentic shared January layouts and use their proper owning declarations, preserving existing target-function matches across all consumers. Separately establish complete helper/SDK data ownership through authentic source topology and ordinary link verification. Do not use opaque prefix facades, declaration-order steering, forced inlining, altered selection metadata, or candidate-only bytes to claim Matching."
+    },
+    {
       "unit": "source/interface/hud_draw",
       "class": "candidate-only-comdat-owner",
       "symbol": "_fast_ftol",

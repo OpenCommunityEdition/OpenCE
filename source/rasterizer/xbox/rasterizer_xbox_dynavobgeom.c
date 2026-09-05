@@ -291,7 +291,7 @@ extern struct rasterizer_dynamic_geometry_debug_options rasterizer_debug_options
 extern struct rasterizer_dynamic_geometry_frame_statistics rasterizer_frame_statistics;
 extern struct rasterizer_dynamic_geometry_window_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
-boolean reported_too_many_transparent_geometry_groups;
+boolean reported_too_many_transparent_geometry_groups = FALSE;
 
 /* ---------- public code */
 

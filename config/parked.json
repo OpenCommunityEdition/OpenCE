@@ -3,6 +3,39 @@
   "entries": [
     {
       "unit": "source/saved games/saved_game_files",
+      "function": "_enumerate_memory_units",
+      "class": "unclassified",
+      "evidence": "Complete natural January memory-unit enumeration: real XDK search structures/APIs, typed saved-file metadata, signature validation and legacy CRC migration, mapfile/mutex lifetimes, existing default enumerators, and unconditional dirty-flag clear. memory/crc.h owns the added CRC calls; no Fable playlist schema dependency. Target992B/52 relocations versus candidate1008B/52, identical relocation destination sequence and exact0xA84 frame; addresses shift after natural inner/outer loop layout differences. One bounded alternate loop spelling produced the same hash and was removed; no lifetime coupling, declaration steering, fake aggregates or compiler controls. All39 inherited exacts and6parks unchanged, all46 target code owners present with no extras, hard _point_from_line3d guard passes. Unknown source/compiler mechanism, so no exact credit. Reopen for authentic source/type/compiler-context evidence only. See docs/object_matching_logs/saved_game_files_obj_enumerate_memory_units_20260904.md.",
+      "measurements": {
+        "target": {"size": 992, "relocation_count": 52, "normalized_sha256": "bb78e47ec36edad43dd58bc245c26cc86944a94a7eb4858c963516799bcfe75c"},
+        "base": {"size": 1008, "relocation_count": 52, "normalized_sha256": "ccb50a7ffa83865a349947689eb2e27427ab5efe0031e980bb95df3340de6096"},
+        "objdiff_percent": 97.08481
+      }
+    },
+    {
+      "unit": "source/bungie_net/network/transport_endpoint_winsock",
+      "function": "_endpoint_listening",
+      "class": "unclassified",
+      "evidence": "Restore credible natural source under current fuzzy-park rules, superseding the August29 exact-only removal. One TEST_FLAG expression on the authentic listening bit returns the same 0/1 long as January after the original ep assertion at line0x42E. Both64B/4relocs; target masks bit1 then shifts, candidate shifts then masks bit0. No spelling search, bitfield, signed flag change, asm, volatile or source steering. All16 inherited exact owners remain unchanged and no extra code or point_from_line3d is emitted. Reopen only with authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_winsock_obj_shared_types_readiness_20260904.md.",
+      "measurements": {
+        "target": {"size": 64, "relocation_count": 4, "normalized_sha256": "9555d57f2b699cbd43b1c64a752c9d489448a4dcf3d7e2587cfca2b0e5cd0378"},
+        "base": {"size": 64, "relocation_count": 4, "normalized_sha256": "0c517bca0e44c9ecaecbb36cbd0fcef89f7336b3879329f6d5092fd4749ae12d"},
+        "objdiff_percent": 90.42857
+      }
+    },
+    {
+      "unit": "source/bungie_net/network/transport_endpoint_winsock",
+      "function": "_endpoint_readable",
+      "class": "unclassified",
+      "evidence": "Restore natural readable-endpoint implementation under current fuzzy-park policy. January-valid socket guard, cached endpoint-set readability, unsigned16-bit timeout, typed select fd_set/timeval and API results are preserved. Public prototype corrected to word timeout in owning winsock header. Candidate176B/6relocs versus target192B/6; January retains EBX zero and separate invalid return, natural C uses immediate zeros and merges false returns. No coupling booleans to pointer/null values, lifetime shaping, raw offsets or codegen controls. Complete8B endpoint struct is shared through a real owner header, with semantic flag constants and TEST_FLAG. All16 inherited exacts unchanged, no extra code/no point_from_line3d. Reopen only with authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_winsock_obj_shared_types_readiness_20260904.md.",
+      "measurements": {
+        "target": {"size": 192, "relocation_count": 6, "normalized_sha256": "4aa245bc023e916684c2f0e85a6c095e39e59b327edf9f0d663f138caf5b8e84"},
+        "base": {"size": 176, "relocation_count": 6, "normalized_sha256": "2bd094fae4e082a8f11aac9fca4ac91313b619d39105ec1dbd4fc9d67515106c"},
+        "objdiff_percent": 82.361115
+      }
+    },
+    {
+      "unit": "source/saved games/saved_game_files",
       "function": "_synchronize_metadata_display_name_with_profile_name",
       "class": "unclassified",
       "evidence": "Complete natural January metadata-rename caller is reconstructed with its genuine private set_nth_entry_in_mapfile write helper (authenticated January/PDB name; helper480padded/474meaningful strict). Typed public long profile_index/wchar_t* game_display_name prototype belongs to saved_game_files.h; no playlist schema changes. Named file type enums, CREATE_NEW and flags0, real mapfile mutex/write APIs and authentic odd TRUE/log failure policy follow January. Target/base1040padded/63relocations,321 aligned instructions;99.58147 percent. Remaining code difference is early mov bl,1 placement around decoded-index stores; three shared %s%s relocation records also differ in csplit ownership classification, so no exact or precise compiler-tie claim. No BL lifetime/declaration permutations, flags, carrier types, source stubs or extra references are used. Nonnull display-name precondition is enforced by ustrlen; original snprintf termination/store schedule is retained. All38 inherited exacts and5parks remain unchanged, no candidate-only code/COMMON is introduced, and hard _point_from_line3d guard passes. Reopen only with source/type/compiler-context or fully resolved ownership evidence, not equivalent spelling searches. See docs/object_matching_logs/saved_game_files_obj_metadata_sync_pair_scratch_20260904.md and docs/object_matching_logs/saved_game_nonce_canonical_integration_20260904.md.",

@@ -281,6 +281,7 @@ symbols in this file:
 #include "bungie_net/common/thread.h"
 
 #include "bungie_net/network/transport.h"
+#include "bungie_net/network/transport_endpoint.h"
 
 /* ---------- constants */
 
@@ -299,14 +300,6 @@ enum
 #define INVALID_SOCKET ((long)-1)
 
 /* ---------- structures */
-
-struct transport_endpoint
-{
-	long socket;
-	byte flags;
-	char type;
-	short error;
-};
 
 struct endpoint_thread_reference
 {
@@ -361,8 +354,6 @@ struct winsock_sockaddr_in
 
 /* ---------- prototypes */
 
-struct transport_endpoint *accept_endpoint(
-	struct transport_endpoint *listening_endpoint);
 long __stdcall accept(
 	long socket,
 	struct winsock_sockaddr *address,
@@ -379,10 +370,6 @@ long __stdcall getsockname(
 	long *address_length);
 void code_000713a0(
 	void);
-void delete_transport_endpoint(
-	struct transport_endpoint *endpoint);
-void disconnect_endpoint(
-	struct transport_endpoint *ep);
 long __stdcall listen(
 	long socket,
 	long backlog);
@@ -402,8 +389,6 @@ long __stdcall WSAGetLastError(
 long __stdcall __WSAFDIsSet(
 	long socket,
 	struct winsock_fd_set *set);
-char const *winsock_error_to_string(
-	long error);
 
 /* ---------- globals */
 
@@ -517,6 +502,45 @@ long endpoint_connected(
 	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x426, ep);
 
 	return ep->flags & 1;
+}
+
+long endpoint_listening(
+	struct transport_endpoint const *ep)
+{
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x42E, ep);
+
+	return TEST_FLAG(ep->flags, _transport_endpoint_listening_bit);
+}
+
+boolean endpoint_readable(
+	struct transport_endpoint *ep,
+	word timeout)
+{
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x3F3, ep);
+
+	if (ep->socket != INVALID_SOCKET)
+	{
+		struct winsock_fd_set readable;
+		struct winsock_timeval timeval;
+
+		if (TEST_FLAG(ep->flags, _transport_endpoint_in_set_bit))
+		{
+			return TEST_FLAG(ep->flags, _transport_endpoint_readable_bit);
+		}
+
+		readable.sockets[0] = ep->socket;
+		timeval.seconds = 0;
+		timeval.microseconds = timeout * MILLISECONDS_PER_SECOND;
+		readable.count = 1;
+
+		if (select(1, &readable, NULL, NULL, &timeval) > 0 &&
+			__WSAFDIsSet(ep->socket, &readable))
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
 }
 
 boolean endpoint_writeable(
