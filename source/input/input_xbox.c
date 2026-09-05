@@ -523,6 +523,68 @@ void input_set_gamepad_rumbler_state(
 	return;
 }
 
+boolean input_key_is_down(
+	short key_code)
+{
+	boolean result = FALSE;
+
+	if (!input_globals.suppressed)
+	{
+		switch (key_code)
+		{
+		case _key_shift:
+			result = MAX(
+				input_globals.key_ticks[_key_left_shift],
+				input_globals.key_ticks[_key_right_shift]);
+			break;
+		case _key_control:
+			result = MAX(
+				input_globals.key_ticks[_key_left_control],
+				input_globals.key_ticks[_key_right_control]);
+			break;
+		case _key_windows:
+			result = MAX(
+				input_globals.key_ticks[_key_left_windows],
+				input_globals.key_ticks[_key_right_windows]);
+			break;
+		case _key_alt:
+			result = MAX(
+				input_globals.key_ticks[_key_left_alt],
+				input_globals.key_ticks[_key_right_alt]);
+			break;
+		default:
+			match_assert(
+				"c:\\halo\\SOURCE\\input\\input_xbox.c",
+				0x13A,
+				key_code>=0 && key_code<NUMBER_OF_KEYS);
+			result = input_globals.key_ticks[key_code];
+			break;
+		}
+	}
+
+	return result;
+}
+
+boolean input_get_key(
+	struct key_stroke *key)
+{
+	boolean result = FALSE;
+
+	if (input_globals.buffered_key_read_index < input_globals.buffered_key_write_index)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\input\\input_xbox.c",
+			0x14E,
+			input_globals.buffered_key_read_index>=0 &&
+				input_globals.buffered_key_read_index<MAXIMUM_BUFFERED_KEYSTROKES);
+
+		*key = input_globals.buffered_keys[input_globals.buffered_key_read_index++];
+		result = TRUE;
+	}
+
+	return result;
+}
+
 void input_vertical_blank_interrupt(
 	void)
 {
@@ -532,6 +594,55 @@ void input_vertical_blank_interrupt(
 	}
 
 	input_globals.update_event_pending = !input_globals.update_event_pending;
+
+	return;
+}
+
+void input_get_raw_data_string(
+	char *buffer,
+	short size)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\input\\input_xbox.c",
+		0x32B,
+		buffer);
+	match_assert(
+		"c:\\halo\\SOURCE\\input\\input_xbox.c",
+		0x32C,
+		size>0);
+
+	if (buffer && size>0)
+	{
+		short buffer_length = (short)_snprintf(
+			buffer,
+			size,
+			"|n|n|n|ngamepad|tleft stick|tright stick|t|n");
+		struct raw_gamepad_state *raw_gamepad_state = input_globals.raw_gamepad_states;
+		HANDLE *gamepad_handle = input_globals.gamepad_handles;
+		long gamepad_index = 0;
+		long gamepad_count = MAXIMUM_GAMEPADS;
+
+		while (gamepad_count)
+		{
+			if (*gamepad_handle != NULL)
+			{
+				buffer_length += (short)_snprintf(
+					buffer + buffer_length,
+					size - buffer_length,
+					"gamepad %d|t(%d, %d)|t(%d, %d)|n",
+					gamepad_index,
+					raw_gamepad_state->sticks[_gamepad_stick_left].x,
+					raw_gamepad_state->sticks[_gamepad_stick_left].y,
+					raw_gamepad_state->sticks[_gamepad_stick_right].x,
+					raw_gamepad_state->sticks[_gamepad_stick_right].y);
+			}
+
+			gamepad_index++;
+			gamepad_handle++;
+			raw_gamepad_state++;
+			gamepad_count--;
+		}
+	}
 
 	return;
 }

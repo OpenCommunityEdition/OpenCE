@@ -2,6 +2,44 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/interface/hud_sounds",
+      "function": "_hud_play_sound",
+      "class": "unclassified",
+      "evidence": "Policy-driven replacement of the inherited unsupported volatile local pointer and redundant nested handle guard with ordinary pointer semantics, natural impulse-sound rising-edge control, SET_FLAG and explicit return. The proper five-argument public API is now declared in closest owner hud.h. Target352 versus candidate384 padded bytes, both13 relocations; source is honestly nonexact and the former Matching label is revoked rather than retained through compiler steering. Original exact-but-noncompliant source remains in Git at d556ba530 and32580a870. No comparator waiver, volatile/register steering, fake lifetime, inline forcing, assembly or expression-order search is used. Reopen only for authentic source/type/control-flow evidence preserving these house rules. See docs/object_matching_logs/hud_sounds_obj_source_authenticity_review_20260904.md and input_hud_player_ui_followup_20260904.md.",
+      "measurements": {
+        "target": {
+          "size": 352,
+          "relocation_count": 13,
+          "normalized_sha256": "1d026cea1652a4639bc1258234647070cfdb9dfda61f268e1033299edb398f37"
+        },
+        "base": {
+          "size": 384,
+          "relocation_count": 13,
+          "normalized_sha256": "5ad2867ca1866ae4cda357d19e78baca3a47d275b39f6640653948f1728cb858"
+        },
+        "objdiff_percent": 82.10656
+      }
+    },
+    {
+      "unit": "source/input/input_xbox",
+      "function": "_input_get_raw_data_string",
+      "class": "unclassified",
+      "evidence": "Natural January raw-gamepad diagnostic formatting through genuine stick/handle arrays, signed16-bit size ABI and original snprintf literals. Target and candidate have equal240-byte padded extent and14 relocations; equivalent pointer setup/register scheduling differs. Retained first ordinary pointer/count implementation without declaration-order tuning, raw offsets, representation punning, helper anchors, compiler controls or assembly. All inherited exact functions and prior parks remain unchanged; key dequeue and key-state retrieval now independently close. Reopen only for authentic source or new type/ABI evidence. See docs/object_matching_logs/input_xbox_obj_remaining_public_leaves_20260904.md and input_xbox_obj_public_leaves_independent_review_20260904.md. No exact credit is claimed for this formatter.",
+      "measurements": {
+        "target": {
+          "size": 240,
+          "relocation_count": 14,
+          "normalized_sha256": "3a95b06caa2d47b995d9c24ba0a7450d1ccbc091e6a4dc288cc6a986d8f76c5a"
+        },
+        "base": {
+          "size": 240,
+          "relocation_count": 14,
+          "normalized_sha256": "1032cde83ef635472499ea3ef854f7bbd2877bc5fb0ef29aa4dc4f41c631557e"
+        },
+        "objdiff_percent": 96.69512
+      }
+    },
+    {
       "unit": "source/input/input_xbox",
       "function": "_input_update_analog_button_state",
       "class": "unclassified",

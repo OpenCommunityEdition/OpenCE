@@ -1,5 +1,15 @@
 [
   {
+    "unit": "source/input/input_xbox",
+    "function": "_input_key_is_down",
+    "reason": "Independent root and reviewer COFF gates prove all 192 meaningful/padded bytes and 19 ordered relocations exact, normalized SHA-256 c1ab3b0043e411c7e6695fb129837501c3bca12a2477d9497b5123f3eaf17805. Objdiff reports 93.93939 percent because compiler-local switch labels are represented differently. A natural result variable and single terminal return satisfy the house rules without a bogus unreachable fallback and reproduce January; no target-byte exception or declaration-order tuning. See docs/object_matching_logs/input_xbox_obj_public_leaves_independent_review_20260904.md."
+  },
+  {
+    "unit": "source/interface/player_ui",
+    "function": "_set_local_player_controls_from_player_profile",
+    "reason": "Independent strict COFF comparison proves all 528 meaningful/padded bytes and 14 ordered relocations exact, normalized SHA-256 ff47c65c6eda0c31b625817bb914f77ad790244d2be44109e484d10664685ee5. Raw objdiff reports 95.89041 percent due to compiler-local switch labels. This repairs existing function credit only; it does not count fresh reconstruction or waive the object's public playlist-layout/coalescing boundary. See docs/object_matching_logs/player_ui_obj_owner_house_rule_reconciliation_20260904.md."
+  },
+  {
     "unit": "source/interface/hud_unit",
     "function": "_hud_render_damage_indicators",
     "reason": "Independent root/worker COFF gates prove all 688 padded bytes and 39 ordered relocations exact, normalized SHA-256 cf7cb8af78f4f4f9fb2a11c7bb67c2e5fb0e31cedcbe8b062ef7aa7fad4cacd0. Objdiff reports 95.85253 percent because compiler-local switch labels are represented differently; no byte or target exception. The independently PDB/type/ABI-reviewed source and complete emitted-owner audit are documented in docs/object_matching_logs/hud_unit_obj_damage_indicators_exact_20260904.md."

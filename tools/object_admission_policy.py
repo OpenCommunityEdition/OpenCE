@@ -1,9 +1,10 @@
 """Validate reviewed whole-object admission rejections.
 
 Function exactness alone cannot prove that a rebuilt translation unit owns
-the same COFF sections as its target.  This policy records reviewed ownership
-failures that must veto whole-object completion without debiting valid target
-function progress.
+the same COFF sections as its target or has an authenticated complete source
+layout. This policy records reviewed ownership and source-layout failures
+that must veto whole-object completion without debiting valid target function
+progress.
 """
 
 from pathlib import Path
@@ -14,6 +15,7 @@ import json
 ALLOWED_CLASSES = {
     "bss-symbol-layout-mismatch",
     "candidate-only-comdat-owner",
+    "source-layout-incomplete",
 }
 
 

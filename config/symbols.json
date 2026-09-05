@@ -22072,7 +22072,7 @@
 { "file_offset": 3101336, "flags": 0, "name": "_profile_graph_value_count" },
 { "file_offset": 3101344, "flags": 0, "name": "_profile_graph_values" },
 { "file_offset": 3134880, "flags": 0, "name": "_check_for_demos", "static": true },
-{ "file_offset": 3134884, "flags": 0, "name": "_data_002fd5a4" },
+{ "file_offset": 3134884, "flags": 0, "name": "_player1_last_used_profile_index", "static": true },
 { "file_offset": 3134888, "flags": 0, "name": "_progress_bar_rendering_enabled" },
 { "file_offset": 3134896, "flags": 0, "name": "_compressed_monk_tone" },
 { "file_offset": 3153292, "flags": 0, "name": "_delta_z" },

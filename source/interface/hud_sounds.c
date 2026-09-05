@@ -12,6 +12,7 @@ symbols in this file:
 
 #include "cseries.h"
 
+#include "interface/hud.h"
 #include "objects/objects.h"
 #include "sound/sound_definitions.h"
 #include "sound/game_sound.h"
@@ -35,13 +36,6 @@ struct hud_sound_definition
 
 /* ---------- prototypes */
 
-void hud_play_sound(
-	short local_player_index,
-	unsigned long state_flags,
-	struct tag_block const *sounds,
-	long *sound_indices,
-	word *volatile played_flags);
-
 /* ---------- globals */
 
 /* ---------- public code */
@@ -51,7 +45,7 @@ void hud_play_sound(
 	unsigned long state_flags,
 	struct tag_block const *sounds,
 	long *sound_indices,
-	word *volatile played_flags)
+	word *played_flags)
 {
 	long absolute_sound_index = 0;
 	short sound_index = 0;
@@ -70,20 +64,18 @@ void hud_play_sound(
 				{
 				default:
 					match_assert("c:\\halo\\SOURCE\\interface\\hud_sounds.c", 47, !"unreachable");
-					*played_flags |= FLAG(absolute_sound_index);
+					SET_FLAG(*played_flags, absolute_sound_index, TRUE);
 					goto next_sound;
 
 				case SOUND_DEFINITION_TAG:
 					index = sound_indices[absolute_sound_index];
-					if (index != NONE)
+					if (index == NONE || !TEST_FLAG(*played_flags, absolute_sound_index))
 					{
-						if (TEST_FLAG(*played_flags, absolute_sound_index))
-							goto mark_played;
-						if (sound_indices[absolute_sound_index] != NONE)
+						if (index != NONE)
 							sound_stop_impulse(index);
+						sound_indices[absolute_sound_index] =
+							unspatialized_impulse_sound_new(sound->sound.index, sound->scale);
 					}
-					sound_indices[absolute_sound_index] =
-						unspatialized_impulse_sound_new(sound->sound.index, sound->scale);
 					break;
 
 				case LOOPING_SOUND_DEFINITION_TAG:
@@ -93,8 +85,7 @@ void hud_play_sound(
 					break;
 				}
 
-			mark_played:
-				*played_flags |= FLAG(absolute_sound_index);
+				SET_FLAG(*played_flags, absolute_sound_index, TRUE);
 			}
 			else
 			{
@@ -114,7 +105,7 @@ void hud_play_sound(
 					}
 
 					sound_indices[absolute_sound_index] = NONE;
-					*played_flags &= ~FLAG(absolute_sound_index);
+					SET_FLAG(*played_flags, absolute_sound_index, FALSE);
 				}
 			}
 
@@ -123,6 +114,8 @@ void hud_play_sound(
 			absolute_sound_index = sound_index;
 		}
 		while (absolute_sound_index < sounds->count);
+
+	return;
 }
 
 /* ---------- private code */

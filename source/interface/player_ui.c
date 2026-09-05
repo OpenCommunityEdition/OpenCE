@@ -133,7 +133,7 @@ symbols in this file:
 00271068 001e:
 	??_C@_0BO@KMODNFHM@ui?2shell?2strings?2temp_strings?$AA@ (0000)
 002FD5A4 0004:
-	_data_002fd5a4 (0000)
+	_player1_last_used_profile_index (0000)
 00453D00 0330:
 	_player_ui_globals (0000)
 */
@@ -250,7 +250,7 @@ struct player_ui_globals
 	struct player_ui_local_player local_players[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
 	boolean multiplayer_autojoin[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
 	short single_player_controller[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
-	byte multiplayer_variant[0x68];
+	struct game_variant multiplayer_variant;
 	boolean multiplayer_variant_specified;
 	byte unknown155[3];
 	long edit_profile_index;
@@ -278,7 +278,7 @@ static void clear_profile_edit_data(
 
 /* ---------- globals */
 
-long data_002fd5a4 = NONE;
+static long player1_last_used_profile_index = NONE;
 struct player_ui_globals player_ui_globals = { 0 };
 
 /* ---------- public code */
@@ -330,20 +330,14 @@ void player_ui_initialize(
 void player_ui_clear_multiplayer_joins(
 	void)
 {
-	long local_player_index = 0;
-	boolean *joined = &player_ui_globals.local_players[0].prejoined_multiplayer;
+	long local_player_index;
 
-	do
+	for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
 	{
 		reset_local_player_profile((short)local_player_index);
-		*joined = FALSE;
+		player_ui_globals.local_players[local_player_index].prejoined_multiplayer = FALSE;
 		player_ui_globals.multiplayer_autojoin[local_player_index] = FALSE;
-		local_player_index++;
-		joined += sizeof(struct player_ui_local_player);
 	}
-	while ((long)joined < (long)(
-		&player_ui_globals.local_players[0].prejoined_multiplayer +
-		sizeof(player_ui_globals.local_players)));
 	return;
 }
 
@@ -389,7 +383,7 @@ void player_ui_clear_multiplayer_variant(
 	void)
 {
 	player_ui_globals.multiplayer_variant_specified = FALSE;
-	game_connection_set(0);
+	game_connection_set(_game_connection_local);
 	game_engine_dispose();
 	game_set_game_variant(NULL);
 	return;
@@ -612,7 +606,7 @@ void player_ui_set_game_variant(
 {
 	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 273, variant);
 
-	csmemcpy(player_ui_globals.multiplayer_variant, variant, 0x68);
+	csmemcpy(&player_ui_globals.multiplayer_variant, variant, sizeof(*variant));
 	player_ui_globals.multiplayer_variant_specified = TRUE;
 	return;
 }
@@ -623,7 +617,7 @@ boolean player_ui_game_variant_specified(
 	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 284, variant);
 
 	if (player_ui_globals.multiplayer_variant_specified)
-		csmemcpy(variant, player_ui_globals.multiplayer_variant, 0x68);
+		csmemcpy(variant, &player_ui_globals.multiplayer_variant, sizeof(*variant));
 	return player_ui_globals.multiplayer_variant_specified;
 }
 
@@ -649,10 +643,10 @@ long player_ui_get_player1_last_used_profile_index(
 		saved_game_file_retrieve_player1_last_used_profile_directory(
 			player_ui_globals.player1_last_used_profile_directory))
 	{
-		data_002fd5a4 = saved_game_file_find_profile_index_for_directory_path(
-			player_ui_globals.player1_last_used_profile_directory, 0);
+		player1_last_used_profile_index = saved_game_file_find_profile_index_for_directory_path(
+			player_ui_globals.player1_last_used_profile_directory, SAVED_GAME_FILE_TYPE_PLAYER_PROFILE);
 	}
-	return data_002fd5a4;
+	return player1_last_used_profile_index;
 }
 
 void player_ui_fast_setup_network_server(
@@ -708,7 +702,7 @@ boolean player_ui_edit_profile_is_default_profile(
 		long type = saved_game_file_get_type(player_ui_globals.edit_profile_index);
 
 		if (type>=0 && type<=SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE)
-			result = ((unsigned long)player_ui_globals.edit_profile_index>>30) & 1;
+			result = TEST_FLAG(player_ui_globals.edit_profile_index, _saved_game_file_default_profile_bit);
 		else
 			error(_error_silent, "unknown saved game file type being edited");
 	}
@@ -719,7 +713,7 @@ boolean player_ui_edit_profile_is_default_profile(
 void player_ui_remember_player1_profile(
 	boolean save)
 {
-	if (data_002fd5a4 != player_ui_globals.local_players[0].active_profile_index)
+	if (player1_last_used_profile_index != player_ui_globals.local_players[0].active_profile_index)
 	{
 		if (player_ui_globals.local_players[0].active_profile_index==NONE ||
 			!player_profile_get_enclosing_directory_path(
@@ -729,7 +723,7 @@ void player_ui_remember_player1_profile(
 			error(_error_silent, "player 1 has no active player profile assigned");
 		}
 
-		data_002fd5a4 = player_ui_globals.local_players[0].active_profile_index;
+		player1_last_used_profile_index = player_ui_globals.local_players[0].active_profile_index;
 	}
 
 	if (save && player_ui_globals.player1_last_used_profile_directory[0])

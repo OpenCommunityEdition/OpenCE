@@ -14,6 +14,9 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct tag_block;
+union real_argb_color;
+
 /* ---------- prototypes/HUD.C */
 
 void hud_update(
@@ -58,11 +61,20 @@ void hud_render_nav_points(
 	short local_player_index);
 void temporary_hud_draw_reticle(
 	real angle,
-	real_argb_color const *color);
+	union real_argb_color const *color);
 void temporary_hud_draw(
 	void);
 void hud_draw_screen(
 	void);
+
+/* ---------- prototypes/HUD_SOUNDS.C */
+
+void hud_play_sound(
+	short local_player_index,
+	unsigned long state_flags,
+	struct tag_block const *sounds,
+	long *sound_indices,
+	word *played_flags);
 
 /* ---------- globals */
 

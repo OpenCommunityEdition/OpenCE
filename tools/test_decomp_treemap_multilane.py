@@ -2,6 +2,8 @@ import json
 import os
 from pathlib import Path
 
+import pytest
+
 from tools.decomp_treemap_multilane import (
     SourceSpec,
     ViewerServer,
@@ -396,19 +398,35 @@ def test_accepted_assembly_parks_do_not_veto_external_exactness(tmp_path):
     )
 
 
-def test_object_admission_rejection_vetoes_complete_unit_not_functions(tmp_path):
+@pytest.mark.parametrize(
+    "rejection_class",
+    ["candidate-only-comdat-owner", "source-layout-incomplete"],
+)
+def test_object_admission_rejection_vetoes_complete_unit_not_functions(
+    tmp_path, rejection_class
+):
     report = _report(
         [{"name": "_owner", "size": "40", "fuzzy_match_percent": 100.0, "address": "0"}],
         fuzzy=100.0,
+    )
+    report["units"][0]["metadata"]["complete"] = True
+    report["units"][0]["measures"].update(total_data="8", matched_data="8")
+    report["units"][0]["sections"].append(
+        {"name": ".data", "size": "8", "fuzzy_match_percent": 100.0}
+    )
+    symbol = (
+        "struct playlist_profile"
+        if rejection_class == "source-layout-incomplete"
+        else "_fast_ftol"
     )
     policy = {
         "version": 1,
         "entries": [
             {
                 "unit": "source/units/example",
-                "class": "candidate-only-comdat-owner",
-                "symbol": "_fast_ftol",
-                "reason": "candidate-only COMDAT",
+                "class": rejection_class,
+                "symbol": symbol,
+                "reason": "reviewed whole-object admission failure",
                 "evidence": "docs/evidence.md",
                 "reopen": "prove compatible owner",
             }
@@ -447,7 +465,7 @@ def test_object_admission_rejection_vetoes_complete_unit_not_functions(tmp_path)
     assert merged["canonicalSemanticComplete"] is False
     assert merged["anySemanticComplete"] is False
     assert merged["canonicalAdmissionRejected"] is True
-    assert merged["canonicalAdmissionRejections"][0]["symbol"] == "_fast_ftol"
+    assert merged["canonicalAdmissionRejections"][0]["symbol"] == symbol
     assert merged["functions"][0]["canonicalExact"] is True
 
 

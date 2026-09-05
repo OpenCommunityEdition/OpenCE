@@ -2,6 +2,14 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/interface/player_ui",
+      "class": "source-layout-incomplete",
+      "symbol": "struct playlist_profile",
+      "reason": "All42 target functions and target data are strict exact, but the public playlist_profile is only forward-declared by its owner header while Player UI defines a local partial view with an opaque0x47-byte middle misleadingly called unused. Those bytes hold real January variant state; the complete authentic January public layout is not yet recovered. Exact code/data alone cannot certify this source as a completed object. The reviewed ordinary typed-loop, enum/macro and game_variant storage cleanups remain valid and receive independent function credit.",
+      "evidence": "docs/object_matching_logs/player_ui_obj_owner_house_rule_reconciliation_20260904.md#remaining-source-boundary-and-reopen-condition",
+      "reopen": "Authenticate the full January playlist-profile layout and place shared declarations in their genuine owner without opaque fake padding or transplantation of the incompatible later152-byte format. Preserve inherited exact functions across affected callers and finish the documented natural select-any string ownership/coalescing audit before whole-object admission. Do not debit valid target-function progress for this separate source-layout veto."
+    },
+    {
       "unit": "source/game/player_rumble",
       "class": "candidate-only-comdat-owner",
       "symbol": "_fast_ftol",

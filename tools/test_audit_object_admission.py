@@ -1,9 +1,14 @@
 from pathlib import Path
+import copy
 import subprocess
 import sys
 import unittest
 
 from tools.audit_object_admission import classify_units
+from tools.object_admission_policy import (
+    ObjectAdmissionPolicyError,
+    rejection_index,
+)
 
 
 def _unit(name, complete, total_functions, matched_functions, total_data, matched_data):
@@ -16,6 +21,17 @@ def _unit(name, complete, total_functions, matched_functions, total_data, matche
             "total_data": total_data,
             "matched_data": matched_data,
         },
+    }
+
+
+def _source_layout_rejection():
+    return {
+        "unit": "source/interface/player_ui",
+        "class": "source-layout-incomplete",
+        "symbol": "struct playlist_profile",
+        "reason": "public source layout retains an unauthenticated opaque middle",
+        "evidence": "docs/source-layout-evidence.md",
+        "reopen": "authenticate and integrate the complete owning public layout",
     }
 
 
@@ -114,6 +130,55 @@ class ObjectAdmissionAuditTests(unittest.TestCase):
         self.assertEqual(
             result["rejected"][0]["rejections"][0]["symbol"], "_fast_ftol"
         )
+
+    def test_source_layout_failure_vetoes_zero_gap_admission_without_debiting_code(self):
+        entry = _source_layout_rejection()
+        policy = rejection_index(
+            {"version": 1, "entries": [entry]},
+            {entry["unit"]},
+        )
+
+        for complete in (False, True):
+            with self.subTest(complete=complete):
+                unit = _unit(entry["unit"], complete, 42, 42, 2004, 2004)
+                unit["measures"].update(total_code=3989, matched_code=3989)
+                raw = {"units": [unit]}
+                strict = copy.deepcopy(raw)
+                before_raw = copy.deepcopy(raw)
+                before_strict = copy.deepcopy(strict)
+
+                result = classify_units(raw, strict, policy)
+
+                self.assertEqual(result["candidates"], [])
+                bucket = "contradicted" if complete else "rejected"
+                self.assertEqual(len(result[bucket]), 1)
+                self.assertEqual(result[bucket][0]["function_gap"], 0)
+                self.assertEqual(result[bucket][0]["data_gap"], 0)
+                self.assertEqual(result[bucket][0]["rejections"], [entry])
+                self.assertEqual(raw, before_raw)
+                self.assertEqual(strict, before_strict)
+                self.assertEqual(strict["units"][0]["measures"]["matched_code"], 3989)
+                self.assertEqual(strict["units"][0]["measures"]["matched_functions"], 42)
+
+    def test_source_layout_policy_still_rejects_unknown_classes(self):
+        entry = _source_layout_rejection()
+        entry["class"] = "unreviewed-layout-override"
+
+        with self.assertRaisesRegex(
+            ObjectAdmissionPolicyError, "unknown object admission blocker class"
+        ):
+            rejection_index({"version": 1, "entries": [entry]})
+
+    def test_source_layout_policy_requires_every_evidence_field(self):
+        for field in ("unit", "class", "symbol", "reason", "evidence", "reopen"):
+            for invalid in (None, "", "   ", 123):
+                with self.subTest(field=field, invalid=invalid):
+                    entry = _source_layout_rejection()
+                    entry[field] = invalid
+                    with self.assertRaisesRegex(
+                        ObjectAdmissionPolicyError, f"requires non-empty {field}"
+                    ):
+                        rejection_index({"version": 1, "entries": [entry]})
 
 
 if __name__ == "__main__":

@@ -70,14 +70,18 @@ symbols in this file:
 #include "cutscene/cinematics.h"
 #include "effects/player_effects.h"
 #include "game/game.h"
+#include "game/game_engine.h"
 #include "game/players.h"
 #include "cache/texture_cache.h"
 #include "interface/hud_definitions.h"
 #include "interface/hud_draw.h"
+#include "interface/hud.h"
 #include "interface/hud_unit.h"
+#include "interface/unit_hud_interface_definition.h"
 #include "render/render.h"
 #include "saved games/game_state.h"
 #include "tag_files/tag_groups.h"
+#include "units/unit_definitions.h"
 #include "units/units.h"
 
 /* ---------- constants */
@@ -145,43 +149,6 @@ struct hud_scripted_globals
 	boolean show_hud;
 	boolean show_hud_help_text;
 	byte reserved2[2];
-};
-
-struct hud_absolute_placement_definition
-{
-	short corner;
-	short pad;
-	long unused[8];
-};
-
-struct hud_placement_definition
-{
-	point2d offset;
-	real_vector2d scale;
-	short multiplayer_scaling_flags;
-	short pad;
-	long unused0[5];
-};
-
-struct hud_color_definition
-{
-	unsigned long color;
-	unsigned long flash_color;
-	real flash_period;
-	real flash_delay;
-	short number_of_flashes;
-	unsigned short flash_flags;
-	real flash_length;
-	unsigned long disabled_color;
-	union
-	{
-		long unused;
-		struct
-		{
-			short up_ticks;
-			short fade_ticks;
-		} objective;
-	} custom;
 };
 
 struct hud_messaging_parameters_definition
@@ -269,12 +236,6 @@ typedef char unit_hud_globals_size_assert[
 	sizeof(struct unit_hud_globals) == 0x164 ? 1 : -1];
 typedef char hud_scripted_globals_size_assert[
 	sizeof(struct hud_scripted_globals) == 0x4 ? 1 : -1];
-typedef char hud_absolute_placement_definition_size_assert[
-	sizeof(struct hud_absolute_placement_definition) == 0x24 ? 1 : -1];
-typedef char hud_placement_definition_size_assert[
-	sizeof(struct hud_placement_definition) == 0x24 ? 1 : -1];
-typedef char hud_color_definition_size_assert[
-	sizeof(struct hud_color_definition) == 0x20 ? 1 : -1];
 typedef char hud_messaging_parameters_definition_size_assert[
 	sizeof(struct hud_messaging_parameters_definition) == 0x120 ? 1 : -1];
 typedef char hud_waypoint_definition_size_assert[
@@ -505,6 +466,112 @@ void scripted_hud_blink_motion_sensor(
 		unit_hud_globals->script_flags,
 		_hud_panel_motion_sensor_blink_bit,
 		blink);
+
+	return;
+}
+
+void hud_play_unit_sounds(
+	struct player_datum const *player,
+	boolean show_hud)
+{
+	struct unit_hud_state *hud_state = get_hud_state(player->local_player_index);
+	long unit_index = player->unit_index;
+
+	if (unit_index == NONE)
+		unit_index = hud_state->last_unit_index;
+
+	{
+		struct unit_datum *unit = unit_try_and_get(unit_index);
+
+		if (unit == NULL)
+			return;
+
+		{
+			struct unit_definition const *unit_definition =
+				unit_definition_get(unit->definition_index);
+			long active_hud_index = unit_definition_get_active_hud_index(
+				unit_definition,
+				local_player_count() > 1);
+
+			if (active_hud_index == NONE)
+				return;
+
+			{
+				struct unit_hud_interface_definition const *hud_definition =
+					unit_hud_interface_definition_get(active_hud_index);
+				unsigned long sound_flags = 0;
+
+				if (TEST_FLAG(unit->object.flags, _object_on_media_bit) ||
+					!(unit->object.body_vitality > 0.0f))
+				{
+					hud_state->last_unit_index = NONE;
+				}
+				else if (show_hud && !cinematic_in_progress())
+				{
+					if (hud_state->last_shield_vitality != -1.0f &&
+						game_engine_has_shield(local_player_get_player_index(
+							player->local_player_index)))
+					{
+						if (!TEST_FLAG(
+							unit_hud_globals->script_flags,
+							_hud_panel_shield_dont_show_bit))
+						{
+							sound_flags = TEST_FLAG(
+								unit->object.damage_flags,
+								_object_shield_charging_bit);
+							SET_FLAG(
+								sound_flags,
+								_unit_hud_shield_damage,
+								hud_state->last_shield_vitality >
+									unit->object.shield_vitality);
+							SET_FLAG(
+								sound_flags,
+								_unit_hud_shield_low,
+								unit->object.shield_vitality < 0.25f &&
+									unit->object.shield_vitality > 0.0f);
+							SET_FLAG(
+								sound_flags,
+								_unit_hud_shield_empty,
+								unit->object.shield_vitality == 0.0f);
+						}
+					}
+
+					if (!TEST_FLAG(
+						unit_hud_globals->script_flags,
+						_hud_panel_health_dont_show_bit))
+					{
+						SET_FLAG(
+							sound_flags,
+							_unit_hud_health_low,
+							unit->object.body_vitality < 0.25f);
+						SET_FLAG(
+							sound_flags,
+							_unit_hud_health_empty,
+							TEST_FLAG(unit->object.damage_flags, _object_dead_bit));
+						SET_FLAG(
+							sound_flags,
+							_unit_hud_minor_damage,
+							hud_state->last_body_vitality >
+								unit->object.body_vitality &&
+								hud_state->last_body_vitality -
+									unit->object.body_vitality < 0.1875f);
+						SET_FLAG(
+							sound_flags,
+							_unit_hud_major_damage,
+							hud_state->last_body_vitality -
+								unit->object.body_vitality >= 0.1875f);
+					}
+				}
+
+				hud_play_sound(
+					player->local_player_index,
+					sound_flags,
+					&hud_definition->warning_sounds,
+					hud_state->last_sound_handles,
+					&hud_state->sound_flags);
+			}
+		}
+	}
 
 	return;
 }
