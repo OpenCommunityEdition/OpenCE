@@ -108,6 +108,11 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	TRANSPORT_NONCE_LENGTH = 8,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -147,6 +152,7 @@ extern long global_key_depth;
 extern XNADDR global_address;
 extern XNKID global_key_id;
 extern XNKEY global_key;
+extern byte global_nonce[TRANSPORT_NONCE_LENGTH];
 
 /* ---------- public code */
 
@@ -336,6 +342,53 @@ long count_endpoints_in_set(
 		0x28A,
 		transport_initialized);
 	return set->last_endpoint_index + 1;
+}
+
+
+void transport_get_nonce(
+	void *dst,
+	long bytes)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x97,
+		dst != NULL);
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x98,
+		bytes == sizeof(global_nonce));
+	memcpy(dst, global_nonce, sizeof(global_nonce));
+	return;
+}
+
+boolean transport_nonce_is_equal(
+	void const *src,
+	void const *dst)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0xA3,
+		src != NULL);
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0xA4,
+		dst != NULL);
+	return memcmp(src, dst, sizeof(global_nonce)) == 0;
+}
+
+boolean transport_is_nonce(
+	void const *src,
+	long bytes)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0xAF,
+		src != NULL);
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0xB0,
+		bytes == sizeof(global_nonce));
+	return transport_nonce_is_equal(src, global_nonce);
 }
 
 /* ---------- private code */

@@ -339,6 +339,11 @@ enum
 
 enum
 {
+	MAXIMUM_SAVED_GAME_NAME_LENGTH = MAX_GAMENAME
+};
+
+enum
+{
 	NUMBER_OF_DEFAULT_PLAYER_PROFILES = 2
 };
 
@@ -471,6 +476,10 @@ static short enumerate_default_playlist_profile_files(
 static short enumerate_default_player_profile_files(
 	void);
 static boolean get_nth_entry_in_mapfile(
+	word memory_unit_index,
+	word n,
+	struct enumerated_saved_game_file *file);
+static boolean set_nth_entry_in_mapfile(
 	word memory_unit_index,
 	word n,
 	struct enumerated_saved_game_file *file);
@@ -1027,6 +1036,155 @@ boolean saved_game_file_open(
 	return success;
 }
 
+boolean synchronize_metadata_display_name_with_profile_name(
+	long profile_index,
+	wchar_t *game_display_name)
+{
+	struct enumerated_saved_game_file file;
+	long type = SAVED_GAME_FILE_INDEX_TYPE(profile_index);
+	long memory_unit = SAVED_GAME_FILE_INDEX_MEMORY_UNIT(profile_index);
+	long n = SAVED_GAME_FILE_INDEX_FILE_INDEX(profile_index);
+	boolean success = TRUE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\saved_game_files.c",
+		774,
+		memory_unit==_memory_unit_hard_drive);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\saved_game_files.c",
+		777,
+		(type >= 0) && (type < NUMBER_OF_SAVED_GAME_FILE_TYPES));
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\saved_game_files.c",
+		778,
+		(memory_unit >= 0) && (memory_unit < NUMBER_OF_MEMORY_UNITS));
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\saved_game_files.c",
+		779,
+		(n >= 0) && (n < MAXIMUM_ENUMERATED_SAVED_GAME_FILES_ANY_TYPE_PER_MEMORY_UNIT));
+
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\saved_game_files.c",
+		781,
+		ustrlen(game_display_name)<MAXIMUM_SAVED_GAME_NAME_LENGTH);
+
+	if (get_nth_entry_in_mapfile(memory_unit, n, &file))
+	{
+		if ((game_display_name != NULL) && (game_display_name[0] != 0) &&
+			ustrcmp(file.display_name, game_display_name))
+		{
+			if (memory_unit == _memory_unit_hard_drive)
+			{
+				char root_path[MEMORY_UNIT_ROOT_PATH_SIZE] = {0};
+				char save_game_directory[MAXIMUM_FILENAME_LENGTH+1] = {0};
+
+				if (!XCreateSaveGame(
+						wide_to_ascii(memory_unit_root_path[memory_unit], root_path, sizeof(root_path)),
+						game_display_name,
+						CREATE_NEW,
+						0,
+						save_game_directory,
+						sizeof(save_game_directory)))
+				{
+					char new_path[MAXIMUM_FILENAME_LENGTH+1];
+
+					switch (file.type)
+					{
+						case _saved_game_file_type_player_profile:
+						{
+							char old_persistent_storage_path[MAXIMUM_FILENAME_LENGTH+1];
+							char new_persistent_storage_path[MAXIMUM_FILENAME_LENGTH+1];
+							char *filename;
+
+							_snprintf(new_path, MAXIMUM_FILENAME_LENGTH, "%s%s", save_game_directory, "blam.sav");
+							new_path[MAXIMUM_FILENAME_LENGTH] = 0;
+							success = (boolean)CopyFileA(file.path, new_path, TRUE);
+
+							if (success == TRUE)
+							{
+								csstrncpy(old_persistent_storage_path, file.path, MAXIMUM_FILENAME_LENGTH);
+								old_persistent_storage_path[MAXIMUM_FILENAME_LENGTH] = 0;
+								filename = strstr(old_persistent_storage_path, "blam.sav");
+
+								if (filename)
+								{
+									*filename = 0;
+									csstrncat(old_persistent_storage_path,
+										game_state_get_persistent_storage_filename(), MAXIMUM_FILENAME_LENGTH);
+									old_persistent_storage_path[MAXIMUM_FILENAME_LENGTH] = 0;
+									_snprintf(new_persistent_storage_path, MAXIMUM_FILENAME_LENGTH, "%s%s",
+										save_game_directory, game_state_get_persistent_storage_filename());
+									success = (boolean)CopyFileA(
+										old_persistent_storage_path, new_persistent_storage_path, TRUE);
+								}
+								else
+								{
+									success = FALSE;
+								}
+							}
+							break;
+						}
+
+						case _saved_game_file_type_game_variant:
+							_snprintf(new_path, MAXIMUM_FILENAME_LENGTH, "%s%s", save_game_directory, "blam.lst");
+							new_path[MAXIMUM_FILENAME_LENGTH] = 0;
+							success = (boolean)CopyFileA(file.path, new_path, TRUE);
+							break;
+
+						default:
+							match_assert(
+								"c:\\halo\\SOURCE\\saved games\\saved_game_files.c",
+								835,
+								!"unknown enumerated file type");
+							success = FALSE;
+							break;
+					}
+
+					if (success == TRUE)
+					{
+						if (XDeleteSaveGame(root_path, file.display_name))
+						{
+							error(_error_silent, "XDeleteSaveGame() failed to delete old saved game metadata in rename_metadata_display_name()");
+						}
+
+						csstrncpy(file.path, new_path, MAXIMUM_FILENAME_LENGTH);
+						file.path[MAXIMUM_FILENAME_LENGTH] = 0;
+						ustrncpy(file.display_name, game_display_name, MAXIMUM_SAVED_GAME_NAME_LENGTH-1);
+						file.display_name[MAXIMUM_SAVED_GAME_NAME_LENGTH-1] = 0;
+
+						if (!set_nth_entry_in_mapfile(memory_unit, n, &file))
+						{
+							error(_error_silent, "failed to update memory unit mapfile after renaming saved game metadata");
+						}
+					}
+					else if (!success)
+					{
+						if (XDeleteSaveGame(root_path, game_display_name))
+						{
+							error(_error_silent, "XDeleteSaveGame() failed to delete empty saved game metadata in rename_metadata_display_name()");
+						}
+					}
+				}
+				else
+				{
+					error(_error_silent, "XCreateSaveGame() failed in synchronize_metadata_display_name_with_profile_name() (maybe the name is already in use?)");
+				}
+			}
+			else
+			{
+				error(_error_silent, "failed to mount memory unit #%d", memory_unit);
+			}
+		}
+	}
+	else
+	{
+		error(_error_silent, "get_nth_entry_in_mapfile() failed");
+	}
+
+	return success;
+}
+
 boolean saved_game_file_get_path_to_enclosing_directory(
 	long profile_index,
 	char *full_path)
@@ -1100,6 +1258,80 @@ boolean saved_game_file_get_path_to_enclosing_directory(
 		{
 			error(_error_silent, "invalid saved game file index");
 		}
+	}
+
+	return success;
+}
+
+static boolean set_nth_entry_in_mapfile(
+	word memory_unit_index,
+	word n,
+	struct enumerated_saved_game_file *file)
+{
+	boolean success = FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\saved_game_files.c",
+		2018,
+		memory_unit_index==_memory_unit_hard_drive);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\saved_game_files.c",
+		2020,
+		!saved_game_files_globals.enumeration_in_progress);
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\saved_game_files.c",
+		2021,
+		(memory_unit_index < NUMBER_OF_MEMORY_UNITS) && (file != NULL));
+
+	if (take_mutex(saved_game_files_globals.mapfile_mutex, SAVED_GAME_FILES_MUTEX_TIMEOUT))
+	{
+		if (file_reference_create_from_path(&saved_game_files_globals.memory_unit_mapfile,
+				memory_unit_mapfile_path[memory_unit_index], FALSE) &&
+			file_open(&saved_game_files_globals.memory_unit_mapfile, FLAG(_permission_write_bit)))
+		{
+			unsigned long mapfile_size = file_get_eof(&saved_game_files_globals.memory_unit_mapfile);
+			unsigned long entry_offset = n*sizeof(struct enumerated_saved_game_file);
+
+			if (mapfile_size%sizeof(struct enumerated_saved_game_file))
+			{
+				error(_error_silent, "memory unit mapfile for memory unit #%d is possibly corrupt", memory_unit_index);
+			}
+
+			if (entry_offset+sizeof(struct enumerated_saved_game_file) <= mapfile_size)
+			{
+				if (file_set_position(&saved_game_files_globals.memory_unit_mapfile, entry_offset) &&
+					file_write(&saved_game_files_globals.memory_unit_mapfile, sizeof(struct enumerated_saved_game_file), file))
+				{
+					success = TRUE;
+				}
+				else
+				{
+					success = FALSE;
+					error(_error_silent, "failed to update entry #%d from memory unit mapfile (#%d)", n, memory_unit_index);
+				}
+			}
+			else
+			{
+				error(_error_silent, "invalid profile index (#%d) into memory unit #%d specified", n, memory_unit_index);
+			}
+
+			if (!file_close(&saved_game_files_globals.memory_unit_mapfile))
+			{
+				error(_error_silent, "failed to close memory unit mapfile for memory unit #%d", memory_unit_index);
+				success = FALSE;
+			}
+		}
+		else
+		{
+			error(_error_silent, "failed to open memory unit mapfile for memory unit #%d", memory_unit_index);
+		}
+
+		release_mutex(saved_game_files_globals.mapfile_mutex);
+	}
+	else
+	{
+		error(_error_silent, "failed to take mapfile mutex");
 	}
 
 	return success;

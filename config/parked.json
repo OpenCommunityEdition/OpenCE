@@ -2,6 +2,44 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/saved games/saved_game_files",
+      "function": "_synchronize_metadata_display_name_with_profile_name",
+      "class": "unclassified",
+      "evidence": "Complete natural January metadata-rename caller is reconstructed with its genuine private set_nth_entry_in_mapfile write helper (authenticated January/PDB name; helper480padded/474meaningful strict). Typed public long profile_index/wchar_t* game_display_name prototype belongs to saved_game_files.h; no playlist schema changes. Named file type enums, CREATE_NEW and flags0, real mapfile mutex/write APIs and authentic odd TRUE/log failure policy follow January. Target/base1040padded/63relocations,321 aligned instructions;99.58147 percent. Remaining code difference is early mov bl,1 placement around decoded-index stores; three shared %s%s relocation records also differ in csplit ownership classification, so no exact or precise compiler-tie claim. No BL lifetime/declaration permutations, flags, carrier types, source stubs or extra references are used. Nonnull display-name precondition is enforced by ustrlen; original snprintf termination/store schedule is retained. All38 inherited exacts and5parks remain unchanged, no candidate-only code/COMMON is introduced, and hard _point_from_line3d guard passes. Reopen only with source/type/compiler-context or fully resolved ownership evidence, not equivalent spelling searches. See docs/object_matching_logs/saved_game_files_obj_metadata_sync_pair_scratch_20260904.md and docs/object_matching_logs/saved_game_nonce_canonical_integration_20260904.md.",
+      "measurements": {
+        "target": {
+          "size": 1040,
+          "relocation_count": 63,
+          "normalized_sha256": "d078b8d967245d5c888b930fd2d3048868407c5c14dea8c14f0586cf91749107"
+        },
+        "base": {
+          "size": 1040,
+          "relocation_count": 63,
+          "normalized_sha256": "8906628ee6e202715d3f0ad9ab72d8e972adeb838f1185fb11cbeeb1b48ff17f"
+        },
+        "objdiff_percent": 99.58147
+      }
+    },
+    {
+      "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
+      "function": "_transport_nonce_is_equal",
+      "class": "unclassified",
+      "evidence": "Natural first-shot typed nonce comparison follows January's two non-NULL assertions and compares exactly sizeof(global_nonce)=8 bytes with the existing cseries memcmp macro. Public prototype already belongs to transport.h; the named external nonce has an eight-byte January symbol span, also corroborated by network message nonce arrays. Target/candidate are both112 padded bytes with all9 relocation addresses/types/destinations identical; objdiff99.60526 percent. Aligned instructions differ only in boolean materialization after neg eax: January sbb al,al / inc al, candidate sbb eax,eax / inc eax, plus trailing padding. Both return the same low-byte boolean. No source/ABI/compiler-context cause is asserted, so park unclassified rather than forcing casts or instruction bytes. The related public functions transport_get_nonce and transport_is_nonce are strict, all10 inherited stricts remain unchanged, no extra code/COMMON is emitted, and the hard _point_from_line3d guard passes. Reopen for authentic source/type/compiler-context evidence only, not expression or declaration permutations. See docs/object_matching_logs/transport_endpoint_set_winsock_obj_nonce_trio_20260904.md.",
+      "measurements": {
+        "target": {
+          "size": 112,
+          "relocation_count": 9,
+          "normalized_sha256": "c108841f462f3a3172f02c5819cb7a9d4fcb132ecdbc53c1cf29c6cd79a5d914"
+        },
+        "base": {
+          "size": 112,
+          "relocation_count": 9,
+          "normalized_sha256": "b61ebb30a9066ba1513167bfab96aca7c891a1b2caeb6dd9b8b8079022e1e06f"
+        },
+        "objdiff_percent": 99.60526
+      }
+    },
+    {
       "unit": "source/ai/actor_perception",
       "function": "_actor_perception_desire_prop",
       "class": "register-allocation",

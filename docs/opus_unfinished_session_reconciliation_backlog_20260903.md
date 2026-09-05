@@ -304,3 +304,25 @@ recorded in
 `object_matching_logs/transport_endpoint_set_winsock_obj_lifecycle_packet_20260904.md`.
 First Person Weapons and Saved Game Files genuine private caller clusters
 continue independently in scratch; no incomplete cluster is yet credited.
+
+### Metadata caller and nonce admission: 900,020 bytes (2026-09-04)
+
+The Saved Game Files pair now passes proper production source/header placement
+and the authenticated private rename to `set_nth_entry_in_mapfile`. Its helper
+adds 474 meaningful exact bytes; the full synchronizer is honestly parked at
+99.58147%. The independent transport nonce trio adds 198 exact bytes and one
+99.60526% comparison park. From publication `06b5f2adf`, this batch gains
+**672 meaningful / 704 padded exact bytes** with **zero strict regressions**.
+Current verified totals are **900,020 meaningful bytes**, **6,149 credited
+functions**, **391/833 Matching objects**, and **258 valid parks**. All 288
+tests and Units' 189 target exacts pass. See
+`object_matching_logs/saved_game_nonce_canonical_integration_20260904.md`.
+
+The full First Person Weapons four-function reconstruction is now preserved
+in scratch: three new strict owners (688 meaningful / 704 padded bytes) and
+one complete natural residual. It is **not admitted** because its six new
+shared helper code COMDATs conflict with existing selected-owner/linkage
+rules; one local-random helper also differs from the selected implementation.
+The source is not lost or counted as completed. Do not solve this by false
+exports, suppressing authentic calls, declaration-order steering, or forcing
+an inline schedule. The new Fable lane remains untouched until user handoff.

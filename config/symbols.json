@@ -7363,7 +7363,7 @@
 { "file_offset": 1783072, "flags": 32, "name": "_enumerate_default_playlist_profile_files", "static": true },
 { "file_offset": 1783600, "flags": 32, "name": "_enumerate_default_player_profile_files", "static": true },
 { "file_offset": 1784112, "flags": 32, "name": "_get_nth_entry_in_mapfile", "static": true },
-{ "file_offset": 1784608, "flags": 32, "name": "_update_nth_entry_in_mapfile", "static": true },
+{ "file_offset": 1784608, "flags": 32, "name": "_set_nth_entry_in_mapfile", "static": true },
 { "file_offset": 1785088, "flags": 32, "name": "_add_new_entry_to_mapfile", "static": true },
 { "file_offset": 1785568, "flags": 32, "name": "_remove_nth_entry_in_mapfile", "static": true },
 { "file_offset": 1786096, "flags": 32, "name": "_saved_game_file_get_display_name" },
