@@ -2,6 +2,63 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/sound/game_sound",
+      "function": "_compute_combined_pas",
+      "class": "unclassified",
+      "evidence": "Reconciled preserved Opus PAS caller packet 9d60117aa onto canonical 18238d906 after genuine intervening owner-header reconstruction removed the old Units regression. Ordinary typed C computes the union of the four January local-player potentially audible sets, using the real 64-byte COMMON combined_pas owner and project bit-vector macros. January/candidate both have 240 padded bytes and 10 relocations; objdiff similarity is 97.5 percent. The private helper is naturally retained by the real game_sound_update caller, with no anchor or changed linkage. Its remaining code-generation difference is not attributed to a specific mechanism. No exact credit is claimed. Reopen only for authentic source/type/compiler-context evidence, not spelling, declaration-order or flag searches. See docs/object_matching_logs/game_sound_obj_pas_current_context_integration_20260904.md.",
+      "measurements": {
+        "target": {
+          "size": 240,
+          "relocation_count": 10,
+          "normalized_sha256": "ecbde409a2d5415d4393356bfcfb672ac00268fd83c3ab10ce67ef80e46d97fb"
+        },
+        "base": {
+          "size": 240,
+          "relocation_count": 10,
+          "normalized_sha256": "79acc8c766b3dd7dcf07882e854bcbf712694b436c05d506c8bf411a070b8178"
+        },
+        "objdiff_percent": 97.5
+      }
+    },
+    {
+      "unit": "source/sound/game_sound",
+      "function": "_update_potentially_audible_looping_sound",
+      "class": "unclassified",
+      "evidence": "Reconciled preserved Opus PAS caller packet 9d60117aa onto canonical 18238d906. Ordinary typed C implements the genuine attached/unattached looping-sound state machine, spatial source transforms, six-argument start/loop/stop refresh API, and pool deletion path. January itself writes the final frame field after datum deletion; the fixed data-pool storage lifetime was checked, not inferred from donor output. Proper owning APIs, semantic flags, project types and natural private linkage are retained. Target619 meaningful/624 padded versus candidate640 padded, both25 relocations, objdiff83.65909 percent. The honest residual receives no exact credit. No forced inline, point_from_line3d COMDAT, fake lifetime, shadow layout, optimizer control or assembly is introduced. Reopen only for authoritative source/type/control-flow or compiler-context evidence. See docs/object_matching_logs/game_sound_obj_pas_current_context_integration_20260904.md.",
+      "measurements": {
+        "target": {
+          "size": 624,
+          "relocation_count": 25,
+          "normalized_sha256": "8fe3a4a813d3a2a8e45a5ce10b8cbd71274a8553f11e8d43ca65fa95c63dd7dc"
+        },
+        "base": {
+          "size": 640,
+          "relocation_count": 25,
+          "normalized_sha256": "6763e595e2871c3e463903bf82b44fee905a82540356e0752a4e9d2d9102527b"
+        },
+        "objdiff_percent": 83.65909
+      }
+    },
+    {
+      "unit": "source/sound/game_sound",
+      "function": "_game_sound_update",
+      "class": "unclassified",
+      "evidence": "Reconciled preserved Opus PAS caller packet 9d60117aa onto canonical 18238d906 with the correct owning game_sound_update(real dt) prototype and pointer-valued Scenario sound-environment output. January game_frame pushes dt even though this body does not read it. The real caller computes PAS, selects background sound, services attached/unattached sources and advances the update index; it naturally retains the three private PAS helpers, including the newly strict location_potentially_audible. Target453 meaningful/464 padded and candidate464 padded, both31 relocations, objdiff97.91391 percent. Proper owner APIs and all inherited strict exacts are preserved after the full header rebuild. No exact caller credit or whole-object completion is claimed; compute_sound_obstruction remains unwritten. Reopen only for authentic source/type/compiler-context evidence, not declaration shuffling or equivalent-spelling searches. See docs/object_matching_logs/game_sound_obj_pas_current_context_integration_20260904.md.",
+      "measurements": {
+        "target": {
+          "size": 464,
+          "relocation_count": 31,
+          "normalized_sha256": "d0c2dc1708f1dbee75a025bb0a2317afdcd65682faf8c301ceb879cdddeabf92"
+        },
+        "base": {
+          "size": 464,
+          "relocation_count": 31,
+          "normalized_sha256": "df019d7cb404727618914dfa2f9cf20897ebca95c66207dd28b758246cf2fb72"
+        },
+        "objdiff_percent": 97.91391
+      }
+    },
+    {
       "unit": "source/interface/hud_unit",
       "function": "_hud_render_unit_interface",
       "class": "unclassified",

@@ -215,3 +215,37 @@ Units shared-helper evidence recorded in `e1eb62f05`. Neither draft contributes
 to the published byte total, and neither is lost. The separately reported
 newer interrupted Opus run still needs a worktree path, branch, commit, patch,
 or handoff before its distinct unreconciled bytes can be measured.
+
+### Current-context PAS admission and renewed leaf audit (2026-09-04)
+
+The preserved PAS packet `9d60117aa` now passes with the same proper owning
+prototype in the current genuinely reconstructed header context. A complete
+production rebuild and stable sweep from publication `18238d906` preserve
+all 6,186 inherited exact owners and add one strict helper: 102 meaningful /
+112 padded bytes. The three genuine caller/PAS residuals are honestly parked,
+not credited as exact. Units retains all 189 exact target functions and its
+separate existing helper-ownership veto is not waived. The verified totals
+are now **898,687 meaningful matched code bytes**, **6,141 credited
+functions**, **391/833 Matching objects**, and **255 valid parks**. See
+`object_matching_logs/game_sound_obj_pas_current_context_integration_20260904.md`.
+
+This new audit also corrects the implication that every old-lane source-shaped
+opportunity had been exhausted. Earlier object-level adjudication does not
+prove that every individual natural helper or caller form was tested:
+
+- The frozen old Fable Props iterator form yields a 544-byte strict scratch
+  closure. It is withheld pending genuine public Actor Perception API/source
+  reconciliation, not imported with its incompatible use-site prototype.
+  See `object_matching_logs/props_obj_old_fable_iterator_reconciliation_20260904.md`.
+- The original Opus audit identifies small Actor Combat and Leaf Map helper
+  leads requiring selective replay and full ownership checks. These are
+  candidates, not additional published bytes.
+- Network Server Manager candidates remain reserved for the **new active
+  Fable 50k lane**. Do not reconcile or implement that assigned scope until
+  the user reports that lane finished or token-exhausted.
+
+The new Fable lane itself remains untouched. A separate read-only census
+found no distinct newer interrupted Opus worktree/ref/patch; that pending
+intake item remains open, not counted as zero progress or silently conflated
+with the already preserved September 2 donor. The historical 100,016-byte
+candidate pool above must still not be used as a current backlog estimate.

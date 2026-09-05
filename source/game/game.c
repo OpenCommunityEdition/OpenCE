@@ -367,8 +367,6 @@ void particle_systems_update(
 	real dt);
 void widgets_update(
 	real dt);
-void game_sound_update(
-	real dt);
 void scenario_frame_update(
 	real dt);
 void rasterizer_frame_update(

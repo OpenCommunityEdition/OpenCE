@@ -10,11 +10,20 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum looping_sound_refresh_state
+{
+	_looping_sound_refresh_start,
+	_looping_sound_refresh_loop,
+	_looping_sound_refresh_stop,
+	NUMBER_OF_LOOPING_SOUND_REFRESH_STATES,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
 
 struct sound_source;
+struct sound_environment_definition;
 
 /* ---------- prototypes/SOUND_MANAGER.C */
 
@@ -61,6 +70,15 @@ void sound_pause(
 	boolean paused);
 void sound_idle(
 	void);
+void sound_manager_set_sound_environment(
+	struct sound_environment_definition const *environment);
+boolean sound_refresh_looping(
+	long definition_index,
+	long looping_sound_index,
+	struct sound_source *source,
+	short refresh_state,
+	boolean alternate,
+	real fade_time);
 
 /* ---------- globals */
 

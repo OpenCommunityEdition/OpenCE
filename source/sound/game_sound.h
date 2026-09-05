@@ -42,6 +42,8 @@ void game_sound_clear(
 	void);
 void game_sound_restore(
 	void);
+void game_sound_update(
+	real dt);
 long game_looping_sound_new(
 	long object_index,
 	long definition_index,

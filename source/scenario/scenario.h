@@ -131,7 +131,10 @@ boolean scenario_ensure_point_within_world(real_point3d *point);
 short scenario_get_fog_region_index(const struct location *location, const real_point3d *position);
 boolean scenario_location_underwater(const struct location *location, const real_point3d *position, short *optional_weather_palette_index);
 real scenario_location_water_depth(const struct location *location, const real_point3d *position);
-void scenario_get_sound_environment(long *background_sound_index, long *sound_environment_tag, boolean *crossed_water_boundary);
+void scenario_get_sound_environment(
+	long *background_sound_index,
+	struct sound_environment_definition const **sound_environment,
+	boolean *crossed_water_boundary);
 void scenario_get_atmospheric_fog(
 	short local_player_index,
 	short sky_index,

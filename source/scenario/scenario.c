@@ -1168,7 +1168,7 @@ missing_tag_loop:
 
 void scenario_get_sound_environment(
 	long *background_sound_index,
-	long *sound_environment_tag,
+	struct sound_environment_definition const **sound_environment_out,
 	boolean *crossed_water_boundary)
 {
 	struct structure_bsp *structure_bsp;
@@ -1287,7 +1287,7 @@ void scenario_get_sound_environment(
 		scenario_globals->sound_environment_initialized = water_boundary;
 		*crossed_water_boundary = TRUE;
 		*background_sound_index = selected_background_sound_index;
-		*sound_environment_tag = (long)current;
+		*sound_environment_out = current;
 		return;
 	}
 
@@ -1307,7 +1307,7 @@ void scenario_get_sound_environment(
 	current_values[13] += PIN(definition_values[13] - current_values[13], -600.0f, 600.0f);
 	*crossed_water_boundary = FALSE;
 	*background_sound_index = selected_background_sound_index;
-	*sound_environment_tag = (long)current;
+	*sound_environment_out = current;
 
 	return;
 }
