@@ -249,3 +249,27 @@ found no distinct newer interrupted Opus worktree/ref/patch; that pending
 intake item remains open, not counted as zero progress or silently conflated
 with the already preserved September 2 donor. The historical 100,016-byte
 candidate pool above must still not be used as a current backlog estimate.
+
+### Props/Actor Perception and grenade-helper reconciliation (2026-09-04)
+
+The two older-lane leads now survive proper canonical integration: Props
+recovers 544 meaningful exact bytes, and Actor Combat recovers its genuine
+private grenade-definition helper for 56 meaningful exact bytes. The same
+packet removes Actor Perception's unsupported parameter-home carrier union
+and incompatible caller declaration, deliberately withdrawing its prior
+549-byte exact claim while retaining a credible typed 97.791664% fuzzy body.
+Net progress from publication `0ac295264` is **+51 meaningful exact bytes**;
+current verified totals are **898,738 bytes**, **6,142 credited functions**,
+**391/833 Matching objects**, and **256 valid parks**. The full stable sweep
+has exactly that one intentional source-policy loss and no collateral loss.
+
+The Leaf Map helpers were also selectively re-audited: their private bodies
+are credible and exact in the donor, but current canonical lacks their real
+callers and correctly emits neither. They remain preserved for caller-cluster
+reconstruction, not exported or anchored for nominal byte credit. See
+`object_matching_logs/leaf_map_obj_opus_private_helper_emission_audit_20260904.md`.
+The fresh provider census is recorded separately in
+`object_matching_logs/claude_opus_lane_intake_inventory_20260904.md`; its
+absence of a new provider ref is not a claim that all old source leads were
+exhausted. The new Fable lane and its assigned Network Server Manager scope
+remain untouched until the user's handoff.

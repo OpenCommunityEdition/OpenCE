@@ -216,6 +216,8 @@ static void actor_combat_find_nearby_target(
 static void actor_get_weapon_vector(
 	long actor_index,
 	real_vector3d *weapon_vector);
+static struct projectile_definition *actor_get_grenade_definition(
+	short grenade_type_index);
 /* The owner declarations in actions.h are macro-renamed while importing the
  * January inline set; restore the external names after that schedule ends. */
 real normalize2d(
@@ -370,6 +372,24 @@ struct actor_variant_definition *actor_combat_get_firing_variant_definition(
 	return firing_variant_definition;
 }
 
+static struct projectile_definition *actor_get_grenade_definition(
+	short grenade_type_index)
+{
+	struct game_globals_grenade *grenade = TAG_BLOCK_GET_ELEMENT(
+		&scenario_get_game_globals()->grenades,
+		grenade_type_index,
+		struct game_globals_grenade);
+	struct projectile_definition *projectile_definition = NULL;
+
+	if (grenade && grenade->projectile.index != NONE)
+	{
+		projectile_definition =
+			projectile_definition_get(grenade->projectile.index);
+	}
+
+	return projectile_definition;
+}
+
 real sine(
 	real angle)
 {
@@ -482,25 +502,15 @@ static boolean actor_combat_reaim_grenade(
 	struct actor_datum *actor = actor_get(actor_index);
 	struct actor_variant_definition *variant_definition =
 		actor_variant_definition_get(actor->meta.variant_definition_index);
-	short grenade_type_index = variant_definition->grenade_combat.grenade_type;
-	struct game_globals_grenade *grenade = TAG_BLOCK_GET_ELEMENT(
-		&scenario_get_game_globals()->grenades,
-		grenade_type_index,
-		struct game_globals_grenade);
-	struct projectile_definition *projectile_definition = NULL;
-	real aim_gravity;
+	struct projectile_definition *projectile_definition =
+		actor_get_grenade_definition(
+			variant_definition->grenade_combat.grenade_type);
 	real_vector2d aim_vector2d;
 	real_vector3d aim_vector;
 	real aim_speed;
 	real aim_ticks;
 	boolean linear;
 	boolean result = FALSE;
-
-	if (grenade && grenade->projectile.index != NONE)
-	{
-		projectile_definition =
-			projectile_definition_get(grenade->projectile.index);
-	}
 
 	match_assert(
 		"c:\\halo\\SOURCE\\ai\\actor_combat.c",
@@ -531,6 +541,7 @@ static boolean actor_combat_reaim_grenade(
 					GRENADE_AIMING_ANGLE_COSINE)
 		{
 			real_vector3d aim_velocity;
+			real aim_gravity;
 
 			aim_velocity.i = aim_vector.i*aim_speed;
 			aim_velocity.j = aim_vector.j*aim_speed;
@@ -573,22 +584,15 @@ static boolean actor_combat_build_grenade_trajectory(
 	real *aim_gravity)
 {
 	boolean result = FALSE;
-	struct game_globals_grenade *grenade;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\ai\\actor_combat.c",
 		1780,
 		grenade_origin && desired_impact_point && aim_vector && aim_speed);
 
-	grenade = TAG_BLOCK_GET_ELEMENT(
-		&scenario_get_game_globals()->grenades,
-		grenade_type_index,
-		struct game_globals_grenade);
-
-	if (grenade && grenade->projectile.index != NONE)
 	{
 		struct projectile_definition *projectile_definition =
-			projectile_definition_get(grenade->projectile.index);
+			actor_get_grenade_definition(grenade_type_index);
 
 		if (projectile_definition)
 		{

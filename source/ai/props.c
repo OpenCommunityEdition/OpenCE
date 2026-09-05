@@ -88,20 +88,6 @@ symbols in this file:
 boolean game_team_is_enemy(short team_index0, short team_index1);
 boolean game_team_is_ally(short team_index0, short team_index1);
 boolean game_team_ally_status_changed(short team_index0, short team_index1);
-boolean actor_perception_desire_prop(
-	long actor_index,
-	long ignored_prop_index,
-	long unit_index,
-	long prop_actor_index,
-	boolean in_use,
-	boolean player,
-	boolean enemy,
-	boolean dead,
-	short dead_ticks,
-	real suicide_radius,
-	real distance_squared,
-	short required_ticks,
-	boolean *replace);
 void prop_position_refresh(
 	long actor_index,
 	long prop_index,
@@ -350,32 +336,29 @@ long prop_new_unacknowledged(
 	long unit_index,
 	boolean enemy)
 {
-	long next_prop_index;
 	long prop_index;
 	long worst_prop_index = NONE;
 	long worst_required_prop_index = NONE;
 	real worst_distance = REAL_MAX;
 	real worst_required_distance = REAL_MAX;
 	short required_prop_count = 0;
-	struct actor_datum *actor = actor_get(actor_index);
+	short required_prop_maximum;
+	struct prop_iterator iterator;
+	struct prop_datum *prop;
 
-	next_prop_index = actor->meta.first_prop_index;
-
-scan_next_prop:
+	prop_iterator_new(&iterator, actor_index);
+	while ((prop = prop_iterator_next(&iterator)) != NULL)
 	{
-		struct prop_datum *prop;
-
-		prop_index = next_prop_index;
-		if (next_prop_index == NONE)
+		if (prop->state >= _prop_state_uninspected_orphan &&
+			prop->state <= _prop_state_inspected_orphan)
 		{
-			goto scan_complete;
+			continue;
+		}
+		if (prop->orphan_prop_index != NONE)
+		{
+			continue;
 		}
 
-		prop = prop_get(prop_index);
-		next_prop_index = prop->next_prop_index;
-		if ((prop->state < _prop_state_uninspected_orphan ||
-			 prop->state > _prop_state_inspected_orphan) &&
-			prop->orphan_prop_index == NONE)
 		{
 			boolean replace = FALSE;
 			boolean desire_prop = actor_perception_desire_prop(
@@ -397,7 +380,7 @@ scan_next_prop:
 			{
 				if (prop->distance < worst_distance)
 				{
-					worst_prop_index = prop_index;
+					worst_prop_index = iterator.index;
 					worst_distance = prop->distance;
 				}
 			}
@@ -407,31 +390,37 @@ scan_next_prop:
 
 				if (replace && prop->distance < worst_required_distance)
 				{
-					worst_required_prop_index = prop_index;
+					worst_required_prop_index = iterator.index;
 					worst_required_distance = prop->distance;
 				}
 			}
 		}
-
-		goto scan_next_prop;
 	}
 
-scan_complete:
-	prop_index = worst_prop_index;
-	if (prop_index == NONE)
+	if (worst_prop_index != NONE)
 	{
-		prop_index = worst_required_prop_index;
-		if (prop_index == NONE ||
-			required_prop_count < (enemy ? 6 : 4))
+		prop_index = worst_prop_index;
+	}
+	else
+	{
+		prop_index = NONE;
+		required_prop_maximum = enemy ? 6 : 4;
+		if (worst_required_prop_index != NONE &&
+			required_prop_count >= required_prop_maximum)
 		{
-			prop_index = datum_new(prop_data);
-			goto initialize_prop;
+			prop_index = worst_required_prop_index;
 		}
 	}
 
+	if (prop_index == NONE)
 	{
-		struct prop_datum *prop = prop_get(prop_index);
+		prop_index = datum_new(prop_data);
+	}
+	else
+	{
 		short identifier;
+
+		prop = prop_get(prop_index);
 
 		match_assert(
 			"c:\\halo\\SOURCE\\ai\\props.c",
@@ -449,7 +438,6 @@ scan_complete:
 		prop->identifier = identifier;
 	}
 
-initialize_prop:
 	prop_add(actor_index, unit_index, prop_index);
 
 	return prop_index;

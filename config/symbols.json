@@ -222,7 +222,7 @@
 { "file_offset": 63296, "flags": 32, "name": "_actor_get_weapon_vector", "static": true },
 { "file_offset": 63488, "flags": 32, "name": "_actor_combat_get_firing_variant_definition" },
 { "file_offset": 63616, "flags": 32, "name": "_code_0000f880" },
-{ "file_offset": 63776, "flags": 32, "name": "_code_0000f920" },
+{ "file_offset": 63776, "flags": 32, "name": "_actor_get_grenade_definition", "static": true },
 { "file_offset": 63840, "flags": 32, "name": "_fast_ftol" },
 { "file_offset": 63872, "flags": 32, "name": "_sine" },
 { "file_offset": 63888, "flags": 32, "name": "_cosine" },

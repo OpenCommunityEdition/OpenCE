@@ -2,6 +2,25 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/ai/actor_perception",
+      "function": "_actor_perception_desire_prop",
+      "class": "register-allocation",
+      "evidence": "Deliberate source-authenticity correction withdraws the inherited 549-meaningful-byte exact claim. January consumes a plain actor-index argument before reusing its parameter-home top byte for a boolean; that compiler allocation is not an authentic public union API. The corrected source takes a long handle and an initialized separate boolean, uses the existing genuine actor/encounter/unit datums instead of incompatible shadow views, and obtains actor_action_class from actions.h. The 13-parameter declaration belongs to actors.h and agrees with Props; DIA corroborates short desired_target_state and the plain long handle. Props-state enum domain is corroborated by orphan-transition callers, not guessed from the formal name. January and candidate both560 padded/16 relocations, candidate normalized607cc3f2;97.791664 percent objdiff. The natural local occupies ebp-1 rather than the dead argument byte ebp+0x17, shifting frame/instruction/relocation addresses while preserving destinations and logic. All32 other inherited strict functions and both inherited residuals are unchanged. This park gives zero exact credit, and no whole-object approval; existing extra helper owners remain disclosed. Reopen only for authentic source/compiler-context evidence, never a carrier union, declaration permutation, false layout or optimizer control. See docs/object_matching_logs/actor_perception_obj_props_api_typed_followup_20260904.md and docs/object_matching_logs/props_actor_perception_grenade_canonical_integration_20260904.md.",
+      "measurements": {
+        "target": {
+          "size": 560,
+          "relocation_count": 16,
+          "normalized_sha256": "f9729e40ecdc2cbd04fcb50024e74431499a7f69d9d071ca13b8cf6eea3def13"
+        },
+        "base": {
+          "size": 560,
+          "relocation_count": 16,
+          "normalized_sha256": "607cc3f2234cd8cdf3e3e0c0c6d3c52de8748c67c11ee3e1a32865c98e6bfa85"
+        },
+        "objdiff_percent": 97.791664
+      }
+    },
+    {
       "unit": "source/sound/game_sound",
       "function": "_compute_combined_pas",
       "class": "unclassified",
@@ -1011,12 +1030,12 @@
     {
       "unit": "source/ai/actor_combat",
       "function": "_actor_combat_reaim_grenade",
-      "class": "register-allocation",
-      "evidence": "The retained typed C follows the HCEA-corroborated grenade-projectile lookup, projectile_aim outputs, normalized planar-facing test, ballistic line-of-fire test, and successful aim latch. Target and candidate both contain 448 padded bytes, 16 relocations, and 162 instructions. Moving the velocity calculation ahead of gravity selection, as both HCEA and January require, raises the natural reconstruction to 98.509674%. The remaining code differences are a four-byte frame/stack-slot coloring shift plus one independent post-tag_get move/stack-cleanup schedule; the calls, branches, arithmetic, and stores otherwise retain January's topology. Natural declaration-order and early-return forms either preserve the slot coloring or worsen the branch polarity. No forced register directive, volatile lifetime, barrier, fake dependency, assembly, or nonsensical control flow is retained. Reopen only for authoritative January local-variable/source evidence or a natural same-compiler stack-allocation donor.",
+      "class": "unclassified",
+      "evidence": "The genuine actor_get_grenade_definition helper and its two ordinary caller uses restore a missed January owner without fake retention. The typed caller keeps projectile_aim outputs, planar-facing and ballistic line-of-fire tests and the successful aim latch. January and candidate both448 padded bytes,16 relocations,162 instructions; all16 relocation addresses/types/destinations agree. The natural replay changes prior hash b2a1aa5c to180b57e6 and improves objdiff98.509674 to99.86452 percent. It fixes the post-tag_get cleanup/move ordering; remaining differences are frame0x30 versus0x2c, stack-slot coloring and corresponding independent velocity-product placement/order. This remeasured park is conservatively unclassified rather than claimed as one allocator tie. All18 inherited strict owners remain strict and the restored64-byte helper is independently exact. No new candidate-only helper, point_from_line3d COMDAT, forced inline, declaration search, volatile/register device, fake reference, assembly or nonsensical branch is introduced. Reopen only for new authentic source/type/compiler-context evidence. See docs/object_matching_logs/actor_combat_obj_grenade_definition_opus_reaudit_20260904.md and docs/object_matching_logs/props_actor_perception_grenade_canonical_integration_20260904.md.",
       "measurements": {
         "target": { "size": 448, "relocation_count": 16, "normalized_sha256": "8d2e09aa4f73bc982c4cf17d6e4f9a963ffd7db0b486ff7f037d19966ef52772" },
-        "base": { "size": 448, "relocation_count": 16, "normalized_sha256": "b2a1aa5cad19d1cfaa1f0cf99729c8edd10f30854f973029e38af9b104e2c54c" },
-        "objdiff_percent": 98.509674
+        "base": { "size": 448, "relocation_count": 16, "normalized_sha256": "180b57e66e87ba40a0ed66e202278c097623976af9e7a41da86825a5d889a6c6" },
+        "objdiff_percent": 99.86452
       }
     },
     {

@@ -249,6 +249,7 @@ symbols in this file:
 
 #include "cseries.h"
 
+#include "actions.h"
 #include "actor_definitions.h"
 #include "actors.h"
 #include "ai_debug.h"
@@ -292,17 +293,6 @@ symbols in this file:
 		(delta_x) * (delta_x) + (delta_y) * (delta_y))
 
 /* ---------- structures */
-
-union actor_perception_prop_actor_slot
-{
-	long actor_index;
-
-	struct
-	{
-		byte padding[3];
-		boolean too_far;
-	};
-};
 
 struct actor_perception_swarm_component_view
 {
@@ -1134,9 +1124,6 @@ void actor_situation_update_target_status(
 void actor_situation_combat_status_update(
 	long actor_index);
 
-short actor_action_class(
-	long actor_index);
-
 real actor_compute_prop_target_weight(
 	long actor_index,
 	long prop_index);
@@ -1297,9 +1284,9 @@ long last_refresh_overflow_warning_time = NONE;
 
 boolean actor_perception_desire_prop(
 	long actor_index,
-	short prop_type,
+	short desired_target_state,
 	long unit_index,
-	union actor_perception_prop_actor_slot prop_actor,
+	long prop_actor_index,
 	boolean in_use,
 	boolean player,
 	boolean enemy,
@@ -1310,21 +1297,19 @@ boolean actor_perception_desire_prop(
 	short required_ticks,
 	boolean *too_far_reference)
 {
-	struct actor_perception_actor_view *actor =
-		(struct actor_perception_actor_view *)actor_get(actor_index);
-	struct actor_perception_actor_view *related_actor;
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_datum *related_actor;
 	boolean desire = dead;
+	boolean too_far = FALSE;
 
-	if (prop_actor.actor_index == NONE)
+	if (prop_actor_index == NONE)
 		related_actor = NULL;
 	else
-		related_actor =
-			(struct actor_perception_actor_view *)actor_get(
-				prop_actor.actor_index);
+		related_actor = actor_get(prop_actor_index);
 
-	prop_actor.too_far = FALSE;
-
-	if ((!enemy || dead) && prop_type >= 4 && prop_type <= 5)
+	if ((!enemy || dead) &&
+		desired_target_state >= _prop_state_uninspected_orphan &&
+		desired_target_state <= _prop_state_inspected_orphan)
 	{
 		desire = FALSE;
 	}
@@ -1333,11 +1318,11 @@ boolean actor_perception_desire_prop(
 		desire = TRUE;
 	}
 	else if (related_actor &&
-		(!related_actor->active || related_actor->dormant))
+		(!related_actor->meta.active || related_actor->meta.dormant))
 	{
 		desire = FALSE;
 	}
-	else if (prop_type == NONE && (in_use || required_ticks > 0))
+	else if (desired_target_state == NONE && (in_use || required_ticks > 0))
 	{
 		desire = TRUE;
 	}
@@ -1349,17 +1334,16 @@ boolean actor_perception_desire_prop(
 	{
 		desire = TRUE;
 
-		if (actor->encounter_index != NONE)
+		if (actor->meta.encounter_index != NONE)
 		{
-			struct actor_perception_encounter_view *encounter =
-				(struct actor_perception_encounter_view *)
-					encounter_get(actor->encounter_index);
+			struct encounter_datum *encounter =
+				encounter_get(actor->meta.encounter_index);
 			struct unit_datum *unit = unit_get(unit_index);
 			long ignore_time = encounter->corpse_ignore_time;
 			boolean inactive_encounter;
 
-			if (ignore_time <= actor->corpse_ignore_time)
-				ignore_time = actor->corpse_ignore_time;
+			if (ignore_time <= actor->emotions.corpse_ignore_time)
+				ignore_time = actor->emotions.corpse_ignore_time;
 
 			if (ignore_time != NONE &&
 				(unit->unit.time_of_death == NONE ||
@@ -1369,9 +1353,9 @@ boolean actor_perception_desire_prop(
 			}
 
 			inactive_encounter =
-				!encounter->enemy_target &&
-				!encounter->stand_down &&
-				!encounter->blind;
+				!encounter->enemy_visible &&
+				!encounter->enemy_alive &&
+				!encounter->stand_down;
 
 			if (!desire)
 				goto done;
@@ -1397,7 +1381,7 @@ boolean actor_perception_desire_prop(
 		{
 			desire = FALSE;
 		}
-		else if (actor_action_class(actor_index) > 1)
+		else if (actor_action_class(actor_index) > _action_class_passive)
 		{
 			desire = FALSE;
 		}
@@ -1405,7 +1389,7 @@ boolean actor_perception_desire_prop(
 		{
 			real maximum_distance_squared = 16.0f;
 
-			if (!enemy && actor->combat_status < 3)
+			if (!enemy && actor->state.mode < 3)
 				maximum_distance_squared = 64.0f;
 
 			desire = distance_squared < maximum_distance_squared;
@@ -1416,24 +1400,24 @@ boolean actor_perception_desire_prop(
 		if (enemy)
 		{
 			desire = TRUE;
-			prop_actor.too_far = distance_squared > 36.0f;
+			too_far = distance_squared > 36.0f;
 		}
 		else
 		{
 			desire = distance_squared < 225.0f;
 
-			if (actor->artificial_combat_status >= 4)
-				prop_actor.too_far = TRUE;
-			else if (actor->corpse_interest_inhibited)
-				prop_actor.too_far = FALSE;
+			if (actor->state.combat_status >= 4)
+				too_far = TRUE;
+			else if (actor->external_orders.pursuit_is_coordinator)
+				too_far = FALSE;
 			else
-				prop_actor.too_far = distance_squared > 16.0f;
+				too_far = distance_squared > 16.0f;
 		}
 	}
 
 done:
 	if (too_far_reference)
-		*too_far_reference = prop_actor.too_far;
+		*too_far_reference = too_far;
 
 	return desire;
 }

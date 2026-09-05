@@ -1125,6 +1125,20 @@ void actor_move_update(
 
 /* ---------- prototypes/ACTOR_PERCEPTION.C */
 
+boolean actor_perception_desire_prop(
+	long actor_index,
+	short desired_target_state,
+	long unit_index,
+	long prop_actor_index,
+	boolean in_use,
+	boolean player,
+	boolean enemy,
+	boolean dead,
+	short dead_ticks,
+	real suicide_radius,
+	real distance_squared,
+	short required_ticks,
+	boolean *too_far_reference);
 boolean actor_expected_acknowledgement(
 	long actor_index,
 	long prop_index);
