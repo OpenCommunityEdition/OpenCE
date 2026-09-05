@@ -288,8 +288,6 @@ void player_ui_dispose(
 	void);
 void game_state_dispose(
 	void);
-void telnet_console_dispose(
-	void);
 void transport_dispose(
 	void);
 void bink_playback_dispose(

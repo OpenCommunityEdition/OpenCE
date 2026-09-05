@@ -2,6 +2,50 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
+      "function": "_transport_endpoint_set_compare_entries",
+      "class": "unclassified",
+      "evidence": "Natural typed qsort callback reconstructed with its real poll caller. Both entries are loaded, non-NULL entries precede NULL entries, and the callback returns the January -1/0/1 relation. Private semantic name is inferred and mapped to the original target owner at 0x70B10 without an alias or linkage change. Both48B/0relocs; only EAX/ECX assignment differs. No register/declaration-order search or ABI steering. All12 inherited exact owners and the nonce park are unchanged; no candidate-only code or point_from_line3d is emitted. Reopen only for authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_set_winsock_obj_set_operations_cluster_20260904.md.",
+      "measurements": {
+        "target": {"size": 48, "relocation_count": 0, "normalized_sha256": "10d0cbdd04c0ad15a3cd14bffdde707c085ce85c4b9fed4c036fb4c103ca9c55"},
+        "base": {"size": 48, "relocation_count": 0, "normalized_sha256": "6621f23910b74ac690b7593956ec7d8b7feb44be8401480ceaff51642dcd6c1f"},
+        "objdiff_percent": 97.61905
+      }
+    },
+    {
+      "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
+      "function": "_poll_endpoint_set",
+      "class": "unclassified",
+      "evidence": "Complete natural January endpoint-set poll reconstructed with its real typed comparator: compact holes, rebuild stock XDK fd_set, clear cached readability, select with word timeout times MILLISECONDS_PER_SECOND, and mark ready endpoints. Correct owner headers provide the endpoint layout and Winsock error API. January's negative select-result branch is preserved without manufacturing its redundant subsequent comparison; its unguarded all-NULL tail compaction is target-proven and explicitly documented as an original defect, not claimed safe. Established short return ABI is retained. Target560B/16relocs versus candidate512B/16; natural allocation/control-flow differences remain. All inherited exact owners and nonce park unchanged, no extra code/COMMON/no point_from_line3d. No compiler controls, false types, fake branches or spelling search. Reopen only for authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_set_winsock_obj_set_operations_cluster_20260904.md.",
+      "measurements": {
+        "target": {"size": 560, "relocation_count": 16, "normalized_sha256": "4a0375522c8a3ff103c5dad92342325f3a41658e90dead5cdcd60d92a8f79f4b"},
+        "base": {"size": 512, "relocation_count": 16, "normalized_sha256": "c605635cb9ce7070a69e80e0b8943c998279fb64fab139b41bdeb8cecb2572a2"},
+        "objdiff_percent": 72.26966
+      }
+    },
+    {
+      "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
+      "function": "_add_endpoint_to_set",
+      "class": "unclassified",
+      "evidence": "Natural typed add caller reconstructed with the genuine private next-index helper, stock XDK FD_SET and semantic SET_FLAG. The helper is newly strict at56 meaningful/64 padded bytes and preserves January's documented one-past-capacity defect. January duplicates instruction-identical FD_SET blocks behind a listening-bit test; the retained source deliberately uses one natural FD_SET rather than an inert branch invented for matching. Target336B/13relocs versus candidate240B/13. Established short return ABI is retained; full-EAX materialization alone does not prove a different C type. All12 inherited exacts and nonce park unchanged, no extra code/COMMON/no point_from_line3d, no compiler controls or fake dependency. Reopen only for authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_set_winsock_obj_set_operations_cluster_20260904.md.",
+      "measurements": {
+        "target": {"size": 336, "relocation_count": 13, "normalized_sha256": "4e3ad84da528b844823d85558c2b994dd8680fbc92b1a456f1f1147a44d91807"},
+        "base": {"size": 240, "relocation_count": 13, "normalized_sha256": "d7e631f5948455759368b6908fb1ddf9f24fe91fc234521cb6f62a1686a2e091"},
+        "objdiff_percent": 55.7094
+      }
+    },
+    {
+      "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
+      "function": "_remove_endpoint_from_set",
+      "class": "unclassified",
+      "evidence": "Complete natural January removal path: locate the typed endpoint pointer, stock XDK FD_CLR, clear the semantic in-set bit, leave a NULL hole and request compaction, otherwise return the original not-in-set error. Both240B/9relocs with the same relocation identities; residuals are register/prologue scheduling and full-EAX versus AX return materialization. Established short return ABI is retained because stripped January PDB records do not establish a wider C return type; no false-type or declaration-order search is used. All inherited exact owners and nonce park unchanged, no extra code/COMMON/no point_from_line3d. Reopen only for authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_set_winsock_obj_set_operations_cluster_20260904.md.",
+      "measurements": {
+        "target": {"size": 240, "relocation_count": 9, "normalized_sha256": "6b4b631ac61f5eee45694fbee875f88fceafc045056afac5289baa7de53f5d34"},
+        "base": {"size": 240, "relocation_count": 9, "normalized_sha256": "be7a5e04decfb01718f78a0b2ff47e856c0c7cd8a90091637ec5b44db1e6acb2"},
+        "objdiff_percent": 94.02273
+      }
+    },
+    {
       "unit": "source/saved games/saved_game_files",
       "function": "_enumerate_memory_units",
       "class": "unclassified",

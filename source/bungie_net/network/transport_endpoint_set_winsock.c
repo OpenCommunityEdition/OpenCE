@@ -5,7 +5,7 @@ symbols in this file:
 00070420 0010:
 	_code_00070420 (0000)
 00070430 0040:
-	_code_00070430 (0000)
+	_transport_endpoint_set_get_next_index (0000)
 00070470 0080:
 	_transport_push_key (0000)
 000704F0 0040:
@@ -35,7 +35,7 @@ symbols in this file:
 00070A80 0090:
 	_delete_endpoint_set (0000)
 00070B10 0030:
-	_code_00070b10 (0000)
+	_transport_endpoint_set_compare_entries (0000)
 00070B40 0230:
 	_poll_endpoint_set (0000)
 00070D70 0150:
@@ -146,6 +146,12 @@ typedef char transport_endpoint_set_size_assert[
 
 /* ---------- prototypes */
 
+static long transport_endpoint_set_get_next_index(
+	struct transport_endpoint_set *set);
+static int __cdecl transport_endpoint_set_compare_entries(
+	void const *a,
+	void const *b);
+
 /* ---------- globals */
 
 extern long global_key_depth;
@@ -153,6 +159,23 @@ extern XNADDR global_address;
 extern XNKID global_key_id;
 extern XNKEY global_key;
 extern byte global_nonce[TRANSPORT_NONCE_LENGTH];
+
+/* ---------- private code */
+
+static long transport_endpoint_set_get_next_index(
+	struct transport_endpoint_set *set)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x39,
+		set);
+	/* January permits one-past-capacity here; preserve the original boundary. */
+	if (set->last_endpoint_index > set->max_endpoints - 1)
+	{
+		return NONE;
+	}
+	return set->last_endpoint_index + 1;
+}
 
 /* ---------- public code */
 
@@ -293,6 +316,179 @@ short delete_endpoint_set(
 		0x1BF,
 		set);
 	return _transport_error_none;
+}
+
+/* ---------- private code */
+
+static int __cdecl transport_endpoint_set_compare_entries(
+	void const *a,
+	void const *b)
+{
+	struct transport_endpoint *endpoint_a = *(struct transport_endpoint *const *)a;
+	struct transport_endpoint *endpoint_b = *(struct transport_endpoint *const *)b;
+
+	if (!endpoint_a && endpoint_b)
+	{
+		return 1;
+	}
+	else if (endpoint_a && !endpoint_b)
+	{
+		return -1;
+	}
+	return 0;
+}
+
+/* ---------- public code */
+
+short poll_endpoint_set(
+	struct transport_endpoint_set *set,
+	word timeout)
+{
+	struct timeval timeout_value;
+	fd_set readable_sockets;
+	long endpoint_index = 0;
+	long select_result;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x1DD,
+		set);
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x1DE,
+		transport_initialized);
+
+	timeout_value.tv_usec = timeout * MILLISECONDS_PER_SECOND;
+	timeout_value.tv_sec = 0;
+
+	if (set->needs_compaction)
+	{
+		qsort(
+			set->ep_array,
+			set->last_endpoint_index + 1,
+			sizeof(*set->ep_array),
+			transport_endpoint_set_compare_entries);
+		/* January has no lower-bound guard when every entry has been removed. */
+		while (!set->ep_array[set->last_endpoint_index])
+		{
+			set->last_endpoint_index--;
+		}
+
+		FD_ZERO(&set->sockets);
+		for (endpoint_index = 0;
+			endpoint_index <= set->last_endpoint_index;
+			endpoint_index++)
+		{
+			struct transport_endpoint *endpoint = set->ep_array[endpoint_index];
+
+			FD_SET(endpoint->socket, &set->sockets);
+			SET_FLAG(endpoint->flags, _transport_endpoint_readable_bit, FALSE);
+		}
+		set->needs_compaction = FALSE;
+	}
+	else
+	{
+		for (endpoint_index = 0;
+			endpoint_index <= set->last_endpoint_index;
+			endpoint_index++)
+		{
+			struct transport_endpoint *endpoint = set->ep_array[endpoint_index];
+
+			SET_FLAG(endpoint->flags, _transport_endpoint_readable_bit, FALSE);
+		}
+	}
+
+	memcpy(&readable_sockets, &set->sockets, sizeof(readable_sockets));
+	select_result = select(
+		set->last_endpoint_index + 1,
+		&readable_sockets,
+		NULL,
+		NULL,
+		&timeout_value);
+	if (select_result > 0)
+	{
+		for (endpoint_index = 0;
+			endpoint_index <= set->last_endpoint_index;
+			endpoint_index++)
+		{
+			struct transport_endpoint *endpoint = set->ep_array[endpoint_index];
+
+			if (endpoint->socket == INVALID_SOCKET)
+			{
+				return _transport_error_bad_endpoint;
+			}
+			if (FD_ISSET(endpoint->socket, &readable_sockets))
+			{
+				SET_FLAG(endpoint->flags, _transport_endpoint_readable_bit, TRUE);
+			}
+		}
+		return _transport_error_none;
+	}
+	if (select_result < 0)
+	{
+		winsock_error_to_string(WSAGetLastError());
+		return _transport_error_poll_error;
+	}
+	return _transport_result_poll_timeout;
+}
+
+short add_endpoint_to_set(
+	struct transport_endpoint *ep,
+	struct transport_endpoint_set *set)
+{
+	long endpoint_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x22F,
+		ep && set);
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x230,
+		transport_initialized);
+
+	endpoint_index = transport_endpoint_set_get_next_index(set);
+	if (endpoint_index < 0)
+	{
+		return _transport_error_endpoint_set_full;
+	}
+
+	set->ep_array[endpoint_index] = ep;
+	FD_SET(ep->socket, &set->sockets);
+	set->last_endpoint_index++;
+	SET_FLAG(ep->flags, _transport_endpoint_in_set_bit, TRUE);
+	return _transport_error_none;
+}
+
+short remove_endpoint_from_set(
+	struct transport_endpoint *ep,
+	struct transport_endpoint_set *set)
+{
+	long endpoint_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x255,
+		ep && set);
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x256,
+		transport_initialized);
+
+	for (endpoint_index = 0;
+		endpoint_index <= set->last_endpoint_index;
+		endpoint_index++)
+	{
+		if (set->ep_array[endpoint_index] == ep)
+		{
+			FD_CLR(ep->socket, &set->sockets);
+			SET_FLAG(ep->flags, _transport_endpoint_in_set_bit, FALSE);
+			set->ep_array[endpoint_index] = NULL;
+			set->needs_compaction = TRUE;
+			return _transport_error_none;
+		}
+	}
+	return _transport_error_endpoint_not_in_set;
 }
 
 void rewind_endpoint_set(

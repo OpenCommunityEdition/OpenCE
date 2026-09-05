@@ -18,8 +18,12 @@ header included in hcex build.
 
 void telnet_console_initialize(
 	void);
-void telnet_console_print(char *string);
-void telnet_console_process(void);
+void telnet_console_dispose(
+	void);
+void telnet_console_print(
+	char *string);
+void telnet_console_process(
+	void);
 
 /* ---------- globals */
 

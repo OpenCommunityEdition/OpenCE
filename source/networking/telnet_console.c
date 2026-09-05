@@ -35,7 +35,7 @@ symbols in this file:
 00288EC8 0021:
 	??_C@_0CB@MOGHMNHN@Would?5you?5like?5to?5play?5a?5game?$DP?$AN?6@ (0000)
 00456D00 008c:
-	_bss_00456d00 (0000)
+	_telnet_console_globals (0000)
 */
 
 
@@ -43,6 +43,8 @@ symbols in this file:
 
 #include "cseries.h"
 #include "bungie_net/network/transport.h"
+#include "bungie_net/network/transport_endpoint.h"
+#include "hs/hs.h"
 #include "networking/telnet_console.h"
 
 /* ---------- constants */
@@ -59,8 +61,6 @@ enum
 
 /* ---------- structures */
 
-struct transport_endpoint;
-
 struct telnet_client
 {
 	struct transport_endpoint *endpoint;
@@ -76,37 +76,6 @@ struct telnet_console_globals
 
 /* ---------- prototypes */
 
-struct transport_endpoint *create_transport_endpoint(
-	long type);
-void delete_transport_endpoint(
-	struct transport_endpoint *endpoint);
-short bind_endpoint(
-	struct transport_endpoint *endpoint,
-	struct transport_address *address);
-short listen_endpoint(
-	struct transport_endpoint *endpoint);
-struct transport_endpoint *accept_endpoint(
-	struct transport_endpoint *endpoint);
-boolean endpoint_readable(
-	struct transport_endpoint *endpoint,
-	long timeout);
-long read_endpoint(
-	struct transport_endpoint *endpoint,
-	void *buffer,
-	long size);
-long write_endpoint(
-	struct transport_endpoint *endpoint,
-	const void *buffer,
-	long size);
-
-boolean hs_compile_and_evaluate(
-	char *expression);
-
-void telnet_console_initialize(
-	void);
-void telnet_console_dispose(
-	void);
-
 static boolean process_telnet_client_buffer(
 	char *buffer,
 	long size,
@@ -114,41 +83,41 @@ static boolean process_telnet_client_buffer(
 
 /* ---------- globals */
 
-struct telnet_console_globals bss_00456d00 = {0};
+struct telnet_console_globals telnet_console_globals = {0};
 
 /* ---------- public code */
 
 void telnet_console_initialize(
 	void)
 {
-	csmemset(&bss_00456d00, 0, sizeof(bss_00456d00));
+	csmemset(&telnet_console_globals, 0, sizeof(telnet_console_globals));
 
-	bss_00456d00.listening_endpoint = create_transport_endpoint(_transport_endpoint_type_telnet);
-	if (bss_00456d00.listening_endpoint)
+	telnet_console_globals.listening_endpoint = create_transport_endpoint(_transport_endpoint_type_telnet);
+	if (telnet_console_globals.listening_endpoint)
 	{
 		struct transport_address address = {{0}};
 
 		address.address_length = IPV4_ADDRESS_LENGTH;
 		address.port = TELNET_CONSOLE_PORT;
 
-		if (bind_endpoint(bss_00456d00.listening_endpoint, &address)==_transport_error_none)
+		if (bind_endpoint(telnet_console_globals.listening_endpoint, &address)==_transport_error_none)
 		{
-			if (listen_endpoint(bss_00456d00.listening_endpoint)==_transport_error_none)
+			if (listen_endpoint(telnet_console_globals.listening_endpoint)==_transport_error_none)
 			{
-				bss_00456d00.initialized = TRUE;
+				telnet_console_globals.initialized = TRUE;
 			}
 			else
 			{
 				error(2, "listen_endpoint() failed on telnet console endpoint");
-				delete_transport_endpoint(bss_00456d00.listening_endpoint);
-				bss_00456d00.listening_endpoint = NULL;
+				delete_transport_endpoint(telnet_console_globals.listening_endpoint);
+				telnet_console_globals.listening_endpoint = NULL;
 			}
 		}
 		else
 		{
 			error(2, "bind_endpoint() failed on telnet console endpoint");
-			delete_transport_endpoint(bss_00456d00.listening_endpoint);
-			bss_00456d00.listening_endpoint = NULL;
+			delete_transport_endpoint(telnet_console_globals.listening_endpoint);
+			telnet_console_globals.listening_endpoint = NULL;
 		}
 	}
 	else
@@ -162,15 +131,15 @@ void telnet_console_initialize(
 void telnet_console_dispose(
 	void)
 {
-	if (bss_00456d00.initialized)
+	if (telnet_console_globals.initialized)
 	{
-		if (bss_00456d00.listening_endpoint)
-			delete_transport_endpoint(bss_00456d00.listening_endpoint);
-		if (bss_00456d00.clients[0].endpoint)
-			delete_transport_endpoint(bss_00456d00.clients[0].endpoint);
+		if (telnet_console_globals.listening_endpoint)
+			delete_transport_endpoint(telnet_console_globals.listening_endpoint);
+		if (telnet_console_globals.clients[0].endpoint)
+			delete_transport_endpoint(telnet_console_globals.clients[0].endpoint);
 	}
 
-	csmemset(&bss_00456d00, 0, sizeof(bss_00456d00));
+	csmemset(&telnet_console_globals, 0, sizeof(telnet_console_globals));
 
 	return;
 }
@@ -178,25 +147,25 @@ void telnet_console_dispose(
 void telnet_console_print(
 	char *string)
 {
-	if (bss_00456d00.initialized && string && string[0])
+	if (telnet_console_globals.initialized && string && string[0])
 	{
 		long length = csstrlen(string);
 
-		if (bss_00456d00.clients[0].endpoint)
+		if (telnet_console_globals.clients[0].endpoint)
 		{
-			long result = write_endpoint(bss_00456d00.clients[0].endpoint, "\r\n", 2);
+			long result = write_endpoint(telnet_console_globals.clients[0].endpoint, "\r\n", 2);
 
 			if (result>0)
 			{
-				result = write_endpoint(bss_00456d00.clients[0].endpoint, string, length);
+				result = write_endpoint(telnet_console_globals.clients[0].endpoint, string, length);
 				if (result>0)
 				{
-					if (bss_00456d00.clients[0].buffer[0])
+					if (telnet_console_globals.clients[0].buffer[0])
 					{
 						result = write_endpoint(
-							bss_00456d00.clients[0].endpoint,
-							bss_00456d00.clients[0].buffer,
-							csstrlen(bss_00456d00.clients[0].buffer));
+							telnet_console_globals.clients[0].endpoint,
+							telnet_console_globals.clients[0].buffer,
+							csstrlen(telnet_console_globals.clients[0].buffer));
 					}
 
 					if (result>0)
@@ -205,8 +174,8 @@ void telnet_console_print(
 			}
 
 			error(2, "connection lost to telnet client");
-			delete_transport_endpoint(bss_00456d00.clients[0].endpoint);
-			bss_00456d00.clients[0].endpoint = NULL;
+			delete_transport_endpoint(telnet_console_globals.clients[0].endpoint);
+			telnet_console_globals.clients[0].endpoint = NULL;
 		}
 	}
 
@@ -216,14 +185,14 @@ void telnet_console_print(
 void telnet_console_process(
 	void)
 {
-	if (bss_00456d00.initialized)
+	if (telnet_console_globals.initialized)
 	{
 		char buffer[32];
 		long count;
 
-		if (endpoint_readable(bss_00456d00.listening_endpoint, 0))
+		if (endpoint_readable(telnet_console_globals.listening_endpoint, 0))
 		{
-			struct transport_endpoint *endpoint = accept_endpoint(bss_00456d00.listening_endpoint);
+			struct transport_endpoint *endpoint = accept_endpoint(telnet_console_globals.listening_endpoint);
 
 			if (endpoint)
 			{
@@ -231,7 +200,7 @@ void telnet_console_process(
 
 				for (client_index = 0; client_index<MAXIMUM_TELNET_CLIENTS; client_index++)
 				{
-					if (!bss_00456d00.clients[client_index].endpoint)
+					if (!telnet_console_globals.clients[client_index].endpoint)
 					{
 						if (write_endpoint(
 							endpoint,
@@ -242,8 +211,8 @@ void telnet_console_process(
 						}
 						else
 						{
-							bss_00456d00.clients[client_index].endpoint = endpoint;
-							bss_00456d00.clients[client_index].buffer[0] = 0;
+							telnet_console_globals.clients[client_index].endpoint = endpoint;
+							telnet_console_globals.clients[client_index].buffer[0] = 0;
 						}
 
 						break;
@@ -261,13 +230,13 @@ void telnet_console_process(
 			}
 		}
 
-		if (bss_00456d00.clients[0].endpoint &&
-			endpoint_readable(bss_00456d00.clients[0].endpoint, 0))
+		if (telnet_console_globals.clients[0].endpoint &&
+			endpoint_readable(telnet_console_globals.clients[0].endpoint, 0))
 		{
-			count = read_endpoint(bss_00456d00.clients[0].endpoint, buffer, sizeof(buffer));
+			count = read_endpoint(telnet_console_globals.clients[0].endpoint, buffer, sizeof(buffer));
 			if (count>0)
 			{
-				if (process_telnet_client_buffer(buffer, count, bss_00456d00.clients))
+				if (process_telnet_client_buffer(buffer, count, telnet_console_globals.clients))
 					return;
 
 				error(2, "error processing telnet client");
@@ -277,10 +246,10 @@ void telnet_console_process(
 				error(2, "connection lost to telnet client ('%s')", transport_error_to_string((short)count));
 			}
 
-			if (bss_00456d00.clients[0].endpoint)
+			if (telnet_console_globals.clients[0].endpoint)
 			{
-				delete_transport_endpoint(bss_00456d00.clients[0].endpoint);
-				bss_00456d00.clients[0].endpoint = NULL;
+				delete_transport_endpoint(telnet_console_globals.clients[0].endpoint);
+				telnet_console_globals.clients[0].endpoint = NULL;
 			}
 		}
 	}
