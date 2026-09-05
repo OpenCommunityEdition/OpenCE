@@ -226,7 +226,7 @@ typedef char verify_xbox_texture_cache_texture_size[
 long bitmap_get_pixel_data_size(
 	struct bitmap_data *bitmap);
 
-boolean texture_cache_locked_block_proc(
+static boolean texture_cache_locked_block_proc(
 	long block_index);
 static void texture_cache_delete_block_proc(
 	long block_index);
@@ -430,6 +430,22 @@ void texture_cache_close(
 }
 
 /* ---------- private code */
+
+static boolean texture_cache_locked_block_proc(
+	long block_index)
+{
+	struct xbox_texture_cache_texture *texture = datum_get(
+		xbox_texture_cache_globals.textures,
+		block_index);
+
+	if (texture->loaded &&
+		!IDirect3DBaseTexture8_IsBusy(&texture->hardware_format))
+	{
+		return FALSE;
+	}
+
+	return TRUE;
+}
 
 static void texture_cache_delete_block_proc(
 	long block_index)

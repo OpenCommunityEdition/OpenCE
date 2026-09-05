@@ -1,5 +1,16 @@
 # `xbox_texture_cache.obj`: XDK device-wrapper pair
 
+## Later ABI correction (2026-09-05)
+
+The locked-callback section below is a historical first-shot result. Its
+full-width-return interpretation is superseded: all five January LRUV
+indirect consumers test AL, establishing the existing byte `boolean` contract.
+The natural candidate's byte return is ABI-correct; its remaining difference
+is instruction selection, not a calling-contract defect. See
+`xbox_texture_cache_obj_locked_callback_natural_boundary_20260905.md` for the
+target caller evidence and current fuzzy-retention review. The historical
+measurements below are retained unchanged.
+
 ## Result
 
 This isolated one-shot wave starts from canonical commit

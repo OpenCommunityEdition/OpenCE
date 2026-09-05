@@ -492,7 +492,7 @@ struct _main_globals
 	boolean main_menu_scenario_loaded;
 	boolean want_to_be_at_main_menu;
 	boolean run_xdemos;
-	byte __unknown115;
+	boolean playback_last_recording;
 	boolean halt_time_scale;
 	boolean restart_time;
 	boolean load_last_solo_level;
@@ -583,7 +583,8 @@ struct _main_window_storage
 
 extern void create_local_players(
 	void);
-extern void main_setup_connection(void);
+extern void main_setup_connection(
+	void);
 extern void main_initialize_time(void);
 extern void main_change_map_name(void);
 extern void main_skip_private(void);
@@ -1008,7 +1009,7 @@ void main_menu_switch_to_single_player(
 void main_set_game_connection_to_film_playback(
 	void)
 {
-	main_globals.__unknown115 = TRUE;
+	main_globals.playback_last_recording = TRUE;
 	return;
 }
 
@@ -1512,6 +1513,42 @@ boolean code_000f0be0(
 	void)
 {
 	return rasterizer_globals.framerate_throttle;
+}
+
+void main_setup_connection(
+	void)
+{
+	struct game_options options;
+
+	if (main_globals.playback_last_recording)
+	{
+		main_globals.want_to_be_at_main_menu = FALSE;
+		main_globals.connection = _game_connection_film_playback;
+		error(_error_silent, "error opening saved film");
+		main_globals.want_to_be_at_main_menu = TRUE;
+		main_menu_load();
+		return;
+	}
+
+	if (main_globals.want_to_be_at_main_menu)
+	{
+		main_menu_load();
+		return;
+	}
+
+	main_globals.connection = _game_connection_local;
+	game_options_new(&options);
+	csstrncpy(
+		options.map_name,
+		main_globals.soloplayer_map_name,
+		NUMBEROF(options.map_name) - 1);
+	options.map_name[NUMBEROF(options.map_name) - 1] = 0;
+	options.difficulty = global_difficulty_level;
+	game_precache_new_map(options.map_name, TRUE);
+	game_dispose_from_old_map();
+	main_new_map(&options);
+
+	return;
 }
 
 void main_initialize_time(

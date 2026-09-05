@@ -2,13 +2,15 @@
 
 ## Current published checkpoint (2026-09-05)
 
-Verified published code checkpoint `760ea3bde` on canonical and both
+Verified published code checkpoint `ea94ab3fa` on canonical and both
 `bnunu/halo` publication branches:
 **906,391 meaningful matched code bytes**, **6,171 credited functions**,
 **2,030,868 matched data bytes**, and **391/833 Matching objects**.
-The full stable-owner sweep has **6,217 strict owners**; **277 fuzzy parks**
-validate. The latest batches reconcile the older Opus Profile getters and
-retain the natural Transport receive pair. All288 tests plus26 subtests pass.
+The full stable-owner sweep has **6,217 strict owners**; **278 fuzzy parks**
+validate at that published checkpoint. The following Main/Texture integration
+batch retains two further credible functions (233 meaningful fuzzy bytes),
+bringing valid parks to280 without changing exact-code/data/object totals.
+All288 tests plus26 subtests pass.
 
 The donor byte pools and earlier "current" totals below are historical
 checkpoints, not a live unreconciled-byte count. Do not subtract or sum them
@@ -39,6 +41,26 @@ existing AI Communication park across63 consumers. The entire four-file trial
 was restored; zero admitted delta. See
 `docs/object_matching_logs/ai_obj_responsible_unit_header_boundary_20260905.md`.
 Do not repeat header-position or source-shape searches to evade this boundary.
+
+### Main/Texture follow-up and Devices boundary
+
+Main setup is now retained at90.416664% (182 meaningful target bytes), without
+the older donor's prohibited compiler barrier. Texture-cache locking is
+retained at95.0% (51 meaningful target bytes); all five January LRUV callers
+prove a byte-return ABI, correcting the earlier full-EAX rejection.
+Both actual canonical objects preserve every inherited runtime owner; the
+only caller-record changes are the specifically reviewed undefined-to-defined
+callee transitions. No new helper or point_from_line3d definition appears.
+
+The Devices front-facing packet remains withheld despite credible behavior:
+its extra dot_product3d COMDAT demonstrably conflicts with canonical
+ActionCharge under the ordinary XDK linker in both input orders. The full
+source/header trial was restored and its research evidence preserved.
+No source-shape or inline-control retry is authorized.
+
+See the20260905 object ledgers for Main startup, Texture locked callback, and
+Devices front-facing ownership. These dispositions are not new exact-byte
+claims or a claim that unidentified interrupted Opus lanes are fully audited.
 
 ## Frozen donor
 

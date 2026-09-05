@@ -2,6 +2,46 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/main/main",
+      "function": "_main_setup_connection",
+      "class": "unclassified",
+      "evidence": "Complete January startup behavior and owner API reconstructed naturally. Film request reports the target error and returns to menu; direct menu and local map branches preserved. Target182/192 meaningful/padded17relocations versus candidate173/176 and16relocations; ordinary objdiff90.42%. Candidate cross-jumps the two main_menu_load/return tails, removing9meaningful bytes and one physical call relocation; all other operations correspond. Do not repeat forbidden donor ReadWriteBarrier tail control or source spelling searches. All75 inherited code/53data owner bytes, orderedrelocations and runtimeproperties remain unchanged; one25B target/property-exact literal added, no helper/COMMON/newglobal/point owner. Full833target census proves sole Main loop caller and existing HS-facing flag setter. Zero exactcode credit; see docs/object_matching_logs/main_obj_startup_connection_natural_boundary_20260905.md.",
+      "measurements": {
+        "target": {
+          "size": 192,
+          "relocation_count": 17,
+          "normalized_sha256": "c5411956292ae880665d080ef10f13e76665ff55bb11fdb8983c5209a4260c72"
+        },
+        "base": {
+          "size": 176,
+          "relocation_count": 16,
+          "normalized_sha256": "7337c8f95e5e76c6be2f564871682de0ddd5916cff77a9eb825f02a3664ec2d6"
+        },
+        "objdiff_percent": 90.416664
+      }
+    },
+    {
+      "unit": "source/cache/xbox_texture_cache",
+      "function": "_texture_cache_locked_block_proc",
+      "class": "unclassified",
+      "evidence": "Natural private boolean callback reconstructed once from the January control flow and authenticated Xbox texture-cache/LRUV types. It returns FALSE exactly when the cache entry is loaded and the XDK resource is not busy, otherwise TRUE. January LRUV consumes this callback through the byte-returning lruv_locked_block_proc contract: all five target indirect call sites test AL, not EAX, so the earlier 2026-08-30 claim that January required a full-width return is retracted. Target and candidate are both 64 padded / 51 meaningful bytes with the same three relocation addresses, types, identities and static owner properties; objdiff reports 95.0 percent. The only emitted differences are the natural boolean return materialization (candidate xor al,al / mov al,1 versus January returning the known-zero IsBusy EAX / mov eax,1) and the two-byte branch displacement induced by that materialization. The fail-closed classifier returns UNKNOWN. No return-type retry, source variant, forced inline, pragma, barrier, register control, raw offset, representation cast, assembly, fake caller, emission anchor, extra helper, COMMON owner, data owner, or point_from_line3d COMDAT is present. Reopen only for authoritative January source/local records or compiler-context evidence explaining the return materialization.",
+      "measurements": {
+        "target": {
+          "size": 64,
+          "meaningful_size": 51,
+          "relocation_count": 3,
+          "normalized_sha256": "9f883aeaa9d5a930f38b79b2960d634b647d971b5fcd92675174941d340b1f1d"
+        },
+        "base": {
+          "size": 64,
+          "meaningful_size": 51,
+          "relocation_count": 3,
+          "normalized_sha256": "ef0debbd170c841a4c89b83eb0363369278f09c33897019f50199a9b888efbf4"
+        },
+        "objdiff_percent": 95
+      }
+    },
+    {
       "unit": "source/bungie_net/network/transport_endpoint_winsock",
       "function": "_winsock_error_to_string",
       "class": "unclassified",
