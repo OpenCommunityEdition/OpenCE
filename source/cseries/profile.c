@@ -311,8 +311,7 @@ struct profile_frame
 {
 	byte __unknown0000[4];
 	long frame_index;
-	long rasterizer_frame_index;
-	long vertical_blank_index;
+	__int64 vertical_blank_index;
 	short game_tick_count;
 	short window_count;
 	byte window_ids[MAXIMUM_PROFILE_WINDOWS];
@@ -346,8 +345,7 @@ struct profile_frame_iterator
 
 struct profile_frame_info
 {
-	long rasterizer_frame_index;
-	long vertical_blank_index;
+	__int64 vertical_blank_index;
 };
 
 struct profile_globals
@@ -532,7 +530,6 @@ boolean profile_frame_iterator_next(
 
 		if (info)
 		{
-			info->rasterizer_frame_index = profile_globals.frames[buffer_index].rasterizer_frame_index;
 			info->vertical_blank_index = profile_globals.frames[buffer_index].vertical_blank_index;
 		}
 
@@ -611,7 +608,6 @@ void profile_frame_start(
 	csmemset(&profile_globals.current_frame, 0, sizeof(profile_globals.current_frame));
 
 	profile_globals.current_frame.frame_index = render.frame_index;
-	profile_globals.current_frame.rasterizer_frame_index = rasterizer_globals.frame_index;
 	profile_globals.current_frame.vertical_blank_index = rasterizer_globals.vertical_blank_index;
 	profile_globals.current_frame.game_tick_count = 0;
 	QUERY_TIMEBASE(timebase);

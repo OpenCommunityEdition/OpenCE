@@ -460,8 +460,7 @@ struct _main_globals
 {
 	unsigned long frame_start_milliseconds;
 	byte reservedB4[4];
-	unsigned long rasterizer_frame_index;
-	unsigned long rasterizer_vertical_blank_index;
+	__int64 rasterizer_vertical_blank_index;
 	byte reservedC0[0x18];
 	real seconds_elapsed;
 	short connection;
@@ -519,10 +518,8 @@ typedef char main_globals_size_assert[
 	sizeof(struct _main_globals) == 0x620 ? 1 : -1];
 typedef char main_globals_frame_start_milliseconds_offset_assert[
 	offsetof(struct _main_globals, frame_start_milliseconds) == 0x00 ? 1 : -1];
-typedef char main_globals_rasterizer_frame_index_offset_assert[
-	offsetof(struct _main_globals, rasterizer_frame_index) == 0x08 ? 1 : -1];
 typedef char main_globals_rasterizer_vertical_blank_index_offset_assert[
-	offsetof(struct _main_globals, rasterizer_vertical_blank_index) == 0x0C ? 1 : -1];
+	offsetof(struct _main_globals, rasterizer_vertical_blank_index) == 0x08 ? 1 : -1];
 typedef char main_globals_seconds_elapsed_offset_assert[
 	offsetof(struct _main_globals, seconds_elapsed) == 0x28 ? 1 : -1];
 typedef char main_globals_connection_offset_assert[
@@ -1506,13 +1503,8 @@ void main_exit(
 void main_reset_time(
 	void)
 {
-	unsigned long frame_index;
-	unsigned long vertical_blank_index;
 	main_globals.frame_start_milliseconds = system_milliseconds();
-	frame_index = rasterizer_globals.frame_index;
-	vertical_blank_index = rasterizer_globals.vertical_blank_index;
-	main_globals.rasterizer_frame_index = frame_index;
-	main_globals.rasterizer_vertical_blank_index = vertical_blank_index;
+	main_globals.rasterizer_vertical_blank_index = rasterizer_globals.vertical_blank_index;
 	return;
 }
 
@@ -1526,7 +1518,6 @@ void main_initialize_time(
 	void)
 {
 	main_globals.frame_start_milliseconds = system_milliseconds();
-	main_globals.rasterizer_frame_index = 0;
 	main_globals.rasterizer_vertical_blank_index = 0;
 	rasterizer_set_vblank_callback(main_vertical_blank_interrupt_handler);
 	main_globals.vblank_flip_delta_index = 0;

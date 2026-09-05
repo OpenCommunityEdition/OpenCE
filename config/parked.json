@@ -4833,6 +4833,25 @@
         },
         "objdiff_percent": 98.3871
       }
+    },
+    {
+      "unit": "source/cache/xbox_texture_cache",
+      "function": "_texture_cache_steal_memory",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after restoring the complete public texture-cache memory-steal path in ordinary typed C. The retained function uses the owning texture_cache.h prototype, signed long page arithmetic independently confirmed by January's cdq/and/add/sar sequence, named page/guard constants, the genuine operational xbox_texture_cache_globals fields, the real XDK XPhysicalProtect declaration and PAGE_READWRITE/PAGE_READONLY constants, and explicit return. January and later HCEA/Pastudan/Stian semantic lifts corroborate the two guards, LRU resize, protection sequence, stolen flag, and returned writable range. Target and candidate are both 224 padded / 209 meaningful bytes with the same 16 relocation offsets, types and identities; objdiff reports 96.95652 percent. The only aligned emitted-code difference is January retaining the returned guard pointer in ESI while VC7 selects EDI for the natural candidate, plus the corresponding pop/move order. The fail-closed classifier returns UNKNOWN, so no recipe or exact credit is claimed. No declaration-order search, register/volatile forcing, pragma, barrier, assembly, raw offset, fake dependency, forced inline, undefined behavior, extra helper, COMMON owner, or point_from_line3d COMDAT is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining this final pointer-register allocation.",
+      "measurements": {
+        "target": {
+          "size": 224,
+          "relocation_count": 16,
+          "normalized_sha256": "7ffbda42b22d2c8bae6f2604509e6b0e39ae275fe38c011febed6f55e1d4620e"
+        },
+        "base": {
+          "size": 224,
+          "relocation_count": 16,
+          "normalized_sha256": "37670ded23c6273a3a573265fe14a008f6abb5fc2799c821368c77f7710cf076"
+        },
+        "objdiff_percent": 96.95652
+      }
     }
   ]
 }

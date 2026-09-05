@@ -165,9 +165,8 @@ struct rasterizer_globals_definition
 	struct rasterizer_globals_reserved04 reserved04;
 	unsigned __int64 fps_accumulation_frame_index;
 	byte reserved20[8];
-	/* updated asynchronously by the rasterizer and vertical-blank callback */
-	volatile unsigned long frame_index;
-	volatile unsigned long vertical_blank_index;
+	/* Incremented asynchronously as one 64-bit counter by the vblank callback. */
+	volatile __int64 vertical_blank_index;
 	byte reserved30[0xD];
 	boolean framerate_throttle;
 	byte reserved3E[6];

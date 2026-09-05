@@ -35,9 +35,9 @@ symbols in this file:
 001AE820 0020:
 	_texture_cache_flush (0000)
 001AE840 0040:
-	_code_001ae840 (0000)
+	_texture_cache_locked_block_proc (0000)
 001AE880 00a0:
-	_code_001ae880 (0000)
+	_texture_cache_delete_block_proc (0000)
 001AE920 0150:
 	_code_001ae920 (0000)
 001AEA70 0100:
@@ -86,6 +86,7 @@ symbols in this file:
 	??_C@_0EE@BCDFBEJK@YOU?5GOT?5STABBED?$CB?$CB?$CB?$CB?5double?9click@ (0000)
 004D1198 1618:
 	_bss_004d1198 (0000)
+	_xbox_texture_cache_globals (1600)
 	_texture_cache_debug_options (1610)
 	_debug_texture_cache (1612)
 */
@@ -93,6 +94,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cache/texture_cache.h"
 #include "cache/physical_memory_map.h"
 #include "memory/data.h"
 #include "memory/lruv_cache.h"
@@ -106,6 +108,11 @@ enum
 	_bitmap_cached_bit = 7,
 	XBOX_TEXTURE_CACHE_PAGE_COUNT = 0x580,
 	XBOX_TEXTURE_CACHE_PAGE_SIZE_BITS = 14,
+	XBOX_TEXTURE_CACHE_PAGE_SIZE = 1 << XBOX_TEXTURE_CACHE_PAGE_SIZE_BITS,
+	XBOX_TEXTURE_CACHE_STEAL_GUARD_SIZE = 0x104000,
+	XBOX_TEXTURE_CACHE_STEALABLE_PAGE_COUNT =
+		XBOX_TEXTURE_CACHE_PAGE_COUNT -
+		2 * (XBOX_TEXTURE_CACHE_STEAL_GUARD_SIZE / XBOX_TEXTURE_CACHE_PAGE_SIZE),
 	XBOX_TEXTURE_CACHE_ENTRY_SIZE = 0x20,
 	XBOX_TEXTURE_CACHE_SIZE = 0x1600000,
 	XBOX_TEXTURE_CACHE_PROTECTION = 0x404,
@@ -142,14 +149,12 @@ struct xbox_bitmap_group_prefix
 	struct tag_data processed_pixel_data;
 };
 
-struct xbox_texture_cache_globals_prefix
+struct xbox_texture_cache_globals
 {
-	byte reserved0000[0x1600];
 	struct data_array *textures;
-	void *base_address;
+	byte *base_address;
 	struct lruv_cache *cache;
 	boolean stolen_memory;
-	byte reserved160D[3];
 };
 
 struct xbox_texture_cache_texture
@@ -186,22 +191,22 @@ typedef char verify_xbox_bitmap_group_pixel_data_file_offset[
 
 typedef char verify_xbox_texture_cache_textures_offset[
 	offsetof(
-		struct xbox_texture_cache_globals_prefix,
-		textures) == 0x1600 ? 1 : -1];
+		struct xbox_texture_cache_globals,
+		textures) == 0 ? 1 : -1];
 typedef char verify_xbox_texture_cache_base_address_offset[
 	offsetof(
-		struct xbox_texture_cache_globals_prefix,
-		base_address) == 0x1604 ? 1 : -1];
+		struct xbox_texture_cache_globals,
+		base_address) == 0x4 ? 1 : -1];
 typedef char verify_xbox_texture_cache_cache_offset[
 	offsetof(
-		struct xbox_texture_cache_globals_prefix,
-		cache) == 0x1608 ? 1 : -1];
+		struct xbox_texture_cache_globals,
+		cache) == 0x8 ? 1 : -1];
 typedef char verify_xbox_texture_cache_stolen_memory_offset[
 	offsetof(
-		struct xbox_texture_cache_globals_prefix,
-		stolen_memory) == 0x160C ? 1 : -1];
-typedef char verify_xbox_texture_cache_globals_prefix_size[
-	sizeof(struct xbox_texture_cache_globals_prefix) == 0x1610 ? 1 : -1];
+		struct xbox_texture_cache_globals,
+		stolen_memory) == 0xC ? 1 : -1];
+typedef char verify_xbox_texture_cache_globals_size[
+	sizeof(struct xbox_texture_cache_globals) == 0x10 ? 1 : -1];
 typedef char verify_xbox_texture_cache_texture_loaded_offset[
 	offsetof(
 		struct xbox_texture_cache_texture,
@@ -218,33 +223,26 @@ typedef char verify_xbox_texture_cache_texture_size[
 	sizeof(struct xbox_texture_cache_texture) == 0x20 ? 1 : -1];
 /* ---------- prototypes */
 
-void __stdcall XPhysicalProtect(
-	void *address,
-	unsigned long size,
-	unsigned long protection);
-
 long bitmap_get_pixel_data_size(
 	struct bitmap_data *bitmap);
 
-boolean code_001ae840(
+boolean texture_cache_locked_block_proc(
 	long block_index);
-void code_001ae880(
+static void texture_cache_delete_block_proc(
 	long block_index);
 
 /* ---------- globals */
 
-extern struct xbox_texture_cache_globals_prefix bss_004d1198;
+static struct xbox_texture_cache_globals xbox_texture_cache_globals;
 extern D3DDevice global_d3d_device;
-
-#define xbox_texture_cache_globals bss_004d1198
 
 /* ---------- public code */
 
 void texture_cache_delete(
 	void)
 {
-	data_dispose(bss_004d1198.textures);
-	lruv_delete(bss_004d1198.cache);
+	data_dispose(xbox_texture_cache_globals.textures);
+	lruv_delete(xbox_texture_cache_globals.cache);
 
 	return;
 }
@@ -252,7 +250,7 @@ void texture_cache_delete(
 void texture_cache_open(
 	void)
 {
-	data_make_valid(bss_004d1198.textures);
+	data_make_valid(xbox_texture_cache_globals.textures);
 
 	return;
 }
@@ -260,7 +258,7 @@ void texture_cache_open(
 void texture_cache_idle(
 	void)
 {
-	lruv_idle(bss_004d1198.cache);
+	lruv_idle(xbox_texture_cache_globals.cache);
 
 	return;
 }
@@ -313,6 +311,47 @@ void texture_cache_bitmap_delete(
 	return;
 }
 
+void *texture_cache_steal_memory(
+	long size)
+{
+	long page_count = size / XBOX_TEXTURE_CACHE_PAGE_SIZE + 1;
+	long remaining_page_count =
+		XBOX_TEXTURE_CACHE_STEALABLE_PAGE_COUNT - page_count;
+	byte *base_address =
+		(byte *)physical_memory_get_texture_cache_base_address() +
+		remaining_page_count * XBOX_TEXTURE_CACHE_PAGE_SIZE;
+	long stolen_size = page_count * XBOX_TEXTURE_CACHE_PAGE_SIZE;
+	byte *end_guard_address =
+		base_address + XBOX_TEXTURE_CACHE_STEAL_GUARD_SIZE + stolen_size;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\xbox_texture_cache.c",
+		0x13F,
+		remaining_page_count>0);
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\xbox_texture_cache.c",
+		0x140,
+		!xbox_texture_cache_globals.stolen_memory);
+	lruv_resize(
+		xbox_texture_cache_globals.cache,
+		remaining_page_count);
+	XPhysicalProtect(
+		base_address + XBOX_TEXTURE_CACHE_STEAL_GUARD_SIZE,
+		stolen_size,
+		PAGE_READWRITE);
+	XPhysicalProtect(
+		base_address,
+		XBOX_TEXTURE_CACHE_STEAL_GUARD_SIZE,
+		PAGE_READONLY);
+	XPhysicalProtect(
+		end_guard_address,
+		XBOX_TEXTURE_CACHE_STEAL_GUARD_SIZE,
+		PAGE_READONLY);
+	xbox_texture_cache_globals.stolen_memory = TRUE;
+
+	return base_address + XBOX_TEXTURE_CACHE_STEAL_GUARD_SIZE;
+}
+
 void texture_cache_return_memory(
 	void)
 {
@@ -359,8 +398,8 @@ void texture_cache_new(
 		XBOX_TEXTURE_CACHE_PAGE_COUNT,
 		XBOX_TEXTURE_CACHE_PAGE_SIZE_BITS,
 		XBOX_TEXTURE_CACHE_PAGE_COUNT,
-		code_001ae880,
-		code_001ae840);
+		texture_cache_delete_block_proc,
+		texture_cache_locked_block_proc);
 	match_vassert(
 		"c:\\halo\\SOURCE\\cache\\xbox_texture_cache.c",
 		102,
@@ -392,7 +431,7 @@ void texture_cache_close(
 
 /* ---------- private code */
 
-void code_001ae880(
+static void texture_cache_delete_block_proc(
 	long block_index)
 {
 	struct xbox_texture_cache_texture *texture;

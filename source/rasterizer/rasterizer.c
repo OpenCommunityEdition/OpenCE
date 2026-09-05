@@ -692,7 +692,6 @@ struct rasterizer_globals_definition rasterizer_globals =
 	0,
 	{ 0 },
 	0,
-	0,
 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0 },
 	TRUE,
 	{ 0 },

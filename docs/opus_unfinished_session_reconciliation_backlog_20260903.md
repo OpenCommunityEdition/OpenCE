@@ -440,3 +440,26 @@ valid parks**. The general campaign next examines genuine Network Connection
 server-idle caller/helper topology and a Texture Cache source-owner repair.
 Neither scratch proposal is credited before full integration. Fable's active
 Network Server Manager and all other assigned files remain excluded.
+
+### Authentic counter schema and Texture Cache fuzzy leaf (2026-09-04)
+
+The shared Rasterizer/Main/Profile counter is now one real signed 64-bit
+vertical-blank index, proven by January ADD/ADC and qword consumers. The
+schema repair preserves all source-layout/runtime owners and every one of
+the 6,208 strict functions. It is correctness progress, not added byte credit.
+See `object_matching_logs/rasterizer_main_profile_vblank64_schema_20260904.md`.
+
+Texture Cache's operational state no longer uses a fabricated 0x1600 prefix.
+Its real 16-byte state is naturally owned, the delete callback has an
+authenticated private name, and the complete public memory-steal path is
+retained as a 96.95652% fuzzy park (209 meaningful / 224 padded bytes).
+The preceding pointer-array owner stays deferred; inherited Bitmap/SDK and
+unwritten callback debt still preclude whole-object approval. All 13 prior
+exact functions survive the genuine symbol regeneration. See
+`object_matching_logs/xbox_texture_cache_obj_steal_memory_owner_reconciliation_20260904.md`.
+
+Combined full build/stable sweep: zero strict regressions; 288 tests plus 26
+subtests pass; 268 valid parks. Totals remain 902,009 meaningful code bytes,
+6,162 credited functions, 2,028,747 data bytes and 391/833 Matching objects.
+Network Connection is still a separately audited scratch proposal. Fable's
+active lane and every reserved implementation remain untouched.
