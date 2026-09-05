@@ -51,9 +51,9 @@ boolean network_connection_read(
 boolean network_connection_write(
 	struct network_connection *connection,
 	void *message,
-	word message_size,
-	struct transport_address *address,
-	long flags);
+	word buffer_size,
+	struct transport_address *dest_address,
+	boolean reliable);
 boolean network_connection_idle(
 	struct network_connection *connection,
 	long timeout,

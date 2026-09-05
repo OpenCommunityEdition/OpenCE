@@ -4890,6 +4890,25 @@
         },
         "objdiff_percent": 99.26966
       }
+    },
+    {
+      "unit": "source/networking/network_connection",
+      "function": "_network_connection_write",
+      "class": "unclassified",
+      "evidence": "Natural typed reconstruction of the last unwritten NetworkConnection owner from the complete January body and the frozen Pastudan semantic reconstruction. It validates the generic header-first packet, swaps from the named host byte order, dispatches server datagrams, reliable stream writes and ordinary unreliable writes, retains January's single positive partial-write success rule, traffic log and counters, and returns the target boolean outcomes. Target/candidate meaningful sizes are 802/772 and padded sizes are 816/784. Candidate has 59 relocations versus target 60; the only missing identity is one traffic-notification call because VC7 coalesces the two normal-unreliable notification tails. Other differences are natural error/success branch orientation, early-return layout, endpoint_connected AL versus current long-returning owner EAX, and constant selected-owner topology. All 22 inherited owners are byte/relocation-identical, all 11 inherited exacts remain exact, the only new code owner is the target function, all 8 new literals are target-owned, and there is no new candidate-only non-code/COMMON/point_from_line3d owner. No alternate control spellings, narrowing casts, fake branches, register/volatile steering, pragmas, assembly, raw packet offsets or helper anchors were tried. Reopen only for authoritative source or genuine owner-prototype/compiler-context evidence. See docs/object_matching_logs/network_connection_obj_write_natural_boundary_20260904.md.",
+      "measurements": {
+        "target": {
+          "size": 816,
+          "relocation_count": 60,
+          "normalized_sha256": "3ab29726ced2524439c488e5d3b8442130baeec0ce4a86deae89ab50559822f6"
+        },
+        "base": {
+          "size": 784,
+          "relocation_count": 59,
+          "normalized_sha256": "9a5c37ee266f90e94139446b81189e71eed5b386616ab2d00fc7637eee6770c6"
+        },
+        "objdiff_percent": 74.261536
+      }
     }
   ]
 }

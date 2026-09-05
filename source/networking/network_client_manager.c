@@ -1199,14 +1199,14 @@ boolean network_game_client_write(
 	message_header *message,
 	word message_size,
 	struct transport_address *address,
-	long flags)
+	boolean reliable)
 {
 	return network_connection_write(
 		connection,
 		message,
 		message_size,
 		address,
-		flags);
+		reliable);
 }
 
 boolean network_game_client_idle(

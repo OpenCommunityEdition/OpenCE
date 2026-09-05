@@ -54,6 +54,11 @@ long write_endpoint(
 	struct transport_endpoint *endpoint,
 	void const *buffer,
 	long size);
+long write_to_endpoint(
+	struct transport_endpoint *endpoint,
+	void const *buffer,
+	long length,
+	struct transport_address const *destination_address);
 boolean endpoint_readable(
 	struct transport_endpoint *endpoint,
 	word timeout);

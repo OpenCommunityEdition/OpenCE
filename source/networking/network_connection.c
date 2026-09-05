@@ -794,6 +794,163 @@ void network_server_allow_client_connections(
 	return;
 }
 
+boolean network_connection_write(
+	struct network_connection *connection,
+	void *message,
+	word buffer_size,
+	struct transport_address *dest_address,
+	boolean reliable)
+{
+	message_header *header = message;
+	long result = 0;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_connection.c",
+		0x170,
+		message);
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_connection.c",
+		0x171,
+		buffer_size);
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_connection.c",
+		0x172,
+		connection);
+	match_vassert(
+		"c:\\halo\\SOURCE\\networking\\network_connection.c",
+		0x174,
+		GET_MESSAGE_SIZE(*header) == buffer_size,
+		"bad message or buffer_size parameter");
+
+	byte_swap_message_header(header, _message_header_byte_order_host);
+
+	if (TEST_FLAG(connection->flags, _connection_create_server_bit))
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\networking\\network_connection.c",
+			0x17B,
+			!reliable);
+		match_assert(
+			"c:\\halo\\SOURCE\\networking\\network_connection.c",
+			0x17C,
+			dest_address);
+		if (buffer_size > DATAGRAM_MAXIMUM_SIZE)
+		{
+			error(
+				_error_silent,
+				"buffer size was %d max is %d",
+				buffer_size,
+				DATAGRAM_MAXIMUM_SIZE);
+			match_assert(
+				"c:\\halo\\SOURCE\\networking\\network_connection.c",
+				0x182,
+				buffer_size <= DATAGRAM_MAXIMUM_SIZE);
+		}
+		result = write_to_endpoint(
+			connection->unreliable_endpoint,
+			message,
+			buffer_size,
+			dest_address);
+		network_connection_notify_traffic_event(
+			_network_connection_traffic_event_datagram_sent,
+			buffer_size,
+			connection);
+	}
+	else if (reliable)
+	{
+		long bytes_written;
+
+		match_vassert(
+			"c:\\halo\\SOURCE\\networking\\network_connection.c",
+			0x18E,
+			buffer_size <= RELIABLE_MESSAGE_MAXIMUM_SIZE,
+			"message size exceeds maximum allowed size");
+		match_assert(
+			"c:\\halo\\SOURCE\\networking\\network_connection.c",
+			0x190,
+			(connection->flags&FLAG(_connection_create_clientside_client_bit)) ||
+			(connection->flags&FLAG(_connection_create_serverside_client_bit)));
+
+		do
+		{
+			bytes_written = write_endpoint(
+				connection->reliable_endpoint,
+				message,
+				buffer_size);
+		}
+		while (bytes_written == _transport_result_operation_would_block);
+
+		if (bytes_written > 0)
+		{
+			result = TRUE;
+			if (connection->traffic_log)
+			{
+				double elapsed_seconds =
+					(double)(system_milliseconds() - connection->traffic_log_start_time) / 1000.0;
+
+				fprintf(
+					connection->traffic_log,
+					"%g\t%ld\t%ld\t%ld\t%ld\n",
+					elapsed_seconds,
+					0,
+					0,
+					bytes_written,
+					0);
+				fflush(connection->traffic_log);
+			}
+			connection->stream_messages_sent++;
+		}
+		else
+		{
+			error(
+				_error_silent,
+				"client call to write_endpoint() returned error '%s'",
+				transport_error_to_string((short)bytes_written));
+		}
+	}
+	else
+	{
+		if (!connection->unreliable_endpoint)
+		{
+			return TRUE;
+		}
+
+		match_vassert(
+			"c:\\halo\\SOURCE\\networking\\network_connection.c",
+			0x1B0,
+			buffer_size <= DATAGRAM_MAXIMUM_SIZE,
+			"message size exceeds maximum allowed size");
+		if (!dest_address)
+		{
+			if (endpoint_connected(connection->unreliable_endpoint))
+			{
+				write_endpoint(
+					connection->unreliable_endpoint,
+					message,
+					buffer_size);
+				network_connection_notify_traffic_event(
+					_network_connection_traffic_event_datagram_sent,
+					buffer_size,
+					connection);
+			}
+			return TRUE;
+		}
+
+		write_to_endpoint(
+			connection->unreliable_endpoint,
+			message,
+			buffer_size,
+			dest_address);
+		network_connection_notify_traffic_event(
+			_network_connection_traffic_event_datagram_sent,
+			buffer_size,
+			connection);
+		return TRUE;
+	}
+
+	return !reliable || result > 0;
+}
+
 static struct network_connection *network_connection_new_serverside_client(
 	struct transport_endpoint *reliable_endpoint)
 {

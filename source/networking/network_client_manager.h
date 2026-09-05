@@ -58,7 +58,7 @@ boolean network_game_client_write(
 	word *message,
 	word message_size,
 	struct transport_address *address,
-	long flags);
+	boolean reliable);
 boolean network_game_client_idle(
 	struct network_game_client *client);
 boolean network_game_client_add_player(

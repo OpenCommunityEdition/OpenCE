@@ -510,3 +510,21 @@ remains unchanged. Verified totals are **904,719 meaningful code bytes**,
 **6,167 credited functions**, **2,028,748 data bytes**, and **391/833 Matching
 objects**. Network write is still separate scratch research. Fable's active
 lane and every reserved implementation remain excluded pending user handoff.
+
+### Network write: final unwritten source gap filled (2026-09-04)
+
+The general campaign retains the complete natural Network Connection write
+path through its proper public API, the real Transport Endpoint declaration,
+and the boolean client wrapper. The three-header full build preserves all
+6,213 strict owners with zero regressions. Network Connection now has
+**11 exact / 12 residual / zero unwritten functions**; write is an honest
+**74.261536% unclassified fuzzy park**, not additional exact-byte credit.
+See `object_matching_logs/network_connection_obj_write_natural_boundary_20260904.md`.
+
+All 288 tests plus 26 subtests pass, 271 parks validate, and admission remains
+unchanged. Published-byte accounting stays 904,719 meaningful code bytes,
+6,167 credited functions, 2,028,748 data bytes and 391/833 Matching objects.
+Older Profile dump/comparator work is separately being researched. The small
+Transport server lifecycle pair is a new general-campaign candidate; neither
+scratch proposal is credited or included here. Fable reservations remain in
+force, including Network Server Manager.
