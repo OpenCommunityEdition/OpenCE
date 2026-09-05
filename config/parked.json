@@ -4814,6 +4814,25 @@
         },
         "objdiff_percent": 99.08602
       }
+    },
+    {
+      "unit": "source/units/bipeds",
+      "function": "_biped_adjust_placement",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after restoring the complete typed placement correction in ordinary C. The retained public function obtains the biped and its definition through the owning typed accessors, applies the named pill-centered-at-origin and non-flying flag predicates, loads the semantic collision_radius field, and adds up*radius to all three placement-position components. January disassembly independently confirms those flags, offsets, direct component arithmetic, and the two call relocations; the later HCEA implementation and independent Stian/Pastudan lifts corroborate the behavior. Target and candidate are both 96 padded / 88 meaningful bytes with the same two relocation identities and objdiff reports 98.3871 percent. The only emitted-code difference is the equivalent choice of ECX in January versus EAX in the candidate for the data pointer across the three coordinate updates. The fail-closed classifier returns UNKNOWN, so no compiler recipe or exact credit is claimed. No declaration-order search, register/volatile forcing, barrier, pragma, assembly, raw offset, fake dependency, forced inline, undefined behavior, nonsensical branch, extra code/data/COMMON owner, or point_from_line3d COMDAT is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining the pointer-register allocation.",
+      "measurements": {
+        "target": {
+          "size": 96,
+          "relocation_count": 2,
+          "normalized_sha256": "41db59000f9eb782eedfa45b2457e16898749fd2a3bc25a0e687c762181a40d4"
+        },
+        "base": {
+          "size": 96,
+          "relocation_count": 2,
+          "normalized_sha256": "5fb478d5414138003fa6ec1126c191fe0383f3c68c42523b28e455dd62e39f10"
+        },
+        "objdiff_percent": 98.3871
+      }
     }
   ]
 }

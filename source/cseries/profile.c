@@ -353,7 +353,7 @@ struct profile_globals
 {
 	__int64 timebase_frequency;
 	short stack_depth;
-	boolean initialized;
+	boolean initialization_pending;
 	long history_index;
 	short section_count;
 	struct profile_section* sections[MAXIMUM_PROFILE_SECTIONS];
@@ -587,7 +587,7 @@ void profile_initialize(
 	profile_global_enable = TRUE;
 	profile_globals.section_count = 0;
 	profile_globals.stack_depth = 0;
-	profile_globals.initialized = TRUE;
+	profile_globals.initialization_pending = TRUE;
 	profile_globals.history_index = 0;
 	profile_globals.current_frame_history_count = 0;
 	profile_globals.current_frame_history_index = 0;
@@ -719,6 +719,54 @@ void profile_idle_end(
 	return;
 }
 
+void profile_enter_private(
+	struct profile_section *section)
+{
+	__int64 timebase;
+
+	find_profile_section(section);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\cseries\\profile.c",
+		597,
+		section->stack_depth==NONE);
+
+	profile_globals.stack_depth++;
+	section->stack_depth = profile_globals.stack_depth;
+	QUERY_TIMEBASE(timebase);
+	section->entry_timebase = timebase;
+	section->frame_call_count++;
+
+	return;
+}
+
+void profile_exit_private(
+	struct profile_section *section)
+{
+	__int64 timebase;
+
+	if (!profile_globals.initialization_pending)
+	{
+		find_profile_section(section);
+
+		match_assert(
+			"c:\\halo\\SOURCE\\cseries\\profile.c",
+			615,
+			section->stack_depth==profile_globals.stack_depth);
+
+		profile_globals.stack_depth--;
+		QUERY_TIMEBASE(timebase);
+		section->frame_elapsed_timebase += timebase-section->entry_timebase;
+		section->stack_depth = NONE;
+	}
+	else
+	{
+		section->stack_depth = NONE;
+	}
+
+	return;
+}
+
 /* ---------- private code */
 
 void code_0007dd20(
@@ -736,27 +784,27 @@ void code_0007dd20(
 			{
 				section->field_20 -= section->field_208[profile_globals.history_index];
 				section->field_18 -= section->field_28[profile_globals.history_index];
-				section->field_208[profile_globals.history_index] = section->field_5D0;
-				section->field_28[profile_globals.history_index] = section->field_5CC;
-				section->field_20 += section->field_5D0;
-				section->field_18 += section->field_5CC;
+				section->field_208[profile_globals.history_index] = section->frame_elapsed_timebase;
+				section->field_28[profile_globals.history_index] = section->frame_call_count;
+				section->field_20 += section->frame_elapsed_timebase;
+				section->field_18 += section->frame_call_count;
 
-				if (section->field_5D0>section->field_5F0)
-					section->field_5F0 = section->field_5D0;
-				if (section->field_5CC>section->field_5E8)
-					section->field_5E8 = section->field_5CC;
+				if (section->frame_elapsed_timebase>section->field_5F0)
+					section->field_5F0 = section->frame_elapsed_timebase;
+				if (section->frame_call_count>section->field_5E8)
+					section->field_5E8 = section->frame_call_count;
 
-				section->field_5E0 += section->field_5D0;
-				section->field_5D8 += section->field_5CC;
-				section->field_5D0 = 0;
-				section->field_5CC = 0;
+				section->field_5E0 += section->frame_elapsed_timebase;
+				section->field_5D8 += section->frame_call_count;
+				section->frame_elapsed_timebase = 0;
+				section->frame_call_count = 0;
 				section->field_5C8++;
 			}
 		}
 	}
 
 	profile_globals.history_index = (profile_globals.history_index+1)%MAXIMUM_PROFILE_HISTORY;
-	profile_globals.initialized = FALSE;
+	profile_globals.initialization_pending = FALSE;
 
 	return;
 }
@@ -790,8 +838,8 @@ void find_profile_section(
 		section->field_20 = 0;
 		section->stack_depth = NONE;
 		section->field_5C8 = 0;
-		section->field_5D0 = 0;
-		section->field_5CC = 0;
+		section->frame_elapsed_timebase = 0;
+		section->frame_call_count = 0;
 		section->field_5E0 = 0;
 		section->field_5D8 = 0;
 		section->field_5F0 = 0;

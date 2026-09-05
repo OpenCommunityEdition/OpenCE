@@ -375,3 +375,32 @@ credible source and evidence are preserved in
 All attempted header changes were restored, with a whole-tree zero-regression
 rebuild before the public-leaf admission. Neither withheld packet contributes
 to the totals above. Active Fable ownership remains excluded.
+
+### Profile entry/exit with real HS ownership: 901,631 bytes (2026-09-04)
+
+The next selective older-Opus packet admits `profile_enter_private` and
+`profile_exit_private`: **+263 meaningful / 288 padded exact bytes**, two
+functions, zero inherited exact regressions. Proper integration removes HS's
+incompatible duplicate Profile type and local declarations, uses the owning
+header/macros, and removes 23 unintended consumer COMMON allocations for
+`profile_global_enable`. Profile alone owns that BSS byte. Four descriptive
+member renames are explicitly identified as semantic inferences, not recovered
+original spellings. See
+`object_matching_logs/profile_obj_enter_exit_owner_reconciliation_20260904.md`.
+
+The full header blast passes. Profile is **28E/0R/16U**, HS retains **445
+exact functions**, Units retains **189 exact target functions**, and the whole
+stable sweep reaches **6,205 exact owners**. Current verified totals are
+**901,631 meaningful credited code bytes**, **6,159 credited functions**,
+**2,028,615 credited data bytes**, and **391/833 Matching objects**. This
+continues selective reconciliation; it does not close all older-lane work,
+the separately pending Opus intake, or any withheld ownership dependency.
+The active new Fable assignments remain excluded until user handoff.
+
+The same publication also retains the general-campaign Biped placement leaf
+as a complete typed **98.3871% fuzzy park**, not exact progress. Its 96-byte
+target differs only in the placement-pointer register; one natural source
+form was retained without tuning. The final combined whole-tree snapshot is
+`scratch/profile-biped-final-20260904.json`, still 6,205 strict owners with
+zero regressions, and **267 parks** now validate. See
+`object_matching_logs/bipeds_obj_adjust_placement_fuzzy_20260904.md`.

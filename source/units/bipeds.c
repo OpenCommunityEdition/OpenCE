@@ -484,6 +484,26 @@ boolean biped_flying_through_air(
 		TEST_FLAG(biped->object.damage_flags, _object_dead_bit));
 }
 
+void biped_adjust_placement(
+	long biped_index,
+	struct object_placement_data *data)
+{
+	struct biped_datum *biped = biped_get(biped_index);
+	struct biped_definition *definition = biped_definition_get(biped->definition_index);
+
+	if (TEST_FLAG(definition->biped.flags, _biped_pill_centered_at_origin_bit) &&
+		!TEST_FLAG(definition->biped.flags, _biped_flying_bit))
+	{
+		real height_offset = definition->biped.collision_radius;
+
+		data->position.x += data->up.i * height_offset;
+		data->position.y += data->up.j * height_offset;
+		data->position.z += data->up.k * height_offset;
+	}
+
+	return;
+}
+
 void biped_export_function_values(
 	long biped_index)
 {

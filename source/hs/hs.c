@@ -2770,6 +2770,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/profile.h"
 #include "camera/director.h"
 #include "cache/sound_cache.h"
 #include "hs.h"
@@ -3344,19 +3345,6 @@ struct hs_external_global_definition
 	short type;
 };
 
-struct hs_profile_section
-{
-	char const *name;
-	long section_index;
-	boolean active;
-	short stack_depth;
-	long field_C;
-	unsigned __int64 field_10;
-	byte unknown18[1460];
-	long field_5CC;
-	byte unknown5D0[40];
-};
-
 struct hud_globals_definition
 {
 	byte reserved_000[0x160];
@@ -3385,7 +3373,7 @@ typedef void (*hs_token_enumerator)(
 struct hs_function_table_storage
 {
 	struct hs_function_definition *functions[418];
-	struct hs_profile_section profile;
+	struct profile_section profile;
 	hs_token_enumerator token_enumerators[18];
 };
 
@@ -3555,10 +3543,6 @@ union hs_boolean_result
 
 /* ---------- prototypes */
 
-void profile_enter_private(
-	struct hs_profile_section *section);
-void profile_exit_private(
-	struct hs_profile_section *section);
 void console_printf(
 	boolean clear,
 	char const *format,
@@ -4475,7 +4459,6 @@ byte bss_00453468[0x12] = { 0 };
 #define hs_token_enumerators hs_function_table.token_enumerators
 struct data_array *hs_syntax_data;
 extern long global_scenario_index;
-extern boolean profile_global_enable;
 extern struct hs_function_table_storage hs_function_table;
 extern short hs_external_global_count;
 extern struct hs_external_global_definition *hs_external_globals[];
@@ -4821,11 +4804,9 @@ boolean hs_rebuild_source(
 void hs_update(
 	void)
 {
-	if (profile_global_enable && hs_function_table.profile.active)
-		profile_enter_private(&hs_function_table.profile);
+	profile_enter(hs_function_table.profile);
 	hs_runtime_update();
-	if (profile_global_enable && hs_function_table.profile.active)
-		profile_exit_private(&hs_function_table.profile);
+	profile_exit(hs_function_table.profile);
 	return;
 }
 

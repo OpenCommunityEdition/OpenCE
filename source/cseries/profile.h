@@ -36,15 +36,15 @@ struct profile_section
 	boolean active;
 	short stack_depth;
 	long field_C;
-	unsigned __int64 field_10;
+	unsigned __int64 entry_timebase;
 	long field_18;
 	byte reserved1C[4];
 	__int64 field_20;
 	long field_28[MAXIMUM_PROFILE_HISTORY];
 	__int64 field_208[MAXIMUM_PROFILE_HISTORY];
 	long field_5C8;
-	long field_5CC;
-	__int64 field_5D0;
+	long frame_call_count;
+	__int64 frame_elapsed_timebase;
 	long field_5D8;
 	byte reserved5DC[4];
 	__int64 field_5E0;
@@ -67,10 +67,10 @@ typedef char profile_section_field_208_offset_assert[
 	offsetof(struct profile_section, field_208) == 0x208 ? 1 : -1];
 typedef char profile_section_field_5C8_offset_assert[
 	offsetof(struct profile_section, field_5C8) == 0x5C8 ? 1 : -1];
-typedef char profile_section_field_5CC_offset_assert[
-	offsetof(struct profile_section, field_5CC) == 0x5CC ? 1 : -1];
-typedef char profile_section_field_5D0_offset_assert[
-	offsetof(struct profile_section, field_5D0) == 0x5D0 ? 1 : -1];
+typedef char profile_section_frame_call_count_offset_assert[
+	offsetof(struct profile_section, frame_call_count) == 0x5CC ? 1 : -1];
+typedef char profile_section_frame_elapsed_timebase_offset_assert[
+	offsetof(struct profile_section, frame_elapsed_timebase) == 0x5D0 ? 1 : -1];
 typedef char profile_section_field_5D8_offset_assert[
 	offsetof(struct profile_section, field_5D8) == 0x5D8 ? 1 : -1];
 typedef char profile_section_reserved5DC_offset_assert[
@@ -93,8 +93,10 @@ void profile_tick_start(
 void profile_tick_end(
 	void);
 
-void profile_enter_private(struct profile_section *objects_update_section);
-void profile_exit_private(struct profile_section *objects_update_section);
+void profile_enter_private(
+	struct profile_section *section);
+void profile_exit_private(
+	struct profile_section *section);
 
 void profile_render_window_start(void *arg0);
 void profile_render_window_end(void);
@@ -117,9 +119,6 @@ extern boolean profile_timebase_ticks;
 extern boolean profile_global_enable;
 extern boolean profile_dump_frames;
 extern boolean profile_dump_lost_frames;
-
-/* comm */
-boolean profile_global_enable;
 
 /* ---------- public code */
 
