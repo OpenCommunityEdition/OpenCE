@@ -117,6 +117,11 @@ enum
 
 /* ---------- structures */
 
+struct server_transport_globals
+{
+	boolean initialized;
+};
+
 struct transport_endpoint;
 
 struct transport_endpoint_set
@@ -157,6 +162,7 @@ static int __cdecl transport_endpoint_set_compare_entries(
 boolean transport_initialized = FALSE;
 boolean global_client_active = FALSE;
 long global_key_depth = 0;
+struct server_transport_globals server_transport_globals;
 extern XNADDR global_address;
 extern XNKID global_key_id;
 extern XNKEY global_key;
@@ -252,6 +258,32 @@ void transport_client_stop(
 		global_client_active = FALSE;
 	}
 	return;
+}
+
+short transport_server_initialize(
+	void)
+{
+	XNKEY key;
+	XNKID key_id;
+
+	transport_client_stop();
+	match_assert(
+		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+		0x79,
+		0 == global_key_depth);
+	server_transport_globals.initialized = TRUE;
+	XNetCreateKey(&key_id, &key);
+	transport_push_key(&key, &key_id);
+	return _transport_error_none;
+}
+
+short transport_server_terminate(
+	void)
+{
+	transport_client_stop();
+	transport_pop_key();
+	memset(&server_transport_globals, 0, sizeof(server_transport_globals));
+	return _transport_error_none;
 }
 
 boolean transport_network_available(

@@ -23,6 +23,10 @@ header included in hcex build.
 
 void transport_client_stop(
 	void);
+short transport_server_initialize(
+	void);
+short transport_server_terminate(
+	void);
 XNADDR *transport_get_xnaddr(
 	XNADDR *address);
 XNKID transport_get_key_id(

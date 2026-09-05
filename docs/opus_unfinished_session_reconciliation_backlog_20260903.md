@@ -528,3 +528,23 @@ Older Profile dump/comparator work is separately being researched. The small
 Transport server lifecycle pair is a new general-campaign candidate; neither
 scratch proposal is credited or included here. Fable reservations remain in
 force, including Network Server Manager.
+
+### Transport server lifecycle pair: 905,027 bytes (2026-09-05)
+
+The general campaign adds the two small, genuine server lifecycle functions
+through the existing Winsock owner header: **308 meaningful / 320 padded exact
+bytes**, two functions. The complete one-byte server-global allocation is a
+natural tentative COMMON, supported by the all-object reference census and
+linked owner; its source compiland attribution remains explicitly inferred.
+No new data byte or whole-object completion is claimed. The unit reaches
+**16 exact / 6 residual / 4 unwritten**.
+See `object_matching_logs/transport_endpoint_set_winsock_obj_server_lifecycle_pair_20260905.md`.
+
+Independent source/ownership review, the actual canonical gate, full Ninja,
+and the stable 8,245-owner sweep all pass: **6,215 strict owners**, two gains,
+zero regressions. All 288 tests plus 26 subtests pass; 271 parks validate;
+admission remains unchanged. Verified totals are **905,027 meaningful code
+bytes**, **6,169 credited functions**, **2,028,748 data bytes**, and **391/833
+Matching objects**. Older Profile dump/comparator reconciliation is still a
+separate scratch proposal pending genuine header/consumer verification.
+The active Fable lane and every reserved implementation remain excluded.
