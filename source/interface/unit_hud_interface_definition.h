@@ -35,6 +35,13 @@ enum unit_hud_sound_state
 	NUMBER_OF_UNIT_HUD_STATES
 };
 
+enum auxilary_overlay_use_team_color_flags
+{
+	_auxilary_overlay_use_team_color_bit = 0,
+
+	NUMBER_OF_UNIT_AUXILARY_OVERLAY_FLAGS
+};
+
 /* ---------- macros */
 
 #define unit_hud_interface_definition_get(index) \
@@ -167,6 +174,23 @@ struct auxilary_panel_definition
 	long unused[4];
 };
 
+struct auxilary_overlay_definition
+{
+	struct static_hud_element_definition static_element;
+	short type;
+	word flags;
+	long unused0[6];
+};
+
+struct auxilary_meter_definition
+{
+	short type;
+	short pad;
+	long unused0[4];
+	struct metered_panel_definition panel;
+	long unused1[16];
+};
+
 struct unit_hud_interface_definition
 {
 	struct hud_absolute_placement_definition absolute_placement;
@@ -200,6 +224,16 @@ typedef char motion_sensor_panel_definition_size_assert[
 	sizeof(struct motion_sensor_panel_definition) == 0xF0 ? 1 : -1];
 typedef char auxilary_panel_definition_size_assert[
 	sizeof(struct auxilary_panel_definition) == 0x40 ? 1 : -1];
+typedef char auxilary_overlay_definition_type_offset_assert[
+	offsetof(struct auxilary_overlay_definition, type) == 0x68 ? 1 : -1];
+typedef char auxilary_overlay_definition_flags_offset_assert[
+	offsetof(struct auxilary_overlay_definition, flags) == 0x6A ? 1 : -1];
+typedef char auxilary_overlay_definition_size_assert[
+	sizeof(struct auxilary_overlay_definition) == 0x84 ? 1 : -1];
+typedef char auxilary_meter_definition_panel_offset_assert[
+	offsetof(struct auxilary_meter_definition, panel) == 0x14 ? 1 : -1];
+typedef char auxilary_meter_definition_size_assert[
+	sizeof(struct auxilary_meter_definition) == 0x144 ? 1 : -1];
 typedef char unit_hud_interface_definition_warning_sounds_offset_assert[
 	offsetof(struct unit_hud_interface_definition, warning_sounds) == 0x3C0 ? 1 : -1];
 typedef char unit_hud_interface_definition_auxilary_meters_offset_assert[

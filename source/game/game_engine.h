@@ -395,7 +395,7 @@ boolean game_engine_draw_object_in_motion_sensor(
 	void);
 
 boolean game_engine_hud_draw_motion_sensor(
-	void);
+	long player_index);
 
 boolean game_engine_player_has_stealth_weapon(
 	long player_index);

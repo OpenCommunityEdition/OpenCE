@@ -214,6 +214,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cseries/errors.h"
+#include "main/main_runtime.h"
 #include "rasterizer.h"
 #include "rasterizer_geometry.h"
 #include "rasterizer_xbox_draw_primitives.h"
@@ -239,6 +240,7 @@ symbols in this file:
  * code_0014e220 = IDirect3DIndexBuffer8_Unlock
  */
 #include <xtl.h>
+#include "rasterizer_xbox.h"
 
 /* ---------- constants */
 
@@ -331,12 +333,6 @@ struct rasterizer_draw_primitives_frame_statistics_prefix
 	long dynamic_triangle_buffer_count;
 };
 
-struct rasterizer_draw_primitives_window_parameters_prefix
-{
-	byte reserved00[2];
-	short window_index;
-};
-
 typedef char dynamic_vertex_group_size_assert[
 	sizeof(struct dynamic_vertex_group) == 0x14 ? 1 : -1];
 typedef char dynamic_vertex_buffer_size_assert[
@@ -348,23 +344,14 @@ typedef char rasterizer_triangle_size_assert[
 
 /* ---------- prototypes */
 
-void rasterizer_error(
-	long error_result,
-	char const *format,
-	...);
-
-short main_get_window_count(
-	void);
-
 static D3DVertexBuffer *dynamic_vertex_group_get_d3d_vertex_buffer(
 	struct dynamic_vertex_group const *group);
 
 /* ---------- globals */
 
-extern D3DDevice *global_d3d_device;
 extern struct rasterizer_draw_primitives_debug_options_prefix rasterizer_debug_options;
 extern struct rasterizer_draw_primitives_frame_statistics_prefix rasterizer_frame_statistics;
-extern struct rasterizer_draw_primitives_window_parameters_prefix global_window_parameters;
+extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 static D3DPRIMITIVETYPE const d3d_primitive_type_table[NUMBER_OF_TRIANGLE_BUFFER_TYPES] =
 {

@@ -4325,7 +4325,7 @@ boolean game_engine_draw_object_in_motion_sensor(
 }
 
 boolean game_engine_hud_draw_motion_sensor(
-	void)
+	long player_index)
 {
 	boolean draw_motion_sensor = TRUE;
 
