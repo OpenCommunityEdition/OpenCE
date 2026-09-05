@@ -46,6 +46,8 @@ if (profile_global_enable && section.active)	\
 
 /* ---------- structures */
 
+struct profile_frame_iterator;
+
 struct profile_section
 {
 	const char *name;
@@ -126,6 +128,15 @@ void profile_frame_start(
 	void);
 void profile_frame_end(
 	void);
+short profile_find_frame_value(
+	const char *name,
+	short *section_index_reference);
+real profile_frame_get_value(
+	struct profile_frame_iterator *iterator,
+	short frame_value,
+	short section_index);
+void profile_seconds_elapsed(
+	real seconds);
 void profile_texture_start(
 	void);
 void profile_texture_end(

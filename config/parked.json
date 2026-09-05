@@ -2,6 +2,25 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/cseries/profile",
+      "function": "_profile_frame_get_value",
+      "class": "unclassified",
+      "evidence": "Complete natural older Opus frame-value getter reconciled with January's three-argument public real-return API, private frame-value enum, true real seconds_elapsed field and setter, and owning profile.h declarations. Target/candidate are928 padded bytes/50 relocations; the sole residual region is the render0_3np loop's ordinary window-count/player-count register and load/add schedule. All cases, including zero results for game1..7/player1..3 and the unused caller-proven third section_index parameter, follow January. No source-shape search, register/lifetime steering, raw offsets, representation pun, fake inline control, anchors, or extra code owners. All35 inherited exact Profile functions and2 parks are retained; the independent parser is strict1072 padded/1063 meaningful bytes. The natural owning-header build covers25 direct consumers, Units remains189/189, and the full stable sweep gains one exact owner without losses. Pooled idle literal has compatible selected target/base ownership and receives no target-owned data credit. Reopen only for authentic source/type/compiler context, not schedule variants. See docs/object_matching_logs/profile_obj_frame_value_getters_natural_boundary_20260905.md.",
+      "measurements": {
+        "target": {
+          "size": 928,
+          "relocation_count": 50,
+          "normalized_sha256": "34007f52073a5931791a093800b82b1569907d4fe1c5f5dd5333df7ecaacf121"
+        },
+        "base": {
+          "size": 928,
+          "relocation_count": 50,
+          "normalized_sha256": "4e64455e0b5ef659900eee87601b7c65210340e95655975ca17cc2c4ffa461e6"
+        },
+        "objdiff_percent": 90.12195
+      }
+    },
+    {
       "unit": "source/bungie_net/network/transport_endpoint_winsock",
       "function": "_write_to_endpoint",
       "class": "unclassified",

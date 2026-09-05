@@ -595,3 +595,27 @@ functions**, **2,028,764 data bytes**, and **391/833 Matching objects**.
 Older Profile getter reconstruction remains a separate uncredited scratch
 packet with its real public API/seconds-elapsed field dependency. All Fable
 reservations remain excluded.
+
+### Older Opus Profile getters reconciled: 906,391 bytes (2026-09-05)
+
+The complete natural parser/getter packet passes its genuine owning-header
+boundary, including the corrected real seconds-elapsed field/setter and the
+caller-proven three-argument real-return API. The parser gains **1,063 meaningful
+/1,072 padded exact code bytes**; the getter is retained as a **90.12195%**
+fuzzy park. Profile reaches **36E/3R/5U**. Its remaining five helper copies
+have no genuine out-of-line callers and were not forced into the object.
+See `object_matching_logs/profile_obj_frame_value_getters_natural_boundary_20260905.md`.
+
+All25 header consumers were rebuilt and compared to frozen pre-edit binaries.
+The only collateral metadata changes are324 compiler-local labels shifted+16;
+all runtime bytes, relocation destinations, real owners and COMMONs are
+unchanged. Units remains189/189; full stable sweep has **6,217 strict owners**,
+one gain and zero regressions. All288 tests plus26 subtests pass,275 parks
+validate, and admission remains unchanged.
+
+The **+2,104 data credit** is the now-complete merged Profile read-only section,
+not2,104 newly emitted bytes: the physical additions are215B. Isolated reports
+show that section rising89.350914%->100%; no unrelated gain is needed.
+Verified totals are **906,391 meaningful code bytes**, **6,171 credited
+functions**, **2,030,868 matched data bytes**, and **391/833 Matching objects**.
+No whole-Profile completion is claimed. Fable reservations remain excluded.

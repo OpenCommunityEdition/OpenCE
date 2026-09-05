@@ -286,6 +286,40 @@ enum
 	MAXIMUM_PROFILE_WINDOWS = 4,
 };
 
+enum profile_frame_value
+{
+	_profile_frame_value_frame = 1,
+	_profile_frame_value_load,
+	_profile_frame_value_game0,
+	_profile_frame_value_game1,
+	_profile_frame_value_game2,
+	_profile_frame_value_game3,
+	_profile_frame_value_game4,
+	_profile_frame_value_game5,
+	_profile_frame_value_game6,
+	_profile_frame_value_game7,
+	_profile_frame_value_player0,
+	_profile_frame_value_player1,
+	_profile_frame_value_player2,
+	_profile_frame_value_player3,
+	_profile_frame_value_nonplayer,
+	_profile_frame_value_render0,
+	_profile_frame_value_render0_1,
+	_profile_frame_value_render0_2,
+	_profile_frame_value_render0_3,
+	_profile_frame_value_render0_3np,
+	_profile_frame_value_render,
+	_profile_frame_value_game_render,
+	_profile_frame_value_stall,
+	_profile_frame_value_texture,
+	_profile_frame_value_idle,
+	_profile_frame_value_dt,
+	_profile_frame_value_gpu,
+	_profile_frame_value_pushbuffer,
+
+	NUMBER_OF_PROFILE_FRAME_VALUES
+};
+
 /* ---------- macros */
 
 #define QUERY_TIMEBASE(timebase) \
@@ -324,7 +358,7 @@ struct profile_frame
 	struct profile_timer stall;
 	struct profile_timer texture;
 	struct profile_timer idle;
-	long seconds_elapsed;
+	real seconds_elapsed;
 	short lapsed_frames;
 	byte __unknown0F06[2];
 	long lapsed_msec;
@@ -623,6 +657,77 @@ void profile_lapsed_frames(
 	return;
 }
 
+short profile_find_frame_value(
+	const char *name,
+	short *section_index_reference)
+{
+	short frame_value = NONE;
+
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 1094,
+		name && section_index_reference);
+
+	if (!_stricmp(name, "frame"))
+		frame_value = _profile_frame_value_frame;
+	else if (!_stricmp(name, "load"))
+		frame_value = _profile_frame_value_load;
+	else if (!_stricmp(name, "game0"))
+		frame_value = _profile_frame_value_game0;
+	else if (!_stricmp(name, "game1"))
+		frame_value = _profile_frame_value_game1;
+	else if (!_stricmp(name, "game2"))
+		frame_value = _profile_frame_value_game2;
+	else if (!_stricmp(name, "game3"))
+		frame_value = _profile_frame_value_game3;
+	else if (!_stricmp(name, "game4"))
+		frame_value = _profile_frame_value_game4;
+	else if (!_stricmp(name, "game5"))
+		frame_value = _profile_frame_value_game5;
+	else if (!_stricmp(name, "game6"))
+		frame_value = _profile_frame_value_game6;
+	else if (!_stricmp(name, "game7"))
+		frame_value = _profile_frame_value_game7;
+	else if (!_stricmp(name, "player0"))
+		frame_value = _profile_frame_value_player0;
+	else if (!_stricmp(name, "player1"))
+		frame_value = _profile_frame_value_player1;
+	else if (!_stricmp(name, "player2"))
+		frame_value = _profile_frame_value_player2;
+	else if (!_stricmp(name, "player3"))
+		frame_value = _profile_frame_value_player3;
+	else if (!_stricmp(name, "nonplayer"))
+		frame_value = _profile_frame_value_nonplayer;
+	else if (!_stricmp(name, "render"))
+		frame_value = _profile_frame_value_render;
+	else if (!_stricmp(name, "render0"))
+		frame_value = _profile_frame_value_render0;
+	else if (!_stricmp(name, "render0_1"))
+		frame_value = _profile_frame_value_render0_1;
+	else if (!_stricmp(name, "render0_2"))
+		frame_value = _profile_frame_value_render0_2;
+	else if (!_stricmp(name, "render0_3"))
+		frame_value = _profile_frame_value_render0_3;
+	else if (!_stricmp(name, "render0_3np"))
+		frame_value = _profile_frame_value_render0_3np;
+	else if (!_stricmp(name, "game_render"))
+		frame_value = _profile_frame_value_game_render;
+	else if (!_stricmp(name, "stall"))
+		frame_value = _profile_frame_value_stall;
+	else if (!_stricmp(name, "texture"))
+		frame_value = _profile_frame_value_texture;
+	else if (!_stricmp(name, "idle"))
+		frame_value = _profile_frame_value_idle;
+	else if (!_stricmp(name, "dt"))
+		frame_value = _profile_frame_value_dt;
+	else if (!_stricmp(name, "gpu"))
+		frame_value = _profile_frame_value_gpu;
+	else if (!_stricmp(name, "pushbuffer"))
+		frame_value = _profile_frame_value_pushbuffer;
+
+	*section_index_reference = NONE;
+
+	return frame_value;
+}
+
 short profile_find_game_value(
 	const char *name,
 	short *section_index_reference)
@@ -632,6 +737,224 @@ short profile_find_game_value(
 	*section_index_reference = NONE;
 
 	return NONE;
+}
+
+real profile_frame_get_value(
+	struct profile_frame_iterator *iterator,
+	short frame_value,
+	short section_index)
+{
+	struct profile_frame *frame =
+		&profile_globals.frames[iterator->current_buffer_index];
+	real value = 0.0f;
+
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 1239,
+		(iterator->current_buffer_index >= 0) &&
+		(iterator->current_buffer_index < profile_globals.current_frame_history_count));
+	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 1240,
+		iterator->current_buffer_index != profile_globals.current_frame_history_index);
+
+	switch (frame_value)
+	{
+		case _profile_frame_value_frame:
+			value = frame->frame.total;
+			break;
+
+		case _profile_frame_value_load:
+			value = frame->frame.total-frame->idle.total;
+			break;
+
+		case _profile_frame_value_game0:
+			if (frame->game_tick_count>0)
+			{
+				value = frame->game_ticks[0].total;
+			}
+			break;
+
+		case _profile_frame_value_player0:
+			if (frame->window_count>0)
+			{
+				value = frame->windows[0].total;
+			}
+			break;
+
+		case _profile_frame_value_nonplayer:
+		{
+			short window_index;
+
+			for (window_index = 0;
+				window_index<frame->window_count;
+				window_index++)
+			{
+				if (!frame->window_ids[window_index])
+				{
+					value = frame->windows[window_index].total;
+					break;
+				}
+			}
+			break;
+		}
+
+		case _profile_frame_value_render:
+			value = frame->render.total;
+			break;
+
+		case _profile_frame_value_render0:
+		{
+			short window_index;
+			short player_window_count = 0;
+
+			value = 0.0f;
+
+			for (window_index = 0;
+				window_index<frame->window_count;
+				window_index++)
+			{
+				if (player_window_count>=1)
+					break;
+
+				if (frame->window_ids[window_index])
+				{
+					value += frame->windows[window_index].total;
+					player_window_count++;
+				}
+			}
+			break;
+		}
+
+		case _profile_frame_value_render0_1:
+		{
+			short window_index;
+			short player_window_count = 0;
+
+			value = 0.0f;
+
+			for (window_index = 0;
+				window_index<frame->window_count;
+				window_index++)
+			{
+				if (player_window_count>=2)
+					break;
+
+				if (frame->window_ids[window_index])
+				{
+					value += frame->windows[window_index].total;
+					player_window_count++;
+				}
+			}
+			break;
+		}
+
+		case _profile_frame_value_render0_2:
+		{
+			short window_index;
+			short player_window_count = 0;
+
+			value = 0.0f;
+
+			for (window_index = 0;
+				window_index<frame->window_count;
+				window_index++)
+			{
+				if (player_window_count>=3)
+					break;
+
+				if (frame->window_ids[window_index])
+				{
+					value += frame->windows[window_index].total;
+					player_window_count++;
+				}
+			}
+			break;
+		}
+
+		case _profile_frame_value_render0_3:
+		{
+			short window_index;
+			short player_window_count = 0;
+
+			value = 0.0f;
+
+			for (window_index = 0;
+				window_index<frame->window_count;
+				window_index++)
+			{
+				if (player_window_count>=4)
+					break;
+
+				if (frame->window_ids[window_index])
+				{
+					value += frame->windows[window_index].total;
+					player_window_count++;
+				}
+			}
+			break;
+		}
+
+		case _profile_frame_value_render0_3np:
+		{
+			short window_index;
+			short player_window_count = 0;
+
+			value = 0.0f;
+
+			for (window_index = 0;
+				window_index<frame->window_count;
+				window_index++)
+			{
+				if (player_window_count>=4)
+					break;
+
+				value += frame->windows[window_index].total;
+
+				if (frame->window_ids[window_index])
+					player_window_count++;
+			}
+			break;
+		}
+
+		case _profile_frame_value_game_render:
+		{
+			short game_tick_index;
+
+			value = frame->render.total;
+
+			for (game_tick_index = 0;
+				game_tick_index<frame->game_tick_count;
+				game_tick_index++)
+			{
+				value += frame->game_ticks[game_tick_index].total;
+			}
+			break;
+		}
+
+		case _profile_frame_value_stall:
+			value = frame->stall.total;
+			break;
+
+		case _profile_frame_value_texture:
+			value = frame->texture.total;
+			break;
+
+		case _profile_frame_value_idle:
+			value = frame->idle.total;
+			break;
+
+		case _profile_frame_value_dt:
+			value = frame->seconds_elapsed*1000.0f;
+			break;
+
+		case _profile_frame_value_gpu:
+			value = frame->rasterizer_gpu_time;
+			break;
+
+		case _profile_frame_value_pushbuffer:
+			value = (real)(frame->rasterizer_pushbuffer_size*
+				(1.0f/(1024.0f*768.0f)))*(100.0f/3.0f);
+			break;
+	}
+
+	return value;
 }
 
 void profile_sections_activate(
@@ -691,7 +1014,7 @@ boolean profile_frame_iterator_next(
 }
 
 void profile_seconds_elapsed(
-	long seconds)
+	real seconds)
 {
 	profile_globals.current_frame.seconds_elapsed = seconds;
 
