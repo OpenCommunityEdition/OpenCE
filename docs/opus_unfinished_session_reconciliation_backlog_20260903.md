@@ -1,5 +1,25 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
+## Actor-mode and erase-all API trials restored (2026-09-06)
+
+Two newly identified owner boundaries were tested without compiling their
+prospective function bodies. A complete actor-mode enum migration across 47
+consumers regressed `unit_preprocess_node_orientations`; the real `ai_erase`
+API declaration across 64 consumers regressed two Race functions. Both
+packets were fully inverse-restored. The frozen comparisons prove 3,165 and
+5,532 unchanged runtime records respectively, and the full strict census
+remains 6,261 with no inherited loss. Canonical/GitHub code remains 917,456
+meaningful exact bytes and 391/833 Matching objects; these trials add no code
+credit. See `object_matching_logs/actor_looking_obj_validity_owner_boundary_20260906.md`
+and `object_matching_logs/ai_script_obj_erase_all_api_owner_boundary_20260906.md`.
+No alternative header ordering or caller-local declaration was used to force
+acceptance. The user has been asked about future policy for independently
+verified semantic-only inherited regressions with substantial net gains;
+until a reply, inherited exact preservation remains unchanged.
+Final restored validation: full Ninja succeeds and the tools suite passes
+576 tests plus 26 subtests. Both concurrent Opus source reservations remain
+untouched.
+
 ## Weapons export owner trial restored (2026-09-06)
 
 The natural particle initialization batch is published as
