@@ -2,6 +2,14 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/tool/error_geometry",
+      "class": "candidate-only-comdat-owner",
+      "symbol": "_set_real_point3d",
+      "reason": "Natural rectangle construction emits an unreferenced 32-byte SELECT_ANY point-setter copy absent from January Error Geometry. January's selected AI Debug copy is NODUPLICATES, and mixed target/base ordinary links fail with LNK2005. Current canonical AI Debug and all ten canonical copies are compatible SELECT_ANY and both real base/base input orders pass the duplicate phase, but unrelated unresolved externals prevent a successful final-link/discard artifact. Valid target-function progress is retained separately; this does not establish whole-object completion.",
+      "evidence": "docs/object_matching_logs/error_geometry_obj_fable_natural_reconciliation_20260905.md#whole-object-veto",
+      "reopen": "Finish all remaining Error Geometry functions/data and prove authentic helper ownership/discard through an ordinary compatible canonical link or original source topology. Do not force inlining, manually expand math to hide the owner, invent anchors or a discard pass, alter COMDAT metadata, or credit the candidate-only 32 bytes."
+    },
+    {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_profile",
       "class": "candidate-only-comdat-owner",
       "symbol": "_D3DSIMPLERENDERSTATEENCODE",

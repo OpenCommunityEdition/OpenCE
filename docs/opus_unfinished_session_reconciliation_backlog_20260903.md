@@ -2,14 +2,19 @@
 
 ## Current verified canonical / publication-batch totals (2026-09-05)
 
-The verified RenderDebug publication batch after `d00a3788d` contains:
-**907,346 meaningful matched code bytes**, **6,176 credited functions**,
+The current ErrorGeometry publication batch after `e98e3ff62852c1031f9ff74101eb0396136b42d9` contains:
+**910,301 meaningful matched code bytes**, **6,186 credited functions**,
 **2,061,020 matched data bytes**, and **391/833 Matching objects**.
-The full sweep preserves all6,220 inherited strict owners and adds two,
-for **6,222 strict owners**. There are now **283 approved fuzzy parks**.
-The batch adds296 meaningful exact code bytes, two functions and29,708
-matched BSS bytes. Its complete natural cache dispatcher is an honest
-57.757446% residual. All288 tests plus26 subtests pass. ActorCombat grenade
+The full sweep preserves all6,222 inherited strict owners and adds ten,
+for **6,232 strict owners**. There are now **284 approved fuzzy parks**.
+The batch adds2,955 meaningful exact code bytes and ten functions; matched
+data and complete-object totals are unchanged. Its complete natural polygon
+writer is an honest99.91892% scheduling residual. The genuine owning header
+passes its complete two-consumer audit. All288 tests plus26 subtests pass.
+Independent owner review and24-case behavioral comparisons pass for both the
+actual and isolated builds; the reusable harness is included with the packet.
+Publication status must be verified against the canonical GitHub branch refs.
+ActorCombat grenade
 aim's unsupported vehicle-path park remains withdrawn. The preceding
 Encounters evaluator remains an honest91.02511% residual.
 
@@ -22,9 +27,17 @@ path/ref remains pending intake, not zero progress or an approved import.
 
 The user has now reported `fable/50k-small-families-20260904` exhausted its
 tokens and explicitly authorized its reconciliation. Its previous exclusion
-is lifted. Preserve the donor's committed and dirty work read-only during
-intake; compare and reconcile it against current canonical, never sum its
-historical totals into ours. This new intake is the next priority.
+is lifted. The main and shadow intake is complete; the tip is not safe to
+cherry-pick wholesale because its retained Path source/snapshot disagree and
+its particle-header zero-loss claim lacks a successful retained blast log.
+The first coherent ErrorGeometry packet is retained, while its two later
+dirty residual additions remain preserved for separate review. ActionObey
+is next in read-only assessment. Preserve all donor committed/dirty work,
+compare against current canonical and never sum historical totals into ours.
+See `object_matching_logs/fable_50k_small_families_interrupted_lane_intake_20260905.md`
+and `object_matching_logs/error_geometry_obj_fable_natural_reconciliation_20260905.md`.
+New Opus implementation reservations are recorded in the separately delivered
+30,000-byte prompt; no implementation in those scopes is part of this packet.
 
 ### Follow-up adjudication
 

@@ -2,6 +2,25 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/tool/error_geometry",
+      "function": "_error_geometry_polygon",
+      "class": "instruction-scheduling",
+      "evidence": "Complete natural polygon writer retained with its genuine rectangle and bounded-polygon callers. January and candidate both contain 496 padded bytes, 50 relocations and 148 instructions; objdiff is 99.91892 percent. The sole machine difference exchanges two independent post-loop loads at +0x137: ESI from [EBP+0x10] and BX from [EBP+8]. Neither load changes flags or depends on the other. Typed points/colors, real math owner, short counts, original assertions/VRML formats, transformed coordinates, alpha conversion and flush order are preserved. Target-first execution covers polygon counts2/3/5, rectangle nesting and bounded counts2/4 with equal API arguments/order, complete globals, inputs and ABI guards. All inherited exact owners survive. No expression/declaration-order trial, flags, forced inline, manual math expansion, assembly or new point_from_line3d owner was introduced. The naturally emitted unreferenced set_real_point3d copy is a separate explicit whole-object veto, receives no credit and is not hidden. See docs/object_matching_logs/error_geometry_obj_fable_natural_reconciliation_20260905.md. Reopen only with authentic source/type/compiler-context evidence, not equivalent spelling searches.",
+      "measurements": {
+        "target": {
+          "size": 496,
+          "relocation_count": 50,
+          "normalized_sha256": "2f599a54025e36e52dc74243de9776633d0bc5e37f55fb1b2c6bcdd402200eaf"
+        },
+        "base": {
+          "size": 496,
+          "relocation_count": 50,
+          "normalized_sha256": "1b20ffa8e5964e947257b0722839dd1a51d0f7b3752bbc0f88d33b239efdf0c3"
+        },
+        "objdiff_percent": 99.91892
+      }
+    },
+    {
       "unit": "source/ai/encounters",
       "function": "_encounter_test_rule",
       "class": "unclassified",
