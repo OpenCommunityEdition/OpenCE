@@ -2,14 +2,14 @@
 
 ## Current published checkpoint (2026-09-05)
 
-Verified published code checkpoint `39a0c5bbb` on canonical and both
+Verified published code checkpoint `c59c6bcc11bcfd8708152b8ea4d99b4ad6834dc5` on canonical and both
 `bnunu/halo` publication branches:
 **906,391 meaningful matched code bytes**, **6,171 credited functions**,
-**2,030,868 matched data bytes**, and **391/833 Matching objects**.
-The full stable-owner sweep has **6,217 strict owners**; **280 fuzzy parks**
-validate at that published checkpoint. Its Main/Texture integration batch
-retains two further credible functions (233 meaningful fuzzy bytes) without
-changing exact-code/data/object totals.
+**2,031,312 matched data bytes**, and **391/833 Matching objects**.
+The full stable-owner sweep has **6,217 strict owners**; **281 fuzzy parks**
+validate at that published checkpoint. Its Transport initialization follow-up
+retains 416 meaningful fuzzy bytes and adds a 444-byte aggregate data match;
+exact code and object totals remain unchanged.
 All288 tests plus26 subtests pass.
 
 The donor byte pools and earlier "current" totals below are historical
@@ -24,6 +24,23 @@ implementations remain excluded from this campaign until the user reports its
 completion or token exhaustion. Read only the frozen older donor trees.
 
 ### Follow-up adjudication
+
+The next verified canonical batch restores ordinary math-header ownership in
+ActionAlert and Particles, and adds the genuine Observer/cluster shared schema.
+Full 46-consumer runtime inspection, actual built-owner comparison, stable
+sweep, parks, admission checks and all 288 tests plus 26 subtests pass.
+This is zero additional exact code/data/object credit. ActionAlert removes
+two unused alias bodies and changes three real helpers to natural SELECT_ANY;
+Particles changes its genuine validator to SELECT_ANY. The old ordinary-link
+vector/validator duplicate failures disappear without compiler/linker tricks.
+
+The old GameSound vector-owner blocker is therefore resolved, but its separate
+shared sound-source schema still requires reconciliation; obstruction is not
+silently admitted. Observer's reviewed caller cluster remains pending because
+ActorCombat still owns duplicate NODUPLICATES sine/cosine wrappers. A single
+natural removal trial loses those two 16-byte functions in the incomplete TU
+and is withheld. Reopen via a genuine missing caller, never an emission anchor.
+The active Fable implementations and playlist schema remain excluded.
 
 The natural Winsock error-string body now passes canonical verification at
 49.78903% ordinary match:1,568 meaningful target bytes reconstructed as fuzzy,

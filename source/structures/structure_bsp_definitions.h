@@ -93,7 +93,9 @@ struct structure_cluster
 	short background_sound_palette_index;
 	short sound_environment_palette_index;
 	short weather_palette_index;
-	byte unusedA[0x5E];
+	byte unusedA[0x1E];
+	struct tag_block predicted_resources;
+	byte unused34[0x34];
 };
 
 typedef char structure_cluster_size_assert[
@@ -104,6 +106,8 @@ typedef char structure_cluster_background_sound_offset_assert[
 	offsetof(struct structure_cluster, background_sound_palette_index) == 0x04 ? 1 : -1];
 typedef char structure_cluster_weather_offset_assert[
 	offsetof(struct structure_cluster, weather_palette_index) == 0x08 ? 1 : -1];
+typedef char structure_cluster_predicted_resources_offset_assert[
+	offsetof(struct structure_cluster, predicted_resources) == 0x28 ? 1 : -1];
 
 /*
  * The January scenario code indexes this palette with a 0x74-byte stride and

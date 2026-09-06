@@ -74,9 +74,7 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define valid_real_point3d valid_real_point3d_inline
 #include "effects/particles.h"
-#undef valid_real_point3d
 
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmaps.h"
@@ -373,12 +371,6 @@ real particle_get_radius(
 	return ((definition->radius_upper_bound - definition->radius_lower_bound) *
 			(particle->age / particle->lifespan) + definition->radius_lower_bound) *
 		particle->radius;
-}
-
-boolean valid_real_point3d(
-	real_point3d const *point)
-{
-	return valid_real(point->x) && valid_real(point->y) && valid_real(point->z);
 }
 
 boolean valid_real_argb_color(

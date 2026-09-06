@@ -175,12 +175,6 @@ enum camera_control_flags
 	_camera_control_roll_right_bit
 };
 
-enum observer_time_flags
-{
-	_observer_time_valid_bit = 0,
-	_observer_time_force_bit
-};
-
 static void director_process_variables(
 	short local_player_index,
 	unsigned long control_flags,

@@ -25,9 +25,20 @@ enum observer_command_flags
 	NUMBER_OF_OBSERVER_COMMAND_FLAGS
 };
 
-enum
+enum observer_command_parameter
 {
-	NUMBER_OF_OBSERVER_COMMAND_PARAMETERS = 5
+	_observer_command_parameter_focus_position,
+	_observer_command_parameter_focus_offset,
+	_observer_command_parameter_focus_distance,
+	_observer_command_parameter_field_of_view,
+	_observer_command_parameter_orientation,
+	NUMBER_OF_OBSERVER_COMMAND_PARAMETERS
+};
+
+enum observer_time_flags
+{
+	_observer_time_valid_bit = 0,
+	_observer_time_force_bit
 };
 
 /* ---------- macros */
@@ -47,12 +58,19 @@ struct observer_result
 struct observer_command
 {
 	long flags;
-	real_point3d focus_position;
-	real_vector3d focus_offset;
-	real focus_distance;
-	real field_of_view;
-	real_vector3d forward;
-	real_vector3d up;
+	union
+	{
+		struct
+		{
+			real_point3d focus_position;
+			real_vector3d focus_offset;
+			real focus_distance;
+			real field_of_view;
+			real_vector3d forward;
+			real_vector3d up;
+		};
+		real parameters[14];
+	};
 	real_vector3d focus_velocity;
 	real timer;
 	byte parameter_flags[NUMBER_OF_OBSERVER_COMMAND_PARAMETERS];
@@ -62,6 +80,12 @@ struct observer_command
 
 typedef char observer_command_size_assert[
 	sizeof(struct observer_command) == 0x68 ? 1 : -1];
+typedef char observer_command_parameters_offset_assert[
+	offsetof(struct observer_command, parameters) == 0x04 ? 1 : -1];
+typedef char observer_command_parameter_flags_offset_assert[
+	offsetof(struct observer_command, parameter_flags) == 0x4C ? 1 : -1];
+typedef char observer_command_parameter_timers_offset_assert[
+	offsetof(struct observer_command, parameter_timers) == 0x54 ? 1 : -1];
 
 /* ---------- prototypes/OBSERVER.C */
 
