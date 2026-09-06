@@ -461,11 +461,6 @@ boolean action_flee_setup(
 	boolean allow_occluded_points,
 	struct flee_state_data *state_data);
 
-boolean action_obey_command_list_setup(
-	long actor_index,
-	short command_list_index,
-	struct obey_state_data *state_data);
-
 boolean action_guard_setup_from_fleeing(
 	long actor_index,
 	struct flee_state_data *flee_state,
@@ -776,17 +771,6 @@ boolean action_charge_perform(
 void action_charge_update(
 	long actor_index);
 void action_charge_control(
-	long actor_index);
-
-void action_obey_begin(
-	long actor_index);
-boolean action_obey_perform(
-	long actor_index);
-void action_obey_update(
-	long actor_index);
-void action_obey_control(
-	long actor_index);
-void action_obey_end(
 	long actor_index);
 
 void action_converse_begin(

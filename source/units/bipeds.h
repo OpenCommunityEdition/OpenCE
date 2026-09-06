@@ -16,7 +16,12 @@ header included in hcex build.
 
 enum
 {
-	_biped_limping_bit = 0,
+	_biped_airborne_bit = 0,
+	_biped_slipping_bit,
+	_biped_absolute_movement_bit,
+	_biped_no_collision_bit,
+	_biped_movement_passes_through_bipeds_bit,
+	_biped_limp_body_physics_active_bit,
 };
 
 /* ---------- macros */

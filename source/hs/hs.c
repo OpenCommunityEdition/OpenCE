@@ -2783,6 +2783,7 @@ symbols in this file:
 #include "ai/ai_scenario_definitions.h"
 #include "ai/ai_profile.h"
 #include "cutscene/recorded_animation_definitions.h"
+#include "cutscene/recorded_animations.h"
 #include "devices/devices.h"
 #include "game/game.h"
 #include "interface/hud_messaging.h"
@@ -3793,15 +3794,6 @@ boolean hs_trigger_volume_test_objects_any(
 boolean hs_trigger_volume_test_objects_all(
 	short trigger_volume_index,
 	long object_list_index);
-boolean recorded_animation_play(
-	long unit_index,
-	word recording_index);
-boolean recorded_animation_play_and_delete(
-	long unit_index,
-	word recording_index);
-boolean recorded_animation_play_and_hover(
-	long unit_index,
-	word recording_index);
 boolean lights_enable(
 	boolean enable);
 boolean unit_start_user_animation(

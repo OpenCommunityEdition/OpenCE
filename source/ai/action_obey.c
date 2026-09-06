@@ -327,11 +327,6 @@ void code_00007840(
 	struct obey_individual_simple_control *simple_control,
 	struct obey_individual_complex_control *complex_control,
 	void *user_data);
-void actor_action_change(
-	long actor_index,
-	long new_action_type,
-	struct action_state_data *new_action_data);
-
 /* ---------- globals */
 
 /* ---------- public code */
@@ -358,6 +353,20 @@ void action_obey_flush_command_indices(
 			state_data,
 			code_00005250,
 			NULL);
+	}
+
+	return;
+}
+
+void action_obey_flush_structure_indices(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct obey_state_data *state_data = &actor->state.action_data.obey;
+
+	if (state_data->complex_control.destination_valid)
+	{
+		state_data->complex_control.destination_surface_index = NONE;
 	}
 
 	return;

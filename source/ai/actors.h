@@ -33,6 +33,15 @@ enum
 
 enum
 {
+	_swarm_component_attacking_in_melee_bit = 0,
+	_swarm_component_attached_to_unit_bit,
+	_swarm_component_wander_bit,
+	_swarm_component_obey_bit,
+	_swarm_component_obey_desire_jump_bit,
+};
+
+enum
+{
 	_actor_target_none = 0,
 	_actor_target_partial_enemy,
 	_actor_target_dead_enemy,
@@ -258,6 +267,9 @@ enum
 
 #define swarm_get(index)			((struct swarm_datum *)datum_get(swarm_data, (index)))
 #define swarm_try_and_get(index)	((struct swarm_datum *)datum_try_and_get(swarm_data, (index)))
+
+#define swarm_component_get(index) \
+	((struct swarm_component_datum *)datum_get(swarm_component_data, (index)))
 
 /* ---------- structures */
 
@@ -800,6 +812,32 @@ struct swarm_datum
 	long component_indices[MAXIMUM_COMPONENT_INDICES_PER_SWARM];
 };
 
+struct swarm_wander_control
+{
+	byte pause_ticks;
+	byte move_ticks;
+	real_vector3d vector;
+	real angle;
+};
+
+struct swarm_component_datum
+{
+	short identifier;
+	short flags;
+	real_point3d position;
+	long surface_index;
+	long combat_target_prop_index;
+	byte attached_to_unit_ticks;
+	byte ground_ticks;
+	byte attack_delay_ticks;
+	byte pad;
+	union
+	{
+		struct swarm_wander_control wander;
+		struct obey_individual_simple_control obey;
+	};
+};
+
 struct vehicle_avoidance_cylinder
 {
 	long object_index;
@@ -1083,6 +1121,8 @@ boolean actor_move_to_point(
 	real_point3d const *destination,
 	long surface_index,
 	long ignore_target_object_index);
+void actor_move_keep_moving_past_destination(
+	long actor_index);
 boolean actor_move_to_move_position(
 	long actor_index,
 	short move_position_index);

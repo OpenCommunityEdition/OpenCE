@@ -2,17 +2,20 @@
 
 ## Current verified canonical / publication-batch totals (2026-09-05)
 
-The current ErrorGeometry publication batch after `e98e3ff62852c1031f9ff74101eb0396136b42d9` contains:
-**910,301 meaningful matched code bytes**, **6,186 credited functions**,
+The current ActionObey owner/leaf publication batch after `31a1927c951479106d0475ee99e1fb236a15e89d` contains:
+**910,347 meaningful matched code bytes**, **6,187 credited functions**,
 **2,061,020 matched data bytes**, and **391/833 Matching objects**.
-The full sweep preserves all6,222 inherited strict owners and adds ten,
-for **6,232 strict owners**. There are now **284 approved fuzzy parks**.
-The batch adds2,955 meaningful exact code bytes and ten functions; matched
-data and complete-object totals are unchanged. Its complete natural polygon
-writer is an honest99.91892% scheduling residual. The genuine owning header
-passes its complete two-consumer audit. All288 tests plus26 subtests pass.
-Independent owner review and24-case behavioral comparisons pass for both the
-actual and isolated builds; the reusable harness is included with the packet.
+The full sweep preserves all6,232 inherited strict owners and adds one,
+for **6,233 strict owners**. There are **284 approved fuzzy parks**.
+This checkpoint adds46 meaningful exact code bytes and one function; matched
+data and complete-object totals are unchanged. Genuine ActionObey public API
+and shared swarm/biped schema ownership pass complete47- and58-consumer
+audits. Two residual encoding/load-order changes are independently proven;
+speech-timer fuzzy coverage returns97.76382% to97.67839% with no exact loss.
+All288 tests plus26 subtests pass; the final leaf passes1,024 cases each in
+target, actual and isolated objects. Units remains189/189 exact. The preceding
+ErrorGeometry batch contributed2,955 meaningful bytes and ten functions;
+its polygon writer remains an honest99.91892% scheduling residual.
 Publication status must be verified against the canonical GitHub branch refs.
 ActorCombat grenade
 aim's unsupported vehicle-path park remains withdrawn. The preceding
@@ -31,11 +34,17 @@ is lifted. The main and shadow intake is complete; the tip is not safe to
 cherry-pick wholesale because its retained Path source/snapshot disagree and
 its particle-header zero-loss claim lacks a successful retained blast log.
 The first coherent ErrorGeometry packet is retained, while its two later
-dirty residual additions remain preserved for separate review. ActionObey
-is next in read-only assessment. Preserve all donor committed/dirty work,
+dirty residual additions remain preserved for separate review. ActionObey's
+owner/schema and structure-flush checkpoint is verified; the larger real
+private command graph and math ownership are still scratch work. Bitmaps has
+18 distinct donor exact candidates/4,736 padded bytes, with ownership and
+provenance review still required; these are not new canonical credit.
+Preserve all donor committed/dirty work,
 compare against current canonical and never sum historical totals into ours.
 See `object_matching_logs/fable_50k_small_families_interrupted_lane_intake_20260905.md`
 and `object_matching_logs/error_geometry_obj_fable_natural_reconciliation_20260905.md`.
+See also `object_matching_logs/action_obey_obj_shared_schema_and_structure_flush_reconciliation_20260905.md`
+and `object_matching_logs/bitmaps_obj_fable_packet_intake_20260905.md`.
 New Opus implementation reservations are recorded in the separately delivered
 30,000-byte prompt; no implementation in those scopes is part of this packet.
 

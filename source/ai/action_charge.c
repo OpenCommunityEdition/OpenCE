@@ -138,9 +138,6 @@ enum
 
 /* ---------- prototypes */
 
-void actor_move_keep_moving_past_destination(
-	long actor_index);
-
 boolean unit_get_melee_range_and_ticks(
 	long unit_index,
 	boolean secondary,

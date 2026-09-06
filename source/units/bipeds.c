@@ -251,12 +251,6 @@ symbols in this file:
 
 /* ---------- constants */
 
-enum
-{
-	_biped_airborne_bit = 0,
-	_biped_limp_body_physics_active_bit = 5,
-};
-
 /* ---------- macros */
 
 #define BIPED_CLIMBING_SNAP_ANGLE ((real)(10.0*M_PI/180.0))

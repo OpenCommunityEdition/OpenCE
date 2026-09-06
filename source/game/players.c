@@ -2108,7 +2108,7 @@ boolean players_respawn_coop(
 				{
 					dangerous = TEST_FLAG(
 						biped->biped.flags,
-						_biped_limping_bit);
+						_biped_airborne_bit);
 				}
 				else
 				{

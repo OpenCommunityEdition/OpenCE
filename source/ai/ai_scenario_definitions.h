@@ -105,6 +105,29 @@ enum
 	NUMBER_OF_AI_ATOM_TYPES,
 };
 
+enum
+{
+	_ai_command_list_allow_initiative_bit = 0,
+	_ai_command_list_allow_targeting_bit,
+	_ai_command_list_disable_looking_bit,
+	_ai_command_list_disable_communication_bit,
+	_ai_command_list_disable_falling_damage_bit,
+};
+
+enum
+{
+	_ai_atom_loop_modifier_until_told_to_advance = 1,
+};
+
+/* Descriptive names for January's four movement-facing modifier values. */
+enum
+{
+	_ai_atom_move_facing_forwards = 0,
+	_ai_atom_move_facing_backwards,
+	_ai_atom_move_facing_left,
+	_ai_atom_move_facing_right,
+};
+
 
 /* ---------- macros */
 

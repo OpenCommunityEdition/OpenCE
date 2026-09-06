@@ -463,10 +463,6 @@ enum
 
 /* ---------- macros */
 
-#define swarm_component_get(index) \
-	((struct swarm_component_datum *)datum_get( \
-		swarm_component_data, (index)))
-
 /* These object chains are polymorphic.  The accessors preserve January's
  * broad verification masks while giving each use site the complete layout it
  * needs after checking object.type. */
@@ -513,16 +509,6 @@ typedef char actor_iterator_size_assert[
 	sizeof(struct actor_iterator) == 0x1C ? 1 : -1];
 typedef char actor_iterator_index_offset_assert[
 	offsetof(struct actor_iterator, index) == 0x14 ? 1 : -1];
-
-struct swarm_component_datum
-{
-	short identifier;
-	word flags;
-	real_point3d position;
-	long surface_index;
-	long combat_target_prop_index;
-	byte unknown_tail[SWARM_COMPONENT_DATUM_SIZE - 0x18];
-};
 
 struct actor_variant_change_colors
 {

@@ -81,29 +81,6 @@ enum
 
 enum
 {
-	_swarm_component_attacking_in_melee_bit = 0,
-	_swarm_component_attached_to_unit_bit,
-	_swarm_component_wander_bit,
-	_swarm_component_obey_bit,
-	_swarm_component_obey_desire_jump_bit,
-};
-
-enum
-{
-	_obey_simple_directmovement_bit = 0,
-	_obey_simple_directmovement_update_continuously_bit,
-	_obey_simple_jump_bit,
-	_obey_simple_jump_jumped_bit,
-	_obey_simple_jump_targeted_bit,
-};
-
-enum
-{
-	_biped_airborne_bit = 0,
-};
-
-enum
-{
 	_unit_melee_attack_none = 0,
 	_unit_melee_attack_starting,
 	_unit_melee_attack_dangerous,
@@ -113,37 +90,7 @@ enum
 
 /* ---------- macros */
 
-#define swarm_component_get(index) \
-	((struct swarm_component_datum *)datum_get(swarm_component_data, (index)))
-
 /* ---------- structures */
-
-struct swarm_wander_control
-{
-	byte pause_ticks;
-	byte move_ticks;
-	word pad;
-	real_vector3d vector;
-	real angle;
-};
-
-struct swarm_component_datum
-{
-	short identifier;
-	word flags;
-	real_point3d position;
-	long surface_index;
-	long combat_target_prop_index;
-	byte attached_to_unit_ticks;
-	byte ground_ticks;
-	byte attack_delay_ticks;
-	byte pad;
-	union
-	{
-		struct swarm_wander_control wander;
-		struct obey_individual_simple_control obey;
-	};
-};
 
 struct unit_control_data
 {

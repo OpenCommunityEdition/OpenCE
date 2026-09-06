@@ -233,11 +233,6 @@ enum control_button
 	NUMBER_OF_ACTION_CONTROL_BUTTONS,
 };
 
-enum
-{
-	_biped_airborne_bit = 0,
-};
-
 enum mouse_button
 {
 	_mouse_button_left = 0,

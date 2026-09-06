@@ -2361,7 +2361,7 @@ void unit_scripting_suspended(
 		if (unit->object.type==_object_type_biped)
 		{
 			struct biped_datum *biped = biped_get(unit_index);
-			SET_FLAG(biped->biped.flags, _biped_limping_bit, FALSE);
+			SET_FLAG(biped->biped.flags, _biped_airborne_bit, FALSE);
 		}
 	}
 
@@ -4216,7 +4216,7 @@ boolean unit_melee_attack_begin(
 				struct biped_datum *biped = (struct biped_datum *)unit;
 				limping = TEST_FLAG(
 					biped->biped.flags,
-					_biped_limping_bit);
+					_biped_airborne_bit);
 			}
 
 			if (continuous)
@@ -4299,7 +4299,7 @@ boolean unit_leap_begin(
 			{
 				biped_limping = TEST_FLAG(
 					((struct biped_datum *)unit)->biped.flags,
-					_biped_limping_bit);
+					_biped_airborne_bit);
 			}
 
 			if (!biped_limping &&
@@ -6544,7 +6544,7 @@ void code_001a0cf0(
 				biped = biped_get(unit_index);
 				biped_definition = biped_definition_get(biped->definition_index);
 
-				if (TEST_FLAG(biped->biped.flags, _biped_limping_bit) &&
+				if (TEST_FLAG(biped->biped.flags, _biped_airborne_bit) &&
 					!TEST_FLAG(
 						biped_definition->biped.flags,
 						_biped_has_no_dying_airborne_bit))
@@ -10048,7 +10048,7 @@ short unit_update_animation(
 					biped = biped_get(unit_index);
 					biped_definition =
 						biped_definition_get(biped->definition_index);
-					if (!TEST_FLAG(biped->biped.flags, _biped_limping_bit) ||
+					if (!TEST_FLAG(biped->biped.flags, _biped_airborne_bit) ||
 						TEST_FLAG(
 							biped_definition->biped.flags,
 							_biped_has_no_dying_airborne_bit))

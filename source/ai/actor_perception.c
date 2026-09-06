@@ -294,14 +294,6 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct actor_perception_swarm_component_view
-{
-	short identifier;
-	word flags;
-	real_point3d position;
-	byte __unknown010[SWARM_COMPONENT_DATUM_SIZE - 0x10];
-};
-
 struct actor_perception_ai_debug_state_view
 {
 	byte __unknown000[6];
@@ -356,10 +348,6 @@ struct ai_profile_globals
 		struct ai_profile_prop_counters perception;
 	} data;
 };
-
-#define swarm_component_get(index) \
-	((struct actor_perception_swarm_component_view *)datum_get( \
-		swarm_component_data, (index)))
 
 #define actor_perception_ai_debug_get() \
 	((struct actor_perception_ai_debug_state_view *)&ai_debug)
@@ -918,8 +906,6 @@ typedef char actor_perception_prop_view_perception_result_offset_assert[
 	offsetof(struct actor_perception_prop_view, perception_result) == 0x30 ? 1 : -1];
 typedef char actor_perception_prop_view_dangerous_vehicle_driver_offset_assert[
 	offsetof(struct actor_perception_prop_view, dangerous_vehicle_driver) == 0x136 ? 1 : -1];
-typedef char actor_perception_swarm_component_position_offset_assert[
-	offsetof(struct actor_perception_swarm_component_view, position) == 4 ? 1 : -1];
 typedef char actor_perception_status_unit_flags_offset_assert[
 	offsetof(struct actor_perception_status_unit_view, status_flags) == 0x1B4 ? 1 : -1];
 typedef char actor_perception_target_unit_active_region_offset_assert[
@@ -3201,7 +3187,7 @@ void actor_perception_find_sense_position(
 
 		for (unit_index = 0; unit_index < swarm->unit_count; unit_index++)
 		{
-			struct actor_perception_swarm_component_view *component =
+			struct swarm_component_datum *component =
 				swarm_component_get(swarm->component_indices[unit_index]);
 			real distance_squared =
 				distance_squared3d(&component->position, position);
@@ -3257,14 +3243,14 @@ static long actor_perception_unit_from_swarm(
 
 		for (unit_index = 0; unit_index < swarm->unit_count; unit_index++)
 		{
-			struct actor_perception_swarm_component_view *component =
+			struct swarm_component_datum *component =
 				swarm_component_get(swarm->component_indices[unit_index]);
 			real distance_squared =
 				distance_squared3d(
 					&component->position,
 					&position->body_position);
 
-			if (TEST_FLAG(component->flags, 1))
+			if (TEST_FLAG(component->flags, _swarm_component_attached_to_unit_bit))
 			{
 				distance_squared *= 2.25f;
 			}

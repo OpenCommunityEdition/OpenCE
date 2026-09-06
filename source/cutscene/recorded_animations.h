@@ -28,6 +28,16 @@ void recorded_animations_clear_debug_storage(
 boolean recorded_animation_controlling_unit(
 	long unit_index);
 
+boolean recorded_animation_play(
+	long unit_index,
+	short animation_index);
+boolean recorded_animation_play_and_delete(
+	long unit_index,
+	short animation_index);
+boolean recorded_animation_play_and_hover(
+	long unit_index,
+	short animation_index);
+
 /* ---------- globals */
 
 /* ---------- public code */

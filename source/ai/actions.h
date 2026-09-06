@@ -26,6 +26,15 @@ enum
 
 enum
 {
+	_obey_simple_directmovement_bit = 0,
+	_obey_simple_directmovement_update_continuously_bit,
+	_obey_simple_jump_bit,
+	_obey_simple_jump_jumped_bit,
+	_obey_simple_jump_targeted_bit,
+};
+
+enum
+{
 	_pursuit_location_target = 0,
 	_pursuit_location_position,
 	_pursuit_location_undirected,
@@ -526,6 +535,26 @@ real normalize3d(
 
 /* ---------- prototypes/ACTION_OBEY.C */
 
+boolean action_obey_command_list_setup(
+	long actor_index,
+	short command_list_index,
+	struct obey_state_data *state_data);
+void action_obey_flush_command_indices(
+	long actor_index);
+void action_obey_flush_structure_indices(
+	long actor_index);
+void action_obey_advance_command_list(
+	long actor_index);
+void action_obey_begin(
+	long actor_index);
+boolean action_obey_perform(
+	long actor_index);
+void action_obey_update(
+	long actor_index);
+void action_obey_control(
+	long actor_index);
+void action_obey_end(
+	long actor_index);
 void action_obey_describe_command(
 	struct scenario *scenario,
 	struct ai_command_definition *command,
