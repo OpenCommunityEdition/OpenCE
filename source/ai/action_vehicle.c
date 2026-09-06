@@ -85,6 +85,11 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	_action_vehicle_idle_look_type = 4,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -154,6 +159,39 @@ real_vector2d *negate_vector2d(
 void action_vehicle_update(
 	long actor_index)
 {
+	return;
+}
+
+void action_vehicle_control(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct vehicle_state_data *state_data = &actor->state.action_data.vehicle;
+
+	if (state_data->lock_facing)
+	{
+		actor->orders.look.primary_priority = _primary_priority_locked_aiming;
+		actor->orders.look.primary_direction.type = _direction_specification_vector;
+		actor->orders.look.primary_direction.vector = state_data->destination_facing;
+	}
+	else if (actor_path_has_path(actor_index))
+	{
+		actor->orders.look.primary_priority = _primary_priority_aiming;
+		actor->orders.look.primary_direction.type = _direction_specification_movement;
+	}
+	else
+	{
+		actor->orders.look.primary_priority = _primary_priority_none;
+	}
+
+	actor->orders.look.idle_look_type = _action_vehicle_idle_look_type;
+	actor->orders.combat.shoot_at_target = FALSE;
+	actor->orders.move.stationary_crouch = FALSE;
+	actor->orders.move.moving_crouch = FALSE;
+	actor->orders.move.panicked = FALSE;
+	actor->orders.move.dive_into_cover = FALSE;
+	actor->orders.move.emerge_from_cover = FALSE;
+
 	return;
 }
 

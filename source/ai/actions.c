@@ -761,8 +761,6 @@ boolean action_vehicle_perform(
 	long actor_index);
 void action_vehicle_update(
 	long actor_index);
-void action_vehicle_control(
-	long actor_index);
 
 void action_charge_begin(
 	long actor_index);

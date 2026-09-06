@@ -105,6 +105,18 @@ enum
 
 /* ---------- public code */
 
+/* Inspect the guarded caller's frame, not the return site of this helper.
+ * A normal prologue would replace EBP and defeat the paired stack check. */
+__declspec(naked) long get_return_eip(
+	void)
+{
+	__asm
+	{
+		mov eax, [ebp+4]
+		ret
+	}
+}
+
 short check_stack_buffer(
 	long *buffer)
 {

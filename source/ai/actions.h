@@ -573,6 +573,11 @@ void action_fight_end(
 void actor_conversation_control(
 	long actor_index);
 
+/* ---------- prototypes/ACTION_VEHICLE.C */
+
+void action_vehicle_control(
+	long actor_index);
+
 /* ---------- globals */
 
 /* ---------- public code */

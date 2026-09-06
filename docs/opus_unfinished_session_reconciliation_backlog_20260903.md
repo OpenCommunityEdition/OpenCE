@@ -1,5 +1,47 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
+## Current Fable ActionVehicle / HUD reconciliation (2026-09-06)
+
+The geosphere fuzzy packet is published as
+`b90402d960a75d312f2a3895c43850e9cca4ccb8` on both authorized GitHub refs.
+It retained five honest typed bodies without claiming extra exact bytes.
+
+The next verified local batch adds ActionVehicle control and HUD's genuine
+return-address helper: **179 meaningful / 192 padded exact code bytes**, two
+functions, no inherited exact losses. The local canonical checkpoint is
+**916,730 / 2,198,102 meaningful exact code bytes**, **6,211 credited
+functions**, **6,257 strict functions**, **391 / 833 Matching objects** and
+unchanged **2,061,020 matched data bytes**. Neither object is complete.
+ActionVehicle is 8/17 strict; HUD Draw is 5/23.
+
+The ActionVehicle public oracle passes 18 cases per target/first/actual
+object and all four real-byte negative controls. The genuine API owner move
+preserves the full 47-consumer inherited runtime closure. HUD's two-instruction
+debug primitive fits the user's sparse genuine-helper assembly exception;
+it preserves all 14 inherited HUD sections and all 571 other base objects.
+Its 24-case execution check distinguishes the caller's saved return address
+from the helper's own return site. No assembly conversion factory is admitted.
+
+The ModelAnimations node-type owner trial lost two strict functions and was
+fully reversed before any graph body/include was compiled. All 1,523 runtime
+sections across 13 consumers are restored unchanged, including Units. The
+352-padded-byte public graph candidate and 544-padded-byte private claims
+remain held. The separate HUD 768-padded-byte bitmap pair needs a coherent
+shared-type migration involving Opus-reserved widget implementations; those
+files remain untouched. Donor work is preserved, not deleted.
+
+See `object_matching_logs/action_vehicle_obj_fable_control_reconciliation_20260906.md`,
+`object_matching_logs/hud_draw_obj_fable_return_address_reconciliation_20260906.md`,
+`object_matching_logs/hud_draw_obj_fable_independent_intake_20260906.md` and
+`object_matching_logs/model_animations_obj_fable_node_owner_trial_rejected_20260906.md`.
+Parks remain 289 valid / zero stale / zero invalid. Admission reports zero
+candidates, contradictions or revocations and five existing rejections.
+The final full suite passes **481 tests plus 26 subtests**. Root independently
+replayed both public runtime oracles. Remote publication must be verified
+against the resulting commit on both authorized refs.
+The exhausted Fable lane is not fully reconciled; the remaining donor totals
+below are historical candidate pools, never additive canonical credit.
+
 ## Current geosphere fuzzy reconciliation (2026-09-06)
 
 The preceding Weapons/Geometry exact batch is published as
