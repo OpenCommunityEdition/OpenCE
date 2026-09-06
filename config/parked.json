@@ -656,44 +656,6 @@
     },
     {
       "unit": "source/devices/devices",
-      "function": "_device_update",
-      "class": "unclassified",
-      "evidence": "Complete typed January device power/position/delay/effect update, independently reviewed against January COFF and pinned HCEA semantic corroboration. Target and candidate have 736 padded bytes, 735 meaningful bytes, 242 instructions including one padding NOP, a 0x18 frame, and all 19 ordered relocations identical. The retained negated delay-limit and group-position comparisons preserve January's unordered/NaN behavior; the initial plain comparisons did not. Exactly six normalized bytes differ at 0x249, 0x24F, 0x251, 0x252, 0x25E and 0x266, solely argument registers for the two stop-effect calls, with identical argument values, stack order and call destinations. The classifier remains UNKNOWN, so this conservative park invents no tuning recipe. All 22 pre-update exact owners and both existing parks remain unchanged; no extra code owner or point_from_line3d COMDAT is emitted. No artificial lifetime, fake helper, raw offset, representation pun, assembly, optimizer control, declaration-order hunt or nonsensical logic is retained. Reopen only for fresh authentic source/compiler-context evidence explaining those argument-register choices. See docs/object_matching_logs/hud_owner_devices_update_independent_audit_20260904.md. This park grants no exact code credit.",
-      "measurements": {
-        "target": {
-          "size": 736,
-          "relocation_count": 19,
-          "normalized_sha256": "a288da977cb9066045f8d9461c85e24bc86a39b0f7557faf6addb2fa36c8fd49"
-        },
-        "base": {
-          "size": 736,
-          "relocation_count": 19,
-          "normalized_sha256": "3791e2d1409f16da2b48f8ad5d4672299df7526bc763f516a7f125e112c49139"
-        },
-        "objdiff_percent": 99.87552
-      }
-    },
-    {
-      "unit": "source/devices/devices",
-      "function": "_create_initial_device_groups",
-      "class": "unclassified",
-      "evidence": "Authentic typed scenario-group initialization preserves all inherited exact siblings; first subobject-base and zero-initialization lowering adds ten meaningful bytes and shifts otherwise identical loop/epilogue. No declaration-order, compiler, fake-lifetime or inline forcing. Reopen for authentic source or new type/ABI evidence. See docs/object_matching_logs/devices_obj_group_creation_wave_20260904.md.",
-      "measurements": {
-        "target": {
-          "size": 224,
-          "relocation_count": 14,
-          "normalized_sha256": "3599a03ce7c3c87fe5261d8f67e0865ee14eda302453f947ee3682499be3bb95"
-        },
-        "base": {
-          "size": 240,
-          "relocation_count": 14,
-          "normalized_sha256": "28358cf0131d290b01174a2e2d24ae4efa49a825a7885389699ea41460081cc0"
-        },
-        "objdiff_percent": 78.333336
-      }
-    },
-    {
-      "unit": "source/devices/devices",
       "function": "_device_add_scenario_information",
       "class": "unclassified",
       "evidence": "Authentic typed scenario-device group assignment; target and candidate are 288 bytes with all 12 ordered relocations identical. Only the equivalent nine-byte changes-once/runtime flag lowering differs at +0x7C. Retain natural FLAG/TEST_FLAG source rather than an unusual shifted mask for codegen. See docs/object_matching_logs/devices_obj_group_creation_wave_20260904.md.",

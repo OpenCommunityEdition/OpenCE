@@ -1,7 +1,7 @@
 # Opus 1 rasterizer/widgets reconciliation against canonical `d574f4ff`
 
-Date: 2026-09-06. This is a read-only reconciliation record; no donor or
-production source was edited or built.
+Date: 2026-09-06. The initial inventory was read-only; subsequent integration
+and source-admission findings are recorded below. Donor trees remain untouched.
 
 ## Verdict
 
@@ -23,6 +23,17 @@ Use function/unit-scoped integration batches with a frozen current-baseline
 whole-tree sweep. A broad Git merge cannot substitute for source/semantic
 admission and linewise config reconciliation; do not replace canonical files or
 configs wholesale with donor versions.
+
+### Subsequent verified integration
+
+The [Devices four-function packet](devices_obj_opus1_four_function_reconciliation_20260906.md)
+admits **1,242 meaningful bytes / four functions** with zero regressions,
+after rejecting the unsupported flag-width fifth gain. This leaves **28,832
+of the lane's originally measured 30,074 meaningful bytes not admitted** by
+this packet, including source/ownership-blocked work; it is not a promise
+that all those bytes will pass admission. Canonical reaches 922,106 meaningful
+exact bytes, 6,234 credited functions and unchanged 391/833 Matching objects.
+Frame Statistics and naming findings below refine the initial proposed order.
 
 ## Identity and frozen evidence
 
@@ -192,13 +203,20 @@ owner. It also adds a TU-local `extern boolean debug_objects_devices`, while
 
 ## Proposed integration batches
 
-1. **Devices five-function no-new-owner packet.** Integrate
+1. **Devices four-function no-new-owner packet (reviewed down from five).** Integrate
    `device_can_change_position` (128), `device_effect_new` (176),
-   `device_update` (736), `device_add_scenario_information` (288), and static
-   `create_initial_device_groups` (224): 1,552 strict padded bytes. All four
+   `device_update` (736), and static `create_initial_device_groups` (224):
+   1,264 strict padded / 1,242 meaningful bytes. All three
    external functions already have their matching contracts in `devices.h`.
-   Apply the target-proven `unsigned long` flags ABI for `device_group_new` and
-   remove only the three corresponding parks. No `symbols.json` change.
+   Retain `word flags` in `device_group_new` and the scenario-assignment park;
+   remove only the two accepted closure parks after verification. The donor's
+   claim that four-byte argument pushes prove the original source type is too
+   strong: a promoted word also occupies a four-byte x86 stack slot.
+   The target allocator reads/stores only a word; its two ordinary calls pass
+   4 or 5. Independent HCEA and PC reconstructions also use 16-bit flags.
+   Reject the unsupported width change even though it closes 288 padded bytes.
+   See [the scoped Devices admission](devices_obj_opus1_four_function_reconciliation_20260906.md).
+   No `symbols.json` change.
    `device_export_function_values` is independently strict (512) and introduces
    no surplus code, but its only declaration is caller-local in
    `object_types.c`; admit it separately with a genuine owning `devices.h`
@@ -212,9 +230,22 @@ owner. It also adds a TU-local `extern boolean debug_objects_devices`, while
    changes no source and accounts for existing byte-identical XDK/helper
    sections. Do not replace canonical `symbols.json`; retain per-offset evidence
    from the naming-gap ledger.
-3. **Frame Statistics exact body packet.** The exact 4,176-byte draw owner adds no
-   target-absent section. Do not automatically carry the zero-credit/residual
-   `get_fps` edit.
+   Independent follow-up narrows the immediately supported scope to 26 XDK
+   wrappers (22 named-callee wrappers and four SDK dispatch expansions).
+   Their source owners are private under `D3DINLINE`, not external: all require
+   independently justified `static:true` split metadata, rather than just the
+   one static record in the donor patch. Hold the two callless cube-texture
+   Unlock names and the uncorroborated `vector2d_reciprocal` source identifier.
+   No naming metadata is changed in the Devices packet.
+3. **Frame Statistics source-admission hold (updated audit).** Although the
+   donor's 4,176-byte draw owner adds no target-absent section, the isolated
+   draw-only candidate is residual under current canonical flags. Exactness
+   depends on retaining the previously rejected `get_fps` predecessor. The
+   donor's experiment history also contains declaration-order permutation
+   searches. Do not import the exact donor version or use its byte match as
+   evidence authenticating that compiler-state dependency. Preserve the natural
+   draw-only reconstruction as research with zero exact credit until independently
+   source-authentic integration and whole-owner verification are available.
 4. **Bounded `rasterizer_xbox.c` body packet.** Start with
    `rasterizer_set_texture` (496), `rasterizer_set_model_skinning` (320),
    `rasterizer_set_frustum_z` (320), and `rasterizer_set_stencil_mode` (784).

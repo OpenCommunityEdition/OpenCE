@@ -87,11 +87,16 @@ symbols in this file:
 #include "device_controls.h"
 #include "device_definitions.h"
 #include "device_machines.h"
+#include "cache/cache_files.h"
+#include "effects/effect_definitions.h"
+#include "effects/effects.h"
 #include "memory/data.h"
 #include "models/model_animation_definitions.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#include "sound/game_sound.h"
+#include "sound/sound_definitions.h"
 
 /* ---------- constants */
 
@@ -399,10 +404,11 @@ boolean device_update(
 					1.0f,
 					TEST_FLAG(definition->device.flags, _device_position_loops_bit)))
 				{
-					if (moving_forward)
-						device_effect_new(device_index, definition->device.positive_stop_effect.index);
-					else
-						device_effect_new(device_index, definition->device.negative_stop_effect.index);
+					long effect_index = moving_forward
+						? definition->device.positive_stop_effect.index
+						: definition->device.negative_stop_effect.index;
+
+					device_effect_new(device_index, effect_index);
 				}
 				else
 				{
@@ -657,6 +663,85 @@ void device_touched(
 	return;
 }
 
+boolean device_can_change_position(
+	long device_index)
+{
+	struct device_datum *device = device_get(device_index);
+	boolean can_change = FALSE;
+
+	if (device->device.position_group_index != NONE)
+	{
+		struct device_group_datum *position_group = datum_get(
+			device_groups_data,
+			device->device.position_group_index);
+		struct device_group_datum *power_group = datum_get(
+			device_groups_data,
+			device->device.power_group_index);
+
+		can_change = TRUE;
+		if (TEST_FLAG(position_group->flags, _device_group_can_change_only_once_bit) &&
+			TEST_FLAG(position_group->flags, _device_group_changed_once_bit))
+		{
+			can_change = FALSE;
+		}
+		if (TEST_FLAG(device->device.flags, _device_not_usable_bit))
+		{
+			can_change = FALSE;
+		}
+		if (power_group->actual_value != 1.0f)
+		{
+			can_change = FALSE;
+		}
+	}
+
+	return can_change;
+}
+
+void device_effect_new(
+	long device_index,
+	long effect_index)
+{
+	if (effect_index != NONE)
+	{
+		struct device_datum *device = device_get(device_index);
+		long group_tag = tag_get_group_tag(effect_index);
+
+		if (group_tag != EFFECT_DEFINITION_TAG)
+		{
+			match_dassert(
+				"c:\\halo\\SOURCE\\devices\\devices.c",
+				761,
+				group_tag == SOUND_DEFINITION_TAG,
+				NULL);
+
+			if (group_tag == SOUND_DEFINITION_TAG)
+			{
+				object_impulse_sound_new(
+					device_index,
+					effect_index,
+					NONE,
+					global_origin3d,
+					global_forward3d,
+					1.0f);
+			}
+		}
+		else
+		{
+			effect_new_from_object(
+				effect_index,
+				device_index,
+				device_index,
+				NONE,
+				device->device.position,
+				device->device.power,
+				NULL,
+				NULL);
+		}
+	}
+
+	return;
+}
+
 void device_set_actual_position(
 	long device_index,
 	real position)
@@ -788,13 +873,13 @@ static short device_group_new(
 static void create_initial_device_groups(
 	void)
 {
-	struct tag_block *groups = &global_scenario_get()->device_groups;
+	struct scenario *scenario = global_scenario_get();
 	short group_index;
 
-	for (group_index = 0; group_index < groups->count; group_index++)
+	for (group_index = 0; group_index < scenario->device_groups.count; group_index++)
 	{
 		struct scenario_device_group *definition = TAG_BLOCK_GET_ELEMENT(
-			groups,
+			&scenario->device_groups,
 			group_index,
 			struct scenario_device_group);
 		word flags = 0;
