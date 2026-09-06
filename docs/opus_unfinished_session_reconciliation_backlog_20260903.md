@@ -2,24 +2,28 @@
 
 ## Current verified canonical / publication-batch totals (2026-09-05)
 
-The current ActionObey partial-graph publication batch after `c32247e7651d680dcd133d72b2fbf4e8009cc124` contains:
-**912,298 meaningful matched code bytes**, **6,197 credited functions**,
+The current Bitmaps stronger partial publication batch after `1200c46e9e0929eeada7669a79e752dd392c3d3b` contains:
+**915,646 meaningful matched code bytes**, **6,206 credited functions**,
 **2,061,020 matched data bytes**, and **391/833 Matching objects**.
-The full sweep preserves all 6,233 inherited strict functions and adds ten,
-for **6,243 strict functions**. There are **284 approved fuzzy parks**.
-This checkpoint adds 1,951 meaningful / 2,032 padded exact code bytes and ten
-functions. ActionObey advances 10/27 to 20/27; it is not a complete object.
-Two strict COFF/objdiff bookkeeping repairs account for 885 of those bytes,
-not an additional gain. Data and complete-object totals are unchanged.
-The genuine callback graph removes two manual math wrappers, preserves all
-target functions, and leaves all 571 other base-object hashes unchanged.
-The new public callback oracle passes 309 cases each in target, actual and
-isolated objects; all 298 tests plus 26 subtests pass. Units remains 189/189.
-Five natural extra math helpers receive no target credit. Ordinary links with
-ActionCharge fail on four NODUPLICATES owners, recorded as a whole-object veto.
-The larger command-owner header trial lost one Units function and was fully
-restored: all 6,355 runtime sections across 86 consumers are unchanged again.
-The earlier shared schema/leaf batch and ErrorGeometry batch remain intact.
+The full sweep preserves all 6,243 inherited strict functions and adds nine,
+for **6,252 strict functions**. There are **284 approved fuzzy parks**.
+This checkpoint adds 3,348 meaningful / 3,408 padded exact code bytes and nine
+functions. Bitmaps advances 9/34 to 18/34 and 791 to 4,139 meaningful exact
+bytes; it is not a complete object. Eleven genuine source bodies are retained,
+but two indistinguishable width/height helpers remain uncredited. The narrow
+mipmap-header repair preserves all 119 runtime sections across 3 consumers; after
+that repair, all 571 other base-object hashes stay identical. The new public
+bitmap runtime oracle passes 34 cases each in target, first and actual objects;
+all 321 tests plus 26 subtests pass. Units remains 189/189. The protected bitmap
+header and utilities hashes are unchanged. Six tuned/corrected bitmap bodies
+and rebuild remain held; the 48-consumer rasterizer lifecycle-owner packet is
+documented separately, with no reserved Opus implementation changed.
+
+The preceding ActionObey checkpoint remains 20/27, with its 1,951 meaningful-byte
+gain intact. Its five natural extra math helpers receive no target credit and
+the four ActionCharge NODUPLICATES link failures remain a whole-object veto.
+Its larger command-owner header trial remains fully restored. Earlier shared
+schema/leaf and ErrorGeometry batches also remain intact.
 Publication status must be verified against the canonical GitHub branch refs.
 ActorCombat grenade
 aim's unsupported vehicle-path park remains withdrawn. The preceding
@@ -43,15 +47,19 @@ owner/schema, structure-flush leaf and smaller closed callback graph are
 verified. Its private command begin/perform proposals remain uncompiled
 scratch research behind the restored header boundary; corrected PDB owner
 prerequisites are documented. Seven target functions, two inherited math
-aliases and final helper linkage still prevent whole-object completion. Bitmaps has
-18 distinct donor exact candidates/4,736 padded bytes, with ownership and
-provenance review still required; these are not new canonical credit.
+aliases and final helper linkage still prevent whole-object completion. Of
+Bitmaps' 18 distinct donor exact candidates / 4,736 padded bytes, nine / 3,408 padded
+are now admitted. The remaining nine / 1,328 padded are not new canonical credit:
+two ambiguous helpers/64, rebuild/128, and six provenance-held bodies/1,136.
 Preserve all donor committed/dirty work,
 compare against current canonical and never sum historical totals into ours.
 See `object_matching_logs/fable_50k_small_families_interrupted_lane_intake_20260905.md`
 and `object_matching_logs/error_geometry_obj_fable_natural_reconciliation_20260905.md`.
 See also `object_matching_logs/action_obey_obj_shared_schema_and_structure_flush_reconciliation_20260905.md`
 and `object_matching_logs/bitmaps_obj_fable_packet_intake_20260905.md`.
+The stronger bitmap checkpoint and next owner prerequisites are in
+`object_matching_logs/bitmaps_obj_fable_stronger_partial_reconciliation_20260905.md`
+and `object_matching_logs/bitmaps_obj_rasterizer_owner_prerequisites_20260905.md`.
 The new checkpoint evidence is in
 `object_matching_logs/action_obey_obj_partial_graph_reconciliation_20260905.md`,
 `object_matching_logs/action_obey_obj_command_owner_trial_rejected_20260905.md`,

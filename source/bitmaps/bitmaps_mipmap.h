@@ -32,6 +32,9 @@ short bitmap_mipmap_get_height(
 short bitmap_mipmap_get_depth(
 	struct bitmap_data *bitmap,
 	short mipmap_index);
+long bitmap_mipmap_get_pixel_count(
+	struct bitmap_data *bitmap,
+	short mipmap_index);
 long bitmap_mipmap_get_pixel_data_size(
 	struct bitmap_data *bitmap,
 	short mipmap_index);

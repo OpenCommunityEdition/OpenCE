@@ -230,7 +230,10 @@ symbols in this file:
 
 #include "cseries.h"
 #include "bitmaps/bitmaps.h"
+#include "bitmaps/bitmaps_internal.h"
+#include "bitmaps/bitmaps_mipmap.h"
 #include "bitmaps/bitmap_group.h"
+#include "cseries/errors.h"
 #include "math/integer_math.h"
 
 /* ---------- constants */
@@ -238,10 +241,57 @@ symbols in this file:
 enum
 {
 	NUMBER_OF_ENTRIES_IN_PALETTE = 256,
-	NUMBER_OF_BITMAP_TYPES = 3,
-	NUMBER_OF_BITMAP_FORMATS = 18,
-	_bitmap_has_power_of_two_dimensions_bit = 0,
-	_bitmap_allocated_bit = 6,
+
+	MAXIMUM_BITMAP_WIDTH = 30000,
+	MAXIMUM_BITMAP_HEIGHT = 30000,
+	MAXIMUM_BITMAP_DEPTH = 256,
+};
+
+enum
+{
+	_bitmap_type_2d,
+	_bitmap_type_3d,
+	_bitmap_type_cube_map,
+	NUMBER_OF_BITMAP_TYPES,
+};
+
+enum
+{
+	_bitmap_format_a8,
+	_bitmap_format_y8,
+	_bitmap_format_ay8,
+	_bitmap_format_a8y8,
+	_bitmap_format_unused1,
+	_bitmap_format_unused2,
+	_bitmap_format_r5g6b5,
+	_bitmap_format_unused3,
+	_bitmap_format_a1r5g5b5,
+	_bitmap_format_a4r4g4b4,
+	_bitmap_format_x8r8g8b8,
+	_bitmap_format_a8r8g8b8,
+	_bitmap_format_unused4,
+	_bitmap_format_unused5,
+	_bitmap_format_dxt1,
+	_bitmap_format_dxt3,
+	_bitmap_format_dxt5,
+	_bitmap_format_p8_bump,
+	NUMBER_OF_BITMAP_FORMATS,
+
+	FIRST_COMPRESSED_BITMAP_FORMAT = _bitmap_format_dxt1,
+	LAST_COMPRESSED_BITMAP_FORMAT = _bitmap_format_dxt5,
+};
+
+enum
+{
+	_bitmap_has_power_of_two_dimensions_bit,
+	_bitmap_compressed_bit,
+	_bitmap_palettized_bit,
+	_bitmap_swizzled_bit,
+	_bitmap_linear_bit,
+	_bitmap_v16u16_bit,
+	_bitmap_allocated_bit,
+	_bitmap_cached_bit,
+	NUMBER_OF_BITMAP_FLAGS,
 };
 
 /* ---------- macros */
@@ -250,16 +300,23 @@ enum
 
 /* ---------- prototypes */
 
-boolean bitmap_verify(
-	struct bitmap_data *bitmap,
-	boolean repair);
 void rasterizer_bitmap_changed(
 	struct bitmap_data *bitmap);
 void rasterizer_bitmap_delete(
 	struct bitmap_data *bitmap);
-long bitmap_mipmap_get_pixel_count(
-	struct bitmap_data *bitmap,
-	short mipmap_index);
+
+static boolean bitmap_format_type_valid_width(
+	short format,
+	short type,
+	short width);
+static boolean bitmap_format_type_valid_height(
+	short format,
+	short type,
+	short height);
+static boolean bitmap_format_type_valid_depth(
+	short format,
+	short type,
+	short depth);
 
 /* ---------- globals */
 
@@ -382,6 +439,166 @@ short bitmap_format_get_bits_per_pixel(
 	return bitmap_format_bits_per_pixel_table[format];
 }
 
+struct bitmap_data *bitmap_2d_new(
+	short width,
+	short height,
+	short mipmap_count,
+	short format)
+{
+	struct bitmap_data *bitmap;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0xB5, bitmap_format_type_valid_width (format, _bitmap_type_2d, width));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0xB6, bitmap_format_type_valid_height(format, _bitmap_type_2d, height));
+
+	bitmap = match_malloc("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0xB8, sizeof(struct bitmap_data));
+	if (bitmap)
+	{
+		csmemset(bitmap, 0, sizeof(struct bitmap_data));
+		bitmap->signature = BITMAP_GROUP_TAG;
+		bitmap->width = width;
+		bitmap->height = height;
+		bitmap->depth = 1;
+		bitmap->type = _bitmap_type_2d;
+		bitmap->format = format;
+		bitmap->flags = FLAG(_bitmap_allocated_bit);
+		bitmap->mipmap_count = mipmap_count;
+		if ((width&(width-1))==0 && (height&(height-1))==0)
+		{
+			SET_FLAG(bitmap->flags, _bitmap_has_power_of_two_dimensions_bit, TRUE);
+		}
+		if (format>=FIRST_COMPRESSED_BITMAP_FORMAT && format<=LAST_COMPRESSED_BITMAP_FORMAT)
+		{
+			SET_FLAG(bitmap->flags, _bitmap_compressed_bit, TRUE);
+		}
+		if (format==_bitmap_format_p8_bump)
+		{
+			SET_FLAG(bitmap->flags, _bitmap_palettized_bit, TRUE);
+		}
+
+		bitmap->base_address = match_malloc("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0xD5, bitmap_get_pixel_data_size(bitmap));
+		if (bitmap->base_address)
+		{
+			match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0xD9, bitmap_verify(bitmap, FALSE));
+		}
+		else
+		{
+			error(_error_silent, "### ERROR failed to allocate bitmap->base_address");
+		}
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate bitmap");
+	}
+
+	return bitmap;
+}
+
+struct bitmap_data *bitmap_3d_new(
+	short width,
+	short height,
+	short depth,
+	short mipmap_count,
+	short format)
+{
+	struct bitmap_data *bitmap;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0xF1, bitmap_format_type_valid_width (format, _bitmap_type_3d, width));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0xF2, bitmap_format_type_valid_height(format, _bitmap_type_3d, height));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0xF3, bitmap_format_type_valid_depth (format, _bitmap_type_3d, depth));
+
+	bitmap = match_malloc("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0xF5, sizeof(struct bitmap_data));
+	if (bitmap)
+	{
+		csmemset(bitmap, 0, sizeof(struct bitmap_data));
+		bitmap->signature = BITMAP_GROUP_TAG;
+		bitmap->width = width;
+		bitmap->height = height;
+		bitmap->depth = depth;
+		bitmap->type = _bitmap_type_3d;
+		bitmap->format = format;
+		bitmap->flags = FLAG(_bitmap_allocated_bit);
+		bitmap->mipmap_count = mipmap_count;
+		if ((width&(width-1))==0 && (height&(height-1))==0 && (depth&(depth-1))==0)
+		{
+			SET_FLAG(bitmap->flags, _bitmap_has_power_of_two_dimensions_bit, TRUE);
+		}
+		if (format>=FIRST_COMPRESSED_BITMAP_FORMAT && format<=LAST_COMPRESSED_BITMAP_FORMAT)
+		{
+			SET_FLAG(bitmap->flags, _bitmap_compressed_bit, TRUE);
+		}
+		if (format==_bitmap_format_p8_bump)
+		{
+			SET_FLAG(bitmap->flags, _bitmap_palettized_bit, TRUE);
+		}
+
+		bitmap->base_address = match_malloc("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x112, bitmap_get_pixel_data_size(bitmap));
+		if (bitmap->base_address)
+		{
+			match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x116, bitmap_verify(bitmap, FALSE));
+		}
+		else
+		{
+			error(_error_silent, "### ERROR failed to allocate bitmap->base_address");
+		}
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate bitmap");
+	}
+
+	return bitmap;
+}
+
+struct bitmap_data *bitmap_cube_map_new(
+	short width,
+	short mipmap_count,
+	short format)
+{
+	struct bitmap_data *bitmap;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x12C, bitmap_format_type_valid_width(format, _bitmap_type_cube_map, width));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x12D, (width&(width-1))==0);
+
+	bitmap = match_malloc("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x12F, sizeof(struct bitmap_data));
+	if (bitmap)
+	{
+		csmemset(bitmap, 0, sizeof(struct bitmap_data));
+		bitmap->signature = BITMAP_GROUP_TAG;
+		bitmap->width = width;
+		bitmap->height = width;
+		bitmap->depth = 1;
+		bitmap->type = _bitmap_type_cube_map;
+		bitmap->format = format;
+		bitmap->mipmap_count = mipmap_count;
+		bitmap->hardware_format = NULL;
+		bitmap->flags = FLAG(_bitmap_has_power_of_two_dimensions_bit)|FLAG(_bitmap_allocated_bit);
+		if (format>=FIRST_COMPRESSED_BITMAP_FORMAT && format<=LAST_COMPRESSED_BITMAP_FORMAT)
+		{
+			SET_FLAG(bitmap->flags, _bitmap_compressed_bit, TRUE);
+		}
+		if (format==_bitmap_format_p8_bump)
+		{
+			SET_FLAG(bitmap->flags, _bitmap_palettized_bit, TRUE);
+		}
+
+		bitmap->base_address = match_malloc("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x14D, bitmap_get_pixel_data_size(bitmap));
+		if (bitmap->base_address)
+		{
+			match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x151, bitmap_verify(bitmap, FALSE));
+		}
+		else
+		{
+			error(_error_silent, "### ERROR failed to allocate bitmap->base_address");
+		}
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate bitmap");
+	}
+
+	return bitmap;
+}
+
 void bitmap_changed(
 	struct bitmap_data *bitmap)
 {
@@ -414,6 +631,144 @@ void bitmap_delete(
 	}
 
 	return;
+}
+
+void *bitmap_2d_address(
+	struct bitmap_data *bitmap,
+	short x,
+	short y,
+	short mipmap_index)
+{
+	long pixel_offset = 0;
+	short width, height, minimum_dimension;
+	long bits_per_pixel;
+	short i;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1A1, bitmap);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1A2, bitmap->base_address);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1A3, bitmap->type==_bitmap_type_2d);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1A4, x>=0 && x<bitmap->width);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1A5, y>=0 && y<bitmap->height);
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1A6, mipmap_index>=0 && mipmap_index<=(short)bitmap->mipmap_count, "mipmap_index>=0 && mipmap_index<=bitmap->mipmap_count");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1A7, !TEST_FLAG(bitmap->flags, _bitmap_compressed_bit) || (x==0 && y==0));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1A8, !TEST_FLAG(bitmap->flags, _bitmap_swizzled_bit) || (x==0 && y==0));
+
+	width = bitmap->width;
+	height = bitmap->height;
+	minimum_dimension = TEST_FLAG(bitmap->flags, _bitmap_compressed_bit) ? 4 : 1;
+	bits_per_pixel = bitmap_format_get_bits_per_pixel(bitmap->format);
+	for (i = 0; i<mipmap_index; i++)
+	{
+		pixel_offset += width*height;
+		width = MAX(minimum_dimension, width>>1);
+		height = MAX(minimum_dimension, height>>1);
+	}
+
+	return (byte *)bitmap->base_address + (pixel_offset + width*y + x)*bits_per_pixel/8;
+}
+
+void *bitmap_3d_address(
+	struct bitmap_data *bitmap,
+	short x,
+	short y,
+	short z,
+	short mipmap_index)
+{
+	long pixel_offset = 0;
+	short width, height, depth, minimum_dimension;
+	long bits_per_pixel;
+	short i;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1C7, bitmap);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1C8, bitmap->base_address);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1C9, bitmap->type==_bitmap_type_3d);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1CA, x>=0 && x<bitmap->width);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1CB, y>=0 && y<bitmap->height);
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1CC, z>=0 && z<(short)bitmap->depth, "z>=0 && z<bitmap->depth");
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1CD, mipmap_index>=0 && mipmap_index<=(short)bitmap->mipmap_count, "mipmap_index>=0 && mipmap_index<=bitmap->mipmap_count");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1CE, !TEST_FLAG(bitmap->flags, _bitmap_compressed_bit) || (x==0 && y==0 && z==0));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1CF, !TEST_FLAG(bitmap->flags, _bitmap_swizzled_bit) || (x==0 && y==0 && z==0));
+
+	width = bitmap->width;
+	height = bitmap->height;
+	depth = bitmap->depth;
+	minimum_dimension = TEST_FLAG(bitmap->flags, _bitmap_compressed_bit) ? 4 : 1;
+	bits_per_pixel = bitmap_format_get_bits_per_pixel(bitmap->format);
+	for (i = 0; i<mipmap_index; i++)
+	{
+		pixel_offset += width*height*depth;
+		width = MAX(minimum_dimension, width>>1);
+		height = MAX(minimum_dimension, height>>1);
+		depth = MAX(1, depth>>1);
+	}
+
+	return (byte *)bitmap->base_address + (pixel_offset + (height*z + y)*width + x)*bits_per_pixel/8;
+}
+
+void *bitmap_cube_map_address(
+	struct bitmap_data *bitmap,
+	short x,
+	short y,
+	short face_index,
+	short mipmap_index)
+{
+	long pixel_offset = 0;
+	short width, minimum_dimension;
+	long bits_per_pixel;
+	short i;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1F0, bitmap);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1F1, bitmap->base_address);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1F2, bitmap->type==_bitmap_type_cube_map);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1F3, x>=0 && x<bitmap->width);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1F4, y>=0 && y<bitmap->height);
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1F5, mipmap_index>=0 && mipmap_index<=(short)bitmap->mipmap_count, "mipmap_index>=0 && mipmap_index<=bitmap->mipmap_count");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1F6, !TEST_FLAG(bitmap->flags, _bitmap_compressed_bit) || (x==0 && y==0));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x1F7, !TEST_FLAG(bitmap->flags, _bitmap_swizzled_bit) || (x==0 && y==0));
+
+	width = bitmap->width;
+	minimum_dimension = TEST_FLAG(bitmap->flags, _bitmap_compressed_bit) ? 4 : 1;
+	bits_per_pixel = bitmap_format_get_bits_per_pixel(bitmap->format);
+	for (i = 0; i<mipmap_index; i++)
+	{
+		pixel_offset += width*width*6;
+		width = MAX(minimum_dimension, width>>1);
+	}
+
+	return (byte *)bitmap->base_address + (pixel_offset + (face_index*width + y)*width + x)*bits_per_pixel/8;
+}
+
+void *bitmap_mipmap_address(
+	struct bitmap_data *bitmap,
+	short mipmap_index)
+{
+	/* January relies on the fatal assertion for unsupported types; there is
+	 * no fallback address if system_exit unexpectedly returns. */
+	void *mipmap_address;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x20D, bitmap);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x20E, bitmap->base_address);
+
+	switch (bitmap->type)
+	{
+	case _bitmap_type_2d:
+		mipmap_address = bitmap_2d_address(bitmap, 0, 0, mipmap_index);
+		break;
+
+	case _bitmap_type_3d:
+		mipmap_address = bitmap_3d_address(bitmap, 0, 0, 0, mipmap_index);
+		break;
+
+	case _bitmap_type_cube_map:
+		mipmap_address = bitmap_cube_map_address(bitmap, 0, 0, 0, mipmap_index);
+		break;
+
+	default:
+		match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x21C, FALSE, "### ERROR unsupported bitmap type");
+		break;
+	}
+
+	return mipmap_address;
 }
 
 short bitmap_get_max_mipmap_count(
@@ -459,6 +814,21 @@ long bitmap_get_pixel_data_size(
 	return pixel_count * bitmap_format_get_bits_per_pixel(bitmap->format) / 8;
 }
 
+long bitmap_mipmap_get_row_pitch(
+	struct bitmap_data *bitmap,
+	short mipmap_index)
+{
+	short width;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x3F5, bitmap_verify(bitmap, FALSE));
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x3F6, mipmap_index>=0 && mipmap_index<=(short)bitmap->mipmap_count, "mipmap_index>=0 && mipmap_index<=bitmap->mipmap_count");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x3F7, !TEST_FLAG(bitmap->flags, _bitmap_compressed_bit));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x3F8, !TEST_FLAG(bitmap->flags, _bitmap_swizzled_bit));
+
+	width = bitmap_mipmap_get_width(bitmap, mipmap_index);
+	return width*bitmap_format_get_bits_per_pixel(bitmap->format)/8;
+}
+
 void bitmap_byte_swap_pixels(
 	struct bitmap_data *bitmap)
 {
@@ -466,3 +836,27 @@ void bitmap_byte_swap_pixels(
 }
 
 /* ---------- private code */
+
+static boolean bitmap_format_type_valid_width(
+	short format,
+	short type,
+	short width)
+{
+	return width>0 && width<=MAXIMUM_BITMAP_WIDTH;
+}
+
+static boolean bitmap_format_type_valid_height(
+	short format,
+	short type,
+	short height)
+{
+	return height>0 && height<=MAXIMUM_BITMAP_HEIGHT;
+}
+
+static boolean bitmap_format_type_valid_depth(
+	short format,
+	short type,
+	short depth)
+{
+	return depth>0 && depth<=MAXIMUM_BITMAP_DEPTH && (depth==1 || type==_bitmap_type_3d);
+}
