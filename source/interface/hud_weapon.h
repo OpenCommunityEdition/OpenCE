@@ -14,6 +14,9 @@ void hud_dispose_weapon_interface_from_old_map(
 void hud_dispose_weapon_interface(
 	void);
 
+void scripted_hud_show_crosshair(
+	boolean show);
+
 void hud_fix_weapon_data(
 	short old_local_player_index,
 	short new_local_player_index);

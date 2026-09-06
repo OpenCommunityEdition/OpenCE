@@ -2788,6 +2788,7 @@ symbols in this file:
 #include "game/game.h"
 #include "interface/hud_messaging.h"
 #include "interface/hud_unit.h"
+#include "interface/hud_weapon.h"
 #include "interface/interface.h"
 #include "interface/player_ui.h"
 #include "rasterizer/rasterizer_cinematics.h"
@@ -3756,8 +3757,6 @@ void errors_overflow_suppression_enable(
 	boolean enabled);
 void scripted_player_effect_stop(
 	real decay_time);
-void scripted_hud_show_crosshair(
-	boolean show);
 void scripted_hud_set_state_message(
 	word message_index);
 void scripted_hud_set_timer_warning_cutoff(

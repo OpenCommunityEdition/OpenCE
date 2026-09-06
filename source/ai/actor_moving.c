@@ -210,6 +210,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "ai/actions.h"
 #include "ai/actor_definitions.h"
+#include "ai/actor_types.h"
 #include "ai/actors.h"
 #include "ai/props.h"
 #include "units/units.h"
@@ -406,6 +407,53 @@ boolean actor_move_force_stop(
 	}
 
 	return result;
+}
+
+boolean actor_aim_jump(
+	long actor_index,
+	long unit_index,
+	boolean leap,
+	real jump_magnitude,
+	real_vector3d *jump_velocity)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->input.vehicle_index == NONE)
+	{
+		if (actor->meta.swarm)
+		{
+			actor_type_swarm_aim_jump(
+				actor_index,
+				unit_index,
+				jump_magnitude,
+				jump_velocity);
+		}
+		else if (actor->control.jumping_targeted)
+		{
+			real magnitude;
+
+			if (actor->state.action == _actor_action_charge &&
+				actor->state.action_data.charge.goal == _charge_goal_melee_leaping)
+			{
+				leap = TRUE;
+			}
+
+			jump_velocity->i = actor->control.jump_alignment_vector.i *
+				actor->control.jump_target_horizontal_vel;
+			jump_velocity->j = actor->control.jump_alignment_vector.j *
+				actor->control.jump_target_horizontal_vel;
+			jump_velocity->k = actor->control.jump_target_vertical_vel;
+			magnitude = magnitude3d(jump_velocity);
+
+			if (!leap && magnitude > jump_magnitude)
+			{
+				scale_vector3d(jump_velocity, jump_magnitude / magnitude, jump_velocity);
+			}
+		}
+	}
+
+	actor->control.jumping_targeted = FALSE;
+	return TRUE;
 }
 
 void actor_move_transform_avoidance_vector(

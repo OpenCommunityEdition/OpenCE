@@ -1103,6 +1103,12 @@ boolean actor_move_animation_impulse(
 	long actor_index,
 	short impulse,
 	real_vector2d const *alignment_vector);
+boolean actor_aim_jump(
+	long actor_index,
+	long unit_index,
+	boolean leap,
+	real jump_magnitude,
+	real_vector3d *jump_velocity);
 void actor_path_input_new(
 	long actor_index,
 	struct path_input *input);

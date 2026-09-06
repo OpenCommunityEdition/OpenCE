@@ -1,5 +1,51 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
+## Current Fable natural aim / HUD crosshair batch (2026-09-06)
+
+The preceding ActionVehicle/HUD batch is published as
+`dde782c26686f1824210b1111736cad07d24e292` on both authorized GitHub refs.
+The next independently verified canonical checkpoint is **916,773 meaningful
+exact code bytes**, **6,212 credited functions**, **6,258 strict functions**,
+**2,061,024 matched data bytes**, and **391 / 833 Matching objects**.
+This adds **43 meaningful / 48 padded exact code bytes**, one function and
+four BSS bytes, with zero inherited strict losses.
+
+HUDWeapon's unchanged natural crosshair setter is first-compile exact after
+the semantic private global/API owner cleanup. Its 4-consumer header sweep
+preserves the inherited functions; all 832 other split targets and, after
+the schema phase, all 571 other base objects are unchanged. The public
+oracle passes 156 cases per target/first/actual object plus three real-byte
+negative controls. HUDWeapon is 6/16 strict, not complete.
+
+ActorMoving gains one honest typed `actor_aim_jump` body at 91.8764%, not
+exact credit: 20 exact / one residual / 15 unwritten. The proper 47-consumer
+API header sweep preserves the inherited exact census. Its one collateral
+fuzzy speech-timer load swap is completely reviewed and independently
+executed before the evidence is refreshed. The aim oracle passes 44 cases
+per role with bit-identical output vectors, while explicitly recording two
+one-ULP internal magnitude residuals. Three natural math fallback owners
+still conflict with ActionCharge NODUPLICATES definitions: this is an
+explicit whole-object linkage veto, not a finished/linkable-object claim.
+
+The first minimal Decals delete trial was exact itself but regressed an
+inherited exact function; it was immediately and fully inverse-restored.
+No published Decals or other progress was removed. Its failed source/object
+evidence and the remaining geometry-owner prerequisites are preserved.
+ParticleSystems' five-claim intake identifies a coherent future 496-padded-
+byte delete/reconnect pair after a genuine shared-schema gate. Its other
+three claims remain withheld for concrete provenance/private-owner issues.
+Those historical pool bytes are not additive credit or reconciled progress.
+
+Root reviewed and independently replayed both new public runtime tools.
+The final full suite passes **502 tests plus 26 subtests**; parks are
+**290 valid / zero stale / zero invalid**. Object admission has zero new
+candidates, contradictions or revocations and five existing rejections.
+See the September 6 ActorMoving natural-aim/math-owner, HUDWeapon crosshair,
+Decals rejected-trial and ParticleSystems five-claim ledgers. The new Opus
+implementation reservations remain untouched. This batch's remote publication
+must be verified against its final commit; Fable reconciliation is not yet
+complete.
+
 ## Current Fable ActionVehicle / HUD reconciliation (2026-09-06)
 
 The geosphere fuzzy packet is published as

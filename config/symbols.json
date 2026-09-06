@@ -22503,7 +22503,7 @@
 { "file_offset": 4537016, "flags": 0, "name": "_hud_messaging_globals", "static": true },
 { "file_offset": 4537020, "flags": 0, "name": "_nav_point_data" },
 { "file_offset": 4537024, "flags": 0, "name": "_unit_hud_globals", "static": true },
-{ "file_offset": 4537028, "flags": 0, "name": "_bss_00453ac4" },
+{ "file_offset": 4537028, "flags": 0, "name": "_weapon_hud_globals", "static": true },
 { "file_offset": 4537032, "flags": 0, "name": "_next_vertex_index" },
 { "file_offset": 4537036, "flags": 0, "name": "_motion_sensor_globals" },
 { "file_offset": 4537044, "flags": 0, "name": "_debug_motion_sensor_draw_all_units" },

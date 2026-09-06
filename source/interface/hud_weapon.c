@@ -47,7 +47,7 @@ symbols in this file:
 002703AC 0030:
 	??_C@_0DA@GANDHJMM@too?5many?5levels?5in?5current?5weapo@ (0000)
 00453AC4 0004:
-	_bss_00453ac4 (0000)
+	_weapon_hud_globals (0000)
 */
 
 /* ---------- headers */
@@ -60,9 +60,12 @@ symbols in this file:
 
 /* ---------- constants */
 
-/* ---------- macros */
+enum hud_crosshair_show_flags
+{
+	_hud_crosshair_show_bit = 0
+};
 
-#define weapon_hud_globals bss_00453ac4
+/* ---------- macros */
 
 /* ---------- structures */
 
@@ -81,7 +84,7 @@ typedef char weapon_hud_globals_size_assert[
 
 /* ---------- globals */
 
-extern struct weapon_hud_globals *bss_00453ac4;
+static struct weapon_hud_globals *weapon_hud_globals = NULL;
 
 /* ---------- public code */
 
@@ -126,6 +129,17 @@ void hud_dispose_weapon_interface_from_old_map(
 void hud_dispose_weapon_interface(
 	void)
 {
+	return;
+}
+
+void scripted_hud_show_crosshair(
+	boolean show)
+{
+	SET_FLAG(
+		weapon_hud_globals->script_flags,
+		_hud_crosshair_show_bit,
+		show);
+
 	return;
 }
 
