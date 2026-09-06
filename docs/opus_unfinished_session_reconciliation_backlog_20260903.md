@@ -2,17 +2,16 @@
 
 ## Current verified canonical / publication-batch totals (2026-09-05)
 
-Published Encounters checkpoint `88b2e0149b1ab956ea30505e20a242b1f6849415`
-is independently verified on both `bnunu/halo` publication branches and
-advances the verified canonical totals to:
-**906,735 meaningful matched code bytes**, **6,173 credited functions**,
+The next verified Encounters platoon-rule publication batch advances canonical
+from published checkpoint `4f90c05c54c78196ce188be3f4439cfdfb30d639` to:
+**907,050 meaningful matched code bytes**, **6,174 credited functions**,
 **2,031,312 matched data bytes**, and **391/833 Matching objects**.
-The full stable-owner sweep has **6,219 strict owners**; **282 fuzzy parks**
-validate. Prior published base `5c22509d85270a056524b6a7eeb22f05a548a9e3`
-was independently verified on both `bnunu/halo` publication branches at
-906,391 code bytes. This coherent batch adds 344 meaningful exact bytes
-and two functions, with zero exact-function losses. It retains the complete
-constructor as honest fuzzy source without claiming whole-object completion.
+The full stable-owner sweep has **6,220 strict owners**; **283 fuzzy parks**
+validate. The preceding initializer batch was independently verified on both
+`bnunu/halo` branches at906,735 meaningful code bytes. This coherent batch
+adds315 meaningful exact bytes and one function, with zero exact-function
+losses. It retains the complete private rule evaluator as honest fuzzy source
+at91.02511%, without claiming whole-object completion.
 All288 tests plus26 subtests pass.
 
 The donor byte pools and earlier "current" totals below are historical
@@ -40,13 +39,16 @@ implementations remain untouched; its later reconciliation must account for
 this genuine shared schema. See the 20260905 Encounters initializer, runtime
 and bounds ledgers for exact evidence and the inferred valid-tag domain0..32.
 
-Next-wave triage identifies the genuine `encounter_update_platoons` /
-`encounter_test_rule` pair (320 + 656 padded bytes). Its real caller is already
-present, but January accesses require additional owning platoon-rule fields
-and named rule enums. This is a queue item only: no candidate body or new
-schema trial is admitted, no exact gain is claimed, and the active Fable lane
-remains excluded. Complete primary field/ABI review and a new full header
-consumer comparison are required before implementation.
+The subsequent genuine `encounter_update_platoons` / `encounter_test_rule`
+pair is now retained (320 +656 padded bytes): one strict caller and one
+complete fuzzy evaluator. Original PDB/January rule fields and enum names
+pass a fresh13-consumer all-section audit with no runtime changes. The
+single natural body preserves all45 inherited exact Encounters functions,
+and111 integrated real-caller/runtime cases pass for target, scratch candidate
+and actual canonical output. All16 new data names have compatible selected
+owners across833 targets and572 canonical objects; no new code helper or
+point COMDAT is emitted. Encounters is now46E/6R/9U. Active Fable remains
+excluded. See the platoon-rule natural, schema, runtime and owner ledgers.
 
 The next verified canonical batch restores ordinary math-header ownership in
 ActionAlert and Particles, and adds the genuine Observer/cluster shared schema.

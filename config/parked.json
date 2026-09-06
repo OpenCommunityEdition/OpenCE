@@ -3,6 +3,25 @@
   "entries": [
     {
       "unit": "source/ai/encounters",
+      "function": "_encounter_test_rule",
+      "class": "unclassified",
+      "evidence": "Complete natural private rule evaluator retained through its genuine encounter_update_platoons caller. January and original PDB authenticate the owning eight-byte platoon_rule, embedded rule fields, ten named rule enums and full-long handle. Typed encounter accessors, real strength values, signed-short counts, natural signed arithmetic and all original diagnostic formats are preserved. First natural candidate is 656 padded bytes/45 relocations versus January 656/46, objdiff 91.02511 percent. Target dispatch includes a redundant never-rule switch slot; VC7 naturally compresses to rules1..9 with a range branch to false. Both code-owned tables preserve all semantic destinations; the omitted default slot explains the single internal relocation difference. The other difference is natural fallback field-load order/register choice; all470 instruction bytes after dispatch align exactly after relocation masking and one-byte address shift. Integrated real-caller/static-callee/accessor execution passes111 cases with matching output arguments, calls, state, signed counts, invalid-index fallback, thresholds/NaNs and guard/ABI checks. All45 inherited exact Encounters functions remain exact; only the intended two code owners and genuine literals appear, with no new point_from_line3d. No source spelling/order search, fake declaration, anchor, forced inline, register/volatile steering, compiler flag or custom ABI was tried. See docs/object_matching_logs/encounters_obj_platoon_rule_pair_natural_20260905.md and its independent runtime and owner reviews. Reopen only for authentic source or compiler-context evidence; do not force the redundant table entry.",
+      "measurements": {
+        "target": {
+          "size": 656,
+          "relocation_count": 46,
+          "normalized_sha256": "ba62edfcd33544627a6b126232380c7f9da859156bbd098cc6425a6e86825c57"
+        },
+        "base": {
+          "size": 656,
+          "relocation_count": 45,
+          "normalized_sha256": "98d8b09149975b27ae9c9fe9f4c0bc9f839a98a76de5b000907b095e0b3b9813"
+        },
+        "objdiff_percent": 91.02511
+      }
+    },
+    {
+      "unit": "source/ai/encounters",
       "function": "_encounter_new",
       "class": "unclassified",
       "evidence": "Complete natural January constructor retained with its genuine public map-initialization caller and private starting-location reset. The owner schema exposes PDB/January-authenticated platoon flags; typed tag/encounter accessors, named cseries flags, original assertions, full salted encounter handles, short counters and the two authentic 999 defaults are preserved. Target and candidate are both 656 padded bytes with 31 relocations; ordinary objdiff is 98.40206 percent. The natural zero-total respawn selection uses a direct short assignment rather than January's EAX selection, shortening that block by three bytes and shifting later branches/relocations. January's external 30.0f constant reference is satisfied by the already-existing genuine candidate literal owner, not a fabricated alias. Integrated real-code execution passes 49/49 cases including field state, external call order, assertions and valid-tag starting-location counts0..32. All43 inherited exact owners and every pre-existing runtime owner are preserved; only compiler-local labels change. No tuning, fake caller, forced inline, custom ABI, raw-offset production access, new math helper or point_from_line3d definition is introduced. See docs/object_matching_logs/encounters_obj_initialize_cluster_natural_20260905.md and its independent runtime review. Park the honest residual; do not search expression/declaration variants.",

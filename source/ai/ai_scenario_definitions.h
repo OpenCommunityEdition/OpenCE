@@ -41,6 +41,20 @@ enum
 
 enum
 {
+	_platoon_rule_never = 0,
+	_platoon_rule_75_strength,
+	_platoon_rule_50_strength,
+	_platoon_rule_25_strength,
+	_platoon_rule_anybody_dead,
+	_platoon_rule_25_dead,
+	_platoon_rule_50_dead,
+	_platoon_rule_75_dead,
+	_platoon_rule_all_but_one_dead,
+	_platoon_rule_all_dead,
+};
+
+enum
+{
 	_actor_starting_location_required_bit = 0,
 };
 
@@ -187,17 +201,37 @@ typedef char actor_starting_location_actor_variant_index_offset_assert[
 typedef char actor_starting_location_command_list_index_offset_assert[
 	offsetof(struct actor_starting_location, command_list_index) == 0x1A ? 1 : -1];
 
+struct platoon_rule
+{
+	short rule_type;
+	short platoon_index;
+	long pad;
+};
+
+typedef char platoon_rule_size_assert[
+	sizeof(struct platoon_rule) == 8 ? 1 : -1];
+typedef char platoon_rule_platoon_index_offset_assert[
+	offsetof(struct platoon_rule, platoon_index) == 2 ? 1 : -1];
+
 struct platoon_definition
 {
 	char name[TAG_STRING_LENGTH+1];
 	unsigned long flags;
-	unsigned char reserved[0x88];
+	unsigned long unused1[3];
+	struct platoon_rule attacking_defending_rule;
+	unsigned long unused2;
+	struct platoon_rule maneuvering_rule;
+	unsigned char reserved[0x68];
 };
 
 typedef char platoon_definition_size_assert[
 	sizeof(struct platoon_definition) == 0xAC ? 1 : -1];
 typedef char platoon_definition_flags_offset_assert[
 	offsetof(struct platoon_definition, flags) == 0x20 ? 1 : -1];
+typedef char platoon_definition_attacking_defending_rule_offset_assert[
+	offsetof(struct platoon_definition, attacking_defending_rule) == 0x30 ? 1 : -1];
+typedef char platoon_definition_maneuvering_rule_offset_assert[
+	offsetof(struct platoon_definition, maneuvering_rule) == 0x3C ? 1 : -1];
 
 struct ai_command_definition
 {

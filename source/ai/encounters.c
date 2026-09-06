@@ -300,6 +300,7 @@ symbols in this file:
 #include "game/game_allegiance.h"
 #include "game/game_engine.h"
 #include "game/players.h"
+#include "main/console.h"
 #include "math/integer_math.h"
 #include "memory/data.h"
 #include "saved games/game_state.h"
@@ -488,8 +489,11 @@ static void encounter_update_squads(
 	long encounter_index);
 void encounter_update_respawn(
 	long encounter_index);
-void encounter_update_platoons(
+static void encounter_update_platoons(
 	long encounter_index);
+static boolean encounter_test_rule(
+	long encounter_index,
+	struct platoon_rule *rule);
 void encounter_update_follow(
 	long encounter_index);
 void encounter_control_actors(
@@ -2158,6 +2162,180 @@ static void encounter_update_timers(
 			encounter->post_combat_delay_timer -= ENCOUNTER_UPDATE_INTERVAL;
 		else
 			encounter->post_combat_delay_timer = 0;
+	}
+
+	return;
+}
+
+static boolean encounter_test_rule(
+	long encounter_index,
+	struct platoon_rule *rule)
+{
+	struct encounter_datum *encounter = encounter_get(encounter_index);
+	short platoon_index = rule->platoon_index;
+	short original_count;
+	real current_strength_fraction;
+	short current_count;
+	boolean result = FALSE;
+
+	if (platoon_index >= 0 && platoon_index < encounter->platoon_count)
+	{
+		struct platoon_datum *platoon =
+			encounter_get_platoon(encounter, platoon_index);
+
+		original_count = platoon->original_count;
+		current_strength_fraction = platoon->current_strength_fraction;
+		current_count = platoon->current_count;
+	}
+	else
+	{
+		original_count = encounter->original_count;
+		current_strength_fraction = encounter->current_strength_fraction;
+		current_count = encounter->current_count;
+	}
+
+	if (original_count > 0)
+	{
+		switch (rule->rule_type)
+		{
+			case _platoon_rule_75_strength:
+				result = current_strength_fraction < 0.75f;
+				break;
+			case _platoon_rule_50_strength:
+				result = current_strength_fraction < 0.5f;
+				break;
+			case _platoon_rule_25_strength:
+				result = current_strength_fraction < 0.25f;
+				break;
+			case _platoon_rule_anybody_dead:
+				result = current_count < original_count;
+				break;
+			case _platoon_rule_25_dead:
+				result = current_count * 4 / 3 <= original_count;
+				break;
+			case _platoon_rule_50_dead:
+				result = current_count * 2 <= original_count;
+				break;
+			case _platoon_rule_75_dead:
+				result = current_count * 4 <= original_count;
+				break;
+			case _platoon_rule_all_but_one_dead:
+				result = current_count <= 1;
+				break;
+			case _platoon_rule_all_dead:
+				result = current_count == 0;
+				break;
+			case _platoon_rule_never:
+			default:
+				result = FALSE;
+				break;
+		}
+	}
+
+	if (ai_debug.print_rule_values && result)
+	{
+		switch (rule->rule_type)
+		{
+			case _platoon_rule_75_strength:
+				console_printf(FALSE, "strength %.2f < 75%%", current_strength_fraction);
+				break;
+			case _platoon_rule_50_strength:
+				console_printf(FALSE, "strength %.2f < 50%%", current_strength_fraction);
+				break;
+			case _platoon_rule_25_strength:
+				console_printf(FALSE, "strength %.2f < 25%%", current_strength_fraction);
+				break;
+			case _platoon_rule_anybody_dead:
+				console_printf(FALSE, "survivors %d < total %d", current_count, original_count);
+				break;
+			case _platoon_rule_25_dead:
+				console_printf(FALSE, "survivors %d <= 25%% of total %d", current_count, original_count);
+				break;
+			case _platoon_rule_50_dead:
+				console_printf(FALSE, "survivors %d <= 50%% of total %d", current_count, original_count);
+				break;
+			case _platoon_rule_75_dead:
+				console_printf(FALSE, "survivors %d <= 75%% of total %d", current_count, original_count);
+				break;
+			case _platoon_rule_all_but_one_dead:
+				console_printf(FALSE, "survivors %d <= 1", current_count);
+				break;
+			case _platoon_rule_all_dead:
+				console_printf(FALSE, "survivors %d = 0", current_count);
+				break;
+			default:
+				break;
+		}
+	}
+
+	return result;
+}
+
+static void encounter_update_platoons(
+	long encounter_index)
+{
+	struct encounter_datum *encounter = encounter_get(encounter_index);
+	struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_encounters,
+		DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index),
+		struct encounter_definition);
+	short platoon_index;
+
+	for (platoon_index = 0;
+		platoon_index < encounter->platoon_count;
+		platoon_index++)
+	{
+		struct platoon_datum *platoon =
+			encounter_get_platoon(encounter, platoon_index);
+
+		if (platoon->current_count > 0)
+		{
+			struct platoon_definition *platoon_definition =
+				TAG_BLOCK_GET_ELEMENT(
+					&encounter_definition->platoons,
+					platoon_index,
+					struct platoon_definition);
+
+			if (!platoon->maneuvering)
+			{
+				platoon->maneuvering = encounter_test_rule(
+					encounter_index,
+					&platoon_definition->maneuvering_rule);
+
+				if (platoon->maneuvering && ai_debug.print_rules)
+				{
+					console_printf(
+						FALSE,
+						"%s/%s triggered maneuvering rule",
+						encounter_definition->name,
+						platoon_definition->name);
+				}
+			}
+
+			if (platoon->maneuver_disable || !platoon->maneuvering)
+			{
+				boolean defending = !TEST_FLAG(
+					platoon_definition->flags,
+					_platoon_initially_defending_bit);
+
+				if (platoon->defending != defending &&
+					encounter_test_rule(
+						encounter_index,
+						&platoon_definition->attacking_defending_rule))
+				{
+					platoon->defending = defending;
+					if (ai_debug.print_rules)
+					{
+						console_printf(
+							FALSE,
+							"%s/%s triggered %s rule",
+							encounter_definition->name,
+							platoon_definition->name,
+							defending ? "defending" : "attacking");
+					}
+				}
+			}
+		}
 	}
 
 	return;
