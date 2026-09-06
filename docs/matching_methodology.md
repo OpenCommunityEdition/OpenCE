@@ -152,6 +152,12 @@ implementation lane.
 
 ## External type-information gate
 
+For the supplied `h1_tags` executables, start with the
+[cross-build intake and missing-PDB identities](crossbuild_h1_tags_intake_20260906.md).
+The `_symbols.exe` images contain external PDB references, not complete
+embedded debug records. That ledger also records the IDA/Ghidra requirement
+and separates analysis-generated names from original-symbol evidence.
+
 HCEX, Halo PC, October 2001, and community sources are hypothesis generators.
 Every imported field or enum value must carry a January-Xbox disassembly proof.
 Unproven spans remain named `reserved`/`unknown` and documented as such. No CEA
