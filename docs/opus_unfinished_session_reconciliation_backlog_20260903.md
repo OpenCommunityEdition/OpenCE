@@ -2,16 +2,16 @@
 
 ## Current verified canonical / publication-batch totals (2026-09-05)
 
-Published checkpoint `616569bb1ef40846dad548d5af9fecd7a0ee5ae4` contains:
-**907,050 meaningful matched code bytes**, **6,174 credited functions**,
-**2,031,312 matched data bytes**, and **391/833 Matching objects**.
-The latest restored full sweep preserves **6,220 strict owners**. There are
-now **282 approved fuzzy parks**, after withdrawing ActorCombat grenade aim's
-unsupported vehicle-path semantic approval. This audit checkpoint adds or
-removes no exact bytes/functions/data/Matching objects. All288 tests plus26
-subtests pass. The preceding Encounters batch added315 meaningful exact bytes
-and one function with zero losses; its rule evaluator remains an honest
-91.02511% residual, not a completed object.
+The verified RenderDebug publication batch after `d00a3788d` contains:
+**907,346 meaningful matched code bytes**, **6,176 credited functions**,
+**2,061,020 matched data bytes**, and **391/833 Matching objects**.
+The full sweep preserves all6,220 inherited strict owners and adds two,
+for **6,222 strict owners**. There are now **283 approved fuzzy parks**.
+The batch adds296 meaningful exact code bytes, two functions and29,708
+matched BSS bytes. Its complete natural cache dispatcher is an honest
+57.757446% residual. All288 tests plus26 subtests pass. ActorCombat grenade
+aim's unsupported vehicle-path park remains withdrawn. The preceding
+Encounters evaluator remains an honest91.02511% residual.
 
 The donor byte pools and earlier "current" totals below are historical
 checkpoints, not a live unreconciled-byte count. Do not subtract or sum them
@@ -20,11 +20,23 @@ functions must not be counted again. Unresolved ownership/API packets remain
 withheld with their evidence; an interrupted newer Opus run without a distinct
 path/ref remains pending intake, not zero progress or an approved import.
 
-The new active `fable/50k-small-families-20260904` lane and all its reserved
-implementations remain excluded from this campaign until the user reports its
-completion or token exhaustion. Read only the frozen older donor trees.
+The user has now reported `fable/50k-small-families-20260904` exhausted its
+tokens and explicitly authorized its reconciliation. Its previous exclusion
+is lifted. Preserve the donor's committed and dirty work read-only during
+intake; compare and reconcile it against current canonical, never sum its
+historical totals into ours. This new intake is the next priority.
 
 ### Follow-up adjudication
+
+Main's old vertical-blank callback was reopened against the now-correct
+64-bit current counter. Two more genuine rasterizer fields are still needed.
+Their first two-file owning-schema trial preserved storage but regressed
+Decals by392 meaningful bytes; the complete packet was reversed with all
+3,522 sections across46 dependents and all6,220 strict owners restored.
+The callback was never compiled and gains no credit. Its target-first
+74-scenario/98-invocation harness and field evidence remain available.
+No header-order or qualifier variants were attempted. See
+`main_obj_vblank_snapshot_schema_boundary_20260905.md`.
 
 The ActorCombat same-TU caller graph is now fully identified: seven genuine
 owners / 7,504 padded bytes, with six DIA-proven static helpers and the public

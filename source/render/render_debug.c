@@ -133,7 +133,11 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h"
+#include "game/game.h"
+#include "interface/interface.h"
 #include "math/real_math.h"
+#include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_debug.h"
 #include "render/render.h"
 #include "render/render_debug.h"
@@ -141,13 +145,126 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	NUMBER_OF_RENDER_DEBUG_CACHE_STRING_CHARACTERS = 1024,
+	MAXIMUM_RENDER_DEBUG_CACHE_ENTRIES = 512,
+};
+
+enum
+{
+	_render_debug_cache_circle,
+	_render_debug_cache_point,
+	_render_debug_cache_line,
+	_render_debug_cache_sphere,
+	_render_debug_cache_cylinder,
+	_render_debug_cache_pill,
+	_render_debug_cache_box,
+	_render_debug_cache_box_outline,
+	_render_debug_cache_string,
+	_render_debug_cache_string_at_point,
+	NUMBER_OF_RENDER_DEBUG_CACHE_TYPES
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
 
+struct render_debug_cache_entry
+{
+	short type;
+	union
+	{
+		struct
+		{
+			real_plane3d plane;
+			short projection;
+			boolean sign;
+			real_point2d center;
+			real radius;
+			real_argb_color color;
+			real offset;
+		} circle;
+		struct
+		{
+			real_point3d point;
+			real size;
+			real_argb_color color;
+		} point;
+		struct
+		{
+			real_point3d point0;
+			real_point3d point1;
+			real_argb_color color;
+		} line;
+		struct
+		{
+			real_point3d base;
+			real_vector3d height;
+			real width;
+			real_argb_color color;
+		} pill;
+		struct
+		{
+			real_rectangle3d bounds;
+			real_argb_color color;
+		} box;
+		struct
+		{
+			char const *string;
+		} string;
+		struct
+		{
+			char const *string;
+			real_point3d point;
+			real_argb_color color;
+		} string_at_point;
+	};
+};
+
+struct render_debug_globals_definition
+{
+	char strings[NUMBER_OF_RENDER_DEBUG_CACHE_STRING_CHARACTERS];
+	struct render_debug_cache_entry entries[MAXIMUM_RENDER_DEBUG_CACHE_ENTRIES];
+	short game_time;
+	byte opaque_after_game_time[2];
+	short entry_count;
+	byte opaque_after_entry_count[2];
+	short string_offset;
+	boolean entry_overflow_reported;
+	boolean string_overflow_reported;
+};
+
+typedef char render_debug_cache_entry_size_check[
+	sizeof(struct render_debug_cache_entry) == 0x38 ? 1 : -1];
+typedef char render_debug_globals_size_check[
+	sizeof(struct render_debug_globals_definition) == 0x740C ? 1 : -1];
+typedef char render_debug_globals_strings_offset_check[
+	offsetof(struct render_debug_globals_definition, strings) == 0x0000 ? 1 : -1];
+typedef char render_debug_globals_entries_offset_check[
+	offsetof(struct render_debug_globals_definition, entries) == 0x0400 ? 1 : -1];
+typedef char render_debug_globals_game_time_offset_check[
+	offsetof(struct render_debug_globals_definition, game_time) == 0x7400 ? 1 : -1];
+typedef char render_debug_globals_entry_count_offset_check[
+	offsetof(struct render_debug_globals_definition, entry_count) == 0x7404 ? 1 : -1];
+typedef char render_debug_globals_string_offset_offset_check[
+	offsetof(struct render_debug_globals_definition, string_offset) == 0x7408 ? 1 : -1];
+typedef char render_debug_globals_entry_overflow_offset_check[
+	offsetof(struct render_debug_globals_definition, entry_overflow_reported) == 0x740A ? 1 : -1];
+typedef char render_debug_globals_string_overflow_offset_check[
+	offsetof(struct render_debug_globals_definition, string_overflow_reported) == 0x740B ? 1 : -1];
+
 /* ---------- prototypes */
 
+static char *render_debug_add_cache_string(
+	char const *string);
+static void render_debug_add_cache_entry(
+	short type,
+	...);
+
 /* ---------- globals */
+
+static struct render_debug_globals_definition render_debug_globals;
 
 /* ---------- public code */
 
@@ -419,6 +536,41 @@ void render_debug_polygon_edges(
 	return;
 }
 
+void render_debug_string(
+	boolean immediate,
+	char const *string)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		893,
+		string);
+
+	if (immediate)
+	{
+		interface_set_bitmap_text_draw_mode(
+			_interface_font_terminal,
+			NONE,
+			0,
+			0,
+			_interface_color_table_dialog,
+			0);
+		rasterizer_draw_string(
+			NULL,
+			NULL,
+			NULL,
+			0,
+			string);
+	}
+	else
+	{
+		render_debug_add_cache_entry(
+			_render_debug_cache_string,
+			string);
+	}
+
+	return;
+}
+
 void render_debug_vectors(
 	boolean immediate,
 	const real_point3d *point,
@@ -512,3 +664,157 @@ void render_debug_box2d_outline(
 }
 
 /* ---------- private code */
+
+static char *render_debug_add_cache_string(
+	char const *string)
+{
+	char *result = NULL;
+	short offset;
+
+	for (offset = 0; offset < render_debug_globals.string_offset; offset++)
+	{
+		if (!csstrcmp(string, &render_debug_globals.strings[offset]))
+		{
+			result = &render_debug_globals.strings[offset];
+			break;
+		}
+	}
+
+	if (!result)
+	{
+		if (render_debug_globals.string_offset < NUMBER_OF_RENDER_DEBUG_CACHE_STRING_CHARACTERS - 1)
+		{
+			result = &render_debug_globals.strings[render_debug_globals.string_offset];
+
+			csstrncpy(
+				result,
+				string,
+				NUMBER_OF_RENDER_DEBUG_CACHE_STRING_CHARACTERS - 1 - render_debug_globals.string_offset);
+			render_debug_globals.strings[NUMBER_OF_RENDER_DEBUG_CACHE_STRING_CHARACTERS - 1] = 0;
+
+			render_debug_globals.string_offset += (short)csstrlen(string) + 1;
+			render_debug_globals.string_offset = MIN(
+				render_debug_globals.string_offset,
+				NUMBER_OF_RENDER_DEBUG_CACHE_STRING_CHARACTERS - 1);
+		}
+		else if (!render_debug_globals.string_overflow_reported)
+		{
+			error(_error_silent, "render debug cache string overflow");
+			render_debug_globals.string_overflow_reported = TRUE;
+		}
+	}
+
+	return result;
+}
+
+static void render_debug_add_cache_entry(
+	short type,
+	...)
+{
+	struct render_debug_cache_entry *entry;
+	char const *cached_string;
+	va_list list;
+
+	if (render_debug_globals.game_time != (short)game_time_get())
+	{
+		render_debug_globals.game_time = (short)game_time_get();
+		render_debug_globals.entry_count = 0;
+		render_debug_globals.string_offset = 0;
+		render_debug_globals.strings[0] = 0;
+	}
+	else if (render_debug_globals.entry_count >= MAXIMUM_RENDER_DEBUG_CACHE_ENTRIES)
+	{
+		if (!render_debug_globals.entry_overflow_reported)
+		{
+			error(_error_silent, "render debug cache overflow.");
+			render_debug_globals.entry_overflow_reported = TRUE;
+		}
+
+		return;
+	}
+
+	entry = &render_debug_globals.entries[render_debug_globals.entry_count++];
+	entry->type = type;
+
+	/*
+	 * MSVC i386 gives the named short a four-byte cdecl argument slot;
+	 * va_start therefore begins at the following slot.  Arguments after the
+	 * ellipsis use the C default promotions: short/boolean -> int, real -> double.
+	 */
+	va_start(list, type);
+
+	switch (type)
+	{
+		case _render_debug_cache_circle:
+			entry->circle.plane = *va_arg(list, real_plane3d const *);
+			entry->circle.projection = (short)va_arg(list, int);
+			entry->circle.sign = (boolean)va_arg(list, int);
+			entry->circle.center = *va_arg(list, real_point2d const *);
+			entry->circle.radius = (real)va_arg(list, double);
+			entry->circle.color = *va_arg(list, real_argb_color const *);
+			entry->circle.offset = (real)va_arg(list, double);
+			break;
+
+		case _render_debug_cache_point:
+		case _render_debug_cache_sphere:
+			entry->point.point = *va_arg(list, real_point3d const *);
+			entry->point.size = (real)va_arg(list, double);
+			entry->point.color = *va_arg(list, real_argb_color const *);
+			break;
+
+		case _render_debug_cache_line:
+			entry->line.point0 = *va_arg(list, real_point3d const *);
+			entry->line.point1 = *va_arg(list, real_point3d const *);
+			entry->line.color = *va_arg(list, real_argb_color const *);
+			break;
+
+		case _render_debug_cache_cylinder:
+			entry->pill.base = *va_arg(list, real_point3d const *);
+			entry->pill.height = *va_arg(list, real_vector3d const *);
+			entry->pill.width = (real)va_arg(list, double);
+			entry->pill.color = *va_arg(list, real_argb_color const *);
+			break;
+
+		case _render_debug_cache_pill:
+			entry->pill.base = *va_arg(list, real_point3d const *);
+			entry->pill.height = *va_arg(list, real_vector3d const *);
+			entry->pill.width = (real)va_arg(list, double);
+			entry->pill.color = *va_arg(list, real_argb_color const *);
+			break;
+
+		case _render_debug_cache_box:
+		case _render_debug_cache_box_outline:
+			entry->box.bounds = *va_arg(list, real_rectangle3d const *);
+			entry->box.color = *va_arg(list, real_argb_color const *);
+			break;
+
+		case _render_debug_cache_string:
+			cached_string = render_debug_add_cache_string(va_arg(list, char const *));
+			if (cached_string)
+			{
+				entry->string.string = cached_string;
+			}
+			else
+			{
+				render_debug_globals.entry_count--;
+			}
+			break;
+
+		case _render_debug_cache_string_at_point:
+			cached_string = render_debug_add_cache_string(va_arg(list, char const *));
+			if (!cached_string)
+			{
+				render_debug_globals.entry_count--;
+				break;
+			}
+
+			entry->string_at_point.string = cached_string;
+			entry->string_at_point.point = *va_arg(list, real_point3d const *);
+			entry->string_at_point.color = *va_arg(list, real_argb_color const *);
+			break;
+	}
+
+	va_end(list);
+
+	return;
+}

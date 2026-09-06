@@ -5128,6 +5128,25 @@
         },
         "objdiff_percent": 74.261536
       }
+    },
+    {
+      "unit": "source/render/render_debug",
+      "function": "_render_debug_add_cache_entry",
+      "class": "unclassified",
+      "evidence": "Complete natural variadic cache dispatcher retained with its genuine private static caller graph and typed tagged-union/cache globals, not an exported emission anchor. Default promotions use int and double. A recovered cached_string local preserves January's stale slot payload when string insertion fails; the old donor's unconditional NULL store is not copied. Target656/27R versus candidate672/27R, objdiff57.757446 percent; residuals are unforced basic-block, save/restore and tail-sharing choices, not missing cases. All ten valid helper type contracts and the real public string chain pass41 scenarios/81invocations with full cache, API-entry snapshots, ABI and guards. Type0 is tested only with its complete valid argument contract: the separate January circle caller omits the offset double and remains unwritten/unapproved. No claim of correctness for that original invalid caller path. Both private string helper and public wrapper are separately strict; all inherited owners and the full strict sweep are preserved, with no extra helper, COMMON or point_from_line3d. See docs/object_matching_logs/render_debug_obj_cache_string_natural_reconciliation_20260905.md. Reopen only from genuine source/schema/compiler evidence, not equivalent spelling or layout searches.",
+      "measurements": {
+        "target": {
+          "size": 656,
+          "relocation_count": 27,
+          "normalized_sha256": "758a747bdf7be941e3f5d2ed8af568da259bfd54f31c20040d5e020dd3a26039"
+        },
+        "base": {
+          "size": 672,
+          "relocation_count": 27,
+          "normalized_sha256": "253ff517307f1ce0930b283987a3440871ba949616ecc6ed43ff1ce939911398"
+        },
+        "objdiff_percent": 57.757446
+      }
     }
   ]
 }
