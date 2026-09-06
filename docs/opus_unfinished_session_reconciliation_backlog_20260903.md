@@ -1,5 +1,25 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
+## Weapons export owner trial restored (2026-09-06)
+
+The natural particle initialization batch is published as
+`ced790c736ea9e7c50b9328269b5e96ad66053d0` on both authorized GitHub refs,
+independently verified. The refreshed canonical treemap has 833 units, one
+source and zero warnings. Canonical/GitHub remain **917,456 meaningful exact
+code bytes**, **6,215 credited functions**, **6,261 strict functions** and
+**391/833 Matching objects**.
+
+The next coherent Weapons export/helper owner-schema trial was fully restored.
+Moving the genuine overheat flag to Weapons also required removing the existing
+FirstPersonWeapons local duplicate. The completed 17-consumer schema build
+swapped two independent loads in GameEngine's 560-byte
+`_populate_statistic_buffer`, dropping one inherited strict function despite
+the unchanged aggregate progress display. No export/helper body was compiled.
+After inverse restoration, all **2,270 runtime records** and the entire
+**6,261-function strict census** are preserved. This is an explicit new owner
+boundary, not admitted donor credit or lost published progress. See
+`object_matching_logs/weapons_obj_export_owner_schema_rejected_20260906.md`.
+
 ## Current natural ParticleSystems initialization batch (2026-09-06)
 
 The preceding lifecycle/Effects ABI batch is published as
