@@ -8,6 +8,12 @@ addend, ABI, build, and regression evidence.
 
 ## Triage decision tree
 
+Before guessing literals or reconstructing diagnostics, consult the
+[common constants reference](common_constants.md) and
+[shared assertion API](assertions.md). They identify existing owners and
+target-specific representation pitfalls; they do not authorize numeric or
+source-shape substitutions just because a value looks familiar.
+
 1. Establish the untouched baseline: padded size, meaningful size, normalized
    hash, relocation table, first differing instruction, and sibling status.
 2. If relocation targets or addresses differ, recover source structure before

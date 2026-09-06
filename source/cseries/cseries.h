@@ -106,14 +106,21 @@ enum
 #define match_vhalt(file, line, string) do { display_assert(string, MATCH_FILE(file), MATCH_LINE(line), TRUE); halt_and_catch_fire(); } while (FALSE);
 #define match_assert(file, line, expr) if (!(expr)) { display_assert(#expr, MATCH_FILE(file), MATCH_LINE(line), TRUE); system_exit(-1); }
 #define match_vassert(file, line, expr, string) if (!(expr)) { display_assert(string, MATCH_FILE(file), MATCH_LINE(line), TRUE); system_exit(-1); }
+#define match_dassert(file, line, expr, diagnostic) do { match_vassert(file, line, expr, diagnostic); } while (FALSE)
 #define match_warn(file, line, expr) if (!(expr)) { display_assert(#expr, MATCH_FILE(file), MATCH_LINE(line), FALSE); }
 #define match_vwarn(file, line, expr, string) if (!(expr)) { display_assert(string, MATCH_FILE(file), MATCH_LINE(line), FALSE); }
+#define match_dwarn(file, line, expr, diagnostic) do { match_vwarn(file, line, expr, diagnostic); } while (FALSE)
+#define match_dhalt(file, line, diagnostic) do { match_vhalt(file, line, diagnostic); } while (FALSE)
 
 #define halt() match_halt(__FILE__, __LINE__)
 #define vhalt(string) match_vhalt(__FILE__, __LINE__, string)
+#define dhalt(diagnostic) match_dhalt(__FILE__, __LINE__, diagnostic)
 #define assert(expr) match_assert(__FILE__, __LINE__, expr)
+#define dassert(expr, diagnostic) match_dassert(__FILE__, __LINE__, expr, diagnostic)
+/* VC7 has no variadic macros: format vassert messages with csprintf(temporary, ...). */
 #define vassert(expr, string) match_vassert(__FILE__, __LINE__, expr, string)
 #define warn(expr) match_warn(__FILE__, __LINE__, expr)
+#define dwarn(expr, diagnostic) match_dwarn(__FILE__, __LINE__, expr, diagnostic)
 #define vwarn(expr, string) match_vwarn(__FILE__, __LINE__, expr, string)
 
 #define ABS(x) ((x>=0) ? (x) : -(x))

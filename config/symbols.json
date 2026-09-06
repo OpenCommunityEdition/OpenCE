@@ -6949,7 +6949,7 @@
 { "file_offset": 1684016, "flags": 32, "name": "_unit_get_weapon" },
 { "file_offset": 1684096, "flags": 32, "name": "_unit_drop_item" },
 { "file_offset": 1684496, "flags": 32, "name": "_code_0019b410" },
-{ "file_offset": 1684672, "flags": 32, "name": "_code_0019b4c0" },
+{ "file_offset": 1684672, "flags": 32, "name": "_unit_drop_inventory_weapons", "static": true },
 { "file_offset": 1684928, "flags": 32, "name": "_unit_handle_region_destroyed" },
 { "file_offset": 1684992, "flags": 32, "name": "_code_0019b600" },
 { "file_offset": 1685120, "flags": 32, "name": "_unit_cause_continuous_melee_damage" },

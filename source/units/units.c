@@ -203,7 +203,7 @@ symbols in this file:
 0019B410 00b0:
 	_code_0019b410 (0000)
 0019B4C0 0100:
-	_code_0019b4c0 (0000)
+	_unit_drop_inventory_weapons (0000)
 0019B5C0 0040:
 	_unit_handle_region_destroyed (0000)
 0019B600 0080:
@@ -1022,7 +1022,7 @@ static long unit_get_weapon(struct unit_datum *unit, short index);
 static void unit_drop_item(long unit_index, long item_index);
 static void code_0019b410(
 	long unit_index);
-static void code_0019b4c0(
+static void unit_drop_inventory_weapons(
 	long unit_index);
 
 static void unit_verify_vectors(long unit_index, char const *debugstring);
@@ -2739,7 +2739,7 @@ void unit_destroy(
 	return;
 }
 
-static void code_0019b4c0(
+static void unit_drop_inventory_weapons(
 	long unit_index)
 {
 	struct unit_datum *unit;
@@ -2758,19 +2758,15 @@ static void code_0019b4c0(
 			inventory_index != unit->unit.current_weapon_index)
 		{
 			weapon = weapon_get(weapon_index);
-			if (TEST_FLAG(weapon->object.flags, _object_connected_to_map_bit))
-			{
-				display_assert(
-					csprintf(
-						temporary,
-						"a %s tried to drop a %s which was connected to the map.",
-						tag_get_name(unit->definition_index),
-						tag_get_name(weapon->definition_index)),
-					"c:\\halo\\SOURCE\\units\\units.c",
-					8505,
-					TRUE);
-				system_exit(-1);
-			}
+			match_vassert(
+				"c:\\halo\\SOURCE\\units\\units.c",
+				8505,
+				!TEST_FLAG(weapon->object.flags, _object_connected_to_map_bit),
+				csprintf(
+					temporary,
+					"a %s tried to drop a %s which was connected to the map.",
+					tag_get_name(unit->definition_index),
+					tag_get_name(weapon->definition_index)));
 
 			unit_drop_item(unit_index, weapon_index);
 			if (inventory_index == unit->unit.desired_weapon_index)
@@ -2876,7 +2872,7 @@ void unit_died(
 	}
 
 	unit->unit.speech.queued.priority = 0;
-	code_0019b4c0(unit_index);
+	unit_drop_inventory_weapons(unit_index);
 	fresh_unit = unit_get(unit_index);
 	if (fresh_unit->unit.equipment_object_index != NONE)
 	{

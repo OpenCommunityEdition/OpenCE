@@ -17,6 +17,13 @@ See https://decomp.dev/api for an API overview.
 
 This is a work-in-progress decompilation of Halo: Combat Evolved build 2342 (`cachebeta.exe`, sha256 `4cc87b45f721270392a96f1674ed2b5cd4a7bb4355faeab4531d1cf1884d9520`).
 
+## Agent quick references
+
+- [Common constants, types, float patterns, tag IDs, and flag conventions](docs/common_constants.md)
+- [Shared assertion macros and byte-matching examples](docs/assertions.md)
+- [Supplied CE source maps, recovered names, and next reconstruction packets](docs/user_source_reconstruction_map_20260906.md)
+- [Matching methodology and source-credibility rules](docs/matching_methodology.md)
+
 ## Build instructions
 
 You must source the Halo 1 PAL debug build and the August 2001 Xbox SDK yourself. You also need [ninja-build](https://ninja-build.org/) on your PATH.

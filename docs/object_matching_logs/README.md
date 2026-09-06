@@ -8,6 +8,10 @@ General techniques that apply across translation units belong in
 `docs/exact_match_acceleration_playbook.md`; object-specific measurements stay
 in the individual ledger.
 
+Start constant and diagnostic recovery with the
+[common constants reference](../common_constants.md) and
+[shared assertion API](../assertions.md), before testing guessed literals.
+
 The purpose is to make matching work cumulative. A new lane must be able to
 distinguish an untried evidence-backed source shape from a spelling that has
 already compiled to the same bytes.

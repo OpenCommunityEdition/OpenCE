@@ -159,6 +159,14 @@ context explaining the extra timing call and register schedule.
 
 ## Explicit rejection
 
+**2026-09-06 evidence update:** the user-supplied server source now directly
+corroborates the automatic initializer, pointer-sized clear, and assertion
+line against January. The unsupported-source rationale below is historical,
+not a current prohibition on a new evidence-backed candidate. See the
+[source reconstruction map](../user_source_reconstruction_map_20260906.md).
+The body has not yet been integrated or credited by this documentation update;
+normal owner, caller, strict-match, and regression gates still apply.
+
 The donor's `network_game_generate_join_game_token` body is not admitted.  It
 declares a pointer parameter, clears `sizeof(join_token)` bytes (therefore only
 the pointer width), and then overwrites the token with a fixed stack literal.
