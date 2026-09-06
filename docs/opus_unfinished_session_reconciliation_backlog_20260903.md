@@ -1,6 +1,32 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
-## Current local publication-batch totals (2026-09-06)
+## Current geosphere fuzzy reconciliation (2026-09-06)
+
+The preceding Weapons/Geometry exact batch is published as
+`c2561af50c7fda9c5ea3326b35b4ba10f90d17f5` on both authorized GitHub refs.
+The next packet retains five geosphere bodies after one genuine typed-C
+repair, with **zero additional exact bytes**. Geometry is 14 exact / 5
+residual / 11 unwritten. All 6,255 inherited strict matches survive.
+The integrated target/first/actual oracle passes 20 cases including the real
+16-segment caller, two explicit x87 modes and original allocation failures.
+Parks are 289 valid / zero stale / zero invalid; the full suite passes
+449 tests plus 26 subtests. Natural helper ownership remains an explicit
+whole-object veto. See `object_matching_logs/geometry_obj_fable_geosphere_reconciliation_20260906.md`.
+
+Render Cameras' one genuine header prerequisite trial regressed three
+inherited functions and was fully reversed before either new body was
+compiled. All 6,669 runtime sections across 82 consumers are restored.
+See `object_matching_logs/render_cameras_obj_fable_owner_trial_rejected_20260906.md`.
+Structures' claimed two-function / 256-padded-byte exact pair remains held:
+the retained donor history documents measured cast/control-flow variants,
+not an admissible first-source closure. Its dirty planar-fog addition is
+separate and untouched. See `object_matching_logs/structures_obj_fable_cluster_pair_intake_20260906.md`.
+
+The geosphere packet's publication must be verified against its final commit;
+this ledger alone is not proof of a push. No reserved new Opus implementation
+has been changed.
+
+## Published exact checkpoint totals (2026-09-06)
 
 The local Weapons inventory / Geometry clean-pair batch after published
 `e50f98a194e0bac4d3f85c2fe2d8aec76b0b9f1c` contains

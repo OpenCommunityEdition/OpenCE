@@ -2,6 +2,61 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/math/geometry",
+      "function": "_geosphere_new",
+      "class": "unclassified",
+      "evidence": "Coherent natural geosphere public entry and four genuine private callees retained after one defined-C repair: calculate_vertex interpolates into a real_vector3d, uses normalize3d, then copies scalar components into the destination real_point3d. The rejected donor pointer-punning first object is preserved separately; no source-shape search followed the repair. Integrated January/typed-first/actual execution passes20 cases from only this public entry, including the real16-segment caller, both explicit x87 control modes, child/per-face allocation failures and original capacity assertion. Exact full heap, vertices, strips, normalization inputs, call order and public ABI agree. Authentic primitive table and existing owner header are preserved. All6255 inherited strict functions survive; no new point_from_line3d. Seven natural helpers gain no credit and the four existing ActionCharge NODUPLICATES conflicts explicitly veto whole-object admission. This is zero exact-byte credit, not a classified compiler-mechanism proof. See docs/object_matching_logs/geometry_obj_fable_geosphere_reconciliation_20260906.md. Reopen only with genuine source/type/compiler-context evidence, not expression, declaration, qualifier or helper-emission tuning.",
+      "measurements": {
+        "target": { "size": 496, "relocation_count": 25, "normalized_sha256": "89b49ad03b434d6258ac264dc7b71bb625984c51016d55a82ad146c86d474911" },
+        "base": { "size": 496, "relocation_count": 25, "normalized_sha256": "56760ccae276f6ff7f6f188448a6f19fbffa288c993cd71d4dd9cad5c9b1c978" },
+        "objdiff_percent": 88.11176
+      }
+    },
+    {
+      "unit": "source/math/geometry",
+      "function": "_subdivide_triangle",
+      "class": "unclassified",
+      "evidence": "Genuine private geosphere graph member, tested by executing geosphere_new and all four same-object private callees with their real compiler-private calling conventions, never by fabricated private stubs. The single typed-vector repair is compiled coherently through all callers. Twenty January/first/actual integrated cases pass exact state/call/ABI comparison, including production16 segments, two x87 modes, face allocation failures and January's original assertion behavior. All inherited runtime owners remain unchanged. No point_from_line3d or source-shape tuning; natural math fallbacks carry zero target credit and known ActionCharge helper conflicts veto the whole object. See docs/object_matching_logs/geometry_obj_fable_geosphere_reconciliation_20260906.md. Keep this honest residual; reopen only for independently justified source/type/compiler-context evidence.",
+      "measurements": {
+        "target": { "size": 944, "relocation_count": 52, "normalized_sha256": "f2e96f710a5b63988446081b1b3fff165fb4db2779f4b38606e273508fcad334" },
+        "base": { "size": 944, "relocation_count": 52, "normalized_sha256": "0ea8faff29e129b55a134432a0e602b69d5f7ad1beeee4b15f02a5e1403599ed" },
+        "objdiff_percent": 90.79672
+      }
+    },
+    {
+      "unit": "source/math/geometry",
+      "function": "_get_face_vertex",
+      "class": "unclassified",
+      "evidence": "Genuine private geosphere face allocator retained in its complete same-object caller graph after one typed-C vector/point repair. Parent vertices may be allocated after the destination slot is reserved; no incorrect parent-index-order assumption is used. Twenty target/first/actual integrated geosphere_new executions pass exact heap/coordinate/strip/normalization-input/call/ABI comparison, including the real16-segment caller and failure paths under two explicit x87 modes. No inherited exact loss or new point_from_line3d. Natural helper copies receive no credit and existing ActionCharge NODUPLICATES ownership bars whole-object admission. See docs/object_matching_logs/geometry_obj_fable_geosphere_reconciliation_20260906.md. No exact closure or precise compiler blocker is claimed; reopen only with genuine new source/type/compiler-context evidence, not variant searches.",
+      "measurements": {
+        "target": { "size": 400, "relocation_count": 18, "normalized_sha256": "6b9b37ec87ba359ac32e9e5bc04938b01a69de5b6783ee0b7d766818299f1b87" },
+        "base": { "size": 400, "relocation_count": 18, "normalized_sha256": "10460c1e30f697342132688a0b347c3cf155248e73da04199d5d482d22c26c63" },
+        "objdiff_percent": 75.62987
+      }
+    },
+    {
+      "unit": "source/math/geometry",
+      "function": "_get_edge_vertex",
+      "class": "unclassified",
+      "evidence": "Genuine private edge-subdivision member of the typed geosphere reconstruction, coherently compiled with its actual public/private callers. One semantic repair removes point/vector representation-pointer punning; no attempt follows to recover the donor's stronger byte shape. Twenty integrated January/first/actual cases pass exact full heap, coordinates, strips, normalization inputs, calls and ABI under two explicit x87 modes, including production16 segments. All inherited exact/runtime owners survive; no new point_from_line3d. Seven authentic natural helpers carry zero credit and four ActionCharge NODUPLICATES conflicts veto whole-object completion. See docs/object_matching_logs/geometry_obj_fable_geosphere_reconciliation_20260906.md. The416/400 padded extent is an honest residual, not claimed exactness; reopen only with genuine source/type/compiler-context evidence.",
+      "measurements": {
+        "target": { "size": 416, "relocation_count": 17, "normalized_sha256": "ebafcbd056870e28f2d96ad7e08a64d9a2e1b2513e911e075aed0fca4b9dc880" },
+        "base": { "size": 400, "relocation_count": 17, "normalized_sha256": "240b22a49f13a88b486b99416a7f162513a3c76a9e4de22ee5445d83f3cc7ded" },
+        "objdiff_percent": 61.442856
+      }
+    },
+    {
+      "unit": "source/math/geometry",
+      "function": "_calculate_vertex",
+      "class": "unclassified",
+      "evidence": "Single defined-C reconciliation of donor point/vector pointer punning: interpolate into a true real_vector3d local with set_real_vector3d, execute genuine normalize3d, copy scalar components out using set_real_point3d. No overlay, raw offset, intermediate void cast, copied math, qualifier search or compiler steering. The genuine public geosphere_new/private graph, including actual16-segment production input, passes20 exact runtime state/call/ABI cases under explicit0x027f/0x037f modes. No numeric tolerance relaxes the target comparison. All inherited exact owners survive. Seven natural helper copies are authenticated but uncredited; four ActionCharge NODUPLICATES conflicts veto the whole object. No point_from_line3d is emitted/referenced. See docs/object_matching_logs/geometry_obj_fable_geosphere_reconciliation_20260906.md. Keep this typed residual rather than revert to a stronger but inadmissible cast form; reopen only with genuine new source/type/compiler-context evidence.",
+      "measurements": {
+        "target": { "size": 336, "relocation_count": 18, "normalized_sha256": "5bc4eb4df60182b53941a5231a7f0f984ca4d4eb37fe4dafb09662a2cf8916af" },
+        "base": { "size": 336, "relocation_count": 18, "normalized_sha256": "26b9afec42c4b82dbb45631840c95109ba1e2ee7bcbe5597afc9d45570e89783" },
+        "objdiff_percent": 72.09804
+      }
+    },
+    {
       "unit": "source/tool/error_geometry",
       "function": "_error_geometry_polygon",
       "class": "instruction-scheduling",

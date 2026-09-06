@@ -195,16 +195,80 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	GEOSPHERE_PRIMITIVE_VERTEX_COUNT= 6,
+	GEOSPHERE_PRIMITIVE_EDGE_COUNT= 12,
+	GEOSPHERE_PRIMITIVE_TRIANGLE_COUNT= 8,
+
+	MAXIMUM_GEOSPHERE_PRIMITIVE_VERTEX_COUNT= 8
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
 
 /* ---------- prototypes */
 
+static void subdivide_triangle(
+	struct geosphere *sphere,
+	short v1,
+	short v2,
+	short v3,
+	short *vertex_index,
+	short *triangle_strip_vertex_indices_index,
+	short *vertex_subdivision_indices);
+static short get_face_vertex(
+	struct geosphere *sphere,
+	short v1,
+	short v2,
+	short v3,
+	short row,
+	short column,
+	short *vertex_index,
+	short *vertex_subdivision_indices,
+	short *vertex_face_indices);
+static short get_edge_vertex(
+	struct geosphere *sphere,
+	short v1,
+	short v2,
+	short subdivision_index,
+	short *vertex_index,
+	short *vertex_subdivision_indices);
+static void calculate_vertex(
+	struct geosphere *sphere,
+	short subdivision_index,
+	short subdivision_count,
+	short parent1,
+	short parent2,
+	short new_vertex);
+
 /* ---------- globals */
 
 real global_convex_hull3d_delta = 0.01f;
 real global_convex_hull3d_epsilon = 0.001f;
+
+static real_point3d const geosphere_primitive_vertices[GEOSPHERE_PRIMITIVE_VERTEX_COUNT]=
+{
+	{0.f, 0.f, 1.f},
+	{0.f, 1.f, 0.f},
+	{1.f, 0.f, 0.f},
+	{0.f, -1.f, 0.f},
+	{-1.f, 0.f, 0.f},
+	{0.f, 0.f, -1.f}
+};
+
+static short const geosphere_primitive_triangles[GEOSPHERE_PRIMITIVE_TRIANGLE_COUNT][NUMBER_OF_VERTICES_PER_TRIANGLE]=
+{
+	{0, 1, 2},
+	{0, 2, 3},
+	{0, 3, 4},
+	{0, 4, 1},
+	{5, 1, 4},
+	{5, 4, 3},
+	{5, 3, 2},
+	{5, 2, 1}
+};
 
 /* ---------- public code */
 
@@ -570,6 +634,82 @@ boolean convex_hull3d_test_point(
 	return result;
 }
 
+struct geosphere *geosphere_new(
+	short segment_count)
+{
+	struct geosphere *result = match_malloc("c:\\halo\\SOURCE\\math\\geometry.c", 58, sizeof(struct geosphere));
+
+	if (result)
+	{
+		short *vertex_subdivision_indices;
+
+		result->segment_count = segment_count;
+		result->triangle_count = GEOSPHERE_PRIMITIVE_TRIANGLE_COUNT*segment_count*segment_count;
+		result->vertex_count = GEOSPHERE_PRIMITIVE_TRIANGLE_COUNT*(segment_count - 2)*(segment_count - 1)/2 +
+			GEOSPHERE_PRIMITIVE_EDGE_COUNT*(segment_count - 1) + GEOSPHERE_PRIMITIVE_VERTEX_COUNT;
+		result->vertices = match_malloc("c:\\halo\\SOURCE\\math\\geometry.c", 66, sizeof(real_point3d)*result->vertex_count);
+		result->triangle_strip_vertex_indices = match_malloc("c:\\halo\\SOURCE\\math\\geometry.c", 67,
+			sizeof(short)*(NUMBER_OF_VERTICES_PER_TRIANGLE + 1)*result->triangle_count);
+		result->triangle_strip_count = 0;
+		vertex_subdivision_indices = match_malloc("c:\\halo\\SOURCE\\math\\geometry.c", 69,
+			sizeof(short)*MAXIMUM_GEOSPHERE_PRIMITIVE_VERTEX_COUNT*MAXIMUM_GEOSPHERE_PRIMITIVE_VERTEX_COUNT);
+
+		if (result->vertices && result->triangle_strip_vertex_indices && vertex_subdivision_indices)
+		{
+			short vertex_index;
+			short triangle_strip_vertex_indices_index = 0;
+			short triangle_index;
+
+			for (vertex_index = 0; vertex_index < MAXIMUM_GEOSPHERE_PRIMITIVE_VERTEX_COUNT*MAXIMUM_GEOSPHERE_PRIMITIVE_VERTEX_COUNT; vertex_index++)
+			{
+				vertex_subdivision_indices[vertex_index] = NONE;
+			}
+
+			for (vertex_index = 0; vertex_index < GEOSPHERE_PRIMITIVE_VERTEX_COUNT; vertex_index++)
+			{
+				result->vertices[vertex_index] = geosphere_primitive_vertices[vertex_index];
+			}
+
+			for (triangle_index = 0; triangle_index < GEOSPHERE_PRIMITIVE_TRIANGLE_COUNT; triangle_index++)
+			{
+				subdivide_triangle(result, geosphere_primitive_triangles[triangle_index][0],
+					geosphere_primitive_triangles[triangle_index][1], geosphere_primitive_triangles[triangle_index][2],
+					&vertex_index, &triangle_strip_vertex_indices_index, vertex_subdivision_indices);
+			}
+
+			/* BUG (preserved for exact matching): at segment_count == 1,
+			 * January fills the allocated strip buffer but rejects equality.
+			 * A corrected build should allow a fully filled valid buffer.
+			 */
+			match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 98,
+				triangle_strip_vertex_indices_index < (NUMBER_OF_VERTICES_PER_TRIANGLE + 1) * result->triangle_count);
+			match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 99, vertex_index == result->vertex_count);
+		}
+		else
+		{
+			/* BUG (preserved for exact matching): January frees allocated
+			 * children but returns the owner with dangling member pointers.
+			 * A corrected build should free the owner and return NULL.
+			 */
+			if (result->vertices)
+			{
+				match_free("c:\\halo\\SOURCE\\math\\geometry.c", 103, result->vertices);
+			}
+			if (result->triangle_strip_vertex_indices)
+			{
+				match_free("c:\\halo\\SOURCE\\math\\geometry.c", 104, result->triangle_strip_vertex_indices);
+			}
+		}
+
+		if (vertex_subdivision_indices)
+		{
+			match_free("c:\\halo\\SOURCE\\math\\geometry.c", 107, vertex_subdivision_indices);
+		}
+	}
+
+	return result;
+}
+
 void geosphere_dispose(
 	struct geosphere *sphere)
 {
@@ -580,6 +720,216 @@ void geosphere_dispose(
 	match_free("c:\\halo\\SOURCE\\math\\geometry.c", 121, sphere->vertices);
 	match_free("c:\\halo\\SOURCE\\math\\geometry.c", 122, sphere->triangle_strip_vertex_indices);
 	match_free("c:\\halo\\SOURCE\\math\\geometry.c", 123, sphere);
+	return;
+}
+
+/* ---------- private code */
+
+static void subdivide_triangle(
+	struct geosphere *sphere,
+	short v1,
+	short v2,
+	short v3,
+	short *vertex_index,
+	short *triangle_strip_vertex_indices_index,
+	short *vertex_subdivision_indices)
+{
+	short face_count = (sphere->segment_count + 1)*(sphere->segment_count + 1);
+	short *vertex_face_indices;
+
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 146, vertex_index);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 147, triangle_strip_vertex_indices_index);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 148, vertex_subdivision_indices);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 149, v1 >= 0 && v1 < sphere->vertex_count);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 150, v2 >= 0 && v2 < sphere->vertex_count);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 151, v3 >= 0 && v3 < sphere->vertex_count);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 152,
+		*triangle_strip_vertex_indices_index < (NUMBER_OF_VERTICES_PER_TRIANGLE + 1) * sphere->triangle_count);
+
+	vertex_face_indices = match_malloc("c:\\halo\\SOURCE\\math\\geometry.c", 154, sizeof(short)*face_count);
+	if (vertex_face_indices)
+	{
+		short face_index;
+		short row;
+
+		for (face_index = 0; face_index < face_count; face_index++)
+		{
+			vertex_face_indices[face_index] = NONE;
+		}
+
+		for (row = 1; row <= sphere->segment_count; row++)
+		{
+			short column;
+
+			sphere->triangle_strip_vertex_indices[(*triangle_strip_vertex_indices_index)++] = 2*row + 1;
+			sphere->triangle_strip_count++;
+
+			for (column = 1; column <= row; column++)
+			{
+				short top_vertex = get_face_vertex(sphere, v1, v2, v3, row - 1, column - 1,
+					vertex_index, vertex_subdivision_indices, vertex_face_indices);
+				short left_vertex = get_face_vertex(sphere, v1, v2, v3, row, column - 1,
+					vertex_index, vertex_subdivision_indices, vertex_face_indices);
+				short right_vertex = get_face_vertex(sphere, v1, v2, v3, row, column,
+					vertex_index, vertex_subdivision_indices, vertex_face_indices);
+
+				match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 176, top_vertex >= 0 && top_vertex <= sphere->vertex_count);
+				match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 177, left_vertex >= 0 && left_vertex <= sphere->vertex_count);
+				match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 178, right_vertex >= 0 && right_vertex <= sphere->vertex_count);
+
+				if (column == 1)
+				{
+					sphere->triangle_strip_vertex_indices[(*triangle_strip_vertex_indices_index)++] = left_vertex;
+					sphere->triangle_strip_vertex_indices[(*triangle_strip_vertex_indices_index)++] = top_vertex;
+				}
+				sphere->triangle_strip_vertex_indices[(*triangle_strip_vertex_indices_index)++] = right_vertex;
+
+				if (column < row)
+				{
+					short topright_vertex = get_face_vertex(sphere, v1, v2, v3, row - 1, column,
+						vertex_index, vertex_subdivision_indices, vertex_face_indices);
+
+					match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 194, topright_vertex >= 0 && topright_vertex <= sphere->vertex_count);
+					sphere->triangle_strip_vertex_indices[(*triangle_strip_vertex_indices_index)++] = topright_vertex;
+				}
+			}
+		}
+
+		match_free("c:\\halo\\SOURCE\\math\\geometry.c", 200, vertex_face_indices);
+	}
+
+	return;
+}
+
+static short get_face_vertex(
+	struct geosphere *sphere,
+	short v1,
+	short v2,
+	short v3,
+	short row,
+	short column,
+	short *vertex_index,
+	short *vertex_subdivision_indices,
+	short *vertex_face_indices)
+{
+	short face_index = row*(sphere->segment_count + 1) + column;
+
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 222, v1 >=0 && v1 <= sphere->vertex_count);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 223, v2 >=0 && v2 <= sphere->vertex_count);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 224, v3 >=0 && v3 <= sphere->vertex_count);
+
+	if (vertex_face_indices[face_index] == NONE)
+	{
+		if (column == 0)
+		{
+			vertex_face_indices[face_index] = get_edge_vertex(sphere, v1, v3, row, vertex_index, vertex_subdivision_indices);
+		}
+		else if (row == sphere->segment_count)
+		{
+			vertex_face_indices[face_index] = get_edge_vertex(sphere, v3, v2, column, vertex_index, vertex_subdivision_indices);
+		}
+		else if (column == row)
+		{
+			vertex_face_indices[face_index] = get_edge_vertex(sphere, v1, v2, row, vertex_index, vertex_subdivision_indices);
+		}
+		else
+		{
+			short new_vertex = (*vertex_index)++;
+			short parent1 = get_edge_vertex(sphere, v1, v3, row, vertex_index, vertex_subdivision_indices);
+			short parent2 = get_edge_vertex(sphere, v1, v2, row, vertex_index, vertex_subdivision_indices);
+
+			vertex_face_indices[face_index] = new_vertex;
+			calculate_vertex(sphere, column, row, parent1, parent2, new_vertex);
+		}
+	}
+
+	return vertex_face_indices[face_index];
+}
+
+static short get_edge_vertex(
+	struct geosphere *sphere,
+	short v1,
+	short v2,
+	short subdivision_index,
+	short *vertex_index,
+	short *vertex_subdivision_indices)
+{
+	boolean reversed = v1 > v2;
+	short va;
+	short vb;
+	short *edge_vertex_index;
+
+	if (v1 > v2)
+	{
+		va = v2;
+		vb = v1;
+	}
+	else
+	{
+		va = v1;
+		vb = v2;
+	}
+
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 269, sphere);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 270, va >= 0 && va < sphere->vertex_count);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 271, vb >= 0 && vb < sphere->vertex_count);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 272, vb != va);
+
+	if (subdivision_index == 0)
+	{
+		return v1;
+	}
+	if (subdivision_index == sphere->segment_count)
+	{
+		return v2;
+	}
+
+	edge_vertex_index = vertex_subdivision_indices + va*MAXIMUM_GEOSPHERE_PRIMITIVE_VERTEX_COUNT + vb;
+	if (*edge_vertex_index == NONE)
+	{
+		short index;
+
+		*edge_vertex_index = *vertex_index;
+		for (index = 1; index < sphere->segment_count; index++)
+		{
+			short new_vertex = (*vertex_index)++;
+
+			calculate_vertex(sphere, index, sphere->segment_count, va, vb, new_vertex);
+		}
+	}
+
+	if (reversed)
+	{
+		return *edge_vertex_index + (sphere->segment_count - subdivision_index) - 1;
+	}
+
+	return *edge_vertex_index + subdivision_index - 1;
+}
+
+static void calculate_vertex(
+	struct geosphere *sphere,
+	short subdivision_index,
+	short subdivision_count,
+	short parent1,
+	short parent2,
+	short new_vertex)
+{
+	real t = (real)subdivision_index/subdivision_count;
+	real one_minus_t = 1.f - t;
+	real_vector3d vertex;
+
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 315, subdivision_index > 0 && subdivision_index < subdivision_count);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 316, parent1 >=0 && parent1 <= sphere->vertex_count);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 317, parent2 >=0 && parent2 <= sphere->vertex_count);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 318, new_vertex >=0 && new_vertex <= sphere->vertex_count);
+
+	set_real_vector3d(&vertex,
+		one_minus_t*sphere->vertices[parent1].x + t*sphere->vertices[parent2].x,
+		one_minus_t*sphere->vertices[parent1].y + t*sphere->vertices[parent2].y,
+		one_minus_t*sphere->vertices[parent1].z + t*sphere->vertices[parent2].z);
+	normalize3d(&vertex);
+	set_real_point3d(&sphere->vertices[new_vertex], vertex.i, vertex.j, vertex.k);
+
 	return;
 }
 
