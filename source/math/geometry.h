@@ -26,6 +26,31 @@ struct geosphere
 	short pad18;
 };
 
+struct vertex3d
+{
+	boolean extant;
+	short point_index;
+	long edge_index;
+	long user_data;
+};
+
+struct edge3d
+{
+	boolean extant;
+	long vertex_indices[2];
+	long edge_indices[2];
+	long surface_indices[2];
+	long user_data;
+};
+
+struct surface3d
+{
+	boolean extant;
+	real_plane3d plane;
+	long edge_index;
+	long user_data;
+};
+
 /* ---------- prototypes/GEOMETRY.C */
 
 struct geosphere *geosphere_new(
@@ -88,6 +113,45 @@ short convex_hull2d_intersect(
 	short maximum_count,
 	real_point2d *result,
 	real epsilon);
+
+boolean convex_hull3d_begin(
+	short point_count,
+	real_point3d const *points,
+	short vertex_count,
+	struct vertex3d *vertices,
+	short edge_count,
+	struct edge3d *edges,
+	short surface_count,
+	struct surface3d *surfaces);
+boolean convex_hull3d_expand(
+	short point_count,
+	real_point3d const *points,
+	short vertex_count,
+	struct vertex3d *vertices,
+	short edge_count,
+	struct edge3d *edges,
+	short surface_count,
+	struct surface3d *surfaces,
+	short point_index);
+boolean convex_hull3d(
+	short point_count,
+	real_point3d const *points,
+	short vertex_count,
+	struct vertex3d *vertices,
+	short edge_count,
+	struct edge3d *edges,
+	short surface_count,
+	struct surface3d *surfaces);
+boolean convex_hull3d_test_point(
+	short point_count,
+	real_point3d const *points,
+	short vertex_count,
+	struct vertex3d const *vertices,
+	short edge_count,
+	struct edge3d const *edges,
+	short surface_count,
+	struct surface3d const *surfaces,
+	real_point3d const *point);
 
 /* ---------- globals */
 

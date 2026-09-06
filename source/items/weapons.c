@@ -203,6 +203,7 @@ symbols in this file:
 #include "cseries.h"
 #include "weapons.h"
 
+#include "equipment.h"
 #include "weapon_definitions.h"
 #include "projectile_definitions.h"
 #include "projectiles.h"
@@ -574,6 +575,82 @@ void weapon_delete(
 	}
 
 	return;
+}
+
+boolean weapon_handle_potential_inventory_item(
+	long weapon_index,
+	long item_object_index,
+	short local_player_index,
+	short *rounds_picked_up)
+{
+	struct weapon_datum *weapon = weapon_get(weapon_index);
+	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
+	struct item_datum *item = item_get(item_object_index);
+	long item_definition_index = item->definition_index;
+	boolean handled = FALSE;
+	short magazine_index;
+
+	for (magazine_index = 0; magazine_index<weapon_definition->weapon.magazines.count; ++magazine_index)
+	{
+		struct weapon_magazine *magazine = weapon_magazine_get(weapon, magazine_index);
+		struct weapon_magazine_definition *magazine_definition = TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, magazine_index, struct weapon_magazine_definition);
+
+		if (magazine->rounds_total<magazine_definition->rounds_total_maximum)
+		{
+			short rounds_needed = magazine_definition->rounds_total_maximum-magazine->rounds_total;
+			short rounds_taken = 0;
+
+			if (weapon->definition_index==item_definition_index)
+			{
+				struct weapon_datum *item_weapon = weapon_get(item_object_index);
+				struct weapon_magazine *item_magazine = weapon_magazine_get(item_weapon, magazine_index);
+
+				rounds_taken = MIN(item_magazine->rounds_total, rounds_needed);
+
+				if (rounds_taken>0)
+				{
+					item_magazine->rounds_total -= rounds_taken;
+
+					if (weapon_definition->weapon.pickup_sound.index!=NONE && local_player_index!=NONE)
+						unspatialized_impulse_sound_new(weapon_definition->weapon.pickup_sound.index, 1.0f);
+
+					if (item_magazine->rounds_total==0)
+						object_delete(item_object_index);
+				}
+
+				handled = TRUE;
+			}
+			else
+			{
+				short ammunition_index;
+
+				for (ammunition_index = 0; ammunition_index<magazine_definition->ammunition_objects.count; ++ammunition_index)
+				{
+					struct weapon_ammunition_object *ammunition_object = TAG_BLOCK_GET_ELEMENT(&magazine_definition->ammunition_objects, ammunition_index, struct weapon_ammunition_object);
+
+					if (ammunition_object->object.index==item_definition_index)
+					{
+						rounds_taken = MIN(ammunition_object->rounds, rounds_needed);
+
+						if (rounds_taken>0)
+						{
+							if (local_player_index!=NONE)
+								equipment_definition_handle_pickup(ammunition_object->object.index);
+
+							object_delete(item_object_index);
+							handled = TRUE;
+							break;
+						}
+					}
+				}
+			}
+
+			magazine->rounds_total += rounds_taken;
+			*rounds_picked_up = rounds_taken;
+		}
+	}
+
+	return handled;
 }
 
 short animation_choose_random_permutation(

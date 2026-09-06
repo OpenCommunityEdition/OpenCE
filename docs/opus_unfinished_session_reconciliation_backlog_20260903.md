@@ -1,6 +1,42 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
-## Current verified canonical / publication-batch totals (2026-09-05)
+## Current local publication-batch totals (2026-09-06)
+
+The local Weapons inventory / Geometry clean-pair batch after published
+`e50f98a194e0bac4d3f85c2fe2d8aec76b0b9f1c` contains
+**916,551 meaningful matched code bytes**, **6,209 credited functions**,
+**2,061,020 matched data bytes**, and **391/833 Matching objects**.
+It adds **905 meaningful / 928 padded bytes and three strict functions**;
+the strict census is **6,255**, with no inherited exact losses. Units remains
+189/189, parks remain 284 valid / zero stale / zero invalid, and admission
+reports zero candidates/contradictions/revocations and five existing rejections.
+Publication is not established by this local ledger; verify both authorized
+GitHub refs against the final commit.
+
+Weapons' authentic shared ammunition subrecord and genuine Equipment include
+support the corrected inventory handler: **536 meaningful / 544 padded bytes**.
+The first compile and normal build are exact. Eighteen actual header consumers
+retain all inherited runtime content; the 23-case, hash-pinned public runtime
+oracle passes after correcting two initially unrealistic harness assumptions.
+Weapons is 47/79 strict, not a complete object. The five other donor strict
+claims / 1,568 padded bytes stay uncredited behind their documented source/API
+boundaries. See `object_matching_logs/weapons_obj_fable_inventory_reconciliation_20260905.md`
+and `object_matching_logs/weapons_obj_fable_packet_intake_20260905.md`.
+
+Geometry's genuine shared hull types and four public API declarations support
+`convex_hull3d` and `convex_hull3d_test_point`: **369 meaningful / 384 padded
+bytes**, exact on the first integration compile and normal build. All 312
+inherited runtime sections across six consumers are unchanged. Geometry is
+14/30 strict, not a complete object. The expression-tuned perimeter/vector
+variants are excluded; the five geosphere residual bodies remain a separate
+read-only intake. Independent runtime/owner review now passes 16 cases each
+for target/first/actual, plus the complete 572/833-object literal-owner census.
+See `object_matching_logs/geometry_obj_fable_clean_pair_reconciliation_20260906.md`.
+The final public test suite passes **381 tests plus 26 subtests**, including
+27 new Weapons oracle tests and 33 new Geometry oracle tests.
+Protected bitmap header/utility implementations are unchanged.
+
+## Previous published Bitmaps checkpoint (2026-09-05)
 
 The current Bitmaps stronger partial publication batch after `1200c46e9e0929eeada7669a79e752dd392c3d3b` contains:
 **915,646 meaningful matched code bytes**, **6,206 credited functions**,
@@ -18,6 +54,11 @@ all 321 tests plus 26 subtests pass. Units remains 189/189. The protected bitmap
 header and utilities hashes are unchanged. Six tuned/corrected bitmap bodies
 and rebuild remain held; the 48-consumer rasterizer lifecycle-owner packet is
 documented separately, with no reserved Opus implementation changed.
+That subsequent three-file lifecycle-owner trial regressed one 392-byte Decals
+function and was fully reversed. All 3,632 runtime sections across 48 consumers
+and the entire 6,252-function exact census are restored; the published bitmap
+gains remain intact. `bitmap_rebuild` was never compiled. See
+`object_matching_logs/bitmaps_obj_lifecycle_owner_trial_rejected_20260905.md`.
 
 The preceding ActionObey checkpoint remains 20/27, with its 1,951 meaningful-byte
 gain intact. Its five natural extra math helpers receive no target credit and

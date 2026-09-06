@@ -83,6 +83,13 @@ struct weapon_magazine_interface_definition
 	rectangle2d unused_rectangles[2];
 };
 
+struct weapon_ammunition_object
+{
+	short rounds;
+	word unused[5];
+	struct tag_reference object;
+};
+
 struct weapon_magazine_definition
 {
 	unsigned long flags;

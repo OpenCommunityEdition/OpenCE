@@ -1,5 +1,14 @@
 # Bitmaps rasterizer-owner and stronger-packet audit (read-only support)
 
+## Subsequent canonical trial
+
+The exact lifecycle packet below was tested once after the Bitmaps publication
+at `e50f98a194e0bac4d3f85c2fe2d8aec76b0b9f1c`. It regressed one 392-byte
+Decals function and was completely restored, with all 3,632 runtime sections
+across 48 consumers unchanged again. Do not repeat it as an untried proposal.
+See `bitmaps_obj_lifecycle_owner_trial_rejected_20260905.md`. The stronger-11
+bitmap packet remains admitted as nine credited gains; rebuild remains held.
+
 ## Conclusion
 
 The genuine existing owner for the three hardware-bitmap lifecycle APIs is

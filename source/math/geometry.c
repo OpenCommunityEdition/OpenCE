@@ -505,6 +505,71 @@ boolean convex_polygon2d_verify(
 	return TRUE;
 }
 
+boolean convex_hull3d(
+	short point_count,
+	real_point3d const *points,
+	short vertex_count,
+	struct vertex3d *vertices,
+	short edge_count,
+	struct edge3d *edges,
+	short surface_count,
+	struct surface3d *surfaces)
+{
+	short point_index;
+
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 2284, points);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 2285, vertices);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 2286, edges);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 2287, surfaces);
+
+	if (!convex_hull3d_begin(point_count, points, vertex_count, vertices, edge_count, edges, surface_count, surfaces))
+	{
+		return FALSE;
+	}
+
+	for (point_index = 0; point_index < point_count; point_index++)
+	{
+		if (!convex_hull3d_expand(point_count, points, vertex_count, vertices, edge_count, edges, surface_count, surfaces, point_index))
+		{
+			return FALSE;
+		}
+	}
+
+	return TRUE;
+}
+
+boolean convex_hull3d_test_point(
+	short point_count,
+	real_point3d const *points,
+	short vertex_count,
+	struct vertex3d const *vertices,
+	short edge_count,
+	struct edge3d const *edges,
+	short surface_count,
+	struct surface3d const *surfaces,
+	real_point3d const *point)
+{
+	short surface_index;
+	boolean result = TRUE;
+
+	for (surface_index = 0; surface_index < surface_count; surface_index++)
+	{
+		struct surface3d const *surface = surfaces + surface_index;
+
+		if (surface->extant)
+		{
+			if (surface->plane.n.i*point->x + surface->plane.n.j*point->y + surface->plane.n.k*point->z - surface->plane.d >
+				global_convex_hull3d_epsilon)
+			{
+				result = FALSE;
+				break;
+			}
+		}
+	}
+
+	return result;
+}
+
 void geosphere_dispose(
 	struct geosphere *sphere)
 {
