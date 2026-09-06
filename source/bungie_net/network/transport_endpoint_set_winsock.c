@@ -103,6 +103,8 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/cseries_windows.h"
+#include "cseries/errors.h"
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_endpoint_winsock.h"
 
@@ -247,6 +249,78 @@ void transport_pop_key(
 		XNetUnregisterKey(&global_key_id);
 	}
 	return;
+}
+
+short transport_initialize(
+	void)
+{
+	if (!transport_initialized)
+	{
+		WSADATA wsa_data = { 0 };
+		XNetStartupParams startup_params = { 0 };
+		DWORD link_status;
+		DWORD address_status;
+		unsigned long deadline;
+		FILE *bypass_file;
+		short wsa_error;
+
+		startup_params.cfgSizeOfStruct = sizeof(startup_params);
+		startup_params.cfgPrivatePoolSizeInPages = 24;
+		startup_params.cfgEnetReceiveQueueLength = 8;
+		startup_params.cfgIpFragMaxSimultaneous = 4;
+		startup_params.cfgIpFragMaxPacketDiv256 = 8;
+		startup_params.cfgSockMaxSockets = 128;
+		startup_params.cfgKeyRegMax = 1;
+		startup_params.cfgSecRegMax = 32;
+
+		link_status = XNetGetEthernetLinkStatus();
+		error(
+			_error_log,
+			"xbox ethernet link is %s%s%s%s%s",
+			(link_status & XNET_ETHERNET_LINK_ACTIVE) ? "connected" : "not connected",
+			(link_status & XNET_ETHERNET_LINK_100MBPS) ? " at 100 Mbps" : "",
+			(link_status & XNET_ETHERNET_LINK_10MBPS) ? " at 10 Mbps" : "",
+			(link_status & XNET_ETHERNET_LINK_FULL_DUPLEX) ? " in full-duplex mode" : "",
+			(link_status & XNET_ETHERNET_LINK_HALF_DUPLEX) ? " in half-duplex mode" : "");
+
+		bypass_file = fopen("d:\\bypass_security.txt", "r");
+		if (bypass_file)
+		{
+			error(_error_silent, "XNET_STARTUP_BYPASS_SECURITY [ON]");
+			startup_params.cfgFlags |= XNET_STARTUP_BYPASS_SECURITY;
+			fclose(bypass_file);
+		}
+
+		if (XNetStartup(&startup_params) != 0)
+			return _transport_error_not_initialized;
+
+		wsa_error = WSAStartup(MAKEWORD(2, 0), &wsa_data);
+		if (wsa_error != 0)
+		{
+			XNetCleanup();
+			winsock_error_to_string(wsa_error);
+			return _transport_error_not_initialized;
+		}
+
+		deadline = system_milliseconds() + 10000;
+		do
+		{
+			address_status = XNetGetTitleXnAddr(&global_address);
+			if (system_milliseconds() > deadline ||
+				address_status == XNET_GET_XNADDR_NONE)
+			{
+				WSACleanup();
+				XNetCleanup();
+				return _transport_error_not_initialized;
+			}
+		}
+		while (address_status == XNET_GET_XNADDR_PENDING);
+
+		XNetRandom(global_nonce, sizeof(global_nonce));
+		transport_initialized = TRUE;
+	}
+
+	return _transport_error_none;
 }
 
 void transport_client_stop(

@@ -2,14 +2,14 @@
 
 ## Current published checkpoint (2026-09-05)
 
-Verified published code checkpoint `ea94ab3fa` on canonical and both
+Verified published code checkpoint `39a0c5bbb` on canonical and both
 `bnunu/halo` publication branches:
 **906,391 meaningful matched code bytes**, **6,171 credited functions**,
 **2,030,868 matched data bytes**, and **391/833 Matching objects**.
-The full stable-owner sweep has **6,217 strict owners**; **278 fuzzy parks**
-validate at that published checkpoint. The following Main/Texture integration
-batch retains two further credible functions (233 meaningful fuzzy bytes),
-bringing valid parks to280 without changing exact-code/data/object totals.
+The full stable-owner sweep has **6,217 strict owners**; **280 fuzzy parks**
+validate at that published checkpoint. Its Main/Texture integration batch
+retains two further credible functions (233 meaningful fuzzy bytes) without
+changing exact-code/data/object totals.
 All288 tests plus26 subtests pass.
 
 The donor byte pools and earlier "current" totals below are historical
@@ -61,6 +61,21 @@ No source-shape or inline-control retry is authorized.
 See the20260905 object ledgers for Main startup, Texture locked callback, and
 Devices front-facing ownership. These dispositions are not new exact-byte
 claims or a claim that unidentified interrupted Opus lanes are fully audited.
+
+The subsequent GameSound obstruction review corrects a remembered blocker:
+the old PAS-header ruling concerned game_sound_update, not obstruction.
+The one current natural obstruction packet instead has a demonstrated ordinary
+vector_from_points3d duplicate-owner failure against canonical ActionAlert.
+All27 exacts and3 parks survive in isolation, but no production source or park
+is admitted. Full source and evidence are preserved in
+`docs/object_matching_logs/game_sound_obj_obstruction_current_owner_boundary_20260905.md`.
+
+The next verified Transport initializer batch adds 416 meaningful fuzzy source
+bytes at 78.47794% and completes a 444-byte aggregate .rdata contribution.
+Exact code/functions stay at 906,391/6,171; reported matched data becomes
+2,031,312. All 6,217 strict owners survive, 281 parks validate, and 288 tests
+plus 26 subtests pass. The actual object preserves every inherited runtime
+record. This is not whole-object admission or a new exact-code gain.
 
 ## Frozen donor
 

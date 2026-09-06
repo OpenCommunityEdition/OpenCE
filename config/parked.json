@@ -2,6 +2,25 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
+      "function": "_transport_initialize",
+      "class": "unclassified",
+      "evidence": "Complete January initialization, link diagnostics, optional bypass file, startup/cleanup ordering, short WSA error handling, unsigned deadline address polling and nonce initialization reconstructed with genuine stock SDK owners. Target416 meaningful/padded33 relocations versus candidate398/400 and33; ordinary frozen objdiff78.47794%. Natural zero initialization removes repeated inert config stores, uses a different zero register and branch/tail layout, and retains the existing inferred short status API (AX, not a full-EAX equivalence claim). All22 inherited code/18 data owners and six existing parks unchanged. Nine new target-owned literals201B are strict/property-exact; two pooled copies3B match real selected target owners and receive no duplicate credit. No new helper/COMMON/global/point owner. Do not reopen with spelling/flags/barriers or couple to withheld dispose/client_start; see docs/object_matching_logs/transport_endpoint_set_winsock_obj_initialize_natural_boundary_20260905.md.",
+      "measurements": {
+        "target": {
+          "size": 416,
+          "relocation_count": 33,
+          "normalized_sha256": "47bd2187b394eb1f7975b4bc618fc0d041f563687eb841257fcae4296bd71db0"
+        },
+        "base": {
+          "size": 400,
+          "relocation_count": 33,
+          "normalized_sha256": "a125c3a8cdab486c1d6414d8644d27b067a58b2ce26c9d769a3a41ef0562b45e"
+        },
+        "objdiff_percent": 78.47794
+      }
+    },
+    {
       "unit": "source/main/main",
       "function": "_main_setup_connection",
       "class": "unclassified",
