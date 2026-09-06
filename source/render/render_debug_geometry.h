@@ -35,5 +35,33 @@ void render_debug_polygon_edges(
 	real_point3d const *points,
 	short point_count,
 	real_argb_color const *color);
+void render_debug_point2d(
+	boolean immediate,
+	real_plane3d const *plane,
+	short projection,
+	boolean sign,
+	real_point2d const *point,
+	real size,
+	real_argb_color const *color,
+	real offset);
+void render_debug_line2d(
+	boolean immediate,
+	real_plane3d const *plane,
+	short projection,
+	boolean sign,
+	real_point2d const *p0,
+	real_point2d const *p1,
+	real_argb_color const *color,
+	real offset);
+void render_debug_vector2d(
+	boolean immediate,
+	real_plane3d const *plane,
+	short projection,
+	boolean sign,
+	real_point2d const *point,
+	real_vector2d const *vector,
+	real size,
+	real_argb_color const *color,
+	real offset);
 
 #endif // __RENDER_DEBUG_GEOMETRY_H

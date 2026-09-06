@@ -833,6 +833,148 @@ void render_debug_box2d_outline(
 	return;
 }
 
+void render_debug_point2d(
+	boolean immediate,
+	real_plane3d const *plane,
+	short projection,
+	boolean sign,
+	real_point2d const *point,
+	real size,
+	real_argb_color const *color,
+	real offset)
+{
+	real_point3d point3d;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		219,
+		plane);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		220,
+		point);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		221,
+		color);
+
+	project_point2d(
+		point,
+		plane,
+		projection,
+		sign,
+		&point3d);
+	point3d.n[projection] += sign ? offset : -offset;
+
+	render_debug_point(
+		immediate,
+		&point3d,
+		size,
+		color);
+
+	return;
+}
+
+void render_debug_line2d(
+	boolean immediate,
+	real_plane3d const *plane,
+	short projection,
+	boolean sign,
+	real_point2d const *p0,
+	real_point2d const *p1,
+	real_argb_color const *color,
+	real offset)
+{
+	real_point3d point0;
+	real_point3d point1;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		242,
+		plane);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		243,
+		p0);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		244,
+		p1);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		245,
+		color);
+
+	project_point2d(
+		p0,
+		plane,
+		projection,
+		sign,
+		&point0);
+	project_point2d(
+		p1,
+		plane,
+		projection,
+		sign,
+		&point1);
+	point0.n[projection] += sign ? offset : -offset;
+	point1.n[projection] += sign ? offset : -offset;
+
+	render_debug_line(
+		immediate,
+		&point0,
+		&point1,
+		color);
+
+	return;
+}
+
+void render_debug_vector2d(
+	boolean immediate,
+	real_plane3d const *plane,
+	short projection,
+	boolean sign,
+	real_point2d const *point,
+	real_vector2d const *vector,
+	real size,
+	real_argb_color const *color,
+	real offset)
+{
+	real_point2d end_point;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		269,
+		plane);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		270,
+		point);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		271,
+		vector);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		272,
+		color);
+
+	end_point.x = point->x + size*vector->i;
+	end_point.y = point->y + size*vector->j;
+
+	render_debug_line2d(
+		immediate,
+		plane,
+		projection,
+		sign,
+		point,
+		&end_point,
+		color,
+		offset);
+
+	return;
+}
+
 /* ---------- private code */
 
 static char *render_debug_add_cache_string(

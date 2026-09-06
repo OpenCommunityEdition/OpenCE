@@ -1,5 +1,42 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
+## RenderDebug 2D wrappers verified (2026-09-06)
+
+ActorLooking's preceding natural fuzzy batch is now published on both authorized
+GitHub refs as `4982ed4c6c94cc1a21e2dadcbeca792e43465ebc`, independently verified.
+It received zero exact-byte credit; no fuzzy work is silently promoted.
+
+The next scoped batch reconstructs point2d, line2d and vector2d from unchanged
+first-exact Opus bodies, with their public prototypes in the existing narrow
+geometry owner header. It adds **711 meaningful exact code bytes**, with
+**zero inherited strict losses**, and brings the verified local total to
+**918,615 meaningful exact code bytes**, **6,220 credited functions**, **6,266
+strict functions**, **2,061,024 matched data bytes** and **391/833 Matching
+objects**. RenderDebug is 18 exact / two residual / 16 unwritten, not complete.
+
+The genuine three-consumer header trial preserves all 573 runtime records;
+ordinary body integration preserves inherited sections and the January split
+inputs. Root and independent replay checks execute real wrappers, role-specific
+projection helpers and 3D/cache callees. The final corpus passes 330 executions
+and rejects a wrong-sign actual-byte mutation. A separate helper probe passes
+336 finite executions and explicitly records 48 NaN executions showing the
+inherited historical/current difference. Current SELECTANY helpers do not have
+the historical split-Decals NODUP ownership policy; actual current diagnostic
+links have no duplicate errors. No complete executable link is claimed.
+
+Full Ninja, the strict census, parks (294 active / zero stale / zero invalid),
+admission (no new issues; five existing rejections) and **613 tests plus 26
+subtests** pass. No implementation in either active Opus reservation is edited.
+See `object_matching_logs/render_debug_obj_2d_wrappers_reconciliation_20260906.md`,
+`tools/audit/render_debug_2d_runtime.py` and `tools/audit/project_point2d_runtime.py`.
+This verified batch is ready for scoped commit and independent remote checking.
+
+Next conditional candidate: the unchanged Fable Path 3D pair at
+`f9dd42218b3325e1b3a63d7860e5309f69fd3d8e` in
+`C:/halo-worktrees/fable-50k-small-families-20260904` (374 meaningful bytes).
+It requires the genuine 50-consumer path.h declaration trial before any import;
+neither candidate is integrated by this RenderDebug batch.
+
 ## ActorLooking decoder and movement caller retained naturally (2026-09-06)
 
 The preceding RenderDebug batch is published as
