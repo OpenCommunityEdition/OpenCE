@@ -14,6 +14,9 @@ enum
 {
 	MAXIMUM_NUMBER_OF_LOCAL_PLAYERS = 4,
 	_connection_dont_timeout = 0,
+	_connection_create_server_bit = 0,
+	_connection_create_clientside_client_bit,
+	_connection_create_serverside_client_bit,
 };
 
 /* ---------- macros */

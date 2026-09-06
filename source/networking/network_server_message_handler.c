@@ -257,6 +257,7 @@ symbols in this file:
 #include "networking/network_connection.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
+#include "networking/network_game_protocol.h"
 #include "networking/network_messages.h"
 #include "networking/network_server_manager_internal.h"
 #include "networking/network_server_message_handler.h"
@@ -278,8 +279,6 @@ enum
 	TRANSPORT_NONCE_LENGTH = 8,
 	NETWORK_GAME_NAME_LENGTH = 16,
 	MAXIMUM_NUMBER_OF_PLAYERS = 16,
-	NETWORK_GAME_SERVER_PORT = 0x141E,
-	NETWORK_GAME_CLIENT_PORT = 0x141F,
 };
 
 enum

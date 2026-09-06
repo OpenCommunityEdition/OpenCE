@@ -110,6 +110,7 @@ symbols in this file:
 #include "network_messages.h"
 #include "network_game_manager.h"
 #include "network_game_globals.h"
+#include "network_server_manager_internal.h"
 
 /* ---------- constants */
 
@@ -219,15 +220,6 @@ typedef char network_game_globals_size_assert[
 	sizeof(struct network_game_globals) == 0x10 ? 1 : -1];
 
 /* ---------- prototypes */
-
-struct network_game *network_game_server_get_game(
-	struct network_game_server *server);
-void network_game_server_dispose(
-	struct network_game_server *server);
-boolean network_game_server_idle(
-	struct network_game_server *server);
-struct network_game_server *network_game_server_create(
-	void);
 
 unsigned long *get_global_local_random_seed_address(
 	void);

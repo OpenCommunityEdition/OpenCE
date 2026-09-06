@@ -19,8 +19,8 @@ enum
 
 enum message_header_byte_order
 {
-	_message_header_byte_order_network = 0,
-	_message_header_byte_order_host,
+	_byte_order_host = 0,
+	_byte_order_network,
 };
 
 enum message_type

@@ -386,6 +386,7 @@ symbols in this file:
 #include "networking/network_connection.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
+#include "networking/network_game_protocol.h"
 #include "networking/network_messages.h"
 #include "networking/network_server_manager.h"
 #include "text/unicode.h"
@@ -425,17 +426,6 @@ enum
 
 enum
 {
-	_rejection_code_version_too_old = 0,
-	_rejection_code_version_too_new,
-	_rejection_code_bad_join_token,
-	_rejection_code_bad_password,
-	_rejection_code_game_is_full,
-	_rejection_code_game_is_closed,
-	_rejection_code_blacklisted_machine,
-};
-
-enum
-{
 	_network_game_client_connection_established_bit,
 	_network_game_client_join_request_sent_bit
 };
@@ -462,8 +452,6 @@ enum network_game_platform
 enum
 {
 	_network_connection_type_client = 2,
-	NETWORK_GAME_SERVER_PORT = 0x141E,
-	NETWORK_GAME_CLIENT_PORT = 0x141F
 };
 
 enum

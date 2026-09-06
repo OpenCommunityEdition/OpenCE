@@ -23,6 +23,12 @@ header included in hcex build.
 struct network_game_server;
 struct game_variant;
 
+struct network_game_server *network_game_server_create(
+	void);
+void network_game_server_dispose(
+	struct network_game_server *server);
+boolean network_game_server_idle(
+	struct network_game_server *server);
 void network_game_server_open_game(
 	struct network_game_server *server);
 void network_game_server_close_game(

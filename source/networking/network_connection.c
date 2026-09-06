@@ -224,9 +224,6 @@ enum
 	MAXIMUM_RESERVED_NETWORK_PORT = 1023,
 	_transport_type_udp = 0x11,
 	_transport_type_tcp,
-	_connection_create_server_bit = 0,
-	_connection_create_clientside_client_bit,
-	_connection_create_serverside_client_bit,
 	_connection_closed_bit = 4,
 	_connection_going_stale_bit,
 };
@@ -653,7 +650,7 @@ static boolean network_connection_read_unreliable(
 
 	if (circular_queue_dequeue_data(connection->unreliable_incoming_queue, &header, sizeof(header), FALSE))
 	{
-		byte_swap_message_header(&header, _message_header_byte_order_network);
+		byte_swap_message_header(&header, _byte_order_host);
 		message_size = GET_MESSAGE_SIZE(header);
 		if (message_size > DATAGRAM_MAXIMUM_SIZE)
 		{
@@ -822,7 +819,7 @@ boolean network_connection_write(
 		GET_MESSAGE_SIZE(*header) == buffer_size,
 		"bad message or buffer_size parameter");
 
-	byte_swap_message_header(header, _message_header_byte_order_host);
+	byte_swap_message_header(header, _byte_order_network);
 
 	if (TEST_FLAG(connection->flags, _connection_create_server_bit))
 	{
@@ -1230,7 +1227,7 @@ static boolean network_connection_read_reliable(
 		return FALSE;
 	}
 
-	byte_swap_message_header(&header, _message_header_byte_order_network);
+	byte_swap_message_header(&header, _byte_order_host);
 	message_size = GET_MESSAGE_SIZE(header);
 	if (message_size > RELIABLE_MESSAGE_MAXIMUM_SIZE)
 	{

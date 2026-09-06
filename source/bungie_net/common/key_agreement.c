@@ -223,7 +223,7 @@ boolean initiate_key_exchange(
 		return FALSE;
 
 	message_size = GET_MESSAGE_SIZE(*message);
-	byte_swap_message_header(message, _message_header_byte_order_host);
+	byte_swap_message_header(message, _byte_order_network);
 	if (write_endpoint(endpoint, message, message_size) != message_size)
 		return FALSE;
 
@@ -283,7 +283,7 @@ boolean complete_key_exchange(
 				return FALSE;
 
 			message_size = GET_MESSAGE_SIZE(*message);
-			byte_swap_message_header(message, _message_header_byte_order_host);
+			byte_swap_message_header(message, _byte_order_network);
 			if (write_endpoint(endpoint, message, message_size) != message_size)
 				return FALSE;
 

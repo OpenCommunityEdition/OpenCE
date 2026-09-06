@@ -67,14 +67,14 @@ void byte_swap_message_header(
 
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\message_header.c", 80, header);
 
-	if (byte_order == _message_header_byte_order_host)
+	if (byte_order == _byte_order_network)
 	{
 		value = *header;
 		*header = (value << 8) | (value >> 8);
 		return;
 	}
 
-	if (byte_order == _message_header_byte_order_network)
+	if (byte_order == _byte_order_host)
 	{
 		value = *header;
 		*header = (value << 8) | (value >> 8);

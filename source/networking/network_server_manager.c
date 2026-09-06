@@ -107,9 +107,9 @@ symbols in this file:
 0011D240 00a0:
 	_code_0011d240 (0000)
 0011D2E0 00a0:
-	_code_0011d2e0 (0000)
+	_network_game_server_send_rejection_message (0000)
 0011D380 0030:
-	_code_0011d380 (0000)
+	_network_game_server_reject_connection_game_is_full (0000)
 0011D3B0 0050:
 	_code_0011d3b0 (0000)
 0011D400 0070:
@@ -451,7 +451,9 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "bungie_net/common/message_header.h"
 #include "bungie_net/network/transport.h"
+#include "bungie_net/network/transport_endpoint_winsock.h"
 #include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
 #include "game/game.h"
@@ -464,6 +466,7 @@ symbols in this file:
 #include "networking/network_connection.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
+#include "networking/network_game_protocol.h"
 #include "networking/network_game_ui.h"
 #include "networking/network_messages.h"
 #include "networking/network_server_manager.h"
@@ -574,6 +577,11 @@ struct message_server_switch_to_pregame
 struct message_server_graceful_game_exit_postgame
 {
 	long unused;
+};
+
+struct message_server_machine_rejected
+{
+	word reason;
 };
 
 struct message_client_game_update
@@ -697,6 +705,11 @@ static boolean network_game_server_setup_game_from_playlist(
 	struct network_game_server *server);
 static boolean network_game_server_handle_client_machines(
 	struct network_game_server *server);
+static void network_game_server_send_rejection_message(
+	struct transport_endpoint *endpoint,
+	word reason);
+static void network_game_server_reject_connection_game_is_full(
+	struct transport_endpoint *endpoint);
 static long network_game_server_get_client_machine_count(
 	struct network_game_server *server);
 void get_unique_random_name(
@@ -713,9 +726,176 @@ static void network_game_server_dump(
 
 /* ---------- globals */
 
-static long network_game_server_next_team_index;
+struct network_game_server network_game_server_memory_do_not_use_directly;
+boolean network_game_server_memory_do_not_use_directly_in_use = FALSE;
 
 /* ---------- public code */
+
+struct network_game_server *network_game_server_create(
+	void)
+{
+	struct network_game_server *server =
+		&network_game_server_memory_do_not_use_directly;
+
+	match_assert(
+		NETWORK_SERVER_MANAGER_FILE,
+		0xE0,
+		!network_game_server_memory_do_not_use_directly_in_use);
+	network_game_server_memory_do_not_use_directly_in_use = TRUE;
+
+	csmemset(server, 0, sizeof(*server));
+
+	if (server != NULL)
+	{
+		server->connection = network_connection_new(
+			FLAG(_connection_create_server_bit),
+			NETWORK_GAME_SERVER_PORT);
+
+		if (server->connection != NULL)
+		{
+			int i;
+
+#ifdef xbox
+			transport_server_initialize();
+#endif
+
+			server->state = _network_game_server_state_pregame;
+			server->flags = FLAG(_network_game_server_game_valid_bit);
+			csmemset(&server->game, 0, sizeof(server->game));
+
+			network_connection_set_connection_rejection_procedure(
+				server->connection,
+				network_game_server_reject_connection_game_is_full);
+
+			network_game_invalidate(&server->game);
+
+			server->game.difficulty = main_get_difficulty();
+			server->game.number_of_games_played = -1;
+
+			for (i = 0; i < MAXIMUM_NETWORK_MACHINE_COUNT; i++)
+			{
+				server->client_machines[i].connection = NULL;
+				server->client_machines[i].last_received_update_sequence_number = 0;
+				server->client_machines[i].stall_start_time = 0;
+				server->client_machines[i].machine_index = NONE;
+				server->client_machines[i].flags = 0;
+				network_game_invalidate_machine(&server->game, i);
+			}
+
+			server->sent_start_game_message = FALSE;
+			server->time_of_first_client_loading_completion = 0;
+
+			if (!network_game_server_reset_to_pregame(server))
+			{
+				error(
+					_error_silent,
+					"failed to initialize server pregame settings");
+				network_game_server_dispose(server);
+				server = NULL;
+			}
+		}
+		else
+		{
+			error(
+				_error_silent,
+				"failed to create the server connection");
+			network_game_server_dispose(server);
+			server = NULL;
+		}
+	}
+
+	return server;
+}
+
+void network_game_server_dispose(
+	struct network_game_server *server)
+{
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x120, server);
+
+	/* The packet schemas serialize unused; never send uninitialized stack data. */
+	switch (server->state)
+	{
+	case _network_game_server_state_pregame:
+	{
+		struct message_server_graceful_game_exit_pregame message_packet = { 0 };
+		struct network_message *message;
+
+		message = create_network_game_message(
+			_message_server_graceful_game_exit_pregame,
+			&message_packet,
+			sizeof(message_packet));
+		if (message != NULL)
+		{
+			if (network_game_server_send_message_to_all_machines(server, message))
+				network_event("notified all clients that we are going down");
+			else
+				network_event("failed to notify all clients that we are going down");
+		}
+		else
+		{
+			network_event(
+				"failed to create a _message_type_server_graceful_game_exit_pregame message");
+		}
+
+		break;
+	}
+
+	case _network_game_server_state_ingame:
+		break;
+
+	case _network_game_server_state_postgame:
+	{
+		struct message_server_graceful_game_exit_postgame message_packet = { 0 };
+		struct network_message *message;
+
+		message = create_network_game_message(
+			_message_server_graceful_game_exit_postgame,
+			&message_packet,
+			sizeof(message_packet));
+		if (message != NULL)
+		{
+			if (network_game_server_send_message_to_all_machines(server, message))
+				network_event("notified all clients that we are going down");
+			else
+				network_event("failed to notify all clients that we are going down");
+		}
+		else
+		{
+			network_event(
+				"failed to create a _message_type_server_graceful_game_exit_postgame message");
+		}
+
+		break;
+	}
+	}
+
+	if (!network_game_server_handle_client_machines(server))
+	{
+		error(
+			_error_silent,
+			"network_game_server_handle_client_machines() failed inside network_game_server_dispose()");
+	}
+
+	if (server->connection)
+		network_connection_delete(server->connection);
+
+#ifdef xbox
+	SleepEx(MILLISECONDS_PER_SECOND, FALSE);
+	transport_server_terminate();
+#endif
+
+	csmemset(server, 0, sizeof(*server));
+
+	match_assert(
+		NETWORK_SERVER_MANAGER_FILE,
+		0x171,
+		network_game_server_memory_do_not_use_directly_in_use);
+	network_game_server_memory_do_not_use_directly_in_use = FALSE;
+
+	network_event("network server disposed");
+
+	return;
+}
 
 unsigned long countdown_timer_update(
 	struct countdown_timer *timer)
@@ -1308,6 +1488,7 @@ boolean network_game_server_add_player_to_game(
 	struct network_game_server_client_machine *machine,
 	struct network_player *player)
 {
+	static long network_game_server_next_team_index = 0;
 	boolean success;
 
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x46C, server);
@@ -2579,6 +2760,56 @@ static boolean network_game_server_handle_client_machines(
 	}
 
 	return success;
+}
+
+static void network_game_server_send_rejection_message(
+	struct transport_endpoint *endpoint,
+	word reason)
+{
+	struct message_server_machine_rejected farewell_message = { reason };
+	message_header *message;
+
+	match_assert(
+		NETWORK_SERVER_MANAGER_FILE,
+		0x878,
+		endpoint && (reason < NUMBER_OF_SERVER_REJECTION_CODES));
+
+	message = create_network_game_message(
+		_message_server_machine_rejected,
+		&farewell_message,
+		sizeof(farewell_message));
+	if (message != NULL)
+	{
+		int length = GET_MESSAGE_SIZE(*message);
+		int bytes_written;
+
+		byte_swap_message_header(message, _byte_order_network);
+		bytes_written = write_endpoint(endpoint, message, length);
+		if (bytes_written != length)
+		{
+			network_event(
+				"error sending rejection message to client; transport error= '%s'",
+				transport_error_to_string(bytes_written));
+		}
+	}
+	else
+	{
+		network_event(
+			"failed to create a message_server_machine_rejected message in network_game_server_send_rejection_message");
+	}
+
+	return;
+}
+
+static void network_game_server_reject_connection_game_is_full(
+	struct transport_endpoint *endpoint)
+{
+	network_event("client connection refused; game is full");
+	network_game_server_send_rejection_message(
+		endpoint,
+		_rejection_code_game_is_full);
+
+	return;
 }
 
 boolean network_game_server_reset_to_pregame(

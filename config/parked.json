@@ -2,6 +2,17 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/networking/network_server_manager",
+      "function": "_network_game_server_dispose",
+      "class": "unclassified",
+      "evidence": "Source-attested public disposal lifecycle retained with one deliberate defined-behavior repair: initialize both graceful-exit payloads to zero. January and the supplied source leave their long unused fields uninitialized, but the actual pregame/postgame packet schemas serialize one long. The natural safe candidate adds two zero stores and their consequent branch/padding displacement; it is 304 padded bytes/27 relocations versus January 288/27 and receives zero exact credit. Keep correct network_message broadcast ownership, enum states/message types, platform guards, explicit return, and genuine singleton BSS/COMMON ownership. No matching-only assembly, casts, declaration permutations, artificial callers or point_from_line3d emission. See docs/object_matching_logs/network_server_manager_obj_create_dispose_packet_20260906.md. Reopen only for new authentic defined-source/protocol evidence, never by removing the initialization to recover a stack-data disclosure.",
+      "measurements": {
+        "target": { "size": 288, "relocation_count": 27, "normalized_sha256": "f85cfb83330267866b08d5d10437b8f9b0879ae564ba22026d33a16cfb33ff89" },
+        "base": { "size": 304, "relocation_count": 27, "normalized_sha256": "ee98d32cde746e108cf3edd6b4174f6c73a8fb5851d7edc740da092f042e47ef" },
+        "objdiff_percent": 97.77778
+      }
+    },
+    {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_widgets",
       "function": "__rasterizer_widget_begin",
       "class": "unclassified",
