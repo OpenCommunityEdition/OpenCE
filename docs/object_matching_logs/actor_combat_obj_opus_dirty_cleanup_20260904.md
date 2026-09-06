@@ -77,3 +77,16 @@ pun, undefined behavior, or nonsensical path.  It emits no
 - protected Units sentinel remains strict exact;
 - no `point_from_line3d` symbol in the rebuilt object;
 - tooling tests and `git diff --check`: pass.
+
+## 2026-09-05 semantic-review correction
+
+The blanket no-undefined-behavior claim above is withdrawn for
+`actor_aim_grenade`'s vehicle path. The typed-point cleanup in `199949614`
+removed working-vector definitions consumed after the vehicle conditional.
+Its 82.03977% measurement remains historical fact, not semantic approval.
+January's stack reuse does not justify position-as-velocity reconstruction;
+the on-foot invariant through release remains unproven. The accepted park is
+withdrawn without changing this body or revoking independent strict gains.
+The separate grenade-definition-helper re-audit already superseded the old
+helper rejection; it does not resolve this dataflow problem. See
+`actor_combat_obj_grenade_vehicle_semantic_withdrawal_20260905.md`.

@@ -82,3 +82,14 @@ authenticated inline schedule rather than serving as misplaced ownership.
   and the candidate emits no `point_from_line3d` symbol or COMDAT.
 
 No canonical worktree was edited and no push was performed by this lane.
+
+## 2026-09-05 semantic-review correction
+
+The earlier approval of `actor_aim_grenade`'s vehicle path as representation-safe
+is withdrawn. The typed-point cleanup in `199949614` removed working-vector
+definitions used after the vehicle conditional. January's stack reuse is not
+proof of intended position-as-velocity logic. AI selection rejects vehicles,
+but that invariant through grenade release is not yet established. This owner
+is unresolved semantic work, not an approved compiler-only park. No independent
+strict gain is revoked. See
+`actor_combat_obj_grenade_vehicle_semantic_withdrawal_20260905.md`.

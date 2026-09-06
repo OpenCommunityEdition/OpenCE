@@ -2,17 +2,16 @@
 
 ## Current verified canonical / publication-batch totals (2026-09-05)
 
-The next verified Encounters platoon-rule publication batch advances canonical
-from published checkpoint `4f90c05c54c78196ce188be3f4439cfdfb30d639` to:
+Published checkpoint `616569bb1ef40846dad548d5af9fecd7a0ee5ae4` contains:
 **907,050 meaningful matched code bytes**, **6,174 credited functions**,
 **2,031,312 matched data bytes**, and **391/833 Matching objects**.
-The full stable-owner sweep has **6,220 strict owners**; **283 fuzzy parks**
-validate. The preceding initializer batch was independently verified on both
-`bnunu/halo` branches at906,735 meaningful code bytes. This coherent batch
-adds315 meaningful exact bytes and one function, with zero exact-function
-losses. It retains the complete private rule evaluator as honest fuzzy source
-at91.02511%, without claiming whole-object completion.
-All288 tests plus26 subtests pass.
+The latest restored full sweep preserves **6,220 strict owners**. There are
+now **282 approved fuzzy parks**, after withdrawing ActorCombat grenade aim's
+unsupported vehicle-path semantic approval. This audit checkpoint adds or
+removes no exact bytes/functions/data/Matching objects. All288 tests plus26
+subtests pass. The preceding Encounters batch added315 meaningful exact bytes
+and one function with zero losses; its rule evaluator remains an honest
+91.02511% residual, not a completed object.
 
 The donor byte pools and earlier "current" totals below are historical
 checkpoints, not a live unreconciled-byte count. Do not subtract or sum them
@@ -26,6 +25,26 @@ implementations remain excluded from this campaign until the user reports its
 completion or token exhaustion. Read only the frozen older donor trees.
 
 ### Follow-up adjudication
+
+The ActorCombat same-TU caller graph is now fully identified: seven genuine
+owners / 7,504 padded bytes, with six DIA-proven static helpers and the public
+update parent. Five small helpers are preserved as uncompiled source-only
+research. The old pause/delay labels were reversed: fba0 is pause176; fc50 is
+first-delay208. Communication API ownership is resolved, but the next four
+public AI/weapon declarations failed their first full63-dependent trial by
+regressing Units preprocessing (1,919 meaningful bytes). Root reversed the
+entire four-file packet; all5,489 frozen runtime sections and all6,220 strict
+owners are restored. No source/header ordering variants were attempted.
+ActorCombat and Observer remain withheld at that genuine dependency boundary.
+See `actor_combat_obj_caller_closure_api_boundary_20260905.md`.
+
+Separately, `actor_aim_grenade` is reopened as unresolved semantic work.
+The typed-point cleanup removed vector definitions read on a vehicle path.
+January's reused/unwritten stack behavior is not credible position-as-velocity
+source evidence; on-foot selection is proven, but release-time invariance is
+not. Its accepted park was withdrawn with no source change or exact-credit
+loss. The live all-lanes view remains82.03977%, not exact, with no external
+contributor. See `actor_combat_obj_grenade_vehicle_semantic_withdrawal_20260905.md`.
 
 The Encounters map-initialization cluster is now retained: 45E/5R/11U,
 with the initializer and private starting-location reset strict and the
