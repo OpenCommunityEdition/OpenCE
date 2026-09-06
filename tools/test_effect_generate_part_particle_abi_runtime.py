@@ -12,6 +12,13 @@ pytest.importorskip("unicorn")
 from tools.audit import effect_generate_part_particle_abi_runtime as oracle
 
 
+def test_target_callee_uses_historical_frozen_capture_not_live_split():
+    assert oracle.TARGET_CALLEE.relative_to(oracle.ROOT).as_posix() == (
+        "scratch/particle-systems-fable-pair-final-20260906/files/"
+        "build/split/source/effects/particle_systems.obj"
+    )
+
+
 def valid_run(role="schema", scale_bits=0x3F800000):
     pointer_bias = 0x100 if role == "target" else 0
     nonvolatile = {

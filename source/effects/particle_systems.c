@@ -43,7 +43,7 @@ symbols in this file:
 0008F4D0 0170:
 	_code_0008f4d0 (0000)
 0008F640 0120:
-	_code_0008f640 (0000)
+	_particle_system_initialize (0000)
 0008F760 0080:
 	_particle_systems_update (0000)
 0008F7E0 00a0:
@@ -80,6 +80,7 @@ symbols in this file:
 
 #include "math/real_math.h"
 #include "memory/data.h"
+#include "objects/object_lights.h"
 #include "objects/objects.h"
 #include "physics/point_physics.h"
 #include "saved games/game_state.h"
@@ -102,6 +103,8 @@ enum
 /* ---------- prototypes */
 
 static void particle_system_delete(
+	long system_index);
+static boolean particle_system_initialize(
 	long system_index);
 void code_0008e0d0(
 	struct particle_system_datum *system,
@@ -232,6 +235,40 @@ void particle_systems_reconnect_to_structure_bsp(
 	return;
 }
 
+long particle_system_new_unattached(
+	long definition_index,
+	real_point3d const *position,
+	real_vector3d const *velocity,
+	real_argb_color const *color,
+	real scale)
+{
+	long system_index = datum_new(particle_systems);
+
+	if (system_index != NONE)
+	{
+		struct particle_system_datum *system = particle_system_get(system_index);
+		real_rgb_color diffuse;
+
+		system->definition_index = definition_index;
+		system->object_index = NONE;
+		system->position = *position;
+		system->velocity = *velocity;
+		system->color = *color;
+		system->scale = scale;
+		SET_FLAG(system->flags, _particle_system_active_bit, TRUE);
+
+		light_particle(&system->position, &system->lighting, &diffuse, FALSE);
+
+		if (!particle_system_initialize(system_index))
+		{
+			datum_delete(particle_systems, system_index);
+			return NONE;
+		}
+	}
+
+	return system_index;
+}
+
 /* ---------- private code */
 
 static void particle_system_delete(
@@ -258,6 +295,57 @@ static void particle_system_delete(
 	datum_delete(particle_systems, system_index);
 
 	return;
+}
+
+static boolean particle_system_initialize(
+	long system_index)
+{
+	struct particle_system_datum *system = particle_system_get(system_index);
+	struct particle_system_definition *definition = particle_system_definition_get(system->definition_index);
+	boolean success = TRUE;
+	short type_index;
+
+	scenario_location_from_point(&system->location, &system->position);
+	SET_FLAG(system->flags, _particle_system_initializing_bit, TRUE);
+
+	for (type_index = 0; type_index < definition->types.count; type_index++)
+	{
+		struct old_particle_system_type *type_definition = TAG_BLOCK_GET_ELEMENT(
+			&definition->types, type_index, struct old_particle_system_type);
+		struct particle_type *type = &system->types[type_index];
+
+		if (type_definition->type_states.count != 0)
+		{
+			type->state_index = 0;
+			type->transition_state_index = NONE;
+			type->states_moving_forward = TRUE;
+			type->particle_count = 0;
+			type->first_particle_index = NONE;
+
+			if (type_definition->type_states.count > 0)
+			{
+				struct particle_system_type_state *state_definition = TAG_BLOCK_GET_ELEMENT(
+					&type_definition->type_states, 0, struct particle_system_type_state);
+				real duration = real_local_random_range(
+					state_definition->duration_lower_bound,
+					state_definition->duration_upper_bound);
+
+				type->time_left_in_state = duration;
+				type->state_length = duration;
+			}
+		}
+		else
+		{
+			success = FALSE;
+		}
+	}
+
+	if (success)
+	{
+		code_0008e7f0(0.001f, system_index);
+	}
+
+	return success;
 }
 
 void code_0008e0d0(

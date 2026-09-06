@@ -27,6 +27,21 @@ enum
 
 /* ---------- structures */
 
+struct particle_system_type_state
+{
+	byte reserved00[0x20];
+	real duration_lower_bound;
+	real duration_upper_bound;
+	byte reserved28[0x98];
+};
+
+struct old_particle_system_type
+{
+	byte reserved00[0x68];
+	struct tag_block type_states;
+	byte reserved74[0xC];
+};
+
 struct particle_system_definition
 {
 	byte reserved00[0x38];
@@ -43,6 +58,16 @@ typedef char particle_system_definition_system_update_point_physics_index_offset
 	offsetof(struct particle_system_definition, system_update_point_physics.index) == 0x44 ? 1 : -1];
 typedef char particle_system_definition_types_offset_assert[
 	offsetof(struct particle_system_definition, types) == 0x5C ? 1 : -1];
+typedef char old_particle_system_type_size_assert[
+	sizeof(struct old_particle_system_type) == 0x80 ? 1 : -1];
+typedef char old_particle_system_type_type_states_offset_assert[
+	offsetof(struct old_particle_system_type, type_states) == 0x68 ? 1 : -1];
+typedef char particle_system_type_state_size_assert[
+	sizeof(struct particle_system_type_state) == 0xC0 ? 1 : -1];
+typedef char particle_system_type_state_duration_lower_bound_offset_assert[
+	offsetof(struct particle_system_type_state, duration_lower_bound) == 0x20 ? 1 : -1];
+typedef char particle_system_type_state_duration_upper_bound_offset_assert[
+	offsetof(struct particle_system_type_state, duration_upper_bound) == 0x24 ? 1 : -1];
 
 /* ---------- prototypes */
 

@@ -53,7 +53,8 @@ from tools.regression_gate import _section_aux_selection  # noqa: E402
 BEFORE = ROOT / "scratch/particle-systems-fable-pair-before-20260906/source/effects/effects.obj"
 SCHEMA = ROOT / "scratch/particle-systems-fable-pair-schema-20260906/source/effects/effects.obj"
 TARGET = ROOT / "build/split/source/effects/effects.obj"
-TARGET_CALLEE = ROOT / "build/split/source/effects/particle_systems.obj"
+# Preserve the audited target after later semantic symbol-manifest changes.
+TARGET_CALLEE = ROOT / "scratch/particle-systems-fable-pair-final-20260906/files/build/split/source/effects/particle_systems.obj"
 BEFORE_MANIFEST = ROOT / "scratch/particle-systems-fable-pair-before-20260906.json"
 SCHEMA_MANIFEST = ROOT / "scratch/particle-systems-fable-pair-schema-20260906.json"
 RUNTIME_SUMMARY = ROOT / "scratch/particle-systems-fable-pair-schema-runtime-20260906/summary.json"

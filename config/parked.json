@@ -2,6 +2,17 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/effects/particle_systems",
+      "function": "_particle_system_initialize",
+      "class": "unclassified",
+      "evidence": "First fixed natural typed initializer retained with its genuine public particle_system_new_unattached caller. January bytes, relocation/caller census, original decorated type owner and independent later PDB fields support the private static owner, initial-state fields, continued iteration after an empty type, genuine local RNG calls and initial 0.001f update. Target and candidate are 288 padded bytes/nine relocations but differ in register allocation, ESI save scope and instruction positions. No Fable declaration-order exact variant, tuning, copied math or fake external leaf is imported. Root replays target/first/actual real initializer and real constructor together: ten bounded cases under two x87 control words, 20 executions per role, identical full system/guard/call/seed/return-channel/ABI outcomes against a separate byte-state reference. Three precise real-byte negative controls fail as intended. Datum/tag/location/lighting/RNG/update APIs are explicitly bounded typed stubs; this is not whole-engine or exhaustive semantic proof. All 6260 inherited strict functions survive; the public constructor adds 205 meaningful exact bytes, the initializer adds none. A natural uncredited 32-byte SELECTANY real_local_random_range copy conflicts with BoredCamera NODUPLICATES in actual VC7 links in both input orders; the still-unwritten update body also remains a partial graph boundary. Whole-object linkage/completion is vetoed. No point_from_line3d or data/BSS/COMMON owner is added. See docs/object_matching_logs/particle_systems_obj_natural_init_creation_reconciliation_20260906.md. Reopen only for genuine source/type/compiler-owner evidence, not equivalent source-shape or emission-policy searches.",
+      "measurements": {
+        "target": { "size": 288, "relocation_count": 9, "normalized_sha256": "ca7322edb56c3275a3480eed1dfbfd87edfb8152a11ff78a201a35fceee09409" },
+        "base": { "size": 288, "relocation_count": 9, "normalized_sha256": "35f03b7cc10bfb87ba227093a550ab55df522596813eeae9746560f8b04db055" },
+        "objdiff_percent": 81.15151
+      }
+    },
+    {
       "unit": "source/ai/actor_moving",
       "function": "_actor_aim_jump",
       "class": "unclassified",

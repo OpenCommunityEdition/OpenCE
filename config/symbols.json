@@ -1934,7 +1934,7 @@
 { "file_offset": 585328, "flags": 32, "name": "_code_0008ee70" },
 { "file_offset": 586688, "flags": 32, "name": "_code_0008f3c0" },
 { "file_offset": 586960, "flags": 32, "name": "_code_0008f4d0" },
-{ "file_offset": 587328, "flags": 32, "name": "_code_0008f640" },
+{ "file_offset": 587328, "flags": 32, "name": "_particle_system_initialize", "static": true },
 { "file_offset": 587616, "flags": 32, "name": "_particle_systems_update" },
 { "file_offset": 587744, "flags": 32, "name": "_particle_systems_render" },
 { "file_offset": 587904, "flags": 32, "name": "_particle_system_new_unattached" },

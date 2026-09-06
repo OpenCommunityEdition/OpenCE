@@ -1,5 +1,36 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
+## Current natural ParticleSystems initialization batch (2026-09-06)
+
+The preceding lifecycle/Effects ABI batch is published as
+`b32b28bdca077f993d0222634440959cbf014fa5` on both authorized GitHub refs;
+root verified both remote hashes and refreshed the treemap without warnings.
+Its published baseline is **917,251 meaningful exact code bytes**.
+
+The next fixed natural source packet reconstructs the real private initializer
+and public unattached constructor together. The constructor adds **205 meaningful
+/ 208 padded exact code bytes**; the initializer is retained at **81.15151%
+fuzzy**, with no exact credit and no declaration-order/source-shape tuning.
+Local canonical is **917,456 meaningful exact code bytes**, **6,215 credited
+functions**, **6,261 strict functions**, **2,061,024 matched data bytes** and
+unchanged **391 / 833 Matching objects**. The five-consumer shared-header
+closure and all inherited runtime sections pass; zero strict functions regress.
+
+Root independently replayed target/first/actual real constructor/initializer
+pairs: 20 bounded executions per role and three genuine-byte negative controls
+pass. The natural random-helper fallback has a confirmed BoredCamera
+NODUPLICATES conflict in VC7 links in both input orders. ParticleSystems is
+**13 exact / one residual / 11 unwritten**, explicitly incomplete and not
+linkable; neither the fuzzy initializer nor helper receives exact credit.
+See `object_matching_logs/particle_systems_obj_natural_init_creation_reconciliation_20260906.md`.
+Final full Ninja and **576 tools tests plus 26 subtests** pass. Parks are
+**291 valid, zero stale/invalid**; admission has zero new candidates,
+contradictions or revocations and five existing rejections. All 572 final base
+hashes and 833 split hashes survive the final documentation capture. The packet
+is approved for scoped publication; verify its final commit and both remote
+refs before reporting it published. The remaining Fable claims/backlog are not
+silently admitted. Both Opus reservations below remain untouched.
+
 ## Current Fable ParticleSystems lifecycle batch (2026-09-06)
 
 The natural aim / HUD crosshair batch is published as
@@ -25,8 +56,8 @@ before failures and five explicitly synthetic outcome controls. Final tools
 tests: **560 passed plus 26 subtests**. Parks: **290 valid, zero stale/invalid**.
 Admission: zero candidates, contradictions or revocations, five prior rejections.
 See `object_matching_logs/particle_systems_obj_fable_lifecycle_pair_reconciliation_20260906.md`.
-The packet is approved for scoped publication; verify the resulting commit
-and both remote refs before calling it published. Remaining Fable claims are
+The packet was published as `b32b28bdca077f993d0222634440959cbf014fa5`, with
+both remote refs independently verified. Remaining Fable claims are
 not silently included, and the reconciliation backlog is still incomplete.
 
 ### Concurrent Opus implementation reservations

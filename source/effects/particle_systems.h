@@ -18,6 +18,7 @@ header included in hcex build.
 enum
 {
 	_particle_system_active_bit,
+	_particle_system_initializing_bit,
 };
 
 enum
@@ -34,7 +35,14 @@ enum
 
 struct particle_type
 {
-	byte reserved00[0x3C];
+	short state_index;
+	short transition_state_index;
+	real time_left_in_state;
+	real state_length;
+	byte reserved0C[0x2C];
+	boolean states_moving_forward;
+	byte reserved39;
+	short particle_count;
 	long first_particle_index;
 };
 
@@ -47,11 +55,13 @@ struct particle_system_datum
 	long object_index;
 	short attachment_index;
 	short type_state_index;
-	real function_value;
+	real scale;
 	struct location location;
 	real_point3d position;
 	real_vector3d velocity;
-	byte reserved38[0x20];
+	real_argb_color color;
+	real_rgb_color lighting;
+	byte reserved54[0x4];
 	struct particle_type types[MAXIMUM_PARTICLE_SYSTEM_TYPES_PER_SYSTEM];
 };
 
@@ -69,6 +79,18 @@ struct ps_particle_datum
 
 typedef char particle_type_size_assert[
 	sizeof(struct particle_type) == 0x40 ? 1 : -1];
+typedef char particle_type_state_index_offset_assert[
+	offsetof(struct particle_type, state_index) == 0x0 ? 1 : -1];
+typedef char particle_type_transition_state_index_offset_assert[
+	offsetof(struct particle_type, transition_state_index) == 0x2 ? 1 : -1];
+typedef char particle_type_time_left_in_state_offset_assert[
+	offsetof(struct particle_type, time_left_in_state) == 0x4 ? 1 : -1];
+typedef char particle_type_state_length_offset_assert[
+	offsetof(struct particle_type, state_length) == 0x8 ? 1 : -1];
+typedef char particle_type_states_moving_forward_offset_assert[
+	offsetof(struct particle_type, states_moving_forward) == 0x38 ? 1 : -1];
+typedef char particle_type_particle_count_offset_assert[
+	offsetof(struct particle_type, particle_count) == 0x3A ? 1 : -1];
 typedef char particle_type_first_particle_index_offset_assert[
 	offsetof(struct particle_type, first_particle_index) == 0x3C ? 1 : -1];
 typedef char particle_system_datum_size_assert[
@@ -79,12 +101,18 @@ typedef char particle_system_datum_definition_index_offset_assert[
 	offsetof(struct particle_system_datum, definition_index) == 0x8 ? 1 : -1];
 typedef char particle_system_datum_object_index_offset_assert[
 	offsetof(struct particle_system_datum, object_index) == 0xC ? 1 : -1];
+typedef char particle_system_datum_scale_offset_assert[
+	offsetof(struct particle_system_datum, scale) == 0x14 ? 1 : -1];
 typedef char particle_system_datum_position_offset_assert[
 	offsetof(struct particle_system_datum, position) == 0x20 ? 1 : -1];
 typedef char particle_system_datum_location_offset_assert[
 	offsetof(struct particle_system_datum, location) == 0x18 ? 1 : -1];
 typedef char particle_system_datum_velocity_offset_assert[
 	offsetof(struct particle_system_datum, velocity) == 0x2C ? 1 : -1];
+typedef char particle_system_datum_color_offset_assert[
+	offsetof(struct particle_system_datum, color) == 0x38 ? 1 : -1];
+typedef char particle_system_datum_lighting_offset_assert[
+	offsetof(struct particle_system_datum, lighting) == 0x48 ? 1 : -1];
 typedef char particle_system_datum_types_offset_assert[
 	offsetof(struct particle_system_datum, types) == 0x58 ? 1 : -1];
 typedef char ps_particle_datum_size_assert[
