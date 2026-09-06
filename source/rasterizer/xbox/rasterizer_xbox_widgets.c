@@ -77,6 +77,7 @@ symbols in this file:
 #include "game/game_globals.h"
 #include "math/real_math.h"
 #include "rasterizer/common/rasterizer_common.h"
+#include "rasterizer/rasterizer_geometry.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
 
 #include <xtl.h>
@@ -353,6 +354,244 @@ void _rasterizer_widget_submit(
 	return;
 }
 
+void _rasterizer_widget_begin(
+	short type,
+	word flags)
+{
+	real vertex_constants[5][4];
+	short viewport_width;
+	short viewport_height;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_widgets.c",
+		154,
+		global_d3d_device);
+
+	switch (type)
+	{
+		case _widget_type_internal_occlusion_test:
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_CULLMODE,
+				D3DCULL_CCW);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_COLORWRITEENABLE,
+				rasterizer_debug_options.lens_flare_occlusion_debug ?
+					D3DCOLORWRITEENABLE_RED |
+					D3DCOLORWRITEENABLE_GREEN |
+					D3DCOLORWRITEENABLE_BLUE :
+					0);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ALPHABLENDENABLE,
+				FALSE);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ALPHATESTENABLE,
+				FALSE);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ZENABLE,
+				TRUE);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ZFUNC,
+				D3DCMP_LESSEQUAL);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ZWRITEENABLE,
+				rasterizer_debug_options.lens_flare_occlusion_debug);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ZBIAS,
+				rasterizer_debug_options.zbias);
+			rasterizer_set_vertex_shader_permutation(
+				0x38,
+				_rasterizer_vertex_type_dynamic_unlit,
+				0);
+			viewport_width = global_window_parameters.viewport_bounds.x1 -
+				global_window_parameters.viewport_bounds.x0;
+			viewport_height = global_window_parameters.viewport_bounds.y1 -
+				global_window_parameters.viewport_bounds.y0;
+			vertex_constants[0][1] = 0.0f;
+			vertex_constants[0][2] = 0.0f;
+			vertex_constants[1][0] = 0.0f;
+			vertex_constants[1][2] = 0.0f;
+			vertex_constants[2][0] = 0.0f;
+			vertex_constants[2][1] = 0.0f;
+			vertex_constants[2][2] = 1.0f;
+			vertex_constants[2][3] = 0.0f;
+			vertex_constants[3][0] = 0.0f;
+			vertex_constants[3][1] = 0.0f;
+			vertex_constants[3][2] = 0.0f;
+			vertex_constants[3][3] = 1.0f;
+			vertex_constants[4][0] = 0.0f;
+			vertex_constants[4][1] = 0.0f;
+			vertex_constants[4][2] = 0.0f;
+			vertex_constants[4][3] = 1.0f;
+			vertex_constants[0][0] = 1.0f / viewport_width * 2.0f;
+			vertex_constants[0][3] = -1.0f - 1.0f / viewport_width;
+			vertex_constants[1][1] = 1.0f / viewport_height * -2.0f;
+			vertex_constants[1][3] = 1.0f / viewport_height + 1.0f;
+			IDirect3DDevice8_SetVertexShaderConstant(
+				global_d3d_device,
+				-68,
+				vertex_constants,
+				5);
+			csmemset(&pixel_shader, 0, sizeof(pixel_shader));
+			pixel_shader.combiner_count = PS_COMBINERCOUNT(1, 0);
+			pixel_shader.final_combiner_inputs_abcd = PS_COMBINERINPUTS(
+				PS_REGISTER_ZERO,
+				PS_REGISTER_ZERO,
+				PS_REGISTER_ZERO,
+				PS_REGISTER_ONE);
+			rasterizer_set_pixel_shader(&pixel_shader);
+			break;
+
+		case _widget_type_internal_sprite:
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_CULLMODE,
+				D3DCULL_CCW);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_COLORWRITEENABLE,
+				D3DCOLORWRITEENABLE_RED |
+				D3DCOLORWRITEENABLE_GREEN |
+				D3DCOLORWRITEENABLE_BLUE);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ALPHABLENDENABLE,
+				TRUE);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_SRCBLEND,
+				D3DBLEND_SRCALPHA);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_DESTBLEND,
+				D3DBLEND_ONE);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_BLENDOP,
+				D3DBLENDOP_ADD);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ALPHATESTENABLE,
+				FALSE);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ZENABLE,
+				TEST_FLAG(flags, _widget_zbuffer_enable_bit));
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ZFUNC,
+				D3DCMP_LESSEQUAL);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ZWRITEENABLE,
+				TEST_FLAG(flags, _widget_zbuffer_write_enable_bit));
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ZBIAS,
+				0);
+			rasterizer_widget_set_tint_factor(1.0f);
+			rasterizer_set_vertex_shader_permutation(
+				0x38,
+				_rasterizer_vertex_type_dynamic_unlit,
+				0);
+			viewport_width = global_window_parameters.viewport_bounds.x1 -
+				global_window_parameters.viewport_bounds.x0;
+			viewport_height = global_window_parameters.viewport_bounds.y1 -
+				global_window_parameters.viewport_bounds.y0;
+			vertex_constants[0][1] = 0.0f;
+			vertex_constants[0][2] = 0.0f;
+			vertex_constants[1][0] = 0.0f;
+			vertex_constants[1][2] = 0.0f;
+			vertex_constants[2][0] = 0.0f;
+			vertex_constants[2][1] = 0.0f;
+			vertex_constants[2][2] = 1.0f;
+			vertex_constants[2][3] = 0.0f;
+			vertex_constants[3][0] = 0.0f;
+			vertex_constants[3][1] = 0.0f;
+			vertex_constants[3][2] = 0.0f;
+			vertex_constants[3][3] = 1.0f;
+			vertex_constants[4][0] = 0.0f;
+			vertex_constants[4][1] = 0.0f;
+			vertex_constants[4][2] = 0.0f;
+			vertex_constants[4][3] = 1.0f;
+			vertex_constants[0][0] = 1.0f / viewport_width * 2.0f;
+			vertex_constants[0][3] = -1.0f - 1.0f / viewport_width;
+			vertex_constants[1][1] = 1.0f / viewport_height * -2.0f;
+			vertex_constants[1][3] = 1.0f / viewport_height + 1.0f;
+			IDirect3DDevice8_SetVertexShaderConstant(
+				global_d3d_device,
+				-68,
+				vertex_constants,
+				5);
+			csmemset(&pixel_shader, 0, sizeof(pixel_shader));
+			pixel_shader.texture_modes = PS_TEXTUREMODES(
+				PS_TEXTUREMODES_PROJECT2D,
+				PS_TEXTUREMODES_NONE,
+				PS_TEXTUREMODES_NONE,
+				PS_TEXTUREMODES_NONE);
+			pixel_shader.combiner_count = PS_COMBINERCOUNT(3, 0);
+			pixel_shader.rgb_inputs[0] = PS_COMBINERINPUTS(
+				PS_REGISTER_T0,
+				PS_REGISTER_T0,
+				PS_REGISTER_ZERO,
+				PS_REGISTER_ZERO);
+			pixel_shader.rgb_outputs[0] = PS_COMBINEROUTPUTS(
+				PS_REGISTER_R0,
+				PS_REGISTER_DISCARD,
+				PS_REGISTER_DISCARD,
+				PS_COMBINEROUTPUT_IDENTITY);
+			pixel_shader.rgb_inputs[1] = PS_COMBINERINPUTS(
+				PS_REGISTER_R0,
+				PS_REGISTER_R0,
+				PS_REGISTER_ZERO,
+				PS_REGISTER_ZERO);
+			pixel_shader.rgb_outputs[1] = PS_COMBINEROUTPUTS(
+				PS_REGISTER_R1,
+				PS_REGISTER_DISCARD,
+				PS_REGISTER_DISCARD,
+				PS_COMBINEROUTPUT_IDENTITY);
+			pixel_shader.rgb_inputs[2] = PS_COMBINERINPUTS(
+				PS_REGISTER_V0,
+				PS_REGISTER_T0,
+				PS_REGISTER_V0 | PS_INPUTMAPPING_UNSIGNED_INVERT,
+				PS_REGISTER_V1 | PS_CHANNEL_ALPHA);
+			pixel_shader.rgb_outputs[2] = PS_COMBINEROUTPUTS(
+				PS_REGISTER_V0,
+				PS_REGISTER_V1,
+				PS_REGISTER_DISCARD,
+				PS_COMBINEROUTPUT_IDENTITY);
+			pixel_shader.final_combiner_inputs_abcd = PS_COMBINERINPUTS(
+				PS_REGISTER_V1,
+				PS_REGISTER_EF_PROD,
+				PS_REGISTER_ZERO,
+				PS_REGISTER_V0);
+			pixel_shader.final_combiner_inputs_efg = PS_COMBINERINPUTS(
+				PS_REGISTER_R0,
+				PS_REGISTER_R1,
+				PS_REGISTER_V0 | PS_CHANNEL_ALPHA,
+				0);
+			rasterizer_set_pixel_shader(&pixel_shader);
+			break;
+
+		default:
+			match_vassert(
+				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_widgets.c",
+				266,
+				FALSE,
+				"### ERROR unsupported widget type");
+			break;
+	}
+
+	return;
+}
+
 boolean _rasterizer_widget_set_texture(
 	short stage_index,
 	long bitmap_group_index,
@@ -433,6 +672,123 @@ void _rasterizer_widget_set_zbuffer_enable(
 		334,
 		global_d3d_device);
 	D3DDevice_SetRenderState_ZEnable(zbuffer_enable);
+
+	return;
+}
+
+void _rasterizer_widget_draw_sprite2d(
+	real_point2d const *point,
+	real radius,
+	real_vector2d const *scale,
+	real_vector2d const *texture_scale,
+	real rotation,
+	unsigned long color)
+{
+	real cos_theta;
+	real sin_theta;
+	real axis_x;
+	real axis_y;
+	real scale_x;
+	real scale_y;
+	long texture_u;
+	long texture_v;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_widgets.c",
+		356,
+		point);
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_widgets.c",
+		357,
+		global_d3d_device);
+
+	if (radius > 0.0f)
+	{
+		if (rotation != 0.0f)
+		{
+			cos_theta = (real)cos(rotation);
+			sin_theta = (real)sin(rotation);
+			match_assert(
+				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_widgets.c",
+				369,
+				fabs(cos_theta*cos_theta + sin_theta*sin_theta - 1.0f)<_real_epsilon);
+			axis_x = cos_theta - sin_theta;
+			axis_y = sin_theta + cos_theta;
+		}
+		else
+		{
+			axis_x = axis_y = 1.0f;
+		}
+
+		if (scale)
+		{
+			scale_x = scale->i;
+			scale_y = scale->j;
+		}
+		else
+		{
+			scale_x = scale_y = 1.0f;
+		}
+
+		if (texture_scale)
+		{
+			texture_u = (long)texture_scale->i;
+			texture_v = (long)texture_scale->j;
+		}
+		else
+		{
+			texture_u = texture_v = 1;
+		}
+
+		IDirect3DDevice8_Begin(
+			global_d3d_device,
+			D3DPT_TRIANGLEFAN);
+		IDirect3DDevice8_SetVertexDataColor(
+			global_d3d_device,
+			9,
+			color);
+		IDirect3DDevice8_SetVertexData2s(
+			global_d3d_device,
+			4,
+			0,
+			0);
+		IDirect3DDevice8_SetVertexData2f(
+			global_d3d_device,
+			0,
+			point->x - scale_x * axis_x,
+			point->y - scale_y * axis_y);
+		IDirect3DDevice8_SetVertexData2s(
+			global_d3d_device,
+			4,
+			texture_u,
+			0);
+		IDirect3DDevice8_SetVertexData2f(
+			global_d3d_device,
+			0,
+			point->x + scale_x * axis_y,
+			point->y - scale_y * axis_x);
+		IDirect3DDevice8_SetVertexData2s(
+			global_d3d_device,
+			4,
+			texture_u,
+			texture_v);
+		IDirect3DDevice8_SetVertexData2f(
+			global_d3d_device,
+			0,
+			point->x + scale_x * axis_x,
+			point->y + scale_y * axis_y);
+		IDirect3DDevice8_SetVertexData2s(
+			global_d3d_device,
+			4,
+			0,
+			texture_v);
+		IDirect3DDevice8_SetVertexData2f(
+			global_d3d_device,
+			0,
+			point->x - scale_x * axis_y,
+			point->y + scale_y * axis_x);
+		IDirect3DDevice8_End(global_d3d_device);
+	}
 
 	return;
 }

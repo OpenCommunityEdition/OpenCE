@@ -38,10 +38,16 @@ add **2,089 meaningful exact bytes / four functions**, again with zero
 regressions. Cumulative canonical gain from these packets is **4,943 bytes**.
 Of that gain, **3,654** belongs to the original 30,074 meaningful-byte headline;
 **1,289** (Devices export 505 and Xbox stencil 784) was absent from that headline
-despite already appearing in the donor's strict-owner count. Therefore
-**26,420 of the original headline is not admitted**, including source/ownership-
+despite already appearing in the donor's strict-owner count. At that checkpoint,
+**26,420 of the original headline was not admitted**, including source/ownership-
 blocked work; it is not a promise that all those bytes will pass admission.
-Canonical reaches **925,807 meaningful exact bytes**, **6,265 credited
+The next [natural Widgets pair](rasterizer_xbox_widgets_obj_natural_opus_pair_20260906.md)
+adds **978 meaningful exact bytes / three SDK wrappers** while retaining two
+credible Halo bodies as fuzzy. Cumulative canonical gain is now **5,921 bytes**:
+**4,632** from the original headline plus the **1,289** previously uncounted
+strict bytes. **25,442 of the original 30,074-byte headline remains unadmitted
+as exact**; some of that is now preserved as honest fuzzy source.
+Canonical reaches **926,785 meaningful exact bytes**, **6,268 credited
 functions**, and unchanged **391/833 Matching objects**.
 Frame Statistics and naming findings below refine the initial proposed order.
 
@@ -269,10 +275,12 @@ owner. It also adds a TU-local `extern boolean debug_objects_devices`, while
    owner corrections above. Audit wrapper call-site provenance separately; do
    not present the current 95/95 byte count as owner-complete or as whole-object
    Matching.
-5. **Widget begin/sprite pair.** `__rasterizer_widget_begin` (1,152) and
-   `__rasterizer_widget_draw_sprite2d` (528) are the cleanest Xbox source pair,
-   with declarations in `rasterizer_widgets.h` and no new pad facade. Three XDK
-   wrappers (992) accompany the pair; the two 16-byte visibility wrappers belong
+5. **Widget begin/sprite pair (natural source admitted, Halo bodies fuzzy).**
+   `__rasterizer_widget_begin` (1,152) and `__rasterizer_widget_draw_sprite2d`
+   (528) retain first-body source, existing owner declarations and no new pad
+   facade. Later exact-producing store/ternary permutations are withheld.
+   Three genuine XDK wrappers add 978 meaningful / 992 padded bytes and have
+   independently corrected private metadata; the two 16-byte visibility wrappers belong
    only to the still-residual 640-byte occlusion-submit body and must not be
    attributed to this pair.
 6. **Active Camouflage cache only.** The 832-byte cache body is standalone. The

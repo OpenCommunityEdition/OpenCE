@@ -99,6 +99,29 @@ immediate.
 | Markers/regions/attachments | `MAXIMUM_MARKERS_PER_OBJECT`, `MAXIMUM_REGIONS_PER_OBJECT`, `MAXIMUM_NUMBER_OF_ATTACHMENTS_PER_OBJECT` | `64`, `8`, `8` | [source/objects/objects.h](../source/objects/objects.h) and [source/objects/object_definitions.h](../source/objects/object_definitions.h). These belong to different arrays despite sharing an object definition. |
 | Damage material modifier capacity | `MAXIMUM_NUMBER_OF_MATERIAL_TYPES` | `40` | [source/game/game_globals.h](../source/game/game_globals.h); used by `damage_definition.material_modifiers` at [source/objects/damage_effect_definitions.h](../source/objects/damage_effect_definitions.h). It is storage capacity, not the current named-material count. |
 
+## Xbox shader encodings (confirmed SDK owners, context-specific)
+
+The existing [Xbox D3D8 types header](../xbox/include/D3D8Types.h) owns the
+register-combiner macros and enums. Prefer them to packed hexadecimal shader
+words; this documents the actual inputs and outputs without creating new
+engine constants. They are hardware encodings, not Bungie identifier recovery.
+
+| Encoding | Existing owner / interpretation | Example |
+| --- | --- | --- |
+| Four combiner inputs | `PS_COMBINERINPUTS(a,b,c,d)` packs four input bytes | `PS_COMBINERINPUTS(PS_REGISTER_T0, PS_REGISTER_T0, PS_REGISTER_ZERO, PS_REGISTER_ZERO)` is `0x08080000`. |
+| Input register/mapping/channel | `PS_REGISTER_*`, `PS_INPUTMAPPING_*`, `PS_CHANNEL_*` | `PS_REGISTER_V0 \| PS_INPUTMAPPING_UNSIGNED_INVERT` is `0x24`; `PS_REGISTER_V1 \| PS_CHANNEL_ALPHA` is `0x15`. These are already encoded masks, not bit indices for `FLAG`. |
+| Constant one input | `PS_REGISTER_ONE` | `0x20`, zero register with unsigned-invert mapping; not a literal register number 32. |
+| Combiner destinations | `PS_COMBINEROUTPUTS(ab,cd,mux_sum,flags)` | R0/discard/discard/identity is `0xC0`; R1/discard/discard/identity is `0xD0`. |
+| Stage count | `PS_COMBINERCOUNT(count,flags)` | Counts 1 and 3 with zero flags encode as 1 and 3. Flags zero select the SDK defaults; count is not a bit index. |
+| Texture addressing modes | `PS_TEXTUREMODES(t0,t1,t2,t3)` with `PS_TEXTUREMODES_*` | PROJECT2D/NONE/NONE/NONE encodes as 1. |
+
+The Widgets reconciliation replaces these packed words using the existing
+macros; all generated code and non-debug sections remain unchanged. Do not
+assign a fixed-function `D3DVSDE_*` semantic name to an arbitrary custom vertex
+shader register just because its number agrees: Widgets sends color through
+register 9 and texture coordinates through register 4. The custom shader's
+input contract, not the fixed-function spelling, determines their meaning.
+
 ## Damage flags relevant to the current caller/helper packet
 
 These are confirmed but context-specific. The enum values are **bit indices**;

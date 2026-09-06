@@ -2,6 +2,28 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_widgets",
+      "function": "__rasterizer_widget_begin",
+      "class": "unclassified",
+      "evidence": "Natural Opus first-body widget setup retained with its genuine public owner and required D3D calls. Uses existing TEST_FLAG and SDK PS_* macros; their normalization leaves all code unchanged. January and candidate have 1152 padded bytes and 87 ordered relocations; the candidate initializes zero/identity matrix entries before the four viewport-derived entries, corroborated by later HCEA source shape. Donor exactness depends on reordering those stores for instruction selection without independent original-source evidence, so that tuned variant is withheld. No new force-inline, helper body, layout facade, foreign prototype or visibility/fast_ftol/point_from_line3d emission is introduced. The three naturally emitted exact SDK wrappers are separately ownership-audited; this Halo body receives zero exact credit. See docs/object_matching_logs/rasterizer_xbox_widgets_obj_natural_opus_pair_20260906.md. Reopen for genuine source/compiler-context evidence, not store/declaration permutation searches.",
+      "measurements": {
+        "target": { "size": 1152, "relocation_count": 87, "normalized_sha256": "9d7646e555d1b71d16837b27172594fe50ecac76ace106f31a70d56380f80ecb" },
+        "base": { "size": 1152, "relocation_count": 87, "normalized_sha256": "2b03536fcfce3c64713cb153dd6f2d0f6ad233708a2ee61cd8ec57cae1d147ee" },
+        "objdiff_percent": 88.338646
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_widgets",
+      "function": "__rasterizer_widget_draw_sprite2d",
+      "class": "unclassified",
+      "evidence": "Natural Opus first-body typed sprite2d reconstruction retained with the genuine rasterizer_widgets.h contract and required draw-call stream. January and candidate have 528 padded bytes and 30 ordered relocations. The remaining null-texture-scale path assigns the same integer unit scales using opposite EBX/EDI assignment order; the donor exact two-ternary rewrite followed a 12-variant code-generation search and is not imported as source-authenticated. No new math helper, forced inline, raw access, foreign prototype, visibility wrapper or point_from_line3d is emitted. This Halo body remains fuzzy with zero exact credit. See docs/object_matching_logs/rasterizer_xbox_widgets_obj_natural_opus_pair_20260906.md. Reopen for genuine source/compiler-context evidence rather than equivalent-expression or declaration permutations.",
+      "measurements": {
+        "target": { "size": 528, "relocation_count": 30, "normalized_sha256": "5adde524c709325b4dd89a59ab62baa7a6f10654ae64b1773bdb05409086f3af" },
+        "base": { "size": 528, "relocation_count": 30, "normalized_sha256": "0297644a3e1501a48dd9d7bbf24744b366d2892607ee9d29d26307e7be593a6a" },
+        "objdiff_percent": 99.911766
+      }
+    },
+    {
       "unit": "source/ai/path_obstacles",
       "function": "_obstacles_test_circle",
       "class": "unclassified",
