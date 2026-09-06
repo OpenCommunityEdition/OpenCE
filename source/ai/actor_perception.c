@@ -1148,15 +1148,6 @@ boolean actor_attacking_target(
 	long actor_index,
 	real_vector3d *attack_vector);
 
-void ai_communication_event(
-	short type,
-	long unit_index,
-	long prop_index,
-	long object_index,
-	long position_index,
-	long structure_index,
-	void const *context);
-
 void actor_discard_firing_position(
 	long actor_index,
 	short firing_position_index,

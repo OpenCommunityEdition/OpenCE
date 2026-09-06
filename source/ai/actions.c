@@ -2014,7 +2014,7 @@ boolean actor_action_handle_surprise(
 				weapon_state,
 				NONE,
 				NONE,
-				FALSE);
+				NULL);
 		}
 
 		if (variant_definition->ranged_combat.surprise_wildfire_time > 0.0f)
@@ -2137,7 +2137,7 @@ boolean actor_action_handle_panic_transition(
 					NONE,
 					NONE,
 					NONE,
-					FALSE);
+					NULL);
 				goto done;
 			}
 
@@ -3172,7 +3172,7 @@ boolean actor_action_handle_lost_contact(
 						NONE,
 						NONE,
 						NONE,
-						FALSE);
+						NULL);
 					firing_positions->pursuit_communicated_lost_contact = TRUE;
 				}
 
@@ -3292,7 +3292,7 @@ boolean actor_action_handle_lost_contact(
 								NONE,
 								NONE,
 								NONE,
-								FALSE);
+								NULL);
 						}
 
 						firing_positions->pursuit_positions_count++;
@@ -3311,7 +3311,7 @@ boolean actor_action_handle_lost_contact(
 							NONE,
 							NONE,
 							NONE,
-							FALSE);
+							NULL);
 					}
 
 					if (!actor->meta.swarm &&
@@ -4047,7 +4047,7 @@ boolean actor_action_try_to_dive(
 			NONE,
 			NONE,
 			NONE,
-			FALSE);
+			NULL);
 		debug_info->dive_decision = 4;
 		return result;
 	}
@@ -4753,7 +4753,7 @@ boolean actor_action_handle_evasion(
 						NONE,
 						NONE,
 						NONE,
-						FALSE);
+						NULL);
 					actor->emotions.perceived_danger = 0.0f;
 					result = TRUE;
 				}
@@ -5036,7 +5036,7 @@ boolean actor_action_handle_danger_avoidance(
 					hostility,
 					NONE,
 					NONE,
-					FALSE);
+					NULL);
 			}
 
 			actor->danger_zone.communicated = TRUE;

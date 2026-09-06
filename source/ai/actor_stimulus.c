@@ -435,7 +435,7 @@ void actor_stimulus_noticed_danger_zone(
 			communication_hostility,
 			NONE,
 			NONE,
-			FALSE);
+			NULL);
 	}
 
 	distance = normalize3d(vector_from_points3d(
@@ -489,7 +489,7 @@ void actor_stimulus_weapon_impact(
 			NONE,
 			NONE,
 			NONE,
-			FALSE);
+			NULL);
 	}
 	else
 	{
@@ -903,7 +903,7 @@ void actor_stimulus_prop_acknowledged(
 					_comm_hostility_enemy,
 					NONE,
 					NONE,
-					FALSE);
+					NULL);
 			}
 		}
 	}
@@ -1065,7 +1065,7 @@ void actor_stimulus_prop_sighted(
 			_comm_hostility_enemy,
 			NONE,
 			NONE,
-			FALSE);
+			NULL);
 	}
 
 	return;
@@ -1089,7 +1089,7 @@ void actor_stimulus_maneuvering(
 			NONE,
 			NONE,
 			NONE,
-			FALSE);
+			NULL);
 	}
 
 	if (flee &&

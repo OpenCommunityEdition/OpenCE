@@ -21,6 +21,7 @@ symbols in this file:
 #include "actor_definitions.h"
 #include "actors.h"
 #include "ai.h"
+#include "ai_communication.h"
 #include "ai_debug.h"
 #include "ai_scenario_definitions.h"
 #include "props.h"
@@ -82,15 +83,6 @@ struct firing_position_candidate
 };
 
 /* ---------- prototypes */
-
-void ai_communication_event(
-	short type,
-	long unit_index,
-	long prop_index,
-	long object_index,
-	long position_index,
-	long structure_index,
-	boolean allow_reply);
 
 void actor_discard_firing_position(
 	long actor_index,
@@ -396,7 +388,7 @@ void action_uncover_begin(
 			NONE,
 			NONE,
 			NONE,
-			FALSE);
+			NULL);
 	}
 	return;
 }

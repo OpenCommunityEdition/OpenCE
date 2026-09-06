@@ -51,6 +51,7 @@ symbols in this file:
 
 #include "actors.h"
 #include "actor_definitions.h"
+#include "ai_communication.h"
 #include "props.h"
 
 /* ---------- constants */
@@ -97,15 +98,6 @@ struct firing_position_candidate
 boolean game_team_is_ally(
 	short team_a,
 	short team_b);
-
-void ai_communication_event(
-	short type,
-	long unit_index,
-	long prop_index,
-	long object_index,
-	long position_index,
-	long structure_index,
-	boolean allow_reply);
 
 long actor_target_unit_index(
 	long actor_index);
@@ -612,7 +604,7 @@ static boolean action_guard_speak_post_combat(
 				prop_type,
 				NONE,
 				NONE,
-				FALSE);
+				NULL);
 			result = TRUE;
 		}
 
@@ -697,7 +689,7 @@ action_guard_update(
 					NONE,
 					NONE,
 					NONE,
-					FALSE);
+					NULL);
 			}
 
 			if (state_data->guard_location_type == 3)
@@ -938,7 +930,7 @@ action_guard_control(
 					NONE,
 					NONE,
 					2,
-					FALSE);
+					NULL);
 			}
 
 			if (state_data->post_combat)

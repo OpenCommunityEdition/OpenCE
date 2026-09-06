@@ -93,6 +93,7 @@ enum ai_communication_hostility
 
 /* ---------- structures */
 
+struct ai_information_data;
 struct ai_information_packet;
 
 /* The independently mapped prefix of the 0x64-byte conversation datum. */
@@ -169,13 +170,13 @@ real ai_communication_get_player_rating(
 short ai_communication_get_type_by_name(
 	char const *name);
 void ai_communication_event(
-	short type,
-	long unit_index,
-	long prop_index,
-	long object_index,
-	long position_index,
-	long structure_index,
-	boolean allow_reply);
+	short communication_type,
+	long subject_unit_index,
+	long cause_unit_index,
+	short hostility,
+	short damage_type,
+	short information_type,
+	struct ai_information_data *information_data);
 
 /* ---------- globals */
 

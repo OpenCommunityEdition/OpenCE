@@ -24,6 +24,7 @@ symbols in this file:
 #include "actions.h"
 
 #include "actors.h"
+#include "ai_communication.h"
 #include "props.h"
 #include "game/game.h"
 
@@ -42,14 +43,6 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-void ai_communication_event(
-	short type,
-	long unit_index,
-	long prop_index,
-	long object_index,
-	long position_index,
-	long structure_index,
-	boolean allow_reply);
 void actor_pursuit_find_nearby_actors(
 	long actor_index,
 	boolean pursuit_is_coordinator);
@@ -196,7 +189,7 @@ action_wait_update(
 		{
 			if (actor->meta.unit_index != NONE)
 			{
-				ai_communication_event(17, actor->meta.unit_index, NONE, NONE, NONE, NONE, FALSE);
+				ai_communication_event(17, actor->meta.unit_index, NONE, NONE, NONE, NONE, NULL);
 			}
 			actor->state.action_data.wait.query_timer = seed_random_range(get_global_random_seed_address(), 300, 600);
 		}
@@ -209,7 +202,7 @@ action_wait_update(
 		{
 			if (actor->state.action_data.wait.waiting_as_coordinator && actor->meta.unit_index != NONE)
 			{
-				ai_communication_event(20, actor->meta.unit_index, NONE, NONE, NONE, NONE, FALSE);
+				ai_communication_event(20, actor->meta.unit_index, NONE, NONE, NONE, NONE, NULL);
 			}
 			actor->state.action_data.wait.wait_done = TRUE;
 		}

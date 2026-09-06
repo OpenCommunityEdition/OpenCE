@@ -2,14 +2,15 @@
 
 ## Current published checkpoint (2026-09-05)
 
-Verified published code checkpoint `c59c6bcc11bcfd8708152b8ea4d99b4ad6834dc5` on canonical and both
+Verified published code checkpoint `3ddb4158e733913c66161ac346000418bae8ca6c` on canonical and both
 `bnunu/halo` publication branches:
 **906,391 meaningful matched code bytes**, **6,171 credited functions**,
 **2,031,312 matched data bytes**, and **391/833 Matching objects**.
 The full stable-owner sweep has **6,217 strict owners**; **281 fuzzy parks**
-validate at that published checkpoint. Its Transport initialization follow-up
-retains 416 meaningful fuzzy bytes and adds a 444-byte aggregate data match;
-exact code and object totals remain unchanged.
+validate at that published checkpoint. Its math-helper ownership and Observer
+shared-schema batch preserves those totals with zero runtime or exact-function
+regressions. The preceding Transport initialization retains 416 meaningful
+fuzzy bytes and adds a 444-byte aggregate data match.
 All288 tests plus26 subtests pass.
 
 The donor byte pools and earlier "current" totals below are historical
@@ -41,6 +42,52 @@ ActorCombat still owns duplicate NODUPLICATES sine/cosine wrappers. A single
 natural removal trial loses those two 16-byte functions in the incomplete TU
 and is withheld. Reopen via a genuine missing caller, never an emission anchor.
 The active Fable implementations and playlist schema remain excluded.
+
+The final frozen Observer body now has an ordinary-link boundary proven in
+both orders: the actual ActorCombat pair reports LNK2005 for sine and cosine.
+The normalized ActionAlert/Particles aggregate has no duplicate-definition
+error. The reviewed Observer source and tests remain preserved, not admitted;
+see the real-update caller-cluster and independent integrator/penetration
+20260905 ledgers. No prospective 416 padded-byte gain enters canonical totals.
+
+A fresh ActionFlee update trial is also withheld. Moving its own update
+declaration and the Unit blind-running declaration to their genuine headers
+affects 84 canonical dependents and regresses two Race strict owners, while
+changing an existing AI Communication park. The complete four-file API trial
+was restored; the full build and stable sweep return to 6,217 strict owners
+and 281 valid parks. The isolated natural body additionally exposes an external
+donor semantic mislabel: January refreshes flee_with_friends_disable_time at
+actor+0x39C, not last_flee_failed_time at +0x398. There is no missing padding
+or actor-schema shift to invent, and the wrong-member draft receives no fuzzy
+credit. Corrected source is preserved pending safe genuine API integration.
+
+The September 5 read-only Git metadata intake still finds the newest older
+Opus ref at eeedd72e5 and Claude ref at 617703d2e, with 35 older Claude/Opus
+worktree metadata records. No distinct newly reported interrupted Opus lane
+is identified. This is a bounded discovery result, not proof no other work
+exists, and does not close that pending intake. Active Fable tree contents
+remain uninspected.
+
+The next canonical prerequisite corrects the real seven-argument
+ai_communication_event API from January and named PDB evidence. Its final
+argument is ai_information_data*, and arguments four through six are shorts.
+Six caller-local shadows are removed, five genuine owner includes added, and
+21 old Boolean-zero pointer arguments are clarified as NULL. No active Fable
+body is edited. The first full build preserves all 6,217 strict owners, all
+281 parks, every completion label, and the 906,391 meaningful-code total;
+288 tests plus 26 subtests pass. The full fourteen-object runtime audit passes:
+1,448 sections are identical and eight differ only in compiler-local label
+spelling; no runtime owner, COMMON, helper, or ABI change is introduced.
+The owning-API ledger records full independent evidence. This fixes a genuine
+ActorCombat prerequisite but does not itself admit the burst/Observer bodies.
+
+The next smaller Encounters candidate is a genuine three-function caller
+cluster (1,024 padded bytes), not a standalone initialization leaf. Its
+platoon-definition flags at +0x20 and starting-location capacity require
+independent owner-schema verification first. The exact target graph and
+boundaries are preserved in
+scratch/encounters_initialize_cluster_triage_20260905.md; no candidate was
+compiled or credited from this triage.
 
 The natural Winsock error-string body now passes canonical verification at
 49.78903% ordinary match:1,568 meaningful target bytes reconstructed as fuzzy,

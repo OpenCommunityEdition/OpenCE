@@ -37,6 +37,7 @@ symbols in this file:
 
 #include "actor_definitions.h"
 #include "actors.h"
+#include "ai_communication.h"
 #include "ai_scenario_definitions.h"
 #include "encounters.h"
 #include "props.h"
@@ -61,15 +62,6 @@ struct firing_position_definition
 };
 
 /* ---------- prototypes */
-
-void ai_communication_event(
-	short type,
-	long unit_index,
-	long prop_index,
-	long object_index,
-	long position_index,
-	long structure_index,
-	boolean allow_reply);
 
 long actor_target_unit_index(
 	long actor_index);
@@ -227,7 +219,7 @@ void action_search_update(
 						NONE,
 						NONE,
 						NONE,
-						FALSE);
+						NULL);
 					actor->firing_positions.pursuit_communicated_lost_contact = TRUE;
 				}
 			}
@@ -240,7 +232,7 @@ void action_search_update(
 					NONE,
 					NONE,
 					NONE,
-					FALSE);
+					NULL);
 			}
 		}
 	}

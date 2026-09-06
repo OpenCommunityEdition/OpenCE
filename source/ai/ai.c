@@ -199,6 +199,7 @@ symbols in this file:
 
 #include "cseries.h"
 
+#include "ai/ai_communication.h"
 #include "ai/ai_runtime.h"
 #include "ai/actor_types.h"
 
@@ -213,12 +214,6 @@ symbols in this file:
 #include <stddef.h>
 
 /* ---------- constants */
-
-enum
-{
-	_ai_communication_vehicle_entry = 36,
-	_ai_communication_vehicle_exit = 37,
-};
 
 /* ---------- macros */
 
@@ -329,15 +324,6 @@ void ai_debug_dispose(
 	void);
 void ai_debug_dispose_from_old_map(
 	void);
-
-void ai_communication_event(
-	short type,
-	long unit_index,
-	long prop_index,
-	long object_index,
-	long position_index,
-	long structure_index,
-	void const *context);
 
 void actor_iterator_new(
 	struct actor_iterator *iterator,
