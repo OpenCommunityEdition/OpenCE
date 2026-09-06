@@ -1,5 +1,42 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
+## ActorLooking decoder and movement caller retained naturally (2026-09-06)
+
+The preceding RenderDebug batch is published as
+`2fbd3e3bb6917e4ee5c47288ad4ed3f5b7173f03` on both authorized GitHub refs,
+independently verified. The refreshed canonical treemap has 833 units,
+one source and zero warnings.
+
+ActorLooking now reconstructs its real static seven-form direction decoder
+and public movement caller in natural typed C, with no shared-header edits
+or emission tricks. They are **65.322365% and 92.38636% fuzzy**, respectively,
+and add **zero exact-byte credit**. The unit is **two exact / two residual /
+twelve unwritten**, not complete. Its nine ordinary math fallbacks retain
+four genuine ActionCharge linker conflicts; those and the five unwritten
+update call sites remain explicit completion blockers.
+
+Root independently reviewed and replayed the actual target/first/ordinary
+machine-code graph: **32 finite cases, two x87 modes, 192 entry executions**.
+Tested outputs, diagnostics, state, ABI and FPSW agree. Four adjacent float32
+boundary probes show no divergence, and three actual-byte mutations are
+rejected. The point x,z,z diagnostic and missing-prop owner zero are proved
+original behavior by raw hex and runtime checks, not invented matching hacks.
+The real helper bodies execute; external engine/CRT contracts are disclosed
+bounded models, not whole-engine proof.
+
+Exact totals remain **917,904 meaningful code bytes**, **6,217 credited
+functions**, **6,263 strict functions**, **2,061,024 matched data bytes** and
+**391/833 Matching objects**. Full Ninja and the complete strict census pass
+with no inherited losses. Parks are **294 active, zero stale and zero
+invalid**; admission retains five existing rejections with no new candidates,
+contradictions or revocations. Source and both concurrent Opus reservations
+remain untouched outside this reviewed ActorLooking packet.
+See `object_matching_logs/actor_looking_obj_direction_decoder_natural_reconstruction_20260906.md`
+and `tools/audit/actor_looking_decoder_runtime.py`. The complete tools suite
+passes **606 tests plus 26 subtests**, including 12 fixture-free ActorLooking
+oracle contracts. The scoped batch is ready for commit; independent remote
+publication checks follow before claiming it published.
+
 ## RenderDebug primitive callers reconciled (2026-09-06)
 
 The preserved Opus line, box-outline and point bodies have been reconciled

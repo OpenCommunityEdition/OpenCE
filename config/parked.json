@@ -5262,6 +5262,44 @@
         },
         "objdiff_percent": 89.066666
       }
+    },
+    {
+      "unit": "source/ai/actor_looking",
+      "function": "_actor_look_decode_direction",
+      "class": "unclassified",
+      "evidence": "First fixed natural typed reconstruction of the genuine static seven-form direction decoder, admitted together with its real public movement caller. January hex, relocation tables, external type/name evidence and later source corroborate the function and complete diagnostic logic, including the original movement x,z,z typo and failed-prop owner zero. No source-shape, declaration-order, forced-inline or compiler-flag variants were tried. The candidate calls the real normal-validity helper for its first check where January inlines it; this explains one extra relocation, not an exact classification of all block-layout differences. Root independently replays 32 finite cases in both x87 control words over target/first/actual real decoder, caller and reached math helpers: 192 executions, equal tested semantics and FPSW, preserved full-page tails and ABI, plus three actual-byte negative controls. Four adjacent float32 validity-boundary probes show no divergence; this is not exhaustive floating-point proof. All inherited exacts and runtime owners survive. Nine ordinary uncredited math fallbacks include four confirmed ActionCharge NODUPLICATES link conflicts, and five genuine actor_look_update call sites remain unwritten; complete-object/link admission is explicitly vetoed. No point_from_line3d is emitted. Reopen only for authentic source/type/complete-caller-context evidence, not equivalent-spelling or emission-policy searches. See docs/object_matching_logs/actor_looking_obj_direction_decoder_natural_reconstruction_20260906.md and tools/audit/actor_looking_decoder_runtime.py.",
+      "measurements": {
+        "target": {
+          "size": 1632,
+          "relocation_count": 98,
+          "normalized_sha256": "4f3714fab510f0c407dc0792b3cbea003ba4d1dfdb4aee74d201d9a9e5dc14a9"
+        },
+        "base": {
+          "size": 1616,
+          "relocation_count": 99,
+          "normalized_sha256": "bea2ec692aedec4276c07fb076ad2dd53888277627541c42fb56dea1670b3008"
+        },
+        "objdiff_percent": 65.322365
+      }
+    },
+    {
+      "unit": "source/ai/actor_looking",
+      "function": "_actor_look_affect_movement",
+      "class": "unclassified",
+      "evidence": "First fixed natural public caller retained with its authentic static actor_look_decode_direction dependency. January confirms priority >= 3 via the real _primary_priority_aiming enum, movement/path short circuit, typed actor access and byte forced-aim flag. Candidate and target are 128 padded bytes with four relocations; the candidate duplicates return/store tails instead of January's shared tail. No alternative expression, declaration-order or inline variants were tried. Root independently replays target/first/actual with the actual private decoder, not a fabricated external stub, including priorities 2/3/4, path/no-path and decoder failure under both x87 control words. Three genuine-byte negatives detect the priority threshold, original diagnostic typo and null-prop owner changes. All inherited strict matches remain preserved. This function adds no exact credit, and the containing partial ActorLooking object retains the documented math-owner link veto and unwritten update callers. Reopen only for authentic source/type/complete-caller-context evidence. See docs/object_matching_logs/actor_looking_obj_direction_decoder_natural_reconstruction_20260906.md and tools/audit/actor_looking_decoder_runtime.py.",
+      "measurements": {
+        "target": {
+          "size": 128,
+          "relocation_count": 4,
+          "normalized_sha256": "5d7d253b925542d2e1c1c21c83c6a2f2049df1a6fe051b6f713b377c47f85dde"
+        },
+        "base": {
+          "size": 128,
+          "relocation_count": 4,
+          "normalized_sha256": "d096436ec233acf74823c8ce959e2ded832eb046b0c8b441be976c5e6cf5dafa"
+        },
+        "objdiff_percent": 92.38636
+      }
     }
   ]
 }

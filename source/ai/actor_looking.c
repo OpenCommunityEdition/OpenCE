@@ -25,7 +25,7 @@ symbols in this file:
 00016C20 0050:
 	_valid_real_normal2d (0000)
 00016C70 0660:
-	_code_00016c70 (0000)
+	_actor_look_decode_direction (0000)
 000172D0 0210:
 	_code_000172d0 (0000)
 000174E0 0170:
@@ -172,6 +172,7 @@ symbols in this file:
 #include "ai_debug.h"
 #include "main/console.h"
 #include "props.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
@@ -211,6 +212,11 @@ typedef char actor_looking_prop_shooting_offset_must_be_0x12F[
 	offsetof(struct prop_datum, shooting) == 0x12F ? 1 : -1];
 
 /* ---------- prototypes */
+
+static boolean actor_look_decode_direction(
+	long actor_index,
+	struct direction_specification *specification,
+	real_vector3d *direction);
 
 /* ---------- globals */
 
@@ -317,4 +323,230 @@ real actor_look_compute_prop_interest(
 	return interest;
 }
 
+void actor_look_affect_movement(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct direction_specification *movement_direction = &actor->orders.look.primary_direction;
+
+	if (movement_direction->type == _direction_specification_movement &&
+		!actor_path_has_path(actor_index))
+	{
+		actor->orders.look.primary_priority = _primary_priority_none;
+	}
+
+	actor->control.moving_forced_by_aiming =
+		actor->orders.look.primary_priority >= _primary_priority_aiming &&
+		movement_direction->type != _direction_specification_movement &&
+		actor_look_decode_direction(
+			actor_index,
+			movement_direction,
+			&actor->control.moving_forced_aim_direction);
+
+	return;
+}
+
 /* ---------- private code */
+
+static boolean actor_look_decode_direction(
+	long actor_index,
+	struct direction_specification *specification,
+	real_vector3d *direction)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean result = FALSE;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\actor_looking.c", 349, specification);
+	match_assert("c:\\halo\\SOURCE\\ai\\actor_looking.c", 350, direction);
+
+	switch (specification->type)
+	{
+	case _direction_specification_movement:
+		if (actor->control.moving)
+		{
+			*direction = actor->control.moving_towards_vector;
+			result = normalize3d(direction) > 0.0f;
+		}
+		break;
+
+	case _direction_specification_prop:
+		{
+			struct prop_datum *prop = prop_try_and_get(specification->prop_index);
+
+			if (prop)
+			{
+				vector_from_points3d(&actor->input.position.head_position, &prop->head_position, direction);
+				result = normalize3d(direction) > 0.0f;
+			}
+		}
+		break;
+
+	case _direction_specification_target:
+		if (actor->control.fire_state == _actor_fire_state_bursting)
+		{
+			*direction = actor->control.burst_aim_vector;
+			result = TRUE;
+		}
+		else if (actor->control.aiming_at_fire_target)
+		{
+			*direction = actor->control.current_fire_target_aim_vector;
+			result = TRUE;
+		}
+		else if (actor->target.target_prop_index != NONE)
+		{
+			struct prop_datum *prop = prop_get(actor->target.target_prop_index);
+
+			vector_from_points3d(&actor->input.position.head_position, &prop->center_of_mass, direction);
+			result = normalize3d(direction) > 0.0f;
+		}
+		break;
+
+	case _direction_specification_point:
+		vector_from_points3d(&actor->input.position.head_position, &specification->point, direction);
+		result = normalize3d(direction) > 0.0f;
+		break;
+
+	case _direction_specification_vector:
+		*direction = specification->vector;
+		result = TRUE;
+		break;
+
+	case _direction_specification_danger:
+		if (actor->danger_zone.danger_type > _actor_danger_zone_none)
+		{
+			vector_from_points3d(&actor->input.position.head_position, &actor->danger_zone.position, direction);
+			result = normalize3d(direction) > 0.0f;
+		}
+		break;
+
+	case _direction_specification_object:
+		{
+			struct object_datum *object = object_try_and_get(specification->object_index);
+
+			if (object)
+			{
+				real_point3d look_point;
+
+				if (TEST_FLAG(_object_mask_unit, object->object.type))
+				{
+					unit_get_head_position(specification->object_index, &look_point);
+				}
+				else
+				{
+					object_get_origin(specification->object_index, &look_point);
+				}
+
+				vector_from_points3d(&actor->input.position.head_position, &look_point, direction);
+				result = normalize3d(direction) > 0.0f;
+			}
+		}
+		break;
+
+	default:
+		match_vassert("c:\\halo\\SOURCE\\ai\\actor_looking.c", 449, FALSE, NULL);
+		break;
+	}
+
+	if (result)
+	{
+		if (!valid_real_normal3d(direction))
+		{
+			real magnitude = magnitude3d(direction);
+
+			switch (specification->type)
+			{
+			case _direction_specification_movement:
+				/* BUG (preserved for exact matching): January loads the point's
+				 * z field twice (actor + 0x514). A corrected diagnostic should
+				 * print the y field as its second point component.
+				 */
+				sprintf(temporary, "denormalized %f: %smoving (p%f %f %f) (v%f %f %f)",
+					magnitude, actor->control.moving ? "" : "not ",
+					actor->control.moving_towards_point.x,
+					actor->control.moving_towards_point.z,
+					actor->control.moving_towards_point.z,
+					actor->control.moving_towards_vector.i,
+					actor->control.moving_towards_vector.j,
+					actor->control.moving_towards_vector.k);
+				break;
+
+			case _direction_specification_prop:
+				{
+					struct prop_datum *prop = prop_try_and_get(specification->prop_index);
+
+					sprintf(temporary, "denormalized %f: prop 0x%08X%s (actor 0x%08X / us 0x%08X)",
+						magnitude, specification->prop_index, prop ? "" : " (invalid)",
+						prop ? prop->owner_actor_index : 0, actor_index);
+				}
+				break;
+
+			case _direction_specification_target:
+				if (actor->control.fire_state == _actor_fire_state_bursting)
+				{
+					sprintf(temporary, "denormalized %f: target type %d (burst aim vector %f %f %f)",
+						magnitude, actor->control.current_fire_target_type,
+						actor->control.burst_aim_vector.i,
+						actor->control.burst_aim_vector.j,
+						actor->control.burst_aim_vector.k);
+				}
+				else if (actor->control.aiming_at_fire_target)
+				{
+					sprintf(temporary, "denormalized %f: target type %d (fire target aim vector %f %f %f)",
+						magnitude, actor->control.current_fire_target_type,
+						actor->control.current_fire_target_aim_vector.i,
+						actor->control.current_fire_target_aim_vector.j,
+						actor->control.current_fire_target_aim_vector.k);
+				}
+				else if (actor->target.target_prop_index != NONE)
+				{
+					struct prop_datum *prop = prop_get(actor->target.target_prop_index);
+
+					sprintf(temporary, "denormalized %f: target (prop 0x%08X center %f %f %f)",
+						magnitude, actor->target.target_prop_index,
+						prop->center_of_mass.x, prop->center_of_mass.y, prop->center_of_mass.z);
+				}
+				else
+				{
+					sprintf(temporary, "denormalized %f: target (none)", magnitude);
+				}
+				break;
+
+			case _direction_specification_point:
+				sprintf(temporary, "denormalized %f: point (%f %f %f)", magnitude,
+					specification->point.x, specification->point.y, specification->point.z);
+				break;
+
+			case _direction_specification_vector:
+				sprintf(temporary, "denormalized %f: vector (%f %f %f)", magnitude,
+					specification->vector.i, specification->vector.j, specification->vector.k);
+				break;
+
+			case _direction_specification_danger:
+				if (actor->danger_zone.danger_type > _actor_danger_zone_none)
+				{
+					sprintf(temporary, "denormalized %f: danger (%f %f %f)", magnitude,
+						actor->danger_zone.position.x, actor->danger_zone.position.y, actor->danger_zone.position.z);
+				}
+				else
+				{
+					sprintf(temporary, "denormalized %f: danger (none)", magnitude);
+				}
+				break;
+
+			case _direction_specification_object:
+				sprintf(temporary, "denormalized %f: object (0x%08X)", magnitude, specification->object_index);
+				break;
+
+			default:
+				sprintf(temporary, "denormalized %f: <error> (type %d)", magnitude, specification->type);
+				break;
+			}
+
+			display_assert(temporary, "c:\\halo\\SOURCE\\ai\\actor_looking.c", 526, FALSE);
+		}
+
+		match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\ai\\actor_looking.c", 529, direction);
+	}
+
+	return result;
+}

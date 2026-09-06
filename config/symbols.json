@@ -285,7 +285,7 @@
 { "file_offset": 92256, "flags": 32, "name": "_code_00016860" },
 { "file_offset": 92608, "flags": 32, "name": "_code_000169c0" },
 { "file_offset": 93216, "flags": 32, "name": "_valid_real_normal2d" },
-{ "file_offset": 93296, "flags": 32, "name": "_code_00016c70" },
+{ "file_offset": 93296, "flags": 32, "name": "_actor_look_decode_direction", "static": true },
 { "file_offset": 94928, "flags": 32, "name": "_code_000172d0" },
 { "file_offset": 95456, "flags": 32, "name": "_code_000174e0" },
 { "file_offset": 95824, "flags": 32, "name": "_actor_look_update" },
