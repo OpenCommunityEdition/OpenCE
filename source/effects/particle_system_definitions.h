@@ -29,14 +29,22 @@ enum
 
 struct particle_system_definition
 {
-	byte opaque00[0x44];
-	long point_physics_index;
+	byte reserved00[0x38];
+	struct tag_reference system_update_point_physics;
+	byte reserved48[0x14];
+	struct tag_block types;
 };
 
-typedef char particle_system_definition_point_physics_index_offset_assert[
-	offsetof(struct particle_system_definition, point_physics_index) == 0x44 ? 1 : -1];
+typedef char particle_system_definition_size_assert[
+	sizeof(struct particle_system_definition) == 0x68 ? 1 : -1];
+typedef char particle_system_definition_system_update_point_physics_offset_assert[
+	offsetof(struct particle_system_definition, system_update_point_physics) == 0x38 ? 1 : -1];
+typedef char particle_system_definition_system_update_point_physics_index_offset_assert[
+	offsetof(struct particle_system_definition, system_update_point_physics.index) == 0x44 ? 1 : -1];
+typedef char particle_system_definition_types_offset_assert[
+	offsetof(struct particle_system_definition, types) == 0x5C ? 1 : -1];
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes */
 
 /* ---------- globals */
 

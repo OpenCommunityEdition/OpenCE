@@ -9,7 +9,7 @@ symbols in this file:
 0008DD50 0030:
 	_particle_system_orphan (0000)
 0008DD80 00b0:
-	_code_0008dd80 (0000)
+	_particle_system_delete (0000)
 0008DE30 0010:
 	_particle_systems_dispose (0000)
 0008DE40 0010:
@@ -83,6 +83,7 @@ symbols in this file:
 #include "objects/objects.h"
 #include "physics/point_physics.h"
 #include "saved games/game_state.h"
+#include "scenario/scenario.h"
 
 /* ---------- constants */
 
@@ -100,7 +101,7 @@ enum
 
 /* ---------- prototypes */
 
-void code_0008dd80(
+static void particle_system_delete(
 	long system_index);
 void code_0008e0d0(
 	struct particle_system_datum *system,
@@ -136,7 +137,7 @@ void particle_system_orphan(
 {
 	struct particle_system_datum *system = particle_system_get(system_index);
 
-	SET_FLAG(system->flags, _particle_system_attached_bit, FALSE);
+	SET_FLAG(system->flags, _particle_system_active_bit, FALSE);
 	system->object_index = NONE;
 
 	return;
@@ -153,7 +154,7 @@ void particle_systems_dispose_from_old_map(
 			system_index != NONE;
 			system_index = data_next_index(particle_systems, system_index))
 		{
-			code_0008dd80(system_index);
+			particle_system_delete(system_index);
 		}
 
 		data_make_invalid(particle_systems);
@@ -175,7 +176,89 @@ void particle_systems_disconnect_from_structure_bsp(
 	return;
 }
 
+void particle_systems_reconnect_to_structure_bsp(
+	void)
+{
+	long system_index;
+
+	for (system_index = data_next_index(particle_systems, NONE);
+		system_index != NONE;
+		system_index = data_next_index(particle_systems, system_index))
+	{
+		struct particle_system_datum *system = particle_system_get(system_index);
+		struct particle_system_definition *definition = particle_system_definition_get(system->definition_index);
+		short type_index;
+
+		if (system->object_index != NONE)
+		{
+			object_get_location(system->object_index, &system->location);
+		}
+		else
+		{
+			scenario_location_from_point(&system->location, &system->position);
+
+			if (system->location.cluster_index == NONE)
+			{
+				particle_system_delete(system_index);
+				continue;
+			}
+		}
+
+		for (type_index = 0; type_index < definition->types.count; type_index++)
+		{
+			long *particle_index_reference = &system->types[type_index].first_particle_index;
+
+			while (*particle_index_reference != NONE)
+			{
+				struct ps_particle_datum *particle = ps_particle_get(*particle_index_reference);
+
+				scenario_location_from_point(&particle->location, &particle->position);
+
+				if (particle->location.cluster_index == NONE)
+				{
+					datum_delete(system_particles, *particle_index_reference);
+
+					/* datum_delete clears the identifier but retains datum storage. */
+					*particle_index_reference = particle->next_particle_index;
+				}
+				else
+				{
+					particle_index_reference = &particle->next_particle_index;
+				}
+			}
+		}
+	}
+
+	return;
+}
+
 /* ---------- private code */
+
+static void particle_system_delete(
+	long system_index)
+{
+	struct particle_system_datum *system = particle_system_get(system_index);
+	struct particle_system_definition *definition = particle_system_definition_get(system->definition_index);
+	short type_index;
+
+	for (type_index = 0; type_index < definition->types.count; type_index++)
+	{
+		struct particle_type *type = &system->types[type_index];
+		long particle_index = type->first_particle_index;
+
+		while (particle_index != NONE)
+		{
+			long next_particle_index = ps_particle_get(particle_index)->next_particle_index;
+
+			datum_delete(system_particles, particle_index);
+			particle_index = next_particle_index;
+		}
+	}
+
+	datum_delete(particle_systems, system_index);
+
+	return;
+}
 
 void code_0008e0d0(
 	struct particle_system_datum *system,
@@ -183,11 +266,11 @@ void code_0008e0d0(
 {
 	struct particle_system_definition *definition = particle_system_definition_get(system->definition_index);
 
-	if (system->object_index == NONE && definition->point_physics_index != NONE)
+	if (system->object_index == NONE && definition->system_update_point_physics.index != NONE)
 	{
 		point_physics_update(
 			0,
-			point_physics_definition_get(definition->point_physics_index),
+			point_physics_definition_get(definition->system_update_point_physics.index),
 			&system->location,
 			NONE,
 			&system->position,
@@ -205,7 +288,7 @@ void code_0008e0d0(
 void code_0008e140(
 	struct particle_system_datum const *system,
 	short type_index,
-	struct system_particle_datum *particle,
+	struct ps_particle_datum *particle,
 	struct object_marker const *marker)
 {
 	particle->position = marker->matrix.position;

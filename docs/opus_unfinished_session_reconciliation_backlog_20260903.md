@@ -1,5 +1,52 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
+## Current Fable ParticleSystems lifecycle batch (2026-09-06)
+
+The natural aim / HUD crosshair batch is published as
+`19765bb76b7a1d287a146ce37b2832810366d47a` on both authorized GitHub refs;
+root verified both remote SHAs. Its 916,773 meaningful exact bytes are the
+published baseline for this packet and the second Opus prompt.
+
+ParticleSystems now has independently verified private deletion and BSP
+reconnection: **478 meaningful / 496 padded exact code bytes**, two functions,
+zero inherited strict losses. Its first fixed natural source form is
+**12 exact / zero residual / 13 unwritten**, not a complete object.
+Canonical is **917,251 meaningful exact code bytes**, **6,214 credited
+functions**, **6,260 strict functions**, **2,061,024 matched data bytes** and
+**391 / 833 Matching objects**. Root reviewed the complete five-consumer shared
+header closure. The sole already-fuzzy Effects collateral fixes a genuine
+missing-prototype float-promotion bug; it adds no exact credit. All other
+inherited runtime changes are classified and preserved.
+
+Root replayed both public machine-code oracles: lifecycle target/first/actual
+cases and three precise binary negative controls pass; the Effects ABI oracle
+passes 36 executions, 12 corrected/January comparisons, 12 intentional frozen
+before failures and five explicitly synthetic outcome controls. Final tools
+tests: **560 passed plus 26 subtests**. Parks: **290 valid, zero stale/invalid**.
+Admission: zero candidates, contradictions or revocations, five prior rejections.
+See `object_matching_logs/particle_systems_obj_fable_lifecycle_pair_reconciliation_20260906.md`.
+The packet is approved for scoped publication; verify the resulting commit
+and both remote refs before calling it published. Remaining Fable claims are
+not silently included, and the reconciliation backlog is still incomplete.
+
+### Concurrent Opus implementation reservations
+
+The active `opus-30k-rasterizer-widgets-20260905` lane owns
+`source/rasterizer/**/*.c`, `source/devices/*.c` and `source/objects/widgets/*.c`.
+Its running worktree remains read-only to reconciliation and its self-reported
+gains are not canonical credit.
+
+The new second prompt reserves `source/hs/*.c`, `source/saved games/*.c`,
+`source/input/*.c`, and four interface C files: `ui_widget.c`,
+`ui_widget_game_data_input_functions.c`, `interface.c`, `progress_bar.c`.
+Proposed independent tree: `C:/halo-worktrees/opus-30k-ui-script-profiles-20260906`;
+branch `opus/30k-ui-script-profiles-20260906`, fixed published base `19765bb76`.
+Treat those C files as reserved pending the user's launch/completion notice.
+This does not confer blanket shared-header ownership. Neither Opus lane may
+push the canonical publication refs; verified integration remains orchestrated.
+Prompt artifact:
+`C:/Users/isabe/Documents/Codex/2026-07-13/i-w/OPUS_5_SECOND_LANE_30000_UI_SCRIPT_PROFILES_20260906.md`.
+
 ## Current Fable natural aim / HUD crosshair batch (2026-09-06)
 
 The preceding ActionVehicle/HUD batch is published as

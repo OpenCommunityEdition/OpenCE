@@ -151,6 +151,7 @@ symbols in this file:
 #include "effects/effect_definitions.h"
 #include "effects/effects.h"
 #include "effects/particle_system_definitions.h"
+#include "effects/particle_systems.h"
 #include "effects/particles.h"
 #include "game/game.h"
 #include "game/players.h"

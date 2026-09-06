@@ -4686,7 +4686,7 @@
       "unit": "source/effects/effects",
       "function": "_effect_generate_part",
       "class": "unclassified",
-      "evidence": "The retained typed ordinary-C part dispatcher covers the target's particle-system, sound, object, decal, damage, and light tag cases, uses subsystem accessors and engine real/color types, and is independently corroborated by the later HCEA reconstruction. Its safe unknown-tag assertion formats into the real global temporary buffer. January's target instead proves a malformed three-argument csprintf call with no destination buffer; the Opus donor reproduced that call, which would write through the format-string literal before the fatal assertion, so it is rejected as unsafe and nonsensical source. The safe candidate is 976 padded bytes with 28 relocations versus January's 992 bytes and 27 relocations, at 85.99458 percent objdiff; the remaining frame delta is also consistent with one unrecovered four-byte local. The fail-closed classifier returns UNKNOWN. No malformed variadic call, raw offset, representation pun, volatile/register forcing, barrier, pragma, forced inline, or assembly is retained. Reopen only for authoritative January source that supplies a safe formatting contract and the missing natural local lifetime.",
+      "evidence": "The retained typed ordinary-C part dispatcher covers the target's particle-system, sound, object, decal, damage, and light tag cases, uses subsystem accessors and engine real/color types, and is independently corroborated by the later HCEA reconstruction. Its safe unknown-tag assertion formats into the real global temporary buffer. January's target instead proves a malformed three-argument csprintf call with no destination buffer; the Opus donor reproduced that call, which would write through the format-string literal before the fatal assertion, so it is rejected as unsafe and nonsensical source. The 2026-09-06 genuine particle_systems.h API inclusion repairs a missing prototype: the old implicit call promoted scale to an eight-byte double, while January's caller pushes and its callee reads a four-byte real. No dispatcher body was changed. The fixed candidate remains 976 padded bytes with 28 relocations versus January's 992 bytes and 27 relocations, now at 89.95122 percent objdiff. The complete five-consumer owner trial preserves all inherited strict functions; the only changed runtime body is this corrected particle-system call tail. The remaining frame delta is also consistent with one unrecovered four-byte local. The fail-closed classifier returns UNKNOWN. No malformed variadic call, raw offset, representation pun, volatile/register forcing, barrier, pragma, forced inline, or assembly is retained. Reopen only for authoritative January source that supplies a safe formatting contract and the missing natural local lifetime.",
       "measurements": {
         "target": {
           "size": 992,
@@ -4696,9 +4696,9 @@
         "base": {
           "size": 976,
           "relocation_count": 28,
-          "normalized_sha256": "a1ef8676e8952af52dbecfeaf78c8273d0b0a959bd48fa00a580c132b4c92128"
+          "normalized_sha256": "84354fb7e9646e34b10f0c114f47b31599ff63d73c6d8a168fd93c23b811b7e3"
         },
-        "objdiff_percent": 85.99458
+        "objdiff_percent": 89.95122
       }
     },
     {

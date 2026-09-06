@@ -169,6 +169,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "effects/effects.h"
 #include "effects/material_effect_definitions.h"
+#include "effects/particle_systems.h"
 #include "game/game_globals.h"
 #include "game/players.h"
 #include "camera/observer.h"
@@ -223,8 +224,6 @@ void ai_reconnect_to_structure_bsp(
 	void);
 void particles_reconnect_to_structure_bsp(
 	void);
-void particle_systems_reconnect_to_structure_bsp(
-	void);
 void contrails_reconnect_to_structure_bsp(
 	void);
 void decals_reconnect_to_structure_bsp(
@@ -247,8 +246,6 @@ void lights_disconnect_from_structure_bsp(
 void ai_disconnect_from_structure_bsp(
 	void);
 void particles_disconnect_from_structure_bsp(
-	void);
-void particle_systems_disconnect_from_structure_bsp(
 	void);
 void contrails_disconnect_from_structure_bsp(
 	void);
