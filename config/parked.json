@@ -2,6 +2,25 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/ai/encounters",
+      "function": "_encounter_new",
+      "class": "unclassified",
+      "evidence": "Complete natural January constructor retained with its genuine public map-initialization caller and private starting-location reset. The owner schema exposes PDB/January-authenticated platoon flags; typed tag/encounter accessors, named cseries flags, original assertions, full salted encounter handles, short counters and the two authentic 999 defaults are preserved. Target and candidate are both 656 padded bytes with 31 relocations; ordinary objdiff is 98.40206 percent. The natural zero-total respawn selection uses a direct short assignment rather than January's EAX selection, shortening that block by three bytes and shifting later branches/relocations. January's external 30.0f constant reference is satisfied by the already-existing genuine candidate literal owner, not a fabricated alias. Integrated real-code execution passes 49/49 cases including field state, external call order, assertions and valid-tag starting-location counts0..32. All43 inherited exact owners and every pre-existing runtime owner are preserved; only compiler-local labels change. No tuning, fake caller, forced inline, custom ABI, raw-offset production access, new math helper or point_from_line3d definition is introduced. See docs/object_matching_logs/encounters_obj_initialize_cluster_natural_20260905.md and its independent runtime review. Park the honest residual; do not search expression/declaration variants.",
+      "measurements": {
+        "target": {
+          "size": 656,
+          "relocation_count": 31,
+          "normalized_sha256": "3984b20f66ae9674d23c3fa400197b1e9a332f054b37bd572ed3bc3ce2c1d288"
+        },
+        "base": {
+          "size": 656,
+          "relocation_count": 31,
+          "normalized_sha256": "f95c0e4d0db253d37bd67b09c89feb5e8019a8a5e5ebe3f2918ec44fdb852719"
+        },
+        "objdiff_percent": 98.40206
+      }
+    },
+    {
       "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
       "function": "_transport_initialize",
       "class": "unclassified",
@@ -2731,7 +2750,7 @@
       "unit": "source/ai/ai_communication",
       "function": "_ai_communication_update_speech_timers",
       "class": "register-allocation",
-      "evidence": "Fuzzy-parked under the current house rule after restoring the complete typed speech-timer update through its genuine ai_communication_started caller. Independent HCEA source authenticates the semantic ai_communication_update_speech_timers and actor_reset_idle_vocalization_timer names; the retained implementation uses unit_get and actor_get, named speech-priority constants, the typed AI communication globals, and the established dialogue/reply table structures. Target and candidate are both 672 padded bytes with all 43 relocation identities, and objdiff reports 97.67839 percent similarity after replacing caller-local game-sound declarations with the owning game_sound.h interface. That declaration-only ownership cleanup changes a minor C2 register schedule without changing size, relocation topology, semantics, or any inherited strict-exact function in the full transitive rebuild. The remaining gap is the previously documented C2 register/lifetime schedule: January retains the unit in EDI and time in ESI while the natural candidate selects the inverse allocation, with a small associated load-order tie. Prior bounded declaration, initialization, and expression-order probes did not close it naturally. No register hint, volatile access, barrier, pragma, assembly, fake dependency, false alias, raw offset, forced inline/noinline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the register lifetimes.",
+      "evidence": "Fuzzy-parked under the current house rule after restoring the complete typed speech-timer update through its genuine ai_communication_started caller. Independent HCEA source authenticates the semantic ai_communication_update_speech_timers and actor_reset_idle_vocalization_timer names; the retained implementation uses unit_get and actor_get, named speech-priority constants, the typed AI communication globals, and the established dialogue/reply table structures. Target and candidate are both 672 padded bytes with all 43 relocation identities. The owning game_sound.h migration previously measured 97.67839 percent. The September 5 genuine Encounters platoon schema and named flag additions naturally transpose only two independent stack loads at +0x167..0x16E; the unchanged source now measures 97.76382 percent. Complete thirteen-consumer inspection preserves all other runtime records apart from compiler-local label spelling, with no new owner, helper, COMMON, ABI change, or inherited strict loss. Root independently verifies that both loads use distinct destinations and stack locations, change no flags, and have no incoming branch inside the reordered block. See docs/object_matching_logs/encounters_obj_initialize_cluster_natural_20260905.md. The remaining gap is the previously documented C2 register/lifetime schedule: January retains the unit in EDI and time in ESI while the natural candidate selects the inverse allocation, with a small associated load-order tie. Prior bounded declaration, initialization, and expression-order probes did not close it naturally. No register hint, volatile access, barrier, pragma, assembly, fake dependency, false alias, raw offset, forced inline/noinline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the register lifetimes.",
       "measurements": {
         "target": {
           "size": 672,
@@ -2741,9 +2760,9 @@
         "base": {
           "size": 672,
           "relocation_count": 43,
-          "normalized_sha256": "885fdb81966284acf5ba7138a4bbbd2221e7c61c89114fdd6f53b96ba89b81a0"
+          "normalized_sha256": "7db4861a5adf519e0457a0ffe785ff4d47e878fda47cc0a06206a529776ac91c"
         },
-        "objdiff_percent": 97.67839
+        "objdiff_percent": 97.76382
       }
     },
     {

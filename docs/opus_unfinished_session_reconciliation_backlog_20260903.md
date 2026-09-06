@@ -1,16 +1,16 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
-## Current published checkpoint (2026-09-05)
+## Current verified canonical / publication-batch totals (2026-09-05)
 
-Verified published code checkpoint `3ddb4158e733913c66161ac346000418bae8ca6c` on canonical and both
-`bnunu/halo` publication branches:
-**906,391 meaningful matched code bytes**, **6,171 credited functions**,
+The Encounters initializer batch advances the verified canonical totals to:
+**906,735 meaningful matched code bytes**, **6,173 credited functions**,
 **2,031,312 matched data bytes**, and **391/833 Matching objects**.
-The full stable-owner sweep has **6,217 strict owners**; **281 fuzzy parks**
-validate at that published checkpoint. Its math-helper ownership and Observer
-shared-schema batch preserves those totals with zero runtime or exact-function
-regressions. The preceding Transport initialization retains 416 meaningful
-fuzzy bytes and adds a 444-byte aggregate data match.
+The full stable-owner sweep has **6,219 strict owners**; **282 fuzzy parks**
+validate. Prior published base `5c22509d85270a056524b6a7eeb22f05a548a9e3`
+was independently verified on both `bnunu/halo` publication branches at
+906,391 code bytes. This next coherent batch adds 344 meaningful exact bytes
+and two functions, with zero exact-function losses. It retains the complete
+constructor as honest fuzzy source without claiming whole-object completion.
 All288 tests plus26 subtests pass.
 
 The donor byte pools and earlier "current" totals below are historical
@@ -25,6 +25,18 @@ implementations remain excluded from this campaign until the user reports its
 completion or token exhaustion. Read only the frozen older donor trees.
 
 ### Follow-up adjudication
+
+The Encounters map-initialization cluster is now retained: 45E/5R/11U,
+with the initializer and private starting-location reset strict and the
+constructor parked at 98.40206%. Its genuine platoon owner-schema addition
+passes all thirteen dependents. One pre-existing speech-timer park changes
+only by two independent loads and is remeasured after full semantic/owner
+review. The three-function real caller graph passes 49/49 integrated runtime
+cases. Four authentic assertion literals add 218 physical bytes but zero
+aggregate matched-data credit. The active Fable tree and reserved source
+implementations remain untouched; its later reconciliation must account for
+this genuine shared schema. See the 20260905 Encounters initializer, runtime
+and bounds ledgers for exact evidence and the inferred valid-tag domain0..32.
 
 The next verified canonical batch restores ordinary math-header ownership in
 ActionAlert and Particles, and adds the genuine Observer/cluster shared schema.

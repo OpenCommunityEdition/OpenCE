@@ -36,6 +36,16 @@ enum
 
 enum
 {
+	_platoon_initially_defending_bit = 2,
+};
+
+enum
+{
+	_actor_starting_location_required_bit = 0,
+};
+
+enum
+{
 	_firing_position_group_attacking = 0,
 	_firing_position_group_attacking_search,
 	_firing_position_group_attacking_guard,
@@ -180,8 +190,14 @@ typedef char actor_starting_location_command_list_index_offset_assert[
 struct platoon_definition
 {
 	char name[TAG_STRING_LENGTH+1];
-	unsigned char reserved[0x8C];
+	unsigned long flags;
+	unsigned char reserved[0x88];
 };
+
+typedef char platoon_definition_size_assert[
+	sizeof(struct platoon_definition) == 0xAC ? 1 : -1];
+typedef char platoon_definition_flags_offset_assert[
+	offsetof(struct platoon_definition, flags) == 0x20 ? 1 : -1];
 
 struct ai_command_definition
 {

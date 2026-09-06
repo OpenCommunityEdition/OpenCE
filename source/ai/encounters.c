@@ -327,6 +327,8 @@ enum
 	NUMBER_OF_POST_COMBAT_POSSIBILITIES = 2,
 	ENCOUNTER_REMAIN_ACTIVE_TIME = 150,
 	ENCOUNTER_UPDATE_INTERVAL = TICKS_PER_SECOND/2,
+	SQUAD_DELAY_FOREVER_TICKS = 999,
+	SQUAD_UNLIMITED_RESPAWN_ACTOR_COUNT = 999,
 };
 
 // encounter_definition.searching
@@ -509,6 +511,13 @@ static long encounter_find_pursuit(
 	short firing_position_index,
 	long history_start_time,
 	boolean force_create);
+static void squad_reset_starting_locations(
+	long encounter_index,
+	short squad_index);
+static void encounter_new(
+	struct encounter_definition *encounter_definition,
+	short *squad_base,
+	short *platoon_base);
 static boolean encounter_activate(
 	long encounter_index);
 static void encounter_deactivate(
@@ -1172,6 +1181,41 @@ void encounters_create_for_new_map(
 	return;
 }
 
+void encounters_initialize_for_new_map(
+	void)
+{
+	struct scenario *scenario = global_scenario_get();
+	short squad_base = 0;
+	short platoon_base = 0;
+	short encounter_index;
+
+	data_make_valid(encounter_data);
+	data_make_valid(pursuit_data);
+	csmemset(
+		squad_array,
+		0,
+		MAXIMUM_SQUADS_PER_MAP * sizeof(struct squad_datum));
+	csmemset(
+		platoon_array,
+		0,
+		MAXIMUM_PLATOONS_PER_MAP * sizeof(struct platoon_datum));
+
+	for (encounter_index = 0;
+		encounter_index < scenario->ai_encounters.count;
+		encounter_index++)
+	{
+		struct encounter_definition *encounter_definition =
+			TAG_BLOCK_GET_ELEMENT(
+				&scenario->ai_encounters,
+				encounter_index,
+				struct encounter_definition);
+
+		encounter_new(encounter_definition, &squad_base, &platoon_base);
+	}
+
+	return;
+}
+
 void encounters_unit_died(
 	long unit_index)
 {
@@ -1753,6 +1797,193 @@ static long encounter_find_pursuit(
 	}
 
 	return pursuit_index;
+}
+
+static void squad_reset_starting_locations(
+	long encounter_index,
+	short squad_index)
+{
+	struct encounter_datum *encounter = encounter_get(encounter_index);
+	struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_encounters,
+		DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index),
+		struct encounter_definition);
+	struct squad_datum *squad = encounter_get_squad(encounter, squad_index);
+	struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+		&encounter_definition->squads,
+		squad_index,
+		struct squad_definition);
+	short starting_location_index;
+
+	csmemset(
+		squad->unused_locations,
+		NONE,
+		BIT_VECTOR_SIZE_IN_BYTES(squad_definition->starting_locations.count));
+
+	for (starting_location_index = 0;
+		starting_location_index < squad_definition->starting_locations.count;
+		starting_location_index++)
+	{
+		struct actor_starting_location *starting_location =
+			TAG_BLOCK_GET_ELEMENT(
+				&squad_definition->starting_locations,
+				starting_location_index,
+				struct actor_starting_location);
+
+		if (TEST_FLAG(
+			starting_location->flags,
+			_actor_starting_location_required_bit))
+		{
+			BIT_VECTOR_SET_FLAG(
+				squad->required_locations,
+				starting_location_index,
+				TRUE);
+		}
+	}
+
+	return;
+}
+
+static void encounter_new(
+	struct encounter_definition *encounter_definition,
+	short *squad_base,
+	short *platoon_base)
+{
+	long encounter_index = datum_new(encounter_data);
+
+	if (encounter_index != NONE)
+	{
+		struct encounter_datum *encounter = encounter_get(encounter_index);
+		short squad_index;
+		short platoon_index;
+
+		encounter->team_index = encounter_definition->team_index;
+		encounter->first_actor_index = NONE;
+		encounter->first_pursuit_index = NONE;
+		encounter->blind = TEST_FLAG(
+			encounter_definition->flags,
+			_encounter_blind_bit);
+		encounter->deaf = TEST_FLAG(
+			encounter_definition->flags,
+			_encounter_deaf_bit);
+		encounter->respawn_enabled = TEST_FLAG(
+			encounter_definition->flags,
+			_encounter_respawn_enabled_bit);
+		encounter->respawn_delay_ticks = 0;
+		encounter->enemy_traitor = FALSE;
+		encounter->enemy_visible = FALSE;
+		encounter->enemy_visible_timer = NONE;
+		encounter->enemy_alive = FALSE;
+		encounter->enemy_alive_timer = NONE;
+		encounter->corpse_ignore_time = NONE;
+		encounter->stand_down = TRUE;
+		encounter->last_grenade_throw_time = NONE;
+		encounter->link_encounter_count = 0;
+		encounter->last_active_time = NONE;
+
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\encounters.c",
+			1444,
+			encounter_definition->squads.count <=
+				MAXIMUM_SQUADS_PER_ENCOUNTER);
+
+		encounter->squad_count = encounter_definition->squads.count;
+		encounter->squad_base = *squad_base;
+		*squad_base += encounter->squad_count;
+
+		match_vassert(
+			"c:\\halo\\SOURCE\\ai\\encounters.c",
+			1448,
+			*squad_base <= MAXIMUM_SQUADS_PER_MAP,
+			csprintf(
+				temporary,
+				"overflowed MAXIMUM_SQUADS_PER_MAP (%d)",
+				MAXIMUM_SQUADS_PER_MAP));
+
+		for (squad_index = 0;
+			squad_index < encounter->squad_count;
+			squad_index++)
+		{
+			struct squad_datum *squad =
+				encounter_get_squad(encounter, squad_index);
+			struct squad_definition *squad_definition =
+				TAG_BLOCK_GET_ELEMENT(
+					&encounter_definition->squads,
+					squad_index,
+					struct squad_definition);
+
+			squad->delay_timer_started = FALSE;
+			if (TEST_FLAG(
+				squad_definition->flags,
+				_squad_delay_forever_bit))
+			{
+				squad->delay_timer = SQUAD_DELAY_FOREVER_TICKS;
+			}
+			else
+			{
+				squad->delay_timer = (short)(
+					squad_definition->squad_delay_timer * TICKS_PER_SECOND);
+			}
+
+			squad->automatic_migration_target = TEST_FLAG(
+				squad_definition->flags,
+				_squad_automatic_migration_bit);
+			squad_reset_starting_locations(encounter_index, squad_index);
+
+			if (squad_definition->respawn_max_actors > 0 ||
+				squad_definition->respawn_min_actors > 0)
+			{
+				short respawn_actors_left =
+					squad_definition->respawn_total_count;
+
+				if (respawn_actors_left == 0)
+				{
+					respawn_actors_left =
+						SQUAD_UNLIMITED_RESPAWN_ACTOR_COUNT;
+				}
+
+				squad->respawn_actors_left = respawn_actors_left;
+			}
+		}
+
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\encounters.c",
+			1483,
+			encounter_definition->platoons.count <=
+				MAXIMUM_PLATOONS_PER_ENCOUNTER);
+
+		encounter->platoon_count = encounter_definition->platoons.count;
+		encounter->platoon_base = *platoon_base;
+		*platoon_base += encounter->platoon_count;
+
+		match_vassert(
+			"c:\\halo\\SOURCE\\ai\\encounters.c",
+			1487,
+			*platoon_base <= MAXIMUM_PLATOONS_PER_MAP,
+			csprintf(
+				temporary,
+				"overflowed MAXIMUM_PLATOONS_PER_MAP (%d)",
+				MAXIMUM_PLATOONS_PER_MAP));
+
+		for (platoon_index = 0;
+			platoon_index < encounter->platoon_count;
+			platoon_index++)
+		{
+			struct platoon_datum *platoon =
+				encounter_get_platoon(encounter, platoon_index);
+			struct platoon_definition *platoon_definition =
+				TAG_BLOCK_GET_ELEMENT(
+					&encounter_definition->platoons,
+					platoon_index,
+					struct platoon_definition);
+
+			platoon->defending = TEST_FLAG(
+				platoon_definition->flags,
+				_platoon_initially_defending_bit);
+		}
+	}
+
+	return;
 }
 
 static boolean encounter_activate(
