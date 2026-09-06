@@ -90,11 +90,6 @@ struct network_game_server_client_machine *network_game_server_get_client_machin
 	unsigned long address);
 struct network_game *network_game_server_get_game(
 	struct network_game_server *server);
-void network_game_server_reset_to_pregame(
-	struct network_game_server *server);
-void network_game_server_pause_countdown(
-	struct network_game_server *server,
-	boolean pause_countdown);
 boolean network_game_server_remove_machine_from_game(
 	struct network_game_server *server,
 	struct network_machine *machine);

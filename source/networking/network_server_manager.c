@@ -503,6 +503,7 @@ enum
 	_network_game_client_machine_joined_bit = 1,
 	_network_game_client_machine_loaded_bit = 2,
 	_network_game_client_machine_precached_bit = 3,
+	MAXIMUM_NETWORK_MESSAGE_SIZE = 0x800,
 };
 
 enum
@@ -565,6 +566,11 @@ struct message_server_graceful_game_exit_pregame
 	long unused;
 };
 
+struct message_server_switch_to_pregame
+{
+	long unused;
+};
+
 struct message_server_graceful_game_exit_postgame
 {
 	long unused;
@@ -607,7 +613,7 @@ typedef char network_machine_size_assert[
 
 struct network_game_map
 {
-	long unknown0;
+	long version;
 	char name[NETWORK_GAME_MAP_NAME_LENGTH];
 };
 
@@ -617,9 +623,9 @@ struct network_game
 	struct network_game_map map;
 	struct game_variant variant;
 	byte opaque10C;
-	char minimum_player_count;
-	byte maximum_player_count;
-	byte team_count;
+	char minimum_players;
+	byte maximum_players;
+	byte maximum_teams;
 	short difficulty;
 	short machine_count;
 	struct network_machine machines[MAXIMUM_NETWORK_MACHINE_COUNT];
@@ -664,7 +670,7 @@ struct network_game_server
 	struct network_game_server_countdown_state countdown_state;
 	struct network_player queued_player;
 	boolean queued_player_valid;
-	boolean network_game_started;
+	boolean sent_start_game_message;
 	byte padding4BA[2];
 };
 
@@ -687,6 +693,10 @@ void countdown_timer_increment(
 	long adjustment,
 	long maximum);
 
+static boolean network_game_server_setup_game_from_playlist(
+	struct network_game_server *server);
+static boolean network_game_server_handle_client_machines(
+	struct network_game_server *server);
 static long network_game_server_get_client_machine_count(
 	struct network_game_server *server);
 void get_unique_random_name(
@@ -873,7 +883,7 @@ boolean network_game_server_start_network_game(
 {
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x2DE, server);
 
-	if (!server->network_game_started)
+	if (!server->sent_start_game_message)
 	{
 		struct network_game game_settings;
 		struct message_server_begin_game begin_game = { 0 };
@@ -894,7 +904,7 @@ boolean network_game_server_start_network_game(
 			{
 				network_event("signalling client machines to begin loading for network game");
 				server->next_update_number = 0;
-				server->network_game_started = TRUE;
+				server->sent_start_game_message = TRUE;
 				return TRUE;
 			}
 		}
@@ -1652,7 +1662,7 @@ boolean server_ok_to_countdown(
 	if (server_has_enough_machines(server) &&
 		server_has_a_player_on_each_machine(server) &&
 		!server_needs_more_teams(server) &&
-		server->game.player_count >= server->game.minimum_player_count)
+		server->game.player_count >= server->game.minimum_players)
 	{
 		return TRUE;
 	}
@@ -1836,7 +1846,7 @@ boolean network_game_server_game_can_start(
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x782, server);
 
 	return server->state == 0 &&
-		server->game.player_count >= server->game.minimum_player_count;
+		server->game.player_count >= server->game.minimum_players;
 }
 
 void network_game_server_pause_countdown(
@@ -2425,4 +2435,277 @@ static long network_game_server_get_client_machine_count(
 	}
 
 	return client_machine_count;
+}
+
+static boolean network_game_server_setup_game_from_playlist(
+	struct network_game_server *server)
+{
+	boolean success = FALSE;
+
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x961, server);
+
+	network_event("setting up a net game");
+	if (game_engine_get_current_stage(&server->game.variant, server->game.map.name))
+	{
+		wchar_t machine_name[MAXIMUM_MACHINE_NAME_LENGTH] = L"<unknown>";
+
+		network_game_generate_local_machine_name(machine_name);
+		ustrncpy(server->game.name, machine_name, NETWORK_GAME_NAME_LENGTH - 1);
+		server->game.name[NETWORK_GAME_NAME_LENGTH - 1] = L'\0';
+		server->game.map.version = 0;
+		server->game.minimum_players = 2;
+		server->game.maximum_players = MAXIMUM_NETWORK_PLAYER_COUNT;
+
+		if (server->game.variant.has_teams)
+		{
+			server->game.maximum_teams = 2;
+		}
+		else
+		{
+			server->game.maximum_teams = 1;
+		}
+
+		network_game_server_open_game(server);
+		success = TRUE;
+	}
+	else
+	{
+		error(
+			_error_silent,
+			"network game setup failed; probably due to a missing playlist");
+	}
+
+	return success;
+}
+
+static boolean network_game_server_handle_client_machines(
+	struct network_game_server *server)
+{
+	boolean success = TRUE;
+	int i;
+
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x827, server);
+
+	for (i = 0; success && i < MAXIMUM_NETWORK_MACHINE_COUNT; i++)
+	{
+		if (server->client_machines[i].machine_index != NONE)
+		{
+			if (!network_connection_active(server->client_machines[i].connection))
+			{
+				if (network_game_server_remove_machine_from_game(
+					server,
+					&server->game.machines[server->client_machines[i].machine_index]))
+				{
+					network_event(
+						"client machine %x removed from game",
+						server->client_machines[i].machine_index);
+					network_game_server_dump(server);
+				}
+				else
+				{
+					network_event(
+						"failed to remove client machine %x from game",
+						server->client_machines[i].machine_index);
+					network_game_server_dump(server);
+				}
+			}
+			else if (network_connection_idle(
+				server->client_machines[i].connection,
+				_connection_dont_timeout,
+				NULL) &&
+				network_connection_connected(server->client_machines[i].connection))
+			{
+				word message_buffer[MAXIMUM_NETWORK_MESSAGE_SIZE / sizeof(word)];
+				word *message = message_buffer;
+				word message_buffer_size = sizeof(message_buffer);
+
+				while (success && network_connection_read(
+					server->client_machines[i].connection,
+					message,
+					&message_buffer_size,
+					NULL))
+				{
+					if (network_game_server_handle_client_message(
+						server,
+						server->client_machines + i,
+						message,
+						message_buffer_size))
+					{
+						message_buffer_size = sizeof(message_buffer);
+					}
+					else
+					{
+						network_event(
+							"network_game_server_handle_client_message() failed in network_game_server_handle_client_machines()");
+						if (network_game_server_remove_machine_from_game(
+							server,
+							&server->game.machines[server->client_machines[i].machine_index]))
+						{
+							network_event(
+								"client machine removed from game",
+								server->client_machines[i].machine_index);
+						}
+						else if (!network_game_server_remove_client_machine_from_game(
+							server,
+							&server->client_machines[i]))
+						{
+							network_event(
+								"failed to remove client machine from game",
+								server->client_machines[i].machine_index);
+						}
+						break;
+					}
+				}
+			}
+			else
+			{
+				if (network_game_server_remove_machine_from_game(
+					server,
+					&server->game.machines[server->client_machines[i].machine_index]))
+				{
+					network_event(
+						"client machine removed from game",
+						server->client_machines[i].machine_index);
+				}
+				else
+				{
+					network_event(
+						"failed to remove client machine from game",
+						server->client_machines[i].machine_index);
+				}
+				continue;
+			}
+		}
+	}
+
+	return success;
+}
+
+boolean network_game_server_reset_to_pregame(
+	struct network_game_server *server)
+{
+	boolean success = FALSE;
+	struct message_server_switch_to_pregame message_packet = { 0 };
+	struct network_message *message;
+	int i;
+
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x324, server);
+
+	csmemset(&server->countdown_state, 0, sizeof(server->countdown_state));
+	server->next_update_number = 0;
+	server->time_of_first_client_loading_completion = 0;
+	server->sent_start_game_message = FALSE;
+	server->queued_player_valid = FALSE;
+	/* Preserve January's 32-bit wrap without overflowing signed arithmetic.
+	 * VC7 converts the unsigned result back to the same signed bit pattern.
+	 */
+	server->game.number_of_games_played =
+		(long)((unsigned long)server->game.number_of_games_played + 1);
+
+	if (server->state == _network_game_server_state_postgame)
+	{
+		message = create_network_game_message(
+			_message_server_switch_to_pregame,
+			&message_packet,
+			sizeof(message_packet));
+		if (message && network_game_server_send_message_to_all_machines(server, message))
+		{
+			network_event("server resetting to pregame");
+
+			if (server->game.variant.has_teams)
+			{
+				for (i = 0; i < MAXIMUM_NETWORK_PLAYER_COUNT; i++)
+				{
+					if (network_player_is_valid(&server->game.players[i]))
+					{
+						switch (server->game.players[i].team_index)
+						{
+						case _team_red:
+							server->game.players[i].team_index = _team_blue;
+							break;
+						case _team_blue:
+							server->game.players[i].team_index = _team_red;
+							break;
+						}
+					}
+				}
+			}
+
+			for (i = 0; i < MAXIMUM_NETWORK_MACHINE_COUNT; i++)
+			{
+				SET_FLAG(
+					server->client_machines[i].flags,
+					_network_game_client_machine_loaded_bit,
+					FALSE);
+				server->client_machines[i].last_received_update_sequence_number = 0;
+				server->client_machines[i].stall_start_time = 0;
+			}
+
+			network_game_reset_for_next_round(&server->game, FALSE);
+			if (network_game_server_setup_game_from_playlist(server))
+			{
+				struct network_game game_settings;
+
+				csmemcpy(&game_settings, &server->game, sizeof(server->game));
+				message = create_network_game_message(
+					_message_server_game_settings_update,
+					&game_settings,
+					sizeof(game_settings));
+				if (message && network_game_server_send_message_to_all_machines(server, message))
+				{
+					server->state = _network_game_server_state_pregame;
+					success = TRUE;
+				}
+			}
+			else
+			{
+				struct message_server_graceful_game_exit_pregame shutdown_message = { 0 };
+
+				message = create_network_game_message(
+					_message_server_graceful_game_exit_pregame,
+					&shutdown_message,
+					sizeof(shutdown_message));
+				if (message &&
+					network_game_server_send_message_to_all_machines(server, message) &&
+					network_game_server_handle_client_machines(server))
+				{
+					network_event("the playlist has ended - server going down");
+				}
+				else
+				{
+					network_event(
+						"the playlist has ended - server going down, but failed to alert client machines");
+				}
+			}
+		}
+		else
+		{
+			network_event("failed to signal all client machines to switch to pregame");
+		}
+	}
+	else
+	{
+		success = network_game_server_setup_game_from_playlist(server);
+
+		if (server->game.variant.has_teams)
+		{
+			for (i = 0; i < MAXIMUM_NETWORK_PLAYER_COUNT; i++)
+			{
+				if (network_player_is_valid(&server->game.players[i]))
+				{
+					switch (server->game.players[i].team_index)
+					{
+					case _team_red:
+						server->game.players[i].team_index = _team_blue;
+						break;
+					case _team_blue:
+						server->game.players[i].team_index = _team_red;
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	return success;
 }

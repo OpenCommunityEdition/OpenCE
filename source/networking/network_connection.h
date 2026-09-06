@@ -13,6 +13,7 @@ header included in hcex build.
 enum
 {
 	MAXIMUM_NUMBER_OF_LOCAL_PLAYERS = 4,
+	_connection_dont_timeout = 0,
 };
 
 /* ---------- macros */

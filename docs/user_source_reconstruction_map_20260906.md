@@ -62,8 +62,11 @@ full consumer regressions still need review.
 private dumps are now verified: **54 exact / 2 parked / 14 unwritten**,
 **+1,315 meaningful code bytes**, zero regressions. See the
 [source-attested integration ledger](object_matching_logs/network_server_manager_obj_source_attested_packet_20260906.md)
-for immutable evidence and the remaining queue. The reset/playlist and larger
-private caller families below remain future work.
+for immutable evidence. The subsequent [reset-connected packet](object_matching_logs/network_server_manager_obj_reset_connected_packet_20260906.md)
+adds reset and playlist setup exact, plus an honest fuzzy client handler:
+**56 exact / 3 parked / 11 unwritten**, **+792 meaningful exact bytes**.
+Creation/disposal and the remaining private idle/connection families are next;
+the return-type conflict and existing countdown residuals stay parked.
 
 ### First packet: join-game token (150 meaningful / 160 padded bytes)
 
@@ -117,8 +120,8 @@ client-machine-to-server-dump-to-data-dump chain.
 
 1. **Remove-client, remove-machine, and two dumps:** approximately 1,200
    padded target bytes, with live callers. Input lines 552-608 and 659-726
-   connect naturally to dumps at 2453-2534. Keep remove-client and dumps
-   private; the internal header owns remove-machine. The intervening
+   connect naturally to dumps at 2453-2534. Keep both dumps private; the supplied
+   remove-client and remove-machine definitions have external linkage. The intervening
    `network_game_server_remove_players_from_machine_ingame` (611-657) maps to
    an already-exact helper currently named `send_player_quit_messages_ingame`.
    Audit that rename separately from body gains.

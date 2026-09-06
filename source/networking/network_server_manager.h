@@ -31,7 +31,7 @@ void network_game_server_switch_to_postgame(
 	struct network_game_server *server);
 boolean network_game_server_graceful_shutdown(
 	struct network_game_server *server);
-void network_game_server_reset_to_pregame(
+boolean network_game_server_reset_to_pregame(
 	struct network_game_server *server);
 void network_game_server_pause_countdown(
 	struct network_game_server *server,
