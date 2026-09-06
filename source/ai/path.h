@@ -264,6 +264,11 @@ boolean path_3d_build_path(
 	real avoidance_distance,
 	real_point3d const *end_point,
 	struct path_result *path);
+void closest_point_to_attractor(
+	real_point3d const *p0,
+	real_point3d const *p1,
+	real_point3d const *q,
+	real_point3d *result);
 real path_attractor_weight(
 	struct path_state *state,
 	real_point3d const *point,

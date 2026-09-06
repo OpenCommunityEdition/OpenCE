@@ -5300,6 +5300,44 @@
         },
         "objdiff_percent": 92.38636
       }
+    },
+    {
+      "unit": "source/ai/path",
+      "function": "_closest_point_to_attractor",
+      "class": "unclassified",
+      "evidence": "First natural public reconstruction with genuine path.h ownership, normal four-argument January ABI, existing typed vector/dot/magnitude helpers and direct point-coordinate stores. January hex and later PDB/source corroborate the unusual p0-minus-attractor projection and fallback to p1; these are not silently corrected. The Fable static spelling and point_from_line3d call are not retained. Target208/2R versus candidate208/2R; real x87 multiply/add ordering differs, so this is not an all-input IEEE equivalence claim or exact credit. Root bounded target/first/ordinary execution covers103 scenarios in two precision modes,618 runs including the real weight caller, endpoints, degenerate segments, radius boundaries and assert/exit. An actual target-byte wrong-sign control is rejected. All6268 inherited strict functions survive and the50-consumer genuine header trial preserves runtime semantics apart from compiler-local labels. No compiler controls, declaration/arithmetic-order variants, representation casts or point_from_line3d COMDAT. Reopen only for authentic source/compiler-context evidence, not equivalent-spelling searches. See docs/object_matching_logs/path_obj_attractor_pair_natural_reconciliation_20260906.md and tools/audit/path_attractor_runtime.py.",
+      "measurements": {
+        "target": {
+          "size": 208,
+          "relocation_count": 2,
+          "normalized_sha256": "5d7c8671785a09168d950e56cacc667c6c40bed2f7b6242aa27b34bdaf74483f"
+        },
+        "base": {
+          "size": 208,
+          "relocation_count": 2,
+          "normalized_sha256": "d96eb8493bcb04e1293629a7c9b5d3735b8eb5f1b30ea2ff2ec5438376d389ab"
+        },
+        "objdiff_percent": 98.567566
+      }
+    },
+    {
+      "unit": "source/ai/path",
+      "function": "_path_attractor_weight",
+      "class": "instruction-scheduling",
+      "evidence": "Natural Fable removed-function reconstruction restored unchanged with its genuine public closest_point_to_attractor dependency and existing owner declaration. Target and candidate192/6R differ only in the order of independent local weight=0 and distance=REAL_MAX initialization stores; no source declaration/store reorder was attempted to force exactness. The complete real pair passes103 bounded target/first/ordinary scenarios in two x87 precision modes,618 executions including zero/negative radius, exact radius boundaries, original signed projection, degenerate segment and null distance-reference assertion/exit. The helper remains a separately documented floating-point residual, so this caller is not an exact or exhaustive semantic claim. Existing exact functions and source ownership remain preserved. No raw offsets, fake inline controls or point_from_line3d COMDAT. Reopen only from authoritative source/compiler-context evidence. See docs/object_matching_logs/path_obj_attractor_pair_natural_reconciliation_20260906.md and tools/audit/path_attractor_runtime.py.",
+      "measurements": {
+        "target": {
+          "size": 192,
+          "relocation_count": 6,
+          "normalized_sha256": "9785d44ef2192e89a1a00c1612a3502d902db25b8dcb9e49a878f641dc42d65e"
+        },
+        "base": {
+          "size": 192,
+          "relocation_count": 6,
+          "normalized_sha256": "ff4988ccef4e2ad240b9506617fb5a267303270e494f81003cc98ab4a573753c"
+        },
+        "objdiff_percent": 99.943665
+      }
     }
   ]
 }

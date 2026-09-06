@@ -426,4 +426,67 @@ boolean path_3d_build_path(
 	return path->valid;
 }
 
+void closest_point_to_attractor(
+	real_point3d const *p0,
+	real_point3d const *p1,
+	real_point3d const *q,
+	real_point3d *result)
+{
+	real_vector3d segment;
+	real_vector3d offset;
+	real t;
+
+	vector_from_points3d(p0, p1, &segment);
+	vector_from_points3d(q, p0, &offset);
+	t = dot_product3d(&offset, &segment)/magnitude_squared3d(&segment);
+	if (t < 0.0f || t > 1.0f)
+	{
+		*result = *p1;
+	}
+	else
+	{
+		result->x = segment.i*t + p0->x;
+		result->y = segment.j*t + p0->y;
+		result->z = segment.k*t + p0->z;
+	}
+
+	return;
+}
+
+real path_attractor_weight(
+	struct path_state *state,
+	real_point3d const *point,
+	real_point3d const *previous_point,
+	real *distance_reference)
+{
+	real_point3d closest_point;
+	real distance_squared;
+	real distance = REAL_MAX;
+	real weight = 0.0f;
+
+	closest_point_to_attractor(
+		point,
+		previous_point,
+		&state->input.attractor_point,
+		&closest_point);
+	distance_squared = distance_squared3d(
+		&state->input.attractor_point,
+		&closest_point);
+	if (distance_squared <
+		state->input.attractor_radius*state->input.attractor_radius)
+	{
+		distance = square_root(distance_squared);
+		weight = (1.0f - distance/state->input.attractor_radius)*
+			state->input.attractor_weight;
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\path.c",
+		1631,
+		distance_reference);
+	*distance_reference = distance;
+
+	return weight;
+}
+
 /* ---------- private code */

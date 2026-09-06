@@ -1,5 +1,35 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
+## Path attractor pair reconstructed and parked (2026-09-06)
+
+The preceding Path 3D batch is published and independently verified on both
+authorized GitHub refs at `b4b5a7400c5ece2ff2e62f3e011349eb0e75e1b7`.
+The next Fable reconciliation restores `closest_point_to_attractor` and its
+real public `path_attractor_weight` caller with genuine owning declarations.
+The first natural compile is **98.567566% / 99.943665% fuzzy**, respectively.
+Both are parked without source-shape tuning and add **zero exact-byte credit**.
+Path is now **15 exact / 2 residual / 15 unwritten**; the canonical exact total
+remains **918,989 bytes** and the Matching-object count remains **391/833**.
+
+January hex confirms the unusual p0-minus-attractor projection and p1 fallback;
+the source and tests preserve those behaviors. The 50-consumer header trial
+preserves runtime semantics and all 6,268 inherited strict functions. Root and
+independent execution agree in 103 scenarios/two x87 modes/618 executions,
+with a genuine wrong-sign target-byte negative rejected. Full Ninja and
+626 tests plus 26 subtests pass; parks are 296 active/zero stale/zero invalid.
+
+This is explicitly **partial source progress, not complete/linkable Path
+approval**. Actual current-base links expose two new duplicate-helper errors
+against ActionCharge's NODUPLICATES `square_root` and `dot_product3d` owners.
+No helper suppression or fake match is used; these ordinary emitted copies
+receive no target credit. The real floating-point evaluation-order residual
+also remains documented, without an exhaustive IEEE-equivalence claim.
+
+See `object_matching_logs/path_obj_attractor_pair_natural_reconciliation_20260906.md`,
+`tools/audit/path_attractor_runtime.py`, and the two explicit park entries.
+The separate active Opus scopes remain untouched. Small unwritten neighboring
+Path-family candidates are being screened next.
+
 ## Path 3D Fable pair reconciled (2026-09-06)
 
 The preceding RenderDebug batch is independently verified on both authorized
