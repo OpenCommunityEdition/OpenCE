@@ -273,8 +273,6 @@ boolean device_new(
 	long object_index);
 void device_delete(
 	long object_index);
-void device_export_function_values(
-	long object_index);
 void device_render_debug(
 	long object_index);
 

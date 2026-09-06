@@ -1,5 +1,15 @@
 [
   {
+    "unit": "source/devices/devices",
+    "function": "_device_export_function_values",
+    "reason": "The scoped Opus reconciliation proves all 512 padded bytes, 21 ordered relocations and normalized SHA-256 7bf0963941ed36b13676536592a3af9d2786f5d4970b56f1129d24c3a35cc968 exact. Objdiff's 94.405594 percent is a compiler-local switch-label representation false negative; credit only the target report's 505 meaningful bytes. The ordinary typed mode loop preserves January's unordered delay predicate and uses the proper devices.h public declaration. No comparator relaxation, byte patch, extra helper, parameter-width trick or whole-object completion claim. See docs/object_matching_logs/devices_obj_export_function_values_opus_reconciliation_20260906.md."
+  },
+  {
+    "unit": "source/rasterizer/xbox/rasterizer_xbox",
+    "function": "_rasterizer_set_stencil_mode",
+    "reason": "The scoped Opus reconciliation proves all 784 padded/meaningful bytes, 78 ordered relocations and normalized SHA-256 903201d61d15f0c4dcad96fd81acb8049e8bfc201883061924dc95f3eaea8852 exact. Objdiff's 96.65072 percent is a compiler-local switch-label representation false negative. Source applies the debug policy in the public long input domain before narrowing once to the short cached mode, as January's entry dataflow corroborates; no declaration permutation or type/ABI change. Existing data and helper ownership remain separate from this function credit. See docs/object_matching_logs/rasterizer_xbox_obj_three_natural_opus_closures_20260906.md."
+  },
+  {
     "unit": "source/ai/action_obey",
     "function": "_action_obey_command_end",
     "reason": "Independent frozen January/actual COFF comparison proves all 560 padded bytes, 24 ordered relocations and normalized SHA-256 f59f0185a672ce6409fe3d3c3a439e517483593f6ffc9bf5eff4b18dd4420a61 exact. Objdiff reports 85.26786 percent because compiler-local switch labels are represented differently. The ledger credits only the target's 549 meaningful bytes, with no byte/comparator exception. The genuine private body is retained through individual_end, not a fake external ABI. Fable's earlier case-order correction remains documented; this is independently authenticated reconstruction, not a claim of first-shot source. Whole-object math-owner and remaining-source boundaries are separate. See docs/object_matching_logs/action_obey_obj_partial_graph_reconciliation_20260905.md."

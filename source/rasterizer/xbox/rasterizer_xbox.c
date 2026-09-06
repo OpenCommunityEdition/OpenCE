@@ -2170,7 +2170,14 @@ union point2d *rasterizer_set_texture(
 			bitmap = bitmap_group_try_and_get_bitmap(
 				bitmap_definition_index,
 				bitmap_sequence_index % bitmap_count);
-			if (bitmap->type != type)
+			if (bitmap->type == type)
+			{
+				rasterizer_set_texture_bitmap_data(stage, bitmap);
+				success = TRUE;
+				bitmap_dimensions.x = bitmap->width;
+				bitmap_dimensions.y = bitmap->height;
+			}
+			else
 			{
 				error(
 					_error_silent,
@@ -2181,7 +2188,7 @@ union point2d *rasterizer_set_texture(
 			}
 		}
 	}
-	if (!bitmap)
+	if (!success)
 	{
 		long default_definition_index =
 			global_rasterizer_data->default_textures[type].index;
@@ -2190,27 +2197,27 @@ union point2d *rasterizer_set_texture(
 			bitmap = bitmap_group_try_and_get_bitmap(
 				default_definition_index,
 				usage);
-	}
-	if (bitmap)
-	{
-		rasterizer_set_texture_bitmap_data(stage, bitmap);
-		success = TRUE;
-		bitmap_dimensions.x = bitmap->width;
-		bitmap_dimensions.y = bitmap->height;
-	}
-	else
-	{
-		display_assert(
-			"### YOU GOT FUCKED in rasterizer_set_texture",
-			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox.c",
-			2117,
-			TRUE);
-		error(
-			_error_silent,
-			"### ERROR default texture not found (stage=%d, type=%d, usage=%d)",
-			stage,
-			type,
-			usage);
+		if (bitmap)
+		{
+			rasterizer_set_texture_bitmap_data(stage, bitmap);
+			success = TRUE;
+			bitmap_dimensions.x = bitmap->width;
+			bitmap_dimensions.y = bitmap->height;
+		}
+		else
+		{
+			display_assert(
+				"### YOU GOT FUCKED in rasterizer_set_texture",
+				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox.c",
+				2117,
+				TRUE);
+			error(
+				_error_silent,
+				"### ERROR default texture not found (stage=%d, type=%d, usage=%d)",
+				stage,
+				type,
+				usage);
+		}
 	}
 	return success ? &bitmap_dimensions : NULL;
 }
@@ -2585,9 +2592,9 @@ void rasterizer_set_stencil_mode(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox.c",
 		3034,
 		global_d3d_device);
-	mode = (short)stencil_mode;
 	if (!rasterizer_debug_options.stencil_mask)
-		mode = RASTERIZER_STENCIL_MODE_NONE;
+		stencil_mode = RASTERIZER_STENCIL_MODE_NONE;
+	mode = (short)stencil_mode;
 	if (mode != rasterizer_state_cache.stencil_mode)
 	{
 		switch (mode)
@@ -2785,13 +2792,14 @@ void rasterizer_set_frustum_z(
 	for (column = 0; column < 4; column++)
 	{
 		for (row = 0; row < 4; row++)
+		{
+			const real *n = global_window_parameters.frustum.world_to_view.n[row];
+
 			vertex_constants[column][row] =
-				global_window_parameters.frustum.world_to_view.n[row][0] *
-					global_window_parameters.frustum.projection_matrix[0][column] +
-				global_window_parameters.frustum.world_to_view.n[row][1] *
-					global_window_parameters.frustum.projection_matrix[1][column] +
-				global_window_parameters.frustum.world_to_view.n[row][2] *
-					global_window_parameters.frustum.projection_matrix[2][column];
+				n[0] * global_window_parameters.frustum.projection_matrix[0][column] +
+				n[1] * global_window_parameters.frustum.projection_matrix[1][column] +
+				n[2] * global_window_parameters.frustum.projection_matrix[2][column];
+		}
 		vertex_constants[column][3] +=
 			global_window_parameters.frustum.projection_matrix[3][column];
 	}

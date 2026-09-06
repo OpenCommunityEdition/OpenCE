@@ -113,6 +113,18 @@ enum
 
 enum
 {
+	_device_function_none = 0,
+	_device_function_power,
+	_device_function_change_in_power,
+	_device_function_position,
+	_device_function_change_in_position,
+	_device_function_locked,
+	_device_function_delay,
+	NUMBER_OF_DEVICE_FUNCTION_MODES,
+};
+
+enum
+{
 	_device_animation_position = 0,
 	_device_animation_power,
 	NUMBER_OF_DEVICE_ANIMATIONS,
@@ -247,6 +259,85 @@ boolean device_new(
 	device->object.flags |= FLAG(_object_shadowless_bit);
 
 	return TRUE;
+}
+
+void device_export_function_values(
+	long device_index)
+{
+	short i;
+	struct device_datum *device = device_get(device_index);
+	struct device_definition *definition = device_definition_get(device->definition_index);
+
+	for (i = 0; i < NUMBEROF(device->object.incoming_function_values); ++i)
+	{
+		if (definition->device.function_modes[i] != _device_function_none)
+		{
+			real value = 0.0f;
+
+			switch (definition->device.function_modes[i])
+			{
+			case _device_function_power:
+				value = device->device.power;
+				break;
+			case _device_function_change_in_power:
+				if (device->device.power_velocity != 0.0f)
+				{
+					value = fabs(device->device.power_velocity) / definition->device.runtime_maximum_power_velocity;
+				}
+				break;
+			case _device_function_position:
+				value = device->device.position;
+				break;
+			case _device_function_change_in_position:
+				if (device->device.position_velocity != 0.0f)
+				{
+					value = fabs(device->device.position_velocity) / definition->device.runtime_maximum_powered_position_velocity;
+				}
+				break;
+			case _device_function_locked:
+				if (device->device.power == 0.0f)
+				{
+					value = 1.0f;
+				}
+				if (device->object.type == _object_type_machine && device->device.position_group_index != NONE)
+				{
+					struct machine_datum *machine = machine_get(device_index);
+					struct device_group_datum *group = datum_get(device_groups_data, machine->device.position_group_index);
+
+					if (TEST_FLAG(machine->machine.flags, _machine_does_not_operate_automatically_bit) ||
+						TEST_FLAG(machine->machine.flags, _machine_one_sided_bit))
+					{
+						value = 1.0f;
+					}
+					if (TEST_FLAG(group->flags, _device_group_can_change_only_once_bit) &&
+						TEST_FLAG(group->flags, _device_group_changed_once_bit))
+					{
+						value = 1.0f;
+					}
+					if (machine->device.position == 1.0f ||
+						TEST_FLAG(machine->machine.flags, _machine_never_appears_locked_bit))
+					{
+						value = 0.0f;
+					}
+				}
+				break;
+			case _device_function_delay:
+				if (definition->device.runtime_delay_ticks <= 0.0f ||
+					device->device.delay_ticks == definition->device.runtime_delay_ticks)
+				{
+					value = 0.0f;
+				}
+				else
+				{
+					value = device->device.delay_ticks / definition->device.runtime_delay_ticks;
+				}
+				break;
+			}
+			device->object.incoming_function_values[i] = value;
+		}
+	}
+
+	return;
 }
 
 void device_preprocess_node_orientations(

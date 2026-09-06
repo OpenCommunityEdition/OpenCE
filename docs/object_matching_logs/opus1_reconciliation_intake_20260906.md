@@ -31,11 +31,18 @@ admits **1,242 meaningful bytes / four functions** with zero regressions,
 after rejecting the unsupported flag-width fifth gain. The subsequent
 [SDK/private-helper naming packet](rasterizer_xbox_sdk_names_and_private_reciprocal_20260906.md)
 recovers **1,612 previously uncounted meaningful bytes / 27 functions** without
-changing any rebuilt object. Together they admit 2,854 of the original 30,074
-meaningful bytes, leaving **27,220 not admitted**, including source/ownership-
+changing any rebuilt object. The subsequent
+[Devices export](devices_obj_export_function_values_opus_reconciliation_20260906.md)
+and [three Xbox closures](rasterizer_xbox_obj_three_natural_opus_closures_20260906.md)
+add **2,089 meaningful exact bytes / four functions**, again with zero
+regressions. Cumulative canonical gain from these packets is **4,943 bytes**.
+Of that gain, **3,654** belongs to the original 30,074 meaningful-byte headline;
+**1,289** (Devices export 505 and Xbox stencil 784) was absent from that headline
+despite already appearing in the donor's strict-owner count. Therefore
+**26,420 of the original headline is not admitted**, including source/ownership-
 blocked work; it is not a promise that all those bytes will pass admission.
-Canonical reaches 923,718 meaningful exact bytes, 6,261 credited functions
-and unchanged 391/833 Matching objects.
+Canonical reaches **925,807 meaningful exact bytes**, **6,265 credited
+functions**, and unchanged **391/833 Matching objects**.
 Frame Statistics and naming findings below refine the initial proposed order.
 
 ## Identity and frozen evidence
@@ -220,11 +227,10 @@ owner. It also adds a TU-local `extern boolean debug_objects_devices`, while
    Reject the unsupported width change even though it closes 288 padded bytes.
    See [the scoped Devices admission](devices_obj_opus1_four_function_reconciliation_20260906.md).
    No `symbols.json` change.
-   `device_export_function_values` is independently strict (512) and introduces
-   no surplus code, but its only declaration is caller-local in
-   `object_types.c`; admit it separately with a genuine owning `devices.h`
-   prototype/removal of the caller-local declaration and a header-consumer
-   audit. Omit the render-debug include, debug flag extern, renderer body, and
+   `device_export_function_values` is now separately admitted (512 padded / 505
+   meaningful) with its genuine owning `devices.h` prototype, removal of the
+   caller-local declaration, and a full header-consumer audit. Omit the
+   render-debug include, debug flag extern, renderer body, and
    `point_from_line3d` owner until both the math owner and public/global
    declaration ownership are resolved.
 
@@ -254,9 +260,11 @@ owner. It also adds a TU-local `extern boolean debug_objects_devices`, while
    source-authentic integration and whole-owner verification are available.
    The [complete source-admission hold](rasterizer_frame_statistics_obj_opus_draw_source_admission_hold_20260906.md)
    records the isolated/full-TU comparison and pinned experiment history.
-4. **Bounded `rasterizer_xbox.c` body packet.** Start with
-   `rasterizer_set_texture` (496), `rasterizer_set_model_skinning` (320),
-   `rasterizer_set_frustum_z` (320), and `rasterizer_set_stencil_mode` (784).
+4. **Bounded `rasterizer_xbox.c` body packet (three admitted).**
+   `rasterizer_set_texture` (496), `rasterizer_set_frustum_z` (320), and
+   `rasterizer_set_stencil_mode` (784) are admitted with 1,584 meaningful bytes.
+   `rasterizer_set_model_skinning` (320) remains parked: the donor closure is an
+   unsupported declaration-order lever for EAX/ECX allocation.
    Hold `_SetupSmartStates` and `__rasterizer_window_begin` for the storage/BSS
    owner corrections above. Audit wrapper call-site provenance separately; do
    not present the current 95/95 byte count as owner-complete or as whole-object

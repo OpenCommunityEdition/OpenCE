@@ -87,6 +87,8 @@ void devices_dispose(
 void device_add_scenario_information(
 	long object_index,
 	struct scenario_device_datum *scenario_device);
+void device_export_function_values(
+	long device_index);
 real device_get_position(
 	long device_index);
 real device_get_power(
