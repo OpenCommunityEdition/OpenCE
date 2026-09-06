@@ -649,8 +649,6 @@ void _rasterizer_environment_fog_screen_draw(
 	long first_triangle_index,
 	long triangle_count,
 	struct vertex_buffer const *vertex_buffer);
-void _rasterizer_profile_enable(
-	boolean enable);
 void _rasterizer_screen_flash(
 	void);
 void _rasterizer_models_begin(

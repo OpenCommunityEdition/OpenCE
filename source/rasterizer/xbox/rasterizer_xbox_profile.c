@@ -128,6 +128,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "cseries/profile_rasterizer.h"
 #include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_debug_options.h"
 
 #include <xtl.h>
 
@@ -218,23 +219,6 @@ struct rasterizer_profile_state
 typedef char rasterizer_profile_state_size_assert[
 	sizeof(struct rasterizer_profile_state) == 12 ? 1 : -1];
 
-struct rasterizer_profile_debug_options_prefix
-{
-	byte reserved00[2];
-	short rasterizer_stats;
-	byte reserved04[0x48];
-	boolean rasterizer_profile_log;
-};
-
-typedef char rasterizer_profile_debug_mode_offset_assert[
-	offsetof(
-		struct rasterizer_profile_debug_options_prefix,
-		rasterizer_stats) == 2 ? 1 : -1];
-typedef char rasterizer_profile_debug_enabled_offset_assert[
-	offsetof(
-		struct rasterizer_profile_debug_options_prefix,
-		rasterizer_profile_log) == 0x4C ? 1 : -1];
-
 /* ---------- prototypes */
 
 static boolean rasterizer_profile_active(
@@ -251,7 +235,6 @@ static void rasterizer_profile_frame_callback(
 
 /* ---------- globals */
 
-extern struct rasterizer_profile_debug_options_prefix rasterizer_debug_options;
 extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 static LARGE_INTEGER rasterizer_profile_performance_counter_frequency = { 1 };
@@ -614,8 +597,8 @@ void rasterizer_profile_dispose(
 static boolean rasterizer_profile_active(
 	void)
 {
-	return rasterizer_debug_options.rasterizer_stats == 3 ||
-		rasterizer_debug_options.rasterizer_profile_log;
+	return rasterizer_debug_options.stats == 3 ||
+		rasterizer_debug_options.profile_log;
 }
 
 static void rasterizer_profile_check(
