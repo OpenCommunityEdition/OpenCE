@@ -69,8 +69,8 @@ Candidate versus accepted-schema baseline:
 - COMMON: the same four inherited 4-byte tentative owners
   (`encounter_data`, `squad_array`, `platoon_array`, `pursuit_data`);
 - lost code/noncode owners: none;
-- changed inherited code/noncode owner payload, relocation, section flag,
-  alignment, storage, type, value, or COMDAT selection: none;
+- changed inherited runtime code/noncode owner payload, relocation, section
+  flag, alignment, storage, type, value, or COMDAT selection: none;
 - new BSS, helper, point helper, or candidate-only code owner: none;
 - newly undefined external owners: only genuine existing APIs/data
   `_data_make_valid`, `_csprintf`, and `_temporary`.
@@ -101,6 +101,12 @@ target-absent noncode owners that were already present in the schema baseline;
 they are inherited whole-object debt, not introduced by this packet.  In
 particular, the existing `encounter_get_squad`/`encounter_get_platoon` owner
 copies are unchanged even though the new constructor genuinely calls them.
+
+The complete unsuppressed metadata comparison also records two inherited
+compiler-metadata differences: the anonymous `.debug$S` payload changes from
+197 to 184 bytes, and `_encounter_create`'s `$L...` compiler-local labels are
+renumbered. Neither changes runtime bytes, real relocation destinations, ABI,
+storage class, or linkage. All other inherited section records are exact.
 
 ## Inherited residual classification
 
@@ -160,6 +166,14 @@ four assertion paths.  Its durable report is
   `scratch/encounters-initialize-cluster-isolated-report-20260905/report.json`
   (SHA256
   `39BDFD530EA9B8A2B404566D87AD8F6C3771029BEDAC776C39BF87D90C869844`).
+- independent full-section metadata cross-check:
+  `scratch/encounters_initialize_cluster_first_candidate_metadata_audit_support_20260905.py`
+  (SHA256
+  `607CE3BF9CC690E0344F3F7971482D760BDE10025A7B9706945BE3FFA4FC2AFA`)
+  and
+  `scratch/encounters-initialize-cluster-first-metadata-audit-support-20260905.json`
+  (SHA256
+  `C11EE808DA9BEBEB6E1A8D484C4E4D8446FAF984607E626DD98E30DE757021B3`).
 
 This ledger approves the frozen three-function packet as authentic functional
 progress only.  The remaining 11 unwritten owners, inherited target-absent
