@@ -304,6 +304,7 @@ symbols in this file:
 #include "real_math.h"
 #include "rasterizer_widgets.h"
 #include "rasterizer.h"
+#include "rasterizer/rasterizer_debug_options.h"
 #include "rasterizer_geometry.h"
 #include <xtl.h>
 #include "rasterizer/xbox/rasterizer_xbox.h"
@@ -325,7 +326,7 @@ enum
 /* ---------- macros */
 
 #define rasterizer_model_obscurer_object_index bss_004662ec
-#define rasterizer_debug_model_vertices_enabled rasterizer_debug_options.reserved0[7]
+#define rasterizer_debug_model_vertices_enabled rasterizer_debug_options.debug_model_vertices
 
 /* ---------- structures */
 
@@ -337,25 +338,6 @@ struct rasterizer_global_defaults
 	real first_person_weapon_far_clip_distance;
 };
 
-struct rasterizer_debug_options_definition
-{
-	byte reserved0[0x10];
-	byte all;
-	byte field_11;
-	byte field_12;
-	byte field_13;
-	byte field_14;
-	byte field_15;
-	byte field_16;
-	byte field_17;
-	byte field_18;
-	byte field_19;
-	byte field_1A;
-	byte field_1B;
-	byte field_1C;
-	byte field_1D;
-	byte reserved1E[0x6E];
-};
 
 struct rasterizer_window_parameters
 {
@@ -703,30 +685,89 @@ struct rasterizer_globals_definition rasterizer_globals =
 };
 struct rasterizer_debug_options_definition rasterizer_debug_options =
 {
-	{ 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF, 0, 0, 1, 1, 1, 1 },
-	2,
-	1,
-	1,
-	1,
-	1,
-	1,
-	1,
-	1,
-	1,
-	1,
-	1,
-	1,
-	1,
-	1,
-	{
-		1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0,
-		0x80, 0x3F, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1,
-		1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0,
-		0, 0, 0xCD, 0xCC, 0xCC, 0x3E, 8, 0, 0, 0, 0, 0, 0x80, 0x3B,
-		0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0x80, 0x3F, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	}
+	FALSE, /* fps_accumulation */
+	0, /* pad01 */
+	0, /* stats */
+	0, /* mode */
+	FALSE, /* wireframe */
+	FALSE, /* debug_model_vertices */
+	NONE, /* debug_model_lod */
+	FALSE, /* debug_transparents */
+	FALSE, /* debug_meter_shader */
+	TRUE, /* models */
+	TRUE, /* model_transparents */
+	TRUE, /* draw_first_person_weapon_first */
+	TRUE, /* stencil_mask */
+	2, /* environment */
+	TRUE, /* environment_lightmaps */
+	TRUE, /* environment_shadows */
+	TRUE, /* environment_diffuse_lights */
+	TRUE, /* environment_diffuse_textures */
+	TRUE, /* environment_decals */
+	TRUE, /* environment_specular_lights */
+	TRUE, /* environment_specular_lightmaps */
+	TRUE, /* environment_reflection_lightmap_mask */
+	TRUE, /* environment_reflection_mirrors */
+	TRUE, /* environment_reflections */
+	TRUE, /* environment_transparents */
+	TRUE, /* environment_fog */
+	TRUE, /* environment_fog_screen */
+	TRUE, /* water */
+	TRUE, /* lens_flares */
+	TRUE, /* dynamic_unlit_geometry */
+	TRUE, /* dynamic_lit_geometry */
+	TRUE, /* dynamic_screen_geometry */
+	TRUE, /* hud_motion_sensor */
+	TRUE, /* detail_objects */
+	TRUE, /* debug_geometry */
+	FALSE, /* debug_geometry_multipass */
+	TRUE, /* fog_atmosphere */
+	TRUE, /* fog_plane */
+	TRUE, /* bump_mapping */
+	{ 0 }, /* pad2A[2] */
+	1.0f, /* lightmap_ambient */
+	{ 0 }, /* reserved30[2] */
+	0, /* pad3 */
+	TRUE, /* lightmaps_incident_radiosity */
+	TRUE, /* lightmaps_filtering */
+	{ 0 }, /* pad36[2] */
+	0.0f, /* model_lighting_ambient */
+	TRUE, /* environment_alpha_testing */
+	TRUE, /* environment_specular_mask */
+	TRUE, /* shadows_convolution */
+	FALSE, /* shadows_debug */
+	FALSE, /* water_mipmapping */
+	TRUE, /* active_camouflage */
+	TRUE, /* active_camouflage_multipass */
+	TRUE, /* plasma_energy */
+	TRUE, /* lens_flares_occlusion */
+	FALSE, /* lens_flares_occlusion_debug */
+	TRUE, /* ray_of_buddha */
+	TRUE, /* screen_flashes */
+	TRUE, /* screen_effects */
+	FALSE, /* DXTC_noise */
+	FALSE, /* soft_filter */
+	FALSE, /* secondary_render_target_debug */
+	FALSE, /* profile_log */
+	{ 0 }, /* pad4D[3] */
+	0.4f, /* detail_objects_offset_multiplier */
+	8, /* zbias */
+	1.0f / 256.0f, /* zoffset */
+	FALSE, /* force_all_player_views_to_default_player */
+	FALSE, /* safe_frame_bounds */
+	0, /* freeze_flying_camera */
+	TRUE, /* zsprites */
+	TRUE, /* filthy_decal_fog_hack */
+	TRUE, /* smart */
+	FALSE, /* splitscreen_VB_optimization */
+	FALSE, /* profile_print_locks */
+	{ 0 }, /* pad65[3] */
+	0.0f, /* profile_objectlock_time */
+	1.0f, /* pad3_scale */
+	{ 0 }, /* f[6] */
+	FALSE, /* transparent_pixel_counter_active */
+	FALSE, /* transparent_pixel_counter */
+	{ 0 }, /* pad8A[2] */
 };
 extern struct rasterizer_window_parameters global_window_parameters;
 /* No PDB name survives for this target-owned BSS symbol. */
@@ -761,22 +802,22 @@ void rasterizer_reset_state(
 void rasterizer_frame_begin(
 	struct rasterizer_frame_begin_parameters const *parameters)
 {
-	if (rasterizer_debug_options.all <= 1)
+	if (rasterizer_debug_options.environment <= 1)
 	{
-		rasterizer_debug_options.field_1C = rasterizer_debug_options.all;
-		rasterizer_debug_options.field_1B = rasterizer_debug_options.all;
-		rasterizer_debug_options.field_1A = rasterizer_debug_options.all;
-		rasterizer_debug_options.field_19 = rasterizer_debug_options.all;
-		rasterizer_debug_options.field_18 = rasterizer_debug_options.all;
-		rasterizer_debug_options.field_17 = rasterizer_debug_options.all;
-		rasterizer_debug_options.field_16 = rasterizer_debug_options.all;
-		rasterizer_debug_options.field_15 = rasterizer_debug_options.all;
-		rasterizer_debug_options.field_14 = rasterizer_debug_options.all;
-		rasterizer_debug_options.field_12 = rasterizer_debug_options.all;
-		rasterizer_debug_options.field_13 = rasterizer_debug_options.all;
-		rasterizer_debug_options.field_11 = rasterizer_debug_options.all;
-		rasterizer_debug_options.field_1D = rasterizer_debug_options.all;
-		rasterizer_debug_options.all = 2;
+		rasterizer_debug_options.environment_fog = rasterizer_debug_options.environment;
+		rasterizer_debug_options.environment_transparents = rasterizer_debug_options.environment;
+		rasterizer_debug_options.environment_reflections = rasterizer_debug_options.environment;
+		rasterizer_debug_options.environment_reflection_mirrors = rasterizer_debug_options.environment;
+		rasterizer_debug_options.environment_reflection_lightmap_mask = rasterizer_debug_options.environment;
+		rasterizer_debug_options.environment_specular_lightmaps = rasterizer_debug_options.environment;
+		rasterizer_debug_options.environment_specular_lights = rasterizer_debug_options.environment;
+		rasterizer_debug_options.environment_decals = rasterizer_debug_options.environment;
+		rasterizer_debug_options.environment_diffuse_textures = rasterizer_debug_options.environment;
+		rasterizer_debug_options.environment_shadows = rasterizer_debug_options.environment;
+		rasterizer_debug_options.environment_diffuse_lights = rasterizer_debug_options.environment;
+		rasterizer_debug_options.environment_lightmaps = rasterizer_debug_options.environment;
+		rasterizer_debug_options.environment_fog_screen = rasterizer_debug_options.environment;
+		rasterizer_debug_options.environment = 2;
 	}
 
 	if (rasterizer_globals.near_clip_distance == 0.f)

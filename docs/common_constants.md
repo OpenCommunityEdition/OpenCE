@@ -229,6 +229,22 @@ ordinary strict-object and consumer checks, not by unreviewed bulk replacement.
    float and `boolean` is byte even when i386 register or stack mechanics make
    a mismatched declaration appear to work.
 
+## Rasterizer shared-state lookup
+
+Use `source/rasterizer/rasterizer_debug_options.h` for the genuine January
+debug-options record; do not add another TU-local prefix. The size is **0x8C**
+(not later HCEA's 0x90). Active Camouflage flags are at 0x41/0x42; January
+`zbias` at 0x54 is `long`, not `real`; `pad3_scale` is at 0x6C and the six
+debug reals start at 0x70. The pixel-counter active/enabled pair is 0x88/0x89.
+Unknown bytes must not inherit later-build names merely by offset.
+
+The complete 0xF0 Xbox `pixel_shader_definition` is in
+`source/rasterizer/xbox/rasterizer_xbox_pixel_shader.h`. Use this associated
+header when a complete type is needed; the broad Xbox header retains its
+forward declaration to avoid colliding with legacy local definitions.
+See the [shared-owner/cache admission](object_matching_logs/rasterizer_xbox_active_camouflage_obj_shared_owner_cache_20260906.md)
+for provenance, the typed initializer and pinned-compiler layout tests.
+
 Useful corroborating ledgers:
 
 - [docs/object_matching_logs/damage_obj_object_damage_update_20260904.md](object_matching_logs/damage_obj_object_damage_update_20260904.md)

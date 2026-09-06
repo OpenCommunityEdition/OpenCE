@@ -51,6 +51,17 @@ Canonical reaches **926,785 meaningful exact bytes**, **6,268 credited
 functions**, and unchanged **391/833 Matching objects**.
 Frame Statistics and naming findings below refine the initial proposed order.
 
+The next [Active Camouflage shared-owner/cache packet](rasterizer_xbox_active_camouflage_obj_shared_owner_cache_20260906.md)
+adds **1,985 meaningful exact bytes / nine functions**: 823 Halo body bytes
+and 1,162 bytes of naturally required stock SDK wrappers. Genuine shared
+debug-options/pixel-shader types replace the proposed local facades, and a
+narrow owning API header avoids the observed unrelated Decals regression.
+Cumulative canonical gain is **7,906 bytes**: **6,617** from the original
+headline plus **1,289** previously uncounted strict bytes. **23,457** of the
+original headline remains unadmitted as exact. Canonical reaches **928,770
+meaningful bytes**, **6,277 credited functions**, and unchanged **391/833
+Matching objects**. This does not close the whole Active Camouflage object.
+
 ## Identity and frozen evidence
 
 - Canonical comparison commit: `d574f4ff458c71ae4011b7796d80e3e67dfed55f`.
@@ -283,9 +294,13 @@ owner. It also adds a TU-local `extern boolean debug_objects_devices`, while
    independently corrected private metadata; the two 16-byte visibility wrappers belong
    only to the still-residual 640-byte occlusion-submit body and must not be
    attributed to this pair.
-6. **Active Camouflage cache only.** The 832-byte cache body is standalone. The
-   112-byte `real_alpha_to_pixel32` section and eight wrappers are retained by
-   the still-fuzzy 2,016-byte draw body, so do not claim/import them standalone.
+6. **Active Camouflage cache (shared-owner packet admitted).** The 832-byte
+   cache body naturally requires eight exact SDK wrappers; the earlier claim
+   that those wrappers depended on retaining the draw body was incorrect.
+   Isolated full-owner verification separates those nine owners from the
+   still-unwritten 2,016-byte draw and 112-byte `real_alpha_to_pixel32`.
+   The complete January 0x8C debug-options owner and compatible 0xF0 Xbox
+   pixel-shader header resolve the cache's local-layout admission hold.
 7. **Owner-blocked remainder.** Glow, Lights, Environment, Fog, Models,
    Transparent Geometry, the remaining Widget work, and Flags need either exact-body isolation
    that stops the listed emissions or a genuine shared-helper/COMDAT ownership
