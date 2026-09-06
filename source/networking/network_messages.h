@@ -14,6 +14,8 @@ header included in hcex build.
 
 /* ---------- constants */
 
+#define NETWORK_JOIN_GAME_TOKEN_SIZE 16
+
 enum network_game_message_type
 {
 	_message_client_broadcast_game_search = 0,

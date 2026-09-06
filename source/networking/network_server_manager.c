@@ -119,9 +119,9 @@ symbols in this file:
 0011D540 0030:
 	_network_game_server_get_client_machine_count (0000)
 0011D570 0100:
-	_code_0011d570 (0000)
+	_dump_network_game_data (0000)
 0011D670 0130:
-	_code_0011d670 (0000)
+	_network_game_server_dump (0000)
 0011D7A0 0140:
 	_network_game_server_remove_client_machine_from_game (0000)
 0011D8E0 0140:
@@ -453,6 +453,7 @@ symbols in this file:
 #include "cseries.h"
 #include "bungie_net/network/transport.h"
 #include "cseries/cseries_windows.h"
+#include "cseries/errors.h"
 #include "game/game.h"
 #include "game/game_engine_runtime.h"
 #include "game/player_queues_new.h"
@@ -470,6 +471,10 @@ symbols in this file:
 #include "networking/network_server_message_handler.h"
 #include "saved games/player_profile.h"
 #include "text/unicode.h"
+
+#ifndef DEBUG
+#include "cache/cache_files.h"
+#endif
 
 /* ---------- constants */
 
@@ -693,6 +698,8 @@ void get_unique_random_color(
 static boolean player_name_is_unique(
 	struct network_game_server *server,
 	wchar_t const *name);
+static void network_game_server_dump(
+	struct network_game_server *server);
 
 /* ---------- globals */
 
@@ -924,7 +931,7 @@ void network_game_server_send_player_quit_messages_ingame(
 			remove_player.player = *player;
 			remove_player.reason = game_time_get() + NETWORK_GAME_PLAYER_QUIT_DELAY;
 
-			error(2, "sending quit out of game, time = %x", remove_player.reason);
+			error(_error_silent, "sending quit out of game, time = %x", remove_player.reason);
 
 			message = create_network_game_message(
 				_message_server_remove_player_ingame,
@@ -1664,6 +1671,50 @@ void network_game_server_invalidate_network_machine(
 	return;
 }
 
+void network_game_generate_join_game_token(
+	byte join_token[NETWORK_JOIN_GAME_TOKEN_SIZE])
+{
+	byte join_token_initializer[] =
+	{
+		0x6D, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x20,
+		0x69, 0x6E, 0x20, 0x61, 0x20, 0x62, 0x6F, 0x74,
+		0x74, 0x6C, 0x65
+	};
+
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 1754, join_token);
+	/* January and the supplied source both clear the decayed pointer's size. */
+	memset(join_token, 0, sizeof(join_token));
+	memcpy(join_token, join_token_initializer,
+		MIN(NETWORK_JOIN_GAME_TOKEN_SIZE, sizeof(join_token_initializer)));
+
+#ifndef DEBUG
+	{
+		char *build_timestamp = __DATE__ __TIME__;
+		int i, j, length = strlen(build_timestamp);
+		unsigned long tags_checksum = tag_groups_checksum();
+
+		/* Release builds also incorporate compilation time and tag checksum. */
+		for (i = 0; i < sizeof(join_token); i++)
+		{
+			for (j = 0; j < length; j++)
+			{
+				join_token[i] ^= build_timestamp[j];
+			}
+		}
+		for (i = j = 0; i < sizeof(join_token); i++)
+		{
+			join_token[i] ^= ((byte *)&tags_checksum)[j++];
+			if (j == sizeof(tags_checksum))
+			{
+				j = 0;
+			}
+		}
+	}
+#endif
+
+	return;
+}
+
 struct network_machine *network_game_server_get_client_machine(
 	struct network_game_server *server,
 	struct network_game_server_client_machine *client_machine,
@@ -1862,6 +1913,233 @@ void network_game_server_change_game_variant(
 		network_event(
 			"network_game_server_change_game_variant() failed to send updated game settings to clients");
 	}
+
+	return;
+}
+
+boolean network_game_server_remove_client_machine_from_game(
+	struct network_game_server *server,
+	struct network_game_server_client_machine *client)
+{
+	boolean success = FALSE;
+	int i;
+
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x22F, server);
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x230, client);
+
+	if (_network_game_server_state_ingame == server->state)
+	{
+		network_game_server_send_player_quit_messages_ingame(server, client);
+	}
+
+	for (i = 0; i < MAXIMUM_NETWORK_MACHINE_COUNT; i++)
+	{
+		if (server->game.machines[i].machine_index == client->machine_index)
+		{
+			if (!network_game_remove_machine(
+				&server->game,
+				&server->game.machines[i]))
+			{
+				error(
+					_error_silent,
+					"network_game_server_remove_client_machine_from_game() failed to remove the offending machine from the server's copy of the game");
+			}
+			break;
+		}
+	}
+
+	for (i = 0; i < MAXIMUM_NETWORK_MACHINE_COUNT; i++)
+	{
+		if (&server->client_machines[i] == client)
+		{
+			if (server->client_machines[i].connection != NULL)
+			{
+				if (!network_server_close_client_connection(
+					server->connection,
+					server->client_machines[i].connection))
+				{
+					network_event("server failed to close a client's connection");
+				}
+			}
+
+			server->client_machines[i].connection = NULL;
+			server->client_machines[i].last_received_update_sequence_number = 0;
+			server->client_machines[i].stall_start_time = 0;
+			server->client_machines[i].machine_index = NONE;
+			server->client_machines[i].flags = 0;
+			success = TRUE;
+			break;
+		}
+	}
+
+	if (!success)
+	{
+		network_event(
+			"network_game_server_remove_client_machine_from_game() failed to find the specified machine");
+	}
+
+	return success;
+}
+
+boolean network_game_server_remove_machine_from_game(
+	struct network_game_server *server,
+	struct network_machine *machine)
+{
+	boolean success = FALSE;
+
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x299, server);
+
+	if (NONE == machine->machine_index)
+	{
+		network_event(
+			"network_game_server_remove_machine_from_game called with a machine_index of NONE");
+	}
+
+	if (network_machine_is_valid(machine))
+	{
+		int i;
+
+		for (i = 0; i < MAXIMUM_NETWORK_MACHINE_COUNT; i++)
+		{
+			if (server->client_machines[i].machine_index == machine->machine_index)
+			{
+				success = network_game_server_remove_client_machine_from_game(
+					server,
+					&server->client_machines[i]);
+				if (!success)
+				{
+					network_event(
+						"network_game_server_remove_client_machine_from_game() failed in network_game_server_remove_machine_from_game()");
+				}
+				break;
+			}
+		}
+
+		if (i == MAXIMUM_NETWORK_MACHINE_COUNT)
+		{
+			network_event(
+				"network_game_server_remove_machine_from_game() failed to find the specified machine");
+		}
+
+		if (machine->machine_index != NONE)
+		{
+			success = network_game_remove_machine(&server->game, machine);
+			if (!success)
+			{
+				network_event(
+					"network_game_remove_machine() failed in network_game_server_remove_machine_from_game()");
+			}
+		}
+
+		if (server->state == _network_game_server_state_pregame)
+		{
+			boolean sent_game_settings =
+				network_game_server_send_game_data_pregame(server);
+			if (!sent_game_settings)
+			{
+				network_event(
+					"network_game_server_remove_machine_from_game() failed to send updated game settings to remaining clients");
+			}
+		}
+	}
+	else
+	{
+		network_event(
+			"attempted to remove an invalid machine from the game in network_game_server_remove_machine_from_game()");
+		network_event("machine name = <not implemented>");
+		network_event("machine index = %x", machine->machine_index);
+		network_game_server_dump(server);
+	}
+
+	return success;
+}
+
+static void dump_network_game_data(
+	char *prefix,
+	struct network_game *network_game_data)
+{
+#ifdef DEBUG
+	network_event("%snetwork_game_data", prefix);
+	network_event("%smachine_count %d", prefix, network_game_data->machine_count);
+	{
+		long itr;
+		for (itr = 0; itr < MAXIMUM_NETWORK_MACHINE_COUNT; itr++)
+		{
+			network_event(
+				"\t%smachine %d %x",
+				prefix,
+				itr,
+				network_game_data->machines[itr].machine_index);
+		}
+	}
+
+	network_event("%splayer_count %d", prefix, network_game_data->player_count);
+	{
+		long itr;
+		for (itr = 0; itr < MAXIMUM_NETWORK_PLAYER_COUNT; itr++)
+		{
+			network_event("%splayer %d", prefix, itr);
+			network_event("%s\tmachine_index %x", prefix,
+				network_game_data->players[itr].machine_index);
+			network_event("%s\tcontroller_index %x", prefix,
+				network_game_data->players[itr].controller_index);
+			network_event("%s\tteam_index %x", prefix,
+				network_game_data->players[itr].team_index);
+			network_event("%s\tplayer_list_index %x", prefix,
+				network_game_data->players[itr].player_list_index);
+		}
+	}
+
+	network_event("%snetwork_game_random_seed %x", prefix,
+		network_game_data->random_seed);
+	network_event("%snumber_of_games_played %d", prefix,
+		network_game_data->number_of_games_played);
+#endif
+
+	return;
+}
+
+static void network_game_server_dump(
+	struct network_game_server *server)
+{
+#ifdef DEBUG
+	long itr;
+
+	network_event("*************BEGIN*************");
+	network_event("\tconnection %x", server->connection);
+	network_event("\tstate %x", server->state);
+	network_event("\tflags %x", server->flags);
+	dump_network_game_data("\t", &server->game);
+
+	network_event("client_machines:");
+	for (itr = 0; itr < MAXIMUM_NETWORK_MACHINE_COUNT; itr++)
+	{
+		struct network_game_server_client_machine *client_machine =
+			server->client_machines + itr;
+		char *connection_status = "no connection";
+
+		if (client_machine->connection != NULL)
+		{
+			connection_status = network_connection_active(client_machine->connection)
+				? "(active)" : "(dead)";
+		}
+
+		network_event("\tclient %d", itr);
+		network_event("\t\tconnection %x %s", client_machine->connection,
+			connection_status);
+		network_event("\t\tlast_received_update_sequence_number %d",
+			client_machine->last_received_update_sequence_number);
+		network_event("\t\tstall_start_time %d", client_machine->stall_start_time);
+		network_event("\t\tmachine_index %x", client_machine->machine_index);
+		network_event("\t\tflags %x", client_machine->flags);
+	}
+
+	network_event("\tnext_update_number %d", server->next_update_number);
+	network_event("\ttime_of_last_keep_alive %d", server->time_of_last_keep_alive);
+	network_event("\ttime_of_first_client_loading_completion %d",
+		server->time_of_first_client_loading_completion);
+	network_event("*************END*************");
+#endif
 
 	return;
 }

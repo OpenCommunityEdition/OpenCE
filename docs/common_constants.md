@@ -89,6 +89,7 @@ immediate.
 | Domain | Symbol(s) | Value | Owner and boundary |
 | --- | --- | --- | --- |
 | Local rendering/input players | `MAXIMUM_LOCAL_PLAYERS` | `4` | [source/game/players.h](../source/game/players.h). This is not the network/player-datum capacity. |
+| Network join token | `NETWORK_JOIN_GAME_TOKEN_SIZE` | `16` | [source/networking/network_messages.h](../source/networking/network_messages.h). Protocol byte count, corroborated by the supplied source and January's generator/callers; restored in the canonical protocol owner, not a claim about the absent original header. |
 | Difficulty | `_game_difficulty_level_easy`, `_game_difficulty_level_normal`, `_game_difficulty_level_hard`, `_game_difficulty_level_impossible` | `0`, `1`, `2`, `3` | [source/game/game.h](../source/game/game.h). Use the enum; a raw ordinal is ambiguous at a call site. |
 | Campaign team | `_game_team_default`, `_game_team_player`, `_game_team_human`, `_game_team_covenant`, `_game_team_flood`, `_game_team_sentinel` | `0` through `5` | [source/game/game.h](../source/game/game.h). Multiplayer `_team_red=0`, `_team_blue=1` intentionally overlaps numerically; the field/API determines the namespace. |
 | Object types | `_object_type_biped` through `_object_type_sound_scenery` | `0` through `11`; `NUMBER_OF_OBJECT_TYPES=12` | [source/objects/object_types.h](../source/objects/object_types.h). Values are ordinals used by object headers and switch statements. |
@@ -161,7 +162,6 @@ from canonical headers or export TU-private coefficients globally.
 | `LAN_INITIAL_SERVER_GAME_COUNTDOWN` | `31 * MILLISECONDS_PER_SECOND - 1` = `30999` | Canonical server `NETWORK_GAME_COUNTDOWN_TIME`. |
 | `LOCAL_INITIAL_SERVER_GAME_COUNTDOWN` | `11 * MILLISECONDS_PER_SECOND - 1` = `10999` | Canonical server `NETWORK_GAME_SPLITSCREEN_COUNTDOWN_TIME`. |
 | `MAXIMUM_SERVER_GAME_COUNTDOWN` | `31 * MILLISECONDS_PER_SECOND - 1` = `30999` | Separate semantic role from the LAN initial time, despite equal values. |
-| `NETWORK_JOIN_GAME_TOKEN_SIZE` | `16`, corroborated by January's token copy | Name is referenced by supplied source but its defining header is absent. Restore the genuine shared owner before using it across callers; do not claim its original declaration was supplied. |
 | `NETWORK_GAME_CLIENT_CONNECTION_PROCESS_TIMEOUT_MILLISECONDS` | Debug `120000`; release `15000` | Supplied client enum selects `120` or `15` times `MILLISECONDS_PER_SECOND` under `DEBUG`; do not use one build's timeout in the other. |
 | `NETWORK_GAME_CLIENT_GAME_SEARCH_INTERVAL_MILLISECONDS` | `2000` | Supplied client search cadence, `2 * MILLISECONDS_PER_SECOND`. |
 | `NETWORK_GAME_CLIENT_GAME_ADVERTISED_GAME_TIMEOUT` | `6000` | Supplied client: twice the search interval plus `2 * MILLISECONDS_PER_SECOND`; not the connection timeout. |

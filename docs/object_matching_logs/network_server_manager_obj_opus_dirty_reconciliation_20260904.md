@@ -164,8 +164,9 @@ corroborates the automatic initializer, pointer-sized clear, and assertion
 line against January. The unsupported-source rationale below is historical,
 not a current prohibition on a new evidence-backed candidate. See the
 [source reconstruction map](../user_source_reconstruction_map_20260906.md).
-The body has not yet been integrated or credited by this documentation update;
-normal owner, caller, strict-match, and regression gates still apply.
+The subsequent [source-attested packet](network_server_manager_obj_source_attested_packet_20260906.md)
+integrates it after owner, caller, strict-match, and regression checks. The
+rejection below describes the evidence available on 2026-09-04.
 
 The donor's `network_game_generate_join_game_token` body is not admitted.  It
 declares a pointer parameter, clears `sizeof(join_token)` bytes (therefore only

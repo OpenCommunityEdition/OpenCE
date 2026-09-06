@@ -53,10 +53,17 @@ Canonical owners:
 - [source/networking/network_server_manager.h](../source/networking/network_server_manager.h)
 - [source/networking/network_server_manager_internal.h](../source/networking/network_server_manager_internal.h)
 
-The current census is **49 exact / 2 parked / 19 unwritten**. All 19 missing
+At initial source review the census was **49 exact / 2 parked / 19 unwritten**. All 19 missing
 bodies are represented in the supplied source. This is not 19 new credited
 closures: headers, global backing, helper reachability, code generation, and
 full consumer regressions still need review.
+
+**Integration update:** the join token and both machine removals plus both
+private dumps are now verified: **54 exact / 2 parked / 14 unwritten**,
+**+1,315 meaningful code bytes**, zero regressions. See the
+[source-attested integration ledger](object_matching_logs/network_server_manager_obj_source_attested_packet_20260906.md)
+for immutable evidence and the remaining queue. The reset/playlist and larger
+private caller families below remain future work.
 
 ### First packet: join-game token (150 meaningful / 160 padded bytes)
 
@@ -79,7 +86,7 @@ client callers. The defining header was not attached; value **16** is target
 corroborated, not a recovered original declaration. Preserve the debug/release
 conditional source distinction and January's actual build configuration.
 Do not generalize this evidence into permission for unrelated redundant or
-nonsensical code. No join-token implementation is integrated by this map.
+nonsensical code. The subsequent integration is recorded in the linked ledger.
 
 ### Private names supplied directly
 

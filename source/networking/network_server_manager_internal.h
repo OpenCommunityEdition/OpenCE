@@ -13,6 +13,7 @@ January compiler is sensitive to declaration position even in unrelated code.
 /* ---------- headers */
 
 #include "cseries.h"
+#include "networking/network_server_manager.h"
 
 /* ---------- constants */
 
@@ -100,9 +101,6 @@ boolean network_game_server_remove_machine_from_game(
 void network_game_server_update_countdown(
 	struct network_game_server *server,
 	short countdown_event);
-void network_game_generate_join_game_token(
-	byte *join_game_token);
-
 /* ---------- globals */
 
 /* ---------- public code */

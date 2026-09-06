@@ -37,7 +37,7 @@ void network_game_server_pause_countdown(
 	struct network_game_server *server,
 	boolean pause_countdown);
 void network_game_generate_join_game_token(
-	byte *join_game_token);
+	byte *join_token);
 long network_game_server_get_oldest_client_update_received(
 	struct network_game_server *server);
 void network_game_server_stalled_on_client(

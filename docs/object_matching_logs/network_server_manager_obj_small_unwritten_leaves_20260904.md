@@ -1,5 +1,10 @@
 # `network_server_manager.obj` small unwritten leaves — 2026-09-04
 
+2026-09-06 follow-up: newly supplied source corroborates the previously rejected
+join token and the connected remove/dump packet. Their verified integration is
+recorded in [the source-attested packet ledger](network_server_manager_obj_source_attested_packet_20260906.md).
+The signed-overflow countdown rejection and parked residuals remain unchanged.
+
 ## Result
 
 This isolated packet starts from canonical commit

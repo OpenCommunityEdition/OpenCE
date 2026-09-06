@@ -54,6 +54,8 @@ boolean cache_file_header_verify(
 
 unsigned long cache_files_get_checksum(
 	void);
+unsigned long tag_groups_checksum(
+	void);
 void cache_files_enable_writes(
 	void);
 void cache_files_disable_writes(
