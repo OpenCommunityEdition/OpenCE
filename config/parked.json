@@ -5243,6 +5243,25 @@
         },
         "objdiff_percent": 57.757446
       }
+    },
+    {
+      "unit": "source/render/render_debug",
+      "function": "_render_debug_point",
+      "class": "instruction-scheduling",
+      "evidence": "Natural Opus point renderer, unchanged across the inspected donor snapshots, reconstructed with authentic pointer assertions, typed axis endpoints, three rasterizer calls and the genuine deferred variadic cache contract. Target and first/ordinary candidate have 288 padded bytes, 11 positionally identical resolved relocations and the same arithmetic/control flow; independent integer stores/moves are scheduled differently around adjacent x87 instructions from +0x99 to +0xD2. No expression/declaration/compiler-control variants were tried. Root read both complete hex/disassembly streams and independently replayed 22 finite scenarios in both x87 precision modes over target/first/actual real public, polygon-edge, line and cache functions: 132 accepted executions plus a true in-memory wrong-sign target-byte negative. All inherited exacts, cache helper, BSS and runtime owners remain preserved; the genuine line definition resolves five prior same-TU references. Neither this fuzzy function nor its ordinary 0.5f constant receives additional exact credit. Reopen only for authentic source/compiler-context evidence, not equivalent-spelling or scheduling searches. See docs/object_matching_logs/render_debug_obj_three_primitives_reconciliation_20260906.md and tools/audit/render_debug_three_runtime.py.",
+      "measurements": {
+        "target": {
+          "size": 288,
+          "relocation_count": 11,
+          "normalized_sha256": "d266ea4ebca719170c806b7e4a1658585a5d9c500cc09c21edeed62d346983f7"
+        },
+        "base": {
+          "size": 288,
+          "relocation_count": 11,
+          "normalized_sha256": "6a4b989254d04fc75596eb41695380e59c683535a1b166ddb97931f41f5c83a0"
+        },
+        "objdiff_percent": 89.066666
+      }
     }
   ]
 }

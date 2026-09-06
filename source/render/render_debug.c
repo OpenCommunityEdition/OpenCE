@@ -383,6 +383,176 @@ void render_debug_polygon(
 	return;
 }
 
+void render_debug_box_outline(
+	boolean immediate,
+	real_rectangle3d const *bounds,
+	real_argb_color const *color)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		812,
+		bounds);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		813,
+		color);
+
+	if (immediate)
+	{
+		real_point3d points[8];
+		short index;
+
+		points[0].x = bounds->x0;
+		points[0].y = bounds->y0;
+		points[0].z = bounds->z0;
+		points[1].x = bounds->x1;
+		points[1].y = bounds->y0;
+		points[1].z = bounds->z0;
+		points[2].x = bounds->x1;
+		points[2].y = bounds->y1;
+		points[2].z = bounds->z0;
+		points[3].x = bounds->x0;
+		points[3].y = bounds->y1;
+		points[3].z = bounds->z0;
+		points[4].x = bounds->x0;
+		points[4].y = bounds->y0;
+		points[4].z = bounds->z1;
+		points[5].x = bounds->x1;
+		points[5].y = bounds->y0;
+		points[5].z = bounds->z1;
+		points[6].x = bounds->x1;
+		points[6].y = bounds->y1;
+		points[6].z = bounds->z1;
+		points[7].x = bounds->x0;
+		points[7].y = bounds->y1;
+		points[7].z = bounds->z1;
+
+		render_debug_polygon_edges(
+			&points[0],
+			4,
+			color);
+		render_debug_polygon_edges(
+			&points[4],
+			4,
+			color);
+
+		for (index = 0; index<4; index++)
+		{
+			render_debug_line(
+				TRUE,
+				&points[index],
+				&points[index+4],
+				color);
+		}
+	}
+	else
+	{
+		render_debug_add_cache_entry(
+			_render_debug_cache_box_outline,
+			bounds,
+			color);
+	}
+
+	return;
+}
+
+void render_debug_point(
+	boolean immediate,
+	real_point3d const *point,
+	real size,
+	real_argb_color const *color)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		327,
+		point);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		328,
+		color);
+
+	if (immediate)
+	{
+		real_point3d points[6];
+		short index;
+
+		points[0].x = point->x-size*0.5f;
+		points[0].y = point->y;
+		points[0].z = point->z;
+		points[1].x = point->x+size*0.5f;
+		points[1].y = point->y;
+		points[1].z = point->z;
+		points[2].x = point->x;
+		points[2].y = point->y-size*0.5f;
+		points[2].z = point->z;
+		points[3].x = point->x;
+		points[3].y = point->y+size*0.5f;
+		points[3].z = point->z;
+		points[4].x = point->x;
+		points[4].y = point->y;
+		points[4].z = point->z-size*0.5f;
+		points[5].x = point->x;
+		points[5].y = point->y;
+		points[5].z = point->z+size*0.5f;
+
+		for (index = 0; index<NUMBEROF(points)/2; index++)
+		{
+			rasterizer_debug_line(
+				&points[index*2],
+				&points[index*2+1],
+				color);
+		}
+	}
+	else
+	{
+		render_debug_add_cache_entry(
+			_render_debug_cache_point,
+			point,
+			size,
+			color);
+	}
+
+	return;
+}
+
+void render_debug_line(
+	boolean immediate,
+	real_point3d const *point0,
+	real_point3d const *point1,
+	real_argb_color const *color)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		363,
+		point0);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		364,
+		point1);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		365,
+		color);
+
+	if (immediate)
+	{
+		rasterizer_debug_line(
+			point0,
+			point1,
+			color);
+	}
+	else
+	{
+		render_debug_add_cache_entry(
+			_render_debug_cache_line,
+			point0,
+			point1,
+			color);
+	}
+
+	return;
+}
+
 void render_debug_vector(
 	boolean immediate,
 	real_point3d const *point,

@@ -1,5 +1,34 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
+## RenderDebug primitive callers reconciled (2026-09-06)
+
+The preserved Opus line, box-outline and point bodies have been reconciled
+without changing shared headers or either active Opus source reservation.
+Line and box-outline add **448 meaningful exact code bytes**. Point remains
+a natural **89.066666%** scheduling residual, with no exact credit. RenderDebug
+is **15 exact / two residual / 19 unwritten**, not a completed object.
+
+The verified canonical total is **917,904 meaningful exact code bytes**,
+**6,217 credited functions**, **6,263 strict functions**, **2,061,024 matched
+data bytes**, and unchanged **391/833 Matching objects**. The whole stable
+census records two gains and zero inherited losses. Full Ninja succeeds;
+the tools suite passes **594 tests plus 26 subtests**. Parks are **292 active,
+zero stale and zero invalid**; admission has no new candidates,
+contradictions or revocations and retains five existing rejections.
+
+Root inspected complete hex/relocation streams and independently replayed
+132 target/first/actual executions across 22 finite scenarios and two x87
+control words. A real wrong-sign target-byte mutation is rejected. The
+inherited cache dispatcher also passes its separate 41-scenario oracle.
+See `object_matching_logs/render_debug_obj_three_primitives_reconciliation_20260906.md`
+and `tools/audit/render_debug_three_runtime.py` for scope, limitations,
+ownership transitions and frozen evidence.
+
+Publication is scoped to RenderDebug and its verification/documentation.
+The separate local ActorLooking decoder/caller work is **uncredited and
+not approved or included in this batch** while behavioral verification is
+pending. Remote publication must be verified independently after commit.
+
 ## Actor-mode and erase-all API trials restored (2026-09-06)
 
 Two newly identified owner boundaries were tested without compiling their
