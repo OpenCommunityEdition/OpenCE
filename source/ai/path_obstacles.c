@@ -15,7 +15,7 @@ symbols in this file:
 00050530 0050:
 	_point_in_sphere (0000)
 00050580 0090:
-	_code_00050580 (0000)
+	_circle_intersect_ray (0000)
 00050610 0080:
 	_code_00050610 (0000)
 00050690 00d0:
@@ -84,6 +84,13 @@ symbols in this file:
 /* ---------- structures */
 
 /* ---------- prototypes */
+
+static boolean circle_intersect_ray(
+	real_point2d const *center,
+	real radius,
+	real_point2d const *point,
+	real_vector2d const *direction,
+	real *distance);
 
 /* ---------- globals */
 
@@ -201,4 +208,77 @@ short obstacles_test_circle(
 	return NONE;
 }
 
+boolean obstacles_test_pill(
+	struct obstacles const *obstacles,
+	short ignore_disc_index,
+	real_point2d const *point,
+	real_vector2d const *direction,
+	real radius,
+	real distance,
+	boolean ignore_optional,
+	struct obstacles_test_pill_result *result)
+{
+	short disc_index;
+
+	result->distance = distance;
+	result->disc_index = NONE;
+	result->obstacle_index = NONE;
+	for (disc_index = 0; disc_index < obstacles->disc_count; disc_index++)
+	{
+		if (disc_index != ignore_disc_index)
+		{
+			struct obstacle_disc const *disc = obstacles_get_disc(obstacles, disc_index);
+
+			if (!ignore_optional || !TEST_FLAG(disc->flags, _disc_optional_bit))
+			{
+				real disc_distance;
+
+				if (circle_intersect_ray(&disc->center, disc->radius + radius,
+					point, direction, &disc_distance) && result->distance > disc_distance)
+				{
+					result->distance = disc_distance;
+					result->disc_index = disc_index;
+					result->obstacle_index = disc->obstacle_index;
+				}
+			}
+		}
+	}
+
+	return result->disc_index != NONE;
+}
+
 /* ---------- private code */
+
+static boolean circle_intersect_ray(
+	real_point2d const *center,
+	real radius,
+	real_point2d const *point,
+	real_vector2d const *direction,
+	real *distance)
+{
+	real_vector2d offset;
+	real projection = dot_product2d(direction, vector_from_points2d(point, center, &offset));
+
+	if (projection > 0.0f)
+	{
+		real distance_squared_minus_radius_squared = magnitude_squared2d(&offset) - radius * radius;
+
+		if (distance_squared_minus_radius_squared <= 0.0f)
+		{
+			*distance = 0.0f;
+			return TRUE;
+		}
+		else
+		{
+			real discriminant = projection * projection - distance_squared_minus_radius_squared;
+
+			if (discriminant >= 0.0f)
+			{
+				*distance = projection - square_root(discriminant);
+				return TRUE;
+			}
+		}
+	}
+
+	return FALSE;
+}

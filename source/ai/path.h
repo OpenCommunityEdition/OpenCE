@@ -170,6 +170,20 @@ struct obstacles
 	struct obstacle_disc discs[MAXIMUM_DISC_COUNT];
 };
 
+struct obstacles_test_pill_result
+{
+	real distance;
+	short disc_index;
+	short obstacle_index;
+};
+
+typedef char obstacles_test_pill_result_size_assert[
+	sizeof(struct obstacles_test_pill_result) == 0x8 ? 1 : -1];
+typedef char obstacles_test_pill_result_disc_index_offset_assert[
+	offsetof(struct obstacles_test_pill_result, disc_index) == 0x4 ? 1 : -1];
+typedef char obstacles_test_pill_result_obstacle_index_offset_assert[
+	offsetof(struct obstacles_test_pill_result, obstacle_index) == 0x6 ? 1 : -1];
+
 typedef char obstacle_disc_size_assert[
 	sizeof(struct obstacle_disc) == 0x18 ? 1 : -1];
 typedef char obstacle_disc_obstacle_index_offset_assert[
@@ -336,6 +350,15 @@ short obstacles_test_circle(
 	short ignore_disc_index,
 	real_point2d const *center,
 	real radius);
+boolean obstacles_test_pill(
+	struct obstacles const *obstacles,
+	short ignore_disc_index,
+	real_point2d const *point,
+	real_vector2d const *direction,
+	real radius,
+	real distance,
+	boolean ignore_optional,
+	struct obstacles_test_pill_result *result);
 
 /* ---------- prototypes/PATH_OBSTACLE_AVOIDANCE.C */
 

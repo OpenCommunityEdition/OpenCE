@@ -1,5 +1,33 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
+## Exact obstacle pill query and authentic private helper (2026-09-06)
+
+The preceding natural circle query/header restoration is published on both
+authorized GitHub refs at `e148167df0908acb3f3423a1d873a3eb1cfd9cd0`.
+
+January hex and independent DIA now authenticate the public pill query,
+its eight-byte result header, and the real private `circle_intersect_ray`
+name/argument order. Both bodies match on their first natural compile:
+**+361 meaningful exact bytes**, with no inherited strict regression.
+The private helper's natural optimized register ABI matches without a shim;
+`config/symbols.json` records its genuine name and static ownership.
+
+Canonical is **919,549 exact code bytes**, **6,225 credited functions**,
+**6,271 strict functions**, and unchanged **391/833 Matching objects**.
+PathObstacles is **8 exact / 1 residual / 7 unwritten**. Its circle residual
+remains parked. The complete 51-consumer header trial preserves inherited
+runtime semantics and Units 189/189. Actual public/helper replay covers 258
+executions and three detected machine-byte negative controls; the full suite
+passes 650 tests plus 26 subtests. Parks and admission remain clean/unchanged.
+
+This is partial source/function progress, **not whole-object link approval**.
+Current-base links with ActionCharge expose NODUPLICATES-vs-SELECT_ANY conflicts
+for `square_root`, `dot_product2d` and the pre-existing `magnitude_squared2d`
+copy. No new helper copy receives January credit and none is hidden or suppressed.
+Authentic shared ownership remains a separate reconciliation task. See
+`object_matching_logs/path_obstacles_obj_pill_private_helper_20260906.md` and
+the committed pill runtime verifier/nine tests. Opus scopes are untouched.
+
 ## Natural obstacle circle query and genuine header accessor (2026-09-06)
 
 The preceding January obstacle-disc correction and exact append are published
