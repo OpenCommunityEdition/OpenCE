@@ -1,5 +1,43 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
+## Path 3D Fable pair reconciled (2026-09-06)
+
+The preceding RenderDebug batch is independently verified on both authorized
+GitHub refs as `ef631fb8967d25e349b62d4ae83aa5b4a17c7770`. Its canonical treemap
+refresh contains 833 units, one source and zero warnings.
+
+The authentic Fable `path_3d_available` and `path_3d_build_path` pair now matches
+on its first natural compile: **+374 meaningful exact code bytes**. The local
+verified total is **918,989 exact code bytes**, **6,222 credited functions**,
+**6,268 strict functions**, **2,061,024 matched data bytes**, and unchanged
+**391/833 Matching objects**. Path is 15 exact / zero residual / 17 unwritten.
+No exact function is lost, no inherited source is retuned, and neither active
+Opus implementation reservation is edited.
+
+The genuine path.h declaration trial rebuilds all 50 dependent objects. Its
+only substantive collateral is the previously proved seven-byte commuting-load
+swap in the already-fuzzy speech-timer helper. Root proves the complete current
+forms identical to the earlier variants and reruns the 24-state block proof
+before refreshing that park. This preserves source semantics and earns zero
+additional exact credit; the initial stale-evidence failure is not bypassed.
+
+Both real Path bodies execute in **1,050 root and independently reproduced
+target/first/ordinary runs**, with exact external API contracts, optional outputs,
+full path-result state, collision boundaries and ignored avoidance-bit checks.
+Two actual wrong-boolean instruction controls are rejected. Extra ordinary math
+helpers receive no target credit; current SELECTANY ownership is distinguished
+from January's selected ActionAlert NODUP owner. Four current whole-object
+diagnostic links report no duplicates but stop at missing full-engine imports.
+
+Final Ninja, full strict census, **620 tests plus 26 subtests**, parks
+(294 active / zero stale / zero invalid), and admission (no new issues; five
+existing rejections) pass. The source/header and all built inputs remain pinned
+to the first natural build. See
+`object_matching_logs/path_obj_3d_pair_reconciliation_20260906.md` and
+`tools/audit/path_3d_runtime.py`. The scoped batch is ready for commit and
+independent remote verification. Remaining small private Path helpers are being
+screened next; they are not included in this batch.
+
 ## RenderDebug 2D wrappers verified (2026-09-06)
 
 ActorLooking's preceding natural fuzzy batch is now published on both authorized

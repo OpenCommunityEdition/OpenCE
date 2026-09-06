@@ -56,6 +56,8 @@ enum
 
 /* ---------- structures */
 
+struct structure_bsp;
+
 struct path_destination
 {
 	real_point3d point;
@@ -249,6 +251,19 @@ struct path_node *path_get_node(
 short path_node_from_hash_table(
 	struct path_state *state,
 	long surface_index);
+boolean path_3d_available(
+	struct structure_bsp *structure,
+	real_point3d const *start_point,
+	real avoidance_distance,
+	real_point3d const *end_point,
+	boolean *finishing_path_reference,
+	real_point3d *path_endpoint);
+boolean path_3d_build_path(
+	struct structure_bsp *structure,
+	real_point3d const *start_point,
+	real avoidance_distance,
+	real_point3d const *end_point,
+	struct path_result *path);
 real path_attractor_weight(
 	struct path_state *state,
 	real_point3d const *point,

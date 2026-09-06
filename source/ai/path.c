@@ -155,7 +155,11 @@ symbols in this file:
 /* ---------- headers */
 
 #include "ai/path.h"
+#include "physics/collision_bsp.h"
+#include "physics/collision_bsp_definitions.h"
+#include "physics/collisions.h"
 #include "scenario/scenario.h"
+#include "structures/structure_bsp_definitions.h"
 
 #include <stddef.h>
 
@@ -341,6 +345,85 @@ short path_node_from_hash_table(
 		state->node_list[node_index].surface_index != surface_index);
 
 	return node_index;
+}
+
+boolean path_3d_available(
+	struct structure_bsp *structure,
+	real_point3d const *start_point,
+	real avoidance_distance,
+	real_point3d const *end_point,
+	boolean *finishing_path_reference,
+	real_point3d *path_endpoint)
+{
+	boolean available = FALSE;
+	boolean finishing_path = FALSE;
+	real_point3d endpoint = *end_point;
+	real_vector3d vector;
+	struct collision_bsp_test_vector_result result;
+
+	vector_from_points3d(start_point, end_point, &vector);
+	if (!collision_bsp_test_vector(
+			FLAG(_collision_test_front_facing_surfaces_bit),
+			TAG_BLOCK_GET_ELEMENT(
+				&structure->collision_bsp,
+				0,
+				struct collision_bsp),
+			0,
+			NULL,
+			start_point,
+			&vector,
+			REAL_MAX,
+			&result) ||
+		result.t >= 1.0f ||
+		magnitude_squared3d(&vector)*((1.0f - result.t)*(1.0f - result.t)) < 0.1f)
+	{
+		available = TRUE;
+		finishing_path = TRUE;
+	}
+
+	if (finishing_path_reference)
+	{
+		*finishing_path_reference = finishing_path;
+	}
+	if (path_endpoint)
+	{
+		*path_endpoint = endpoint;
+	}
+
+	return available;
+}
+
+boolean path_3d_build_path(
+	struct structure_bsp *structure,
+	real_point3d const *start_point,
+	real avoidance_distance,
+	real_point3d const *end_point,
+	struct path_result *path)
+{
+	real_point3d endpoint;
+	boolean finishing_path;
+
+	csmemset(path, 0, sizeof(*path));
+	if (path_3d_available(
+			structure,
+			start_point,
+			avoidance_distance,
+			end_point,
+			&finishing_path,
+			&endpoint))
+	{
+		path->steps[0].point = endpoint;
+		path->step_count = 1;
+		path->steps[0].surface_index = NONE;
+		path->step_index = 0;
+		path->steps_finish_path = finishing_path;
+		path->endpoint.point = *end_point;
+		path->endpoint.surface_index = NONE;
+		path->endpoint.target_radius = 0.0f;
+		path->valid = TRUE;
+	}
+
+	return path->valid;
 }
 
 /* ---------- private code */
