@@ -193,18 +193,6 @@ typedef char obstacle_path_heap_offset_assert[
 
 /* ---------- private code */
 
-struct obstacle_disc const *obstacles_get_disc(
-	struct obstacles const *obstacles,
-	short disc_index)
-{
-	match_assert(
-		"c:\\halo\\source\\ai\\path.h",
-		0x18C,
-		disc_index>=0 && disc_index<obstacles->disc_count && obstacles->disc_count<=MAXIMUM_DISC_COUNT);
-
-	return &obstacles->discs[disc_index];
-}
-
 long obstacle_from_disc(
 	struct obstacles const *obstacles,
 	short disc_index)

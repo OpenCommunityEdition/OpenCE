@@ -1,5 +1,34 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
+## Natural obstacle circle query and genuine header accessor (2026-09-06)
+
+The preceding January obstacle-disc correction and exact append are published
+on both authorized GitHub refs at `007da7f2a9e41291c40192b84f5ac31d50005af7`.
+
+Continue the same family with the previously unwritten `obstacles_test_circle`:
+**160 meaningful/padded bytes, four relocations, 96.878784% fuzzy** after one
+natural compile. It uses typed discs, the existing point-in-circle API, and
+the genuine accessor restored from the avoidance C file to `path.h`.
+January assertion ownership and independent DIA inline records authenticate
+that move. Both current accessor copies have identical bytes/relocations and
+compatible SELECT_ANY ownership; they receive no new function credit.
+
+All 6,269 inherited strict functions survive the 51-consumer owner trial.
+The sole unrelated byte delta is the independently proved commuting pair
+of loads in the already-fuzzy speech timer; its evidence is refreshed without
+a source edit or exact-credit exception. Root and independent actual-body
+replay pass **240 executions** over 40 scenarios/two x87 modes, plus two
+detected byte-level negative controls. **641 tests plus 26 subtests** pass;
+parks are 297 active with no stale/invalid entries and admission is unchanged.
+
+This is **zero exact-byte gain**: canonical remains **919,188 exact code
+bytes and 391/833 Matching objects**. PathObstacles is now **6 exact /
+1 residual / 9 unwritten**, not complete. Keep the radius-load/fadd scheduling
+residual parked; unmasked floating exception timing is outside the bounded
+proof. See `object_matching_logs/path_obstacles_obj_circle_query_natural_20260906.md`
+and the committed circle runtime verifier/eight focused tests. Opus scopes
+and read-only donor worktrees are untouched.
+
 ## January obstacle-disc layout reconciled; append exact (2026-09-06)
 
 The previous fuzzy Path attractor packet is published on both authorized

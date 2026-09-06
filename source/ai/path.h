@@ -331,10 +331,15 @@ boolean obstacles_add_disc(
 	short flags,
 	real_point3d const *center,
 	real radius);
+short obstacles_test_circle(
+	struct obstacles const *obstacles,
+	short ignore_disc_index,
+	real_point2d const *center,
+	real radius);
 
 /* ---------- prototypes/PATH_OBSTACLE_AVOIDANCE.C */
 
-struct obstacle_disc const *obstacles_get_disc(
+__inline struct obstacle_disc const *obstacles_get_disc(
 	struct obstacles const *obstacles,
 	short disc_index);
 long obstacle_from_disc(
@@ -344,5 +349,17 @@ long obstacle_from_disc(
 /* ---------- globals */
 
 /* ---------- public code */
+
+__inline struct obstacle_disc const *obstacles_get_disc(
+	struct obstacles const *obstacles,
+	short disc_index)
+{
+	match_assert(
+		"c:\\halo\\source\\ai\\path.h",
+		0x18C,
+		disc_index>=0 && disc_index<obstacles->disc_count && obstacles->disc_count<=MAXIMUM_DISC_COUNT);
+
+	return &obstacles->discs[disc_index];
+}
 
 #endif // __PATH_H

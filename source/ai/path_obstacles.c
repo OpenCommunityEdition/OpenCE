@@ -177,4 +177,28 @@ boolean obstacles_add_disc(
 	return TRUE;
 }
 
+short obstacles_test_circle(
+	struct obstacles const *obstacles,
+	short ignore_disc_index,
+	real_point2d const *center,
+	real radius)
+{
+	short disc_index;
+
+	for (disc_index = 0; disc_index < obstacles->disc_count; disc_index++)
+	{
+		if (disc_index != ignore_disc_index)
+		{
+			struct obstacle_disc const *disc = obstacles_get_disc(obstacles, disc_index);
+
+			if (point_in_circle(center, &disc->center, disc->radius + radius))
+			{
+				return disc_index;
+			}
+		}
+	}
+
+	return NONE;
+}
+
 /* ---------- private code */
