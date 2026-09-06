@@ -1,5 +1,28 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
+## Tangents and alias-safe rotation held; source preserved (2026-09-06)
+
+ActionCharge ownership/name cleanup is published on both authorized GitHub
+refs at `b185898cea1a11c7cf78464adbc3c7fb28bcb6e2`. Canonical remains
+919,549 meaningful exact code bytes and 391/833 Matching objects.
+
+The next genuine PathObstacles tangent caller matches 211 meaningful bytes
+on its first natural compile. Its helper's real private name is
+`circle_tangents`. January hex also exposes a real in-place aliasing defect in
+the existing `rotate_vector2d` header body. One grounded two-temporary
+correctness trial matches all 42 meaningful rotation bytes. Neither packet
+passes the full inherited-strict gate: the public prototype alone changes an
+exact Units function, and the broader math repair disturbs four other exact
+functions. These are held candidates, not 253 bytes of canonical progress.
+
+The production implementation/header trials are restored, without source-order
+tuning or semantic waivers. The authenticated private name/static metadata can
+be retained independently. Both full source candidates and the new aliasing
+evidence are preserved in
+`object_matching_logs/path_obstacles_obj_tangents_alias_semantics_hold_20260906.md`.
+Do not repeat the same trials; reopen with genuine owner/header evidence or
+explicit policy direction. Active Opus source scopes remain untouched.
+
 ## ActionCharge shared-math ownership and private names (2026-09-06)
 
 The preceding exact pill/private-helper packet is published on both GitHub

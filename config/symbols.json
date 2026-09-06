@@ -920,7 +920,7 @@
 { "file_offset": 328944, "flags": 32, "name": "_point_in_circle" },
 { "file_offset": 329008, "flags": 32, "name": "_point_in_sphere" },
       { "file_offset": 329088, "flags": 32, "name": "_circle_intersect_ray", "static": true },
-{ "file_offset": 329232, "flags": 32, "name": "_code_00050610" },
+{ "file_offset": 329232, "flags": 32, "name": "_circle_tangents", "static": true },
 { "file_offset": 329360, "flags": 32, "name": "_obstacles_add_disc" },
 { "file_offset": 329568, "flags": 32, "name": "_obstacles_get_discs_in_sphere" },
 { "file_offset": 330368, "flags": 32, "name": "_obstacles_test_circle" },
