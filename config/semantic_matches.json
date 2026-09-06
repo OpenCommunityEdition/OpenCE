@@ -1,5 +1,15 @@
 [
   {
+    "unit": "source/ai/action_obey",
+    "function": "_action_obey_command_end",
+    "reason": "Independent frozen January/actual COFF comparison proves all 560 padded bytes, 24 ordered relocations and normalized SHA-256 f59f0185a672ce6409fe3d3c3a439e517483593f6ffc9bf5eff4b18dd4420a61 exact. Objdiff reports 85.26786 percent because compiler-local switch labels are represented differently. The ledger credits only the target's 549 meaningful bytes, with no byte/comparator exception. The genuine private body is retained through individual_end, not a fake external ABI. Fable's earlier case-order correction remains documented; this is independently authenticated reconstruction, not a claim of first-shot source. Whole-object math-owner and remaining-source boundaries are separate. See docs/object_matching_logs/action_obey_obj_partial_graph_reconciliation_20260905.md."
+  },
+  {
+    "unit": "source/ai/action_obey",
+    "function": "_action_obey_directmovement_update_facing",
+    "reason": "Independent frozen January/actual COFF comparison proves all 336 meaningful/padded bytes, 17 ordered relocations and normalized SHA-256 17b28fabb3ad4366074689d2f9be1364ccf07cdc0c7a185dbd4dff25b00e3f97 exact. Objdiff reports 96.77419 percent due to compiler-local switch labels. This is strict target-function credit only; no comparator weakening or surplus helper credit. Its real individual_update caller naturally preserves the target cross_product3d/negate_vector3d owners after removing their manual wrapper aliases. Five additional header math owners are explicitly audited and remain a whole-object link/admission boundary. See docs/object_matching_logs/action_obey_obj_partial_graph_reconciliation_20260905.md."
+  },
+  {
     "unit": "source/input/input_xbox",
     "function": "_input_key_is_down",
     "reason": "Independent root and reviewer COFF gates prove all 192 meaningful/padded bytes and 19 ordered relocations exact, normalized SHA-256 c1ab3b0043e411c7e6695fb129837501c3bca12a2477d9497b5123f3eaf17805. Objdiff reports 93.93939 percent because compiler-local switch labels are represented differently. A natural result variable and single terminal return satisfy the house rules without a bogus unreachable fallback and reproduce January; no target-byte exception or declaration-order tuning. See docs/object_matching_logs/input_xbox_obj_public_leaves_independent_review_20260904.md."

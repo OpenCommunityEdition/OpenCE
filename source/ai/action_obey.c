@@ -248,20 +248,28 @@ symbols in this file:
 
 #define random_range random_range_inline
 #define vector_from_points2d vector_from_points2d_inline
-#define cross_product3d cross_product3d_inline
-#define negate_vector3d negate_vector3d_inline
 #include "cseries.h"
 #include "actions.h"
 
+#include "actor_looking.h"
 #include "actors.h"
+#include "ai_debug.h"
+#include "ai_scenario_definitions.h"
+#include "cseries/errors.h"
+#include "math/real_math.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
-#undef negate_vector3d
-#undef cross_product3d
+#include "units/bipeds.h"
+#include "units/units.h"
 #undef vector_from_points2d
 #undef random_range
 
 /* ---------- constants */
+
+enum
+{
+	OBEY_MAXIMUM_LOOP_COUNT = 10,
+};
 
 /* ---------- macros */
 
@@ -286,50 +294,147 @@ typedef char action_obey_state_offset_assert[
 
 /* ---------- prototypes */
 
-void code_00005250(
+static void action_obey_command_end(
+	long actor_index,
+	long unit_index,
+	short command_list_index,
+	struct obey_individual_simple_control *simple_control,
+	struct obey_individual_complex_control *complex_control,
+	byte *next_command_index);
+static void action_obey_individual_setup(
 	long actor_index,
 	long unit_index,
 	short command_list_index,
 	struct obey_individual_simple_control *simple_control,
 	struct obey_individual_complex_control *complex_control,
 	void *user_data);
-void code_00005290(
+static void action_obey_individual_flush_command_indices(
 	long actor_index,
 	long unit_index,
 	short command_list_index,
 	struct obey_individual_simple_control *simple_control,
 	struct obey_individual_complex_control *complex_control,
 	void *user_data);
-void code_000052e0(
+static void action_obey_individual_begin(
 	long actor_index,
 	long unit_index,
 	short command_list_index,
 	struct obey_individual_simple_control *simple_control,
 	struct obey_individual_complex_control *complex_control,
 	void *user_data);
-void code_00005300(
+static void action_obey_individual_advance(
 	long actor_index,
 	long unit_index,
 	short command_list_index,
 	struct obey_individual_simple_control *simple_control,
 	struct obey_individual_complex_control *complex_control,
 	void *user_data);
-void code_00005350(
+static void action_obey_individual_end(
+	long actor_index,
+	long unit_index,
+	short command_list_index,
+	struct obey_individual_simple_control *simple_control,
+	struct obey_individual_complex_control *complex_control,
+	void *user_data);
+static void action_obey_individuals_iterate(
 	long actor_index,
 	boolean initialize_structures,
 	struct obey_state_data *state_data,
 	action_obey_individual_iterator_proc iterator,
 	void *user_data);
-void code_00007840(
+static void action_obey_directmovement_update_facing(
+	long actor_index,
+	long unit_index,
+	struct obey_individual_simple_control *simple_control);
+static void action_obey_individual_update(
 	long actor_index,
 	long unit_index,
 	short command_list_index,
 	struct obey_individual_simple_control *simple_control,
 	struct obey_individual_complex_control *complex_control,
 	void *user_data);
+
 /* ---------- globals */
 
 /* ---------- public code */
+
+boolean action_obey_command_list_setup(
+	long actor_index,
+	short command_list_index,
+	struct obey_state_data *state_data)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct scenario *scenario = global_scenario_get();
+	struct ai_command_list_definition *command_list = NULL;
+	boolean success = FALSE;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\action_obey.c", 1597, state_data);
+	csmemset(state_data, 0, sizeof(*state_data));
+
+	if (command_list_index >= 0 &&
+		command_list_index < scenario->ai_command_lists.count)
+	{
+		command_list = TAG_BLOCK_GET_ELEMENT(
+			&scenario->ai_command_lists,
+			command_list_index,
+			struct ai_command_list_definition);
+
+		if (actor->meta.swarm && actor->meta.swarm_cache_index == NONE)
+		{
+			if (actor->meta.active)
+			{
+				char buffer[256];
+
+				ai_debug_describe_actor(actor_index, NONE, TRUE, buffer, sizeof(buffer));
+				error(
+					_error_silent,
+					"swarm actor %s cannot execute command list, ran out of swarm caches",
+					buffer);
+			}
+			else
+			{
+				actor->state.command_list_index = command_list_index;
+			}
+		}
+		else if (command_list->runtime_structure_bsp_reference_index != NONE &&
+			command_list->runtime_structure_bsp_reference_index != global_structure_bsp_index)
+		{
+			error(
+				_error_silent,
+				"wrong structure bsp, cannot execute command list %s",
+				command_list->name);
+		}
+		else
+		{
+			state_data->command_list_index = command_list_index;
+			success = TRUE;
+		}
+	}
+
+	if (success)
+	{
+		boolean initiative = TEST_FLAG(command_list->flags, _ai_command_list_allow_initiative_bit);
+		boolean targeting = TEST_FLAG(command_list->flags, _ai_command_list_allow_targeting_bit);
+		boolean allow_looking = !TEST_FLAG(command_list->flags, _ai_command_list_disable_looking_bit);
+		boolean allow_communication = !TEST_FLAG(command_list->flags, _ai_command_list_disable_communication_bit);
+
+		if (!allow_looking)
+		{
+			actor_look_secondary_stop(actor_index);
+		}
+		state_data->initiative = initiative;
+		state_data->allow_looking = allow_looking;
+		state_data->allow_communication = allow_communication;
+		action_obey_individuals_iterate(
+			actor_index,
+			TRUE,
+			state_data,
+			action_obey_individual_setup,
+			&targeting);
+	}
+
+	return success;
+}
 
 void action_obey_flush_command_indices(
 	long actor_index)
@@ -347,11 +452,11 @@ void action_obey_flush_command_indices(
 	}
 	else
 	{
-		code_00005350(
+		action_obey_individuals_iterate(
 			actor_index,
 			FALSE,
 			state_data,
-			code_00005250,
+			action_obey_individual_flush_command_indices,
 			NULL);
 	}
 
@@ -378,11 +483,11 @@ void action_obey_advance_command_list(
 	struct actor_datum *actor = actor_get(actor_index);
 	struct obey_state_data *state_data = &actor->state.action_data.obey;
 
-	code_00005350(
+	action_obey_individuals_iterate(
 		actor_index,
 		FALSE,
 		state_data,
-		code_000052e0,
+		action_obey_individual_advance,
 		NULL);
 
 	return;
@@ -394,11 +499,11 @@ void action_obey_begin(
 	struct actor_datum *actor = actor_get(actor_index);
 	struct obey_state_data *state_data = &actor->state.action_data.obey;
 
-	code_00005350(
+	action_obey_individuals_iterate(
 		actor_index,
 		FALSE,
 		state_data,
-		code_00005290,
+		action_obey_individual_begin,
 		NULL);
 
 	return;
@@ -410,11 +515,11 @@ void action_obey_end(
 	struct actor_datum *actor = actor_get(actor_index);
 	struct obey_state_data *state_data = &actor->state.action_data.obey;
 
-	code_00005350(
+	action_obey_individuals_iterate(
 		actor_index,
 		FALSE,
 		state_data,
-		code_00005300,
+		action_obey_individual_end,
 		NULL);
 
 	return;
@@ -426,11 +531,11 @@ void action_obey_update(
 	struct actor_datum *actor = actor_get(actor_index);
 	struct obey_state_data *state_data = &actor->state.action_data.obey;
 
-	code_00005350(
+	action_obey_individuals_iterate(
 		actor_index,
 		FALSE,
 		state_data,
-		code_00007840,
+		action_obey_individual_update,
 		NULL);
 
 	return;
@@ -457,30 +562,384 @@ real_vector2d *vector_from_points2d(
 	return result;
 }
 
-real_vector3d *cross_product3d(
-	real_vector3d const *a,
-	real_vector3d const *b,
-	real_vector3d *result)
-{
-	real k = a->i*b->j - a->j*b->i;
-	real j = a->k*b->i - a->i*b->k;
-	real i = a->j*b->k - a->k*b->j;
-	result->i = i;
-	result->j = j;
-	result->k = k;
-
-	return result;
-}
-
-real_vector3d *negate_vector3d(
-	real_vector3d const *a,
-	real_vector3d *result)
-{
-	result->i = -a->i;
-	result->j = -a->j;
-	result->k = -a->k;
-
-	return result;
-}
 
 /* ---------- private code */
+
+static void action_obey_command_end(
+	long actor_index,
+	long unit_index,
+	short command_list_index,
+	struct obey_individual_simple_control *simple_control,
+	struct obey_individual_complex_control *complex_control,
+	byte *next_command_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct ai_command_list_definition *command_list = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_command_lists,
+		command_list_index,
+		struct ai_command_list_definition);
+
+	if (simple_control->current_command_index < command_list->commands.count)
+	{
+		struct ai_command_definition *command = TAG_BLOCK_GET_ELEMENT(
+			&command_list->commands,
+			simple_control->current_command_index,
+			struct ai_command_definition);
+
+		switch (command->atom_type)
+		{
+		case _ai_atom_go_to:
+		case _ai_atom_go_to_and_face:
+			if (unit_index == actor->meta.unit_index)
+			{
+				actor_move_halt(actor_index);
+			}
+			if (complex_control)
+			{
+				complex_control->destination_valid = FALSE;
+				complex_control->destination_facing = FALSE;
+			}
+			break;
+
+		case _ai_atom_move_direction:
+		case _ai_atom_move_immediate:
+			SET_FLAG(simple_control->simple_control_flags, _obey_simple_directmovement_bit, FALSE);
+			simple_control->directmovement.facing = NONE;
+			break;
+
+		case _ai_atom_shoot:
+			if (complex_control)
+			{
+				complex_control->shoot_at_target = FALSE;
+			}
+			break;
+
+		case _ai_atom_running_jump:
+		case _ai_atom_targeted_jump:
+			SET_FLAG(simple_control->simple_control_flags, _obey_simple_jump_bit, FALSE);
+			simple_control->jump.delay_ticks = 0;
+			break;
+
+		case _ai_atom_loop:
+			{
+				boolean loop = TRUE;
+
+				if (command->atom_modifier == _ai_atom_loop_modifier_until_told_to_advance)
+				{
+					loop = !TEST_FLAG(simple_control->metadata_flags, _obey_metadata_told_to_advance_bit);
+					SET_FLAG(simple_control->metadata_flags, _obey_metadata_told_to_advance_bit, FALSE);
+					SET_FLAG(simple_control->metadata_flags, _obey_metadata_waiting_for_advance_notification_bit, loop);
+				}
+
+				if (loop)
+				{
+					if (command->command_index == simple_control->current_command_index)
+					{
+						char buffer[512];
+
+						ai_debug_describe_actor(actor_index, NONE, TRUE, buffer, sizeof(buffer));
+						error(
+							_error_silent,
+							"%s: command list %s entry #%d tried to loop to itself",
+							buffer,
+							command_list->name,
+							simple_control->current_command_index);
+					}
+					else if (simple_control->loop_counter >= OBEY_MAXIMUM_LOOP_COUNT)
+					{
+						char buffer[512];
+
+						ai_debug_describe_actor(actor_index, NONE, TRUE, buffer, sizeof(buffer));
+						error(
+							_error_silent,
+							"%s: command list %s is stuck looping (aborting on loop #%d)",
+							buffer,
+							command_list->name,
+							simple_control->current_command_index);
+					}
+					else
+					{
+						*next_command_index = command->command_index;
+						simple_control->loop_counter += 1;
+					}
+				}
+			}
+			break;
+
+		case _ai_atom_animate:
+			{
+				struct biped_datum *biped = biped_try_and_get(unit_index);
+
+				if (biped)
+				{
+					SET_FLAG(biped->biped.flags, _biped_absolute_movement_bit, FALSE);
+					SET_FLAG(biped->biped.flags, _biped_no_collision_bit, FALSE);
+				}
+			}
+			break;
+
+		case _ai_atom_look:
+		case _ai_atom_look_random:
+		case _ai_atom_look_player:
+		case _ai_atom_look_object:
+			if (unit_index == actor->meta.unit_index)
+			{
+				actor_look_secondary_stop(actor_index);
+			}
+			break;
+		}
+	}
+
+	return;
+}
+
+static void action_obey_individual_setup(
+	long actor_index,
+	long unit_index,
+	short command_list_index,
+	struct obey_individual_simple_control *simple_control,
+	struct obey_individual_complex_control *complex_control,
+	void *user_data)
+{
+	boolean *targeting_reference = user_data;
+
+	csmemset(simple_control, 0, sizeof(*simple_control));
+	simple_control->current_command_index = NONE;
+	match_assert("c:\\halo\\SOURCE\\ai\\action_obey.c", 1360, targeting_reference);
+	SET_FLAG(simple_control->metadata_flags, _obey_metadata_targeting_bit, *targeting_reference);
+
+	if (complex_control)
+	{
+		csmemset(complex_control, 0, sizeof(*complex_control));
+		complex_control->override_movement_type = NONE;
+	}
+
+	return;
+}
+
+static void action_obey_individual_flush_command_indices(
+	long actor_index,
+	long unit_index,
+	short command_list_index,
+	struct obey_individual_simple_control *simple_control,
+	struct obey_individual_complex_control *complex_control,
+	void *user_data)
+{
+	struct ai_command_list_definition *command_list = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_command_lists,
+		command_list_index,
+		struct ai_command_list_definition);
+
+	if (simple_control->current_command_index >= command_list->commands.count)
+	{
+		simple_control->current_command_index = NONE;
+	}
+
+	return;
+}
+
+static void action_obey_individual_begin(
+	long actor_index,
+	long unit_index,
+	short command_list_index,
+	struct obey_individual_simple_control *simple_control,
+	struct obey_individual_complex_control *complex_control,
+	void *user_data)
+{
+	struct ai_command_list_definition *command_list = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_command_lists,
+		command_list_index,
+		struct ai_command_list_definition);
+
+	if (TEST_FLAG(command_list->flags, _ai_command_list_disable_falling_damage_bit))
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+
+		SET_FLAG(unit->unit.flags, _unit_no_falling_damage_bit, TRUE);
+	}
+
+	return;
+}
+
+static void action_obey_individual_advance(
+	long actor_index,
+	long unit_index,
+	short command_list_index,
+	struct obey_individual_simple_control *simple_control,
+	struct obey_individual_complex_control *complex_control,
+	void *user_data)
+{
+	SET_FLAG(simple_control->metadata_flags, _obey_metadata_waiting_for_advance_notification_bit, FALSE);
+	SET_FLAG(simple_control->metadata_flags, _obey_metadata_told_to_advance_bit, TRUE);
+
+	return;
+}
+
+static void action_obey_individual_end(
+	long actor_index,
+	long unit_index,
+	short command_list_index,
+	struct obey_individual_simple_control *simple_control,
+	struct obey_individual_complex_control *complex_control,
+	void *user_data)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	if (!TEST_FLAG(simple_control->metadata_flags, _obey_metadata_commands_finished_bit))
+	{
+		byte next_command_index;
+
+		action_obey_command_end(
+			actor_index,
+			unit_index,
+			command_list_index,
+			simple_control,
+			complex_control,
+			&next_command_index);
+	}
+	SET_FLAG(unit->unit.flags, _unit_no_falling_damage_bit, FALSE);
+
+	return;
+}
+
+static void action_obey_individuals_iterate(
+	long actor_index,
+	boolean initialize_structures,
+	struct obey_state_data *state_data,
+	action_obey_individual_iterator_proc iterator,
+	void *user_data)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\action_obey.c",
+		1553,
+		!actor->meta.swarm || (actor->meta.swarm_cache_index != NONE));
+
+	if (actor->meta.swarm)
+	{
+		struct swarm_datum *swarm = swarm_get(actor->meta.swarm_cache_index);
+		short component_index;
+
+		for (component_index = 0; component_index < swarm->unit_count; component_index++)
+		{
+			struct swarm_component_datum *component =
+				swarm_component_get(swarm->component_indices[component_index]);
+
+			if (initialize_structures)
+			{
+				csmemset(&component->obey, 0, sizeof(component->obey));
+				SET_FLAG(component->flags, _swarm_component_wander_bit, FALSE);
+				SET_FLAG(component->flags, _swarm_component_obey_bit, TRUE);
+			}
+
+			if (TEST_FLAG(component->flags, _swarm_component_obey_bit))
+			{
+				iterator(
+					actor_index,
+					swarm->unit_indices[component_index],
+					state_data->command_list_index,
+					&component->obey,
+					NULL,
+					user_data);
+			}
+		}
+	}
+	else
+	{
+		iterator(
+			actor_index,
+			actor->meta.unit_index,
+			state_data->command_list_index,
+			&state_data->simple_control,
+			&state_data->complex_control,
+			user_data);
+	}
+
+	return;
+}
+
+static void action_obey_directmovement_update_facing(
+	long actor_index,
+	long unit_index,
+	struct obey_individual_simple_control *simple_control)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	real_vector3d facing;
+	real_vector3d perpendicular;
+
+	if (unit_index == actor->meta.unit_index)
+	{
+		facing = actor->input.facing_vector;
+	}
+	else
+	{
+		unit_get_facing_vector(unit_index, &facing);
+	}
+
+	switch (simple_control->directmovement.facing)
+	{
+	case _ai_atom_move_facing_forwards:
+		simple_control->directmovement.vector = facing;
+		break;
+
+	case _ai_atom_move_facing_backwards:
+		negate_vector3d(&facing, &simple_control->directmovement.vector);
+		break;
+
+	case _ai_atom_move_facing_left:
+	case _ai_atom_move_facing_right:
+		cross_product3d(global_up3d, &facing, &perpendicular);
+		if (normalize3d(&perpendicular) == 0.0f)
+		{
+			struct unit_datum *unit = unit_get(unit_index);
+
+			cross_product3d(&unit->object.up, &facing, &perpendicular);
+			if (normalize3d(&perpendicular) == 0.0f)
+			{
+				perpendicular = *global_forward3d;
+			}
+		}
+		if (simple_control->directmovement.facing == _ai_atom_move_facing_left)
+		{
+			simple_control->directmovement.vector = perpendicular;
+		}
+		else
+		{
+			negate_vector3d(&perpendicular, &simple_control->directmovement.vector);
+		}
+		break;
+	}
+
+	return;
+}
+
+static void action_obey_individual_update(
+	long actor_index,
+	long unit_index,
+	short command_list_index,
+	struct obey_individual_simple_control *simple_control,
+	struct obey_individual_complex_control *complex_control,
+	void *user_data)
+{
+	if (simple_control->pause_timer > 0)
+	{
+		simple_control->pause_timer -= 1;
+	}
+
+	if (TEST_FLAG(simple_control->simple_control_flags, _obey_simple_jump_bit))
+	{
+		if (simple_control->jump.delay_ticks > 0)
+		{
+			simple_control->jump.delay_ticks -= 1;
+		}
+	}
+
+	if (TEST_FLAG(simple_control->simple_control_flags, _obey_simple_directmovement_bit) &&
+		TEST_FLAG(simple_control->simple_control_flags, _obey_simple_directmovement_update_continuously_bit))
+	{
+		action_obey_directmovement_update_facing(actor_index, unit_index, simple_control);
+	}
+
+	return;
+}

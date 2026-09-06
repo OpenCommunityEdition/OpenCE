@@ -2,6 +2,14 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/ai/action_obey",
+      "class": "candidate-only-comdat-owner",
+      "symbol": "_normalize3d",
+      "reason": "The genuine partial callback graph has20 strict target functions, but naturally emits five target-absent SELECT_ANY math owners: square_root16, scale_vector3d48, magnitude_squared3d48, magnitude3d48 and normalize3d96. Their code and ordered relocations match available canonical implementations, but ordinary actual base/base links against ActionCharge fail both input orders with LNK2005 for square_root, scale_vector3d, magnitude3d and normalize3d because ActionCharge uses NODUPLICATES. No helper receives ActionObey target credit. Two inherited random_range/vector_from_points2d wrapper aliases also remain pending their genuine private-command caller graph. Function progress is valid independently; whole-object completion is not established.",
+      "evidence": "docs/object_matching_logs/action_obey_obj_partial_graph_reconciliation_20260905.md#whole-object-boundary",
+      "reopen": "Finish the remaining seven target functions and all data/source checks, replace the two remaining inherited wrapper aliases through genuine callers, and prove authentic compatible helper ownership with an ordinary canonical link or original source topology. Do not force inline, add emission anchors, hand-expand math to hide helpers, alter COMDAT/comparator metadata, or count another object's selected helper bytes."
+    },
+    {
       "unit": "source/tool/error_geometry",
       "class": "candidate-only-comdat-owner",
       "symbol": "_set_real_point3d",

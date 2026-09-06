@@ -2,20 +2,24 @@
 
 ## Current verified canonical / publication-batch totals (2026-09-05)
 
-The current ActionObey owner/leaf publication batch after `31a1927c951479106d0475ee99e1fb236a15e89d` contains:
-**910,347 meaningful matched code bytes**, **6,187 credited functions**,
+The current ActionObey partial-graph publication batch after `c32247e7651d680dcd133d72b2fbf4e8009cc124` contains:
+**912,298 meaningful matched code bytes**, **6,197 credited functions**,
 **2,061,020 matched data bytes**, and **391/833 Matching objects**.
-The full sweep preserves all6,232 inherited strict owners and adds one,
-for **6,233 strict owners**. There are **284 approved fuzzy parks**.
-This checkpoint adds46 meaningful exact code bytes and one function; matched
-data and complete-object totals are unchanged. Genuine ActionObey public API
-and shared swarm/biped schema ownership pass complete47- and58-consumer
-audits. Two residual encoding/load-order changes are independently proven;
-speech-timer fuzzy coverage returns97.76382% to97.67839% with no exact loss.
-All288 tests plus26 subtests pass; the final leaf passes1,024 cases each in
-target, actual and isolated objects. Units remains189/189 exact. The preceding
-ErrorGeometry batch contributed2,955 meaningful bytes and ten functions;
-its polygon writer remains an honest99.91892% scheduling residual.
+The full sweep preserves all 6,233 inherited strict functions and adds ten,
+for **6,243 strict functions**. There are **284 approved fuzzy parks**.
+This checkpoint adds 1,951 meaningful / 2,032 padded exact code bytes and ten
+functions. ActionObey advances 10/27 to 20/27; it is not a complete object.
+Two strict COFF/objdiff bookkeeping repairs account for 885 of those bytes,
+not an additional gain. Data and complete-object totals are unchanged.
+The genuine callback graph removes two manual math wrappers, preserves all
+target functions, and leaves all 571 other base-object hashes unchanged.
+The new public callback oracle passes 309 cases each in target, actual and
+isolated objects; all 298 tests plus 26 subtests pass. Units remains 189/189.
+Five natural extra math helpers receive no target credit. Ordinary links with
+ActionCharge fail on four NODUPLICATES owners, recorded as a whole-object veto.
+The larger command-owner header trial lost one Units function and was fully
+restored: all 6,355 runtime sections across 86 consumers are unchanged again.
+The earlier shared schema/leaf batch and ErrorGeometry batch remain intact.
 Publication status must be verified against the canonical GitHub branch refs.
 ActorCombat grenade
 aim's unsupported vehicle-path park remains withdrawn. The preceding
@@ -35,8 +39,11 @@ cherry-pick wholesale because its retained Path source/snapshot disagree and
 its particle-header zero-loss claim lacks a successful retained blast log.
 The first coherent ErrorGeometry packet is retained, while its two later
 dirty residual additions remain preserved for separate review. ActionObey's
-owner/schema and structure-flush checkpoint is verified; the larger real
-private command graph and math ownership are still scratch work. Bitmaps has
+owner/schema, structure-flush leaf and smaller closed callback graph are
+verified. Its private command begin/perform proposals remain uncompiled
+scratch research behind the restored header boundary; corrected PDB owner
+prerequisites are documented. Seven target functions, two inherited math
+aliases and final helper linkage still prevent whole-object completion. Bitmaps has
 18 distinct donor exact candidates/4,736 padded bytes, with ownership and
 provenance review still required; these are not new canonical credit.
 Preserve all donor committed/dirty work,
@@ -45,6 +52,10 @@ See `object_matching_logs/fable_50k_small_families_interrupted_lane_intake_20260
 and `object_matching_logs/error_geometry_obj_fable_natural_reconciliation_20260905.md`.
 See also `object_matching_logs/action_obey_obj_shared_schema_and_structure_flush_reconciliation_20260905.md`
 and `object_matching_logs/bitmaps_obj_fable_packet_intake_20260905.md`.
+The new checkpoint evidence is in
+`object_matching_logs/action_obey_obj_partial_graph_reconciliation_20260905.md`,
+`object_matching_logs/action_obey_obj_command_owner_trial_rejected_20260905.md`,
+and `object_matching_logs/action_obey_obj_private_command_owner_prerequisites_20260905.md`.
 New Opus implementation reservations are recorded in the separately delivered
 30,000-byte prompt; no implementation in those scopes is part of this packet.
 
