@@ -1,5 +1,37 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
+## ActionCharge shared-math ownership and private names (2026-09-06)
+
+The preceding exact pill/private-helper packet is published on both GitHub
+refs at `71128a19fc9707f678f970e380b97ee3181db05e`; the canonical treemap
+shows the two new exact functions and correctly retains the unfinished object.
+
+The shared-math audit identified reconstructed NODUPLICATES wrappers in
+ActionCharge as the duplicate-owner source. Restore its `square_root` and
+`magnitude_squared2d` to the existing, debug-authenticated `real_math.h`
+definitions: remove only their local aliases and duplicate C definitions.
+The header and genuine source calls are unchanged. Both bodies still emit
+and stay exact; all compiled content is identical except the two COMDAT
+selection changes from NODUPLICATES to SELECT_ANY. Both-order diagnostic links
+with PathObstacles now report only the remaining `dot_product2d` conflict.
+That helper lacks a genuine current caller, so its restoration waits for the
+unwritten perform body; no retention anchor or fabricated caller is added.
+
+A separately frozen phase replaces two address-labeled private functions with
+the original `action_charge_find_target_range` and
+`action_charge_valid_melee_destination` names and correct static metadata.
+January atlas, DIA and actual call/argument evidence authenticate these changes.
+All 38 runtime sections remain identical modulo those two real names. Preserve
+the genuine point-pointer goal signature despite erroneous later type metadata,
+and do not invent a write through the demonstrably unused melee output pointer.
+
+All **6,271 strict functions** survive. This adds **zero exact-byte credit**:
+canonical remains **919,549 exact code bytes and 391/833 Matching objects**.
+ActionCharge remains **20 exact / 1 residual / 1 unwritten**. Its large
+unwritten perform and structural setup residual are not silently closed.
+See `object_matching_logs/action_charge_obj_authentic_math_header_owners_20260906.md`.
+All active Opus scopes and the old read-only Fable lane remain untouched.
+
 ## Exact obstacle pill query and authentic private helper (2026-09-06)
 
 The preceding natural circle query/header restoration is published on both

@@ -5,7 +5,7 @@ symbols in this file:
 00001080 0050:
 	_action_charge_begin (0000)
 000010D0 0110:
-	_code_000010d0 (0000)
+	_action_charge_find_target_range (0000)
 000011E0 0050:
 	_action_charge_update (0000)
 00001230 0220:
@@ -43,7 +43,7 @@ symbols in this file:
 00001720 0cb0:
 	_action_charge_perform (0000)
 000023D0 0120:
-	_code_000023d0 (0000)
+	_action_charge_valid_melee_destination (0000)
 000024F0 03b0:
 	_action_charge_setup (0000)
 00242F60 0004:
@@ -82,9 +82,7 @@ symbols in this file:
 
 #include "cseries.h"
 
-#define square_root square_root_inline
 #define scale_vector2d scale_vector2d_inline
-#define magnitude_squared2d magnitude_squared2d_inline
 #define magnitude2d magnitude2d_inline
 #define normalize2d normalize2d_inline
 #define dot_product2d dot_product2d_inline
@@ -106,9 +104,7 @@ symbols in this file:
 #include "physics/collisions.h"
 #include "physics/collision_usage.h"
 #include "units/units.h"
-#undef square_root
 #undef scale_vector2d
-#undef magnitude_squared2d
 #undef magnitude2d
 #undef normalize2d
 #undef dot_product2d
@@ -146,12 +142,12 @@ boolean unit_get_melee_range_and_ticks(
 	short *frame_count,
 	real *damage_time);
 
-static real code_000010d0(
+static real action_charge_find_target_range(
 	long actor_index,
 	short goal,
 	struct charge_state_data *state_data);
 
-static boolean code_000023d0(
+static boolean action_charge_valid_melee_destination(
 	long actor_index,
 	real_point3d const *goal,
 	real_point3d *melee_target_point);
@@ -180,7 +176,7 @@ void action_charge_begin(
 	return;
 }
 
-static real code_000010d0(
+static real action_charge_find_target_range(
 	long actor_index,
 	short goal,
 	struct charge_state_data *state_data)
@@ -345,12 +341,6 @@ boolean action_charge_is_leaping(
 	return result;
 }
 
-real square_root(
-	real x)
-{
-	return sqrt(x);
-}
-
 real_vector2d *scale_vector2d(
 	real_vector2d const *a,
 	real c,
@@ -360,12 +350,6 @@ real_vector2d *scale_vector2d(
 	result->j = c*a->j;
 
 	return result;
-}
-
-real magnitude_squared2d(
-	real_vector2d const *v)
-{
-	return v->i*v->i + v->j*v->j;
 }
 
 real magnitude2d(
@@ -472,7 +456,7 @@ real real_random(
 		get_global_random_seed_address());
 }
 
-static boolean code_000023d0(
+static boolean action_charge_valid_melee_destination(
 	long actor_index,
 	real_point3d const *goal,
 	real_point3d *melee_target_point)
@@ -638,7 +622,7 @@ boolean action_charge_setup(
 						state_data->melee_ticks_until_dangerous = ticks_until_dangerous;
 						{
 							boolean valid = FALSE;
-							real target_range = code_000010d0(
+							real target_range = action_charge_find_target_range(
 								actor_index,
 								goal,
 								state_data);
@@ -658,7 +642,7 @@ boolean action_charge_setup(
 								real_point3d melee_target_point;
 
 								actor_move_keep_moving_past_destination(actor_index);
-								valid = code_000023d0(
+								valid = action_charge_valid_melee_destination(
 									actor_index,
 									&prop->center_of_mass,
 									&melee_target_point);
