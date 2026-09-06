@@ -83,29 +83,6 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct obstacle_disc
-{
-	short flags;
-	short obstacle_index;
-	long object_index;
-	real_point2d center;
-	real radius;
-};
-
-struct obstacles
-{
-	short obstacle_count;
-	short disc_count;
-	short disc_optional_count;
-	byte reserved6[2];
-	struct obstacle_disc discs[128];
-};
-
-typedef char obstacle_disc_size_assert[
-	sizeof(struct obstacle_disc) == 0x14 ? 1 : -1];
-typedef char obstacles_size_assert[
-	sizeof(struct obstacles) == 0xA08 ? 1 : -1];
-
 /* ---------- prototypes */
 
 /* ---------- globals */
@@ -161,6 +138,43 @@ boolean point_in_sphere(
 	real radius)
 {
 	return distance_squared3d_inline(point, center) <= (radius * radius);
+}
+
+boolean obstacles_add_disc(
+	struct obstacles *obstacles,
+	long object_index,
+	short flags,
+	real_point3d const *center,
+	real radius)
+{
+	struct obstacle_disc *disc;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\path_obstacles.c",
+		104,
+		obstacles->disc_count>=0 && obstacles->disc_count<=MAXIMUM_DISC_COUNT);
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\path_obstacles.c",
+		105,
+		obstacles->obstacle_count>=0 && obstacles->obstacle_count<=obstacles->disc_count);
+	if (obstacles->disc_count == MAXIMUM_DISC_COUNT)
+	{
+		return FALSE;
+	}
+
+	disc = &obstacles->discs[obstacles->disc_count++];
+	if (TEST_FLAG(flags, _disc_optional_bit))
+	{
+		obstacles->disc_optional_count++;
+	}
+	disc->flags = flags;
+	disc->object_index = object_index;
+	disc->obstacle_index = NONE;
+	project_point3d(center, _z, TRUE, &disc->center);
+	disc->radius = radius;
+	disc->height = center->z;
+
+	return TRUE;
 }
 
 /* ---------- private code */

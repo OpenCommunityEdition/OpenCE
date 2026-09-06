@@ -1,5 +1,35 @@
 # Unfinished Opus session reconciliation backlog (2026-09-03)
 
+## January obstacle-disc layout reconciled; append exact (2026-09-06)
+
+The previous fuzzy Path attractor packet is published on both authorized
+GitHub refs at `902d808478e94ec48fd611ee4f9f6e2e039f70ce`. Its exact-credit
+total did not increase and its two helper-link vetoes remain documented.
+
+Fresh January hex examination now corrects a real neighboring schema error:
+PathObstacles used later HCEA's 0x14-byte discs/0xA08 container, while January
+and the already-exact avoidance accessor use 0x18/0xC08. The missing real
+field at disc+0x14 is center.z; it receives the explicitly inferred name
+`height`. Both local models are replaced with one genuine path.h definition,
+natural padding, authentic `_disc_optional_bit` and correct public prototypes.
+The complete 51-consumer header trial preserves all inherited runtime behavior
+and 6,268 strict functions.
+
+`obstacles_add_disc` matches on its first natural compile: **+199 meaningful
+exact bytes**, ten relocations. PathObstacles is **6 exact / zero residual /
+10 unwritten**; avoidance retains all nine exact functions. Canonical is now
+**919,188 exact code bytes**, **6,223 credited functions**, **6,269 strict
+functions**, and unchanged **391/833 Matching objects**. No new helper or
+link conflict is introduced by this packet; neither object is complete.
+
+Root and independent target/first/final replay agree in **504 executions**
+across 84 scenarios and two x87 modes, including capacity, last-record stride,
+height, optional flags, full-page guards and genuine assertion paths. Actual
+wrong-stride and wrong-height target-byte controls fail as expected. Full
+Ninja, strict census, **633 tests plus 26 subtests**, parks and admission pass.
+See `object_matching_logs/path_obstacles_obj_shared_disc_schema_add_20260906.md`,
+`tools/audit/path_obstacles_add_disc_runtime.py` and its seven focused tests.
+
 ## Path attractor pair reconstructed and parked (2026-09-06)
 
 The preceding Path 3D batch is published and independently verified on both

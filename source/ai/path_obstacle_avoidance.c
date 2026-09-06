@@ -112,6 +112,8 @@ symbols in this file:
 #include "math/real_math.h"
 #undef valid_real_point2d
 
+#include "ai/path.h"
+
 #undef memcpy
 #include <stddef.h>
 #include <string.h>
@@ -120,7 +122,6 @@ symbols in this file:
 
 enum
 {
-	MAXIMUM_DISC_COUNT = 128,
 	MAXIMUM_OBSTACLE_AVOIDANCE_STEPS = 128,
 };
 
@@ -129,25 +130,6 @@ enum
 /* ---------- structures */
 
 struct structure_bsp;
-
-struct obstacle_disc
-{
-	short flags;
-	short obstacle_index;
-	long object_index;
-	real_point2d center;
-	real radius;
-	byte reserved14[4];
-};
-
-struct obstacles
-{
-	short obstacle_count;
-	short disc_count;
-	short disc_optional_count;
-	byte reserved6[2];
-	struct obstacle_disc discs[MAXIMUM_DISC_COUNT];
-};
 
 struct obstacle_path_step
 {
@@ -192,16 +174,6 @@ struct obstacle_path
 
 typedef char obstacle_path_step_size_assert[
 	sizeof(struct obstacle_path_step) == 0x28 ? 1 : -1];
-typedef char obstacle_disc_size_assert[
-	sizeof(struct obstacle_disc) == 0x18 ? 1 : -1];
-typedef char obstacle_disc_obstacle_index_offset_assert[
-	offsetof(struct obstacle_disc, obstacle_index) == 0x2 ? 1 : -1];
-typedef char obstacles_size_assert[
-	sizeof(struct obstacles) == 0xC08 ? 1 : -1];
-typedef char obstacles_disc_count_offset_assert[
-	offsetof(struct obstacles, disc_count) == 0x2 ? 1 : -1];
-typedef char obstacles_discs_offset_assert[
-	offsetof(struct obstacles, discs) == 0x8 ? 1 : -1];
 typedef char obstacle_path_size_assert[
 	sizeof(struct obstacle_path) == 0x1534 ? 1 : -1];
 typedef char obstacle_path_step_count_offset_assert[
@@ -214,10 +186,6 @@ typedef char obstacle_path_heap_offset_assert[
 	offsetof(struct obstacle_path, heap) == 0x1432 ? 1 : -1];
 
 /* ---------- prototypes */
-
-struct obstacle_disc const *obstacles_get_disc(
-	struct obstacles const *obstacles,
-	short disc_index);
 
 /* ---------- globals */
 

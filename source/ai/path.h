@@ -19,6 +19,12 @@ enum
 {
 	PATH_NODE_LIST_SIZE = 0x400,
 	PATH_HASH_TABLE_SIZE = 0x1000,
+	MAXIMUM_DISC_COUNT = 128,
+};
+
+enum
+{
+	_disc_optional_bit = 0,
 };
 
 enum
@@ -145,6 +151,37 @@ struct path_state
 	struct path_heap_element heap[1025];
 	short hash_table[PATH_HASH_TABLE_SIZE];
 };
+
+struct obstacle_disc
+{
+	short flags;
+	short obstacle_index;
+	long object_index;
+	real_point2d center;
+	real radius;
+	real height;
+};
+
+struct obstacles
+{
+	short obstacle_count;
+	short disc_count;
+	short disc_optional_count;
+	struct obstacle_disc discs[MAXIMUM_DISC_COUNT];
+};
+
+typedef char obstacle_disc_size_assert[
+	sizeof(struct obstacle_disc) == 0x18 ? 1 : -1];
+typedef char obstacle_disc_obstacle_index_offset_assert[
+	offsetof(struct obstacle_disc, obstacle_index) == 0x2 ? 1 : -1];
+typedef char obstacle_disc_height_offset_assert[
+	offsetof(struct obstacle_disc, height) == 0x14 ? 1 : -1];
+typedef char obstacles_size_assert[
+	sizeof(struct obstacles) == 0xC08 ? 1 : -1];
+typedef char obstacles_disc_count_offset_assert[
+	offsetof(struct obstacles, disc_count) == 0x2 ? 1 : -1];
+typedef char obstacles_discs_offset_assert[
+	offsetof(struct obstacles, discs) == 0x8 ? 1 : -1];
 
 struct path_avoidance_obstacles
 {
@@ -283,6 +320,26 @@ void paths_initialize_for_new_map(
 	void);
 void paths_dispose_from_old_map(
 	void);
+
+/* ---------- prototypes/PATH_OBSTACLES.C */
+
+void obstacles_new(
+	struct obstacles *obstacles);
+boolean obstacles_add_disc(
+	struct obstacles *obstacles,
+	long object_index,
+	short flags,
+	real_point3d const *center,
+	real radius);
+
+/* ---------- prototypes/PATH_OBSTACLE_AVOIDANCE.C */
+
+struct obstacle_disc const *obstacles_get_disc(
+	struct obstacles const *obstacles,
+	short disc_index);
+long obstacle_from_disc(
+	struct obstacles const *obstacles,
+	short disc_index);
 
 /* ---------- globals */
 
