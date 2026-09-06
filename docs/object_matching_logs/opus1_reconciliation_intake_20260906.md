@@ -28,11 +28,14 @@ configs wholesale with donor versions.
 
 The [Devices four-function packet](devices_obj_opus1_four_function_reconciliation_20260906.md)
 admits **1,242 meaningful bytes / four functions** with zero regressions,
-after rejecting the unsupported flag-width fifth gain. This leaves **28,832
-of the lane's originally measured 30,074 meaningful bytes not admitted** by
-this packet, including source/ownership-blocked work; it is not a promise
-that all those bytes will pass admission. Canonical reaches 922,106 meaningful
-exact bytes, 6,234 credited functions and unchanged 391/833 Matching objects.
+after rejecting the unsupported flag-width fifth gain. The subsequent
+[SDK/private-helper naming packet](rasterizer_xbox_sdk_names_and_private_reciprocal_20260906.md)
+recovers **1,612 previously uncounted meaningful bytes / 27 functions** without
+changing any rebuilt object. Together they admit 2,854 of the original 30,074
+meaningful bytes, leaving **27,220 not admitted**, including source/ownership-
+blocked work; it is not a promise that all those bytes will pass admission.
+Canonical reaches 923,718 meaningful exact bytes, 6,261 credited functions
+and unchanged 391/833 Matching objects.
 Frame Statistics and naming findings below refine the initial proposed order.
 
 ## Identity and frozen evidence
@@ -225,7 +228,7 @@ owner. It also adds a TU-local `extern boolean debug_objects_devices`, while
    `point_from_line3d` owner until both the math owner and public/global
    declaration ownership are resolved.
 
-2. **Pure naming attestation packet.** Review and apply the 29-record
+2. **Pure naming attestation packet (27 reviewed records admitted).** Review the 29-record
    `fde5bd48e...` packet linewise (19 `rasterizer_xbox`, 10 screen-effect). It
    changes no source and accounts for existing byte-identical XDK/helper
    sections. Do not replace canonical `symbols.json`; retain per-offset evidence
@@ -235,8 +238,11 @@ owner. It also adds a TU-local `extern boolean debug_objects_devices`, while
    Their source owners are private under `D3DINLINE`, not external: all require
    independently justified `static:true` split metadata, rather than just the
    one static record in the donor patch. Hold the two callless cube-texture
-   Unlock names and the uncorroborated `vector2d_reciprocal` source identifier.
-   No naming metadata is changed in the Devices packet.
+   Unlock names. The root also admits `vector2d_reciprocal` as a descriptive
+   reconstructed name, not a recovered original identifier, under the user's
+   explicit naming rule. January's complete body and four private callers
+   establish its componentwise reciprocal behavior and private ABI.
+   All 27 metadata records are now individually reconciled; no C/header changes.
 3. **Frame Statistics source-admission hold (updated audit).** Although the
    donor's 4,176-byte draw owner adds no target-absent section, the isolated
    draw-only candidate is residual under current canonical flags. Exactness
@@ -246,6 +252,8 @@ owner. It also adds a TU-local `extern boolean debug_objects_devices`, while
    evidence authenticating that compiler-state dependency. Preserve the natural
    draw-only reconstruction as research with zero exact credit until independently
    source-authentic integration and whole-owner verification are available.
+   The [complete source-admission hold](rasterizer_frame_statistics_obj_opus_draw_source_admission_hold_20260906.md)
+   records the isolated/full-TU comparison and pinned experiment history.
 4. **Bounded `rasterizer_xbox.c` body packet.** Start with
    `rasterizer_set_texture` (496), `rasterizer_set_model_skinning` (320),
    `rasterizer_set_frustum_z` (320), and `rasterizer_set_stencil_mode` (784).
