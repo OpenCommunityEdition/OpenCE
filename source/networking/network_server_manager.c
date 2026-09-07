@@ -911,9 +911,15 @@ unsigned long countdown_timer_update(
 		long elapsed_time = update_time - last_update_time;
 
 		if (elapsed_time < timer->time_remaining)
-			timer->time_remaining -= elapsed_time;
+		{
+			timer->time_remaining = (long)(
+				(unsigned long)timer->time_remaining -
+				(unsigned long)elapsed_time);
+		}
 		else
+		{
 			timer->time_remaining = 0;
+		}
 	}
 
 	return update_time;
@@ -943,6 +949,38 @@ long countdown_timer_get_time_remaining(
 		timer->time_remaining >= 0);
 
 	return time_remaining;
+}
+
+void countdown_timer_increment(
+	struct countdown_timer *timer,
+	long adjustment,
+	long maximum)
+{
+	long adjusted_time_remaining;
+
+	countdown_timer_update(timer);
+
+	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x68, adjustment >= 0);
+
+	/* Preserve January's two's-complement bits without signed-addition UB. */
+	adjusted_time_remaining = (long)(
+		(unsigned long)timer->time_remaining + (unsigned long)adjustment);
+	if (adjusted_time_remaining < adjustment)
+	{
+		timer->time_remaining = maximum;
+	}
+	else
+	{
+		timer->time_remaining = adjusted_time_remaining;
+		timer->time_remaining = MIN(timer->time_remaining, maximum);
+	}
+
+	match_assert(
+		NETWORK_SERVER_MANAGER_FILE,
+		0x75,
+		timer->time_remaining >= 0);
+
+	return;
 }
 
 void countdown_timer_decrement(

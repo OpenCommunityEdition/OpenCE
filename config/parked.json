@@ -3,6 +3,17 @@
   "entries": [
     {
       "unit": "source/networking/network_server_manager",
+      "function": "_countdown_timer_increment",
+      "class": "unclassified",
+      "evidence": "Source-attested public increment restored as one natural defined-arithmetic reconstruction. It calls the real countdown_timer_update provider, asserts nonnegative adjustment, adds through unsigned long then converts the result to signed long under the VC7/Xbox two's-complement contract, preserves January's signed overflow probe and MIN clamp, and asserts the resulting timer. The provider's modular remaining-time subtraction is likewise made defined; its existing exact 48-byte machine code is unchanged. All inherited function/runtime owners, including prior fuzzy bodies, remain unchanged. The new increment is 144 padded bytes/nine relocation dependencies like January but differs in naturally inlined update scheduling, registers and final assertion operand; it receives zero exact credit. The earlier signed-overflow exact form remains rejected. This is retained under the current honest-fuzzy policy, not reopened for source-shape tuning. No manual inline, fake caller, assembly, volatile/register steering, foreign prototype or new data owner is used. See docs/object_matching_logs/network_server_manager_obj_defined_countdown_increment_20260906.md. Reopen only for genuine source/compiler-context evidence; do not restore signed-overflow UB to regain exact bytes.",
+      "measurements": {
+        "target": { "size": 144, "relocation_count": 9, "normalized_sha256": "0291de1fcc1f65baf92a784ad590c78925729c9c4ba0b9a1bbf33a6e8cdd7aa5" },
+        "base": { "size": 144, "relocation_count": 9, "normalized_sha256": "96937b1e7ff0aa3415fa0b0a397feddc2b30699e3d34b7be1db7f80b3eb96485" },
+        "objdiff_percent": 84.28571
+      }
+    },
+    {
+      "unit": "source/networking/network_server_manager",
       "function": "_network_game_server_dispose",
       "class": "unclassified",
       "evidence": "Source-attested public disposal lifecycle retained with one deliberate defined-behavior repair: initialize both graceful-exit payloads to zero. January and the supplied source leave their long unused fields uninitialized, but the actual pregame/postgame packet schemas serialize one long. The natural safe candidate adds two zero stores and their consequent branch/padding displacement; it is 304 padded bytes/27 relocations versus January 288/27 and receives zero exact credit. Keep correct network_message broadcast ownership, enum states/message types, platform guards, explicit return, and genuine singleton BSS/COMMON ownership. No matching-only assembly, casts, declaration permutations, artificial callers or point_from_line3d emission. See docs/object_matching_logs/network_server_manager_obj_create_dispose_packet_20260906.md. Reopen only for new authentic defined-source/protocol evidence, never by removing the initialization to recover a stack-data disclosure.",

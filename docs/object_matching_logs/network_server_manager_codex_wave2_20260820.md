@@ -1,5 +1,10 @@
 # `network_server_manager.obj` Codex wave-two checkpoint
 
+2026-09-06 follow-up: the signed-overflow exact form remains rejected. A
+source-backed defined-arithmetic alternative is now retained under the user's
+honest-fuzzy policy, with the real update provider's subtraction also repaired.
+See [the defined increment ledger](network_server_manager_obj_defined_countdown_increment_20260906.md).
+
 This is a new Codex-owned ledger. It supplements the earlier Codex ledgers
 without editing, replacing, or deleting any pre-existing Markdown file.
 
