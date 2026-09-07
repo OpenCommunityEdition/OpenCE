@@ -368,6 +368,7 @@ symbols in this file:
 #include "cseries.h"
 #include "bungie_net/common/message_header.h"
 #include "bungie_net/network/transport.h"
+#include "bungie_net/network/transport_address_constants.h"
 #include "bungie_net/network/transport_endpoint_winsock.h"
 #include "cache/cache_file_precaching.h"
 #include "cache/cache_files.h"
@@ -456,7 +457,6 @@ enum
 
 enum
 {
-	LOCAL_HOST_IPV4_ADDRESS = 0x7F000001,
 	BROADCAST_IPV4_ADDRESS = 0xFFFFFFFF
 };
 
@@ -2590,7 +2590,7 @@ static boolean network_game_client_idle_searching(
 			struct network_join_parameters join_parameters;
 			struct transport_address server_address;
 
-			server_address.address.long_words[0] = LOCAL_HOST_IPV4_ADDRESS;
+			server_address.address.long_words[0] = IPV4_LOOPBACK_ADDRESS;
 			server_address.port = NETWORK_GAME_SERVER_PORT;
 			server_address.address_length = IPV4_ADDRESS_LENGTH;
 			local_game.platform = network_game_get_local_platform();

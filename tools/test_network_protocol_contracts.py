@@ -12,7 +12,7 @@ from tools import coff_compare as cc
 ROOT = Path(__file__).resolve().parents[1]
 UNIT = "source/networking/network_server_manager"
 SYMBOL = "_network_protocol_contract"
-EXPECTED = (0, 1, 1, 2, 4, 0x141E, 0x141F, 4, 7)
+EXPECTED = (0, 1, 1, 2, 4, 0x141E, 0x141F, 4, 7, 400, 0x7F000001)
 PROBE = """
 unsigned long const network_protocol_contract[] =
 {
@@ -25,6 +25,8 @@ unsigned long const network_protocol_contract[] =
     NETWORK_GAME_CLIENT_PORT,
     _rejection_code_game_is_full,
     NUMBER_OF_SERVER_REJECTION_CODES,
+    DATAGRAM_MAXIMUM_SIZE,
+    IPV4_LOOPBACK_ADDRESS,
 };
 """
 
@@ -40,7 +42,7 @@ def require_constants(obj):
     assert section["reloc_count"] == 0
     raw = bytes(cc._section_bytes(obj, section))
     assert len(raw) == 4 * len(EXPECTED)
-    actual = struct.unpack("<9I", raw)
+    actual = struct.unpack(f"<{len(EXPECTED)}I", raw)
     if actual != EXPECTED:
         raise ProtocolConstantMismatch((actual, EXPECTED))
 
@@ -52,6 +54,7 @@ def compiler(tmp_path_factory):
         pytest.skip("locally supplied VC7 compiler/January target is unavailable")
     folder = tmp_path_factory.mktemp("network-protocol-contract")
     headers = ("bungie_net/common/message_header.h",
+               "bungie_net/network/transport_address_constants.h",
                "networking/network_connection.h",
                "networking/network_game_protocol.h")
 
@@ -92,6 +95,12 @@ def test_actual_owner_constants(compiler):
     ("wrong-rejection", ("networking/network_game_protocol.h",
                          "_rejection_code_game_is_full,",
                          "_rejection_code_game_is_full = 3,")),
+    ("wrong-datagram-capacity", ("networking/network_connection.h",
+                                 "DATAGRAM_MAXIMUM_SIZE = 400,",
+                                 "DATAGRAM_MAXIMUM_SIZE = 401,")),
+    ("wrong-loopback", ("bungie_net/network/transport_address_constants.h",
+                        "IPV4_LOOPBACK_ADDRESS = 0x7F000001,",
+                        "IPV4_LOOPBACK_ADDRESS = 0x0100007F,")),
 ])
 def test_compiled_bad_constant_is_detected(compiler, name, mutation):
     # Compilation/setup errors cannot satisfy the expected mismatch control.

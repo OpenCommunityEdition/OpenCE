@@ -219,7 +219,6 @@ symbols in this file:
 
 enum
 {
-	DATAGRAM_MAXIMUM_SIZE = 400,
 	RELIABLE_MESSAGE_MAXIMUM_SIZE = 2048,
 	MAXIMUM_RESERVED_NETWORK_PORT = 1023,
 	_transport_type_udp = 0x11,

@@ -453,6 +453,7 @@ symbols in this file:
 #include "cseries.h"
 #include "bungie_net/common/message_header.h"
 #include "bungie_net/network/transport.h"
+#include "bungie_net/network/transport_address_constants.h"
 #include "bungie_net/network/transport_endpoint_winsock.h"
 #include "cseries/cseries_windows.h"
 #include "cseries/errors.h"

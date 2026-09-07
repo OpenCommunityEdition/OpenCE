@@ -36,6 +36,8 @@ word network_game_server_get_state(
 	short *substate);
 boolean network_game_server_game_is_open(
 	struct network_game_server *server);
+boolean network_game_server_game_is_valid(
+	struct network_game_server *server);
 boolean network_game_server_client_machine_is_joined_to_game(
 	struct network_game_server *server,
 	struct network_game_server_client_machine *machine);

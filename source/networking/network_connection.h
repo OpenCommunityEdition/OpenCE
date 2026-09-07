@@ -12,6 +12,7 @@ header included in hcex build.
 
 enum
 {
+	DATAGRAM_MAXIMUM_SIZE = 400,
 	MAXIMUM_NUMBER_OF_LOCAL_PLAYERS = 4,
 	_connection_dont_timeout = 0,
 	_connection_create_server_bit = 0,
