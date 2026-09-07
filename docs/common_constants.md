@@ -239,6 +239,14 @@ ordinary strict-object and consumer checks, not by unreviewed bulk replacement.
 
 ## Rasterizer shared-state lookup
 
+Use `source/rasterizer/rasterizer_frame_statistics.h` for the complete January
+**0x170-byte** frame-statistics record and its external declaration. Do not
+introduce another consumer-specific prefix. Dynamic buffer counts are not
+maximum capacities; model skinning/lighting accumulators count uploaded
+constant bytes, not objects. See the
+[shared counter owner ledger](object_matching_logs/rasterizer_frame_statistics_obj_shared_counter_owner_20260906.md)
+for the current writer-backed fields and intentionally unreviewed interiors.
+
 Use `source/rasterizer/rasterizer_debug_options.h` for the genuine January
 debug-options record; do not add another TU-local prefix. The size is **0x8C**
 (not later HCEA's 0x90). Active Camouflage flags are at 0x41/0x42; January

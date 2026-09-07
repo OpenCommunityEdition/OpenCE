@@ -192,14 +192,6 @@ struct rasterizer_environment_fog_debug_options
 	boolean draw_environment_fog_screen;
 };
 
-struct rasterizer_environment_fog_frame_statistics
-{
-	byte reserved00[0xAC];
-	unsigned long environment_fog_dynamic_vertex_count;
-	unsigned long environment_fog_dynamic_triangle_count;
-	unsigned long environment_fog_dynamic_draw_count;
-};
-
 struct pixel_shader_definition
 {
 	unsigned long alpha_inputs[NUMBER_OF_PIXEL_SHADER_STAGES];
@@ -292,7 +284,6 @@ typedef char rasterizer_environment_fog_pixel_shader_size_assert[
 static struct rasterizer_environment_fog_screen_globals rasterizer_environment_fog_screen_globals = { 0 };
 
 extern struct rasterizer_environment_fog_debug_options rasterizer_debug_options;
-extern struct rasterizer_environment_fog_frame_statistics rasterizer_frame_statistics;
 extern struct rasterizer_environment_fog_window_parameters global_window_parameters;
 
 /* ---------- public code */

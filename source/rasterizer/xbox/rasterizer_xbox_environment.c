@@ -442,32 +442,6 @@ struct rasterizer_environment_window_parameters
 	real_vector3d camera_forward;
 };
 
-struct rasterizer_environment_frame_statistics
-{
-	byte reserved00[0x40];
-	unsigned long environment_dynamic_vertex_count;
-	unsigned long environment_dynamic_triangle_count;
-	unsigned long environment_dynamic_draw_count;
-	byte reserved4C[0x14];
-	unsigned long diffuse_texture_dynamic_vertex_count;
-	unsigned long diffuse_texture_dynamic_triangle_count;
-	unsigned long diffuse_texture_dynamic_draw_count;
-	unsigned long specular_light_dynamic_vertex_count;
-	unsigned long specular_light_dynamic_triangle_count;
-	unsigned long specular_light_dynamic_draw_count;
-	unsigned long specular_lightmap_dynamic_vertex_count;
-	unsigned long specular_lightmap_dynamic_triangle_count;
-	unsigned long specular_lightmap_dynamic_draw_count;
-	unsigned long reflection_mask_dynamic_vertex_count;
-	unsigned long reflection_mask_dynamic_triangle_count;
-	unsigned long reflection_mask_dynamic_draw_count;
-	byte reserved90[0xC];
-	unsigned long transparent_geometry_dynamic_vertex_count;
-	unsigned long transparent_geometry_dynamic_triangle_count;
-	long transparent_geometry_largest_dynamic_triangle_count;
-	unsigned long transparent_geometry_dynamic_draw_count;
-};
-
 /* ---------- prototypes */
 
 static void rasterizer_environment_specular_spot_light_begin(
@@ -479,7 +453,6 @@ extern struct rasterizer_environment_debug_options rasterizer_debug_options;
 static struct rasterizer_environment_globals rasterizer_environment_globals;
 extern struct pixel_shader_definition pixel_shader;
 extern struct rasterizer_lights_globals rasterizer_lights;
-extern struct rasterizer_environment_frame_statistics rasterizer_frame_statistics;
 extern struct rasterizer_environment_window_parameters global_window_parameters;
 extern short specular_light_vertex_shader_permutation_index;
 

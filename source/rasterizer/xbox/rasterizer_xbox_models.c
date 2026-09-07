@@ -98,6 +98,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "rasterizer/rasterizer_frame_statistics.h"
 #include "cseries.h"
 #include "rasterizer/rasterizer.h"
 
@@ -174,18 +175,6 @@ struct rasterizer_models_private_globals_prefix
 	boolean do_not_change_z_stencil_states;
 };
 
-struct rasterizer_models_frame_statistics_prefix
-{
-	byte reserved000[0xD4];
-	unsigned long model_count;
-	byte reserved0D8[0x78];
-	unsigned long skinning_work;
-	unsigned long lighting_work;
-	byte reserved158[8];
-	unsigned long skinning_work_accumulated;
-	unsigned long lighting_work_accumulated;
-};
-
 typedef char verify_rasterizer_models_draw_models_offset[
 	offsetof(struct rasterizer_models_debug_options_prefix, draw_models) == 0x0C
 		? 1 : -1];
@@ -225,8 +214,8 @@ typedef char verify_rasterizer_models_window_fog_offset[
 		? 1 : -1];
 typedef char verify_rasterizer_models_statistics_skinning_offset[
 	offsetof(
-		struct rasterizer_models_frame_statistics_prefix,
-		skinning_work) == 0x150 ? 1 : -1];
+		struct rasterizer_frame_statistics_globals,
+		vertex_shader_skinning_constant_bytes) == 0x150 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -254,7 +243,6 @@ extern struct rasterizer_models_debug_options_prefix rasterizer_debug_options;
 extern struct rasterizer_models_private_globals_prefix bss_00465d68;
 extern boolean data_0030cefb;
 extern struct rasterizer_window_begin_parameters global_window_parameters;
-extern struct rasterizer_models_frame_statistics_prefix rasterizer_frame_statistics;
 
 /* ---------- public code */
 
@@ -388,16 +376,16 @@ void _rasterizer_model_begin(
 		}
 		else
 		{
-			skinning_work = rasterizer_frame_statistics.skinning_work;
+			skinning_work = rasterizer_frame_statistics.vertex_shader_skinning_constant_bytes;
 			rasterizer_set_model_skinning(&parameters->skinning);
 			skinning_work =
-				rasterizer_frame_statistics.skinning_work - skinning_work;
-			lighting_work = rasterizer_frame_statistics.lighting_work;
+				rasterizer_frame_statistics.vertex_shader_skinning_constant_bytes - skinning_work;
+			lighting_work = rasterizer_frame_statistics.vertex_shader_lighting_constant_bytes;
 			rasterizer_set_model_lighting(&parameters->lighting);
-			rasterizer_frame_statistics.skinning_work_accumulated +=
+			rasterizer_frame_statistics.model_skinning_constant_bytes +=
 				skinning_work;
-			rasterizer_frame_statistics.lighting_work_accumulated +=
-				rasterizer_frame_statistics.lighting_work - lighting_work;
+			rasterizer_frame_statistics.model_lighting_constant_bytes +=
+				rasterizer_frame_statistics.vertex_shader_lighting_constant_bytes - lighting_work;
 			bss_00465d68.model_effect_type = RENDER_MODEL_EFFECT_NONE;
 		}
 

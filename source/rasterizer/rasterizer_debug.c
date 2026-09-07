@@ -58,6 +58,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "rasterizer/rasterizer_frame_statistics.h"
 #include <stdlib.h>
 
 #include "cseries.h"
@@ -144,12 +145,6 @@ struct rasterizer_debug_window_parameters_prefix
 	real_vector3d camera_forward;
 };
 
-struct rasterizer_debug_frame_statistics_prefix
-{
-	byte reserved000[0x140];
-	long debug_primitive_count;
-};
-
 typedef char rasterizer_debug_data_size_assert[
 	sizeof(struct rasterizer_debug_data) == 0x21 ? 1 : -1];
 typedef char rasterizer_debug_primitive_size_assert[
@@ -183,7 +178,6 @@ static struct rasterizer_debug_data debug_data;
 
 extern struct rasterizer_debug_options_prefix rasterizer_debug_options;
 extern struct rasterizer_debug_window_parameters_prefix global_window_parameters;
-extern struct rasterizer_debug_frame_statistics_prefix rasterizer_frame_statistics;
 
 /* ---------- public code */
 

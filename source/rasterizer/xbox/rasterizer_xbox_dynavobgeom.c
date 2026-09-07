@@ -217,15 +217,6 @@ struct rasterizer_dynamic_geometry_debug_options
 	byte reserved23;
 };
 
-struct rasterizer_dynamic_geometry_frame_statistics
-{
-	byte reserved000[0x104];
-	unsigned long dynamic_unlit_draw_count;
-	unsigned long dynamic_unlit_triangle_count;
-	long largest_dynamic_unlit_triangle_count;
-	unsigned long dynamic_unlit_vertex_count;
-};
-
 struct rasterizer_meter_parameters
 {
 	pixel32 gradient_min_color;
@@ -288,7 +279,6 @@ static void rasterizer_screen_geometry_submit_vertex(
 /* ---------- globals */
 
 extern struct rasterizer_dynamic_geometry_debug_options rasterizer_debug_options;
-extern struct rasterizer_dynamic_geometry_frame_statistics rasterizer_frame_statistics;
 extern struct rasterizer_dynamic_geometry_window_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
 boolean reported_too_many_transparent_geometry_groups = FALSE;

@@ -44,6 +44,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "rasterizer/rasterizer_frame_statistics.h"
 #include "cseries.h"
 #include "cseries/errors.h"
 #include "rasterizer_xbox_vertex_shaders.h"
@@ -79,12 +80,6 @@ struct rasterizer_vertex_shader_debug_options
 {
 	byte reserved00[2];
 	short vertex_shader_statistics;
-};
-
-struct rasterizer_vertex_shader_frame_statistics
-{
-	byte reserved000[0x158];
-	long vertex_shader_instruction_count;
 };
 
 /* ---------- prototypes */
@@ -167,7 +162,6 @@ struct rasterizer_vertex_shader_runtime_globals vertex_shader_runtime_globals =
 };
 
 extern struct rasterizer_vertex_shader_debug_options rasterizer_debug_options;
-extern struct rasterizer_vertex_shader_frame_statistics rasterizer_frame_statistics;
 extern void *global_d3d_device;
 
 /* ---------- public code */

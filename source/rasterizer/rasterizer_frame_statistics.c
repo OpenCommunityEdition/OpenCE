@@ -148,11 +148,6 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct rasterizer_frame_statistics_globals
-{
-	byte data[0x170];
-};
-
 struct rasterizer_frame_statistics_private_globals_prefix
 {
 	byte reserved000[0x740];
@@ -188,7 +183,6 @@ static boolean eat_my_shorts(
 
 /* ---------- globals */
 
-extern struct rasterizer_frame_statistics_globals rasterizer_frame_statistics;
 extern struct rasterizer_frame_statistics_private_globals_prefix rasterizer_frame_statistics_private_globals;
 extern struct rasterizer_frame_statistics_debug_options_prefix rasterizer_debug_options;
 

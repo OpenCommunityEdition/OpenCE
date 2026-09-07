@@ -145,20 +145,6 @@ struct rasterizer_shadows_window_parameters_prefix
 	word rasterizer_target;
 };
 
-struct rasterizer_shadows_frame_statistics_prefix
-{
-	byte reserved000[0x30];
-	unsigned long shadow_count;
-	unsigned long shadow_vertex_count;
-	unsigned long shadow_triangle_count;
-	unsigned long shadow_draw_count;
-	byte reserved040[0xB4];
-	unsigned long model_shadow_count;
-	unsigned long model_shadow_vertex_count;
-	unsigned long model_shadow_triangle_count;
-	unsigned long model_shadow_draw_count;
-};
-
 struct pixel_shader_definition
 {
 	unsigned long alpha_inputs[8];
@@ -251,7 +237,7 @@ typedef char verify_rasterizer_shadows_draw_shadows_offset[
 		draw_environment_shadows) == 0x12 ? 1 : -1];
 typedef char verify_rasterizer_shadows_model_shadow_count_offset[
 	offsetof(
-		struct rasterizer_shadows_frame_statistics_prefix,
+		struct rasterizer_frame_statistics_globals,
 		model_shadow_count) == 0xF4 ? 1 : -1];
 typedef char verify_rasterizer_shadows_local_parameters_offset[
 	offsetof(
@@ -289,7 +275,6 @@ static void rasterizer_shadow_convolve(
 extern D3DDevice *global_d3d_device;
 extern struct rasterizer_shadows_debug_options_prefix rasterizer_debug_options;
 extern struct rasterizer_shadows_window_parameters_prefix global_window_parameters;
-extern struct rasterizer_shadows_frame_statistics_prefix rasterizer_frame_statistics;
 extern struct pixel_shader_definition pixel_shader;
 extern struct rasterizer_shadows_frame_parameters global_frame_parameters;
 

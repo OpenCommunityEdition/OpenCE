@@ -212,6 +212,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "rasterizer/rasterizer_frame_statistics.h"
 #include "cseries.h"
 #include "cseries/errors.h"
 #include "main/main_runtime.h"
@@ -324,15 +325,6 @@ struct rasterizer_draw_primitives_debug_options_prefix
 	boolean split_dynamic_geometry_between_windows;
 };
 
-struct rasterizer_draw_primitives_frame_statistics_prefix
-{
-	byte reserved000[0x130];
-	long dynamic_vertex_count;
-	long dynamic_vertex_buffer_count;
-	long dynamic_triangle_count;
-	long dynamic_triangle_buffer_count;
-};
-
 typedef char dynamic_vertex_group_size_assert[
 	sizeof(struct dynamic_vertex_group) == 0x14 ? 1 : -1];
 typedef char dynamic_vertex_buffer_size_assert[
@@ -350,7 +342,6 @@ static D3DVertexBuffer *dynamic_vertex_group_get_d3d_vertex_buffer(
 /* ---------- globals */
 
 extern struct rasterizer_draw_primitives_debug_options_prefix rasterizer_debug_options;
-extern struct rasterizer_draw_primitives_frame_statistics_prefix rasterizer_frame_statistics;
 extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 static D3DPRIMITIVETYPE const d3d_primitive_type_table[NUMBER_OF_TRIANGLE_BUFFER_TYPES] =

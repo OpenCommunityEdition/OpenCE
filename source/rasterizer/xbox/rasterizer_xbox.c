@@ -673,17 +673,6 @@ struct rasterizer_hardware_state_cache
 	short stencil_mode;
 };
 
-/* The rasterizer's own frame-statistics counters; only the fields this
- * object updates are named. */
-struct rasterizer_frame_statistics_globals
-{
-	byte reserved000[0x150];
-	long vertex_shader_skinning_constant_bytes;
-	long vertex_shader_lighting_constant_bytes;
-	long vertex_shader_instruction_count;
-	long pixel_shader_pushbuffer_bytes;
-};
-
 /* The debug-option field names and offsets are the ones the scripting engine
  * publishes for this global in hs_globals_external.c. */
 struct rasterizer_debug_options
@@ -896,7 +885,6 @@ extern struct window_globals_prefix window_globals;
 extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern struct rasterizer_debug_options rasterizer_debug_options;
 extern struct rasterizer_lights_globals_prefix rasterizer_lights;
-extern struct rasterizer_frame_statistics_globals rasterizer_frame_statistics;
 
 /* owned by source/bitmaps/bitmaps.c */
 extern pixel32 global_vector_palette[NUMBER_OF_ENTRIES_IN_PALETTE];

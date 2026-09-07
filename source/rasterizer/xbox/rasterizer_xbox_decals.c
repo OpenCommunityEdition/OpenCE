@@ -122,6 +122,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "rasterizer/rasterizer_frame_statistics.h"
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "effects/decal_definitions.h"
@@ -311,16 +312,6 @@ typedef char verify_decal_definition_map_index_offset[
 		struct decal_definition,
 		shader.map.index) == 0xe4 ? 1 : -1];
 
-struct rasterizer_decals_frame_statistics
-{
-	byte reserved0000[0x4c];
-	unsigned long decal_vertex_count;
-	unsigned long decal_triangle_count;
-	unsigned long decal_draw_count;
-	unsigned long decal_shader_change_count;
-	unsigned long decal_texture_change_count;
-};
-
 /* ---------- prototypes */
 
 static void rasterizer_decal_vertices_purge_proc(
@@ -344,7 +335,6 @@ extern short rasterizer_decal_cached_bitmap_index;
 extern struct rasterizer_decals_debug_options rasterizer_debug_options;
 extern struct rasterizer_decals_window_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
-extern struct rasterizer_decals_frame_statistics rasterizer_frame_statistics;
 
 long last_decal_index_queried_by_lruv_cache = NONE;
 

@@ -80,6 +80,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "rasterizer/rasterizer_frame_statistics.h"
 #include "cseries.h"
 #include "errors.h"
 #include "render.h"
@@ -221,13 +222,6 @@ struct rasterizer_lights_debug_options_prefix
 	boolean lens_flares;
 };
 
-struct rasterizer_lights_frame_statistics_prefix
-{
-	byte reserved000[0x148];
-	long dynamic_light_count;
-	long lens_flare_count;
-};
-
 typedef char verify_structure_cluster_size[
 	sizeof(struct structure_cluster) == 0x68 ? 1 : -1];
 typedef char verify_structure_cluster_lens_flare_marker_count_offset[
@@ -256,11 +250,11 @@ typedef char verify_rasterizer_lights_debug_options_lens_flares_offset[
 		lens_flares) == 0x1F ? 1 : -1];
 typedef char verify_rasterizer_lights_frame_statistics_dynamic_light_count_offset[
 	offsetof(
-		struct rasterizer_lights_frame_statistics_prefix,
+		struct rasterizer_frame_statistics_globals,
 		dynamic_light_count) == 0x148 ? 1 : -1];
 typedef char verify_rasterizer_lights_frame_statistics_lens_flare_count_offset[
 	offsetof(
-		struct rasterizer_lights_frame_statistics_prefix,
+		struct rasterizer_frame_statistics_globals,
 		lens_flare_count) == 0x14C ? 1 : -1];
 
 /* ---------- prototypes */
@@ -281,7 +275,6 @@ static long local_lens_flare_count = 0;
 static boolean local_lens_flare_error_printed = FALSE;
 extern struct rasterizer_lights_globals rasterizer_lights;
 extern struct rasterizer_lights_debug_options_prefix rasterizer_debug_options;
-extern struct rasterizer_lights_frame_statistics_prefix rasterizer_frame_statistics;
 extern struct rasterizer_lights_window_parameters global_window_parameters;
 extern short global_screenshot_count;
 extern short global_screenshot_size;
