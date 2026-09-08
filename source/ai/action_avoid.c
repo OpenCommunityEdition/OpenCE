@@ -29,7 +29,6 @@ symbols in this file:
 
 enum
 {
-	_action_avoid_firing_position_group = 6,
 	_action_avoid_primary_target_priority = 7,
 	_action_avoid_primary_danger_priority = 5,
 	_action_avoid_idle_look_type = 4,
@@ -38,28 +37,6 @@ enum
 /* ---------- macros */
 
 /* ---------- structures */
-
-/*
- * These are work records owned by actor_firing_position.c.  That object has
- * not yet been reconstructed, so only the field consumed here is named; the
- * remaining bytes are an evidence-bounded temporary gap (0x670 bytes total).
- */
-struct firing_position_search_definition
-{
-	long allowed_groups;
-	short firing_position_group;
-	byte unresolved[0x66A];
-};
-
-struct firing_position_search_workspace
-{
-	byte unresolved[0x1408C];
-};
-
-struct firing_position_candidate
-{
-	byte unresolved[0x3C];
-};
 
 /* ---------- prototypes */
 
@@ -80,30 +57,32 @@ void
 action_avoid_begin(
 	long actor_index)
 {
+	return;
 }
 
 void
 action_avoid_end(
 	long actor_index)
 {
+	return;
 }
 
 boolean action_avoid_perform(
 	long actor_index)
 {
-	long position_flags;
+	boolean position_flags;
 	long previous_owner_actor_index;
 	short firing_position_index;
-	struct firing_position_candidate candidate;
-	struct firing_position_search_definition search;
-	struct firing_position_search_workspace workspace;
+	struct firing_position candidate;
+	struct firing_position_evaluation_context search;
+	struct path_state workspace;
 	struct actor_datum *actor = actor_get(actor_index);
 
 	match_assert("c:\\halo\\SOURCE\\ai\\action_avoid.c", 55, !actor->meta.swarm);
 	if (actor->meta.timeslice)
 	{
 		memset(&search, 0, sizeof(search));
-		search.firing_position_group = _action_avoid_firing_position_group;
+		search.evaluation_mode = _firing_point_evaluation_mode_avoid;
 		firing_position_index = actor_active_select_firing_position(
 			actor_index,
 			&search,

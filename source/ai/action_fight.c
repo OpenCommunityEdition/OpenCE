@@ -39,29 +39,6 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct firing_position_search_definition
-{
-	long allowed_groups;
-	short firing_position_group;
-	byte unresolved[0x66A];
-};
-
-struct firing_position_search_workspace
-{
-	byte unresolved[0x1408C];
-};
-
-struct firing_position_candidate
-{
-	byte unresolved[0x3C];
-};
-
-struct firing_position_definition
-{
-	real_point3d position;
-	byte unresolved[0xC];
-};
-
 struct fight_vehicle_definition
 {
 	byte unresolved[0x3A8];
@@ -69,17 +46,6 @@ struct fight_vehicle_definition
 };
 
 /* ---------- prototypes */
-
-void actor_discard_firing_position(
-	long actor_index,
-	short firing_position_index,
-	boolean temporary);
-
-boolean actor_nearby_firing_positions(
-	long actor_index,
-	real_point3d const *position,
-	long surface_index,
-	boolean allow_outside_range);
 
 void actor_perception_unreachable(
 	long actor_index,
@@ -186,7 +152,7 @@ action_fight_perform(
 					actor_index,
 					&actor->input.pathfinding_point,
 					actor->input.pathfinding_surface_index,
-					FALSE))
+					_firing_position_group_normal))
 				{
 					boolean near_current_firing_position;
 
@@ -235,18 +201,18 @@ action_fight_perform(
 
 			{
 				short firing_position_index;
-				long position_flags;
+				boolean position_flags;
 				real combat_position_time_lower_bound;
 				long previous_owner_actor_index;
 				short old_firing_position_index;
 				short new_firing_position_index;
-				struct firing_position_candidate candidate;
-				struct firing_position_search_definition search;
-				struct firing_position_search_workspace workspace;
+				struct firing_position candidate;
+				struct firing_position_evaluation_context search;
+				struct path_state workspace;
 
 				old_firing_position_index = actor->firing_positions.current_position_index;
 				csmemset(&search, 0, sizeof(search));
-				search.firing_position_group = _firing_position_group_attacking;
+				search.evaluation_mode = _firing_point_evaluation_mode_fight;
 				firing_position_index = actor_active_select_firing_position(
 					actor_index,
 					&search,

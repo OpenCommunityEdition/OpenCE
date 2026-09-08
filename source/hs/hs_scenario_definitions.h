@@ -10,6 +10,16 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum
+{
+	_hs_script_startup = 0,
+	_hs_script_dormant,
+	_hs_script_continuous,
+	_hs_script_static,
+	_hs_script_stub,
+	NUMBER_OF_HS_SCRIPT_TYPES,
+};
+
 /* ---------- headers */
 
 #include "tag_files/tag_groups.h"
@@ -52,12 +62,28 @@ struct hs_source_file
 struct hs_syntax_node
 {
 	short datum_header;
-	short index;
+	union
+	{
+		short index;
+		short constant_type;
+		short function_index;
+		short script_index;
+	};
 	short type;
 	short flags;
 	long next_node_index;
-	long string_offset;
-	long data;
+	union
+	{
+		long string_offset;
+		long source_offset;
+	};
+	union
+	{
+		long data;
+		boolean boolean_value;
+		real real_value;
+		short short_value;
+	};
 };
 
 /* ---------- prototypes/EXAMPLE.C */

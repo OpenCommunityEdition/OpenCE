@@ -76,23 +76,6 @@ enum
 
 /* ---------- structures */
 
-struct firing_position_search_definition
-{
-	long allowed_groups;
-	short firing_position_group;
-	byte unresolved[0x66A];
-};
-
-struct firing_position_search_workspace
-{
-	byte unresolved[0x1408C];
-};
-
-struct firing_position_candidate
-{
-	byte unresolved[0x3C];
-};
-
 /* ---------- prototypes */
 
 boolean game_team_is_ally(
@@ -102,40 +85,16 @@ boolean game_team_is_ally(
 long actor_target_unit_index(
 	long actor_index);
 
-void actor_discard_firing_position(
-	long actor_index,
-	short firing_position_index,
-	boolean temporary);
-
 void actor_perception_forget_recent_damage(
 	long actor_index);
 
 void actor_perception_retreat_successful(
 	long actor_index);
 
-boolean actor_nearby_firing_positions(
-	long actor_index,
-	real_point3d const *point,
-	long surface_index,
-	boolean allow_outside_range);
-
 void actor_stimulus_suspicion(
 	long actor_index,
 	short suspicion_level,
 	long ticks);
-
-long actor_get_firing_position_group(
-	long actor_index,
-	short evaluation_mode,
-	short group_selection_mode);
-
-long actor_select_firing_position(
-	long actor_index,
-	struct firing_position_search_definition *search,
-	struct firing_position_candidate *candidate,
-	long *previous_owner_actor_index,
-	struct firing_position_search_workspace *workspace,
-	long *position_flags);
 
 /* ---------- globals */
 
@@ -274,7 +233,7 @@ action_guard_setup_from_combat_transition(
 				actor_index,
 				&actor->stimuli.combat_transition_guard_point,
 				actor->stimuli.combat_transition_guard_point_surface_index,
-				TRUE))
+				_firing_position_group_when_searching))
 		{
 			state_data->guard_location_type = 2;
 			state_data->guard_point.position = actor->stimuli.combat_transition_guard_point;
@@ -720,15 +679,15 @@ boolean
 action_guard_perform(
 	long actor_index)
 {
-	long position_flags;
+	boolean position_flags;
 	long previous_owner_actor_index;
 	long selected_firing_position_index;
 	real guard_position_time_lower_bound;
 	real guard_position_time_upper_bound;
 	short firing_position_index;
-	struct firing_position_candidate candidate;
-	struct firing_position_search_definition search;
-	struct firing_position_search_workspace workspace;
+	struct firing_position candidate;
+	struct firing_position_evaluation_context search;
+	struct path_state workspace;
 	struct actor_datum *actor = actor_get(actor_index);
 	struct actor_definition *definition = actor_definition_get(actor->meta.definition_index);
 	struct guard_state_data *state_data = &actor->state.action_data.guard;
@@ -765,9 +724,12 @@ action_guard_perform(
 		}
 
 		csmemset(&search, 0, sizeof(search));
-		search.firing_position_group = 4;
-		search.allowed_groups = actor_get_firing_position_group(actor_index, 4, FALSE);
-		search.unresolved[0xF] = TRUE;
+		search.evaluation_mode = _firing_point_evaluation_mode_guard;
+		search.allowed_position_mask = actor_get_firing_position_group(
+			actor_index,
+			_firing_point_evaluation_mode_guard,
+			_firing_position_group_normal);
+		search.allow_outside_range = TRUE;
 		selected_firing_position_index = actor_select_firing_position(
 			actor_index,
 			&search,
@@ -890,7 +852,7 @@ action_guard_control(
 				if (!actor_move_to_firing_position(
 					actor_index,
 					actor->firing_positions.current_position_index,
-					FALSE))
+					NULL))
 				{
 					actor_discard_firing_position(
 						actor_index,

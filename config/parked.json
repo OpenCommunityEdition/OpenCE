@@ -3109,9 +3109,9 @@
         "base": {
           "size": 672,
           "relocation_count": 43,
-          "normalized_sha256": "7db4861a5adf519e0457a0ffe785ff4d47e878fda47cc0a06206a529776ac91c"
+          "normalized_sha256": "885fdb81966284acf5ba7138a4bbbd2221e7c61c89114fdd6f53b96ba89b81a0"
         },
-        "objdiff_percent": 97.76382
+        "objdiff_percent": 97.67839
       }
     },
     {
@@ -5544,6 +5544,158 @@
           "normalized_sha256": "ff4988ccef4e2ad240b9506617fb5a267303270e494f81003cc98ab4a573753c"
         },
         "objdiff_percent": 99.943665
+      }
+    },
+    {
+      "unit": "source/ai/action_guard",
+      "function": "_action_guard_perform",
+      "class": "unclassified",
+      "evidence": "Best currently integrated house-rule-compliant reconstruction after the 2026-09-07 ActorFiringPosition owner/ABI reconciliation. The genuine boolean selection flag, firing_position records and path_state workspace replace the prior opaque long/byte facades. This proper shared ownership changes the actor_change_firing_position call encoding and following layout while preserving the 448-byte size and all 13 relocation identities. The former 437 meaningful exact bytes are explicitly debited; this function receives zero exact credit. See docs/object_matching_logs/hs_actor_owner_reconciliation_20260907.md for donor provenance, full-batch evidence and research pointers.",
+      "measurements": {
+        "target": {
+          "size": 448,
+          "relocation_count": 13,
+          "normalized_sha256": "d977c9d5393c42c808bd1b16613d64e889b937c6e12af2de2d01d42fb0e7bf2a"
+        },
+        "base": {
+          "size": 448,
+          "relocation_count": 13,
+          "normalized_sha256": "e5bd29903c9626c22a35480c01a556e383a5c27a364a7f4ca2c25f9e3fcabd8f"
+        },
+        "objdiff_percent": 99.22481
+      }
+    },
+    {
+      "unit": "source/ai/actor_firing_position",
+      "function": "_pre_evaluator_combatmove",
+      "class": "unclassified",
+      "evidence": "Best currently integrated house-rule-compliant Fable reconstruction. The complete combat-range and friendly-fire-vector evaluator is retained, but the donor-only unused actor_get local was removed because no source/PDB evidence authenticates dead lookup source and HCEA omits it. That deliberate credibility correction makes the body fuzzy rather than restoring target bytes through an unused call. Zero exact credit. See docs/object_matching_logs/hs_actor_owner_reconciliation_20260907.md.",
+      "measurements": {
+        "target": {
+          "size": 576,
+          "relocation_count": 21,
+          "normalized_sha256": "dec21af4f9dee8911db9c77008eca40cb30fade0f2974d2c1c42ae9856976f7f"
+        },
+        "base": {
+          "size": 560,
+          "relocation_count": 19,
+          "normalized_sha256": "3c9497178c02139574930a24631dd082f814a8593d7ddec49ba7ebcfa3ecb443"
+        },
+        "objdiff_percent": 95.75
+      }
+    },
+    {
+      "unit": "source/ai/actor_firing_position",
+      "function": "_post_evaluator_global",
+      "class": "unclassified",
+      "evidence": "Best currently integrated house-rule-compliant Fable reconstruction of the flying-path post evaluator. The donor-only unused actor_definition_get local was removed because it has no authenticated source/PDB proof and the independent HCEA reconstruction omits it; the used actor access and complete path checks remain. This is credible fuzzy source, not matching credit. See docs/object_matching_logs/hs_actor_owner_reconciliation_20260907.md.",
+      "measurements": {
+        "target": {
+          "size": 224,
+          "relocation_count": 8,
+          "normalized_sha256": "e07f193d22593c7a8b5891a3bd0e570baf0a411c087993859cdda8c7de69831b"
+        },
+        "base": {
+          "size": 208,
+          "relocation_count": 7,
+          "normalized_sha256": "b75362f25576003d8ea43e890bd732cdeb53ecc48ff463270f444fd577ea24b8"
+        },
+        "objdiff_percent": 68.09638
+      }
+    },
+    {
+      "unit": "source/ai/actor_firing_position",
+      "function": "_post_evaluator_hide",
+      "class": "unclassified",
+      "evidence": "Best currently integrated Fable reconstruction of the complete hide/cover line-of-sight post evaluator, using the genuine evaluation context, named line-of-sight enum and shared rejection/debug helpers. Target and candidate are both 224 bytes with 11 relocations, but control-flow scheduling remains non-exact. No source-shape tuning or inappropriate exact credit is retained. See docs/object_matching_logs/hs_actor_owner_reconciliation_20260907.md.",
+      "measurements": {
+        "target": {
+          "size": 224,
+          "relocation_count": 11,
+          "normalized_sha256": "66434779de62f535539bcfe2fa4c163a9b2ead54c7c979c8ee45c17420d1a027"
+        },
+        "base": {
+          "size": 224,
+          "relocation_count": 11,
+          "normalized_sha256": "2e587cb1a2579a7eed9ec60904d589517ddb0ef4d79b22f3804b228ace218614"
+        },
+        "objdiff_percent": 82.5
+      }
+    },
+    {
+      "unit": "source/ai/actor_firing_position",
+      "function": "_post_evaluator_uncover",
+      "class": "unclassified",
+      "evidence": "Best currently integrated Fable reconstruction of the uncover line-of-sight post evaluator, retaining the real target-distance rejection rule and named line-of-sight enum through genuine shared owners. Target and candidate are both 192 bytes with four relocations; remaining branch scheduling is fuzzy and uncredited. See docs/object_matching_logs/hs_actor_owner_reconciliation_20260907.md.",
+      "measurements": {
+        "target": {
+          "size": 192,
+          "relocation_count": 4,
+          "normalized_sha256": "45c381842b37aba13ac53fdd0a37338c3219f4ad6bfd5fd9e54e893796a40beb"
+        },
+        "base": {
+          "size": 192,
+          "relocation_count": 4,
+          "normalized_sha256": "f3d29c892ec86f96936dae4c7acff6444ec421e13216d339b69a017e863ecbcc"
+        },
+        "objdiff_percent": 86.5625
+      }
+    },
+    {
+      "unit": "source/ai/actor_firing_position",
+      "function": "_post_evaluator_attack",
+      "class": "unclassified",
+      "evidence": "Best currently integrated Fable reconstruction of the attack line-of-sight post evaluator. It retains the complete optional/non-optional target scoring and rejection behavior with genuine types and enums. The candidate is 208 versus 224 target bytes with the same three relocations; remaining source scheduling is non-exact and receives zero exact credit. See docs/object_matching_logs/hs_actor_owner_reconciliation_20260907.md.",
+      "measurements": {
+        "target": {
+          "size": 224,
+          "relocation_count": 3,
+          "normalized_sha256": "46496861931cc3563c1a0d319a03bb82e475885a1295221b4b2c72c2c0797bd6"
+        },
+        "base": {
+          "size": 208,
+          "relocation_count": 3,
+          "normalized_sha256": "f063ea5068c49a4946bc5474e2b4da7652d5b1bf3a4a4fbc7f60a10c42a4a36b"
+        },
+        "objdiff_percent": 90.36232
+      }
+    },
+    {
+      "unit": "source/ai/actor_firing_position",
+      "function": "_pre_evaluator_global",
+      "class": "unclassified",
+      "evidence": "First natural complete January-layout reconstruction of the global firing-position pre-evaluator, using HCEA only as an algorithm/name map and January diagnostics, scores, vehicle mask and 0x670 context as target evidence. Target and candidate are both 1616 bytes with 53 relocations; remaining instruction selection is fuzzy. No forced inline, point_from_line3d, raw-offset facade or exact credit is retained. See docs/object_matching_logs/hs_actor_owner_reconciliation_20260907.md.",
+      "measurements": {
+        "target": {
+          "size": 1616,
+          "relocation_count": 53,
+          "normalized_sha256": "d83fd2341499b72125066d2b82c940567be7758ff5667186d64ad59a5113196e"
+        },
+        "base": {
+          "size": 1616,
+          "relocation_count": 53,
+          "normalized_sha256": "05e05f53acd0028ba0cd138da91bb820b72ee30387444f3cda257f5fe7a1b232"
+        },
+        "objdiff_percent": 90.75197
+      }
+    },
+    {
+      "unit": "source/ai/actor_firing_position",
+      "function": "_pre_evaluator_attack",
+      "class": "unclassified",
+      "evidence": "First natural complete January-layout reconstruction of the attack firing-position pre-evaluator, using genuine actor/weapon access, project real/vector types, named evaluation categories and January diagnostics. The 1120-byte candidate is one relocation short of the 1120-byte target and remains fuzzy. No dead call, compiler pressure, forced inline or exact credit is retained. See docs/object_matching_logs/hs_actor_owner_reconciliation_20260907.md.",
+      "measurements": {
+        "target": {
+          "size": 1120,
+          "relocation_count": 39,
+          "normalized_sha256": "7b38541b266185306cf06750f8e771df6b21326f143ee2c01259e94c5d63595b"
+        },
+        "base": {
+          "size": 1120,
+          "relocation_count": 38,
+          "normalized_sha256": "0ce537b371ae59cdaa713342af23346c37187ab268e04f9c932af2fdcc41ed58"
+        },
+        "objdiff_percent": 93.621216
       }
     }
   ]

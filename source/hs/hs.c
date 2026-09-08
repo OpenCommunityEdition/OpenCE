@@ -3328,19 +3328,6 @@ struct hs_arguments_long_long_long
 	long value2;
 };
 
-struct hs_function_definition
-{
-	short return_type;
-	short flags;
-	char const *name;
-	void *parse;
-	void *evaluate;
-	char const *help;
-	char const *usage;
-	short parameter_count;
-	short parameter_types[1];
-};
-
 struct hs_external_global_definition
 {
 	char const *name;
@@ -4394,10 +4381,6 @@ void vehicle_hover(
 	boolean hover);
 void hs_dispose_from_old_map(
 	void);
-void hs_compile_initialize(
-	boolean compiling_scenario);
-void hs_compile_dispose(
-	void);
 long alphabetize_file_references(
 	struct file_reference const *left,
 	struct file_reference const *right);
@@ -4409,11 +4392,6 @@ boolean tag_block_resize(
 	long count);
 long tag_block_add_element(
 	struct tag_block *block);
-long hs_compile_expression(
-	long source_size,
-	char const *source,
-	char const **error_source,
-	char const **error_message);
 int isspace(
 	int character);
 boolean hs_scenario_merge(
@@ -6537,6 +6515,8 @@ boolean hs_compile_and_evaluate(
 				system_exit(-1);
 				break;
 			}
+			/* BUG (original): January and HCEA pass the message/source outputs
+			 * in reverse. Keep the authentic target behavior explicit. */
 			expression_index = hs_compile_expression(csstrlen(source), source, &error_source, &error_message);
 			if (expression_index != NONE)
 			{

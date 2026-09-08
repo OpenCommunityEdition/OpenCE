@@ -384,34 +384,6 @@ struct vehicle_definition
 	real ai_strafing_stop_range;
 };
 
-/* Private firing-position search records.  Their sizes and the fields used
- * here are proven by the January lost-contact frame and by the already
- * reconstructed action_guard/action_fight callers. */
-struct actions_firing_position_search_definition
-{
-	long allowed_groups;
-	short evaluation_mode;
-	word __pad6;
-	long orphan_prop_index;
-	long last_perceived_time;
-	boolean tenacious;
-	byte __unknown11[0xB];
-	real maximum_search_range;
-	byte __unknown20[0x23];
-	boolean find_path_direction_from_target;
-	byte __unknown44[0x62C];
-};
-
-struct actions_firing_position_search_workspace
-{
-	byte __unknown[0x1408C];
-};
-
-struct actions_firing_position_candidate
-{
-	byte __unknown[0x3C];
-};
-
 typedef char ai_globals_action_vehicle_size_assert[
 	sizeof(struct ai_vehicle_enterable) == 0x28 ? 1 : -1];
 typedef char ai_globals_action_grenades_enabled_offset_assert[
@@ -443,8 +415,8 @@ typedef char actions_actor_debug_dive_offset_assert[
 	offsetof(struct actor_debug_info, dive_decision_time) == 0x184 ? 1 : -1];
 typedef char actions_actor_debug_info_size_assert[
 	sizeof(struct actor_debug_info) == 0x657C ? 1 : -1];
-typedef char actions_firing_position_search_definition_size_assert[
-	sizeof(struct actions_firing_position_search_definition) == 0x670 ? 1 : -1];
+typedef char firing_position_evaluation_context_size_assert[
+	sizeof(struct firing_position_evaluation_context) == 0x670 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -612,24 +584,6 @@ boolean action_wait_setup(
 	long actor_index,
 	boolean was_actively_searching,
 	struct wait_state_data *state_data);
-
-long actor_get_firing_position_group(
-	long actor_index,
-	short group,
-	boolean include_discarded);
-
-short actor_select_firing_position(
-	long actor_index,
-	struct actions_firing_position_search_definition *search,
-	struct actions_firing_position_candidate *candidate,
-	long *previous_owner_actor_index,
-	struct actions_firing_position_search_workspace *workspace,
-	boolean *position_flags);
-
-void actor_discard_firing_position(
-	long actor_index,
-	short firing_position_index,
-	boolean temporary);
 
 boolean action_avoid_setup(
 	long actor_index,
@@ -1812,7 +1766,7 @@ static void actor_action_determine_pursuit_options(
 				actor_index,
 				&prop->pathfinding_point,
 				prop->pathfinding_surface_index,
-				TRUE);
+				_firing_position_group_when_searching);
 		}
 	}
 
@@ -2955,9 +2909,9 @@ boolean actor_action_handle_combat_selection(
 boolean actor_action_handle_lost_contact(
 	long actor_index)
 {
-	struct actions_firing_position_search_workspace search_workspace;
-	struct actions_firing_position_search_definition search;
-	struct actions_firing_position_candidate candidate;
+	struct path_state search_workspace;
+	struct firing_position_evaluation_context search;
+	struct firing_position candidate;
 	struct action_state_data action_data;
 	struct actor_datum *actor = actor_get(actor_index);
 	struct actor_firing_position_data *firing_positions =
@@ -3198,19 +3152,19 @@ boolean actor_action_handle_lost_contact(
 									examined_threshold)
 							{
 								csmemset(&search, 0, sizeof(search));
-								search.evaluation_mode = 5;
-								search.orphan_prop_index =
+								search.evaluation_mode = _firing_point_evaluation_mode_pursue;
+								search.evaluation_data.pursue.orphan_prop_index =
 									actor->target.target_prop_index;
-								search.last_perceived_time = orphan ?
+								search.evaluation_data.pursue.last_perceived_time = orphan ?
 									orphan->last_perceived_time : NONE;
-								search.tenacious = pursue_tenacious;
+								search.evaluation_data.pursue.tenacious = pursue_tenacious;
 								search.find_path_direction_from_target =
 									actor->target.target_prop_index != NONE;
-								search.allowed_groups =
+								search.allowed_position_mask =
 									actor_get_firing_position_group(
 										actor_index,
-										5,
-										FALSE);
+										_firing_point_evaluation_mode_pursue,
+										_firing_position_group_normal);
 								search.maximum_search_range = 20.0f;
 								firing_position_index = actor_select_firing_position(
 									actor_index,

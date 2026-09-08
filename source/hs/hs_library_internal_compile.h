@@ -14,7 +14,17 @@ file has inline function assertions.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/HS_COMPILE.C */
+
+void hs_compile_initialize(
+	boolean compiling_scenario);
+void hs_compile_dispose(
+	void);
+long hs_compile_expression(
+	long source_size,
+	char const *source,
+	char const **error_message,
+	char const **error_source);
 
 boolean hs_compile_postprocess(
 	char const **error_message,
@@ -22,6 +32,37 @@ boolean hs_compile_postprocess(
 void hs_compile_finish(
 	void);
 boolean hs_parse_sleep(
+	short function_index,
+	long expression_index);
+
+boolean hs_macro_function_parse(
+	short function_index,
+	long expression_index);
+boolean hs_parse_if(
+	short function_index,
+	long expression_index);
+boolean hs_parse_logical(
+	short function_index,
+	long expression_index);
+boolean hs_parse_arithmetic(
+	short function_index,
+	long expression_index);
+boolean hs_parse_equality(
+	short function_index,
+	long expression_index);
+boolean hs_parse_inequality(
+	short function_index,
+	long expression_index);
+boolean hs_parse_sleep_until(
+	short function_index,
+	long expression_index);
+boolean hs_parse_wake(
+	short function_index,
+	long expression_index);
+boolean hs_parse_object_cast_up(
+	short function_index,
+	long expression_index);
+boolean hs_parse_debug_string(
 	short function_index,
 	long expression_index);
 

@@ -296,41 +296,6 @@ enum
 	_hs_syntax_node_global_bit,
 };
 
-enum hs_function_index
-{
-	_hs_function_begin = 0,
-	_hs_function_begin_random,
-	_hs_function_if,
-	_hs_function_cond,
-	_hs_function_set,
-	_hs_function_and,
-	_hs_function_or,
-	_hs_function_plus,
-	_hs_function_minus,
-	_hs_function_times,
-	_hs_function_divide,
-	_hs_function_min,
-	_hs_function_max,
-	_hs_function_equal,
-	_hs_function_not_equal,
-	_hs_function_greater_than,
-	_hs_function_less_than,
-	_hs_function_greater_than_or_equal,
-	_hs_function_less_than_or_equal,
-	_hs_function_sleep,
-	_hs_function_sleep_until,
-	_hs_function_wake,
-	_hs_function_inspect,
-	_hs_function_object_to_unit,
-	_hs_function_debug_string__first,
-	_hs_function_debug_string__ai_debug_communication_suppress =
-		_hs_function_debug_string__first,
-	_hs_function_debug_string__ai_debug_communication_ignore,
-	_hs_function_debug_string__ai_debug_communication_focus,
-	_hs_function_debug_string__last =
-		_hs_function_debug_string__ai_debug_communication_focus,
-};
-
 enum
 {
 	MAXIMUM_HS_DEBUG_STRING_ARGUMENTS = 32
@@ -339,15 +304,6 @@ enum
 enum
 {
 	HS_THREAD_STACK_SIZE = 0x200
-};
-
-enum
-{
-	_hs_script_startup = 0,
-	_hs_script_dormant,
-	_hs_script_continuous,
-	_hs_script_static,
-	_hs_script_stub,
 };
 
 enum
@@ -401,30 +357,12 @@ typedef void (*hs_debug_string_procedure)(
 	long name_count,
 	char const **names);
 
-typedef void (*hs_evaluate_procedure)(
-	short function_index,
-	long thread_index,
-	boolean initialize);
-
 typedef void (*hs_inspection_procedure)(
 	short type,
 	union hs_conversion_result value,
 	char *result);
 
 /* ---------- structures */
-
-struct hs_function_definition
-{
-	short return_type;
-	short flags;
-	char const *name;
-	void *parse;
-	void *evaluate;
-	char const *help;
-	char const *usage;
-	short parameter_count;
-	short parameter_types[1];
-};
 
 struct hs_runtime_globals
 {
@@ -2105,7 +2043,7 @@ static void hs_thread_main(
 
 			match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x2d8, function->evaluate);
 
-			((hs_evaluate_procedure)function->evaluate)(
+			function->evaluate(
 				expression->index,
 				thread_index,
 				initialize);

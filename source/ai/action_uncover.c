@@ -35,59 +35,12 @@ symbols in this file:
 
 /* ---------- constants */
 
-enum
-{
-	_firing_point_evaluation_mode_uncover = 3,
-};
-
 /* ---------- structures */
 
 typedef char action_uncover_ai_debug_printing_offset_must_be_0xA4[
 	offsetof(struct ai_debug_state, print_uncovering) == 0xA4 ? 1 : -1];
 
-struct firing_position_definition
-{
-	real_point3d position;
-	byte unresolved[2];
-	short cluster_index;
-	byte unresolved2[4];
-	long surface_index;
-};
-
-struct firing_position_search_definition
-{
-	long allowed_groups;
-	short evaluation_mode;
-	byte unresolved06[0x1A];
-	boolean specific_target_enable;
-	byte unresolved21[3];
-	real_point3d specific_target_point;
-	long specific_target_surface_index;
-	short specific_target_cluster_index;
-	byte unresolved36[0xB];
-	boolean use_last_visible_target_position;
-	byte unresolved42[0x62E];
-};
-
-struct firing_position_search_workspace
-{
-	byte unresolved[0x1408C];
-};
-
-struct firing_position_candidate
-{
-	byte unresolved00[6];
-	short line_of_sight;
-	real path_distance_from_actor;
-	byte unresolved0C[0x30];
-};
-
 /* ---------- prototypes */
-
-void actor_discard_firing_position(
-	long actor_index,
-	short firing_position_index,
-	boolean temporary);
 
 /* ---------- public code */
 
@@ -150,13 +103,13 @@ boolean action_uncover_setup_pursuit(
 boolean action_uncover_perform(
 	long actor_index)
 {
-	long position_flags;
+	boolean position_flags;
 	long previous_owner_actor_index;
 	short selected_firing_position_index;
-	struct firing_position_candidate candidate;
+	struct firing_position candidate;
 	char temporary[256];
-	struct firing_position_search_definition search;
-	struct firing_position_search_workspace workspace;
+	struct firing_position_evaluation_context search;
+	struct path_state workspace;
 	struct actor_datum *actor = actor_get(actor_index);
 	struct uncover_state_data *state_data = &actor->state.action_data.uncover;
 

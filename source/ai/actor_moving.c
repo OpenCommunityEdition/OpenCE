@@ -637,11 +637,11 @@ boolean actor_move_to_point(
 		actor->orders.move.destination.ignore_target_object_index = ignore_target_object_index;
 		actor->control.path.destination_orders = actor->orders.move.destination;
 
-		result = actor_path_refresh(actor_index, TRUE, FALSE);
+		result = actor_path_refresh(actor_index, TRUE, NULL);
 	}
 	else if (actor->meta.timeslice && !actor->control.path.refreshed_this_tick)
 	{
-		result = actor_path_refresh(actor_index, FALSE, FALSE);
+		result = actor_path_refresh(actor_index, FALSE, NULL);
 	}
 
 	return result;
@@ -666,11 +666,11 @@ boolean actor_move_to_move_position(
 		actor->orders.move.destination.ignore_target_object_index = NONE;
 		actor->control.path.destination_orders = actor->orders.move.destination;
 
-		result = actor_path_refresh(actor_index, TRUE, FALSE);
+		result = actor_path_refresh(actor_index, TRUE, NULL);
 	}
 	else if (actor->meta.timeslice && !actor->control.path.refreshed_this_tick)
 	{
-		result = actor_path_refresh(actor_index, FALSE, FALSE);
+		result = actor_path_refresh(actor_index, FALSE, NULL);
 	}
 
 	return result;
@@ -679,7 +679,7 @@ boolean actor_move_to_move_position(
 boolean actor_move_to_firing_position(
 	long actor_index,
 	short firing_position_index,
-	boolean temporary)
+	struct path_state *cached_path_state)
 {
 	struct actor_datum *actor = actor_get(actor_index);
 	boolean result = TRUE;
@@ -696,11 +696,11 @@ boolean actor_move_to_firing_position(
 		actor->firing_positions.moved_away_from_firing_position = FALSE;
 		actor->control.path.destination_orders = actor->orders.move.destination;
 
-		result = actor_path_refresh(actor_index, TRUE, temporary);
+		result = actor_path_refresh(actor_index, TRUE, cached_path_state);
 	}
 	else if (actor->meta.timeslice && !actor->control.path.refreshed_this_tick)
 	{
-		result = actor_path_refresh(actor_index, FALSE, temporary);
+		result = actor_path_refresh(actor_index, FALSE, cached_path_state);
 	}
 
 	return result;
@@ -731,11 +731,11 @@ boolean actor_move_to_prop(
 			prop->vehicle_index == NONE ? prop->unit_index : prop->vehicle_index;
 		actor->control.path.destination_orders = actor->orders.move.destination;
 
-		result = actor_path_refresh(actor_index, TRUE, FALSE);
+		result = actor_path_refresh(actor_index, TRUE, NULL);
 	}
 	else if (actor->meta.timeslice && !actor->control.path.refreshed_this_tick)
 	{
-		result = actor_path_refresh(actor_index, FALSE, FALSE);
+		result = actor_path_refresh(actor_index, FALSE, NULL);
 	}
 
 	return result;
@@ -763,7 +763,7 @@ boolean actor_move_halt(
 		actor->control.path.destination_orders = actor->orders.move.destination;
 	}
 
-	return actor_path_refresh(actor_index, TRUE, FALSE);
+	return actor_path_refresh(actor_index, TRUE, NULL);
 }
 
 boolean actor_move_halt_at_firing_position(
@@ -781,7 +781,7 @@ boolean actor_move_halt_at_firing_position(
 		return actor_move_to_firing_position(
 			actor_index,
 			firing_position_index,
-			FALSE);
+			NULL);
 	}
 
 	if (actor->control.path.destination_orders.destination_type != _destination_halt)
@@ -790,5 +790,5 @@ boolean actor_move_halt_at_firing_position(
 		actor->control.path.destination_orders = actor->orders.move.destination;
 	}
 
-	return actor_path_refresh(actor_index, TRUE, FALSE);
+	return actor_path_refresh(actor_index, TRUE, NULL);
 }

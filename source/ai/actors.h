@@ -260,6 +260,28 @@ enum
 
 #define MAXIMUM_NUMBER_OF_AVOIDANCE_OBJECTS 1024
 
+enum
+{
+	_firing_point_evaluation_mode_fight = 0,
+	_firing_point_evaluation_mode_panic,
+	_firing_point_evaluation_mode_cover,
+	_firing_point_evaluation_mode_uncover,
+	_firing_point_evaluation_mode_guard,
+	_firing_point_evaluation_mode_pursue,
+	_firing_point_evaluation_mode_avoid,
+	NUMBER_OF_FIRING_POINT_EVALUATION_MODES,
+};
+
+enum
+{
+	_firing_position_group_normal = 0,
+	_firing_position_group_when_searching,
+	_firing_position_group_when_not_searching,
+};
+
+#define MAXIMUM_NUMBER_OF_FIRING_POSITION_AVOID_POINTS 32
+#define MAXIMUM_NUMBER_OF_FIRING_POSITION_ATTACK_VECTORS 32
+
 /* ---------- macros */
 
 #define actor_get(index)			((struct actor_datum *)datum_get(actor_data, (index)))
@@ -273,9 +295,117 @@ enum
 
 /* ---------- structures */
 
-struct firing_position_search_definition;
-struct firing_position_search_workspace;
-struct firing_position_candidate;
+struct firing_position_definition;
+
+struct firing_position_avoid_point
+{
+	real radius;
+	real_point3d point;
+};
+
+struct firing_position_attack_vector
+{
+	short type;
+	real_point3d point;
+	real_vector3d vector;
+};
+
+union firing_position_evaluation_data
+{
+	struct
+	{
+		boolean forced_to_flee;
+	} panic;
+	struct
+	{
+		long orphan_prop_index;
+		long last_perceived_time;
+		boolean tenacious;
+	} pursue;
+	struct
+	{
+		boolean allow_occluded_points;
+	} cover;
+};
+
+/* January query/scoring context; the last six debug counters are absent in HCEA. */
+struct firing_position_evaluation_context
+{
+	unsigned long allowed_position_mask;
+	short evaluation_mode;
+	union firing_position_evaluation_data evaluation_data;
+	boolean allow_rejected_positions;
+	boolean allow_outside_range;
+	real maximum_allowable_range;
+	real maximum_search_range;
+	boolean specific_target_enable;
+	real_point3d specific_target_point;
+	long specific_target_surface_index;
+	short specific_target_cluster_index;
+	boolean attractor_enable;
+	real attractor_weight;
+	real attractor_radius;
+	boolean find_path_direction_from_actor;
+	boolean use_last_visible_target_position;
+	boolean find_path_distance_to_target;
+	boolean find_path_direction_from_target;
+	boolean flying;
+	boolean directional_driving;
+	boolean directional_driving_cannot_stop;
+	unsigned long preferred_groups;
+	real preferred_weight;
+	long avoid_point_count;
+	struct firing_position_avoid_point avoid_points[MAXIMUM_NUMBER_OF_FIRING_POSITION_AVOID_POINTS];
+	short attack_vector_count;
+	short friend_attack_vector_count;
+	short dangerous_enemy_attack_vector_count;
+	struct firing_position_attack_vector attack_vectors[MAXIMUM_NUMBER_OF_FIRING_POSITION_ATTACK_VECTORS];
+	boolean has_gun_offset_stand;
+	real_vector3d gun_offset_stand;
+	boolean has_gun_offset_crouch;
+	real_vector3d gun_offset_crouch;
+	boolean has_target;
+	real target_current_distance;
+	real_point3d target_point;
+	real_point3d target_head_position;
+	real_point3d target_line_of_sight_position;
+	boolean target_line_of_sight_optional;
+	long target_vehicle_index;
+	long target_pathfinding_surface_index;
+	real_point3d target_pathfinding_point;
+	short target_cluster_index;
+	long target_prop_index;
+	boolean target_has_hint_vector;
+	real_vector3d target_hint_vector;
+	real target_danger_radius;
+	boolean post_evaluation_bounded;
+	real post_evaluation_bound;
+	short debug_encounter_count;
+	short debug_considered_count;
+	short debug_valid_count;
+	short debug_nonrejected_count;
+	short debug_post_evaluated_count;
+	short debug_skipped_count;
+};
+
+/* Runtime candidate record, distinct from the scenario tag definition. */
+struct firing_position
+{
+	struct firing_position_definition *definition;
+	short original_index;
+	short line_of_sight;
+	real path_distance_from_actor;
+	real_vector3d path_direction_from_actor;
+	real path_distance_to_target;
+	real path_closest_approach_to_target;
+	real_vector3d path_direction_from_target;
+	real linear_distance_squared_to_target;
+	boolean valid;
+	boolean rejected;
+	real pre_evaluation;
+	real evaluation;
+};
+
 
 struct actor_meta_data
 {
@@ -904,9 +1034,6 @@ long actor_create_for_unit(
 	short initial_command_list_index,
 	char noncombat_sequence_id);
 
-void actor_clear_discarded_firing_positions(
-	long actor_index,
-	boolean clear_temporary_only);
 short actors_spawn_from_unit(
 	long unit_index,
 	long actor_variant_definition_index,
@@ -1037,20 +1164,46 @@ void actors_update(
 
 /* ---------- prototypes/ACTOR_FIRING_POSITION.C */
 
+long actor_get_firing_position_group(
+	long actor_index,
+	short evaluation_mode,
+	short group_selection_mode);
+void actor_clear_discarded_firing_positions(
+	long actor_index,
+	boolean clear_temporary_only);
+void actor_discard_firing_position(
+	long actor_index,
+	short firing_position_index,
+	boolean temporary);
+boolean actor_firing_position_discarded(
+	long actor_index,
+	short firing_position_index);
+boolean actor_nearby_firing_positions(
+	long actor_index,
+	real_point3d const *test_point,
+	long test_surface_index,
+	short group_selection_mode);
+short actor_select_firing_position(
+	long actor_index,
+	struct firing_position_evaluation_context *evaluation_context,
+	struct firing_position *best_firing_position,
+	long *current_owner,
+	struct path_state *area_path_state,
+	boolean *area_path_state_valid);
 short actor_active_select_firing_position(
 	long actor_index,
-	struct firing_position_search_definition *search,
-	struct firing_position_candidate *candidate,
-	long *previous_owner_actor_index,
-	struct firing_position_search_workspace *workspace,
-	long *position_flags);
+	struct firing_position_evaluation_context *evaluation_context,
+	struct firing_position *best_firing_position,
+	long *current_owner,
+	struct path_state *area_path_state,
+	boolean *area_path_state_valid);
 short actor_change_firing_position(
 	long actor_index,
 	short firing_position_index,
-	struct firing_position_candidate *candidate,
-	long previous_owner_actor_index,
-	struct firing_position_search_workspace *workspace,
-	long position_flags);
+	struct firing_position *firing_position,
+	long previous_owner,
+	struct path_state *cached_path_state,
+	boolean cached_path_available);
 
 /* ---------- prototypes/ACTOR_COMBAT.C */
 
@@ -1121,7 +1274,7 @@ boolean actor_test_destination(
 boolean actor_path_refresh(
 	long actor_index,
 	boolean new_destination,
-	boolean temporary_firing_position);
+	struct path_state *cached_path_state);
 boolean actor_move_to_point(
 	long actor_index,
 	real_point3d const *destination,
@@ -1135,7 +1288,7 @@ boolean actor_move_to_move_position(
 boolean actor_move_to_firing_position(
 	long actor_index,
 	short firing_position_index,
-	boolean temporary);
+	struct path_state *cached_path_state);
 boolean actor_move_to_prop(
 	long actor_index,
 	long prop_index,

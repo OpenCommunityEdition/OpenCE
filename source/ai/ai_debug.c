@@ -5766,8 +5766,8 @@ static void code_00041220(
 
 	for (index = 0; index<definition->firing_positions.count; index++)
 	{
-		struct firing_position *position = TAG_BLOCK_GET_ELEMENT(&definition->firing_positions, index,
-			struct firing_position);
+		struct firing_position_definition *position = TAG_BLOCK_GET_ELEMENT(&definition->firing_positions, index,
+			struct firing_position_definition);
 		real_argb_color const *colors[MAXIMUM_NUMBER_OF_FIRING_POSITION_GROUPS];
 		boolean owner_flags[MAXIMUM_NUMBER_OF_FIRING_POSITION_GROUPS];
 		real_point3d corner[4];
@@ -5890,7 +5890,7 @@ default_firing_position_colors:
 
 		if (ai_debug.render_firing_positions)
 		{
-			real_argb_color const *color = position->field_14==NONE ?
+			real_argb_color const *color = position->surface_index==NONE ?
 				global_real_argb_red : global_real_argb_white;
 			real_point3d p0;
 			real_point3d p1;

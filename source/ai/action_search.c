@@ -52,15 +52,6 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct firing_position_definition
-{
-	real_point3d position;
-	byte unresolved[2];
-	short cluster_index;
-	byte unresolved2[4];
-	long surface_index;
-};
-
 /* ---------- prototypes */
 
 long actor_target_unit_index(
@@ -502,7 +493,7 @@ boolean action_search_perform(
 			if (!actor_move_to_firing_position(
 				actor_index,
 				state_data->pursuit_location.firing_position_index,
-				FALSE))
+				NULL))
 			{
 				state_data->search_done = TRUE;
 				state_data->search_failed = TRUE;

@@ -425,16 +425,6 @@ enum
 {
 	first_hs_object_type = _hs_type_object,
 	first_hs_object_name_type = _hs_type_object_name,
-	_hs_script_startup = 0,
-	_hs_script_dormant,
-	_hs_script_continuous,
-	_hs_script_static,
-	_hs_script_stub,
-	NUMBER_OF_HS_SCRIPT_TYPES,
-	_hs_function_begin = 0,
-	_hs_function_set = 4,
-	_hs_function_sleep = 19,
-	_hs_function_sleep_until,
 	scenario_cutscene_flag_size = 0x5C,
 	scenario_cutscene_title_size = 0x60,
 	scenario_recorded_animation_size = 0x40,
@@ -465,7 +455,7 @@ enum hs_tokenizer_state
 
 /* ---------- macros */
 
-#define hs_syntax_get(expression_index) ((struct hs_compile_syntax_node *)datum_get(hs_syntax_data, (expression_index)))
+#define hs_syntax_get(expression_index) ((struct hs_syntax_node *)datum_get(hs_syntax_data, (expression_index)))
 #define hud_globals_definition_get(index) ((struct hud_globals_definition *)tag_get(hud_globals_group_tag, (index)))
 #define hud_message_text_definition_get(index) ((struct hud_message_text_definition *)tag_get(hud_message_text_group_tag, (index)))
 #undef HS_TYPE_IS_OBJECT
@@ -497,53 +487,13 @@ struct hs_compile_globals
 	byte pad129[3];
 };
 
-struct hs_compile_syntax_node
-{
-	short datum_header;
-	union
-	{
-		short index;
-		short constant_type;
-		short function_index;
-		short script_index;
-	};
-	short type;
-	word flags;
-	long next_node_index;
-	long source_offset;
-	union
-	{
-		long data;
-		boolean boolean_value;
-		real real_value;
-		short short_value;
-	};
-};
-
 struct hs_tokenizer
 {
 	char *cursor;
 };
 
-typedef boolean (*hs_function_parse_proc)(
-	short function_index,
-	long expression_index);
-
-struct hs_function_definition
-{
-	short return_type;
-	word flags;
-	char const *name;
-	hs_function_parse_proc parse;
-	void *evaluate;
-	char const *help;
-	char const *usage;
-	short parameter_count;
-	short parameter_types[1];
-};
-
-typedef char verify_hs_compile_syntax_node_size[
-	sizeof(struct hs_compile_syntax_node) == sizeof(struct hs_syntax_node) ? 1 : -1];
+typedef char verify_hs_syntax_node_size[
+	sizeof(struct hs_syntax_node) == 0x14 ? 1 : -1];
 
 struct hud_globals_definition
 {
@@ -579,6 +529,11 @@ typedef char verify_hs_compile_globals_size[
 
 /* ---------- prototypes */
 
+static boolean hs_get_parameter_indices(
+	char const *function_name,
+	short parameter_count,
+	long *parameter_indices,
+	long expression_index);
 static boolean hs_parse_scenario_datum(
 	long expression_index,
 	short offset,
@@ -790,6 +745,41 @@ boolean hs_verify_source_offset(
 
 /* ---------- private code */
 
+static boolean hs_get_parameter_indices(
+	char const *function_name,
+	short parameter_count,
+	long *parameter_indices,
+	long expression_index)
+{
+	boolean result = TRUE;
+	long parameter_expression_index = hs_syntax_get(hs_syntax_get(expression_index)->data)->next_node_index;
+	short parameter_index;
+
+	for (parameter_index = 0;
+		parameter_expression_index != NONE;
+		parameter_expression_index = hs_syntax_get(parameter_expression_index)->next_node_index,
+			parameter_index++)
+	{
+		if (parameter_index >= parameter_count)
+			break;
+		parameter_indices[parameter_index] = parameter_expression_index;
+	}
+
+	if (parameter_index != parameter_count || parameter_expression_index != NONE)
+	{
+		sprintf(
+			hs_compile_globals.error_buffer,
+			"the %s call requires %d arguments.",
+			function_name,
+			parameter_count);
+		hs_compile_globals.error = hs_compile_globals.error_buffer;
+		hs_compile_globals.error_offset = hs_syntax_get(expression_index)->source_offset;
+		result = FALSE;
+	}
+
+	return result;
+}
+
 boolean hs_parse_sleep(
 	short function_index,
 	long expression_index)
@@ -842,7 +832,7 @@ static boolean hs_parse_variable(
 	long expression_index)
 {
 	boolean result = FALSE;
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	short global_index;
 
 	match_assert(
@@ -888,8 +878,8 @@ static boolean hs_parse_variable(
 static void hs_parse_call_predicate(
 	long expression_index)
 {
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
-	struct hs_compile_syntax_node *predicate = hs_syntax_get(
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *predicate = hs_syntax_get(
 		hs_syntax_get(expression_index)->data);
 
 	if (predicate->type == _hs_function_name)
@@ -921,7 +911,7 @@ static void hs_parse_call_predicate(
 static boolean hs_parse_boolean(
 	long expression_index)
 {
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	char const *string = hs_compile_globals.compiled_source + expression->source_offset;
 
 	match_assert(
@@ -957,7 +947,7 @@ static boolean hs_parse_real(
 	long expression_index)
 {
 	boolean result = TRUE;
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	char const *string = hs_compile_globals.compiled_source + expression->source_offset;
 	boolean decimal = FALSE;
 
@@ -997,7 +987,7 @@ static boolean hs_parse_integer(
 	long expression_index)
 {
 	boolean result = TRUE;
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	char const *string = hs_compile_globals.compiled_source + expression->source_offset;
 	long value;
 
@@ -1044,7 +1034,7 @@ static boolean hs_parse_integer(
 static boolean hs_parse_string(
 	long expression_index)
 {
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 
 	match_assert(
 		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
@@ -1063,7 +1053,7 @@ static boolean hs_parse_string(
 static boolean hs_parse_script(
 	long expression_index)
 {
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	short script_index;
 
 	match_assert(
@@ -1092,7 +1082,7 @@ static boolean hs_parse_script(
 static boolean hs_parse_tag_reference(
 	long expression_index)
 {
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	struct scenario *scenario = global_scenario_get();
 	tag group_tag;
 	short reference_index;
@@ -1127,7 +1117,7 @@ static boolean hs_parse_tag_reference(
 static boolean hs_parse_enum(
 	long expression_index)
 {
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	struct hs_enum_definition *enum_definition = &hs_enum_table[expression->type];
 	short value_index;
 
@@ -1188,7 +1178,7 @@ static boolean hs_parse_scenario_datum(
 	struct tag_block *block,
 	long element_size)
 {
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	short element_index;
 
 	match_assert(
@@ -1317,7 +1307,7 @@ static boolean hs_parse_device_group(
 static boolean hs_parse_ai(
 	long expression_index)
 {
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	boolean result;
 
 	match_assert(
@@ -1391,7 +1381,7 @@ static boolean hs_parse_object_name(
 	long expression_index)
 {
 	boolean result = FALSE;
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	short object_name_index;
 
 	match_assert(
@@ -1443,7 +1433,7 @@ static boolean hs_parse_object(
 	long expression_index)
 {
 	boolean result = TRUE;
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 
 	match_assert(
 		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
@@ -1515,7 +1505,7 @@ static boolean hs_parse_hud_message(
 static boolean hs_parse_object_list(
 	long expression_index)
 {
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	boolean result;
 
 	match_assert(
@@ -1566,7 +1556,7 @@ static long hs_concatenate_string_constant(
 static void hs_concatenate_expression(
 	long expression_index)
 {
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 
 	SET_FLAG(expression->flags, _hs_syntax_node_permanent_bit, TRUE);
 	if (TEST_FLAG(hs_syntax_get(expression_index)->flags, _hs_syntax_node_primitive_bit))
@@ -1609,7 +1599,7 @@ static boolean hs_add_global(
 	long expression_index)
 {
 	boolean result = FALSE;
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	long type_expression_index = hs_syntax_get(expression->data)->next_node_index;
 
 	if (type_expression_index != NONE)
@@ -1693,7 +1683,7 @@ static boolean hs_add_global(
 static boolean hs_add_script(
 	long expression_index)
 {
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	long script_type_expression_index = hs_syntax_get(expression->data)->next_node_index;
 	short script_type;
 	short return_type;
@@ -1704,8 +1694,8 @@ static boolean hs_add_script(
 	struct hs_script *script;
 	long root_expression_index;
 	long begin_expression_index;
-	struct hs_compile_syntax_node *root_expression;
-	struct hs_compile_syntax_node *begin_expression;
+	struct hs_syntax_node *root_expression;
+	struct hs_syntax_node *begin_expression;
 
 	if (script_type_expression_index == NONE)
 	{
@@ -1867,7 +1857,7 @@ static void hs_tokenize_primitive(
 	struct hs_tokenizer *tokenizer,
 	long expression_index)
 {
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	char *token_start = tokenizer->cursor;
 	short character_index;
 	char character;
@@ -2006,7 +1996,7 @@ static boolean hs_parse_primitive(
 	long expression_index)
 {
 	boolean result = FALSE;
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 
 	match_assert(
 		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
@@ -2060,9 +2050,9 @@ static boolean hs_parse_primitive(
 static boolean hs_parse_nonprimitive(
 	long expression_index)
 {
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	long predicate_index = hs_syntax_get(expression_index)->data;
-	struct hs_compile_syntax_node *predicate = hs_syntax_get(predicate_index);
+	struct hs_syntax_node *predicate = hs_syntax_get(predicate_index);
 
 	match_assert(
 		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
@@ -2184,7 +2174,7 @@ static long hs_tokenize(
 		!hs_compile_globals.error);
 	if (expression_index != NONE)
 	{
-		struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+		struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 
 		expression->flags = 0;
 		expression->type = _hs_unparsed;
@@ -2208,7 +2198,7 @@ static void hs_tokenize_nonprimitive(
 	struct hs_tokenizer *tokenizer,
 	long expression_index)
 {
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	long *child_link = &expression->data;
 
 	expression->source_offset = tokenizer->cursor - hs_compile_globals.compiled_source;
@@ -2257,7 +2247,8 @@ boolean hs_parse(
 	long expression_index,
 	short expected_type)
 {
-	struct hs_compile_syntax_node *expression = hs_syntax_get(expression_index);
+	boolean result = TRUE;
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 
 	match_assert(
 		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
@@ -2273,13 +2264,15 @@ boolean hs_parse(
 		if (TEST_FLAG(hs_syntax_get(expression_index)->flags, _hs_syntax_node_primitive_bit))
 		{
 			expression->constant_type = expected_type;
-			return hs_parse_primitive(expression_index);
+			result = hs_parse_primitive(expression_index);
 		}
-
-		return hs_parse_nonprimitive(expression_index);
+		else
+		{
+			result = hs_parse_nonprimitive(expression_index);
+		}
 	}
 
-	return TRUE;
+	return result;
 }
 
 void hs_compile(
@@ -2339,6 +2332,392 @@ void hs_compile(
 	}
 
 	return;
+}
+
+/* ---------- builtin function parsers */
+
+boolean hs_macro_function_parse(
+	short function_index,
+	long expression_index)
+{
+	boolean result = TRUE;
+	struct hs_function_definition *definition = hs_function_get(function_index);
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
+	long argument_expression_index = hs_syntax_get(expression->data)->next_node_index;
+	short parameter_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
+		0x819,
+		hs_type_valid(definition->return_type));
+	for (parameter_index = 0;
+		result && parameter_index < definition->parameter_count && argument_expression_index != NONE;
+		parameter_index++)
+	{
+		if (hs_parse(argument_expression_index, definition->parameter_types[parameter_index]))
+		{
+			struct hs_syntax_node *argument = hs_syntax_get(argument_expression_index);
+
+			argument_expression_index = argument->next_node_index;
+		}
+		else
+		{
+			result = FALSE;
+		}
+	}
+
+	if (result &&
+		(parameter_index != definition->parameter_count || argument_expression_index != NONE))
+	{
+		sprintf(
+			hs_compile_globals.error_buffer,
+			"the \"%s\" call requires exactly %d arguments.",
+			definition->name,
+			definition->parameter_count);
+		hs_compile_globals.error = hs_compile_globals.error_buffer;
+		hs_compile_globals.error_offset = hs_syntax_get(expression_index)->source_offset;
+		result = FALSE;
+	}
+
+	return result;
+}
+
+boolean hs_parse_if(
+	short function_index,
+	long expression_index)
+{
+	boolean result = FALSE;
+	boolean valid = FALSE;
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
+	long condition_expression_index = hs_syntax_get(
+		hs_syntax_get(expression_index)->data)->next_node_index;
+
+	match_assert(
+		"c:\\halo\\source\\hs\\hs_library_internal_compile.h",
+		0x5B,
+		function_index==_hs_function_if);
+	if (condition_expression_index != NONE)
+	{
+		long then_expression_index = hs_syntax_get(condition_expression_index)->next_node_index;
+
+		if (then_expression_index != NONE)
+		{
+			long else_expression_index = hs_syntax_get(then_expression_index)->next_node_index;
+
+			if (else_expression_index == NONE ||
+				hs_syntax_get(else_expression_index)->next_node_index == NONE)
+			{
+				valid = TRUE;
+				if (hs_parse(condition_expression_index, _hs_type_boolean))
+				{
+					if (hs_parse(then_expression_index, expression->type))
+					{
+						if (!expression->type)
+							expression->type = hs_syntax_get(then_expression_index)->type;
+						result = else_expression_index == NONE ||
+							hs_parse(else_expression_index, expression->type);
+					}
+					else if (!hs_compile_globals.error &&
+						!expression->type &&
+						else_expression_index != NONE &&
+						hs_parse(else_expression_index, expression->type))
+					{
+						expression->type = hs_syntax_get(else_expression_index)->type;
+						result = hs_parse(then_expression_index, expression->type);
+					}
+				}
+			}
+		}
+	}
+
+	if (!valid)
+	{
+		hs_compile_globals.error = "i expected (if <condition> <then> [<else>]).";
+		hs_compile_globals.error_offset = hs_syntax_get(expression_index)->source_offset;
+	}
+
+	return result;
+}
+
+boolean hs_parse_logical(
+	short function_index,
+	long expression_index)
+{
+	boolean result = TRUE;
+	long argument_expression_index = hs_syntax_get(
+		hs_syntax_get(expression_index)->data)->next_node_index;
+	short argument_count;
+
+	match_assert(
+		"c:\\halo\\source\\hs\\hs_library_internal_compile.h",
+		0x15D,
+		function_index==_hs_function_and || function_index==_hs_function_or);
+	for (argument_count = 0;
+		result && argument_expression_index != NONE;
+		argument_count++)
+	{
+		result = hs_parse(argument_expression_index, _hs_type_boolean);
+		argument_expression_index = hs_syntax_get(argument_expression_index)->next_node_index;
+	}
+
+	if (result && argument_count < 2)
+	{
+		sprintf(
+			hs_compile_globals.error_buffer,
+			"the %s call requires at least 2 arguments.",
+			hs_function_get(function_index)->name);
+		hs_compile_globals.error = hs_compile_globals.error_buffer;
+		hs_compile_globals.error_offset = hs_syntax_get(expression_index)->source_offset;
+		result = FALSE;
+	}
+
+	return result;
+}
+
+boolean hs_parse_arithmetic(
+	short function_index,
+	long expression_index)
+{
+	boolean result = TRUE;
+	long argument_expression_index = hs_syntax_get(
+		hs_syntax_get(expression_index)->data)->next_node_index;
+	short argument_count;
+
+	match_assert(
+		"c:\\halo\\source\\hs\\hs_library_internal_compile.h",
+		0x17D,
+		function_index>=_hs_function_plus && function_index<=_hs_function_max);
+	for (argument_count = 0;
+		result && argument_expression_index != NONE;
+		argument_count++)
+	{
+		result = hs_parse(argument_expression_index, _hs_type_real);
+		argument_expression_index = hs_syntax_get(argument_expression_index)->next_node_index;
+	}
+
+	if ((result && argument_count < 2) ||
+		(function_index == _hs_function_divide && argument_count > 2))
+	{
+		sprintf(
+			hs_compile_globals.error_buffer,
+			"the %s call requires %s2 arguments.",
+			hs_function_get(function_index)->name,
+			function_index == _hs_function_divide ? "" : "at least ");
+		hs_compile_globals.error = hs_compile_globals.error_buffer;
+		hs_compile_globals.error_offset = hs_syntax_get(expression_index)->source_offset;
+		result = FALSE;
+	}
+
+	return result;
+}
+
+boolean hs_parse_equality(
+	short function_index,
+	long expression_index)
+{
+	boolean result = FALSE;
+	long argument_indices[2];
+
+	match_assert(
+		"c:\\halo\\source\\hs\\hs_library_internal_compile.h",
+		0x1BC,
+		function_index==_hs_function_equal || function_index==_hs_function_not_equal);
+	if (hs_get_parameter_indices(
+		hs_function_get(function_index)->name,
+		2,
+		argument_indices,
+		expression_index))
+	{
+		if (hs_parse(argument_indices[0], _hs_unparsed))
+		{
+			if (hs_parse(argument_indices[1], hs_syntax_get(argument_indices[0])->type))
+				result = TRUE;
+		}
+		else if (!hs_compile_globals.error)
+		{
+			if (hs_parse(argument_indices[1], _hs_unparsed))
+			{
+				if (hs_parse(argument_indices[0], hs_syntax_get(argument_indices[1])->type))
+					result = TRUE;
+			}
+			else if (!hs_compile_globals.error)
+			{
+				if (hs_parse(argument_indices[0], _hs_type_real) &&
+					hs_parse(argument_indices[1], _hs_type_real))
+					result = TRUE;
+			}
+		}
+	}
+
+	return result;
+}
+
+boolean hs_parse_inequality(
+	short function_index,
+	long expression_index)
+{
+	boolean result = FALSE;
+	long argument_indices[2];
+
+	match_assert(
+		"c:\\halo\\source\\hs\\hs_library_internal_compile.h",
+		0x1E3,
+		function_index>=_hs_function_gt && function_index<=_hs_function_lte);
+	if (hs_get_parameter_indices(
+		hs_function_get(function_index)->name,
+		2,
+		argument_indices,
+		expression_index))
+	{
+		if (hs_parse(argument_indices[0], _hs_unparsed) &&
+			(HS_TYPE_IS_ENUM(hs_syntax_get(argument_indices[0])->type) ||
+			(hs_syntax_get(argument_indices[0])->type>=_hs_type_real &&
+			hs_syntax_get(argument_indices[0])->type<=_hs_type_long_integer)))
+		{
+			if (hs_parse(argument_indices[1], hs_syntax_get(argument_indices[0])->type))
+				result = TRUE;
+		}
+		else if (!hs_compile_globals.error)
+		{
+			if (hs_parse(argument_indices[1], _hs_unparsed) &&
+				(HS_TYPE_IS_ENUM(hs_syntax_get(argument_indices[1])->type) ||
+				(hs_syntax_get(argument_indices[1])->type>=_hs_type_real &&
+				hs_syntax_get(argument_indices[1])->type<=_hs_type_long_integer)))
+			{
+				if (hs_parse(argument_indices[0], hs_syntax_get(argument_indices[1])->type))
+					result = TRUE;
+			}
+			else if (!hs_compile_globals.error)
+			{
+				if (hs_parse(argument_indices[0], _hs_type_real) &&
+					hs_parse(argument_indices[1], _hs_type_real))
+					result = TRUE;
+			}
+		}
+	}
+
+	return result;
+}
+
+boolean hs_parse_sleep_until(
+	short function_index,
+	long expression_index)
+{
+	boolean result = FALSE;
+	long condition_expression_index;
+
+	match_assert(
+		"c:\\halo\\source\\hs\\hs_library_internal_compile.h",
+		0x235,
+		function_index==_hs_function_sleep_until);
+	condition_expression_index = hs_syntax_get(
+		hs_syntax_get(expression_index)->data)->next_node_index;
+	if (condition_expression_index != NONE)
+	{
+		long period_expression_index = hs_syntax_get(condition_expression_index)->next_node_index;
+
+		result = hs_parse(condition_expression_index, _hs_type_boolean);
+		if (result && period_expression_index != NONE)
+		{
+			long timeout_expression_index = hs_syntax_get(period_expression_index)->next_node_index;
+
+			result = hs_parse(period_expression_index, _hs_type_short_integer);
+			if (result && timeout_expression_index != NONE)
+				result = hs_parse(timeout_expression_index, _hs_type_long_integer);
+		}
+	}
+	else
+	{
+		hs_compile_globals.error = "the sleep_until call requires a condition and, optionally, a period.";
+		hs_compile_globals.error_offset = hs_syntax_get(expression_index)->source_offset;
+	}
+
+	return result;
+}
+
+boolean hs_parse_wake(
+	short function_index,
+	long expression_index)
+{
+	boolean result = FALSE;
+	long script_expression_index;
+
+	match_assert(
+		"c:\\halo\\source\\hs\\hs_library_internal_compile.h",
+		0x25D,
+		function_index==_hs_function_wake);
+	if (hs_get_parameter_indices(
+		hs_function_get(function_index)->name,
+		1,
+		&script_expression_index,
+		expression_index))
+	{
+		struct hs_syntax_node *script_expression = hs_syntax_get(script_expression_index);
+
+		if (hs_parse(script_expression_index, _hs_type_script))
+		{
+			struct hs_script *script = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->hs_scripts,
+				script_expression->short_value,
+				struct hs_script);
+
+			if (script->script_type == _hs_script_static || script->script_type == _hs_script_stub)
+			{
+				hs_compile_globals.error = "this static script cannot be awakened.";
+				hs_compile_globals.error_offset = script_expression->source_offset;
+			}
+			else
+			{
+				result = TRUE;
+			}
+		}
+	}
+
+	return result;
+}
+
+boolean hs_parse_object_cast_up(
+	short function_index,
+	long expression_index)
+{
+	boolean result = FALSE;
+	long argument_indices[1];
+
+	match_assert(
+		"c:\\halo\\source\\hs\\hs_library_internal_compile.h",
+		0x29A,
+		function_index>=_hs_function_object_to_unit && function_index<=_hs_function_object_to_unit);
+	if (hs_get_parameter_indices(
+		hs_function_get(function_index)->name,
+		1,
+		argument_indices,
+		expression_index))
+	{
+		result = hs_parse(argument_indices[0], _hs_type_object);
+	}
+
+	return result;
+}
+
+boolean hs_parse_debug_string(
+	short function_index,
+	long expression_index)
+{
+	boolean result = TRUE;
+	long argument_expression_index = hs_syntax_get(
+		hs_syntax_get(expression_index)->data)->next_node_index;
+
+	match_assert(
+		"c:\\halo\\source\\hs\\hs_library_internal_compile.h",
+		0x2AE,
+		(function_index>=_hs_function_debug_string__first) && (function_index<=_hs_function_debug_string__last));
+	while (result && argument_expression_index != NONE)
+	{
+		result = hs_parse(argument_expression_index, _hs_type_string);
+		argument_expression_index = hs_syntax_get(argument_expression_index)->next_node_index;
+	}
+
+	return result;
 }
 
 void hs_compile_finish(

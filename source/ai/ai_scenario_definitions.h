@@ -169,13 +169,13 @@ struct squad_definition
 
 /* element of encounter_definition.firing_positions; 0x18 from the call site,
 group_index at 0xc and the tag index at 0x14 from code_00041220 */
-struct firing_position
+struct firing_position_definition
 {
 	real_point3d position;
 	short group_index;
-	short pad;
-	long __unknown10;
-	long field_14;
+	short cluster_index;
+	byte unresolved[4];
+	long surface_index;
 };
 
 struct encounter_definition

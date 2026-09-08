@@ -69,6 +69,41 @@ enum
 	NUMBER_OF_HS_OBJECT_TYPES = 6
 };
 
+enum hs_function_index
+{
+	_hs_function_begin = 0,
+	_hs_function_begin_random,
+	_hs_function_if,
+	_hs_function_cond,
+	_hs_function_set,
+	_hs_function_and,
+	_hs_function_or,
+	_hs_function_plus,
+	_hs_function_minus,
+	_hs_function_times,
+	_hs_function_divide,
+	_hs_function_min,
+	_hs_function_max,
+	_hs_function_equal,
+	_hs_function_not_equal,
+	_hs_function_gt,
+	_hs_function_lt,
+	_hs_function_gte,
+	_hs_function_lte,
+	_hs_function_sleep,
+	_hs_function_sleep_until,
+	_hs_function_wake,
+	_hs_function_inspect,
+	_hs_function_object_to_unit,
+	_hs_function_debug_string__first,
+	_hs_function_debug_string__ai_debug_communication_suppress =
+		_hs_function_debug_string__first,
+	_hs_function_debug_string__ai_debug_communication_ignore,
+	_hs_function_debug_string__ai_debug_communication_focus,
+	_hs_function_debug_string__last =
+		_hs_function_debug_string__ai_debug_communication_focus,
+};
+
 /* ---------- macros */
 
 #define hs_type_valid(type) ((type)>=_hs_type_void && (type)<NUMBER_OF_HS_TYPES)
@@ -86,7 +121,28 @@ struct hs_enum_definition
 	char const **values;
 };
 
-struct hs_function_definition;
+typedef boolean (*hs_function_parse_proc)(
+	short function_index,
+	long expression_index);
+
+typedef void (*hs_evaluate_procedure)(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+
+struct hs_function_definition
+{
+	short return_type;
+	short flags;
+	char const *name;
+	hs_function_parse_proc parse;
+	hs_evaluate_procedure evaluate;
+	char const *help;
+	char const *usage;
+	short parameter_count;
+	short parameter_types[1];
+};
+
 struct hs_external_global_definition;
 
 /* ---------- prototypes/HS.C */
@@ -138,9 +194,14 @@ long *hs_macro_function_evaluate(
 void hs_recompile(
 	void);
 
-boolean hs_compile_and_evaluate(const char *expression);
+boolean hs_compile_and_evaluate(
+	char const *expression);
 
-short hs_tokens_enumerate(char const *substring, long type_flags, char const **results, short maximum_count);
+short hs_tokens_enumerate(
+	char const *substring,
+	long type_flags,
+	char const **results,
+	short maximum_count);
 
 boolean hs_can_cast(
 	short actual_type,
@@ -159,6 +220,8 @@ short hs_global_get_type(
 	short global_index);
 char const *hs_global_get_name(
 	short global_index);
+/* ---------- prototypes/HS_COMPILE.C */
+
 boolean hs_parse(
 	long expression_index,
 	short expected_type);

@@ -61,13 +61,21 @@ ownership; no matching override hides them. Ten new useful fuzzy bodies are
 also retained, with unsafe donor paths repaired and zero exact credit.
 Full tests: 1,120 passed, two skipped, 26 subtests. Parks: 309 active, none
 stale/invalid. See [the batch ledger](object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md).
-Publication is checked after committing this batch.
+Published as `458ba910cc907048a667215f7dc583e52cdab5e5`; both authorized
+remote branch tips were independently verified there.
 
-Next prepared scratch batches, not yet compiled/admitted: HS builtin parser
-owners at `scratch/hs-builtin-owner-packet-20260907` (3,137 meaningful saved
-donor bytes), and the complete firing-position evaluator/caller graph at
-`scratch/actor-firing-position-owner-packet-20260907` (including newly written
-missing evaluator bodies). Donor/projected totals are not canonical credit.
+The next verified coherent batch is HS compiler plus ActorFiringPosition:
+**+5,239 gross exact bytes minus one explicit 437-byte ActionGuard debit =
++4,802 net**, reaching **938,227 meaningful exact code bytes / 6,321 credited
+functions**. Stable census is **6,367/8,245**: 18 gains and one disclosed loss.
+Matching objects decrease to **390/833** because ActionGuard is honestly
+reclassified NonMatching; matched data remains **2,062,532**. Seven complete
+Actor residuals plus four credible written-but-naturally-unemitted private
+bodies are retained without exact credit. Full tests: **1,120 passed, two
+skipped, 26 subtests**. Parks: 317 active, none stale/invalid. Admission audit:
+zero candidates, contradictions or revocations. See
+[the HS/Actor ledger](object_matching_logs/hs_actor_owner_reconciliation_20260907.md).
+Publication is checked after committing this batch.
 
 Per the latest [house rules and batch cadence](campaign_house_rules.md), the
 next forced canonical treemap refresh is at **940,828 meaningful exact bytes**
@@ -79,6 +87,37 @@ No other part of the new-lane totals below is added to that checkpoint.
 They are donor-relative observations, not an audited union or promised future
 credit. Fresh canonical rebuilds, source admission, complete runtime ownership
 and regression checks are still required for every packet.
+
+## Complete-tip lane accounting against current canonical
+
+The user-provided screenshots are internally reproducible, but each starts at
+its lane's older, overlapping base. Opus reaches 963,046 meaningful credited
+bytes in its own tree and Fable reaches 948,240; neither total is added to
+canonical. A complete stable-owner set comparison finds 231 unique lane gains /
+64,872 meaningful bytes, with no intersection between these two particular
+new-gain sets. Forty of those owners / 9,552 bytes are already exact after the
+HS/Actor trial.
+
+The remaining donor-strict/current-nonstrict set is 191 owners / 55,320 bytes.
+That still includes 1,409 bytes already reconciled as safer fuzzy source and the
+615-byte rejected Alpha3 encoder. Removing those known dispositions leaves a
+**53,296-byte upper screening ceiling**, not a promise of recoverable exact
+credit. Further ABI, owner, source-quality and collateral-regression review will
+reduce or partition it.
+
+The broader 57,316-byte donor-exact/current-nonexact difference additionally
+contains exactly 1,996 bytes of known collateral debits: Bitmap mipmap (866),
+solo-level UI (693) and this batch's ActionGuard (437). These are not fresh lane
+work and must not be used to claim that reconciliation lost or ignored bytes.
+
+Reproducible detailed evidence is in
+`scratch/two-lane-screenshot-accounting-20260907.md` and its adjacent JSON/script.
+Complete source/owner intake is in
+`scratch/opus2-complete-tip-backlog-intake-20260907.md` and
+`scratch/fable_complete_tip_remaining_intake_20260907.md`. The largest queued
+families are UIWidget, UI game-data input, HS compile and saved-game storage;
+CollisionBSP plus Damage is the next smaller-family packet under review. All
+figures are screening bounds until rebuilt and admitted in current canonical.
 
 ## Opus 2: UI, scripting and profiles
 

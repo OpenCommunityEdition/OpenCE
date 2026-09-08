@@ -1134,11 +1134,6 @@ boolean actor_attacking_target(
 	long actor_index,
 	real_vector3d *attack_vector);
 
-void actor_discard_firing_position(
-	long actor_index,
-	short firing_position_index,
-	boolean temporary);
-
 void actor_stimulus_prop_sighted(
 	long actor_index,
 	long prop_index,
