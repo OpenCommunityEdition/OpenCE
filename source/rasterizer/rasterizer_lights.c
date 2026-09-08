@@ -90,6 +90,7 @@ symbols in this file:
 #include "rasterizer.h"
 #include "rasterizer_lights.h"
 #include "rasterizer_geometry.h"
+#include "rasterizer_debug_options.h"
 #include <xtl.h>
 #include "rasterizer/xbox/rasterizer_xbox.h"
 
@@ -214,14 +215,6 @@ struct rasterizer_lights_globals
 	long fixed_function_light_count;
 };
 
-struct rasterizer_lights_debug_options_prefix
-{
-	byte reserved000[2];
-	short statistics_mode;
-	byte reserved004[0x1B];
-	boolean lens_flares;
-};
-
 typedef char verify_structure_cluster_size[
 	sizeof(struct structure_cluster) == 0x68 ? 1 : -1];
 typedef char verify_structure_cluster_lens_flare_marker_count_offset[
@@ -240,14 +233,6 @@ typedef char verify_rasterizer_lights_window_parameters_camera_forward_offset[
 		camera_forward) == 0x14 ? 1 : -1];
 typedef char verify_rasterizer_light_submit_parameters_size[
 	sizeof(struct rasterizer_light_submit_parameters) == 0x38 ? 1 : -1];
-typedef char verify_rasterizer_lights_debug_options_statistics_mode_offset[
-	offsetof(
-		struct rasterizer_lights_debug_options_prefix,
-		statistics_mode) == 0x2 ? 1 : -1];
-typedef char verify_rasterizer_lights_debug_options_lens_flares_offset[
-	offsetof(
-		struct rasterizer_lights_debug_options_prefix,
-		lens_flares) == 0x1F ? 1 : -1];
 typedef char verify_rasterizer_lights_frame_statistics_dynamic_light_count_offset[
 	offsetof(
 		struct rasterizer_frame_statistics_globals,
@@ -274,7 +259,6 @@ static struct rasterizer_lens_flare_submit_parameters local_lens_flare_parameter
 static long local_lens_flare_count = 0;
 static boolean local_lens_flare_error_printed = FALSE;
 extern struct rasterizer_lights_globals rasterizer_lights;
-extern struct rasterizer_lights_debug_options_prefix rasterizer_debug_options;
 extern struct rasterizer_lights_window_parameters global_window_parameters;
 extern short global_screenshot_count;
 extern short global_screenshot_size;
@@ -433,7 +417,7 @@ void rasterizer_lens_flare_submit(
 					}
 				}
 
-				if (rasterizer_debug_options.statistics_mode==_rasterizer_statistics_mode_geometry)
+				if (rasterizer_debug_options.stats==_rasterizer_statistics_mode_geometry)
 				{
 					rasterizer_frame_statistics.lens_flare_count++;
 				}
@@ -469,11 +453,10 @@ void rasterizer_lights_begin_for_new_frame(
 
 			if (lens_flare_parameters->internal__occlusion_pixels>0)
 			{
-				long new_visibility= (255*rasterizer_widget_get_occlusion_test_result(lens_flare_index) +
-					(lens_flare_parameters->internal__occlusion_pixels>>1)) /
-					lens_flare_parameters->internal__occlusion_pixels;
+				long visible_pixels= rasterizer_widget_get_occlusion_test_result(lens_flare_index);
+				long occlusion_pixels= lens_flare_parameters->internal__occlusion_pixels;
 
-				latest_visibility= (byte)MIN(255, new_visibility);
+				latest_visibility= (byte)MIN(255, (255*visible_pixels + (occlusion_pixels>>1))/occlusion_pixels);
 			}
 			else
 			{
@@ -542,7 +525,7 @@ long rasterizer_light_submit(
 		light_index= rasterizer_lights.light_count++;
 		rasterizer_lights.lights[light_index]= *parameters;
 
-		if (rasterizer_debug_options.statistics_mode==_rasterizer_statistics_mode_geometry)
+		if (rasterizer_debug_options.stats==_rasterizer_statistics_mode_geometry)
 		{
 			rasterizer_frame_statistics.dynamic_light_count++;
 		}

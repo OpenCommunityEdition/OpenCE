@@ -62,6 +62,18 @@ original headline remains unadmitted as exact. Canonical reaches **928,770
 meaningful bytes**, **6,277 credited functions**, and unchanged **391/833
 Matching objects**. This does not close the whole Active Camouflage object.
 
+The subsequent [Lights frame-start packet](rasterizer_lights_obj_frame_start_reconciliation_20260906.md)
+adds **289 meaningful exact bytes / one function**, bringing the tracked Opus
+reconciliation gain to **8,195 bytes**: **6,906** from the original headline
+plus **1,289** previously uncounted strict bytes. **23,168** of the original
+headline remains unadmitted as exact. This includes work preserved as honest
+fuzzy source and source/ownership-blocked candidates; it is not promised future
+credit. Interleaved verified networking work brings canonical's overall total
+to **930,363 meaningful bytes / 6,283 credited functions**, with unchanged
+**391/833 Matching objects**. The Lights ledger discloses the donor's expression
+search history and the independent source-credibility decision; it does not
+claim that the byte match alone authenticates original source.
+
 ## Identity and frozen evidence
 
 - Canonical comparison commit: `d574f4ff458c71ae4011b7796d80e3e67dfed55f`.
