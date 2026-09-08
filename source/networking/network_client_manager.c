@@ -379,6 +379,7 @@ symbols in this file:
 #include "game/player_queues_new.h"
 #include "game/players.h"
 #include "interface/player_ui.h"
+#include "saved games/player_profile.h"
 #include "interface/ui_widget.h"
 #include "main/main.h"
 #include "memory/data.h"
@@ -581,28 +582,6 @@ struct connect_process_input;
 struct message_client_game_start_request
 {
 	short request_type;
-};
-
-struct player_profile_controller_settings
-{
-	byte button_preset;
-	byte joystick_preset;
-	byte look_sensitivity;
-	boolean invert_look;
-	boolean vibration_disabled;
-	boolean flight_stick_aircraft_controls;
-	boolean autocenter;
-	boolean ingame_help_disabled;
-};
-
-struct player_profile
-{
-	wchar_t name[12];
-	short primary_color_index;
-	word flags;
-	byte solo_levels[10];
-	short last_single_player_level;
-	struct player_profile_controller_settings controller_settings;
 };
 
 struct message_client_add_player_request
@@ -1566,7 +1545,7 @@ boolean network_game_client_add_player(
 
 	player.controller_index = (char)local_player_index;
 	player.machine_index = (char)client->machine_index;
-	ustrncpy(player.name, profile.name, NETWORK_PLAYER_NAME_LENGTH - 1);
+	ustrncpy(player.name, profile.player_name, NETWORK_PLAYER_NAME_LENGTH - 1);
 	player.name[NETWORK_PLAYER_NAME_LENGTH - 1] = 0;
 	player.primary_color_index = profile.primary_color_index;
 	player.icon_index = NONE;

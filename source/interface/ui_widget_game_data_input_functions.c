@@ -502,28 +502,6 @@ struct network_game
 	struct network_player players[16];
 };
 
-struct player_profile_controller_settings
-{
-	byte button_preset;
-	byte joystick_preset;
-	byte look_sensitivity;
-	boolean invert_look;
-	boolean vibration_disabled;
-	boolean flight_stick_aircraft_controls;
-	boolean autocenter;
-	boolean ingame_help_disabled;
-};
-
-struct player_profile
-{
-	wchar_t name[12];
-	short primary_color_index;
-	word flags;
-	byte solo_levels[10];
-	short last_single_player_level;
-	struct player_profile_controller_settings controller_settings;
-};
-
 struct playlist_profile
 {
 	wchar_t name[12];
@@ -993,13 +971,13 @@ void get_active_player_profile_display_name(
 	player_ui_get_active_player_profile(widget->local_player_index, &profile);
 	widget->parameters.text_box.text = ui_widget_realloc(
 		widget->parameters.text_box.text,
-		sizeof(profile.name),
+		sizeof(profile.player_name),
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0x9F0);
 	if (widget->parameters.text_box.text)
 	{
-		ustrncpy(widget->parameters.text_box.text, profile.name, NUMBEROF(profile.name) - 1);
-		widget->parameters.text_box.text[NUMBEROF(profile.name) - 1] = 0;
+		ustrncpy(widget->parameters.text_box.text, profile.player_name, NUMBEROF(profile.player_name) - 1);
+		widget->parameters.text_box.text[NUMBEROF(profile.player_name) - 1] = 0;
 	}
 	return;
 }
@@ -1025,13 +1003,13 @@ void get_editable_player_profile_display_name(
 	{
 		widget->parameters.text_box.text = ui_widget_realloc(
 			widget->parameters.text_box.text,
-			sizeof(profile->name),
+			sizeof(profile->player_name),
 			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 			0xA04);
 		if (widget->parameters.text_box.text)
 		{
-			ustrncpy(widget->parameters.text_box.text, profile->name, NUMBEROF(profile->name) - 1);
-			widget->parameters.text_box.text[NUMBEROF(profile->name) - 1] = 0;
+			ustrncpy(widget->parameters.text_box.text, profile->player_name, NUMBEROF(profile->player_name) - 1);
+			widget->parameters.text_box.text[NUMBEROF(profile->player_name) - 1] = 0;
 		}
 	}
 	return;
@@ -2461,7 +2439,7 @@ void player_profile_3wide_list_update(
 				0x7E7);
 			if (profile_name->parameters.text_box.text)
 			{
-				if (TEST_FLAG(profile->flags, 0))
+				if (TEST_FLAG(profile->flags, _player_profile_default_profile_bit))
 				{
 					wchar_t const *name;
 					long default_name_index = profile->flags >> 8;
@@ -2482,7 +2460,7 @@ void player_profile_3wide_list_update(
 				{
 					ustrncpy(
 						profile_name->parameters.text_box.text,
-						profile->name,
+						profile->player_name,
 						0xB);
 					profile_name->parameters.text_box.text[0xB] = 0;
 				}
@@ -2499,7 +2477,7 @@ void player_profile_3wide_list_update(
 			else
 				color_picture->animation.current_frame_index = profile->primary_color_index;
 
-			if (TEST_FLAG(profile->flags, 0))
+			if (TEST_FLAG(profile->flags, _player_profile_default_profile_bit))
 			{
 				current_level_text->visible = FALSE;
 				current_skill_text->visible = FALSE;
@@ -2670,7 +2648,7 @@ void player_profile_1wide_list_update(
 	{
 		wchar_t const *profile_name;
 
-		if (TEST_FLAG(profile->flags, 0))
+		if (TEST_FLAG(profile->flags, _player_profile_default_profile_bit))
 		{
 			long default_name_index = profile->flags >> 8;
 			long names_tag_index = tag_loaded(
@@ -2686,7 +2664,7 @@ void player_profile_1wide_list_update(
 			}
 		}
 		else
-			profile_name = profile->name;
+			profile_name = profile->player_name;
 
 		ustrncpy(list_widget->parameters.list.item_text, profile_name, 0xB);
 		list_widget->parameters.list.item_text[0xB] = 0;
@@ -2720,7 +2698,7 @@ void player_profile_1wide_list_update(
 			long joystick_descriptions_tag_index;
 			long button_descriptions_tag_index;
 
-			if (TEST_FLAG(profile->flags, 0))
+			if (TEST_FLAG(profile->flags, _player_profile_default_profile_bit))
 			{
 				joystick_descriptions_path =
 					"ui\\shell\\main_menu\\player_profiles_select\\joystick_set_defaults_descriptions";
@@ -2760,7 +2738,7 @@ void player_profile_1wide_list_update(
 					"\r\n",
 					button_description);
 			}
-			else if (TEST_FLAG(profile->flags, 0))
+			else if (TEST_FLAG(profile->flags, _player_profile_default_profile_bit))
 				profile_description->parameters.text_box.text[0] = 0;
 
 			profile_description->parameters.text_box.text[0xFF] = 0;

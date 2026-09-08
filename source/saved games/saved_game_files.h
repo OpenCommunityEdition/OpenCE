@@ -12,6 +12,24 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum
+{
+	SAVED_GAME_FILE_BLOCK_SIZE = 512
+};
+
+enum
+{
+	_saved_game_file_index_read_only_bit = 30,
+	_saved_game_file_index_valid_bit
+};
+
+enum
+{
+	_saved_game_file_type_player_profile = 0,
+	_saved_game_file_type_game_variant,
+	NUMBER_OF_SAVED_GAME_FILE_TYPES
+};
+
 /* ---------- macros */
 
 /* ---------- structures */

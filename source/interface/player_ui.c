@@ -167,53 +167,12 @@ enum
 {
 	MAXIMUM_NUMBER_OF_LOCAL_PLAYERS = 4,
 	PLAYER_UI_DISPOSE_SIZE = 0x230,
-	SAVED_GAME_FILE_TYPE_PLAYER_PROFILE = 0,
-	SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE = 1,
-	NUMBER_OF_SAVED_GAME_FILE_TYPES = 2,
-	_saved_game_file_default_profile_bit = 30,
-	_playlist_profile_system_default_bit = 0,
-
-	_button_preset_standard = 0,
-	_button_preset_southpaw,
-	_button_preset_jumpy,
-	_button_preset_bumperjumper,
-	_button_preset_boxer,
-	NUMBER_OF_BUTTON_PRESETS,
-
-	_joystick_preset_standard = 0,
-	_joystick_preset_south_paw,
-	_joystick_preset_legacy,
-	_joystick_preset_legacy_south_paw,
-	NUMBER_OF_JOYSTICK_PRESETS,
-
-	NUMBER_OF_LOOK_SENSITIVITY_SETTINGS = 10
+	_playlist_profile_system_default_bit = 0
 };
 
 /* ---------- macros */
 
 /* ---------- structures */
-
-struct player_profile_controller_settings
-{
-	byte button_preset;
-	byte joystick_preset;
-	byte look_sensitivity;
-	boolean invert_look;
-	boolean vibration_disabled;
-	boolean flight_stick_aircraft_controls;
-	boolean autocenter;
-	boolean ingame_help_disabled;
-};
-
-struct player_profile
-{
-	wchar_t name[12];
-	short primary_color_index;
-	word flags;
-	byte solo_levels[10];
-	short last_single_player_level;
-	struct player_profile_controller_settings controller_settings;
-};
 
 struct player_ui_local_player
 {
@@ -406,7 +365,7 @@ struct player_profile *player_ui_get_edit_player_profile(
 {
 	struct player_profile *result;
 
-	if (saved_game_file_get_type(player_ui_globals.edit_profile_index) == SAVED_GAME_FILE_TYPE_PLAYER_PROFILE)
+	if (saved_game_file_get_type(player_ui_globals.edit_profile_index) == _saved_game_file_type_player_profile)
 		result = &player_ui_globals.edit_profile.current.player;
 	else
 		result = NULL;
@@ -418,7 +377,7 @@ struct playlist_profile *player_ui_get_edit_playlist_profile(
 {
 	struct playlist_profile *result;
 
-	if (saved_game_file_get_type(player_ui_globals.edit_profile_index) == SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE)
+	if (saved_game_file_get_type(player_ui_globals.edit_profile_index) == _saved_game_file_type_game_variant)
 		result = &player_ui_globals.edit_profile.current.playlist;
 	else
 		result = NULL;
@@ -437,7 +396,7 @@ boolean player_ui_edit_profile_is_dirty(
 	{
 		switch (saved_game_file_get_type(player_ui_globals.edit_profile_index))
 		{
-			case SAVED_GAME_FILE_TYPE_PLAYER_PROFILE:
+			case _saved_game_file_type_player_profile:
 			{
 				original_flags = player_ui_globals.edit_profile.original.player.flags;
 				current_flags = player_ui_globals.edit_profile.current.player.flags;
@@ -456,7 +415,7 @@ boolean player_ui_edit_profile_is_dirty(
 				break;
 			}
 
-			case SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE:
+			case _saved_game_file_type_game_variant:
 			{
 				original_flags = player_ui_globals.edit_profile.original.playlist.flags;
 				current_flags = player_ui_globals.edit_profile.current.playlist.flags;
@@ -527,7 +486,7 @@ short player_ui_get_last_single_player_level_played(
 {
 	match_assert("c:\\halo\\SOURCE\\interface\\player_ui.c", 265, (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
 
-	return player_ui_globals.local_players[local_player_index].profile.last_single_player_level;
+	return player_ui_globals.local_players[local_player_index].profile.last_single_player_map_played;
 }
 
 short player_ui_get_single_player_local_player_controller(
@@ -590,7 +549,7 @@ void player_ui_activate_all_solo_levels(
 	level_index = 0;
 	do
 	{
-		player_ui_globals.local_players[0].profile.solo_levels[level_index] |= 0xf;
+		player_ui_globals.local_players[0].profile.single_player_map_flags[level_index] |= 0xf;
 	}
 	while (++level_index < 10);
 
@@ -644,7 +603,7 @@ long player_ui_get_player1_last_used_profile_index(
 			player_ui_globals.player1_last_used_profile_directory))
 	{
 		player1_last_used_profile_index = saved_game_file_find_profile_index_for_directory_path(
-			player_ui_globals.player1_last_used_profile_directory, SAVED_GAME_FILE_TYPE_PLAYER_PROFILE);
+			player_ui_globals.player1_last_used_profile_directory, _saved_game_file_type_player_profile);
 	}
 	return player1_last_used_profile_index;
 }
@@ -701,8 +660,8 @@ boolean player_ui_edit_profile_is_default_profile(
 	{
 		long type = saved_game_file_get_type(player_ui_globals.edit_profile_index);
 
-		if (type>=0 && type<=SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE)
-			result = TEST_FLAG(player_ui_globals.edit_profile_index, _saved_game_file_default_profile_bit);
+		if (type>=0 && type<=_saved_game_file_type_game_variant)
+			result = TEST_FLAG(player_ui_globals.edit_profile_index, _saved_game_file_index_read_only_bit);
 		else
 			error(_error_silent, "unknown saved game file type being edited");
 	}
@@ -743,7 +702,7 @@ void player_ui_begin_editing_profile(
 
 	switch (type)
 	{
-		case SAVED_GAME_FILE_TYPE_PLAYER_PROFILE:
+		case _saved_game_file_type_player_profile:
 			if (player_profile_get(
 				profile_index,
 				&player_ui_globals.edit_profile.original.player))
@@ -760,7 +719,7 @@ void player_ui_begin_editing_profile(
 			}
 			break;
 
-		case SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE:
+		case _saved_game_file_type_game_variant:
 			if (playlist_profile_get(
 				profile_index,
 				&player_ui_globals.edit_profile.original.playlist))
@@ -794,10 +753,10 @@ boolean player_ui_save_profile(
 
 	switch (saved_game_file_get_type(player_ui_globals.edit_profile_index))
 	{
-		case SAVED_GAME_FILE_TYPE_PLAYER_PROFILE:
+		case _saved_game_file_type_player_profile:
 			if (TEST_FLAG(
 				player_ui_globals.edit_profile_index,
-				_saved_game_file_default_profile_bit))
+				_saved_game_file_index_read_only_bit))
 			{
 				error(_error_silent, "### WARNING: saving over a default player profile");
 			}
@@ -813,7 +772,7 @@ boolean player_ui_save_profile(
 			result = TRUE;
 			break;
 
-		case SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE:
+		case _saved_game_file_type_game_variant:
 			if (!player_ui_edit_profile_is_dirty())
 			{
 				error(_error_silent, "### WARNING: saving player profile even though it hasn't been changed");
@@ -821,7 +780,7 @@ boolean player_ui_save_profile(
 
 			if (TEST_FLAG(
 				player_ui_globals.edit_profile_index,
-				_saved_game_file_default_profile_bit))
+				_saved_game_file_index_read_only_bit))
 			{
 				if (ustrncmp(
 					player_ui_globals.edit_profile.current.playlist.name,
@@ -922,17 +881,17 @@ boolean player_ui_edit_profile_name_is_dirty(
 
 		switch (type)
 		{
-			case SAVED_GAME_FILE_TYPE_PLAYER_PROFILE:
+			case _saved_game_file_type_player_profile:
 				if (ustrncmp(
-					player_ui_globals.edit_profile.current.player.name,
-					player_ui_globals.edit_profile.original.player.name,
+					player_ui_globals.edit_profile.current.player.player_name,
+					player_ui_globals.edit_profile.original.player.player_name,
 					12)!=0)
 				{
 					result = TRUE;
 				}
 				break;
 
-			case SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE:
+			case _saved_game_file_type_game_variant:
 				if (ustrncmp(
 					player_ui_globals.edit_profile.current.playlist.name,
 					player_ui_globals.edit_profile.original.playlist.name,
@@ -967,14 +926,14 @@ boolean player_ui_prompt_user_to_rename_edit_profile(
 
 		switch (type)
 		{
-			case SAVED_GAME_FILE_TYPE_PLAYER_PROFILE:
+			case _saved_game_file_type_player_profile:
 				result = virtual_keyboard_launch(
-					player_ui_globals.edit_profile.current.player.name,
-					sizeof(player_ui_globals.edit_profile.current.player.name),
+					player_ui_globals.edit_profile.current.player.player_name,
+					sizeof(player_ui_globals.edit_profile.current.player.player_name),
 					10);
 				break;
 
-			case SAVED_GAME_FILE_TYPE_PLAYLIST_PROFILE:
+			case _saved_game_file_type_game_variant:
 				result = virtual_keyboard_launch(
 					player_ui_globals.edit_profile.current.playlist.name,
 					sizeof(player_ui_globals.edit_profile.current.playlist.name),
@@ -1086,7 +1045,7 @@ static void set_local_player_controls_from_player_profile(
 			preferences.game_control_to_xbox_buttons[11] = _gamepad_binary_button_right_thumb;
 			break;
 
-		case _button_preset_southpaw:
+		case _button_preset_swap_triggers:
 			preferences.game_control_to_xbox_buttons[0] = _gamepad_analog_button_a;
 			preferences.game_control_to_xbox_buttons[1] = _gamepad_analog_button_black;
 			preferences.game_control_to_xbox_buttons[2] = _gamepad_analog_button_x;
@@ -1101,7 +1060,7 @@ static void set_local_player_controls_from_player_profile(
 			preferences.game_control_to_xbox_buttons[11] = _gamepad_binary_button_right_thumb;
 			break;
 
-		case _button_preset_jumpy:
+		case _button_preset_swap_a_and_left_trigger:
 			preferences.game_control_to_xbox_buttons[0] = _gamepad_analog_button_left_trigger;
 			preferences.game_control_to_xbox_buttons[1] = _gamepad_analog_button_black;
 			preferences.game_control_to_xbox_buttons[2] = _gamepad_analog_button_x;
@@ -1116,7 +1075,7 @@ static void set_local_player_controls_from_player_profile(
 			preferences.game_control_to_xbox_buttons[11] = _gamepad_binary_button_right_thumb;
 			break;
 
-		case _button_preset_bumperjumper:
+		case _button_preset_swap_b_and_left_trigger:
 			preferences.game_control_to_xbox_buttons[0] = _gamepad_analog_button_a;
 			preferences.game_control_to_xbox_buttons[1] = _gamepad_analog_button_black;
 			preferences.game_control_to_xbox_buttons[2] = _gamepad_analog_button_x;
@@ -1131,7 +1090,7 @@ static void set_local_player_controls_from_player_profile(
 			preferences.game_control_to_xbox_buttons[11] = _gamepad_binary_button_right_thumb;
 			break;
 
-		case _button_preset_boxer:
+		case _button_preset_swap_b_and_right_thumb:
 			preferences.game_control_to_xbox_buttons[0] = _gamepad_analog_button_a;
 			preferences.game_control_to_xbox_buttons[1] = _gamepad_analog_button_black;
 			preferences.game_control_to_xbox_buttons[2] = _gamepad_analog_button_x;

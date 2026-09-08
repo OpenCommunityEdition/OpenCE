@@ -43,6 +43,14 @@ Publish only verified source/tooling gains to canonical and the authorized
 GitHub branches. Donor-relative headline totals are not additive canonical
 credit. Keep meaningful exact bytes distinct from padded and fuzzy counts.
 
+User clarification, 2026-09-07: preserve the best available house-rule-compliant
+Claude implementations in canonical and GitHub even when non-exact. Document
+the donor, fresh measurements, remaining differences and research pointers;
+do not leave useful fuzzy work stranded in donor trees. Closeness never
+justifies undefined/nonsensical logic or inappropriate Matching credit.
+Any accepted loss of exactness must be explicitly recorded and subtracted,
+not hidden behind the batch's gross gains or a semantic-match override.
+
 Refresh the canonical treemap after each **10,000 additional verified reconciled
 meaningful code bytes**. Starting checkpoint for this cadence is **930,828**;
 the first threshold is **940,828**. Record the next threshold in the queue.

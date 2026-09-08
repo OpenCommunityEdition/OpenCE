@@ -780,15 +780,6 @@ enum
 	NUMBER_OF_ICON_TYPES
 };
 
-enum
-{
-	_joystick_preset_standard,
-	_joystick_preset_south_paw,
-	_joystick_preset_legacy,
-	_joystick_preset_legacy_south_paw,
-	NUMBER_OF_JOYSTICK_PRESETS
-};
-
 /* ---------- macros */
 
 /* ---------- structures */

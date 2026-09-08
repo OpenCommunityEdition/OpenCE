@@ -2,6 +2,234 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/bitmaps/s3tc/s3tc",
+      "function": "_RGBToColor",
+      "class": "unclassified",
+      "measurements": {
+        "target": {
+          "size": 96,
+          "relocation_count": 0,
+          "normalized_sha256": "ca5bedfcc8216c56321d66212d39b53e22e075af0592c03f107014ba342e40c7"
+        },
+        "base": {
+          "size": 96,
+          "relocation_count": 0,
+          "normalized_sha256": "b58eb7a340fc8ef25b0d47b5511c1a9049c3de291030487fe17957ecadedbc86"
+        },
+        "objdiff_percent": 56.35294
+      },
+      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Initialize the four-byte color before its aggregate copy; do not restore the original indeterminate alpha read to regain bytes. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
+    },
+    {
+      "unit": "source/bitmaps/s3tc/s3tc",
+      "function": "_Quantize",
+      "class": "unclassified",
+      "measurements": {
+        "target": {
+          "size": 528,
+          "relocation_count": 30,
+          "normalized_sha256": "01a6d9b9fd4dd740422a1ced163db15fea206d97a106b0471381584fce23e591"
+        },
+        "base": {
+          "size": 528,
+          "relocation_count": 30,
+          "normalized_sha256": "d3d27024351f575d957242049f1c3624288bc5c621f2dbe23d67e47dcc40acf1"
+        },
+        "objdiff_percent": 70.2013
+      },
+      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Retain ordinary endpoint quantization and three/four-color ordering through the genuine safe RGB conversion helpers; remaining helper scheduling is non-exact. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
+    },
+    {
+      "unit": "source/bitmaps/s3tc/s3tc",
+      "function": "_EncodeBlockRGBColorKey",
+      "class": "unclassified",
+      "measurements": {
+        "target": {
+          "size": 2192,
+          "relocation_count": 36,
+          "normalized_sha256": "45e9affc7207d1ab1a4aaa74be0067da9dfbc354b78df6d91a4915d13fe8b295"
+        },
+        "base": {
+          "size": 2640,
+          "relocation_count": 36,
+          "normalized_sha256": "3b24c3325027dbfaff9a94ceb067ae1b7b08fd6f84575066fd893502f2b2b80e"
+        },
+        "objdiff_percent": 63.242176
+      },
+      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Retain the real covariance/axis/endpoint/selector graph. Initialize axis and selector packing, and handle zero-length quantized endpoints for mixed-alpha blocks too, preventing NaN conversion and invalid palette indexing. The held Alpha3 encoder is not imported. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
+    },
+    {
+      "unit": "source/bitmaps/s3tc/s3tc",
+      "function": "_DecodeBlockRGB",
+      "class": "unclassified",
+      "measurements": {
+        "target": {
+          "size": 448,
+          "relocation_count": 2,
+          "normalized_sha256": "fea1c6a895d8bbee78184c8fc8b615b008c32a49e61881ea0024c78e926b3529"
+        },
+        "base": {
+          "size": 384,
+          "relocation_count": 3,
+          "normalized_sha256": "ae13c5e75781b0f81749dbab99aeaacb6e603d038a75ff2b05d445c23bbb36e5"
+        },
+        "objdiff_percent": 77.32895
+      },
+      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Retain the complete ordinary three/four-color block decoder with typed color/RGB helpers; remaining instruction selection and scheduling are non-exact. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
+    },
+    {
+      "unit": "source/bitmaps/s3tc/s3tc",
+      "function": "_DecodeBlockRGB__single_pixel",
+      "class": "unclassified",
+      "measurements": {
+        "target": {
+          "size": 496,
+          "relocation_count": 10,
+          "normalized_sha256": "430094b19ae6b9e585f8c77b2c063824b45c98e3ceea58ac1dd4e2049730247b"
+        },
+        "base": {
+          "size": 432,
+          "relocation_count": 11,
+          "normalized_sha256": "cc11abaf66fdd2eace5c9a6382c31a681c628c8483ce2a4b615c93c391fa8c30"
+        },
+        "objdiff_percent": 79.449104
+      },
+      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Repair the null-source clear to four output bytes rather than the original 64-byte overrun. Require coordinates 0..3, not the original inclusive 4 which permits an invalid selector shift. Preserve the actual three/four-color palette implementation. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
+    },
+    {
+      "unit": "source/bitmaps/s3tc/s3tc",
+      "function": "_EncodeBlockAlpha4",
+      "class": "unclassified",
+      "measurements": {
+        "target": {
+          "size": 112,
+          "relocation_count": 1,
+          "normalized_sha256": "d508f24925507ded3bf3ca041bb4a630bab72325280c17b22799582f791b782a"
+        },
+        "base": {
+          "size": 128,
+          "relocation_count": 1,
+          "normalized_sha256": "5105927dc877ff33f0b790e380ba55ba85af3064264d958120a5c732cac3d1b6"
+        },
+        "objdiff_percent": 94.08889
+      },
+      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Initialize each row before shift/OR alpha packing; do not restore uninitialized reads to recover the donor's exact result. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
+    },
+    {
+      "unit": "source/saved games/player_profile",
+      "function": "_player_profile_write_thread_proc@4",
+      "class": "unclassified",
+      "measurements": {
+        "target": {
+          "size": 352,
+          "relocation_count": 27,
+          "normalized_sha256": "9a173aa9929df8a1827813fbb56be23b0e01ba5909c15458179fcdecc81a0cf5"
+        },
+        "base": {
+          "size": 384,
+          "relocation_count": 27,
+          "normalized_sha256": "839937d5e05bba8840732fd3c229c8f0829b7b35c43bcf2391c459165baaf3c0"
+        },
+        "objdiff_percent": 88.40708
+      },
+      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Keep the genuine thread callback, mutex/file/checksum/metadata lifecycle and typed 512-byte file block, with initialized padding rather than serializing stack bytes. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
+    },
+    {
+      "unit": "source/saved games/player_profile",
+      "function": "_player_profile_new",
+      "class": "unclassified",
+      "measurements": {
+        "target": {
+          "size": 464,
+          "relocation_count": 19,
+          "normalized_sha256": "ce58c5a489fbc7f573a6dfe0317252b6e02b73afcfd552784c6bc7bb18d22dc6"
+        },
+        "base": {
+          "size": 464,
+          "relocation_count": 18,
+          "normalized_sha256": "4df7452aff75a49e3ce459ccce47ed3e699b3bf20092cfbfdfd1cbcc58fbb01d"
+        },
+        "objdiff_percent": 76.566666
+      },
+      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Keep the complete creation/default/name/level/checksum graph and initialize the entire file block. Close using the valid opened index before deleting a failed write and setting the returned index to NONE; never pass NONE to the asserted close API. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
+    },
+    {
+      "unit": "source/saved games/player_profile",
+      "function": "_player_profile_get_argb_color",
+      "class": "unclassified",
+      "measurements": {
+        "target": {
+          "size": 80,
+          "relocation_count": 1,
+          "normalized_sha256": "733b6e189ab86d153c588b799a279fc40047a862d19155e00ce0dce17a3094c3"
+        },
+        "base": {
+          "size": 80,
+          "relocation_count": 1,
+          "normalized_sha256": "7fec3375bf61f2ee4ddd844c9d83d3dc63a9215511cc95d2e8a6065f1992d3a8"
+        },
+        "objdiff_percent": 83.7
+      },
+      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Keep the typed project-color implementation and natural component stores; the x87 instruction schedule remains non-exact. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
+    },
+    {
+      "unit": "source/saved games/player_profile",
+      "function": "_player_profile_create_default_profiles_on_disk",
+      "class": "unclassified",
+      "measurements": {
+        "target": {
+          "size": 288,
+          "relocation_count": 14,
+          "normalized_sha256": "0f24b860ac0a7fc78494fc8a5800b536295353b883b135905cd1bab3f8d96b64"
+        },
+        "base": {
+          "size": 336,
+          "relocation_count": 14,
+          "normalized_sha256": "3ce0cc6f2de1f5b8b0af45174e0ceddd0c5938259a79b8822281af82cf7d3347"
+        },
+        "objdiff_percent": 83.795456
+      },
+      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Keep both real default profiles and the typed checksummed file format. Initialize all serialized padding and close after every successful open, including seek failure; do not restore the donor's disclosure/leak paths. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
+    },
+    {
+      "unit": "source/bitmaps/bitmap_utilities",
+      "function": "_bitmap_2d_uncompress_from_mipmap",
+      "class": "instruction-scheduling",
+      "measurements": {
+        "target": {
+          "size": 880,
+          "relocation_count": 49,
+          "normalized_sha256": "4f4b53aed0db63a496b4c239249e9adaaa70adee056f6e6bc6118dc30dc2b4ab"
+        },
+        "base": {
+          "size": 880,
+          "relocation_count": 49,
+          "normalized_sha256": "0d0264895ee68a288dde6eb4dcbd425500971c01ba59158e1fe21ea4f05b456c"
+        },
+        "objdiff_percent": 99.922264
+      },
+      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. This was previously exact (866 meaningful bytes), now explicitly debited. Proper S3TC header ownership changes only two independent ordinary stack loads at +0x33a/+0x33d: EDI from [EBP-0x24] and EBX from [EBP+0x10]. Both complete code sections are 880 bytes and all 49 ordered relocations are unchanged. No function-body or ABI change; no declaration-position search or fake source is used. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
+    },
+    {
+      "unit": "source/interface/ui_widget_game_data_input_functions",
+      "function": "_solo_level_select_list_update_displayed_items",
+      "class": "instruction-scheduling",
+      "measurements": {
+        "target": {
+          "size": 704,
+          "relocation_count": 45,
+          "normalized_sha256": "085a6479228260634b66faf32f9a24a26b26970e7d1e186bdeb793fd3f44e828"
+        },
+        "base": {
+          "size": 704,
+          "relocation_count": 45,
+          "normalized_sha256": "f227fef9eb2b8f59b53286bf3eafbd6773e5804d66051f03a43d20a5879e0804"
+        },
+        "objdiff_percent": 99.891624
+      },
+      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. This was previously exact (693 meaningful bytes), now explicitly debited. Proper shared PlayerProfile ownership changes only two independent ordinary stack loads at +0x9a/+0x9d: EAX from [EBP-0xc] and EDI from [EBP+8]. Both complete code sections and ordered relocation identities otherwise agree. The previous playlist-only no-loss hold remains historical; this coherent ownership migration is retained under the user's house-rules/honest-fuzzy direction, not relabelled exact. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
+    },
+    {
       "unit": "source/networking/network_server_manager",
       "function": "_countdown_timer_increment",
       "class": "unclassified",

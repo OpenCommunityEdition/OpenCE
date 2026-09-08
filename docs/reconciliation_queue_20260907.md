@@ -48,7 +48,26 @@ functions**; stable census **6,335/8,245**, four gains and zero regressions.
 Full tests: **1,120 passed, two skipped, 26 subtests**. See
 [the Weather ledger](object_matching_logs/weather_particle_systems_obj_delete_reconciliation_20260907.md).
 The inherited BSS linkage discrepancy remains explicit; no whole-object claim.
-Publication is verified after commit.
+Published as `e36d74756548de01732db37d3ff9eca7549dde3d`; both authorized
+remote tips were independently verified there.
+
+The next verified coherent batch is PlayerProfile plus S3TC:
+**+3,712 newly exact bytes minus 1,559 explicit exact-to-fuzzy debits =
++2,153 net**, reaching **933,425 meaningful exact bytes / 6,304 credited
+functions**. Stable census is 6,350/8,245: 17 gains and two documented losses,
+not zero regressions. Matching objects remain 391/833; matched data is 2,062,532.
+Both debits are independent stack-load order changes from proper header
+ownership; no matching override hides them. Ten new useful fuzzy bodies are
+also retained, with unsafe donor paths repaired and zero exact credit.
+Full tests: 1,120 passed, two skipped, 26 subtests. Parks: 309 active, none
+stale/invalid. See [the batch ledger](object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md).
+Publication is checked after committing this batch.
+
+Next prepared scratch batches, not yet compiled/admitted: HS builtin parser
+owners at `scratch/hs-builtin-owner-packet-20260907` (3,137 meaningful saved
+donor bytes), and the complete firing-position evaluator/caller graph at
+`scratch/actor-firing-position-owner-packet-20260907` (including newly written
+missing evaluator bodies). Donor/projected totals are not canonical credit.
 
 Per the latest [house rules and batch cadence](campaign_house_rules.md), the
 next forced canonical treemap refresh is at **940,828 meaningful exact bytes**

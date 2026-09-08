@@ -261,6 +261,24 @@ forward declaration to avoid colliding with legacy local definitions.
 See the [shared-owner/cache admission](object_matching_logs/rasterizer_xbox_active_camouflage_obj_shared_owner_cache_20260906.md)
 for provenance, the typed initializer and pinned-compiler layout tests.
 
+### PlayerProfile and S3TC constants
+
+January; 2026-09-07 owner reconciliation:
+
+- `source/saved games/player_profile.h` owns the 48-byte profile: name is
+  12 wchar_t at +0, color short at +24, flags word at +26, ten byte map flags
+  at +28, last level short at +38 and eight-byte controller settings at +40.
+  These are not the larger later-PC/PDB profile layout.
+- `SAVED_GAME_FILE_BLOCK_SIZE` is 512 in saved_game_files.h. PlayerProfile's
+  typed file block has 48 profile bytes, a 20-byte XDK signature and 444 bytes
+  of zeroed padding. Do not serialize uninitialized padding for matching.
+- `S3TC_BLOCK_PIXELS` is 16 (4 by 4); single-pixel coordinates are 0..3.
+  RGB565 is blue/green/red 5/6/5 in the project's byte-channel order.
+  S3TC's weights are 0.082f, 0.6094f, 0.3086f in that order; maps are
+  RGB4 {0,2,3,1}, RGB3 {0,2,1,3}. These are codec operations, not flag bits.
+- See [the coherent batch ledger](object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md)
+  for evidence limits, safe repairs, retained fuzzy work and exact debits.
+
 Useful corroborating ledgers:
 
 - [docs/object_matching_logs/damage_obj_object_damage_update_20260904.md](object_matching_logs/damage_obj_object_damage_update_20260904.md)

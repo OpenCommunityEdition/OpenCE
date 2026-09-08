@@ -36,6 +36,22 @@ The complete attachments are not republished in this documentation batch.
 Canonical baseline for the review was
 `98f3bb719d7af4ccf572c51d126e5534356d7709`.
 
+## Additional references checked on 2026-09-07
+
+[Exploring the Halo 1 System Link protocol](https://hllmn.net/blog/2023-09-18_h1x-net/)
+is useful independent experimental context for discovery cadence, serialized
+player inputs and deterministic network simulation. It studies retail PAL
+behavior with a console/emulator; do not transplant its packet layouts,
+timing values or addresses into the January debug target without comparison.
+
+The local Marathon reference is
+`C:/Users/isabe/Documents/Codex/2026-07-13/i-w/_research-marathon-source-agent-20260904`
+at `ce4fdc63f20f6fa39616a86e717118f4d8bdf25c`. Its
+`cseries.lib/preferences.c` and `.h` provide a contemporary example of owned
+preference APIs, structured checksum headers and default reconstruction on
+invalid data. Use them as style/semantic context, not the Halo profile format
+or a source of January byte credit. Do not copy its platform APIs or old bugs.
+
 ## Assertion evidence
 
 RandomMath lines 41/56, server line 1248, and client line 521 use the

@@ -345,17 +345,6 @@ enum
 
 enum
 {
-	NUMBER_OF_DEFAULT_PLAYER_PROFILES = 2
-};
-
-enum
-{
-	_saved_game_file_index_read_only_bit = 30,
-	_saved_game_file_index_valid_bit
-};
-
-enum
-{
 	NUMBER_OF_SUPPORTED_MEMORY_UNITS = 1
 };
 
@@ -393,17 +382,11 @@ enum
    block and comparing that against the signature stored immediately after them */
 enum
 {
-	SAVED_GAME_FILE_BLOCK_SIZE = 512,
 	PLAYER_PROFILE_CHECKSUM_DATA_SIZE = 48,
 	PLAYLIST_PROFILE_CHECKSUM_DATA_SIZE = 104
 };
 
-enum
-{
-	_saved_game_file_type_player_profile = 0,
-	_saved_game_file_type_game_variant,
-	NUMBER_OF_SAVED_GAME_FILE_TYPES
-};
+
 
 /* ---------- macros */
 
@@ -2306,7 +2289,7 @@ static short enumerate_default_player_profile_files(
 
 	if (string_list_index != NONE)
 	{
-		while (profile_index < NUMBER_OF_DEFAULT_PLAYER_PROFILES)
+		while (profile_index < NUMBER_OF_DEFAULT_PROFILES)
 		{
 			wchar_t *display_name = unicode_string_list_get_string(string_list_index, profile_index);
 

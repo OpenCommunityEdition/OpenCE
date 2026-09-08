@@ -68,7 +68,8 @@ Research root:
   The inventory script now uses plain `GhidraScript`; analysis completion is
   established by the analysis log, not by a no-analysis export run.
 
-Verified project status at handoff:
+Verified original-project status at the 2026-09-06 handoff (see the separate
+2026-09-07 analysis update below):
 
 | Program | Analysis status | Observed function records |
 | --- | --- | ---: |
@@ -126,6 +127,32 @@ the supplied binary corpus.
    requires the January COFF byte/relocation, source-authenticity, whole-TU,
    whole-tree regression, and object-admission gates. No canonical code bytes
    are earned by this intake or by automatic analysis alone.
+
+## 2026-09-07: seven further programs analyzed and saved
+
+The original project/cache analysis above remains preserved. A separate project
+now holds the four remaining Symbols programs and the three supplied Play
+programs:
+`C:/Users/isabe/Documents/Codex/2026-07-13/i-w/research/hs7/remaining-projects/h1-tags-remaining-seven.gpr`.
+Keep its sibling `.rep` directory with it. No supplied executable was run.
+
+All seven Programs were saved and 21 detailed exports were produced. Input
+hashes and exported PDB GUID/ages were rechecked. The bounded analysis phases
+finished with warnings for Halo Tag Symbols (19,228 function records), Sapien
+Symbols (54,820), Guerilla Play (3,770), Sapien Play (9,045) and Tool Play
+(7,893). Guerilla Symbols (41,854) and Tool Symbols (46,630) reached their
+300-second limits and remain explicitly **partial**, not complete analyses.
+
+The local guide is `research/hs7/ANALYSIS_GUIDE.md` under the outer workspace;
+the detailed functions/types/metadata exports are in `research/hs7/analyze-detailed`.
+`research/hs7/remaining-analysis-summary.json` has SHA-256
+`dbe1283d88ae4b8839b42888e7f80d70be4a87233824a99f7c6a77540bae5aaa`.
+The guide records source classifications, timeout evidence, API-type archive
+provenance and analyzer warnings, including WindowsResourceReference's OSGi
+warning. PDB analyzers were disabled because matching PDBs are absent; no
+external symbol download was performed. These generated records are not
+restored original names, inline boundaries or debug assets, and earn no exact
+code credit. IDA remains unlocated and that part of the request is outstanding.
 
 ## Related networking evidence
 

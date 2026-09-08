@@ -910,6 +910,7 @@ symbols in this file:
 #include "cseries.h"
 #include "bungie_net/network/transport.h"
 #include "interface/player_ui.h"
+#include "saved games/player_profile.h"
 #include "interface/ui_widget_definitions.h"
 
 /* ---------- constants */
@@ -958,12 +959,6 @@ struct event_record
 {
 	short type;
 	short controller_index;
-};
-
-struct player_profile_color_prefix
-{
-	byte unknown00[0x18];
-	short primary_color;
 };
 
 struct network_player_data
@@ -1060,10 +1055,6 @@ void main_set_map_name(
 	char *map_name);
 void main_defer_map_map_change(
 	void);
-void player_profile_get_highest_completed_solo_level(
-	void *profile,
-	short *level,
-	short *difficulty);
 void *widget_free(
 	void *pointer);
 boolean create_global_network_game_client(
@@ -1082,8 +1073,6 @@ void error(
 	...);
 void playlist_profile_delete(
 	long profile_index);
-void player_profile_delete(
-	long profile_index);
 void ui_play_audio_feedback_sound(
 	short feedback);
 void display_error_deferred(
@@ -1091,9 +1080,6 @@ void display_error_deferred(
 	short local_player_index,
 	boolean modal,
 	boolean pause_game_time);
-long player_profile_new(
-	short controller_index,
-	wchar_t *name);
 boolean virtual_keyboard_launch(
 	void *text,
 	long maximum_length,
@@ -1148,11 +1134,6 @@ void network_event(
 	...);
 void ui_widget_delete(
 	struct widget_instance *widget);
-void player_profiles_enumerate_available_to_local_player_index(
-	short local_player_index,
-	long *profile_count,
-	long *profile_indices,
-	boolean include_default);
 void playlist_profiles_enumerate_available_to_local_player_index(
 	short local_player_index,
 	long *profile_count,
@@ -1190,11 +1171,6 @@ void *ui_widget_realloc(
 	word size,
 	char *file,
 	long line);
-long player_profile_number_of_available_primary_colors(
-	void);
-boolean player_profile_get(
-	long profile_index,
-	void *profile);
 
 extern byte cached_player_profile[0x9C];
 
@@ -1917,7 +1893,7 @@ boolean new_campaign_decision(
 	boolean *widget_deleted)
 {
 	boolean result;
-	byte profile[0x30];
+	struct player_profile profile;
 	wchar_t name[128];
 
 	result = FALSE;
@@ -1940,9 +1916,9 @@ boolean new_campaign_decision(
 				}
 				if (profile_index != NONE)
 				{
-					if (player_profile_get(profile_index, profile))
+					if (player_profile_get(profile_index, &profile))
 					{
-						player_ui_set_active_player_profile(0, profile_index, profile);
+						player_ui_set_active_player_profile(0, profile_index, &profile);
 						result = TRUE;
 					}
 					else
@@ -2511,12 +2487,12 @@ boolean player_profile_change_name(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	void *profile = player_ui_get_edit_player_profile();
+	struct player_profile *profile = player_ui_get_edit_player_profile();
 	boolean result = TRUE;
 
 	if (profile)
 	{
-		if (!virtual_keyboard_launch(profile, 24, 8))
+		if (!virtual_keyboard_launch(profile->player_name, sizeof(profile->player_name), 8))
 		{
 			error(2, "failed to invoke virtual keyboard on player profile name");
 			result = FALSE;
@@ -2681,7 +2657,7 @@ boolean new_campaign_if_no_custom_player_profiles_exist(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	long profile_count = 1;
+	word profile_count = 1;
 	long profile_index;
 	boolean result;
 	player_profiles_enumerate_available_to_local_player_index(NONE, &profile_count, &profile_index, FALSE);
@@ -2862,7 +2838,7 @@ boolean player_profile_color_picker_select_color(
 	boolean *widget_deleted)
 {
 	struct widget_instance *color_select_screen = widget->focused_child;
-	struct player_profile_color_prefix *profile = player_ui_get_edit_player_profile();
+	struct player_profile *profile = player_ui_get_edit_player_profile();
 
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3630,
 		color_select_screen != NULL && color_select_screen->type == 2,
@@ -2879,11 +2855,11 @@ boolean player_profile_color_picker_select_color(
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3644,
 		color_select_screen->data3C.selected_index >= 0 &&
 		color_select_screen->data3C.selected_index <
-			(unsigned short)player_profile_number_of_available_primary_colors(),
+			player_profile_number_of_available_primary_colors(),
 		"invalid player profile color index specified");
 	if (profile)
 	{
-		profile->primary_color = color_select_screen->data3C.selected_index;
+		profile->primary_color_index = color_select_screen->data3C.selected_index;
 		return TRUE;
 	}
 	error(2, "failed to set player profile color because no profile is currently being edited");
@@ -3053,7 +3029,7 @@ boolean create_and_begin_editing_new_player_profile(
 	short controller_index = event->controller_index;
 	boolean result = FALSE;
 	long profile_index;
-	byte *profile;
+	struct player_profile *profile;
 
 	if (controller_index == NONE)
 		controller_index = 0;
@@ -3067,9 +3043,9 @@ boolean create_and_begin_editing_new_player_profile(
 			profile = player_ui_get_edit_player_profile();
 			if (profile)
 			{
-				ustrncpy((wchar_t *)profile, name, 11);
-				*(short *)(profile + 0x16) = 0;
-				result = virtual_keyboard_launch(profile, 0x18, 8);
+				ustrncpy(profile->player_name, name, MAXIMUM_PLAYER_PROFILE_NAME_LENGTH-1);
+				profile->player_name[MAXIMUM_PLAYER_PROFILE_NAME_LENGTH-1] = 0;
+				result = virtual_keyboard_launch(profile->player_name, sizeof(profile->player_name), 8);
 			}
 			else
 			{
@@ -3270,8 +3246,8 @@ boolean player_profile_color_picker_menu_initialize(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	long color_count = player_profile_number_of_available_primary_colors();
-	struct player_profile_color_prefix *profile = player_ui_get_edit_player_profile();
+	word color_count = player_profile_number_of_available_primary_colors();
+	struct player_profile *profile = player_ui_get_edit_player_profile();
 	struct ui_widget_definition *definition = ui_widget_definition_get(widget->definition_tag_index);
 	long index;
 
@@ -3291,7 +3267,7 @@ boolean player_profile_color_picker_menu_initialize(
 	}
 	if (profile)
 	{
-		short color = profile->primary_color;
+		short color = profile->primary_color_index;
 		long result;
 
 		if (color < 0)
@@ -3303,7 +3279,7 @@ boolean player_profile_color_picker_menu_initialize(
 			if (result > maximum_color)
 				result = maximum_color;
 		}
-		profile->primary_color = (short)result;
+		profile->primary_color_index = (short)result;
 		widget->data3C.selected_index = (short)result;
 	}
 	else
@@ -4060,7 +4036,7 @@ boolean player_profile_set_for_game_1wide(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	byte profile[0x30];
+	struct player_profile profile;
 	struct widget_instance *spinner_list;
 	struct ui_widget_definition *definition;
 	short controller_index;
@@ -4082,9 +4058,9 @@ boolean player_profile_set_for_game_1wide(
 		ui_play_audio_feedback_sound(4);
 		return FALSE;
 	}
-	if (player_profile_get(available_profiles[spinner_list->data3C.selected_index], profile))
+	if (player_profile_get(available_profiles[spinner_list->data3C.selected_index], &profile))
 	{
-		player_ui_set_active_player_profile(controller_index, available_profiles[spinner_list->data3C.selected_index], profile);
+		player_ui_set_active_player_profile(controller_index, available_profiles[spinner_list->data3C.selected_index], &profile);
 		return TRUE;
 	}
 	error(2, "failed to retrieve user selected player profile");
@@ -4097,11 +4073,11 @@ boolean player_profile_initialize_controller_settings(
 	boolean *widget_deleted)
 {
 	boolean result;
-	byte *profile;
+	struct player_profile *profile;
 	struct widget_instance *list_item;
 	struct widget_instance *option_spinner;
 
-	profile = (byte *)player_ui_get_edit_player_profile();
+	profile = player_ui_get_edit_player_profile();
 	result = TRUE;
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3793, widget->type == 3, "expected column list for controller settings widget");
 	if (profile)
@@ -4112,18 +4088,18 @@ boolean player_profile_initialize_controller_settings(
 		while (option_spinner && option_spinner->type != 2)
 			option_spinner = option_spinner->next;
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3803, option_spinner, "expected 'joystick config' option spinner list");
-		switch (profile[0x29])
+		switch (profile->controller_settings.joystick_preset)
 		{
-		case 0:
+		case _joystick_preset_standard:
 			option_spinner->data3C.selected_index = 0;
 			break;
-		case 1:
+		case _joystick_preset_south_paw:
 			option_spinner->data3C.selected_index = 1;
 			break;
-		case 2:
+		case _joystick_preset_legacy:
 			option_spinner->data3C.selected_index = 2;
 			break;
-		case 3:
+		case _joystick_preset_legacy_south_paw:
 			option_spinner->data3C.selected_index = 3;
 			break;
 		default:
@@ -4137,21 +4113,21 @@ boolean player_profile_initialize_controller_settings(
 		while (option_spinner && option_spinner->type != 2)
 			option_spinner = option_spinner->next;
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3816, option_spinner, "expected 'button config' option spinner list");
-		switch (profile[0x28])
+		switch (profile->controller_settings.button_preset)
 		{
-		case 0:
+		case _button_preset_standard:
 			option_spinner->data3C.selected_index = 0;
 			break;
-		case 1:
+		case _button_preset_swap_triggers:
 			option_spinner->data3C.selected_index = 1;
 			break;
-		case 2:
+		case _button_preset_swap_a_and_left_trigger:
 			option_spinner->data3C.selected_index = 2;
 			break;
-		case 3:
+		case _button_preset_swap_b_and_left_trigger:
 			option_spinner->data3C.selected_index = 3;
 			break;
-		case 4:
+		case _button_preset_swap_b_and_right_thumb:
 			option_spinner->data3C.selected_index = 4;
 			break;
 		default:
@@ -4172,30 +4148,30 @@ boolean solo_level_initialize_list_coop(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	byte profile1[0x30];
-	byte profile0[0x30];
+	struct player_profile profile1;
+	struct player_profile profile0;
 	short highest_levels[2];
 	short highest_difficulties[2];
 	struct ui_widget_definition *definition;
 
 	memset(single_player_level_data, 0, 0x50);
 	{
-		player_ui_get_active_player_profile(0, profile0);
-		player_profile_get_highest_completed_solo_level(profile0, &highest_levels[0], &highest_difficulties[0]);
-		player_ui_get_active_player_profile(1, profile1);
-		player_profile_get_highest_completed_solo_level(profile1, &highest_levels[1], &highest_difficulties[1]);
+		player_ui_get_active_player_profile(0, &profile0);
+		player_profile_get_highest_completed_solo_level(&profile0, &highest_levels[0], &highest_difficulties[0]);
+		player_ui_get_active_player_profile(1, &profile1);
+		player_profile_get_highest_completed_solo_level(&profile1, &highest_levels[1], &highest_difficulties[1]);
 	}
 	{
-		register long level_index;
+		long level_index;
 
 		for (level_index = 0; level_index < 10; level_index++)
 		{
 			((struct single_player_level_entry *)single_player_level_data)[level_index].map_name = (&event_handler_functions.map_name)[level_index];
-			if (profile0[0x1C + level_index] || level_index == highest_levels[0] + 1 || profile1[0x1C + level_index] || level_index == highest_levels[1] + 1 || level_index == 0)
+			if (profile0.single_player_map_flags[level_index] || level_index == highest_levels[0] + 1 || profile1.single_player_map_flags[level_index] || level_index == highest_levels[1] + 1 || level_index == 0)
 			{
-				register unsigned long level_flags;
+				unsigned long level_flags;
 
-				level_flags = (char)profile0[0x1C + level_index] | (char)profile1[0x1C + level_index];
+				level_flags = (char)profile0.single_player_map_flags[level_index] | (char)profile1.single_player_map_flags[level_index];
 				((struct single_player_level_entry *)single_player_level_data)[level_index].unknown5 = (level_flags >> 1) & 1;
 				((struct single_player_level_entry *)single_player_level_data)[level_index].available = TRUE;
 				((struct single_player_level_entry *)single_player_level_data)[level_index].unknown6 = (level_flags >> 2) & 1;
@@ -4218,11 +4194,11 @@ boolean player_profile_change_advanced_controller_settings(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	byte *profile;
+	struct player_profile *profile;
 	struct widget_instance *list_item;
 	struct widget_instance *option_spinner;
 
-	profile = (byte *)player_ui_get_edit_player_profile();
+	profile = player_ui_get_edit_player_profile();
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3984, widget->type == 3, "expected column list for advanced controller settings widget");
 	if (profile)
 	{
@@ -4234,8 +4210,8 @@ boolean player_profile_change_advanced_controller_settings(
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3994, option_spinner, "expected 'invert joystick' option spinner list");
 		switch (option_spinner->data3C.selected_index)
 		{
-		case 0: profile[0x2B] = TRUE; break;
-		case 1: profile[0x2B] = FALSE; break;
+		case 0: profile->controller_settings.invert_look = TRUE; break;
+		case 1: profile->controller_settings.invert_look = FALSE; break;
 		default: error(2, "unknown option selected for invert joystick"); break;
 		}
 
@@ -4248,7 +4224,7 @@ boolean player_profile_change_advanced_controller_settings(
 		{
 			long selected_index = option_spinner->data3C.selected_index;
 			if (selected_index >= 0 && selected_index <= 9)
-				profile[0x2A] = (byte)(option_spinner->data3C.selected_index + 1);
+				profile->controller_settings.look_sensitivity = (byte)(option_spinner->data3C.selected_index + 1);
 			else
 				error(2, "unknown option selected for look sensitivity");
 		}
@@ -4261,8 +4237,8 @@ boolean player_profile_change_advanced_controller_settings(
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 4026, option_spinner, "expected 'controller vibration' option spinner list");
 		switch (option_spinner->data3C.selected_index)
 		{
-		case 0: profile[0x2C] = FALSE; break;
-		case 1: profile[0x2C] = TRUE; break;
+		case 0: profile->controller_settings.vibration_disabled = FALSE; break;
+		case 1: profile->controller_settings.vibration_disabled = TRUE; break;
 		default: error(2, "unknown option selected for controller vibration"); break;
 		}
 
@@ -4274,8 +4250,8 @@ boolean player_profile_change_advanced_controller_settings(
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 4037, option_spinner, "expected 'flight stick controls' option spinner list");
 		switch (option_spinner->data3C.selected_index)
 		{
-		case 0: profile[0x2D] = TRUE; break;
-		case 1: profile[0x2D] = FALSE; break;
+		case 0: profile->controller_settings.flight_stick_aircraft_controls = TRUE; break;
+		case 1: profile->controller_settings.flight_stick_aircraft_controls = FALSE; break;
 		default: error(2, "unknown option selected for controller flight_stick_aircraft_controls"); break;
 		}
 
@@ -4287,8 +4263,8 @@ boolean player_profile_change_advanced_controller_settings(
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 4048, option_spinner, "expected 'autocenter' option spinner list");
 		switch (option_spinner->data3C.selected_index)
 		{
-		case 0: profile[0x2E] = TRUE; break;
-		case 1: profile[0x2E] = FALSE; break;
+		case 0: profile->controller_settings.autocenter = TRUE; break;
+		case 1: profile->controller_settings.autocenter = FALSE; break;
 		default: error(2, "unknown option selected for controller autocenter"); break;
 		}
 		return TRUE;
@@ -4304,7 +4280,7 @@ boolean solo_level_set_next_map_name(
 {
 	boolean result;
 	struct widget_instance *list_widget;
-	byte profile[0x30];
+	struct player_profile profile;
 	short highest_level;
 	short highest_difficulty;
 
@@ -4314,9 +4290,9 @@ boolean solo_level_set_next_map_name(
 	switch (player_spawn_count)
 	{
 	case 1:
-		player_ui_get_active_player_profile(0, profile);
-		player_profile_get_highest_completed_solo_level(profile, &highest_level, &highest_difficulty);
-		if (profile[0x1C + list_widget->data3C.selected_index] || list_widget->data3C.selected_index == highest_level + 1 || list_widget->data3C.selected_index == 0)
+		player_ui_get_active_player_profile(0, &profile);
+		player_profile_get_highest_completed_solo_level(&profile, &highest_level, &highest_difficulty);
+		if (profile.single_player_map_flags[list_widget->data3C.selected_index] || list_widget->data3C.selected_index == highest_level + 1 || list_widget->data3C.selected_index == 0)
 			result = TRUE;
 		player_ui_remember_player1_profile(0);
 	case 2:
@@ -4325,9 +4301,9 @@ boolean solo_level_set_next_map_name(
 
 			for (local_player_index = 0; local_player_index <= 1; local_player_index++)
 			{
-				player_ui_get_active_player_profile(local_player_index, profile);
-				player_profile_get_highest_completed_solo_level(profile, &highest_level, &highest_difficulty);
-				if (profile[0x1C + list_widget->data3C.selected_index] || list_widget->data3C.selected_index == highest_level + 1 || list_widget->data3C.selected_index == 0)
+				player_ui_get_active_player_profile(local_player_index, &profile);
+				player_profile_get_highest_completed_solo_level(&profile, &highest_level, &highest_difficulty);
+				if (profile.single_player_map_flags[list_widget->data3C.selected_index] || list_widget->data3C.selected_index == highest_level + 1 || list_widget->data3C.selected_index == 0)
 				{
 					result = TRUE;
 					break;
@@ -4392,7 +4368,7 @@ boolean player_profiles_list_initialize(
 	boolean *widget_deleted)
 {
 	struct ui_widget_definition *definition = ui_widget_definition_get(widget->definition_tag_index);
-	long profile_count;
+	word profile_count;
 	long last_profile_index;
 	long profile_index;
 	boolean include_default;
@@ -4465,7 +4441,7 @@ boolean player_profile_set_for_game_3wide(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	byte profile[0x30];
+	struct player_profile profile;
 	struct ui_widget_definition *definition;
 	struct widget_instance *spinner;
 	long profile_index;
@@ -4503,7 +4479,7 @@ boolean player_profile_set_for_game_3wide(
 			*widget_deleted = TRUE;
 			return FALSE;
 		}
-		if (player_profile_get(profile_index, profile))
+		if (player_profile_get(profile_index, &profile))
 		{
 			short local_player_index;
 
@@ -4511,7 +4487,7 @@ boolean player_profile_set_for_game_3wide(
 			player_ui_set_active_player_profile(
 				local_player_index,
 				profile_indices[spinner->data3C.selected_index],
-				profile);
+				&profile);
 			return TRUE;
 		}
 		error(2, "failed to retrieve user selected player profile");
@@ -4674,11 +4650,11 @@ boolean player_profile_initialize_advanced_controller_settings(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	byte *profile;
+	struct player_profile *profile;
 	struct widget_instance *list_item;
 	struct widget_instance *option_spinner;
 
-	profile = (byte *)player_ui_get_edit_player_profile();
+	profile = player_ui_get_edit_player_profile();
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3844, widget->type == 3, "expected column list for advanced controller settings widget");
 	if (profile)
 	{
@@ -4688,10 +4664,10 @@ boolean player_profile_initialize_advanced_controller_settings(
 		while (option_spinner && option_spinner->type != 2)
 			option_spinner = option_spinner->next;
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3854, option_spinner, "expected 'invert joystick' option spinner list");
-		switch (profile[0x2B])
+		switch (profile->controller_settings.invert_look)
 		{
-		case 0: option_spinner->data3C.selected_index = 1; break;
-		case 1: option_spinner->data3C.selected_index = 0; break;
+		case FALSE: option_spinner->data3C.selected_index = 1; break;
+		case TRUE: option_spinner->data3C.selected_index = 0; break;
 		default: option_spinner->data3C.selected_index = 0; break;
 		}
 
@@ -4701,8 +4677,8 @@ boolean player_profile_initialize_advanced_controller_settings(
 		while (option_spinner && option_spinner->type != 2)
 			option_spinner = option_spinner->next;
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3865, option_spinner, "expected 'look sensitivity' option spinner list");
-		if (profile[0x2A] > 0 && profile[0x2A] <= 10)
-			option_spinner->data3C.selected_index = profile[0x2A] - 1;
+		if (profile->controller_settings.look_sensitivity > 0 && profile->controller_settings.look_sensitivity <= 10)
+			option_spinner->data3C.selected_index = profile->controller_settings.look_sensitivity - 1;
 		else
 			option_spinner->data3C.selected_index = 0;
 
@@ -4712,10 +4688,10 @@ boolean player_profile_initialize_advanced_controller_settings(
 		while (option_spinner && option_spinner->type != 2)
 			option_spinner = option_spinner->next;
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3886, option_spinner, "expected 'controller vibration' option spinner list");
-		switch (profile[0x2C])
+		switch (profile->controller_settings.vibration_disabled)
 		{
-		case 0: option_spinner->data3C.selected_index = 0; break;
-		case 1: option_spinner->data3C.selected_index = 1; break;
+		case FALSE: option_spinner->data3C.selected_index = 0; break;
+		case TRUE: option_spinner->data3C.selected_index = 1; break;
 		default: option_spinner->data3C.selected_index = 0; break;
 		}
 
@@ -4725,10 +4701,10 @@ boolean player_profile_initialize_advanced_controller_settings(
 		while (option_spinner && option_spinner->type != 2)
 			option_spinner = option_spinner->next;
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3897, option_spinner, "expected 'flight stick controls' option spinner list");
-		switch (profile[0x2D])
+		switch (profile->controller_settings.flight_stick_aircraft_controls)
 		{
-		case 0: option_spinner->data3C.selected_index = 1; break;
-		case 1: option_spinner->data3C.selected_index = 0; break;
+		case FALSE: option_spinner->data3C.selected_index = 1; break;
+		case TRUE: option_spinner->data3C.selected_index = 0; break;
 		default: option_spinner->data3C.selected_index = 0; break;
 		}
 
@@ -4738,10 +4714,10 @@ boolean player_profile_initialize_advanced_controller_settings(
 		while (option_spinner && option_spinner->type != 2)
 			option_spinner = option_spinner->next;
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3908, option_spinner, "expected 'autocenter' option spinner list");
-		switch (profile[0x2E])
+		switch (profile->controller_settings.autocenter)
 		{
-		case 0: option_spinner->data3C.selected_index = 1; return TRUE;
-		case 1: option_spinner->data3C.selected_index = 0; break;
+		case FALSE: option_spinner->data3C.selected_index = 1; return TRUE;
+		case TRUE: option_spinner->data3C.selected_index = 0; break;
 		default: option_spinner->data3C.selected_index = 0; break;
 		}
 		return TRUE;
@@ -4755,11 +4731,11 @@ boolean player_profile_change_controller_settings(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	byte *profile;
+	struct player_profile *profile;
 	struct widget_instance *list_item;
 	struct widget_instance *option_spinner;
 
-	profile = (byte *)player_ui_get_edit_player_profile();
+	profile = player_ui_get_edit_player_profile();
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3933, widget->type == 3, "expected column list for controller settings widget");
 	if (profile)
 	{
@@ -4771,10 +4747,10 @@ boolean player_profile_change_controller_settings(
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3943, option_spinner, "expected 'joystick config' option spinner list");
 		switch (option_spinner->data3C.selected_index)
 		{
-		case 0: profile[0x29] = 0; break;
-		case 1: profile[0x29] = 1; break;
-		case 2: profile[0x29] = 2; break;
-		case 3: profile[0x29] = 3; break;
+		case _joystick_preset_standard: profile->controller_settings.joystick_preset = _joystick_preset_standard; break;
+		case _joystick_preset_south_paw: profile->controller_settings.joystick_preset = _joystick_preset_south_paw; break;
+		case _joystick_preset_legacy: profile->controller_settings.joystick_preset = _joystick_preset_legacy; break;
+		case _joystick_preset_legacy_south_paw: profile->controller_settings.joystick_preset = _joystick_preset_legacy_south_paw; break;
 		default: error(2, "unknown option selected for joystick config"); break;
 		}
 
@@ -4786,11 +4762,11 @@ boolean player_profile_change_controller_settings(
 		match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3956, option_spinner, "expected 'button config' option spinner list");
 		switch (option_spinner->data3C.selected_index)
 		{
-		case 0: profile[0x28] = 0; return TRUE;
-		case 1: profile[0x28] = 1; return TRUE;
-		case 2: profile[0x28] = 2; return TRUE;
-		case 3: profile[0x28] = 3; return TRUE;
-		case 4: profile[0x28] = 4; return TRUE;
+		case _button_preset_standard: profile->controller_settings.button_preset = _button_preset_standard; return TRUE;
+		case _button_preset_swap_triggers: profile->controller_settings.button_preset = _button_preset_swap_triggers; return TRUE;
+		case _button_preset_swap_a_and_left_trigger: profile->controller_settings.button_preset = _button_preset_swap_a_and_left_trigger; return TRUE;
+		case _button_preset_swap_b_and_left_trigger: profile->controller_settings.button_preset = _button_preset_swap_b_and_left_trigger; return TRUE;
+		case _button_preset_swap_b_and_right_thumb: profile->controller_settings.button_preset = _button_preset_swap_b_and_right_thumb; return TRUE;
 		default: error(2, "unknown button config option selected"); return TRUE;
 		}
 	}
@@ -5805,7 +5781,7 @@ boolean solo_level_initialize_list_single_player(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	byte profile[0x30];
+	struct player_profile profile;
 	short highest_level;
 	short highest_difficulty;
 	struct ui_widget_definition *definition;
@@ -5831,17 +5807,17 @@ boolean solo_level_initialize_list_single_player(
 		event_handler_functions.last_player1_profile_index = profile_index;
 	}
 
-	player_ui_get_active_player_profile(0, profile);
-	player_profile_get_highest_completed_solo_level(profile, &highest_level, &highest_difficulty);
+	player_ui_get_active_player_profile(0, &profile);
+	player_profile_get_highest_completed_solo_level(&profile, &highest_level, &highest_difficulty);
 	for (level_index = 0; level_index < 10; level_index++)
 	{
-		register unsigned long level_flags;
+		unsigned long level_flags;
 
 		((struct single_player_level_entry *)single_player_level_data)[level_index].map_name =
 			(&event_handler_functions.map_name)[level_index];
-		if (profile[0x1C + level_index] || level_index == highest_level + 1 || level_index == 0)
+		if (profile.single_player_map_flags[level_index] || level_index == highest_level + 1 || level_index == 0)
 		{
-			level_flags = (char)profile[0x1C + level_index];
+			level_flags = (char)profile.single_player_map_flags[level_index];
 			((struct single_player_level_entry *)single_player_level_data)[level_index].unknown5 = (level_flags >> 1) & 1;
 			((struct single_player_level_entry *)single_player_level_data)[level_index].available = TRUE;
 			((struct single_player_level_entry *)single_player_level_data)[level_index].unknown6 = (level_flags >> 2) & 1;
