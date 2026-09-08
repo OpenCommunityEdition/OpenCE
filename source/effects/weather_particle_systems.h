@@ -33,6 +33,8 @@ void weather_particle_systems_dispose_from_old_map(
 	void);
 void weather_particle_systems_dispose(
 	void);
+void weather_particle_system_delete(
+	short local_player_index);
 
 extern struct data_array *weather_particle_data;
 

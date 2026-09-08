@@ -39,7 +39,22 @@ Full tests: **1,059 passed, two skipped, 26 subtests**. Its original-target/firs
 ordinary private-ABI replay passes 72 executions plus two rejected byte mutations.
 See [the ProgressBar ledger](object_matching_logs/progress_bar_obj_base_layer_reconciliation_20260907.md).
 This is one small wrapper, not a whole-object or whole-lane completion.
-Its publication is checked separately after commit.
+Published as `62b3cec7c55c27ebc5aaf28f664a61763ac16f00`; both authorized
+remote branch tips were independently verified at that commit.
+
+The next verified packet is Weather delete plus three private helpers:
+**+444 meaningful exact bytes**, reaching **931,272 code bytes / 6,289 credited
+functions**; stable census **6,335/8,245**, four gains and zero regressions.
+Full tests: **1,120 passed, two skipped, 26 subtests**. See
+[the Weather ledger](object_matching_logs/weather_particle_systems_obj_delete_reconciliation_20260907.md).
+The inherited BSS linkage discrepancy remains explicit; no whole-object claim.
+Publication is verified after commit.
+
+Per the latest [house rules and batch cadence](campaign_house_rules.md), the
+next forced canonical treemap refresh is at **940,828 meaningful exact bytes**
+(10,000 beyond the cadence's published 930,828 starting checkpoint). Batch
+larger coherent packets and isolate blockers; do not repeat bespoke runtime
+test development for every ordinary byte-exact leaf.
 
 No other part of the new-lane totals below is added to that checkpoint.
 They are donor-relative observations, not an audited union or promised future
@@ -163,7 +178,7 @@ First packets to inspect:
 1. **RenderDebug box-only admitted:** 378 meaningful / 384 padded bytes, using
    the genuine narrow `source/render/render_debug_geometry.h` owner. All three
    complete header consumers preserve inherited code/data/ownership. This is
-   the only new-continuation packet admitted so far. The remaining cylinder/pill/
+   one admitted new-continuation packet. The remaining cylinder/pill/
    height-matrix graph is conditional: the saved donor adds nine math code
    owners absent from the January object, including a normalize3d fallback.
    Do not restore its rejected debug-global header packet or the held circle
@@ -182,15 +197,13 @@ First packets to inspect:
    A minimal declaration packet has six consumers; its emitted-owner subset
    has not been freshly isolated. The q-count ABI correction and changed
    structure-visibility parks remain separate work.
-4. **Weather delete-only is the next promising trial:** public delete plus
-   three genuine private accessors/list-deletion helpers, saved **444 meaningful
-   / 464 padded bytes**. This is not yet an isolated canonical compile. It needs
-   genuine 0x30 tag ownership, the four-system January runtime layout, public
-   declaration and semantic BSS/private names. Current public-header consumers
-   are Game and Weather. Measure natural private register conventions once;
-   do not manufacture callers to retain the helpers. Exclude new-system and
-   all rendering/update/schema additions. Damage, player queues, Bink,
-   collision/path and physics still need genuine owner/schema work.
+4. **Weather delete-only admitted:** public delete plus three private helpers,
+   **444 meaningful / 464 padded bytes**, with genuine tag/runtime ownership,
+   proper declarations/names and unchanged Game consumer. Natural private ABIs
+   match; all inherited runtime owners survive. Target BSS storage2 versus
+   candidate storage3 is an inherited gap, not resolved by this packet.
+   New-system and rendering/update additions remain excluded. Damage, player
+   queues, Bink, collision/path and physics still need genuine owner/schema work.
 
 Preserve existing holds: no fabricated combined player-queues global, no
 external-linkage conclusion from a BSS split or memset extent, no foreign

@@ -20,6 +20,11 @@ The input directory is local and read-only for this campaign:
 C:/Users/isabe/Downloads/Wormhole yyO4nv/
 ```
 
+The user supplied a second location on 2026-09-07:
+`C:/Users/isabe/Downloads/haloleak2024/halo1/`. All three files there were
+rehashed and exactly match the SHA-256 values below; they are the same source
+evidence, not three new independent references.
+
 | File | Size | SHA-256 |
 | --- | --- | --- |
 | `network_server_manager.c` | 74,686 bytes / 2,534 lines | `d84a91f0220e4158fb2de12e387e1323451c72ca56b347258f56d1565dc46969` |

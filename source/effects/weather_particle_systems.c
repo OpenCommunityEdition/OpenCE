@@ -69,44 +69,98 @@ symbols in this file:
 #include "effects/weather_particle_systems.h"
 
 #include "cseries/errors.h"
+#include "effects/weather_particle_definitions.h"
 #include "networking/network_connection.h"
+#include "objects/objects.h"
 
 /* ---------- constants */
+
+enum
+{
+	MAXIMUM_NUMBER_OF_WEATHER_PARTICLES = 512,
+	MAXIMUM_NUMBER_OF_WEATHER_PARTICLE_TYPES = 8,
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
-struct local_weather_particle_system_globals
+struct weather_particle_type
 {
-	long particle_system_index;
-	byte pad4[0x98];
+	real density;
+	real box_width;
+	short particle_count;
+	word pad0A;
+	long first_particle_index;
+};
+
+struct weather_particle_system
+{
+	long definition_index;
+	real time;
+	real time_delta_sec;
+	real scale;
+	struct location location;
+	short weather_palette_index;
+	boolean under_water;
+	byte pad1B;
+	struct weather_particle_type types[MAXIMUM_NUMBER_OF_WEATHER_PARTICLE_TYPES];
+};
+
+struct weather_particle
+{
+	short identifier;
+	word pad02;
+	real_point3d position;
+	real_vector3d velocity;
+	real_vector3d acceleration;
+	short sequence_index;
+	word pad2A;
+	real sprite_index;
+	real rotation;
+	real_argb_color color;
+	real radius;
+	real rotation_rate;
+	real animation_rate;
+	long next_particle_index;
 };
 
 struct weather_particle_system_globals
 {
 	short active_system_count;
-	short pad2;
-	struct local_weather_particle_system_globals local_players[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+	word pad02;
+	struct weather_particle_system systems[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
 };
 
-typedef char local_weather_particle_system_globals_size_assert[
-	sizeof(struct local_weather_particle_system_globals) == 0x9C ? 1 : -1];
+typedef char weather_particle_type_size_assert[
+	sizeof(struct weather_particle_type) == 0x10 ? 1 : -1];
+typedef char weather_particle_system_size_assert[
+	sizeof(struct weather_particle_system) == 0x9C ? 1 : -1];
+typedef char weather_particle_size_assert[
+	sizeof(struct weather_particle) == 0x54 ? 1 : -1];
 typedef char weather_particle_system_globals_size_assert[
 	sizeof(struct weather_particle_system_globals) == 0x274 ? 1 : -1];
 
 /* ---------- prototypes */
 
+static struct weather_particle_system *weather_particle_system_get(
+	short local_player_index);
+static struct weather_particle_type *weather_particle_system_get_type(
+	struct weather_particle_system *system,
+	short type_index);
+static void weather_particle_system_type_delete_particle(
+	struct weather_particle_type *type);
+
 /* ---------- globals */
 
-static struct weather_particle_system_globals bss_0043d590;
+static struct weather_particle_system_globals weather_particle_system_globals;
 
 /* ---------- public code */
 
 void weather_particle_systems_initialize(
 	void)
 {
-	weather_particle_data = data_new("weather particles", 512, 0x54);
+	weather_particle_data = data_new("weather particles", MAXIMUM_NUMBER_OF_WEATHER_PARTICLES, sizeof(struct weather_particle));
 	if (!weather_particle_data)
 		error(_error_immediate, "couldn't allocate weather particle system globals.");
 
@@ -121,10 +175,10 @@ void weather_particle_systems_initialize_for_new_map(
 	for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
 	{
 		match_assert("c:\\halo\\SOURCE\\effects\\weather_particle_systems.c", 91, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
-		bss_0043d590.local_players[local_player_index].particle_system_index = NONE;
+		weather_particle_system_globals.systems[local_player_index].definition_index = NONE;
 	}
 
-	bss_0043d590.active_system_count = 0;
+	weather_particle_system_globals.active_system_count = 0;
 	data_make_valid(weather_particle_data);
 
 	return;
@@ -151,4 +205,59 @@ void weather_particle_systems_dispose(
 	return;
 }
 
+void weather_particle_system_delete(
+	short local_player_index)
+{
+	struct weather_particle_system *system = weather_particle_system_get(local_player_index);
+	struct weather_particle_system_definition *definition = weather_particle_system_definition_get(system->definition_index);
+	short type_index;
+
+	for (type_index = 0; type_index<definition->particle_types.count; type_index++)
+	{
+		struct weather_particle_type *type = weather_particle_system_get_type(system, type_index);
+
+		while (type->first_particle_index!=NONE)
+		{
+			weather_particle_system_type_delete_particle(type);
+		}
+	}
+
+	weather_particle_system_globals.active_system_count-= 1;
+	system->definition_index = NONE;
+
+	return;
+}
+
 /* ---------- private code */
+
+static struct weather_particle_system *weather_particle_system_get(
+	short local_player_index)
+{
+	match_assert("c:\\halo\\SOURCE\\effects\\weather_particle_systems.c", 91, local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+
+	return &weather_particle_system_globals.systems[local_player_index];
+}
+
+static struct weather_particle_type *weather_particle_system_get_type(
+	struct weather_particle_system *system,
+	short type_index)
+{
+	struct weather_particle_system_definition *definition = weather_particle_system_definition_get(system->definition_index);
+
+	match_assert("c:\\halo\\SOURCE\\effects\\weather_particle_systems.c", 102, type_index>=0 && type_index<definition->particle_types.count);
+
+	return &system->types[type_index];
+}
+
+static void weather_particle_system_type_delete_particle(
+	struct weather_particle_type *type)
+{
+	struct weather_particle *particle = datum_get(weather_particle_data, type->first_particle_index);
+	long next_particle_index = particle->next_particle_index;
+
+	datum_delete(weather_particle_data, type->first_particle_index);
+	type->particle_count-= 1;
+	type->first_particle_index = next_particle_index;
+
+	return;
+}

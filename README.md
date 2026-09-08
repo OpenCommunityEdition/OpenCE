@@ -19,6 +19,7 @@ This is a work-in-progress decompilation of Halo: Combat Evolved build 2342 (`ca
 
 ## Agent quick references
 
+- [Current campaign house rules and batch/treemap cadence](docs/campaign_house_rules.md)
 - [Common constants, types, float patterns, tag IDs, and flag conventions](docs/common_constants.md)
 - [Shared assertion macros and byte-matching examples](docs/assertions.md)
 - [Supplied CE source maps, recovered names, and next reconstruction packets](docs/user_source_reconstruction_map_20260906.md)
