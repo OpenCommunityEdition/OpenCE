@@ -1,0 +1,207 @@
+# Reconciliation queue: completed/interrupted Claude lanes
+
+Updated 2026-09-07 after the user confirmed that both Opus 2 and the new
+Fable 5 lane had concluded or exhausted their tokens. Their implementation
+reservations are released for reconciliation. Donor worktrees remain read-only:
+preserve committed, dirty and scratch work; do not restart either lane or send
+another prompt without a new request.
+
+## Published checkpoint
+
+Canonical is
+`C:/Users/isabe/Documents/Codex/2026-07-13/i-w/work/rasterizer-model-wrapper-alias-20260829`,
+branch `jonas/ai-debug-integration-20260829`.
+
+The Lights batch is committed as
+`adc1f36a2a95cff0ae99ebbf3b3bc1ee026e1932`, independently verified on both
+`jonas/exact-pilots` and `jonas/ai-debug-integration-20260829` at remote
+`jonas` (`https://github.com/bnunu/halo.git`). It adds 289 meaningful exact
+code bytes, reaching **930,363 code bytes / 6,283 credited functions**;
+**391/833 Matching objects** and **2,061,024 matched data bytes** are unchanged.
+The complete strict sweep is 6,329/8,245, one gain and zero regressions.
+Full tests: 1,019 passed, two skipped, 26 subtests passed. Independent focused
+runtime review: ten passed. See
+[the Lights ledger](object_matching_logs/rasterizer_lights_obj_frame_start_reconciliation_20260906.md).
+
+None of the new-lane totals below is added to that published checkpoint.
+They are donor-relative observations, not an audited union or promised future
+credit. Fresh canonical rebuilds, source admission, complete runtime ownership
+and regression checks are still required for every packet.
+
+## Opus 2: UI, scripting and profiles
+
+- Worktree: `C:/halo-worktrees/opus-30k-ui-script-profiles-20260906`.
+- Branch: `opus/30k-ui-script-profiles-20260906`.
+- Base: `19765bb76b7a1d287a146ce37b2832810366d47a`.
+- Observed tip: `08d6bea92b1b7da925bf3687b44310b6203953dd` (35 commits).
+- Tracked tree clean; untracked `scratch/` preserved. Git reported permission
+  warnings for its cache/global ignore; this does not inventory inaccessible
+  untracked contents.
+- Changes: 13 C files, one header, three configs, seven tools, 75 documents.
+
+The handoff `docs/object_matching_logs/opus_30k_ui_script_profiles_HANDOFF_20260906.md`
+is stale at `50bf63c0b`. Latest wave-13 commit instead reports **+46,273
+meaningful code bytes** (916,773 to 963,046), 6,355 credited functions, 287
+parks, and 502 tests plus 26 subtests. No new behavioral tests were added in
+this lane. Read-only saved-snapshot comparison confirms **140 strict gains,
+zero losses**, 6,258 to 6,398 exact rows out of 8,245; that is not a fresh build
+or current-canonical admission.
+
+First packets to inspect:
+
+1. `playlist_profile_get_display_name`: 53 meaningful / 64 padded target
+   bytes. Natural copy/accessor leaf; needs its public prototype in the genuine
+   `source/saved games/playlist_profile.h` and proper dependency headers.
+   Do not import the surrounding data/BSS facades or other profile bodies.
+   **First owner trial is now held:** the leaf is exact and 20 runtime tests
+   pass, but its genuine header declaration regresses an existing 693-byte
+   exact UI function. The packet was fully restored with zero lasting losses;
+   see [the held trial](object_matching_logs/playlist_profile_obj_display_name_owner_hold_20260907.md).
+2. `draw_gravy_base_layer`: 96 padded bytes. Review real caller extraction
+   separately from the empty 16-byte noise helper whose January caller placement
+   remains inferred.
+3. Other small player/playlist profile leaves and their real read/write graphs.
+4. HS parser helper/caller packets, then larger UI and save-file logic.
+
+Admission boundaries:
+
+- Playlist retains address-named globals and prefix views; data ownership is
+  expressly unaudited. New leaf credit does not close that object.
+- Game-state source retains a BSS prefix, locally copied public/SDK prototypes
+  and a new `static __inline` helper. No blanket import.
+- `player_profile.h` changes a return type from `short` to `word`; a conflicting
+  local `long` declaration remains in a different UI consumer. Resolve the
+  genuine contract and full transitive header effects.
+- Review unused call-result locals, repeated source-shape searches, duplicated
+  accessors, original-bug claims and uninitialized failure paths individually.
+  Exactness does not authenticate those mechanisms.
+- Three config diffs include six semantic credits and symbol/static changes.
+  Reconcile entries individually; no wholesale config replacement.
+- A function-only "closed" saved-game file is not a whole-object admission.
+
+Tool review is queued separately:
+`tools/campaign/add_semantic_matches.py`, `merge_candidates.py`,
+`refresh_parks.py`, `relcount.py`, `relocdiff.py`, `stdcall_scan.py`,
+`unparked.py`. Configuration-mutating helpers must not be run to manufacture
+admission. Review their safety/correctness before any tooling publication.
+
+Read-only review found concrete blockers: `relcount` hardcodes a UI target;
+`relocdiff` truncates unequal lists with `zip`; `unparked` discards compile
+failure status; the return-convention scanner overclaims stdcall from `ret N`.
+`merge_candidates` misses competing insertions at the same gap and mixed EOLs.
+`refresh_parks` can alter target size through an unscoped replacement and remove
+by function name without unit; `add_semantic_matches` accepts absent baseline
+entries as fresh credit and hardcodes lane cases. Do not run/copy these as
+trusted general tooling. Harden read-only diagnostics with negative tests first;
+keep manifest-editing utilities held pending admission-policy review.
+
+Primary pointers under the donor root:
+
+- `docs/object_matching_logs/opus_30k_ui_script_profiles_session_20260906.md`.
+- `docs/object_matching_logs/opus_lane_wave9_orchestrator_20260907.md`.
+- `docs/object_matching_logs/hs_compile_finish_obj_opus_wave13_20260907.md`.
+- `docs/object_matching_logs/never_swept_obj_opus_wave13_20260907.md`.
+- `docs/object_matching_logs/uiw_finish_obj_opus_wave13_20260907.md`.
+- `scratch/baseline-19765bb76.json`, `scratch/after-wave13.json`,
+  `scratch/ninja13.log`, `build/report.json`, `build/semantic_report.json`.
+
+Snapshot SHA-256 pins:
+
+- Before: `fb3225b553f82edf883c4e89ac4bd6be147ae710d4bb9aabcc09f7b5e59ae973`.
+- Wave 13: `5d92eb9450b5fadb7a9a578e26de5ed8220820e768f63c70bae1146dbdb68dd5`.
+- Raw report: `778f02c804f162fbe55c8f6b81dd882b8608e5ea1e78d8e7a1f8bd3ee045adf0`.
+- Semantic report: `f798f86c29a3c13c8f7e6dced40b243ebbe4b5684c5074313b9f150b9ad94552`.
+
+## New Fable 5 continuation: committed and dirty waves
+
+- Worktree: `C:/halo-worktrees/fable-50k-resume-20260906`.
+- Branch: `fable/50k-resume-20260906`.
+- Base: `aae36798942305d022ee9502915c15dac7431c39`.
+- Observed tip: `740bbc33aeaa7c2c6ee86304b7a52279df44a930` (four commits).
+- Committed changes: 14 C files, four headers, two configs and the ledger.
+- Dirty tracked work: the ledger, `source/ai/encounters.c`,
+  `source/cache/xbox_texture_cache.c`, `source/physics/collisions.c`.
+  Preserve untracked `scratch/` too.
+
+The main ledger is `docs/object_matching_logs/fable_50k_resume_lane_20260906.md`.
+It reports **+21,455 meaningful credited code bytes** (926,785 to 948,240),
+with 391/833 Matching objects unchanged. Saved-snapshot comparison confirms
+**91 strict gains / 22,144 padded bytes, zero exact-status losses**, 6,314 to
+6,405 of 8,245 rows. This includes naming/owner recovery, not exclusively newly
+written bodies. Bink contributes **ten net gains**, not fourteen: four callers
+were restored baseline matches, and must not be counted twice.
+
+Saved `scratch/pytest-r4.log` records 950 passed, five skipped and 26 subtests.
+`scratch/ninja-r4.log` ends FAILED on two stale structure-visibility parks.
+The later `scratch/resume-parks-r4b.json` has no stale/invalid records and the
+ledger claims a successful rerun, but intake did not locate that rerun's saved
+Ninja log. Reproduce the build; do not silently convert this discrepancy into
+a verified pass. The ledger's attribution of its chosen base to the refreshed
+prompt is also stale; retain the real commit identity above.
+
+First packets to inspect:
+
+1. **RenderDebug box-only next:** 384 padded bytes, using the genuine narrow
+   `source/render/render_debug_geometry.h` owner (not the broad header).
+   Existing quadrilateral/cache callers supply its dependencies. Revalidate
+   the complete header consumers before the trial. The remaining cylinder/pill/
+   height-matrix graph is conditional: the saved donor adds nine math code
+   owners absent from the January object, including a normalize3d fallback.
+   Do not restore its rejected debug-global header packet or the held circle
+   caller with an omitted variadic offset. See existing RenderDebug ledgers.
+2. ActionFlee flush/replace/modify-color: three small leaves, 208 padded bytes.
+   Their owning public prototypes are missing. Begin/update remain held on
+   `unit_start_running_blindly` ownership and the known header regression.
+3. Small Geometry verify/vector helpers, with real prototypes; assess the
+   q-count ABI correction and changed structure-visibility parks separately.
+4. Weather lifecycle/accessors, then larger caller graphs. Damage, player
+   queues, Bink, collision/path and physics need genuine owner/schema work.
+
+Preserve existing holds: no fabricated combined player-queues global, no
+external-linkage conclusion from a BSS split or memset extent, no foreign
+prototype/type facade, no speculative inline substitute, no camera-global
+aggregation. The new camera donor does not resolve the original linkage hold.
+
+### Dirty wave: not included in the r4 credit
+
+- Encounters: claimed 640-padded pursuit closure uses an implicit foreign
+  call; proper prototypes/enums are needed. Respawn is fuzzy, not exact credit.
+- Collisions: the current dirty file **fails the forbidden
+  `_point_from_line3d` emission guard** after adding `units/bipeds.h` and emits
+  other math owners. Do not copy it wholesale. Keep its separate scratch
+  helper/name-recovery candidates for a genuine owner packet.
+- Xbox texture cache: three claimed name-gap owners total 112 padded bytes;
+  two 144-byte format mappers have local-table identity differences. Audit
+  table/global ownership, enums and prototypes before admission.
+
+Read `scratch/reports/<unit>.md` and `scratch/hdr/<unit>.md` for each selected
+unit, including all earlier canonical object ledgers and rejection criteria.
+Snapshot/dirty SHA-256 pins:
+
+- `scratch/resume-before.json`: `6821c47049642366b7ae3f6f20d7cd44bfe70bc102af1c7a4145e83540c69991`.
+- `scratch/resume-r4.json`: `4974984f8030bdff429c81a1fb38579847d874c05560b1c47c3e659a7e613d6e`.
+- Main dirty ledger: `a7153cf0cea8bda080692e88d9dedd64662c212f03fb316adc2b3f0506c36362`.
+- Dirty encounters: `9c91916689b490f21ab2b4d0fe7843f414ca8882cbc302d7ea71214d63372440`.
+- Dirty texture cache: `121364b93e575af119147e4bee311b47597bf5a2d82d27caec2598fb5c1c9a34`.
+- Dirty collisions: `73b137815679268564abe744ce9cbee917b9e4d1a607cf5d9de18aa704ad7230`.
+
+## Existing backlog remains queued
+
+The [completed first Opus lane intake](object_matching_logs/opus1_reconciliation_intake_20260906.md)
+tracks 8,195 admitted meaningful bytes across its reconciliation packets,
+including 6,906 from the original 30,074-byte headline and 1,289 previously
+uncounted strict bytes. **23,168 of that original headline remains unadmitted
+as exact**, including honest fuzzy source and held candidates. This is not a
+guaranteed remaining recoverable total.
+
+Keep its FrameStatistics genuine-owner/draw research and other rasterizer
+holds, plus the [older Opus backlog](opus_unfinished_session_reconciliation_backlog_20260903.md)
+and [old interrupted Fable intake](object_matching_logs/fable_50k_small_families_interrupted_lane_intake_20260905.md).
+The old Fable worktree is not the new continuation tree. No parked or rejected
+body is reopened merely because a new lane repeats an exactness claim.
+
+Only the canonical orchestrator edits shared headers/configs, runs full
+Ninja/capture/sweeps, commits or pushes. Workers use disjoint read-only intake
+or isolated scratch outputs. Freeze the current canonical baseline before
+each material packet, preserve all inherited exact and credible partial work,
+and publish coherent verified batches to the two authorized branches only.

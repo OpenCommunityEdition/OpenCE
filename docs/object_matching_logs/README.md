@@ -1,5 +1,9 @@
 # Object exact-match strategy logs
 
+For the completed/interrupted Opus 2 and new Fable 5 lanes, start with the
+[current reconciliation queue](../reconciliation_queue_20260907.md). It separates
+published progress, donor claims, dirty work, owner holds and tooling defects.
+
 Every object that receives implementation or matching work must maintain one
 Markdown ledger in this directory. The filename is the object name with
 `_obj.md`, for example `players_obj.md`.
