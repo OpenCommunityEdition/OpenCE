@@ -155,6 +155,9 @@ void main_present_frame(
 void main_pregame_render(
 	void);
 
+void main_framerate_render(
+	void);
+
 void main_rasterizer_throttle(
 	void);
 

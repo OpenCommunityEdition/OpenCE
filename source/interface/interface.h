@@ -45,7 +45,12 @@ void interface_initialize(
 	void);
 void interface_initialize_for_new_map(
 	void);
-long interface_get_tag_index(short interface_tag_index);
+long interface_get_tag_index(
+	short interface_tag_index);
+real_argb_color *interface_get_real_argb_color(
+	short interface_color_table_index,
+	short color_index,
+	real_argb_color *color);
 void interface_set_bitmap_text_draw_mode(
 	short interface_font_index,
 	short style,

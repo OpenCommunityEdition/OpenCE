@@ -6058,6 +6058,25 @@
         },
         "objdiff_percent": 100
       }
+    },
+    {
+      "unit": "source/hs/hs_runtime",
+      "function": "_hs_global_reconcile_write",
+      "class": "instruction-scheduling",
+      "evidence": "Best complete house-rule-compliant reconstruction retained from Opus commit 0973b18e6 and freshly reconciled against canonical headers. The natural typed switch writes every supported external HS global through its named definition and preserves the real-valued temporary used by January's shared switch blocks. Target is 400 padded bytes; the candidate is 416 padded bytes. Both have 47 relocations to the same semantic callees, data and switch destinations, but instruction offsets and normalized bytes differ after the candidate's longer entry schedule. It is required by three newly exact HS runtime owners and receives zero exact credit. No inequality workaround, BSS split, foreign type duplicate, raw offset, forced inline, volatile/register steering, representation pun, assembly, or nonsensical branch is retained. See docs/object_matching_logs/hs_runtime_interface_leaf_reconciliation_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 400,
+          "relocation_count": 47,
+          "normalized_sha256": "2970ab42df38836052877705d5ead641c4ff94b5d55807c7b3049f03bbe01ab4"
+        },
+        "base": {
+          "size": 416,
+          "relocation_count": 47,
+          "normalized_sha256": "2dab6c4ec4e33d061b84bab1219522b4c8c229ea2f423c07038e6bf880eca663"
+        },
+        "objdiff_percent": 68.44203
+      }
     }
   ]
 }

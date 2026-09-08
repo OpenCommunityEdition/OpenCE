@@ -573,5 +573,10 @@
     "unit": "source/interface/ui_widget_game_data_input_functions",
     "function": "_mutliplayer_settings_select_list_update_displayed_items",
     "reason": "hardened COFF comparison proves all 1424 padded bytes and all 73 semantic relocations exact (SHA-256 adce7f9ab32aee72ec9d542efc297df9295a839a27406848eb8467ffea97594f); objdiff reports compiler-local switch-table labels as a false negative; January's original misspelling of multiplayer in the owner name is preserved"
+  },
+  {
+    "unit": "source/interface/ui_widget",
+    "function": "_remap_sticks_for_local_player",
+    "reason": "hardened COFF comparison proves all 304 padded bytes and all 31 semantic relocations exact (SHA-256 963b6756ac2f3b70faf18955bad37bac6ed40bbe366baa697feccc61e7050ce8); objdiff reports a control-flow pairing false negative after the natural switch assigns the remapped icon and reaches the shared return"
   }
 ]

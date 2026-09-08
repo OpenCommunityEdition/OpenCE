@@ -19,6 +19,12 @@ union real_argb_color;
 
 /* ---------- prototypes/HUD.C */
 
+void hud_initialize(
+	void);
+void hud_dispose(
+	void);
+void hud_dispose_from_old_map(
+	void);
 void hud_update(
 	void);
 void hud_initialize_for_new_map(

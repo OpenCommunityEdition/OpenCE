@@ -40,6 +40,10 @@ long object_list_get_first(
 long object_list_get_next(
 	long object_list_index,
 	long *reference_index);
+void object_list_add_reference(
+	long object_list_index);
+void object_list_remove_reference(
+	long object_list_index);
 
 
 /* ---------- globals */

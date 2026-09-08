@@ -264,6 +264,7 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "ai/ai_debug_scripting.h"
 #include "hs/hs.h"
+#include "hs/hs_library_internal_runtime.h"
 #include "hs/object_lists.h"
 #include "hs/hs_scenario_definitions.h"
 #include "math/real_math.h"
@@ -480,6 +481,9 @@ static long hs_syntax_nth(
 	short n);
 static void hs_thread_delete(
 	long thread_index);
+static long hs_thread_new(
+	short type,
+	long script_index);
 static void hs_stack_push(
 	long thread_index);
 static void *hs_stack_allocate(
@@ -490,7 +494,7 @@ static void hs_evaluate(
 	long expression_index,
 	long *destination);
 static long hs_global_evaluate(
-	word global_designator);
+	short global_designator);
 static long *hs_arguments_evaluate(
 	long thread_index,
 	short formal_parameter_count,
@@ -508,6 +512,8 @@ static void hs_thread_main(
 	long thread_index);
 static void hs_global_reconcile_read(
 	word global_designator);
+static void hs_global_reconcile_write(
+	word global_designator);
 
 /* ---------- globals */
 
@@ -518,6 +524,7 @@ extern struct data_array *hs_syntax_data;
 extern short hs_external_global_count;
 extern short hs_type_sizes[NUMBER_OF_HS_TYPES];
 extern boolean debug_scripting;
+extern unsigned long hs_debug_data[];
 static hs_inspection_procedure hs_type_inspectors[NUMBER_OF_HS_TYPES] =
 {
 	NULL,
@@ -633,7 +640,8 @@ void hs_runtime_initialize(
 			global_index<hs_external_global_count;
 			global_index++)
 		{
-			index = datum_new_at_index(hs_global_data, global_index|0xaced0000);
+			index = datum_new_at_index(hs_global_data,
+				DATUM_INDEX_NEW(global_index, 0xaced));
 			match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0xb1, index!=NONE);
 		}
 	}
@@ -641,6 +649,93 @@ void hs_runtime_initialize(
 	{
 		error(_error_immediate, "couldn't allocate scripting globals.");
 	}
+
+	return;
+}
+
+void hs_runtime_initialize_for_new_map(
+	void)
+{
+	long internal_thread_index;
+
+	data_make_valid(hs_thread_data);
+	hs_runtime_globals.initialized = TRUE;
+	hs_runtime_globals.executing_thread_index = NONE;
+	internal_thread_index = hs_thread_new(_hs_thread_type_global_initialize, NONE);
+
+	if (global_scenario_index!=NONE)
+	{
+		struct scenario *scenario = global_scenario_get();
+		struct hs_thread_datum *internal_thread = hs_thread_get(internal_thread_index);
+		struct hs_global_datum *global_datum;
+		long global_datum_index;
+		short global_index;
+		short script_index;
+
+		for (global_index = 0;
+			global_index<scenario->hs_globals.count;
+			global_index++)
+		{
+			struct hs_global *global = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->hs_globals,
+				global_index,
+				struct hs_global);
+
+			if (HS_GLOBAL_DESIGNATOR_IS_EXTERNAL((word)global_index))
+				global_datum_index = HS_GLOBAL_DESIGNATOR_TO_INDEX(global_index);
+			else
+				global_datum_index = HS_GLOBAL_DESIGNATOR_TO_INDEX(global_index)+
+					hs_external_global_count;
+			datum_new_at_index(hs_global_data,
+				DATUM_INDEX_NEW(global_datum_index, 0xaced));
+
+			if (HS_GLOBAL_DESIGNATOR_IS_EXTERNAL((word)global_index))
+				global_datum_index = HS_GLOBAL_DESIGNATOR_TO_INDEX(global_index);
+			else
+				global_datum_index = HS_GLOBAL_DESIGNATOR_TO_INDEX(global_index)+
+					hs_external_global_count;
+			global_datum = datum_get(hs_global_data, global_datum_index);
+			internal_thread->script_index = NONE;
+			internal_thread->stack->size = 0;
+			hs_evaluate(
+				internal_thread_index,
+				global->initialization_expression_index,
+				&global_datum->value.long_integer);
+
+			if (TEST_FLAG(internal_thread->flags, _hs_thread_in_function_call_bit))
+			{
+				hs_thread_main(internal_thread_index);
+				if (global->type==_hs_type_object_list)
+					object_list_add_reference(hs_global_evaluate(global_index));
+				match_hs_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0xe7, internal_thread_index,
+					internal_thread->sleep_until==0,
+					"a global initialization attempted to sleep.");
+			}
+			hs_global_reconcile_write(global_index);
+		}
+
+		hs_thread_delete(internal_thread_index);
+
+		for (script_index = 0;
+			script_index<scenario->hs_scripts.count;
+			script_index++)
+		{
+			struct hs_script *script = TAG_BLOCK_GET_ELEMENT(
+				&scenario->hs_scripts,
+				script_index,
+				struct hs_script);
+
+			if (script->script_type!=_hs_script_static &&
+				script->script_type!=_hs_script_stub)
+			{
+				if (hs_thread_new(_hs_thread_type_script, script_index)==NONE)
+					error(_error_immediate, "ran out of script threads.");
+			}
+		}
+	}
+
+	csmemset(hs_debug_data, 0,
+		BIT_VECTOR_SIZE_IN_BYTES(MAXIMUM_TRIGGER_VOLUMES_PER_SCENARIO));
 
 	return;
 }
@@ -902,6 +997,45 @@ static long hs_syntax_nth(
 		expression_index = hs_syntax_get(expression_index)->next_node_index;
 
 	return expression_index;
+}
+
+static long hs_thread_new(
+	short type,
+	long script_index)
+{
+	long thread_index = datum_new(hs_thread_data);
+	struct hs_thread_datum *thread;
+
+	match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x26f,
+		type>=0 && type<NUMBER_OF_HS_THREAD_TYPES);
+	match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x270,
+		type!=_hs_thread_type_script || script_index!=NONE);
+
+	if (thread_index!=NONE)
+	{
+		thread = hs_thread_get(thread_index);
+		thread->stack = (struct hs_stack_frame *)thread->stack_data;
+		thread->stack->previous = NULL;
+		thread->stack->size = 0;
+		thread->stack->expression_index = NONE;
+		thread->type = (byte)type;
+		thread->script_index = script_index;
+		thread->flags = 0;
+		if (script_index!=NONE &&
+			TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->hs_scripts,
+				script_index,
+				struct hs_script)->script_type==_hs_script_dormant)
+		{
+			thread->sleep_until = NONE-1;
+		}
+		else
+		{
+			thread->sleep_until = 0;
+		}
+	}
+
+	return thread_index;
 }
 
 static void hs_thread_delete(
@@ -1569,6 +1703,49 @@ void hs_evaluate_if(
 	else
 	{
 		hs_return(thread_index, *result);
+	}
+
+	return;
+}
+
+void hs_evaluate_set(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+	long variable_expression_index = hs_syntax_get(hs_syntax_get(
+		thread->stack->expression_index)->data)->next_node_index;
+	struct hs_syntax_node *variable = hs_syntax_get(variable_expression_index);
+	short type;
+	long global_index;
+
+	hs_stack_allocate(thread_index, sizeof(long));
+	type = hs_global_get_type((short)variable->data);
+
+	if (initialize)
+	{
+		if (type==_hs_type_object_list)
+			object_list_remove_reference(hs_global_evaluate((short)variable->data));
+
+		if (HS_GLOBAL_DESIGNATOR_IS_EXTERNAL(variable->data))
+			global_index = HS_GLOBAL_DESIGNATOR_TO_INDEX((short)variable->data);
+		else
+			global_index = HS_GLOBAL_DESIGNATOR_TO_INDEX((short)variable->data)+
+				hs_external_global_count;
+
+		hs_evaluate(thread_index,
+			hs_syntax_get(variable_expression_index)->next_node_index,
+			&((struct hs_global_datum *)datum_get(hs_global_data,
+				global_index))->value.long_integer);
+	}
+	else
+	{
+		hs_global_reconcile_write((short)variable->data);
+		if (type==_hs_type_object_list)
+			object_list_add_reference(hs_global_evaluate((short)variable->data));
+
+		hs_return(thread_index, hs_global_evaluate((short)variable->data));
 	}
 
 	return;
@@ -2379,13 +2556,196 @@ static void hs_global_reconcile_read(
 	return;
 }
 
-static long hs_global_evaluate(
+static void hs_global_reconcile_write(
 	word global_designator)
+{
+	struct hs_global_datum *global;
+	struct hs_external_global_definition *external;
+	real value;
+
+	if (HS_GLOBAL_DESIGNATOR_IS_EXTERNAL(global_designator))
+	{
+		global = datum_get(hs_global_data,
+			HS_GLOBAL_DESIGNATOR_TO_INDEX(global_designator));
+		external = hs_global_external_get(
+			HS_GLOBAL_DESIGNATOR_TO_INDEX(global_designator));
+
+		switch (hs_global_get_type(global_designator))
+		{
+		case _hs_type_boolean:
+			if (external->address)
+				*(boolean *)external->address = global->value.boolean;
+			break;
+		case _hs_type_real:
+			value = global->value.real;
+			if (external->address)
+				*(real *)external->address = value;
+			break;
+		case _hs_type_short_integer:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		case _hs_type_long_integer:
+			if (external->address)
+				*(long *)external->address = global->value.long_integer;
+			break;
+		case _hs_type_string:
+			if (external->address)
+				*(char const **)external->address = global->value.string;
+			break;
+		case _hs_type_script:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		case _hs_type_trigger_volume:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		case _hs_type_cutscene_flag:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		case _hs_type_cutscene_camera_point:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		case _hs_type_cutscene_title:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		case _hs_type_cutscene_recording:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		case _hs_type_device_group:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		case _hs_type_ai:
+			if (external->address)
+				*(long *)external->address = global->value.long_integer;
+			break;
+		case _hs_type_ai_command_list:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		case _hs_type_starting_profile:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		case _hs_type_conversation:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		case _hs_type_navpoint:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		case _hs_type_hud_message:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		case _hs_type_object_list:
+			if (external->address)
+				*(long *)external->address = global->value.long_integer;
+			break;
+		case _hs_type_sound:
+			if (external->address)
+				*(long *)external->address = global->value.long_integer;
+			break;
+		case _hs_type_effect:
+			if (external->address)
+				*(long *)external->address = global->value.long_integer;
+			break;
+		case _hs_type_damage:
+			if (external->address)
+				*(long *)external->address = global->value.long_integer;
+			break;
+		case _hs_type_looping_sound:
+			if (external->address)
+				*(long *)external->address = global->value.long_integer;
+			break;
+		case _hs_type_animation_graph:
+			if (external->address)
+				*(long *)external->address = global->value.long_integer;
+			break;
+		case _hs_type_actor_variant:
+			if (external->address)
+				*(long *)external->address = global->value.long_integer;
+			break;
+		case _hs_type_damage_effect:
+			if (external->address)
+				*(long *)external->address = global->value.long_integer;
+			break;
+		case _hs_type_object_definition:
+			if (external->address)
+				*(long *)external->address = global->value.long_integer;
+			break;
+		case _hs_type_enum_game_difficulty:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		case _hs_type_enum_team:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		case _hs_type_enum_ai_default_state:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		case _hs_type_enum_actor_type:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		case _hs_type_enum_hud_corner:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		case _hs_type_object:
+			if (external->address)
+				*(long *)external->address = global->value.long_integer;
+			break;
+		case _hs_type_unit:
+			if (external->address)
+				*(long *)external->address = global->value.long_integer;
+			break;
+		case _hs_type_vehicle:
+			if (external->address)
+				*(long *)external->address = global->value.long_integer;
+			break;
+		case _hs_type_weapon:
+			if (external->address)
+				*(long *)external->address = global->value.long_integer;
+			break;
+		case _hs_type_device:
+			if (external->address)
+				*(long *)external->address = global->value.long_integer;
+			break;
+		case _hs_type_scenery:
+			if (external->address)
+				*(long *)external->address = global->value.long_integer;
+			break;
+		case _hs_type_object_name:
+			if (external->address)
+				*(short *)external->address = global->value.short_integer;
+			break;
+		default:
+			display_assert(NULL, "c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x671, TRUE);
+			system_exit(-1);
+			break;
+		}
+	}
+
+	return;
+}
+
+static long hs_global_evaluate(
+	short global_designator)
 {
 	long global_index;
 
 	hs_global_reconcile_read(global_designator);
-	if (HS_GLOBAL_DESIGNATOR_IS_EXTERNAL(global_designator))
+	if (HS_GLOBAL_DESIGNATOR_IS_EXTERNAL((word)global_designator))
 	{
 		global_index = HS_GLOBAL_DESIGNATOR_TO_INDEX(global_designator);
 	}

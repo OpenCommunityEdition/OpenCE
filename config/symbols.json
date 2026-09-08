@@ -3537,7 +3537,7 @@
 { "file_offset": 845952, "flags": 32, "name": "_profile_graph_toggle" },
 { "file_offset": 846080, "flags": 32, "name": "_code_000ce900" },
 { "file_offset": 846352, "flags": 32, "name": "_code_000cea10" },
-{ "file_offset": 848624, "flags": 32, "name": "_code_000cf2f0" },
+{ "file_offset": 848624, "flags": 32, "name": "_interface_splitscreen_render" },
 { "file_offset": 848848, "flags": 32, "name": "_interface_initialize_for_new_map" },
 { "file_offset": 848944, "flags": 32, "name": "_interface_get_rgb_color" },
 { "file_offset": 849056, "flags": 32, "name": "_interface_draw_fullscreen_overlays" },

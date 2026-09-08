@@ -2653,9 +2653,7 @@ short remap_sticks_for_local_player(
 	short icon,
 	short local_player_index)
 {
-	long icon_index = icon;
-
-	switch (icon_index)
+	switch (icon)
 	{
 	case _icon_left_stick:
 	case _icon_move:
@@ -2667,7 +2665,8 @@ short remap_sticks_for_local_player(
 			"c:\\halo\\SOURCE\\interface\\ui_widget.c",
 			4244,
 			30 == get_icon_type(L"move"));
-		return should_flip_sticks_for_local_player(local_player_index) ? _icon_right_stick : _icon_left_stick;
+		icon = should_flip_sticks_for_local_player(local_player_index) ? _icon_right_stick : _icon_left_stick;
+		break;
 	case _icon_right_stick:
 	case _icon_look:
 		match_assert(
@@ -2678,7 +2677,8 @@ short remap_sticks_for_local_player(
 			"c:\\halo\\SOURCE\\interface\\ui_widget.c",
 			4251,
 			31 == get_icon_type(L"look"));
-		return should_flip_sticks_for_local_player(local_player_index) ? _icon_left_stick : _icon_right_stick;
+		icon = should_flip_sticks_for_local_player(local_player_index) ? _icon_left_stick : _icon_right_stick;
+		break;
 	}
 
 	return icon;

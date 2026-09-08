@@ -41,13 +41,16 @@ struct terminal_gets_state
 
 /* ---------- prototypes/TERMINAL.C */
 
-void terminal_initialize(void);
-void terminal_dispose(void);
+void terminal_initialize(
+	void);
+void terminal_dispose(
+	void);
 void terminal_clear(void);
 boolean terminal_gets_active(void);
 boolean terminal_gets_begin(struct terminal_gets_state *state);
 void terminal_gets_end(struct terminal_gets_state *state);
-void terminal_draw(void);
+void terminal_draw(
+	void);
 boolean terminal_update(void);
 void terminal_printf(real_argb_color const *color, char const *format, ...);
 

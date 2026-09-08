@@ -73,6 +73,9 @@ void cinematic_set_title_delayed(
 	real delay);
 void cinematic_render(
 	void);
+void draw_quad(
+	rectangle2d *rectangle,
+	pixel32 color);
 void cinematic_set_title(
 	unsigned short title_index);
 
