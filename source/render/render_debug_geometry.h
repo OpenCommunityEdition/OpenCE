@@ -23,6 +23,10 @@ void render_debug_quadrilateral(
 	real_point3d const *point2,
 	real_point3d const *point3,
 	real_argb_color const *color);
+void render_debug_box(
+	boolean immediate,
+	real_rectangle3d const *bounds,
+	real_argb_color const *color);
 void render_debug_box2d_outline(
 	boolean immediate,
 	real_rectangle2d const *bounds,

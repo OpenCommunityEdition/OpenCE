@@ -6,7 +6,7 @@ reservations are released for reconciliation. Donor worktrees remain read-only:
 preserve committed, dirty and scratch work; do not restart either lane or send
 another prompt without a new request.
 
-## Published checkpoint
+## Verified canonical checkpoint
 
 Canonical is
 `C:/Users/isabe/Documents/Codex/2026-07-13/i-w/work/rasterizer-model-wrapper-alias-20260829`,
@@ -23,7 +23,16 @@ Full tests: 1,019 passed, two skipped, 26 subtests passed. Independent focused
 runtime review: ten passed. See
 [the Lights ledger](object_matching_logs/rasterizer_lights_obj_frame_start_reconciliation_20260906.md).
 
-None of the new-lane totals below is added to that published checkpoint.
+The next verified packet is the new Fable continuation's solid RenderDebug box:
+**+378 meaningful exact bytes**, reaching **930,741 code bytes / 6,284 credited
+functions**. Stable census: **6,330/8,245**, one gain and zero losses; object/data
+totals are unchanged. Full tests: **1,038 passed, two skipped, 26 subtests**;
+root actual-x86 replay: 138 executions and two rejected byte mutations.
+See [the Box ledger](object_matching_logs/render_debug_obj_box_reconciliation_20260907.md)
+for frozen inputs, complete owner audit and the remaining graph holds.
+Publication of this packet is independently checked after commit.
+
+No other part of the new-lane totals below is added to that checkpoint.
 They are donor-relative observations, not an audited union or promised future
 credit. Fresh canonical rebuilds, source admission, complete runtime ownership
 and regression checks are still required for every packet.
@@ -141,10 +150,10 @@ prompt is also stale; retain the real commit identity above.
 
 First packets to inspect:
 
-1. **RenderDebug box-only next:** 384 padded bytes, using the genuine narrow
-   `source/render/render_debug_geometry.h` owner (not the broad header).
-   Existing quadrilateral/cache callers supply its dependencies. Revalidate
-   the complete header consumers before the trial. The remaining cylinder/pill/
+1. **RenderDebug box-only admitted:** 378 meaningful / 384 padded bytes, using
+   the genuine narrow `source/render/render_debug_geometry.h` owner. All three
+   complete header consumers preserve inherited code/data/ownership. This is
+   the only new-continuation packet admitted so far. The remaining cylinder/pill/
    height-matrix graph is conditional: the saved donor adds nine math code
    owners absent from the January object, including a normalize3d fallback.
    Do not restore its rejected debug-global header packet or the held circle

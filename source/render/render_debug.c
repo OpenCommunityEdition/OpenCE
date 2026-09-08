@@ -669,6 +669,73 @@ void render_debug_matrix(
 	return;
 }
 
+void render_debug_box(
+	boolean immediate,
+	real_rectangle3d const *bounds,
+	real_argb_color const *color)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		776,
+		bounds);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		777,
+		color);
+
+	if (immediate)
+	{
+		real_point3d points[8];
+
+		points[0].x = bounds->x0;
+		points[0].y = bounds->y0;
+		points[0].z = bounds->z0;
+		points[1].x = bounds->x1;
+		points[1].y = bounds->y0;
+		points[1].z = bounds->z0;
+		points[2].x = bounds->x0;
+		points[2].y = bounds->y0;
+		points[2].z = bounds->z1;
+		points[3].x = bounds->x1;
+		points[3].y = bounds->y0;
+		points[3].z = bounds->z1;
+		points[4].x = bounds->x0;
+		points[4].y = bounds->y1;
+		points[4].z = bounds->z1;
+		points[5].x = bounds->x1;
+		points[5].y = bounds->y1;
+		points[5].z = bounds->z1;
+		points[6].x = bounds->x0;
+		points[6].y = bounds->y1;
+		points[6].z = bounds->z0;
+		points[7].x = bounds->x1;
+		points[7].y = bounds->y1;
+		points[7].z = bounds->z0;
+
+		render_debug_quadrilateral(
+			TRUE, &points[0], &points[2], &points[4], &points[6], color);
+		render_debug_quadrilateral(
+			TRUE, &points[1], &points[3], &points[5], &points[7], color);
+		render_debug_quadrilateral(
+			TRUE, &points[0], &points[1], &points[3], &points[2], color);
+		render_debug_quadrilateral(
+			TRUE, &points[4], &points[5], &points[7], &points[6], color);
+		render_debug_quadrilateral(
+			TRUE, &points[0], &points[1], &points[7], &points[6], color);
+		render_debug_quadrilateral(
+			TRUE, &points[2], &points[3], &points[5], &points[4], color);
+	}
+	else
+	{
+		render_debug_add_cache_entry(
+			_render_debug_cache_box,
+			bounds,
+			color);
+	}
+
+	return;
+}
+
 void render_debug_polygon_edges(
 	real_point3d const *points,
 	short point_count,
