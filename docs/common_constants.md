@@ -1,6 +1,6 @@
 # Common constants and representation reference
 
-Verified against canonical on 2026-09-06. Start here before guessing literals.
+Verified against canonical on 2026-09-08. Start here before guessing literals.
 
 This is a lookup guide, not a new constants owner. Most rows record high-use
 names that already have canonical owners; the supplied-source crosswalk is
@@ -104,6 +104,7 @@ immediate.
 | Object masks | `_object_mask_unit`, `_object_mask_item`, `_object_mask_device`, `_object_mask_all` | `0x3`, `0x1C`, `0x380`, `0xFFFFFFFF` | [source/objects/object_types.h](../source/objects/object_types.h). These are already masks; test them against an object type with the established `TEST_FLAG(mask, type)` convention. |
 | Object capacity | `MAXIMUM_OBJECTS_PER_MAP` | `2048` | [source/objects/objects.h](../source/objects/objects.h). Capacity is not the current datum count. |
 | Rendered-object capacity | `MAXIMUM_RENDERED_OBJECTS` | `256` | [source/objects/objects.h](../source/objects/objects.h). Do not use it to size the master object datum array. |
+| UI deletion input-inhibit mask | `WIDGET_DELETED_PLAYER_CONTROL_INHIBIT_FLAGS` | `0x0FFF` | TU-local owner in [source/interface/ui_widget.c](../source/interface/ui_widget.c). Passed as a `word` to `player_control_inhibit_buttons` when a root widget with a non-`NONE` local-player index is deleted. It fences the evidenced low twelve discrete action buttons until each held button is released; it does not cover analog movement/look, and it is not `UNSIGNED_SHORT_MAX`, a universal all-buttons mask, or a bit index for `FLAG`. |
 | Markers/regions/attachments | `MAXIMUM_MARKERS_PER_OBJECT`, `MAXIMUM_REGIONS_PER_OBJECT`, `MAXIMUM_NUMBER_OF_ATTACHMENTS_PER_OBJECT` | `64`, `8`, `8` | [source/objects/objects.h](../source/objects/objects.h) and [source/objects/object_definitions.h](../source/objects/object_definitions.h). These belong to different arrays despite sharing an object definition. |
 | Damage material modifier capacity | `MAXIMUM_NUMBER_OF_MATERIAL_TYPES` | `40` | [source/game/game_globals.h](../source/game/game_globals.h); used by `damage_definition.material_modifiers` at [source/objects/damage_effect_definitions.h](../source/objects/damage_effect_definitions.h). It is storage capacity, not the current named-material count. |
 

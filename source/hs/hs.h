@@ -155,6 +155,8 @@ void hs_update(
 	void);
 void hs_dispose(
 	void);
+boolean hs_evaluate_by_name(
+	char const *name);
 
 /* ---------- prototypes/HS_RUNTIME.C */
 

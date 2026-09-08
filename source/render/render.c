@@ -78,6 +78,7 @@ symbols in this file:
 #include "editor_stubs.h"
 #include "render_debug.h"
 #include "objects/object_lights_rendering.h"
+#include "effects/weather_particle_systems.h"
 
 /* ---------- constants */
 
@@ -140,8 +141,6 @@ void render_objects(
 void rasterizer_lens_flares_submit_occlusion_tests(
 	void);
 void render_object_shadows(
-	void);
-void weather_particle_systems_render(
 	void);
 void particle_systems_render(
 	void);

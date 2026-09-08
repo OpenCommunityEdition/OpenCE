@@ -252,8 +252,6 @@ void game_sound_dispose(
 	void);
 void sound_classes_dispose(
 	void);
-void weather_particle_systems_dispose(
-	void);
 void particles_dispose(
 	void);
 void contrails_dispose(
@@ -314,8 +312,6 @@ void player_effect_dispose_from_old_map(
 void rumble_dispose_from_old_map(
 	void);
 void point_physics_dispose_from_old_map(
-	void);
-void weather_particle_systems_dispose_from_old_map(
 	void);
 void decals_dispose_from_old_map(
 	void);

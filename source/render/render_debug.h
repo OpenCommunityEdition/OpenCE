@@ -54,9 +54,32 @@ void render_debug_matrix(
 	struct real_matrix4x3 const *matrix,
 	real size);
 
-void render_debug_sphere(boolean immediate, real_point3d const *center, real radius, real_argb_color const *color);
-void render_debug_cylinder(boolean immediate, real_point3d const *base, real_vector3d const *height, real width, real_argb_color const *color);
-void render_debug_pill(boolean immediate, real_point3d const *base, real_vector3d const *height, real width, real_argb_color const *color);
+void render_debug_sphere(
+	boolean immediate,
+	real_point3d const *center,
+	real radius,
+	real_argb_color const *color);
+void render_debug_circle(
+	boolean immediate,
+	real_plane3d const *plane,
+	short projection,
+	boolean sign,
+	real_point2d const *center,
+	real radius,
+	real_argb_color const *color,
+	real offset);
+void render_debug_cylinder(
+	boolean immediate,
+	real_point3d const *base,
+	real_vector3d const *height,
+	real width,
+	real_argb_color const *color);
+void render_debug_pill(
+	boolean immediate,
+	real_point3d const *base,
+	real_vector3d const *height,
+	real width,
+	real_argb_color const *color);
 void render_debug_box_outline(
 	boolean immediate,
 	real_rectangle3d const *bounds,

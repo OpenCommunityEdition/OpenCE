@@ -140,6 +140,7 @@ symbols in this file:
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_debug.h"
 #include "render/render.h"
+#include "render/render_cameras_internal.h"
 #include "render/render_debug.h"
 #include "render/render_debug_geometry.h"
 
@@ -149,6 +150,8 @@ enum
 {
 	NUMBER_OF_RENDER_DEBUG_CACHE_STRING_CHARACTERS = 1024,
 	MAXIMUM_RENDER_DEBUG_CACHE_ENTRIES = 512,
+
+	NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS = 16,
 };
 
 enum
@@ -258,6 +261,23 @@ typedef char render_debug_globals_string_overflow_offset_check[
 
 static char *render_debug_add_cache_string(
 	char const *string);
+static void build_circle_points(
+	real radius,
+	real_point2d *points);
+static real build_height_matrix(
+	real_point3d const *base,
+	real_vector3d const *height,
+	real_matrix4x3 *matrix);
+static void build_pill_points(
+	real_point3d const *base,
+	real_vector3d const *height,
+	real width,
+	real_point3d *top_points,
+	real_point3d *bottom_points,
+	real_point3d *top_yz_points,
+	real_point3d *bottom_yz_points,
+	real_point3d *top_xz_points,
+	real_point3d *bottom_xz_points);
 static void render_debug_add_cache_entry(
 	short type,
 	...);
@@ -669,6 +689,212 @@ void render_debug_matrix(
 	return;
 }
 
+void render_debug_sphere(
+	boolean immediate,
+	real_point3d const *center,
+	real radius,
+	real_argb_color const *color)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		518,
+		center);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		519,
+		color);
+
+	if (immediate)
+	{
+		if (render_frustum_sphere_visible(&render.frustum, center, radius))
+		{
+			real_point2d points[NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS+1];
+			real_point3d point0;
+			real_point3d point1;
+			short index;
+
+			build_circle_points(radius, points);
+
+			for (index = 1; index<NUMBEROF(points); index++)
+			{
+				point0.x = center->x + points[index-1].x;
+				point0.y = center->y + points[index-1].y;
+				point0.z = center->z;
+				point1.x = center->x + points[index].x;
+				point1.y = center->y + points[index].y;
+				point1.z = center->z;
+				rasterizer_debug_line(&point0, &point1, color);
+
+				point0.x = center->x + points[index-1].y;
+				point0.y = center->y;
+				point0.z = center->z + points[index-1].x;
+				point1.x = center->x + points[index].y;
+				point1.y = center->y;
+				point1.z = center->z + points[index].x;
+				rasterizer_debug_line(&point0, &point1, color);
+
+				point0.x = center->x;
+				point0.y = center->y + points[index-1].x;
+				point0.z = center->z + points[index-1].y;
+				point1.x = center->x;
+				point1.y = center->y + points[index].x;
+				point1.z = center->z + points[index].y;
+				rasterizer_debug_line(&point0, &point1, color);
+			}
+		}
+	}
+	else
+	{
+		render_debug_add_cache_entry(
+			_render_debug_cache_sphere,
+			center,
+			radius,
+			color);
+	}
+
+	return;
+}
+
+void render_debug_cylinder(
+	boolean immediate,
+	real_point3d const *base,
+	real_vector3d const *height,
+	real width,
+	real_argb_color const *color)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		645,
+		base);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		646,
+		height);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		647,
+		color);
+
+	if (immediate)
+	{
+		real_point3d bottom_points[NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS+1];
+		real_point3d top_points[NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS+1];
+		short index;
+
+		build_pill_points(
+			base,
+			height,
+			width,
+			top_points,
+			bottom_points,
+			NULL,
+			NULL,
+			NULL,
+			NULL);
+
+		for (index = 0; index<NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS; index++)
+		{
+			rasterizer_debug_line(&bottom_points[index], &bottom_points[index+1], color);
+			rasterizer_debug_line(&top_points[index], &top_points[index+1], color);
+		}
+
+		for (index = 0; index<NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS; index+= NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/4)
+		{
+			rasterizer_debug_line(&bottom_points[index], &top_points[index], color);
+		}
+
+		for (index = 0; index<NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2; index+= NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/4)
+		{
+			rasterizer_debug_line(&bottom_points[index], &bottom_points[index+NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2], color);
+			rasterizer_debug_line(&top_points[index], &top_points[index+NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2], color);
+		}
+	}
+	else
+	{
+		render_debug_add_cache_entry(
+			_render_debug_cache_cylinder,
+			base,
+			height,
+			width,
+			color);
+	}
+
+	return;
+}
+
+void render_debug_pill(
+	boolean immediate,
+	real_point3d const *base,
+	real_vector3d const *height,
+	real width,
+	real_argb_color const *color)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		693,
+		base);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		694,
+		height);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		695,
+		color);
+
+	if (immediate)
+	{
+		real_point3d top_points[NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS+1];
+		real_point3d bottom_points[NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS+1];
+		real_point3d top_yz_points[NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2+1];
+		real_point3d bottom_yz_points[NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2+1];
+		real_point3d top_xz_points[NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2+1];
+		real_point3d bottom_xz_points[NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2+1];
+		short index;
+
+		build_pill_points(
+			base,
+			height,
+			width,
+			top_points,
+			bottom_points,
+			top_yz_points,
+			bottom_yz_points,
+			top_xz_points,
+			bottom_xz_points);
+
+		for (index = 0; index<NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS; index++)
+		{
+			rasterizer_debug_line(&top_points[index], &top_points[index+1], color);
+			rasterizer_debug_line(&bottom_points[index], &bottom_points[index+1], color);
+		}
+
+		for (index = 0; index<NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS; index+= NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/4)
+		{
+			rasterizer_debug_line(&top_points[index], &bottom_points[index], color);
+		}
+
+		for (index = 0; index<NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2; index++)
+		{
+			rasterizer_debug_line(&top_yz_points[index], &top_yz_points[index+1], color);
+			rasterizer_debug_line(&bottom_yz_points[index], &bottom_yz_points[index+1], color);
+			rasterizer_debug_line(&top_xz_points[index], &top_xz_points[index+1], color);
+			rasterizer_debug_line(&bottom_xz_points[index], &bottom_xz_points[index+1], color);
+		}
+	}
+	else
+	{
+		render_debug_add_cache_entry(
+			_render_debug_cache_pill,
+			base,
+			height,
+			width,
+			color);
+	}
+
+	return;
+}
+
 void render_debug_box(
 	boolean immediate,
 	real_rectangle3d const *bounds,
@@ -803,6 +1029,70 @@ void render_debug_string(
 		render_debug_add_cache_entry(
 			_render_debug_cache_string,
 			string);
+	}
+
+	return;
+}
+
+void render_debug_circle(
+	boolean immediate,
+	real_plane3d const *plane,
+	short projection,
+	boolean sign,
+	real_point2d const *center,
+	real radius,
+	real_argb_color const *color,
+	real offset)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		290,
+		plane);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		291,
+		center);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		292,
+		color);
+
+	if (immediate)
+	{
+		real_point2d points[NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS+1];
+		real_point2d point0;
+		real_point2d point1;
+		short index;
+
+		build_circle_points(radius, points);
+
+		for (index = 1; index<NUMBEROF(points); index++)
+		{
+			point0.x = center->x + points[index-1].x;
+			point0.y = center->y + points[index-1].y;
+			point1.x = center->x + points[index].x;
+			point1.y = center->y + points[index].y;
+			render_debug_line2d(
+				TRUE,
+				plane,
+				projection,
+				sign,
+				&point0,
+				&point1,
+				color,
+				offset);
+		}
+	}
+	else
+	{
+		render_debug_add_cache_entry(
+			_render_debug_cache_circle,
+			plane,
+			projection,
+			sign,
+			center,
+			radius,
+			color);
 	}
 
 	return;
@@ -1084,6 +1374,106 @@ static char *render_debug_add_cache_string(
 	}
 
 	return result;
+}
+
+static void build_circle_points(
+	real radius,
+	real_point2d *points)
+{
+	real sine_of_angle = sine(2*_pi/NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS);
+	real cosine_of_angle = cosine(2*_pi/NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS);
+	short index;
+
+	set_real_point2d(&points[0], radius, 0.f);
+
+	for (index = 0; index+1<NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS; index++)
+	{
+		set_real_point2d(
+			&points[index+1],
+			cosine_of_angle*points[index].x - sine_of_angle*points[index].y,
+			sine_of_angle*points[index].x + cosine_of_angle*points[index].y);
+	}
+
+	points[NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS] = points[0];
+
+	return;
+}
+
+static real build_height_matrix(
+	real_point3d const *base,
+	real_vector3d const *height,
+	real_matrix4x3 *matrix)
+{
+	real height_magnitude;
+
+	matrix->scale = 1.f;
+	matrix->up = *height;
+	perpendicular3d(&matrix->up, &matrix->left);
+	height_magnitude = normalize3d(&matrix->up);
+	normalize3d(&matrix->left);
+	cross_product3d(&matrix->left, &matrix->up, &matrix->forward);
+	matrix->position = *base;
+
+	return height_magnitude;
+}
+
+static void build_pill_points(
+	real_point3d const *base,
+	real_vector3d const *height,
+	real width,
+	real_point3d *top_points,
+	real_point3d *bottom_points,
+	real_point3d *top_yz_points,
+	real_point3d *bottom_yz_points,
+	real_point3d *top_xz_points,
+	real_point3d *bottom_xz_points)
+{
+	real_matrix4x3 matrix;
+	real_point2d points[NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS+1];
+	real height_magnitude = build_height_matrix(base, height, &matrix);
+	short index;
+
+	build_circle_points(width, points);
+
+	if (top_points && bottom_points)
+	{
+		for (index = 0; index<NUMBEROF(points); index++)
+		{
+			top_points[index].x = points[index].x;
+			top_points[index].y = points[index].y;
+			top_points[index].z = height_magnitude;
+			bottom_points[index].x = points[index].x;
+			bottom_points[index].y = points[index].y;
+			bottom_points[index].z = 0.f;
+			matrix4x3_transform_point(&matrix, &top_points[index], &top_points[index]);
+			matrix4x3_transform_point(&matrix, &bottom_points[index], &bottom_points[index]);
+		}
+	}
+
+	if (top_yz_points && bottom_yz_points && top_xz_points && bottom_xz_points)
+	{
+		for (index = 0; index<NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2+1; index++)
+		{
+			top_yz_points[index].x = 0.f;
+			top_yz_points[index].y = points[index].x;
+			top_yz_points[index].z = height_magnitude + points[index].y;
+			bottom_yz_points[index].x = 0.f;
+			bottom_yz_points[index].y = points[index+NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2].x;
+			bottom_yz_points[index].z = points[index+NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2].y;
+			top_xz_points[index].x = points[index].x;
+			top_xz_points[index].y = 0.f;
+			top_xz_points[index].z = height_magnitude + points[index].y;
+			bottom_xz_points[index].x = points[index+NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2].x;
+			bottom_xz_points[index].y = 0.f;
+			bottom_xz_points[index].z = points[index+NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2].y;
+			matrix4x3_transform_point(&matrix, &top_yz_points[index], &top_yz_points[index]);
+			matrix4x3_transform_point(&matrix, &bottom_yz_points[index], &bottom_yz_points[index]);
+			matrix4x3_transform_point(&matrix, &top_xz_points[index], &top_xz_points[index]);
+			matrix4x3_transform_point(&matrix, &bottom_xz_points[index], &bottom_xz_points[index]);
+		}
+	}
+
+	return;
 }
 
 static void render_debug_add_cache_entry(

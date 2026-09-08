@@ -58,6 +58,15 @@ void structures_dispose_from_old_map(
 	void);
 void structures_dispose(
 	void);
+short structure_clusters_in_cone(
+	short position_cluster_index,
+	real_point3d const *position,
+	real_vector3d const *direction,
+	real distance,
+	real sine,
+	real cosine,
+	short maximum_cluster_count,
+	short *cluster_indices);
 short structure_clusters_in_sphere(short cluster_index, real_point3d const *position, real radius, short maximum_count, short *intersected_indices);
 
 /* ---------- prototypes/STRUCTURE_DETAIL_OBJECTS.C */

@@ -2764,7 +2764,12 @@ symbols in this file:
 	__hs_type_string_default (00d8)
 	_hs_function_table (00e0)
 00453468 0012:
-	_bss_00453468 (0000)
+	_hs_enumeration_result_count (0000)
+	_hs_enumeration_maximum_count (0004)
+	_enumeration_results (0008)
+	_hs_enumeration_substring (000c)
+	_hs_recompile_pending (0010)
+	_hs_syntax_data_allocated (0011)
 */
 
 /* ---------- headers */
@@ -4418,11 +4423,12 @@ boolean game_state_reverted(
 
 /* ---------- globals */
 
-byte bss_00453468[0x12] = { 0 };
-#define hs_enumeration_result_count (*(short *)&bss_00453468[0])
-#define hs_enumeration_maximum_count (*(short *)&bss_00453468[4])
-#define enumeration_results (*(char const ***)&bss_00453468[8])
-#define hs_enumeration_substring (*(char const **)&bss_00453468[12])
+static short hs_enumeration_result_count = 0;
+static short hs_enumeration_maximum_count = 0;
+static char const **enumeration_results = NULL;
+static char const *hs_enumeration_substring = NULL;
+static boolean hs_recompile_pending = FALSE;
+static boolean hs_syntax_data_allocated = FALSE;
 #define hs_token_enumerators hs_function_table.token_enumerators
 struct data_array *hs_syntax_data;
 extern long global_scenario_index;
@@ -4523,7 +4529,7 @@ void hs_allocate(
 		}
 		else
 		{
-			bss_00453468[0x11] = TRUE;
+			hs_syntax_data_allocated = TRUE;
 		}
 	}
 	else
@@ -4815,11 +4821,11 @@ void hs_dispose_from_old_map(
 	if (hs_syntax_data)
 	{
 		hs_node_gc();
-		if (bss_00453468[0x11])
+		if (hs_syntax_data_allocated)
 		{
 			data_make_invalid(hs_syntax_data);
 			data_dispose(hs_syntax_data);
-			bss_00453468[0x11] = FALSE;
+			hs_syntax_data_allocated = FALSE;
 		}
 		hs_syntax_data = NULL;
 	}
@@ -4831,7 +4837,7 @@ void hs_dispose_from_old_map(
 void hs_recompile(
 	void)
 {
-	bss_00453468[0x10] = TRUE;
+	hs_recompile_pending = TRUE;
 	return;
 }
 
@@ -5117,7 +5123,7 @@ static void hs_tokens_enumerate_add_string(
 		short result_index;
 		short new_result_count;
 
-		result_index = *(short *)&bss_00453468[0];
+		result_index = hs_enumeration_result_count;
 		new_result_count = (short)(result_index + 1);
 		enumeration_results[result_index] = token;
 		hs_enumeration_result_count = new_result_count;
@@ -6349,7 +6355,7 @@ void hs_recompile_evaluate(
 	long thread_index,
 	boolean initialize)
 {
-	bss_00453468[0x10] = TRUE;
+	hs_recompile_pending = TRUE;
 	hs_return(thread_index, 0);
 	return;
 }
@@ -6541,7 +6547,7 @@ boolean hs_compile_and_evaluate(
 			character++;
 		} while (*character != 0);
 	}
-	if (bss_00453468[0x10])
+	if (hs_recompile_pending)
 	{
 		if (hs_rebuild_source())
 		{
@@ -6551,11 +6557,11 @@ boolean hs_compile_and_evaluate(
 			if (hs_syntax_data)
 			{
 				hs_node_gc();
-				if (bss_00453468[0x11])
+				if (hs_syntax_data_allocated)
 				{
 					data_make_invalid(hs_syntax_data);
 					data_dispose(hs_syntax_data);
-					bss_00453468[0x11] = FALSE;
+					hs_syntax_data_allocated = FALSE;
 				}
 				hs_syntax_data = NULL;
 			}
@@ -6568,7 +6574,7 @@ boolean hs_compile_and_evaluate(
 			object_lists_initialize_for_new_map();
 			hs_runtime_initialize_for_new_map();
 		}
-		bss_00453468[0x10] = FALSE;
+		hs_recompile_pending = FALSE;
 	}
 
 	return success;

@@ -444,6 +444,38 @@ boolean point_in_sector3d(
 	real_vector3d const *direction,
 	real radius,
 	real cosine);
+boolean circle_intersects_cone2d(
+	real_point2d const *circle_center,
+	real circle_radius,
+	real_point2d const *cone_center,
+	real_vector2d const *cone_direction,
+	real cone_length,
+	real sine,
+	real cosine);
+boolean circle_intersects_sector2d(
+	real_point2d const *circle_center,
+	real circle_radius,
+	real_point2d const *sector_center,
+	real_vector2d const *sector_direction,
+	real sector_radius,
+	real sine,
+	real cosine);
+boolean sphere_intersects_cone3d(
+	real_point3d const *sphere_center,
+	real sphere_radius,
+	real_point3d const *cone_center,
+	real_vector3d const *cone_direction,
+	real cone_length,
+	real sine,
+	real cosine);
+boolean sphere_intersects_sector3d(
+	real_point3d const *sphere_center,
+	real sphere_radius,
+	real_point3d const *sector_center,
+	real_vector3d const *sector_direction,
+	real sector_radius,
+	real sine,
+	real cosine);
 boolean point_in_triangle2d(
 	real_point2d const *point,
 	real_point2d const *triangle0,
@@ -528,7 +560,6 @@ void pitch_vectors(real_vector3d *forward, real_vector3d *up, real sine, real co
 
 void fast_normals_interpolate(real_vector3d const *a, real_vector3d const *b, real t, real_vector3d *result);
 void normals_interpolate(real_vector3d const *a, real_vector3d const *b, real t, real_vector3d *result);
-
 real_vector3d *reflect_vector3d(real_vector3d const *incident, real_vector3d const *normal, real_vector3d *reflection);
 real_vector3d *refract_vector3d(real_vector3d const *incident, real_vector3d const *normal, real coefficient_of_refraction, real_vector3d *refraction);
 
@@ -565,7 +596,6 @@ boolean point_from_planes3d(
 	real_plane3d const *plane1,
 	real_plane3d const *plane2,
 	real_point3d *point);
-
 boolean accelerate_to_position(
 	real *position,
 	real *velocity,

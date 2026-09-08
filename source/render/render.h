@@ -122,6 +122,7 @@ void render_objects_dispose(
 /* ---------- globals */
 
 extern struct render_globals render;
+extern boolean render_particle_systems_enabled;
 
 /* ---------- public code */
 

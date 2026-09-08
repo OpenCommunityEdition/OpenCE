@@ -3460,7 +3460,7 @@ boolean multiplayer_profiles_list_initialize(
 boolean ui_widget_event_handler_function_invoke(
 	struct widget_instance *widget,
 	struct event_record *event,
-	unsigned short function_index,
+	word function_index,
 	boolean *widget_deleted)
 {
 	boolean result;

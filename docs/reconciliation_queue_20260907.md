@@ -326,3 +326,20 @@ Ninja/capture/sweeps, commits or pushes. Workers use disjoint read-only intake
 or isolated scratch outputs. Freeze the current canonical baseline before
 each material packet, preserve all inherited exact and credible partial work,
 and publish coherent verified batches to the two authorized branches only.
+
+## 2026-09-08 UI, Weather, AimAssist, RenderDebug, and HS admission
+
+The commit containing this checkpoint reconciles the strongest admissible
+packet from Opus `08d6bea92` and Fable `740bbc33a`. A clean replay from
+canonical `24092ea0f` verifies the same result as the shared integration tree:
+**975,317 meaningful exact code bytes / 6,467 credited functions**, a net gain
+of **10,187 bytes / 40 functions**. The strict section sweep records 45 gains
+and three explicit debits. Complete useful residual bodies are retained at
+zero credit, and the declaration-context Decals debit is parked rather than
+source-tuned.
+
+The full evidence and per-function boundary list is in
+[the reconciliation ledger](object_matching_logs/claude_ui_weather_aim_render_hs_reconciliation_20260908.md).
+The canonical multi-lane treemap was force-refreshed after crossing the
+972,207-byte cadence checkpoint. The next required refresh threshold is
+**985,317 meaningful exact code bytes**.

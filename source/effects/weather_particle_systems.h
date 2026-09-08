@@ -19,7 +19,14 @@ header included in hcex build.
 
 /* ---------- structures */
 
-/* ---------- prototypes/EXAMPLE.C */
+/* ---------- prototypes/WEATHER_PARTICLE_SYSTEMS.C */
+
+void weather_particle_system_new(
+	short local_player_index,
+	long definition_index,
+	real scale);
+void weather_particle_systems_render(
+	void);
 
 /* ---------- globals */
 
@@ -37,5 +44,6 @@ void weather_particle_system_delete(
 	short local_player_index);
 
 extern struct data_array *weather_particle_data;
+extern boolean weather;
 
 #endif // __WEATHER_PARTICLE_SYSTEMS_H

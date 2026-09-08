@@ -894,6 +894,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "effects/weather_particle_systems.h"
 #include "hs.h"
 #include "main/main.h"
 #include "main/main_internal.h"
@@ -1083,7 +1084,7 @@ extern byte render_model_markers[];
 extern byte render_model_no_geometry[];
 extern byte render_model_nodes[];
 extern byte render_model_vertex_counts[];
-extern byte render_particle_systems_enabled[];
+extern boolean render_particle_systems_enabled;
 extern byte render_particles_enabled[];
 extern byte render_shadows[];
 extern byte render_weather_particle_systems_enabled[];
@@ -1094,7 +1095,6 @@ extern byte stun_enable[];
 extern byte temporary_hud[];
 extern byte terminal_render_enable[];
 extern byte texture_cache_debug_options[];
-extern byte weather[];
 
 struct hs_external_global_definition hs_external_global_definitions[442] =
 {
@@ -1277,7 +1277,7 @@ struct hs_external_global_definition hs_external_global_definitions[442] =
 	{ "debug_inactive_objects", _hs_type_boolean, 0, debug_inactive_objects },
 	{ "render_contrails", _hs_type_boolean, 0, render_contrails_enabled },
 	{ "render_particles", _hs_type_boolean, 0, render_particles_enabled },
-	{ "render_psystems", _hs_type_boolean, 0, render_particle_systems_enabled },
+	{ "render_psystems", _hs_type_boolean, 0, &render_particle_systems_enabled },
 	{ "render_wsystems", _hs_type_boolean, 0, render_weather_particle_systems_enabled },
 	{ "debug_objects", _hs_type_boolean, 0, debug_objects },
 	{ "debug_objects_position_velocity", _hs_type_boolean, 0, debug_objects_position_velocity },
@@ -1368,7 +1368,7 @@ struct hs_external_global_definition hs_external_global_definitions[442] =
 	{ "debug_collision_skip_objects", _hs_type_boolean, 0, debug_collision_skip_objects },
 	{ "debug_collision_skip_vectors", _hs_type_boolean, 0, debug_collision_skip_vectors },
 	{ "debug_material_effects", _hs_type_boolean, 0, debug_material_effects },
-	{ "weather", _hs_type_boolean, 0, weather },
+	{ "weather", _hs_type_boolean, 0, &weather },
 	{ "ai_profile_disable", _hs_type_boolean, 0, ai_profile },
 	{ "ai_profile_random", _hs_type_boolean, 0, ai_profile + 0x1 },
 	{ "ai_show", _hs_type_boolean, 0, ai_profile + 0x4 },
