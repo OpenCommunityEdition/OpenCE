@@ -2018,9 +2018,9 @@ static void actor_decision_loop(
 	char message[1024];
 	char encounter_name[256];
 	short action_history[NUMBER_OF_DECISION_LOOP_HISTORY_ENTRIES];
+	boolean action_performed = FALSE;
 	long iteration = 0;
 	long history_index = 0;
-	boolean action_performed = FALSE;
 
 	csmemset(action_history, NONE, sizeof(action_history));
 
@@ -2066,9 +2066,10 @@ static void actor_decision_loop(
 
 	if (iteration >= MAXIMUM_DECISION_LOOP_ITERATIONS)
 	{
-		long entry_index = history_index;
+		long entry_index;
 
 		sprintf(message, "actor-type %s ", actor_type_get_name(actor->meta.type));
+		entry_index = history_index;
 		do
 		{
 			if (action_history[entry_index] != NONE)
