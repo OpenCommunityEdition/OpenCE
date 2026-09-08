@@ -230,6 +230,7 @@ symbols in this file:
 #include "sound_environment_definitions.h"
 #include "game_sound.h"
 #include "sound_preferences.h"
+#include "effects/player_effects.h"
 #include "game/players.h"
 #include "render/render_debug.h"
 #include "scenario/scenario.h"
@@ -311,9 +312,19 @@ enum sound_channel_flags
 	_sound_channel_compressed_bit,
 };
 
+enum looping_sound_track_flags
+{
+	_fade_in_at_start_bit,
+	_fade_out_at_stop_bit,
+	_fade_in_alternate_bit,
+	NUMBER_OF_LOOPING_SOUND_TRACK_FLAGS,
+};
+
 /* ---------- macros */
 
 #define sound_get(index) ((struct sound_datum *)datum_get(sound_data, (index)))
+#define looping_sound_get(index) \
+	((struct looping_sound_datum *)datum_get(looping_sound_data, (index)))
 #define sound_permutation_get(definition_index, pitch_range_index, permutation_index) \
 	TAG_BLOCK_GET_ELEMENT( \
 		&TAG_BLOCK_GET_ELEMENT( \
@@ -404,7 +415,7 @@ struct looping_sound_datum
 	byte pad_4F;
 	short component_sound_count;
 	short state;
-	byte details[0x80];
+	long detail_play_times[MAXIMUM_DETAIL_SOUNDS_PER_LOOPING_SOUND];
 	struct
 	{
 		long primary_sound_index;
@@ -560,12 +571,24 @@ static void sound_set_definition_begin(
 	long definition_index);
 static long looping_sound_find(
 	long identifier);
+static long looping_sound_new(
+	long definition_index,
+	long identifier,
+	struct sound_source const *source);
+static long update_potentially_audible_looping_sound(
+	long definition_index,
+	long looping_sound_index,
+	short track_index,
+	short type);
 static real limit_pitch(
 	real desired_pitch,
 	real old_pitch,
 	real maximum_bend);
 static void render_debug_sound(
 	long sound_index);
+static void render_debug_looping_sound(
+	long definition_index,
+	struct sound_source const *source);
 static real sound_scale_random_value(
 	real base_lower_bound,
 	real base_upper_bound,
@@ -601,6 +624,7 @@ extern struct data_array *looping_sound_data;
 extern struct data_array *sound_data;
 extern struct sound_channel_datum sound_channels[MAXIMUM_SOUND_CHANNELS];
 extern boolean loud_dialog_hack;
+extern boolean debug_looping_sound;
 
 static real const sound_pitch_range_fade_time = 0.5f;
 static real const sound_inaudible_fade_out_time = 2.f;
@@ -1094,14 +1118,14 @@ static boolean track_loop_track_sound(
 	struct looping_sound_datum *looping_sound =
 		datum_try_and_get(looping_sound_data, looping_sound_index);
 
-	if (!looping_sound)
+	if (looping_sound)
 	{
-		return FALSE;
+		*source = looping_sound->source;
+
+		return TRUE;
 	}
 
-	*source = looping_sound->source;
-
-	return TRUE;
+	return FALSE;
 }
 
 static void sound_set_definition_begin(
@@ -1123,14 +1147,16 @@ static long looping_sound_find(
 {
 	long looping_sound_index = data_next_index(looping_sound_data, NONE);
 
+	if (looping_sound_index == NONE)
+	{
+		return NONE;
+	}
+
 	while (looping_sound_index != NONE)
 	{
-		struct looping_sound_datum *looping_sound =
-			datum_get(looping_sound_data, looping_sound_index);
-
-		if (looping_sound->loop_identifier == identifier)
+		if (looping_sound_get(looping_sound_index)->loop_identifier == identifier)
 		{
-			break;
+			return looping_sound_index;
 		}
 
 		looping_sound_index = data_next_index(
@@ -1138,7 +1164,152 @@ static long looping_sound_find(
 			looping_sound_index);
 	}
 
+	return NONE;
+}
+
+static long looping_sound_new(
+	long definition_index,
+	long identifier,
+	struct sound_source const *source)
+{
+	long looping_sound_index = NONE;
+
+	if (sound_manager_globals.initialized && sound_manager_globals.enabled)
+	{
+		looping_sound_index = datum_new(looping_sound_data);
+		if (looping_sound_index != NONE)
+		{
+			struct looping_sound_datum *looping_sound =
+				looping_sound_get(looping_sound_index);
+			struct looping_sound_definition *definition =
+				looping_sound_definition_get(definition_index);
+			short detail_index = 0;
+
+			looping_sound->definition_index = definition_index;
+			looping_sound->loop_identifier = identifier;
+			looping_sound->component_sound_count = 0;
+			looping_sound->ordered_sounds_finished = FALSE;
+
+			if (definition->details.count > 0)
+			{
+				do
+				{
+					struct looping_sound_detail *detail = TAG_BLOCK_GET_ELEMENT(
+						&definition->details,
+						detail_index,
+						struct looping_sound_detail);
+					real scale;
+					real upper_scale;
+					real lower_scale;
+					real period_upper_bound;
+					real period_lower_bound;
+					real period;
+
+					sound_definition_get(detail->sound.index);
+					scale = source->scale;
+					upper_scale =
+						definition->scale_upper_bound.detail_period;
+					lower_scale =
+						definition->scale_lower_bound.detail_period;
+					period_upper_bound = detail->period_bounds.upper;
+					period_lower_bound = detail->period_bounds.lower;
+					period = real_seed_random_range(
+						get_global_local_random_seed_address(),
+						period_lower_bound,
+						period_upper_bound);
+					looping_sound->detail_play_times[detail_index] = (long)(
+						((upper_scale - lower_scale) * scale + lower_scale) *
+						period * 1000.f + sound_manager_globals.render_time);
+
+					detail_index++;
+				}
+				while (detail_index < definition->details.count);
+			}
+		}
+	}
+
 	return looping_sound_index;
+}
+
+static long update_potentially_audible_looping_sound(
+	long definition_index,
+	long looping_sound_index,
+	short track_index,
+	short type)
+{
+	long sound_index = NONE;
+	struct looping_sound_datum *looping_sound =
+		looping_sound_get(looping_sound_index);
+	real scale = looping_sound->source.scale;
+
+	if (sound_definition_is_playable(definition_index))
+	{
+		struct sound_definition *definition =
+			sound_definition_get(definition_index);
+		real maximum_distance =
+			sound_definition_get_maximum_distance(definition_index);
+		short listener_index = source_audible(
+			&looping_sound->source,
+			maximum_distance);
+
+		if (listener_index != NONE)
+		{
+			sound_index = datum_new(sound_data);
+			if (sound_index != NONE)
+			{
+				struct sound_datum *sound = sound_get(sound_index);
+
+				sound->listener_index = listener_index;
+				sound->definition_index = definition_index;
+				sound->playing_channel_index = NONE;
+				sound->flags = 0;
+				{
+					real pitch_upper_bound =
+						definition->random_pitch_bounds.upper;
+					real pitch_lower_bound =
+						definition->random_pitch_bounds.lower;
+
+					sound->pitch = real_seed_random_range(
+						get_global_local_random_seed_address(),
+						pitch_lower_bound,
+						pitch_upper_bound);
+				}
+				sound->source_identifier = looping_sound_index;
+				sound->source = looping_sound->source;
+				sound->type = type;
+				sound->start_time = sound_manager_globals.render_time;
+				sound->loop_track_index = track_index;
+				sound->track_proc = track_loop_track_sound;
+				sound->fade_stop_time = 0;
+				sound->fade_start_time = 0;
+				sound->next_definition_index = NONE;
+				sound->pitch_range_index =
+					sound_definition_find_pitch_range_by_pitch(
+						definition,
+						sound_scale_value(
+							sound->pitch,
+							definition->zero_pitch_modifier,
+							definition->one_pitch_modifier,
+							scale),
+						NONE);
+				sound->permutation_index = sound_definition_next_permutation(
+					definition,
+					sound->pitch_range_index,
+					NONE);
+				_sound_cache_sound_request(
+					sound_permutation_get(
+						sound->definition_index,
+						sound->pitch_range_index,
+						sound->permutation_index),
+					FALSE,
+					TRUE,
+					FALSE);
+				looping_sound->component_sound_count++;
+			}
+		}
+	}
+
+	return sound_index;
 }
 
 static real limit_pitch(
@@ -1189,6 +1360,78 @@ static void render_debug_sound(
 			&sound->source.location.position,
 			string,
 			global_real_argb_white);
+	}
+
+	return;
+}
+
+static void render_debug_looping_sound(
+	long definition_index,
+	struct sound_source const *source)
+{
+	if (debug_looping_sound &&
+		source->spatialization_mode == _sound_spatialization_mode_absolute)
+	{
+		struct looping_sound_definition *definition =
+			looping_sound_definition_get(definition_index);
+		real minimum_distance = 0.f;
+		real maximum_distance = 0.f;
+		short index;
+
+		for (index = 0; index < definition->tracks.count; index++)
+		{
+			struct looping_sound_track *track = TAG_BLOCK_GET_ELEMENT(
+				&definition->tracks,
+				0,
+				struct looping_sound_track);
+
+			if (track->loop_sound.index != NONE)
+			{
+				sound_definition_get(track->loop_sound.index);
+				minimum_distance = sound_definition_get_minimum_distance(
+					track->loop_sound.index);
+				maximum_distance = sound_definition_get_maximum_distance(
+					track->loop_sound.index);
+				break;
+			}
+		}
+
+		if (minimum_distance == 0.f)
+		{
+			for (index = 0; index < definition->details.count; index++)
+			{
+				struct looping_sound_detail *detail = TAG_BLOCK_GET_ELEMENT(
+					&definition->details,
+					0,
+					struct looping_sound_detail);
+
+				if (detail->sound.index != NONE)
+				{
+					sound_definition_get(detail->sound.index);
+					minimum_distance = sound_definition_get_minimum_distance(
+						detail->sound.index);
+					maximum_distance = sound_definition_get_maximum_distance(
+						detail->sound.index);
+					break;
+				}
+			}
+		}
+
+		render_debug_string_at_point(
+			FALSE,
+			&source->location.position,
+			tag_get_name(definition_index),
+			global_real_argb_white);
+		render_debug_sphere(
+			FALSE,
+			&source->location.position,
+			maximum_distance,
+			global_real_argb_cyan);
+		render_debug_sphere(
+			FALSE,
+			&source->location.position,
+			minimum_distance,
+			global_real_argb_blue);
 	}
 
 	return;
@@ -1738,6 +1981,276 @@ long sound_new_impulse(
 	else
 	{
 		sound->start_time = sound_manager_globals.render_time;
+	}
+
+	return result;
+}
+
+boolean sound_refresh_looping(
+	long definition_index,
+	long looping_sound_identifier,
+	struct sound_source *source,
+	short refresh_state,
+	boolean alternate,
+	real fade_time)
+{
+	boolean result = refresh_state == _looping_sound_refresh_stop;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\sound_manager.c",
+		0x2F4,
+		source->spatialization_mode==_sound_spatialization_mode_none ||
+			valid_real_normal3d(&source->location.forward));
+	render_debug_looping_sound(definition_index, source);
+
+	if (sound_manager_globals.initialized && sound_manager_globals.enabled)
+	{
+		long looping_sound_index = looping_sound_find(looping_sound_identifier);
+		boolean new_looping_sound = FALSE;
+
+		if (looping_sound_index == NONE)
+		{
+			if (refresh_state == _looping_sound_refresh_stop)
+			{
+				return TRUE;
+			}
+
+			looping_sound_index = looping_sound_new(
+				definition_index,
+				looping_sound_identifier,
+				source);
+			new_looping_sound = TRUE;
+			if (looping_sound_index == NONE)
+			{
+				return FALSE;
+			}
+		}
+
+		{
+			struct looping_sound_datum *loop =
+				looping_sound_get(looping_sound_index);
+			struct looping_sound_definition *definition =
+				looping_sound_definition_get(definition_index);
+			short track_index;
+
+			match_assert(
+				"c:\\halo\\SOURCE\\sound\\sound_manager.c",
+				0x30E,
+				loop->definition_index==definition_index);
+
+			loop->source = *source;
+			loop->flip_flop = sound_manager_globals.flip_flop;
+
+			if ((refresh_state == _looping_sound_refresh_stop ||
+				loop->ordered_sounds_finished) &&
+				loop->component_sound_count == 0)
+			{
+				datum_delete(looping_sound_data, looping_sound_index);
+				return TRUE;
+			}
+
+			if (definition->continuous_damage_effect.index != NONE)
+			{
+				player_effect_continuous_refresh(
+					definition->continuous_damage_effect.index,
+					&source->location.position);
+			}
+
+			for (track_index = 0; track_index < definition->tracks.count; track_index++)
+			{
+				struct looping_sound_track *track = TAG_BLOCK_GET_ELEMENT(
+					&definition->tracks,
+					track_index,
+					struct looping_sound_track);
+				long *playing_sound_index =
+					&loop->tracks[track_index].primary_sound_index;
+				long sound_definition_index = 0;
+
+				if (new_looping_sound)
+				{
+					*playing_sound_index = NONE;
+				}
+
+				if (refresh_state == _looping_sound_refresh_start)
+				{
+					if (track->start_sound.index != NONE)
+					{
+						*playing_sound_index =
+							update_potentially_audible_looping_sound(
+								track->start_sound.index,
+								looping_sound_index,
+								track_index,
+								_sound_start_track);
+					}
+				}
+				else if (refresh_state == _looping_sound_refresh_stop)
+				{
+					goto begin_stop;
+				}
+
+				if (loop->ordered_sounds_finished)
+				{
+					goto begin_stop;
+				}
+
+				sound_definition_index = track->loop_sound.index;
+				if (alternate && track->alternate_loop_sound.index != NONE)
+				{
+					sound_definition_index = track->alternate_loop_sound.index;
+				}
+
+				if (sound_definition_index != NONE)
+				{
+					if (*playing_sound_index != NONE &&
+						(refresh_state != _looping_sound_refresh_start ||
+							!TEST_FLAG(track->flags, _fade_in_at_start_bit)))
+					{
+						sound_get(*playing_sound_index);
+
+						if (alternate != loop->alternate &&
+							TEST_FLAG(track->flags, _fade_in_alternate_bit))
+						{
+							long new_sound_index =
+								update_potentially_audible_looping_sound(
+									sound_definition_index,
+									looping_sound_index,
+									track_index,
+									_sound_loop_track);
+
+							if (new_sound_index != NONE)
+							{
+								sound_start_fade(
+									_sound_fade_mode_linear,
+									track->fade_out_duration,
+									new_sound_index,
+									*playing_sound_index);
+								*playing_sound_index = new_sound_index;
+							}
+						}
+						else if (!new_looping_sound)
+						{
+							sound_set_definition_begin(
+								*playing_sound_index,
+								sound_definition_index);
+						}
+					}
+					else
+					{
+						long new_sound_index =
+							update_potentially_audible_looping_sound(
+								sound_definition_index,
+								looping_sound_index,
+								track_index,
+								_sound_loop_track);
+
+						if (new_sound_index != NONE)
+						{
+							real fade_in_time;
+							sound_get(new_sound_index);
+
+							if (refresh_state != _looping_sound_refresh_start)
+							{
+								fade_in_time = sound_inaudible_fade_out_time;
+							}
+							else if (TEST_FLAG(
+								track->flags,
+								_fade_in_at_start_bit))
+							{
+								fade_in_time = track->fade_in_duration;
+							}
+							else
+							{
+								*playing_sound_index = new_sound_index;
+								continue;
+							}
+
+							sound_start_fade(
+								_sound_fade_mode_linear,
+								fade_in_time,
+								new_sound_index,
+								NONE);
+							*playing_sound_index = new_sound_index;
+						}
+					}
+				}
+
+				continue;
+
+			begin_stop:
+				if (loop->state != _looping_sound_refresh_stop)
+				{
+					if (fade_time != 0.f)
+					{
+						sound_start_fade(
+							_sound_fade_mode_linear,
+							fade_time,
+							NONE,
+							*playing_sound_index);
+					}
+					else
+					{
+						if (*playing_sound_index != NONE &&
+							(TEST_FLAG(track->flags, _fade_out_at_stop_bit) ||
+								(track->stop_sound.index == NONE &&
+									!TEST_FLAG(
+										definition->flags,
+										_looping_sound_fake_impulse_sound_bit))))
+						{
+							sound_start_fade(
+								_sound_fade_mode_linear,
+								track->fade_out_duration,
+								NONE,
+								*playing_sound_index);
+						}
+
+						sound_definition_index = track->stop_sound.index;
+						if (alternate &&
+							track->alternate_stop_sound.index != NONE)
+						{
+							sound_definition_index =
+								track->alternate_stop_sound.index;
+						}
+
+						if (sound_definition_index != NONE)
+						{
+							if (TEST_FLAG(
+								track->flags,
+								_fade_out_at_stop_bit))
+							{
+								update_potentially_audible_looping_sound(
+									sound_definition_index,
+									looping_sound_index,
+									track_index,
+									_sound_stop_track);
+							}
+							else if (*playing_sound_index != NONE)
+							{
+								struct sound_datum *playing_sound =
+									sound_get(*playing_sound_index);
+
+								if (playing_sound->playing_channel_index != NONE)
+								{
+									sound_set_definition_begin(
+										*playing_sound_index,
+										sound_definition_index);
+									playing_sound->type = _sound_stopping_track;
+								}
+							}
+						}
+					}
+				}
+			}
+
+			if (loop->component_sound_count == 0 &&
+				source_audible(source, definition->runtime_maximum_distance) == NONE)
+			{
+				datum_delete(looping_sound_data, looping_sound_index);
+			}
+
+			loop->alternate = alternate;
+			loop->state = refresh_state;
+			result = FALSE;
+		}
 	}
 
 	return result;

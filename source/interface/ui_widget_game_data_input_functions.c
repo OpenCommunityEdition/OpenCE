@@ -335,6 +335,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/cseries_windows.h"
 #include "bungie_net/network/transport.h"
 #include "interface/ui_widget.h"
 #include "interface/ui_widget_definitions.h"
@@ -365,7 +366,16 @@ enum
 
 enum
 {
-	_ui_error_network_connection_lost = 6,
+	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
+	MAXIMUM_NETWORK_ADVERTISED_GAMES = 9,
+	MAXIMUM_DISPLAYED_SERVERS = 10,
+};
+
+enum network_game_platform
+{
+	_network_game_platform_xbox,
+	_network_game_platform_pc,
+	NUMBER_OF_NETWORK_GAME_PLATFORMS,
 };
 
 enum multiplayer_game_text_string
@@ -486,6 +496,31 @@ struct ui_game_variant
 	byte padding60[0x08];
 };
 
+struct network_advertised_game
+{
+	byte padding00[0x30];
+	wchar_t game_name[16];
+	long padding50;
+	char map_name[0x80];
+	short engine_type;
+	short machine_count;
+	word player_count;
+	short maximum_player_count;
+	short score_limit;
+	short platform;
+	boolean open;
+	boolean valid;
+	boolean has_teams;
+	boolean oddball_variant;
+};
+
+struct network_machine
+{
+	wchar_t name[32];
+	char machine_index;
+	byte padding41[3];
+};
+
 struct network_game
 {
 	byte padding000[0x24];
@@ -497,10 +532,23 @@ struct network_game
 	byte padding10F;
 	short difficulty;
 	short machine_count;
-	byte machines[0x110];
+	struct network_machine machines[MAXIMUM_NETWORK_MACHINE_COUNT];
 	short player_count;
 	struct network_player players[16];
 };
+
+typedef char network_advertised_game_size_assert[
+	sizeof(struct network_advertised_game) == 0xE4 ? 1 : -1];
+typedef char network_advertised_game_game_name_offset_assert[
+	offsetof(struct network_advertised_game, game_name) == 0x30 ? 1 : -1];
+typedef char network_advertised_game_engine_type_offset_assert[
+	offsetof(struct network_advertised_game, engine_type) == 0xD4 ? 1 : -1];
+typedef char network_advertised_game_platform_offset_assert[
+	offsetof(struct network_advertised_game, platform) == 0xDE ? 1 : -1];
+typedef char network_machine_size_assert[
+	sizeof(struct network_machine) == 0x44 ? 1 : -1];
+typedef char network_game_players_offset_assert[
+	offsetof(struct network_game, players) == 0x226 ? 1 : -1];
 
 struct playlist_profile
 {
@@ -561,7 +609,16 @@ extern struct single_player_level_entry single_player_level_data[10];
 extern struct cached_player_profile_entry cached_player_profile[3];
 extern struct cached_variant_profile_entry cached_variant_profile[3];
 
-static struct advertised_game_data *displayed_servers[10];
+/* Controller-color bitmap frame indices for each local player, selected by
+   team. The first table is ordered [no teams, team 1, team 0] for the networked
+   pregame screen; the second is [no teams, team 0, team 1] for splitscreen. */
+static byte const local_player_controller_bitmap_frames[2][MAXIMUM_LOCAL_PLAYERS][3] =
+{
+	{{3, 4, 5}, {6, 7, 8}, {9, 10, 11}, {12, 13, 14}},
+	{{3, 5, 4}, {6, 8, 7}, {9, 11, 10}, {12, 14, 13}}
+};
+
+static struct network_advertised_game *displayed_servers[MAXIMUM_DISPLAYED_SERVERS];
 static wchar_t ui_widget_game_data_build_version_wide_string[64];
 
 /* ---------- public code */
@@ -809,6 +866,788 @@ void difficulty_select_menu_update_extended_description(
 
 		description_picture->animation.current_frame_index = index;
 		description_text->parameters.text_box.string_list_index = index;
+	}
+	return;
+}
+
+void server_list_menu_update(
+	struct widget_instance *widget)
+{
+	struct network_game_client *client = global_network_game_client_get();
+	long displayed_server_count = 0;
+
+	csmemset(
+		displayed_servers,
+		0,
+		MAXIMUM_NETWORK_ADVERTISED_GAMES * sizeof(*displayed_servers));
+	if (client)
+	{
+		struct ui_widget_definition *definition = ui_widget_definition_get(
+			widget->definition_tag_index);
+		struct network_advertised_game *available_games =
+			network_game_client_get_available_games(client);
+		struct widget_instance *item;
+		unsigned long milliseconds_since_creation;
+		long game_index;
+		long item_index;
+
+		match_vassert(
+			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+			0x297,
+			definition->type == _ui_widget_type_column_list &&
+				definition->child_count == 9,
+			"this doesn't look like the net game server list widget");
+
+		for (game_index = 0;
+			game_index < MAXIMUM_NETWORK_ADVERTISED_GAMES;
+			game_index++)
+		{
+			if (network_game_client_advertised_game_is_valid(&available_games[game_index]) &&
+				available_games[game_index].platform == _network_game_platform_xbox &&
+				available_games[game_index].open)
+			{
+				displayed_servers[displayed_server_count] = &available_games[game_index];
+				displayed_server_count++;
+			}
+		}
+
+		for (game_index = 0;
+			game_index < MAXIMUM_NETWORK_ADVERTISED_GAMES;
+			game_index++)
+		{
+			if (network_game_client_advertised_game_is_valid(&available_games[game_index]) &&
+				available_games[game_index].platform == _network_game_platform_xbox &&
+				!available_games[game_index].open)
+			{
+				displayed_servers[displayed_server_count] = &available_games[game_index];
+				displayed_server_count++;
+			}
+		}
+
+		widget->parameters.list.list_items = displayed_servers;
+		widget->parameters.list.number_of_items = (word)displayed_server_count;
+		widget->parameters.list.selected_list_item_index = (short)CEILING(
+			widget->parameters.list.selected_list_item_index,
+			displayed_server_count - 1);
+
+		for (item = widget->child, item_index = 0;
+			item && item_index < displayed_server_count;
+			item = item->next, item_index++)
+		{
+			item->parameters.text_box.text = ui_widget_realloc(
+				item->parameters.text_box.text,
+				0x40,
+				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+				0x2C5);
+			if (item->parameters.text_box.text)
+			{
+				if (displayed_servers[item_index]->open == TRUE)
+				{
+					ustrncpy(
+						item->parameters.text_box.text,
+						displayed_servers[item_index]->game_name,
+						0x1F);
+				}
+				else
+				{
+					long text_tag_index = tag_loaded(
+						UNICODE_STRING_LIST_TAG,
+						"ui\\multiplayer_game_text");
+					wchar_t const *closed_game_prefix =
+						unicode_string_list_get_string(text_tag_index, 19);
+
+					usnprintf(
+						item->parameters.text_box.text,
+						0x1F,
+						L"%s %s",
+						closed_game_prefix,
+						displayed_servers[item_index]->game_name);
+				}
+				item->parameters.text_box.text[0x1F] = 0;
+			}
+		}
+
+		if (displayed_server_count > 0 &&
+			widget->parameters.list.selected_list_item_index < 0)
+		{
+			widget->parameters.list.selected_list_item_index = 0;
+		}
+
+		milliseconds_since_creation = system_milliseconds() - widget->creation_time;
+		match_vassert(
+			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+			0x2F7,
+			ui_widget_definition_get(
+				widget->parameters.list.extended_description->definition_tag_index)->child_count == 5,
+			"this doesn't look like the server list extended description widget");
+
+		{
+			struct widget_instance *game_type_bitmap =
+				widget->parameters.list.extended_description->child;
+			struct widget_instance *map_bitmap = game_type_bitmap->next;
+			struct widget_instance *description_container = map_bitmap->next;
+			struct widget_instance *message_text = description_container->next;
+			struct widget_instance *open_closed_text = description_container->child;
+			struct widget_instance *map_name_text;
+			struct widget_instance *ruleset_text;
+			struct widget_instance *teams_text;
+			struct widget_instance *number_of_players_text;
+			struct widget_instance *score_limit_text;
+			struct widget_instance *score_limit_type_text;
+
+			match_vassert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+				0x2FF,
+				open_closed_text && open_closed_text->type == _ui_widget_type_text_box,
+				"expected 'open/closed game' textbox");
+			map_name_text = open_closed_text->next;
+			match_vassert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+				0x301,
+				map_name_text && map_name_text->type == _ui_widget_type_text_box,
+				"expected 'map name' textbox");
+			ruleset_text = map_name_text->next;
+			match_vassert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+				0x303,
+				ruleset_text && ruleset_text->type == _ui_widget_type_text_box,
+				"expected 'ruleset' textbox");
+			teams_text = ruleset_text->next;
+			match_vassert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+				0x305,
+				teams_text && teams_text->type == _ui_widget_type_text_box,
+				"expected 'teams on/off' textbox");
+			number_of_players_text = teams_text->next;
+			match_vassert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+				0x307,
+				number_of_players_text &&
+					number_of_players_text->type == _ui_widget_type_text_box,
+				"expected 'number of players' textbox");
+			score_limit_text = number_of_players_text->next;
+			match_vassert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+				0x309,
+				score_limit_text && score_limit_text->type == _ui_widget_type_text_box,
+				"expected 'score limit' textbox");
+			score_limit_type_text = score_limit_text->next;
+			match_vassert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+				0x30B,
+				score_limit_type_text &&
+					score_limit_type_text->type == _ui_widget_type_text_box,
+				"expected 'score limit type' textbox");
+
+			if (widget->parameters.list.selected_list_item_index >= 0)
+			{
+				struct network_advertised_game *server = displayed_servers[
+					widget->parameters.list.selected_list_item_index];
+				char const *map_name;
+
+				switch (server->engine_type)
+				{
+				case game_engine_ctf:
+					game_type_bitmap->animation.current_frame_index =
+						_multiplayer_game_bitmap_ctf;
+					break;
+				case game_engine_slayer:
+					game_type_bitmap->animation.current_frame_index =
+						_multiplayer_game_bitmap_slayer;
+					break;
+				case game_engine_oddball:
+					game_type_bitmap->animation.current_frame_index =
+						_multiplayer_game_bitmap_oddball;
+					break;
+				case game_engine_king:
+					game_type_bitmap->animation.current_frame_index =
+						_multiplayer_game_bitmap_king;
+					break;
+				case game_engine_race:
+					game_type_bitmap->animation.current_frame_index =
+						_multiplayer_game_bitmap_race;
+					break;
+				default:
+					game_type_bitmap->animation.current_frame_index =
+						_multiplayer_game_bitmap_unknown;
+					break;
+				}
+
+				map_name = server->map_name;
+				if (strstr(map_name, "beavercreek"))
+					map_bitmap->animation.current_frame_index = 0;
+				else if (strstr(map_name, "sidewinder"))
+					map_bitmap->animation.current_frame_index = 1;
+				else if (strstr(map_name, "damnation"))
+					map_bitmap->animation.current_frame_index = 2;
+				else if (strstr(map_name, "ratrace"))
+					map_bitmap->animation.current_frame_index = 3;
+				else if (strstr(map_name, "prisoner"))
+					map_bitmap->animation.current_frame_index = 4;
+				else if (strstr(map_name, "hangemhigh"))
+					map_bitmap->animation.current_frame_index = 5;
+				else if (strstr(map_name, "chillout"))
+					map_bitmap->animation.current_frame_index = 6;
+				else if (strstr(map_name, "carousel"))
+					map_bitmap->animation.current_frame_index = 7;
+				else if (strstr(map_name, "boardingaction"))
+					map_bitmap->animation.current_frame_index = 8;
+				else if (strstr(map_name, "bloodgulch"))
+					map_bitmap->animation.current_frame_index = 9;
+				else if (strstr(map_name, "wizard"))
+					map_bitmap->animation.current_frame_index = 10;
+				else if (strstr(map_name, "putput"))
+					map_bitmap->animation.current_frame_index = 11;
+				else if (strstr(map_name, "longest"))
+					map_bitmap->animation.current_frame_index = 12;
+				else
+					map_bitmap->animation.current_frame_index = 13;
+
+				open_closed_text->parameters.text_box.string_list_index =
+					(server->open == TRUE) ? 20 : 21;
+				map_name_text->parameters.text_box.string_list_index =
+					map_bitmap->animation.current_frame_index;
+
+				switch (server->engine_type)
+				{
+				case game_engine_ctf:
+					ruleset_text->parameters.text_box.string_list_index =
+						_multiplayer_game_text_string_capture_the_flag;
+					break;
+				case game_engine_slayer:
+					ruleset_text->parameters.text_box.string_list_index =
+						_multiplayer_game_text_string_slayer;
+					break;
+				case game_engine_oddball:
+					ruleset_text->parameters.text_box.string_list_index =
+						_multiplayer_game_text_string_oddball;
+					break;
+				case game_engine_king:
+					ruleset_text->parameters.text_box.string_list_index =
+						_multiplayer_game_text_string_king_of_the_hill;
+					break;
+				case game_engine_race:
+					ruleset_text->parameters.text_box.string_list_index =
+						_multiplayer_game_text_string_race;
+					break;
+				default:
+					ruleset_text->parameters.text_box.string_list_index =
+						_multiplayer_game_text_string_unknown_game_type;
+					break;
+				}
+
+				teams_text->parameters.text_box.string_list_index =
+					(server->has_teams == TRUE) ? 12 : 13;
+
+				number_of_players_text->parameters.text_box.text = ui_widget_realloc(
+					number_of_players_text->parameters.text_box.text,
+					8,
+					"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+					0x364);
+				if (number_of_players_text->parameters.text_box.text)
+				{
+					usnprintf(
+						number_of_players_text->parameters.text_box.text,
+						3,
+						L"%d",
+						server->player_count);
+					number_of_players_text->parameters.text_box.text[3] = 0;
+				}
+
+				score_limit_text->parameters.text_box.text = ui_widget_realloc(
+					score_limit_text->parameters.text_box.text,
+					8,
+					"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+					0x369);
+				if (score_limit_text->parameters.text_box.text)
+				{
+					usnprintf(
+						score_limit_text->parameters.text_box.text,
+						3,
+						L"%d",
+						server->score_limit);
+					score_limit_text->parameters.text_box.text[3] = 0;
+				}
+
+				switch (server->engine_type)
+				{
+				case game_engine_ctf:
+					score_limit_type_text->parameters.text_box.string_list_index =
+						_multiplayer_game_text_string_captures;
+					break;
+				case game_engine_slayer:
+					score_limit_type_text->parameters.text_box.string_list_index =
+						_multiplayer_game_text_string_frags;
+					break;
+				case game_engine_oddball:
+					score_limit_type_text->parameters.text_box.string_list_index =
+						(server->oddball_variant == TRUE) ?
+							_multiplayer_game_text_string_frags :
+							_multiplayer_game_text_string_minutes;
+					break;
+				case game_engine_king:
+					score_limit_type_text->parameters.text_box.string_list_index =
+						_multiplayer_game_text_string_minutes;
+					break;
+				case game_engine_race:
+					score_limit_type_text->parameters.text_box.string_list_index =
+						_multiplayer_game_text_string_laps;
+					break;
+				default:
+					score_limit_type_text->parameters.text_box.string_list_index = 1;
+					break;
+				}
+
+				message_text->parameters.text_box.string_list_index = 2;
+				message_text->visible = FALSE;
+
+				if (!widget->focused_child)
+				{
+					widget->parameters.list.selected_list_item_index = 0;
+					widget->focused_child = widget->child;
+				}
+			}
+			else
+			{
+				game_type_bitmap->animation.current_frame_index =
+					_multiplayer_game_bitmap_unknown;
+				map_bitmap->animation.current_frame_index = 13;
+				open_closed_text->parameters.text_box.string_list_index = 1;
+				map_name_text->parameters.text_box.string_list_index = 14;
+				ruleset_text->parameters.text_box.string_list_index = 1;
+				teams_text->parameters.text_box.string_list_index = 1;
+
+				number_of_players_text->parameters.text_box.text = ui_widget_realloc(
+					number_of_players_text->parameters.text_box.text,
+					8,
+					"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+					0x3A3);
+				if (number_of_players_text->parameters.text_box.text)
+					number_of_players_text->parameters.text_box.text[0] = 0;
+
+				score_limit_text->parameters.text_box.text = ui_widget_realloc(
+					score_limit_text->parameters.text_box.text,
+					8,
+					"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+					0x3A7);
+				if (score_limit_text->parameters.text_box.text)
+					score_limit_text->parameters.text_box.text[0] = 0;
+
+				score_limit_type_text->parameters.text_box.string_list_index = 1;
+				message_text->parameters.text_box.string_list_index =
+					(milliseconds_since_creation >= 1000) ? 1 : 0;
+				message_text->visible = TRUE;
+			}
+		}
+	}
+	return;
+}
+
+void network_pregame_status_screen_update(
+	struct widget_instance *widget)
+{
+	struct network_game *game = network_game_get_game();
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+		0x3FC,
+		ui_widget_definition_get(widget->definition_tag_index)->child_count == 6,
+		"this doesn't look like the net pregame status screen to me");
+
+	if (game)
+	{
+		short local_machine_index = network_game_client_get_machine_index(
+			global_network_game_client_get());
+		struct widget_instance *local_machine_widget = widget->child;
+		struct widget_instance *second_machine_widget;
+		struct widget_instance *third_machine_widget;
+		struct widget_instance *fourth_machine_widget;
+		struct widget_instance *status_text;
+		struct widget_instance *countdown_text;
+		struct widget_instance *machine_name_text;
+		struct widget_instance *machine_icon;
+		wchar_t const *machine_name;
+		long local_player_indices[MAXIMUM_LOCAL_PLAYERS];
+		struct widget_instance *player_widgets[MAXIMUM_LOCAL_PLAYERS];
+		long local_player_count;
+		long machine_index;
+		long player_index;
+		long local_player_index;
+		long length;
+		boolean local_machine_found;
+
+		second_machine_widget = local_machine_widget->next;
+		third_machine_widget = second_machine_widget->next;
+		fourth_machine_widget = third_machine_widget->next;
+		status_text = fourth_machine_widget->next;
+		countdown_text = status_text->next;
+
+		countdown_text->parameters.text_box.text = ui_widget_realloc(
+			countdown_text->parameters.text_box.text,
+			0x20,
+			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+			0x40B);
+		if (countdown_text->parameters.text_box.text)
+		{
+			short seconds_to_game_start = network_game_client_get_seconds_to_game_start(
+				global_network_game_client_get());
+			boolean waiting_for_machines = (global_network_game_server_get() &&
+				game->machine_count < 2);
+
+			ustrncpy(countdown_text->parameters.text_box.text, L"-:--", 15);
+			status_text->visible = TRUE;
+			status_text->parameters.text_box.string_list_index = 0;
+			countdown_text->visible = TRUE;
+			if (seconds_to_game_start == 0)
+			{
+				status_text->parameters.text_box.string_list_index = 1;
+				countdown_text->visible = FALSE;
+			}
+			else if (seconds_to_game_start > 0)
+			{
+				if (seconds_to_game_start < 60)
+				{
+					usnprintf(
+						countdown_text->parameters.text_box.text,
+						15,
+						L"0:%02d",
+						seconds_to_game_start);
+				}
+				else if (seconds_to_game_start < 3600)
+				{
+					long minutes = seconds_to_game_start / 60;
+
+					usnprintf(
+						countdown_text->parameters.text_box.text,
+						15,
+						L"%02d:%02d",
+						minutes,
+						seconds_to_game_start - minutes * 60);
+				}
+				else
+				{
+					long hours = seconds_to_game_start / 3600;
+					long minutes = (seconds_to_game_start - hours * 3600) / 60;
+
+					usnprintf(
+						countdown_text->parameters.text_box.text,
+						15,
+						L"%d:%02d:%02d",
+						hours,
+						minutes,
+						seconds_to_game_start - (hours * 60 + minutes) * 60);
+				}
+			}
+			else if (waiting_for_machines || game->variant.has_teams == TRUE)
+			{
+				status_text->visible = FALSE;
+				countdown_text->visible = FALSE;
+			}
+			countdown_text->parameters.text_box.text[15] = 0;
+		}
+
+		match_vassert(
+			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+			0x44C,
+			ui_widget_definition_get(local_machine_widget->definition_tag_index)->child_count == 6,
+			"this doesn't look like the net pregame status screen to me");
+
+		local_machine_found = FALSE;
+		machine_name = L"?";
+		machine_name_text = local_machine_widget->child;
+		machine_icon = machine_name_text->next;
+		player_widgets[0] = machine_icon->next;
+		player_widgets[1] = player_widgets[0]->next;
+		player_widgets[2] = player_widgets[1]->next;
+		player_widgets[3] = player_widgets[2]->next;
+
+		for (machine_index = 0;
+			machine_index < MAXIMUM_NETWORK_MACHINE_COUNT;
+			machine_index++)
+		{
+			struct network_machine *machine = &game->machines[machine_index];
+
+			if (VALID_INDEX(machine->machine_index, MAXIMUM_NETWORK_MACHINE_COUNT) &&
+				machine->machine_index == local_machine_index)
+			{
+				struct network_machine *local_machine = network_game_client_get_machine(
+					global_network_game_client_get());
+
+				if (local_machine && local_machine->name[0])
+					machine_name = local_machine->name;
+				local_machine_found = TRUE;
+			}
+		}
+
+		csmemset(local_player_indices, NONE, sizeof(local_player_indices));
+		local_player_count = 0;
+		for (player_index = 0;
+			player_index < (long)NUMBEROF(game->players);
+			player_index++)
+		{
+			if (network_player_is_valid(&game->players[player_index]) &&
+				game->players[player_index].machine_index == local_machine_index)
+			{
+				local_player_indices[game->players[player_index].controller_index] = player_index;
+				local_player_count++;
+				if (local_player_count == MAXIMUM_LOCAL_PLAYERS)
+					break;
+			}
+		}
+
+		length = ustrlen(machine_name);
+		machine_name_text->parameters.text_box.text = ui_widget_realloc(
+			machine_name_text->parameters.text_box.text,
+			(word)(2 * length + 2),
+			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+			0x47B);
+		if (machine_name_text->parameters.text_box.text)
+		{
+			ustrncpy(machine_name_text->parameters.text_box.text, machine_name, length);
+			machine_name_text->parameters.text_box.text[length] = 0;
+		}
+		machine_icon->animation.current_frame_index = local_machine_found ? 1 : 0;
+
+		for (local_player_index = 0;
+			local_player_index < MAXIMUM_LOCAL_PLAYERS;
+			local_player_index++)
+		{
+			struct widget_instance *controller_bitmap;
+			struct widget_instance *name_text;
+			struct widget_instance *team_list;
+
+			match_vassert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+				0x485,
+				ui_widget_definition_get(
+					player_widgets[local_player_index]->definition_tag_index)->child_count == 3,
+				"this doesn't look like the net pregame status screen to me");
+
+			controller_bitmap = player_widgets[local_player_index]->child;
+			match_vassert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+				0x48B,
+				controller_bitmap && controller_bitmap->type == _ui_widget_type_bitmap,
+				"expected container widget for local player controller bitmap");
+			name_text = controller_bitmap->next;
+			match_vassert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+				0x48D,
+				name_text && name_text->type == _ui_widget_type_text_box,
+				"expected a text box for local player name field");
+			team_list = name_text->next;
+			match_vassert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+				0x48F,
+				team_list && team_list->type == _ui_widget_type_spinner_list,
+				"expected a spinner list for local player team display");
+
+			if (!game->variant.has_teams)
+				widget_instance_set_visibility_recursive(team_list, FALSE);
+			else
+				widget_instance_set_visibility_recursive(team_list, TRUE);
+
+			if (local_player_indices[local_player_index] == NONE)
+			{
+				controller_bitmap->animation.current_frame_index = 0;
+				name_text->parameters.text_box.text = ui_widget_realloc(
+					name_text->parameters.text_box.text,
+					2,
+					"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+					0x49D);
+				if (name_text->parameters.text_box.text)
+					name_text->parameters.text_box.text[0] = 0;
+				team_list->parameters.list.selected_list_item_index = 2;
+			}
+			else
+			{
+				long name_length = ustrlen(
+					game->players[local_player_indices[local_player_index]].name);
+
+				name_text->parameters.text_box.text = ui_widget_realloc(
+					name_text->parameters.text_box.text,
+					(word)(2 * name_length + 2),
+					"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+					0x4A6);
+				if (name_text->parameters.text_box.text)
+				{
+					ustrncpy(
+						name_text->parameters.text_box.text,
+						game->players[local_player_indices[local_player_index]].name,
+						name_length);
+					name_text->parameters.text_box.text[name_length] = 0;
+				}
+
+				if (!game->variant.has_teams)
+				{
+					controller_bitmap->animation.current_frame_index = 1;
+				}
+				else
+				{
+					switch (game->players[local_player_indices[local_player_index]].team_index)
+					{
+					case _team_red:
+						controller_bitmap->animation.current_frame_index =
+							local_player_controller_bitmap_frames[0][local_player_index][2];
+						team_list->parameters.list.selected_list_item_index = 0;
+						break;
+					case _team_blue:
+						controller_bitmap->animation.current_frame_index =
+							local_player_controller_bitmap_frames[0][local_player_index][1];
+						team_list->parameters.list.selected_list_item_index = 1;
+						break;
+					default:
+						controller_bitmap->animation.current_frame_index =
+							local_player_controller_bitmap_frames[0][local_player_index][0];
+						team_list->parameters.list.selected_list_item_index = 2;
+						break;
+					}
+				}
+			}
+		}
+
+		{
+			long machine_indices[MAXIMUM_NETWORK_MACHINE_COUNT - 1];
+			struct widget_instance *machine_widgets[MAXIMUM_NETWORK_MACHINE_COUNT - 1];
+			long machine_widget_index;
+			long j;
+
+			machine_widgets[0] = second_machine_widget;
+			machine_widgets[1] = third_machine_widget;
+			machine_widgets[2] = fourth_machine_widget;
+			csmemset(machine_indices, NONE, sizeof(machine_indices));
+			for (machine_index = 0, j = 0;
+				machine_index < MAXIMUM_NETWORK_MACHINE_COUNT;
+				machine_index++)
+			{
+				struct network_machine *machine = &game->machines[machine_index];
+
+				if (VALID_INDEX(machine->machine_index, MAXIMUM_NETWORK_MACHINE_COUNT) &&
+					machine->machine_index != local_machine_index)
+				{
+					match_assert(
+						"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+						0x4D4,
+						j<(MAXIMUM_NETWORK_MACHINE_COUNT-1));
+
+					machine_indices[j] = machine_index;
+					j++;
+				}
+			}
+
+			for (machine_widget_index = 0;
+				machine_widget_index < MAXIMUM_NETWORK_MACHINE_COUNT - 1;
+				machine_widget_index++)
+			{
+				struct widget_instance *remote_machine_icon;
+				struct widget_instance *remote_machine_name_text;
+				struct widget_instance *player_widget;
+
+				match_vassert(
+					"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+					0x4DD,
+					ui_widget_definition_get(
+						machine_widgets[machine_widget_index]->definition_tag_index)->child_count == 6,
+					"this doesn't look like the net pregame status screen to me");
+
+				remote_machine_icon = machine_widgets[machine_widget_index]->child;
+				remote_machine_name_text = remote_machine_icon->next;
+				if (machine_indices[machine_widget_index] == NONE)
+				{
+					remote_machine_icon->animation.current_frame_index = 0;
+					remote_machine_name_text->parameters.text_box.text = ui_widget_realloc(
+						remote_machine_name_text->parameters.text_box.text,
+						2,
+						"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+						0x4E7);
+					if (remote_machine_name_text->parameters.text_box.text)
+						remote_machine_name_text->parameters.text_box.text[0] = 0;
+
+					player_widget = remote_machine_name_text->next;
+					for (local_player_index = 0;
+						local_player_index < MAXIMUM_LOCAL_PLAYERS;
+						local_player_index++)
+					{
+						if (!player_widget)
+							break;
+
+						player_widget->animation.current_frame_index = 2;
+						player_widget = player_widget->next;
+					}
+				}
+				else
+				{
+					remote_machine_icon->animation.current_frame_index = 1;
+					length = ustrlen(game->machines[machine_indices[machine_widget_index]].name);
+					remote_machine_name_text->parameters.text_box.text = ui_widget_realloc(
+						remote_machine_name_text->parameters.text_box.text,
+						(word)(2 * length + 2),
+						"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+						0x4F4);
+					if (remote_machine_name_text->parameters.text_box.text)
+					{
+						ustrncpy(
+							remote_machine_name_text->parameters.text_box.text,
+							game->machines[machine_indices[machine_widget_index]].name,
+							length);
+						remote_machine_name_text->parameters.text_box.text[length] = 0;
+					}
+
+					csmemset(local_player_indices, NONE, sizeof(local_player_indices));
+					for (player_index = 0;
+						player_index < (long)NUMBEROF(game->players);
+						player_index++)
+					{
+						if (network_player_is_valid(&game->players[player_index]) &&
+							game->players[player_index].machine_index ==
+								game->machines[machine_indices[machine_widget_index]].machine_index)
+						{
+							local_player_indices[game->players[player_index].controller_index] =
+								player_index;
+						}
+					}
+
+					player_widget = remote_machine_name_text->next;
+					for (local_player_index = 0;
+						local_player_index < MAXIMUM_LOCAL_PLAYERS;
+						local_player_index++)
+					{
+						if (!player_widget)
+							break;
+
+						if (local_player_indices[local_player_index] == NONE)
+						{
+							player_widget->animation.current_frame_index = 2;
+						}
+						else if (!game->variant.has_teams)
+						{
+							player_widget->animation.current_frame_index =
+								local_player_controller_bitmap_frames[0][local_player_index][0];
+						}
+						else
+						{
+							switch (game->players[
+								local_player_indices[local_player_index]].team_index)
+							{
+							case _team_red:
+								player_widget->animation.current_frame_index =
+									local_player_controller_bitmap_frames[0][local_player_index][2];
+								break;
+							case _team_blue:
+								player_widget->animation.current_frame_index =
+									local_player_controller_bitmap_frames[0][local_player_index][1];
+								break;
+							default:
+								player_widget->animation.current_frame_index =
+									local_player_controller_bitmap_frames[0][local_player_index][0];
+								break;
+							}
+						}
+						player_widget = player_widget->next;
+					}
+				}
+			}
+		}
 	}
 	return;
 }
@@ -1709,7 +2548,7 @@ void system_link_status_check(
 
 	if (!transport_network_available() && !network_game_is_splitscreen_local())
 	{
-		display_error_when_main_menu_loaded(_ui_error_network_connection_lost);
+		display_error_when_main_menu_loaded(_error_network_connection_lost);
 		main_goto_main_menu();
 		error(2, "network connection went down!");
 	}
@@ -1768,10 +2607,10 @@ void multiplayer_game_directions(
 			{
 				switch (player->team_index)
 				{
-				case 0:
+				case _team_red:
 					team_zero_player_count++;
 					break;
-				case 1:
+				case _team_blue:
 					team_one_player_count++;
 					break;
 				}
@@ -1979,11 +2818,11 @@ void variant_profile_update_cache_for_nwide_list(
 	long *profile_indices,
 	long profile_index_count)
 {
-	boolean still_wanted[3] = { FALSE, FALSE, FALSE };
+	boolean still_wanted[3] = { FALSE };
 	long cache_index;
 	long requested_index;
 
-	for (cache_index = 0; cache_index < NUMBEROF(cached_variant_profile); cache_index++)
+	for (cache_index = 0; cache_index < (long)NUMBEROF(cached_variant_profile); cache_index++)
 	{
 		if (cached_variant_profile[cache_index].profile_index == NONE)
 			continue;
@@ -2000,35 +2839,34 @@ void variant_profile_update_cache_for_nwide_list(
 
 	for (requested_index = 0; requested_index < profile_index_count; requested_index++)
 	{
-		long requested_profile_index = profile_indices[requested_index];
-
-		if (requested_profile_index == NONE)
+		if (profile_indices[requested_index] == NONE)
 			continue;
 
-		for (cache_index = 0; cache_index < NUMBEROF(cached_variant_profile); cache_index++)
+		for (cache_index = 0; cache_index < (long)NUMBEROF(cached_variant_profile); cache_index++)
 		{
-			if (cached_variant_profile[cache_index].profile_index == requested_profile_index)
+			if (profile_indices[requested_index] == cached_variant_profile[cache_index].profile_index)
 				break;
 		}
 
-		if (cache_index == NUMBEROF(cached_variant_profile))
+		if (cache_index == (long)NUMBEROF(cached_variant_profile))
 		{
-			for (cache_index = 0;
-				cache_index < NUMBEROF(still_wanted) && still_wanted[cache_index] == TRUE;
-				cache_index++)
+			for (cache_index = 0; cache_index < (long)NUMBEROF(still_wanted); cache_index++)
 			{
+				if (still_wanted[cache_index] != TRUE)
+					break;
+
+				match_vassert(
+					"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+					0xCD5,
+					cache_index < (long)NUMBEROF(cached_variant_profile),
+					"not enough cache profiles");
 			}
 
-			match_assert(
-				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
-				0xCD5,
-				cache_index < NUMBEROF(cached_variant_profile));
-
 			if (playlist_profile_get(
-				requested_profile_index,
+				profile_indices[requested_index],
 				(struct game_variant *)&cached_variant_profile[cache_index].profile))
 			{
-				cached_variant_profile[cache_index].profile_index = requested_profile_index;
+				cached_variant_profile[cache_index].profile_index = profile_indices[requested_index];
 				still_wanted[cache_index] = TRUE;
 			}
 			else

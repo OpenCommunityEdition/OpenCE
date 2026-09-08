@@ -29,7 +29,7 @@ symbols in this file:
 000FAAF0 0030:
 	_seed_random_range (0000)
 000FAB20 0080:
-	_code_000fab20 (0000)
+	_direction3d_from_table (0000)
 000FABA0 0040:
 	_seed_random_direction3d (0000)
 000FABE0 0100:
@@ -57,10 +57,18 @@ symbols in this file:
 #include "cseries.h"
 #include "cseries_windows.h"
 #include "real_math.h"
+#include "geometry.h"
 #include "random_math.h"
 #include "game_engine.h"
 
 /* ---------- constants */
+
+enum
+{
+	RANDOM_DIRECTION_TABLE_GEOSPHERE_SEGMENT_COUNT= 16,
+	RANDOM_A= 1664525L,
+	RANDOM_C= 1013904223L
+};
 
 /* ---------- macros */
 
@@ -68,7 +76,7 @@ symbols in this file:
 
 struct random_math_globals
 {
-	void *random_direction_table;
+	real_vector3d *random_direction_table;
 	short random_direction_table_size;
 	short pad;
 	long global_random_seed_lock;
@@ -76,24 +84,12 @@ struct random_math_globals
 	unsigned long global_local_random_seed;
 };
 
-struct geosphere
-{
-	long pad0;
-	real_vector3d *vertices;
-	long pad8;
-	short vertex_count;
-	short pad14;
-};
-
 /* ---------- prototypes */
 
-unsigned long system_seconds(void);
 static real_vector3d *
-code_000fab20(
-	short index,
-	real_vector3d *result);
-struct geosphere *geosphere_new(short subdivision_count);
-void geosphere_dispose(struct geosphere *sphere);
+direction3d_from_table(
+	real_vector3d *result,
+	short index);
 
 /* ---------- globals */
 
@@ -104,30 +100,36 @@ struct random_math_globals random_math_globals;
 /* ---------- public code */
 
 void
-lock_global_random_seed(void)
+lock_global_random_seed(
+	void)
 {
 	random_math_globals.global_random_seed_lock++;
+	return;
 }
 
 void
-unlock_global_random_seed(void)
+unlock_global_random_seed(
+	void)
 {
-	match_vassert(
+	match_dassert(
 		"c:\\halo\\SOURCE\\math\\random_math.c",
 		41,
 		random_math_globals.global_random_seed_lock>0,
 		"unmatched call to unlock_random_seed() somewhere");
 	random_math_globals.global_random_seed_lock--;
+	return;
 }
 
-unsigned long get_random_seed(void)
+unsigned long get_random_seed(
+	void)
 {
 	return random_math_globals.global_random_seed;
 }
 
-unsigned long *get_global_random_seed_address(void)
+unsigned long *get_global_random_seed_address(
+	void)
 {
-	match_vassert(
+	match_dassert(
 		"c:\\halo\\SOURCE\\math\\random_math.c",
 		56,
 		!game_engine_running() || !random_math_globals.global_random_seed_lock,
@@ -135,7 +137,8 @@ unsigned long *get_global_random_seed_address(void)
 	return &random_math_globals.global_random_seed;
 }
 
-unsigned long *get_global_local_random_seed_address(void)
+unsigned long *get_global_local_random_seed_address(
+	void)
 {
 	return &random_math_globals.global_local_random_seed;
 }
@@ -147,19 +150,21 @@ random_seed_debug_log(
 	return;
 }
 
-unsigned long get_number_suitable_for_initializing_random_seed(void)
+unsigned long get_number_suitable_for_initializing_random_seed(
+	void)
 {
 	return system_seconds()^system_milliseconds()^rand();
 }
 
 void
-random_math_initialize(void)
+random_math_initialize(
+	void)
 {
 	struct geosphere *random_direction_geosphere;
 	short index;
 
 	random_math_globals.global_local_random_seed= get_number_suitable_for_initializing_random_seed();
-	random_direction_geosphere= geosphere_new(16);
+	random_direction_geosphere= geosphere_new(RANDOM_DIRECTION_TABLE_GEOSPHERE_SEGMENT_COUNT);
 	match_assert("c:\\halo\\SOURCE\\math\\random_math.c", 174, random_direction_geosphere);
 	random_math_globals.random_direction_table= match_malloc(
 		"c:\\halo\\SOURCE\\math\\random_math.c",
@@ -167,23 +172,27 @@ random_math_initialize(void)
 		random_direction_geosphere->vertex_count*sizeof(real_vector3d));
 	random_math_globals.random_direction_table_size= random_direction_geosphere->vertex_count;
 	for (index= 0; index<random_direction_geosphere->vertex_count; index++)
-		((real_vector3d *)random_math_globals.random_direction_table)[index]= random_direction_geosphere->vertices[index];
+		random_math_globals.random_direction_table[index]=
+			*((real_vector3d *)random_direction_geosphere->vertices + index);
 	geosphere_dispose(random_direction_geosphere);
+	return;
 }
 
 void
-random_math_dispose(void)
+random_math_dispose(
+	void)
 {
 	debug_free(
 		random_math_globals.random_direction_table,
 		"c:\\halo\\SOURCE\\math\\random_math.c",
 		200);
+	return;
 }
 
 unsigned short seed_random(
 	unsigned long *seed)
 {
-	*seed = *seed*0x19660D+0x3C6EF35F;
+	*seed = *seed*RANDOM_A+RANDOM_C;
 	return *seed>>16;
 }
 
@@ -198,7 +207,7 @@ short seed_random_range(
 real real_seed_random(
 	unsigned long *seed)
 {
-	*seed = *seed*0x19660D+0x3C6EF35F;
+	*seed = *seed*RANDOM_A+RANDOM_C;
 	return (real)(*seed>>16)/65535.0f;
 }
 
@@ -215,9 +224,9 @@ real_vector3d *seed_random_direction3d(
 	unsigned long *seed,
 	real_vector3d *direction)
 {
-	return code_000fab20(
-		seed_random_range(seed, 0, random_math_globals.random_direction_table_size),
-		direction);
+	return direction3d_from_table(
+		direction,
+		seed_random_range(seed, 0, random_math_globals.random_direction_table_size));
 }
 
 void
@@ -243,6 +252,7 @@ seed_random_orientation(
 	up->k= elevation_cosine;
 
 	yaw_vectors(up, facing, sine(roll), cosine(roll));
+	return;
 }
 
 real_vector3d *
@@ -258,9 +268,9 @@ seed_random_vector_in_cone3d(
 	real angle;
 
 	*result= *axis;
-	code_000fab20(
-		seed_random_range(seed, 0, random_math_globals.random_direction_table_size),
-		&random_direction);
+	direction3d_from_table(
+		&random_direction,
+		seed_random_range(seed, 0, random_math_globals.random_direction_table_size));
 	cross_product3d(axis, &random_direction, &rotation_axis);
 	if (normalize3d(&rotation_axis)>0.f)
 	{
@@ -274,12 +284,12 @@ seed_random_vector_in_cone3d(
 /* ---------- private code */
 
 static real_vector3d *
-code_000fab20(
-	short index,
-	real_vector3d *result)
+direction3d_from_table(
+	real_vector3d *result,
+	short index)
 {
 	real_vector3d *random_direction=
-		&((real_vector3d *)random_math_globals.random_direction_table)[index];
+		&random_math_globals.random_direction_table[index];
 	match_assert(
 		"c:\\halo\\SOURCE\\math\\random_math.c",
 		250,

@@ -16,6 +16,11 @@ file has inline function assertions.
 
 /* ---------- prototypes/HS_RUNTIME.C */
 
+void hs_evaluate_inequality(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+
 void hs_evaluate_set(
 	short function_index,
 	long thread_index,

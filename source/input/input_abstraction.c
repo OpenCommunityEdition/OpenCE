@@ -104,12 +104,6 @@ enum
 	_vehicle_type_alien_fighter = 5,
 };
 
-enum
-{
-	_error_controller_unplugged_start_to_continue = 12,
-	_error_controller_unplugged = 13,
-};
-
 /* January promotes the rounded 45- and 10-degree single-precision constants
  * before subtracting them; the 35-degree window and its reciprocal are double. */
 #define STICK_DIAGONAL_ANGLE 0.7853981852531433f

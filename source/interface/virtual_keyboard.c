@@ -187,13 +187,6 @@ enum ui_audio_feedback_sound
 	_ui_audio_feedback_flag_failure,
 };
 
-/* ui_widget.c owns the full error enum. */
-enum virtual_keyboard_error
-{
-	_error_already_a_saved_game_file_with_that_name = 27,
-	_error_cannot_create_saved_game_file_with_empty_name = 29,
-};
-
 /* ---------- macros */
 
 #define VIRTUAL_KEYBOARD_TAG 'vcky'

@@ -53,6 +53,7 @@ struct transport_address_data
 {
 	union
 	{
+		unsigned long ipv4_address;
 		unsigned long long_words[MAXIMUM_TRANSPORT_ADDRESS_LENGTH / sizeof(unsigned long)];
 		word words[MAXIMUM_TRANSPORT_ADDRESS_LENGTH / sizeof(word)];
 		byte bytes[MAXIMUM_TRANSPORT_ADDRESS_LENGTH];

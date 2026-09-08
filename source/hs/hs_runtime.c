@@ -367,7 +367,6 @@ typedef void (*hs_inspection_procedure)(
 
 struct hs_runtime_globals
 {
-	byte reserved[4];
 	boolean initialized;
 	byte pad;
 	short executing_thread_index;
@@ -774,8 +773,11 @@ static char const *expression_get_function_name(
 	struct hs_syntax_node *syntax_node = hs_syntax_get(expression_index);
 	struct hs_thread_datum *thread = hs_thread_get(thread_index);
 
-	while (!TEST_FLAG(syntax_node->flags, _hs_syntax_node_script_bit))
+	while (TRUE)
 	{
+		if (TEST_FLAG(syntax_node->flags, _hs_syntax_node_script_bit))
+			break;
+
 		if (syntax_node->index != 0 ||
 			expression_index != thread->stack->expression_index)
 		{
@@ -1605,6 +1607,123 @@ void hs_evaluate_equality(
 			equal = !equal;
 
 		result.boolean = equal;
+		hs_return(thread_index, result.long_integer);
+	}
+
+	return;
+}
+
+void hs_evaluate_inequality(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	static short parameter_types[2];
+	long *arguments;
+
+	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x15d,
+		function_index>=_hs_function_gt && function_index<=_hs_function_lte);
+
+	parameter_types[0] = parameter_types[1] = hs_syntax_get(hs_syntax_get(hs_syntax_get(
+		hs_thread_get(thread_index)->stack->expression_index)->data)->next_node_index)->type;
+
+	arguments = hs_arguments_evaluate(thread_index, 2, parameter_types, initialize);
+	if (arguments)
+	{
+		union hs_conversion_result result;
+		boolean comparison;
+		real value0;
+		real value1;
+
+		switch (parameter_types[0])
+		{
+		case _hs_type_real:
+			value0 = ((real *)arguments)[0];
+			value1 = ((real *)arguments)[1];
+			switch (function_index)
+			{
+			case _hs_function_gt:
+				comparison = value0>value1;
+				break;
+			case _hs_function_lt:
+				comparison = value0<value1;
+				break;
+			case _hs_function_gte:
+				comparison = value0>=value1;
+				break;
+			case _hs_function_lte:
+				comparison = value0<=value1;
+				break;
+			default:
+				comparison = FALSE;
+				match_vassert(
+					"c:\\halo\\source\\hs\\hs_library_internal_runtime.h",
+					0x16b,
+					FALSE,
+					NULL);
+				break;
+			}
+			break;
+		case _hs_type_long_integer:
+			value0 = (real)arguments[0];
+			value1 = (real)arguments[1];
+			switch (function_index)
+			{
+			case _hs_function_gt:
+				comparison = value0>value1;
+				break;
+			case _hs_function_lt:
+				comparison = value0<value1;
+				break;
+			case _hs_function_gte:
+				comparison = value0>=value1;
+				break;
+			case _hs_function_lte:
+				comparison = value0<=value1;
+				break;
+			default:
+				comparison = FALSE;
+				match_vassert(
+					"c:\\halo\\source\\hs\\hs_library_internal_runtime.h",
+					0x16e,
+					FALSE,
+					NULL);
+				break;
+			}
+			break;
+		default:
+			match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x171,
+				parameter_types[0]==_hs_type_short_integer || HS_TYPE_IS_ENUM(parameter_types[0]));
+
+			value0 = (real)(short)arguments[0];
+			value1 = (real)(short)arguments[1];
+			switch (function_index)
+			{
+			case _hs_function_gt:
+				comparison = value0>value1;
+				break;
+			case _hs_function_lt:
+				comparison = value0<value1;
+				break;
+			case _hs_function_gte:
+				comparison = value0>=value1;
+				break;
+			case _hs_function_lte:
+				comparison = value0<=value1;
+				break;
+			default:
+				comparison = FALSE;
+				match_vassert(
+					"c:\\halo\\source\\hs\\hs_library_internal_runtime.h",
+					0x172,
+					FALSE,
+					NULL);
+				break;
+			}
+			break;
+		}
+
+		result.boolean = comparison;
 		hs_return(thread_index, result.long_integer);
 	}
 

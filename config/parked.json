@@ -557,7 +557,7 @@
       "unit": "source/bungie_net/network/transport_endpoint_winsock",
       "function": "_read_from_endpoint",
       "class": "unclassified",
-      "evidence": "First complete natural January datagram receive using the existing exact static create_endpoint_socket, real public short-return bind_endpoint, naturally inlined endpoint_connected predicate, and stock recvfrom/WSA API. No bind body, helper, shared header or SDK feature was changed. Target/candidate544 padded bytes/30 relocations; target543 meaningful bytes. Natural VC7 keeps length in EBX and saves/restores it whereas January reloads the stack parameter; it uses a different zero-initialization store schedule, places the address-copy success block before errors, and chooses equivalent flag-update instructions. Same44B stack frame, all target cases and call identities present; no variants were tried. Zero datagrams return0 and populate IPv4/port; unused source-address fields stay untouched. All20 inherited code owners (17 exact,3 parked) and17 inherited runtime-data owners retain bytes/relocations and real-owner properties. Exactly one new code owner and three authentic assertion literals94B (all strict to target), no new candidate-only owner/COMMON/point_from_line3d. Park credible fuzzy; reopen only from authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_winsock_obj_read_from_natural_boundary_20260905.md.",
+      "evidence": "First complete natural January datagram receive using the existing exact static create_endpoint_socket, real public short-return bind_endpoint, naturally inlined endpoint_connected predicate, and stock recvfrom/WSA API. Target is 544 padded bytes and current candidate is 560, both with 30 relocations; target is 543 meaningful bytes. Natural VC7 keeps length in EBX and saves/restores it whereas January reloads the stack parameter; it uses a different zero-initialization store schedule, places the address-copy success block before errors, and chooses equivalent flag-update instructions. The candidate changed from 544 to 560 bytes only after the supplied Bungie networking source required the genuine `ipv4_address` alias in the proper shared transport union; that authentic header correction is retained and the snapshot is honestly refreshed. Zero datagrams return 0 and populate IPv4/port; unused source-address fields stay untouched. No fake dependency, raw access, compiler steering, or point_from_line3d emission is used. Park credible fuzzy; reopen only from authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_winsock_obj_read_from_natural_boundary_20260905.md.",
       "measurements": {
         "target": {
           "size": 544,
@@ -565,11 +565,11 @@
           "normalized_sha256": "436b29a8a3fead8a698af2e95e38faae6e8e1336c2566954e28b7382a1890a9b"
         },
         "base": {
-          "size": 544,
+          "size": 560,
           "relocation_count": 30,
-          "normalized_sha256": "dad0a6d1bcae2082669d34fb51928ab05bc0f7a1b54e23e9a7dea80de81e9441"
+          "normalized_sha256": "a46da0bae52718e3a246eac2c68edda4fc8a58e3ed69279cffce7ff21f07118a"
         },
-        "objdiff_percent": 46.441624
+        "objdiff_percent": 49.725887
       }
     },
     {
@@ -5159,25 +5159,6 @@
       }
     },
     {
-      "unit": "source/hs/hs_runtime",
-      "function": "_expression_get_function_name",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete private helper in ordinary typed C from January's instruction and relocation topology, with the independent later HCEA implementation corroborating its script-stack semantics and original-style name. The retained static helper walks outward through the active thread stack, returns the current function name, preserves the authenticated end-of-script string, and resolves script names through the typed TAG_BLOCK_GET_ELEMENT path. Target and candidate both occupy 176 padded bytes, have the same 70 decoded instructions, and share all 12 relocation identities at identical offsets; objdiff reports 99.52381 percent similarity. The only byte differences are two independent ECX/EDX scratch-register selections in the terminal script-index and function-index paths. Bounded declaration, next-expression staging, assignment-order, scalar-width, and loop/return forms either converge on this fixed point or disturb otherwise exact control flow. The fail-closed classifier returns UNKNOWN, so the entry remains unclassified rather than inferring a compiler recipe. No register or volatile forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, undefined behavior, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the two scratch-register choices.",
-      "measurements": {
-        "target": {
-          "size": 176,
-          "relocation_count": 12,
-          "normalized_sha256": "50c82a2814e4ab854e325a08464b0ae9985f2c032445bb2c9e16bb26754ea821"
-        },
-        "base": {
-          "size": 176,
-          "relocation_count": 12,
-          "normalized_sha256": "bf099693458aa0c86c0297f4536c0d37f8d73bda1332a1448d4ee921f4ba51cf"
-        },
-        "objdiff_percent": 99.52381
-      }
-    },
-    {
       "unit": "source/effects/particles",
       "function": "_particle_next_frame",
       "class": "register-allocation",
@@ -6068,6 +6049,177 @@
           "normalized_sha256": "2dab6c4ec4e33d061b84bab1219522b4c8c229ea2f423c07038e6bf880eca663"
         },
         "objdiff_percent": 68.44203
+      }
+    },
+    {
+      "unit": "source/hs/hs_runtime",
+      "function": "_hs_evaluate_inequality",
+      "class": "instruction-scheduling",
+      "evidence": "Complete typed ordinary-C evaluator retained as the best coherent reconstruction from the Opus lane, with correct syntax traversal, HS enum cases, comparison semantics, assertions, result convention, and explicit return. Target and candidate are both 528 padded bytes with the same 40 relocation dependencies, but January keeps a different x87 lifetime for the two real values. A redundant real-to-double-to-real round trip made the donor exact but was rejected as unsupported compiler steering under the no-fake-matching house rule. Canonical uses direct real loads and assigns zero exact credit. No register or volatile forcing, pragma, assembly, fake dependency, raw offset, undefined behavior, or nonsensical branch is retained. See docs/object_matching_logs/hs_runtime_inequality_reconciliation_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 528,
+          "relocation_count": 40,
+          "normalized_sha256": "63ee22c1451726f68f114f399e057f6636f9af0b25180143a459a566d16e464d"
+        },
+        "base": {
+          "size": 528,
+          "relocation_count": 40,
+          "normalized_sha256": "35e92238733bcbabb14299ef539bc9cf67fd1bebc1dddd72c43ca3aae005c7c3"
+        },
+        "objdiff_percent": 88.47953
+      }
+    },
+    {
+      "unit": "source/bink/bink_playback",
+      "function": "_bink_alloc@4",
+      "class": "tu-context-optimization",
+      "evidence": "Complete ordinary-C Bink pool allocator retained from the Fable graph reconciliation. It follows the authenticated allocation, protection, guard, bookkeeping, diagnostic, and fallback behavior. January is 496 padded bytes with 52 relocations; canonical is 512 bytes with 51 because VC7 chooses a different first memory-free predicate call/inlining context and block schedule. It receives zero exact credit. No force-inline/noinline directive, local clone, volatile/register carrier, optimizer pragma, fake dependency, assembly, raw offset, or nonsensical branch is retained. See docs/object_matching_logs/bink_playback_obj_fable_graph_reconciliation_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 496,
+          "relocation_count": 52,
+          "normalized_sha256": "09c916253ce6d4de138897643092eb0801cd14d0e7abdf8ca88c3bb6369a33ac"
+        },
+        "base": {
+          "size": 512,
+          "relocation_count": 51,
+          "normalized_sha256": "e4612444abc905a9f2ba8587f89856d75389dac12ac7443a16fe2f8b1d8fb888"
+        },
+        "objdiff_percent": 55.544827
+      }
+    },
+    {
+      "unit": "source/bink/bink_playback",
+      "function": "_bink_free_texture_cache",
+      "class": "tu-context-optimization",
+      "evidence": "Coherent typed texture-cache release retained from the Fable graph reconciliation. January emits 96 padded bytes with 11 relocations while canonical emits 144 bytes with 12 because VC7 chooses a different predicate call/inlining context in the diagnostic path. The function receives zero exact credit. No inline control, duplicate helper, volatile/register forcing, pragma, assembly, fake dependency, raw offset, or nonsensical logic is retained. See docs/object_matching_logs/bink_playback_obj_fable_graph_reconciliation_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 96,
+          "relocation_count": 11,
+          "normalized_sha256": "9c2a9405a0477844e5a6fee2c1b0c1b0a1d625a530a6b227701aec798386d468"
+        },
+        "base": {
+          "size": 144,
+          "relocation_count": 12,
+          "normalized_sha256": "292d116be7d25fd9fcc59b6a20832ec5e6cd0719381567afdba7706936a33eb1"
+        },
+        "objdiff_percent": 19.545454
+      }
+    },
+    {
+      "unit": "source/bink/bink_playback",
+      "function": "_bink_playback_idle",
+      "class": "register-allocation",
+      "evidence": "Complete typed playback-idle logic retained from the Fable graph reconciliation. January is 160 padded bytes and canonical is 176; both carry the same 14 relocation dependencies, while VC7 spills the authentic allow_skipping boolean instead of retaining it in AL. The function receives zero exact credit. No volatile/register forcing, pragma, assembly, fake dependency, raw offset, undefined behavior, or nonsensical branch is retained. See docs/object_matching_logs/bink_playback_obj_fable_graph_reconciliation_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 160,
+          "relocation_count": 14,
+          "normalized_sha256": "8a3e23da9d6e73e456d5ac27d74066ff6d80583545aba88bf10f7a10b71c4de2"
+        },
+        "base": {
+          "size": 176,
+          "relocation_count": 14,
+          "normalized_sha256": "86021bbf771c32c0a9c2b925043631f2659a4fa1ca45afd6440264801e4f6d50"
+        },
+        "objdiff_percent": 85.96154
+      }
+    },
+    {
+      "unit": "source/bink/bink_playback",
+      "function": "_bink_query_analog_controller_buttons",
+      "class": "register-allocation",
+      "evidence": "Typed controller-query helper retained from the Fable graph reconciliation. January is 80 padded bytes and canonical is 96; both have one relocation to the input owner, with the remaining difference confined to boolean/index register allocation and scheduling. The function receives zero exact credit. No volatile/register forcing, pragma, assembly, fake dependency, raw offset, undefined behavior, or nonsensical branch is retained. See docs/object_matching_logs/bink_playback_obj_fable_graph_reconciliation_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 80,
+          "relocation_count": 1,
+          "normalized_sha256": "c88d131ba2ff1ac71831f79a7cc5c8d03b77bc67282bcde88660f7b2cbf47bc3"
+        },
+        "base": {
+          "size": 96,
+          "relocation_count": 1,
+          "normalized_sha256": "eec8d318ea74fd9a14e67eb76a9c44415ed448308d3fb875105cd31286fad6d0"
+        },
+        "objdiff_percent": 61.451614
+      }
+    },
+    {
+      "unit": "source/interface/ui_widget_game_data_input_functions",
+      "function": "_network_pregame_status_screen_update",
+      "class": "instruction-scheduling",
+      "evidence": "Best complete typed UI/network pregame reconstruction retained with zero exact credit. Target and candidate are both 1,984 padded bytes with 81 semantic relocations; the controller-frame table has its proper semantic owner and all relocation identities agree. A prior exact candidate depended on two impossible `machine &&` tests immediately after taking an array-element address. Those nonsensical checks are deliberately rejected under house rule 21, leaving an honest code-hash residual. See docs/object_matching_logs/ui_server_graph_reconciliation_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 1984,
+          "relocation_count": 81,
+          "normalized_sha256": "1a93e54737381c28f6977f4a053cc4f5753eb19083dcad0b38d295a0720730b2"
+        },
+        "base": {
+          "size": 1984,
+          "relocation_count": 81,
+          "normalized_sha256": "f139c00d124a264b1c87357b384023c3dd64dde724e1e3e7867ff64c1c0380ea"
+        },
+        "objdiff_percent": 96.35922
+      }
+    },
+    {
+      "unit": "source/sound/sound_manager",
+      "function": "_looping_sound_new",
+      "class": "instruction-scheduling",
+      "evidence": "Best complete ordinary-C looping-sound allocator reconstructed from January code/relocations and the HCEA cross-build semantic map. January is 304 padded bytes and canonical is 320, both with 14 relocations. It retains typed data/tag access, source-backed field names and real constants, and receives zero exact credit. No compiler steering, fake dependency, raw offset, undefined behavior, or nonsensical branch is retained. See docs/object_matching_logs/sound_manager_obj_small_looping_graph_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 304,
+          "relocation_count": 14,
+          "normalized_sha256": "c611da5fed821bf1db78b52fd3fbbe3fa7f3829024d30a558b3f3f3d124fa4cc"
+        },
+        "base": {
+          "size": 320,
+          "relocation_count": 14,
+          "normalized_sha256": "33527f3f412c4a571c518625ad2296ced844078e01b20cf8c57aa989f8492606"
+        },
+        "objdiff_percent": 79.056076
+      }
+    },
+    {
+      "unit": "source/sound/sound_manager",
+      "function": "_sound_refresh_looping",
+      "class": "tu-context-optimization",
+      "evidence": "Best complete ordinary-C refresh graph retained with zero exact credit. January is 1,136 padded bytes with 43 relocations; canonical is 1,088 with 42. Target-backed datum validation calls, the named sound_inaudible_fade_out_time constant, and the source-authentic `loop` assertion spelling are preserved. The remaining missing relocation is a compiler-merged duplicate fade-call tail; HCEA cache-release logic is intentionally absent because January has none of its dependencies. No compiler steering, fake dependency, raw offset, undefined behavior, or nonsensical branch is retained. See docs/object_matching_logs/sound_manager_obj_small_looping_graph_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 1136,
+          "relocation_count": 43,
+          "normalized_sha256": "22e6f76584244a8861a4c646d88eb7c301fa5cdc1fc8d98849e505c2d3a391db"
+        },
+        "base": {
+          "size": 1088,
+          "relocation_count": 42,
+          "normalized_sha256": "4820b25c27684fd9430551da92e07ac3c2f358bb66962348d445b5697defb11a"
+        },
+        "objdiff_percent": 36.576504
+      }
+    },
+    {
+      "unit": "source/bink/bink_playback",
+      "function": "_bink_draw_frame",
+      "class": "unclassified",
+      "evidence": "Complete typed best-known reconstruction retained with zero exact credit. It restores January's texture quad, debug timing text, periodic Bink summary collection, and skipped-frame/blit diagnostics using the Bink 1.0p ABI and corroborating HaloCEA semantics. Target and candidate share the 912-byte padded envelope; January has 59 relocations and canonical has 61, with the remaining difference concentrated in screen-bound load scheduling and an eight-byte stack-frame delta. The target-static owner is modeled as a static C definition. No raw-address replay, opcode transcription, compiler steering, fake dependency, undefined behavior, or nonsensical branch is retained. The unresolved `debug_bink` owner remains a plainly documented external declaration until its proper header is identified. See docs/object_matching_logs/bink_playback_obj_fable_graph_reconciliation_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 912,
+          "relocation_count": 59,
+          "normalized_sha256": "24aa7c5023629b6b863f6028dc0f1d55396a2083472edfd6e45e48866e726910"
+        },
+        "base": {
+          "size": 912,
+          "relocation_count": 61,
+          "normalized_sha256": "54104cacd763706fac4823bab62bd97ad1a20ecfb838239ad87e3c9ea3cb48d9"
+        },
+        "objdiff_percent": 79.409256
       }
     }
   ]
