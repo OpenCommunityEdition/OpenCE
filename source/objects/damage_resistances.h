@@ -24,13 +24,21 @@ struct damage_resistance_material
 	unsigned long flags;
 	short material_type;
 	word pad;
-	long unused[8];
+	real shield_leak_fraction;
+	real shield_damage_multiplier;
+	real shield_unused[3];
+	real body_damage_multiplier;
+	long body_unused[2];
 };
 
 typedef char damage_resistance_material_size_assert[
 	sizeof(struct damage_resistance_material) == 0x48 ? 1 : -1];
 typedef char damage_resistance_material_type_offset_assert[
 	offsetof(struct damage_resistance_material, material_type) == 0x24 ? 1 : -1];
+typedef char damage_resistance_material_shield_leak_fraction_offset_assert[
+	offsetof(struct damage_resistance_material, shield_leak_fraction) == 0x28 ? 1 : -1];
+typedef char damage_resistance_material_body_damage_multiplier_offset_assert[
+	offsetof(struct damage_resistance_material, body_damage_multiplier) == 0x3C ? 1 : -1];
 
 struct damage_resistance
 {

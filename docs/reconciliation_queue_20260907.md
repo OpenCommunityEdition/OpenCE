@@ -1,6 +1,6 @@
 # Reconciliation queue: completed/interrupted Claude lanes
 
-Updated 2026-09-07 after the user confirmed that both Opus 2 and the new
+Updated 2026-09-08 after the user confirmed that both Opus 2 and the new
 Fable 5 lane had concluded or exhausted their tokens. Their implementation
 reservations are released for reconciliation. Donor worktrees remain read-only:
 preserve committed, dirty and scratch work; do not restart either lane or send
@@ -75,13 +75,26 @@ bodies are retained without exact credit. Full tests: **1,120 passed, two
 skipped, 26 subtests**. Parks: 317 active, none stale/invalid. Admission audit:
 zero candidates, contradictions or revocations. See
 [the HS/Actor ledger](object_matching_logs/hs_actor_owner_reconciliation_20260907.md).
-Publication is checked after committing this batch.
+Published as `25c45ad20d49587d98640ca78c0c08014819bbf0`; both authorized
+remote branch tips were independently verified there.
+
+The next verified coherent packet combines CollisionBSP, Damage and the small
+GameState Xbox allocation owner: **+2,653 meaningful exact code bytes / +7
+credited functions**, reaching **940,880 meaningful exact code bytes / 6,328
+credited functions**. The rename-stable census is **6,374/8,245**: seven gains /
+2,704 padded bytes / zero regressions. Matching objects remain **390/833** and
+matched data remains **2,062,692 bytes**. Five complete CollisionBSP bodies and
+two complete Damage bodies are retained as explicit fuzzy parks with zero exact
+credit. The GameState packet also replaces the inherited `bss_004d27d0` global
+name with `xbox_game_state_globals`. Full tests: **1,120 passed, two skipped,
+26 subtests**. See [the CollisionBSP/Damage ledger](object_matching_logs/collision_bsp_damage_owner_reconciliation_20260907.md)
+and [the GameState ledger](object_matching_logs/game_state_xbox_obj_allocate_buffer_reconciliation_20260908.md).
 
 Per the latest [house rules and batch cadence](campaign_house_rules.md), the
-next forced canonical treemap refresh is at **940,828 meaningful exact bytes**
-(10,000 beyond the cadence's published 930,828 starting checkpoint). Batch
-larger coherent packets and isolate blockers; do not repeat bespoke runtime
-test development for every ordinary byte-exact leaf.
+940,828-byte canonical treemap threshold has now been crossed. After this
+refresh, the next forced cadence threshold is **950,828 meaningful exact bytes**.
+Batch larger coherent packets and isolate blockers; do not repeat bespoke
+runtime test development for every ordinary byte-exact leaf.
 
 No other part of the new-lane totals below is added to that checkpoint.
 They are donor-relative observations, not an audited union or promised future
@@ -98,14 +111,15 @@ canonical. A complete stable-owner set comparison finds 231 unique lane gains /
 new-gain sets. Forty of those owners / 9,552 bytes are already exact after the
 HS/Actor trial.
 
-The remaining donor-strict/current-nonstrict set is 191 owners / 55,320 bytes.
+After the seven newly admitted CollisionBSP, Damage and GameState owners, the
+remaining donor-strict/current-nonstrict set is **184 owners / 52,667 bytes**.
 That still includes 1,409 bytes already reconciled as safer fuzzy source and the
 615-byte rejected Alpha3 encoder. Removing those known dispositions leaves a
-**53,296-byte upper screening ceiling**, not a promise of recoverable exact
+**50,643-byte upper screening ceiling**, not a promise of recoverable exact
 credit. Further ABI, owner, source-quality and collateral-regression review will
 reduce or partition it.
 
-The broader 57,316-byte donor-exact/current-nonexact difference additionally
+The broader **54,663-byte** donor-exact/current-nonexact difference additionally
 contains exactly 1,996 bytes of known collateral debits: Bitmap mipmap (866),
 solo-level UI (693) and this batch's ActionGuard (437). These are not fresh lane
 work and must not be used to claim that reconciliation lost or ignored bytes.
@@ -115,8 +129,9 @@ Reproducible detailed evidence is in
 Complete source/owner intake is in
 `scratch/opus2-complete-tip-backlog-intake-20260907.md` and
 `scratch/fable_complete_tip_remaining_intake_20260907.md`. The largest queued
-families are UIWidget, UI game-data input, HS compile and saved-game storage;
-CollisionBSP plus Damage is the next smaller-family packet under review. All
+families are UIWidget, UI game-data input, HS compile and saved-game storage.
+The next packet must again be selected from the current-canonical owner set
+difference, not from either lane headline. All
 figures are screening bounds until rebuilt and admitted in current canonical.
 
 ## Opus 2: UI, scripting and profiles

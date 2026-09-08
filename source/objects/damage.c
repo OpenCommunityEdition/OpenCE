@@ -25,7 +25,7 @@ symbols in this file:
 00126030 0060:
 	_object_double_charge_shield (0000)
 00126090 0050:
-	_code_00126090 (0000)
+	_object_destroy_notify_children (0000)
 001260E0 0050:
 	_get_player_index_from_object_or_parents (0000)
 00126130 0050:
@@ -51,7 +51,7 @@ symbols in this file:
 00126790 0230:
 	_object_damage_aftermath (0000)
 001269C0 0200:
-	_code_001269c0 (0000)
+	_damage_effect_new_at_location (0000)
 00126BC0 01d0:
 	_render_debug_object_damage (0000)
 00126D90 00e0:
@@ -59,7 +59,7 @@ symbols in this file:
 00126E70 0070:
 	_object_destroy (0000)
 00126EE0 0140:
-	_code_00126ee0 (0000)
+	_object_destroy_region (0000)
 00127020 0550:
 	_object_damage_body (0000)
 00127570 07c0:
@@ -135,7 +135,50 @@ symbols in this file:
 
 enum
 {
-	_object_region_missing_when_shield_is_zero_bit = 4,
+	_object_region_lives_until_object_dies_bit = 0,
+	_object_region_forces_object_to_die_bit,
+	_object_region_dies_when_object_dies_bit,
+	_object_region_dies_when_object_is_damaged_bit,
+	_object_region_missing_when_shield_is_zero_bit,
+	_object_region_inhibits_melee_attack_bit,
+	_object_region_inhibits_ranged_attack_bit,
+	_object_region_inhibits_walking_bit,
+	_object_region_forces_drop_weapon_bit,
+	_object_region_head_destroyed_scream_bit,
+	NUMBER_OF_DAMAGE_REGION_FLAGS,
+};
+
+enum
+{
+	_damage_material_head_bit = 0,
+};
+
+enum
+{
+	_damage_category_none = 0,
+	_damage_category_falling,
+	_damage_category_bullet,
+	_damage_category_grenade,
+	_damage_category_highexplosive,
+	_damage_category_sniper,
+	_damage_category_melee,
+	_damage_category_flame,
+	_damage_category_mountedweapon,
+	_damage_category_vehicle,
+	_damage_category_plasma,
+	_damage_category_needle,
+	_damage_category_shotgun,
+	NUMBER_OF_DAMAGE_CATEGORIES,
+};
+
+enum
+{
+	_effect_vector_normal = 0,
+	_effect_vector_incident,
+	_effect_vector_negative_incident,
+	_effect_vector_reflected,
+	_effect_vector_gravity,
+	NUMBER_OF_EFFECT_MARKERS,
 };
 
 enum
@@ -254,6 +297,24 @@ typedef char object_deplete_body_effect_offset_assert[
 	offsetof(struct collision_model, resistance) + offsetof(struct damage_resistance, body_depleted_effect) + offsetof(struct tag_reference, index) == 0xB4 ? 1 : -1];
 typedef char object_destroy_effect_offset_assert[
 	offsetof(struct collision_model, resistance) + offsetof(struct damage_resistance, body_destroyed_effect) + offsetof(struct tag_reference, index) == 0xC8 ? 1 : -1];
+typedef char object_destroy_region_regions_destroyed_flags_offset_assert[
+	offsetof(struct object_datum, object) + offsetof(struct _object_datum, regions_destroyed_flags) == 0x124 ? 1 : -1];
+typedef char object_destroy_region_regions_block_offset_assert[
+	offsetof(struct collision_model, resistance) + offsetof(struct damage_resistance, regions) == 0x240 ? 1 : -1];
+typedef char object_destroy_region_flags_offset_assert[
+	offsetof(struct damage_region, flags) == 0x20 ? 1 : -1];
+typedef char object_destroy_region_destroyed_effect_offset_assert[
+	offsetof(struct damage_region, destroyed_effect) + offsetof(struct tag_reference, index) == 0x44 ? 1 : -1];
+typedef char object_damage_body_region_damage_offset_assert[
+	offsetof(struct object_datum, object) + offsetof(struct _object_datum, region_damage) == 0x128 ? 1 : -1];
+typedef char object_damage_body_damage_threshold_offset_assert[
+	offsetof(struct damage_region, damage_threshold) == 0x28 ? 1 : -1];
+typedef char object_damage_body_driver_offset_assert[
+	offsetof(struct unit_datum, unit) + offsetof(struct _unit_datum, driver_object_index) == 0x2D4 ? 1 : -1];
+typedef char object_damage_body_localized_effect_offset_assert[
+	offsetof(struct damage_resistance, localized_damage_effect) + offsetof(struct tag_reference, index) == 0x7C ? 1 : -1];
+typedef char object_damage_body_body_destroyed_threshold_offset_assert[
+	offsetof(struct damage_resistance, body_destroyed_threshold) == 0xB8 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -311,6 +372,18 @@ void area_of_effect_cause_damage_to_object(
 static void damage_effect_new_on_object(
 	long effect_definition_index,
 	long object_index);
+
+static void damage_effect_new_at_location(
+	long effect_definition_index,
+	long object_index,
+	short node_index,
+	real_point3d const *position,
+	real_vector3d const *direction,
+	real_vector3d const *normal);
+
+static void object_destroy_region(
+	long object_index,
+	short region_index);
 
 /* ---------- globals */
 
@@ -536,7 +609,7 @@ void object_deplete_body(
 	return;
 }
 
-void code_00126090(
+void object_destroy_notify_children(
 	long object_index)
 {
 	struct object_datum *object = object_get(object_index);
@@ -547,7 +620,7 @@ void code_00126090(
 		long next_object_index = object_get(child_object_index)->object.next_object_index;
 
 		if (!object_type_handle_parent_destroyed(child_object_index))
-			code_00126090(child_object_index);
+			object_destroy_notify_children(child_object_index);
 
 		child_object_index = next_object_index;
 	}
@@ -578,7 +651,7 @@ void object_destroy(
 			object_index);
 	}
 
-	code_00126090(object_index);
+	object_destroy_notify_children(object_index);
 	object_delete(object_index);
 
 	return;
@@ -744,6 +817,224 @@ void object_set_melee_attack_inhibited(
 		struct object_datum *object = object_get(object_index);
 		SET_FLAG(object->object.damage_flags, _object_melee_attack_inhibited_bit, inhibited);
 	}
+
+	return;
+}
+
+void object_damage_body(
+	long object_index,
+	short region_index,
+	short node_index,
+	real_vector3d const *object_normal,
+	struct damage_resistance const *damage_resistance,
+	struct damage_resistance_material const *damage_material,
+	struct damage_definition const *damage_definition,
+	struct damage_data *damage,
+	unsigned long *being_damaged_flags,
+	real *body_damage,
+	real *body_damage_multiplier,
+	real total_damage)
+{
+	struct object_datum *object = object_get(object_index);
+	real damage_amount = damage_material->body_damage_multiplier*total_damage;
+	boolean ignore_difficulty = FALSE;
+	real maximum_body_vitality;
+	real inverse_maximum_body_vitality;
+	real actual_damage;
+
+	if (TEST_FLAG(damage_resistance->flags, _damage_resistance_only_hurt_while_occupied_bit) &&
+		object->object.type == _object_type_vehicle &&
+		unit_get(object_index)->unit.driver_object_index == NONE)
+	{
+		damage_amount = 0.f;
+	}
+
+	if (!game_engine_running() &&
+		damage_definition->category == _damage_category_falling &&
+		object->object.owner_team_index == _game_team_player)
+	{
+		ignore_difficulty = TRUE;
+	}
+
+	maximum_body_vitality = object_get_maximum_body_vitality(object_index, ignore_difficulty);
+	if (maximum_body_vitality > 0.f)
+		inverse_maximum_body_vitality = 1.f/maximum_body_vitality;
+	else
+		inverse_maximum_body_vitality = 0.f;
+
+	actual_damage = damage_amount;
+	if (TEST_FLAG(*being_damaged_flags, _object_being_damaged_by_friendly_bit))
+	{
+		actual_damage = (1.f - damage_resistance->friendly_damage_resistance)*damage_amount;
+		if (TEST_FLAG(*being_damaged_flags, _object_being_damaged_multiplied_by_difficulty_bit))
+		{
+			real difficulty = game_difficulty_get_value(_game_difficulty_value_enemy_damage);
+
+			if (difficulty > 0.f)
+				actual_damage /= difficulty;
+		}
+	}
+	actual_damage *= inverse_maximum_body_vitality;
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\objects\\damage.c",
+		1295,
+		damage_material->material_type>=0 && damage_material->material_type<NUMBER_OF_MATERIAL_TYPES,
+		"damage_material->type>=0 && damage_material->type<NUMBER_OF_MATERIAL_TYPES");
+	actual_damage *= damage_definition->material_modifiers[damage_material->material_type];
+
+	if (!TEST_FLAG(object->object.damage_flags, _object_cannot_take_damage_bit))
+	{
+		if (damage_amount > 0.f && TEST_FLAG(damage_material->flags, _damage_material_head_bit))
+		{
+			if (TEST_FLAG(damage_definition->flags, _damage_can_cause_headshots_bit))
+			{
+				if (game_engine_running() ||
+					object->object.type != _object_type_biped ||
+					unit_get(object_index)->unit.player_index == NONE)
+				{
+					object->object.body_vitality = 0.f;
+					SET_FLAG(*being_damaged_flags, _object_being_damaged_killed_instantly_bit, TRUE);
+					if (game_engine_running())
+						SET_FLAG(*being_damaged_flags, _object_being_damaged_force_hard_ping_bit, TRUE);
+				}
+			}
+			else if (TEST_FLAG(damage_definition->flags, _damage_can_cause_multiplayer_headshots_bit) &&
+				game_engine_running())
+			{
+				actual_damage *= 2.f;
+				if (actual_damage > object->object.body_vitality)
+					SET_FLAG(*being_damaged_flags, _object_being_damaged_force_hard_ping_bit, TRUE);
+			}
+		}
+
+		object->object.body_vitality -= actual_damage;
+	}
+
+	if (region_index != NONE &&
+		!TEST_FLAG(object->object.regions_destroyed_flags, region_index))
+	{
+		struct damage_region const *region = TAG_BLOCK_GET_ELEMENT(
+			&damage_resistance->regions,
+			region_index,
+			struct damage_region);
+		byte region_damage = (byte)(actual_damage*255.f + object->object.region_damage[region_index]);
+
+		object->object.region_damage[region_index] = region_damage;
+		if (region->damage_threshold > 0.f &&
+			region_damage*(1.f/255.f) > region->damage_threshold)
+		{
+			object_destroy_region(object_index, region_index);
+			SET_FLAG(*being_damaged_flags, _object_being_damaged_region_destroyed_bit, TRUE);
+		}
+	}
+
+	object->object.body_damage_decay_timer = 0;
+	object->object.current_body_damage += actual_damage;
+	object->object.recent_body_damage += actual_damage;
+	if (object->object.current_body_damage > 1.f)
+		object->object.current_body_damage = 1.f;
+	if (object->object.recent_body_damage > 1.f)
+		object->object.recent_body_damage = 1.f;
+
+	if (cheat.deathless_player && object->object.body_vitality < 0.f)
+	{
+		if (TEST_FLAG(_object_mask_unit, object->object.type))
+		{
+			boolean player_controlled = unit_get(object_index)->unit.player_index != NONE;
+
+			if (!player_controlled && object->object.type == _object_type_vehicle)
+			{
+				long child_object_index = object->object.first_child_object_index;
+
+				while (child_object_index != NONE)
+				{
+					struct object_datum *child = object_get(child_object_index);
+
+					if (TEST_FLAG(_object_mask_unit, child->object.type) &&
+						unit_get(child_object_index)->unit.player_index != NONE)
+					{
+						player_controlled = TRUE;
+						break;
+					}
+
+					child_object_index = child->object.next_object_index;
+				}
+			}
+
+			if (player_controlled)
+				object->object.body_vitality = 0.f;
+		}
+	}
+
+	{
+		real body_vitality = object_get_actual_body_vitality(object_index, FALSE);
+
+		if (damage_resistance->body_destroyed_threshold < 0.f &&
+			body_vitality < damage_resistance->body_destroyed_threshold)
+		{
+			object_destroy(object_index);
+			*being_damaged_flags |=
+				FLAG(_object_being_damaged_body_depleted_bit) |
+				FLAG(_object_being_damaged_body_destroyed_bit);
+		}
+		else if (body_vitality < 0.f)
+		{
+			if (!TEST_FLAG(object->object.damage_flags, _object_dead_bit))
+			{
+				short dying_region_index;
+
+				for (dying_region_index = 0;
+					dying_region_index < damage_resistance->regions.count;
+					dying_region_index++)
+				{
+					struct damage_region const *region = TAG_BLOCK_GET_ELEMENT(
+						&damage_resistance->regions,
+						dying_region_index,
+						struct damage_region);
+
+					if (TEST_FLAG(region->flags, _object_region_dies_when_object_dies_bit))
+						object_destroy_region(object_index, dying_region_index);
+				}
+
+				object_deplete_body(object_index);
+				SET_FLAG(*being_damaged_flags, _object_being_damaged_body_depleted_bit, TRUE);
+			}
+		}
+		else if (body_vitality < damage_resistance->body_damaged_effect_threshold &&
+			!TEST_FLAG(object->object.damage_flags, _object_passed_body_damage_threshold_bit))
+		{
+			damage_effect_new_on_object(
+				damage_resistance->body_damaged_effect.index,
+				object_index);
+			SET_FLAG(object->object.damage_flags, _object_passed_body_damage_threshold_bit, TRUE);
+		}
+	}
+
+	if (TEST_FLAG(damage->flags, _damage_create_localized_effect_bit) &&
+		damage_resistance->localized_damage_effect.index != NONE)
+	{
+		damage_effect_new_at_location(
+			damage_resistance->localized_damage_effect.index,
+			object_index,
+			node_index,
+			&damage->epicenter,
+			&damage->direction,
+			object_normal);
+	}
+
+	if (TEST_FLAG(damage->flags, _damage_area_of_effect_bit) &&
+		damage_amount > damage_resistance->area_damage_effect_threshold &&
+		damage_resistance->area_damage_effect.index != NONE &&
+		damage_definition->category != _damage_category_flame)
+	{
+		damage_effect_new_on_object(
+			damage_resistance->area_damage_effect.index,
+			object_index);
+	}
+
+	*body_damage = damage_amount;
+	*body_damage_multiplier = damage_material->body_damage_multiplier;
 
 	return;
 }
@@ -1475,6 +1766,147 @@ static void damage_effect_new_on_object(
 		0.f,
 		NULL,
 		NULL);
+	return;
+}
+
+static void damage_effect_new_at_location(
+	long effect_definition_index,
+	long object_index,
+	short node_index,
+	real_point3d const *position,
+	real_vector3d const *direction,
+	real_vector3d const *normal)
+{
+	char const *marker_names[NUMBER_OF_EFFECT_MARKERS];
+	real_point3d marker_points[NUMBER_OF_EFFECT_MARKERS];
+	real_vector3d marker_forwards[NUMBER_OF_EFFECT_MARKERS];
+	real_vector3d incident;
+	short marker_index;
+
+	marker_names[_effect_vector_normal] = "normal";
+	marker_names[_effect_vector_incident] = "incident";
+	marker_names[_effect_vector_negative_incident] = "negative incident";
+	marker_names[_effect_vector_reflected] = "reflection";
+	marker_names[_effect_vector_gravity] = "gravity";
+
+	marker_forwards[_effect_vector_gravity] = *global_down3d;
+
+	incident = *direction;
+	if (normalize3d(&incident) == 0.f)
+		incident = *global_forward3d;
+	scale_vector3d(&incident, -1.f, &marker_forwards[_effect_vector_incident]);
+	marker_forwards[_effect_vector_negative_incident] = incident;
+
+	if (!normal)
+	{
+		real_point3d origin;
+		real_vector3d position_normal;
+
+		object_get_origin(object_index, &origin);
+		vector_from_points3d(&origin, position, &position_normal);
+		if (normalize3d(&position_normal) == 0.f)
+			position_normal = object_get(object_index)->object.forward;
+
+		marker_forwards[_effect_vector_normal] = position_normal;
+		reflect_vector3d(
+			&incident,
+			&position_normal,
+			&marker_forwards[_effect_vector_reflected]);
+	}
+	else
+	{
+		marker_forwards[_effect_vector_normal] = *normal;
+		reflect_vector3d(
+			&incident,
+			normal,
+			&marker_forwards[_effect_vector_reflected]);
+	}
+
+	for (marker_index = 0; marker_index < NUMBER_OF_EFFECT_MARKERS; marker_index++)
+		marker_points[marker_index] = *position;
+
+	if (object_index != NONE && node_index != NONE)
+	{
+		effect_new_attached_from_markers(
+			effect_definition_index,
+			object_index,
+			object_index,
+			node_index,
+			NUMBER_OF_EFFECT_MARKERS,
+			marker_names,
+			marker_points,
+			marker_forwards,
+			1.f,
+			0.f,
+			NULL,
+			NULL);
+	}
+	else
+	{
+		effect_new_unattached_from_markers(
+			effect_definition_index,
+			object_index,
+			global_zero_vector3d,
+			NUMBER_OF_EFFECT_MARKERS,
+			marker_names,
+			marker_points,
+			marker_forwards,
+			1.f,
+			0.f,
+			NULL,
+			NULL,
+			FALSE);
+	}
+
+	return;
+}
+
+static void object_destroy_region(
+	long object_index,
+	short region_index)
+{
+	struct object_datum *object = object_get(object_index);
+	struct object_definition *definition = object_definition_get(object->definition_index);
+	long collision_model_index = definition->object.collision_model.index;
+
+	if (collision_model_index != NONE)
+	{
+		struct collision_model *collision_model =
+			collision_model_definition_get(collision_model_index);
+
+		match_assert(
+			"c:\\halo\\SOURCE\\objects\\damage.c",
+			1818,
+			region_index>=0 && region_index<MAXIMUM_REGIONS_PER_OBJECT);
+
+		if (!TEST_FLAG(object->object.regions_destroyed_flags, region_index))
+		{
+			struct damage_region *region = TAG_BLOCK_GET_ELEMENT(
+				&collision_model->resistance.regions,
+				region_index,
+				struct damage_region);
+
+			damage_effect_new_on_object(
+				region->destroyed_effect.index,
+				object_index);
+			object_permute_region(object_index, "~damaged", region_index, TRUE);
+
+			if (TEST_FLAG(region->flags, _object_region_inhibits_melee_attack_bit))
+				SET_FLAG(object->object.damage_flags, _object_melee_attack_inhibited_bit, TRUE);
+			if (TEST_FLAG(region->flags, _object_region_inhibits_ranged_attack_bit))
+				SET_FLAG(object->object.damage_flags, _object_ranged_attack_inhibited_bit, TRUE);
+			if (TEST_FLAG(region->flags, _object_region_inhibits_walking_bit))
+				SET_FLAG(object->object.damage_flags, _object_walking_inhibited_bit, TRUE);
+			if (TEST_FLAG(region->flags, _object_region_forces_drop_weapon_bit))
+				SET_FLAG(object->object.damage_flags, _object_cannot_hold_weapon_bit, TRUE);
+			if (TEST_FLAG(region->flags, _object_region_forces_object_to_die_bit))
+				object_deplete_body(object_index);
+
+			SET_FLAG(object->object.regions_destroyed_flags, region_index, TRUE);
+			object_type_handle_region_destroyed(object_index, region_index, region->flags);
+		}
+	}
+
 	return;
 }
 

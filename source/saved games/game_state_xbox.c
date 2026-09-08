@@ -89,20 +89,28 @@ symbols in this file:
 002A8400 002d:
 	??_C@_0CN@DOEIAHAD@failed?5to?5read?5from?5persistent?5s@ (0000)
 004D27D0 0014:
-	_bss_004d27d0 (0000)
+	_xbox_game_state_globals (0000)
 */
 
 /* ---------- headers */
 
+#include "cache/physical_memory_map.h"
 #include "cseries/cseries.h"
 #include "saved games/game_state.h"
 
 /* ---------- constants */
 
+enum
+{
+	CPU_PAGE_SIZE = 0x1000
+};
+
 /* ---------- macros */
 
-#define xbox_game_state_globals bss_004d27d0
 #define INVALID_HANDLE_VALUE ((HANDLE)-1)
+
+#define PAGE_READWRITE 0x04
+#define PAGE_WRITECOMBINE 0x400
 
 /* ---------- structures */
 
@@ -133,6 +141,10 @@ typedef char verify_xbox_game_state_globals_prefix_size[
 
 void __stdcall XPhysicalFree(
 	void *address);
+int __stdcall XPhysicalProtect(
+	void *address,
+	unsigned long size,
+	unsigned long protect);
 int __stdcall CloseHandle(
 	HANDLE handle);
 int __stdcall DeleteFileA(
@@ -147,9 +159,63 @@ HANDLE code_001b0270(
 
 /* ---------- globals */
 
-extern struct xbox_game_state_globals_prefix bss_004d27d0;
+extern struct xbox_game_state_globals_prefix xbox_game_state_globals;
 
 /* ---------- public code */
+
+void *game_state_allocate_buffer(
+	unsigned long address,
+	unsigned long cpu_size,
+	unsigned long gpu_size)
+{
+	void *result;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\game_state_xbox.c",
+		46,
+		!xbox_game_state_globals.buffer_allocated);
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\game_state_xbox.c",
+		48,
+		address);
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\game_state_xbox.c",
+		49,
+		cpu_size>0);
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\game_state_xbox.c",
+		50,
+		gpu_size>0);
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\game_state_xbox.c",
+		53,
+		!(cpu_size&(CPU_PAGE_SIZE-1)));
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\game_state_xbox.c",
+		54,
+		!(gpu_size&(CPU_PAGE_SIZE-1)));
+
+	result = physical_memory_get_game_state_base_address();
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\game_state_xbox.c",
+		58,
+		result);
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\game_state_xbox.c",
+		59,
+		(unsigned long)result==address);
+
+	XPhysicalProtect(
+		(void *)(address+cpu_size),
+		gpu_size,
+		PAGE_READWRITE|PAGE_WRITECOMBINE);
+
+	xbox_game_state_globals.buffer_allocated = TRUE;
+	xbox_game_state_globals.buffer = (void *)address;
+	xbox_game_state_globals.buffer_size = cpu_size+gpu_size;
+
+	return result;
+}
 
 void game_state_free_buffer(
 	void)

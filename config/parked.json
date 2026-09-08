@@ -5265,7 +5265,7 @@
       "unit": "source/objects/damage",
       "function": "_object_cause_damage",
       "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete master object-damage dispatcher in ordinary typed C and naturally activating its private player-owner helper as a strict exact same-TU function. January COFF remains the sole byte, ABI, control-flow, constant, and relocation authority; independent HCEA source and Stian's PC lift corroborate the parent walk, damage randomization and modifiers, vehicle-child recursion, player feedback, collision material selection, shield/body dispatch, material-effect reporting, aftermath, and deletion behavior. The target occupies 1984 padded / 1971 meaningful bytes with 654 instructions; the candidate occupies 1952 padded / 1950 meaningful bytes with 640 instructions and objdiff reports 88.5429 percent similarity. Both carry the same 75 ordered relocation identities, including the internal recursive call and all three damage-stage calls, and the inverted-branch scan reports zero polarity conflicts. The fail-closed classifier returns UNKNOWN, so the entry remains unclassified. A material remaining context difference is that object_damage_shield, object_damage_body, and object_damage_aftermath are still unwritten: January's same-TU compiler context uses private register call boundaries for shield and aftermath, while the current source must compile those calls against declarations alone. Reopen when those authentic callee bodies are reconstructed together, or when authoritative January source/local records explain the remaining register allocation, stack frame, and x87 schedule. No raw offset, false type, representation pun, volatile/register forcing, barrier, pragma, assembly, fake dependency, forced inline/noinline, undefined behavior, or nonsensical branch is retained.",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete master object-damage dispatcher in ordinary typed C and naturally activating its private player-owner helper as a strict exact same-TU function. January COFF remains the sole byte, ABI, control-flow, constant, and relocation authority; independent HCEA source and Stian's PC lift corroborate the parent walk, damage randomization and modifiers, vehicle-child recursion, player feedback, collision material selection, shield/body dispatch, material-effect reporting, aftermath, and deletion behavior. This refreshed context writes object_damage_body as a credible typed fuzzy body and adds the independently authenticated same-TU private helpers damage_effect_new_at_location and object_destroy_region as strict exact functions. Those legitimate additions change this candidate's normalized hash but not its envelope or similarity: the target occupies 1984 padded / 1971 meaningful bytes; the candidate occupies 1952 padded / 1950 meaningful bytes; both carry the same 75 ordered relocation identities; objdiff remains 88.5429 percent. object_damage_shield and object_damage_aftermath remain unwritten and preserve a material private-call-boundary context gap. Reopen when those authentic callee bodies are reconstructed together, or when authoritative January source/local records explain the remaining register allocation, stack frame, and x87 schedule. No raw offset, false type, representation pun, volatile/register forcing, barrier, pragma, assembly, fake dependency, forced inline/noinline, undefined behavior, nonsensical branch, or fake context is retained.",
       "measurements": {
         "target": {
           "size": 1984,
@@ -5275,9 +5275,28 @@
         "base": {
           "size": 1952,
           "relocation_count": 75,
-          "normalized_sha256": "d23ca8fda3de1d48517c5cb5ae53f9858e2d6c4a7b9da91e90fb509fa0525ef5"
+          "normalized_sha256": "cfd8204015222ec9bd4dc25d3d1d245a4bcb17b29f273c39fb79dca037f9aa3b"
         },
         "objdiff_percent": 88.5429
+      }
+    },
+    {
+      "unit": "source/objects/damage",
+      "function": "_object_damage_body",
+      "class": "unclassified",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete body-damage stage in ordinary typed C. January COFF is the byte and ABI authority; independent HCEA source and Stian's PC lift corroborate occupied-only damage, falling-damage difficulty handling, friendly resistance, headshots, regional damage and destruction, deathless-player child traversal, body thresholds, localized and area effects, and output multipliers. The named material fields preserve the authenticated 0x48 layout and exact +0x28/+0x2C/+0x3C offsets; region flags and damage categories use genuine enum constants, and typed tag/object access macros own all subsystem retrieval. The target occupies 1360 padded / 1347 meaningful bytes with 43 relocations; the retained house-rule candidate occupies 1392 padded / 1389 meaningful bytes with 44 relocations and objdiff reports 88.00236 percent similarity. The extra lookup/relocation is the honest typed unit_get boundary after a generic child object type check. Fable's 1360-byte 98.31-percent probe used a repeated raw object_get downcast to unit_datum; it is explicitly rejected under the typed-access house rule and receives no exact credit. The separately reconstructed private helpers damage_effect_new_at_location and object_destroy_region are strict exact under their exact-tier symbol aliases. No fake matching, raw offset, false prototype, volatile/register forcing, barrier, optimizer pragma, assembly, undefined behavior, nonsensical branch, or fake context is retained. Reopen for authoritative January source/local records or a natural owner-safe accessor arrangement that improves code generation without violating typed access.",
+      "measurements": {
+        "target": {
+          "size": 1360,
+          "relocation_count": 43,
+          "normalized_sha256": "15116626eee783a53894c24ec0e9cb3cf2ad2a5734d7c3de99a15e2df4aa460e"
+        },
+        "base": {
+          "size": 1392,
+          "relocation_count": 44,
+          "normalized_sha256": "9e29dfe9abf1237a6bea6282926123f9fa15d7140977f2cfa1dedd6c68960412"
+        },
+        "objdiff_percent": 88.00236
       }
     },
     {
@@ -5335,6 +5354,101 @@
           "normalized_sha256": "f0b2e6723519920dcc3ca4060725b75b2b3fc3cd032e52595af3a6a9669ea008"
         },
         "objdiff_percent": 99.08602
+      }
+    },
+    {
+      "unit": "source/physics/collision_bsp",
+      "function": "_collision_bsp_test_pill_new_recursive",
+      "class": "unclassified",
+      "evidence": "Complete typed reconstruction of the private January pill traversal, using semantic contents/leaf/plane state, genuine tag-block access and natural recursive interval clipping. Independent HCEA source corroborates the algorithm and owner name; January COFF remains the byte authority. Target and candidate are both 672 padded bytes with the same eight ordered relocation identities; objdiff is 99.210526 percent. All inherited exact owners remain exact and no point_from_line3d or packet-induced math helper owner is emitted. The remaining gap is ordinary instruction and branch scheduling, so this body is retained as the best credible fuzzy source with zero exact credit. Reopen only for authoritative January source or compiler-context evidence, not register forcing, fake dependencies, representation puns or nonsensical branches.",
+      "measurements": {
+        "target": {
+          "size": 672,
+          "relocation_count": 8,
+          "normalized_sha256": "e827739a9d842166268f6d779ec92b8b2b7ee82c95e89feb447627388b812a5a"
+        },
+        "base": {
+          "size": 672,
+          "relocation_count": 8,
+          "normalized_sha256": "da558e0b2136b9b0c2412fe2ca08d8dcbed690d132eed7f80e0060e2c0c0387d"
+        },
+        "objdiff_percent": 99.210526
+      }
+    },
+    {
+      "unit": "source/physics/collision_bsp",
+      "function": "_collision_leaf_test_vector",
+      "class": "unclassified",
+      "evidence": "Complete typed reconstruction of the private leaf/vector surface resolver, with genuine collision-test flags, semantic projection axes, tag-block access and the recovered private point-in-surface owner. Independent HCEA source corroborates the traversal while January COFF remains authoritative. Target and candidate are both 400 padded bytes with the same seven ordered relocation identities; objdiff is 89.64331 percent. The retained body introduces no target-absent helper owner and receives zero exact credit. Reopen only for authoritative January source or compiler-context evidence, not raw offsets, false types, register forcing or fake matching.",
+      "measurements": {
+        "target": {
+          "size": 400,
+          "relocation_count": 7,
+          "normalized_sha256": "8a3bcaad9d40e34c86ea82609da382977b0266d4005603d2b1954da218a8cbb5"
+        },
+        "base": {
+          "size": 400,
+          "relocation_count": 7,
+          "normalized_sha256": "6c9fd41d0c88df316f808b3df4e4c7a47edbf242ee51a9871a5b0b4e9cee7520"
+        },
+        "objdiff_percent": 89.64331
+      }
+    },
+    {
+      "unit": "source/physics/collision_bsp",
+      "function": "_collision_bsp_test_vector_recursive",
+      "class": "unclassified",
+      "evidence": "Complete typed reconstruction of the private recursive vector traversal, including semantic empty/semi-empty/solid transitions, correct front/back/two-sided flag handling, leaf reporting and genuine private surface resolution. Independent HCEA source corroborates the behavior; January COFF remains authoritative. The target is 800 padded bytes and the natural candidate is 784, both with the same thirteen relocation identities; objdiff is 98.178215 percent. No target-absent helper or point_from_line3d owner is emitted, and all inherited exact owners survive. Retained as credible fuzzy source with zero exact credit; reopen only for authentic source/type/compiler context.",
+      "measurements": {
+        "target": {
+          "size": 800,
+          "relocation_count": 13,
+          "normalized_sha256": "843ff490914a065f0b80a94d52b63c7176ff57515a249d83655c4c69909058fc"
+        },
+        "base": {
+          "size": 784,
+          "relocation_count": 13,
+          "normalized_sha256": "7626157916622d26ad5e7a4cbf12854a3e8b3b0a17b7f54ca87bc01ea9dc8ed2"
+        },
+        "objdiff_percent": 98.178215
+      }
+    },
+    {
+      "unit": "source/physics/collision_bsp",
+      "function": "_bsp2d_test_pill_recursive",
+      "class": "instruction-scheduling",
+      "evidence": "Complete natural private 2D BSP pill traversal using project real types, named epsilon, genuine tag-block access and the recovered surface test. Target and candidate are both 272 padded bytes with the same six ordered relocation identities; objdiff is 98.95652 percent. The remaining gap is a small ordinary expression/control schedule, and no compiler steering or extra code owner is retained. This best credible fuzzy body receives zero exact credit; reopen for authoritative January source or natural compiler-context evidence.",
+      "measurements": {
+        "target": {
+          "size": 272,
+          "relocation_count": 6,
+          "normalized_sha256": "40f743a1aebcedeaaf128f692bf200d33fb5694033dc89fe37eff3b6b8ba9a9d"
+        },
+        "base": {
+          "size": 272,
+          "relocation_count": 6,
+          "normalized_sha256": "fbfc56173dffadd2460310f6003a0789e42d875f741ba619c2bef7abda02a782"
+        },
+        "objdiff_percent": 98.95652
+      }
+    },
+    {
+      "unit": "source/physics/collision_bsp",
+      "function": "_bsp3d_test_pill_recursive",
+      "class": "unclassified",
+      "evidence": "Complete typed private 3D BSP pill traversal reconstructed from January disassembly with independent HCEA corroboration. It preserves the authenticated traversal stack, real_math assertion, semantic projection state, leaf/reference walks, surface/edge tests and global projection mapping while expanding natural math at call sites so no target-absent helper or point_from_line3d owner is emitted. The target is 1504 padded bytes with 31 relocations; the natural candidate is 1472 with 28 relocations and objdiff is 85.46875 percent. The structural schedule remains fuzzy and receives zero exact credit. Reopen only for authoritative January source or genuine compiler-context evidence, never fake dependencies, forced inlining, raw offsets or nonsensical logic.",
+      "measurements": {
+        "target": {
+          "size": 1504,
+          "relocation_count": 31,
+          "normalized_sha256": "057a2c8bfb82a96726d0e834b8c8724e71bfa42180cb31b7dab6f725f154667c"
+        },
+        "base": {
+          "size": 1472,
+          "relocation_count": 28,
+          "normalized_sha256": "2811fc4e3aebae94947e5d3cfa8072e55478d17813b5c14b034951e711fed4eb"
+        },
+        "objdiff_percent": 85.46875
       }
     },
     {
