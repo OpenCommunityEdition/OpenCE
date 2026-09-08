@@ -3630,7 +3630,7 @@
 { "file_offset": 857904, "flags": 32, "name": "_gen_mask_coord" },
 { "file_offset": 857968, "flags": 32, "name": "_draw_gravy_layer", "static": true },
 { "file_offset": 858320, "flags": 32, "name": "_draw_gravy_screen_layer" },
-{ "file_offset": 858416, "flags": 32, "name": "_code_000d1930" },
+{ "file_offset": 858416, "flags": 32, "name": "_draw_gravy_base_layer", "static": true },
 { "file_offset": 858512, "flags": 32, "name": "_progress_bar_alias_surface_texture", "static": true },
 { "file_offset": 858560, "flags": 32, "name": "_set_blur_texture_coordinates" },
 { "file_offset": 858720, "flags": 32, "name": "_draw_fullscreen_blur" },

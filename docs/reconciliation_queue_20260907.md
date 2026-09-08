@@ -23,14 +23,23 @@ Full tests: 1,019 passed, two skipped, 26 subtests passed. Independent focused
 runtime review: ten passed. See
 [the Lights ledger](object_matching_logs/rasterizer_lights_obj_frame_start_reconciliation_20260906.md).
 
-The next verified packet is the new Fable continuation's solid RenderDebug box:
+Published `34db75424bb629c061b5d8b714294aa9d41d5d22` is the new Fable continuation's solid RenderDebug box:
 **+378 meaningful exact bytes**, reaching **930,741 code bytes / 6,284 credited
 functions**. Stable census: **6,330/8,245**, one gain and zero losses; object/data
 totals are unchanged. Full tests: **1,038 passed, two skipped, 26 subtests**;
 root actual-x86 replay: 138 executions and two rejected byte mutations.
 See [the Box ledger](object_matching_logs/render_debug_obj_box_reconciliation_20260907.md)
 for frozen inputs, complete owner audit and the remaining graph holds.
-Publication of this packet is independently checked after commit.
+Both authorized remote branch tips were independently verified at that commit.
+
+The next verified Opus 2 packet is the private ProgressBar base-layer wrapper:
+**+87 meaningful exact bytes**, reaching **930,828 code bytes / 6,285 credited
+functions**; stable census **6,331/8,245**, one gain and zero regressions.
+Full tests: **1,059 passed, two skipped, 26 subtests**. Its original-target/first/
+ordinary private-ABI replay passes 72 executions plus two rejected byte mutations.
+See [the ProgressBar ledger](object_matching_logs/progress_bar_obj_base_layer_reconciliation_20260907.md).
+This is one small wrapper, not a whole-object or whole-lane completion.
+Its publication is checked separately after commit.
 
 No other part of the new-lane totals below is added to that checkpoint.
 They are donor-relative observations, not an audited union or promised future
@@ -66,9 +75,10 @@ First packets to inspect:
    pass, but its genuine header declaration regresses an existing 693-byte
    exact UI function. The packet was fully restored with zero lasting losses;
    see [the held trial](object_matching_logs/playlist_profile_obj_display_name_owner_hold_20260907.md).
-2. `draw_gravy_base_layer`: 96 padded bytes. Review real caller extraction
-   separately from the empty 16-byte noise helper whose January caller placement
-   remains inferred.
+2. `draw_gravy_base_layer`: **87 meaningful / 96 padded bytes admitted** with
+   unchanged real caller, full owner audit and explicit semantic-name/static
+   inference. The empty 16-byte noise helper remains excluded: its January
+   caller placement is not authenticated.
 3. Other small player/playlist profile leaves and their real read/write graphs.
 4. HS parser helper/caller packets, then larger UI and save-file logic.
 
@@ -158,13 +168,29 @@ First packets to inspect:
    owners absent from the January object, including a normalize3d fallback.
    Do not restore its rejected debug-global header packet or the held circle
    caller with an omitted variadic offset. See existing RenderDebug ledgers.
-2. ActionFlee flush/replace/modify-color: three small leaves, 208 padded bytes.
-   Their owning public prototypes are missing. Begin/update remain held on
-   `unit_start_running_blindly` ownership and the known header regression.
-3. Small Geometry verify/vector helpers, with real prototypes; assess the
-   q-count ABI correction and changed structure-visibility parks separately.
-4. Weather lifecycle/accessors, then larger caller graphs. Damage, player
-   queues, Bink, collision/path and physics need genuine owner/schema work.
+2. ActionFlee flush/replace/modify-color: saved exact **186 meaningful / 208
+   padded bytes**, held pending review of the inherited source-provenance
+   boundary and proper public declarations. The minimal actions.h closure is
+   47 objects; Race is not among them. A previous combined actions.h/units.h
+   failure therefore does not prove this narrower packet regresses Race.
+   AI communication is included and remains a measured sensitivity risk.
+   Begin/update stay outside this packet.
+3. Geometry verify/vector: saved exact **657 meaningful / 672 padded bytes**,
+   held on prior source-topology/expression reviews; vector also activates the
+   existing point-to-vector cast in its plane helper. The combined donor adds
+   five SELECT_ANY math owners (288 padded bytes), not new target credit.
+   A minimal declaration packet has six consumers; its emitted-owner subset
+   has not been freshly isolated. The q-count ABI correction and changed
+   structure-visibility parks remain separate work.
+4. **Weather delete-only is the next promising trial:** public delete plus
+   three genuine private accessors/list-deletion helpers, saved **444 meaningful
+   / 464 padded bytes**. This is not yet an isolated canonical compile. It needs
+   genuine 0x30 tag ownership, the four-system January runtime layout, public
+   declaration and semantic BSS/private names. Current public-header consumers
+   are Game and Weather. Measure natural private register conventions once;
+   do not manufacture callers to retain the helpers. Exclude new-system and
+   all rendering/update/schema additions. Damage, player queues, Bink,
+   collision/path and physics still need genuine owner/schema work.
 
 Preserve existing holds: no fabricated combined player-queues global, no
 external-linkage conclusion from a BSS split or memset extent, no foreign

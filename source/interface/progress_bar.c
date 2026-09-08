@@ -289,6 +289,10 @@ void draw_gravy_screen_layer(
 	real_rgb_color const *color,
 	real progress);
 
+static void draw_gravy_base_layer(
+	real_rgb_color const *color,
+	real progress);
+
 void set_blur_texture_coordinates(
 	real x,
 	real y);
@@ -772,6 +776,24 @@ void draw_gravy_screen_layer(
 	return;
 }
 
+static void draw_gravy_base_layer(
+	real_rgb_color const *color,
+	real progress)
+{
+	struct gravy_layer layer;
+
+	layer.texture_width= 640.f;
+	layer.texture_height= 480.f;
+	layer.x= 0.f;
+	layer.y= 0.f;
+	layer.half_width= (real)fabs(640.0/2.0);
+	layer.half_height= (real)fabs(480.0/2.0);
+	layer.distance= 0.f;
+	draw_gravy_layer(&layer, color, 1.f, progress);
+
+	return;
+}
+
 void set_blur_texture_coordinates(
 	real x,
 	real y)
@@ -845,7 +867,6 @@ static void progress_bar_draw(
 	real ranges[NUMBER_OF_PROGRESS_BAR_SOUNDS][2]= {{0.f, 1.f}, {0.4f, 1.f}, {0.5f, 1.f}, {0.55f, 1.f}};
 	real volumes[NUMBER_OF_PROGRESS_BAR_SOUNDS]= {3500.f, 4500.f, 3500.f, 4500.f};
 	D3DBaseTexture back_buffer_texture;
-	struct gravy_layer layer;
 	real_rgb_color color;
 	D3DSurface *back_buffer;
 	real t;
@@ -927,14 +948,7 @@ static void progress_bar_draw(
 	IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_ADDRESSU, D3DTADDRESS_BORDER);
 	IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
 	IDirect3DDevice8_SetPixelShaderProgram(global_d3d_device, (D3DPIXELSHADERDEF *)&regular_shader);
-	layer.texture_width= 640.f;
-	layer.texture_height= 480.f;
-	layer.x= 0.f;
-	layer.y= 0.f;
-	layer.half_width= (real)fabs(640.0/2.0);
-	layer.half_height= (real)fabs(480.0/2.0);
-	layer.distance= 0.f;
-	draw_gravy_layer(&layer, &color, 1.f, progress);
+	draw_gravy_base_layer(&color, progress);
 	for (stage= 0; stage<4; stage++)
 		IDirect3DDevice8_SetTexture(global_d3d_device, stage, NULL);
 	IDirect3DDevice8_SetTransform(global_d3d_device, D3DTS_WORLD, &progress_bar_globals.saved_world);
