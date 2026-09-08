@@ -595,28 +595,28 @@ void widget_function_null(
 void settings_menu_update_extended_description(
 	struct widget_instance *list_widget)
 {
-	struct widget_instance *description = list_widget->parameters.list.extended_description;
-	struct ui_widget_definition *description_definition =
-		ui_widget_definition_get(description->definition_tag_index);
+	struct ui_widget_definition *description_definition = ui_widget_definition_get(
+		list_widget->parameters.list.extended_description->definition_tag_index);
 	struct widget_instance *description_picture;
 	struct widget_instance *description_text;
 	struct widget_instance *child;
-	short index = 0;
+	short index;
 
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0x12C,
-		list_widget->focused_child && description,
-		"this doesn't look like the settings select widget to me");
+		list_widget->focused_child && list_widget->parameters.list.extended_description,
+		"invalid widget trying to update its extended list description");
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0x12D,
 		description_definition->child_count == 2,
 		"this doesn't look like the settings select widget to me");
 
-	description_picture = description->child;
+	description_picture = list_widget->parameters.list.extended_description->child;
 	description_text = description_picture->next;
 	child = list_widget->child;
+	index = 0;
 	while (child)
 	{
 		if (child == list_widget->focused_child)
@@ -691,7 +691,7 @@ void playlist_gametype_select_menu_update_extended_description(
 	struct widget_instance *child;
 	struct widget_instance *description_child;
 	struct ui_widget_definition *description_definition;
-	short index = 0;
+	short index;
 
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
@@ -699,6 +699,7 @@ void playlist_gametype_select_menu_update_extended_description(
 		list_widget && list_widget->focused_child && list_widget->parameters.list.extended_description,
 		"invalid widget trying to update its extended list description");
 
+	index = 0;
 	child = list_widget->child;
 	while (child)
 	{
@@ -729,8 +730,7 @@ void multiplayer_type_menu_update_extended_description(
 	struct widget_instance *list_widget)
 {
 	struct widget_instance *child;
-	struct widget_instance *description_picture;
-	short index = 0;
+	short index;
 
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
@@ -741,6 +741,7 @@ void multiplayer_type_menu_update_extended_description(
 			list_widget->parameters.list.extended_description->child->next,
 		"invalid widget trying to update its extended list description");
 
+	index = 0;
 	child = list_widget->child;
 	while (child)
 	{
@@ -752,9 +753,10 @@ void multiplayer_type_menu_update_extended_description(
 
 	if (index != NONE)
 	{
-		description_picture = list_widget->parameters.list.extended_description->child;
-		description_picture->animation.current_frame_index = index;
-		description_picture->next->parameters.text_box.string_list_index = index;
+		list_widget->parameters.list.extended_description->child->
+			animation.current_frame_index = index;
+		list_widget->parameters.list.extended_description->child->next->
+			parameters.text_box.string_list_index = index;
 	}
 	return;
 }
@@ -762,28 +764,28 @@ void multiplayer_type_menu_update_extended_description(
 void difficulty_select_menu_update_extended_description(
 	struct widget_instance *list_widget)
 {
-	struct widget_instance *description = list_widget->parameters.list.extended_description;
-	struct ui_widget_definition *description_definition =
-		ui_widget_definition_get(description->definition_tag_index);
+	struct ui_widget_definition *description_definition = ui_widget_definition_get(
+		list_widget->parameters.list.extended_description->definition_tag_index);
 	struct widget_instance *description_picture;
 	struct widget_instance *description_text;
 	struct widget_instance *child;
-	short index = 0;
+	short index;
 
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0x237,
-		list_widget->focused_child && description,
-		"this doesn't look like the difficulty select widget to me");
+		list_widget->focused_child && list_widget->parameters.list.extended_description,
+		"invalid widget trying to update its extended list description");
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0x238,
 		description_definition->child_count == 2,
 		"this doesn't look like the difficulty select widget to me");
 
-	description_picture = description->child;
+	description_picture = list_widget->parameters.list.extended_description->child;
 	description_text = description_picture->next;
 	child = list_widget->child;
+	index = 0;
 	while (child)
 	{
 		if (child == list_widget->focused_child)
@@ -930,8 +932,6 @@ void solo_game_objective_text(
 void main_menu_animation_fakery(
 	struct widget_instance *widget)
 {
-	struct widget_instance *extended_description;
-
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0x9AB,
@@ -944,11 +944,11 @@ void main_menu_animation_fakery(
 			widget->parameters.list.extended_description->type == _ui_widget_type_bitmap,
 		"expected a picture (container) for main menu options list extended description");
 
-	extended_description = widget->parameters.list.extended_description;
-	extended_description->animation.current_frame_index = widget->parameters.list.selected_list_item_index;
-	extended_description->animation.current_frame_index =
-		extended_description->animation.current_frame_index < 0 ?
-			0 : extended_description->animation.current_frame_index;
+	widget->parameters.list.extended_description->animation.current_frame_index =
+		widget->parameters.list.selected_list_item_index;
+	widget->parameters.list.extended_description->animation.current_frame_index = (short)FLOOR(
+		widget->parameters.list.extended_description->animation.current_frame_index,
+		0);
 	return;
 }
 
@@ -1054,7 +1054,6 @@ void get_active_player_profile_color_index(
 	struct widget_instance *widget)
 {
 	struct player_profile profile;
-	word last_available_color;
 
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
@@ -1063,18 +1062,10 @@ void get_active_player_profile_color_index(
 		"profile color picture requires a valid local player index");
 
 	player_ui_get_active_player_profile(widget->local_player_index, &profile);
-	if (profile.primary_color_index < 0)
-	{
-		widget->animation.current_frame_index = 0;
-		return;
-	}
-
-	last_available_color = player_profile_number_of_available_primary_colors() - 1;
-	if (profile.primary_color_index > last_available_color)
-		last_available_color = player_profile_number_of_available_primary_colors() - 1;
-	else
-		last_available_color = profile.primary_color_index;
-	widget->animation.current_frame_index = last_available_color;
+	widget->animation.current_frame_index = (short)PIN(
+		profile.primary_color_index,
+		0,
+		player_profile_number_of_available_primary_colors() - 1);
 	return;
 }
 
@@ -2035,7 +2026,7 @@ void variant_profile_update_cache_for_nwide_list(
 
 			if (playlist_profile_get(
 				requested_profile_index,
-				&cached_variant_profile[cache_index].profile))
+				(struct game_variant *)&cached_variant_profile[cache_index].profile))
 			{
 				cached_variant_profile[cache_index].profile_index = requested_profile_index;
 				still_wanted[cache_index] = TRUE;
@@ -2063,22 +2054,25 @@ void mutliplayer_settings_select_list_update_displayed_items(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0x67D,
 		definition->type == _ui_widget_type_spinner_list,
-		"expected a spinner list for 'multiplayer settings select' list");
+		"expected a spinner list for 'multiplayer settings select' widget");
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0x67E,
 		definition->child_count == 3,
-		"expected 3 children (list items) in multiplayer settings select list");
+		"expected 3 children (list items) for 'multiplayer settings select' widget");
 
 	spinner_list_3wide_determine_displayed_item_indices(
 		list_widget,
 		displayed_item_indices);
-	for (item_index = 0; item_index < NUMBEROF(profile_indices); item_index++)
+	for (item_index = 0; item_index < 3; item_index++)
 	{
-		long displayed_item_index = displayed_item_indices[item_index];
-
-		profile_indices[item_index] = displayed_item_index == NONE ?
-			NONE : ((long *)list_widget->parameters.list.list_items)[displayed_item_index];
+		if (displayed_item_indices[item_index] != NONE)
+		{
+			profile_indices[item_index] = ((long *)list_widget->parameters.list.list_items)
+				[displayed_item_indices[item_index]];
+		}
+		else
+			profile_indices[item_index] = NONE;
 	}
 	variant_profile_update_cache_for_nwide_list(
 		profile_indices,
@@ -2092,15 +2086,45 @@ void mutliplayer_settings_select_list_update_displayed_items(
 		struct widget_instance *item = widget_instance_get_nth_child(
 			list_widget,
 			item_index);
+		struct widget_instance *description_box = item->child;
+		struct widget_instance *icon = description_box->next;
+		struct widget_instance *label_box = icon->next;
+		struct widget_instance *description_container = label_box->next;
 		struct playlist_profile *profile = NULL;
-		long profile_index = ((long *)list_widget->parameters.list.list_items)
-			[displayed_item_indices[item_index]];
+		long profile_index;
 		long cache_index;
 
+		definition = ui_widget_definition_get(item->definition_tag_index);
+		match_vassert(
+			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+			0x69E,
+			definition->child_count != 0,
+			"expected 3 children in multiplayer settings list item (name, pic, desc)");
+		match_vassert(
+			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+			0x6A0,
+			ui_widget_definition_get(description_box->definition_tag_index)->type ==
+				_ui_widget_type_text_box,
+			"expected a text box widget for the list item's first child (map name)");
+		match_vassert(
+			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+			0x6A2,
+			ui_widget_definition_get(icon->definition_tag_index)->type ==
+				_ui_widget_type_bitmap,
+			"expected a container widget for the list item's second child (map pic)");
+		match_vassert(
+			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+			0x6A4,
+			ui_widget_definition_get(label_box->definition_tag_index)->type ==
+				_ui_widget_type_text_box,
+			"expected a text box widget for the list item's third child (map description)");
+
+		profile_index = ((long *)list_widget->parameters.list.list_items)
+			[displayed_item_indices[item_index]];
 		if (profile_index != NONE)
 		{
 			for (cache_index = 0;
-				cache_index < NUMBEROF(cached_variant_profile);
+				cache_index < (long)NUMBEROF(cached_variant_profile);
 				cache_index++)
 			{
 				if (cached_variant_profile[cache_index].profile_index == profile_index)
@@ -2111,74 +2135,9 @@ void mutliplayer_settings_select_list_update_displayed_items(
 			}
 		}
 
+		description_container->visible = FALSE;
+		if (profile)
 		{
-			struct widget_instance *description_box = item->child;
-			struct widget_instance *icon = description_box->next;
-			struct widget_instance *label_box = icon->next;
-			struct widget_instance *description_container = label_box->next;
-
-			definition = ui_widget_definition_get(item->definition_tag_index);
-			match_vassert(
-				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
-				0x69E,
-				definition->child_count > 0,
-				"expected 3 children in multiplayer settings select list item");
-			match_vassert(
-				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
-				0x6A0,
-				ui_widget_definition_get(description_box->definition_tag_index)->type ==
-					_ui_widget_type_text_box,
-				"expected a text box widget for the first child of the list item");
-			match_vassert(
-				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
-				0x6A2,
-				ui_widget_definition_get(icon->definition_tag_index)->type ==
-					_ui_widget_type_bitmap,
-				"expected a container widget for the second child of the list item");
-			match_vassert(
-				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
-				0x6A4,
-				ui_widget_definition_get(label_box->definition_tag_index)->type ==
-					_ui_widget_type_text_box,
-				"expected a text box widget for the third child of the list item");
-
-			description_container->visible = FALSE;
-			if (!profile)
-			{
-				long labels_tag_index;
-
-				description_box->parameters.text_box.text = ui_widget_realloc(
-					description_box->parameters.text_box.text,
-					0x100,
-					"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
-					0x751);
-				if (description_box->parameters.text_box.text)
-					description_box->parameters.text_box.text[0] = 0;
-
-				icon->animation.current_frame_index = _multiplayer_game_bitmap_unknown;
-				label_box->parameters.text_box.text = ui_widget_realloc(
-					label_box->parameters.text_box.text,
-					0x200,
-					"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
-					0x756);
-				if (label_box->parameters.text_box.text)
-				{
-					label_box->parameters.text_box.text[0] = 0;
-					labels_tag_index = tag_loaded(
-						UNICODE_STRING_LIST_TAG,
-						"ui\\shell\\main_menu\\player_profiles_select\\profile_description_labels");
-					if (labels_tag_index != NONE)
-					{
-						ustrncpy(
-							label_box->parameters.text_box.text,
-							unicode_string_list_get_string(labels_tag_index, 5),
-							0xFF);
-						label_box->parameters.text_box.text[0xFF] = 0;
-					}
-				}
-				continue;
-			}
-
 			description_box->parameters.text_box.text = ui_widget_realloc(
 				description_box->parameters.text_box.text,
 				0x100,
@@ -2201,7 +2160,7 @@ void mutliplayer_settings_select_list_update_displayed_items(
 
 			if (TEST_FLAG(profile->flags, 0))
 			{
-				short string_index = (short)((profile->flags >> 8) + 10);
+				long string_index = (profile->flags >> 8) + 10;
 
 				switch (profile->engine_type)
 				{
@@ -2236,45 +2195,150 @@ void mutliplayer_settings_select_list_update_displayed_items(
 				continue;
 			}
 
-			if (profile->engine_type >= game_engine_ctf &&
-				profile->engine_type <= game_engine_race)
+			switch (profile->engine_type)
 			{
-				short string_index;
-
-				switch (profile->engine_type)
-				{
-				case game_engine_ctf:
-					icon->animation.current_frame_index = _multiplayer_game_bitmap_ctf;
-					string_index = profile->teams == TRUE ? 1 : 0;
-					break;
-				case game_engine_slayer:
-					icon->animation.current_frame_index = _multiplayer_game_bitmap_slayer;
-					string_index = profile->teams == TRUE ? 3 : 2;
-					break;
-				case game_engine_oddball:
-					icon->animation.current_frame_index = _multiplayer_game_bitmap_oddball;
-					string_index = profile->teams == TRUE ? 5 : 4;
-					break;
-				case game_engine_king:
-					icon->animation.current_frame_index = _multiplayer_game_bitmap_king;
-					string_index = profile->teams == TRUE ? 7 : 6;
-					break;
-				default:
-					icon->animation.current_frame_index = _multiplayer_game_bitmap_race;
-					string_index = profile->teams == TRUE ? 9 : 8;
-					break;
-				}
-
+			case game_engine_ctf:
+				icon->animation.current_frame_index = _multiplayer_game_bitmap_ctf;
 				if (descriptions_tag_index != NONE && label_box->parameters.text_box.text)
 				{
-					ustrncpy(
-						label_box->parameters.text_box.text,
-						unicode_string_list_get_string(
-							descriptions_tag_index,
-							string_index),
-						0xFF);
+					if (profile->teams == TRUE)
+					{
+						ustrncpy(
+							label_box->parameters.text_box.text,
+							unicode_string_list_get_string(descriptions_tag_index, 1),
+							0xFF);
+					}
+					else
+					{
+						ustrncpy(
+							label_box->parameters.text_box.text,
+							unicode_string_list_get_string(descriptions_tag_index, 0),
+							0xFF);
+					}
 					label_box->parameters.text_box.text[0xFF] = 0;
 				}
+				break;
+			case game_engine_slayer:
+				icon->animation.current_frame_index = _multiplayer_game_bitmap_slayer;
+				if (descriptions_tag_index != NONE && label_box->parameters.text_box.text)
+				{
+					if (profile->teams == TRUE)
+					{
+						ustrncpy(
+							label_box->parameters.text_box.text,
+							unicode_string_list_get_string(descriptions_tag_index, 3),
+							0xFF);
+					}
+					else
+					{
+						ustrncpy(
+							label_box->parameters.text_box.text,
+							unicode_string_list_get_string(descriptions_tag_index, 2),
+							0xFF);
+					}
+					label_box->parameters.text_box.text[0xFF] = 0;
+				}
+				break;
+			case game_engine_oddball:
+				icon->animation.current_frame_index = _multiplayer_game_bitmap_oddball;
+				if (descriptions_tag_index != NONE && label_box->parameters.text_box.text)
+				{
+					if (profile->teams == TRUE)
+					{
+						ustrncpy(
+							label_box->parameters.text_box.text,
+							unicode_string_list_get_string(descriptions_tag_index, 5),
+							0xFF);
+					}
+					else
+					{
+						ustrncpy(
+							label_box->parameters.text_box.text,
+							unicode_string_list_get_string(descriptions_tag_index, 4),
+							0xFF);
+					}
+					label_box->parameters.text_box.text[0xFF] = 0;
+				}
+				break;
+			case game_engine_king:
+				icon->animation.current_frame_index = _multiplayer_game_bitmap_king;
+				if (descriptions_tag_index != NONE && label_box->parameters.text_box.text)
+				{
+					if (profile->teams == TRUE)
+					{
+						ustrncpy(
+							label_box->parameters.text_box.text,
+							unicode_string_list_get_string(descriptions_tag_index, 7),
+							0xFF);
+					}
+					else
+					{
+						ustrncpy(
+							label_box->parameters.text_box.text,
+							unicode_string_list_get_string(descriptions_tag_index, 6),
+							0xFF);
+					}
+					label_box->parameters.text_box.text[0xFF] = 0;
+				}
+				break;
+			case game_engine_race:
+				icon->animation.current_frame_index = _multiplayer_game_bitmap_race;
+				if (descriptions_tag_index != NONE && label_box->parameters.text_box.text)
+				{
+					if (profile->teams == TRUE)
+					{
+						ustrncpy(
+							label_box->parameters.text_box.text,
+							unicode_string_list_get_string(descriptions_tag_index, 9),
+							0xFF);
+					}
+					else
+					{
+						ustrncpy(
+							label_box->parameters.text_box.text,
+							unicode_string_list_get_string(descriptions_tag_index, 8),
+							0xFF);
+					}
+					label_box->parameters.text_box.text[0xFF] = 0;
+				}
+				break;
+			}
+
+			continue;
+		}
+
+		description_box->parameters.text_box.text = ui_widget_realloc(
+			description_box->parameters.text_box.text,
+			0x100,
+			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+			0x751);
+		if (description_box->parameters.text_box.text)
+			description_box->parameters.text_box.text[0] = 0;
+
+		icon->animation.current_frame_index = _multiplayer_game_bitmap_unknown;
+		label_box->parameters.text_box.text = ui_widget_realloc(
+			label_box->parameters.text_box.text,
+			0x200,
+			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+			0x756);
+		if (label_box->parameters.text_box.text)
+		{
+			long labels_tag_index = tag_loaded(
+				UNICODE_STRING_LIST_TAG,
+				"ui\\shell\\main_menu\\player_profiles_select\\profile_description_labels");
+
+			label_box->parameters.text_box.text[0] = 0;
+			if (labels_tag_index != NONE)
+			{
+				wchar_t const *label_text = unicode_string_list_get_string(
+					labels_tag_index,
+					5);
+
+				ustrncpy(
+					label_box->parameters.text_box.text,
+					label_text,
+					0xFF);
+				label_box->parameters.text_box.text[0xFF] = 0;
 			}
 		}
 	}
@@ -3038,21 +3102,13 @@ static long filter_invalid_list_indices(
 	long *indices,
 	long number_of_items)
 {
-	long count = 0;
+	long count;
 
 	qsort(indices, number_of_items, sizeof(long), list_indices_sort_proc);
-	if (number_of_items > 0)
+	for (count = 0; count < number_of_items; count++)
 	{
-		long *index = indices;
-
-		do
-		{
-			if (*index == NONE)
-				break;
-			count++;
-			index++;
-		}
-		while (count < number_of_items);
+		if (indices[count] == NONE)
+			break;
 	}
 	return count;
 }

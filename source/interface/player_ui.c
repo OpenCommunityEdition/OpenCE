@@ -722,7 +722,7 @@ void player_ui_begin_editing_profile(
 		case _saved_game_file_type_game_variant:
 			if (playlist_profile_get(
 				profile_index,
-				&player_ui_globals.edit_profile.original.playlist))
+				(struct game_variant *)&player_ui_globals.edit_profile.original.playlist))
 			{
 				csmemcpy(
 					&player_ui_globals.edit_profile.current.playlist,
@@ -800,7 +800,7 @@ boolean player_ui_save_profile(
 					{
 						playlist_profile_save(
 							new_profile_index,
-							&player_ui_globals.edit_profile.current.playlist);
+							(struct game_variant *)&player_ui_globals.edit_profile.current.playlist);
 						player_ui_globals.edit_profile_index = new_profile_index;
 						if (saved_game_file_get_path_to_enclosing_directory(
 							new_profile_index,
@@ -827,7 +827,7 @@ boolean player_ui_save_profile(
 			{
 				playlist_profile_save(
 					player_ui_globals.edit_profile_index,
-					&player_ui_globals.edit_profile.current.playlist);
+					(struct game_variant *)&player_ui_globals.edit_profile.current.playlist);
 				if (saved_game_file_get_path_to_enclosing_directory(
 					player_ui_globals.edit_profile_index,
 					directory_path))

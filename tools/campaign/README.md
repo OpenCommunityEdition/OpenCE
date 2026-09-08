@@ -163,6 +163,39 @@ proof. The tool never edits source or config, rejects ambiguous pairings, and
 requires independent January/PDB/source provenance review before a human makes
 any rename.
 
+## merge_candidates.py — fail-closed candidate-copy merger
+
+    python tools/campaign/merge_candidates.py scratch/base.c scratch/merged.c scratch/a.c scratch/b.c
+
+Merges disjoint edits from complete candidate copies made against one common
+base. It rejects overlapping replacements, same-position insertions, mixed or
+changed line endings, and output paths outside scratch/. Output is written
+atomically and remains a review artifact; diff and gate every affected
+function before applying it to source.
+
+## relocdiff.py — complete relocation-identity comparison
+
+    python tools/campaign/relocdiff.py source/hs/hs_compile _hs_parse_object_name
+    python tools/campaign/relocdiff.py source/hs/hs_compile _hs_parse_object_name scratch/probe.obj --count-by-target
+
+Prints both sides of every relocation row, including address, type, target
+identity, unmatched tails, and optional per-target counts. The default mode
+fails closed unless size, relocation count, normalized bytes, and
+address/type layout establish a pure relocation-identity residual. Use
+`--allow-structural` only for deliberate broader inspection.
+
+## stdcall_scan.py — proposal-only calling-convention name gaps
+
+    python tools/campaign/stdcall_scan.py source/hs/hs_compile
+    python tools/campaign/stdcall_scan.py --all
+
+Scans terminal x86 ret-immediate instructions and proposes missing stdcall
+decorations without editing config. By default it reports only
+`_code_XXXXXXXX` placeholders; `--all-undecorated` broadens the diagnostic.
+Every hit remains non-authoritative and requires source, symbol, and caller
+review. Missing units fail nonzero, while `--keep-going` permits an explicitly
+partial scan that still exits nonzero.
+
 ## units_hunt_all.py — cross-branch splice hunter
 
 ```

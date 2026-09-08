@@ -6001,6 +6001,63 @@
         },
         "objdiff_percent": 99.49045
       }
+    },
+    {
+      "unit": "source/hs/hs_compile",
+      "function": "_hs_parse_enum",
+      "class": "csplit-relocation-alias",
+      "evidence": "Code bytes, padded size (464), relocation count (43), relocation offsets/types, and normalized SHA-256 are identical. The sole symbolic identity difference is target __hs_type_scenery_default+12912 versus candidate _hs_enum_table-256; both resolve to image file offset 2493140. Zero strict-exact credit; accept only through the canonical relocation-address validator.",
+      "measurements": {
+        "target": {
+          "size": 464,
+          "relocation_count": 43,
+          "normalized_sha256": "6d5a6ec9dfca19aeabff7f7b48941ab226301531966c86beb8165eb4cbf70db1"
+        },
+        "base": {
+          "size": 464,
+          "relocation_count": 43,
+          "normalized_sha256": "6d5a6ec9dfca19aeabff7f7b48941ab226301531966c86beb8165eb4cbf70db1"
+        },
+        "objdiff_percent": 100
+      }
+    },
+    {
+      "unit": "source/hs/hs_compile",
+      "function": "_hs_parse_object_name",
+      "class": "csplit-relocation-alias",
+      "evidence": "Code bytes, padded size (320), relocation count (26), relocation offsets/types, and normalized SHA-256 are identical. The sole symbolic identity difference resolves to image file offset 2479850: target csplit string+58 equals candidate _hs_object_type_masks-86. Zero strict-exact credit; accept only through the canonical relocation-address validator.",
+      "measurements": {
+        "target": {
+          "size": 320,
+          "relocation_count": 26,
+          "normalized_sha256": "8328bb587dd8eecd7fcfefb54794728f56fd653e10bf3a8f4d2fea86605b6710"
+        },
+        "base": {
+          "size": 320,
+          "relocation_count": 26,
+          "normalized_sha256": "8328bb587dd8eecd7fcfefb54794728f56fd653e10bf3a8f4d2fea86605b6710"
+        },
+        "objdiff_percent": 100
+      }
+    },
+    {
+      "unit": "source/hs/hs_compile",
+      "function": "_hs_parse_tag_reference",
+      "class": "csplit-relocation-alias",
+      "evidence": "Code bytes, padded size (208), relocation count (11), relocation offsets/types, and normalized SHA-256 are identical. The sole symbolic identity difference resolves to image file offset 2479852: target csplit string+60 equals candidate _hs_tag_reference_type_group_tags-96. Zero strict-exact credit; accept only through the canonical relocation-address validator.",
+      "measurements": {
+        "target": {
+          "size": 208,
+          "relocation_count": 11,
+          "normalized_sha256": "2d1c09cc00e5c911dd12e1a555e5c702767613e2f4a030b13b9cdd5c25d28df1"
+        },
+        "base": {
+          "size": 208,
+          "relocation_count": 11,
+          "normalized_sha256": "2d1c09cc00e5c911dd12e1a555e5c702767613e2f4a030b13b9cdd5c25d28df1"
+        },
+        "objdiff_percent": 100
+      }
     }
   ]
 }

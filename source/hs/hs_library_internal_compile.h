@@ -41,6 +41,9 @@ boolean hs_macro_function_parse(
 boolean hs_parse_if(
 	short function_index,
 	long expression_index);
+boolean hs_parse_begin(
+	short function_index,
+	long expression_index);
 boolean hs_parse_logical(
 	short function_index,
 	long expression_index);
@@ -53,6 +56,12 @@ boolean hs_parse_equality(
 boolean hs_parse_inequality(
 	short function_index,
 	long expression_index);
+boolean hs_parse_cond(
+	short function_index,
+	long expression_index);
+boolean hs_parse_set(
+	short function_index,
+	long expression_index);
 boolean hs_parse_sleep_until(
 	short function_index,
 	long expression_index);
@@ -63,6 +72,9 @@ boolean hs_parse_object_cast_up(
 	short function_index,
 	long expression_index);
 boolean hs_parse_debug_string(
+	short function_index,
+	long expression_index);
+boolean hs_parse_inspect(
 	short function_index,
 	long expression_index);
 
