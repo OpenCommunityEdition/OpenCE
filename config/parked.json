@@ -2,6 +2,63 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/game/player_queues_new",
+      "function": "_update_client_get_maximum_possible_server_time",
+      "class": "instruction-scheduling",
+      "evidence": "Best currently reviewed Fable reconstruction. The complete bounded update-window traversal is supported by January disassembly and the HCEA cross-build semantic map. Target and candidate are both 80 padded bytes with three relocations; the only remaining divergence is an independent compare/load transposition at +0x0d. Zero exact credit. See docs/object_matching_logs/player_queues_new_obj_fable_owner_reconciliation_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 80,
+          "relocation_count": 3,
+          "normalized_sha256": "30ffd0838c5ff2ede2048d24ee662704576c5f1a3dcd0b28b547ebc8ba71dd96"
+        },
+        "base": {
+          "size": 80,
+          "relocation_count": 3,
+          "normalized_sha256": "1e89386ca07f7c6177e1185e1b57677f16c7dc643933deb8e2d6dd4171558f57"
+        },
+        "objdiff_percent": 92.11539
+      }
+    },
+    {
+      "unit": "source/game/player_queues_new",
+      "function": "_update_queues_reset_and_fill_with_lies",
+      "class": "instruction-scheduling",
+      "evidence": "Best currently reviewed Fable reconstruction. It retains the complete queue reset, bounded 128-entry history fill, named constants and typed queue datum; HCEA corroborates the cross-build algorithm. Target and candidate are both 272 padded bytes with 24 relocations. The remaining mismatch is one independent store scheduled around a push. Zero exact credit. See docs/object_matching_logs/player_queues_new_obj_fable_owner_reconciliation_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 272,
+          "relocation_count": 24,
+          "normalized_sha256": "786c6c80f9616932ef40b3146089fa32653cdaecada706c74ae2dae993d4ba70"
+        },
+        "base": {
+          "size": 272,
+          "relocation_count": 24,
+          "normalized_sha256": "f76f7cbc4610f79054248415a81369440801966b04db8783981e8d3a491592bd"
+        },
+        "objdiff_percent": 97.297295
+      }
+    },
+    {
+      "unit": "source/game/player_queues_new",
+      "function": "_update_client_local_ticks",
+      "class": "tu-context-optimization",
+      "evidence": "Best currently reviewed Fable reconstruction. It retains the complete local action-to-server tick path with an ordinary long update_number local; the earlier fake `(long *)&ticks` cast is rejected. January calls the already-exact update_server_build_server_update, while VC7 inlines that callee in this TU context, producing 352 candidate bytes versus 192 target bytes and 31 versus 15 relocations. Zero exact credit. See docs/object_matching_logs/player_queues_new_obj_fable_owner_reconciliation_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 192,
+          "relocation_count": 15,
+          "normalized_sha256": "006837ab68e640685cba73184552b14fce1cb09c8b4286c8a7aa689f02b81c46"
+        },
+        "base": {
+          "size": 352,
+          "relocation_count": 31,
+          "normalized_sha256": "af7f4084e08112b9a60a42c0739a64c19cc1202277fbf8969f9d245b37c4f0f4"
+        },
+        "objdiff_percent": 1.6181818
+      }
+    },
+    {
       "unit": "source/bitmaps/s3tc/s3tc",
       "function": "_RGBToColor",
       "class": "unclassified",
@@ -5810,6 +5867,139 @@
           "normalized_sha256": "0ce537b371ae59cdaa713342af23346c37187ab268e04f9c932af2fdcc41ed58"
         },
         "objdiff_percent": 93.621216
+      }
+    },
+    {
+      "unit": "source/saved games/game_state_xbox",
+      "function": "_game_state_open_persistent_storage",
+      "class": "instruction-scheduling",
+      "evidence": "Best credible complete reconstruction from Opus lane 66f75b77b, reconciled against canonical 7f7b72cc3. The name and private ownership are independently supported by the HCEA correspondence atlas. The natural C body preserves the documented double path lookup, 0x380000 file size, 16 KiB zeroing write, failure cleanup, diagnostic strings and calls. Candidate and target are both 400 padded bytes with 26 relocation destinations in the same sequence; an alignment-aware comparison isolates the remaining mismatch to terminal cold-block placement plus padding. No undefined behavior, forced inline, fabricated register pressure or exact credit is retained. See docs/object_matching_logs/game_state_xbox_obj_opus_remainder_reconciliation_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 400,
+          "relocation_count": 26,
+          "normalized_sha256": "b8779377c24f612ca3559f6a8f5fd75277d2c541f847f8c331d79cceabd6769b"
+        },
+        "base": {
+          "size": 400,
+          "relocation_count": 26,
+          "normalized_sha256": "6457f7e47a8b11aa911b5099e4bce81a274621530d30235c8909cce4d6b09cbc"
+        },
+        "objdiff_percent": 91.22951
+      }
+    },
+    {
+      "unit": "source/ai/path_obstacle_avoidance",
+      "function": "_path_new",
+      "class": "instruction-scheduling",
+      "evidence": "Best complete natural reconstruction from the Fable obstacle-search graph after canonical owner reconciliation. January and candidate are both 480 padded bytes with all 24 relocation identities; the remaining difference is ordinary field-store scheduling. The body uses the real typed path structures and named limits, with no raw offsets, register pressure, forced inline, invented logic or exact credit. See docs/object_matching_logs/path_obstacle_avoidance_obj_fable_owner_reconciliation_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 480,
+          "relocation_count": 24,
+          "normalized_sha256": "5d754d83f2bb8621dfab62179b4bde5ac1a57f4e94238d669cbd305208d3845a"
+        },
+        "base": {
+          "size": 480,
+          "relocation_count": 24,
+          "normalized_sha256": "5eec6c7258e58d880f83c6e52d154413872c69797ee5d539edbe00e11a7b01c0"
+        },
+        "objdiff_percent": 95.76
+      }
+    },
+    {
+      "unit": "source/ai/path_obstacle_avoidance",
+      "function": "_path_add_steps",
+      "class": "register-allocation",
+      "evidence": "Best complete natural reconstruction from the Fable obstacle-search graph after canonical owner reconciliation. January and candidate are both 816 padded bytes with all 30 relocation identities; only a private register and word-store allocation tie remains. The real typed step-building algorithm is retained without source-pressure tuning, fake dependencies, invented branches or exact credit. See docs/object_matching_logs/path_obstacle_avoidance_obj_fable_owner_reconciliation_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 816,
+          "relocation_count": 30,
+          "normalized_sha256": "9e03f302b0caf5a5e6b53433fdded66b356d7b50378c2bb652e4647761ae3f3f"
+        },
+        "base": {
+          "size": 816,
+          "relocation_count": 30,
+          "normalized_sha256": "708637ce28f153838eb46d5a0df699c351dfcac5edd5f13088f8f18646aaadf1"
+        },
+        "objdiff_percent": 99.4
+      }
+    },
+    {
+      "unit": "source/ai/path_obstacle_avoidance",
+      "function": "_path_avoid_obstacles",
+      "class": "register-allocation",
+      "evidence": "Best complete typed reconstruction from the Fable obstacle-search graph after canonical owner reconciliation. January is 1360 padded bytes and the natural candidate is 1312, with the same 49 relocation identities; January's boolean/register schedule is not reproduced by the ordinary source. The complete algorithm is retained as honest fuzzy work with no raw offsets, source pressure, nonsensical control flow or exact credit. See docs/object_matching_logs/path_obstacle_avoidance_obj_fable_owner_reconciliation_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 1360,
+          "relocation_count": 49,
+          "normalized_sha256": "ec47d37a5ccdd19d9d81026b7676d2a3fc7525416375f8d52257b65938ffe90b"
+        },
+        "base": {
+          "size": 1312,
+          "relocation_count": 49,
+          "normalized_sha256": "ebd074f70b98e427ea8e4304e5039f9d7bd1a58c6b22a4940466c1eb9789368d"
+        },
+        "objdiff_percent": 90.164444
+      }
+    },
+    {
+      "unit": "source/ai/path_obstacle_avoidance",
+      "function": "_render_debug_path",
+      "class": "instruction-scheduling",
+      "evidence": "Best complete natural debug-path reconstruction from the Fable obstacle-search graph after canonical owner reconciliation. January and candidate are both 608 padded bytes with all 28 relocation identities; two independent point locals occupy opposite stack slots. The ordinary typed render graph is retained without declaration-order searches, source pressure, fake logic or exact credit. See docs/object_matching_logs/path_obstacle_avoidance_obj_fable_owner_reconciliation_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 608,
+          "relocation_count": 28,
+          "normalized_sha256": "3a4858ca4cf82b84fd23ff99e17f3aae4ddd3fef218daa8174b650ca5cbd9d99"
+        },
+        "base": {
+          "size": 608,
+          "relocation_count": 28,
+          "normalized_sha256": "a1779f59405d48cc89513787a67a413d9757abd6c3ccc0a81474d40eae0148a1"
+        },
+        "objdiff_percent": 99.96172
+      }
+    },
+    {
+      "unit": "source/camera/editor_flying_camera",
+      "function": "_editor_camera_flying_update",
+      "class": "unclassified",
+      "evidence": "Best complete house-rule-compliant reconstruction retained from the Fable 50k resume lane after canonical replay. Target and candidate are both 1408 padded bytes with all 60 relocation identities, and objdiff reports 99.25616 percent. Component-wise position sums preserve January's inline schedule and avoid a surplus point_from_line3d SELECT_ANY COMDAT; remaining differences are the BSS use_roll load schedule and January's single address-taking form for the unit bounding-sphere center. The body uses semantic typed camera/object/math structures and ordinary C. No raw offset, representation pun, volatile/register forcing, barrier, pragma, assembly, forced inline, fake dependency, candidate-only helper, or nonsensical branch is retained. All inherited and newly admitted exact editor-camera owners remain strict; this function receives zero exact credit. See docs/object_matching_logs/editor_flying_camera_obj_owner_graph_reconciliation_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 1408,
+          "relocation_count": 60,
+          "normalized_sha256": "1e60e84909386438cd7ad676733806a7fa509e0c126e888b2b3823faa23d5892"
+        },
+        "base": {
+          "size": 1408,
+          "relocation_count": 60,
+          "normalized_sha256": "0687aab09e94dd30e99bd420e8c9339fd35a889970cce1220ca7502a23f52def"
+        },
+        "objdiff_percent": 99.25616
+      }
+    },
+    {
+      "unit": "source/camera/editor_flying_camera",
+      "function": "_editor_camera_orbiting_update",
+      "class": "unclassified",
+      "evidence": "Complete ordinary-C reconstruction retained from independent HaloCEA behavior and January's typed instruction, relocation, constant and assertion topology. It fills the player camera info, applies yaw/pitch orbit input, clamps pitch to plus/minus 0.4 pi, updates wheel distance with the 0.6 minimum, derives forward/up and unit velocity, and emits the complete line-571 camera-command validation. Target and candidate are both 1120 padded bytes with all 49 relocation identities; objdiff reports 99.49045 percent. Remaining differences are natural expression and local scheduling, not missing behavior. The function is a genuine static owner referenced by the exact 52-byte/9-relocation update dispatch table and receives zero exact credit. No raw offset, representation pun, volatile/register forcing, barrier, pragma, assembly, forced inline, fake dependency, candidate-only helper, or nonsensical branch is retained. See docs/object_matching_logs/editor_flying_camera_obj_owner_graph_reconciliation_20260908.md.",
+      "measurements": {
+        "target": {
+          "size": 1120,
+          "relocation_count": 49,
+          "normalized_sha256": "280e2c91cb77eeafa93951dae28c4d74b793d9ab0d5e7e4f5adbf851c5231ce0"
+        },
+        "base": {
+          "size": 1120,
+          "relocation_count": 49,
+          "normalized_sha256": "9463178809d2bfb1bf576e5389a16ece8f2afbfd963a75ab30cd958c7a733c5d"
+        },
+        "objdiff_percent": 99.49045
       }
     }
   ]

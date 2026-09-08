@@ -23,6 +23,13 @@ struct path_collision_result
 	real t;
 };
 
+struct structure_test_ray2d_result
+{
+	real distance;
+	long surface_index;
+	long edge_index;
+};
+
 typedef char path_collision_result_size_assert[
 	sizeof(struct path_collision_result) == 0x1C ? 1 : -1];
 typedef char path_collision_result_point_offset_assert[
@@ -31,6 +38,15 @@ typedef char path_collision_result_t_offset_assert[
 	offsetof(struct path_collision_result, t) == 0x18 ? 1 : -1];
 
 /* ---------- public code */
+
+boolean structure_test_ray2d(
+	struct structure_bsp const *structure,
+	boolean ignore_broken_surfaces,
+	real_point2d const *point,
+	long surface_index,
+	real_vector2d const *direction,
+	real distance,
+	struct structure_test_ray2d_result *result);
 
 boolean structure_surfaces_are_equivalent(
 	struct structure_bsp const *structure,

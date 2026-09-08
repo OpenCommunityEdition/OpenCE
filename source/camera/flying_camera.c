@@ -46,7 +46,7 @@ void flying_camera_new(
 	camera->position.x = 0.f;
 	camera->facing.yaw = 0.f;
 	camera->facing.pitch = 0.f;
-	camera->facing.roll = 0.f;
+	camera->roll = 0.f;
 	camera->field_of_view = DEGREES_TO_RADIANS(70);
 	return;
 }
@@ -71,21 +71,21 @@ void flying_camera_update(
 	match_assert("c:\\halo\\SOURCE\\camera\\flying_camera.c", 42, controls);
 	match_assert("c:\\halo\\SOURCE\\camera\\flying_camera.c", 43, result);
 
-	if (controls->inhibit_input)
+	if (controls->active)
 	{
 		camera->facing.yaw += controls->facing_delta.yaw;
 		camera->facing.pitch = PIN(
 			camera->facing.pitch + controls->facing_delta.pitch,
 			-1.56765485f,
 			1.56765485f);
-		camera->facing.roll += controls->facing_delta.roll;
+		camera->roll += controls->facing_delta.roll;
 	}
 
 	if (rasterizer_debug_options.flying_camera_reset_ticks > 0)
 	{
 		camera->facing.yaw = 0.f;
 		camera->facing.pitch = 0.f;
-		camera->facing.roll = 0.f;
+		camera->roll = 0.f;
 		rasterizer_debug_options.flying_camera_reset_ticks--;
 	}
 
@@ -95,13 +95,13 @@ void flying_camera_update(
 	rotate_vector_about_axis(
 		&result->up,
 		&result->forward,
-		sine(camera->facing.roll),
-		cosine(camera->facing.roll));
+		sine(camera->roll),
+		cosine(camera->roll));
 
-	if (controls->inhibit_input)
+	if (controls->active)
 	{
-		real cosine_yaw= cosine(camera->facing.yaw);
-		real sine_yaw= sine(camera->facing.yaw);
+		real cosine_yaw = cosine(camera->facing.yaw);
+		real sine_yaw = sine(camera->facing.yaw);
 		real_vector3d translation;
 		real_point3d position;
 
@@ -110,7 +110,9 @@ void flying_camera_update(
 			cosine_yaw*controls->translation.i - sine_yaw*controls->translation.j,
 			cosine_yaw*controls->translation.j + sine_yaw*controls->translation.i,
 			controls->translation.k);
-		point_from_line3d(&camera->position, &translation, 1.f, &position);
+		position.x = camera->position.x + translation.i;
+		position.y = camera->position.y + translation.j;
+		position.z = camera->position.z + translation.k;
 		camera->position = position;
 	}
 
@@ -118,12 +120,12 @@ void flying_camera_update(
 	result->offset = *global_zero_vector3d;
 	result->depth = 0.f;
 	result->field_of_view = camera->field_of_view;
-	result->flags = FLAG(0);
+	result->flags = FLAG(_observer_command_valid_bit);
 
 	match_vassert(
 		"c:\\halo\\SOURCE\\camera\\flying_camera.c",
 		149,
-		!(result->flags & FLAG(0)) ||
+		!TEST_FLAG(result->flags, _observer_command_valid_bit) ||
 		(valid_real_vector3d_axes2(&result->forward, &result->up) &&
 			valid_real(result->position.x) && result->position.x>=-5000.f && result->position.x<=5000.f &&
 			valid_real(result->position.y) && result->position.y>=-5000.f && result->position.y<=5000.f &&

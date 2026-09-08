@@ -41,6 +41,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "actions.h"
 #include "actors.h"
 #include "units/units.h"
 
@@ -70,6 +71,50 @@ void action_flee_end(
 	if (actor->meta.unit_index != NONE)
 	{
 		unit_stop_running_blindly(actor->meta.unit_index);
+	}
+
+	return;
+}
+
+void action_flee_flush_position_indices(
+	long actor_index)
+{
+	struct flee_state_data *state_data = &actor_get(actor_index)->state.action_data.flee;
+
+	state_data->flee_firing_position_index = NONE;
+	state_data->find_new_flee_position = TRUE;
+
+	return;
+}
+
+void action_flee_modify_color(
+	long actor_index,
+	real_argb_color *color)
+{
+	struct flee_state_data *state_data = &actor_get(actor_index)->state.action_data.flee;
+
+	if (state_data->panic_type > 0)
+	{
+		*color = *global_real_argb_yellow;
+	}
+	else
+	{
+		*color = *global_real_argb_green;
+	}
+
+	return;
+}
+
+void action_flee_replace_prop(
+	long actor_index,
+	long invalid_prop_index,
+	long replacement_prop_index)
+{
+	struct flee_state_data *state_data = &actor_get(actor_index)->state.action_data.flee;
+
+	if (state_data->flee_prop_index == invalid_prop_index)
+	{
+		state_data->flee_prop_index = replacement_prop_index;
 	}
 
 	return;

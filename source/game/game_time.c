@@ -70,6 +70,7 @@ symbols in this file:
 #include "cseries_windows.h"
 #include "real_math.h"
 #include "game.h"
+#include "player_queues_new.h"
 
 /* ---------- constants */
 
@@ -120,18 +121,12 @@ struct game_time_globals_struct
 
 /* ---------- prototypes */
 
-extern void update_client_start(void);
-extern void update_server_start(void);
 extern void *game_state_malloc(char const *, char const *, long);
 struct network_game_server;
 extern struct network_game_server *global_network_game_server_get(void);
 extern long network_game_server_get_oldest_client_update_received(struct network_game_server *server);
 extern void network_game_server_stalled_on_client(struct network_game_server *server, boolean stalled);
 extern void network_game_server_update_ticks(struct network_game_server *server, long ticks);
-extern long update_client_get_maximum_actions(void);
-extern long update_client_get_maximum_possible_server_time(void);
-extern void update_client_local_ticks(long ticks);
-
 /* ---------- globals */
 
 static struct game_time_statistics game_time_statistics;

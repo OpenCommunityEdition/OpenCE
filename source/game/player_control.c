@@ -191,6 +191,7 @@ symbols in this file:
 #include "game/player_control.h"
 #include "game/player_control_runtime.h"
 #include "players.h"
+#include "player_queues_new.h"
 
 #include "game/aim_assist.h"
 #include "game/game_globals.h"

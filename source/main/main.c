@@ -927,11 +927,6 @@ void main_menu_unload(
 	return;
 }
 
-extern void update_server_delete(
-	void);
-extern void update_server_start(
-	void);
-
 void main_menu_load(
 	void)
 {

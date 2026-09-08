@@ -20,6 +20,8 @@ enum
 	PATH_NODE_LIST_SIZE = 0x400,
 	PATH_HASH_TABLE_SIZE = 0x1000,
 	MAXIMUM_DISC_COUNT = 128,
+	MAXIMUM_OBSTACLE_AVOIDANCE_STEPS = 128,
+	MAXIMUM_SMOOTHED_PATH_STEPS = 4,
 };
 
 enum
@@ -170,6 +172,60 @@ struct obstacles
 	struct obstacle_disc discs[MAXIMUM_DISC_COUNT];
 };
 
+struct obstacle_path_step
+{
+	real_point2d point;
+	long surface_index;
+	real_vector2d direction;
+	real distance;
+	short obstacle_index;
+	byte obstacle_direction_index;
+	byte reserved1B;
+	short obstructed_goal_step_indices[2];
+	real total_distance;
+	short previous_step_index;
+	byte reserved26[2];
+};
+
+struct obstacle_path
+{
+	real radius;
+	boolean ignore_broken_surfaces;
+	byte reserved5[3];
+	struct obstacles const *obstacles;
+	struct structure_bsp const *structure;
+	real_point2d goal;
+	long goal_surface_index;
+	short goal_obstacle_index;
+	short goal_step_index;
+	short best_goal_blocked_step_index;
+	byte reserved22[2];
+	real best_goal_blocked_distance;
+	boolean goal_found_exactly;
+	boolean finishing;
+	boolean ignore_optional;
+	byte reserved2B;
+	short step_count;
+	byte reserved2E[2];
+	struct obstacle_path_step steps[MAXIMUM_OBSTACLE_AVOIDANCE_STEPS];
+	short heap_count;
+	short heap[MAXIMUM_OBSTACLE_AVOIDANCE_STEPS];
+	byte reserved1532[2];
+};
+
+typedef char obstacle_path_step_size_assert[
+	sizeof(struct obstacle_path_step) == 0x28 ? 1 : -1];
+typedef char obstacle_path_size_assert[
+	sizeof(struct obstacle_path) == 0x1534 ? 1 : -1];
+typedef char obstacle_path_step_count_offset_assert[
+	offsetof(struct obstacle_path, step_count) == 0x2C ? 1 : -1];
+typedef char obstacle_path_steps_offset_assert[
+	offsetof(struct obstacle_path, steps) == 0x30 ? 1 : -1];
+typedef char obstacle_path_heap_count_offset_assert[
+	offsetof(struct obstacle_path, heap_count) == 0x1430 ? 1 : -1];
+typedef char obstacle_path_heap_offset_assert[
+	offsetof(struct obstacle_path, heap) == 0x1432 ? 1 : -1];
+
 struct obstacles_test_pill_result
 {
 	real distance;
@@ -197,17 +253,6 @@ typedef char obstacles_disc_count_offset_assert[
 typedef char obstacles_discs_offset_assert[
 	offsetof(struct obstacles, discs) == 0x8 ? 1 : -1];
 
-struct path_avoidance_obstacles
-{
-	char __unknown00[0xC08];
-};
-
-struct path_avoidance_path
-{
-	long field_00;
-	char __unknown04[0x1530];
-};
-
 struct path_debug_storage
 {
 	long actor_index;
@@ -229,10 +274,11 @@ struct path_debug_storage
 	short avoided_step_count;
 	word pad_14546;
 	struct path_step avoided_steps[4];
-	word pad_14588;
+	boolean use_stored_obstacles;
+	byte pad_14589;
 	short avoidance_path_count;
-	struct path_avoidance_obstacles avoidance_obstacles[4];
-	struct path_avoidance_path avoidance_paths[4];
+	struct obstacles avoidance_obstacles[4];
+	struct obstacle_path avoidance_paths[4];
 };
 
 typedef char path_state_node_count_offset_assert[
@@ -359,6 +405,27 @@ boolean obstacles_test_pill(
 	real distance,
 	boolean ignore_optional,
 	struct obstacles_test_pill_result *result);
+void obstacles_get_discs_in_sphere(
+	struct obstacles *obstacles,
+	real_point3d const *center,
+	real radius,
+	real_vector3d const *movement_direction,
+	long ignore_source_object_index,
+	long ignore_target_object_index);
+void obstacles_disc_tangents(
+	struct obstacles const *obstacles,
+	short disc_index,
+	real_point2d const *point,
+	real radius,
+	real_vector2d *right_direction,
+	real_vector2d *left_direction,
+	real *tangent_distance);
+void obstacles_recompute(
+	struct obstacles *obstacles,
+	real radius);
+void render_debug_obstacles(
+	struct obstacles const *obstacles,
+	real radius);
 
 /* ---------- prototypes/PATH_OBSTACLE_AVOIDANCE.C */
 
@@ -368,8 +435,29 @@ __inline struct obstacle_disc const *obstacles_get_disc(
 long obstacle_from_disc(
 	struct obstacles const *obstacles,
 	short disc_index);
+void render_debug_path(
+	struct obstacle_path *path);
+boolean path_avoid_obstacles(
+	struct path_state *state,
+	short input_step_count,
+	struct path_step const *input_steps,
+	short *avoided_step_count,
+	struct path_step *avoided_steps,
+	boolean *steps_finish_path);
+void render_debug_obstacle_path(
+	void);
 
 /* ---------- globals */
+
+extern boolean debug_obstacle_path;
+extern boolean debug_obstacle_path_on_failure;
+extern real_point3d debug_obstacle_path_start_point;
+extern long debug_obstacle_path_start_surface_index;
+extern real_point3d debug_obstacle_path_goal_point;
+extern long debug_obstacle_path_goal_surface_index;
+extern real debug_obstacle_path_radius;
+extern boolean debug_obstacle_path_finishing;
+extern boolean debug_ignore_broken_surfaces;
 
 /* ---------- public code */
 

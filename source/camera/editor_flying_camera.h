@@ -33,6 +33,24 @@ void editor_camera_update(
 	struct flying_camera_action const *controls,
 	struct camera_command *result);
 
+void editor_camera_get_focus(
+	real_point3d *position,
+	real_euler_angles2d *angles);
+void editor_camera_set_focus(
+	real_point3d const *position,
+	real_euler_angles2d const *angles);
+void editor_camera_set_position(
+	real_point3d const *point,
+	real_euler_angles2d const *angles);
+void editor_camera_set_unit_focus(
+	long unit_index);
+void editor_camera_bump_speed(
+	void);
+boolean editor_camera_use_roll(
+	boolean new_use_roll);
+void editor_camera_set_mode(
+	short mode);
+
 long editor_camera_get_speed(
 	void);
 

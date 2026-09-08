@@ -965,9 +965,9 @@ struct widget_instance
 		struct
 		{
 			short selected_index;
-			short top_index;
+			short last_list_tab_direction;
 			void *list_items;
-			short number_of_items;
+			word number_of_items;
 			struct widget_instance *extended_description;
 			wchar_t *item_text;
 		} list;
@@ -1006,6 +1006,18 @@ static unsigned long __stdcall filesystem_initialization_thread_proc(
 	void *input);
 static void perform_filesystem_initialization(
 	void);
+static __inline boolean widget_instance_can_handle_events(
+	struct widget_instance *widget);
+static struct widget_instance *widget_instance_find_by_tag_index_recursive(
+	struct widget_instance *widget,
+	long tag_index);
+static void widget_instance_give_focus_directly(
+	struct widget_instance *widget,
+	struct widget_instance *new_focus);
+static void widget_instance_give_focus_by_tag(
+	struct widget_instance *widget,
+	long tag_index,
+	short local_player_index);
 
 /* ---------- globals */
 
@@ -1670,6 +1682,361 @@ static void dispose_widget_stack(
 	}
 
 	return;
+}
+
+static __inline boolean widget_instance_can_handle_events(
+	struct widget_instance *widget)
+{
+	struct ui_widget_definition *definition =
+		ui_widget_definition_get(widget->definition_tag_index);
+
+	if (!widget->disabled &&
+		(definition->event_handlers.count > 0 ||
+		widget->type == _ui_widget_type_spinner_list ||
+		widget->type == _ui_widget_type_column_list))
+	{
+		return TRUE;
+	}
+
+	return FALSE;
+}
+
+static struct widget_instance *widget_instance_find_by_tag_index_recursive(
+	struct widget_instance *widget,
+	long tag_index)
+{
+	struct widget_instance *result = NULL;
+
+	if (widget->definition_tag_index == tag_index)
+	{
+		result = widget;
+	}
+	else
+	{
+		struct widget_instance *child;
+
+		for (child = widget->child; child && !result; child = child->next)
+		{
+			if (child->definition_tag_index == tag_index)
+				result = child;
+			else
+				result = widget_instance_find_by_tag_index_recursive(child, tag_index);
+		}
+	}
+
+	return result;
+}
+
+static void widget_instance_give_focus_directly(
+	struct widget_instance *widget,
+	struct widget_instance *new_focus)
+{
+	struct widget_instance *focused_child =
+		widget_instance_get_topmost_parent(widget)->focused_child;
+
+	if (new_focus->disabled == TRUE)
+	{
+		struct widget_instance *substitute;
+
+		for (substitute = new_focus->next; substitute; substitute = substitute->next)
+		{
+			if (widget_instance_can_handle_events(substitute))
+				break;
+		}
+		if (!substitute && new_focus->parent)
+		{
+			for (substitute = new_focus->parent->child; substitute; substitute = substitute->next)
+			{
+				if (widget_instance_can_handle_events(substitute))
+					break;
+			}
+			if (substitute == new_focus->parent->focused_child)
+			{
+				for (substitute = new_focus->previous; substitute; substitute = substitute->previous)
+				{
+					if (widget_instance_can_handle_events(substitute))
+						break;
+				}
+			}
+		}
+		if (substitute)
+			new_focus = substitute;
+	}
+	if (focused_child)
+	{
+		if (new_focus &&
+			focused_child->parent == new_focus->parent &&
+			focused_child->parent)
+		{
+			new_focus->parent->focused_child = new_focus;
+
+			return;
+		}
+		while (focused_child)
+		{
+			focused_child->parent->focused_child = NULL;
+			focused_child = focused_child->focused_child;
+		}
+	}
+	while (new_focus->parent)
+	{
+		new_focus->parent->focused_child = new_focus;
+		new_focus = new_focus->parent;
+	}
+
+	return;
+}
+
+static void widget_instance_give_focus_by_tag(
+	struct widget_instance *widget,
+	long tag_index,
+	short local_player_index)
+{
+	struct widget_instance *root = widget_instance_get_topmost_parent(widget);
+	struct widget_instance *new_focus =
+		widget_instance_find_by_tag_index_recursive(root, tag_index);
+
+	if (new_focus)
+		widget_instance_give_focus_directly(root, new_focus);
+	else
+		error(_error_silent, "failed to find event focus target widget");
+
+	return;
+}
+
+boolean widget_event_function_list_widget_goto_next_item(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted)
+{
+	struct ui_widget_definition *definition;
+	struct widget_instance *child;
+	long item_index;
+	boolean result = TRUE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+		1230,
+		widget);
+	definition = ui_widget_definition_get(widget->definition_tag_index);
+	match_vassert(
+		"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+		1233,
+		widget->type == _ui_widget_type_spinner_list || widget->type == _ui_widget_type_column_list,
+		"calling a list widget function on a non-list widget");
+	if (widget->parameters.list.list_items && widget->parameters.list.number_of_items > 0)
+	{
+		item_index = widget->parameters.list.selected_index + 1;
+		if (item_index >= widget->parameters.list.number_of_items)
+			item_index = 0;
+		if (widget->type == _ui_widget_type_column_list)
+		{
+			child = widget_instance_get_nth_child(widget, item_index);
+			if (child)
+			{
+				widget_instance_give_focus_by_tag(
+					widget,
+					child->definition_tag_index,
+					widget->local_player_index);
+				widget->parameters.list.selected_index = (short)item_index;
+			}
+			else
+			{
+				error(
+					_error_silent,
+					"failed to set focus to the #%d list item of a column list widget",
+					item_index);
+				result = FALSE;
+			}
+		}
+		else if (widget->type == _ui_widget_type_spinner_list)
+		{
+			if (definition->child_count > 1)
+			{
+				match_vassert(
+					"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+					1268,
+					definition->child_count == 3,
+					"spinner lists must be either 1- or 3-wide... sorry");
+				if (widget->focused_child == widget->child ||
+					widget->focused_child == widget->child->next)
+				{
+					if (widget->focused_child->next)
+						widget_instance_give_focus_directly(widget, widget->focused_child->next);
+				}
+			}
+			widget->parameters.list.selected_index = (short)item_index;
+		}
+	}
+	else
+	{
+		if (widget->type == _ui_widget_type_spinner_list)
+		{
+			match_vassert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+				1288,
+				definition->child_count <= 1,
+				"spinner lists with more that 1 visible item need to have code-generated lists associated with them... sorry.");
+		}
+		if (widget->type == _ui_widget_type_spinner_list &&
+			TEST_FLAG(definition->list_flags, _list_items_generated_from_string_list_tag) &&
+			definition->child_count == 0)
+		{
+			widget->parameters.list.selected_index++;
+			if (widget->parameters.list.selected_index == widget->parameters.list.number_of_items)
+				widget->parameters.list.selected_index = 0;
+		}
+		else
+		{
+			child = NULL;
+			if (widget->focused_child)
+			{
+				item_index = widget->parameters.list.selected_index + 1;
+				child = widget->focused_child->next;
+				if (item_index == widget->parameters.list.number_of_items)
+					child = NULL;
+			}
+			if (!child)
+			{
+				child = widget->child;
+				item_index = 0;
+			}
+			if (child)
+			{
+				widget_instance_give_focus_by_tag(
+					widget,
+					child->definition_tag_index,
+					widget->local_player_index);
+				widget->parameters.list.selected_index = (short)item_index;
+			}
+			else
+			{
+				error(
+					_error_silent,
+					"failed to set focus to the next list item of a column widget");
+				result = FALSE;
+			}
+		}
+	}
+	if (result)
+		widget->parameters.list.last_list_tab_direction = 15;
+
+	return result;
+}
+
+boolean widget_event_function_list_widget_goto_previous_item(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted)
+{
+	struct ui_widget_definition *definition;
+	struct widget_instance *child;
+	long item_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+		1359,
+		widget);
+	definition = ui_widget_definition_get(widget->definition_tag_index);
+	match_vassert(
+		"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+		1362,
+		widget->type == _ui_widget_type_spinner_list || widget->type == _ui_widget_type_column_list,
+		"calling a list widget function on a non-list widget");
+	if (widget->parameters.list.list_items && widget->parameters.list.number_of_items > 0)
+	{
+		item_index = widget->parameters.list.selected_index - 1;
+		if (item_index < 0)
+			item_index = widget->parameters.list.number_of_items - 1;
+		if (widget->type == _ui_widget_type_column_list)
+		{
+			child = widget_instance_get_nth_child(widget, item_index);
+			if (child)
+			{
+				widget_instance_give_focus_by_tag(
+					widget,
+					child->definition_tag_index,
+					widget->local_player_index);
+				widget->parameters.list.selected_index = (short)item_index;
+			}
+			else
+			{
+				error(
+					_error_silent,
+					"failed to set focus to the #%d list item of a column list widget",
+					item_index);
+
+				return FALSE;
+			}
+		}
+		else if (widget->type == _ui_widget_type_spinner_list)
+		{
+			if (definition->child_count > 1)
+			{
+				match_vassert(
+					"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+					1396,
+					definition->child_count == 3,
+					"spinner lists must be either 1- or 3-wide... sorry");
+				if (widget->focused_child != widget->child)
+				{
+					match_assert(
+						"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+						1405,
+						widget->focused_child);
+					if (widget->focused_child->previous)
+						widget_instance_give_focus_directly(widget, widget->focused_child->previous);
+				}
+			}
+			widget->parameters.list.selected_index = (short)item_index;
+		}
+	}
+	else
+	{
+		if (widget->type == _ui_widget_type_spinner_list)
+		{
+			match_vassert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+				1420,
+				definition->child_count <= 1,
+				"spinner lists with more that 1 visible item need to have code-generated lists associated with them... sorry.");
+		}
+		if (widget->type == _ui_widget_type_spinner_list &&
+			TEST_FLAG(definition->list_flags, _list_items_generated_from_string_list_tag) &&
+			definition->child_count == 0)
+		{
+			widget->parameters.list.selected_index--;
+			if (widget->parameters.list.selected_index < 0)
+				widget->parameters.list.selected_index = widget->parameters.list.number_of_items - 1;
+		}
+		else
+		{
+			child = NULL;
+			if (widget->focused_child)
+			{
+				item_index = widget->parameters.list.selected_index - 1;
+				child = widget->focused_child->previous;
+			}
+			if (!child)
+			{
+				child = widget->child;
+				item_index = 0;
+				while (child->next)
+				{
+					child = child->next;
+					item_index++;
+				}
+			}
+			widget_instance_give_focus_by_tag(
+				widget,
+				child->definition_tag_index,
+				widget->local_player_index);
+			widget->parameters.list.selected_index = (short)item_index;
+		}
+	}
+	widget->parameters.list.last_list_tab_direction = -15;
+
+	return TRUE;
 }
 
 void ui_widgets_close_all(

@@ -568,6 +568,38 @@ void action_fight_begin(
 void action_fight_end(
 	long actor_index);
 
+/* ---------- prototypes/ACTION_FLEE.C */
+
+boolean action_flee_setup(
+	long actor_index,
+	short panic_type,
+	long panic_prop_index,
+	boolean force_state_entry,
+	boolean flee_from_last_visible_location,
+	boolean allow_occluded_points,
+	struct flee_state_data *state_data);
+void action_flee_begin(
+	long actor_index);
+boolean action_flee_perform(
+	long actor_index);
+void action_flee_update(
+	long actor_index);
+void action_flee_control(
+	long actor_index);
+void action_flee_end(
+	long actor_index);
+void action_flee_flush_position_indices(
+	long actor_index);
+void action_flee_modify_color(
+	long actor_index,
+	real_argb_color *color);
+void action_flee_replace_prop(
+	long actor_index,
+	long invalid_prop_index,
+	long replacement_prop_index);
+boolean action_flee_blind_panic(
+	short panic_type);
+
 /* ---------- prototypes/ACTION_CONVERSE.C */
 
 void actor_conversation_control(

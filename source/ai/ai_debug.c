@@ -4121,7 +4121,7 @@ static void ai_debug_render_path_storage(
 			{
 				render_debug_obstacles(
 					&path->avoidance_obstacles[ai_debug.render_paths_avoidance_segment],
-					path->avoidance_paths[ai_debug.render_paths_avoidance_segment].field_00);
+					path->avoidance_paths[ai_debug.render_paths_avoidance_segment].radius);
 			}
 
 			if (ai_debug.render_paths_avoidance_search && matching_bsp)

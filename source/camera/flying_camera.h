@@ -22,17 +22,19 @@ header included in hcex build.
 struct flying_camera
 {
 	real_point3d position;
-	real_euler_angles3d facing;
+	real_euler_angles2d facing;
+	real roll;
 	real field_of_view;
 };
 
 struct flying_camera_action
 {
 	short local_player_index;
-	boolean inhibit_input;
+	boolean active;
 	byte pad3[5];
 	real_euler_angles3d facing_delta;
 	real_vector3d translation;
+	real wheel_delta;
 };
 
 struct camera_command;

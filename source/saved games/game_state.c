@@ -109,6 +109,7 @@ symbols in this file:
 #include "sound_manager.h"
 #include "observer.h"
 #include "players.h"
+#include "player_queues_new.h"
 #include "rasterizer.h"
 #include "recorded_animations.h"
 #include "ai_debug.h"

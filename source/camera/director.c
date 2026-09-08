@@ -443,10 +443,10 @@ void director_load_camera(
 
 		flying_camera_new_from_point_and_vector(camera, &position, &forward);
 		observer_up_from_forward(&forward, &derived_up);
-		camera->facing.roll = angle_between_vectors3d(&stored_up, &derived_up);
+		camera->roll = angle_between_vectors3d(&stored_up, &derived_up);
 		cross_product3d(&stored_up, &derived_up, &cross_product);
 		if (dot_product3d(&cross_product, &forward) > 0.f)
-			camera->facing.roll = -camera->facing.roll;
+			camera->roll = -camera->roll;
 		camera->field_of_view = field_of_view;
 		director_set_camera(
 			0,

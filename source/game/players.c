@@ -260,6 +260,7 @@ symbols in this file:
 #include "real_math.h"
 #include "render/render_debug.h"
 #include "players.h"
+#include "player_queues_new.h"
 #include "player_control.h"
 #include "objects/objects.h"
 #include "saved games/game_state.h"

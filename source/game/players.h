@@ -193,6 +193,9 @@ void players_initialize(
 void players_initialize_for_new_map(
 	void);
 
+long *machine_get_player_list(
+	long machine_index);
+
 long player_new(
 	long machine_index,
 	long player_index,
@@ -262,16 +265,6 @@ void players_update_after_game(
 void player_handle_powerup_equipment(
 	long player_index,
 	long equipment_index);
-
-/* ---------- prototypes/PLAYER_QUEUES_NEW.C */
-
-void update_client_queue(
-	struct player_action const *action);
-void update_client_queue_push(
-	void);
-void update_queues_reset_and_fill_with_lies(void);
-boolean update_client_dequeue(
-	struct player_action *actions);
 
 /* ---------- globals */
 

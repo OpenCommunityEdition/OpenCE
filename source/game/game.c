@@ -347,8 +347,6 @@ void sound_dispose_from_old_map(
 	void);
 void game_allegiance_dispose_from_old_map(
 	void);
-void update_server_delete(
-	void);
 void game_engine_dispose_from_old_map(
 	void);
 void scenario_dispose_from_old_map(

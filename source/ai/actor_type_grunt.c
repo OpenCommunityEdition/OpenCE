@@ -13,6 +13,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "actions.h"
 #include "actors.h"
 #include "actor_types.h"
 
@@ -23,9 +24,6 @@ symbols in this file:
 /* ---------- structures */
 
 /* ---------- prototypes */
-
-boolean action_flee_blind_panic(
-	short panic_type);
 
 void grunt_decide_action(
 	long actor_index);
