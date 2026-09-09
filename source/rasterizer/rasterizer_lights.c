@@ -1020,7 +1020,7 @@ void rasterizer_lens_flares_draw(
 									point.y = offset*mirror.j + position.y;
 									point.z = offset*mirror.k + position.z;
 
-									if (!rasterizer_widget_set_texture(
+									if (rasterizer_widget_set_texture(
 										0,
 										definition->primary_map.index,
 										reflection->bitmap_index))

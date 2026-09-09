@@ -6169,11 +6169,11 @@
       "unit": "source/rasterizer/rasterizer_lights",
       "function": "_rasterizer_lens_flares_draw",
       "class": "unclassified",
-      "evidence": "Complete typed lens-flare reflection renderer reconstructed from January control flow, assertions, relocations and the authenticated cross-build lens-flare definitions. It is retained because the genuine caller naturally owns the now-exact private corona-rotation evaluator. January and canonical are both 2,240 padded bytes with all 115 relocations; the remaining normalized instruction scheduling differs at 99.27634 percent similarity and receives zero exact credit. The natural math calls retain two helper COMDATs that the linked January split assigns elsewhere; no helper alias, declaration trick, forced inline, compiler steering, raw offset, undefined behavior or nonsensical branch is used. See docs/object_matching_logs/rasterizer_lights_obj_corona_rotation_and_draw_frontier_20260909.md.",
+      "evidence": "Complete typed lens-flare reflection renderer reconstructed from January control flow, assertions, relocations and the authenticated cross-build lens-flare definitions. It is retained because the genuine caller naturally owns the now-exact private corona-rotation evaluator. Peer audit corrected the texture-setup gate to break on a nonzero return, as proved independently by January's conditional branch and the recovered HCEA source. January and canonical are both 2,240 padded bytes with all 115 relocations; the remaining normalized instruction scheduling differs at 99.38321 percent similarity and receives zero exact credit. The natural math calls retain two helper COMDATs that the linked January split assigns elsewhere; no helper alias, declaration trick, forced inline, compiler steering, raw offset, undefined behavior or nonsensical branch is used. See docs/object_matching_logs/rasterizer_lights_obj_corona_rotation_and_draw_frontier_20260909.md.",
       "measurements": {
         "target": { "size": 2240, "relocation_count": 115, "normalized_sha256": "05fb320827e436e1733ef2667350c93c08d8acfe68778f47d3ff0a6f675a583b" },
-        "base": { "size": 2240, "relocation_count": 115, "normalized_sha256": "6603cf40da8b91ddc8e4214baa66e951d7f50b18bf833ce8243d71e850e40c85" },
-        "objdiff_percent": 99.27634
+        "base": { "size": 2240, "relocation_count": 115, "normalized_sha256": "25834daf80e88b4175ab92e01e17a5cc917acdeb58f57fc1b9856c22e317fb03" },
+        "objdiff_percent": 99.38321
       }
     }
   ]

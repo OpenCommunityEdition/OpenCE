@@ -18,7 +18,7 @@ padded code bytes** and zero inherited loss:
 
 The complete `rasterizer_lens_flares_draw` reconstruction is retained as an
 honest fuzzy body: 2,226 meaningful / 2,240 padded bytes, 115 relocations and
-99.27634 percent objdiff similarity. It receives **zero exact credit** and has
+99.38321 percent objdiff similarity. It receives **zero exact credit** and has
 an active hash-pinned record in `config/parked.json`. Neither object is marked
 whole-object Matching.
 
@@ -45,6 +45,13 @@ ordinary static ownership and exact January body observable. The draw body is
 not distorted to close its remaining instruction-scheduling differences.
 It uses no address names, raw field offsets, pointer punning, fake branch,
 helper alias, declaration trick, forced inline, compiler steering or assembly.
+
+Peer review caught and rejected an initially inverted texture-setup test in
+the fuzzy draw body. January's conditional branch exits the reflection loop
+when `rasterizer_widget_set_texture` returns nonzero, and the independently
+recovered HCEA source uses the same positive condition. The source now follows
+that evidence. Rebuilding improved the fuzzy score to 99.38321 percent while
+leaving the exact corona evaluator and the packet's credited totals unchanged.
 
 The natural math calls cause VC7 to retain 64-byte `cross_product3d` and
 48-byte `subtract_vectors3d` COMDAT copies which the linked January split
@@ -94,6 +101,7 @@ variant from earlier donor experiments are likewise not imported.
 - Park validation: 351 active, zero stale, zero invalid.
 - Fake-match scan over all changed source and owner-interface files: zero
   review leads.
+- Peer-audit test suite: 1,144 passed, 5 skipped and 26 subtests passed.
 - `git diff --check`: clean.
 
 The root integrator must still run the full Ninja, semantic, test, admission
