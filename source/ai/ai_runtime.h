@@ -63,23 +63,4 @@ void ai_erase(
 	long squad_index,
 	boolean immediate);
 
-/* ---------- prototypes/ACTOR_MOVING.C */
-
-void actor_move_initialize(
-	void);
-
-/* ---------- prototypes/ACTOR_PERCEPTION.C */
-
-boolean actor_compute_prop_unopposable(
-	long actor_index,
-	long prop_index);
-real actor_compute_prop_target_weight(
-	long actor_index,
-	long prop_index);
-
-/* ---------- prototypes/ACTOR_STIMULUS.C */
-
-void actor_stimulus_vehicle_eviction(
-	long actor_index);
-
 #endif // __AI_RUNTIME_H

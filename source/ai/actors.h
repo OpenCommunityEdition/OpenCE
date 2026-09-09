@@ -1250,6 +1250,8 @@ void actor_combat_update(
 
 /* ---------- prototypes/ACTOR_MOVING.C */
 
+void actor_move_initialize(
+	void);
 boolean actor_move_animation_busy(
 	long actor_index);
 boolean actor_move_animation_impulse(
@@ -1324,6 +1326,12 @@ void actor_move_update(
 
 /* ---------- prototypes/ACTOR_PERCEPTION.C */
 
+boolean actor_compute_prop_unopposable(
+	long actor_index,
+	long prop_index);
+real actor_compute_prop_target_weight(
+	long actor_index,
+	long prop_index);
 boolean actor_perception_desire_prop(
 	long actor_index,
 	short desired_target_state,
@@ -1387,6 +1395,8 @@ boolean actor_emotion_flee_with_friends(
 
 /* ---------- prototypes/ACTOR_STIMULUS.C */
 
+void actor_stimulus_vehicle_eviction(
+	long actor_index);
 void actor_stimulus_surprise(
 	long actor_index,
 	short surprise_level,

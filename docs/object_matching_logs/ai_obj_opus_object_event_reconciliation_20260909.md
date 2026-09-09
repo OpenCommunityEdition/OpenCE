@@ -56,13 +56,14 @@ identity.
   contains no `bss_<address>` placeholder.
 - All imported functions use semantic names; no `code_<address>` source
   function was admitted.
-- Public declarations remain with their subsystem owners. AI-internal lifecycle,
-  event, and actor-helper declarations used across implementation files live in
-  the existing narrow `ai_runtime.h`; `game.c` and `units.c` now include that
-  owner instead of repeating those declarations locally. Declarations that are
-  genuinely part of the broader subsystem interface remain in `ai.h`,
-  `ai_communication.h`, `ai_debug.h`, `encounters.h`, `props.h`, and
-  `game_allegiance.h`.
+- Public declarations remain with their subsystem owners. AI-internal lifecycle
+  and event declarations used across implementation files live in the existing
+  narrow `ai_runtime.h`; `game.c` and `units.c` now include that AI owner
+  instead of repeating those declarations locally. Actor-moving, perception,
+  and stimulus declarations remain in their named owner sections in `actors.h`.
+  Declarations that are genuinely part of the broader subsystem interface
+  remain in `ai.h`, `ai_communication.h`, `ai_debug.h`, `encounters.h`,
+  `props.h`, and `game_allegiance.h`.
 - The major-upgrade enumeration lives beside
   `squad_definition::major_upgrade` in `ai_scenario_definitions.h`.
 - Unit, object, tag-block, and tag-definition access uses the established
@@ -135,3 +136,13 @@ exact bytes**, with 6,708 accepted functions, 1,063,802 meaningful accepted
 bytes, and zero unit errors. The universal per-TU gate also reports
 `units.obj` at **189 exact / 0 residual / 0 unwritten** and `ai.obj` at
 **36 exact / 0 residual / 10 unwritten**.
+
+A follow-up ownership audit compiled all 49 translation units that transitively
+include `actors.h`, `ai_debug.h`, or `ai_runtime.h`. Returning
+`actor_move_initialize`, `actor_compute_prop_unopposable`,
+`actor_compute_prop_target_weight`, and `actor_stimulus_vehicle_eviction` to
+their named `actors.h` sections changes no accepted target function. The only
+candidate section affected is the already-uncredited
+`encounter_update_respawn`; it remains non-exact on both sides. Moving
+`ai_debug_update` into `ai_runtime.h` was also byte-neutral in that sweep, but
+was rejected because `ai_debug.h` is its proper implementation-owner header.
