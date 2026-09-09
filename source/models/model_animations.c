@@ -148,6 +148,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "models/model_animations.h"
 #include "models/models.h"
 #include "models/model_definitions.h"
@@ -358,6 +359,38 @@ void animation_get_x_offsets(
 	{
 		*key_frame_x_offset = key_x_offset;
 	}
+
+	return;
+}
+
+void animation_set_frame_size(
+	struct animation *animation)
+{
+	short frame_size = 0;
+	short node_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\models\\model_animations.c",
+		123,
+		animation);
+
+	for (node_index = 0; node_index < animation->node_count; node_index++)
+	{
+		if (BIT_VECTOR_TEST_FLAG(animation->nodes_with_rotation_flags, node_index))
+		{
+			frame_size += sizeof(struct compressed_quaternion_8byte);
+		}
+		if (BIT_VECTOR_TEST_FLAG(animation->nodes_with_translation_flags, node_index))
+		{
+			frame_size += sizeof(real_point3d);
+		}
+		if (BIT_VECTOR_TEST_FLAG(animation->nodes_with_scale_flags, node_index))
+		{
+			frame_size += sizeof(real);
+		}
+	}
+
+	animation->frame_size = frame_size;
 
 	return;
 }
@@ -928,6 +961,627 @@ void overlay_animation_apply_scaled(
 			"c:\\halo\\SOURCE\\models\\model_animations.c",
 			554,
 			compressed || ((byte *)data-(byte *)animation_get_frame_data(animation, frame_index)==animation->frame_size));
+	}
+
+	return;
+}
+
+void overlay_animation_apply_continuous(
+	struct animation const *animation,
+	real real_frame_index,
+	struct real_orientation *node_orientations)
+{
+	real fraction;
+	short frame_index;
+
+	fraction = (real)fmod((double)real_frame_index, 1.0);
+	frame_index = (short)fast_ftol((real)floor(fabs(real_frame_index)));
+
+	if (real_frame_index < 0.0f || real_frame_index > (real)animation->frame_count)
+	{
+		error(
+			_error_silent,
+			"### ERROR animation frame index out of bounds A(%f,%x) -- tell Bernie!!",
+			real_frame_index,
+			*((long *)&real_frame_index));
+	}
+
+	if (frame_index >= animation->frame_count)
+	{
+		frame_index = animation->frame_count - 1;
+		fraction = 1.0f;
+		real_frame_index = (real)frame_index;
+	}
+
+	if (animation->type == _animation_overlay)
+	{
+		boolean compressed = animation_is_compressed(animation);
+		short next_frame_index = frame_index == animation->frame_count - 1 ? 0 : frame_index + 1;
+		byte *data = animation_get_frame_data(animation, frame_index);
+		byte *next_data = animation_get_frame_data(animation, next_frame_index);
+		long rotation_index = 0;
+		unsigned long rotation_flags;
+		long translation_index = 0;
+		unsigned long translation_flags;
+		long scale_index = 0;
+		unsigned long scale_flags;
+		short node_index;
+
+		for (node_index = 0; node_index < animation->node_count; node_index++)
+		{
+			struct real_orientation *orientation = &node_orientations[node_index];
+
+		if (!(node_index & (LONG_BITS - 1)))
+		{
+			short long_index = node_index >> LONG_BITS_BITS;
+
+			translation_flags = animation->nodes_with_translation_flags[long_index];
+			rotation_flags = animation->nodes_with_rotation_flags[long_index];
+			scale_flags = animation->nodes_with_scale_flags[long_index];
+		}
+
+		if (TEST_FLAG(rotation_flags, 0))
+		{
+			real_quaternion rotation;
+
+			if (compressed)
+			{
+				animation_get_keyframe_rotation(
+					animation,
+					(real)frame_index,
+					(short)rotation_index++,
+					node_index,
+					&rotation);
+			}
+			else
+			{
+				real_quaternion this_rotation;
+				real_quaternion next_rotation;
+
+				quaternion_decompress_8byte(
+					(struct compressed_quaternion_8byte const *)data,
+					&this_rotation);
+				data += sizeof(struct compressed_quaternion_8byte);
+				quaternion_decompress_8byte(
+					(struct compressed_quaternion_8byte const *)next_data,
+					&next_rotation);
+				next_data += sizeof(struct compressed_quaternion_8byte);
+				quaternions_interpolate_and_normalize(
+					&this_rotation,
+					&next_rotation,
+					fraction,
+					&rotation);
+			}
+
+			quaternions_multiply(&rotation, &orientation->rotation, &orientation->rotation);
+		}
+		rotation_flags >>= 1;
+
+		if (TEST_FLAG(translation_flags, 0))
+		{
+			real_point3d translation;
+
+			if (compressed)
+			{
+				animation_get_keyframe_translation(
+					animation,
+					real_frame_index,
+					(short)translation_index++,
+					node_index,
+					&translation);
+			}
+			else
+			{
+				points_interpolate(
+					(real_point3d const *)data,
+					(real_point3d const *)next_data,
+					fraction,
+					&translation);
+				data += sizeof(real_point3d);
+				next_data += sizeof(real_point3d);
+			}
+
+			orientation->translation.x += translation.x;
+			orientation->translation.y += translation.y;
+			orientation->translation.z += translation.z;
+		}
+		translation_flags >>= 1;
+
+		if (TEST_FLAG(scale_flags, 0))
+		{
+			real scale;
+
+			if (compressed)
+			{
+				animation_get_keyframe_scale(
+					animation,
+					real_frame_index,
+					(short)scale_index++,
+					node_index,
+					&scale);
+			}
+			else
+			{
+				scalars_interpolate(
+					*(real const *)data,
+					*(real const *)next_data,
+					fraction,
+					&scale);
+				data += sizeof(real);
+				next_data += sizeof(real);
+			}
+
+			orientation->scale *= scale;
+		}
+		scale_flags >>= 1;
+	}
+
+		match_assert(
+			"c:\\halo\\SOURCE\\models\\model_animations.c",
+			693,
+			compressed || ((byte *)data-(byte *)animation_get_frame_data(animation, frame_index)==animation->frame_size));
+		match_assert(
+			"c:\\halo\\SOURCE\\models\\model_animations.c",
+			694,
+			compressed || ((byte *)next_data-(byte *)animation_get_frame_data(animation, next_frame_index)==animation->frame_size));
+	}
+
+	return;
+}
+
+void inverse_kinematics_adjust_matrices(
+	struct real_matrix4x3 *desired_hand_matrix,
+	struct real_matrix4x3 *shoulder_matrix,
+	struct real_matrix4x3 *elbow_matrix,
+	struct real_matrix4x3 *hand_matrix)
+{
+	real upper_arm_length = distance3d(&shoulder_matrix->position, &elbow_matrix->position);
+	real forearm_length = distance3d(&elbow_matrix->position, &hand_matrix->position);
+	real hand_distance = distance3d(&desired_hand_matrix->position, &shoulder_matrix->position);
+	real inverse_hand_distance;
+	real_vector3d shoulder_to_elbow;
+	real_vector3d hand_direction;
+	real_vector3d bend_plane_normal;
+	real_vector3d bend_direction;
+	real maximum_reach;
+	real elbow_projection;
+	real elbow_remainder;
+	real elbow_height;
+	real_point3d new_elbow_position;
+
+	shoulder_to_elbow.i = elbow_matrix->position.x-shoulder_matrix->position.x;
+	shoulder_to_elbow.j = elbow_matrix->position.y-shoulder_matrix->position.y;
+	shoulder_to_elbow.k = elbow_matrix->position.z-shoulder_matrix->position.z;
+	inverse_hand_distance = 1.0f/hand_distance;
+	hand_direction.i = (desired_hand_matrix->position.x-shoulder_matrix->position.x)*inverse_hand_distance;
+	hand_direction.j = (desired_hand_matrix->position.y-shoulder_matrix->position.y)*inverse_hand_distance;
+	hand_direction.k = (desired_hand_matrix->position.z-shoulder_matrix->position.z)*inverse_hand_distance;
+	cross_product3d(&hand_direction, &shoulder_to_elbow, &bend_plane_normal);
+	normalize3d(&bend_plane_normal);
+	cross_product3d(&bend_plane_normal, &hand_direction, &bend_direction);
+
+	maximum_reach = (upper_arm_length+forearm_length)*0.98f;
+	if (maximum_reach<hand_distance)
+	{
+		desired_hand_matrix->position.x = shoulder_matrix->position.x+hand_direction.i*maximum_reach;
+		desired_hand_matrix->position.y = shoulder_matrix->position.y+hand_direction.j*maximum_reach;
+		desired_hand_matrix->position.z = shoulder_matrix->position.z+hand_direction.k*maximum_reach;
+		hand_distance = maximum_reach;
+	}
+
+	elbow_projection =
+		(hand_distance*hand_distance+upper_arm_length*upper_arm_length-forearm_length*forearm_length)/
+		(hand_distance+hand_distance);
+	elbow_remainder = hand_distance-elbow_projection;
+	elbow_height = square_root(upper_arm_length*upper_arm_length-elbow_projection*elbow_projection);
+
+	{
+		real_vector3d *shoulder_left = &shoulder_matrix->left;
+		real_vector3d *shoulder_forward = &shoulder_matrix->forward;
+
+		shoulder_forward->i = elbow_projection*hand_direction.i+elbow_height*bend_direction.i;
+		shoulder_forward->j = elbow_projection*hand_direction.j+elbow_height*bend_direction.j;
+		shoulder_forward->k = elbow_projection*hand_direction.k+elbow_height*bend_direction.k;
+		normalize3d(shoulder_forward);
+		cross_product3d(shoulder_forward, shoulder_left, &shoulder_matrix->up);
+		normalize3d(&shoulder_matrix->up);
+		cross_product3d(&shoulder_matrix->up, shoulder_forward, shoulder_left);
+
+		new_elbow_position.x = shoulder_matrix->position.x+shoulder_forward->i*upper_arm_length;
+		new_elbow_position.y = shoulder_matrix->position.y+shoulder_forward->j*upper_arm_length;
+		new_elbow_position.z = shoulder_matrix->position.z+shoulder_forward->k*upper_arm_length;
+	}
+	{
+		real_vector3d *elbow_forward = &elbow_matrix->forward;
+		real_vector3d *elbow_up = &elbow_matrix->up;
+
+		elbow_forward->i = elbow_remainder*hand_direction.i-elbow_height*bend_direction.i;
+		elbow_forward->j = elbow_remainder*hand_direction.j-elbow_height*bend_direction.j;
+		elbow_forward->k = elbow_remainder*hand_direction.k-elbow_height*bend_direction.k;
+		normalize3d(elbow_forward);
+		cross_product3d(elbow_forward, &elbow_matrix->left, elbow_up);
+		normalize3d(elbow_up);
+		cross_product3d(elbow_up, elbow_forward, &elbow_matrix->left);
+	}
+	elbow_matrix->position = new_elbow_position;
+
+	*hand_matrix = *desired_hand_matrix;
+
+	return;
+}
+
+void overlay_animation_apply_continuous_scaled(
+	struct animation const *animation,
+	real real_frame_index,
+	real animation_scale,
+	struct real_orientation *node_orientations)
+{
+	real inverse_animation_scale = 1.0f-animation_scale;
+	real fraction = (real)fmod((double)real_frame_index, 1.0);
+	short frame_index = (short)fast_ftol((real)floor(real_frame_index));
+
+	if (real_frame_index<0.0f || real_frame_index>(real)animation->frame_count)
+	{
+		error(
+			_error_silent,
+			"### ERROR animation frame index out of bounds B(%f,%x) -- tell Bernie!!",
+			real_frame_index,
+			*((long *)&real_frame_index));
+	}
+
+	if (frame_index>=animation->frame_count)
+	{
+		frame_index = animation->frame_count-1;
+		fraction = 1.0f;
+		real_frame_index = (real)frame_index;
+	}
+
+	if (animation->type==_animation_overlay)
+	{
+		boolean compressed = animation_is_compressed(animation);
+		short next_frame_index = frame_index==animation->frame_count-1 ? 0 : frame_index+1;
+		byte *data = animation_get_frame_data(animation, frame_index);
+		byte *next_data = animation_get_frame_data(animation, next_frame_index);
+		long rotation_index = 0;
+		unsigned long rotation_flags;
+		long translation_index = 0;
+		unsigned long translation_flags;
+		long scale_index = 0;
+		unsigned long scale_flags;
+		short node_index;
+
+		for (node_index = 0; node_index<animation->node_count; node_index++)
+		{
+			struct real_orientation *orientation = &node_orientations[node_index];
+
+			if (!(node_index&(LONG_BITS-1)))
+			{
+				short long_index = node_index>>LONG_BITS_BITS;
+
+				translation_flags = animation->nodes_with_translation_flags[long_index];
+				rotation_flags = animation->nodes_with_rotation_flags[long_index];
+				scale_flags = animation->nodes_with_scale_flags[long_index];
+			}
+
+			if (TEST_FLAG(rotation_flags, 0))
+			{
+				real_quaternion rotation;
+
+				if (compressed)
+				{
+					animation_get_keyframe_rotation(
+						animation,
+						(real)frame_index,
+						(short)rotation_index++,
+						node_index,
+						&rotation);
+				}
+				else
+				{
+					real_quaternion this_rotation;
+					real_quaternion next_rotation;
+
+					quaternion_decompress_8byte(
+						(struct compressed_quaternion_8byte const *)data,
+						&this_rotation);
+					data += sizeof(struct compressed_quaternion_8byte);
+					quaternion_decompress_8byte(
+						(struct compressed_quaternion_8byte const *)next_data,
+						&next_rotation);
+					next_data += sizeof(struct compressed_quaternion_8byte);
+					quaternions_interpolate_and_normalize(
+						&this_rotation,
+						&next_rotation,
+						fraction,
+						&rotation);
+				}
+
+				quaternions_interpolate_and_normalize(
+					global_identity_quaternion,
+					&rotation,
+					animation_scale,
+					&rotation);
+				quaternions_multiply(&rotation, &orientation->rotation, &orientation->rotation);
+			}
+			rotation_flags >>= 1;
+
+			if (TEST_FLAG(translation_flags, 0))
+			{
+				real_point3d translation;
+
+				if (compressed)
+				{
+					animation_get_keyframe_translation(
+						animation,
+						real_frame_index,
+						(short)translation_index++,
+						node_index,
+						&translation);
+				}
+				else
+				{
+					points_interpolate(
+						(real_point3d const *)data,
+						(real_point3d const *)next_data,
+						fraction,
+						&translation);
+					data += sizeof(real_point3d);
+					next_data += sizeof(real_point3d);
+				}
+
+				orientation->translation.x += translation.x*animation_scale;
+				orientation->translation.y += translation.y*animation_scale;
+				orientation->translation.z += translation.z*animation_scale;
+			}
+			translation_flags >>= 1;
+
+			if (TEST_FLAG(scale_flags, 0))
+			{
+				real scale;
+
+				if (compressed)
+				{
+					animation_get_keyframe_scale(
+						animation,
+						real_frame_index,
+						(short)scale_index++,
+						node_index,
+						&scale);
+				}
+				else
+				{
+					scalars_interpolate(
+						*(real const *)data,
+						*(real const *)next_data,
+						fraction,
+						&scale);
+					data += sizeof(real);
+					next_data += sizeof(real);
+				}
+
+				orientation->scale *= scale*animation_scale+inverse_animation_scale;
+			}
+			scale_flags >>= 1;
+		}
+
+		match_assert(
+			"c:\\halo\\SOURCE\\models\\model_animations.c",
+			820,
+			compressed || ((byte *)data-(byte *)animation_get_frame_data(animation, frame_index)==animation->frame_size));
+		match_assert(
+			"c:\\halo\\SOURCE\\models\\model_animations.c",
+			821,
+			compressed || ((byte *)next_data-(byte *)animation_get_frame_data(animation, next_frame_index)==animation->frame_size));
+	}
+
+	return;
+}
+
+void aiming_screen_apply(
+	struct animation const *animation,
+	struct animation_aiming_screen_bounds const *aiming_screen_bounds,
+	real yaw,
+	real pitch,
+	struct real_orientation *node_orientations)
+{
+	short grid_width = aiming_screen_bounds->negative_yaw_frame_count+
+		aiming_screen_bounds->positive_yaw_frame_count+1;
+	short grid_height = aiming_screen_bounds->negative_pitch_frame_count+
+		aiming_screen_bounds->positive_pitch_frame_count+1;
+	short yaw_frame_index;
+	boolean compressed;
+	real yaw_delta;
+	real yaw_frame;
+	real yaw_fraction;
+	real pitch_delta;
+	real pitch_frame;
+	short pitch_frame_index;
+	real pitch_fraction;
+	short next_yaw_cell;
+	short next_pitch_cell;
+	short frame_index00;
+	short frame_index10;
+	short frame_index01;
+	short frame_index11;
+	byte *data00;
+	byte *data10;
+	byte *data01;
+	byte *data11;
+	long rotation_index;
+	long translation_index;
+	unsigned long rotation_flags;
+	unsigned long translation_flags;
+	short node_index;
+
+	if (animation->type!=_animation_overlay ||
+		animation->frame_count<grid_width*grid_height)
+	{
+		return;
+	}
+
+	compressed = animation_is_compressed(animation);
+	yaw_delta = yaw<0.0f ? aiming_screen_bounds->negative_yaw_delta :
+		aiming_screen_bounds->positive_yaw_delta;
+	yaw_frame = yaw_delta==0.0f ? 0.0f : yaw/yaw_delta;
+	yaw_frame_index = (short)yaw_frame;
+	yaw_fraction = (real)fmod((double)yaw_frame, 1.0);
+	if (yaw_fraction<0.0f)
+	{
+		yaw_fraction += 1.0f;
+		yaw_frame_index--;
+	}
+	if (yaw_frame_index>=aiming_screen_bounds->positive_yaw_frame_count)
+	{
+		yaw_frame_index = aiming_screen_bounds->positive_yaw_frame_count-1;
+		yaw_fraction = 1.0f;
+	}
+	if (yaw_frame_index<-aiming_screen_bounds->negative_yaw_frame_count)
+	{
+		yaw_frame_index = -aiming_screen_bounds->negative_yaw_frame_count;
+		yaw_fraction = 0.0f;
+	}
+	yaw_frame_index += aiming_screen_bounds->negative_yaw_frame_count;
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\models\\model_animations.c",
+		869,
+		yaw_fraction>=0.0f && yaw_fraction<=1.0f,
+		csprintf(
+			temporary,
+			"d0==%f direction(%f) yaw_delta(%f,%f)",
+			yaw_fraction,
+			yaw,
+			aiming_screen_bounds->negative_yaw_delta,
+			aiming_screen_bounds->positive_yaw_delta));
+
+	pitch_delta = pitch<0.0f ? aiming_screen_bounds->negative_pitch_delta :
+		aiming_screen_bounds->positive_pitch_delta;
+	pitch_frame = pitch_delta==0.0f ? 0.0f : pitch/pitch_delta;
+	pitch_frame_index = (short)pitch_frame;
+	pitch_fraction = (real)fmod((double)pitch_frame, 1.0);
+	if (pitch_fraction<0.0f)
+	{
+		pitch_fraction += 1.0f;
+		pitch_frame_index--;
+	}
+	if (pitch_frame_index>=aiming_screen_bounds->positive_pitch_frame_count)
+	{
+		pitch_frame_index = aiming_screen_bounds->positive_pitch_frame_count-1;
+		pitch_fraction = 1.0f;
+	}
+	if (pitch_frame_index<-aiming_screen_bounds->negative_pitch_frame_count)
+	{
+		pitch_frame_index = -aiming_screen_bounds->negative_pitch_frame_count;
+		pitch_fraction = 0.0f;
+	}
+	pitch_frame_index += aiming_screen_bounds->negative_pitch_frame_count;
+
+	if (pitch_frame_index<0 || pitch_frame_index>=grid_height ||
+		yaw_frame_index<0 || yaw_frame_index>=grid_width)
+	{
+		return;
+	}
+
+	next_yaw_cell = yaw_frame_index+1==grid_width ? yaw_frame_index : yaw_frame_index+1;
+	next_pitch_cell = pitch_frame_index+1==grid_height ? pitch_frame_index : pitch_frame_index+1;
+	frame_index00 = yaw_frame_index+pitch_frame_index*grid_width;
+	frame_index10 = next_yaw_cell+pitch_frame_index*grid_width;
+	frame_index01 = yaw_frame_index+next_pitch_cell*grid_width;
+	frame_index11 = next_yaw_cell+next_pitch_cell*grid_width;
+	data00 = animation_get_frame_data(animation, frame_index00);
+	data10 = animation_get_frame_data(animation, frame_index10);
+	data01 = animation_get_frame_data(animation, frame_index01);
+	data11 = animation_get_frame_data(animation, frame_index11);
+	rotation_index = 0;
+	translation_index = 0;
+
+	for (node_index = 0; node_index<animation->node_count; node_index++)
+	{
+		struct real_orientation *orientation = &node_orientations[node_index];
+
+		if (!(node_index&(LONG_BITS-1)))
+		{
+			short long_index = node_index>>LONG_BITS_BITS;
+
+			translation_flags = animation->nodes_with_translation_flags[long_index];
+			rotation_flags = animation->nodes_with_rotation_flags[long_index];
+		}
+
+		if (TEST_FLAG(rotation_flags, 0))
+		{
+			real_quaternion rotation00;
+			real_quaternion rotation10;
+			real_quaternion rotation01;
+			real_quaternion rotation11;
+			real_quaternion yaw_rotation0;
+			real_quaternion yaw_rotation1;
+			real_quaternion rotation;
+
+			if (compressed)
+			{
+				animation_get_keyframe_rotation(animation, (real)frame_index00, (short)rotation_index, node_index, &rotation00);
+				animation_get_keyframe_rotation(animation, (real)frame_index10, (short)rotation_index, node_index, &rotation10);
+				animation_get_keyframe_rotation(animation, (real)frame_index01, (short)rotation_index, node_index, &rotation01);
+				animation_get_keyframe_rotation(animation, (real)frame_index11, (short)rotation_index++, node_index, &rotation11);
+			}
+			else
+			{
+				quaternion_decompress_8byte((struct compressed_quaternion_8byte const *)data00, &rotation00);
+				data00 += sizeof(struct compressed_quaternion_8byte);
+				quaternion_decompress_8byte((struct compressed_quaternion_8byte const *)data10, &rotation10);
+				data10 += sizeof(struct compressed_quaternion_8byte);
+				quaternion_decompress_8byte((struct compressed_quaternion_8byte const *)data01, &rotation01);
+				data01 += sizeof(struct compressed_quaternion_8byte);
+				quaternion_decompress_8byte((struct compressed_quaternion_8byte const *)data11, &rotation11);
+				data11 += sizeof(struct compressed_quaternion_8byte);
+			}
+
+			quaternions_interpolate_and_normalize(&rotation00, &rotation10, yaw_fraction, &yaw_rotation0);
+			quaternions_interpolate_and_normalize(&rotation01, &rotation11, yaw_fraction, &yaw_rotation1);
+			quaternions_interpolate_and_normalize(&yaw_rotation0, &yaw_rotation1, pitch_fraction, &rotation);
+			quaternions_multiply(&rotation, &orientation->rotation, &orientation->rotation);
+		}
+		rotation_flags >>= 1;
+
+		if (TEST_FLAG(translation_flags, 0))
+		{
+			real_point3d translation00;
+			real_point3d translation10;
+			real_point3d translation01;
+			real_point3d translation11;
+			real inverse_yaw_fraction = 1.0f-yaw_fraction;
+			real inverse_pitch_fraction = 1.0f-pitch_fraction;
+
+			if (compressed)
+			{
+				animation_get_keyframe_translation(animation, (real)frame_index00, (short)translation_index, node_index, &translation00);
+				animation_get_keyframe_translation(animation, (real)frame_index10, (short)translation_index, node_index, &translation10);
+				animation_get_keyframe_translation(animation, (real)frame_index01, (short)translation_index, node_index, &translation01);
+				animation_get_keyframe_translation(animation, (real)frame_index11, (short)translation_index++, node_index, &translation11);
+			}
+			else
+			{
+				translation00 = *(real_point3d const *)data00;
+				data00 += sizeof(real_point3d);
+				translation10 = *(real_point3d const *)data10;
+				data10 += sizeof(real_point3d);
+				translation01 = *(real_point3d const *)data01;
+				data01 += sizeof(real_point3d);
+				translation11 = *(real_point3d const *)data11;
+				data11 += sizeof(real_point3d);
+			}
+
+			orientation->translation.x +=
+				(translation01.x*inverse_yaw_fraction+translation11.x*yaw_fraction)*pitch_fraction+
+				(translation00.x*inverse_yaw_fraction+translation10.x*yaw_fraction)*inverse_pitch_fraction;
+			orientation->translation.y +=
+				(translation01.y*inverse_yaw_fraction+translation11.y*yaw_fraction)*pitch_fraction+
+				(translation00.y*inverse_yaw_fraction+translation10.y*yaw_fraction)*inverse_pitch_fraction;
+			orientation->translation.z +=
+				(translation00.z*inverse_yaw_fraction+translation10.z*yaw_fraction)*inverse_pitch_fraction+
+				(translation01.z*inverse_yaw_fraction+translation11.z*yaw_fraction)*pitch_fraction;
+		}
+		translation_flags >>= 1;
 	}
 
 	return;

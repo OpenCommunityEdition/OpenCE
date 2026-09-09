@@ -59,6 +59,63 @@
       }
     },
     {
+      "unit": "source/models/model_animations",
+      "function": "_inverse_kinematics_adjust_matrices",
+      "class": "instruction-scheduling",
+      "evidence": "Best reviewed house-rule-compliant semantic reconstruction from the 2026-09-09 large-function packet. The complete two-bone IK solution uses ordinary named vector algebra and authentic shoulder/elbow matrix roles. Target and candidate are both 864 padded bytes with seven matching relocation identities; the remaining differences are commutative operand scheduling in the shoulder-basis cross products. No fake casts or spill steering are admitted. Zero exact credit. See docs/object_matching_logs/model_animations_obj_large_reconstruction_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 864,
+          "relocation_count": 7,
+          "normalized_sha256": "e1cd1ac47b76f42334c53adb2fbd8b10702421c0417e1935a370b01913ae77ad"
+        },
+        "base": {
+          "size": 864,
+          "relocation_count": 7,
+          "normalized_sha256": "d9fc11bebc1ea09f8bf293268952861f24b6df0bc9d093dc433a9d0c4018cec8"
+        },
+        "objdiff_percent": 99.190186
+      }
+    },
+    {
+      "unit": "source/models/model_animations",
+      "function": "_overlay_animation_apply_continuous",
+      "class": "register-allocation",
+      "evidence": "Best reviewed house-rule-compliant semantic reconstruction from the 2026-09-09 large-function packet. It retains the complete compressed and uncompressed frame paths, orientation composition, translation and scale application, and source assertions using semantic locals and project types. Target and candidate are both 960 padded bytes with 34 matching relocation identities; VC7 local allocation and instruction scheduling remain different. Zero exact credit. See docs/object_matching_logs/model_animations_obj_large_reconstruction_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 960,
+          "relocation_count": 34,
+          "normalized_sha256": "5ffa1215f54cc536965c23570748b1fbd028622f034111b95af4d49a3e9d508a"
+        },
+        "base": {
+          "size": 960,
+          "relocation_count": 34,
+          "normalized_sha256": "9f9b2604c3c535b6ceacc8be3a2aefc744cbd91e4d75d8e79ef969e8a07ad9b8"
+        },
+        "objdiff_percent": 86.22492
+      }
+    },
+    {
+      "unit": "source/models/model_animations",
+      "function": "_overlay_animation_apply_continuous_scaled",
+      "class": "register-allocation",
+      "evidence": "Best reviewed house-rule-compliant semantic reconstruction from the 2026-09-09 large-function packet. It retains the complete compressed and uncompressed frame paths, scaled quaternion and translation blending, scale composition, and source assertions using semantic locals and project types. The candidate is 1008 versus 1024 target padded bytes with all 37 relocation identities; VC7 local allocation and instruction scheduling remain different. Zero exact credit. See docs/object_matching_logs/model_animations_obj_large_reconstruction_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 1024,
+          "relocation_count": 37,
+          "normalized_sha256": "345a817b00662af38c623b59e4d4bab23b460f41eb8576160e4b4b84b22afb9d"
+        },
+        "base": {
+          "size": 1008,
+          "relocation_count": 37,
+          "normalized_sha256": "a35ac9998b7fb96b26b61c18f91a753c66ba4552949e2fabf910778c0157f2ad"
+        },
+        "objdiff_percent": 82.324715
+      }
+    },
+    {
       "unit": "source/game/player_queues_new",
       "function": "_update_client_get_maximum_possible_server_time",
       "class": "instruction-scheduling",
