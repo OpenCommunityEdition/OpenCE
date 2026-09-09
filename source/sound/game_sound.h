@@ -97,6 +97,13 @@ void compute_sound_obstruction(
 	short local_player_index,
 	struct sound_source *source,
 	real distance);
+void game_sound_set_mouth_aperture(
+	long object_index,
+	real mouth_aperture);
+boolean track_object_impulse_sound(
+	long object_index,
+	void const *attachment_data,
+	struct sound_source *source);
 
 /* ---------- globals */
 

@@ -385,3 +385,19 @@ and [the Physics research ledger](object_matching_logs/physics_obj_update_new_re
 
 This gain does not yet cross the **1,041,486-byte** treemap cadence threshold,
 so the next verified packet should be accumulated before refreshing the map.
+
+## 2026-09-08 HUD, Geometry, and Sound caller packet
+
+The canonical semantic ledger now reports **1,037,674 meaningful exact code
+bytes / 6,611 accepted exact functions**. HUD and Sound add **11 exact
+functions / 2,596 meaningful / 2,688 padded bytes**, with zero losses in the
+8,245-function stable census. Geometry adds no exact credit in this packet.
+
+An additional **8,688 padded bytes** of complete HUD, Geometry, and Sound
+source are retained as explicitly documented zero-credit fuzzies. The batch
+uses genuine declaration owners and semantic private names, passes the full
+build, park, fake-match, admission, and test gates, and does not emit the
+forbidden `_point_from_line3d` helper. See
+[the aggregate ledger](object_matching_logs/hud_geometry_sound_caller_packet_reconciliation_20260908.md).
+
+The **1,041,486-byte** treemap refresh threshold has not yet been crossed.

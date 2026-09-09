@@ -221,11 +221,6 @@ static void scripted_music_stop_all(
 static void scripted_looping_sound_stop_internal(
 	long sound_index,
 	boolean fixed_fadeout);
-static boolean track_object_impulse_sound(
-	long object_index,
-	void const *attachment_data,
-	struct sound_source *source);
-
 /* ---------- globals */
 
 struct game_sound_globals *game_sound_globals;
@@ -1006,7 +1001,7 @@ static boolean looping_sound_definition_is_music(
 	return FALSE;
 }
 
-static boolean track_object_impulse_sound(
+boolean track_object_impulse_sound(
 	long object_index,
 	void const *attachment_data,
 	struct sound_source *source)

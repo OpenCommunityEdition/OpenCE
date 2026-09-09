@@ -13,6 +13,12 @@ file has inline function assertions.
 
 /* ---------- constants */
 
+enum
+{
+	MAXIMUM_SOUND_INSTANCES_PER_DEFINITION = 16,
+	MAXIMUM_SOUND_INSTANCES_PER_OBJECT_PER_DEFINITION = 16
+};
+
 enum sound_class
 {
 	_sound_class_unit_dialog = 19,

@@ -117,18 +117,30 @@ symbols in this file:
 #include "cseries/cseries.h"
 
 #include "cseries/errors.h"
+#include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmaps.h"
+#include "cache/texture_cache.h"
+#include "cutscene/cinematics.h"
 #include "game/game.h"
 #include "game/game_engine.h"
 #include "game/players.h"
+#include "input/input_abstraction.h"
 #include "interface/hud_draw.h"
+#include "interface/hud.h"
 #include "interface/hud_messaging.h"
 #include "interface/interface.h"
+#include "interface/ui_widget.h"
+#include "items/item_definitions.h"
+#include "rasterizer/rasterizer.h"
 #include "render/render.h"
 #include "render/render_debug.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "tag_files/tag_groups.h"
+#include "text/draw_string.h"
+#include "text/font_group.h"
+#include "text/text_group.h"
 #include "text/unicode.h"
 
 #include <stddef.h>
@@ -160,6 +172,78 @@ enum hud_number_show_flags
 	_hud_number_show_only_when_zoomed_bit,
 	_hud_number_show_trailing_m_bit,
 	NUMBER_OF_HUD_NUMBER_SHOW_FLAGS
+};
+
+enum hud_icon_flags
+{
+	_hud_icon_use_text_bit,
+	_hud_icon_use_color_bit,
+	_hud_icon_absolute_width_bit,
+	NUMBER_OF_HUD_ICON_FLAGS
+};
+
+enum hud_flash_flags
+{
+	_hud_flash_reverse_colors_bit,
+	NUMBER_OF_HUD_FLASH_FLAGS
+};
+
+enum text_justification
+{
+	_text_justification_left,
+	_text_justification_right,
+	_text_justification_center,
+	NUMBER_OF_TEXT_JUSTIFICATIONS
+};
+
+enum hud_icon_type
+{
+	_icon_a_button,
+	_icon_b_button,
+	_icon_x_button,
+	_icon_y_button,
+	_icon_black_button,
+	_icon_white_button,
+	_icon_left_trigger,
+	_icon_right_trigger,
+	_icon_dpad_up,
+	_icon_dpad_down,
+	_icon_dpad_left,
+	_icon_dpad_right,
+	_icon_start_button,
+	_icon_back_button,
+	_icon_left_thumb,
+	_icon_right_thumb,
+	_icon_left_stick,
+	_icon_right_stick,
+	_icon_action,
+	_icon_throw_grenade,
+	_icon_primary_trigger,
+	_icon_integrated_light,
+	_icon_jump,
+	_icon_use_equipment,
+	_icon_rotate_weapons,
+	_icon_rotate_grenades,
+	_icon_crouch,
+	_icon_zoom,
+	_icon_accept,
+	_icon_back,
+	_icon_move,
+	_icon_look,
+	_icon_custom_1,
+	_icon_custom_2,
+	_icon_custom_3,
+	_icon_custom_4,
+	_icon_custom_5,
+	_icon_custom_6,
+	_icon_custom_7,
+	_icon_custom_8,
+	NUMBER_OF_ICON_TYPES
+};
+
+enum
+{
+	NUMBER_OF_HUD_CUSTOM_ICONS = _icon_custom_8 - _icon_custom_1 + 1
 };
 
 /* ---------- macros */
@@ -206,7 +290,16 @@ struct hud_state_message_element
 	byte data;
 };
 
-struct icon_hud_element_definition;
+struct icon_hud_element_definition
+{
+	short sequence_index;
+	short width_offset;
+	point2d offset;
+	pixel32 color;
+	char frame_rate;
+	byte flags;
+	short text_index;
+};
 
 struct hud_state_message_text_info_definition
 {
@@ -356,7 +449,8 @@ struct hud_timer_definition
 
 struct hud_messaging_parameters_definition
 {
-	byte reserved000[0x48];
+	struct hud_absolute_placement_definition absolute_placement;
+	struct hud_placement_definition placement;
 	struct tag_reference single_player_font;
 	struct tag_reference multi_player_font;
 	real up_time;
@@ -451,6 +545,16 @@ static struct hud_message_definition *find_free_hud_message(
 	struct hud_messaging_datum_definition *datum,
 	long item_definition_index,
 	char message_offset);
+static void render_state_text(
+	rectangle2d *bounds,
+	rectangle2d *cursor_bounds,
+	wchar_t const *text,
+	boolean custom);
+static void render_state_bitmap(
+	rectangle2d *bounds,
+	rectangle2d *cursor_bounds,
+	pixel32 color,
+	struct icon_hud_element_definition const *icon);
 
 /* ---------- globals */
 
@@ -458,10 +562,101 @@ static struct hud_messaging_globals_definition *hud_messaging_globals;
 extern struct hud_globals_definition *hud_globals;
 extern struct hud_messaging_parameters_definition *hud_msg_def;
 extern struct hud_scripted_globals_definition *hud_scripted_globals;
-extern long time_code_time;
-extern long time_code_stop_time;
+static char button_mappings[_icon_custom_1 - _icon_action] =
+{
+	2,
+	6,
+	7,
+	5,
+	0,
+	4,
+	3,
+	1,
+	11,
+	10,
+	_icon_a_button,
+	_icon_b_button,
+	_icon_left_stick,
+	_icon_right_stick
+};
+long time_code_time = NONE;
+long time_code_stop_time = NONE;
+static long split_screen_hud_message_offset = 17;
 
 /* ---------- public code */
+
+static void render_state_text(
+	rectangle2d *bounds,
+	rectangle2d *cursor_bounds,
+	wchar_t const *text,
+	boolean custom)
+{
+	rectangle2d text_bounds;
+
+	draw_string_set_indents(cursor_bounds->x0 - bounds->x0, 0);
+	draw_unicode_string_compute_bounds(bounds, text, &text_bounds, cursor_bounds);
+	cursor_bounds->x0 -= 3;
+	text_bounds.x0 = bounds->x0;
+	if (custom && game_engine_running())
+		draw_string_and_hack_in_icons(&text_bounds, NULL, NULL, 0, text, TRUE);
+	else
+		rasterizer_draw_unicode_string(&text_bounds, NULL, NULL, 0, text);
+	bounds->y0 = cursor_bounds->y0;
+
+	return;
+}
+
+static void render_state_bitmap(
+	rectangle2d *bounds,
+	rectangle2d *cursor_bounds,
+	pixel32 color,
+	struct icon_hud_element_definition const *icon)
+{
+	long bitmap_group_index = hud_globals->messaging.messaging_icons.index;
+	long frame_index = 0;
+	struct bitmap_data *bitmap = NULL;
+	real_rectangle2d const *clip = NULL;
+	real scale;
+	point2d point;
+
+	if (icon->frame_rate)
+		frame_index = game_time_get() / icon->frame_rate;
+	hud_retrieve_bitmap_and_bounding_rect(
+		bitmap_group_index,
+		icon->sequence_index,
+		frame_index,
+		&bitmap,
+		&clip);
+	if (bitmap && _texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
+	{
+		scale = local_player_count() > 1 ? 0.75f : 1.0f;
+		point.x = (short)(icon->offset.x * scale + cursor_bounds->x0);
+		point.y = (short)(cursor_bounds->y1 - icon->offset.y * scale);
+		hud_draw_bitmap_direct(
+			bitmap,
+			_hud_corner_bottom_left,
+			&point,
+			clip,
+			scale,
+			0.0f,
+			TEST_FLAG(icon->flags, _hud_icon_use_color_bit) ? icon->color : color,
+			FALSE);
+		if (TEST_FLAG(icon->flags, _hud_icon_absolute_width_bit))
+			cursor_bounds->x0 = (short)(icon->width_offset * scale + point.x);
+		else if (clip)
+		{
+			cursor_bounds->x0 = (short)(
+				((clip->x1 - clip->x0) * bitmap->width + icon->width_offset) * scale + point.x);
+		}
+		else
+		{
+			cursor_bounds->x0 = (short)(
+				(bitmap->width + icon->width_offset) * scale + point.x);
+		}
+	}
+
+	return;
+}
 
 void hud_messaging_initialize(
 	void)
@@ -1204,4 +1399,529 @@ static long compare_messages(
 	}
 
 	return difference;
+}
+
+void hud_messaging_update(
+	short local_player_index)
+{
+	if (!cinematic_in_progress() &&
+		local_player_index != NONE &&
+		game_engine_hud_draw_messages(local_player_get_player_index(local_player_index)))
+	{
+		long font_index = local_player_count() > 1 &&
+			hud_msg_def->multi_player_font.index != NONE
+				? hud_msg_def->multi_player_font.index
+				: hud_msg_def->single_player_font.index;
+		boolean split_screen = local_player_count() > 1;
+		point2d screen_point;
+		struct font_header *font;
+		short line_top;
+		short line_height;
+		short first_line_height;
+		struct hud_messaging_datum_definition *datum;
+		short maximum_message_count;
+		boolean objective_active;
+		boolean help_active;
+		boolean state_active;
+		rectangle2d line_bounds;
+		rectangle2d line_cursor;
+		real_argb_color state_color;
+		real_argb_color text_color;
+		pixel32 pixel_color = 0;
+
+		hud_calculate_point(
+			local_player_index,
+			&hud_msg_def->absolute_placement,
+			&hud_msg_def->placement,
+			NULL,
+			local_player_count() > 1,
+			0.0f,
+			&screen_point);
+		font = font_definition_get(font_index);
+		line_top = screen_point.y;
+		if (split_screen)
+		{
+			line_height = font->leading_height + font->ascending_height;
+			line_top -= (short)split_screen_hud_message_offset;
+		}
+		else
+		{
+			line_height = font->leading_height +
+				font->descending_height +
+				font->ascending_height;
+		}
+		first_line_height = line_height;
+		datum = &hud_messaging_globals->message_data[render.local_player_index];
+		maximum_message_count = 4 - (local_player_count() > 1);
+		objective_active = hud_messaging_globals->objective.message &&
+			hud_messaging_globals->objective.uptime;
+		help_active = hud_scripted_globals->show_hud_help_text &&
+			hud_messaging_globals->help_message;
+		state_active = datum->state_message.valid &&
+			(datum->state_message.state_message || datum->state_message.message_buffer[0]);
+
+		if (objective_active || help_active || state_active)
+		{
+			struct game_input_preferences preferences;
+			struct hud_message_text_definition *hud_messages;
+			struct hud_state_message_definition *message;
+
+			input_abstraction_get_local_player_preferences(
+				local_player_index,
+				&preferences);
+			if (objective_active)
+			{
+				struct hud_color_definition *objective_color =
+					&hud_globals->messaging.objective_color;
+				pixel32 flash_color = get_flash_color(
+					objective_color,
+					game_time_get() + hud_messaging_globals->objective.uptime -
+						objective_color->custom.objective.up_ticks -
+						objective_color->custom.objective.fade_ticks);
+
+				pixel32_to_real_argb_color(flash_color, &state_color);
+				state_color.alpha *= MIN(
+					(real)hud_messaging_globals->objective.uptime /
+						objective_color->custom.objective.fade_ticks,
+					1.0f);
+				pixel_color = real_argb_color_to_pixel32(&state_color);
+			}
+			else if (help_active)
+			{
+				if (hud_messaging_globals->use_flash)
+				{
+					pixel_color = get_flash_color(
+						&hud_globals->messaging.color,
+						hud_messaging_globals->flash_start_time);
+				}
+				else if (TEST_FLAG(
+					hud_globals->messaging.color.flash_flags,
+					_hud_flash_reverse_colors_bit))
+				{
+					pixel_color = hud_globals->messaging.color.flash_color;
+				}
+				else
+				{
+					pixel_color = hud_globals->messaging.color.color;
+				}
+				pixel32_to_real_argb_color(pixel_color, &state_color);
+			}
+			else
+			{
+				state_color = hud_msg_def->state_color;
+				pixel_color = real_argb_color_to_pixel32(&state_color);
+			}
+
+			line_bounds.y0 = line_top;
+			line_bounds.x0 = screen_point.x;
+			line_bounds.y1 = 5 * line_height + line_top;
+			line_bounds.x1 = render.camera.window_bounds.x1 -
+				render.camera.viewport_bounds.x0;
+			line_cursor = line_bounds;
+			draw_string_set_draw_mode(
+				font_index,
+				NONE,
+				_text_justification_left,
+				0,
+				&state_color);
+
+			if (!objective_active && !help_active &&
+				!datum->state_message.state_message)
+			{
+				if (datum->state_message.message_buffer[0])
+				{
+					render_state_text(
+						&line_bounds,
+						&line_cursor,
+						datum->state_message.message_buffer,
+						TRUE);
+				}
+			}
+			else
+			{
+				word text_position;
+				short element_index;
+
+				if (objective_active)
+				{
+					struct scenario *scenario;
+
+					match_vassert(
+						"c:\\halo\\SOURCE\\interface\\hud_messaging.c",
+						0x420,
+						hud_messaging_globals->objective.message &&
+							hud_messaging_globals->objective.uptime,
+						"hud_messaging_globals->objective.message && hud_messaging_globals->objective.uptime");
+					hud_messaging_globals->objective.uptime = MAX(
+						hud_messaging_globals->objective.uptime - game_time_get_elapsed(),
+						0);
+					scenario = global_scenario_get();
+					hud_messages = HUD_MESSAGE_TEXT_DEFINITION_GET(
+						scenario->hud_messages.index);
+					message = hud_messaging_globals->objective.message;
+				}
+				else if (help_active)
+				{
+					struct scenario *scenario = global_scenario_get();
+
+					hud_messages = HUD_MESSAGE_TEXT_DEFINITION_GET(
+						scenario->hud_messages.index);
+					message = hud_messaging_globals->help_message;
+				}
+				else
+				{
+					match_vassert(
+						"c:\\halo\\SOURCE\\interface\\hud_messaging.c",
+						0x42C,
+						state_active,
+						"show_state_message");
+					hud_messages = HUD_MESSAGE_TEXT_DEFINITION_GET(
+						hud_globals->messaging.hud_messages.index);
+					message = datum->state_message.state_message;
+				}
+
+				text_position = message->text_start_index;
+				for (element_index = 0;
+					element_index < message->element_count;
+					element_index++)
+				{
+					struct hud_state_message_element *element = TAG_BLOCK_GET_ELEMENT(
+						&hud_messages->elements,
+						message->element_start_index + element_index,
+						struct hud_state_message_element);
+
+					switch (element->type)
+					{
+					case _hud_message_type_text:
+						{
+							wchar_t const *text = tag_data_get_pointer(
+								&hud_messages->text_data,
+								text_position * sizeof(wchar_t),
+								element->data * sizeof(wchar_t));
+							rectangle2d text_bounds;
+
+							draw_string_set_indents(line_cursor.x0 - line_bounds.x0, 0);
+							draw_unicode_string_compute_bounds(
+								&line_bounds,
+								text,
+								&text_bounds,
+								&line_cursor);
+							line_cursor.x0 -= 3;
+							text_bounds.x0 = line_bounds.x0;
+							rasterizer_draw_unicode_string(
+								&text_bounds,
+								NULL,
+								NULL,
+								0,
+								text);
+							line_bounds.y0 = line_cursor.y0;
+							text_position += element->data;
+						}
+						break;
+
+					case _hud_message_type_icon:
+						{
+							short icon_index = NONE;
+
+							if (element->data <= _icon_right_stick)
+							{
+								icon_index = element->data;
+							}
+							else if (element->data <= _icon_look)
+							{
+								if (element->data <= _icon_accept)
+								{
+									icon_index = preferences.game_control_to_xbox_buttons[
+										button_mappings[element->data - _icon_action]];
+								}
+								else
+								{
+									icon_index = button_mappings[element->data - _icon_action];
+								}
+							}
+							else if (hud_scripted_globals->show_hud_help_text)
+							{
+								error(_error_silent, "help text cannot use custom icons");
+							}
+							else
+							{
+								short custom_index = element->data - _icon_custom_1;
+
+								match_vassert(
+									"c:\\halo\\SOURCE\\interface\\hud_messaging.c",
+									0x457,
+									custom_index < NUMBER_OF_HUD_CUSTOM_ICONS,
+									"custom_index<NUMBER_OF_HUD_CUSTOM_ICONS");
+								if (TEST_FLAG(datum->state_message.is_text_flags, custom_index))
+								{
+									short string_index = datum->state_message.info[custom_index].text.string_index;
+
+									if (string_index == NONE)
+									{
+										render_state_text(
+											&line_bounds,
+											&line_cursor,
+											L"<unknown>",
+											FALSE);
+									}
+									else if (datum->state_message.info[custom_index].text.uses_scenario_names)
+									{
+										match_vassert(
+											"c:\\halo\\SOURCE\\interface\\hud_messaging.c",
+											0x460,
+											global_scenario_get()->custom_object_names.index != NONE,
+											"global_scenario_get()->custom_object_names.index!=NONE");
+										render_state_text(
+											&line_bounds,
+											&line_cursor,
+											unicode_string_list_get_string(
+												global_scenario_get()->custom_object_names.index,
+												string_index),
+											FALSE);
+									}
+									else
+									{
+										render_state_text(
+											&line_bounds,
+											&line_cursor,
+											unicode_string_list_get_string(
+												hud_globals->messaging.alternate_icon_text.index,
+												string_index),
+											FALSE);
+									}
+								}
+								else
+								{
+									struct icon_hud_element_definition const *icon =
+										datum->state_message.info[custom_index].icon;
+
+									if (icon)
+									{
+										render_state_bitmap(
+											&line_bounds,
+											&line_cursor,
+											pixel_color,
+											icon);
+									}
+									else
+									{
+										error(
+											_error_silent,
+											"help message using old code. get latest code and tags.");
+									}
+								}
+								break;
+							}
+
+							if (icon_index < hud_globals->messaging.button_icons.count)
+							{
+								struct icon_hud_element_definition const *icon;
+
+								icon_index = remap_sticks_for_local_player(
+									icon_index,
+									local_player_index);
+								icon = TAG_BLOCK_GET_ELEMENT(
+									&hud_globals->messaging.button_icons,
+									icon_index,
+									struct icon_hud_element_definition);
+								if (TEST_FLAG(icon->flags, _hud_icon_use_text_bit))
+								{
+									wchar_t const *icon_text;
+									rectangle2d text_bounds;
+
+									if (TEST_FLAG(icon->flags, _hud_icon_use_color_bit))
+									{
+										pixel32_to_real_argb_color(pixel_color, &text_color);
+										draw_string_set_draw_mode(
+											font_index,
+											NONE,
+											_text_justification_left,
+											0,
+											&text_color);
+									}
+									icon_text = unicode_string_list_get_string(
+										hud_globals->messaging.alternate_icon_text.index,
+										icon->text_index);
+									draw_string_set_indents(line_cursor.x0 - line_bounds.x0, 0);
+									draw_unicode_string_compute_bounds(
+										&line_bounds,
+										icon_text,
+										&text_bounds,
+										&line_cursor);
+									line_cursor.x0 -= 3;
+									text_bounds.x0 = line_bounds.x0;
+									rasterizer_draw_unicode_string(
+										&text_bounds,
+										NULL,
+										NULL,
+										0,
+										icon_text);
+									line_bounds.y0 = line_cursor.y0;
+									draw_string_set_draw_mode(
+										font_index,
+										NONE,
+										_text_justification_left,
+										0,
+										&state_color);
+								}
+								else
+								{
+									render_state_bitmap(
+										&line_bounds,
+										&line_cursor,
+										pixel_color,
+										icon);
+								}
+							}
+							else
+							{
+								rectangle2d text_bounds;
+
+								draw_string_set_indents(line_cursor.x0 - line_bounds.x0, 0);
+								draw_unicode_string_compute_bounds(
+									&line_bounds,
+									L"<no button icon>",
+									&text_bounds,
+									&line_cursor);
+								line_cursor.x0 -= 3;
+								text_bounds.x0 = line_bounds.x0;
+								rasterizer_draw_unicode_string(
+									&text_bounds,
+									NULL,
+									NULL,
+									0,
+									L"<no button icon>");
+								line_bounds.y0 = line_cursor.y0;
+							}
+						}
+						break;
+
+					default:
+						match_assert(
+							"c:\\halo\\SOURCE\\interface\\hud_messaging.c",
+							0x4A7,
+							!"unreachable");
+						break;
+					}
+				}
+			}
+
+			draw_string_set_indents(0, 0);
+			line_height = first_line_height;
+			line_top = line_cursor.y1;
+		}
+
+		if (!objective_active && !help_active &&
+			(datum->state_message.valid || datum->leave_first_line_blank))
+		{
+			if (split_screen)
+			{
+				line_top = (short)(
+					hud_msg_def->spacing * line_height +
+					screen_point.y - split_screen_hud_message_offset);
+			}
+			else
+			{
+				line_top = (short)(
+					hud_msg_def->spacing * line_height + screen_point.y);
+			}
+			maximum_message_count--;
+		}
+
+		qsort(
+			datum->messages,
+			NUMBEROF(datum->messages),
+			sizeof(datum->messages[0]),
+			(int (__cdecl *)(void const *, void const *))compare_messages);
+		if (maximum_message_count > 0)
+		{
+			wchar_t formatted[276];
+			short message_index;
+
+			for (message_index = 0;
+				message_index < maximum_message_count;
+				message_index++)
+			{
+				struct hud_message_definition *message = &datum->messages[message_index];
+				long now;
+				long elapsed;
+				rectangle2d message_bounds;
+				wchar_t const *item_text;
+
+				if (!message->valid)
+					break;
+				now = game_time_get();
+				elapsed = now - message->time;
+				text_color = hud_msg_def->text_color;
+				if ((real)elapsed > hud_msg_def->up_time * TICKS_PER_SECOND)
+				{
+					real fade = PIN(
+						1.0f -
+							((real)elapsed - hud_msg_def->up_time * TICKS_PER_SECOND) /
+							(hud_msg_def->fade_time * TICKS_PER_SECOND),
+						0.0f,
+						1.0f);
+
+					text_color.alpha *= (real)pow((double)fade, 1.9f);
+				}
+
+				message_bounds = render.camera.window_bounds;
+				message_bounds.y0 = line_top;
+				message_bounds.x0 = screen_point.x;
+				message_bounds.y1 = line_height + line_top;
+				message_bounds.x1 = render.camera.window_bounds.x1 -
+					render.camera.viewport_bounds.x0;
+				line_top = (short)(hud_msg_def->spacing * line_height + line_top);
+				draw_string_set_draw_mode(
+					font_index,
+					NONE,
+					_text_justification_left,
+					0,
+					&text_color);
+
+				if (message->item_definition_index == NONE)
+				{
+					rasterizer_draw_unicode_string(
+						&message_bounds,
+						NULL,
+						NULL,
+						0,
+						message->text);
+				}
+				else
+				{
+					char message_offset = message->message_offset;
+					struct item_definition *item = item_definition_get(
+						message->item_definition_index);
+
+					if (message_offset == NONE)
+						message_offset = message->quantity > 1;
+					item_text = hud_get_item_string(
+						item->item.hud_message_index + message_offset);
+					if ((message->message_offset == NONE && message_offset) ||
+						message->quantity)
+					{
+						usprintf(
+							formatted,
+							item_text,
+							message->quantity /
+								MAX(item->item.hud_message_value_scale, 1));
+						item_text = formatted;
+					}
+					rasterizer_draw_unicode_string(
+						&message_bounds,
+						NULL,
+						NULL,
+						0,
+						item_text);
+				}
+				message->valid = (real)(now - message->time) <
+					(hud_msg_def->fade_time + hud_msg_def->up_time) * TICKS_PER_SECOND;
+				if (!message->valid)
+					message->time = NONE;
+			}
+		}
+	}
+
+	return;
 }

@@ -57,6 +57,9 @@ void hud_calculate_point(
 	point2d *result);
 long get_flash_duration(
 	struct hud_color_definition const *hud_color);
+pixel32 get_flash_color(
+	struct hud_color_definition const *hud_color,
+	long reference_value);
 void hud_draw_meter(
 	short local_player_index,
 	struct hud_absolute_placement_definition const *placement,

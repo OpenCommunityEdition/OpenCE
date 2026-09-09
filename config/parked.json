@@ -3109,9 +3109,9 @@
         "base": {
           "size": 672,
           "relocation_count": 43,
-          "normalized_sha256": "885fdb81966284acf5ba7138a4bbbd2221e7c61c89114fdd6f53b96ba89b81a0"
+          "normalized_sha256": "7db4861a5adf519e0457a0ffe785ff4d47e878fda47cc0a06206a529776ac91c"
         },
-        "objdiff_percent": 97.67839
+        "objdiff_percent": 97.76382
       }
     },
     {
@@ -6214,6 +6214,94 @@
         "target": { "size": 608, "relocation_count": 26, "normalized_sha256": "dfe35f0bc1c0576d568472c8be04583e4651a2fe14810520891f9608bf86ccd2" },
         "base": { "size": 608, "relocation_count": 26, "normalized_sha256": "bcf4cefdb82e1d1eb34388f794ca0cdcc98c1d01b635c44e8796e744e9e3e920" },
         "objdiff_percent": 95.505615
+      }
+    },
+    {
+      "unit": "source/interface/hud_messaging",
+      "function": "_hud_messaging_update",
+      "class": "unclassified",
+      "evidence": "Complete typed HUD renderer reconstructed from January control flow, strings, data and relocations, with the independent HCEA implementation as a semantic map. It covers objective/help/custom state messages, text and bitmap elements, button remapping, split-screen placement, timed item messages, fading and expiration. January is 2,928 padded bytes with 137 relocations; canonical is 2,880 with 136. The remaining delta is a VC7 load/register schedule around split-screen line placement, not known missing behavior. No compiler steering, raw offsets, fake dependency, undefined behavior, representation pun, forced inline or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/hud_messaging_obj_renderer_caller_closure_20260908.md.",
+      "measurements": {
+        "target": { "size": 2928, "relocation_count": 137, "normalized_sha256": "26a1376422e3742f9d65a8d83241919e1e370769a936ade9c9b859829d7d1b7b" },
+        "base": { "size": 2880, "relocation_count": 136, "normalized_sha256": "d5d32a3ce4d44e6e87ed3daa1d1ce28cf1a746bd53ae0b678bf7ec99a955d815" },
+        "objdiff_percent": 66.71034
+      }
+    },
+    {
+      "unit": "source/math/geometry",
+      "function": "_convex_hull3d_begin",
+      "class": "unclassified",
+      "evidence": "Complete typed tetrahedron seed reconstructed from January assertions, layout and disassembly with the independent HCEA convex-hull source as a semantic map. January is 1,488 padded bytes and canonical is 1,472, both with 28 relocations and the same ordered destinations. The remaining 16-byte aggregate-home and topology schedule difference has no proved source-level mechanism. No compiler steering, raw layout, fake dependency, extra helper owner, forced inline or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/geometry_obj_convex_hull3d_begin_expand_reconciliation_20260908.md.",
+      "measurements": {
+        "target": { "size": 1488, "relocation_count": 28, "normalized_sha256": "d3e0ba2e2077ce1e167e22398d1ce4b18329c8a3301ef606b46f56456ee282bc" },
+        "base": { "size": 1472, "relocation_count": 28, "normalized_sha256": "1b5824819ddffa0f161d260eec28283d4b1e3fc5a7422dee6ec8e5f5653f8804" },
+        "objdiff_percent": 93.49269
+      }
+    },
+    {
+      "unit": "source/math/geometry",
+      "function": "_convex_hull3d_expand",
+      "class": "unclassified",
+      "evidence": "Complete typed convex-hull expansion reconstructed from January assertions, layout and disassembly with independent HCEA source as a semantic map. Target and canonical are both 1,808 padded bytes with 67 relocations and the same ordered destinations. Final audit moved indexed surface and edge pointer formation behind the corresponding bounds validation, removing abstract-C undefined behavior from the earlier, superficially closer candidate. That valid source perturbs VC7 allocation and relocation addresses across the horizon walk, reducing objdiff to 84.64924 percent; it is retained because semantic validity outranks similarity. No compiler steering, raw layout, fake dependency, extra helper owner, forced inline, undefined behavior or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/geometry_obj_convex_hull3d_begin_expand_reconciliation_20260908.md.",
+      "measurements": {
+        "target": { "size": 1808, "relocation_count": 67, "normalized_sha256": "bad17e2158737f40d52656451e9f2ce826a8b27d395f84032536dceab223fbb0" },
+        "base": { "size": 1808, "relocation_count": 67, "normalized_sha256": "3b42a1bae5ecb4b878280d95cedf580f83abd8c332c193aae825d59a7ae3c5f1" },
+        "objdiff_percent": 84.64924
+      }
+    },
+    {
+      "unit": "source/sound/sound_manager",
+      "function": "_update_channel_for_looping_sound",
+      "class": "unclassified",
+      "evidence": "Complete typed looping-channel update reconstructed from January code/relocations and HCEA semantics. It covers properties, cache transitions, linked permutations, definition changes and crossfades. January is 1,360 padded bytes with 61 relocations; canonical is 1,376 with 61. No unique source-level mechanism explains the residual, so it receives zero exact credit. No compiler steering, raw offset, fake dependency, undefined behavior or nonsensical branch is retained. See docs/object_matching_logs/sound_manager_obj_idle_channel_spine_20260908.md.",
+      "measurements": {
+        "target": { "size": 1360, "relocation_count": 61, "normalized_sha256": "457d122269e7e06c8b4a557f80eef434e3eb925aa8aaaa73d9e69bce635a6d78" },
+        "base": { "size": 1376, "relocation_count": 61, "normalized_sha256": "5fa29769faf68bcaa178d1a65f979d8641b10b3727a404d00849b345f42a0ff7" },
+        "objdiff_percent": 96.782814
+      }
+    },
+    {
+      "unit": "source/sound/sound_manager",
+      "function": "_update_channel_for_impulse_sound",
+      "class": "unclassified",
+      "evidence": "Complete typed impulse-channel property/queue/update body retained under its corrected semantic target name. January and canonical are both 528 padded bytes with all 29 relocations; normalized code still differs through ordinary scheduling. January bodies, callers and HCEA names independently prove the target symbol rotation. No compiler steering, raw offset, fake dependency, undefined behavior or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/sound_manager_obj_idle_channel_spine_20260908.md.",
+      "measurements": {
+        "target": { "size": 528, "relocation_count": 29, "normalized_sha256": "b700f26596f466e5771d4f875b0d3a9354600ee13b4dd1553cde0c48d45d8202" },
+        "base": { "size": 528, "relocation_count": 29, "normalized_sha256": "2d81b0f86a90351a964320970505552d0b323a95a871e75b9d8a4e50cf29eeb4" },
+        "objdiff_percent": 94.03593
+      }
+    },
+    {
+      "unit": "source/sound/sound_manager",
+      "function": "_limit_pitch",
+      "class": "unclassified",
+      "evidence": "Complete ordinary-C pitch-bend limiter reconstructed from January and HCEA behavior. January is 96 padded bytes and canonical is 112, both with one relocation. The residual is not assigned a speculative compiler mechanism and receives zero exact credit. No compiler steering, fake dependency, undefined behavior or nonsensical branch is retained. See docs/object_matching_logs/sound_manager_obj_idle_channel_spine_20260908.md.",
+      "measurements": {
+        "target": { "size": 96, "relocation_count": 1, "normalized_sha256": "fa465e8daf708a83bb16686d2c254a68937b1ad2c600be40817358dbdd31c6f3" },
+        "base": { "size": 112, "relocation_count": 1, "normalized_sha256": "c296946da525c8cb2c0e7c9ddced82e27a98fbfb51f9eb7e032bcecd8c880375" },
+        "objdiff_percent": 91.57895
+      }
+    },
+    {
+      "unit": "source/sound/sound_manager",
+      "function": "_sound_set_definition_end",
+      "class": "unclassified",
+      "evidence": "Complete queued-end-definition transition retained under its corrected semantic target name. January and canonical are both 208 padded bytes with all nine relocations; the code hash remains different. It uses the now-exact bounded channel-summary builder and the typed instance-limit flow. No compiler steering, raw offset, fake dependency, undefined behavior or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/sound_manager_obj_idle_channel_spine_20260908.md.",
+      "measurements": {
+        "target": { "size": 208, "relocation_count": 9, "normalized_sha256": "06f507e27039b2a39192271221e6c7b703aee4d5ae45becdac84f3543095ec13" },
+        "base": { "size": 208, "relocation_count": 9, "normalized_sha256": "4f5a03ed0532981c792521f1ce7cdcc47eef5a3ee2d038caf65f57b1987675d9" },
+        "objdiff_percent": 91.884056
+      }
+    },
+    {
+      "unit": "source/sound/sound_manager",
+      "function": "_sound_find_like_channel",
+      "class": "unclassified",
+      "evidence": "Complete typed best-channel selector for a supplied channel list. Target and canonical are both 272 padded bytes with all 16 relocations and 97.15909 percent similarity; the remaining normalized difference is not assigned a speculative mechanism. No compiler steering, raw offset, fake dependency, undefined behavior or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/sound_manager_obj_idle_channel_spine_20260908.md.",
+      "measurements": {
+        "target": { "size": 272, "relocation_count": 16, "normalized_sha256": "240a72742e0bdcb19f5bbf684bcffaefcf37a483a9fc59393cf4a6d0c36984b3" },
+        "base": { "size": 272, "relocation_count": 16, "normalized_sha256": "a695dfa283a53aeabb3923c2186b6690ff2b319205588ba7cebefce9b7c91c56" },
+        "objdiff_percent": 97.15909
       }
     }
   ]

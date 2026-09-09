@@ -39,6 +39,13 @@ enum
 	MAXIMUM_DETAIL_SOUNDS_PER_LOOPING_SOUND = 32,
 };
 
+enum sound_definition_flags
+{
+	_sound_definition_fit_to_compression_block_size_bit,
+	_sound_definition_linked_permutations_bit,
+	NUMBER_OF_SOUND_DEFINITION_FLAGS,
+};
+
 enum looping_sound_definition_flags
 {
 	_looping_sound_deafening_bit,
@@ -194,6 +201,9 @@ real sound_definition_get_maximum_distance(
 	long sound_index);
 real sound_definition_get_minimum_distance(
 	long sound_index);
+real sound_permutation_get_real_mouth_aperture(
+	struct sound_permutation *permutation,
+	long tick_index);
 
 short sound_definition_find_pitch_range_by_pitch(
 	struct sound_definition *definition,

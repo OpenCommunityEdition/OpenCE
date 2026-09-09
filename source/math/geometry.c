@@ -725,6 +725,472 @@ boolean convex_polygon3d_verify(
 	return TRUE;
 }
 
+boolean convex_hull3d_begin(
+	short point_count,
+	real_point3d const *points,
+	short vertex_count,
+	struct vertex3d *vertices,
+	short edge_count,
+	struct edge3d *edges,
+	short surface_count,
+	struct surface3d *surfaces)
+{
+	short minimum_x_point_index = NONE;
+	short farthest_point_index = NONE;
+	short farthest_line_point_index = NONE;
+	short farthest_plane_point_index = NONE;
+	real minimum_x;
+	real maximum_distance_squared;
+	real maximum_line_distance_squared;
+	real maximum_plane_distance;
+	real_vector3d line_direction;
+	real_plane3d plane;
+	short point_index;
+
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1710, points);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1711, vertices);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1712, edges);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1713, surfaces);
+
+	if (vertex_count < 4 || edge_count < 6 || surface_count < 4)
+	{
+		return FALSE;
+	}
+
+	minimum_x = REAL_MAX;
+	for (point_index = 0; point_index < point_count; point_index++)
+	{
+		if (points[point_index].x < minimum_x)
+		{
+			minimum_x = points[point_index].x;
+			minimum_x_point_index = point_index;
+		}
+	}
+	if (minimum_x_point_index == NONE)
+	{
+		return FALSE;
+	}
+
+	maximum_distance_squared = 0.f;
+	for (point_index = 0; point_index < point_count; point_index++)
+	{
+		if (distance_squared3d(points + point_index, points + minimum_x_point_index) > maximum_distance_squared)
+		{
+			farthest_point_index = point_index;
+			maximum_distance_squared = distance_squared3d(points + point_index, points + minimum_x_point_index);
+		}
+	}
+	if (farthest_point_index == NONE || maximum_distance_squared < global_convex_hull3d_delta)
+	{
+		return FALSE;
+	}
+
+	maximum_line_distance_squared = 0.f;
+	vector_from_points3d(points + minimum_x_point_index, points + farthest_point_index, &line_direction);
+	for (point_index = 0; point_index < point_count; point_index++)
+	{
+		real_vector3d offset;
+		real_vector3d projection = line_direction;
+		real t;
+		real distance_squared;
+
+		vector_from_points3d(points + minimum_x_point_index, points + point_index, &offset);
+		t = dot_product3d(&offset, &line_direction) / magnitude_squared3d(&line_direction);
+		scale_vector3d(&projection, t, &projection);
+		subtract_vectors3d(&offset, &projection, &offset);
+		distance_squared = magnitude_squared3d(&offset);
+
+		if (distance_squared > maximum_line_distance_squared)
+		{
+			maximum_line_distance_squared = distance_squared;
+			farthest_line_point_index = point_index;
+		}
+	}
+	if (farthest_line_point_index == NONE || maximum_line_distance_squared < global_convex_hull3d_delta)
+	{
+		return FALSE;
+	}
+
+	maximum_plane_distance = 0.f;
+	plane3d_from_points(&plane,
+		points + minimum_x_point_index,
+		points + farthest_point_index,
+		points + farthest_line_point_index);
+	for (point_index = 0; point_index < point_count; point_index++)
+	{
+		real distance = points[point_index].x*plane.n.i +
+			points[point_index].y*plane.n.j + points[point_index].z*plane.n.k - plane.d;
+
+		if (fabs(distance) > fabs(maximum_plane_distance))
+		{
+			maximum_plane_distance = distance;
+			farthest_plane_point_index = point_index;
+		}
+	}
+	if (farthest_plane_point_index == NONE || fabs(maximum_plane_distance) < global_convex_hull3d_delta)
+	{
+		return FALSE;
+	}
+
+	if (maximum_plane_distance > 0.f)
+	{
+		short swap = farthest_point_index;
+		farthest_point_index = farthest_line_point_index;
+		farthest_line_point_index = swap;
+	}
+
+	vertices[1].point_index = farthest_point_index;
+	vertices[2].point_index = farthest_line_point_index;
+	vertices[0].point_index = minimum_x_point_index;
+	vertices[3].edge_index = 3;
+	vertices[0].extant = TRUE;
+	vertices[0].edge_index = 0;
+	vertices[1].extant = TRUE;
+	vertices[1].edge_index = 0;
+	vertices[2].extant = TRUE;
+	vertices[2].edge_index = 1;
+	vertices[3].extant = TRUE;
+	vertices[3].point_index = farthest_plane_point_index;
+
+	edges[0].edge_indices[1] = 3;
+	edges[2].edge_indices[1] = 5;
+	edges[2].surface_indices[1] = 3;
+	edges[3].vertex_indices[1] = 3;
+	edges[3].surface_indices[1] = 3;
+	edges[4].vertex_indices[0] = 3;
+	edges[4].edge_indices[1] = 5;
+	edges[5].vertex_indices[0] = 3;
+	edges[5].edge_indices[1] = 3;
+	edges[5].surface_indices[1] = 3;
+	edges[0].extant = TRUE;
+	edges[0].vertex_indices[0] = 0;
+	edges[0].vertex_indices[1] = 1;
+	edges[0].edge_indices[0] = 1;
+	edges[0].surface_indices[0] = 0;
+	edges[0].surface_indices[1] = 1;
+	edges[1].extant = TRUE;
+	edges[1].vertex_indices[0] = 1;
+	edges[1].vertex_indices[1] = 2;
+	edges[1].edge_indices[0] = 2;
+	edges[1].edge_indices[1] = 4;
+	edges[1].surface_indices[0] = 0;
+	edges[1].surface_indices[1] = 2;
+	edges[2].extant = TRUE;
+	edges[2].vertex_indices[0] = 2;
+	edges[2].vertex_indices[1] = 0;
+	edges[2].edge_indices[0] = 0;
+	edges[2].surface_indices[0] = 0;
+	edges[3].extant = TRUE;
+	edges[3].vertex_indices[0] = 0;
+	edges[3].edge_indices[0] = 4;
+	edges[3].edge_indices[1] = 2;
+	edges[3].surface_indices[0] = 1;
+	edges[4].extant = TRUE;
+	edges[4].vertex_indices[1] = 1;
+	edges[4].edge_indices[0] = 0;
+	edges[4].surface_indices[0] = 1;
+	edges[4].surface_indices[1] = 2;
+	edges[5].extant = TRUE;
+	edges[5].vertex_indices[1] = 2;
+	edges[5].edge_indices[0] = 1;
+	edges[5].surface_indices[0] = 2;
+
+	surfaces[0].extant = TRUE;
+	plane3d_from_points(&surfaces[0].plane,
+		points + minimum_x_point_index,
+		points + farthest_point_index,
+		points + farthest_line_point_index);
+	surfaces[0].edge_index = 0;
+	surfaces[1].extant = TRUE;
+	plane3d_from_points(&surfaces[1].plane,
+		points + minimum_x_point_index,
+		points + farthest_plane_point_index,
+		points + farthest_point_index);
+	surfaces[1].edge_index = 0;
+	surfaces[2].extant = TRUE;
+	plane3d_from_points(&surfaces[2].plane,
+		points + farthest_point_index,
+		points + farthest_plane_point_index,
+		points + farthest_line_point_index);
+	surfaces[2].edge_index = 1;
+	surfaces[3].extant = TRUE;
+	plane3d_from_points(&surfaces[3].plane,
+		points + minimum_x_point_index,
+		points + farthest_line_point_index,
+		points + farthest_plane_point_index);
+	surfaces[3].edge_index = 2;
+
+	for (point_index = 4; point_index < vertex_count; point_index++)
+	{
+		vertices[point_index].extant = FALSE;
+	}
+	for (point_index = 6; point_index < edge_count; point_index++)
+	{
+		edges[point_index].extant = FALSE;
+	}
+	for (point_index = 4; point_index < surface_count; point_index++)
+	{
+		surfaces[point_index].extant = FALSE;
+	}
+
+	return TRUE;
+}
+
+boolean convex_hull3d_expand(
+	short point_count,
+	real_point3d const *points,
+	short vertex_count,
+	struct vertex3d *vertices,
+	short edge_count,
+	struct edge3d *edges,
+	short surface_count,
+	struct surface3d *surfaces,
+	short point_index)
+{
+	real_point3d const *new_point;
+	boolean already_contained = TRUE;
+	short first_boundary_edge_index;
+	short surface_index;
+	short edge_index;
+	short vertex_index;
+	short new_vertex_index;
+	short previous_new_edge_index;
+	short first_new_edge_index;
+
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1973, points);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1974, vertices);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1975, edges);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1976, surfaces);
+
+	if (point_index < 0 || point_index >= point_count)
+	{
+		return FALSE;
+	}
+
+	new_point = points + point_index;
+	first_boundary_edge_index = NONE;
+	for (surface_index = 0; surface_index < surface_count; surface_index++)
+	{
+		struct surface3d const *surface = surfaces + surface_index;
+
+		if (surface->extant &&
+			surface->plane.n.i*new_point->x + surface->plane.n.j*new_point->y +
+			surface->plane.n.k*new_point->z - surface->plane.d > global_convex_hull3d_delta)
+		{
+			already_contained = FALSE;
+			break;
+		}
+	}
+	if (already_contained)
+	{
+		return TRUE;
+	}
+
+	for (surface_index = 0; surface_index < surface_count; surface_index++)
+	{
+		struct surface3d *surface = surfaces + surface_index;
+
+		if (surface->extant)
+		{
+			real distance = surface->plane.n.i*new_point->x +
+				surface->plane.n.j*new_point->y + surface->plane.n.k*new_point->z - surface->plane.d;
+			surface->extant = !(distance > -global_convex_hull3d_epsilon);
+		}
+	}
+
+	for (edge_index = 0; edge_index < edge_count; edge_index++)
+	{
+		struct edge3d *edge = edges + edge_index;
+
+		if (edge->extant)
+		{
+			struct surface3d *surface0;
+			struct surface3d *surface1;
+
+			if (edge->surface_indices[0] < 0 || edge->surface_indices[0] >= surface_count ||
+				edge->surface_indices[1] < 0 || edge->surface_indices[1] >= surface_count)
+			{
+				return FALSE;
+			}
+			surface0 = surfaces + edge->surface_indices[0];
+			surface1 = surfaces + edge->surface_indices[1];
+
+			edge->extant = surface0->extant || surface1->extant;
+			if (edge->extant && surface0->extant != surface1->extant)
+			{
+				if (!surface0->extant)
+				{
+					edge->surface_indices[0] = NONE;
+				}
+				else
+				{
+					edge->surface_indices[1] = NONE;
+				}
+				if (first_boundary_edge_index == NONE)
+				{
+					first_boundary_edge_index = edge_index;
+				}
+			}
+		}
+	}
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 2076, first_boundary_edge_index!=NONE);
+
+	for (vertex_index = 0; vertex_index < vertex_count; vertex_index++)
+	{
+		struct vertex3d *vertex = vertices + vertex_index;
+
+		if (vertex->extant)
+		{
+			short first_edge_index = NONE;
+			short previous_edge_index = NONE;
+			short edge_index = (short)vertex->edge_index;
+
+			do
+			{
+				struct edge3d *edge;
+
+				match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 2098, edge_index>=0 && edge_index<edge_count);
+				edge = edges + edge_index;
+				match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 2099,
+					edge->vertex_indices[0]==vertex_index || edge->vertex_indices[1]==vertex_index);
+
+				if (edge->extant)
+				{
+					if (previous_edge_index == NONE)
+					{
+						first_edge_index = edge_index;
+					}
+					else
+					{
+						struct edge3d *previous_edge = edges + previous_edge_index;
+						previous_edge->edge_indices[previous_edge->vertex_indices[0]==vertex_index] = edge_index;
+					}
+					previous_edge_index = edge_index;
+				}
+				edge_index = (short)edge->edge_indices[edge->vertex_indices[0]==vertex_index];
+			}
+			while (edge_index != vertex->edge_index);
+
+			if (previous_edge_index == NONE)
+			{
+				vertex->extant = FALSE;
+			}
+			else
+			{
+				struct edge3d *previous_edge = edges + previous_edge_index;
+				vertex->edge_index = first_edge_index;
+				previous_edge->edge_indices[previous_edge->vertex_indices[0]==vertex_index] = first_edge_index;
+			}
+		}
+	}
+
+	new_vertex_index = 0;
+	first_new_edge_index = NONE;
+	previous_new_edge_index = NONE;
+	edge_index = first_boundary_edge_index;
+	while (new_vertex_index < vertex_count && vertices[new_vertex_index].extant)
+	{
+		new_vertex_index++;
+	}
+	if (new_vertex_index >= vertex_count)
+	{
+		return FALSE;
+	}
+
+	for (;;)
+	{
+		struct edge3d *edge;
+		struct vertex3d *vertex1;
+		struct vertex3d *vertex2;
+		struct surface3d *new_surface;
+		struct edge3d *new_edge;
+		short new_surface_index;
+		short new_edge_index;
+
+		match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 2167, edge_index>=0 && edge_index<edge_count);
+		edge = edges + edge_index;
+		match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 2168, edge->extant);
+		match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 2169,
+			edge->vertex_indices[0]>=0 && edge->vertex_indices[0]<vertex_count);
+		match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 2170,
+			edge->vertex_indices[1]>=0 && edge->vertex_indices[1]<vertex_count);
+		match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 2171,
+			(edge->surface_indices[0]==NONE)!=(edge->surface_indices[1]==NONE));
+
+		for (new_surface_index = 0;
+			new_surface_index < surface_count && surfaces[new_surface_index].extant;
+			new_surface_index++)
+		{
+		}
+		if (new_surface_index >= surface_count)
+		{
+			break;
+		}
+
+		for (new_edge_index = 0;
+			new_edge_index < edge_count && edges[new_edge_index].extant;
+			new_edge_index++)
+		{
+		}
+		if (new_edge_index >= edge_count)
+		{
+			break;
+		}
+
+		new_surface = surfaces + new_surface_index;
+		vertex1 = vertices + edge->vertex_indices[edge->surface_indices[0]!=NONE];
+		vertex2 = vertices + edge->vertex_indices[edge->surface_indices[1]!=NONE];
+
+		match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 2206, vertex1->extant);
+		match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 2207,
+			vertex1->point_index>=0 && vertex1->point_index<point_count);
+		match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 2209, vertex2->extant);
+		match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 2210,
+			vertex2->point_index>=0 && vertex2->point_index<point_count);
+
+		new_surface->extant = TRUE;
+		plane3d_from_points(&new_surface->plane,
+			new_point,
+			points + vertex1->point_index,
+			points + vertex2->point_index);
+		new_surface->edge_index = edge_index;
+
+		new_edge = edges + new_edge_index;
+		new_edge->extant = TRUE;
+		new_edge->vertex_indices[0] = edge->vertex_indices[edge->surface_indices[1]!=NONE];
+		new_edge->vertex_indices[1] = new_vertex_index;
+		new_edge->edge_indices[0] = previous_new_edge_index;
+		new_edge->edge_indices[1] = edge->edge_indices[edge->surface_indices[0]!=NONE];
+		new_edge->surface_indices[0] = new_surface_index;
+		new_edge->surface_indices[1] = NONE;
+
+		edge->edge_indices[edge->surface_indices[0]!=NONE] = new_edge_index;
+		edge->surface_indices[edge->surface_indices[0]!=NONE] = new_surface_index;
+		if (previous_new_edge_index == NONE)
+		{
+			first_new_edge_index = new_edge_index;
+		}
+		else
+		{
+			edges[previous_new_edge_index].surface_indices[1] = new_surface_index;
+		}
+		previous_new_edge_index = new_edge_index;
+
+		edge_index = (short)new_edge->edge_indices[1];
+		if (edge_index == first_boundary_edge_index)
+		{
+			vertices[new_vertex_index].extant = TRUE;
+			vertices[new_vertex_index].point_index = point_index;
+			vertices[new_vertex_index].edge_index = first_new_edge_index;
+			edges[first_new_edge_index].edge_indices[0] = new_edge_index;
+			new_edge->surface_indices[1] = edges[first_new_edge_index].surface_indices[0];
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
 boolean convex_hull3d(
 	short point_count,
 	real_point3d const *points,
