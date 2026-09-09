@@ -6481,11 +6481,11 @@
       "unit": "source/rasterizer/xbox/rasterizer_xbox_models",
       "function": "__rasterizer_model_transparent_geometry_submit",
       "class": "tu-context-optimization",
-      "evidence": "Best complete typed transparent-group submission reconstruction retained from the Opus rasterizer lane. January is 1,296 padded bytes/83 relocations and candidate is 1,344/93 at 89.129036 percent similarity. The extra relocations and code reflect unresolved January caller-specific real_math helper ownership, not missing branches. It preserves the full queue/immediate-group behavior under semantic private-global names. No forced inline, header-suppression trick, raw offset, fake dependency, undefined behavior, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/rasterizer_xbox_models_obj_opus_reconciliation_20260909.md.",
+      "evidence": "Best complete typed transparent-group submission reconstruction retained from the Opus rasterizer lane. January is 1,296 padded bytes/83 relocations and the combined canonical candidate is 1,344/93 at 89.008064 percent similarity. The extra relocations and code reflect unresolved January caller-specific real_math helper ownership, not missing branches. It preserves the full queue/immediate-group behavior under semantic private-global names. The narrow environment-reflection prototype restoration changes only compiler scheduling in this already-fuzzy owner and adds no exact credit. No forced inline, header-suppression trick, raw offset, fake dependency, undefined behavior, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/rasterizer_xbox_models_obj_opus_reconciliation_20260909.md.",
       "measurements": {
         "target": { "size": 1296, "relocation_count": 83, "normalized_sha256": "7b84b560459ad2dda9183d24997e2bf23d7d14ad1e19fa27ba689241819fbd5d" },
-        "base": { "size": 1344, "relocation_count": 93, "normalized_sha256": "8fb7c26befa120e17d2ce14b97c0683b37967cf4fc774a1387a90465155c86e0" },
-        "objdiff_percent": 89.129036
+        "base": { "size": 1344, "relocation_count": 93, "normalized_sha256": "cc54c1a8a3f7041ac35015b99e2252472658776499af13cd790b47b88c979091" },
+        "objdiff_percent": 89.008064
       }
     },
     {

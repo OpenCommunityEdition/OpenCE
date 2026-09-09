@@ -24,8 +24,6 @@ struct render_lighting;
 struct rasterizer_frame_begin_parameters;
 struct rasterizer_model_lighting_constants;
 struct rasterizer_window_begin_parameters;
-struct shader;
-struct vertex_buffer;
 
 boolean _rasterizer_initialize(
 	void);

@@ -65,7 +65,7 @@ All three complete callers receive zero exact credit and are recorded in
 | function | January / candidate padded | relocations | objdiff |
 | --- | ---: | ---: | ---: |
 | `rasterizer_model_draw_environment_shader` | 3,104 / 3,104 | 235 / 235 | 95.87124% |
-| `_rasterizer_model_transparent_geometry_submit` | 1,296 / 1,344 | 83 / 93 | 89.129036% |
+| `_rasterizer_model_transparent_geometry_submit` | 1,296 / 1,344 | 83 / 93 | 89.008064% |
 | `_rasterizer_model_draw` | 5,168 / 5,184 | 350 / 349 | 96.66598% |
 
 The remaining large-caller frontier is dominated by caller-specific
