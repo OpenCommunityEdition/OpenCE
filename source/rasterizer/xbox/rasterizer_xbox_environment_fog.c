@@ -161,6 +161,7 @@ enum
 enum
 {
 	_rasterizer_vertex_shader_environment_fog = 6,
+	_rasterizer_vertex_shader_screen_effect = 38,
 };
 
 enum
@@ -178,6 +179,21 @@ enum
 	_fog_definition_atmosphere_dominant_bit = 1,
 };
 
+enum
+{
+	MAXIMUM_ENVIRONMENT_FOG_SCREEN_LAYERS = 4,
+};
+
+enum
+{
+	_rasterizer_target_render_primary = 0,
+};
+
+enum
+{
+	_fog_screen_use_fixed_density_bit = 0,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -190,6 +206,25 @@ struct rasterizer_environment_fog_debug_options
 	byte reserved06[0x16];
 	boolean draw_environment_fog;
 	boolean draw_environment_fog_screen;
+};
+
+struct fog_screen
+{
+	word flags;
+	short layer_count;
+	real near_distance;
+	real far_distance;
+	real near_density;
+	real far_density;
+	real start_distance_from_fog_plane;
+	byte reserved18[4];
+	pixel32 color;
+	real rotation_multiplier;
+	real strafing_multiplier;
+	real zoom_multiplier;
+	byte reserved2C[8];
+	real map_scale;
+	struct tag_reference map;
 };
 
 struct pixel_shader_definition
@@ -228,7 +263,7 @@ struct rasterizer_environment_fog_window_fog_parameters
 	real planar_maximum_density;
 	real planar_maximum_distance;
 	real planar_maximum_depth;
-	void const *screen;
+	struct fog_screen const *screen;
 	real screen_density;
 };
 
@@ -251,20 +286,32 @@ struct rasterizer_environment_fog_screen_wind
 
 struct rasterizer_environment_fog_screen_window
 {
-	byte reserved00[44];
+	word animation_index;
+	word pad002;
+	byte reserved004[0x28];
 	struct rasterizer_environment_fog_screen_wind wind;
-	byte reserved38[20];
+	byte reserved038[0x14];
 };
 
 struct rasterizer_environment_fog_screen_globals
 {
-	byte reserved000[0x120];
+	byte reserved000[0xD8];
+	boolean local_environment_fog_screen_model_flag;
+	boolean local_environment_fog_screen_flag;
+	byte reserved0DA[2];
+	word local_fog_screen_layer_bitmap_indices[MAXIMUM_ENVIRONMENT_FOG_SCREEN_LAYERS];
+	real_rgb_color local_fog_screen_layer_colors[MAXIMUM_ENVIRONMENT_FOG_SCREEN_LAYERS];
+	real local_fog_eye_density;
+	short local_fog_pass;
+	byte reserved11A[6];
 	struct rasterizer_environment_fog_screen_window windows[MAXIMUM_WINDOWS];
 	void *opaque_model_submit_parameters;
 	long opaque_model_count;
-	byte reserved258[40];
+	boolean fog_screen_active[MAXIMUM_WINDOWS];
+	byte reserved25C[4];
+	unsigned __int64 last_frame_index[MAXIMUM_WINDOWS];
 	short atmosphere_dominant_warning_count;
-	word pad282;
+	byte reserved282[2];
 	void *model;
 };
 
@@ -278,6 +325,15 @@ typedef char rasterizer_environment_fog_window_parameters_fog_offset_assert[
 	offsetof(struct rasterizer_environment_fog_window_parameters, fog) == 0x1E8 ? 1 : -1];
 typedef char rasterizer_environment_fog_pixel_shader_size_assert[
 	sizeof(struct pixel_shader_definition) == 0xF0 ? 1 : -1];
+
+/* January's assertions name these file-scope values.  They occupy fields in
+ * the single private BSS owner recovered for this translation unit. */
+#define local_fog_eye_density rasterizer_environment_fog_screen_globals.local_fog_eye_density
+#define local_fog_pass rasterizer_environment_fog_screen_globals.local_fog_pass
+#define local_environment_fog_screen_flag rasterizer_environment_fog_screen_globals.local_environment_fog_screen_flag
+#define local_environment_fog_screen_model_flag rasterizer_environment_fog_screen_globals.local_environment_fog_screen_model_flag
+#define local_fog_screen_layer_bitmap_indices rasterizer_environment_fog_screen_globals.local_fog_screen_layer_bitmap_indices
+#define local_fog_screen_layer_colors rasterizer_environment_fog_screen_globals.local_fog_screen_layer_colors
 
 /* ---------- globals */
 
@@ -545,6 +601,70 @@ boolean local_random_boolean(
 	return local_random() > 0x8000;
 }
 
+static boolean rasterizer_environment_fog_screen_active(
+	void)
+{
+	short window_index = global_window_parameters.window_index;
+	boolean active;
+
+	if (VALID_INDEX(window_index, MAXIMUM_WINDOWS))
+	{
+		struct fog_screen const *screen;
+
+		rasterizer_environment_fog_screen_globals.fog_screen_active[window_index] = FALSE;
+		if (rasterizer_globals.fps_accumulation_frame_index !=
+			rasterizer_environment_fog_screen_globals.last_frame_index[window_index])
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment_fog.c",
+				92,
+				global_window_parameters.fog.planar_maximum_depth!=0.0f);
+			if (rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_normal &&
+				rasterizer_debug_options.draw_environment_fog_screen &&
+				global_window_parameters.rasterizer_target == _rasterizer_target_render_primary &&
+				(screen = global_window_parameters.fog.screen) != NULL &&
+				screen->layer_count > 0 &&
+				screen->map.index != NONE &&
+				screen->far_distance != 0.0f &&
+				screen->far_density != 0.0f &&
+				(!TEST_FLAG(
+					global_window_parameters.fog.screen_flags,
+					_fog_screen_use_fixed_density_bit) ||
+					global_window_parameters.fog.screen_density > 0.0f))
+			{
+				real depth = global_window_parameters.fog.planar_maximum_depth;
+				real distance =
+					global_window_parameters.camera_position.x *
+						global_window_parameters.fog.plane.n.i +
+					global_window_parameters.camera_position.y *
+						global_window_parameters.fog.plane.n.j +
+					global_window_parameters.camera_position.z *
+						global_window_parameters.fog.plane.n.k -
+					global_window_parameters.fog.plane.d;
+				real z = screen->start_distance_from_fog_plane;
+				real base_z = -depth;
+
+				if (z == base_z)
+					z = 0.0001f - depth;
+				local_fog_eye_density = TEST_FLAG(
+					global_window_parameters.fog.screen_flags,
+					_fog_screen_use_fixed_density_bit)
+						? global_window_parameters.fog.screen_density
+						: PIN((distance - z) / (base_z - z), 0.0f, 1.0f);
+				if (local_fog_eye_density > 0.0f)
+					rasterizer_environment_fog_screen_globals.fog_screen_active[window_index] = TRUE;
+			}
+		}
+		active = rasterizer_environment_fog_screen_globals.fog_screen_active[window_index];
+	}
+	else
+	{
+		active = FALSE;
+	}
+
+	return active;
+}
+
 void _rasterizer_environment_fog_screen_wind_get_vector(
 	short window_index,
 	real dt,
@@ -565,6 +685,176 @@ void _rasterizer_environment_fog_screen_wind_get_vector(
 	wind_vector->i = wind->magnitude * wind->direction.i * dt;
 	wind_vector->j = wind->direction.j * wind->magnitude * dt;
 	wind_vector->k = 0.0f;
+
+	return;
+}
+
+void _rasterizer_environment_fog_screen_end(
+	void)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment_fog.c",
+		1036,
+		global_d3d_device);
+	if (rasterizer_environment_fog_screen_active())
+	{
+		struct fog_screen const *screen = global_window_parameters.fog.screen;
+		struct rasterizer_environment_fog_screen_window *window =
+			&rasterizer_environment_fog_screen_globals.windows[
+				global_window_parameters.window_index];
+		boolean fog_screen_drawn = local_environment_fog_screen_flag ||
+			local_environment_fog_screen_model_flag;
+		short layer;
+
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment_fog.c",
+			1045,
+			local_fog_pass==0 || local_fog_pass==1);
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment_fog.c",
+			1047,
+			global_window_parameters.fog.screen);
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment_fog.c",
+			1048,
+			global_window_parameters.window_index>=0 &&
+				global_window_parameters.window_index<MAXIMUM_WINDOWS);
+
+		for (layer = 0; layer < screen->layer_count; layer++)
+		{
+			word animation_index = window->animation_index + layer;
+			short layer_index = animation_index % screen->layer_count;
+
+			rasterizer_set_texture_direct(
+				layer,
+				screen->map.index,
+				local_fog_screen_layer_bitmap_indices[layer_index]);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, layer, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, layer, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, layer, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, layer, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, layer, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+		}
+
+		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_CULLMODE, D3DCULL_CCW);
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_COLORWRITEENABLE,
+			local_fog_pass == 0 && fog_screen_drawn
+				? D3DCOLORWRITEENABLE_ALPHA
+				: D3DCOLORWRITEENABLE_RED | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_BLUE);
+		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ALPHABLENDENABLE, TRUE);
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_SRCBLEND,
+			fog_screen_drawn ? D3DBLEND_INVDESTALPHA : D3DBLEND_ONE);
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_DESTBLEND,
+			fog_screen_drawn ? D3DBLEND_ONE : D3DBLEND_SRCALPHA);
+		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_BLENDOP, D3DBLENDOP_ADD);
+		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ALPHATESTENABLE, FALSE);
+		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZENABLE, FALSE);
+		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZBIAS, 0);
+
+		rasterizer_set_vertex_shader_permutation(
+			_rasterizer_vertex_shader_screen_effect,
+			_rasterizer_vertex_type_dynamic_screen,
+			FALSE);
+
+		csmemset(&pixel_shader, 0, sizeof(pixel_shader));
+		pixel_shader.texture_modes =
+			1 |
+			((screen->layer_count > 1) << 5) |
+			((screen->layer_count > 2) << 10) |
+			((screen->layer_count > 3) << 15);
+		pixel_shader.combiner_count = 0x11004;
+		pixel_shader.constant_0[0] = real_rgb_color_to_pixel32(&local_fog_screen_layer_colors[0]);
+		pixel_shader.constant_1[0] = real_rgb_color_to_pixel32(&local_fog_screen_layer_colors[1]);
+		pixel_shader.rgb_inputs[0] = 0x08010902;
+		pixel_shader.rgb_outputs[0] = 0x3089;
+		pixel_shader.constant_0[1] = real_rgb_color_to_pixel32(&local_fog_screen_layer_colors[2]);
+		pixel_shader.constant_1[1] = real_rgb_color_to_pixel32(&local_fog_screen_layer_colors[3]);
+		pixel_shader.alpha_inputs[1] =
+			0x28000000 | ((screen->layer_count > 1 ? 0x29 : 0x20) << 16);
+		pixel_shader.alpha_outputs[1] = 0xC0;
+		pixel_shader.rgb_inputs[1] = 0x0A010B02;
+		pixel_shader.rgb_outputs[1] = 0x30AB;
+		pixel_shader.alpha_inputs[2] =
+			((screen->layer_count > 2 ? 0x2A : 0x20) << 24) |
+			((screen->layer_count > 3 ? 0x2B : 0x20) << 16);
+		pixel_shader.alpha_outputs[2] = 0xD0;
+		pixel_shader.rgb_inputs[2] =
+			((screen->layer_count > 2 ? 0x2A : 0x20) << 24) |
+			((screen->layer_count > 3 ? 0x0B : 0x00) << 16) |
+			((screen->layer_count > 2 ? 0x0A : 0x00) << 8) |
+			0x20;
+		pixel_shader.rgb_outputs[2] = 0xC00;
+		pixel_shader.alpha_inputs[3] = 0x1C1D0000;
+		pixel_shader.alpha_outputs[3] = 0xC0;
+		pixel_shader.rgb_inputs[3] =
+			((screen->layer_count > 1 ? 0x29 : 0x20) << 24) |
+			0x000C0000 |
+			((screen->layer_count > 1 ? 0x09 : 0x00) << 8) |
+			0x20;
+		pixel_shader.rgb_outputs[3] = 0xC00;
+		if (screen->color)
+		{
+			pixel_shader.final_combiner_constant_0 = screen->color;
+		}
+		else
+		{
+			pixel_shader.final_combiner_constant_0 =
+				real_rgb_color_to_pixel32(&global_window_parameters.fog.planar_color);
+		}
+		pixel_shader.final_combiner_inputs_abcd = 0x08010F00;
+		pixel_shader.final_combiner_inputs_efg = 0x0C011C00;
+		rasterizer_set_pixel_shader(&pixel_shader);
+
+		IDirect3DDevice8_Begin(global_d3d_device, D3DPT_TRIANGLEFAN);
+		IDirect3DDevice8_SetVertexData2s(global_d3d_device, D3DVSDE_SPECULAR, -1, 1);
+		IDirect3DDevice8_SetVertexData2s(global_d3d_device, D3DVSDE_POSITION, -1, 1);
+		IDirect3DDevice8_SetVertexData2s(global_d3d_device, D3DVSDE_SPECULAR, 1, 1);
+		IDirect3DDevice8_SetVertexData2s(global_d3d_device, D3DVSDE_POSITION, 1, 1);
+		IDirect3DDevice8_SetVertexData2s(global_d3d_device, D3DVSDE_SPECULAR, 1, -1);
+		IDirect3DDevice8_SetVertexData2s(global_d3d_device, D3DVSDE_POSITION, 1, -1);
+		IDirect3DDevice8_SetVertexData2s(global_d3d_device, D3DVSDE_SPECULAR, -1, -1);
+		IDirect3DDevice8_SetVertexData2s(global_d3d_device, D3DVSDE_POSITION, -1, -1);
+		IDirect3DDevice8_End(global_d3d_device);
+
+		if (local_fog_pass == 0 && fog_screen_drawn)
+		{
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_COLORWRITEENABLE,
+				D3DCOLORWRITEENABLE_RED | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_BLUE);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_SRCBLEND,
+				D3DBLEND_INVDESTALPHA);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_DESTBLEND,
+				D3DBLEND_ONE);
+
+			csmemset(&pixel_shader, 0, sizeof(pixel_shader));
+			pixel_shader.combiner_count = 1;
+			rasterizer_set_pixel_shader(&pixel_shader);
+
+			IDirect3DDevice8_Begin(global_d3d_device, D3DPT_TRIANGLEFAN);
+			IDirect3DDevice8_SetVertexData2s(global_d3d_device, D3DVSDE_SPECULAR, -1, 1);
+			IDirect3DDevice8_SetVertexData2s(global_d3d_device, D3DVSDE_POSITION, -1, 1);
+			IDirect3DDevice8_SetVertexData2s(global_d3d_device, D3DVSDE_SPECULAR, 1, 1);
+			IDirect3DDevice8_SetVertexData2s(global_d3d_device, D3DVSDE_POSITION, 1, 1);
+			IDirect3DDevice8_SetVertexData2s(global_d3d_device, D3DVSDE_SPECULAR, 1, -1);
+			IDirect3DDevice8_SetVertexData2s(global_d3d_device, D3DVSDE_POSITION, 1, -1);
+			IDirect3DDevice8_SetVertexData2s(global_d3d_device, D3DVSDE_SPECULAR, -1, -1);
+			IDirect3DDevice8_SetVertexData2s(global_d3d_device, D3DVSDE_POSITION, -1, -1);
+			IDirect3DDevice8_End(global_d3d_device);
+		}
+	}
+	if (local_fog_pass != 0)
+		rasterizer_profile_end(_rasterizer_profile_environment_fog_screen);
 
 	return;
 }
