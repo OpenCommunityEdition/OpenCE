@@ -135,6 +135,14 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum render_frustum_point_flag_bits
+{
+	_render_frustum_point_flags_left_bit,
+	_render_frustum_point_flags_right_bit,
+	_render_frustum_point_flags_top_bit,
+	_render_frustum_point_flags_bottom_bit,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -243,6 +251,64 @@ real render_frustum_sphere_diameter_in_pixels(
 	real clamped_depth = MAX(absolute_depth, 0.1f);
 
 	return (frustum->projection_world_to_screen.j / clamped_depth) * radius * 2.0f;
+}
+
+word render_frustum_build_point_flags(
+	const struct render_frustum *frustum,
+	const real_point3d *point)
+{
+	word flags = plane3d_distance_to_point(&frustum->world_planes[0], point) > 0.0f ?
+		FLAG(_render_frustum_point_flags_left_bit) : 0;
+
+	flags |= plane3d_distance_to_point(&frustum->world_planes[1], point) > 0.0f ?
+		FLAG(_render_frustum_point_flags_right_bit) : 0;
+	flags |= plane3d_distance_to_point(&frustum->world_planes[2], point) > 0.0f ?
+		FLAG(_render_frustum_point_flags_bottom_bit) : 0;
+	flags |= plane3d_distance_to_point(&frustum->world_planes[3], point) > 0.0f ?
+		FLAG(_render_frustum_point_flags_top_bit) : 0;
+
+	return flags;
+}
+
+void render_camera_screen_to_world(
+	const struct render_camera *camera,
+	const struct render_frustum *frustum,
+	const real_point2d *screen_point,
+	real_point3d *world_point,
+	real_vector3d *world_vector)
+{
+	real_vector3d view_vector;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		1052,
+		camera);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		1053,
+		frustum);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		1054,
+		screen_point);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		1055,
+		world_point);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		1056,
+		world_vector);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		1058,
+		frustum->projection_valid);
+
+	render_camera_screen_to_view(camera, frustum, screen_point, &view_vector);
+	*world_point = camera->position;
+	matrix4x3_transform_vector(&frustum->view_to_world, &view_vector, world_vector);
+
+	return;
 }
 
 /* ---------- private code */
