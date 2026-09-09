@@ -14,6 +14,10 @@ January's compiler-sensitive declaration context for unrelated consumers.
 #include "math/integer_math.h"
 
 struct bitmap_data;
+struct rasterizer_model_begin_parameters;
+struct shader;
+struct triangle_buffer;
+struct vertex_buffer;
 struct render_distant_light;
 struct render_fog;
 struct render_lighting;
@@ -90,6 +94,18 @@ void rasterizer_environment_fog_screen_window_begin(
 	void);
 void rasterizer_environment_fog_screen_window_end(
 	void);
+boolean rasterizer_environment_fog_screen_model_begin(
+	struct rasterizer_model_begin_parameters const *parameters);
+void rasterizer_environment_fog_screen_model_end(
+	void);
+void rasterizer_environment_fog_screen_model_submit(
+	struct shader *shader,
+	short shader_permutation_index,
+	struct triangle_buffer const *triangle_buffer,
+	long dynamic_triangle_buffer_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer,
+	long dynamic_vertex_buffer_index);
 void rasterizer_environment_fog_screen_dispose(
 	void);
 

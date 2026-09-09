@@ -24,6 +24,10 @@ void rasterizer_transparent_geometry_groups_end(
 	void);
 struct transparent_geometry_group *rasterizer_transparent_geometry_new_group(
 	void);
+struct transparent_geometry_group *rasterizer_transparent_geometry_new_group2(
+	void);
+short rasterizer_transparent_geometry_get_group_presorted_index(
+	struct transparent_geometry_group const *group);
 void rasterizer_transparent_geometry_group_draw(
 	struct transparent_geometry_group *group,
 	boolean dirty);

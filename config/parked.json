@@ -6465,6 +6465,39 @@
         "base": { "size": 896, "relocation_count": 29, "normalized_sha256": "44eba783428926e28e6c68010f33daa6f131348a390fa28dca3a14a0fc79a212" },
         "objdiff_percent": 40.492752
       }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_models",
+      "function": "_rasterizer_model_draw_environment_shader",
+      "class": "instruction-scheduling",
+      "evidence": "Best complete typed environment-shader caller retained from the Opus rasterizer lane after canonical reconciliation. January and candidate are both 3,104 padded bytes with all 235 relocation identities; objdiff reports 95.87124 percent similarity. Its genuine call graph naturally materializes the exact private pixel-shader helper and five exact stock-XDK wrappers. January remains the byte/layout authority and HCEA is used only as a semantic map. No compiler steering, raw offset, fake dependency, undefined behavior, forced inline, or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/rasterizer_xbox_models_obj_opus_reconciliation_20260909.md.",
+      "measurements": {
+        "target": { "size": 3104, "relocation_count": 235, "normalized_sha256": "d4c4ee8c3b174dadb7364ae989fb815d8f7fc5cec2be5f2251abd438f7b36ace" },
+        "base": { "size": 3104, "relocation_count": 235, "normalized_sha256": "5179768ee4ad9fc8a971e3c4ef621f2ab0b6f5d9866a4fe5af747b7f02e28725" },
+        "objdiff_percent": 95.87124
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_models",
+      "function": "__rasterizer_model_transparent_geometry_submit",
+      "class": "inline-ownership",
+      "evidence": "Best complete typed transparent-group submission reconstruction retained from the Opus rasterizer lane. January is 1,296 padded bytes/83 relocations and candidate is 1,344/93 at 89.129036 percent similarity. The extra relocations and code reflect unresolved January caller-specific real_math helper ownership, not missing branches. It preserves the full queue/immediate-group behavior under semantic private-global names. No forced inline, header-suppression trick, raw offset, fake dependency, undefined behavior, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/rasterizer_xbox_models_obj_opus_reconciliation_20260909.md.",
+      "measurements": {
+        "target": { "size": 1296, "relocation_count": 83, "normalized_sha256": "7b84b560459ad2dda9183d24997e2bf23d7d14ad1e19fa27ba689241819fbd5d" },
+        "base": { "size": 1344, "relocation_count": 93, "normalized_sha256": "8fb7c26befa120e17d2ce14b97c0683b37967cf4fc774a1387a90465155c86e0" },
+        "objdiff_percent": 89.129036
+      }
+    },
+    {
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_models",
+      "function": "__rasterizer_model_draw",
+      "class": "inline-ownership",
+      "evidence": "Best complete typed model draw reconstruction retained from the Opus rasterizer lane. January is 5,168 padded bytes/350 relocations and candidate is 5,184/349 at 96.66598 percent similarity. January's point_from_line3d call is preserved through the established external-declaration include mode, so this TU emits no point_from_line3d COMDAT; remaining differences are the unresolved external-versus-inline schedule of adjacent real_math helpers. Semantic model-effect enums and render_lighting fields replace misleading donor placeholders. No forced inline, fake dependency, raw offset, undefined behavior, or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/rasterizer_xbox_models_obj_opus_reconciliation_20260909.md.",
+      "measurements": {
+        "target": { "size": 5168, "relocation_count": 350, "normalized_sha256": "99d8b95f1ce011781cedc3a123887065a0f8af4a54c842194fcd90c22fa2cc4e" },
+        "base": { "size": 5184, "relocation_count": 349, "normalized_sha256": "982de54d0345982399502ae06daef7092be87a44321c5a19c7d1f76dc5012d9f" },
+        "objdiff_percent": 96.66598
+      }
     }
   ]
 }
