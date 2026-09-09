@@ -40,6 +40,10 @@ typedef char leaf_portal_size_assert[
 
 /* ---------- prototypes/LEAF_MAP.C */
 
+boolean leaf_map_initialize_from_bsp(
+	struct leaf_map *leaf_map,
+	struct bsp3d const *bsp,
+	long leaf_count);
 void leaf_map_delete(
 	struct leaf_map *leaf_map);
 void leaf_map_close_portal(

@@ -462,11 +462,11 @@
       "unit": "source/math/geometry",
       "function": "_get_edge_vertex",
       "class": "unclassified",
-      "evidence": "Genuine private edge-subdivision member of the typed geosphere reconstruction, coherently compiled with its actual public/private callers. One semantic repair removes point/vector representation-pointer punning; no attempt follows to recover the donor's stronger byte shape. Twenty integrated January/first/actual cases pass exact full heap, coordinates, strips, normalization inputs, calls and ABI under two explicit x87 modes, including production16 segments. All inherited exact/runtime owners survive; no new point_from_line3d. Seven authentic natural helpers carry zero credit and four ActionCharge NODUPLICATES conflicts veto whole-object completion. See docs/object_matching_logs/geometry_obj_fable_geosphere_reconciliation_20260906.md. The416/400 padded extent is an honest residual, not claimed exactness; reopen only with genuine source/type/compiler-context evidence. The September 8 geometry closure batch did not edit this body; adding genuine sibling functions changed only its already-fuzzy translation-unit code-generation context, and the refreshed form still receives zero exact credit.",
+      "evidence": "Genuine private edge-subdivision member of the typed geosphere reconstruction, coherently compiled with its actual public/private callers. One semantic repair removes point/vector representation-pointer punning; no attempt follows to recover the donor's stronger byte shape. Twenty integrated January/first/actual cases pass exact full heap, coordinates, strips, normalization inputs, calls and ABI under two explicit x87 modes, including production16 segments. All inherited exact/runtime owners survive; no new point_from_line3d. Seven authentic natural helpers carry zero credit and four ActionCharge NODUPLICATES conflicts veto whole-object completion. See docs/object_matching_logs/geometry_obj_fable_geosphere_reconciliation_20260906.md. The 416/400 padded extent is an honest residual, not claimed exactness; reopen only with genuine source/type/compiler-context evidence. The 2026-09-09 Leaf Map integration moved two genuine Geometry declarations into their correct owner header without editing this body. That changed only the already-fuzzy translation-unit allocation context; the refreshed form still receives zero exact credit.",
       "measurements": {
         "target": { "size": 416, "relocation_count": 17, "normalized_sha256": "ebafcbd056870e28f2d96ad7e08a64d9a2e1b2513e911e075aed0fca4b9dc880" },
-        "base": { "size": 400, "relocation_count": 17, "normalized_sha256": "240b22a49f13a88b486b99416a7f162513a3c76a9e4de22ee5445d83f3cc7ded" },
-        "objdiff_percent": 61.442856
+        "base": { "size": 400, "relocation_count": 17, "normalized_sha256": "cbd59745d903fd9daba7435a854ac62755bc9349bfa1f91197aa7ce1364580ea" },
+        "objdiff_percent": 61.557144
       }
     },
     {
@@ -6074,11 +6074,11 @@
       "unit": "source/ai/encounters",
       "function": "_encounter_update_respawn",
       "class": "unclassified",
-      "evidence": "Complete ordinary-C respawn update retained from January and HCEA evidence. Target and candidate are both 704 padded bytes with all 27 relocations, but the normalized code remains materially different and no precise compiler blocker is proved. Typed encounter access and named fields are preserved without fake matching constructs. Zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md.",
+      "evidence": "Complete ordinary-C respawn update retained from January and HCEA evidence. Target and candidate are both 704 padded bytes with all 27 relocations, but the normalized code remains materially different and no precise compiler blocker is proved. Typed encounter access and named fields are preserved without fake matching constructs. The body was untouched by the 2026-09-09 Leaf Map packet; recompilation under the newly proper Geometry owner declarations changed only its already-fuzzy translation-unit allocation context. Zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md.",
       "measurements": {
         "target": { "size": 704, "relocation_count": 27, "normalized_sha256": "284b0de2b79bd79600f3495bb1372b261e026d2959de7adeed7edb074fc5219d" },
-        "base": { "size": 704, "relocation_count": 27, "normalized_sha256": "32d0a2476768c4f90bd26a0f1a98dedeff9f808e0be1904d6137b94a53d03627" },
-        "objdiff_percent": 77.72766
+        "base": { "size": 704, "relocation_count": 27, "normalized_sha256": "647cc2e7c6b1161aac51d47e0d4b97bdc81e429042cca996570a7d1f86e8917e" },
+        "objdiff_percent": 77.697876
       }
     },
     {
@@ -6354,6 +6354,72 @@
         "target": { "size": 864, "relocation_count": 30, "normalized_sha256": "d62f05304574f88eefd7c025a452910d821e3986442777adcb223dc0d2085dc2" },
         "base": { "size": 848, "relocation_count": 30, "normalized_sha256": "e4b2a3cecd2525f5989ea94abd238fd8cc687627248f91ba39f597fe4ae66f7e" },
         "objdiff_percent": 77.46595
+      }
+    },
+    {
+      "unit": "source/structures/leaf_map",
+      "function": "_node_stack_read",
+      "class": "csplit-relocation-alias",
+      "evidence": "Natural typed stack accessor. Target and canonical have identical 64-byte code sections, seven relocations, and normalized SHA-256. The sole symbolic mismatch is target _faked_xbox_command_line+4 versus canonical _leaf_map_globals-4 at relocation offset 0x3A; both resolve to January image address 4982956. The split boundary lands four bytes before the authenticated leaf_map_globals owner. Zero strict-exact credit; accept only through the canonical resolved-address validator. See docs/object_matching_logs/leaf_map_obj_private_graph_reconciliation_20260909.md.",
+      "measurements": {
+        "target": { "size": 64, "relocation_count": 7, "normalized_sha256": "6173baeea5403235db6ff471e0e0f140e6c1e31a32019a34825979294eb363f9" },
+        "base": { "size": 64, "relocation_count": 7, "normalized_sha256": "6173baeea5403235db6ff471e0e0f140e6c1e31a32019a34825979294eb363f9" },
+        "objdiff_percent": 100.0
+      }
+    },
+    {
+      "unit": "source/structures/leaf_map",
+      "function": "_find_like_crossing",
+      "class": "csplit-relocation-alias",
+      "evidence": "Same-build symbols authenticate the private name and the complete typed stack-plane search. Target and canonical have identical 160-byte code sections, nine relocations, and normalized SHA-256. The sole symbolic mismatch is target _faked_xbox_command_line+4 versus canonical _leaf_map_globals-4 at relocation offset 0x50; both resolve to January image address 4982956. Zero strict-exact credit; accept only through the canonical resolved-address validator. See docs/object_matching_logs/leaf_map_obj_private_graph_reconciliation_20260909.md.",
+      "measurements": {
+        "target": { "size": 160, "relocation_count": 9, "normalized_sha256": "663e3657f92949f904f1b44dacbe89442c7a655d7325f245e9d13ba59b54b74b" },
+        "base": { "size": 160, "relocation_count": 9, "normalized_sha256": "663e3657f92949f904f1b44dacbe89442c7a655d7325f245e9d13ba59b54b74b" },
+        "objdiff_percent": 100.0
+      }
+    },
+    {
+      "unit": "source/structures/leaf_map",
+      "function": "_leaf_map_build_leaf_face_for_leaf_on_node",
+      "class": "csplit-relocation-alias",
+      "evidence": "Same-build symbols authenticate this private caller and the complete typed BSP-plane clipping body. Target and canonical have identical 608-byte code sections, 30 relocations, and normalized SHA-256. The sole symbolic mismatch is target _faked_xbox_command_line+4 versus canonical _leaf_map_globals-4 at relocation offset 0xA4; both resolve to January image address 4982956. Zero strict-exact credit; accept only through the canonical resolved-address validator. See docs/object_matching_logs/leaf_map_obj_private_graph_reconciliation_20260909.md.",
+      "measurements": {
+        "target": { "size": 608, "relocation_count": 30, "normalized_sha256": "52640cd38559b34cede1057294be7ca6099a445067f11eb96d699b065e063bb1" },
+        "base": { "size": 608, "relocation_count": 30, "normalized_sha256": "52640cd38559b34cede1057294be7ca6099a445067f11eb96d699b065e063bb1" },
+        "objdiff_percent": 100.0
+      }
+    },
+    {
+      "unit": "source/structures/leaf_map",
+      "function": "_leaf_map_build_leaf_faces_for_leaf",
+      "class": "csplit-relocation-alias",
+      "evidence": "Same-build symbols authenticate this private stack-walk caller. Target and canonical have identical 112-byte code sections, nine relocations, and normalized SHA-256. The sole symbolic mismatch is target _faked_xbox_command_line+4 versus canonical _leaf_map_globals-4 at relocation offset 0x48; both resolve to January image address 4982956. Zero strict-exact credit; accept only through the canonical resolved-address validator. See docs/object_matching_logs/leaf_map_obj_private_graph_reconciliation_20260909.md.",
+      "measurements": {
+        "target": { "size": 112, "relocation_count": 9, "normalized_sha256": "10e5a7b3ba4c61f4128829f463ba33e0b441098b9011e68497c2c64fc0b9a31c" },
+        "base": { "size": 112, "relocation_count": 9, "normalized_sha256": "10e5a7b3ba4c61f4128829f463ba33e0b441098b9011e68497c2c64fc0b9a31c" },
+        "objdiff_percent": 100.0
+      }
+    },
+    {
+      "unit": "source/structures/leaf_map",
+      "function": "_intersect_planes3d",
+      "class": "unclassified",
+      "evidence": "Best complete house-rule-compliant plane-intersection reconstruction retained from the interrupted Opus Leaf Map graph. Same-build symbols authenticate the private name and January's calls/constants/assertions authenticate the algorithm. The source uses typed point copies for projection instead of representation-pointer casts. Target is 368 padded bytes and canonical is 400; both have 15 relocations. Objdiff reports 83.8 percent and no precise natural source-level mechanism is proved. Zero exact credit. See docs/object_matching_logs/leaf_map_obj_private_graph_reconciliation_20260909.md.",
+      "measurements": {
+        "target": { "size": 368, "relocation_count": 15, "normalized_sha256": "a0b61bbc6c485e42fbef0dc01a08a7253c8482ba6e064301a7841894e54a0877" },
+        "base": { "size": 400, "relocation_count": 15, "normalized_sha256": "eab2397552382149e33587ca367acb312ca6a326f1d855f28cc7543813104c26" },
+        "objdiff_percent": 83.8
+      }
+    },
+    {
+      "unit": "source/structures/leaf_map",
+      "function": "_leaf_map_build_portals_from_leaf",
+      "class": "unclassified",
+      "evidence": "Best complete ordinary-C recursive portal traversal retained from the interrupted Opus Leaf Map graph. Same-build symbols authenticate the private name; January's branch, relocation and assertion topology plus the independent HCEA lift support the behavior. Natural signed designator comparisons are retained without source-pressure rewrites. Target is 480 padded bytes and canonical is 432, both with 17 relocations; objdiff reports 63.948864 percent. No precise natural source-level mechanism is proved. Zero exact credit. See docs/object_matching_logs/leaf_map_obj_private_graph_reconciliation_20260909.md.",
+      "measurements": {
+        "target": { "size": 480, "relocation_count": 17, "normalized_sha256": "d50628a74d0b5faa208698ae864a472891a40d442d219bd01dd148adb640fe81" },
+        "base": { "size": 432, "relocation_count": 17, "normalized_sha256": "8e4bf5849992759b74e770a10ea4e2173b3a3626c137a8f20dc3514267fd54a7" },
+        "objdiff_percent": 63.948864
       }
     }
   ]

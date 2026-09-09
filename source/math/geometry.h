@@ -86,6 +86,9 @@ boolean convex_hull2d_test_point_indexed(
 real convex_hull2d_area(
 	short count,
 	real_point2d const *vertices);
+real convex_hull2d_perimeter(
+	short count,
+	real_point2d const *points);
 boolean convex_hull2d_test_vector(
 	short count,
 	real_point2d const *points,
@@ -96,6 +99,15 @@ boolean convex_hull2d_test_vector(
 boolean convex_polygon2d_verify(
 	short count,
 	real *vertices);
+short convex_polygon2d_clip_to_plane(
+	short count,
+	real_point2d const *points,
+	real_plane2d const *plane,
+	short maximum_count,
+	real_point2d *result,
+	long *clip_flags,
+	boolean *clipped,
+	real epsilon);
 short convex_polygon3d_clip_to_plane(
 	short vertex_count,
 	real_point3d const *vertices,

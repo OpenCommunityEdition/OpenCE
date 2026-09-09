@@ -279,6 +279,26 @@ global table, which authenticates their names and offsets: `disabled` at
    float and `boolean` is byte even when i386 register or stack mechanics make
    a mismatched declaration appear to work.
 
+## Leaf Map construction constants (context-specific)
+
+These values are authenticated by January's Leaf Map strings, data, control
+flow, and the reconciled private caller graph.  They belong to
+`source/structures/leaf_map.c`; they are not general geometry constants.
+
+| Role | Source spelling / value | Boundary |
+| --- | --- | --- |
+| BSP traversal stack capacity | `MAXIMUM_NODE_STACK_COUNT = 256` | Assertion text names the constant and aggregate field.  Stack entries are signed node designators whose sign bit records the child side. |
+| Initial face polygon capacity | `MAXIMUM_LEAF_FACE_VERTICES = 64` | Bounds the local clipped polygon and the correctly owned Geometry clip call. |
+| Portal intersection capacity | `MAXIMUM_PORTAL_VERTICES = 64` | Bounds the temporary intersection polygon; it is not a generic tag-block capacity. |
+| Initial projected world square | coordinates `+/-1536.f` | The four-point polygon is clipped by every ancestor BSP plane; do not export 1536 as a world-wide coordinate bound. |
+| Leaf-face clip epsilon | `0.000244140625f` (`1/4096`) | Algorithm-specific clip tolerance, distinct from `_real_epsilon`. |
+| Portal intersection epsilon | `0.00048828125f` (`1/2048`) | Algorithm-specific intersection tolerance. |
+| Portal closure thresholds | area `< 0.0025f` or `sqrt(area)/perimeter < 0.01f` | Preserve expression order and the perimeter call; these are not generic degenerate-polygon rules. |
+
+See [the Leaf Map reconciliation ledger](object_matching_logs/leaf_map_obj_private_graph_reconciliation_20260909.md)
+for symbol provenance, strict-credit boundaries, and the remaining data/BSS
+gap.
+
 ## Rasterizer shared-state lookup
 
 Use `source/rasterizer/rasterizer_frame_statistics.h` for the complete January
