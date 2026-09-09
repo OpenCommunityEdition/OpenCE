@@ -268,28 +268,6 @@
       "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. This was previously exact (693 meaningful bytes), now explicitly debited. Proper shared PlayerProfile ownership changes only two independent ordinary stack loads at +0x9a/+0x9d: EAX from [EBP-0xc] and EDI from [EBP+8]. Both complete code sections and ordered relocation identities otherwise agree. The previous playlist-only no-loss hold remains historical; this coherent ownership migration is retained under the user's house-rules/honest-fuzzy direction, not relabelled exact. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
     },
     {
-      "unit": "source/networking/network_server_manager",
-      "function": "_countdown_timer_increment",
-      "class": "unclassified",
-      "evidence": "Source-attested public increment restored as one natural defined-arithmetic reconstruction. It calls the real countdown_timer_update provider, asserts nonnegative adjustment, adds through unsigned long then converts the result to signed long under the VC7/Xbox two's-complement contract, preserves January's signed overflow probe and MIN clamp, and asserts the resulting timer. The provider's modular remaining-time subtraction is likewise made defined; its existing exact 48-byte machine code is unchanged. All inherited function/runtime owners, including prior fuzzy bodies, remain unchanged. The new increment is 144 padded bytes/nine relocation dependencies like January but differs in naturally inlined update scheduling, registers and final assertion operand; it receives zero exact credit. The earlier signed-overflow exact form remains rejected. This is retained under the current honest-fuzzy policy, not reopened for source-shape tuning. No manual inline, fake caller, assembly, volatile/register steering, foreign prototype or new data owner is used. See docs/object_matching_logs/network_server_manager_obj_defined_countdown_increment_20260906.md. Reopen only for genuine source/compiler-context evidence; do not restore signed-overflow UB to regain exact bytes.",
-      "measurements": {
-        "target": { "size": 144, "relocation_count": 9, "normalized_sha256": "0291de1fcc1f65baf92a784ad590c78925729c9c4ba0b9a1bbf33a6e8cdd7aa5" },
-        "base": { "size": 144, "relocation_count": 9, "normalized_sha256": "96937b1e7ff0aa3415fa0b0a397feddc2b30699e3d34b7be1db7f80b3eb96485" },
-        "objdiff_percent": 84.28571
-      }
-    },
-    {
-      "unit": "source/networking/network_server_manager",
-      "function": "_network_game_server_dispose",
-      "class": "unclassified",
-      "evidence": "Source-attested public disposal lifecycle retained with one deliberate defined-behavior repair: initialize both graceful-exit payloads to zero. January and the supplied source leave their long unused fields uninitialized, but the actual pregame/postgame packet schemas serialize one long. The natural safe candidate adds two zero stores and their consequent branch/padding displacement; it is 304 padded bytes/27 relocations versus January 288/27 and receives zero exact credit. Keep correct network_message broadcast ownership, enum states/message types, platform guards, explicit return, and genuine singleton BSS/COMMON ownership. No matching-only assembly, casts, declaration permutations, artificial callers or point_from_line3d emission. See docs/object_matching_logs/network_server_manager_obj_create_dispose_packet_20260906.md. Reopen only for new authentic defined-source/protocol evidence, never by removing the initialization to recover a stack-data disclosure.",
-      "measurements": {
-        "target": { "size": 288, "relocation_count": 27, "normalized_sha256": "f85cfb83330267866b08d5d10437b8f9b0879ae564ba22026d33a16cfb33ff89" },
-        "base": { "size": 304, "relocation_count": 27, "normalized_sha256": "ee98d32cde746e108cf3edd6b4174f6c73a8fb5851d7edc740da092f042e47ef" },
-        "objdiff_percent": 97.77778
-      }
-    },
-    {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_widgets",
       "function": "__rasterizer_widget_begin",
       "class": "unclassified",
@@ -320,17 +298,6 @@
         "target": { "size": 160, "relocation_count": 4, "normalized_sha256": "3a11e2b7f83efa430dfba1728254845c7707cba32e459854f452a47d527bd433" },
         "base": { "size": 160, "relocation_count": 4, "normalized_sha256": "f07c634dda655b3857287511109246b281ad8f7c784f29868e4e930140d31ef9" },
         "objdiff_percent": 96.878784
-      }
-    },
-    {
-      "unit": "source/effects/particle_systems",
-      "function": "_particle_system_initialize",
-      "class": "unclassified",
-      "evidence": "First fixed natural typed initializer retained with its genuine public particle_system_new_unattached caller. January bytes, relocation/caller census, original decorated type owner and independent later PDB fields support the private static owner, initial-state fields, continued iteration after an empty type, genuine local RNG calls and initial 0.001f update. Target and candidate are 288 padded bytes/nine relocations but differ in register allocation, ESI save scope and instruction positions. No Fable declaration-order exact variant, tuning, copied math or fake external leaf is imported. Root replays target/first/actual real initializer and real constructor together: ten bounded cases under two x87 control words, 20 executions per role, identical full system/guard/call/seed/return-channel/ABI outcomes against a separate byte-state reference. Three precise real-byte negative controls fail as intended. Datum/tag/location/lighting/RNG/update APIs are explicitly bounded typed stubs; this is not whole-engine or exhaustive semantic proof. All 6260 inherited strict functions survive; the public constructor adds 205 meaningful exact bytes, the initializer adds none. A natural uncredited 32-byte SELECTANY real_local_random_range copy conflicts with BoredCamera NODUPLICATES in actual VC7 links in both input orders; the still-unwritten update body also remains a partial graph boundary. Whole-object linkage/completion is vetoed. No point_from_line3d or data/BSS/COMMON owner is added. See docs/object_matching_logs/particle_systems_obj_natural_init_creation_reconciliation_20260906.md. Reopen only for genuine source/type/compiler-owner evidence, not equivalent source-shape or emission-policy searches.",
-      "measurements": {
-        "target": { "size": 288, "relocation_count": 9, "normalized_sha256": "ca7322edb56c3275a3480eed1dfbfd87edfb8152a11ff78a201a35fceee09409" },
-        "base": { "size": 288, "relocation_count": 9, "normalized_sha256": "35f03b7cc10bfb87ba227093a550ab55df522596813eeae9746560f8b04db055" },
-        "objdiff_percent": 81.15151
       }
     },
     {
@@ -1536,17 +1503,6 @@
         "target": { "size": 400, "relocation_count": 25, "normalized_sha256": "dcc6a629481fabd93292d708b860675421698d6ef2dc9e0679b57331d784d35f" },
         "base": { "size": 384, "relocation_count": 26, "normalized_sha256": "1ab3a89f52527a51460b6a1afa552e825fe26353faf14970500d56510166cf27" },
         "objdiff_percent": 94.21311
-      }
-    },
-    {
-      "unit": "source/effects/decals",
-      "function": "_decals_delete_permanent_from_cluster",
-      "class": "instruction-scheduling",
-      "evidence": "Previously exact source is deliberately debited after restoring the public structure_clusters_in_cone prototype to its genuine Structures owner for the AimAssist caller graph. The function body is unchanged. January and candidate remain 400 padded bytes with all 29 ordered relocation identities; the sole code difference swaps two adjacent independent stack loads, ESI from [EBP-4] and EBX from [EBP+8], without changing flags or dependencies. Repeated declaration-context trials identify this as VC7 translation-unit scheduling sensitivity, not a semantic source defect. No declaration shuffling, source tuning, register forcing, volatile access, pragma, assembly, fake dependency, or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/claude_ui_weather_aim_render_hs_reconciliation_20260908.md.",
-      "measurements": {
-        "target": { "size": 400, "relocation_count": 29, "normalized_sha256": "b3eeb427eeef1e02f793286b1011a5b89822e041f0b442759259255e1117220a" },
-        "base": { "size": 400, "relocation_count": 29, "normalized_sha256": "6fb830e33513eb040f0ff7cb46cc9167d30a96893dedb145370b416426025ffd" },
-        "objdiff_percent": 99.81035
       }
     },
     {
@@ -3403,7 +3359,7 @@
       "unit": "source/networking/network_connection",
       "function": "_network_connection_connected",
       "class": "register-allocation",
-      "evidence": "Fuzzy-parked after retaining the complete typed connection predicate supported by January and independent HCEA behavior. Target and candidate both have 81 meaningful bytes, 96 padded bytes, and the same five relocation identities. Their only normalized difference begins at +0x31: January reuses ESI for the reliable endpoint while VC7 retains the connection in ESI and uses EAX for the endpoint. A natural direct-member formulation produces the same candidate, so coercive register steering was rejected. No volatile/register forcing, barrier, pragma, assembly, fake dependency, or semantic distortion is present. Reopen only for authoritative January source or a natural same-compiler allocation donor.",
+      "evidence": "Fuzzy-parked after retaining the complete typed connection predicate supported by January and independent HCEA behavior. Correcting the owner contract from generic long to project boolean naturally narrows the candidate from 96 to 80 padded bytes while preserving the five relocation identities; January remains 96 padded bytes. The remaining difference is ordinary return-width and register allocation rather than missing behavior. Coercive register steering and a false owner type were rejected. No volatile/register forcing, barrier, pragma, assembly, fake dependency, or semantic distortion is present. Reopen only for authoritative January source or a natural same-compiler allocation donor.",
       "measurements": {
         "target": {
           "size": 96,
@@ -3411,11 +3367,11 @@
           "normalized_sha256": "50677dce5bbee398989d36573afcb4be3ca3025c446a6e7bb0c005c2cd4fe3f8"
         },
         "base": {
-          "size": 96,
+          "size": 80,
           "relocation_count": 5,
-          "normalized_sha256": "2d3b407a0afef3ca4f721a1dd65d6e75ff6d7277377b7200372ccefcd1eade92"
+          "normalized_sha256": "94c65a6742d8ae1738407c82cc2a2c2afbd1211b7c7104b96ed087796db42f3a"
         },
-        "objdiff_percent": 99.375
+        "objdiff_percent": 98.90625
       }
     },
     {
@@ -4258,7 +4214,7 @@
       "unit": "source/rasterizer/xbox/rasterizer_xbox_screen_effect",
       "function": "__rasterizer_screen_effect",
       "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after reconciling the complete ordinary-C Xbox cinematic screen-effect path from January's instruction, relocation, assertion-string, and global-offset topology. The retained function validates video/convolution combinations, alternates the primary and screen-effect targets, binds the correct convolution/video textures, configures the January pixel-combiner programs, uploads texture transforms, draws every triangle-fan pass with checked XDK calls, restores the window target, and closes the screen-effect profile. The independent HaloCEA DX9 reconstruction corroborates the parameter layout, pass count, ping-pong topology, mask/scanline/noise selection, convolution/warp transforms, video overbright handling, and final target restoration while remaining build-divergent evidence. Target and candidate preserve all 290 relocation identities; objdiff reports 93.197845 percent similarity, with a 3888-byte target and 3872-byte candidate. The residual is broad instruction/register/x87 scheduling and one 16-byte padded-size slot rather than a missing call or branch, so no compiler-tie grind was attempted. Donor-local false prototypes and the provisional flat window layout were removed in favor of owning headers, the canonical rasterizer window type, a layout-checked complete cinematic state plus parameter prefix, real/enum types, and named XDK constants. No volatile/register forcing, barrier, pragma, assembly, raw address, representation pun, fake dependency, forced inline, undefined behavior, or nonsensical matching form is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the remaining allocation and schedule.",
+      "evidence": "Fuzzy-parked under the current house rule after reconciling the complete ordinary-C Xbox cinematic screen-effect path from January's instruction, relocation, assertion-string, and global-offset topology. The retained function validates video/convolution combinations, alternates the primary and screen-effect targets, binds the correct convolution/video textures, configures the January pixel-combiner programs, uploads texture transforms, draws every triangle-fan pass with checked XDK calls, restores the window target, and closes the screen-effect profile. The independent HaloCEA DX9 reconstruction corroborates the parameter layout, pass count, ping-pong topology, mask/scanline/noise selection, convolution/warp transforms, video overbright handling, and final target restoration while remaining build-divergent evidence. Target and candidate preserve all 290 relocation identities; after correcting the public parameter-pointer owner, objdiff reports 93.261505 percent similarity, with a 3888-byte target and 3872-byte candidate. The residual is broad instruction/register/x87 scheduling and one 16-byte padded-size slot rather than a missing call or branch, so no compiler-tie grind was attempted. Donor-local false prototypes and the provisional flat window layout were removed in favor of owning headers, the canonical rasterizer window type, a layout-checked complete cinematic state plus parameter prefix, real/enum types, and named XDK constants. No volatile/register forcing, barrier, pragma, assembly, raw address, representation pun, fake dependency, forced inline, undefined behavior, or nonsensical matching form is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the remaining allocation and schedule.",
       "measurements": {
         "target": {
           "size": 3888,
@@ -4268,9 +4224,9 @@
         "base": {
           "size": 3872,
           "relocation_count": 290,
-          "normalized_sha256": "fe3e214e0e283e629854f4b448c161f0adc9254aaf2088c339c235ff9b1bca87"
+          "normalized_sha256": "073549d7cf4ac30ea5f16d846fee4fd7e4defb22764f5465d7f9b7338c129c3b"
         },
-        "objdiff_percent": 93.197845
+        "objdiff_percent": 93.261505
       }
     },
     {
@@ -4654,101 +4610,6 @@
       }
     },
     {
-      "unit": "source/networking/network_client_manager",
-      "function": "_network_game_client_add_advertised_game",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after selectively reconciling the interrupted Opus reconstruction as ordinary typed C and checking it against January's complete instruction and relocation topology. The retained helper expires stale advertisements, reuses a nonce match or empty/closed slot, copies the authenticated advertisement fields, applies named advertisement flag macros and platform enum constants, and emits the observed diagnostics. Target and candidate both occupy 720 padded bytes with 22 relocations; objdiff reports 82.70755 percent similarity. The aligned streams agree through both initial table walks, then differ in a compiler-sensitive spill/branch schedule for the closed-slot replacement and in later independent aggregate-copy/load ordering and two-case platform selection. The fail-closed classifier reports UNKNOWN, so no recipe is inferred. No raw offsets, volatile/register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, forced inline, or nonsensical coincidental match is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the remaining frame, branch, and aggregate-copy schedule.",
-      "measurements": {
-        "target": {
-          "size": 720,
-          "relocation_count": 22,
-          "normalized_sha256": "7584796d30a9a06f6c3a1b12feaca8607256f9330324c750f0794af6b307bd1c"
-        },
-        "base": {
-          "size": 720,
-          "relocation_count": 22,
-          "normalized_sha256": "730d6ba279a033af67b58c31b0dbed4c19a53837deaf895920e65311fa1a7d2b"
-        },
-        "objdiff_percent": 82.70755
-      }
-    },
-    {
-      "unit": "source/networking/network_client_manager",
-      "function": "_network_game_client_idle_ingame",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after retaining Opus's complete ordinary-C in-game idle state machine with the truthful owner declaration for network_connection_connected. The body checks connection liveness, reports transport loss and newly silent connections, services the connection, processes incoming messages, and preserves the two distinct abort diagnostics. Target and candidate both occupy 400 padded bytes with 27 relocations; objdiff reports 76.03846 percent similarity. January keeps the success and silent-state bytes in a different register/stack lifetime and orders the two post-idle connection checks and diagnostic blocks differently; the retained source expresses the same short-circuit behavior without compiler steering. The fail-closed classifier reports UNKNOWN, so no register or scheduling recipe is asserted. No false prototype, raw offset, volatile/register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor that explains the private value lifetimes and failure-block placement.",
-      "measurements": {
-        "target": {
-          "size": 400,
-          "relocation_count": 27,
-          "normalized_sha256": "b8d85f18191d91a25dc95c9f4a4aa11d3fb04b2cb9d05cf41360550932dfcad8"
-        },
-        "base": {
-          "size": 400,
-          "relocation_count": 27,
-          "normalized_sha256": "5a2c1ae0e065f5b1f47062cdb79bbb04bf0641cb3ece81f9a30a669c53a645e3"
-        },
-        "objdiff_percent": 76.03846
-      }
-    },
-    {
-      "unit": "source/networking/network_client_manager",
-      "function": "_network_game_client_remove_player",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after retaining the complete typed player-removal path from Opus and verifying it against January. The function locates the matching network player, removes it from the embedded game, updates the real player datum through the existing player-data owner, detects the last local player, and emits the observed failure diagnostics. Target and candidate both occupy 368 padded bytes with all 18 relocation identities; objdiff reports 98.06201 percent similarity. The residual consists of equivalent byte-register choices for the game-active test and an independent load order/extension choice in the final local-machine comparison. The fail-closed classifier reports UNKNOWN, so the honest class remains unclassified. No raw offset, one-use alias, volatile/register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, forced inline, or nonsensical logic is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining those two narrow instruction-selection choices.",
-      "measurements": {
-        "target": {
-          "size": 368,
-          "relocation_count": 18,
-          "normalized_sha256": "dc8b3cc79a45ade5c1867e72dca21cc20d4512358c82a52cfa4ba47a50a21e3a"
-        },
-        "base": {
-          "size": 368,
-          "relocation_count": 18,
-          "normalized_sha256": "d4cc7f9d2314f34438970668b3bf27328b326dfa823cb0466cd79ccd72a0850c"
-        },
-        "objdiff_percent": 98.06201
-      }
-    },
-    {
-      "unit": "source/networking/network_client_manager",
-      "function": "_network_game_client_initiate_join_game",
-      "class": "unclassified",
-      "evidence": "Parked at a source-authentic relocation-only boundary. Target and candidate have identical 256-byte padded code, 15 relocations, normalized instruction bytes, and a 100.0 percent objdiff score. Their sole strict difference is the assertion-expression string: January spells !network_connection_connected(client->connection), while the retained source must spell !(boolean)network_connection_connected(client->connection) because the January owner body and repository owner declaration truthfully return long. Opus obtained the January string only through a contradictory TU-local boolean prototype. Removing the cast would make C evaluation depend on nonzero upper result bytes; hard-coding or otherwise faking the string is forbidden. No false prototype, fake string, raw offset, volatile/register forcing, barrier, pragma, assembly, or undefined behavior is retained. Reopen only if authoritative January source proves a different shared owner contract that also preserves the owner translation unit.",
-      "measurements": {
-        "target": {
-          "size": 256,
-          "relocation_count": 15,
-          "normalized_sha256": "faa6e6c953ee2541df879bd31303e2fe8c028f3ee10d7a4938d841824467795c"
-        },
-        "base": {
-          "size": 256,
-          "relocation_count": 15,
-          "normalized_sha256": "faa6e6c953ee2541df879bd31303e2fe8c028f3ee10d7a4938d841824467795c"
-        },
-        "objdiff_percent": 100.0
-      }
-    },
-    {
-      "unit": "source/networking/network_client_manager",
-      "function": "_network_game_client_leave_game",
-      "class": "unclassified",
-      "evidence": "Parked at the same truthful owner-contract boundary as network_game_client_initiate_join_game. Target and candidate have identical 608-byte padded code, identical normalized instruction bytes, and 42 relocations; objdiff reports 96.15385 percent because one assertion-owned data relocation differs. January's assertion string spells !network_connection_connected(client->connection), while the retained source's normal narrowing cast stringizes as !(boolean)network_connection_connected(client->connection). The cast is required by the long-returning owner declaration and January's full-EAX owner code; Opus's exact form depended on a false TU-local boolean prototype. All five switch arms, the jump table, message sends, disconnects, diagnostics, and invalidation tail otherwise compare identically. No false prototype, fake assertion text, raw offset, volatile/register forcing, barrier, pragma, assembly, or undefined behavior is retained. Reopen only if authoritative January source proves a different shared owner contract that also preserves the owner translation unit.",
-      "measurements": {
-        "target": {
-          "size": 608,
-          "relocation_count": 42,
-          "normalized_sha256": "c987a13c402904abf05ce28daff5016f5d5b50ec351b6cc671e1a9d37184ef43"
-        },
-        "base": {
-          "size": 608,
-          "relocation_count": 42,
-          "normalized_sha256": "c987a13c402904abf05ce28daff5016f5d5b50ec351b6cc671e1a9d37184ef43"
-        },
-        "objdiff_percent": 96.15385
-      }
-    },
-    {
       "unit": "source/effects/effects",
       "function": "_effect_allowed_by_environment",
       "class": "unclassified",
@@ -4955,63 +4816,6 @@
           "normalized_sha256": "0f62d6950730557f884ae53b66518852751bf8414fe24bb8eb3011fe333e54fe"
         },
         "objdiff_percent": 94.97531
-      }
-    },
-    {
-      "unit": "source/networking/network_server_manager",
-      "function": "_network_game_server_start_network_game",
-      "class": "register-allocation",
-      "evidence": "Fuzzy-parked after reconstructing the complete typed game-start message sequence from January's instruction and relocation topology and corroborating it against the frozen Opus donor and the independent Stian PC lift. The retained function validates the server, skips an already-started game, copies the typed network game into the settings payload, broadcasts the settings and begin-game messages in order, records the start state, resets the update number on every exit path, and preserves January's intentionally TRUE result. January occupies 224 padded bytes with 13 relocations; the natural VC7 candidate occupies 240 with the same 13 relocation identities and scores 87.44 percent in objdiff. The residual is a compiler allocation fixed point: January keeps a shared zero in EBX, reuses the dead incoming-parameter slot for the four-byte begin-game payload, and orders the adjacent final stores differently, while ordinary block-scope and initialization-lifetime spellings retain the same coherent 240-byte form or worsen it. No false linkage or prototype, forced inline/noinline, volatile/register forcing, barrier, pragma, assembly, raw offset, fake dependency, undefined behavior, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler context explaining the saved-zero allocation.",
-      "measurements": {
-        "target": {
-          "size": 224,
-          "relocation_count": 13,
-          "normalized_sha256": "b5b6ecc62e0eff77aeab7b5ca8f40326d7cd7486a5d2ca7ca092e9e9d6967f39"
-        },
-        "base": {
-          "size": 240,
-          "relocation_count": 13,
-          "normalized_sha256": "4fdad9f5a67f8ddb8839f712a0173d6df2fc175a957e7b907e3ce620c5816c48"
-        },
-        "objdiff_percent": 87.44
-      }
-    },
-    {
-      "unit": "source/networking/network_server_manager",
-      "function": "_network_game_server_handle_client_machines",
-      "class": "unclassified",
-      "evidence": "Source-attested connected reconstruction from the user-supplied server source, reached naturally by reset-to-pregame. The 464-byte candidate retains all 162 instructions and 25 ordered relocation identities/addresses; the sole non-relocation byte difference is TEST EAX versus January TEST AL at +0xED after network_connection_connected. The genuine connection owner currently declares and defines a long return. The supplied caller source does not include that defining header, so it does not settle the historical owner conflict. Preserve that owner and this honest fuzzy implementation; do not narrow or change the API merely for byte equality. The receive buffer is an aligned word array occupying the target-proven 0x800 bytes, and timeout zero uses the real connection API owner. No forced emission, signature fiction, assembly, register steering, or undefined arithmetic is retained. Reopen only with independent return-contract evidence. See docs/object_matching_logs/network_server_manager_obj_reset_connected_packet_20260906.md.",
-      "measurements": {
-        "target": {
-          "size": 464,
-          "relocation_count": 25,
-          "normalized_sha256": "0935e7d0a5d8d56a67ff919a2df0a58398375cd09e1ae6d24ceb16121ca489cc"
-        },
-        "base": {
-          "size": 464,
-          "relocation_count": 25,
-          "normalized_sha256": "0d4007945149c3676dc282030ed04c28b00da80d27e2db9c024d3865092cdfb3"
-        },
-        "objdiff_percent": 99.932884
-      }
-    },
-    {
-      "unit": "source/networking/network_server_manager",
-      "function": "_network_game_server_update_countdown",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed countdown state machine from January's message events, server state, millisecond timing, game-start status, client-loading gates, transition calls, and all ordinary branches. January occupies 480 padded bytes with 21 relocations; the closest natural VC7 candidate occupies 496 with 20 at 72.8 percent objdiff similarity. The residual is a compiler register/allocation and call-scheduling choice: January retains one additional system_milliseconds call/relocation and pins the zero/event temporaries in different saved registers, while natural short/long parameter spellings and helper placement either select the retained 496-byte form or a worse out-of-line-helper form. The classifier found no defensible known mechanism. No forced inline or noinline, false linkage/type/prototype, raw offset, volatile/register forcing, barrier, pragma, assembly, fake dependency, undefined behavior, or nonsensical branch is retained. Reopen for authoritative January source/local records or a natural same-compiler TU context that explains the extra timing call and register schedule.",
-      "measurements": {
-        "target": {
-          "size": 480,
-          "relocation_count": 21,
-          "normalized_sha256": "4e64f4f9ca4b1c3e6971dca2af566fbe87b5abd43272ed45535a12592f23ac51"
-        },
-        "base": {
-          "size": 496,
-          "relocation_count": 20,
-          "normalized_sha256": "19afd9e555269508c01d42c537ee32f4df08d3088646b9b1db15fe1e094ff997"
-        },
-        "objdiff_percent": 72.8
       }
     },
     {
@@ -6113,8 +5917,8 @@
       "evidence": "Complete ordinary-C respawn update retained from January and HCEA evidence. Target and candidate are both 704 padded bytes with all 27 relocations, but the normalized code remains materially different and no precise compiler blocker is proved. Typed encounter access and named fields are preserved without fake matching constructs. Zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md.",
       "measurements": {
         "target": { "size": 704, "relocation_count": 27, "normalized_sha256": "284b0de2b79bd79600f3495bb1372b261e026d2959de7adeed7edb074fc5219d" },
-        "base": { "size": 704, "relocation_count": 27, "normalized_sha256": "32d0a2476768c4f90bd26a0f1a98dedeff9f808e0be1904d6137b94a53d03627" },
-        "objdiff_percent": 77.72766
+        "base": { "size": 704, "relocation_count": 27, "normalized_sha256": "647cc2e7c6b1161aac51d47e0d4b97bdc81e429042cca996570a7d1f86e8917e" },
+        "objdiff_percent": 77.697876
       }
     },
     {

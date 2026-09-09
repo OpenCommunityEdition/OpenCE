@@ -65,6 +65,8 @@ symbols in this file:
  * nine of them; the real calls below are what instantiates them. */
 #include <xtl.h>
 #include "rasterizer_xbox.h"
+#include "rasterizer/rasterizer_transparent_geometry.h"
+#include "rasterizer_xbox_water.h"
 
 /* ---------- constants */
 
@@ -225,15 +227,6 @@ typedef char verify_water_definition_ripples_offset[
 	offsetof(struct shader_transparent_water_definition, ripples) == 0x124 ? 1 : -1];
 typedef char verify_pixel_shader_definition_size[
 	sizeof(struct pixel_shader_definition) == 0xF0 ? 1 : -1];
-
-/* ---------- prototypes */
-
-short rasterizer_transparent_geometry_get_primary_vertex_type(
-	struct transparent_geometry_group const *group);
-
-void rasterizer_transparent_geometry_group_draw__internal(
-	struct transparent_geometry_group const *group,
-	boolean dirty);
 
 /* ---------- globals */
 

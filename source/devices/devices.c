@@ -934,6 +934,30 @@ void device_add_scenario_information(
 	return;
 }
 
+boolean device_frontfacing(
+	long device_index,
+	real_point3d const *position,
+	real_vector3d const *facing)
+{
+	struct control_datum *control = control_try_and_get(device_index);
+	struct object_marker front_marker;
+	boolean frontfacing = TRUE;
+
+	if (control != NULL &&
+		!TEST_FLAG(control->control.flags, _control_usable_from_both_sides_bit) &&
+		object_get_marker_by_name(device_index, "front", &front_marker, 1) == 1)
+	{
+		real facing_dot_front =
+			facing->i * front_marker.matrix.forward.i +
+			facing->j * front_marker.matrix.forward.j +
+			facing->k * front_marker.matrix.forward.k;
+
+		frontfacing = !(facing_dot_front > 0.0f);
+	}
+
+	return frontfacing;
+}
+
 /* ---------- private code */
 
 static short device_group_new(

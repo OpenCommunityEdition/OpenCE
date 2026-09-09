@@ -180,6 +180,7 @@ struct game_options;
 #include "sound/sound_manager.h"
 #include "structures/structures.h"
 #include "units/units.h"
+#include "units/vehicles.h"
 
 /* ---------- constants */
 
@@ -379,6 +380,59 @@ static struct profile_section game_update_section = {"game_update", NONE, TRUE};
 
 /* ---------- public code */
 
+void game_initialize(
+	void)
+{
+	game_globals = game_state_malloc(
+		"game globals",
+		NULL,
+		sizeof(*game_globals));
+	csmemset(game_globals, 0, sizeof(*game_globals));
+	csmemset(&game_variant_global, 0, sizeof(game_variant_global));
+	real_math_reset_precision();
+	game_time_initialize();
+	game_engine_initialize(&game_variant_global);
+	game_allegiance_initialize();
+	interface_initialize();
+	scenario_initialize();
+	director_initialize();
+	observer_initialize();
+	render_initialize();
+	objects_initialize();
+	structures_initialize();
+	breakable_surfaces_initialize();
+	decals_initialize();
+	collision_log_initialize();
+	players_initialize();
+	contrails_initialize();
+	particles_initialize();
+	effects_initialize();
+	weather_particle_systems_initialize();
+	particle_systems_initialize();
+	sound_classes_initialize();
+	game_sound_initialize();
+	rumble_initialize();
+	player_effect_initialize();
+	ai_initialize();
+	editor_initialize();
+	ui_widgets_initialize();
+	hs_initialize();
+	recorded_animations_initialize();
+	cheats_initialize();
+	transport_initialize();
+	telnet_console_initialize();
+	initialize_network_game_packets();
+	cinematic_initialize();
+	saved_game_files_initialize();
+	event_manager_initialize();
+	input_abstraction_initialize();
+	player_ui_initialize();
+	bink_playback_initialize();
+	progress_bar_initialize();
+
+	return;
+}
+
 void game_tick(
 	void)
 {
@@ -533,6 +587,63 @@ boolean game_all_quiet(
 	return TRUE;
 }
 
+boolean game_safe_to_save(
+	void)
+{
+	boolean safe = TRUE;
+
+	if (ai_enemies_can_see_player())
+	{
+		if (debug_game_save)
+			console_warning("not safe to save: ai_enemies_can_see_player");
+		safe = FALSE;
+	}
+	if (safe && dangerous_projectiles_near_player())
+	{
+		if (debug_game_save)
+			console_warning("not safe to save: dangerous_projectiles_near_player");
+		safe = FALSE;
+	}
+	if (safe && dangerous_items_near_player())
+	{
+		if (debug_game_save)
+			console_warning("not safe to save: dangerous_items_near_player");
+		safe = FALSE;
+	}
+	if (safe && dangerous_effects_near_player())
+	{
+		if (debug_game_save)
+			console_warning("not safe to save: dangerous_effects_near_player");
+		safe = FALSE;
+	}
+	if (safe && any_unit_is_dangerous())
+	{
+		if (debug_game_save)
+			console_warning("not safe to save: any_unit_is_dangerous");
+		safe = FALSE;
+	}
+	if (safe && any_player_is_in_the_air())
+	{
+		if (debug_game_save)
+			console_warning("not safe to save: any_player_is_in_the_air");
+		safe = FALSE;
+	}
+	if (safe && any_player_is_dead())
+	{
+		if (debug_game_save)
+			console_warning("not safe to save: any_player_is_dead");
+		safe = FALSE;
+	}
+	if (safe && vehicle_moving_near_any_player())
+	{
+		if (debug_game_save)
+			console_warning("not safe to save: vehicle_moving_near_any_player");
+		return FALSE;
+	}
+
+	return safe;
+}
+
 boolean game_safe_to_speak(
 	void)
 {
@@ -586,6 +697,71 @@ boolean game_load(
 		globals->map_loaded = TRUE;
 
 	return globals->map_loaded;
+}
+
+void game_initialize_for_new_map(
+	void)
+{
+	unsigned long random_seed;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\game.c",
+		0x1D1,
+		game_globals->map_loaded);
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\game.c",
+		0x1D2,
+		!game_globals->active);
+
+	random_seed = game_globals->options.random_seed;
+	*get_global_random_seed_address() = random_seed;
+	game_engine_dispose();
+	game_engine_initialize(&game_variant_global);
+	real_math_reset_precision();
+	rasterizer_initialize_for_new_map();
+	game_state_initialize_for_new_map();
+	game_time_initialize_for_new_map();
+	interface_initialize_for_new_map();
+	game_allegiance_initialize_for_new_map();
+	players_initialize_for_new_map();
+	scenario_initialize_for_new_map();
+	objects_initialize_for_new_map();
+	render_initialize_for_new_map();
+	structures_initialize_for_new_map();
+	breakable_surfaces_initialize_for_new_map();
+	decals_initialize_for_new_map();
+	director_initialize_for_new_map();
+	observer_initialize_for_new_map();
+	contrails_initialize_for_new_map();
+	particles_initialize_for_new_map();
+	effects_initialize_for_new_map();
+	particle_systems_initialize_for_new_map();
+	sound_initialize_for_new_map();
+	sound_classes_initialize_for_new_map();
+	game_sound_initialize_for_new_map();
+	weather_particle_systems_initialize_for_new_map();
+	point_physics_initialize_for_new_map();
+	game_engine_initialize_for_new_map();
+	game_statistics_start();
+	update_server_new();
+	player_control_initialize_for_new_map();
+	rumble_initialize_for_new_map();
+	player_effect_initialize_for_new_map();
+	ai_initialize_for_new_map();
+	console_initialize_for_new_map();
+	editor_initialize_for_new_map();
+	cinematic_initialize_for_new_map();
+	hs_initialize_for_new_map();
+	recorded_animations_initialize_for_new_map();
+	cheats_initialize_for_new_map();
+
+	game_globals->active = TRUE;
+	objects_place();
+	if (!game_in_editor())
+		ai_place();
+	ui_widgets_safe_to_load(TRUE);
+
+	return;
 }
 
 boolean game_map_loading_in_progress(

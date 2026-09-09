@@ -58,6 +58,8 @@ void interface_set_bitmap_text_draw_mode(
 	unsigned long flags,
 	short color_table_index,
 	short color_index);
+void interface_draw_screen(
+	void);
 void interface_draw_bitmap(
 	struct bitmap_data const *bitmap,
 	union point2d const *point,

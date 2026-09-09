@@ -15,7 +15,7 @@ symbols in this file:
 000CE2D0 0050:
 	_interface_set_bitmap_text_draw_mode (0000)
 000CE320 01c0:
-	_code_000ce320 (0000)
+	_interface_get_weapon_hud_index (0000)
 000CE4E0 03a0:
 	_interface_draw_screen (0000)
 000CE880 0080:
@@ -75,6 +75,7 @@ symbols in this file:
 #include "cutscene/cinematics.h"
 #include "game/game_globals.h"
 #include "game/game_engine.h"
+#include "game/player_control.h"
 #include "game/players.h"
 #include "interface/first_person_weapons.h"
 #include "interface/hud.h"
@@ -82,8 +83,11 @@ symbols in this file:
 #include "interface/hud_messaging.h"
 #include "interface/terminal.h"
 #include "main/main.h"
+#include "main/main_runtime.h"
 #include "math/real_math.h"
 #include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_cinematics.h"
+#include "render/render.h"
 #include "scenario/scenario.h"
 #include "text/draw_string.h"
 
@@ -111,6 +115,26 @@ enum
 	NUMBER_OF_PROFILE_GRAPH_VALUES = 14,
 };
 
+enum
+{
+	_hud_screen_effect_mask_only_when_zoomed_bit = 0,
+	_hud_screen_effect_convolution_only_when_zoomed_bit = 0,
+	_hud_screen_effect_light_enhancement_only_when_zoomed_bit = 0,
+	_hud_screen_effect_light_enhancement_connect_to_flashlight_bit = 1,
+	_hud_screen_effect_light_enhancement_uses_convolution_mask_bit = 2,
+	_hud_screen_effect_desaturation_only_when_zoomed_bit = 0,
+	_hud_screen_effect_desaturation_connect_to_flashlight_bit = 1,
+	_hud_screen_effect_desaturation_is_additive_bit = 2,
+	_hud_screen_effect_desaturation_uses_convolution_mask_bit = 3,
+};
+
+enum
+{
+	_rasterizer_screen_effect_convolution_type_none = 0,
+	_rasterizer_screen_effect_convolution_type_blur,
+	_rasterizer_screen_effect_convolution_type_warp,
+};
+
 /* ---------- macros */
 
 #define interface_tag_references_get() \
@@ -118,6 +142,9 @@ enum
 		TAG_BLOCK_GET_ELEMENT(&scenario_get_game_globals()->interface_tag_references, 0, \
 			struct interface_tag_references_definition) : \
 		NULL)
+
+#define weapon_hud_interface_definition_get(index) \
+	((struct weapon_hud_interface_definition *)tag_get('wphi', (index)))
 
 /* ---------- structures */
 
@@ -139,6 +166,97 @@ struct interface_tag_references_definition
 typedef char interface_tag_references_definition_size_assert[
 	sizeof(struct interface_tag_references_definition) == 0x130 ? 1 : -1];
 
+struct weapon_flash_state_definition
+{
+	short flags;
+	short pad02;
+	short total_ammo;
+	short loaded_ammo;
+	short heat;
+	short age;
+	long unused0C[8];
+};
+
+struct hud_absolute_placement_definition
+{
+	short corner;
+	short pad02;
+	long unused04[8];
+};
+
+struct icon_hud_element_definition
+{
+	short sequence_index;
+	short width_offset;
+	point2d offset;
+	pixel32 color;
+	char frame_rate;
+	byte flags;
+	short text_index;
+};
+
+struct weapon_hud_interface_definition
+{
+	struct tag_reference parent_hud;
+	struct weapon_flash_state_definition flash_cutoffs;
+	struct hud_absolute_placement_definition absolute_placement;
+	struct tag_block statics;
+	struct tag_block meters;
+	struct tag_block numbers;
+	struct tag_block crosshairs;
+	struct tag_block overlays;
+	unsigned long valid_crosshair_types_flags;
+	struct tag_block warning_sounds;
+	struct tag_block screen_effects;
+	long unusedB8[33];
+	struct icon_hud_element_definition messaging_icon;
+	long unused14C[12];
+};
+
+struct hud_screen_effect_definition
+{
+	long unused00;
+	word mask_flags;
+	word mask_pad;
+	long mask_unused[4];
+	struct tag_reference mask_fullscreen;
+	struct tag_reference mask_splitscreen;
+	long unused38[2];
+	word convolution_flags;
+	word convolution_pad;
+	real convolution_radius_in_bounds[2];
+	real convolution_radius_out_bounds[2];
+	long unused54[6];
+	word light_enhancement_flags;
+	short light_enhancement_script_source;
+	real light_enhancement_intensity;
+	long unused74[6];
+	word desaturation_flags;
+	short desaturation_script_source;
+	real desaturation_intensity;
+	real_rgb_color desaturation_tint;
+	long unusedA0[6];
+};
+
+typedef char weapon_hud_interface_definition_screen_effects_offset_assert[
+	offsetof(struct weapon_hud_interface_definition, screen_effects) == 0xAC ? 1 : -1];
+typedef char weapon_flash_state_definition_size_assert[
+	sizeof(struct weapon_flash_state_definition) == 0x2C ? 1 : -1];
+typedef char hud_absolute_placement_definition_size_assert[
+	sizeof(struct hud_absolute_placement_definition) == 0x24 ? 1 : -1];
+typedef char icon_hud_element_definition_size_assert[
+	sizeof(struct icon_hud_element_definition) == 0x10 ? 1 : -1];
+typedef char weapon_hud_interface_definition_size_assert[
+	sizeof(struct weapon_hud_interface_definition) == 0x17C ? 1 : -1];
+typedef char hud_screen_effect_definition_size_assert[
+	sizeof(struct hud_screen_effect_definition) == 0xB8 ? 1 : -1];
+typedef char hud_screen_effect_definition_light_flags_offset_assert[
+	offsetof(struct hud_screen_effect_definition, light_enhancement_flags) == 0x6C ? 1 : -1];
+typedef char hud_screen_effect_definition_desaturation_flags_offset_assert[
+	offsetof(struct hud_screen_effect_definition, desaturation_flags) == 0x8C ? 1 : -1];
+typedef char rasterizer_cinematic_screen_effect_parameters_tint_offset_assert[
+	offsetof(struct rasterizer_cinematic_screen_effect_parameters, filter_desaturation_tint) == 0x14 ? 1 : -1];
+
 struct profile_value
 {
 	char name[256];
@@ -159,6 +277,8 @@ void interface_splitscreen_render(
 	void);
 void code_000cea10(
 	void);
+long interface_get_weapon_hud_index(
+	real *flashlight_power);
 /* ---------- globals */
 
 static short profile_game_value_count = NUMBER_OF_PROFILE_GAME_VALUES;
@@ -431,6 +551,165 @@ void interface_draw_bitmap_modulated(
 	parameters.map[0] = (struct bitmap_data *)bitmap;
 
 	rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
+
+	return;
+}
+
+void interface_draw_screen(
+	void)
+{
+	real flashlight_power;
+	long weapon_hud_index;
+
+	if (render.local_player_index == NONE)
+		return;
+
+	weapon_hud_index = interface_get_weapon_hud_index(&flashlight_power);
+	if (weapon_hud_index != NONE)
+	{
+		struct weapon_hud_interface_definition *hud_definition =
+			weapon_hud_interface_definition_get(weapon_hud_index);
+
+		if (hud_definition->screen_effects.count > 0)
+		{
+			struct hud_screen_effect_definition *screen_effect = TAG_BLOCK_GET_ELEMENT(
+				&hud_definition->screen_effects,
+				0,
+				struct hud_screen_effect_definition);
+			boolean zoomed = player_control_get_zoom_level(render.local_player_index) != NONE;
+			struct rasterizer_cinematic_screen_effect_parameters parameters;
+
+			csmemset(&parameters, 0, sizeof(parameters));
+
+			if (zoomed ||
+				!TEST_FLAG(screen_effect->mask_flags,
+					_hud_screen_effect_mask_only_when_zoomed_bit))
+			{
+				long mask_tag_index = main_get_window_count() <= 1 ?
+					screen_effect->mask_fullscreen.index :
+					screen_effect->mask_splitscreen.index;
+
+				if (mask_tag_index != NONE)
+				{
+					parameters.convolution_mask = TAG_BLOCK_GET_ELEMENT(
+						&bitmap_group_get(mask_tag_index)->bitmap_data,
+						0,
+						struct bitmap_data);
+					parameters.filter_light_enhancement_uses_convolution_mask =
+						TEST_FLAG(
+							screen_effect->light_enhancement_flags,
+							_hud_screen_effect_light_enhancement_uses_convolution_mask_bit);
+					parameters.filter_desaturation_uses_convolution_mask =
+						TEST_FLAG(
+							screen_effect->desaturation_flags,
+							_hud_screen_effect_desaturation_uses_convolution_mask_bit);
+				}
+			}
+
+			if (main_get_window_count() <= 1 &&
+				(zoomed ||
+					!TEST_FLAG(
+						screen_effect->convolution_flags,
+						_hud_screen_effect_convolution_only_when_zoomed_bit)))
+			{
+				real convolution_radius = 0.0f;
+
+				if (screen_effect->convolution_radius_in_bounds[0] !=
+					screen_effect->convolution_radius_in_bounds[1])
+				{
+					real interpolation = PIN(
+						(render.camera.vertical_field_of_view -
+							screen_effect->convolution_radius_in_bounds[0]) /
+						(screen_effect->convolution_radius_in_bounds[1] -
+							screen_effect->convolution_radius_in_bounds[0]),
+						0.0f,
+						1.0f);
+
+					scalars_interpolate(
+						screen_effect->convolution_radius_out_bounds[0],
+						screen_effect->convolution_radius_out_bounds[1],
+						interpolation,
+						&convolution_radius);
+				}
+				else
+				{
+					convolution_radius = screen_effect->convolution_radius_out_bounds[1];
+				}
+
+				if (convolution_radius > 0.0f)
+				{
+					parameters.convolution_radius = convolution_radius;
+					parameters.convolution_type =
+						_rasterizer_screen_effect_convolution_type_warp;
+				}
+			}
+
+			if (zoomed ||
+				!TEST_FLAG(
+					screen_effect->light_enhancement_flags,
+					_hud_screen_effect_light_enhancement_only_when_zoomed_bit))
+			{
+				real intensity = screen_effect->light_enhancement_intensity;
+
+				if (TEST_FLAG(
+					screen_effect->light_enhancement_flags,
+					_hud_screen_effect_light_enhancement_connect_to_flashlight_bit))
+				{
+					intensity *= PIN(flashlight_power, 0.0f, 1.0f);
+				}
+
+				intensity *= PIN(
+					rasterizer_script_screen_effect_get_value(
+						screen_effect->light_enhancement_script_source),
+					0.0f,
+					1.0f);
+				if (intensity > 0.0f)
+					parameters.filter_light_enhancement_intensity = intensity;
+			}
+
+			if (zoomed ||
+				!TEST_FLAG(
+					screen_effect->desaturation_flags,
+					_hud_screen_effect_desaturation_only_when_zoomed_bit))
+			{
+				real intensity = screen_effect->desaturation_intensity;
+
+				if (TEST_FLAG(
+					screen_effect->desaturation_flags,
+					_hud_screen_effect_desaturation_connect_to_flashlight_bit))
+				{
+					intensity *= PIN(flashlight_power, 0.0f, 1.0f);
+				}
+
+				intensity *= PIN(
+					rasterizer_script_screen_effect_get_value(
+						screen_effect->desaturation_script_source),
+					0.0f,
+					1.0f);
+				if (intensity > 0.0f)
+				{
+					parameters.filter_desaturation_intensity = intensity;
+					parameters.filter_desaturation_is_additive = TEST_FLAG(
+						screen_effect->desaturation_flags,
+						_hud_screen_effect_desaturation_is_additive_bit);
+					parameters.filter_desaturation_tint = screen_effect->desaturation_tint;
+				}
+			}
+
+			rasterizer_screen_effect(&parameters);
+		}
+		else
+		{
+			rasterizer_screen_effect(NULL);
+		}
+	}
+	else
+	{
+		rasterizer_screen_effect(NULL);
+	}
+
+	hud_draw_screen();
+	game_engine_post_rasterize();
 
 	return;
 }

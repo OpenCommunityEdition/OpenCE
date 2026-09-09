@@ -160,7 +160,7 @@ struct rasterizer_transparent_geometry_window_parameters
 /* ---------- prototypes */
 
 short rasterizer_transparent_geometry_get_group_presorted_index(
-	struct transparent_geometry_group *group);
+	struct transparent_geometry_group const *group);
 void rasterizer_set_stencil_mode(
 	long stencil_mode);
 static void rasterizer_sort_internal(
@@ -244,7 +244,7 @@ void rasterizer_transparent_geometry_end(
 }
 
 short rasterizer_transparent_geometry_get_primary_vertex_type(
-	struct transparent_geometry_group *group)
+	struct transparent_geometry_group const *group)
 {
 	short vertex_type = NONE;
 
@@ -267,7 +267,7 @@ short rasterizer_transparent_geometry_get_primary_vertex_type(
 }
 
 void rasterizer_transparent_geometry_set_group_pending_status(
-	struct transparent_geometry_group *group,
+	struct transparent_geometry_group const *group,
 	boolean pending)
 {
 	short group_presorted_index = rasterizer_transparent_geometry_get_group_presorted_index(group);
@@ -279,7 +279,7 @@ void rasterizer_transparent_geometry_set_group_pending_status(
 }
 
 boolean rasterizer_transparent_geometry_get_group_pending_status(
-	struct transparent_geometry_group *group)
+	struct transparent_geometry_group const *group)
 {
 	short group_presorted_index = rasterizer_transparent_geometry_get_group_presorted_index(group);
 	boolean pending = TRUE;
@@ -291,7 +291,7 @@ boolean rasterizer_transparent_geometry_get_group_pending_status(
 }
 
 short rasterizer_transparent_geometry_get_group_presorted_index(
-	struct transparent_geometry_group *group)
+	struct transparent_geometry_group const *group)
 {
 	short group_presorted_index = NONE;
 
@@ -328,11 +328,11 @@ void *rasterizer_transparent_geometry_get_groups2(
 }
 
 struct transparent_geometry_group *rasterizer_transparent_geometry_next_group(
-	struct transparent_geometry_group *group)
+	struct transparent_geometry_group const *group)
 {
 	short next_group_sorted_index;
 	short group_sorted_index;
-	struct transparent_geometry_group *next_group = group;
+	struct transparent_geometry_group *next_group = (struct transparent_geometry_group *)group;
 
 	if (group)
 	{

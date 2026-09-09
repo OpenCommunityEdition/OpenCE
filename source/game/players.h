@@ -224,6 +224,8 @@ boolean players_respawn_coop(
 
 boolean players_are_all_dead(
 	void);
+boolean any_player_is_in_the_air(
+	void);
 boolean any_player_is_dead(
 	void);
 

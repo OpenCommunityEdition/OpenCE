@@ -119,6 +119,8 @@ struct game_statistics
 
 /* ---------- prototypes/GAME_STATISTICS.C */
 
+void game_statistics_start(
+	void);
 void game_statistics_record_kill(
 	long dead_unit_index,
 	long killing_player_index,
@@ -127,7 +129,8 @@ void game_statistics_record_kill(
 
 /* ---------- prototypes/GAME.C */
 
-void game_initialize(void);
+void game_initialize(
+	void);
 void game_dispose(void);
 void game_precache_new_map(char *map_name, boolean blocking);
 boolean game_map_loading_in_progress(real *progress);
@@ -150,13 +153,15 @@ void game_set_game_variant(struct game_variant *variant);
 void game_set_game_engine_index(short index);
 boolean game_all_quiet(
 	void);
-boolean game_safe_to_save(void);
+boolean game_safe_to_save(
+	void);
 boolean game_safe_to_speak(
 	void);
 boolean game_is_cooperative(void);
 boolean game_load(
 	struct game_options *options);
-void game_initialize_for_new_map(void);
+void game_initialize_for_new_map(
+	void);
 void game_set_game_variant_from_name(
 	const char *name);
 

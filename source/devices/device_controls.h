@@ -18,6 +18,12 @@ enum
 	CONTROL_DEFINITION_TAG = 'ctrl',
 };
 
+enum control_datum_flags
+{
+	_control_usable_from_both_sides_bit = 0,
+	NUMBER_OF_CONTROL_DATUM_FLAGS,
+};
+
 /* ---------- macros */
 
 #define control_definition_get(index) ((struct control_definition *)tag_get(CONTROL_DEFINITION_TAG, (index)))

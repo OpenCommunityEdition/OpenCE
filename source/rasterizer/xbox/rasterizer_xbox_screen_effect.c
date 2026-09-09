@@ -172,47 +172,6 @@ struct rasterizer_screen_effect_debug_options
 	boolean screen_effects;
 };
 
-struct rasterizer_cinematic_screen_effect_parameters
-{
-	short convolution_extra_passes;
-	short convolution_type;
-	real convolution_radius;
-	struct bitmap_data *convolution_mask;
-	real filter_light_enhancement_intensity;
-	real filter_desaturation_intensity;
-	real_rgb_color filter_desaturation_tint;
-	boolean filter_desaturation_is_additive;
-	boolean filter_light_enhancement_uses_convolution_mask;
-	boolean filter_desaturation_uses_convolution_mask;
-	boolean video_on;
-	short video_overbright_mode;
-	byte pad26[2];
-	struct bitmap_data *video_scanline_map;
-	real video_noise_intensity;
-	real video_noise_map_scale;
-	struct bitmap_data *video_noise_map;
-};
-
-struct rasterizer_cinematic_screen_effect_state
-{
-	struct rasterizer_cinematic_screen_effect_parameters parameters;
-	boolean has_control;
-	boolean initialized;
-	byte reserved3A[2];
-	real convolution_radius[2];
-	real convolution_time[2];
-	real filter_light_enhancement_intensity[2];
-	real filter_desaturation_intensity[2];
-	real filter_time[2];
-	real script_values[4];
-	real near_clip_distance;
-};
-
-typedef char rasterizer_cinematic_screen_effect_parameters_size_assert[
-	sizeof(struct rasterizer_cinematic_screen_effect_parameters) == 0x38 ? 1 : -1];
-typedef char rasterizer_cinematic_screen_effect_state_size_assert[
-	sizeof(struct rasterizer_cinematic_screen_effect_state) == 0x78 ? 1 : -1];
-
 struct pixel_shader_definition
 {
 	unsigned long alpha_inputs[8];
@@ -523,9 +482,8 @@ static void rasterizer_screen_effect_set_vertex_shader_constants(
 /* ---------- public code */
 
 void _rasterizer_screen_effect(
-	struct rasterizer_cinematic_screen_effect_state *state)
+	struct rasterizer_cinematic_screen_effect_parameters *parameters)
 {
-	struct rasterizer_cinematic_screen_effect_parameters *parameters;
 	boolean success = TRUE;
 
 	match_assert(
@@ -535,8 +493,7 @@ void _rasterizer_screen_effect(
 
 	rasterizer_profile_begin(_rasterizer_profile_screen_effect);
 
-	state = rasterizer_screen_effect_get_cinematic_parameters(state);
-	parameters = state ? &state->parameters : NULL;
+	parameters = rasterizer_screen_effect_get_cinematic_parameters(parameters);
 
 	if (parameters &&
 		(parameters->convolution_type != _rasterizer_screen_effect_convolution_type_none ||

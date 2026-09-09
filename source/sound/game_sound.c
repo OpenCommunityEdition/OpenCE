@@ -918,6 +918,86 @@ void game_sound_set_mouth_aperture(
 	return;
 }
 
+void compute_sound_obstruction(
+	short local_player_index,
+	struct sound_source *source,
+	real distance)
+{
+	struct observer_result const *camera = observer_get_camera(local_player_index);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\game_sound.c",
+		882,
+		global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
+	global_current_collision_users[global_current_collision_user_depth++] =
+		_collision_user_sounds;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\game_sound.c",
+		887,
+		source->spatialization_mode == _sound_spatialization_mode_absolute);
+	source->obstruction = 0.6f;
+	source->occlusion = 1.0f;
+
+	if (source->location.game_location.cluster_index != NONE &&
+		camera->location.cluster_index != NONE)
+	{
+		real cluster_distance =
+			(structure_bsp_get_cluster_encoded_sound_distance(
+				global_structure_bsp_get(),
+				camera->location.cluster_index,
+				source->location.game_location.cluster_index) & CLUSTER_SOUND_DISTANCE_VALUE_MASK)
+			* (MAXIMUM_CLUSTER_SOUND_DISTANCE / CLUSTER_SOUND_DISTANCE_VALUE_MASK);
+
+		if (cluster_distance < MAXIMUM_CLUSTER_SOUND_DISTANCE)
+		{
+			if (BIT_VECTOR_TEST_FLAG(
+				structure_bsp_get_cluster_pvs(
+					global_structure_bsp_get(),
+					camera->location.cluster_index),
+				source->location.game_location.cluster_index))
+			{
+				real_vector3d vector;
+				struct collision_result collision;
+
+				source->obstruction = 0.45f;
+				vector.i = source->location.position.x - camera->position.x;
+				vector.j = source->location.position.y - camera->position.y;
+				vector.k = source->location.position.z - camera->position.z;
+				if (!collision_test_vector(
+					FLAG(_collision_test_front_facing_surfaces_bit) |
+						FLAG(_collision_test_structure_bit) |
+						FLAG(_collision_test_media_bit) |
+						FLAG(_collision_test_objects_bit) |
+						FLAG(_collision_test_objects_scenery_bit) |
+						FLAG(_collision_test_objects_machines_bit),
+					&camera->position,
+					&vector,
+					NONE,
+					&collision))
+				{
+					source->obstruction = 0.0f;
+					source->occlusion = 0.0f;
+				}
+			}
+
+			if (source->obstruction != 0.0f)
+			{
+				source->occlusion = 1.0f - distance / (cluster_distance + distance);
+				source->occlusion = PIN(source->occlusion * 1.4f, 0.0f, 1.0f);
+			}
+		}
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\sound\\game_sound.c",
+		926,
+		global_current_collision_user_depth > 1);
+	--global_current_collision_user_depth;
+
+	return;
+}
+
 /* ---------- private code */
 
 static void compute_combined_pas(

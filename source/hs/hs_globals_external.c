@@ -986,7 +986,6 @@ extern byte debug_effects_nonviolent[];
 extern byte debug_fog_planes[];
 extern byte debug_force_frame_rate_update[];
 extern byte debug_frame_rate[];
-extern byte debug_game_save[];
 extern byte debug_inactive_objects[];
 extern byte debug_input[];
 extern byte debug_input_target[];
@@ -1107,7 +1106,7 @@ struct hs_external_global_definition hs_external_global_definitions[442] =
 	{ "display_framerate", _hs_type_boolean, 0, display_framerate },
 	{ "display_vblank_deltas", _hs_type_boolean, 0, display_vblank_deltas },
 	{ "display_precache_progress", _hs_type_boolean, 0, display_precache_progress },
-	{ "debug_game_save", _hs_type_boolean, 0, debug_game_save },
+	{ "debug_game_save", _hs_type_boolean, 0, &debug_game_save },
 	{ "terminal_render", _hs_type_boolean, 0, terminal_render_enable },
 	{ "console_dump_to_file", _hs_type_boolean, 0, console_dump_to_file },
 	{ "rasterizer_near_clip_distance", _hs_type_real, 0, rasterizer_globals + 0x44 },

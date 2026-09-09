@@ -28,6 +28,8 @@ symbols in this file:
 
 #include "cseries.h"
 #include "real_math.h"
+#include "rasterizer/rasterizer_transparent_geometry.h"
+#include "rasterizer/xbox/rasterizer_xbox_plasma_energy.h"
 #include "shaders/shader_definitions.h"
 #include <stddef.h>
 
@@ -151,9 +153,6 @@ void rasterizer_set_texture(
 	long bitmap_definition_index,
 	short bitmap_sequence_index);
 
-short rasterizer_transparent_geometry_get_primary_vertex_type(
-	struct rasterizer_transparent_geometry_group_plasma const *group);
-
 void rasterizer_set_vertex_shader_permutation(
 	short vertex_type,
 	short permutation,
@@ -161,10 +160,6 @@ void rasterizer_set_vertex_shader_permutation(
 
 void rasterizer_set_pixel_shader(
 	struct pixel_shader_definition const *definition);
-
-void rasterizer_transparent_geometry_group_draw__internal(
-	struct rasterizer_transparent_geometry_group_plasma const *group,
-	boolean dirty);
 
 /* ---------- globals */
 
@@ -258,7 +253,8 @@ void rasterizer_plasma_energy_draw(
 
 		rasterizer_set_vertex_shader_permutation(
 			15,
-			rasterizer_transparent_geometry_get_primary_vertex_type(group),
+			rasterizer_transparent_geometry_get_primary_vertex_type(
+				(struct transparent_geometry_group const *)group),
 			FALSE);
 
 		match_assert(
@@ -341,7 +337,9 @@ void rasterizer_plasma_energy_draw(
 		pixel_shader.final_combiner_inputs_abcd = 0x0C0F0000;
 		pixel_shader.final_combiner_inputs_efg = 0x1C1C1400;
 		rasterizer_set_pixel_shader(&pixel_shader);
-		rasterizer_transparent_geometry_group_draw__internal(group, FALSE);
+		rasterizer_transparent_geometry_group_draw__internal(
+			(struct transparent_geometry_group const *)group,
+			FALSE);
 	}
 	return;
 }

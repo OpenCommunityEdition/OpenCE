@@ -11,32 +11,13 @@ header included in hcex build.
 /* ---------- headers */
 
 #include "math/real_math.h"
+#include "shaders/shader_texture_animation.h"
 
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
-
-struct shader_texture_animation
-{
-	short u_source;
-	short u_function;
-	real u_period;
-	real u_phase;
-	real u_scale;
-	short v_source;
-	short v_function;
-	real v_period;
-	real v_phase;
-	real v_scale;
-	short r_source;
-	short r_function;
-	real r_period;
-	real r_phase;
-	real r_scale;
-	real_point2d r_center;
-};
 
 struct render_animation
 {

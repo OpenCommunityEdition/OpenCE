@@ -1,4 +1,4 @@
-"""Compile real disposal and prove its two call-site payloads are initialized.
+"""Prove disposal retains the two source-authenticated uninitialized payloads.
 
 This is a deliberately narrow machine-code argument-block check, not a full
 network test or a general x86 interpreter. Unknown instructions fail closed.
@@ -21,8 +21,8 @@ CREATE = "_create_network_game_message"
 KINDS = {9: "pregame", 31: "postgame"}
 
 
-class PayloadNotInitialized(AssertionError):
-    """Only a successfully analyzed call with a nonzero/unknown payload."""
+class PayloadUnexpectedlyInitialized(AssertionError):
+    """Only a successfully analyzed call with a zeroed payload."""
 
 
 def payload_calls(obj):
@@ -98,9 +98,9 @@ def payload_calls(obj):
     return result
 
 
-def require_zero(proof, kind):
-    if not proof[kind]["zero"]:
-        raise PayloadNotInitialized(kind)
+def require_uninitialized(proof, kind):
+    if proof[kind]["zero"]:
+        raise PayloadUnexpectedlyInitialized(kind)
 
 
 @pytest.fixture(scope="module")
@@ -111,14 +111,14 @@ def compiler(tmp_path_factory):
     folder = tmp_path_factory.mktemp("server-dispose-payload")
     source = SOURCE.read_bytes()
 
-    def compile_one(name, remove_kind=None):
+    def compile_one(name, initialize_kind=None):
         code = source
-        if remove_kind is not None:
+        if initialize_kind is not None:
             declaration = ("struct message_server_graceful_game_exit_"
-                           + KINDS[remove_kind] + " message_packet").encode()
-            needle = declaration + b" = { 0 };"
+                           + KINDS[initialize_kind] + " message_packet").encode()
+            needle = declaration + b";"
             assert code.count(needle) == 1
-            code = code.replace(needle, declaration + b";", 1)
+            code = code.replace(needle, declaration + b" = { 0 };", 1)
         input_path, output_path = folder / (name + ".c"), folder / (name + ".obj")
         input_path.write_bytes(code)
         completed = subprocess.run(
@@ -130,21 +130,23 @@ def compiler(tmp_path_factory):
         assert SOURCE.read_bytes() == source, "source changed during test"
         return payload_calls(cc.load(output_path))
 
+    target = payload_calls(cc.load(ROOT / ("build/split/" + UNIT + ".obj")))
     positive = compile_one("actual")
+    assert positive == target
     for kind in KINDS:
-        require_zero(positive, kind)
+        require_uninitialized(positive, kind)
     return compile_one
 
 
-def test_both_actual_payloads_are_zero(compiler):
+def test_both_actual_payloads_are_uninitialized(compiler):
     assert callable(compiler)
 
 
 @pytest.mark.parametrize("kind", [9, 31])
-def test_missing_initializer_is_rejected_after_successful_compile(compiler, kind):
-    proof = compiler("missing-" + KINDS[kind], kind)
-    require_zero(proof, next(k for k in KINDS if k != kind))
+def test_added_initializer_is_rejected_after_successful_compile(compiler, kind):
+    proof = compiler("initialized-" + KINDS[kind], kind)
+    require_uninitialized(proof, next(k for k in KINDS if k != kind))
     # Compilation and unsupported instructions cannot satisfy this control.
-    with pytest.raises(PayloadNotInitialized) as error:
-        require_zero(proof, kind)
+    with pytest.raises(PayloadUnexpectedlyInitialized) as error:
+        require_uninitialized(proof, kind)
     assert error.value.args == (kind,)

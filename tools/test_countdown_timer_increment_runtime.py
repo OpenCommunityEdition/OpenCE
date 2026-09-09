@@ -51,17 +51,17 @@ TARGET_SPEC = (
 )
 REBUILT_SPEC = (
     144,
-    "96937b1e7ff0aa3415fa0b0a397feddc2b30699e3d34b7be1db7f80b3eb96485",
+    "0291de1fcc1f65baf92a784ad590c78925729c9c4ba0b9a1bbf33a6e8cdd7aa5",
     [
         (0x05, 20, SYSTEM_MILLISECONDS),
-        (0x37, 6, FILE_LITERAL),
-        (0x3C, 6, ADJUSTMENT_LITERAL),
-        (0x41, 20, DISPLAY_ASSERT),
-        (0x48, 20, SYSTEM_EXIT),
-        (0x74, 6, FILE_LITERAL),
-        (0x79, 6, TIMER_LITERAL),
-        (0x7E, 20, DISPLAY_ASSERT),
-        (0x85, 20, SYSTEM_EXIT),
+        (0x39, 6, FILE_LITERAL),
+        (0x3E, 6, ADJUSTMENT_LITERAL),
+        (0x43, 20, DISPLAY_ASSERT),
+        (0x4A, 20, SYSTEM_EXIT),
+        (0x76, 6, FILE_LITERAL),
+        (0x7B, 6, TIMER_LITERAL),
+        (0x80, 20, DISPLAY_ASSERT),
+        (0x87, 20, SYSTEM_EXIT),
     ],
 )
 
@@ -178,19 +178,19 @@ def bodies(tmp_path_factory):
 
     source_before = SOURCE.read_bytes()
     normalized_source = source_before.replace(b"\r\n", b"\n")
-    update_start = normalized_source.index(b"unsigned long countdown_timer_update(")
+    update_start = normalized_source.index(b"void countdown_timer_update(")
     update_end = normalized_source.index(b"long countdown_timer_get_time_remaining(", update_start)
     update_body = normalized_source[update_start:update_end]
     update_tokens = b" ".join(update_body.split())
-    assert update_tokens.count(
-        b"timer->time_remaining = (long)( (unsigned long)timer->time_remaining "
-        b"- (unsigned long)elapsed_time);") == 1
-    assert b"timer->time_remaining -= elapsed_time;" not in update_body
+    assert update_tokens.count(b"timer->time_remaining -= elapsed_time;") == 1
+    assert b"(unsigned long)" not in update_body
     increment_start = normalized_source.rindex(b"void countdown_timer_increment(")
     increment_end = normalized_source.index(b"void countdown_timer_decrement(", increment_start)
     increment_body = normalized_source[increment_start:increment_end]
-    assert b" ".join(increment_body.split()).count(
-        b"(unsigned long)timer->time_remaining + (unsigned long)adjustment") == 1
+    increment_tokens = b" ".join(increment_body.split())
+    assert increment_tokens.count(
+        b"timer->time_remaining + adjustment < adjustment") == 1
+    assert b"(unsigned long)" not in increment_body
 
     output = tmp_path_factory.mktemp("countdown-timer-increment") / "rebuilt.obj"
     completed = subprocess.run(
@@ -489,7 +489,7 @@ def test_337_real_body_cases_match_target_and_preserve_contracts(bodies):
         footprints["rebuilt_write"].update((offset, size) for offset, size, _ in rebuilt["writes"])
 
     assert all(value == {(0, 4), (4, 4)} for value in footprints.values())
-    assert volatile_differences > 0  # EAX is intentionally not a void-return contract.
+    assert volatile_differences == 0  # The admitted rebuilt body is byte-exact.
     assert assertion_literals == {ADJUSTMENT_LITERAL, TIMER_LITERAL}
     expected_boundaries = {
         "positive_to_negative_clock_sign_transition": (100, "normal"),
@@ -512,8 +512,8 @@ def test_real_overflow_branch_mutation_is_rejected(bodies):
     reference = execute(bodies["rebuilt"], item)
     require_same(execute(bodies["target"], item), reference)
     mutant = bytearray(bodies["rebuilt"])
-    assert mutant[0x56:0x58] == b"\x7D\x05"
-    mutant[0x56] = 0xEB  # JGE -> JMP: bypass the overflow clamp.
+    assert mutant[0x5B:0x5D] == b"\x7D\x04"
+    mutant[0x5B] = 0xEB  # JGE -> JMP: bypass the overflow clamp.
     changed = execute(bytes(mutant), item)
     with pytest.raises(RuntimeSemanticMismatch):
         require_same(reference, changed)
@@ -525,8 +525,8 @@ def test_real_timer_update_branch_mutation_is_rejected(bodies):
     reference = execute(bodies["rebuilt"], item)
     require_same(execute(bodies["target"], item), reference)
     mutant = bytearray(bodies["rebuilt"])
-    assert mutant[0x14:0x16] == b"\x7E\x14"
-    mutant[0x14] = 0xEB  # JLE -> JMP: always bypass elapsed-time processing.
+    assert mutant[0x11:0x13] == b"\x7E\x16"
+    mutant[0x11] = 0xEB  # JLE -> JMP: always bypass elapsed-time processing.
     changed = execute(bytes(mutant), item)
     with pytest.raises(RuntimeSemanticMismatch):
         require_same(reference, changed)

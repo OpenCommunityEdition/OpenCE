@@ -306,7 +306,7 @@ void network_connection_initialize(
 	return;
 }
 
-long network_connection_connected(
+boolean network_connection_connected(
 	struct network_connection *connection)
 {
 	match_assert(

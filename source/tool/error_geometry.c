@@ -262,6 +262,22 @@ void error_geometry_set_name(
 	return;
 }
 
+void error_geometry_set_transform(
+	real_matrix4x3 const *matrix)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\tool\\error_geometry.c",
+		0x6B,
+		matrix);
+	match_assert_valid_real_matrix4x3(
+		"c:\\halo\\SOURCE\\tool\\error_geometry.c",
+		0x6C,
+		matrix);
+	error_geometry_globals.transform= *matrix;
+
+	return;
+}
+
 void error_geometry_point(
 	real_point3d const *point,
 	real_argb_color const *color)
@@ -431,6 +447,157 @@ void error_geometry_polygon(
 	return;
 }
 
+void error_geometry_polygon_list(
+	long polygon_count,
+	short const *point_counts,
+	real_point3d const *points,
+	real_argb_color const *colors)
+{
+	real_point3d point;
+	long point_index;
+	long polygon_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\tool\\error_geometry.c",
+		332,
+		polygon_count>=0);
+	match_assert(
+		"c:\\halo\\SOURCE\\tool\\error_geometry.c",
+		333,
+		point_counts);
+	match_assert(
+		"c:\\halo\\SOURCE\\tool\\error_geometry.c",
+		334,
+		points);
+
+	if (polygon_count>0 && error_geometry_file_is_open())
+	{
+		fprintf(error_geometry_file, "Separator\n{\n");
+		fprintf(error_geometry_file, "\tCoordinate3\n\t{\n\t\tpoint\n\t\t[\n");
+		point_index = 0;
+		for (polygon_index= 0; polygon_index<polygon_count; ++polygon_index)
+		{
+			short polygon_point_index;
+
+			for (
+				polygon_point_index= 0;
+				polygon_point_index<point_counts[polygon_index];
+				++polygon_point_index, ++point_index)
+			{
+				matrix4x3_transform_point(&error_geometry_globals.transform, &points[point_index], &point);
+				fprintf(error_geometry_file, "\t\t\t%f %f %f,\n",
+					point.x*ERROR_GEOMETRY_SCALE,
+					point.y*ERROR_GEOMETRY_SCALE,
+					point.z*ERROR_GEOMETRY_SCALE);
+			}
+		}
+		fprintf(error_geometry_file, "\t\t]\n\t}\n");
+		fprintf(error_geometry_file, "\tMaterialBinding\n\t{\n\t\tvalue PER_FACE\n\t}\n");
+		if (colors)
+		{
+			fprintf(error_geometry_file, "\tMaterial\n\t{\n\t\tdiffuseColor\n\t\t[\n");
+			for (polygon_index= 0; polygon_index<polygon_count; ++polygon_index)
+			{
+				short triangle_index;
+
+				for (triangle_index= 2; triangle_index<point_counts[polygon_index]; ++triangle_index)
+				{
+					fprintf(error_geometry_file, "\t\t\t%f %f %f, ",
+						colors[polygon_index].red,
+						colors[polygon_index].green,
+						colors[polygon_index].blue);
+				}
+				fprintf(error_geometry_file, "\n");
+			}
+			fprintf(error_geometry_file, "\t\t]\n\t\ttransparency[%f]\n\t}\n", 1.f-colors->alpha);
+		}
+		fprintf(error_geometry_file, "\tIndexedFaceSet\n\t{\n\t\tcoordIndex\n\t\t[\n");
+		point_index = 0;
+		for (polygon_index= 0; polygon_index<polygon_count; ++polygon_index)
+		{
+			short triangle_index;
+
+			fprintf(error_geometry_file, "\t\t\t");
+			for (triangle_index= 2; triangle_index<point_counts[polygon_index]; ++triangle_index)
+			{
+				fprintf(error_geometry_file, "%d,%d,%d,-1, ",
+					point_index,
+					point_index+triangle_index-1,
+					point_index+triangle_index);
+			}
+			fprintf(error_geometry_file, "\n");
+			point_index+= point_counts[polygon_index];
+		}
+		fprintf(error_geometry_file, "\t\t]\n\t}\n}\n");
+		fflush(error_geometry_file);
+	}
+
+	return;
+}
+
+void error_geometry_polygon_mesh__textured_with_no_import_scale(
+	long width,
+	long height,
+	real_point3d const *points,
+	real_point2d const *texcoords)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\tool\\error_geometry.c",
+		428,
+		width>0);
+	match_assert(
+		"c:\\halo\\SOURCE\\tool\\error_geometry.c",
+		429,
+		height>0);
+	match_assert(
+		"c:\\halo\\SOURCE\\tool\\error_geometry.c",
+		430,
+		points);
+	match_assert(
+		"c:\\halo\\SOURCE\\tool\\error_geometry.c",
+		431,
+		texcoords);
+
+	if (error_geometry_file_is_open())
+	{
+		long point_count;
+		long point_index, x, y;
+
+		fprintf(error_geometry_file, "Separator\n{\n");
+		fprintf(error_geometry_file, "\tCoordinate3\n\t{\n\t\tpoint\n\t\t[\n");
+		point_count= width*height;
+		for (point_index= 0; point_index<point_count; ++point_index)
+		{
+			fprintf(error_geometry_file, "\t\t\t%f %f %f,\n",
+				points[point_index].x, points[point_index].y, points[point_index].z);
+		}
+		fprintf(error_geometry_file, "\t\t]\n\t}\n");
+		fprintf(error_geometry_file, "\tTextureCoordinate\n\t{\n\t\tpoint\n\t\t[\n");
+		for (point_index= 0; point_index<point_count; ++point_index)
+		{
+			fprintf(error_geometry_file, "\t\t\t%f %f,\n",
+				texcoords[point_index].x, texcoords[point_index].y);
+		}
+		fprintf(error_geometry_file, "\t\t]\n\t}\n");
+		fprintf(error_geometry_file, "\tMaterialBinding\n\t{\n\t\tvalue PER_FACE\n\t}\n");
+		fprintf(error_geometry_file, "\tIndexedFaceSet\n\t{\n\t\tcoordIndex\n\t\t[\n");
+		for (y= 0; y<height-1; ++y)
+		{
+			for (x= 0; x<width-1; ++x)
+			{
+				fprintf(error_geometry_file, "\t\t\t");
+				fprintf(error_geometry_file, "%d,%d,%d,%d,-1,",
+					y*width+x, y*width+x+1, (y+1)*width+x+1, (y+1)*width+x);
+				fprintf(error_geometry_file, "\n");
+			}
+		}
+		fprintf(error_geometry_file, "\t\t]\n\t}\n}\n");
+		fflush(error_geometry_file);
+	}
+
+	return;
+}
+
 void error_geometry_rectangle3d(
 	real_rectangle3d const *bounds,
 	real_argb_color const *color)
@@ -556,6 +723,50 @@ void error_geometry_bounded_line(
 		bounds_color.alpha= color->alpha*0.5f;
 		error_geometry_rectangle3d(&bounds, &bounds_color);
 		error_geometry_line(p0, p1, color);
+	}
+
+	return;
+}
+
+void error_geometry_bounded_triangle(
+	real_point3d const *p0,
+	real_point3d const *p1,
+	real_point3d const *p2,
+	real radius,
+	real_argb_color const *color)
+{
+	real_rectangle3d bounds;
+	real_argb_color bounds_color;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\tool\\error_geometry.c",
+		597,
+		p0);
+	match_assert(
+		"c:\\halo\\SOURCE\\tool\\error_geometry.c",
+		598,
+		p1);
+	match_assert(
+		"c:\\halo\\SOURCE\\tool\\error_geometry.c",
+		599,
+		p2);
+	match_assert(
+		"c:\\halo\\SOURCE\\tool\\error_geometry.c",
+		600,
+		color);
+
+	if (error_geometry_file_is_open())
+	{
+		bounds.x0= MIN(p0->x, MIN(p1->x, p2->x)) - radius;
+		bounds.x1= MAX(p0->x, MAX(p1->x, p2->x)) + radius;
+		bounds.y0= MIN(p0->y, MIN(p1->y, p2->y)) - radius;
+		bounds.y1= MAX(p0->y, MAX(p1->y, p2->y)) + radius;
+		bounds.z0= MIN(p0->z, MIN(p1->z, p2->z)) - radius;
+		bounds.z1= MAX(p0->z, MAX(p1->z, p2->z)) + radius;
+		bounds_color.alpha= color->alpha*0.5f;
+		bounds_color.rgb= color->rgb;
+		error_geometry_rectangle3d(&bounds, &bounds_color);
+		error_geometry_triangle(p0, p1, p2, color);
 	}
 
 	return;

@@ -1310,6 +1310,41 @@ void main_save_current_solo_map(
 	return;
 }
 
+void main_load_last_solo_map(
+	void)
+{
+	char map_name[256];
+	boolean valid_map_name = FALSE;
+
+	if (main_globals.load_last_solo_level && !bink_playback_active())
+	{
+		FILE *file;
+
+		file = fopen("z:\\last_solo.txt", "r");
+
+		if (file)
+		{
+			long character_count;
+
+			character_count = fread(map_name, 1, 255, file);
+			fclose(file);
+			if (character_count > 255)
+				character_count = 255;
+			map_name[character_count] = 0;
+			valid_map_name = main_get_solo_level_from_name(map_name) != NONE;
+		}
+
+		if (valid_map_name)
+			main_set_map_name(map_name);
+		else
+			main_set_map_name(scenario_paths[0]);
+		main_globals.defer_map_change = FALSE;
+		main_globals.load_last_solo_level = FALSE;
+	}
+
+	return;
+}
+
 void main_load_ui_scenario(
 	boolean precache_resources)
 {
@@ -1369,6 +1404,31 @@ void main_skip_cinematic_private(
 		main_globals.revert_map = FALSE;
 	}
 	main_globals.skip_cinematic = FALSE;
+	return;
+}
+
+void main_skip_private(
+	void)
+{
+	if (main_globals.skip_ticks && cinematic_in_progress())
+	{
+		real saved_speed = game_time_get_speed();
+
+		game_time_set_speed(1.0f);
+		while (main_globals.skip_ticks-- > 0)
+			game_time_update(1.0f / TICKS_PER_SECOND);
+		game_time_set_speed(saved_speed);
+	}
+	else
+	{
+		error(
+			_error_silent,
+			"manual skipping doesn't work outside of cinemtatic start/stop...");
+	}
+
+	main_globals.skip_ticks = 0;
+	main_globals.skip = FALSE;
+
 	return;
 }
 

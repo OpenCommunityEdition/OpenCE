@@ -150,8 +150,6 @@ void rasterizer_transparent_geometry_stop(
 	void);
 void rasterizer_lens_flares_draw(
 	void);
-void interface_draw_screen(
-	void);
 void interface_draw_fullscreen_overlays(
 	void);
 void rasterizer_debug_draw(

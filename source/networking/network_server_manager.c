@@ -740,7 +740,7 @@ static void network_game_server_send_rejection_message(
 	word reason);
 static void network_game_server_reject_connection_game_is_full(
 	struct transport_endpoint *endpoint);
-static long network_game_server_get_client_machine_count(
+static short network_game_server_get_client_machine_count(
 	struct network_game_server *server);
 void get_unique_random_name(
 	struct network_game_server *server,
@@ -842,12 +842,11 @@ void network_game_server_dispose(
 {
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x120, server);
 
-	/* The packet schemas serialize unused; never send uninitialized stack data. */
 	switch (server->state)
 	{
 	case _network_game_server_state_pregame:
 	{
-		struct message_server_graceful_game_exit_pregame message_packet = { 0 };
+		struct message_server_graceful_game_exit_pregame message_packet;
 		struct network_message *message;
 
 		message = create_network_game_message(
@@ -875,7 +874,7 @@ void network_game_server_dispose(
 
 	case _network_game_server_state_postgame:
 	{
-		struct message_server_graceful_game_exit_postgame message_packet = { 0 };
+		struct message_server_graceful_game_exit_postgame message_packet;
 		struct network_message *message;
 
 		message = create_network_game_message(
@@ -1031,31 +1030,24 @@ exit:
 	return success;
 }
 
-unsigned long countdown_timer_update(
+void countdown_timer_update(
 	struct countdown_timer *timer)
 {
-	unsigned long update_time = system_milliseconds();
-	unsigned long last_update_time = timer->last_update_time;
+	long update_time = system_milliseconds();
+
+	if (update_time > (long)timer->last_update_time)
+	{
+		long elapsed_time = update_time - timer->last_update_time;
+
+		if (elapsed_time < timer->time_remaining)
+			timer->time_remaining -= elapsed_time;
+		else
+			timer->time_remaining = 0;
+	}
 
 	timer->last_update_time = update_time;
 
-	if ((long)update_time > (long)last_update_time)
-	{
-		long elapsed_time = update_time - last_update_time;
-
-		if (elapsed_time < timer->time_remaining)
-		{
-			timer->time_remaining = (long)(
-				(unsigned long)timer->time_remaining -
-				(unsigned long)elapsed_time);
-		}
-		else
-		{
-			timer->time_remaining = 0;
-		}
-	}
-
-	return update_time;
+	return;
 }
 
 long countdown_timer_get_time_remaining(
@@ -1089,22 +1081,17 @@ void countdown_timer_increment(
 	long adjustment,
 	long maximum)
 {
-	long adjusted_time_remaining;
-
 	countdown_timer_update(timer);
 
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x68, adjustment >= 0);
 
-	/* Preserve January's two's-complement bits without signed-addition UB. */
-	adjusted_time_remaining = (long)(
-		(unsigned long)timer->time_remaining + (unsigned long)adjustment);
-	if (adjusted_time_remaining < adjustment)
+	if (timer->time_remaining + adjustment < adjustment)
 	{
 		timer->time_remaining = maximum;
 	}
 	else
 	{
-		timer->time_remaining = adjusted_time_remaining;
+		timer->time_remaining += adjustment;
 		timer->time_remaining = MIN(timer->time_remaining, maximum);
 	}
 
@@ -1233,40 +1220,41 @@ void network_game_server_close_game(
 boolean network_game_server_start_network_game(
 	struct network_game_server *server)
 {
+	boolean success = TRUE;
+
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x2DE, server);
 
-	if (!server->sent_start_game_message)
+	if (server->sent_start_game_message == FALSE)
 	{
 		struct network_game game_settings;
 		struct message_server_begin_game begin_game = { 0 };
 		void *message;
 
 		csmemcpy(&game_settings, &server->game, sizeof(game_settings));
-		message = create_network_game_message(
+		if (((message = create_network_game_message(
 			_message_server_game_settings_update,
 			&game_settings,
-			sizeof(game_settings));
-		if (message && network_game_server_send_message_to_all_machines(server, message))
-		{
-			message = create_network_game_message(
+			sizeof(game_settings))) != NULL) &&
+			network_game_server_send_message_to_all_machines(server, message) &&
+			((message = create_network_game_message(
 				_message_server_begin_game,
 				&begin_game,
-				sizeof(begin_game));
-			if (message && network_game_server_send_message_to_all_machines(server, message))
-			{
-				network_event("signalling client machines to begin loading for network game");
-				server->next_update_number = 0;
-				server->sent_start_game_message = TRUE;
-				return TRUE;
-			}
+				sizeof(begin_game))) != NULL) &&
+			network_game_server_send_message_to_all_machines(server, message))
+		{
+			network_event("signalling client machines to begin loading for network game");
+			server->sent_start_game_message = TRUE;
+			success = TRUE;
 		}
-
-		network_event("failed to signal client machines to begin loading for network game");
+		else
+		{
+			network_event("failed to signal client machines to begin loading for network game");
+		}
 	}
 
 	server->next_update_number = 0;
 
-	return TRUE;
+	return success;
 }
 
 void network_game_server_send_player_quit_messages_ingame(
@@ -2597,9 +2585,11 @@ void network_game_server_update_countdown(
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x66E,
 		server && server->state == _network_game_server_state_pregame);
 
-	if (!server->countdown_state.paused)
+	if (server->countdown_state.paused == FALSE)
 	{
-		if (server_ok_to_countdown(server) ||
+		boolean ok_to_countdown = server_ok_to_countdown(server);
+
+		if (ok_to_countdown ||
 			countdown_event == _network_game_server_countdown_event_stop)
 		{
 			if (server->countdown_state.active == TRUE)
@@ -2648,24 +2638,33 @@ void network_game_server_update_countdown(
 			}
 			else
 			{
-				countdown_timer_set_time_remaining(&server->countdown_state.timer, 0);
+				unsigned long now = system_milliseconds();
 
 				if (countdown_event == _network_game_server_countdown_event_start_immediately)
 				{
-					server->countdown_state.adjusted_time_this_tick = FALSE;
+					countdown_timer_set_time_remaining(&server->countdown_state.timer, 0);
 					server->countdown_state.active = TRUE;
+					server->countdown_state.adjusted_time_this_tick = FALSE;
 				}
-				else if (!network_game_should_accept_remote_connections() ||
-					network_game_server_get_client_machine_count(server) > 1)
+				else
 				{
-					server->countdown_state.active = TRUE;
-					countdown_timer_set_time_remaining(
-						&server->countdown_state.timer,
-						network_game_is_splitscreen_local()
-							? NETWORK_GAME_SPLITSCREEN_COUNTDOWN_TIME
-							: NETWORK_GAME_COUNTDOWN_TIME);
-					server->countdown_state.last_countdown_message_time = 0;
-					server->countdown_state.adjusted_time_this_tick = FALSE;
+					if (network_game_should_accept_remote_connections() == FALSE ||
+						network_game_server_get_client_machine_count(server) > 1)
+					{
+						unsigned long countdown;
+
+						if (network_game_is_splitscreen_local())
+							countdown = NETWORK_GAME_SPLITSCREEN_COUNTDOWN_TIME;
+						else
+							countdown = NETWORK_GAME_COUNTDOWN_TIME;
+
+						server->countdown_state.active = TRUE;
+						countdown_timer_set_time_remaining(
+							&server->countdown_state.timer,
+							countdown);
+						server->countdown_state.adjusted_time_this_tick = FALSE;
+						server->countdown_state.last_countdown_message_time = 0;
+					}
 				}
 			}
 		}
@@ -2770,10 +2769,10 @@ static boolean player_name_is_unique(
 	return TRUE;
 }
 
-static long network_game_server_get_client_machine_count(
+static short network_game_server_get_client_machine_count(
 	struct network_game_server *server)
 {
-	long client_machine_count = 0;
+	short client_machine_count = 0;
 	short client_machine_index;
 
 	for (client_machine_index = 0;

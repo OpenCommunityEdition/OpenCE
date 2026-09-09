@@ -179,6 +179,7 @@ void main_loop(void);
 /* ---------- globals */
 
 extern short player_spawn_count;
+extern boolean debug_game_save;
 
 /* ---------- public code */
 

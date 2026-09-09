@@ -35,7 +35,7 @@ typedef void (*network_connection_rejection_procedure)(
 
 void network_connection_initialize(
 	void);
-long network_connection_connected(
+boolean network_connection_connected(
 	struct network_connection *connection);
 void network_connection_get_address(
 	struct network_connection *connection,

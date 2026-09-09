@@ -48,6 +48,8 @@ void vehicles_dispose_from_old_map(
 	void);
 void vehicles_dispose(
 	void);
+boolean vehicle_moving_near_any_player(
+	void);
 void vehicle_delete(
 	long vehicle_index);
 long vehicle_find_pathfinding_surface_index(

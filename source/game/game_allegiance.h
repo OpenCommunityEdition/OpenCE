@@ -15,8 +15,16 @@ void game_allegiance_update(
 boolean game_team_is_enemy(
 	short team_index0,
 	short team_index1);
+boolean game_team_is_ally(
+	short our_team_index,
+	short other_team_index);
 boolean game_allegiance_remove(
 	short team1_index,
 	short team2_index);
+boolean game_allegiance_incident(
+	short aggressor_team_index,
+	short victim_team_index,
+	short incident_type,
+	boolean *notify_immediately);
 
 #endif // __GAME_ALLEGIANCE_H

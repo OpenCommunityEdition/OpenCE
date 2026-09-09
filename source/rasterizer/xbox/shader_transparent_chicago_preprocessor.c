@@ -18,6 +18,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cseries/errors.h"
+#include "rasterizer/xbox/shader_transparent_chicago_preprocessor.h"
 #include "shaders/shader_definitions.h"
 #include "tag_files/tag_groups.h"
 

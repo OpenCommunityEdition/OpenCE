@@ -88,7 +88,11 @@ enum rasterizer_lock_operation
 
 /* ---------- macros */
 
+#define RASTERIZER_GLOBALS_FLOATING_POINT_ZBUFFER(globals) ((globals).reserved30[0xC])
+
 /* ---------- structures */
+
+struct rasterizer_cinematic_screen_effect_parameters;
 
 struct rasterizer_model_begin_parameters;
 struct detail_object_view_data;
@@ -191,6 +195,8 @@ typedef char verify_rasterizer_globals_fps_accumulation_frame_index_offset[
 	offsetof(struct rasterizer_globals_definition, fps_accumulation_frame_index) == 0x18 ? 1 : -1];
 typedef char verify_rasterizer_globals_framerate_throttle_offset[
 	offsetof(struct rasterizer_globals_definition, framerate_throttle) == 0x3D ? 1 : -1];
+typedef char verify_rasterizer_globals_floating_point_zbuffer_offset[
+	offsetof(struct rasterizer_globals_definition, reserved30) + 0xC == 0x3C ? 1 : -1];
 typedef char verify_rasterizer_globals_near_clip_distance_offset[
 	offsetof(struct rasterizer_globals_definition, near_clip_distance) == 0x44 ? 1 : -1];
 struct rasterizer_window_begin_parameters
@@ -324,7 +330,7 @@ void rasterizer_detail_objects_draw(
 void rasterizer_detail_objects_end(
 	void);
 void rasterizer_screen_effect(
-	struct render_screen_effect const *effect);
+	struct rasterizer_cinematic_screen_effect_parameters *parameters);
 
 void rasterizer_debug_immediate_begin(
 	void);

@@ -461,7 +461,7 @@ void _rasterizer_detail_objects_draw(
 void _rasterizer_detail_objects_end(
 	void);
 void _rasterizer_screen_effect(
-	struct render_screen_effect const *effect);
+	struct rasterizer_cinematic_screen_effect_parameters *parameters);
 void _rasterizer_hud_motion_sensor_blip_begin(
 	void);
 void _rasterizer_hud_motion_sensor_blip_draw(
@@ -1084,9 +1084,9 @@ void rasterizer_detail_objects_end(
 }
 
 void rasterizer_screen_effect(
-	struct render_screen_effect const *effect)
+	struct rasterizer_cinematic_screen_effect_parameters *parameters)
 {
-	_rasterizer_screen_effect(effect);
+	_rasterizer_screen_effect(parameters);
 	return;
 }
 

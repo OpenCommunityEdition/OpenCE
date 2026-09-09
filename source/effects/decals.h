@@ -24,6 +24,10 @@ struct decal_editor_geometry;
 
 /* ---------- prototypes/DECALS.C */
 
+void decals_initialize(
+	void);
+void decals_initialize_for_new_map(
+	void);
 void decals_unlock(
 	boolean permanent);
 void decal_delete(
@@ -62,6 +66,7 @@ pixel32 real_a_rgb_color_to_pixel32(
 /* ---------- globals */
 
 extern boolean decals_enabled;
+extern boolean debug_decals;
 
 /* ---------- public code */
 

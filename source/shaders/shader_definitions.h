@@ -11,7 +11,10 @@ header included in hcex build.
 /* ---------- headers */
 
 #include "real_math.h"
+#include "shaders/shader_texture_animation.h"
 #include "tag_groups.h"
+
+/* ---------- constants */
 
 /* ---------- macros */
 
@@ -46,15 +49,28 @@ struct shader_effect_definition
 	short framebuffer_blend_function;
 	short framebuffer_fade_mode;
 	unsigned short primary_map_flags;
-	byte reserved_before_bitmap[28];
-	struct tag_reference bitmap;
-	byte reserved_before_secondary_map_radius[60];
+	byte reserved_before_secondary_map[28];
+	struct tag_reference secondary_map;
+	short secondary_map_anchor;
+	unsigned short secondary_map_flags;
+	struct shader_texture_animation secondary_map_animation;
 	real secondary_map_radius;
-	byte reserved_after_secondary_map_radius[24];
+	real secondary_map_zsprite_radius_scale;
+	byte reserved_after_secondary_map_zsprite_radius_scale[20];
 };
 
+typedef char shader_effect_secondary_map_offset_assert[
+	offsetof(struct shader_effect_definition, secondary_map) == 0x4C ? 1 : -1];
+typedef char shader_effect_secondary_map_anchor_offset_assert[
+	offsetof(struct shader_effect_definition, secondary_map_anchor) == 0x5C ? 1 : -1];
+typedef char shader_effect_secondary_map_flags_offset_assert[
+	offsetof(struct shader_effect_definition, secondary_map_flags) == 0x5E ? 1 : -1];
+typedef char shader_effect_secondary_map_animation_offset_assert[
+	offsetof(struct shader_effect_definition, secondary_map_animation) == 0x60 ? 1 : -1];
 typedef char shader_effect_secondary_map_radius_offset_assert[
 	offsetof(struct shader_effect_definition, secondary_map_radius) == 0x98 ? 1 : -1];
+typedef char shader_effect_secondary_map_zsprite_radius_scale_offset_assert[
+	offsetof(struct shader_effect_definition, secondary_map_zsprite_radius_scale) == 0x9C ? 1 : -1];
 typedef char shader_effect_framebuffer_fade_mode_offset_assert[
 	offsetof(struct shader_effect_definition, framebuffer_fade_mode) == 0x2C ? 1 : -1];
 typedef char shader_effect_definition_size_assert[
