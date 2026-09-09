@@ -710,14 +710,7 @@ boolean actor_combat_check_collateral_damage(
 			{
 				if (prop->enemy)
 				{
-					real_vector3d displacement;
-
-					displacement.i = test_point->x - prop->body_position.x;
-					displacement.j = test_point->y - prop->body_position.y;
-					displacement.k = test_point->z - prop->body_position.z;
-					if (displacement.i*displacement.i +
-						displacement.j*displacement.j +
-						displacement.k*displacement.k <
+					if (actor_combat_distance_squared3d_inline(&prop->body_position, test_point) <
 						enemy_radius*enemy_radius)
 					{
 						if (prop->player)
@@ -746,21 +739,12 @@ boolean actor_combat_check_collateral_damage(
 						}
 					}
 				}
-				else if (collateral_damage_radius > 0.0f)
+				else if (collateral_damage_radius > 0.0f &&
+					actor_combat_distance_squared3d_inline(&prop->body_position, test_point) <
+						collateral_damage_radius*collateral_damage_radius)
 				{
-					real_vector3d displacement;
-
-					displacement.i = test_point->x - prop->body_position.x;
-					displacement.j = test_point->y - prop->body_position.y;
-					displacement.k = test_point->z - prop->body_position.z;
-					if (displacement.i*displacement.i +
-						displacement.j*displacement.j +
-						displacement.k*displacement.k <
-							collateral_damage_radius*collateral_damage_radius)
-					{
-						result = FALSE;
-						break;
-					}
+					result = FALSE;
+					break;
 				}
 			}
 		}
@@ -798,29 +782,18 @@ boolean actor_combat_check_collateral_damage(
 						}
 					}
 
-					if (!already_counted)
+					if (!already_counted &&
+						actor_combat_distance_squared3d_inline(
+							&enemy_actor->input.position.body_position,
+							test_point) < enemy_radius*enemy_radius)
 					{
-						real_vector3d displacement;
-
-						displacement.i = test_point->x -
-							enemy_actor->input.position.body_position.x;
-						displacement.j = test_point->y -
-							enemy_actor->input.position.body_position.y;
-						displacement.k = test_point->z -
-							enemy_actor->input.position.body_position.z;
-						if (displacement.i*displacement.i +
-							displacement.j*displacement.j +
-							displacement.k*displacement.k <
-								enemy_radius*enemy_radius)
+						if (enemy_actor->meta.swarm)
 						{
-							if (enemy_actor->meta.swarm)
-							{
-								threats += enemy_actor->meta.swarm_unit_count;
-							}
-							else
-							{
-								threats++;
-							}
+							threats += enemy_actor->meta.swarm_unit_count;
+						}
+						else
+						{
+							threats++;
 						}
 					}
 				}
@@ -840,18 +813,9 @@ boolean actor_combat_check_collateral_damage(
 			friend_actor;
 			friend_actor = encounter_actor_iterator_next(&actor_iterator))
 		{
-			real_vector3d displacement;
-
-			displacement.i = test_point->x -
-				friend_actor->input.position.body_position.x;
-			displacement.j = test_point->y -
-				friend_actor->input.position.body_position.y;
-			displacement.k = test_point->z -
-				friend_actor->input.position.body_position.z;
-			if (displacement.i*displacement.i +
-				displacement.j*displacement.j +
-				displacement.k*displacement.k <
-					collateral_damage_radius*collateral_damage_radius)
+			if (actor_combat_distance_squared3d_inline(
+					&friend_actor->input.position.body_position,
+					test_point) < collateral_damage_radius*collateral_damage_radius)
 			{
 				result = FALSE;
 				break;

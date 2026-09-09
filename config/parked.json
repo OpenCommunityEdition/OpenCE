@@ -1774,17 +1774,6 @@
     },
     {
       "unit": "source/ai/actor_combat",
-      "function": "_actor_combat_check_collateral_damage",
-      "class": "instruction-scheduling",
-      "evidence": "The retained source expresses each typed real_vector3d squared distance directly and coherently. Target and candidate are both 880 bytes with 21 identical relocation identities and 293 instructions; only six x87 stack-index opcode choices in the first inlined distance expression differ. Reordering terms can perturb the result but is not supported by source evidence and was rejected as fake matching. No duplicate math helper, volatile access, representation punning, assembly, or candidate-only helper COMDAT is retained. Reopen only for authoritative source or natural same-compiler expression/lifetime evidence.",
-      "measurements": {
-        "target": { "size": 880, "relocation_count": 21, "normalized_sha256": "eb4aee9d9f4765a5505126a61d5ef2bdabe4c40f9de3cba7d3cd7cc9771ee0d0" },
-        "base": { "size": 880, "relocation_count": 21, "normalized_sha256": "811617f77eb8c57aa71254cae2acdee20a270e90855aeb6976bbd25faca08ecc" },
-        "objdiff_percent": 99.89474
-      }
-    },
-    {
-      "unit": "source/ai/actor_combat",
       "function": "_actor_combat_plan_grenade_trajectory",
       "class": "register-allocation",
       "evidence": "The retained function now uses the HCEA-authenticated build-trajectory argument order and typed grenade constants. Target and candidate have the same 288-byte envelope, five relocations, and identical relocation identities. January uses a 0x30-byte frame by reusing a dead incoming parameter home slot, while this VC7 source shape uses a 0x34-byte frame and a separate local slot. Natural declaration/lifetime and signature corrections do not reproduce the stack-slot colouring. No volatile access, raw overlay, fake dependency, assembly, or manual stack control is retained. Reopen only for authoritative source or a natural same-compiler stack-lifetime donor.",
