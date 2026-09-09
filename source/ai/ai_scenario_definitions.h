@@ -34,6 +34,16 @@ enum
 	NUMBER_OF_SQUAD_FLAGS,
 };
 
+enum actor_major_upgrade
+{
+	_actor_major_upgrade_normal = 0,
+	_actor_major_upgrade_few,
+	_actor_major_upgrade_many,
+	_actor_major_upgrade_none,
+	_actor_major_upgrade_all,
+	NUMBER_OF_ACTOR_MAJOR_UPGRADES,
+};
+
 enum
 {
 	_platoon_flee_upon_maneuver_bit = 0,

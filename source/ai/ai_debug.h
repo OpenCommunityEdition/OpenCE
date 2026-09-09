@@ -537,6 +537,9 @@ void ai_debug_actor_deleted(
 void ai_debug_initialize_for_new_map(
 	void);
 
+void ai_debug_update(
+	void);
+
 void ai_debug_render(
 	void);
 

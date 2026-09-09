@@ -198,35 +198,121 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 
+#include "ai/ai.h"
 #include "ai/ai_communication.h"
+#include "ai/ai_debug.h"
+#include "ai/ai_profile.h"
 #include "ai/ai_runtime.h"
+#include "ai/ai_scenario_definitions.h"
+#include "ai/ai_script.h"
+#include "ai/actor_iterators.h"
 #include "ai/actor_types.h"
 
 #include "ai/actors.h"
 #include "ai/encounters.h"
+#include "ai/path.h"
 #include "ai/props.h"
+#include "units/unit_definitions.h"
 #include "units/units.h"
 #include "game/game.h"
+#include "game/game_allegiance.h"
+#include "game/game_globals.h"
 
 #include "memory/data.h"
+#include "objects/damage.h"
+#include "saved games/game_state.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
+#include "tag_files/tag_files.h"
+#include "tag_files/tag_groups.h"
 
 #include <stddef.h>
 
 /* ---------- constants */
 
+enum
+{
+	MAXIMUM_NUMBER_OF_MOUNTED_WEAPON_UNITS = 8,
+	NUMBER_OF_AI_SPEECH_TIMERS = 2,
+	MAXIMUM_POTENTIALLY_RELEASABLE_ENTITIES = 256,
+	AI_ENDANGER_PLAYER_RECENT_VISIBILITY_TICKS = 90,
+	NUMBER_OF_AI_SOUND_VOLUMES = 5,
+	AI_UNIT_EFFECT_TIMEOUT = 30,
+	MINIMUM_ACTOR_KILLING_SPREE = 3,
+	MINIMUM_PLAYER_KILLING_SPREE = 5,
+	AI_DESCRIPTION_BUFFER_SIZE = 512,
+};
+
+enum
+{
+	_ai_unit_effect_bump = 0,
+	_ai_unit_effect_shooting,
+	_ai_unit_effect_death_scream,
+	_ai_unit_effect_magic_sight,
+	NUMBER_OF_AI_UNIT_EFFECTS,
+};
+
+enum
+{
+	_damage_category_none = 0,
+	_damage_category_falling,
+	_damage_category_bullet,
+	_damage_category_grenade,
+	_damage_category_highexplosive,
+	_damage_category_sniper,
+	_damage_category_melee,
+	_damage_category_flame,
+	_damage_category_mountedweapon,
+	_damage_category_vehicle,
+	_damage_category_plasma,
+	_damage_category_needle,
+	_damage_category_shotgun,
+	NUMBER_OF_DAMAGE_CATEGORIES,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
 
-struct ai_globals_prefix
+struct ai_globals_data
 {
 	boolean ai_active;
 	boolean ai_initialized_for_map;
-	byte reserved002[0xE];
+	boolean ai_has_control_data;
+	byte reserved003[0x5];
+	long first_encounterless_actor_index;
+	real major_upgrade_error;
 	boolean dialogue_triggers_enabled;
-	byte reserved011[0x3A3];
+	byte reserved011[0x3];
+	long last_chatter_time[NUMBER_OF_AI_SPEECH_TIMERS];
+	long last_talk_time[NUMBER_OF_AI_SPEECH_TIMERS];
+	long last_shout_time[NUMBER_OF_AI_SPEECH_TIMERS];
+	byte reserved02C[0x104];
+	short spatial_effect_first_index;
+	short spatial_effect_last_index;
+	byte spatial_effects[0x280];
 	boolean grenades_enabled;
+	byte reserved3B5[0x503];
+	short mounted_weapon_unit_count;
+	byte reserved8BA[0x2];
+	long mounted_weapon_unit_indices[MAXIMUM_NUMBER_OF_MOUNTED_WEAPON_UNITS];
+};
+
+struct potentially_releasable_entity
+{
+	boolean is_actor;
+	byte pad[3];
+	long entity_index;
+	long last_active_time;
+};
+
+struct potentially_releasable_storage
+{
+	short count;
+	short cursor;
+	struct potentially_releasable_entity entities[MAXIMUM_POTENTIALLY_RELEASABLE_ENTITIES];
 };
 
 struct actor_iterator
@@ -246,16 +332,33 @@ struct encounter_actor_iterator
 	long next_index;
 };
 
-typedef char ai_globals_prefix_active_offset_assert[
-	offsetof(struct ai_globals_prefix, ai_active) == 0x0 ? 1 : -1];
-typedef char ai_globals_prefix_initialized_offset_assert[
-	offsetof(struct ai_globals_prefix, ai_initialized_for_map) == 0x1 ? 1 : -1];
-typedef char ai_globals_prefix_dialogue_offset_assert[
-	offsetof(struct ai_globals_prefix, dialogue_triggers_enabled) == 0x10 ? 1 : -1];
-typedef char ai_globals_prefix_grenades_offset_assert[
-	offsetof(struct ai_globals_prefix, grenades_enabled) == 0x3B4 ? 1 : -1];
-typedef char ai_globals_prefix_size_assert[
-	sizeof(struct ai_globals_prefix) == 0x3B5 ? 1 : -1];
+struct encounter_iterator
+{
+	struct data_iterator data;
+	long index;
+	boolean active_only;
+};
+
+typedef char ai_globals_active_offset_assert[
+	offsetof(struct ai_globals_data, ai_active) == 0x0 ? 1 : -1];
+typedef char ai_globals_initialized_offset_assert[
+	offsetof(struct ai_globals_data, ai_initialized_for_map) == 0x1 ? 1 : -1];
+typedef char ai_globals_first_encounterless_actor_offset_assert[
+	offsetof(struct ai_globals_data, first_encounterless_actor_index) == 0x8 ? 1 : -1];
+typedef char ai_globals_dialogue_offset_assert[
+	offsetof(struct ai_globals_data, dialogue_triggers_enabled) == 0x10 ? 1 : -1];
+typedef char ai_globals_last_chatter_time_offset_assert[
+	offsetof(struct ai_globals_data, last_chatter_time) == 0x14 ? 1 : -1];
+typedef char ai_globals_spatial_effects_offset_assert[
+	offsetof(struct ai_globals_data, spatial_effects) == 0x134 ? 1 : -1];
+typedef char ai_globals_grenades_offset_assert[
+	offsetof(struct ai_globals_data, grenades_enabled) == 0x3B4 ? 1 : -1];
+typedef char ai_globals_mounted_weapon_count_offset_assert[
+	offsetof(struct ai_globals_data, mounted_weapon_unit_count) == 0x8B8 ? 1 : -1];
+typedef char ai_globals_size_assert[
+	sizeof(struct ai_globals_data) == 0x8DC ? 1 : -1];
+typedef char ai_potentially_releasable_storage_size_assert[
+	sizeof(struct potentially_releasable_storage) == 0xC04 ? 1 : -1];
 typedef char ai_unit_actor_index_offset_assert[
 	offsetof(struct unit_datum, unit.actor_index) == 0x1A4 ? 1 : -1];
 typedef char ai_actor_last_vehicle_exit_forced_offset_assert[
@@ -264,6 +367,10 @@ typedef char ai_actor_iterator_size_assert[
 	sizeof(struct actor_iterator) == 0x1C ? 1 : -1];
 typedef char ai_actor_iterator_index_offset_assert[
 	offsetof(struct actor_iterator, index) == 0x14 ? 1 : -1];
+typedef char ai_encounter_iterator_size_assert[
+	sizeof(struct encounter_iterator) == 0x18 ? 1 : -1];
+typedef char ai_encounter_iterator_index_offset_assert[
+	offsetof(struct encounter_iterator, index) == 0x10 ? 1 : -1];
 typedef char ai_encounter_actor_iterator_size_assert[
 	sizeof(struct encounter_actor_iterator) == 0xC ? 1 : -1];
 typedef char ai_encounter_actor_iterator_index_offset_assert[
@@ -297,65 +404,32 @@ typedef char ai_prop_unopposable_enemy_offset_assert[
 
 /* ---------- prototypes */
 
-void ai_communication_dispose(
-	void);
-void ai_communication_dispose_from_old_map(
-	void);
-void ai_script_dispose(
-	void);
-void ai_script_dispose_from_old_map(
-	void);
-
-void encounters_dispose(
-	void);
-void encounters_dispose_from_old_map(
-	void);
-void props_dispose_from_old_map(
-	void);
-void actors_dispose_from_old_map(
-	void);
-void paths_dispose_from_old_map(
-	void);
-void ai_profile_dispose(
-	void);
-void ai_profile_dispose_from_old_map(
-	void);
-void ai_debug_dispose(
-	void);
-void ai_debug_dispose_from_old_map(
-	void);
-
-void actor_iterator_new(
-	struct actor_iterator *iterator,
-	boolean active_only);
-struct actor_datum *actor_iterator_next(
-	struct actor_iterator *iterator);
-void actor_erase(
-	long actor_index,
-	boolean immediate);
-boolean game_team_is_enemy(
-	short team_index0,
-	short team_index1);
-boolean game_team_is_ally(
-	short team_index0,
-	short team_index1);
-boolean actor_compute_prop_unopposable(
-	long actor_index,
-	long prop_index);
-real actor_compute_prop_target_weight(
-	long actor_index,
-	long prop_index);
-void actor_stimulus_vehicle_eviction(
-	long actor_index);
-
-boolean code_000309a0(
-	boolean must_be_attacking);
-
 /* ---------- globals */
 
-extern struct ai_globals_prefix *ai_globals;
+extern struct ai_globals_data *ai_globals;
 
 /* ---------- public code */
+
+void ai_initialize(
+	void)
+{
+	ai_globals = game_state_malloc("ai globals", NULL, sizeof(struct ai_globals_data));
+	match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x8C, ai_globals);
+
+	csmemset(ai_globals, 0, sizeof(struct ai_globals_data));
+
+	ai_debug_initialize();
+	ai_profile_initialize();
+	paths_initialize();
+	actors_initialize();
+	props_initialize();
+	encounters_initialize();
+	ai_script_initialize();
+	ai_communication_initialize();
+	actor_move_initialize();
+
+	return;
+}
 
 void ai_dispose(
 	void)
@@ -427,6 +501,73 @@ void ai_globals_grenades_enabled(
 	return;
 }
 
+void ai_get_major_upgrade_chance(
+	short major_upgrade,
+	boolean *force_major,
+	boolean *is_random,
+	real *random_chance)
+{
+	match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x158, force_major && is_random && random_chance);
+
+	switch (major_upgrade)
+	{
+	case _actor_major_upgrade_none:
+		*is_random = FALSE;
+		*force_major = FALSE;
+		break;
+
+	case _actor_major_upgrade_all:
+		*is_random = FALSE;
+		*force_major = TRUE;
+		break;
+
+	case _actor_major_upgrade_few:
+		*is_random = TRUE;
+		*random_chance = game_difficulty_get_value(_game_difficulty_value_major_upgrade_1);
+		break;
+
+	case _actor_major_upgrade_many:
+		*is_random = TRUE;
+		*random_chance = game_difficulty_get_value(_game_difficulty_value_major_upgrade_2);
+		break;
+
+	default:
+		*is_random = TRUE;
+		*random_chance = game_difficulty_get_value(_game_difficulty_value_major_upgrade);
+		break;
+	}
+
+	return;
+}
+
+boolean ai_adjust_damage(
+	long actor_index,
+	struct damage_data *damage_data,
+	real *damage)
+{
+	boolean adjusted = FALSE;
+
+	if (actor_index != NONE)
+	{
+		struct actor_datum *actor = actor_get(actor_index);
+
+		if (TEST_FLAG(damage_data->flags, _damage_from_weapon_bit) &&
+			actor->control.burst_damage_modifier > 0.0f)
+		{
+			adjusted = TRUE;
+			*damage = actor->control.burst_damage_modifier * *damage;
+		}
+
+		if (actor->external_orders.playfighting)
+		{
+			*damage = *damage * 0.3f;
+			adjusted = TRUE;
+		}
+	}
+
+	return adjusted;
+}
+
 void ai_erase(
 	long encounter_index,
 	long platoon_index,
@@ -469,6 +610,187 @@ void ai_erase(
 	return;
 }
 
+boolean ai_release_inactive_swarms(
+	char *result_description,
+	boolean *more_to_release,
+	byte *working_memory,
+	short working_memory_size)
+{
+	struct actor_iterator iterator;
+	short released_unit_count = 0;
+	struct actor_datum *actor;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x1F7, result_description && more_to_release);
+
+	actor_iterator_new(&iterator, FALSE);
+	actor = actor_iterator_next(&iterator);
+
+	while (actor)
+	{
+		if (actor->meta.swarm &&
+			!actor->meta.active &&
+			actor->meta.last_active_time != NONE)
+		{
+			released_unit_count += actor->meta.swarm_unit_count;
+			actor_erase(iterator.index, TRUE);
+		}
+
+		actor = actor_iterator_next(&iterator);
+	}
+
+	sprintf(result_description, "%d swarm units", released_unit_count);
+	*more_to_release = FALSE;
+
+	return released_unit_count > 0;
+}
+
+int compare_potentially_releasable_entities(
+	void const *element0,
+	void const *element1)
+{
+	struct potentially_releasable_entity const *entity0 =
+		(struct potentially_releasable_entity const *)element0;
+	struct potentially_releasable_entity const *entity1 =
+		(struct potentially_releasable_entity const *)element1;
+	long last_active_time0 = entity0->last_active_time;
+	long last_active_time1 = entity1->last_active_time;
+
+	if (last_active_time1 < last_active_time0)
+		return 1;
+	if (last_active_time1 > last_active_time0)
+		return -1;
+	if (entity0->is_actor > entity1->is_actor)
+		return -1;
+
+	return entity0->is_actor < entity1->is_actor;
+}
+
+void ai_find_inactive_encounters(
+	byte *working_memory,
+	short working_memory_size)
+{
+	struct potentially_releasable_storage *storage;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x22E, working_memory_size >= sizeof(struct potentially_releasable_storage));
+
+	storage = (struct potentially_releasable_storage *)working_memory;
+	storage->count = 0;
+	storage->cursor = 0;
+
+	{
+		struct encounter_actor_iterator actor_iterator;
+		struct actor_datum *actor;
+
+		encounter_actor_iterator_new(&actor_iterator, NONE);
+		actor = encounter_actor_iterator_next(&actor_iterator);
+
+		while (actor)
+		{
+			if (storage->count >= MAXIMUM_POTENTIALLY_RELEASABLE_ENTITIES)
+				break;
+
+			if (!actor->meta.active &&
+				actor->meta.last_active_time != NONE)
+			{
+				storage->entities[storage->count].is_actor = TRUE;
+				storage->entities[storage->count].entity_index = actor_iterator.index;
+				storage->entities[storage->count].last_active_time = actor->meta.last_active_time;
+				storage->count++;
+			}
+
+			actor = encounter_actor_iterator_next(&actor_iterator);
+		}
+	}
+
+	{
+		struct encounter_iterator encounter_iterator;
+		struct encounter_datum *encounter;
+
+		encounter_iterator_new(&encounter_iterator, FALSE);
+		encounter = encounter_iterator_next(&encounter_iterator);
+
+		while (encounter)
+		{
+			if (storage->count >= MAXIMUM_POTENTIALLY_RELEASABLE_ENTITIES)
+				break;
+
+			if (!encounter->active &&
+				encounter->current_count > 0 &&
+				encounter->last_active_time != NONE)
+			{
+				storage->entities[storage->count].is_actor = FALSE;
+				storage->entities[storage->count].entity_index = encounter_iterator.index;
+				storage->entities[storage->count].last_active_time = encounter->last_active_time;
+				storage->count++;
+			}
+
+			encounter = encounter_iterator_next(&encounter_iterator);
+		}
+	}
+
+	if (storage->count > 0)
+	{
+		qsort(
+			storage->entities,
+			storage->count,
+			sizeof(struct potentially_releasable_entity),
+			compare_potentially_releasable_entities);
+	}
+
+	return;
+}
+
+boolean ai_release_inactive_encounters(
+	char *result_description,
+	boolean *more_to_release,
+	byte *working_memory,
+	short working_memory_size)
+{
+	struct potentially_releasable_storage *storage;
+	boolean released = FALSE;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x270, result_description && more_to_release);
+	match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x271, working_memory_size >= sizeof(struct potentially_releasable_storage));
+
+	storage = (struct potentially_releasable_storage *)working_memory;
+
+	if (storage->cursor < storage->count)
+	{
+		struct potentially_releasable_entity *entity = &storage->entities[storage->cursor];
+
+		if (entity->is_actor)
+		{
+			sprintf(
+				result_description,
+				"encounterless-actor %s",
+				tag_name_strip_path(tag_get_name(
+					actor_get(entity->entity_index)->meta.variant_definition_index)));
+			actor_erase(entity->entity_index, TRUE);
+		}
+		else
+		{
+			struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->ai_encounters,
+				DATUM_INDEX_TO_ABSOLUTE_INDEX(entity->entity_index),
+				struct encounter_definition);
+
+			sprintf(
+				result_description,
+				"encounter %s (%d units)",
+				encounter_definition->name,
+				encounter_get(entity->entity_index)->current_count);
+			ai_erase(entity->entity_index, NONE, NONE, TRUE);
+		}
+
+		storage->cursor++;
+		released = TRUE;
+	}
+
+	*more_to_release = storage->cursor < storage->count;
+
+	return released;
+}
+
 boolean ai_try_vehicle_eviction(
 	long actor_index,
 	long entering_unit_index,
@@ -494,6 +816,268 @@ boolean ai_try_vehicle_eviction(
 	}
 
 	return result;
+}
+
+long ai_get_responsible_unit(
+	long object_index,
+	boolean responsible_for_weapon_fire)
+{
+	long responsible_unit_index = NONE;
+
+	if (object_index != NONE)
+	{
+		struct unit_datum *unit = unit_try_and_get(object_index);
+
+		if (unit)
+		{
+			responsible_unit_index = object_index;
+
+			if (responsible_for_weapon_fire &&
+				unit->unit.gunner_object_index != NONE)
+			{
+				responsible_unit_index = unit->unit.gunner_object_index;
+			}
+			else if (unit->unit.driver_object_index != NONE)
+			{
+				responsible_unit_index = unit->unit.driver_object_index;
+			}
+
+			if (responsible_unit_index != NONE &&
+				!game_connection() &&
+				ai_debug.ignore_player &&
+				unit_get(responsible_unit_index)->unit.player_index != NONE)
+			{
+				responsible_unit_index = NONE;
+			}
+		}
+	}
+
+	return responsible_unit_index;
+}
+
+void ai_handle_death(
+	long unit_index,
+	long killer_object_index,
+	short damage_category)
+{
+	long responsible_unit_index = ai_get_responsible_unit(
+		killer_object_index,
+		damage_category != _damage_category_vehicle);
+	short hostility = _comm_hostility_none;
+
+	if (unit_index == responsible_unit_index)
+	{
+		hostility = _comm_hostility_self;
+	}
+	else if (responsible_unit_index != NONE)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+		struct unit_datum *responsible_unit = unit_get(responsible_unit_index);
+
+		hostility = game_team_is_enemy(
+			unit->object.owner_team_index,
+			responsible_unit->object.owner_team_index)
+			? _comm_hostility_enemy
+			: _comm_hostility_friend;
+	}
+
+	ai_communication_event(
+		_ai_communication_death,
+		unit_index,
+		responsible_unit_index,
+		hostility,
+		damage_category,
+		NONE,
+		NULL);
+	ai_conversation_unit_died(unit_index, FALSE);
+	encounters_unit_died(unit_index);
+
+	return;
+}
+
+boolean ai_handle_killing_spree(
+	long unit_index,
+	short killing_spree_count)
+{
+	char description[AI_DESCRIPTION_BUFFER_SIZE];
+	struct unit_datum *unit = unit_get(unit_index);
+	long player_index = unit->unit.player_index;
+	short minimum_killing_spree = (player_index != NONE)
+		? MINIMUM_PLAYER_KILLING_SPREE
+		: MINIMUM_ACTOR_KILLING_SPREE;
+	boolean killing_spree = FALSE;
+
+	if (ai_debug.print_killing_sprees)
+	{
+		if (player_index == NONE)
+		{
+			ai_debug_describe_actor(
+				unit->unit.actor_index,
+				unit_index,
+				TRUE,
+				description,
+				sizeof(description));
+		}
+		else
+		{
+			sprintf(description, "player%d", DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index));
+		}
+
+		console_printf(FALSE, "%s killing spree: %d", description, killing_spree_count);
+	}
+
+	if (killing_spree_count >= minimum_killing_spree)
+	{
+		ai_communication_event(
+			_ai_communication_killing_spree,
+			unit_index,
+			NONE,
+			NONE,
+			NONE,
+			NONE,
+			NULL);
+
+		killing_spree = TRUE;
+	}
+
+	return killing_spree;
+}
+
+void ai_handle_allegiance_status_changed(
+	short team1_index,
+	short team2_index,
+	boolean currently_broken,
+	boolean permanently_broken)
+{
+	struct actor_iterator actor_iterator;
+	struct actor_datum *actor;
+
+	if (ai_debug.print_allegiance)
+	{
+		console_printf(
+			FALSE,
+			"allegiance between teams %s and %s %s%s",
+			global_game_team_names[team1_index],
+			global_game_team_names[team2_index],
+			currently_broken ? "broken" : "reformed",
+			permanently_broken ? " permanently" : "");
+	}
+
+	actor_iterator_new(&actor_iterator, TRUE);
+	actor = actor_iterator_next(&actor_iterator);
+
+	while (actor)
+	{
+		short other_team_index = NONE;
+
+		if (actor->meta.team_index == team1_index)
+			other_team_index = team2_index;
+		else if (actor->meta.team_index == team2_index)
+			other_team_index = team1_index;
+
+		if (other_team_index != NONE)
+		{
+			struct prop_iterator prop_iterator;
+			struct prop_datum *prop;
+
+			prop_iterator_new(&prop_iterator, actor_iterator.index);
+			prop = prop_iterator_next(&prop_iterator);
+
+			while (prop)
+			{
+				if (prop->team_index == other_team_index)
+				{
+					if (!permanently_broken)
+					{
+						prop->ally = TRUE;
+						prop->ally_status_changed = TRUE;
+					}
+
+					if (!currently_broken || permanently_broken)
+					{
+						prop->enemy = currently_broken;
+						prop->unopposable_enemy = actor_compute_prop_unopposable(
+							actor_iterator.index,
+							prop_iterator.index);
+						prop->target_weight = actor_compute_prop_target_weight(
+							actor_iterator.index,
+							prop_iterator.index);
+					}
+				}
+
+				prop = prop_iterator_next(&prop_iterator);
+			}
+		}
+
+		actor = actor_iterator_next(&actor_iterator);
+	}
+
+	return;
+}
+
+void ai_handle_allegiance_broken_notification(
+	short team1_index,
+	short team2_index,
+	boolean broken)
+{
+	struct actor_iterator actor_iterator;
+	struct actor_datum *actor;
+
+	if (ai_debug.print_allegiance)
+	{
+		console_printf(
+			FALSE,
+			"allegiance between teams %s and %s communicated as %s",
+			global_game_team_names[team1_index],
+			global_game_team_names[team2_index],
+			broken ? "broken" : "reformed");
+	}
+
+	actor_iterator_new(&actor_iterator, TRUE);
+	actor = actor_iterator_next(&actor_iterator);
+
+	while (actor)
+	{
+		short other_team_index = NONE;
+
+		if (actor->meta.team_index == team1_index)
+			other_team_index = team2_index;
+		else if (actor->meta.team_index == team2_index)
+			other_team_index = team1_index;
+
+		if (other_team_index != NONE)
+		{
+			struct prop_iterator prop_iterator;
+			struct prop_datum *prop;
+
+			prop_iterator_new(&prop_iterator, actor_iterator.index);
+			prop = prop_iterator_next(&prop_iterator);
+
+			while (prop)
+			{
+				if (prop->team_index == other_team_index)
+				{
+					prop->ally = TRUE;
+					prop->ally_status_changed = FALSE;
+					prop->enemy = broken;
+					prop->unopposable_enemy = actor_compute_prop_unopposable(
+						actor_iterator.index,
+						prop_iterator.index);
+					prop->target_weight = actor_compute_prop_target_weight(
+						actor_iterator.index,
+						prop_iterator.index);
+				}
+
+				prop = prop_iterator_next(&prop_iterator);
+			}
+		}
+
+		actor = actor_iterator_next(&actor_iterator);
+	}
+
+	game_allegiance_notify_change(team1_index, team2_index);
+
+	return;
 }
 
 void ai_update_team_status(
@@ -535,6 +1119,290 @@ void ai_update_team_status(
 		}
 
 		actor = actor_iterator_next(&actor_iterator);
+	}
+
+	return;
+}
+
+void ai_handle_bump(
+	long unit_index,
+	long object_index,
+	union real_vector3d const *old_velocity)
+{
+	long responsible_unit_index = ai_get_responsible_unit(object_index, FALSE);
+
+	(void)old_velocity;
+
+	if (responsible_unit_index != NONE)
+	{
+		struct unit_datum *responsible_unit = unit_get(responsible_unit_index);
+
+		if (responsible_unit->object.type == _object_type_biped)
+		{
+			struct unit_datum *unit = unit_get(unit_index);
+
+			if (unit->unit.actor_index != NONE)
+			{
+				long prop_index = prop_get_base_by_unit_index(
+					unit->unit.actor_index,
+					responsible_unit_index,
+					TRUE,
+					FALSE);
+
+				if (prop_index != NONE)
+				{
+					actor_handle_unit_effect(
+						unit->unit.actor_index,
+						prop_index,
+						_ai_unit_effect_bump);
+				}
+			}
+
+			if (responsible_unit->unit.actor_index != NONE)
+			{
+				long prop_index = prop_get_base_by_unit_index(
+					responsible_unit->unit.actor_index,
+					unit_index,
+					TRUE,
+					FALSE);
+
+				if (prop_index != NONE)
+				{
+					actor_handle_unit_effect(
+						responsible_unit->unit.actor_index,
+						prop_index,
+						_ai_unit_effect_bump);
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+void ai_create_mounted_weapons_for_unit(
+	long unit_index)
+{
+	if (ai_globals->ai_initialized_for_map)
+	{
+		if (ai_globals->mounted_weapon_unit_count < MAXIMUM_NUMBER_OF_MOUNTED_WEAPON_UNITS)
+		{
+			ai_globals->mounted_weapon_unit_indices[ai_globals->mounted_weapon_unit_count] = unit_index;
+			ai_globals->mounted_weapon_unit_count++;
+		}
+		else
+		{
+			error(
+				_error_silent,
+				"WARNING: cannot create mounted weapons for %s, exceeded MAXIMUM_NUMBER_OF_MOUNTED_WEAPON_UNITS",
+				tag_name_strip_path(tag_get_name(unit_get(unit_index)->definition_index)));
+		}
+	}
+
+	return;
+}
+
+void ai_handle_damage(
+	long unit_index,
+	long shooter_object_index,
+	short damage_category,
+	real fraction,
+	union real_vector3d *damage_velocity,
+	boolean delayed)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	long responsible_unit_index = ai_get_responsible_unit(
+		shooter_object_index,
+		damage_category != _damage_category_vehicle);
+	struct unit_datum *responsible_unit = (responsible_unit_index == NONE)
+		? NULL
+		: unit_get(responsible_unit_index);
+	short hostility;
+
+	if (!delayed &&
+		damage_category != _damage_category_falling &&
+		unit->unit.actor_index != NONE)
+	{
+		actor_handle_damage(
+			unit->unit.actor_index,
+			responsible_unit_index,
+			fraction,
+			damage_velocity);
+	}
+
+	hostility = _comm_hostility_none;
+
+	if (unit_index == responsible_unit_index)
+	{
+		hostility = _comm_hostility_self;
+	}
+	else if (responsible_unit)
+	{
+		hostility = game_team_is_enemy(
+			unit->object.owner_team_index,
+			responsible_unit->object.owner_team_index)
+			? _comm_hostility_enemy
+			: _comm_hostility_friend;
+	}
+
+	if (!delayed && hostility == _comm_hostility_friend)
+	{
+		ai_communication_event(
+			_ai_communication_damage,
+			unit_index,
+			responsible_unit_index,
+			_comm_hostility_friend,
+			damage_category,
+			NONE,
+			NULL);
+	}
+	else if (fraction >= 0.3f)
+	{
+		ai_communication_event(
+			_ai_communication_hurt,
+			unit_index,
+			responsible_unit_index,
+			hostility,
+			damage_category,
+			NONE,
+			NULL);
+	}
+
+	if (responsible_unit)
+	{
+		game_allegiance_provoke(
+			responsible_unit->object.owner_team_index,
+			unit->object.owner_team_index);
+	}
+
+	return;
+}
+
+void ai_handle_deleted_object(
+	long object_index)
+{
+	struct object_datum *object;
+	struct unit_datum *unit;
+	struct data_iterator iterator;
+	struct prop_datum *prop;
+	short mounted_weapon_index;
+
+	if (!ai_globals->ai_initialized_for_map)
+		return;
+
+	object = object_get(object_index);
+	if (!TEST_FLAG(_object_mask_unit, object->object.type))
+		return;
+
+	unit = unit_get(object_index);
+	if (unit->unit.actor_index != NONE)
+	{
+		actor_delete(unit->unit.actor_index, FALSE);
+	}
+	else if (unit->unit.swarm_actor_index != NONE)
+	{
+		actor_swarm_unit_died(unit->unit.swarm_actor_index, object_index);
+	}
+
+	data_iterator_new(&iterator, prop_data);
+	prop = data_iterator_next(&iterator);
+
+	while (prop)
+	{
+		if (prop->unit_index == object_index)
+		{
+			actor_switch_props(
+				prop->owner_actor_index,
+				iterator.datum_index,
+				NONE);
+			prop_delete(prop->owner_actor_index, iterator.datum_index);
+		}
+		else if (prop->vehicle_index == object_index)
+		{
+			prop->vehicle_index = NONE;
+			prop->dangerous_vehicle_driver = FALSE;
+			prop->vehicle_gunner = FALSE;
+		}
+
+		prop = data_iterator_next(&iterator);
+	}
+
+	ai_conversation_unit_died(object_index, TRUE);
+
+	for (mounted_weapon_index = 0;
+		mounted_weapon_index < ai_globals->mounted_weapon_unit_count;
+		mounted_weapon_index++)
+	{
+		if (ai_globals->mounted_weapon_unit_indices[mounted_weapon_index] == object_index)
+		{
+			ai_globals->mounted_weapon_unit_count--;
+
+			if (ai_globals->mounted_weapon_unit_count > 0)
+			{
+				ai_globals->mounted_weapon_unit_indices[mounted_weapon_index] =
+					ai_globals->mounted_weapon_unit_indices[ai_globals->mounted_weapon_unit_count];
+			}
+		}
+	}
+
+	return;
+}
+
+void ai_handle_unit_effect(
+	long unit_index,
+	short effect_type,
+	short volume)
+{
+	if (!ai_globals->ai_initialized_for_map)
+		return;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x729, volume>=0 && volume<NUMBER_OF_AI_SOUND_VOLUMES);
+	match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x72A, effect_type>=0 && effect_type<NUMBER_OF_AI_UNIT_EFFECTS);
+
+	if (unit_index != NONE && volume > 0)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+		long game_time = game_time_get();
+
+		if (!game_connection() &&
+			ai_debug.ignore_player &&
+			unit->unit.player_index != NONE)
+		{
+			return;
+		}
+
+		if (effect_type > unit->unit.last_unit_effect_type ||
+			game_time > unit->unit.game_time_at_last_unit_effect + AI_UNIT_EFFECT_TIMEOUT)
+		{
+			short object_type = unit->object.type;
+
+			unit->unit.last_unit_effect_type = effect_type;
+			unit->unit.game_time_at_last_unit_effect = game_time;
+
+			if (object_type == _object_type_vehicle)
+			{
+				long child_object_index = unit->object.first_child_object_index;
+
+				while (child_object_index != NONE)
+				{
+					struct object_datum *child = object_get(child_object_index);
+
+					if (child->object.type == _object_type_biped)
+					{
+						actors_handle_unit_effect(
+							child_object_index,
+							effect_type,
+							volume);
+					}
+
+					child_object_index = child->object.next_object_index;
+				}
+			}
+			else if (object_type == _object_type_biped)
+			{
+				actors_handle_unit_effect(unit_index, effect_type, volume);
+			}
+		}
 	}
 
 	return;
@@ -596,16 +1464,251 @@ void ai_handle_exit_vehicle(
 	return;
 }
 
+void ai_flush_spatial_effects(
+	void)
+{
+	ai_globals->spatial_effect_last_index = 0;
+	ai_globals->spatial_effect_first_index = 0;
+	csmemset(
+		ai_globals->spatial_effects,
+		0,
+		sizeof(ai_globals->spatial_effects));
+
+	return;
+}
+
+void ai_reconnect_to_structure_bsp(
+	void)
+{
+	short structure_bsp_index = global_structure_bsp_index_get();
+	long actor_index = ai_globals->first_encounterless_actor_index;
+
+	while (actor_index != NONE)
+	{
+		struct actor_datum *actor = actor_get(actor_index);
+		long next_actor_index = actor->meta.next_actor_index;
+
+		match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x96F, actor->meta.encounterless);
+
+		if (actor->meta.disconnected_encounter_index != NONE)
+		{
+			struct encounter_definition *encounter = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->ai_encounters,
+				DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->meta.disconnected_encounter_index),
+				struct encounter_definition);
+
+			if (encounter->runtime_structure_bsp_reference_index == structure_bsp_index)
+			{
+				encounterless_detach_actor(actor_index);
+				encounter_attach_actor(
+					actor_index,
+					actor->meta.disconnected_encounter_index,
+					actor->meta.disconnected_squad_index,
+					TRUE);
+			}
+		}
+
+		actor_index = next_actor_index;
+	}
+
+	return;
+}
+
+boolean ai_consider_major_upgrade(
+	long encounter_index,
+	short squad_index,
+	real chance)
+{
+	struct encounter_datum *encounter = encounter_get(encounter_index);
+	struct squad_datum *squad = encounter_get_squad(encounter, squad_index);
+	real global_error = ai_globals->major_upgrade_error * -(1.0f / 3.0f);
+	real squad_error = -squad->major_upgrade_error;
+	real chance_error = (fabs(global_error) > fabs(squad_error))
+		? global_error
+		: squad_error;
+	real random_chance = real_seed_random(get_global_random_seed_address());
+	real adjusted_chance = chance_error + chance;
+	boolean upgrade_major = random_chance < adjusted_chance;
+	real error_delta = upgrade_major - chance;
+
+	squad->major_upgrade_error += error_delta;
+	ai_globals->major_upgrade_error += error_delta;
+
+	if (ai_debug.print_major_upgrade)
+	{
+		struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->ai_encounters,
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index),
+			struct encounter_definition);
+
+		console_printf(
+			FALSE,
+			csprintf(
+				temporary,
+				"%s/%s major upgrade chance %.2f: %s (g %.2f s %.2f -> chance %.2f rand %.2f err %.2f)",
+				encounter_definition->name,
+				TAG_BLOCK_GET_ELEMENT(
+					&encounter_definition->squads,
+					squad_index,
+					struct squad_definition)->name,
+				chance,
+				upgrade_major ? "YES" : "NO",
+				global_error,
+				squad_error,
+				adjusted_chance,
+				random_chance,
+				error_delta));
+
+		error(_error_silent, "%s", temporary);
+	}
+
+	return upgrade_major;
+}
+
+void ai_initialize_for_new_map(
+	void)
+{
+	csmemset(ai_globals, 0, sizeof(struct ai_globals_data));
+
+	ai_globals->ai_active = TRUE;
+	ai_globals->ai_has_control_data = TRUE;
+	ai_globals->first_encounterless_actor_index = NONE;
+	ai_globals->grenades_enabled = TRUE;
+	ai_globals->dialogue_triggers_enabled = TRUE;
+
+	csmemset(
+		ai_globals->last_chatter_time,
+		NONE,
+		sizeof(ai_globals->last_chatter_time));
+	csmemset(
+		ai_globals->last_talk_time,
+		NONE,
+		sizeof(ai_globals->last_talk_time));
+	csmemset(
+		ai_globals->last_shout_time,
+		NONE,
+		sizeof(ai_globals->last_shout_time));
+
+	ai_debug_initialize_for_new_map();
+	ai_profile_initialize_for_new_map();
+	paths_initialize_for_new_map();
+	actors_initialize_for_new_map();
+	props_initialize_for_new_map();
+	encounters_initialize_for_new_map();
+	ai_script_initialize_for_new_map();
+	ai_communication_initialize_for_new_map();
+
+	ai_flush_spatial_effects();
+
+	ai_globals->ai_initialized_for_map = TRUE;
+
+	return;
+}
+
+boolean ai_enemies_endanger_player(
+	boolean must_be_attacking)
+{
+	long current_time = game_time_get();
+	struct data_iterator iterator;
+	struct prop_datum *prop;
+
+	data_iterator_new(&iterator, prop_data);
+	prop = data_iterator_next(&iterator);
+
+	while (prop)
+	{
+		if (prop->player &&
+			prop->enemy &&
+			unit_get(prop->unit_index)->unit.player_index != NONE)
+		{
+			struct actor_datum *actor = actor_get(prop->owner_actor_index);
+			long object_index = actor->meta.swarm
+				? actor->meta.swarm_unit_index
+				: actor->meta.unit_index;
+			struct unit_definition *definition = unit_definition_get(
+				unit_get(object_index)->definition_index);
+			boolean does_not_endanger_player = FALSE;
+
+			if (TEST_FLAG(definition->unit.flags, _unit_is_inconsequential_bit) &&
+				prop->distance > 4.0f)
+			{
+				does_not_endanger_player = TRUE;
+			}
+
+			if (must_be_attacking &&
+				!actor->control.fire_state &&
+				actor->state.action != _actor_action_charge &&
+				prop->distance > 15.0f)
+			{
+				does_not_endanger_player = TRUE;
+			}
+
+			if (!does_not_endanger_player)
+			{
+				short state = prop->state;
+
+				if ((state < _prop_state_uninspected_orphan ||
+					state > _prop_state_inspected_orphan) &&
+					prop->last_visible_time != NONE &&
+					prop->last_visible_time + AI_ENDANGER_PLAYER_RECENT_VISIBILITY_TICKS >= current_time)
+				{
+					return TRUE;
+				}
+
+				if ((state < _prop_state_uninspected_orphan ||
+					state > _prop_state_inspected_orphan) &&
+					prop->distance < 4.0f)
+				{
+					return TRUE;
+				}
+
+				if (actor->target.target_prop_index == iterator.datum_index)
+				{
+					if (state >= _prop_state_becoming_unacknowledged &&
+						state <= _prop_state_acknowledged)
+					{
+						return TRUE;
+					}
+
+					if (state >= _prop_state_uninspected_orphan &&
+						state <= _prop_state_inspected_orphan)
+					{
+						struct prop_datum *parent_prop;
+
+						if (prop->definitely_located)
+							return TRUE;
+
+						parent_prop = prop_get(prop->parent_prop_index);
+
+						if (prop->state == _prop_state_uninspected_orphan &&
+							prop->distance < 12.0f &&
+							distance_squared3d(
+								&parent_prop->body_position,
+								&prop->body_position) < 16.0f)
+						{
+							return TRUE;
+						}
+					}
+				}
+			}
+		}
+
+		prop = data_iterator_next(&iterator);
+	}
+
+	return FALSE;
+}
+
 boolean ai_enemies_can_see_player(
 	void)
 {
-	return code_000309a0(FALSE);
+	return ai_enemies_endanger_player(FALSE);
 }
 
 boolean ai_enemies_attacking_player(
 	void)
 {
-	return code_000309a0(TRUE);
+	return ai_enemies_endanger_player(TRUE);
 }
 
 long ai_get_race_from_team_index(

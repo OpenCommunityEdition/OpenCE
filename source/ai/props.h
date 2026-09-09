@@ -154,6 +154,10 @@ struct prop_iterator
 
 /* ---------- prototypes/PROPS.C */
 
+void props_initialize(
+	void);
+void props_initialize_for_new_map(
+	void);
 void props_dispose(
 	void);
 void prop_delete(

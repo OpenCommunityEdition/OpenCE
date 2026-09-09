@@ -30,6 +30,7 @@ file has inline function assertions.
 struct actor_datum;
 struct actor_iterator;
 struct encounter_actor_iterator;
+struct encounter_iterator;
 
 struct encounter_datum
 {
@@ -130,6 +131,11 @@ void encounters_update(
 	void);
 void encounters_update_dirty_status(
 	void);
+void encounter_iterator_new(
+	struct encounter_iterator *iterator,
+	boolean active_only);
+struct encounter_datum *encounter_iterator_next(
+	struct encounter_iterator *iterator);
 void encounter_update_status(
 	long encounter_index);
 void encounter_create(

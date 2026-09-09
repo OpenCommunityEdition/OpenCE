@@ -26,6 +26,12 @@ boolean game_team_is_enemy(
 boolean game_team_is_ally(
 	short our_team_index,
 	short other_team_index);
+void game_allegiance_provoke(
+	short team_index0,
+	short team_index1);
+void game_allegiance_notify_change(
+	short team1_index,
+	short team2_index);
 boolean game_allegiance_remove(
 	short team1_index,
 	short team2_index);
@@ -34,5 +40,7 @@ boolean game_allegiance_incident(
 	short victim_team_index,
 	short incident_type,
 	boolean *notify_immediately);
+
+extern char const *global_game_team_names[];
 
 #endif // __GAME_ALLEGIANCE_H

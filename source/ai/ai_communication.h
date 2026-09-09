@@ -114,6 +114,10 @@ struct ai_conversation_datum_header
 
 /* ---------- prototypes/AI_COMMUNICATION.C */
 
+void ai_communication_initialize(
+	void);
+void ai_communication_initialize_for_new_map(
+	void);
 void ai_communication_dispose(
 	void);
 void ai_communication_dispose_from_old_map(
@@ -172,6 +176,9 @@ real ai_communication_get_player_rating(
 	real *distance_reference);
 short ai_communication_get_type_by_name(
 	char const *name);
+void ai_conversation_unit_died(
+	long unit_index,
+	boolean deleted);
 void ai_communication_event(
 	short communication_type,
 	long subject_unit_index,
