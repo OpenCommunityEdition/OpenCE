@@ -48,5 +48,10 @@ boolean render_camera_view_to_screen(
 	struct render_frustum const *frustum,
 	real_point3d const *view_point,
 	real_point2d *screen_point);
+boolean render_camera_world_to_screen(
+	struct render_camera const *camera,
+	struct render_frustum const *frustum,
+	real_point3d const *world_point,
+	real_point2d *screen_point);
 
 #endif /* __RENDER_CAMERAS_INTERNAL_H */

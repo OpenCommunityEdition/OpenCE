@@ -1034,6 +1034,70 @@ void render_debug_string(
 	return;
 }
 
+void render_debug_string_at_point(
+	boolean immediate,
+	real_point3d const *point,
+	char const *string,
+	real_argb_color const *color)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		914,
+		point);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		915,
+		string);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_debug.c",
+		916,
+		color);
+
+	if (immediate)
+	{
+		real_point2d screen_point;
+
+		if (render_camera_world_to_screen(
+			&render.camera,
+			&render.frustum,
+			point,
+			&screen_point))
+		{
+			rectangle2d bounds;
+
+			bounds.x0 = (short)(screen_point.x - render.camera.viewport_bounds.x0);
+			bounds.y0 = (short)(screen_point.y - render.camera.viewport_bounds.y0);
+			bounds.x1 = SHORT_MAX;
+			bounds.y1 = SHORT_MAX;
+
+			interface_set_bitmap_text_draw_mode(
+				_interface_font_terminal,
+				NONE,
+				0,
+				0,
+				_interface_color_table_dialog,
+				0);
+			draw_string_set_color(color);
+			rasterizer_draw_string(
+				&bounds,
+				NULL,
+				NULL,
+				0,
+				string);
+		}
+	}
+	else
+	{
+		render_debug_add_cache_entry(
+			_render_debug_cache_string_at_point,
+			string,
+			point,
+			color);
+	}
+
+	return;
+}
+
 void render_debug_circle(
 	boolean immediate,
 	real_plane3d const *plane,
