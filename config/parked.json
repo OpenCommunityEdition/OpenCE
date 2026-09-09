@@ -6272,7 +6272,7 @@
       "class": "unclassified",
       "evidence": "Best complete typed caller retained to connect the exact private action_flee_find_flee_position owner. January and the independent later HaloCEA lift support initialization, panic-target acquisition, blind-panic random stationary behavior and firing-position search. Target is 272 padded bytes/12 relocations; candidate is 256/12 with 80.265305 percent objdiff similarity. The remaining code hash and allocation differences have no proved source-level mechanism and receive zero exact credit. No compiler steering, raw offset, fake dependency, undefined behavior, forced inline or nonsensical branch is retained. See docs/object_matching_logs/action_flee_obj_position_helpers_exact_20260909.md; reopen only for authoritative January source/local records or another natural same-compiler donor.",
       "measurements": {
-        "target": { "size": 272, "relocation_count": 12, "normalized_sha256": "1a415a0adece0dd58822de4fab9d12085b404e3531000124330031c56d9effa8" },
+        "target": { "size": 272, "relocation_count": 12, "normalized_sha256": "1a415a0adece0dd541b62c1c9ada51604d58751e66d769d88619d76db5471d79" },
         "base": { "size": 256, "relocation_count": 12, "normalized_sha256": "cfc7ace7bcb857227c8c0559c80681a4f9ff2b142fa9df3e57c59af75960a898" },
         "objdiff_percent": 80.265305
       }
@@ -6283,7 +6283,7 @@
       "class": "register-allocation",
       "evidence": "Best complete typed private exposure query retained to connect the action_flee_perform caller. January and the independent later HaloCEA lift support the encounter/firing-position lookup, crouching head estimate, eight-argument AI line-of-sight query, acknowledged-prop exposure result and approach-point update. Target and candidate are both 352 padded bytes with all 13 relocation identities; objdiff reports 83.46342 percent similarity. The remaining difference is a coherent EDI/EBX actor/encounter allocation and one candidate pointer home, not missing behavior. It receives zero exact credit. No compiler steering, raw offset, fake dependency, representation pun, undefined behavior, forced inline or nonsensical branch is retained. See docs/object_matching_logs/action_flee_obj_position_helpers_exact_20260909.md; reopen only for authoritative January source/local records or another natural same-compiler allocation donor.",
       "measurements": {
-        "target": { "size": 352, "relocation_count": 13, "normalized_sha256": "498dc2c0460731080f45893a5b2f648e99742a6d5733c010626f4466c0b31bb5" },
+        "target": { "size": 352, "relocation_count": 13, "normalized_sha256": "498dc2c046073108d309d0057bb5fc0405a8112c5532e90ef7ec5e79f21d7708" },
         "base": { "size": 352, "relocation_count": 13, "normalized_sha256": "bbfe7ce7c3bafd235c0528f0480f5836b1d5016ec27e364ef77db6381c616c60" },
         "objdiff_percent": 83.46342
       }
@@ -6294,7 +6294,7 @@
       "class": "unclassified",
       "evidence": "Best complete typed ActionFlee state-machine caller retained so the exact private arrival and firing-position owners have their genuine caller graph. January control flow and the independent later HaloCEA lift support stationary panic, destination arrival, prop status updates, enum-correct threat completion, timesliced replanning, flee communications and both January assertions. Target is 864 padded bytes/30 relocations; candidate is 848/30 with the same relocation identities and 77.46595 percent objdiff similarity. The remaining control-flow and allocation residual is not assigned a speculative compiler mechanism and receives zero exact credit. No compiler steering, raw offset, fake dependency, undefined behavior, forced inline or nonsensical branch is retained. See docs/object_matching_logs/action_flee_obj_position_helpers_exact_20260909.md; reopen only for authoritative January source/local records or another natural same-compiler donor.",
       "measurements": {
-        "target": { "size": 864, "relocation_count": 30, "normalized_sha256": "d62f05304574f88e07577a3c0942f0fa591776cc95c210216383895494921f39" },
+        "target": { "size": 864, "relocation_count": 30, "normalized_sha256": "d62f05304574f88eefd7c025a452910d821e3986442777adcb223dc0d2085dc2" },
         "base": { "size": 848, "relocation_count": 30, "normalized_sha256": "e4b2a3cecd2525f5989ea94abd238fd8cc687627248f91ba39f597fe4ae66f7e" },
         "objdiff_percent": 77.46595
       }

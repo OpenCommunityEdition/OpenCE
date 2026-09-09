@@ -43,7 +43,9 @@ symbols in this file:
 #include "cseries.h"
 #include "actions.h"
 #include "actor_definitions.h"
+#define PATH_EXTERNAL_FLEE_ROUTINES
 #include "actors.h"
+#undef PATH_EXTERNAL_FLEE_ROUTINES
 #include "actor_perception.h"
 #include "ai.h"
 #include "ai_communication.h"

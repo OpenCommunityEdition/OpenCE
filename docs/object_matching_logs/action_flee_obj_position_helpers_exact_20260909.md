@@ -42,6 +42,13 @@ owner header. Their earlier placement in the middle of the heavily shared
 keeps ActionFlee fully typed while preserving all 189 exact `units.obj`
 functions and the existing code generation of unrelated AI consumers.
 
+The two previously undeclared PATH.C routines use an opt-in declaration block
+at the end of `path.h` for the same reason. The genuine `path_state_find`
+return type is corrected in the ordinary owner declaration, while the two new
+declarations are visible only to ActionFlee. This preserves the closer parked
+`encounter_update_respawn` schedule instead of silently degrading a fuzzy
+owner merely to expose unrelated declarations.
+
 The second exact owner carries January's line-470 assertion, validates the
 current encounter firing position, honors the already-at-destination fast
 path, and compares the squared body distance against the actor's destination
@@ -69,11 +76,11 @@ receive zero matched-byte credit:
 
 Their normalized target/candidate SHA-256 pairs are respectively:
 
-- setup: `1a415a0adece0dd58822de4fab9d12085b404e3531000124330031c56d9effa8` /
+- setup: `1a415a0adece0dd541b62c1c9ada51604d58751e66d769d88619d76db5471d79` /
   `cfc7ace7bcb857227c8c0559c80681a4f9ff2b142fa9df3e57c59af75960a898`
-- current-position exposure: `498dc2c0460731080f45893a5b2f648e99742a6d5733c010626f4466c0b31bb5` /
+- current-position exposure: `498dc2c046073108d309d0057bb5fc0405a8112c5532e90ef7ec5e79f21d7708` /
   `bbfe7ce7c3bafd235c0528f0480f5836b1d5016ec27e364ef77db6381c616c60`
-- perform: `d62f05304574f88e07577a3c0942f0fa591776cc95c210216383895494921f39` /
+- perform: `d62f05304574f88eefd7c025a452910d821e3986442777adcb223dc0d2085dc2` /
   `e4b2a3cecd2525f5989ea94abd238fd8cc687627248f91ba39f597fe4ae66f7e`
 
 These are ordinary typed C with named constants and subsystem APIs.  They
