@@ -194,6 +194,28 @@ enum
 
 enum
 {
+	_shader_environment_diffuse_rescale_detail_maps_bit = 0,
+	_shader_environment_diffuse_rescale_bump_map_bit,
+};
+
+enum
+{
+	_shader_environment_type_normal = 0,
+	_shader_environment_type_blended,
+	_shader_environment_type_blended_base_specular,
+	NUMBER_OF_SHADER_ENVIRONMENT_TYPES,
+};
+
+enum
+{
+	_detail_map_function_double_biased_multiply = 0,
+	_detail_map_function_multiply,
+	_detail_map_function_double_biased_add,
+	NUMBER_OF_DETAIL_MAP_FUNCTIONS,
+};
+
+enum
+{
 	_shader_type_environment = 3,
 	_shader_type_transparent_water = 7,
 	_rasterizer_statistics_mode_enabled = 2,
@@ -379,7 +401,22 @@ struct rasterizer_lights_globals
 
 struct shader_environment_diffuse_properties
 {
-	byte reserved00[0xA0];
+	word flags;
+	short pad02;
+	byte reserved04[0x18];
+	struct tag_reference base_map;
+	byte reserved2C[0x18];
+	short detail_map_function;
+	short pad46;
+	real primary_detail_map_scale;
+	struct tag_reference primary_detail_map;
+	real secondary_detail_map_scale;
+	struct tag_reference secondary_detail_map;
+	byte reserved70[0x18];
+	short micro_detail_map_function;
+	short pad8A;
+	real micro_detail_map_scale;
+	struct tag_reference micro_detail_map;
 	real_rgb_color material_color;
 	byte reservedAC[0xC];
 	real bump_map_scale;
@@ -891,6 +928,293 @@ void _rasterizer_environment_diffuse_textures_begin(
 		D3DDevice_SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
 		D3DDevice_SetRenderState(D3DRS_ZBIAS, 0);
 		rasterizer_set_stencil_mode(5);
+	}
+	return;
+}
+
+void _rasterizer_environment_diffuse_texture_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+		968,
+		global_d3d_device);
+
+	if ((rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_normal ||
+		rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_overdraw ||
+		rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_specular_mask ||
+		rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_specular_mask_times_bump_color ||
+		rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_specular_mask_times_bump_edge ||
+		rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_diffuse_texture_times_bump_color ||
+		rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_diffuse_texture_times_bump_edge) &&
+		rasterizer_debug_options.draw_environment_textures)
+	{
+		struct shader_environment_definition *shader_environment;
+		union point2d base_map_size;
+		union point2d primary_detail_map_size;
+		union point2d secondary_detail_map_size;
+		union point2d micro_detail_map_size;
+
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+			981,
+			shader);
+		shader_environment = (struct shader_environment_definition *)
+			shader_get_and_verify_type((struct shader *)shader, _shader_type_environment);
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+			995,
+			vertex_buffer);
+
+		rasterizer_set_vertex_shader_permutation(
+			40,
+			vertex_buffer->type,
+			shader_get_vertex_shader_permutation(shader));
+
+		base_map_size = *rasterizer_set_texture(
+			0,
+			0,
+			1,
+			shader_environment->environment.diffuse.base_map.index,
+			bitmap_index);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+
+		primary_detail_map_size = *rasterizer_set_texture(
+			1,
+			0,
+			2,
+			shader_environment->environment.diffuse.primary_detail_map.index,
+			bitmap_index);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+
+		secondary_detail_map_size = *rasterizer_set_texture(
+			2,
+			0,
+			2,
+			shader_environment->environment.diffuse.secondary_detail_map.index,
+			bitmap_index);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+
+		micro_detail_map_size = *rasterizer_set_texture(
+			3,
+			0,
+			2,
+			shader_environment->environment.diffuse.micro_detail_map.index,
+			bitmap_index);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+
+		{
+			real_vector4d texture_transform_constants[3];
+			real_vector2d primary_detail_map_scale;
+			real_vector2d secondary_detail_map_scale;
+			real_vector2d micro_detail_map_scale;
+
+			if (TEST_FLAG(
+				shader_environment->environment.diffuse.flags,
+				_shader_environment_diffuse_rescale_detail_maps_bit))
+			{
+				primary_detail_map_scale.i = (real)base_map_size.x / (real)primary_detail_map_size.x;
+				primary_detail_map_scale.j = (real)base_map_size.y / (real)primary_detail_map_size.y;
+				secondary_detail_map_scale.i = (real)base_map_size.x / (real)secondary_detail_map_size.x;
+				secondary_detail_map_scale.j = (real)base_map_size.y / (real)secondary_detail_map_size.y;
+				micro_detail_map_scale.i = (real)base_map_size.x / (real)micro_detail_map_size.x;
+				micro_detail_map_scale.j = (real)base_map_size.y / (real)micro_detail_map_size.y;
+			}
+			else
+			{
+				primary_detail_map_scale.i =
+					primary_detail_map_scale.j =
+					secondary_detail_map_scale.i =
+					secondary_detail_map_scale.j =
+					micro_detail_map_scale.i =
+					micro_detail_map_scale.j = 1.0f;
+			}
+
+			texture_transform_constants[0].i =
+				primary_detail_map_scale.i * shader_environment->environment.diffuse.primary_detail_map_scale;
+			texture_transform_constants[0].j =
+				primary_detail_map_scale.j * shader_environment->environment.diffuse.primary_detail_map_scale;
+			texture_transform_constants[0].k =
+				secondary_detail_map_scale.i * shader_environment->environment.diffuse.secondary_detail_map_scale;
+			texture_transform_constants[0].l =
+				secondary_detail_map_scale.j * shader_environment->environment.diffuse.secondary_detail_map_scale;
+			texture_transform_constants[1].i = 1.0f;
+			texture_transform_constants[1].j = 0.0f;
+			texture_transform_constants[1].k =
+				micro_detail_map_scale.i * shader_environment->environment.diffuse.micro_detail_map_scale;
+			texture_transform_constants[1].l = 0.0f;
+			texture_transform_constants[2].i = 0.0f;
+			texture_transform_constants[2].j = 1.0f;
+			texture_transform_constants[2].k =
+				micro_detail_map_scale.j * shader_environment->environment.diffuse.micro_detail_map_scale;
+			texture_transform_constants[2].l = 0.0f;
+			shader_environment_texture_animation_evaluate(
+				shader,
+				global_frame_parameters.game_time_sec,
+				&texture_transform_constants[1].l,
+				&texture_transform_constants[2].l);
+			IDirect3DDevice8_SetVertexShaderConstant(global_d3d_device, -84, texture_transform_constants, 3);
+
+			csmemset(&pixel_shader, 0, sizeof(pixel_shader));
+			pixel_shader.texture_modes = 0x00008421;
+			pixel_shader.combiner_count = 3;
+			switch (shader_environment->environment.type)
+			{
+				case _shader_environment_type_normal:
+					pixel_shader.alpha_inputs[0] = 0x3A1A1A19;
+					pixel_shader.rgb_inputs[0] = 0x3A0A1A09;
+					pixel_shader.alpha_inputs[1] = 0x181C0000;
+					pixel_shader.alpha_outputs[1] = 0x000000C0;
+					pixel_shader.alpha_outputs[0] = 0x00000C00;
+					pixel_shader.rgb_outputs[0] = 0x00000C00;
+					break;
+
+				case _shader_environment_type_blended:
+					pixel_shader.alpha_inputs[0] = 0x381A1819;
+					pixel_shader.rgb_inputs[0] = 0x380A1809;
+					pixel_shader.alpha_outputs[1] = 0;
+					pixel_shader.alpha_outputs[0] = 0x00000C00;
+					pixel_shader.rgb_outputs[0] = 0x00000C00;
+					break;
+
+				case _shader_environment_type_blended_base_specular:
+					pixel_shader.alpha_inputs[0] = 0x18200000;
+					pixel_shader.alpha_outputs[0] = 0x000000C0;
+					pixel_shader.rgb_inputs[0] = 0x380A1809;
+					pixel_shader.alpha_outputs[1] = 0;
+					pixel_shader.rgb_outputs[0] = 0x00000C00;
+					break;
+
+				default:
+					match_vassert(
+						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+						1145,
+						FALSE,
+						"### ERROR unsupported environment shader type");
+					break;
+			}
+
+			switch (shader_environment->environment.diffuse.detail_map_function)
+			{
+				case _detail_map_function_double_biased_multiply:
+					pixel_shader.rgb_inputs[1] = 0x080C080C;
+					pixel_shader.rgb_outputs[1] = 0x00000C00;
+					break;
+
+				case _detail_map_function_multiply:
+					pixel_shader.rgb_inputs[1] = 0x080C0000;
+					pixel_shader.rgb_outputs[1] = 0x00000C00;
+					break;
+
+				case _detail_map_function_double_biased_add:
+					pixel_shader.rgb_inputs[1] = 0x08204C20;
+					pixel_shader.rgb_outputs[1] = 0x00000C00;
+					break;
+
+				default:
+					match_vassert(
+						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+						1163,
+						FALSE,
+						"### ERROR unsupported environment shader detail function");
+					break;
+			}
+
+			pixel_shader.alpha_inputs[2] = 0x1C1B0000;
+			pixel_shader.alpha_outputs[2] = 0x000000C0;
+			switch (shader_environment->environment.diffuse.micro_detail_map_function)
+			{
+				case _detail_map_function_double_biased_multiply:
+					pixel_shader.rgb_inputs[2] = 0x0C0B0C0B;
+					pixel_shader.rgb_outputs[2] = 0x00000C00;
+					break;
+
+				case _detail_map_function_multiply:
+					pixel_shader.rgb_inputs[2] = 0x0C0B0000;
+					pixel_shader.rgb_outputs[2] = 0x00000C00;
+					break;
+
+				case _detail_map_function_double_biased_add:
+					pixel_shader.rgb_inputs[2] = 0x0C204B20;
+					pixel_shader.rgb_outputs[2] = 0x00000C00;
+					break;
+
+				default:
+					match_vassert(
+						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+						1184,
+						FALSE,
+						"### ERROR unsupported environment shader detail function");
+					break;
+			}
+
+			pixel_shader.final_combiner_inputs_efg = 0x00001C00;
+			switch (rasterizer_debug_options.drawing_mode)
+			{
+				case _rasterizer_drawing_mode_normal:
+				case _rasterizer_drawing_mode_diffuse_texture_times_bump_color:
+				case _rasterizer_drawing_mode_diffuse_texture_times_bump_edge:
+					pixel_shader.final_combiner_inputs_abcd = 0x0000000C;
+					break;
+
+				case _rasterizer_drawing_mode_overdraw:
+					pixel_shader.final_combiner_constant_0 = real_alpha_to_pixel32(0.33f);
+					pixel_shader.final_combiner_inputs_abcd = 0x0C110000;
+					break;
+
+				case _rasterizer_drawing_mode_specular_mask:
+				case _rasterizer_drawing_mode_specular_mask_times_bump_color:
+				case _rasterizer_drawing_mode_specular_mask_times_bump_edge:
+					pixel_shader.final_combiner_inputs_abcd = 0x0000001C;
+					break;
+
+				default:
+					match_vassert(
+						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+						1206,
+						FALSE,
+						"### ERROR unsupported drawing mode in environment texture pass");
+					break;
+			}
+			rasterizer_set_pixel_shader(&pixel_shader);
+
+			rasterizer_draw_dynamic_triangles_static_vertices(
+				dynamic_triangle_buffer_index,
+				first_triangle_index,
+				triangle_count,
+				vertex_buffer);
+			if (rasterizer_debug_options.statistics_mode == _rasterizer_statistics_mode_enabled)
+			{
+				rasterizer_frame_statistics.diffuse_texture_dynamic_draw_count++;
+				rasterizer_frame_statistics.diffuse_texture_dynamic_triangle_count += triangle_count;
+				rasterizer_frame_statistics.diffuse_texture_dynamic_vertex_count +=
+					rasterizer_frame_statistics_count_dynamic_vertices(
+						dynamic_triangle_buffer_index,
+						first_triangle_index,
+						triangle_count);
+			}
+		}
 	}
 	return;
 }
