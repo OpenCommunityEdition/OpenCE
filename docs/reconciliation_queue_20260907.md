@@ -405,11 +405,11 @@ The **1,041,486-byte** treemap refresh threshold has not yet been crossed.
 ## 2026-09-09 HS, Sound, HUD, and AI Script 10K reconciliation
 
 Relative to published commit `105d9acaac`, the rebuilt canonical semantic
-ledger now reports **1,058,444 meaningful accepted exact code bytes / 6,684
-accepted exact functions**. This is a net **10,232-byte / 46-function** gain
-with zero lost accepted exact functions and zero unit errors. The total does
-not include two authenticated private-name mappings worth a further 385 bytes
-until the generated target is re-split.
+ledger now reports **1,058,829 meaningful accepted exact code bytes / 6,686
+accepted exact functions**. This is a net **10,617-byte / 48-function** gain
+with zero lost accepted exact functions and zero unit errors. The generated
+target was re-split so both authenticated private-name corrections compare
+directly under their semantic names.
 
 The batch rejects 1,090 exact-looking saved-game bytes whose source preserves
 uninitialized output/padding, invalid close ordering, or a handle leak. It
@@ -420,4 +420,4 @@ object-admission audit, fake-source review, and the complete 1,144-test plus
 [the aggregate ledger](object_matching_logs/claude_lane_reconciliation_10k_batch_20260909.md).
 
 The canonical treemap is force-refreshed for this boundary. The next required
-refresh threshold is **1,068,444 meaningful accepted exact code bytes**.
+refresh threshold is **1,068,829 meaningful accepted exact code bytes**.

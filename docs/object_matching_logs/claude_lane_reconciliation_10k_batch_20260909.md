@@ -5,11 +5,11 @@
 The frozen published base is
 `105d9acaacda589e21a4389d7e6bd69db0b42aba`, with 6,638 accepted exact
 functions and 1,048,212 meaningful exact code bytes. The final rebuilt
-semantic ledger for this packet contains 6,684 accepted exact functions and
-1,058,444 meaningful exact code bytes:
+semantic ledger for this packet contains 6,686 accepted exact functions and
+1,058,829 meaningful exact code bytes:
 
-- **46 net accepted exact functions**;
-- **10,232 net meaningful exact code bytes**;
+- **48 net accepted exact functions**;
+- **10,617 net meaningful exact code bytes**;
 - **zero lost accepted exact functions**;
 - **zero unit errors**.
 
@@ -20,17 +20,14 @@ added to it.
 | --- | ---: | ---: |
 | `hs_compile.obj` inspect parser | 1 | 191 |
 | `sound_manager.obj` render/prioritization graph | 12 | 4,049 |
-| `hud_draw.obj` public bitmap retrieval | 1 | 482 |
-| `ai_script.obj` coherent scripting graph | 32 | 5,510 |
-| **published semantic-ledger total** | **46** | **10,232** |
+| `hud_draw.obj` bitmap retrieval pair | 2 | 753 |
+| `ai_script.obj` coherent scripting graph | 33 | 5,624 |
+| **published semantic-ledger total** | **48** | **10,617** |
 
-Two further private owners are byte/relocation exact under authenticated
-name-only target mappings: `get_sprite_clip_rect` (271 meaningful bytes) and
-`ai_scripting_assess_status` (114). Their address-derived target placeholders
-are corrected in `config/symbols.json`, but these 385 bytes are deliberately
-excluded from the total above until the generated split target is refreshed.
-The focused alias gates and naming evidence are recorded in their object
-ledgers; no semantic waiver or byte exception was added.
+The generated target was re-split after authenticating the private names
+`get_sprite_clip_rect` and `ai_scripting_assess_status`. Both now compare
+directly under their semantic names. No semantic waiver, alias-only published
+credit, or byte exception was added.
 
 ## Reconciliation decisions
 
@@ -70,9 +67,9 @@ function-level measurements and rejected paths.
 ## Publication gate
 
 - Full `ninja all_source`: passed.
-- Hardened semantic audit: 473 units, 7,170 functions evaluated, 6,684
+- Hardened semantic audit: 473 units, 7,172 functions evaluated, 6,686
   accepted exact, zero unit errors.
-- Frozen accepted-ledger comparison: 46 gains / zero losses / +10,232
+- Frozen accepted-ledger comparison: 48 gains / zero losses / +10,617
   meaningful bytes.
 - Park validation: 347 active, zero stale, zero invalid.
 - Object-admission audit: zero candidates and zero contradictions; six
@@ -84,4 +81,4 @@ function-level measurements and rejected paths.
 - `git diff --check`: passed.
 
 The canonical treemap is refreshed at this 10K boundary. Its next required
-refresh threshold is **1,068,444 meaningful accepted exact bytes**.
+refresh threshold is **1,068,829 meaningful accepted exact bytes**.
