@@ -92,6 +92,7 @@ symbols in this file:
 #include "effects/effects.h"
 #include "memory/data.h"
 #include "models/model_animation_definitions.h"
+#include "render/render_debug.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
@@ -610,6 +611,64 @@ void device_group_set_actual_value(
 			device->device.position = actual_value;
 			device->device.position_velocity = 0.0f;
 		}
+	}
+
+	return;
+}
+
+void device_render_debug(
+	long device_index)
+{
+	struct device_datum *device = device_get(device_index);
+
+	if (debug_objects_devices)
+	{
+		char string[512];
+		real_point3d origin;
+
+		csstrcpy(string, "");
+		sprintf(
+			string+csstrlen(string),
+			"power %.2f/vel %.2f",
+			device->device.power,
+			device->device.power_velocity);
+		if (device->device.power_group_index != NONE)
+		{
+			struct device_group_datum *group = datum_get(
+				device_groups_data,
+				device->device.power_group_index);
+
+			sprintf(
+				string+csstrlen(string),
+				" (group %d desired %.2f)",
+				DATUM_INDEX_TO_ABSOLUTE_INDEX(device->device.power_group_index),
+				group->actual_value);
+		}
+
+		sprintf(
+			string+csstrlen(string),
+			"|nposition %.2f/vel %.2f",
+			device->device.position,
+			device->device.position_velocity);
+		if (device->device.position_group_index != NONE)
+		{
+			struct device_group_datum *group = datum_get(
+				device_groups_data,
+				device->device.position_group_index);
+
+			sprintf(
+				string+csstrlen(string),
+				" (group %d desired %.2f)",
+				DATUM_INDEX_TO_ABSOLUTE_INDEX(device->device.position_group_index),
+				group->actual_value);
+		}
+
+		object_get_origin(device_index, &origin);
+		/* Preserve January's inline schedule without owning point_from_line3d here. */
+		origin.x = global_up3d->i*0.4f + origin.x;
+		origin.y = global_up3d->j*0.4f + origin.y;
+		origin.z = global_up3d->k*0.4f + origin.z;
+		render_debug_string_at_point(FALSE, &origin, string, global_real_argb_white);
 	}
 
 	return;

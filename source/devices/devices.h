@@ -89,6 +89,8 @@ void device_add_scenario_information(
 	struct scenario_device_datum *scenario_device);
 void device_export_function_values(
 	long device_index);
+void device_render_debug(
+	long device_index);
 real device_get_position(
 	long device_index);
 real device_get_power(
@@ -134,6 +136,8 @@ boolean device_update(
 extern struct data_array *device_groups_data;
 
 /* ---------- globals */
+
+extern boolean debug_objects_devices;
 
 /* ---------- public code */
 

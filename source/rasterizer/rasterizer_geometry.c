@@ -98,6 +98,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "math/real_math.h"
 #include "rasterizer_geometry.h"
+#include "rasterizer_geometry_compression.h"
 
 /* ---------- constants */
 

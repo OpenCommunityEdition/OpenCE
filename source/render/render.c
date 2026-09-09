@@ -68,6 +68,7 @@ symbols in this file:
 #include "structure_bsp_definitions.h"
 #include "structures/structure_visibility.h"
 #include "rasterizer.h"
+#include "rasterizer/rasterizer_lights.h"
 #include "profile.h"
 #include "progress_bar.h"
 #include "ui_widget.h"
@@ -138,8 +139,6 @@ void render_sky(
 	void);
 void render_objects(
 	void);
-void rasterizer_lens_flares_submit_occlusion_tests(
-	void);
 void render_object_shadows(
 	void);
 void particle_systems_render(
@@ -147,8 +146,6 @@ void particle_systems_render(
 void rasterizer_transparent_geometry_draw(
 	boolean water);
 void rasterizer_transparent_geometry_stop(
-	void);
-void rasterizer_lens_flares_draw(
 	void);
 void interface_draw_fullscreen_overlays(
 	void);

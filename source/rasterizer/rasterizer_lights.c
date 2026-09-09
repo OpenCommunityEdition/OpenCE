@@ -83,6 +83,10 @@ symbols in this file:
 #include "rasterizer/rasterizer_frame_statistics.h"
 #include "cseries.h"
 #include "errors.h"
+#include "bitmaps/bitmaps.h"
+#include "interface/hud_draw.h"
+#include "math/periodic_functions.h"
+#include "objects/widgets/widget_types.h"
 #include "render.h"
 #include "scenario/scenario.h"
 #include "tag_files/tag_groups.h"
@@ -90,6 +94,7 @@ symbols in this file:
 #include "rasterizer.h"
 #include "rasterizer_lights.h"
 #include "rasterizer_geometry.h"
+#include "rasterizer_geometry_compression.h"
 #include "rasterizer_debug_options.h"
 #include <xtl.h>
 #include "rasterizer/xbox/rasterizer_xbox.h"
@@ -120,8 +125,62 @@ enum
 	_lens_flare_dynamic_light_index_mask = FLAG(15)-1
 };
 
+enum
+{
+	_lens_flare_corona_rotation_function_none = 0,
+	_lens_flare_corona_rotation_function_eye_in_light_space,
+	_lens_flare_corona_rotation_function_light_in_eye_space,
+	_lens_flare_corona_rotation_function_eye_to_light_in_light_space,
+	_lens_flare_corona_rotation_function_eye_to_light_in_eye_space,
+	NUMBER_OF_LENS_FLARE_CORONA_ROTATION_FUNCTIONS
+};
+
+enum
+{
+	_lens_flare_reflection_scale_function_none = 0,
+	_lens_flare_reflection_scale_function_light_direction,
+	_lens_flare_reflection_scale_function_light_to_camera,
+	_lens_flare_reflection_scale_function_camera_direction,
+	NUMBER_OF_LENS_FLARE_REFLECTION_SCALE_FUNCTIONS
+};
+
+enum
+{
+	_lens_flare_reflection_rotate_from_center_of_screen_bit = 0,
+	_lens_flare_reflection_radius_not_scaled_by_distance_bit,
+	_lens_flare_reflection_radius_scaled_by_occlusion_bit,
+	_lens_flare_reflection_zbuffer_bit,
+	NUMBER_OF_LENS_FLARE_REFLECTION_FLAGS
+};
+
+enum
+{
+	_lens_flare_reflection_animation_color_interpolate_in_hsv_bit = 0,
+	_lens_flare_reflection_animation_color_interpolate_along_farthest_hue_path_bit,
+	NUMBER_OF_LENS_FLARE_REFLECTION_ANIMATION_FLAGS
+};
+
+enum
+{
+	_lens_flare_sun_bit = 0,
+	NUMBER_OF_LENS_FLARE_DEFINITION_FLAGS
+};
+
+enum
+{
+	_periodic_function_one = 0,
+	_periodic_function_zero
+};
+
+enum
+{
+	RASTERIZER_STENCIL_MODE_NONE = 0,
+	RASTERIZER_STENCIL_MODE_REJECT = 2
+};
+
 /* ---------- macros */
 
+#define LENS_FLARE_LIGHT_COLOR_ALPHA(color) ((color)>>24)
 #define LENS_FLARE_LIGHT_COLOR_ALPHA_MASK 0xff000000
 
 #define LENS_FLARE_DEFINITION_TAG 'lens'
@@ -131,12 +190,61 @@ enum
 
 struct lens_flare_definition
 {
-	byte reserved00[0x10];
+	real falloff_angle;
+	real cutoff_angle;
+	real runtime_cosine_falloff_angle;
+	real runtime_cosine_cutoff_angle;
 	real occlusion_radius;
 	short occlusion_offset_direction;
-	byte reserved16[0x6];
+	word pad16;
+	real near_fade_distance;
 	real far_fade_distance;
+	struct tag_reference primary_map;
+	word flags;
+	word pad32;
+	byte reserved34[0x4C];
+	short corona_rotation_function;
+	word pad82;
+	real corona_rotation_function_scale;
+	byte reserved88[0x18];
+	real_vector2d corona_radius_scale;
+	byte reservedA8[0x1C];
+	struct tag_block reflections;
+	byte reservedD0[0x20];
 };
+
+struct lens_flare_reflection
+{
+	word flags;
+	short type;
+	short bitmap_index;
+	word pad06;
+	byte reserved08[0x14];
+	real offset;
+	real rotation_offset;
+	byte reserved24[0x4];
+	real radius_lower_bounds;
+	real radius_upper_bounds;
+	short radius_scale_function;
+	word pad32;
+	real brightness_lower_bounds;
+	real brightness_upper_bounds;
+	short brightness_scale_function;
+	word pad3E;
+	real_argb_color tint_color;
+	real_argb_color animation_color_lower_bound;
+	real_argb_color animation_color_upper_bound;
+	word animation_flags;
+	short animation_function;
+	real animation_period;
+	real animation_phase;
+	byte reserved7C[0x4];
+};
+
+typedef char verify_lens_flare_definition_size[
+	sizeof(struct lens_flare_definition) == 0xF0 ? 1 : -1];
+typedef char verify_lens_flare_reflection_size[
+	sizeof(struct lens_flare_reflection) == 0x80 ? 1 : -1];
 
 struct structure_bsp
 {
@@ -175,6 +283,8 @@ struct rasterizer_lights_window_parameters
 	byte reserved04[4];
 	real_point3d camera_position;
 	real_vector3d camera_forward;
+	byte reserved20[0x80];
+	real_matrix4x3 view_to_world;
 };
 
 struct lens_flare_occlusion_test_results
@@ -250,6 +360,9 @@ static struct rasterizer_lens_flare_submit_parameters *lens_flare_submit_paramet
 	short lens_flare_index);
 static byte *lens_flare_occlusion_test_results_get(
 	struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters);
+static real lens_flare_evaluate_corona_rotation_function(
+	short corona_rotation_function,
+	struct rasterizer_lens_flare_submit_parameters const *lens_flare_parameters);
 
 /* ---------- globals */
 
@@ -320,6 +433,89 @@ static byte *lens_flare_occlusion_test_results_get(
 	return &local_lens_flare_occlusion_test_results[lens_flare_parameters->light_index].
 		data[lens_flare_parameters->lens_flare_index]
 		[lens_flare_parameters->compressed_window_index & _lens_flare_window_index_mask];
+}
+
+static real lens_flare_evaluate_corona_rotation_function(
+	short corona_rotation_function,
+	struct rasterizer_lens_flare_submit_parameters const *lens_flare_parameters)
+{
+	real cosine = 1.0f;
+	real sine = 0.0f;
+	real rotation = 0.0f;
+	real_vector3d uncompressed_direction;
+	real_vector3d direction;
+	real_vector3d offset;
+
+#line 118 "c:\\halo\\SOURCE\\rasterizer\\rasterizer_lights.c"
+	assert(lens_flare_parameters);
+
+	direction = *uncompress_int32_to_real_vector3d(
+		&uncompressed_direction,
+		lens_flare_parameters->compressed_direction);
+
+	switch (corona_rotation_function)
+	{
+		case _lens_flare_corona_rotation_function_none:
+			break;
+
+		case _lens_flare_corona_rotation_function_eye_in_light_space:
+		{
+			real_vector3d plane;
+
+			cross_product3d(&direction, &global_window_parameters.view_to_world.forward, &plane);
+			cross_product3d(&plane, &direction, &plane);
+			offset.i = global_window_parameters.camera_forward.i;
+			offset.j = global_window_parameters.camera_forward.j;
+			offset.k = global_window_parameters.camera_forward.k;
+			sine = dot_product3d(&plane, &offset);
+			cosine = -dot_product3d(&direction, &offset);
+			break;
+		}
+
+		case _lens_flare_corona_rotation_function_light_in_eye_space:
+			offset.i = -direction.i;
+			offset.j = -direction.j;
+			offset.k = -direction.k;
+			sine = dot_product3d(&global_window_parameters.view_to_world.forward, &offset);
+			cosine = -dot_product3d(&global_window_parameters.view_to_world.up, &offset);
+			break;
+
+		case _lens_flare_corona_rotation_function_eye_to_light_in_light_space:
+		{
+			real_vector3d plane;
+
+			cross_product3d(&direction, &global_window_parameters.view_to_world.forward, &plane);
+			cross_product3d(&plane, &direction, &plane);
+			vector_from_points3d(
+				&global_window_parameters.camera_position,
+				&lens_flare_parameters->position,
+				&offset);
+			sine = dot_product3d(&plane, &offset);
+			cosine = -dot_product3d(&direction, &offset);
+			break;
+		}
+
+		case _lens_flare_corona_rotation_function_eye_to_light_in_eye_space:
+			vector_from_points3d(
+				&global_window_parameters.camera_position,
+				&lens_flare_parameters->position,
+				&offset);
+			sine = dot_product3d(&global_window_parameters.view_to_world.forward, &offset);
+			cosine = -dot_product3d(&global_window_parameters.view_to_world.up, &offset);
+			break;
+
+		default:
+#line 151 "c:\\halo\\SOURCE\\rasterizer\\rasterizer_lights.c"
+			vassert(FALSE, "### ERROR unsupported lens flare corona rotation function");
+			break;
+	}
+
+	if (corona_rotation_function != _lens_flare_corona_rotation_function_none && sine != 0.0f)
+	{
+		rotation = (real)atan2(sine, cosine)*(1.0f/(2.0f*_pi));
+	}
+
+	return rotation;
 }
 
 /* ---------- public code */
@@ -586,6 +782,299 @@ void rasterizer_lens_flare_submit_for_cluster(
 			rasterizer_lens_flare_submit(&parameters);
 		}
 	}
+
+	return;
+}
+
+void rasterizer_lens_flares_draw(
+	void)
+{
+	rasterizer_profile_begin(_rasterizer_profile_lens_flares);
+
+	if (rasterizer_debug_options.lens_flares &&
+		global_window_parameters.rasterizer_target == _rasterizer_target_render_primary &&
+		local_lens_flare_count > 0)
+	{
+		short lens_flare_index;
+
+		rasterizer_widget_begin(_widget_type_internal_sprite, 0);
+
+		for (lens_flare_index = 0; lens_flare_index < local_lens_flare_count; lens_flare_index++)
+		{
+			struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters =
+				lens_flare_submit_parameter_get(lens_flare_index);
+			byte *occlusion_test_result = lens_flare_occlusion_test_results_get(lens_flare_parameters);
+			real_vector3d uncompressed_direction;
+			real_vector3d direction = *uncompress_int32_to_real_vector3d(
+				&uncompressed_direction,
+				lens_flare_parameters->compressed_direction);
+
+			if ((lens_flare_parameters->compressed_window_index & _lens_flare_window_index_mask) ==
+				global_window_parameters.window_index)
+			{
+				struct lens_flare_definition *definition = lens_flare_parameters->definition;
+
+				if (lens_flare_parameters->internal__occlusion_pixels > 0 &&
+					LENS_FLARE_LIGHT_COLOR_ALPHA(lens_flare_parameters->compressed_light_color) > 0 &&
+					definition->reflections.count > 0)
+				{
+					real_point3d position = lens_flare_parameters->position;
+					real_vector3d camera_offset;
+					real_vector3d mirror;
+					real depth;
+					real occlusion_fraction;
+					real light_brightness;
+					real corona_rotation;
+					real screen_rotation;
+					real cosine_scale;
+					real cosine_offset;
+					real scale_functions[NUMBER_OF_LENS_FLARE_REFLECTION_SCALE_FUNCTIONS];
+					real light_scale;
+					short reflection_index;
+
+					vector_from_points3d(
+						&global_window_parameters.camera_position,
+						&position,
+						&camera_offset);
+					depth = dot_product3d(&global_window_parameters.camera_forward, &camera_offset);
+
+					scale_vector3d(&global_window_parameters.camera_forward, depth, &mirror);
+					subtract_vectors3d(&mirror, &camera_offset, &mirror);
+					scale_vector3d(&mirror, 2.0f, &mirror);
+
+					occlusion_fraction = *occlusion_test_result*(1.0f/255.0f);
+
+					if (definition->far_fade_distance > 0.0f)
+					{
+						light_brightness = PIN(
+							(depth-definition->far_fade_distance)/
+								(definition->near_fade_distance-definition->far_fade_distance),
+							0.0f,
+							1.0f);
+					}
+					else
+					{
+						light_brightness = 1.0f;
+					}
+
+					light_brightness *= occlusion_fraction;
+					light_brightness *= uncompress_int8_to_real(
+						(byte)LENS_FLARE_LIGHT_COLOR_ALPHA(lens_flare_parameters->compressed_light_color));
+					corona_rotation = lens_flare_evaluate_corona_rotation_function(
+						definition->corona_rotation_function,
+						lens_flare_parameters)*definition->corona_rotation_function_scale;
+					screen_rotation = (real)atan2(
+						dot_product3d(&global_window_parameters.view_to_world.forward, &camera_offset),
+						dot_product3d(&global_window_parameters.view_to_world.left, &camera_offset))*(180.0f/_pi);
+
+					cosine_scale = 1.0f/
+						(definition->runtime_cosine_falloff_angle-definition->runtime_cosine_cutoff_angle);
+					cosine_offset = -(definition->runtime_cosine_cutoff_angle*cosine_scale);
+
+					normalize3d(&camera_offset);
+
+					scale_functions[_lens_flare_reflection_scale_function_none] = 1.0f;
+					scale_functions[_lens_flare_reflection_scale_function_light_direction] = PIN(
+						-dot_product3d(&global_window_parameters.camera_forward, &direction)*cosine_scale+cosine_offset,
+						0.0f,
+						1.0f);
+					scale_functions[_lens_flare_reflection_scale_function_light_to_camera] = PIN(
+						-dot_product3d(&direction, &camera_offset)*cosine_scale+cosine_offset,
+						0.0f,
+						1.0f);
+					scale_functions[_lens_flare_reflection_scale_function_camera_direction] = PIN(
+						dot_product3d(&global_window_parameters.camera_forward, &camera_offset)*cosine_scale+cosine_offset,
+						0.0f,
+						1.0f);
+
+					if (light_brightness > 0.0f)
+					{
+						light_scale = uncompress_int8_to_real(lens_flare_parameters->compressed_light_scale);
+
+						for (reflection_index = 0; reflection_index < definition->reflections.count; reflection_index++)
+						{
+							struct lens_flare_reflection *reflection = TAG_BLOCK_GET_ELEMENT(
+								&definition->reflections,
+								reflection_index,
+								struct lens_flare_reflection);
+							real brightness_lower_bound = reflection->brightness_lower_bounds;
+							real brightness = (brightness_lower_bound+
+								(reflection->brightness_upper_bounds-brightness_lower_bound)*light_scale)*
+								scale_functions[reflection->brightness_scale_function]*light_brightness;
+
+							if (reflection_index == 0)
+							{
+								light_brightness = brightness;
+							}
+
+							if (brightness > 0.0f)
+							{
+								real radius_lower_bound = reflection->radius_lower_bounds;
+								real radius = radius_lower_bound+
+									(reflection->radius_upper_bounds-radius_lower_bound)*light_scale;
+								real_argb_color color;
+								real_vector2d radius_scale;
+								real rotation;
+								pixel32 pixel;
+								real tint_factor;
+
+								if (reflection->tint_color.alpha == 0.0f &&
+									reflection->tint_color.red == 0.0f &&
+									reflection->tint_color.green == 0.0f &&
+									reflection->tint_color.blue == 0.0f)
+								{
+									pixel = (compress_real_to_int8(brightness)<<24) |
+										(lens_flare_parameters->compressed_light_color & ~LENS_FLARE_LIGHT_COLOR_ALPHA_MASK);
+									tint_factor = 1.0f;
+								}
+								else
+								{
+									color.rgb = reflection->tint_color.rgb;
+									color.alpha = brightness;
+
+									if (reflection->animation_function > _periodic_function_zero)
+									{
+										real_argb_color animation_color;
+										real animation_time;
+
+										match_assert(
+											"c:\\halo\\SOURCE\\rasterizer\\rasterizer_lights.c",
+											651,
+											reflection->animation_period != 0.0f);
+
+										animation_time = periodic_function_evaluate(
+											reflection->animation_function,
+											(global_frame_parameters.game_time_sec+reflection->animation_phase)/
+												reflection->animation_period);
+
+										rgb_colors_interpolate(
+											&animation_color.rgb,
+											reflection->animation_flags &
+												(FLAG(_lens_flare_reflection_animation_color_interpolate_in_hsv_bit) |
+												 FLAG(_lens_flare_reflection_animation_color_interpolate_along_farthest_hue_path_bit)),
+											&reflection->animation_color_lower_bound.rgb,
+											&reflection->animation_color_upper_bound.rgb,
+											animation_time);
+										scalars_interpolate(
+											reflection->animation_color_lower_bound.alpha,
+											reflection->animation_color_upper_bound.alpha,
+											animation_time,
+											&animation_color.alpha);
+
+										match_assert(
+											"c:\\halo\\SOURCE\\rasterizer\\rasterizer_lights.c",
+											667,
+											animation_color.alpha >= 0.0f && animation_color.alpha <= 1.0f);
+										match_assert(
+											"c:\\halo\\SOURCE\\rasterizer\\rasterizer_lights.c",
+											668,
+											animation_color.red >= 0.0f && animation_color.red <= 1.0f);
+										match_assert(
+											"c:\\halo\\SOURCE\\rasterizer\\rasterizer_lights.c",
+											669,
+											animation_color.green >= 0.0f && animation_color.green <= 1.0f);
+										match_assert(
+											"c:\\halo\\SOURCE\\rasterizer\\rasterizer_lights.c",
+											670,
+											animation_color.blue >= 0.0f && animation_color.blue <= 1.0f);
+
+										color.alpha *= animation_color.alpha;
+										color.red *= animation_color.red;
+										color.green *= animation_color.green;
+										color.blue *= animation_color.blue;
+									}
+
+									pixel = real_argb_color_to_pixel32(&color);
+									tint_factor = reflection->tint_color.alpha;
+								}
+
+								if (reflection_index == 0)
+								{
+									rotation = corona_rotation+reflection->rotation_offset;
+									radius_scale = definition->corona_radius_scale;
+								}
+								else
+								{
+									rotation = reflection->rotation_offset;
+									radius_scale.i = radius_scale.j = 1.0f;
+								}
+
+								if (TEST_FLAG(reflection->flags, _lens_flare_reflection_rotate_from_center_of_screen_bit))
+								{
+									rotation += screen_rotation;
+								}
+								if (TEST_FLAG(reflection->flags, _lens_flare_reflection_radius_scaled_by_occlusion_bit))
+								{
+									radius = (occlusion_fraction+1.0f)*radius*0.5f;
+								}
+								if (TEST_FLAG(reflection->flags, _lens_flare_reflection_radius_not_scaled_by_distance_bit))
+								{
+									radius *= depth;
+								}
+
+								{
+									real offset = reflection->offset;
+									real_point3d point;
+
+									point.x = offset*mirror.i + position.x;
+									point.y = offset*mirror.j + position.y;
+									point.z = offset*mirror.k + position.z;
+
+									if (!rasterizer_widget_set_texture(
+										0,
+										definition->primary_map.index,
+										reflection->bitmap_index))
+									{
+										break;
+									}
+
+									rasterizer_widget_set_tint_factor(tint_factor);
+									if (TEST_FLAG(reflection->flags, _lens_flare_reflection_zbuffer_bit) &&
+										(lens_flare_parameters->compressed_window_index & _lens_flare_first_person_weapon_flag))
+									{
+										rasterizer_set_stencil_mode(RASTERIZER_STENCIL_MODE_REJECT);
+									}
+									else
+									{
+										rasterizer_set_stencil_mode(RASTERIZER_STENCIL_MODE_NONE);
+									}
+									rasterizer_widget_draw_sprite3d(
+										&point,
+										radius,
+										&radius_scale,
+										rotation*(_pi/180.0f),
+										pixel);
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		rasterizer_set_stencil_mode(RASTERIZER_STENCIL_MODE_NONE);
+		rasterizer_widget_end();
+
+		if (rasterizer_debug_options.ray_of_buddha)
+		{
+			for (lens_flare_index = 0; lens_flare_index < local_lens_flare_count; lens_flare_index++)
+			{
+				struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters =
+					lens_flare_submit_parameter_get(lens_flare_index);
+
+				if (lens_flare_parameters->internal__occlusion_pixels > 0 &&
+					(lens_flare_parameters->compressed_window_index & _lens_flare_window_index_mask) ==
+						global_window_parameters.window_index &&
+					(lens_flare_parameters->definition->occlusion_radius == 50.0f ||
+						TEST_FLAG(lens_flare_parameters->definition->flags, _lens_flare_sun_bit)))
+				{
+					rasterizer_sun_glow_draw(lens_flare_parameters);
+				}
+			}
+		}
+	}
+
+	rasterizer_profile_end(_rasterizer_profile_lens_flares);
 
 	return;
 }

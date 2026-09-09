@@ -21,5 +21,11 @@ void rasterizer_lens_flare_submit(
 	struct rasterizer_lens_flare_submit_parameters const *parameters);
 void rasterizer_lens_flare_submit_for_cluster(
 	short cluster_index);
+void rasterizer_lens_flares_submit_occlusion_tests(
+	void);
+void rasterizer_lens_flares_draw(
+	void);
+void rasterizer_sun_glow_draw(
+	struct rasterizer_lens_flare_submit_parameters const *parameters);
 
 #endif // __RASTERIZER_LIGHTS_H
