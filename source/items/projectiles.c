@@ -121,10 +121,13 @@ symbols in this file:
 #undef normalize3d
 #undef random_vector_in_cone3d
 
+#include "projectiles_callbacks.h"
 #include "projectile_definitions.h"
 
+#include "effects/contrail_definitions.h"
 #include "objects/objects.h"
 #include "physics/physics.h"
+#include "scenario/scenario.h"
 
 /* ---------- constants */
 
@@ -153,9 +156,74 @@ enum projectile_definition_flags
 	NUMBER_OF_PROJECTILE_DEFINITION_FLAGS,
 };
 
+enum projectile_export_function_mode
+{
+	_projectile_export_function_none = 0,
+	_projectile_export_function_range_remaining,
+	_projectile_export_function_time_remaining,
+	_projectile_export_function_tracer,
+	NUMBER_OF_PROJECTILE_EXPORT_FUNCTION_MODES,
+};
+
 /* ---------- macros */
 
+#define projectile_runtime_get(index) \
+	((struct projectile_runtime_datum *)object_get_and_verify_type( \
+		(index), \
+		_object_mask_projectile))
+
 /* ---------- structures */
+
+struct _projectile_runtime_datum
+{
+	unsigned long flags;
+	short action;
+	short hit_material_type;
+	long ignore_object_index;
+	long target_object_index;
+	long tracer_attachment_index;
+	real detonation_timer;
+	real detonation_timer_delta;
+	real arming_time;
+	real arming_time_delta;
+	real odometer;
+	real deceleration_timer;
+	real deceleration_timer_delta;
+	real deceleration;
+	real maximum_damage_distance;
+	real_vector3d rotation_axis;
+	real rotation_sine;
+	real rotation_cosine;
+};
+
+struct projectile_runtime_datum
+{
+	long definition_index;
+	struct _object_datum object;
+	struct _item_datum item;
+	struct _projectile_runtime_datum projectile;
+};
+
+typedef char projectile_runtime_arming_time_delta_offset_assert[
+	offsetof(struct projectile_runtime_datum, projectile.arming_time_delta) == 0x1FC
+		? 1
+		: -1];
+typedef char projectile_runtime_odometer_offset_assert[
+	offsetof(struct projectile_runtime_datum, projectile.odometer) == 0x200
+		? 1
+		: -1];
+typedef char projectile_runtime_deceleration_offset_assert[
+	offsetof(struct projectile_runtime_datum, projectile.deceleration) == 0x20C
+		? 1
+		: -1];
+typedef char projectile_runtime_rotation_axis_offset_assert[
+	offsetof(struct projectile_runtime_datum, projectile.rotation_axis) == 0x214
+		? 1
+		: -1];
+typedef char projectile_runtime_rotation_cosine_offset_assert[
+	offsetof(struct projectile_runtime_datum, projectile.rotation_cosine) == 0x224
+		? 1
+		: -1];
 
 /* ---------- prototypes */
 
@@ -170,6 +238,15 @@ boolean projectile_aim_linear(
 	real *result_velocity,
 	real *result_ticks,
 	real *result_distance);
+
+static real projectile_calculate_deceleration_from_distances(
+	struct projectile_definition const *definition,
+	real minimum_distance,
+	real maximum_distance);
+static void projectile_adjust_for_angular_velocity_change(
+	long projectile_index);
+static void projectile_calculate_deceleration(
+	long projectile_index);
 
 /* ---------- globals */
 
@@ -301,7 +378,300 @@ boolean dangerous_projectiles_near_player(
 	return FALSE;
 }
 
+void projectile_export_function_values(
+	long projectile_index)
+{
+	struct projectile_runtime_datum *projectile;
+	struct projectile_definition const *definition;
+	short function_index;
+
+	projectile = projectile_runtime_get(projectile_index);
+	definition = projectile_definition_get(projectile->definition_index);
+
+	for (function_index = 0; function_index < NUMBEROF(definition->projectile.function_inputs); function_index++)
+	{
+		real value;
+		short function_input = definition->projectile.function_inputs[function_index];
+
+		if (function_input != _projectile_export_function_none)
+		{
+			switch (function_input)
+			{
+			case _projectile_export_function_range_remaining:
+				if (definition->projectile.maximum_range != 0.f)
+					value = projectile->projectile.odometer / definition->projectile.maximum_range;
+				else
+					value = 0.f;
+				break;
+
+			case _projectile_export_function_time_remaining:
+				value = projectile->projectile.detonation_timer;
+				break;
+
+			case _projectile_export_function_tracer:
+				if (TEST_FLAG(projectile->projectile.flags, _projectile_tracer_bit))
+					value = 1.f;
+				else
+					value = 0.f;
+				break;
+
+			default:
+				display_assert(
+					NULL,
+					"c:\\halo\\SOURCE\\items\\projectiles.c",
+					1570,
+					TRUE);
+				system_exit(NONE);
+				break;
+			}
+
+			projectile->object.incoming_function_values[function_index] = value;
+		}
+	}
+
+	return;
+}
+
+boolean projectile_new(
+	long projectile_index)
+{
+	struct projectile_runtime_datum *projectile;
+	struct projectile_definition const *definition;
+	struct tag_block const *attachments;
+	real detonation_ticks;
+	real arming_ticks;
+	real initial_velocity;
+	short attachment_index;
+	boolean underwater;
+
+	projectile = projectile_runtime_get(projectile_index);
+	definition = projectile_definition_get(projectile->definition_index);
+
+	projectile->object.flags |= FLAG(_object_dynamic_lighting_recompute_bit);
+	projectile->projectile.flags = FLAG(_projectile_tracer_bit);
+	projectile->projectile.target_object_index = NONE;
+	projectile->projectile.action = 0;
+	projectile->projectile.hit_material_type = NONE;
+	projectile->projectile.ignore_object_index =
+		object_get_ultimate_parent(projectile->object.owner_object_index);
+
+	if (TEST_FLAG(
+		definition->projectile.flags,
+		_projectile_detonation_max_time_if_attached_bit))
+	{
+		detonation_ticks = definition->projectile.timer_lower_bound;
+	}
+	else
+	{
+		detonation_ticks = real_random_range(
+			definition->projectile.timer_lower_bound,
+			definition->projectile.timer_upper_bound);
+	}
+	detonation_ticks *= TICKS_PER_SECOND;
+	if (detonation_ticks >= 1.f)
+		projectile->projectile.detonation_timer_delta = 1.f / detonation_ticks;
+
+	arming_ticks = definition->projectile.arming_time * TICKS_PER_SECOND;
+	if (arming_ticks >= 1.f)
+		projectile->projectile.arming_time_delta = 1.f / arming_ticks;
+
+	attachments = &definition->object.attachments;
+	projectile->projectile.tracer_attachment_index = NONE;
+	for (attachment_index = 0;
+		attachment_index < attachments->count;
+		attachment_index++)
+	{
+		struct object_attachment_definition const *attachment = TAG_BLOCK_GET_ELEMENT(
+			attachments,
+			attachment_index,
+			struct object_attachment_definition);
+
+		if (attachment->type.group_tag == CONTRAIL_DEFINITION_TAG)
+		{
+			projectile->projectile.tracer_attachment_index = attachment_index;
+			break;
+		}
+	}
+
+	initial_velocity = definition->projectile.initial_velocity;
+	projectile->object.translational_velocity.i =
+		projectile->object.forward.i * initial_velocity +
+		projectile->object.translational_velocity.i;
+	projectile->object.translational_velocity.j =
+		projectile->object.forward.j * initial_velocity +
+		projectile->object.translational_velocity.j;
+	projectile->object.translational_velocity.k =
+		projectile->object.forward.k * initial_velocity +
+		projectile->object.translational_velocity.k;
+
+	underwater = scenario_location_underwater(
+		&projectile->object.location,
+		&projectile->object.bounding_sphere_center,
+		NULL);
+	SET_FLAG(projectile->object.flags, _object_wholly_under_media_bit, underwater);
+
+	projectile_adjust_for_angular_velocity_change(projectile_index);
+	projectile_export_function_values(projectile_index);
+	projectile_calculate_deceleration(projectile_index);
+
+	projectile->object.flags |=
+		FLAG(_object_shadowless_bit) |
+		FLAG(_object_deleted_when_deactivated_bit);
+
+	return TRUE;
+}
+
+void projectile_accelerate(
+	long projectile_index,
+	real_vector3d const *acceleration)
+{
+	struct projectile_runtime_datum *projectile;
+	real_vector3d rotation_axis;
+	real rotation_magnitude;
+
+	projectile = projectile_runtime_get(projectile_index);
+	projectile_definition_get(projectile->definition_index);
+
+	match_assert_valid_real_vector3d(
+		"c:\\halo\\SOURCE\\items\\projectiles.c",
+		1007,
+		acceleration);
+
+	if (projectile->object.parent_object_index != NONE)
+		return;
+
+	match_assert_valid_real_vector3d(
+		"c:\\halo\\SOURCE\\items\\projectiles.c",
+		1011,
+		&projectile->object.translational_velocity);
+
+	add_vectors3d(
+		&projectile->object.translational_velocity,
+		acceleration,
+		&projectile->object.translational_velocity);
+
+	random_direction3d(&rotation_axis);
+	rotation_magnitude =
+		magnitude3d(acceleration) *
+		real_random() *
+		1.5707964f;
+	scale_vector3d(&rotation_axis, rotation_magnitude, &rotation_axis);
+	add_vectors3d(
+		&projectile->object.angular_velocity,
+		&rotation_axis,
+		&projectile->object.angular_velocity);
+
+	projectile_adjust_for_angular_velocity_change(projectile_index);
+	projectile->object.flags &= ~FLAG(_object_at_rest_bit);
+
+	match_assert_valid_real_vector3d(
+		"c:\\halo\\SOURCE\\items\\projectiles.c",
+		1029,
+		&projectile->object.translational_velocity);
+
+	return;
+}
+
 /* ---------- private code */
+
+static real projectile_calculate_deceleration_from_distances(
+	struct projectile_definition const *definition,
+	real minimum_distance,
+	real maximum_distance)
+{
+	real distance_delta = maximum_distance - minimum_distance;
+	real deceleration = 0.f;
+
+	if (definition->projectile.initial_velocity != definition->projectile.final_velocity &&
+		distance_delta != 0.f)
+	{
+		deceleration =
+			(definition->projectile.initial_velocity * definition->projectile.initial_velocity -
+			 definition->projectile.final_velocity * definition->projectile.final_velocity) /
+			(2.f * distance_delta);
+	}
+
+	return deceleration;
+}
+
+static void projectile_adjust_for_angular_velocity_change(
+	long projectile_index)
+{
+	struct projectile_runtime_datum *projectile;
+	real angular_velocity_magnitude;
+
+	projectile = projectile_runtime_get(projectile_index);
+	angular_velocity_magnitude = magnitude3d(&projectile->object.angular_velocity);
+
+	if (angular_velocity_magnitude != 0.f)
+	{
+		projectile->projectile.flags |= FLAG(_projectile_has_nonzero_angular_velocity_bit);
+		scale_vector3d(
+			&projectile->object.angular_velocity,
+			1.f / angular_velocity_magnitude,
+			&projectile->projectile.rotation_axis);
+		projectile->projectile.rotation_sine = sine(angular_velocity_magnitude);
+		projectile->projectile.rotation_cosine = cosine(angular_velocity_magnitude);
+	}
+	else
+	{
+		projectile->projectile.flags &= ~FLAG(_projectile_has_nonzero_angular_velocity_bit);
+		projectile->projectile.rotation_sine = 0.f;
+		projectile->projectile.rotation_cosine = 1.f;
+	}
+
+	return;
+}
+
+static void projectile_calculate_deceleration(
+	long projectile_index)
+{
+	struct projectile_runtime_datum *projectile;
+	struct projectile_definition const *definition;
+
+	projectile = projectile_runtime_get(projectile_index);
+	definition = projectile_definition_get(projectile->definition_index);
+
+	if (TEST_FLAG(projectile->object.flags, _object_wholly_under_media_bit))
+	{
+		projectile->projectile.deceleration = projectile_calculate_deceleration_from_distances(
+			definition,
+			definition->projectile.water_damage_range_lower_bound,
+			definition->projectile.water_damage_range_upper_bound);
+		projectile->projectile.maximum_damage_distance =
+			definition->projectile.water_damage_range_upper_bound;
+
+		if (definition->projectile.water_damage_range_lower_bound > 0.f)
+		{
+			projectile->projectile.deceleration_timer_delta =
+				definition->projectile.water_damage_range_lower_bound /
+				definition->projectile.initial_velocity;
+			return;
+		}
+	}
+	else
+	{
+		projectile->projectile.deceleration = projectile_calculate_deceleration_from_distances(
+			definition,
+			definition->projectile.air_damage_range_lower_bound,
+			definition->projectile.air_damage_range_upper_bound);
+		projectile->projectile.maximum_damage_distance =
+			definition->projectile.water_damage_range_upper_bound;
+
+		if (definition->projectile.air_damage_range_lower_bound > 0.f)
+		{
+			projectile->projectile.deceleration_timer_delta =
+				definition->projectile.air_damage_range_lower_bound /
+				definition->projectile.initial_velocity;
+			return;
+		}
+	}
+
+	projectile->projectile.deceleration_timer = 1.f;
+	projectile->projectile.deceleration_timer_delta = 0.f;
+
+	return;
+}
 
 real projectile_get_ballistic_acceleration(
 	struct projectile_definition const *definition)

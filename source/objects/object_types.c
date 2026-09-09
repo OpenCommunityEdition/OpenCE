@@ -130,6 +130,8 @@ symbols in this file:
 #include "devices/devices.h"
 #include "editor/editor_stubs.h"
 #include "items/items.h"
+#include "items/projectiles.h"
+#include "items/projectiles_callbacks.h"
 #include "items/weapons.h"
 #include "objects.h"
 #include "scenario/scenario.h"
@@ -162,7 +164,6 @@ DECLARE_OBJECT_TYPE_LIFECYCLE(bipeds);
 DECLARE_OBJECT_TYPE_LIFECYCLE(vehicles);
 DECLARE_OBJECT_TYPE_LIFECYCLE(items);
 DECLARE_OBJECT_TYPE_LIFECYCLE(weapons);
-DECLARE_OBJECT_TYPE_LIFECYCLE(projectiles);
 DECLARE_OBJECT_TYPE_LIFECYCLE(scenery);
 DECLARE_OBJECT_TYPE_LIFECYCLE(devices);
 DECLARE_OBJECT_TYPE_LIFECYCLE(machines);
@@ -238,20 +239,6 @@ void equipment_place(
 boolean garbage_new(
 	long object_index);
 boolean garbage_update(
-	long object_index);
-
-boolean projectile_new(
-	long object_index);
-void projectile_delete(
-	long object_index);
-boolean projectile_update(
-	long object_index);
-void projectile_export_function_values(
-	long object_index);
-void projectile_handle_deleted_object(
-	long object_index,
-	long deleted_object_index);
-boolean projectile_handle_parent_destroyed(
 	long object_index);
 
 boolean scenery_new(

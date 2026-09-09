@@ -6421,6 +6421,28 @@
         "base": { "size": 432, "relocation_count": 17, "normalized_sha256": "8e4bf5849992759b74e770a10ea4e2173b3a3626c137a8f20dc3514267fd54a7" },
         "objdiff_percent": 63.948864
       }
+    },
+    {
+      "unit": "source/items/projectiles",
+      "function": "_projectile_new",
+      "class": "unclassified",
+      "evidence": "Complete typed projectile initialization reconstructed from January code and relocations with the recovered HCEA source as an independent semantic map. Target and candidate are both 432 padded bytes with all 16 relocations at identical addresses and destinations; the remaining ten normalized byte positions are confined to independent x87 multiplication/addition and scenario-call argument scheduling, yielding 96.93284 percent similarity. The fail-closed classifier did not prove a narrower recipe, so this receives zero exact credit. No raw datum offsets, fake dependency, forced inline, undefined behavior, or nonsensical branch is retained, and the runtime view remains translation-unit private to avoid the documented units.obj header regression. See docs/object_matching_logs/projectiles_obj_runtime_cache_callbacks_20260909.md.",
+      "measurements": {
+        "target": { "size": 432, "relocation_count": 16, "normalized_sha256": "85fac0f022801486c49b0eda0aca4c67263a4425a83e261c6aeaee8f8965820f" },
+        "base": { "size": 432, "relocation_count": 16, "normalized_sha256": "9d8477d25eb528d75b66dededc61869098cfbd1255b7aac1dd349f612d0901d0" },
+        "objdiff_percent": 96.93284
+      }
+    },
+    {
+      "unit": "source/items/projectiles",
+      "function": "_projectile_accelerate",
+      "class": "unclassified",
+      "evidence": "Complete typed acceleration and angular-velocity update reconstructed from January code and relocations with the recovered HCEA source as an independent semantic map. Target and candidate are both 496 padded bytes with the same 32 relocation identities; the remaining offset shifts arise from compiler-local x87 temporary and spill scheduling, yielding 97.04402 percent similarity. The fail-closed classifier did not prove a narrower recipe, so this receives zero exact credit. The source preserves natural math-helper ownership and emits neither point_from_line3d nor substitute forced-inline helpers; it contains no raw datum offsets, fake dependency, undefined behavior, or nonsensical logic. See docs/object_matching_logs/projectiles_obj_runtime_cache_callbacks_20260909.md.",
+      "measurements": {
+        "target": { "size": 496, "relocation_count": 32, "normalized_sha256": "e2f31c3bd7a0aae6dc41d6cf08108355de63d6b3829568a59b363c3db0a5cfc1" },
+        "base": { "size": 496, "relocation_count": 32, "normalized_sha256": "a4c30f36eb44dae31674b6beef2e74edbbfb0d7970709ecb91c52db69c38682d" },
+        "objdiff_percent": 97.04402
+      }
     }
   ]
 }
