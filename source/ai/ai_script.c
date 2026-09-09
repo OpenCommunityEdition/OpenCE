@@ -446,6 +446,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "ai/ai.h"
+#include "ai/ai_runtime.h"
 #include "ai/actions.h"
 #include "ai/actor_iterators.h"
 #include "ai/actor_definitions.h"

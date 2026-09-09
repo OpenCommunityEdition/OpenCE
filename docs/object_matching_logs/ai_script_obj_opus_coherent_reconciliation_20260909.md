@@ -125,7 +125,8 @@ numeric or unrelated representation cast.
 Public declarations were removed from the `.c` file and placed only in their
 true owners:
 
-- `ai_erase` in `source/ai/ai.h`;
+- `ai_erase` in the existing `source/ai/ai_runtime.h`, the internal cross-TU
+  API owned by `ai.c`;
 - `ai_conversation` in `source/ai/ai_communication.h`;
 - `encounters_update_dirty_status` in `source/ai/encounters.h`;
 - `game_allegiance_create` in `source/game/game_allegiance.h`;
@@ -173,3 +174,19 @@ had zero losses and zero gains. Every compile also passed the
 `_point_from_line3d` emitted-symbol guard.
 
 No configure, Ninja build, or push was performed in this bounded lane.
+
+## Canonical integration correction
+
+The orchestrator's whole-tree sweep found that placing `ai_erase` in the
+broad `ai.h` changed C2 declaration context in transitive Units/Race consumers:
+`_race_engine_player_update`, `_race_touch_flag`, and
+`_unit_preprocess_node_orientations` temporarily ceased to compare exact.
+The declaration now lives in the already established `ai_runtime.h`, which is
+included by both its `ai.c` owner and the `ai_script.c` consumer. This is the
+narrower genuine interface, not a consumer-local declaration.
+
+After that correction, a full 473-unit rebuild and semantic comparison against
+the published base reports zero lost accepted-exact functions and zero unit
+errors. The ordinary stale-name ledger sees 32 of this packet's gains; the
+authenticated private rename accounts for the remaining 114 meaningful bytes
+after the target is re-split.
