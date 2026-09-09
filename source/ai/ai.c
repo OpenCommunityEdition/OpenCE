@@ -197,8 +197,12 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
+#define REAL_MATH_EXTERNAL_NORMALIZE3D
+#define COLLISIONS_EXTERNAL_COLLISION_TEST_LINE
 #include "cseries.h"
 #include "cseries/errors.h"
+#include "cseries/profile.h"
 
 #include "ai/ai.h"
 #include "ai/ai_communication.h"
@@ -208,12 +212,15 @@ symbols in this file:
 #include "ai/ai_scenario_definitions.h"
 #include "ai/ai_script.h"
 #include "ai/actor_iterators.h"
+#include "ai/actor_placement.h"
 #include "ai/actor_types.h"
+#include "ai/actions.h"
 
 #include "ai/actors.h"
 #include "ai/encounters.h"
 #include "ai/path.h"
 #include "ai/props.h"
+#include "units/bipeds.h"
 #include "units/unit_definitions.h"
 #include "units/units.h"
 #include "game/game.h"
@@ -222,6 +229,8 @@ symbols in this file:
 
 #include "memory/data.h"
 #include "objects/damage.h"
+#include "physics/collision_usage.h"
+#include "physics/collisions.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
@@ -230,6 +239,10 @@ symbols in this file:
 
 #include <stddef.h>
 
+#undef COLLISIONS_EXTERNAL_COLLISION_TEST_LINE
+#undef REAL_MATH_EXTERNAL_NORMALIZE3D
+#undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
+
 /* ---------- constants */
 
 enum
@@ -237,6 +250,12 @@ enum
 	MAXIMUM_NUMBER_OF_MOUNTED_WEAPON_UNITS = 8,
 	NUMBER_OF_AI_SPEECH_TIMERS = 2,
 	MAXIMUM_POTENTIALLY_RELEASABLE_ENTITIES = 256,
+	MAXIMUM_LINE_OF_FIRE_PILLS = 32,
+	MAXIMUM_AI_DEBUG_BALLISTIC_POINTS = 64,
+	MAXIMUM_AI_SPATIAL_EFFECTS = 32,
+	NUMBER_OF_AI_SPATIAL_EFFECTS = 3,
+	AI_SPATIAL_EFFECT_REFRESH_TICKS = 30,
+	AI_SPATIAL_EFFECT_LIFETIME_TICKS = 120,
 	AI_ENDANGER_PLAYER_RECENT_VISIBILITY_TICKS = 90,
 	NUMBER_OF_AI_SOUND_VOLUMES = 5,
 	AI_UNIT_EFFECT_TIMEOUT = 30,
@@ -274,7 +293,17 @@ enum
 
 /* ---------- macros */
 
+#define AI_SPATIAL_EFFECT_NEXT_INDEX(index) (((index) + 1) & (MAXIMUM_AI_SPATIAL_EFFECTS - 1))
+
 /* ---------- structures */
+
+struct ai_spatial_effect
+{
+	short type;
+	short count;
+	real_point3d position;
+	long last_tick;
+};
 
 struct ai_globals_data
 {
@@ -292,7 +321,7 @@ struct ai_globals_data
 	byte reserved02C[0x104];
 	short spatial_effect_first_index;
 	short spatial_effect_last_index;
-	byte spatial_effects[0x280];
+	struct ai_spatial_effect spatial_effects[MAXIMUM_AI_SPATIAL_EFFECTS];
 	boolean grenades_enabled;
 	byte reserved3B5[0x503];
 	short mounted_weapon_unit_count;
@@ -332,6 +361,30 @@ struct encounter_actor_iterator
 	long next_index;
 };
 
+struct ai_profile_ai_data
+{
+	boolean suspend_ai;
+	boolean move_actors_randomly;
+	byte reserved002[0xB32];
+	short collision_test_count;
+	byte reservedB36[0x86];
+	short lineofsight_test_count;
+	byte reservedBBE[0x86];
+	short lineoffire_test_count;
+};
+
+struct line_of_fire_pill
+{
+	boolean hit;
+	boolean spherical;
+	byte pad[2];
+	real_point3d base;
+	real_vector3d directed_height;
+	long prop_index;
+	long unit_index;
+	real width;
+};
+
 struct encounter_iterator
 {
 	struct data_iterator data;
@@ -351,6 +404,8 @@ typedef char ai_globals_last_chatter_time_offset_assert[
 	offsetof(struct ai_globals_data, last_chatter_time) == 0x14 ? 1 : -1];
 typedef char ai_globals_spatial_effects_offset_assert[
 	offsetof(struct ai_globals_data, spatial_effects) == 0x134 ? 1 : -1];
+typedef char ai_spatial_effect_size_assert[
+	sizeof(struct ai_spatial_effect) == 0x14 ? 1 : -1];
 typedef char ai_globals_grenades_offset_assert[
 	offsetof(struct ai_globals_data, grenades_enabled) == 0x3B4 ? 1 : -1];
 typedef char ai_globals_mounted_weapon_count_offset_assert[
@@ -375,6 +430,16 @@ typedef char ai_encounter_actor_iterator_size_assert[
 	sizeof(struct encounter_actor_iterator) == 0xC ? 1 : -1];
 typedef char ai_encounter_actor_iterator_index_offset_assert[
 	offsetof(struct encounter_actor_iterator, index) == 0x4 ? 1 : -1];
+typedef char ai_line_of_fire_pill_size_assert[
+	sizeof(struct line_of_fire_pill) == 0x28 ? 1 : -1];
+typedef char ai_line_of_fire_pill_width_offset_assert[
+	offsetof(struct line_of_fire_pill, width) == 0x24 ? 1 : -1];
+typedef char ai_profile_collision_test_count_offset_assert[
+	offsetof(struct ai_profile_ai_data, collision_test_count) == 0xB34 ? 1 : -1];
+typedef char ai_profile_lineofsight_test_count_offset_assert[
+	offsetof(struct ai_profile_ai_data, lineofsight_test_count) == 0xBBC ? 1 : -1];
+typedef char ai_profile_lineoffire_test_count_offset_assert[
+	offsetof(struct ai_profile_ai_data, lineoffire_test_count) == 0xC44 ? 1 : -1];
 typedef char ai_actor_squad_index_offset_assert[
 	offsetof(struct actor_datum, meta.squad_index) == 0x3A ? 1 : -1];
 typedef char ai_actor_platoon_index_offset_assert[
@@ -404,9 +469,31 @@ typedef char ai_prop_unopposable_enemy_offset_assert[
 
 /* ---------- prototypes */
 
+static void ai_place_pending_mounted_weapons(
+	void);
+
 /* ---------- globals */
 
 extern struct ai_globals_data *ai_globals;
+extern struct ai_profile_ai_data ai_profile;
+
+static struct profile_section ai_update_section = { "ai_update", NONE, TRUE };
+
+static char *ai_sound_volume_names[NUMBER_OF_AI_SOUND_VOLUMES] =
+{
+	"silent",
+	"medium",
+	"loud",
+	"shout",
+	"quiet"
+};
+
+struct tag_enum_definition ai_sound_volume_enum =
+{
+	NUMBER_OF_AI_SOUND_VOLUMES,
+	ai_sound_volume_names,
+	NULL
+};
 
 /* ---------- public code */
 
@@ -1605,6 +1692,44 @@ void ai_initialize_for_new_map(
 	return;
 }
 
+void ai_update(
+	void)
+{
+	boolean update_ai = ai_globals->ai_initialized_for_map && !ai_profile.suspend_ai;
+	boolean move_actors_randomly = ai_profile.move_actors_randomly;
+
+	profile_enter(ai_update_section);
+
+	if (update_ai)
+	{
+		ai_debug_update();
+		ai_profile_update();
+		ai_place_pending_mounted_weapons();
+
+		if (move_actors_randomly)
+		{
+			actors_move_randomly();
+			ai_globals->ai_has_control_data = TRUE;
+		}
+		else if (ai_globals->ai_active)
+		{
+			ai_conversation_update();
+			encounters_update();
+			actors_update();
+			ai_globals->ai_has_control_data = TRUE;
+		}
+		else if (ai_globals->ai_has_control_data)
+		{
+			actors_freeze();
+			ai_globals->ai_has_control_data = FALSE;
+		}
+	}
+
+	profile_exit(ai_update_section);
+
+	return;
+}
+
 boolean ai_enemies_endanger_player(
 	boolean must_be_attacking)
 {
@@ -1730,4 +1855,971 @@ long ai_get_race_from_team_index(
 	return race;
 }
 
+static void ai_generate_line_of_fire_pill(
+	long unit_index,
+	long prop_index,
+	struct line_of_fire_pill *pill)
+{
+	real height;
+	real width;
+
+	biped_get_physics_pill(unit_index, &pill->base, &height, &width);
+
+	pill->spherical = (height == 0.0f);
+	set_real_vector3d(&pill->directed_height, 0.0f, 0.0f, height);
+	pill->width = width + 0.15f;
+	pill->prop_index = prop_index;
+	pill->unit_index = unit_index;
+	pill->hit = FALSE;
+
+	return;
+}
+
+static short ai_find_line_of_fire_friend_pills(
+	long actor_index,
+	short maximum_pill_count,
+	struct line_of_fire_pill *pills)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	short pill_count = 0;
+
+	if (actor->meta.encounter_index != NONE)
+	{
+		struct encounter_actor_iterator iterator;
+		struct actor_datum *friend;
+
+		encounter_actor_iterator_new(&iterator, actor->meta.encounter_index);
+		friend = encounter_actor_iterator_next(&iterator);
+
+		while (friend)
+		{
+			if (iterator.index != actor_index &&
+				pill_count < maximum_pill_count &&
+				friend->meta.unit_index != NONE &&
+				friend->input.vehicle_index == NONE)
+			{
+				ai_generate_line_of_fire_pill(
+					friend->meta.unit_index,
+					prop_get_active_by_unit_index(actor_index, friend->meta.unit_index),
+					&pills[pill_count]);
+				pill_count++;
+			}
+
+			friend = encounter_actor_iterator_next(&iterator);
+		}
+	}
+
+	{
+		struct prop_iterator iterator;
+		struct prop_datum *prop;
+
+		prop_iterator_new(&iterator, actor_index);
+		prop = prop_iterator_next(&iterator);
+
+		while (prop)
+		{
+			if (!prop->enemy &&
+				!prop->dead &&
+				prop->state == _prop_state_acknowledged &&
+				prop->vehicle_index == NONE)
+			{
+				struct object_datum *object = object_get(prop->unit_index);
+
+				if (TEST_FLAG(_object_mask_biped, object->object.type) &&
+					(actor->meta.encounter_index == NONE ||
+					prop->actor_index == NONE ||
+					actor_get(prop->actor_index)->meta.encounter_index != actor->meta.encounter_index) &&
+					pill_count < maximum_pill_count)
+				{
+					ai_generate_line_of_fire_pill(
+						prop->unit_index,
+						iterator.index,
+						&pills[pill_count]);
+					pill_count++;
+				}
+			}
+
+			prop = prop_iterator_next(&iterator);
+		}
+	}
+
+	return pill_count;
+}
+
+boolean ai_test_line_of_fire(
+	long actor_index,
+	long target_unit_index,
+	real_point3d const *origin,
+	real_vector3d const *vector,
+	long *blocking_prop_index_reference)
+{
+	struct line_of_fire_pill pills[MAXIMUM_LINE_OF_FIRE_PILLS];
+	struct actor_datum *actor = actor_get(actor_index);
+	boolean line_of_fire = TRUE;
+	long blocking_prop_index = NONE;
+	short pill_count;
+	short pill_index;
+
+	ai_profile.lineoffire_test_count++;
+
+	pill_count = ai_find_line_of_fire_friend_pills(
+		actor_index,
+		MAXIMUM_LINE_OF_FIRE_PILLS,
+		pills);
+
+	for (pill_index = 0; pill_index < pill_count; pill_index++)
+	{
+		if (pills[pill_index].unit_index != target_unit_index)
+		{
+			boolean intersected;
+
+			if (pills[pill_index].spherical)
+			{
+				intersected = fast_vector_intersects_sphere(
+					origin,
+					vector,
+					&pills[pill_index].base,
+					pills[pill_index].width);
+			}
+			else
+			{
+				intersected = vector_intersects_pill3d(
+					origin,
+					vector,
+					&pills[pill_index].base,
+					&pills[pill_index].directed_height,
+					pills[pill_index].width);
+			}
+
+			if (intersected)
+			{
+				blocking_prop_index = pills[pill_index].prop_index;
+				line_of_fire = FALSE;
+				pills[pill_index].hit = TRUE;
+				break;
+			}
+		}
+	}
+
+	if (ai_debug.render_lineoffire)
+	{
+		ai_debug_lineoffire_new(origin, vector);
+
+		for (pill_index = 0; pill_index < pill_count; pill_index++)
+		{
+			ai_debug_lineoffire_addpill(
+				&pills[pill_index].base,
+				&pills[pill_index].directed_height,
+				pills[pill_index].width,
+				pills[pill_index].hit);
+		}
+
+		ai_debug_lineoffire_success(line_of_fire);
+	}
+
+	if (blocking_prop_index_reference)
+		*blocking_prop_index_reference = blocking_prop_index;
+
+	return line_of_fire;
+}
+
+short ai_test_line_of_sight(
+	real_point3d const *point0,
+	short cluster0,
+	real_point3d const *point1,
+	short cluster1,
+	short mode,
+	boolean test_line_of_fire,
+	long ignore_object_index,
+	boolean ignore_vehicles)
+{
+	struct collision_result collision;
+	real collision_fraction;
+	unsigned long collision_flags;
+	boolean clear_line_of_sight;
+	boolean blocked;
+	short result;
+
+	if (ai_debug.render_lineofsight)
+		ai_debug_lineofsight(point0, cluster0, point1, cluster1);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\ai.c",
+		0x349,
+		global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
+	global_current_collision_users[global_current_collision_user_depth++] =
+		_collision_user_ai_lineofsight;
+	ai_profile.lineofsight_test_count++;
+
+	if (cluster0 != NONE && cluster1 != NONE && !scenario_test_pvs(cluster0, cluster1))
+		goto obstructed;
+
+	collision_flags =
+		FLAG(_collision_test_front_facing_surfaces_bit) |
+		FLAG(_collision_test_back_facing_surfaces_bit) |
+		FLAG(_collision_test_structure_bit) |
+		FLAG(_collision_test_objects_bit) |
+		_collision_test_objects_sight_blocking_flags;
+
+	if (game_connection() == _game_connection_local && ai_debug.fast_los)
+	{
+		collision_flags =
+			FLAG(_collision_test_front_facing_surfaces_bit) |
+			FLAG(_collision_test_back_facing_surfaces_bit) |
+			FLAG(_collision_test_structure_bit);
+	}
+
+	if (test_line_of_fire)
+		SET_FLAG(collision_flags, _collision_test_ignore_breakable_surfaces_bit, TRUE);
+	else
+		SET_FLAG(collision_flags, _collision_test_ignore_two_sided_surfaces_bit, TRUE);
+
+	if (ignore_vehicles)
+		SET_FLAG(collision_flags, _collision_test_objects_vehicles_bit, FALSE);
+
+	{
+		real_vector3d vector;
+
+		ai_profile.collision_test_count++;
+		vector_from_points3d(point0, point1, &vector);
+
+		if (!collision_test_vector(
+			collision_flags,
+			point0,
+			&vector,
+			ignore_object_index,
+			&collision))
+		{
+			clear_line_of_sight = TRUE;
+		}
+		else
+		{
+			clear_line_of_sight = FALSE;
+			collision_fraction = collision.t;
+		}
+	}
+
+	{
+		real fog = scenario_fog_at_point(
+			&collision.start_location,
+			point0,
+			&collision.point);
+
+		if (fog > 0.8f)
+			goto classify_collision_distance;
+
+		if (fog > 0.6f)
+			goto occluded;
+	}
+
+	if (mode == _ai_line_of_sight_normal)
+		goto classify_visibility;
+
+	{
+		real_vector3d perpendicular;
+
+		perpendicular.i = point0->y - point1->y;
+		perpendicular.j = point1->x - point0->x;
+		perpendicular.k = 0.0f;
+
+		if (normalize3d(&perpendicular) == 0.0f)
+			perpendicular = *global_forward3d;
+
+		if (mode == _ai_line_of_sight_expand_source)
+		{
+			real_point3d right;
+			real_point3d left;
+
+			right.x = perpendicular.i * 0.25f + point0->x;
+			right.y = perpendicular.j * 0.25f + point0->y;
+			right.z = perpendicular.k * 0.25f + point0->z;
+			left.x = point0->x - perpendicular.i * 0.25f;
+			left.y = point0->y - perpendicular.j * 0.25f;
+			left.z = point0->z - perpendicular.k * 0.25f;
+
+			ai_profile.collision_test_count++;
+			if (clear_line_of_sight)
+			{
+				blocked = collision_test_line(
+					collision_flags,
+					&right,
+					point1,
+					ignore_object_index,
+					&collision);
+
+				if (!blocked)
+				{
+					ai_profile.collision_test_count++;
+					blocked = collision_test_line(
+						collision_flags,
+						&left,
+						point1,
+						ignore_object_index,
+						&collision);
+				}
+			}
+			else
+			{
+				blocked = !collision_test_line(
+					collision_flags,
+					&right,
+					point1,
+					ignore_object_index,
+					&collision);
+
+				if (!blocked)
+				{
+					ai_profile.collision_test_count++;
+					blocked = !collision_test_line(
+						collision_flags,
+						&left,
+						point1,
+						ignore_object_index,
+						&collision);
+				}
+			}
+		}
+		else
+		{
+			real_point3d right;
+			real_point3d left;
+			real_point3d down;
+
+			if (!clear_line_of_sight)
+				goto classify_collision_distance;
+
+			point_from_line3d(point1, &perpendicular, 0.1f, &right);
+			point_from_line3d(point1, &perpendicular, -0.1f, &left);
+			point_from_line3d(point1, global_down3d, 0.1f, &down);
+
+			ai_profile.collision_test_count++;
+			blocked = collision_test_line(
+				collision_flags,
+				&right,
+				point0,
+				ignore_object_index,
+				&collision);
+
+			if (!blocked)
+			{
+				ai_profile.collision_test_count++;
+				blocked = collision_test_line(
+					collision_flags,
+					&left,
+					point0,
+					ignore_object_index,
+					&collision);
+			}
+
+			if (!blocked)
+			{
+				ai_profile.collision_test_count++;
+				blocked = collision_test_line(
+					collision_flags,
+					&down,
+					point0,
+					ignore_object_index,
+					&collision);
+			}
+		}
+	}
+
+	if (blocked)
+		goto occluded;
+
+classify_visibility:
+	if (clear_line_of_sight)
+	{
+		result = _ai_line_of_sight_clear;
+		goto finish;
+	}
+
+classify_collision_distance:
+	{
+		real distance = distance3d(point0, point1);
+
+		if (distance < 1.0f)
+			goto obstructed;
+
+		if (distance * collision_fraction < 1.0f)
+		{
+			result = _ai_line_of_sight_from_cover;
+			goto finish;
+		}
+
+		result = _ai_line_of_sight_to_cover;
+		if ((1.0f - collision_fraction) * distance < 4.0f)
+			goto finish;
+	}
+
+obstructed:
+	result = _ai_line_of_sight_obstructed;
+	goto finish;
+
+occluded:
+	result = _ai_line_of_sight_occluded;
+
+finish:
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\ai.c",
+		0x3F0,
+		global_current_collision_user_depth > 1);
+	--global_current_collision_user_depth;
+
+	return result;
+}
+
+boolean ai_test_ballistic_line_of_fire(
+	long actor_index,
+	real_point3d const *origin,
+	real ticks,
+	real_vector3d const *velocity,
+	real gravity,
+	long ignore_object_index,
+	boolean in_vehicle)
+{
+	struct line_of_fire_pill pills[MAXIMUM_LINE_OF_FIRE_PILLS];
+	struct collision_result collision;
+	struct actor_datum *actor = actor_get(actor_index);
+	real_point3d point;
+	real_point3d end_point;
+	real_vector3d arc_velocity;
+	real segment_start_time;
+	real segment_end_time;
+	real segment_time;
+	unsigned long collision_flags;
+	short pill_count;
+	short pill_index;
+	boolean line_of_fire;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x408, global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
+	global_current_collision_users[global_current_collision_user_depth++] =
+		_collision_user_ai_lineoffire;
+
+	pill_count = ai_find_line_of_fire_friend_pills(
+		actor_index,
+		MAXIMUM_LINE_OF_FIRE_PILLS,
+		pills);
+
+	if (!ai_debug.ballistic_lineoffire_freeze)
+	{
+		ai_debug.ballistic_lineoffire_valid = TRUE;
+		ai_debug.ballistic_lineoffire_start = *origin;
+		ai_debug.ballistic_lineoffire_vector = *velocity;
+		ai_debug.ballistic_lineoffire_point_count = 0;
+		ai_debug.ballistic_lineoffire_pill_count = MIN(
+			pill_count,
+			MAXIMUM_AI_DEBUG_LINEOFFIRE_PILLS);
+
+		for (pill_index = 0;
+			pill_index < ai_debug.ballistic_lineoffire_pill_count;
+			pill_index++)
+		{
+			ai_debug.ballistic_lineoffire_pill_start[pill_index] = pills[pill_index].base;
+			ai_debug.ballistic_lineoffire_pill_end[pill_index] = pills[pill_index].directed_height;
+			ai_debug.ballistic_lineoffire_pill_radius[pill_index] = pills[pill_index].width;
+		}
+	}
+
+	collision_flags =
+		FLAG(_collision_test_front_facing_surfaces_bit) |
+		FLAG(_collision_test_back_facing_surfaces_bit) |
+		FLAG(_collision_test_ignore_breakable_surfaces_bit) |
+		FLAG(_collision_test_structure_bit) |
+		FLAG(_collision_test_objects_bit) |
+		_collision_test_objects_sight_blocking_flags;
+
+	if (in_vehicle)
+		collision_flags &= ~FLAG(_collision_test_objects_vehicles_bit);
+
+	point = *origin;
+	arc_velocity = *velocity;
+	segment_start_time = 0.0f;
+	segment_end_time = MIN(6.0f, ticks);
+
+	do
+	{
+		if (!ai_debug.ballistic_lineoffire_freeze &&
+			ai_debug.ballistic_lineoffire_point_count < MAXIMUM_AI_DEBUG_BALLISTIC_POINTS)
+		{
+			ai_debug.ballistic_lineoffire_point[ai_debug.ballistic_lineoffire_point_count] = point;
+			ai_debug.ballistic_lineoffire_point_count++;
+		}
+
+		segment_time = segment_end_time - segment_start_time;
+
+		end_point.x = arc_velocity.i * segment_time + point.x;
+		end_point.y = arc_velocity.j * segment_time + point.y;
+		end_point.z = segment_time * arc_velocity.k + point.z +
+			(segment_time * segment_time) * gravity * 0.5f;
+
+		{
+			real_vector3d segment_vector;
+
+			vector_from_points3d(&point, &end_point, &segment_vector);
+			line_of_fire = !collision_test_vector(
+				collision_flags,
+				&point,
+				&segment_vector,
+				ignore_object_index,
+				&collision);
+		}
+
+		if (!line_of_fire)
+			break;
+
+		{
+			real_vector3d segment_vector;
+
+			vector_from_points3d(&point, &end_point, &segment_vector);
+
+			for (pill_index = 0; pill_index < pill_count; pill_index++)
+			{
+				boolean intersected = vector_intersects_pill3d(
+					&point,
+					&segment_vector,
+					&pills[pill_index].base,
+					&pills[pill_index].directed_height,
+					pills[pill_index].width);
+
+				if (intersected)
+				{
+					line_of_fire = FALSE;
+					break;
+				}
+			}
+		}
+
+		if (!line_of_fire)
+			break;
+
+		point = end_point;
+		arc_velocity.k = segment_time * gravity + arc_velocity.k;
+		segment_start_time = segment_end_time;
+		segment_end_time += 6.0f;
+
+		if (segment_end_time > ticks)
+			segment_end_time = ticks;
+	}
+	while (segment_start_time < ticks);
+
+	if (!ai_debug.ballistic_lineoffire_freeze &&
+		ai_debug.ballistic_lineoffire_point_count < MAXIMUM_AI_DEBUG_BALLISTIC_POINTS)
+	{
+		ai_debug.ballistic_lineoffire_point[ai_debug.ballistic_lineoffire_point_count] = end_point;
+		ai_debug.ballistic_lineoffire_point_count++;
+	}
+
+	if (!ai_debug.ballistic_lineoffire_freeze)
+		ai_debug.ballistic_lineoffire_success = line_of_fire;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x478, global_current_collision_user_depth > 1);
+	--global_current_collision_user_depth;
+
+	return line_of_fire;
+}
+
+void ai_handle_editing(
+	long encounter_index)
+{
+	if (ai_globals->ai_initialized_for_map)
+	{
+		struct scenario *scenario = global_scenario_get();
+
+		if ((short)encounter_index >= 0 &&
+			(short)encounter_index < scenario->ai_encounters.count)
+		{
+			struct encounter_datum *encounter = encounter_get(encounter_index);
+			struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->ai_encounters,
+				DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index),
+				struct encounter_definition);
+			short squad_count_delta = encounter_definition->squads.count - encounter->squad_count;
+			short platoon_count_delta = encounter_definition->platoons.count - encounter->platoon_count;
+
+			if (squad_count_delta)
+			{
+				struct encounter_datum *last_encounter = encounter_get(scenario->ai_encounters.count - 1);
+				short last_squad_index = last_encounter->squad_base + last_encounter->squad_count;
+
+				match_vassert(
+					"c:\\halo\\SOURCE\\ai\\ai.c",
+					0x6B0,
+					last_squad_index + squad_count_delta <= MAXIMUM_SQUADS_PER_MAP,
+					csprintf(
+						temporary,
+						"editing caused an overflow of MAXIMUM_SQUADS_PER_MAP(%d)",
+						MAXIMUM_SQUADS_PER_MAP));
+
+				csmemmove(
+					&squad_array[encounter->squad_base + encounter_definition->squads.count],
+					&squad_array[encounter->squad_base + encounter->squad_count],
+					last_squad_index - encounter->squad_base - encounter->squad_count);
+
+				if (squad_count_delta > 0)
+				{
+					csmemset(
+						&squad_array[encounter->squad_base + encounter->squad_count],
+						0,
+						squad_count_delta * sizeof(struct squad_datum));
+				}
+
+				encounter->squad_count += squad_count_delta;
+			}
+
+			if (platoon_count_delta)
+			{
+				struct encounter_datum *last_encounter = encounter_get(scenario->ai_encounters.count - 1);
+				short last_platoon_index = last_encounter->platoon_base + last_encounter->platoon_count;
+
+				match_vassert(
+					"c:\\halo\\SOURCE\\ai\\ai.c",
+					0x6C4,
+					last_platoon_index + platoon_count_delta <= MAXIMUM_PLATOONS_PER_MAP,
+					csprintf(
+						temporary,
+						"editing caused an overflow of MAXIMUM_PLATOONS_PER_MAP(%d)",
+						MAXIMUM_PLATOONS_PER_MAP));
+
+				csmemmove(
+					&platoon_array[encounter->platoon_base + encounter_definition->platoons.count],
+					&platoon_array[encounter->platoon_base + encounter->platoon_count],
+					last_platoon_index - encounter->platoon_base - encounter->platoon_count);
+
+				if (platoon_count_delta > 0)
+				{
+					csmemset(
+						&platoon_array[encounter->platoon_base + encounter->platoon_count],
+						0,
+						platoon_count_delta * sizeof(struct platoon_datum));
+				}
+
+				encounter->platoon_count += platoon_count_delta;
+			}
+
+			if (squad_count_delta || platoon_count_delta)
+			{
+				short adjust_encounter_index;
+
+				for (adjust_encounter_index = encounter_index + 1;
+					adjust_encounter_index < scenario->ai_encounters.count;
+					adjust_encounter_index++)
+				{
+					struct encounter_datum *adjust_encounter = encounter_get(adjust_encounter_index);
+
+					adjust_encounter->squad_base += squad_count_delta;
+					match_assert(
+						"c:\\halo\\SOURCE\\ai\\ai.c",
+						0x6DC,
+						adjust_encounter->squad_base >= encounter->squad_base + encounter->squad_count);
+					match_assert(
+						"c:\\halo\\SOURCE\\ai\\ai.c",
+						0x6DD,
+						adjust_encounter->squad_base + adjust_encounter->squad_count <= MAXIMUM_SQUADS_PER_MAP);
+
+					adjust_encounter->platoon_base += platoon_count_delta;
+					match_assert(
+						"c:\\halo\\SOURCE\\ai\\ai.c",
+						0x6E0,
+						adjust_encounter->platoon_base >= encounter->platoon_base + encounter->platoon_count);
+					match_assert(
+						"c:\\halo\\SOURCE\\ai\\ai.c",
+						0x6E1,
+						adjust_encounter->platoon_base + adjust_encounter->platoon_count <= MAXIMUM_PLATOONS_PER_MAP);
+				}
+			}
+
+			{
+				struct encounter_actor_iterator iterator;
+				struct actor_datum *actor;
+
+				encounter_actor_iterator_new(&iterator, encounter_index);
+				actor = encounter_actor_iterator_next(&iterator);
+
+				while (actor)
+				{
+					boolean kill_actor = FALSE;
+
+					if (actor->meta.squad_index < 0 ||
+						actor->meta.squad_index >= encounter_definition->squads.count)
+					{
+						if (encounter_definition->squads.count)
+						{
+							struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+								&encounter_definition->squads,
+								0,
+								struct squad_definition);
+
+							actor->meta.squad_index = 0;
+							actor->meta.platoon_index = squad_definition->platoon_index;
+
+							if (actor->meta.platoon_index < 0 ||
+								actor->meta.platoon_index >= encounter_definition->platoons.count)
+							{
+								actor->meta.platoon_index = NONE;
+							}
+						}
+						else
+						{
+							kill_actor = TRUE;
+						}
+					}
+
+					if (kill_actor)
+					{
+						actor_kill(iterator.index, FALSE, FALSE);
+					}
+					else
+					{
+						if (actor->meta.platoon_index < 0 ||
+							actor->meta.platoon_index >= encounter_definition->platoons.count)
+						{
+							actor->meta.platoon_index = NONE;
+						}
+
+						if (actor->state.command_list_index < 0 ||
+							actor->state.command_list_index >= scenario->ai_command_lists.count)
+						{
+							actor->state.command_list_index = NONE;
+						}
+
+						if (actor->state.action == _actor_action_obey)
+							action_obey_flush_command_indices(iterator.index);
+
+						actor_flush_position_indices(iterator.index);
+					}
+
+					actor = encounter_actor_iterator_next(&iterator);
+				}
+			}
+		}
+		else
+		{
+			struct actor_iterator iterator;
+
+			ai_debug.selected_actor_index = NONE;
+			actor_iterator_new(&iterator, FALSE);
+
+			while (actor_iterator_next(&iterator))
+				actor_kill(iterator.index, FALSE, FALSE);
+
+			ai_communication_dispose_from_old_map();
+			ai_script_dispose_from_old_map();
+			encounters_dispose_from_old_map();
+			props_dispose_from_old_map();
+			actors_dispose_from_old_map();
+			paths_dispose_from_old_map();
+			ai_profile_dispose_from_old_map();
+			ai_debug_dispose_from_old_map();
+			ai_globals->ai_initialized_for_map = FALSE;
+			ai_initialize_for_new_map();
+		}
+	}
+
+	return;
+}
+
+#pragma optimize("", off)
+
+void ai_handle_spatial_effect(
+	long object_index,
+	real_point3d const *position,
+	short effect_type,
+	short volume,
+	short count)
+{
+	if (ai_globals->ai_initialized_for_map)
+	{
+		long now = game_time_get();
+
+		match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x80E, count>0);
+		match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x80F, volume>=0 && volume<NUMBER_OF_AI_SOUND_VOLUMES);
+		match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x810, effect_type>=0 && effect_type<NUMBER_OF_AI_SPATIAL_EFFECTS);
+
+		if (volume > 0)
+		{
+			long submit_time;
+			long new_position_time;
+			long expired_time;
+			struct ai_spatial_effect *matching_effect;
+			boolean submit;
+			short available_effect_index;
+			short i;
+
+			submit_time = now - AI_SPATIAL_EFFECT_REFRESH_TICKS;
+			new_position_time = now - AI_SPATIAL_EFFECT_REFRESH_TICKS;
+			expired_time = new_position_time -
+				(AI_SPATIAL_EFFECT_LIFETIME_TICKS - AI_SPATIAL_EFFECT_REFRESH_TICKS);
+			matching_effect = NULL;
+			submit = TRUE;
+			available_effect_index = NONE;
+
+			for (i = ai_globals->spatial_effect_first_index;
+				i != ai_globals->spatial_effect_last_index;
+				i = AI_SPATIAL_EFFECT_NEXT_INDEX(i))
+			{
+				boolean matches = FALSE;
+
+				if (effect_type == ai_globals->spatial_effects[i].type &&
+					distance_squared3d(
+						&ai_globals->spatial_effects[i].position,
+						position) < 1.0f)
+				{
+					matches = TRUE;
+				}
+
+				if (ai_globals->spatial_effects[i].last_tick <= expired_time)
+				{
+					ai_globals->spatial_effects[i].type = NONE;
+
+					if (i == ai_globals->spatial_effect_first_index)
+					{
+						ai_globals->spatial_effect_first_index =
+							AI_SPATIAL_EFFECT_NEXT_INDEX(i);
+					}
+					else
+					{
+						available_effect_index = i;
+					}
+				}
+				else if (matches)
+				{
+					matching_effect = &ai_globals->spatial_effects[i];
+					matching_effect->count = matching_effect->count + 1;
+					submit = matching_effect->last_tick < submit_time;
+
+					if (matching_effect->last_tick < new_position_time)
+					{
+						matching_effect->position = *position;
+						match_assert("c:\\halo\\SOURCE\\ai\\ai.c", 0x847, submit);
+					}
+					else
+					{
+						real weight = 1.0f / matching_effect->count;
+						real old_weight = 1.0f - weight;
+
+						matching_effect->position.x = old_weight * matching_effect->position.x + weight * position->x;
+						matching_effect->position.y = old_weight * matching_effect->position.y + weight * position->y;
+						matching_effect->position.z = old_weight * matching_effect->position.z + weight * position->z;
+					}
+
+					break;
+				}
+			}
+
+			if (!matching_effect)
+			{
+				if (available_effect_index == NONE)
+				{
+					i = ai_globals->spatial_effect_last_index;
+					ai_globals->spatial_effect_last_index =
+						AI_SPATIAL_EFFECT_NEXT_INDEX(ai_globals->spatial_effect_last_index);
+
+					if (ai_globals->spatial_effect_last_index ==
+						ai_globals->spatial_effect_first_index)
+					{
+						ai_globals->spatial_effect_first_index =
+							AI_SPATIAL_EFFECT_NEXT_INDEX(ai_globals->spatial_effect_first_index);
+					}
+				}
+				else
+				{
+					i = available_effect_index;
+				}
+
+				{
+					short distance_to_effect =
+						(i - ai_globals->spatial_effect_first_index + MAXIMUM_AI_SPATIAL_EFFECTS) &
+						(MAXIMUM_AI_SPATIAL_EFFECTS - 1);
+					short distance_to_end_of_queue =
+						(ai_globals->spatial_effect_last_index - ai_globals->spatial_effect_first_index +
+							MAXIMUM_AI_SPATIAL_EFFECTS) &
+						(MAXIMUM_AI_SPATIAL_EFFECTS - 1);
+
+					match_assert(
+						"c:\\halo\\SOURCE\\ai\\ai.c",
+						0x871,
+						(distance_to_effect >= 0) && (distance_to_effect < distance_to_end_of_queue));
+				}
+
+				matching_effect = &ai_globals->spatial_effects[i];
+				matching_effect->position = *position;
+				matching_effect->last_tick = now;
+				matching_effect->type = effect_type;
+				matching_effect->count = 1;
+			}
+
+			if (submit)
+			{
+				actors_handle_spatial_effect(
+					object_index,
+					matching_effect->type,
+					&matching_effect->position,
+					volume,
+					matching_effect->count);
+			}
+		}
+	}
+
+	return;
+}
+
+#pragma optimize("", on)
+
 /* ---------- private code */
+
+static void ai_place_pending_mounted_weapons(
+	void)
+{
+	short unit_number;
+
+	for (unit_number = 0;
+		unit_number < ai_globals->mounted_weapon_unit_count;
+		unit_number++)
+	{
+		long unit_index = ai_globals->mounted_weapon_unit_indices[unit_number];
+		struct unit_datum *unit = unit_get(unit_index);
+		struct unit_definition *definition = unit_definition_get(unit->definition_index);
+		short seat_index;
+
+		for (seat_index = 0; seat_index < definition->unit.seats.count; seat_index++)
+		{
+			struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+				&definition->unit.seats,
+				seat_index,
+				struct unit_seat);
+
+			if (seat->built_in_actor_reference.index != NONE)
+			{
+				struct actor_starting_location starting_location;
+				long actor_index;
+
+				csmemset(&starting_location, 0, sizeof(starting_location));
+				starting_location.command_list_index = NONE;
+				object_get_origin(unit_index, &starting_location.position);
+
+				actor_index = actor_place(
+					seat->built_in_actor_reference.index,
+					NONE,
+					NONE,
+					&starting_location,
+					FALSE,
+					FALSE);
+
+				if (actor_index != NONE)
+				{
+					struct actor_datum *actor = actor_get(actor_index);
+
+					unit_enter_seat(
+						actor->meta.unit_index,
+						unit_index,
+						seat_index);
+				}
+			}
+		}
+	}
+
+	ai_globals->mounted_weapon_unit_count = 0;
+
+	return;
+}

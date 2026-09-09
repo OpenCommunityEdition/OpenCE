@@ -20,6 +20,14 @@ enum
 	NUMBER_OF_AI_LINE_OF_SIGHTS,
 };
 
+enum
+{
+	_ai_line_of_sight_normal = 0,
+	_ai_line_of_sight_expand_source,
+	_ai_line_of_sight_expand_target,
+	NUMBER_OF_AI_LINE_OF_SIGHT_MODES,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -127,6 +135,29 @@ boolean ai_test_ballistic_line_of_fire(
 	real gravity,
 	long ignore_object_index,
 	boolean in_vehicle);
+boolean ai_test_line_of_fire(
+	long actor_index,
+	long target_unit_index,
+	union real_point3d const *origin,
+	union real_vector3d const *vector,
+	long *blocking_prop_index_reference);
+short ai_test_line_of_sight(
+	union real_point3d const *point0,
+	short cluster0,
+	union real_point3d const *point1,
+	short cluster1,
+	short mode,
+	boolean test_line_of_fire,
+	long ignore_object_index,
+	boolean ignore_vehicles);
+void ai_handle_editing(
+	long encounter_index);
+void ai_handle_spatial_effect(
+	long object_index,
+	union real_point3d const *position,
+	short effect_type,
+	short volume,
+	short count);
 
 boolean ai_release_inactive_swarms(
 	char *result_description,

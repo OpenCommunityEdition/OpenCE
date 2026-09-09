@@ -166,6 +166,14 @@ short collision_move_sphere(
 
 /* ---------- public code */
 
+#ifdef COLLISIONS_EXTERNAL_COLLISION_TEST_LINE
+boolean collision_test_line(
+	unsigned long flags,
+	real_point3d const *point0,
+	real_point3d const *point1,
+	long ignore_object_index,
+	struct collision_result *collision);
+#else
 __inline boolean collision_test_line(
 	unsigned long flags,
 	real_point3d const *point0,
@@ -178,6 +186,7 @@ __inline boolean collision_test_line(
 	vector_from_points3d(point0, point1, &vector);
 	return collision_test_vector(flags, point0, &vector, ignore_object_index, collision);
 }
+#endif
 
 
 #endif // __COLLISIONS_H

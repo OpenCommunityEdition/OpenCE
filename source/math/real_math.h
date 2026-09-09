@@ -1042,6 +1042,13 @@ __inline real_vector3d *set_real_vector3d(
 	return v;
 }
 
+#ifdef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
+real_point3d *point_from_line3d(
+	real_point3d const *p,
+	real_vector3d const *v,
+	real t,
+	real_point3d *result);
+#else
 __inline real_point3d *point_from_line3d(
 	real_point3d const *p, 
 	real_vector3d const *v, 
@@ -1053,6 +1060,7 @@ __inline real_point3d *point_from_line3d(
 	result->z = v->k*t + p->z;
 	return result;
 }
+#endif
 
 __inline real_vector3d *vector_from_points3d(
 	real_point3d const *a,
@@ -1088,6 +1096,10 @@ __inline real magnitude3d(
 	return square_root(magnitude_squared3d(v));
 }
 
+#ifdef REAL_MATH_EXTERNAL_NORMALIZE3D
+real normalize3d(
+	real_vector3d *v);
+#else
 __inline real normalize3d(
 	real_vector3d *v)
 {
@@ -1104,6 +1116,7 @@ __inline real normalize3d(
 
 	return magnitude;
 }
+#endif
 
 __inline boolean limit3d(
 	real_vector3d *vector,

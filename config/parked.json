@@ -6175,6 +6175,50 @@
         "base": { "size": 2240, "relocation_count": 115, "normalized_sha256": "25834daf80e88b4175ab92e01e17a5cc917acdeb58f57fc1b9856c22e317fb03" },
         "objdiff_percent": 99.38321
       }
+    },
+    {
+      "unit": "source/ai/ai",
+      "function": "_ai_test_line_of_fire",
+      "class": "instruction-scheduling",
+      "evidence": "Complete typed line-of-fire pill test reconstructed from January code and relocations with HCEA as an independent semantic map. Target and candidate are both 336 padded bytes with all 10 relocations; remaining differences are ordinary local and branch scheduling. No fake dependency, raw offset, forced inline, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md.",
+      "measurements": {
+        "target": { "size": 336, "relocation_count": 10, "normalized_sha256": "0aef44a538a12480aec2d0e85e44b434a56a3a3703ca0bc324a00dfdad2a3b3c" },
+        "base": { "size": 336, "relocation_count": 10, "normalized_sha256": "a2c988c9fb9cb73a850cc3b148527a6ed9891b5a4425d9eef7a4babc2851cf25" },
+        "objdiff_percent": 88.17
+      }
+    },
+    {
+      "unit": "source/ai/ai",
+      "function": "_ai_test_line_of_sight",
+      "class": "instruction-scheduling",
+      "evidence": "Complete typed PVS, collision, fog, expanded-source, and expanded-target visibility classifier reconstructed from January code/relocations and HCEA semantics. It preserves January's external helper schedule without emitting point_from_line3d. January is 1,008 padded bytes and candidate is 1,024, both with 50 relocations. Remaining differences are compiler-local frame/register scheduling. No fake dependency, raw offset, forced inline, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md.",
+      "measurements": {
+        "target": { "size": 1008, "relocation_count": 50, "normalized_sha256": "aecb662c1c4868e27cbd680dba829bdedc994fc2f91911172ad86ecdfdec9b86" },
+        "base": { "size": 1024, "relocation_count": 50, "normalized_sha256": "7b3f15c72e0f7c1c1c7ea1372676c6a01984aad2a78b6e2a5af6764f0c3474e5" },
+        "objdiff_percent": 98.28
+      }
+    },
+    {
+      "unit": "source/ai/ai",
+      "function": "_ai_test_ballistic_line_of_fire",
+      "class": "instruction-scheduling",
+      "evidence": "Complete typed ballistic trajectory, world-collision, friendly-pill, and debug-recording reconstruction from January code/relocations and HCEA semantics. Target and candidate are both 944 padded bytes with all 49 relocations. Remaining differences are compiler-local x87 and independent instruction scheduling. No fake dependency, raw offset, forced inline, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md.",
+      "measurements": {
+        "target": { "size": 944, "relocation_count": 49, "normalized_sha256": "6c90076033e91f26356e42166cf4bb0a8d5a902ae35bc67db15aec19ee9982ac" },
+        "base": { "size": 944, "relocation_count": 49, "normalized_sha256": "c8f5527aacb22c833089881ef848f5d4056908d6524c3be7ac4099325db85bce" },
+        "objdiff_percent": 94.5
+      }
+    },
+    {
+      "unit": "source/ai/ai",
+      "function": "_ai_handle_editing",
+      "class": "instruction-scheduling",
+      "evidence": "Complete typed live-editor reconciliation reconstructed from January code, strings, assertions, and relocations with HCEA as an independent semantic map. It covers squad/platoon run shifts, overflow validation, following-encounter base repair, actor repair/kill decisions, and the full out-of-range teardown path. Target and candidate are both 1,296 padded bytes with all 70 relocations. Remaining differences are compiler-local branch and register scheduling. No fake dependency, raw offset, forced inline, undefined behavior, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md.",
+      "measurements": {
+        "target": { "size": 1296, "relocation_count": 70, "normalized_sha256": "652338b1724b0f70d82160cd72c21e568a24fd099c4208e692215bb4e3d93cf8" },
+        "base": { "size": 1296, "relocation_count": 70, "normalized_sha256": "e5a842c17028ee168efa69e654cce4a195585fd8d865b17fe552b1b343048e5f" },
+        "objdiff_percent": 98.46
+      }
     }
   ]
 }

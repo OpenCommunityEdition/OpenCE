@@ -143,6 +143,8 @@ void ai_communication_finished(
 	struct ai_information_packet *information);
 void actor_communication_update(
 	long actor_index);
+void ai_conversation_update(
+	void);
 void actor_handle_communication(
 	long actor_index,
 	long prop_index,

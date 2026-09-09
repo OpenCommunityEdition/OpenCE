@@ -596,6 +596,11 @@ boolean ai_debug_highlight_cluster(
 
 void ai_debug_lineofsight_reset(
 	void);
+void ai_debug_lineofsight(
+	real_point3d const *start,
+	short start_key,
+	real_point3d const *end,
+	short end_key);
 
 void ai_debug_speak(
 	char const *vocalization_type_name);
