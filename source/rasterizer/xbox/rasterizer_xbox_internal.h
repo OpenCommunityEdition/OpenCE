@@ -20,6 +20,8 @@ struct render_lighting;
 struct rasterizer_frame_begin_parameters;
 struct rasterizer_model_lighting_constants;
 struct rasterizer_window_begin_parameters;
+struct shader;
+struct vertex_buffer;
 
 boolean _rasterizer_initialize(
 	void);
@@ -89,6 +91,29 @@ void rasterizer_environment_fog_screen_window_begin(
 void rasterizer_environment_fog_screen_window_end(
 	void);
 void rasterizer_environment_fog_screen_dispose(
+	void);
+
+void _rasterizer_environment_reflection_mirrors_begin(
+	void);
+void _rasterizer_environment_reflection_mirror_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
+void _rasterizer_environment_reflection_mirrors_end(
+	void);
+void _rasterizer_environment_reflections_begin(
+	void);
+void _rasterizer_environment_reflection_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
+void _rasterizer_environment_reflections_end(
 	void);
 
 #endif /* __RASTERIZER_XBOX_INTERNAL_H */

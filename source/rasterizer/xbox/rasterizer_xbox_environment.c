@@ -141,6 +141,7 @@ symbols in this file:
 #include "cseries.h"
 #include "bitmaps/bitmaps.h"
 #include "cseries/errors.h"
+#include "effects/decals.h"
 #include "game/game_globals.h"
 #include "interface/hud_draw.h"
 #include "bitmaps/bitmaps_inlines.h"
@@ -160,6 +161,7 @@ symbols in this file:
 
 #include "rasterizer_xbox.h"
 #include "rasterizer_xbox_draw_primitives.h"
+#include "rasterizer_xbox_internal.h"
 
 /* ---------- constants */
 
@@ -190,6 +192,24 @@ enum
 	_shader_environment_specular_overbright_bit = 0,
 	_shader_environment_specular_extra_shiny_bit,
 	_shader_environment_specular_lightmap_bit,
+};
+
+enum
+{
+	_shader_environment_reflection_dynamic_mirror_bit = 0,
+};
+
+enum
+{
+	_shader_environment_reflection_type_bumped_cube_map = 0,
+	_shader_environment_reflection_type_flat_cube_map,
+	_shader_environment_reflection_type_bumped_radiosity,
+	NUMBER_OF_SHADER_ENVIRONMENT_REFLECTION_TYPES,
+};
+
+enum
+{
+	_rasterizer_target_render_primary = 0,
 };
 
 enum
@@ -430,9 +450,15 @@ struct shader_environment_reflection_properties
 	word flags;
 	short type;
 	real lightmap_brightness_scale;
-	byte reserved08[0x1C];
+	long unused1[7];
 	real view_perpendicular_brightness;
 	real view_parallel_brightness;
+	long unused2[4];
+	real mirror_index_of_refraction;
+	real mirror_depth;
+	long unused3[4];
+	struct tag_reference cube_map;
+	long unused4[4];
 };
 
 struct shader_environment_specular_properties
@@ -472,13 +498,6 @@ struct shader_transparent_water_definition
 	word flags;
 };
 
-struct rasterizer_environment_window_parameters
-{
-	byte reserved00[8];
-	real_point3d camera_position;
-	real_vector3d camera_forward;
-};
-
 /* ---------- prototypes */
 
 static void rasterizer_environment_specular_spot_light_begin(
@@ -490,7 +509,7 @@ extern struct rasterizer_environment_debug_options rasterizer_debug_options;
 static struct rasterizer_environment_globals rasterizer_environment_globals;
 extern struct pixel_shader_definition pixel_shader;
 extern struct rasterizer_lights_globals rasterizer_lights;
-extern struct rasterizer_environment_window_parameters global_window_parameters;
+extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern short specular_light_vertex_shader_permutation_index;
 
 /* ---------- public code */
@@ -1966,6 +1985,182 @@ void _rasterizer_environment_reflection_mirrors_begin(
 	return;
 }
 
+void _rasterizer_environment_reflection_mirror_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+		2271,
+		global_d3d_device);
+
+	if (rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_normal &&
+		rasterizer_debug_options.draw_environment_reflection_mirrors &&
+		global_window_parameters.has_mirror &&
+		global_window_parameters.rasterizer_target == _rasterizer_target_render_primary)
+	{
+		struct shader_environment_definition *shader_environment;
+
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+			2280,
+			shader);
+		shader_environment = (struct shader_environment_definition *)
+			shader_get_and_verify_type((struct shader *)shader, _shader_type_environment);
+
+		if (TEST_FLAG(
+			shader_environment->environment.reflection.flags,
+			_shader_environment_reflection_dynamic_mirror_bit) &&
+			(shader_environment->environment.reflection.view_perpendicular_brightness > 0.0f ||
+			shader_environment->environment.reflection.view_parallel_brightness > 0.0f))
+		{
+			real_vector4d texture_transform_constants[3];
+			real_rgb_color mirror_color;
+
+			match_assert(
+				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+				2287,
+				vertex_buffer);
+
+			rasterizer_set_texture(
+				0,
+				0,
+				3,
+				shader_environment->environment.diffuse.bump_map.index,
+				bitmap_index);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+
+			rasterizer_set_texture_direct(1, global_rasterizer_data->vector_normalization.index, 0);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_ADDRESSW, D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MINFILTER, D3DTEXF_POINT);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MIPFILTER, D3DTEXF_POINT);
+
+			rasterizer_set_texture_direct(2, global_rasterizer_data->vector_normalization.index, 0);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_ADDRESSW, D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_MINFILTER, D3DTEXF_POINT);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_MIPFILTER, D3DTEXF_POINT);
+
+			rasterizer_set_target_as_texture(3, 1, 0);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_CULLMODE, D3DCULL_CCW);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_COLORWRITEENABLE,
+				D3DCOLORWRITEENABLE_RED |
+				D3DCOLORWRITEENABLE_GREEN |
+				D3DCOLORWRITEENABLE_BLUE);
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ALPHABLENDENABLE, TRUE);
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_SRCBLEND, D3DBLEND_DESTALPHA);
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_DESTBLEND, D3DBLEND_ONE);
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_BLENDOP, D3DBLENDOP_ADD);
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ALPHATESTENABLE, FALSE);
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZENABLE, TRUE);
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZFUNC, D3DCMP_EQUAL);
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZWRITEENABLE, FALSE);
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZBIAS, 0);
+
+			rasterizer_set_vertex_shader_permutation(51, vertex_buffer->type, 0);
+
+			texture_transform_constants[0].i = shader_environment->environment.diffuse.runtime_bump_map_scale.i;
+			texture_transform_constants[0].j = shader_environment->environment.diffuse.runtime_bump_map_scale.j;
+			texture_transform_constants[0].k = 320.0f;
+			texture_transform_constants[0].l = 240.0f;
+			texture_transform_constants[1].i = 1.0f;
+			texture_transform_constants[1].j = 0.0f;
+			texture_transform_constants[1].k = 0.0f;
+			texture_transform_constants[1].l = 0.0f;
+			texture_transform_constants[2].i = 0.0f;
+			texture_transform_constants[2].j = 1.0f;
+			texture_transform_constants[2].k = 0.0f;
+			texture_transform_constants[2].l = 0.0f;
+			shader_environment_texture_animation_evaluate(
+				shader,
+				global_frame_parameters.game_time_sec,
+				&texture_transform_constants[1].l,
+				&texture_transform_constants[2].l);
+			IDirect3DDevice8_SetVertexShaderConstant(global_d3d_device, -84, texture_transform_constants, 3);
+
+			csmemset(&pixel_shader, 0, sizeof(pixel_shader));
+			pixel_shader.texture_modes = 0x00008C61;
+			pixel_shader.combiner_count = 0x00011005;
+			if (shader_environment->environment.diffuse.bump_map.index == NONE)
+			{
+				mirror_color.red = PIN(0.5f - global_window_parameters.camera.forward.i * 0.5f, 0.0f, 1.0f);
+				mirror_color.green = PIN(0.5f - global_window_parameters.camera.forward.j * 0.5f, 0.0f, 1.0f);
+				mirror_color.blue = PIN(0.5f - global_window_parameters.camera.forward.k * 0.5f, 0.0f, 1.0f);
+				pixel_shader.constant_0[0] = real_rgb_color_to_pixel32(&mirror_color);
+				pixel_shader.rgb_inputs[0] = 0x4A410B0B;
+			}
+			else
+			{
+				pixel_shader.rgb_inputs[0] = 0x49480B0B;
+			}
+			pixel_shader.rgb_outputs[0] = 0x000020CD;
+			pixel_shader.rgb_inputs[1] = 0x0C0C0D0D;
+			pixel_shader.rgb_outputs[1] = 0x000000CD;
+			pixel_shader.rgb_inputs[2] = 0x0C0C0D0D;
+			pixel_shader.rgb_outputs[2] = 0x0000000D;
+			pixel_shader.constant_0[3] = real_a_rgb_color_to_pixel32(
+				shader_environment->environment.reflection.view_perpendicular_brightness,
+				&shader_environment->environment.specular.view_perpendicular_color);
+			pixel_shader.constant_1[3] = real_a_rgb_color_to_pixel32(
+				shader_environment->environment.reflection.view_parallel_brightness,
+				&shader_environment->environment.specular.view_parallel_color);
+			pixel_shader.alpha_inputs[3] = 0x2C120C11;
+			pixel_shader.alpha_outputs[3] = 0x00000C00;
+			pixel_shader.rgb_inputs[3] = 0x2C020C01;
+			pixel_shader.rgb_outputs[3] = 0x00000C00;
+			pixel_shader.rgb_inputs[4] = 0x2C0D0C0B;
+			pixel_shader.rgb_outputs[4] = 0x00000C00;
+			pixel_shader.final_combiner_inputs_abcd = 0x0C0F0000;
+			pixel_shader.final_combiner_inputs_efg =
+				(0x1C00 |
+					(TEST_FLAG(
+						shader_environment->environment.flags,
+						_shader_environment_bump_map_is_specular_mask_bit)
+						? 0x08
+						: 0x20)) << 16;
+			rasterizer_set_pixel_shader(&pixel_shader);
+
+			rasterizer_draw_dynamic_triangles_static_vertices(
+				dynamic_triangle_buffer_index,
+				first_triangle_index,
+				triangle_count,
+				vertex_buffer);
+			if (rasterizer_debug_options.statistics_mode == _rasterizer_statistics_mode_enabled)
+			{
+				rasterizer_frame_statistics.reflection_dynamic_draw_count++;
+				rasterizer_frame_statistics.reflection_dynamic_triangle_count += triangle_count;
+				rasterizer_frame_statistics.reflection_dynamic_vertex_count +=
+					rasterizer_frame_statistics_count_dynamic_vertices(
+						dynamic_triangle_buffer_index,
+						first_triangle_index,
+						triangle_count);
+			}
+		}
+	}
+	return;
+}
+
 void _rasterizer_environment_reflection_mirrors_end(
 	void)
 {
@@ -1977,6 +2172,231 @@ void _rasterizer_environment_reflections_begin(
 	void)
 {
 	rasterizer_profile_begin(_rasterizer_profile_environment_reflections);
+	return;
+}
+
+void _rasterizer_environment_reflection_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+		2462,
+		global_d3d_device);
+
+	if (rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_normal &&
+		rasterizer_debug_options.draw_environment_reflections)
+	{
+		struct shader_environment_definition *shader_environment;
+		short reflection_type;
+
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+			2470,
+			shader);
+		shader_environment = (struct shader_environment_definition *)
+			shader_get_and_verify_type((struct shader *)shader, _shader_type_environment);
+
+		reflection_type = shader_environment->environment.reflection.type;
+		if (reflection_type == _shader_environment_reflection_type_bumped_cube_map ||
+			reflection_type == _shader_environment_reflection_type_bumped_radiosity)
+		{
+			if (TEST_FLAG(
+				shader_environment->environment.flags,
+				_shader_environment_bump_map_is_specular_mask_bit))
+			{
+				reflection_type = _shader_environment_reflection_type_flat_cube_map;
+			}
+			if (shader_environment->environment.diffuse.bump_map.index == NONE)
+			{
+				reflection_type = _shader_environment_reflection_type_flat_cube_map;
+			}
+		}
+
+		if ((shader_environment->environment.reflection.view_perpendicular_brightness > 0.0f ||
+			shader_environment->environment.reflection.view_parallel_brightness > 0.0f) &&
+			shader_environment->environment.reflection.cube_map.index != NONE)
+		{
+			real_vector4d texture_transform_constants[3];
+			real_rgb_color mirror_color;
+
+			match_assert(
+				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+				2495,
+				vertex_buffer);
+			match_assert(
+				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+				2496,
+				reflection_type>=0 && reflection_type<NUMBER_OF_SHADER_ENVIRONMENT_REFLECTION_TYPES);
+
+			rasterizer_set_texture(
+				0,
+				0,
+				3,
+				shader_environment->environment.diffuse.bump_map.index,
+				bitmap_index);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+
+			rasterizer_set_texture_direct(1, global_rasterizer_data->vector_normalization.index, 0);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_ADDRESSW, D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MINFILTER, D3DTEXF_POINT);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MIPFILTER, D3DTEXF_POINT);
+
+			rasterizer_set_texture_direct(2, global_rasterizer_data->vector_normalization.index, 0);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_ADDRESSW, D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_MINFILTER, D3DTEXF_POINT);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_MIPFILTER, D3DTEXF_POINT);
+
+			rasterizer_set_texture(
+				3,
+				2,
+				0,
+				shader_environment->environment.reflection.cube_map.index,
+				bitmap_index);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_ADDRESSW, D3DTADDRESS_CLAMP);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+			IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_CULLMODE, D3DCULL_CCW);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_COLORWRITEENABLE,
+				D3DCOLORWRITEENABLE_RED |
+				D3DCOLORWRITEENABLE_GREEN |
+				D3DCOLORWRITEENABLE_BLUE);
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ALPHABLENDENABLE, TRUE);
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_SRCBLEND, D3DBLEND_DESTALPHA);
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_DESTBLEND, D3DBLEND_ONE);
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_BLENDOP, D3DBLENDOP_ADD);
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ALPHATESTENABLE, FALSE);
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZENABLE, TRUE);
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZFUNC, D3DCMP_EQUAL);
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZWRITEENABLE, FALSE);
+			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZBIAS, 0);
+
+			rasterizer_set_vertex_shader_permutation(42, vertex_buffer->type, reflection_type);
+
+			texture_transform_constants[0].i = shader_environment->environment.diffuse.runtime_bump_map_scale.i;
+			texture_transform_constants[0].j = shader_environment->environment.diffuse.runtime_bump_map_scale.j;
+			texture_transform_constants[0].k = 320.0f;
+			texture_transform_constants[0].l = 240.0f;
+			texture_transform_constants[1].i = 1.0f;
+			texture_transform_constants[1].j = 0.0f;
+			texture_transform_constants[1].k = 0.0f;
+			texture_transform_constants[1].l = 0.0f;
+			texture_transform_constants[2].i = 0.0f;
+			texture_transform_constants[2].j = 1.0f;
+			texture_transform_constants[2].k = 0.0f;
+			texture_transform_constants[2].l = 0.0f;
+			shader_environment_texture_animation_evaluate(
+				shader,
+				global_frame_parameters.game_time_sec,
+				&texture_transform_constants[1].l,
+				&texture_transform_constants[2].l);
+			IDirect3DDevice8_SetVertexShaderConstant(global_d3d_device, -84, texture_transform_constants, 3);
+
+			csmemset(&pixel_shader, 0, sizeof(pixel_shader));
+			switch (reflection_type)
+			{
+				case _shader_environment_reflection_type_bumped_cube_map:
+				case _shader_environment_reflection_type_bumped_radiosity:
+					pixel_shader.texture_modes = 0x00062E21;
+					pixel_shader.input_texture = 0;
+					pixel_shader.dot_mapping = 0x00000111;
+					break;
+
+				case _shader_environment_reflection_type_flat_cube_map:
+					pixel_shader.texture_modes = 0x00018C61;
+					break;
+
+				default:
+					match_vassert(
+						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+						2592,
+						FALSE,
+						"### ERROR unsupported reflection type");
+					break;
+			}
+			pixel_shader.combiner_count = 0x00011005;
+
+			if (reflection_type == _shader_environment_reflection_type_bumped_cube_map ||
+				reflection_type == _shader_environment_reflection_type_bumped_radiosity ||
+				shader_environment->environment.diffuse.bump_map.index == NONE)
+			{
+				mirror_color.red = PIN(0.5f - global_window_parameters.camera.forward.i * 0.5f, 0.0f, 1.0f);
+				mirror_color.green = PIN(0.5f - global_window_parameters.camera.forward.j * 0.5f, 0.0f, 1.0f);
+				mirror_color.blue = PIN(0.5f - global_window_parameters.camera.forward.k * 0.5f, 0.0f, 1.0f);
+				pixel_shader.constant_0[0] = real_rgb_color_to_pixel32(&mirror_color);
+				pixel_shader.rgb_inputs[0] = 0x4A410B0B;
+			}
+			else
+			{
+				pixel_shader.rgb_inputs[0] = 0x49480B0B;
+			}
+			pixel_shader.rgb_inputs[1] = 0x0C0C0D0D;
+			pixel_shader.rgb_inputs[2] = 0x0C0C0D0D;
+			pixel_shader.rgb_outputs[0] = 0x000020CD;
+			pixel_shader.rgb_outputs[1] = 0x000000CD;
+			pixel_shader.rgb_outputs[2] = 0x0000000D;
+			pixel_shader.constant_0[3] = real_a_rgb_color_to_pixel32(
+				shader_environment->environment.reflection.view_perpendicular_brightness,
+				&shader_environment->environment.specular.view_perpendicular_color);
+			pixel_shader.constant_1[3] = real_a_rgb_color_to_pixel32(
+				shader_environment->environment.reflection.view_parallel_brightness,
+				&shader_environment->environment.specular.view_parallel_color);
+			pixel_shader.alpha_inputs[3] = 0x2C120C11;
+			pixel_shader.alpha_outputs[3] = 0x00000C00;
+			pixel_shader.rgb_inputs[3] = 0x2C020C01;
+			pixel_shader.rgb_outputs[3] = 0x00000C00;
+			pixel_shader.rgb_inputs[4] = 0x2C0D0C0B;
+			pixel_shader.rgb_outputs[4] = 0x00000C00;
+			pixel_shader.final_combiner_inputs_abcd = 0x0C0F0000;
+			pixel_shader.final_combiner_inputs_efg =
+				(0x1C00 |
+					(TEST_FLAG(
+						shader_environment->environment.flags,
+						_shader_environment_bump_map_is_specular_mask_bit)
+						? 0x08
+						: 0x20)) << 16;
+			rasterizer_set_pixel_shader(&pixel_shader);
+
+			rasterizer_draw_dynamic_triangles_static_vertices2(
+				dynamic_triangle_buffer_index,
+				first_triangle_index,
+				triangle_count,
+				vertex_buffer,
+				vertex_buffer +
+					(rasterizer_globals.lightmap_mode != _rasterizer_lightmap_mode_normal &&
+					reflection_type == _shader_environment_reflection_type_bumped_radiosity));
+			if (rasterizer_debug_options.statistics_mode == _rasterizer_statistics_mode_enabled)
+			{
+				rasterizer_frame_statistics.reflection_dynamic_draw_count++;
+				rasterizer_frame_statistics.reflection_dynamic_triangle_count += triangle_count;
+				rasterizer_frame_statistics.reflection_dynamic_vertex_count +=
+					rasterizer_frame_statistics_count_dynamic_vertices(
+						dynamic_triangle_buffer_index,
+						first_triangle_index,
+						triangle_count);
+			}
+		}
+	}
 	return;
 }
 
@@ -2039,9 +2459,9 @@ void _rasterizer_environment_transparent_geometry_submit(
 			0xA95,
 			centroid);
 
-		camera_to_centroid.i = centroid->x - global_window_parameters.camera_position.x;
-		camera_to_centroid.j = centroid->y - global_window_parameters.camera_position.y;
-		camera_to_centroid.k = centroid->z - global_window_parameters.camera_position.z;
+		camera_to_centroid.i = centroid->x - global_window_parameters.camera.position.x;
+		camera_to_centroid.j = centroid->y - global_window_parameters.camera.position.y;
+		camera_to_centroid.k = centroid->z - global_window_parameters.camera.position.z;
 		if (plane)
 			geometry_flags |= FLAG(_rasterizer_geometry_no_sort_bit);
 		if (shader_is_decal((struct shader *)shader))
@@ -2082,9 +2502,9 @@ void _rasterizer_environment_transparent_geometry_submit(
 		null_plane.n.k = 0.0f;
 		null_plane.d = 0.0f;
 		group->z_sort = -(
-			global_window_parameters.camera_forward.i * camera_to_centroid.i +
-			global_window_parameters.camera_forward.j * camera_to_centroid.j +
-			global_window_parameters.camera_forward.k * camera_to_centroid.k);
+			global_window_parameters.camera.forward.i * camera_to_centroid.i +
+			global_window_parameters.camera.forward.j * camera_to_centroid.j +
+			global_window_parameters.camera.forward.k * camera_to_centroid.k);
 		group->centroid = *centroid;
 
 		if (plane)

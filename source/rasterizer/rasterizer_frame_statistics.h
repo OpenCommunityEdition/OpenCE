@@ -39,7 +39,9 @@ struct rasterizer_frame_statistics_globals
 	unsigned long reflection_mask_dynamic_vertex_count;
 	unsigned long reflection_mask_dynamic_triangle_count;
 	unsigned long reflection_mask_dynamic_draw_count;
-	byte reserved090[0xC];
+	unsigned long reflection_dynamic_vertex_count;
+	unsigned long reflection_dynamic_triangle_count;
+	unsigned long reflection_dynamic_draw_count;
 	unsigned long transparent_geometry_dynamic_vertex_count;
 	unsigned long transparent_geometry_dynamic_triangle_count;
 	long transparent_geometry_largest_dynamic_triangle_count;
