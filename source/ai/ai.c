@@ -361,18 +361,6 @@ struct encounter_actor_iterator
 	long next_index;
 };
 
-struct ai_profile_ai_data
-{
-	boolean suspend_ai;
-	boolean move_actors_randomly;
-	byte reserved002[0xB32];
-	short collision_test_count;
-	byte reservedB36[0x86];
-	short lineofsight_test_count;
-	byte reservedBBE[0x86];
-	short lineoffire_test_count;
-};
-
 struct line_of_fire_pill
 {
 	boolean hit;
@@ -435,11 +423,14 @@ typedef char ai_line_of_fire_pill_size_assert[
 typedef char ai_line_of_fire_pill_width_offset_assert[
 	offsetof(struct line_of_fire_pill, width) == 0x24 ? 1 : -1];
 typedef char ai_profile_collision_test_count_offset_assert[
-	offsetof(struct ai_profile_ai_data, collision_test_count) == 0xB34 ? 1 : -1];
+	offsetof(struct ai_profile_globals, meters) +
+		_ai_meter_collisions * sizeof(struct ai_meter) == 0xB34 ? 1 : -1];
 typedef char ai_profile_lineofsight_test_count_offset_assert[
-	offsetof(struct ai_profile_ai_data, lineofsight_test_count) == 0xBBC ? 1 : -1];
+	offsetof(struct ai_profile_globals, meters) +
+		_ai_meter_line_of_sight * sizeof(struct ai_meter) == 0xBBC ? 1 : -1];
 typedef char ai_profile_lineoffire_test_count_offset_assert[
-	offsetof(struct ai_profile_ai_data, lineoffire_test_count) == 0xC44 ? 1 : -1];
+	offsetof(struct ai_profile_globals, meters) +
+		_ai_meter_line_of_fire * sizeof(struct ai_meter) == 0xC44 ? 1 : -1];
 typedef char ai_actor_squad_index_offset_assert[
 	offsetof(struct actor_datum, meta.squad_index) == 0x3A ? 1 : -1];
 typedef char ai_actor_platoon_index_offset_assert[
@@ -475,7 +466,6 @@ static void ai_place_pending_mounted_weapons(
 /* ---------- globals */
 
 extern struct ai_globals_data *ai_globals;
-extern struct ai_profile_ai_data ai_profile;
 
 static struct profile_section ai_update_section = { "ai_update", NONE, TRUE };
 
@@ -1695,7 +1685,7 @@ void ai_initialize_for_new_map(
 void ai_update(
 	void)
 {
-	boolean update_ai = ai_globals->ai_initialized_for_map && !ai_profile.suspend_ai;
+	boolean update_ai = ai_globals->ai_initialized_for_map && !ai_profile.disabled;
 	boolean move_actors_randomly = ai_profile.move_actors_randomly;
 
 	profile_enter(ai_update_section);
@@ -1948,7 +1938,7 @@ static short ai_find_line_of_fire_friend_pills(
 
 boolean ai_test_line_of_fire(
 	long actor_index,
-	long target_unit_index,
+	long ignore_unit_index,
 	real_point3d const *origin,
 	real_vector3d const *vector,
 	long *blocking_prop_index_reference)
@@ -1960,7 +1950,7 @@ boolean ai_test_line_of_fire(
 	short pill_count;
 	short pill_index;
 
-	ai_profile.lineoffire_test_count++;
+	ai_profile.meters[_ai_meter_line_of_fire].accumulator++;
 
 	pill_count = ai_find_line_of_fire_friend_pills(
 		actor_index,
@@ -1969,7 +1959,7 @@ boolean ai_test_line_of_fire(
 
 	for (pill_index = 0; pill_index < pill_count; pill_index++)
 	{
-		if (pills[pill_index].unit_index != target_unit_index)
+		if (pills[pill_index].unit_index != ignore_unit_index)
 		{
 			boolean intersected;
 
@@ -2034,7 +2024,7 @@ short ai_test_line_of_sight(
 	boolean ignore_vehicles)
 {
 	struct collision_result collision;
-	real collision_fraction;
+	real collision_fraction = 1.0f;
 	unsigned long collision_flags;
 	boolean clear_line_of_sight;
 	boolean blocked;
@@ -2049,7 +2039,7 @@ short ai_test_line_of_sight(
 		global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
 	global_current_collision_users[global_current_collision_user_depth++] =
 		_collision_user_ai_lineofsight;
-	ai_profile.lineofsight_test_count++;
+	ai_profile.meters[_ai_meter_line_of_sight].accumulator++;
 
 	if (cluster0 != NONE && cluster1 != NONE && !scenario_test_pvs(cluster0, cluster1))
 		goto obstructed;
@@ -2080,7 +2070,7 @@ short ai_test_line_of_sight(
 	{
 		real_vector3d vector;
 
-		ai_profile.collision_test_count++;
+		ai_profile.meters[_ai_meter_collisions].accumulator++;
 		vector_from_points3d(point0, point1, &vector);
 
 		if (!collision_test_vector(
@@ -2137,7 +2127,7 @@ short ai_test_line_of_sight(
 			left.y = point0->y - perpendicular.j * 0.25f;
 			left.z = point0->z - perpendicular.k * 0.25f;
 
-			ai_profile.collision_test_count++;
+			ai_profile.meters[_ai_meter_collisions].accumulator++;
 			if (clear_line_of_sight)
 			{
 				blocked = collision_test_line(
@@ -2149,7 +2139,7 @@ short ai_test_line_of_sight(
 
 				if (!blocked)
 				{
-					ai_profile.collision_test_count++;
+					ai_profile.meters[_ai_meter_collisions].accumulator++;
 					blocked = collision_test_line(
 						collision_flags,
 						&left,
@@ -2169,7 +2159,7 @@ short ai_test_line_of_sight(
 
 				if (!blocked)
 				{
-					ai_profile.collision_test_count++;
+					ai_profile.meters[_ai_meter_collisions].accumulator++;
 					blocked = !collision_test_line(
 						collision_flags,
 						&left,
@@ -2192,7 +2182,7 @@ short ai_test_line_of_sight(
 			point_from_line3d(point1, &perpendicular, -0.1f, &left);
 			point_from_line3d(point1, global_down3d, 0.1f, &down);
 
-			ai_profile.collision_test_count++;
+			ai_profile.meters[_ai_meter_collisions].accumulator++;
 			blocked = collision_test_line(
 				collision_flags,
 				&right,
@@ -2202,7 +2192,7 @@ short ai_test_line_of_sight(
 
 			if (!blocked)
 			{
-				ai_profile.collision_test_count++;
+				ai_profile.meters[_ai_meter_collisions].accumulator++;
 				blocked = collision_test_line(
 					collision_flags,
 					&left,
@@ -2213,7 +2203,7 @@ short ai_test_line_of_sight(
 
 			if (!blocked)
 			{
-				ai_profile.collision_test_count++;
+				ai_profile.meters[_ai_meter_collisions].accumulator++;
 				blocked = collision_test_line(
 					collision_flags,
 					&down,

@@ -56,7 +56,7 @@ future research. They are explicitly parked and receive **zero exact credit**:
 | owner | January / candidate bytes | relocations | objdiff |
 | --- | ---: | ---: | ---: |
 | `_ai_test_line_of_fire` | 336 / 336 | 10 / 10 | 88.17% |
-| `_ai_test_line_of_sight` | 1,008 / 1,024 | 50 / 50 | 98.28% |
+| `_ai_test_line_of_sight` | 1,008 / 1,040 | 50 / 50 | 97.98% |
 | `_ai_test_ballistic_line_of_fire` | 944 / 944 | 49 / 49 | 94.50% |
 | `_ai_handle_editing` | 1,296 / 1,296 | 70 / 70 | 93.23% |
 
@@ -65,6 +65,12 @@ debug recording, PVS/fog classification, and ballistic segmentation. The
 remaining differences are compiler-local frame, register, x87, and independent
 instruction scheduling decisions. No fake dependency, raw-offset access,
 nonsensical branch, or artificial source-pressure steering was retained.
+
+The retained `ai_test_line_of_sight` initializes `collision_fraction` before
+the fog-classification path. The previous draft left that local indeterminate
+when the collision vector reported clear, so a valid fog path could read
+undefined state. The safe source is sixteen padded bytes larger and receives
+the same zero exact credit.
 
 `ai_test_line_of_sight` requires external calls to January's
 `point_from_line3d`, `normalize3d`, and `collision_test_line` owners. The owning

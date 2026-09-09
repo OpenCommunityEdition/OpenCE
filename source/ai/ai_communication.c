@@ -546,6 +546,7 @@ symbols in this file:
 
 #include "ai.h"
 #include "ai_debug.h"
+#include "ai_profile.h"
 #include "actor_definitions.h"
 #include "actors.h"
 #include "actor_types.h"
@@ -569,8 +570,6 @@ symbols in this file:
 
 enum
 {
-	_ai_meter_collisions = 21,
-	NUMBER_OF_AI_PROFILE_METERS = 28,
 	NUMBER_OF_COMMUNICATION_PRIORITIES = 8,
 	NUMBER_OF_COMMUNICATION_TEAMS = 4,
 	NUMBER_OF_COMMUNICATION_TYPES = 57,
@@ -780,18 +779,6 @@ struct dialogue_event_status
 	long disable_until_time;
 };
 
-struct ai_profile_meter_view
-{
-	short accumulator;
-	byte __unknown02[0x86];
-};
-
-struct ai_profile_globals_view
-{
-	byte __unknown00[0x0C];
-	struct ai_profile_meter_view meters[NUMBER_OF_AI_PROFILE_METERS];
-};
-
 struct ai_communication_globals_view
 {
 	byte __unknown00[0x10];
@@ -856,11 +843,6 @@ typedef char ai_conversation_driver_line_address_unit_index_offset_assert[
 	offsetof(struct ai_conversation_driver_datum_view, line_address_unit_index) == 0x58 ? 1 : -1];
 typedef char recent_conversation_view_size_assert[
 	sizeof(struct recent_conversation_view) == 0x10 ? 1 : -1];
-typedef char ai_profile_meter_view_size_assert[
-	sizeof(struct ai_profile_meter_view) == 0x88 ? 1 : -1];
-typedef char ai_profile_collisions_accumulator_offset_assert[
-	offsetof(struct ai_profile_globals_view, meters) +
-		_ai_meter_collisions * sizeof(struct ai_profile_meter_view) == 0xB34 ? 1 : -1];
 typedef char ai_print_conversations_offset_assert[
 	offsetof(struct ai_debug_state, print_conversations) == 0x9F ? 1 : -1];
 typedef char ai_communication_unit_speech_item_size_assert[
@@ -998,7 +980,6 @@ boolean code_00034020(
 
 extern short global_communication_table_indices[NUMBER_OF_COMMUNICATION_TYPES];
 extern struct ai_communication_globals_view *ai_globals;
-extern struct ai_profile_globals_view ai_profile;
 
 /* ---------- globals */
 

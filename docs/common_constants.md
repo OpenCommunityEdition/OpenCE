@@ -218,6 +218,47 @@ The supplied client names its two flag indices
 shorter inferred names and literal timing values; restore names only with
 ordinary strict-object and consumer checks, not by unreviewed bulk replacement.
 
+## AI profile meter layout
+
+January's shared AI profiling state is declared in
+`source/ai/ai_profile.h`. Include that owner when incrementing a meter; do not
+declare an opaque `extern byte ai_profile[]`, a partial local structure, or a
+consumer-specific view of the same global.
+
+- `ai_profile.meters` begins at offset `0x0C`.
+- There are 28 meter records, each `0x88` bytes.
+- `accumulator` is at record offset `0`; `current_value` is at offset `2`.
+- A meter accumulator is therefore at `0x0C + index * 0x88`.
+
+Frequently used indices and accumulator offsets:
+
+| meter enum | index | offset |
+| --- | ---: | ---: |
+| `_ai_meter_encounters_updated` | 1 | `0x094` |
+| `_ai_meter_actors_updated` | 3 | `0x1A4` |
+| `_ai_meter_actors_active` | 4 | `0x22C` |
+| `_ai_meter_units_updated` | 6 | `0x33C` |
+| `_ai_meter_units_active` | 7 | `0x3C4` |
+| `_ai_meter_dead_props_acknowledged` | 9 | `0x4D4` |
+| `_ai_meter_dead_props_orphaned` | 10 | `0x55C` |
+| `_ai_meter_dead_props_unacknowledged` | 11 | `0x5E4` |
+| `_ai_meter_enemy_props_acknowledged` | 12 | `0x66C` |
+| `_ai_meter_enemy_props_orphaned` | 13 | `0x6F4` |
+| `_ai_meter_enemy_props_unacknowledged` | 14 | `0x77C` |
+| `_ai_meter_friendly_props_acknowledged` | 15 | `0x804` |
+| `_ai_meter_friendly_props_orphaned` | 16 | `0x88C` |
+| `_ai_meter_friendly_props_unacknowledged` | 17 | `0x914` |
+| `_ai_meter_collisions` | 21 | `0xB34` |
+| `_ai_meter_line_of_sight` | 22 | `0xBBC` |
+| `_ai_meter_line_of_fire` | 23 | `0xC44` |
+| `_ai_meter_action_change` | 26 | `0xDDC` |
+
+The leading booleans are independently exposed through the Halo Script
+global table, which authenticates their names and offsets: `disabled` at
+`0x00`, `move_actors_randomly` at `0x01`, `show` through
+`show_sound_distance` at `0x04` through `0x0B`. The complete global is
+`0xEEC` bytes.
+
 ## Reconstruction checklist
 
 1. Search for an existing owner before adding a constant, enum, macro, or

@@ -101,8 +101,6 @@ symbols in this file:
 
 enum
 {
-	AI_METER_HISTORY_TICKS = 60,
-	NUMBER_OF_AI_METERS = 28,
 	AI_PROFILE_STRING_LENGTH = 2048,
 };
 
@@ -112,38 +110,6 @@ enum
 	_ai_render_spray_actions,
 	_ai_render_spray_activation_status,
 	NUMBER_OF_AI_RENDER_SPRAYS,
-};
-
-enum
-{
-	_ai_meter_encounters = 0,
-	_ai_meter_encounters_updated,
-	_ai_meter_actors,
-	_ai_meter_actors_updated,
-	_ai_meter_actors_active,
-	_ai_meter_units,
-	_ai_meter_units_updated,
-	_ai_meter_units_active,
-	_ai_meter_props,
-	_ai_meter_dead_props_acknowledged,
-	_ai_meter_dead_props_orphaned,
-	_ai_meter_dead_props_unacknowledged,
-	_ai_meter_enemy_props_acknowledged,
-	_ai_meter_enemy_props_orphaned,
-	_ai_meter_enemy_props_unacknowledged,
-	_ai_meter_friendly_props_acknowledged,
-	_ai_meter_friendly_props_orphaned,
-	_ai_meter_friendly_props_unacknowledged,
-	_ai_meter_swarm_actors,
-	_ai_meter_swarms,
-	_ai_meter_swarm_components,
-	_ai_meter_collisions,
-	_ai_meter_line_of_sight,
-	_ai_meter_line_of_fire,
-	_ai_meter_path_flood,
-	_ai_meter_path_find,
-	_ai_meter_action_change,
-	_ai_meter_firing_point,
 };
 
 /* ---------- macros */
@@ -162,34 +128,15 @@ struct actor_iterator
 	long next_index;
 };
 
-struct ai_meter
-{
-	short accumulator;
-	short current_value;
-	real average;
-	long history_sum;
-	short history_next_index;
-	short history_count;
-	short history[AI_METER_HISTORY_TICKS];
-};
-
-struct ai_profile_globals
-{
-	short __unknown0;
-	short render_spray;
-	boolean enabled;
-	boolean show_encounters;
-	boolean show_actors;
-	boolean show_swarms;
-	boolean show_paths;
-	boolean show_collisions;
-	boolean show_props;
-	byte pad;
-	struct ai_meter meters[NUMBER_OF_AI_METERS];
-};
-
 typedef short (*ai_meter_sample_proc)(
 	void);
+
+typedef char ai_meter_size_assert[
+	sizeof(struct ai_meter) == 0x88 ? 1 : -1];
+typedef char ai_profile_globals_meters_offset_assert[
+	offsetof(struct ai_profile_globals, meters) == 0x0C ? 1 : -1];
+typedef char ai_profile_globals_size_assert[
+	sizeof(struct ai_profile_globals) == 0xEEC ? 1 : -1];
 
 struct ai_meter_definition
 {
@@ -280,7 +227,7 @@ void ai_profile_initialize(
 	void)
 {
 	csmemset(&ai_profile, 0, sizeof(ai_profile));
-	ai_profile.enabled = TRUE;
+	ai_profile.show = TRUE;
 	return;
 }
 
@@ -374,13 +321,13 @@ void ai_profile_render(
 {
 	global_ai_profile_string_position = rasterizer_globals.reserved04.frame_bounds.y1 - 20;
 	ai_profile_render_spray();
-	if (ai_profile.enabled)
+	if (ai_profile.show)
 	{
-		if (ai_profile.show_props)
+		if (ai_profile.show_prop_types)
 		{
 			ai_profile_render_props();
 		}
-		if (ai_profile.show_collisions)
+		if (ai_profile.show_line_of_sight)
 		{
 			ai_profile_render_collisions();
 		}
@@ -396,7 +343,7 @@ void ai_profile_render(
 		{
 			ai_profile_render_actors();
 		}
-		if (ai_profile.show_encounters)
+		if (ai_profile.show_stats)
 		{
 			ai_profile_render_encounters();
 		}

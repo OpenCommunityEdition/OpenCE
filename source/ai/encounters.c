@@ -292,6 +292,7 @@ symbols in this file:
 #include "actor_types.h"
 #include "ai.h"
 #include "ai_debug.h"
+#include "ai_profile.h"
 #include "ai_script.h"
 #include "ai_scenario_definitions.h"
 #include "props.h"
@@ -455,14 +456,6 @@ struct actor_iterator
 	long next_index;
 };
 
-/* `ai_profile` is owned by ai_profile.c.  Encounters only owns the January
- * encounter-update counter at +0x94, so keep the rest opaque here. */
-struct ai_profile_encounter_data
-{
-	byte __unknown0[0x94];
-	short encounter_update_count;
-};
-
 struct encounter_ai_globals_prefix
 {
 	boolean ai_active;
@@ -566,7 +559,6 @@ static short squad_get_actor_type(
 /* ---------- globals */
 
 extern struct encounter_ai_globals_prefix *ai_globals;
-extern struct ai_profile_encounter_data ai_profile;
 
 struct data_array *encounter_data;
 struct platoon_datum *platoon_array;
@@ -2068,7 +2060,7 @@ void encounters_update(
 	{
 		short encounter_phase = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.index) % ENCOUNTER_UPDATE_INTERVAL;
 
-		ai_profile.encounter_update_count++;
+		ai_profile.meters[_ai_meter_encounters_updated].accumulator++;
 		if (encounter_phase == phase)
 		{
 			encounter_update_status(iterator.index);

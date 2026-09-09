@@ -236,6 +236,7 @@ symbols in this file:
 #include "ai.h"
 #include "ai_communication.h"
 #include "ai_debug.h"
+#include "ai_profile.h"
 #include "encounters.h"
 #include "props.h"
 
@@ -348,14 +349,6 @@ struct ai_globals_action_data
 	byte __unknown3B5;
 	short enterable_vehicle_count;
 	struct ai_vehicle_enterable enterable_vehicles[32];
-};
-
-/* `ai_profile` is owned by ai_profile.c.  Actions only owns the January
- * action-change counter at +0xDDC, so keep the rest opaque here. */
-struct ai_profile_action_data
-{
-	byte __unknown0[0xDDC];
-	short action_change_count;
 };
 
 /* The January iterator is exactly three datum indices; callers consume the
@@ -715,7 +708,6 @@ static boolean actor_action_allowed_to_enter_vehicle(
 /* ---------- globals */
 
 extern struct ai_globals_action_data *ai_globals;
-extern struct ai_profile_action_data ai_profile;
 
 struct action_specification const global_action_functions[NUMBER_OF_ACTOR_ACTIONS] =
 {
@@ -2296,7 +2288,7 @@ void actor_action_change(
 	void (*handler)(
 		long actor_index);
 
-	ai_profile.action_change_count++;
+	ai_profile.meters[_ai_meter_action_change].accumulator++;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\ai\\actions.c",

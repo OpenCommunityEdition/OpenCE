@@ -137,7 +137,7 @@ boolean ai_test_ballistic_line_of_fire(
 	boolean in_vehicle);
 boolean ai_test_line_of_fire(
 	long actor_index,
-	long target_unit_index,
+	long ignore_unit_index,
 	union real_point3d const *origin,
 	union real_vector3d const *vector,
 	long *blocking_prop_index_reference);

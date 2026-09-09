@@ -252,6 +252,7 @@ symbols in this file:
 #include "actions.h"
 #include "actor_definitions.h"
 #include "actors.h"
+#include "ai.h"
 #include "ai_debug.h"
 #include "ai_profile.h"
 #include "encounters.h"
@@ -323,42 +324,6 @@ struct actor_perception_debug_info_view
 	byte __unknown0000[0x6578];
 	short perception_awareness_speed;
 	short evaluation_mode;
-};
-
-struct ai_profile_prop_counters
-{
-	byte __unknown000[0x4C8];
-	short dead_acknowledged;
-	byte __unknown4CA[0x86];
-	short dead_orphan;
-	byte __unknown552[0x86];
-	short dead_unacknowledged;
-	byte __unknown5DA[0x86];
-	short enemy_acknowledged;
-	byte __unknown662[0x86];
-	short enemy_orphan;
-	byte __unknown6EA[0x86];
-	short enemy_unacknowledged;
-	byte __unknown772[0x86];
-	short friend_acknowledged;
-	byte __unknown7FA[0x86];
-	short friend_orphan;
-	byte __unknown882[0x86];
-	short friend_unacknowledged;
-	byte __unknown90A[0x5D6];
-};
-
-struct ai_profile_globals
-{
-	long __unknown0;
-	boolean enabled;
-	byte __unknown5[7];
-
-	union
-	{
-		byte map_data[0xEE0];
-		struct ai_profile_prop_counters perception;
-	} data;
 };
 
 #define actor_perception_ai_debug_get() \
@@ -998,26 +963,6 @@ typedef char actor_perception_actor_weapon_range_offset_assert[
 	offsetof(struct actor_datum, control.weapon_maximum_range) == 0x608 ? 1 : -1];
 typedef char actor_perception_definition_melee_range_offset_assert[
 	offsetof(struct actor_definition, berserk.melee_attack_range) == 0x37C ? 1 : -1];
-typedef char actor_perception_profile_size_assert[
-	sizeof(struct ai_profile_globals) == 0xEEC ? 1 : -1];
-typedef char actor_perception_profile_dead_acknowledged_offset_assert[
-	offsetof(struct ai_profile_globals, data.perception.dead_acknowledged) == 0x4D4 ? 1 : -1];
-typedef char actor_perception_profile_dead_orphan_offset_assert[
-	offsetof(struct ai_profile_globals, data.perception.dead_orphan) == 0x55C ? 1 : -1];
-typedef char actor_perception_profile_dead_unacknowledged_offset_assert[
-	offsetof(struct ai_profile_globals, data.perception.dead_unacknowledged) == 0x5E4 ? 1 : -1];
-typedef char actor_perception_profile_enemy_acknowledged_offset_assert[
-	offsetof(struct ai_profile_globals, data.perception.enemy_acknowledged) == 0x66C ? 1 : -1];
-typedef char actor_perception_profile_enemy_orphan_offset_assert[
-	offsetof(struct ai_profile_globals, data.perception.enemy_orphan) == 0x6F4 ? 1 : -1];
-typedef char actor_perception_profile_enemy_unacknowledged_offset_assert[
-	offsetof(struct ai_profile_globals, data.perception.enemy_unacknowledged) == 0x77C ? 1 : -1];
-typedef char actor_perception_profile_friend_acknowledged_offset_assert[
-	offsetof(struct ai_profile_globals, data.perception.friend_acknowledged) == 0x804 ? 1 : -1];
-typedef char actor_perception_profile_friend_orphan_offset_assert[
-	offsetof(struct ai_profile_globals, data.perception.friend_orphan) == 0x88C ? 1 : -1];
-typedef char actor_perception_profile_friend_unacknowledged_offset_assert[
-	offsetof(struct ai_profile_globals, data.perception.friend_unacknowledged) == 0x914 ? 1 : -1];
 typedef char actor_perception_vehicle_definition_radius_offset_assert[
 	offsetof(struct actor_perception_vehicle_definition_view, bounding_radius) == 4 ? 1 : -1];
 typedef char actor_perception_vehicle_definition_danger_zone_offset_assert[
@@ -1185,16 +1130,6 @@ boolean game_team_is_enemy(
 	short team_index0,
 	short team_index1);
 
-short ai_test_line_of_sight(
-	struct actor_position_data const *position,
-	short source_cluster_index,
-	real_point3d const *target_position,
-	short target_cluster_index,
-	short mode,
-	boolean ignore_blockers,
-	long vehicle_index,
-	boolean actor_in_vehicle);
-
 short actor_visibility_at_point(
 	long actor_index,
 	struct actor_position_data const *position,
@@ -1246,8 +1181,6 @@ static __inline void actor_perception_midpoint3d(
 }
 
 /* ---------- globals */
-
-extern struct ai_profile_globals ai_profile;
 
 short const global_combat_status_table[NUMBER_OF_ACTOR_TARGET_TYPES] =
 {

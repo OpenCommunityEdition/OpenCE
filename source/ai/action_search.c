@@ -37,6 +37,7 @@ symbols in this file:
 
 #include "actor_definitions.h"
 #include "actors.h"
+#include "ai.h"
 #include "ai_communication.h"
 #include "ai_scenario_definitions.h"
 #include "encounters.h"
@@ -60,16 +61,6 @@ long actor_target_unit_index(
 boolean actors_searching_same_position(
 	long actor_index,
 	long other_actor_index);
-
-short ai_test_line_of_sight(
-	real_point3d const *origin,
-	word origin_cluster_index,
-	real_point3d const *target,
-	word target_cluster_index,
-	long unused_a,
-	long unused_b,
-	long ignore_object_index,
-	boolean in_vehicle);
 
 /* ---------- public code */
 

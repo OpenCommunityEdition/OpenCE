@@ -293,6 +293,7 @@ symbols in this file:
 #include "actor_looking.h"
 #include "ai_communication.h"
 #include "ai_debug.h"
+#include "ai_profile.h"
 #include "ai_scenario_definitions.h"
 #include "bitmaps/bitmaps.h"
 #include "encounters.h"
@@ -439,17 +440,6 @@ enum
 	NUMBER_OF_FOLLOW_TARGET_TYPES,
 };
 
-/* ai profile meters touched by the actor update (ai_profile.h does not yet
- * declare the meter table; ai_profile.c owns NUMBER_OF_AI_METERS == 28) */
-enum
-{
-	_ai_meter_actors_updated = 3,
-	_ai_meter_actors_active,
-	_ai_meter_units_updated = 6,
-	_ai_meter_units_active,
-	NUMBER_OF_AI_METERS = 28,
-};
-
 /* ai_information_packet.information_type (ai.h does not yet declare these) */
 enum
 {
@@ -575,28 +565,6 @@ typedef char ai_globals_service_data_current_highest_offset_assert[
 typedef char ai_globals_service_data_grenades_enabled_offset_assert[
 	offsetof(struct ai_globals_service_data, grenades_enabled) == 0x3B4 ? 1 : -1];
 
-/* ai_profile.c owns the profile globals; actors bumps only the January
- * authenticated per-tick meters, so model the 0x88-byte meter records that
- * follow the profile header locally. */
-struct ai_profile_meter
-{
-	short current;
-	byte __unknown2[0x86];
-};
-
-struct ai_profile_meter_globals
-{
-	byte __unknown0[0xC];
-	struct ai_profile_meter meters[NUMBER_OF_AI_METERS];
-};
-
-typedef char ai_profile_meter_size_assert[
-	sizeof(struct ai_profile_meter) == 0x88 ? 1 : -1];
-typedef char ai_profile_meter_globals_actors_updated_offset_assert[
-	offsetof(struct ai_profile_meter_globals, meters) + _ai_meter_actors_updated * sizeof(struct ai_profile_meter) == 0x1A4 ? 1 : -1];
-typedef char ai_profile_meter_globals_units_active_offset_assert[
-	offsetof(struct ai_profile_meter_globals, meters) + _ai_meter_units_active * sizeof(struct ai_profile_meter) == 0x3C4 ? 1 : -1];
-
 /* ---------- prototypes */
 
 /* January keeps this function private to ACTORS.C. */
@@ -620,7 +588,6 @@ short const global_movement_animation_states[NUMBER_OF_ACTOR_MOVEMENT_TYPES] =
 };
 
 extern struct ai_globals_service_data *ai_globals;
-extern struct ai_profile_meter_globals ai_profile;
 
 /* ---------- public code */
 
@@ -3943,26 +3910,26 @@ static boolean actor_general_update(
 	struct actor_datum *actor = actor_get(actor_index);
 	boolean result = TRUE;
 
-	ai_profile.meters[_ai_meter_actors_updated].current++;
+	ai_profile.meters[_ai_meter_actors_updated].accumulator++;
 	if (!actor->meta.dormant)
 	{
-		ai_profile.meters[_ai_meter_actors_active].current++;
+		ai_profile.meters[_ai_meter_actors_active].accumulator++;
 	}
 
 	if (actor->meta.swarm)
 	{
-		ai_profile.meters[_ai_meter_units_updated].current += actor->meta.swarm_unit_count;
+		ai_profile.meters[_ai_meter_units_updated].accumulator += actor->meta.swarm_unit_count;
 		if (!actor->meta.dormant)
 		{
-			ai_profile.meters[_ai_meter_units_active].current += actor->meta.swarm_unit_count;
+			ai_profile.meters[_ai_meter_units_active].accumulator += actor->meta.swarm_unit_count;
 		}
 	}
 	else
 	{
-		ai_profile.meters[_ai_meter_units_updated].current++;
+		ai_profile.meters[_ai_meter_units_updated].accumulator++;
 		if (!actor->meta.dormant)
 		{
-			ai_profile.meters[_ai_meter_units_active].current++;
+			ai_profile.meters[_ai_meter_units_active].accumulator++;
 		}
 	}
 

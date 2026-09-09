@@ -894,6 +894,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "ai/ai_profile.h"
 #include "effects/weather_particle_systems.h"
 #include "hs.h"
 #include "main/main.h"
@@ -924,7 +925,6 @@ typedef char verify_hs_external_global_definition_size[
 short const hs_external_global_count = 443;
 
 extern byte ai_debug[];
-extern byte ai_profile[];
 extern byte allow_out_of_sync[];
 extern byte breakable_surface_effect_enabled[];
 extern byte cheat[];
@@ -1368,16 +1368,16 @@ struct hs_external_global_definition hs_external_global_definitions[442] =
 	{ "debug_collision_skip_vectors", _hs_type_boolean, 0, debug_collision_skip_vectors },
 	{ "debug_material_effects", _hs_type_boolean, 0, debug_material_effects },
 	{ "weather", _hs_type_boolean, 0, &weather },
-	{ "ai_profile_disable", _hs_type_boolean, 0, ai_profile },
-	{ "ai_profile_random", _hs_type_boolean, 0, ai_profile + 0x1 },
-	{ "ai_show", _hs_type_boolean, 0, ai_profile + 0x4 },
-	{ "ai_show_stats", _hs_type_boolean, 0, ai_profile + 0x5 },
-	{ "ai_show_actors", _hs_type_boolean, 0, ai_profile + 0x6 },
-	{ "ai_show_swarms", _hs_type_boolean, 0, ai_profile + 0x7 },
-	{ "ai_show_paths", _hs_type_boolean, 0, ai_profile + 0x8 },
-	{ "ai_show_line_of_sight", _hs_type_boolean, 0, ai_profile + 0x9 },
-	{ "ai_show_prop_types", _hs_type_boolean, 0, ai_profile + 0xA },
-	{ "ai_show_sound_distance", _hs_type_boolean, 0, ai_profile + 0xB },
+	{ "ai_profile_disable", _hs_type_boolean, 0, &ai_profile.disabled },
+	{ "ai_profile_random", _hs_type_boolean, 0, &ai_profile.move_actors_randomly },
+	{ "ai_show", _hs_type_boolean, 0, &ai_profile.show },
+	{ "ai_show_stats", _hs_type_boolean, 0, &ai_profile.show_stats },
+	{ "ai_show_actors", _hs_type_boolean, 0, &ai_profile.show_actors },
+	{ "ai_show_swarms", _hs_type_boolean, 0, &ai_profile.show_swarms },
+	{ "ai_show_paths", _hs_type_boolean, 0, &ai_profile.show_paths },
+	{ "ai_show_line_of_sight", _hs_type_boolean, 0, &ai_profile.show_line_of_sight },
+	{ "ai_show_prop_types", _hs_type_boolean, 0, &ai_profile.show_prop_types },
+	{ "ai_show_sound_distance", _hs_type_boolean, 0, &ai_profile.show_sound_distance },
 	{ "ai_render", _hs_type_boolean, 0, ai_debug + 0xA5 },
 	{ "ai_render_all_actors", _hs_type_boolean, 0, ai_debug + 0xA6 },
 	{ "ai_render_inactive_actors", _hs_type_boolean, 0, ai_debug + 0xA7 },

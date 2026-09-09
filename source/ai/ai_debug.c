@@ -102,22 +102,6 @@ struct ai_debug_globals_view
 	short field_8B8;
 	char __unknown8BA[0x22];
 };
-
-struct ai_debug_profile_map_data
-{
-	byte __unknown000[0xB28];
-	short field_B34;
-	byte __unknownB2A[0x3B6];
-};
-
-struct ai_debug_profile_globals_view
-{
-	long __unknown0;
-	boolean enabled;
-	byte __unknown5[7];
-	struct ai_debug_profile_map_data map_data;
-};
-
 struct encounter_actor_iterator
 {
 	long encounter_index;
@@ -143,12 +127,6 @@ typedef char ai_debug_globals_enterable_vehicle_offset_assert[
 	offsetof(struct ai_debug_globals_view, enterable_vehicle) == 0x3B8 ? 1 : -1];
 typedef char ai_debug_globals_size_assert[
 	sizeof(struct ai_debug_globals_view) == 0x8DC ? 1 : -1];
-typedef char ai_debug_profile_map_data_size_assert[
-	sizeof(struct ai_debug_profile_map_data) == 0xEE0 ? 1 : -1];
-typedef char ai_debug_profile_map_data_offset_assert[
-	offsetof(struct ai_debug_profile_globals_view, map_data) == 0x0C ? 1 : -1];
-typedef char ai_debug_profile_field_B34_offset_assert[
-	offsetof(struct ai_debug_profile_globals_view, map_data.field_B34) == 0xB34 ? 1 : -1];
 typedef char ai_debug_actor_iterator_size_assert[
 	sizeof(struct actor_iterator) == 0x1C ? 1 : -1];
 
@@ -252,7 +230,6 @@ struct actor_datum *actor_iterator_next(
 struct ai_debug_state ai_debug;
 
 extern struct ai_debug_globals_view *ai_globals;
-extern struct ai_debug_profile_globals_view ai_profile;
 
 struct actor_debug_info *actor_debug_array = NULL;
 struct path_debug_storage *actor_path_debug_array = NULL;
@@ -4718,7 +4695,7 @@ void ai_debug_update(
 				struct collision_result collision;
 				real_vector3d down_vector;
 
-				ai_profile.map_data.field_B34++;
+				ai_profile.meters[_ai_meter_collisions].accumulator++;
 
 				down_vector.i = global_down3d->i*1000.f;
 				down_vector.j = global_down3d->j*1000.f;

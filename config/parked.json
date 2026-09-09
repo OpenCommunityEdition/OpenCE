@@ -6020,8 +6020,8 @@
       "evidence": "Complete ordinary-C respawn update retained from January and HCEA evidence. Target and candidate are both 704 padded bytes with all 27 relocations, but the normalized code remains materially different and no precise compiler blocker is proved. Typed encounter access and named fields are preserved without fake matching constructs. Zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md.",
       "measurements": {
         "target": { "size": 704, "relocation_count": 27, "normalized_sha256": "284b0de2b79bd79600f3495bb1372b261e026d2959de7adeed7edb074fc5219d" },
-        "base": { "size": 704, "relocation_count": 27, "normalized_sha256": "647cc2e7c6b1161aac51d47e0d4b97bdc81e429042cca996570a7d1f86e8917e" },
-        "objdiff_percent": 77.697876
+        "base": { "size": 704, "relocation_count": 27, "normalized_sha256": "32d0a2476768c4f90bd26a0f1a98dedeff9f808e0be1904d6137b94a53d03627" },
+        "objdiff_percent": 77.72766
       }
     },
     {
@@ -6230,18 +6230,18 @@
       "measurements": {
         "target": { "size": 336, "relocation_count": 10, "normalized_sha256": "0aef44a538a12480aec2d0e85e44b434a56a3a3703ca0bc324a00dfdad2a3b3c" },
         "base": { "size": 336, "relocation_count": 10, "normalized_sha256": "a2c988c9fb9cb73a850cc3b148527a6ed9891b5a4425d9eef7a4babc2851cf25" },
-        "objdiff_percent": 88.17
+        "objdiff_percent": 88.16964
       }
     },
     {
       "unit": "source/ai/ai",
       "function": "_ai_test_line_of_sight",
       "class": "instruction-scheduling",
-      "evidence": "Complete typed PVS, collision, fog, expanded-source, and expanded-target visibility classifier reconstructed from January code/relocations and HCEA semantics. It preserves January's external helper schedule without emitting point_from_line3d. January is 1,008 padded bytes and candidate is 1,024, both with 50 relocations. Remaining differences are compiler-local frame/register scheduling. No fake dependency, raw offset, forced inline, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md.",
+      "evidence": "Complete typed PVS, collision, fog, expanded-source, and expanded-target visibility classifier reconstructed from January code/relocations and HCEA semantics. It preserves January's external helper schedule without emitting point_from_line3d. The retained source initializes collision_fraction before the fog path so no execution can read an indeterminate value. January is 1,008 padded bytes and candidate is 1,040, both with 50 relocations. Remaining differences are compiler-local frame/register scheduling. No fake dependency, raw offset, forced inline, undefined read, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md.",
       "measurements": {
         "target": { "size": 1008, "relocation_count": 50, "normalized_sha256": "aecb662c1c4868e27cbd680dba829bdedc994fc2f91911172ad86ecdfdec9b86" },
-        "base": { "size": 1024, "relocation_count": 50, "normalized_sha256": "7b3f15c72e0f7c1c1c7ea1372676c6a01984aad2a78b6e2a5af6764f0c3474e5" },
-        "objdiff_percent": 98.28
+        "base": { "size": 1040, "relocation_count": 50, "normalized_sha256": "61a3ce7f829fcafe2bf34705e9d6e2a0bb2be0d80257c1921cc134edb6eb0488" },
+        "objdiff_percent": 97.97885
       }
     },
     {
@@ -6263,7 +6263,7 @@
       "measurements": {
         "target": { "size": 1296, "relocation_count": 70, "normalized_sha256": "652338b1724b0f70d82160cd72c21e568a24fd099c4208e692215bb4e3d93cf8" },
         "base": { "size": 1296, "relocation_count": 70, "normalized_sha256": "5a0356c0457d3b500449b2cb4abfeeee8d281c857e47b9eb1521e35d63dbf5fd" },
-        "objdiff_percent": 93.23
+        "objdiff_percent": 93.23018
       }
     }
   ]
