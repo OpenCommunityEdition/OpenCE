@@ -6443,6 +6443,28 @@
         "base": { "size": 496, "relocation_count": 32, "normalized_sha256": "a4c30f36eb44dae31674b6beef2e74edbbfb0d7970709ecb91c52db69c38682d" },
         "objdiff_percent": 97.04402
       }
+    },
+    {
+      "unit": "source/ai/ai_communication",
+      "function": "_ai_communication_actor_talk_weight",
+      "class": "instruction-scheduling",
+      "evidence": "Best complete typed private actor speech-weight reconstruction retained from January control flow and relocations, independently corroborated by the later HaloCEA lift and the archived 2026-08-28 same-compiler experiment. Target and candidate are both 912 padded bytes, 302 instructions, and 24 relocations; objdiff reports 99.31293 percent. With the definition-correct long actor_get_perception_knowledge return type in actor_perception.h, the remaining normalized differences are one independent perception-argument push schedule and the final two boolean-local loads. The older one-difference experiment depended on a declaration that contradicted the actual owner definition and is deliberately rejected. Named actor/prop types, typed accessors, cseries FLAG masks, and semantic private ownership are retained; no register forcing, volatile carrier, fake dependency, unrelated prototype, raw address, forced inline, assembly, or nonsensical branch is present. Zero exact credit. See docs/object_matching_logs/ai_communication_obj_private_speech_graph_20260909.md; reopen only for authoritative January source/local records or a natural same-compiler scheduling donor.",
+      "measurements": {
+        "target": { "size": 912, "relocation_count": 24, "normalized_sha256": "9e4e417453eb75eb5f5a4d4fa433f75006e5a17ba9c8c84f3921a9d0cb108279" },
+        "base": { "size": 912, "relocation_count": 24, "normalized_sha256": "4386615ddee912defcf37785c3542a0ac4bcc261c3f6e10ba497d77f154d4053" },
+        "objdiff_percent": 99.31293
+      }
+    },
+    {
+      "unit": "source/ai/ai_communication",
+      "function": "_ai_communication_finished",
+      "class": "unclassified",
+      "evidence": "Best coherent typed reply-dispatch reconstruction retained from the independent later HaloCEA lift and checked against January's public signature, table traversal, calls, and relocation graph. It handles reply-row selection, protagonist resolution, scripted-dialog and damage gates, chance/filter checks, speech construction, timer updates, and the secondary look response. January is 1,584 padded bytes with 87 relocations; the natural candidate is 896 padded bytes with 29 relocations and objdiff reports 40.492752 percent. The missing envelope is primarily unreconstructed January diagnostic/debug-string work, so no precise compiler blocker or completion claim is invented. Semantic enums, typed unit/actor access, project real types, and proper owner prototypes are retained; no compiler steering, raw offset, fake dependency, undefined read, forced inline, or nonsensical logic is present. Zero exact credit. See docs/object_matching_logs/ai_communication_obj_private_speech_graph_20260909.md; reopen for January diagnostics/source evidence or after the remaining private conversation/reply graph is naturally reconstructed.",
+      "measurements": {
+        "target": { "size": 1584, "relocation_count": 87, "normalized_sha256": "79de598402e5831bf7376d7471f92958b7ecf34ee356b0110ec16127875e524b" },
+        "base": { "size": 896, "relocation_count": 29, "normalized_sha256": "44eba783428926e28e6c68010f33daa6f131348a390fa28dca3a14a0fc79a212" },
+        "objdiff_percent": 40.492752
+      }
     }
   ]
 }
