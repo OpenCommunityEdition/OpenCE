@@ -35,6 +35,14 @@ path subsystem.  It uses `actor_get`, `actor_definition_get`, `prop_get` and
 `ai.h` and `path.h`; no raw datum/tag casts or local foreign prototypes were
 introduced.
 
+The three ACTOR_PERCEPTION.C situation declarations are exposed from the end
+of the associated `actors.h` only to consumers that opt in with
+`ACTORS_EXTERNAL_SITUATION_ROUTINES`. Their earlier placement in the middle
+of that heavily shared header perturbed C2's declaration-position-sensitive
+allocation in `units.obj` and reopened one otherwise exact owner. The opt-in
+owner declaration keeps ActionFlee fully typed while preserving all 189
+exact `units.obj` functions.
+
 The second exact owner carries January's line-470 assertion, validates the
 current encounter firing position, honors the already-at-destination fast
 path, and compares the squared body distance against the actor's destination
