@@ -263,7 +263,8 @@ void weapon_owner_update(long weapon_index, word control_flags, real primary_tri
 struct weapon_interface_state;
 
 boolean weapon_new(long weapon_index);
-void weapon_export_function_values(long weapon_index);
+void weapon_export_function_values(
+	long weapon_index);
 
 void weapon_set_total_rounds(long weapon_index, short *rounds_array);
 void weapon_set_current_amount(

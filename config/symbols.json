@@ -4017,7 +4017,7 @@
 { "file_offset": 961632, "flags": 32, "name": "_weapon_get_effect_object_index" },
 { "file_offset": 961680, "flags": 32, "name": "_weapon_get_owner_object_index" },
 { "file_offset": 961744, "flags": 32, "name": "_code_000eacd0" },
-{ "file_offset": 961824, "flags": 32, "name": "_code_000ead20" },
+{ "file_offset": 961824, "flags": 0, "name": "_weapon_trigger_get_charged_fraction", "static": true },
 { "file_offset": 961968, "flags": 32, "name": "_code_000eadb0" },
 { "file_offset": 962208, "flags": 32, "name": "_code_000eaea0" },
 { "file_offset": 962288, "flags": 32, "name": "_weapon_effect_new" },

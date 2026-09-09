@@ -106,6 +106,7 @@ symbols in this file:
 #include "game/game_globals.h"
 #include "game/player_control.h"
 #include "game/players.h"
+#include "items/weapon_datum_flags.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
 #include "models/model_animations.h"
@@ -126,11 +127,6 @@ symbols in this file:
 enum
 {
 	_render_model_first_person_bit = 3,
-};
-
-enum
-{
-	_weapon_overheated_bit = 0,
 };
 
 enum
