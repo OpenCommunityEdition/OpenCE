@@ -13,13 +13,22 @@ GATE = ['python', 'tools/campaign/gate.py']
 
 
 def unique_blobs(path):
-    brs = subprocess.run(['git', 'for-each-ref', '--format=%(refname:short)', 'refs/heads'],
-                         capture_output=True, text=True).stdout.split()
+    # Asking every branch for the same path scales as O(branches) Git process
+    # launches (more than a thousand in the campaign repository).  rev-list's
+    # object walk returns each reachable historical blob in one Git process.
+    # A blob hash is sufficient provenance for the compile sweep; a promising
+    # result can be mapped back to its commits with git log --find-object.
+    rows = subprocess.run(
+        ['git', 'rev-list', '--objects', '--all', '--', path],
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
     blobs = {}
-    for b in brs:
-        r = subprocess.run(['git', 'rev-parse', f'{b}:{path}'], capture_output=True, text=True)
-        if r.returncode == 0:
-            blobs.setdefault(r.stdout.strip(), []).append(b)
+    for row in rows:
+        fields = row.split(' ', 1)
+        if len(fields) == 2 and fields[1] == path:
+            blob = fields[0]
+            blobs.setdefault(blob, []).append(f'history:{blob[:8]}')
     return blobs
 
 

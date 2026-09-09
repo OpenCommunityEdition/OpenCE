@@ -207,6 +207,20 @@ branches' `source/units/units.c`, splices each into the current file, compiles,
 and gates. Finds work already done in another lane. Generalize by editing the
 unit path constants.
 
+## branch_sweep.py — fast historical source census
+
+```
+python tools/campaign/branch_sweep.py source/ai/actor_type_infection
+python tools/campaign/branch_sweep.py --near
+```
+
+Compiles each distinct reachable historical blob for the selected translation
+unit against the current target and flags versions that gate better than the
+current source. Blob discovery uses one `git rev-list --objects` walk per file,
+so runtime scales with distinct source versions rather than with the repository's
+large branch count. Map a promising `history:<blob>` result back to commits with
+`git log --all --find-object=<blob>` before source and provenance review.
+
 ## Related tools (already in tools/)
 
 - `tools/bijection_walk.py` — register-bijection lockstep walker; the instrument
