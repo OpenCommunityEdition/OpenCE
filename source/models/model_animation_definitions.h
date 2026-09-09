@@ -59,6 +59,8 @@ enum
 
 #define animation_graph_animation_index_get(block)	((struct animation_graph_animation_index *)((block)->address))
 
+#define animation_get_default_data(animation) ((animation)->default_data.address)
+
 /* ---------- structures */
 
 struct animation
@@ -310,6 +312,8 @@ extern struct animation_list device_animation_list;
 extern char *damage_type_strings[4];
 extern char *damage_direction_strings[4];
 extern char *damage_part_strings[11];
+
+extern boolean hs_model_animation_compression_enabled;
 
 /* ---------- public code */
 
