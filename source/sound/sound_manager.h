@@ -48,6 +48,8 @@ void sound_reconnect_to_structure_bsp(
 
 long sound_render_time(
 	void);
+void sound_render(
+	void);
 
 void sound_stop_all(
 	void);

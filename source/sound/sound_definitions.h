@@ -54,6 +54,13 @@ enum looping_sound_definition_flags
 	NUMBER_OF_LOOPING_SOUND_FLAGS,
 };
 
+enum detail_dont_play_flags
+{
+	_detail_dont_play_with_alternate_bit,
+	_detail_dont_play_without_alternate_bit,
+	NUMBER_OF_DETAIL_DONT_PLAY_FLAGS,
+};
+
 /* ---------- macros */
 
 #define sound_definition_get(index) ((struct sound_definition *)tag_get(SOUND_DEFINITION_TAG, (index)))
@@ -126,9 +133,9 @@ struct sound_definition
 	struct tag_reference promotion_sound;
 	short promotion_count;
 	short unknown0;
-	unsigned long longest_permutation_length;
-	unsigned long promotion_counter;
-	unsigned long promotion_time;
+	long longest_permutation_length;
+	long promotion_counter;
+	long promotion_time;
 	unsigned long scripting_time;
 	long scripting_sound_index;
 	struct tag_block pitch_ranges;

@@ -3299,6 +3299,7 @@ boolean hs_parse_inspect(
 	short function_index,
 	long expression_index)
 {
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	boolean result = FALSE;
 	long argument_expression_index;
 
