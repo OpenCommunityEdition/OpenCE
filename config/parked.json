@@ -557,6 +557,63 @@
       }
     },
     {
+      "unit": "source/main/main",
+      "function": "_main_get_window_count",
+      "class": "unclassified",
+      "evidence": "Complete typed January window-count policy reconstructed from the HCEA behavior and target call graph. It forces one window for engine single-screen mode, cinematics, or fewer than one local player, caps the result at MAXIMUM_WINDOWS, and otherwise returns the local-player count. Target and candidate are both 64 padded bytes with all five relocation identities. Ordinary source produces a 79.210526 percent residual because VC7 reorders the repeated local_player_count calls and branch tails; the prior bounded source-shape review did not recover January's placement without artificial control. No compiler steering, barrier, volatile access, raw offset, fake dependency, undefined behavior, or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/main_obj_lifecycle_and_fuzzy_reconstruction_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 64,
+          "relocation_count": 5,
+          "normalized_sha256": "cc9155af657ad736bf7fd5410a94b6eb05279075318066650757e10bbdda0e9b"
+        },
+        "base": {
+          "size": 64,
+          "relocation_count": 5,
+          "normalized_sha256": "47b068a1fa916098b3899d2671b2e8e01ef76a05b8de0061eff434d63c795eae"
+        },
+        "objdiff_percent": 79.210526
+      }
+    },
+    {
+      "unit": "source/main/main",
+      "function": "_main_change_map_name",
+      "class": "unclassified",
+      "evidence": "Complete typed January deferred-map-change lifecycle reconstructed from the HCEA source map and the historical same-compiler exact donor. It preserves menu-music fade timing, UI inhibition, local-game disposal/precache/reload, exact main_new_map ownership, and last-level profile persistence. Target and candidate are both 384 padded bytes with all 35 relocation identities. Ordinary coherent source remains a 65.166664 percent control-flow-placement residual; the target and candidate select different shared hot/cold tails despite corresponding behavior and callees. No compiler steering, barrier, volatile access, raw offset, fake dependency, undefined behavior, or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/main_obj_lifecycle_and_fuzzy_reconstruction_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 384,
+          "relocation_count": 35,
+          "normalized_sha256": "d4399d9558fa56ca1b98419bb62a950b8018cfa101637b50b9d5312af4cd8c3e"
+        },
+        "base": {
+          "size": 384,
+          "relocation_count": 35,
+          "normalized_sha256": "8273c50210453c6ec97c145fdf4bbf7d7c390bc08708b7e3eb23a6a36f3589f8"
+        },
+        "objdiff_percent": 65.166664
+      }
+    },
+    {
+      "unit": "source/main/main",
+      "function": "_main_get_solo_level_from_name",
+      "class": "unclassified",
+      "evidence": "Complete bounded lowercase scenario-name classifier reconstructed from the HCEA source map and historical same-compiler donor. It recognizes the ten campaign level stems and returns NONE otherwise. The natural short return type is retained because it is the owner contract used by the already-exact main_won_map_private caller; changing it to long closes this isolated body but regresses that exact caller and is therefore rejected. January is 368 padded bytes and the compatible candidate is 352, both with 22 relocations; objdiff reports 99.62406 percent similarity. No unrelated local extern, compiler steering, fake dependency, undefined behavior, or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/main_obj_lifecycle_and_fuzzy_reconstruction_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 368,
+          "relocation_count": 22,
+          "normalized_sha256": "68e7372c529d46cf6292e2698cf022704ed3085cbabae5fd7bedc48598bf81a9"
+        },
+        "base": {
+          "size": 352,
+          "relocation_count": 22,
+          "normalized_sha256": "980a37d83b9de7f7512e5004af01bdd801eeb09e69695638a5fef766c18d2c42"
+        },
+        "objdiff_percent": 99.62406
+      }
+    },
+    {
       "unit": "source/cache/xbox_texture_cache",
       "function": "_texture_cache_locked_block_proc",
       "class": "unclassified",

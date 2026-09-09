@@ -342,6 +342,7 @@ symbols in this file:
 #include "game/player_control.h"
 #include "game/player_control_runtime.h"
 #include "game/players.h"
+#include "game/local_players.h"
 #include "game/player_queues_new.h"
 #include "integer_math.h"
 #include "main/main_runtime.h"
@@ -581,15 +582,14 @@ struct _main_window_storage
 
 /* ---------- prototypes */
 
-extern void create_local_players(
-	void);
+long sort_controllers_ascending(
+	short const *a,
+	short const *b);
 extern void main_setup_connection(
 	void);
 extern void main_initialize_time(void);
-extern void main_change_map_name(void);
 extern void main_skip_private(void);
 extern void main_update_time(void);
-extern void main_save_map_private(void);
 extern void main_game_render(
 	double time_delta_since_tick_sec);
 extern void main_frame_rate_debug(void);
@@ -676,6 +676,93 @@ boolean gamepad_button_is_down(
 	}
 
 	return result;
+}
+
+void create_local_players(
+	void)
+{
+	short used_controllers[MAXIMUM_GAMEPADS];
+	short default_controllers[MAXIMUM_GAMEPADS];
+	short desired_controllers[MAXIMUM_GAMEPADS];
+	long i;
+	long j;
+	long player;
+	short gamepad_index;
+
+	if (main_globals.main_menu_scenario_loaded)
+	{
+		player = player_new(0, NONE, 0, NULL);
+		local_player_set_player_index(
+			0,
+			player);
+	}
+	else
+	{
+		csmemset(used_controllers, NONE, sizeof(used_controllers));
+		csmemset(desired_controllers, NONE, sizeof(desired_controllers));
+		default_controllers[0] = 0;
+		default_controllers[1] = 1;
+		default_controllers[2] = 2;
+		default_controllers[3] = 3;
+
+		match_assert(
+			"c:\\halo\\SOURCE\\main\\main.c",
+			741,
+			game_connection() == _game_connection_local);
+		for (i = 0; i < player_spawn_count; i++)
+		{
+			gamepad_index =
+				player_ui_get_single_player_local_player_controller(i);
+			desired_controllers[i] = gamepad_index;
+			if (desired_controllers[i] == NONE)
+				desired_controllers[i] = default_controllers[i];
+			match_assert(
+				"c:\\halo\\SOURCE\\main\\main.c",
+				755,
+				(desired_controllers[i]>=0) && (desired_controllers[i]<MAXIMUM_GAMEPADS));
+
+			if (used_controllers[desired_controllers[i]] != NONE)
+			{
+				for (j = 0; j < MAXIMUM_GAMEPADS; j++)
+				{
+					if (used_controllers[j] == NONE)
+					{
+						desired_controllers[i] = (short)j;
+						used_controllers[(short)j] = (short)j;
+						break;
+					}
+				}
+				match_assert(
+					"c:\\halo\\SOURCE\\main\\main.c",
+					768,
+					j<MAXIMUM_GAMEPADS);
+			}
+			else
+			{
+				used_controllers[desired_controllers[i]] = desired_controllers[i];
+			}
+		}
+
+		qsort(
+			desired_controllers,
+			MAXIMUM_GAMEPADS,
+			sizeof(*desired_controllers),
+			(int (__cdecl *)(void const *, void const *))sort_controllers_ascending);
+		for (i = 0; i < player_spawn_count; i++)
+		{
+			gamepad_index = desired_controllers[i];
+			match_assert(
+				"c:\\halo\\SOURCE\\main\\main.c",
+				784,
+				(gamepad_index>=0) && (gamepad_index<MAXIMUM_GAMEPADS));
+			player = player_new(0, NONE, gamepad_index, NULL);
+			local_player_set_player_index(
+				gamepad_index,
+				player);
+		}
+	}
+
+	return;
 }
 
 void game_connection_set(
@@ -1008,8 +1095,36 @@ void main_set_game_connection_to_film_playback(
 	return;
 }
 
-extern short main_get_solo_level_from_name(
-	char const *name);
+short main_get_solo_level_from_name(
+	char const *name)
+{
+	char lower_name[128] = { 0 };
+
+	csstrncpy(lower_name, name, NUMBEROF(lower_name) - 1);
+	lower_name[NUMBEROF(lower_name) - 1] = 0;
+	strlwr(lower_name);
+
+	if (strstr(lower_name, "a10"))
+		return 0;
+	if (strstr(lower_name, "a30"))
+		return 1;
+	if (strstr(lower_name, "a50"))
+		return 2;
+	if (strstr(lower_name, "b30"))
+		return 3;
+	if (strstr(lower_name, "b40"))
+		return 4;
+	if (strstr(lower_name, "c10"))
+		return 5;
+	if (strstr(lower_name, "c20"))
+		return 6;
+	if (strstr(lower_name, "c40"))
+		return 7;
+	if (strstr(lower_name, "d20"))
+		return 8;
+
+	return strstr(lower_name, "d40") ? 9 : NONE;
+}
 
 short main_get_current_solo_level(
 	void)
@@ -1147,6 +1262,132 @@ void compute_window_bounds(
 		pixel_bounds->y0 = rasterizer_globals.reserved04.screen_bounds.y0;
 	if (vertical_index+1==vertical_count)
 		pixel_bounds->y1 = rasterizer_globals.reserved04.screen_bounds.y1;
+
+	return;
+}
+
+short main_get_window_count(
+	void)
+{
+	if (game_engine_force_single_screen() || cinematic_in_progress())
+		return 1;
+	if (local_player_count() < 1)
+		return 1;
+	if (local_player_count() > MAXIMUM_WINDOWS)
+		return MAXIMUM_WINDOWS;
+
+	return local_player_count();
+}
+
+void main_new_map(
+	struct game_options *options)
+{
+	input_flush();
+	if (game_load(options))
+	{
+		game_initialize_for_new_map();
+	}
+	else
+	{
+		error(_error_immediate, "game_load() failed.");
+	}
+
+	if (!errors_handle())
+	{
+		create_local_players();
+		game_time_start();
+	}
+	else
+	{
+		error(_error_immediate, "main_new_map() failed.");
+	}
+	game_initial_pulse();
+
+	main_globals.reset_map = FALSE;
+	main_globals.defer_map_change = FALSE;
+	main_globals.revert_map = FALSE;
+	main_globals.skip_cinematic = FALSE;
+	main_globals.saving_map = FALSE;
+	main_globals.won_map = FALSE;
+	main_globals.lost_map = FALSE;
+	main_globals.respawn = FALSE;
+	main_globals.save_core = FALSE;
+	main_globals.switch_to_structure_bsp_index = NONE;
+	main_globals.load_core = main_globals.load_core_at_startup;
+	main_globals.load_core_at_startup = FALSE;
+
+	if (main_globals.allow_persistent_storage)
+		game_state_try_and_load_from_persistent_storage();
+	ui_widgets_disable_pause_game(30);
+
+	return;
+}
+
+void main_change_map_name(
+	void)
+{
+	if (main_globals.main_menu_scenario_loaded == TRUE)
+	{
+		if (!main_globals.map_change_load_timer)
+		{
+			if (ui_main_menu_music_active() == TRUE)
+			{
+				main_globals.map_change_load_timer =
+					main_globals.frame_start_milliseconds + 1000;
+				main_screen_shell_begin_fade(1000);
+				ui_widgets_inhibit_processing(TRUE);
+				ui_widgets_set_fade_value(0.0f);
+			}
+		}
+		else
+		{
+			unsigned long remaining_milliseconds =
+				main_globals.map_change_load_timer - main_globals.frame_start_milliseconds;
+
+			ui_widgets_set_fade_value(
+				1.0f - (real)remaining_milliseconds * 0.001f);
+		}
+
+		if (main_globals.frame_start_milliseconds < main_globals.map_change_load_timer)
+			return;
+	}
+	else
+	{
+		main_globals.map_change_load_timer = 0;
+	}
+
+	ui_widgets_set_fade_value(-1.0f);
+	ui_stop_main_menu_music();
+	main_menu_active(FALSE);
+	main_globals.main_menu_scenario_loaded = FALSE;
+	ui_widgets_inhibit_processing(FALSE);
+
+	if (game_in_progress() && main_globals.connection == _game_connection_local)
+	{
+		struct game_options options;
+		short local_player_index;
+
+		game_options_new(&options);
+		csstrncpy(
+			options.map_name,
+			main_globals.soloplayer_map_name,
+			NUMBEROF(options.map_name) - 1);
+		options.map_name[NUMBEROF(options.map_name) - 1] = 0;
+		options.difficulty = global_difficulty_level;
+		game_dispose_from_old_map();
+		game_precache_new_map(options.map_name, TRUE);
+		game_unload();
+		main_new_map(&options);
+
+		for (local_player_index = 0;
+			local_player_index < player_spawn_count;
+			local_player_index++)
+		{
+			player_profile_save_last_level_played(local_player_index);
+		}
+	}
+
+	main_globals.map_change_load_timer = 0;
 
 	return;
 }
@@ -1438,6 +1679,56 @@ void main_saving_map_private(
 	game_state_save();
 	hud_autosave(FALSE);
 	main_globals.save_map_completed = FALSE;
+	return;
+}
+
+void main_save_map_private(
+	void)
+{
+	if (!game_time_get_paused())
+	{
+		boolean save_map_safely = main_globals.save_map_safely;
+		boolean save_map = FALSE;
+
+		if (save_map_safely)
+		{
+			if (main_globals.ticks_unable_to_save++ >= 240 &&
+				main_globals.save_map_timeout)
+			{
+				if (debug_game_save)
+					console_printf(FALSE, "gave up trying to save");
+				main_globals.saving_map = FALSE;
+				return;
+			}
+			else if (main_globals.ticks_until_next_save_check-- <= 0)
+			{
+				if (game_safe_to_save())
+				{
+					if (main_globals.safe_intervals++ >= 3)
+						save_map = TRUE;
+				}
+				else
+				{
+					main_globals.safe_intervals = 0;
+				}
+				main_globals.ticks_until_next_save_check = 10;
+			}
+		}
+		else
+		{
+			if (debug_game_save)
+				console_printf(FALSE, "unsafe save");
+			save_map = TRUE;
+		}
+
+		if (save_map)
+		{
+			hud_autosave(TRUE);
+			main_globals.save_map_completed = TRUE;
+			main_globals.saving_map = FALSE;
+		}
+	}
+
 	return;
 }
 
