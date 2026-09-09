@@ -95,7 +95,24 @@ boolean projectile_aim(
 	real *result_ticks,
 	real *result_distance,
 	boolean *result_linear);
-void projectile_accelerate(long projectile_index, union real_vector3d const *acceleration);
+boolean projectile_aim_ballistic(
+	real base_velocity,
+	real gravity_scale,
+	real_point3d const *origin,
+	real_point3d const *target_point,
+	real *target_velocity_min,
+	real *target_ballistic_fraction_min,
+	real *forced_velocity,
+	boolean lob,
+	real_vector3d *result_aim_vector,
+	real *result_velocity,
+	real *result_ticks,
+	real *result_distance,
+	real *result_vertical_velocity,
+	real *result_horizontal_velocity);
+void projectile_accelerate(
+	long projectile_index,
+	union real_vector3d const *acceleration);
 
 /* ---------- globals */
 

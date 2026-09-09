@@ -162,22 +162,6 @@ enum projectile_definition_flags
 real normalize3d(
 	real_vector3d *v);
 
-boolean projectile_aim_ballistic(
-	real base_velocity,
-	real gravity_scale,
-	real_point3d const *origin,
-	real_point3d const *target_point,
-	real *target_velocity_min,
-	real *target_ballistic_fraction_min,
-	real *forced_velocity,
-	boolean lob,
-	real_vector3d *result_aim_vector,
-	real *result_velocity,
-	real *result_ticks,
-	real *result_distance,
-	real *result_vertical_velocity,
-	real *result_horizontal_velocity);
-
 boolean projectile_aim_linear(
 	real base_velocity,
 	real_point3d const *origin,

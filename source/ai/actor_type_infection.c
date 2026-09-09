@@ -52,6 +52,7 @@ symbols in this file:
 #include "props.h"
 
 #include "game/game.h"
+#include "items/projectiles.h"
 #include "units/bipeds.h"
 #include "units/units.h"
 #include "units/unit_definitions.h"
@@ -108,10 +109,14 @@ struct unit_control_data
 	real_vector3d looking_vector;
 };
 
-struct projectile_aim_direction
+union projectile_aim_direction
 {
-	real_vector2d horizontal;
-	real vertical;
+	real_vector3d vector;
+	struct
+	{
+		real_vector2d horizontal;
+		real vertical;
+	};
 };
 
 typedef char swarm_component_datum_size_check[
@@ -131,7 +136,7 @@ typedef char unit_control_data_throttle_offset_check[
 typedef char unit_control_data_facing_offset_check[
 	offsetof(struct unit_control_data, facing_vector) == 0x1C ? 1 : -1];
 typedef char projectile_aim_direction_size_check[
-	sizeof(struct projectile_aim_direction) == sizeof(real_vector3d) ? 1 : -1];
+	sizeof(union projectile_aim_direction) == sizeof(real_vector3d) ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -142,21 +147,6 @@ static short infection_wander_move_time(
 real real_random_range(
 	real lower_bound,
 	real upper_bound);
-boolean projectile_aim_ballistic(
-	real base_velocity,
-	real gravity_scale,
-	real_point3d const *origin,
-	real_point3d const *target_point,
-	real *target_velocity_min,
-	real *target_ballistic_fraction_min,
-	real *forced_velocity,
-	boolean lob,
-	struct projectile_aim_direction *result_aim_direction,
-	real *result_velocity,
-	real *result_ticks,
-	real *result_distance,
-	real *result_vertical_velocity,
-	real *result_horizontal_velocity);
 
 void infection_decide_action(
 	long actor_index);
@@ -892,7 +882,7 @@ void infection_swarm_aim_jump(
 					swarm_component->combat_target_prop_index);
 				real target_velocity_min = 0.06f;
 				real target_ballistic_fraction_min = 0.8f;
-				struct projectile_aim_direction aim_direction;
+				union projectile_aim_direction aim_direction;
 				real vertical_velocity;
 				real horizontal_velocity;
 
@@ -907,7 +897,7 @@ void infection_swarm_aim_jump(
 					&target_ballistic_fraction_min,
 					NULL,
 					FALSE,
-					&aim_direction,
+					&aim_direction.vector,
 					NULL,
 					NULL,
 					NULL,
@@ -918,14 +908,10 @@ void infection_swarm_aim_jump(
 
 					if (normalize2d(&aim_direction.horizontal) == 0.f)
 					{
-						aim_direction.horizontal.i = actor->input.facing_vector.i;
-						aim_direction.horizontal.j = actor->input.facing_vector.j;
-						aim_direction.vertical = actor->input.facing_vector.k;
+						aim_direction.vector = actor->input.facing_vector;
 						if (normalize2d(&aim_direction.horizontal) == 0.f)
 						{
-							aim_direction.horizontal.i = global_forward3d->i;
-							aim_direction.horizontal.j = global_forward3d->j;
-							aim_direction.vertical = global_forward3d->k;
+							aim_direction.vector = *global_forward3d;
 						}
 					}
 
