@@ -256,22 +256,10 @@ struct structure_weather_polyhedron
 	struct tag_block planes;
 };
 
-struct bitmap_group_sequence
-{
-	char name[32];
-	short first_bitmap_index;
-	short bitmap_count;
-	long unused[4];
-	struct tag_block sprites;
-};
-
 typedef char structure_weather_palette_entry_size_assert[
 	sizeof(struct structure_weather_palette_entry) == 0xF0 ? 1 : -1];
 typedef char structure_weather_polyhedron_size_assert[
 	sizeof(struct structure_weather_polyhedron) == 0x20 ? 1 : -1];
-typedef char bitmap_group_sequence_size_assert[
-	sizeof(struct bitmap_group_sequence) == 0x40 ? 1 : -1];
-
 /* ---------- prototypes */
 
 static struct weather_particle_system *weather_particle_system_get(

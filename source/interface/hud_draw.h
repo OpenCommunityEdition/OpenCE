@@ -36,7 +36,7 @@ void hud_retrieve_bitmap_and_bounding_rect(
 	long bitmap_group_index,
 	short sequence_index,
 	short frame_index,
-	struct bitmap_data **bitmap,
+	struct bitmap_data const **bitmap,
 	real_rectangle2d const **clip);
 long fast_ftol_C(
 	real value);

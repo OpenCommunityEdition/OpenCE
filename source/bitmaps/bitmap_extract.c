@@ -275,24 +275,6 @@ enum
 
 /* ---------- structures */
 
-struct bitmap_group_sprite
-{
-	short bitmap_index;
-	word bitmap_pad;
-	long unused;
-	real_rectangle2d bounds;
-	real_point2d registration_point;
-};
-
-struct bitmap_group_sequence
-{
-	char name[32];
-	short first_bitmap_index;
-	short bitmap_count;
-	long unused[4];
-	struct tag_block sprites;
-};
-
 struct bitmap_extract_data
 {
 	struct bitmap_extract_entry *bitmaps;
@@ -320,10 +302,6 @@ struct bitmap_extract_entry
 	long page_entry_index;
 };
 
-typedef char bitmap_group_sprite_size_assert[
-	sizeof(struct bitmap_group_sprite) == 0x20 ? 1 : -1];
-typedef char bitmap_group_sequence_size_assert[
-	sizeof(struct bitmap_group_sequence) == 0x40 ? 1 : -1];
 typedef char bitmap_extract_entry_size_assert[
 	sizeof(struct bitmap_extract_entry) == 0x10 ? 1 : -1];
 typedef char bitmap_extract_data_size_assert[

@@ -3332,7 +3332,7 @@
 { "file_offset": 788384, "flags": 32, "name": "_hud_draw_screen" },
 { "file_offset": 788704, "flags": 32, "name": "_get_return_eip" },
 { "file_offset": 788720, "flags": 32, "name": "_check_stack_buffer" },
-{ "file_offset": 788768, "flags": 32, "name": "_code_000c0920" },
+{ "file_offset": 788768, "flags": 32, "name": "_get_sprite_clip_rect", "static": true },
 { "file_offset": 789040, "flags": 32, "name": "_hud_globals_get_scale" },
 { "file_offset": 789056, "flags": 32, "name": "_hud_retrieve_bitmap_and_bounding_rect" },
 { "file_offset": 789552, "flags": 32, "name": "_code_000c0c30" },

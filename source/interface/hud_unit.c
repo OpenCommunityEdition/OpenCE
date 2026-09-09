@@ -746,7 +746,7 @@ void hud_render_damage_indicators(
 			{
 				long bitmap_group_index;
 				short sequence_index;
-				struct bitmap_data *bitmap;
+				struct bitmap_data const *bitmap;
 				real_rectangle2d const *clip;
 
 				switch (direction)
@@ -817,7 +817,7 @@ void hud_render_damage_indicators(
 
 				if (bitmap &&
 					_texture_cache_bitmap_get_hardware_format(
-						bitmap,
+						(struct bitmap_data *)bitmap,
 						FALSE,
 						TRUE))
 				{

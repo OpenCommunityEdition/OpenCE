@@ -326,24 +326,6 @@ typedef char decal_definition_size_check[
 typedef char decal_definition_map_index_offset_check[
 	offsetof(struct decal_definition, shader.map.index) == 0xE4 ? 1 : -1];
 
-struct bitmap_group_sprite
-{
-	short bitmap_index;
-	word pad002;
-	long unused004;
-	real_rectangle2d bounds;
-	real_point2d registration_point;
-};
-
-struct bitmap_group_sequence
-{
-	char name[32];
-	short first_bitmap_index;
-	short bitmap_count;
-	long unused024[4];
-	struct tag_block sprites;
-};
-
 struct decal_vertex
 {
 	real_point3d position;

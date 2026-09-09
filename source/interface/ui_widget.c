@@ -988,24 +988,12 @@ struct interface_tag_references_definition
 	byte unused[48];
 };
 
-struct bitmap_group_sequence
-{
-	char name[32];
-	short first_bitmap_index;
-	short bitmap_count;
-	long unknown024[4];
-	struct tag_block sprites;
-};
-
 typedef char verify_icon_hud_element_definition_size[
 	sizeof(struct icon_hud_element_definition) == 0x10 ? 1 : -1];
 typedef char verify_hud_globals_button_icons_offset[
 	offsetof(struct hud_globals_definition, messaging.button_icons) == 0xC4 ? 1 : -1];
 typedef char verify_interface_tag_references_definition_size[
 	sizeof(struct interface_tag_references_definition) == 0x130 ? 1 : -1];
-typedef char verify_bitmap_group_sequence_size[
-	sizeof(struct bitmap_group_sequence) == 0x40 ? 1 : -1];
-
 /* narrow views of the 'DeLa' widget definition tag and of the three block
 elements this file walks; only the members this file reaches are named and
 every other span is left explicitly unknown */
@@ -3790,7 +3778,7 @@ static void render_state_bitmap(
 	struct interface_tag_references_definition *interface_tag_references;
 	long bitmap_group_index;
 	long frame_index;
-	struct bitmap_data *bitmap;
+	struct bitmap_data const *bitmap;
 	real_rectangle2d const *clip;
 	real scale;
 	point2d point;
@@ -3815,7 +3803,8 @@ static void render_state_bitmap(
 		frame_index,
 		&bitmap,
 		&clip);
-	if (bitmap && _texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
+	if (bitmap && _texture_cache_bitmap_get_hardware_format(
+		(struct bitmap_data *)bitmap, FALSE, TRUE))
 	{
 		scale = hud_globals_get_scale(local_player_count() > 1);
 		point.x = (short)(icon->offset.x * scale + cursor_bounds->x0 + 1.0f);

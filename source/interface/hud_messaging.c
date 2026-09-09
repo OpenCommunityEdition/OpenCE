@@ -614,7 +614,7 @@ static void render_state_bitmap(
 {
 	long bitmap_group_index = hud_globals->messaging.messaging_icons.index;
 	long frame_index = 0;
-	struct bitmap_data *bitmap = NULL;
+	struct bitmap_data const *bitmap = NULL;
 	real_rectangle2d const *clip = NULL;
 	real scale;
 	point2d point;
@@ -627,7 +627,8 @@ static void render_state_bitmap(
 		frame_index,
 		&bitmap,
 		&clip);
-	if (bitmap && _texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
+	if (bitmap && _texture_cache_bitmap_get_hardware_format(
+		(struct bitmap_data *)bitmap, FALSE, TRUE))
 	{
 		scale = local_player_count() > 1 ? 0.75f : 1.0f;
 		point.x = (short)(icon->offset.x * scale + cursor_bounds->x0);

@@ -132,18 +132,6 @@ enum
 
 /* ---------- structures */
 
-struct bitmap_group_sequence
-{
-	char name[TAG_STRING_LENGTH+1];
-	short first_bitmap_index;
-	short bitmap_count;
-	long unused[4];
-	struct tag_block sprites;
-};
-
-typedef char bitmap_group_sequence_size_assert[
-	sizeof(struct bitmap_group_sequence) == 0x40 ? 1 : -1];
-
 /* ---------- prototypes */
 
 static void contrail_next_frame(

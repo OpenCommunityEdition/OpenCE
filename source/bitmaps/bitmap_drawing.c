@@ -161,15 +161,6 @@ struct bitmap_line_state
 	point2d end_point;
 };
 
-struct bitmap_group_sequence
-{
-	char name[32];
-	short first_bitmap_index;
-	short bitmap_count;
-	long unknown024[4];
-	struct tag_block sprites;
-};
-
 /* ---------- prototypes */
 
 void bitmap_initialize_line(

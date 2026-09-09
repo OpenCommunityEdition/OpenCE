@@ -256,24 +256,6 @@ struct glow_definition
 	struct tag_reference texture;
 };
 
-struct bitmap_group_sprite
-{
-	short bitmap_index;
-	word pad02;
-	long unknown004;
-	real_rectangle2d bounds;
-	real_point2d registration_point;
-};
-
-struct bitmap_group_sequence
-{
-	char name[32];
-	short first_bitmap_index;
-	short bitmap_count;
-	long unknown024[4];
-	struct tag_block sprites;
-};
-
 typedef char glow_datum_definition_index_offset_assert[
 	offsetof(struct glow_datum, definition_index) == 0x224 ? 1 : -1];
 typedef char glow_datum_bitmap_dimension_offset_assert[
@@ -294,11 +276,6 @@ typedef char glow_definition_size_assert[
 	sizeof(struct glow_definition) == 0x154 ? 1 : -1];
 typedef char bitmap_group_sequences_offset_assert[
 	offsetof(struct bitmap_group, sequences) == 0x54 ? 1 : -1];
-typedef char bitmap_group_sprite_size_assert[
-	sizeof(struct bitmap_group_sprite) == 0x20 ? 1 : -1];
-typedef char bitmap_group_sequence_size_assert[
-	sizeof(struct bitmap_group_sequence) == 0x40 ? 1 : -1];
-
 /* ---------- prototypes */
 
 static void glow_trailing_particle_update_color(

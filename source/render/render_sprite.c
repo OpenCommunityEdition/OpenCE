@@ -137,30 +137,6 @@ struct build_sprite_vertex
 typedef char build_sprite_vertex_size_assert[
 	sizeof(struct build_sprite_vertex) == 0x18 ? 1 : -1];
 
-struct bitmap_group_sprite
-{
-	short bitmap_index;
-	word pad02;
-	long unused04;
-	real_rectangle2d bounds;
-	real_point2d registration_point;
-};
-
-typedef char bitmap_group_sprite_size_assert[
-	sizeof(struct bitmap_group_sprite) == 0x20 ? 1 : -1];
-
-struct bitmap_group_sequence
-{
-	char name[32];
-	short first_bitmap_index;
-	short bitmap_count;
-	byte unused24[16];
-	struct tag_block sprites;
-};
-
-typedef char bitmap_group_sequence_size_assert[
-	sizeof(struct bitmap_group_sequence) == 0x40 ? 1 : -1];
-
 struct build_sprite_globals_data
 {
 	boolean initialized;

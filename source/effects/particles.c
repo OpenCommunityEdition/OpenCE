@@ -177,18 +177,6 @@ match_vassert(																\
 
 /* ---------- structures */
 
-struct bitmap_group_sequence
-{
-	char name[32];
-	short first_bitmap_index;
-	short bitmap_count;
-	long unused[4];
-	struct tag_block sprites;
-};
-
-typedef char bitmap_group_sequence_size_assert[
-	sizeof(struct bitmap_group_sequence) == 0x40 ? 1 : -1];
-
 /* ---------- prototypes */
 
 static boolean new_particle_is_visible(

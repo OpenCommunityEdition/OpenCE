@@ -84,6 +84,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "math/real_math.h"
+#include "bitmaps/bitmap_group.h"
 #include "interface/hud_draw.h"
 #include "interface/unit_hud_interface_definition.h"
 
@@ -97,9 +98,21 @@ enum
 
 /* ---------- macros */
 
+#define hud_draw_stack_buffer_check(line) \
+{ \
+	short corrupt_index = check_stack_buffer(stack_buffer); \
+	match_vassert("c:\\halo\\SOURCE\\interface\\hud_draw.c", line, return_eip==get_return_eip(), "corrupt return address!"); \
+	match_vassert("c:\\halo\\SOURCE\\interface\\hud_draw.c", line, corrupt_index==NONE, csprintf(temporary, "corrupt stack at %d!", corrupt_index)); \
+}
+
 /* ---------- structures */
 
 /* ---------- prototypes */
+
+static real_rectangle2d const *get_sprite_clip_rect(
+	long bitmap_group_index,
+	short sequence_index,
+	short frame_index);
 
 /* ---------- globals */
 
@@ -137,6 +150,61 @@ real hud_globals_get_scale(
 	return 1.0f;
 }
 
+void hud_retrieve_bitmap_and_bounding_rect(
+	long bitmap_group_index,
+	short sequence_index,
+	short frame_index,
+	struct bitmap_data const **bitmap,
+	real_rectangle2d const **clip)
+{
+	long return_eip = get_return_eip();
+	long stack_buffer[STACK_BUFFER_LENGTH];
+
+	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+
+	match_assert("c:\\halo\\SOURCE\\interface\\hud_draw.c", 193, bitmap);
+	match_assert("c:\\halo\\SOURCE\\interface\\hud_draw.c", 194, clip);
+
+	if (bitmap_group_index!=NONE)
+	{
+		struct bitmap_group *group = bitmap_group_get(bitmap_group_index);
+
+		if (sequence_index<group->sequences.count)
+		{
+			struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
+				&group->sequences, sequence_index, struct bitmap_group_sequence);
+			long sprite_count;
+
+			frame_index &= 0x7FFF;
+			match_assert("c:\\halo\\SOURCE\\interface\\hud_draw.c", 205, frame_index >= 0);
+
+			sprite_count = sequence->sprites.count;
+			if (sprite_count)
+			{
+				struct bitmap_group_sprite *sprite = TAG_BLOCK_GET_ELEMENT(
+					&sequence->sprites, frame_index%sprite_count, struct bitmap_group_sprite);
+
+				*bitmap = TAG_BLOCK_GET_ELEMENT(
+					&group->bitmap_data, sprite->bitmap_index, struct bitmap_data);
+			}
+			else
+			{
+				*bitmap = bitmap_group_get_bitmap_from_sequence(
+					bitmap_group_index, sequence_index, frame_index);
+			}
+		}
+	}
+
+	if (*bitmap)
+		*clip = get_sprite_clip_rect(bitmap_group_index, sequence_index, frame_index);
+	else
+		*clip = NULL;
+
+	hud_draw_stack_buffer_check(228);
+
+	return;
+}
+
 pixel32 real_alpha_intensity_to_pixel32(
 	real alpha,
 	real intensity)
@@ -167,3 +235,39 @@ long get_flash_duration(
 }
 
 /* ---------- private code */
+
+static real_rectangle2d const *get_sprite_clip_rect(
+	long bitmap_group_index,
+	short sequence_index,
+	short frame_index)
+{
+	real_rectangle2d const *result = NULL;
+	long return_eip = get_return_eip();
+	long stack_buffer[STACK_BUFFER_LENGTH];
+
+	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+
+	if (bitmap_group_index!=NONE && sequence_index!=NONE && frame_index!=NONE)
+	{
+		struct bitmap_group *group = bitmap_group_get(bitmap_group_index);
+
+		if (sequence_index<group->sequences.count)
+		{
+			struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
+				&group->sequences, sequence_index, struct bitmap_group_sequence);
+			long sprite_count = sequence->sprites.count;
+
+			if (sprite_count)
+			{
+				struct bitmap_group_sprite *sprite = TAG_BLOCK_GET_ELEMENT(
+					&sequence->sprites, frame_index%sprite_count, struct bitmap_group_sprite);
+
+				result = &sprite->bounds;
+			}
+		}
+	}
+
+	hud_draw_stack_buffer_check(100);
+
+	return result;
+}

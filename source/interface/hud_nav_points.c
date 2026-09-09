@@ -892,7 +892,7 @@ void custom_render_nav_point(
 
 	{
 		long bitmap_group_index = hud_globals->waypoint.arrow_bitmap.index;
-		struct bitmap_data *bitmap = NULL;
+		struct bitmap_data const *bitmap = NULL;
 		real_rectangle2d const *clip = NULL;
 
 		hud_retrieve_bitmap_and_bounding_rect(
@@ -902,7 +902,8 @@ void custom_render_nav_point(
 			&bitmap,
 			&clip);
 
-		if (bitmap && _texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
+		if (bitmap && _texture_cache_bitmap_get_hardware_format(
+			(struct bitmap_data *)bitmap, FALSE, TRUE))
 		{
 			point2d point;
 			real_rgb_color color;
