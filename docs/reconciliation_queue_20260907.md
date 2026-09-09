@@ -364,3 +364,24 @@ and [remaining-donor ledger](object_matching_logs/claude_remaining_donor_batch_2
 
 The canonical multi-lane treemap was force-refreshed after this build. The next
 required refresh threshold is **1,041,486 meaningful exact code bytes**.
+
+## 2026-09-08 Glow caller-connected admission
+
+The current verified batch advances canonical to **1,035,078 meaningful exact
+code bytes / 6,600 accepted exact functions**. The complete Glow graph adds 13
+strict functions and **3,592 meaningful / 3,680 padded bytes** with zero losses
+across the 8,245-function stable census. Its two remaining complete bodies are
+explicit zero-credit fuzzies; no whole-object claim is made because ordinary
+shared math COMDATs remain outside the January Glow ownership boundary.
+
+The Physics integrator trial contributes no production exact credit. Its
+genuine math-owner declaration perturbed unrelated VC7 translation units, so
+the active fuzzy body and header change were withdrawn. The complete 1,976-byte
+target-scope reconstruction is preserved under `research/reconstructions/`,
+and its private rotation helper is retained in source but remains unrooted and
+unemitted. See
+[the Glow ledger](object_matching_logs/glow_obj_house_rule_reconciliation_20260908.md)
+and [the Physics research ledger](object_matching_logs/physics_obj_update_new_reconciliation_20260908.md).
+
+This gain does not yet cross the **1,041,486-byte** treemap cadence threshold,
+so the next verified packet should be accumulated before refreshing the map.

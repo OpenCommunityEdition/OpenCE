@@ -6193,6 +6193,28 @@
         "base": { "size": 368, "relocation_count": 23, "normalized_sha256": "dd7b18146c75001cc5ddc7e35211ad1e681d072f37abdf77d2f7730c9e3348e0" },
         "objdiff_percent": 93.27049
       }
+    },
+    {
+      "unit": "source/objects/widgets/glow",
+      "function": "_get_particle_world_position",
+      "class": "unclassified",
+      "evidence": "Best complete defined-C particle spline reconstruction retained from the HCEA semantic packet, the Opus caller-connected packet, and January control-flow review. January is 1,744 padded bytes with 43 relocations; canonical is 2,528 with 55. The canonical body uses initialized side controls, a defined increasing knot sequence, and typed point/vector component copies instead of reproducing January's target-authentic uninitialized side/knot reads and point/vector pointer punning. January-confirmed y-base z-component quirks are retained. This behavioral repair remains fuzzy and receives zero exact credit. See docs/object_matching_logs/glow_obj_house_rule_reconciliation_20260908.md; reopen only for authoritative original-source, type, local-variable, or precondition evidence.",
+      "measurements": {
+        "target": { "size": 1744, "relocation_count": 43, "normalized_sha256": "84720a5067d22512436bb45e9b948155fa08a828b9adf592a50c11ddd885596b" },
+        "base": { "size": 2528, "relocation_count": 55, "normalized_sha256": "fb7bb3c6b7236d625348b35cdfa4175844acc230855ecc85e7ca966dd3b518e0" },
+        "objdiff_percent": 49.07078
+      }
+    },
+    {
+      "unit": "source/objects/widgets/glow",
+      "function": "_glow_trailing_particle_new",
+      "class": "instruction-scheduling",
+      "evidence": "Best complete natural typed-C trailing-particle constructor retained from the HCEA semantic packet and January disassembly. Target and canonical are both 608 padded bytes with all 26 relocations, but normalized code differs through x87 store scheduling. The Opus donor reached exact only after explicitly introducing t/i/j/k spill temporaries for code generation; those source-unproven compiler-steering locals were rejected under the no-fake-matching rule. The natural body remains fuzzy and receives zero exact credit. See docs/object_matching_logs/glow_obj_house_rule_reconciliation_20260908.md; reopen only for authentic source/local records or another natural same-compiler donor.",
+      "measurements": {
+        "target": { "size": 608, "relocation_count": 26, "normalized_sha256": "dfe35f0bc1c0576d568472c8be04583e4651a2fe14810520891f9608bf86ccd2" },
+        "base": { "size": 608, "relocation_count": 26, "normalized_sha256": "bcf4cefdb82e1d1eb34388f794ca0cdcc98c1d01b635c44e8796e744e9e3e920" },
+        "objdiff_percent": 95.505615
+      }
     }
   ]
 }

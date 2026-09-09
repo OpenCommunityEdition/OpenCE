@@ -242,6 +242,12 @@ static void friction_evaluate(
 	struct friction_datum *friction,
 	real_vector3d const *forward,
 	real_vector3d const *up);
+static void rotate_vectors3d_by_angular_velocity(
+	real_vector3d const *forward,
+	real_vector3d const *up,
+	real_vector3d const *angular_velocity,
+	real_vector3d *rotated_forward,
+	real_vector3d *rotated_up);
 
 /* ---------- globals */
 
@@ -909,6 +915,54 @@ void physics_compute_new(
 		add_vectors3d(total_force, &mass_point->force, total_force);
 		add_vectors3d(total_torque, &mass_point->torque, total_torque);
 	}
+
+	return;
+}
+
+static void rotate_vectors3d_by_angular_velocity(
+	real_vector3d const *forward,
+	real_vector3d const *up,
+	real_vector3d const *angular_velocity,
+	real_vector3d *rotated_forward,
+	real_vector3d *rotated_up)
+{
+	real_vector3d axis = *angular_velocity;
+	real magnitude = normalize3d(&axis);
+
+	match_assert("c:\\halo\\SOURCE\\physics\\physics.c", 944, forward!=rotated_forward);
+	match_assert("c:\\halo\\SOURCE\\physics\\physics.c", 945, up!=rotated_up);
+
+	if (magnitude != 0.0f)
+	{
+		real_matrix4x3 rotation;
+		real dot;
+
+		matrix4x3_rotation_from_axis_and_angle(
+			&rotation,
+			&axis,
+			sine(magnitude),
+			cosine(magnitude));
+		matrix4x3_transform_vector(&rotation, forward, rotated_forward);
+		matrix4x3_transform_vector(&rotation, up, rotated_up);
+		normalize3d(rotated_forward);
+
+		dot = -dot_product3d(rotated_up, rotated_forward);
+		rotated_up->i += dot*rotated_forward->i;
+		rotated_up->j += dot*rotated_forward->j;
+		rotated_up->k += dot*rotated_forward->k;
+		normalize3d(rotated_up);
+	}
+	else
+	{
+		*rotated_forward = *forward;
+		*rotated_up = *up;
+	}
+
+	match_assert_valid_real_vector3d_axes2(
+		"c:\\halo\\SOURCE\\physics\\physics.c",
+		965,
+		rotated_forward,
+		rotated_up);
 
 	return;
 }
