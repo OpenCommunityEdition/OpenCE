@@ -28,19 +28,18 @@ there are no address-derived private identifiers in the reconstructed source.
 ## Strict exact credit
 
 The frozen baseline was 16 exact, zero residual, and 16 unwritten functions.
-The focused final gate is 23 exact, three residual, and six unwritten.  Seven
+The focused final gate is 22 exact, three residual, and seven unwritten.  Six
 new functions receive strict credit:
 
 | function | meaningful bytes | padded bytes |
 |---|---:|---:|
 | `animation_is_compressed` | 67 | 80 |
-| `animation_graph_node_matrices_from_orientations` | 337 | 352 |
 | `animation_keyframe_search` | 452 | 464 |
 | `animation_get_node_orientations` | 760 | 768 |
 | `replacement_animation_apply` | 465 | 480 |
 | `overlay_animation_apply` | 518 | 528 |
 | `overlay_animation_apply_scaled` | 568 | 576 |
-| **total** | **3,167** | **3,248** |
+| **total** | **2,830** | **2,896** |
 
 `tools/campaign/gate.py` compares complete padded sections, normalized bytes,
 and ordered symbolic relocations.  All 16 inherited exact functions remain
@@ -49,20 +48,23 @@ exact; this packet claims no data or completion credit.
 ## Honest fuzzy frontier (zero credit)
 
 The following natural compressed-keyframe implementations are retained as the
-best coherent source frontier.  They compile with the target padded size and
-relocation identity but fail normalized-byte equality (`[sha]`), so none is
-counted as matching:
+best coherent source frontier. Their relocation identities agree with the
+target, but their current house-rule-correct signed frame-index contracts emit
+smaller sections and also fail normalized-byte equality. None is counted as
+matching:
 
-| semantic function | meaningful bytes | padded bytes | verdict |
-|---|---:|---:|---|
-| `animation_get_keyframe_rotation` | 779 | 784 | residual, zero credit |
-| `animation_get_keyframe_translation` | 759 | 768 | residual, zero credit |
-| `animation_get_keyframe_scale` | 742 | 752 | residual, zero credit |
-| **total** | **2,280** | **2,304** | **zero credit** |
+| semantic function | target meaningful | target padded | candidate padded | verdict |
+|---|---:|---:|---:|---|
+| `animation_get_keyframe_rotation` | 779 | 784 | 768 | residual, zero credit |
+| `animation_get_keyframe_translation` | 759 | 768 | 752 | residual, zero credit |
+| `animation_get_keyframe_scale` | 742 | 752 | 736 | residual, zero credit |
+| **total** | **2,280** | **2,304** | **2,256** | **zero credit** |
 
 These bodies implement the expected compressed-stream header decoding,
 keyframe search, default-value path, wraparound path, and interpolation.  They
-contain no undefined behavior, volatile/spill steering, self-assignment,
+use signed `short` frame-index streams consistently with the exact search
+helper and HCEA's independently recovered `int16_t` contract. They contain no
+undefined behavior, volatile/spill steering, self-assignment,
 synthetic branches, or target-byte emission.  They are parked for later
 ordinary source/codegen research rather than tuned into accidental matches.
 The donor's unrelated metric globals and other speculative bodies were not
@@ -76,10 +78,13 @@ admitted.
 - `animation_get_default_data` and the scripting compression global are now
   declared in `model_animation_definitions.h`; the redundant consumer-local
   global declaration was removed from `model_animation_definitions.c`.
-- The recovered animation node and compressed-stream layouts remain TU-private.
-  A trial placement of the node layout in the broad header correctly exposed
-  collisions with two existing purpose-specific TU layouts, so it was rejected
-  before admission.
+- The compressed-stream layout remains TU-private. The donor's exact-looking
+  `animation_graph_node_matrices_from_orientations` body and its duplicate
+  TU-private animation-node layout are not admitted. The prior canonical owner
+  audit authenticated the shared fields as `range` and `pad1` and showed that
+  moving the genuine layout perturbs inherited exact consumers under VC7. The
+  337 meaningful / 352 padded-byte body remains unwritten and gets zero credit
+  until the shared owner can be reconciled without regressions.
 - Reconstructed code uses project `real` and geometry types, flag and tag-block
   access macros, typed animation/model tag accessors, owner headers, semantic
   enum constants, one parameter per line, and explicit terminal returns.
@@ -101,7 +106,7 @@ python -B tools/campaign/gate.py source/models/model_animations --all \
   --forbid-emitted-symbol _point_from_line3d
 ```
 
-Result: `exact 23, residual 3, unwritten 6`; the forbidden-emitted-symbol
+Result: `exact 22, residual 3, unwritten 7`; the forbidden-emitted-symbol
 guard passes.
 
 The two shared-header declaration changes were measured before and after in

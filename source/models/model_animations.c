@@ -216,28 +216,12 @@ struct animation_frame_info_dx_dy_dz_dyaw
 	real dyaw;
 };
 
-struct animation_graph_node
-{
-	char name[TAG_STRING_LENGTH+1];
-	short next_sibling_node_index;
-	short first_child_node_index;
-	short parent_node_index;
-	word pad;
-	unsigned long flags;
-	real_vector3d base_vector;
-	real vector_range;
-	long unused;
-};
-
 typedef char verify_animation_frame_info_dx_dy_size[
 	sizeof(struct animation_frame_info_dx_dy) == 0x08 ? 1 : -1];
 typedef char verify_animation_frame_info_dx_dy_dyaw_size[
 	sizeof(struct animation_frame_info_dx_dy_dyaw) == 0x0C ? 1 : -1];
 typedef char verify_animation_frame_info_dx_dy_dz_dyaw_size[
 	sizeof(struct animation_frame_info_dx_dy_dz_dyaw) == 0x10 ? 1 : -1];
-typedef char verify_animation_graph_node_size[
-	sizeof(struct animation_graph_node) == 0x40 ? 1 : -1];
-
 struct compressed_animation_header
 {
 	long rotation_keyframe_frame_indices_offset;
@@ -373,64 +357,6 @@ void animation_get_x_offsets(
 	if (key_frame_x_offset)
 	{
 		*key_frame_x_offset = key_x_offset;
-	}
-
-	return;
-}
-
-void animation_graph_node_matrices_from_orientations(
-	long animation_graph_index,
-	real_matrix4x3 *node_matrices,
-	real_orientation const *node_orientations,
-	real_point3d const *origin,
-	real_vector3d const *forward,
-	real_vector3d const *up)
-{
-	struct animation_graph const *animation_graph = animation_graph_definition_get(animation_graph_index);
-	real_matrix4x3 root_matrix;
-
-	matrix4x3_from_point_and_vectors(&root_matrix, origin, forward, up);
-
-	if (animation_graph->nodes.count>0)
-	{
-		short node_queue[MAXIMUM_NODES_PER_ANIMATION];
-		short read_index = 0;
-		short write_index = 1;
-
-		node_queue[0] = 0;
-
-		do
-		{
-			short node_index = node_queue[read_index++];
-			struct animation_graph_node const *node = TAG_BLOCK_GET_ELEMENT(
-				&animation_graph->nodes,
-				node_index,
-				struct animation_graph_node);
-			real_matrix4x3 const *parent_matrix = node_index==0 ?
-				&root_matrix : &node_matrices[node->parent_node_index];
-			real_matrix4x3 node_matrix;
-
-			matrix4x3_from_orientation(&node_matrix, &node_orientations[node_index]);
-			matrix4x3_multiply(parent_matrix, &node_matrix, &node_matrices[node_index]);
-
-			if (node->next_sibling_node_index!=NONE)
-			{
-				match_assert(
-					"c:\\halo\\SOURCE\\models\\model_animations.c",
-					1250,
-					write_index<MAXIMUM_NODES_PER_MODEL);
-				node_queue[write_index++] = node->next_sibling_node_index;
-			}
-			if (node->first_child_node_index!=NONE)
-			{
-				match_assert(
-					"c:\\halo\\SOURCE\\models\\model_animations.c",
-					1256,
-					write_index<MAXIMUM_NODES_PER_MODEL);
-				node_queue[write_index++] = node->first_child_node_index;
-			}
-		}
-		while (read_index!=write_index);
 	}
 
 	return;
@@ -1175,7 +1101,7 @@ static void animation_get_keyframe_rotation(
 	short keyframe_count = (short)(node_header&(FLAG(COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS)-1));
 	short first_keyframe_index = (short)(node_header>>COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS);
 	struct compressed_quaternion_6byte const *default_rotations = (struct compressed_quaternion_6byte const *)(data+header->default_rotations_offset);
-	word const *keyframe_frame_indices;
+	short const *keyframe_frame_indices;
 	struct compressed_quaternion_6byte const *keyframe_rotations;
 	short frame_index;
 	struct compressed_quaternion_6byte const *this_keyframe;
@@ -1204,7 +1130,7 @@ static void animation_get_keyframe_rotation(
 		return;
 	}
 
-	keyframe_frame_indices = (word const *)(data+header->rotation_keyframe_frame_indices_offset)+first_keyframe_index;
+	keyframe_frame_indices = (short const *)(data+header->rotation_keyframe_frame_indices_offset)+first_keyframe_index;
 	keyframe_rotations = (struct compressed_quaternion_6byte const *)(data+header->rotation_keyframes_offset)+first_keyframe_index;
 	frame_index = (short)fast_ftol(floor(real_frame_index));
 
@@ -1307,7 +1233,7 @@ static void animation_get_keyframe_translation(
 	}
 	else
 	{
-		word const *keyframe_frame_indices = (word const *)(data+header->translation_keyframe_frame_indices_offset)+first_keyframe_index;
+		short const *keyframe_frame_indices = (short const *)(data+header->translation_keyframe_frame_indices_offset)+first_keyframe_index;
 		real_point3d const *keyframe_translations = (real_point3d const *)(data+header->translation_keyframes_offset)+first_keyframe_index;
 		short frame_index = (short)fast_ftol(floor(real_frame_index));
 		real_point3d const *this_keyframe;
@@ -1410,7 +1336,7 @@ static void animation_get_keyframe_scale(
 	}
 	else
 	{
-		word const *keyframe_frame_indices = (word const *)(data+header->scale_keyframe_frame_indices_offset)+first_keyframe_index;
+		short const *keyframe_frame_indices = (short const *)(data+header->scale_keyframe_frame_indices_offset)+first_keyframe_index;
 		real const *keyframe_scales = (real const *)(data+header->scale_keyframes_offset)+first_keyframe_index;
 		short frame_index = (short)fast_ftol(floor(real_frame_index));
 		real this_keyframe_scale;
