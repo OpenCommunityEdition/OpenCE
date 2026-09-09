@@ -471,6 +471,8 @@ extern struct data_array *global_decal_data;
 
 boolean decals_enabled= TRUE;
 static boolean decal_locked_count_reported;
+static boolean decal_delete_locked_reported;
+static boolean decal_delete_permanent_reported;
 static struct decal_globals *decal_globals;
 static struct decal_geometry decal_geometry;
 
@@ -774,6 +776,67 @@ void decals_delete_permanent_from_cluster(
 
 		match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 936, decal_globals->permanent_count>=0);
 	}
+
+	return;
+}
+
+void decal_delete(
+	long decal_index)
+{
+	struct decal_datum *decal= DECAL_GET(decal_index);
+
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 947, decal);
+
+	if (TEST_FLAG(decal->flags, _decal_locked_bit) && !decal_delete_locked_reported)
+	{
+		error(
+			_error_silent,
+			"### ERROR decals: deleting locked decal (#%d) -- tell Bernie!!",
+			decal_index);
+		decal_delete_locked_reported= TRUE;
+	}
+
+	if (TEST_FLAG(decal->flags, _decal_permanent_bit) && !decal_delete_permanent_reported)
+	{
+		error(
+			_error_silent,
+			"### ERROR decals: deleting permanent decal (#%d) -- tell Bernie!!",
+			decal_index);
+		decal_delete_permanent_reported= TRUE;
+	}
+
+	if (decal->next_decal_index!=NONE)
+	{
+		DECAL_GET(decal->next_decal_index)->previous_decal_index= decal->previous_decal_index;
+	}
+
+	if (decal->previous_decal_index!=NONE)
+	{
+		DECAL_GET(decal->previous_decal_index)->next_decal_index= decal->next_decal_index;
+	}
+	else if (decal->cluster_index==NONE)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\effects\\decals.c",
+			987,
+			decal_globals->first_disconnected_decal_index==decal_index);
+
+		decal_globals->first_disconnected_decal_index= decal->next_decal_index;
+	}
+	else
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\effects\\decals.c",
+			992,
+			decal_get_first_decal_index(decal->cluster_index, decal->layer)==decal_index);
+
+		decal_set_first_decal_index(
+			decal->cluster_index,
+			decal->layer,
+			decal->next_decal_index);
+	}
+
+	datum_delete(global_decal_data, decal_index);
 
 	return;
 }

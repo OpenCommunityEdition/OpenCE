@@ -22466,6 +22466,8 @@
 { "file_offset": 4414832, "flags": 0, "name": "_decal_globals", "static": true },
 { "file_offset": 4414840, "flags": 0, "name": "_decal_geometry", "static": true },
 { "file_offset": 4445564, "flags": 0, "name": "_decal_locked_count_reported", "static": true },
+{ "file_offset": 4445568, "flags": 0, "name": "_decal_delete_locked_reported", "static": true },
+{ "file_offset": 4445569, "flags": 0, "name": "_decal_delete_permanent_reported", "static": true },
 { "file_offset": 4445572, "flags": 0, "name": "_global_effect_marker_list", "static": true },
 { "file_offset": 4445576, "flags": 0, "name": "_debug_effects_nonviolent" },
 { "file_offset": 4445577, "flags": 0, "name": "_debug_material_effects" },
