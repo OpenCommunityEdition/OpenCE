@@ -31,17 +31,16 @@ January remains the byte and branch-semantics authority.  The first exact
 owner carries January's line-522 non-swarm assertion, selects and commits a
 cover/panic firing position, and computes an approach point through the real
 path subsystem.  It uses `actor_get`, `actor_definition_get`, `prop_get` and
-`TAG_BLOCK_GET_ELEMENT`, plus the owner-header declarations in `actors.h`,
-`ai.h` and `path.h`; no raw datum/tag casts or local foreign prototypes were
-introduced.
+`TAG_BLOCK_GET_ELEMENT`, plus declarations from the owning `ai.h`, `path.h`,
+and `actor_perception.h`; no raw datum/tag casts or local foreign prototypes
+were introduced.
 
-The three ACTOR_PERCEPTION.C situation declarations are exposed from the end
-of the associated `actors.h` only to consumers that opt in with
-`ACTORS_EXTERNAL_SITUATION_ROUTINES`. Their earlier placement in the middle
-of that heavily shared header perturbed C2's declaration-position-sensitive
-allocation in `units.obj` and reopened one otherwise exact owner. The opt-in
-owner declaration keeps ActionFlee fully typed while preserving all 189
-exact `units.obj` functions.
+The three ACTOR_PERCEPTION.C situation declarations live in the dedicated
+owner header. Their earlier placement in the middle of the heavily shared
+`actors.h` perturbed C2's declaration-position-sensitive allocation in
+`units.obj` and reopened one otherwise exact owner. Isolating the declarations
+keeps ActionFlee fully typed while preserving all 189 exact `units.obj`
+functions and the existing code generation of unrelated AI consumers.
 
 The second exact owner carries January's line-470 assertion, validates the
 current encounter firing position, honors the already-at-destination fast

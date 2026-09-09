@@ -43,9 +43,8 @@ symbols in this file:
 #include "cseries.h"
 #include "actions.h"
 #include "actor_definitions.h"
-#define ACTORS_EXTERNAL_SITUATION_ROUTINES
 #include "actors.h"
-#undef ACTORS_EXTERNAL_SITUATION_ROUTINES
+#include "actor_perception.h"
 #include "ai.h"
 #include "ai_communication.h"
 #include "ai_scenario_definitions.h"

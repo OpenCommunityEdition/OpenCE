@@ -1497,16 +1497,3 @@ extern struct data_array *actor_data;
 /* ---------- public code */
 
 #endif // __ACTORS_H
-
-/* Opt-in declarations owned by ACTOR_PERCEPTION.C.  Keeping this block after
- * the legacy include guard preserves the January C2 declaration schedule for
- * translation units that do not call these routines. */
-#ifdef ACTORS_EXTERNAL_SITUATION_ROUTINES
-void actor_situation_update_target_status(
-	long actor_index);
-void actor_situation_combat_status_update(
-	long actor_index);
-boolean actor_situation_try_new_target(
-	long actor_index,
-	long prop_index);
-#endif
