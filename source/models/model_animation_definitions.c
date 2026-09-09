@@ -275,6 +275,8 @@ symbols in this file:
 
 /* ---------- globals */
 
+extern boolean hs_model_animation_compression_enabled;
+
 typedef char verify_animation_size[
 	sizeof(struct animation) == 0xB4 ? 1 : -1];
 typedef char verify_animation_frame_count_offset[

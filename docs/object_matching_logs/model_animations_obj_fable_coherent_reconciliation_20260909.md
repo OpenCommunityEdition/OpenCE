@@ -75,9 +75,12 @@ admitted.
 - The public animation entry points were already declared in their owning
   model headers.  Private helper declarations remain in
   `model_animations.c`.
-- `animation_get_default_data` and the scripting compression global are now
-  declared in `model_animation_definitions.h`; the redundant consumer-local
-  global declaration was removed from `model_animation_definitions.c`.
+- `animation_get_default_data` is declared in
+  `model_animation_definitions.h`. The scripting compression global retains
+  its existing consumer-local declaration in `model_animation_definitions.c`:
+  promoting that declaration into the broad header perturbed canonical
+  `_unit_preprocess_node_orientations` under VC7, so the full-tree gate rejected
+  that otherwise cosmetic ownership cleanup.
 - The compressed-stream layout remains TU-private. The donor's exact-looking
   `animation_graph_node_matrices_from_orientations` body and its duplicate
   TU-private animation-node layout are not admitted. The prior canonical owner
@@ -109,12 +112,13 @@ python -B tools/campaign/gate.py source/models/model_animations --all \
 Result: `exact 22, residual 3, unwritten 7`; the forbidden-emitted-symbol
 guard passes.
 
-The two shared-header declaration changes were measured before and after in
+The shared-header macro change was measured before and after in
 every direct or transitive C consumer: `vehicles`, `units`,
 `biped_limp_noodle`, `bipeds`, `devices`, `model_animation_definitions`,
 `camera_scripting`, `first_person_weapons`, `weapons`, `render_sky`, `objects`,
-and `scenery`.  Their exact-function sets and gate summaries are identical:
-zero lost and zero gained functions across the complete 12-TU consumer sweep.
+and `scenery`. The final canonical full-tree sweep additionally verifies that
+all prior exact functions remain exact after the header-global trial was
+removed.
 
 `tools/fake_match_scan.py --fail-on-findings` over the three touched model
 source/header files reports zero review leads.  `git diff --check` passes.

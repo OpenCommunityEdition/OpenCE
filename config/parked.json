@@ -2,6 +2,63 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/models/model_animations",
+      "function": "_animation_get_keyframe_rotation",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant compressed-keyframe reconstruction from the 2026-09-09 Fable reconciliation. January exact-tier symbols and HCEA authenticate the private name and signed short frame-index stream. The retained body implements header decoding, default and wraparound paths, and normalized quaternion interpolation without source-pressure steering. It is 768 candidate versus 784 target padded bytes with all 43 relocation identities, remains non-exact, and receives zero credit. See docs/object_matching_logs/model_animations_obj_fable_coherent_reconciliation_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 784,
+          "relocation_count": 43,
+          "normalized_sha256": "a533276c9248c7483d0976ab483c322c903192ed9133423cd0f59912a9c87684"
+        },
+        "base": {
+          "size": 768,
+          "relocation_count": 43,
+          "normalized_sha256": "b07863488ad7253e3c23653df7074b5b3913b73ec6b8d45939ec7792bef963e1"
+        },
+        "objdiff_percent": 88.50764
+      }
+    },
+    {
+      "unit": "source/models/model_animations",
+      "function": "_animation_get_keyframe_translation",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant compressed-keyframe reconstruction from the 2026-09-09 Fable reconciliation. January exact-tier symbols and HCEA authenticate the private name and signed short frame-index stream. The retained body implements header decoding, default and wraparound paths, and point interpolation without source-pressure steering. It is 752 candidate versus 768 target padded bytes with all 37 relocation identities, remains non-exact, and receives zero credit. See docs/object_matching_logs/model_animations_obj_fable_coherent_reconciliation_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 768,
+          "relocation_count": 37,
+          "normalized_sha256": "2a4ed003246c413640a5b1cb1f2ddc8b0211fac68a0306389a6f2e5b007ae812"
+        },
+        "base": {
+          "size": 752,
+          "relocation_count": 37,
+          "normalized_sha256": "2261009b94bd607e91d7914bdc8e2bfe32a0fdcae3852f0df3297cc2467d69ad"
+        },
+        "objdiff_percent": 88.350395
+      }
+    },
+    {
+      "unit": "source/models/model_animations",
+      "function": "_animation_get_keyframe_scale",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant compressed-keyframe reconstruction from the 2026-09-09 Fable reconciliation. January exact-tier symbols and HCEA authenticate the private name and signed short frame-index stream. The retained body implements header decoding, default and wraparound paths, and scalar interpolation without source-pressure steering. It is 736 candidate versus 752 target padded bytes with all 37 relocation identities, remains non-exact, and receives zero credit. See docs/object_matching_logs/model_animations_obj_fable_coherent_reconciliation_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 752,
+          "relocation_count": 37,
+          "normalized_sha256": "842fdd10dc6dcd11802d323642403bf8b9282606e0a7a71d5d54db0da6492f13"
+        },
+        "base": {
+          "size": 736,
+          "relocation_count": 37,
+          "normalized_sha256": "013ee0c2d8e47636bcb5ec14883aa56600f0d692892a571d2a5767bddaf47c7f"
+        },
+        "objdiff_percent": 84.45783
+      }
+    },
+    {
       "unit": "source/game/player_queues_new",
       "function": "_update_client_get_maximum_possible_server_time",
       "class": "instruction-scheduling",
@@ -3065,9 +3122,9 @@
         "base": {
           "size": 672,
           "relocation_count": 43,
-          "normalized_sha256": "7db4861a5adf519e0457a0ffe785ff4d47e878fda47cc0a06206a529776ac91c"
+          "normalized_sha256": "885fdb81966284acf5ba7138a4bbbd2221e7c61c89114fdd6f53b96ba89b81a0"
         },
-        "objdiff_percent": 97.76382
+        "objdiff_percent": 97.67839
       }
     },
     {
