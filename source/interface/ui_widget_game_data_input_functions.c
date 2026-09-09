@@ -1652,6 +1652,245 @@ void network_pregame_status_screen_update(
 	return;
 }
 
+void splitscreen_pregame_status_screen_update(
+	struct widget_instance *widget)
+{
+	struct network_game *game = network_game_get_game();
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+		0x550,
+		ui_widget_definition_get(widget->definition_tag_index)->child_count == 3,
+		"this doesn't look like the net pregame status screen to me");
+
+	if (game)
+	{
+		short local_machine_index = network_game_client_get_machine_index(
+			global_network_game_client_get());
+		struct widget_instance *status_container = widget->child;
+		struct widget_instance *status_text = status_container->next;
+		struct widget_instance *countdown_text = status_text->next;
+		struct widget_instance *machine_name_text;
+		struct widget_instance *machine_icon;
+		struct widget_instance *player_widgets[MAXIMUM_LOCAL_PLAYERS];
+		wchar_t const *machine_name;
+		long local_player_indices[MAXIMUM_LOCAL_PLAYERS];
+		long local_player_count;
+		long machine_index;
+		long player_index;
+		long local_player_index;
+		long length;
+		boolean local_machine_found;
+
+		countdown_text->parameters.text_box.text = ui_widget_realloc(
+			countdown_text->parameters.text_box.text,
+			0x20,
+			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+			0x55C);
+		if (countdown_text->parameters.text_box.text)
+		{
+			short seconds_to_game_start = network_game_client_get_seconds_to_game_start(
+				global_network_game_client_get());
+
+			ustrncpy(countdown_text->parameters.text_box.text, L"-:--", 15);
+			status_text->visible = TRUE;
+			status_text->parameters.text_box.string_list_index = 0;
+			countdown_text->visible = TRUE;
+			if (seconds_to_game_start == 0)
+			{
+				status_text->parameters.text_box.string_list_index = 1;
+				countdown_text->visible = FALSE;
+			}
+			else if (seconds_to_game_start > 0)
+			{
+				if (seconds_to_game_start < 60)
+				{
+					usnprintf(
+						countdown_text->parameters.text_box.text,
+						15,
+						L"0:%02d",
+						seconds_to_game_start);
+				}
+				else if (seconds_to_game_start < 3600)
+				{
+					long minutes = seconds_to_game_start / 60;
+
+					usnprintf(
+						countdown_text->parameters.text_box.text,
+						15,
+						L"%02d:%02d",
+						minutes,
+						seconds_to_game_start - minutes * 60);
+				}
+				else
+				{
+					long hours = seconds_to_game_start / 3600;
+					long minutes = (seconds_to_game_start - hours * 3600) / 60;
+
+					usnprintf(
+						countdown_text->parameters.text_box.text,
+						15,
+						L"%d:%02d:%02d",
+						hours,
+						minutes,
+						seconds_to_game_start - (hours * 60 + minutes) * 60);
+				}
+			}
+			else if (game->player_count < 2 || game->variant.has_teams == TRUE)
+			{
+				status_text->visible = FALSE;
+				countdown_text->visible = FALSE;
+			}
+			countdown_text->parameters.text_box.text[15] = 0;
+		}
+
+		match_vassert(
+			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+			0x592,
+			ui_widget_definition_get(status_container->definition_tag_index)->child_count == 6,
+			"this doesn't look like the net pregame status screen to me");
+
+		local_machine_found = FALSE;
+		machine_name = L"?";
+		machine_name_text = status_container->child;
+		machine_icon = machine_name_text->next;
+		player_widgets[0] = machine_icon->next;
+		player_widgets[1] = player_widgets[0]->next;
+		player_widgets[2] = player_widgets[1]->next;
+		player_widgets[3] = player_widgets[2]->next;
+
+		for (machine_index = 0;
+			machine_index < MAXIMUM_NETWORK_MACHINE_COUNT;
+			machine_index++)
+		{
+			struct network_machine *machine = &game->machines[machine_index];
+
+			if (VALID_INDEX(machine->machine_index, MAXIMUM_NETWORK_MACHINE_COUNT) &&
+				machine->machine_index == local_machine_index)
+			{
+				struct network_machine *local_machine = network_game_client_get_machine(
+					global_network_game_client_get());
+
+				if (local_machine && local_machine->name[0])
+					machine_name = local_machine->name;
+				local_machine_found = TRUE;
+				break;
+			}
+		}
+
+		csmemset(local_player_indices, NONE, sizeof(local_player_indices));
+		local_player_count = 0;
+		for (player_index = 0;
+			player_index < (long)NUMBEROF(game->players);
+			player_index++)
+		{
+			if (network_player_is_valid(&game->players[player_index]) &&
+				game->players[player_index].machine_index == local_machine_index)
+			{
+				local_player_indices[game->players[player_index].controller_index] = player_index;
+				local_player_count++;
+				if (local_player_count == MAXIMUM_LOCAL_PLAYERS)
+					break;
+			}
+		}
+
+		length = ustrlen(machine_name);
+		machine_name_text->parameters.text_box.text = ui_widget_realloc(
+			machine_name_text->parameters.text_box.text,
+			(word)(2 * length + 2),
+			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+			0x5C2);
+		if (machine_name_text->parameters.text_box.text)
+		{
+			ustrncpy(machine_name_text->parameters.text_box.text, machine_name, length);
+			machine_name_text->parameters.text_box.text[length] = 0;
+		}
+		machine_icon->animation.current_frame_index = local_machine_found ? 1 : 0;
+
+		for (local_player_index = 0;
+			local_player_index < MAXIMUM_LOCAL_PLAYERS;
+			local_player_index++)
+		{
+			struct widget_instance *controller_bitmap;
+			struct widget_instance *name_text;
+			struct widget_instance *team_list;
+
+			match_vassert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+				0x5CC,
+				ui_widget_definition_get(
+					player_widgets[local_player_index]->definition_tag_index)->child_count == 3,
+				"this doesn't look like the net pregame status screen to me");
+
+			controller_bitmap = player_widgets[local_player_index]->child;
+			name_text = controller_bitmap->next;
+			team_list = name_text->next;
+
+			if (!game->variant.has_teams)
+				widget_instance_set_visibility_recursive(team_list, FALSE);
+
+			if (local_player_indices[local_player_index] == NONE)
+			{
+				controller_bitmap->animation.current_frame_index = 0;
+				name_text->parameters.text_box.text = ui_widget_realloc(
+					name_text->parameters.text_box.text,
+					2,
+					"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+					0x5DB);
+				if (name_text->parameters.text_box.text)
+					name_text->parameters.text_box.text[0] = 0;
+				team_list->parameters.list.selected_list_item_index = 0;
+			}
+			else
+			{
+				long name_length = ustrlen(
+					game->players[local_player_indices[local_player_index]].name);
+
+				name_text->parameters.text_box.text = ui_widget_realloc(
+					name_text->parameters.text_box.text,
+					(word)(2 * name_length + 2),
+					"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+					0x5E4);
+				if (name_text->parameters.text_box.text)
+				{
+					ustrncpy(
+						name_text->parameters.text_box.text,
+						game->players[local_player_indices[local_player_index]].name,
+						name_length);
+					name_text->parameters.text_box.text[name_length] = 0;
+				}
+
+				if (!game->variant.has_teams)
+				{
+					controller_bitmap->animation.current_frame_index = 1;
+				}
+				else
+				{
+					switch (game->players[local_player_indices[local_player_index]].team_index)
+					{
+					case _team_red:
+						controller_bitmap->animation.current_frame_index =
+							local_player_controller_bitmap_frames[1][local_player_index][1];
+						team_list->parameters.list.selected_list_item_index = 0;
+						break;
+					case _team_blue:
+						controller_bitmap->animation.current_frame_index =
+							local_player_controller_bitmap_frames[1][local_player_index][2];
+						team_list->parameters.list.selected_list_item_index = 1;
+						break;
+					default:
+						controller_bitmap->animation.current_frame_index =
+							local_player_controller_bitmap_frames[1][local_player_index][0];
+						team_list->parameters.list.selected_list_item_index = 0;
+						break;
+					}
+				}
+			}
+		}
+	}
+	return;
+}
+
 void netgame_prejoin_players(
 	struct widget_instance *widget)
 {
@@ -2597,15 +2836,14 @@ void multiplayer_game_directions(
 		long team_zero_player_count = 0;
 		long team_one_player_count = 0;
 		long player_index;
-		struct network_player *player = game->players;
 
 		for (player_index = 0;
 			player_index < NUMBEROF(game->players);
-			player_index++, player++)
+			player_index++)
 		{
-			if (network_player_is_valid(player))
+			if (network_player_is_valid(&game->players[player_index]))
 			{
-				switch (player->team_index)
+				switch (game->players[player_index].team_index)
 				{
 				case _team_red:
 					team_zero_player_count++;
@@ -3348,13 +3586,14 @@ void player_profile_3wide_list_update(
 					long names_tag_index = tag_loaded(
 						UNICODE_STRING_LIST_TAG,
 						"ui\\shell\\strings\\default_player_profile_names");
-					name = L"<unknown>";
 					if (names_tag_index != NONE)
 					{
 						name = unicode_string_list_get_string(
 							names_tag_index,
 							(short)default_name_index);
 					}
+					else
+						name = L"<unknown>";
 					ustrncpy(profile_name->parameters.text_box.text, name, 0xB);
 					profile_name->parameters.text_box.text[0xB] = 0;
 				}
@@ -3368,16 +3607,10 @@ void player_profile_3wide_list_update(
 				}
 			}
 
-			if (profile->primary_color_index < 0)
-				color_picture->animation.current_frame_index = 0;
-			else if (profile->primary_color_index >
-				player_profile_number_of_available_primary_colors() - 1)
-			{
-				color_picture->animation.current_frame_index =
-					player_profile_number_of_available_primary_colors() - 1;
-			}
-			else
-				color_picture->animation.current_frame_index = profile->primary_color_index;
+			color_picture->animation.current_frame_index = (short)PIN(
+				profile->primary_color_index,
+				0,
+				player_profile_number_of_available_primary_colors() - 1);
 
 			if (TEST_FLAG(profile->flags, _player_profile_default_profile_bit))
 			{
@@ -3393,8 +3626,8 @@ void player_profile_3wide_list_update(
 					profile,
 					&highest_level,
 					&highest_difficulty);
-				current_level_text->parameters.text_box.string_list_index =
-					(short)MIN(highest_level + 1, 9);
+				highest_level = (short)MIN(highest_level + 1, 9);
+				current_level_text->parameters.text_box.string_list_index = highest_level;
 				current_skill_text->parameters.text_box.string_list_index = highest_difficulty;
 				controls_text->parameters.text_box.string_list_index =
 					profile->controller_settings.invert_look == TRUE;
@@ -3430,26 +3663,26 @@ void player_profile_1wide_list_update(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0x85E,
 		list_widget->parent,
-		"expected qtr-screen profile selection list to have a parent");
+		"expected qtr-screen profile select list to be wrapped in a container widget");
 
 	definition = ui_widget_definition_get(list_widget->definition_tag_index);
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0x864,
 		definition->type == _ui_widget_type_spinner_list,
-		"expected a spinner list for 'mp profile select' list");
+		"expected a spinner list for 'mp player settings select' widget");
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0x865,
 		definition->child_count == 0,
-		"expected 0 children (1-wide spinner list) in qtr-screen profile selection list");
+		"expected 0 children (1-wide spinner) for 'mp player settings select' widget");
 
 	definition = ui_widget_definition_get(list_widget->parent->definition_tag_index);
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0x867,
 		definition->child_count == 3,
-		"expected qtr-screen profile selection container to have exactly 3 children");
+		"expected qtr-screen profile select wrapper screen to have 3 child widgets (pic, description, list... in that order)");
 
 	name_bitmap = list_widget->parent->child;
 	profile_description = name_bitmap->next;
@@ -3457,26 +3690,27 @@ void player_profile_1wide_list_update(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0x86D,
 		list_widget == profile_description->next,
-		"expected qtr-screen profile selection container children to end with the profile list");
+		"expected qtr-screen profile select wrapper screen to have 3 child widgets (pic, description, list... in that order)");
 
 	for (;;)
 	{
-		short selected_item_index = list_widget->parameters.list.selected_list_item_index;
-
 		match_vassert(
 			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 			0x86F,
-			selected_item_index >= 0 &&
-				selected_item_index < list_widget->parameters.list.number_of_items,
-			"qtr-screen profile list has invalid selected item index");
+			list_widget->parameters.list.selected_list_item_index >= 0 &&
+				list_widget->parameters.list.selected_list_item_index <
+					list_widget->parameters.list.number_of_items,
+			"qtr-screen profile list has invalid list item index");
 		match_vassert(
 			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 			0x872,
-			selected_item_index >= 0 &&
-				selected_item_index < list_widget->parameters.list.number_of_items,
+			list_widget->parameters.list.selected_list_item_index >= 0 &&
+				list_widget->parameters.list.selected_list_item_index <
+					list_widget->parameters.list.number_of_items,
 			"invalid list item index");
 
-		profile_index = ((long *)list_widget->parameters.list.list_items)[selected_item_index];
+		profile_index = ((long *)list_widget->parameters.list.list_items)
+			[list_widget->parameters.list.selected_list_item_index];
 		player_profile_update_cache_for_nwide_list(&profile_index, 1);
 		profile = NULL;
 
@@ -3485,7 +3719,7 @@ void player_profile_1wide_list_update(
 			long cache_index;
 
 			for (cache_index = 0;
-				cache_index < NUMBEROF(cached_player_profile);
+				cache_index < (long)NUMBEROF(cached_player_profile);
 				cache_index++)
 			{
 				if (cached_player_profile[cache_index].profile_index == profile_index)
@@ -3499,46 +3733,35 @@ void player_profile_1wide_list_update(
 		if (profile)
 			break;
 
-		if (list_widget->parameters.list.number_of_items == 0)
+		if (list_widget->parameters.list.number_of_items > 0)
 		{
-			list_widget->parameters.list.item_text = ui_widget_realloc(
-				list_widget->parameters.list.item_text,
-				4,
-				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
-				0x8D2);
-			if (list_widget->parameters.list.item_text)
-				list_widget->parameters.list.item_text[0] = 0;
-
-			name_bitmap->animation.current_frame_index = 0;
-			profile_description->parameters.text_box.text = ui_widget_realloc(
-				profile_description->parameters.text_box.text,
-				4,
-				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
-				0x8D7);
-			if (profile_description->parameters.text_box.text)
-				profile_description->parameters.text_box.text[0] = 0;
-			return;
-		}
-
-		{
-			long item_count = list_widget->parameters.list.number_of_items;
-			short selected_item_index = list_widget->parameters.list.selected_list_item_index;
-			long valid_item_count = filter_invalid_list_indices(
+			list_widget->parameters.list.number_of_items = (word)filter_invalid_list_indices(
 				(long *)list_widget->parameters.list.list_items,
-				item_count);
-
-			list_widget->parameters.list.number_of_items = (word)valid_item_count;
-			if (selected_item_index < 0)
-				list_widget->parameters.list.selected_list_item_index = 0;
-			else
-			{
-				long last_item_index = valid_item_count - 1;
-
-				if (selected_item_index > last_item_index)
-					selected_item_index = (short)last_item_index;
-				list_widget->parameters.list.selected_list_item_index = selected_item_index;
-			}
+				list_widget->parameters.list.number_of_items);
+			list_widget->parameters.list.selected_list_item_index = (short)PIN(
+				list_widget->parameters.list.selected_list_item_index,
+				0,
+				list_widget->parameters.list.number_of_items - 1);
+			continue;
 		}
+
+		list_widget->parameters.list.item_text = ui_widget_realloc(
+			list_widget->parameters.list.item_text,
+			4,
+			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+			0x8D2);
+		if (list_widget->parameters.list.item_text)
+			list_widget->parameters.list.item_text[0] = 0;
+
+		name_bitmap->animation.current_frame_index = 0;
+		profile_description->parameters.text_box.text = ui_widget_realloc(
+			profile_description->parameters.text_box.text,
+			4,
+			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+			0x8D7);
+		if (profile_description->parameters.text_box.text)
+			profile_description->parameters.text_box.text[0] = 0;
+		return;
 	}
 
 	list_widget->parameters.list.item_text = ui_widget_realloc(
@@ -3548,45 +3771,34 @@ void player_profile_1wide_list_update(
 		0x886);
 	if (list_widget->parameters.list.item_text)
 	{
-		wchar_t const *profile_name;
-
 		if (TEST_FLAG(profile->flags, _player_profile_default_profile_bit))
 		{
 			long default_name_index = profile->flags >> 8;
 			long names_tag_index = tag_loaded(
 				UNICODE_STRING_LIST_TAG,
 				"ui\\shell\\strings\\default_player_profile_names");
+			wchar_t const *profile_name = L"";
 
-			profile_name = L"";
 			if (names_tag_index != NONE)
 			{
 				profile_name = unicode_string_list_get_string(
 					names_tag_index,
 					(short)default_name_index);
 			}
+
+			ustrncpy(list_widget->parameters.list.item_text, profile_name, 0xB);
+			list_widget->parameters.list.item_text[0xB] = 0;
 		}
-		else
-			profile_name = profile->player_name;
-
-		ustrncpy(list_widget->parameters.list.item_text, profile_name, 0xB);
-		list_widget->parameters.list.item_text[0xB] = 0;
-
-		if (profile->primary_color_index < 0)
-			name_bitmap->animation.current_frame_index = 0;
 		else
 		{
-			short last_color_index =
-				player_profile_number_of_available_primary_colors() - 1;
-
-			if (profile->primary_color_index > last_color_index)
-			{
-				last_color_index =
-					player_profile_number_of_available_primary_colors() - 1;
-			}
-			else
-				last_color_index = profile->primary_color_index;
-			name_bitmap->animation.current_frame_index = last_color_index;
+			ustrncpy(list_widget->parameters.list.item_text, profile->player_name, 0xB);
+			list_widget->parameters.list.item_text[0xB] = 0;
 		}
+
+		name_bitmap->animation.current_frame_index = (short)PIN(
+			profile->primary_color_index,
+			0,
+			player_profile_number_of_available_primary_colors() - 1);
 
 		profile_description->parameters.text_box.text = ui_widget_realloc(
 			profile_description->parameters.text_box.text,
@@ -3595,55 +3807,62 @@ void player_profile_1wide_list_update(
 			0x89C);
 		if (profile_description->parameters.text_box.text)
 		{
-			char const *joystick_descriptions_path;
-			char const *button_descriptions_path;
-			long joystick_descriptions_tag_index;
-			long button_descriptions_tag_index;
-
 			if (TEST_FLAG(profile->flags, _player_profile_default_profile_bit))
 			{
-				joystick_descriptions_path =
-					"ui\\shell\\main_menu\\player_profiles_select\\joystick_set_defaults_descriptions";
-				button_descriptions_path =
-					"ui\\shell\\main_menu\\player_profiles_select\\button_set_long_descriptions";
+				long joystick_descriptions_tag_index = tag_loaded(
+					UNICODE_STRING_LIST_TAG,
+					"ui\\shell\\main_menu\\player_profiles_select\\joystick_set_defaults_descriptions");
+				long button_descriptions_tag_index = tag_loaded(
+					UNICODE_STRING_LIST_TAG,
+					"ui\\shell\\main_menu\\player_profiles_select\\button_set_long_descriptions");
+
+				if (joystick_descriptions_tag_index != NONE &&
+					button_descriptions_tag_index != NONE)
+				{
+					usnprintf(
+						profile_description->parameters.text_box.text,
+						0xFF,
+						L"%s%hs%s",
+						unicode_string_list_get_string(
+							joystick_descriptions_tag_index,
+							profile->controller_settings.joystick_preset),
+						"\r\n",
+						unicode_string_list_get_string(
+							button_descriptions_tag_index,
+							profile->controller_settings.button_preset));
+				}
+				else
+					profile_description->parameters.text_box.text[0] = 0;
+
+				profile_description->parameters.text_box.text[0xFF] = 0;
 			}
 			else
 			{
-				joystick_descriptions_path =
-					"ui\\shell\\main_menu\\player_profiles_select\\joystick_set_short_descriptions";
-				button_descriptions_path =
-					"ui\\shell\\main_menu\\player_profiles_select\\button_set_short_descriptions";
+				long joystick_descriptions_tag_index = tag_loaded(
+					UNICODE_STRING_LIST_TAG,
+					"ui\\shell\\main_menu\\player_profiles_select\\joystick_set_short_descriptions");
+				long button_descriptions_tag_index = tag_loaded(
+					UNICODE_STRING_LIST_TAG,
+					"ui\\shell\\main_menu\\player_profiles_select\\button_set_short_descriptions");
+
+				if (joystick_descriptions_tag_index != NONE &&
+					button_descriptions_tag_index != NONE)
+				{
+					usnprintf(
+						profile_description->parameters.text_box.text,
+						0xFF,
+						L"%s%hs%s",
+						unicode_string_list_get_string(
+							joystick_descriptions_tag_index,
+							profile->controller_settings.joystick_preset),
+						"\r\n",
+						unicode_string_list_get_string(
+							button_descriptions_tag_index,
+							profile->controller_settings.button_preset));
+				}
+
+				profile_description->parameters.text_box.text[0xFF] = 0;
 			}
-
-			joystick_descriptions_tag_index = tag_loaded(
-				UNICODE_STRING_LIST_TAG,
-				joystick_descriptions_path);
-			button_descriptions_tag_index = tag_loaded(
-				UNICODE_STRING_LIST_TAG,
-				button_descriptions_path);
-
-			if (joystick_descriptions_tag_index != NONE &&
-				button_descriptions_tag_index != NONE)
-			{
-				wchar_t const *joystick_description = unicode_string_list_get_string(
-					joystick_descriptions_tag_index,
-					profile->controller_settings.joystick_preset);
-				wchar_t const *button_description = unicode_string_list_get_string(
-					button_descriptions_tag_index,
-					profile->controller_settings.button_preset);
-
-				usnprintf(
-					profile_description->parameters.text_box.text,
-					0xFF,
-					L"%s%hs%s",
-					joystick_description,
-					"\r\n",
-					button_description);
-			}
-			else if (TEST_FLAG(profile->flags, _player_profile_default_profile_bit))
-				profile_description->parameters.text_box.text[0] = 0;
-
-			profile_description->parameters.text_box.text[0xFF] = 0;
 		}
 	}
 	return;
