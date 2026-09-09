@@ -87,26 +87,15 @@ struct ai_information_packet
 
 /* ---------- prototypes/AI.C */
 
-struct damage_data;
-struct scenario;
-
 void ai_initialize(
 	void);
-void ai_dispose(
-	void);
 void ai_initialize_for_new_map(
-	void);
-void ai_dispose_from_old_map(
 	void);
 void ai_place(
 	void);
 void ai_update(
 	void);
-void ai_globals_ai_active(
-	boolean enabled);
 void ai_globals_dialogue_triggers_enabled(
-	boolean enabled);
-void ai_globals_grenades_enabled(
 	boolean enabled);
 void ai_update_team_status(
 	void);
@@ -126,8 +115,6 @@ boolean ai_enemies_attacking_player(
 	void);
 boolean ai_enemies_can_see_player(
 	void);
-boolean ai_enemies_endanger_player(
-	boolean must_be_attacking);
 boolean ai_try_vehicle_eviction(
 	long actor_index,
 	long entering_unit_index,
@@ -155,25 +142,6 @@ boolean ai_release_inactive_encounters(
 	byte *working_memory,
 	short working_memory_size);
 
-long ai_get_responsible_unit(
-	long object_index,
-	boolean responsible_for_weapon_fire);
-void ai_handle_bump(
-	long unit_index,
-	long object_index,
-	union real_vector3d const *old_velocity);
-void ai_handle_death(
-	long unit_index,
-	long killer_object_index,
-	short damage_category);
-boolean ai_handle_killing_spree(
-	long unit_index,
-	short killing_spree_count);
-void ai_handle_allegiance_broken_notification(
-	short team1_index,
-	short team2_index,
-	boolean broken);
-
 void ai_handle_damage(
 	long unit_index,
 	long shooter_object_index,
@@ -187,19 +155,6 @@ void ai_handle_enter_vehicle(
 void ai_handle_exit_vehicle(
 	long unit_index,
 	long vehicle_index);
-void ai_create_mounted_weapons_for_unit(
-	long unit_index);
-void ai_handle_deleted_object(
-	long object_index);
-void ai_handle_unit_effect(
-	long unit_index,
-	short effect_type,
-	short volume);
-void ai_flush_spatial_effects(
-	void);
-void ai_reconnect_to_structure_bsp(
-	void);
-
 /* ---------- globals */
 
 void ai_index_to_string(
@@ -207,6 +162,8 @@ void ai_index_to_string(
 	struct scenario *scenario,
 	char *buffer,
 	long size);
+
+struct damage_data;
 
 boolean ai_adjust_damage(
 	long actor_index,

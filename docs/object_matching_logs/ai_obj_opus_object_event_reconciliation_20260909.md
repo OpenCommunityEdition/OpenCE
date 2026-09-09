@@ -56,9 +56,13 @@ identity.
   contains no `bss_<address>` placeholder.
 - All imported functions use semantic names; no `code_<address>` source
   function was admitted.
-- Public declarations were added to their real owners (`ai.h`,
-  `ai_communication.h`, `ai_debug.h`, `actors.h`, `encounters.h`, `props.h`,
-  and `game_allegiance.h`) rather than copied into `ai.c` or unrelated callers.
+- Public declarations remain with their subsystem owners. AI-internal lifecycle,
+  event, and actor-helper declarations used across implementation files live in
+  the existing narrow `ai_runtime.h`; `game.c` and `units.c` now include that
+  owner instead of repeating those declarations locally. Declarations that are
+  genuinely part of the broader subsystem interface remain in `ai.h`,
+  `ai_communication.h`, `ai_debug.h`, `encounters.h`, `props.h`, and
+  `game_allegiance.h`.
 - The major-upgrade enumeration lives beside
   `squad_definition::major_upgrade` in `ai_scenario_definitions.h`.
 - Unit, object, tag-block, and tag-definition access uses the established
@@ -120,3 +124,14 @@ the emitted-symbol guard passed. A separate COFF audit passed target/candidate
 function type and storage-class equality for all 22 new functions.
 `git diff --check` passed. Generated `build/` and `scratch/` artifacts are not
 part of the commit.
+
+After integration onto published canonical `6a9bc341e`, a full semantic sweep
+initially exposed two unrelated losses caused solely by the donor's broader
+header declaration placement: `game_engine::_populate_statistic_buffer` and
+`units::_unit_preprocess_node_orientations`. Narrowing the implementation-only
+declarations to `ai_runtime.h` restores both without changing any admitted AI
+body. The final rebuilt ledger is **22 gains / zero losses / +4,973 meaningful
+exact bytes**, with 6,708 accepted functions, 1,063,802 meaningful accepted
+bytes, and zero unit errors. The universal per-TU gate also reports
+`units.obj` at **189 exact / 0 residual / 0 unwritten** and `ai.obj` at
+**36 exact / 0 residual / 10 unwritten**.

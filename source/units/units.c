@@ -653,6 +653,7 @@ symbols in this file:
 
 #include "ai/actors.h"
 #include "ai/ai_debug.h"
+#include "ai/ai_runtime.h"
 #include "bitmaps/bitmaps.h"
 #include "cseries/errors.h"
 #include "cseries/profile.h"
@@ -1033,11 +1034,6 @@ static boolean unit_integrated_night_vision_is_active(long unit_index);
 boolean game_team_is_enemy(
 	short team_index0,
 	short team_index1);
-boolean ai_handle_killing_spree(
-	long unit_index,
-	short killing_spree_count);
-void ai_create_mounted_weapons_for_unit(
-	long unit_index);
 void player_died(
 	long player_index);
 void actor_died(
@@ -1055,10 +1051,6 @@ void aiming_screen_apply(
 	real yaw,
 	real pitch,
 	struct real_orientation *node_orientations);
-void ai_handle_death(
-	long unit_index,
-	long killer_object_index,
-	short damage_category);
 boolean unit_make_damage_sound(
 	long unit_index,
 	struct damage_data *damage_data,

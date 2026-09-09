@@ -123,6 +123,7 @@ struct game_options;
 #include "game/game.h"
 #undef set_random_seed
 #include "ai/ai.h"
+#include "ai/ai_runtime.h"
 #include "bink/bink_playback.h"
 #include "bungie_net/network/transport.h"
 #include "cache/cache_files.h"
@@ -242,8 +243,6 @@ void cheats_dispose(
 void ui_widgets_dispose(
 	void);
 void editor_dispose(
-	void);
-void ai_dispose(
 	void);
 void player_effect_dispose(
 	void);
