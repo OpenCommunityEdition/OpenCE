@@ -6208,6 +6208,17 @@
         "base": { "size": 944, "relocation_count": 49, "normalized_sha256": "c8f5527aacb22c833089881ef848f5d4056908d6524c3be7ac4099325db85bce" },
         "objdiff_percent": 94.5
       }
+    },
+    {
+      "unit": "source/ai/ai",
+      "function": "_ai_handle_editing",
+      "class": "unclassified",
+      "evidence": "Complete typed live-editor reconciliation reconstructed from January code, strings, assertions, and relocations with HCEA as an independent semantic map. The retained body deliberately corrects January's unsafe unscaled csmemmove record counts by multiplying the squad and platoon spans by their datum sizes. Target and candidate remain 1,296 padded bytes with all 70 relocations, but the safe source is non-exact and receives zero credit. No fake dependency, raw offset, forced inline, undefined behavior, or nonsensical logic is retained. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md.",
+      "measurements": {
+        "target": { "size": 1296, "relocation_count": 70, "normalized_sha256": "652338b1724b0f70d82160cd72c21e568a24fd099c4208e692215bb4e3d93cf8" },
+        "base": { "size": 1296, "relocation_count": 70, "normalized_sha256": "5a0356c0457d3b500449b2cb4abfeeee8d281c857e47b9eb1521e35d63dbf5fd" },
+        "objdiff_percent": 93.23
+      }
     }
   ]
 }

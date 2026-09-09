@@ -2454,7 +2454,7 @@ void ai_handle_editing(
 				csmemmove(
 					&squad_array[encounter->squad_base + encounter_definition->squads.count],
 					&squad_array[encounter->squad_base + encounter->squad_count],
-					last_squad_index - encounter->squad_base - encounter->squad_count);
+					(last_squad_index - encounter->squad_base - encounter->squad_count) * sizeof(struct squad_datum));
 
 				if (squad_count_delta > 0)
 				{
@@ -2484,7 +2484,7 @@ void ai_handle_editing(
 				csmemmove(
 					&platoon_array[encounter->platoon_base + encounter_definition->platoons.count],
 					&platoon_array[encounter->platoon_base + encounter->platoon_count],
-					last_platoon_index - encounter->platoon_base - encounter->platoon_count);
+					(last_platoon_index - encounter->platoon_base - encounter->platoon_count) * sizeof(struct platoon_datum));
 
 				if (platoon_count_delta > 0)
 				{

@@ -8,8 +8,8 @@ Starting revision: `6f8644c0c`
 
 ## Result
 
-The strict isolated gate advances this unit from 36 to 42 exact functions.
-The six newly exact owners contribute **3,386 meaningful code bytes**:
+The strict isolated gate advances this unit from 36 to 41 exact functions.
+The five newly exact owners contribute **2,090 meaningful code bytes**:
 
 | January owner | retained semantic source name | bytes |
 | --- | --- | ---: |
@@ -18,11 +18,17 @@ The six newly exact owners contribute **3,386 meaningful code bytes**:
 | `_code_0002fa30` | `ai_find_line_of_fire_friend_pills` | 368 |
 | `_ai_update` | `ai_update` | 208 |
 | `_ai_handle_spatial_effect` | `ai_handle_spatial_effect` | 1,130 |
-| `_ai_handle_editing` | `ai_handle_editing` | 1,296 |
 
-Each exact owner has equal section size, relocation count, normalized bytes,
+Each credited exact owner has equal section size, relocation count, normalized bytes,
 and normalized relocation identity under `tools/coff_compare.py`. No residual
 or previously exact owner was counted as progress.
+
+`ai_handle_editing` can reproduce January's 1,296-byte body only if the two
+`csmemmove` lengths are passed as unscaled record counts. That code is unsafe:
+`csmemmove` accepts bytes, while the arrays contain 32-byte `squad_datum` and
+16-byte `platoon_datum` records. The retained source scales both lengths by
+their record sizes. It is therefore deliberately non-exact, parked, and worth
+zero exact credit even though January appears to contain the original bug.
 
 `ai_handle_spatial_effect` has a function-local `/Od` code-generation shape in
 January: an EBP frame, stack homes for every scalar, no callee-save allocator
@@ -44,7 +50,7 @@ behavior, January location, and the HCEA cross-build reconstruction corpus.
 
 ## Best coherent non-exact bodies
 
-Three larger public routines were reconstructed completely and retained for
+Four larger public routines were reconstructed completely and retained for
 future research. They are explicitly parked and receive **zero exact credit**:
 
 | owner | January / candidate bytes | relocations | objdiff |
@@ -52,6 +58,7 @@ future research. They are explicitly parked and receive **zero exact credit**:
 | `_ai_test_line_of_fire` | 336 / 336 | 10 / 10 | 88.17% |
 | `_ai_test_line_of_sight` | 1,008 / 1,024 | 50 / 50 | 98.28% |
 | `_ai_test_ballistic_line_of_fire` | 944 / 944 | 49 / 49 | 94.50% |
+| `_ai_handle_editing` | 1,296 / 1,296 | 70 / 70 | 93.23% |
 
 These bodies preserve the observed control flow, collision-user accounting,
 debug recording, PVS/fog classification, and ballistic segmentation. The
@@ -91,6 +98,6 @@ python tools/campaign/gate.py source/ai/ai --all \
   --out scratch/ai-large-packet.obj
 ```
 
-Expected result: `exact 42`, `residual 3`, `unwritten 1`, with the emitted
+Expected result: `exact 41`, `residual 4`, `unwritten 1`, with the emitted
 symbol guard passing. The one intentionally unwritten owner is
 `_ai_disconnect_from_structure_bsp`; it was not fabricated for this packet.
