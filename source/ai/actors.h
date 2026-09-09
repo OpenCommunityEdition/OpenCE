@@ -1370,6 +1370,13 @@ long actor_perception_find_killer_prop_index(
 void actor_perception_find_prop_pathfinding_location(
 	long actor_index,
 	long prop_index);
+void actor_situation_update_target_status(
+	long actor_index);
+void actor_situation_combat_status_update(
+	long actor_index);
+boolean actor_situation_try_new_target(
+	long actor_index,
+	long prop_index);
 void actor_perception_find_sense_position(
 	long actor_index,
 	real_point3d const *position,

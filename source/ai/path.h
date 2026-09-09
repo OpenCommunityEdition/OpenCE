@@ -306,6 +306,9 @@ void path_input_new(
 	real pathfinding_radius,
 	boolean ignore_broken_surfaces,
 	long ignore_source_object_index);
+void path_input_set_target_object(
+	struct path_input *input,
+	long target_object_index);
 void path_input_set_start(
 	struct path_input *input,
 	real_point3d const *point,
@@ -329,8 +332,14 @@ void path_state_destination(
 	real_point3d const *point,
 	long surface_index,
 	real target_radius);
-void path_state_find(
+boolean path_state_find(
 	struct path_state *state);
+boolean path_state_approach_point(
+	struct path_state *state,
+	real_point2d const *end_point,
+	long end_surface_index,
+	boolean *straight_line_reference,
+	real_point3d *approach_point_reference);
 void path_state_build_path(
 	struct path_state *state,
 	boolean *complete);

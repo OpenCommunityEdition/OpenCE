@@ -95,6 +95,16 @@ struct ai_information_packet
 
 /* ---------- prototypes/AI.C */
 
+short ai_test_line_of_sight(
+	real_point3d const *origin,
+	short origin_cluster_index,
+	real_point3d const *target,
+	short target_cluster_index,
+	short mode,
+	boolean test_line_of_fire,
+	long ignore_object_index,
+	boolean ignore_vehicles);
+
 void ai_initialize(
 	void);
 void ai_initialize_for_new_map(
