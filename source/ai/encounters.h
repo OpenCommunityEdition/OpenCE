@@ -128,6 +128,8 @@ void encounters_create_for_new_map(
 	void);
 void encounters_update(
 	void);
+void encounters_update_dirty_status(
+	void);
 void encounter_update_status(
 	long encounter_index);
 void encounter_create(

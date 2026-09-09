@@ -147,6 +147,9 @@ short actor_communication_team(
 	long actor_index);
 short ai_conversation_status(
 	short scenario_conversation_index);
+boolean ai_conversation(
+	short scenario_conversation_index,
+	boolean scripted);
 long ai_conversation_new(
 	short scenario_conversation_index,
 	boolean scripted);

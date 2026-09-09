@@ -12,6 +12,14 @@ void game_allegiance_dispose_from_old_map(
 	void);
 void game_allegiance_update(
 	void);
+void game_allegiance_create(
+	short team1_index,
+	boolean team1_suspicious,
+	short team2_index,
+	boolean team2_suspicious,
+	short incident_threshold,
+	short incident_decay_time,
+	boolean requires_communication);
 boolean game_team_is_enemy(
 	short team_index0,
 	short team_index1);

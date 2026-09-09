@@ -145,6 +145,11 @@ void ai_handle_enter_vehicle(
 void ai_handle_exit_vehicle(
 	long unit_index,
 	long vehicle_index);
+void ai_erase(
+	long encounter_index,
+	long platoon_index,
+	long squad_index,
+	boolean immediate);
 
 /* ---------- globals */
 

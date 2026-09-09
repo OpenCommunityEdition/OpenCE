@@ -158,6 +158,82 @@ void ai_scripting_follow_target_unit(
 void ai_scripting_force_active(
 	long ai_reference,
 	boolean force);
+void ai_scripting_detach_units(
+	long object_list_index);
+void ai_scripting_select(
+	long ai_reference);
+short ai_scripting_status(
+	long ai_reference);
+void ai_scripting_spawn_actor(
+	long ai_reference);
+void ai_scripting_vehicle_encounter(
+	long unit_index,
+	long ai_reference);
+void ai_scripting_allegiance(
+	short team_index0,
+	short team_index1);
+void ai_scripting_renew(
+	long ai_reference);
+void ai_scripting_braindead_by_unit(
+	long object_list_index,
+	boolean braindead);
+void ai_scripting_force_active_by_unit(
+	long unit_index,
+	boolean force);
+void ai_scripting_attach_free(
+	long unit_index,
+	long actor_variant_definition_index);
+void ai_scripting_try_to_fight(
+	long ai_reference,
+	long target_ai_reference);
+void ai_scripting_set_return_state(
+	long ai_reference,
+	short default_state);
+void ai_scripting_magically_see_encounter(
+	long ai_reference,
+	long target_ai_reference);
+void ai_scripting_link_activation(
+	long ai_reference,
+	long link_ai_reference);
+void ai_scripting_free(
+	long ai_reference);
+void ai_scripting_free_units(
+	long object_list_index);
+void ai_scripting_exit_vehicle(
+	long ai_reference);
+void ai_scripting_set_current_state(
+	long ai_reference,
+	short current_state);
+void ai_scripting_command_list(
+	long ai_reference,
+	short command_list_index);
+void ai_scripting_command_list_by_unit(
+	long unit_index,
+	short command_list_index);
+void ai_scripting_try_to_fight_nothing(
+	long ai_reference);
+void ai_scripting_try_to_fight_player(
+	long ai_reference);
+void ai_scripting_ignore(
+	long object_list_index,
+	boolean ignore);
+void ai_scripting_prefer_target(
+	long object_list_index,
+	boolean prefer);
+void ai_scripting_command_list_advance(
+	long ai_reference);
+void ai_scripting_erase(
+	long ai_reference);
+void ai_scripting_place(
+	long ai_reference);
+void ai_scripting_look_at_object(
+	long unit_index,
+	long object_index);
+void ai_scripting_set_team(
+	long ai_reference,
+	short team_index);
+void ai_scripting_command_list_advance_by_unit(
+	long unit_index);
 
 /* ---------- globals */
 

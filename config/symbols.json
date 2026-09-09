@@ -761,7 +761,7 @@
 { "file_offset": 286576, "flags": 32, "name": "_ai_scripting_force_active_by_unit" },
 { "file_offset": 286784, "flags": 32, "name": "_ai_scripting_set_return_state" },
 { "file_offset": 286992, "flags": 32, "name": "_ai_scripting_set_current_state" },
-{ "file_offset": 287152, "flags": 32, "name": "_code_000461b0" },
+{ "file_offset": 287152, "flags": 32, "name": "_ai_scripting_assess_status" },
 { "file_offset": 287280, "flags": 32, "name": "_ai_scripting_status" },
 { "file_offset": 287440, "flags": 32, "name": "_ai_scripting_reconnect" },
 { "file_offset": 287456, "flags": 32, "name": "_ai_scripting_playfight" },

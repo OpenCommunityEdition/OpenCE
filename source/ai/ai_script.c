@@ -165,7 +165,7 @@ symbols in this file:
 00046110 00a0:
 	_ai_scripting_set_current_state (0000)
 000461B0 0080:
-	_code_000461b0 (0000)
+	_ai_scripting_assess_status (0000)
 00046230 00a0:
 	_ai_scripting_status (0000)
 000462D0 0010:
@@ -445,17 +445,22 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "ai/ai.h"
 #include "ai/actions.h"
 #include "ai/actor_iterators.h"
+#include "ai/actor_definitions.h"
 #include "ai/actor_looking.h"
 #include "ai/actors.h"
 #include "ai/ai_communication.h"
 #include "ai/ai_debug.h"
 #include "ai/ai_scenario_definitions.h"
 #include "ai/encounters.h"
+#include "ai/props.h"
 #include "ai/ai_script.h"
 #include "cseries/errors.h"
+#include "game/game.h"
 #include "game/game_allegiance.h"
+#include "game/players.h"
 #include "hs/hs.h"
 #include "hs/object_lists.h"
 #include "memory/data.h"
@@ -480,6 +485,61 @@ enum ai_reference_type
 	_ai_reference_type_platoon,
 	_ai_reference_type_squad,
 	NUMBER_OF_AI_REFERENCE_TYPES,
+};
+
+enum
+{
+	MAXIMUM_ACTIVATION_LINK_INDICES_PER_ENCOUNTER = 3,
+};
+
+/* actor default states (actors.c keeps this enum file-local too) */
+enum actor_default_state
+{
+	actor_default_state_none = 0,
+	actor_default_state_asleep,
+	actor_default_state_alert,
+	actor_default_state_moving_repeat_position,
+	actor_default_state_moving_loop,
+	actor_default_state_moving_loop_back_and_forth,
+	actor_default_state_moving_loop_randomly,
+	actor_default_state_moving_randomly,
+	actor_default_state_guarding,
+	actor_default_state_guarding_at_guard_point,
+	actor_default_state_searching,
+	actor_default_state_fleeing,
+	number_of_actor_default_states,
+};
+
+/* actor_state_data.mode (actors.c keeps this enum file-local too) */
+enum
+{
+	_actor_mode_braindead = 0,
+	_actor_mode_alert = 2,
+	_actor_mode_combat,
+};
+
+enum
+{
+	_actor_combat_status_none = 0,
+};
+
+/* ai unit effect types (ai.h does not yet declare these) */
+enum
+{
+	_ai_unit_effect_bump = 0,
+	_ai_unit_effect_shooting,
+	_ai_unit_effect_death_scream,
+	_ai_unit_effect_magic_sight,
+	NUMBER_OF_AI_UNIT_EFFECTS,
+};
+
+/* actor_external_orders.desired_target_type (actors.h does not yet declare these) */
+enum
+{
+	_desired_target_none = 0,
+	_desired_target_ai,
+	_desired_target_player,
+	NUMBER_OF_DESIRED_TARGET_TYPES,
 };
 
 /* encounter_datum.follow_target_type (encounters.h does not yet declare these) */
@@ -511,6 +571,13 @@ struct actor_iterator
 	boolean iterated_encounterless_list;
 	boolean active_only;
 	byte pad[2];
+	long index;
+	long next_index;
+};
+
+struct encounter_actor_iterator
+{
+	long encounter_index;
 	long index;
 	long next_index;
 };
@@ -551,22 +618,10 @@ typedef char ai_script_vehicle_candidate_distance_offset_assert[
 	offsetof(struct ai_script_vehicle_candidate, distance_squared) == 0x4 ? 1 : -1];
 typedef char ai_script_vehicle_candidate_state_offset_assert[
 	offsetof(struct ai_script_vehicle_candidate, already_going_to_vehicle) == 0x8 ? 1 : -1];
-
 /* ---------- prototypes */
 
-void ai_debug_select_actor(
-	long encounter_index,
+static long ai_scripting_assess_status(
 	long actor_index);
-boolean ai_conversation(
-	short conversation_index,
-	boolean scripted);
-void actor_delete(
-	long actor_index,
-	boolean died);
-void actor_kill(
-	long actor_index,
-	boolean silent,
-	boolean delayed);
 static void ai_scripting_kill_internal(
 	long ai_reference,
 	boolean silent);
@@ -665,6 +720,81 @@ void ai_index_to_string(
 	}
 
 	return;
+}
+
+boolean ai_index_from_string(
+	struct scenario *scenario,
+	char const *ai_string,
+	long *ai_index_reference)
+{
+	long ai_reference = NONE;
+	char const *separator;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\ai_script.c", 87, ai_string && ai_index_reference);
+
+	if (!_stricmp(ai_string, "none"))
+	{
+		*ai_index_reference = ai_reference;
+		return TRUE;
+	}
+
+	separator = strrchr(ai_string, '/');
+	if (!separator)
+	{
+		long encounter_index = scenario_get_encounter_by_name(scenario, ai_string);
+
+		if (encounter_index != NONE)
+			ai_reference = encounter_index & UNSIGNED_SHORT_MAX;
+	}
+	else
+	{
+		long encounter_name_length = separator - ai_string;
+
+		if (encounter_name_length <= TAG_STRING_LENGTH)
+		{
+			char encounter_name[TAG_STRING_LENGTH+1];
+			long encounter_index;
+
+			csstrncpy(encounter_name, ai_string, encounter_name_length);
+			encounter_name[encounter_name_length] = 0;
+
+			encounter_index = scenario_get_encounter_by_name(scenario, encounter_name);
+			if (encounter_index != NONE)
+			{
+				struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+					&scenario->ai_encounters,
+					encounter_index,
+					struct encounter_definition);
+				long squad_index = encounter_definition_get_squad_by_name(
+					encounter_definition,
+					separator + 1);
+
+				if (squad_index != NONE)
+				{
+					ai_reference = (_ai_reference_type_squad << 30) |
+						((squad_index & UNSIGNED_CHAR_MAX) << 16) |
+						(encounter_index & UNSIGNED_SHORT_MAX);
+				}
+				else
+				{
+					long platoon_index = encounter_definition_get_platoon_by_name(
+						encounter_definition,
+						separator + 1);
+
+					if (platoon_index != NONE)
+					{
+						ai_reference = (_ai_reference_type_platoon << 30) |
+							((platoon_index & UNSIGNED_CHAR_MAX) << 16) |
+							(encounter_index & UNSIGNED_SHORT_MAX);
+					}
+				}
+			}
+		}
+	}
+
+	*ai_index_reference = ai_reference;
+
+	return ai_reference != NONE;
 }
 
 void ai_index_squad_iterator_new(
@@ -849,6 +979,79 @@ struct platoon_datum *ai_index_platoon_iterator_next(
 	}
 
 	return platoon;
+}
+
+void ai_index_actor_iterator_new(
+	long ai_reference,
+	struct ai_script_actor_reference_iterator *iterator)
+{
+	struct scenario *scenario = global_scenario_try_and_get();
+
+	match_assert("c:\\halo\\SOURCE\\ai\\ai_script.c", 384, iterator);
+
+	iterator->encounter_index = ai_reference & UNSIGNED_SHORT_MAX;
+
+	if (scenario &&
+		ai_globals->ai_initialized_for_map &&
+		VALID_INDEX(iterator->encounter_index, scenario->ai_encounters.count))
+	{
+		struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->ai_encounters,
+			iterator->encounter_index & UNSIGNED_SHORT_MAX,
+			struct encounter_definition);
+
+		iterator->platoon_index = NONE;
+		iterator->squad_index = NONE;
+
+		switch ((unsigned long)ai_reference >> 30)
+		{
+		case _ai_reference_type_encounter:
+			break;
+		case _ai_reference_type_platoon:
+			iterator->platoon_index = (ai_reference >> 16) & UNSIGNED_CHAR_MAX;
+			break;
+		case _ai_reference_type_squad:
+			iterator->squad_index = (ai_reference >> 16) & UNSIGNED_CHAR_MAX;
+			break;
+		default:
+			iterator->encounter_index = NONE;
+			break;
+		}
+	}
+	else
+	{
+		iterator->encounter_index = NONE;
+	}
+
+	if (iterator->encounter_index != NONE)
+	{
+		encounter_actor_iterator_new(
+			(struct encounter_actor_iterator *)&iterator->actor_encounter_index,
+			iterator->encounter_index);
+	}
+
+	return;
+}
+
+struct actor_datum *ai_index_actor_iterator_next(
+	struct ai_script_actor_reference_iterator *iterator)
+{
+	struct actor_datum *actor;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\ai_script.c", 442, iterator);
+
+	do
+	{
+		actor = encounter_actor_iterator_next(
+			(struct encounter_actor_iterator *)&iterator->actor_encounter_index);
+	}
+	while (actor &&
+		((iterator->squad_index != NONE &&
+			iterator->squad_index != actor->meta.squad_index) ||
+		(iterator->platoon_index != NONE &&
+			iterator->platoon_index != actor->meta.platoon_index)));
+
+	return actor;
 }
 
 long object_list_from_ai_reference(
@@ -1565,6 +1768,21 @@ void ai_scripting_detach_unit(
 	return;
 }
 
+void ai_scripting_detach_units(
+	long object_list_index)
+{
+	long reference_index;
+	long unit_index = object_list_get_first(object_list_index, &reference_index);
+
+	while (unit_index != NONE)
+	{
+		ai_scripting_detach_unit(unit_index);
+		unit_index = object_list_get_next(object_list_index, &reference_index);
+	}
+
+	return;
+}
+
 void ai_scripting_kill(
 	long ai_reference)
 {
@@ -1893,6 +2111,1304 @@ void ai_scripting_go_to_vehicle_override(
 	return;
 }
 
+void ai_scripting_erase_all(
+	void)
+{
+	if (ai_debug.print_scripting)
+	{
+		error(_error_silent, "%s: ai_erase_all", hs_runtime_get_executing_thread_name());
+	}
+
+	ai_erase(NONE, NONE, NONE, FALSE);
+
+	return;
+}
+
+void ai_scripting_select(
+	long ai_reference)
+{
+	if (ai_globals->ai_initialized_for_map)
+	{
+		long encounter_index;
+
+		if (ai_reference == NONE)
+			encounter_index = NONE;
+		else
+			encounter_index = ai_reference & UNSIGNED_SHORT_MAX;
+
+		ai_debug_select_encounter(encounter_index);
+	}
+
+	return;
+}
+
+short ai_scripting_status(
+	long ai_reference)
+{
+	short status = 0;
+	struct ai_script_actor_reference_iterator iterator;
+
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[512];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_status %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	ai_index_actor_iterator_new(ai_reference, &iterator);
+	while (ai_index_actor_iterator_next(&iterator))
+	{
+		short actor_status = ai_scripting_assess_status(iterator.actor_index);
+
+		status = MAX(status, actor_status);
+	}
+
+	return status;
+}
+
+void ai_scripting_spawn_actor(
+	long ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_spawn_actor %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	if (ai_globals->ai_initialized_for_map && ai_reference != NONE)
+	{
+		long encounter_index = ai_reference & UNSIGNED_SHORT_MAX;
+		short squad_index = ((unsigned long)ai_reference >> 30) == _ai_reference_type_squad ?
+			((unsigned long)ai_reference >> 16) & UNSIGNED_CHAR_MAX : NONE;
+
+		if (squad_index == NONE &&
+			((unsigned long)ai_reference >> 30) == _ai_reference_type_platoon)
+		{
+			struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->ai_encounters,
+				DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index),
+				struct encounter_definition);
+			short search_index;
+
+			for (search_index = 0;
+				search_index < encounter_definition->squads.count;
+				search_index++)
+			{
+				struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+					&encounter_definition->squads,
+					search_index,
+					struct squad_definition);
+
+				if (squad_definition->platoon_index == (((unsigned long)ai_reference >> 16) & UNSIGNED_CHAR_MAX))
+				{
+					squad_index = search_index;
+					break;
+				}
+			}
+		}
+
+		if (squad_index != NONE)
+			encounter_spawn_actor(encounter_index, squad_index);
+	}
+
+	return;
+}
+
+void ai_scripting_vehicle_encounter(
+	long unit_index,
+	long ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[512];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(
+			_error_silent,
+			"%s: ai_vehicle_encounter <some unit> %s",
+			hs_runtime_get_executing_thread_name(),
+			ai_name);
+	}
+
+	if (unit_index != NONE)
+	{
+		struct unit_datum *vehicle = unit_get(unit_index);
+		short target_encounter_index = NONE;
+		short target_squad_index = NONE;
+
+		if (ai_reference != NONE)
+		{
+			struct scenario *scenario = global_scenario_get();
+			short encounter_index = ai_reference;
+
+			if (VALID_INDEX(encounter_index, scenario->ai_encounters.count))
+			{
+				struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+					&global_scenario_get()->ai_encounters,
+					DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index),
+					struct encounter_definition);
+				short squad_index = 0;
+
+				switch ((unsigned long)ai_reference >> 30)
+				{
+				case _ai_reference_type_encounter:
+					break;
+				case _ai_reference_type_platoon:
+				{
+					short platoon_index = (ai_reference >> 16) & UNSIGNED_CHAR_MAX;
+					short search_index;
+
+					for (search_index = 0;
+						search_index < encounter_definition->squads.count;
+						search_index++)
+					{
+						if (TAG_BLOCK_GET_ELEMENT(
+							&encounter_definition->squads,
+							search_index,
+							struct squad_definition)->platoon_index == platoon_index)
+						{
+							break;
+						}
+					}
+
+					squad_index = search_index < encounter_definition->squads.count ?
+						search_index : 0;
+					break;
+				}
+				case _ai_reference_type_squad:
+					squad_index = (ai_reference >> 16) & UNSIGNED_CHAR_MAX;
+					break;
+				default:
+					match_assert("c:\\halo\\SOURCE\\ai\\ai_script.c", 3154, !"unreachable");
+					break;
+				}
+
+				if (VALID_INDEX(squad_index, encounter_definition->squads.count))
+				{
+					target_encounter_index = ai_reference;
+					target_squad_index = squad_index;
+				}
+			}
+		}
+
+		if (target_encounter_index != NONE && target_squad_index != NONE)
+		{
+			short previous_encounter_index = vehicle->unit.fake_encounter_index;
+
+			if (previous_encounter_index != NONE)
+			{
+				struct encounter_actor_iterator iterator;
+				struct actor_datum *actor;
+
+				encounter_actor_iterator_new(&iterator, previous_encounter_index);
+				for (actor = encounter_actor_iterator_next(&iterator);
+					actor;
+					actor = encounter_actor_iterator_next(&iterator))
+				{
+					if (actor->input.vehicle_index == unit_index)
+					{
+						actor_change_encounter(
+							iterator.index,
+							target_encounter_index,
+							target_squad_index);
+					}
+				}
+			}
+		}
+
+		vehicle->unit.fake_encounter_index = target_encounter_index;
+		vehicle->unit.fake_squad_index = target_squad_index;
+	}
+
+	return;
+}
+
+void ai_scripting_attach_unit(
+	long unit_index,
+	long ai_reference)
+{
+	struct scenario *scenario = global_scenario_get();
+
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, scenario, ai_name, sizeof(ai_name));
+		error(
+			_error_silent,
+			"%s: ai_attach_unit 0x%04X %s",
+			hs_runtime_get_executing_thread_name(),
+			unit_index & UNSIGNED_SHORT_MAX,
+			ai_name);
+	}
+
+	if (ai_globals->ai_initialized_for_map &&
+		unit_index != NONE &&
+		ai_reference != NONE)
+	{
+		long encounter_index = ai_reference & UNSIGNED_SHORT_MAX;
+
+		if (VALID_INDEX(encounter_index, scenario->ai_encounters.count))
+		{
+			struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->ai_encounters,
+				DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index),
+				struct encounter_definition);
+			long squad_index = 0;
+
+			if (((unsigned long)ai_reference >> 30) == _ai_reference_type_squad)
+			{
+				squad_index = (ai_reference >> 16) & UNSIGNED_CHAR_MAX;
+			}
+			else if (((unsigned long)ai_reference >> 30) == _ai_reference_type_platoon)
+			{
+				long platoon_index = (ai_reference >> 16) & UNSIGNED_CHAR_MAX;
+				long search_index;
+
+				for (search_index = 0;
+					search_index < encounter_definition->squads.count;
+					search_index++)
+				{
+					if (TAG_BLOCK_GET_ELEMENT(
+						&encounter_definition->squads,
+						search_index,
+						struct squad_definition)->platoon_index == platoon_index)
+					{
+						squad_index = search_index;
+						break;
+					}
+				}
+			}
+
+			if (VALID_INDEX(squad_index, encounter_definition->squads.count))
+			{
+				struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+					&encounter_definition->squads,
+					squad_index,
+					struct squad_definition);
+
+				if (squad_definition->actor_palette_index != NONE)
+				{
+					struct tag_reference *actor_palette_entry = TAG_BLOCK_GET_ELEMENT(
+						&scenario->ai_actor_palette,
+						squad_definition->actor_palette_index,
+						struct tag_reference);
+
+					if (actor_palette_entry->index != NONE)
+					{
+						long actor_definition_index = actor_variant_definition_get(
+							actor_palette_entry->index)->actor_reference.index;
+
+						if (actor_definition_index != NONE)
+						{
+							actor_create_for_unit(
+								TEST_FLAG(
+									actor_definition_get(actor_definition_index)->flags,
+									_actor_definition_swarm_actor_bit),
+								unit_index,
+								actor_palette_entry->index,
+								encounter_index,
+								squad_index,
+								FALSE,
+								NONE,
+								TEST_FLAG(
+									encounter_definition->flags,
+									_encounter_braindead_bit),
+								squad_definition->initial_state,
+								squad_definition->default_state,
+								NONE,
+								0);
+							encounters_update_dirty_status();
+
+							return;
+						}
+					}
+				}
+
+				error(
+					_error_silent,
+					"ai_attach: no actor variant specified for %s/%s, cannot create actor to attach to biped",
+					encounter_definition->name,
+					squad_definition->name);
+			}
+			else
+			{
+				error(
+					_error_silent,
+					"ai_attach: could not find a squad in encounter %s to attach actor",
+					encounter_definition->name);
+			}
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_allegiance(
+	short team_index0,
+	short team_index1)
+{
+	if (ai_debug.print_scripting)
+	{
+		error(
+			_error_silent,
+			"%s: ai_allegiance %d %d",
+			hs_runtime_get_executing_thread_name(),
+			team_index0,
+			team_index1);
+	}
+
+	if (team_index0 != NONE && team_index1 != NONE)
+	{
+		short special_team_index = NONE;
+		short incident_decay_time = NONE;
+		short incident_threshold = NONE;
+		boolean requires_communication = FALSE;
+		boolean suspicious = FALSE;
+
+		if (team_index0 == _game_team_player)
+			special_team_index = team_index1;
+		else if (team_index1 == _game_team_player)
+			special_team_index = team_index0;
+
+		switch (special_team_index)
+		{
+		case _game_team_human:
+		case _game_team_sentinel:
+		{
+			short incident_decay_times[NUMBER_OF_GAME_DIFFICULTY_LEVELS] =
+				{300, 450, 1200, 2700};
+
+			suspicious = TRUE;
+			incident_threshold = 5;
+			incident_decay_time = incident_decay_times[game_difficulty_level_get()];
+			requires_communication = special_team_index == _game_team_human;
+			break;
+		}
+		}
+
+		game_allegiance_create(
+			team_index0,
+			suspicious && team_index0 == special_team_index,
+			team_index1,
+			suspicious && team_index1 == special_team_index,
+			incident_threshold,
+			incident_decay_time,
+			requires_communication);
+	}
+
+	return;
+}
+
+void ai_scripting_renew(
+	long ai_reference)
+{
+	struct ai_script_actor_reference_iterator iterator;
+	struct actor_datum *actor;
+
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_renew %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	ai_index_actor_iterator_new(ai_reference, &iterator);
+	for (actor = ai_index_actor_iterator_next(&iterator);
+		actor;
+		actor = ai_index_actor_iterator_next(&iterator))
+	{
+		if (actor->meta.unit_index != NONE)
+		{
+			struct actor_variant_definition *actor_variant_definition =
+				actor_variant_definition_get(actor->meta.variant_definition_index);
+			struct unit_datum *unit = unit_get(actor->meta.unit_index);
+
+			unit->object.body_vitality = unit->object.maximum_body_vitality > 0.0f ? 1.0f : 0.0f;
+			unit->object.shield_vitality = unit->object.maximum_shield_vitality > 0.0f ? 1.0f : 0.0f;
+
+			if (actor_variant_definition->grenade_combat.grenade_type != NONE)
+			{
+				short desired_grenade_count = seed_random_range(
+					get_global_random_seed_address(),
+					actor_variant_definition->items.grenades_lower_bound,
+					actor_variant_definition->items.grenades_upper_bound + 1);
+				short grenade_count = unit_get_grenade_count(
+					actor->meta.unit_index,
+					unit_get_current_grenade_type(actor->meta.unit_index));
+
+				if (grenade_count < desired_grenade_count)
+				{
+					unit_add_grenade_type_to_inventory(
+						actor->meta.unit_index,
+						actor_variant_definition->grenade_combat.grenade_type,
+						desired_grenade_count - grenade_count);
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_braindead_by_unit(
+	long object_list_index,
+	boolean braindead)
+{
+	long reference_index;
+	long unit_index = object_list_get_first(object_list_index, &reference_index);
+
+	if (ai_debug.print_scripting)
+	{
+		error(
+			_error_silent,
+			"%s: ai_braindead_by_unit <some guys> %s",
+			hs_runtime_get_executing_thread_name(),
+			braindead ? "on" : "off");
+	}
+
+	while (unit_index != NONE)
+	{
+		struct unit_datum *unit = unit_try_and_get(unit_index);
+
+		if (unit)
+		{
+			long child_object_index;
+
+			if (unit->unit.actor_index != NONE)
+			{
+				actor_braindead(unit->unit.actor_index, braindead);
+			}
+			else if (unit->unit.swarm_actor_index != NONE)
+			{
+				actor_braindead(unit->unit.swarm_actor_index, braindead);
+			}
+
+			child_object_index = unit->object.first_child_object_index;
+			while (child_object_index != NONE)
+			{
+				struct object_datum *child_object = object_get(child_object_index);
+
+				if (TEST_FLAG(_object_mask_unit, child_object->object.type))
+				{
+					struct unit_datum *child = (struct unit_datum *)child_object;
+
+					if (child->unit.actor_index != NONE)
+					{
+						actor_braindead(child->unit.actor_index, braindead);
+					}
+					else if (child->unit.swarm_actor_index != NONE)
+					{
+						actor_braindead(child->unit.swarm_actor_index, braindead);
+					}
+				}
+
+				child_object_index = child_object->object.next_object_index;
+			}
+		}
+
+		unit_index = object_list_get_next(object_list_index, &reference_index);
+	}
+
+	return;
+}
+
+void ai_scripting_force_active_by_unit(
+	long unit_index,
+	boolean force)
+{
+	if (ai_debug.print_scripting)
+	{
+		error(
+			_error_silent,
+			"%s: ai_force_active_by_unit <some unit> %s",
+			hs_runtime_get_executing_thread_name(),
+			force ? "true" : "false");
+	}
+
+	if (unit_index != NONE)
+	{
+		long actor_index = unit_get(unit_index)->unit.actor_index;
+
+		if (actor_index != NONE)
+		{
+			struct actor_datum *actor = actor_get(actor_index);
+
+			if (actor->meta.encounterless)
+			{
+				actor->meta.force_active = force;
+			}
+			else
+			{
+				struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+					&global_scenario_get()->ai_encounters,
+					actor->meta.encounter_index & UNSIGNED_SHORT_MAX,
+					struct encounter_definition);
+
+				error(
+					_error_silent,
+					"ai_force_active_by_unit: unit is a member of encounter %s/%s, you must use ai_force_active instead",
+					encounter_definition->name,
+					TAG_BLOCK_GET_ELEMENT(
+						&encounter_definition->squads,
+						actor->meta.squad_index,
+						struct squad_definition)->name);
+			}
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_attach_free(
+	long unit_index,
+	long actor_variant_definition_index)
+{
+	if (ai_debug.print_scripting)
+	{
+		error(
+			_error_silent,
+			"%s: ai_attach_free 0x%04X %s",
+			hs_runtime_get_executing_thread_name(),
+			unit_index & UNSIGNED_SHORT_MAX,
+			actor_variant_definition_index == NONE ?
+				"<error>" :
+				tag_name_strip_path(tag_get_name(actor_variant_definition_index)));
+	}
+
+	if (ai_globals->ai_initialized_for_map &&
+		unit_index != NONE &&
+		actor_variant_definition_index != NONE)
+	{
+		long actor_definition_index =
+			actor_variant_definition_get(actor_variant_definition_index)->actor_reference.index;
+
+		if (actor_definition_index != NONE)
+		{
+			if (TEST_FLAG(
+				actor_definition_get(actor_definition_index)->flags,
+				_actor_definition_swarm_actor_bit))
+			{
+				error(
+					_error_silent,
+					"%s: ai_attach_free %s cannot be used for swarm actors",
+					hs_runtime_get_executing_thread_name(),
+					tag_name_strip_path(tag_get_name(actor_variant_definition_index)));
+			}
+			else
+			{
+				actor_create_for_unit(
+					FALSE,
+					unit_index,
+					actor_variant_definition_index,
+					NONE,
+					NONE,
+					FALSE,
+					NONE,
+					FALSE,
+					actor_default_state_alert,
+					actor_default_state_none,
+					NONE,
+					0);
+			}
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_try_to_fight(
+	long ai_reference,
+	long target_ai_reference)
+{
+	struct ai_script_actor_reference_iterator iterator;
+	struct actor_datum *actor;
+
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+		char target_ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		ai_index_to_string(target_ai_reference, global_scenario_get(), target_ai_name, sizeof(target_ai_name));
+		error(
+			_error_silent,
+			"%s: ai_try_to_fight %s %s",
+			hs_runtime_get_executing_thread_name(),
+			ai_name,
+			target_ai_name);
+	}
+
+	ai_index_actor_iterator_new(ai_reference, &iterator);
+	for (actor = ai_index_actor_iterator_next(&iterator);
+		actor;
+		actor = ai_index_actor_iterator_next(&iterator))
+	{
+		actor->external_orders.desired_target_type = _desired_target_ai;
+		actor->external_orders.desired_target_ai_index = target_ai_reference;
+	}
+
+	return;
+}
+
+void ai_scripting_set_return_state(
+	long ai_reference,
+	short default_state)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[512];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(
+			_error_silent,
+			"%s: ai_set_return_state %s %d",
+			hs_runtime_get_executing_thread_name(),
+			ai_name,
+			default_state);
+	}
+
+	if (VALID_INDEX(default_state, number_of_actor_default_states))
+	{
+		struct ai_script_actor_reference_iterator iterator;
+		struct actor_datum *actor;
+
+		ai_index_actor_iterator_new(ai_reference, &iterator);
+		for (actor = ai_index_actor_iterator_next(&iterator);
+			actor;
+			actor = ai_index_actor_iterator_next(&iterator))
+		{
+			short action_class = actor_action_class(iterator.actor_index);
+
+			actor->state.default_state = default_state;
+
+			if (actor->state.combat_status == _actor_combat_status_none &&
+				(action_class == _action_class_noncombat ||
+					action_class == _action_class_passive ||
+					action_class == _action_class_transitory))
+			{
+				actor_action_set_default_state(iterator.actor_index, NONE);
+			}
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_magically_see_unit(
+	long ai_reference,
+	long unit_index)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(
+			_error_silent,
+			"%s: ai_magically_see_unit %s 0x%04X",
+			hs_runtime_get_executing_thread_name(),
+			ai_name,
+			unit_index & UNSIGNED_SHORT_MAX);
+	}
+
+	if (ai_reference != NONE && unit_index != NONE)
+	{
+		struct ai_script_actor_reference_iterator iterator;
+		struct actor_datum *actor;
+
+		ai_index_actor_iterator_new(ai_reference, &iterator);
+		for (actor = ai_index_actor_iterator_next(&iterator);
+			actor;
+			actor = ai_index_actor_iterator_next(&iterator))
+		{
+			long prop_index;
+
+			if (actor->meta.encounter_index != NONE)
+				encounter_force_activate(actor->meta.encounter_index);
+
+			prop_index = prop_get_base_by_unit_index(iterator.actor_index, unit_index, TRUE, FALSE);
+			if (prop_index != NONE)
+				actor_handle_unit_effect(iterator.actor_index, prop_index, _ai_unit_effect_magic_sight);
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_magically_see_encounter(
+	long ai_reference,
+	long target_ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+		char target_ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		ai_index_to_string(target_ai_reference, global_scenario_get(), target_ai_name, sizeof(target_ai_name));
+		error(
+			_error_silent,
+			"%s: ai_magically_see_encounter %s %s",
+			hs_runtime_get_executing_thread_name(),
+			ai_name,
+			target_ai_name);
+	}
+
+	if (ai_reference != NONE && target_ai_reference != NONE)
+	{
+		struct ai_script_actor_reference_iterator iterator;
+		struct actor_datum *actor;
+
+		ai_index_actor_iterator_new(target_ai_reference, &iterator);
+		for (actor = ai_index_actor_iterator_next(&iterator);
+			actor;
+			actor = ai_index_actor_iterator_next(&iterator))
+		{
+			if (actor->meta.unit_index != NONE)
+			{
+				ai_scripting_magically_see_unit(ai_reference, actor->meta.unit_index);
+			}
+			else if (actor->meta.swarm_unit_index != NONE)
+			{
+				ai_scripting_magically_see_unit(ai_reference, actor->meta.swarm_unit_index);
+			}
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_link_activation(
+	long ai_reference,
+	long link_ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[512];
+		char link_ai_name[512];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		ai_index_to_string(link_ai_reference, global_scenario_get(), link_ai_name, sizeof(link_ai_name));
+		error(
+			_error_silent,
+			"%s: ai_link_activation %s %s",
+			hs_runtime_get_executing_thread_name(),
+			ai_name,
+			link_ai_name);
+	}
+
+	if (ai_reference != NONE && link_ai_reference != NONE)
+	{
+		if (!encounter_link_activation(ai_reference & UNSIGNED_SHORT_MAX, link_ai_reference))
+		{
+			error(
+				_error_silent,
+				"ai_link_activation: cannot link to another encounter, MAXIMUM_ACTIVATION_LINK_INDICES_PER_ENCOUNTER is %d",
+				MAXIMUM_ACTIVATION_LINK_INDICES_PER_ENCOUNTER);
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_free(
+	long ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[512];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_free %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	if (ai_reference != NONE)
+	{
+		struct ai_script_actor_reference_iterator iterator;
+		struct actor_datum *actor;
+
+		ai_index_actor_iterator_new(ai_reference, &iterator);
+		for (actor = ai_index_actor_iterator_next(&iterator);
+			actor;
+			actor = ai_index_actor_iterator_next(&iterator))
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\ai_script.c",
+				2769,
+				actor->meta.encounter_index != NONE);
+
+			actor_flush_position_indices(iterator.actor_index);
+			encounter_detach_actor(iterator.actor_index, FALSE);
+			encounterless_attach_actor(iterator.actor_index);
+		}
+
+		encounters_update_dirty_status();
+	}
+
+	return;
+}
+
+void ai_scripting_free_units(
+	long object_list_index)
+{
+	long reference_index;
+	long unit_index = object_list_get_first(object_list_index, &reference_index);
+	short freed_count = 0;
+
+	if (ai_debug.print_scripting)
+	{
+		error(
+			_error_silent,
+			"%s: ai_free_units <some units>",
+			hs_runtime_get_executing_thread_name());
+	}
+
+	while (unit_index != NONE)
+	{
+		struct unit_datum *unit = unit_try_and_get(unit_index);
+
+		if (unit &&
+			unit->unit.actor_index != NONE &&
+			actor_get(unit->unit.actor_index)->meta.encounter_index != NONE)
+		{
+			actor_flush_position_indices(unit->unit.actor_index);
+			encounter_detach_actor(unit->unit.actor_index, FALSE);
+			encounterless_attach_actor(unit->unit.actor_index);
+			freed_count++;
+		}
+
+		unit_index = object_list_get_next(object_list_index, &reference_index);
+	}
+
+	if (freed_count > 0)
+		encounters_update_dirty_status();
+
+	return;
+}
+
+void ai_scripting_exit_vehicle(
+	long ai_reference)
+{
+	struct ai_script_actor_reference_iterator iterator;
+	struct actor_datum *actor;
+
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_exit_vehicle %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	ai_index_actor_iterator_new(ai_reference, &iterator);
+	for (actor = ai_index_actor_iterator_next(&iterator);
+		actor;
+		actor = ai_index_actor_iterator_next(&iterator))
+	{
+		if (actor->input.vehicle_index != NONE && actor->meta.unit_index != NONE)
+			unit_try_and_exit_seat(actor->meta.unit_index);
+	}
+
+	return;
+}
+
+void ai_scripting_magically_see_players(
+	long ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_magically_see_players %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	if (ai_reference != NONE)
+	{
+		struct data_iterator iterator;
+		struct player_datum *player;
+
+		data_iterator_new(&iterator, player_data);
+		for (player = data_iterator_next(&iterator);
+			player;
+			player = data_iterator_next(&iterator))
+		{
+			ai_scripting_magically_see_unit(ai_reference, player->unit_index);
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_set_current_state(
+	long ai_reference,
+	short current_state)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[512];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(
+			_error_silent,
+			"%s: ai_set_current_state %s %d",
+			hs_runtime_get_executing_thread_name(),
+			ai_name,
+			current_state);
+	}
+
+	if (VALID_INDEX(current_state, number_of_actor_default_states))
+	{
+		struct ai_script_actor_reference_iterator iterator;
+
+		ai_index_actor_iterator_new(ai_reference, &iterator);
+		while (ai_index_actor_iterator_next(&iterator))
+			actor_action_set_default_state(iterator.actor_index, current_state);
+	}
+
+	return;
+}
+
+void ai_scripting_command_list(
+	long ai_reference,
+	short command_list_index)
+{
+	struct ai_script_actor_reference_iterator iterator;
+
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(
+			_error_silent,
+			"%s: ai_command_list %s %d",
+			hs_runtime_get_executing_thread_name(),
+			ai_name,
+			command_list_index);
+	}
+
+	ai_index_actor_iterator_new(ai_reference, &iterator);
+	while (ai_index_actor_iterator_next(&iterator))
+	{
+		struct action_state_data action_data;
+
+		if (action_obey_command_list_setup(
+			iterator.actor_index,
+			command_list_index,
+			&action_data.obey))
+		{
+			actor_action_change(iterator.actor_index, _actor_action_obey, &action_data);
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_command_list_by_unit(
+	long unit_index,
+	short command_list_index)
+{
+	if (ai_debug.print_scripting)
+	{
+		error(
+			_error_silent,
+			"%s: ai_command_list_by_unit <unit> %d",
+			hs_runtime_get_executing_thread_name(),
+			command_list_index);
+	}
+
+	if (unit_index != NONE)
+	{
+		struct unit_datum *unit = unit_try_and_get(unit_index);
+
+		if (unit && unit->unit.actor_index != NONE)
+		{
+			struct actor_datum *actor = actor_get(unit->unit.actor_index);
+			struct action_state_data action_data;
+
+			if (action_obey_command_list_setup(
+				unit->unit.actor_index,
+				command_list_index,
+				&action_data.obey))
+			{
+				actor_action_change(unit->unit.actor_index, _actor_action_obey, &action_data);
+			}
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_try_to_fight_nothing(
+	long ai_reference)
+{
+	struct ai_script_actor_reference_iterator iterator;
+	struct actor_datum *actor;
+
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_try_to_fight_nothing %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	ai_index_actor_iterator_new(ai_reference, &iterator);
+	for (actor = ai_index_actor_iterator_next(&iterator);
+		actor;
+		actor = ai_index_actor_iterator_next(&iterator))
+	{
+		actor->external_orders.desired_target_type = _desired_target_none;
+	}
+
+	return;
+}
+
+void ai_scripting_try_to_fight_player(
+	long ai_reference)
+{
+	struct ai_script_actor_reference_iterator iterator;
+	struct actor_datum *actor;
+
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_try_to_fight_player %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	ai_index_actor_iterator_new(ai_reference, &iterator);
+	for (actor = ai_index_actor_iterator_next(&iterator);
+		actor;
+		actor = ai_index_actor_iterator_next(&iterator))
+	{
+		actor->external_orders.desired_target_type = _desired_target_player;
+	}
+
+	return;
+}
+
+void ai_scripting_ignore(
+	long object_list_index,
+	boolean ignore)
+{
+	long reference_index;
+	long unit_index = object_list_get_first(object_list_index, &reference_index);
+
+	if (ai_debug.print_scripting)
+	{
+		error(
+			_error_silent,
+			"%s: ai_disregard <some guys> %s",
+			hs_runtime_get_executing_thread_name(),
+			ignore ? "on" : "off");
+	}
+
+	while (unit_index != NONE)
+	{
+		struct unit_datum *unit = unit_try_and_get(unit_index);
+
+		if (unit)
+			SET_FLAG(unit->unit.flags, _unit_ignored_by_actors_bit, ignore);
+
+		unit_index = object_list_get_next(object_list_index, &reference_index);
+	}
+
+	return;
+}
+
+void ai_scripting_prefer_target(
+	long object_list_index,
+	boolean prefer)
+{
+	long reference_index;
+	long unit_index = object_list_get_first(object_list_index, &reference_index);
+
+	if (ai_debug.print_scripting)
+	{
+		error(
+			_error_silent,
+			"%s: ai_prefer_target <some guys> %s",
+			hs_runtime_get_executing_thread_name(),
+			prefer ? "on" : "off");
+	}
+
+	while (unit_index != NONE)
+	{
+		struct unit_datum *unit = unit_try_and_get(unit_index);
+
+		if (unit)
+			SET_FLAG(unit->unit.flags, _unit_preferred_target_bit, prefer);
+
+		unit_index = object_list_get_next(object_list_index, &reference_index);
+	}
+
+	return;
+}
+
+void ai_scripting_command_list_advance(
+	long ai_reference)
+{
+	struct ai_script_actor_reference_iterator iterator;
+
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_command_list_advance %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	ai_index_actor_iterator_new(ai_reference, &iterator);
+	while (ai_index_actor_iterator_next(&iterator))
+		action_obey_advance_command_list(iterator.actor_index);
+
+	return;
+}
+
+void ai_scripting_erase(
+	long ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_erase %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	if (ai_reference != NONE)
+	{
+		long squad_index = ((unsigned long)ai_reference >> 30) == _ai_reference_type_squad ?
+			(ai_reference >> 16) & UNSIGNED_CHAR_MAX : NONE;
+		long platoon_index = ((unsigned long)ai_reference >> 30) == _ai_reference_type_platoon ?
+			(ai_reference >> 16) & UNSIGNED_CHAR_MAX : NONE;
+
+		ai_erase(ai_reference & UNSIGNED_SHORT_MAX, platoon_index, squad_index, FALSE);
+	}
+
+	return;
+}
+
+void ai_scripting_place(
+	long ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(_error_silent, "%s: ai_place %s", hs_runtime_get_executing_thread_name(), ai_name);
+	}
+
+	if (ai_reference != NONE)
+	{
+		long squad_index = ((unsigned long)ai_reference >> 30) == _ai_reference_type_squad ?
+			(ai_reference >> 16) & UNSIGNED_CHAR_MAX : NONE;
+		long platoon_index = ((unsigned long)ai_reference >> 30) == _ai_reference_type_platoon ?
+			(ai_reference >> 16) & UNSIGNED_CHAR_MAX : NONE;
+
+		encounter_create(ai_reference & UNSIGNED_SHORT_MAX, platoon_index, squad_index);
+	}
+
+	return;
+}
+
+void ai_scripting_look_at_object(
+	long unit_index,
+	long object_index)
+{
+	if (ai_debug.print_scripting)
+	{
+		error(
+			_error_silent,
+			"%s: ai_look_at_object <some unit> <some object>",
+			hs_runtime_get_executing_thread_name());
+	}
+
+	if (unit_index != NONE && object_index != NONE)
+	{
+		long actor_index = unit_get(unit_index)->unit.actor_index;
+
+		if (actor_index != NONE)
+		{
+			struct direction_specification direction;
+
+			direction.type = _direction_specification_object;
+			direction.object_index = object_index;
+
+			actor_look_secondary(
+				actor_index,
+				_secondary_look_scripted,
+				_secondary_look_priority_default,
+				&direction);
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_set_team(
+	long ai_reference,
+	short team_index)
+{
+	long encounter_index = ai_reference & UNSIGNED_SHORT_MAX;
+	struct encounter_actor_iterator iterator;
+	struct actor_datum *actor;
+
+	encounter_get(encounter_index)->team_index = team_index;
+
+	encounter_actor_iterator_new(&iterator, encounter_index);
+	for (actor = encounter_actor_iterator_next(&iterator);
+		actor;
+		actor = encounter_actor_iterator_next(&iterator))
+	{
+		actor_set_team(iterator.index, team_index);
+	}
+
+	ai_update_team_status();
+
+	return;
+}
+
+void ai_scripting_command_list_advance_by_unit(
+	long unit_index)
+{
+	if (ai_debug.print_scripting)
+	{
+		error(
+			_error_silent,
+			"%s: ai_command_list_advance_by_unit <some unit>",
+			hs_runtime_get_executing_thread_name());
+	}
+
+	if (unit_index != NONE)
+	{
+		struct unit_datum *unit = unit_try_and_get(unit_index);
+
+		if (unit)
+		{
+			if (unit->unit.actor_index != NONE)
+			{
+				action_obey_advance_command_list(unit->unit.actor_index);
+			}
+			else if (unit->unit.swarm_actor_index != NONE)
+			{
+				action_obey_advance_command_list(unit->unit.swarm_actor_index);
+			}
+		}
+	}
+
+	return;
+}
+
 /* ---------- private code */
 
 static int ai_scripting_vehicle_candidate_qsort(
@@ -1990,6 +3506,32 @@ static void ai_scripting_go_to_vehicle_internal(
 	}
 
 	return;
+}
+
+static long ai_scripting_assess_status(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (!actor->meta.active)
+		return 0;
+
+	if (actor->state.mode < _actor_mode_combat)
+		return 1;
+
+	if (!actor->state.combat_status)
+		return 2;
+
+	if (actor->target.target_type < _actor_target_definite_orphan)
+		return 3;
+
+	if (actor->target.target_type < _actor_target_visible_enemy)
+		return 4;
+
+	if (actor->orders.combat.shoot_at_target || actor->orders.combat.throw_grenade)
+		return 6;
+
+	return 5;
 }
 
 static void ai_scripting_kill_internal(
