@@ -162,6 +162,19 @@ void encounter_modify_pursuit_desires(
 	short *desired_target_search,
 	short *desired_pursuit,
 	short *desired_pursuit_search);
+void encounter_determine_pursuit_availability(
+	long encounter_index,
+	long actor_index,
+	short group_pursuit_restriction,
+	boolean group_pursuit_controller,
+	boolean *allow_target_uncover,
+	boolean *allow_indefinite_target_uncover,
+	boolean *allow_target_search,
+	boolean *allow_pursuit,
+	boolean *allow_pursuit_search,
+	boolean *controlling_group_pursuit,
+	boolean *controlled_by_group_pursuit,
+	boolean *wait_after_pursuit);
 boolean encounter_link_activation(
 	long encounter_index,
 	short link_encounter_index);

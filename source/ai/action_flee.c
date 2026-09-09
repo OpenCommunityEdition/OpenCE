@@ -43,12 +43,14 @@ symbols in this file:
 #include "cseries.h"
 #include "actions.h"
 #include "actors.h"
+#include "game/game.h"
 #include "units/units.h"
 
 /* ---------- constants */
 
 enum
 {
+	_actor_panic_none = 0,
 	_actor_panic_grenade_attached_to_us = 9,
 	_actor_panic_burning_to_death = 12,
 };
@@ -93,7 +95,7 @@ void action_flee_modify_color(
 {
 	struct flee_state_data *state_data = &actor_get(actor_index)->state.action_data.flee;
 
-	if (state_data->panic_type > 0)
+	if (state_data->panic_type > _actor_panic_none)
 	{
 		*color = *global_real_argb_yellow;
 	}
@@ -125,6 +127,59 @@ boolean action_flee_blind_panic(
 {
 	return panic_type >= _actor_panic_grenade_attached_to_us &&
 		panic_type <= _actor_panic_burning_to_death;
+}
+
+void action_flee_begin(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct flee_state_data *state_data = &actor->state.action_data.flee;
+
+	state_data->flee_timer = 0;
+	if (state_data->panic_type > _actor_panic_none)
+	{
+		actor->state.searching = FALSE;
+	}
+
+	if (state_data->flee_stationary_ticks == 0 &&
+		actor->meta.unit_index != NONE &&
+		action_flee_blind_panic(state_data->panic_type))
+	{
+		unit_start_running_blindly(actor->meta.unit_index);
+	}
+
+	return;
+}
+
+void action_flee_update(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct flee_state_data *state_data = &actor->state.action_data.flee;
+
+	state_data->flee_timer += 1;
+	if (state_data->forced_flee_ticks > 0)
+	{
+		state_data->forced_flee_ticks -= 1;
+	}
+
+	if (state_data->flee_stationary_ticks > 0)
+	{
+		state_data->flee_stationary_ticks -= 1;
+		if (state_data->flee_stationary_ticks == 0 &&
+			actor->meta.unit_index != NONE &&
+			action_flee_blind_panic(state_data->panic_type))
+		{
+			unit_start_running_blindly(actor->meta.unit_index);
+		}
+	}
+
+	if (state_data->panic_type > _actor_panic_none)
+	{
+		actor->emotions.flee_with_friends_disable_time = game_time_get() + 25*TICKS_PER_SECOND;
+	}
+
+	return;
 }
 
 /* ---------- private code */

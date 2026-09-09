@@ -201,7 +201,9 @@ enum
 	GEOSPHERE_PRIMITIVE_EDGE_COUNT= 12,
 	GEOSPHERE_PRIMITIVE_TRIANGLE_COUNT= 8,
 
-	MAXIMUM_GEOSPHERE_PRIMITIVE_VERTEX_COUNT= 8
+	MAXIMUM_GEOSPHERE_PRIMITIVE_VERTEX_COUNT= 8,
+
+	CLIP_BUFFER_SIZE= 512
 };
 
 /* ---------- macros */
@@ -209,6 +211,20 @@ enum
 /* ---------- structures */
 
 /* ---------- prototypes */
+
+short convex_polygon2d_clip_to_plane(
+	short count,
+	real_point2d const *points,
+	real_plane2d const *plane,
+	short maximum_count,
+	real_point2d *result,
+	long *clip_flags,
+	boolean *clipped,
+	real epsilon);
+
+static short points_dimension2d(
+	short count,
+	real_point2d const *points);
 
 static void subdivide_triangle(
 	struct geosphere *sphere,
@@ -300,6 +316,109 @@ real vector_intersect_plane3d(
 {
 	return (point->x*plane->n.i + point->y*plane->n.j + point->z*plane->n.k - plane->d) /
 		-(vector->i*plane->n.i + vector->j*plane->n.j + vector->k*plane->n.k);
+}
+
+short convex_hull2d(
+	short vertex_count,
+	real_point2d const *points,
+	short *hull_indices)
+{
+	short hull_count = 0;
+
+	if (points_dimension2d(vertex_count, points) == 2)
+	{
+		boolean nondegenerate = FALSE;
+		real accumulated_angle = 0.f;
+		real minimum_x = REAL_MAX;
+		real minimum_y = REAL_MAX;
+		short current_index;
+		short best_index;
+		short index;
+
+		for (index = 0; index < vertex_count; index++)
+		{
+			real_point2d const *point = points + index;
+
+			if (point->y < minimum_y - _real_epsilon ||
+				(point->y < minimum_y && point->x < minimum_x + _real_epsilon) ||
+				(point->y < minimum_y + _real_epsilon && point->x < minimum_x - _real_epsilon))
+			{
+				minimum_x = point->x;
+				current_index = index;
+				minimum_y = point->y;
+			}
+		}
+
+		do
+		{
+			real minimum_angle_increment = REAL_MAX;
+			real_point2d const *current;
+
+			if (hull_count >= vertex_count)
+			{
+				short last_vertex_index = hull_count - 1;
+				short start_vertex_index;
+				short vertex_index;
+
+				for (start_vertex_index = last_vertex_index - 1; start_vertex_index > 0; start_vertex_index--)
+				{
+					if (hull_indices[start_vertex_index] == hull_indices[last_vertex_index])
+					{
+						hull_count = last_vertex_index - start_vertex_index;
+						for (vertex_index = 0; vertex_index < hull_count; vertex_index++)
+						{
+							match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 633, vertex_index<vertex_count);
+							match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 634, start_vertex_index+vertex_index<vertex_count);
+							hull_indices[vertex_index] = hull_indices[start_vertex_index + vertex_index];
+						}
+						break;
+					}
+				}
+				match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 642, start_vertex_index>0);
+				break;
+			}
+
+			hull_indices[hull_count++] = current_index;
+			current = points + current_index;
+
+			for (index = 0; index < vertex_count; index++)
+			{
+				real_point2d const *point = points + index;
+
+				if (point->x != current->x || point->y != current->y)
+				{
+					real angle_increment = arctangent(point->y - current->y, point->x - current->x) - accumulated_angle;
+
+					while (angle_increment < -_real_epsilon)
+					{
+						angle_increment += 2.f*_pi;
+					}
+					if (angle_increment < minimum_angle_increment)
+					{
+						minimum_angle_increment = angle_increment;
+						best_index = index;
+					}
+				}
+			}
+
+			accumulated_angle += minimum_angle_increment;
+			current_index = best_index;
+
+			if (!nondegenerate)
+			{
+				real_point2d const *start = points + hull_indices[0];
+				real_point2d const *best = points + best_index;
+
+				nondegenerate = !(fabs(best->x - start->x) < _real_epsilon && fabs(best->y - start->y) < _real_epsilon);
+			}
+		}
+		while (best_index != hull_indices[0] &&
+			!(nondegenerate &&
+				fabs(points[best_index].x - points[hull_indices[0]].x) < _real_epsilon &&
+				fabs(points[best_index].y - points[hull_indices[0]].y) < _real_epsilon));
+	}
+
+	return hull_count;
 }
 
 boolean convex_hull2d_verify(
@@ -569,6 +688,43 @@ boolean convex_polygon2d_verify(
 	return TRUE;
 }
 
+boolean convex_polygon3d_verify(
+	short count,
+	real_point3d const *points)
+{
+	real_vector3d edge0;
+	real_vector3d edge1;
+	real_vector3d normal;
+	real_vector3d cross;
+	short index;
+
+	vector_from_points3d(&points[1], &points[0], &edge0);
+	vector_from_points3d(&points[1], &points[2], &edge1);
+	cross_product3d(&edge0, &edge1, &normal);
+
+	for (index = 0; index < count; index++)
+	{
+		real_point3d const *previous = index == 0 ? points + count - 1 : points + index - 1;
+		real_point3d const *current = points + index;
+		real_point3d const *next = index == count - 1 ? points : current + 1;
+
+		if (!valid_real_point3d(current))
+		{
+			return FALSE;
+		}
+
+		vector_from_points3d(current, previous, &edge0);
+		vector_from_points3d(current, next, &edge1);
+		cross_product3d(&edge0, &edge1, &cross);
+		if (dot_product3d(&normal, &cross) < -0.000001f)
+		{
+			return FALSE;
+		}
+	}
+
+	return TRUE;
+}
+
 boolean convex_hull3d(
 	short point_count,
 	real_point3d const *points,
@@ -632,6 +788,121 @@ boolean convex_hull3d_test_point(
 	}
 
 	return result;
+}
+
+boolean convex_hull3d_test_vector(
+	short point_count,
+	real_point3d const *points,
+	short vertex_count,
+	struct vertex3d const *vertices,
+	short edge_count,
+	struct edge3d const *edges,
+	short surface_count,
+	struct surface3d const *surfaces,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real *minimum_distance,
+	real *maximum_distance)
+{
+	real minimum = REAL_MIN;
+	real maximum = REAL_MAX;
+	short surface_index;
+
+	for (surface_index = 0; surface_index < surface_count; surface_index++)
+	{
+		struct surface3d const *surface = surfaces + surface_index;
+
+		if (surface->extant)
+		{
+			real numerator = plane3d_distance_to_point(&surface->plane, point);
+			real denominator = dot_product3d(vector, &surface->plane.n);
+
+			if (!(fabs(denominator) < _real_epsilon))
+			{
+				real distance = -(numerator / denominator);
+
+				if (denominator > 0.f)
+				{
+					if (minimum < distance)
+					{
+						minimum = distance;
+					}
+				}
+				else if (maximum > distance)
+				{
+					maximum = distance;
+				}
+
+				if (minimum > maximum)
+				{
+					return FALSE;
+				}
+			}
+			else if (numerator > global_convex_hull3d_epsilon)
+			{
+				return FALSE;
+			}
+		}
+	}
+
+	if (minimum_distance)
+	{
+		*minimum_distance = minimum;
+	}
+	if (maximum_distance)
+	{
+		*maximum_distance = maximum;
+	}
+
+	return TRUE;
+}
+
+short convex_hull2d_intersect(
+	short p_count,
+	real_point2d const *p,
+	short q_count,
+	real_point2d const *q,
+	short maximum_count,
+	real_point2d *result,
+	real epsilon)
+{
+	short result_count = q_count;
+	real_point2d const *source = q;
+	real_plane2d plane;
+	real_point2d buffers[2][CLIP_BUFFER_SIZE];
+	short index;
+
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1016, maximum_count<=CLIP_BUFFER_SIZE);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1017, p);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1018, p_count);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1019, q);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1020, q_count);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1021, result);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1022, p!=result && q!=result);
+
+	for (index = 0; index < p_count && result_count > 0; index++)
+	{
+		short previous_index = index != 0 ? index - 1 : p_count - 1;
+		real_point2d *output = index == p_count - 1 ? result : buffers[index & 1];
+
+		if (plane2d_from_points(&plane, p + index, p + previous_index))
+		{
+			result_count = convex_polygon2d_clip_to_plane(result_count, source, &plane, maximum_count, output, NULL, NULL, epsilon);
+			if (result_count == NONE)
+			{
+				return NONE;
+			}
+		}
+		else
+		{
+			match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1037, result_count>=0 && result_count<=maximum_count);
+			csmemcpy(output, source, sizeof(real_point2d)*result_count);
+		}
+
+		source = output;
+	}
+
+	return result_count;
 }
 
 struct geosphere *geosphere_new(
@@ -721,6 +992,51 @@ void geosphere_dispose(
 	match_free("c:\\halo\\SOURCE\\math\\geometry.c", 122, sphere->triangle_strip_vertex_indices);
 	match_free("c:\\halo\\SOURCE\\math\\geometry.c", 123, sphere);
 	return;
+}
+
+static short points_dimension2d(
+	short count,
+	real_point2d const *points)
+{
+	short dimension = NONE;
+	short index = 0;
+	real_point2d reference_point;
+	real_plane2d line;
+
+	do
+	{
+		if (index >= count)
+		{
+			break;
+		}
+
+		switch (dimension)
+		{
+		case NONE:
+			reference_point = points[index];
+			dimension = 0;
+			break;
+
+		case 0:
+			if (plane2d_from_points(&line, &points[index], &reference_point))
+			{
+				dimension = 1;
+			}
+			break;
+
+		case 1:
+			if (!(fabs(plane2d_distance_to_point(&line, &points[index])) < _real_epsilon))
+			{
+				dimension = 2;
+			}
+			break;
+		}
+
+		index++;
+	}
+	while (dimension < 2);
+
+	return dimension;
 }
 
 /* ---------- private code */

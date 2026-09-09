@@ -19,7 +19,9 @@ header included in hcex build.
 /* ---------- structures */
 
 struct collision_feature_list;
+struct mass_point_datum;
 struct physics_definition;
+struct powered_mass_point_datum;
 
 struct physics_instance
 {
@@ -53,6 +55,12 @@ boolean physics_test_vector(
 	real_point3d const *point,
 	real_vector3d const *vector,
 	struct physics_test_vector_result *result);
+void physics_compute_new(
+	struct physics_instance const *instance,
+	struct powered_mass_point_datum const *powered_mass_points,
+	struct mass_point_datum *mass_points,
+	real_vector3d *total_force,
+	real_vector3d *total_torque);
 
 void render_debug_physics(struct physics_instance *instance);
 

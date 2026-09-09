@@ -102,6 +102,15 @@ enum
 	NUMBER_OF_SHADER_FRAMEBUFFER_BLEND_FUNCTIONS
 };
 
+enum
+{
+	MAXIMUM_PROFILE_VALUES = 64,
+
+	NUMBER_OF_PROFILE_GAME_VALUES = 3,
+	NUMBER_OF_PROFILE_FRAME_VALUES = 1,
+	NUMBER_OF_PROFILE_GRAPH_VALUES = 14,
+};
+
 /* ---------- macros */
 
 #define interface_tag_references_get() \
@@ -130,6 +139,20 @@ struct interface_tag_references_definition
 typedef char interface_tag_references_definition_size_assert[
 	sizeof(struct interface_tag_references_definition) == 0x130 ? 1 : -1];
 
+struct profile_value
+{
+	char name[256];
+	char label[256];
+	real_argb_color const **color;
+	short frame_value;
+	short section_index;
+	boolean subtract_previous;
+	boolean enabled;
+};
+
+typedef char profile_value_size_assert[
+	sizeof(struct profile_value) == 0x20C ? 1 : -1];
+
 /* ---------- prototypes */
 
 void interface_splitscreen_render(
@@ -137,6 +160,39 @@ void interface_splitscreen_render(
 void code_000cea10(
 	void);
 /* ---------- globals */
+
+static short profile_game_value_count = NUMBER_OF_PROFILE_GAME_VALUES;
+static struct profile_value profile_game_values[MAXIMUM_PROFILE_VALUES] =
+{
+	{ "game", "game", &global_real_argb_yellow, NONE, NONE, FALSE, TRUE },
+	{ "objects_update", "objects", &global_real_argb_green, NONE, NONE, FALSE, TRUE },
+	{ "ai_update", "ai", &global_real_argb_blue, NONE, NONE, FALSE, TRUE },
+};
+
+static short profile_frame_value_count = NUMBER_OF_PROFILE_FRAME_VALUES;
+static struct profile_value profile_frame_values[MAXIMUM_PROFILE_VALUES] =
+{
+	{ "frame", "frame", &global_real_argb_white, NONE, NONE, FALSE, TRUE },
+};
+
+static short profile_graph_value_count = NUMBER_OF_PROFILE_GRAPH_VALUES;
+static struct profile_value profile_graph_values[MAXIMUM_PROFILE_VALUES] =
+{
+	{ "stall", "stall", &global_real_argb_red, NONE, NONE, FALSE, TRUE },
+	{ "texture", "texture", &global_real_argb_orange, NONE, NONE, FALSE, TRUE },
+	{ "render0", "window0", &global_real_argb_blue, NONE, NONE, FALSE, TRUE },
+	{ "render0_1", "window1", &global_real_argb_lightblue, NONE, NONE, TRUE, TRUE },
+	{ "render0_2", "window2", &global_real_argb_cyan, NONE, NONE, TRUE, TRUE },
+	{ "render0_3", "window3", &global_real_argb_purple, NONE, NONE, TRUE, TRUE },
+	{ "render0_3np", "overlay", &global_real_argb_salmon, NONE, NONE, TRUE, TRUE },
+	{ "render", "render", &global_real_argb_violet, NONE, NONE, TRUE, TRUE },
+	{ "game_render", "game", &global_real_argb_yellow, NONE, NONE, TRUE, TRUE },
+	{ "load", "load", &global_real_argb_magenta, NONE, NONE, TRUE, TRUE },
+	{ "frame", "time", &global_real_argb_white, NONE, NONE, TRUE, TRUE },
+	{ "gpu", "gpu", &global_real_argb_green, NONE, NONE, FALSE, TRUE },
+	{ "pushbuffer", "pushbuffer", &global_real_argb_darkgreen, NONE, NONE, FALSE, TRUE },
+	{ "dt", "dt", &global_real_argb_grey, NONE, NONE, FALSE, TRUE },
+};
 
 /* ---------- public code */
 
@@ -375,6 +431,74 @@ void interface_draw_bitmap_modulated(
 	parameters.map[0] = (struct bitmap_data *)bitmap;
 
 	rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
+
+	return;
+}
+
+void interface_draw_bitmap_modulated_p32(
+	struct bitmap_data const *bitmap,
+	point2d const *point,
+	real_rectangle2d const *clip,
+	real scale,
+	real theta,
+	pixel32 modulated_color,
+	short shader_type)
+{
+	real_rectangle2d entire_bitmap =
+		{ 0.0f, (real)bitmap->width, 0.0f, (real)bitmap->height };
+	real sine_theta = sine(theta);
+	real cosine_theta = cosine(theta);
+	struct dynamic_screen_vertex vertices[NUMBER_OF_POINTS_PER_RECTANGLE];
+	struct rasterizer_dynamic_screen_geometry_parameters parameters;
+	short vertex_index;
+
+	if (!clip)
+		clip = &entire_bitmap;
+
+	for (vertex_index = 0; vertex_index < NUMBER_OF_POINTS_PER_RECTANGLE; vertex_index++)
+	{
+		real u = ((vertex_index+1)&2) ? clip->x1 : clip->x0;
+		real v = (vertex_index>1) ? clip->y1 : clip->y0;
+		real local_x = (u - bitmap->registration_point_x)*scale;
+		real local_y = (v - bitmap->registration_point_y)*scale;
+
+		vertices[vertex_index].position.x = point->x + local_x*cosine_theta - local_y*sine_theta;
+		vertices[vertex_index].position.y = point->y + local_x*sine_theta + local_y*cosine_theta;
+		vertices[vertex_index].texture_coordinates.u = u;
+		vertices[vertex_index].texture_coordinates.v = v;
+		vertices[vertex_index].color = modulated_color;
+	}
+
+	csmemset(&parameters, 0, sizeof(parameters));
+	parameters.map_scale[0].i = parameters.map_scale[0].j =
+		parameters.map_texture_scale[0].i = parameters.map_texture_scale[0].j = 1.0f;
+	parameters.meter_parameters = NULL;
+	parameters.point_sampled = FALSE;
+	parameters.framebuffer_blend_function = shader_type;
+	parameters.map[0] = (struct bitmap_data *)bitmap;
+
+	rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
+
+	return;
+}
+
+void profile_graph_toggle(
+	char const *graph_name)
+{
+	short graph_value_index;
+
+	for (graph_value_index = 0;
+		graph_value_index < profile_graph_value_count;
+		graph_value_index++)
+	{
+		struct profile_value *graph_value = &profile_graph_values[graph_value_index];
+
+		if (!_stricmp(graph_value->name, graph_name) ||
+			!_stricmp(graph_value->label, graph_name))
+		{
+			graph_value->enabled = !graph_value->enabled;
+		}
+	}
 
 	return;
 }

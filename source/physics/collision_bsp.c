@@ -1411,11 +1411,7 @@ static boolean collision_bsp_test_pill_new_recursive(
 		*data->t = t0;
 		if (data->last_plane_designator & LONG_MIN)
 		{
-			real_vector3d *normal = data->normal;
-
-			normal->i = -plane->n.i;
-			normal->j = -plane->n.j;
-			normal->k = -plane->n.k;
+			negate_vector3d(&plane->n, data->normal);
 		}
 		else
 		{
@@ -1508,7 +1504,7 @@ static long collision_leaf_test_vector(
 			else
 				projection = absolute_j >= absolute_i ? _y : _x;
 			projection_sign =
-				(plane->n.n[projection] > 0.f) !=
+				projection_sign_from_vector3d(&plane->n, projection) !=
 				(reference->plane_designator & LONG_MIN ? TRUE : FALSE);
 			hit_point.x = vector->i*t + point->x;
 			hit_point.y = vector->j*t + point->y;

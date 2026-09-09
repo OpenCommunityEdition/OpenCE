@@ -531,20 +531,6 @@ boolean action_fight_setup(
 	long actor_index,
 	struct fight_state_data *state_data);
 
-void encounter_determine_pursuit_availability(
-	long encounter_index,
-	long actor_index,
-	short group_pursuit_restriction,
-	boolean group_pursuit_controller,
-	boolean *allow_target_uncover,
-	boolean *allow_indefinite_target_uncover,
-	boolean *allow_target_search,
-	boolean *allow_pursuit,
-	boolean *allow_pursuit_search,
-	boolean *controlling_group_pursuit,
-	boolean *controlled_by_group_pursuit,
-	boolean *wait_after_pursuit);
-
 boolean action_uncover_setup_target(
 	long actor_index,
 	boolean able_to_search,

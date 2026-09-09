@@ -448,9 +448,9 @@ static boolean read_next_entry_in_mapfile(
 static long count_enumerated_profiles_in_mapfile(
 	word memory_unit_index);
 static long build_saved_game_file_index(
-	long n,
 	long type,
 	long memory_unit_index,
+	long n,
 	boolean read_only,
 	boolean valid);
 static boolean enumerate_mapfile_end(
@@ -663,20 +663,20 @@ short saved_game_perform_file_system_checks(
 		HANDLE find_handle = XFindFirstSaveGame(
 			wide_to_ascii(memory_unit_root_path[_memory_unit_hard_drive], root_path, sizeof(root_path)),
 			&find_data);
+		unsigned long number_of_saved_games = 1;
 
 		if (find_handle != INVALID_HANDLE_VALUE)
 		{
-			unsigned long number_of_saved_games = 1;
-
-			while (number_of_saved_games < MAXIMUM_ENUMERATED_SAVED_GAME_FILES_ANY_TYPE_PER_MEMORY_UNIT)
+			do
 			{
-				number_of_saved_games++;
-
-				if ((boolean)XFindNextSaveGame(find_handle, &find_data) != TRUE)
+				if (number_of_saved_games >= MAXIMUM_ENUMERATED_SAVED_GAME_FILES_ANY_TYPE_PER_MEMORY_UNIT)
 				{
 					break;
 				}
+
+				number_of_saved_games++;
 			}
+			while ((boolean)XFindNextSaveGame(find_handle, &find_data) == TRUE);
 
 			if (!XFindClose(find_handle))
 			{
@@ -1025,10 +1025,10 @@ boolean synchronize_metadata_display_name_with_profile_name(
 	wchar_t *game_display_name)
 {
 	struct enumerated_saved_game_file file;
+	boolean success = TRUE;
 	long type = SAVED_GAME_FILE_INDEX_TYPE(profile_index);
 	long memory_unit = SAVED_GAME_FILE_INDEX_MEMORY_UNIT(profile_index);
 	long n = SAVED_GAME_FILE_INDEX_FILE_INDEX(profile_index);
-	boolean success = TRUE;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\saved games\\saved_game_files.c",
@@ -1442,8 +1442,10 @@ long create_enumerated_saved_game_file(
 								434,
 								profile_index == file.index);
 
-							return build_saved_game_file_index(file.index, saved_game_file_type,
-								_memory_unit_hard_drive, file.read_only, file.valid);
+							new_profile_index = build_saved_game_file_index(saved_game_file_type,
+								_memory_unit_hard_drive, file.index, file.read_only, file.valid);
+
+							goto done;
 						}
 						else
 						{
@@ -1463,7 +1465,7 @@ long create_enumerated_saved_game_file(
 					error(_error_silent, "XDeleteSaveGame() failed... ghost meta data likely");
 				}
 
-				return NONE;
+				goto done;
 			}
 			else
 			{
@@ -1477,6 +1479,7 @@ long create_enumerated_saved_game_file(
 		}
 	}
 
+done:
 	return new_profile_index;
 }
 
@@ -1615,6 +1618,7 @@ void saved_game_files_enumerate_available_to_local_player_index(
 {
 	struct enumerated_saved_game_file file;
 	long number_of_available_profiles = 0;
+	word memory_unit_index = _memory_unit_hard_drive;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\saved games\\saved_game_files.c",
@@ -1630,11 +1634,10 @@ void saved_game_files_enumerate_available_to_local_player_index(
 			enumerate_memory_units();
 		}
 
-		number_of_entries = count_enumerated_profiles_in_mapfile(_memory_unit_hard_drive);
-
+		number_of_entries = count_enumerated_profiles_in_mapfile(memory_unit_index);
 		if (take_mutex(saved_game_files_globals.mapfile_mutex, SAVED_GAME_FILES_MUTEX_TIMEOUT))
 		{
-			if (open_mapfile_for_reading(_memory_unit_hard_drive))
+			if (open_mapfile_for_reading(memory_unit_index))
 			{
 				long entry_index;
 
@@ -1651,13 +1654,13 @@ void saved_game_files_enumerate_available_to_local_player_index(
 						((include_default_profiles == TRUE) || !file.read_only))
 					{
 						player_profile_indices[number_of_available_profiles] =
-							build_saved_game_file_index(entry_index, saved_game_file_type,
-								_memory_unit_hard_drive, file.read_only, file.valid);
+							build_saved_game_file_index(saved_game_file_type, memory_unit_index,
+								entry_index, file.read_only, file.valid);
 						number_of_available_profiles++;
 					}
 				}
 
-				close_mapfile_after_reading(_memory_unit_hard_drive);
+				close_mapfile_after_reading(memory_unit_index);
 			}
 
 			release_mutex(saved_game_files_globals.mapfile_mutex);
@@ -1686,6 +1689,7 @@ long saved_game_file_find_profile_index_for_directory_path(
 	struct enumerated_saved_game_file file;
 	long profile_index = NONE;
 	unsigned long directory_path_length;
+	word memory_unit_index = _memory_unit_hard_drive;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\saved games\\saved_game_files.c",
@@ -1698,9 +1702,9 @@ long saved_game_file_find_profile_index_for_directory_path(
 	{
 		if (take_mutex(saved_game_files_globals.mapfile_mutex, SAVED_GAME_FILES_MUTEX_TIMEOUT))
 		{
-			long number_of_entries = count_enumerated_profiles_in_mapfile(_memory_unit_hard_drive);
+			long number_of_entries = count_enumerated_profiles_in_mapfile(memory_unit_index);
 
-			if (open_mapfile_for_reading(_memory_unit_hard_drive))
+			if (open_mapfile_for_reading(memory_unit_index))
 			{
 				long entry_index;
 
@@ -1714,13 +1718,13 @@ long saved_game_file_find_profile_index_for_directory_path(
 					if (file.type == type &&
 						!_strnicmp(directory_path, file.path, directory_path_length))
 					{
-						profile_index = build_saved_game_file_index(entry_index,
-							type, _memory_unit_hard_drive, file.read_only, file.valid);
+						profile_index = build_saved_game_file_index(type,
+							memory_unit_index, entry_index, file.read_only, file.valid);
 						break;
 					}
 				}
 
-				close_mapfile_after_reading(_memory_unit_hard_drive);
+				close_mapfile_after_reading(memory_unit_index);
 			}
 
 			release_mutex(saved_game_files_globals.mapfile_mutex);
@@ -1749,7 +1753,7 @@ void saved_game_files_delete_all_custom_profiles(
 
 	memory_unit_index = _memory_unit_hard_drive;
 
-	while (memory_unit_index < NUMBER_OF_SUPPORTED_MEMORY_UNITS)
+	while (memory_unit_index <= _memory_unit_hard_drive)
 	{
 		if (enumerate_mapfile_begin(memory_unit_index))
 		{
@@ -1762,18 +1766,19 @@ void saved_game_files_delete_all_custom_profiles(
 
 				if (find_handle != INVALID_HANDLE_VALUE)
 				{
-					while (number_of_enumerated_files < MAXIMUM_ENUMERATED_SAVED_GAME_FILES_ANY_TYPE_PER_MEMORY_UNIT)
+					do
 					{
+						if (number_of_enumerated_files >= MAXIMUM_ENUMERATED_SAVED_GAME_FILES_ANY_TYPE_PER_MEMORY_UNIT)
+						{
+							break;
+						}
+
 						if (XDeleteSaveGame(root_path, find_data.szSaveGameName))
 						{
 							error(_error_silent, "XDeleteSaveGame() failed to delete profile");
 						}
-
-						if (!(boolean)XFindNextSaveGame(find_handle, &find_data))
-						{
-							break;
-						}
 					}
+					while ((boolean)XFindNextSaveGame(find_handle, &find_data));
 
 					if (!XFindClose(find_handle))
 					{
@@ -1812,7 +1817,7 @@ void enumerate_memory_units(
 	unsigned long memory_unit_index = _memory_unit_hard_drive;
 	long number_of_enumerated_files = 0;
 
-	while (memory_unit_index < NUMBER_OF_SUPPORTED_MEMORY_UNITS)
+	while (memory_unit_index <= _memory_unit_hard_drive)
 	{
 		if (take_mutex(saved_game_files_globals.general_mutex, SAVED_GAME_FILES_MUTEX_TIMEOUT))
 		{
@@ -1827,109 +1832,113 @@ void enumerate_memory_units(
 
 					if (find_handle != INVALID_HANDLE_VALUE)
 					{
-						while (number_of_enumerated_files < MAXIMUM_ENUMERATED_SAVED_GAME_FILES_ANY_TYPE_PER_MEMORY_UNIT)
+						do
 						{
-							struct enumerated_saved_game_file file = {0};
-							word checksum_data_size;
-							if (_snprintf(
-									file.path,
-									MAXIMUM_FILENAME_LENGTH,
-									"%s%s",
-									find_data.szSaveGameDirectory,
-									"blam.sav") > 0 &&
-								file_reference_create_from_path(&saved_game_file, file.path, FALSE) &&
-								file_exists(&saved_game_file))
+							if (number_of_enumerated_files >= MAXIMUM_ENUMERATED_SAVED_GAME_FILES_ANY_TYPE_PER_MEMORY_UNIT)
 							{
-								file.type = _saved_game_file_type_player_profile;
-								checksum_data_size = PLAYER_PROFILE_CHECKSUM_DATA_SIZE;
-							}
-							else if (_snprintf(
-									file.path,
-									MAXIMUM_FILENAME_LENGTH,
-									"%s%s",
-									find_data.szSaveGameDirectory,
-									"blam.lst") > 0 &&
-								file_reference_create_from_path(&saved_game_file, file.path, FALSE) &&
-								file_exists(&saved_game_file))
-							{
-								file.type = _saved_game_file_type_game_variant;
-								checksum_data_size = PLAYLIST_PROFILE_CHECKSUM_DATA_SIZE;
-							}
-							else
-							{
-								usnprintf(
-									message,
-									MAXIMUM_FILENAME_LENGTH,
-									L"random crap found by XFindNextSaveGame(): display name= '%s' path= '%hs'",
-									find_data.szSaveGameName,
-									find_data.wfd.cFileName);
-								message[MAXIMUM_FILENAME_LENGTH] = 0;
-								error(
-									_error_silent,
-									wide_to_ascii(message, (char *)message, sizeof(message)));
-								file.type = NONE;
+								break;
 							}
 
-							if (file.type != NONE)
 							{
-								ustrncpy(file.display_name, find_data.szSaveGameName, MAX_GAMENAME-1);
-								file.display_name[MAX_GAMENAME-1] = 0;
+								struct enumerated_saved_game_file file = {0};
+								word checksum_data_size;
 
-								if (file_open(
-										&saved_game_file,
-										FLAG(_permission_read_bit)|FLAG(_permission_write_bit)))
+								if (_snprintf(
+										file.path,
+										MAXIMUM_FILENAME_LENGTH,
+										"%s%s",
+										find_data.szSaveGameDirectory,
+										"blam.sav") > 0 &&
+									file_reference_create_from_path(&saved_game_file, file.path, FALSE) &&
+									file_exists(&saved_game_file))
 								{
-									if (file_read(&saved_game_file, sizeof(block), block))
+									file.type = _saved_game_file_type_player_profile;
+									checksum_data_size = PLAYER_PROFILE_CHECKSUM_DATA_SIZE;
+								}
+								else if (_snprintf(
+										file.path,
+										MAXIMUM_FILENAME_LENGTH,
+										"%s%s",
+										find_data.szSaveGameDirectory,
+										"blam.lst") > 0 &&
+									file_reference_create_from_path(&saved_game_file, file.path, FALSE) &&
+									file_exists(&saved_game_file))
+								{
+									file.type = _saved_game_file_type_game_variant;
+									checksum_data_size = PLAYLIST_PROFILE_CHECKSUM_DATA_SIZE;
+								}
+								else
+								{
+									usnprintf(
+										message,
+										MAXIMUM_FILENAME_LENGTH,
+										L"random crap found by XFindNextSaveGame(): display name= '%s' path= '%hs'",
+										find_data.szSaveGameName,
+										find_data.wfd.cFileName);
+									message[MAXIMUM_FILENAME_LENGTH] = 0;
+									error(
+										_error_silent,
+										wide_to_ascii(message, (char *)message, sizeof(message)));
+									file.type = NONE;
+								}
+
+								if (file.type != NONE)
+								{
+									ustrncpy(file.display_name, find_data.szSaveGameName, MAX_GAMENAME-1);
+									file.display_name[MAX_GAMENAME-1] = 0;
+
+									if (file_open(
+											&saved_game_file,
+											FLAG(_permission_read_bit)|FLAG(_permission_write_bit)))
 									{
-										saved_game_file_generate_checksum(block, checksum_data_size, &checksum);
-										if (!csmemcmp(&checksum, block+checksum_data_size, sizeof(checksum)))
+										if (file_read(&saved_game_file, sizeof(block), block))
 										{
-											file.valid = TRUE;
+											saved_game_file_generate_checksum(block, checksum_data_size, &checksum);
+											if (!csmemcmp(&checksum, block+checksum_data_size, sizeof(checksum)))
+											{
+												file.valid = TRUE;
+											}
+											else
+											{
+												error(_error_silent, "checksum validation failed for '%s'", file.path);
+												crc_new(&old_style_crc);
+												crc_checksum_buffer(&old_style_crc, block, checksum_data_size);
+												if (!csmemcmp(&old_style_crc, block+checksum_data_size, sizeof(old_style_crc)))
+												{
+													error(_error_silent, "checksum validation matched old-style crc; updating saved game file '%s'", file.path);
+													csmemcpy(block+checksum_data_size, &checksum, sizeof(checksum));
+													if (file_set_position(&saved_game_file, 0) &&
+														file_write(&saved_game_file, sizeof(block), block))
+													{
+														file.valid = TRUE;
+													}
+												}
+											}
 										}
 										else
 										{
-											error(_error_silent, "checksum validation failed for '%s'", file.path);
-											crc_new(&old_style_crc);
-											crc_checksum_buffer(&old_style_crc, block, checksum_data_size);
-											if (!csmemcmp(&old_style_crc, block+checksum_data_size, sizeof(old_style_crc)))
-											{
-												error(_error_silent, "checksum validation matched old-style crc; updating saved game file '%s'", file.path);
-												csmemcpy(block+checksum_data_size, &checksum, sizeof(checksum));
-												if (file_set_position(&saved_game_file, 0) &&
-													file_write(&saved_game_file, sizeof(block), block))
-												{
-													file.valid = TRUE;
-												}
-											}
+											error(_error_silent, "failed to read saved game file to verify checksum");
+										}
+
+										if (!file_close(&saved_game_file))
+										{
+											error(_error_silent, "failed to close saved game file after verifying checksum");
 										}
 									}
 									else
 									{
-										error(_error_silent, "failed to read saved game file to verify checksum");
+										error(_error_silent, "failed to open saved game file to verify checksum");
 									}
 
-									if (!file_close(&saved_game_file))
+									if (!append_entry_to_mapfile(&file))
 									{
-										error(_error_silent, "failed to close saved game file after verifying checksum");
+										break;
 									}
+									number_of_enumerated_files++;
 								}
-								else
-								{
-									error(_error_silent, "failed to open saved game file to verify checksum");
-								}
-
-								if (!append_entry_to_mapfile(&file))
-								{
-									break;
-								}
-								number_of_enumerated_files++;
-							}
-
-							if (!(boolean)XFindNextSaveGame(find_handle, &find_data))
-							{
-								break;
 							}
 						}
+						while ((boolean)XFindNextSaveGame(find_handle, &find_data));
 
 						if (!XFindClose(find_handle))
 						{
@@ -2178,9 +2187,9 @@ static long count_enumerated_profiles_in_mapfile(
 }
 
 static long build_saved_game_file_index(
-	long n,
 	long type,
 	long memory_unit_index,
+	long n,
 	boolean read_only,
 	boolean valid)
 {

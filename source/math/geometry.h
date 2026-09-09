@@ -108,7 +108,7 @@ short convex_polygon3d_clip_to_plane(
 short convex_hull2d_intersect(
 	short p_count,
 	real_point2d const *p,
-	long q_count,
+	short q_count,
 	real_point2d const *q,
 	short maximum_count,
 	real_point2d *result,
@@ -152,6 +152,22 @@ boolean convex_hull3d_test_point(
 	short surface_count,
 	struct surface3d const *surfaces,
 	real_point3d const *point);
+boolean convex_polygon3d_verify(
+	short count,
+	real_point3d const *points);
+boolean convex_hull3d_test_vector(
+	short point_count,
+	real_point3d const *points,
+	short vertex_count,
+	struct vertex3d const *vertices,
+	short edge_count,
+	struct edge3d const *edges,
+	short surface_count,
+	struct surface3d const *surfaces,
+	real_point3d const *origin,
+	real_vector3d const *vector,
+	real *minimum_distance,
+	real *maximum_distance);
 
 /* ---------- globals */
 

@@ -4330,8 +4330,6 @@ void profile_sections_activate(
 	char const *section_name);
 void profile_sections_deactivate(
 	char const *section_name);
-void profile_graph_toggle(
-	char const *graph_name);
 void ai_debug_vocalize(
 	long ai_index,
 	char const *vocalization);

@@ -65,6 +65,24 @@ void interface_draw_bitmap(
 	real scale,
 	real theta,
 	real fade);
+void interface_draw_bitmap_modulated(
+	struct bitmap_data const *bitmap,
+	union point2d const *point,
+	union real_rectangle2d const *clip,
+	real scale,
+	real theta,
+	real_argb_color const *modulated_color,
+	short shader_type);
+void interface_draw_bitmap_modulated_p32(
+	struct bitmap_data const *bitmap,
+	union point2d const *point,
+	union real_rectangle2d const *clip,
+	real scale,
+	real theta,
+	pixel32 modulated_color,
+	short shader_type);
+void profile_graph_toggle(
+	char const *graph_name);
 
 /* ---------- globals */
 

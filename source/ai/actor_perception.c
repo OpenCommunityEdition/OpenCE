@@ -271,6 +271,18 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	_actor_mode_combat = 3,
+};
+
+enum
+{
+	_actor_combat_status_none = 0,
+	_actor_combat_status_certain = 4,
+	_actor_combat_status_visible = 7,
+};
+
 /* ---------- macros */
 
 /*
@@ -1661,6 +1673,238 @@ void actor_situation_update_target_status(
 	}
 
 	return;
+}
+
+void actor_situation_combat_status_update(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	short combat_status;
+
+	if (actor->stimuli.suspicion_combat_status > _actor_combat_status_none)
+	{
+		if (actor->state.suspicion_combat_status <
+			actor->stimuli.suspicion_combat_status)
+		{
+			actor->state.suspicion_combat_status =
+				actor->stimuli.suspicion_combat_status;
+			actor->state.suspicion_timer = actor->stimuli.suspicion_timer;
+		}
+		else if (actor->state.suspicion_combat_status ==
+			actor->stimuli.suspicion_combat_status)
+		{
+			actor->state.suspicion_timer = MAX(
+				actor->state.suspicion_timer,
+				actor->stimuli.suspicion_timer);
+		}
+
+		actor->stimuli.suspicion_combat_status =
+			_actor_combat_status_none;
+	}
+
+#line 4408 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+	assert((actor->target.target_type >= 0) && (actor->target.target_type < NUMBER_OF_ACTOR_TARGET_TYPES));
+#line 540 "source\\ai\\actor_perception.c"
+
+	combat_status = MAX(
+		actor->state.suspicion_combat_status,
+		MAX(
+			actor->state.artificial_combat_status,
+			global_combat_status_table[actor->target.target_type]));
+	actor->state.combat_status = combat_status;
+
+	if (combat_status > actor->state.suspicion_combat_status)
+		actor->state.suspicion_combat_status = _actor_combat_status_none;
+
+	if (actor->state.mode < _actor_mode_combat)
+		actor->state.combat_mode_timer = 0;
+	else
+		actor->state.combat_mode_timer++;
+
+	if (combat_status == _actor_combat_status_none)
+	{
+		actor->state.in_combat_timer = 0;
+		actor->state.certain_combat_timer = 0;
+	}
+	else
+	{
+		actor->state.in_combat_timer++;
+
+		if (combat_status >= _actor_combat_status_certain)
+		{
+			actor->state.certain_combat_timer++;
+			actor->state.uncertain_combat_timer = 0;
+			goto combat_status_timers_updated;
+		}
+
+		actor->state.certain_combat_timer = 0;
+	}
+
+	if (actor->state.uncertain_combat_timer != NONE)
+		actor->state.uncertain_combat_timer++;
+
+combat_status_timers_updated:
+	if (combat_status >= _actor_combat_status_visible)
+		actor->state.had_visible_enemy = TRUE;
+
+	return;
+}
+
+boolean actor_perception_friend_prop_is_attacking(
+	long actor_index,
+	long friend_prop_index,
+	real_vector3d *attack_vector)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct prop_datum *friend_prop = prop_get(friend_prop_index);
+
+#line 4710 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+	vassert(
+		prop_acknowledged(friend_prop) && !friend_prop->enemy && !friend_prop->dead,
+		"prop_acknowledged(friend_prop) && !friend_prop->enemy && !friend_prop->dead");
+#line 610 "source\\ai\\actor_perception.c"
+
+	if (!friend_prop->swarm)
+	{
+		if (friend_prop->player)
+		{
+			boolean attacking = friend_prop->shooting;
+
+			unit_get_aiming_vector(friend_prop->unit_index, attack_vector);
+			if (!attacking && actor->situation.known_enemies > 0)
+			{
+				struct prop_iterator iterator;
+				struct prop_datum *prop;
+
+				prop_iterator_new(&iterator, actor_index);
+				prop = prop_iterator_next(&iterator);
+				while (prop != NULL)
+				{
+					if (prop_acknowledged(prop) && prop->enemy)
+					{
+						real_vector3d friend_to_enemy;
+
+						vector_from_points3d(
+							&friend_prop->body_position,
+							&prop->body_position,
+							&friend_to_enemy);
+						if (normalize3d(&friend_to_enemy) > 0.0f &&
+							dot_product3d(
+								&friend_to_enemy,
+								attack_vector) > 0.5f)
+						{
+							return TRUE;
+						}
+					}
+
+					prop = prop_iterator_next(&iterator);
+				}
+			}
+
+			return attacking;
+		}
+
+		if (friend_prop->actor_index != NONE)
+		{
+			return actor_attacking_target(
+				friend_prop->actor_index,
+				attack_vector);
+		}
+	}
+
+	return FALSE;
+}
+
+short actor_perception_aiming_vector_test_blockage(
+	real_point3d const *origin,
+	real_vector3d const *aiming_vector,
+	real_point3d const *point,
+	real_vector3d *error)
+{
+	real_vector2d horizontal_aiming;
+	real_vector3d friend_vector;
+	real_vector3d blockage_vector;
+	real horizontal_aiming_magnitude;
+	real projection;
+	real friend_distance;
+	real horizontal_error_squared;
+	short blockage;
+	short result = 0;
+
+	horizontal_aiming.i = aiming_vector->i;
+	horizontal_aiming.j = aiming_vector->j;
+	horizontal_aiming_magnitude = magnitude2d(&horizontal_aiming);
+	if (!(_real_epsilon > fabs(horizontal_aiming_magnitude)))
+	{
+		real inverse_magnitude = 1.0f / horizontal_aiming_magnitude;
+
+		horizontal_aiming.i *= inverse_magnitude;
+		horizontal_aiming.j *= inverse_magnitude;
+	}
+	else
+	{
+		horizontal_aiming_magnitude = 0.0f;
+	}
+
+	if (horizontal_aiming_magnitude <= 0.0f)
+		goto done;
+
+	vector_from_points3d(origin, point, &friend_vector);
+	projection =
+		friend_vector.i * horizontal_aiming.i +
+		friend_vector.j * horizontal_aiming.j;
+	friend_distance = square_root(
+		friend_vector.i * friend_vector.i +
+		friend_vector.j * friend_vector.j);
+	friend_distance *= 0.8660254f;
+
+	if (!(projection > friend_distance))
+		goto done;
+
+	projection = -projection;
+	blockage_vector.i =
+		friend_vector.i + projection * aiming_vector->i;
+	blockage_vector.j =
+		friend_vector.j + projection * aiming_vector->j;
+	blockage_vector.k =
+		friend_vector.k + projection * aiming_vector->k;
+
+	if (error != NULL)
+	{
+		error->i = -blockage_vector.i;
+		error->j = -blockage_vector.j;
+		error->k = -blockage_vector.k;
+	}
+
+	if (blockage_vector.k > -0.5f && blockage_vector.k < 0.9f)
+	{
+		blockage = 2;
+	}
+	else
+	{
+		if (blockage_vector.k <= -0.8f ||
+			blockage_vector.k >= 1.2f)
+		{
+			goto done;
+		}
+
+		blockage = 1;
+	}
+
+	horizontal_error_squared =
+		blockage_vector.i * blockage_vector.i +
+		blockage_vector.j * blockage_vector.j;
+	if (horizontal_error_squared < 0.36f)
+	{
+		result = blockage;
+		goto done;
+	}
+
+	if (horizontal_error_squared < 1.21f)
+		result = 1;
+
+done:
+	return result;
 }
 
 real actor_compute_prop_target_weight(

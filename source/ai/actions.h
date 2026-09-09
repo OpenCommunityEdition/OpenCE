@@ -502,6 +502,9 @@ boolean actor_action_try_to_enter_vehicle(
 
 struct pursuit_location *actor_get_pursuit_location(
 	long actor_index);
+long actor_pursuit_find_nearby_actors(
+	long actor_index,
+	boolean pursuit_is_coordinator);
 
 real_argb_color *actor_action_debug_color(
 	long actor_index);

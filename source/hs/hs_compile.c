@@ -872,8 +872,7 @@ void hs_compile_dispose(
 			data_delete_all(hs_syntax_data);
 		}
 
-		if (hs_compile_globals.compiled_source &&
-			!hs_compile_globals.malloced)
+		if (hs_compile_globals.compiled_source)
 		{
 			match_free(
 				"c:\\halo\\SOURCE\\hs\\hs_compile.c",

@@ -43,9 +43,6 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-void actor_pursuit_find_nearby_actors(
-	long actor_index,
-	boolean pursuit_is_coordinator);
 /* ---------- globals */
 
 /* ---------- public code */

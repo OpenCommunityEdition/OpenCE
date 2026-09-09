@@ -36,7 +36,10 @@ enum
 
 enum
 {
-	_platoon_initially_defending_bit = 2,
+	_platoon_flee_upon_maneuver_bit = 0,
+	_platoon_advancing_maneuver_bit,
+	_platoon_initially_defending_bit,
+	NUMBER_OF_PLATOON_FLAGS,
 };
 
 enum

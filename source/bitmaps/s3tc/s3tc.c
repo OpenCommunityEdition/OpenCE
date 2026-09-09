@@ -867,12 +867,136 @@ void EncodeBlockAlpha4(
 
 	for (row = 0; row < 4; ++row)
 	{
-		block->alpha_bitmap[row] = 0;
 		for (column = 3; column >= 0; --column)
 		{
 			block->alpha_bitmap[row] <<= 4;
 			block->alpha_bitmap[row] |= colors[4 * row + column].rgba[S3TC_ALPHA] >> 4;
 		}
+	}
+
+	EncodeBlockRGBColorKey(colors, &block->rgb, 0);
+
+	return;
+}
+
+void EncodeBlockAlpha3(
+	struct s3tc_color colors[S3TC_BLOCK_PIXELS],
+	struct s3tc_block_alpha3 *block)
+{
+	byte alpha0;
+	byte alpha1;
+	byte alpha;
+	long six_alpha;
+	long range;
+	long bias;
+	long steps;
+	long index;
+	long pixel;
+	unsigned long bitmap = 0;
+
+	alpha0 = alpha1 = colors[0].rgba[S3TC_ALPHA];
+	for (pixel = 1; pixel < S3TC_BLOCK_PIXELS; ++pixel)
+	{
+		alpha = colors[pixel].rgba[S3TC_ALPHA];
+		if (alpha > alpha0)
+		{
+			alpha0 = alpha;
+		}
+		if (alpha < alpha1)
+		{
+			alpha1 = alpha;
+		}
+	}
+
+	if (alpha0 == 255 && alpha1 == 0)
+	{
+		for (pixel = 0; pixel < S3TC_BLOCK_PIXELS; ++pixel)
+		{
+			alpha = colors[pixel].rgba[S3TC_ALPHA];
+			if (alpha < alpha0 && alpha != 0)
+			{
+				alpha0 = alpha;
+			}
+			if (alpha > alpha1 && alpha != 255)
+			{
+				alpha1 = alpha;
+			}
+		}
+
+		if (alpha0 < alpha1)
+		{
+			six_alpha = TRUE;
+		}
+		else
+		{
+			alpha0 = 255;
+			alpha1 = 0;
+			six_alpha = FALSE;
+		}
+	}
+	else
+	{
+		six_alpha = FALSE;
+	}
+
+	block->alpha0 = alpha0;
+	block->alpha1 = alpha1;
+
+	if (alpha0 != alpha1)
+	{
+		range = alpha0 - alpha1;
+		bias = range >> 1;
+		steps = six_alpha ? 5 : 7;
+
+		for (pixel = S3TC_BLOCK_PIXELS - 1; pixel >= 0; --pixel)
+		{
+			bitmap <<= 3;
+			if (six_alpha && colors[pixel].rgba[S3TC_ALPHA] == 0)
+			{
+				bitmap |= 6;
+			}
+			else if (six_alpha && colors[pixel].rgba[S3TC_ALPHA] == 255)
+			{
+				bitmap |= 7;
+			}
+			else
+			{
+				index = ((alpha0 - colors[pixel].rgba[S3TC_ALPHA]) * steps + bias) / range;
+				if (index >= steps)
+				{
+					bitmap |= 1;
+				}
+				else if (index > 0)
+				{
+					bitmap |= index + 1;
+				}
+			}
+
+			if ((pixel & 7) == 0)
+			{
+				if (pixel == 8)
+				{
+					block->alpha_bitmap[3] = (byte)bitmap;
+					bitmap >>= 8;
+					block->alpha_bitmap[4] = (byte)bitmap;
+					bitmap >>= 8;
+					block->alpha_bitmap[5] = (byte)bitmap;
+				}
+				else
+				{
+					block->alpha_bitmap[0] = (byte)bitmap;
+					bitmap >>= 8;
+					block->alpha_bitmap[1] = (byte)bitmap;
+					bitmap >>= 8;
+					block->alpha_bitmap[2] = (byte)bitmap;
+				}
+			}
+		}
+	}
+	else
+	{
+		block->alpha_bitmap[0] = block->alpha_bitmap[1] = block->alpha_bitmap[2] =
+			block->alpha_bitmap[3] = block->alpha_bitmap[4] = block->alpha_bitmap[5] = 0;
 	}
 
 	EncodeBlockRGBColorKey(colors, &block->rgb, 0);

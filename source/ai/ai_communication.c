@@ -551,8 +551,11 @@ symbols in this file:
 #include "actor_types.h"
 #include "ai_scenario_definitions.h"
 #include "game/game.h"
+#include "game/players.h"
 #include "main/console.h"
 #include "memory/data.h"
+#include "physics/collision_usage.h"
+#include "physics/collisions.h"
 #include "props.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
@@ -566,6 +569,8 @@ symbols in this file:
 
 enum
 {
+	_ai_meter_collisions = 21,
+	NUMBER_OF_AI_PROFILE_METERS = 28,
 	NUMBER_OF_COMMUNICATION_PRIORITIES = 8,
 	NUMBER_OF_COMMUNICATION_TEAMS = 4,
 	NUMBER_OF_COMMUNICATION_TYPES = 57,
@@ -775,6 +780,18 @@ struct dialogue_event_status
 	long disable_until_time;
 };
 
+struct ai_profile_meter_view
+{
+	short accumulator;
+	byte __unknown02[0x86];
+};
+
+struct ai_profile_globals_view
+{
+	byte __unknown00[0x0C];
+	struct ai_profile_meter_view meters[NUMBER_OF_AI_PROFILE_METERS];
+};
+
 struct ai_communication_globals_view
 {
 	byte __unknown00[0x10];
@@ -839,6 +856,11 @@ typedef char ai_conversation_driver_line_address_unit_index_offset_assert[
 	offsetof(struct ai_conversation_driver_datum_view, line_address_unit_index) == 0x58 ? 1 : -1];
 typedef char recent_conversation_view_size_assert[
 	sizeof(struct recent_conversation_view) == 0x10 ? 1 : -1];
+typedef char ai_profile_meter_view_size_assert[
+	sizeof(struct ai_profile_meter_view) == 0x88 ? 1 : -1];
+typedef char ai_profile_collisions_accumulator_offset_assert[
+	offsetof(struct ai_profile_globals_view, meters) +
+		_ai_meter_collisions * sizeof(struct ai_profile_meter_view) == 0xB34 ? 1 : -1];
 typedef char ai_print_conversations_offset_assert[
 	offsetof(struct ai_debug_state, print_conversations) == 0x9F ? 1 : -1];
 typedef char ai_communication_unit_speech_item_size_assert[
@@ -976,6 +998,7 @@ boolean code_00034020(
 
 extern short global_communication_table_indices[NUMBER_OF_COMMUNICATION_TYPES];
 extern struct ai_communication_globals_view *ai_globals;
+extern struct ai_profile_globals_view ai_profile;
 
 /* ---------- globals */
 
@@ -2286,6 +2309,155 @@ void ai_conversation_finish(
 	}
 
 	return;
+}
+
+real ai_communication_get_player_rating(
+	long unit_index,
+	boolean test_line_of_sight,
+	long *unit_index_reference,
+	real *distance_reference)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	real_point3d position;
+	real_point3d player_position;
+	real_vector3d vector;
+	real_vector3d aiming_vector;
+	long closest_unit_index = NONE;
+	real best_rating = 0.0f;
+	real closest_distance = REAL_MAX;
+	boolean any_players = FALSE;
+	real rating;
+
+	unit_get_head_position(unit_index, &position);
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+	{
+		if (player->unit_index != NONE)
+		{
+			real distance_squared;
+
+			any_players = TRUE;
+			unit_get_head_position(player->unit_index, &player_position);
+			vector_from_points3d(&player_position, &position, &vector);
+			distance_squared = magnitude_squared3d(&vector);
+			if (distance_squared <
+				communication_player_absolute_range * communication_player_absolute_range)
+			{
+				boolean clear_line_of_sight = FALSE;
+				real distance;
+
+				if (test_line_of_sight)
+				{
+					struct collision_result collision;
+					real_vector3d line_of_sight_vector;
+					boolean blocked;
+					short cluster_index = object_get(object_get_ultimate_parent(unit_index))->
+						object.location.cluster_index;
+					short player_cluster_index =
+						object_get(object_get_ultimate_parent(player->unit_index))->
+							object.location.cluster_index;
+
+					if (cluster_index != NONE &&
+						player_cluster_index != NONE &&
+						!scenario_test_pvs(cluster_index, player_cluster_index))
+					{
+						continue;
+					}
+
+					ai_profile.meters[_ai_meter_collisions].accumulator++;
+					match_assert(
+						"c:\\halo\\SOURCE\\ai\\ai_communication.c",
+						0xE91,
+						global_current_collision_user_depth <
+							MAXIMUM_COLLISION_USER_STACK_DEPTH);
+					global_current_collision_users[global_current_collision_user_depth++] =
+						_collision_user_ai_comms;
+
+					vector_from_points3d(
+						&player_position,
+						&position,
+						&line_of_sight_vector);
+					blocked = collision_test_vector(
+						FLAG(_collision_test_front_facing_surfaces_bit) |
+							FLAG(_collision_test_back_facing_surfaces_bit) |
+							FLAG(_collision_test_ignore_two_sided_surfaces_bit) |
+							FLAG(_collision_test_structure_bit),
+						&player_position,
+						&line_of_sight_vector,
+						NONE,
+						&collision);
+
+					match_assert(
+						"c:\\halo\\SOURCE\\ai\\ai_communication.c",
+						0xE97,
+						global_current_collision_user_depth > 1);
+					--global_current_collision_user_depth;
+
+					clear_line_of_sight = (boolean)(distance_squared <
+						communication_player_ideal_range_min *
+							communication_player_ideal_range_min ||
+						!blocked);
+				}
+
+				rating = 1.0f;
+				distance = square_root(distance_squared);
+				if (distance < communication_player_ideal_range_max)
+				{
+					if (distance < communication_player_ideal_range_min)
+					{
+						rating = 2.0f;
+					}
+					else
+					{
+						rating = 1.0f +
+							(communication_player_ideal_range_max - distance) /
+							(communication_player_ideal_range_max -
+								communication_player_ideal_range_min);
+					}
+
+					if (clear_line_of_sight)
+					{
+						rating += 0.5f;
+					}
+
+					if (distance > _real_epsilon)
+					{
+						real facing;
+
+						unit_get_aiming_vector(player->unit_index, &aiming_vector);
+						facing = dot_product3d(&aiming_vector, &vector) / distance;
+						if (facing > communication_player_ideal_fov)
+						{
+							rating += 0.7f - (1.0f - facing) /
+								(1.0f - communication_player_ideal_fov) * 0.35f;
+						}
+					}
+				}
+
+				if (rating > best_rating)
+				{
+					best_rating = rating;
+					closest_unit_index = player->unit_index;
+					closest_distance = distance;
+				}
+			}
+		}
+	}
+
+	rating = !any_players ? 1.0f : best_rating;
+
+	if (distance_reference)
+	{
+		*distance_reference = closest_distance;
+	}
+
+	if (unit_index_reference)
+	{
+		*unit_index_reference = closest_unit_index;
+	}
+
+	return rating;
 }
 
 void ai_conversation_stop(

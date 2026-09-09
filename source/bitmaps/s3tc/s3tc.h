@@ -98,6 +98,9 @@ void EncodeBlockRGB(
 void EncodeBlockAlpha4(
 	struct s3tc_color colors[S3TC_BLOCK_PIXELS],
 	struct s3tc_block_alpha4 *block);
+void EncodeBlockAlpha3(
+	struct s3tc_color colors[S3TC_BLOCK_PIXELS],
+	struct s3tc_block_alpha3 *block);
 
 /* ---------- globals */
 

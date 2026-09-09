@@ -1441,6 +1441,10 @@ void actor_stimulus_prop_just_killed(
 void actor_stimulus_prop_fleeing(
 	long actor_index,
 	long prop_index);
+void actor_stimulus_maneuvering(
+	long actor_index,
+	boolean advancing,
+	boolean flee);
 void actor_stimulus_abandon_stationary_facing(
 	long actor_index);
 void actor_stimulus_prop_acknowledged(

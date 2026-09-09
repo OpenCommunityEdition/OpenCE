@@ -343,3 +343,24 @@ The full evidence and per-function boundary list is in
 The canonical multi-lane treemap was force-refreshed after crossing the
 972,207-byte cadence checkpoint. The next required refresh threshold is
 **985,317 meaningful exact code bytes**.
+
+## 2026-09-08 Fable/Opus final reconciliation packet
+
+The current canonical full build and semantic ledger report **1,031,486
+meaningful exact code bytes / 6,587 accepted exact functions**. Relative to
+published commit `8074a18fc` at 982,763 bytes / 6,492 functions, this is a net
+canonical gain of **48,723 meaningful exact bytes / 95 accepted functions**.
+Donor-relative headline totals are not added separately.
+
+The final universal strict snapshot for the last source slice records 22 net
+new strict functions / 8,848 padded bytes. Its only debit from the provisional
+snapshot is the deliberate rejection of an undefined saved-game failure path;
+there are zero unintended regressions. Credible residual bodies are retained
+in source and `config/parked.json` with zero exact credit; in particular, the
+448-byte `_encounter_control_actors` scheduling residual is parked rather than
+tuned further. See
+[the final checkpoint](object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md)
+and [remaining-donor ledger](object_matching_logs/claude_remaining_donor_batch_20260908.md).
+
+The canonical multi-lane treemap was force-refreshed after this build. The next
+required refresh threshold is **1,041,486 meaningful exact code bytes**.
