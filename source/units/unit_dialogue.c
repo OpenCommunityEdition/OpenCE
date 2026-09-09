@@ -80,8 +80,13 @@ symbols in this file:
 #include "units.h"
 
 #include "ai/ai_communication.h"
+#include "ai/ai_debug.h"
 #include "dialogue_definitions.h"
+#include "game/game.h"
+#include "main/console.h"
 #include "sound/game_sound.h"
+#include "sound/sound_definitions.h"
+#include "tag_files/tag_groups.h"
 #include "unit_definitions.h"
 
 /* ---------- constants */
@@ -96,7 +101,20 @@ enum unit_play_speech_type
 
 /* ---------- macros */
 
+#define AI_BEHAVIOR(field) \
+	(game_connection() == _game_connection_local && ai_debug.field)
+#define NUMBER_OF_VOCALIZATION_TYPES NUMBER_OF_DIALOGUE_VOCALIZATION_TYPES
+
 /* ---------- structures */
+
+struct dialogue_definition
+{
+	short vocalization_enum_version;
+	word pad;
+	long unused[3];
+	struct tag_reference vocalizations[NUMBER_OF_DIALOGUE_VOCALIZATION_TYPES];
+	struct tag_reference unused_vocalizations[47];
+};
 
 /* ---------- prototypes */
 
@@ -105,8 +123,14 @@ static long unit_find_dialogue_variant(
 	short variant_number);
 static void unit_dialogue_setup(
 	long unit_index);
+static void unit_lose_speech(
+	long unit_index,
+	short play_type,
+	struct unit_speech_item const *speech_item);
 
 /* ---------- globals */
+
+extern short const dialogue_vocalization_lookup[NUMBER_OF_DIALOGUE_VOCALIZATION_TYPES];
 
 char const *global_speech_priority_names[NUMBER_OF_UNIT_SPEECH_PRIORITIES] =
 {
@@ -123,9 +147,202 @@ char const *global_speech_priority_names[NUMBER_OF_UNIT_SPEECH_PRIORITIES] =
 	"death",
 };
 
+short const global_speech_override_priorities[NUMBER_OF_UNIT_SPEECH_PRIORITIES] =
+{
+	_unit_speech_none,
+	_unit_speech_none,
+	_unit_speech_idle,
+	_unit_speech_idle,
+	_unit_speech_pain,
+	_unit_speech_pain,
+	_unit_speech_shout,
+	_unit_speech_shout,
+	_unit_speech_involuntary,
+	_unit_speech_involuntary,
+	_unit_speech_death,
+};
+
+real const global_speech_queue_times[NUMBER_OF_UNIT_SPEECH_PRIORITIES] =
+{
+	0.0f,
+	0.0f,
+	0.0f,
+	1.5f,
+	3.0f,
+	4.0f,
+	REAL_MAX,
+	3.0f,
+	3.0f,
+	3.0f,
+	3.0f,
+};
+
 long sequential_counter;
 
 /* ---------- public code */
+
+short unit_test_speech(
+	long unit_index,
+	short priority,
+	boolean allow_recursive_lookup,
+	boolean allow_queue,
+	long *unit_last_speech_time,
+	short *vocalization_type_reference,
+	long *sound_definition_index_reference)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	short vocalization_type;
+	short result;
+	long sound_definition_index;
+	boolean can_queue;
+	real queue_time;
+
+	game_time_get();
+	result = _unit_play_speech_none;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\unit_dialogue.c",
+		128,
+		vocalization_type_reference);
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\unit_dialogue.c",
+		129,
+		sound_definition_index_reference);
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\unit_dialogue.c",
+		130,
+		(priority >= 0) && (priority < NUMBER_OF_UNIT_SPEECH_PRIORITIES));
+
+	vocalization_type = *vocalization_type_reference;
+	sound_definition_index = *sound_definition_index_reference;
+
+	if (sound_definition_index == NONE &&
+		unit->unit.dialogue_index != NONE &&
+		vocalization_type != NONE)
+	{
+		struct dialogue_definition *dialogue_definition =
+			dialogue_definition_get(unit->unit.dialogue_index);
+
+		do
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\units\\unit_dialogue.c",
+				144,
+				(vocalization_type >= 0) &&
+					(vocalization_type < NUMBER_OF_VOCALIZATION_TYPES));
+
+			sound_definition_index =
+				dialogue_definition->vocalizations[vocalization_type].index;
+
+			if (!allow_recursive_lookup ||
+				sound_definition_index != NONE ||
+				AI_BEHAVIOR(force_vocalizations))
+			{
+				break;
+			}
+
+			vocalization_type = dialogue_vocalization_lookup[vocalization_type];
+		}
+		while (vocalization_type != NONE);
+	}
+
+	if ((!TEST_FLAG(unit->object.damage_flags, _object_dead_bit) ||
+		priority == _unit_speech_death) &&
+		(AI_BEHAVIOR(force_vocalizations) || sound_definition_index != NONE))
+	{
+		short current_priority = unit->unit.speech.current.priority;
+
+		if (current_priority == _unit_speech_none)
+		{
+			result = _unit_play_speech_immediate;
+		}
+		else
+		{
+			short queued_priority = unit->unit.speech.queued.priority;
+			short highest_priority = MAX(current_priority, queued_priority);
+			long priority_index = priority;
+
+			switch (priority_index)
+			{
+			case _unit_speech_pain:
+			case _unit_speech_involuntary:
+			case _unit_speech_death:
+				if (unit->unit.speech.played &&
+					unit->unit.speech.sound_timer == 0 &&
+					priority > highest_priority)
+				{
+					current_priority = _unit_speech_none;
+					highest_priority = queued_priority;
+				}
+				break;
+			}
+
+			if (global_speech_override_priorities[priority_index] >= highest_priority)
+			{
+				result = _unit_play_speech_immediate_dequeue;
+			}
+			else if (priority >= _unit_speech_involuntary &&
+				global_speech_override_priorities[priority_index] >= current_priority)
+			{
+				result = _unit_play_speech_immediate;
+			}
+			else if (allow_queue)
+			{
+				queue_time = global_speech_queue_times[priority_index];
+
+				if (queue_time != 0.0f)
+				{
+					if (queue_time == REAL_MAX)
+					{
+						can_queue = TRUE;
+					}
+					else
+					{
+						can_queue =
+							unit->unit.speech.post_delay_timer +
+								unit->unit.speech.sound_timer <
+							(short)(queue_time * TICKS_PER_SECOND);
+					}
+
+					if (can_queue)
+					{
+						if (priority <= highest_priority)
+						{
+							if (priority <= queued_priority)
+								can_queue = FALSE;
+							else
+							{
+								switch (current_priority)
+								{
+								case _unit_speech_pain:
+								case _unit_speech_involuntary:
+									can_queue = TRUE;
+									break;
+								}
+								if (priority == _unit_speech_scripted)
+									can_queue = TRUE;
+							}
+						}
+						else
+						{
+							can_queue = TRUE;
+						}
+
+						if (can_queue)
+							result = _unit_play_speech_queue;
+					}
+				}
+			}
+		}
+	}
+
+	*vocalization_type_reference = vocalization_type;
+	*sound_definition_index_reference = sound_definition_index;
+	if (unit_last_speech_time)
+		*unit_last_speech_time = unit->unit.speech.last_speech_finished_time;
+
+	return result;
+}
 
 boolean unit_is_speaking(
 	long unit_index)
@@ -201,6 +418,135 @@ short unit_get_speech_priority_by_name(
 	}
 
 	return result;
+}
+
+static void unit_lose_speech(
+	long unit_index,
+	short play_type,
+	struct unit_speech_item const *speech_item)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\unit_dialogue.c",
+		1045,
+		speech_item);
+
+	if (ai_debug.print_lost_speech)
+	{
+		struct unit_definition *definition = unit_definition_get(unit->definition_index);
+		char const *speech_name;
+
+		if (speech_item->vocalization_type != NONE)
+		{
+			speech_name = dialogue_get_vocalization_name(
+				speech_item->vocalization_type,
+				FALSE);
+		}
+		else if (speech_item->sound_definition_index != NONE)
+		{
+			char const *separator;
+
+			speech_name = tag_get_name(speech_item->sound_definition_index);
+			separator = strrchr(speech_name, '\\');
+			if (separator)
+				speech_name = separator + 1;
+		}
+		else
+		{
+			speech_name = "<unknown>";
+		}
+
+		console_printf(
+			FALSE,
+			"%s: lost %s speech %s",
+			definition->object.model.name,
+			play_type == _unit_play_speech_immediate ? "waiting" : "queued",
+			speech_name);
+	}
+
+	return;
+}
+
+void unit_speak(
+	long unit_index,
+	short play_type,
+	struct unit_speech_item const *speech_item)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\unit_dialogue.c",
+		302,
+		speech_item);
+
+	if (TEST_FLAG(unit->object.damage_flags, _object_dead_bit) &&
+		speech_item->priority != _unit_speech_death)
+	{
+		return;
+	}
+
+	if (play_type >= _unit_play_speech_immediate)
+	{
+		if (unit->unit.speech.current.priority > _unit_speech_none &&
+			!unit->unit.speech.played)
+		{
+			unit_lose_speech(
+				unit_index,
+				_unit_play_speech_immediate,
+				&unit->unit.speech.current);
+		}
+
+		unit->unit.speech.current = *speech_item;
+
+		if (play_type == _unit_play_speech_immediate_dequeue &&
+			unit->unit.speech.queued.priority > _unit_speech_none)
+		{
+			if (speech_item != &unit->unit.speech.queued)
+			{
+				unit_lose_speech(
+					unit_index,
+					_unit_play_speech_queue,
+					&unit->unit.speech.queued);
+			}
+			unit->unit.speech.queued.priority = _unit_speech_none;
+		}
+
+		unit->unit.speech.pre_delay_timer = unit->unit.speech.current.delay_time;
+		unit->unit.speech.played = FALSE;
+		unit->unit.speech.notified_ai = FALSE;
+		unit->unit.speech.finished = FALSE;
+		unit->unit.speech.impulse_sound_index = NONE;
+		unit->unit.speech.post_delay_timer = unit->unit.speech.current.pause_time;
+		unit->unit.speech.ai_delay_timer =
+			unit->unit.speech.current.ai_notification_delay;
+
+		if (unit->unit.speech.current.sound_definition_index != NONE)
+		{
+			struct sound_definition *sound_definition =
+				sound_definition_get(unit->unit.speech.current.sound_definition_index);
+			unit->unit.speech.sound_timer = (short)(
+				(long)(sound_definition->longest_permutation_length * TICKS_PER_SECOND) / 1000);
+		}
+		else
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\units\\unit_dialogue.c",
+				360,
+				AI_BEHAVIOR(force_vocalizations));
+			unit->unit.speech.sound_timer = 45;
+		}
+	}
+	else if (play_type == _unit_play_speech_queue)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\units\\unit_dialogue.c",
+			366,
+			unit->unit.speech.current.priority > _unit_speech_none);
+		unit->unit.speech.queued = *speech_item;
+	}
+
+	return;
 }
 
 void unit_dialogue_update(
