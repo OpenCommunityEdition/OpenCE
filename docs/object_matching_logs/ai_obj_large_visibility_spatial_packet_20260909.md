@@ -8,8 +8,8 @@ Starting revision: `6f8644c0c`
 
 ## Result
 
-The strict isolated gate advances this unit from 36 to 41 exact functions.
-The five newly exact owners contribute **2,090 meaningful code bytes**:
+The strict isolated gate advances this unit from 36 to 42 exact functions.
+The six newly exact owners contribute **3,386 meaningful code bytes**:
 
 | January owner | retained semantic source name | bytes |
 | --- | --- | ---: |
@@ -18,10 +18,25 @@ The five newly exact owners contribute **2,090 meaningful code bytes**:
 | `_code_0002fa30` | `ai_find_line_of_fire_friend_pills` | 368 |
 | `_ai_update` | `ai_update` | 208 |
 | `_ai_handle_spatial_effect` | `ai_handle_spatial_effect` | 1,130 |
+| `_ai_handle_editing` | `ai_handle_editing` | 1,296 |
 
 Each exact owner has equal section size, relocation count, normalized bytes,
 and normalized relocation identity under `tools/coff_compare.py`. No residual
 or previously exact owner was counted as progress.
+
+`ai_handle_spatial_effect` has a function-local `/Od` code-generation shape in
+January: an EBP frame, stack homes for every scalar, no callee-save allocator
+use, and unoptimized assertion/control-flow expansion, unlike its optimized
+neighbors in the same translation unit. A tightly scoped
+`#pragma optimize("", off)` reproduces all 1,130 bytes and 47 relocations, and
+optimization is restored immediately afterward. No surviving source artifact
+spells the pragma, so its textual form is an evidence-based inference from that
+unique compiler-mode signature rather than authenticated source text.
+
+No circular-buffer next-index helper exists in `cseries.h` or the other
+project headers. The local `AI_SPATIAL_EFFECT_NEXT_INDEX` macro gives a semantic
+name to the `(index + 1) & 31` operation independently present in the HCEA map
+and emitted by January.
 
 The semantic private names are recorded in `config/symbols.json`; source does
 not retain address-derived names. The names are supported by their callers,
@@ -29,7 +44,7 @@ behavior, January location, and the HCEA cross-build reconstruction corpus.
 
 ## Best coherent non-exact bodies
 
-Four larger public routines were reconstructed completely and retained for
+Three larger public routines were reconstructed completely and retained for
 future research. They are explicitly parked and receive **zero exact credit**:
 
 | owner | January / candidate bytes | relocations | objdiff |
@@ -37,11 +52,9 @@ future research. They are explicitly parked and receive **zero exact credit**:
 | `_ai_test_line_of_fire` | 336 / 336 | 10 / 10 | 88.17% |
 | `_ai_test_line_of_sight` | 1,008 / 1,024 | 50 / 50 | 98.28% |
 | `_ai_test_ballistic_line_of_fire` | 944 / 944 | 49 / 49 | 94.50% |
-| `_ai_handle_editing` | 1,296 / 1,296 | 70 / 70 | 98.46% |
 
 These bodies preserve the observed control flow, collision-user accounting,
-debug recording, PVS/fog classification, ballistic segmentation, editor array
-movement, bounds diagnostics, actor repair, and full-map teardown path. The
+debug recording, PVS/fog classification, and ballistic segmentation. The
 remaining differences are compiler-local frame, register, x87, and independent
 instruction scheduling decisions. No fake dependency, raw-offset access,
 nonsensical branch, or artificial source-pressure steering was retained.
@@ -78,6 +91,6 @@ python tools/campaign/gate.py source/ai/ai --all \
   --out scratch/ai-large-packet.obj
 ```
 
-Expected result: `exact 41`, `residual 4`, `unwritten 1`, with the emitted
+Expected result: `exact 42`, `residual 3`, `unwritten 1`, with the emitted
 symbol guard passing. The one intentionally unwritten owner is
 `_ai_disconnect_from_structure_bsp`; it was not fabricated for this packet.

@@ -2448,7 +2448,7 @@ void ai_handle_editing(
 					last_squad_index + squad_count_delta <= MAXIMUM_SQUADS_PER_MAP,
 					csprintf(
 						temporary,
-						"editing caused an overflow of MAXIMUM_SQUADS_PER_MAP(%d)",
+						"editing caused an overflow of MAXIMUM_SQUADS_PER_MAP (%d)",
 						MAXIMUM_SQUADS_PER_MAP));
 
 				csmemmove(
@@ -2478,7 +2478,7 @@ void ai_handle_editing(
 					last_platoon_index + platoon_count_delta <= MAXIMUM_PLATOONS_PER_MAP,
 					csprintf(
 						temporary,
-						"editing caused an overflow of MAXIMUM_PLATOONS_PER_MAP(%d)",
+						"editing caused an overflow of MAXIMUM_PLATOONS_PER_MAP (%d)",
 						MAXIMUM_PLATOONS_PER_MAP));
 
 				csmemmove(
@@ -2553,8 +2553,8 @@ void ai_handle_editing(
 							actor->meta.squad_index = 0;
 							actor->meta.platoon_index = squad_definition->platoon_index;
 
-							if (actor->meta.platoon_index < 0 ||
-								actor->meta.platoon_index >= encounter_definition->platoons.count)
+							if (squad_definition->platoon_index < 0 ||
+								squad_definition->platoon_index >= encounter_definition->platoons.count)
 							{
 								actor->meta.platoon_index = NONE;
 							}
@@ -2597,7 +2597,7 @@ void ai_handle_editing(
 		{
 			struct actor_iterator iterator;
 
-			ai_debug.selected_actor_index = NONE;
+			ai_debug.selected_squad_index = NONE;
 			actor_iterator_new(&iterator, FALSE);
 
 			while (actor_iterator_next(&iterator))
