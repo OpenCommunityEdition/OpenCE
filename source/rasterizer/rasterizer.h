@@ -88,7 +88,7 @@ enum rasterizer_lock_operation
 
 /* ---------- macros */
 
-#define RASTERIZER_GLOBALS_FLOATING_POINT_ZBUFFER(globals) ((globals).reserved30[0xC])
+#define RASTERIZER_GLOBALS_FLOATING_POINT_ZBUFFER(globals) ((globals).floating_point_zbuffer)
 
 /* ---------- structures */
 
@@ -167,12 +167,35 @@ struct rasterizer_globals_definition
 	short current_lock_operation;
 	struct rasterizer_globals_reserved04 reserved04;
 	unsigned __int64 fps_accumulation_frame_index;
-	byte reserved20[8];
-	/* Incremented asynchronously as one 64-bit counter by the vblank callback. */
-	volatile __int64 vertical_blank_index;
-	byte reserved30[0xD];
+	volatile unsigned long d3d_flip_count;
+	byte reserved24[4];
+	/* Updated asynchronously as one 64-bit counter by the vblank callback. */
+	union
+	{
+		volatile __int64 vertical_blank_index;
+		volatile unsigned __int64 frame_and_vertical_blank_index;
+		struct
+		{
+			volatile unsigned long frame_index;
+			volatile unsigned long vertical_blank_count;
+		};
+	};
+	union
+	{
+		volatile unsigned __int64 previous_frame_and_vertical_blank_index;
+		struct
+		{
+			volatile unsigned long previous_frame_index;
+			volatile unsigned long previous_vertical_blank_index;
+		};
+	};
+	byte reserved38[4];
+	boolean floating_point_zbuffer;
 	boolean framerate_throttle;
-	byte reserved3E[6];
+	boolean framerate_throttle_debug;
+	byte reserved3F;
+	short framerate_throttle_target;
+	byte reserved42[2];
 	real near_clip_distance;
 	real far_clip_distance;
 	real first_person_weapon_near_clip_distance;
@@ -194,8 +217,18 @@ typedef char verify_rasterizer_globals_fps_accumulation_frame_index_offset[
 	offsetof(struct rasterizer_globals_definition, fps_accumulation_frame_index) == 0x18 ? 1 : -1];
 typedef char verify_rasterizer_globals_framerate_throttle_offset[
 	offsetof(struct rasterizer_globals_definition, framerate_throttle) == 0x3D ? 1 : -1];
+typedef char verify_rasterizer_globals_d3d_flip_count_offset[
+	offsetof(struct rasterizer_globals_definition, d3d_flip_count) == 0x20 ? 1 : -1];
+typedef char verify_rasterizer_globals_frame_and_vertical_blank_index_offset[
+	offsetof(struct rasterizer_globals_definition, frame_and_vertical_blank_index) == 0x28 ? 1 : -1];
+typedef char verify_rasterizer_globals_previous_frame_and_vertical_blank_index_offset[
+	offsetof(struct rasterizer_globals_definition, previous_frame_and_vertical_blank_index) == 0x30 ? 1 : -1];
+typedef char verify_rasterizer_globals_framerate_throttle_debug_offset[
+	offsetof(struct rasterizer_globals_definition, framerate_throttle_debug) == 0x3E ? 1 : -1];
+typedef char verify_rasterizer_globals_framerate_throttle_target_offset[
+	offsetof(struct rasterizer_globals_definition, framerate_throttle_target) == 0x40 ? 1 : -1];
 typedef char verify_rasterizer_globals_floating_point_zbuffer_offset[
-	offsetof(struct rasterizer_globals_definition, reserved30) + 0xC == 0x3C ? 1 : -1];
+	offsetof(struct rasterizer_globals_definition, floating_point_zbuffer) == 0x3C ? 1 : -1];
 typedef char verify_rasterizer_globals_near_clip_distance_offset[
 	offsetof(struct rasterizer_globals_definition, near_clip_distance) == 0x44 ? 1 : -1];
 struct rasterizer_window_begin_parameters
@@ -632,6 +665,8 @@ void rasterizer_transparent_geometry_begin(
 	void);
 void rasterizer_transparent_geometry_end(
 	void);
+void rasterizer_transparent_geometry_draw(
+	boolean water);
 
 /* ---------- prototypes/RASTERIZER_DEBUG.C */
 

@@ -491,6 +491,8 @@ enum ai_reference_type
 enum
 {
 	MAXIMUM_ACTIVATION_LINK_INDICES_PER_ENCOUNTER = 3,
+	MAXIMUM_AI_ENTERABLE_VEHICLES = 32,
+	MAXIMUM_AI_INDICES_PER_ENTERABLE_VEHICLE = 6,
 };
 
 /* actor default states (actors.c keeps this enum file-local too) */
@@ -557,10 +559,24 @@ enum
 
 /* ---------- structures */
 
-struct ai_script_globals_prefix
+struct ai_script_vehicle_enterable_data
+{
+	long vehicle_index;
+	real radius;
+	short team_bitmask;
+	short actor_type_bitmask;
+	short ai_indices_count;
+	word __pad0E;
+	long ai_indices[MAXIMUM_AI_INDICES_PER_ENTERABLE_VEHICLE];
+};
+
+struct ai_script_globals_data
 {
 	boolean ai_active;
 	boolean ai_initialized_for_map;
+	byte __unknown2[0x3B4];
+	short enterable_vehicle_count;
+	struct ai_script_vehicle_enterable_data enterable_vehicles[MAXIMUM_AI_ENTERABLE_VEHICLES];
 };
 
 typedef char ai_script_squad_iterator_size_assert[
@@ -611,6 +627,12 @@ typedef char ai_script_vehicle_enterable_team_offset_assert[
 	offsetof(struct ai_script_vehicle_enterable, team_bitmask) == 0x8 ? 1 : -1];
 typedef char ai_script_vehicle_enterable_actor_type_offset_assert[
 	offsetof(struct ai_script_vehicle_enterable, actor_type_bitmask) == 0xA ? 1 : -1];
+typedef char ai_script_vehicle_enterable_data_size_assert[
+	sizeof(struct ai_script_vehicle_enterable_data) == 0x28 ? 1 : -1];
+typedef char ai_script_globals_enterable_vehicle_count_offset_assert[
+	offsetof(struct ai_script_globals_data, enterable_vehicle_count) == 0x3B6 ? 1 : -1];
+typedef char ai_script_globals_enterable_vehicles_offset_assert[
+	offsetof(struct ai_script_globals_data, enterable_vehicles) == 0x3B8 ? 1 : -1];
 typedef char ai_script_platoon_iterator_size_assert[
 	sizeof(struct ai_script_platoon_iterator) == 0xC ? 1 : -1];
 typedef char ai_script_vehicle_candidate_size_assert[
@@ -642,7 +664,7 @@ static void ai_scripting_go_to_vehicle_internal(
 
 /* ---------- globals */
 
-extern struct ai_script_globals_prefix *ai_globals;
+extern struct ai_script_globals_data *ai_globals;
 
 /* ---------- public code */
 
@@ -1672,6 +1694,47 @@ void ai_scripting_set_blind(
 	return;
 }
 
+struct ai_script_vehicle_enterable *ai_scripting_find_vehicle_enterable(
+	long vehicle_index)
+{
+	struct ai_script_vehicle_enterable_data *vehicle_enterable = NULL;
+
+	if (vehicle_index != NONE)
+	{
+		short vehicle_enterable_count = ai_globals->enterable_vehicle_count;
+		short vehicle_enterable_index;
+
+		for (vehicle_enterable_index = 0;
+			vehicle_enterable_index < vehicle_enterable_count;
+			vehicle_enterable_index++)
+		{
+			if (ai_globals->enterable_vehicles[vehicle_enterable_index].vehicle_index == vehicle_index)
+				break;
+		}
+
+		if (vehicle_enterable_index >= MAXIMUM_AI_ENTERABLE_VEHICLES)
+		{
+			error(
+				_error_silent,
+				"ai_vehicle_enterable: too many enterable vehicles (max is %d)",
+				MAXIMUM_AI_ENTERABLE_VEHICLES);
+		}
+		else
+		{
+			vehicle_enterable = &ai_globals->enterable_vehicles[vehicle_enterable_index];
+			if (vehicle_enterable_index >= vehicle_enterable_count)
+			{
+				csmemset(vehicle_enterable, 0, sizeof(*vehicle_enterable));
+				vehicle_enterable->vehicle_index = vehicle_index;
+				vehicle_enterable->radius = 8.0f;
+				ai_globals->enterable_vehicle_count++;
+			}
+		}
+	}
+
+	return (struct ai_script_vehicle_enterable *)vehicle_enterable;
+}
+
 void ai_scripting_vehicle_enterable_distance(
 	long unit_index,
 	real distance)
@@ -1742,6 +1805,86 @@ void ai_scripting_vehicle_enterable_actor_type(
 			ai_scripting_find_vehicle_enterable(unit_index);
 		if (vehicle_enterable)
 			vehicle_enterable->actor_type_bitmask |= 1 << type;
+	}
+
+	return;
+}
+
+void ai_scripting_vehicle_enterable_actors(
+	long unit_index,
+	long ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[512];
+
+		ai_index_to_string(
+			ai_reference,
+			global_scenario_get(),
+			ai_name,
+			sizeof(ai_name));
+		error(
+			_error_silent,
+			"%s: ai_vehicle_enterable_actors <some vehicle> %s",
+			hs_runtime_get_executing_thread_name(),
+			ai_name);
+	}
+
+	if (unit_index != NONE && ai_reference != NONE)
+	{
+		struct ai_script_vehicle_enterable_data *vehicle_enterable =
+			(struct ai_script_vehicle_enterable_data *)ai_scripting_find_vehicle_enterable(unit_index);
+
+		if (vehicle_enterable)
+		{
+			if (vehicle_enterable->ai_indices_count < MAXIMUM_AI_INDICES_PER_ENTERABLE_VEHICLE)
+			{
+				vehicle_enterable->ai_indices[vehicle_enterable->ai_indices_count++] = ai_reference;
+			}
+			else
+			{
+				error(
+					_error_silent,
+					"ai_vehicle_enterable_actors: too many groups of actors (max is %d)",
+					MAXIMUM_AI_INDICES_PER_ENTERABLE_VEHICLE);
+			}
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_vehicle_enterable_disable(
+	long unit_index)
+{
+	if (ai_debug.print_scripting)
+	{
+		error(
+			_error_silent,
+			"%s: ai_vehicle_enterable_disable <some vehicle>",
+			hs_runtime_get_executing_thread_name());
+	}
+
+	if (unit_index != NONE)
+	{
+		short vehicle_enterable_index;
+
+		for (vehicle_enterable_index = 0;
+			vehicle_enterable_index < ai_globals->enterable_vehicle_count;
+			vehicle_enterable_index++)
+		{
+			if (ai_globals->enterable_vehicles[vehicle_enterable_index].vehicle_index == unit_index)
+			{
+				ai_globals->enterable_vehicle_count--;
+				if (vehicle_enterable_index < ai_globals->enterable_vehicle_count)
+				{
+					ai_globals->enterable_vehicles[vehicle_enterable_index] =
+						ai_globals->enterable_vehicles[ai_globals->enterable_vehicle_count];
+				}
+
+				break;
+			}
+		}
 	}
 
 	return;

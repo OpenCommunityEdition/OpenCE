@@ -128,6 +128,16 @@ void profile_frame_start(
 	void);
 void profile_frame_end(
 	void);
+void profile_idle_start(
+	void);
+void profile_idle_end(
+	void);
+void profile_lapsed_frames(
+	short frames,
+	boolean lapsed,
+	char const *reason);
+void profile_lapsed_msec(
+	long msec);
 short profile_find_frame_value(
 	const char *name,
 	short *section_index_reference);

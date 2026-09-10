@@ -85,8 +85,12 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "math/real_math.h"
 #include "bitmaps/bitmap_group.h"
+#include "game/players.h"
+#include "interface/hud_definitions.h"
 #include "interface/hud_draw.h"
 #include "interface/unit_hud_interface_definition.h"
+#include "rasterizer/rasterizer.h"
+#include "render/render.h"
 
 /* ---------- constants */
 
@@ -94,6 +98,16 @@ enum
 {
 	STACK_BUFFER_LENGTH = 0x80,
 	STACK_BUFFER_FILL = 0x62626262,
+};
+
+enum
+{
+	_hud_dont_scale_offset_bit = 0,
+};
+
+enum
+{
+	_shader_framebuffer_blend_function_alpha_multiply_add = 7,
 };
 
 /* ---------- macros */
@@ -113,6 +127,33 @@ static real_rectangle2d const *get_sprite_clip_rect(
 	long bitmap_group_index,
 	short sequence_index,
 	short frame_index);
+static void hud_calculate_bitmap_bounds(
+	struct bitmap_data const *bitmap,
+	short placement_type,
+	real_rectangle2d const *clip,
+	real_rectangle2d *bounds,
+	boolean is_interface_bitmap);
+static void hud_draw_bitmap_internal(
+	void *meter_parameters,
+	struct bitmap_data const *bitmap,
+	point2d const *point,
+	real_rectangle2d const *clip,
+	real_rectangle2d const *bounds,
+	real_vector2d const *xy_scale,
+	real theta,
+	pixel32 color);
+static void hud_draw_bitmap_with_meter(
+	void *meter_parameters,
+	struct bitmap_data const *bitmap,
+	struct hud_absolute_placement_definition const *absolute_placement,
+	struct hud_placement_definition const *placement,
+	real_rectangle2d const *clip,
+	real scale,
+	real theta,
+	pixel32 color,
+	boolean in_multiplayer,
+	boolean is_interface_bitmap,
+	boolean is_crosshair_bitmap);
 
 /* ---------- globals */
 
@@ -234,6 +275,167 @@ long get_flash_duration(
 	return fast_ftol(hud_color->flash_period * 30.0f);
 }
 
+void hud_draw_bitmap(
+	struct bitmap_data const *bitmap,
+	struct hud_absolute_placement_definition const *absolute_placement,
+	struct hud_placement_definition const *placement,
+	real_rectangle2d const *clip,
+	real scale,
+	real theta,
+	pixel32 color,
+	boolean in_multiplayer,
+	boolean is_interface_bitmap,
+	boolean is_crosshair_bitmap)
+{
+	hud_draw_bitmap_with_meter(
+		NULL,
+		bitmap,
+		absolute_placement,
+		placement,
+		clip,
+		scale,
+		theta,
+		color,
+		in_multiplayer,
+		is_interface_bitmap,
+		is_crosshair_bitmap);
+
+	return;
+}
+
+static void hud_draw_bitmap_internal(
+	void *meter_parameters,
+	struct bitmap_data const *bitmap,
+	point2d const *point,
+	real_rectangle2d const *clip,
+	real_rectangle2d const *bounds,
+	real_vector2d const *xy_scale,
+	real theta,
+	pixel32 color)
+{
+	long return_eip = get_return_eip();
+	long stack_buffer[STACK_BUFFER_LENGTH];
+	real sin_theta;
+	real cos_theta;
+	struct dynamic_screen_vertex vertices[4];
+	struct rasterizer_dynamic_screen_geometry_parameters parameters;
+	short vertex_index;
+
+	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+
+	sin_theta = (real)sin(theta);
+	cos_theta = (real)cos(theta);
+
+	for (vertex_index = 0; vertex_index < 4; vertex_index++)
+	{
+		long use_x1 = (vertex_index+1)&2;
+		real texture_x = use_x1 ? clip->x1 : clip->x0;
+		real texture_y = vertex_index>1 ? clip->y1 : clip->y0;
+		real bound_x = use_x1 ? bounds->x1 : bounds->x0;
+		real bound_y = vertex_index>1 ? bounds->y1 : bounds->y0;
+
+		vertices[vertex_index].position.x = (real)(point->x + fast_ftol(
+			(bound_x*cos_theta-bound_y*sin_theta)*xy_scale->i));
+		vertices[vertex_index].position.y = (real)(point->y + fast_ftol(
+			(bound_y*cos_theta+bound_x*sin_theta)*xy_scale->j));
+		vertices[vertex_index].texture_coordinates.x = texture_x;
+		vertices[vertex_index].texture_coordinates.y = texture_y;
+		vertices[vertex_index].color = color;
+	}
+
+	csmemset(&parameters, 0, sizeof(parameters));
+	parameters.map_texture_scale[0].j = 1.0f;
+	parameters.map_texture_scale[0].i = 1.0f;
+	parameters.map_scale[0].j = 1.0f;
+	parameters.map_scale[0].i = 1.0f;
+	parameters.meter_parameters = meter_parameters;
+	parameters.point_sampled = meter_parameters && local_player_count()==1;
+	parameters.map[0] = (struct bitmap_data *)bitmap;
+	parameters.framebuffer_blend_function =
+		_shader_framebuffer_blend_function_alpha_multiply_add;
+
+	rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
+
+	hud_draw_stack_buffer_check(985);
+
+	return;
+}
+
+static void hud_draw_bitmap_with_meter(
+	void *meter_parameters,
+	struct bitmap_data const *bitmap,
+	struct hud_absolute_placement_definition const *absolute_placement,
+	struct hud_placement_definition const *placement,
+	real_rectangle2d const *clip,
+	real scale,
+	real theta,
+	pixel32 color,
+	boolean in_multiplayer,
+	boolean is_interface_bitmap,
+	boolean is_crosshair_bitmap)
+{
+	long return_eip = get_return_eip();
+	long stack_buffer[STACK_BUFFER_LENGTH];
+	real_rectangle2d default_clip;
+	real_vector2d xy_scale;
+	point2d point;
+	real_rectangle2d bounds;
+	boolean use_multiplayer_scaling;
+
+	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+
+	default_clip.x0 = 0.0f;
+	default_clip.x1 = 1.0f;
+	default_clip.y0 = 0.0f;
+	default_clip.y1 = 1.0f;
+
+	if (is_interface_bitmap)
+	{
+		default_clip.x1 = (real)bitmap->width;
+		default_clip.y1 = (real)bitmap->height;
+	}
+
+	if (!clip)
+	{
+		clip = &default_clip;
+	}
+
+	xy_scale.i = placement->scale.i*scale;
+	xy_scale.j = placement->scale.j*scale;
+	use_multiplayer_scaling =
+		in_multiplayer && !TEST_FLAG(
+			placement->multiplayer_scaling_flags,
+			_hud_dont_scale_offset_bit);
+
+	hud_calculate_point(
+		render.local_player_index,
+		absolute_placement,
+		placement,
+		NULL,
+		use_multiplayer_scaling,
+		0.0f,
+		&point);
+	hud_calculate_bitmap_bounds(
+		bitmap,
+		absolute_placement->corner,
+		clip,
+		&bounds,
+		is_interface_bitmap);
+	hud_draw_bitmap_internal(
+		meter_parameters,
+		bitmap,
+		&point,
+		clip,
+		&bounds,
+		&xy_scale,
+		theta,
+		color);
+
+	hud_draw_stack_buffer_check(814);
+
+	return;
+}
+
 /* ---------- private code */
 
 static real_rectangle2d const *get_sprite_clip_rect(
@@ -270,4 +472,68 @@ static real_rectangle2d const *get_sprite_clip_rect(
 	hud_draw_stack_buffer_check(100);
 
 	return result;
+}
+
+static void hud_calculate_bitmap_bounds(
+	struct bitmap_data const *bitmap,
+	short placement_type,
+	real_rectangle2d const *clip,
+	real_rectangle2d *bounds,
+	boolean is_interface_bitmap)
+{
+	long return_eip = get_return_eip();
+	long stack_buffer[STACK_BUFFER_LENGTH];
+	real width;
+	real height;
+
+	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+
+	width = (clip->x1-clip->x0)*(is_interface_bitmap ? 1 : bitmap->width);
+	height = (clip->y1-clip->y0)*(is_interface_bitmap ? 1 : bitmap->height);
+
+	switch (placement_type)
+	{
+	case _hud_anchor_top_left:
+		bounds->x0 = 0.0f;
+		bounds->x1 = width;
+		bounds->y0 = 0.0f;
+		bounds->y1 = height;
+		break;
+
+	case _hud_anchor_top_right:
+		bounds->x0 = -width;
+		bounds->x1 = 0.0f;
+		bounds->y0 = 0.0f;
+		bounds->y1 = height;
+		break;
+
+	case _hud_anchor_bottom_left:
+		bounds->x0 = 0.0f;
+		bounds->x1 = width;
+		bounds->y0 = -height;
+		bounds->y1 = 0.0f;
+		break;
+
+	case _hud_anchor_bottom_right:
+		bounds->x0 = -width;
+		bounds->x1 = 0.0f;
+		bounds->y0 = -height;
+		bounds->y1 = 0.0f;
+		break;
+
+	case _hud_anchor_center:
+		bounds->x0 = width*-0.5f;
+		bounds->x1 = width*0.5f;
+		bounds->y0 = height*-0.5f;
+		bounds->y1 = height*0.5f;
+		break;
+
+	default:
+		match_assert("c:\\halo\\SOURCE\\interface\\hud_draw.c", 904, !"unreachable");
+		break;
+	}
+
+	hud_draw_stack_buffer_check(907);
+
+	return;
 }

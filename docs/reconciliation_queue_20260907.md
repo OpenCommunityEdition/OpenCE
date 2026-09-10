@@ -421,3 +421,18 @@ object-admission audit, fake-source review, and the complete 1,144-test plus
 
 The canonical treemap is force-refreshed for this boundary. The next required
 refresh threshold is **1,068,829 meaningful accepted exact code bytes**.
+
+## 2026-09-09 fifth 10K reconciliation packet
+
+Relative to published commit `7a1d0d91d7`, the canonical semantic ledger
+advances from 1,092,574 meaningful bytes / 6,781 accepted functions to
+**1,103,239 meaningful bytes / 6,828 accepted functions**: a net gain of
+**10,665 bytes / 47 functions**. The independent strict target-section census
+records 44 gains / 10,012 meaningful / 10,304 padded bytes with zero
+regressions, so the strict result alone crosses the publication threshold.
+
+All retained residual bodies are explicitly parked at zero exact credit. See
+[the fifth 10K ledger](object_matching_logs/lane_reconciliation_10k_batch_5_20260909.md)
+and its companion fuzzy ledgers. The canonical treemap is refreshed for this
+boundary. The next required refresh threshold is **1,113,239 meaningful
+accepted exact code bytes**.

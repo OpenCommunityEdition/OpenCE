@@ -34,11 +34,23 @@ symbols in this file:
 #include "path_structure_bsp.h"
 
 #include "math/real_math.h"
+#include "physics/breakable_surfaces.h"
 #include "physics/collision_bsp.h"
 #include "physics/collision_bsp_definitions.h"
 #include "structures/structure_bsp_definitions.h"
 
 /* ---------- constants */
+
+enum
+{
+	_pathfinding_surface_walkable_bit = 6,
+	_pathfinding_surface_breakable_bit = 7,
+};
+
+enum
+{
+	_collision_surface_breakable_bit = 3,
+};
 
 /* ---------- macros */
 
@@ -49,6 +61,139 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+boolean structure_test_ray2d(
+	struct structure_bsp const *structure,
+	boolean ignore_broken_surfaces,
+	real_point2d const *point,
+	long surface_index,
+	real_vector2d const *direction,
+	real distance,
+	struct structure_test_ray2d_result *result)
+{
+	struct collision_surface_test_line2d_result surface_result;
+	struct collision_bsp const *bsp;
+	byte *breakable_surface_flags;
+	byte const *pathfinding_surfaces;
+
+	bsp = TAG_BLOCK_GET_ELEMENT(&structure->collision_bsp, 0, struct collision_bsp);
+	breakable_surface_flags = breakable_surface_flags_get();
+	pathfinding_surfaces = structure->pathfinding_surfaces.address;
+
+	collision_surface_test_line2d(
+		bsp,
+		surface_index,
+		_z,
+		TRUE,
+		point,
+		direction,
+		&surface_result);
+
+	while (TRUE)
+	{
+		long next_surface_index;
+		byte pathfinding_surface_flags;
+		boolean surface_passable;
+
+		if (distance < surface_result.enter_t)
+		{
+			pathfinding_surface_flags = pathfinding_surfaces[surface_result.enter_surface_index];
+			if (pathfinding_surface_flags)
+			{
+				surface_passable = TRUE;
+				if (!ignore_broken_surfaces &&
+					TEST_FLAG(pathfinding_surface_flags, _pathfinding_surface_breakable_bit))
+				{
+					struct collision_surface const *collision_surface;
+
+					collision_surface = TAG_BLOCK_GET_ELEMENT(
+						&bsp->surfaces,
+						surface_result.enter_surface_index,
+						struct collision_surface);
+					match_assert(
+						"c:\\halo\\SOURCE\\ai\\path_structure_bsp.c",
+						105,
+						TEST_FLAG(collision_surface->flags, _collision_surface_breakable_bit));
+					surface_passable = BIT_VECTOR_TEST_FLAG(
+						(long *)breakable_surface_flags,
+						collision_surface->breakable_surface_index);
+				}
+
+				if (surface_passable && surface_result.enter_surface_index != NONE)
+				{
+					next_surface_index = surface_result.enter_surface_index;
+					goto continue_from_surface;
+				}
+			}
+		}
+
+		if (distance > surface_result.exit_t)
+		{
+			pathfinding_surface_flags = pathfinding_surfaces[surface_result.exit_surface_index];
+			if (pathfinding_surface_flags)
+			{
+				surface_passable = TRUE;
+				if (!ignore_broken_surfaces &&
+					TEST_FLAG(pathfinding_surface_flags, _pathfinding_surface_breakable_bit))
+				{
+					struct collision_surface const *collision_surface;
+
+					collision_surface = TAG_BLOCK_GET_ELEMENT(
+						&bsp->surfaces,
+						surface_result.exit_surface_index,
+						struct collision_surface);
+					match_assert(
+						"c:\\halo\\SOURCE\\ai\\path_structure_bsp.c",
+						126,
+						TEST_FLAG(collision_surface->flags, _collision_surface_breakable_bit));
+					surface_passable = BIT_VECTOR_TEST_FLAG(
+						(long *)breakable_surface_flags,
+						collision_surface->breakable_surface_index);
+				}
+
+				if (surface_passable && surface_result.exit_surface_index != NONE)
+				{
+					next_surface_index = surface_result.exit_surface_index;
+					goto continue_from_surface;
+				}
+			}
+		}
+
+		break;
+
+continue_from_surface:
+		collision_surface_test_line2d(
+			bsp,
+			surface_index = next_surface_index,
+			_z,
+			TRUE,
+			point,
+			direction,
+			&surface_result);
+	}
+
+	if (distance < surface_result.enter_t)
+	{
+		result->distance = surface_result.enter_t;
+		result->surface_index = surface_index;
+		result->edge_index = surface_result.enter_edge_index;
+		return TRUE;
+	}
+
+	if (distance > surface_result.exit_t)
+	{
+		result->distance = surface_result.exit_t;
+		result->surface_index = surface_index;
+		result->edge_index = surface_result.exit_edge_index;
+		return TRUE;
+	}
+
+	result->distance = distance;
+	result->surface_index = surface_index;
+	result->edge_index = NONE;
+
+	return FALSE;
+}
 
 boolean structure_surfaces_are_equivalent(
 	struct structure_bsp const *structure,

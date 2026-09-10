@@ -172,7 +172,8 @@ void main_reset_map(void);
 void main_stop_time(void);
 void main_start_time(void);
 
-void main_vertical_blank_interrupt_handler(unsigned long);
+void main_vertical_blank_interrupt_handler(
+	unsigned long);
 
 void main_loop(void);
 

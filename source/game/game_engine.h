@@ -392,7 +392,7 @@ boolean game_engine_has_shield(
 	long player_index);
 
 boolean game_engine_draw_object_in_motion_sensor(
-	void);
+	long unit_index);
 
 boolean game_engine_hud_draw_motion_sensor(
 	long player_index);

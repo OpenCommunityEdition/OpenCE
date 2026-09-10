@@ -4314,7 +4314,7 @@ boolean game_engine_has_shield(
 }
 
 boolean game_engine_draw_object_in_motion_sensor(
-	void)
+	long unit_index)
 {
 	boolean draw_object = TRUE;
 

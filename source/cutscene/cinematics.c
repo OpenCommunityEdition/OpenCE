@@ -340,34 +340,25 @@ void cinematic_render(
 			rectangle2d bar;
 			real bar_height;
 			real viewport_height;
-			real coordinate;
 
 			bar_height = cinematic_globals->letterbox_amount * 0.125f;
 			viewport_height = (real)(
 				render.camera.viewport_bounds.y1 -
 				render.camera.viewport_bounds.y0);
 
-			coordinate = (real)render.camera.viewport_bounds.x0;
-			bar.x0 = (short)fast_ftol(coordinate);
-			coordinate = (real)render.camera.viewport_bounds.x1;
-			bar.x1 = (short)fast_ftol(coordinate);
-			coordinate = (real)render.camera.viewport_bounds.y0;
-			bar.y0 = (short)fast_ftol(coordinate);
+			bar.x0 = (short)fast_ftol((real)render.camera.viewport_bounds.x0);
+			bar.x1 = (short)fast_ftol((real)render.camera.viewport_bounds.x1);
+			bar.y0 = (short)fast_ftol((real)render.camera.viewport_bounds.y0);
 			bar_height *= viewport_height;
-			coordinate =
-				(real)render.camera.viewport_bounds.y0 + bar_height;
-			bar.y1 = (short)fast_ftol(coordinate);
+			bar.y1 = (short)fast_ftol(
+				(real)render.camera.viewport_bounds.y0 + bar_height);
 			draw_quad(&bar, 0xFF000000);
 
-			coordinate = (real)render.camera.viewport_bounds.x0;
-			bar.x0 = (short)fast_ftol(coordinate);
-			coordinate = (real)render.camera.viewport_bounds.x1;
-			bar.x1 = (short)fast_ftol(coordinate);
-			coordinate =
-				(real)render.camera.viewport_bounds.y1 - bar_height;
-			bar.y0 = (short)fast_ftol(coordinate);
-			coordinate = (real)render.camera.viewport_bounds.y1;
-			bar.y1 = (short)fast_ftol(coordinate);
+			bar.x0 = (short)fast_ftol((real)render.camera.viewport_bounds.x0);
+			bar.x1 = (short)fast_ftol((real)render.camera.viewport_bounds.x1);
+			bar.y0 = (short)fast_ftol(
+				(real)render.camera.viewport_bounds.y1 - bar_height);
+			bar.y1 = (short)fast_ftol((real)render.camera.viewport_bounds.y1);
 			draw_quad(&bar, 0xFF000000);
 		}
 	}

@@ -60,6 +60,17 @@ long get_flash_duration(
 pixel32 get_flash_color(
 	struct hud_color_definition const *hud_color,
 	long reference_value);
+void hud_draw_bitmap(
+	struct bitmap_data const *bitmap,
+	struct hud_absolute_placement_definition const *absolute_placement,
+	struct hud_placement_definition const *placement,
+	real_rectangle2d const *clip,
+	real scale,
+	real theta,
+	pixel32 color,
+	boolean in_multiplayer,
+	boolean is_interface_bitmap,
+	boolean is_crosshair_bitmap);
 void hud_draw_meter(
 	short local_player_index,
 	struct hud_absolute_placement_definition const *placement,

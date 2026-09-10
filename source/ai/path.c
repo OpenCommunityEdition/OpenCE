@@ -155,6 +155,10 @@ symbols in this file:
 /* ---------- headers */
 
 #include "ai/path.h"
+#include "ai/ai_profile.h"
+#include "ai/path_structure_bsp.h"
+#include "cseries/errors.h"
+#include "physics/breakable_surfaces.h"
 #include "physics/collision_bsp.h"
 #include "physics/collision_bsp_definitions.h"
 #include "physics/collisions.h"
@@ -165,9 +169,30 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	_collision_surface_breakable_bit = 3,
+	_pathfinding_surface_walkable_bit = 6,
+	_pathfinding_surface_breakable_bit = 7,
+};
+
+#define PATH_COST_ESTIMATE_GRANULARITY 0.1f
+
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct path_edge
+{
+	long adjacent_surface_index;
+	byte adjacent_pathfinding_surface;
+	byte pad05[3];
+	real_point3d base_point;
+	real_vector3d edge_vector;
+};
+
+typedef char path_edge_size_assert[
+	sizeof(struct path_edge) == 0x20 ? 1 : -1];
 
 typedef char path_input_size_assert[
 	sizeof(struct path_input) == 0x48 ? 1 : -1];
@@ -199,6 +224,37 @@ typedef char path_node_surface_index_offset_assert[
 	offsetof(struct path_node, surface_index) == 0x8 ? 1 : -1];
 
 /* ---------- prototypes */
+
+static void path_state_reset(
+	struct path_state *state);
+static void path_heap_bubble_up(
+	struct path_state *state,
+	short heap_location);
+static void path_heap_bubble_down(
+	struct path_state *state,
+	short heap_location);
+static short path_heap_pop_cheapest_node(
+	struct path_state *state);
+static void path_heap_insert(
+	struct path_state *state,
+	short node_index,
+	short quantized_cost_estimate);
+static boolean surface_is_broken(
+	struct structure_bsp const *structure,
+	long surface_index);
+static boolean path_state_begin(
+	struct path_state *state);
+static real closest_available_point_on_surface(
+	struct structure_bsp const *structure,
+	long surface_index,
+	real_point3d const *point,
+	real_point3d *closest_point);
+static short build_path_edges_for_surface(
+	struct structure_bsp const *structure,
+	long surface_index,
+	struct path_edge *edges);
+static boolean path_state_traverse(
+	struct path_state *state);
 
 /* ---------- globals */
 
@@ -310,6 +366,273 @@ void path_state_destination(
 	state->destination.target_radius = destination_accept_radius;
 
 	return;
+}
+
+static void path_state_reset(
+	struct path_state *state)
+{
+	state->node_count = 0;
+	state->heap_count = 1;
+	csmemset(state->hash_table, NONE, sizeof(state->hash_table));
+	state->closest_node_index = NONE;
+	state->closest_distance = REAL_MAX;
+	state->closest_cost_estimate = REAL_MAX;
+
+	return;
+}
+
+static void path_heap_bubble_up(
+	struct path_state *state,
+	short heap_location)
+{
+	short node_index;
+	short node_cost;
+	struct path_node *node;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\path.c",
+		0x4EA,
+		(heap_location >= 1) && (heap_location <= PATH_NODE_LIST_SIZE));
+
+	node_index = state->heap[heap_location].node_index;
+	node_cost = state->heap[heap_location].quantized_cost_estimate;
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\path.c",
+		0x4EF,
+		(node_index >= 0) && (node_index < PATH_NODE_LIST_SIZE));
+	node = &state->node_list[node_index];
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\path.c",
+		0x4F0,
+		state->node_list[node_index].quantized_cost_estimate == node_cost);
+
+	if (heap_location > 1)
+	{
+		short parent_location;
+		short parent_node_index;
+		short parent_cost_estimate;
+		struct path_node *parent_node;
+
+		do
+		{
+			parent_location = heap_location >> 1;
+			parent_node_index = state->heap[parent_location].node_index;
+			parent_cost_estimate = state->heap[parent_location].quantized_cost_estimate;
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\path.c",
+				0x4FF,
+				(parent_node_index >= 0) && (parent_node_index < PATH_NODE_LIST_SIZE));
+			parent_node = &state->node_list[parent_node_index];
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\path.c",
+				0x500,
+				state->node_list[parent_node_index].heap_location == parent_location);
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\path.c",
+				0x501,
+				state->node_list[parent_node_index].quantized_cost_estimate == parent_cost_estimate);
+
+			if (node_cost >= parent_cost_estimate)
+			{
+				break;
+			}
+
+			state->heap[heap_location].node_index = parent_node_index;
+			state->heap[heap_location].quantized_cost_estimate = parent_cost_estimate;
+			parent_node->heap_location = heap_location;
+			heap_location = parent_location;
+		}
+		while (parent_location > 1);
+	}
+
+	state->heap[heap_location].node_index = node_index;
+	state->heap[heap_location].quantized_cost_estimate = node_cost;
+	node->heap_location = heap_location;
+
+	return;
+}
+
+static void path_heap_bubble_down(
+	struct path_state *state,
+	short heap_location)
+{
+	short node_index;
+	short node_cost;
+	struct path_node *node;
+	short new_node_index;
+	short new_heap_location;
+	short new_cost;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\path.c",
+		0x524,
+		(heap_location >= 1) && (heap_location <= PATH_NODE_LIST_SIZE));
+
+	node_index = state->heap[heap_location].node_index;
+	node_cost = state->heap[heap_location].quantized_cost_estimate;
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\path.c",
+		0x529,
+		(node_index >= 0) && (node_index < PATH_NODE_LIST_SIZE));
+	node = &state->node_list[node_index];
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\path.c",
+		0x52A,
+		state->node_list[node_index].quantized_cost_estimate == node_cost);
+
+	while (TRUE)
+	{
+		short child_heap_location = (short)(heap_location << 1);
+		short child_number = 0;
+
+		new_node_index = node_index;
+		new_heap_location = heap_location;
+		new_cost = node_cost;
+
+		while (child_number < 2 && child_heap_location < state->heap_count)
+		{
+			short child_node_index = state->heap[child_heap_location].node_index;
+			short child_cost = state->heap[child_heap_location].quantized_cost_estimate;
+			struct path_node *child_node;
+
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\path.c",
+				0x53E,
+				(child_node_index >= 0) && (child_node_index < PATH_NODE_LIST_SIZE));
+			child_node = &state->node_list[child_node_index];
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\path.c",
+				0x53F,
+				state->node_list[child_node_index].heap_location == child_heap_location);
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\path.c",
+				0x540,
+				state->node_list[child_node_index].quantized_cost_estimate == child_cost);
+
+			if (child_cost < new_cost)
+			{
+				new_heap_location = child_heap_location;
+				new_node_index = child_node_index;
+				new_cost = child_cost;
+			}
+
+			child_number++;
+			child_heap_location++;
+		}
+
+		if (new_heap_location == heap_location)
+		{
+			break;
+		}
+
+		state->heap[heap_location].node_index = new_node_index;
+		state->heap[heap_location].quantized_cost_estimate = new_cost;
+		state->node_list[new_node_index].heap_location = heap_location;
+		heap_location = new_heap_location;
+	}
+
+	state->heap[heap_location].node_index = node_index;
+	state->heap[heap_location].quantized_cost_estimate = node_cost;
+	node->heap_location = heap_location;
+
+	return;
+}
+
+static short path_heap_pop_cheapest_node(
+	struct path_state *state)
+{
+	short node_index = NONE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\path.c",
+		0x572,
+		state->heap_count >= 1);
+
+	if (state->heap_count > 1)
+	{
+		struct path_node *node;
+
+		node_index = state->heap[1].node_index;
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\path.c",
+			0x577,
+			(node_index >= 0) && (node_index < PATH_NODE_LIST_SIZE));
+		node = &state->node_list[node_index];
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\path.c",
+			0x579,
+			state->node_list[node_index].heap_location == 1);
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\path.c",
+			0x57A,
+			state->node_list[node_index].quantized_cost_estimate == state->heap[1].quantized_cost_estimate);
+
+		node->heap_location = NONE;
+		state->heap_count--;
+		if (state->heap_count > 1)
+		{
+			state->heap[1] = state->heap[state->heap_count];
+			path_heap_bubble_down(state, 1);
+		}
+	}
+
+	return node_index;
+}
+
+static void path_heap_insert(
+	struct path_state *state,
+	short node_index,
+	short quantized_cost_estimate)
+{
+	short heap_location;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\path.c",
+		0x594,
+		state->heap_count >= 1);
+
+	heap_location = state->heap_count;
+	if (heap_location < PATH_NODE_LIST_SIZE)
+	{
+		state->heap_count++;
+		state->heap[heap_location].node_index = node_index;
+		state->heap[heap_location].quantized_cost_estimate = quantized_cost_estimate;
+		path_heap_bubble_up(state, heap_location);
+	}
+	else
+	{
+		error(_error_silent, "path_heap_" "insert: overflowed static size heap");
+	}
+
+	return;
+}
+
+static boolean surface_is_broken(
+	struct structure_bsp const *structure,
+	long surface_index)
+{
+	struct collision_bsp const *bsp = TAG_BLOCK_GET_ELEMENT(
+		&structure->collision_bsp,
+		0,
+		struct collision_bsp);
+	struct collision_surface const *surface = TAG_BLOCK_GET_ELEMENT(
+		&bsp->surfaces,
+		surface_index,
+		struct collision_surface);
+	boolean broken;
+
+	broken = FALSE;
+	if (TEST_FLAG(surface->flags, _collision_surface_breakable_bit))
+	{
+		long const *breakable_surface_flags =
+			(long const *)breakable_surface_flags_get();
+
+		broken = !BIT_VECTOR_TEST_FLAG(
+			breakable_surface_flags,
+			surface->breakable_surface_index);
+	}
+
+	return broken;
 }
 
 struct path_node *path_get_node(
@@ -426,6 +749,276 @@ boolean path_3d_build_path(
 	return path->valid;
 }
 
+boolean path_state_approach_point(
+	struct path_state *state,
+	real_point2d const *end_point,
+	long end_surface_index,
+	boolean *straight_line_reference,
+	real_point3d *approach_point_reference)
+{
+	short node_index = path_node_from_hash_table(state, end_surface_index);
+	boolean result = FALSE;
+
+	if (node_index != NONE)
+	{
+		struct path_node *node = path_get_node(state, node_index);
+
+		while (node->parent_node_index != NONE)
+		{
+			struct path_node *parent_node = path_get_node(
+				state,
+				node->parent_node_index);
+			struct path_collision_result collision_result;
+
+			if (structure_test_line2d(
+					state->structure,
+					state->input.ignore_broken_surfaces,
+					end_point,
+					end_surface_index,
+					(real_point2d const *)&parent_node->entry_point,
+					parent_node->surface_index,
+					&collision_result))
+			{
+				break;
+			}
+
+			node = path_get_node(state, node->parent_node_index);
+		}
+
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\path.c",
+			0x12D,
+			approach_point_reference);
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\path.c",
+			0x12E,
+			straight_line_reference);
+
+		if (node->parent_node_index == NONE)
+		{
+			*straight_line_reference = TRUE;
+			*approach_point_reference = state->input.start_point;
+		}
+		else
+		{
+			*straight_line_reference = FALSE;
+			*approach_point_reference = node->entry_point;
+		}
+
+		result = TRUE;
+	}
+
+	return result;
+}
+
+static boolean path_state_begin(
+	struct path_state *state)
+{
+	boolean result = FALSE;
+
+	if (state->input.start_surface_index != NONE &&
+		state->input.start_point.z > -1000.0f)
+	{
+		struct collision_bsp const *bsp = TAG_BLOCK_GET_ELEMENT(
+			&state->structure->collision_bsp,
+			0,
+			struct collision_bsp);
+		real distance_to_destination;
+		long quantized_cost_estimate;
+
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\path.c",
+			0x2B1,
+			(state->input.start_surface_index >= 0) && (state->input.start_surface_index < bsp->surfaces.count));
+
+		if (state->destination_valid)
+		{
+			distance_to_destination = distance3d(
+				&state->input.start_point,
+				&state->destination.point);
+			quantized_cost_estimate = (long)(distance_to_destination / PATH_COST_ESTIMATE_GRANULARITY);
+			if (quantized_cost_estimate >= SHORT_MAX)
+			{
+				error(
+					_error_silent,
+					"pathfinding: attempted to build path from (%.1f %.1f %.1f) to (%.1f %.1f %.1f) ... distance %.1f > maximum allowed %.1f",
+					state->input.start_point.x,
+					state->input.start_point.y,
+					state->input.start_point.z,
+					state->destination.point.x,
+					state->destination.point.y,
+					state->destination.point.z,
+					distance_to_destination,
+					SHORT_MAX * PATH_COST_ESTIMATE_GRANULARITY);
+				return FALSE;
+			}
+			result = TRUE;
+		}
+		else
+		{
+			distance_to_destination = 0.0f;
+			quantized_cost_estimate = 0;
+			result = TRUE;
+		}
+
+		if (result)
+		{
+			short node_index;
+			struct path_node *initial_node;
+
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\path.c",
+				0x2CC,
+				state->node_count == 0);
+			node_index = state->node_count++;
+			initial_node = &state->node_list[node_index];
+			initial_node->parent_node_index = NONE;
+			initial_node->parent_node_surface_index = NONE;
+			initial_node->surface_index = state->input.start_surface_index;
+			initial_node->entry_point = state->input.start_point;
+			initial_node->linear_distance_to_entry_point = 0.0f;
+			initial_node->closest_approach_to_attractor = REAL_MAX;
+			initial_node->path_distance_from_origin = 0.0f;
+			initial_node->cumulative_cost = 0.0f;
+			initial_node->total_cost_estimate = distance_to_destination;
+			initial_node->quantized_cost_estimate = (short)quantized_cost_estimate;
+			initial_node->depth = 0;
+			initial_node->last_render_id = NONE;
+
+			bsp = TAG_BLOCK_GET_ELEMENT(
+				&state->structure->collision_bsp,
+				0,
+				struct collision_bsp);
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\path.c",
+				0x2E3,
+				(initial_node->surface_index >= 0) && (initial_node->surface_index < bsp->surfaces.count));
+
+			if (state->destination_valid)
+			{
+				state->closest_distance = distance_to_destination;
+				state->closest_cost_estimate = distance_to_destination;
+				state->closest_node_index = node_index;
+				state->closest_point = state->input.start_point;
+			}
+
+			state->hash_table[
+				(initial_node->surface_index & PATH_HASH_KEY_MASK) << 3] = node_index;
+			path_heap_insert(
+				state,
+				node_index,
+				(short)quantized_cost_estimate);
+		}
+	}
+
+	return result;
+}
+
+static real closest_available_point_on_surface(
+	struct structure_bsp const *structure,
+	long surface_index,
+	real_point3d const *point,
+	real_point3d *closest_point)
+{
+	struct collision_bsp const *bsp = TAG_BLOCK_GET_ELEMENT(
+		&structure->collision_bsp,
+		0,
+		struct collision_bsp);
+	real_point2d closest_point2d;
+
+	collision_surface_find_closest_point2d(
+		bsp,
+		surface_index,
+		_z,
+		TRUE,
+		(real_point2d const *)point,
+		&closest_point2d);
+	collision_surface_project_point2d(
+		bsp,
+		surface_index,
+		_z,
+		TRUE,
+		&closest_point2d,
+		closest_point);
+
+	return distance3d(point, closest_point);
+}
+
+static short build_path_edges_for_surface(
+	struct structure_bsp const *structure,
+	long surface_index,
+	struct path_edge *edges)
+{
+	byte const *pathfinding_surfaces = structure->pathfinding_surfaces.address;
+	struct collision_bsp const *bsp = TAG_BLOCK_GET_ELEMENT(
+		&structure->collision_bsp,
+		0,
+		struct collision_bsp);
+	short edge_count = 0;
+	struct collision_surface const *surface;
+	long first_edge_index;
+	long edge_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\path.c",
+		0x5D8,
+		(surface_index >= 0) && (surface_index < bsp->surfaces.count));
+	surface = TAG_BLOCK_GET_ELEMENT(
+		&bsp->surfaces,
+		surface_index,
+		struct collision_surface);
+	first_edge_index = surface->first_edge_index;
+	edge_index = first_edge_index;
+
+	do
+	{
+		struct collision_edge const *collision_edge = TAG_BLOCK_GET_ELEMENT(
+			&bsp->edges,
+			edge_index,
+			struct collision_edge);
+		struct path_edge *edge = &edges[edge_count++];
+		boolean right_surface = collision_edge->surface_indices[1] == surface_index;
+		struct collision_vertex const *start_vertex;
+		struct collision_vertex const *end_vertex;
+
+		edge->adjacent_surface_index =
+			collision_edge->surface_indices[right_surface ? 0 : 1];
+		if (edge->adjacent_surface_index != NONE)
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\path.c",
+				0x5EE,
+				(edge->adjacent_surface_index >= 0) && (edge->adjacent_surface_index < bsp->surfaces.count));
+		}
+		edge->adjacent_pathfinding_surface =
+			pathfinding_surfaces[edge->adjacent_surface_index];
+
+		start_vertex = TAG_BLOCK_GET_ELEMENT(
+			&bsp->vertices,
+			collision_edge->vertex_indices[0],
+			struct collision_vertex);
+		end_vertex = TAG_BLOCK_GET_ELEMENT(
+			&bsp->vertices,
+			collision_edge->vertex_indices[1],
+			struct collision_vertex);
+		edge->base_point = start_vertex->point;
+		vector_from_points3d(
+			&start_vertex->point,
+			&end_vertex->point,
+			&edge->edge_vector);
+
+		if (edge_count == MAXIMUM_PATH_EDGES_PER_COLLISION_SURFACE)
+		{
+			break;
+		}
+
+		edge_index = collision_edge->edge_indices[right_surface ? 1 : 0];
+	}
+	while (edge_index != first_edge_index);
+
+	return edge_count;
+}
+
 void closest_point_to_attractor(
 	real_point3d const *p0,
 	real_point3d const *p1,
@@ -487,6 +1080,494 @@ real path_attractor_weight(
 	*distance_reference = distance;
 
 	return weight;
+}
+
+boolean path_state_estimated_distance(
+	struct path_state *state,
+	real_point3d const *end_point,
+	long end_surface_index,
+	real *distance_reference,
+	real *closest_approach_to_attractor_reference,
+	real_vector3d *estimated_direction_reference)
+{
+	short node_index = path_node_from_hash_table(state, end_surface_index);
+	boolean result = FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\path.c",
+		0x14E,
+		distance_reference);
+
+	if (node_index != NONE)
+	{
+		struct path_node *node = path_get_node(state, node_index);
+		real distance = distance3d(end_point, &node->entry_point) +
+			node->path_distance_from_origin;
+		real closest_approach_to_attractor;
+
+		if (state->input.attractor_valid)
+		{
+			real_point3d closest_point;
+
+			closest_point_to_attractor(
+				&node->entry_point,
+				end_point,
+				&state->input.attractor_point,
+				&closest_point);
+			closest_approach_to_attractor = MIN(
+				distance3d(&closest_point, &state->input.attractor_point),
+				node->closest_approach_to_attractor);
+		}
+		else
+		{
+			closest_approach_to_attractor = 0.0f;
+		}
+
+		if (closest_approach_to_attractor_reference)
+		{
+			*closest_approach_to_attractor_reference = closest_approach_to_attractor;
+		}
+		*distance_reference = distance;
+
+		if (estimated_direction_reference)
+		{
+			short child_node_index = NONE;
+			short current_node_index = node_index;
+			real path_distance = 0.0f;
+			real_point3d const *direction_point;
+
+			do
+			{
+				node = path_get_node(state, current_node_index);
+				node->child_node_index = child_node_index;
+				child_node_index = current_node_index;
+				current_node_index = node->parent_node_index;
+			}
+			while (current_node_index != NONE);
+
+			if (child_node_index != NONE)
+			{
+				do
+				{
+					if (path_distance >= 0.8f)
+					{
+						break;
+					}
+					node = path_get_node(state, child_node_index);
+					path_distance += node->linear_distance_to_entry_point;
+					child_node_index = node->child_node_index;
+				}
+				while (child_node_index != NONE);
+			}
+
+			direction_point = child_node_index == NONE ?
+				end_point : &node->entry_point;
+			vector_from_points3d(
+				&state->input.start_point,
+				direction_point,
+				estimated_direction_reference);
+			normalize3d(estimated_direction_reference);
+		}
+
+		result = TRUE;
+	}
+	else
+	{
+		if (closest_approach_to_attractor_reference)
+		{
+			*closest_approach_to_attractor_reference = REAL_MAX;
+		}
+		if (estimated_direction_reference)
+		{
+			*estimated_direction_reference = *global_zero_vector3d;
+		}
+		*distance_reference = REAL_MAX;
+	}
+
+	return result;
+}
+
+static boolean path_state_traverse(
+	struct path_state *state)
+{
+	real pathfinding_radius = MAX(state->input.pathfinding_radius, 0.2f);
+	struct path_edge edges[MAXIMUM_PATH_EDGES_PER_COLLISION_SURFACE];
+	boolean result = TRUE;
+	boolean reported_cost_overflow = FALSE;
+	short cheapest_node_index = path_heap_pop_cheapest_node(state);
+
+	while (cheapest_node_index != NONE)
+	{
+		struct path_node *cheapest_node = path_get_node(state, cheapest_node_index);
+		struct collision_bsp const *bsp = TAG_BLOCK_GET_ELEMENT(
+			&state->structure->collision_bsp,
+			0,
+			struct collision_bsp);
+		short edge_count;
+		short edge_index;
+
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\path.c",
+			0x35D,
+			(cheapest_node->surface_index >= 0) && (cheapest_node->surface_index < bsp->surfaces.count));
+
+		if (state->destination_valid)
+		{
+			if (cheapest_node->surface_index == state->destination.surface_index)
+			{
+				state->closest_point = state->destination.point;
+				state->closest_node_index = cheapest_node_index;
+				state->closest_distance = 0.0f;
+				break;
+			}
+
+			if (cheapest_node->total_cost_estimate >
+				MAX(state->closest_distance, 5.0f) * 10.0f + state->closest_cost_estimate)
+			{
+				if (state->debug &&
+					state->debug->path_traverse_result == _path_traverse_result_none)
+				{
+					state->debug->path_traverse_result =
+						_path_traverse_result_never_close_enough;
+				}
+				break;
+			}
+		}
+
+		edge_count = build_path_edges_for_surface(
+			state->structure,
+			cheapest_node->surface_index,
+			edges);
+		for (edge_index = 0; edge_index < edge_count; edge_index++)
+		{
+			struct path_edge const *edge = &edges[edge_index];
+			long adjacent_surface_index = edge->adjacent_surface_index;
+			boolean passable = TRUE;
+			real_point3d entry_point;
+			real linear_distance;
+			real path_distance_from_origin;
+			real closest_approach_to_attractor;
+			real cumulative_cost;
+			real total_cost_estimate;
+			real distance_to_destination = 0.0f;
+			long quantized_cost_estimate;
+			short new_node_index = NONE;
+			struct path_node *new_node;
+
+			if (adjacent_surface_index == cheapest_node->parent_node_surface_index ||
+				!TEST_FLAG(
+					edge->adjacent_pathfinding_surface,
+					_pathfinding_surface_walkable_bit))
+			{
+				passable = FALSE;
+			}
+			if (!state->input.ignore_broken_surfaces &&
+				TEST_FLAG(
+					edge->adjacent_pathfinding_surface,
+					_pathfinding_surface_breakable_bit) &&
+				surface_is_broken(state->structure, adjacent_surface_index))
+			{
+				passable = FALSE;
+			}
+			if (!passable)
+			{
+				continue;
+			}
+
+			entry_point.x = edge->base_point.x + 0.5f * edge->edge_vector.i;
+			entry_point.y = edge->base_point.y + 0.5f * edge->edge_vector.j;
+			entry_point.z = edge->base_point.z + 0.5f * edge->edge_vector.k;
+
+			if (state->destination_valid)
+			{
+				real edge_length_squared = magnitude_squared3d(&edge->edge_vector);
+				real diameter = pathfinding_radius * 2.0f;
+
+				if (edge_length_squared > 16.0f &&
+					edge_length_squared > diameter * diameter)
+				{
+					real t =
+						(edge->edge_vector.i *
+							(state->destination.point.x - edge->base_point.x) +
+						 edge->edge_vector.j *
+							(state->destination.point.y - edge->base_point.y) +
+						 edge->edge_vector.k *
+							(state->destination.point.z - edge->base_point.z)) /
+						edge_length_squared;
+					real margin = pathfinding_radius / square_root(edge_length_squared);
+
+					t = PIN(t, margin, 1.0f - margin);
+				entry_point.x = edge->base_point.x + t * edge->edge_vector.i;
+				entry_point.y = edge->base_point.y + t * edge->edge_vector.j;
+				entry_point.z = edge->base_point.z + t * edge->edge_vector.k;
+				}
+			}
+
+			linear_distance = distance3d(&entry_point, &cheapest_node->entry_point);
+			path_distance_from_origin =
+				cheapest_node->path_distance_from_origin + linear_distance;
+			if (state->input.attractor_valid)
+			{
+				real distance_to_attractor;
+				real cost = path_attractor_weight(
+					state,
+					&cheapest_node->entry_point,
+					&entry_point,
+					&distance_to_attractor);
+
+				cumulative_cost = cheapest_node->cumulative_cost +
+					(cost + 1.0f) * linear_distance;
+				closest_approach_to_attractor = MIN(
+					cheapest_node->closest_approach_to_attractor,
+					distance_to_attractor);
+			}
+			else
+			{
+				cumulative_cost = cheapest_node->cumulative_cost + linear_distance;
+				closest_approach_to_attractor = 0.0f;
+			}
+
+			total_cost_estimate = cumulative_cost;
+			if (state->destination_valid)
+			{
+				distance_to_destination = distance3d(
+					&state->destination.point,
+					&entry_point);
+				total_cost_estimate += distance_to_destination;
+			}
+
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\path.c",
+				0x3ED,
+				total_cost_estimate - cheapest_node->total_cost_estimate >= -PATH_COST_ESTIMATE_GRANULARITY);
+			quantized_cost_estimate =
+				(long)(total_cost_estimate / PATH_COST_ESTIMATE_GRANULARITY);
+			if (quantized_cost_estimate >= SHORT_MAX)
+			{
+				if (!reported_cost_overflow)
+				{
+					error(
+						_error_log,
+						"path_state_" "traverse: cost %.1f exceeded maximum allowed %.1f, discarding node",
+						total_cost_estimate,
+						SHORT_MAX * PATH_COST_ESTIMATE_GRANULARITY);
+					reported_cost_overflow = TRUE;
+				}
+				continue;
+			}
+			if (state->input.search_bounded &&
+				path_distance_from_origin > state->input.search_maximum_distance)
+			{
+				continue;
+			}
+
+			{
+				short hash_slot = (short)(
+					(adjacent_surface_index & PATH_HASH_KEY_MASK) << 3);
+				short node_index = state->hash_table[hash_slot];
+
+				while (node_index != NONE)
+				{
+					struct path_node *node = path_get_node(
+						state,
+						node_index);
+
+					if (node->surface_index == adjacent_surface_index)
+					{
+						if (quantized_cost_estimate < node->quantized_cost_estimate)
+						{
+							short heap_location = node->heap_location;
+
+							if (heap_location == NONE)
+							{
+								error(
+									_error_silent,
+									"path_state_" "traverse: found a 'better' path to a closed node");
+							}
+							else
+							{
+								match_assert(
+									"c:\\halo\\SOURCE\\ai\\path.c",
+									0x423,
+									(heap_location >= 1) && (heap_location < state->heap_count));
+								match_assert(
+									"c:\\halo\\SOURCE\\ai\\path.c",
+									0x424,
+									state->heap[heap_location].node_index == node_index);
+								match_assert(
+									"c:\\halo\\SOURCE\\ai\\path.c",
+									0x425,
+									state->heap[heap_location].quantized_cost_estimate == node->quantized_cost_estimate);
+								new_node_index = node_index;
+							}
+						}
+						break;
+					}
+
+					hash_slot = (short)((hash_slot + 1) & PATH_HASH_TABLE_MASK);
+					node_index = state->hash_table[hash_slot];
+				}
+
+				if (node_index == NONE)
+				{
+					if (state->node_count < PATH_NODE_LIST_SIZE)
+					{
+						new_node_index = state->node_count++;
+						state->hash_table[hash_slot] = new_node_index;
+						state->node_list[new_node_index].heap_location = NONE;
+					}
+					else if (state->debug &&
+						state->debug->path_traverse_result == _path_traverse_result_none)
+					{
+						state->debug->path_traverse_result =
+							_path_traverse_result_overflowed_nodes;
+					}
+				}
+			}
+
+			if (new_node_index == NONE)
+			{
+				continue;
+			}
+
+			new_node = path_get_node(state, new_node_index);
+			new_node->parent_node_index = cheapest_node_index;
+			new_node->parent_node_surface_index = cheapest_node->surface_index;
+			new_node->surface_index = adjacent_surface_index;
+			new_node->entry_point = entry_point;
+			new_node->linear_distance_to_entry_point = linear_distance;
+			new_node->closest_approach_to_attractor = closest_approach_to_attractor;
+			new_node->path_distance_from_origin = path_distance_from_origin;
+			new_node->cumulative_cost = cumulative_cost;
+			new_node->total_cost_estimate = total_cost_estimate;
+			new_node->quantized_cost_estimate = (short)quantized_cost_estimate;
+			new_node->depth = cheapest_node->depth + 1;
+			new_node->last_render_id = NONE;
+			new_node->closest_distance_to_attractor = REAL_MAX;
+
+			bsp = TAG_BLOCK_GET_ELEMENT(
+				&state->structure->collision_bsp,
+				0,
+				struct collision_bsp);
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\path.c",
+				0x466,
+				(new_node->surface_index >= 0) && (new_node->surface_index < bsp->surfaces.count));
+
+			if (new_node->heap_location == NONE)
+			{
+				path_heap_insert(
+					state,
+					new_node_index,
+					(short)quantized_cost_estimate);
+			}
+			else
+			{
+				match_assert(
+					"c:\\halo\\SOURCE\\ai\\path.c",
+					0x471,
+					(new_node->heap_location >= 1) && (new_node->heap_location < state->heap_count));
+				match_assert(
+					"c:\\halo\\SOURCE\\ai\\path.c",
+					0x472,
+					quantized_cost_estimate <= state->heap[new_node->heap_location].quantized_cost_estimate);
+				state->heap[new_node->heap_location].quantized_cost_estimate =
+					(short)quantized_cost_estimate;
+				path_heap_bubble_up(state, new_node->heap_location);
+			}
+
+			if (state->destination_valid)
+			{
+				real_point3d closest_point = new_node->entry_point;
+
+				if (distance_to_destination < 4.0f)
+				{
+					distance_to_destination = closest_available_point_on_surface(
+						state->structure,
+						new_node->surface_index,
+						&state->destination.point,
+						&closest_point);
+				}
+				new_node->closest_distance_to_attractor = distance_to_destination;
+				new_node->closest_point_to_attractor = closest_point;
+
+				if (distance_to_destination < state->closest_distance)
+				{
+					state->closest_distance = distance_to_destination;
+					state->closest_node_index = new_node_index;
+					state->closest_point = closest_point;
+					state->closest_cost_estimate = total_cost_estimate;
+				}
+			}
+		}
+
+		cheapest_node_index = path_heap_pop_cheapest_node(state);
+	}
+
+	if (cheapest_node_index == NONE && state->debug &&
+		state->debug->path_traverse_result == _path_traverse_result_none)
+	{
+		state->debug->path_traverse_result = _path_traverse_result_exhausted_search;
+	}
+
+	if (state->destination_valid &&
+		state->closest_distance > state->destination.target_radius)
+	{
+		result = FALSE;
+	}
+	if (result && state->debug)
+	{
+		state->debug->path_traverse_result = _path_traverse_result_success;
+	}
+
+	return result;
+}
+
+boolean path_state_find(
+	struct path_state *state)
+{
+	boolean result = FALSE;
+
+	if (state->destination_valid)
+	{
+		ai_profile.meters[_ai_meter_path_find].accumulator++;
+	}
+	else
+	{
+		ai_profile.meters[_ai_meter_path_flood].accumulator++;
+	}
+
+	path_state_reset(state);
+	if (state->debug)
+	{
+		state->debug->path_traverse_result = _path_traverse_result_none;
+	}
+
+	if (path_state_begin(state))
+	{
+		result = path_state_traverse(state);
+	}
+	else if (state->debug)
+	{
+		state->debug->path_traverse_result =
+			_path_traverse_result_initial_not_pathfindable;
+	}
+
+	if (state->debug)
+	{
+		state->debug->path_state = *state;
+		state->debug->structure_bsp_index = global_structure_bsp_index_get();
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\path.c",
+			0x32D,
+			state->debug->path_traverse_result != _path_traverse_result_none);
+		if (state->debug->path_traverse_result != _path_traverse_result_success)
+		{
+			state->debug->failure = TRUE;
+		}
+	}
+
+	return result;
 }
 
 /* ---------- private code */

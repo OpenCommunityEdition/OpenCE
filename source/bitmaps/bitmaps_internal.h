@@ -10,8 +10,17 @@ Narrow cross-translation-unit interface owned by BITMAPS.C.
 
 #include "bitmaps/bitmaps.h"
 
+extern pixel32 global_vector_palette[];
+
 char const *bitmap_format_get_string(
 	short format);
+pixel32 bitmap_format_to_a8r8g8b8(
+	short format,
+	void const *mipmap_address,
+	long pixel_index);
+byte palette_find_closest_match(
+	pixel32 const *palette,
+	pixel32 color);
 void bitmap_delete(
 	struct bitmap_data *bitmap);
 void *bitmap_3d_address(

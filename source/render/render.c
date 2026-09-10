@@ -13,7 +13,7 @@ symbols in this file:
 00174400 0010:
 	_render_dispose (0000)
 00174410 0110:
-	_code_00174410 (0000)
+	_render_nonplayer_frame (0000)
 00174520 00f0:
 	_render_frame_pregame (0000)
 00174610 0020:
@@ -23,9 +23,9 @@ symbols in this file:
 001746A0 0050:
 	_rendered_cluster_get (0000)
 001746F0 03f0:
-	_code_001746f0 (0000)
+	_render_window (0000)
 00174AE0 03f0:
-	_code_00174ae0 (0000)
+	_render_player_frame (0000)
 00174ED0 00f0:
 	_render_frame (0000)
 0029F44C 001f:
@@ -54,7 +54,7 @@ symbols in this file:
 	_render_particle_systems_enabled (0002)
 	_render_weather_particle_systems_enabled (0003)
 004B8B22 0001:
-	_bss_004b8b22 (0000)
+	_render_invalid_fog_warning_displayed (0000)
 */
 
 /* ---------- headers */
@@ -112,10 +112,10 @@ enum
 
 /* ---------- prototypes */
 
-static void code_00174410(
+static void render_nonplayer_frame(
 	const struct render_window *window,
 	long window_type);
-static void code_001746f0(
+static void render_window(
 	short local_player_index,
 	const struct render_camera *camera,
 	const struct render_frustum *frustum,
@@ -123,7 +123,7 @@ static void code_001746f0(
 	const struct render_frustum *rasterizer_frustum,
 	short rasterizer_target,
 	boolean has_mirror);
-static void code_00174ae0(
+static void render_player_frame(
 	struct render_window *window,
 	const point2d *screenshot_combined_index);
 
@@ -143,8 +143,6 @@ void render_object_shadows(
 	void);
 void particle_systems_render(
 	void);
-void rasterizer_transparent_geometry_draw(
-	boolean water);
 void rasterizer_transparent_geometry_stop(
 	void);
 void interface_draw_fullscreen_overlays(
@@ -162,7 +160,7 @@ short main_get_window_count(
 
 struct render_globals render;
 
-static boolean bss_004b8b22;
+static boolean render_invalid_fog_warning_displayed;
 
 extern short global_screenshot_count;
 extern short global_screenshot_size;
@@ -207,7 +205,7 @@ void render_dispose(
 	render_objects_dispose();
 }
 
-static void code_00174410(
+static void render_nonplayer_frame(
 	const struct render_window *window,
 	long window_type)
 {
@@ -250,7 +248,8 @@ static void code_00174410(
 }
 
 void render_frame_pregame(
-	const struct render_window *window)
+	struct render_window const *window,
+	struct bitmap_data *bitmap)
 {
 	struct rasterizer_frame_begin_parameters parameters;
 	struct rasterizer_window_begin_parameters rasterizer_parameters;
@@ -287,6 +286,8 @@ void render_frame_pregame(
 	profile_render_window_end();
 	rasterizer_windows_end();
 	rasterizer_frame_end();
+
+	return;
 }
 
 void render_frame_present(
@@ -294,6 +295,8 @@ void render_frame_present(
 	struct bitmap_data *bitmap)
 {
 	rasterizer_present(bitmap, screenshot_index);
+
+	return;
 }
 
 boolean render_location_visible(
@@ -310,7 +313,7 @@ struct rendered_cluster *rendered_cluster_get(
 	return &render.rendered_clusters[rendered_cluster_index];
 }
 
-static void code_001746f0(
+static void render_window(
 	short local_player_index,
 	const struct render_camera *camera,
 	const struct render_frustum *frustum,
@@ -435,7 +438,7 @@ static void code_001746f0(
 	return;
 }
 
-static void code_00174ae0(
+static void render_player_frame(
 	struct render_window *window,
 	const point2d *screenshot_combined_index)
 {
@@ -483,10 +486,10 @@ static void code_00174ae0(
 
 	if (window->render_camera.z_far <= window->render_camera.z_near)
 	{
-		if (!bss_004b8b22)
+		if (!render_invalid_fog_warning_displayed)
 		{
 			error(2, "### ERROR something is wrong with the fog in the sky tag or the fog tag");
-			bss_004b8b22 = TRUE;
+			render_invalid_fog_warning_displayed = TRUE;
 		}
 
 		window->render_camera.z_far = window->render_camera.z_near + 0.01f;
@@ -560,7 +563,7 @@ static void code_00174ae0(
 
 			rasterizer_profile_enable(FALSE);
 			render.cluster_index = mirror.cluster_index;
-			code_001746f0(
+			render_window(
 				NONE,
 				&mirror_camera,
 				&mirror_frustum,
@@ -574,7 +577,7 @@ static void code_00174ae0(
 		}
 	}
 
-	code_001746f0(
+	render_window(
 		window->local_player_index,
 		camera,
 		&frustum,
@@ -626,7 +629,7 @@ void render_frame(
 					screenshot_page_index->y * global_screenshot_size + screenshot_index->y;
 			}
 
-			code_00174ae0(
+			render_player_frame(
 				window,
 				screenshot_index != NULL ? &screenshot_combined_index : NULL);
 			continue;
@@ -636,7 +639,7 @@ void render_frame(
 			window_type = 1;
 		}
 
-		code_00174410(window, window_type);
+		render_nonplayer_frame(window, window_type);
 	}
 
 	progress_bar_eachframe();

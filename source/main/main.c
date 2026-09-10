@@ -135,7 +135,7 @@ symbols in this file:
 000F0BB0 0030:
 	_code_000f0bb0 (0000)
 000F0BE0 0010:
-	_code_000f0be0 (0000)
+	_main_framerate_throttle_enabled (0000)
 000F0BF0 05a0:
 	_code_000f0bf0 (0000)
 000F1190 0210:
@@ -334,6 +334,7 @@ symbols in this file:
 #include "cseries.h"
 #include "errors.h"
 #include "cseries/profile.h"
+#include "cseries/cseries_windows.h"
 #include "main.h"
 #include "real_math.h"
 #include "game.h"
@@ -360,10 +361,13 @@ symbols in this file:
 #include "cache/predicted_resources.h"
 #include "bitmaps/bitmaps_internal.h"
 #include "interface/hud.h"
+#include "interface/interface.h"
 #include "interface/terminal.h"
 #include "saved games/player_profile.h"
 #include "saved games/game_state.h"
+#include "sound/sound_manager.h"
 #include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_debug.h"
 #include "bink/bink_playback.h"
 #include "main/d3d_intimacy.h"
 #include "networking/network_game_globals.h"
@@ -374,6 +378,8 @@ symbols in this file:
 #include "physics/collision_debug.h"
 #include "hs/hs.h"
 #include "render/render.h"
+#include "text/draw_string.h"
+#include "text/font_group.h"
 #include "tag_files/files.h"
 
 /* ---------- constants */
@@ -460,12 +466,22 @@ struct _main_globals
 struct _main_globals
 {
 	unsigned long frame_start_milliseconds;
-	byte reservedB4[4];
-	__int64 rasterizer_vertical_blank_index;
-	byte reservedC0[0x18];
+	byte reserved04[4];
+	union
+	{
+		__int64 rasterizer_target_index;
+		struct
+		{
+			unsigned long rasterizer_frame_index;
+			unsigned long rasterizer_vertical_blank_index;
+		};
+	};
+	__int64 rasterizer_initial_index;
+	__int64 rasterizer_throttle_start_index;
+	__int64 rasterizer_throttle_end_index;
 	real seconds_elapsed;
 	short connection;
-	byte __unknownDE[2];
+	unsigned short screenshot_identifier;
 	struct bitmap_data *movie;
 	long recording_start_tick;
 	long recording_stop_tick;
@@ -508,19 +524,32 @@ struct _main_globals
 	char multiplayer_map_name[256];
 	char queued_map_name[256];
 	char core_name[64];
-	byte reserved465[0x43];
+	byte reserved3B5;
+	short vblank_interval_current;
+	short vblank_interval_requested;
+	boolean vblank_interval_held;
+	byte reserved3BB;
+	short vblank_failure_counts[6];
+	__int64 vblank_last_failure_indices[6];
 	volatile unsigned int *d3d_flip_count;
 	short vblank_flip_delta_index;
 	short vblank_flip_deltas[15];
-	byte reserved4CC[0x204];
+	char vblank_debug_string[0x200];
+	byte reserved61C[4];
 };
 
 typedef char main_globals_size_assert[
 	sizeof(struct _main_globals) == 0x620 ? 1 : -1];
 typedef char main_globals_frame_start_milliseconds_offset_assert[
 	offsetof(struct _main_globals, frame_start_milliseconds) == 0x00 ? 1 : -1];
-typedef char main_globals_rasterizer_vertical_blank_index_offset_assert[
-	offsetof(struct _main_globals, rasterizer_vertical_blank_index) == 0x08 ? 1 : -1];
+typedef char main_globals_rasterizer_target_index_offset_assert[
+	offsetof(struct _main_globals, rasterizer_target_index) == 0x08 ? 1 : -1];
+typedef char main_globals_rasterizer_initial_index_offset_assert[
+	offsetof(struct _main_globals, rasterizer_initial_index) == 0x10 ? 1 : -1];
+typedef char main_globals_rasterizer_throttle_start_index_offset_assert[
+	offsetof(struct _main_globals, rasterizer_throttle_start_index) == 0x18 ? 1 : -1];
+typedef char main_globals_rasterizer_throttle_end_index_offset_assert[
+	offsetof(struct _main_globals, rasterizer_throttle_end_index) == 0x20 ? 1 : -1];
 typedef char main_globals_seconds_elapsed_offset_assert[
 	offsetof(struct _main_globals, seconds_elapsed) == 0x28 ? 1 : -1];
 typedef char main_globals_connection_offset_assert[
@@ -555,12 +584,24 @@ typedef char main_globals_multiplayer_map_name_offset_assert[
 	offsetof(struct _main_globals, multiplayer_map_name) == 0x175 ? 1 : -1];
 typedef char main_globals_core_name_offset_assert[
 	offsetof(struct _main_globals, core_name) == 0x375 ? 1 : -1];
+typedef char main_globals_vblank_interval_current_offset_assert[
+	offsetof(struct _main_globals, vblank_interval_current) == 0x3B6 ? 1 : -1];
+typedef char main_globals_vblank_interval_requested_offset_assert[
+	offsetof(struct _main_globals, vblank_interval_requested) == 0x3B8 ? 1 : -1];
+typedef char main_globals_vblank_interval_held_offset_assert[
+	offsetof(struct _main_globals, vblank_interval_held) == 0x3BA ? 1 : -1];
+typedef char main_globals_vblank_failure_counts_offset_assert[
+	offsetof(struct _main_globals, vblank_failure_counts) == 0x3BC ? 1 : -1];
+typedef char main_globals_vblank_last_failure_indices_offset_assert[
+	offsetof(struct _main_globals, vblank_last_failure_indices) == 0x3C8 ? 1 : -1];
 typedef char main_globals_d3d_flip_count_offset_assert[
 	offsetof(struct _main_globals, d3d_flip_count) == 0x3F8 ? 1 : -1];
 typedef char main_globals_vblank_flip_delta_index_offset_assert[
 	offsetof(struct _main_globals, vblank_flip_delta_index) == 0x3FC ? 1 : -1];
 typedef char main_globals_vblank_flip_deltas_offset_assert[
 	offsetof(struct _main_globals, vblank_flip_deltas) == 0x3FE ? 1 : -1];
+typedef char main_globals_vblank_debug_string_offset_assert[
+	offsetof(struct _main_globals, vblank_debug_string) == 0x41C ? 1 : -1];
 
 struct game_options
 {
@@ -580,6 +621,25 @@ struct _main_window_storage
 	byte reservedAC[4];
 };
 
+#pragma pack(push, 1)
+struct _screenshot_and_framerate_globals
+{
+	short count;
+	byte reserved002[6];
+	struct render_window windows[MAXIMUM_WINDOWS + 1];
+	real framerate_samples[8];
+	word framerate_flags;
+	char framerate_sample_index;
+	boolean framerate_active;
+	char framerate_counter;
+	boolean framerate_reset;
+	boolean halt_recursion_lock;
+};
+#pragma pack(pop)
+
+typedef char screenshot_and_framerate_globals_size_assert[
+	sizeof(struct _screenshot_and_framerate_globals) == 0x38B ? 1 : -1];
+
 /* ---------- prototypes */
 
 long sort_controllers_ascending(
@@ -589,10 +649,12 @@ extern void main_setup_connection(
 	void);
 extern void main_initialize_time(void);
 extern void main_skip_private(void);
-extern void main_update_time(void);
+extern void main_update_time(
+	void);
 extern void main_game_render(
 	double time_delta_since_tick_sec);
-extern void main_frame_rate_debug(void);
+static void main_frame_rate_debug(
+	void);
 
 extern void main_new_map(
 	struct game_options *options);
@@ -608,7 +670,6 @@ extern struct bitmap_data *bitmap_2d_new(
 extern char const *tiff_export(
 	struct file_reference *file,
 	struct bitmap_data *bitmap);
-extern short global_screenshot_count;
 
 /* ---------- globals */
 
@@ -640,6 +701,7 @@ boolean debug_frame_rate = FALSE;
 boolean display_framerate = FALSE;
 boolean display_vblank_deltas = FALSE;
 boolean display_precache_progress = FALSE;
+struct _screenshot_and_framerate_globals global_screenshot_count = { 0 };
 
 /* ---------- public code */
 
@@ -1052,7 +1114,7 @@ void main_present_frame(
 	char path[512];
 
 	render_frame_present(NULL, main_globals.movie);
-	if (global_screenshot_count <= 0 && main_globals.movie)
+	if (global_screenshot_count.count <= 0 && main_globals.movie)
 	{
 		_snprintf(
 			path,
@@ -1488,7 +1550,7 @@ void main_queue_map_name(
 boolean main_taking_screenshot(
 	void)
 {
-	return global_screenshot_count > 0 || main_globals.movie != NULL;
+	return global_screenshot_count.count > 0 || main_globals.movie != NULL;
 }
 
 void main_movie_start(
@@ -1526,6 +1588,31 @@ void main_print_version(
 	void)
 {
 	console_printf(FALSE, "halobeta xbox 01.01.14.2342 Jan 14 2002 12:49:20");
+	return;
+}
+
+void main_vertical_blank_interrupt_handler(
+	unsigned long context)
+{
+	rasterizer_globals.frame_and_vertical_blank_index++;
+	if (!main_globals.d3d_flip_count)
+	{
+		rasterizer_globals.previous_frame_and_vertical_blank_index =
+			rasterizer_globals.frame_and_vertical_blank_index;
+	}
+	else if (*main_globals.d3d_flip_count != rasterizer_globals.d3d_flip_count)
+	{
+		main_globals.vblank_flip_deltas[main_globals.vblank_flip_delta_index] =
+			(short)((short)rasterizer_globals.frame_and_vertical_blank_index -
+				(short)rasterizer_globals.previous_frame_and_vertical_blank_index);
+		main_globals.vblank_flip_delta_index =
+			(short)((main_globals.vblank_flip_delta_index + 1) % 15);
+		rasterizer_globals.previous_frame_and_vertical_blank_index =
+			rasterizer_globals.frame_and_vertical_blank_index;
+		rasterizer_globals.d3d_flip_count = *main_globals.d3d_flip_count;
+	}
+
+	input_vertical_blank_interrupt();
 	return;
 }
 
@@ -1623,6 +1710,44 @@ void main_roll_credits(
 	error(_error_silent, "congratulations, you won the game!");
 	main_menu_load();
 	game_end_credits_start();
+	return;
+}
+
+void main_pregame_render(
+	void)
+{
+	collision_log_continue_period(TRUE);
+	sound_render();
+	{
+		real_point3d position = { 0.0f, 0.0f, 0.0f };
+		real_vector3d forward = { 0.0f, 0.0f, 1.0f };
+		real_vector3d up = { 0.0f, 1.0f, 0.0f };
+
+		window_storage.window.local_player_index = NONE;
+		window_storage.window.console_window = TRUE;
+		window_storage.window.rasterizer_camera.position = position;
+		window_storage.window.rasterizer_camera.forward = forward;
+		window_storage.window.rasterizer_camera.up = up;
+		window_storage.window.rasterizer_camera.mirrored = FALSE;
+		window_storage.window.rasterizer_camera.vertical_field_of_view =
+			2.0f * arctangent(
+				0.75f * render_camera_get_adjusted_field_of_view_tangent(
+					DEGREES_TO_RADIANS(80.0f)),
+				1.0f);
+		compute_window_bounds(
+			0,
+			1,
+			&window_storage.window.rasterizer_camera.viewport_bounds,
+			&window_storage.window.rasterizer_camera.window_bounds);
+		window_storage.window.rasterizer_camera.z_near = 0.01f;
+		window_storage.window.rasterizer_camera.z_far = 1.0f;
+		window_storage.window.render_camera = window_storage.window.rasterizer_camera;
+		render_frame_pregame(
+			&window_storage.window,
+			main_globals.movie);
+	}
+	collision_log_end_period();
+
 	return;
 }
 
@@ -1794,6 +1919,116 @@ void main_run_demos_private(
 	return;
 }
 
+static void main_frame_rate_debug(
+	void)
+{
+	char sample_index;
+
+	if (global_screenshot_count.framerate_reset)
+	{
+		if (debug_frame_rate)
+		{
+			sample_index = global_screenshot_count.framerate_sample_index;
+		}
+		else
+		{
+			global_screenshot_count.framerate_reset = FALSE;
+			csmemset(
+				global_screenshot_count.framerate_samples,
+				0,
+				sizeof(global_screenshot_count.framerate_samples));
+			sample_index = 0;
+			global_screenshot_count.framerate_flags = 0;
+			global_screenshot_count.framerate_sample_index = sample_index;
+			global_screenshot_count.framerate_active = FALSE;
+			global_screenshot_count.framerate_counter = 0;
+			global_screenshot_count.framerate_reset = FALSE;
+		}
+	}
+	else
+	{
+		sample_index = global_screenshot_count.framerate_sample_index;
+	}
+
+	if (debug_frame_rate)
+	{
+		global_screenshot_count.framerate_samples[sample_index] =
+			main_globals.seconds_elapsed;
+		SET_FLAG(
+			global_screenshot_count.framerate_flags,
+			sample_index,
+			main_globals.seconds_elapsed > 0.036);
+
+		sample_index = (char)(
+			(sample_index + 1) % NUMBEROF(global_screenshot_count.framerate_samples));
+		global_screenshot_count.framerate_sample_index = sample_index;
+		global_screenshot_count.framerate_reset = TRUE;
+
+		if (global_screenshot_count.framerate_active)
+		{
+			if (global_screenshot_count.framerate_sample_index == 0)
+			{
+				if (global_screenshot_count.framerate_flags == 0)
+				{
+					if (++global_screenshot_count.framerate_counter >= 60)
+					{
+						global_screenshot_count.framerate_counter = 0;
+						global_screenshot_count.framerate_active = FALSE;
+						return;
+					}
+				}
+				else
+				{
+					global_screenshot_count.framerate_counter = 0;
+					return;
+				}
+			}
+		}
+		else if (global_screenshot_count.framerate_flags == 0xFF)
+		{
+			SYSTEMTIME system_time;
+			char core_name[256];
+			char init_file_name[260];
+			char const *scenario_name =
+				tag_name_strip_path(tag_get_name(global_scenario_index));
+			FILE *file;
+
+			GetSystemTime(&system_time);
+			sprintf(
+				core_name,
+				"%s_slow_%d_%d_%d_%d_%d_%d.bin",
+				scenario_name,
+				system_time.wMonth,
+				system_time.wDay,
+				system_time.wYear,
+				system_time.wHour,
+				system_time.wMinute,
+				system_time.wSecond);
+			game_state_save_core(core_name);
+			sprintf(init_file_name, "d:\\%s_init.txt", scenario_name);
+
+			file = fopen(init_file_name, "r");
+			if (!file)
+			{
+				file = fopen(init_file_name, "wt");
+				fprintf(file, "map_name %s\n", scenario_name);
+			}
+			else
+			{
+				fclose(file);
+				file = fopen(init_file_name, "a+t");
+			}
+
+			fprintf(file, ";core_load_name_at_startup %s\n", core_name);
+			fflush(file);
+			fclose(file);
+			global_screenshot_count.framerate_active = TRUE;
+		}
+	}
+
+	return;
+}
+
 void main_won_map_private(
 	void)
 {
@@ -1851,14 +2086,325 @@ void main_reset_time(
 	void)
 {
 	main_globals.frame_start_milliseconds = system_milliseconds();
-	main_globals.rasterizer_vertical_blank_index = rasterizer_globals.vertical_blank_index;
+	main_globals.rasterizer_target_index = rasterizer_globals.vertical_blank_index;
 	return;
 }
 
-boolean code_000f0be0(
+boolean main_framerate_throttle_enabled(
 	void)
 {
 	return rasterizer_globals.framerate_throttle;
+}
+
+void main_update_time(
+	void)
+{
+	unsigned long end_milliseconds;
+	long milliseconds_elapsed;
+	short requested_rate;
+	short selected_interval;
+	short elapsed_game_ticks;
+	short slot;
+	boolean framerate_throttle;
+	__int64 target_index;
+	__int64 short_target_index;
+	real seconds_elapsed;
+
+	end_milliseconds = system_milliseconds();
+	target_index = MAX(
+		main_globals.rasterizer_target_index,
+		main_globals.rasterizer_throttle_end_index);
+	framerate_throttle = rasterizer_globals.framerate_throttle;
+
+	if (framerate_throttle)
+	{
+		csstrcpy(main_globals.vblank_debug_string, "");
+		if (global_frame_rate_throttle && rasterizer_globals.framerate_throttle_target >= 0)
+		{
+			requested_rate = rasterizer_globals.framerate_throttle_target;
+			if (requested_rate == 0)
+				requested_rate = 30;
+
+			selected_interval = (short)(60 / requested_rate);
+			main_globals.vblank_interval_requested = selected_interval;
+
+			if (rasterizer_globals.framerate_throttle_debug)
+			{
+				short best_interval;
+				short current_interval;
+
+				elapsed_game_ticks = game_time_get_elapsed();
+				short_target_index = (short)target_index;
+				best_interval = 5;
+
+				_snprintf(
+					main_globals.vblank_debug_string + csstrlen(main_globals.vblank_debug_string),
+					sizeof(main_globals.vblank_debug_string) - csstrlen(main_globals.vblank_debug_string),
+					"last%6I64d init%6I64d achv%6I64d pres%6I64d g%d cur%d... ",
+					main_globals.rasterizer_target_index,
+					main_globals.rasterizer_initial_index,
+					main_globals.rasterizer_throttle_start_index,
+					main_globals.rasterizer_throttle_end_index,
+					elapsed_game_ticks,
+					main_globals.vblank_interval_current);
+
+				for (slot = 5; slot > 0; slot--)
+				{
+					short displayed_failure_count;
+					short target_age;
+					short slot_bucket;
+					boolean ignore_failure;
+					char const *label;
+					__int64 last_failure_index;
+					__int64 target_age_raw;
+
+					displayed_failure_count = main_globals.vblank_failure_counts[slot];
+					if (displayed_failure_count > 99)
+						displayed_failure_count = 99;
+					ignore_failure = FALSE;
+
+					last_failure_index = main_globals.vblank_last_failure_indices[slot];
+					target_age_raw = short_target_index - last_failure_index;
+					if (target_age_raw < 99)
+						target_age = (short)target_age_raw;
+					else
+						target_age = 99;
+
+					slot_bucket = (short)((slot + 1) / 2);
+					current_interval = main_globals.vblank_interval_current;
+					if ((short)((current_interval + 1) / 2) > slot_bucket &&
+						slot_bucket >= (short)(current_interval / 2) &&
+						elapsed_game_ticks > slot_bucket)
+					{
+						ignore_failure = TRUE;
+					}
+
+					if (main_globals.rasterizer_throttle_start_index >=
+						main_globals.rasterizer_initial_index + slot)
+					{
+						if (ignore_failure)
+						{
+							label = "ignor";
+						}
+						else
+						{
+							long failure_count;
+
+							failure_count = main_globals.vblank_failure_counts[slot];
+							main_globals.vblank_failure_counts[slot] =
+								(short)(failure_count + 1);
+							main_globals.vblank_last_failure_indices[slot] = target_index;
+							label = "fail ";
+						}
+
+						_snprintf(
+							main_globals.vblank_debug_string + csstrlen(main_globals.vblank_debug_string),
+							sizeof(main_globals.vblank_debug_string) - csstrlen(main_globals.vblank_debug_string),
+							"(%s%2d) ",
+							label,
+							displayed_failure_count);
+					}
+					else
+					{
+						if (target_index < last_failure_index + 15)
+						{
+							label = main_globals.vblank_failure_counts[slot] < 4 ? "wt" : "dn";
+							_snprintf(
+								main_globals.vblank_debug_string + csstrlen(main_globals.vblank_debug_string),
+								sizeof(main_globals.vblank_debug_string) - csstrlen(main_globals.vblank_debug_string),
+								"(%s%2d/%2d) ",
+								label,
+								displayed_failure_count,
+								target_age);
+						}
+						else
+						{
+							main_globals.vblank_failure_counts[slot] = 0;
+							_snprintf(
+								main_globals.vblank_debug_string + csstrlen(main_globals.vblank_debug_string),
+								sizeof(main_globals.vblank_debug_string) - csstrlen(main_globals.vblank_debug_string),
+								"(ok   %2d) ",
+								target_age);
+						}
+					}
+
+					if (main_globals.vblank_interval_requested <= slot &&
+						main_globals.vblank_failure_counts[slot] < 4)
+					{
+						best_interval = slot;
+					}
+				}
+
+				if (best_interval == 0)
+					requested_rate = 999;
+				else
+					requested_rate = (short)(60 / best_interval);
+
+				_snprintf(
+					main_globals.vblank_debug_string + csstrlen(main_globals.vblank_debug_string),
+					sizeof(main_globals.vblank_debug_string) - csstrlen(main_globals.vblank_debug_string),
+					main_globals.vblank_interval_current < best_interval
+						? " FAILDOWN %d"
+						: best_interval < main_globals.vblank_interval_current
+							? " RESTORE  %d"
+							: " MAINTAIN %d",
+					requested_rate);
+
+				_snprintf(
+					main_globals.vblank_debug_string + csstrlen(main_globals.vblank_debug_string),
+					sizeof(main_globals.vblank_debug_string) - csstrlen(main_globals.vblank_debug_string),
+					" des %d targ%6I64d",
+					requested_rate,
+					target_index + best_interval);
+				selected_interval = best_interval;
+			}
+
+			target_index += selected_interval;
+			main_globals.vblank_interval_current = selected_interval;
+		}
+	}
+	else
+	{
+		milliseconds_elapsed = (long)(real)(
+			(long)end_milliseconds - (long)main_globals.frame_start_milliseconds);
+		main_globals.vblank_interval_held = FALSE;
+		if (milliseconds_elapsed < 33)
+		{
+			profile_idle_start();
+			if (global_frame_rate_throttle)
+				Sleep(33 - milliseconds_elapsed);
+			profile_idle_end();
+		}
+		else
+		{
+			profile_lapsed_msec(milliseconds_elapsed - 33);
+		}
+	}
+
+	end_milliseconds = system_milliseconds();
+	if (target_index < (__int64)rasterizer_globals.frame_and_vertical_blank_index)
+		target_index = (__int64)rasterizer_globals.frame_and_vertical_blank_index;
+
+	if (framerate_throttle)
+	{
+		seconds_elapsed =
+			(real)(target_index - (__int64)main_globals.rasterizer_target_index) *
+			0.01666666753590107f;
+	}
+	else
+	{
+		seconds_elapsed =
+			(real)(end_milliseconds - main_globals.frame_start_milliseconds) *
+			0.001000000047497451f;
+	}
+
+	if (main_globals.movie)
+	{
+		seconds_elapsed = main_globals.recording_dt;
+	}
+	else
+	{
+		seconds_elapsed = PIN(seconds_elapsed, 0.0f, 1.0f);
+		if (main_globals.connection == _game_connection_local)
+		{
+			if (debug_force_frame_rate_update)
+				seconds_elapsed = CEILING(seconds_elapsed, 0.03333333507180214f);
+			else
+				seconds_elapsed = CEILING(seconds_elapsed, 0.06666667014360428f);
+		}
+	}
+
+	main_globals.frame_start_milliseconds = end_milliseconds;
+	main_globals.rasterizer_target_index = target_index;
+	main_globals.seconds_elapsed = seconds_elapsed;
+	profile_seconds_elapsed(seconds_elapsed);
+	main_globals.rasterizer_initial_index =
+		rasterizer_globals.frame_and_vertical_blank_index;
+
+	return;
+}
+
+void main_rasterizer_throttle(
+	void)
+{
+	__int64 entry_index;
+	__int64 target_index;
+	__int64 end_index;
+	__int64 index_delta;
+	__int64 elapsed_index;
+	unsigned long start_milliseconds;
+	short lapsed_frames;
+	boolean did_throttle;
+	boolean precache_in_progress;
+	boolean synchronized;
+	char const *description;
+
+	entry_index = rasterizer_globals.frame_and_vertical_blank_index;
+	did_throttle = FALSE;
+	main_globals.rasterizer_throttle_start_index =
+		rasterizer_globals.frame_and_vertical_blank_index + 1;
+	if (rasterizer_globals.framerate_throttle)
+	{
+		target_index = main_globals.rasterizer_target_index;
+		target_index--;
+		if ((__int64)rasterizer_globals.frame_and_vertical_blank_index < target_index)
+		{
+			start_milliseconds = system_milliseconds();
+			precache_in_progress = cache_files_precache_in_progress();
+			did_throttle = TRUE;
+			profile_idle_start();
+			while ((__int64)rasterizer_globals.frame_and_vertical_blank_index < target_index)
+			{
+				if (precache_in_progress)
+				{
+					Sleep(1);
+				}
+				if (system_milliseconds() > start_milliseconds + 1000)
+				{
+					console_warning(
+						"stuck waiting for VBLANK callback! disabling rasterizer framerate control");
+					rasterizer_globals.framerate_throttle = FALSE;
+					break;
+				}
+			}
+			profile_idle_end();
+		}
+	}
+
+	end_index = rasterizer_globals.frame_and_vertical_blank_index + 1;
+	synchronized =
+		main_globals.vblank_interval_current == main_globals.vblank_interval_requested;
+	main_globals.rasterizer_throttle_end_index = end_index;
+	index_delta = end_index - main_globals.rasterizer_target_index;
+	lapsed_frames = (short)PIN(index_delta, 0, 0x7FFF);
+
+	if (did_throttle)
+	{
+		elapsed_index = rasterizer_globals.frame_and_vertical_blank_index - entry_index;
+		description = "THROTTLE";
+	}
+	else
+	{
+		elapsed_index = lapsed_frames;
+		description = lapsed_frames == 0 ? "SYNCED  " : "LAPSED  ";
+	}
+
+	_snprintf(
+		main_globals.vblank_debug_string + csstrlen(main_globals.vblank_debug_string),
+		sizeof(main_globals.vblank_debug_string) - csstrlen(main_globals.vblank_debug_string),
+		"%6I64d(targ%6I64d %s%2d)",
+		entry_index,
+		main_globals.rasterizer_target_index,
+		description,
+		elapsed_index);
+	main_globals.vblank_interval_held =
+		main_globals.vblank_interval_current > 0 && lapsed_frames == 0;
+	profile_lapsed_frames(
+		lapsed_frames,
+		synchronized,
+		main_globals.vblank_debug_string);
+
+	return;
 }
 
 void main_setup_connection(
@@ -1901,7 +2447,7 @@ void main_initialize_time(
 	void)
 {
 	main_globals.frame_start_milliseconds = system_milliseconds();
-	main_globals.rasterizer_vertical_blank_index = 0;
+	main_globals.rasterizer_target_index = 0;
 	rasterizer_set_vblank_callback(main_vertical_blank_interrupt_handler);
 	main_globals.vblank_flip_delta_index = 0;
 	csmemset(main_globals.vblank_flip_deltas, 0, sizeof(main_globals.vblank_flip_deltas));
@@ -1926,6 +2472,120 @@ static void main_reset_map_private(
 		main_globals.reset_map = FALSE;
 	}
 
+	return;
+}
+
+void halt_and_catch_fire(
+	void)
+{
+	short gamepad_index;
+	long font_tag_index;
+	struct scenario *scenario;
+	struct rasterizer_frame_begin_parameters frame_parameters;
+	struct rasterizer_window_begin_parameters window_parameters;
+
+	if (!global_screenshot_count.halt_recursion_lock)
+	{
+		scenario = global_scenario_try_and_get();
+		global_screenshot_count.halt_recursion_lock = TRUE;
+		for (gamepad_index = 0; gamepad_index < MAXIMUM_GAMEPADS; gamepad_index++)
+		{
+			if (input_has_gamepad(gamepad_index))
+			{
+				input_set_gamepad_rumbler_state(
+					gamepad_index,
+					0,
+					0);
+			}
+		}
+
+		if (scenario)
+		{
+			font_tag_index = interface_get_tag_index(_interface_font_terminal);
+		}
+		if (!scenario || font_tag_index == NONE)
+		{
+			font_tag_index = tag_loaded(
+				FONT_GROUP_TAG,
+				"old tags\\internal system plain");
+		}
+
+		while (TRUE)
+		{
+			rasterizer_reset_state();
+			csmemset(&frame_parameters, 0, sizeof(frame_parameters));
+			rasterizer_frame_begin(&frame_parameters);
+			rasterizer_windows_begin();
+
+			csmemset(&window_parameters, 0, sizeof(window_parameters));
+			window_parameters.camera.position = *global_origin3d;
+			window_parameters.camera.forward = *global_forward3d;
+			window_parameters.camera.up = *global_up3d;
+			window_parameters.camera.mirrored = FALSE;
+			window_parameters.camera.vertical_field_of_view =
+				2.0f * arctangent(
+					0.75f * render_camera_get_adjusted_field_of_view_tangent(
+						DEGREES_TO_RADIANS(80.0f)),
+					1.0f);
+			window_parameters.camera.z_near = rasterizer_globals.near_clip_distance;
+			window_parameters.camera.viewport_bounds.x0 = 0;
+			window_parameters.camera.viewport_bounds.x1 = 640;
+			window_parameters.camera.viewport_bounds.y0 = 0;
+			window_parameters.camera.viewport_bounds.y1 = 480;
+			window_parameters.camera.z_far = rasterizer_globals.far_clip_distance;
+			render_camera_build_frustum(
+				&window_parameters.camera,
+				NULL,
+				&window_parameters.frustum,
+				TRUE);
+			window_parameters.rasterizer_target = 0;
+			window_parameters.fog.atmospheric_color = *global_real_rgb_blue;
+			window_parameters.fog.atmospheric_maximum_distance = 0.0f;
+			window_parameters.fog.atmospheric_minimum_distance = 0.0f;
+			window_parameters.fog.planar_mode = 0;
+			render.camera = window_parameters.camera;
+			rasterizer_window_begin(&window_parameters);
+
+			if (font_tag_index != NONE)
+			{
+				point2d cursor = { 0, 0 };
+				rectangle2d bounds = rasterizer_globals.reserved04.frame_bounds;
+
+				draw_string_set_draw_mode(
+					font_tag_index,
+					NONE,
+					0,
+					0,
+					global_real_argb_white);
+				draw_string_set_tab_stops(NULL, 0);
+				draw_string_set_color(global_real_argb_white);
+				rasterizer_draw_string(
+					&bounds,
+					NULL,
+					&cursor,
+					-4,
+					"halobeta xbox 01.01.14.2342 built at: Jan 14 2002 12:49:20");
+				bounds.y0 = cursor.y - 1;
+				rasterizer_draw_string(
+					&bounds,
+					NULL,
+					&cursor,
+					-4,
+					error_get());
+			}
+
+			rasterizer_transparent_geometry_draw(TRUE);
+			rasterizer_transparent_geometry_draw(FALSE);
+			rasterizer_debug_draw();
+			rasterizer_window_end();
+			rasterizer_windows_end();
+			rasterizer_frame_end();
+			rasterizer_present(NULL, NULL);
+			input_update();
+		}
+	}
+
+	exit(0);
 	return;
 }
 

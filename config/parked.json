@@ -1999,7 +1999,7 @@
       "unit": "source/cutscene/cinematics",
       "function": "_cinematic_render",
       "class": "register-allocation",
-      "evidence": "The retained reconstruction is coherent Halo cinematic rendering source corroborated by the later HCEA control flow and the January instruction/relocation topology. It advances letterbox interpolation from game ticks, draws two 1/8-height black bars, validates and fades four queued chapter titles, sets the authored text bounds/colors/shadow, renders the localized string, and retires expired titles. The authenticated cseries fast_ftol helper supplies the original dword x87 conversions; there is no inline assembly in cinematic_render itself. Target and candidate share the 1280-byte envelope and all 57 relocation identities and addresses. The remaining 46 normalized byte differences are confined to VC7 stack-slot coloring for the elapsed/bar/helper temporaries and the shadow-color pack schedule. The preserved declaration, scope, expression, HCEA-layout, helper-call, subtraction, and shadow-pack matrices found no closer authentic source form; artificial barriers, volatile lifetimes, representation punning, forced register dependencies, direct gameplay assembly, and exact-only control flow were rejected. The translation unit also emits a candidate-only 32-byte zero-relocation _fast_ftol COMDAT from the authenticated external-inline helper, while January selects that owner from actor_combat.obj; this separate ownership surplus prevents whole-object completion even though delayed titles are strict exact. Reopen the function only for authoritative January source/local-variable records or a natural same-compiler donor that explains the remaining slot/pack schedule, and reopen whole-object admission only with a proven COMDAT ownership schedule that does not add a cinematics owner.",
+      "evidence": "The retained reconstruction is coherent Halo cinematic rendering source corroborated by the later HCEA control flow and the January instruction/relocation topology. It advances letterbox interpolation from game ticks, draws two 1/8-height black bars, validates and fades four queued chapter titles, sets the authored text bounds/colors/shadow, renders the localized string, and retires expired titles. The authenticated cseries fast_ftol helper supplies the original dword x87 conversions; there is no inline assembly in cinematic_render itself. Target and candidate share the 1280-byte envelope and all 57 relocation identities and addresses. The remaining difference is confined to four ARGB scheduling instructions. The preserved declaration, scope, expression, HCEA-layout, helper-call, subtraction, and shadow-pack matrices found no closer authentic source form; artificial barriers, volatile lifetimes, representation punning, forced register dependencies, direct gameplay assembly, and exact-only control flow were rejected. The translation unit also emits a candidate-only 32-byte zero-relocation _fast_ftol COMDAT from the authenticated external-inline helper, while January selects that owner from actor_combat.obj; this separate ownership surplus prevents whole-object completion even though delayed titles are strict exact. Reopen the function only for authoritative January source/local-variable records or a natural same-compiler donor that explains the remaining slot/pack schedule, and reopen whole-object admission only with a proven COMDAT ownership schedule that does not add a cinematics owner.",
       "measurements": {
         "target": {
           "size": 1280,
@@ -2009,9 +2009,9 @@
         "base": {
           "size": 1280,
           "relocation_count": 57,
-          "normalized_sha256": "1eb7cfd27d9ce0693adee50153f2c344766443274dcf486917756d03eb2bf7ac"
+          "normalized_sha256": "1a9d49fc4eace03cb02268a6434f252b45496477fac007eba679c72e4b5c8d1c"
         },
-        "objdiff_percent": 99.32809
+        "objdiff_percent": 99.43569
       }
     },
     {
@@ -2769,7 +2769,7 @@
         "base": {
           "size": 992,
           "relocation_count": 59,
-          "normalized_sha256": "0bd88e42b1b36f4e9df5a8bed007887a18a1443d6f895f15ea9d275f2f6526c4"
+          "normalized_sha256": "2e0bbd84c45f240758cc76a2d4df8c78be689cfe9bc21af6a52e017f218e7ca0"
         },
         "objdiff_percent": 60.99099
       }
@@ -3282,9 +3282,9 @@
         "base": {
           "size": 1152,
           "relocation_count": 66,
-          "normalized_sha256": "feaf057bd40ae57be6e00fd6b992917f505b252e13ee90219ae693a6be9a26ed"
+          "normalized_sha256": "720d8e364ef806437370817882806154fc1209410c0f44b69e1b99872d02ba22"
         },
-        "objdiff_percent": 80.3984
+        "objdiff_percent": 81.149734
       }
     },
     {
@@ -6522,14 +6522,702 @@
       }
     },
     {
-      "unit": "source/rasterizer/xbox/rasterizer_xbox_draw_primitives",
-      "function": "_rasterizer_dynamic_geometry_initialize",
-      "class": "tu-context-optimization",
-      "evidence": "Best complete ordinary-C initializer retained after the public model API was moved out of the broad rasterizer header into its typed subsystem owner and the frame-statistics record kept meaningful named reflection counters. January and candidate are both 480 padded bytes with all 35 relocation identities; objdiff reports 93.59494 percent similarity. The remaining difference is VC7 scheduling of independent stack reloads caused by the corrected translation-unit declaration context. Restoring the former strict hash would require weaker or duplicate declarations, so the previous exact credit is deliberately retired. No source-pressure declaration, fake dependency, raw offset, undefined behavior, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/rasterizer_xbox_draw_primitives_obj_typed_header_reconciliation_20260909.md.",
+      "unit": "source/bitmaps/bitmaps",
+      "function": "_bitmap_format_to_a8r8g8b8",
+      "class": "unclassified",
+      "evidence": "Complete natural typed bitmap-format conversion retained from the 2026-09-09 reconciliation packet. The switch uses the project bitmap enums and pixel/color helpers, but the current candidate is 560 padded bytes and 21 relocations versus January's 544 bytes and 22 relocations. The remaining control-flow and instruction-selection differences are not treated as exact. No fake dependency, raw offset, compiler steering, assembly, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/bitmaps_obj_natural_reconstruction_packet_20260909.md.",
       "measurements": {
-        "target": { "size": 480, "relocation_count": 35, "normalized_sha256": "8dcf639e6a56145f391857236a9079531fa32e6cf447291cd9d1a9d13b896afa" },
-        "base": { "size": 480, "relocation_count": 35, "normalized_sha256": "bda00785ec3b03ddfe11744b93f62d5752c743f4f57b43405e265a2304c07502" },
-        "objdiff_percent": 93.59494
+        "target": { "size": 544, "relocation_count": 22, "normalized_sha256": "393db9b9a129a1c388c69259dd20b6dc91bbf6e5943ebc5d398375e9da4ef806" },
+        "base": { "size": 560, "relocation_count": 21, "normalized_sha256": "2cca10a4cf9dcec80df84852ea289c0773ab8fecb23c6ad42d132d05ddad7da8" },
+        "objdiff_percent": 40.976078
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmaps",
+      "function": "_palette_find_closest_match",
+      "class": "unclassified",
+      "evidence": "Complete natural palette-search reconstruction retained from the 2026-09-09 bitmap packet. It uses typed pixel channels and the ordinary closest-distance loop; the current candidate is 272 padded bytes with four relocations versus January's 256 bytes and four relocations. The nonexact register and loop schedule receives no matching credit. No fake dependency, raw offset, compiler steering, assembly, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/bitmaps_obj_natural_reconstruction_packet_20260909.md.",
+      "measurements": {
+        "target": { "size": 256, "relocation_count": 4, "normalized_sha256": "bff02f627a7490e89413a9c25091762766ee6c4d5a197b895d3f9b7675573b9e" },
+        "base": { "size": 272, "relocation_count": 4, "normalized_sha256": "a710c01ba8e35d709c6d06b07008af5d0e3415d3c75b670b628242ad54d68a2c" },
+        "objdiff_percent": 78.02247
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmaps",
+      "function": "_bitmap_2d_get_pixel",
+      "class": "unclassified",
+      "evidence": "Complete natural typed two-dimensional bitmap pixel reader retained from the 2026-09-09 bitmap packet. It follows the format-aware mipmap addressing and color conversion graph, but the current candidate is 1,200 padded bytes and 64 relocations versus January's 1,296 bytes and 67 relocations. The missing target schedule is not filled with guessed branches or byte-forcing source. Zero exact credit. See docs/object_matching_logs/bitmaps_obj_natural_reconstruction_packet_20260909.md.",
+      "measurements": {
+        "target": { "size": 1296, "relocation_count": 67, "normalized_sha256": "8d11e53e96af45f9a8b00f2daf6140159157cd09cfe9d79b4afa06acb787c215" },
+        "base": { "size": 1200, "relocation_count": 64, "normalized_sha256": "37e2a79e1edd171d28cbb715f9d525367b09cd0f22b1322837065e492f456741" },
+        "objdiff_percent": 74.77802
+      }
+    },
+    {
+      "unit": "source/main/main",
+      "function": "_main_frame_rate_debug",
+      "class": "unclassified",
+      "evidence": "Complete natural frame-rate diagnostic state machine retained from the 2026-09-09 Main packet. It uses the authenticated Main state, project types, and ordinary file/time APIs. The candidate is 528 padded bytes with 51 relocations versus January's 544 bytes and 52 relocations; the remaining code-generation difference is explicitly fuzzy. No barrier, volatile carrier, fake dependency, raw address, or exact-only branch is retained. Zero exact credit. See docs/object_matching_logs/main_obj_natural_state_and_render_packet_20260909.md.",
+      "measurements": {
+        "target": { "size": 544, "relocation_count": 52, "normalized_sha256": "17546b1f02410f30e6fc728300d275c40d65bf6cb6a35a096a8d735f96512d83" },
+        "base": { "size": 528, "relocation_count": 51, "normalized_sha256": "5608160797d3d13d3bcb562329ef3ab715e43cf5b5add8d94035bc62893e71d3" },
+        "objdiff_percent": 94.67308
+      }
+    },
+    {
+      "unit": "source/main/main",
+      "function": "_main_update_time",
+      "class": "unclassified",
+      "evidence": "Complete natural Main timing and vblank-throttle reconstruction retained from the 2026-09-09 packet. It uses named fields in the authenticated rasterizer/Main state and the genuine profiler APIs. Target and candidate are both 1,440 padded bytes, but January has 117 relocations and the candidate has 118 with different normalized code. The rejected compiler-barrier experiment is not retained. Zero exact credit. See docs/object_matching_logs/main_obj_natural_state_and_render_packet_20260909.md.",
+      "measurements": {
+        "target": { "size": 1440, "relocation_count": 117, "normalized_sha256": "b32677fb6c4cc6bcd664b98bfc5cc962b68bdf65228a31759b52574becdf200b" },
+        "base": { "size": 1440, "relocation_count": 118, "normalized_sha256": "5f8cfd1a03e2d4faddfd96d46f25ce9676ab650b4f12f4a8351bb5dc9f1bfba2" },
+        "objdiff_percent": 62.50114
+      }
+    },
+    {
+      "unit": "source/ai/path",
+      "function": "_path_heap_bubble_down",
+      "class": "instruction-scheduling",
+      "evidence": "Best reviewed natural 1-based min-heap sift-down reconstruction from the 2026-09-09 path packet, with its private name independently authenticated by HCEA. The retained typed source preserves all assertions, heap/node back-pointer updates, and the complete 24-relocation destination sequence. January is 560 padded bytes and the candidate is 544; remaining layout and scheduling differences receive zero exact credit. No register steering, fake dependency, raw offset, or nonsensical logic is retained.",
+      "measurements": {
+        "target": { "size": 560, "relocation_count": 24, "normalized_sha256": "7a171cedd6dae59cca1f1aece48a3a3811d22ad2c92f739e2e8c587739f60ef2" },
+        "base": { "size": 544, "relocation_count": 24, "normalized_sha256": "633165e5c90816f685ef3b8031cfd9b500b615c86675913b1fbf3d25b28100c9" },
+        "objdiff_percent": 92.354164
+      }
+    },
+    {
+      "unit": "source/ai/path",
+      "function": "_path_state_begin",
+      "class": "instruction-scheduling",
+      "evidence": "Best reviewed natural path-search initializer from the 2026-09-09 packet. HCEA independently confirms the start validation, distance quantization and overflow rejection, initial-node setup, closest-node seed, surface-hash insertion, and heap insertion. The candidate retains all 20 target dependency identities but is 608 padded bytes versus January's 592 because VC7 layout and scheduling remain different. Zero exact credit; no compiler steering, fake branch, or raw layout access is retained.",
+      "measurements": {
+        "target": { "size": 592, "relocation_count": 20, "normalized_sha256": "039ed79debe1e371d717cdadda825e3d97de89560511aae5ba2e7a919236d357" },
+        "base": { "size": 608, "relocation_count": 20, "normalized_sha256": "ad863f4591f7a5699cda9d18300fe73ceab053b88250f4084df32b0aa8eed71a" },
+        "objdiff_percent": 93.61539
+      }
+    },
+    {
+      "unit": "source/ai/path",
+      "function": "_build_path_edges_for_surface",
+      "class": "instruction-scheduling",
+      "evidence": "Best reviewed natural surface-edge builder from the 2026-09-09 path packet. HCEA authenticates the boundary-edge loop, adjacent-surface selection, typed vertex reads, base-point/vector construction, and 64-edge cap. Target and candidate share the 384-byte envelope and all 13 relocation identities at the same addresses; only instruction selection and register scheduling remain different. Zero exact credit; no byte forcing or fake dependency is retained.",
+      "measurements": {
+        "target": { "size": 384, "relocation_count": 13, "normalized_sha256": "3f8e92ea9ce08fb346676f4f52ff44f33f1ab0fe433d2e2deee46da398f85031" },
+        "base": { "size": 384, "relocation_count": 13, "normalized_sha256": "d0a1a65d568c291ba993aa737804a0c3e9a369a069ea7dc7a90315d5a7f18d9c" },
+        "objdiff_percent": 85.31111
+      }
+    },
+    {
+      "unit": "source/ai/path",
+      "function": "_path_state_traverse",
+      "class": "unclassified",
+      "evidence": "Best reviewed natural A-star expand/relax reconstruction from the 2026-09-09 path packet, with semantics and private name independently corroborated by HCEA. The typed candidate preserves edge expansion, breakable/passable tests, cost and attractor calculations, hash lookup, heap relaxation, closest-node tracking, and debug outcomes. Target and candidate share the 2,096-byte envelope and the same 65-relocation destination multiset, but control order and scheduling differ materially. Zero exact credit; no exact-only branch, fake dependency, or raw access is retained.",
+      "measurements": {
+        "target": { "size": 2096, "relocation_count": 65, "normalized_sha256": "3e33ddd8b81a7b51dc2886a3056a35dc11723632acde0244128e99383d585582" },
+        "base": { "size": 2096, "relocation_count": 65, "normalized_sha256": "f52af9dafed6defa3a51fbfa27488bb0d86ced29706083c805bec86f31c0d59e" },
+        "objdiff_percent": 64.63636
+      }
+    },
+    {
+      "unit": "source/structures/structures",
+      "function": "_structure_render_surface_from_point_and_leaf",
+      "class": "instruction-scheduling",
+      "evidence": "Best reviewed natural typed structure-surface query retained from the 2026-09-09 structures packet. It walks the leaf surface references, matches the BSP plane, resolves the lightmap and material, obtains the three environment vertices, tests point_in_triangle3d, and returns the surface/lightmap/material outputs. Target and candidate share the 432-byte envelope and all 13 dependency identities; only statement and register scheduling remain different. Zero exact credit; no representation pun, fake dependency, or raw address is retained.",
+      "measurements": {
+        "target": { "size": 432, "relocation_count": 13, "normalized_sha256": "0554dba934d6bb4545ff3a40d968b5ba8480c15e9820af556c9911ab4e3d0c7d" },
+        "base": { "size": 432, "relocation_count": 13, "normalized_sha256": "b32bba9dfdbb7d999245ad799c2591fc176d3b1890cdcfd459b03f83d93ee6c0" },
+        "objdiff_percent": 84.0875
+      }
+    },
+    {
+      "unit": "source/ai/ai_communication",
+      "function": "_ai_conversation_find_participant",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 2048,
+          "relocation_count": 85,
+          "normalized_sha256": "344df5e9415b7b470e528153f3097ef3ff894d72ef2253625e61af4c1ecafdeb"
+        },
+        "base": {
+          "size": 2032,
+          "relocation_count": 85,
+          "normalized_sha256": "faae33e2ab872f9c1cfb5038a17b6f5fc8819eedef3921f3a033f9959743a37b"
+        },
+        "objdiff_percent": 48.317684
+      }
+    },
+    {
+      "unit": "source/ai/ai_communication",
+      "function": "_ai_conversation_begin",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 1744,
+          "relocation_count": 54,
+          "normalized_sha256": "4ac91071ef1ee4f6e17df958f06ddfcb727ef821e855baceca2e77f32c94cb12"
+        },
+        "base": {
+          "size": 1648,
+          "relocation_count": 53,
+          "normalized_sha256": "2b82a4dec36414ec29ab8e478339a96d72c82b323b1b28168eb3986b88de7914"
+        },
+        "objdiff_percent": 64.41936
+      }
+    },
+    {
+      "unit": "source/ai/path",
+      "function": "_path_state_approach_point",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 304,
+          "relocation_count": 13,
+          "normalized_sha256": "d5abe183e0dbbae53e3f46f674b31ee96aef3f8f9f0905473cdc288ba1b45d20"
+        },
+        "base": {
+          "size": 304,
+          "relocation_count": 13,
+          "normalized_sha256": "9f758f9afb195dbb26c1e57ebbd34161ba8573c80c4efe85a346ab6a2117b90b"
+        },
+        "objdiff_percent": 94.52586
+      }
+    },
+    {
+      "unit": "source/ai/path",
+      "function": "_path_state_estimated_distance",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 496,
+          "relocation_count": 13,
+          "normalized_sha256": "24719f50ab8c668f8155c5e89903def4b71a2d5b1479dd61f07b9e999e1298da"
+        },
+        "base": {
+          "size": 528,
+          "relocation_count": 13,
+          "normalized_sha256": "e286347823095bc8eb26bcf1768e6607851c2c8e2b1bc646d8636257e6444245"
+        },
+        "objdiff_percent": 77.47895
+      }
+    },
+    {
+      "unit": "source/ai/path_obstacles",
+      "function": "_circle_tangents",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 128,
+          "relocation_count": 3,
+          "normalized_sha256": "13e114ec1e11801cdc5da866057bcc4de4136dc423b6ebe8340456a24147f986"
+        },
+        "base": {
+          "size": 128,
+          "relocation_count": 3,
+          "normalized_sha256": "a54010efa25a9daafaee40aae4871c8b3078128a03e6614ac33deeee1293069c"
+        },
+        "objdiff_percent": 87.34694
+      }
+    },
+    {
+      "unit": "source/ai/path_obstacles",
+      "function": "_obstacles_disc_neighborhood",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 560,
+          "relocation_count": 21,
+          "normalized_sha256": "daa57d89708f1bf205442613b8d59462c3e83133254dd9d23c4a8486a75581f1"
+        },
+        "base": {
+          "size": 560,
+          "relocation_count": 21,
+          "normalized_sha256": "ec5db927f53566b43b74f00b87411dd57031310473bf0d21a2cfbf1a0c40a7ad"
+        },
+        "objdiff_percent": 96.05747
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_extract",
+      "function": "_extract_3d_textures",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 464,
+          "relocation_count": 22,
+          "normalized_sha256": "db5cb3236cbae82c1dbb9a526754dc136bf8741c9f1608c2b80c43982b33edfd"
+        },
+        "base": {
+          "size": 448,
+          "relocation_count": 22,
+          "normalized_sha256": "1faf0f6890cea8e63d3aaae5f77752d39cae58d8a7044d41f80647c05c62cf97"
+        },
+        "objdiff_percent": 88.46575
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_extract",
+      "function": "_extract_add_bitmap",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 688,
+          "relocation_count": 55,
+          "normalized_sha256": "c8118b1518729467fb711b03b848810d1fb022378efdcb1993864c51a80834c8"
+        },
+        "base": {
+          "size": 704,
+          "relocation_count": 55,
+          "normalized_sha256": "839abe0f5831fbd84ad64ad0a7cd8676bb1bd0f81aa9666ffa0724706c4cd658"
+        },
+        "objdiff_percent": 83.140274
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_extract",
+      "function": "_extract_build_debug_plate",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 1408,
+          "relocation_count": 52,
+          "normalized_sha256": "c7ced6d2891f524edfb3b911a2ea180a2c9bcc1f4fcf8b4faf41504084881e88"
+        },
+        "base": {
+          "size": 1504,
+          "relocation_count": 54,
+          "normalized_sha256": "3be6b5185897bf993a4952e6e70142bd0e5248b55118cc2d922e23c4f8c32339"
+        },
+        "objdiff_percent": 46.90763
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_extract",
+      "function": "_extract_cube_maps",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 544,
+          "relocation_count": 37,
+          "normalized_sha256": "17babd5be00b7725547b4bcc9bdffb5a7582a30f4e11a9b5a85a509f75bb9480"
+        },
+        "base": {
+          "size": 512,
+          "relocation_count": 33,
+          "normalized_sha256": "7055481eb0e36f29f1329e678c2a3d4058a4d8b76e8b21f9077a78fd092af58a"
+        },
+        "objdiff_percent": 52.68485
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_extract",
+      "function": "_extract_get_bitmap_format",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 576,
+          "relocation_count": 20,
+          "normalized_sha256": "de642601ab31964719ffd3853c0be2514d729c1b266f7e65dcab606b6312400e"
+        },
+        "base": {
+          "size": 496,
+          "relocation_count": 20,
+          "normalized_sha256": "66819a8ba442bcfc2e9b369e2b4480ca807f6b3db31648cbd0d253b08de35f96"
+        },
+        "objdiff_percent": 66.40804
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_extract",
+      "function": "_extract_mipmaps_to_bitmap",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 976,
+          "relocation_count": 68,
+          "normalized_sha256": "690b82e1ac6db7cfa5bd6982d84a602fbf94afb65110a170b5410a29f3a3f898"
+        },
+        "base": {
+          "size": 960,
+          "relocation_count": 68,
+          "normalized_sha256": "e1ba61664cfcc43e00e2af1af771b0c5eb7c36df2d82c94d0c3539c9a80d3089"
+        },
+        "objdiff_percent": 96.16161
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_extract",
+      "function": "_extract_pixels_from_mipmap",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 528,
+          "relocation_count": 35,
+          "normalized_sha256": "89a0f49d2b11682782c4b618179ed6ef841e7fda585ad1ab6554f0229f36d4eb"
+        },
+        "base": {
+          "size": 528,
+          "relocation_count": 35,
+          "normalized_sha256": "6f83dd0973f03baaeb6d6c41853eae14b8eb4d9964424fc050ec126d1eec5345"
+        },
+        "objdiff_percent": 91.694916
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_extract",
+      "function": "_extract_pixels_to_mipmap",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 944,
+          "relocation_count": 58,
+          "normalized_sha256": "819f2ecf803274443d1a5ff05ee462142fb6d2094d681b43557f14e845c1d262"
+        },
+        "base": {
+          "size": 928,
+          "relocation_count": 57,
+          "normalized_sha256": "3abeb614371fc1b6eb35922ab80a898468e9b83b30520a791dc61e2264e9bfa8"
+        },
+        "objdiff_percent": 75
+      }
+    },
+    {
+      "unit": "source/cache/xbox_texture_cache",
+      "function": "_texture_cache_debug_render",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 784,
+          "relocation_count": 46,
+          "normalized_sha256": "ce7f0ad96dcc116804baa4c17f35d73e2a95286cfcb61644f4702afb031e1d04"
+        },
+        "base": {
+          "size": 784,
+          "relocation_count": 46,
+          "normalized_sha256": "5a3d5f2d21a3a7416760c0efdbd4489c670ae641042e6c564dd9b34ee4a6432f"
+        },
+        "objdiff_percent": 91.88461
+      }
+    },
+    {
+      "unit": "source/interface/hud_draw",
+      "function": "_hud_draw_bitmap_internal",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. January target CFG directly loads the fog definition animation distance and multiplies it by the literal zero before building the renderer offset vector; independent Halo CE PC and HCEA reconstructions preserve the same disabled operation, while the stripped January PDB exposes no local phase name. The source labels this target-proven behavior under the original-bug policy instead of inventing an animation expression. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 544,
+          "relocation_count": 16,
+          "normalized_sha256": "afc1044b43f5f168eed9a6f96553231667e861929533abbac26a2b229df5b972"
+        },
+        "base": {
+          "size": 544,
+          "relocation_count": 16,
+          "normalized_sha256": "fcfc4a4eebd7b00d6325212d2d737886467259b5e79b8bfada2142ea5908445d"
+        },
+        "objdiff_percent": 86.4012
+      }
+    },
+    {
+      "unit": "source/interface/hud_draw",
+      "function": "_hud_draw_bitmap_with_meter",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. January directly proves the apparently nonsensical animation operation: fld [definition+4] followed by a relocation-backed fmul of __real@00000000. Independent HCEA and Halo CE PC reconstructions preserve the same literal-zero multiply, while Marathon has no corresponding planar-fog animation implementation and January's stripped structures.obj PDB module contains no local-variable records from which an original phase name could be recovered. The source therefore labels this target-proven disabled feature as an original bug instead of inventing a time-varying expression. Current canonical target/base COFF measurements remain non-identical; the candidate is 32 padded bytes short and lacks one January tag-block lookup. Objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 384,
+          "relocation_count": 17,
+          "normalized_sha256": "e44c9d5bbd7d5279cc45630280f6b347dfc572ab2e635e4a5a84ad940d3ac4e8"
+        },
+        "base": {
+          "size": 400,
+          "relocation_count": 17,
+          "normalized_sha256": "3cc01a61674255de737e68476c3052952b668dafb47a0c135c1ecc92a4c54c8b"
+        },
+        "objdiff_percent": 92.69841
+      }
+    },
+    {
+      "unit": "source/interface/motion_sensor",
+      "function": "_blip_begin",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 112,
+          "relocation_count": 10,
+          "normalized_sha256": "02831c4d76978889bea0fbdb6c45941bc96272e613d3005cb0d7c7cdd73d0f5e"
+        },
+        "base": {
+          "size": 112,
+          "relocation_count": 10,
+          "normalized_sha256": "6a9a7351f54ec563c0c7be8deed0ac2f8b6bdf40a80f8b97aaa054aba73675e4"
+        },
+        "objdiff_percent": 99.92
+      }
+    },
+    {
+      "unit": "source/interface/motion_sensor",
+      "function": "_blip_type_get",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 352,
+          "relocation_count": 21,
+          "normalized_sha256": "cb65a91e416950514c828a2fbed685df031a289140a3218812a754128d8ad64e"
+        },
+        "base": {
+          "size": 368,
+          "relocation_count": 21,
+          "normalized_sha256": "96890d3f5ec91d4143be970194bfa3cfdeb3d43cc5a1e85c699db8d4b1b3c948"
+        },
+        "objdiff_percent": 82.347824
+      }
+    },
+    {
+      "unit": "source/interface/motion_sensor",
+      "function": "_motion_sensor_blip_set_type_and_size",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 96,
+          "relocation_count": 4,
+          "normalized_sha256": "c28dfa90e22bd48348034ae8cb472a5b6d0ebe45476d8ff47bcdaa672c060a5d"
+        },
+        "base": {
+          "size": 96,
+          "relocation_count": 4,
+          "normalized_sha256": "9017714cf6af70be634c7df315274d181143f59c15e804a30813e339c331574e"
+        },
+        "objdiff_percent": 89.84849
+      }
+    },
+    {
+      "unit": "source/interface/motion_sensor",
+      "function": "_motion_sensor_update",
+      "class": "unclassified",
+      "evidence": "Best reviewed natural reconstruction retained with zero exact credit. January emits the otherwise-discarded game_engine_running call immediately before the live game_time_get call, and the later first-party HCEA PDB assigns the two calls distinct source lines, so the former is an authenticated source quirk rather than fake matching. January and the accepted HUD family also authenticate the return-EIP and 0x62 stack-sentinel diagnostics. Current target/base COFFs remain non-identical; objdiff similarity is diagnostic only. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 1168,
+          "relocation_count": 43,
+          "normalized_sha256": "a8c62ddee9e7e5718949844c1e68489d08cc78c86da8f29f842b5d61f450b713"
+        },
+        "base": {
+          "size": 1136,
+          "relocation_count": 44,
+          "normalized_sha256": "a500a22dabf0b552854bfa0f08476cc706ba2062cb3c0f3b59d89d706f99c0c6"
+        },
+        "objdiff_percent": 60.598267
+      }
+    },
+    {
+      "unit": "source/interface/motion_sensor",
+      "function": "_render_blip",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 400,
+          "relocation_count": 18,
+          "normalized_sha256": "67347be9f029e06db7df599121540e3f2d416555d004f40e760cf1065dbbef09"
+        },
+        "base": {
+          "size": 384,
+          "relocation_count": 17,
+          "normalized_sha256": "2eeacc63ed8514975642035ea2087f3baced8d1db8ec0e99a655b2e4ecfc40d9"
+        },
+        "objdiff_percent": 67.72868
+      }
+    },
+    {
+      "unit": "source/interface/motion_sensor",
+      "function": "_render_motion_sensor",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 768,
+          "relocation_count": 40,
+          "normalized_sha256": "954bdcc559c91d9e79948d1b28ce0a380e2b7cbe48030891ad5da5620dbf4cff"
+        },
+        "base": {
+          "size": 768,
+          "relocation_count": 40,
+          "normalized_sha256": "fe7bcd275ed517944e3ed18c3f8f940174e8d6697e8fbaf2b4a3e8c350dd5557"
+        },
+        "objdiff_percent": 92.604546
+      }
+    },
+    {
+      "unit": "source/interface/motion_sensor",
+      "function": "_should_draw_object",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 224,
+          "relocation_count": 7,
+          "normalized_sha256": "13cd9e4469147c6d8d340c8f80647e653a8e0ef1bf957b9cfb7b09eef6360f66"
+        },
+        "base": {
+          "size": 208,
+          "relocation_count": 7,
+          "normalized_sha256": "8b893ff8a14a03489422f2a2bd1d6de7dc1ff67db399367a3949da5bb4fcd02d"
+        },
+        "objdiff_percent": 85.988235
+      }
+    },
+    {
+      "unit": "source/interface/motion_sensor",
+      "function": "_update_motion_sensor",
+      "class": "unclassified",
+      "evidence": "Best reviewed natural reconstruction retained with zero exact credit. Two decompiler-style 0.0f products were removed in favor of the typed magnitude_squared2d helper already used by this TU; January's two zero-real relocations reflect unresolved x87 scheduling and are not recreated with fake source pressure. The otherwise-discarded game_time_get call and the return-EIP/0x62 stack-sentinel diagnostics are present in January and independently authenticated by the later first-party HCEA build/PDB. Current target/base COFFs remain non-identical; objdiff similarity is diagnostic only. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 864,
+          "relocation_count": 39,
+          "normalized_sha256": "b37814ed8aaa3427a5d8e1fe1327e22cc80190383562143e94c35df03f5db06b"
+        },
+        "base": {
+          "size": 800,
+          "relocation_count": 37,
+          "normalized_sha256": "84b9c39937441c96077c365acc97afd3875f9cbd58bc70cee61dab9e7d421f0c"
+        },
+        "objdiff_percent": 74.21111
+      }
+    },
+    {
+      "unit": "source/items/projectiles",
+      "function": "_projectile_aim_ballistic",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 880,
+          "relocation_count": 35,
+          "normalized_sha256": "fbc7e95f65b75fdae9a94e16b800e681c145c3449dcb9f70dcf87efb9eba370d"
+        },
+        "base": {
+          "size": 880,
+          "relocation_count": 36,
+          "normalized_sha256": "6e936a41aee4d8d56ae60e217127e8b8dff81b1e7229e2e2b2f70ffa868a39e6"
+        },
+        "objdiff_percent": 86.6431
+      }
+    },
+    {
+      "unit": "source/structures/structures",
+      "function": "_render_debug_fog_planes",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 352,
+          "relocation_count": 20,
+          "normalized_sha256": "2aa37cc3d43bb69853a07c8693e3c4ef83389a26910a64ae4619010e09d52ea8"
+        },
+        "base": {
+          "size": 368,
+          "relocation_count": 20,
+          "normalized_sha256": "a8adaa33cd572e879ba65d3b5c042368b8d5d29e90739dc418b65cadb1652474"
+        },
+        "objdiff_percent": 70.925
+      }
+    },
+    {
+      "unit": "source/structures/structures",
+      "function": "_structure_cluster_mark",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 128,
+          "relocation_count": 12,
+          "normalized_sha256": "c426fbafcf634a63373bab944083c26aaebda5a181121a993ed0e2c0e644921a"
+        },
+        "base": {
+          "size": 128,
+          "relocation_count": 12,
+          "normalized_sha256": "6a2ecd6bf009e8daca71c82a97e74f82e02a4c69336e61acabbfffff357af60c"
+        },
+        "objdiff_percent": 77.948715
+      }
+    },
+    {
+      "unit": "source/structures/structures",
+      "function": "_structure_cluster_unmarked",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 128,
+          "relocation_count": 11,
+          "normalized_sha256": "98b5502fb6c8cb58f48c07e07ae161eb7434b246a299c669a8eb61d33efbed6a"
+        },
+        "base": {
+          "size": 128,
+          "relocation_count": 11,
+          "normalized_sha256": "3b867b30927311d97aed7094ec07a3b176faded2b3bd27c5280dc4e6f734ea4a"
+        },
+        "objdiff_percent": 90.588234
+      }
+    },
+    {
+      "unit": "source/structures/structures",
+      "function": "_structure_clusters_in_cone",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 480,
+          "relocation_count": 26,
+          "normalized_sha256": "7dace3a28da0af6b4ba088102aea9d2cac40a2f8c43ae0a86d7ee0d4fe8b0735"
+        },
+        "base": {
+          "size": 480,
+          "relocation_count": 25,
+          "normalized_sha256": "771335c67292ccfe8f04ecaa7bb5b27615bfd70b652087e19fc7589004a557d9"
+        },
+        "objdiff_percent": 84.54967
+      }
+    },
+    {
+      "unit": "source/structures/structures",
+      "function": "_structure_get_planar_fog",
+      "class": "unclassified",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 448,
+          "relocation_count": 15,
+          "normalized_sha256": "a5aa0f690e82204d70cb108e143047be76871fd5cf1a979119ce80e8163c097b"
+        },
+        "base": {
+          "size": 416,
+          "relocation_count": 14,
+          "normalized_sha256": "7a670604363eebcb3d91e0a6a9a2ba90aa5983e1c5e9e062407b4f78f7ff07bf"
+        },
+        "objdiff_percent": 38.43919
       }
     }
   ]

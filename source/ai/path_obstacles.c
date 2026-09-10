@@ -63,6 +63,7 @@ symbols in this file:
 /* ---------- headers */
 
 #define set_real_point2d set_real_point2d_inline
+#define rotate_vector2d rotate_vector2d_inline
 #define project_point3d project_point3d_inline
 #define distance_squared2d distance_squared2d_inline
 #define point_in_circle point_in_circle_inline
@@ -71,6 +72,7 @@ symbols in this file:
 #include "cseries.h"
 #include "path.h"
 #undef set_real_point2d
+#undef rotate_vector2d
 #undef project_point3d
 #undef distance_squared2d
 #undef point_in_circle
@@ -91,6 +93,13 @@ static boolean circle_intersect_ray(
 	real_point2d const *point,
 	real_vector2d const *direction,
 	real *distance);
+static void circle_tangents(
+	real_vector2d const *direction,
+	real distance,
+	real radius,
+	real_vector2d *right_direction,
+	real_vector2d *left_direction,
+	real *tangent_distance);
 
 /* ---------- globals */
 
@@ -113,6 +122,20 @@ real_point2d *set_real_point2d(
 	p->x = x;
 	p->y = y;
 	return p;
+}
+
+real_vector2d *rotate_vector2d(
+	real_vector2d const *vector,
+	real sine,
+	real cosine,
+	real_vector2d *result)
+{
+	real j = sine * vector->i + cosine * vector->j;
+	real i = cosine * vector->i - sine * vector->j;
+
+	result->i = i;
+	result->j = j;
+	return result;
 }
 
 real_point2d *project_point3d(
@@ -247,6 +270,120 @@ boolean obstacles_test_pill(
 	return result->disc_index != NONE;
 }
 
+void obstacles_disc_tangents(
+	struct obstacles const *obstacles,
+	short disc_index,
+	real_point2d const *point,
+	real radius,
+	real_vector2d *right_direction,
+	real_vector2d *left_direction,
+	real *tangent_distance)
+{
+	struct obstacle_disc const *disc = obstacles_get_disc(obstacles, disc_index);
+	real_vector2d direction;
+	real distance = normalize2d(vector_from_points2d(point, &disc->center, &direction));
+
+	circle_tangents(
+		&direction,
+		distance,
+		radius + disc->radius + 0.00390625f,
+		right_direction,
+		left_direction,
+		tangent_distance);
+	return;
+}
+
+void obstacles_disc_neighborhood(
+	struct obstacles const *obstacles,
+	real radius,
+	short seed_disc_index,
+	byte *disc_flags)
+{
+	short disc_stack[MAXIMUM_DISC_COUNT];
+	short stack_top;
+	unsigned long *disc_flag_words = (unsigned long *)disc_flags;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\path_obstacles.c",
+		0x183,
+		obstacles->disc_count>=0 && obstacles->disc_count<=MAXIMUM_DISC_COUNT);
+	csmemset(disc_flag_words, 0, BIT_VECTOR_SIZE_IN_BYTES(obstacles->disc_count));
+
+	if (seed_disc_index != NONE)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\path_obstacles.c",
+			0x18C,
+			seed_disc_index>=0 && seed_disc_index<obstacles->disc_count);
+
+		disc_stack[0] = seed_disc_index;
+		stack_top = 1;
+		BIT_VECTOR_SET_FLAG(disc_flag_words, seed_disc_index, TRUE);
+
+		while (stack_top > 0)
+		{
+			short current_disc_index = disc_stack[--stack_top];
+			struct obstacle_disc const *current_disc = obstacles_get_disc(obstacles, current_disc_index);
+			short disc_index;
+
+			for (disc_index = 0; disc_index < obstacles->disc_count; disc_index++)
+			{
+				if (!BIT_VECTOR_TEST_FLAG(disc_flag_words, disc_index))
+				{
+					struct obstacle_disc const *disc = obstacles_get_disc(obstacles, disc_index);
+
+					if (point_in_circle_inline(
+						&disc->center,
+						&current_disc->center,
+						(disc->radius + radius) + (current_disc->radius + radius)))
+					{
+						BIT_VECTOR_SET_FLAG(disc_flag_words, disc_index, TRUE);
+						match_assert(
+							"c:\\halo\\SOURCE\\ai\\path_obstacles.c",
+							0x1A5,
+							stack_top<MAXIMUM_DISC_COUNT);
+						disc_stack[stack_top++] = disc_index;
+					}
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+void obstacles_recompute(
+	struct obstacles *obstacles,
+	real radius)
+{
+	unsigned long disc_flags[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_DISC_COUNT)];
+	short disc_index;
+
+	obstacles->obstacle_count = 0;
+	for (disc_index = 0; disc_index < obstacles->disc_count; disc_index++)
+		obstacles->discs[disc_index].obstacle_index = NONE;
+
+	for (disc_index = 0; disc_index < obstacles->disc_count; disc_index++)
+	{
+		if (obstacles->discs[disc_index].obstacle_index == NONE)
+		{
+			short obstacle_index = obstacles->obstacle_count++;
+			short neighborhood_disc_index;
+
+			obstacles_disc_neighborhood(obstacles, radius, disc_index, (byte *)disc_flags);
+			for (neighborhood_disc_index = 0;
+				neighborhood_disc_index < obstacles->disc_count;
+				neighborhood_disc_index++)
+			{
+				if (BIT_VECTOR_TEST_FLAG(disc_flags, neighborhood_disc_index))
+					obstacles->discs[neighborhood_disc_index].obstacle_index = obstacle_index;
+			}
+		}
+	}
+
+	return;
+}
+
 /* ---------- private code */
 
 static boolean circle_intersect_ray(
@@ -281,4 +418,21 @@ static boolean circle_intersect_ray(
 	}
 
 	return FALSE;
+}
+
+static void circle_tangents(
+	real_vector2d const *direction,
+	real distance,
+	real radius,
+	real_vector2d *right_direction,
+	real_vector2d *left_direction,
+	real *tangent_distance)
+{
+	real sine = MIN(radius / distance, 1.0f);
+	real cosine = square_root(1.0f - sine * sine);
+
+	rotate_vector2d(direction, -sine, cosine, right_direction);
+	rotate_vector2d(direction, sine, cosine, left_direction);
+	*tangent_distance = cosine * distance;
+	return;
 }

@@ -27,11 +27,11 @@ symbols in this file:
 0006B970 0100:
 	_palette_find_closest_match (0000)
 0006BA70 0020:
-	_code_0006ba70 (0000)
+	_bitmap_format_type_valid_width (0000)
 0006BA90 0020:
-	_code_0006ba90 (0000)
+	_bitmap_format_type_valid_height (0000)
 0006BAB0 0030:
-	_code_0006bab0 (0000)
+	_bitmap_format_type_valid_depth (0000)
 0006BAE0 0160:
 	_bitmap_verify (0000)
 0006BC40 0080:
@@ -233,8 +233,10 @@ symbols in this file:
 #include "bitmaps/bitmaps_internal.h"
 #include "bitmaps/bitmaps_mipmap.h"
 #include "bitmaps/bitmap_group.h"
+#include "bitmaps/s3tc/s3tc.h"
 #include "cseries/errors.h"
 #include "math/integer_math.h"
+#include "rasterizer/rasterizer_swizzle.h"
 
 /* ---------- constants */
 
@@ -771,6 +773,157 @@ void *bitmap_mipmap_address(
 	return mipmap_address;
 }
 
+pixel32 bitmap_format_to_a8r8g8b8(
+	short format,
+	void const *mipmap_address,
+	long pixel_index)
+{
+	pixel32 result = 0;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x22B, mipmap_address);
+
+	switch (format)
+	{
+	case _bitmap_format_r5g6b5:
+	{
+		pixel32 pixel = ((word const *)mipmap_address)[pixel_index];
+		pixel32 expanded = ((pixel & 0xFFFFF800) | 0xFFFF0000) << 3;
+		pixel32 low_bits = ((pixel >> 1) & 0xE) | (pixel & 0x600);
+
+		expanded |= pixel & 0x7E0;
+		expanded = (expanded << 2) | (pixel & 0xFFFFE01F);
+		result = (expanded << 3) | (low_bits >> 1);
+		break;
+	}
+
+	case _bitmap_format_a1r5g5b5:
+	{
+		pixel32 pixel = ((word const *)mipmap_address)[pixel_index];
+
+		result = (pixel & 0x7C00) << 3;
+		result = (result | (pixel & 0x3E0)) << 2;
+		result = (result | (pixel & 0x7000)) << 1;
+		result |= pixel & 0x1F;
+		result = (result << 2) | (pixel & 0x380);
+		result = (result << 1) | ((pixel >> 2) & 7);
+		result |= -(long)(pixel >> 15) << 24;
+		break;
+	}
+
+	case _bitmap_format_a4r4g4b4:
+	{
+		pixel32 pixel = ((word const *)mipmap_address)[pixel_index];
+		pixel32 high_channels = pixel >> 8;
+		pixel32 alpha = high_channels & 0xF;
+		pixel32 red = (pixel >> 4) & 0xF;
+		pixel32 green = pixel & 0xF;
+
+		result = (((high_channels & 0xF0) << 12) | pixel) & 0xFFFFF000;
+		result |= (alpha << 4) | alpha;
+		result = ((result | red) << 4) | red;
+		result = ((result << 4) | green) << 4 | green;
+		break;
+	}
+
+	case _bitmap_format_x8r8g8b8:
+	case _bitmap_format_a8r8g8b8:
+		result = ((pixel32 const *)mipmap_address)[pixel_index];
+		break;
+
+	case _bitmap_format_a8:
+		result = (pixel32)((byte const *)mipmap_address)[pixel_index] << 24;
+		break;
+
+	case _bitmap_format_y8:
+	{
+		pixel32 intensity = ((byte const *)mipmap_address)[pixel_index];
+
+		result = intensity | 0xFFFFFF00;
+		result = (result << 8) | intensity;
+		result = (result << 8) | intensity;
+		break;
+	}
+
+	case _bitmap_format_ay8:
+	{
+		pixel32 intensity = ((byte const *)mipmap_address)[pixel_index];
+
+		result = intensity;
+		result = (result << 8) | intensity;
+		result = (result << 8) | intensity;
+		result = (result << 8) | intensity;
+		break;
+	}
+
+	case _bitmap_format_a8y8:
+	{
+		word pixel = ((word const *)mipmap_address)[pixel_index];
+		pixel32 intensity = (byte)pixel;
+
+		result = ((pixel32)pixel & 0xFFFFFF00) | intensity;
+		result = (result << 8) | intensity;
+		result = (result << 8) | intensity;
+		break;
+	}
+
+	case _bitmap_format_p8_bump:
+		result = global_vector_palette[((byte const *)mipmap_address)[pixel_index]];
+		break;
+
+	default:
+		match_vassert(
+			"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
+			0x254,
+			FALSE,
+			"### ERROR unsupported bitmap format");
+		break;
+	}
+
+	return result;
+}
+
+byte palette_find_closest_match(
+	pixel32 const *palette,
+	pixel32 color)
+{
+	long closest_match_index = NONE;
+	long closest_distance = 0;
+	short palette_index;
+
+	if ((color & 0xFF000000) <= 0x80000000)
+	{
+		return 255;
+	}
+
+	for (palette_index = 0; palette_index < NUMBER_OF_ENTRIES_IN_PALETTE; palette_index++)
+	{
+		pixel32 palette_color = palette[palette_index];
+		long red_delta;
+		long green_delta;
+		long blue_delta;
+		long distance;
+
+		if (palette_color == 0)
+		{
+			break;
+		}
+
+		red_delta = ABS((long)((palette_color >> 16) & 0xFF) - (long)((color >> 16) & 0xFF));
+		green_delta = ABS((long)((palette_color >> 8) & 0xFF) - (long)((color >> 8) & 0xFF));
+		blue_delta = ABS((long)(palette_color & 0xFF) - (long)(color & 0xFF));
+		distance = red_delta * red_delta + green_delta * green_delta + blue_delta * blue_delta;
+		if (palette_index == 0 || distance < closest_distance)
+		{
+			closest_distance = distance;
+			closest_match_index = palette_index;
+		}
+	}
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x44D, closest_match_index!=NONE);
+
+	return (byte)closest_match_index;
+}
+
 short bitmap_get_max_mipmap_count(
 	struct bitmap_data *bitmap)
 {
@@ -814,6 +967,87 @@ long bitmap_get_pixel_data_size(
 	return pixel_count * bitmap_format_get_bits_per_pixel(bitmap->format) / 8;
 }
 
+short bitmap_mipmap_get_width(
+	struct bitmap_data *bitmap,
+	short mipmap_index)
+{
+	short width;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x39B, bitmap_verify(bitmap, FALSE));
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x39C, mipmap_index>=0 && mipmap_index<=(short)bitmap->mipmap_count, "mipmap_index>=0 && mipmap_index<=bitmap->mipmap_count");
+
+	width = MAX(bitmap->width>>mipmap_index, 1);
+	if (TEST_FLAG(bitmap->flags, _bitmap_compressed_bit))
+	{
+		width += (-width)&3;
+	}
+
+	return width;
+}
+
+short bitmap_mipmap_get_height(
+	struct bitmap_data *bitmap,
+	short mipmap_index)
+{
+	short height;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x3AE, bitmap_verify(bitmap, FALSE));
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x3AF, mipmap_index>=0 && mipmap_index<=(short)bitmap->mipmap_count, "mipmap_index>=0 && mipmap_index<=bitmap->mipmap_count");
+
+	height = MAX(bitmap->height>>mipmap_index, 1);
+	if (TEST_FLAG(bitmap->flags, _bitmap_compressed_bit))
+	{
+		height += (-height)&3;
+	}
+
+	return height;
+}
+
+short bitmap_mipmap_get_depth(
+	struct bitmap_data *bitmap,
+	short mipmap_index)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x3BF, bitmap_verify(bitmap, FALSE));
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x3C0, mipmap_index>=0 && mipmap_index<=(short)bitmap->mipmap_count, "mipmap_index>=0 && mipmap_index<=bitmap->mipmap_count");
+
+	return MAX((short)bitmap->depth>>mipmap_index, 1);
+}
+
+long bitmap_mipmap_get_pixel_count(
+	struct bitmap_data *bitmap,
+	short mipmap_index)
+{
+	long pixel_count;
+	short width, height, depth;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x3CB, bitmap_verify(bitmap, FALSE));
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x3CC, mipmap_index>=0 && mipmap_index<=(short)bitmap->mipmap_count, "mipmap_index>=0 && mipmap_index<=bitmap->mipmap_count");
+
+	width = bitmap_mipmap_get_width(bitmap, mipmap_index);
+	height = bitmap_mipmap_get_height(bitmap, mipmap_index);
+	depth = bitmap_mipmap_get_depth(bitmap, mipmap_index);
+	pixel_count = width*height*depth;
+	if (bitmap->type==_bitmap_type_cube_map)
+	{
+		pixel_count *= 6;
+	}
+
+	return pixel_count;
+}
+
+long bitmap_mipmap_get_pixel_data_size(
+	struct bitmap_data *bitmap,
+	short mipmap_index)
+{
+	long pixel_count;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x3E3, bitmap_verify(bitmap, FALSE));
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x3E4, mipmap_index>=0 && mipmap_index<=(short)bitmap->mipmap_count, "mipmap_index>=0 && mipmap_index<=bitmap->mipmap_count");
+
+	pixel_count = bitmap_mipmap_get_pixel_count(bitmap, mipmap_index);
+	return pixel_count*bitmap_format_get_bits_per_pixel(bitmap->format)/8;
+}
+
 long bitmap_mipmap_get_row_pitch(
 	struct bitmap_data *bitmap,
 	short mipmap_index)
@@ -829,9 +1063,316 @@ long bitmap_mipmap_get_row_pitch(
 	return width*bitmap_format_get_bits_per_pixel(bitmap->format)/8;
 }
 
+pixel32 bitmap_2d_get_pixel(
+	struct bitmap_data *bitmap,
+	union real_point2d const *point,
+	real lod)
+{
+	short mipmap_index;
+	short width;
+	short height;
+	long unwrapped_x;
+	long unwrapped_y;
+	short x;
+	short y;
+	void *mipmap_address;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x261, bitmap);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x262, bitmap->type==_bitmap_type_2d);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x263, !TEST_FLAG(bitmap->flags, _bitmap_linear_bit));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x264, point);
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x265, lod>=0.0f && lod<=1.0f, "lod>=0.0f && lod<=1.0f");
+
+	if (!bitmap->base_address)
+	{
+		return (pixel32)NONE;
+	}
+
+	if (lod < 1.0f && (short)bitmap->mipmap_count > 0)
+	{
+		mipmap_index = (short)fast_ftol((1.0f - lod) * (short)bitmap->mipmap_count);
+		match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x26F, mipmap_index>=0 && mipmap_index<=(short)bitmap->mipmap_count, "mipmap_index>=0 && mipmap_index<=bitmap->mipmap_count");
+	}
+	else
+	{
+		mipmap_index = 0;
+	}
+
+	width = bitmap_mipmap_get_width(bitmap, mipmap_index);
+	height = bitmap_mipmap_get_height(bitmap, mipmap_index);
+	unwrapped_x = fast_ftol((real)width * point->x - 0.5f);
+	if ((width & (width - 1)) == 0)
+	{
+		x = (short)(unwrapped_x & (width - 1));
+	}
+	else
+	{
+		x = (short)(((unwrapped_x % width) + width) % width);
+	}
+	unwrapped_y = fast_ftol((real)height * point->y - 0.5f);
+	if ((height & (height - 1)) == 0)
+	{
+		y = (short)(unwrapped_y & (height - 1));
+	}
+	else
+	{
+		y = (short)(((unwrapped_y % height) + height) % height);
+	}
+
+	mipmap_address = bitmap_mipmap_address(bitmap, mipmap_index);
+	if (TEST_FLAG(bitmap->flags, _bitmap_compressed_bit))
+	{
+		short bytes_per_block = (short)(S3TC_BLOCK_PIXELS * bitmap_format_get_bits_per_pixel(bitmap->format) / CHAR_BITS);
+		byte *block_address = (byte *)mipmap_address + (y / 4 * width / 4 + x / 4) * bytes_per_block;
+		pixel32 pixel;
+
+		match_vassert(
+			"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
+			0x2A0,
+			block_address >= (byte *)bitmap->base_address,
+			csprintf(
+				temporary,
+				"bitmap_2d_get_pixel tried to access compressed block @ -%d bytes from address start (w=%d, h=%d, m=%d, x=%d, y=%d, lod=%f)",
+				(byte *)bitmap->base_address - block_address,
+				bitmap->width,
+				bitmap->height,
+				(short)bitmap->mipmap_count,
+				unwrapped_x % width,
+				unwrapped_y % height,
+				mipmap_index));
+		match_vassert(
+			"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
+			0x2A9,
+			block_address < (byte *)bitmap->base_address + bitmap->pixel_data_size,
+			csprintf(
+				temporary,
+				"bitmap_2d_get_pixel tried to access compressed block @ -%d bytes from address end (w=%d, h=%d, m=%d, x=%d, y=%d, lod=%f)",
+				block_address - ((byte *)bitmap->base_address + bitmap->pixel_data_size),
+				bitmap->width,
+				bitmap->height,
+				(short)bitmap->mipmap_count,
+				unwrapped_x % width,
+				unwrapped_y % height,
+				mipmap_index));
+
+		switch (bitmap->format)
+		{
+		case _bitmap_format_dxt1:
+			DecodeBlockRGB__single_pixel(
+				(struct s3tc_block_rgb const *)block_address,
+				(struct s3tc_color *)&pixel,
+				x & 3,
+				y & 3);
+			break;
+
+		case _bitmap_format_dxt3:
+			DecodeBlockAlpha4__single_pixel(
+				(struct s3tc_block_alpha4 const *)block_address,
+				(struct s3tc_color *)&pixel,
+				x & 3,
+				y & 3);
+			break;
+
+		case _bitmap_format_dxt5:
+			DecodeBlockAlpha3__single_pixel(
+				(struct s3tc_block_alpha3 const *)block_address,
+				(struct s3tc_color *)&pixel,
+				x & 3,
+				y & 3);
+			break;
+
+		default:
+			match_vassert(
+				"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
+				0x2B7,
+				FALSE,
+				"### ERROR unsupported bitmap format");
+			break;
+		}
+
+		return pixel;
+	}
+
+	if (TEST_FLAG(bitmap->flags, _bitmap_swizzled_bit))
+	{
+		long result[2];
+
+		match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x2C1, x>=0 && x<4096);
+		match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x2C2, y>=0 && y<4096);
+		bitmap_swizzle_vector2d(width, height, x, y, result);
+
+		return bitmap_format_to_a8r8g8b8(bitmap->format, mipmap_address, result[0] | result[1]);
+	}
+
+	return bitmap_format_to_a8r8g8b8(bitmap->format, mipmap_address, y * width + x);
+}
+
+boolean bitmap_verify(
+	struct bitmap_data *bitmap,
+	boolean import)
+{
+	boolean valid = TRUE;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x40F, bitmap);
+
+	if (bitmap->signature==BITMAP_GROUP_TAG &&
+		(bitmap->flags&~(FLAG(NUMBER_OF_BITMAP_FLAGS)-1))==0 &&
+		VALID_INDEX(bitmap->type, NUMBER_OF_BITMAP_TYPES) &&
+		VALID_INDEX(bitmap->format, NUMBER_OF_BITMAP_FORMATS) &&
+		bitmap_format_type_valid_width(bitmap->format, bitmap->type, bitmap->width) &&
+		bitmap_format_type_valid_height(bitmap->format, bitmap->type, bitmap->height) &&
+		bitmap_format_type_valid_depth(bitmap->format, bitmap->type, (short)bitmap->depth) &&
+		(short)bitmap->mipmap_count>=0 &&
+		(short)bitmap->mipmap_count<=floor_log2(MAX(bitmap->width, MAX(bitmap->height, (short)bitmap->depth))))
+	{
+		if (import &&
+			!(bitmap->format==_bitmap_format_a8r8g8b8 &&
+				bitmap->base_address &&
+				bitmap->mipmap_count==0 &&
+				!TEST_FLAG(bitmap->flags, _bitmap_compressed_bit) &&
+				!TEST_FLAG(bitmap->flags, _bitmap_palettized_bit) &&
+				!TEST_FLAG(bitmap->flags, _bitmap_swizzled_bit)))
+		{
+			error(_error_silent, "### ERROR bitmap @%p (#%dx#%d) appears to be invalid for import", bitmap, bitmap->width, bitmap->height);
+			valid = FALSE;
+		}
+	}
+	else
+	{
+		error(_error_silent, "### ERROR bitmap @%p (#%dx#%d) appears to be invalid", bitmap, bitmap->width, bitmap->height);
+		valid = FALSE;
+	}
+
+	return valid;
+}
+
 void bitmap_byte_swap_pixels(
 	struct bitmap_data *bitmap)
 {
+	return;
+}
+
+void bitmap_3d_slice_extract(
+	struct bitmap_data *source_bitmap,
+	short source_mipmap_index,
+	short source_slice_index,
+	struct bitmap_data *slice_bitmap)
+{
+	long pixel_data_size;
+	void *source_address;
+	void *slice_address;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x2E3, bitmap_verify(source_bitmap, FALSE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x2E4, source_bitmap->type==_bitmap_type_3d);
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x2E5, source_mipmap_index>=0 && source_mipmap_index<=(short)source_bitmap->mipmap_count, "source_mipmap_index>=0 && source_mipmap_index<=source_bitmap->mipmap_count");
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x2E6, source_slice_index>=0 && source_slice_index<(short)source_bitmap->depth, "source_slice_index>=0 && source_slice_index<source_bitmap->depth");
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x2E7, MAX(1, source_bitmap->width>>source_mipmap_index)==slice_bitmap->width, "MAX(1, source_bitmap->width >>source_mipmap_index)==slice_bitmap->width");
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x2E8, MAX(1, source_bitmap->height>>source_mipmap_index)==slice_bitmap->height, "MAX(1, source_bitmap->height>>source_mipmap_index)==slice_bitmap->height");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x2E9, !TEST_FLAG(source_bitmap->flags, _bitmap_swizzled_bit));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x2EB, bitmap_verify(slice_bitmap, FALSE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x2EC, slice_bitmap->mipmap_count==0);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x2ED, slice_bitmap->type==_bitmap_type_2d);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x2EE, slice_bitmap->format==source_bitmap->format);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x2EF, !TEST_FLAG(slice_bitmap->flags, _bitmap_swizzled_bit));
+
+	pixel_data_size = bitmap_get_pixel_data_size(slice_bitmap);
+	source_address = bitmap_3d_address(source_bitmap, 0, 0, source_slice_index, source_mipmap_index);
+	slice_address = bitmap_mipmap_address(slice_bitmap, 0);
+	csmemcpy(slice_address, source_address, pixel_data_size);
+
+	return;
+}
+
+void bitmap_3d_slice_insert(
+	struct bitmap_data *slice_bitmap,
+	struct bitmap_data *destination_bitmap,
+	short destination_mipmap_index,
+	short destination_slice_index)
+{
+	long pixel_data_size;
+	void *source_address;
+	void *destination_address;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x306, bitmap_verify(slice_bitmap, FALSE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x307, slice_bitmap->mipmap_count==0);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x308, slice_bitmap->type==_bitmap_type_2d);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x309, slice_bitmap->format==destination_bitmap->format);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x30A, !TEST_FLAG(slice_bitmap->flags, _bitmap_swizzled_bit));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x30C, bitmap_verify(destination_bitmap, FALSE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x30D, destination_bitmap->type==_bitmap_type_3d);
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x30E, destination_mipmap_index>=0 && destination_mipmap_index<=(short)destination_bitmap->mipmap_count, "destination_mipmap_index>=0 && destination_mipmap_index<=destination_bitmap->mipmap_count");
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x30F, destination_slice_index>=0 && destination_slice_index<(short)destination_bitmap->depth, "destination_slice_index>=0 && destination_slice_index<destination_bitmap->depth");
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x310, MAX(1, destination_bitmap->width>>destination_mipmap_index)==slice_bitmap->width, "MAX(1, destination_bitmap->width >>destination_mipmap_index)==slice_bitmap->width");
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x311, MAX(1, destination_bitmap->height>>destination_mipmap_index)==slice_bitmap->height, "MAX(1, destination_bitmap->height>>destination_mipmap_index)==slice_bitmap->height");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x312, !TEST_FLAG(destination_bitmap->flags, _bitmap_swizzled_bit));
+
+	pixel_data_size = bitmap_get_pixel_data_size(slice_bitmap);
+	destination_address = bitmap_3d_address(destination_bitmap, 0, 0, destination_slice_index, destination_mipmap_index);
+	source_address = bitmap_mipmap_address(slice_bitmap, 0);
+	csmemcpy(destination_address, source_address, pixel_data_size);
+
+	return;
+}
+
+void bitmap_cube_map_face_extract(
+	struct bitmap_data *source_bitmap,
+	short source_mipmap_index,
+	short source_face_index,
+	struct bitmap_data *face_bitmap)
+{
+	long pixel_data_size;
+	void *source_address;
+	void *face_address;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x329, bitmap_verify(source_bitmap, FALSE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x32A, source_bitmap->type==_bitmap_type_cube_map);
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x32B, source_mipmap_index>=0 && source_mipmap_index<=(short)source_bitmap->mipmap_count, "source_mipmap_index>=0 && source_mipmap_index<=source_bitmap->mipmap_count");
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x32C, source_face_index>=0 && source_face_index<NUMBER_OF_FACES_PER_CUBE, "source_face_index>=0 && source_face_index<NUMBER_OF_FACES_PER_CUBE");
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x32D, MAX(1, source_bitmap->width>>source_mipmap_index)==face_bitmap->width, "MAX(1, source_bitmap->width >>source_mipmap_index)==face_bitmap->width");
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x32E, MAX(1, source_bitmap->height>>source_mipmap_index)==face_bitmap->height, "MAX(1, source_bitmap->height>>source_mipmap_index)==face_bitmap->height");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x32F, !TEST_FLAG(source_bitmap->flags, _bitmap_swizzled_bit));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x331, bitmap_verify(face_bitmap, FALSE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x332, face_bitmap->mipmap_count==0);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x333, face_bitmap->type==_bitmap_type_2d);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x334, face_bitmap->format==source_bitmap->format);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x335, !TEST_FLAG(face_bitmap->flags, _bitmap_swizzled_bit));
+
+	pixel_data_size = bitmap_get_pixel_data_size(face_bitmap);
+	source_address = bitmap_cube_map_address(source_bitmap, 0, 0, source_face_index, source_mipmap_index);
+	face_address = bitmap_mipmap_address(face_bitmap, 0);
+	csmemcpy(face_address, source_address, pixel_data_size);
+
+	return;
+}
+
+void bitmap_cube_map_face_insert(
+	struct bitmap_data *face_bitmap,
+	struct bitmap_data *destination_bitmap,
+	short destination_mipmap_index,
+	short destination_face_index)
+{
+	long pixel_data_size;
+	void *source_address;
+	void *destination_address;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x34C, bitmap_verify(face_bitmap, FALSE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x34D, face_bitmap->mipmap_count==0);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x34E, face_bitmap->type==_bitmap_type_2d);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x34F, face_bitmap->format==destination_bitmap->format);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x350, !TEST_FLAG(face_bitmap->flags, _bitmap_swizzled_bit));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x352, bitmap_verify(destination_bitmap, FALSE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x353, destination_bitmap->type==_bitmap_type_cube_map);
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x354, destination_mipmap_index>=0 && destination_mipmap_index<=(short)destination_bitmap->mipmap_count, "destination_mipmap_index>=0 && destination_mipmap_index<=destination_bitmap->mipmap_count");
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x355, destination_face_index>=0 && destination_face_index<NUMBER_OF_FACES_PER_CUBE, "destination_face_index>=0 && destination_face_index<NUMBER_OF_FACES_PER_CUBE");
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x356, MAX(1, destination_bitmap->width>>destination_mipmap_index)==face_bitmap->width, "MAX(1, destination_bitmap->width >>destination_mipmap_index)==face_bitmap->width");
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x357, MAX(1, destination_bitmap->height>>destination_mipmap_index)==face_bitmap->height, "MAX(1, destination_bitmap->height>>destination_mipmap_index)==face_bitmap->height");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x358, !TEST_FLAG(destination_bitmap->flags, _bitmap_swizzled_bit));
+
+	pixel_data_size = bitmap_get_pixel_data_size(face_bitmap);
+	destination_address = bitmap_cube_map_address(destination_bitmap, 0, 0, destination_face_index, destination_mipmap_index);
+	source_address = bitmap_mipmap_address(face_bitmap, 0);
+	csmemcpy(destination_address, source_address, pixel_data_size);
+
 	return;
 }
 

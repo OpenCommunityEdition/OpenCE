@@ -13,17 +13,17 @@ symbols in this file:
 000624B0 0190:
 	_extract_find_bitmap_bounds (0000)
 00062640 0240:
-	_code_00062640 (0000)
+	_extract_get_bitmap_format (0000)
 00062880 03b0:
-	_code_00062880 (0000)
+	_extract_pixels_to_mipmap (0000)
 00062C30 0210:
-	_code_00062c30 (0000)
+	_extract_pixels_from_mipmap (0000)
 00062E40 0260:
-	_code_00062e40 (0000)
+	_extract_build_texture_pages_by_sequence (0000)
 000630A0 0580:
 	_extract_build_debug_plate (0000)
 00063620 03d0:
-	_code_00063620 (0000)
+	_extract_mipmaps_to_bitmap (0000)
 000639F0 02b0:
 	_extract_add_bitmap (0000)
 00063CA0 01d0:
@@ -220,8 +220,10 @@ symbols in this file:
 
 #include "cseries.h"
 #include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmap_drawing.h"
 #include "bitmaps/bitmaps.h"
 #include "bitmaps/bitmaps_internal.h"
+#include "bitmaps/bitmap_utilities.h"
 #include "cache/cache_files.h"
 #include "cseries/errors.h"
 #include "math/integer_math.h"
@@ -263,11 +265,48 @@ enum
 
 enum
 {
-	_bitmap_format_a8r8g8b8 = 11,
+	_bitmap_format_a8,
+	_bitmap_format_y8,
+	_bitmap_format_ay8,
+	_bitmap_format_a8y8,
+	_bitmap_format_unused1,
+	_bitmap_format_unused2,
+	_bitmap_format_r5g6b5,
+	_bitmap_format_unused3,
+	_bitmap_format_a1r5g5b5,
+	_bitmap_format_a4r4g4b4,
+	_bitmap_format_x8r8g8b8,
+	_bitmap_format_a8r8g8b8,
+	_bitmap_format_unused4,
+	_bitmap_format_unused5,
+	_bitmap_format_dxt1,
+	_bitmap_format_dxt3,
+	_bitmap_format_dxt5,
+	_bitmap_format_p8_bump,
+	NUMBER_OF_BITMAP_FORMATS
 };
 
 enum
 {
+	_bitmap_type_2d,
+	_bitmap_type_3d,
+	_bitmap_type_cube_map,
+};
+
+enum
+{
+	_bitmap_has_power_of_two_dimensions_bit,
+	_bitmap_compressed_bit,
+	_bitmap_palettized_bit,
+	_bitmap_swizzled_bit,
+	_bitmap_linear_bit,
+};
+
+enum
+{
+	_bitmap_group_diffusion_dither_bit,
+	_bitmap_group_disable_vector_compression_bit,
+	_bitmap_group_uniform_sprite_sequences_bit,
 	_bitmap_group_extract_sprites_filthy_bug_fix_bit = 3,
 };
 
@@ -318,17 +357,31 @@ static void extract_warn_about_horizontal_border(
 static boolean extract_find_bitmap_bounds(
 	rectangle2d const *bounds,
 	rectangle2d *adjusted_bounds_reference);
+static short extract_get_bitmap_format(
+	struct bitmap_data *bitmap);
+static void extract_pixels_from_mipmap(
+	struct bitmap_data *source_bitmap,
+	struct bitmap_data *destination_bitmap,
+	short source_mipmap_index);
+static struct bitmap_data *extract_build_debug_plate(
+	struct bitmap_data *bitmap,
+	boolean alpha_to_rgb,
+	boolean include_mipmaps,
+	boolean border);
 static boolean extract_sequences(
 	void);
 static boolean extract_without_sequences(
 	void);
 boolean extract_plateless_cube_map(
 	struct bitmap_data *bitmap);
-short extract_add_bitmap(
+static short extract_add_bitmap(
 	struct bitmap_data *bitmap);
+static void extract_mipmaps_to_bitmap(
+	struct bitmap_data *source_bitmap,
+	struct bitmap_data *destination_bitmap);
 static boolean extract_3d_textures(
 	void);
-boolean extract_cube_maps(
+static boolean extract_cube_maps(
 	void);
 boolean extract_sprites(
 	void);
@@ -341,6 +394,9 @@ boolean extract_sequence(
 /* ---------- globals */
 
 static struct bitmap_extract_data extract_data;
+extern short bits_per_channel_r5g6b5[4];
+extern short bits_per_channel_a1r5g5b5[4];
+extern short bits_per_channel_a4r4g4b4[4];
 
 /* ---------- public code */
 
@@ -730,6 +786,805 @@ static boolean extract_find_bitmap_bounds(
 	return result;
 }
 
+static short extract_get_bitmap_format(
+	struct bitmap_data *bitmap)
+{
+	short format = NONE;
+	boolean channels_differ = FALSE;
+	pixel32 *pixels;
+	pixel32 first_pixel;
+	long pixel_count;
+	short alpha_bits = 0;
+	short color_bits = 0;
+	long pixel_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x429,
+		bitmap_verify(bitmap, TRUE));
+
+	pixels = bitmap_mipmap_address(bitmap, 0);
+	first_pixel = *pixels;
+	pixel_count = bitmap_get_pixel_count(bitmap);
+	for (pixel_index = 0; pixel_index < pixel_count; pixel_index++)
+	{
+		pixel32 pixel = pixels[pixel_index];
+		byte alpha = (byte)(pixel >> 24);
+		byte color = (byte)(pixel >> 16);
+
+		if (alpha != 0 && alpha != 255)
+		{
+			alpha_bits = 8;
+		}
+		else if ((pixel & 0xFF000000) != (first_pixel & 0xFF000000) && alpha_bits <= 1)
+		{
+			alpha_bits = 1;
+		}
+
+		if (color != 0 && color != 255)
+		{
+			color_bits = 8;
+		}
+		else if ((pixel & 0x00FF0000) != (first_pixel & 0x00FF0000) && color_bits <= 1)
+		{
+			color_bits = 1;
+		}
+
+		if (alpha != color)
+			channels_differ = TRUE;
+	}
+
+	switch (extract_data.group->format)
+	{
+	case _bitmap_group_format_compressed_color_key_transparency:
+		format = _bitmap_format_dxt1;
+		break;
+	case _bitmap_group_format_compressed_explicit_alpha:
+		format = alpha_bits > 0 ? _bitmap_format_dxt3 : _bitmap_format_dxt1;
+		break;
+	case _bitmap_group_format_compressed_interpolated_alpha:
+		format = alpha_bits > 0 ? _bitmap_format_dxt5 : _bitmap_format_dxt1;
+		break;
+	case _bitmap_group_format_16bit_color:
+		if (alpha_bits == 0)
+			format = _bitmap_format_r5g6b5;
+		else if (alpha_bits == 1)
+			format = _bitmap_format_a1r5g5b5;
+		else
+			format = _bitmap_format_a4r4g4b4;
+		break;
+	case _bitmap_group_format_32bit_color:
+		format = alpha_bits == 0 ? _bitmap_format_x8r8g8b8 : _bitmap_format_a8r8g8b8;
+		break;
+	case _bitmap_group_format_monochrome:
+		if (alpha_bits == 0)
+			format = _bitmap_format_y8;
+		else if (color_bits == 0)
+			format = _bitmap_format_a8;
+		else
+			format = channels_differ ? _bitmap_format_a8y8 : _bitmap_format_ay8;
+		break;
+	default:
+		match_vassert(
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+			0x466,
+			FALSE,
+			"### ERROR extract: unsupported bitmap format");
+		break;
+	}
+
+	if (extract_data.group->type == _bitmap_group_type_interface_bitmaps)
+	{
+		switch (format)
+		{
+		case _bitmap_format_a1r5g5b5:
+			format = _bitmap_format_a4r4g4b4;
+			break;
+		case _bitmap_format_x8r8g8b8:
+			format = _bitmap_format_a8r8g8b8;
+			break;
+		}
+	}
+
+	if (extract_data.group->usage == _bitmap_group_usage_height_map ||
+		extract_data.group->usage == _bitmap_group_usage_vector_map)
+	{
+		if (!TEST_FLAG(
+			extract_data.group->flags,
+			_bitmap_group_disable_vector_compression_bit))
+		{
+			return _bitmap_format_p8_bump;
+		}
+	}
+
+	return format;
+}
+
+static void extract_pixels_to_mipmap(
+	struct bitmap_data *source_bitmap,
+	struct bitmap_data *destination_bitmap,
+	short destination_mipmap_index)
+{
+	pixel32 *source_pixels;
+	void *destination_pixels;
+	long pixel_count;
+	long pixel_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x6A6,
+		bitmap_verify(source_bitmap, TRUE));
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x6A7,
+		source_bitmap->width == MAX(1, destination_bitmap->width >> destination_mipmap_index));
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x6A8,
+		source_bitmap->height == MAX(1, destination_bitmap->height >> destination_mipmap_index));
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x6A9,
+		(short)source_bitmap->depth ==
+			MAX(1, (short)destination_bitmap->depth >> destination_mipmap_index));
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x6AB,
+		bitmap_verify(destination_bitmap, FALSE));
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x6AC,
+		destination_bitmap->type == source_bitmap->type);
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x6AD,
+		destination_mipmap_index >= 0 &&
+			destination_mipmap_index <= (short)destination_bitmap->mipmap_count);
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x6AE,
+		!TEST_FLAG(destination_bitmap->flags, _bitmap_swizzled_bit));
+
+	if (TEST_FLAG(destination_bitmap->flags, _bitmap_compressed_bit))
+	{
+		bitmap_compress_to_mipmap(
+			source_bitmap,
+			destination_bitmap,
+			destination_mipmap_index,
+			extract_data.extract_sequences != FALSE);
+		return;
+	}
+
+	source_pixels = bitmap_mipmap_address(source_bitmap, 0);
+	destination_pixels = bitmap_mipmap_address(
+		destination_bitmap,
+		destination_mipmap_index);
+	pixel_count = bitmap_get_pixel_count(source_bitmap);
+	for (pixel_index = 0; pixel_index < pixel_count; pixel_index++)
+	{
+		pixel32 pixel = source_pixels[pixel_index];
+
+		switch (destination_bitmap->format)
+		{
+		case _bitmap_format_a8:
+			((byte *)destination_pixels)[pixel_index] = (byte)(pixel >> 24);
+			break;
+		case _bitmap_format_y8:
+		case _bitmap_format_ay8:
+			((byte *)destination_pixels)[pixel_index] = (byte)(pixel >> 16);
+			break;
+		case _bitmap_format_a8y8:
+			((word *)destination_pixels)[pixel_index] = (word)(pixel >> 16);
+			break;
+		case _bitmap_format_r5g6b5:
+			((word *)destination_pixels)[pixel_index] = (word)(
+				(((pixel >> 16) & 0xF8) << 8) |
+				(((pixel >> 8) & 0xFC) << 3) |
+				((pixel >> 3) & 0x1F));
+			break;
+		case _bitmap_format_a1r5g5b5:
+			((word *)destination_pixels)[pixel_index] = (word)(
+				((pixel & 0xFF000000) ? 0x8000 : 0) |
+				(((pixel >> 16) & 0xF8) << 7) |
+				(((pixel >> 8) & 0xF8) << 2) |
+				((pixel >> 3) & 0x1F));
+			break;
+		case _bitmap_format_a4r4g4b4:
+			((word *)destination_pixels)[pixel_index] = (word)(
+				((pixel >> 16) & 0xF000) |
+				((pixel >> 12) & 0x0F00) |
+				((pixel >> 8) & 0x00F0) |
+				((pixel >> 4) & 0x000F));
+			break;
+		case _bitmap_format_x8r8g8b8:
+			((pixel32 *)destination_pixels)[pixel_index] = pixel | 0xFF000000;
+			break;
+		case _bitmap_format_a8r8g8b8:
+			((pixel32 *)destination_pixels)[pixel_index] = pixel;
+			break;
+		case _bitmap_format_p8_bump:
+			((byte *)destination_pixels)[pixel_index] =
+				(byte)palette_find_closest_match(global_vector_palette, pixel);
+			break;
+		default:
+			match_vassert(
+				"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+				0x6EC,
+				FALSE,
+				"### ERROR unsupported bitmap format");
+			break;
+		}
+	}
+
+	return;
+}
+
+static void extract_pixels_from_mipmap(
+	struct bitmap_data *source_bitmap,
+	struct bitmap_data *destination_bitmap,
+	short source_mipmap_index)
+{
+	void *source_pixels;
+	pixel32 *destination_pixels;
+	long pixel_count;
+	long pixel_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x6F9,
+		bitmap_verify(source_bitmap, TRUE));
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x6FA,
+		destination_bitmap->width == MAX(1, source_bitmap->width >> source_mipmap_index));
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x6FB,
+		destination_bitmap->height == MAX(1, source_bitmap->height >> source_mipmap_index));
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x6FC,
+		(short)destination_bitmap->depth ==
+			MAX(1, (short)source_bitmap->depth >> source_mipmap_index));
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x6FE,
+		bitmap_verify(destination_bitmap, FALSE));
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x6FF,
+		source_bitmap->type == destination_bitmap->type);
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x700,
+		source_mipmap_index >= 0 &&
+			source_mipmap_index <= (short)source_bitmap->mipmap_count);
+
+	if (TEST_FLAG(source_bitmap->flags, _bitmap_compressed_bit))
+	{
+		bitmap_uncompress_from_mipmap(
+			source_bitmap,
+			destination_bitmap,
+			source_mipmap_index);
+		return;
+	}
+
+	source_pixels = bitmap_mipmap_address(source_bitmap, source_mipmap_index);
+	destination_pixels = bitmap_mipmap_address(destination_bitmap, 0);
+	pixel_count = bitmap_get_pixel_count(destination_bitmap);
+	for (pixel_index = 0; pixel_index < pixel_count; pixel_index++)
+	{
+		destination_pixels[pixel_index] = bitmap_format_to_a8r8g8b8(
+			source_bitmap->format,
+			source_pixels,
+			pixel_index);
+	}
+
+	return;
+}
+
+static struct bitmap_data *extract_build_debug_plate(
+	struct bitmap_data *bitmap,
+	boolean alpha_to_rgb,
+	boolean include_mipmaps,
+	boolean border)
+{
+	struct bitmap_data *converted_bitmap = NULL;
+	struct bitmap_data *debug_bitmap = NULL;
+	short mipmap_index;
+	short slice_count;
+	short debug_width;
+	short debug_height;
+	short border_size = border ? 4 : 0;
+	short destination_y = border ? 3 : 0;
+
+	switch (bitmap->type)
+	{
+	case _bitmap_type_2d:
+		converted_bitmap = bitmap_2d_new(
+			bitmap->width,
+			bitmap->height,
+			bitmap->mipmap_count,
+			_bitmap_format_a8r8g8b8);
+		break;
+	case _bitmap_type_3d:
+		converted_bitmap = bitmap_3d_new(
+			bitmap->width,
+			bitmap->height,
+			bitmap->depth,
+			bitmap->mipmap_count,
+			_bitmap_format_a8r8g8b8);
+		break;
+	case _bitmap_type_cube_map:
+		converted_bitmap = bitmap_cube_map_new(
+			bitmap->width,
+			bitmap->mipmap_count,
+			_bitmap_format_a8r8g8b8);
+		break;
+	default:
+		match_vassert(
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+			0x518,
+			FALSE,
+			"### ERROR unsupported bitmap type");
+		break;
+	}
+
+	if (!converted_bitmap || !converted_bitmap->base_address)
+	{
+		error(_error_immediate, "### ERROR failed to allocate debug plate bitmap");
+		bitmap_delete(converted_bitmap);
+		return NULL;
+	}
+
+	for (mipmap_index = 0; mipmap_index <= (short)bitmap->mipmap_count; mipmap_index++)
+	{
+		short width = MAX(1, bitmap->width >> mipmap_index);
+		short height = MAX(1, bitmap->height >> mipmap_index);
+		short depth = MAX(1, (short)bitmap->depth >> mipmap_index);
+		struct bitmap_data *mipmap_bitmap = NULL;
+
+		switch (bitmap->type)
+		{
+		case _bitmap_type_2d:
+			mipmap_bitmap = bitmap_2d_new(width, height, 0, _bitmap_format_a8r8g8b8);
+			break;
+		case _bitmap_type_3d:
+			mipmap_bitmap = bitmap_3d_new(width, height, depth, 0, _bitmap_format_a8r8g8b8);
+			break;
+		case _bitmap_type_cube_map:
+			mipmap_bitmap = bitmap_cube_map_new(width, 0, _bitmap_format_a8r8g8b8);
+			break;
+		default:
+			match_vassert(
+				"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+				0x542,
+				FALSE,
+				"### ERROR unsupported bitmap type");
+			break;
+		}
+
+		if (mipmap_bitmap && mipmap_bitmap->base_address)
+		{
+			extract_pixels_from_mipmap(bitmap, mipmap_bitmap, mipmap_index);
+			extract_pixels_to_mipmap(mipmap_bitmap, converted_bitmap, mipmap_index);
+		}
+		else
+		{
+			error(_error_immediate, "### ERROR failed to allocate debug slice bitmap");
+		}
+		bitmap_delete(mipmap_bitmap);
+	}
+
+	switch (bitmap->type)
+	{
+	case _bitmap_type_2d:
+		slice_count = 1;
+		break;
+	case _bitmap_type_3d:
+		slice_count = bitmap->depth;
+		break;
+	case _bitmap_type_cube_map:
+		slice_count = 6;
+		break;
+	default:
+		match_vassert(
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+			0x567,
+			FALSE,
+			"### ERROR unsupported bitmap type");
+		slice_count = 1;
+		break;
+	}
+
+	debug_width = border
+		? (short)((bitmap->width + 3) * slice_count + 3)
+		: (short)(bitmap->width * slice_count);
+	debug_height = border ? (short)(bitmap->height + 8) : bitmap->height;
+	if (include_mipmaps)
+	{
+		for (mipmap_index = 1; mipmap_index <= (short)bitmap->mipmap_count; mipmap_index++)
+		{
+			debug_height += MAX(1, bitmap->height >> mipmap_index) + border_size;
+		}
+	}
+
+	debug_bitmap = bitmap_2d_new(
+		debug_width,
+		debug_height,
+		0,
+		_bitmap_format_a8r8g8b8);
+	if (debug_bitmap && debug_bitmap->base_address)
+	{
+		pixel32 *pixels = bitmap_mipmap_address(debug_bitmap, 0);
+		long pixel_count = bitmap_get_pixel_count(debug_bitmap);
+		long pixel_index;
+
+		for (pixel_index = 0; pixel_index < pixel_count; pixel_index++)
+			pixels[pixel_index] = 0x000000FF;
+
+		for (mipmap_index = 0;
+			mipmap_index <= (include_mipmaps ? (short)bitmap->mipmap_count : 0);
+			mipmap_index++)
+		{
+			short width = MAX(1, bitmap->width >> mipmap_index);
+			short height = MAX(1, bitmap->height >> mipmap_index);
+			short mipmap_slice_count;
+			short slice_index;
+			short destination_x = border ? 3 : 0;
+			struct bitmap_data *slice_bitmap = bitmap_2d_new(
+				width,
+				height,
+				0,
+				_bitmap_format_a8r8g8b8);
+
+			if (!slice_bitmap || !slice_bitmap->base_address)
+			{
+				error(_error_immediate, "### ERROR failed to allocate debug bitmap");
+				bitmap_delete(slice_bitmap);
+				break;
+			}
+
+			switch (bitmap->type)
+			{
+			case _bitmap_type_2d:
+				mipmap_slice_count = 1;
+				break;
+			case _bitmap_type_3d:
+				mipmap_slice_count = MAX(1, (short)bitmap->depth >> mipmap_index);
+				break;
+			case _bitmap_type_cube_map:
+				mipmap_slice_count = 6;
+				break;
+			default:
+				match_vassert(
+					"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+					0x5AC,
+					FALSE,
+					"### ERROR unsupported bitmap type");
+				mipmap_slice_count = 1;
+				break;
+			}
+
+			for (slice_index = 0; slice_index < mipmap_slice_count; slice_index++)
+			{
+				void *source_address = NULL;
+				long pixel_data_size = bitmap_get_pixel_data_size(slice_bitmap);
+				point2d destination_point;
+
+				switch (bitmap->type)
+				{
+				case _bitmap_type_2d:
+					source_address = bitmap_mipmap_address(converted_bitmap, mipmap_index);
+					break;
+				case _bitmap_type_3d:
+					source_address = bitmap_3d_address(
+						converted_bitmap,
+						0,
+						0,
+						slice_index,
+						mipmap_index);
+					break;
+				case _bitmap_type_cube_map:
+					source_address = bitmap_cube_map_address(
+						converted_bitmap,
+						0,
+						0,
+						slice_index,
+						mipmap_index);
+					break;
+				default:
+					match_vassert(
+						"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+						0x5C8,
+						FALSE,
+						"### ERROR unsupported bitmap type");
+					break;
+				}
+
+				csmemcpy(bitmap_mipmap_address(slice_bitmap, 0), source_address, pixel_data_size);
+				set_point2d(&destination_point, destination_x, destination_y);
+				bitmap_copy(
+					debug_bitmap,
+					&destination_point,
+					NULL,
+					slice_bitmap,
+					NULL,
+					0xFFFFFFFF,
+					0);
+				destination_x += width + border_size;
+			}
+
+			bitmap_delete(slice_bitmap);
+			destination_y += height + border_size;
+		}
+	}
+	else
+	{
+		error(_error_immediate, "### ERROR failed to allocate debug bitmap");
+	}
+
+	if (debug_bitmap && debug_bitmap->base_address && alpha_to_rgb)
+		bitmap_alpha_to_rgb(debug_bitmap);
+	bitmap_delete(converted_bitmap);
+	return debug_bitmap;
+}
+
+static void extract_mipmaps_to_bitmap(
+	struct bitmap_data *source_bitmap,
+	struct bitmap_data *destination_bitmap)
+{
+	short mipmap_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x5F9,
+		bitmap_verify(source_bitmap, TRUE));
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x5FA,
+		destination_bitmap);
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x5FB,
+		destination_bitmap->base_address);
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x5FC,
+		destination_bitmap->type == source_bitmap->type);
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x5FD,
+		destination_bitmap->width == source_bitmap->width);
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x5FE,
+		destination_bitmap->height == source_bitmap->height);
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x5FF,
+		destination_bitmap->depth == source_bitmap->depth);
+
+	for (mipmap_index = 0;
+		mipmap_index <= (short)destination_bitmap->mipmap_count;
+		mipmap_index++)
+	{
+		boolean ignore_transparent_pixels =
+			extract_data.group->usage == _bitmap_group_usage_alpha_blend &&
+			destination_bitmap->format != _bitmap_format_y8 &&
+			destination_bitmap->format != _bitmap_format_r5g6b5 &&
+			destination_bitmap->format != _bitmap_format_x8r8g8b8;
+		real mipmap_fraction = (real)mipmap_index / destination_bitmap->mipmap_count;
+		short alpha_bias = (short)floor(
+			PIN(extract_data.group->alpha_bias, -1.0f, 1.0f) *
+			mipmap_fraction * 255.0f + 0.5f);
+		struct bitmap_data *mipmap_bitmap;
+
+		match_assert(
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+			0x616,
+			alpha_bias >= -255 && alpha_bias <= 255);
+
+		mipmap_bitmap = bitmap_shrink(
+			source_bitmap,
+			(short)(1 << mipmap_index),
+			alpha_bias,
+			ignore_transparent_pixels);
+		if (mipmap_bitmap && mipmap_bitmap->base_address)
+		{
+			bitmap_sharpen(mipmap_bitmap, extract_data.group->sharpen_amount);
+
+			if (extract_data.group->usage == _bitmap_group_usage_detail_map)
+			{
+				real fade_amount = PIN(
+					(real)mipmap_index /
+						(destination_bitmap->mipmap_count *
+							(1.0f - extract_data.group->detail_fade) +
+							extract_data.group->detail_fade),
+					0.0f,
+					1.0f);
+
+				bitmap_fade(mipmap_bitmap, 0xFF7F7F7F, fade_amount);
+			}
+
+			if (ignore_transparent_pixels)
+				bitmap_alpha_bleed(mipmap_bitmap, 1);
+			if (extract_data.group->usage == _bitmap_group_usage_height_map)
+				bitmap_height_map(mipmap_bitmap, extract_data.group->bump_height);
+			if (extract_data.group->usage == _bitmap_group_usage_vector_map)
+				bitmap_vector_map(mipmap_bitmap);
+
+			if (TEST_FLAG(
+				extract_data.group->flags,
+				_bitmap_group_diffusion_dither_bit) &&
+				extract_data.group->usage != _bitmap_group_usage_height_map &&
+				extract_data.group->usage != _bitmap_group_usage_light_map &&
+				extract_data.group->usage != _bitmap_group_usage_vector_map)
+			{
+				short const *bits_per_channel = NULL;
+
+				switch (destination_bitmap->format)
+				{
+				case _bitmap_format_r5g6b5:
+					bits_per_channel = bits_per_channel_r5g6b5;
+					break;
+				case _bitmap_format_a1r5g5b5:
+					bits_per_channel = bits_per_channel_a1r5g5b5;
+					break;
+				case _bitmap_format_a4r4g4b4:
+					bits_per_channel = bits_per_channel_a4r4g4b4;
+					break;
+				}
+
+				bitmap_quantitize(mipmap_bitmap, bits_per_channel);
+			}
+
+			extract_pixels_to_mipmap(
+				mipmap_bitmap,
+				destination_bitmap,
+				mipmap_index);
+			bitmap_delete(mipmap_bitmap);
+		}
+		else
+		{
+			error(_error_silent, "### ERROR extract: failed to allocate temporary bitmap");
+		}
+	}
+
+	if (extract_data.build_debug_plate)
+	{
+		bitmap_delete(extract_build_debug_plate(destination_bitmap, 0, 1, 1));
+	}
+
+	return;
+}
+
+static short extract_add_bitmap(
+	struct bitmap_data *bitmap)
+{
+	short format;
+	short mipmap_count;
+	short bitmap_index;
+	struct bitmap_data *destination_bitmap;
+	struct bitmap_data *working_bitmap;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x487,
+		bitmap_verify(bitmap, TRUE));
+
+	format = extract_get_bitmap_format(bitmap);
+	if (extract_data.group->type == _bitmap_group_type_interface_bitmaps ||
+		extract_data.group->usage == _bitmap_group_usage_light_map)
+	{
+		mipmap_count = 0;
+	}
+	else
+	{
+		mipmap_count = bitmap_get_max_mipmap_count(bitmap);
+		if (extract_data.group->type == _bitmap_group_type_sprites && mipmap_count >= 2)
+			mipmap_count = 2;
+
+		if ((short)extract_data.group->mipmap_count > 0 &&
+			(short)extract_data.group->mipmap_count - 1 <= mipmap_count)
+		{
+			mipmap_count = extract_data.group->mipmap_count - 1;
+		}
+	}
+
+	bitmap_index = bitmap_group_add_bitmap(
+		extract_data.group,
+		bitmap->width,
+		bitmap->height,
+		bitmap->depth,
+		bitmap->type,
+		format,
+		mipmap_count);
+	extract_data.bitmap_index = bitmap_index;
+	if (bitmap_index != NONE)
+	{
+		working_bitmap = bitmap_clone(bitmap);
+		destination_bitmap = TAG_BLOCK_GET_ELEMENT(
+			&extract_data.group->bitmap_data,
+			bitmap_index,
+			struct bitmap_data);
+
+		if (TEST_FLAG(
+			extract_data.group->flags,
+			_bitmap_group_extract_sprites_filthy_bug_fix_bit))
+		{
+			destination_bitmap->registration_point_x =
+				(bitmap->registration_point_x + 1) / 2;
+			destination_bitmap->registration_point_y =
+				(bitmap->registration_point_y + 1) / 2;
+		}
+		else
+		{
+			destination_bitmap->registration_point_x = bitmap->registration_point_x;
+			destination_bitmap->registration_point_y = bitmap->registration_point_y;
+		}
+
+		if (working_bitmap && working_bitmap->base_address)
+		{
+			if (extract_data.group->smoothing_filter_size > 0.0f)
+			{
+				switch (extract_data.group->type)
+				{
+				case _bitmap_group_type_2d_textures:
+				case _bitmap_group_type_3d_textures:
+				case _bitmap_group_type_cube_maps:
+					bitmap_smooth(
+						working_bitmap,
+						extract_data.group->smoothing_filter_size);
+					break;
+				case _bitmap_group_type_sprites:
+					fprintf(stdout, "### WARNING tried to smooth a sprite group", "\r\n");
+					fflush(stdout);
+					break;
+				case _bitmap_group_type_interface_bitmaps:
+					fprintf(stdout, "### WARNING tried to smooth an interface-bitmap group", "\r\n");
+					fflush(stdout);
+					break;
+				default:
+					match_vassert(
+						"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+						0x4D0,
+						FALSE,
+						"### ERROR unsupported bitmap group type");
+					break;
+				}
+			}
+
+			extract_mipmaps_to_bitmap(working_bitmap, destination_bitmap);
+			if (destination_bitmap->type == _bitmap_type_3d)
+			{
+				fprintf(
+					stdout,
+					"bitmap created: #%dx#%dx#%d, %s, %dK-bytes\r\n",
+					destination_bitmap->width,
+					destination_bitmap->height,
+					destination_bitmap->depth,
+					bitmap_format_get_string(destination_bitmap->format),
+					bitmap_get_pixel_data_size(destination_bitmap) / 1024);
+				fflush(stdout);
+			}
+			else
+			{
+				fprintf(
+					stdout,
+					"bitmap created: #%dx#%d, %s, %dK-bytes\r\n",
+					destination_bitmap->width,
+					destination_bitmap->height,
+					bitmap_format_get_string(destination_bitmap->format),
+					bitmap_get_pixel_data_size(destination_bitmap) / 1024);
+				fflush(stdout);
+			}
+		}
+	}
+
+	return bitmap_index;
+}
+
 static boolean extract_bitmap(
 	rectangle2d const *bounds)
 {
@@ -1018,7 +1873,7 @@ static boolean extract_3d_textures(
 
 				extract_data.sequence_index = sequence_index;
 				{
-					short bitmap_index = extract_add_bitmap(bitmap);
+				short bitmap_index = extract_add_bitmap(bitmap);
 
 					if (bitmap_index != NONE)
 					{
@@ -1050,6 +1905,122 @@ static boolean extract_3d_textures(
 		}
 
 		first_bitmap_index += bitmap_count;
+	}
+
+	return result;
+}
+
+static boolean extract_cube_maps(
+	void)
+{
+	boolean result = TRUE;
+	struct bitmap_data *temporary_bitmap = NULL;
+	short face_index = 0;
+	short sequence_index;
+	long bitmap_index = 0;
+
+	while (result && bitmap_index < extract_data.bitmap_count)
+	{
+		struct bitmap_extract_entry *entry = &extract_data.bitmaps[bitmap_index];
+		boolean skip_cube_map = FALSE;
+
+		if (face_index == 0)
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+				0x798,
+				!temporary_bitmap);
+
+			if (entry->bitmap->width == entry->bitmap->height)
+			{
+				temporary_bitmap = bitmap_cube_map_new(
+					entry->bitmap->width,
+					0,
+					_bitmap_format_a8r8g8b8);
+				sequence_index = entry->sequence_index;
+			}
+			else
+			{
+				fprintf(stdout, "skipping cube map with non-square faces\r\n");
+				fflush(stdout);
+				skip_cube_map = TRUE;
+			}
+		}
+
+		if (temporary_bitmap && temporary_bitmap->base_address)
+		{
+			if (entry->sequence_index != sequence_index)
+			{
+				fprintf(stdout, "skipping cube map which spanned sequence\r\n");
+				fflush(stdout);
+				skip_cube_map = TRUE;
+			}
+			else if (entry->bitmap->width != temporary_bitmap->width ||
+				entry->bitmap->height != temporary_bitmap->height)
+			{
+				fprintf(stdout, "skipping cube map with incompatible-size faces\r\n");
+				fflush(stdout);
+				skip_cube_map = TRUE;
+			}
+			else
+			{
+				bitmap_cube_map_face_insert(
+					entry->bitmap,
+					temporary_bitmap,
+					0,
+					face_index);
+			}
+
+			face_index++;
+			if (skip_cube_map)
+			{
+				bitmap_delete(temporary_bitmap);
+				temporary_bitmap = NULL;
+				face_index = 0;
+			}
+
+			if (result && face_index == 6)
+			{
+				short group_bitmap_index = extract_add_bitmap(temporary_bitmap);
+
+				if (group_bitmap_index != NONE)
+				{
+					struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
+						&extract_data.group->sequences,
+						sequence_index,
+						struct bitmap_group_sequence);
+
+					if (sequence->first_bitmap_index == NONE)
+					{
+						sequence->first_bitmap_index = group_bitmap_index;
+						sequence->bitmap_count = 0;
+					}
+					sequence->bitmap_count++;
+				}
+
+				bitmap_delete(temporary_bitmap);
+				temporary_bitmap = NULL;
+				face_index = 0;
+			}
+		}
+		else if (!skip_cube_map)
+		{
+			error(_error_silent, "### ERROR extract: failed to create temporary cube map");
+			result = FALSE;
+		}
+
+		bitmap_delete(entry->bitmap);
+		bitmap_index++;
+	}
+
+	if (temporary_bitmap)
+	{
+		if (result)
+		{
+			fprintf(stdout, "skipping cube map with less than six faces\r\n");
+			fflush(stdout);
+		}
+		bitmap_delete(temporary_bitmap);
 	}
 
 	return result;

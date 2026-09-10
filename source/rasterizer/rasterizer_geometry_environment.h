@@ -12,12 +12,16 @@ RASTERIZER_GEOMETRY.C.
 /* ---------- structures */
 
 union real_point2d;
+union real_point3d;
 union real_vector3d;
 struct environment_lightmap_vertex_compressed;
 struct environment_vertex_compressed;
 
 /* ---------- prototypes/RASTERIZER_GEOMETRY.C */
 
+void environment_vertex_compressed_get_point(
+	struct environment_vertex_compressed const *vertex,
+	union real_point3d *point);
 void environment_vertex_compressed_get_normal(
 	struct environment_vertex_compressed const *vertex,
 	union real_vector3d *normal);
