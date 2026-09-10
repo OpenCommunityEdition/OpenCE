@@ -107,6 +107,7 @@ symbols in this file:
 #undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_geometry.h"
+#include "rasterizer/rasterizer_models.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
 #include "render/render.h"
 #include "shaders/shader_definitions.h"
@@ -114,9 +115,11 @@ symbols in this file:
 
 #include <xtl.h>
 
+#include "interface/progress_bar_internal.h"
 #include "rasterizer/xbox/rasterizer_xbox.h"
 #include "rasterizer/xbox/rasterizer_xbox_draw_primitives.h"
 #include "rasterizer/xbox/rasterizer_xbox_internal.h"
+#include "rasterizer/xbox/rasterizer_xbox_models.h"
 
 /* ---------- constants */
 
@@ -186,6 +189,11 @@ enum
 	_shader_model_alpha_blended_decal_bit,
 	_shader_model_true_atmospheric_fog_bit,
 	_shader_model_nocull_two_sided_bit,
+};
+
+enum
+{
+	_fog_definition_atmosphere_dominant_bit = 1,
 };
 
 enum
@@ -299,7 +307,8 @@ struct shader_model_definition
 
 struct shader_transparent_plasma_definition
 {
-	byte reserved00[4];
+	struct shader shader;
+	byte reserved28[4];
 	short intensity_exponent_source;
 };
 
@@ -597,7 +606,7 @@ typedef char verify_rasterizer_models_statistics_vertex_shader_accum_offset[
 typedef char verify_shader_plasma_intensity_exponent_source_offset[
 	offsetof(
 		struct shader_transparent_plasma_definition,
-		intensity_exponent_source) == 0x04 ? 1 : -1];
+		intensity_exponent_source) == 0x2C ? 1 : -1];
 typedef char verify_shader_model_translucency_offset[
 	offsetof(struct shader_model_definition, model.translucency) == 0x38
 		? 1 : -1];
@@ -655,19 +664,6 @@ typedef char verify_shader_model_reflection_cube_map_offset[
 	offsetof(
 		struct shader_model_definition,
 		model.reflection_cube_map.index) == 0x170 ? 1 : -1];
-
-/* ---------- prototypes */
-
-struct transparent_geometry_group *_rasterizer_model_transparent_geometry_submit(
-	struct shader *shader,
-	short shader_permutation_index,
-	struct triangle_buffer const *triangle_buffer,
-	long dynamic_triangle_buffer_index,
-	long triangle_count,
-	struct vertex_buffer const *vertex_buffer,
-	long dynamic_vertex_buffer_index,
-	real_point3d const *centroid,
-	struct render_sort_filth *sort_filth);
 
 /* ---------- globals */
 
@@ -886,47 +882,132 @@ static void set_environment_shader_pixel_shader(
 	{
 		unsigned long detail_mask_alpha_inputs[
 			NUMBER_OF_SHADER_MODEL_DETAIL_MASKS] =
-			{0x20, 0x2D, 0x0D, 0x3C, 0x1C, 0x39, 0x19, 0x3A, 0x1A};
+			{
+				PS_REGISTER_ONE,
+				PS_REGISTER_R1 | PS_INPUTMAPPING_UNSIGNED_INVERT,
+				PS_REGISTER_R1,
+				PS_REGISTER_R0 | PS_CHANNEL_ALPHA |
+					PS_INPUTMAPPING_UNSIGNED_INVERT,
+				PS_REGISTER_R0 | PS_CHANNEL_ALPHA,
+				PS_REGISTER_T1 | PS_CHANNEL_ALPHA |
+					PS_INPUTMAPPING_UNSIGNED_INVERT,
+				PS_REGISTER_T1 | PS_CHANNEL_ALPHA,
+				PS_REGISTER_T2 | PS_CHANNEL_ALPHA |
+					PS_INPUTMAPPING_UNSIGNED_INVERT,
+				PS_REGISTER_T2 | PS_CHANNEL_ALPHA,
+			};
 		unsigned long detail_function_alpha_inputs[
-			NUMBER_OF_SHADER_MODEL_DETAIL_FUNCTIONS] = {0xA0, 0x20, 0xA0};
+			NUMBER_OF_SHADER_MODEL_DETAIL_FUNCTIONS] =
+			{
+				PS_REGISTER_ONE_HALF,
+				PS_REGISTER_ONE,
+				PS_REGISTER_ONE_HALF,
+			};
 
 		pixel_shader.constant_0[2] = base_color;
 		pixel_shader.constant_0[1] = detail_color;
-		pixel_shader.rgb_inputs[3] =
-			((((detail_function_alpha_inputs[detail_function] |
-			((detail_mask_alpha_inputs[detail_mask] ^ 0x20) << 8)) << 8) |
-			detail_mask_alpha_inputs[detail_mask]) << 8) | 0x09;
+		pixel_shader.rgb_inputs[3] = PS_COMBINERINPUTS(
+			detail_mask_alpha_inputs[detail_mask] ^
+				PS_INPUTMAPPING_UNSIGNED_INVERT,
+			detail_function_alpha_inputs[detail_function],
+			detail_mask_alpha_inputs[detail_mask],
+			PS_REGISTER_T1);
 	}
 
 	if (double_diffuse_intensity)
 	{
 		unsigned long detail_function_rgb_inputs[
 			NUMBER_OF_SHADER_MODEL_DETAIL_FUNCTIONS] =
-			{0x0C090C09, 0x0C090000, 0x0C204920};
+			{
+				PS_COMBINERINPUTS(
+					PS_REGISTER_R0,
+					PS_REGISTER_T1,
+					PS_REGISTER_R0,
+					PS_REGISTER_T1),
+				PS_COMBINERINPUTS(
+					PS_REGISTER_R0,
+					PS_REGISTER_T1,
+					PS_REGISTER_ZERO,
+					PS_REGISTER_ZERO),
+				PS_COMBINERINPUTS(
+					PS_REGISTER_R0,
+					PS_REGISTER_ONE,
+					PS_REGISTER_T1 | PS_INPUTMAPPING_EXPAND_NORMAL,
+					PS_REGISTER_ONE),
+			};
 
-		pixel_shader.rgb_inputs[6] = 0x08040B1D;
-		pixel_shader.rgb_outputs[6] = 0x0C00;
+		pixel_shader.rgb_inputs[6] = PS_COMBINERINPUTS(
+			PS_REGISTER_T0,
+			PS_REGISTER_V0,
+			PS_REGISTER_T3,
+			PS_REGISTER_R1 | PS_CHANNEL_ALPHA);
+		pixel_shader.rgb_outputs[6] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_R0,
+			PS_COMBINEROUTPUT_IDENTITY);
 		pixel_shader.rgb_inputs[7] =
 			detail_function_rgb_inputs[detail_function];
-		pixel_shader.rgb_outputs[7] = 0x0C00;
+		pixel_shader.rgb_outputs[7] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_R0,
+			PS_COMBINEROUTPUT_IDENTITY);
 	}
 	else
 	{
 		unsigned long detail_function_rgb_inputs[
 			NUMBER_OF_SHADER_MODEL_DETAIL_FUNCTIONS] =
-			{0x08090809, 0x08090000, 0x08204920};
+			{
+				PS_COMBINERINPUTS(
+					PS_REGISTER_T0,
+					PS_REGISTER_T1,
+					PS_REGISTER_T0,
+					PS_REGISTER_T1),
+				PS_COMBINERINPUTS(
+					PS_REGISTER_T0,
+					PS_REGISTER_T1,
+					PS_REGISTER_ZERO,
+					PS_REGISTER_ZERO),
+				PS_COMBINERINPUTS(
+					PS_REGISTER_T0,
+					PS_REGISTER_ONE,
+					PS_REGISTER_T1 | PS_INPUTMAPPING_EXPAND_NORMAL,
+					PS_REGISTER_ONE),
+			};
 
 		pixel_shader.rgb_inputs[6] =
 			detail_function_rgb_inputs[detail_function];
-		pixel_shader.rgb_outputs[6] = 0x0800;
-		pixel_shader.rgb_inputs[7] = 0x08040B1D;
-		pixel_shader.rgb_outputs[7] = 0x0C00;
+		pixel_shader.rgb_outputs[6] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_T0,
+			PS_COMBINEROUTPUT_IDENTITY);
+		pixel_shader.rgb_inputs[7] = PS_COMBINERINPUTS(
+			PS_REGISTER_T0,
+			PS_REGISTER_V0,
+			PS_REGISTER_T3,
+			PS_REGISTER_R1 | PS_CHANNEL_ALPHA);
+		pixel_shader.rgb_outputs[7] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_R0,
+			PS_COMBINEROUTPUT_IDENTITY);
 	}
 
 	if (true_atmospheric_fog)
 	{
-		pixel_shader.final_combiner_inputs_abcd = 0x330C0300;
-		pixel_shader.final_combiner_inputs_efg = 0x00001800;
+		pixel_shader.final_combiner_inputs_abcd = PS_COMBINERINPUTS(
+			PS_REGISTER_FOG | PS_CHANNEL_ALPHA |
+				PS_INPUTMAPPING_UNSIGNED_INVERT,
+			PS_REGISTER_R0,
+			PS_REGISTER_FOG,
+			PS_REGISTER_ZERO);
+		pixel_shader.final_combiner_inputs_efg = PS_COMBINERINPUTS(
+			PS_REGISTER_ZERO,
+			PS_REGISTER_ZERO,
+			PS_REGISTER_T0 | PS_CHANNEL_ALPHA,
+			0);
 	}
 	else
 	{
@@ -934,33 +1015,118 @@ static void set_environment_shader_pixel_shader(
 		pixel_shader.constant_1[5] = atmospheric_fog_color;
 		pixel_shader.final_combiner_constant_0 = fog_color;
 		pixel_shader.final_combiner_constant_1 = atmospheric_fog_color;
-		pixel_shader.final_combiner_inputs_abcd = 0x340F010D;
-		pixel_shader.final_combiner_inputs_efg = 0x0C111800;
+		pixel_shader.final_combiner_inputs_abcd = PS_COMBINERINPUTS(
+			PS_REGISTER_V0 | PS_CHANNEL_ALPHA |
+				PS_INPUTMAPPING_UNSIGNED_INVERT,
+			PS_REGISTER_EF_PROD,
+			PS_REGISTER_C0,
+			PS_REGISTER_R1);
+		pixel_shader.final_combiner_inputs_efg = PS_COMBINERINPUTS(
+			PS_REGISTER_R0,
+			PS_REGISTER_C0 | PS_CHANNEL_ALPHA,
+			PS_REGISTER_T0 | PS_CHANNEL_ALPHA,
+			0);
 	}
 
 	if (local_pixel_shader_dirty_flag)
 	{
-		pixel_shader.texture_modes = 0x00018421;
-		pixel_shader.combiner_count = 0x00011008;
+		pixel_shader.texture_modes = PS_TEXTUREMODES(
+			PS_TEXTUREMODES_PROJECT2D,
+			PS_TEXTUREMODES_PROJECT2D,
+			PS_TEXTUREMODES_PROJECT2D,
+			PS_TEXTUREMODES_CUBEMAP);
+		pixel_shader.combiner_count = PS_COMBINERCOUNT(
+			8,
+			PS_COMBINERCOUNT_UNIQUE_C0 | PS_COMBINERCOUNT_UNIQUE_C1);
 		pixel_shader.constant_0[0] = 0x00FF0000;
 		pixel_shader.constant_1[0] = 0x0000FF00;
-		pixel_shader.alpha_inputs[0] = 0x0A200000;
-		pixel_shader.alpha_outputs[0] = 0x000000C0;
-		pixel_shader.rgb_inputs[0] = 0x0A020A01;
-		pixel_shader.rgb_outputs[0] = 0x000030CD;
-		pixel_shader.alpha_inputs[1] = 0x1C200000;
-		pixel_shader.alpha_outputs[1] = 0x00000090;
-		pixel_shader.rgb_inputs[1] = 0x04200C01;
-		pixel_shader.rgb_outputs[1] = 0x00000400;
-		pixel_shader.alpha_inputs[2] = 0x0C200D15;
-		pixel_shader.alpha_outputs[2] = 0x000000CD;
-		pixel_shader.rgb_inputs[2] = 0x3C201C01;
-		pixel_shader.rgb_outputs[2] = 0x00000C00;
-		pixel_shader.rgb_outputs[3] = 0x00000900;
-		pixel_shader.rgb_inputs[4] = 0x0B05040C;
-		pixel_shader.rgb_outputs[4] = 0x000000B4;
-		pixel_shader.rgb_inputs[5] = 0x022014E1;
-		pixel_shader.rgb_outputs[5] = 0x00000D00;
+		pixel_shader.alpha_inputs[0] = PS_COMBINERINPUTS(
+			PS_REGISTER_T2,
+			PS_REGISTER_ONE,
+			PS_REGISTER_ZERO,
+			PS_REGISTER_ZERO);
+		pixel_shader.alpha_outputs[0] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_R0,
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_DISCARD,
+			PS_COMBINEROUTPUT_IDENTITY);
+		pixel_shader.rgb_inputs[0] = PS_COMBINERINPUTS(
+			PS_REGISTER_T2,
+			PS_REGISTER_C1,
+			PS_REGISTER_T2,
+			PS_REGISTER_C0);
+		pixel_shader.rgb_outputs[0] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_R0,
+			PS_REGISTER_R1,
+			PS_REGISTER_DISCARD,
+			PS_COMBINEROUTPUT_AB_DOT_PRODUCT |
+				PS_COMBINEROUTPUT_CD_DOT_PRODUCT);
+		pixel_shader.alpha_inputs[1] = PS_COMBINERINPUTS(
+			PS_REGISTER_R0 | PS_CHANNEL_ALPHA,
+			PS_REGISTER_ONE,
+			PS_REGISTER_ZERO,
+			PS_REGISTER_ZERO);
+		pixel_shader.alpha_outputs[1] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_T1,
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_DISCARD,
+			PS_COMBINEROUTPUT_IDENTITY);
+		pixel_shader.rgb_inputs[1] = PS_COMBINERINPUTS(
+			PS_REGISTER_V0,
+			PS_REGISTER_ONE,
+			PS_REGISTER_R0,
+			PS_REGISTER_C0);
+		pixel_shader.rgb_outputs[1] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_V0,
+			PS_COMBINEROUTPUT_IDENTITY);
+		pixel_shader.alpha_inputs[2] = PS_COMBINERINPUTS(
+			PS_REGISTER_R0,
+			PS_REGISTER_ONE,
+			PS_REGISTER_R1,
+			PS_REGISTER_V1 | PS_CHANNEL_ALPHA);
+		pixel_shader.alpha_outputs[2] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_R0,
+			PS_REGISTER_R1,
+			PS_REGISTER_DISCARD,
+			PS_COMBINEROUTPUT_IDENTITY);
+		pixel_shader.rgb_inputs[2] = PS_COMBINERINPUTS(
+			PS_REGISTER_R0 | PS_CHANNEL_ALPHA |
+				PS_INPUTMAPPING_UNSIGNED_INVERT,
+			PS_REGISTER_ONE,
+			PS_REGISTER_R0 | PS_CHANNEL_ALPHA,
+			PS_REGISTER_C0);
+		pixel_shader.rgb_outputs[2] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_R0,
+			PS_COMBINEROUTPUT_IDENTITY);
+		pixel_shader.rgb_outputs[3] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_T1,
+			PS_COMBINEROUTPUT_IDENTITY);
+		pixel_shader.rgb_inputs[4] = PS_COMBINERINPUTS(
+			PS_REGISTER_T3,
+			PS_REGISTER_V1,
+			PS_REGISTER_V0,
+			PS_REGISTER_R0);
+		pixel_shader.rgb_outputs[4] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_T3,
+			PS_REGISTER_V0,
+			PS_REGISTER_DISCARD,
+			PS_COMBINEROUTPUT_IDENTITY);
+		pixel_shader.rgb_inputs[5] = PS_COMBINERINPUTS(
+			PS_REGISTER_C1,
+			PS_REGISTER_ONE,
+			PS_REGISTER_V0 | PS_CHANNEL_ALPHA,
+			PS_REGISTER_C0 | PS_INPUTMAPPING_SIGNED_NEGATE);
+		pixel_shader.rgb_outputs[5] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_R1,
+			PS_COMBINEROUTPUT_IDENTITY);
 		rasterizer_set_pixel_shader(&pixel_shader);
 		local_pixel_shader_dirty_flag = FALSE;
 	}
@@ -1383,7 +1549,7 @@ void rasterizer_model_draw_environment_shader(
 
 			if (TEST_FLAG(
 					global_window_parameters.fog.fog_definition_flags,
-					1))
+					_fog_definition_atmosphere_dominant_bit))
 			{
 				planar_fog_fraction = 1.0f;
 			}
@@ -1491,15 +1657,27 @@ void rasterizer_model_draw_environment_shader(
 		IDirect3DDevice8_SetRenderState(
 			global_d3d_device,
 			D3DRS_PSRGBINPUTS0,
-			0x0A021819);
+			PS_COMBINERINPUTS(
+				PS_REGISTER_T2,
+				PS_REGISTER_C1,
+				PS_REGISTER_T0 | PS_CHANNEL_ALPHA,
+				PS_REGISTER_T1 | PS_CHANNEL_ALPHA));
 		IDirect3DDevice8_SetRenderState(
 			global_d3d_device,
 			D3DRS_PSRGBOUTPUTS0,
-			0x000020CD);
+			PS_COMBINEROUTPUTS(
+				PS_REGISTER_R0,
+				PS_REGISTER_R1,
+				PS_REGISTER_DISCARD,
+				PS_COMBINEROUTPUT_AB_DOT_PRODUCT));
 		IDirect3DDevice8_SetRenderState(
 			global_d3d_device,
 			D3DRS_PSFINALCOMBINERINPUTSEFG,
-			0x0C111A00);
+			PS_COMBINERINPUTS(
+				PS_REGISTER_R0,
+				PS_REGISTER_C0 | PS_CHANNEL_ALPHA,
+				PS_REGISTER_T2 | PS_CHANNEL_ALPHA,
+				0));
 
 		rasterizer_draw(
 			triangle_buffer,
@@ -1512,15 +1690,28 @@ void rasterizer_model_draw_environment_shader(
 		IDirect3DDevice8_SetRenderState(
 			global_d3d_device,
 			D3DRS_PSRGBINPUTS0,
-			0x0A020A01);
+			PS_COMBINERINPUTS(
+				PS_REGISTER_T2,
+				PS_REGISTER_C1,
+				PS_REGISTER_T2,
+				PS_REGISTER_C0));
 		IDirect3DDevice8_SetRenderState(
 			global_d3d_device,
 			D3DRS_PSRGBOUTPUTS0,
-			0x000030CD);
+			PS_COMBINEROUTPUTS(
+				PS_REGISTER_R0,
+				PS_REGISTER_R1,
+				PS_REGISTER_DISCARD,
+				PS_COMBINEROUTPUT_AB_DOT_PRODUCT |
+					PS_COMBINEROUTPUT_CD_DOT_PRODUCT));
 		IDirect3DDevice8_SetRenderState(
 			global_d3d_device,
 			D3DRS_PSFINALCOMBINERINPUTSEFG,
-			0x0C111800);
+			PS_COMBINERINPUTS(
+				PS_REGISTER_R0,
+				PS_REGISTER_C0 | PS_CHANNEL_ALPHA,
+				PS_REGISTER_T0 | PS_CHANNEL_ALPHA,
+				0));
 
 		if (rasterizer_debug_options.statistics_mode ==
 			_rasterizer_statistics_mode_enabled)
@@ -1562,14 +1753,14 @@ void _rasterizer_model_draw(
 	short vertex_shader_permutation;
 	real_argb_color perpendicular;
 	real_argb_color parallel;
-	real vertex_constants[3][4];
+	real_vector4d vertex_constants[3];
 	real specular_constants[2][4];
 	pixel32 cc0_pixel;
 	pixel32 cc0_error_pixel;
 	pixel32 cc1_pixel;
 	unsigned long seed;
 	real self_illumination_phase;
-	real_vector3d self_illumination_color_delta;
+	real self_illumination_animation_fraction;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
@@ -1594,11 +1785,10 @@ void _rasterizer_model_draw(
 			if (local_parameters->effect.shader->base.type ==
 				_shader_type_transparent_plasma)
 			{
-				plasma = (struct shader_transparent_plasma_definition const *)(
-					(byte *)shader_get_and_verify_type(
+				plasma = (struct shader_transparent_plasma_definition const *)
+					shader_get_and_verify_type(
 						local_parameters->effect.shader,
-						_shader_type_transparent_plasma) +
-					sizeof(struct shader));
+						_shader_type_transparent_plasma);
 				intensity_exponent_source = plasma->intensity_exponent_source;
 			}
 
@@ -1840,45 +2030,55 @@ void _rasterizer_model_draw(
 				SetTextureStageStateSmart(
 					3, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
 
+				seed = local_parameters->unique_identifier;
+				if (TEST_FLAG(
+						shader_model->model.self_illumination_flags,
+						_shader_model_self_illumination_no_random_phase_bit))
 				{
-					real_vector3d *color_delta = &self_illumination_color_delta;
-
-					seed = local_parameters->unique_identifier;
-					if (TEST_FLAG(
-							shader_model->model.self_illumination_flags,
-							_shader_model_self_illumination_no_random_phase_bit))
-					{
-						self_illumination_phase = 0.0f;
-					}
-					else
-					{
-						self_illumination_phase = real_seed_random(&seed);
-					}
-
-					match_assert(
-						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
-						864,
-						shader_model->model.self_illumination_animation_period!=0.0f);
-
-					subtract_vectors3d(
-						(real_vector3d const *)&shader_model->model.
-							self_illumination_animation_color_upper_bound,
-						(real_vector3d const *)&shader_model->model.
-							self_illumination_animation_color_lower_bound,
-						color_delta);
-					point_from_line3d(
-						(real_point3d const *)&shader_model->model.
-							self_illumination_animation_color_lower_bound,
-						color_delta,
-						periodic_function_evaluate(
-							shader_model->model.
-								self_illumination_animation_function,
-							global_frame_parameters.game_time_sec/
-								shader_model->model.
-									self_illumination_animation_period +
-								self_illumination_phase),
-						(real_point3d *)&self_illumination_color);
+					self_illumination_phase = 0.0f;
 				}
+				else
+				{
+					self_illumination_phase = real_seed_random(&seed);
+				}
+
+				match_assert(
+					"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+					864,
+					shader_model->model.self_illumination_animation_period!=0.0f);
+
+				self_illumination_animation_fraction =
+					periodic_function_evaluate(
+						shader_model->model.
+							self_illumination_animation_function,
+						global_frame_parameters.game_time_sec/
+							shader_model->model.
+								self_illumination_animation_period +
+							self_illumination_phase);
+				self_illumination_color.red =
+					shader_model->model.
+						self_illumination_animation_color_lower_bound.red +
+					(shader_model->model.
+							self_illumination_animation_color_upper_bound.red -
+						shader_model->model.
+							self_illumination_animation_color_lower_bound.red) *
+					self_illumination_animation_fraction;
+				self_illumination_color.green =
+					shader_model->model.
+						self_illumination_animation_color_lower_bound.green +
+					(shader_model->model.
+							self_illumination_animation_color_upper_bound.green -
+						shader_model->model.
+							self_illumination_animation_color_lower_bound.green) *
+					self_illumination_animation_fraction;
+				self_illumination_color.blue =
+					shader_model->model.
+						self_illumination_animation_color_lower_bound.blue +
+					(shader_model->model.
+							self_illumination_animation_color_upper_bound.blue -
+						shader_model->model.
+							self_illumination_animation_color_lower_bound.blue) *
+					self_illumination_animation_fraction;
 
 				match_assert(
 					"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
@@ -2031,19 +2231,19 @@ void _rasterizer_model_draw(
 					shader_model->model.parallel_tint_color.blue*
 					local_parameters->lighting.reflection_tint_color.blue;
 
-				vertex_constants[0][0] = shader_model->model.detail_map_scale;
-				vertex_constants[0][1] = shader_model->model.detail_map_scale*
+				vertex_constants[0].n[0] = shader_model->model.detail_map_scale;
+				vertex_constants[0].n[1] = shader_model->model.detail_map_scale*
 					shader_model->model.detail_map_v_scale;
-				vertex_constants[0][2] = 1.0f;
-				vertex_constants[0][3] = 1.0f;
-				vertex_constants[1][0] = 1.0f;
-				vertex_constants[1][1] = 0.0f;
-				vertex_constants[1][2] = 0.0f;
-				vertex_constants[1][3] = 0.0f;
-				vertex_constants[2][0] = 0.0f;
-				vertex_constants[2][1] = 1.0f;
-				vertex_constants[2][2] = 0.0f;
-				vertex_constants[2][3] = 0.0f;
+				vertex_constants[0].n[2] = 1.0f;
+				vertex_constants[0].n[3] = 1.0f;
+				vertex_constants[1].n[0] = 1.0f;
+				vertex_constants[1].n[1] = 0.0f;
+				vertex_constants[1].n[2] = 0.0f;
+				vertex_constants[1].n[3] = 0.0f;
+				vertex_constants[2].n[0] = 0.0f;
+				vertex_constants[2].n[1] = 1.0f;
+				vertex_constants[2].n[2] = 0.0f;
+				vertex_constants[2].n[3] = 0.0f;
 				specular_constants[0][0] = perpendicular.red - parallel.red;
 				specular_constants[0][1] = perpendicular.green - parallel.green;
 				specular_constants[0][2] = perpendicular.blue - parallel.blue;
@@ -2064,9 +2264,9 @@ void _rasterizer_model_draw(
 					0.0f,
 					0.0f,
 					global_frame_parameters.game_time_sec,
-					(real_vector4d *)vertex_constants[1],
-					(real_vector4d *)vertex_constants[2]);
-				vertex_constants[2][2] = shader_model->model.translucency;
+					&vertex_constants[1],
+					&vertex_constants[2]);
+				vertex_constants[2].n[2] = shader_model->model.translucency;
 
 				IDirect3DDevice8_SetVertexShaderConstant(
 					global_d3d_device,
@@ -2155,7 +2355,7 @@ void _rasterizer_model_draw(
 
 					if (TEST_FLAG(
 							global_window_parameters.fog.fog_definition_flags,
-							1))
+						_fog_definition_atmosphere_dominant_bit))
 					{
 						planar_fog_fraction = 1.0f;
 					}
@@ -2287,21 +2487,21 @@ void _rasterizer_model_draw(
 						shader_model->model.flags,
 						_shader_model_two_sided_bit))
 				{
-					vertex_constants[0][0] =
+					vertex_constants[0].n[0] =
 						shader_model->model.detail_map_scale;
-					vertex_constants[0][1] =
+					vertex_constants[0].n[1] =
 						shader_model->model.detail_map_scale*
 						shader_model->model.detail_map_v_scale;
-					vertex_constants[0][2] = 1.0f;
-					vertex_constants[0][3] = -1.0f;
-					vertex_constants[1][0] = 1.0f;
-					vertex_constants[1][1] = 0.0f;
-					vertex_constants[1][2] = 0.0f;
-					vertex_constants[1][3] = 0.0f;
-					vertex_constants[2][0] = 0.0f;
-					vertex_constants[2][1] = 1.0f;
-					vertex_constants[2][2] = 0.0f;
-					vertex_constants[2][3] = 0.0f;
+					vertex_constants[0].n[2] = 1.0f;
+					vertex_constants[0].n[3] = -1.0f;
+					vertex_constants[1].n[0] = 1.0f;
+					vertex_constants[1].n[1] = 0.0f;
+					vertex_constants[1].n[2] = 0.0f;
+					vertex_constants[1].n[3] = 0.0f;
+					vertex_constants[2].n[0] = 0.0f;
+					vertex_constants[2].n[1] = 1.0f;
+					vertex_constants[2].n[2] = 0.0f;
+					vertex_constants[2].n[3] = 0.0f;
 
 					shader_texture_animation_evaluate(
 						&shader_model->model.texture_animation,
@@ -2314,9 +2514,9 @@ void _rasterizer_model_draw(
 						0.0f,
 						0.0f,
 						global_frame_parameters.game_time_sec,
-						(real_vector4d *)vertex_constants[1],
-						(real_vector4d *)vertex_constants[2]);
-					vertex_constants[2][2] =
+						&vertex_constants[1],
+						&vertex_constants[2]);
+					vertex_constants[2].n[2] =
 						shader_model->model.translucency;
 
 					IDirect3DDevice8_SetVertexShaderConstant(
@@ -2443,9 +2643,14 @@ struct transparent_geometry_group *_rasterizer_model_transparent_geometry_submit
 			{
 				if (shader_is_decal(shader))
 				{
-					geometry_flags |=
-						FLAG(_rasterizer_geometry_no_sort_bit)|
-						FLAG(_rasterizer_geometry_no_queue_bit);
+					SET_FLAG(
+						geometry_flags,
+						_rasterizer_geometry_no_sort_bit,
+						TRUE);
+					SET_FLAG(
+						geometry_flags,
+						_rasterizer_geometry_no_queue_bit,
+						TRUE);
 				}
 
 				if (TEST_FLAG(

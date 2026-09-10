@@ -2167,7 +2167,7 @@ static real ai_communication_actor_talk_weight(
 			goto done;
 		}
 
-		if (flags & FLAG(_find_actor_near_to_players_bit))
+		if (TEST_FLAG(flags, _find_actor_near_to_players_bit))
 		{
 			real player_rating;
 
@@ -2187,7 +2187,7 @@ static real ai_communication_actor_talk_weight(
 			}
 		}
 
-		if ((flags & FLAG(_find_actor_same_vehicle_bit)) &&
+		if (TEST_FLAG(flags, _find_actor_same_vehicle_bit) &&
 			subject_unit_index != NONE)
 		{
 			struct unit_datum *subject_unit;
@@ -2219,7 +2219,7 @@ static real ai_communication_actor_talk_weight(
 				communication_priority,
 				speech_priority,
 				0,
-				flags & FLAG(_find_actor_allow_lookup_bit),
+				TEST_FLAG(flags, _find_actor_allow_lookup_bit),
 				TRUE,
 				&line_vocalization_type,
 				&weight,
@@ -2241,7 +2241,7 @@ static real ai_communication_actor_talk_weight(
 			{
 				if (actor->meta.unit_index == subject_unit_index)
 				{
-					if (flags & FLAG(_find_actor_allow_subject_bit))
+					if (TEST_FLAG(flags, _find_actor_allow_subject_bit))
 					{
 						subject_matches = TRUE;
 					}
@@ -2305,7 +2305,7 @@ static real ai_communication_actor_talk_weight(
 			{
 				if (actor->meta.unit_index == cause_unit_index)
 				{
-					if (flags & FLAG(_find_actor_allow_cause_bit))
+					if (TEST_FLAG(flags, _find_actor_allow_cause_bit))
 					{
 						cause_matches = TRUE;
 					}
@@ -2445,7 +2445,9 @@ static long ai_communication_find_global_actor_to_talk(
 	}
 	if (cause_unit_index != NONE)
 	{
-		/* January asks for the subject position in this branch. */
+		/* BUG (preserved for exact matching): January asks for the subject
+		 * position again here and leaves cause_point uninitialized. A corrected
+		 * build should call unit_get_head_position(cause_unit_index, &cause_point). */
 		unit_get_head_position(subject_unit_index, &subject_point);
 	}
 

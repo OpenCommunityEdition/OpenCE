@@ -96,10 +96,6 @@ void rasterizer_set_target_as_texture(
 void SetRenderStateSmart(
 	D3DRENDERSTATETYPE state,
 	unsigned long value);
-void SetTextureStageStateSmart(
-	unsigned long stage,
-	D3DTEXTURESTAGESTATETYPE type,
-	unsigned long value);
 void rasterizer_set_stencil_mode(
 	long stencil_mode);
 boolean rasterizer_set_texture_bitmap_data(

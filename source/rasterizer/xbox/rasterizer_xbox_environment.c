@@ -214,6 +214,12 @@ enum
 
 enum
 {
+	_rasterizer_vertex_shader_environment_reflection = 42,
+	_rasterizer_vertex_shader_environment_reflection_mirror = 51,
+};
+
+enum
+{
 	_shader_environment_diffuse_rescale_detail_maps_bit = 0,
 	_shader_environment_diffuse_rescale_bump_map_bit,
 };
@@ -2078,7 +2084,10 @@ void _rasterizer_environment_reflection_mirror_draw(
 			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZWRITEENABLE, FALSE);
 			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZBIAS, 0);
 
-			rasterizer_set_vertex_shader_permutation(51, vertex_buffer->type, 0);
+			rasterizer_set_vertex_shader_permutation(
+				_rasterizer_vertex_shader_environment_reflection_mirror,
+				vertex_buffer->type,
+				0);
 
 			texture_transform_constants[0].i = shader_environment->environment.diffuse.runtime_bump_map_scale.i;
 			texture_transform_constants[0].j = shader_environment->environment.diffuse.runtime_bump_map_scale.j;
@@ -2100,45 +2109,109 @@ void _rasterizer_environment_reflection_mirror_draw(
 			IDirect3DDevice8_SetVertexShaderConstant(global_d3d_device, -84, texture_transform_constants, 3);
 
 			csmemset(&pixel_shader, 0, sizeof(pixel_shader));
-			pixel_shader.texture_modes = 0x00008C61;
-			pixel_shader.combiner_count = 0x00011005;
+			pixel_shader.texture_modes = PS_TEXTUREMODES(
+				PS_TEXTUREMODES_PROJECT2D,
+				PS_TEXTUREMODES_CUBEMAP,
+				PS_TEXTUREMODES_CUBEMAP,
+				PS_TEXTUREMODES_PROJECT2D);
+			pixel_shader.combiner_count = PS_COMBINERCOUNT(
+				5,
+				PS_COMBINERCOUNT_UNIQUE_C0 | PS_COMBINERCOUNT_UNIQUE_C1);
 			if (shader_environment->environment.diffuse.bump_map.index == NONE)
 			{
 				mirror_color.red = PIN(0.5f - global_window_parameters.camera.forward.i * 0.5f, 0.0f, 1.0f);
 				mirror_color.green = PIN(0.5f - global_window_parameters.camera.forward.j * 0.5f, 0.0f, 1.0f);
 				mirror_color.blue = PIN(0.5f - global_window_parameters.camera.forward.k * 0.5f, 0.0f, 1.0f);
 				pixel_shader.constant_0[0] = real_rgb_color_to_pixel32(&mirror_color);
-				pixel_shader.rgb_inputs[0] = 0x4A410B0B;
+				pixel_shader.rgb_inputs[0] = PS_COMBINERINPUTS(
+					PS_REGISTER_T2 | PS_INPUTMAPPING_EXPAND_NORMAL,
+					PS_REGISTER_C0 | PS_INPUTMAPPING_EXPAND_NORMAL,
+					PS_REGISTER_T3,
+					PS_REGISTER_T3);
 			}
 			else
 			{
-				pixel_shader.rgb_inputs[0] = 0x49480B0B;
+				pixel_shader.rgb_inputs[0] = PS_COMBINERINPUTS(
+					PS_REGISTER_T1 | PS_INPUTMAPPING_EXPAND_NORMAL,
+					PS_REGISTER_T0 | PS_INPUTMAPPING_EXPAND_NORMAL,
+					PS_REGISTER_T3,
+					PS_REGISTER_T3);
 			}
-			pixel_shader.rgb_outputs[0] = 0x000020CD;
-			pixel_shader.rgb_inputs[1] = 0x0C0C0D0D;
-			pixel_shader.rgb_outputs[1] = 0x000000CD;
-			pixel_shader.rgb_inputs[2] = 0x0C0C0D0D;
-			pixel_shader.rgb_outputs[2] = 0x0000000D;
+			pixel_shader.rgb_outputs[0] = PS_COMBINEROUTPUTS(
+				PS_REGISTER_R0,
+				PS_REGISTER_R1,
+				PS_REGISTER_DISCARD,
+				PS_COMBINEROUTPUT_AB_DOT_PRODUCT);
+			pixel_shader.rgb_inputs[1] = PS_COMBINERINPUTS(
+				PS_REGISTER_R0,
+				PS_REGISTER_R0,
+				PS_REGISTER_R1,
+				PS_REGISTER_R1);
+			pixel_shader.rgb_outputs[1] = PS_COMBINEROUTPUTS(
+				PS_REGISTER_R0,
+				PS_REGISTER_R1,
+				PS_REGISTER_DISCARD,
+				PS_COMBINEROUTPUT_IDENTITY);
+			pixel_shader.rgb_inputs[2] = PS_COMBINERINPUTS(
+				PS_REGISTER_R0,
+				PS_REGISTER_R0,
+				PS_REGISTER_R1,
+				PS_REGISTER_R1);
+			pixel_shader.rgb_outputs[2] = PS_COMBINEROUTPUTS(
+				PS_REGISTER_DISCARD,
+				PS_REGISTER_R1,
+				PS_REGISTER_DISCARD,
+				PS_COMBINEROUTPUT_IDENTITY);
 			pixel_shader.constant_0[3] = real_a_rgb_color_to_pixel32(
 				shader_environment->environment.reflection.view_perpendicular_brightness,
 				&shader_environment->environment.specular.view_perpendicular_color);
 			pixel_shader.constant_1[3] = real_a_rgb_color_to_pixel32(
 				shader_environment->environment.reflection.view_parallel_brightness,
 				&shader_environment->environment.specular.view_parallel_color);
-			pixel_shader.alpha_inputs[3] = 0x2C120C11;
-			pixel_shader.alpha_outputs[3] = 0x00000C00;
-			pixel_shader.rgb_inputs[3] = 0x2C020C01;
-			pixel_shader.rgb_outputs[3] = 0x00000C00;
-			pixel_shader.rgb_inputs[4] = 0x2C0D0C0B;
-			pixel_shader.rgb_outputs[4] = 0x00000C00;
-			pixel_shader.final_combiner_inputs_abcd = 0x0C0F0000;
-			pixel_shader.final_combiner_inputs_efg =
-				(0x1C00 |
-					(TEST_FLAG(
-						shader_environment->environment.flags,
-						_shader_environment_bump_map_is_specular_mask_bit)
-						? 0x08
-						: 0x20)) << 16;
+			pixel_shader.alpha_inputs[3] = PS_COMBINERINPUTS(
+				PS_REGISTER_R0 | PS_INPUTMAPPING_UNSIGNED_INVERT,
+				PS_REGISTER_C1 | PS_CHANNEL_ALPHA,
+				PS_REGISTER_R0,
+				PS_REGISTER_C0 | PS_CHANNEL_ALPHA);
+			pixel_shader.alpha_outputs[3] = PS_COMBINEROUTPUTS(
+				PS_REGISTER_DISCARD,
+				PS_REGISTER_DISCARD,
+				PS_REGISTER_R0,
+				PS_COMBINEROUTPUT_IDENTITY);
+			pixel_shader.rgb_inputs[3] = PS_COMBINERINPUTS(
+				PS_REGISTER_R0 | PS_INPUTMAPPING_UNSIGNED_INVERT,
+				PS_REGISTER_C1,
+				PS_REGISTER_R0,
+				PS_REGISTER_C0);
+			pixel_shader.rgb_outputs[3] = PS_COMBINEROUTPUTS(
+				PS_REGISTER_DISCARD,
+				PS_REGISTER_DISCARD,
+				PS_REGISTER_R0,
+				PS_COMBINEROUTPUT_IDENTITY);
+			pixel_shader.rgb_inputs[4] = PS_COMBINERINPUTS(
+				PS_REGISTER_R0 | PS_INPUTMAPPING_UNSIGNED_INVERT,
+				PS_REGISTER_R1,
+				PS_REGISTER_R0,
+				PS_REGISTER_T3);
+			pixel_shader.rgb_outputs[4] = PS_COMBINEROUTPUTS(
+				PS_REGISTER_DISCARD,
+				PS_REGISTER_DISCARD,
+				PS_REGISTER_R0,
+				PS_COMBINEROUTPUT_IDENTITY);
+			pixel_shader.final_combiner_inputs_abcd = PS_COMBINERINPUTS(
+				PS_REGISTER_R0,
+				PS_REGISTER_EF_PROD,
+				PS_REGISTER_ZERO,
+				PS_REGISTER_ZERO);
+			pixel_shader.final_combiner_inputs_efg = PS_COMBINERINPUTS(
+				PS_REGISTER_R0 | PS_CHANNEL_ALPHA,
+				TEST_FLAG(
+					shader_environment->environment.flags,
+					_shader_environment_bump_map_is_specular_mask_bit)
+					? PS_REGISTER_T0
+					: PS_REGISTER_ONE,
+				PS_REGISTER_ZERO,
+				0);
 			rasterizer_set_pixel_shader(&pixel_shader);
 
 			rasterizer_draw_dynamic_triangles_static_vertices(
@@ -2291,7 +2364,10 @@ void _rasterizer_environment_reflection_draw(
 			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZWRITEENABLE, FALSE);
 			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZBIAS, 0);
 
-			rasterizer_set_vertex_shader_permutation(42, vertex_buffer->type, reflection_type);
+			rasterizer_set_vertex_shader_permutation(
+				_rasterizer_vertex_shader_environment_reflection,
+				vertex_buffer->type,
+				reflection_type);
 
 			texture_transform_constants[0].i = shader_environment->environment.diffuse.runtime_bump_map_scale.i;
 			texture_transform_constants[0].j = shader_environment->environment.diffuse.runtime_bump_map_scale.j;
@@ -2317,13 +2393,25 @@ void _rasterizer_environment_reflection_draw(
 			{
 				case _shader_environment_reflection_type_bumped_cube_map:
 				case _shader_environment_reflection_type_bumped_radiosity:
-					pixel_shader.texture_modes = 0x00062E21;
-					pixel_shader.input_texture = 0;
-					pixel_shader.dot_mapping = 0x00000111;
+					pixel_shader.texture_modes = PS_TEXTUREMODES(
+						PS_TEXTUREMODES_PROJECT2D,
+						PS_TEXTUREMODES_DOTPRODUCT,
+						PS_TEXTUREMODES_DOT_RFLCT_DIFF,
+						PS_TEXTUREMODES_DOT_RFLCT_SPEC);
+					pixel_shader.input_texture = PS_INPUTTEXTURE(0, 0, 0, 0);
+					pixel_shader.dot_mapping = PS_DOTMAPPING(
+						PS_DOTMAPPING_ZERO_TO_ONE,
+						PS_DOTMAPPING_MINUS1_TO_1_D3D,
+						PS_DOTMAPPING_MINUS1_TO_1_D3D,
+						PS_DOTMAPPING_MINUS1_TO_1_D3D);
 					break;
 
 				case _shader_environment_reflection_type_flat_cube_map:
-					pixel_shader.texture_modes = 0x00018C61;
+					pixel_shader.texture_modes = PS_TEXTUREMODES(
+						PS_TEXTUREMODES_PROJECT2D,
+						PS_TEXTUREMODES_CUBEMAP,
+						PS_TEXTUREMODES_CUBEMAP,
+						PS_TEXTUREMODES_CUBEMAP);
 					break;
 
 				default:
@@ -2334,7 +2422,9 @@ void _rasterizer_environment_reflection_draw(
 						"### ERROR unsupported reflection type");
 					break;
 			}
-			pixel_shader.combiner_count = 0x00011005;
+			pixel_shader.combiner_count = PS_COMBINERCOUNT(
+				5,
+				PS_COMBINERCOUNT_UNIQUE_C0 | PS_COMBINERCOUNT_UNIQUE_C1);
 
 			if (reflection_type == _shader_environment_reflection_type_bumped_cube_map ||
 				reflection_type == _shader_environment_reflection_type_bumped_radiosity ||
@@ -2344,37 +2434,95 @@ void _rasterizer_environment_reflection_draw(
 				mirror_color.green = PIN(0.5f - global_window_parameters.camera.forward.j * 0.5f, 0.0f, 1.0f);
 				mirror_color.blue = PIN(0.5f - global_window_parameters.camera.forward.k * 0.5f, 0.0f, 1.0f);
 				pixel_shader.constant_0[0] = real_rgb_color_to_pixel32(&mirror_color);
-				pixel_shader.rgb_inputs[0] = 0x4A410B0B;
+				pixel_shader.rgb_inputs[0] = PS_COMBINERINPUTS(
+					PS_REGISTER_T2 | PS_INPUTMAPPING_EXPAND_NORMAL,
+					PS_REGISTER_C0 | PS_INPUTMAPPING_EXPAND_NORMAL,
+					PS_REGISTER_T3,
+					PS_REGISTER_T3);
 			}
 			else
 			{
-				pixel_shader.rgb_inputs[0] = 0x49480B0B;
+				pixel_shader.rgb_inputs[0] = PS_COMBINERINPUTS(
+					PS_REGISTER_T1 | PS_INPUTMAPPING_EXPAND_NORMAL,
+					PS_REGISTER_T0 | PS_INPUTMAPPING_EXPAND_NORMAL,
+					PS_REGISTER_T3,
+					PS_REGISTER_T3);
 			}
-			pixel_shader.rgb_inputs[1] = 0x0C0C0D0D;
-			pixel_shader.rgb_inputs[2] = 0x0C0C0D0D;
-			pixel_shader.rgb_outputs[0] = 0x000020CD;
-			pixel_shader.rgb_outputs[1] = 0x000000CD;
-			pixel_shader.rgb_outputs[2] = 0x0000000D;
+			pixel_shader.rgb_inputs[1] = PS_COMBINERINPUTS(
+				PS_REGISTER_R0,
+				PS_REGISTER_R0,
+				PS_REGISTER_R1,
+				PS_REGISTER_R1);
+			pixel_shader.rgb_inputs[2] = PS_COMBINERINPUTS(
+				PS_REGISTER_R0,
+				PS_REGISTER_R0,
+				PS_REGISTER_R1,
+				PS_REGISTER_R1);
+			pixel_shader.rgb_outputs[0] = PS_COMBINEROUTPUTS(
+				PS_REGISTER_R0,
+				PS_REGISTER_R1,
+				PS_REGISTER_DISCARD,
+				PS_COMBINEROUTPUT_AB_DOT_PRODUCT);
+			pixel_shader.rgb_outputs[1] = PS_COMBINEROUTPUTS(
+				PS_REGISTER_R0,
+				PS_REGISTER_R1,
+				PS_REGISTER_DISCARD,
+				PS_COMBINEROUTPUT_IDENTITY);
+			pixel_shader.rgb_outputs[2] = PS_COMBINEROUTPUTS(
+				PS_REGISTER_DISCARD,
+				PS_REGISTER_R1,
+				PS_REGISTER_DISCARD,
+				PS_COMBINEROUTPUT_IDENTITY);
 			pixel_shader.constant_0[3] = real_a_rgb_color_to_pixel32(
 				shader_environment->environment.reflection.view_perpendicular_brightness,
 				&shader_environment->environment.specular.view_perpendicular_color);
 			pixel_shader.constant_1[3] = real_a_rgb_color_to_pixel32(
 				shader_environment->environment.reflection.view_parallel_brightness,
 				&shader_environment->environment.specular.view_parallel_color);
-			pixel_shader.alpha_inputs[3] = 0x2C120C11;
-			pixel_shader.alpha_outputs[3] = 0x00000C00;
-			pixel_shader.rgb_inputs[3] = 0x2C020C01;
-			pixel_shader.rgb_outputs[3] = 0x00000C00;
-			pixel_shader.rgb_inputs[4] = 0x2C0D0C0B;
-			pixel_shader.rgb_outputs[4] = 0x00000C00;
-			pixel_shader.final_combiner_inputs_abcd = 0x0C0F0000;
-			pixel_shader.final_combiner_inputs_efg =
-				(0x1C00 |
-					(TEST_FLAG(
-						shader_environment->environment.flags,
-						_shader_environment_bump_map_is_specular_mask_bit)
-						? 0x08
-						: 0x20)) << 16;
+			pixel_shader.alpha_inputs[3] = PS_COMBINERINPUTS(
+				PS_REGISTER_R0 | PS_INPUTMAPPING_UNSIGNED_INVERT,
+				PS_REGISTER_C1 | PS_CHANNEL_ALPHA,
+				PS_REGISTER_R0,
+				PS_REGISTER_C0 | PS_CHANNEL_ALPHA);
+			pixel_shader.alpha_outputs[3] = PS_COMBINEROUTPUTS(
+				PS_REGISTER_DISCARD,
+				PS_REGISTER_DISCARD,
+				PS_REGISTER_R0,
+				PS_COMBINEROUTPUT_IDENTITY);
+			pixel_shader.rgb_inputs[3] = PS_COMBINERINPUTS(
+				PS_REGISTER_R0 | PS_INPUTMAPPING_UNSIGNED_INVERT,
+				PS_REGISTER_C1,
+				PS_REGISTER_R0,
+				PS_REGISTER_C0);
+			pixel_shader.rgb_outputs[3] = PS_COMBINEROUTPUTS(
+				PS_REGISTER_DISCARD,
+				PS_REGISTER_DISCARD,
+				PS_REGISTER_R0,
+				PS_COMBINEROUTPUT_IDENTITY);
+			pixel_shader.rgb_inputs[4] = PS_COMBINERINPUTS(
+				PS_REGISTER_R0 | PS_INPUTMAPPING_UNSIGNED_INVERT,
+				PS_REGISTER_R1,
+				PS_REGISTER_R0,
+				PS_REGISTER_T3);
+			pixel_shader.rgb_outputs[4] = PS_COMBINEROUTPUTS(
+				PS_REGISTER_DISCARD,
+				PS_REGISTER_DISCARD,
+				PS_REGISTER_R0,
+				PS_COMBINEROUTPUT_IDENTITY);
+			pixel_shader.final_combiner_inputs_abcd = PS_COMBINERINPUTS(
+				PS_REGISTER_R0,
+				PS_REGISTER_EF_PROD,
+				PS_REGISTER_ZERO,
+				PS_REGISTER_ZERO);
+			pixel_shader.final_combiner_inputs_efg = PS_COMBINERINPUTS(
+				PS_REGISTER_R0 | PS_CHANNEL_ALPHA,
+				TEST_FLAG(
+					shader_environment->environment.flags,
+					_shader_environment_bump_map_is_specular_mask_bit)
+					? PS_REGISTER_T0
+					: PS_REGISTER_ONE,
+				PS_REGISTER_ZERO,
+				0);
 			rasterizer_set_pixel_shader(&pixel_shader);
 
 			rasterizer_draw_dynamic_triangles_static_vertices2(

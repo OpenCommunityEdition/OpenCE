@@ -102,7 +102,6 @@ struct shader;
 struct triangle_buffer;
 struct vertex_buffer;
 struct rasterizer_dynamic_screen_geometry_parameters;
-struct rasterizer_model_geometry_part;
 struct rasterizer_model_skinning;
 
 #ifndef RASTERIZER_WIDGET_SIGNATURES_OWNED
@@ -276,10 +275,6 @@ void rasterizer_debug_immediate_vector(
 	real_vector3d const *vector,
 	real scale,
 	real_rgb_color const *color);
-void rasterizer_debug_model_vertices(
-	long object_index,
-	struct rasterizer_model_skinning const *skinning,
-	struct rasterizer_model_geometry_part const *part);
 void rasterizer_debug_immediate_triangle(
 	real_point3d const *p0,
 	real_point3d const *p1,
@@ -356,29 +351,6 @@ void rasterizer_hud_motion_sensor_blip_draw(
 void rasterizer_hud_motion_sensor_blip_end(
 	real_point2d const *center,
 	real scale);
-void rasterizer_model_begin(
-	struct rasterizer_model_begin_parameters const *parameters,
-	boolean is_dynamic);
-void rasterizer_model_draw(
-	struct shader const *shader,
-	short bitmap_index,
-	void const *geometry,
-	long geometry_index,
-	long model_data,
-	real_rgb_color const *change_colors,
-	long model_effect);
-void rasterizer_model_transparent_geometry_submit(
-	struct shader const *shader,
-	short bitmap_index,
-	void const *geometry,
-	long geometry_index,
-	long model_data,
-	real_rgb_color const *change_colors,
-	long model_effect,
-	void const *lighting,
-	void const *effect);
-void rasterizer_model_end(
-	void);
 void rasterizer_models_end(
 	void);
 void rasterizer_models_begin(

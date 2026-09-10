@@ -49,7 +49,9 @@ FIELDS = (
 	("reflection_mask_dynamic_vertex_count", 0x084, 4, "unsigned"),
 	("reflection_mask_dynamic_triangle_count", 0x088, 4, "unsigned"),
 	("reflection_mask_dynamic_draw_count", 0x08C, 4, "unsigned"),
-	("reserved090", 0x090, 0x0C, None),
+	("reflection_dynamic_vertex_count", 0x090, 4, "unsigned"),
+	("reflection_dynamic_triangle_count", 0x094, 4, "unsigned"),
+	("reflection_dynamic_draw_count", 0x098, 4, "unsigned"),
 	("transparent_geometry_dynamic_vertex_count", 0x09C, 4, "unsigned"),
 	("transparent_geometry_dynamic_triangle_count", 0x0A0, 4, "unsigned"),
 	("transparent_geometry_largest_dynamic_triangle_count", 0x0A4, 4, "signed"),
@@ -246,19 +248,19 @@ def test_models_keeps_unsigned_delta_and_accumulator_contract():
 	assert body.count("unsigned long lighting_work;") == 1
 	assert body.count(
 		"skinning_work = rasterizer_frame_statistics."
-		"vertex_shader_skinning_constant_bytes;") == 1
-	assert body.count(
-		"skinning_work = rasterizer_frame_statistics."
-		"vertex_shader_skinning_constant_bytes - skinning_work;") == 1
-	assert body.count(
-		"lighting_work = rasterizer_frame_statistics."
-		"vertex_shader_lighting_constant_bytes;") == 1
-	assert body.count(
-		"rasterizer_frame_statistics.model_skinning_constant_bytes += "
 		"skinning_work;") == 1
 	assert body.count(
-		"rasterizer_frame_statistics.model_lighting_constant_bytes += "
-		"rasterizer_frame_statistics.vertex_shader_lighting_constant_bytes - "
+		"skinning_work = rasterizer_frame_statistics."
+		"skinning_work - skinning_work;") == 1
+	assert body.count(
+		"lighting_work = rasterizer_frame_statistics."
+		"lighting_work;") == 1
+	assert body.count(
+		"rasterizer_frame_statistics.skinning_work_accumulated += "
+		"skinning_work;") == 1
+	assert body.count(
+		"rasterizer_frame_statistics.lighting_work_accumulated += "
+		"rasterizer_frame_statistics.lighting_work - "
 		"lighting_work;") == 1
 
 

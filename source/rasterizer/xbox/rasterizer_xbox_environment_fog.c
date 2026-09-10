@@ -763,41 +763,98 @@ void _rasterizer_environment_fog_screen_end(
 			FALSE);
 
 		csmemset(&pixel_shader, 0, sizeof(pixel_shader));
-		pixel_shader.texture_modes =
-			1 |
-			((screen->layer_count > 1) << 5) |
-			((screen->layer_count > 2) << 10) |
-			((screen->layer_count > 3) << 15);
-		pixel_shader.combiner_count = 0x11004;
+		pixel_shader.texture_modes = PS_TEXTUREMODES(
+			PS_TEXTUREMODES_PROJECT2D,
+			screen->layer_count > 1 ? PS_TEXTUREMODES_PROJECT2D : PS_TEXTUREMODES_NONE,
+			screen->layer_count > 2 ? PS_TEXTUREMODES_PROJECT2D : PS_TEXTUREMODES_NONE,
+			screen->layer_count > 3 ? PS_TEXTUREMODES_PROJECT2D : PS_TEXTUREMODES_NONE);
+		pixel_shader.combiner_count = PS_COMBINERCOUNT(
+			4,
+			PS_COMBINERCOUNT_UNIQUE_C0 | PS_COMBINERCOUNT_UNIQUE_C1);
 		pixel_shader.constant_0[0] = real_rgb_color_to_pixel32(&local_fog_screen_layer_colors[0]);
 		pixel_shader.constant_1[0] = real_rgb_color_to_pixel32(&local_fog_screen_layer_colors[1]);
-		pixel_shader.rgb_inputs[0] = 0x08010902;
-		pixel_shader.rgb_outputs[0] = 0x3089;
+		pixel_shader.rgb_inputs[0] = PS_COMBINERINPUTS(
+			PS_REGISTER_T0,
+			PS_REGISTER_C0,
+			PS_REGISTER_T1,
+			PS_REGISTER_C1);
+		pixel_shader.rgb_outputs[0] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_T0,
+			PS_REGISTER_T1,
+			PS_REGISTER_DISCARD,
+			PS_COMBINEROUTPUT_AB_DOT_PRODUCT | PS_COMBINEROUTPUT_CD_DOT_PRODUCT);
 		pixel_shader.constant_0[1] = real_rgb_color_to_pixel32(&local_fog_screen_layer_colors[2]);
 		pixel_shader.constant_1[1] = real_rgb_color_to_pixel32(&local_fog_screen_layer_colors[3]);
-		pixel_shader.alpha_inputs[1] =
-			0x28000000 | ((screen->layer_count > 1 ? 0x29 : 0x20) << 16);
-		pixel_shader.alpha_outputs[1] = 0xC0;
-		pixel_shader.rgb_inputs[1] = 0x0A010B02;
-		pixel_shader.rgb_outputs[1] = 0x30AB;
-		pixel_shader.alpha_inputs[2] =
-			((screen->layer_count > 2 ? 0x2A : 0x20) << 24) |
-			((screen->layer_count > 3 ? 0x2B : 0x20) << 16);
-		pixel_shader.alpha_outputs[2] = 0xD0;
-		pixel_shader.rgb_inputs[2] =
-			((screen->layer_count > 2 ? 0x2A : 0x20) << 24) |
-			((screen->layer_count > 3 ? 0x0B : 0x00) << 16) |
-			((screen->layer_count > 2 ? 0x0A : 0x00) << 8) |
-			0x20;
-		pixel_shader.rgb_outputs[2] = 0xC00;
-		pixel_shader.alpha_inputs[3] = 0x1C1D0000;
-		pixel_shader.alpha_outputs[3] = 0xC0;
-		pixel_shader.rgb_inputs[3] =
-			((screen->layer_count > 1 ? 0x29 : 0x20) << 24) |
-			0x000C0000 |
-			((screen->layer_count > 1 ? 0x09 : 0x00) << 8) |
-			0x20;
-		pixel_shader.rgb_outputs[3] = 0xC00;
+		pixel_shader.alpha_inputs[1] = PS_COMBINERINPUTS(
+			PS_REGISTER_T0 | PS_INPUTMAPPING_UNSIGNED_INVERT,
+			screen->layer_count > 1
+				? PS_REGISTER_T1 | PS_INPUTMAPPING_UNSIGNED_INVERT
+				: PS_REGISTER_ONE,
+			PS_REGISTER_ZERO,
+			PS_REGISTER_ZERO);
+		pixel_shader.alpha_outputs[1] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_R0,
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_DISCARD,
+			PS_COMBINEROUTPUT_IDENTITY);
+		pixel_shader.rgb_inputs[1] = PS_COMBINERINPUTS(
+			PS_REGISTER_T2,
+			PS_REGISTER_C0,
+			PS_REGISTER_T3,
+			PS_REGISTER_C1);
+		pixel_shader.rgb_outputs[1] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_T2,
+			PS_REGISTER_T3,
+			PS_REGISTER_DISCARD,
+			PS_COMBINEROUTPUT_AB_DOT_PRODUCT | PS_COMBINEROUTPUT_CD_DOT_PRODUCT);
+		pixel_shader.alpha_inputs[2] = PS_COMBINERINPUTS(
+			screen->layer_count > 2
+				? PS_REGISTER_T2 | PS_INPUTMAPPING_UNSIGNED_INVERT
+				: PS_REGISTER_ONE,
+			screen->layer_count > 3
+				? PS_REGISTER_T3 | PS_INPUTMAPPING_UNSIGNED_INVERT
+				: PS_REGISTER_ONE,
+			PS_REGISTER_ZERO,
+			PS_REGISTER_ZERO);
+		pixel_shader.alpha_outputs[2] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_R1,
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_DISCARD,
+			PS_COMBINEROUTPUT_IDENTITY);
+		pixel_shader.rgb_inputs[2] = PS_COMBINERINPUTS(
+			screen->layer_count > 2
+				? PS_REGISTER_T2 | PS_INPUTMAPPING_UNSIGNED_INVERT
+				: PS_REGISTER_ONE,
+			screen->layer_count > 3 ? PS_REGISTER_T3 : PS_REGISTER_ZERO,
+			screen->layer_count > 2 ? PS_REGISTER_T2 : PS_REGISTER_ZERO,
+			PS_REGISTER_ONE);
+		pixel_shader.rgb_outputs[2] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_R0,
+			PS_COMBINEROUTPUT_IDENTITY);
+		pixel_shader.alpha_inputs[3] = PS_COMBINERINPUTS(
+			PS_REGISTER_R0 | PS_CHANNEL_ALPHA,
+			PS_REGISTER_R1 | PS_CHANNEL_ALPHA,
+			PS_REGISTER_ZERO,
+			PS_REGISTER_ZERO);
+		pixel_shader.alpha_outputs[3] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_R0,
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_DISCARD,
+			PS_COMBINEROUTPUT_IDENTITY);
+		pixel_shader.rgb_inputs[3] = PS_COMBINERINPUTS(
+			screen->layer_count > 1
+				? PS_REGISTER_T1 | PS_INPUTMAPPING_UNSIGNED_INVERT
+				: PS_REGISTER_ONE,
+			PS_REGISTER_R0,
+			screen->layer_count > 1 ? PS_REGISTER_T1 : PS_REGISTER_ZERO,
+			PS_REGISTER_ONE);
+		pixel_shader.rgb_outputs[3] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_R0,
+			PS_COMBINEROUTPUT_IDENTITY);
 		if (screen->color)
 		{
 			pixel_shader.final_combiner_constant_0 = screen->color;
@@ -807,8 +864,16 @@ void _rasterizer_environment_fog_screen_end(
 			pixel_shader.final_combiner_constant_0 =
 				real_rgb_color_to_pixel32(&global_window_parameters.fog.planar_color);
 		}
-		pixel_shader.final_combiner_inputs_abcd = 0x08010F00;
-		pixel_shader.final_combiner_inputs_efg = 0x0C011C00;
+		pixel_shader.final_combiner_inputs_abcd = PS_COMBINERINPUTS(
+			PS_REGISTER_T0,
+			PS_REGISTER_C0,
+			PS_REGISTER_EF_PROD,
+			PS_REGISTER_ZERO);
+		pixel_shader.final_combiner_inputs_efg = PS_COMBINERINPUTS(
+			PS_REGISTER_R0,
+			PS_REGISTER_C0,
+			PS_REGISTER_R0 | PS_CHANNEL_ALPHA,
+			0);
 		rasterizer_set_pixel_shader(&pixel_shader);
 
 		IDirect3DDevice8_Begin(global_d3d_device, D3DPT_TRIANGLEFAN);
@@ -838,7 +903,7 @@ void _rasterizer_environment_fog_screen_end(
 				D3DBLEND_ONE);
 
 			csmemset(&pixel_shader, 0, sizeof(pixel_shader));
-			pixel_shader.combiner_count = 1;
+			pixel_shader.combiner_count = PS_COMBINERCOUNT(1, 0);
 			rasterizer_set_pixel_shader(&pixel_shader);
 
 			IDirect3DDevice8_Begin(global_d3d_device, D3DPT_TRIANGLEFAN);

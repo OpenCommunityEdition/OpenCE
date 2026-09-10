@@ -1169,6 +1169,10 @@ static void leaf_map_build_portal_from_leaves(
 			short portal_designator_index0 = (short)tag_block_add_element(&leaf0->portal_designators);
 			short portal_designator_index1 = (short)tag_block_add_element(&leaf1->portal_designators);
 
+			/* BUG (preserved for exact matching): January checks vertex_count
+			 * against NONE only after entering the positive-count branch, where
+			 * the assertion cannot fail. A corrected build should perform this
+			 * check immediately after convex_hull2d_intersect returns. */
 			match_vassert(
 				"c:\\halo\\SOURCE\\structures\\leaf_map.c",
 				487,

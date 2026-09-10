@@ -306,9 +306,11 @@ symbols in this file:
 #include "rasterizer.h"
 #include "rasterizer/rasterizer_debug_options.h"
 #include "rasterizer_geometry.h"
+#include "rasterizer_models.h"
 #include <xtl.h>
 #include "rasterizer/xbox/rasterizer_xbox.h"
 #include "rasterizer/xbox/rasterizer_xbox_internal.h"
+#include "rasterizer/xbox/rasterizer_xbox_models.h"
 #include "rasterizer/xbox/rasterizer_xbox_dynavobgeom.h"
 #include "render/render.h"
 #include "render/render_debug.h"
@@ -348,15 +350,6 @@ struct rasterizer_window_parameters
 	real_vector3d camera_forward;
 };
 
-struct rasterizer_triangle_buffer
-{
-	short type;
-	word pad;
-	long count;
-	void *data;
-	void *hardware_format;
-};
-
 struct rasterizer_model_vertex_compressed
 {
 	real_point3d position;
@@ -368,7 +361,7 @@ struct rasterizer_model_vertex_compressed
 	short node_weight;
 };
 
-struct rasterizer_model_geometry_part
+struct model_geometry_part
 {
 	unsigned long flags;
 	short shader_index;
@@ -382,7 +375,8 @@ struct rasterizer_model_geometry_part
 	struct tag_block uncompressed_vertices;
 	struct tag_block compressed_vertices;
 	struct tag_block triangles;
-	struct rasterizer_triangle_buffer triangle_buffer;
+	struct triangle_buffer triangle_buffer;
+	struct vertex_buffer vertex_buffer;
 };
 
 struct rasterizer_model_skinning
@@ -473,31 +467,6 @@ void _rasterizer_hud_motion_sensor_blip_draw(
 void _rasterizer_hud_motion_sensor_blip_end(
 	real_point2d const *center,
 	real scale);
-void _rasterizer_model_begin(
-	struct rasterizer_model_begin_parameters const *parameters,
-	boolean is_dynamic);
-void _rasterizer_model_draw(
-	struct shader const *shader,
-	short bitmap_index,
-	void const *geometry,
-	long geometry_index,
-	long model_data,
-	real_rgb_color const *change_colors,
-	long model_effect);
-void _rasterizer_model_transparent_geometry_submit(
-	struct shader const *shader,
-	short bitmap_index,
-	void const *geometry,
-	long geometry_index,
-	long model_data,
-	real_rgb_color const *change_colors,
-	long model_effect,
-	void const *lighting,
-	void const *effect);
-void _rasterizer_model_end(
-	void);
-void _rasterizer_models_end(
-	void);
 void _rasterizer_environment_lightmap_begin(
 	struct bitmap_data const *lightmap_bitmap);
 void _rasterizer_environment_lightmap_draw(
@@ -612,8 +581,6 @@ void _rasterizer_environment_fog_draw(
 	long first_triangle_index,
 	long triangle_count,
 	struct vertex_buffer const *vertex_buffer);
-void _rasterizer_environment_fog_screen_end(
-	void);
 void _rasterizer_environment_fog_screen_wind_get_vector(
 	short wind_index,
 	real animation_time,
@@ -629,9 +596,6 @@ void _rasterizer_environment_fog_screen_draw(
 	struct vertex_buffer const *vertex_buffer);
 void _rasterizer_screen_flash(
 	void);
-void _rasterizer_models_begin(
-	boolean skip_obscurer_test);
-
 /* ---------- globals */
 
 const struct rasterizer_global_defaults rasterizer_global_defaults =
@@ -1145,30 +1109,46 @@ void rasterizer_model_begin(
 }
 
 void rasterizer_model_draw(
-	struct shader const *shader,
-	short bitmap_index,
-	void const *geometry,
-	long geometry_index,
-	long model_data,
-	real_rgb_color const *change_colors,
-	long model_effect)
+	struct shader *shader,
+	short shader_permutation_index,
+	struct triangle_buffer const *triangle_buffer,
+	long dynamic_triangle_buffer_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer,
+	long dynamic_vertex_buffer_index)
 {
-	_rasterizer_model_draw(shader, bitmap_index, geometry, geometry_index, model_data, change_colors, model_effect);
+	_rasterizer_model_draw(
+		shader,
+		shader_permutation_index,
+		triangle_buffer,
+		dynamic_triangle_buffer_index,
+		triangle_count,
+		vertex_buffer,
+		dynamic_vertex_buffer_index);
 	return;
 }
 
 void rasterizer_model_transparent_geometry_submit(
-	struct shader const *shader,
-	short bitmap_index,
-	void const *geometry,
-	long geometry_index,
-	long model_data,
-	real_rgb_color const *change_colors,
-	long model_effect,
-	void const *lighting,
-	void const *effect)
+	struct shader *shader,
+	short shader_permutation_index,
+	struct triangle_buffer const *triangle_buffer,
+	long dynamic_triangle_buffer_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer,
+	long dynamic_vertex_buffer_index,
+	real_point3d const *centroid,
+	struct render_sort_filth *sort_filth)
 {
-	_rasterizer_model_transparent_geometry_submit(shader, bitmap_index, geometry, geometry_index, model_data, change_colors, model_effect, lighting, effect);
+	_rasterizer_model_transparent_geometry_submit(
+		shader,
+		shader_permutation_index,
+		triangle_buffer,
+		dynamic_triangle_buffer_index,
+		triangle_count,
+		vertex_buffer,
+		dynamic_vertex_buffer_index,
+		centroid,
+		sort_filth);
 	return;
 }
 
@@ -1922,7 +1902,7 @@ void rasterizer_debug_immediate_vector(
 void rasterizer_debug_model_vertices(
 	long object_index,
 	struct rasterizer_model_skinning const *skinning,
-	struct rasterizer_model_geometry_part const *part)
+	struct model_geometry_part const *part)
 {
 	long debug_vertex_count;
 	long closest_debug_vertex_index;

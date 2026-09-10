@@ -90,6 +90,7 @@ symbols in this file:
 #include "math/geometry.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_geometry.h"
+#include "rasterizer/rasterizer_models.h"
 #include "render/render.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"

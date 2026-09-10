@@ -45,8 +45,17 @@ target symbol rename was recorded.
   `rasterizer_transparent_geometry.h`, `rasterizer_xbox.h`, and the narrow Xbox
   internal interface. Color conversion declarations come from `hud_draw.h`.
 - January's external `point_from_line3d` call is retained via the already
-  established external-declaration include mode. The rebuilt object has no
-  emitted `point_from_line3d` definition or COMDAT.
+  established external-declaration include mode wherever that helper is used.
+  The rebuilt object has no emitted `point_from_line3d` definition or COMDAT.
+- The private pixel-shader builder expresses XDK register inputs, outputs,
+  texture modes, and combiner count through the stock `PS_*` macros. The
+  named forms constant-fold to the same January bytes, so the helper remains
+  strict exact.
+- The model drawer's plasma payload is represented by its authentic enclosing
+  shader definition rather than pointer arithmetic. Its animation constants
+  use `real_vector4d` storage, self-illumination color interpolation is
+  component-wise defined arithmetic, and the atmosphere-dominant test uses
+  the named fog flag.
 - No forced inline, register/volatile steering, barrier, pragma, assembly,
   fake dependency, raw field offset, undefined behavior, or nonsensical branch
   is present. `tools/fake_match_scan.py` reports zero findings.
@@ -65,20 +74,22 @@ All three complete callers receive zero exact credit and are recorded in
 | function | January / candidate padded | relocations | objdiff |
 | --- | ---: | ---: | ---: |
 | `rasterizer_model_draw_environment_shader` | 3,104 / 3,104 | 235 / 235 | 95.87124% |
-| `_rasterizer_model_transparent_geometry_submit` | 1,296 / 1,344 | 83 / 93 | 89.008064% |
-| `_rasterizer_model_draw` | 5,168 / 5,184 | 350 / 349 | 96.66598% |
+| `_rasterizer_model_transparent_geometry_submit` | 1,296 / 1,344 | 83 / 93 | 89.129036% |
+| `_rasterizer_model_draw` | 5,168 / 5,168 | 350 / 348 | 95.331955% |
 
-The remaining large-caller frontier is dominated by caller-specific
-`real_math.h` external-versus-inline ownership and ordinary scheduling. It was
-not pursued with source-shape searches or compiler steering.
+The remaining large-caller frontier includes caller-specific `real_math.h`
+ownership, ordinary scheduling, and the draw target's two geometry-helper
+relocations. The latter are intentionally absent from the retained candidate:
+reproducing them required incompatible color/point/vector representation casts,
+while the component-wise reconstruction is defined and semantically direct.
+No exact credit is claimed and no source-shape search or compiler steering was
+used to recover the lower fuzzy percentage.
 
 ## Verification
 
 ```text
 python tools/campaign/gate.py source/rasterizer/xbox/rasterizer_xbox_models \
-  --alias set_environment_shader_pixel_shader=code_0015a350 \
-  --alias local_pixel_shader_dirty_flag=data_0030cefb \
-  --alias rasterizer_models_globals=bss_00465d68 \
+  --source source/rasterizer/xbox/rasterizer_xbox_models.c \
   --all --forbid-emitted-symbol _point_from_line3d
 
 exact 11, residual 3, unwritten 0

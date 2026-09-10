@@ -79,6 +79,7 @@ The target SHA is
 `ea96544f961a628945353c8e51d4b6f6d23d0a311d2822cb7180c1ced9d5da3d`;
 the candidate SHA is
 `19b4d27dcd140be10cbcea9e2eb0ba9d9238c5e10eedc7011f47c5af924ded7f`.
+The production report measures 97.25564 percent similarity.
 Aligned disassembly shows the remaining differences are independent scheduling
 of the initial activity-byte clear versus the frame-index comparison, and the
 final activity-byte load versus density stores.  No declaration or statement

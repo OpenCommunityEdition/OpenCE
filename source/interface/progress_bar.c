@@ -183,6 +183,8 @@ symbols in this file:
  */
 #include <xtl.h>
 
+#include "interface/progress_bar_internal.h"
+
 /* ---------- constants */
 
 enum

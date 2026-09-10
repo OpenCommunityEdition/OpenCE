@@ -33,7 +33,7 @@ void rasterizer_environment_shadow_model_begin(
 void rasterizer_environment_shadow_model_end(
 	void);
 void rasterizer_model_draw(
-	struct shader const *shader,
+	struct shader *shader,
 	short shader_permutation_index,
 	struct triangle_buffer const *triangle_buffer,
 	long dynamic_triangle_buffer_index,
@@ -41,7 +41,7 @@ void rasterizer_model_draw(
 	struct vertex_buffer const *vertex_buffer,
 	long dynamic_vertex_buffer_index);
 void rasterizer_model_transparent_geometry_submit(
-	struct shader const *shader,
+	struct shader *shader,
 	short shader_permutation_index,
 	struct triangle_buffer const *triangle_buffer,
 	long dynamic_triangle_buffer_index,

@@ -156,6 +156,7 @@ symbols in this file:
 /* January retains the stock XDK D3DINLINE out-of-line wrappers emitted by
  * the real device calls below. Keep the stock definitions intact. */
 #include <xtl.h>
+#include "interface/progress_bar_internal.h"
 #include "rasterizer/xbox/rasterizer_xbox.h"
 #include "rasterizer/xbox/rasterizer_xbox_plasma_energy.h"
 #include "rasterizer/xbox/rasterizer_xbox_water.h"

@@ -33,7 +33,9 @@ unsigned long const rasterizer_frame_statistics_layout[] =
 	FRAME_STATISTICS_FIELD(reflection_mask_dynamic_vertex_count),
 	FRAME_STATISTICS_FIELD(reflection_mask_dynamic_triangle_count),
 	FRAME_STATISTICS_FIELD(reflection_mask_dynamic_draw_count),
-	FRAME_STATISTICS_FIELD(reserved090),
+	FRAME_STATISTICS_FIELD(reflection_dynamic_vertex_count),
+	FRAME_STATISTICS_FIELD(reflection_dynamic_triangle_count),
+	FRAME_STATISTICS_FIELD(reflection_dynamic_draw_count),
 	FRAME_STATISTICS_FIELD(transparent_geometry_dynamic_vertex_count),
 	FRAME_STATISTICS_FIELD(transparent_geometry_dynamic_triangle_count),
 	FRAME_STATISTICS_FIELD(transparent_geometry_largest_dynamic_triangle_count),
@@ -116,6 +118,9 @@ void rasterizer_frame_statistics_type_contract(
 	EXPECT_UNSIGNED(reflection_mask_dynamic_vertex_count);
 	EXPECT_UNSIGNED(reflection_mask_dynamic_triangle_count);
 	EXPECT_UNSIGNED(reflection_mask_dynamic_draw_count);
+	EXPECT_UNSIGNED(reflection_dynamic_vertex_count);
+	EXPECT_UNSIGNED(reflection_dynamic_triangle_count);
+	EXPECT_UNSIGNED(reflection_dynamic_draw_count);
 	EXPECT_UNSIGNED(transparent_geometry_dynamic_vertex_count);
 	EXPECT_UNSIGNED(transparent_geometry_dynamic_triangle_count);
 	EXPECT_SIGNED(transparent_geometry_largest_dynamic_triangle_count);

@@ -92,6 +92,8 @@ void rasterizer_environment_fog_screen_window_begin(
 	void);
 void rasterizer_environment_fog_screen_window_end(
 	void);
+void _rasterizer_environment_fog_screen_end(
+	void);
 boolean rasterizer_environment_fog_screen_model_begin(
 	struct rasterizer_model_begin_parameters const *parameters);
 void rasterizer_environment_fog_screen_model_end(

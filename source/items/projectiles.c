@@ -282,7 +282,7 @@ void projectile_kill_tracer(
 	struct projectile_datum *projectile;
 
 	projectile = projectile_get(projectile_index);
-	projectile->projectile.flags &= ~FLAG(_projectile_tracer_bit);
+	SET_FLAG(projectile->projectile.flags, _projectile_tracer_bit, FALSE);
 
 	return;
 }
@@ -325,7 +325,7 @@ void projectile_make_tracer(
 	struct projectile_datum *projectile;
 
 	projectile = projectile_get(projectile_index);
-	projectile->projectile.flags |= FLAG(_projectile_tracer_bit);
+	SET_FLAG(projectile->projectile.flags, _projectile_tracer_bit, TRUE);
 
 	return;
 }
@@ -355,7 +355,7 @@ boolean projectile_handle_parent_destroyed(
 		projectile->object.parent_object_index != NONE);
 	projectile->projectile.arming_time = 1.0f;
 	projectile->projectile.detonation_timer = 1.0f;
-	projectile->projectile.flags &= ~FLAG(_projectile_attached_bit);
+	SET_FLAG(projectile->projectile.flags, _projectile_attached_bit, FALSE);
 	object_detach(projectile_index);
 
 	return TRUE;
@@ -447,7 +447,7 @@ boolean projectile_new(
 	projectile = projectile_runtime_get(projectile_index);
 	definition = projectile_definition_get(projectile->definition_index);
 
-	projectile->object.flags |= FLAG(_object_dynamic_lighting_recompute_bit);
+	SET_FLAG(projectile->object.flags, _object_dynamic_lighting_recompute_bit, TRUE);
 	projectile->projectile.flags = FLAG(_projectile_tracer_bit);
 	projectile->projectile.target_object_index = NONE;
 	projectile->projectile.action = 0;
@@ -514,9 +514,8 @@ boolean projectile_new(
 	projectile_export_function_values(projectile_index);
 	projectile_calculate_deceleration(projectile_index);
 
-	projectile->object.flags |=
-		FLAG(_object_shadowless_bit) |
-		FLAG(_object_deleted_when_deactivated_bit);
+	SET_FLAG(projectile->object.flags, _object_shadowless_bit, TRUE);
+	SET_FLAG(projectile->object.flags, _object_deleted_when_deactivated_bit, TRUE);
 
 	return TRUE;
 }
@@ -562,7 +561,7 @@ void projectile_accelerate(
 		&projectile->object.angular_velocity);
 
 	projectile_adjust_for_angular_velocity_change(projectile_index);
-	projectile->object.flags &= ~FLAG(_object_at_rest_bit);
+	SET_FLAG(projectile->object.flags, _object_at_rest_bit, FALSE);
 
 	match_assert_valid_real_vector3d(
 		"c:\\halo\\SOURCE\\items\\projectiles.c",
@@ -605,7 +604,10 @@ static void projectile_adjust_for_angular_velocity_change(
 
 	if (angular_velocity_magnitude != 0.f)
 	{
-		projectile->projectile.flags |= FLAG(_projectile_has_nonzero_angular_velocity_bit);
+		SET_FLAG(
+			projectile->projectile.flags,
+			_projectile_has_nonzero_angular_velocity_bit,
+			TRUE);
 		scale_vector3d(
 			&projectile->object.angular_velocity,
 			1.f / angular_velocity_magnitude,
@@ -615,7 +617,10 @@ static void projectile_adjust_for_angular_velocity_change(
 	}
 	else
 	{
-		projectile->projectile.flags &= ~FLAG(_projectile_has_nonzero_angular_velocity_bit);
+		SET_FLAG(
+			projectile->projectile.flags,
+			_projectile_has_nonzero_angular_velocity_bit,
+			FALSE);
 		projectile->projectile.rotation_sine = 0.f;
 		projectile->projectile.rotation_cosine = 1.f;
 	}
@@ -655,6 +660,9 @@ static void projectile_calculate_deceleration(
 			definition,
 			definition->projectile.air_damage_range_lower_bound,
 			definition->projectile.air_damage_range_upper_bound);
+		/* BUG (preserved for exact matching): January loads the water upper bound
+		 * in the air branch. A corrected build should use
+		 * definition->projectile.air_damage_range_upper_bound. */
 		projectile->projectile.maximum_damage_distance =
 			definition->projectile.water_damage_range_upper_bound;
 
